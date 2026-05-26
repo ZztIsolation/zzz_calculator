@@ -21,6 +21,7 @@ const els = {
     discPicker: document.getElementById("discPicker"),
     agentMeta: document.getElementById("agentMeta"),
     wEngineMeta: document.getElementById("wEngineMeta"),
+    wEngineEffect: document.getElementById("wEngineEffect"),
     agentImage: document.getElementById("agentImage"),
     wEngineImage: document.getElementById("wEngineImage"),
     heroAgentImage: document.getElementById("heroAgentImage"),
@@ -415,6 +416,18 @@ function appliedEffectText(item) {
 
 function nameOf(item) {
     return item?.name?.zhCN ?? item?.name?.en ?? item?.id ?? "-"
+}
+
+function localizedText(value) {
+    if (!value) {
+        return ""
+    }
+
+    if (typeof value === "string") {
+        return value
+    }
+
+    return value.zhCN ?? value.en ?? ""
 }
 
 function escapeHtml(value) {
@@ -955,6 +968,7 @@ function renderAgentMeta(agent, coreSkillLevel = "none") {
 function renderWEngineMeta(wEngine) {
     if (!wEngine) {
         els.wEngineMeta.innerHTML = ""
+        els.wEngineEffect.innerHTML = ""
         return
     }
 
@@ -969,10 +983,85 @@ function renderWEngineMeta(wEngine) {
     ])
 }
 
+function renderWEngineEffect(wEngine) {
+    els.wEngineEffect.innerHTML = ""
+    const effect = wEngineEffectData(wEngine)
+    if (!effect) {
+        const empty = document.createElement("div")
+        empty.className = "list-item empty"
+        empty.textContent = "-"
+        els.wEngineEffect.appendChild(empty)
+        return
+    }
+
+    const requirement = localizedText(effect.requirement?.label)
+        || (effect.requirement?.specialty ? `对于【${enumLabel("specialty", effect.requirement.specialty)}】角色，能够触发以下效果` : "")
+    const description = localizedText(effect.description)
+    const buff = wEngineEffectBuff(wEngine)
+    const stats = effectStatText(effectStats(buff))
+
+    const head = document.createElement("div")
+    head.className = "weapon-effect-head"
+    const eyebrow = document.createElement("span")
+    eyebrow.textContent = "音擎效果"
+    const title = document.createElement("strong")
+    title.textContent = nameOf(effect)
+    head.append(eyebrow, title)
+
+    const body = document.createElement("div")
+    body.className = "weapon-effect-body"
+    if (requirement) {
+        const requirementLine = document.createElement("p")
+        requirementLine.className = "weapon-effect-requirement"
+        requirementLine.textContent = requirement
+        body.appendChild(requirementLine)
+    }
+
+    if (description) {
+        const descriptionLine = document.createElement("p")
+        descriptionLine.textContent = description
+        body.appendChild(descriptionLine)
+    }
+
+    if (stats) {
+        const buffLine = document.createElement("p")
+        buffLine.className = "weapon-effect-buff"
+        buffLine.textContent = `局内 Buff：${stats}`
+        body.appendChild(buffLine)
+    }
+
+    els.wEngineEffect.append(head, body)
+}
+
 function effectStats(effect) {
     return Array.isArray(effect?.stats)
         ? effect.stats
         : effect?.statsByPhase?.["1"] ?? effect?.statsByPhase?.[1] ?? []
+}
+
+function wEngineEffectData(wEngine) {
+    if (wEngine?.effect) {
+        return wEngine.effect
+    }
+
+    if (wEngine?.passive) {
+        return {
+            name: wEngine.passive.name,
+            description: null,
+            requirement: wEngine.specialty
+                ? {
+                    specialty: wEngine.specialty,
+                }
+                : null,
+            buff: wEngine.passive,
+        }
+    }
+
+    return null
+}
+
+function wEngineEffectBuff(wEngine) {
+    return wEngineEffectData(wEngine)?.buff ?? null
 }
 
 function combatBuffsByType(sourceType) {
@@ -981,16 +1070,18 @@ function combatBuffsByType(sourceType) {
 
 function wEnginePassiveBuff() {
     const wEngine = getWEngine(els.wEngineSelect.value)
-    if (!wEngine?.passive || wEngine.passive.scope !== "inCombat") {
+    const effect = wEngineEffectData(wEngine)
+    const buff = wEngineEffectBuff(wEngine)
+    if (!buff || buff.scope !== "inCombat") {
         return null
     }
 
     return {
         id: `wEngine:${wEngine.id}.passive`,
         sourceType: "self",
-        name: wEngine.passive.name ?? wEngine.name,
-        conditionLabel: wEngine.passive.condition,
-        stats: effectStats(wEngine.passive),
+        name: effect?.name ?? buff.name ?? wEngine.name,
+        conditionLabel: localizedText(effect?.requirement?.label) || buff.condition,
+        stats: effectStats(buff),
     }
 }
 
@@ -1321,6 +1412,7 @@ function renderCurrentSelection() {
     setEntityImage(els.wEngineImage, wEngine, "wEngine")
     renderAgentMeta(agent, coreSkillLevel)
     renderWEngineMeta(wEngine)
+    renderWEngineEffect(wEngine)
     renderDiscPicker(agent?.id)
     renderDiscGrid(discs)
     renderCombatBuffControls()
