@@ -2,8 +2,10 @@
   "$schema": "./schemas/w_engines.schema.json",
   "version": 1,
   "notes": [
-    "v1 applies Base ATK and advanced stats only.",
-    "Passive effects are stored for later but not applied to out-of-combat panel calculations unless explicitly marked unconditional outOfCombat."
+    "v1 applies Base ATK and advanced stats to the out-of-combat panel.",
+    "Each W-Engine should carry an effect object with display text and a separate buff object.",
+    "effect.description is for UI display; effect.buff is the structured calculation payload used by the in-combat panel.",
+    "W-Engine effect buffs are not applied to out-of-combat panel calculations unless explicitly marked unconditional outOfCombat."
   ],
   "wEngines": [
     {
@@ -27,34 +29,49 @@
           "mode": "pct"
         }
       },
-      "passive": {
+      "effect": {
         "name": {
+          "zhCN": "In a Flash of Light",
           "en": "In a Flash of Light"
         },
-        "scope": "inCombat",
-        "condition": "specialtyMatch && hitWithDodgeCounterOrAssistAttack",
-        "statsByPhase": {
-          "1": [
-            {
-              "stat": "electricDmg",
-              "value": 0.15,
-              "mode": "flat"
-            },
-            {
-              "stat": "energyRegen",
-              "value": 0.18,
-              "mode": "flat"
-            }
-          ]
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For Stun characters, the following effect can be triggered."
+          }
         },
-        "appliesToOutOfCombatPanel": false
+        "description": {
+          "zhCN": "电属性伤害提升15%；闪避反击或支援攻击命中敌人时，能量自动回复提升18%。",
+          "en": "Electric DMG increases by 15%. When a Dodge Counter or Assist Attack hits an enemy, Energy Regen increases by 18%."
+        },
+        "buff": {
+          "scope": "inCombat",
+          "condition": "specialtyMatch && hitWithDodgeCounterOrAssistAttack",
+          "statsByPhase": {
+            "1": [
+              {
+                "stat": "electricDmg",
+                "value": 0.15,
+                "mode": "flat"
+              },
+              {
+                "stat": "energyRegen",
+                "value": 0.18,
+                "mode": "flat"
+              }
+            ]
+          },
+          "appliesToOutOfCombatPanel": false
+        }
       },
       "sources": [
         "https://zenless-zone-zero.fandom.com/wiki/Demara_Battery_Mark_II"
       ],
       "verification": {
         "level60Stats": "source-checked",
-        "passive": "source-checked"
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
       }
     },
     {
@@ -78,45 +95,59 @@
           "mode": "flat"
         }
       },
-      "passive": {
+      "effect": {
         "name": {
           "zhCN": "玉魄冰心",
           "en": "Jade Heart of Ice"
         },
-        "scope": "inCombat",
-        "condition": null,
-        "phase": 1,
-        "statsByPhase": {
-          "1": [
-            {
-              "stat": "physicalResIgnore",
-              "value": 0.2,
-              "mode": "flat"
-            },
-            {
-              "stat": "dmgBonus",
-              "value": 0.25,
-              "mode": "flat"
-            },
-            {
-              "stat": "critDmg",
-              "value": 0.25,
-              "mode": "flat"
-            }
-          ]
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For Attack characters, the following effect can be triggered."
+          }
         },
-        "appliesToOutOfCombatPanel": false,
-        "notes": [
-          "Modeled at phase 1 only.",
-          "Duration and trigger are intentionally ignored for the next combat-damage milestone."
-        ]
+        "description": {
+          "zhCN": "装备者造成的伤害无视目标20%物理属性伤害抗性；装备者开启【以太帷幕】时，自身造成的伤害提升25%，暴击伤害提升25%，持续40秒，重复触发时刷新持续时间。",
+          "en": "The equipper's damage ignores 20% Physical RES. When the equipper activates Ether Veil, their DMG increases by 25% and CRIT DMG increases by 25% for 40s. Repeated triggers refresh the duration."
+        },
+        "buff": {
+          "scope": "inCombat",
+          "condition": "etherVeil",
+          "phase": 1,
+          "statsByPhase": {
+            "1": [
+              {
+                "stat": "physicalResIgnore",
+                "value": 0.2,
+                "mode": "flat"
+              },
+              {
+                "stat": "dmgBonus",
+                "value": 0.25,
+                "mode": "flat"
+              },
+              {
+                "stat": "critDmg",
+                "value": 0.25,
+                "mode": "flat"
+              }
+            ]
+          },
+          "appliesToOutOfCombatPanel": false,
+          "notes": [
+            "Modeled at phase 1 only.",
+            "The in-combat panel uses one checkbox for the whole W-Engine effect. Duration refresh is display-only until timeline modeling exists."
+          ]
+        }
       },
       "sources": [
         "https://wiki.biligame.com/zzz/%E4%BA%91%E9%9C%93%E5%AD%A4%E5%85%89"
       ],
       "verification": {
         "level60Stats": "source-checked",
-        "phase1Passive": "source-checked"
+        "effectText": "from-provided-screenshot",
+        "phase1EffectBuff": "source-checked"
       }
     }
   ]
