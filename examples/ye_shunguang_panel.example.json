@@ -1,0 +1,324 @@
+{
+  "$schema": "./schemas/out_of_combat_panel_example.schema.json",
+  "version": 1,
+  "description": "Ye Shunguang + Cloudcleave Radiance snapshot using the six in-game Drive Discs from the provided screenshots.",
+  "input": {
+    "agentId": "ye_shunguang",
+    "agentLevel": 60,
+    "coreSkillLevel": "F",
+    "wEngineId": "cloudcleave_radiance",
+    "wEngineLevel": 60,
+    "driveDiscs": [
+      {
+        "id": "scanner-13-2a399ce54a6d",
+        "setId": "scanner-set-fcf8ae93d798",
+        "setName": "沧浪行歌",
+        "partition": 1,
+        "rarity": "S",
+        "level": 15,
+        "maxLevel": 15,
+        "mainStat": {
+          "stat": "hpFlat",
+          "value": 2200,
+          "mode": "flat"
+        },
+        "subStats": [
+          {
+            "stat": "critRate",
+            "value": 0.072,
+            "mode": "pct"
+          },
+          {
+            "stat": "critDmg",
+            "value": 0.096,
+            "mode": "pct"
+          },
+          {
+            "stat": "penFlat",
+            "value": 9,
+            "mode": "flat"
+          },
+          {
+            "stat": "atkPct",
+            "value": 0.06,
+            "mode": "pct"
+          }
+        ]
+      },
+      {
+        "id": "scanner-24-4aaaab72872d",
+        "setId": "scanner-set-fcf8ae93d798",
+        "setName": "沧浪行歌",
+        "partition": 2,
+        "rarity": "S",
+        "level": 15,
+        "maxLevel": 15,
+        "mainStat": {
+          "stat": "atkFlat",
+          "value": 316,
+          "mode": "flat"
+        },
+        "subStats": [
+          {
+            "stat": "critRate",
+            "value": 0.024,
+            "mode": "pct"
+          },
+          {
+            "stat": "critDmg",
+            "value": 0.096,
+            "mode": "pct"
+          },
+          {
+            "stat": "hpFlat",
+            "value": 224,
+            "mode": "flat"
+          },
+          {
+            "stat": "atkPct",
+            "value": 0.09,
+            "mode": "pct"
+          }
+        ]
+      },
+      {
+        "id": "ye-shunguang-screenshot-disc-3",
+        "setId": "scanner-set-48ee0a14625f",
+        "setName": "折枝剑歌",
+        "partition": 3,
+        "rarity": "S",
+        "level": 15,
+        "maxLevel": 15,
+        "mainStat": {
+          "stat": "defFlat",
+          "value": 184,
+          "mode": "flat"
+        },
+        "subStats": [
+          {
+            "stat": "atkPct",
+            "value": 0.12,
+            "mode": "pct"
+          },
+          {
+            "stat": "critDmg",
+            "value": 0.096,
+            "mode": "pct"
+          },
+          {
+            "stat": "critRate",
+            "value": 0.024,
+            "mode": "pct"
+          },
+          {
+            "stat": "penFlat",
+            "value": 9,
+            "mode": "flat"
+          }
+        ]
+      },
+      {
+        "id": "scanner-34-c38c1321bfea",
+        "setId": "scanner-set-fcf8ae93d798",
+        "setName": "沧浪行歌",
+        "partition": 4,
+        "rarity": "S",
+        "level": 15,
+        "maxLevel": 15,
+        "mainStat": {
+          "stat": "critDmg",
+          "value": 0.48,
+          "mode": "pct"
+        },
+        "subStats": [
+          {
+            "stat": "atkFlat",
+            "value": 38,
+            "mode": "flat"
+          },
+          {
+            "stat": "critRate",
+            "value": 0.096,
+            "mode": "pct"
+          },
+          {
+            "stat": "atkPct",
+            "value": 0.06,
+            "mode": "pct"
+          },
+          {
+            "stat": "hpPct",
+            "value": 0.03,
+            "mode": "pct"
+          }
+        ]
+      },
+      {
+        "id": "scanner-40-e7852a13cf2a",
+        "setId": "scanner-set-fcf8ae93d798",
+        "setName": "沧浪行歌",
+        "partition": 5,
+        "rarity": "S",
+        "level": 15,
+        "maxLevel": 15,
+        "mainStat": {
+          "stat": "atkPct",
+          "value": 0.3,
+          "mode": "pct"
+        },
+        "subStats": [
+          {
+            "stat": "defFlat",
+            "value": 30,
+            "mode": "flat"
+          },
+          {
+            "stat": "defPct",
+            "value": 0.096,
+            "mode": "pct"
+          },
+          {
+            "stat": "critRate",
+            "value": 0.024,
+            "mode": "pct"
+          },
+          {
+            "stat": "critDmg",
+            "value": 0.144,
+            "mode": "pct"
+          }
+        ]
+      },
+      {
+        "id": "ye-shunguang-screenshot-disc-6",
+        "setId": "scanner-set-48ee0a14625f",
+        "setName": "折枝剑歌",
+        "partition": 6,
+        "rarity": "S",
+        "level": 15,
+        "maxLevel": 15,
+        "mainStat": {
+          "stat": "atkPct",
+          "value": 0.3,
+          "mode": "pct"
+        },
+        "subStats": [
+          {
+            "stat": "defPct",
+            "value": 0.048,
+            "mode": "pct"
+          },
+          {
+            "stat": "hpFlat",
+            "value": 112,
+            "mode": "flat"
+          },
+          {
+            "stat": "critDmg",
+            "value": 0.144,
+            "mode": "pct"
+          },
+          {
+            "stat": "critRate",
+            "value": 0.072,
+            "mode": "pct"
+          }
+        ]
+      }
+    ]
+  },
+  "expectedAppliedSetEffects": [
+    "ye_shunguang.coreSkill.A",
+    "ye_shunguang.coreSkill.B",
+    "ye_shunguang.coreSkill.C",
+    "ye_shunguang.coreSkill.D",
+    "ye_shunguang.coreSkill.E",
+    "ye_shunguang.coreSkill.F",
+    "scanner-set-fcf8ae93d798.twoPiece",
+    "scanner-set-48ee0a14625f.twoPiece"
+  ],
+  "expectedIgnoredEffects": [
+    "scanner-set-fcf8ae93d798.fourPiece",
+    "scanner-set-48ee0a14625f.fourPiece",
+    "cloudcleave_radiance.passive"
+  ],
+  "expectedOutput": {
+    "base": {
+      "hp": 7673,
+      "atk": 1681,
+      "def": 606
+    },
+    "baseBreakdown": {
+      "agent": {
+        "hp": 7673,
+        "atk": 863,
+        "def": 606
+      },
+      "wEngine": {
+        "hp": 0,
+        "atk": 743,
+        "def": 0
+      },
+      "coreSkill": {
+        "hp": 0,
+        "atk": 75,
+        "def": 0
+      },
+      "total": {
+        "hp": 7673,
+        "atk": 1681,
+        "def": 606
+      }
+    },
+    "bonusTotals": {
+      "hpFlat": 2536,
+      "hpPct": 0.03,
+      "atkFlat": 354,
+      "atkPct": 0.93,
+      "defFlat": 214,
+      "defPct": 0.144,
+      "critRate": 0.456,
+      "critDmg": 1.696,
+      "impactPct": 0,
+      "impactFlat": 0,
+      "anomalyProficiencyFlat": 0,
+      "anomalyMasteryFlat": 0,
+      "energyRegenPct": 0,
+      "penFlat": 18,
+      "penRatio": 0,
+      "physicalResIgnore": 0,
+      "dmgBonus": 0,
+      "physicalDmg": 0.1,
+      "fireDmg": 0,
+      "iceDmg": 0,
+      "electricDmg": 0,
+      "etherDmg": 0
+    },
+    "panel": {
+      "hp": 10439.19,
+      "atk": 3598.33,
+      "def": 907.264,
+      "critRate": 0.506,
+      "critDmg": 2.196,
+      "impact": 83,
+      "anomalyProficiency": 93,
+      "anomalyMastery": 94,
+      "energyRegen": 1.2,
+      "penFlat": 18,
+      "penRatio": 0,
+      "physicalResIgnore": 0,
+      "dmgBonus": 0,
+      "physicalDmg": 0.1,
+      "fireDmg": 0,
+      "iceDmg": 0,
+      "electricDmg": 0,
+      "etherDmg": 0
+    },
+    "selectedDmgBonus": 0.1,
+    "simpleTargetScore": 8356.378729688
+  },
+  "verification": {
+    "purpose": "Use this snapshot to validate Ye Shunguang's out-of-combat panel against the provided Drive Disc screenshots.",
+    "warning": "Cloudcleave Radiance passive and conditional 4-piece effects are intentionally excluded from out-of-combat panel output."
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "zzz_calculator",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "node backend/server.js",
+    "start": "node backend/server.js"
+  }
+}
+

@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>驱动盘仓库 | ZZZ 驱动盘计算器</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <img class="brand-mark" src="/zzz-mark.svg" alt="ZZZ">
+        <div>
+          <div class="brand-name">绝区零计算器</div>
+          <div class="brand-sub">驱动盘 · 音擎 · 局外面板</div>
+        </div>
+      </div>
+
+      <nav class="side-nav">
+        <a href="/" class="nav-item">首页</a>
+        <a href="/#agent-section" class="nav-item">角色</a>
+        <a href="/#weapon-section" class="nav-item">音擎</a>
+        <a href="/drive-discs.html" class="nav-item active">驱动盘</a>
+        <a href="/#panel-section" class="nav-item">面板</a>
+        <a href="/#effects-section" class="nav-item">效果</a>
+        <a href="/#advanced-section" class="nav-item">数据</a>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="mini-chip" id="status">加载中</div>
+        <div class="mini-note">用户仓库 · 导入与维护</div>
+      </div>
+    </aside>
+
+    <main class="content inventory-content">
+      <header class="page-header" id="page-top">
+        <div class="title-block">
+          <div class="eyebrow">DRIVE DISC INVENTORY</div>
+          <h1>驱动盘仓库</h1>
+          <p>导入、筛选、查看和维护驱动盘</p>
+        </div>
+        <div class="header-actions">
+          <button id="newDiscBtn" type="button" class="primary-btn">+ 新增</button>
+          <button id="refreshBtn" type="button" class="ghost-btn">刷新</button>
+        </div>
+      </header>
+
+      <section class="inventory-shell">
+        <div class="inventory-topline">
+          <div>
+            <h2>驱动盘（<span id="totalCount">0</span>）</h2>
+            <p><span id="setCount">0 套</span> · <span id="importCount">0 次导入</span></p>
+          </div>
+          <div class="inventory-actions">
+            <button id="importPanelToggle" type="button" class="ghost-btn">导入</button>
+            <button id="clearImportBtn" type="button" class="ghost-btn">清空输入</button>
+            <button id="importBtn" type="button" class="primary-btn">导入到仓库</button>
+          </div>
+        </div>
+
+        <section id="importPanel" class="import-panel" hidden>
+          <div class="import-grid">
+            <label class="field">
+              <span>本地导出路径</span>
+              <input id="importPathInput" value="E:\yan1\ZZZ-Scanner-master\ZZZ-Scanner.Next\publish-dpi-fix\Scans\2026-05-26-19-12-09\export.json">
+            </label>
+            <label class="field">
+              <span>选择 JSON 文件</span>
+              <input id="importFileInput" type="file" accept=".json,application/json">
+            </label>
+          </div>
+          <label class="field import-text-field">
+            <span>或粘贴 ZZZ Scanner 导出 JSON</span>
+            <textarea id="importTextarea" spellcheck="false" placeholder="粘贴 export.json 内容，或保留为空并使用上方路径导入"></textarea>
+          </label>
+        </section>
+
+        <div class="inventory-filter-row">
+          <label class="field">
+            <span>套装</span>
+            <select id="setFilter">
+              <option value="">全部</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>主词条</span>
+            <select id="mainStatFilter">
+              <option value="">全部</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>搜索</span>
+            <input id="searchInput" placeholder="套装、属性、ID">
+          </label>
+          <label class="field">
+            <span>排序</span>
+            <select id="sortSelect">
+              <option value="sequence">导入顺序</option>
+              <option value="slot">槽位</option>
+              <option value="setName">套装名</option>
+              <option value="level">等级</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="slot-tabs" id="slotTabs" aria-label="驱动盘槽位筛选">
+          <button type="button" class="active" data-slot="">全部</button>
+          <button type="button" data-slot="1">1</button>
+          <button type="button" data-slot="2">2</button>
+          <button type="button" data-slot="3">3</button>
+          <button type="button" data-slot="4">4</button>
+          <button type="button" data-slot="5">5</button>
+          <button type="button" data-slot="6">6</button>
+        </div>
+        <select id="slotFilter" hidden>
+          <option value="">全部</option>
+          <option value="1">1号位</option>
+          <option value="2">2号位</option>
+          <option value="3">3号位</option>
+          <option value="4">4号位</option>
+          <option value="5">5号位</option>
+          <option value="6">6号位</option>
+        </select>
+
+        <div class="disc-table-wrap clean-table-wrap">
+          <table class="disc-table clean-disc-table">
+            <thead>
+              <tr>
+                <th>驱动盘</th>
+                <th>槽位</th>
+                <th>等级</th>
+                <th>主词条</th>
+                <th>副词条</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="discTableBody"></tbody>
+          </table>
+        </div>
+        <div id="emptyInventory" class="inventory-empty" hidden>
+          <img src="/assets/drive-discs/empty.svg" alt="">
+          <strong>No Data</strong>
+          <span>暂无符合筛选条件的驱动盘</span>
+        </div>
+        <div class="inventory-footline">
+          <span id="filteredCount">-</span>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="discModal" class="modal-layer" hidden>
+    <div class="modal-scrim" data-close-modal></div>
+    <section class="disc-modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button id="closeDiscModalBtn" type="button" class="modal-close" aria-label="关闭">×</button>
+      <header class="modal-head">
+        <div>
+          <h2 id="modalTitle">添加驱动盘</h2>
+          <p id="selectedTag">选择套装、槽位和词条</p>
+        </div>
+        <div class="modal-actions">
+          <button id="deleteDiscBtn" type="button" class="danger-btn">删除</button>
+          <button id="saveDiscBtn" type="submit" form="discForm" class="primary-btn">保存</button>
+        </div>
+      </header>
+
+      <form id="discForm" class="disc-editor modal-editor">
+        <input id="discIdInput" type="hidden">
+        <input id="setNameInput" type="hidden" required>
+        <select id="partitionInput" hidden>
+          <option value="1">1号位</option>
+          <option value="2">2号位</option>
+          <option value="3">3号位</option>
+          <option value="4">4号位</option>
+          <option value="5">5号位</option>
+          <option value="6">6号位</option>
+        </select>
+        <select id="rarityInput" hidden>
+          <option value="S">S</option>
+          <option value="A">A</option>
+          <option value="B">B</option>
+        </select>
+        <input id="maxLevelInput" type="hidden" value="15">
+        <input id="equippedByInput" type="hidden">
+        <input id="lockedInput" type="checkbox" hidden>
+
+        <section class="modal-section">
+          <h3>驱动盘套装</h3>
+          <div id="setGrid" class="set-palette"></div>
+        </section>
+
+        <section class="modal-section">
+          <h3>驱动盘位置</h3>
+          <div id="partitionGrid" class="partition-palette"></div>
+        </section>
+
+        <section class="modal-form-grid">
+          <div class="modal-section">
+            <h3>品质</h3>
+            <div id="rarityButtons" class="rarity-buttons">
+              <button type="button" data-rarity="S" class="active">★★★★★</button>
+              <button type="button" data-rarity="A">★★★★</button>
+              <button type="button" data-rarity="B">★★★</button>
+            </div>
+          </div>
+
+          <div class="modal-section">
+            <h3>等级</h3>
+            <div class="level-control">
+              <input id="levelRange" type="range" min="0" max="15" value="15">
+              <div class="stepper">
+                <button id="levelMinusBtn" type="button">−</button>
+                <input id="levelInput" type="number" min="0" max="15" step="1" value="15">
+                <button id="levelPlusBtn" type="button">+</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="modal-form-grid">
+          <div class="modal-section">
+            <h3>主词条</h3>
+            <div class="stat-editor-row">
+              <label class="field">
+                <span>属性</span>
+                <select id="mainStatSelect"></select>
+              </label>
+              <label class="field">
+                <span>数值</span>
+                <input id="mainStatValueInput" type="number" step="0.1">
+              </label>
+            </div>
+          </div>
+
+          <div class="modal-section">
+            <h3>副词条</h3>
+            <div id="subStatEditors" class="substat-editor"></div>
+          </div>
+        </section>
+      </form>
+
+      <pre id="rawPreview" class="raw modal-raw"></pre>
+    </section>
+  </div>
+
+  <script type="module" src="/drive-discs.js"></script>
+</body>
+</html>

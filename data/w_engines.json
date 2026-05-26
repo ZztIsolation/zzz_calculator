@@ -1,0 +1,123 @@
+{
+  "$schema": "./schemas/w_engines.schema.json",
+  "version": 1,
+  "notes": [
+    "v1 applies Base ATK and advanced stats only.",
+    "Passive effects are stored for later but not applied to out-of-combat panel calculations unless explicitly marked unconditional outOfCombat."
+  ],
+  "wEngines": [
+    {
+      "id": "demara_battery_mark_ii",
+      "name": {
+        "en": "Demara Battery Mark II",
+        "zhCN": "德玛拉电池II型"
+      },
+      "rarity": "A",
+      "specialty": "stun",
+      "attribute": "electric",
+      "images": {
+        "icon": "/assets/w-engines/demara_battery_mark_ii.webp",
+        "source": "https://zenless-zone-zero.fandom.com/wiki/File:W-Engine_Demara_Battery_Mark_II.png"
+      },
+      "level60": {
+        "atkBase": 624,
+        "advancedStat": {
+          "stat": "impact",
+          "value": 0.15,
+          "mode": "pct"
+        }
+      },
+      "passive": {
+        "name": {
+          "en": "In a Flash of Light"
+        },
+        "scope": "inCombat",
+        "condition": "specialtyMatch && hitWithDodgeCounterOrAssistAttack",
+        "statsByPhase": {
+          "1": [
+            {
+              "stat": "electricDmg",
+              "value": 0.15,
+              "mode": "flat"
+            },
+            {
+              "stat": "energyRegen",
+              "value": 0.18,
+              "mode": "flat"
+            }
+          ]
+        },
+        "appliesToOutOfCombatPanel": false
+      },
+      "sources": [
+        "https://zenless-zone-zero.fandom.com/wiki/Demara_Battery_Mark_II"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "passive": "source-checked"
+      }
+    },
+    {
+      "id": "cloudcleave_radiance",
+      "name": {
+        "en": "Cloudcleave Radiance",
+        "zhCN": "云霓孤光"
+      },
+      "rarity": "S",
+      "specialty": "attack",
+      "relatedAgentId": "ye_shunguang",
+      "images": {
+        "icon": "/assets/w-engines/cloudcleave_radiance.webp",
+        "source": "https://zenless-zone-zero.fandom.com/wiki/File:W-Engine_Cloudcleave_Radiance.png"
+      },
+      "level60": {
+        "atkBase": 743,
+        "advancedStat": {
+          "stat": "critDmg",
+          "value": 0.48,
+          "mode": "flat"
+        }
+      },
+      "passive": {
+        "name": {
+          "zhCN": "玉魄冰心",
+          "en": "Jade Heart of Ice"
+        },
+        "scope": "inCombat",
+        "condition": null,
+        "phase": 1,
+        "statsByPhase": {
+          "1": [
+            {
+              "stat": "physicalResIgnore",
+              "value": 0.2,
+              "mode": "flat"
+            },
+            {
+              "stat": "dmgBonus",
+              "value": 0.25,
+              "mode": "flat"
+            },
+            {
+              "stat": "critDmg",
+              "value": 0.25,
+              "mode": "flat"
+            }
+          ]
+        },
+        "appliesToOutOfCombatPanel": false,
+        "notes": [
+          "Modeled at phase 1 only.",
+          "Duration and trigger are intentionally ignored for the next combat-damage milestone."
+        ]
+      },
+      "sources": [
+        "https://wiki.biligame.com/zzz/%E4%BA%91%E9%9C%93%E5%AD%A4%E5%85%89"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "phase1Passive": "source-checked"
+      }
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "$schema": "./schemas/combat_buffs.schema.json",
+  "version": 1,
+  "notes": [
+    "Generic in-combat buff catalog. Verified W-Engine passives and Drive Disc 4-piece effects remain in their existing source files and are exposed as runtime candidates.",
+    "Visible self, teammate, boss, and field buffs should only be added after their values are verified. Until then, use manual corrections from the frontend.",
+    "Hidden entries exist only for backend validation of different percentage attack bases."
+  ],
+  "buffs": [
+    {
+      "id": "manual.test.base_atk_pct_10",
+      "hidden": true,
+      "sourceType": "manual",
+      "scope": "inCombat",
+      "name": {
+        "zhCN": "校验：基础攻击力 +10%",
+        "en": "Validation: Base ATK +10%"
+      },
+      "conditionLabel": "隐藏校验项",
+      "stats": [
+        {
+          "stat": "atkPct",
+          "value": 0.1,
+          "mode": "pct",
+          "basis": "baseAtk"
+        }
+      ]
+    },
+    {
+      "id": "manual.test.out_of_combat_atk_pct_10",
+      "hidden": true,
+      "sourceType": "manual",
+      "scope": "inCombat",
+      "name": {
+        "zhCN": "校验：局外攻击力 +10%",
+        "en": "Validation: Out-of-Combat ATK +10%"
+      },
+      "conditionLabel": "隐藏校验项",
+      "stats": [
+        {
+          "stat": "atkPct",
+          "value": 0.1,
+          "mode": "pct",
+          "basis": "outOfCombatAtk"
+        }
+      ]
+    }
+  ]
+}

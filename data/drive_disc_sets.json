@@ -1,0 +1,294 @@
+{
+  "$schema": "./schemas/drive_disc_sets.schema.json",
+  "version": 1,
+  "notes": [
+    "Only effects with scope outOfCombat and condition null should affect v1 panel calculations.",
+    "In-combat 4-piece effects are recorded but intentionally ignored by the v1 out-of-combat panel.",
+    "Image-only entries are kept so imported inventory can show set art before full set-effect modeling is added."
+  ],
+  "sets": [
+    {
+      "id": "woodpecker_electro",
+      "name": {
+        "en": "Woodpecker Electro",
+        "zhCN": "啄木鸟电音"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/woodpecker_electro.webp",
+        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_Woodpecker_Electro_S.png"
+      },
+      "twoPiece": {
+        "scope": "outOfCombat",
+        "condition": null,
+        "stats": [
+          {
+            "stat": "critRate",
+            "value": 0.08,
+            "mode": "flat"
+          }
+        ]
+      },
+      "fourPiece": {
+        "scope": "inCombat",
+        "condition": "criticalHitWithBasicAttackOrDodgeCounterOrExSpecialAttack",
+        "stats": [
+          {
+            "stat": "atkPct",
+            "value": 0.09,
+            "mode": "pct"
+          }
+        ],
+        "durationSeconds": 6,
+        "appliesToOutOfCombatPanel": false
+      },
+      "sources": [
+        "https://zenless-zone-zero.fandom.com/wiki/Woodpecker_Electro"
+      ]
+    },
+    {
+      "id": "swing_jazz",
+      "name": {
+        "en": "Swing Jazz",
+        "zhCN": "摇摆爵士"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/swing_jazz.webp",
+        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_Swing_Jazz_S.png"
+      },
+      "twoPiece": {
+        "scope": "outOfCombat",
+        "condition": null,
+        "stats": [
+          {
+            "stat": "energyRegen",
+            "value": 0.2,
+            "mode": "pct"
+          }
+        ]
+      },
+      "fourPiece": {
+        "scope": "inCombat",
+        "condition": "launchChainAttackOrUltimate",
+        "stats": [
+          {
+            "stat": "dmgBonus",
+            "value": 0.15,
+            "mode": "flat"
+          }
+        ],
+        "durationSeconds": 12,
+        "appliesToOutOfCombatPanel": false
+      },
+      "sources": [
+        "https://zenless-zone-zero.fandom.com/wiki/Swing_Jazz"
+      ]
+    },
+    {
+      "id": "hormone_punk",
+      "name": {
+        "en": "Hormone Punk",
+        "zhCN": "激素朋克"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/hormone_punk.webp",
+        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_Hormone_Punk_S.png"
+      },
+      "twoPiece": {
+        "scope": "outOfCombat",
+        "condition": null,
+        "stats": [
+          {
+            "stat": "atkPct",
+            "value": 0.1,
+            "mode": "pct"
+          }
+        ]
+      },
+      "fourPiece": {
+        "scope": "inCombat",
+        "condition": "enterCombatOrSwitchIn",
+        "stats": [
+          {
+            "stat": "atkPct",
+            "value": 0.25,
+            "mode": "pct"
+          }
+        ],
+        "durationSeconds": 10,
+        "cooldownSeconds": 20,
+        "appliesToOutOfCombatPanel": false
+      },
+      "sources": [
+        "https://zenless-zone-zero.fandom.com/wiki/Hormone_Punk"
+      ]
+    },
+    {
+      "id": "scanner-set-fcf8ae93d798",
+      "name": {
+        "en": "White Water Ballad",
+        "zhCN": "沧浪行歌"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/white_water_ballad.webp",
+        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_White_Water_Ballad_S.png"
+      },
+      "twoPiece": {
+        "scope": "outOfCombat",
+        "condition": null,
+        "stats": [
+          {
+            "stat": "physicalDmg",
+            "value": 0.1,
+            "mode": "flat"
+          }
+        ]
+      },
+      "fourPiece": {
+        "scope": "inCombat",
+        "condition": "etherVeil",
+        "stats": [
+          {
+            "stat": "critRate",
+            "value": 0.1,
+            "mode": "flat"
+          },
+          {
+            "stat": "atkPct",
+            "value": 0.1,
+            "mode": "pct"
+          }
+        ],
+        "appliesToOutOfCombatPanel": false
+      },
+      "sources": [
+        "https://game8.co/games/Zenless-Zone-Zero/archives/572095"
+      ]
+    },
+    {
+      "id": "scanner-set-48ee0a14625f",
+      "name": {
+        "en": "Branch & Blade Song",
+        "zhCN": "折枝剑歌"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/branch_blade_song.webp",
+        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_Branch_%26_Blade_Song_S.png"
+      },
+      "twoPiece": {
+        "scope": "outOfCombat",
+        "condition": null,
+        "stats": [
+          {
+            "stat": "critDmg",
+            "value": 0.16,
+            "mode": "flat"
+          }
+        ]
+      },
+      "fourPiece": {
+        "scope": "inCombat",
+        "condition": "anomalyMasteryAtLeast115Or150",
+        "stats": [
+          {
+            "stat": "critDmg",
+            "value": 0.3,
+            "mode": "flat"
+          },
+          {
+            "stat": "critRate",
+            "value": 0.12,
+            "mode": "flat"
+          }
+        ],
+        "appliesToOutOfCombatPanel": false
+      },
+      "sources": [
+        "https://game8.co/games/Zenless-Zone-Zero/archives/488264"
+      ]
+    },
+    {
+      "id": "astral_voice",
+      "name": {
+        "en": "Astral Voice",
+        "zhCN": "流光咏叹"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/astral_voice.webp",
+        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_Astral_Voice_S.png"
+      },
+      "sources": [
+        "https://zenless-zone-zero.fandom.com/wiki/Astral_Voice"
+      ]
+    },
+    {
+      "id": "phaethons_melody",
+      "name": {
+        "en": "Phaethon's Melody",
+        "zhCN": "法厄同之歌"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/phaethons_melody.webp",
+        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_Phaethon%27s_Melody_S.png"
+      },
+      "sources": [
+        "https://zenless-zone-zero.fandom.com/wiki/Phaethon's_Melody"
+      ]
+    },
+    {
+      "id": "yunkui_tales",
+      "name": {
+        "en": "Yunkui Tales",
+        "zhCN": "云岿如我"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/yunkui_tales.webp",
+        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_Yunkui_Tales_S.png"
+      },
+      "sources": [
+        "https://zenless-zone-zero.fandom.com/wiki/Yunkui_Tales"
+      ]
+    },
+    {
+      "id": "moonlight_lullaby",
+      "name": {
+        "en": "Moonlight Lullaby",
+        "zhCN": "月光骑士颂"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/moonlight_lullaby.webp",
+        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_Moonlight_Lullaby_S.png"
+      },
+      "sources": [
+        "https://zenless-zone-zero.fandom.com/wiki/Moonlight_Lullaby"
+      ]
+    },
+    {
+      "id": "shadow_harmony",
+      "name": {
+        "en": "Shadow Harmony",
+        "zhCN": "如影相随"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/shadow_harmony.webp",
+        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_Shadow_Harmony_S.png"
+      },
+      "sources": [
+        "https://zenless-zone-zero.fandom.com/wiki/Shadow_Harmony"
+      ]
+    },
+    {
+      "id": "king_of_the_summit",
+      "name": {
+        "en": "King of the Summit",
+        "zhCN": "山大王"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/king_of_the_summit.webp",
+        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_King_of_the_Summit_S.png"
+      },
+      "sources": [
+        "https://zenless-zone-zero.fandom.com/wiki/King_of_the_Summit"
+      ]
+    }
+  ]
+}

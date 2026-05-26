@@ -1,0 +1,206 @@
+{
+  "$schema": "./schemas/agents.schema.json",
+  "version": 1,
+  "notes": [
+    "v1 stores only level 60 values.",
+    "HP, ATK, and DEF should be verified against in-game panels before a production calculator release.",
+    "Non-HP/ATK/DEF defaults are included to make panel examples deterministic and should be screenshot-verified later."
+  ],
+  "agents": [
+    {
+      "id": "anby_demara",
+      "name": {
+        "en": "Anby Demara",
+        "zhCN": "安比"
+      },
+      "rarity": "A",
+      "attribute": "electric",
+      "specialty": "stun",
+      "attackTypes": ["slash"],
+      "faction": "cunning_hares",
+      "images": {
+        "portrait": "/assets/agents/anby_demara.webp",
+        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Agent_Anby_Demara_Portrait.png"
+      },
+      "level60": {
+        "hpBase": 7500,
+        "atkBase": 583,
+        "defBase": 612,
+        "critRate": 0.05,
+        "critDmg": 0.5,
+        "impact": 118,
+        "anomalyProficiency": 94,
+        "anomalyMastery": 93,
+        "energyRegen": 1.2
+      },
+      "sources": [
+        "https://zenless-zone-zero.fandom.com/wiki/Anby_Demara"
+      ],
+      "verification": {
+        "level60HpAtkDef": "source-checked",
+        "otherPanelDefaults": "needs-screenshot"
+      }
+    },
+    {
+      "id": "ye_shunguang",
+      "name": {
+        "en": "Ye Shunguang",
+        "zhCN": "叶瞬光"
+      },
+      "rarity": "S",
+      "attribute": "honed_edge",
+      "damageElement": "physical",
+      "specialty": "attack",
+      "attackTypes": ["slash"],
+      "faction": "yunkui_summit",
+      "images": {
+        "portrait": "/assets/agents/ye_shunguang.webp",
+        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Agent_Ye_Shunguang_Portrait.png"
+      },
+      "level60": {
+        "hpBase": 7673,
+        "atkBase": 863,
+        "defBase": 606,
+        "critRate": 0.05,
+        "critDmg": 0.5,
+        "impact": 83,
+        "anomalyProficiency": 93,
+        "anomalyMastery": 94,
+        "energyRegen": 1.2,
+        "penRatio": 0
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "照破无明"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 0.048,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 0.048,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 0.048,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "sources": [
+          "user-provided-screenshot-2026-05-27"
+        ],
+        "verification": {
+          "stats": "source-checked-from-user-screenshot",
+          "skillLevelBonuses": "stored-but-not-used-in-panel"
+        }
+      },
+      "sources": [
+        "https://wiki.biligame.com/zzz/%E5%8F%B6%E7%9E%AC%E5%85%89"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "panelDefaults": "source-checked",
+        "damageElement": "modeled-from-physical-resistance-wording"
+      }
+    }
+  ]
+}

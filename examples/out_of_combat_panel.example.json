@@ -1,0 +1,180 @@
+{
+  "$schema": "./schemas/out_of_combat_panel_example.schema.json",
+  "version": 1,
+  "description": "A deterministic Anby example for validating v1 out-of-combat panel math.",
+  "input": {
+    "agentId": "anby_demara",
+    "agentLevel": 60,
+    "wEngineId": "demara_battery_mark_ii",
+    "wEngineLevel": 60,
+    "driveDiscs": [
+      {
+        "id": "example_disc_1",
+        "setId": "woodpecker_electro",
+        "partition": 1,
+        "rarity": "S",
+        "level": 15,
+        "mainStat": { "stat": "hpFlat", "value": 2200 },
+        "subStats": [
+          { "stat": "atkPct", "value": 0.03 },
+          { "stat": "critRate", "value": 0.024 },
+          { "stat": "critDmg", "value": 0.048 },
+          { "stat": "atkFlat", "value": 19 }
+        ]
+      },
+      {
+        "id": "example_disc_2",
+        "setId": "woodpecker_electro",
+        "partition": 2,
+        "rarity": "S",
+        "level": 15,
+        "mainStat": { "stat": "atkFlat", "value": 316 },
+        "subStats": [
+          { "stat": "hpPct", "value": 0.03 },
+          { "stat": "critRate", "value": 0.024 },
+          { "stat": "critDmg", "value": 0.048 },
+          { "stat": "penFlat", "value": 9 }
+        ]
+      },
+      {
+        "id": "example_disc_3",
+        "setId": "swing_jazz",
+        "partition": 3,
+        "rarity": "S",
+        "level": 15,
+        "mainStat": { "stat": "defFlat", "value": 184 },
+        "subStats": [
+          { "stat": "atkPct", "value": 0.03 },
+          { "stat": "hpFlat", "value": 112 },
+          { "stat": "defPct", "value": 0.048 },
+          { "stat": "anomalyProficiency", "value": 9 }
+        ]
+      },
+      {
+        "id": "example_disc_4",
+        "setId": "swing_jazz",
+        "partition": 4,
+        "rarity": "S",
+        "level": 15,
+        "mainStat": { "stat": "critRate", "value": 0.24 },
+        "subStats": [
+          { "stat": "atkFlat", "value": 19 },
+          { "stat": "critDmg", "value": 0.048 },
+          { "stat": "atkPct", "value": 0.03 },
+          { "stat": "hpPct", "value": 0.03 }
+        ]
+      },
+      {
+        "id": "example_disc_5",
+        "setId": "hormone_punk",
+        "partition": 5,
+        "rarity": "S",
+        "level": 15,
+        "mainStat": { "stat": "electricDmg", "value": 0.3 },
+        "subStats": [
+          { "stat": "critRate", "value": 0.024 },
+          { "stat": "critDmg", "value": 0.048 },
+          { "stat": "atkPct", "value": 0.03 },
+          { "stat": "penFlat", "value": 9 }
+        ]
+      },
+      {
+        "id": "example_disc_6",
+        "setId": "hormone_punk",
+        "partition": 6,
+        "rarity": "S",
+        "level": 15,
+        "mainStat": { "stat": "impact", "value": 0.18 },
+        "subStats": [
+          { "stat": "atkFlat", "value": 19 },
+          { "stat": "critRate", "value": 0.024 },
+          { "stat": "critDmg", "value": 0.048 },
+          { "stat": "anomalyProficiency", "value": 9 }
+        ]
+      }
+    ]
+  },
+  "expectedAppliedSetEffects": [
+    {
+      "setId": "woodpecker_electro",
+      "pieceCount": 2,
+      "scope": "outOfCombat",
+      "stats": [{ "stat": "critRate", "value": 0.08, "mode": "flat" }]
+    },
+    {
+      "setId": "swing_jazz",
+      "pieceCount": 2,
+      "scope": "outOfCombat",
+      "stats": [{ "stat": "energyRegen", "value": 0.2, "mode": "pct" }]
+    },
+    {
+      "setId": "hormone_punk",
+      "pieceCount": 2,
+      "scope": "outOfCombat",
+      "stats": [{ "stat": "atkPct", "value": 0.1, "mode": "pct" }]
+    }
+  ],
+  "expectedIgnoredEffects": [
+    "woodpecker_electro.fourPiece",
+    "swing_jazz.fourPiece",
+    "hormone_punk.fourPiece",
+    "demara_battery_mark_ii.passive"
+  ],
+  "expectedOutput": {
+    "base": {
+      "hp": 7500,
+      "atk": 1207,
+      "def": 612
+    },
+    "bonusTotals": {
+      "hpFlat": 2312,
+      "hpPct": 0.06,
+      "atkFlat": 373,
+      "atkPct": 0.22,
+      "defFlat": 184,
+      "defPct": 0.048,
+      "critRate": 0.416,
+      "critDmg": 0.24,
+      "impactPct": 0.33,
+      "impactFlat": 0,
+      "anomalyProficiencyFlat": 18,
+      "anomalyMasteryFlat": 0,
+      "energyRegenPct": 0.2,
+      "penFlat": 18,
+      "penRatio": 0,
+      "dmgBonus": 0,
+      "physicalDmg": 0,
+      "fireDmg": 0,
+      "iceDmg": 0,
+      "electricDmg": 0.3,
+      "etherDmg": 0
+    },
+    "panel": {
+      "hp": 10262,
+      "atk": 1845.54,
+      "def": 825.376,
+      "critRate": 0.466,
+      "critDmg": 0.74,
+      "impact": 156.94,
+      "anomalyProficiency": 112,
+      "anomalyMastery": 93,
+      "energyRegen": 1.44,
+      "penFlat": 18,
+      "penRatio": 0,
+      "dmgBonus": 0,
+      "physicalDmg": 0,
+      "fireDmg": 0,
+      "iceDmg": 0,
+      "electricDmg": 0.3,
+      "etherDmg": 0
+    },
+    "simpleTargetScore": {
+      "formula": "atkPanel * (1 + min(critRate, 1) * critDmg) * (1 + electricDmg)",
+      "value": 3226.54281768
+    }
+  },
+  "verification": {
+    "purpose": "Use this as the first snapshot once a calculator function exists.",
+    "warning": "Some non-HP/ATK/DEF default panel stats still need in-game screenshot verification."
+  }
+}

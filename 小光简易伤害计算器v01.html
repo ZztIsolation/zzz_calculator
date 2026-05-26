@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>叶瞬光 - 核心伤害演算枢纽</title>
+    <style>
+        :root {
+            /* 全新的配色方案：深空蓝/全息风格 */
+            --bg-body: #0f172a;
+            --bg-panel: #1e293b;
+            --bg-card: #334155;
+            --bg-hover: #475569;
+            --primary: #38bdf8;
+            --primary-glow: rgba(56, 189, 248, 0.4);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --success: #4ade80;
+            --danger: #f87171;
+            --radius: 12px;
+            --transition: all 0.25s ease;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding-bottom: 20px;
+        }
+
+        /* 顶部导航条 */
+        header {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        header h1 {
+            font-size: 1.2rem;
+            color: var(--primary);
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .action-btns { display: flex; gap: 10px; }
+
+        button.sys-btn {
+            background: var(--bg-card);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 6px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: var(--transition);
+        }
+
+        button.sys-btn:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #0f172a;
+            box-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        /* 主体网格布局 */
+        .container {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 20px;
+            padding: 20px 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* 面板统一样式 */
+        .module-box {
+            background: var(--bg-panel);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .module-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .module-title::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 16px;
+            background: var(--primary);
+            border-radius: 2px;
+        }
+
+        /* 表单输入域 */
+        .form-group {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .form-group label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .input-wrap {
+            display: flex;
+            align-items: center;
+            background: var(--bg-body);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 4px 8px;
+            width: 140px;
+        }
+
+        .input-wrap input {
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            width: 100%;
+            text-align: right;
+            outline: none;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        .input-wrap span {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            margin-left: 5px;
+        }
+
+        .input-stack {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 260px;
+        }
+
+        .input-stack input[type="range"] {
+            flex: 1;
+            accent-color: var(--primary);
+        }
+
+        .reset-btn {
+            background: var(--bg-body);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            border-radius: 6px;
+            padding: 4px 8px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .reset-btn:hover {
+            background: var(--primary);
+            color: #0f172a;
+            border-color: var(--primary);
+        }
+
+        .preset-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .preset-btn {
+            flex: 1;
+            padding: 6px 8px;
+            background: var(--bg-body);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: var(--transition);
+            line-height: 1.2;
+        }
+
+        .preset-btn:hover {
+            border-color: var(--primary);
+        }
+
+        .preset-btn.active {
+            background: var(--primary);
+            color: #0f172a;
+            border-color: var(--primary);
+            font-weight: 600;
+        }
+
+        /* 单选/标签选择器 */
+        .tag-group { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 15px;}
+        .tag {
+            padding: 6px 12px;
+            background: var(--bg-body);
+            border: 1px solid var(--border-color);
+            border-radius: 15px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: var(--transition);
+            user-select: none;
+        }
+        .tag.active {
+            background: var(--primary);
+            color: #0f172a;
+            border-color: var(--primary);
+            font-weight: 600;
+        }
+        .tag.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Checkbox 列表 */
+        .check-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; }
+        .check-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 6px;
+        }
+        .check-item:hover { background: var(--bg-body); }
+        .check-item input[type="checkbox"] {
+            accent-color: var(--primary);
+            width: 16px;
+            height: 16px;
+        }
+
+        /* 分割线 */
+        .divider {
+            height: 1px;
+            background: var(--border-color);
+            margin: 15px 0;
+        }
+
+        /* 右侧结果区 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card.main-result {
+            grid-column: span 2;
+            background: linear-gradient(135deg, rgba(56,189,248,0.1), transparent);
+            border-color: var(--primary);
+        }
+
+        .stat-label { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; }
+        .stat-value { font-size: 1.8rem; font-weight: bold; color: var(--text-main); font-family: monospace; }
+        .main-result .stat-value { font-size: 2.5rem; color: var(--primary); text-shadow: 0 0 15px var(--primary-glow); }
+
+        /* 公式白盒区 */
+        .whitebox {
+            background: var(--bg-body);
+            border-radius: var(--radius);
+            padding: 15px;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .wb-row {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed var(--border-color);
+        }
+        .wb-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .wb-title { color: var(--primary); font-weight: bold; margin-bottom: 4px;}
+        .wb-formula { color: var(--text-muted); line-height: 1.5; word-wrap: break-word;}
+        .wb-hl { color: var(--success); }
+        
+        /* 模态框 */
+        .modal-overlay {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(5px);
+            display: none; justify-content: center; align-items: center; z-index: 1000;
+        }
+        .modal {
+            background: var(--bg-panel); border-radius: var(--radius);
+            border: 1px solid var(--border-color); width: 600px; max-width: 90%;
+            padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .modal-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .modal-title { font-size: 1.2rem; color: var(--primary); }
+        .modal-close { cursor: pointer; color: var(--text-muted); }
+        
+        /* 对比表格 */
+        .compare-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem;}
+        .compare-table th, .compare-table td { padding: 10px; border-bottom: 1px solid var(--border-color); text-align: left;}
+        .compare-table th { color: var(--text-muted); font-weight: normal; }
+        .diff-up { color: var(--success); }
+        .diff-down { color: var(--danger); }
+
+        /* 响应式 */
+        @media (max-width: 900px) {
+            .container { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>⚡ 叶瞬光 - 核心伤害演算枢纽</h1>
+    <div class="action-btns">
+        <button class="sys-btn" onclick="openSaveModal()">💾 储存方案</button>
+        <button class="sys-btn" onclick="openLoadModal()">📂 读取方案</button>
+        <button class="sys-btn" onclick="openCompareModal()">⚖️ 对比演算</button>
+    </div>
+</header>
+
+<div class="container">
+    <div class="left-panel">
+        <div class="module-box" style="margin-bottom: 20px;">
+            <div class="module-title">基础属性录入 (角色A: 叶瞬光)</div>
+            
+            <div class="form-group">
+                <label>面板攻击力 (atkPanel)</label>
+                <div class="input-wrap"><input type="number" id="atkPanel" value="2500" oninput="runCalc()"></div>
+            </div>
+            <div class="form-group">
+                <label>面板暴击率 (critPanel)</label>
+                <div class="input-wrap"><input type="number" id="critPanel" value="20" oninput="runCalc()"><span>%</span></div>
+            </div>
+            <div class="form-group">
+                <label>面板暴击伤害 (critDmgPanel)</label>
+                <div class="input-wrap"><input type="number" id="critDmgPanel" value="100" oninput="runCalc()"><span>%</span></div>
+            </div>
+            <div class="form-group">
+                <label>穿透率 (penetration)</label>
+                <div class="input-wrap"><input type="number" id="penetration" value="0" oninput="runCalc()"><span>%</span></div>
+            </div>
+            <div class="form-group">
+                <label>物理伤害加成</label>
+                <div class="tag-group" style="margin:0;">
+                    <div class="tag active" onclick="setPhysDmg(0, this)">0%</div>
+                    <div class="tag" onclick="setPhysDmg(30, this)">30%</div>
+                </div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="module-title">角色A (叶瞬光) Buff设置</div>
+            <div class="check-list" style="color:var(--text-muted); font-size:0.8rem;">
+                <div>[底层被动生效中]：+10%攻击, +50%暴击率, +35%增伤</div>
+            </div>
+            <div class="check-list">
+                <label class="check-item">
+                    <input type="checkbox" id="buffA_wep" onchange="runCalc()"> 
+                    《专武精1》：增伤+25%，暴击伤害+25%
+                </label>
+                <label class="check-item">
+                    <input type="checkbox" id="buffA_m1" onchange="runCalc()"> 
+                    《影画1》：减防率+20%
+                </label>
+            </div>
+        </div>
+
+        <div class="module-box" style="margin-bottom: 20px;">
+            <div class="module-title">队伍配置 (最多选2名)</div>
+            <div class="tag-group" id="teamSelect">
+                <div class="tag" data-role="B" onclick="toggleTeammate('B', this)">照 (B)</div>
+                <div class="tag" data-role="C" onclick="toggleTeammate('C', this)">琉音 (C)</div>
+                <div class="tag" data-role="D" onclick="toggleTeammate('D', this)">千夏 (D)</div>
+            </div>
+
+            <div id="config_B" style="display:none; background:var(--bg-body); padding:10px; border-radius:8px; margin-bottom:10px;">
+                <div style="font-size:0.85rem; color:var(--primary); margin-bottom:8px;">[照] 底层生效：攻击+1000, 增伤与生命值挂钩</div>
+                <div class="form-group">
+                    <label>照的生命值 (hpB)</label>
+                    <div class="input-wrap"><input type="number" id="hpB" value="27000" oninput="runCalc()"></div>
+                </div>
+                <div class="check-list">
+                    <label class="check-item"><input type="checkbox" id="buffB_wep" onchange="runCalc()"> 《专武精1》: A攻击+10%, 爆伤+30%</label>
+                    <label class="check-item"><input type="checkbox" id="buffB_set" onchange="runCalc()"> 《嘉音四件套》: 增伤+24%</label>
+                </div>
+            </div>
+
+            <div id="config_C" style="display:none; background:var(--bg-body); padding:10px; border-radius:8px; margin-bottom:10px;">
+                <div style="font-size:0.85rem; color:var(--primary); margin-bottom:8px;">[琉音] 底层生效：增伤+40%</div>
+                <div class="check-list">
+                    <label class="check-item"><input type="checkbox" id="buffC_wep" onchange="runCalc()"> 《专武精1》: 爆伤+30%</label>
+                    <label class="check-item"><input type="checkbox" id="buffC_set" onchange="runCalc()"> 《山大王四件套》: 爆伤+30%</label>
+                </div>
+            </div>
+
+            <div id="config_D" style="display:none; background:var(--bg-body); padding:10px; border-radius:8px;">
+                <div style="font-size:0.85rem; color:var(--primary); margin-bottom:8px;">[千夏] 底层生效：攻击+1100</div>
+                <div class="check-list">
+                    <label class="check-item"><input type="checkbox" id="buffD_wep" onchange="runCalc()"> 《专武精1》: 增伤+25%, A攻击+10%</label>
+                    <label class="check-item"><input type="checkbox" id="buffD_set" onchange="runCalc()"> 《月光四件套》: 增伤+18%</label>
+                    <label class="check-item"><input type="checkbox" id="buffD_m1" onchange="runCalc()"> 《影画1》: 减防率+21%</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="module-box">
+            <div class="module-title">环境与怪物设置</div>
+            <div class="form-group">
+                <label>怪物防御力 (defenseEnemy)</label>
+                <div class="input-wrap"><input type="number" id="defenseEnemy" value="476" oninput="onDefenseInput()"></div>
+            </div>
+            <div class="preset-group" id="defensePresets">
+                <div class="preset-btn active" data-value="476" onclick="setDefensePreset(476, this)">476<br>太初梦魇</div>
+                <div class="preset-btn" data-value="953" onclick="setDefensePreset(953, this)">953<br>普通</div>
+                <div class="preset-btn" data-value="1588" onclick="setDefensePreset(1588, this)">1588<br>彷徨猎手</div>
+            </div>
+            <div class="check-list">
+                <label class="check-item">
+                    <input type="checkbox" id="env_1" onchange="runCalc()"> 
+                    《太初梦魇debuff》: 暴击伤害+60%
+                </label>
+                <label class="check-item">
+                    <input type="checkbox" id="env_2" onchange="runCalc()"> 
+                    《危局增益：乘流》: A攻击+15%, 增伤+20%, 爆伤+40%
+                </label>
+            </div>
+            <div class="divider"></div>
+            <div class="module-title">其他属性修正</div>
+            <div class="form-group">
+                <label>攻击力数值</label>
+                <div class="input-stack">
+                    <input type="range" id="extraAtkFlatRange" min="-500" max="2000" value="0" oninput="updateExtra('extraAtkFlat', this.value)">
+                    <div class="input-wrap"><input type="number" id="extraAtkFlat" value="0" oninput="updateExtra('extraAtkFlat', this.value)"></div>
+                    <button class="reset-btn" onclick="resetExtra('extraAtkFlat', 0)">↻</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>攻击力%</label>
+                <div class="input-stack">
+                    <input type="range" id="extraAtkPctRange" min="-50" max="100" value="0" oninput="updateExtra('extraAtkPct', this.value)">
+                    <div class="input-wrap"><input type="number" id="extraAtkPct" value="0" oninput="updateExtra('extraAtkPct', this.value)"><span>%</span></div>
+                    <button class="reset-btn" onclick="resetExtra('extraAtkPct', 0)">↻</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>暴击伤害%</label>
+                <div class="input-stack">
+                    <input type="range" id="extraCritDmgRange" min="-50" max="200" value="0" oninput="updateExtra('extraCritDmg', this.value)">
+                    <div class="input-wrap"><input type="number" id="extraCritDmg" value="0" oninput="updateExtra('extraCritDmg', this.value)"><span>%</span></div>
+                    <button class="reset-btn" onclick="resetExtra('extraCritDmg', 0)">↻</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>增伤%</label>
+                <div class="input-stack">
+                    <input type="range" id="extraDmgRange" min="-50" max="100" value="0" oninput="updateExtra('extraDmg', this.value)">
+                    <div class="input-wrap"><input type="number" id="extraDmg" value="0" oninput="updateExtra('extraDmg', this.value)"><span>%</span></div>
+                    <button class="reset-btn" onclick="resetExtra('extraDmg', 0)">↻</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>减防率%</label>
+                <div class="input-stack">
+                    <input type="range" id="extraDefReduRange" min="0" max="100" value="0" oninput="updateExtra('extraDefRedu', this.value)">
+                    <div class="input-wrap"><input type="number" id="extraDefRedu" value="0" oninput="updateExtra('extraDefRedu', this.value)"><span>%</span></div>
+                    <button class="reset-btn" onclick="resetExtra('extraDefRedu', 0)">↻</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="right-panel">
+        <div class="stats-grid">
+            <div class="stat-card main-result">
+                <div class="stat-label">最终伤害预测 (finalDamage)</div>
+                <div class="stat-value" id="res_finalDamage">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">局内攻击力 (atkInner)</div>
+                <div class="stat-value" id="res_atkInner">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">期望爆伤乘区 (critDmgMultiplier)</div>
+                <div class="stat-value" id="res_critDmgMultiplier">0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">增伤乘区 (dmgMultiplier + 1)</div>
+                <div class="stat-value" id="res_dmgMultiplier">0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">防御乘区 (defenseCritDmgMultiplier)</div>
+                <div class="stat-value" id="res_defMultiplier">0.000</div>
+            </div>
+            <div class="stat-card" style="grid-column: span 2; display: flex; justify-content: space-around; padding: 10px; background: transparent; border: none;">
+                <div>局内暴击率: <span id="res_critInner" style="color:var(--primary)">0%</span></div>
+                <div>局内暴伤: <span id="res_critDmgInner" style="color:var(--primary)">0%</span></div>
+                <div>减防率: <span id="res_defenRedu" style="color:var(--primary)">0%</span></div>
+            </div>
+        </div>
+
+        <div class="module-box">
+            <div class="module-title">🧮 算式白盒 (透明化演算)</div>
+            <div class="whitebox" id="whitebox">
+                </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modalSave">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">💾 保存当前方案</div>
+            <div class="modal-close" onclick="closeModal('modalSave')">✕</div>
+        </div>
+        <input type="text" id="presetName" placeholder="输入方案名称，例如：专武+照+千夏" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-body); color: white; margin-bottom: 20px;">
+        <button class="sys-btn" style="width: 100%;" onclick="savePreset()">确认保存</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modalList">
+    <div class="modal" style="width: 800px;">
+        <div class="modal-header">
+            <div class="modal-title" id="listModalTitle">📂 方案列表</div>
+            <div class="modal-close" onclick="closeModal('modalList')">✕</div>
+        </div>
+        
+        <div id="presetListContainer" style="max-height: 200px; overflow-y: auto; margin-bottom: 20px;"></div>
+        
+        <div id="compareArea" style="display: none;">
+            <div class="divider"></div>
+            <div class="module-title">⚖️ 差异化对比 (预设方案 VS 当前面板)</div>
+            <table class="compare-table">
+                <thead>
+                    <tr>
+                        <th>数据项</th>
+                        <th>当前面板</th>
+                        <th id="comparePresetName">预设方案</th>
+                        <th>差值变化</th>
+                    </tr>
+                </thead>
+                <tbody id="compareTableBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 状态管理
+    let physicalDmgBonus = 0;
+    let selectedTeammates = [];
+    let currentCalcResult = {};
+
+    // 核心计算函数 (严格遵守 Markdown 规范)
+    function runCalc() {
+        // 1. 获取输入面板数据
+        const atkPanel = parseFloat(document.getElementById('atkPanel').value) || 0;
+        const critPanel = (parseFloat(document.getElementById('critPanel').value) || 0) / 100;
+        const critDmgPanel = (parseFloat(document.getElementById('critDmgPanel').value) || 0) / 100;
+        const penetration = (parseFloat(document.getElementById('penetration').value) || 0) / 100;
+        const defenseEnemy = parseFloat(document.getElementById('defenseEnemy').value) || 476;
+        const defenseConst = 794;
+        const extraAtkFlat = parseFloat(document.getElementById('extraAtkFlat').value) || 0;
+        const extraAtkPct = (parseFloat(document.getElementById('extraAtkPct').value) || 0) / 100;
+        const extraCritDmg = (parseFloat(document.getElementById('extraCritDmg').value) || 0) / 100;
+        const extraDmg = (parseFloat(document.getElementById('extraDmg').value) || 0) / 100;
+        const extraDefRedu = (parseFloat(document.getElementById('extraDefRedu').value) || 0) / 100;
+        
+        // 记录各项Buff的文字说明，用于白盒
+        let logAtk = [`面板 ${atkPanel}`];
+        let logCr = [`面板 ${(critPanel*100).toFixed(1)}%`];
+        let logCdmg = [`面板 ${(critDmgPanel*100).toFixed(1)}%`];
+        let logDmg = [`物理加成 ${physicalDmgBonus*100}%`];
+        let logDefRedu = [];
+
+        // --- 基础计算累加器 ---
+        let atkAdd = 0;
+        let crAdd = 0;
+        let cdmgAdd = 0;
+        let dmgAdd = physicalDmgBonus;
+        let defenRedu = 0;
+
+        // A基础Buff
+        atkAdd += atkPanel * 0.1; logAtk.push(`A基础(10%面板) ${Math.round(atkPanel*0.1)}`);
+        crAdd += 0.5; logCr.push(`A基础 50%`);
+        dmgAdd += 0.35; logDmg.push(`A基础 35%`);
+
+        // A可选Buff
+        if(document.getElementById('buffA_wep').checked) {
+            dmgAdd += 0.25; logDmg.push(`A专武 25%`);
+            cdmgAdd += 0.25; logCdmg.push(`A专武 25%`);
+        }
+        if(document.getElementById('buffA_m1').checked) {
+            defenRedu += 0.2; logDefRedu.push(`A影画1 20%`);
+        }
+
+        // 队友系统
+        const hasB = selectedTeammates.includes('B');
+        const hasC = selectedTeammates.includes('C');
+        const hasD = selectedTeammates.includes('D');
+
+        if(hasB) {
+            let hpB = parseFloat(document.getElementById('hpB').value) || 27000;
+            atkAdd += 1000; logAtk.push(`B基础 1000`);
+            let bDmg = 0.1 + (hpB - 15000) / 400 * 0.01;
+            dmgAdd += bDmg; logDmg.push(`B基础(HP转) ${(bDmg*100).toFixed(1)}%`);
+            
+            if(document.getElementById('buffB_wep').checked) {
+                atkAdd += atkPanel * 0.1; logAtk.push(`B专武(10%面板) ${Math.round(atkPanel*0.1)}`);
+                cdmgAdd += 0.3; logCdmg.push(`B专武 30%`);
+            }
+            if(document.getElementById('buffB_set').checked) {
+                dmgAdd += 0.24; logDmg.push(`B套装 24%`);
+            }
+        }
+
+        if(hasC) {
+            dmgAdd += 0.4; logDmg.push(`C基础 40%`);
+            if(document.getElementById('buffC_wep').checked) { cdmgAdd += 0.3; logCdmg.push(`C专武 30%`); }
+            if(document.getElementById('buffC_set').checked) { cdmgAdd += 0.3; logCdmg.push(`C套装 30%`); }
+        }
+
+        if(hasD) {
+            atkAdd += 1100; logAtk.push(`D基础 1100`);
+            if(document.getElementById('buffD_wep').checked) {
+                dmgAdd += 0.25; logDmg.push(`D专武 25%`);
+                atkAdd += atkPanel * 0.1; logAtk.push(`D专武(10%面板) ${Math.round(atkPanel*0.1)}`);
+            }
+            if(document.getElementById('buffD_set').checked) {
+                dmgAdd += 0.18; logDmg.push(`D套装 18%`);
+            }
+            if(document.getElementById('buffD_m1').checked) {
+                defenRedu += 0.21; logDefRedu.push(`D影画1 21%`);
+            }
+        }
+
+        // 环境Buff
+        if(document.getElementById('env_1').checked) {
+            cdmgAdd += 0.6; logCdmg.push(`环境1 60%`);
+        }
+        if(document.getElementById('env_2').checked) {
+            atkAdd += atkPanel * 0.15; logAtk.push(`环境2(15%面板) ${Math.round(atkPanel*0.15)}`);
+            dmgAdd += 0.2; logDmg.push(`环境2 20%`);
+            cdmgAdd += 0.4; logCdmg.push(`环境2 40%`);
+        }
+
+        if (extraAtkFlat !== 0) {
+            atkAdd += extraAtkFlat; logAtk.push(`额外修正(数值) ${Math.round(extraAtkFlat)}`);
+        }
+        if (extraAtkPct !== 0) {
+            atkAdd += atkPanel * extraAtkPct; logAtk.push(`额外修正(${(extraAtkPct*100).toFixed(1)}%面板) ${Math.round(atkPanel*extraAtkPct)}`);
+        }
+        if (extraCritDmg !== 0) {
+            cdmgAdd += extraCritDmg; logCdmg.push(`额外修正 ${(extraCritDmg*100).toFixed(1)}%`);
+        }
+        if (extraDmg !== 0) {
+            dmgAdd += extraDmg; logDmg.push(`额外修正 ${(extraDmg*100).toFixed(1)}%`);
+        }
+        if (extraDefRedu !== 0) {
+            defenRedu += extraDefRedu; logDefRedu.push(`额外修正 ${(extraDefRedu*100).toFixed(1)}%`);
+        }
+
+        // --- 最终变量合成 ---
+        const atkInner = atkPanel + atkAdd;
+        let critInner = critPanel + crAdd;
+        if(critInner > 1) critInner = 1; // 局内暴击率不能超过1
+        const critDmgInner = critDmgPanel + cdmgAdd;
+
+        const critDmgMultiplier = critInner * (1 + critDmgInner) + (1 - critInner);
+        
+        // 增伤乘区 = dmgAdd (前面已包含 physicalDmgBonus)
+        const dmgMultiplier = dmgAdd;
+
+        let effectiveDefense = defenseEnemy * (1 - penetration) * (1 - defenRedu) - 0;
+        if(effectiveDefense < 0) effectiveDefense = 0; // 防止变负
+        let defenseCritDmgMultiplier = defenseConst / (effectiveDefense + defenseConst);
+        if(defenseCritDmgMultiplier > 1) defenseCritDmgMultiplier = 1;
+
+        const finalDamage = atkInner * critDmgMultiplier * (dmgMultiplier + 1) * defenseCritDmgMultiplier;
+
+        // 保存当前结果供对比使用
+        currentCalcResult = {
+            finalDamage, atkInner, critInner, critDmgInner, critDmgMultiplier, dmgMultiplier, defenseCritDmgMultiplier, defenRedu
+        };
+
+        // --- 更新UI ---
+        document.getElementById('res_finalDamage').innerText = Math.round(finalDamage).toLocaleString();
+        document.getElementById('res_atkInner').innerText = Math.round(atkInner).toLocaleString();
+        document.getElementById('res_critDmgMultiplier').innerText = critDmgMultiplier.toFixed(3);
+        document.getElementById('res_dmgMultiplier').innerText = (dmgMultiplier + 1).toFixed(3) + ` (+${(dmgMultiplier*100).toFixed(1)}%)`;
+        document.getElementById('res_defMultiplier').innerText = defenseCritDmgMultiplier.toFixed(4);
+        
+        document.getElementById('res_critInner').innerText = (critInner * 100).toFixed(1) + '%';
+        document.getElementById('res_critDmgInner').innerText = (critDmgInner * 100).toFixed(1) + '%';
+        document.getElementById('res_defenRedu').innerText = (defenRedu * 100).toFixed(1) + '%';
+
+        // 渲染白盒
+        const wb = document.getElementById('whitebox');
+        wb.innerHTML = `
+            <div class="wb-row">
+                <div class="wb-title">1. 局内攻击力 (atkInner)</div>
+                <div class="wb-formula">${logAtk.join(' + ')} = <span class="wb-hl">${Math.round(atkInner)}</span></div>
+            </div>
+            <div class="wb-row">
+                <div class="wb-title">2. 局内暴击/爆伤 (限制暴击≤1)</div>
+                <div class="wb-formula">暴击：${logCr.join(' + ')} = <span class="wb-hl">${(critInner*100).toFixed(1)}%</span></div>
+                <div class="wb-formula">爆伤：${logCdmg.join(' + ')} = <span class="wb-hl">${(critDmgInner*100).toFixed(1)}%</span></div>
+            </div>
+            <div class="wb-row">
+                <div class="wb-title">3. 期望爆伤乘区</div>
+                <div class="wb-formula">算法: 暴击率*（1+爆伤）+（1-暴击率）</div>
+                <div class="wb-formula">计算: ${critInner.toFixed(2)} * (1 + ${critDmgInner.toFixed(2)}) + ${(1-critInner).toFixed(2)} = <span class="wb-hl">${critDmgMultiplier.toFixed(3)}</span></div>
+            </div>
+            <div class="wb-row">
+                <div class="wb-title">4. 增伤乘区总和</div>
+                <div class="wb-formula">${logDmg.join(' + ')} = <span class="wb-hl">${(dmgMultiplier*100).toFixed(1)}%</span></div>
+            </div>
+            <div class="wb-row">
+                <div class="wb-title">5. 防御乘区</div>
+                <div class="wb-formula">减防: ${logDefRedu.length?logDefRedu.join(' + '):'0'} = ${(defenRedu*100).toFixed(1)}%</div>
+                <div class="wb-formula">有效防御: ${defenseEnemy} * (1 - ${penetration}) * (1 - ${defenRedu}) = ${effectiveDefense.toFixed(1)}</div>
+                <div class="wb-formula">防御乘区: 794 / (${effectiveDefense.toFixed(1)} + 794) = <span class="wb-hl">${defenseCritDmgMultiplier.toFixed(4)}</span></div>
+            </div>
+            <div class="wb-row">
+                <div class="wb-title">🚀 最终伤害 (finalDamage)=局内攻击力*期望爆伤乘区*（增伤乘区总和+1）*防御乘区</div>
+                <div class="wb-formula" style="font-size:1.1em; color:var(--text-main);">
+                    ${Math.round(atkInner)} × ${critDmgMultiplier.toFixed(3)} × ${(dmgMultiplier+1).toFixed(3)} × ${defenseCritDmgMultiplier.toFixed(4)} 
+                    = <span style="color:var(--primary); font-weight:bold;">${Math.round(finalDamage).toLocaleString()}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // 交互逻辑
+    function setPhysDmg(val, el) {
+        physicalDmgBonus = val / 100;
+        el.parentElement.querySelectorAll('.tag').forEach(t => t.classList.remove('active'));
+        el.classList.add('active');
+        runCalc();
+    }
+
+    function onDefenseInput() {
+        syncDefensePreset();
+        runCalc();
+    }
+
+    function setDefensePreset(value, el) {
+        document.getElementById('defenseEnemy').value = value;
+        syncDefensePreset();
+        runCalc();
+    }
+
+    function syncDefensePreset() {
+        const group = document.getElementById('defensePresets');
+        if (!group) return;
+        const val = parseFloat(document.getElementById('defenseEnemy').value);
+        group.querySelectorAll('.preset-btn').forEach(btn => {
+            const presetVal = parseFloat(btn.dataset.value);
+            if (!Number.isNaN(presetVal) && presetVal === val) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
+    function updateExtra(id, value) {
+        const num = document.getElementById(id);
+        const range = document.getElementById(id + 'Range');
+        if (num) num.value = value;
+        if (range) range.value = value;
+        runCalc();
+    }
+
+    function resetExtra(id, value) {
+        updateExtra(id, value);
+    }
+
+    function toggleTeammate(role, el) {
+        const idx = selectedTeammates.indexOf(role);
+        if(idx > -1) {
+            // 取消选择
+            selectedTeammates.splice(idx, 1);
+            el.classList.remove('active');
+            document.getElementById('config_' + role).style.display = 'none';
+        } else {
+            // 新增选择 (最多2个)
+            if(selectedTeammates.length >= 2) {
+                alert("最多只能选择两名队友！");
+                return;
+            }
+            selectedTeammates.push(role);
+            el.classList.add('active');
+            document.getElementById('config_' + role).style.display = 'block';
+        }
+        runCalc();
+    }
+
+    // --- 预设方案存储与读取系统 ---
+    function getCurrentState() {
+        const inputs = ['atkPanel', 'critPanel', 'critDmgPanel', 'penetration', 'defenseEnemy', 'hpB', 'extraAtkFlat', 'extraAtkPct', 'extraCritDmg', 'extraDmg', 'extraDefRedu'];
+        const checks = [
+            'buffA_wep', 'buffA_m1', 'buffB_wep', 'buffB_set', 
+            'buffC_wep', 'buffC_set', 'buffD_wep', 'buffD_set', 'buffD_m1', 'env_1', 'env_2'
+        ];
+        let state = { physicalDmgBonus, selectedTeammates: [...selectedTeammates], vals: {}, checks: {} };
+        inputs.forEach(id => state.vals[id] = document.getElementById(id).value);
+        checks.forEach(id => state.checks[id] = document.getElementById(id).checked);
+        return state;
+    }
+
+    function loadState(state) {
+        setPhysDmg(state.physicalDmgBonus * 100, document.querySelectorAll('.tag-group')[0].children[state.physicalDmgBonus === 0 ? 0 : 1]);
+        
+        // 重置队友
+        ['B','C','D'].forEach(r => {
+            document.querySelector(`.tag[data-role="${r}"]`).classList.remove('active');
+            document.getElementById('config_'+r).style.display = 'none';
+        });
+        selectedTeammates = [];
+        state.selectedTeammates.forEach(r => {
+            selectedTeammates.push(r);
+            document.querySelector(`.tag[data-role="${r}"]`).classList.add('active');
+            document.getElementById('config_'+r).style.display = 'block';
+        });
+
+        Object.keys(state.vals).forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = state.vals[id]; });
+        Object.keys(state.checks).forEach(id => { if(document.getElementById(id)) document.getElementById(id).checked = state.checks[id]; });
+        ['extraAtkFlat', 'extraAtkPct', 'extraCritDmg', 'extraDmg', 'extraDefRedu'].forEach(id => {
+            const val = state.vals[id] ?? 0;
+            updateExtra(id, val);
+        });
+        syncDefensePreset();
+        
+        runCalc();
+    }
+
+    function savePreset() {
+        const name = document.getElementById('presetName').value.trim();
+        if(!name) return alert('请输入方案名称');
+        let presets = JSON.parse(localStorage.getItem('yS_Presets') || '[]');
+        presets.push({ name, time: new Date().toLocaleString(), state: getCurrentState(), calcData: currentCalcResult });
+        localStorage.setItem('yS_Presets', JSON.stringify(presets));
+        closeModal('modalSave');
+        alert('保存成功！');
+    }
+
+    // Modal 控制
+    function openSaveModal() {
+        document.getElementById('presetName').value = '';
+        document.getElementById('modalSave').style.display = 'flex';
+    }
+
+    function openLoadModal() {
+        renderPresetList(false);
+        document.getElementById('listModalTitle').innerText = '📂 读取方案';
+        document.getElementById('compareArea').style.display = 'none';
+        document.getElementById('modalList').style.display = 'flex';
+    }
+
+    function openCompareModal() {
+        renderPresetList(true);
+        document.getElementById('listModalTitle').innerText = '⚖️ 选择要对比的预设';
+        document.getElementById('compareArea').style.display = 'block';
+        document.getElementById('compareTableBody').innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">请点击上方预设的“对比”按钮</td></tr>';
+        document.getElementById('modalList').style.display = 'flex';
+    }
+
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    function renderPresetList(isCompare) {
+        const presets = JSON.parse(localStorage.getItem('yS_Presets') || '[]');
+        const container = document.getElementById('presetListContainer');
+        if(presets.length === 0) {
+            container.innerHTML = '<div style="color:var(--text-muted);">暂无保存的方案记录。</div>';
+            return;
+        }
+        container.innerHTML = presets.map((p, idx) => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:var(--bg-body); border:1px solid var(--border-color); border-radius:6px; margin-bottom:8px;">
+                <div><div style="color:var(--primary); font-weight:bold;">${p.name}</div><div style="font-size:0.75rem; color:var(--text-muted)">${p.time}</div></div>
+                <div>
+                    ${isCompare ? 
+                        `<button class="sys-btn" onclick="doCompare(${idx})">对比</button>` : 
+                        `<button class="sys-btn" onclick="doLoad(${idx})">读取</button>`}
+                    <button class="sys-btn" style="border-color:var(--danger); color:var(--danger);" onclick="deletePreset(${idx}, ${isCompare})">删除</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function doLoad(idx) {
+        const presets = JSON.parse(localStorage.getItem('yS_Presets') || '[]');
+        loadState(presets[idx].state);
+        closeModal('modalList');
+    }
+
+    function deletePreset(idx, isCompare) {
+        let presets = JSON.parse(localStorage.getItem('yS_Presets') || '[]');
+        presets.splice(idx, 1);
+        localStorage.setItem('yS_Presets', JSON.stringify(presets));
+        renderPresetList(isCompare);
+    }
+
+    function doCompare(idx) {
+        const presets = JSON.parse(localStorage.getItem('yS_Presets') || '[]');
+        const pre = presets[idx];
+        document.getElementById('comparePresetName').innerText = pre.name;
+        
+        const cur = currentCalcResult;
+        const old = pre.calcData;
+
+        const makeRow = (label, cVal, oVal, isPct) => {
+            const diff = cVal - oVal;
+            const diffStr = diff > 0 ? `+${isPct?(diff*100).toFixed(1)+'%':Math.round(diff)}` : (isPct?(diff*100).toFixed(1)+'%':Math.round(diff));
+            const colorClass = diff > 0 ? 'diff-up' : (diff < 0 ? 'diff-down' : '');
+            return `<tr>
+                <td>${label}</td>
+                <td>${isPct ? (cVal*100).toFixed(1)+'%' : Math.round(cVal).toLocaleString()}</td>
+                <td>${isPct ? (oVal*100).toFixed(1)+'%' : Math.round(oVal).toLocaleString()}</td>
+                <td class="${colorClass}">${diff === 0 ? '-' : diffStr}</td>
+            </tr>`;
+        };
+
+        const html = `
+            ${makeRow('最终伤害', cur.finalDamage, old.finalDamage, false)}
+            ${makeRow('局内攻击力', cur.atkInner, old.atkInner, false)}
+            ${makeRow('局内暴击率', cur.critInner, old.critInner, true)}
+            ${makeRow('局内暴伤', cur.critDmgInner, old.critDmgInner, true)}
+            <tr>
+                <td>增伤乘区</td>
+                <td>${(cur.dmgMultiplier+1).toFixed(3)}</td>
+                <td>${(old.dmgMultiplier+1).toFixed(3)}</td>
+                <td class="${cur.dmgMultiplier > old.dmgMultiplier ? 'diff-up':'diff-down'}">${cur.dmgMultiplier === old.dmgMultiplier ? '-' : (cur.dmgMultiplier > old.dmgMultiplier ? '+' : '') + ((cur.dmgMultiplier - old.dmgMultiplier)*100).toFixed(1) + '%'}</td>
+            </tr>
+        `;
+        document.getElementById('compareTableBody').innerHTML = html;
+    }
+
+    // 初始化运行一次
+    runCalc();
+</script>
+</body>
+</html>

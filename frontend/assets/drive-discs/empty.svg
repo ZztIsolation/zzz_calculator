@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="empty drive disc image">
+  <rect width="256" height="256" rx="24" fill="#f3f6fa"/>
+  <rect x="30" y="30" width="196" height="196" rx="20" fill="#fff" stroke="#d7dee8" stroke-width="4"/>
+  <circle cx="128" cy="116" r="54" fill="#e5eaf1"/>
+  <circle cx="128" cy="116" r="24" fill="#f8fafc"/>
+  <path d="M72 188h112" stroke="#c8d1dd" stroke-width="10" stroke-linecap="round"/>
+  <path d="M92 208h72" stroke="#d7dee8" stroke-width="8" stroke-linecap="round"/>
+</svg>
