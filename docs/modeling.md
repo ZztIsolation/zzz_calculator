@@ -139,7 +139,15 @@ interface WEngineStaticData {
     atkBase: number;
     advancedStat?: { stat: ZzzStat; value: number };
   };
-  passive: Effect;
+  effect: {
+    name: { zhCN?: string; en?: string };
+    requirement?: {
+      specialty?: string;
+      label?: { zhCN?: string; en?: string };
+    };
+    description: { zhCN?: string; en?: string };
+    buff: Effect;
+  };
 }
 
 interface DriveDisc {

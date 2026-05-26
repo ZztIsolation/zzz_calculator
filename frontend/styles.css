@@ -542,6 +542,67 @@ button {
   overflow-wrap: anywhere;
 }
 
+.weapon-effect {
+  margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(246, 201, 69, 0.14), transparent 54%),
+    #fff;
+}
+
+.weapon-effect-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 42px;
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.weapon-effect-head span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.weapon-effect-head strong {
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.25;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.weapon-effect-body {
+  padding: 10px 11px 11px;
+}
+
+.weapon-effect-body p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.weapon-effect-body p + p {
+  margin-top: 7px;
+}
+
+.weapon-effect-requirement {
+  color: var(--muted) !important;
+  font-weight: 800;
+}
+
+.weapon-effect-buff {
+  color: var(--green) !important;
+  font-weight: 800;
+}
+
 .disc-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
