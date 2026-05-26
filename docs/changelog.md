@@ -6,6 +6,78 @@ This changelog is the long-form maintenance log for `zzz_calculator`. Every
 future change to the Zenless Zone Zero calculator should be appended here with
 the reason, the files touched, the model impact, and the verification performed.
 
+## 2026-05-27 - Split W-Engine Effect Text From In-Combat Buff Data
+
+### Request Context
+
+The homepage W-Engine card showed Base ATK and advanced stat but did not show
+the W-Engine's weapon effect text. The required model shape is now explicitly
+split into two layers:
+
+1. Human-readable W-Engine effect text for the UI.
+2. Structured Buff data used by the in-combat panel.
+
+### Data Changes
+
+Updated:
+
+```text
+data/w_engines.json
+```
+
+Each current W-Engine now uses:
+
+```json
+{
+  "effect": {
+    "name": {},
+    "requirement": {},
+    "description": {},
+    "buff": {}
+  }
+}
+```
+
+`effect.description` is display-only. `effect.buff` is the structured
+calculation payload that can be enabled from the homepage's in-combat settings.
+This prevents future W-Engine descriptions from being conflated with formulas.
+
+### Backend Changes
+
+Updated:
+
+```text
+backend/calculator.js
+```
+
+The calculator now reads W-Engine in-combat effects from `effect.buff`. A small
+compatibility helper still understands old `passive` records if they ever appear
+in imported or transitional data, but the canonical static model is `effect`.
+
+`GET /api/meta` now exposes the full `effect` object for each W-Engine and keeps
+a derived `passive` field only as a compatibility alias for existing frontend
+logic.
+
+### Frontend Changes
+
+Updated:
+
+```text
+frontend/index.html
+frontend/app.js
+frontend/styles.css
+```
+
+The homepage W-Engine settings card now renders an "音擎效果" block containing:
+
+- The effect name.
+- The specialty requirement text.
+- The display description.
+- A compact "局内 Buff" line generated from the structured Buff stats.
+
+The in-combat Buff selector continues to use the same W-Engine effect, but now
+it pulls from `effect.buff` instead of relying on a top-level `passive`.
+
 ## 2026-05-27 - Added In-Combat Panel Stage
 
 ### Request Context
