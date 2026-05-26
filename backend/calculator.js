@@ -292,6 +292,31 @@ function applyEffectSet(bonusTotals, effect, label, appliedEffects, ignoredEffec
     })
 }
 
+function wEngineEffectData(wEngine) {
+    if (wEngine?.effect) {
+        return wEngine.effect
+    }
+
+    if (wEngine?.passive) {
+        return {
+            name: wEngine.passive.name,
+            description: null,
+            requirement: wEngine.specialty
+                ? {
+                    specialty: wEngine.specialty,
+                }
+                : null,
+            buff: wEngine.passive,
+        }
+    }
+
+    return null
+}
+
+function wEngineEffectBuff(wEngine) {
+    return wEngineEffectData(wEngine)?.buff ?? null
+}
+
 function applyCombatEffect({ bonusTotals, effect, key, name, sourceType, conditionLabel, outOfCombat, activeEffects, ignoredEffects }) {
     const normalized = normalizeEffect(effect)
     if (!normalized) {
@@ -548,10 +573,11 @@ function calculatePanel({ agent, wEngine, driveDiscs, driveDiscSets, coreSkillLe
         }
     }
 
-    if (wEngine.passive) {
+    const effectBuff = wEngineEffectBuff(wEngine)
+    if (effectBuff) {
         applyEffectSet(
             bonusTotals,
-            wEngine.passive,
+            effectBuff,
             `${wEngine.id}.passive`,
             appliedEffects,
             ignoredEffects
@@ -651,7 +677,8 @@ export function buildMeta(catalog) {
             specialty: item.specialty,
             attribute: item.attribute,
             level60: item.level60,
-            passive: item.passive,
+            effect: item.effect ?? null,
+            passive: wEngineEffectBuff(item),
             relatedAgentId: item.relatedAgentId,
             images: item.images,
         })),
@@ -736,14 +763,17 @@ export function calculateInCombatPanel(catalog, input) {
     }
 
     const wEnginePassiveKey = `wEngine:${wEngine.id}.passive`
+    const effectData = wEngineEffectData(wEngine)
+    const effectBuff = wEngineEffectBuff(wEngine)
     if (activeBuffIds.has(wEnginePassiveKey)) {
-        if (!wEngine.passive) {
+        const requiredSpecialty = effectData?.requirement?.specialty ?? wEngine.specialty
+        if (!effectBuff) {
             ignoredEffects.push({
                 key: wEnginePassiveKey,
                 sourceType: "self",
                 reason: "missingEffect",
             })
-        } else if (wEngine.specialty && wEngine.specialty !== agent.specialty) {
+        } else if (requiredSpecialty && requiredSpecialty !== agent.specialty) {
             ignoredEffects.push({
                 key: wEnginePassiveKey,
                 sourceType: "self",
@@ -752,11 +782,11 @@ export function calculateInCombatPanel(catalog, input) {
         } else {
             applyCombatEffect({
                 bonusTotals,
-                effect: wEngine.passive,
+                effect: effectBuff,
                 key: wEnginePassiveKey,
-                name: wEngine.passive.name ?? wEngine.name,
+                name: effectData?.name ?? effectBuff.name ?? wEngine.name,
                 sourceType: "self",
-                conditionLabel: wEngine.passive.condition,
+                conditionLabel: effectBuff.condition,
                 outOfCombat,
                 activeEffects,
                 ignoredEffects,
