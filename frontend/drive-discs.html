@@ -19,12 +19,9 @@
 
       <nav class="side-nav">
         <a href="/" class="nav-item">首页</a>
-        <a href="/#agent-section" class="nav-item">角色</a>
-        <a href="/#weapon-section" class="nav-item">音擎</a>
         <a href="/drive-discs.html" class="nav-item active">驱动盘</a>
-        <a href="/#panel-section" class="nav-item">面板</a>
-        <a href="/#effects-section" class="nav-item">效果</a>
-        <a href="/#advanced-section" class="nav-item">数据</a>
+        <a href="/calculate.html" class="nav-item">计算</a>
+        <a href="/maintenance.html" class="nav-item">维护</a>
       </nav>
 
       <div class="sidebar-foot">
@@ -147,6 +144,34 @@
           <span id="filteredCount">-</span>
         </div>
       </section>
+
+      <section class="inventory-shell loadout-shell">
+        <div class="inventory-topline">
+          <div>
+            <h2>套装预设（<span id="loadoutCount">0</span>）</h2>
+            <p>由计算页保存，可在首页按角色应用</p>
+          </div>
+        </div>
+        <div class="disc-table-wrap clean-table-wrap">
+          <table class="disc-table clean-disc-table">
+            <thead>
+              <tr>
+                <th>名称</th>
+                <th>角色</th>
+                <th>驱动盘</th>
+                <th>分数</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="loadoutTableBody"></tbody>
+          </table>
+        </div>
+        <div id="emptyLoadouts" class="inventory-empty" hidden>
+          <img src="/assets/drive-discs/empty.svg" alt="">
+          <strong>No Data</strong>
+          <span>暂无保存的套装预设</span>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -241,6 +266,36 @@
       </form>
 
       <pre id="rawPreview" class="raw modal-raw"></pre>
+    </section>
+  </div>
+
+  <div id="loadoutModal" class="modal-layer" hidden>
+    <div class="modal-scrim" data-close-loadout-modal></div>
+    <section class="disc-modal" role="dialog" aria-modal="true" aria-labelledby="loadoutModalTitle">
+      <button id="closeLoadoutModalBtn" type="button" class="modal-close" aria-label="关闭">×</button>
+      <header class="modal-head">
+        <div>
+          <h2 id="loadoutModalTitle">编辑套装预设</h2>
+          <p id="loadoutSelectedTag">调整名称和六个槽位</p>
+        </div>
+        <div class="modal-actions">
+          <button id="deleteLoadoutBtn" type="button" class="danger-btn">删除</button>
+          <button id="saveLoadoutBtn" type="button" class="primary-btn">保存</button>
+        </div>
+      </header>
+
+      <form class="disc-editor modal-editor">
+        <input id="loadoutIdInput" type="hidden">
+        <label class="field">
+          <span>名称</span>
+          <input id="loadoutNameInput">
+        </label>
+        <label class="field">
+          <span>角色</span>
+          <select id="loadoutAgentSelect"></select>
+        </label>
+        <div id="loadoutSlotEditors" class="loadout-slot-editors"></div>
+      </form>
     </section>
   </div>
 

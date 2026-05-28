@@ -1,0 +1,555 @@
+{
+  "$schema": "./schemas/agent_skills.schema.json",
+  "version": 1,
+  "agentSkills": [
+    {
+      "id": "ye_shunguang",
+      "agentId": "ye_shunguang",
+      "name": {
+        "zhCN": "叶瞬光技能倍率"
+      },
+      "categories": [
+        {
+          "id": "basic",
+          "name": {
+            "zhCN": "普通攻击"
+          },
+          "icon": "https://patchwiki.biligame.com/images/zzz/e/e8/l2xulkq8z1y6kzmp5j0o36q44cb91qh.png",
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "quick_sword",
+              "name": {
+                "zhCN": "普通攻击：快剑"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "hit_1",
+                  "label": {
+                    "zhCN": "一段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [79.4, 86.7, 94, 101.3, 108.6, 115.9, 123.3, 130.6, 137.9, 145.2, 152.5, 159.8, 167.2, 174.5, 181.8, 189.1]
+                },
+                {
+                  "id": "hit_2",
+                  "label": {
+                    "zhCN": "二段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [82.1, 89.6, 97.1, 104.7, 112.2, 119.8, 127.3, 134.8, 142.4, 149.9, 157.4, 165, 172.5, 180.1, 187.6, 195.1]
+                },
+                {
+                  "id": "hit_3",
+                  "label": {
+                    "zhCN": "三段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [116.8, 127.5, 138.2, 148.8, 159.5, 170.2, 180.9, 191.5, 202.2, 212.9, 223.6, 234.2, 244.9, 255.6, 266.3, 276.9]
+                },
+                {
+                  "id": "hit_4",
+                  "label": {
+                    "zhCN": "四段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [150.1, 163.8, 177.5, 191.2, 204.9, 218.6, 232.3, 246, 259.7, 273.4, 287.1, 300.8, 314.5, 328.2, 341.9, 355.6]
+                }
+              ]
+            },
+            {
+              "id": "cloud_sword_intent",
+              "name": {
+                "zhCN": "普通攻击：流云剑意"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "sword_aura",
+                  "label": {
+                    "zhCN": "每道剑气伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [29.9, 32.7, 35.4, 38.2, 40.9, 43.7, 46.4, 49.2, 51.9, 54.7, 57.4, 60.2, 62.9, 65.7, 68.4, 71.1]
+                }
+              ]
+            },
+            {
+              "id": "clarity_parting_water",
+              "name": {
+                "zhCN": "普通攻击：明心境·分水行"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "hit_1",
+                  "label": {
+                    "zhCN": "一段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [140, 152.8, 165.6, 178.4, 191.2, 204, 216.8, 229.6, 242.4, 255.2, 268, 280.8, 293.6, 306.4, 319.2, 332]
+                },
+                {
+                  "id": "hit_2",
+                  "label": {
+                    "zhCN": "二段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [347.6, 379.2, 410.8, 442.4, 474, 505.6, 537.2, 568.8, 600.4, 632, 663.6, 695.2, 726.8, 758.4, 790, 821.6]
+                },
+                {
+                  "id": "hit_3",
+                  "label": {
+                    "zhCN": "三段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [366.9, 400.3, 433.7, 467.1, 500.5, 533.9, 567.3, 600.7, 634.1, 667.5, 700.9, 734.3, 767.7, 801.1, 834.5, 867.9]
+                }
+              ]
+            },
+            {
+              "id": "clarity_soaring",
+              "name": {
+                "zhCN": "普通攻击：明心境·扶摇势"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [740.8, 808.2, 875.6, 943, 1010.4, 1077.8, 1145.2, 1212.6, 1280, 1347.4, 1414.8, 1482.2, 1549.6, 1617, 1684.4, 1751.8]
+                }
+              ]
+            },
+            {
+              "id": "clarity_cut_light_extreme",
+              "name": {
+                "zhCN": "普通攻击：明心境·斩流光 极"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [328.6, 358.5, 388.4, 418.3, 448.2, 478.1, 508, 537.9, 567.8, 597.7, 627.6, 657.5, 687.4, 717.3, 747.2, 777.1]
+                }
+              ]
+            },
+            {
+              "id": "clarity_cut_light",
+              "name": {
+                "zhCN": "普通攻击：明心境·斩流光"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "hit_1",
+                  "label": {
+                    "zhCN": "一段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [645.6, 704.3, 763, 821.7, 880.4, 939.1, 997.8, 1056.5, 1115.2, 1173.9, 1232.6, 1291.3, 1350, 1408.7, 1467.4, 1526.1]
+                },
+                {
+                  "id": "hit_2",
+                  "label": {
+                    "zhCN": "二段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [1936.7, 2112.8, 2288.9, 2465, 2641.1, 2817.2, 2993.3, 3169.4, 3345.5, 3521.6, 3697.7, 3873.8, 4049.9, 4226, 4402.1, 4578.2]
+                }
+              ]
+            },
+            {
+              "id": "clarity_cut_light_annihilation",
+              "name": {
+                "zhCN": "普通攻击：明心境·斩流光 灭"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "with_sword_force",
+                  "label": {
+                    "zhCN": "有[青溟剑势]伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [621.1, 677.6, 734.1, 790.6, 847.1, 903.6, 960.1, 1016.6, 1073.1, 1129.6, 1186.1, 1242.6, 1299.1, 1355.6, 1412.1, 1468.6]
+                },
+                {
+                  "id": "without_sword_force",
+                  "label": {
+                    "zhCN": "无[青溟剑势]伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [64.6, 70.5, 76.4, 82.3, 88.2, 94.1, 100, 105.9, 111.8, 117.7, 123.6, 129.5, 135.4, 141.3, 147.2, 153.1]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "dodge",
+          "name": {
+            "zhCN": "闪避"
+          },
+          "icon": "https://patchwiki.biligame.com/images/zzz/d/d5/d1cf7qkzfs2r810to84781bsuvy7vzi.png",
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "dash_shadow_rush",
+              "name": {
+                "zhCN": "冲刺攻击：如影疾行"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [68.6, 74.9, 81.2, 87.5, 93.8, 100.1, 106.4, 112.7, 119, 125.3, 131.6, 137.9, 144.2, 150.5, 156.8, 163.1]
+                }
+              ]
+            },
+            {
+              "id": "dodge_counter_swallow",
+              "name": {
+                "zhCN": "闪避反击：燕袭"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [226.6, 247.2, 267.8, 288.4, 309, 329.6, 350.2, 370.8, 391.4, 412, 432.6, 453.2, 473.8, 494.4, 515, 535.6]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "assist",
+          "name": {
+            "zhCN": "支援技"
+          },
+          "icon": "https://patchwiki.biligame.com/images/zzz/4/46/iyacfbd5q50nrqs7vcifukxl1l49dog.png",
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "entry_shadow",
+              "name": {
+                "zhCN": "登场技：照影"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [400.4, 436.8, 473.2, 509.6, 546, 582.4, 618.8, 655.2, 691.6, 728, 764.4, 800.8, 837.2, 873.6, 910, 946.4]
+                }
+              ]
+            },
+            {
+              "id": "quick_assist_guard",
+              "name": {
+                "zhCN": "快速支援：援守"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [103.6, 113.1, 122.6, 132.1, 141.6, 151.1, 160.6, 170.1, 179.6, 189.1, 198.6, 208.1, 217.6, 227.1, 236.6, 246.1]
+                }
+              ]
+            },
+            {
+              "id": "assist_followup_stop_war",
+              "name": {
+                "zhCN": "支援突击：止戈"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [485.2, 529.4, 573.6, 617.8, 662, 706.2, 750.4, 794.6, 838.8, 883, 927.2, 971.4, 1015.6, 1059.8, 1104, 1148.2]
+                }
+              ]
+            },
+            {
+              "id": "clarity_quick_assist_response",
+              "name": {
+                "zhCN": "快速支援：明心境·策应"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [103.6, 113.1, 122.6, 132.1, 141.6, 151.1, 160.6, 170.1, 179.6, 189.1, 198.6, 208.1, 217.6, 227.1, 236.6, 246.1]
+                }
+              ]
+            },
+            {
+              "id": "clarity_assist_followup_unity",
+              "name": {
+                "zhCN": "支援突击：明心境·抱一"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [167.2, 182.4, 197.6, 212.8, 228, 243.2, 258.4, 273.6, 288.8, 304, 319.2, 334.4, 349.6, 364.8, 380, 395.2]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "special",
+          "name": {
+            "zhCN": "特殊技"
+          },
+          "icon": "https://patchwiki.biligame.com/images/zzz/f/fb/6igddy97k08apxga9tfy7iiug8qny0f.png",
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "draw_blue_waves",
+              "name": {
+                "zhCN": "特殊技：引沧澜"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [92.4, 100.8, 109.2, 117.6, 126, 134.4, 142.8, 151.2, 159.6, 168, 176.4, 184.8, 193.2, 201.6, 210, 218.4]
+                },
+                {
+                  "id": "perfect_dodge_trigger_damage",
+                  "label": {
+                    "zhCN": "触发极限闪避伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [226.6, 247.2, 267.8, 288.4, 309, 329.6, 350.2, 370.8, 391.4, 412, 432.6, 453.2, 473.8, 494.4, 515, 535.6]
+                }
+              ]
+            },
+            {
+              "id": "ex_calm_waves",
+              "name": {
+                "zhCN": "强化特殊技：定风波"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [437.1, 476.9, 516.7, 556.5, 596.3, 636.1, 675.9, 715.7, 755.5, 795.3, 835.1, 874.9, 914.7, 954.5, 994.3, 1034.1]
+                }
+              ]
+            },
+            {
+              "id": "clarity_brush_sleeve",
+              "name": {
+                "zhCN": "特殊技：明心境·拂衣去"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [221.6, 241.8, 262, 282.2, 302.4, 322.6, 342.8, 363, 383.2, 403.4, 423.6, 443.8, 464, 484.2, 504.4, 524.6]
+                }
+              ]
+            },
+            {
+              "id": "ex_clarity_flying_light",
+              "name": {
+                "zhCN": "强化特殊技：明心境·飞光"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "consume_1_sword_force",
+                  "label": {
+                    "zhCN": "消耗1点[青溟剑势]伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [126, 137.5, 149, 160.5, 172, 183.5, 195, 206.5, 218, 229.5, 241, 252.5, 264, 275.5, 287, 298.5]
+                },
+                {
+                  "id": "consume_6_sword_force",
+                  "label": {
+                    "zhCN": "消耗6点[青溟剑势]伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [756, 824.8, 893.6, 962.4, 1031.2, 1100, 1168.8, 1237.6, 1306.4, 1375.2, 1444, 1512.8, 1581.6, 1650.4, 1719.2, 1788]
+                }
+              ]
+            },
+            {
+              "id": "ex_clarity_return_dust",
+              "name": {
+                "zhCN": "强化特殊技：明心境·归尘"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [360, 392.8, 425.6, 458.4, 491.2, 524, 556.8, 589.6, 622.4, 655.2, 688, 720.8, 753.6, 786.4, 819.2, 852]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "chain",
+          "name": {
+            "zhCN": "连携技"
+          },
+          "icon": "https://patchwiki.biligame.com/images/zzz/5/53/qsswotdbtz6nnqdo2jtyv2flhftsyex.png",
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "chain_cut_evil",
+              "name": {
+                "zhCN": "连携技：斩邪祟"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [880.6, 960.7, 1040.8, 1120.9, 1201, 1281.1, 1361.2, 1441.3, 1521.4, 1601.5, 1681.6, 1761.7, 1841.8, 1921.9, 2002, 2082.1]
+                }
+              ]
+            },
+            {
+              "id": "ultimate_chase_cloud_thunder",
+              "name": {
+                "zhCN": "终结技：逐云惊霆"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [1455.7, 1588.1, 1720.5, 1852.9, 1985.3, 2117.7, 2250.1, 2382.5, 2514.9, 2647.3, 2779.7, 2912.1, 3044.5, 3176.9, 3309.3, 3441.7]
+                }
+              ]
+            },
+            {
+              "id": "chain_clarity_pull_thunder",
+              "name": {
+                "zhCN": "连携技：明心境·掣惊雷"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [210.6, 229.8, 249, 268.2, 287.4, 306.6, 325.8, 345, 364.2, 383.4, 402.6, 421.8, 441, 460.2, 479.4, 498.6]
+                }
+              ]
+            },
+            {
+              "id": "ultimate_cut_delusion_open_heaven",
+              "name": {
+                "zhCN": "终结技：斩妄开天"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [2700.1, 2945.6, 3191.1, 3436.6, 3682.1, 3927.6, 4173.1, 4418.6, 4664.1, 4909.6, 5155.1, 5400.6, 5646.1, 5891.6, 6137.1, 6382.6]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "sources": [
+        "https://wiki.biligame.com/zzz/%E5%8F%B6%E7%9E%AC%E5%85%89"
+      ],
+      "verification": {
+        "skillMultipliers": "source-checked-biligame-wiki-2026-05-29",
+        "exclusions": "core skill, no-damage active skills, daze multipliers, and special energy costs are intentionally omitted"
+      }
+    }
+  ]
+}

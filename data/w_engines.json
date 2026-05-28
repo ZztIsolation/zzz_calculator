@@ -3,15 +3,14 @@
   "version": 1,
   "notes": [
     "v1 applies Base ATK and advanced stats to the out-of-combat panel.",
-    "Each W-Engine should carry an effect object with display text and a separate buff object.",
-    "effect.description is for UI display; effect.buff is the structured calculation payload used by the in-combat panel.",
+    "Each W-Engine should carry an effect object with display text plus separate self/team buff objects.",
+    "effect.selfBuff stores effects limited to the wearer; effect.teamBuff stores team-wide W-Engine buffs.",
     "W-Engine effect buffs are not applied to out-of-combat panel calculations unless explicitly marked unconditional outOfCombat."
   ],
   "wEngines": [
     {
       "id": "demara_battery_mark_ii",
       "name": {
-        "en": "Demara Battery Mark II",
         "zhCN": "德玛拉电池II型"
       },
       "rarity": "A",
@@ -19,51 +18,58 @@
       "attribute": "electric",
       "images": {
         "icon": "/assets/w-engines/demara_battery_mark_ii.webp",
-        "source": "https://zenless-zone-zero.fandom.com/wiki/File:W-Engine_Demara_Battery_Mark_II.png"
+        "source": "https://zenless-zone-zero.fandom.com/wiki/Demara_Battery_Mark_II"
       },
       "level60": {
         "atkBase": 624,
         "advancedStat": {
           "stat": "impact",
-          "value": 0.15,
+          "value": 15,
           "mode": "pct"
         }
       },
       "effect": {
         "name": {
-          "zhCN": "In a Flash of Light",
-          "en": "In a Flash of Light"
+          "zhCN": "电光石火"
         },
         "requirement": {
           "specialty": "stun",
           "label": {
             "zhCN": "对于【击破】角色，能够触发以下效果",
-            "en": "For Stun characters, the following effect can be triggered."
+            "en": "For matching specialty characters, the following effect can be triggered."
           }
         },
         "description": {
           "zhCN": "电属性伤害提升15%；闪避反击或支援攻击命中敌人时，能量自动回复提升18%。",
           "en": "Electric DMG increases by 15%. When a Dodge Counter or Assist Attack hits an enemy, Energy Regen increases by 18%."
         },
-        "buff": {
+        "selfBuff": {
           "scope": "inCombat",
-          "condition": "specialtyMatch && hitWithDodgeCounterOrAssistAttack",
-          "statsByPhase": {
-            "1": [
-              {
-                "stat": "electricDmg",
-                "value": 0.15,
-                "mode": "flat"
-              },
-              {
-                "stat": "energyRegen",
-                "value": 0.18,
-                "mode": "flat"
-              }
-            ]
-          },
-          "appliesToOutOfCombatPanel": false
-        }
+          "appliesToOutOfCombatPanel": false,
+          "effects": [
+            {
+              "id": "effect_q4n8v2k1",
+              "type": "fixed",
+              "stat": "electricDmg",
+              "value": 15,
+              "mode": "flat"
+            },
+            {
+              "id": "effect_l7p3x9za",
+              "type": "fixed",
+              "stat": "energyRegen",
+              "value": 18,
+              "mode": "flat"
+            }
+          ],
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        "teamBuff": null
       },
       "sources": [
         "https://zenless-zone-zero.fandom.com/wiki/Demara_Battery_Mark_II"
@@ -77,7 +83,6 @@
     {
       "id": "cloudcleave_radiance",
       "name": {
-        "en": "Cloudcleave Radiance",
         "zhCN": "云霓孤光"
       },
       "rarity": "S",
@@ -85,61 +90,59 @@
       "relatedAgentId": "ye_shunguang",
       "images": {
         "icon": "/assets/w-engines/cloudcleave_radiance.webp",
-        "source": "https://zenless-zone-zero.fandom.com/wiki/File:W-Engine_Cloudcleave_Radiance.png"
+        "source": "https://wiki.biligame.com/zzz/%E4%BA%91%E9%9C%93%E5%AD%A4%E5%85%89"
       },
       "level60": {
         "atkBase": 743,
         "advancedStat": {
           "stat": "critDmg",
-          "value": 0.48,
+          "value": 48,
           "mode": "flat"
         }
       },
       "effect": {
         "name": {
-          "zhCN": "玉魄冰心",
-          "en": "Jade Heart of Ice"
+          "zhCN": "玉魄冰心"
         },
         "requirement": {
           "specialty": "attack",
           "label": {
             "zhCN": "对于【强攻】角色，能够触发以下效果",
-            "en": "For Attack characters, the following effect can be triggered."
+            "en": "For matching specialty characters, the following effect can be triggered."
           }
         },
         "description": {
           "zhCN": "装备者造成的伤害无视目标20%物理属性伤害抗性；装备者开启【以太帷幕】时，自身造成的伤害提升25%，暴击伤害提升25%，持续40秒，重复触发时刷新持续时间。",
           "en": "The equipper's damage ignores 20% Physical RES. When the equipper activates Ether Veil, their DMG increases by 25% and CRIT DMG increases by 25% for 40s. Repeated triggers refresh the duration."
         },
-        "buff": {
+        "selfBuff": {
           "scope": "inCombat",
-          "condition": "etherVeil",
-          "phase": 1,
-          "statsByPhase": {
-            "1": [
-              {
-                "stat": "physicalResIgnore",
-                "value": 0.2,
-                "mode": "flat"
-              },
-              {
-                "stat": "dmgBonus",
-                "value": 0.25,
-                "mode": "flat"
-              },
-              {
-                "stat": "critDmg",
-                "value": 0.25,
-                "mode": "flat"
-              }
-            ]
-          },
-          "appliesToOutOfCombatPanel": false,
-          "notes": [
-            "Modeled at phase 1 only.",
-            "The in-combat panel uses one checkbox for the whole W-Engine effect. Duration refresh is display-only until timeline modeling exists."
-          ]
-        }
+          "effects": [
+            {
+              "id": "effect_r6m2c8tw",
+              "type": "fixed",
+              "stat": "physicalResIgnore",
+              "mode": "flat",
+              "value": 20
+            },
+            {
+              "id": "effect_v9k5n1qp",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 25
+            },
+            {
+              "id": "effect_b3x7d4la",
+              "type": "fixed",
+              "stat": "critDmg",
+              "mode": "flat",
+              "value": 25
+            }
+          ],
+          "appliesToOutOfCombatPanel": false
+        },
+        "teamBuff": null
       },
       "sources": [
         "https://wiki.biligame.com/zzz/%E4%BA%91%E9%9C%93%E5%AD%A4%E5%85%89"
@@ -148,6 +151,305 @@
         "level60Stats": "source-checked",
         "effectText": "from-provided-screenshot",
         "phase1EffectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1826",
+      "name": {
+        "zhCN": "思络成歌"
+      },
+      "rarity": "S",
+      "specialty": "support",
+      "attribute": "physical",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1826.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "energyRegen",
+          "value": 60,
+          "mode": "pct"
+        }
+      },
+      "effect": {
+        "name": {
+          "zhCN": "喧响独白"
+        },
+        "requirement": {
+          "specialty": "support",
+          "label": {
+            "zhCN": "对于【支援】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者为非操作中角色时，能量自动回复提升0.6点/秒；装备者发动【强化特殊技】造成物理伤害时，使全队角色造成伤害提升12.5%，持续40秒，最多叠加2层；拥有2层效果时，角色的攻击力额外提升10%。",
+          "en": "When off-field, Energy Regen increases. When the equipper's EX Special Attack deals Physical DMG, the squad gains DMG Bonus, stacking up to 2 times; at 2 stacks, squad ATK further increases."
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "type": "fixed",
+              "stat": "energyRegen",
+              "mode": "flat",
+              "value": 60
+            }
+          ],
+          "appliesToOutOfCombatPanel": false
+        },
+        "teamBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1826_team_dmg",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 25
+            },
+            {
+              "id": "effect_wiki_1826_team_atk",
+              "type": "fixed",
+              "stat": "atkPct",
+              "mode": "pct",
+              "basis": "outOfCombatAtk",
+              "value": 10
+            }
+          ],
+          "appliesToOutOfCombatPanel": false
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "partially-modeled"
+      }
+    },
+    {
+      "id": "zzz_wiki_1753",
+      "name": {
+        "zhCN": "半糖雪兔"
+      },
+      "rarity": "S",
+      "specialty": "defense",
+      "attribute": "ice",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1753.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "hpPct",
+          "value": 30,
+          "mode": "pct"
+        }
+      },
+      "effect": {
+        "name": {
+          "zhCN": "易碎之甜"
+        },
+        "requirement": {
+          "specialty": "defense",
+          "label": {
+            "zhCN": "对于【防护】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者的能量自动回复提升0.46点/秒；全队角色攻击力提升10%，最大生命值提升10%；装备者开启或延长【以太帷幕】时，使全队暴击伤害提升30%，持续60秒。",
+          "en": "The equipper gains Energy Regen. Squad ATK and Max HP increase. When the equipper activates or extends Ether Veil, squad CRIT DMG increases."
+        },
+        "selfBuff": null,
+        "teamBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1753_team_atk",
+              "type": "fixed",
+              "stat": "atkPct",
+              "mode": "pct",
+              "basis": "outOfCombatAtk",
+              "value": 10
+            },
+            {
+              "id": "effect_wiki_1753_team_hp",
+              "type": "fixed",
+              "stat": "hpPct",
+              "mode": "pct",
+              "basis": "outOfCombatHp",
+              "value": 10
+            },
+            {
+              "id": "effect_wiki_1753_team_crit_dmg",
+              "type": "fixed",
+              "stat": "critDmg",
+              "mode": "flat",
+              "value": 30
+            }
+          ],
+          "appliesToOutOfCombatPanel": false
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "partially-modeled"
+      }
+    },
+    {
+      "id": "zzz_wiki_1689",
+      "name": {
+        "zhCN": "昨夜来电"
+      },
+      "rarity": "S",
+      "specialty": "stun",
+      "attribute": "physical",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1689.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/11/20/15559334/70db2c7b9e57bba67f0c38f6ee9a3d0d_6951351254901344764.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "critRate",
+          "value": 24,
+          "mode": "flat"
+        }
+      },
+      "effect": {
+        "name": {
+          "zhCN": "7x24"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "位于后台时，装备者的能量自动回复提升1.5点/秒；装备者发动【强化特殊技】造成物理属性伤害时，装备者攻击造成的失衡值提升9%，最多叠加3层，持续10秒；叠加到3层时，全队角色暴击伤害额外提升30%，持续40秒。",
+          "en": "When off-field, the equipper gains Energy Regen. Physical EX Special Attack damage increases the Daze dealt by the equipper's attacks, stacking up to 3 times. At 3 stacks, squad CRIT DMG increases."
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "condition": "enhancedSpecialPhysicalDamage",
+          "durationSeconds": 10,
+          "appliesToOutOfCombatPanel": false,
+          "effects": [
+            {
+              "id": "effect_wiki_1689_self_daze",
+              "type": "stacked",
+              "stat": "impactPct",
+              "mode": "flat",
+              "valuePerStack": 9,
+              "maxStacks": 3,
+              "defaultStacks": 3
+            }
+          ],
+          "effectText": {
+            "zhCN": "装备者发动[强化特殊技]造成物理属性伤害时，装备者攻击造成的失衡值提升9%，最多叠加3层，持续10秒。"
+          }
+        },
+        "teamBuff": {
+          "scope": "inCombat",
+          "condition": "threeStacks",
+          "durationSeconds": 40,
+          "effects": [
+            {
+              "id": "effect_wiki_1689_team_crit_dmg",
+              "type": "fixed",
+              "stat": "critDmg",
+              "mode": "flat",
+              "value": 30
+            }
+          ],
+          "effectText": {
+            "zhCN": "叠加到3层时，全队角色暴击伤害额外提升30%，持续40秒。"
+          }
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "partially-modeled"
+      }
+    },
+    {
+      "id": "zzz_wiki_486",
+      "name": {
+        "zhCN": "好斗的阿炮"
+      },
+      "rarity": "A",
+      "specialty": "support",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_486.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/07/02/222203892/6de89d4ff56df24f73d020c6f056376a_5782990277416426429.png"
+      },
+      "level60": {
+        "atkBase": 624,
+        "advancedStat": {
+          "stat": "energyRegen",
+          "value": 50,
+          "mode": "pct"
+        }
+      },
+      "effect": {
+        "name": {
+          "zhCN": "踩踏事故"
+        },
+        "requirement": {
+          "specialty": "support",
+          "label": {
+            "zhCN": "对于【支援】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "队伍中任意友方单位攻击命中敌人时，全队攻击力提升2.5%，最多叠加4层，持续8秒，每层效果单独结算持续时间。",
+          "en": "When any friendly unit hits an enemy, squad ATK increases, stacking up to 4 times. Each stack's duration is counted separately."
+        },
+        "selfBuff": null,
+        "teamBuff": {
+          "scope": "inCombat",
+          "condition": "friendlyUnitHitEnemy",
+          "durationSeconds": 8,
+          "effects": [
+            {
+              "id": "effect_wiki_486_team_atk",
+              "type": "stacked",
+              "stat": "atkPct",
+              "mode": "pct",
+              "valuePerStack": 2.5,
+              "maxStacks": 4,
+              "defaultStacks": 4
+            }
+          ],
+          "effectText": {
+            "zhCN": "队伍中任意友方单位攻击命中敌人时，全队攻击力提升2.5%，最多叠加4层，持续8秒，每层效果单独结算持续时间。"
+          }
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
       }
     }
   ]

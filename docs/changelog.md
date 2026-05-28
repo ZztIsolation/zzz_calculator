@@ -6,6 +6,247 @@ This changelog is the long-form maintenance log for `zzz_calculator`. Every
 future change to the Zenless Zone Zero calculator should be appended here with
 the reason, the files touched, the model impact, and the verification performed.
 
+## 2026-05-28 - Removed Homepage Effect Record Card
+
+### Request Context
+
+The homepage "效果记录" card mixed out-of-combat effect records with in-combat
+Buff diagnostics. After W-Engine and Drive Disc 4-piece Buffs moved into the
+in-combat layer, that card showed normal in-combat-only rules as "已忽略",
+which was misleading for users.
+
+### UI Changes
+
+Removed the homepage "效果记录" card and removed the related "效果" sidebar
+links from the homepage, maintenance page, and Drive Disc inventory page. The
+in-combat panel still shows "已启用 Buff", and the raw debug JSON still exposes
+`appliedEffects` and `ignoredEffects`.
+
+### Model Changes
+
+Stopped adding Drive Disc 4-piece rules and W-Engine self Buffs to
+`outOfCombat.ignoredEffects`. Those rules belong to the in-combat Buff layer;
+the backend keeps `ignoredEffects` for real diagnostics such as missing sets,
+not-equipped 4-piece Buffs, specialty mismatches, and missing ATK% basis.
+
+## 2026-05-28 - Added Formula Buff Rule
+
+### Request Context
+
+The existing `derived` Buff rule only supported proportional conversion:
+`sourceValue * ratio / 100`, optionally capped. That cannot accurately model
+rules such as "base 10% damage bonus, then every 400 HP above 15000 adds 1%,
+up to 40% total." A dedicated threshold-step template was too narrow for future
+Buffs, so the model now uses a safe single-variable function rule instead.
+
+### Model Changes
+
+Added a new structured Buff rule type:
+
+```json
+{
+  "type": "formula",
+  "stat": "dmgBonus",
+  "mode": "flat",
+  "source": {
+    "variable": "x",
+    "label": { "zhCN": "照的初始最大生命值" },
+    "defaultValue": 27000,
+    "min": 15000,
+    "max": 27000
+  },
+  "formula": {
+    "expression": "clamp(floor((x - 15000) / 400) + 10, 10, 40)",
+    "valueUnit": "storedPercent"
+  }
+}
+```
+
+The backend evaluates formula rules with a whitelist parser, not `eval` or
+`new Function`. Only the variable `x`, numbers, arithmetic operators,
+parentheses, and `floor/ceil/round/min/max/clamp` are allowed. The computed
+value then goes through the same stored-percent conversion as all other Buff
+stats, so `dmgBonus: 40` becomes `0.4` in the in-combat panel.
+
+### UI Changes
+
+Updated the homepage Buff runtime controls so `formula` reuses the existing
+source-value input and shows the expression used. Updated the maintenance page
+rule editor with a new "受限函数换算" type and fields for source label, default
+source value, source min/max, and expression.
+
+### Data Changes
+
+Updated `data/combat_buffs.json` so 照's teammate Buff includes the actual
+formula-based damage bonus from the supplied screenshot.
+
+### Verification
+
+Added `tests/formula.test.js` for source values 15000, 15399, 15400, 27000, and
+31000, plus a regression check that 千夏's existing `derived` rule is unchanged.
+Updated maintenance validation tests to accept valid `formula` rules and reject
+unsafe expressions such as `window.x`.
+
+## 2026-05-27 - Fixed Stored Percent Display in Core Skill Summary
+
+### Request Context
+
+After the stricter percent modeling work, the homepage character card displayed
+Ye Shunguang's Core Skill as `暴击率 +1440%`. The underlying data was correct:
+the Core Skill grants `4.8%` CRIT Rate at each of A, C, and E, for `14.4%`
+total. The bug was a display-layer mismatch between stored percent values and
+calculated panel fractions.
+
+### Frontend Changes
+
+Updated:
+
+```text
+frontend/app.js
+```
+
+`coreSkillSummary()` now formats Core Skill stat totals with the stored-percent
+formatter. Core Skill JSON uses human percent numbers, such as `4.8` for
+`4.8%`, while panel output uses calculated fractions, such as `0.048`. The
+summary previously sent the stored number into the panel formatter, which
+multiplied it by 100 again.
+
+### Test Changes
+
+Added:
+
+```text
+tests/percent-sanity.test.js
+```
+
+The new test scans stored percent data for implausible outliers and verifies
+example calculated panels keep percent-like values in calculated-fraction
+space. This does not replace source verification, but it catches common
+conversion mistakes such as `14.4` being treated as `1440%` in the calculation
+layer.
+
+Updated `package.json` with:
+
+```text
+npm run test:percent-sanity
+```
+
+### Verification
+
+Ran:
+
+```text
+node --check frontend/app.js
+node --check backend/calculator.js
+npm run test:percent-sanity
+npm run test:atk-basis
+```
+
+All checks passed.
+
+## 2026-05-27 - Hardened ATK Basis Modeling and Added Attack Breakdown UI
+
+### Request Context
+
+The calculator needed a clearer and safer separation between three attack
+concepts: Base ATK from agent, W-Engine, and Core Skill; out-of-combat panel ATK
+from equipment percentages and flats; and in-combat ATK from teammate, field,
+enemy, W-Engine, Drive Disc, or manual Buffs.
+
+### Backend Changes
+
+Updated `backend/calculator.js` so in-combat ATK% effects no longer silently
+fall back to the wrong basis. Teammate, boss/enemy, field, and manual Buffs now
+default missing in-combat `atkPct` basis to `outOfCombatAtk`. Self, W-Engine,
+and Drive Disc 4-piece in-combat `atkPct` effects must explicitly declare
+`basis`; otherwise the effect is ignored with `missingAtkPctBasis`.
+
+The calculation response now includes attack breakdowns:
+
+- `outOfCombat.breakdown.baseAtk`
+- `outOfCombat.breakdown.atkPanel`
+- `inCombat.breakdown.atkPanel`
+
+These make the Base ATK, out-of-combat ATK, and in-combat ATK stages inspectable
+without reverse-engineering the formula from totals.
+
+### Data Changes
+
+Updated existing in-combat Drive Disc 4-piece ATK% entries in
+`data/drive_disc_sets.json` to declare `basis: "baseAtk"` explicitly.
+
+### Frontend Changes
+
+Added a homepage "攻击力计算明细" card with a collapsed details control. It
+shows Base ATK composition, out-of-combat ATK calculation, and in-combat ATK
+calculation. Buff records and ignored-effect records now surface the basis or
+the missing-basis reason.
+
+### Model Guardrail
+
+Documented the ATK basis rules in `docs/modeling.md`. Future data additions
+should never add an in-combat `atkPct` without either an explicit `basis` or a
+source type that intentionally defaults to `outOfCombatAtk`.
+
+Added catalog-load validation in `backend/calculator.js` for the strict source
+types. Self Buffs, W-Engine effects, and Drive Disc 4-piece effects now fail
+data loading if they contain in-combat `atkPct` without `basis`, so the mistake
+is caught while editing data instead of only after a user clicks the checkbox.
+
+Added `tests/atk-basis.test.js` and the `npm run test:atk-basis` script. The
+test locks the important attack stages:
+
+- Base ATK includes agent Base ATK, W-Engine Base ATK, and Core Skill Base ATK.
+- Out-of-combat ATK% including a simulated W-Engine advanced ATK% stat scales
+  from Base ATK.
+- `basis: "baseAtk"` and `basis: "outOfCombatAtk"` produce different
+  in-combat flat attack contributions.
+- Teammate ATK% without basis defaults to `outOfCombatAtk`.
+- Self ATK% without basis is ignored with `missingAtkPctBasis`.
+- Equipped 4-piece ATK% uses its explicit `baseAtk` basis.
+
+## 2026-05-27 - Simplified Out-of-Combat Panel Display and Added Ye Shunguang Highlights
+
+### Request Context
+
+The homepage out-of-combat panel still showed the old simple-score block and
+top stat summary. The requested display should remove that block, remove the
+generic damage bonus row from the out-of-combat module, and visually emphasize
+Ye Shunguang's priority panel stats.
+
+### Frontend Changes
+
+Updated:
+
+```text
+frontend/index.html
+frontend/app.js
+frontend/styles.css
+```
+
+Removed the out-of-combat panel's top `panel-band` block, including the visible
+simple-score card and compact summary tiles. The raw calculation still keeps
+`simpleTargetScore`, but it is no longer displayed inside the out-of-combat
+panel card.
+
+Split the out-of-combat panel display order from the shared panel order. The
+out-of-combat panel now omits `dmgBonus`, while the in-combat panel continues
+to show `dmgBonus` because it is needed for Buff inspection.
+
+Removed `dmgBonus` from the out-of-combat "加成汇总" display as well, so the
+entire out-of-combat module no longer shows the generic damage bonus row.
+
+Added a first character-specific highlight map:
+
+```text
+ye_shunguang: atk, critRate, critDmg, physicalDmg
+```
+
+These rows now get a stronger dark font weight and a yellow-accent highlighted
+row style when Ye Shunguang is selected. The data model is intentionally shaped
+so later characters can receive their own highlight sets without changing the
+table renderer again.
+
 ## 2026-05-27 - Split W-Engine Effect Text From In-Combat Buff Data
 
 ### Request Context
@@ -406,7 +647,6 @@ The main page sections became:
 - 驱动盘
 - 输入数据
 - 局外面板
-- 效果记录
 - 原始结果
 
 ### Visual Style
@@ -575,7 +815,7 @@ base.def = 606
 panel.critRate = 0.05
 panel.critDmg = 0.50 + 0.48 = 0.98
 simpleTargetScore = 1684.694
-ignoredEffects = ["cloudcleave_radiance.passive"]
+ignoredEffects = []
 ```
 
 ### API Added
@@ -1453,3 +1693,466 @@ Verified:
   backend calculation formula.
 - The full Ye Shunguang example still calculates through the same
   `coreSkillLevel: "F"` path used by the previous Core Skill modeling update.
+
+## 2026-05-27 - Added Grouped Teammate Buff Model And Qianxia Buffs
+
+### Request Context
+
+The user asked for the homepage's teammate Buff model to be made explicit before
+more teammate support is added. The requested shape is teammate-centered:
+
+```text
+teammate name
+  -> Buff source
+  -> literal Buff description
+  -> structured calculation effect
+```
+
+The important modeling requirement is that one teammate name must be able to own
+multiple Buff entries. The Buff entries must preserve their literal in-game text
+for inspection, while also storing normalized stat effects for actual in-combat
+panel calculation.
+
+The first teammate requested was 千夏, with two Buffs:
+
+1. Source: `核心被动`
+2. Source: `强化特殊技`
+
+Both Buffs are treated as in-combat Buffs. Duration and trigger logic are not
+modeled yet; the homepage exposes them as user-selected checkboxes.
+
+### Data Model Change
+
+Updated:
+
+```text
+data/combat_buffs.json
+```
+
+Added a new top-level `teammates` array. It is separate from the existing flat
+`buffs` array so teammate data can stay naturally grouped for maintenance and
+frontend display.
+
+The shape is:
+
+```json
+{
+  "teammates": [
+    {
+      "id": "qianxia",
+      "name": {
+        "zhCN": "千夏",
+        "en": "Qianxia"
+      },
+      "buffs": [
+        {
+          "id": "qianxia.core_passive.angelic_chord_atk_flat_1050",
+          "source": {
+            "zhCN": "核心被动",
+            "en": "Core Passive"
+          },
+          "description": {
+            "zhCN": "literal display text"
+          },
+          "scope": "inCombat",
+          "stats": [
+            {
+              "stat": "atkFlat",
+              "value": 1050,
+              "mode": "flat"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+This gives each teammate a stable id, localized name, and a list of Buff
+entries. Each Buff entry has:
+
+- `id`: stable calculation id used in `activeBuffIds`;
+- `source`: where the Buff comes from, such as `核心被动`, `影画1`,
+  `额外能力`, or `强化特殊技`;
+- `description`: literal text for UI inspection;
+- `scope`: currently `inCombat`;
+- `stats`: normalized calculation payload.
+
+### Qianxia Data Added
+
+Added teammate:
+
+```text
+千夏 / qianxia
+```
+
+Added Buff 1:
+
+```text
+id: qianxia.core_passive.angelic_chord_atk_flat_1050
+source: 核心被动
+description:
+  处于「天使协律」状态下的角色的攻击力提升，提升数值等同于千夏30%初始攻击力，最高不超过1050点；当千夏的初始攻击力达到3500点时，为全队角色提供的攻击力增益效果达到最大值
+stats:
+  atkFlat +1050
+```
+
+Added Buff 2:
+
+```text
+id: qianxia.ex_special.ethereal_curtain_reverie_atk_flat_50
+source: 强化特殊技
+description:
+  「以太帷幕·妄想重奏」生效期间，全队角色攻击力额外提升50点，持续40秒，千夏重复开启「以太帷幕·妄想重奏」前，将关闭已有的「以太帷幕·妄想重奏」
+stats:
+  atkFlat +50
+```
+
+### Backend Change
+
+Updated:
+
+```text
+backend/calculator.js
+```
+
+Added helper:
+
+```text
+flattenTeammateCombatBuffs(teammates)
+```
+
+The backend keeps the grouped teammate structure for `/api/meta`, but flattens
+each teammate Buff into the existing combat Buff calculation path. This avoids
+creating a second calculation mechanism while still preserving the grouped
+maintenance model.
+
+For calculation, each teammate Buff is normalized with:
+
+- `sourceType: "teammate"`;
+- `teammateId`;
+- `teammateName`;
+- `sourceLabel`;
+- `description`;
+- `conditionLabel`, derived from description unless an explicit condition label
+  is provided;
+- `name`, defaulting to `队友名｜Buff来源`.
+
+The existing in-combat request can now activate 千夏 Buffs through:
+
+```json
+{
+  "combatBuffs": {
+    "activeBuffIds": [
+      "qianxia.core_passive.angelic_chord_atk_flat_1050",
+      "qianxia.ex_special.ethereal_curtain_reverie_atk_flat_50"
+    ]
+  }
+}
+```
+
+When both are active, the in-combat panel receives:
+
+```text
+atkFlat +1100
+```
+
+### Frontend Change
+
+Updated:
+
+```text
+frontend/app.js
+frontend/styles.css
+```
+
+The homepage teammate Buff section now renders grouped teammate Buffs through:
+
+```text
+teammateCombatBuffGroups()
+renderTeammateCombatBuffGroups(...)
+```
+
+The visible structure is:
+
+```text
+千夏
+  [ ] 核心被动
+      literal description
+      实际效果：攻击力 +1050
+  [ ] 强化特殊技
+      literal description
+      实际效果：攻击力 +50
+```
+
+The checkbox still uses the same `data-combat-buff-id` mechanism as other
+combat Buffs, so selecting either row immediately feeds its id into
+`activeBuffIds` and recalculates the in-combat panel.
+
+Added styles for:
+
+- `.combat-team-group`;
+- `.teammate-buff-row`;
+- `.combat-check-description`;
+- `.combat-check-stats`.
+
+The goal was to make teammate Buffs readable without turning them into raw JSON.
+
+### Documentation Updated
+
+Updated:
+
+```text
+docs/modeling.md
+docs/goal.md
+```
+
+`docs/modeling.md` now documents the teammate Buff group shape and explains the
+backend flattening step.
+
+`docs/goal.md` now marks the grouped teammate Buff model and the first 千夏
+Buff entries as done. The in-combat panel layer is now marked as iterating
+instead of merely planned, because the calculator already has a working
+selection and panel-composition path, while damage and timing semantics remain
+future work.
+
+### Verification
+
+Verified:
+
+- `node --check backend/calculator.js`
+- `node --check frontend/app.js`
+- `data/combat_buffs.json` parses successfully as JSON.
+
+The next verification step after restarting the local server is to call
+`POST /api/calculate/in-combat` with both 千夏 Buff ids enabled and confirm that
+the returned `inCombat.buffTotals.atkFlat` increases by `1100`.
+
+## 2026-05-27 - Polished Buff Selection Modal And Limited Custom Buffs To One Stat
+
+### Request Context
+
+The user reported that the Buff selection modal opened by the `+` button looked
+too rough, with the custom Buff page being especially poor. The user also asked
+that custom Buff creation should no longer allow adding multiple entries inside
+one modal. One modal submission should create one custom Buff only.
+
+### UI Problems Addressed
+
+The previous modal inherited too much from the Drive Disc modal:
+
+- It stretched very wide across the viewport.
+- The header was a plain white form header.
+- The search box, tabs, and content had little visual hierarchy.
+- The custom Buff pane rendered as a raw row of select + input + delete button.
+- The `添加属性` button encouraged bundling several unrelated stat effects into
+  one custom Buff, making later inspection harder.
+
+### HTML Changes
+
+Updated:
+
+```text
+frontend/index.html
+```
+
+Changed the Buff modal search label to use:
+
+```text
+combat-buff-search-field
+```
+
+This gives the search row a modal-specific layout and avoids relying only on the
+generic `.field` styling.
+
+Added a custom Buff intro block:
+
+```text
+custom-buff-intro
+```
+
+The intro states that one modal submission adds one custom Buff and that the
+saved Buff will appear in the homepage `其他 Buff` list.
+
+Removed the old custom Buff button:
+
+```text
+addCustomBuffStatBtn
+```
+
+Removed visible text:
+
+```text
+添加属性
+```
+
+Renamed the save action text from:
+
+```text
+保存自定义 Buff
+```
+
+to:
+
+```text
+保存并添加
+```
+
+This better matches the action: the Buff is saved and immediately added to the
+current in-combat panel configuration.
+
+### Frontend Logic Changes
+
+Updated:
+
+```text
+frontend/app.js
+```
+
+Removed `addCustomBuffStatBtn` from the element lookup table and removed its
+event listener.
+
+Removed the custom stat row delete handler. Since there is now only one custom
+stat row, deleting rows is no longer part of the interaction.
+
+Changed:
+
+```text
+renderCustomBuffStatRows(...)
+```
+
+The function now renders exactly one custom stat editor:
+
+- one stat select;
+- one numeric value input;
+- no remove button;
+- no dynamic row append.
+
+The rendered row uses real `.field` labels for `属性` and `数值`, so the layout
+looks consistent with the rest of the application.
+
+Changed custom Buff sanitization:
+
+```text
+sanitizeAddedCombatBuffs(...)
+```
+
+When loading saved custom Buffs, the code now keeps only the first valid stat:
+
+```text
+stats: stats.slice(0, 1)
+```
+
+This ensures older multi-stat custom Buff records do not keep behaving like
+multi-effect custom Buffs after the UI has moved to a one-stat model.
+
+### Styling Changes
+
+Updated:
+
+```text
+frontend/styles.css
+```
+
+The Buff modal is now styled through:
+
+```text
+.disc-modal.combat-buff-modal
+```
+
+The selector intentionally has higher specificity than the generic
+`.disc-modal` rule, so the modal no longer expands to the Drive Disc modal's
+wide layout.
+
+Changed modal width to:
+
+```text
+min(920px, calc(100vw - 32px))
+```
+
+The modal now has:
+
+- a dark ZZZ-like header;
+- a yellow bottom accent line;
+- a card-like white/soft-gray body;
+- a segmented tab control;
+- more deliberate candidate Buff cards;
+- a polished custom Buff panel;
+- a compact single-row custom stat editor.
+
+Added or updated styles for:
+
+```text
+.combat-buff-search-field
+.combat-buff-tabs
+.combat-buff-candidate-list
+.combat-candidate-row
+.combat-custom-pane
+.custom-buff-intro
+.custom-buff-stat-row
+```
+
+### Behavior After Change
+
+Opening the Buff modal with `+` now shows a narrower, more focused modal.
+
+Switching to `自定义` now shows:
+
+```text
+自定义 Buff
+名称
+属性
+数值
+保存并添加
+```
+
+There is no `添加属性` button. There are no per-row delete buttons. Saving can
+only create a custom Buff with one normalized stat effect.
+
+### Documentation Updated
+
+Updated:
+
+```text
+docs/modeling.md
+docs/goal.md
+docs/changelog.md
+```
+
+`docs/modeling.md` now documents that homepage custom Buffs are one-Buff,
+one-stat manual corrections converted into `combatBuffs.manualStats`.
+
+`docs/goal.md` now marks Buff modal polishing and single-stat custom Buff input
+as done.
+
+### Verification
+
+Verified:
+
+- `node --check frontend/app.js`
+- Search confirmed that `addCustomBuffStatBtn`, `data-remove-custom-stat`, and
+  visible `添加属性` are no longer present in the active frontend files.
+- Loaded `http://localhost:8787/` in headless Edge, clicked the homepage `+`
+  Buff button, switched to `自定义`, and inspected the live DOM.
+- Saved a live custom Buff named `测试攻击 Buff` with `固定攻击力 = 123` and
+  confirmed the homepage stored exactly one normalized stat object:
+  `atkFlat +123`.
+
+Live DOM verification returned:
+
+```json
+{
+  "modalHidden": false,
+  "modalWidth": 920,
+  "addButtonExists": false,
+  "customRowCount": 1,
+  "customSelectCount": 1,
+  "customValueCount": 1,
+  "removeButtonCount": 0
+}
+```
+
+A screenshot was inspected locally to confirm the custom Buff panel has no
+obvious text overlap or raw row controls. The temporary screenshot file was
+deleted after verification.

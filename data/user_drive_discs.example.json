@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "updatedAt": null,
+  "owners": [
+    {
+      "id": "default",
+      "label": "默认用户"
+    }
+  ],
+  "imports": [],
+  "driveDiscs": [],
+  "driveDiscLoadouts": []
+}

@@ -2,30 +2,150 @@
   "$schema": "./schemas/stat_rules.schema.json",
   "version": 1,
   "statDisplay": {
-    "hpBase": { "label": "Base HP", "display": "integer" },
-    "atkBase": { "label": "Base ATK", "display": "integer" },
-    "defBase": { "label": "Base DEF", "display": "integer" },
-    "hpFlat": { "label": "HP", "display": "integer" },
-    "atkFlat": { "label": "ATK", "display": "integer" },
-    "defFlat": { "label": "DEF", "display": "integer" },
-    "hpPct": { "label": "HP%", "display": "percent" },
-    "atkPct": { "label": "ATK%", "display": "percent" },
-    "defPct": { "label": "DEF%", "display": "percent" },
-    "critRate": { "label": "CRIT Rate", "display": "percent" },
-    "critDmg": { "label": "CRIT DMG", "display": "percent" },
-    "impact": { "label": "Impact", "display": "number" },
-    "anomalyProficiency": { "label": "Anomaly Proficiency", "display": "integer" },
-    "anomalyMastery": { "label": "Anomaly Mastery", "display": "number" },
-    "penFlat": { "label": "PEN", "display": "integer" },
-    "penRatio": { "label": "PEN Ratio", "display": "percent" },
-    "physicalResIgnore": { "label": "Physical RES Ignore", "display": "percent" },
-    "energyRegen": { "label": "Energy Regen", "display": "percent" },
-    "physicalDmg": { "label": "Physical DMG Bonus", "display": "percent" },
-    "fireDmg": { "label": "Fire DMG Bonus", "display": "percent" },
-    "iceDmg": { "label": "Ice DMG Bonus", "display": "percent" },
-    "electricDmg": { "label": "Electric DMG Bonus", "display": "percent" },
-    "etherDmg": { "label": "Ether DMG Bonus", "display": "percent" },
-    "dmgBonus": { "label": "DMG Bonus", "display": "percent" }
+    "hpBase": {
+      "label": "Base HP",
+      "display": "integer"
+    },
+    "atkBase": {
+      "label": "Base ATK",
+      "display": "integer"
+    },
+    "defBase": {
+      "label": "Base DEF",
+      "display": "integer"
+    },
+    "hpFlat": {
+      "label": "HP",
+      "display": "integer"
+    },
+    "atkFlat": {
+      "label": "ATK",
+      "display": "integer"
+    },
+    "defFlat": {
+      "label": "DEF",
+      "display": "integer"
+    },
+    "hpPct": {
+      "label": "HP%",
+      "display": "percent"
+    },
+    "atkPct": {
+      "label": "ATK%",
+      "display": "percent"
+    },
+    "defPct": {
+      "label": "DEF%",
+      "display": "percent"
+    },
+    "critRate": {
+      "label": "CRIT Rate%",
+      "display": "percent"
+    },
+    "critDmg": {
+      "label": "CRIT DMG%",
+      "display": "percent"
+    },
+    "impact": {
+      "label": "Impact",
+      "display": "number"
+    },
+    "anomalyProficiency": {
+      "label": "Anomaly Proficiency",
+      "display": "integer"
+    },
+    "anomalyMastery": {
+      "label": "Anomaly Mastery",
+      "display": "number"
+    },
+    "penFlat": {
+      "label": "PEN",
+      "display": "integer"
+    },
+    "penRatio": {
+      "label": "PEN Ratio%",
+      "display": "percent"
+    },
+    "physicalResIgnore": {
+      "label": "Physical RES Ignore%",
+      "display": "percent"
+    },
+    "fireResIgnore": {
+      "label": "Fire RES Ignore%",
+      "display": "percent"
+    },
+    "iceResIgnore": {
+      "label": "Ice RES Ignore%",
+      "display": "percent"
+    },
+    "electricResIgnore": {
+      "label": "Electric RES Ignore%",
+      "display": "percent"
+    },
+    "etherResIgnore": {
+      "label": "Ether RES Ignore%",
+      "display": "percent"
+    },
+    "energyRegen": {
+      "label": "Energy Regen%",
+      "display": "percent"
+    },
+    "physicalDmg": {
+      "label": "Physical DMG Bonus%",
+      "display": "percent"
+    },
+    "fireDmg": {
+      "label": "Fire DMG Bonus%",
+      "display": "percent"
+    },
+    "iceDmg": {
+      "label": "Ice DMG Bonus%",
+      "display": "percent"
+    },
+    "electricDmg": {
+      "label": "Electric DMG Bonus%",
+      "display": "percent"
+    },
+    "etherDmg": {
+      "label": "Ether DMG Bonus%",
+      "display": "percent"
+    },
+    "dmgBonus": {
+      "label": "DMG Bonus%",
+      "display": "percent"
+    },
+    "enemyDefReduction": {
+      "label": "Enemy DEF Reduction%",
+      "display": "percent"
+    },
+    "enemyResReduction": {
+      "label": "Enemy Current RES Reduction%",
+      "display": "percent"
+    },
+    "enemyPhysicalResReduction": {
+      "label": "Enemy Physical RES Reduction%",
+      "display": "percent"
+    },
+    "enemyFireResReduction": {
+      "label": "Enemy Fire RES Reduction%",
+      "display": "percent"
+    },
+    "enemyIceResReduction": {
+      "label": "Enemy Ice RES Reduction%",
+      "display": "percent"
+    },
+    "enemyElectricResReduction": {
+      "label": "Enemy Electric RES Reduction%",
+      "display": "percent"
+    },
+    "enemyEtherResReduction": {
+      "label": "Enemy Ether RES Reduction%",
+      "display": "percent"
+    },
+    "enemyDefFlatReduction": {
+      "label": "Enemy DEF Reduction",
+      "display": "number"
+    }
   },
   "driveDisc": {
     "rarityMaxLevel": {
@@ -34,32 +154,62 @@
       "B": 9
     },
     "mainStatPools": {
-      "1": ["hpFlat"],
-      "2": ["atkFlat"],
-      "3": ["defFlat"],
-      "4": ["hpPct", "atkPct", "defPct", "critRate", "critDmg", "anomalyProficiency"],
-      "5": ["hpPct", "atkPct", "defPct", "penRatio", "physicalDmg", "fireDmg", "iceDmg", "electricDmg", "etherDmg"],
-      "6": ["hpPct", "atkPct", "defPct", "anomalyMastery", "impact", "energyRegen"]
+      "1": [
+        "hpFlat"
+      ],
+      "2": [
+        "atkFlat"
+      ],
+      "3": [
+        "defFlat"
+      ],
+      "4": [
+        "hpPct",
+        "atkPct",
+        "defPct",
+        "critRate",
+        "critDmg",
+        "anomalyProficiency"
+      ],
+      "5": [
+        "hpPct",
+        "atkPct",
+        "defPct",
+        "penRatio",
+        "physicalDmg",
+        "fireDmg",
+        "iceDmg",
+        "electricDmg",
+        "etherDmg"
+      ],
+      "6": [
+        "hpPct",
+        "atkPct",
+        "defPct",
+        "anomalyMastery",
+        "impact",
+        "energyRegen"
+      ]
     },
     "sRankMaxMainStat": {
       "hpFlat": 2200,
       "atkFlat": 316,
       "defFlat": 184,
-      "hpPct": 0.3,
-      "atkPct": 0.3,
-      "defPct": 0.48,
-      "critRate": 0.24,
-      "critDmg": 0.48,
+      "hpPct": 30,
+      "atkPct": 30,
+      "defPct": 48,
+      "critRate": 24,
+      "critDmg": 48,
       "anomalyProficiency": 92,
-      "penRatio": 0.24,
-      "physicalDmg": 0.3,
-      "fireDmg": 0.3,
-      "iceDmg": 0.3,
-      "electricDmg": 0.3,
-      "etherDmg": 0.3,
-      "anomalyMastery": 0.3,
-      "impact": 0.18,
-      "energyRegen": 0.6
+      "penRatio": 24,
+      "physicalDmg": 30,
+      "fireDmg": 30,
+      "iceDmg": 30,
+      "electricDmg": 30,
+      "etherDmg": 30,
+      "anomalyMastery": 30,
+      "impact": 18,
+      "energyRegen": 60
     },
     "subStatPool": [
       "hpFlat",
@@ -77,11 +227,11 @@
       "hpFlat": 112,
       "atkFlat": 19,
       "defFlat": 15,
-      "hpPct": 0.03,
-      "atkPct": 0.03,
-      "defPct": 0.048,
-      "critRate": 0.024,
-      "critDmg": 0.048,
+      "hpPct": 3,
+      "atkPct": 3,
+      "defPct": 4.8,
+      "critRate": 2.4,
+      "critDmg": 4.8,
       "anomalyProficiency": 9,
       "penFlat": 9
     }

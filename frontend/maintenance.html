@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>维护界面 | ZZZ 驱动盘计算器</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <img class="brand-mark" src="/zzz-mark.svg" alt="ZZZ">
+        <div>
+          <div class="brand-name">绝区零计算器</div>
+          <div class="brand-sub">驱动盘 · 音擎 · 局外/局内面板</div>
+        </div>
+      </div>
+
+      <nav class="side-nav">
+        <a href="/" class="nav-item">首页</a>
+        <a href="/drive-discs.html" class="nav-item">驱动盘</a>
+        <a href="/calculate.html" class="nav-item">计算</a>
+        <a href="/maintenance.html" class="nav-item active">维护</a>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="mini-chip" id="status">加载中</div>
+        <div class="mini-note">管理员数据维护</div>
+      </div>
+    </aside>
+
+    <main class="content maintenance-content">
+      <header class="page-header" id="page-top">
+        <div class="title-block">
+          <div class="eyebrow">DATA MAINTENANCE</div>
+          <h1>维护界面</h1>
+          <p>角色、音擎、驱动盘套装与 Buff 数据录入</p>
+        </div>
+        <div class="header-actions">
+          <button id="cloneBtn" type="button" class="ghost-btn">复制当前</button>
+          <button id="newBtn" type="button" class="ghost-btn">新增</button>
+          <button id="saveBtn" type="submit" form="maintenanceForm" class="primary-btn">保存</button>
+        </div>
+      </header>
+
+      <section class="maintenance-tabs" role="tablist">
+        <button type="button" class="active" data-kind="agents">角色资料</button>
+        <button type="button" data-kind="agentSkills">技能倍率</button>
+        <button type="button" data-kind="wEngines">音擎资料</button>
+        <button type="button" data-kind="driveDiscSets">驱动盘资料</button>
+        <button type="button" data-kind="buffs">Buff 资料</button>
+      </section>
+
+      <div class="maintenance-layout">
+        <section class="maintenance-list-panel">
+          <label class="field">
+            <span>搜索</span>
+            <input id="searchInput" placeholder="名称、ID、来源">
+          </label>
+          <div id="recordList" class="maintenance-record-list"></div>
+        </section>
+
+        <section class="maintenance-editor-panel">
+          <div class="card maintenance-card">
+            <div class="card-head">
+              <h2 id="editorTitle">资料维护</h2>
+              <div id="editorTag" class="tag">-</div>
+            </div>
+            <div id="maintenanceFeedback" class="maintenance-feedback" hidden></div>
+            <form id="maintenanceForm" class="maintenance-form"></form>
+          </div>
+
+          <div class="card maintenance-preview-card">
+            <div class="card-head">
+              <h2>保存预览</h2>
+              <div class="tag">JSON</div>
+            </div>
+            <pre id="jsonPreview" class="raw"></pre>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="/maintenance.js"></script>
+</body>
+</html>

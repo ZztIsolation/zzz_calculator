@@ -16,8 +16,8 @@ v1 models an out-of-combat panel first, then an optional in-combat panel layer:
 6. In-combat stats start from `outOfCombat.panel` and then add selected Buffs
    from self, teammate, W-Engine passives, Drive Disc 4-piece effects, boss or
    enemy effects, field effects, and manual corrections.
-7. Final damage, enemy defense, resistance, stun, skill multipliers, anomaly,
-   disorder, and rotation logic are still out of scope.
+7. Single-row direct damage can resolve maintained skill multipliers. Stun,
+   anomaly, disorder, and rotation logic are still out of scope.
 
 ## Frontend / Backend Split
 
@@ -32,6 +32,8 @@ The project is organized as a small full-stack app:
 - In-combat Buff catalog: `data/combat_buffs.json` stores generic verified
   Buffs. W-Engine passives stay in `data/w_engines.json`, and Drive Disc set
   effects stay in `data/drive_disc_sets.json`.
+- Agent skill multipliers: `data/agent_skills.json` stores active skill
+  categories, moves, direct damage rows, and per-level multiplier tables.
 - User inventory: scanner imports and future manual CRUD data are stored in
   `data/user_drive_discs.json`. This file is deliberately separate from
   canonical static data because it belongs to one user/account rather than the
@@ -66,6 +68,8 @@ Primary references used while drafting this model:
 
 - `GET /api/health`
 - `GET /api/meta`
+- `GET /api/maintenance/catalog`
+- `POST /api/maintenance/agent-skills`
 - `GET /api/example/out-of-combat`
 - `GET /api/example/ye-shunguang`
 - `POST /api/calculate/out-of-combat`
@@ -122,6 +126,11 @@ interface AgentStaticData {
     source?: string;
   };
   level60: Record<string, number>;
+  combatBuffs?: {
+    corePassive?: Effect | null;
+    additionalAbility?: Effect | null;
+    cinemaBuffs?: AgentCinemaBuff[];
+  };
 }
 
 interface WEngineStaticData {
@@ -171,8 +180,10 @@ interface DriveDiscSetStaticData {
     icon?: string;
     source?: string;
   };
-  twoPiece?: Effect;
-  fourPiece?: Effect;
+  // 2-piece effects implicitly apply to the out-of-combat panel.
+  twoPiece?: Omit<Effect, "scope" | "appliesToOutOfCombatPanel">;
+  // 4-piece effects implicitly apply only as in-combat effects.
+  fourPiece?: Omit<Effect, "scope" | "appliesToOutOfCombatPanel">;
 }
 
 interface DriveDiscInventoryItem {
@@ -234,22 +245,75 @@ interface DriveDiscInventoryStore {
 interface Effect {
   scope: "outOfCombat" | "inCombat";
   condition: string | null;
-  stats: Array<{
+  stats?: Array<{
     stat: ZzzStat;
     value: number;
     mode: "flat" | "pct";
     basis?: "baseHp" | "outOfCombatHp" | "baseAtk" | "outOfCombatAtk" | "baseDef" | "outOfCombatDef";
   }>;
+  effects?: Array<
+    | { type: "fixed"; stat: ZzzStat; value: number; mode: "flat" | "pct"; basis?: Effect["stats"][number]["basis"] }
+    | { type: "derived"; stat: ZzzStat; mode: "flat" | "pct"; sourceLabel?: { zhCN?: string }; defaultSourceValue: number; ratio: number; cap?: number }
+    | { type: "formula"; stat: ZzzStat; mode: "flat" | "pct"; source: { variable: "x"; label?: { zhCN?: string }; defaultValue: number; min?: number; max?: number }; formula: { expression: string; valueUnit?: "storedValue" | "storedPercent" } }
+    | { type: "stacked"; stat: ZzzStat; mode: "flat" | "pct"; valuePerStack: number; maxStacks: number; defaultStacks?: number; basis?: Effect["stats"][number]["basis"] }
+  >;
 }
 
 interface CombatBuff {
   id: string;
   hidden?: boolean;
-  sourceType: "self" | "teammate" | "driveDisc4pc" | "boss" | "field" | "manual";
+  sourceType: "self" | "teammate" | "wEngine" | "driveDisc4pc" | "boss" | "field" | "manual";
+  teammateId?: string;
+  teammateName?: { zhCN?: string; en?: string };
+  sourceLabel?: { zhCN?: string; en?: string };
   name: { zhCN?: string; en?: string };
-  conditionLabel?: string | null;
+  description?: string | { zhCN?: string; en?: string } | null;
+  conditionLabel?: string | { zhCN?: string; en?: string } | null;
   scope: "inCombat";
   stats: Effect["stats"];
+}
+
+interface AgentCinemaBuff extends Effect {
+  cinemaLevel: 1 | 2 | 3 | 4 | 5 | 6;
+  cinemaName: { zhCN?: string; en?: string };
+  description: string | { zhCN?: string; en?: string };
+  defaultChecked?: false;
+}
+
+interface AgentSkillCatalog {
+  id: string;
+  agentId: string;
+  name?: { zhCN?: string; en?: string };
+  categories: Array<{
+    id: string;
+    name: { zhCN?: string; en?: string };
+    icon?: string;
+    levelRange: { min: number; max: number; default: number };
+    moves: Array<{
+      id: string;
+      name: { zhCN?: string; en?: string };
+      damageElement?: "physical" | "fire" | "ice" | "electric" | "ether";
+      rows: Array<{
+        id: string;
+        label: { zhCN?: string; en?: string };
+        kind?: "damageMultiplier";
+        values: number[]; // 159.8 means 159.8%
+      }>;
+    }>;
+  }>;
+  sources?: string[];
+}
+
+interface TeammateCombatBuffGroup {
+  id: string;
+  name: { zhCN?: string; en?: string };
+  buffs: Array<{
+    id: string;
+    source: { zhCN?: string; en?: string };
+    description: string | { zhCN?: string; en?: string };
+    scope: "inCombat";
+    stats: Effect["stats"];
+  }>;
 }
 
 interface InCombatRequest {
@@ -268,6 +332,16 @@ interface InCombatRequest {
       mode: "flat" | "pct";
       basis?: Effect["stats"][number]["basis"];
     }>;
+  };
+  damage?: {
+    skillMultiplier?: number;
+    skillRef?: {
+      agentSkillId: string;
+      categoryId: string;
+      moveId: string;
+      rowId: string;
+      level: number;
+    };
   };
 }
 
@@ -293,6 +367,16 @@ interface InCombatResponse {
     ignoredEffects: Array<{ key: string; sourceType?: string; reason?: string }>;
     breakdown: {
       flatFromPct: { hp: number; atk: number; def: number };
+      atkPanel: {
+        outOfCombatAtk: number;
+        atkFlat: number;
+        baseAtk: number;
+        baseAtkPct: number;
+        atkFromBasePct: number;
+        outOfCombatAtkPct: number;
+        atkFromOutOfCombatPct: number;
+        total: number;
+      };
       basis: {
         base: Record<string, number>;
         outOfCombatPanel: Record<string, number>;
@@ -324,15 +408,147 @@ atkPct +10%, basis outOfCombatAtk:
   flat attack contribution = outOfCombat.panel.atk * 0.10
 ```
 
-If a percentage HP/ATK/DEF Buff does not provide `basis`, the default is the
-corresponding base stat. The frontend manual correction area exposes both
-base-attack percentage and out-of-combat-attack percentage because they are
-different Buff semantics.
+The frontend manual correction area exposes both base-attack percentage and
+out-of-combat-attack percentage because they are different Buff semantics.
 
 `dmgBonus` and elemental damage bonuses are displayed separately even though
 they will later share a damage multiplier bucket. CRIT Rate is not capped in
 the panel layer; any future expectation formula should cap it inside the damage
 calculation, not here.
+
+### Buff Rule Types
+
+Structured Buffs can use these calculation rules:
+
+- `fixed`: directly adds one stored stat value.
+- `derived`: converts a runtime source number by `sourceValue * ratio / 100`,
+  then applies optional `cap`.
+- `formula`: evaluates a safe single-variable expression from source `x` into
+  the stored stat value. It only permits numbers, `x`, arithmetic, parentheses,
+  and `floor/ceil/round/min/max/clamp`.
+- `stacked`: multiplies `valuePerStack` by runtime stack count.
+
+For the HP-to-damage Buff, use:
+`clamp(floor((x - 15000) / 400) + 10, 10, 40)`, with source `x` clamped to
+15000-27000 and defaulted to 27000. Stored percent conventions still apply, so
+formula result `40` for `dmgBonus` means 40% before the backend converts it to
+the panel fraction `0.4`.
+
+## ATK Basis Rules
+
+Attack has three intentionally separate stages:
+
+```text
+base.atk = agent Base ATK + W-Engine Base ATK + Core Skill Base ATK
+outOfCombat.panel.atk = base.atk * (1 + outOfCombat atkPct) + outOfCombat atkFlat
+inCombat.panel.atk = outOfCombat.panel.atk + selected in-combat ATK buffs
+```
+
+Out-of-combat `atkPct` always scales from `base.atk`. This includes Drive Disc
+ATK% main stats, Drive Disc ATK% sub-stats, unconditional out-of-combat set
+effects, and W-Engine advanced stats when an advanced stat is ATK%.
+
+In-combat ATK% must preserve its basis:
+
+- `basis: "baseAtk"` scales from `outOfCombat.base.atk`.
+- `basis: "outOfCombatAtk"` scales from `outOfCombat.panel.atk`.
+- Teammate, boss/enemy, field, and manual Buffs default to
+  `outOfCombatAtk` when they provide in-combat `atkPct` without an explicit
+  basis.
+- Self, W-Engine, and Drive Disc 4-piece in-combat `atkPct` effects must write
+  `basis` explicitly. If they do not, the calculator ignores that effect and
+  reports `missingAtkPctBasis`.
+
+When adding new data, never treat `atkPct` as self-explanatory in an in-combat
+effect. Either write a `basis` field or make sure the source type is one of the
+explicit out-of-combat defaults above.
+
+### Agent Cinema Buff Data Shape
+
+Agent cinema Buffs live under `agent.combatBuffs.cinemaBuffs` as a sparse array.
+Only modeled cinemas are stored; do not create empty entries for missing cinema
+levels. Each entry keeps the cinema level, cinema name, literal Buff
+description, and structured `effects` rules:
+
+```json
+{
+  "combatBuffs": {
+    "corePassive": null,
+    "additionalAbility": null,
+    "cinemaBuffs": [
+      {
+        "cinemaLevel": 1,
+        "cinemaName": { "zhCN": "影画名称" },
+        "description": { "zhCN": "Buff 原文描述" },
+        "scope": "inCombat",
+        "defaultChecked": false,
+        "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 },
+        "effects": [
+          { "id": "effect-1", "type": "fixed", "stat": "atkPct", "value": 20, "mode": "pct", "basis": "baseAtk" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+At load time, cinema entries become normal self Buff candidates with IDs like
+`agent:ye_shunguang.cinema.1`. They are not checked by default, because a
+modeled cinema should not imply the player owns that cinema. Since they are
+self Buffs, in-combat `atkPct` rules must declare `basis` explicitly.
+
+### Teammate Buff Data Shape
+
+Teammate Buffs are stored by teammate first, because one teammate can contribute
+multiple independent Buff sources. The current shape is:
+
+```json
+{
+  "teammates": [
+    {
+      "id": "qianxia",
+      "name": { "zhCN": "千夏" },
+      "buffs": [
+        {
+          "id": "qianxia.core_passive.angelic_chord_atk_flat_1050",
+          "source": { "zhCN": "核心被动" },
+          "description": { "zhCN": "字面描述原文" },
+          "scope": "inCombat",
+          "stats": [
+            { "stat": "atkFlat", "value": 1050, "mode": "flat" }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+At load time, the backend flattens those teammate entries into normal
+`CombatBuff` candidates so the existing `activeBuffIds` calculation path can
+apply them. The grouped shape remains available in `/api/meta` for frontend
+display, where the homepage renders:
+
+- teammate name;
+- Buff source, such as `核心被动`, `强化特殊技`, `影画1`, `额外能力`;
+- literal description;
+- structured calculation effect.
+
+For the first teammate, 千夏 currently has:
+
+- `核心被动`: `atkFlat +1050`;
+- `强化特殊技`: `atkFlat +50`.
+
+### Custom Buff Input Rule
+
+Homepage custom Buffs are user-created, temporary in-combat corrections stored
+inside the local homepage selection state. They are converted into
+`combatBuffs.manualStats` when the calculator sends an in-combat request.
+
+The custom Buff modal intentionally creates only one custom Buff at a time, and
+that Buff contains only one stat effect. This keeps manual corrections
+inspectable on the homepage and prevents a single opaque "custom" row from
+silently bundling several unrelated calculations together.
 
 ## User Drive Disc Inventory
 
@@ -483,11 +699,15 @@ against screenshots before implementation.
 
 ## Effect Scope Rules
 
-v1 applies only effects with:
+v1 applies out-of-combat effects with:
 
 ```text
 scope === "outOfCombat" && condition === null
 ```
+
+Drive Disc set effects use fixed defaults instead of storing those fields:
+2-piece effects always apply to the out-of-combat panel, and 4-piece effects
+are always modeled as in-combat effects.
 
 Examples:
 
@@ -521,7 +741,8 @@ Anomaly, Support, Defense, and Rupture-specific scoring should be added later.
 ## Explicitly Deferred
 
 - Character levels other than 60.
-- Skill multipliers and core passive damage scaling.
+- Multi-hit rotation totals, skill resource modeling, and core passive damage
+  scaling.
 - Mindscape Cinema.
 - Conditional W-Engine passives.
 - Conditional Drive Disc 4-piece effects.

@@ -14,12 +14,27 @@
         "partition": 1,
         "rarity": "S",
         "level": 15,
-        "mainStat": { "stat": "hpFlat", "value": 2200 },
+        "mainStat": {
+          "stat": "hpFlat",
+          "value": 2200
+        },
         "subStats": [
-          { "stat": "atkPct", "value": 0.03 },
-          { "stat": "critRate", "value": 0.024 },
-          { "stat": "critDmg", "value": 0.048 },
-          { "stat": "atkFlat", "value": 19 }
+          {
+            "stat": "atkPct",
+            "value": 3
+          },
+          {
+            "stat": "critRate",
+            "value": 2.4
+          },
+          {
+            "stat": "critDmg",
+            "value": 4.8
+          },
+          {
+            "stat": "atkFlat",
+            "value": 19
+          }
         ]
       },
       {
@@ -28,12 +43,27 @@
         "partition": 2,
         "rarity": "S",
         "level": 15,
-        "mainStat": { "stat": "atkFlat", "value": 316 },
+        "mainStat": {
+          "stat": "atkFlat",
+          "value": 316
+        },
         "subStats": [
-          { "stat": "hpPct", "value": 0.03 },
-          { "stat": "critRate", "value": 0.024 },
-          { "stat": "critDmg", "value": 0.048 },
-          { "stat": "penFlat", "value": 9 }
+          {
+            "stat": "hpPct",
+            "value": 3
+          },
+          {
+            "stat": "critRate",
+            "value": 2.4
+          },
+          {
+            "stat": "critDmg",
+            "value": 4.8
+          },
+          {
+            "stat": "penFlat",
+            "value": 9
+          }
         ]
       },
       {
@@ -42,12 +72,27 @@
         "partition": 3,
         "rarity": "S",
         "level": 15,
-        "mainStat": { "stat": "defFlat", "value": 184 },
+        "mainStat": {
+          "stat": "defFlat",
+          "value": 184
+        },
         "subStats": [
-          { "stat": "atkPct", "value": 0.03 },
-          { "stat": "hpFlat", "value": 112 },
-          { "stat": "defPct", "value": 0.048 },
-          { "stat": "anomalyProficiency", "value": 9 }
+          {
+            "stat": "atkPct",
+            "value": 3
+          },
+          {
+            "stat": "hpFlat",
+            "value": 112
+          },
+          {
+            "stat": "defPct",
+            "value": 4.8
+          },
+          {
+            "stat": "anomalyProficiency",
+            "value": 9
+          }
         ]
       },
       {
@@ -56,12 +101,27 @@
         "partition": 4,
         "rarity": "S",
         "level": 15,
-        "mainStat": { "stat": "critRate", "value": 0.24 },
+        "mainStat": {
+          "stat": "critRate",
+          "value": 24
+        },
         "subStats": [
-          { "stat": "atkFlat", "value": 19 },
-          { "stat": "critDmg", "value": 0.048 },
-          { "stat": "atkPct", "value": 0.03 },
-          { "stat": "hpPct", "value": 0.03 }
+          {
+            "stat": "atkFlat",
+            "value": 19
+          },
+          {
+            "stat": "critDmg",
+            "value": 4.8
+          },
+          {
+            "stat": "atkPct",
+            "value": 3
+          },
+          {
+            "stat": "hpPct",
+            "value": 3
+          }
         ]
       },
       {
@@ -70,12 +130,27 @@
         "partition": 5,
         "rarity": "S",
         "level": 15,
-        "mainStat": { "stat": "electricDmg", "value": 0.3 },
+        "mainStat": {
+          "stat": "electricDmg",
+          "value": 30
+        },
         "subStats": [
-          { "stat": "critRate", "value": 0.024 },
-          { "stat": "critDmg", "value": 0.048 },
-          { "stat": "atkPct", "value": 0.03 },
-          { "stat": "penFlat", "value": 9 }
+          {
+            "stat": "critRate",
+            "value": 2.4
+          },
+          {
+            "stat": "critDmg",
+            "value": 4.8
+          },
+          {
+            "stat": "atkPct",
+            "value": 3
+          },
+          {
+            "stat": "penFlat",
+            "value": 9
+          }
         ]
       },
       {
@@ -84,12 +159,27 @@
         "partition": 6,
         "rarity": "S",
         "level": 15,
-        "mainStat": { "stat": "impact", "value": 0.18 },
+        "mainStat": {
+          "stat": "impact",
+          "value": 18
+        },
         "subStats": [
-          { "stat": "atkFlat", "value": 19 },
-          { "stat": "critRate", "value": 0.024 },
-          { "stat": "critDmg", "value": 0.048 },
-          { "stat": "anomalyProficiency", "value": 9 }
+          {
+            "stat": "atkFlat",
+            "value": 19
+          },
+          {
+            "stat": "critRate",
+            "value": 2.4
+          },
+          {
+            "stat": "critDmg",
+            "value": 4.8
+          },
+          {
+            "stat": "anomalyProficiency",
+            "value": 9
+          }
         ]
       }
     ]
@@ -99,19 +189,37 @@
       "setId": "woodpecker_electro",
       "pieceCount": 2,
       "scope": "outOfCombat",
-      "stats": [{ "stat": "critRate", "value": 0.08, "mode": "flat" }]
+      "stats": [
+        {
+          "stat": "critRate",
+          "value": 8,
+          "mode": "flat"
+        }
+      ]
     },
     {
       "setId": "swing_jazz",
       "pieceCount": 2,
       "scope": "outOfCombat",
-      "stats": [{ "stat": "energyRegen", "value": 0.2, "mode": "pct" }]
+      "stats": [
+        {
+          "stat": "energyRegen",
+          "value": 20,
+          "mode": "pct"
+        }
+      ]
     },
     {
       "setId": "hormone_punk",
       "pieceCount": 2,
       "scope": "outOfCombat",
-      "stats": [{ "stat": "atkPct", "value": 0.1, "mode": "pct" }]
+      "stats": [
+        {
+          "stat": "atkPct",
+          "value": 10,
+          "mode": "pct"
+        }
+      ]
     }
   ],
   "expectedIgnoredEffects": [
@@ -142,6 +250,7 @@
       "energyRegenPct": 0.2,
       "penFlat": 18,
       "penRatio": 0,
+      "physicalResIgnore": 0,
       "dmgBonus": 0,
       "physicalDmg": 0,
       "fireDmg": 0,
@@ -161,6 +270,7 @@
       "energyRegen": 1.44,
       "penFlat": 18,
       "penRatio": 0,
+      "physicalResIgnore": 0,
       "dmgBonus": 0,
       "physicalDmg": 0,
       "fireDmg": 0,

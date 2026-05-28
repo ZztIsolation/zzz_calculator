@@ -21,6 +21,9 @@ const els = {
     sortSelect: document.getElementById("sortSelect"),
     discTableBody: document.getElementById("discTableBody"),
     emptyInventory: document.getElementById("emptyInventory"),
+    loadoutCount: document.getElementById("loadoutCount"),
+    loadoutTableBody: document.getElementById("loadoutTableBody"),
+    emptyLoadouts: document.getElementById("emptyLoadouts"),
     discModal: document.getElementById("discModal"),
     closeDiscModalBtn: document.getElementById("closeDiscModalBtn"),
     modalTitle: document.getElementById("modalTitle"),
@@ -46,29 +49,39 @@ const els = {
     saveDiscBtn: document.getElementById("saveDiscBtn"),
     deleteDiscBtn: document.getElementById("deleteDiscBtn"),
     rawPreview: document.getElementById("rawPreview"),
+    loadoutModal: document.getElementById("loadoutModal"),
+    closeLoadoutModalBtn: document.getElementById("closeLoadoutModalBtn"),
+    loadoutModalTitle: document.getElementById("loadoutModalTitle"),
+    loadoutSelectedTag: document.getElementById("loadoutSelectedTag"),
+    loadoutIdInput: document.getElementById("loadoutIdInput"),
+    loadoutNameInput: document.getElementById("loadoutNameInput"),
+    loadoutAgentSelect: document.getElementById("loadoutAgentSelect"),
+    loadoutSlotEditors: document.getElementById("loadoutSlotEditors"),
+    saveLoadoutBtn: document.getElementById("saveLoadoutBtn"),
+    deleteLoadoutBtn: document.getElementById("deleteLoadoutBtn"),
 }
 
 const EMPTY_DISC_IMAGE = "/assets/drive-discs/empty.svg"
 const STAT_OPTIONS = [
     ["hpFlat", "生命值"],
-    ["hpPct", "生命值%"],
+    ["hpPct", "百分比生命值%"],
     ["atkFlat", "攻击力"],
-    ["atkPct", "攻击力%"],
+    ["atkPct", "百分比攻击力%"],
     ["defFlat", "防御力"],
-    ["defPct", "防御力%"],
-    ["critRate", "暴击率"],
-    ["critDmg", "暴击伤害"],
-    ["impact", "冲击力"],
+    ["defPct", "百分比防御力%"],
+    ["critRate", "暴击率%"],
+    ["critDmg", "暴击伤害%"],
+    ["impact", "冲击力%"],
     ["anomalyProficiency", "异常精通"],
-    ["anomalyMastery", "异常掌控"],
-    ["energyRegen", "能量自动回复"],
+    ["anomalyMastery", "异常掌控%"],
+    ["energyRegen", "能量自动回复%"],
     ["penFlat", "穿透值"],
-    ["penRatio", "穿透率"],
-    ["physicalDmg", "物理伤害加成"],
-    ["fireDmg", "火属性伤害加成"],
-    ["iceDmg", "冰属性伤害加成"],
-    ["electricDmg", "电属性伤害加成"],
-    ["etherDmg", "以太伤害加成"],
+    ["penRatio", "穿透率%"],
+    ["physicalDmg", "物理伤害加成%"],
+    ["fireDmg", "火属性伤害加成%"],
+    ["iceDmg", "冰属性伤害加成%"],
+    ["electricDmg", "电属性伤害加成%"],
+    ["etherDmg", "以太伤害加成%"],
 ]
 const STAT_LABELS = Object.fromEntries(STAT_OPTIONS)
 const PERCENT_STATS = new Set([
@@ -93,6 +106,7 @@ let store = null
 let selectedId = null
 let selectedSetId = null
 let selectedSetName = ""
+let selectedLoadoutId = null
 
 function setStatus(text, tone = "idle") {
     els.status.textContent = text
@@ -134,7 +148,7 @@ function formatStatValue(stat, value, mode) {
     }
 
     if (mode === "pct" || isPercentStat(stat)) {
-        return `${Number((value * 100).toFixed(1))}%`
+        return `${Number(value.toFixed(3))}%`
     }
 
     return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(3)))
@@ -154,7 +168,7 @@ function valueToInput(item) {
     }
 
     return item.mode === "pct" || isPercentStat(item.stat)
-        ? Number((item.value * 100).toFixed(3))
+        ? Number(item.value.toFixed(3))
         : item.value
 }
 
@@ -164,7 +178,7 @@ function inputToValue(stat, rawValue) {
         return 0
     }
 
-    return isPercentStat(stat) ? Number((value / 100).toFixed(12)) : value
+    return value
 }
 
 function defaultMainValue(stat) {
@@ -173,7 +187,7 @@ function defaultMainValue(stat) {
         return ""
     }
 
-    return isPercentStat(stat) ? Number((value * 100).toFixed(3)) : value
+    return isPercentStat(stat) ? Number(value.toFixed(3)) : value
 }
 
 async function api(path, options = {}) {
@@ -361,10 +375,49 @@ function renderTable() {
     }
 }
 
+function agentName(agentId) {
+    return nameOf(meta?.agents?.find(agent => agent.id === agentId)) || agentId
+}
+
+function discById(id) {
+    return (store?.driveDiscs ?? []).find(disc => disc.id === id) ?? null
+}
+
+function loadoutSlotText(loadout) {
+    return [1, 2, 3, 4, 5, 6].map(slot => {
+        const disc = discById(loadout.driveDiscIdsBySlot?.[String(slot)])
+        return disc ? `${slot}:${disc.setName || nameOf(resolveSet(disc))}` : `${slot}:-`
+    }).join(" / ")
+}
+
+function renderLoadouts() {
+    const loadouts = store?.driveDiscLoadouts ?? []
+    if (!els.loadoutTableBody) {
+        return
+    }
+
+    els.loadoutCount.textContent = String(loadouts.length)
+    els.loadoutTableBody.innerHTML = ""
+    els.emptyLoadouts.hidden = loadouts.length !== 0
+    for (const loadout of loadouts) {
+        const row = document.createElement("tr")
+        row.dataset.loadoutId = loadout.id
+        row.innerHTML = `
+            <td><strong>${escapeHtml(loadout.name)}</strong><br><span>${escapeHtml(loadout.updatedAt ?? "-")}</span></td>
+            <td>${escapeHtml(agentName(loadout.agentId))}</td>
+            <td class="substat-cell">${escapeHtml(loadoutSlotText(loadout))}</td>
+            <td>${Number.isFinite(Number(loadout.score)) ? Number(loadout.score).toFixed(0) : "-"}</td>
+            <td><button type="button" class="compact-btn" data-action="edit-loadout" data-loadout-id="${escapeHtml(loadout.id)}">编辑</button></td>
+        `
+        els.loadoutTableBody.appendChild(row)
+    }
+}
+
 function renderAll() {
     populateFilters()
     renderSummary()
     renderTable()
+    renderLoadouts()
 }
 
 function currentDisc() {
@@ -504,6 +557,112 @@ function openModal(disc = null) {
 function closeModal() {
     els.discModal.hidden = true
     document.body.classList.remove("modal-open")
+}
+
+function currentLoadout() {
+    return (store?.driveDiscLoadouts ?? []).find(item => item.id === selectedLoadoutId) ?? null
+}
+
+function populateLoadoutAgentSelect(selectedAgentId) {
+    els.loadoutAgentSelect.innerHTML = ""
+    for (const agent of meta?.agents ?? []) {
+        const option = document.createElement("option")
+        option.value = agent.id
+        option.textContent = nameOf(agent)
+        option.selected = agent.id === selectedAgentId
+        els.loadoutAgentSelect.appendChild(option)
+    }
+}
+
+function renderLoadoutSlotEditors(loadout) {
+    els.loadoutSlotEditors.innerHTML = ""
+    for (let slot = 1; slot <= 6; slot += 1) {
+        const label = document.createElement("label")
+        label.className = "field"
+        const select = document.createElement("select")
+        select.dataset.loadoutSlot = String(slot)
+        const discs = (store?.driveDiscs ?? [])
+            .filter(disc => Number(disc.partition) === slot)
+            .sort((left, right) =>
+                String(left.setName).localeCompare(String(right.setName), "zh-CN")
+                || Number(left.source?.sequence ?? 999999) - Number(right.source?.sequence ?? 999999)
+            )
+        for (const disc of discs) {
+            const option = document.createElement("option")
+            option.value = disc.id
+            option.textContent = `${disc.setName || nameOf(resolveSet(disc))} · ${slot}号位 · ${statText(disc.mainStat)}${disc.source?.sequence ? ` · #${disc.source.sequence}` : ""}`
+            option.selected = disc.id === loadout.driveDiscIdsBySlot?.[String(slot)]
+            select.appendChild(option)
+        }
+        label.innerHTML = `<span>${slot}号位</span>`
+        label.appendChild(select)
+        els.loadoutSlotEditors.appendChild(label)
+    }
+}
+
+function openLoadoutModal(loadout) {
+    selectedLoadoutId = loadout.id
+    els.loadoutIdInput.value = loadout.id
+    els.loadoutNameInput.value = loadout.name
+    populateLoadoutAgentSelect(loadout.agentId)
+    renderLoadoutSlotEditors(loadout)
+    els.loadoutSelectedTag.textContent = `${agentName(loadout.agentId)} · ${Number.isFinite(Number(loadout.score)) ? Number(loadout.score).toFixed(0) : "手动"}`
+    els.loadoutModal.hidden = false
+    document.body.classList.add("modal-open")
+}
+
+function closeLoadoutModal() {
+    els.loadoutModal.hidden = true
+    document.body.classList.remove("modal-open")
+    selectedLoadoutId = null
+}
+
+function readLoadoutSlotIds() {
+    return Object.fromEntries(
+        [...els.loadoutSlotEditors.querySelectorAll("select[data-loadout-slot]")]
+            .map(select => [select.dataset.loadoutSlot, select.value])
+            .filter(([, id]) => id)
+    )
+}
+
+async function saveCurrentLoadout() {
+    const existing = currentLoadout()
+    if (!existing) {
+        return
+    }
+    const response = await api(`/api/user-drive-disc-loadouts/${encodeURIComponent(existing.id)}`, {
+        method: "PUT",
+        body: JSON.stringify({
+            ...existing,
+            name: els.loadoutNameInput.value.trim() || existing.name,
+            agentId: els.loadoutAgentSelect.value,
+            driveDiscIdsBySlot: readLoadoutSlotIds(),
+            source: {
+                ...(existing.source ?? {}),
+                editedFromInventory: true,
+            },
+        }),
+    })
+    store = response.store
+    closeLoadoutModal()
+    renderAll()
+}
+
+async function deleteCurrentLoadout() {
+    const existing = currentLoadout()
+    if (!existing) {
+        return
+    }
+    const ok = window.confirm(`确认删除套装预设「${existing.name}」？`)
+    if (!ok) {
+        return
+    }
+    const response = await api(`/api/user-drive-disc-loadouts/${encodeURIComponent(existing.id)}`, {
+        method: "DELETE",
+    })
+    store = response.store
+    closeLoadoutModal()
+    renderAll()
 }
 
 function readSubStats() {
@@ -699,6 +858,19 @@ els.discTableBody.addEventListener("click", event => {
     }
 })
 
+els.loadoutTableBody?.addEventListener("click", event => {
+    const target = event.target.closest("[data-loadout-id]")
+    const row = target ?? event.target.closest("tr[data-loadout-id]")
+    if (!row) {
+        return
+    }
+
+    const loadout = (store?.driveDiscLoadouts ?? []).find(item => item.id === row.dataset.loadoutId)
+    if (loadout) {
+        openLoadoutModal(loadout)
+    }
+})
+
 els.setGrid.addEventListener("click", event => {
     const button = event.target.closest("button[data-set-id]")
     if (!button) {
@@ -739,6 +911,30 @@ els.closeDiscModalBtn.addEventListener("click", closeModal)
 els.discModal.addEventListener("click", event => {
     if (event.target.matches("[data-close-modal]")) {
         closeModal()
+    }
+})
+els.closeLoadoutModalBtn?.addEventListener("click", closeLoadoutModal)
+els.loadoutModal?.addEventListener("click", event => {
+    if (event.target.matches("[data-close-loadout-modal]")) {
+        closeLoadoutModal()
+    }
+})
+els.saveLoadoutBtn?.addEventListener("click", async () => {
+    try {
+        setStatus("保存套装", "idle")
+        await saveCurrentLoadout()
+        setStatus("已保存", "success")
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
+})
+els.deleteLoadoutBtn?.addEventListener("click", async () => {
+    try {
+        setStatus("删除套装", "idle")
+        await deleteCurrentLoadout()
+        setStatus("已删除", "success")
+    } catch (error) {
+        setStatus(error.message, "error")
     }
 })
 

@@ -4,46 +4,195 @@
   "notes": [
     "Generic in-combat buff catalog. Verified W-Engine passives and Drive Disc 4-piece effects remain in their existing source files and are exposed as runtime candidates.",
     "Visible self, teammate, boss, and field buffs should only be added after their values are verified. Until then, use manual corrections from the frontend.",
+    "Teammate buffs are grouped by teammate first. Each teammate owns multiple buff entries, and each entry separates source label, literal description, and structured stats used by calculation.",
     "Hidden entries exist only for backend validation of different percentage attack bases."
   ],
-  "buffs": [
+  "teammates": [
     {
-      "id": "manual.test.base_atk_pct_10",
-      "hidden": true,
-      "sourceType": "manual",
-      "scope": "inCombat",
+      "id": "qianxia",
       "name": {
-        "zhCN": "校验：基础攻击力 +10%",
-        "en": "Validation: Base ATK +10%"
+        "zhCN": "千夏"
       },
-      "conditionLabel": "隐藏校验项",
-      "stats": [
+      "buffs": [
         {
-          "stat": "atkPct",
-          "value": 0.1,
-          "mode": "pct",
-          "basis": "baseAtk"
+          "id": "buff_j8kf2r9m4q",
+          "source": {
+            "zhCN": "核心被动"
+          },
+          "description": {
+            "zhCN": "处于「天使协律」状态下的角色的攻击力提升，提升数值等同于千夏30%初始攻击力，最高不超过1050点；当千夏的初始攻击力达到3500点时，为全队角色提供的攻击力增益效果达到最大值"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_d4n8q2lm",
+              "type": "derived",
+              "stat": "atkFlat",
+              "mode": "flat",
+              "sourceLabel": {
+                "zhCN": "千夏初始攻击力"
+              },
+              "defaultSourceValue": 3500,
+              "ratio": 30,
+              "cap": 1050
+            }
+          ]
+        },
+        {
+          "id": "buff_v6p3n8x2la",
+          "source": {
+            "zhCN": "强化特殊技"
+          },
+          "description": {
+            "zhCN": "「以太帷幕·妄想重奏」生效期间，全队角色攻击力额外提升50点，持续40秒，千夏重复开启「以太帷幕·妄想重奏」前，将关闭已有的「以太帷幕·妄想重奏」"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_p7vx3k9a",
+              "type": "fixed",
+              "stat": "atkFlat",
+              "mode": "flat",
+              "value": 50
+            }
+          ]
         }
       ]
     },
     {
-      "id": "manual.test.out_of_combat_atk_pct_10",
+      "id": "liuyin",
+      "name": {
+        "zhCN": "琉音"
+      },
+      "buffs": [
+        {
+          "source": {
+            "zhCN": "额外能力"
+          },
+          "description": {
+            "zhCN": "发动[强化特殊技]或[终结技]时全队角色获得[好评如潮]效果，[好评如潮]状态下的角色造成的伤害提升40%，持续15秒，琉音在[好评如潮]状态下发动[强化特殊技]或[终结技]时，若当前[好评如潮]的剩余持续时间小于35秒，则将该状态的持续时间延长10秒；"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 40,
+              "id": "effect_2690c691d0"
+            }
+          ],
+          "id": "buff_6646686e01"
+        }
+      ]
+    },
+    {
+      "id": "zhao",
+      "name": {
+        "zhCN": "照"
+      },
+      "buffs": [
+        {
+          "source": {
+            "zhCN": "核心被动"
+          },
+          "description": {
+            "zhCN": "照发动「登场技」时，消耗所有「霜寒值」，开启「以太帷幕·涌泉」；\n「以太帷幕·涌泉」生效期间，全队角色最大生命值提升5%，持续40秒，照重复开启「以太帷幕·涌泉」前，将关闭已有的「以太帷幕·涌泉」；\n照开启「以太帷幕·涌泉」时，使全队角色的攻击力提升1000点，持续50秒；\n照处于任意「以太帷幕」中时，使全队造成的伤害提升10%，照的初始最大生命值高于15000点时，每超过400点初始最大生命值，可使增伤效果额外提升1%，初始效果与额外提升最大总共提升至40%。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "type": "fixed",
+              "stat": "hpPct",
+              "mode": "pct",
+              "basis": "outOfCombatHp",
+              "value": 5,
+              "id": "effect_2b727bb5b2"
+            },
+            {
+              "type": "fixed",
+              "stat": "atkFlat",
+              "mode": "flat",
+              "value": 1000,
+              "id": "effect_0400b55f89"
+            },
+            {
+              "type": "formula",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "source": {
+                "variable": "x",
+                "label": {
+                  "zhCN": "照的初始最大生命值"
+                },
+                "defaultValue": 27000,
+                "min": 15000,
+                "max": 27000
+              },
+              "formula": {
+                "expression": "clamp(floor((x - 15000) / 400) + 10, 10, 40)",
+                "valueUnit": "storedPercent"
+              },
+              "id": "effect_zhao_hp_to_dmg"
+            }
+          ],
+          "id": "buff_7a09645b2f"
+        }
+      ]
+    }
+  ],
+  "buffs": [
+    {
+      "id": "buff_m9c4t2z8qw",
       "hidden": true,
       "sourceType": "manual",
       "scope": "inCombat",
       "name": {
-        "zhCN": "校验：局外攻击力 +10%",
-        "en": "Validation: Out-of-Combat ATK +10%"
+        "zhCN": "校验：基础攻击力 +10%"
       },
       "conditionLabel": "隐藏校验项",
-      "stats": [
+      "effects": [
         {
+          "id": "effect_b6q2mz4r",
+          "type": "fixed",
           "stat": "atkPct",
-          "value": 0.1,
+          "value": 10,
+          "mode": "pct",
+          "basis": "baseAtk"
+        }
+      ],
+      "coverage": {
+        "default": 1,
+        "min": 0,
+        "max": 1,
+        "step": 0.1
+      }
+    },
+    {
+      "id": "buff_h2r7x5p1kd",
+      "hidden": true,
+      "sourceType": "manual",
+      "scope": "inCombat",
+      "name": {
+        "zhCN": "校验：局外攻击力 +10%"
+      },
+      "conditionLabel": "隐藏校验项",
+      "effects": [
+        {
+          "id": "effect_t5w8n1rc",
+          "type": "fixed",
+          "stat": "atkPct",
+          "value": 10,
           "mode": "pct",
           "basis": "outOfCombatAtk"
         }
-      ]
+      ],
+      "coverage": {
+        "default": 1,
+        "min": 0,
+        "max": 1,
+        "step": 0.1
+      }
     }
   ]
 }

@@ -10,13 +10,14 @@
     {
       "id": "anby_demara",
       "name": {
-        "en": "Anby Demara",
         "zhCN": "安比"
       },
       "rarity": "A",
       "attribute": "electric",
       "specialty": "stun",
-      "attackTypes": ["slash"],
+      "attackTypes": [
+        "slash"
+      ],
       "faction": "cunning_hares",
       "images": {
         "portrait": "/assets/agents/anby_demara.webp",
@@ -26,12 +27,34 @@
         "hpBase": 7500,
         "atkBase": 583,
         "defBase": 612,
-        "critRate": 0.05,
-        "critDmg": 0.5,
+        "critRate": 5,
+        "critDmg": 50,
         "impact": 118,
         "anomalyProficiency": 94,
         "anomalyMastery": 93,
-        "energyRegen": 1.2
+        "energyRegen": 120
+      },
+      "combatBuffs": {
+        "corePassive": null,
+        "additionalAbility": null
+      },
+      "preferredDriveDiscs": {
+        "mainStatLimits": {
+          "4": [
+            "critRate",
+            "critDmg"
+          ],
+          "5": [
+            "electricDmg",
+            "atkPct",
+            "penRatio"
+          ],
+          "6": [
+            "impact",
+            "energyRegen",
+            "atkPct"
+          ]
+        }
       },
       "sources": [
         "https://zenless-zone-zero.fandom.com/wiki/Anby_Demara"
@@ -44,30 +67,97 @@
     {
       "id": "ye_shunguang",
       "name": {
-        "en": "Ye Shunguang",
         "zhCN": "叶瞬光"
       },
       "rarity": "S",
       "attribute": "honed_edge",
       "damageElement": "physical",
       "specialty": "attack",
-      "attackTypes": ["slash"],
-      "faction": "yunkui_summit",
+      "attackTypes": [
+        "slash"
+      ],
+      "faction": "云岿山",
       "images": {
         "portrait": "/assets/agents/ye_shunguang.webp",
-        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Agent_Ye_Shunguang_Portrait.png"
+        "source": "https://wiki.biligame.com/zzz/%E5%8F%B6%E7%9E%AC%E5%85%89"
       },
       "level60": {
         "hpBase": 7673,
         "atkBase": 863,
         "defBase": 606,
-        "critRate": 0.05,
-        "critDmg": 0.5,
+        "critRate": 5,
+        "critDmg": 50,
         "impact": 83,
         "anomalyProficiency": 93,
         "anomalyMastery": 94,
-        "energyRegen": 1.2,
+        "energyRegen": 120,
         "penRatio": 0
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          },
+          "effects": [
+            {
+              "id": "effect-1",
+              "type": "fixed",
+              "stat": "critRate",
+              "value": 30,
+              "mode": "flat"
+            },
+            {
+              "id": "effect-2",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 25,
+              "mode": "flat"
+            }
+          ]
+        },
+        "additionalAbility": null,
+        "cinemaBuffs": [
+          {
+            "cinemaLevel": 1,
+            "cinemaName": {
+              "zhCN": "梦中身"
+            },
+            "description": {
+              "zhCN": "进入战场时，获得6点[青溟剑势]，在勘域模式中此效果180秒内最多触发一次；\n[核心被动：照破无明]中[合道]效果额外使造成的伤害提升10%，无视目标20%防御力。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "coverage": {
+              "default": 1,
+              "min": 0,
+              "max": 1,
+              "step": 0.1
+            },
+            "effects": [
+              {
+                "id": "effect-1",
+                "type": "fixed",
+                "stat": "dmgBonus",
+                "value": 10,
+                "mode": "flat"
+              },
+              {
+                "id": "effect-2",
+                "type": "fixed",
+                "stat": "enemyDefReduction",
+                "value": 20,
+                "mode": "flat"
+              }
+            ]
+          }
+        ]
       },
       "coreSkill": {
         "name": {
@@ -82,7 +172,7 @@
             "stats": [
               {
                 "stat": "critRate",
-                "value": 0.048,
+                "value": 4.8,
                 "mode": "flat",
                 "target": "panel"
               }
@@ -118,7 +208,7 @@
             "stats": [
               {
                 "stat": "critRate",
-                "value": 0.048,
+                "value": 4.8,
                 "mode": "flat",
                 "target": "panel"
               }
@@ -154,7 +244,7 @@
             "stats": [
               {
                 "stat": "critRate",
-                "value": 0.048,
+                "value": 4.8,
                 "mode": "flat",
                 "target": "panel"
               }
@@ -191,6 +281,23 @@
         "verification": {
           "stats": "source-checked-from-user-screenshot",
           "skillLevelBonuses": "stored-but-not-used-in-panel"
+        }
+      },
+      "preferredDriveDiscs": {
+        "mainStatLimits": {
+          "4": [
+            "atkPct",
+            "critRate",
+            "critDmg"
+          ],
+          "5": [
+            "atkPct",
+            "penRatio",
+            "physicalDmg"
+          ],
+          "6": [
+            "atkPct"
+          ]
         }
       },
       "sources": [

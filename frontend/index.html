@@ -19,13 +19,9 @@
 
       <nav class="side-nav">
         <a href="/" class="nav-item active">首页</a>
-        <a href="#agent-section" class="nav-item">角色</a>
-        <a href="#weapon-section" class="nav-item">音擎</a>
         <a href="/drive-discs.html" class="nav-item">驱动盘</a>
-        <a href="#panel-section" class="nav-item">面板</a>
-        <a href="#combat-section" class="nav-item">局内</a>
-        <a href="#effects-section" class="nav-item">效果</a>
-        <a href="#advanced-section" class="nav-item">数据</a>
+        <a href="/calculate.html" class="nav-item">计算</a>
+        <a href="/maintenance.html" class="nav-item">维护</a>
       </nav>
 
       <div class="sidebar-foot">
@@ -126,6 +122,16 @@
               <h2>驱动盘</h2>
               <div class="tag">仓库选择</div>
             </div>
+            <div class="disc-source-toggle">
+              <div class="segmented-control" role="group" aria-label="驱动盘来源">
+                <button id="manualDiscModeBtn" type="button" class="active" data-disc-mode="manual">自选</button>
+                <button id="loadoutDiscModeBtn" type="button" data-disc-mode="loadout">套装</button>
+              </div>
+              <label class="field loadout-apply-field">
+                <span>套装预设</span>
+                <select id="homeLoadoutSelect"></select>
+              </label>
+            </div>
             <div class="disc-picker" id="discPicker"></div>
             <div class="disc-grid" id="discGrid"></div>
           </article>
@@ -142,73 +148,79 @@
                 <div id="selfCombatBuffs" class="combat-buff-list"></div>
               </div>
               <div class="combat-group">
-                <h3>队友 Buff</h3>
-                <div id="teammateCombatBuffs" class="combat-buff-list"></div>
+                <h3>驱动盘 Buff</h3>
+                <div id="driveDiscCombatBuffs" class="combat-buff-list"></div>
               </div>
               <div class="combat-group">
-                <h3>驱动盘 4 件套</h3>
-                <div id="ownDriveDisc4pcBuffs" class="combat-buff-list"></div>
-                <div class="teammate-disc-selects">
-                  <label class="field">
-                    <span>队友 1 4 件套</span>
-                    <select id="teammateDriveDiscSet1"></select>
-                  </label>
-                  <label class="field">
-                    <span>队友 2 4 件套</span>
-                    <select id="teammateDriveDiscSet2"></select>
-                  </label>
+                <h3>音擎 Buff</h3>
+                <div id="wEngineCombatBuffs" class="combat-buff-list"></div>
+              </div>
+              <div class="combat-group">
+                <div class="combat-add-head">
+                  <h3>其他 Buff</h3>
+                  <button id="openCombatBuffModalBtn" type="button" class="icon-add-btn" aria-label="添加 Buff">+</button>
                 </div>
+                <div id="addedCombatBuffs" class="combat-added-list"></div>
               </div>
               <div class="combat-group">
                 <h3>Boss / 敌方效果</h3>
+                <div class="target-settings-grid">
+                  <label class="field">
+                    <span>Boss 预设</span>
+                    <select id="damageTargetPreset"></select>
+                  </label>
+                  <label class="field">
+                    <span>最终防御力</span>
+                    <input id="damageTargetDefense" type="number" min="0" step="1" value="953">
+                  </label>
+                  <label class="field">
+                    <span>等级基数</span>
+                    <input id="damageLevelCoefficient" type="number" min="1" step="1" value="794">
+                  </label>
+                  <div class="field target-resistance-field">
+                    <span id="damageTargetResistanceLabel">Boss 抗性</span>
+                    <div id="damageTargetResistancePreset" class="resistance-buttons" role="group" aria-label="Boss 抗性快捷">
+                      <button type="button" data-resistance-preset="-20">-20%</button>
+                      <button type="button" data-resistance-preset="0" class="active">0%</button>
+                      <button type="button" data-resistance-preset="20">+20%</button>
+                      <button type="button" data-resistance-preset="custom">自定义</button>
+                    </div>
+                    <input id="damageTargetResistance" class="resistance-custom-input" type="number" min="-100" max="100" step="0.1" value="0" aria-label="Boss 抗性自定义百分比" hidden>
+                  </div>
+                  <label class="field">
+                    <span>技能倍率%</span>
+                    <input id="damageSkillMultiplier" type="number" min="0" step="0.1" value="100">
+                  </label>
+                  <label class="field">
+                    <span>技能分类</span>
+                    <select id="damageSkillCategory"></select>
+                  </label>
+                  <label class="field">
+                    <span>招式</span>
+                    <select id="damageSkillMove"></select>
+                  </label>
+                  <label class="field">
+                    <span>倍率行</span>
+                    <select id="damageSkillRow"></select>
+                  </label>
+                  <label class="field">
+                    <span>技能等级</span>
+                    <select id="damageSkillLevel"></select>
+                  </label>
+                  <label class="field">
+                    <span>暴击模式</span>
+                    <select id="damageCritMode">
+                      <option value="expected">期望</option>
+                      <option value="crit">暴击</option>
+                      <option value="nonCrit">非暴击</option>
+                    </select>
+                  </label>
+                </div>
                 <div id="bossCombatBuffs" class="combat-buff-list"></div>
               </div>
               <div class="combat-group">
                 <h3>场地 Buff</h3>
                 <div id="fieldCombatBuffs" class="combat-buff-list"></div>
-              </div>
-              <div class="combat-group combat-group-wide">
-                <h3>手动修正</h3>
-                <div class="combat-manual-grid">
-                  <label class="field">
-                    <span>固定攻击力</span>
-                    <input id="manualAtkFlat" type="number" step="1" value="0">
-                  </label>
-                  <label class="field">
-                    <span>基础攻击力 %</span>
-                    <input id="manualAtkBasePct" type="number" step="0.1" value="0">
-                  </label>
-                  <label class="field">
-                    <span>局外攻击力 %</span>
-                    <input id="manualAtkPanelPct" type="number" step="0.1" value="0">
-                  </label>
-                  <label class="field">
-                    <span>基础生命值 %</span>
-                    <input id="manualHpBasePct" type="number" step="0.1" value="0">
-                  </label>
-                  <label class="field">
-                    <span>穿透率 %</span>
-                    <input id="manualPenRatio" type="number" step="0.1" value="0">
-                  </label>
-                  <label class="field">
-                    <span>通用伤害 %</span>
-                    <input id="manualDmgBonus" type="number" step="0.1" value="0">
-                  </label>
-                  <label class="field">
-                    <span>元素伤害类型</span>
-                    <select id="manualElementDmgStat">
-                      <option value="physicalDmg">物理伤害</option>
-                      <option value="fireDmg">火属性伤害</option>
-                      <option value="iceDmg">冰属性伤害</option>
-                      <option value="electricDmg">电属性伤害</option>
-                      <option value="etherDmg">以太伤害</option>
-                    </select>
-                  </label>
-                  <label class="field">
-                    <span>元素伤害 %</span>
-                    <input id="manualElementDmg" type="number" step="0.1" value="0">
-                  </label>
-                </div>
               </div>
             </div>
           </article>
@@ -217,69 +229,74 @@
         </section>
 
         <section class="result-column">
-          <article class="card" id="panel-section">
+          <article class="card collapsible-card" id="panel-section">
             <div class="card-head">
               <h2>局外面板</h2>
               <div class="tag">局外面板</div>
             </div>
-            <div class="panel-band">
-              <div class="score-card">
-                <span>简单评分</span>
-                <strong id="scoreBox">-</strong>
+            <div class="collapsible-body">
+              <div class="kv-section">
+                <h3>基础属性</h3>
+                <div id="baseTable" class="kv-table"></div>
               </div>
-              <div class="panel-summary" id="panelSummary"></div>
-            </div>
-
-            <div class="kv-section">
-              <h3>基础属性</h3>
-              <div id="baseTable" class="kv-table"></div>
-            </div>
-            <div class="kv-section">
-              <h3>局外面板</h3>
-              <div id="bonusTable" class="kv-table"></div>
-            </div>
-            <div class="kv-section">
-              <h3>加成汇总</h3>
-              <div id="panelTable" class="kv-table"></div>
+              <div class="kv-section">
+                <h3>局外面板</h3>
+                <div id="bonusTable" class="kv-table"></div>
+              </div>
             </div>
           </article>
 
-          <article class="card" id="in-combat-panel-section">
+          <article class="card collapsible-card" id="in-combat-panel-section">
             <div class="card-head">
               <h2>局内面板</h2>
               <div class="tag">局内</div>
             </div>
-            <div class="panel-summary" id="inCombatPanelSummary"></div>
-
-            <div class="kv-section">
-              <h3>局内面板</h3>
-              <div id="inCombatPanelTable" class="kv-table"></div>
-            </div>
-            <div class="kv-section">
-              <h3>局内加成汇总</h3>
-              <div id="inCombatBonusTable" class="kv-table"></div>
-            </div>
-            <div class="kv-section">
-              <h3>已启用 Buff</h3>
-              <div id="inCombatActiveEffects" class="list"></div>
+            <div class="collapsible-body">
+              <div class="kv-section">
+                <h3>局内面板</h3>
+                <div id="inCombatPanelTable" class="kv-table"></div>
+              </div>
+              <div class="kv-section">
+                <h3>已启用 Buff</h3>
+                <div id="inCombatActiveEffects" class="list"></div>
+              </div>
             </div>
           </article>
 
-          <article class="card" id="effects-section">
+          <article class="card" id="damage-whitebox-section">
             <div class="card-head">
-              <h2>效果记录</h2>
-              <div class="tag">套装 / 被动</div>
+              <h2>伤害白盒</h2>
+              <div class="tag">直接伤害 V1</div>
             </div>
-            <div class="split-list">
-              <div>
-                <h3>已应用</h3>
-                <div id="appliedEffects" class="list"></div>
-              </div>
-              <div>
-                <h3>已忽略</h3>
-                <div id="ignoredEffects" class="list"></div>
-              </div>
+            <div class="damage-result-head">
+              <span>最终伤害</span>
+              <strong id="damageFinalValue">-</strong>
             </div>
+            <div id="damageWhiteBoxRows" class="damage-whitebox-list"></div>
+          </article>
+
+          <article class="card" id="atk-breakdown-section">
+            <div class="card-head">
+              <h2>攻击力计算明细</h2>
+              <div class="tag">基准</div>
+            </div>
+            <details id="atkBreakdownDetails" class="breakdown-details">
+              <summary>展开攻击力来源与 Buff 基准</summary>
+              <div class="breakdown-grid">
+                <div class="kv-section">
+                  <h3>基础攻击力组成</h3>
+                  <div id="baseAtkBreakdown" class="kv-table"></div>
+                </div>
+                <div class="kv-section">
+                  <h3>局外攻击力计算</h3>
+                  <div id="outAtkBreakdown" class="kv-table"></div>
+                </div>
+                <div class="kv-section">
+                  <h3>局内攻击力计算</h3>
+                  <div id="inAtkBreakdown" class="kv-table"></div>
+                </div>
+              </div>
+            </details>
           </article>
 
           <article class="card" id="advanced-section">
@@ -292,6 +309,47 @@
         </section>
       </div>
     </main>
+  </div>
+
+  <div id="combatBuffModal" class="modal-layer" hidden>
+    <div class="modal-scrim" data-close-combat-buff-modal></div>
+    <section class="disc-modal combat-buff-modal" role="dialog" aria-modal="true" aria-labelledby="combatBuffModalTitle">
+      <button id="closeCombatBuffModalBtn" type="button" class="modal-close" aria-label="关闭">×</button>
+      <header class="modal-head">
+        <div>
+          <h2 id="combatBuffModalTitle">选择 Buff</h2>
+          <p>选择后才会添加到首页并计入局内面板</p>
+        </div>
+      </header>
+
+      <label class="field combat-buff-search-field">
+        <span>搜索</span>
+        <input id="combatBuffSearchInput" placeholder="搜索来源、名称、效果">
+      </label>
+
+      <div class="combat-buff-tabs" role="tablist">
+        <button type="button" class="active" data-combat-buff-tab="agent">角色引发的 Buff</button>
+        <button type="button" data-combat-buff-tab="wEngine">音擎引发的 Buff</button>
+        <button type="button" data-combat-buff-tab="driveDisc">驱动盘引发的 Buff</button>
+        <button type="button" data-combat-buff-tab="custom">自定义</button>
+      </div>
+
+      <div id="combatBuffCandidateList" class="combat-buff-candidate-list"></div>
+      <div id="combatBuffCustomPane" class="combat-custom-pane" hidden>
+        <label class="field">
+          <span>名称</span>
+          <input id="customBuffNameInput" value="自定义 Buff">
+        </label>
+        <div id="customBuffStatRows" class="custom-buff-stat-rows"></div>
+        <div class="modal-actions">
+          <button id="saveCustomBuffBtn" type="button" class="primary-btn">保存并添加</button>
+        </div>
+      </div>
+      <div id="combatBuffModalEmpty" class="inventory-empty home-disc-empty" hidden>
+        <strong>No Data</strong>
+        <span>暂无可添加的 Buff</span>
+      </div>
+    </section>
   </div>
 
   <div id="homeDiscModal" class="modal-layer" hidden>

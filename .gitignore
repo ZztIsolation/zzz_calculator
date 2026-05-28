@@ -4,12 +4,27 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# local server logs
+.server*.log
+*.log
+
 .env
 .env.*
 
 dist/
 build/
 coverage/
+
+# user-local runtime data
+data/user_drive_discs.json
+
+# local scanner exports, if copied into this repo
+data/imports/
+imports/
+*.scanner-export.json
+
+.vscode/
+.idea/
 
 .DS_Store
 Thumbs.db

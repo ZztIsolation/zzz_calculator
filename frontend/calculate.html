@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>计算 | ZZZ 驱动盘计算器</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <img class="brand-mark" src="/zzz-mark.svg" alt="ZZZ">
+        <div>
+          <div class="brand-name">绝区零计算器</div>
+          <div class="brand-sub">驱动盘 · 音擎 · 局外/局内面板</div>
+        </div>
+      </div>
+
+      <nav class="side-nav">
+        <a href="/" class="nav-item">首页</a>
+        <a href="/drive-discs.html" class="nav-item">驱动盘</a>
+        <a href="/calculate.html" class="nav-item active">计算</a>
+        <a href="/maintenance.html" class="nav-item">维护</a>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="mini-chip" id="status">加载中</div>
+        <div class="mini-note">仓库最优 · 伤害最大化</div>
+      </div>
+    </aside>
+
+    <main class="content optimize-content">
+      <header class="page-header" id="page-top">
+        <div class="title-block">
+          <div class="eyebrow">DRIVE DISC OPTIMIZER</div>
+          <h1>驱动盘最优计算</h1>
+          <p>固定角色、音擎与局内 Buff，从仓库中寻找伤害最高的六件套</p>
+        </div>
+        <div class="header-actions">
+          <button id="optimizeBtn" type="button" class="primary-btn">开始计算</button>
+          <button id="cancelOptimizeBtn" type="button" class="ghost-btn" hidden>取消计算</button>
+        </div>
+      </header>
+
+      <div class="optimizer-workspace">
+        <section class="optimizer-left">
+          <article class="card optimizer-entity-card" id="agent-section">
+            <div class="card-head">
+              <h2>角色设置</h2>
+              <div class="tag">同步首页</div>
+            </div>
+            <div class="optimizer-entity-head">
+              <div class="entity-preview optimizer-entity-media agent-preview">
+                <img id="agentImage" src="/zzz-mark.svg" alt="">
+              </div>
+              <div class="optimizer-entity-fields">
+                <label class="field">
+                  <span>角色</span>
+                  <select id="agentSelect"></select>
+                </label>
+                <label class="field">
+                  <span>等级</span>
+                  <input id="agentLevelInput" value="60" disabled>
+                </label>
+              </div>
+            </div>
+            <div class="optimizer-placeholder-grid">
+              <label class="field">
+                <span>核心技</span>
+                <select id="coreSkillSelect"></select>
+              </label>
+              <label class="field">
+                <span>影画</span>
+                <input id="cinemaLevelInput" value="未建模" disabled>
+              </label>
+            </div>
+            <div class="optimizer-skill-grid">
+              <label class="field"><span>普通攻击</span><input id="basicSkillLevelInput" value="未建模" disabled></label>
+              <label class="field"><span>闪避</span><input id="dodgeSkillLevelInput" value="未建模" disabled></label>
+              <label class="field"><span>支援技</span><input id="assistSkillLevelInput" value="未建模" disabled></label>
+              <label class="field"><span>特殊技</span><input id="specialSkillLevelInput" value="未建模" disabled></label>
+              <label class="field"><span>连携技</span><input id="chainSkillLevelInput" value="未建模" disabled></label>
+            </div>
+            <div class="stat-strip optimizer-entity-meta" id="agentMeta"></div>
+          </article>
+
+          <article class="card optimizer-entity-card" id="weapon-section">
+            <div class="card-head">
+              <h2>音擎设置</h2>
+              <div class="tag">同步首页</div>
+            </div>
+            <div class="optimizer-entity-head">
+              <div class="entity-preview optimizer-entity-media weapon-preview">
+                <img id="wEngineImage" src="/zzz-mark.svg" alt="">
+              </div>
+              <div class="optimizer-entity-fields">
+                <label class="field">
+                  <span>音擎</span>
+                  <select id="wEngineSelect"></select>
+                </label>
+                <label class="field">
+                  <span>等级</span>
+                  <input id="wEngineLevelInput" value="60" disabled>
+                </label>
+              </div>
+            </div>
+            <label class="field">
+              <span>改装等级</span>
+              <input id="wEngineRefineInput" value="未建模" disabled>
+            </label>
+            <div class="stat-strip optimizer-entity-meta" id="wEngineMeta"></div>
+            <div class="weapon-effect optimizer-weapon-effect" id="wEngineEffect"></div>
+          </article>
+
+          <article class="card" id="combat-section">
+            <div class="card-head">
+              <h2>局内设置</h2>
+              <div class="tag">同步首页</div>
+            </div>
+            <div class="combat-section-grid optimizer-combat-section-grid">
+              <div class="combat-group">
+                <h3>自身 Buff</h3>
+                <div id="selfCombatBuffs" class="combat-buff-list"></div>
+              </div>
+              <div class="combat-group">
+                <h3>音擎 Buff</h3>
+                <div id="wEngineCombatBuffs" class="combat-buff-list"></div>
+              </div>
+              <div class="combat-group">
+                <div class="combat-add-head">
+                  <h3>其他 Buff</h3>
+                  <button id="openCombatBuffModalBtn" type="button" class="icon-add-btn" aria-label="添加 Buff">+</button>
+                </div>
+                <div id="addedCombatBuffs" class="combat-added-list"></div>
+              </div>
+              <div class="combat-group">
+                <h3>Boss / 敌方效果</h3>
+                <div class="target-settings-grid optimizer-target-grid">
+                  <label class="field">
+                    <span>Boss 预设</span>
+                    <select id="damageTargetPreset"></select>
+                  </label>
+                  <label class="field">
+                    <span>最终防御力</span>
+                    <input id="damageTargetDefense" type="number" min="0" step="1" value="953">
+                  </label>
+                  <label class="field">
+                    <span>等级基数</span>
+                    <input id="damageLevelCoefficient" type="number" min="1" step="1" value="794">
+                  </label>
+                  <div class="field target-resistance-field">
+                    <span id="damageTargetResistanceLabel">Boss 抗性</span>
+                    <div id="damageTargetResistancePreset" class="resistance-buttons" role="group" aria-label="Boss 抗性快捷">
+                      <button type="button" data-resistance-preset="-20">-20%</button>
+                      <button type="button" data-resistance-preset="0" class="active">0%</button>
+                      <button type="button" data-resistance-preset="20">+20%</button>
+                      <button type="button" data-resistance-preset="custom">自定义</button>
+                    </div>
+                    <input id="damageTargetResistance" class="resistance-custom-input" type="number" min="-100" max="100" step="0.1" value="0" aria-label="Boss 抗性自定义百分比" hidden>
+                  </div>
+                  <label class="field">
+                    <span>技能倍率%</span>
+                    <input id="damageSkillMultiplier" type="number" min="0" step="0.1" value="100">
+                  </label>
+                  <label class="field">
+                    <span>技能分类</span>
+                    <select id="damageSkillCategory"></select>
+                  </label>
+                  <label class="field">
+                    <span>招式</span>
+                    <select id="damageSkillMove"></select>
+                  </label>
+                  <label class="field">
+                    <span>倍率行</span>
+                    <select id="damageSkillRow"></select>
+                  </label>
+                  <label class="field">
+                    <span>技能等级</span>
+                    <select id="damageSkillLevel"></select>
+                  </label>
+                  <label class="field">
+                    <span>暴击模式</span>
+                    <select id="damageCritMode">
+                      <option value="expected">期望</option>
+                      <option value="crit">暴击</option>
+                      <option value="nonCrit">非暴击</option>
+                    </select>
+                  </label>
+                </div>
+                <div id="bossCombatBuffs" class="combat-buff-list"></div>
+              </div>
+              <div class="combat-group">
+                <h3>场地 Buff</h3>
+                <div id="fieldCombatBuffs" class="combat-buff-list"></div>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <section class="optimizer-center">
+          <article class="card">
+            <div class="card-head">
+              <h2>计算设置</h2>
+              <div class="tag">精确枚举</div>
+            </div>
+            <div class="optimizer-settings-grid">
+              <label class="field">
+                <span>算法</span>
+                <select id="algorithmSelect">
+                  <option value="exact">精确枚举</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>限定 4 件套</span>
+                <select id="fourPieceSetSelect"></select>
+              </label>
+              <label class="field">
+                <span>额外 2 件套</span>
+                <select id="twoPieceSetSelect">
+                  <option value="">不限定</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="optimizer-subsection">
+              <h3>限定主词条</h3>
+              <div class="optimizer-main-stat-grid">
+                <div class="field optimizer-main-stat-field">
+                  <div class="field-row-head">
+                    <span>4号位</span>
+                    <button type="button" class="compact-btn" data-clear-main-stats="4">清空</button>
+                  </div>
+                  <select id="slot4MainStats" multiple hidden></select>
+                  <div id="slot4MainStatChoices" class="main-stat-choice-list"></div>
+                </div>
+                <div class="field optimizer-main-stat-field">
+                  <div class="field-row-head">
+                    <span>5号位</span>
+                    <button type="button" class="compact-btn" data-clear-main-stats="5">清空</button>
+                  </div>
+                  <select id="slot5MainStats" multiple hidden></select>
+                  <div id="slot5MainStatChoices" class="main-stat-choice-list"></div>
+                </div>
+                <div class="field optimizer-main-stat-field">
+                  <div class="field-row-head">
+                    <span>6号位</span>
+                    <button type="button" class="compact-btn" data-clear-main-stats="6">清空</button>
+                  </div>
+                  <select id="slot6MainStats" multiple hidden></select>
+                  <div id="slot6MainStatChoices" class="main-stat-choice-list"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="optimizer-subsection">
+              <h3>限定最小值</h3>
+              <div class="optimizer-min-grid">
+                <label class="field">
+                  <span>能量自动回复%</span>
+                  <input id="minEnergyRegen" type="number" step="0.1" placeholder="不限定">
+                </label>
+                <label class="field">
+                  <span>异常精通</span>
+                  <input id="minAnomalyProficiency" type="number" step="1" placeholder="不限定">
+                </label>
+                <label class="field">
+                  <span>暴击率%</span>
+                  <input id="minCritRate" type="number" step="0.1" placeholder="不限定">
+                </label>
+                <label class="field">
+                  <span>暴击伤害%</span>
+                  <input id="minCritDmg" type="number" step="0.1" placeholder="不限定">
+                </label>
+              </div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <h2>计算结果</h2>
+              <div class="tag" id="optimizerMetrics">未计算</div>
+            </div>
+            <div id="optimizerProgress" class="optimizer-progress" hidden>
+              <div class="optimizer-progress-head">
+                <strong id="optimizerProgressPercent">0%</strong>
+                <span id="optimizerElapsed">已计算 00:00</span>
+              </div>
+              <div class="optimizer-progress-track">
+                <div id="optimizerProgressFill" class="optimizer-progress-fill"></div>
+              </div>
+              <div class="optimizer-progress-meta">
+                <span id="optimizerEvaluated">已评估 0</span>
+                <span id="optimizerEstimate">估算 0</span>
+              </div>
+              <div id="optimizerProgressNote" class="optimizer-progress-note">等待开始</div>
+            </div>
+            <div id="optimizerResultTabs" class="optimizer-result-tabs"></div>
+            <div id="optimizerResultList" class="optimizer-result-list"></div>
+            <div id="optimizerEmpty" class="inventory-empty home-disc-empty">
+              <img src="/assets/drive-discs/empty.svg" alt="">
+              <strong>暂无结果</strong>
+              <span>开始计算后会显示伤害最高的前 5 套</span>
+            </div>
+            <div class="modal-actions optimizer-save-actions">
+              <button id="saveLoadoutBtn" type="button" class="primary-btn" disabled>存为套装</button>
+            </div>
+          </article>
+        </section>
+
+        <section class="optimizer-right">
+          <article class="card">
+            <div class="card-head">
+              <h2>局外面板</h2>
+              <div class="tag">当前结果</div>
+            </div>
+            <div class="kv-section">
+              <h3>基础属性</h3>
+              <div id="baseTable" class="kv-table"></div>
+            </div>
+            <div class="kv-section">
+              <h3>局外面板</h3>
+              <div id="bonusTable" class="kv-table"></div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <h2>局内面板</h2>
+              <div class="tag">Buff 后</div>
+            </div>
+            <div id="inCombatPanelTable" class="kv-table"></div>
+            <div class="kv-section">
+              <h3>已启用 Buff</h3>
+              <div id="inCombatActiveEffects" class="list"></div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <h2>最终伤害</h2>
+              <div class="tag">finalDamage</div>
+            </div>
+            <div class="damage-result-head">
+              <span>最终伤害</span>
+              <strong id="damageFinalValue">-</strong>
+            </div>
+            <div id="damageWhiteBoxRows" class="damage-whitebox-list"></div>
+          </article>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="combatBuffModal" class="modal-layer" hidden>
+    <div class="modal-scrim" data-close-combat-buff-modal></div>
+    <section class="disc-modal combat-buff-modal" role="dialog" aria-modal="true" aria-labelledby="combatBuffModalTitle">
+      <button id="closeCombatBuffModalBtn" type="button" class="modal-close" aria-label="关闭">×</button>
+      <header class="modal-head">
+        <div>
+          <h2 id="combatBuffModalTitle">选择 Buff</h2>
+          <p>计算页与首页共享这些局内设置；驱动盘 Buff 由候选套装自动计入</p>
+        </div>
+      </header>
+
+      <label class="field combat-buff-search-field">
+        <span>搜索</span>
+        <input id="combatBuffSearchInput" placeholder="搜索来源、名称、效果">
+      </label>
+
+      <div class="combat-buff-tabs" role="tablist">
+        <button type="button" class="active" data-combat-buff-tab="agent">角色引发的 Buff</button>
+        <button type="button" data-combat-buff-tab="wEngine">音擎引发的 Buff</button>
+        <button type="button" data-combat-buff-tab="custom">自定义</button>
+      </div>
+
+      <div id="combatBuffCandidateList" class="combat-buff-candidate-list"></div>
+      <div id="combatBuffCustomPane" class="combat-custom-pane" hidden>
+        <label class="field">
+          <span>名称</span>
+          <input id="customBuffNameInput" value="自定义 Buff">
+        </label>
+        <div id="customBuffStatRows" class="custom-buff-stat-rows"></div>
+        <div class="modal-actions">
+          <button id="saveCustomBuffBtn" type="button" class="primary-btn">保存并添加</button>
+        </div>
+      </div>
+      <div id="combatBuffModalEmpty" class="inventory-empty home-disc-empty" hidden>
+        <strong>No Data</strong>
+        <span>暂无可添加的 Buff</span>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="/calculate.js"></script>
+</body>
+</html>

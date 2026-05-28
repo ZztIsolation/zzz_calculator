@@ -25,12 +25,12 @@
         "subStats": [
           {
             "stat": "critRate",
-            "value": 0.072,
+            "value": 7.2,
             "mode": "pct"
           },
           {
             "stat": "critDmg",
-            "value": 0.096,
+            "value": 9.6,
             "mode": "pct"
           },
           {
@@ -40,7 +40,7 @@
           },
           {
             "stat": "atkPct",
-            "value": 0.06,
+            "value": 6,
             "mode": "pct"
           }
         ]
@@ -61,12 +61,12 @@
         "subStats": [
           {
             "stat": "critRate",
-            "value": 0.024,
+            "value": 2.4,
             "mode": "pct"
           },
           {
             "stat": "critDmg",
-            "value": 0.096,
+            "value": 9.6,
             "mode": "pct"
           },
           {
@@ -76,7 +76,7 @@
           },
           {
             "stat": "atkPct",
-            "value": 0.09,
+            "value": 9,
             "mode": "pct"
           }
         ]
@@ -97,17 +97,17 @@
         "subStats": [
           {
             "stat": "atkPct",
-            "value": 0.12,
+            "value": 12,
             "mode": "pct"
           },
           {
             "stat": "critDmg",
-            "value": 0.096,
+            "value": 9.6,
             "mode": "pct"
           },
           {
             "stat": "critRate",
-            "value": 0.024,
+            "value": 2.4,
             "mode": "pct"
           },
           {
@@ -127,7 +127,7 @@
         "maxLevel": 15,
         "mainStat": {
           "stat": "critDmg",
-          "value": 0.48,
+          "value": 48,
           "mode": "pct"
         },
         "subStats": [
@@ -138,17 +138,17 @@
           },
           {
             "stat": "critRate",
-            "value": 0.096,
+            "value": 9.6,
             "mode": "pct"
           },
           {
             "stat": "atkPct",
-            "value": 0.06,
+            "value": 6,
             "mode": "pct"
           },
           {
             "stat": "hpPct",
-            "value": 0.03,
+            "value": 3,
             "mode": "pct"
           }
         ]
@@ -163,7 +163,7 @@
         "maxLevel": 15,
         "mainStat": {
           "stat": "atkPct",
-          "value": 0.3,
+          "value": 30,
           "mode": "pct"
         },
         "subStats": [
@@ -174,17 +174,17 @@
           },
           {
             "stat": "defPct",
-            "value": 0.096,
+            "value": 9.6,
             "mode": "pct"
           },
           {
             "stat": "critRate",
-            "value": 0.024,
+            "value": 2.4,
             "mode": "pct"
           },
           {
             "stat": "critDmg",
-            "value": 0.144,
+            "value": 14.4,
             "mode": "pct"
           }
         ]
@@ -199,13 +199,13 @@
         "maxLevel": 15,
         "mainStat": {
           "stat": "atkPct",
-          "value": 0.3,
+          "value": 30,
           "mode": "pct"
         },
         "subStats": [
           {
             "stat": "defPct",
-            "value": 0.048,
+            "value": 4.8,
             "mode": "pct"
           },
           {
@@ -215,12 +215,12 @@
           },
           {
             "stat": "critDmg",
-            "value": 0.144,
+            "value": 14.4,
             "mode": "pct"
           },
           {
             "stat": "critRate",
-            "value": 0.072,
+            "value": 7.2,
             "mode": "pct"
           }
         ]

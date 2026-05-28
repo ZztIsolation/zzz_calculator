@@ -2,293 +2,926 @@
   "$schema": "./schemas/drive_disc_sets.schema.json",
   "version": 1,
   "notes": [
-    "Only effects with scope outOfCombat and condition null should affect v1 panel calculations.",
-    "In-combat 4-piece effects are recorded but intentionally ignored by the v1 out-of-combat panel.",
+    "Two-piece effects always apply directly to the out-of-combat panel.",
+    "Four-piece effects are stored as fourPiece.selfBuff and fourPiece.teamBuff; they are applied only by the in-combat panel.",
     "Image-only entries are kept so imported inventory can show set art before full set-effect modeling is added."
   ],
   "sets": [
     {
-      "id": "woodpecker_electro",
+      "id": "zzz_wiki_1907",
       "name": {
-        "en": "Woodpecker Electro",
-        "zhCN": "啄木鸟电音"
+        "zhCN": "雪兔梦游仙境"
       },
       "images": {
-        "icon": "/assets/drive-discs/woodpecker_electro.webp",
-        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_Woodpecker_Electro_S.png"
+        "icon": "/assets/drive-discs/zzz_wiki_1907.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
       },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
       "twoPiece": {
-        "scope": "outOfCombat",
-        "condition": null,
-        "stats": [
+        "effects": [
           {
-            "stat": "critRate",
-            "value": 0.08,
+            "id": "effect-1",
+            "type": "fixed",
+            "stat": "hpPct",
+            "value": 10,
+            "mode": "pct"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "[防护]角色装备时：装备者发动[强化特殊技]或队伍中任意队友发动[招架支援]、[回避支援]时，全队角色造成伤害提升6%，最多叠加3层，持续25秒，层数逐层衰减，获得或者衰减时刷新持续时间，同名被动效果之间不可叠加。",
+          "en": ""
+        },
+        "selfBuff": null,
+        "teamBuff": {
+          "condition": null,
+          "effects": [
+            {
+              "type": "stacked",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "valuePerStack": 6,
+              "maxStacks": 3,
+              "defaultStacks": 3,
+              "id": "effect_8f320d1674"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "zzz_wiki_1906",
+      "name": {
+        "zhCN": "囚徒手记"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/zzz_wiki_1906.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/03/16/141353238/4ebfdd28579fa98ff24f948ec172d845_1224104404961001766.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_wiki_1906_2pc",
+            "type": "fixed",
+            "stat": "iceDmg",
+            "value": 10,
             "mode": "flat"
           }
         ]
       },
       "fourPiece": {
-        "scope": "inCombat",
-        "condition": "criticalHitWithBasicAttackOrDodgeCounterOrExSpecialAttack",
-        "stats": [
+        "effectText": {
+          "zhCN": "装备者触发[异放]时，装备者异常精通提升48点，持续30秒；重复触发时刷新持续时间；装备者触发[冻结]效果时，装备者造成的所有属性异常伤害、[紊乱]伤害提升16%，持续30秒，重复触发时刷新持续时间。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      }
+    },
+    {
+      "id": "scanner-set-fcf8ae93d798",
+      "name": {
+        "zhCN": "沧浪行歌"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/scanner-set-fcf8ae93d798.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      },
+      "twoPiece": {
+        "effects": [
           {
-            "stat": "atkPct",
-            "value": 0.09,
-            "mode": "pct"
+            "id": "effect-1",
+            "type": "fixed",
+            "stat": "physicalDmg",
+            "value": 10,
+            "mode": "flat"
           }
-        ],
-        "durationSeconds": 6,
-        "appliesToOutOfCombatPanel": false
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "装备者处于任意[以太帷幕]中时，自身暴击率提高10%，离开[以太帷幕]后，该增益效果仍然保留，持续15秒；装备者为[强攻]角色时，开启[以太帷幕]或延长[以太帷幕]的持续时间会使自身暴击率提升10%和攻击力提升10%，持续30秒，重复触发时刷新持续时间。",
+          "en": "While Ether Veil is active, CRIT Rate increases by 10% and ATK increases by 10%."
+        },
+        "selfBuff": {
+          "condition": "以太帷幕",
+          "effects": [
+            {
+              "id": "effect_n3x8p5rw",
+              "type": "fixed",
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 20
+            },
+            {
+              "id": "effect_6ae683de9d",
+              "type": "fixed",
+              "stat": "atkPct",
+              "mode": "pct",
+              "basis": "outOfCombatAtk",
+              "value": 10
+            }
+          ]
+        },
+        "teamBuff": null
       },
       "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ]
+    },
+    {
+      "id": "astral_voice",
+      "name": {
+        "zhCN": "流光咏叹"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/astral_voice.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/12/26/76099754/5be5aff4902913ddee95a39c2abcb8e6_5215505302189329329.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46",
+        "https://zenless-zone-zero.fandom.com/wiki/Astral_Voice"
+      ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_wiki_1750_2pc",
+            "type": "fixed",
+            "stat": "etherDmg",
+            "value": 10,
+            "mode": "flat"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "装备者发动[普通攻击]命中敌人时，自身异常精通提升36点，持续8秒，重复触发时刷新持续时间；当场上有敌人进入失衡状态时，装备者造成的伤害提升25%；持续18秒，重复触发时刷新持续时间。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      }
+    },
+    {
+      "id": "zzz_wiki_1552",
+      "name": {
+        "zhCN": "拂晓生花"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/zzz_wiki_1552.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/08/28/141353238/d29c086d50b35dde10d900e7977482a0_3613380490491435750.PNG"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "[普通攻击]造成的伤害提升20%，装备者为[强攻]角色时，发动[强化特殊技]或[终结技]会使[普通攻击]造成的伤害额外提升20%，持续25秒，重复触发时刷新持续时间。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      }
+    },
+    {
+      "id": "moonlight_lullaby",
+      "name": {
+        "zhCN": "月光骑士颂"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/moonlight_lullaby.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect-1",
+            "type": "fixed",
+            "stat": "energyRegen",
+            "value": 20,
+            "mode": "flat"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "装备者为[支援]角色时，发动[强化特殊技]或[终结技]会使全队角色造成的伤害提升18%，持续25秒，重复触发时刷新持续时间，同名被动效果之间不可叠加。",
+          "en": ""
+        },
+        "selfBuff": null,
+        "teamBuff": {
+          "condition": null,
+          "effects": [
+            {
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 18,
+              "id": "effect_91d604d37e"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "yunkui_tales",
+      "name": {
+        "zhCN": "云岿如我"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/yunkui_tales.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/05/31/82500917/dc6808d5dd3bc7b61298c1e235e8fbd6_6869244274463995040.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46",
+        "https://zenless-zone-zero.fandom.com/wiki/Yunkui_Tales"
+      ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_wiki_1347_2pc",
+            "type": "fixed",
+            "stat": "hpPct",
+            "value": 10,
+            "mode": "pct"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "发动[强化特殊技]、[连携技]、[终结技]时，暴击率提升4%，最多叠加3层，持续15秒，重复触发时刷新持续时间，拥有3层效果时，造成的贯穿伤害提升10%。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      }
+    },
+    {
+      "id": "king_of_the_summit",
+      "name": {
+        "zhCN": "山大王"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/king_of_the_summit.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "装备者为[击破]角色时，发动[强化特殊技]或[连携技]会使全队角色暴击伤害提升15%，装备者的暴击率大于等于50%时暴击伤害额外提升15%，持续15秒，重复触发时刷新持续时间，同名被动效果之间不可叠加。",
+          "en": ""
+        },
+        "selfBuff": null,
+        "teamBuff": {
+          "condition": null,
+          "effects": [
+            {
+              "type": "stacked",
+              "stat": "critDmg",
+              "mode": "flat",
+              "valuePerStack": 15,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "id": "effect_e044f6f6b8"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "phaethons_melody",
+      "name": {
+        "zhCN": "法厄同之歌"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/phaethons_melody.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/03/03/82500917/b815a9e4150ea81e31de93ac69733ed6_4775101255671251088.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46",
+        "https://zenless-zone-zero.fandom.com/wiki/Phaethon's_Melody"
+      ],
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "队伍中任意角色发动[强化特殊技]时，装备者的异常精通提升45点，持续8秒；如果发动[强化特殊技]的角色不是装备者本人时，装备者造成的以太伤害提升25%。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      }
+    },
+    {
+      "id": "shadow_harmony",
+      "name": {
+        "zhCN": "如影相随"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/shadow_harmony.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/03/03/82500917/1bc3f90e3407b55603f6051242444270_7586763932234819462.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46",
+        "https://zenless-zone-zero.fandom.com/wiki/Shadow_Harmony"
+      ],
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "[追加攻击]或[冲刺攻击]命中敌人时，若造成的伤害与装备者的属性一致，则获得1层增益效果，同一招式内最多触发一次；每拥有1层增益效果，装备者的攻击力提升4%，暴击率提升4%，最多叠加3层，持续15秒，重复触发时刷新持续时间。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      }
+    },
+    {
+      "id": "scanner-set-48ee0a14625f",
+      "name": {
+        "zhCN": "折枝剑歌"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/scanner-set-48ee0a14625f.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/12/13/158441880/36b1daf1b269c3c44caa36511c0d1262_2994496140477816610.PNG"
+      },
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_t1q7z4vb",
+            "type": "fixed",
+            "stat": "critDmg",
+            "value": 16,
+            "mode": "flat"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "异常掌控大于等于115点时，装备者的暴击伤害提升30%；队伍中任意角色对敌人施加[冻结]或触发[碎冰]效果时，装备者的暴击率提升12%，持续15秒。",
+          "en": "When Anomaly Mastery meets the requirement, CRIT DMG increases by 30% and CRIT Rate increases by 12%."
+        },
+        "selfBuff": {
+          "condition": "anomalyMasteryAtLeast115Or150",
+          "effects": [
+            {
+              "id": "effect_d8w3n6px",
+              "type": "fixed",
+              "stat": "critDmg",
+              "value": 30,
+              "mode": "flat"
+            },
+            {
+              "id": "effect_l5c9r2qa",
+              "type": "fixed",
+              "stat": "critRate",
+              "value": 12,
+              "mode": "flat"
+            }
+          ]
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46",
+        "https://game8.co/games/Zenless-Zone-Zero/archives/488264"
+      ]
+    },
+    {
+      "id": "zzz_wiki_1001",
+      "name": {
+        "zhCN": "静听嘉音"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/zzz_wiki_1001.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect-1",
+            "type": "fixed",
+            "stat": "atkPct",
+            "value": 10,
+            "mode": "pct"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "队伍中任意角色通过[快速支援]入场时，全队角色获得1层[嘉音]，最多叠加3层，持续15秒，重复触发时刷新持续时间， 每拥有1层[嘉音]，通过[快速支援]入场的角色造成的伤害提升8%，该效果全队唯一。",
+          "en": ""
+        },
+        "selfBuff": null,
+        "teamBuff": {
+          "condition": null,
+          "effects": [
+            {
+              "id": "effect_b0e5b35aa3",
+              "type": "stacked",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "valuePerStack": 8,
+              "maxStacks": 3,
+              "defaultStacks": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "chaos_jazz",
+      "name": {
+        "zhCN": "混沌爵士"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/chaos_jazz.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/09/17/141353238/8568657ee1c1230ddad9fb021ff45499_2817033800235380162.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_wiki_800_2pc",
+            "type": "fixed",
+            "stat": "anomalyProficiency",
+            "value": 30,
+            "mode": "flat"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "火属性伤害和电属性伤害提升15%；位于后场时，[强化特殊技]和[支援攻击]造成的伤害提升20%，换入前场后，该增益效果仍然保留，持续5秒，保留效果7.5秒内最多触发一次"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      }
+    },
+    {
+      "id": "proto_punk",
+      "name": {
+        "zhCN": "原始朋克"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/proto_punk.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/09/12/141353238/d31be186482261d79ab67b2d88888d9c_8701404487668237170.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "队伍中任意角色发动[招架支援]和[回避支援]时，全队角色造成的伤害提升15%，持续10秒，同名被动效果之间不可叠加。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      }
+    },
+    {
+      "id": "chaotic_metal",
+      "name": {
+        "zhCN": "混沌重金属"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/chaotic_metal.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/29/15559334/d24db7eae8c2561bc49a1d72b9259364_2918562507175760826.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_wiki_236_2pc",
+            "type": "fixed",
+            "stat": "etherDmg",
+            "value": 10,
+            "mode": "flat"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "装备者的暴击伤害提升20%，队伍中任意角色触发[侵蚀]效果的额外伤害时，该增益效果额外提升5.5%，最多叠加6层，持续8秒，重复触发时刷新持续时间。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      }
+    },
+    {
+      "id": "soul_rock",
+      "name": {
+        "zhCN": "灵魂摇滚"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/soul_rock.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/29/15559334/b4fd81cd50ea47a2107308e7a11d8a55_530837361569576012.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_wiki_233_2pc",
+            "type": "fixed",
+            "stat": "defPct",
+            "value": 16,
+            "mode": "pct"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "受到敌方攻击并损失生命值时，装备者受到的伤害降低40%，持续2.5秒，15秒内最多触发一次。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      }
+    },
+    {
+      "id": "woodpecker_electro",
+      "name": {
+        "zhCN": "啄木鸟电音"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/woodpecker_electro.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/29/15559334/0d4dd047370168a3b992d9884ca926c6_3624385829818904793.png"
+      },
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_a8q2m7vz",
+            "type": "fixed",
+            "stat": "critRate",
+            "value": 8,
+            "mode": "flat"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": " [普通攻击]、[闪避反击]或[强化特殊技]命中敌人并触发暴击时，分别为装备者提供1层增益效果，每层增益效果使装备者的攻击力提升9%，持续6秒，不同招式分别结算持续时间。",
+          "en": "When a CRIT hits an enemy, the equipper gains 9% ATK for 6s."
+        },
+        "selfBuff": {
+          "condition": "criticalHitWithBasicAttackOrDodgeCounterOrExSpecialAttack",
+          "durationSeconds": 6,
+          "effects": [
+            {
+              "id": "effect_k4p9x1nd",
+              "type": "fixed",
+              "stat": "atkPct",
+              "value": 9,
+              "mode": "pct",
+              "basis": "baseAtk"
+            }
+          ]
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46",
         "https://zenless-zone-zero.fandom.com/wiki/Woodpecker_Electro"
       ]
     },
     {
       "id": "swing_jazz",
       "name": {
-        "en": "Swing Jazz",
         "zhCN": "摇摆爵士"
       },
       "images": {
-        "icon": "/assets/drive-discs/swing_jazz.webp",
-        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_Swing_Jazz_S.png"
+        "icon": "/assets/drive-discs/swing_jazz.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/29/15559334/4f85a6c7c3f2a3bbde23b282b477f8dd_6011861012357025109.png"
       },
       "twoPiece": {
-        "scope": "outOfCombat",
-        "condition": null,
-        "stats": [
+        "effects": [
           {
+            "id": "effect_z5r3l8ca",
+            "type": "fixed",
             "stat": "energyRegen",
-            "value": 0.2,
+            "value": 20,
             "mode": "pct"
           }
         ]
       },
       "fourPiece": {
-        "scope": "inCombat",
-        "condition": "launchChainAttackOrUltimate",
-        "stats": [
-          {
-            "stat": "dmgBonus",
-            "value": 0.15,
-            "mode": "flat"
-          }
-        ],
-        "durationSeconds": 12,
-        "appliesToOutOfCombatPanel": false
+        "effectText": {
+          "zhCN": "发动[连携技]或[终结技]时，全队角色造成的伤害提升15%，持续12秒，同名被动效果之间不可叠加。",
+          "en": "Launching a Chain Attack or Ultimate increases squad DMG by 15% for 12s."
+        },
+        "selfBuff": {
+          "condition": "launchChainAttackOrUltimate",
+          "durationSeconds": 12,
+          "effects": [
+            {
+              "id": "effect_m2v6q9tb",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 15,
+              "mode": "flat"
+            }
+          ]
+        },
+        "teamBuff": null
       },
       "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46",
         "https://zenless-zone-zero.fandom.com/wiki/Swing_Jazz"
       ]
     },
     {
+      "id": "puffer_electro",
+      "name": {
+        "zhCN": "河豚电音"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/puffer_electro.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/29/15559334/554cb9ae3eea679586cc85ac4cd586c0_8880473955646374868.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_wiki_193_2pc",
+            "type": "fixed",
+            "stat": "penRatio",
+            "value": 8,
+            "mode": "flat"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": " [终结技]造成的伤害提升20%；发动[终结技]时，装备者的攻击力提升15%，持续12秒。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      }
+    },
+    {
+      "id": "inferno_metal",
+      "name": {
+        "zhCN": "炎狱重金属"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/inferno_metal.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/29/15559334/16d66698b1d28c72040c270aac5919ff_6356103811076061260.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_wiki_192_2pc",
+            "type": "fixed",
+            "stat": "fireDmg",
+            "value": 10,
+            "mode": "flat"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "攻击命中处于[灼烧]状态下的敌人时，装备者的暴击率提升28%，持续8秒。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      }
+    },
+    {
+      "id": "freedom_blues",
+      "name": {
+        "zhCN": "自由蓝调"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/freedom_blues.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/29/15559334/ec6bd15b507c13de9ed3dfe331893b03_8948524582852848913.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_wiki_191_2pc",
+            "type": "fixed",
+            "stat": "anomalyProficiency",
+            "value": 30,
+            "mode": "flat"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "[强化特殊技]命中敌人时，根据装备者的属性类型，使目标对应属性异常积蓄抗性降低20%，持续8秒，相同属性类型的效果不可叠加。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      }
+    },
+    {
+      "id": "polar_metal",
+      "name": {
+        "zhCN": "极地重金属"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/polar_metal.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/29/15559334/1c3c63f61e89acf72f66fa49270b4e16_3769293831738857202.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_wiki_189_2pc",
+            "type": "fixed",
+            "stat": "iceDmg",
+            "value": 10,
+            "mode": "flat"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "[普通攻击]和[冲刺攻击]造成的伤害提升20%，队伍中任意角色对敌人施加[冻结]或触发[碎冰]效果时，该增益效果额外提升20%，持续12秒。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      }
+    },
+    {
+      "id": "thunder_metal",
+      "name": {
+        "zhCN": "雷暴重金属"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/thunder_metal.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/29/15559334/75f9b18188620315fa938eb30766a91b_9030954012082069665.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_wiki_153_2pc",
+            "type": "fixed",
+            "stat": "electricDmg",
+            "value": 10,
+            "mode": "flat"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "当场上存在处于[感电]状态下的敌人时，装备者的攻击力提升28%。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      }
+    },
+    {
+      "id": "shockstar_disco",
+      "name": {
+        "zhCN": "震星迪斯科"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/shockstar_disco.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/29/15559334/b3feeb5bf8107a0f9aa81c948fb18d70_5006176235064018963.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_wiki_152_2pc",
+            "type": "fixed",
+            "stat": "impact",
+            "value": 6,
+            "mode": "flat"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "[普通攻击]、[冲刺攻击]、[闪避反击]对主要攻击目标造成的失衡值提升20%。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      }
+    },
+    {
       "id": "hormone_punk",
       "name": {
-        "en": "Hormone Punk",
         "zhCN": "激素朋克"
       },
       "images": {
-        "icon": "/assets/drive-discs/hormone_punk.webp",
-        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_Hormone_Punk_S.png"
+        "icon": "/assets/drive-discs/hormone_punk.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
       },
       "twoPiece": {
-        "scope": "outOfCombat",
-        "condition": null,
-        "stats": [
+        "effects": [
           {
+            "id": "effect-1",
+            "type": "fixed",
             "stat": "atkPct",
-            "value": 0.1,
+            "value": 10,
             "mode": "pct"
           }
         ]
       },
       "fourPiece": {
-        "scope": "inCombat",
-        "condition": "enterCombatOrSwitchIn",
-        "stats": [
-          {
-            "stat": "atkPct",
-            "value": 0.25,
-            "mode": "pct"
-          }
-        ],
-        "durationSeconds": 10,
-        "cooldownSeconds": 20,
-        "appliesToOutOfCombatPanel": false
+        "effectText": {
+          "zhCN": "进入接战状态或换入前场时，装备者的攻击力提升25%，持续10秒，20秒内最多触发一次。",
+          "en": "Entering combat or switching in increases the equipper's ATK by 25% for 10s, up to once every 20s."
+        },
+        "selfBuff": {
+          "condition": "enterCombatOrSwitchIn",
+          "durationSeconds": 10,
+          "coverage": {
+            "default": 0.7,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          },
+          "effects": [
+            {
+              "id": "effect_w8d5k2lm",
+              "type": "fixed",
+              "stat": "atkPct",
+              "mode": "pct",
+              "basis": "outOfCombatAtk",
+              "value": 25
+            }
+          ]
+        },
+        "teamBuff": null
       },
       "sources": [
-        "https://zenless-zone-zero.fandom.com/wiki/Hormone_Punk"
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
       ]
     },
     {
-      "id": "scanner-set-fcf8ae93d798",
+      "id": "fanged_metal",
       "name": {
-        "en": "White Water Ballad",
-        "zhCN": "沧浪行歌"
+        "zhCN": "獠牙重金属"
       },
       "images": {
-        "icon": "/assets/drive-discs/white_water_ballad.webp",
-        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_White_Water_Ballad_S.png"
+        "icon": "/assets/drive-discs/fanged_metal.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
       },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
       "twoPiece": {
-        "scope": "outOfCombat",
-        "condition": null,
-        "stats": [
+        "effects": [
           {
+            "id": "effect-1",
+            "type": "fixed",
             "stat": "physicalDmg",
-            "value": 0.1,
+            "value": 10,
             "mode": "flat"
           }
         ]
       },
       "fourPiece": {
-        "scope": "inCombat",
-        "condition": "etherVeil",
-        "stats": [
-          {
-            "stat": "critRate",
-            "value": 0.1,
-            "mode": "flat"
+        "effectText": {
+          "zhCN": "队伍中任意角色对敌人施加[强击]效果时，装备者对目标造成的伤害提升35%，持续12秒。",
+          "en": ""
+        },
+        "selfBuff": {
+          "condition": null,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
           },
-          {
-            "stat": "atkPct",
-            "value": 0.1,
-            "mode": "pct"
-          }
-        ],
-        "appliesToOutOfCombatPanel": false
-      },
-      "sources": [
-        "https://game8.co/games/Zenless-Zone-Zero/archives/572095"
-      ]
-    },
-    {
-      "id": "scanner-set-48ee0a14625f",
-      "name": {
-        "en": "Branch & Blade Song",
-        "zhCN": "折枝剑歌"
-      },
-      "images": {
-        "icon": "/assets/drive-discs/branch_blade_song.webp",
-        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_Branch_%26_Blade_Song_S.png"
-      },
-      "twoPiece": {
-        "scope": "outOfCombat",
-        "condition": null,
-        "stats": [
-          {
-            "stat": "critDmg",
-            "value": 0.16,
-            "mode": "flat"
-          }
-        ]
-      },
-      "fourPiece": {
-        "scope": "inCombat",
-        "condition": "anomalyMasteryAtLeast115Or150",
-        "stats": [
-          {
-            "stat": "critDmg",
-            "value": 0.3,
-            "mode": "flat"
-          },
-          {
-            "stat": "critRate",
-            "value": 0.12,
-            "mode": "flat"
-          }
-        ],
-        "appliesToOutOfCombatPanel": false
-      },
-      "sources": [
-        "https://game8.co/games/Zenless-Zone-Zero/archives/488264"
-      ]
-    },
-    {
-      "id": "astral_voice",
-      "name": {
-        "en": "Astral Voice",
-        "zhCN": "流光咏叹"
-      },
-      "images": {
-        "icon": "/assets/drive-discs/astral_voice.webp",
-        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_Astral_Voice_S.png"
-      },
-      "sources": [
-        "https://zenless-zone-zero.fandom.com/wiki/Astral_Voice"
-      ]
-    },
-    {
-      "id": "phaethons_melody",
-      "name": {
-        "en": "Phaethon's Melody",
-        "zhCN": "法厄同之歌"
-      },
-      "images": {
-        "icon": "/assets/drive-discs/phaethons_melody.webp",
-        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_Phaethon%27s_Melody_S.png"
-      },
-      "sources": [
-        "https://zenless-zone-zero.fandom.com/wiki/Phaethon's_Melody"
-      ]
-    },
-    {
-      "id": "yunkui_tales",
-      "name": {
-        "en": "Yunkui Tales",
-        "zhCN": "云岿如我"
-      },
-      "images": {
-        "icon": "/assets/drive-discs/yunkui_tales.webp",
-        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_Yunkui_Tales_S.png"
-      },
-      "sources": [
-        "https://zenless-zone-zero.fandom.com/wiki/Yunkui_Tales"
-      ]
-    },
-    {
-      "id": "moonlight_lullaby",
-      "name": {
-        "en": "Moonlight Lullaby",
-        "zhCN": "月光骑士颂"
-      },
-      "images": {
-        "icon": "/assets/drive-discs/moonlight_lullaby.webp",
-        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_Moonlight_Lullaby_S.png"
-      },
-      "sources": [
-        "https://zenless-zone-zero.fandom.com/wiki/Moonlight_Lullaby"
-      ]
-    },
-    {
-      "id": "shadow_harmony",
-      "name": {
-        "en": "Shadow Harmony",
-        "zhCN": "如影相随"
-      },
-      "images": {
-        "icon": "/assets/drive-discs/shadow_harmony.webp",
-        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_Shadow_Harmony_S.png"
-      },
-      "sources": [
-        "https://zenless-zone-zero.fandom.com/wiki/Shadow_Harmony"
-      ]
-    },
-    {
-      "id": "king_of_the_summit",
-      "name": {
-        "en": "King of the Summit",
-        "zhCN": "山大王"
-      },
-      "images": {
-        "icon": "/assets/drive-discs/king_of_the_summit.webp",
-        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Drive_Disc_King_of_the_Summit_S.png"
-      },
-      "sources": [
-        "https://zenless-zone-zero.fandom.com/wiki/King_of_the_Summit"
-      ]
+          "effects": [
+            {
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 35,
+              "id": "effect_03c221a712"
+            }
+          ]
+        },
+        "teamBuff": null
+      }
     }
   ]
 }

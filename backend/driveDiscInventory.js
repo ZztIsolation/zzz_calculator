@@ -6,49 +6,109 @@ import path from "node:path"
 const STORE_FILE = "user_drive_discs.json"
 
 const DRIVE_DISC_SET_ALIASES = {
+    "雪兔梦游仙境": {
+        id: "zzz_wiki_1907",
+        name: { zhCN: "雪兔梦游仙境" },
+    },
+    "囚徒手记": {
+        id: "zzz_wiki_1906",
+        name: { zhCN: "囚徒手记" },
+    },
     "啄木鸟电音": {
         id: "woodpecker_electro",
-        name: { en: "Woodpecker Electro", zhCN: "啄木鸟电音" },
+        name: { zhCN: "啄木鸟电音" },
     },
     "摇摆爵士": {
         id: "swing_jazz",
-        name: { en: "Swing Jazz", zhCN: "摇摆爵士" },
+        name: { zhCN: "摇摆爵士" },
     },
     "激素朋克": {
         id: "hormone_punk",
-        name: { en: "Hormone Punk", zhCN: "激素朋克" },
+        name: { zhCN: "激素朋克" },
+    },
+    "獠牙重金属": {
+        id: "fanged_metal",
+        name: { zhCN: "獠牙重金属" },
+    },
+    "震星迪斯科": {
+        id: "shockstar_disco",
+        name: { zhCN: "震星迪斯科" },
+    },
+    "雷暴重金属": {
+        id: "thunder_metal",
+        name: { zhCN: "雷暴重金属" },
+    },
+    "极地重金属": {
+        id: "polar_metal",
+        name: { zhCN: "极地重金属" },
+    },
+    "自由蓝调": {
+        id: "freedom_blues",
+        name: { zhCN: "自由蓝调" },
+    },
+    "炎狱重金属": {
+        id: "inferno_metal",
+        name: { zhCN: "炎狱重金属" },
+    },
+    "河豚电音": {
+        id: "puffer_electro",
+        name: { zhCN: "河豚电音" },
+    },
+    "灵魂摇滚": {
+        id: "soul_rock",
+        name: { zhCN: "灵魂摇滚" },
+    },
+    "混沌重金属": {
+        id: "chaotic_metal",
+        name: { zhCN: "混沌重金属" },
+    },
+    "原始朋克": {
+        id: "proto_punk",
+        name: { zhCN: "原始朋克" },
+    },
+    "混沌爵士": {
+        id: "chaos_jazz",
+        name: { zhCN: "混沌爵士" },
+    },
+    "静听嘉音": {
+        id: "zzz_wiki_1001",
+        name: { zhCN: "静听嘉音" },
     },
     "沧浪行歌": {
         id: "scanner-set-fcf8ae93d798",
-        name: { en: "White Water Ballad", zhCN: "沧浪行歌" },
+        name: { zhCN: "沧浪行歌" },
+    },
+    "拂晓生花": {
+        id: "zzz_wiki_1552",
+        name: { zhCN: "拂晓生花" },
     },
     "折枝剑歌": {
         id: "scanner-set-48ee0a14625f",
-        name: { en: "Branch & Blade Song", zhCN: "折枝剑歌" },
+        name: { zhCN: "折枝剑歌" },
     },
     "流光咏叹": {
         id: "astral_voice",
-        name: { en: "Astral Voice", zhCN: "流光咏叹" },
+        name: { zhCN: "流光咏叹" },
     },
     "法厄同之歌": {
         id: "phaethons_melody",
-        name: { en: "Phaethon's Melody", zhCN: "法厄同之歌" },
+        name: { zhCN: "法厄同之歌" },
     },
     "云岿如我": {
         id: "yunkui_tales",
-        name: { en: "Yunkui Tales", zhCN: "云岿如我" },
+        name: { zhCN: "云岿如我" },
     },
     "月光骑士颂": {
         id: "moonlight_lullaby",
-        name: { en: "Moonlight Lullaby", zhCN: "月光骑士颂" },
+        name: { zhCN: "月光骑士颂" },
     },
     "如影相随": {
         id: "shadow_harmony",
-        name: { en: "Shadow Harmony", zhCN: "如影相随" },
+        name: { zhCN: "如影相随" },
     },
     "山大王": {
         id: "king_of_the_summit",
-        name: { en: "King of the Summit", zhCN: "山大王" },
+        name: { zhCN: "山大王" },
     },
 }
 
@@ -126,6 +186,18 @@ function createEmptyStore() {
         ],
         imports: [],
         driveDiscs: [],
+        driveDiscLoadouts: [],
+    }
+}
+
+function normalizeStore(store) {
+    return {
+        ...createEmptyStore(),
+        ...(store ?? {}),
+        owners: Array.isArray(store?.owners) ? store.owners : createEmptyStore().owners,
+        imports: Array.isArray(store?.imports) ? store.imports : [],
+        driveDiscs: Array.isArray(store?.driveDiscs) ? store.driveDiscs : [],
+        driveDiscLoadouts: Array.isArray(store?.driveDiscLoadouts) ? store.driveDiscLoadouts : [],
     }
 }
 
@@ -160,7 +232,7 @@ function parseScannerValue(rawValue) {
         const trimmed = rawValue.trim()
         if (trimmed.endsWith("%")) {
             return {
-                value: Number((Number(trimmed.slice(0, -1)) / 100).toFixed(12)),
+                value: Number(trimmed.slice(0, -1)),
                 mode: "pct",
                 rawValue,
             }
@@ -302,12 +374,12 @@ export async function loadUserDriveDiscStore(dataDir) {
     }
 
     const text = await readFile(filePath, "utf8")
-    return JSON.parse(text)
+    return normalizeStore(JSON.parse(text))
 }
 
 export async function saveUserDriveDiscStore(dataDir, store) {
     const nextStore = {
-        ...store,
+        ...normalizeStore(store),
         updatedAt: new Date().toISOString(),
     }
     await writeFile(storePath(dataDir), `${JSON.stringify(nextStore, null, 2)}\n`, "utf8")
@@ -373,6 +445,80 @@ export async function deleteUserDriveDisc(dataDir, id) {
     return {
         store: nextStore,
         deleted: before.length !== driveDiscs.length,
+    }
+}
+
+function cleanDriveDiscIdsBySlot(driveDiscIdsBySlot = {}) {
+    return Object.fromEntries(
+        Object.entries(driveDiscIdsBySlot ?? {})
+            .map(([slot, id]) => [String(Number(slot)), String(id ?? "").trim()])
+            .filter(([slot, id]) => Number(slot) >= 1 && Number(slot) <= 6 && id)
+    )
+}
+
+function normalizeDriveDiscLoadout(loadout, existing = null) {
+    const id = String(loadout?.id ?? existing?.id ?? `loadout-${Date.now()}`).trim()
+    const agentId = String(loadout?.agentId ?? existing?.agentId ?? "").trim()
+    if (!id) {
+        throw new Error("Drive disc loadout id is required.")
+    }
+    if (!agentId) {
+        throw new Error("Drive disc loadout agentId is required.")
+    }
+
+    const driveDiscIdsBySlot = cleanDriveDiscIdsBySlot(loadout?.driveDiscIdsBySlot ?? existing?.driveDiscIdsBySlot)
+    const missingSlots = [1, 2, 3, 4, 5, 6].filter(slot => !driveDiscIdsBySlot[String(slot)])
+    if (missingSlots.length) {
+        throw new Error(`Drive disc loadout must include slots: ${missingSlots.join(", ")}.`)
+    }
+
+    const now = new Date().toISOString()
+    return {
+        ...(existing ?? {}),
+        ...loadout,
+        id,
+        agentId,
+        name: String(loadout?.name ?? existing?.name ?? "未命名套装").trim() || "未命名套装",
+        ownerId: String(loadout?.ownerId ?? existing?.ownerId ?? "default"),
+        driveDiscIdsBySlot,
+        source: loadout?.source ?? existing?.source ?? { type: "manual" },
+        score: Number.isFinite(Number(loadout?.score)) ? Number(loadout.score) : existing?.score ?? null,
+        createdAt: existing?.createdAt ?? loadout?.createdAt ?? now,
+        updatedAt: now,
+    }
+}
+
+export async function upsertDriveDiscLoadout(dataDir, loadout) {
+    const store = await loadUserDriveDiscStore(dataDir)
+    const existing = store.driveDiscLoadouts ?? []
+    const id = String(loadout?.id ?? "").trim() || `loadout-${Date.now()}`
+    const index = existing.findIndex(item => item.id === id)
+    const nextLoadout = normalizeDriveDiscLoadout({ ...loadout, id }, index >= 0 ? existing[index] : null)
+    const driveDiscLoadouts = index >= 0
+        ? existing.map(item => item.id === id ? nextLoadout : item)
+        : [...existing, nextLoadout]
+
+    return {
+        store: await saveUserDriveDiscStore(dataDir, {
+            ...store,
+            driveDiscLoadouts,
+        }),
+        loadout: nextLoadout,
+    }
+}
+
+export async function deleteDriveDiscLoadout(dataDir, id) {
+    const store = await loadUserDriveDiscStore(dataDir)
+    const before = store.driveDiscLoadouts ?? []
+    const driveDiscLoadouts = before.filter(item => item.id !== id)
+    const nextStore = await saveUserDriveDiscStore(dataDir, {
+        ...store,
+        driveDiscLoadouts,
+    })
+
+    return {
+        store: nextStore,
+        deleted: before.length !== driveDiscLoadouts.length,
     }
 }
 
