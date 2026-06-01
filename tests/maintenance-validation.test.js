@@ -133,6 +133,44 @@ const validBuff = {
     ],
 }
 
+const validFieldBuff = {
+    id: "test_field_buff",
+    sourceType: "field",
+    scope: "inCombat",
+    name: { zhCN: "测试场地 Buff" },
+    source: { zhCN: "危局强袭战" },
+    sourcePeriod: { zhCN: "2.8版本第三期" },
+    description: { zhCN: "场地使代理人造成的伤害提升。" },
+    coverage: { default: 0.5, min: 0, max: 1, step: 0.1 },
+    effects: [
+        {
+            type: "fixed",
+            stat: "dmgBonus",
+            value: 20,
+            mode: "flat",
+        },
+    ],
+}
+
+const validBossBuff = {
+    id: "test_boss_buff",
+    sourceType: "boss",
+    scope: "inCombat",
+    bossName: { zhCN: "测试 BOSS" },
+    bossSource: { zhCN: "防卫战" },
+    sourcePeriod: { zhCN: "2.8版本第三期" },
+    description: { zhCN: "BOSS 受到的物理伤害提高。" },
+    coverage: { default: 1, min: 0, max: 1, step: 0.1 },
+    effects: [
+        {
+            type: "fixed",
+            stat: "enemyPhysicalResReduction",
+            value: 20,
+            mode: "flat",
+        },
+    ],
+}
+
 function clone(value) {
     return JSON.parse(JSON.stringify(value))
 }
@@ -154,6 +192,16 @@ function assertInvalid(kind, item, text, context = {}) {
 }
 
 assertValid("agents", validAgent)
+assertValid("agents", {
+    ...validAgent,
+    attribute: "frost",
+    damageElement: "ice",
+})
+assertInvalid("agents", {
+    ...validAgent,
+    attribute: "frost",
+    damageElement: "",
+}, "特殊显示属性必须填写真实伤害结算属性")
 assertValid("agents", {
     ...validAgent,
     preferredDriveDiscs: {
@@ -234,9 +282,53 @@ assertInvalid("agent-skills", {
     ],
 }, "必须是有效数字")
 assertValid("wEngines", validWEngine)
+const wEngineWithModificationScaling = clone(validWEngine)
+wEngineWithModificationScaling.modification = { minLevel: 1, maxLevel: 5, defaultLevel: 1 }
+wEngineWithModificationScaling.effect.selfBuff.effects[0].modificationScaling = {
+    value: {
+        base: 20,
+        step: 2,
+        displayValues: [20, 22, 24, 26, 28],
+    },
+}
+assertValid("wEngines", wEngineWithModificationScaling)
+
+const wEngineWithStackedModificationScaling = clone(validWEngine)
+wEngineWithStackedModificationScaling.effect.selfBuff.effects = [
+    {
+        type: "stacked",
+        stat: "dmgBonus",
+        valuePerStack: 5,
+        mode: "flat",
+        maxStacks: 4,
+        defaultStacks: 4,
+        modificationScaling: {
+            valuePerStack: {
+                base: 5,
+                step: 1,
+                displayValues: [5, 6, 7, 8, 9],
+            },
+        },
+    },
+]
+assertValid("wEngines", wEngineWithStackedModificationScaling)
+
+const wEngineScalingMissingDisplay = clone(wEngineWithModificationScaling)
+wEngineScalingMissingDisplay.effect.selfBuff.effects[0].modificationScaling.value.displayValues = [20, 22, 24]
+assertInvalid("wEngines", wEngineScalingMissingDisplay, "必须覆盖 1-5")
+
+const wEngineScalingBadDisplay = clone(wEngineWithModificationScaling)
+wEngineScalingBadDisplay.effect.selfBuff.effects[0].modificationScaling.value.displayValues = [20, 22, "oops", 26, 28]
+assertInvalid("wEngines", wEngineScalingBadDisplay, "必须是有效数字")
+
+const wEngineScalingBaseMismatch = clone(wEngineWithModificationScaling)
+wEngineScalingBaseMismatch.effect.selfBuff.effects[0].modificationScaling.value.base = 19
+assertInvalid("wEngines", wEngineScalingBaseMismatch, "1级计算值必须与规则当前数值一致")
 assertValid("driveDiscSets", validDriveDiscSet)
 assertValid("driveDiscSets", validDriveDiscSetWithSplitFourPiece)
 assertValid("buffs", validBuff)
+assertValid("field-buffs", validFieldBuff)
+assertValid("boss-buffs", validBossBuff)
 assertValid("buffs", {
     ...validBuff,
     id: undefined,
@@ -259,12 +351,40 @@ assertValid("buffs", {
     effects: [
         {
             type: "fixed",
+            stat: "enemyDefIgnore",
+            value: 20,
+            mode: "flat",
+        },
+    ],
+})
+assertValid("buffs", {
+    ...validBuff,
+    sourceType: "boss",
+    effects: [
+        {
+            type: "fixed",
             stat: "enemyPhysicalResReduction",
             value: 20,
             mode: "flat",
         },
     ],
 })
+assertInvalid("field-buffs", {
+    ...validFieldBuff,
+    sourcePeriod: { zhCN: "" },
+}, "中文名必填")
+assertInvalid("field-buffs", {
+    ...validFieldBuff,
+    scope: "outOfCombat",
+}, "不是支持的选项")
+assertInvalid("boss-buffs", {
+    ...validBossBuff,
+    bossName: { zhCN: "" },
+}, "中文名必填")
+assertInvalid("boss-buffs", {
+    ...validBossBuff,
+    effects: [],
+}, "至少需要一条")
 assertInvalid("buffs", {
     ...validBuff,
     scope: "outOfCombat",
@@ -585,5 +705,499 @@ assertInvalid("teammate-buffs", {
         source: { zhCN: "" },
     },
 }, "buff.source.zhCN")
+
+const validAnomalyEffect = {
+    id: "test_assault",
+    maintenanceType: "anomaly",
+    label: { zhCN: "测试强击" },
+    element: "physical",
+    baseMultiplier: 7.13,
+    defaultProcCount: 1,
+}
+assertValid("anomaly-effects", validAnomalyEffect)
+assertInvalid("anomaly-effects", {
+    ...validAnomalyEffect,
+    label: { zhCN: "" },
+}, "label.zhCN")
+assertInvalid("anomaly-effects", {
+    ...validAnomalyEffect,
+    element: "honed_edge",
+}, "element")
+assertInvalid("anomaly-effects", {
+    ...validAnomalyEffect,
+    element: "frost",
+}, "element")
+assertInvalid("anomaly-effects", {
+    ...validAnomalyEffect,
+    baseMultiplier: -1,
+}, "不能小于 0")
+assertInvalid("anomaly-effects", validAnomalyEffect, "重复", {
+    items: [validAnomalyEffect],
+})
+
+const validDisorderEffect = {
+    id: "test_burn",
+    maintenanceType: "disorder",
+    label: { zhCN: "测试灼烧紊乱" },
+    element: "fire",
+    fixedMultiplier: 4.5,
+    tickMultiplier: 0.5,
+    tickIntervalSeconds: 0.5,
+    defaultDurationSeconds: 10,
+}
+assertValid("anomaly-effects", validDisorderEffect)
+assertInvalid("anomaly-effects", {
+    ...validDisorderEffect,
+    tickIntervalSeconds: 0,
+}, "跳间隔必须大于 0")
+
+const buffWithDamageModifier = {
+    id: "test_damage_modifier",
+    sourceType: "manual",
+    scope: "inCombat",
+    name: { zhCN: "测试异常增伤" },
+    effects: [
+        {
+            type: "damageModifier",
+            kind: "anomalyDamageBonus",
+            value: 0.2,
+            appliesTo: {
+                damageKinds: ["anomaly"],
+                anomalyEffects: ["test_assault"],
+                elements: ["physical"],
+            },
+        },
+    ],
+}
+assertValid("combat-buffs", buffWithDamageModifier)
+assertValid("combat-buffs", {
+    ...buffWithDamageModifier,
+    effects: [
+        {
+            type: "damageModifier",
+            kind: "skillMultiplierBonus",
+            value: 15,
+            valueUnit: "decimal",
+            appliesTo: {
+                damageKinds: ["direct"],
+                skillTargets: [
+                    {
+                        agentSkillId: "test_agent_skill",
+                        categoryId: "basic",
+                        moveId: "normal",
+                        rowId: "hit_1",
+                    },
+                ],
+            },
+        },
+        {
+            type: "damageModifier",
+            kind: "directDamageBonus",
+            value: 0.6,
+            valueUnit: "decimal",
+            appliesTo: {
+                damageKinds: ["direct"],
+                skillTargets: [
+                    {
+                        agentSkillId: "test_agent_skill",
+                        categoryId: "basic",
+                        moveId: "normal",
+                    },
+                ],
+            },
+        },
+    ],
+})
+const buffWithSkillTargetRules = {
+    ...validBuff,
+    id: "test_skill_target_rules",
+    scope: "inCombat",
+    effects: [
+        {
+            id: "effect-skill-dmg",
+            type: "fixed",
+            stat: "dmgBonus",
+            value: 50,
+            mode: "flat",
+            target: {
+                kind: "skill",
+                skillTargets: [
+                    {
+                        agentSkillId: "test_agent_skill",
+                        categoryId: "basic",
+                        moveId: "normal",
+                    },
+                ],
+            },
+        },
+        {
+            id: "effect-skill-multiplier",
+            type: "fixed",
+            stat: "skillMultiplierBonus",
+            value: 1500,
+            mode: "flat",
+            target: {
+                kind: "skill",
+                skillTargets: [
+                    {
+                        agentSkillId: "test_agent_skill",
+                        categoryId: "basic",
+                        moveId: "normal",
+                        rowId: "hit_1",
+                    },
+                ],
+            },
+        },
+        {
+            id: "effect-skill-res-ignore",
+            type: "fixed",
+            stat: "physicalResIgnore",
+            value: 20,
+            mode: "flat",
+            target: {
+                kind: "skill",
+                skillTargets: [
+                    {
+                        agentSkillId: "test_agent_skill",
+                        categoryId: "basic",
+                        moveId: "normal",
+                    },
+                ],
+            },
+        },
+    ],
+}
+assertValid("combat-buffs", buffWithSkillTargetRules)
+assertValid("agents", {
+    ...validAgent,
+    combatBuffs: {
+        ...validAgent.combatBuffs,
+        corePassive: {
+            scope: "inCombat",
+            effects: [
+                {
+                    id: "effect-1",
+                    type: "fixed",
+                    stat: "skillMultiplierBonus",
+                    value: 1500,
+                    mode: "flat",
+                    target: {
+                        kind: "skill",
+                        skillTargets: [
+                            {
+                                agentSkillId: "test_agent_skill",
+                                categoryId: "basic",
+                                moveId: "normal",
+                            },
+                        ],
+                    },
+                },
+            ],
+        },
+    },
+})
+assertInvalid("combat-buffs", {
+    ...validBuff,
+    scope: "inCombat",
+    effects: [
+        {
+            type: "fixed",
+            stat: "dmgBonus",
+            value: 50,
+            mode: "flat",
+            target: {
+                kind: "skill",
+                skillTargets: [],
+            },
+        },
+    ],
+}, "技能增幅必须至少选择一个技能目标")
+assertInvalid("combat-buffs", {
+    ...validBuff,
+    scope: "inCombat",
+    effects: [
+        {
+            type: "fixed",
+            stat: "atkFlat",
+            value: 100,
+            mode: "flat",
+            target: {
+                kind: "skill",
+                skillTargets: [
+                    {
+                        agentSkillId: "test_agent_skill",
+                        categoryId: "basic",
+                        moveId: "normal",
+                    },
+                ],
+            },
+        },
+    ],
+}, "技能增幅对象不支持该增幅类型")
+assertInvalid("combat-buffs", {
+    ...validBuff,
+    scope: "inCombat",
+    effects: [
+        {
+            type: "fixed",
+            stat: "skillMultiplierBonus",
+            value: 1500,
+            mode: "flat",
+            target: { kind: "default" },
+        },
+    ],
+}, "不是支持的选项")
+assertInvalid("combat-buffs", {
+    ...validBuff,
+    scope: "outOfCombat",
+    effects: [
+        {
+            type: "fixed",
+            stat: "dmgBonus",
+            value: 50,
+            mode: "flat",
+            target: {
+                kind: "skill",
+                skillTargets: [
+                    {
+                        agentSkillId: "test_agent_skill",
+                        categoryId: "basic",
+                        moveId: "normal",
+                    },
+                ],
+            },
+        },
+    ],
+}, "技能增幅对象只能用于局内 Buff")
+assertInvalid("combat-buffs", {
+    ...buffWithDamageModifier,
+    effects: [
+        {
+            type: "damageModifier",
+            kind: "skillMultiplierBonus",
+            value: 15,
+            valueUnit: "percent",
+            appliesTo: {
+                skillTargets: [
+                    {
+                        agentSkillId: "test_agent_skill",
+                        categoryId: "basic",
+                    },
+                ],
+            },
+        },
+    ],
+}, "不是支持的选项")
+assertInvalid("combat-buffs", {
+    ...buffWithDamageModifier,
+    effects: [
+        {
+            type: "damageModifier",
+            kind: "skillMultiplierBonus",
+            value: 15,
+            valueUnit: "decimal",
+            appliesTo: {
+                skillTargets: [
+                    {
+                        agentSkillId: "test_agent_skill",
+                        categoryId: "basic",
+                    },
+                ],
+            },
+        },
+    ],
+}, "必须填写角色技能表、技能大类和招式")
+assertValid("agents", {
+    ...validAgent,
+    combatBuffs: {
+        ...validAgent.combatBuffs,
+        corePassive: {
+            scope: "inCombat",
+            effects: [
+                {
+                    id: "effect-1",
+                    type: "damageModifier",
+                    kind: "anomalyDamageBonus",
+                    value: 0.15,
+                    appliesTo: {
+                        damageKinds: ["anomaly"],
+                    },
+                },
+            ],
+        },
+    },
+})
+assertValid("agents", {
+    ...validAgent,
+    combatBuffs: {
+        ...validAgent.combatBuffs,
+        corePassive: {
+            scope: "inCombat",
+            effects: [
+                {
+                    id: "effect-1",
+                    type: "damageModifier",
+                    kind: "skillMultiplierBonus",
+                    value: 15,
+                    valueUnit: "decimal",
+                    appliesTo: {
+                        damageKinds: ["direct"],
+                        skillTargets: [
+                            {
+                                agentSkillId: "test_agent_skill",
+                                categoryId: "basic",
+                                moveId: "normal",
+                            },
+                        ],
+                    },
+                },
+            ],
+        },
+    },
+})
+assertInvalid("agents", {
+    ...validAgent,
+    combatBuffs: {
+        ...validAgent.combatBuffs,
+        corePassive: {
+            scope: "inCombat",
+            effects: [
+                {
+                    id: "effect-1",
+                    type: "damageModifier",
+                    kind: "skillMultiplierBonus",
+                    value: 15,
+                    valueUnit: "decimal",
+                    appliesTo: {
+                        damageKinds: ["direct"],
+                    },
+                },
+            ],
+        },
+    },
+}, "指定技能修正必须至少选择一个技能目标")
+assertInvalid("combat-buffs", {
+    ...buffWithDamageModifier,
+    scope: "outOfCombat",
+}, "伤害修正只能用于局内 Buff")
+
+const buffWithModifierOnly = {
+    ...validBuff,
+    id: "youye.cinema_1.amplify_additional_ability",
+    effects: [],
+    buffModifiers: [
+        {
+            id: "youye_cinema1_amplify_additional",
+            operation: "multiplyResolvedValue",
+            factor: 1.3,
+            targetBuffIds: ["youye.additional_ability.anomaly_damage_bonus"],
+            targetEffectIds: ["youye_additional_anomaly_damage_bonus"],
+            label: { zhCN: "额外能力效果提升至原本的130%" },
+        },
+    ],
+}
+assertValid("combat-buffs", buffWithModifierOnly)
+assertValid("teammate-buffs", {
+    teammate: {
+        id: "youye",
+        name: { zhCN: "浮波柚叶" },
+    },
+    buff: {
+        id: "youye.cinema_1.amplify_additional_ability",
+        source: { zhCN: "影画一" },
+        description: { zhCN: "额外能力效果提升至原本的130%。" },
+        scope: "inCombat",
+        effects: [],
+        buffModifiers: buffWithModifierOnly.buffModifiers,
+    },
+})
+assertInvalid("combat-buffs", {
+    ...buffWithModifierOnly,
+    buffModifiers: [
+        {
+            ...buffWithModifierOnly.buffModifiers[0],
+            targetBuffIds: [],
+        },
+    ],
+}, "目标 Buff ID至少需要填写一个")
+assertInvalid("combat-buffs", {
+    ...buffWithModifierOnly,
+    buffModifiers: [
+        {
+            ...buffWithModifierOnly.buffModifiers[0],
+            targetEffectIds: [],
+        },
+    ],
+}, "目标效果 ID至少需要填写一个")
+assertInvalid("combat-buffs", {
+    ...buffWithModifierOnly,
+    buffModifiers: [
+        {
+            ...buffWithModifierOnly.buffModifiers[0],
+            factor: 0,
+        },
+    ],
+}, "倍率必须大于 0")
+assertInvalid("combat-buffs", {
+    ...buffWithModifierOnly,
+    buffModifiers: [
+        {
+            ...buffWithModifierOnly.buffModifiers[0],
+            operation: "addResolvedValue",
+        },
+    ],
+}, "不是支持的选项")
+
+const wEngineWithDamageModifier = clone(validWEngine)
+wEngineWithDamageModifier.effect.selfBuff.effects = [
+    {
+        type: "damageModifier",
+        kind: "baseMultiplierBonus",
+        value: 0.1,
+        appliesTo: {
+            damageKinds: ["disorder"],
+        },
+    },
+]
+assertValid("wEngines", wEngineWithDamageModifier)
+
+const driveDiscWithDamageModifier = {
+    ...validDriveDiscSet,
+    twoPiece: null,
+    fourPiece: {
+        effectText: { zhCN: "触发后提升紊乱倍率。" },
+        selfBuff: {
+            scope: "inCombat",
+            effects: [
+                {
+                    type: "damageModifier",
+                    kind: "baseMultiplierBonus",
+                    value: 0.1,
+                    appliesTo: {
+                        damageKinds: ["disorder"],
+                    },
+                },
+            ],
+        },
+    },
+}
+assertValid("drive-disc-sets", driveDiscWithDamageModifier)
+assertValid("drive-disc-sets", {
+    ...validDriveDiscSet,
+    twoPiece: {
+        scope: "inCombat",
+        effects: [
+            {
+                id: "effect-1",
+                type: "damageModifier",
+                kind: "anomalyDamageBonus",
+                value: 0.15,
+                appliesTo: {
+                    damageKinds: ["anomaly"],
+                },
+            },
+        ],
+    },
+})
 
 console.log("maintenance validation tests passed")

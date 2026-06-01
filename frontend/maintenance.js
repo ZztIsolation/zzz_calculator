@@ -1,4 +1,11 @@
 import { validateMaintenanceItem } from "./maintenanceValidation.js"
+import {
+    defaultRuntimeForBuff,
+    materializeWEngineForModificationLevel,
+    storedEffectRuleText as storedCombatEffectRuleText,
+    storedEffectRulesText,
+} from "./shared-combat.js"
+import { damageSkillRowsWithGeneratedTotals } from "./skillMultiplierCandidates.js"
 
 const els = {
     status: document.getElementById("status"),
@@ -32,9 +39,21 @@ const KIND_CONFIG = {
         title: "驱动盘资料",
         endpoint: "drive-disc-sets",
     },
-    buffs: {
-        title: "Buff 资料",
-        endpoint: "combat-buffs",
+    anomalyEffects: {
+        title: "异常伤害",
+        endpoint: "anomaly-effects",
+    },
+    teammateBuffs: {
+        title: "队友 Buff 资料",
+        endpoint: "teammate-buffs",
+    },
+    fieldBuffs: {
+        title: "场地 Buff 资料",
+        endpoint: "field-buffs",
+    },
+    bossBuffs: {
+        title: "BOSS Buff 资料",
+        endpoint: "boss-buffs",
     },
 }
 
@@ -58,6 +77,7 @@ const ATTRIBUTE_OPTIONS = [
     ["electric", "电"],
     ["ether", "以太"],
     ["honed_edge", "凛刃"],
+    ["frost", "烈霜"],
 ]
 const SPECIALTY_OPTIONS = [
     ["attack", "强攻"],
@@ -67,16 +87,16 @@ const SPECIALTY_OPTIONS = [
     ["defense", "防护"],
     ["rupture", "命破"],
 ]
-const SOURCE_TYPE_OPTIONS = [
-    ["teammate", "队友 Buff"],
-    ["self", "自身 Buff"],
-    ["boss", "Boss / 敌方效果"],
-    ["field", "场地 Buff"],
-    ["manual", "通用 Buff"],
-]
 const EFFECT_SCOPE_OPTIONS = [
     ["outOfCombat", "局外"],
     ["inCombat", "局内"],
+]
+const DAMAGE_ELEMENT_OPTIONS = ATTRIBUTE_OPTIONS.filter(([value]) => !["honed_edge", "frost"].includes(value))
+const SKILL_ROW_KIND_OPTIONS = [
+    ["damageMultiplier", "伤害倍率"],
+    ["dazeMultiplier", "失衡倍率"],
+    ["energyCost", "能量消耗"],
+    ["statBonus", "属性加成"],
 ]
 const STAT_OPTIONS = [
     ["atkFlat", "固定攻击力", "flat"],
@@ -107,6 +127,7 @@ const STAT_OPTIONS = [
     ["electricDmg", "电属性伤害加成%", "percentFlat"],
     ["etherDmg", "以太伤害加成%", "percentFlat"],
     ["enemyDefReduction", "敌方减防率%", "percentFlat"],
+    ["enemyDefIgnore", "无视防御率%", "percentFlat"],
     ["enemyDefFlatReduction", "敌方固定减防", "flat"],
     ["enemyResReduction", "敌方当前属性减抗%", "percentFlat"],
     ["enemyPhysicalResReduction", "敌方物理减抗%", "percentFlat"],
@@ -115,7 +136,54 @@ const STAT_OPTIONS = [
     ["enemyElectricResReduction", "敌方电减抗%", "percentFlat"],
     ["enemyEtherResReduction", "敌方以太减抗%", "percentFlat"],
 ]
-const STAT_LABELS = Object.fromEntries(STAT_OPTIONS.map(([key, label]) => [key, label]))
+const STAT_DAMAGE_MODIFIER_OPTIONS = [
+    ["anomalyDamageBonus", "异常伤害增伤%", {
+        stat: "anomalyDamageBonus",
+    }],
+    ["baseMultiplierBonus", "异常倍率加算%", {
+        stat: "baseMultiplierBonus",
+    }],
+    ["anomalyCritRate", "异常暴击率%", {
+        stat: "anomalyCritRate",
+    }],
+    ["anomalyCritDmg", "异常暴击伤害%", {
+        stat: "anomalyCritDmg",
+    }],
+]
+const STAT_DAMAGE_MODIFIER_OPTION_BY_KEY = Object.fromEntries(STAT_DAMAGE_MODIFIER_OPTIONS.map(([key, , effect]) => [key, effect]))
+const SKILL_TARGET_STAT_OPTIONS = [
+    ["dmgBonus", "通用伤害加成%"],
+    ["physicalDmg", "物理伤害加成%"],
+    ["fireDmg", "火属性伤害加成%"],
+    ["iceDmg", "冰属性伤害加成%"],
+    ["electricDmg", "电属性伤害加成%"],
+    ["etherDmg", "以太伤害加成%"],
+    ["anomalyDamageBonus", "异常伤害增伤%"],
+    ["skillMultiplierBonus", "技能倍率加算%"],
+    ["enemyDefReduction", "敌方减防率%"],
+    ["enemyDefIgnore", "无视防御率%"],
+    ["enemyResReduction", "敌方当前属性减抗%"],
+    ["enemyPhysicalResReduction", "敌方物理减抗%"],
+    ["enemyFireResReduction", "敌方火减抗%"],
+    ["enemyIceResReduction", "敌方冰减抗%"],
+    ["enemyElectricResReduction", "敌方电减抗%"],
+    ["enemyEtherResReduction", "敌方以太减抗%"],
+    ["physicalResIgnore", "物理抗性无视%"],
+    ["fireResIgnore", "火抗性无视%"],
+    ["iceResIgnore", "冰抗性无视%"],
+    ["electricResIgnore", "电抗性无视%"],
+    ["etherResIgnore", "以太抗性无视%"],
+]
+const SKILL_TARGET_STAT_KEYS = new Set(SKILL_TARGET_STAT_OPTIONS.map(([key]) => key))
+const BUFF_STAT_OPTIONS = [
+    ...STAT_OPTIONS.map(([key, label]) => [key, label]),
+    ...STAT_DAMAGE_MODIFIER_OPTIONS.map(([key, label]) => [key, label]),
+]
+const STAT_LABELS = {
+    ...Object.fromEntries(STAT_OPTIONS.map(([key, label]) => [key, label])),
+    ...Object.fromEntries(STAT_DAMAGE_MODIFIER_OPTIONS.map(([key, label]) => [key, label])),
+    ...Object.fromEntries(SKILL_TARGET_STAT_OPTIONS.map(([key, label]) => [key, label])),
+}
 const PERCENT_VALUE_STATS = new Set([
     "atkPct",
     "hpPct",
@@ -140,12 +208,23 @@ const PERCENT_VALUE_STATS = new Set([
     "electricDmg",
     "etherDmg",
     "enemyDefReduction",
+    "enemyDefIgnore",
     "enemyResReduction",
     "enemyPhysicalResReduction",
     "enemyFireResReduction",
     "enemyIceResReduction",
     "enemyElectricResReduction",
     "enemyEtherResReduction",
+    "anomalyDamageBonus",
+    "baseMultiplierBonus",
+    "anomalyCritRate",
+    "anomalyCritDmg",
+    "skillMultiplierBonus",
+])
+const PERCENT_INPUT_STATS = new Set([
+    ...PERCENT_VALUE_STATS,
+    ...STAT_DAMAGE_MODIFIER_OPTIONS.map(([key]) => key),
+    ...SKILL_TARGET_STAT_OPTIONS.map(([key]) => key),
 ])
 const BASIS_OPTIONS = [
     ["", "默认基准"],
@@ -162,13 +241,30 @@ const BUFF_EFFECT_TYPE_OPTIONS = [
     ["formula", "受限函数换算"],
     ["stacked", "层数"],
 ]
+const DAMAGE_MODIFIER_KIND_OPTIONS = [
+    ["anomalyDamageBonus", "异常增伤%"],
+    ["baseMultiplierBonus", "异常倍率修正%"],
+    ["anomalyCritRate", "异常暴击率%"],
+    ["anomalyCritDmg", "异常暴击伤害%"],
+    ["directDamageBonus", "技能专属伤害增伤%"],
+    ["skillMultiplierBonus", "技能倍率加算%"],
+]
+const DAMAGE_MODIFIER_LABELS = {
+    ...Object.fromEntries(DAMAGE_MODIFIER_KIND_OPTIONS.map(([key, label]) => [key, label])),
+    anomalyDamageBonus: "异常伤害增伤%",
+}
+const DAMAGE_KIND_OPTIONS = [
+    ["direct", "直伤"],
+    ["anomaly", "异常"],
+    ["disorder", "紊乱"],
+]
 
 let catalog = null
 let activeKind = "agents"
 let selectedKey = ""
 let draftCounter = 0
 const DRAFT_STORAGE_KEY = "zzz_maintenance_drafts_v1"
-const DRAFT_KIND_KEYS = ["agents", "agentSkills", "wEngines", "driveDiscSets", "buffs"]
+const DRAFT_KIND_KEYS = ["agents", "agentSkills", "wEngines", "driveDiscSets", "anomalyEffects", "teammateBuffs", "fieldBuffs", "bossBuffs"]
 let drafts = loadDrafts()
 const unsavedEdits = new Map()
 let isRenderingEditor = false
@@ -207,6 +303,11 @@ function friendlyValidationMessage(message) {
         "teammate.name.zhCN": "队友中文名",
         "buff.id": "Buff ID",
         "buff.source.zhCN": "来源中文名",
+        "source.zhCN": "Buff 来源",
+        "sourcePeriod.zhCN": "来源期数",
+        "bossName.zhCN": "BOSS 名称",
+        "bossSource.zhCN": "BOSS 来源",
+        "description.zhCN": "中文说明",
         "level60.hpBase": "60级基础生命值",
         "level60.atkBase": "60级基础攻击力",
         "level60.defBase": "60级基础防御力",
@@ -338,16 +439,61 @@ function blankDraftItem(kind) {
         }
     }
 
+    if (kind === "anomalyEffects") {
+        return {
+            id: "",
+            maintenanceType: "anomaly",
+            label: { zhCN: "未命名异常" },
+            element: "physical",
+            baseMultiplier: 0,
+            defaultProcCount: 1,
+        }
+    }
+
+    if (kind === "teammateBuffs") {
+        return {
+            id: "",
+            maintenanceType: "teammate",
+            teammateId: "",
+            teammateName: { zhCN: "未命名" },
+            source: { zhCN: "" },
+            description: { zhCN: "" },
+            scope: "inCombat",
+            effects: [],
+            coverage: { default: 1, min: 0, max: 1, step: 0.1 },
+        }
+    }
+
+    if (kind === "fieldBuffs") {
+        return {
+            id: "",
+            sourceType: "field",
+            name: { zhCN: "未命名场地 Buff" },
+            source: { zhCN: "" },
+            sourcePeriod: { zhCN: "" },
+            description: { zhCN: "" },
+            scope: "inCombat",
+            effects: [],
+            coverage: { default: 1, min: 0, max: 1, step: 0.1 },
+        }
+    }
+
+    if (kind === "bossBuffs") {
+        return {
+            id: "",
+            sourceType: "boss",
+            bossName: { zhCN: "未命名 BOSS" },
+            bossSource: { zhCN: "" },
+            sourcePeriod: { zhCN: "" },
+            description: { zhCN: "" },
+            scope: "inCombat",
+            effects: [],
+            coverage: { default: 1, min: 0, max: 1, step: 0.1 },
+        }
+    }
+
     return {
         id: "",
-        maintenanceType: "teammate",
-        teammateId: "",
-        teammateName: { zhCN: "未命名" },
-        source: { zhCN: "" },
-        description: { zhCN: "" },
-        scope: "inCombat",
-        effects: [],
-        coverage: { default: 1, min: 0, max: 1, step: 0.1 },
     }
 }
 
@@ -384,7 +530,10 @@ function nameOf(item) {
         return item.name
     }
 
-    return item?.name?.zhCN ?? item?.name?.en ?? item?.zhCN ?? item?.en ?? item?.id ?? "-"
+    return item?.name?.zhCN ?? item?.name?.en
+        ?? item?.bossName?.zhCN ?? item?.bossName?.en
+        ?? item?.label?.zhCN ?? item?.label?.en
+        ?? item?.zhCN ?? item?.en ?? item?.id ?? "-"
 }
 
 function localized(value) {
@@ -476,12 +625,112 @@ function modeForStat(stat, explicit = "") {
         return explicit
     }
 
+    if (isStatDamageModifierOption(stat)) {
+        return "flat"
+    }
+
     const option = STAT_OPTIONS.find(([key]) => key === stat)
     if (option?.[2] === "pct") {
         return "pct"
     }
 
     return "flat"
+}
+
+function isStatDamageModifierOption(stat) {
+    return Object.prototype.hasOwnProperty.call(STAT_DAMAGE_MODIFIER_OPTION_BY_KEY, stat)
+}
+
+function isEventModifierStat(stat) {
+    return isStatDamageModifierOption(stat) || stat === "skillMultiplierBonus"
+}
+
+function canonicalBuffStat(stat) {
+    return stat === "enemyDefIgnore" ? "enemyDefReduction" : stat
+}
+
+function ruleTargetKind(rule = {}) {
+    return rule.target?.kind === "skill" ? "skill" : "default"
+}
+
+function statOptionsForTargetKind(targetKind = "default") {
+    return targetKind === "skill" ? SKILL_TARGET_STAT_OPTIONS : BUFF_STAT_OPTIONS
+}
+
+function legacyDamageModifierToRule(rule = {}) {
+    const appliesTo = rule.appliesTo ?? {}
+    const skillTargets = appliesTo.skillTargets ?? []
+    const target = skillTargets.length ? { kind: "skill", skillTargets } : { kind: "default" }
+    const value = damageModifierInputValue(rule)
+    const stat = rule.kind === "directDamageBonus"
+        ? "dmgBonus"
+        : rule.kind
+    return {
+        id: rule.id,
+        type: "fixed",
+        stat,
+        value,
+        mode: "flat",
+        target,
+        label: rule.label ?? null,
+    }
+}
+
+function editableEffectRule(rule = {}) {
+    return (rule.type ?? "fixed") === "damageModifier" ? legacyDamageModifierToRule(rule) : rule
+}
+
+const DEFAULT_W_ENGINE_MODIFICATION = { minLevel: 1, maxLevel: 5, defaultLevel: 1 }
+
+function wEngineModificationMetadata(wEngine = {}) {
+    return {
+        minLevel: Number.isInteger(Number(wEngine.modification?.minLevel)) ? Number(wEngine.modification.minLevel) : 1,
+        maxLevel: Number.isInteger(Number(wEngine.modification?.maxLevel)) ? Number(wEngine.modification.maxLevel) : 5,
+        defaultLevel: Number.isInteger(Number(wEngine.modification?.defaultLevel)) ? Number(wEngine.modification.defaultLevel) : 1,
+    }
+}
+
+function isWEngineEffectRuleContainer(containerId = "") {
+    return containerId === "wEngineSelfBuffRules" || containerId === "wEngineTeamBuffRules"
+}
+
+function formatScalingNumber(value) {
+    return Number.isFinite(Number(value)) ? String(Number(value)) : ""
+}
+
+function displayValuesInput(scaling = null) {
+    return Array.isArray(scaling?.displayValues)
+        ? scaling.displayValues.map(formatScalingNumber).join("/")
+        : ""
+}
+
+function parseDisplayValuesInput(value = "") {
+    return String(value)
+        .split("/")
+        .map(item => item.trim())
+        .filter(Boolean)
+        .map(item => Number(item))
+}
+
+function damageModifierInputValue(rule = {}) {
+    const rawValue = Number(rule.value ?? 0)
+    if (rule.valueUnit === "decimal") {
+        return rawValue * 100
+    }
+    return Math.abs(rawValue) > 1 ? rawValue : rawValue * 100
+}
+
+function eventModifierRuleFromStatRow(stat, value, index = 0, target = { kind: "default" }) {
+    return {
+        id: `effect-${index + 1}`,
+        type: "fixed",
+        stat,
+        value,
+        mode: "flat",
+        target: target.kind === "skill"
+            ? { kind: "skill", skillTargets: target.skillTargets ?? [] }
+            : { kind: "default" },
+    }
 }
 
 async function api(path, options = {}) {
@@ -505,17 +754,31 @@ function rawCollections() {
         agentSkills: catalog?.agentSkills?.agentSkills ?? [],
         wEngines: catalog?.wEngines?.wEngines ?? [],
         driveDiscSets: catalog?.driveDiscSets?.sets ?? [],
-        buffs: [
+        anomalyEffects: [
+            ...(catalog?.anomalyEffects?.anomalyEffects ?? []).map(effect => ({
+                ...effect,
+                maintenanceType: "anomaly",
+            })),
+            ...(catalog?.anomalyEffects?.disorderEffects ?? []).map(effect => ({
+                ...effect,
+                maintenanceType: "disorder",
+            })),
+        ],
+        teammateBuffs: [
             ...(catalog?.combatBuffs?.teammates ?? []).flatMap(teammate => (teammate.buffs ?? []).map(buff => ({
                 ...buff,
                 maintenanceType: "teammate",
                 teammateId: teammate.id,
                 teammateName: teammate.name,
             }))),
-            ...(catalog?.combatBuffs?.buffs ?? []).map(buff => ({
-                ...buff,
-                maintenanceType: "generic",
-            })),
+        ],
+        fieldBuffs: [
+            ...(catalog?.combatBuffs?.fieldBuffs ?? []),
+            ...(catalog?.combatBuffs?.buffs ?? []).filter(buff => buff.sourceType === "field"),
+        ],
+        bossBuffs: [
+            ...(catalog?.combatBuffs?.bossBuffs ?? []),
+            ...(catalog?.combatBuffs?.buffs ?? []).filter(buff => buff.sourceType === "boss"),
         ],
     }
 }
@@ -535,6 +798,10 @@ function collectionForActiveKind() {
 }
 
 function baseRecordKey(record) {
+    if (record.maintenanceType === "anomaly" || record.maintenanceType === "disorder") {
+        return `${record.maintenanceType}:${record.id}`
+    }
+
     return record.maintenanceType === "teammate"
         ? `teammate:${record.teammateId}:${record.id}`
         : record.id
@@ -561,7 +828,7 @@ function rawSelectedRecord() {
 }
 
 function editorRecordFromPayload(payload) {
-    if (activeKind !== "buffs" || !payload?.teammate || !payload?.buff) {
+    if (activeKind !== "teammateBuffs" || !payload?.teammate || !payload?.buff) {
         return stripDraftMetadata(payload)
     }
 
@@ -614,6 +881,196 @@ function statsSummary(stats = []) {
     }).join(" / ")
 }
 
+function anomalyEffectScopeOptions() {
+    const byId = new Map()
+    for (const item of catalog?.meta?.anomalyEffects ?? []) {
+        byId.set(item.id, localized(item.label) || item.id)
+    }
+    for (const item of catalog?.meta?.disorderEffects ?? []) {
+        byId.set(item.id, localized(item.label) || item.id)
+    }
+    return [...byId.entries()]
+}
+
+function checkboxOptions(options, selected = [], dataName) {
+    const selectedSet = new Set(selected)
+    return `
+        <div class="maintenance-checkbox-group">
+          ${options.map(([value, label]) => `
+            <label>
+              <input type="checkbox" data-${dataName} value="${escapeHtml(value)}"${selectedSet.has(value) ? " checked" : ""}>
+              <span>${escapeHtml(label)}</span>
+            </label>
+          `).join("")}
+        </div>
+    `
+}
+
+function checkedValues(row, selector) {
+    return [...row.querySelectorAll(`${selector}:checked`)].map(input => input.value)
+}
+
+function agentSkillOptions() {
+    return (rawCollections().agentSkills ?? []).map(skill => [skill.id, nameOf(skill)])
+}
+
+function agentSkillById(agentSkillId) {
+    return (rawCollections().agentSkills ?? []).find(skill => skill.id === agentSkillId) ?? null
+}
+
+function agentById(agentId) {
+    return (rawCollections().agents ?? []).find(agent => agent.id === agentId) ?? null
+}
+
+function skillTargetLabel(target = {}) {
+    const skillSet = agentSkillById(target.agentSkillId)
+    const agentLabel = String(localized(agentById(skillSet?.agentId)?.name) || localized(skillSet?.name) || target.agentSkillId || "")
+        .replace(/技能倍率$/, "")
+        .trim()
+    const category = (skillSet?.categories ?? []).find(item => item.id === target.categoryId)
+    const move = (category?.moves ?? []).find(item => item.id === target.moveId)
+    const row = damageSkillRowsWithGeneratedTotals(category ?? {}, move ?? {}).find(item => item.id === target.rowId)
+    return [
+        agentLabel,
+        localized(move?.name) || target.moveId,
+        target.rowId ? localized(row?.label) || target.rowId : "",
+    ].filter(Boolean).join("/")
+}
+
+function skillTargetFieldsHtml(target = {}, targetIndex = 0) {
+    const skills = agentSkillOptions()
+    const selectedSkillId = target.agentSkillId || skills[0]?.[0] || ""
+    const skillSet = agentSkillById(selectedSkillId)
+    const categories = skillSet?.categories ?? []
+    const selectedCategoryId = target.categoryId || categories[0]?.id || ""
+    const category = categories.find(item => item.id === selectedCategoryId) ?? categories[0] ?? null
+    const moves = category?.moves ?? []
+    const selectedMoveId = target.moveId || moves[0]?.id || ""
+    const move = moves.find(item => item.id === selectedMoveId) ?? moves[0] ?? null
+    const rowOptions = [
+        ["", "整招式"],
+        ...damageSkillRowsWithGeneratedTotals(category ?? {}, move ?? {}).map(row => [row.id, localized(row.label) || row.id]),
+    ]
+    return `
+        <div class="maintenance-skill-target-row" data-skill-target-row="${targetIndex}">
+          <label class="field">
+            <span>技能表</span>
+            <select data-effect-skill-target-agent>${selectOptions(skills, selectedSkillId)}</select>
+          </label>
+          <label class="field">
+            <span>技能大类</span>
+            <select data-effect-skill-target-category>${selectOptions(categories.map(item => [item.id, localized(item.name) || item.id]), selectedCategoryId)}</select>
+          </label>
+          <label class="field">
+            <span>招式</span>
+            <select data-effect-skill-target-move>${selectOptions(moves.map(item => [item.id, localized(item.name) || item.id]), selectedMoveId)}</select>
+          </label>
+          <label class="field">
+            <span>倍率行</span>
+            <select data-effect-skill-target-row-id>${selectOptions(rowOptions, target.rowId ?? "")}</select>
+          </label>
+          <button type="button" class="compact-btn maintenance-remove-skill-target" data-remove-skill-target="${targetIndex}">删除目标</button>
+        </div>
+    `
+}
+
+function skillTargetsHtml(targets = []) {
+    const rows = targets.length ? targets : [{}]
+    return `
+        <div class="maintenance-skill-targets" data-effect-skill-targets>
+          ${rows.map((target, index) => skillTargetFieldsHtml(target, index)).join("")}
+          <button type="button" class="compact-btn maintenance-add-skill-target" data-add-skill-target>添加技能目标</button>
+        </div>
+    `
+}
+
+function readSkillTargets(row) {
+    return [...row.querySelectorAll(".maintenance-skill-target-row")]
+        .map(targetRow => {
+            const target = {
+                agentSkillId: targetRow.querySelector("[data-effect-skill-target-agent]")?.value ?? "",
+                categoryId: targetRow.querySelector("[data-effect-skill-target-category]")?.value ?? "",
+                moveId: targetRow.querySelector("[data-effect-skill-target-move]")?.value ?? "",
+            }
+            const rowId = targetRow.querySelector("[data-effect-skill-target-row-id]")?.value ?? ""
+            if (rowId) {
+                target.rowId = rowId
+            }
+            return target
+        })
+        .filter(target => target.agentSkillId && target.categoryId && target.moveId)
+}
+
+function refreshSkillTargetRow(targetRow, target = null) {
+    if (!targetRow) {
+        return
+    }
+    const current = target ?? {
+        agentSkillId: targetRow.querySelector("[data-effect-skill-target-agent]")?.value ?? "",
+        categoryId: targetRow.querySelector("[data-effect-skill-target-category]")?.value ?? "",
+        moveId: targetRow.querySelector("[data-effect-skill-target-move]")?.value ?? "",
+        rowId: targetRow.querySelector("[data-effect-skill-target-row-id]")?.value ?? "",
+    }
+    const index = Number(targetRow.dataset.skillTargetRow ?? 0)
+    targetRow.outerHTML = skillTargetFieldsHtml(current, index)
+}
+
+function replaceSelectOptions(select, options, selected = "") {
+    if (!select) {
+        return ""
+    }
+    const nextSelected = options.some(([value]) => value === selected) ? selected : options[0]?.[0] ?? ""
+    select.innerHTML = selectOptions(options, nextSelected)
+    return nextSelected
+}
+
+function syncMaintenanceStatRow(row) {
+    if (!row) {
+        return
+    }
+    const targetKind = row.querySelector("[data-stat-target-kind]")?.value === "skill" ? "skill" : "default"
+    const statSelect = row.querySelector("[data-stat-key]")
+    const stat = replaceSelectOptions(statSelect, statOptionsForTargetKind(targetKind), statSelect?.value ?? "atkFlat")
+    row.querySelector("[data-stat-mode]").value = modeForStat(stat)
+    const label = row.querySelector("[data-stat-value]")?.closest(".field")?.querySelector("span")
+    if (label) {
+        label.outerHTML = fieldLabel(`数值${PERCENT_INPUT_STATS.has(stat) ? "（15 表示 15%）" : ""}`, true)
+    }
+    const isEventModifier = isEventModifierStat(stat)
+    const simple = row.parentElement?.dataset.simple === "true"
+    for (const item of row.querySelectorAll("[data-stat-mode], [data-stat-basis]")) {
+        item.closest(".field").hidden = isEventModifier || targetKind === "skill" || simple
+    }
+    const skillTargetField = row.querySelector(".stat-skill-target-modifier-only")
+    if (skillTargetField) {
+        skillTargetField.hidden = targetKind !== "skill"
+    }
+}
+
+function syncEffectStatOptions(row) {
+    if (!row) {
+        return
+    }
+    const targetKind = row.querySelector("[data-effect-target-kind]")?.value === "skill" ? "skill" : "default"
+    const statSelect = row.querySelector("[data-effect-stat]")
+    const stat = replaceSelectOptions(statSelect, statOptionsForTargetKind(targetKind), statSelect?.value ?? "atkFlat")
+    row.querySelector("[data-effect-mode]").value = modeForStat(stat)
+    syncBuffEffectRow(row)
+}
+
+function damageModifierSummary(rule = {}) {
+    const appliesTo = rule.appliesTo ?? {}
+    const scope = [
+        ...(appliesTo.damageKinds ?? []).map(kind => Object.fromEntries(DAMAGE_KIND_OPTIONS)[kind] ?? kind),
+        ...(appliesTo.anomalyEffects ?? []).map(effect => Object.fromEntries(anomalyEffectScopeOptions())[effect] ?? effect),
+        ...(appliesTo.elements ?? []).map(element => Object.fromEntries(DAMAGE_ELEMENT_OPTIONS)[element] ?? element),
+        ...(appliesTo.skillTargets ?? []).map(target => skillTargetLabel(target)),
+    ].filter(Boolean).join(" / ") || "全部"
+    const rawValue = Number(rule.value ?? 0)
+    const value = rule.valueUnit === "decimal" ? rawValue * 100 : Math.abs(rawValue) > 1 ? rawValue : rawValue * 100
+    return `${DAMAGE_MODIFIER_LABELS[rule.kind] ?? rule.kind} +${value}%（${scope}）`
+}
+
 function effectStats(effect) {
     if (Array.isArray(effect?.stats)) {
         return effect.stats
@@ -621,13 +1078,16 @@ function effectStats(effect) {
 
     if (Array.isArray(effect?.effects)) {
         return effect.effects
+            .map(rule => editableEffectRule(rule))
             .filter(rule => (rule.type ?? "fixed") === "fixed")
             .map(rule => ({
+                id: rule.id ?? null,
                 stat: rule.stat,
                 value: rule.value,
                 mode: rule.mode ?? "flat",
                 basis: rule.basis ?? null,
                 label: rule.label ?? null,
+                target: rule.target ?? { kind: "default" },
             }))
     }
 
@@ -636,7 +1096,7 @@ function effectStats(effect) {
 
 function effectRules(effect) {
     if (Array.isArray(effect?.effects)) {
-        return effect.effects
+        return effect.effects.map(rule => editableEffectRule(rule))
     }
 
     return effectStats(effect).map((stat, index) => ({
@@ -649,8 +1109,25 @@ function effectRules(effect) {
     }))
 }
 
+function buffModifiers(effect) {
+    return Array.isArray(effect?.buffModifiers) ? effect.buffModifiers : []
+}
+
+function buffModifierSummary(modifier = {}) {
+    const factor = Number(modifier.factor ?? 1)
+    const label = localized(modifier.label) || "Buff 修饰"
+    const targetBuffs = Array.isArray(modifier.targetBuffIds) ? modifier.targetBuffIds.filter(Boolean).join(" / ") : ""
+    const targetEffects = Array.isArray(modifier.targetEffectIds) ? modifier.targetEffectIds.filter(Boolean).join(" / ") : ""
+    const target = [targetBuffs, targetEffects].filter(Boolean).join(" · ") || "未选择目标"
+    return `${label}：${target} × ${Number((factor * 100).toFixed(3))}%`
+}
+
 function effectsSummary(item = {}) {
-    return effectRules(item).map(rule => {
+    const ruleSummaries = effectRules(item).map(rule => {
+        if (rule.type === "damageModifier") {
+            return damageModifierSummary(rule)
+        }
+
         if (rule.type === "derived") {
             return `${statLabel(rule.stat)} = ${localized(rule.sourceLabel) || "来源数值"} × ${rule.ratio ?? 0}%${Number.isFinite(Number(rule.cap)) ? `，上限 ${rule.cap}` : ""}`
         }
@@ -664,7 +1141,9 @@ function effectsSummary(item = {}) {
         }
 
         return `${statLabel(rule.stat)} +${rule.value ?? 0}${PERCENT_VALUE_STATS.has(rule.stat) || rule.mode === "pct" ? "%" : ""}`
-    }).join(" / ")
+    })
+    const modifierSummaries = buffModifiers(item).map(buffModifierSummary)
+    return [...ruleSummaries, ...modifierSummaries].join(" / ")
 }
 
 function renderList() {
@@ -675,6 +1154,10 @@ function renderList() {
             nameOf(item),
             localized(item.source),
             localized(item.sourceLabel),
+            localized(item.sourcePeriod),
+            localized(item.bossName),
+            localized(item.bossSource),
+            localized(item.label),
             localized(item.description),
             localized(item.teammateName),
         ].join(" ").toLowerCase()
@@ -697,17 +1180,25 @@ function renderList() {
         button.dataset.key = recordKey(item)
 
         const title = item.__isDraft
-            ? (activeKind === "buffs" && item.maintenanceType === "teammate"
+            ? (activeKind === "teammateBuffs" && item.maintenanceType === "teammate"
                 ? nameOf(item.teammateName)
                 : nameOf(item))
-            : activeKind === "buffs" && item.maintenanceType === "teammate"
+            : activeKind === "teammateBuffs" && item.maintenanceType === "teammate"
                 ? `${nameOf(item.teammateName)}｜${localized(item.source) || nameOf(item)}`
+                : activeKind === "bossBuffs"
+                    ? nameOf(item.bossName)
                 : nameOf(item)
         const detail = item.__isDraft
             ? `草稿 · ${item.id || "尚未填写 ID"}`
-            : activeKind === "buffs"
-            ? effectsSummary(item)
-            : item.id
+            : activeKind === "teammateBuffs"
+                ? effectsSummary(item)
+                : activeKind === "fieldBuffs"
+                    ? [localized(item.source), localized(item.sourcePeriod), effectsSummary(item)].filter(Boolean).join(" · ")
+                    : activeKind === "bossBuffs"
+                        ? [localized(item.bossSource), localized(item.sourcePeriod), effectsSummary(item)].filter(Boolean).join(" · ")
+                        : activeKind === "anomalyEffects"
+                            ? `${item.maintenanceType === "disorder" ? "紊乱" : "异常"} · ${item.element ?? "-"} · ${item.id}`
+                            : item.id
 
         button.innerHTML = `
             <strong>${escapeHtml(title)}</strong>
@@ -724,32 +1215,49 @@ function renderStatRows(containerId, stats = [], options = {}) {
     }
 
     const simple = options.simple ?? container.dataset.simple === "true"
+    const allowDamageModifiers = options.allowDamageModifiers ?? container.dataset.allowDamageModifiers === "true"
     container.dataset.simple = simple ? "true" : "false"
+    container.dataset.allowDamageModifiers = allowDamageModifiers ? "true" : "false"
     container.innerHTML = ""
     const rows = stats.length ? stats : [{ stat: "atkFlat", value: 0, mode: "flat", basis: "" }]
-    rows.forEach((stat, index) => {
+    rows.forEach((rawStat, index) => {
+        const stat = allowDamageModifiers && rawStat.type === "damageModifier"
+            ? legacyDamageModifierToRule(rawStat)
+            : rawStat
+        const targetKind = allowDamageModifiers ? ruleTargetKind(stat) : "default"
+        const isEventModifier = allowDamageModifiers && isEventModifierStat(stat.stat)
+        const statOptions = allowDamageModifiers ? statOptionsForTargetKind(targetKind) : STAT_OPTIONS.map(([key, label]) => [key, label])
+        const selectedStat = statOptions.some(([key]) => key === stat.stat) ? stat.stat : statOptions[0]?.[0] ?? "atkFlat"
         const row = document.createElement("div")
         row.className = "maintenance-stat-row"
         row.dataset.statRow = containerId
         row.innerHTML = `
+            <label class="field"${allowDamageModifiers ? "" : " hidden"}>
+              ${fieldLabel("增幅对象", true)}
+              <select data-stat-target-kind>${selectOptions([["default", "默认"], ["skill", "技能"]], targetKind)}</select>
+            </label>
             <label class="field">
               ${fieldLabel("增幅类型", true)}
-              <select data-stat-key>${selectOptions(STAT_OPTIONS.map(([key, label]) => [key, label]), stat.stat)}</select>
+              <select data-stat-key>${selectOptions(statOptions, selectedStat)}</select>
             </label>
             <label class="field">
-              ${fieldLabel(`数值${PERCENT_VALUE_STATS.has(stat.stat) ? "（15 表示 15%）" : ""}`, true)}
-              <input data-stat-value type="number" step="0.01" value="${escapeHtml(percentInputValue(stat.stat, Number(stat.value ?? 0)))}">
+              ${fieldLabel(`数值${PERCENT_INPUT_STATS.has(selectedStat) ? "（15 表示 15%）" : ""}`, true)}
+              <input data-stat-value type="number" step="0.01" value="${escapeHtml(percentInputValue(selectedStat, Number(stat.value ?? 0)))}">
             </label>
-            <label class="field"${simple ? " hidden" : ""}>
+            <label class="field"${simple || isEventModifier || targetKind === "skill" ? " hidden" : ""}>
               ${fieldLabel("计算方式", true)}
               <select data-stat-mode>
-                ${selectOptions([["flat", "直接加到面板"], ["pct", "按基准换算"]], stat.mode ?? modeForStat(stat.stat))}
+                ${selectOptions([["flat", "直接加到面板"], ["pct", "按基准换算"]], stat.mode ?? modeForStat(selectedStat))}
               </select>
             </label>
-            <label class="field"${simple ? " hidden" : ""}>
+            <label class="field"${simple || isEventModifier || targetKind === "skill" ? " hidden" : ""}>
               <span>基准</span>
               <select data-stat-basis>${selectOptions(BASIS_OPTIONS, stat.basis ?? "")}</select>
             </label>
+            <div class="field stat-skill-target-modifier-only"${targetKind === "skill" ? "" : " hidden"}>
+              <span>技能目标</span>
+              ${skillTargetsHtml(stat.target?.skillTargets ?? [])}
+            </div>
             <button type="button" class="compact-btn maintenance-remove-stat" data-remove-stat="${index}">删除</button>
         `
         container.appendChild(row)
@@ -763,30 +1271,65 @@ function readStatRows(containerId) {
     }
 
     return [...container.querySelectorAll(".maintenance-stat-row")]
-        .map(row => {
-            const stat = row.querySelector("[data-stat-key]")?.value
+        .map((row, index) => {
+            const targetKind = row.querySelector("[data-stat-target-kind]")?.value === "skill" ? "skill" : "default"
+            const target = targetKind === "skill"
+                ? { kind: "skill", skillTargets: readSkillTargets(row) }
+                : { kind: "default" }
+            const stat = canonicalBuffStat(row.querySelector("[data-stat-key]")?.value)
+            const value = inputToStoredValue(stat, row.querySelector("[data-stat-value]")?.value)
+            if (container.dataset.allowDamageModifiers === "true" && (targetKind === "skill" || isEventModifierStat(stat))) {
+                return eventModifierRuleFromStatRow(stat, value, index, target)
+            }
+
             const mode = row.querySelector("[data-stat-mode]")?.value || modeForStat(stat)
             const basis = row.querySelector("[data-stat-basis]")?.value || null
             return {
                 stat,
-                value: inputToStoredValue(stat, row.querySelector("[data-stat-value]")?.value),
+                value,
                 mode,
+                target,
                 ...(basis ? { basis } : {}),
             }
         })
-        .filter(item => item.stat && Number.isFinite(item.value))
+        .filter(item => item && item.stat && Number.isFinite(item.value))
 }
 
 function statRowsToFixedEffects(stats = []) {
-    return stats.map((stat, index) => ({
-        id: stat.id ?? `effect-${index + 1}`,
-        type: "fixed",
-        stat: stat.stat,
-        value: stat.value,
-        mode: stat.mode ?? "flat",
-        ...(stat.basis ? { basis: stat.basis } : {}),
-        ...(stat.label ? { label: stat.label } : {}),
-    }))
+    return stats.map((stat, index) => {
+        if (stat.type === "damageModifier") {
+            return {
+                id: stat.id ?? `effect-${index + 1}`,
+                type: "damageModifier",
+                kind: stat.kind,
+                value: stat.value,
+                ...(stat.valueUnit ? { valueUnit: stat.valueUnit } : {}),
+                ...(stat.appliesTo ? { appliesTo: stat.appliesTo } : {}),
+                ...(stat.label ? { label: stat.label } : {}),
+            }
+        }
+
+        return {
+            id: stat.id ?? `effect-${index + 1}`,
+            type: "fixed",
+            stat: stat.stat,
+            value: stat.value,
+            mode: stat.mode ?? "flat",
+            target: stat.target ?? { kind: "default" },
+            ...(stat.basis ? { basis: stat.basis } : {}),
+            ...(stat.label ? { label: stat.label } : {}),
+        }
+    })
+}
+
+function hasBuffRuleValue(item = {}) {
+    if (item.type === "derived") {
+        return item.ratio !== 0
+    }
+    if (item.type === "formula") {
+        return String(item.formula?.expression ?? "").trim()
+    }
+    return Number(item.value ?? item.valuePerStack ?? 0) !== 0
 }
 
 function statBlock(title, containerId, stats = [], options = {}) {
@@ -804,7 +1347,7 @@ function statBlock(title, containerId, stats = [], options = {}) {
             <button type="button" class="compact-btn" data-add-stat="${escapeHtml(containerId)}">添加增幅</button>
           </div>
           ${descriptionInput}
-          <div id="${escapeHtml(containerId)}" class="maintenance-stat-rows" data-simple="${simple}"></div>
+          <div id="${escapeHtml(containerId)}" class="maintenance-stat-rows" data-simple="${simple}" data-allow-damage-modifiers="true"></div>
           <p class="form-help">百分比属性直接填写百分比数字，例如 15 表示 15%。</p>
         </section>
     `
@@ -858,7 +1401,7 @@ function cinemaBuffCard(buff = {}, index = 0) {
             <h4>增幅规则</h4>
             <button type="button" class="compact-btn" data-add-stat="${escapeHtml(containerId)}">添加增幅</button>
           </div>
-          <div id="${escapeHtml(containerId)}" class="maintenance-stat-rows"></div>
+          <div id="${escapeHtml(containerId)}" class="maintenance-stat-rows" data-allow-damage-modifiers="true"></div>
           <p class="form-help">影画 Buff 默认不勾选；百分比属性直接填写百分比数字，例如 15 表示 15%。</p>
         </article>
     `
@@ -872,7 +1415,7 @@ function renderCinemaBuffRows(cinemaBuffs = []) {
 
     container.innerHTML = cinemaBuffs.map(cinemaBuffCard).join("")
     cinemaBuffs.forEach((buff, index) => {
-        renderStatRows(cinemaBuffStatContainerId(index), effectStats(buff))
+        renderStatRows(cinemaBuffStatContainerId(index), effectStats(buff), { allowDamageModifiers: true })
     })
 }
 
@@ -927,7 +1470,7 @@ function renderAgentForm(item = null) {
             ${localizedZhInput("name", agent.name)}
             <label class="field">${fieldLabel("稀有度", true)}<select id="rarity">${selectOptions([["S", "S"], ["A", "A"], ["B", "B"]], agent.rarity)}</select></label>
             <label class="field">${fieldLabel("属性", true)}<select id="attribute">${selectOptions(ATTRIBUTE_OPTIONS, agent.attribute)}</select></label>
-            <label class="field"><span>伤害结算属性</span><select id="damageElement"><option value="">同角色属性</option>${selectOptions(ATTRIBUTE_OPTIONS, agent.damageElement)}</select></label>
+            <label class="field"><span>伤害结算属性</span><select id="damageElement"><option value="">同角色属性</option>${selectOptions(DAMAGE_ELEMENT_OPTIONS, agent.damageElement)}</select></label>
             <label class="field">${fieldLabel("特性", true)}<select id="specialty">${selectOptions(SPECIALTY_OPTIONS, agent.specialty)}</select></label>
             <label class="field"><span>阵营</span><input id="faction" value="${escapeHtml(agent.faction ?? "")}"></label>
             ${sourceFields(agent)}
@@ -987,8 +1530,8 @@ function renderAgentForm(item = null) {
           </label>
         </section>
     `
-    renderStatRows("corePassiveStats", effectStats(agent.combatBuffs?.corePassive))
-    renderStatRows("additionalAbilityStats", effectStats(agent.combatBuffs?.additionalAbility))
+    renderStatRows("corePassiveStats", effectStats(agent.combatBuffs?.corePassive), { allowDamageModifiers: true })
+    renderStatRows("additionalAbilityStats", effectStats(agent.combatBuffs?.additionalAbility), { allowDamageModifiers: true })
     renderCinemaBuffRows(cinemaBuffsOf(agent))
     updatePreview()
 }
@@ -1083,6 +1626,220 @@ function buildAgent(options = {}) {
     return item
 }
 
+function skillCategoryDraft() {
+    return {
+        id: `category_${Date.now()}`,
+        name: { zhCN: "新技能大类" },
+        icon: "",
+        levelRange: { min: 1, max: 16, default: 12 },
+        moves: [],
+    }
+}
+
+function skillMoveDraft() {
+    return {
+        id: `move_${Date.now()}`,
+        name: { zhCN: "新招式" },
+        damageElement: "physical",
+        rows: [],
+    }
+}
+
+function skillRowDraft(levelRange = { min: 1, max: 16 }) {
+    const min = Number(levelRange.min ?? 1)
+    const max = Number(levelRange.max ?? 16)
+    const length = Math.max(1, max - min + 1)
+    return {
+        id: `row_${Date.now()}`,
+        label: { zhCN: "伤害倍率" },
+        kind: "damageMultiplier",
+        values: Array.from({ length }, () => ""),
+    }
+}
+
+function skillLevelRangeOf(category = {}) {
+    const raw = category.levelRange ?? {}
+    let min = Number(raw.min ?? 1)
+    let max = Number(raw.max ?? 16)
+    let defaultLevel = Number(raw.default ?? min)
+    if (!Number.isInteger(min) || min < 1) {
+        min = 1
+    }
+    if (!Number.isInteger(max) || max < min) {
+        max = min
+    }
+    if (!Number.isInteger(defaultLevel) || defaultLevel < min || defaultLevel > max) {
+        defaultLevel = min
+    }
+    return { min, max, default: defaultLevel }
+}
+
+function skillLevelsForCategory(category = {}) {
+    const range = skillLevelRangeOf(category)
+    const levels = []
+    for (let level = range.min; level <= range.max; level += 1) {
+        levels.push(level)
+    }
+    return levels
+}
+
+function skillValueForLevel(row = {}, category = {}, level) {
+    const range = skillLevelRangeOf(category)
+    const index = Number(level) - range.min
+    return row.values?.[index] ?? ""
+}
+
+function renderSkillMultiplierTable(category = {}, move = {}) {
+    const levels = skillLevelsForCategory(category)
+    const rows = Array.isArray(move.rows) ? move.rows : []
+    return `
+        <div class="skill-table-wrap">
+          <table class="skill-multiplier-table">
+            <thead>
+              <tr>
+                <th>倍率行 ID</th>
+                <th>行名</th>
+                <th>类型</th>
+                ${levels.map(level => `<th>LV${level}</th>`).join("")}
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((row, rowIndex) => `
+                <tr data-skill-row-row>
+                  <td><input data-skill-row-id value="${escapeHtml(row.id ?? "")}" placeholder="hit_1"></td>
+                  <td><input data-skill-row-label value="${escapeHtml(localized(row.label) || "")}" placeholder="一段伤害倍率"></td>
+                  <td><select data-skill-row-kind>${selectOptions(SKILL_ROW_KIND_OPTIONS, row.kind ?? "damageMultiplier")}</select></td>
+                  ${levels.map(level => `
+                    <td>
+                      <input data-skill-value data-skill-level="${level}" type="number" step="0.01" value="${escapeHtml(skillValueForLevel(row, category, level))}">
+                    </td>
+                  `).join("")}
+                  <td><button type="button" class="compact-btn danger-lite" data-remove-skill-row="${rowIndex}">删除</button></td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+    `
+}
+
+function renderSkillMoveCard(category = {}, move = {}, moveIndex = 0) {
+    return `
+        <article class="maintenance-subcard skill-move-card" data-skill-move-row>
+          <div class="maintenance-section-head">
+            <h4>${escapeHtml(localized(move.name) || `招式 ${moveIndex + 1}`)}</h4>
+            <div class="skill-maintenance-actions">
+              <button type="button" class="compact-btn" data-add-skill-row>添加倍率行</button>
+              <button type="button" class="compact-btn danger-lite" data-remove-skill-move="${moveIndex}">删除招式</button>
+            </div>
+          </div>
+          <div class="maintenance-grid skill-move-grid">
+            <label class="field">${fieldLabel("招式 ID", true)}<input data-skill-move-id value="${escapeHtml(move.id ?? "")}" placeholder="quick_sword"></label>
+            <label class="field">${fieldLabel("招式名", true)}<input data-skill-move-name value="${escapeHtml(localized(move.name) || "")}" placeholder="普通攻击：快剑"></label>
+            <label class="field"><span>伤害属性</span><select data-skill-move-damage-element>${selectOptions(DAMAGE_ELEMENT_OPTIONS, move.damageElement ?? "physical")}</select></label>
+          </div>
+          ${renderSkillMultiplierTable(category, move)}
+        </article>
+    `
+}
+
+function renderSkillCategoryCard(category = {}, categoryIndex = 0) {
+    const range = skillLevelRangeOf(category)
+    return `
+        <details class="maintenance-subcard skill-category-card" data-skill-category-row open>
+          <summary>
+            <span>${escapeHtml(localized(category.name) || `技能大类 ${categoryIndex + 1}`)}</span>
+            <small>${escapeHtml(category.id ?? "")}</small>
+          </summary>
+          <div class="maintenance-section-head skill-category-toolbar">
+            <h4>技能大类</h4>
+            <div class="skill-maintenance-actions">
+              <button type="button" class="compact-btn" data-add-skill-move>添加招式</button>
+              <button type="button" class="compact-btn danger-lite" data-remove-skill-category="${categoryIndex}">删除大类</button>
+            </div>
+          </div>
+          <div class="maintenance-grid skill-category-grid">
+            <label class="field">${fieldLabel("大类 ID", true)}<input data-skill-category-id value="${escapeHtml(category.id ?? "")}" placeholder="basic"></label>
+            <label class="field">${fieldLabel("大类名", true)}<input data-skill-category-name value="${escapeHtml(localized(category.name) || "")}" placeholder="普通攻击"></label>
+            <label class="field"><span>图标</span><input data-skill-category-icon value="${escapeHtml(category.icon ?? "")}" placeholder="/assets/... 或 https://..."></label>
+            <label class="field">${fieldLabel("最低等级", true)}<input data-skill-level-min type="number" min="1" step="1" value="${escapeHtml(range.min)}"></label>
+            <label class="field">${fieldLabel("最高等级", true)}<input data-skill-level-max type="number" min="1" step="1" value="${escapeHtml(range.max)}"></label>
+            <label class="field">${fieldLabel("默认等级", true)}<input data-skill-level-default type="number" min="1" step="1" value="${escapeHtml(range.default)}"></label>
+          </div>
+          <div class="skill-move-list">
+            ${(category.moves ?? []).map((move, moveIndex) => renderSkillMoveCard(category, move, moveIndex)).join("")}
+          </div>
+        </details>
+    `
+}
+
+function renderSkillCategoryRows(categories = []) {
+    const container = document.getElementById("agentSkillCategoryRows")
+    if (!container) {
+        return
+    }
+    container.innerHTML = categories.map(renderSkillCategoryCard).join("")
+}
+
+function readSkillRow(rowElement, categoryRange) {
+    const values = []
+    for (let level = categoryRange.min; level <= categoryRange.max; level += 1) {
+        const input = rowElement.querySelector(`[data-skill-value][data-skill-level="${level}"]`)
+        const raw = input?.value ?? ""
+        values.push(raw === "" ? "" : numberValue(raw))
+    }
+    return {
+        id: rowElement.querySelector("[data-skill-row-id]")?.value.trim() ?? "",
+        label: { zhCN: rowElement.querySelector("[data-skill-row-label]")?.value.trim() ?? "" },
+        kind: rowElement.querySelector("[data-skill-row-kind]")?.value || "damageMultiplier",
+        values,
+    }
+}
+
+function readSkillMove(moveElement, categoryRange) {
+    return {
+        id: moveElement.querySelector("[data-skill-move-id]")?.value.trim() ?? "",
+        name: { zhCN: moveElement.querySelector("[data-skill-move-name]")?.value.trim() ?? "" },
+        damageElement: moveElement.querySelector("[data-skill-move-damage-element]")?.value || "physical",
+        rows: [...moveElement.querySelectorAll("[data-skill-row-row]")]
+            .map(row => readSkillRow(row, categoryRange)),
+    }
+}
+
+function readSkillCategory(categoryElement) {
+    const min = numberValue(categoryElement.querySelector("[data-skill-level-min]")?.value, 1)
+    const max = numberValue(categoryElement.querySelector("[data-skill-level-max]")?.value, min)
+    const defaultLevel = numberValue(categoryElement.querySelector("[data-skill-level-default]")?.value, min)
+    const category = {
+        id: categoryElement.querySelector("[data-skill-category-id]")?.value.trim() ?? "",
+        name: { zhCN: categoryElement.querySelector("[data-skill-category-name]")?.value.trim() ?? "" },
+        icon: categoryElement.querySelector("[data-skill-category-icon]")?.value.trim() ?? "",
+        levelRange: {
+            min,
+            max,
+            default: defaultLevel,
+        },
+        moves: [],
+    }
+    const range = skillLevelRangeOf(category)
+    category.moves = [...categoryElement.querySelectorAll("[data-skill-move-row]")]
+        .map(move => readSkillMove(move, range))
+    if (!category.icon) {
+        delete category.icon
+    }
+    return category
+}
+
+function readSkillCategories() {
+    return [...els.maintenanceForm.querySelectorAll("[data-skill-category-row]")]
+        .map(readSkillCategory)
+}
+
+function rerenderSkillCategories(categories = readSkillCategories()) {
+    renderSkillCategoryRows(categories)
+}
+
 function renderAgentSkillForm(item = null) {
     const agentSkill = item ?? blankDraftItem("agentSkills")
     const agentOptions = (catalog?.meta?.agents ?? []).map(agent => [agent.id, nameOf(agent)])
@@ -1102,13 +1859,14 @@ function renderAgentSkillForm(item = null) {
           </div>
         </section>
         <section class="maintenance-section">
-          <h3>技能分类 JSON</h3>
-          <label class="field">
-            <span>categories</span>
-            <textarea id="agentSkillCategoriesJson" spellcheck="false">${escapeHtml(JSON.stringify(agentSkill.categories ?? [], null, 2))}</textarea>
-          </label>
+          <div class="maintenance-section-head">
+            <h3>技能分类与倍率</h3>
+            <button type="button" class="compact-btn" data-add-skill-category>添加大类</button>
+          </div>
+          <div id="agentSkillCategoryRows" class="skill-category-list"></div>
         </section>
     `
+    renderSkillCategoryRows(agentSkill.categories ?? [])
     updatePreview()
 }
 
@@ -1119,7 +1877,7 @@ function buildAgentSkill() {
         id: document.getElementById("recordId").value.trim(),
         agentId: document.getElementById("agentSkillAgentId").value,
         name: readLocalizedZh("name"),
-        categories: JSON.parse(document.getElementById("agentSkillCategoriesJson")?.value.trim() || "[]"),
+        categories: readSkillCategories(),
         sources: [sourceUrl].filter(Boolean),
     }
 }
@@ -1132,10 +1890,12 @@ function renderWEngineForm(item = null) {
         specialty: "attack",
         attribute: "physical",
         level60: { atkBase: 0, advancedStat: { stat: "critDmg", value: 0, mode: "flat" } },
+        modification: DEFAULT_W_ENGINE_MODIFICATION,
         effect: { name: { zhCN: "音擎效果" }, selfBuff: { scope: "inCombat", effects: [] }, teamBuff: null },
     }
     const selfBuff = wEngine.effect?.selfBuff ?? wEngine.effect?.buff
     const teamBuff = wEngine.effect?.teamBuff
+    const modification = wEngineModificationMetadata(wEngine)
 
     els.editorTitle.textContent = "音擎资料"
     els.editorTag.textContent = wEngine.id || "草稿"
@@ -1183,6 +1943,28 @@ function renderWEngineForm(item = null) {
           </div>
           <div id="wEngineTeamBuffRules" class="maintenance-buff-effect-rows"></div>
         </section>
+
+        <section class="maintenance-section">
+          <div class="maintenance-section-head">
+            <h3>改装等级与效果预览</h3>
+          </div>
+          <div class="maintenance-grid">
+            <label class="field"><span>最小等级</span><input value="${escapeHtml(modification.minLevel)}" readonly></label>
+            <label class="field"><span>最大等级</span><input value="${escapeHtml(modification.maxLevel)}" readonly></label>
+            <label class="field"><span>默认等级</span><input value="${escapeHtml(modification.defaultLevel)}" readonly></label>
+            <label class="field">
+              <span>预览等级</span>
+              <select id="wEngineModificationPreviewLevel">${selectOptions(
+        Array.from({ length: modification.maxLevel - modification.minLevel + 1 }, (_, index) => {
+            const level = modification.minLevel + index
+            return [String(level), `${level}级`]
+        }),
+        String(modification.defaultLevel),
+    )}</select>
+            </label>
+          </div>
+          <div id="wEngineModificationPreview" class="maintenance-modification-preview"></div>
+        </section>
     `
     renderStatRows("advancedStatRows", wEngine.level60?.advancedStat ? [wEngine.level60.advancedStat] : [], { simple: true })
     renderEffectRuleRows("wEngineSelfBuffRules", effectRules(selfBuff))
@@ -1192,17 +1974,8 @@ function renderWEngineForm(item = null) {
 
 function buildWEngine() {
     const advancedStats = readStatRows("advancedStatRows").filter(item => item.stat)
-    const validBuffRule = item => {
-        if (item.type === "derived") {
-            return item.ratio !== 0
-        }
-        if (item.type === "formula") {
-            return String(item.formula?.expression ?? "").trim()
-        }
-        return Number(item.value ?? item.valuePerStack ?? 0) !== 0
-    }
-    const selfBuffRules = readEffectRuleRows("wEngineSelfBuffRules").filter(validBuffRule)
-    const teamBuffRules = readEffectRuleRows("wEngineTeamBuffRules").filter(validBuffRule)
+    const selfBuffRules = readEffectRuleRows("wEngineSelfBuffRules").filter(hasBuffRuleValue)
+    const teamBuffRules = readEffectRuleRows("wEngineTeamBuffRules").filter(hasBuffRuleValue)
     return {
         ...(selectedCleanRecord() ?? {}),
         id: document.getElementById("recordId").value.trim(),
@@ -1219,6 +1992,7 @@ function buildWEngine() {
             atkBase: numberValue(document.getElementById("atkBase").value),
             advancedStat: advancedStats[0] ?? null,
         },
+        modification: DEFAULT_W_ENGINE_MODIFICATION,
         effect: {
             name: readLocalizedZh("effectName"),
             requirement: document.getElementById("requirementSpecialty").value ? {
@@ -1247,6 +2021,42 @@ function buildWEngine() {
         },
         sources: [document.getElementById("sourceUrl").value.trim()].filter(Boolean),
     }
+}
+
+function renderWEngineModificationPreview(wEngine = null, error = "") {
+    const container = document.getElementById("wEngineModificationPreview")
+    if (!container) {
+        return
+    }
+
+    if (error) {
+        container.innerHTML = `<p class="form-help">${escapeHtml(error)}</p>`
+        return
+    }
+
+    const previewLevel = numberValue(document.getElementById("wEngineModificationPreviewLevel")?.value, DEFAULT_W_ENGINE_MODIFICATION.defaultLevel)
+    const materializedWEngine = materializeWEngineForModificationLevel(wEngine, previewLevel)
+    const selfBuff = materializedWEngine?.effect?.selfBuff ?? materializedWEngine?.effect?.buff ?? null
+    const teamBuff = materializedWEngine?.effect?.teamBuff ?? null
+    const rows = [
+        ["限佩戴者", selfBuff],
+        ["团队", teamBuff],
+    ].map(([label, buff]) => {
+        const text = storedEffectRulesText(buff, defaultRuntimeForBuff(buff), catalog?.meta)
+        return text ? { label, text } : null
+    }).filter(Boolean)
+
+    if (!rows.length) {
+        container.innerHTML = `<p class="form-help">当前等级没有可预览的固定/叠层 Buff 规则。</p>`
+        return
+    }
+
+    container.innerHTML = rows.map(row => `
+        <div class="maintenance-preview-row">
+          <strong>${escapeHtml(row.label)}</strong>
+          <span>${escapeHtml(row.text)}</span>
+        </div>
+    `).join("")
 }
 
 function driveDiscLegacyFourPieceBuff(fourPiece) {
@@ -1341,29 +2151,23 @@ function renderDriveDiscSetForm(item = null) {
         ${effectSection("twoPiece", "2 件套", set.twoPiece, { kind: "twoPiece" })}
         ${effectSection("fourPiece", "4 件套", set.fourPiece, { kind: "fourPiece" })}
     `
-    renderStatRows("twoPieceStats", effectStats(set.twoPiece), { simple: true })
+    renderStatRows("twoPieceStats", effectStats(set.twoPiece), { simple: true, allowDamageModifiers: true })
     renderEffectRuleRows("fourPieceSelfRules", effectRules(driveDiscFourPieceSelfBuff(set.fourPiece)))
     renderEffectRuleRows("fourPieceTeamRules", effectRules(driveDiscFourPieceTeamBuff(set.fourPiece)))
     updatePreview()
 }
 
 function readDriveDiscBuffEffect(prefix) {
-    const stats = readEffectRuleRows(`${prefix}Rules`).filter(item => {
-        if (item.type === "derived") {
-            return item.ratio !== 0
-        }
-        if (item.type === "formula") {
-            return String(item.formula?.expression ?? "").trim()
-        }
-        return Number(item.value ?? item.valuePerStack ?? 0) !== 0
-    })
+    const stats = readEffectRuleRows(`${prefix}Rules`).filter(hasBuffRuleValue)
     if (!stats.length) {
         return null
     }
 
     const effect = {
+        scope: "inCombat",
         condition: document.getElementById(`${prefix}Condition`)?.value.trim() || null,
         effects: stats,
+        appliesToOutOfCombatPanel: false,
     }
     const coverage = readCoverageConfig(prefix)
     if (coverage) {
@@ -1400,15 +2204,7 @@ function readFourPieceEffect(prefix) {
 function readEffect(prefix) {
     const rulesContainer = document.getElementById(`${prefix}Rules`)
     const stats = rulesContainer
-        ? readEffectRuleRows(`${prefix}Rules`).filter(item => {
-            if (item.type === "derived") {
-                return item.ratio !== 0
-            }
-            if (item.type === "formula") {
-                return String(item.formula?.expression ?? "").trim()
-            }
-            return Number(item.value ?? item.valuePerStack ?? 0) !== 0
-        })
+        ? readEffectRuleRows(`${prefix}Rules`).filter(hasBuffRuleValue)
         : readStatRows(`${prefix}Stats`).filter(item => item.value !== 0)
     const conditionInput = document.getElementById(`${prefix}Condition`)
     const effectTextZh = document.getElementById(`${prefix}EffectTextZh`)
@@ -1462,10 +2258,35 @@ function renderEffectRuleRows(containerId, effects = []) {
         return
     }
 
+    const allowModificationScaling = isWEngineEffectRuleContainer(containerId)
     const rows = effects.length ? effects : [{ type: "fixed", stat: "atkFlat", value: 0, mode: "flat" }]
     container.innerHTML = ""
-    rows.forEach((effect, index) => {
+    rows.map(effect => editableEffectRule(effect)).forEach((effect, index) => {
         const type = effect.type ?? "fixed"
+        const targetKind = ruleTargetKind(effect)
+        const statOptions = statOptionsForTargetKind(targetKind)
+        const selectedStat = statOptions.some(([key]) => key === effect.stat) ? effect.stat : statOptions[0]?.[0] ?? "atkFlat"
+        const shownValue = type === "stacked"
+            ? effect.valuePerStack ?? effect.value ?? 0
+            : effect.value ?? 0
+        const scalingField = type === "stacked" ? "valuePerStack" : "value"
+        const scaling = effect.modificationScaling?.[scalingField] ?? null
+        const modificationScalingHtml = allowModificationScaling ? `
+            <div class="maintenance-modification-scaling modification-scaling-only" data-has-modification-scaling="${scaling ? "true" : "false"}">
+              <label class="field">
+                <span data-modification-base-label>${type === "stacked" ? "每层 1级计算值" : "1级计算值"}</span>
+                <input data-modification-base type="number" step="0.0001" value="${escapeHtml(formatScalingNumber(scaling?.base))}" placeholder="${escapeHtml(formatScalingNumber(shownValue))}">
+              </label>
+              <label class="field">
+                <span>每级精确增量</span>
+                <input data-modification-step type="number" step="0.0001" value="${escapeHtml(formatScalingNumber(scaling?.step))}">
+              </label>
+              <label class="field modification-display-values-field">
+                <span>1-5级展示值</span>
+                <input data-modification-display-values value="${escapeHtml(displayValuesInput(scaling))}" placeholder="15/17.5/20/22/24">
+              </label>
+            </div>
+        ` : ""
         const row = document.createElement("div")
         row.className = "maintenance-buff-effect-row"
         row.dataset.effectIndex = String(index)
@@ -1476,21 +2297,29 @@ function renderEffectRuleRows(containerId, effects = []) {
               <select data-effect-type>${selectOptions(BUFF_EFFECT_TYPE_OPTIONS, type)}</select>
             </label>
             <label class="field">
-              ${fieldLabel("目标属性", true)}
-              <select data-effect-stat>${selectOptions(STAT_OPTIONS.map(([key, label]) => [key, label]), effect.stat ?? "atkFlat")}</select>
+              ${fieldLabel("增幅对象", true)}
+              <select data-effect-target-kind>${selectOptions([["default", "默认"], ["skill", "技能"]], targetKind)}</select>
+            </label>
+            <label class="field panel-rule-only">
+              ${fieldLabel("增幅类型", true)}
+              <select data-effect-stat>${selectOptions(statOptions, selectedStat)}</select>
             </label>
             <label class="field direct-value-only">
               ${fieldLabel(type === "stacked" ? "每层数值" : "数值", true)}
-              <input data-effect-value type="number" step="0.01" value="${escapeHtml(type === "stacked" ? effect.valuePerStack ?? effect.value ?? 0 : effect.value ?? 0)}">
+              <input data-effect-value type="number" step="0.01" value="${escapeHtml(shownValue)}">
             </label>
-            <label class="field">
+            <label class="field panel-rule-only">
               ${fieldLabel("计算方式", true)}
               <select data-effect-mode>${selectOptions([["flat", "直接加到面板"], ["pct", "按基准换算"]], effect.mode ?? modeForStat(effect.stat ?? "atkFlat"))}</select>
             </label>
-            <label class="field">
+            <label class="field panel-rule-only">
               <span>基准</span>
               <select data-effect-basis>${selectOptions(BASIS_OPTIONS, effect.basis ?? "")}</select>
             </label>
+            <div class="field skill-target-modifier-only"${targetKind === "skill" ? "" : " hidden"}>
+              <span>技能目标</span>
+              ${skillTargetsHtml(effect.target?.skillTargets ?? [])}
+            </div>
             <label class="field source-value-only">
               ${fieldLabel("来源数值名称", true)}
               <input data-effect-source-label value="${escapeHtml(localized(effect.source?.label ?? effect.sourceLabel) || "来源数值")}">
@@ -1528,6 +2357,7 @@ function renderEffectRuleRows(containerId, effects = []) {
               <input data-effect-default-stacks type="number" min="0" step="1" value="${escapeHtml(effect.defaultStacks ?? effect.maxStacks ?? 1)}">
             </label>
             <button type="button" class="compact-btn maintenance-remove-effect" data-remove-effect="${index}">删除</button>
+            ${modificationScalingHtml}
         `
         container.appendChild(row)
         syncBuffEffectRow(row)
@@ -1536,6 +2366,18 @@ function renderEffectRuleRows(containerId, effects = []) {
 
 function syncBuffEffectRow(row) {
     const type = row.querySelector("[data-effect-type]")?.value ?? "fixed"
+    const stat = row.querySelector("[data-effect-stat]")?.value ?? "atkFlat"
+    const targetKind = row.querySelector("[data-effect-target-kind]")?.value === "skill" ? "skill" : "default"
+    const isEventModifier = isEventModifierStat(stat)
+    for (const item of row.querySelectorAll(".panel-rule-only")) {
+        item.hidden = false
+    }
+    for (const item of row.querySelectorAll(".panel-rule-only [data-effect-mode], .panel-rule-only [data-effect-basis]")) {
+        item.closest(".field").hidden = targetKind === "skill" || isEventModifier
+    }
+    for (const item of row.querySelectorAll(".skill-target-modifier-only")) {
+        item.hidden = targetKind !== "skill"
+    }
     for (const item of row.querySelectorAll(".direct-value-only")) {
         item.hidden = type === "derived" || type === "formula"
     }
@@ -1551,18 +2393,68 @@ function syncBuffEffectRow(row) {
     for (const item of row.querySelectorAll(".stacked-only")) {
         item.hidden = type !== "stacked"
     }
+    for (const item of row.querySelectorAll(".modification-scaling-only")) {
+        item.hidden = type !== "fixed" && type !== "stacked"
+    }
+    const modificationBaseLabel = row.querySelector("[data-modification-base-label]")
+    if (modificationBaseLabel) {
+        modificationBaseLabel.textContent = type === "stacked" ? "每层 1级计算值" : "1级计算值"
+    }
+}
+
+function readRuleModificationScaling(row, type, stat, currentValue) {
+    const scaling = row.querySelector(".maintenance-modification-scaling")
+    if (!scaling || (type !== "fixed" && type !== "stacked")) {
+        return {}
+    }
+
+    const baseInput = scaling.querySelector("[data-modification-base]")
+    const stepInput = scaling.querySelector("[data-modification-step]")
+    const displayValuesInputEl = scaling.querySelector("[data-modification-display-values]")
+    const hasExistingScaling = scaling.dataset.hasModificationScaling === "true"
+    const hasEditedScaling = [baseInput?.value, stepInput?.value, displayValuesInputEl?.value]
+        .some(value => String(value ?? "").trim() !== "")
+    if (!hasExistingScaling && !hasEditedScaling) {
+        return {}
+    }
+
+    const key = type === "stacked" ? "valuePerStack" : "value"
+    const fallbackBase = Number.isFinite(Number(currentValue)) ? Number(currentValue) : inputToStoredValue(stat, row.querySelector("[data-effect-value]")?.value)
+    const base = String(baseInput?.value ?? "").trim() === ""
+        ? fallbackBase
+        : numberValue(baseInput.value)
+    return {
+        modificationScaling: {
+            [key]: {
+                base,
+                step: numberValue(stepInput?.value),
+                displayValues: parseDisplayValuesInput(displayValuesInputEl?.value),
+            },
+        },
+    }
 }
 
 function readEffectRuleRows(containerId) {
     return [...document.querySelectorAll(`#${containerId} .maintenance-buff-effect-row`)].map((row, index) => {
         const type = row.querySelector("[data-effect-type]")?.value ?? "fixed"
-        const stat = row.querySelector("[data-effect-stat]")?.value ?? "atkFlat"
-        const base = {
+        const targetKind = row.querySelector("[data-effect-target-kind]")?.value === "skill" ? "skill" : "default"
+        const target = targetKind === "skill"
+            ? { kind: "skill", skillTargets: readSkillTargets(row) }
+            : { kind: "default" }
+        const commonBase = {
             ...(row.dataset.effectId ? { id: row.dataset.effectId } : {}),
             type,
+            target,
+        }
+
+        const stat = canonicalBuffStat(row.querySelector("[data-effect-stat]")?.value ?? "atkFlat")
+        const base = {
+            ...commonBase,
             stat,
-            mode: row.querySelector("[data-effect-mode]")?.value || modeForStat(stat),
-            ...(row.querySelector("[data-effect-basis]")?.value ? { basis: row.querySelector("[data-effect-basis]").value } : {}),
+            mode: targetKind === "skill" || isEventModifierStat(stat)
+                ? "flat"
+                : row.querySelector("[data-effect-mode]")?.value || modeForStat(stat),
+            ...(targetKind === "default" && !isEventModifierStat(stat) && row.querySelector("[data-effect-basis]")?.value ? { basis: row.querySelector("[data-effect-basis]").value } : {}),
         }
 
         if (type === "derived") {
@@ -1599,17 +2491,21 @@ function readEffectRuleRows(containerId) {
         }
 
         if (type === "stacked") {
+            const valuePerStack = inputToStoredValue(stat, row.querySelector("[data-effect-value]")?.value)
             return {
                 ...base,
-                valuePerStack: inputToStoredValue(stat, row.querySelector("[data-effect-value]")?.value),
+                valuePerStack,
                 maxStacks: numberValue(row.querySelector("[data-effect-max-stacks]")?.value, 1),
                 defaultStacks: numberValue(row.querySelector("[data-effect-default-stacks]")?.value, 1),
+                ...readRuleModificationScaling(row, type, stat, valuePerStack),
             }
         }
 
+        const value = inputToStoredValue(stat, row.querySelector("[data-effect-value]")?.value)
         return {
             ...base,
-            value: inputToStoredValue(stat, row.querySelector("[data-effect-value]")?.value),
+            value,
+            ...readRuleModificationScaling(row, type, stat, value),
         }
     }).filter(effect => effect.stat)
 }
@@ -1620,6 +2516,79 @@ function renderBuffEffectRows(effects = []) {
 
 function readBuffEffectRows() {
     return readEffectRuleRows("buffEffectRows")
+}
+
+function renderAnomalyEffectForm(item = null) {
+    const effect = item ?? blankDraftItem("anomalyEffects")
+    const maintenanceType = effect.maintenanceType === "disorder" ? "disorder" : "anomaly"
+    els.editorTitle.textContent = "异常伤害"
+    els.editorTag.textContent = `${maintenanceType === "disorder" ? "紊乱" : "异常"} / ${effect.id || "新条目"}`
+    els.maintenanceForm.innerHTML = `
+        <section class="maintenance-section">
+          <h3>基础信息</h3>
+          <div class="maintenance-grid">
+            <label class="field">${fieldLabel("类型", true)}<select id="anomalyMaintenanceType">${selectOptions([["anomaly", "属性异常"], ["disorder", "紊乱"]], maintenanceType)}</select></label>
+            <label class="field">${fieldLabel("ID", true)}<input id="recordId" value="${escapeHtml(effect.id ?? "")}" required></label>
+            ${localizedZhInput("label", effect.label, "中文名")}
+            <label class="field">${fieldLabel("元素", true)}<select id="anomalyElement">${selectOptions(DAMAGE_ELEMENT_OPTIONS, effect.element ?? "physical")}</select></label>
+          </div>
+        </section>
+        <section class="maintenance-section anomaly-effect-only">
+          <h3>属性异常倍率</h3>
+          <div class="maintenance-grid">
+            <label class="field">${fieldLabel("基础倍率", true)}<input id="baseMultiplier" type="number" min="0" step="0.001" value="${escapeHtml(effect.baseMultiplier ?? 0)}"></label>
+            <label class="field">${fieldLabel("默认结算次数", true)}<input id="defaultProcCount" type="number" min="0" step="1" value="${escapeHtml(effect.defaultProcCount ?? 1)}"></label>
+          </div>
+        </section>
+        <section class="maintenance-section disorder-effect-only">
+          <h3>紊乱倍率</h3>
+          <div class="maintenance-grid">
+            <label class="field">${fieldLabel("固定倍率", true)}<input id="fixedMultiplier" type="number" min="0" step="0.001" value="${escapeHtml(effect.fixedMultiplier ?? 4.5)}"></label>
+            <label class="field">${fieldLabel("每跳倍率", true)}<input id="tickMultiplier" type="number" min="0" step="0.001" value="${escapeHtml(effect.tickMultiplier ?? 0)}"></label>
+            <label class="field">${fieldLabel("跳间隔秒", true)}<input id="tickIntervalSeconds" type="number" min="0.0001" step="0.1" value="${escapeHtml(effect.tickIntervalSeconds ?? 1)}"></label>
+            <label class="field">${fieldLabel("默认持续秒数", true)}<input id="defaultDurationSeconds" type="number" min="0" step="0.1" value="${escapeHtml(effect.defaultDurationSeconds ?? 10)}"></label>
+          </div>
+        </section>
+    `
+    syncAnomalyEffectTypeFields()
+    updatePreview()
+}
+
+function syncAnomalyEffectTypeFields() {
+    const maintenanceType = document.getElementById("anomalyMaintenanceType")?.value ?? "anomaly"
+    for (const item of els.maintenanceForm.querySelectorAll(".anomaly-effect-only")) {
+        item.hidden = maintenanceType !== "anomaly"
+    }
+    for (const item of els.maintenanceForm.querySelectorAll(".disorder-effect-only")) {
+        item.hidden = maintenanceType !== "disorder"
+    }
+}
+
+function buildAnomalyEffect() {
+    const maintenanceType = document.getElementById("anomalyMaintenanceType")?.value === "disorder"
+        ? "disorder"
+        : "anomaly"
+    const base = {
+        id: document.getElementById("recordId").value.trim(),
+        maintenanceType,
+        label: readLocalizedZh("label"),
+        element: document.getElementById("anomalyElement").value,
+    }
+    if (maintenanceType === "disorder") {
+        return {
+            ...base,
+            fixedMultiplier: numberValue(document.getElementById("fixedMultiplier").value),
+            tickMultiplier: numberValue(document.getElementById("tickMultiplier").value),
+            tickIntervalSeconds: numberValue(document.getElementById("tickIntervalSeconds").value),
+            defaultDurationSeconds: numberValue(document.getElementById("defaultDurationSeconds").value),
+        }
+    }
+
+    return {
+        ...base,
+        baseMultiplier: numberValue(document.getElementById("baseMultiplier").value),
+        defaultProcCount: numberValue(document.getElementById("defaultProcCount").value),
+    }
 }
 
 function coverageBlock(prefix, coverage = null) {
@@ -1646,37 +2615,17 @@ function readCoverageConfig(prefix = "") {
 }
 
 function renderBuffForm(item = null) {
-    const buff = item ?? {
-        maintenanceType: "teammate",
-        teammateId: "new_teammate",
-        teammateName: { zhCN: "新队友" },
-        source: { zhCN: "核心被动" },
-        description: { zhCN: "" },
-        scope: "inCombat",
-        effects: [],
-        coverage: { default: 1, min: 0, max: 1, step: 0.1 },
+    if (activeKind === "fieldBuffs") {
+        renderFieldBuffForm(item)
+    } else if (activeKind === "bossBuffs") {
+        renderBossBuffForm(item)
+    } else {
+        renderTeammateBuffForm(item)
     }
-    const isTeammate = buff.maintenanceType === "teammate" || buff.sourceType === "teammate"
+}
 
-    els.editorTitle.textContent = "Buff 资料"
-    els.editorTag.textContent = isTeammate
-        ? `${buff.teammateId || "新队友"} / ${localized(buff.source) || "新 Buff"}`
-        : localized(buff.name) || localized(buff.source) || "未命名"
-    els.maintenanceForm.innerHTML = `
-        <section class="maintenance-section">
-          <h3>Buff 归属</h3>
-          <div class="maintenance-grid">
-            <label class="field">${fieldLabel("类型", true)}<select id="buffType">${selectOptions(SOURCE_TYPE_OPTIONS, isTeammate ? "teammate" : buff.sourceType ?? "manual")}</select></label>
-            <label class="field teammate-only">${fieldLabel("队友 ID", true)}<input id="teammateId" value="${escapeHtml(buff.teammateId ?? "")}"></label>
-            <label class="field teammate-only">${fieldLabel("队友中文名", true)}<input id="teammateNameZh" value="${escapeHtml(buff.teammateName?.zhCN ?? "")}" required></label>
-            <label class="field generic-only">${fieldLabel("Buff 中文名", true)}<input id="buffNameZh" value="${escapeHtml(buff.name?.zhCN || localized(buff.source) || "未命名")}" required></label>
-            <label class="field" id="buffSourceField">${fieldLabel("来源中文名", isTeammate)}<input id="buffSourceZh" value="${escapeHtml((buff.source ?? buff.sourceLabel)?.zhCN ?? "")}"></label>
-            <label class="field">${fieldLabel("范围", true)}<select id="buffScope">${selectOptions(EFFECT_SCOPE_OPTIONS, buff.scope ?? "inCombat")}</select></label>
-            <label class="field"><span>条件标签</span><input id="conditionLabel" value="${escapeHtml(localized(buff.conditionLabel) || "")}"></label>
-            <label class="field"><span>中文说明</span><textarea id="descriptionZh">${escapeHtml(buff.description?.zhCN ?? "")}</textarea></label>
-          </div>
-        </section>
-        ${coverageBlock("buff", buff.coverage)}
+function buffRuleSection() {
+    return `
         <section class="maintenance-section">
           <div class="maintenance-section-head">
             <h3>Buff 规则</h3>
@@ -1685,42 +2634,383 @@ function renderBuffForm(item = null) {
           <div id="buffEffectRows" class="maintenance-buff-effect-rows"></div>
         </section>
     `
+}
+
+function buffModifierSection() {
+    return `
+        <section class="maintenance-section">
+          <div class="maintenance-section-head">
+            <h3>Buff 修饰</h3>
+            <button type="button" class="compact-btn" data-add-buff-modifier>添加修饰</button>
+          </div>
+          <div id="buffModifierRows" class="maintenance-buff-modifier-rows"></div>
+        </section>
+    `
+}
+
+function collectionForKind(kind) {
+    const records = rawCollections()[kind] ?? []
+    return [
+        ...(drafts[kind] ?? []).map(draftRecord),
+        ...records.map(item => {
+            const key = baseRecordKey(item)
+            const edit = unsavedEdits.get(sessionKey(kind, key))
+            return edit
+                ? { ...item, ...structuredClone(edit), __sessionKey: key }
+                : { ...item, __sessionKey: key }
+        }),
+    ]
+}
+
+function shortInternalId(id = "") {
+    const text = String(id || "")
+    if (text.length <= 32) {
+        return text
+    }
+    const parts = text.split(/[._:-]+/).filter(Boolean)
+    return parts.length >= 2
+        ? parts.slice(-2).join(".")
+        : `${text.slice(0, 14)}...${text.slice(-10)}`
+}
+
+function currentTeammateIdForBuffModifierOptions() {
+    return document.getElementById("teammateId")?.value.trim()
+        || selectedCleanRecord()?.teammateId
+        || ""
+}
+
+function buffModifierTargetBuffCandidates() {
+    const seen = new Set()
+    const candidates = []
+    const addCandidate = (kind, item, label, ownerId = "") => {
+        if (!item?.id || seen.has(item.id)) {
+            return
+        }
+        seen.add(item.id)
+        candidates.push({
+            id: item.id,
+            kind,
+            item,
+            label,
+            ownerId,
+        })
+    }
+
+    for (const item of collectionForKind("teammateBuffs")) {
+        const owner = localized(item.teammateName) || item.teammateId || "队友"
+        const source = localized(item.source) || localized(item.sourceLabel) || nameOf(item)
+        addCandidate("teammate", item, `${owner}｜${source || item.id}`, item.teammateId)
+    }
+    for (const item of collectionForKind("fieldBuffs")) {
+        const source = localized(item.source) || localized(item.sourceLabel) || nameOf(item)
+        const period = localized(item.sourcePeriod)
+        addCandidate("field", item, ["场地", source, period].filter(Boolean).join("｜") || item.id)
+    }
+    for (const item of collectionForKind("bossBuffs")) {
+        const owner = nameOf(item) || "BOSS"
+        const source = localized(item.bossSource) || localized(item.source) || localized(item.sourceLabel)
+        addCandidate("boss", item, [owner, source].filter(Boolean).join("｜") || item.id)
+    }
+
+    const labelCounts = new Map()
+    for (const candidate of candidates) {
+        labelCounts.set(candidate.label, (labelCounts.get(candidate.label) ?? 0) + 1)
+    }
+
+    const currentTeammateId = currentTeammateIdForBuffModifierOptions()
+    const kindOrder = { teammate: 0, field: 1, boss: 2 }
+    return candidates
+        .map(candidate => ({
+            ...candidate,
+            optionLabel: labelCounts.get(candidate.label) > 1
+                ? `${candidate.label}（${shortInternalId(candidate.id)}）`
+                : candidate.label,
+        }))
+        .sort((left, right) => {
+            const leftSameTeammate = left.kind === "teammate" && left.ownerId && left.ownerId === currentTeammateId
+            const rightSameTeammate = right.kind === "teammate" && right.ownerId && right.ownerId === currentTeammateId
+            if (leftSameTeammate !== rightSameTeammate) {
+                return leftSameTeammate ? -1 : 1
+            }
+            const kindDelta = (kindOrder[left.kind] ?? 99) - (kindOrder[right.kind] ?? 99)
+            if (kindDelta !== 0) {
+                return kindDelta
+            }
+            return left.optionLabel.localeCompare(right.optionLabel, "zh-CN")
+        })
+}
+
+function buffModifierTargetBuffOptions(selectedBuffId = "") {
+    const options = [
+        ["", "请选择目标 Buff"],
+        ...buffModifierTargetBuffCandidates().map(candidate => [candidate.id, candidate.optionLabel]),
+    ]
+    if (selectedBuffId && !options.some(([value]) => value === selectedBuffId)) {
+        options.push([selectedBuffId, `未知 Buff：${selectedBuffId}`])
+    }
+    return options
+}
+
+function buffModifierTargetBuff(buffId = "") {
+    return buffModifierTargetBuffCandidates().find(candidate => candidate.id === buffId) ?? null
+}
+
+function buffModifierEffectOptionLabel(rule, buff) {
+    const runtime = defaultRuntimeForBuff(buff)
+    return storedCombatEffectRuleText(rule, runtime, buff, catalog?.meta)
+        || effectsSummary({ effects: [rule] })
+        || rule.id
+        || "未命名规则"
+}
+
+function buffModifierTargetEffectOptions(targetBuffId = "", selectedEffectId = "") {
+    const target = buffModifierTargetBuff(targetBuffId)
+    if (!target) {
+        return [
+            ["", "先选择目标 Buff"],
+            ...(selectedEffectId ? [[selectedEffectId, `未知效果：${selectedEffectId}`]] : []),
+        ]
+    }
+
+    const rules = effectRules(target.item)
+    const options = [
+        ["", "请选择目标效果"],
+        ...rules.map((rule, index) => {
+            const normalizedRule = {
+                ...rule,
+                id: rule.id ?? `effect-${index + 1}`,
+            }
+            return [normalizedRule.id, buffModifierEffectOptionLabel(normalizedRule, target.item)]
+        }),
+    ]
+    if (selectedEffectId && !options.some(([value]) => value === selectedEffectId)) {
+        options.push([selectedEffectId, `未知效果：${selectedEffectId}`])
+    }
+    if (options.length === 1) {
+        options[0][1] = "目标 Buff 没有普通规则"
+        if (selectedEffectId) {
+            options.push([selectedEffectId, `未知效果：${selectedEffectId}`])
+        }
+    }
+    return options
+}
+
+function syncBuffModifierTargetEffectRow(row, preferredEffectId = undefined) {
+    if (!row) {
+        return
+    }
+
+    const targetBuffId = row.querySelector("[data-buff-modifier-target-buff]")?.value ?? ""
+    const effectSelect = row.querySelector("[data-buff-modifier-target-effect]")
+    const options = buffModifierTargetEffectOptions(targetBuffId, preferredEffectId ?? effectSelect?.value ?? "")
+    const realOptions = options.filter(([value]) => value)
+    const selected = preferredEffectId ?? effectSelect?.value ?? (realOptions.length === 1 ? realOptions[0][0] : "")
+    replaceSelectOptions(effectSelect, options, selected)
+    if (effectSelect) {
+        effectSelect.disabled = !targetBuffId || !realOptions.length
+    }
+}
+
+function parseModifierTargetDataset(value) {
+    try {
+        const parsed = JSON.parse(value || "[]")
+        return Array.isArray(parsed)
+            ? parsed.map(item => String(item ?? "").trim()).filter(Boolean)
+            : []
+    } catch {
+        return []
+    }
+}
+
+function selectedModifierTargetArray(row, selector, datasetKey) {
+    const selected = row.querySelector(selector)?.value.trim() ?? ""
+    if (!selected) {
+        return []
+    }
+    const original = parseModifierTargetDataset(row.dataset[datasetKey])
+    return original[0] === selected && original.length > 1
+        ? original
+        : [selected]
+}
+
+function currentBuffModifierSourceId() {
+    const existing = selectedCleanRecord()
+    if (activeKind === "fieldBuffs" || activeKind === "bossBuffs") {
+        return document.getElementById("recordId")?.value.trim() || existing?.id || ""
+    }
+
+    return existing?.id
+        || [
+            document.getElementById("teammateId")?.value.trim(),
+            document.getElementById("buffSourceZh")?.value.trim(),
+        ].filter(Boolean).join(".")
+}
+
+function generatedBuffModifierId(targetBuffIds = [], targetEffectIds = []) {
+    const source = slugify(currentBuffModifierSourceId(), "buff")
+    const target = slugify(targetEffectIds[0] || targetBuffIds[0], "effect")
+    return `${source}.modify_${target}`
+}
+
+function renderBuffModifierRows(modifiers = []) {
+    const container = document.getElementById("buffModifierRows")
+    if (!container) {
+        return
+    }
+
+    container.innerHTML = ""
+    modifiers.forEach((modifier, index) => {
+        const originalTargetBuffIds = Array.isArray(modifier.targetBuffIds)
+            ? modifier.targetBuffIds.map(item => String(item ?? "").trim()).filter(Boolean)
+            : []
+        const originalTargetEffectIds = Array.isArray(modifier.targetEffectIds)
+            ? modifier.targetEffectIds.map(item => String(item ?? "").trim()).filter(Boolean)
+            : []
+        const selectedTargetBuffId = originalTargetBuffIds[0] ?? ""
+        const selectedTargetEffectId = originalTargetEffectIds[0] ?? ""
+        const row = document.createElement("div")
+        row.className = "maintenance-buff-effect-row maintenance-buff-modifier-row"
+        row.dataset.modifierIndex = String(index)
+        row.dataset.modifierId = modifier.id ?? ""
+        row.dataset.originalTargetBuffIds = JSON.stringify(originalTargetBuffIds)
+        row.dataset.originalTargetEffectIds = JSON.stringify(originalTargetEffectIds)
+        row.innerHTML = `
+            <label class="field">
+              ${fieldLabel("说明", true)}
+              <input data-buff-modifier-label value="${escapeHtml(localized(modifier.label) || "")}" placeholder="额外能力效果提升至原本的130%">
+            </label>
+            <label class="field">
+              ${fieldLabel("目标 Buff", true)}
+              <select data-buff-modifier-target-buff>${selectOptions(buffModifierTargetBuffOptions(selectedTargetBuffId), selectedTargetBuffId)}</select>
+            </label>
+            <label class="field">
+              ${fieldLabel("目标效果", true)}
+              <select data-buff-modifier-target-effect>${selectOptions(buffModifierTargetEffectOptions(selectedTargetBuffId, selectedTargetEffectId), selectedTargetEffectId)}</select>
+            </label>
+            <label class="field">
+              ${fieldLabel("倍率", true)}
+              <input data-buff-modifier-factor type="number" step="0.01" min="0" value="${escapeHtml(modifier.factor ?? 1.3)}">
+            </label>
+            <button type="button" class="compact-btn maintenance-remove-effect" data-remove-buff-modifier="${index}">删除</button>
+        `
+        container.appendChild(row)
+        syncBuffModifierTargetEffectRow(row, selectedTargetEffectId)
+    })
+}
+
+function readBuffModifierRows() {
+    return [...document.querySelectorAll("#buffModifierRows .maintenance-buff-modifier-row")]
+        .map(row => {
+            const label = row.querySelector("[data-buff-modifier-label]")?.value.trim()
+            const targetBuffIds = selectedModifierTargetArray(row, "[data-buff-modifier-target-buff]", "originalTargetBuffIds")
+            const targetEffectIds = selectedModifierTargetArray(row, "[data-buff-modifier-target-effect]", "originalTargetEffectIds")
+            const factor = numberValue(row.querySelector("[data-buff-modifier-factor]")?.value, NaN)
+            const id = row.dataset.modifierId?.trim()
+                || (targetBuffIds.length && targetEffectIds.length ? generatedBuffModifierId(targetBuffIds, targetEffectIds) : "")
+            return {
+                ...(id ? { id } : {}),
+                operation: "multiplyResolvedValue",
+                factor,
+                targetBuffIds,
+                targetEffectIds,
+                ...(label ? { label: { zhCN: label } } : {}),
+            }
+        })
+        .filter(modifier =>
+            modifier.id
+            || localized(modifier.label)
+            || modifier.targetBuffIds.length
+            || modifier.targetEffectIds.length
+            || Number.isFinite(modifier.factor)
+        )
+}
+
+function renderTeammateBuffForm(item = null) {
+    const buff = item ?? blankDraftItem("teammateBuffs")
+    els.editorTitle.textContent = "队友 Buff 资料"
+    els.editorTag.textContent = `${buff.teammateId || "新队友"} / ${localized(buff.source) || "新 Buff"}`
+    els.maintenanceForm.innerHTML = `
+        <section class="maintenance-section">
+          <h3>Buff 归属</h3>
+          <div class="maintenance-grid">
+            <label class="field">${fieldLabel("队友 ID", true)}<input id="teammateId" value="${escapeHtml(buff.teammateId ?? "")}" required></label>
+            <label class="field">${fieldLabel("队友中文名", true)}<input id="teammateNameZh" value="${escapeHtml(buff.teammateName?.zhCN ?? "")}" required></label>
+            <label class="field">${fieldLabel("来源中文名", true)}<input id="buffSourceZh" value="${escapeHtml((buff.source ?? buff.sourceLabel)?.zhCN ?? "")}" required></label>
+            <label class="field">${fieldLabel("范围", true)}<select id="buffScope">${selectOptions(EFFECT_SCOPE_OPTIONS, buff.scope ?? "inCombat")}</select></label>
+            <label class="field"><span>条件标签</span><input id="conditionLabel" value="${escapeHtml(localized(buff.conditionLabel) || "")}"></label>
+            <label class="field"><span>中文说明</span><textarea id="descriptionZh">${escapeHtml(buff.description?.zhCN ?? "")}</textarea></label>
+          </div>
+        </section>
+        ${coverageBlock("buff", buff.coverage)}
+        ${buffRuleSection()}
+        ${buffModifierSection()}
+    `
     renderBuffEffectRows(effectRules(buff))
-    syncBuffTypeFields()
+    renderBuffModifierRows(buff.buffModifiers ?? [])
     updatePreview()
 }
 
-function syncBuffTypeFields() {
-    const isTeammate = document.getElementById("buffType")?.value === "teammate"
-    const sourceFieldLabel = document.querySelector("#buffSourceField .field-label")
-    if (sourceFieldLabel) {
-        sourceFieldLabel.outerHTML = fieldLabel("来源中文名", isTeammate)
-    }
-    const sourceInput = document.getElementById("buffSourceZh")
-    if (sourceInput) {
-        sourceInput.required = isTeammate
-    }
-    for (const item of els.maintenanceForm.querySelectorAll(".teammate-only")) {
-        item.hidden = !isTeammate
-        for (const input of item.querySelectorAll("input, select, textarea")) {
-            input.required = isTeammate && ["teammateId", "teammateNameZh"].includes(input.id)
-        }
-    }
-    for (const item of els.maintenanceForm.querySelectorAll(".generic-only")) {
-        item.hidden = isTeammate
-        for (const input of item.querySelectorAll("input, select, textarea")) {
-            input.required = !isTeammate && input.id === "buffNameZh"
-        }
-    }
+function renderFieldBuffForm(item = null) {
+    const buff = item ?? blankDraftItem("fieldBuffs")
+    els.editorTitle.textContent = "场地 Buff 资料"
+    els.editorTag.textContent = localized(buff.name) || localized(buff.source) || "未命名"
+    els.maintenanceForm.innerHTML = `
+        <section class="maintenance-section">
+          <h3>场地 Buff 信息</h3>
+          <div class="maintenance-grid">
+            <label class="field">${fieldLabel("Buff ID")}<input id="recordId" value="${escapeHtml(buff.id ?? "")}" placeholder="留空自动生成"></label>
+            <label class="field">${fieldLabel("中文名称", true)}<input id="buffNameZh" value="${escapeHtml(buff.name?.zhCN ?? "")}" required></label>
+            <label class="field">${fieldLabel("Buff 来源", true)}<input id="buffSourceZh" value="${escapeHtml((buff.source ?? buff.sourceLabel)?.zhCN ?? "")}" required></label>
+            <label class="field">${fieldLabel("来源期数", true)}<input id="sourcePeriodZh" value="${escapeHtml(buff.sourcePeriod?.zhCN ?? "")}" required></label>
+            <label class="field"><span>中文说明</span><textarea id="descriptionZh" required>${escapeHtml(buff.description?.zhCN ?? "")}</textarea></label>
+          </div>
+        </section>
+        ${coverageBlock("buff", buff.coverage)}
+        ${buffRuleSection()}
+        ${buffModifierSection()}
+    `
+    renderBuffEffectRows(effectRules(buff))
+    renderBuffModifierRows(buff.buffModifiers ?? [])
+    updatePreview()
+}
+
+function renderBossBuffForm(item = null) {
+    const buff = item ?? blankDraftItem("bossBuffs")
+    els.editorTitle.textContent = "BOSS Buff 资料"
+    els.editorTag.textContent = localized(buff.bossName) || "未命名"
+    els.maintenanceForm.innerHTML = `
+        <section class="maintenance-section">
+          <h3>BOSS Buff 信息</h3>
+          <div class="maintenance-grid">
+            <label class="field">${fieldLabel("Buff ID")}<input id="recordId" value="${escapeHtml(buff.id ?? "")}" placeholder="留空自动生成"></label>
+            <label class="field">${fieldLabel("BOSS 名称", true)}<input id="bossNameZh" value="${escapeHtml(buff.bossName?.zhCN ?? "")}" required></label>
+            <label class="field">${fieldLabel("BOSS 来源", true)}<input id="bossSourceZh" value="${escapeHtml(buff.bossSource?.zhCN ?? "")}" required></label>
+            <label class="field">${fieldLabel("来源期数", true)}<input id="sourcePeriodZh" value="${escapeHtml(buff.sourcePeriod?.zhCN ?? "")}" required></label>
+            <label class="field"><span>中文说明</span><textarea id="descriptionZh" required>${escapeHtml(buff.description?.zhCN ?? "")}</textarea></label>
+          </div>
+        </section>
+        ${coverageBlock("buff", buff.coverage)}
+        ${buffRuleSection()}
+        ${buffModifierSection()}
+    `
+    renderBuffEffectRows(effectRules(buff))
+    renderBuffModifierRows(buff.buffModifiers ?? [])
+    updatePreview()
 }
 
 function buildBuff() {
-    const sourceType = document.getElementById("buffType").value
+    if (activeKind === "fieldBuffs") {
+        return buildFieldBuff()
+    }
+    if (activeKind === "bossBuffs") {
+        return buildBossBuff()
+    }
+
     const existing = selectedCleanRecord()
     const buff = {
         ...(existing?.id ? { id: existing.id } : {}),
         scope: document.getElementById("buffScope").value,
-        sourceType,
+        sourceType: "teammate",
         name: readLocalizedZh("buffName"),
         source: readLocalizedZh("buffSource"),
         sourceLabel: readLocalizedZh("buffSource"),
@@ -1730,29 +3020,61 @@ function buildBuff() {
         },
         coverage: readCoverageConfig("buff"),
         effects: readBuffEffectRows(),
+        buffModifiers: readBuffModifierRows(),
     }
 
-    if (sourceType === "teammate") {
-        return {
-            teammate: {
-                id: document.getElementById("teammateId").value.trim(),
-                name: readLocalizedZh("teammateName"),
-            },
-            buff: {
-                ...(buff.id ? { id: buff.id } : {}),
-                source: buff.source,
-                description: buff.description,
-                scope: buff.scope,
-                ...(buff.coverage ? { coverage: buff.coverage } : {}),
-                effects: buff.effects,
-            },
-        }
-    }
-
-    const { maintenanceType, teammateId, teammateName, stats, statsByPhase, ...existingGeneric } = existing ?? {}
     return {
-        ...existingGeneric,
-        ...buff,
+        teammate: {
+            id: document.getElementById("teammateId").value.trim(),
+            name: readLocalizedZh("teammateName"),
+        },
+        buff: {
+            ...(buff.id ? { id: buff.id } : {}),
+            source: buff.source,
+            description: buff.description,
+            scope: buff.scope,
+            ...(buff.coverage ? { coverage: buff.coverage } : {}),
+            effects: buff.effects,
+            buffModifiers: buff.buffModifiers,
+        },
+    }
+}
+
+function buildFieldBuff() {
+    const existing = selectedCleanRecord()
+    return {
+        ...(existing?.id ? { id: existing.id } : {}),
+        ...(document.getElementById("recordId")?.value.trim() ? { id: document.getElementById("recordId").value.trim() } : {}),
+        sourceType: "field",
+        scope: "inCombat",
+        name: readLocalizedZh("buffName"),
+        source: readLocalizedZh("buffSource"),
+        sourcePeriod: readLocalizedZh("sourcePeriod"),
+        description: {
+            zhCN: document.getElementById("descriptionZh").value.trim(),
+        },
+        coverage: readCoverageConfig("buff"),
+        effects: readBuffEffectRows(),
+        buffModifiers: readBuffModifierRows(),
+    }
+}
+
+function buildBossBuff() {
+    const existing = selectedCleanRecord()
+    return {
+        ...(existing?.id ? { id: existing.id } : {}),
+        ...(document.getElementById("recordId")?.value.trim() ? { id: document.getElementById("recordId").value.trim() } : {}),
+        sourceType: "boss",
+        scope: "inCombat",
+        bossName: readLocalizedZh("bossName"),
+        bossSource: readLocalizedZh("bossSource"),
+        sourcePeriod: readLocalizedZh("sourcePeriod"),
+        description: {
+            zhCN: document.getElementById("descriptionZh").value.trim(),
+        },
+        coverage: readCoverageConfig("buff"),
+        effects: readBuffEffectRows(),
+        buffModifiers: readBuffModifierRows(),
     }
 }
 
@@ -1768,6 +3090,9 @@ function buildCurrentPayload(options = {}) {
     }
     if (activeKind === "driveDiscSets") {
         return buildDriveDiscSet()
+    }
+    if (activeKind === "anomalyEffects") {
+        return buildAnomalyEffect()
     }
 
     return buildBuff()
@@ -1823,14 +3148,33 @@ function validationContextForCurrent(payload) {
             currentId: isDraftKey() ? undefined : rawSelectedRecord()?.id,
         }
     }
-    if (payload?.teammate || payload?.buff) {
+    if (activeKind === "anomalyEffects") {
+        const maintenanceType = payload?.maintenanceType === "disorder" ? "disorder" : "anomaly"
+        return {
+            items: rawCollections().anomalyEffects.filter(item => item.maintenanceType === maintenanceType),
+            currentId: isDraftKey() ? undefined : rawSelectedRecord()?.id,
+        }
+    }
+    if (activeKind === "teammateBuffs" || payload?.teammate || payload?.buff) {
         return {
             teammates: catalog?.combatBuffs?.teammates ?? [],
             currentBuffId: isDraftKey() ? undefined : rawSelectedRecord()?.id,
         }
     }
+    if (activeKind === "fieldBuffs") {
+        return {
+            items: rawCollections().fieldBuffs,
+            currentId: isDraftKey() ? undefined : rawSelectedRecord()?.id,
+        }
+    }
+    if (activeKind === "bossBuffs") {
+        return {
+            items: rawCollections().bossBuffs,
+            currentId: isDraftKey() ? undefined : rawSelectedRecord()?.id,
+        }
+    }
     return {
-        items: catalog?.combatBuffs?.buffs ?? [],
+        items: [],
         currentId: isDraftKey() ? undefined : rawSelectedRecord()?.id,
     }
 }
@@ -1839,17 +3183,23 @@ function updatePreview() {
     try {
         const payload = buildCurrentPayload()
         els.jsonPreview.textContent = JSON.stringify(previewPayload(payload), null, 2)
+        if (activeKind === "wEngines") {
+            renderWEngineModificationPreview(payload)
+        }
         persistCurrentEditor(payload)
         renderList()
     } catch (error) {
         els.jsonPreview.textContent = error.message
+        if (activeKind === "wEngines") {
+            renderWEngineModificationPreview(null, error.message)
+        }
         persistCurrentEditor()
         renderList()
     }
 }
 
 function previewPayload(payload) {
-    if (activeKind !== "buffs") {
+    if (!["teammateBuffs", "fieldBuffs", "bossBuffs"].includes(activeKind)) {
         return payload
     }
 
@@ -1859,6 +3209,12 @@ function previewPayload(payload) {
     if (Array.isArray(buff.effects)) {
         buff.effects = buff.effects.map(effect => {
             const { id, ...rest } = effect
+            return rest
+        })
+    }
+    if (Array.isArray(buff.buffModifiers)) {
+        buff.buffModifiers = buff.buffModifiers.map(modifier => {
+            const { id, ...rest } = modifier
             return rest
         })
     }
@@ -1876,6 +3232,8 @@ function renderEditor(item = selectedRecord()) {
             renderWEngineForm(item)
         } else if (activeKind === "driveDiscSets") {
             renderDriveDiscSetForm(item)
+        } else if (activeKind === "anomalyEffects") {
+            renderAnomalyEffectForm(item)
         } else {
             renderBuffForm(item)
         }
@@ -1914,9 +3272,7 @@ async function saveCurrent() {
 
     const draftId = draftIdFromKey()
     const previousSessionKey = sessionKey()
-    const endpoint = activeKind === "buffs" && document.getElementById("buffType")?.value === "teammate"
-        ? "teammate-buffs"
-        : KIND_CONFIG[activeKind].endpoint
+    const endpoint = KIND_CONFIG[activeKind].endpoint
     const response = await api(`/api/maintenance/${endpoint}`, {
         method: "POST",
         body: JSON.stringify(payload),
@@ -1929,7 +3285,7 @@ async function saveCurrent() {
     }
     selectedKey = response.savedItem
         ? recordKey(response.savedItem)
-        : activeKind === "buffs" && endpoint === "teammate-buffs"
+        : activeKind === "teammateBuffs" && endpoint === "teammate-buffs"
             ? `teammate:${payload.teammate.id}:${payload.buff.id}`
             : payload.id
     renderAll()
@@ -1959,7 +3315,7 @@ function cloneRecord() {
     if (copy.maintenanceType === "teammate") {
         copy.id = copy.id ? `${copy.id}_${Date.now()}` : ""
     }
-    if (activeKind === "buffs") {
+    if (["teammateBuffs", "fieldBuffs", "bossBuffs"].includes(activeKind)) {
         delete copy.id
     }
     createDraft(copy)
@@ -2003,22 +3359,60 @@ els.maintenanceForm.addEventListener("input", () => {
 })
 els.maintenanceForm.addEventListener("change", event => {
     clearFeedback()
-    if (event.target.matches("[data-stat-key]")) {
-        const row = event.target.closest(".maintenance-stat-row")
-        const stat = event.target.value
-        row.querySelector("[data-stat-mode]").value = modeForStat(stat)
-        const label = row.querySelector("[data-stat-value]")?.closest(".field")?.querySelector("span")
-        if (label) {
-            label.outerHTML = fieldLabel(`数值${PERCENT_VALUE_STATS.has(stat) ? "（15 表示 15%）" : ""}`, true)
-        }
+    if (activeKind === "agentSkills" && event.target.matches("[data-skill-level-min], [data-skill-level-max]")) {
+        rerenderSkillCategories()
+        updatePreview()
+        return
     }
 
-    if (event.target.id === "buffType") {
-        syncBuffTypeFields()
+    if (event.target.matches("[data-stat-key], [data-stat-target-kind]")) {
+        const row = event.target.closest(".maintenance-stat-row")
+        syncMaintenanceStatRow(row)
+    }
+
+    if (event.target.id === "anomalyMaintenanceType") {
+        syncAnomalyEffectTypeFields()
     }
 
     if (event.target.matches("[data-effect-type]")) {
         syncBuffEffectRow(event.target.closest(".maintenance-buff-effect-row"))
+    }
+
+    if (event.target.matches("[data-effect-target-kind]")) {
+        syncEffectStatOptions(event.target.closest(".maintenance-buff-effect-row"))
+    }
+
+    if (event.target.matches("[data-buff-modifier-target-buff]")) {
+        syncBuffModifierTargetEffectRow(event.target.closest(".maintenance-buff-modifier-row"))
+    }
+
+    if (event.target.matches("[data-effect-skill-target-agent]")) {
+        const targetRow = event.target.closest(".maintenance-skill-target-row")
+        refreshSkillTargetRow(targetRow, { agentSkillId: event.target.value })
+    }
+
+    if (event.target.matches("[data-effect-skill-target-category]")) {
+        const targetRow = event.target.closest(".maintenance-skill-target-row")
+        refreshSkillTargetRow(targetRow, {
+            agentSkillId: targetRow.querySelector("[data-effect-skill-target-agent]")?.value ?? "",
+            categoryId: event.target.value,
+        })
+    }
+
+    if (event.target.matches("[data-effect-skill-target-move]")) {
+        const targetRow = event.target.closest(".maintenance-skill-target-row")
+        refreshSkillTargetRow(targetRow, {
+            agentSkillId: targetRow.querySelector("[data-effect-skill-target-agent]")?.value ?? "",
+            categoryId: targetRow.querySelector("[data-effect-skill-target-category]")?.value ?? "",
+            moveId: event.target.value,
+        })
+    }
+
+    if (event.target.matches("[data-effect-stat]")) {
+        const row = event.target.closest(".maintenance-buff-effect-row")
+        const stat = event.target.value
+        row.querySelector("[data-effect-mode]").value = modeForStat(stat)
+        syncBuffEffectRow(row)
     }
 
     if (event.target.matches("[data-preferred-main-stat]")) {
@@ -2028,6 +3422,91 @@ els.maintenanceForm.addEventListener("change", event => {
     updatePreview()
 })
 els.maintenanceForm.addEventListener("click", event => {
+    const addSkillCategory = event.target.closest("[data-add-skill-category]")
+    if (addSkillCategory) {
+        clearFeedback()
+        rerenderSkillCategories([...readSkillCategories(), skillCategoryDraft()])
+        updatePreview()
+        return
+    }
+
+    const removeSkillCategory = event.target.closest("[data-remove-skill-category]")
+    if (removeSkillCategory) {
+        clearFeedback()
+        const categories = readSkillCategories()
+        categories.splice(Number(removeSkillCategory.dataset.removeSkillCategory), 1)
+        rerenderSkillCategories(categories)
+        updatePreview()
+        return
+    }
+
+    const addSkillMove = event.target.closest("[data-add-skill-move]")
+    if (addSkillMove) {
+        clearFeedback()
+        const categoryElement = addSkillMove.closest("[data-skill-category-row]")
+        const categories = readSkillCategories()
+        const categoryIndex = [...els.maintenanceForm.querySelectorAll("[data-skill-category-row]")].indexOf(categoryElement)
+        if (categories[categoryIndex]) {
+            categories[categoryIndex].moves = [...(categories[categoryIndex].moves ?? []), skillMoveDraft()]
+        }
+        rerenderSkillCategories(categories)
+        updatePreview()
+        return
+    }
+
+    const removeSkillMove = event.target.closest("[data-remove-skill-move]")
+    if (removeSkillMove) {
+        clearFeedback()
+        const categoryElement = removeSkillMove.closest("[data-skill-category-row]")
+        const categories = readSkillCategories()
+        const categoryIndex = [...els.maintenanceForm.querySelectorAll("[data-skill-category-row]")].indexOf(categoryElement)
+        if (categories[categoryIndex]) {
+            categories[categoryIndex].moves.splice(Number(removeSkillMove.dataset.removeSkillMove), 1)
+        }
+        rerenderSkillCategories(categories)
+        updatePreview()
+        return
+    }
+
+    const addSkillRow = event.target.closest("[data-add-skill-row]")
+    if (addSkillRow) {
+        clearFeedback()
+        const categoryElement = addSkillRow.closest("[data-skill-category-row]")
+        const moveElement = addSkillRow.closest("[data-skill-move-row]")
+        const categoryElements = [...els.maintenanceForm.querySelectorAll("[data-skill-category-row]")]
+        const moveElements = [...categoryElement.querySelectorAll("[data-skill-move-row]")]
+        const categoryIndex = categoryElements.indexOf(categoryElement)
+        const moveIndex = moveElements.indexOf(moveElement)
+        const categories = readSkillCategories()
+        if (categories[categoryIndex]?.moves?.[moveIndex]) {
+            categories[categoryIndex].moves[moveIndex].rows = [
+                ...(categories[categoryIndex].moves[moveIndex].rows ?? []),
+                skillRowDraft(categories[categoryIndex].levelRange),
+            ]
+        }
+        rerenderSkillCategories(categories)
+        updatePreview()
+        return
+    }
+
+    const removeSkillRow = event.target.closest("[data-remove-skill-row]")
+    if (removeSkillRow) {
+        clearFeedback()
+        const categoryElement = removeSkillRow.closest("[data-skill-category-row]")
+        const moveElement = removeSkillRow.closest("[data-skill-move-row]")
+        const categoryElements = [...els.maintenanceForm.querySelectorAll("[data-skill-category-row]")]
+        const moveElements = [...categoryElement.querySelectorAll("[data-skill-move-row]")]
+        const categoryIndex = categoryElements.indexOf(categoryElement)
+        const moveIndex = moveElements.indexOf(moveElement)
+        const categories = readSkillCategories()
+        if (categories[categoryIndex]?.moves?.[moveIndex]) {
+            categories[categoryIndex].moves[moveIndex].rows.splice(Number(removeSkillRow.dataset.removeSkillRow), 1)
+        }
+        rerenderSkillCategories(categories)
+        updatePreview()
+        return
+    }
+
     const clearPreferredMainStats = event.target.closest("[data-clear-preferred-main-stats]")
     if (clearPreferredMainStats) {
         clearFeedback()
@@ -2089,12 +3568,64 @@ els.maintenanceForm.addEventListener("click", event => {
         return
     }
 
+    const addBuffModifier = event.target.closest("[data-add-buff-modifier]")
+    if (addBuffModifier) {
+        clearFeedback()
+        renderBuffModifierRows([
+            ...readBuffModifierRows(),
+            {
+                operation: "multiplyResolvedValue",
+                factor: 1.3,
+                targetBuffIds: [],
+                targetEffectIds: [],
+                label: { zhCN: "" },
+            },
+        ])
+        updatePreview()
+        return
+    }
+
+    const removeBuffModifier = event.target.closest("[data-remove-buff-modifier]")
+    if (removeBuffModifier) {
+        clearFeedback()
+        const modifiers = readBuffModifierRows()
+        modifiers.splice(Number(removeBuffModifier.dataset.removeBuffModifier), 1)
+        renderBuffModifierRows(modifiers)
+        updatePreview()
+        return
+    }
+
+    const addSkillTarget = event.target.closest("[data-add-skill-target]")
+    if (addSkillTarget) {
+        clearFeedback()
+        const row = addSkillTarget.closest(".maintenance-buff-effect-row, .maintenance-stat-row")
+        const targets = [...readSkillTargets(row), {}]
+        row.querySelector("[data-effect-skill-targets]").outerHTML = skillTargetsHtml(targets)
+        updatePreview()
+        return
+    }
+
+    const removeSkillTarget = event.target.closest("[data-remove-skill-target]")
+    if (removeSkillTarget) {
+        clearFeedback()
+        const row = removeSkillTarget.closest(".maintenance-buff-effect-row, .maintenance-stat-row")
+        const targets = readSkillTargets(row)
+        targets.splice(Number(removeSkillTarget.dataset.removeSkillTarget), 1)
+        row.querySelector("[data-effect-skill-targets]").outerHTML = skillTargetsHtml(targets)
+        updatePreview()
+        return
+    }
+
     const add = event.target.closest("[data-add-stat]")
     if (add) {
         clearFeedback()
         const id = add.dataset.addStat
         const stats = readStatRows(id)
-        renderStatRows(id, [...stats, { stat: "atkFlat", value: 0, mode: "flat" }])
+        const container = document.getElementById(id)
+        renderStatRows(id, [...stats, { stat: "atkFlat", value: 0, mode: "flat" }], {
+            simple: container?.dataset.simple === "true",
+            allowDamageModifiers: container?.dataset.allowDamageModifiers === "true",
+        })
         updatePreview()
         return
     }
@@ -2105,7 +3636,11 @@ els.maintenanceForm.addEventListener("click", event => {
         const id = remove.closest("[data-stat-row]")?.dataset.statRow
         const stats = readStatRows(id)
         stats.splice(Number(remove.dataset.removeStat), 1)
-        renderStatRows(id, stats)
+        const container = document.getElementById(id)
+        renderStatRows(id, stats, {
+            simple: container?.dataset.simple === "true",
+            allowDamageModifiers: container?.dataset.allowDamageModifiers === "true",
+        })
         updatePreview()
     }
 })

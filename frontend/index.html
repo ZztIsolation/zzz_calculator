@@ -21,6 +21,7 @@
         <a href="/" class="nav-item active">首页</a>
         <a href="/drive-discs.html" class="nav-item">驱动盘</a>
         <a href="/calculate.html" class="nav-item">计算</a>
+        <a href="/accounts.html" class="nav-item" data-account-label>账号 / 加载中</a>
         <a href="/maintenance.html" class="nav-item">维护</a>
       </nav>
 
@@ -85,12 +86,25 @@
               </div>
               <label class="field">
                 <span>等级</span>
-                <input value="60" disabled>
+                <input id="agentLevelInput" type="number" min="1" max="60" step="1" value="60">
               </label>
+            </div>
+            <div class="optimizer-placeholder-grid">
               <label class="field">
                 <span>核心技</span>
                 <select id="coreSkillSelect"></select>
               </label>
+              <label class="field">
+                <span>影画</span>
+                <select id="cinemaLevelSelect"></select>
+              </label>
+            </div>
+            <div class="optimizer-skill-grid">
+              <label class="field"><span>普通攻击</span><select id="basicSkillLevelSelect" data-agent-skill-level="basic"></select></label>
+              <label class="field"><span>闪避</span><select id="dodgeSkillLevelSelect" data-agent-skill-level="dodge"></select></label>
+              <label class="field"><span>支援技</span><select id="assistSkillLevelSelect" data-agent-skill-level="assist"></select></label>
+              <label class="field"><span>特殊技</span><select id="specialSkillLevelSelect" data-agent-skill-level="special"></select></label>
+              <label class="field"><span>连携技</span><select id="chainSkillLevelSelect" data-agent-skill-level="chain"></select></label>
             </div>
             <div class="stat-strip" id="agentMeta"></div>
           </article>
@@ -111,6 +125,10 @@
               <label class="field">
                 <span>等级</span>
                 <input value="60" disabled>
+              </label>
+              <label class="field">
+                <span>改装等级</span>
+                <select id="wEngineModificationSelect"></select>
               </label>
             </div>
             <div class="stat-strip" id="wEngineMeta"></div>
@@ -188,32 +206,49 @@
                     <input id="damageTargetResistance" class="resistance-custom-input" type="number" min="-100" max="100" step="0.1" value="0" aria-label="Boss 抗性自定义百分比" hidden>
                   </div>
                   <label class="field">
+                    <span>伤害类型</span>
+                    <select id="damageEventType">
+                      <option value="direct">直伤</option>
+                      <option value="anomaly">异常伤害</option>
+                      <option value="disorder">紊乱</option>
+                    </select>
+                  </label>
+                  <label class="field damage-direct-field">
                     <span>技能倍率%</span>
                     <input id="damageSkillMultiplier" type="number" min="0" step="0.1" value="100">
                   </label>
-                  <label class="field">
-                    <span>技能分类</span>
-                    <select id="damageSkillCategory"></select>
-                  </label>
-                  <label class="field">
-                    <span>招式</span>
-                    <select id="damageSkillMove"></select>
-                  </label>
-                  <label class="field">
-                    <span>倍率行</span>
-                    <select id="damageSkillRow"></select>
-                  </label>
-                  <label class="field">
-                    <span>技能等级</span>
-                    <select id="damageSkillLevel"></select>
-                  </label>
-                  <label class="field">
+                  <div class="field damage-skill-picker-field damage-direct-field">
+                    <span>当前技能</span>
+                    <button id="openDamageSkillModalBtn" type="button" class="ghost-btn">选择技能</button>
+                    <small id="damageSkillSummary">手填倍率</small>
+                  </div>
+                  <label class="field damage-direct-field">
                     <span>暴击模式</span>
                     <select id="damageCritMode">
                       <option value="expected">期望</option>
                       <option value="crit">暴击</option>
                       <option value="nonCrit">非暴击</option>
                     </select>
+                  </label>
+                  <label class="field damage-anomaly-field" hidden>
+                    <span>异常类型</span>
+                    <select id="damageAnomalyEffect"></select>
+                  </label>
+                  <label class="field damage-anomaly-field" hidden>
+                    <span>结算次数</span>
+                    <input id="damageAnomalyProcCount" type="number" min="0" step="1" value="1">
+                  </label>
+                  <label class="field damage-disorder-field" hidden>
+                    <span>原异常</span>
+                    <select id="damageDisorderEffect"></select>
+                  </label>
+                  <label class="field damage-disorder-field" hidden>
+                    <span>已生效秒数</span>
+                    <input id="damageDisorderElapsed" type="number" min="0" step="0.1" value="0">
+                  </label>
+                  <label class="field damage-disorder-field" hidden>
+                    <span>持续秒数</span>
+                    <input id="damageDisorderDuration" type="number" min="0" step="0.1" value="10">
                   </label>
                 </div>
                 <div id="bossCombatBuffs" class="combat-buff-list"></div>
@@ -311,6 +346,24 @@
     </main>
   </div>
 
+  <div id="damageSkillModal" class="modal-layer" hidden>
+    <div class="modal-scrim" data-close-damage-skill-modal></div>
+    <section class="disc-modal damage-skill-modal" role="dialog" aria-modal="true" aria-labelledby="damageSkillModalTitle">
+      <button id="closeDamageSkillModalBtn" type="button" class="modal-close" aria-label="关闭">×</button>
+      <header class="modal-head">
+        <div>
+          <h2 id="damageSkillModalTitle">选择技能倍率</h2>
+          <p>按当前技能大类等级读取倍率</p>
+        </div>
+      </header>
+      <div id="damageSkillModalList" class="damage-skill-modal-list"></div>
+      <div id="damageSkillModalEmpty" class="inventory-empty home-disc-empty" hidden>
+        <strong>No Data</strong>
+        <span>当前角色暂无可选择的技能倍率</span>
+      </div>
+    </section>
+  </div>
+
   <div id="combatBuffModal" class="modal-layer" hidden>
     <div class="modal-scrim" data-close-combat-buff-modal></div>
     <section class="disc-modal combat-buff-modal" role="dialog" aria-modal="true" aria-labelledby="combatBuffModalTitle">
@@ -394,6 +447,7 @@
     </section>
   </div>
 
+  <script type="module" src="/accounts.js"></script>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

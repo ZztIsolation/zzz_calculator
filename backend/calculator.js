@@ -1,6 +1,11 @@
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { evaluateFormulaExpression } from "../frontend/formulaEvaluator.js"
+import {
+    damageSkillRowsWithGeneratedTotals,
+    skillLevelRange as levelRangeForSkill,
+    skillRowValue,
+} from "../frontend/skillMultiplierCandidates.js"
 
 const BONUS_KEY_MAP = {
     hpFlat: "hpFlat",
@@ -166,6 +171,43 @@ const RES_REDUCTION_KEY_BY_ELEMENT = {
 }
 const RES_IGNORE_KEYS = Object.values(RES_IGNORE_KEY_BY_ELEMENT)
 
+const DAMAGE_EVENT_KINDS = ["direct", "anomaly", "disorder"]
+const DAMAGE_MODIFIER_KINDS = ["anomalyDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "directDamageBonus", "skillMultiplierBonus"]
+const EVENT_MODIFIER_STAT_KEYS = new Set([
+    "anomalyDamageBonus",
+    "baseMultiplierBonus",
+    "anomalyCritRate",
+    "anomalyCritDmg",
+    "skillMultiplierBonus",
+])
+const SKILL_TARGET_STAT_KEYS = new Set([
+    "physicalResIgnore",
+    "fireResIgnore",
+    "iceResIgnore",
+    "electricResIgnore",
+    "etherResIgnore",
+    "enemyDefReduction",
+    "enemyResReduction",
+    "enemyPhysicalResReduction",
+    "enemyFireResReduction",
+    "enemyIceResReduction",
+    "enemyElectricResReduction",
+    "enemyEtherResReduction",
+    "dmgBonus",
+    "physicalDmg",
+    "fireDmg",
+    "iceDmg",
+    "electricDmg",
+    "etherDmg",
+    "anomalyDamageBonus",
+    "skillMultiplierBonus",
+])
+const EVENT_MODIFIER_KIND_VALUES = new Set([
+    ...DAMAGE_MODIFIER_KINDS,
+    ...EVENT_MODIFIER_STAT_KEYS,
+    ...SKILL_TARGET_STAT_KEYS,
+])
+
 const DAMAGE_TARGET_PRESETS = [
     {
         id: "taichu-nightmare",
@@ -199,6 +241,9 @@ const DEFAULT_DAMAGE_LEVEL_COEFFICIENT = 794
 const OUT_OF_COMBAT_BASIS_SOURCE_TYPES = new Set(["teammate", "wEngineTeam", "driveDisc4pcTeam", "field", "boss", "manual"])
 const REQUIRED_ATK_PCT_BASIS_SOURCE_TYPES = new Set(["self", "wEngine", "driveDisc4pc"])
 const TARGET_STAT_KEYS = new Set(COMBAT_TARGET_BONUS_KEYS)
+const STAT_ALIAS_MAP = {
+    enemyDefIgnore: "enemyDefReduction",
+}
 
 const STORED_PERCENT_STATS = new Set([
     "hpPct",
@@ -224,6 +269,7 @@ const STORED_PERCENT_STATS = new Set([
     "electricDmg",
     "etherDmg",
     "enemyDefReduction",
+    "enemyDefIgnore",
     "enemyResReduction",
     "enemyPhysicalResReduction",
     "enemyFireResReduction",
@@ -277,6 +323,7 @@ function createCombatBonusTotals() {
         ...createBonusTotals(),
         ...Object.fromEntries(COMBAT_BONUS_EXTRA_KEYS.map(key => [key, 0])),
         ...Object.fromEntries(COMBAT_TARGET_BONUS_KEYS.map(key => [key, 0])),
+        damageModifiers: [],
     }
 }
 
@@ -288,6 +335,10 @@ function isStoredPercentStat(stat, mode) {
     return mode === "pct" || STORED_PERCENT_STATS.has(stat)
 }
 
+function canonicalBuffStat(stat) {
+    return STAT_ALIAS_MAP[stat] ?? stat
+}
+
 function toCalcValue(stat, value, mode) {
     const numeric = Number(value ?? 0)
     return isStoredPercentStat(stat, mode) ? numeric / 100 : numeric
@@ -296,6 +347,19 @@ function toCalcValue(stat, value, mode) {
 function toBaseCalcValue(stat, value) {
     const numeric = Number(value ?? 0)
     return BASE_PERCENT_STATS.has(stat) ? numeric / 100 : numeric
+}
+
+function toDamageModifierCalcValue(value, valueUnit = null) {
+    const numeric = Number(value ?? 0)
+    if (!Number.isFinite(numeric)) {
+        return 0
+    }
+
+    if (valueUnit === "decimal") {
+        return numeric
+    }
+
+    return Math.abs(numeric) > 1 ? numeric / 100 : numeric
 }
 
 function addBonus(totals, stat, value, mode) {
@@ -381,6 +445,132 @@ function clampNumber(value, min, max) {
     return Math.max(Number(min ?? numeric), Math.min(Number(max ?? numeric), numeric))
 }
 
+export function clampWEngineModificationLevel(value, wEngine = {}) {
+    const modification = wEngine?.modification ?? {}
+    const min = Number.isInteger(Number(modification.minLevel)) ? Number(modification.minLevel) : 1
+    const max = Number.isInteger(Number(modification.maxLevel)) ? Number(modification.maxLevel) : 5
+    const defaultLevel = Number.isInteger(Number(modification.defaultLevel)) ? Number(modification.defaultLevel) : min
+    const numeric = Number(value ?? defaultLevel)
+    const level = Number.isFinite(numeric) ? Math.trunc(numeric) : defaultLevel
+    return clampNumber(level, min, max)
+}
+
+function wEngineModificationRange(wEngine = {}) {
+    const modification = wEngine?.modification ?? {}
+    return {
+        min: Number.isInteger(Number(modification.minLevel)) ? Number(modification.minLevel) : 1,
+        max: Number.isInteger(Number(modification.maxLevel)) ? Number(modification.maxLevel) : 5,
+        defaultLevel: Number.isInteger(Number(modification.defaultLevel)) ? Number(modification.defaultLevel) : 1,
+    }
+}
+
+function strictWEngineModificationLevel(value, wEngine = {}) {
+    const { min, max, defaultLevel } = wEngineModificationRange(wEngine)
+    const numeric = Number(value)
+    if (!Number.isInteger(numeric) || numeric < min || numeric > max) {
+        return defaultLevel
+    }
+    return numeric
+}
+
+function wEngineTeamModificationLevelMap(combatInput = {}) {
+    return combatInput.wEngineTeamModificationLevels && typeof combatInput.wEngineTeamModificationLevels === "object"
+        ? combatInput.wEngineTeamModificationLevels
+        : {}
+}
+
+function materializedTeamWEngineEntry(sourceWEngine, levelMap = {}) {
+    const key = wEngineTeamBuffKey(sourceWEngine)
+    const modificationLevel = strictWEngineModificationLevel(levelMap[key], sourceWEngine)
+    const materializedSourceWEngine = materializeWEngineForModificationLevel(sourceWEngine, modificationLevel)
+    return {
+        key,
+        sourceWEngine: materializedSourceWEngine,
+        teamBuff: wEngineEffectTeamBuff(materializedSourceWEngine),
+        wEngineModificationLevel: modificationLevel,
+    }
+}
+
+function modificationScalingValue(rule, key, level) {
+    const scaling = rule?.modificationScaling?.[key]
+    if (!scaling) {
+        return null
+    }
+
+    const base = Number(scaling.base ?? rule[key] ?? 0)
+    const step = Number(scaling.step ?? 0)
+    if (!Number.isFinite(base) || !Number.isFinite(step)) {
+        return null
+    }
+
+    const displayValues = Array.isArray(scaling.displayValues) ? scaling.displayValues : []
+    return {
+        value: base + step * (level - 1),
+        displayValue: displayValues[level - 1],
+    }
+}
+
+function materializeEffectRuleForModificationLevel(rule, level) {
+    if (!rule?.modificationScaling) {
+        return rule
+    }
+
+    const next = { ...rule }
+    const fixedValue = modificationScalingValue(rule, "value", level)
+    if (fixedValue) {
+        next.value = fixedValue.value
+        if (fixedValue.displayValue !== undefined) {
+            next.displayValue = fixedValue.displayValue
+        }
+    }
+
+    const valuePerStack = modificationScalingValue(rule, "valuePerStack", level)
+    if (valuePerStack) {
+        next.valuePerStack = valuePerStack.value
+        if (valuePerStack.displayValue !== undefined) {
+            next.displayValuePerStack = valuePerStack.displayValue
+        }
+    }
+
+    return next
+}
+
+function materializeEffectSetForModificationLevel(effect, level) {
+    if (!effect || !Array.isArray(effect.effects)) {
+        return effect
+    }
+
+    return {
+        ...effect,
+        effects: effect.effects.map(rule => materializeEffectRuleForModificationLevel(rule, level)),
+    }
+}
+
+export function materializeWEngineForModificationLevel(wEngine, value) {
+    if (!wEngine) {
+        return wEngine
+    }
+
+    const level = clampWEngineModificationLevel(value, wEngine)
+    const effect = wEngine.effect
+        ? {
+            ...wEngine.effect,
+            selfBuff: materializeEffectSetForModificationLevel(wEngine.effect.selfBuff, level),
+            teamBuff: materializeEffectSetForModificationLevel(wEngine.effect.teamBuff, level),
+            buff: materializeEffectSetForModificationLevel(wEngine.effect.buff, level),
+        }
+        : wEngine.effect
+
+    return {
+        ...wEngine,
+        selectedModificationLevel: level,
+        ...(effect ? { effect } : {}),
+        ...(wEngine.selfBuff ? { selfBuff: materializeEffectSetForModificationLevel(wEngine.selfBuff, level) } : {}),
+        ...(wEngine.teamBuff ? { teamBuff: materializeEffectSetForModificationLevel(wEngine.teamBuff, level) } : {}),
+        ...(wEngine.passive ? { passive: materializeEffectSetForModificationLevel(wEngine.passive, level) } : {}),
+    }
+}
+
 function defaultCoverage(effect) {
     return clampNumber(effect.coverage?.default ?? 1, effect.coverage?.min ?? 0, effect.coverage?.max ?? 1)
 }
@@ -417,7 +607,121 @@ function effectRuntimeFor(rule, runtimeInput = {}) {
     return runtimeInput.effects?.[id] ?? runtimeInput[id] ?? {}
 }
 
-function resolveEffectRule(rule, effect, runtimeInput = {}) {
+function effectBuffModifiers(effect) {
+    return Array.isArray(effect?.buffModifiers) ? effect.buffModifiers : []
+}
+
+function stringArray(value) {
+    return Array.isArray(value)
+        ? value.map(item => String(item ?? "").trim()).filter(Boolean)
+        : []
+}
+
+function normalizeBuffModifier(modifier = {}, source = {}) {
+    const operation = modifier.operation ?? "multiplyResolvedValue"
+    const factor = Number(modifier.factor ?? 1)
+    if (operation !== "multiplyResolvedValue" || !Number.isFinite(factor) || factor <= 0) {
+        return null
+    }
+
+    const targetBuffIds = stringArray(modifier.targetBuffIds)
+    const targetEffectIds = stringArray(modifier.targetEffectIds)
+    if (!targetBuffIds.length || !targetEffectIds.length) {
+        return null
+    }
+
+    return {
+        id: modifier.id ?? `${source.key ?? "buff"}.modifier`,
+        label: modifier.label ?? null,
+        operation,
+        factor,
+        targetBuffIds,
+        targetEffectIds,
+        sourceKey: source.key ?? null,
+        sourceType: source.sourceType ?? null,
+        sourceName: source.name ?? null,
+    }
+}
+
+function collectBuffModifiers(effect, source = {}) {
+    if ((effect?.scope ?? "outOfCombat") !== "inCombat") {
+        return []
+    }
+
+    return effectBuffModifiers(effect)
+        .map(modifier => normalizeBuffModifier(modifier, source))
+        .filter(Boolean)
+}
+
+function buffModifierAppliesToRule(modifier, sourceKey, rule = {}) {
+    const ruleId = String(rule.id ?? rule.stat ?? "").trim()
+    if (!sourceKey || !ruleId) {
+        return false
+    }
+    if (!modifier.targetBuffIds.includes(sourceKey)) {
+        return false
+    }
+    if (!modifier.targetEffectIds.includes(ruleId)) {
+        return false
+    }
+    return true
+}
+
+function applyBuffModifiersToResolvedRule(resolved, rule, modifierContext = {}) {
+    const sourceKey = modifierContext.sourceKey
+    const modifiers = Array.isArray(modifierContext.buffModifiers) ? modifierContext.buffModifiers : []
+    const appliedBuffModifiers = modifiers.filter(modifier => buffModifierAppliesToRule(modifier, sourceKey, rule))
+    if (!appliedBuffModifiers.length) {
+        return resolved
+    }
+
+    const buffModifierFactor = appliedBuffModifiers.reduce((total, modifier) => total * modifier.factor, 1)
+    return {
+        ...resolved,
+        value: Number(resolved.value ?? 0) * buffModifierFactor,
+        buffModifierFactor,
+        appliedBuffModifiers,
+    }
+}
+
+function normalizedRuleTarget(rule = {}) {
+    const target = rule.target ?? {}
+    if (target.kind === "skill") {
+        return {
+            kind: "skill",
+            skillTargets: Array.isArray(target.skillTargets) ? target.skillTargets : [],
+        }
+    }
+    return { kind: "default" }
+}
+
+function ruleTargetKind(rule = {}) {
+    return normalizedRuleTarget(rule).kind
+}
+
+function isRuleEventModifier(rule = {}) {
+    if ((rule.type ?? "fixed") === "damageModifier") {
+        return true
+    }
+    return ruleTargetKind(rule) === "skill" || EVENT_MODIFIER_STAT_KEYS.has(canonicalBuffStat(rule.stat))
+}
+
+function eventModifierCalcValue(rule = {}) {
+    const value = Number(rule.value ?? rule.valuePerStack ?? 0)
+    if (!Number.isFinite(value)) {
+        return 0
+    }
+    const stat = canonicalBuffStat(rule.stat)
+    if (stat === "skillMultiplierBonus") {
+        return value / 100
+    }
+    if (EVENT_MODIFIER_STAT_KEYS.has(stat)) {
+        return value / 100
+    }
+    return toCalcValue(stat, value, rule.mode)
+}
+
+function resolveEffectRule(rule, effect, runtimeInput = {}, modifierContext = {}) {
     const type = rule.type ?? "fixed"
     const runtime = effectRuntimeFor(rule, runtimeInput)
     const coverage = coverageFromRuntime(effect, runtimeInput)
@@ -425,10 +729,21 @@ function resolveEffectRule(rule, effect, runtimeInput = {}) {
         id: rule.id ?? rule.stat ?? type,
         label: rule.label ?? null,
         type,
-        stat: rule.stat,
+        stat: canonicalBuffStat(rule.stat),
         mode: rule.mode ?? "flat",
         basis: rule.basis ?? null,
+        target: normalizedRuleTarget(rule),
         coverage,
+    }
+
+    if (type === "damageModifier") {
+        return applyBuffModifiersToResolvedRule({
+            ...common,
+            kind: rule.kind,
+            value: toDamageModifierCalcValue(rule.value, rule.valueUnit) * coverage,
+            valueUnit: rule.valueUnit ?? null,
+            appliesTo: rule.appliesTo ?? null,
+        }, rule, modifierContext)
     }
 
     if (type === "derived") {
@@ -439,7 +754,7 @@ function resolveEffectRule(rule, effect, runtimeInput = {}) {
             ? Math.min(uncappedValue, Number(rule.cap))
             : uncappedValue
         const value = cappedValue * coverage
-        return {
+        return applyBuffModifiersToResolvedRule({
             ...common,
             sourceLabel: rule.sourceLabel ?? null,
             sourceValue,
@@ -447,7 +762,7 @@ function resolveEffectRule(rule, effect, runtimeInput = {}) {
             cap: Number.isFinite(Number(rule.cap)) ? Number(rule.cap) : null,
             uncappedValue,
             value,
-        }
+        }, rule, modifierContext)
     }
 
     if (type === "formula") {
@@ -464,7 +779,7 @@ function resolveEffectRule(rule, effect, runtimeInput = {}) {
         const expression = rule.formula?.expression ?? ""
         const formulaValue = evaluateFormulaExpression(expression, { [variable]: sourceValue })
         const value = formulaValue * coverage
-        return {
+        return applyBuffModifiersToResolvedRule({
             ...common,
             source,
             sourceLabel: source.label ?? rule.sourceLabel ?? null,
@@ -475,7 +790,7 @@ function resolveEffectRule(rule, effect, runtimeInput = {}) {
             valueUnit: rule.formula?.valueUnit ?? "storedValue",
             formulaValue,
             value,
-        }
+        }, rule, modifierContext)
     }
 
     if (type === "stacked") {
@@ -483,37 +798,60 @@ function resolveEffectRule(rule, effect, runtimeInput = {}) {
         const stacks = clampNumber(runtime.stacks ?? rule.defaultStacks ?? maxStacks, 0, maxStacks)
         const valuePerStack = Number(rule.valuePerStack ?? rule.value ?? 0)
         const value = valuePerStack * stacks * coverage
-        return {
+        return applyBuffModifiersToResolvedRule({
             ...common,
             value,
             valuePerStack,
             stacks,
             maxStacks,
             defaultStacks: Number(rule.defaultStacks ?? maxStacks),
-        }
+        }, rule, modifierContext)
     }
 
-    return {
+    return applyBuffModifiersToResolvedRule({
         ...common,
         value: Number(rule.value ?? 0) * coverage,
-    }
+    }, rule, modifierContext)
 }
 
-function resolveEffectStats(effect, runtimeInput = {}) {
+function resolveEffectStats(effect, runtimeInput = {}, modifierContext = {}) {
     return effectRules(effect)
-        .map(rule => resolveEffectRule(rule, effect, runtimeInput))
+        .filter(rule => !isRuleEventModifier(rule))
+        .map(rule => resolveEffectRule(rule, effect, runtimeInput, modifierContext))
         .filter(rule => rule.stat && Number.isFinite(Number(rule.value)))
 }
 
-function addCombatStat(totals, stat, sourceType, outOfCombat, resolvedStats) {
-    const value = toCalcValue(stat.stat, stat.value, stat.mode)
-    const mode = stat.mode ?? "flat"
-    const pctMeta = COMBAT_PCT_BASIS_BY_STAT[stat.stat]
+function resolveEffectDamageModifiers(effect, runtimeInput = {}, modifierContext = {}) {
+    return effectRules(effect)
+        .filter(rule => isRuleEventModifier(rule))
+        .map(rule => {
+            const resolved = resolveEffectRule(rule, effect, runtimeInput, modifierContext)
+            if ((rule.type ?? "fixed") === "damageModifier") {
+                return resolved
+            }
+            const target = normalizedRuleTarget(rule)
+            return {
+                ...resolved,
+                type: "eventModifier",
+                kind: resolved.stat,
+                value: eventModifierCalcValue(resolved),
+                appliesTo: target.kind === "skill" ? { skillTargets: target.skillTargets } : null,
+            }
+        })
+        .filter(rule => EVENT_MODIFIER_KIND_VALUES.has(rule.kind) && Number.isFinite(Number(rule.value)))
+}
 
-    if (TARGET_STAT_KEYS.has(stat.stat)) {
-        totals[stat.stat] += value
+function addCombatStat(totals, stat, sourceType, outOfCombat, resolvedStats) {
+    const statKey = canonicalBuffStat(stat.stat)
+    const value = toCalcValue(statKey, stat.value, stat.mode)
+    const mode = stat.mode ?? "flat"
+    const pctMeta = COMBAT_PCT_BASIS_BY_STAT[statKey]
+
+    if (TARGET_STAT_KEYS.has(statKey)) {
+        totals[statKey] += value
         resolvedStats.push({
             ...stat,
+            stat: statKey,
             value,
             mode,
         })
@@ -528,42 +866,47 @@ function addCombatStat(totals, stat, sourceType, outOfCombat, resolvedStats) {
                 ? pctMeta.outOfCombatKey
                 : null
         if (!key) {
-            throw new Error(`Unsupported combat buff basis for ${stat.stat}: ${basis}`)
+            throw new Error(`Unsupported combat buff basis for ${statKey}: ${basis}`)
         }
 
         totals[key] += value
         resolvedStats.push({
             ...stat,
+            stat: statKey,
             value,
             mode,
             basis,
-            resolvedStat: flatStatForPct(stat.stat),
+            resolvedStat: flatStatForPct(statKey),
             resolvedValue: basisValue(outOfCombat, basis) * value,
         })
         return
     }
 
-    addBonusCalcValue(totals, stat.stat, value)
+    addBonusCalcValue(totals, statKey, value)
     resolvedStats.push({
         ...stat,
+        stat: statKey,
         value,
         mode,
     })
 }
 
-function normalizeEffect(effect, runtimeInput = {}) {
+function normalizeEffect(effect, runtimeInput = {}, modifierContext = {}) {
     if (!effect) {
         return null
     }
 
-    const stats = resolveEffectStats(effect, runtimeInput)
+    const stats = resolveEffectStats(effect, runtimeInput, modifierContext)
+    const damageModifiers = resolveEffectDamageModifiers(effect, runtimeInput, modifierContext)
 
     return {
         name: effect.name ?? null,
         scope: effect.scope ?? "outOfCombat",
         condition: effect.condition ?? null,
         stats,
+        damageModifiers,
         effects: effectRules(effect),
+        buffModifiers: effectBuffModifiers(effect),
         coverage: effect.coverage ?? null,
         appliesToOutOfCombatPanel: effect.appliesToOutOfCombatPanel ?? true,
     }
@@ -574,6 +917,41 @@ async function readJson(filePath) {
     return JSON.parse(text)
 }
 
+function normalizeCatalogLabel(label, fallback) {
+    if (typeof label === "string") {
+        return { zhCN: label }
+    }
+
+    return {
+        zhCN: String(label?.zhCN ?? fallback ?? "").trim(),
+        ...(label?.en ? { en: String(label.en).trim() } : {}),
+    }
+}
+
+function normalizeAnomalyCatalogEffect(effect = {}) {
+    const id = String(effect.id ?? "").trim()
+    return {
+        id,
+        label: normalizeCatalogLabel(effect.label, id),
+        element: DAMAGE_ELEMENTS.includes(effect.element) ? effect.element : "physical",
+        baseMultiplier: Math.max(0, Number(effect.baseMultiplier ?? 0)),
+        defaultProcCount: Math.max(0, Number(effect.defaultProcCount ?? 1)),
+    }
+}
+
+function normalizeDisorderCatalogEffect(effect = {}) {
+    const id = String(effect.id ?? "").trim()
+    return {
+        id,
+        label: normalizeCatalogLabel(effect.label, id),
+        element: DAMAGE_ELEMENTS.includes(effect.element) ? effect.element : "physical",
+        fixedMultiplier: Math.max(0, Number(effect.fixedMultiplier ?? 4.5)),
+        tickMultiplier: Math.max(0, Number(effect.tickMultiplier ?? 0)),
+        tickIntervalSeconds: Math.max(0.0001, Number(effect.tickIntervalSeconds ?? 1)),
+        defaultDurationSeconds: Math.max(0, Number(effect.defaultDurationSeconds ?? 10)),
+    }
+}
+
 function buildMaps(catalog) {
     const agents = new Map(catalog.agents.map(agent => [agent.id, agent]))
     const wEngines = new Map(catalog.wEngines.map(item => [item.id, item]))
@@ -581,6 +959,8 @@ function buildMaps(catalog) {
     const combatBuffs = new Map((catalog.combatBuffs ?? []).map(item => [item.id, item]))
     const agentSkills = new Map((catalog.agentSkills ?? []).map(item => [item.id, item]))
     const agentSkillsByAgent = new Map((catalog.agentSkills ?? []).map(item => [item.agentId, item]))
+    const anomalyEffects = new Map((catalog.anomalyEffects ?? []).map(item => [item.id, item]))
+    const disorderEffects = new Map((catalog.disorderEffects ?? []).map(item => [item.id, item]))
     return {
         agentsMap: agents,
         wEnginesMap: wEngines,
@@ -588,6 +968,8 @@ function buildMaps(catalog) {
         combatBuffsMap: combatBuffs,
         agentSkillsMap: agentSkills,
         agentSkillsByAgentMap: agentSkillsByAgent,
+        anomalyEffectsMap: anomalyEffects,
+        disorderEffectsMap: disorderEffects,
     }
 }
 
@@ -799,6 +1181,78 @@ function flattenTeammateCombatBuffs(teammates) {
     )
 }
 
+function flattenFieldCombatBuffs(fieldBuffs) {
+    return (fieldBuffs ?? []).map(buff => {
+        const sourceLabel = buff.source ?? buff.sourceLabel ?? null
+        const description = buff.description ?? buff.conditionLabel ?? null
+        return {
+            ...buff,
+            sourceType: "field",
+            sourceCategory: "field",
+            sourceKind: "field",
+            sourceLabel,
+            description,
+            conditionLabel: buff.conditionLabel ?? description,
+            scope: buff.scope ?? "inCombat",
+        }
+    })
+}
+
+function bossBuffName(buff = {}) {
+    const name = {
+        zhCN: [
+            buff.bossName?.zhCN ?? buff.name?.zhCN,
+            buff.bossSource?.zhCN ?? buff.source?.zhCN,
+        ].filter(Boolean).join("｜"),
+    }
+    if (buff.bossName?.en || buff.name?.en || buff.bossSource?.en || buff.source?.en) {
+        name.en = [
+            buff.bossName?.en ?? buff.name?.en,
+            buff.bossSource?.en ?? buff.source?.en,
+        ].filter(Boolean).join(" | ")
+    }
+    return name
+}
+
+function flattenBossCombatBuffs(bossBuffs) {
+    return (bossBuffs ?? []).map(buff => {
+        const bossSource = buff.bossSource ?? buff.source ?? buff.sourceLabel ?? null
+        const description = buff.description ?? buff.conditionLabel ?? null
+        return {
+            ...buff,
+            sourceType: "boss",
+            sourceCategory: "boss",
+            sourceKind: "boss",
+            bossSource,
+            sourceLabel: bossSource,
+            name: buff.name ?? bossBuffName(buff),
+            description,
+            conditionLabel: buff.conditionLabel ?? description,
+            scope: buff.scope ?? "inCombat",
+        }
+    })
+}
+
+function legacyCombatBuffBuckets(buffs) {
+    const buckets = {
+        fieldBuffs: [],
+        bossBuffs: [],
+        systemBuffs: [],
+    }
+
+    for (const buff of buffs ?? []) {
+        if (buff?.sourceType === "field") {
+            buckets.fieldBuffs.push(buff)
+        } else if (buff?.sourceType === "boss") {
+            buckets.bossBuffs.push(buff)
+        } else {
+            buckets.systemBuffs.push(buff)
+        }
+    }
+
+    return buckets
+}
+
 function collectMissingAtkPctBasis(violations, sourceType, label, effect) {
     const isImplicitInCombat = sourceType === "driveDisc4pc"
     if (!REQUIRED_ATK_PCT_BASIS_SOURCE_TYPES.has(sourceType) || (!isImplicitInCombat && effect?.scope !== "inCombat")) {
@@ -867,8 +1321,11 @@ function validateCatalogModeling(catalog) {
     }
 }
 
-function applyCombatEffect({ bonusTotals, effect, key, name, sourceType, conditionLabel, outOfCombat, runtimeInput, activeEffects, ignoredEffects }) {
-    const normalized = normalizeEffect(effect, runtimeInput)
+function applyCombatEffect({ bonusTotals, effect, key, name, sourceType, conditionLabel, outOfCombat, runtimeInput, buffModifiers, activeEffects, ignoredEffects }) {
+    const normalized = normalizeEffect(effect, runtimeInput, {
+        sourceKey: key,
+        buffModifiers,
+    })
     if (!normalized) {
         ignoredEffects.push({
             key,
@@ -903,6 +1360,12 @@ function applyCombatEffect({ bonusTotals, effect, key, name, sourceType, conditi
     for (const stat of normalized.stats) {
         addCombatStat(bonusTotals, stat, sourceType, outOfCombat, resolvedStats)
     }
+    const resolvedDamageModifiers = normalized.damageModifiers.map(modifier => ({
+        ...modifier,
+        sourceKey: key,
+        sourceType,
+    }))
+    bonusTotals.damageModifiers.push(...resolvedDamageModifiers)
 
     activeEffects.push({
         key,
@@ -916,9 +1379,103 @@ function applyCombatEffect({ bonusTotals, effect, key, name, sourceType, conditi
             value: toCalcValue(stat.stat, stat.value, stat.mode),
         })),
         effects: normalized.effects,
+        buffModifiers: normalized.buffModifiers,
         coverage: normalized.coverage,
+        runtime: runtimeInput ?? null,
         resolvedStats,
+        resolvedDamageModifiers,
     })
+}
+
+function collectActiveBuffModifiers({
+    activeCatalogBuffs = [],
+    activeAgentBuffs = [],
+    activeCurrentWEngineEntries = [],
+    activeTeamWEngineEntries = [],
+    activeDriveDisc4pcIds = [],
+    teammateDriveDiscSetIds = [],
+    driveDiscSets = new Map(),
+    setCounts = new Map(),
+    currentWEngineRequirement = null,
+    agent = null,
+} = {}) {
+    const modifiers = []
+
+    for (const buff of activeCatalogBuffs) {
+        modifiers.push(...collectBuffModifiers(buff, {
+            key: buff.id,
+            name: buff.name,
+            sourceType: buff.sourceType ?? "manual",
+        }))
+    }
+
+    for (const entry of activeAgentBuffs) {
+        modifiers.push(...collectBuffModifiers(entry.buff, {
+            key: entry.id,
+            name: entry.name,
+            sourceType: "self",
+        }))
+    }
+
+    for (const entry of activeCurrentWEngineEntries) {
+        if (entry.requiresCurrentWearer && currentWEngineRequirement && currentWEngineRequirement !== agent?.specialty) {
+            continue
+        }
+
+        modifiers.push(...collectBuffModifiers(entry.effect, {
+            key: entry.key,
+            name: entry.effect?.name ?? entry.name,
+            sourceType: entry.sourceType,
+        }))
+    }
+
+    for (const entry of activeTeamWEngineEntries) {
+        modifiers.push(...collectBuffModifiers(entry.teamBuff, {
+            key: entry.key,
+            name: entry.teamBuff?.name ?? wEngineEffectData(entry.sourceWEngine)?.name ?? entry.sourceWEngine?.name,
+            sourceType: "wEngineTeam",
+        }))
+    }
+
+    for (const activeId of activeDriveDisc4pcIds) {
+        const rawKey = String(activeId).slice("driveDisc4pc:".length)
+        const [setId, part = "self"] = rawKey.split(".")
+        const set = driveDiscSets.get(setId)
+        const count = setCounts.get(setId) ?? 0
+        if (!set || count < 4) {
+            continue
+        }
+
+        const effect = part === "team"
+            ? driveDiscFourPieceTeamBuff(set)
+            : driveDiscFourPieceSelfBuff(set)
+        modifiers.push(...collectBuffModifiers(effect, {
+            key: activeId,
+            name: set.name,
+            sourceType: part === "team" ? "driveDisc4pcTeam" : "driveDisc4pc",
+        }))
+    }
+
+    teammateDriveDiscSetIds.forEach((setId, index) => {
+        if (!setId) {
+            return
+        }
+
+        const set = driveDiscSets.get(setId)
+        if (!set) {
+            return
+        }
+
+        const key = `teammateDriveDisc4pc:${index + 1}:${setId}`
+        const teamBuff = driveDiscFourPieceTeamBuff(set)
+        modifiers.push(...collectBuffModifiers(teamBuff, {
+            key,
+            name: set.name,
+            sourceType: "driveDisc4pcTeam",
+        }))
+    })
+
+    return modifiers
 }
 
 function combatFlatFromPct(totals, outOfCombat) {
@@ -989,15 +1546,18 @@ function normalizeResistanceByElement(targetInput, damageElement) {
     const source = targetInput.resistanceByElement && typeof targetInput.resistanceByElement === "object"
         ? targetInput.resistanceByElement
         : {}
+    const fallbackResistance = normalizeResistancePercent(targetInput.resistance, 0)
     const resistanceByElement = {}
     for (const element of DAMAGE_ELEMENTS) {
         if (source[element] !== undefined && source[element] !== null && source[element] !== "") {
             resistanceByElement[element] = normalizeResistancePercent(source[element])
+        } else {
+            resistanceByElement[element] = fallbackResistance
         }
     }
 
     if (resistanceByElement[damageElement] === undefined) {
-        resistanceByElement[damageElement] = normalizeResistancePercent(targetInput.resistance, 0)
+        resistanceByElement[damageElement] = fallbackResistance
     }
 
     return resistanceByElement
@@ -1011,14 +1571,6 @@ function localizedName(value, fallback = "") {
     return value?.zhCN ?? value?.en ?? fallback
 }
 
-function levelRangeForSkill(category = {}, move = {}, row = {}) {
-    return row.levelRange ?? move.levelRange ?? category.levelRange ?? {
-        min: 1,
-        max: Array.isArray(row.values) ? row.values.length : 1,
-        default: 1,
-    }
-}
-
 function resolveDamageSkillRef(catalog, agent, skillRef = null) {
     if (!skillRef || typeof skillRef !== "object") {
         return null
@@ -1026,8 +1578,10 @@ function resolveDamageSkillRef(catalog, agent, skillRef = null) {
 
     const agentSkillId = String(skillRef.agentSkillId ?? "").trim()
     const skillSet = agentSkillId
-        ? catalog.agentSkillsMap?.get(agentSkillId) ?? (catalog.agentSkills ?? []).find(item => item.id === agentSkillId)
-        : catalog.agentSkillsByAgentMap?.get(agent.id) ?? (catalog.agentSkills ?? []).find(item => item.agentId === agent.id)
+        ? (typeof catalog.agentSkillsMap?.get === "function" ? catalog.agentSkillsMap.get(agentSkillId) : null)
+            ?? (catalog.agentSkills ?? []).find(item => item.id === agentSkillId)
+        : (typeof catalog.agentSkillsByAgentMap?.get === "function" ? catalog.agentSkillsByAgentMap.get(agent.id) : null)
+            ?? (catalog.agentSkills ?? []).find(item => item.agentId === agent.id)
     if (!skillSet) {
         throw new Error(`Unknown agent skill catalog: ${agentSkillId || agent.id}`)
     }
@@ -1046,7 +1600,7 @@ function resolveDamageSkillRef(catalog, agent, skillRef = null) {
     if (!move) {
         throw new Error(`Unknown skill move for ${skillSet.id}.${categoryId}: ${moveId}`)
     }
-    const row = (move.rows ?? []).find(item => item.id === rowId)
+    const row = damageSkillRowsWithGeneratedTotals(category, move).find(item => item.id === rowId)
     if (!row) {
         throw new Error(`Unknown skill multiplier row for ${skillSet.id}.${categoryId}.${moveId}: ${rowId}`)
     }
@@ -1063,7 +1617,7 @@ function resolveDamageSkillRef(catalog, agent, skillRef = null) {
         throw new Error(`Skill level out of range for ${skillSet.id}.${categoryId}.${moveId}.${rowId}: ${skillRef.level}`)
     }
 
-    const value = Number(row.values?.[requestedLevel - min])
+    const value = skillRowValue(category, move, row, requestedLevel)
     if (!Number.isFinite(value)) {
         throw new Error(`Missing skill multiplier for ${skillSet.id}.${categoryId}.${moveId}.${rowId} level ${requestedLevel}`)
     }
@@ -1082,7 +1636,9 @@ function resolveDamageSkillRef(catalog, agent, skillRef = null) {
             categoryId,
             moveId,
             rowId,
+            generatedFromRowIds: Array.isArray(row.generatedFromRowIds) ? row.generatedFromRowIds : [],
             level: requestedLevel,
+            damageElement: DAMAGE_ELEMENTS.includes(move.damageElement) ? move.damageElement : null,
             categoryName: category.name,
             moveName: move.name,
             rowLabel: row.label,
@@ -1091,30 +1647,181 @@ function resolveDamageSkillRef(catalog, agent, skillRef = null) {
     }
 }
 
-function normalizeDamageInput(input = {}, agent = {}, catalog = {}) {
+function normalizeDamageTarget(input = {}, damageElement) {
     const targetInput = input.target ?? {}
     const preset = damageTargetPreset(targetInput.presetId ?? DEFAULT_DAMAGE_TARGET_PRESET_ID)
     const defense = Number(targetInput.defense ?? preset?.defense ?? 953)
     const levelCoefficient = Number(targetInput.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT)
-    const skillRefResult = resolveDamageSkillRef(catalog, agent, input.skillRef)
-    const skillMultiplier = skillRefResult?.skillMultiplier ?? (Number(input.skillMultiplier ?? 100) / 100)
-    const critMode = ["expected", "crit", "nonCrit"].includes(input.critMode)
-        ? input.critMode
-        : "expected"
-    const damageElement = resolveDamageElement(agent)
 
     return {
+        presetId: targetInput.presetId ?? preset?.id ?? DEFAULT_DAMAGE_TARGET_PRESET_ID,
+        defense: Number.isFinite(defense) ? Math.max(0, defense) : Number(preset?.defense ?? 953),
+        levelCoefficient: Number.isFinite(levelCoefficient) && levelCoefficient > 0
+            ? levelCoefficient
+            : DEFAULT_DAMAGE_LEVEL_COEFFICIENT,
+        resistanceByElement: normalizeResistanceByElement(targetInput, damageElement),
+    }
+}
+
+function normalizeDamageCount(value, fallback = 1) {
+    const numeric = Number(value ?? fallback)
+    return Number.isFinite(numeric) ? Math.max(0, numeric) : fallback
+}
+
+function normalizeAgentLevel(value) {
+    const numeric = Number(value ?? 60)
+    return Number.isFinite(numeric) ? clampNumber(numeric, 1, 60) : 60
+}
+
+function trunc4(value) {
+    return Math.trunc(Number(value ?? 0) * 10000) / 10000
+}
+
+function anomalyLevelMultiplier(agentLevel) {
+    return clampNumber(trunc4(1 + (normalizeAgentLevel(agentLevel) - 1) / 59), 1, 2)
+}
+
+function anomalyEffectData(catalog, effectId) {
+    const key = String(effectId ?? "").trim()
+    const effect = (typeof catalog?.anomalyEffectsMap?.get === "function" ? catalog.anomalyEffectsMap.get(key) : null)
+        ?? (catalog?.anomalyEffects ?? []).find(item => item.id === key)
+    if (!effect) {
+        throw new Error(`Unknown anomaly effect: ${effectId}`)
+    }
+    return effect
+}
+
+function disorderEffectData(catalog, effectId) {
+    const key = String(effectId ?? "").trim()
+    const effect = (typeof catalog?.disorderEffectsMap?.get === "function" ? catalog.disorderEffectsMap.get(key) : null)
+        ?? (catalog?.disorderEffects ?? []).find(item => item.id === key)
+    if (!effect) {
+        throw new Error(`Unknown disorder anomaly effect: ${effectId}`)
+    }
+    return effect
+}
+
+function disorderBaseMultiplier(effect, elapsedSeconds, durationSeconds) {
+    const duration = Math.max(0, Number(durationSeconds ?? effect.defaultDurationSeconds ?? 10))
+    const elapsed = clampNumber(Number(elapsedSeconds ?? 0), 0, duration)
+    const remaining = Math.max(0, duration - elapsed)
+    const interval = Math.max(0.0001, Number(effect.tickIntervalSeconds ?? 1))
+    const tickCount = Math.floor((remaining + 1e-9) / interval)
+    return {
+        duration,
+        elapsed,
+        remaining,
+        tickCount,
+        baseMultiplier: Number(effect.fixedMultiplier ?? 4.5) + tickCount * Number(effect.tickMultiplier ?? 0),
+    }
+}
+
+function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index = 0) {
+    const skillRefResult = resolveDamageSkillRef(catalog, agent, event.skillRef)
+    const skillMultiplier = skillRefResult?.skillMultiplier
+        ?? (event.normalized === true ? Number(event.skillMultiplier ?? 1) : Number(event.skillMultiplier ?? 100) / 100)
+    const critMode = ["expected", "crit", "nonCrit"].includes(event.critMode)
+        ? event.critMode
+        : "expected"
+    const damageElement = DAMAGE_ELEMENTS.includes(event.damageElement)
+        ? event.damageElement
+        : skillRefResult?.skillSource?.damageElement ?? resolveDamageElement(agent)
+
+    return {
+        id: String(event.id ?? `direct-${index + 1}`),
+        kind: "direct",
+        normalized: true,
         skillMultiplier: Number.isFinite(skillMultiplier) ? Math.max(0, skillMultiplier) : 1,
         skillSource: skillRefResult?.skillSource ?? null,
         critMode,
-        target: {
-            presetId: targetInput.presetId ?? preset?.id ?? DEFAULT_DAMAGE_TARGET_PRESET_ID,
-            defense: Number.isFinite(defense) ? Math.max(0, defense) : Number(preset?.defense ?? 953),
-            levelCoefficient: Number.isFinite(levelCoefficient) && levelCoefficient > 0
-                ? levelCoefficient
-                : DEFAULT_DAMAGE_LEVEL_COEFFICIENT,
-            resistanceByElement: normalizeResistanceByElement(targetInput, damageElement),
-        },
+        damageElement,
+        count: normalizeDamageCount(event.count, 1),
+    }
+}
+
+function normalizeAnomalyDamageEvent(event = {}, catalog = {}, index = 0) {
+    const effect = anomalyEffectData(catalog, event.anomalyEffect ?? "assault")
+    const procCount = normalizeDamageCount(event.procCount, effect.defaultProcCount)
+    return {
+        id: String(event.id ?? `anomaly-${index + 1}`),
+        kind: "anomaly",
+        normalized: true,
+        anomalyEffect: effect.id,
+        anomalyLabel: effect.label,
+        damageElement: effect.element,
+        baseMultiplier: Number(effect.baseMultiplier ?? 0) * procCount,
+        baseMultiplierPerProc: Number(effect.baseMultiplier ?? 0),
+        procCount,
+        count: normalizeDamageCount(event.count, 1),
+    }
+}
+
+function normalizeDisorderDamageEvent(event = {}, catalog = {}, index = 0) {
+    const effect = disorderEffectData(catalog, event.previousAnomalyEffect ?? "burn")
+    const disorder = disorderBaseMultiplier(effect, event.elapsedSeconds, event.durationSeconds)
+    return {
+        id: String(event.id ?? `disorder-${index + 1}`),
+        kind: "disorder",
+        normalized: true,
+        previousAnomalyEffect: effect.id,
+        anomalyEffect: effect.id,
+        anomalyLabel: effect.label,
+        damageElement: effect.element,
+        baseMultiplier: disorder.baseMultiplier,
+        fixedMultiplier: Number(effect.fixedMultiplier ?? 4.5),
+        tickMultiplier: Number(effect.tickMultiplier ?? 0),
+        tickIntervalSeconds: Number(effect.tickIntervalSeconds ?? 1),
+        tickCount: disorder.tickCount,
+        durationSeconds: disorder.duration,
+        elapsedSeconds: disorder.elapsed,
+        remainingSeconds: disorder.remaining,
+        count: normalizeDamageCount(event.count, 1),
+    }
+}
+
+function normalizeDamageEvent(event = {}, agent = {}, catalog = {}, index = 0) {
+    const kind = DAMAGE_EVENT_KINDS.includes(event.kind) ? event.kind : "direct"
+    if (kind === "anomaly") {
+        return normalizeAnomalyDamageEvent(event, catalog, index)
+    }
+    if (kind === "disorder") {
+        return normalizeDisorderDamageEvent(event, catalog, index)
+    }
+    return normalizeDirectDamageEvent(event, agent, catalog, index)
+}
+
+function legacyDirectDamageEvent(input = {}) {
+    return {
+        id: "direct-1",
+        kind: "direct",
+        skillMultiplier: input.skillMultiplier,
+        skillRef: input.skillRef,
+        critMode: input.critMode,
+        count: input.count,
+        damageElement: input.damageElement,
+    }
+}
+
+function normalizeDamageRequest(input = {}, agent = {}, catalog = {}) {
+    const rawEvents = Array.isArray(input.events) && input.events.length
+        ? input.events
+        : [legacyDirectDamageEvent(input)]
+    const events = rawEvents.map((event, index) => normalizeDamageEvent(event, agent, catalog, index))
+    const firstElement = events[0]?.damageElement ?? resolveDamageElement(agent)
+    return {
+        agentLevel: normalizeAgentLevel(input.agentLevel),
+        target: normalizeDamageTarget(input, firstElement),
+        selectedEventId: input.selectedEventId ?? events[0]?.id ?? null,
+        events,
+    }
+}
+
+function normalizeDamageInput(input = {}, agent = {}, catalog = {}) {
+    const request = normalizeDamageRequest(input, agent, catalog)
+    return {
+        ...request.events[0],
+        target: request.target,
+        agentLevel: request.agentLevel,
     }
 }
 
@@ -1154,164 +1861,513 @@ function critMultiplierForMode(panel, mode) {
     return critRate * (1 + critDmg) + (1 - critRate)
 }
 
-function calculateDamageFinalValue({ agent, panel, selectedDmgBonus, bonusTotals, damageInput }) {
-    const damageElement = resolveDamageElement(agent)
-    const atk = Number(panel.atk ?? 0)
-    const skillMultiplier = damageInput.skillMultiplier
-    const critMultiplier = critMultiplierForMode(panel, damageInput.critMode)
-    const dmgMultiplier = 1 + Number(selectedDmgBonus ?? 0)
-    const targetDefense = damageInput.target.defense
-    const levelCoefficient = damageInput.target.levelCoefficient
-    const enemyDefReduction = Number(bonusTotals.enemyDefReduction ?? 0)
-    const enemyDefFlatReduction = Number(bonusTotals.enemyDefFlatReduction ?? 0)
-    const penRatio = Number(panel.penRatio ?? 0)
-    const penFlat = Number(panel.penFlat ?? 0)
-    const targetDefenseAfterReduction = Math.max(0, targetDefense * (1 - enemyDefReduction) - enemyDefFlatReduction)
-    const effectiveDefense = Math.max(0, targetDefenseAfterReduction * (1 - penRatio) - penFlat)
-    const defenseMultiplier = Math.min(1, levelCoefficient / (levelCoefficient + effectiveDefense))
-    const targetResistance = Number(damageInput.target.resistanceByElement?.[damageElement] ?? 0)
-    const enemyResReductionKey = RES_REDUCTION_KEY_BY_ELEMENT[damageElement]
-    const enemyResReduction = Number(bonusTotals.enemyResReduction ?? 0)
-        + Number(bonusTotals[enemyResReductionKey] ?? 0)
-    const resIgnoreKey = RES_IGNORE_KEY_BY_ELEMENT[damageElement]
-    const resIgnore = Number(panel[resIgnoreKey] ?? 0)
-    const effectiveResistance = targetResistance - enemyResReduction - resIgnore
-    const resistanceMultiplier = clampNumber(1 - effectiveResistance, 0.01, 2)
-
-    return atk * skillMultiplier * critMultiplier * dmgMultiplier * defenseMultiplier * resistanceMultiplier
+function selectedDmgBonusForElement(panel, damageElement) {
+    const elementKey = `${damageElement}Dmg`
+    return Number(panel.dmgBonus ?? 0) + Number(panel[elementKey] ?? 0)
 }
 
-function calculateDamageWhiteBox({ catalog, agent, panel, selectedDmgBonus, bonusTotals, input }) {
-    const damageElement = resolveDamageElement(agent)
-    const damageInput = normalizeDamageInput(input, agent, catalog)
-    const atk = Number(panel.atk ?? 0)
-    const skillMultiplier = damageInput.skillMultiplier
-    const rawCritRate = Number(panel.critRate ?? 0)
-    const critRateForDamage = damageCritRate(panel)
-    const critDmg = Number(panel.critDmg ?? 0)
-    const critMultiplier = critMultiplierForMode(panel, damageInput.critMode)
-    const dmgMultiplier = 1 + Number(selectedDmgBonus ?? 0)
-    const targetDefense = damageInput.target.defense
-    const levelCoefficient = damageInput.target.levelCoefficient
-    const enemyDefReduction = Number(bonusTotals.enemyDefReduction ?? 0)
+function damageElementLabel(damageElement) {
+    return DAMAGE_ELEMENT_LABELS[damageElement] ?? damageElement
+}
+
+function targetBreakdownForElement(panel, bonusTotals, target, damageElement, eventTotals = {}) {
+    const targetDefense = target.defense
+    const levelCoefficient = target.levelCoefficient
+    const enemyDefReduction = Number(bonusTotals.enemyDefReduction ?? 0) + Number(eventTotals.enemyDefReduction ?? 0)
     const enemyDefFlatReduction = Number(bonusTotals.enemyDefFlatReduction ?? 0)
     const penRatio = Number(panel.penRatio ?? 0)
     const penFlat = Number(panel.penFlat ?? 0)
     const targetDefenseAfterReduction = Math.max(0, targetDefense * (1 - enemyDefReduction) - enemyDefFlatReduction)
     const effectiveDefense = Math.max(0, targetDefenseAfterReduction * (1 - penRatio) - penFlat)
     const defenseMultiplier = Math.min(1, levelCoefficient / (levelCoefficient + effectiveDefense))
-    const targetResistance = Number(damageInput.target.resistanceByElement?.[damageElement] ?? 0)
+    const targetResistance = Number(target.resistanceByElement?.[damageElement] ?? 0)
     const enemyResReductionKey = RES_REDUCTION_KEY_BY_ELEMENT[damageElement]
     const enemyResReduction = Number(bonusTotals.enemyResReduction ?? 0)
         + Number(bonusTotals[enemyResReductionKey] ?? 0)
+        + Number(eventTotals.enemyResReduction ?? 0)
+        + Number(eventTotals[enemyResReductionKey] ?? 0)
     const resIgnoreKey = RES_IGNORE_KEY_BY_ELEMENT[damageElement]
-    const resIgnore = Number(panel[resIgnoreKey] ?? 0)
+    const resIgnore = Number(panel[resIgnoreKey] ?? 0) + Number(eventTotals[resIgnoreKey] ?? 0)
     const effectiveResistance = targetResistance - enemyResReduction - resIgnore
     const rawResistanceMultiplier = 1 - effectiveResistance
     const resistanceMultiplier = clampNumber(rawResistanceMultiplier, 0.01, 2)
-    const finalDamage = atk * skillMultiplier * critMultiplier * dmgMultiplier * defenseMultiplier * resistanceMultiplier
 
+    return {
+        presetId: target.presetId,
+        damageElement,
+        targetDefense,
+        levelCoefficient,
+        enemyDefReduction,
+        enemyDefFlatReduction,
+        targetDefenseAfterReduction,
+        penRatio,
+        penFlat,
+        effectiveDefense,
+        defenseMultiplier,
+        targetResistance,
+        enemyResReduction,
+        enemyResReductionKey,
+        resIgnore,
+        resIgnoreKey,
+        effectiveResistance,
+        rawResistanceMultiplier,
+        resistanceMultiplier,
+    }
+}
+
+function damageModifierAppliesTo(modifier, event) {
+    const appliesTo = modifier.appliesTo ?? {}
+    if (modifier.target?.kind === "skill" && (!Array.isArray(appliesTo.skillTargets) || !appliesTo.skillTargets.length)) {
+        return false
+    }
+    if (["directDamageBonus", "skillMultiplierBonus"].includes(modifier.kind)
+        && (!Array.isArray(appliesTo.skillTargets) || !appliesTo.skillTargets.length)) {
+        return false
+    }
+    if (Array.isArray(appliesTo.damageKinds) && appliesTo.damageKinds.length && !appliesTo.damageKinds.includes(event.kind)) {
+        return false
+    }
+    if (Array.isArray(appliesTo.anomalyEffects) && appliesTo.anomalyEffects.length) {
+        const effectIds = [event.anomalyEffect, event.previousAnomalyEffect].filter(Boolean)
+        if (!effectIds.some(effectId => appliesTo.anomalyEffects.includes(effectId))) {
+            return false
+        }
+    }
+    if (Array.isArray(appliesTo.elements) && appliesTo.elements.length && !appliesTo.elements.includes(event.damageElement)) {
+        return false
+    }
+    if (Array.isArray(appliesTo.skillTargets) && appliesTo.skillTargets.length && !skillTargetsApplyTo(appliesTo.skillTargets, event)) {
+        return false
+    }
+    return true
+}
+
+function skillTargetsApplyTo(skillTargets, event) {
+    const source = event.skillSource
+    if (!source) {
+        return false
+    }
+
+    return skillTargets.some(target => skillTargetAppliesTo(target, source))
+}
+
+function skillTargetAppliesTo(target = {}, source = {}) {
+    if (!target || typeof target !== "object") {
+        return false
+    }
+    if (!target.agentSkillId || !target.categoryId || !target.moveId) {
+        return false
+    }
+    if (target.agentSkillId !== source.agentSkillId) {
+        return false
+    }
+    if (target.categoryId !== source.categoryId) {
+        return false
+    }
+    if (target.moveId !== source.moveId) {
+        return false
+    }
+    if (target.rowId) {
+        const sourceRowIds = [
+            source.rowId,
+            ...(Array.isArray(source.generatedFromRowIds) ? source.generatedFromRowIds : []),
+        ].filter(Boolean)
+        if (!sourceRowIds.includes(target.rowId)) {
+            return false
+        }
+    }
+    return true
+}
+
+function sumDamageModifiers(bonusTotals, event, kind) {
+    return (bonusTotals.damageModifiers ?? [])
+        .filter(modifier => modifier.kind === kind && damageModifierAppliesTo(modifier, event))
+        .reduce((total, modifier) => total + Number(modifier.value ?? 0), 0)
+}
+
+function eventTargetTotalsForElement(bonusTotals, event) {
+    const damageElement = event.damageElement
+    const elementDmgKey = `${damageElement}Dmg`
+    const resIgnoreKey = RES_IGNORE_KEY_BY_ELEMENT[damageElement]
+    const resReductionKey = RES_REDUCTION_KEY_BY_ELEMENT[damageElement]
+    return {
+        dmgBonus: sumDamageModifiers(bonusTotals, event, "dmgBonus"),
+        [elementDmgKey]: sumDamageModifiers(bonusTotals, event, elementDmgKey),
+        enemyDefReduction: sumDamageModifiers(bonusTotals, event, "enemyDefReduction"),
+        enemyResReduction: sumDamageModifiers(bonusTotals, event, "enemyResReduction"),
+        [resReductionKey]: sumDamageModifiers(bonusTotals, event, resReductionKey),
+        [resIgnoreKey]: sumDamageModifiers(bonusTotals, event, resIgnoreKey),
+        anomalyDamageBonus: sumDamageModifiers(bonusTotals, event, "anomalyDamageBonus"),
+        skillMultiplierBonus: sumDamageModifiers(bonusTotals, event, "skillMultiplierBonus"),
+    }
+}
+
+function anomalyCritMultiplier(bonusTotals, event) {
+    const critRate = clampNumber(sumDamageModifiers(bonusTotals, event, "anomalyCritRate"), 0, 1)
+    const critDmg = Math.max(0, sumDamageModifiers(bonusTotals, event, "anomalyCritDmg"))
+    return {
+        critRate,
+        critDmg,
+        multiplier: critRate > 0 && critDmg > 0 ? 1 + critRate * critDmg : 1,
+    }
+}
+
+function defenseWhiteBoxRow(targetBreakdown) {
+    const formulaLines = [
+        `减防后防御（减防/无视防御）= ${formatDamageNumber(targetBreakdown.targetDefense)} × (1 - ${formatDamagePercent(targetBreakdown.enemyDefReduction)}) - ${formatDamageNumber(targetBreakdown.enemyDefFlatReduction)}`,
+        `有效防御（穿透率）= ${formatDamageNumber(targetBreakdown.targetDefenseAfterReduction)} × (1 - ${formatDamagePercent(targetBreakdown.penRatio)}) - ${formatDamageNumber(targetBreakdown.penFlat)}`,
+        `防御乘区 = ${formatDamageNumber(targetBreakdown.levelCoefficient)} / (${formatDamageNumber(targetBreakdown.levelCoefficient)} + ${formatDamageNumber(targetBreakdown.effectiveDefense)})`,
+    ]
+    return {
+        label: "防御乘区",
+        formula: formulaLines.join("\n"),
+        formulaLines,
+        value: targetBreakdown.defenseMultiplier,
+        displayValue: formatDamageNumber(targetBreakdown.defenseMultiplier, 4),
+    }
+}
+
+function directDamageWhiteBoxRows({ event, atk, critMultiplier, critRateForDamage, critDmg, selectedDmgBonus, directDamageBonus, dmgMultiplier, targetBreakdown, skillMultiplierBonus, effectiveSkillMultiplier, finalDamage, singleDamage }) {
     const critModeLabel = {
         expected: "期望",
         crit: "暴击",
         nonCrit: "非暴击",
-    }[damageInput.critMode]
-    const damageElementLabel = DAMAGE_ELEMENT_LABELS[damageElement] ?? damageElement
+    }[event.critMode]
+    const damageElementText = damageElementLabel(event.damageElement)
+    const rows = [
+        {
+            label: "局内攻击力",
+            formula: "来自局内面板攻击力",
+            value: atk,
+            displayValue: formatDamageNumber(atk),
+        },
+        {
+            label: "技能倍率",
+            formula: event.skillSource
+                ? `${event.skillSource.label} LV${event.skillSource.level}${skillMultiplierBonus ? ` + 技能倍率加算 ${formatDamagePercent(skillMultiplierBonus)}` : ""}`
+                : `本次直伤倍率${skillMultiplierBonus ? ` + 技能倍率加算 ${formatDamagePercent(skillMultiplierBonus)}` : ""}`,
+            value: effectiveSkillMultiplier,
+            displayValue: formatDamagePercent(effectiveSkillMultiplier),
+        },
+        {
+            label: "暴击乘区",
+            formula: event.critMode === "expected"
+                ? `${formatDamagePercent(critRateForDamage)} × (1 + ${formatDamagePercent(critDmg)}) + (1 - ${formatDamagePercent(critRateForDamage)})`
+                : critModeLabel,
+            value: critMultiplier,
+            displayValue: formatDamageNumber(critMultiplier, 4),
+        },
+        {
+            label: "增伤乘区",
+            formula: `1 + 通用/属性增伤 ${formatDamagePercent(selectedDmgBonus)}${directDamageBonus ? ` + 技能专属增伤 ${formatDamagePercent(directDamageBonus)}` : ""}`,
+            value: dmgMultiplier,
+            displayValue: formatDamageNumber(dmgMultiplier, 4),
+        },
+        defenseWhiteBoxRow(targetBreakdown),
+        {
+            label: "抗性乘区",
+            formula: `clamp(1 - (${damageElementText}抗性 ${formatDamagePercent(targetBreakdown.targetResistance)} - 减抗 ${formatDamagePercent(targetBreakdown.enemyResReduction)} - 抗性无视 ${formatDamagePercent(targetBreakdown.resIgnore)}), 0.01, 2)`,
+            value: targetBreakdown.resistanceMultiplier,
+            displayValue: formatDamageNumber(targetBreakdown.resistanceMultiplier, 4),
+        },
+    ]
+    if (event.count !== 1) {
+        rows.push({
+            label: "事件次数",
+            formula: "单次伤害 × 次数",
+            value: event.count,
+            displayValue: formatDamageNumber(event.count),
+        })
+    }
+    rows.push({
+        label: "最终伤害",
+        formula: event.count === 1
+            ? `${formatDamageNumber(atk)} × ${formatDamagePercent(effectiveSkillMultiplier)} × ${formatDamageNumber(critMultiplier, 4)} × ${formatDamageNumber(dmgMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.defenseMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.resistanceMultiplier, 4)}`
+            : `${formatDamageNumber(singleDamage)} × ${formatDamageNumber(event.count)}`,
+        value: finalDamage,
+        displayValue: formatDamageNumber(finalDamage),
+    })
+    return rows
+}
+
+function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBonus, dmgMultiplier, targetBreakdown, anomalyProficiencyMultiplier, levelMultiplier, anomalyDamageBonus, anomalyCrit, baseMultiplierBonus, effectiveBaseMultiplier, finalDamage, singleDamage }) {
+    const damageElementText = damageElementLabel(event.damageElement)
+    const effectLabel = localizedName(event.anomalyLabel, event.anomalyEffect ?? event.previousAnomalyEffect)
+    const rows = [
+        {
+            label: "局内攻击力",
+            formula: "来自局内面板攻击力",
+            value: atk,
+            displayValue: formatDamageNumber(atk),
+        },
+        {
+            label: event.kind === "disorder" ? "紊乱倍率" : "异常倍率",
+            formula: event.kind === "disorder"
+                ? `${effectLabel}：450% + ${event.tickCount} × ${formatDamagePercent(event.tickMultiplier)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`
+                : `${effectLabel}：${formatDamagePercent(event.baseMultiplierPerProc)} × ${formatDamageNumber(event.procCount)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`,
+            value: effectiveBaseMultiplier,
+            displayValue: formatDamagePercent(effectiveBaseMultiplier),
+        },
+        {
+            label: "增伤乘区",
+            formula: `1 + 通用/属性增伤 ${formatDamagePercent(selectedDmgBonus)}${skillDamageBonus ? ` + 技能专属增伤 ${formatDamagePercent(skillDamageBonus)}` : ""}`,
+            value: dmgMultiplier,
+            displayValue: formatDamageNumber(dmgMultiplier, 4),
+        },
+        defenseWhiteBoxRow(targetBreakdown),
+        {
+            label: "抗性乘区",
+            formula: `clamp(1 - (${damageElementText}抗性 ${formatDamagePercent(targetBreakdown.targetResistance)} - 减抗 ${formatDamagePercent(targetBreakdown.enemyResReduction)} - 抗性无视 ${formatDamagePercent(targetBreakdown.resIgnore)}), 0.01, 2)`,
+            value: targetBreakdown.resistanceMultiplier,
+            displayValue: formatDamageNumber(targetBreakdown.resistanceMultiplier, 4),
+        },
+        {
+            label: "异常精通区",
+            formula: "异常精通 / 100",
+            value: anomalyProficiencyMultiplier,
+            displayValue: formatDamageNumber(anomalyProficiencyMultiplier, 4),
+        },
+        {
+            label: "等级区",
+            formula: "trunc(1 + (角色等级 - 1) / 59, 4)",
+            value: levelMultiplier,
+            displayValue: formatDamageNumber(levelMultiplier, 4),
+        },
+        {
+            label: "异常增伤区",
+            formula: `1 + 异常增伤 ${formatDamagePercent(anomalyDamageBonus - 1)}`,
+            value: anomalyDamageBonus,
+            displayValue: formatDamageNumber(anomalyDamageBonus, 4),
+        },
+        {
+            label: "异常暴击区",
+            formula: anomalyCrit.multiplier === 1
+                ? "未启用异常暴击"
+                : `1 + ${formatDamagePercent(anomalyCrit.critRate)} × ${formatDamagePercent(anomalyCrit.critDmg)}`,
+            value: anomalyCrit.multiplier,
+            displayValue: formatDamageNumber(anomalyCrit.multiplier, 4),
+        },
+    ]
+    if (event.count !== 1) {
+        rows.push({
+            label: "事件次数",
+            formula: "单次伤害 × 次数",
+            value: event.count,
+            displayValue: formatDamageNumber(event.count),
+        })
+    }
+    rows.push({
+        label: "最终伤害",
+        formula: event.count === 1
+            ? `${formatDamageNumber(atk)} × ${formatDamagePercent(effectiveBaseMultiplier)} × ${formatDamageNumber(dmgMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.defenseMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.resistanceMultiplier, 4)} × ${formatDamageNumber(anomalyProficiencyMultiplier, 4)} × ${formatDamageNumber(levelMultiplier, 4)} × ${formatDamageNumber(anomalyDamageBonus, 4)} × ${formatDamageNumber(anomalyCrit.multiplier, 4)}`
+            : `${formatDamageNumber(singleDamage)} × ${formatDamageNumber(event.count)}`,
+        value: finalDamage,
+        displayValue: formatDamageNumber(finalDamage),
+    })
+    return rows
+}
+
+function calculateDirectDamageEvent({ event, panel, bonusTotals, target, includeWhiteBox }) {
+    const atk = Number(panel.atk ?? 0)
+    const critMultiplier = critMultiplierForMode(panel, event.critMode)
+    const rawCritRate = Number(panel.critRate ?? 0)
+    const critRateForDamage = damageCritRate(panel)
+    const critDmg = Number(panel.critDmg ?? 0)
+    const selectedDmgBonus = selectedDmgBonusForElement(panel, event.damageElement)
+    const eventTotals = eventTargetTotalsForElement(bonusTotals, event)
+    const elementDmgKey = `${event.damageElement}Dmg`
+    const directDamageBonus = sumDamageModifiers(bonusTotals, event, "directDamageBonus")
+        + Number(eventTotals.dmgBonus ?? 0)
+        + Number(eventTotals[elementDmgKey] ?? 0)
+    const dmgMultiplier = 1 + selectedDmgBonus + directDamageBonus
+    const skillMultiplierBonus = Number(eventTotals.skillMultiplierBonus ?? 0)
+    const effectiveSkillMultiplier = Math.max(0, Number(event.skillMultiplier ?? 0) + skillMultiplierBonus)
+    const targetBreakdown = targetBreakdownForElement(panel, bonusTotals, target, event.damageElement, eventTotals)
+    const singleDamage = atk * effectiveSkillMultiplier * critMultiplier * dmgMultiplier * targetBreakdown.defenseMultiplier * targetBreakdown.resistanceMultiplier
+    const finalDamage = singleDamage * event.count
 
     return {
+        id: event.id,
+        kind: event.kind,
+        label: event.skillSource?.label ?? "直伤",
         finalDamage,
-        input: damageInput,
+        singleDamage,
+        count: event.count,
+        input: {
+            ...event,
+            target,
+        },
         multipliers: {
             atk,
-            skill: skillMultiplier,
+            skill: effectiveSkillMultiplier,
+            baseSkill: event.skillMultiplier,
+            skillMultiplierBonus,
             crit: critMultiplier,
             critRate: critRateForDamage,
             rawCritRate,
             critDmg,
             dmg: dmgMultiplier,
-            defense: defenseMultiplier,
-            resistance: resistanceMultiplier,
+            directDamageBonus,
+            defense: targetBreakdown.defenseMultiplier,
+            resistance: targetBreakdown.resistanceMultiplier,
         },
-        targetBreakdown: {
-            presetId: damageInput.target.presetId,
-            damageElement,
-            targetDefense,
-            levelCoefficient,
-            enemyDefReduction,
-            enemyDefFlatReduction,
-            targetDefenseAfterReduction,
-            penRatio,
-            penFlat,
-            effectiveDefense,
-            targetResistance,
-            enemyResReduction,
-            enemyResReductionKey,
-            resIgnore,
-            resIgnoreKey,
-            effectiveResistance,
-            rawResistanceMultiplier,
-        },
-        whiteBoxRows: [
-            {
-                label: "局内攻击力",
-                formula: "来自局内面板攻击力",
-                value: atk,
-                displayValue: formatDamageNumber(atk),
-            },
-            {
-                label: "技能倍率",
-                formula: damageInput.skillSource
-                    ? `${damageInput.skillSource.label} LV${damageInput.skillSource.level}`
-                    : "本次直伤倍率",
-                value: skillMultiplier,
-                displayValue: formatDamagePercent(skillMultiplier),
-            },
-            {
-                label: "暴击乘区",
-                formula: damageInput.critMode === "expected"
-                    ? `${formatDamagePercent(critRateForDamage)} × (1 + ${formatDamagePercent(critDmg)}) + (1 - ${formatDamagePercent(critRateForDamage)})`
-                    : critModeLabel,
-                value: critMultiplier,
-                displayValue: formatDamageNumber(critMultiplier, 4),
-            },
-            {
-                label: "增伤乘区",
-                formula: `1 + 通用/属性增伤 ${formatDamagePercent(selectedDmgBonus)}`,
-                value: dmgMultiplier,
-                displayValue: formatDamageNumber(dmgMultiplier, 4),
-            },
-            {
-                label: "减防后防御",
-                formula: `${formatDamageNumber(targetDefense)} × (1 - ${formatDamagePercent(enemyDefReduction)}) - ${formatDamageNumber(enemyDefFlatReduction)}`,
-                value: targetDefenseAfterReduction,
-                displayValue: formatDamageNumber(targetDefenseAfterReduction),
-            },
-            {
-                label: "有效防御",
-                formula: `${formatDamageNumber(targetDefenseAfterReduction)} × (1 - ${formatDamagePercent(penRatio)}) - ${formatDamageNumber(penFlat)}`,
-                value: effectiveDefense,
-                displayValue: formatDamageNumber(effectiveDefense),
-            },
-            {
-                label: "防御乘区",
-                formula: `${formatDamageNumber(levelCoefficient)} / (${formatDamageNumber(levelCoefficient)} + ${formatDamageNumber(effectiveDefense)})`,
-                value: defenseMultiplier,
-                displayValue: formatDamageNumber(defenseMultiplier, 4),
-            },
-            {
-                label: "抗性乘区",
-                formula: `clamp(1 - (${damageElementLabel}抗性 ${formatDamagePercent(targetResistance)} - 减抗 ${formatDamagePercent(enemyResReduction)} - 抗性无视 ${formatDamagePercent(resIgnore)}), 0.01, 2)`,
-                value: resistanceMultiplier,
-                displayValue: formatDamageNumber(resistanceMultiplier, 4),
-            },
-            {
-                label: "最终伤害",
-                formula: `${formatDamageNumber(atk)} × ${formatDamagePercent(skillMultiplier)} × ${formatDamageNumber(critMultiplier, 4)} × ${formatDamageNumber(dmgMultiplier, 4)} × ${formatDamageNumber(defenseMultiplier, 4)} × ${formatDamageNumber(resistanceMultiplier, 4)}`,
-                value: finalDamage,
-                displayValue: formatDamageNumber(finalDamage),
-            },
-        ],
+        targetBreakdown,
+        whiteBoxRows: includeWhiteBox
+            ? directDamageWhiteBoxRows({
+                event,
+                atk,
+                critMultiplier,
+                critRateForDamage,
+                critDmg,
+                selectedDmgBonus,
+                directDamageBonus,
+                dmgMultiplier,
+                targetBreakdown,
+                skillMultiplierBonus,
+                effectiveSkillMultiplier,
+                finalDamage,
+                singleDamage,
+            })
+            : [],
     }
+}
+
+function calculateAnomalyDamageEvent({ event, panel, bonusTotals, target, agentLevel, includeWhiteBox }) {
+    const atk = Number(panel.atk ?? 0)
+    const selectedDmgBonus = selectedDmgBonusForElement(panel, event.damageElement)
+    const eventTotals = eventTargetTotalsForElement(bonusTotals, event)
+    const elementDmgKey = `${event.damageElement}Dmg`
+    const skillDamageBonus = Number(eventTotals.dmgBonus ?? 0) + Number(eventTotals[elementDmgKey] ?? 0)
+    const dmgMultiplier = 1 + selectedDmgBonus + skillDamageBonus
+    const targetBreakdown = targetBreakdownForElement(panel, bonusTotals, target, event.damageElement, eventTotals)
+    const anomalyProficiencyMultiplier = Math.max(0, Number(panel.anomalyProficiency ?? 0)) / 100
+    const levelMultiplier = anomalyLevelMultiplier(agentLevel)
+    const anomalyDamageBonus = 1 + Number(eventTotals.anomalyDamageBonus ?? 0)
+    const baseMultiplierBonus = sumDamageModifiers(bonusTotals, event, "baseMultiplierBonus")
+    const effectiveBaseMultiplier = Math.max(0, Number(event.baseMultiplier ?? 0) + baseMultiplierBonus)
+    const anomalyCrit = anomalyCritMultiplier(bonusTotals, event)
+    const singleDamage = atk
+        * effectiveBaseMultiplier
+        * dmgMultiplier
+        * targetBreakdown.defenseMultiplier
+        * targetBreakdown.resistanceMultiplier
+        * anomalyProficiencyMultiplier
+        * levelMultiplier
+        * anomalyDamageBonus
+        * anomalyCrit.multiplier
+    const finalDamage = singleDamage * event.count
+
+    return {
+        id: event.id,
+        kind: event.kind,
+        label: localizedName(event.anomalyLabel, event.anomalyEffect ?? event.previousAnomalyEffect),
+        finalDamage,
+        singleDamage,
+        count: event.count,
+        input: {
+            ...event,
+            target,
+            agentLevel: normalizeAgentLevel(agentLevel),
+        },
+        multipliers: {
+            atk,
+            anomaly: effectiveBaseMultiplier,
+            baseMultiplier: Number(event.baseMultiplier ?? 0),
+            baseMultiplierBonus,
+            dmg: dmgMultiplier,
+            defense: targetBreakdown.defenseMultiplier,
+            resistance: targetBreakdown.resistanceMultiplier,
+            anomalyProficiency: anomalyProficiencyMultiplier,
+            anomalyLevel: levelMultiplier,
+            anomalyDamage: anomalyDamageBonus,
+            anomalyCrit: anomalyCrit.multiplier,
+            anomalyCritRate: anomalyCrit.critRate,
+            anomalyCritDmg: anomalyCrit.critDmg,
+        },
+        targetBreakdown,
+        whiteBoxRows: includeWhiteBox
+            ? anomalyDamageWhiteBoxRows({
+                event,
+                atk,
+                selectedDmgBonus,
+                skillDamageBonus,
+                dmgMultiplier,
+                targetBreakdown,
+                anomalyProficiencyMultiplier,
+                levelMultiplier,
+                anomalyDamageBonus,
+                anomalyCrit,
+                baseMultiplierBonus,
+                effectiveBaseMultiplier,
+                finalDamage,
+                singleDamage,
+            })
+            : [],
+    }
+}
+
+function calculateDamageResult({ catalog, agent, panel, bonusTotals, input, includeWhiteBox = true }) {
+    const damageRequest = normalizeDamageRequest(input, agent, catalog)
+    const events = damageRequest.events.map(event => {
+        if (event.kind === "direct") {
+            return calculateDirectDamageEvent({
+                event,
+                panel,
+                bonusTotals,
+                target: damageRequest.target,
+                includeWhiteBox,
+            })
+        }
+        return calculateAnomalyDamageEvent({
+            event,
+            panel,
+            bonusTotals,
+            target: damageRequest.target,
+            agentLevel: damageRequest.agentLevel,
+            includeWhiteBox,
+        })
+    })
+    const selectedEvent = events.find(event => event.id === damageRequest.selectedEventId) ?? events[0] ?? null
+    const totalFinalDamage = events.reduce((total, event) => total + Number(event.finalDamage ?? 0), 0)
+
+    return {
+        finalDamage: Number(selectedEvent?.finalDamage ?? 0),
+        totalFinalDamage,
+        selectedEventId: selectedEvent?.id ?? null,
+        input: selectedEvent?.input ?? normalizeDamageInput(input, agent, catalog),
+        multipliers: selectedEvent?.multipliers ?? {},
+        targetBreakdown: selectedEvent?.targetBreakdown ?? {},
+        whiteBoxRows: selectedEvent?.whiteBoxRows ?? [],
+        events,
+        request: {
+            agentLevel: damageRequest.agentLevel,
+            target: damageRequest.target,
+            selectedEventId: damageRequest.selectedEventId,
+        },
+    }
+}
+
+function calculateDamageFinalValue({ agent, panel, bonusTotals, damageInput }) {
+    return calculateDamageResult({
+        catalog: {},
+        agent,
+        panel,
+        bonusTotals,
+        input: damageInput,
+        includeWhiteBox: false,
+    }).totalFinalDamage
+}
+
+function calculateDamageWhiteBox({ catalog, agent, panel, selectedDmgBonus, bonusTotals, input }) {
+    void selectedDmgBonus
+    return calculateDamageResult({
+        catalog,
+        agent,
+        panel,
+        bonusTotals,
+        input,
+        includeWhiteBox: true,
+    })
 }
 
 function outOfCombatAtkBreakdown(baseBreakdown, bonusTotals, panel) {
@@ -1768,29 +2824,54 @@ function createPreparedOutOfCombatPanelCalculator({ agent, wEngine, driveDiscSet
 }
 
 export async function loadCatalog(dataDir, exampleDir) {
-    const [agentsRaw, agentSkillsRaw, wEnginesRaw, driveDiscSetsRaw, combatBuffsRaw, statRulesRaw, exampleRaw, yeShunguangExampleRaw] = await Promise.all([
+    const [agentsRaw, agentSkillsRaw, wEnginesRaw, driveDiscSetsRaw, combatBuffsRaw, anomalyEffectsRaw, statRulesRaw, exampleRaw, yeShunguangExampleRaw] = await Promise.all([
         readJson(path.join(dataDir, "agents.json")),
         readJson(path.join(dataDir, "agent_skills.json")),
         readJson(path.join(dataDir, "w_engines.json")),
         readJson(path.join(dataDir, "drive_disc_sets.json")),
         readJson(path.join(dataDir, "combat_buffs.json")),
+        readJson(path.join(dataDir, "anomaly_effects.json")),
         readJson(path.join(dataDir, "stat_rules.json")),
         readJson(path.join(exampleDir, "out_of_combat_panel.example.json")),
         readJson(path.join(exampleDir, "ye_shunguang_panel.example.json")),
     ])
 
+    const legacyCombatBuffs = legacyCombatBuffBuckets(combatBuffsRaw.buffs ?? [])
+    const rawFieldBuffs = [
+        ...(combatBuffsRaw.fieldBuffs ?? []),
+        ...legacyCombatBuffs.fieldBuffs,
+    ]
+    const rawBossBuffs = [
+        ...(combatBuffsRaw.bossBuffs ?? []),
+        ...legacyCombatBuffs.bossBuffs,
+    ]
+    const rawSystemBuffs = [
+        ...(combatBuffsRaw.systemBuffs ?? []),
+        ...legacyCombatBuffs.systemBuffs,
+    ]
     const teammateCombatBuffs = flattenTeammateCombatBuffs(combatBuffsRaw.teammates ?? [])
+    const fieldCombatBuffs = flattenFieldCombatBuffs(rawFieldBuffs)
+    const bossCombatBuffs = flattenBossCombatBuffs(rawBossBuffs)
+    const anomalyEffects = (anomalyEffectsRaw.anomalyEffects ?? []).map(normalizeAnomalyCatalogEffect)
+    const disorderEffects = (anomalyEffectsRaw.disorderEffects ?? []).map(normalizeDisorderCatalogEffect)
     const catalog = {
         agents: agentsRaw.agents ?? [],
         agentSkills: agentSkillsRaw.agentSkills ?? [],
         wEngines: wEnginesRaw.wEngines ?? [],
         driveDiscSets: driveDiscSetsRaw.sets ?? [],
+        anomalyEffects,
+        disorderEffects,
         combatBuffs: [
-            ...(combatBuffsRaw.buffs ?? []),
             ...teammateCombatBuffs,
+            ...fieldCombatBuffs,
+            ...bossCombatBuffs,
+            ...rawSystemBuffs,
         ],
         teammateCombatBuffGroups: combatBuffsRaw.teammates ?? [],
         teammateCombatBuffs,
+        fieldCombatBuffs: rawFieldBuffs,
+        bossCombatBuffs: rawBossBuffs,
+        systemCombatBuffs: rawSystemBuffs,
         statRules: statRulesRaw,
         example: exampleRaw,
         examples: {
@@ -1837,6 +2918,7 @@ export function buildMeta(catalog) {
             specialty: item.specialty,
             attribute: item.attribute,
             level60: item.level60,
+            modification: item.modification ?? { minLevel: 1, maxLevel: 5, defaultLevel: 1 },
             effect: item.effect ?? null,
             passive: wEngineEffectSelfBuff(item),
             selfBuff: wEngineEffectSelfBuff(item),
@@ -1860,12 +2942,17 @@ export function buildMeta(catalog) {
                 sourceKind: item.sourceKind,
                 teammateId: item.teammateId,
                 teammateName: item.teammateName,
+                source: item.source,
                 sourceLabel: item.sourceLabel,
+                sourcePeriod: item.sourcePeriod,
+                bossName: item.bossName,
+                bossSource: item.bossSource,
                 name: item.name,
                 description: item.description,
                 conditionLabel: item.conditionLabel,
                 stats: item.stats ?? [],
                 effects: item.effects ?? null,
+                buffModifiers: item.buffModifiers ?? null,
                 coverage: item.coverage ?? null,
             })),
         teammateCombatBuffGroups: (catalog.teammateCombatBuffGroups ?? []).map(teammate => ({
@@ -1887,12 +2974,52 @@ export function buildMeta(catalog) {
                     conditionLabel: buff.conditionLabel ?? description,
                     stats: buff.stats ?? [],
                     effects: buff.effects ?? null,
+                    buffModifiers: buff.buffModifiers ?? null,
                     coverage: buff.coverage ?? null,
                 }
             }),
         })),
+        fieldCombatBuffs: flattenFieldCombatBuffs(catalog.fieldCombatBuffs ?? [])
+            .filter(item => !item.hidden)
+            .map(item => ({
+                id: item.id,
+                sourceType: item.sourceType,
+                sourceCategory: item.sourceCategory,
+                sourceKind: item.sourceKind,
+                source: item.source,
+                sourceLabel: item.sourceLabel,
+                sourcePeriod: item.sourcePeriod,
+                name: item.name,
+                description: item.description,
+                conditionLabel: item.conditionLabel,
+                stats: item.stats ?? [],
+                effects: item.effects ?? null,
+                buffModifiers: item.buffModifiers ?? null,
+                coverage: item.coverage ?? null,
+            })),
+        bossCombatBuffs: flattenBossCombatBuffs(catalog.bossCombatBuffs ?? [])
+            .filter(item => !item.hidden)
+            .map(item => ({
+                id: item.id,
+                sourceType: item.sourceType,
+                sourceCategory: item.sourceCategory,
+                sourceKind: item.sourceKind,
+                bossName: item.bossName,
+                bossSource: item.bossSource,
+                sourceLabel: item.sourceLabel,
+                sourcePeriod: item.sourcePeriod,
+                name: item.name,
+                description: item.description,
+                conditionLabel: item.conditionLabel,
+                stats: item.stats ?? [],
+                effects: item.effects ?? null,
+                buffModifiers: item.buffModifiers ?? null,
+                coverage: item.coverage ?? null,
+            })),
         statRules: catalog.statRules,
         damageTargetPresets: DAMAGE_TARGET_PRESETS,
+        anomalyEffects: catalog.anomalyEffects ?? [],
+        disorderEffects: catalog.disorderEffects ?? [],
     }
 }
 
@@ -1902,10 +3029,11 @@ export function calculateOutOfCombatPanel(catalog, input) {
         throw new Error(`Unknown agent: ${input.agentId}`)
     }
 
-    const wEngine = catalog.wEnginesMap?.get(input.wEngineId) ?? catalog.wEngines.find(item => item.id === input.wEngineId)
-    if (!wEngine) {
+    const rawWEngine = catalog.wEnginesMap?.get(input.wEngineId) ?? catalog.wEngines.find(item => item.id === input.wEngineId)
+    if (!rawWEngine) {
         throw new Error(`Unknown W-Engine: ${input.wEngineId}`)
     }
+    const wEngine = materializeWEngineForModificationLevel(rawWEngine, input.wEngineModificationLevel)
 
     const driveDiscSets = catalog.driveDiscSetsMap ?? new Map(catalog.driveDiscSets.map(item => [item.id, item]))
     const driveDiscs = Array.isArray(input.driveDiscs) ? input.driveDiscs : []
@@ -1919,10 +3047,11 @@ export function createInCombatPanelCalculator(catalog, input) {
         throw new Error(`Unknown agent: ${input.agentId}`)
     }
 
-    const wEngine = catalog.wEnginesMap?.get(input.wEngineId) ?? catalog.wEngines.find(item => item.id === input.wEngineId)
-    if (!wEngine) {
+    const rawWEngine = catalog.wEnginesMap?.get(input.wEngineId) ?? catalog.wEngines.find(item => item.id === input.wEngineId)
+    if (!rawWEngine) {
         throw new Error(`Unknown W-Engine: ${input.wEngineId}`)
     }
+    const wEngine = materializeWEngineForModificationLevel(rawWEngine, input.wEngineModificationLevel)
 
     const driveDiscSets = catalog.driveDiscSetsMap ?? new Map(catalog.driveDiscSets.map(item => [item.id, item]))
     const combatInput = input.combatBuffs ?? input.combat ?? {}
@@ -1931,9 +3060,11 @@ export function createInCombatPanelCalculator(catalog, input) {
         ? combatInput.teammateDriveDiscSetIds
         : []
     const manualStats = Array.isArray(combatInput.manualStats) ? combatInput.manualStats : []
+    const manualEffects = Array.isArray(combatInput.manualEffects) ? combatInput.manualEffects : []
     const runtimeInputs = combatInput.runtimeInputs && typeof combatInput.runtimeInputs === "object"
         ? combatInput.runtimeInputs
         : {}
+    const wEngineTeamModificationLevels = wEngineTeamModificationLevelMap(combatInput)
     const outOfCombatCalculator = createPreparedOutOfCombatPanelCalculator({
         agent,
         wEngine,
@@ -1946,17 +3077,10 @@ export function createInCombatPanelCalculator(catalog, input) {
     const activeCurrentWEngineEntries = wEngineCombatBuffEntries(wEngine).filter(entry => activeBuffIds.has(entry.key))
     const appliedCurrentWEngineKeys = new Set(activeCurrentWEngineEntries.map(entry => entry.key))
     const activeTeamWEngineEntries = (catalog.wEngines ?? [])
-        .map(sourceWEngine => {
-            const key = wEngineTeamBuffKey(sourceWEngine)
-            return {
-                key,
-                sourceWEngine,
-                teamBuff: wEngineEffectTeamBuff(sourceWEngine),
-            }
-        })
+        .map(sourceWEngine => materializedTeamWEngineEntry(sourceWEngine, wEngineTeamModificationLevels))
         .filter(entry => activeBuffIds.has(entry.key) && !appliedCurrentWEngineKeys.has(entry.key))
     const activeDriveDisc4pcIds = [...activeBuffIds].filter(activeId => String(activeId).startsWith("driveDisc4pc:"))
-    const normalizedDamageInput = normalizeDamageInput(input.damage, agent, catalog)
+    const normalizedDamageInput = normalizeDamageRequest(input.damage, agent, catalog)
     const activeManualEntries = manualStats
         .map((item, index) => {
             const value = Number(item?.value ?? 0)
@@ -1985,6 +3109,26 @@ export function createInCombatPanelCalculator(catalog, input) {
             }
         })
         .filter(Boolean)
+    const activeManualEffectEntries = manualEffects
+        .map((item, index) => {
+            const effects = Array.isArray(item?.effects) ? item.effects : []
+            if (!effects.length) {
+                return null
+            }
+            return {
+                key: item.id ? `manualEffect:${item.id}` : `manualEffect:${index + 1}`,
+                name: {
+                    zhCN: item.label ?? item.name ?? "手动修正",
+                    en: item.label ?? item.name ?? "Manual Correction",
+                },
+                effect: {
+                    scope: "inCombat",
+                    condition: null,
+                    effects,
+                },
+            }
+        })
+        .filter(Boolean)
 
     return {
         calculate(driveDiscs = [], options = {}) {
@@ -1992,6 +3136,27 @@ export function createInCombatPanelCalculator(catalog, input) {
             const bonusTotals = createCombatBonusTotals()
             const activeEffects = []
             const ignoredEffects = []
+            const setCounts = new Map()
+            for (const disc of driveDiscs) {
+                if (!disc.setId) {
+                    continue
+                }
+
+                setCounts.set(disc.setId, (setCounts.get(disc.setId) ?? 0) + 1)
+            }
+
+            const activeBuffModifiers = collectActiveBuffModifiers({
+                activeCatalogBuffs,
+                activeAgentBuffs,
+                activeCurrentWEngineEntries,
+                activeTeamWEngineEntries,
+                activeDriveDisc4pcIds,
+                teammateDriveDiscSetIds,
+                driveDiscSets,
+                setCounts,
+                currentWEngineRequirement,
+                agent,
+            })
 
             for (const buff of activeCatalogBuffs) {
                 applyCombatEffect({
@@ -2003,6 +3168,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     conditionLabel: buff.conditionLabel,
                     outOfCombat,
                     runtimeInput: runtimeInputs[buff.id],
+                    buffModifiers: activeBuffModifiers,
                     activeEffects,
                     ignoredEffects,
                 })
@@ -2018,6 +3184,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     conditionLabel: entry.conditionLabel,
                     outOfCombat,
                     runtimeInput: runtimeInputs[entry.id],
+                    buffModifiers: activeBuffModifiers,
                     activeEffects,
                     ignoredEffects,
                 })
@@ -2042,6 +3209,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     conditionLabel: entry.conditionLabel,
                     outOfCombat,
                     runtimeInput: runtimeInputs[entry.key],
+                    buffModifiers: activeBuffModifiers,
                     activeEffects,
                     ignoredEffects,
                 })
@@ -2057,18 +3225,10 @@ export function createInCombatPanelCalculator(catalog, input) {
                     conditionLabel: entry.teamBuff?.condition,
                     outOfCombat,
                     runtimeInput: runtimeInputs[entry.key],
+                    buffModifiers: activeBuffModifiers,
                     activeEffects,
                     ignoredEffects,
                 })
-            }
-
-            const setCounts = new Map()
-            for (const disc of driveDiscs) {
-                if (!disc.setId) {
-                    continue
-                }
-
-                setCounts.set(disc.setId, (setCounts.get(disc.setId) ?? 0) + 1)
             }
 
             for (const activeId of activeDriveDisc4pcIds) {
@@ -2108,6 +3268,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     conditionLabel: effect?.condition,
                     outOfCombat,
                     runtimeInput: runtimeInputs[activeId],
+                    buffModifiers: activeBuffModifiers,
                     activeEffects,
                     ignoredEffects,
                 })
@@ -2139,12 +3300,13 @@ export function createInCombatPanelCalculator(catalog, input) {
                     conditionLabel: teamBuff?.condition,
                     outOfCombat,
                     runtimeInput: runtimeInputs[key] ?? runtimeInputs[`teammateDriveDisc4pc:${setId}`],
+                    buffModifiers: activeBuffModifiers,
                     activeEffects,
                     ignoredEffects,
                 })
             })
 
-            for (const entry of activeManualEntries) {
+            for (const entry of [...activeManualEntries, ...activeManualEffectEntries]) {
                 applyCombatEffect({
                     bonusTotals,
                     effect: entry.effect,
@@ -2153,6 +3315,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     sourceType: "manual",
                     conditionLabel: null,
                     outOfCombat,
+                    buffModifiers: activeBuffModifiers,
                     activeEffects,
                     ignoredEffects,
                 })
@@ -2196,6 +3359,18 @@ export function createInCombatPanelCalculator(catalog, input) {
             const bonusTotals = createCombatBonusTotals()
             const activeEffects = []
             const ignoredEffects = []
+            const activeBuffModifiers = collectActiveBuffModifiers({
+                activeCatalogBuffs,
+                activeAgentBuffs,
+                activeCurrentWEngineEntries,
+                activeTeamWEngineEntries,
+                activeDriveDisc4pcIds,
+                teammateDriveDiscSetIds,
+                driveDiscSets,
+                setCounts,
+                currentWEngineRequirement,
+                agent,
+            })
 
             for (const buff of activeCatalogBuffs) {
                 applyCombatEffect({
@@ -2207,6 +3382,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     conditionLabel: buff.conditionLabel,
                     outOfCombat,
                     runtimeInput: runtimeInputs[buff.id],
+                    buffModifiers: activeBuffModifiers,
                     activeEffects,
                     ignoredEffects,
                 })
@@ -2222,6 +3398,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     conditionLabel: entry.buff.conditionLabel,
                     outOfCombat,
                     runtimeInput: runtimeInputs[entry.id],
+                    buffModifiers: activeBuffModifiers,
                     activeEffects,
                     ignoredEffects,
                 })
@@ -2241,6 +3418,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     conditionLabel: entry.conditionLabel,
                     outOfCombat,
                     runtimeInput: runtimeInputs[entry.key],
+                    buffModifiers: activeBuffModifiers,
                     activeEffects,
                     ignoredEffects,
                 })
@@ -2256,6 +3434,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     conditionLabel: entry.teamBuff?.condition,
                     outOfCombat,
                     runtimeInput: runtimeInputs[entry.key],
+                    buffModifiers: activeBuffModifiers,
                     activeEffects,
                     ignoredEffects,
                 })
@@ -2282,6 +3461,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     conditionLabel: effect?.condition,
                     outOfCombat,
                     runtimeInput: runtimeInputs[activeId],
+                    buffModifiers: activeBuffModifiers,
                     activeEffects,
                     ignoredEffects,
                 })
@@ -2308,12 +3488,13 @@ export function createInCombatPanelCalculator(catalog, input) {
                     conditionLabel: teamBuff?.condition,
                     outOfCombat,
                     runtimeInput: runtimeInputs[key] ?? runtimeInputs[`teammateDriveDisc4pc:${setId}`],
+                    buffModifiers: activeBuffModifiers,
                     activeEffects,
                     ignoredEffects,
                 })
             })
 
-            for (const entry of activeManualEntries) {
+            for (const entry of [...activeManualEntries, ...activeManualEffectEntries]) {
                 applyCombatEffect({
                     bonusTotals,
                     effect: entry.effect,
@@ -2322,6 +3503,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     sourceType: "manual",
                     conditionLabel: null,
                     outOfCombat,
+                    buffModifiers: activeBuffModifiers,
                     activeEffects,
                     ignoredEffects,
                 })
@@ -2349,10 +3531,11 @@ export function calculateInCombatPanel(catalog, input) {
         throw new Error(`Unknown agent: ${input.agentId}`)
     }
 
-    const wEngine = catalog.wEnginesMap?.get(input.wEngineId) ?? catalog.wEngines.find(item => item.id === input.wEngineId)
-    if (!wEngine) {
+    const rawWEngine = catalog.wEnginesMap?.get(input.wEngineId) ?? catalog.wEngines.find(item => item.id === input.wEngineId)
+    if (!rawWEngine) {
         throw new Error(`Unknown W-Engine: ${input.wEngineId}`)
     }
+    const wEngine = materializeWEngineForModificationLevel(rawWEngine, input.wEngineModificationLevel)
 
     const driveDiscSets = catalog.driveDiscSetsMap ?? new Map(catalog.driveDiscSets.map(item => [item.id, item]))
     const driveDiscs = Array.isArray(input.driveDiscs) ? input.driveDiscs : []
@@ -2362,20 +3545,47 @@ export function calculateInCombatPanel(catalog, input) {
         ? combatInput.teammateDriveDiscSetIds
         : []
     const manualStats = Array.isArray(combatInput.manualStats) ? combatInput.manualStats : []
+    const manualEffects = Array.isArray(combatInput.manualEffects) ? combatInput.manualEffects : []
     const runtimeInputs = combatInput.runtimeInputs && typeof combatInput.runtimeInputs === "object"
         ? combatInput.runtimeInputs
         : {}
+    const wEngineTeamModificationLevels = wEngineTeamModificationLevelMap(combatInput)
 
     const outOfCombat = calculateOutOfCombatPanel(catalog, input)
     const bonusTotals = createCombatBonusTotals()
     const activeEffects = []
     const ignoredEffects = []
-
-    for (const buff of catalog.combatBuffs ?? []) {
-        if (!activeBuffIds.has(buff.id)) {
+    const activeCatalogBuffs = (catalog.combatBuffs ?? []).filter(buff => activeBuffIds.has(buff.id))
+    const activeAgentBuffs = agentCombatBuffEntries(agent).filter(entry => activeBuffIds.has(entry.id))
+    const currentWEngineRequirement = wEngineEffectData(wEngine)?.requirement?.specialty ?? wEngine.specialty
+    const activeCurrentWEngineEntries = wEngineCombatBuffEntries(wEngine).filter(entry => activeBuffIds.has(entry.key))
+    const appliedWEngineKeys = new Set(activeCurrentWEngineEntries.map(entry => entry.key))
+    const activeTeamWEngineEntries = (catalog.wEngines ?? [])
+        .map(sourceWEngine => materializedTeamWEngineEntry(sourceWEngine, wEngineTeamModificationLevels))
+        .filter(entry => activeBuffIds.has(entry.key) && !appliedWEngineKeys.has(entry.key))
+    const activeDriveDisc4pcIds = [...activeBuffIds].filter(activeId => String(activeId).startsWith("driveDisc4pc:"))
+    const setCounts = new Map()
+    for (const disc of driveDiscs) {
+        if (!disc.setId) {
             continue
         }
 
+        setCounts.set(disc.setId, (setCounts.get(disc.setId) ?? 0) + 1)
+    }
+    const activeBuffModifiers = collectActiveBuffModifiers({
+        activeCatalogBuffs,
+        activeAgentBuffs,
+        activeCurrentWEngineEntries,
+        activeTeamWEngineEntries,
+        activeDriveDisc4pcIds,
+        teammateDriveDiscSetIds,
+        driveDiscSets,
+        setCounts,
+        currentWEngineRequirement,
+        agent,
+    })
+
+    for (const buff of activeCatalogBuffs) {
         applyCombatEffect({
             bonusTotals,
             effect: buff,
@@ -2385,16 +3595,13 @@ export function calculateInCombatPanel(catalog, input) {
             conditionLabel: buff.conditionLabel,
             outOfCombat,
             runtimeInput: runtimeInputs[buff.id],
+            buffModifiers: activeBuffModifiers,
             activeEffects,
             ignoredEffects,
         })
     }
 
-    for (const entry of agentCombatBuffEntries(agent)) {
-        if (!activeBuffIds.has(entry.id)) {
-            continue
-        }
-
+    for (const entry of activeAgentBuffs) {
         applyCombatEffect({
             bonusTotals,
             effect: entry.buff,
@@ -2404,19 +3611,13 @@ export function calculateInCombatPanel(catalog, input) {
             conditionLabel: entry.conditionLabel,
             outOfCombat,
             runtimeInput: runtimeInputs[entry.id],
+            buffModifiers: activeBuffModifiers,
             activeEffects,
             ignoredEffects,
         })
     }
 
-    const appliedWEngineKeys = new Set()
-    const currentWEngineRequirement = wEngineEffectData(wEngine)?.requirement?.specialty ?? wEngine.specialty
-    for (const entry of wEngineCombatBuffEntries(wEngine)) {
-        if (!activeBuffIds.has(entry.key)) {
-            continue
-        }
-
-        appliedWEngineKeys.add(entry.key)
+    for (const entry of activeCurrentWEngineEntries) {
         if (entry.requiresCurrentWearer && currentWEngineRequirement && currentWEngineRequirement !== agent.specialty) {
             ignoredEffects.push({
                 key: entry.key,
@@ -2435,46 +3636,29 @@ export function calculateInCombatPanel(catalog, input) {
             conditionLabel: entry.conditionLabel,
             outOfCombat,
             runtimeInput: runtimeInputs[entry.key],
+            buffModifiers: activeBuffModifiers,
             activeEffects,
             ignoredEffects,
         })
     }
 
-    for (const sourceWEngine of catalog.wEngines ?? []) {
-        const key = wEngineTeamBuffKey(sourceWEngine)
-        if (!activeBuffIds.has(key) || appliedWEngineKeys.has(key)) {
-            continue
-        }
-
-        const teamBuff = wEngineEffectTeamBuff(sourceWEngine)
+    for (const entry of activeTeamWEngineEntries) {
         applyCombatEffect({
             bonusTotals,
-            effect: teamBuff,
-            key,
-            name: teamBuff?.name ?? wEngineEffectData(sourceWEngine)?.name ?? sourceWEngine.name,
+            effect: entry.teamBuff,
+            key: entry.key,
+            name: entry.teamBuff?.name ?? wEngineEffectData(entry.sourceWEngine)?.name ?? entry.sourceWEngine.name,
             sourceType: "wEngineTeam",
-            conditionLabel: teamBuff?.condition,
+            conditionLabel: entry.teamBuff?.condition,
             outOfCombat,
-            runtimeInput: runtimeInputs[key],
+            runtimeInput: runtimeInputs[entry.key],
+            buffModifiers: activeBuffModifiers,
             activeEffects,
             ignoredEffects,
         })
     }
 
-    const setCounts = new Map()
-    for (const disc of driveDiscs) {
-        if (!disc.setId) {
-            continue
-        }
-
-        setCounts.set(disc.setId, (setCounts.get(disc.setId) ?? 0) + 1)
-    }
-
-    for (const activeId of activeBuffIds) {
-        if (!activeId.startsWith("driveDisc4pc:")) {
-            continue
-        }
-
+    for (const activeId of activeDriveDisc4pcIds) {
         const rawKey = activeId.slice("driveDisc4pc:".length)
         const [setId, part = "self"] = rawKey.split(".")
         const set = driveDiscSets.get(setId)
@@ -2511,6 +3695,7 @@ export function calculateInCombatPanel(catalog, input) {
             conditionLabel: effect?.condition,
             outOfCombat,
             runtimeInput: runtimeInputs[activeId],
+            buffModifiers: activeBuffModifiers,
             activeEffects,
             ignoredEffects,
         })
@@ -2542,6 +3727,7 @@ export function calculateInCombatPanel(catalog, input) {
             conditionLabel: teamBuff?.condition,
             outOfCombat,
             runtimeInput: runtimeInputs[key] ?? runtimeInputs[`teammateDriveDisc4pc:${setId}`],
+            buffModifiers: activeBuffModifiers,
             activeEffects,
             ignoredEffects,
         })
@@ -2576,6 +3762,34 @@ export function calculateInCombatPanel(catalog, input) {
             sourceType: "manual",
             conditionLabel: null,
             outOfCombat,
+            buffModifiers: activeBuffModifiers,
+            activeEffects,
+            ignoredEffects,
+        })
+    })
+    manualEffects.forEach((item, index) => {
+        const effects = Array.isArray(item?.effects) ? item.effects : []
+        if (!effects.length) {
+            return
+        }
+
+        const key = item.id ? `manualEffect:${item.id}` : `manualEffect:${index + 1}`
+        applyCombatEffect({
+            bonusTotals,
+            effect: {
+                scope: "inCombat",
+                condition: null,
+                effects,
+            },
+            key,
+            name: {
+                zhCN: item.label ?? item.name ?? "手动修正",
+                en: item.label ?? item.name ?? "Manual Correction",
+            },
+            sourceType: "manual",
+            conditionLabel: null,
+            outOfCombat,
+            buffModifiers: activeBuffModifiers,
             activeEffects,
             ignoredEffects,
         })

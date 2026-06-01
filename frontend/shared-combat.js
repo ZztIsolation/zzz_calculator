@@ -1,6 +1,7 @@
 import { evaluateFormulaExpression } from "./formulaEvaluator.js"
 
 export const HOME_SELECTION_STORAGE_KEY = "zzz-calculator.homeSelection.v1"
+export const CURRENT_ACCOUNT_STORAGE_KEY = "zzz-calculator.currentAccount.v1"
 export const DEFAULT_DAMAGE_TARGET_PRESET_ID = "normal-boss"
 export const DEFAULT_DAMAGE_LEVEL_COEFFICIENT = 794
 export const DAMAGE_ELEMENTS = ["physical", "fire", "ice", "electric", "ether"]
@@ -10,6 +11,27 @@ export const DAMAGE_ELEMENT_SHORT_LABELS = {
     ice: "冰",
     electric: "电",
     ether: "以太",
+}
+export const DAMAGE_KIND_LABELS = {
+    direct: "直伤",
+    anomaly: "异常",
+    disorder: "紊乱",
+}
+export const DAMAGE_MODIFIER_KIND_LABELS = {
+    anomalyDamageBonus: "异常伤害增伤",
+    baseMultiplierBonus: "伤害倍率修正",
+    anomalyCritRate: "异常暴击率",
+    anomalyCritDmg: "异常暴击伤害",
+    skillMultiplierBonus: "技能倍率加算",
+}
+export const ANOMALY_EFFECT_LABELS = {
+    assault: "强击",
+    shatter: "碎冰",
+    burn: "灼烧",
+    shock: "感电",
+    corruption: "侵蚀",
+    frozen: "霜寒",
+    flinch: "畏缩",
 }
 export const RES_IGNORE_STAT_BY_ELEMENT = {
     physical: "physicalResIgnore",
@@ -32,12 +54,17 @@ export const CUSTOM_BUFF_STAT_OPTIONS = [
     ["critDmg", "暴击伤害%", "flat", null],
     ["penRatio", "穿透率%", "flat", null],
     ["dmgBonus", "通用伤害%", "flat", null],
+    ["anomalyDamageBonus", "异常伤害增伤%", "eventModifier", null],
+    ["baseMultiplierBonus", "异常倍率加算%", "eventModifier", null],
+    ["anomalyCritRate", "异常暴击率%", "eventModifier", null],
+    ["anomalyCritDmg", "异常暴击伤害%", "eventModifier", null],
     ["physicalDmg", "物理伤害%", "flat", null],
     ["fireDmg", "火属性伤害%", "flat", null],
     ["iceDmg", "冰属性伤害%", "flat", null],
     ["electricDmg", "电属性伤害%", "flat", null],
     ["etherDmg", "以太伤害%", "flat", null],
     ["enemyDefReduction", "敌方减防率%", "flat", null],
+    ["enemyDefIgnore", "无视防御率%", "flat", null],
     ["enemyDefFlatReduction", "敌方固定减防", "flat", null],
     ["enemyResReduction", "当前属性减抗%", "flat", null],
     ["currentResIgnore", "当前属性抗性无视%", "flat", null],
@@ -51,6 +78,29 @@ export const CUSTOM_BUFF_STAT_OPTIONS = [
     ["iceResIgnore", "冰抗性无视%", "flat", null],
     ["electricResIgnore", "电抗性无视%", "flat", null],
     ["etherResIgnore", "以太抗性无视%", "flat", null],
+]
+export const CUSTOM_BUFF_SKILL_STAT_OPTIONS = [
+    ["dmgBonus", "通用伤害加成%", "skill", null],
+    ["physicalDmg", "物理伤害加成%", "skill", null],
+    ["fireDmg", "火属性伤害加成%", "skill", null],
+    ["iceDmg", "冰属性伤害加成%", "skill", null],
+    ["electricDmg", "电属性伤害加成%", "skill", null],
+    ["etherDmg", "以太伤害加成%", "skill", null],
+    ["anomalyDamageBonus", "异常伤害增伤%", "skill", null],
+    ["skillMultiplierBonus", "技能倍率加算%", "skill", null],
+    ["enemyDefReduction", "敌方减防率%", "skill", null],
+    ["enemyDefIgnore", "无视防御率%", "skill", null],
+    ["enemyResReduction", "当前属性减抗%", "skill", null],
+    ["enemyPhysicalResReduction", "物理减抗%", "skill", null],
+    ["enemyFireResReduction", "火减抗%", "skill", null],
+    ["enemyIceResReduction", "冰减抗%", "skill", null],
+    ["enemyElectricResReduction", "电减抗%", "skill", null],
+    ["enemyEtherResReduction", "以太减抗%", "skill", null],
+    ["physicalResIgnore", "物理抗性无视%", "skill", null],
+    ["fireResIgnore", "火抗性无视%", "skill", null],
+    ["iceResIgnore", "冰抗性无视%", "skill", null],
+    ["electricResIgnore", "电抗性无视%", "skill", null],
+    ["etherResIgnore", "以太抗性无视%", "skill", null],
 ]
 
 export const FALLBACK_LABELS = {
@@ -97,6 +147,7 @@ export const FALLBACK_LABELS = {
     etherDmg: "以太伤害加成",
     dmgBonus: "通用伤害加成",
     enemyDefReduction: "敌方减防率",
+    enemyDefIgnore: "无视防御率",
     enemyDefFlatReduction: "敌方固定减防",
     enemyResReduction: "敌方当前属性减抗",
     enemyPhysicalResReduction: "敌方物理减抗",
@@ -104,12 +155,18 @@ export const FALLBACK_LABELS = {
     enemyIceResReduction: "敌方冰减抗",
     enemyElectricResReduction: "敌方电减抗",
     enemyEtherResReduction: "敌方以太减抗",
+    anomalyDamageBonus: "异常伤害增伤",
+    baseMultiplierBonus: "异常倍率加算",
+    anomalyCritRate: "异常暴击率",
+    anomalyCritDmg: "异常暴击伤害",
+    skillMultiplierBonus: "技能倍率加算",
 }
 
 export const ENUM_LABELS = {
     attribute: {
         physical: "物理属性",
         honed_edge: "凛刃",
+        frost: "烈霜",
         fire: "火属性",
         ice: "冰属性",
         electric: "电属性",
@@ -164,12 +221,18 @@ export const PERCENT_KEYS = new Set([
     "etherDmg",
     "dmgBonus",
     "enemyDefReduction",
+    "enemyDefIgnore",
     "enemyResReduction",
     "enemyPhysicalResReduction",
     "enemyFireResReduction",
     "enemyIceResReduction",
     "enemyElectricResReduction",
     "enemyEtherResReduction",
+    "anomalyDamageBonus",
+    "baseMultiplierBonus",
+    "anomalyCritRate",
+    "anomalyCritDmg",
+    "skillMultiplierBonus",
 ])
 export const PERCENT_MODE_KEY = {
     hp: "hpPct",
@@ -202,12 +265,18 @@ export const STORED_PERCENT_STATS = new Set([
     "etherDmg",
     "dmgBonus",
     "enemyDefReduction",
+    "enemyDefIgnore",
     "enemyResReduction",
     "enemyPhysicalResReduction",
     "enemyFireResReduction",
     "enemyIceResReduction",
     "enemyElectricResReduction",
     "enemyEtherResReduction",
+    "anomalyDamageBonus",
+    "baseMultiplierBonus",
+    "anomalyCritRate",
+    "anomalyCritDmg",
+    "skillMultiplierBonus",
 ])
 export const STORED_STAT_LABELS = {
     hpPct: "百分比生命值%",
@@ -233,19 +302,27 @@ export const STORED_STAT_LABELS = {
     etherDmg: "以太伤害加成%",
     dmgBonus: "通用伤害加成%",
     enemyDefReduction: "敌方减防率%",
+    enemyDefIgnore: "无视防御率%",
     enemyResReduction: "敌方当前属性减抗%",
     enemyPhysicalResReduction: "敌方物理减抗%",
     enemyFireResReduction: "敌方火减抗%",
     enemyIceResReduction: "敌方冰减抗%",
     enemyElectricResReduction: "敌方电减抗%",
     enemyEtherResReduction: "敌方以太减抗%",
+    anomalyDamageBonus: "异常伤害增伤%",
+    baseMultiplierBonus: "异常倍率加算%",
+    anomalyCritRate: "异常暴击率%",
+    anomalyCritDmg: "异常暴击伤害%",
+    skillMultiplierBonus: "技能倍率加算%",
 }
 
 export function nameOf(item) {
     if (typeof item?.name === "string") {
         return item.name
     }
-    return item?.name?.zhCN ?? item?.name?.en ?? item?.setName ?? item?.id ?? "-"
+    return item?.name?.zhCN ?? item?.name?.en
+        ?? item?.bossName?.zhCN ?? item?.bossName?.en
+        ?? item?.setName ?? item?.id ?? "-"
 }
 
 export function localizedText(value) {
@@ -342,6 +419,96 @@ export function coreSkillSummary(agent, selectedLevel, meta) {
     return `${coreSkillLevelLabel(agent, selectedLevel)}${text ? ` · ${text}` : ""}`
 }
 
+export function clampWEngineModificationLevel(value, wEngine = {}) {
+    const modification = wEngine?.modification ?? {}
+    const min = Number.isInteger(Number(modification.minLevel)) ? Number(modification.minLevel) : 1
+    const max = Number.isInteger(Number(modification.maxLevel)) ? Number(modification.maxLevel) : 5
+    const defaultLevel = Number.isInteger(Number(modification.defaultLevel)) ? Number(modification.defaultLevel) : min
+    const numeric = Number(value ?? defaultLevel)
+    const level = Number.isFinite(numeric) ? Math.trunc(numeric) : defaultLevel
+    return Math.max(min, Math.min(max, level))
+}
+
+function modificationScalingValue(rule, key, level) {
+    const scaling = rule?.modificationScaling?.[key]
+    if (!scaling) {
+        return null
+    }
+
+    const base = Number(scaling.base ?? rule[key] ?? 0)
+    const step = Number(scaling.step ?? 0)
+    if (!Number.isFinite(base) || !Number.isFinite(step)) {
+        return null
+    }
+
+    const displayValues = Array.isArray(scaling.displayValues) ? scaling.displayValues : []
+    return {
+        value: base + step * (level - 1),
+        displayValue: displayValues[level - 1],
+    }
+}
+
+function materializeEffectRuleForModificationLevel(rule, level) {
+    if (!rule?.modificationScaling) {
+        return rule
+    }
+
+    const next = { ...rule }
+    const fixedValue = modificationScalingValue(rule, "value", level)
+    if (fixedValue) {
+        next.value = fixedValue.value
+        if (fixedValue.displayValue !== undefined) {
+            next.displayValue = fixedValue.displayValue
+        }
+    }
+
+    const valuePerStack = modificationScalingValue(rule, "valuePerStack", level)
+    if (valuePerStack) {
+        next.valuePerStack = valuePerStack.value
+        if (valuePerStack.displayValue !== undefined) {
+            next.displayValuePerStack = valuePerStack.displayValue
+        }
+    }
+
+    return next
+}
+
+function materializeEffectSetForModificationLevel(effect, level) {
+    if (!effect || !Array.isArray(effect.effects)) {
+        return effect
+    }
+
+    return {
+        ...effect,
+        effects: effect.effects.map(rule => materializeEffectRuleForModificationLevel(rule, level)),
+    }
+}
+
+export function materializeWEngineForModificationLevel(wEngine, value) {
+    if (!wEngine) {
+        return wEngine
+    }
+
+    const level = clampWEngineModificationLevel(value, wEngine)
+    const effect = wEngine.effect
+        ? {
+            ...wEngine.effect,
+            selfBuff: materializeEffectSetForModificationLevel(wEngine.effect.selfBuff, level),
+            teamBuff: materializeEffectSetForModificationLevel(wEngine.effect.teamBuff, level),
+            buff: materializeEffectSetForModificationLevel(wEngine.effect.buff, level),
+        }
+        : wEngine.effect
+
+    return {
+        ...wEngine,
+        selectedModificationLevel: level,
+        ...(effect ? { effect } : {}),
+        ...(wEngine.selfBuff ? { selfBuff: materializeEffectSetForModificationLevel(wEngine.selfBuff, level) } : {}),
+        ...(wEngine.teamBuff ? { teamBuff: materializeEffectSetForModificationLevel(wEngine.teamBuff, level) } : {}),
+        ...(wEngine.passive ? { passive: materializeEffectSetForModificationLevel(wEngine.passive, level) } : {}),
+    }
+}
+
 export function agentAttributeText(agent) {
     const attribute = enumLabel("attribute", agent?.attribute)
     if (agent?.damageElement && agent.damageElement !== agent.attribute) {
@@ -367,28 +534,85 @@ export function readJsonStorage(key, fallback) {
     }
 }
 
+export function currentAccountId() {
+    return localStorage.getItem(CURRENT_ACCOUNT_STORAGE_KEY) || "default"
+}
+
+export function setCurrentAccountId(ownerId) {
+    localStorage.setItem(CURRENT_ACCOUNT_STORAGE_KEY, ownerId || "default")
+}
+
 export function loadHomeSelection() {
     const value = readJsonStorage(HOME_SELECTION_STORAGE_KEY, null)
     if (!value || typeof value !== "object") {
-        return { version: 1, currentAgentId: null, byAgent: {} }
+        return { version: 2, currentOwnerId: currentAccountId(), byOwner: { [currentAccountId()]: { currentAgentId: null, byAgent: {} } } }
+    }
+    if (value.byOwner && typeof value.byOwner === "object") {
+        return {
+            version: 2,
+            currentOwnerId: value.currentOwnerId ?? currentAccountId(),
+            byOwner: value.byOwner,
+        }
     }
     return {
-        version: 1,
-        currentAgentId: value.currentAgentId ?? null,
-        byAgent: value.byAgent && typeof value.byAgent === "object" ? value.byAgent : {},
+        version: 2,
+        currentOwnerId: "default",
+        byOwner: {
+            default: {
+                currentAgentId: value.currentAgentId ?? null,
+                byAgent: value.byAgent && typeof value.byAgent === "object" ? value.byAgent : {},
+            },
+        },
     }
 }
 
 export function saveHomeSelection(selection) {
+    const ownerId = selection.currentOwnerId ?? currentAccountId()
     localStorage.setItem(HOME_SELECTION_STORAGE_KEY, JSON.stringify({
-        version: 1,
-        currentAgentId: selection.currentAgentId ?? null,
-        byAgent: selection.byAgent ?? {},
+        version: 2,
+        currentOwnerId: ownerId,
+        byOwner: selection.byOwner ?? {
+            [ownerId]: {
+                currentAgentId: selection.currentAgentId ?? null,
+                byAgent: selection.byAgent ?? {},
+            },
+        },
     }))
 }
 
+export function loadCurrentOwnerSelection(ownerId = currentAccountId()) {
+    const selection = loadHomeSelection()
+    return selection.byOwner?.[ownerId] ?? { currentAgentId: null, byAgent: {} }
+}
+
+export function saveCurrentOwnerSelection(ownerSelection, ownerId = currentAccountId()) {
+    const selection = loadHomeSelection()
+    saveHomeSelection({
+        version: 2,
+        currentOwnerId: ownerId,
+        byOwner: {
+            ...(selection.byOwner ?? {}),
+            [ownerId]: {
+                currentAgentId: ownerSelection.currentAgentId ?? null,
+                byAgent: ownerSelection.byAgent ?? {},
+            },
+        },
+    })
+}
+
+export function deleteOwnerSelection(ownerId) {
+    const selection = loadHomeSelection()
+    const byOwner = { ...(selection.byOwner ?? {}) }
+    delete byOwner[ownerId]
+    saveHomeSelection({
+        version: 2,
+        currentOwnerId: selection.currentOwnerId === ownerId ? currentAccountId() : selection.currentOwnerId,
+        byOwner,
+    })
+}
+
 export function configForAgent(agentId) {
-    return loadHomeSelection().byAgent?.[agentId] ?? {}
+    return loadCurrentOwnerSelection().byAgent?.[agentId] ?? {}
 }
 
 export function effectStats(effect) {
@@ -398,7 +622,7 @@ export function effectStats(effect) {
 }
 
 export function effectRules(effect) {
-    if (Array.isArray(effect?.effects)) {
+    if (Array.isArray(effect?.effects) && effect.effects.length > 0) {
         return effect.effects
     }
     return effectStats(effect).map((stat, index) => ({
@@ -410,6 +634,10 @@ export function effectRules(effect) {
         basis: stat.basis ?? null,
         label: stat.label ?? null,
     }))
+}
+
+export function buffModifiers(effect) {
+    return Array.isArray(effect?.buffModifiers) ? effect.buffModifiers : []
 }
 
 export function defaultRuntimeForBuff(buff = {}) {
@@ -445,10 +673,31 @@ export function runtimeForBuff(item, buff) {
     }
 }
 
+function ruleTargetText(rule = {}, meta) {
+    const target = rule.target ?? {}
+    if (target.kind !== "skill") {
+        return ""
+    }
+    const targets = Array.isArray(target.skillTargets) ? target.skillTargets : []
+    return targets.length ? `（技能：${targets.map(item => skillTargetLabel(item, meta)).join("；")}）` : "（技能：未选择）"
+}
+
 export function storedEffectRuleText(rule, runtime, effect, meta) {
     const id = rule.id ?? rule.stat ?? "effect"
     const coverage = Number(runtime?.coverage ?? effect?.coverage?.default ?? 1)
     const ruleRuntime = runtime?.effects?.[id] ?? {}
+    if (rule.type === "damageModifier") {
+        const rawValue = Number(rule.value ?? 0)
+        const value = (rule.valueUnit === "decimal" ? rawValue * 100 : Math.abs(rawValue) > 1 ? rawValue : rawValue * 100) * coverage
+        const appliesTo = rule.appliesTo ?? {}
+        const scopes = [
+            ...(appliesTo.damageKinds ?? []).map(kind => DAMAGE_KIND_LABELS[kind] ?? kind),
+            ...(appliesTo.anomalyEffects ?? []).map(item => ANOMALY_EFFECT_LABELS[item] ?? item),
+            ...(appliesTo.elements ?? []).map(item => DAMAGE_ELEMENT_SHORT_LABELS[item] ?? item),
+            ...(appliesTo.skillTargets ?? []).map(item => skillTargetLabel(item, meta)),
+        ]
+        return `${DAMAGE_MODIFIER_KIND_LABELS[rule.kind] ?? rule.kind} +${formatStoredStatValue("dmgBonus", value)}${scopes.length ? `（${scopes.join(" / ")}）` : ""}${coverage !== 1 ? `（覆盖率 ${coverage}）` : ""}`
+    }
     if (rule.type === "derived") {
         const sourceValue = Number(ruleRuntime.sourceValue ?? rule.defaultSourceValue ?? 0)
         const ratio = Number(rule.ratio ?? rule.ratioPct ?? 0)
@@ -457,7 +706,7 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
         const finalValue = capped * coverage
         const source = localizedText(rule.sourceLabel) || "来源数值"
         const capText = Number.isFinite(Number(rule.cap)) ? `，上限 ${rule.cap}` : ""
-        return `${storedStatLabel(rule.stat, rule.mode, meta)} +${formatStoredStatValue(rule.stat, finalValue, { percentMode: rule.mode === "pct" })}（${source} ${sourceValue} × ${ratio}%${capText}，覆盖率 ${coverage}）`
+        return `${storedStatLabel(rule.stat, rule.mode, meta)} +${formatStoredStatValue(rule.stat, finalValue, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}（${source} ${sourceValue} × ${ratio}%${capText}，覆盖率 ${coverage}）`
     }
     if (rule.type === "formula") {
         const source = rule.source ?? {}
@@ -471,18 +720,51 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
             const finalValue = evaluateFormulaExpression(expression, { [source.variable ?? "x"]: sourceValue }) * coverage
             const sourceLabel = localizedText(source.label ?? rule.sourceLabel) || "来源数值"
             const coverageText = coverage !== 1 ? `，覆盖率 ${coverage}` : ""
-            return `${storedStatLabel(rule.stat, rule.mode, meta)} +${formatStoredStatValue(rule.stat, finalValue, { percentMode: rule.mode === "pct" })}（${sourceLabel} x=${sourceValue}；公式 ${expression}${coverageText}）`
+            return `${storedStatLabel(rule.stat, rule.mode, meta)} +${formatStoredStatValue(rule.stat, finalValue, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}（${sourceLabel} x=${sourceValue}；公式 ${expression}${coverageText}）`
         } catch {
             return `${storedStatLabel(rule.stat, rule.mode, meta)}：公式无效`
         }
     }
     if (rule.type === "stacked") {
         const stacks = Number(ruleRuntime.stacks ?? rule.defaultStacks ?? rule.maxStacks ?? 1)
-        const value = Number(rule.valuePerStack ?? rule.value ?? 0) * stacks * coverage
-        return `${storedStatLabel(rule.stat, rule.mode, meta)} +${formatStoredStatValue(rule.stat, value, { percentMode: rule.mode === "pct" })}（${stacks}/${rule.maxStacks ?? stacks} 层，覆盖率 ${coverage}）`
+        const displayValuePerStack = Number(rule.displayValuePerStack ?? rule.valuePerStack ?? rule.value ?? 0)
+        const valuePerStack = Number.isFinite(displayValuePerStack)
+            ? displayValuePerStack
+            : Number(rule.valuePerStack ?? rule.value ?? 0)
+        const value = valuePerStack * stacks * coverage
+        return `${storedStatLabel(rule.stat, rule.mode, meta)} +${formatStoredStatValue(rule.stat, value, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}（${stacks}/${rule.maxStacks ?? stacks} 层，覆盖率 ${coverage}）`
     }
-    const value = Number(rule.value ?? 0) * coverage
-    return `${storedStatLabel(rule.stat, rule.mode, meta)} +${formatStoredStatValue(rule.stat, value, { percentMode: rule.mode === "pct" })}${coverage !== 1 ? `（覆盖率 ${coverage}）` : ""}`
+    const displayValue = Number(rule.displayValue ?? rule.value ?? 0)
+    const value = (Number.isFinite(displayValue) ? displayValue : Number(rule.value ?? 0)) * coverage
+    return `${storedStatLabel(rule.stat, rule.mode, meta)} +${formatStoredStatValue(rule.stat, value, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${coverage !== 1 ? `（覆盖率 ${coverage}）` : ""}`
+}
+
+export function storedBuffModifierText(modifier = {}) {
+    const operation = modifier.operation ?? "multiplyResolvedValue"
+    const factor = Number(modifier.factor ?? 1)
+    if (operation !== "multiplyResolvedValue" || !Number.isFinite(factor)) {
+        return ""
+    }
+
+    const label = localizedText(modifier.label)
+    if (label) {
+        return label
+    }
+
+    const targetBuffs = Array.isArray(modifier.targetBuffIds) ? modifier.targetBuffIds.filter(Boolean) : []
+    const targetEffects = Array.isArray(modifier.targetEffectIds) ? modifier.targetEffectIds.filter(Boolean) : []
+    const targetText = [
+        targetBuffs.length ? `目标 Buff ${targetBuffs.join(" / ")}` : "",
+        targetEffects.length ? `效果 ${targetEffects.join(" / ")}` : "",
+    ].filter(Boolean).join("；")
+    const factorText = `${Number((factor * 100).toFixed(3))}%`
+    return `${label || "Buff 修饰"}：${targetText || "未选择目标"} × ${factorText}`
+}
+
+export function storedBuffModifierTexts(effect) {
+    return buffModifiers(effect)
+        .map(storedBuffModifierText)
+        .filter(Boolean)
 }
 
 export function storedEffectRulesText(effect, runtime = defaultRuntimeForBuff(effect), meta) {
@@ -510,6 +792,68 @@ export function normalizeCustomBuffStat(stat, meta) {
     }
 }
 
+export function normalizeCustomBuffEffect(effect) {
+    if (!["damageModifier", "fixed"].includes(effect?.type ?? "")) {
+        return null
+    }
+    const value = Number(effect.value ?? 0)
+    if (!Number.isFinite(value) || value === 0) {
+        return null
+    }
+    if ((effect?.type ?? "") === "fixed") {
+        const target = effect.target?.kind === "skill"
+            ? { kind: "skill", skillTargets: Array.isArray(effect.target.skillTargets) ? effect.target.skillTargets : [] }
+            : { kind: "default" }
+        if (target.kind === "skill" && !target.skillTargets.length) {
+            return null
+        }
+        return {
+            id: effect.id ?? `${effect.stat ?? "effect"}-${Date.now()}`,
+            type: "fixed",
+            stat: effect.stat,
+            value,
+            mode: effect.mode ?? "flat",
+            target,
+            label: effect.label ?? null,
+        }
+    }
+    return {
+        id: effect.id ?? `${effect.kind ?? "damage-modifier"}-${Date.now()}`,
+        type: "damageModifier",
+        kind: effect.kind,
+        value,
+        valueUnit: effect.valueUnit ?? null,
+        appliesTo: effect.appliesTo ?? null,
+        label: effect.label ?? null,
+    }
+}
+
+function wEngineIdFromTeamBuffKey(key) {
+    const match = String(key ?? "").match(/^wEngine:(.+)\.team$/)
+    return match?.[1] ?? ""
+}
+
+function wEngineForTeamBuffKey(key, meta) {
+    const wEngineId = wEngineIdFromTeamBuffKey(key)
+    return (meta?.wEngines ?? []).find(item => item.id === wEngineId) ?? null
+}
+
+export function skillTargetLabel(target = {}, meta = {}) {
+    const skillSet = (meta?.agentSkills ?? []).find(item => item.id === target.agentSkillId)
+    const agent = (meta?.agents ?? []).find(item => item.id === skillSet?.agentId || item.id === target.agentSkillId)
+    const category = (skillSet?.categories ?? []).find(item => item.id === target.categoryId)
+    const move = (category?.moves ?? []).find(item => item.id === target.moveId)
+    const row = (move?.rows ?? []).find(item => item.id === target.rowId)
+    const agentLabel = String(localizedText(agent?.name) || localizedText(skillSet?.name) || target.agentSkillId || "")
+        .replace(/技能倍率$/, "")
+        .trim()
+    return [
+        agentLabel,
+        localizedText(move?.name) || target.moveId,
+        target.rowId ? localizedText(row?.label) || target.rowId : "",
+    ].filter(Boolean).join("/")
+}
+
 export function sanitizeAddedCombatBuffs(addedBuffs = [], meta) {
     return (Array.isArray(addedBuffs) ? addedBuffs : [])
         .map(item => {
@@ -518,7 +862,8 @@ export function sanitizeAddedCombatBuffs(addedBuffs = [], meta) {
             }
             if (item.sourceKind === "custom") {
                 const stats = (item.stats ?? []).map(stat => normalizeCustomBuffStat(stat, meta)).filter(Boolean)
-                if (!stats.length) {
+                const effects = (item.effects ?? []).map(effect => normalizeCustomBuffEffect(effect)).filter(Boolean)
+                if (!stats.length && !effects.length) {
                     return null
                 }
                 return {
@@ -527,17 +872,24 @@ export function sanitizeAddedCombatBuffs(addedBuffs = [], meta) {
                     sourceKind: "custom",
                     name: item.name || "自定义 Buff",
                     stats: stats.slice(0, 1),
+                    effects: effects.slice(0, 1),
                     runtime: item.runtime ?? null,
                 }
             }
             if (item.sourceKind === "teammateDriveDisc4pc" && !item.setId) {
                 return null
             }
+            const wEngine = item.sourceKind === "wEngineTeam"
+                ? wEngineForTeamBuffKey(item.id, meta)
+                : null
             return {
                 id: item.id,
                 sourceCategory: item.sourceCategory,
                 sourceKind: item.sourceKind,
                 setId: item.setId ?? null,
+                ...(item.sourceKind === "wEngineTeam" ? {
+                    wEngineModificationLevel: clampWEngineModificationLevel(item.wEngineModificationLevel, wEngine ?? {}),
+                } : {}),
                 runtime: item.runtime ?? null,
             }
         })
@@ -564,8 +916,13 @@ export function createCombatUiController(options = {}) {
         agentAttributeText,
         effectStats,
         effectRules,
+        clampWEngineModificationLevel,
+        materializeWEngineForModificationLevel,
+        buffModifiers,
         defaultRuntimeForBuff,
         runtimeForBuff,
+        storedBuffModifierText,
+        storedBuffModifierTexts,
         storedEffectRulesText: (effect, runtime = defaultRuntimeForBuff(effect)) => storedEffectRulesText(effect, runtime, getMeta()),
         loadHomeSelection,
         saveHomeSelection,

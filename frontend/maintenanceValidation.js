@@ -1,17 +1,49 @@
 import { evaluateFormulaExpression, validateFormulaExpression } from "./formulaEvaluator.js"
 
-const ID_PATTERN = /^[a-z0-9][a-z0-9_-]*$/
+const ID_PATTERN = /^[a-z0-9][a-z0-9_.-]*$/
 const PLACEHOLDER_NAMES = new Set(["未命名"])
 
-const ATTRIBUTE_VALUES = new Set(["physical", "fire", "ice", "electric", "ether", "honed_edge"])
+const ATTRIBUTE_VALUES = new Set(["physical", "fire", "ice", "electric", "ether", "honed_edge", "frost"])
 const DAMAGE_ELEMENT_VALUES = new Set(["physical", "fire", "ice", "electric", "ether"])
 const SPECIALTY_VALUES = new Set(["attack", "stun", "anomaly", "support", "defense", "rupture"])
 const RARITY_VALUES = new Set(["B", "A", "S"])
 const SOURCE_TYPE_VALUES = new Set(["teammate", "self", "boss", "field", "manual"])
 const EFFECT_SCOPE_VALUES = new Set(["outOfCombat", "inCombat"])
-const EFFECT_TYPE_VALUES = new Set(["fixed", "derived", "formula", "stacked"])
+const EFFECT_TYPE_VALUES = new Set(["fixed", "derived", "formula", "stacked", "damageModifier"])
+const BUFF_MODIFIER_OPERATION_VALUES = new Set(["multiplyResolvedValue"])
 const FORMULA_VALUE_UNIT_VALUES = new Set(["storedValue", "storedPercent"])
 const SKILL_ROW_KIND_VALUES = new Set(["damageMultiplier", "dazeMultiplier", "energyCost", "statBonus"])
+const DAMAGE_EVENT_KIND_VALUES = new Set(["direct", "anomaly", "disorder"])
+const DAMAGE_MODIFIER_KIND_VALUES = new Set(["anomalyDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "directDamageBonus", "skillMultiplierBonus"])
+const SKILL_TARGET_DAMAGE_MODIFIER_KIND_VALUES = new Set(["directDamageBonus", "skillMultiplierBonus"])
+const DAMAGE_MODIFIER_VALUE_UNIT_VALUES = new Set(["decimal"])
+const RULE_TARGET_KIND_VALUES = new Set(["default", "skill"])
+const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["anomalyDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg"])
+const SKILL_TARGET_STAT_VALUES = new Set([
+    "physicalResIgnore",
+    "fireResIgnore",
+    "iceResIgnore",
+    "electricResIgnore",
+    "etherResIgnore",
+    "enemyDefReduction",
+    "enemyDefIgnore",
+    "enemyResReduction",
+    "enemyPhysicalResReduction",
+    "enemyFireResReduction",
+    "enemyIceResReduction",
+    "enemyElectricResReduction",
+    "enemyEtherResReduction",
+    "dmgBonus",
+    "physicalDmg",
+    "fireDmg",
+    "iceDmg",
+    "electricDmg",
+    "etherDmg",
+    "anomalyDamageBonus",
+    "skillMultiplierBonus",
+])
+const ANOMALY_EFFECT_VALUES = new Set(["assault", "shatter", "burn", "shock", "corruption", "frozen", "flinch"])
+const ANOMALY_MAINTENANCE_TYPE_VALUES = new Set(["anomaly", "disorder"])
 const STAT_VALUES = new Set([
     "atkFlat",
     "atkPct",
@@ -43,6 +75,7 @@ const STAT_VALUES = new Set([
     "electricDmg",
     "etherDmg",
     "enemyDefReduction",
+    "enemyDefIgnore",
     "enemyDefFlatReduction",
     "enemyResReduction",
     "enemyPhysicalResReduction",
@@ -51,8 +84,10 @@ const STAT_VALUES = new Set([
     "enemyElectricResReduction",
     "enemyEtherResReduction",
 ])
+const RULE_STAT_VALUES = new Set([...STAT_VALUES, ...DEFAULT_EVENT_MODIFIER_STAT_VALUES, ...SKILL_TARGET_STAT_VALUES])
 const TARGET_STAT_VALUES = new Set([
     "enemyDefReduction",
+    "enemyDefIgnore",
     "enemyDefFlatReduction",
     "enemyResReduction",
     "enemyPhysicalResReduction",
@@ -115,6 +150,14 @@ function rulesOf(effect = {}) {
     return []
 }
 
+function buffModifiersOf(effect = {}) {
+    return Array.isArray(effect?.buffModifiers) ? effect.buffModifiers : []
+}
+
+function hasRulesOrModifiers(effect = {}) {
+    return rulesOf(effect).length > 0 || buffModifiersOf(effect).length > 0
+}
+
 function isValidHttpUrl(value) {
     try {
         const url = new URL(value)
@@ -135,14 +178,14 @@ function requireId(errors, item, path = "id") {
         return
     }
     if (!ID_PATTERN.test(id)) {
-        add(errors, path, "只能使用小写字母、数字、下划线或连字符，且必须以小写字母或数字开头。")
+        add(errors, path, "只能使用小写字母、数字、下划线、点号或连字符，且必须以小写字母或数字开头。")
     }
 }
 
 function validateOptionalId(errors, item, path = "id") {
     const id = String(item?.id ?? "").trim()
     if (id && !ID_PATTERN.test(id)) {
-        add(errors, path, "只能使用小写字母、数字、下划线或连字符，且必须以小写字母或数字开头。")
+        add(errors, path, "只能使用小写字母、数字、下划线、点号或连字符，且必须以小写字母或数字开头。")
     }
 }
 
@@ -193,10 +236,96 @@ function validateCoverage(errors, coverage, path) {
     }
 }
 
+function validateModificationScaling(errors, scaling, path, rankOneValue) {
+    if (!scaling) {
+        return
+    }
+
+    if (typeof scaling !== "object" || Array.isArray(scaling)) {
+        add(errors, path, "必须是 JSON 对象。")
+        return
+    }
+
+    const base = requireFinite(errors, scaling.base, `${path}.base`)
+    requireFinite(errors, scaling.step, `${path}.step`)
+    const displayValues = scaling.displayValues
+    if (!Array.isArray(displayValues) || displayValues.length !== 5) {
+        add(errors, `${path}.displayValues`, "必须覆盖 1-5 级五个展示值。")
+    } else {
+        displayValues.forEach((value, index) => requireFinite(errors, value, `${path}.displayValues[${index}]`))
+    }
+
+    if (Number.isFinite(base) && Number.isFinite(rankOneValue) && Math.abs(base - rankOneValue) > 1e-9) {
+        add(errors, `${path}.base`, "1级计算值必须与规则当前数值一致。")
+    }
+}
+
 function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scope = "outOfCombat") {
     const type = rule.type ?? "fixed"
     requireEnum(errors, type, EFFECT_TYPE_VALUES, `${path}.type`)
-    requireEnum(errors, rule.stat, STAT_VALUES, `${path}.stat`)
+
+    if (type === "damageModifier") {
+        if (rule.modificationScaling) {
+            add(errors, `${path}.modificationScaling`, "改装等级缩放只支持固定值或叠层规则。")
+        }
+        requireEnum(errors, rule.kind, DAMAGE_MODIFIER_KIND_VALUES, `${path}.kind`)
+        const value = requireFinite(errors, rule.value, `${path}.value`)
+        if (Number.isFinite(value) && value === 0) {
+            add(errors, `${path}.value`, "数值不能为 0。")
+        }
+        if (rule.valueUnit != null && rule.valueUnit !== "") {
+            requireEnum(errors, rule.valueUnit, DAMAGE_MODIFIER_VALUE_UNIT_VALUES, `${path}.valueUnit`)
+        }
+        const appliesTo = rule.appliesTo ?? {}
+        if (Array.isArray(appliesTo.damageKinds)) {
+            appliesTo.damageKinds.forEach((kind, index) => requireEnum(errors, kind, DAMAGE_EVENT_KIND_VALUES, `${path}.appliesTo.damageKinds[${index}]`))
+        }
+        if (Array.isArray(appliesTo.anomalyEffects)) {
+            appliesTo.anomalyEffects.forEach((effect, index) => {
+                if (!ANOMALY_EFFECT_VALUES.has(effect) && !ID_PATTERN.test(String(effect ?? ""))) {
+                    add(errors, `${path}.appliesTo.anomalyEffects[${index}]`, "不是有效异常 ID。")
+                }
+            })
+        }
+        if (Array.isArray(appliesTo.elements)) {
+            appliesTo.elements.forEach((element, index) => requireEnum(errors, element, DAMAGE_ELEMENT_VALUES, `${path}.appliesTo.elements[${index}]`))
+        }
+        if (Array.isArray(appliesTo.skillTargets)) {
+            appliesTo.skillTargets.forEach((target, index) => validateSkillTarget(errors, target, `${path}.appliesTo.skillTargets[${index}]`))
+        }
+        if (SKILL_TARGET_DAMAGE_MODIFIER_KIND_VALUES.has(rule.kind)
+            && (!Array.isArray(appliesTo.skillTargets) || !appliesTo.skillTargets.length)) {
+            add(errors, `${path}.appliesTo.skillTargets`, "指定技能修正必须至少选择一个技能目标。")
+        }
+        if (scope !== "inCombat") {
+            add(errors, `${path}.type`, "伤害修正只能用于局内 Buff。")
+        }
+        return
+    }
+
+    const target = rule.target ?? { kind: "default" }
+    const targetKind = target.kind ?? "default"
+    requireEnum(errors, targetKind, RULE_TARGET_KIND_VALUES, `${path}.target.kind`)
+    if (targetKind === "skill") {
+        if (!Array.isArray(target.skillTargets) || !target.skillTargets.length) {
+            add(errors, `${path}.target.skillTargets`, "技能增幅必须至少选择一个技能目标。")
+        } else {
+            target.skillTargets.forEach((skillTarget, index) => validateSkillTarget(errors, skillTarget, `${path}.target.skillTargets[${index}]`))
+        }
+        if (!SKILL_TARGET_STAT_VALUES.has(rule.stat)) {
+            add(errors, `${path}.stat`, "技能增幅对象不支持该增幅类型。")
+        }
+        if (scope !== "inCombat") {
+            add(errors, `${path}.target.kind`, "技能增幅对象只能用于局内 Buff。")
+        }
+    } else if (!STAT_VALUES.has(rule.stat) && !DEFAULT_EVENT_MODIFIER_STAT_VALUES.has(rule.stat)) {
+        add(errors, `${path}.stat`, "不是支持的选项。")
+    }
+    if (DEFAULT_EVENT_MODIFIER_STAT_VALUES.has(rule.stat) && scope !== "inCombat") {
+        add(errors, `${path}.stat`, "事件增幅只能用于局内 Buff。")
+    }
+
+    requireEnum(errors, rule.stat, RULE_STAT_VALUES, `${path}.stat`)
 
     const mode = rule.mode ?? "flat"
     requireEnum(errors, mode, MODE_VALUES, `${path}.mode`)
@@ -214,6 +343,9 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     }
 
     if (type === "derived") {
+        if (rule.modificationScaling) {
+            add(errors, `${path}.modificationScaling`, "改装等级缩放只支持固定值或叠层规则。")
+        }
         requireName(errors, rule.sourceLabel, `${path}.sourceLabel`)
         requireFinite(errors, rule.defaultSourceValue, `${path}.defaultSourceValue`)
         const ratio = requireFinite(errors, rule.ratio ?? rule.ratioPct, `${path}.ratio`)
@@ -230,6 +362,9 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     }
 
     if (type === "formula") {
+        if (rule.modificationScaling) {
+            add(errors, `${path}.modificationScaling`, "改装等级缩放只支持固定值或叠层规则。")
+        }
         const source = rule.source ?? {}
         requireName(errors, source.label ?? rule.sourceLabel, `${path}.source.label`)
         const variable = source.variable ?? "x"
@@ -288,12 +423,68 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
         if (Number.isFinite(defaultStacks) && Number.isFinite(maxStacks) && (defaultStacks < 0 || defaultStacks > maxStacks)) {
             add(errors, `${path}.defaultStacks`, "默认层数必须在 0 到最大层数之间。")
         }
+        validateModificationScaling(errors, rule.modificationScaling?.valuePerStack, `${path}.modificationScaling.valuePerStack`, value)
         return
     }
 
     const value = requireFinite(errors, rule.value, `${path}.value`)
     if (Number.isFinite(value) && value === 0) {
         add(errors, `${path}.value`, "数值不能为 0。")
+    }
+    validateModificationScaling(errors, rule.modificationScaling?.value, `${path}.modificationScaling.value`, value)
+}
+
+function validateRequiredStringList(errors, value, path, label) {
+    if (!Array.isArray(value) || !value.length) {
+        add(errors, path, `${label}至少需要填写一个。`)
+        return
+    }
+
+    value.forEach((item, index) => {
+        if (!String(item ?? "").trim()) {
+            add(errors, `${path}[${index}]`, `${label}不能为空。`)
+        }
+    })
+}
+
+function validateBuffModifier(errors, modifier = {}, path, scope = "outOfCombat") {
+    if (modifier.id) {
+        validateOptionalId(errors, { id: modifier.id }, `${path}.id`)
+    }
+
+    const operation = modifier.operation ?? "multiplyResolvedValue"
+    requireEnum(errors, operation, BUFF_MODIFIER_OPERATION_VALUES, `${path}.operation`)
+
+    const factor = requireFinite(errors, modifier.factor, `${path}.factor`)
+    if (Number.isFinite(factor) && factor <= 0) {
+        add(errors, `${path}.factor`, "倍率必须大于 0。")
+    }
+
+    validateRequiredStringList(errors, modifier.targetBuffIds, `${path}.targetBuffIds`, "目标 Buff ID")
+    validateRequiredStringList(errors, modifier.targetEffectIds, `${path}.targetEffectIds`, "目标效果 ID")
+
+    if (modifier.label && !hasText(modifier.label)) {
+        add(errors, `${path}.label.zhCN`, "说明不能为空。")
+    }
+
+    if (scope !== "inCombat") {
+        add(errors, `${path}.operation`, "Buff 修饰只能用于局内 Buff。")
+    }
+}
+
+function validateSkillTarget(errors, target = {}, path) {
+    if (!target || typeof target !== "object" || Array.isArray(target)) {
+        add(errors, path, "必须是技能目标对象。")
+        return
+    }
+
+    validateOptionalId(errors, { id: target.agentSkillId }, `${path}.agentSkillId`)
+    validateOptionalId(errors, { id: target.categoryId }, `${path}.categoryId`)
+    validateOptionalId(errors, { id: target.moveId }, `${path}.moveId`)
+    validateOptionalId(errors, { id: target.rowId }, `${path}.rowId`)
+
+    if (!target.agentSkillId || !target.categoryId || !target.moveId) {
+        add(errors, path, "必须填写角色技能表、技能大类和招式。")
     }
 }
 
@@ -313,7 +504,8 @@ function validateEffectSet(errors, effect, path, options = {}) {
     }
 
     const rules = rulesOf(effect)
-    if (options.requireRule && !rules.length) {
+    const buffModifiers = buffModifiersOf(effect)
+    if (options.requireRule && !rules.length && !buffModifiers.length) {
         add(errors, `${path}.effects`, "至少需要一条有效规则。")
     }
 
@@ -322,6 +514,12 @@ function validateEffectSet(errors, effect, path, options = {}) {
         rule,
         `${path}.effects[${index}]`,
         options.sourceType,
+        effect.scope ?? "outOfCombat",
+    ))
+    buffModifiers.forEach((modifier, index) => validateBuffModifier(
+        errors,
+        modifier,
+        `${path}.buffModifiers[${index}]`,
         effect.scope ?? "outOfCombat",
     ))
 }
@@ -535,6 +733,8 @@ function validateAgent(item, context) {
     requireEnum(errors, item?.specialty, SPECIALTY_VALUES, "specialty")
     if (item?.damageElement) {
         requireEnum(errors, item.damageElement, DAMAGE_ELEMENT_VALUES, "damageElement")
+    } else if (item?.attribute && !DAMAGE_ELEMENT_VALUES.has(item.attribute)) {
+        add(errors, "damageElement", "特殊显示属性必须填写真实伤害结算属性。")
     }
     validateOptionalSources(errors, item, item?.images?.portrait ?? item?.images?.icon)
 
@@ -595,7 +795,7 @@ function validateWEngine(item, context) {
     requireName(errors, item?.effect?.description, "effect.description.zhCN")
     const selfBuff = item?.effect?.selfBuff ?? item?.effect?.buff
     const teamBuff = item?.effect?.teamBuff
-    if (!rulesOf(selfBuff).length && !rulesOf(teamBuff).length) {
+    if (!hasRulesOrModifiers(selfBuff) && !hasRulesOrModifiers(teamBuff)) {
         add(errors, "effect", "至少需要一条音擎 Buff 规则。")
     }
     validateEffectSet(errors, selfBuff, "effect.selfBuff", { sourceType: "wEngine" })
@@ -620,14 +820,15 @@ function validateDriveDiscSet(item, context) {
 
     if (item?.fourPiece) {
         const selfBuff = item.fourPiece.selfBuff ?? (
-            rulesOf(item.fourPiece).length ? item.fourPiece : null
+            hasRulesOrModifiers(item.fourPiece) ? item.fourPiece : null
         )
         const teamBuff = item.fourPiece.teamBuff
         const rules = [
             ...rulesOf(selfBuff),
             ...rulesOf(teamBuff),
         ]
-        if (!rules.length && !hasEffectText(item.fourPiece)) {
+        const buffModifierCount = buffModifiersOf(selfBuff).length + buffModifiersOf(teamBuff).length
+        if (!rules.length && !buffModifierCount && !hasEffectText(item.fourPiece)) {
             add(errors, "fourPiece", "需要中文效果文案或至少一条有效规则。")
         }
         validateEffectSet(errors, selfBuff, "fourPiece.selfBuff", { sourceType: "driveDisc4pc" })
@@ -644,6 +845,40 @@ function validateBuffPayload(item, context) {
     }
 
     return validateGenericBuff(item, context)
+}
+
+function validateAnomalyMaintenanceItem(item, context) {
+    const errors = []
+    const maintenanceType = item?.maintenanceType ?? "anomaly"
+    requireEnum(errors, maintenanceType, ANOMALY_MAINTENANCE_TYPE_VALUES, "maintenanceType")
+    requireId(errors, item)
+    requireName(errors, item?.label, "label.zhCN")
+    requireEnum(errors, item?.element, DAMAGE_ELEMENT_VALUES, "element")
+
+    if (maintenanceType === "disorder") {
+        for (const stat of ["fixedMultiplier", "tickMultiplier", "tickIntervalSeconds", "defaultDurationSeconds"]) {
+            const value = requireFinite(errors, item?.[stat], stat)
+            if (Number.isFinite(value)) {
+                if (stat === "tickIntervalSeconds" && value <= 0) {
+                    add(errors, stat, "跳间隔必须大于 0。")
+                } else if (stat !== "tickIntervalSeconds" && value < 0) {
+                    add(errors, stat, "不能小于 0。")
+                }
+            }
+        }
+    } else {
+        const baseMultiplier = requireFinite(errors, item?.baseMultiplier, "baseMultiplier")
+        if (Number.isFinite(baseMultiplier) && baseMultiplier < 0) {
+            add(errors, "baseMultiplier", "不能小于 0。")
+        }
+        const defaultProcCount = requireFinite(errors, item?.defaultProcCount, "defaultProcCount")
+        if (Number.isFinite(defaultProcCount) && (!Number.isInteger(defaultProcCount) || defaultProcCount < 0)) {
+            add(errors, "defaultProcCount", "默认结算次数必须是非负整数。")
+        }
+    }
+
+    validateDuplicateId(errors, item?.id, context, "id")
+    return errors
 }
 
 function validateGenericBuff(item, context) {
@@ -676,6 +911,40 @@ function validateTeammateBuff(item, context) {
     return errors
 }
 
+function validateFieldBuff(item, context) {
+    const errors = []
+    validateOptionalId(errors, item)
+    if (item?.sourceType !== undefined) {
+        requireEnum(errors, item.sourceType, new Set(["field"]), "sourceType")
+    }
+    requireEnum(errors, item?.scope, new Set(["inCombat"]), "scope")
+    requireName(errors, item?.name, "name.zhCN")
+    requireName(errors, item?.source, "source.zhCN")
+    requireName(errors, item?.sourcePeriod, "sourcePeriod.zhCN")
+    requireName(errors, item?.description, "description.zhCN")
+    validateCoverage(errors, item?.coverage, "coverage")
+    validateEffectSet(errors, item, "effects", { requireRule: true, sourceType: "field" })
+    validateDuplicateId(errors, item?.id, context, "id")
+    return errors
+}
+
+function validateBossBuff(item, context) {
+    const errors = []
+    validateOptionalId(errors, item)
+    if (item?.sourceType !== undefined) {
+        requireEnum(errors, item.sourceType, new Set(["boss"]), "sourceType")
+    }
+    requireEnum(errors, item?.scope, new Set(["inCombat"]), "scope")
+    requireName(errors, item?.bossName, "bossName.zhCN")
+    requireName(errors, item?.bossSource, "bossSource.zhCN")
+    requireName(errors, item?.sourcePeriod, "sourcePeriod.zhCN")
+    requireName(errors, item?.description, "description.zhCN")
+    validateCoverage(errors, item?.coverage, "coverage")
+    validateEffectSet(errors, item, "effects", { requireRule: true, sourceType: "boss" })
+    validateDuplicateId(errors, item?.id, context, "id")
+    return errors
+}
+
 function validateDuplicateId(errors, id, context = {}, path) {
     const items = context?.items ?? []
     if (!id || !Array.isArray(items)) {
@@ -699,7 +968,14 @@ function normalizeKind(kind) {
             return "agentSkills"
         case "combat-buffs":
         case "teammate-buffs":
+        case "teammateBuffs":
             return "buffs"
+        case "field-buffs":
+            return "fieldBuffs"
+        case "boss-buffs":
+            return "bossBuffs"
+        case "anomaly-effects":
+            return "anomalyEffects"
         default:
             return kind
     }
@@ -707,17 +983,26 @@ function normalizeKind(kind) {
 
 export function validateMaintenanceItem(kind, item, context = {}) {
     const normalized = normalizeKind(kind)
-    const errors = normalized === "agents"
-        ? validateAgent(item, context)
-        : normalized === "wEngines"
-            ? validateWEngine(item, context)
-        : normalized === "driveDiscSets"
-            ? validateDriveDiscSet(item, context)
-            : normalized === "agentSkills"
-                ? validateAgentSkill(item, context)
-                : normalized === "buffs"
-                    ? validateBuffPayload(item, context)
-                    : [`kind: unsupported maintenance kind ${kind}`]
+    let errors
+    if (normalized === "agents") {
+        errors = validateAgent(item, context)
+    } else if (normalized === "wEngines") {
+        errors = validateWEngine(item, context)
+    } else if (normalized === "driveDiscSets") {
+        errors = validateDriveDiscSet(item, context)
+    } else if (normalized === "agentSkills") {
+        errors = validateAgentSkill(item, context)
+    } else if (normalized === "buffs") {
+        errors = validateBuffPayload(item, context)
+    } else if (normalized === "fieldBuffs") {
+        errors = validateFieldBuff(item, context)
+    } else if (normalized === "bossBuffs") {
+        errors = validateBossBuff(item, context)
+    } else if (normalized === "anomalyEffects") {
+        errors = validateAnomalyMaintenanceItem(item, context)
+    } else {
+        errors = [`kind: unsupported maintenance kind ${kind}`]
+    }
 
     return {
         ok: errors.length === 0,

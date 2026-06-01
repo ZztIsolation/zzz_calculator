@@ -7,10 +7,18 @@ import { fileURLToPath } from "node:url"
 import { buildMeta, calculateInCombatPanel, calculateOutOfCombatPanel, loadCalculatorContext } from "./calculator.js"
 import { OptimizerCancelledError, optimizeDriveDiscs, optimizeDriveDiscsAsync, previewDriveDiscOptimization } from "./driveDiscOptimizer.js"
 import {
+    accountSummary,
+    clearUserDriveDiscStore,
+    createAccount,
+    deleteAccount,
     deleteDriveDiscLoadout,
     deleteUserDriveDisc,
     importScannerExportToStore,
+    loadCurrentUserDriveDiscStore,
     loadUserDriveDiscStore,
+    ownerScopedStore,
+    switchAccount,
+    updateAccount,
     upsertDriveDiscLoadout,
     upsertUserDriveDisc,
 } from "./driveDiscInventory.js"
@@ -46,6 +54,17 @@ const maintenanceResources = {
     "combat-buffs": {
         fileName: "combat_buffs.json",
         collectionKey: "buffs",
+    },
+    "field-buffs": {
+        fileName: "combat_buffs.json",
+        collectionKey: "fieldBuffs",
+    },
+    "boss-buffs": {
+        fileName: "combat_buffs.json",
+        collectionKey: "bossBuffs",
+    },
+    "anomaly-effects": {
+        fileName: "anomaly_effects.json",
     },
 }
 
@@ -204,11 +223,19 @@ function cleanOptionalZh(value) {
     return clean.zhCN ? clean : null
 }
 
+function canonicalBuffStat(stat) {
+    return stat === "enemyDefIgnore" ? "enemyDefReduction" : stat
+}
+
 function cleanEffectRule(effect = {}) {
     const { sourceStat, ...rest } = effect
     const next = {
         ...rest,
         id: rest.id || randomId("effect"),
+    }
+
+    if (next.stat) {
+        next.stat = canonicalBuffStat(next.stat)
     }
 
     if (rest.sourceLabel) {
@@ -218,11 +245,33 @@ function cleanEffectRule(effect = {}) {
     return next
 }
 
+function cleanBuffModifier(modifier = {}) {
+    const next = {
+        ...modifier,
+        id: modifier.id || randomId("modifier"),
+        operation: modifier.operation ?? "multiplyResolvedValue",
+    }
+
+    if (modifier.label) {
+        next.label = zhOnly(modifier.label)
+    }
+
+    next.targetBuffIds = Array.isArray(modifier.targetBuffIds)
+        ? modifier.targetBuffIds.map(item => String(item ?? "").trim()).filter(Boolean)
+        : []
+    next.targetEffectIds = Array.isArray(modifier.targetEffectIds)
+        ? modifier.targetEffectIds.map(item => String(item ?? "").trim()).filter(Boolean)
+        : []
+
+    return next
+}
+
 function cleanBuff(buff = {}) {
     const next = {
         ...buff,
         id: buff.id || randomId("buff"),
         effects: (buff.effects ?? []).map(cleanEffectRule),
+        buffModifiers: (buff.buffModifiers ?? []).map(cleanBuffModifier),
     }
 
     if (buff.name) {
@@ -252,6 +301,42 @@ function cleanBuff(buff = {}) {
     return next
 }
 
+function cleanFieldBuff(buff = {}) {
+    const next = cleanBuff({
+        ...buff,
+        sourceType: "field",
+        scope: "inCombat",
+    })
+
+    if (buff.sourcePeriod) {
+        next.sourcePeriod = zhOnly(buff.sourcePeriod)
+    } else {
+        delete next.sourcePeriod
+    }
+
+    return next
+}
+
+function cleanBossBuff(buff = {}) {
+    const next = cleanBuff({
+        ...buff,
+        sourceType: "boss",
+        scope: "inCombat",
+    })
+
+    next.bossName = zhOnly(buff.bossName)
+    next.bossSource = zhOnly(buff.bossSource)
+    if (buff.sourcePeriod) {
+        next.sourcePeriod = zhOnly(buff.sourcePeriod)
+    } else {
+        delete next.sourcePeriod
+    }
+
+    delete next.source
+    delete next.sourceLabel
+    return next
+}
+
 function cleanEffectSet(effect = {}) {
     if (!effect) {
         return effect
@@ -259,7 +344,16 @@ function cleanEffectSet(effect = {}) {
 
     return {
         ...effect,
+        ...(Array.isArray(effect.stats)
+            ? {
+                stats: effect.stats.map(stat => ({
+                    ...stat,
+                    stat: canonicalBuffStat(stat.stat),
+                })),
+            }
+            : {}),
         effects: (effect.effects ?? []).map(cleanEffectRule),
+        buffModifiers: (effect.buffModifiers ?? []).map(cleanBuffModifier),
     }
 }
 
@@ -420,9 +514,37 @@ function cleanDriveDiscSet(item = {}) {
     }
 }
 
+function cleanAnomalyEffect(item = {}) {
+    return {
+        id: requireId(item),
+        label: zhOnly(item.label),
+        element: item.element,
+        baseMultiplier: Number(item.baseMultiplier ?? 0),
+        defaultProcCount: Number(item.defaultProcCount ?? 1),
+    }
+}
+
+function cleanDisorderEffect(item = {}) {
+    return {
+        id: requireId(item),
+        label: zhOnly(item.label),
+        element: item.element,
+        fixedMultiplier: Number(item.fixedMultiplier ?? 0),
+        tickMultiplier: Number(item.tickMultiplier ?? 0),
+        tickIntervalSeconds: Number(item.tickIntervalSeconds ?? 1),
+        defaultDurationSeconds: Number(item.defaultDurationSeconds ?? 10),
+    }
+}
+
 function cleanMaintenanceItem(resource, item) {
     if (resource === "combat-buffs") {
         return cleanBuff(item)
+    }
+    if (resource === "field-buffs") {
+        return cleanFieldBuff(item)
+    }
+    if (resource === "boss-buffs") {
+        return cleanBossBuff(item)
     }
     if (resource === "agent-skills") {
         return item
@@ -463,7 +585,57 @@ function deleteById(items, id) {
     return items.filter(item => item.id !== id)
 }
 
+function anomalyMaintenanceCollectionKey(itemOrType = {}) {
+    const maintenanceType = typeof itemOrType === "string"
+        ? itemOrType
+        : itemOrType?.maintenanceType
+    return maintenanceType === "disorder" ? "disorderEffects" : "anomalyEffects"
+}
+
+function cleanAnomalyMaintenanceItem(item = {}) {
+    const maintenanceType = item.maintenanceType === "disorder" ? "disorder" : "anomaly"
+    const cleaned = maintenanceType === "disorder"
+        ? cleanDisorderEffect(item)
+        : cleanAnomalyEffect(item)
+    return {
+        maintenanceType,
+        cleaned,
+        savedItem: {
+            ...cleaned,
+            maintenanceType,
+        },
+    }
+}
+
+async function saveAnomalyMaintenanceItem(item) {
+    const payload = await readDataFile("anomaly_effects.json")
+    const collectionKey = anomalyMaintenanceCollectionKey(item)
+    assertValidMaintenanceItem("anomaly-effects", item, {
+        items: payload[collectionKey] ?? [],
+        currentId: item?.id,
+    })
+    const { cleaned, savedItem } = cleanAnomalyMaintenanceItem(item)
+    payload[collectionKey] = upsertById(payload[collectionKey] ?? [], cleaned)
+    await writeDataFile("anomaly_effects.json", payload)
+    return {
+        payload,
+        savedItem,
+    }
+}
+
+async function deleteAnomalyMaintenanceItem(maintenanceType, id) {
+    const payload = await readDataFile("anomaly_effects.json")
+    const collectionKey = anomalyMaintenanceCollectionKey(maintenanceType)
+    payload[collectionKey] = deleteById(payload[collectionKey] ?? [], id)
+    await writeDataFile("anomaly_effects.json", payload)
+    return payload
+}
+
 async function saveMaintenanceItem(resource, item) {
+    if (resource === "anomaly-effects") {
+        return saveAnomalyMaintenanceItem(item)
+    }
+
     const config = maintenanceResources[resource]
     if (!config) {
         throw new Error(`Unsupported maintenance resource: ${resource}`)
@@ -484,6 +656,10 @@ async function saveMaintenanceItem(resource, item) {
 }
 
 async function deleteMaintenanceItem(resource, id) {
+    if (resource === "anomaly-effects") {
+        return deleteAnomalyMaintenanceItem("anomaly", id)
+    }
+
     const config = maintenanceResources[resource]
     if (!config) {
         throw new Error(`Unsupported maintenance resource: ${resource}`)
@@ -625,13 +801,106 @@ async function routeApi(req, res, pathname) {
         return
     }
 
+    if (pathname === "/api/accounts") {
+        if (req.method === "GET") {
+            sendJson(res, 200, {
+                ok: true,
+                ...(await accountSummary(dataDir)),
+            })
+            return
+        }
+
+        if (req.method === "POST") {
+            try {
+                const body = await readBody(req)
+                const result = await createAccount(dataDir, JSON.parse(body || "{}"))
+                sendJson(res, 200, {
+                    ok: true,
+                    account: result.account,
+                    ...result.summary,
+                })
+            } catch (error) {
+                sendJson(res, 400, {
+                    ok: false,
+                    error: error instanceof Error ? error.message : String(error),
+                })
+            }
+            return
+        }
+    }
+
+    if (req.method === "POST" && pathname === "/api/accounts/current") {
+        try {
+            const body = await readBody(req)
+            const input = JSON.parse(body || "{}")
+            const result = await switchAccount(dataDir, input.id ?? input.ownerId)
+            sendJson(res, 200, {
+                ok: true,
+                ...result.summary,
+            })
+        } catch (error) {
+            sendJson(res, 400, {
+                ok: false,
+                error: error instanceof Error ? error.message : String(error),
+            })
+        }
+        return
+    }
+
+    if (pathname.startsWith("/api/accounts/")) {
+        const id = decodeURIComponent(pathname.slice("/api/accounts/".length))
+        if (!id) {
+            sendJson(res, 400, {
+                ok: false,
+                error: "Account id is required.",
+            })
+            return
+        }
+
+        if (req.method === "PUT") {
+            try {
+                const body = await readBody(req)
+                const result = await updateAccount(dataDir, id, JSON.parse(body || "{}"))
+                sendJson(res, 200, {
+                    ok: true,
+                    account: result.account,
+                    ...result.summary,
+                })
+            } catch (error) {
+                sendJson(res, 400, {
+                    ok: false,
+                    error: error instanceof Error ? error.message : String(error),
+                })
+            }
+            return
+        }
+
+        if (req.method === "DELETE") {
+            try {
+                const result = await deleteAccount(dataDir, id)
+                sendJson(res, 200, {
+                    ok: true,
+                    deleted: result.deleted,
+                    ...result.summary,
+                })
+            } catch (error) {
+                sendJson(res, 400, {
+                    ok: false,
+                    error: error instanceof Error ? error.message : String(error),
+                })
+            }
+            return
+        }
+    }
+
     if (req.method === "GET" && pathname === "/api/maintenance/catalog") {
-        const [agents, agentSkills, wEngines, driveDiscSets, combatBuffs] = await Promise.all([
+        const [agents, agentSkills, wEngines, driveDiscSets, combatBuffs, anomalyEffects] = await Promise.all([
             readDataFile("agents.json"),
             readDataFile("agent_skills.json"),
             readDataFile("w_engines.json"),
             readDataFile("drive_disc_sets.json"),
             readDataFile("combat_buffs.json"),
+            readDataFile("anomaly_effects.json"),
         ])
         sendJson(res, 200, {
             ok: true,
@@ -641,6 +910,7 @@ async function routeApi(req, res, pathname) {
                 wEngines,
                 driveDiscSets,
                 combatBuffs,
+                anomalyEffects,
                 meta: buildMeta(catalog),
             },
         })
@@ -669,6 +939,8 @@ async function routeApi(req, res, pathname) {
             if (req.method === "DELETE") {
                 if (resource === "teammate-buffs") {
                     await deleteTeammateBuff(decodeURIComponent(parts[1] ?? ""), decodeURIComponent(parts[2] ?? ""))
+                } else if (resource === "anomaly-effects") {
+                    await deleteAnomalyMaintenanceItem(decodeURIComponent(parts[1] ?? "anomaly"), decodeURIComponent(parts[2] ?? ""))
                 } else {
                     await deleteMaintenanceItem(resource, decodeURIComponent(parts[1] ?? ""))
                 }
@@ -738,6 +1010,11 @@ async function routeApi(req, res, pathname) {
             const body = await readBody(req)
             const input = JSON.parse(body || "{}")
             const store = await loadUserDriveDiscStore(dataDir)
+            input.ownerId = input.ownerId ?? store.currentOwnerId
+            input.settings = {
+                ...(input.settings ?? {}),
+                ownerId: input.settings?.ownerId ?? input.ownerId,
+            }
             const preview = previewDriveDiscOptimization(catalog, store, input)
             sendJson(res, 200, {
                 ok: true,
@@ -758,6 +1035,11 @@ async function routeApi(req, res, pathname) {
             const body = await readBody(req)
             const input = JSON.parse(body || "{}")
             const store = await loadUserDriveDiscStore(dataDir)
+            input.ownerId = input.ownerId ?? store.currentOwnerId
+            input.settings = {
+                ...(input.settings ?? {}),
+                ownerId: input.settings?.ownerId ?? input.ownerId,
+            }
             const job = createOptimizerJob(store, input)
             sendJson(res, 200, {
                 ok: true,
@@ -810,6 +1092,11 @@ async function routeApi(req, res, pathname) {
             const body = await readBody(req)
             const input = JSON.parse(body || "{}")
             const store = await loadUserDriveDiscStore(dataDir)
+            input.ownerId = input.ownerId ?? store.currentOwnerId
+            input.settings = {
+                ...(input.settings ?? {}),
+                ownerId: input.settings?.ownerId ?? input.ownerId,
+            }
             const result = optimizeDriveDiscs(catalog, store, input)
             sendJson(res, 200, {
                 ok: true,
@@ -826,13 +1113,23 @@ async function routeApi(req, res, pathname) {
     }
 
     if (req.method === "GET" && pathname === "/api/user-drive-discs") {
-        sendJson(res, 200, await loadUserDriveDiscStore(dataDir))
+        sendJson(res, 200, await loadCurrentUserDriveDiscStore(dataDir))
+        return
+    }
+
+    if (req.method === "DELETE" && pathname === "/api/user-drive-discs") {
+        const result = await clearUserDriveDiscStore(dataDir)
+        sendJson(res, 200, {
+            ok: true,
+            cleared: result.previous,
+            store: ownerScopedStore(result.store),
+        })
         return
     }
 
     if (pathname === "/api/user-drive-disc-loadouts") {
         if (req.method === "GET") {
-            const store = await loadUserDriveDiscStore(dataDir)
+            const store = await loadCurrentUserDriveDiscStore(dataDir)
             sendJson(res, 200, {
                 ok: true,
                 loadouts: store.driveDiscLoadouts ?? [],
@@ -848,7 +1145,7 @@ async function routeApi(req, res, pathname) {
                 sendJson(res, 200, {
                     ok: true,
                     loadout: result.loadout,
-                    store: result.store,
+                    store: ownerScopedStore(result.store),
                 })
             } catch (error) {
                 sendJson(res, 400, {
@@ -880,7 +1177,7 @@ async function routeApi(req, res, pathname) {
                 sendJson(res, 200, {
                     ok: true,
                     loadout: result.loadout,
-                    store: result.store,
+                    store: ownerScopedStore(result.store),
                 })
             } catch (error) {
                 sendJson(res, 400, {
@@ -896,7 +1193,7 @@ async function routeApi(req, res, pathname) {
             sendJson(res, 200, {
                 ok: true,
                 deleted: result.deleted,
-                store: result.store,
+                store: ownerScopedStore(result.store),
             })
             return
         }
@@ -915,12 +1212,14 @@ async function routeApi(req, res, pathname) {
                     : input
             )
             const store = await importScannerExportToStore(dataDir, sourceData, {
-                ownerId: input.ownerId ?? "default",
+                ownerId: input.ownerId ?? undefined,
                 sourcePath: input.sourcePath ?? null,
+                removeMissing: Boolean(input.removeMissing),
             })
             sendJson(res, 200, {
                 ok: true,
-                store,
+                store: ownerScopedStore(store),
+                summary: store.lastImportSummary ?? null,
             })
         } catch (error) {
             sendJson(res, 400, {
@@ -938,7 +1237,7 @@ async function routeApi(req, res, pathname) {
             const store = await upsertUserDriveDisc(dataDir, driveDisc)
             sendJson(res, 200, {
                 ok: true,
-                store,
+                store: ownerScopedStore(store),
             })
         } catch (error) {
             sendJson(res, 400, {
@@ -969,7 +1268,7 @@ async function routeApi(req, res, pathname) {
                 const store = await upsertUserDriveDisc(dataDir, driveDisc)
                 sendJson(res, 200, {
                     ok: true,
-                    store,
+                    store: ownerScopedStore(store),
                 })
             } catch (error) {
                 sendJson(res, 400, {
@@ -985,7 +1284,7 @@ async function routeApi(req, res, pathname) {
             sendJson(res, 200, {
                 ok: true,
                 deleted: result.deleted,
-                store: result.store,
+                store: ownerScopedStore(result.store),
             })
             return
         }

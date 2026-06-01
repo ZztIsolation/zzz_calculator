@@ -4,7 +4,8 @@
 
 v1 models an out-of-combat panel first, then an optional in-combat panel layer:
 
-1. Agent base stats are fixed at level 60.
+1. Agent base stats are fixed at level 60. `damage.agentLevel` is modeled only
+   for anomaly damage's level zone; it does not yet change base panel stats.
 2. Total Base ATK is `agent Base ATK + W-Engine Base ATK + Core Skill Base ATK`.
 3. Out-of-combat stats are built from agent base stats, selected Core Skill
    level bonuses, W-Engine advanced stats, Drive Disc main stats, Drive Disc
@@ -16,8 +17,9 @@ v1 models an out-of-combat panel first, then an optional in-combat panel layer:
 6. In-combat stats start from `outOfCombat.panel` and then add selected Buffs
    from self, teammate, W-Engine passives, Drive Disc 4-piece effects, boss or
    enemy effects, field effects, and manual corrections.
-7. Single-row direct damage can resolve maintained skill multipliers. Stun,
-   anomaly, disorder, and rotation logic are still out of scope.
+7. Direct, anomaly, and disorder damage can be modeled as damage events in the
+   same in-combat calculator. Stun, anomaly buildup, and rotation logic are
+   still out of scope.
 
 ## Frontend / Backend Split
 
@@ -242,6 +244,25 @@ interface DriveDiscInventoryStore {
   driveDiscs: DriveDiscInventoryItem[];
 }
 
+type SkillTarget = {
+  agentSkillId: string;
+  categoryId: string;
+  moveId: string;
+  rowId?: string;
+};
+
+type EffectTarget =
+  | { kind?: "default" }
+  | { kind: "skill"; skillTargets: SkillTarget[] };
+
+type BuffRuleStat =
+  | ZzzStat
+  | "anomalyDamageBonus"
+  | "baseMultiplierBonus"
+  | "anomalyCritRate"
+  | "anomalyCritDmg"
+  | "skillMultiplierBonus";
+
 interface Effect {
   scope: "outOfCombat" | "inCombat";
   condition: string | null;
@@ -252,11 +273,21 @@ interface Effect {
     basis?: "baseHp" | "outOfCombatHp" | "baseAtk" | "outOfCombatAtk" | "baseDef" | "outOfCombatDef";
   }>;
   effects?: Array<
-    | { type: "fixed"; stat: ZzzStat; value: number; mode: "flat" | "pct"; basis?: Effect["stats"][number]["basis"] }
-    | { type: "derived"; stat: ZzzStat; mode: "flat" | "pct"; sourceLabel?: { zhCN?: string }; defaultSourceValue: number; ratio: number; cap?: number }
-    | { type: "formula"; stat: ZzzStat; mode: "flat" | "pct"; source: { variable: "x"; label?: { zhCN?: string }; defaultValue: number; min?: number; max?: number }; formula: { expression: string; valueUnit?: "storedValue" | "storedPercent" } }
-    | { type: "stacked"; stat: ZzzStat; mode: "flat" | "pct"; valuePerStack: number; maxStacks: number; defaultStacks?: number; basis?: Effect["stats"][number]["basis"] }
+    | { type: "fixed"; stat: BuffRuleStat; value: number; mode: "flat" | "pct"; basis?: Effect["stats"][number]["basis"]; target?: EffectTarget }
+    | { type: "derived"; stat: BuffRuleStat; mode: "flat" | "pct"; sourceLabel?: { zhCN?: string }; defaultSourceValue: number; ratio: number; cap?: number; target?: EffectTarget }
+    | { type: "formula"; stat: BuffRuleStat; mode: "flat" | "pct"; source: { variable: "x"; label?: { zhCN?: string }; defaultValue: number; min?: number; max?: number }; formula: { expression: string; valueUnit?: "storedValue" | "storedPercent" }; target?: EffectTarget }
+    | { type: "stacked"; stat: BuffRuleStat; mode: "flat" | "pct"; valuePerStack: number; maxStacks: number; defaultStacks?: number; basis?: Effect["stats"][number]["basis"]; target?: EffectTarget }
+    // Deprecated read-only compatibility. New UI/save paths must use target.kind + stat.
+    | { type: "damageModifier"; kind: "anomalyDamageBonus" | "baseMultiplierBonus" | "anomalyCritRate" | "anomalyCritDmg" | "directDamageBonus" | "skillMultiplierBonus"; value: number; valueUnit?: "decimal"; appliesTo?: { damageKinds?: Array<"direct" | "anomaly" | "disorder">; anomalyEffects?: string[]; elements?: Array<"physical" | "fire" | "ice" | "electric" | "ether">; skillTargets?: SkillTarget[] } }
   >;
+  buffModifiers?: Array<{
+    id?: string;
+    operation: "multiplyResolvedValue";
+    factor: number;
+    targetBuffIds: string[];
+    targetEffectIds: string[];
+    label?: { zhCN?: string; en?: string };
+  }>;
 }
 
 interface CombatBuff {
@@ -266,6 +297,10 @@ interface CombatBuff {
   teammateId?: string;
   teammateName?: { zhCN?: string; en?: string };
   sourceLabel?: { zhCN?: string; en?: string };
+  source?: { zhCN?: string; en?: string };
+  sourcePeriod?: { zhCN?: string; en?: string };
+  bossName?: { zhCN?: string; en?: string };
+  bossSource?: { zhCN?: string; en?: string };
   name: { zhCN?: string; en?: string };
   description?: string | { zhCN?: string; en?: string } | null;
   conditionLabel?: string | { zhCN?: string; en?: string } | null;
@@ -316,6 +351,26 @@ interface TeammateCombatBuffGroup {
   }>;
 }
 
+interface FieldCombatBuff extends Effect {
+  id: string;
+  sourceType: "field";
+  name: { zhCN?: string; en?: string };
+  source: { zhCN?: string; en?: string };
+  sourcePeriod: { zhCN?: string; en?: string };
+  description: { zhCN?: string; en?: string };
+  scope: "inCombat";
+}
+
+interface BossCombatBuff extends Effect {
+  id: string;
+  sourceType: "boss";
+  bossName: { zhCN?: string; en?: string };
+  bossSource: { zhCN?: string; en?: string };
+  sourcePeriod: { zhCN?: string; en?: string };
+  description: { zhCN?: string; en?: string };
+  scope: "inCombat";
+}
+
 interface InCombatRequest {
   agentId: string;
   coreSkillLevel?: string;
@@ -334,6 +389,7 @@ interface InCombatRequest {
     }>;
   };
   damage?: {
+    agentLevel?: number; // default 60; only used by anomaly level zone for now.
     skillMultiplier?: number;
     skillRef?: {
       agentSkillId: string;
@@ -342,6 +398,12 @@ interface InCombatRequest {
       rowId: string;
       level: number;
     };
+    selectedEventId?: string;
+    events?: Array<
+      | { id: string; kind: "direct"; skillMultiplier?: number; skillRef?: InCombatRequest["damage"]["skillRef"]; critMode?: "expected" | "crit" | "nonCrit"; count?: number }
+      | { id: string; kind: "anomaly"; anomalyEffect: "assault" | "shatter" | "burn" | "shock" | "corruption"; procCount?: number; count?: number }
+      | { id: string; kind: "disorder"; previousAnomalyEffect: "burn" | "shock" | "corruption" | "frozen" | "flinch"; elapsedSeconds: number; durationSeconds?: number; count?: number }
+    >;
   };
 }
 
@@ -382,6 +444,26 @@ interface InCombatResponse {
         outOfCombatPanel: Record<string, number>;
       };
     };
+  };
+  damage?: {
+    finalDamage: number; // selected or first event, kept for compatibility.
+    totalFinalDamage: number;
+    selectedEventId: string | null;
+    events: Array<{
+      id: string;
+      kind: "direct" | "anomaly" | "disorder";
+      finalDamage: number;
+      singleDamage: number;
+      count: number;
+      multipliers: Record<string, number>;
+      whiteBoxRows: Array<{
+        label: string;
+        formula: string;
+        formulaLines?: string[];
+        value: number;
+        displayValue: string;
+      }>;
+    }>;
   };
 }
 ```
@@ -428,6 +510,64 @@ Structured Buffs can use these calculation rules:
   and `floor/ceil/round/min/max/clamp`.
 - `stacked`: multiplies `valuePerStack` by runtime stack count.
 
+Buffs can also declare `buffModifiers` for effects that amplify another active
+Buff rather than directly adding a stat. The first supported operation is
+`multiplyResolvedValue`: when the modifier Buff and the target Buff are both
+active, and the current rule id matches `targetEffectIds`, the rule's resolved
+stored value is multiplied by `factor`. Multiple matching modifiers multiply
+together. If the target Buff is not active, the modifier contributes no value.
+This is used for Youye's Cinema 1, which multiplies her additional ability's
+`anomalyDamageBonus` rule by `1.3`.
+
+Every rule can choose an amplification target:
+
+- `target.kind: "default"` (or omitted) uses the ordinary Buff path. Panel and
+  enemy-target stats are added to the in-combat panel/target totals. Default
+  event stats such as `anomalyDamageBonus`, `baseMultiplierBonus`,
+  `anomalyCritRate`, and `anomalyCritDmg` are kept out of the panel and applied
+  only inside the relevant damage event formula.
+- `target.kind: "skill"` requires at least one `skillTargets` entry and is only
+  valid for in-combat Buffs. It never writes into the global panel. It is
+  evaluated against the selected damage event's `skillSource`; manually typed
+  multipliers without a skill reference do not match. Omitting `rowId` targets
+  the whole move, while a `rowId` targets only that multiplier row. Generated
+  total rows also carry their source row ids, so a row-targeted rule is applied
+  once when the generated total contains that source row.
+
+Skill-targeted rules may use only the event-safe stats: elemental resistance
+ignore, current/element resistance reduction, `enemyDefReduction`, generic and
+elemental damage bonuses, `anomalyDamageBonus`, and `skillMultiplierBonus`.
+`skillMultiplierBonus` stores UI percentages, so `1500` means `+1500%` and the
+calculator adds `15` to the direct skill multiplier:
+
+```json
+{
+  "type": "fixed",
+  "target": {
+    "kind": "skill",
+    "skillTargets": [
+      {
+        "agentSkillId": "hoshimi_miyabi",
+        "categoryId": "basic",
+        "moveId": "frost_moon",
+        "rowId": "charge_3"
+      }
+    ]
+  },
+  "stat": "skillMultiplierBonus",
+  "value": 1500,
+  "mode": "flat"
+}
+```
+
+Skill-targeted `dmgBonus` and elemental damage bonus are additive with the
+normal generic/elemental damage bonus zone for the matched event only.
+Skill-targeted defense, resistance reduction, and resistance ignore modify only
+the matched event's defense/resistance multiplier. Legacy `type:
+"damageModifier"` rules are still accepted by the calculator and maintenance
+validator so older saved data can load, but new maintenance UI and custom Buff
+UI no longer create that rule type.
+
 For the HP-to-damage Buff, use:
 `clamp(floor((x - 15000) / 400) + 10, 10, 40)`, with source `x` clamped to
 15000-27000 and defaulted to 27000. Stored percent conventions still apply, so
@@ -462,6 +602,81 @@ In-combat ATK% must preserve its basis:
 When adding new data, never treat `atkPct` as self-explanatory in an in-combat
 effect. Either write a `basis` field or make sure the source type is one of the
 explicit out-of-combat defaults above.
+
+## Damage Events
+
+The in-combat calculator now accepts a list of damage events. If `events` is
+omitted, the legacy direct-damage fields are normalized into one direct event.
+`damage.finalDamage` remains the selected or first event's damage for backward
+compatibility; `damage.totalFinalDamage` is the sum of all events.
+
+Direct damage uses:
+
+```text
+atk * skillMultiplier * critMultiplier * (1 + generic/element dmg bonus)
+  * defenseMultiplier * resistanceMultiplier
+```
+
+Anomaly and disorder reuse the same attack, damage bonus, defense, resistance,
+PEN, RES ignore, and RES reduction logic as direct damage. They do not use CRIT
+unless an anomaly-specific crit modifier is present.
+
+### Anomaly Damage
+
+Attribute anomaly damage uses:
+
+```text
+atk * anomalyMultiplier * (1 + generic/element dmg bonus)
+  * defenseMultiplier * resistanceMultiplier
+  * anomalyProficiency / 100
+  * anomalyLevel
+  * (1 + anomalyDamageBonus)
+  * anomalyCritMultiplier
+```
+
+`anomalyDamageBonus` is independent from the existing generic/elemental damage
+bonus bucket. A Buff can apply it to all anomaly damage, only disorder, one
+anomaly effect such as Shock, or one element.
+
+The anomaly and disorder catalogs live in `data/anomaly_effects.json` and are
+editable from the maintenance UI. v1 ships these default anomaly multipliers:
+
+- Assault / 强击: `713%`
+- Shatter / 碎冰: `500%`
+- Burn / 灼烧: `50%` per tick, default `20` ticks
+- Shock / 感电: `125%` per proc, default `10` procs
+- Corruption / 侵蚀: `62.5%` per tick, default `20` ticks
+
+The level zone is modeled as:
+
+```text
+anomalyLevel = trunc4(1 + (clamp(agentLevel, 1, 60) - 1) / 59)
+```
+
+The result is clamped between `1` and `2`. Current base panels still come from
+level-60 static data; supporting character levels other than 60 requires future
+agent, W-Engine, and core-skill stat tables.
+
+### Disorder Damage
+
+Disorder is manually modeled from the previous anomaly effect and elapsed time.
+The second anomaly that triggers Disorder is not treated as the damage source in
+v1; the current in-combat panel is used as the source snapshot.
+
+```text
+Burn Disorder       = 450% + floor((duration - elapsed) / 0.5) * 50%
+Shock Disorder      = 450% + floor(duration - elapsed) * 125%
+Corruption Disorder = 450% + floor((duration - elapsed) / 0.5) * 62.5%
+Frozen Disorder     = 450% + floor(duration - elapsed) * 7.5%
+Flinch Disorder     = 450% + floor(duration - elapsed) * 7.5%
+```
+
+`elapsed` is clamped to `0..duration`, and `duration` defaults to `10` seconds.
+The frontend exposes duration so effects that extend anomaly duration can be
+entered manually.
+
+v1 explicitly does not model anomaly buildup, buildup ownership, multi-agent
+source weighting, polarity disorder, or wind/vortex-style newer special cases.
 
 ### Agent Cinema Buff Data Shape
 
@@ -499,8 +714,12 @@ self Buffs, in-combat `atkPct` rules must declare `basis` explicitly.
 
 ### Teammate Buff Data Shape
 
+Combat Buff data uses `data/combat_buffs.json` version 2. Teammate, field,
+boss, and hidden system Buffs are stored separately for maintenance, then the
+backend flattens them into the existing `activeBuffIds` calculation path.
+
 Teammate Buffs are stored by teammate first, because one teammate can contribute
-multiple independent Buff sources. The current shape is:
+multiple independent Buff sources:
 
 ```json
 {
@@ -538,6 +757,31 @@ For the first teammate, 千夏 currently has:
 
 - `核心被动`: `atkFlat +1050`;
 - `强化特殊技`: `atkFlat +50`.
+
+Field Buffs are stored in `fieldBuffs`:
+
+```json
+{
+  "fieldBuffs": [
+    {
+      "id": "field.example",
+      "sourceType": "field",
+      "name": { "zhCN": "场地效果名" },
+      "source": { "zhCN": "危局" },
+      "sourcePeriod": { "zhCN": "2.8版本第三期" },
+      "description": { "zhCN": "字面说明" },
+      "scope": "inCombat",
+      "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 },
+      "effects": []
+    }
+  ]
+}
+```
+
+Boss Buffs are stored in `bossBuffs` with `bossName`, `bossSource`,
+`sourcePeriod`, `description`, `coverage`, and `effects`. Hidden validation
+entries live in `systemBuffs`; they remain calculable but are filtered from
+`/api/meta`.
 
 ### Custom Buff Input Rule
 
@@ -738,9 +982,17 @@ the out-of-combat panel formula.
 This target function is deliberately not a real rotation model. Attack, Stun,
 Anomaly, Support, Defense, and Rupture-specific scoring should be added later.
 
+The Drive Disc optimizer still uses its existing `damage` objective. A future
+optimizer pass should expose at least these objectives:
+
+- `directDamage`: maximize one selected direct event.
+- `anomalyDamage`: maximize one selected anomaly or disorder event.
+- `mixedRotationTotal`: let the user choose direct skills and anomaly/disorder
+  counts, then maximize the total damage sum.
+
 ## Explicitly Deferred
 
-- Character levels other than 60.
+- Character levels other than 60 for base panel calculation.
 - Multi-hit rotation totals, skill resource modeling, and core passive damage
   scaling.
 - Mindscape Cinema.
@@ -748,5 +1000,6 @@ Anomaly, Support, Defense, and Rupture-specific scoring should be added later.
 - Conditional Drive Disc 4-piece effects.
 - Teammate and field buffs.
 - Enemy defense, resistance, weakness, and stun multipliers.
-- Daze, stun windows, anomaly buildup, anomaly damage, and disorder.
+- Daze, stun windows, anomaly buildup, anomaly ownership weighting, polarity
+  disorder, and multi-hit rotation totals.
 - Data imports from external databases.

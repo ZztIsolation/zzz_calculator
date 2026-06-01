@@ -323,6 +323,13 @@ approx(
     teamDriveDiscBuff.outOfCombat.panel.atk * 0.1,
     "Team Drive Disc 4-piece ATK% without basis should default to outOfCombatAtk and not require current equipment",
 )
+assert.ok(
+    teamDriveDiscBuff.inCombat.activeEffects.some(effect =>
+        effect.key === "teammateDriveDisc4pc:1:scanner-set-fcf8ae93d798"
+        && effect.sourceType === "driveDisc4pcTeam"
+    ),
+    "Team Drive Disc 4-piece Buff should be recorded as an active teammate effect",
+)
 
 const withRuntimeBuffs = cloneCatalog(catalog)
 withRuntimeBuffs.combatBuffs.push(

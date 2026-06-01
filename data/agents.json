@@ -99,6 +99,9 @@
           "name": {
             "zhCN": "核心被动"
           },
+          "description": {
+            "zhCN": "进入战场时，获得[合道]效果，暴击率提升30%，造成的伤害提升25%。"
+          },
           "coverage": {
             "default": 1,
             "min": 0,
@@ -111,16 +114,23 @@
               "type": "fixed",
               "stat": "critRate",
               "value": 30,
-              "mode": "flat"
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              }
             },
             {
               "id": "effect-2",
               "type": "fixed",
               "stat": "dmgBonus",
               "value": 25,
-              "mode": "flat"
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              }
             }
-          ]
+          ],
+          "buffModifiers": []
         },
         "additionalAbility": null,
         "cinemaBuffs": [
@@ -146,16 +156,65 @@
                 "type": "fixed",
                 "stat": "dmgBonus",
                 "value": 10,
-                "mode": "flat"
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                }
               },
               {
                 "id": "effect-2",
                 "type": "fixed",
                 "stat": "enemyDefReduction",
                 "value": 20,
-                "mode": "flat"
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                }
               }
-            ]
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 2,
+            "cinemaName": {
+              "zhCN": "光与影"
+            },
+            "description": {
+              "zhCN": "[载物]可叠加层数提升至6层，[观止]可叠加至9层；\n[明心境]状态下，每消耗1点[青溟剑势]，则获得1层[观止]效果；\n[强化特殊技：明心境·飞光]和[终结技：斩妄开天]造成的伤害无视目标40%防御力。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "coverage": {
+              "default": 1,
+              "min": 0,
+              "max": 1,
+              "step": 0.1
+            },
+            "effects": [
+              {
+                "id": "effect-1",
+                "type": "fixed",
+                "stat": "enemyDefReduction",
+                "value": 40,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "agentSkillId": "ye_shunguang",
+                      "categoryId": "special",
+                      "moveId": "ex_clarity_flying_light"
+                    },
+                    {
+                      "agentSkillId": "ye_shunguang",
+                      "categoryId": "chain",
+                      "moveId": "ultimate_cut_delusion_open_heaven"
+                    }
+                  ]
+                }
+              }
+            ],
+            "buffModifiers": []
           }
         ]
       },
@@ -307,6 +366,513 @@
         "level60Stats": "source-checked",
         "panelDefaults": "source-checked",
         "damageElement": "modeled-from-physical-resistance-wording"
+      }
+    },
+    {
+      "id": "hoshimi_miyabi",
+      "name": {
+        "zhCN": "星见雅"
+      },
+      "rarity": "S",
+      "attribute": "frost",
+      "damageElement": "ice",
+      "specialty": "anomaly",
+      "attackTypes": [
+        "slash"
+      ],
+      "faction": "对空六课",
+      "images": {
+        "portrait": "/assets/agents/hoshimi_miyabi.png",
+        "source": "https://wiki.biligame.com/zzz/%E9%9B%85"
+      },
+      "level60": {
+        "hpBase": 7673,
+        "atkBase": 805,
+        "defBase": 606,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 86,
+        "anomalyProficiency": 148,
+        "anomalyMastery": 116,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "combatBuffs": {
+        "corePassive": null,
+        "additionalAbility": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "额外能力"
+          },
+          "description": {
+            "zhCN": "队伍中存在「支援」角色或与自身阵营相同的角色时触发：\n「普通攻击：霜月」造成的伤害提升60%；队伍中任意角色触发「紊乱」效果时，星见雅获得2点「落霜」，且在下一次「霜月架势」期间，「普通攻击：霜月」将无视目标30%冰属性伤害抗性。"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          },
+          "effects": [
+            {
+              "id": "effect-1",
+              "type": "fixed",
+              "stat": "iceResIgnore",
+              "value": 30,
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "agentSkillId": "hoshimi_miyabi",
+                    "categoryId": "basic",
+                    "moveId": "frost_moon"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "effect-2",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 60,
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "agentSkillId": "hoshimi_miyabi",
+                    "categoryId": "basic",
+                    "moveId": "frost_moon"
+                  }
+                ]
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "cinemaBuffs": []
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "寒炎"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "anomalyProficiency",
+                "value": 30,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "anomalyProficiency",
+                "value": 30,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "anomalyProficiency",
+                "value": 30,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "核心被动：寒炎"
+          },
+          "levels": [
+            {
+              "level": 1,
+              "frostburnBreakAtkMultiplier": 750,
+              "teamAnomalyBuildupPct": 14
+            },
+            {
+              "level": 2,
+              "frostburnBreakAtkMultiplier": 875,
+              "teamAnomalyBuildupPct": 15
+            },
+            {
+              "level": 3,
+              "frostburnBreakAtkMultiplier": 1000,
+              "teamAnomalyBuildupPct": 16
+            },
+            {
+              "level": 4,
+              "frostburnBreakAtkMultiplier": 1125,
+              "teamAnomalyBuildupPct": 17
+            },
+            {
+              "level": 5,
+              "frostburnBreakAtkMultiplier": 1250,
+              "teamAnomalyBuildupPct": 18
+            },
+            {
+              "level": 6,
+              "frostburnBreakAtkMultiplier": 1375,
+              "teamAnomalyBuildupPct": 19
+            },
+            {
+              "level": 7,
+              "frostburnBreakAtkMultiplier": 1500,
+              "teamAnomalyBuildupPct": 20
+            }
+          ],
+          "defaultLevelAtCoreSkill": "F"
+        },
+        "sources": [
+          "https://wiki.biligame.com/zzz/%E9%9B%85"
+        ],
+        "verification": {
+          "stats": "source-checked-biligame-wiki-2026-05-30",
+          "skillLevelBonuses": "A/C/E each add Anomaly Proficiency +30 and Core Passive level +1; B/D/F each add Base ATK +25 and Core Passive level +1",
+          "corePassiveScaling": "source-checked; F corresponds to Core Passive level 7, Frostburn Break 1500% ATK and team anomaly buildup +20%",
+          "unsupportedBuffs": "crit-to-frost-buildup efficiency, frostburn target buildup bonus, and additional ability's conditional resistance ignore are not modeled as global combat buffs"
+        }
+      },
+      "preferredDriveDiscs": {
+        "mainStatLimits": {
+          "4": [
+            "atkPct",
+            "critRate",
+            "critDmg",
+            "anomalyProficiency"
+          ],
+          "5": [
+            "atkPct",
+            "penRatio",
+            "iceDmg"
+          ],
+          "6": [
+            "atkPct",
+            "anomalyMastery"
+          ]
+        }
+      },
+      "sources": [
+        "https://wiki.biligame.com/zzz/%E9%9B%85"
+      ],
+      "verification": {
+        "level60Stats": "source-checked-biligame-wiki-2026-05-30",
+        "panelDefaults": "source-checked-biligame-wiki-2026-05-30",
+        "damageElement": "displayed as frost but settled as ice so it uses ice damage bonus and ice resistance"
+      }
+    },
+    {
+      "id": "alice_thymefield",
+      "name": {
+        "zhCN": "爱丽丝"
+      },
+      "rarity": "S",
+      "attribute": "physical",
+      "damageElement": "physical",
+      "specialty": "anomaly",
+      "attackTypes": [
+        "slash"
+      ],
+      "faction": "怪啖屋",
+      "images": {
+        "portrait": "/assets/agents/alice_thymefield.png",
+        "source": "https://wiki.biligame.com/zzz/%E7%88%B1%E4%B8%BD%E4%B8%9D"
+      },
+      "level60": {
+        "hpBase": 7673,
+        "atkBase": 805,
+        "defBase": 606,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 86,
+        "anomalyProficiency": 118,
+        "anomalyMastery": 106,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "combatBuffs": {
+        "corePassive": null,
+        "additionalAbility": null
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "剑心双虹"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "核心被动：剑心双虹"
+          },
+          "levels": [
+            {
+              "level": 1,
+              "physicalAnomalyBuildupEfficiencyPct": 12.5
+            },
+            {
+              "level": 2,
+              "physicalAnomalyBuildupEfficiencyPct": 14.6
+            },
+            {
+              "level": 3,
+              "physicalAnomalyBuildupEfficiencyPct": 16.7
+            },
+            {
+              "level": 4,
+              "physicalAnomalyBuildupEfficiencyPct": 18.8
+            },
+            {
+              "level": 5,
+              "physicalAnomalyBuildupEfficiencyPct": 20.8
+            },
+            {
+              "level": 6,
+              "physicalAnomalyBuildupEfficiencyPct": 22.9
+            },
+            {
+              "level": 7,
+              "physicalAnomalyBuildupEfficiencyPct": 25
+            }
+          ],
+          "defaultLevelAtCoreSkill": "F"
+        },
+        "corePassiveMechanics": {
+          "physicalAnomalyExtraDamageRatioPct": 2.5,
+          "disorderMultiplierBonusPerRemainingSecondPct": 18,
+          "disorderMultiplierBonusCapPct": 180,
+          "polarizedAssaultBaseAssaultDamagePct": 100,
+          "swordMeterMax": 300
+        },
+        "sources": [
+          "https://wiki.biligame.com/zzz/%E7%88%B1%E4%B8%BD%E4%B8%9D"
+        ],
+        "verification": {
+          "stats": "source-checked-biligame-wiki-2026-05-30",
+          "skillLevelBonuses": "A/C/E each add Anomaly Mastery +12 and Core Passive level +1; B/D/F each add Base ATK +25 and Core Passive level +1",
+          "corePassiveScaling": "source-checked; F corresponds to Core Passive level 7 and physical anomaly buildup efficiency +25%",
+          "unsupportedBuffs": "physical anomaly buildup efficiency, physical anomaly extra damage tick, disorder multiplier bonus, polarized assault, and additional ability's anomaly-mastery-to-proficiency conversion are not modeled as automatic combat buffs"
+        }
+      },
+      "preferredDriveDiscs": {
+        "mainStatLimits": {
+          "4": [
+            "anomalyProficiency"
+          ],
+          "5": [
+            "physicalDmg",
+            "penRatio",
+            "atkPct"
+          ],
+          "6": [
+            "anomalyMastery"
+          ]
+        }
+      },
+      "sources": [
+        "https://wiki.biligame.com/zzz/%E7%88%B1%E4%B8%BD%E4%B8%9D"
+      ],
+      "verification": {
+        "level60Stats": "source-checked-biligame-wiki-2026-05-30",
+        "panelDefaults": "source-checked-biligame-wiki-2026-05-30"
       }
     }
   ]

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url"
 import { calculateInCombatPanel, loadCalculatorContext } from "../backend/calculator.js"
 import { optimizeDriveDiscs, previewDriveDiscOptimization } from "../backend/driveDiscOptimizer.js"
 import {
+    clearUserDriveDiscStore,
     deleteDriveDiscLoadout,
     loadUserDriveDiscStore,
     toCalculatorDriveDisc,
@@ -183,6 +184,15 @@ const set22Input = optimizerInput({ settings: { twoPieceSetId: twoSet } })
 const set22 = optimizeDriveDiscs(catalog, store, set22Input)
 const set22Brute = bruteForce(set22Input)
 assert.equal(set22.results[0].driveDiscs.map(item => item.id).join("|"), set22Brute[0].ids)
+assert.equal(
+    set22.results[0].data.outOfCombat.appliedEffects.filter(item => item.key.endsWith(".twoPiece")).length,
+    2,
+    "4+2 candidates should activate both set 2-piece effects",
+)
+assert.ok(
+    set22.results[0].data.inCombat.activeEffects.some(item => item.key === `driveDisc4pc:${fourSet}.self`),
+    "4+2 candidates should automatically apply the wearer 4-piece Buff",
+)
 
 const limitedInput = optimizerInput({
     settings: {
@@ -257,3 +267,26 @@ assert.equal((await loadUserDriveDiscStore(tempDir)).driveDiscLoadouts.length, 1
 const deleted = await deleteDriveDiscLoadout(tempDir, saved.loadout.id)
 assert.equal(deleted.deleted, true)
 assert.equal((await loadUserDriveDiscStore(tempDir)).driveDiscLoadouts.length, 0)
+
+await upsertDriveDiscLoadout(tempDir, {
+    agentId: "ye_shunguang",
+    name: "待清空套装",
+    driveDiscIdsBySlot: {
+        1: "f1",
+        2: "f2",
+        3: "f3",
+        4: "f4",
+        5: "f5",
+        6: "f6",
+    },
+})
+const cleared = await clearUserDriveDiscStore(tempDir)
+assert.deepEqual(cleared.previous, {
+    imports: 0,
+    driveDiscs: 0,
+    driveDiscLoadouts: 1,
+})
+assert.equal(cleared.store.owners.length, 1)
+assert.equal(cleared.store.driveDiscLoadouts.length, 0)
+assert.equal(cleared.store.driveDiscs.length, 0)
+assert.equal(cleared.store.imports.length, 0)

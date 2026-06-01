@@ -1,11 +1,24 @@
 import { evaluateFormulaExpression } from "./formulaEvaluator.js"
+import {
+    damageSkillRowsWithGeneratedTotals,
+    skillLevelRange,
+    skillRowValue,
+} from "./skillMultiplierCandidates.js"
 import * as SharedCombat from "./shared-combat.js"
 
 const els = {
     status: document.getElementById("status"),
     agentSelect: document.getElementById("agentSelect"),
     coreSkillSelect: document.getElementById("coreSkillSelect"),
+    cinemaLevelSelect: document.getElementById("cinemaLevelSelect"),
+    agentLevelInput: document.getElementById("agentLevelInput"),
+    basicSkillLevelSelect: document.getElementById("basicSkillLevelSelect"),
+    dodgeSkillLevelSelect: document.getElementById("dodgeSkillLevelSelect"),
+    assistSkillLevelSelect: document.getElementById("assistSkillLevelSelect"),
+    specialSkillLevelSelect: document.getElementById("specialSkillLevelSelect"),
+    chainSkillLevelSelect: document.getElementById("chainSkillLevelSelect"),
     wEngineSelect: document.getElementById("wEngineSelect"),
+    wEngineModificationSelect: document.getElementById("wEngineModificationSelect"),
     driveDiscInput: document.getElementById("driveDiscInput"),
     calculateBtn: document.getElementById("calculateBtn"),
     baseTable: document.getElementById("baseTable"),
@@ -45,12 +58,20 @@ const els = {
     damageTargetResistanceLabel: document.getElementById("damageTargetResistanceLabel"),
     damageTargetResistance: document.getElementById("damageTargetResistance"),
     damageTargetResistanceButtons: Array.from(document.querySelectorAll("[data-resistance-preset]")),
+    damageEventType: document.getElementById("damageEventType"),
     damageSkillMultiplier: document.getElementById("damageSkillMultiplier"),
-    damageSkillCategory: document.getElementById("damageSkillCategory"),
-    damageSkillMove: document.getElementById("damageSkillMove"),
-    damageSkillRow: document.getElementById("damageSkillRow"),
-    damageSkillLevel: document.getElementById("damageSkillLevel"),
+    openDamageSkillModalBtn: document.getElementById("openDamageSkillModalBtn"),
+    damageSkillSummary: document.getElementById("damageSkillSummary"),
+    damageSkillModal: document.getElementById("damageSkillModal"),
+    closeDamageSkillModalBtn: document.getElementById("closeDamageSkillModalBtn"),
+    damageSkillModalList: document.getElementById("damageSkillModalList"),
+    damageSkillModalEmpty: document.getElementById("damageSkillModalEmpty"),
     damageCritMode: document.getElementById("damageCritMode"),
+    damageAnomalyEffect: document.getElementById("damageAnomalyEffect"),
+    damageAnomalyProcCount: document.getElementById("damageAnomalyProcCount"),
+    damageDisorderEffect: document.getElementById("damageDisorderEffect"),
+    damageDisorderElapsed: document.getElementById("damageDisorderElapsed"),
+    damageDisorderDuration: document.getElementById("damageDisorderDuration"),
     damageFinalValue: document.getElementById("damageFinalValue"),
     damageWhiteBoxRows: document.getElementById("damageWhiteBoxRows"),
     combatBuffModal: document.getElementById("combatBuffModal"),
@@ -118,6 +139,7 @@ const FALLBACK_LABELS = {
     etherDmg: "以太伤害加成",
     dmgBonus: "通用伤害加成",
     enemyDefReduction: "敌方减防率",
+    enemyDefIgnore: "无视防御率",
     enemyDefFlatReduction: "敌方固定减防",
     enemyResReduction: "敌方当前属性减抗",
     enemyPhysicalResReduction: "敌方物理减抗",
@@ -131,6 +153,7 @@ const ENUM_LABELS = {
     attribute: {
         physical: "物理属性",
         honed_edge: "凛刃",
+        frost: "烈霜",
         fire: "火属性",
         ice: "冰属性",
         electric: "电属性",
@@ -178,6 +201,7 @@ const PERCENT_KEYS = new Set([
     "etherDmg",
     "dmgBonus",
     "enemyDefReduction",
+    "enemyDefIgnore",
     "enemyResReduction",
     "enemyPhysicalResReduction",
     "enemyFireResReduction",
@@ -218,6 +242,7 @@ const STORED_PERCENT_STATS = new Set([
     "etherDmg",
     "dmgBonus",
     "enemyDefReduction",
+    "enemyDefIgnore",
     "enemyResReduction",
     "enemyPhysicalResReduction",
     "enemyFireResReduction",
@@ -250,6 +275,7 @@ const STORED_STAT_LABELS = {
     etherDmg: "以太伤害加成%",
     dmgBonus: "通用伤害加成%",
     enemyDefReduction: "敌方减防率%",
+    enemyDefIgnore: "无视防御率%",
     enemyResReduction: "敌方当前属性减抗%",
     enemyPhysicalResReduction: "敌方物理减抗%",
     enemyFireResReduction: "敌方火减抗%",
@@ -372,39 +398,40 @@ const RES_IGNORE_STAT_BY_ELEMENT = {
     electric: "electricResIgnore",
     ether: "etherResIgnore",
 }
-const RESISTANCE_PRESET_VALUES = new Set(["-20", "0", "20"])
-const CUSTOM_BUFF_STAT_OPTIONS = [
-    ["atkFlat", "固定攻击力", "flat", null],
-    ["atkPct", "基础攻击力%", "pct", "baseAtk"],
-    ["atkPct", "局外攻击力%", "pct", "outOfCombatAtk"],
-    ["hpPct", "基础生命值%", "pct", "baseHp"],
-    ["hpPct", "局外生命值%", "pct", "outOfCombatHp"],
-    ["defPct", "基础防御力%", "pct", "baseDef"],
-    ["defPct", "局外防御力%", "pct", "outOfCombatDef"],
-    ["critRate", "暴击率%", "flat", null],
-    ["critDmg", "暴击伤害%", "flat", null],
-    ["penRatio", "穿透率%", "flat", null],
-    ["dmgBonus", "通用伤害%", "flat", null],
-    ["physicalDmg", "物理伤害%", "flat", null],
-    ["fireDmg", "火属性伤害%", "flat", null],
-    ["iceDmg", "冰属性伤害%", "flat", null],
-    ["electricDmg", "电属性伤害%", "flat", null],
-    ["etherDmg", "以太伤害%", "flat", null],
-    ["enemyDefReduction", "敌方减防率%", "flat", null],
-    ["enemyDefFlatReduction", "敌方固定减防", "flat", null],
-    ["enemyResReduction", "当前属性减抗%", "flat", null],
-    ["currentResIgnore", "当前属性抗性无视%", "flat", null],
-    ["enemyPhysicalResReduction", "物理减抗%", "flat", null],
-    ["enemyFireResReduction", "火减抗%", "flat", null],
-    ["enemyIceResReduction", "冰减抗%", "flat", null],
-    ["enemyElectricResReduction", "电减抗%", "flat", null],
-    ["enemyEtherResReduction", "以太减抗%", "flat", null],
-    ["physicalResIgnore", "物理抗性无视%", "flat", null],
-    ["fireResIgnore", "火抗性无视%", "flat", null],
-    ["iceResIgnore", "冰抗性无视%", "flat", null],
-    ["electricResIgnore", "电抗性无视%", "flat", null],
-    ["etherResIgnore", "以太抗性无视%", "flat", null],
+const ANOMALY_EFFECT_LABELS = {
+    assault: "强击",
+    shatter: "碎冰",
+    burn: "灼烧",
+    shock: "感电",
+    corruption: "侵蚀",
+    frozen: "霜寒",
+    flinch: "畏缩",
+}
+const DAMAGE_MODIFIER_KIND_LABELS = {
+    anomalyDamageBonus: "异常伤害增伤",
+    baseMultiplierBonus: "伤害倍率修正",
+    anomalyCritRate: "异常暴击率",
+    anomalyCritDmg: "异常暴击伤害",
+    directDamageBonus: "技能专属伤害增伤",
+    skillMultiplierBonus: "技能倍率加算",
+}
+const DEFAULT_ANOMALY_PROC_COUNTS = {
+    assault: 1,
+    shatter: 1,
+    burn: 20,
+    shock: 10,
+    corruption: 20,
+}
+const SKILL_CATEGORY_ORDER = [
+    ["basic", "普通攻击", "basicSkillLevelSelect"],
+    ["dodge", "闪避", "dodgeSkillLevelSelect"],
+    ["assist", "支援技", "assistSkillLevelSelect"],
+    ["special", "特殊技", "specialSkillLevelSelect"],
+    ["chain", "连携技", "chainSkillLevelSelect"],
 ]
+const RESISTANCE_PRESET_VALUES = new Set(["-20", "0", "20"])
+const CUSTOM_BUFF_STAT_OPTIONS = SharedCombat.CUSTOM_BUFF_STAT_OPTIONS
+const CUSTOM_BUFF_SKILL_STAT_OPTIONS = SharedCombat.CUSTOM_BUFF_SKILL_STAT_OPTIONS
 
 let meta = null
 let userDriveDiscStore = null
@@ -413,6 +440,9 @@ let activeCombatBuffTab = "agent"
 const manuallyUncheckedDefaultCombatBuffIds = new Set()
 const damageTargetResistanceByElement = Object.fromEntries(DAMAGE_ELEMENTS.map(element => [element, 0]))
 let activeDamageResistanceElement = "physical"
+let selectedDamageSkillRef = null
+let activeDamageSkillPickerMoveRef = null
+let damageSkillLevelsByCategory = {}
 const CALCULATE_DEBOUNCE_MS = 250
 let calculateDebounceTimer = null
 const combatUi = SharedCombat.createCombatUiController({
@@ -543,20 +573,58 @@ function populateDamageTargetPresets() {
     els.damageLevelCoefficient.value = DEFAULT_DAMAGE_LEVEL_COEFFICIENT
 }
 
-function agentSkillCatalog(agentId = els.agentSelect?.value) {
-    return meta?.agentSkills?.find(item => item.agentId === agentId) ?? null
+function anomalyEffects() {
+    return meta?.anomalyEffects ?? [
+        { id: "assault", label: { zhCN: "强击" }, defaultProcCount: 1 },
+        { id: "shatter", label: { zhCN: "碎冰" }, defaultProcCount: 1 },
+        { id: "burn", label: { zhCN: "灼烧" }, defaultProcCount: 20 },
+        { id: "shock", label: { zhCN: "感电" }, defaultProcCount: 10 },
+        { id: "corruption", label: { zhCN: "侵蚀" }, defaultProcCount: 20 },
+    ]
 }
 
-function skillLevelRange(category = {}, move = {}, row = {}) {
-    return row.levelRange ?? move.levelRange ?? category.levelRange ?? {
-        min: 1,
-        max: Array.isArray(row.values) ? row.values.length : 1,
-        default: 1,
+function disorderEffects() {
+    return meta?.disorderEffects ?? [
+        { id: "burn", label: { zhCN: "灼烧" } },
+        { id: "shock", label: { zhCN: "感电" } },
+        { id: "corruption", label: { zhCN: "侵蚀" } },
+        { id: "frozen", label: { zhCN: "霜寒" } },
+        { id: "flinch", label: { zhCN: "畏缩" } },
+    ]
+}
+
+function populateDamageEventSelects() {
+    if (els.damageAnomalyEffect) {
+        els.damageAnomalyEffect.innerHTML = ""
+        for (const effect of anomalyEffects()) {
+            const option = document.createElement("option")
+            option.value = effect.id
+            option.textContent = localizedText(effect.label) || ANOMALY_EFFECT_LABELS[effect.id] || effect.id
+            option.dataset.defaultProcCount = String(effect.defaultProcCount ?? DEFAULT_ANOMALY_PROC_COUNTS[effect.id] ?? 1)
+            els.damageAnomalyEffect.appendChild(option)
+        }
+    }
+    if (els.damageDisorderEffect) {
+        els.damageDisorderEffect.innerHTML = ""
+        for (const effect of disorderEffects()) {
+            const option = document.createElement("option")
+            option.value = effect.id
+            option.textContent = localizedText(effect.label) || ANOMALY_EFFECT_LABELS[effect.id] || effect.id
+            option.dataset.defaultDurationSeconds = String(effect.defaultDurationSeconds ?? 10)
+            els.damageDisorderEffect.appendChild(option)
+        }
     }
 }
 
-function damageSkillRows(move = {}) {
-    return (move.rows ?? []).filter(row => (row.kind ?? "damageMultiplier") === "damageMultiplier")
+function renderDamageEventControls() {
+    const type = els.damageEventType?.value || "direct"
+    document.querySelectorAll(".damage-direct-field").forEach(item => { item.hidden = type !== "direct" })
+    document.querySelectorAll(".damage-anomaly-field").forEach(item => { item.hidden = type !== "anomaly" })
+    document.querySelectorAll(".damage-disorder-field").forEach(item => { item.hidden = type !== "disorder" })
+}
+
+function agentSkillCatalog(agentId = els.agentSelect?.value) {
+    return meta?.agentSkills?.find(item => item.agentId === agentId) ?? null
 }
 
 function damageSkillCategories(skill = agentSkillCatalog()) {
@@ -566,124 +634,305 @@ function damageSkillCategories(skill = agentSkillCatalog()) {
             moves: (category.moves ?? [])
                 .map(move => ({
                     ...move,
-                    rows: damageSkillRows(move),
+                    rows: damageSkillRowsWithGeneratedTotals(category, move),
                 }))
                 .filter(move => move.rows.length),
         }))
         .filter(category => category.moves.length)
 }
 
-function setDamageSkillControlsHidden(hidden) {
-    for (const control of [els.damageSkillCategory, els.damageSkillMove, els.damageSkillRow, els.damageSkillLevel]) {
-        if (!control) {
-            continue
-        }
-        control.closest(".field").hidden = hidden
-        control.disabled = hidden
-    }
+function defaultSkillLevel(category = {}) {
+    const range = skillLevelRange(category)
+    return Number(range.default ?? range.max ?? range.min ?? 1)
 }
 
-function fillDamageSkillSelect(select, options, selected = "") {
-    if (!select) {
-        return ""
+function clampSkillLevel(category = {}, level) {
+    const range = skillLevelRange(category)
+    const numeric = Number(level)
+    if (!Number.isInteger(numeric)) {
+        return defaultSkillLevel(category)
     }
-    select.innerHTML = ""
-    for (const [value, label] of options) {
+    return Math.max(Number(range.min ?? 1), Math.min(Number(range.max ?? numeric), numeric))
+}
+
+function selectedSkillLevel(category = {}) {
+    return clampSkillLevel(category, damageSkillLevelsByCategory[category.id] ?? defaultSkillLevel(category))
+}
+
+function skillLevelSelects() {
+    return SKILL_CATEGORY_ORDER
+        .map(([categoryId, , elementKey]) => ({ categoryId, select: els[elementKey] }))
+        .filter(item => item.select)
+}
+
+function normalizeSkillLevelsByCategory(skill = agentSkillCatalog(), stored = {}) {
+    const next = {}
+    for (const category of damageSkillCategories(skill)) {
+        next[category.id] = clampSkillLevel(category, stored?.[category.id] ?? defaultSkillLevel(category))
+    }
+    return next
+}
+
+function selectedCinemaLevel() {
+    const level = Number(els.cinemaLevelSelect?.value ?? 0)
+    return Number.isInteger(level) ? Math.max(0, Math.min(6, level)) : 0
+}
+
+function cinemaLevelForAgent(agentId = els.agentSelect?.value) {
+    const level = Number(configForAgent(agentId).cinemaLevel ?? 0)
+    return Number.isInteger(level) ? Math.max(0, Math.min(6, level)) : 0
+}
+
+function populateCinemaLevelSelect(preferredLevel = cinemaLevelForAgent()) {
+    if (!els.cinemaLevelSelect) {
+        return 0
+    }
+    const selected = Number.isInteger(Number(preferredLevel))
+        ? Math.max(0, Math.min(6, Number(preferredLevel)))
+        : 0
+    els.cinemaLevelSelect.innerHTML = ""
+    for (let level = 0; level <= 6; level += 1) {
         const option = document.createElement("option")
-        option.value = value
-        option.textContent = label
-        select.appendChild(option)
+        option.value = String(level)
+        option.textContent = `${level} 影`
+        option.selected = level === selected
+        els.cinemaLevelSelect.appendChild(option)
     }
-    const validSelected = options.some(([value]) => value === selected) ? selected : options[0]?.[0] ?? ""
-    select.value = validSelected
-    return validSelected
+    return selected
 }
 
-function readDamageSkillRef() {
+function resolveDamageSkillRef(ref = null) {
     const skill = agentSkillCatalog()
-    if (!skill || !els.damageSkillCategory?.value || !els.damageSkillMove?.value || !els.damageSkillRow?.value) {
+    if (!skill || !ref) {
         return null
     }
+    const category = damageSkillCategories(skill).find(item => item.id === ref.categoryId)
+    const move = (category?.moves ?? []).find(item => item.id === ref.moveId)
+    const row = (move?.rows ?? []).find(item => item.id === ref.rowId)
+    if (!category || !move || !row) {
+        return null
+    }
+    const level = selectedSkillLevel(category)
+    const value = skillRowValue(category, move, row, level)
     return {
-        agentSkillId: skill.id,
-        categoryId: els.damageSkillCategory.value,
-        moveId: els.damageSkillMove.value,
-        rowId: els.damageSkillRow.value,
-        level: Number(els.damageSkillLevel?.value || 1),
+        skill,
+        category,
+        move,
+        row,
+        level,
+        value,
+        ref: {
+            agentSkillId: skill.id,
+            categoryId: category.id,
+            moveId: move.id,
+            rowId: row.id,
+            level,
+        },
     }
 }
 
-function selectedDamageSkillRow() {
-    const skill = agentSkillCatalog()
-    const category = damageSkillCategories(skill).find(item => item.id === els.damageSkillCategory?.value)
-    const move = (category?.moves ?? []).find(item => item.id === els.damageSkillMove?.value)
-    const row = damageSkillRows(move).find(item => item.id === els.damageSkillRow?.value)
-    return { skill, category, move, row }
-}
-
-function syncDamageSkillMultiplierFromSelection() {
-    const { category, move, row } = selectedDamageSkillRow()
-    const range = skillLevelRange(category, move, row)
-    const level = Number(els.damageSkillLevel?.value || range.default || range.min || 1)
-    const value = Number(row?.values?.[level - Number(range.min ?? 1)])
-    if (Number.isFinite(value)) {
-        els.damageSkillMultiplier.value = value
-    }
-}
-
-function populateDamageSkillControls(preferredRef = null) {
-    const skill = agentSkillCatalog()
-    const categories = damageSkillCategories(skill)
-    setDamageSkillControlsHidden(!skill || !categories.length)
-    if (!skill || !categories.length) {
+function renderDamageSkillSummary() {
+    const resolved = resolveDamageSkillRef(selectedDamageSkillRef)
+    if (!resolved) {
+        selectedDamageSkillRef = null
+        if (els.damageSkillSummary) {
+            els.damageSkillSummary.textContent = "手填倍率"
+        }
         return
     }
 
-    const categoryId = fillDamageSkillSelect(els.damageSkillCategory, [
-        ["", "手填倍率"],
-        ...categories.map(category => [category.id, nameOf(category)]),
-    ], preferredRef?.categoryId ?? "")
-    const category = categories.find(item => item.id === categoryId)
-    const manualMode = !category
-    for (const control of [els.damageSkillMove, els.damageSkillRow, els.damageSkillLevel]) {
-        if (control) {
-            control.disabled = manualMode
+    selectedDamageSkillRef = resolved.ref
+    if (Number.isFinite(resolved.value)) {
+        els.damageSkillMultiplier.value = resolved.value
+    }
+    if (els.damageSkillSummary) {
+        els.damageSkillSummary.textContent = `${nameOf(resolved.category)} / ${nameOf(resolved.move)} / ${localizedText(resolved.row.label) || resolved.row.id} · LV${resolved.level} · ${Number.isFinite(resolved.value) ? `${resolved.value}%` : "-"}`
+    }
+}
+
+function renderAgentSkillLevelControls() {
+    const skill = agentSkillCatalog()
+    const categories = new Map(damageSkillCategories(skill).map(category => [category.id, category]))
+    if (els.openDamageSkillModalBtn) {
+        els.openDamageSkillModalBtn.disabled = categories.size === 0
+    }
+    for (const [categoryId, , elementKey] of SKILL_CATEGORY_ORDER) {
+        const select = els[elementKey]
+        if (!select) {
+            continue
+        }
+        const category = categories.get(categoryId)
+        select.innerHTML = ""
+        if (!category) {
+            const option = document.createElement("option")
+            option.value = ""
+            option.textContent = "未建模"
+            select.appendChild(option)
+            select.disabled = true
+            continue
+        }
+        const range = skillLevelRange(category)
+        const selected = selectedSkillLevel(category)
+        for (let level = Number(range.min ?? 1); level <= Number(range.max ?? selected); level += 1) {
+            const option = document.createElement("option")
+            option.value = String(level)
+            option.textContent = `LV${level}`
+            option.selected = level === selected
+            select.appendChild(option)
+        }
+        select.disabled = false
+    }
+    renderDamageSkillSummary()
+}
+
+function firstDamageSkillMoveRef(categories = []) {
+    for (const category of categories) {
+        const move = (category.moves ?? [])[0]
+        if (move) {
+            return {
+                categoryId: category.id,
+                moveId: move.id,
+            }
         }
     }
-    if (manualMode) {
-        fillDamageSkillSelect(els.damageSkillMove, [["", "-"]])
-        fillDamageSkillSelect(els.damageSkillRow, [["", "-"]])
-        fillDamageSkillSelect(els.damageSkillLevel, [["", "-"]])
+    return null
+}
+
+function resolveDamageSkillMoveRef(categories = [], ref = null) {
+    if (!ref) {
+        return null
+    }
+    const category = categories.find(item => item.id === ref.categoryId)
+    const move = (category?.moves ?? []).find(item => item.id === ref.moveId)
+    return category && move
+        ? {
+            category,
+            move,
+            ref: {
+                categoryId: category.id,
+                moveId: move.id,
+            },
+        }
+        : null
+}
+
+function activeDamageSkillMove(categories = []) {
+    const resolved = resolveDamageSkillMoveRef(categories, activeDamageSkillPickerMoveRef)
+        ?? resolveDamageSkillMoveRef(categories, selectedDamageSkillRef)
+        ?? resolveDamageSkillMoveRef(categories, firstDamageSkillMoveRef(categories))
+    activeDamageSkillPickerMoveRef = resolved?.ref ?? null
+    return resolved
+}
+
+function renderDamageSkillModal() {
+    if (!els.damageSkillModalList || !els.damageSkillModalEmpty) {
+        return
+    }
+    const categories = damageSkillCategories(agentSkillCatalog())
+    els.damageSkillModalList.innerHTML = ""
+    els.damageSkillModalEmpty.hidden = categories.length > 0
+    if (!categories.length) {
+        activeDamageSkillPickerMoveRef = null
         return
     }
 
-    const moveId = fillDamageSkillSelect(
-        els.damageSkillMove,
-        category.moves.map(move => [move.id, nameOf(move)]),
-        preferredRef?.moveId ?? "",
-    )
-    const move = category.moves.find(item => item.id === moveId)
-    const rows = damageSkillRows(move)
-    const rowId = fillDamageSkillSelect(
-        els.damageSkillRow,
-        rows.map(row => [row.id, localizedText(row.label) || row.id]),
-        preferredRef?.rowId ?? "",
-    )
-    const row = rows.find(item => item.id === rowId)
-    const range = skillLevelRange(category, move, row)
-    const min = Number(range.min ?? 1)
-    const max = Number(range.max ?? row?.values?.length ?? min)
-    const defaultLevel = Number(range.default ?? max)
-    const preferredLevel = Number(preferredRef?.level)
-    const selectedLevel = String(Number.isInteger(preferredLevel) && preferredLevel >= min && preferredLevel <= max
-        ? preferredLevel
-        : defaultLevel)
-    const levels = []
-    for (let level = min; level <= max; level += 1) {
-        levels.push([String(level), `LV${level}`])
+    const active = activeDamageSkillMove(categories)
+    const wrapper = document.createElement("div")
+    wrapper.className = "damage-skill-cascade"
+    const movePane = document.createElement("div")
+    movePane.className = "damage-skill-move-pane"
+    for (const category of categories) {
+        const level = selectedSkillLevel(category)
+        const group = document.createElement("section")
+        group.className = "damage-skill-move-group"
+        group.innerHTML = `<h3>${escapeHtml(nameOf(category))}<span>LV${level}</span></h3>`
+        for (const move of category.moves ?? []) {
+            const button = document.createElement("button")
+            button.type = "button"
+            button.className = [
+                "damage-skill-move-option",
+                active?.category.id === category.id && active?.move.id === move.id ? "active" : "",
+            ].filter(Boolean).join(" ")
+            button.dataset.pickDamageSkillMove = "true"
+            button.dataset.categoryId = category.id
+            button.dataset.moveId = move.id
+            button.innerHTML = `
+                <strong>${escapeHtml(nameOf(move))}</strong>
+                <span>${escapeHtml((move.rows ?? []).length)} 项</span>
+            `
+            group.appendChild(button)
+        }
+        movePane.appendChild(group)
     }
-    fillDamageSkillSelect(els.damageSkillLevel, levels, selectedLevel)
-    syncDamageSkillMultiplierFromSelection()
+
+    const rowPane = document.createElement("div")
+    rowPane.className = "damage-skill-row-pane"
+    if (active) {
+        const level = selectedSkillLevel(active.category)
+        rowPane.innerHTML = `
+            <div class="damage-skill-row-head">
+                <strong>${escapeHtml(nameOf(active.move))}</strong>
+                <span>${escapeHtml(nameOf(active.category))} · LV${level}</span>
+            </div>
+        `
+        const rows = document.createElement("div")
+        rows.className = "damage-skill-choice-list"
+        for (const row of active.move.rows ?? []) {
+            const value = skillRowValue(active.category, active.move, row, level)
+            const selected = selectedDamageSkillRef?.categoryId === active.category.id
+                && selectedDamageSkillRef?.moveId === active.move.id
+                && selectedDamageSkillRef?.rowId === row.id
+            const choice = document.createElement("div")
+            choice.className = ["damage-skill-choice-row", selected ? "active" : ""].filter(Boolean).join(" ")
+            choice.innerHTML = `
+                <strong>${escapeHtml(localizedText(row.label) || row.id)}</strong>
+                <span>${escapeHtml(nameOf(active.move))}</span>
+                <b>${Number.isFinite(value) ? `${escapeHtml(value)}%` : "-"}</b>
+                <button
+                    type="button"
+                    class="damage-skill-select-btn"
+                    data-select-damage-skill="true"
+                    data-category-id="${escapeHtml(active.category.id)}"
+                    data-move-id="${escapeHtml(active.move.id)}"
+                    data-row-id="${escapeHtml(row.id)}"
+                >选取</button>
+            `
+            rows.appendChild(choice)
+        }
+        rowPane.appendChild(rows)
+    }
+
+    wrapper.append(movePane, rowPane)
+    els.damageSkillModalList.appendChild(wrapper)
+}
+
+function openDamageSkillModal() {
+    if (!els.damageSkillModal) {
+        return
+    }
+    activeDamageSkillPickerMoveRef = selectedDamageSkillRef
+        ? {
+            categoryId: selectedDamageSkillRef.categoryId,
+            moveId: selectedDamageSkillRef.moveId,
+        }
+        : activeDamageSkillPickerMoveRef
+    renderDamageSkillModal()
+    els.damageSkillModal.hidden = false
+    document.body.classList.add("modal-open")
+}
+
+function closeDamageSkillModal() {
+    if (!els.damageSkillModal) {
+        return
+    }
+    els.damageSkillModal.hidden = true
+    document.body.classList.remove("modal-open")
+}
+
+function selectDamageSkill(ref) {
+    const resolved = resolveDamageSkillRef(ref)
+    selectedDamageSkillRef = resolved?.ref ?? null
+    renderDamageSkillSummary()
 }
 
 function syncDamageDefenseToPreset() {
@@ -770,12 +1019,42 @@ function applyStoredDamageConfig(config = {}) {
 
     const target = config.target ?? {}
     const damageElement = currentDamageElement()
+    const selectedEvent = (config.events ?? []).find(event => event.id === config.selectedEventId)
+        ?? (config.events ?? [])[0]
+        ?? { kind: "direct" }
+    if (els.agentLevelInput) {
+        els.agentLevelInput.value = config.agentLevel ?? 60
+    }
     els.damageTargetPreset.value = target.presetId ?? DEFAULT_DAMAGE_TARGET_PRESET_ID
     els.damageTargetDefense.value = target.defense ?? damageTargetPresetById(els.damageTargetPreset.value)?.defense ?? 953
     els.damageLevelCoefficient.value = target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT
-    els.damageSkillMultiplier.value = config.skillMultiplier ?? 100
-    els.damageCritMode.value = config.critMode ?? "expected"
-    populateDamageSkillControls(config.skillRef ?? null)
+    if (els.damageEventType) {
+        els.damageEventType.value = ["direct", "anomaly", "disorder"].includes(selectedEvent.kind) ? selectedEvent.kind : "direct"
+    }
+    els.damageSkillMultiplier.value = selectedEvent.skillMultiplier ?? config.skillMultiplier ?? 100
+    els.damageCritMode.value = selectedEvent.critMode ?? config.critMode ?? "expected"
+    if (els.damageAnomalyEffect) {
+        els.damageAnomalyEffect.value = selectedEvent.anomalyEffect ?? "assault"
+        const defaultProcCount = els.damageAnomalyEffect.selectedOptions?.[0]?.dataset.defaultProcCount
+        els.damageAnomalyProcCount.value = selectedEvent.procCount ?? defaultProcCount ?? 1
+    }
+    if (els.damageDisorderEffect) {
+        els.damageDisorderEffect.value = selectedEvent.previousAnomalyEffect ?? "burn"
+        els.damageDisorderElapsed.value = selectedEvent.elapsedSeconds ?? 0
+        els.damageDisorderDuration.value = selectedEvent.durationSeconds ?? 10
+    }
+    const storedSkillRef = selectedEvent.skillRef ?? config.skillRef ?? null
+    const skillCatalog = agentSkillCatalog()
+    damageSkillLevelsByCategory = normalizeSkillLevelsByCategory(skillCatalog, config.skillLevelsByCategory ?? {})
+    if (storedSkillRef?.categoryId && config.skillLevelsByCategory?.[storedSkillRef.categoryId] === undefined) {
+        const category = damageSkillCategories(skillCatalog).find(item => item.id === storedSkillRef.categoryId)
+        if (category) {
+            damageSkillLevelsByCategory[category.id] = clampSkillLevel(category, storedSkillRef.level)
+        }
+    }
+    selectedDamageSkillRef = storedSkillRef
+    renderAgentSkillLevelControls()
+    renderDamageEventControls()
 
     if (target.resistanceByElement && typeof target.resistanceByElement === "object") {
         for (const [element, value] of Object.entries(target.resistanceByElement)) {
@@ -1017,11 +1296,11 @@ function readJsonStorage(key, fallback) {
 }
 
 function loadHomeSelection() {
-    return combatUi.loadHomeSelection()
+    return SharedCombat.loadCurrentOwnerSelection()
 }
 
 function saveHomeSelection(selection) {
-    combatUi.saveHomeSelection(selection)
+    SharedCombat.saveCurrentOwnerSelection(selection)
 }
 
 function legacyDiscSelectionsForAgent(agentId) {
@@ -1037,6 +1316,35 @@ function validAgentId(agentId) {
 
 function validWEngineId(wEngineId) {
     return getWEngine(wEngineId)?.id ?? meta?.wEngines?.[0]?.id ?? ""
+}
+
+function selectedWEngineModificationLevel(wEngine = getWEngine(els.wEngineSelect.value)) {
+    return SharedCombat.clampWEngineModificationLevel(els.wEngineModificationSelect?.value, wEngine)
+}
+
+function populateWEngineModificationSelect(wEngine, preferredLevel = 1) {
+    if (!els.wEngineModificationSelect) {
+        return 1
+    }
+
+    const selectedLevel = SharedCombat.clampWEngineModificationLevel(preferredLevel, wEngine)
+    const modification = wEngine?.modification ?? {}
+    const min = Number.isInteger(Number(modification.minLevel)) ? Number(modification.minLevel) : 1
+    const max = Number.isInteger(Number(modification.maxLevel)) ? Number(modification.maxLevel) : 5
+    els.wEngineModificationSelect.innerHTML = ""
+    for (let level = min; level <= max; level += 1) {
+        const option = document.createElement("option")
+        option.value = String(level)
+        option.textContent = `${level}级`
+        option.selected = level === selectedLevel
+        els.wEngineModificationSelect.appendChild(option)
+    }
+    return selectedLevel
+}
+
+function currentWEngineWithModification() {
+    const wEngine = getWEngine(els.wEngineSelect.value)
+    return SharedCombat.materializeWEngineForModificationLevel(wEngine, selectedWEngineModificationLevel(wEngine))
 }
 
 function isValidCoreSkillLevel(agent, level) {
@@ -1066,6 +1374,10 @@ function normalizeCustomBuffStat(stat) {
 }
 
 function resolveCustomBuffStatOption(stat) {
+    if (stat === "enemyDefIgnore") {
+        return "enemyDefReduction"
+    }
+
     if (stat === "currentResIgnore") {
         return RES_IGNORE_STAT_BY_ELEMENT[currentDamageElement()] ?? "physicalResIgnore"
     }
@@ -1084,6 +1396,138 @@ function resolveCustomBuffStatLabel(stat, fallbackLabel) {
     }
 
     return fallbackLabel
+}
+
+function damageModifierOptionText(effect = {}) {
+    const appliesTo = effect.appliesTo ?? {}
+    const scopes = [
+        ...(appliesTo.damageKinds ?? []).map(kind => ({ anomaly: "异常", disorder: "紊乱", direct: "直伤" }[kind] ?? kind)),
+        ...(appliesTo.anomalyEffects ?? []).map(item => ANOMALY_EFFECT_LABELS[item] ?? item),
+        ...(appliesTo.elements ?? []).map(item => damageElementShortLabel(item)),
+        ...(appliesTo.skillTargets ?? []).map(item => skillTargetLabel(item)),
+    ]
+    return `${DAMAGE_MODIFIER_KIND_LABELS[effect.kind] ?? effect.kind}${scopes.length ? `（${scopes.join(" / ")}）` : ""}`
+}
+
+function agentSkillOptions() {
+    return (meta?.agentSkills ?? []).map(skill => [skill.id, nameOf(skill)])
+}
+
+function agentSkillById(agentSkillId) {
+    return (meta?.agentSkills ?? []).find(skill => skill.id === agentSkillId) ?? null
+}
+
+function skillTargetLabel(target = {}) {
+    const skillSet = agentSkillById(target.agentSkillId)
+    const agentName = skillSet?.agentId ? nameOf(getAgent(skillSet.agentId)) : ""
+    const skillSetName = nameOf(skillSet)
+    const agentLabel = String((agentName && agentName !== "-" ? agentName : "")
+        || (skillSetName && skillSetName !== "-" ? skillSetName : "")
+        || target.agentSkillId
+        || "")
+        .replace(/技能倍率$/, "")
+        .trim()
+    const category = (skillSet?.categories ?? []).find(item => item.id === target.categoryId)
+    const move = (category?.moves ?? []).find(item => item.id === target.moveId)
+    const row = damageSkillRowsWithGeneratedTotals(category ?? {}, move ?? {}).find(item => item.id === target.rowId)
+    return [
+        agentLabel,
+        nameOf(move) || target.moveId,
+        target.rowId ? localizedText(row?.label) || target.rowId : "",
+    ].filter(Boolean).join("/")
+}
+
+function customSkillTargetFields(target = {}) {
+    const skills = agentSkillOptions()
+    const selectedSkillId = target.agentSkillId || agentSkillCatalog()?.id || skills[0]?.[0] || ""
+    const skillSet = agentSkillById(selectedSkillId)
+    const categories = damageSkillCategories(skillSet)
+    const selectedCategoryId = target.categoryId || categories[0]?.id || ""
+    const category = categories.find(item => item.id === selectedCategoryId) ?? categories[0] ?? null
+    const moves = category?.moves ?? []
+    const selectedMoveId = target.moveId || moves[0]?.id || ""
+    const move = moves.find(item => item.id === selectedMoveId) ?? moves[0] ?? null
+    const rowOptions = [
+        ["", "整招式"],
+        ...damageSkillRowsWithGeneratedTotals(category ?? {}, move ?? {}).map(row => [row.id, localizedText(row.label) || row.id]),
+    ]
+    return { skills, selectedSkillId, categories, selectedCategoryId, moves, selectedMoveId, rowOptions }
+}
+
+function populateCustomSkillTargetSelect(select, options, selected = "") {
+    select.innerHTML = ""
+    for (const [value, label] of options) {
+        const option = document.createElement("option")
+        option.value = value
+        option.textContent = label
+        option.selected = value === selected
+        select.appendChild(option)
+    }
+}
+
+function syncCustomSkillTargetFields(targetWrap, target = null) {
+    if (!targetWrap) {
+        return
+    }
+    const current = target ?? {
+        agentSkillId: targetWrap.querySelector("[data-custom-skill-agent]")?.value ?? "",
+        categoryId: targetWrap.querySelector("[data-custom-skill-category]")?.value ?? "",
+        moveId: targetWrap.querySelector("[data-custom-skill-move]")?.value ?? "",
+        rowId: targetWrap.querySelector("[data-custom-skill-row-id]")?.value ?? "",
+    }
+    const fields = customSkillTargetFields(current)
+    populateCustomSkillTargetSelect(targetWrap.querySelector("[data-custom-skill-agent]"), fields.skills, fields.selectedSkillId)
+    populateCustomSkillTargetSelect(targetWrap.querySelector("[data-custom-skill-category]"), fields.categories.map(item => [item.id, nameOf(item)]), fields.selectedCategoryId)
+    populateCustomSkillTargetSelect(targetWrap.querySelector("[data-custom-skill-move]"), fields.moves.map(item => [item.id, nameOf(item)]), fields.selectedMoveId)
+    populateCustomSkillTargetSelect(targetWrap.querySelector("[data-custom-skill-row-id]"), fields.rowOptions, current.rowId ?? "")
+}
+
+function customSkillTargetRow(target = {}, index = 0) {
+    const targetField = document.createElement("div")
+    targetField.className = "custom-skill-target-row"
+    targetField.dataset.customSkillTarget = String(index)
+    targetField.innerHTML = `
+        <label class="field">
+          <span>技能表</span>
+          <select data-custom-skill-agent></select>
+        </label>
+        <label class="field">
+          <span>技能大类</span>
+          <select data-custom-skill-category></select>
+        </label>
+        <label class="field">
+          <span>招式</span>
+          <select data-custom-skill-move></select>
+        </label>
+        <label class="field">
+          <span>倍率行</span>
+          <select data-custom-skill-row-id></select>
+        </label>
+        <button type="button" class="compact-btn" data-remove-custom-skill-target="${index}">删除目标</button>
+    `
+    syncCustomSkillTargetFields(targetField, target)
+    return targetField
+}
+
+function readCustomSkillTargets(row) {
+    return [...row.querySelectorAll("[data-custom-skill-target]")]
+        .map(targetRow => {
+            const target = {
+                agentSkillId: targetRow.querySelector("[data-custom-skill-agent]")?.value ?? "",
+                categoryId: targetRow.querySelector("[data-custom-skill-category]")?.value ?? "",
+                moveId: targetRow.querySelector("[data-custom-skill-move]")?.value ?? "",
+            }
+            const rowId = targetRow.querySelector("[data-custom-skill-row-id]")?.value ?? ""
+            if (rowId) {
+                target.rowId = rowId
+            }
+            return target
+        })
+        .filter(target => target.agentSkillId && target.categoryId && target.moveId)
+}
+
+function normalizeCustomBuffEffect(effect) {
+    return SharedCombat.normalizeCustomBuffEffect(effect)
 }
 
 function sanitizeAddedCombatBuffs(addedBuffs = []) {
@@ -1126,12 +1570,12 @@ function manualDiscIdsFromSavedConfig(agentId) {
 
 function loadoutIdForAgent(agentId) {
     const id = configForAgent(agentId).selectedLoadoutId ?? ""
-    return driveDiscLoadoutsForAgent(agentId).some(loadout => loadout.id === id) ? id : ""
+    return driveDiscLoadoutsForAgent(agentId).some(loadout => loadout.id === id && loadoutIsComplete(loadout)) ? id : ""
 }
 
 function loadoutDiscIdsForAgent(agentId, loadoutId = loadoutIdForAgent(agentId)) {
     const loadout = driveDiscLoadoutsForAgent(agentId).find(item => item.id === loadoutId)
-    return loadout ? sanitizeDiscIdsBySlot(loadout.driveDiscIdsBySlot) : {}
+    return loadout && loadoutIsComplete(loadout) ? sanitizeDiscIdsBySlot(loadout.driveDiscIdsBySlot) : {}
 }
 
 function selectedDiscIdsFromSavedConfig(agentId) {
@@ -1154,7 +1598,7 @@ function saveCurrentHomeSelection({ mode = currentHomeDiscMode(), manualDriveDis
 
     const agent = getAgent(agentId)
     const selection = loadHomeSelection()
-    const byAgent = { ...selection.byAgent }
+    const byAgent = { ...(selection.byAgent ?? {}) }
     const previousConfig = byAgent[agentId] ?? {}
     const driveDiscMode = normalizeHomeDiscMode(mode)
     const nextManualDriveDiscIdsBySlot = manualDriveDiscIdsBySlot === undefined
@@ -1175,7 +1619,9 @@ function saveCurrentHomeSelection({ mode = currentHomeDiscMode(), manualDriveDis
     byAgent[agentId] = {
         ...previousConfig,
         wEngineId: validWEngineId(els.wEngineSelect.value),
+        wEngineModificationLevel: selectedWEngineModificationLevel(getWEngine(els.wEngineSelect.value)),
         coreSkillLevel: validCoreSkillLevel(agent, els.coreSkillSelect.value),
+        cinemaLevel: selectedCinemaLevel(),
         driveDiscMode,
         manualDriveDiscIdsBySlot: nextManualDriveDiscIdsBySlot,
         selectedLoadoutId: nextSelectedLoadoutId,
@@ -1188,7 +1634,6 @@ function saveCurrentHomeSelection({ mode = currentHomeDiscMode(), manualDriveDis
     }
 
     saveHomeSelection({
-        version: 1,
         currentAgentId: agentId,
         byAgent,
     })
@@ -1220,6 +1665,18 @@ function driveDiscLoadoutsForAgent(agentId) {
         )
 }
 
+function loadoutMissingSlots(loadout) {
+    return [1, 2, 3, 4, 5, 6].filter(slot => {
+        const id = loadout?.driveDiscIdsBySlot?.[String(slot)]
+        const disc = id ? driveDiscById(id) : null
+        return !disc || Number(disc.partition) !== slot
+    })
+}
+
+function loadoutIsComplete(loadout) {
+    return loadoutMissingSlots(loadout).length === 0
+}
+
 function setHomeDiscMode(mode) {
     const useLoadout = mode === "loadout"
     els.manualDiscModeBtn?.classList.toggle("active", !useLoadout)
@@ -1248,18 +1705,23 @@ function renderHomeLoadoutSelect(agentId) {
     els.homeLoadoutSelect.appendChild(empty)
 
     for (const loadout of loadouts) {
+        const missingSlots = loadoutMissingSlots(loadout)
         const option = document.createElement("option")
         option.value = loadout.id
-        option.textContent = `${loadout.name}${Number.isFinite(Number(loadout.score)) ? ` · ${Number(loadout.score).toFixed(0)}` : ""}`
+        option.textContent = `${loadout.name}${Number.isFinite(Number(loadout.score)) ? ` · ${Number(loadout.score).toFixed(0)}` : ""}${missingSlots.length ? ` · 缺 ${missingSlots.join("、")} 号位` : ""}`
+        option.disabled = missingSlots.length > 0
         option.selected = loadout.id === selectedLoadoutId
         els.homeLoadoutSelect.appendChild(option)
     }
 
-    els.homeLoadoutSelect.disabled = loadouts.length === 0
+    els.homeLoadoutSelect.disabled = loadouts.every(loadout => !loadoutIsComplete(loadout))
 }
 
 async function switchHomeDiscMode(mode) {
     const nextMode = normalizeHomeDiscMode(mode)
+    if (nextMode === "loadout" && !loadoutIdForAgent(validAgentId(els.agentSelect.value))) {
+        throw new Error("当前角色没有可应用的完整套装，请先在驱动盘页修复缺失槽位。")
+    }
     setHomeDiscMode(nextMode)
     saveCurrentHomeSelection({ mode: nextMode })
     loadEquippedDriveDiscsForSelectedAgent()
@@ -1293,7 +1755,7 @@ function saveCurrentAddedCombatBuffs(addedBuffs) {
     }
 
     const selection = loadHomeSelection()
-    const byAgent = { ...selection.byAgent }
+    const byAgent = { ...(selection.byAgent ?? {}) }
     const previousConfig = byAgent[agentId] ?? {}
     const driveDiscMode = normalizeHomeDiscMode(previousConfig.driveDiscMode)
     const manualDriveDiscIdsBySlot = manualDiscIdsFromSavedConfig(agentId)
@@ -1301,6 +1763,7 @@ function saveCurrentAddedCombatBuffs(addedBuffs) {
     byAgent[agentId] = {
         ...previousConfig,
         wEngineId: validWEngineId(els.wEngineSelect.value),
+        wEngineModificationLevel: selectedWEngineModificationLevel(getWEngine(els.wEngineSelect.value)),
         coreSkillLevel: validCoreSkillLevel(getAgent(agentId), els.coreSkillSelect.value),
         driveDiscMode,
         manualDriveDiscIdsBySlot,
@@ -1318,7 +1781,6 @@ function saveCurrentAddedCombatBuffs(addedBuffs) {
     }
 
     saveHomeSelection({
-        version: 1,
         currentAgentId: agentId,
         byAgent,
     })
@@ -1340,6 +1802,75 @@ function updateAddedCombatBuffRuntime(buffKey, updater) {
         }
     })
     saveCurrentAddedCombatBuffs(next)
+}
+
+function updateAddedCombatBuffModificationLevel(buffKey, value) {
+    const next = currentAddedCombatBuffs().map(item => {
+        if (addedCombatBuffKey(item) !== buffKey || item.sourceKind !== "wEngineTeam") {
+            return item
+        }
+
+        return {
+            ...item,
+            wEngineModificationLevel: SharedCombat.clampWEngineModificationLevel(
+                value,
+                rawWEngineForTeamBuffKey(item.id) ?? {},
+            ),
+        }
+    })
+    saveCurrentAddedCombatBuffs(next)
+}
+
+function catalogCombatBuffKey(item) {
+    return `catalog:${item.id}`
+}
+
+function catalogCombatBuffIdFromKey(buffKey) {
+    return String(buffKey ?? "").startsWith("catalog:")
+        ? String(buffKey).slice("catalog:".length)
+        : ""
+}
+
+function catalogCombatBuffRuntimes() {
+    return configForAgent(validAgentId(els.agentSelect.value))?.combat?.catalogBuffRuntimes ?? {}
+}
+
+function catalogCombatBuffRuntimeItem(buff) {
+    return {
+        id: buff.id,
+        sourceKind: "catalogBuff",
+        runtime: catalogCombatBuffRuntimes()[buff.id] ?? null,
+    }
+}
+
+function updateCatalogCombatBuffRuntime(buffKey, updater) {
+    const buffId = catalogCombatBuffIdFromKey(buffKey)
+    const buff = (meta?.combatBuffs ?? []).find(item => item.id === buffId)
+    const agentId = validAgentId(els.agentSelect.value)
+    if (!buff || !agentId) {
+        return
+    }
+
+    const selection = loadHomeSelection()
+    const byAgent = { ...(selection.byAgent ?? {}) }
+    const previousConfig = byAgent[agentId] ?? {}
+    const combat = previousConfig.combat ?? {}
+    const runtime = runtimeForBuff({ runtime: combat.catalogBuffRuntimes?.[buffId] ?? null }, buff)
+    updater(runtime)
+    byAgent[agentId] = {
+        ...previousConfig,
+        combat: {
+            ...combat,
+            catalogBuffRuntimes: {
+                ...(combat.catalogBuffRuntimes ?? {}),
+                [buffId]: runtime,
+            },
+        },
+    }
+    saveHomeSelection({
+        currentAgentId: agentId,
+        byAgent,
+    })
 }
 
 function addedCombatBuffByKey(buffKey) {
@@ -1784,8 +2315,8 @@ function renderWEngineEffect(wEngine) {
     const requirement = localizedText(effect.requirement?.label)
         || (effect.requirement?.specialty ? `对于【${enumLabel("specialty", effect.requirement.specialty)}】角色，能够触发以下效果` : "")
     const description = localizedText(effect.description)
-    const selfStats = storedEffectStatText(effectStats(wEngineEffectSelfBuff(wEngine)))
-    const teamStats = storedEffectStatText(effectStats(wEngineEffectTeamBuff(wEngine)))
+    const selfStats = storedEffectRulesText(wEngineEffectSelfBuff(wEngine))
+    const teamStats = storedEffectRulesText(wEngineEffectTeamBuff(wEngine))
 
     const head = document.createElement("div")
     head.className = "weapon-effect-head"
@@ -1845,6 +2376,29 @@ function runtimeForBuff(item, buff) {
 
 function storedEffectRulesText(effect, runtime = defaultRuntimeForBuff(effect)) {
     return combatUi.storedEffectRulesText(effect, runtime)
+}
+
+function storedBuffModifierTexts(effect) {
+    return combatUi.storedBuffModifierTexts(effect)
+}
+
+function setCombatStatLines(container, lines = []) {
+    container.textContent = ""
+    for (const line of lines.filter(Boolean)) {
+        const item = document.createElement("span")
+        item.textContent = line
+        container.appendChild(item)
+    }
+}
+
+function renderBuffEffectLines(container, buff, runtime = defaultRuntimeForBuff(buff), options = {}) {
+    const normalText = storedEffectRulesText(buff, runtime) || options.fallbackText || ""
+    const modifierTexts = storedBuffModifierTexts(buff)
+    const lines = [
+        normalText ? `${options.normalPrefix ?? ""}${normalText}` : "",
+        ...modifierTexts,
+    ].filter(Boolean)
+    setCombatStatLines(container, lines.length ? lines : [options.emptyText ?? "-"])
 }
 
 function storedEffectRuleText(rule, runtime, effect) {
@@ -1932,6 +2486,51 @@ function wEngineSelfBuffKey(wEngine) {
 
 function wEngineTeamBuffKey(wEngine) {
     return `wEngine:${wEngine.id}.team`
+}
+
+function wEngineIdFromTeamBuffKey(key) {
+    const match = String(key ?? "").match(/^wEngine:(.+)\.team$/)
+    return match?.[1] ?? ""
+}
+
+function rawWEngineForTeamBuffKey(key) {
+    const wEngineId = wEngineIdFromTeamBuffKey(key)
+    return meta?.wEngines?.find(item => item.id === wEngineId) ?? null
+}
+
+function wEngineTeamModificationLevelForItem(item) {
+    return SharedCombat.clampWEngineModificationLevel(
+        item?.wEngineModificationLevel,
+        rawWEngineForTeamBuffKey(item?.id) ?? {},
+    )
+}
+
+function wEngineTeamBuffCandidateFromWEngine(wEngine, modificationLevel = 1) {
+    if (!wEngine) {
+        return null
+    }
+    const materializedWEngine = SharedCombat.materializeWEngineForModificationLevel(wEngine, modificationLevel)
+    const effect = wEngineEffectData(materializedWEngine)
+    const buff = wEngineEffectTeamBuff(materializedWEngine)
+    if (!buff || buff.scope !== "inCombat") {
+        return null
+    }
+
+    return {
+        id: wEngineTeamBuffKey(materializedWEngine),
+        sourceType: "wEngineTeam",
+        sourceCategory: "wEngine",
+        sourceKind: "wEngineTeam",
+        wEngineModificationLevel: materializedWEngine.selectedModificationLevel ?? 1,
+        ownerName: materializedWEngine.name,
+        name: effect?.name ?? buff.name ?? materializedWEngine.name,
+        description: effect?.description ?? buff.description ?? buff.conditionLabel,
+        conditionLabel: buff.condition ?? effect?.requirement?.label,
+        stats: effectStats(buff),
+        effects: buff.effects ?? null,
+        buffModifiers: buff.buffModifiers ?? null,
+        coverage: buff.coverage ?? null,
+    }
 }
 
 function legacyDriveDiscFourPieceBuff(fourPiece) {
@@ -2024,6 +2623,7 @@ function agentCombatBuffs() {
     }
 
     const combatBuffs = agent?.combatBuffs ?? {}
+    const unlockedCinemaLevel = selectedCinemaLevel()
     const fixedBuffs = [
         ["corePassive", combatBuffs.corePassive],
         ["additionalAbility", combatBuffs.additionalAbility],
@@ -2036,20 +2636,28 @@ function agentCombatBuffs() {
                 zhCN: labels[key] ?? key,
                 en: labels[key] ?? key,
             },
+            description: buff.description ?? null,
             conditionLabel: localizedText(buff.conditionLabel) || buff.condition,
             stats: effectStats(buff),
             effects: buff.effects ?? null,
             coverage: buff.coverage ?? null,
         }))
     const cinemaBuffs = (combatBuffs.cinemaBuffs ?? [])
-        .filter(buff => buff?.scope === "inCombat")
+        .filter(buff => {
+            const level = Number(buff?.cinemaLevel)
+            return buff?.scope === "inCombat"
+                && Number.isInteger(level)
+                && level >= 1
+                && level <= unlockedCinemaLevel
+        })
         .map(buff => ({
             id: `agent:${agent.id}.cinema.${buff.cinemaLevel}`,
             sourceType: "self",
             sourceKind: "cinema",
             defaultChecked: buff.defaultChecked ?? false,
             name: buff.name ?? cinemaBuffName(buff),
-            conditionLabel: localizedText(buff.conditionLabel) || localizedText(buff.description) || buff.condition,
+            description: buff.description ?? null,
+            conditionLabel: localizedText(buff.conditionLabel) || buff.condition,
             stats: effectStats(buff),
             effects: buff.effects ?? null,
             coverage: buff.coverage ?? null,
@@ -2058,7 +2666,7 @@ function agentCombatBuffs() {
 }
 
 function wEngineEquippedBuffs() {
-    const wEngine = getWEngine(els.wEngineSelect.value)
+    const wEngine = currentWEngineWithModification()
     const effect = wEngineEffectData(wEngine)
     if (!wEngine) {
         return []
@@ -2085,6 +2693,7 @@ function wEngineEquippedBuffs() {
             id: item.id,
             sourceType: item.sourceType,
             name: item.name,
+            description: effect?.description ?? item.buff.description ?? null,
             conditionLabel: item.conditionLabel,
             stats: effectStats(item.buff),
             effects: item.buff.effects ?? null,
@@ -2125,9 +2734,11 @@ function ownDriveDisc4pcBuffs() {
             id: item.id,
             sourceType: item.sourceType,
             name: item.name,
+            description: item.effectText ?? item.buff.description ?? null,
             conditionLabel: item.buff.condition,
             stats: effectStats(item.buff),
             effects: item.buff.effects ?? null,
+            buffModifiers: item.buff.buffModifiers ?? null,
             coverage: item.buff.coverage ?? null,
             effectText: item.effectText,
         }))
@@ -2153,6 +2764,7 @@ function teammateBuffCandidates() {
             conditionLabel: buff.conditionLabel,
             stats: buff.stats ?? [],
             effects: buff.effects ?? null,
+            buffModifiers: buff.buffModifiers ?? null,
             coverage: buff.coverage ?? null,
         })))
 }
@@ -2184,6 +2796,7 @@ function teammateDriveDisc4pcCandidates() {
                 conditionLabel: teamBuff.condition,
                 stats: effectStats(teamBuff),
                 effects: teamBuff.effects ?? null,
+                buffModifiers: teamBuff.buffModifiers ?? null,
                 coverage: teamBuff.coverage ?? null,
             }
         })
@@ -2192,27 +2805,7 @@ function teammateDriveDisc4pcCandidates() {
 
 function wEngineTeamBuffCandidates() {
     return (meta?.wEngines ?? [])
-        .map(wEngine => {
-            const effect = wEngineEffectData(wEngine)
-            const buff = wEngineEffectTeamBuff(wEngine)
-            if (!buff || buff.scope !== "inCombat") {
-                return null
-            }
-
-            return {
-                id: wEngineTeamBuffKey(wEngine),
-                sourceType: "wEngineTeam",
-                sourceCategory: "wEngine",
-                sourceKind: "wEngineTeam",
-                ownerName: wEngine.name,
-                name: effect?.name ?? buff.name ?? wEngine.name,
-                description: effect?.description ?? buff.description ?? buff.conditionLabel,
-                conditionLabel: buff.condition ?? effect?.requirement?.label,
-                stats: effectStats(buff),
-                effects: buff.effects ?? null,
-                coverage: buff.coverage ?? null,
-            }
-        })
+        .map(wEngine => wEngineTeamBuffCandidateFromWEngine(wEngine, 1))
         .filter(Boolean)
 }
 
@@ -2252,12 +2845,19 @@ function resolveAddedCombatBuff(item) {
                 zhCN: "自定义",
                 en: "Custom",
             },
-            description: storedEffectStatText(item.stats),
+            description: storedEffectRulesText(item) || storedEffectStatText(item.stats),
         }
     }
 
     if (item?.sourceKind === "teammateDriveDisc4pc") {
         return teammateDriveDisc4pcCandidates().find(candidate => candidate.setId === item.setId) ?? item
+    }
+
+    if (item?.sourceKind === "wEngineTeam") {
+        return wEngineTeamBuffCandidateFromWEngine(
+            rawWEngineForTeamBuffKey(item.id),
+            wEngineTeamModificationLevelForItem(item),
+        ) ?? item
     }
 
     return allCombatBuffCandidates().find(candidate =>
@@ -2308,26 +2908,102 @@ function renderCombatCheckboxList(container, buffs, checkedIds) {
     }
 
     for (const buff of buffs) {
+        const checked = checkedIds.has(buff.id)
+            || (isDefaultCheckedCombatBuff(buff) && !manuallyUncheckedDefaultCombatBuffIds.has(buff.id))
         const row = document.createElement("label")
-        row.className = "combat-check-row"
+        row.className = checked ? "combat-check-row active" : "combat-check-row"
 
         const input = document.createElement("input")
         input.type = "checkbox"
         input.dataset.combatBuffId = buff.id
         input.dataset.combatBuffSourceType = buff.sourceType ?? ""
         input.dataset.combatBuffDefaultChecked = isDefaultCheckedCombatBuff(buff) ? "true" : "false"
-        input.checked = checkedIds.has(buff.id)
-            || (isDefaultCheckedCombatBuff(buff) && !manuallyUncheckedDefaultCombatBuffIds.has(buff.id))
+        input.checked = checked
 
         const copy = document.createElement("span")
         copy.className = "combat-check-copy"
         const title = document.createElement("strong")
         title.textContent = nameOf(buff)
-        const detail = document.createElement("span")
-        const stats = storedEffectRulesText(buff)
-        detail.textContent = [buff.conditionLabel, stats].filter(Boolean).join(" · ") || "勾选后计入局内"
-        copy.append(title, detail)
+        const description = document.createElement("span")
+        description.className = "combat-check-description"
+        description.textContent = localizedText(buff.description)
+            || localizedText(buff.effectText)
+            || localizedText(buff.conditionLabel)
+            || buff.condition
+            || "勾选后计入局内"
+        const stats = document.createElement("span")
+        stats.className = "combat-check-stats combat-buff-effect-lines"
+        renderBuffEffectLines(stats, buff)
+        copy.append(title, description, stats)
         row.append(input, copy)
+        container.appendChild(row)
+    }
+}
+
+function catalogBuffMetaLine(buff) {
+    if (buff.sourceType === "boss") {
+        return [
+            localizedText(buff.bossSource) || localizedText(buff.sourceLabel),
+            localizedText(buff.sourcePeriod),
+        ].filter(Boolean).join(" · ")
+    }
+
+    return [
+        localizedText(buff.source) || localizedText(buff.sourceLabel),
+        localizedText(buff.sourcePeriod),
+    ].filter(Boolean).join(" · ")
+}
+
+function renderCatalogCombatBuffCards(container, buffs, checkedIds) {
+    container.innerHTML = ""
+    if (!buffs.length) {
+        const empty = document.createElement("div")
+        empty.className = "list-item empty"
+        empty.textContent = "-"
+        container.appendChild(empty)
+        return
+    }
+
+    for (const buff of buffs) {
+        const checked = checkedIds.has(buff.id)
+        const item = catalogCombatBuffRuntimeItem(buff)
+        const runtime = runtimeForBuff(item, buff)
+        const row = document.createElement("article")
+        row.className = checked ? "combat-added-card combat-select-card active" : "combat-added-card combat-select-card"
+        row.dataset.buffKey = catalogCombatBuffKey(buff)
+
+        const toggle = document.createElement("label")
+        toggle.className = "combat-select-toggle"
+        const input = document.createElement("input")
+        input.type = "checkbox"
+        input.dataset.combatBuffId = buff.id
+        input.dataset.combatBuffSourceType = buff.sourceType ?? ""
+        input.dataset.combatBuffDefaultChecked = isDefaultCheckedCombatBuff(buff) ? "true" : "false"
+        input.checked = checked
+
+        const title = document.createElement("strong")
+        title.textContent = nameOf(buff)
+        toggle.append(input, title)
+        row.appendChild(toggle)
+
+        const metaLine = catalogBuffMetaLine(buff)
+        if (metaLine) {
+            const meta = document.createElement("span")
+            meta.textContent = metaLine
+            row.appendChild(meta)
+        }
+
+        const description = document.createElement("p")
+        description.textContent = localizedText(buff.description) || localizedText(buff.conditionLabel) || "勾选后计入局内计算"
+
+        const stats = document.createElement("span")
+        stats.className = "combat-added-stats combat-buff-effect-lines"
+        renderBuffEffectLines(stats, buff, runtime)
+
+        row.append(description, stats)
+        if (checked) {
+            renderBuffRuntimeControls(row, item, buff, runtime)
+        }
         container.appendChild(row)
     }
 }
@@ -2370,8 +3046,8 @@ function renderTeammateCombatBuffGroups(container, groups, checkedIds) {
             description.textContent = localizedText(buff.description) || localizedText(buff.conditionLabel) || "勾选后计入局内"
 
             const stats = document.createElement("span")
-            stats.className = "combat-check-stats"
-            stats.textContent = `实际效果：${storedEffectRulesText(buff) || "-"}`
+            stats.className = "combat-check-stats combat-buff-effect-lines"
+            renderBuffEffectLines(stats, buff, defaultRuntimeForBuff(buff), { normalPrefix: "实际效果：" })
 
             copy.append(source, description, stats)
             row.append(input, copy)
@@ -2426,8 +3102,8 @@ function renderAddedCombatBuffs() {
         description.textContent = localizedText(buff.description) || localizedText(buff.conditionLabel) || "已添加到局内计算"
 
         const stats = document.createElement("span")
-        stats.className = "combat-added-stats"
-        stats.textContent = storedEffectRulesText(buff, runtime) || "-"
+        stats.className = "combat-added-stats combat-buff-effect-lines"
+        renderBuffEffectLines(stats, buff, runtime)
 
         const remove = document.createElement("button")
         remove.type = "button"
@@ -2445,10 +3121,43 @@ function renderAddedCombatBuffs() {
             row.appendChild(metaLine)
         }
         row.append(description, stats)
+        renderAddedWEngineModificationControl(row, item)
         renderBuffRuntimeControls(row, item, buff, runtime)
         row.appendChild(remove)
         els.addedCombatBuffs.appendChild(row)
     }
+}
+
+function renderAddedWEngineModificationControl(row, item) {
+    if (item?.sourceKind !== "wEngineTeam") {
+        return
+    }
+
+    const rawWEngine = rawWEngineForTeamBuffKey(item.id)
+    const selectedLevel = wEngineTeamModificationLevelForItem(item)
+    const modification = rawWEngine?.modification ?? {}
+    const min = Number.isInteger(Number(modification.minLevel)) ? Number(modification.minLevel) : 1
+    const max = Number.isInteger(Number(modification.maxLevel)) ? Number(modification.maxLevel) : 5
+    const controls = document.createElement("div")
+    controls.className = "combat-runtime-grid"
+    controls.dataset.buffKey = addedCombatBuffKey(item)
+
+    const field = document.createElement("label")
+    field.className = "field"
+    const label = document.createElement("span")
+    label.textContent = "改装等级"
+    const select = document.createElement("select")
+    select.dataset.wEngineTeamModificationLevel = "true"
+    for (let level = min; level <= max; level += 1) {
+        const option = document.createElement("option")
+        option.value = String(level)
+        option.textContent = `${level}级`
+        option.selected = level === selectedLevel
+        select.appendChild(option)
+    }
+    field.append(label, select)
+    controls.appendChild(field)
+    row.appendChild(controls)
 }
 
 function renderBuffRuntimeControls(row, item, buff, runtime) {
@@ -2458,10 +3167,11 @@ function renderBuffRuntimeControls(row, item, buff, runtime) {
     if (!needsRuntime) {
         return
     }
+    const buffKey = item?.sourceKind === "catalogBuff" ? catalogCombatBuffKey(item) : addedCombatBuffKey(item)
 
     const controls = document.createElement("div")
     controls.className = "combat-runtime-grid"
-    controls.dataset.buffKey = addedCombatBuffKey(item)
+    controls.dataset.buffKey = buffKey
 
     if (hasCoverage) {
         const field = document.createElement("label")
@@ -2568,19 +3278,32 @@ function setRuntimeValue(runtime, field, value) {
 }
 
 function updateRuntimeFieldValue(buffKey, field, value) {
+    if (catalogCombatBuffIdFromKey(buffKey)) {
+        updateCatalogCombatBuffRuntime(buffKey, runtime => setRuntimeValue(runtime, field, value))
+        return
+    }
+
     updateAddedCombatBuffRuntime(buffKey, runtime => setRuntimeValue(runtime, field, value))
 }
 
 function refreshAddedCombatBuffSummary(buffKey) {
-    const item = addedCombatBuffByKey(buffKey)
-    const row = els.addedCombatBuffs.querySelector(`[data-buff-key="${CSS.escape(buffKey)}"]`)
+    const catalogBuffId = catalogCombatBuffIdFromKey(buffKey)
+    const item = catalogBuffId
+        ? catalogCombatBuffRuntimeItem((meta?.combatBuffs ?? []).find(buff => buff.id === catalogBuffId) ?? {})
+        : addedCombatBuffByKey(buffKey)
+    const row = els.combatSection.querySelector(`[data-buff-key="${CSS.escape(buffKey)}"]`)
     const summary = row?.querySelector(".combat-added-stats")
     if (!item || !summary) {
         return
     }
 
-    const buff = resolveAddedCombatBuff(item)
-    summary.textContent = storedEffectRulesText(buff, runtimeForBuff(item, buff)) || "-"
+    const buff = catalogBuffId
+        ? (meta?.combatBuffs ?? []).find(candidate => candidate.id === catalogBuffId)
+        : resolveAddedCombatBuff(item)
+    if (!buff) {
+        return
+    }
+    renderBuffEffectLines(summary, buff, runtimeForBuff(item, buff))
 }
 
 function sourceCategoryLabel(sourceCategory) {
@@ -2625,6 +3348,7 @@ function renderCombatBuffCandidates() {
                 localizedText(candidate.description),
                 localizedText(candidate.conditionLabel),
                 storedEffectRulesText(candidate),
+                ...storedBuffModifierTexts(candidate),
             ].join(" ").toLowerCase()
             return !search || haystack.includes(search)
         })
@@ -2655,12 +3379,14 @@ function renderCombatBuffCandidates() {
         const description = document.createElement("p")
         description.textContent = localizedText(candidate.description) || localizedText(candidate.conditionLabel) || ""
         const stats = document.createElement("span")
-        stats.className = "combat-added-stats"
-        stats.textContent = alreadyAdded
-            ? "已添加"
-            : overTeammateSetLimit
-                ? `队友 4 件套最多 ${TEAMMATE_DRIVE_DISC_LIMIT} 个`
-                : storedEffectRulesText(candidate) || "-"
+        stats.className = "combat-added-stats combat-buff-effect-lines"
+        if (alreadyAdded) {
+            setCombatStatLines(stats, ["已添加"])
+        } else if (overTeammateSetLimit) {
+            setCombatStatLines(stats, [`队友 4 件套最多 ${TEAMMATE_DRIVE_DISC_LIMIT} 个`])
+        } else {
+            renderBuffEffectLines(stats, candidate)
+        }
 
         row.append(title)
         if (shouldShowCombatBuffMetaLine(candidate)) {
@@ -2710,6 +3436,7 @@ function addCombatBuffCandidateByKey(key) {
         sourceCategory: candidate.sourceCategory,
         sourceKind: candidate.sourceKind,
         setId: candidate.setId ?? null,
+        ...(candidate.sourceKind === "wEngineTeam" ? { wEngineModificationLevel: 1 } : {}),
         runtime: defaultRuntimeForBuff(candidate),
     }])
     return true
@@ -2717,18 +3444,35 @@ function addCombatBuffCandidateByKey(key) {
 
 function renderCustomBuffStatRows(rows = [{ optionIndex: 0, value: 0 }]) {
     els.customBuffStatRows.innerHTML = ""
-    const row = rows[0] ?? { optionIndex: 0, value: 0 }
+    const row = rows[0] ?? { targetKind: "default", optionIndex: 0, value: 0 }
+    const targetKind = row.targetKind === "skill" ? "skill" : "default"
+    const options = targetKind === "skill" ? CUSTOM_BUFF_SKILL_STAT_OPTIONS : CUSTOM_BUFF_STAT_OPTIONS
     const item = document.createElement("div")
     item.className = "custom-buff-stat-row"
     item.dataset.index = "0"
 
+    const targetField = document.createElement("label")
+    targetField.className = "field"
+    const targetLabel = document.createElement("span")
+    targetLabel.textContent = "增幅对象"
+    const targetSelect = document.createElement("select")
+    targetSelect.dataset.customTargetKind = "0"
+    ;[["default", "默认"], ["skill", "技能"]].forEach(([value, label]) => {
+        const opt = document.createElement("option")
+        opt.value = value
+        opt.textContent = label
+        opt.selected = targetKind === value
+        targetSelect.appendChild(opt)
+    })
+    targetField.append(targetLabel, targetSelect)
+
     const statField = document.createElement("label")
     statField.className = "field"
     const statLabelEl = document.createElement("span")
-    statLabelEl.textContent = "属性"
+    statLabelEl.textContent = "增幅类型"
     const select = document.createElement("select")
     select.dataset.customStatSelect = "0"
-    CUSTOM_BUFF_STAT_OPTIONS.forEach((option, optionIndex) => {
+    options.forEach((option, optionIndex) => {
         const opt = document.createElement("option")
         opt.value = String(optionIndex)
         opt.textContent = option[1]
@@ -2748,14 +3492,32 @@ function renderCustomBuffStatRows(rows = [{ optionIndex: 0, value: 0 }]) {
     input.dataset.customStatValue = "0"
     valueField.append(valueLabel, input)
 
-    item.append(statField, valueField)
+    item.append(targetField, statField, valueField)
+    if (targetKind === "skill") {
+        const targetList = document.createElement("div")
+        targetList.className = "custom-skill-target"
+        targetList.dataset.customSkillTargets = "0"
+        const targets = row.skillTargets?.length ? row.skillTargets : row.skillTarget ? [row.skillTarget] : [{}]
+        targets.forEach((target, targetIndex) => {
+            targetList.appendChild(customSkillTargetRow(target, targetIndex))
+        })
+        const addTargetBtn = document.createElement("button")
+        addTargetBtn.type = "button"
+        addTargetBtn.className = "compact-btn"
+        addTargetBtn.dataset.addCustomSkillTarget = "0"
+        addTargetBtn.textContent = "添加技能目标"
+        targetList.appendChild(addTargetBtn)
+        item.appendChild(targetList)
+    }
     els.customBuffStatRows.appendChild(item)
 }
 
 function customBuffRowsFromDom() {
     return [...els.customBuffStatRows.querySelectorAll(".custom-buff-stat-row")].map(row => ({
+        targetKind: row.querySelector("[data-custom-target-kind]")?.value === "skill" ? "skill" : "default",
         optionIndex: Number(row.querySelector("[data-custom-stat-select]")?.value ?? 0),
         value: Number(row.querySelector("[data-custom-stat-value]")?.value ?? 0),
+        skillTargets: row.querySelector("[data-custom-skill-target]") ? readCustomSkillTargets(row) : [],
     }))
 }
 
@@ -2763,7 +3525,7 @@ function customBuffStatsFromDom() {
     return customBuffRowsFromDom()
         .map((row, index) => {
             const option = CUSTOM_BUFF_STAT_OPTIONS[row.optionIndex]
-            if (!option) {
+            if (!option || row.targetKind === "skill" || option[2] === "eventModifier") {
                 return null
             }
 
@@ -2777,6 +3539,30 @@ function customBuffStatsFromDom() {
                 value: rawValue,
                 mode,
                 basis,
+            })
+        })
+        .filter(Boolean)
+}
+
+function customBuffEffectsFromDom() {
+    return customBuffRowsFromDom()
+        .map((row, index) => {
+            const options = row.targetKind === "skill" ? CUSTOM_BUFF_SKILL_STAT_OPTIONS : CUSTOM_BUFF_STAT_OPTIONS
+            const option = options[row.optionIndex]
+            if (!option || (row.targetKind !== "skill" && option[2] !== "eventModifier")) {
+                return null
+            }
+            const [stat, label] = option
+            return normalizeCustomBuffEffect({
+                id: `effect-${index + 1}`,
+                type: "fixed",
+                stat: resolveCustomBuffStatOption(stat),
+                label,
+                value: Number(row.value ?? 0),
+                mode: "flat",
+                target: row.targetKind === "skill"
+                    ? { kind: "skill", skillTargets: row.skillTargets ?? [] }
+                    : { kind: "default" },
             })
         })
         .filter(Boolean)
@@ -2797,8 +3583,8 @@ function renderCombatBuffControls() {
     renderCombatCheckboxList(els.driveDiscCombatBuffs, ownDriveDisc4pcBuffs(), checkedIds)
     renderCombatCheckboxList(els.wEngineCombatBuffs, wEngineEquippedBuffs(), checkedIds)
     renderAddedCombatBuffs()
-    renderCombatCheckboxList(els.bossCombatBuffs, combatBuffsByType("boss"), checkedIds)
-    renderCombatCheckboxList(els.fieldCombatBuffs, combatBuffsByType("field"), checkedIds)
+    renderCatalogCombatBuffCards(els.bossCombatBuffs, combatBuffsByType("boss"), checkedIds)
+    renderCatalogCombatBuffCards(els.fieldCombatBuffs, combatBuffsByType("field"), checkedIds)
 }
 
 function collectManualStats() {
@@ -2814,10 +3600,21 @@ function collectManualStats() {
         })))
 }
 
+function collectManualEffects() {
+    return currentAddedCombatBuffs()
+        .filter(item => item.sourceKind === "custom")
+        .flatMap(item => (item.effects ?? []).map((effect, index) => ({
+            id: `${item.id}.${effect.id ?? index + 1}`,
+            label: `${item.name || "自定义 Buff"}｜${effect.label ?? (effect.type === "damageModifier" ? damageModifierOptionText(effect) : statLabel(effect.stat))}`,
+            effects: [effect],
+        })))
+}
+
 function collectCombatBuffConfig() {
     const addedBuffs = currentAddedCombatBuffs()
     const activeBuffIds = [...checkedCombatBuffIds()]
     const runtimeInputs = {}
+    const wEngineTeamModificationLevels = {}
     for (const item of addedBuffs) {
         if (item.sourceKind === "teammate") {
             activeBuffIds.push(item.id)
@@ -2831,11 +3628,18 @@ function collectCombatBuffConfig() {
 
         if (item.sourceKind === "wEngineTeam") {
             activeBuffIds.push(item.id)
+            wEngineTeamModificationLevels[item.id] = wEngineTeamModificationLevelForItem(item)
             runtimeInputs[item.id] = item.runtime ?? defaultRuntimeForBuff(resolveAddedCombatBuff(item))
         }
 
         if (item.sourceKind === "teammateDriveDisc4pc") {
             runtimeInputs[`teammateDriveDisc4pc:${item.setId}`] = item.runtime ?? defaultRuntimeForBuff(resolveAddedCombatBuff(item))
+        }
+    }
+    for (const buff of [...combatBuffsByType("boss"), ...combatBuffsByType("field")]) {
+        if (activeBuffIds.includes(buff.id)) {
+            const item = catalogCombatBuffRuntimeItem(buff)
+            runtimeInputs[buff.id] = runtimeForBuff(item, buff)
         }
     }
 
@@ -2847,27 +3651,77 @@ function collectCombatBuffConfig() {
             .filter(Boolean)
             .slice(0, TEAMMATE_DRIVE_DISC_LIMIT),
         manualStats: collectManualStats(),
+        manualEffects: collectManualEffects(),
         runtimeInputs,
+        wEngineTeamModificationLevels,
     }
 }
 
 function collectDamageConfig() {
     persistCurrentDamageResistanceInput()
     const damageElement = currentDamageElement()
-    const skillRef = readDamageSkillRef()
-    return {
-        skillMultiplier: Number(els.damageSkillMultiplier?.value ?? 100),
-        ...(skillRef ? { skillRef } : {}),
-        critMode: els.damageCritMode?.value ?? "expected",
-        target: {
-            presetId: els.damageTargetPreset?.value || DEFAULT_DAMAGE_TARGET_PRESET_ID,
-            defense: Number(els.damageTargetDefense?.value ?? 953),
-            levelCoefficient: Number(els.damageLevelCoefficient?.value ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT),
-            resistanceByElement: {
-                ...damageTargetResistanceByElement,
-                [damageElement]: Number(els.damageTargetResistance?.value ?? 0),
-            },
+    const resolvedSkill = resolveDamageSkillRef(selectedDamageSkillRef)
+    const eventType = els.damageEventType?.value || "direct"
+    const agentLevel = Number(els.agentLevelInput?.value || 60)
+    const target = {
+        presetId: els.damageTargetPreset?.value || DEFAULT_DAMAGE_TARGET_PRESET_ID,
+        defense: Number(els.damageTargetDefense?.value ?? 953),
+        levelCoefficient: Number(els.damageLevelCoefficient?.value ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT),
+        resistanceByElement: {
+            ...damageTargetResistanceByElement,
+            [damageElement]: Number(els.damageTargetResistance?.value ?? 0),
         },
+    }
+    if (eventType === "anomaly") {
+        const anomalyEffect = els.damageAnomalyEffect?.value || "assault"
+        return {
+            agentLevel,
+            skillLevelsByCategory: { ...damageSkillLevelsByCategory },
+            selectedEventId: "anomaly-1",
+            events: [
+                {
+                    id: "anomaly-1",
+                    kind: "anomaly",
+                    anomalyEffect,
+                    procCount: Number(els.damageAnomalyProcCount?.value || DEFAULT_ANOMALY_PROC_COUNTS[anomalyEffect] || 1),
+                },
+            ],
+            target,
+        }
+    }
+    if (eventType === "disorder") {
+        return {
+            agentLevel,
+            skillLevelsByCategory: { ...damageSkillLevelsByCategory },
+            selectedEventId: "disorder-1",
+            events: [
+                {
+                    id: "disorder-1",
+                    kind: "disorder",
+                    previousAnomalyEffect: els.damageDisorderEffect?.value || "burn",
+                    elapsedSeconds: Number(els.damageDisorderElapsed?.value || 0),
+                    durationSeconds: Number(els.damageDisorderDuration?.value || 10),
+                },
+            ],
+            target,
+        }
+    }
+    const directEvent = {
+        id: "direct-1",
+        kind: "direct",
+        skillMultiplier: Number(els.damageSkillMultiplier?.value ?? 100),
+        ...(resolvedSkill ? { skillRef: resolvedSkill.ref } : {}),
+        critMode: els.damageCritMode?.value ?? "expected",
+    }
+    return {
+        agentLevel,
+        skillMultiplier: Number(els.damageSkillMultiplier?.value ?? 100),
+        skillLevelsByCategory: { ...damageSkillLevelsByCategory },
+        ...(resolvedSkill ? { skillRef: resolvedSkill.ref } : {}),
+        critMode: els.damageCritMode?.value ?? "expected",
+        selectedEventId: directEvent.id,
+        events: [directEvent],
+        target,
     }
 }
 
@@ -2886,12 +3740,29 @@ function combatSourceLabel(sourceType) {
     return labels[sourceType] ?? sourceType ?? "局内"
 }
 
+function activeEffectDisplayText(item) {
+    const effects = Array.isArray(item?.effects) ? item.effects : []
+    if (!effects.some(rule => rule.displayValue !== undefined || rule.displayValuePerStack !== undefined)) {
+        return ""
+    }
+
+    const effect = {
+        effects,
+        coverage: item.coverage ?? null,
+    }
+    return storedEffectRulesText(effect, item.runtime ?? defaultRuntimeForBuff(effect))
+}
+
 function combatEffectText(item) {
     const label = item?.name ? nameOf(item) : effectLabel(item.key)
-    const stats = effectStatText(item.resolvedStats?.length ? item.resolvedStats : item.stats)
+    const stats = activeEffectDisplayText(item) || effectStatText(item.resolvedStats?.length ? item.resolvedStats : item.stats)
+    const modifiers = (item.resolvedDamageModifiers ?? [])
+        .map(modifier => `${damageModifierOptionText(modifier)} +${formatStoredStatValue("dmgBonus", Number(modifier.value ?? 0) * 100)}`)
+        .join("，")
     const conditionLabel = localizedText(item.conditionLabel) || item.conditionLabel
     const condition = conditionLabel ? ` · ${conditionLabel}` : ""
-    return `${combatSourceLabel(item.sourceType)}｜${label}${stats ? `：${stats}` : ""}${condition}`
+    const detail = [stats, modifiers].filter(Boolean).join("，")
+    return `${combatSourceLabel(item.sourceType)}｜${label}${detail ? `：${detail}` : ""}${condition}`
 }
 
 function renderDamageWhiteBox(damage) {
@@ -2911,10 +3782,13 @@ function renderDamageWhiteBox(damage) {
     for (const rowData of damage.whiteBoxRows ?? []) {
         const row = document.createElement("div")
         row.className = "damage-whitebox-row"
+        const formulaHtml = Array.isArray(rowData.formulaLines) && rowData.formulaLines.length
+            ? rowData.formulaLines.map(line => `<span>${escapeHtml(line)}</span>`).join("")
+            : `<span>${escapeHtml(rowData.formula ?? "")}</span>`
         row.innerHTML = `
             <div>
               <strong>${escapeHtml(rowData.label ?? "-")}</strong>
-              <span>${escapeHtml(rowData.formula ?? "")}</span>
+              ${formulaHtml}
             </div>
             <strong>${escapeHtml(rowData.displayValue ?? formatValue(rowData.value ?? 0))}</strong>
         `
@@ -3004,7 +3878,9 @@ async function loadMeta() {
     meta = response
     populateSelect(els.agentSelect, response.agents, response.agents[0]?.id)
     populateSelect(els.wEngineSelect, response.wEngines, response.wEngines[0]?.id)
+    populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), 1)
     populateDamageTargetPresets()
+    populateDamageEventSelects()
     syncDamageResistanceControlsToAgent()
 }
 
@@ -3018,7 +3894,9 @@ function applySelectionForAgent(agentId) {
 
     els.agentSelect.value = agentId
     els.wEngineSelect.value = validWEngineId(config.wEngineId)
+    populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), config.wEngineModificationLevel)
     populateCoreSkillSelect(agent, validCoreSkillLevel(agent, config.coreSkillLevel))
+    populateCinemaLevelSelect(cinemaLevelForAgent(agentId))
     applyStoredDamageConfig(config.damage)
     renderHomeLoadoutSelect(agentId)
     setHomeDiscMode(selectedDiscModeForAgent(agentId))
@@ -3046,7 +3924,7 @@ function parseDriveDiscs() {
 
 function renderCurrentSelection({ refreshCombatBuffControls = true } = {}) {
     const agent = getAgent(els.agentSelect.value)
-    const wEngine = getWEngine(els.wEngineSelect.value)
+    const wEngine = currentWEngineWithModification()
     const coreSkillLevel = populateCoreSkillSelect(agent, els.coreSkillSelect.value)
     const discs = (() => {
         try {
@@ -3062,6 +3940,8 @@ function renderCurrentSelection({ refreshCombatBuffControls = true } = {}) {
     setEntityImage(els.agentImage, agent, "agent")
     setEntityImage(els.wEngineImage, wEngine, "wEngine")
     renderAgentMeta(agent, coreSkillLevel)
+    populateCinemaLevelSelect(selectedCinemaLevel())
+    renderAgentSkillLevelControls()
     renderWEngineMeta(wEngine)
     renderWEngineEffect(wEngine)
     renderDiscPicker(agent?.id)
@@ -3134,6 +4014,7 @@ async function calculate({ refreshSelection = true, refreshCombatBuffControls = 
         agentId: els.agentSelect.value,
         coreSkillLevel,
         wEngineId: els.wEngineSelect.value,
+        wEngineModificationLevel: selectedWEngineModificationLevel(getWEngine(els.wEngineSelect.value)),
         driveDiscs,
         combatBuffs: collectCombatBuffConfig(),
         damage: collectDamageConfig(),
@@ -3230,6 +4111,16 @@ async function commitGenericNumberInput(input) {
 function runtimeFieldContext(field) {
     const group = field.closest("[data-buff-key]")
     const buffKey = group?.dataset.buffKey
+    const catalogBuffId = catalogCombatBuffIdFromKey(buffKey)
+    if (catalogBuffId) {
+        const buff = (meta?.combatBuffs ?? []).find(item => item.id === catalogBuffId)
+        return {
+            buffKey,
+            item: buff ? catalogCombatBuffRuntimeItem(buff) : null,
+            buff,
+        }
+    }
+
     const item = buffKey ? addedCombatBuffByKey(buffKey) : null
     const buff = item ? resolveAddedCombatBuff(item) : null
     return { buffKey, item, buff }
@@ -3278,6 +4169,16 @@ els.agentSelect.addEventListener("change", async () => {
 els.wEngineSelect.addEventListener("change", async () => {
     try {
         setStatus("计算中", "idle")
+        populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), els.wEngineModificationSelect?.value ?? 1)
+        saveCurrentHomeSelection()
+        await calculate()
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
+})
+els.wEngineModificationSelect?.addEventListener("change", async () => {
+    try {
+        setStatus("计算中", "idle")
         saveCurrentHomeSelection()
         await calculate()
     } catch (error) {
@@ -3293,8 +4194,50 @@ els.coreSkillSelect.addEventListener("change", async () => {
         setStatus(error.message, "error")
     }
 })
+els.cinemaLevelSelect?.addEventListener("change", async () => {
+    try {
+        setStatus("计算中", "idle")
+        saveCurrentHomeSelection()
+        renderCombatBuffControls()
+        await calculate()
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
+})
+els.agentLevelInput?.addEventListener("change", async () => {
+    try {
+        setStatus("计算中", "idle")
+        saveCurrentHomeSelection()
+        await calculate()
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
+})
+els.agentLevelInput?.addEventListener("input", () => {
+    saveCurrentHomeSelection()
+    scheduleCalculate("计算中", { refreshSelection: false })
+})
+for (const { categoryId, select } of skillLevelSelects()) {
+    select.addEventListener("change", async () => {
+        try {
+            setStatus("计算中", "idle")
+            damageSkillLevelsByCategory[categoryId] = Number(select.value)
+            renderDamageSkillSummary()
+            saveCurrentHomeSelection()
+            await calculate()
+        } catch (error) {
+            setStatus(error.message, "error")
+        }
+    })
+}
 els.driveDiscInput.addEventListener("input", renderCurrentSelection)
 els.combatSection.addEventListener("change", async event => {
+    const runtimeField = event.target.closest("[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]")
+    if (runtimeField && !els.addedCombatBuffs.contains(event.target)) {
+        await commitRuntimeField(runtimeField)
+        return
+    }
+
     if (els.addedCombatBuffs.contains(event.target)) {
         return
     }
@@ -3320,14 +4263,14 @@ els.combatSection.addEventListener("change", async event => {
         if (event.target === els.damageTargetPreset) {
             syncDamageDefenseToPreset()
         }
-        if ([els.damageSkillCategory, els.damageSkillMove, els.damageSkillRow, els.damageSkillLevel].includes(event.target)) {
-            const preferredRef = readDamageSkillRef() ?? {
-                categoryId: els.damageSkillCategory?.value ?? "",
-                moveId: els.damageSkillMove?.value ?? "",
-                rowId: els.damageSkillRow?.value ?? "",
-                level: Number(els.damageSkillLevel?.value || 0),
-            }
-            populateDamageSkillControls(preferredRef)
+        if (event.target === els.damageEventType) {
+            renderDamageEventControls()
+        }
+        if (event.target === els.damageAnomalyEffect) {
+            els.damageAnomalyProcCount.value = event.target.selectedOptions?.[0]?.dataset.defaultProcCount ?? 1
+        }
+        if (event.target === els.damageDisorderEffect) {
+            els.damageDisorderDuration.value = event.target.selectedOptions?.[0]?.dataset.defaultDurationSeconds ?? 10
         }
         await calculateNow()
     } catch (error) {
@@ -3348,6 +4291,26 @@ els.combatSection.addEventListener("click", async event => {
     }
 })
 els.combatSection.addEventListener("input", async event => {
+    const runtimeField = event.target.closest("[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]")
+    if (runtimeField && !els.addedCombatBuffs.contains(event.target)) {
+        const group = runtimeField.closest("[data-buff-key]")
+        if (!group) {
+            return
+        }
+        try {
+            const value = inputNumberValue(runtimeField)
+            if (value === null || !Number.isFinite(value)) {
+                return
+            }
+            updateRuntimeFieldValue(group.dataset.buffKey, runtimeField, value)
+            refreshAddedCombatBuffSummary(group.dataset.buffKey)
+            scheduleCalculate("计算中", { refreshSelection: false })
+        } catch (error) {
+            setStatus(error.message, "error")
+        }
+        return
+    }
+
     if (els.addedCombatBuffs.contains(event.target)) {
         return
     }
@@ -3369,7 +4332,8 @@ els.combatSection.addEventListener("input", async event => {
             syncDamageResistancePresetFromValue()
         }
         if (event.target === els.damageSkillMultiplier) {
-            populateDamageSkillControls({ categoryId: "" })
+            selectedDamageSkillRef = null
+            renderDamageSkillSummary()
         }
         scheduleCalculate("计算中", { refreshSelection: false })
     } catch (error) {
@@ -3377,6 +4341,16 @@ els.combatSection.addEventListener("input", async event => {
     }
 })
 els.combatSection.addEventListener("keydown", async event => {
+    const runtimeField = event.target.closest("[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]")
+    if (runtimeField && !els.addedCombatBuffs.contains(event.target)) {
+        if (event.key !== "Enter") {
+            return
+        }
+        event.preventDefault()
+        await commitRuntimeField(runtimeField)
+        return
+    }
+
     if (event.key !== "Enter" || els.addedCombatBuffs.contains(event.target) || !event.target.matches("input[type='number']")) {
         return
     }
@@ -3423,6 +4397,24 @@ els.addedCombatBuffs.addEventListener("input", async event => {
     }
 })
 els.addedCombatBuffs.addEventListener("change", async event => {
+    const modificationSelect = event.target.closest("[data-w-engine-team-modification-level]")
+    if (modificationSelect) {
+        const group = modificationSelect.closest("[data-buff-key]")
+        if (!group) {
+            return
+        }
+
+        try {
+            setStatus("更新音擎改装等级", "idle")
+            updateAddedCombatBuffModificationLevel(group.dataset.buffKey, modificationSelect.value)
+            renderCombatBuffControls()
+            await calculate()
+        } catch (error) {
+            setStatus(error.message, "error")
+        }
+        return
+    }
+
     const runtimeField = event.target.closest("[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]")
     if (!runtimeField) {
         return
@@ -3442,6 +4434,46 @@ els.addedCombatBuffs.addEventListener("keydown", async event => {
 
     event.preventDefault()
     await commitRuntimeField(runtimeField)
+})
+els.openDamageSkillModalBtn?.addEventListener("click", openDamageSkillModal)
+els.closeDamageSkillModalBtn?.addEventListener("click", closeDamageSkillModal)
+els.damageSkillModal?.addEventListener("click", async event => {
+    if (event.target.matches("[data-close-damage-skill-modal]")) {
+        closeDamageSkillModal()
+        return
+    }
+
+    const moveChoice = event.target.closest("[data-pick-damage-skill-move]")
+    if (moveChoice) {
+        const movePaneScrollTop = els.damageSkillModalList?.querySelector(".damage-skill-move-pane")?.scrollTop ?? 0
+        activeDamageSkillPickerMoveRef = {
+            categoryId: moveChoice.dataset.categoryId,
+            moveId: moveChoice.dataset.moveId,
+        }
+        renderDamageSkillModal()
+        const movePane = els.damageSkillModalList?.querySelector(".damage-skill-move-pane")
+        if (movePane) {
+            movePane.scrollTop = movePaneScrollTop
+        }
+        return
+    }
+
+    const choice = event.target.closest("[data-select-damage-skill]")
+    if (!choice) {
+        return
+    }
+
+    try {
+        selectDamageSkill({
+            categoryId: choice.dataset.categoryId,
+            moveId: choice.dataset.moveId,
+            rowId: choice.dataset.rowId,
+        })
+        closeDamageSkillModal()
+        await calculateNow()
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
 })
 els.openCombatBuffModalBtn.addEventListener("click", () => openCombatBuffModal())
 els.closeCombatBuffModalBtn.addEventListener("click", closeCombatBuffModal)
@@ -3471,12 +4503,65 @@ els.combatBuffModal.addEventListener("click", async event => {
             setStatus(error.message, "error")
         }
     }
+
+    const addSkillTarget = event.target.closest("[data-add-custom-skill-target]")
+    if (addSkillTarget) {
+        const rows = customBuffRowsFromDom()
+        rows[0].skillTargets = [...(rows[0].skillTargets ?? []), {}]
+        renderCustomBuffStatRows(rows)
+        return
+    }
+
+    const removeSkillTarget = event.target.closest("[data-remove-custom-skill-target]")
+    if (removeSkillTarget) {
+        const rows = customBuffRowsFromDom()
+        rows[0].skillTargets = (rows[0].skillTargets ?? []).filter((_, index) => index !== Number(removeSkillTarget.dataset.removeCustomSkillTarget))
+        renderCustomBuffStatRows(rows)
+    }
+})
+els.combatBuffModal.addEventListener("change", event => {
+    if (event.target.matches("[data-custom-target-kind]")) {
+        const rows = customBuffRowsFromDom()
+        rows[0].optionIndex = 0
+        rows[0].skillTargets = [{}]
+        renderCustomBuffStatRows(rows)
+        return
+    }
+
+    if (event.target.matches("[data-custom-stat-select]")) {
+        renderCustomBuffStatRows(customBuffRowsFromDom())
+        return
+    }
+
+    if (event.target.matches("[data-custom-skill-agent]")) {
+        syncCustomSkillTargetFields(event.target.closest("[data-custom-skill-target]"), { agentSkillId: event.target.value })
+        return
+    }
+
+    if (event.target.matches("[data-custom-skill-category]")) {
+        const targetRow = event.target.closest("[data-custom-skill-target]")
+        syncCustomSkillTargetFields(targetRow, {
+            agentSkillId: targetRow.querySelector("[data-custom-skill-agent]")?.value ?? "",
+            categoryId: event.target.value,
+        })
+        return
+    }
+
+    if (event.target.matches("[data-custom-skill-move]")) {
+        const targetRow = event.target.closest("[data-custom-skill-target]")
+        syncCustomSkillTargetFields(targetRow, {
+            agentSkillId: targetRow.querySelector("[data-custom-skill-agent]")?.value ?? "",
+            categoryId: targetRow.querySelector("[data-custom-skill-category]")?.value ?? "",
+            moveId: event.target.value,
+        })
+    }
 })
 els.combatBuffSearchInput.addEventListener("input", renderCombatBuffCandidates)
 els.saveCustomBuffBtn.addEventListener("click", async () => {
     try {
         const stats = customBuffStatsFromDom()
-        if (!stats.length) {
+        const effects = customBuffEffectsFromDom()
+        if (!stats.length && !effects.length) {
             setStatus("自定义 Buff 至少需要一个非零属性", "error")
             return
         }
@@ -3490,6 +4575,7 @@ els.saveCustomBuffBtn.addEventListener("click", async () => {
                 sourceKind: "custom",
                 name: els.customBuffNameInput.value.trim() || "自定义 Buff",
                 stats,
+                effects,
             },
         ])
         closeCombatBuffModal()
@@ -3543,6 +4629,11 @@ els.loadoutDiscModeBtn?.addEventListener("click", async () => {
 })
 els.homeLoadoutSelect?.addEventListener("change", async () => {
     try {
+        const selectedLoadout = driveDiscLoadoutsForAgent(validAgentId(els.agentSelect.value))
+            .find(loadout => loadout.id === els.homeLoadoutSelect.value)
+        if (selectedLoadout && !loadoutIsComplete(selectedLoadout)) {
+            throw new Error("该套装缺少驱动盘槽位，请先在驱动盘页修复。")
+        }
         setStatus("切换套装", "idle")
         setHomeDiscMode("loadout")
         saveCurrentHomeSelection({

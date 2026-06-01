@@ -1,25 +1,70 @@
 # ZZZ Calculator
 
-Zenless Zone Zero Drive Disc and damage calculator with a small Node backend and
-a static frontend. It can manage local Drive Disc inventory, calculate
-out-of-combat and in-combat panels, preview/launch Drive Disc optimization, and
-maintain the public game data used by the calculator.
+Zenless Zone Zero Drive Disc, panel, damage, and optimizer workspace. The app is
+a small dependency-free Node.js backend with static browser pages for account
+management, inventory maintenance, out-of-combat and in-combat panel
+calculation, damage inspection, and Drive Disc optimization.
+
+Chinese documentation is available in [README.zh-CN.md](README.zh-CN.md).
+
+## Recent Update Summary
+
+The current workspace update since the last pushed `main` commit adds or
+expands these major areas:
+
+- Multi-account support with isolated Drive Disc inventories, loadouts, imports,
+  and homepage selections.
+- Direct, anomaly, and disorder damage calculation with white-box multiplier
+  rows for defense, resistance, PEN, RES ignore, anomaly proficiency, anomaly
+  level, anomaly damage bonus, anomaly crit, and final damage.
+- Data-backed anomaly and disorder catalogs in `data/anomaly_effects.json`.
+- Agent skill multiplier catalogs for Ye Shunguang, Hoshimi Miyabi, and Alice
+  Thymefield, including generated total-hit rows for compatible multi-hit
+  moves.
+- W-Engine modification levels from 1 to 5, with exact calculation values and
+  official rounded display values for self and team buffs.
+- New agent and W-Engine data and assets for Hoshimi Miyabi, Alice Thymefield,
+  Hailfall Star Palace, and Tenfold Starforge.
+- Expanded teammate, field, boss, manual, skill-targeted, and W-Engine team
+  buff modeling, including modifier-only buffs and buff amplification rules.
+- Homepage and optimizer damage controls for target presets, defense,
+  elemental resistance, direct skill selection, anomaly events, and disorder
+  timing.
+- Drive Disc import deduplication, upgrade merging, remove-missing sync, and
+  loadout cleanup when imported or deleted discs disappear.
+- Drive Disc loadout management and optimizer save-to-loadout flow.
+- Maintenance UI support for agent skills, W-Engine modification scaling,
+  anomaly/disorder effects, split self/team effects, and stricter validation.
+- Additional regression tests for accounts, scanner import, W-Engine
+  modification scaling, shared combat helpers, anomaly damage, damage
+  white-box output, maintenance validation, and optimizer behavior.
 
 ## Features
 
-- Agent, W-Engine, Drive Disc set, skill, stat rule, and combat buff catalogs.
-- Out-of-combat and in-combat panel calculation APIs.
-- Drive Disc inventory import from ZZZ Scanner JSON exports.
-- Drive Disc loadout storage and optimizer endpoints.
-- Browser pages for the home calculator, inventory, calculation workspace, and
-  data maintenance.
-- Example payloads and focused Node test scripts for calculator behavior.
+- Agent, W-Engine, Drive Disc set, skill multiplier, stat rule, anomaly effect,
+  and combat buff catalogs.
+- Out-of-combat panel calculation from agent stats, Core Skill level, W-Engine
+  stats, Drive Discs, and unconditional set effects.
+- In-combat panel calculation from selected self, teammate, W-Engine, Drive Disc
+  4-piece, field, boss, and manual buffs.
+- Damage preview for direct, anomaly, and disorder events, with inspectable
+  white-box formula rows.
+- ZZZ Scanner Drive Disc import, manual inventory editing, duplicate handling,
+  account-scoped storage, and optional remove-missing synchronization.
+- Saved Drive Disc loadouts that can be applied on the homepage or created from
+  optimizer results.
+- Drive Disc optimizer with preview, background job progress, cancelation,
+  set-shape constraints, main-stat constraints, minimum stat filters, and
+  damage scoring.
+- Browser maintenance pages for static game data and validation-oriented JSON
+  editing.
 
 ## Directory Layout
 
 ```text
 zzz_calculator/
   README.md
+  README.zh-CN.md
   package.json
   backend/
     server.js
@@ -29,6 +74,7 @@ zzz_calculator/
   data/
     agents.json
     agent_skills.json
+    anomaly_effects.json
     w_engines.json
     drive_disc_sets.json
     stat_rules.json
@@ -45,7 +91,16 @@ zzz_calculator/
     index.html
     drive-discs.html
     calculate.html
+    accounts.html
     maintenance.html
+    app.js
+    calculate.js
+    drive-discs.js
+    accounts.js
+    accounts-page.js
+    maintenance.js
+    shared-combat.js
+    skillMultiplierCandidates.js
     assets/
   tests/
 ```
@@ -65,17 +120,19 @@ the port with `PORT=8791 npm start`.
 
 Main pages:
 
-- `/` - home calculator
-- `/drive-discs.html` - Drive Disc inventory
-- `/calculate.html` - calculation workspace
-- `/maintenance.html` - catalog maintenance
+- `/` - homepage calculator, panel view, combat buffs, and damage white box
+- `/drive-discs.html` - Drive Disc inventory and loadout management
+- `/calculate.html` - Drive Disc optimizer workspace
+- `/accounts.html` - account creation, switching, rename, and deletion
+- `/maintenance.html` - static catalog maintenance
 
 ## Local Runtime Data
 
 `data/user_drive_discs.json` is intentionally ignored by Git because it stores
-local player inventory, imports, and loadouts. A fresh clone can run without
-this file: the backend uses an empty Drive Disc store when it is missing, then
-creates the local file after importing or editing Drive Discs.
+local player inventory, imports, account records, loadouts, and current account
+selection. A fresh clone can run without this file: the backend uses an empty
+store when it is missing, then creates the local file after importing or
+editing Drive Discs.
 
 Use `data/user_drive_discs.example.json` as the documented empty-store shape.
 Scanner exports copied into `imports/` or `data/imports/` are also ignored.
@@ -86,7 +143,7 @@ normally.
 
 ## Tests
 
-Run individual focused tests with npm scripts:
+Run focused Node test scripts with npm:
 
 ```bash
 npm run test:atk-basis
@@ -94,31 +151,70 @@ npm run test:percent-sanity
 npm run test:maintenance-validation
 npm run test:formula
 npm run test:damage-whitebox
+npm run test:shared-combat
+npm run test:w-engine-modification
+npm run test:anomaly-damage
 npm run test:optimizer
 npm run test:optimizer-progress
 npm run test:optimizer-api
+npm run test:drive-disc-import
+npm run test:accounts
+```
+
+Useful syntax checks:
+
+```bash
+node --check backend/calculator.js
+node --check backend/server.js
+node --check frontend/app.js
+node --check frontend/calculate.js
+node --check frontend/drive-discs.js
+node --check frontend/maintenance.js
+node --check frontend/accounts-page.js
 ```
 
 ## API Overview
 
 - `GET /api/health`
 - `GET /api/meta`
+- `GET /api/accounts`
+- `POST /api/accounts`
+- `POST /api/accounts/current`
+- `PUT|DELETE /api/accounts/:id`
 - `GET /api/maintenance/catalog`
 - `POST|PUT|DELETE /api/maintenance/:resource`
+- `DELETE /api/maintenance/anomaly-effects/:type/:id`
 - `GET /api/example/out-of-combat`
 - `GET /api/example/ye-shunguang`
 - `POST /api/calculate/out-of-combat`
 - `POST /api/calculate/in-combat`
 - `POST /api/optimize/drive-discs/preview`
-- `POST /api/optimize/drive-discs`
 - `POST /api/optimize/drive-discs/jobs`
 - `GET|DELETE /api/optimize/drive-discs/jobs/:id`
-- `GET /api/user-drive-discs`
+- `POST /api/optimize/drive-discs`
+- `GET|DELETE /api/user-drive-discs`
 - `POST /api/user-drive-discs/import/zzz-scanner`
 - `POST /api/user-drive-discs`
 - `PUT|DELETE /api/user-drive-discs/:id`
 - `GET|POST /api/user-drive-disc-loadouts`
 - `PUT|DELETE /api/user-drive-disc-loadouts/:id`
+
+## Modeling Notes
+
+- Base ATK is `agent Base ATK + W-Engine Base ATK + Core Skill Base ATK`.
+- Out-of-combat stats are the stable base for later conditional in-combat
+  buffs.
+- In-combat buffs can contribute plain stats, runtime-scaled effects, damage
+  modifiers, W-Engine team buffs, and skill-targeted effects.
+- Special display attributes can declare a real `damageElement`; for example,
+  Ye Shunguang is displayed as Honed Edge but calculates physical damage.
+- Anomaly and disorder damage use catalog-backed base multipliers from
+  `data/anomaly_effects.json`.
+- W-Engine modification ranks materialize buff values without changing level 60
+  Base ATK or advanced stats.
+
+For deeper implementation detail, see [docs/modeling.md](docs/modeling.md) and
+[docs/changelog.md](docs/changelog.md).
 
 ## Maintenance Rule
 

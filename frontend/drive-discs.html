@@ -21,6 +21,7 @@
         <a href="/" class="nav-item">首页</a>
         <a href="/drive-discs.html" class="nav-item active">驱动盘</a>
         <a href="/calculate.html" class="nav-item">计算</a>
+        <a href="/accounts.html" class="nav-item" data-account-label>账号 / 加载中</a>
         <a href="/maintenance.html" class="nav-item">维护</a>
       </nav>
 
@@ -50,28 +51,15 @@
             <p><span id="setCount">0 套</span> · <span id="importCount">0 次导入</span></p>
           </div>
           <div class="inventory-actions">
-            <button id="importPanelToggle" type="button" class="ghost-btn">导入</button>
-            <button id="clearImportBtn" type="button" class="ghost-btn">清空输入</button>
-            <button id="importBtn" type="button" class="primary-btn">导入到仓库</button>
+            <label class="inline-check import-remove-missing">
+              <input id="removeMissingInput" type="checkbox">
+              <span>删除不存在的驱动盘</span>
+            </label>
+            <button id="importBtn" type="button" class="ghost-btn">导入</button>
+            <button id="clearInventoryBtn" type="button" class="danger-btn">清空仓库</button>
           </div>
         </div>
-
-        <section id="importPanel" class="import-panel" hidden>
-          <div class="import-grid">
-            <label class="field">
-              <span>本地导出路径</span>
-              <input id="importPathInput" value="E:\yan1\ZZZ-Scanner-master\ZZZ-Scanner.Next\publish-dpi-fix\Scans\2026-05-26-19-12-09\export.json">
-            </label>
-            <label class="field">
-              <span>选择 JSON 文件</span>
-              <input id="importFileInput" type="file" accept=".json,application/json">
-            </label>
-          </div>
-          <label class="field import-text-field">
-            <span>或粘贴 ZZZ Scanner 导出 JSON</span>
-            <textarea id="importTextarea" spellcheck="false" placeholder="粘贴 export.json 内容，或保留为空并使用上方路径导入"></textarea>
-          </label>
-        </section>
+        <input id="importFileInput" type="file" accept=".json,application/json" hidden>
 
         <div class="inventory-filter-row">
           <label class="field">
@@ -299,6 +287,7 @@
     </section>
   </div>
 
+  <script type="module" src="/accounts.js"></script>
   <script type="module" src="/drive-discs.js"></script>
 </body>
 </html>

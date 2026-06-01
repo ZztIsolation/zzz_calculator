@@ -6,13 +6,10 @@ const els = {
     setCount: document.getElementById("setCount"),
     importCount: document.getElementById("importCount"),
     filteredCount: document.getElementById("filteredCount"),
-    importPanelToggle: document.getElementById("importPanelToggle"),
-    importPanel: document.getElementById("importPanel"),
-    importPathInput: document.getElementById("importPathInput"),
     importFileInput: document.getElementById("importFileInput"),
-    importTextarea: document.getElementById("importTextarea"),
+    removeMissingInput: document.getElementById("removeMissingInput"),
     importBtn: document.getElementById("importBtn"),
-    clearImportBtn: document.getElementById("clearImportBtn"),
+    clearInventoryBtn: document.getElementById("clearInventoryBtn"),
     searchInput: document.getElementById("searchInput"),
     slotFilter: document.getElementById("slotFilter"),
     slotTabs: document.getElementById("slotTabs"),
@@ -337,9 +334,12 @@ function filteredDiscs() {
 
 function renderSummary() {
     const discs = store?.driveDiscs ?? []
+    const imports = store?.imports ?? []
+    const loadouts = store?.driveDiscLoadouts ?? []
     els.totalCount.textContent = String(discs.length)
     els.setCount.textContent = `${new Set(discs.map(item => item.setName)).size} 套`
-    els.importCount.textContent = `${store?.imports?.length ?? 0} 次导入`
+    els.importCount.textContent = `${imports.length} 次导入`
+    els.clearInventoryBtn.disabled = discs.length === 0 && imports.length === 0 && loadouts.length === 0
 }
 
 function renderTable() {
@@ -383,6 +383,14 @@ function discById(id) {
     return (store?.driveDiscs ?? []).find(disc => disc.id === id) ?? null
 }
 
+function loadoutMissingSlots(loadout) {
+    return [1, 2, 3, 4, 5, 6].filter(slot => !discById(loadout.driveDiscIdsBySlot?.[String(slot)]))
+}
+
+function loadoutIsIncomplete(loadout) {
+    return loadoutMissingSlots(loadout).length > 0
+}
+
 function loadoutSlotText(loadout) {
     return [1, 2, 3, 4, 5, 6].map(slot => {
         const disc = discById(loadout.driveDiscIdsBySlot?.[String(slot)])
@@ -400,12 +408,15 @@ function renderLoadouts() {
     els.loadoutTableBody.innerHTML = ""
     els.emptyLoadouts.hidden = loadouts.length !== 0
     for (const loadout of loadouts) {
+        const missingSlots = loadoutMissingSlots(loadout)
+        const statusText = missingSlots.length ? `待修复：缺 ${missingSlots.join("、")} 号位` : "完整"
         const row = document.createElement("tr")
         row.dataset.loadoutId = loadout.id
+        row.className = missingSlots.length ? "loadout-row-incomplete" : ""
         row.innerHTML = `
             <td><strong>${escapeHtml(loadout.name)}</strong><br><span>${escapeHtml(loadout.updatedAt ?? "-")}</span></td>
             <td>${escapeHtml(agentName(loadout.agentId))}</td>
-            <td class="substat-cell">${escapeHtml(loadoutSlotText(loadout))}</td>
+            <td class="substat-cell">${escapeHtml(loadoutSlotText(loadout))}<br><span class="${missingSlots.length ? "danger-text" : "muted-text"}">${escapeHtml(statusText)}</span></td>
             <td>${Number.isFinite(Number(loadout.score)) ? Number(loadout.score).toFixed(0) : "-"}</td>
             <td><button type="button" class="compact-btn" data-action="edit-loadout" data-loadout-id="${escapeHtml(loadout.id)}">编辑</button></td>
         `
@@ -581,6 +592,11 @@ function renderLoadoutSlotEditors(loadout) {
         label.className = "field"
         const select = document.createElement("select")
         select.dataset.loadoutSlot = String(slot)
+        const empty = document.createElement("option")
+        empty.value = ""
+        empty.textContent = "未选择"
+        empty.selected = !loadout.driveDiscIdsBySlot?.[String(slot)]
+        select.appendChild(empty)
         const discs = (store?.driveDiscs ?? [])
             .filter(disc => Number(disc.partition) === slot)
             .sort((left, right) =>
@@ -606,7 +622,8 @@ function openLoadoutModal(loadout) {
     els.loadoutNameInput.value = loadout.name
     populateLoadoutAgentSelect(loadout.agentId)
     renderLoadoutSlotEditors(loadout)
-    els.loadoutSelectedTag.textContent = `${agentName(loadout.agentId)} · ${Number.isFinite(Number(loadout.score)) ? Number(loadout.score).toFixed(0) : "手动"}`
+    const missingSlots = loadoutMissingSlots(loadout)
+    els.loadoutSelectedTag.textContent = `${agentName(loadout.agentId)} · ${Number.isFinite(Number(loadout.score)) ? Number(loadout.score).toFixed(0) : "手动"}${missingSlots.length ? ` · 缺 ${missingSlots.join("、")} 号位` : ""}`
     els.loadoutModal.hidden = false
     document.body.classList.add("modal-open")
 }
@@ -704,7 +721,7 @@ function buildDiscFromForm() {
     return {
         ...(existing ?? {}),
         id,
-        ownerId: existing?.ownerId ?? "default",
+        ownerId: existing?.ownerId ?? store?.currentOwnerId ?? "default",
         setId: selectedSetId || existing?.setId || "manual-set",
         setName: selectedSetName || existing?.setName || "未命名套装",
         canonicalSetName: getSetById(selectedSetId)?.name ?? existing?.canonicalSetName ?? null,
@@ -733,36 +750,68 @@ async function loadStore() {
     renderAll()
 }
 
-async function importScannerData() {
-    const text = els.importTextarea.value.trim()
-    let payload = null
+function importSummaryText(summary) {
+    if (!summary) {
+        return "导入完成"
+    }
 
-    if (els.importFileInput.files?.[0]) {
-        const fileText = await els.importFileInput.files[0].text()
-        payload = {
-            ownerId: "default",
-            sourcePath: els.importFileInput.files[0].name,
-            items: JSON.parse(fileText),
-        }
-    } else if (text) {
-        payload = {
-            ownerId: "default",
-            sourcePath: els.importPathInput.value.trim() || null,
-            items: JSON.parse(text),
-        }
-    } else {
-        payload = {
-            ownerId: "default",
-            sourcePath: els.importPathInput.value.trim(),
+    return `导入完成：新增 ${summary.added ?? 0}，跳过 ${summary.skipped ?? 0}，更新 ${summary.updated ?? 0}，删除 ${summary.removed ?? 0}，文件内重复 ${summary.duplicateInImport ?? 0}`
+}
+
+async function importScannerFile(file) {
+    if (!file) {
+        return false
+    }
+
+    let items = null
+    try {
+        items = JSON.parse(await file.text())
+    } catch (error) {
+        throw new Error(`JSON 解析失败：${error instanceof Error ? error.message : String(error)}`)
+    }
+
+    const removeMissing = Boolean(els.removeMissingInput?.checked)
+    if (removeMissing) {
+        const ok = window.confirm("确认按本次完整导入删除不存在的驱动盘？这会删除同账号下未出现在文件中的所有驱动盘，并清空相关套装预设槽位。")
+        if (!ok) {
+            return false
         }
     }
 
     const response = await api("/api/user-drive-discs/import/zzz-scanner", {
         method: "POST",
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+            sourcePath: file.name,
+            items,
+            removeMissing,
+        }),
     })
     store = response.store
     renderAll()
+    setStatus(importSummaryText(response.summary ?? store.lastImportSummary), "success")
+    return true
+}
+
+async function clearInventory() {
+    const driveDiscCount = store?.driveDiscs?.length ?? 0
+    const importCount = store?.imports?.length ?? 0
+    const loadoutCount = store?.driveDiscLoadouts?.length ?? 0
+    const ok = window.confirm(`确认清空驱动盘仓库？将删除 ${driveDiscCount} 个驱动盘、${importCount} 次导入记录和 ${loadoutCount} 个套装预设。维护界面的驱动盘资料不会受影响。`)
+    if (!ok) {
+        return false
+    }
+
+    const response = await api("/api/user-drive-discs", {
+        method: "DELETE",
+    })
+    store = response.store
+    selectedId = null
+    selectedLoadoutId = null
+    els.importFileInput.value = ""
+    closeModal()
+    closeLoadoutModal()
+    renderAll()
+    return true
 }
 
 async function saveCurrentDisc() {
@@ -798,10 +847,6 @@ async function deleteCurrentDisc() {
     renderAll()
 }
 
-els.importPanelToggle.addEventListener("click", () => {
-    els.importPanel.hidden = !els.importPanel.hidden
-})
-
 els.refreshBtn.addEventListener("click", async () => {
     try {
         setStatus("刷新中", "idle")
@@ -814,19 +859,41 @@ els.refreshBtn.addEventListener("click", async () => {
 
 els.newDiscBtn.addEventListener("click", () => openModal(null))
 
-els.importBtn.addEventListener("click", async () => {
+els.importBtn.addEventListener("click", () => {
+    els.importFileInput.value = ""
+    els.importFileInput.click()
+})
+
+els.importFileInput.addEventListener("change", async () => {
+    const file = els.importFileInput.files?.[0]
+    if (!file) {
+        return
+    }
+
     try {
+        els.importBtn.disabled = true
         setStatus("导入中", "idle")
-        await importScannerData()
-        setStatus("导入完成", "success")
+        const imported = await importScannerFile(file)
+        if (!imported) {
+            setStatus("已取消导入", "idle")
+        }
     } catch (error) {
-        setStatus(error.message, "error")
+        const message = error instanceof Error ? error.message : String(error)
+        setStatus(message, "error")
+        window.alert(message)
+    } finally {
+        els.importBtn.disabled = false
     }
 })
 
-els.clearImportBtn.addEventListener("click", () => {
-    els.importTextarea.value = ""
-    els.importFileInput.value = ""
+els.clearInventoryBtn.addEventListener("click", async () => {
+    try {
+        setStatus("清空仓库", "idle")
+        const cleared = await clearInventory()
+        setStatus(cleared ? "仓库已清空" : "就绪", cleared ? "success" : "idle")
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
 })
 
 for (const input of [els.searchInput, els.setFilter, els.mainStatFilter, els.sortSelect]) {

@@ -10,8 +10,13 @@
     "test:maintenance-validation": "node tests/maintenance-validation.test.js",
     "test:formula": "node tests/formula.test.js",
     "test:damage-whitebox": "node tests/damage-whitebox.test.js",
+    "test:shared-combat": "node tests/shared-combat.test.js",
+    "test:w-engine-modification": "node tests/w-engine-modification.test.js",
+    "test:anomaly-damage": "node tests/anomaly-damage.test.js",
     "test:optimizer": "node tests/optimizer.test.js",
     "test:optimizer-progress": "node tests/optimizer-progress.test.js",
-    "test:optimizer-api": "node tests/optimizer-job-api.test.js"
+    "test:optimizer-api": "node tests/optimizer-job-api.test.js",
+    "test:drive-disc-import": "node tests/drive-disc-import.test.js",
+    "test:accounts": "node tests/accounts.test.js"
   }
 }

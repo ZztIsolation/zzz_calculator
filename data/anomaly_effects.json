@@ -1,0 +1,116 @@
+{
+  "anomalyEffects": [
+    {
+      "id": "assault",
+      "label": {
+        "zhCN": "强击",
+        "en": "Assault"
+      },
+      "element": "physical",
+      "baseMultiplier": 7.13,
+      "defaultProcCount": 1
+    },
+    {
+      "id": "shatter",
+      "label": {
+        "zhCN": "碎冰",
+        "en": "Shatter"
+      },
+      "element": "ice",
+      "baseMultiplier": 5,
+      "defaultProcCount": 1
+    },
+    {
+      "id": "burn",
+      "label": {
+        "zhCN": "灼烧",
+        "en": "Burn"
+      },
+      "element": "fire",
+      "baseMultiplier": 0.5,
+      "defaultProcCount": 20
+    },
+    {
+      "id": "shock",
+      "label": {
+        "zhCN": "感电",
+        "en": "Shock"
+      },
+      "element": "electric",
+      "baseMultiplier": 1.25,
+      "defaultProcCount": 10
+    },
+    {
+      "id": "corruption",
+      "label": {
+        "zhCN": "侵蚀",
+        "en": "Corruption"
+      },
+      "element": "ether",
+      "baseMultiplier": 0.625,
+      "defaultProcCount": 20
+    }
+  ],
+  "disorderEffects": [
+    {
+      "id": "burn",
+      "label": {
+        "zhCN": "灼烧紊乱",
+        "en": "Burn Disorder"
+      },
+      "element": "fire",
+      "fixedMultiplier": 4.5,
+      "tickMultiplier": 0.5,
+      "tickIntervalSeconds": 0.5,
+      "defaultDurationSeconds": 10
+    },
+    {
+      "id": "shock",
+      "label": {
+        "zhCN": "感电紊乱",
+        "en": "Shock Disorder"
+      },
+      "element": "electric",
+      "fixedMultiplier": 4.5,
+      "tickMultiplier": 1.25,
+      "tickIntervalSeconds": 1,
+      "defaultDurationSeconds": 10
+    },
+    {
+      "id": "corruption",
+      "label": {
+        "zhCN": "侵蚀紊乱",
+        "en": "Corruption Disorder"
+      },
+      "element": "ether",
+      "fixedMultiplier": 4.5,
+      "tickMultiplier": 0.625,
+      "tickIntervalSeconds": 0.5,
+      "defaultDurationSeconds": 10
+    },
+    {
+      "id": "frozen",
+      "label": {
+        "zhCN": "霜寒紊乱",
+        "en": "Frozen Disorder"
+      },
+      "element": "ice",
+      "fixedMultiplier": 4.5,
+      "tickMultiplier": 0.075,
+      "tickIntervalSeconds": 1,
+      "defaultDurationSeconds": 10
+    },
+    {
+      "id": "flinch",
+      "label": {
+        "zhCN": "畏缩紊乱",
+        "en": "Flinch Disorder"
+      },
+      "element": "physical",
+      "fixedMultiplier": 4.5,
+      "tickMultiplier": 0.075,
+      "tickIntervalSeconds": 1,
+      "defaultDurationSeconds": 10
+    }
+  ]
+}

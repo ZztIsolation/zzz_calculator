@@ -743,6 +743,7 @@ function createOptimizerState(catalog, store, input = {}) {
         agentId: input.agentId,
         coreSkillLevel: input.coreSkillLevel,
         wEngineId: input.wEngineId,
+        wEngineModificationLevel: input.wEngineModificationLevel,
         combatBuffs,
         damage: input.damage,
     }

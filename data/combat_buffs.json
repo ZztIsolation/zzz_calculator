@@ -1,10 +1,12 @@
 {
   "$schema": "./schemas/combat_buffs.schema.json",
-  "version": 1,
+  "version": 2,
   "notes": [
-    "Generic in-combat buff catalog. Verified W-Engine passives and Drive Disc 4-piece effects remain in their existing source files and are exposed as runtime candidates.",
-    "Visible self, teammate, boss, and field buffs should only be added after their values are verified. Until then, use manual corrections from the frontend.",
+    "Combat buff catalog. Teammate, field, boss, and hidden system buffs are stored separately for maintenance, then flattened by the backend for calculation.",
+    "Visible self buffs remain in their existing source files. Verified W-Engine passives and Drive Disc 4-piece effects remain in their existing source files and are exposed as runtime candidates.",
     "Teammate buffs are grouped by teammate first. Each teammate owns multiple buff entries, and each entry separates source label, literal description, and structured stats used by calculation.",
+    "Field buffs use fieldBuffs entries with name, source, sourcePeriod, description, coverage, and effects.",
+    "Boss buffs use bossBuffs entries with bossName, bossSource, sourcePeriod, description, coverage, and effects.",
     "Hidden entries exist only for backend validation of different percentage attack bases."
   ],
   "teammates": [
@@ -139,9 +141,159 @@
           "id": "buff_7a09645b2f"
         }
       ]
+    },
+    {
+      "id": "nangongyu",
+      "name": {
+        "zhCN": "南宫羽"
+      },
+      "buffs": [
+        {
+          "source": {
+            "zhCN": "核心被动"
+          },
+          "description": {
+            "zhCN": "南宫羽的「普通攻击：可爱地雷飞天撞」或「强化特殊技：相当沉重的爱意」命中敌人时，会使自身的属性异常积蓄效率提升17%，造成的失衡值提升20%，使全队造成的伤害提升25%，持续30秒，重复触发时刷新持续时间"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 25,
+              "id": "effect_884161bbba"
+            }
+          ],
+          "id": "buff_1f08564414"
+        }
+      ]
+    },
+    {
+      "id": "youye",
+      "name": {
+        "zhCN": "浮波柚叶"
+      },
+      "buffs": [
+        {
+          "source": {
+            "zhCN": "核心被动"
+          },
+          "description": {
+            "zhCN": "柚叶的「强化特殊技：小心蛀牙」、「强化特殊技：小心蛀牙，就是现在！」和「终结技：不投降就捣乱」攻击命中敌人时，为全队角色施加「狸之愿」效果；\n「狸之愿」效果会提供等同于柚叶的40%初始攻击力的攻击力加成，最多提升1200点，并使拥有者造成的伤害提升15%，持续40秒，重复触发时刷新持续时间；\n当柚叶的初始攻击力达到3000点时，为全队角色提供的攻击力增益效果达到最大值。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "type": "derived",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkFlat",
+              "mode": "flat",
+              "sourceLabel": {
+                "zhCN": "柚叶初始攻击力"
+              },
+              "defaultSourceValue": 3000,
+              "ratio": 40,
+              "cap": 1200,
+              "id": "effect_105516c8a1"
+            },
+            {
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 15.04,
+              "id": "effect_68de5894c8"
+            }
+          ],
+          "id": "buff_883a921c63"
+        },
+        {
+          "id": "youye.additional_ability.anomaly_damage_bonus",
+          "source": {
+            "zhCN": "额外能力"
+          },
+          "description": {
+            "zhCN": "队伍中存在[异常]角色或与自身阵营相同的角色时触发：若柚叶的异常掌控大于100点，每超过1点异常掌控会使拥有[狸之愿]效果的角色的属性异常积蓄效率提升0.2%，最多提升20%，还会使其所有属性异常伤害和[紊乱]伤害提升0.2%，最多提升20%，当柚叶的异常掌控达到200点时，上述增益效果达到最大值。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "youye_additional_anomaly_damage_bonus",
+              "type": "formula",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyDamageBonus",
+              "mode": "flat",
+              "source": {
+                "variable": "x",
+                "label": {
+                  "zhCN": "柚叶异常掌控"
+                },
+                "defaultValue": 200,
+                "min": 100,
+                "max": 200
+              },
+              "formula": {
+                "expression": "clamp((x - 100) * 0.2, 0, 20)",
+                "valueUnit": "storedPercent"
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "youye.cinema_1.amplify_additional_ability",
+          "source": {
+            "zhCN": "影画一"
+          },
+          "description": {
+            "zhCN": "柚叶进入战场时，回复30点能量，在勘域模式中该效果每180秒最多触发一次；处于[甜蜜惊吓]状态下的敌人全属性伤害抗性降低10%；[额外能力]中属性异常伤害和[紊乱]伤害增益效果提升至原本的130%。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "enemyResReduction",
+              "mode": "flat",
+              "value": 10,
+              "id": "effect_4debdc78eb"
+            }
+          ],
+          "buffModifiers": [
+            {
+              "id": "youye_cinema1_amplify_additional",
+              "operation": "multiplyResolvedValue",
+              "factor": 1.3,
+              "targetBuffIds": [
+                "youye.additional_ability.anomaly_damage_bonus"
+              ],
+              "targetEffectIds": [
+                "youye_additional_anomaly_damage_bonus"
+              ],
+              "label": {
+                "zhCN": "[额外能力]中属性异常伤害和[紊乱]伤害增益效果提升至原本的130%。"
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
-  "buffs": [
+  "fieldBuffs": [],
+  "bossBuffs": [],
+  "systemBuffs": [
     {
       "id": "buff_m9c4t2z8qw",
       "hidden": true,

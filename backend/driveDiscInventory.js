@@ -170,6 +170,133 @@ function hashText(value) {
     return createHash("sha1").update(value).digest("hex").slice(0, 12)
 }
 
+function stableStringify(value) {
+    if (Array.isArray(value)) {
+        return `[${value.map(stableStringify).join(",")}]`
+    }
+
+    if (value && typeof value === "object") {
+        return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`
+    }
+
+    return JSON.stringify(value)
+}
+
+function normalizedStatValue(value) {
+    const number = Number(value ?? 0)
+    return Number.isFinite(number) ? Number(number.toFixed(5)) : 0
+}
+
+function statFingerprintEntry(stat, { includeValue = true } = {}) {
+    const entry = {
+        stat: stat?.stat ?? "unknown",
+        mode: stat?.mode ?? "unknown",
+    }
+    if (includeValue) {
+        entry.value = normalizedStatValue(stat?.value)
+    }
+    return entry
+}
+
+export function driveDiscContentFingerprint(disc) {
+    return hashText(stableStringify({
+        setId: disc?.setId ?? "",
+        setName: disc?.setName ?? "",
+        partition: Number(disc?.partition ?? 0),
+        rarity: String(disc?.rarity ?? ""),
+        level: Number(disc?.level ?? 0),
+        mainStat: statFingerprintEntry(disc?.mainStat, { includeValue: true }),
+        subStats: (disc?.subStats ?? []).map(stat => statFingerprintEntry(stat, { includeValue: true })),
+    }))
+}
+
+export function driveDiscIdentityFingerprint(disc) {
+    return hashText(stableStringify({
+        setId: disc?.setId ?? "",
+        setName: disc?.setName ?? "",
+        partition: Number(disc?.partition ?? 0),
+        rarity: String(disc?.rarity ?? ""),
+        mainStat: statFingerprintEntry(disc?.mainStat, { includeValue: false }),
+        subStats: (disc?.subStats ?? []).map(stat => statFingerprintEntry(stat, { includeValue: false })),
+    }))
+}
+
+function withDriveDiscFingerprints(disc) {
+    const next = {
+        ...(disc ?? {}),
+    }
+    next.contentFingerprint = driveDiscContentFingerprint(next)
+    next.identityFingerprint = driveDiscIdentityFingerprint(next)
+    return next
+}
+
+function buildDuplicateAwareIndex(items, keyOf) {
+    const result = new Map()
+    for (const item of items ?? []) {
+        const key = keyOf(item)
+        if (!key) {
+            continue
+        }
+        const existing = result.get(key) ?? []
+        existing.push(item)
+        result.set(key, existing)
+    }
+    return result
+}
+
+function matchedImportSource(source) {
+    return {
+        ...(source ?? {}),
+        lastMatchedAt: new Date().toISOString(),
+    }
+}
+
+function mergeImportedDriveDisc(existing, imported) {
+    return withDriveDiscFingerprints({
+        ...existing,
+        ...imported,
+        id: existing.id,
+        ownerId: existing.ownerId ?? imported.ownerId,
+        locked: existing.locked ?? imported.locked ?? false,
+        equippedBy: existing.equippedBy ?? imported.equippedBy ?? null,
+        source: matchedImportSource({
+            ...(existing.source ?? {}),
+            ...(imported.source ?? {}),
+            previousImportId: existing.source?.importId ?? null,
+        }),
+        updatedAt: new Date().toISOString(),
+    })
+}
+
+function clearDeletedDriveDiscLoadoutSlots(loadouts, deletedIds) {
+    if (!deletedIds?.size) {
+        return loadouts ?? []
+    }
+
+    return (loadouts ?? []).map(loadout => {
+        const idsBySlot = { ...(loadout.driveDiscIdsBySlot ?? {}) }
+        const removedFromLoadout = []
+        for (const [slot, id] of Object.entries(idsBySlot)) {
+            if (deletedIds.has(id)) {
+                delete idsBySlot[slot]
+                removedFromLoadout.push(id)
+            }
+        }
+
+        if (!removedFromLoadout.length) {
+            return loadout
+        }
+
+        return {
+            ...loadout,
+            driveDiscIdsBySlot: idsBySlot,
+            status: "incomplete",
+            missingDriveDiscIds: [...new Set([...(loadout.missingDriveDiscIds ?? []), ...removedFromLoadout])],
+            updatedAt: new Date().toISOString(),
+        }
+    })
+}
+
 function storePath(dataDir) {
     return path.join(dataDir, STORE_FILE)
 }
@@ -178,6 +305,7 @@ function createEmptyStore() {
     return {
         version: 1,
         updatedAt: null,
+        currentOwnerId: "default",
         owners: [
             {
                 id: "default",
@@ -190,15 +318,68 @@ function createEmptyStore() {
     }
 }
 
+function cleanOwnerId(id) {
+    return String(id ?? "").trim()
+}
+
+function uniqueOwnerId(baseId, owners) {
+    const used = new Set((owners ?? []).map(owner => owner.id))
+    let id = cleanOwnerId(baseId) || `account-${Date.now()}`
+    if (!used.has(id)) {
+        return id
+    }
+
+    let index = 2
+    while (used.has(`${id}-${index}`)) {
+        index += 1
+    }
+    return `${id}-${index}`
+}
+
+function defaultOwner() {
+    return { id: "default", label: "默认用户" }
+}
+
 function normalizeStore(store) {
+    const fallback = createEmptyStore()
+    const owners = Array.isArray(store?.owners) && store.owners.length
+        ? store.owners
+            .map(owner => ({
+                id: cleanOwnerId(owner.id),
+                label: String(owner.label ?? owner.name ?? owner.id ?? "").trim() || cleanOwnerId(owner.id),
+            }))
+            .filter(owner => owner.id)
+        : fallback.owners
+    const safeOwners = owners.length ? owners : [defaultOwner()]
+    const currentOwnerId = safeOwners.some(owner => owner.id === store?.currentOwnerId)
+        ? store.currentOwnerId
+        : safeOwners[0].id
+
     return {
-        ...createEmptyStore(),
+        ...fallback,
         ...(store ?? {}),
-        owners: Array.isArray(store?.owners) ? store.owners : createEmptyStore().owners,
+        currentOwnerId,
+        owners: safeOwners,
         imports: Array.isArray(store?.imports) ? store.imports : [],
-        driveDiscs: Array.isArray(store?.driveDiscs) ? store.driveDiscs : [],
+        driveDiscs: Array.isArray(store?.driveDiscs) ? store.driveDiscs.map(withDriveDiscFingerprints) : [],
         driveDiscLoadouts: Array.isArray(store?.driveDiscLoadouts) ? store.driveDiscLoadouts : [],
     }
+}
+
+export function ownerScopedStore(store, ownerId = store.currentOwnerId) {
+    const normalized = normalizeStore(store)
+    const scopedOwnerId = normalized.owners.some(owner => owner.id === ownerId) ? ownerId : normalized.currentOwnerId
+    return {
+        ...normalized,
+        currentOwnerId: scopedOwnerId,
+        imports: (normalized.imports ?? []).filter(item => (item.ownerId ?? "default") === scopedOwnerId),
+        driveDiscs: (normalized.driveDiscs ?? []).filter(item => (item.ownerId ?? "default") === scopedOwnerId),
+        driveDiscLoadouts: (normalized.driveDiscLoadouts ?? []).filter(item => (item.ownerId ?? "default") === scopedOwnerId),
+    }
+}
+
+export function currentOwnerId(store) {
+    return normalizeStore(store).currentOwnerId
 }
 
 function pickScannerItems(input) {
@@ -303,19 +484,8 @@ function normalizeScannerItem(rawItem, index, options, warnings) {
     const rarity = String(rawItem["品质"] ?? "S")
     const level = Number(rawItem["等级"] ?? 0)
     const maxLevel = Number(rawItem["最大等级"] ?? level)
-    const rawIdentity = JSON.stringify({
-        ownerId: options.ownerId,
-        sourceSequence,
-        setName,
-        partition,
-        rarity,
-        level,
-        mainStat: rawItem["主属性"],
-        subStats: rawItem["副属性"],
-    })
-
-    return {
-        id: `scanner-${sourceSequence}-${hashText(rawIdentity)}`,
+    const normalized = {
+        id: `scanner-${sourceSequence}-${hashText(`${options.ownerId}:${setName}:${partition}:${rarity}:${stableStringify(rawItem["主属性"])}:${stableStringify(rawItem["副属性"])}`)}`,
         ownerId: options.ownerId,
         setId: setMatch?.id ?? `scanner-set-${hashText(setName)}`,
         setName,
@@ -340,6 +510,12 @@ function normalizeScannerItem(rawItem, index, options, warnings) {
         },
         raw: rawItem,
     }
+
+    const withFingerprints = withDriveDiscFingerprints(normalized)
+    return {
+        ...withFingerprints,
+        id: `scanner-${withFingerprints.contentFingerprint}`,
+    }
 }
 
 export function normalizeScannerExport(input, options = {}) {
@@ -362,6 +538,7 @@ export function normalizeScannerExport(input, options = {}) {
             importedAt,
             itemCount: driveDiscs.length,
             warnings,
+            removeMissing: Boolean(options.removeMissing),
         },
         driveDiscs,
     }
@@ -377,6 +554,11 @@ export async function loadUserDriveDiscStore(dataDir) {
     return normalizeStore(JSON.parse(text))
 }
 
+export async function loadCurrentUserDriveDiscStore(dataDir) {
+    const store = await loadUserDriveDiscStore(dataDir)
+    return ownerScopedStore(store)
+}
+
 export async function saveUserDriveDiscStore(dataDir, store) {
     const nextStore = {
         ...normalizeStore(store),
@@ -387,27 +569,143 @@ export async function saveUserDriveDiscStore(dataDir, store) {
 }
 
 export async function importScannerExportToStore(dataDir, input, options = {}) {
-    const normalized = normalizeScannerExport(input, options)
+    const currentStore = await loadUserDriveDiscStore(dataDir)
+    const effectiveOwnerId = options.ownerId ?? currentStore.currentOwnerId
+    const normalized = normalizeScannerExport(input, {
+        ...options,
+        ownerId: effectiveOwnerId,
+        removeMissing: Boolean(options.removeMissing),
+    })
     const ownerId = normalized.importRecord.ownerId
-    const store = await loadUserDriveDiscStore(dataDir)
+    const store = currentStore
     const owners = store.owners?.some(owner => owner.id === ownerId)
         ? store.owners
         : [...(store.owners ?? []), { id: ownerId, label: ownerId }]
+    const existingSameOwner = (store.driveDiscs ?? []).filter(item => item.ownerId === ownerId)
+    const existingOtherOwners = (store.driveDiscs ?? []).filter(item => item.ownerId !== ownerId)
+    const byContent = buildDuplicateAwareIndex(existingSameOwner, item => item.contentFingerprint)
+    const byIdentity = buildDuplicateAwareIndex(existingSameOwner, item => item.identityFingerprint)
+    const nextSameOwner = new Map(existingSameOwner.map(item => [item.id, item]))
+    const matchedExistingIds = new Set()
+    const seenImportContent = new Set()
+    const summary = {
+        added: 0,
+        skipped: 0,
+        updated: 0,
+        removed: 0,
+        duplicateInImport: 0,
+        warnings: normalized.importRecord.warnings ?? [],
+    }
+
+    for (const imported of normalized.driveDiscs) {
+        if (seenImportContent.has(imported.contentFingerprint)) {
+            summary.duplicateInImport += 1
+            continue
+        }
+        seenImportContent.add(imported.contentFingerprint)
+
+        const contentMatches = byContent.get(imported.contentFingerprint) ?? []
+        if (contentMatches.length > 0) {
+            const existing = contentMatches[0]
+            matchedExistingIds.add(existing.id)
+            nextSameOwner.set(existing.id, {
+                ...existing,
+                source: matchedImportSource({
+                    ...(existing.source ?? {}),
+                    importId: imported.source?.importId,
+                    importedAt: imported.source?.importedAt,
+                    sourcePath: imported.source?.sourcePath,
+                    sequence: imported.source?.sequence,
+                    rawIndex: imported.source?.rawIndex,
+                }),
+                raw: imported.raw ?? existing.raw ?? null,
+                contentFingerprint: imported.contentFingerprint,
+                identityFingerprint: imported.identityFingerprint,
+            })
+            summary.skipped += 1
+            continue
+        }
+
+        const identityMatches = byIdentity.get(imported.identityFingerprint) ?? []
+        if (identityMatches.length === 1 && Number(imported.level ?? 0) > Number(identityMatches[0].level ?? 0)) {
+            const existing = identityMatches[0]
+            matchedExistingIds.add(existing.id)
+            const merged = mergeImportedDriveDisc(existing, imported)
+            nextSameOwner.set(existing.id, merged)
+            summary.updated += 1
+            continue
+        }
+
+        let nextId = imported.id
+        while (nextSameOwner.has(nextId) || existingOtherOwners.some(item => item.id === nextId)) {
+            nextId = `scanner-${imported.contentFingerprint}-${hashText(`${nextId}:${nextSameOwner.size}`)}`
+        }
+        const nextDisc = withDriveDiscFingerprints({
+            ...imported,
+            id: nextId,
+            createdAt: imported.createdAt ?? new Date().toISOString(),
+            updatedAt: imported.updatedAt ?? new Date().toISOString(),
+        })
+        nextSameOwner.set(nextDisc.id, nextDisc)
+        matchedExistingIds.add(nextDisc.id)
+        summary.added += 1
+    }
+
+    const deletedIds = new Set()
+    if (options.removeMissing) {
+        for (const disc of existingSameOwner) {
+            if (!matchedExistingIds.has(disc.id)) {
+                nextSameOwner.delete(disc.id)
+                deletedIds.add(disc.id)
+            }
+        }
+        summary.removed = deletedIds.size
+    }
 
     const nextStore = {
         ...store,
         owners,
+        currentOwnerId: store.currentOwnerId,
         imports: [
             ...(store.imports ?? []),
-            normalized.importRecord,
+            {
+                ...normalized.importRecord,
+                summary,
+            },
         ],
         driveDiscs: [
-            ...(store.driveDiscs ?? []).filter(item => item.ownerId !== ownerId),
-            ...normalized.driveDiscs,
+            ...existingOtherOwners,
+            ...nextSameOwner.values(),
         ],
+        driveDiscLoadouts: clearDeletedDriveDiscLoadoutSlots(store.driveDiscLoadouts ?? [], deletedIds),
     }
 
-    return saveUserDriveDiscStore(dataDir, nextStore)
+    const saved = await saveUserDriveDiscStore(dataDir, nextStore)
+    return {
+        ...saved,
+        lastImportSummary: summary,
+    }
+}
+
+export async function clearUserDriveDiscStore(dataDir, ownerId = null) {
+    const store = await loadUserDriveDiscStore(dataDir)
+    const scopedOwnerId = ownerId ?? store.currentOwnerId
+    const previous = {
+        imports: (store.imports ?? []).filter(item => (item.ownerId ?? "default") === scopedOwnerId).length,
+        driveDiscs: (store.driveDiscs ?? []).filter(item => (item.ownerId ?? "default") === scopedOwnerId).length,
+        driveDiscLoadouts: (store.driveDiscLoadouts ?? []).filter(item => (item.ownerId ?? "default") === scopedOwnerId).length,
+    }
+    const nextStore = await saveUserDriveDiscStore(dataDir, {
+        ...store,
+        imports: (store.imports ?? []).filter(item => (item.ownerId ?? "default") !== scopedOwnerId),
+        driveDiscs: (store.driveDiscs ?? []).filter(item => (item.ownerId ?? "default") !== scopedOwnerId),
+        driveDiscLoadouts: (store.driveDiscLoadouts ?? []).filter(item => (item.ownerId ?? "default") !== scopedOwnerId),
+    })
+
+    return {
+        store: nextStore,
+        previous,
+    }
 }
 
 export async function upsertUserDriveDisc(dataDir, driveDisc) {
@@ -416,10 +714,12 @@ export async function upsertUserDriveDisc(dataDir, driveDisc) {
     }
 
     const store = await loadUserDriveDiscStore(dataDir)
+    const ownerId = driveDisc.ownerId ?? store.currentOwnerId
     const existing = store.driveDiscs ?? []
     const index = existing.findIndex(item => item.id === driveDisc.id)
     const nextDriveDisc = {
         ...driveDisc,
+        ownerId,
         updatedAt: new Date().toISOString(),
     }
 
@@ -435,16 +735,21 @@ export async function upsertUserDriveDisc(dataDir, driveDisc) {
 
 export async function deleteUserDriveDisc(dataDir, id) {
     const store = await loadUserDriveDiscStore(dataDir)
+    const ownerId = store.currentOwnerId
     const before = store.driveDiscs ?? []
-    const driveDiscs = before.filter(item => item.id !== id)
+    const deletedDisc = before.find(item => item.id === id && (item.ownerId ?? "default") === ownerId)
+    const driveDiscs = before.filter(item => !(item.id === id && (item.ownerId ?? "default") === ownerId))
     const nextStore = await saveUserDriveDiscStore(dataDir, {
         ...store,
         driveDiscs,
+        driveDiscLoadouts: deletedDisc
+            ? clearDeletedDriveDiscLoadoutSlots(store.driveDiscLoadouts ?? [], new Set([id]))
+            : store.driveDiscLoadouts ?? [],
     })
 
     return {
         store: nextStore,
-        deleted: before.length !== driveDiscs.length,
+        deleted: Boolean(deletedDisc),
     }
 }
 
@@ -468,9 +773,6 @@ function normalizeDriveDiscLoadout(loadout, existing = null) {
 
     const driveDiscIdsBySlot = cleanDriveDiscIdsBySlot(loadout?.driveDiscIdsBySlot ?? existing?.driveDiscIdsBySlot)
     const missingSlots = [1, 2, 3, 4, 5, 6].filter(slot => !driveDiscIdsBySlot[String(slot)])
-    if (missingSlots.length) {
-        throw new Error(`Drive disc loadout must include slots: ${missingSlots.join(", ")}.`)
-    }
 
     const now = new Date().toISOString()
     return {
@@ -481,6 +783,9 @@ function normalizeDriveDiscLoadout(loadout, existing = null) {
         name: String(loadout?.name ?? existing?.name ?? "未命名套装").trim() || "未命名套装",
         ownerId: String(loadout?.ownerId ?? existing?.ownerId ?? "default"),
         driveDiscIdsBySlot,
+        status: missingSlots.length ? "incomplete" : "complete",
+        missingSlots,
+        missingDriveDiscIds: missingSlots.length ? loadout?.missingDriveDiscIds ?? existing?.missingDriveDiscIds ?? [] : [],
         source: loadout?.source ?? existing?.source ?? { type: "manual" },
         score: Number.isFinite(Number(loadout?.score)) ? Number(loadout.score) : existing?.score ?? null,
         createdAt: existing?.createdAt ?? loadout?.createdAt ?? now,
@@ -490,10 +795,11 @@ function normalizeDriveDiscLoadout(loadout, existing = null) {
 
 export async function upsertDriveDiscLoadout(dataDir, loadout) {
     const store = await loadUserDriveDiscStore(dataDir)
+    const ownerId = loadout.ownerId ?? store.currentOwnerId
     const existing = store.driveDiscLoadouts ?? []
     const id = String(loadout?.id ?? "").trim() || `loadout-${Date.now()}`
-    const index = existing.findIndex(item => item.id === id)
-    const nextLoadout = normalizeDriveDiscLoadout({ ...loadout, id }, index >= 0 ? existing[index] : null)
+    const index = existing.findIndex(item => item.id === id && (item.ownerId ?? "default") === ownerId)
+    const nextLoadout = normalizeDriveDiscLoadout({ ...loadout, id, ownerId }, index >= 0 ? existing[index] : null)
     const driveDiscLoadouts = index >= 0
         ? existing.map(item => item.id === id ? nextLoadout : item)
         : [...existing, nextLoadout]
@@ -509,8 +815,9 @@ export async function upsertDriveDiscLoadout(dataDir, loadout) {
 
 export async function deleteDriveDiscLoadout(dataDir, id) {
     const store = await loadUserDriveDiscStore(dataDir)
+    const ownerId = store.currentOwnerId
     const before = store.driveDiscLoadouts ?? []
-    const driveDiscLoadouts = before.filter(item => item.id !== id)
+    const driveDiscLoadouts = before.filter(item => !(item.id === id && (item.ownerId ?? "default") === ownerId))
     const nextStore = await saveUserDriveDiscStore(dataDir, {
         ...store,
         driveDiscLoadouts,
@@ -519,6 +826,98 @@ export async function deleteDriveDiscLoadout(dataDir, id) {
     return {
         store: nextStore,
         deleted: before.length !== driveDiscLoadouts.length,
+    }
+}
+
+export async function accountSummary(dataDir) {
+    const store = await loadUserDriveDiscStore(dataDir)
+    return {
+        currentOwnerId: store.currentOwnerId,
+        owners: (store.owners ?? []).map(owner => ({
+            ...owner,
+            driveDiscCount: (store.driveDiscs ?? []).filter(item => (item.ownerId ?? "default") === owner.id).length,
+            loadoutCount: (store.driveDiscLoadouts ?? []).filter(item => (item.ownerId ?? "default") === owner.id).length,
+            importCount: (store.imports ?? []).filter(item => (item.ownerId ?? "default") === owner.id).length,
+        })),
+    }
+}
+
+export async function createAccount(dataDir, account = {}) {
+    const store = await loadUserDriveDiscStore(dataDir)
+    const id = uniqueOwnerId(account.id ?? `account-${Date.now()}`, store.owners)
+    const label = String(account.label ?? account.name ?? "新账号").trim() || "新账号"
+    const nextStore = await saveUserDriveDiscStore(dataDir, {
+        ...store,
+        owners: [...(store.owners ?? []), { id, label }],
+    })
+    return {
+        store: nextStore,
+        account: nextStore.owners.find(owner => owner.id === id),
+        summary: await accountSummary(dataDir),
+    }
+}
+
+export async function updateAccount(dataDir, id, patch = {}) {
+    const store = await loadUserDriveDiscStore(dataDir)
+    const ownerId = cleanOwnerId(id)
+    const owners = (store.owners ?? []).map(owner =>
+        owner.id === ownerId
+            ? {
+                ...owner,
+                label: String(patch.label ?? patch.name ?? owner.label).trim() || owner.label,
+            }
+            : owner
+    )
+    if (!owners.some(owner => owner.id === ownerId)) {
+        throw new Error("Account not found.")
+    }
+    const nextStore = await saveUserDriveDiscStore(dataDir, {
+        ...store,
+        owners,
+    })
+    return {
+        store: nextStore,
+        account: nextStore.owners.find(owner => owner.id === ownerId),
+        summary: await accountSummary(dataDir),
+    }
+}
+
+export async function switchAccount(dataDir, id) {
+    const store = await loadUserDriveDiscStore(dataDir)
+    const ownerId = cleanOwnerId(id)
+    if (!(store.owners ?? []).some(owner => owner.id === ownerId)) {
+        throw new Error("Account not found.")
+    }
+    const nextStore = await saveUserDriveDiscStore(dataDir, {
+        ...store,
+        currentOwnerId: ownerId,
+    })
+    return {
+        store: nextStore,
+        summary: await accountSummary(dataDir),
+    }
+}
+
+export async function deleteAccount(dataDir, id) {
+    const store = await loadUserDriveDiscStore(dataDir)
+    const ownerId = cleanOwnerId(id)
+    if (ownerId === store.currentOwnerId) {
+        throw new Error("Cannot delete the current account.")
+    }
+    if (!(store.owners ?? []).some(owner => owner.id === ownerId)) {
+        throw new Error("Account not found.")
+    }
+    const nextStore = await saveUserDriveDiscStore(dataDir, {
+        ...store,
+        owners: (store.owners ?? []).filter(owner => owner.id !== ownerId),
+        imports: (store.imports ?? []).filter(item => (item.ownerId ?? "default") !== ownerId),
+        driveDiscs: (store.driveDiscs ?? []).filter(item => (item.ownerId ?? "default") !== ownerId),
+        driveDiscLoadouts: (store.driveDiscLoadouts ?? []).filter(item => (item.ownerId ?? "default") !== ownerId),
+    })
+    return {
+        store: nextStore,
+        summary: await accountSummary(dataDir),
+        deleted: true,
     }
 }
 

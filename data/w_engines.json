@@ -28,6 +28,11 @@
           "mode": "pct"
         }
       },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
       "effect": {
         "name": {
           "zhCN": "电光石火"
@@ -40,7 +45,7 @@
           }
         },
         "description": {
-          "zhCN": "电属性伤害提升15%；闪避反击或支援攻击命中敌人时，能量自动回复提升18%。",
+          "zhCN": "电属性伤害提升15%/17.5%/20%/22%/24%；闪避反击或支援攻击命中敌人时，能量自动回复提升18%/20.5%/23%/25%/27.5%。",
           "en": "Electric DMG increases by 15%. When a Dodge Counter or Assist Attack hits an enemy, Energy Regen increases by 18%."
         },
         "selfBuff": {
@@ -52,14 +57,28 @@
               "type": "fixed",
               "stat": "electricDmg",
               "value": 15,
-              "mode": "flat"
+              "mode": "flat",
+              "modificationScaling": {
+                "value": {
+                  "base": 15,
+                  "step": 2.25,
+                  "displayValues": [15, 17.5, 20, 22, 24]
+                }
+              }
             },
             {
               "id": "effect_l7p3x9za",
               "type": "fixed",
               "stat": "energyRegen",
               "value": 18,
-              "mode": "flat"
+              "mode": "flat",
+              "modificationScaling": {
+                "value": {
+                  "base": 18,
+                  "step": 2.375,
+                  "displayValues": [18, 20.5, 23, 25, 27.5]
+                }
+              }
             }
           ],
           "coverage": {
@@ -100,6 +119,11 @@
           "mode": "flat"
         }
       },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
       "effect": {
         "name": {
           "zhCN": "玉魄冰心"
@@ -112,7 +136,7 @@
           }
         },
         "description": {
-          "zhCN": "装备者造成的伤害无视目标20%物理属性伤害抗性；装备者开启【以太帷幕】时，自身造成的伤害提升25%，暴击伤害提升25%，持续40秒，重复触发时刷新持续时间。",
+          "zhCN": "装备者造成的伤害无视目标20%/22%/24%/26%/28%物理属性伤害抗性；装备者开启[以太帷幕]时，自身造成的伤害提升25%/28.7%/32.5%/36.2%/40%，暴击伤害提升25%/28.7%/32.5%/36.2%/40%，持续40秒，重复触发时刷新持续时间。",
           "en": "The equipper's damage ignores 20% Physical RES. When the equipper activates Ether Veil, their DMG increases by 25% and CRIT DMG increases by 25% for 40s. Repeated triggers refresh the duration."
         },
         "selfBuff": {
@@ -123,21 +147,42 @@
               "type": "fixed",
               "stat": "physicalResIgnore",
               "mode": "flat",
-              "value": 20
+              "value": 20,
+              "modificationScaling": {
+                "value": {
+                  "base": 20,
+                  "step": 2,
+                  "displayValues": [20, 22, 24, 26, 28]
+                }
+              }
             },
             {
               "id": "effect_v9k5n1qp",
               "type": "fixed",
               "stat": "dmgBonus",
               "mode": "flat",
-              "value": 25
+              "value": 25,
+              "modificationScaling": {
+                "value": {
+                  "base": 25,
+                  "step": 3.75,
+                  "displayValues": [25, 28.7, 32.5, 36.2, 40]
+                }
+              }
             },
             {
               "id": "effect_b3x7d4la",
               "type": "fixed",
               "stat": "critDmg",
               "mode": "flat",
-              "value": 25
+              "value": 25,
+              "modificationScaling": {
+                "value": {
+                  "base": 25,
+                  "step": 3.75,
+                  "displayValues": [25, 28.7, 32.5, 36.2, 40]
+                }
+              }
             }
           ],
           "appliesToOutOfCombatPanel": false
@@ -151,6 +196,182 @@
         "level60Stats": "source-checked",
         "effectText": "from-provided-screenshot",
         "phase1EffectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "hailfall_star_palace",
+      "name": {
+        "zhCN": "霰落星殿"
+      },
+      "rarity": "S",
+      "specialty": "anomaly",
+      "attribute": "ice",
+      "relatedAgentId": "hoshimi_miyabi",
+      "images": {
+        "icon": "/assets/w-engines/hailfall_star_palace.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      },
+      "level60": {
+        "atkBase": 743,
+        "advancedStat": {
+          "stat": "critRate",
+          "value": 24,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "霜染寒星"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "暴击伤害提升50%/57%/65%/72%/80%；发动[强化特殊技]或队伍中任意角色对敌人施加属性异常效果时，装备者造成的冰属性伤害提升20%/23%/26%/29%/32%，最多叠加2层，持续15秒，每层效果单独结算持续时间。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_hailfall_crit_dmg",
+              "type": "fixed",
+              "stat": "critDmg",
+              "mode": "flat",
+              "value": 50,
+              "modificationScaling": {
+                "value": {
+                  "base": 50,
+                  "step": 7.5,
+                  "displayValues": [50, 57, 65, 72, 80]
+                }
+              }
+            },
+            {
+              "id": "effect_hailfall_ice_dmg",
+              "type": "stacked",
+              "stat": "iceDmg",
+              "mode": "flat",
+              "valuePerStack": 20,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "modificationScaling": {
+                "valuePerStack": {
+                  "base": 20,
+                  "step": 3,
+                  "displayValues": [20, 23, 26, 29, 32]
+                }
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://wiki.biligame.com/zzz/%E9%9C%B0%E8%90%BD%E6%98%9F%E6%AE%BF"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked-rank-1-default-full-stacks"
+      }
+    },
+    {
+      "id": "tenfold_starforge",
+      "name": {
+        "zhCN": "十方锻星"
+      },
+      "rarity": "S",
+      "specialty": "anomaly",
+      "attribute": "physical",
+      "relatedAgentId": "alice_thymefield",
+      "images": {
+        "icon": "/assets/w-engines/tenfold_starforge.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 30,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "予你星屑"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者的异常掌控提升60/69/78/87/96点；触发[强击]时，装备者造成的物理伤害提升20%/23%/26%/29%/32%，持续20秒，最多叠加2层，重复触发时刷新持续时间，装备者进入接战状态时，立即获得2层效果。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_tenfold_anomaly_mastery",
+              "type": "fixed",
+              "stat": "anomalyMasteryFlat",
+              "mode": "flat",
+              "value": 60,
+              "modificationScaling": {
+                "value": {
+                  "base": 60,
+                  "step": 9,
+                  "displayValues": [60, 69, 78, 87, 96]
+                }
+              }
+            },
+            {
+              "id": "effect_tenfold_physical_dmg",
+              "type": "stacked",
+              "stat": "physicalDmg",
+              "mode": "flat",
+              "valuePerStack": 20,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "modificationScaling": {
+                "valuePerStack": {
+                  "base": 20,
+                  "step": 3,
+                  "displayValues": [20, 23, 26, 29, 32]
+                }
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://wiki.biligame.com/zzz/%E5%8D%81%E6%96%B9%E9%94%BB%E6%98%9F"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked-rank-1-default-full-stacks"
       }
     },
     {
@@ -173,6 +394,11 @@
           "mode": "pct"
         }
       },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
       "effect": {
         "name": {
           "zhCN": "喧响独白"
@@ -185,7 +411,7 @@
           }
         },
         "description": {
-          "zhCN": "装备者为非操作中角色时，能量自动回复提升0.6点/秒；装备者发动【强化特殊技】造成物理伤害时，使全队角色造成伤害提升12.5%，持续40秒，最多叠加2层；拥有2层效果时，角色的攻击力额外提升10%。",
+          "zhCN": "装备者为非操作中角色时，能量自动回复提升0.6/0.69/0.78/0.87/0.96点/秒；装备者发动[强化特殊技]造成物理伤害时，使全队角色造成伤害提升12.5%/14.3%/16.1%/17.9%/20%，持续40秒，最多叠加2层；拥有2层效果时，角色的攻击力额外提升10%/11.5%/13%/14.5%/16%。",
           "en": "When off-field, Energy Regen increases. When the equipper's EX Special Attack deals Physical DMG, the squad gains DMG Bonus, stacking up to 2 times; at 2 stacks, squad ATK further increases."
         },
         "selfBuff": {
@@ -205,10 +431,19 @@
           "effects": [
             {
               "id": "effect_wiki_1826_team_dmg",
-              "type": "fixed",
+              "type": "stacked",
               "stat": "dmgBonus",
               "mode": "flat",
-              "value": 25
+              "valuePerStack": 12.5,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "modificationScaling": {
+                "valuePerStack": {
+                  "base": 12.5,
+                  "step": 1.875,
+                  "displayValues": [12.5, 14.3, 16.1, 17.9, 20]
+                }
+              }
             },
             {
               "id": "effect_wiki_1826_team_atk",
@@ -216,7 +451,14 @@
               "stat": "atkPct",
               "mode": "pct",
               "basis": "outOfCombatAtk",
-              "value": 10
+              "value": 10,
+              "modificationScaling": {
+                "value": {
+                  "base": 10,
+                  "step": 1.5,
+                  "displayValues": [10, 11.5, 13, 14.5, 16]
+                }
+              }
             }
           ],
           "appliesToOutOfCombatPanel": false
@@ -251,6 +493,11 @@
           "mode": "pct"
         }
       },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
       "effect": {
         "name": {
           "zhCN": "易碎之甜"
@@ -263,7 +510,7 @@
           }
         },
         "description": {
-          "zhCN": "装备者的能量自动回复提升0.46点/秒；全队角色攻击力提升10%，最大生命值提升10%；装备者开启或延长【以太帷幕】时，使全队暴击伤害提升30%，持续60秒。",
+          "zhCN": "装备者的能量自动回复提升0.46/0.53/0.6/0.67/0.74点/秒；全队角色攻击力提升10%/11.5%/13%/14.5%/16%，最大生命值提升10%/11.5%/13%/14.5%/16%；装备者开启或延长[以太帷幕]时，使全队暴击伤害提升30%/34.5%/39%/43.5%/48%，持续60秒。",
           "en": "The equipper gains Energy Regen. Squad ATK and Max HP increase. When the equipper activates or extends Ether Veil, squad CRIT DMG increases."
         },
         "selfBuff": null,
@@ -276,7 +523,14 @@
               "stat": "atkPct",
               "mode": "pct",
               "basis": "outOfCombatAtk",
-              "value": 10
+              "value": 10,
+              "modificationScaling": {
+                "value": {
+                  "base": 10,
+                  "step": 1.5,
+                  "displayValues": [10, 11.5, 13, 14.5, 16]
+                }
+              }
             },
             {
               "id": "effect_wiki_1753_team_hp",
@@ -284,14 +538,28 @@
               "stat": "hpPct",
               "mode": "pct",
               "basis": "outOfCombatHp",
-              "value": 10
+              "value": 10,
+              "modificationScaling": {
+                "value": {
+                  "base": 10,
+                  "step": 1.5,
+                  "displayValues": [10, 11.5, 13, 14.5, 16]
+                }
+              }
             },
             {
               "id": "effect_wiki_1753_team_crit_dmg",
               "type": "fixed",
               "stat": "critDmg",
               "mode": "flat",
-              "value": 30
+              "value": 30,
+              "modificationScaling": {
+                "value": {
+                  "base": 30,
+                  "step": 4.5,
+                  "displayValues": [30, 34.5, 39, 43.5, 48]
+                }
+              }
             }
           ],
           "appliesToOutOfCombatPanel": false
@@ -326,6 +594,11 @@
           "mode": "flat"
         }
       },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
       "effect": {
         "name": {
           "zhCN": "7x24"
@@ -338,7 +611,7 @@
           }
         },
         "description": {
-          "zhCN": "位于后台时，装备者的能量自动回复提升1.5点/秒；装备者发动【强化特殊技】造成物理属性伤害时，装备者攻击造成的失衡值提升9%，最多叠加3层，持续10秒；叠加到3层时，全队角色暴击伤害额外提升30%，持续40秒。",
+          "zhCN": "位于后台时，装备者的能量自动回复提升1.5/1.7/1.9/2.1/2.3点/秒；装备者发动[强化特殊技]造成物理属性伤害时，装备者攻击造成的失衡值提升9%/10.3%/11.7%/13%/14.5%，最多叠加3层，持续10秒；叠加到3层时，全队角色暴击伤害额外提升30%/34.5%/39%/43.5%/48%，持续40秒。",
           "en": "When off-field, the equipper gains Energy Regen. Physical EX Special Attack damage increases the Daze dealt by the equipper's attacks, stacking up to 3 times. At 3 stacks, squad CRIT DMG increases."
         },
         "selfBuff": {
@@ -354,11 +627,18 @@
               "mode": "flat",
               "valuePerStack": 9,
               "maxStacks": 3,
-              "defaultStacks": 3
+              "defaultStacks": 3,
+              "modificationScaling": {
+                "valuePerStack": {
+                  "base": 9,
+                  "step": 1.375,
+                  "displayValues": [9, 10.3, 11.7, 13, 14.5]
+                }
+              }
             }
           ],
           "effectText": {
-            "zhCN": "装备者发动[强化特殊技]造成物理属性伤害时，装备者攻击造成的失衡值提升9%，最多叠加3层，持续10秒。"
+            "zhCN": "装备者发动[强化特殊技]造成物理属性伤害时，装备者攻击造成的失衡值提升9%/10.3%/11.7%/13%/14.5%，最多叠加3层，持续10秒。"
           }
         },
         "teamBuff": {
@@ -371,11 +651,18 @@
               "type": "fixed",
               "stat": "critDmg",
               "mode": "flat",
-              "value": 30
+              "value": 30,
+              "modificationScaling": {
+                "value": {
+                  "base": 30,
+                  "step": 4.5,
+                  "displayValues": [30, 34.5, 39, 43.5, 48]
+                }
+              }
             }
           ],
           "effectText": {
-            "zhCN": "叠加到3层时，全队角色暴击伤害额外提升30%，持续40秒。"
+            "zhCN": "叠加到3层时，全队角色暴击伤害额外提升30%/34.5%/39%/43.5%/48%，持续40秒。"
           }
         }
       },
@@ -407,6 +694,11 @@
           "mode": "pct"
         }
       },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
       "effect": {
         "name": {
           "zhCN": "踩踏事故"
@@ -419,7 +711,7 @@
           }
         },
         "description": {
-          "zhCN": "队伍中任意友方单位攻击命中敌人时，全队攻击力提升2.5%，最多叠加4层，持续8秒，每层效果单独结算持续时间。",
+          "zhCN": "队伍中任意友方单位攻击命中敌人时，全队攻击力提升2.5%/2.8%/3.2%/3.6%/4%，最多叠加4层，持续8秒，每层效果单独结算持续时间。",
           "en": "When any friendly unit hits an enemy, squad ATK increases, stacking up to 4 times. Each stack's duration is counted separately."
         },
         "selfBuff": null,
@@ -435,11 +727,18 @@
               "mode": "pct",
               "valuePerStack": 2.5,
               "maxStacks": 4,
-              "defaultStacks": 4
+              "defaultStacks": 4,
+              "modificationScaling": {
+                "valuePerStack": {
+                  "base": 2.5,
+                  "step": 0.375,
+                  "displayValues": [2.5, 2.8, 3.2, 3.6, 4]
+                }
+              }
             }
           ],
           "effectText": {
-            "zhCN": "队伍中任意友方单位攻击命中敌人时，全队攻击力提升2.5%，最多叠加4层，持续8秒，每层效果单独结算持续时间。"
+            "zhCN": "队伍中任意友方单位攻击命中敌人时，全队攻击力提升2.5%/2.8%/3.2%/3.6%/4%，最多叠加4层，持续8秒，每层效果单独结算持续时间。"
           }
         }
       },
