@@ -7,10 +7,45 @@ calculation, damage inspection, and Drive Disc optimization.
 
 Chinese documentation is available in [README.zh-CN.md](README.zh-CN.md).
 
-## Recent Update Summary
+## Upload Update Summaries
 
-The current workspace update since the last pushed `main` commit adds or
-expands these major areas:
+### 2026-06-02 02:55 +08:00
+
+This upload adds or expands these major areas:
+
+- Added a calculator configuration workflow for the optimizer, with single
+  direct-damage, anomaly-focused, and custom multi-event damage objectives.
+- Added per-agent admin default calculation configs that can be edited from the
+  maintenance page and applied from the optimizer page; Hoshimi Miyabi now ships
+  with a default mixed rotation target.
+- Reworked anomaly data into a unified `effects` catalog with `settlementType`,
+  while still exposing attribute anomaly and disorder lists separately to the
+  calculator and maintenance UI.
+- Added Hoshimi Miyabi's Frost Frozen Disorder model, including its 600% fixed
+  multiplier, 75% per-tick multiplier, and 20 second default duration.
+- Expanded damage event normalization so disorder is modeled as an anomaly
+  settlement type, event lists can sum into `totalFinalDamage`, direct damage
+  exposes crit/non-crit/expected variants, and damage rows include panel
+  snapshots for debugging.
+- Upgraded the Drive Disc optimizer with the recommended `exact-super-bound`
+  algorithm, a legacy exact comparison mode, a fast non-strict heuristic mode,
+  super-bound pruning metrics, scored/pruned/processed counts, and better
+  progress percentages.
+- Added support for choosing multiple allowed extra 2-piece sets instead of a
+  single fixed extra set.
+- Improved optimizer background jobs, polling, cancelation, progress display,
+  evaluation-rate reporting, complexity hints, and result metrics.
+- Added `npm run benchmark:optimizer` for comparing the legacy exact optimizer
+  against the new super-bound exact optimizer.
+- Extended maintenance validation for default calculation configs, anomaly
+  settlement types, skill references, event counts, and disorder timing.
+- Expanded regression coverage for optimizer algorithms, progress accounting,
+  custom/default damage configs, anomaly settlement, damage white-box output,
+  and maintenance validation.
+
+### 2026-06-01 22:54 +08:00
+
+This upload added or expanded these major areas:
 
 - Multi-account support with isolated Drive Disc inventories, loadouts, imports,
   and homepage selections.
@@ -53,9 +88,10 @@ expands these major areas:
   account-scoped storage, and optional remove-missing synchronization.
 - Saved Drive Disc loadouts that can be applied on the homepage or created from
   optimizer results.
-- Drive Disc optimizer with preview, background job progress, cancelation,
-  set-shape constraints, main-stat constraints, minimum stat filters, and
-  damage scoring.
+- Drive Disc optimizer with calculation target presets, preview, background job
+  progress, cancelation, set-shape constraints, multiple optional 2-piece set
+  choices, main-stat constraints, minimum stat filters, exact/fast algorithm
+  choices, and damage scoring.
 - Browser maintenance pages for static game data and validation-oriented JSON
   editing.
 
@@ -161,6 +197,12 @@ npm run test:drive-disc-import
 npm run test:accounts
 ```
 
+Run the optimizer benchmark helper when comparing exact optimizer strategies:
+
+```bash
+npm run benchmark:optimizer
+```
+
 Useful syntax checks:
 
 ```bash
@@ -206,10 +248,12 @@ node --check frontend/accounts-page.js
   buffs.
 - In-combat buffs can contribute plain stats, runtime-scaled effects, damage
   modifiers, W-Engine team buffs, and skill-targeted effects.
+- Optimizer damage targets can use one direct/anomaly event or a custom list of
+  weighted direct, anomaly, and disorder events.
 - Special display attributes can declare a real `damageElement`; for example,
   Ye Shunguang is displayed as Honed Edge but calculates physical damage.
-- Anomaly and disorder damage use catalog-backed base multipliers from
-  `data/anomaly_effects.json`.
+- Anomaly and disorder damage use catalog-backed multipliers from the unified
+  `data/anomaly_effects.json` `effects` list, split by `settlementType`.
 - W-Engine modification ranks materialize buff values without changing level 60
   Base ATK or advanced stats.
 

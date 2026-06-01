@@ -1,7 +1,8 @@
 {
-  "anomalyEffects": [
+  "effects": [
     {
       "id": "assault",
+      "settlementType": "attribute",
       "label": {
         "zhCN": "强击",
         "en": "Assault"
@@ -12,6 +13,7 @@
     },
     {
       "id": "shatter",
+      "settlementType": "attribute",
       "label": {
         "zhCN": "碎冰",
         "en": "Shatter"
@@ -22,6 +24,7 @@
     },
     {
       "id": "burn",
+      "settlementType": "attribute",
       "label": {
         "zhCN": "灼烧",
         "en": "Burn"
@@ -32,6 +35,7 @@
     },
     {
       "id": "shock",
+      "settlementType": "attribute",
       "label": {
         "zhCN": "感电",
         "en": "Shock"
@@ -42,6 +46,7 @@
     },
     {
       "id": "corruption",
+      "settlementType": "attribute",
       "label": {
         "zhCN": "侵蚀",
         "en": "Corruption"
@@ -49,11 +54,10 @@
       "element": "ether",
       "baseMultiplier": 0.625,
       "defaultProcCount": 20
-    }
-  ],
-  "disorderEffects": [
+    },
     {
       "id": "burn",
+      "settlementType": "disorder",
       "label": {
         "zhCN": "灼烧紊乱",
         "en": "Burn Disorder"
@@ -66,6 +70,7 @@
     },
     {
       "id": "shock",
+      "settlementType": "disorder",
       "label": {
         "zhCN": "感电紊乱",
         "en": "Shock Disorder"
@@ -78,6 +83,7 @@
     },
     {
       "id": "corruption",
+      "settlementType": "disorder",
       "label": {
         "zhCN": "侵蚀紊乱",
         "en": "Corruption Disorder"
@@ -90,6 +96,7 @@
     },
     {
       "id": "frozen",
+      "settlementType": "disorder",
       "label": {
         "zhCN": "霜寒紊乱",
         "en": "Frozen Disorder"
@@ -101,7 +108,21 @@
       "defaultDurationSeconds": 10
     },
     {
+      "id": "frost_frozen",
+      "settlementType": "disorder",
+      "label": {
+        "zhCN": "烈霜霜寒紊乱（星见雅）",
+        "en": "Frost Frozen Disorder (Hoshimi Miyabi)"
+      },
+      "element": "ice",
+      "fixedMultiplier": 6,
+      "tickMultiplier": 0.75,
+      "tickIntervalSeconds": 1,
+      "defaultDurationSeconds": 20
+    },
+    {
       "id": "flinch",
+      "settlementType": "disorder",
       "label": {
         "zhCN": "畏缩紊乱",
         "en": "Flinch Disorder"

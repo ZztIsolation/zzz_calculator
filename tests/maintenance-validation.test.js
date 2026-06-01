@@ -709,6 +709,7 @@ assertInvalid("teammate-buffs", {
 const validAnomalyEffect = {
     id: "test_assault",
     maintenanceType: "anomaly",
+    settlementType: "attribute",
     label: { zhCN: "测试强击" },
     element: "physical",
     baseMultiplier: 7.13,
@@ -738,6 +739,7 @@ assertInvalid("anomaly-effects", validAnomalyEffect, "重复", {
 const validDisorderEffect = {
     id: "test_burn",
     maintenanceType: "disorder",
+    settlementType: "disorder",
     label: { zhCN: "测试灼烧紊乱" },
     element: "fire",
     fixedMultiplier: 4.5,
@@ -750,6 +752,128 @@ assertInvalid("anomaly-effects", {
     ...validDisorderEffect,
     tickIntervalSeconds: 0,
 }, "跳间隔必须大于 0")
+
+const validCalculationContext = {
+    agentSkills: [validAgentSkill],
+    anomalyEffects: [validAnomalyEffect],
+    disorderEffects: [validDisorderEffect],
+    effects: [validAnomalyEffect, validDisorderEffect],
+}
+const validDefaultCalculationConfig = {
+    mode: "custom",
+    name: { zhCN: "测试默认循环" },
+    selectedEventId: "direct-1",
+    events: [
+        {
+            id: "direct-1",
+            kind: "direct",
+            count: 2,
+            critMode: "expected",
+            skillRef: {
+                agentSkillId: "test_agent_skill",
+                categoryId: "basic",
+                moveId: "normal",
+                rowId: "hit_1",
+            },
+        },
+        {
+            id: "anomaly-1",
+            kind: "anomaly",
+            settlementType: "attribute",
+            anomalyEffect: "test_assault",
+            procCount: 1,
+            count: 1,
+        },
+        {
+            id: "disorder-1",
+            kind: "anomaly",
+            settlementType: "disorder",
+            anomalyEffect: "test_burn",
+            elapsedSeconds: 0,
+            durationSeconds: 10,
+            count: 1,
+        },
+    ],
+}
+assertValid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: validDefaultCalculationConfig,
+}, validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: {
+        ...validDefaultCalculationConfig,
+        events: [],
+    },
+}, "至少需要一个事件", validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: {
+        ...validDefaultCalculationConfig,
+        events: [
+            {
+                ...validDefaultCalculationConfig.events[0],
+                count: -1,
+            },
+        ],
+    },
+}, "次数必须大于 0", validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: {
+        ...validDefaultCalculationConfig,
+        events: [
+            {
+                ...validDefaultCalculationConfig.events[0],
+                skillRef: {
+                    ...validDefaultCalculationConfig.events[0].skillRef,
+                    rowId: "missing",
+                },
+            },
+        ],
+    },
+}, "技能倍率行不存在", validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: {
+        ...validDefaultCalculationConfig,
+        events: [
+            {
+                ...validDefaultCalculationConfig.events[1],
+                anomalyEffect: "missing",
+            },
+        ],
+    },
+}, "属性异常不存在", validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: {
+        ...validDefaultCalculationConfig,
+        events: [
+            {
+                ...validDefaultCalculationConfig.events[2],
+                anomalyEffect: "missing",
+            },
+        ],
+    },
+}, "紊乱类型不存在", validCalculationContext)
+assertValid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: {
+        ...validDefaultCalculationConfig,
+        selectedEventId: "legacy-disorder",
+        events: [
+            {
+                id: "legacy-disorder",
+                kind: "disorder",
+                previousAnomalyEffect: "test_burn",
+                elapsedSeconds: 0,
+                durationSeconds: 10,
+                count: 1,
+            },
+        ],
+    },
+}, validCalculationContext)
 
 const buffWithDamageModifier = {
     id: "test_damage_modifier",

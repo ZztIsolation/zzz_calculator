@@ -108,10 +108,18 @@ const asyncResult = await optimizeDriveDiscsAsync(catalog, store, optimizerInput
 })
 assert.deepEqual(resultIds(asyncResult), resultIds(sync))
 assert.equal(asyncResult.metrics.evaluated, sync.metrics.evaluated)
+assert.equal(
+    asyncResult.metrics.processedCombinationCount,
+    asyncResult.metrics.evaluated + asyncResult.metrics.prunedBySuperBound,
+)
 assert.ok(progressEvents.length > 2)
 assert.equal(progressEvents.at(-1).status, "complete")
 assert.equal(progressEvents.at(-1).percent, 100)
+assert.equal(asyncResult.metrics.algorithmId, "exact-super-bound")
+assert.equal(asyncResult.metrics.strictExact, true)
 assert.ok(progressEvents.some(progress => progress.evaluated > 0 && progress.percent > 0))
+assert.ok(progressEvents.some(progress => progress.evaluated === progress.metrics?.processedCombinationCount))
+assert.ok(progressEvents.some(progress => Number(progress.metrics?.evaluationsPerSecond ?? 0) > 0))
 
 const noResultEvents = []
 const noResult = await optimizeDriveDiscsAsync(catalog, store, optimizerInput({
@@ -147,4 +155,4 @@ await assert.rejects(
     OptimizerCancelledError,
 )
 assert.ok(cancelEvents.some(progress => progress.evaluated >= 1))
-assert.ok(cancelEvents.at(-1).evaluated < sync.metrics.evaluated)
+assert.ok(cancelEvents.at(-1).evaluated < cancelEvents.at(-1).estimatedCombinationCount)

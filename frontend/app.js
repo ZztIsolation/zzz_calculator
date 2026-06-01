@@ -405,6 +405,7 @@ const ANOMALY_EFFECT_LABELS = {
     shock: "感电",
     corruption: "侵蚀",
     frozen: "霜寒",
+    frost_frozen: "烈霜霜寒紊乱（星见雅）",
     flinch: "畏缩",
 }
 const DAMAGE_MODIFIER_KIND_LABELS = {
@@ -589,6 +590,7 @@ function disorderEffects() {
         { id: "shock", label: { zhCN: "感电" } },
         { id: "corruption", label: { zhCN: "侵蚀" } },
         { id: "frozen", label: { zhCN: "霜寒" } },
+        { id: "frost_frozen", label: { zhCN: "烈霜霜寒紊乱（星见雅）" }, defaultDurationSeconds: 20 },
         { id: "flinch", label: { zhCN: "畏缩" } },
     ]
 }

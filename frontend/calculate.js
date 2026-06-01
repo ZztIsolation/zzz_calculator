@@ -46,7 +46,6 @@ const els = {
     damageTargetResistancePreset: document.getElementById("damageTargetResistancePreset"),
     damageTargetResistanceLabel: document.getElementById("damageTargetResistanceLabel"),
     damageTargetResistance: document.getElementById("damageTargetResistance"),
-    damageEventType: document.getElementById("damageEventType"),
     damageSkillMultiplier: document.getElementById("damageSkillMultiplier"),
     openDamageSkillModalBtn: document.getElementById("openDamageSkillModalBtn"),
     damageSkillSummary: document.getElementById("damageSkillSummary"),
@@ -55,6 +54,7 @@ const els = {
     damageSkillModalList: document.getElementById("damageSkillModalList"),
     damageSkillModalEmpty: document.getElementById("damageSkillModalEmpty"),
     damageCritMode: document.getElementById("damageCritMode"),
+    damageAnomalySettlementType: document.getElementById("damageAnomalySettlementType"),
     damageAnomalyEffect: document.getElementById("damageAnomalyEffect"),
     damageAnomalyProcCount: document.getElementById("damageAnomalyProcCount"),
     damageDisorderEffect: document.getElementById("damageDisorderEffect"),
@@ -63,6 +63,7 @@ const els = {
     algorithmSelect: document.getElementById("algorithmSelect"),
     fourPieceSetSelect: document.getElementById("fourPieceSetSelect"),
     twoPieceSetSelect: document.getElementById("twoPieceSetSelect"),
+    twoPieceSetChoices: document.getElementById("twoPieceSetChoices"),
     slot4MainStats: document.getElementById("slot4MainStats"),
     slot5MainStats: document.getElementById("slot5MainStats"),
     slot6MainStats: document.getElementById("slot6MainStats"),
@@ -70,6 +71,27 @@ const els = {
     minAnomalyProficiency: document.getElementById("minAnomalyProficiency"),
     minCritRate: document.getElementById("minCritRate"),
     minCritDmg: document.getElementById("minCritDmg"),
+    openCalculationConfigBtn: document.getElementById("openCalculationConfigBtn"),
+    calculationSettingsCard: document.getElementById("calculationSettingsCard"),
+    calculationConfigSummary: document.getElementById("calculationConfigSummary"),
+    calculationSingleControls: document.getElementById("calculationSingleControls"),
+    calculationAnomalyControls: document.getElementById("calculationAnomalyControls"),
+    calculationConfigModal: document.getElementById("calculationConfigModal"),
+    closeCalculationConfigModalBtn: document.getElementById("closeCalculationConfigModalBtn"),
+    calculationConfigMode: document.getElementById("calculationConfigMode"),
+    adminDefaultCalculationSummary: document.getElementById("adminDefaultCalculationSummary"),
+    applyAdminDefaultCalculationBtn: document.getElementById("applyAdminDefaultCalculationBtn"),
+    calculationConfigEventCount: document.getElementById("calculationConfigEventCount"),
+    calculationConfigEventList: document.getElementById("calculationConfigEventList"),
+    calculationEventEditorTitle: document.getElementById("calculationEventEditorTitle"),
+    calculationEventEditorFields: document.getElementById("calculationEventEditorFields"),
+    duplicateCalculationEventBtn: document.getElementById("duplicateCalculationEventBtn"),
+    removeCalculationEventBtn: document.getElementById("removeCalculationEventBtn"),
+    addCalculationDirectEventBtn: document.getElementById("addCalculationDirectEventBtn"),
+    addCalculationAnomalyEventBtn: document.getElementById("addCalculationAnomalyEventBtn"),
+    addCalculationDisorderEventBtn: document.getElementById("addCalculationDisorderEventBtn"),
+    calculationConfigFooterSummary: document.getElementById("calculationConfigFooterSummary"),
+    saveCalculationConfigBtn: document.getElementById("saveCalculationConfigBtn"),
     optimizeBtn: document.getElementById("optimizeBtn"),
     cancelOptimizeBtn: document.getElementById("cancelOptimizeBtn"),
     optimizerMetrics: document.getElementById("optimizerMetrics"),
@@ -115,6 +137,7 @@ const ANOMALY_EFFECT_LABELS = {
     shock: "感电",
     corruption: "侵蚀",
     frozen: "霜寒",
+    frost_frozen: "烈霜霜寒紊乱（星见雅）",
     flinch: "畏缩",
 }
 const DAMAGE_MODIFIER_KIND_LABELS = {
@@ -131,6 +154,13 @@ const DEFAULT_ANOMALY_PROC_COUNTS = {
     burn: 20,
     shock: 10,
     corruption: 20,
+}
+const DEFAULT_ANOMALY_EFFECT_BY_ELEMENT = {
+    physical: "assault",
+    ice: "shatter",
+    fire: "burn",
+    electric: "shock",
+    ether: "corruption",
 }
 const ELEMENT_DMG_KEYS = new Set(["physicalDmg", "fireDmg", "iceDmg", "electricDmg", "etherDmg"])
 const RES_IGNORE_STAT_BY_ELEMENT = {
@@ -287,6 +317,11 @@ let activeDamageResistanceElement = "physical"
 let selectedDamageSkillRef = null
 let activeDamageSkillPickerMoveRef = null
 let damageSkillLevelsByCategory = {}
+let calculationConfigMode = "single"
+let calculationConfigEvents = []
+let calculationConfigSelectedEventId = null
+let calculationConfigEditingIndex = 0
+let currentRenderedDamage = null
 const combatUi = SharedCombat.createCombatUiController({
     getMeta: () => meta,
     includeDriveDiscBuffs: false,
@@ -321,6 +356,14 @@ function formatPercent(value) {
         return `${percent.toFixed(1)}%`
     }
     return `${Math.round(percent)}%`
+}
+
+function formatRate(value) {
+    const rate = Number(value ?? 0)
+    if (!Number.isFinite(rate) || rate <= 0) {
+        return ""
+    }
+    return `${formatCount(Math.round(rate))}/秒`
 }
 
 function setOptimizeButtonRunning(isRunning) {
@@ -361,6 +404,32 @@ function progressTextForStatus(status) {
     return "正在精确枚举候选组合"
 }
 
+function algorithmProgressText(metrics = {}) {
+    const label = metrics.algorithmLabel || metrics.algorithmId
+    if (!label) {
+        return ""
+    }
+    const exactText = metrics.strictExact === false ? "非严格精准" : "严格精准"
+    const parts = [`算法：${label}`, exactText]
+    const pruned = Number(metrics.prunedBySuperBound ?? 0)
+    const checks = Number(metrics.superBoundChecks ?? 0)
+    if (pruned > 0) {
+        parts.push(`真实评分 ${formatCount(metrics.scoredCombinationCount ?? metrics.evaluated ?? 0)}`)
+        parts.push(`剪枝 ${formatCount(pruned)}`)
+    } else if (checks > 0) {
+        parts.push(`上界检查 ${formatCount(checks)}`)
+    }
+    return parts.join(" · ")
+}
+
+function processedOptimizationCount(metrics = {}, fallback = null) {
+    if (fallback !== null && fallback !== undefined) {
+        return Number(fallback ?? 0)
+    }
+    return Number(metrics.processedCombinationCount
+        ?? (Number(metrics.evaluated ?? 0) + Number(metrics.prunedBySuperBound ?? 0)))
+}
+
 function appliedPreferredText(settings = {}) {
     const entries = Object.entries(settings.appliedPreferredMainStatLimits ?? {})
         .filter(([, values]) => Array.isArray(values) && values.length > 0)
@@ -372,15 +441,39 @@ function appliedPreferredText(settings = {}) {
         .join("；")}`
 }
 
-function complexityText(metrics = {}) {
+function hasExplicitMainStatLimits(settings = {}) {
+    const explicit = Object.values(settings.explicitMainStatLimits ?? {})
+        .some(values => Array.isArray(values) && values.length > 0)
+    if (explicit) {
+        return true
+    }
+    return Object.values(settings.mainStatLimits ?? {})
+        .some(values => Array.isArray(values) && values.length > 0)
+}
+
+function hasTwoPieceSetLimit(settings = {}) {
+    return Array.isArray(settings.twoPieceSetIds)
+        ? settings.twoPieceSetIds.length > 0
+        : Boolean(settings.twoPieceSetId)
+}
+
+function complexityText(metrics = {}, settings = {}) {
     const complexity = metrics.complexity
     if (!complexity?.label) {
         return ""
     }
     const high = ["high", "extreme"].includes(complexity.level)
-    return high
-        ? `复杂度：${complexity.label}，建议限定 2 件套或主词条`
-        : `复杂度：${complexity.label}`
+    if (!high) {
+        return `复杂度：${complexity.label}`
+    }
+    if (hasExplicitMainStatLimits(settings)) {
+        return hasTwoPieceSetLimit(settings)
+            ? `复杂度：${complexity.label}，已限定主词条，候选仍多时可继续收窄`
+            : `复杂度：${complexity.label}，已限定主词条，建议再限定 2 件套`
+    }
+    return hasTwoPieceSetLimit(settings)
+        ? `复杂度：${complexity.label}，建议限定主词条`
+        : `复杂度：${complexity.label}，建议限定 2 件套或主词条`
 }
 
 function renderOptimizationProgress(job = {}) {
@@ -396,14 +489,17 @@ function renderOptimizationProgress(job = {}) {
     lastOptimizationProgress = merged
     const metrics = merged.metrics ?? {}
     const elapsedMs = merged.elapsedMs ?? (optimizationStartedAt ? Date.now() - optimizationStartedAt : 0)
-    const evaluated = merged.evaluated ?? metrics.evaluated ?? 0
+    const evaluated = processedOptimizationCount(metrics, merged.evaluated)
     const estimated = merged.estimatedCombinationCount ?? metrics.estimatedCombinationCount ?? 0
+    const rateText = formatRate(metrics.evaluationsPerSecond ?? merged.evaluationsPerSecond)
     const percent = Math.max(0, Math.min(100, Number(merged.percent ?? 0)))
     els.optimizerProgress.hidden = false
     els.optimizerProgressFill.style.width = `${percent}%`
     els.optimizerProgressPercent.textContent = formatPercent(percent)
     els.optimizerElapsed.textContent = `已计算 ${formatDuration(elapsedMs)}`
-    els.optimizerEvaluated.textContent = `已评估 ${formatCount(evaluated)}`
+    els.optimizerEvaluated.textContent = rateText
+        ? `已评估 ${formatCount(evaluated)}（${rateText}）`
+        : `已评估 ${formatCount(evaluated)}`
     els.optimizerEstimate.textContent = `估算 ${formatCount(estimated)}`
 
     const candidateCounts = metrics.candidateCountsBySlot ?? {}
@@ -412,12 +508,18 @@ function renderOptimizationProgress(job = {}) {
         : ""
     els.optimizerProgressNote.textContent = [
         progressTextForStatus(merged.status),
+        algorithmProgressText(metrics),
         candidateText,
-        complexityText(metrics),
+        complexityText(metrics, merged.settings),
         appliedPreferredText(merged.settings),
     ].filter(Boolean).join(" · ")
     els.optimizerMetrics.textContent = estimated
-        ? `${formatPercent(percent)} · ${formatCount(evaluated)} / ${formatCount(estimated)}`
+        ? [
+            formatPercent(percent),
+            `${formatCount(evaluated)} / ${formatCount(estimated)}`,
+            rateText,
+            Number(metrics.prunedBySuperBound ?? 0) > 0 ? `剪枝 ${formatCount(metrics.prunedBySuperBound)}` : "",
+        ].filter(Boolean).join(" · ")
         : progressTextForStatus(merged.status)
 }
 
@@ -804,8 +906,17 @@ function disorderEffects() {
         { id: "shock", label: { zhCN: "感电" } },
         { id: "corruption", label: { zhCN: "侵蚀" } },
         { id: "frozen", label: { zhCN: "霜寒" } },
+        { id: "frost_frozen", label: { zhCN: "烈霜霜寒紊乱（星见雅）" }, defaultDurationSeconds: 20 },
         { id: "flinch", label: { zhCN: "畏缩" } },
     ]
+}
+
+function anomalySettlementType(event = {}) {
+    return event.kind === "disorder" || event.settlementType === "disorder" ? "disorder" : "attribute"
+}
+
+function anomalyEffectId(event = {}) {
+    return event.anomalyEffect ?? event.previousAnomalyEffect ?? ""
 }
 
 function populateDamageEventSelects() {
@@ -831,11 +942,16 @@ function populateDamageEventSelects() {
     }
 }
 
-function renderDamageEventControls() {
-    const type = els.damageEventType?.value || "direct"
-    document.querySelectorAll(".damage-direct-field").forEach(item => { item.hidden = type !== "direct" })
-    document.querySelectorAll(".damage-anomaly-field").forEach(item => { item.hidden = type !== "anomaly" })
-    document.querySelectorAll(".damage-disorder-field").forEach(item => { item.hidden = type !== "disorder" })
+function renderCalculationObjectiveControls() {
+    if (els.calculationSingleControls) {
+        els.calculationSingleControls.hidden = calculationConfigMode !== "single"
+    }
+    if (els.calculationAnomalyControls) {
+        els.calculationAnomalyControls.hidden = calculationConfigMode !== "anomaly"
+    }
+    const settlementType = els.damageAnomalySettlementType?.value === "disorder" ? "disorder" : "attribute"
+    document.querySelectorAll(".calculation-anomaly-attribute-field").forEach(item => { item.hidden = settlementType !== "attribute" })
+    document.querySelectorAll(".calculation-anomaly-disorder-field").forEach(item => { item.hidden = settlementType !== "disorder" })
 }
 
 function agentSkillCatalog(agentId = els.agentSelect?.value) {
@@ -872,6 +988,236 @@ function clampSkillLevel(category = {}, level) {
 
 function selectedSkillLevel(category = {}) {
     return clampSkillLevel(category, damageSkillLevelsByCategory[category.id] ?? defaultSkillLevel(category))
+}
+
+function stripSkillRefLevel(skillRef = null) {
+    if (!skillRef || typeof skillRef !== "object") {
+        return null
+    }
+    return {
+        agentSkillId: String(skillRef.agentSkillId ?? "").trim(),
+        categoryId: String(skillRef.categoryId ?? "").trim(),
+        moveId: String(skillRef.moveId ?? "").trim(),
+        rowId: String(skillRef.rowId ?? "").trim(),
+    }
+}
+
+function calculationConfigFromStored(config = null) {
+    const events = Array.isArray(config?.events)
+        ? config.events.map((event, index) => ({
+            ...event,
+            id: String(event.id ?? `${event.kind ?? "event"}-${index + 1}`),
+            kind: event.kind === "anomaly" || event.kind === "disorder" ? "anomaly" : "direct",
+            settlementType: anomalySettlementType(event),
+            ...(anomalySettlementType(event) === "disorder"
+                ? { anomalyEffect: anomalyEffectId(event) || "burn" }
+                : {}),
+            count: Number(event.count ?? 1),
+            ...(event.skillRef ? { skillRef: stripSkillRefLevel(event.skillRef) } : {}),
+        }))
+        : []
+    return {
+        mode: ["single", "anomaly", "custom"].includes(config?.mode) ? config.mode : (events.length > 1 ? "custom" : "single"),
+        selectedEventId: config?.selectedEventId ?? events[0]?.id ?? null,
+        events,
+    }
+}
+
+function defaultAnomalyEffectIdForAgent(agent = getAgent(els.agentSelect.value)) {
+    const element = damageElementForAgent(agent)
+    return DEFAULT_ANOMALY_EFFECT_BY_ELEMENT[element] ?? "assault"
+}
+
+function firstDamageSkillRef() {
+    const skill = agentSkillCatalog()
+    const category = damageSkillCategories(skill)[0]
+    const move = category?.moves?.[0]
+    const row = move?.rows?.find(item => (item.kind ?? "damageMultiplier") === "damageMultiplier") ?? move?.rows?.[0]
+    if (!skill || !category || !move || !row) {
+        return null
+    }
+    return {
+        agentSkillId: skill.id,
+        categoryId: category.id,
+        moveId: move.id,
+        rowId: row.id,
+    }
+}
+
+function uniqueCalculationEventId(kind = "event") {
+    const prefix = kind === "direct" ? "direct" : kind === "disorder" ? "disorder" : "anomaly"
+    let index = calculationConfigEvents.length + 1
+    const used = new Set(calculationConfigEvents.map(event => event.id))
+    while (used.has(`${prefix}-${index}`)) {
+        index += 1
+    }
+    return `${prefix}-${index}`
+}
+
+function calculationEventDraft(kind = "direct") {
+    const id = uniqueCalculationEventId(kind)
+    if (kind === "anomaly") {
+        const anomalyEffect = defaultAnomalyEffectIdForAgent()
+        return {
+            id,
+            kind: "anomaly",
+            settlementType: "attribute",
+            anomalyEffect,
+            procCount: DEFAULT_ANOMALY_PROC_COUNTS[anomalyEffect] ?? 1,
+            count: 1,
+        }
+    }
+    if (kind === "disorder") {
+        return {
+            id,
+            kind: "anomaly",
+            settlementType: "disorder",
+            anomalyEffect: disorderEffects()[0]?.id ?? "burn",
+            elapsedSeconds: 0,
+            durationSeconds: 10,
+            count: 1,
+        }
+    }
+    return {
+        id,
+        kind: "direct",
+        skillRef: firstDamageSkillRef(),
+        skillMultiplier: Number(els.damageSkillMultiplier?.value || 100),
+        critMode: "expected",
+        count: 1,
+    }
+}
+
+function skillRefWithCurrentLevel(skillRef = null) {
+    const base = stripSkillRefLevel(skillRef)
+    if (!base?.categoryId) {
+        return null
+    }
+    const skill = meta?.agentSkills?.find(item => item.id === base.agentSkillId)
+        ?? agentSkillCatalog()
+    const category = damageSkillCategories(skill).find(item => item.id === base.categoryId)
+    if (!category) {
+        return base
+    }
+    return {
+        ...base,
+        level: selectedSkillLevel(category),
+    }
+}
+
+function eventWithCurrentSkillLevel(event = {}) {
+    if (event.kind !== "direct") {
+        return { ...event }
+    }
+    const skillRef = skillRefWithCurrentLevel(event.skillRef)
+    return {
+        ...event,
+        ...(skillRef ? { skillRef } : {}),
+    }
+}
+
+function collectDamageTargetConfig() {
+    persistCurrentDamageResistanceInput()
+    const damageElement = currentDamageElement()
+    return {
+        presetId: els.damageTargetPreset?.value || DEFAULT_DAMAGE_TARGET_PRESET_ID,
+        defense: Number(els.damageTargetDefense?.value || 953),
+        levelCoefficient: Number(els.damageLevelCoefficient?.value || DEFAULT_DAMAGE_LEVEL_COEFFICIENT),
+        resistanceByElement: {
+            ...damageTargetResistanceByElement,
+            [damageElement]: Number(els.damageTargetResistance?.value || 0),
+        },
+    }
+}
+
+function directEventFromControls(id = "direct-1") {
+    const resolvedSkill = resolveDamageSkillRef(selectedDamageSkillRef)
+    return {
+        id,
+        kind: "direct",
+        skillMultiplier: Number(els.damageSkillMultiplier?.value || 100),
+        ...(resolvedSkill ? { skillRef: resolvedSkill.ref } : {}),
+        critMode: els.damageCritMode?.value || "expected",
+        count: 1,
+    }
+}
+
+function singleEventFromControls() {
+    return directEventFromControls("direct-1")
+}
+
+function anomalyEventFromControls() {
+    const settlementType = els.damageAnomalySettlementType?.value === "disorder" ? "disorder" : "attribute"
+    if (settlementType === "disorder") {
+        return {
+            id: "disorder-1",
+            kind: "anomaly",
+            settlementType: "disorder",
+            anomalyEffect: els.damageDisorderEffect?.value || "burn",
+            elapsedSeconds: Number(els.damageDisorderElapsed?.value || 0),
+            durationSeconds: Number(els.damageDisorderDuration?.value || 10),
+            count: 1,
+        }
+    }
+    const anomalyEffect = els.damageAnomalyEffect?.value || "assault"
+    return {
+        id: "anomaly-1",
+        kind: "anomaly",
+        settlementType: "attribute",
+        anomalyEffect,
+        procCount: Number(els.damageAnomalyProcCount?.value || DEFAULT_ANOMALY_PROC_COUNTS[anomalyEffect] || 1),
+        count: 1,
+    }
+}
+
+function configuredCalculationEventsForRequest() {
+    if (calculationConfigMode === "anomaly") {
+        return [anomalyEventFromControls()]
+    }
+    if (calculationConfigMode === "custom") {
+        const events = calculationConfigEvents.length
+            ? calculationConfigEvents
+            : [calculationEventDraft("direct")]
+        return events.map(eventWithCurrentSkillLevel)
+    }
+    return [singleEventFromControls()]
+}
+
+function calculationEventTitle(event = {}) {
+    if (event.kind === "anomaly" && anomalySettlementType(event) === "attribute") {
+        const effect = anomalyEffects().find(item => item.id === event.anomalyEffect)
+        return `${localizedText(effect?.label) || ANOMALY_EFFECT_LABELS[event.anomalyEffect] || event.anomalyEffect} ×${event.count ?? 1}`
+    }
+    if (event.kind === "anomaly" && anomalySettlementType(event) === "disorder") {
+        const effectId = anomalyEffectId(event)
+        const effect = disorderEffects().find(item => item.id === effectId)
+        return `${localizedText(effect?.label) || ANOMALY_EFFECT_LABELS[effectId] || effectId} ×${event.count ?? 1}`
+    }
+    const skill = meta?.agentSkills?.find(item => item.id === event.skillRef?.agentSkillId) ?? agentSkillCatalog()
+    const category = damageSkillCategories(skill).find(item => item.id === event.skillRef?.categoryId)
+    const move = (category?.moves ?? []).find(item => item.id === event.skillRef?.moveId)
+    const row = (move?.rows ?? []).find(item => item.id === event.skillRef?.rowId)
+    const label = [category && nameOf(category), move && nameOf(move), row && (localizedText(row.label) || row.id)].filter(Boolean).join(" / ")
+    return `${label || "直伤"} ×${event.count ?? 1}`
+}
+
+function calculationConfigSummaryText(config = null) {
+    const mode = config?.mode ?? calculationConfigMode
+    if (mode === "anomaly") {
+        return `最大化异常伤害：${calculationEventTitle(anomalyEventFromControls())}`
+    }
+    const events = config?.events ?? (mode === "single" ? [singleEventFromControls()] : calculationConfigEvents)
+    if (!events.length) {
+        return mode === "custom" ? "自定义：未配置事件" : "最大化单个伤害"
+    }
+    const prefix = mode === "custom" ? "自定义" : "单个伤害"
+    return `${prefix}：${events.map(calculationEventTitle).join(" + ")}`
+}
+
+function syncCalculationConfigSummary() {
+    if (els.calculationConfigSummary) {
+        els.calculationConfigSummary.textContent = calculationConfigSummaryText()
+    }
 }
 
 function skillLevelSelects() {
@@ -1148,13 +1494,419 @@ function selectDamageSkill(ref) {
     const resolved = resolveDamageSkillRef(ref)
     selectedDamageSkillRef = resolved?.ref ?? null
     renderDamageSkillSummary()
+    syncCalculationConfigSummary()
+}
+
+function optionHtml(options = [], selected = "") {
+    return options.map(([value, label]) => `
+        <option value="${escapeHtml(value)}"${String(value) === String(selected) ? " selected" : ""}>${escapeHtml(label)}</option>
+    `).join("")
+}
+
+function calculationSkillCategoryOptions(selected = "") {
+    return optionHtml(damageSkillCategories().map(category => [category.id, nameOf(category)]), selected)
+}
+
+function calculationSkillMoveOptions(categoryId, selected = "") {
+    const category = damageSkillCategories().find(item => item.id === categoryId)
+    return optionHtml((category?.moves ?? []).map(move => [move.id, nameOf(move)]), selected)
+}
+
+function calculationSkillRowOptions(categoryId, moveId, selected = "") {
+    const category = damageSkillCategories().find(item => item.id === categoryId)
+    const move = (category?.moves ?? []).find(item => item.id === moveId)
+    return optionHtml((move?.rows ?? [])
+        .filter(row => (row.kind ?? "damageMultiplier") === "damageMultiplier")
+        .map(row => [row.id, localizedText(row.label) || row.id]), selected)
+}
+
+function anomalyEffectOptions(selected = "") {
+    return optionHtml(anomalyEffects().map(effect => [
+        effect.id,
+        localizedText(effect.label) || ANOMALY_EFFECT_LABELS[effect.id] || effect.id,
+    ]), selected)
+}
+
+function disorderEffectOptions(selected = "") {
+    return optionHtml(disorderEffects().map(effect => [
+        effect.id,
+        localizedText(effect.label) || ANOMALY_EFFECT_LABELS[effect.id] || effect.id,
+    ]), selected)
+}
+
+function calculationEventUiKind(event = {}) {
+    return event.kind === "direct" ? "direct" : (anomalySettlementType(event) === "disorder" ? "disorder" : "anomaly")
+}
+
+function calculationEventKindLabel(kind) {
+    return {
+        direct: "直伤",
+        anomaly: "属性异常",
+        disorder: "紊乱",
+    }[kind] ?? "事件"
+}
+
+function normalizeCalculationEditingIndex() {
+    if (!calculationConfigEvents.length) {
+        calculationConfigEditingIndex = 0
+        calculationConfigSelectedEventId = null
+        return -1
+    }
+    const selectedIndex = calculationConfigEvents.findIndex(event => event.id === calculationConfigSelectedEventId)
+    if (!Number.isInteger(calculationConfigEditingIndex) || calculationConfigEditingIndex < 0 || calculationConfigEditingIndex >= calculationConfigEvents.length) {
+        calculationConfigEditingIndex = selectedIndex >= 0 ? selectedIndex : 0
+    }
+    calculationConfigSelectedEventId = calculationConfigEvents[calculationConfigEditingIndex]?.id ?? null
+    return calculationConfigEditingIndex
+}
+
+function calculationEventForKind(kind = "direct", previous = {}) {
+    const draft = calculationEventDraft(kind)
+    return {
+        ...draft,
+        id: previous.id ?? draft.id,
+        count: previous.count ?? draft.count ?? 1,
+    }
+}
+
+function duplicateCalculationEvent(event = {}) {
+    const kind = calculationEventUiKind(event)
+    return {
+        ...structuredClone(event),
+        id: uniqueCalculationEventId(kind),
+    }
+}
+
+function selectCalculationConfigEvent(index) {
+    syncEditingEventFromEditor({ renderList: false })
+    calculationConfigEditingIndex = Math.max(0, Math.min(calculationConfigEvents.length - 1, Number(index)))
+    calculationConfigSelectedEventId = calculationConfigEvents[calculationConfigEditingIndex]?.id ?? null
+    renderCalculationConfigEvents()
+}
+
+function addCalculationConfigEvent(kind = "direct") {
+    syncEditingEventFromEditor({ renderList: false })
+    calculationConfigEvents.push(calculationEventDraft(kind))
+    calculationConfigEditingIndex = calculationConfigEvents.length - 1
+    calculationConfigSelectedEventId = calculationConfigEvents[calculationConfigEditingIndex]?.id ?? null
+    renderCalculationConfigEvents()
+}
+
+function duplicateCalculationConfigEvent(index = calculationConfigEditingIndex) {
+    syncEditingEventFromEditor({ renderList: false })
+    const sourceIndex = Math.max(0, Math.min(calculationConfigEvents.length - 1, Number(index)))
+    const source = calculationConfigEvents[sourceIndex]
+    if (!source) {
+        return
+    }
+    calculationConfigEvents.splice(sourceIndex + 1, 0, duplicateCalculationEvent(source))
+    calculationConfigEditingIndex = sourceIndex + 1
+    calculationConfigSelectedEventId = calculationConfigEvents[calculationConfigEditingIndex]?.id ?? null
+    renderCalculationConfigEvents()
+}
+
+function removeCalculationConfigEvent(index = calculationConfigEditingIndex) {
+    syncEditingEventFromEditor({ renderList: false })
+    if (!calculationConfigEvents.length) {
+        return
+    }
+    const removeIndex = Math.max(0, Math.min(calculationConfigEvents.length - 1, Number(index)))
+    const oldEditingIndex = calculationConfigEditingIndex
+    calculationConfigEvents.splice(removeIndex, 1)
+    if (removeIndex < oldEditingIndex) {
+        calculationConfigEditingIndex = oldEditingIndex - 1
+    } else if (removeIndex === oldEditingIndex) {
+        calculationConfigEditingIndex = Math.min(removeIndex, calculationConfigEvents.length - 1)
+    }
+    calculationConfigSelectedEventId = calculationConfigEvents[calculationConfigEditingIndex]?.id ?? null
+    renderCalculationConfigEvents()
+}
+
+function calculationEventListItemHtml(event = {}, index = 0) {
+    const kind = calculationEventUiKind(event)
+    const active = index === calculationConfigEditingIndex
+    return `
+        <article class="calculation-event-list-item${active ? " active" : ""}" data-calculation-event-index="${index}">
+          <button type="button" class="calculation-event-select" data-select-calculation-event="${index}">
+            <span class="calculation-event-order">#${index + 1}</span>
+            <span class="calculation-event-copy">
+              <strong>${escapeHtml(calculationEventKindLabel(kind))} · ${escapeHtml(calculationEventTitle(event))}</strong>
+              <small>${escapeHtml(`次数 ×${event.count ?? 1}`)}</small>
+            </span>
+          </button>
+          <div class="calculation-event-inline-actions">
+            <button type="button" class="compact-btn" data-duplicate-calculation-event="${index}" aria-label="复制事件 ${index + 1}">复制</button>
+            <button type="button" class="compact-btn danger-lite" data-remove-calculation-event="${index}" aria-label="删除事件 ${index + 1}">删除</button>
+          </div>
+        </article>
+    `
+}
+
+function calculationEventEditorHtml(event = {}) {
+    const kind = event.kind === "direct" ? "direct" : (anomalySettlementType(event) === "disorder" ? "disorder" : "anomaly")
+    const skillRef = kind === "direct" ? (stripSkillRefLevel(event.skillRef) ?? firstDamageSkillRef()) : null
+    const categoryId = skillRef?.categoryId ?? damageSkillCategories()[0]?.id ?? ""
+    const moveId = skillRef?.moveId ?? damageSkillCategories().find(item => item.id === categoryId)?.moves?.[0]?.id ?? ""
+    const rowId = skillRef?.rowId ?? damageSkillCategories().find(item => item.id === categoryId)?.moves?.find(item => item.id === moveId)?.rows?.[0]?.id ?? ""
+    return `
+        <label class="field">
+          <span>类型</span>
+          <select data-calculation-event-kind>${optionHtml([["direct", "直伤"], ["anomaly", "属性异常"], ["disorder", "紊乱"]], kind)}</select>
+        </label>
+        <label class="field">
+          <span>次数</span>
+          <input data-calculation-event-count type="number" min="0" step="1" value="${escapeHtml(event.count ?? 1)}">
+        </label>
+        <label class="field calculation-direct-only"${kind === "direct" ? "" : " hidden"}>
+          <span>技能大类</span>
+          <select data-calculation-skill-category>${calculationSkillCategoryOptions(categoryId)}</select>
+        </label>
+        <label class="field calculation-direct-only"${kind === "direct" ? "" : " hidden"}>
+          <span>招式</span>
+          <select data-calculation-skill-move>${calculationSkillMoveOptions(categoryId, moveId)}</select>
+        </label>
+        <label class="field calculation-direct-only"${kind === "direct" ? "" : " hidden"}>
+          <span>倍率行</span>
+          <select data-calculation-skill-row>${calculationSkillRowOptions(categoryId, moveId, rowId)}</select>
+        </label>
+        <label class="field calculation-direct-only"${kind === "direct" ? "" : " hidden"}>
+          <span>暴击模式</span>
+          <select data-calculation-crit-mode>${optionHtml([["expected", "期望"], ["crit", "暴击"], ["nonCrit", "非暴击"]], event.critMode ?? "expected")}</select>
+        </label>
+        <label class="field calculation-anomaly-only"${kind === "anomaly" ? "" : " hidden"}>
+          <span>异常类型</span>
+          <select data-calculation-anomaly-effect>${anomalyEffectOptions(event.anomalyEffect ?? defaultAnomalyEffectIdForAgent())}</select>
+        </label>
+        <label class="field calculation-anomaly-only"${kind === "anomaly" ? "" : " hidden"}>
+          <span>结算次数</span>
+          <input data-calculation-proc-count type="number" min="0" step="1" value="${escapeHtml(event.procCount ?? 1)}">
+        </label>
+        <label class="field calculation-disorder-only"${kind === "disorder" ? "" : " hidden"}>
+          <span>紊乱类型</span>
+          <select data-calculation-disorder-effect>${disorderEffectOptions(anomalyEffectId(event) || "burn")}</select>
+        </label>
+        <label class="field calculation-disorder-only"${kind === "disorder" ? "" : " hidden"}>
+          <span>已生效秒数</span>
+          <input data-calculation-elapsed type="number" min="0" step="0.1" value="${escapeHtml(event.elapsedSeconds ?? 0)}">
+        </label>
+        <label class="field calculation-disorder-only"${kind === "disorder" ? "" : " hidden"}>
+          <span>持续秒数</span>
+          <input data-calculation-duration type="number" min="0" step="0.1" value="${escapeHtml(event.durationSeconds ?? 10)}">
+        </label>
+    `
+}
+
+function renderCalculationConfigEventList(events = calculationConfigEvents) {
+    if (!els.calculationConfigEventList) {
+        return
+    }
+    els.calculationConfigEventList.innerHTML = events.length
+        ? events.map(calculationEventListItemHtml).join("")
+        : `<div class="calculation-event-empty">还没有目标事件</div>`
+    if (els.calculationConfigEventCount) {
+        els.calculationConfigEventCount.textContent = `${events.length} 项`
+    }
+}
+
+function renderCalculationEventEditor() {
+    const index = normalizeCalculationEditingIndex()
+    const event = index >= 0 ? calculationConfigEvents[index] : null
+    if (els.calculationEventEditorTitle) {
+        els.calculationEventEditorTitle.textContent = event ? calculationEventTitle(event) : "添加一个事件开始配置"
+    }
+    if (els.calculationEventEditorFields) {
+        els.calculationEventEditorFields.innerHTML = event
+            ? calculationEventEditorHtml(event)
+            : `<div class="calculation-event-editor-empty">左侧添加直伤、属性异常或紊乱事件。</div>`
+    }
+    if (els.duplicateCalculationEventBtn) {
+        els.duplicateCalculationEventBtn.disabled = !event
+    }
+    if (els.removeCalculationEventBtn) {
+        els.removeCalculationEventBtn.disabled = !event
+    }
+}
+
+function syncCalculationConfigModalSummary() {
+    if (els.calculationConfigFooterSummary) {
+        const mode = els.calculationConfigMode?.value ?? calculationConfigMode
+        const events = mode === "custom"
+            ? calculationConfigEvents
+            : mode === "anomaly"
+                ? [anomalyEventFromControls()]
+                : [singleEventFromControls()]
+        els.calculationConfigFooterSummary.textContent = calculationConfigSummaryText({ mode, events })
+    }
+}
+
+function renderCalculationConfigEvents(events = calculationConfigEvents) {
+    calculationConfigEvents = events
+    normalizeCalculationEditingIndex()
+    renderCalculationConfigEventList()
+    renderCalculationEventEditor()
+    syncCalculationConfigModalSummary()
+}
+
+function syncCalculationConfigModeFields() {
+    const mode = els.calculationConfigMode?.value ?? calculationConfigMode
+    if (els.calculationConfigEventList) {
+        els.calculationConfigEventList.closest(".calculation-config-events").hidden = mode !== "custom"
+    }
+    for (const button of [
+        els.addCalculationDirectEventBtn,
+        els.addCalculationAnomalyEventBtn,
+        els.addCalculationDisorderEventBtn,
+    ]) {
+        if (button) {
+            button.hidden = mode !== "custom"
+        }
+    }
+    renderCalculationObjectiveControls()
+    syncCalculationConfigModalSummary()
+}
+
+function readCalculationEventFromEditor(index = calculationConfigEditingIndex) {
+    const current = calculationConfigEvents[index]
+    if (!current || !els.calculationEventEditorFields) {
+        return current
+    }
+    const kind = els.calculationEventEditorFields.querySelector("[data-calculation-event-kind]")?.value ?? calculationEventUiKind(current)
+    const count = Number(els.calculationEventEditorFields.querySelector("[data-calculation-event-count]")?.value || 1)
+    if (kind === "anomaly") {
+        return {
+            id: current.id,
+            kind: "anomaly",
+            settlementType: "attribute",
+            anomalyEffect: els.calculationEventEditorFields.querySelector("[data-calculation-anomaly-effect]")?.value || defaultAnomalyEffectIdForAgent(),
+            procCount: Number(els.calculationEventEditorFields.querySelector("[data-calculation-proc-count]")?.value || 1),
+            count,
+        }
+    }
+    if (kind === "disorder") {
+        return {
+            id: current.id,
+            kind: "anomaly",
+            settlementType: "disorder",
+            anomalyEffect: els.calculationEventEditorFields.querySelector("[data-calculation-disorder-effect]")?.value || "burn",
+            elapsedSeconds: Number(els.calculationEventEditorFields.querySelector("[data-calculation-elapsed]")?.value || 0),
+            durationSeconds: Number(els.calculationEventEditorFields.querySelector("[data-calculation-duration]")?.value || 10),
+            count,
+        }
+    }
+    const skill = agentSkillCatalog()
+    return {
+        id: current.id,
+        kind: "direct",
+        count,
+        critMode: els.calculationEventEditorFields.querySelector("[data-calculation-crit-mode]")?.value || "expected",
+        skillRef: {
+            agentSkillId: skill?.id ?? "",
+            categoryId: els.calculationEventEditorFields.querySelector("[data-calculation-skill-category]")?.value ?? "",
+            moveId: els.calculationEventEditorFields.querySelector("[data-calculation-skill-move]")?.value ?? "",
+            rowId: els.calculationEventEditorFields.querySelector("[data-calculation-skill-row]")?.value ?? "",
+        },
+    }
+}
+
+function syncEditingEventFromEditor({ renderList = true } = {}) {
+    if ((els.calculationConfigMode?.value ?? calculationConfigMode) !== "custom") {
+        return
+    }
+    const index = normalizeCalculationEditingIndex()
+    if (index < 0 || !els.calculationEventEditorFields?.querySelector("[data-calculation-event-kind]")) {
+        return
+    }
+    calculationConfigEvents[index] = readCalculationEventFromEditor(index)
+    calculationConfigSelectedEventId = calculationConfigEvents[index]?.id ?? null
+    if (renderList) {
+        renderCalculationConfigEventList()
+        if (els.calculationEventEditorTitle) {
+            els.calculationEventEditorTitle.textContent = calculationEventTitle(calculationConfigEvents[index])
+        }
+        syncCalculationConfigModalSummary()
+    }
+}
+
+function readCalculationConfigEventsFromModal() {
+    syncEditingEventFromEditor({ renderList: false })
+    return [...calculationConfigEvents]
+}
+
+function adminDefaultCalculationText(config = null) {
+    if (!config?.events?.length) {
+        return "未配置"
+    }
+    const name = localizedText(config.name) || "管理员默认"
+    return `${name} · ${config.events.length} 个事件`
+}
+
+function renderCalculationConfigModal() {
+    if (!els.calculationConfigModal) {
+        return
+    }
+    if (els.calculationConfigMode) {
+        els.calculationConfigMode.value = calculationConfigMode
+    }
+    const selectedIndex = calculationConfigEvents.findIndex(event => event.id === calculationConfigSelectedEventId)
+    if (selectedIndex >= 0) {
+        calculationConfigEditingIndex = selectedIndex
+    }
+    const defaultConfig = getAgent(els.agentSelect.value)?.defaultCalculationConfig
+    if (els.adminDefaultCalculationSummary) {
+        els.adminDefaultCalculationSummary.textContent = adminDefaultCalculationText(defaultConfig)
+        els.adminDefaultCalculationSummary.title = defaultConfig ? calculationConfigSummaryText(defaultConfig) : ""
+    }
+    if (els.applyAdminDefaultCalculationBtn) {
+        els.applyAdminDefaultCalculationBtn.disabled = !defaultConfig
+    }
+    renderCalculationConfigEvents()
+    syncCalculationConfigModeFields()
+}
+
+function openCalculationConfigModal() {
+    renderCalculationConfigModal()
+    els.calculationConfigModal.hidden = false
+    document.body.classList.add("modal-open")
+}
+
+function closeCalculationConfigModal() {
+    els.calculationConfigModal.hidden = true
+    document.body.classList.remove("modal-open")
+}
+
+function applyCalculationConfig(config = {}) {
+    const next = calculationConfigFromStored(config)
+    calculationConfigMode = next.mode
+    calculationConfigEvents = next.events.length ? next.events : calculationConfigEvents
+    calculationConfigSelectedEventId = next.selectedEventId ?? calculationConfigEvents[0]?.id ?? null
+    const selected = calculationConfigEvents.find(event => event.id === calculationConfigSelectedEventId) ?? calculationConfigEvents[0]
+    if (selected) {
+        applyStoredDamageConfig({
+            mode: "single",
+            selectedEventId: selected.id,
+            events: [selected],
+            skillLevelsByCategory: damageSkillLevelsByCategory,
+            target: collectDamageTargetConfig(),
+        })
+        calculationConfigMode = next.mode
+        calculationConfigEvents = next.events
+        calculationConfigSelectedEventId = next.selectedEventId ?? selected.id
+        calculationConfigEditingIndex = Math.max(0, calculationConfigEvents.findIndex(event => event.id === calculationConfigSelectedEventId))
+    }
+    syncCalculationConfigSummary()
+    renderCalculationObjectiveControls()
 }
 
 function applyStoredDamageConfig(config = {}) {
+    const calculationConfig = calculationConfigFromStored(config)
+    calculationConfigMode = calculationConfig.mode
+    calculationConfigEvents = calculationConfig.events
+    calculationConfigSelectedEventId = calculationConfig.selectedEventId
+    calculationConfigEditingIndex = Math.max(0, calculationConfigEvents.findIndex(event => event.id === calculationConfigSelectedEventId))
     const target = config.target ?? {}
     const damageElement = currentDamageElement()
-    const selectedEvent = (config.events ?? []).find(event => event.id === config.selectedEventId)
-        ?? (config.events ?? [])[0]
+    const selectedEvent = calculationConfig.events.find(event => event.id === calculationConfig.selectedEventId)
+        ?? calculationConfig.events[0]
         ?? { kind: "direct" }
     activeDamageResistanceElement = damageElement
     for (const element of DAMAGE_ELEMENTS) {
@@ -1167,20 +1919,23 @@ function applyStoredDamageConfig(config = {}) {
     els.damageTargetDefense.value = target.defense ?? damageTargetPresetById(els.damageTargetPreset.value)?.defense ?? 953
     els.damageLevelCoefficient.value = target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT
     els.damageTargetResistance.value = damageTargetResistanceByElement[damageElement] ?? 0
-    if (els.damageEventType) {
-        els.damageEventType.value = ["direct", "anomaly", "disorder"].includes(selectedEvent.kind) ? selectedEvent.kind : "direct"
-    }
-    els.damageSkillMultiplier.value = selectedEvent.skillMultiplier ?? config.skillMultiplier ?? 100
-    els.damageCritMode.value = selectedEvent.critMode ?? config.critMode ?? "expected"
-    if (els.damageAnomalyEffect) {
-        els.damageAnomalyEffect.value = selectedEvent.anomalyEffect ?? "assault"
-        const defaultProcCount = els.damageAnomalyEffect.selectedOptions?.[0]?.dataset.defaultProcCount
-        els.damageAnomalyProcCount.value = selectedEvent.procCount ?? defaultProcCount ?? 1
-    }
-    if (els.damageDisorderEffect) {
-        els.damageDisorderEffect.value = selectedEvent.previousAnomalyEffect ?? "burn"
-        els.damageDisorderElapsed.value = selectedEvent.elapsedSeconds ?? 0
-        els.damageDisorderDuration.value = selectedEvent.durationSeconds ?? 10
+    if (selectedEvent.kind === "direct") {
+        els.damageSkillMultiplier.value = selectedEvent.skillMultiplier ?? config.skillMultiplier ?? 100
+        els.damageCritMode.value = selectedEvent.critMode ?? config.critMode ?? "expected"
+    } else {
+        const settlementType = anomalySettlementType(selectedEvent)
+        if (els.damageAnomalySettlementType) {
+            els.damageAnomalySettlementType.value = settlementType
+        }
+        if (settlementType === "disorder") {
+            els.damageDisorderEffect.value = anomalyEffectId(selectedEvent) || "burn"
+            els.damageDisorderElapsed.value = selectedEvent.elapsedSeconds ?? 0
+            els.damageDisorderDuration.value = selectedEvent.durationSeconds ?? 10
+        } else if (els.damageAnomalyEffect) {
+            els.damageAnomalyEffect.value = selectedEvent.anomalyEffect ?? "assault"
+            const defaultProcCount = els.damageAnomalyEffect.selectedOptions?.[0]?.dataset.defaultProcCount
+            els.damageAnomalyProcCount.value = selectedEvent.procCount ?? defaultProcCount ?? 1
+        }
     }
     const storedSkillRef = selectedEvent.skillRef ?? config.skillRef ?? null
     const skillCatalog = agentSkillCatalog()
@@ -1193,9 +1948,10 @@ function applyStoredDamageConfig(config = {}) {
     }
     selectedDamageSkillRef = storedSkillRef
     renderAgentSkillLevelControls()
-    renderDamageEventControls()
+    renderCalculationObjectiveControls()
     syncDamageResistanceControlsToAgent()
     syncDamagePresetFromDefense()
+    syncCalculationConfigSummary()
 }
 
 function syncDamageDefenseToPreset() {
@@ -2502,69 +3258,23 @@ function collectCombatBuffConfig() {
 }
 
 function collectDamageConfig() {
-    persistCurrentDamageResistanceInput()
-    const damageElement = currentDamageElement()
-    const resolvedSkill = resolveDamageSkillRef(selectedDamageSkillRef)
-    const eventType = els.damageEventType?.value || "direct"
     const agentLevel = Number(els.agentLevelInput?.value || 60)
-    const target = {
-        presetId: els.damageTargetPreset?.value || DEFAULT_DAMAGE_TARGET_PRESET_ID,
-        defense: Number(els.damageTargetDefense?.value || 953),
-        levelCoefficient: Number(els.damageLevelCoefficient?.value || DEFAULT_DAMAGE_LEVEL_COEFFICIENT),
-        resistanceByElement: {
-            ...damageTargetResistanceByElement,
-            [damageElement]: Number(els.damageTargetResistance?.value || 0),
-        },
-    }
-    if (eventType === "anomaly") {
-        const anomalyEffect = els.damageAnomalyEffect?.value || "assault"
-        return {
-            agentLevel,
-            skillLevelsByCategory: { ...damageSkillLevelsByCategory },
-            selectedEventId: "anomaly-1",
-            events: [
-                {
-                    id: "anomaly-1",
-                    kind: "anomaly",
-                    anomalyEffect,
-                    procCount: Number(els.damageAnomalyProcCount?.value || DEFAULT_ANOMALY_PROC_COUNTS[anomalyEffect] || 1),
-                },
-            ],
-            target,
-        }
-    }
-    if (eventType === "disorder") {
-        return {
-            agentLevel,
-            skillLevelsByCategory: { ...damageSkillLevelsByCategory },
-            selectedEventId: "disorder-1",
-            events: [
-                {
-                    id: "disorder-1",
-                    kind: "disorder",
-                    previousAnomalyEffect: els.damageDisorderEffect?.value || "burn",
-                    elapsedSeconds: Number(els.damageDisorderElapsed?.value || 0),
-                    durationSeconds: Number(els.damageDisorderDuration?.value || 10),
-                },
-            ],
-            target,
-        }
-    }
-    const directEvent = {
-        id: "direct-1",
-        kind: "direct",
-        skillMultiplier: Number(els.damageSkillMultiplier?.value || 100),
-        ...(resolvedSkill ? { skillRef: resolvedSkill.ref } : {}),
-        critMode: els.damageCritMode?.value || "expected",
-    }
+    const target = collectDamageTargetConfig()
+    const events = configuredCalculationEventsForRequest()
+    const selectedEventId = calculationConfigMode === "custom"
+        ? calculationConfigSelectedEventId ?? events[0]?.id
+        : events[0]?.id
+    const selectedDirect = events.find(event => event.id === selectedEventId && event.kind === "direct")
+        ?? events.find(event => event.kind === "direct")
     return {
+        mode: calculationConfigMode,
         agentLevel,
-        skillMultiplier: Number(els.damageSkillMultiplier?.value || 100),
         skillLevelsByCategory: { ...damageSkillLevelsByCategory },
-        ...(resolvedSkill ? { skillRef: resolvedSkill.ref } : {}),
-        critMode: els.damageCritMode?.value || "expected",
-        selectedEventId: directEvent.id,
-        events: [directEvent],
+        ...(selectedDirect?.skillMultiplier ? { skillMultiplier: selectedDirect.skillMultiplier } : {}),
+        ...(selectedDirect?.skillRef ? { skillRef: selectedDirect.skillRef } : {}),
+        ...(selectedDirect?.critMode ? { critMode: selectedDirect.critMode } : {}),
+        selectedEventId,
+        events,
         target,
     }
 }
@@ -2839,6 +3549,14 @@ function syncMainStatChoices(select, slot) {
     }
 }
 
+function syncTwoPieceSetChoices() {
+    const selected = new Set(selectedValues(els.twoPieceSetSelect))
+    for (const input of els.twoPieceSetChoices.querySelectorAll("input[data-two-piece-set-limit]")) {
+        input.checked = selected.has(input.value)
+        input.closest(".main-stat-choice")?.classList.toggle("active", input.checked)
+    }
+}
+
 function setMainStatSelected(select, stat, selected) {
     const option = [...select.options].find(item => item.value === stat)
     if (!option) {
@@ -2846,6 +3564,23 @@ function setMainStatSelected(select, stat, selected) {
     }
     option.selected = selected
     select.dispatchEvent(new Event("change", { bubbles: true }))
+}
+
+function setTwoPieceSetSelected(setId, selected) {
+    const option = [...els.twoPieceSetSelect.options].find(item => item.value === setId)
+    if (!option) {
+        return
+    }
+    option.selected = selected
+    els.twoPieceSetSelect.dispatchEvent(new Event("change", { bubbles: true }))
+}
+
+function clearTwoPieceSetLimits() {
+    for (const option of els.twoPieceSetSelect.options) {
+        option.selected = false
+    }
+    syncTwoPieceSetChoices()
+    els.twoPieceSetSelect.dispatchEvent(new Event("change", { bubbles: true }))
 }
 
 function clearMainStatLimits(slot) {
@@ -2871,7 +3606,7 @@ function collectOptimizationSettings() {
     return {
         algorithm: els.algorithmSelect.value,
         fourPieceSetId: els.fourPieceSetSelect.value,
-        twoPieceSetId: els.twoPieceSetSelect.value || null,
+        twoPieceSetIds: selectedValues(els.twoPieceSetSelect),
         objective: "damage",
         mainStatLimits: {
             4: selectedValues(els.slot4MainStats),
@@ -2947,12 +3682,115 @@ function renderActiveEffects(effects = []) {
     }
 }
 
+const DAMAGE_PANEL_SNAPSHOT_LABELS = {
+    atk: "局内攻击力",
+    critRate: "面板暴击率",
+    effectiveCritRate: "有效暴击率",
+    critDmg: "暴击伤害",
+    anomalyProficiency: "异常精通",
+    dmgBonus: "通用增伤",
+    physicalDmg: "物理增伤",
+    fireDmg: "火属性增伤",
+    iceDmg: "冰属性增伤",
+    electricDmg: "电属性增伤",
+    etherDmg: "以太增伤",
+    penRatio: "穿透率",
+    penFlat: "穿透值",
+}
+
+const DAMAGE_PANEL_PERCENT_KEYS = new Set([
+    "critRate",
+    "effectiveCritRate",
+    "critDmg",
+    "dmgBonus",
+    "physicalDmg",
+    "fireDmg",
+    "iceDmg",
+    "electricDmg",
+    "etherDmg",
+    "penRatio",
+])
+
+function damageNumber(value, digits = 3) {
+    const number = Number(value)
+    if (!Number.isFinite(number)) {
+        return "-"
+    }
+    return String(Number(number.toFixed(digits)))
+}
+
+function damagePanelValue(key, value) {
+    const number = Number(value)
+    if (!Number.isFinite(number)) {
+        return "-"
+    }
+    if (DAMAGE_PANEL_PERCENT_KEYS.has(key)) {
+        return `${damageNumber(number * 100, 2)}%`
+    }
+    return damageNumber(number)
+}
+
+function directEventVariantHtml(event = {}) {
+    if (!event.damageVariants) {
+        return ""
+    }
+    const items = [
+        ["expected", "期望"],
+        ["crit", "暴击"],
+        ["nonCrit", "非暴击"],
+    ].map(([key, label]) => {
+        const value = event.damageVariants?.[key]?.finalDamage
+        return `<span>${label} ${escapeHtml(damageNumber(value))}</span>`
+    }).join("")
+    return `<small class="damage-event-variants">${items}</small>`
+}
+
+function renderDamagePanelSnapshot(container, snapshot = {}) {
+    const entries = Object.entries(snapshot).filter(([, value]) => Number.isFinite(Number(value)))
+    if (!entries.length) {
+        return
+    }
+    const block = document.createElement("div")
+    block.className = "damage-whitebox-panel"
+    block.innerHTML = `
+        <strong>结算面板</strong>
+        <div>
+          ${entries.map(([key, value]) => `
+            <span>${escapeHtml(DAMAGE_PANEL_SNAPSHOT_LABELS[key] ?? statLabel(key))}</span>
+            <b>${escapeHtml(damagePanelValue(key, value))}</b>
+          `).join("")}
+        </div>
+    `
+    container.appendChild(block)
+}
+
 function renderDamageWhiteBox(damage) {
-    els.damageFinalValue.textContent = damage?.finalDamage === undefined
+    currentRenderedDamage = damage ?? null
+    const totalDamage = damage?.totalFinalDamage ?? damage?.finalDamage
+    els.damageFinalValue.textContent = totalDamage === undefined
         ? "-"
-        : String(Number(damage.finalDamage.toFixed(3)))
+        : damageNumber(totalDamage)
     els.damageWhiteBoxRows.innerHTML = ""
-    for (const row of damage?.whiteBoxRows ?? []) {
+    const events = damage?.events ?? []
+    const selectedEventId = damage?.selectedEventId ?? events[0]?.id
+    if (events.length) {
+        const breakdown = document.createElement("div")
+        breakdown.className = "damage-event-breakdown"
+        breakdown.innerHTML = events.map(event => `
+            <button type="button" data-select-damage-event-whitebox="${escapeHtml(event.id)}" class="${event.id === selectedEventId ? "active" : ""}">
+              <span>
+                <span>${escapeHtml(event.label ?? event.id)} ×${escapeHtml(event.count ?? 1)}</span>
+                ${event.kind === "direct" ? directEventVariantHtml(event) : ""}
+              </span>
+              <strong>${escapeHtml(damageNumber(event.finalDamage ?? 0))}</strong>
+            </button>
+        `).join("")
+        els.damageWhiteBoxRows.appendChild(breakdown)
+    }
+    const selectedEvent = events.find(event => event.id === selectedEventId)
+    renderDamagePanelSnapshot(els.damageWhiteBoxRows, selectedEvent?.panelSnapshot ?? {})
+    const rows = selectedEvent?.whiteBoxRows ?? damage?.whiteBoxRows ?? []
+    for (const row of rows) {
         const item = document.createElement("div")
         item.className = "damage-whitebox-row"
         const formulaHtml = Array.isArray(row.formulaLines) && row.formulaLines.length
@@ -3100,8 +3938,14 @@ async function finishOptimizationJob(job) {
     optimizationResults = data?.results ?? []
     activeResultIndex = optimizationResults.length ? 0 : -1
     const metrics = data?.metrics ?? job.metrics
+    const processedCount = processedOptimizationCount(metrics)
     els.optimizerMetrics.textContent = metrics
-        ? `评估 ${formatCount(metrics.evaluated)} / 估算 ${formatCount(metrics.estimatedCombinationCount)}`
+        ? [
+            `评估 ${formatCount(processedCount)} / 估算 ${formatCount(metrics.estimatedCombinationCount)}`,
+            metrics.algorithmLabel,
+            Number(metrics.prunedBySuperBound ?? 0) > 0 ? `真实评分 ${formatCount(metrics.scoredCombinationCount ?? metrics.evaluated ?? 0)}` : "",
+            Number(metrics.prunedBySuperBound ?? 0) > 0 ? `剪枝 ${formatCount(metrics.prunedBySuperBound)}` : "",
+        ].filter(Boolean).join(" · ")
         : "已计算"
     renderResultTabs()
     renderResultList()
@@ -3274,13 +4118,23 @@ function populateSetSelects() {
     const sets = [...(meta?.driveDiscSets ?? [])]
         .sort((left, right) => nameOf(left).localeCompare(nameOf(right), "zh-CN"))
     populateSelect(els.fourPieceSetSelect, sets, sets[0]?.id)
-    els.twoPieceSetSelect.innerHTML = `<option value="">不限定</option>`
+    els.twoPieceSetSelect.innerHTML = ""
+    els.twoPieceSetChoices.innerHTML = ""
     for (const set of sets) {
         const option = document.createElement("option")
         option.value = set.id
         option.textContent = nameOf(set)
         els.twoPieceSetSelect.appendChild(option)
+
+        const label = document.createElement("label")
+        label.className = "main-stat-choice"
+        label.innerHTML = `
+            <input type="checkbox" data-two-piece-set-limit value="${escapeHtml(set.id)}">
+            <span>${escapeHtml(nameOf(set))}</span>
+        `
+        els.twoPieceSetChoices.appendChild(label)
     }
+    syncTwoPieceSetChoices()
 }
 
 function restoreHomeState() {
@@ -3292,7 +4146,7 @@ function restoreHomeState() {
     populateCinemaLevelSelect(cinemaLevelForAgent(agentId))
     els.wEngineSelect.value = getWEngine(config.wEngineId)?.id ?? meta.wEngines[0]?.id
     populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), config.wEngineModificationLevel)
-    applyStoredDamageConfig(config.damage)
+    applyStoredDamageConfig(config.damage ?? getAgent(agentId)?.defaultCalculationConfig ?? {})
     renderEntityCards()
     renderCombatControls()
 }
@@ -3337,7 +4191,7 @@ els.agentSelect.addEventListener("change", async () => {
         populateCinemaLevelSelect(cinemaLevelForAgent(agentId))
         els.wEngineSelect.value = getWEngine(config.wEngineId)?.id ?? meta.wEngines[0]?.id
         populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), config.wEngineModificationLevel)
-        applyStoredDamageConfig(config.damage)
+        applyStoredDamageConfig(config.damage ?? getAgent(agentId)?.defaultCalculationConfig ?? {})
         await refreshAfterConfigChange()
     } catch (error) {
         setStatus(error.message, "error")
@@ -3371,6 +4225,7 @@ for (const { categoryId, select } of skillLevelSelects()) {
         try {
             damageSkillLevelsByCategory[categoryId] = Number(select.value)
             renderDamageSkillSummary()
+            syncCalculationConfigSummary()
             await refreshAfterConfigChange()
         } catch (error) {
             setStatus(error.message, "error")
@@ -3396,6 +4251,19 @@ for (const input of [
         }
     })
 }
+document.querySelector(".optimizer-settings-grid").addEventListener("change", event => {
+    if (!event.target.matches("[data-two-piece-set-limit]")) {
+        return
+    }
+    event.target.closest(".main-stat-choice")?.classList.toggle("active", event.target.checked)
+    setTwoPieceSetSelected(event.target.value, event.target.checked)
+})
+document.querySelector(".optimizer-settings-grid").addEventListener("click", event => {
+    if (!event.target.closest("[data-clear-two-piece-sets]")) {
+        return
+    }
+    clearTwoPieceSetLimits()
+})
 document.querySelector(".optimizer-main-stat-grid").addEventListener("change", event => {
     if (!event.target.matches("[data-main-stat-limit]")) {
         return
@@ -3440,15 +4308,7 @@ els.combatSection.addEventListener("change", async event => {
         if (event.target === els.damageTargetPreset) {
             syncDamageDefenseToPreset()
         }
-        if (event.target === els.damageEventType) {
-            renderDamageEventControls()
-        }
-        if (event.target === els.damageAnomalyEffect) {
-            els.damageAnomalyProcCount.value = event.target.selectedOptions?.[0]?.dataset.defaultProcCount ?? 1
-        }
-        if (event.target === els.damageDisorderEffect) {
-            els.damageDisorderDuration.value = event.target.selectedOptions?.[0]?.dataset.defaultDurationSeconds ?? 10
-        }
+        syncCalculationConfigSummary()
         await refreshAfterConfigChange()
     } catch (error) {
         setStatus(error.message, "error")
@@ -3503,9 +4363,41 @@ els.combatSection.addEventListener("input", event => {
         persistCurrentDamageResistanceInput()
         syncDamageResistancePresetFromValue()
     }
+    try {
+        saveSyncedConfig()
+        invalidateResults()
+        setStatus(activeOptimizationJobId ? "计算中" : "需重新计算", "idle")
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
+})
+els.calculationSettingsCard?.addEventListener("change", async event => {
+    try {
+        if (event.target === els.damageAnomalySettlementType) {
+            renderCalculationObjectiveControls()
+        }
+        if (event.target === els.damageAnomalyEffect) {
+            els.damageAnomalyProcCount.value = event.target.selectedOptions?.[0]?.dataset.defaultProcCount ?? 1
+        }
+        if (event.target === els.damageDisorderEffect) {
+            els.damageDisorderDuration.value = event.target.selectedOptions?.[0]?.dataset.defaultDurationSeconds ?? 10
+        }
+        syncCalculationConfigSummary()
+        await refreshAfterConfigChange()
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
+})
+els.calculationSettingsCard?.addEventListener("input", event => {
+    if (!event.target.matches("input[type='number']")) {
+        return
+    }
     if (event.target === els.damageSkillMultiplier) {
         selectedDamageSkillRef = null
         renderDamageSkillSummary()
+    }
+    if (event.target === els.damageSkillMultiplier || event.target === els.damageAnomalyProcCount || event.target === els.damageDisorderElapsed || event.target === els.damageDisorderDuration) {
+        syncCalculationConfigSummary()
     }
     try {
         saveSyncedConfig()
@@ -3514,6 +4406,13 @@ els.combatSection.addEventListener("input", event => {
     } catch (error) {
         setStatus(error.message, "error")
     }
+})
+els.calculationSettingsCard?.addEventListener("keydown", async event => {
+    if (event.key !== "Enter" || !event.target.matches("input[type='number']")) {
+        return
+    }
+    event.preventDefault()
+    await refreshAfterConfigChange()
 })
 els.combatSection.addEventListener("keydown", async event => {
     const runtimeField = event.target.closest("[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]")
@@ -3603,6 +4502,104 @@ els.addedCombatBuffs.addEventListener("keydown", async event => {
 })
 els.openDamageSkillModalBtn?.addEventListener("click", openDamageSkillModal)
 els.closeDamageSkillModalBtn?.addEventListener("click", closeDamageSkillModal)
+els.openCalculationConfigBtn?.addEventListener("click", openCalculationConfigModal)
+els.closeCalculationConfigModalBtn?.addEventListener("click", closeCalculationConfigModal)
+els.calculationConfigModal?.addEventListener("click", async event => {
+    if (event.target.matches("[data-close-calculation-config-modal]")) {
+        closeCalculationConfigModal()
+        return
+    }
+    if (event.target === els.applyAdminDefaultCalculationBtn) {
+        const config = getAgent(els.agentSelect.value)?.defaultCalculationConfig
+        if (config) {
+            applyCalculationConfig(config)
+            renderCalculationConfigModal()
+        }
+        return
+    }
+    const addKind = event.target.closest("[data-add-calculation-event-kind]")
+    if (addKind) {
+        addCalculationConfigEvent(addKind.dataset.addCalculationEventKind)
+        return
+    }
+    const selectEvent = event.target.closest("[data-select-calculation-event]")
+    if (selectEvent) {
+        selectCalculationConfigEvent(Number(selectEvent.dataset.selectCalculationEvent))
+        return
+    }
+    const duplicate = event.target.closest("[data-duplicate-calculation-event]")
+    if (duplicate) {
+        duplicateCalculationConfigEvent(Number(duplicate.dataset.duplicateCalculationEvent))
+        return
+    }
+    if (event.target === els.duplicateCalculationEventBtn) {
+        duplicateCalculationConfigEvent()
+        return
+    }
+    const remove = event.target.closest("[data-remove-calculation-event]")
+    if (remove) {
+        removeCalculationConfigEvent(Number(remove.dataset.removeCalculationEvent))
+        return
+    }
+    if (event.target === els.removeCalculationEventBtn) {
+        removeCalculationConfigEvent()
+        return
+    }
+    if (event.target === els.saveCalculationConfigBtn) {
+        calculationConfigMode = els.calculationConfigMode?.value ?? "single"
+        calculationConfigEvents = readCalculationConfigEventsFromModal()
+        calculationConfigSelectedEventId = calculationConfigEvents.some(item => item.id === calculationConfigSelectedEventId)
+            ? calculationConfigSelectedEventId
+            : calculationConfigEvents[0]?.id ?? null
+        syncCalculationConfigSummary()
+        renderCalculationObjectiveControls()
+        closeCalculationConfigModal()
+        await refreshAfterConfigChange()
+    }
+})
+els.calculationConfigModal?.addEventListener("change", event => {
+    if (event.target === els.calculationConfigMode) {
+        syncEditingEventFromEditor({ renderList: false })
+        syncCalculationConfigModeFields()
+        return
+    }
+    if (!els.calculationEventEditorFields?.contains(event.target)) {
+        return
+    }
+    if (event.target.matches("[data-calculation-event-kind]")) {
+        const index = normalizeCalculationEditingIndex()
+        if (index >= 0) {
+            const previous = calculationConfigEvents[index]
+            calculationConfigEvents[index] = calculationEventForKind(event.target.value, previous)
+            calculationConfigSelectedEventId = calculationConfigEvents[index]?.id ?? null
+        }
+        renderCalculationConfigEvents()
+        return
+    }
+    if (event.target.matches("[data-calculation-skill-category]")) {
+        const categoryId = event.target.value
+        const moveSelect = els.calculationEventEditorFields.querySelector("[data-calculation-skill-move]")
+        const rowSelect = els.calculationEventEditorFields.querySelector("[data-calculation-skill-row]")
+        moveSelect.innerHTML = calculationSkillMoveOptions(categoryId)
+        rowSelect.innerHTML = calculationSkillRowOptions(categoryId, moveSelect.value)
+        syncEditingEventFromEditor()
+        return
+    }
+    if (event.target.matches("[data-calculation-skill-move]")) {
+        const categoryId = els.calculationEventEditorFields.querySelector("[data-calculation-skill-category]")?.value ?? ""
+        const rowSelect = els.calculationEventEditorFields.querySelector("[data-calculation-skill-row]")
+        rowSelect.innerHTML = calculationSkillRowOptions(categoryId, event.target.value)
+        syncEditingEventFromEditor()
+        return
+    }
+    syncEditingEventFromEditor()
+})
+els.calculationConfigModal?.addEventListener("input", event => {
+    if (!els.calculationEventEditorFields?.contains(event.target)) {
+        return
+    }
+    syncEditingEventFromEditor()
+})
 els.damageSkillModal?.addEventListener("click", async event => {
     if (event.target.matches("[data-close-damage-skill-modal]")) {
         closeDamageSkillModal()
@@ -3745,6 +4742,17 @@ els.optimizerResultTabs.addEventListener("click", event => {
     if (button) {
         selectResult(Number(button.dataset.resultIndex))
     }
+})
+els.damageWhiteBoxRows.addEventListener("click", event => {
+    const button = event.target.closest("[data-select-damage-event-whitebox]")
+    if (!button || !currentRenderedDamage) {
+        return
+    }
+    calculationConfigSelectedEventId = button.dataset.selectDamageEventWhitebox
+    renderDamageWhiteBox({
+        ...currentRenderedDamage,
+        selectedEventId: button.dataset.selectDamageEventWhitebox,
+    })
 })
 els.optimizeBtn.addEventListener("click", async () => {
     try {

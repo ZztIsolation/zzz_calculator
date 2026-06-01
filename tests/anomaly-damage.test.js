@@ -13,6 +13,7 @@ const exampleInput = catalog.examples.yeShunguang.input
 const meta = buildMeta(catalog)
 assert.ok(meta.anomalyEffects.some(effect => effect.id === "assault" && effect.baseMultiplier === 7.13), "Meta should expose data-backed anomaly effects")
 assert.ok(meta.disorderEffects.some(effect => effect.id === "burn" && effect.tickMultiplier === 0.5), "Meta should expose data-backed disorder effects")
+assert.ok(meta.disorderEffects.some(effect => effect.id === "frost_frozen" && effect.fixedMultiplier === 6 && effect.defaultDurationSeconds === 20), "Meta should expose Miyabi frost disorder effect")
 const metaYouyeCinemaOne = meta.teammateCombatBuffGroups
     .find(group => group.id === "youye")
     ?.buffs?.find(buff => buff.id === "youye.cinema_1.amplify_additional_ability")
@@ -106,6 +107,8 @@ for (const [effect, elapsedSeconds, durationSeconds, expectedMultiplier] of [
     ["shock", 0, 13, 20.75],
     ["corruption", 0, 10, 17],
     ["frozen", 0, 10, 5.25],
+    ["frost_frozen", 0, undefined, 21],
+    ["frost_frozen", 3, 20, 18.75],
     ["flinch", 0, 10, 5.25],
 ]) {
     const result = calculateEvent({
@@ -117,6 +120,17 @@ for (const [effect, elapsedSeconds, durationSeconds, expectedMultiplier] of [
     })
     approx(result.damage.multipliers.anomaly, expectedMultiplier, `${effect} disorder multiplier`)
 }
+
+const unifiedDisorder = calculateEvent({
+    id: "unified-disorder",
+    kind: "anomaly",
+    settlementType: "disorder",
+    anomalyEffect: "burn",
+    elapsedSeconds: 10,
+})
+assert.equal(unifiedDisorder.damage.events[0].kind, "anomaly")
+assert.equal(unifiedDisorder.damage.events[0].settlementType, "disorder")
+approx(unifiedDisorder.damage.multipliers.anomaly, 4.5, "Unified disorder event should resolve burn disorder")
 
 const levelOne = calculateEvent({
     id: "level-one",
@@ -301,7 +315,7 @@ const disorderWithAnomalyOnlyModifier = calculateEvent({
         ],
     },
 })
-approx(disorderWithAnomalyOnlyModifier.damage.multipliers.anomalyDamage, 1, "Anomaly-only damage bonus should not apply to disorder")
+approx(disorderWithAnomalyOnlyModifier.damage.multipliers.anomalyDamage, 1.15, "Anomaly-only damage bonus should apply to disorder subtype")
 
 const youyeAdditionalBuffId = "youye.additional_ability.anomaly_damage_bonus"
 const youyeCinemaOneBuffId = "youye.cinema_1.amplify_additional_ability"

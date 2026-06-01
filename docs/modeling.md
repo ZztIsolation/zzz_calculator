@@ -668,12 +668,14 @@ Burn Disorder       = 450% + floor((duration - elapsed) / 0.5) * 50%
 Shock Disorder      = 450% + floor(duration - elapsed) * 125%
 Corruption Disorder = 450% + floor((duration - elapsed) / 0.5) * 62.5%
 Frozen Disorder     = 450% + floor(duration - elapsed) * 7.5%
+Frost Frozen Disorder (Miyabi) = 600% + floor(duration - elapsed) * 75%
 Flinch Disorder     = 450% + floor(duration - elapsed) * 7.5%
 ```
 
-`elapsed` is clamped to `0..duration`, and `duration` defaults to `10` seconds.
-The frontend exposes duration so effects that extend anomaly duration can be
-entered manually.
+`elapsed` is clamped to `0..duration`, and `duration` defaults to the catalog
+effect duration. Most effects default to `10` seconds; Miyabi's Frost Frozen
+Disorder defaults to `20` seconds. The frontend exposes duration so effects
+that extend anomaly duration can be entered manually.
 
 v1 explicitly does not model anomaly buildup, buildup ownership, multi-agent
 source weighting, polarity disorder, or wind/vortex-style newer special cases.

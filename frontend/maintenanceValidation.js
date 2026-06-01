@@ -14,6 +14,8 @@ const BUFF_MODIFIER_OPERATION_VALUES = new Set(["multiplyResolvedValue"])
 const FORMULA_VALUE_UNIT_VALUES = new Set(["storedValue", "storedPercent"])
 const SKILL_ROW_KIND_VALUES = new Set(["damageMultiplier", "dazeMultiplier", "energyCost", "statBonus"])
 const DAMAGE_EVENT_KIND_VALUES = new Set(["direct", "anomaly", "disorder"])
+const ANOMALY_SETTLEMENT_TYPE_VALUES = new Set(["attribute", "disorder"])
+const CALCULATION_MODE_VALUES = new Set(["single", "anomaly", "custom"])
 const DAMAGE_MODIFIER_KIND_VALUES = new Set(["anomalyDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "directDamageBonus", "skillMultiplierBonus"])
 const SKILL_TARGET_DAMAGE_MODIFIER_KIND_VALUES = new Set(["directDamageBonus", "skillMultiplierBonus"])
 const DAMAGE_MODIFIER_VALUE_UNIT_VALUES = new Set(["decimal"])
@@ -550,6 +552,159 @@ function validatePreferredDriveDiscs(errors, preferredDriveDiscs) {
     }
 }
 
+function calculationAnomalyIds(context = {}, maintenanceType) {
+    const settlementType = maintenanceType === "disorder" ? "disorder" : "attribute"
+    const fromUnified = Array.isArray(context.effects)
+        ? context.effects
+            .filter(item => (item?.settlementType === "disorder" ? "disorder" : "attribute") === settlementType)
+            .map(item => item?.id)
+            .filter(Boolean)
+        : []
+    const explicit = settlementType === "disorder"
+        ? context.disorderEffects
+        : context.anomalyEffects
+    const fromContext = Array.isArray(explicit)
+        ? explicit.map(item => item?.id).filter(Boolean)
+        : []
+    const defaults = settlementType === "disorder"
+        ? ["burn", "shock", "corruption", "frozen", "flinch"]
+        : ["assault", "shatter", "burn", "shock", "corruption"]
+    return new Set([...defaults, ...fromUnified, ...fromContext])
+}
+
+function skillCatalogForRef(context = {}, skillRef = {}) {
+    const agentSkills = Array.isArray(context.agentSkills) ? context.agentSkills : []
+    return agentSkills.find(skill => skill.id === skillRef.agentSkillId) ?? null
+}
+
+function validateCalculationSkillRef(errors, skillRef, path, context = {}, agentId = "") {
+    if (!skillRef || typeof skillRef !== "object" || Array.isArray(skillRef)) {
+        add(errors, path, "必须选择技能倍率。")
+        return
+    }
+    for (const key of ["agentSkillId", "categoryId", "moveId", "rowId"]) {
+        if (!String(skillRef[key] ?? "").trim()) {
+            add(errors, `${path}.${key}`, "必填。")
+        }
+    }
+    if (skillRef.level !== undefined && skillRef.level !== null && skillRef.level !== "") {
+        add(errors, `${path}.level`, "默认计算配置不保存技能等级。")
+    }
+
+    const skill = skillCatalogForRef(context, skillRef)
+    if (!skill) {
+        add(errors, `${path}.agentSkillId`, "技能倍率目录不存在。")
+        return
+    }
+    if (agentId && skill.agentId !== agentId) {
+        add(errors, `${path}.agentSkillId`, "技能倍率目录不属于当前角色。")
+    }
+    const category = (skill.categories ?? []).find(item => item.id === skillRef.categoryId)
+    if (!category) {
+        add(errors, `${path}.categoryId`, "技能大类不存在。")
+        return
+    }
+    const move = (category.moves ?? []).find(item => item.id === skillRef.moveId)
+    if (!move) {
+        add(errors, `${path}.moveId`, "技能招式不存在。")
+        return
+    }
+    const row = (move.rows ?? []).find(item => item.id === skillRef.rowId)
+    if (!row) {
+        add(errors, `${path}.rowId`, "技能倍率行不存在。")
+        return
+    }
+    if ((row.kind ?? "damageMultiplier") !== "damageMultiplier") {
+        add(errors, `${path}.rowId`, "只能选择伤害倍率行。")
+    }
+}
+
+function validatePositiveNumber(errors, value, path, label = "数值") {
+    const numericValue = requireFinite(errors, value, path)
+    if (Number.isFinite(numericValue) && numericValue <= 0) {
+        add(errors, path, `${label}必须大于 0。`)
+    }
+}
+
+function validateNonNegativeNumber(errors, value, path, label = "数值") {
+    const numericValue = requireFinite(errors, value, path)
+    if (Number.isFinite(numericValue) && numericValue < 0) {
+        add(errors, path, `${label}不能小于 0。`)
+    }
+}
+
+function validateCalculationEvent(errors, event, path, context = {}, agentId = "") {
+    if (!event || typeof event !== "object" || Array.isArray(event)) {
+        add(errors, path, "必须是对象。")
+        return
+    }
+    validateOptionalId(errors, event, `${path}.id`)
+    requireEnum(errors, event.kind, DAMAGE_EVENT_KIND_VALUES, `${path}.kind`)
+    validatePositiveNumber(errors, event.count ?? 1, `${path}.count`, "次数")
+
+    if (event.kind === "direct") {
+        validateCalculationSkillRef(errors, event.skillRef, `${path}.skillRef`, context, agentId)
+        if (event.critMode !== undefined) {
+            requireEnum(errors, event.critMode, new Set(["expected", "crit", "nonCrit"]), `${path}.critMode`)
+        }
+        return
+    }
+    const settlementType = event.kind === "disorder"
+        ? "disorder"
+        : (event.settlementType === "disorder" ? "disorder" : "attribute")
+    if (event.settlementType !== undefined) {
+        requireEnum(errors, event.settlementType, ANOMALY_SETTLEMENT_TYPE_VALUES, `${path}.settlementType`)
+    }
+    if (settlementType === "attribute") {
+        if (!calculationAnomalyIds(context, "anomaly").has(event.anomalyEffect)) {
+            add(errors, `${path}.anomalyEffect`, "属性异常不存在。")
+        }
+        validatePositiveNumber(errors, event.procCount ?? 1, `${path}.procCount`, "结算次数")
+        return
+    }
+    const disorderEffectId = event.anomalyEffect ?? event.previousAnomalyEffect
+    if (!calculationAnomalyIds(context, "disorder").has(disorderEffectId)) {
+        add(errors, event.anomalyEffect === undefined ? `${path}.previousAnomalyEffect` : `${path}.anomalyEffect`, "紊乱类型不存在。")
+    }
+    validateNonNegativeNumber(errors, event.elapsedSeconds ?? 0, `${path}.elapsedSeconds`, "已生效秒数")
+    validatePositiveNumber(errors, event.durationSeconds ?? 10, `${path}.durationSeconds`, "持续时间")
+}
+
+function validateDefaultCalculationConfig(errors, config, context = {}, agentId = "") {
+    if (config === undefined || config === null) {
+        return
+    }
+    if (typeof config !== "object" || Array.isArray(config)) {
+        add(errors, "defaultCalculationConfig", "必须是对象。")
+        return
+    }
+    requireEnum(errors, config.mode ?? "custom", CALCULATION_MODE_VALUES, "defaultCalculationConfig.mode")
+    if (config.name !== undefined) {
+        requireName(errors, config.name, "defaultCalculationConfig.name.zhCN")
+    }
+    if (!Array.isArray(config.events)) {
+        add(errors, "defaultCalculationConfig.events", "必须是数组。")
+        return
+    }
+    if (!config.events.length) {
+        add(errors, "defaultCalculationConfig.events", "至少需要一个事件。")
+        return
+    }
+    const ids = new Set()
+    config.events.forEach((event, index) => {
+        validateCalculationEvent(errors, event, `defaultCalculationConfig.events[${index}]`, context, agentId)
+        if (event?.id) {
+            if (ids.has(event.id)) {
+                add(errors, `defaultCalculationConfig.events[${index}].id`, "事件 ID 不能重复。")
+            }
+            ids.add(event.id)
+        }
+    })
+    if (config.selectedEventId && !ids.has(config.selectedEventId)) {
+        add(errors, "defaultCalculationConfig.selectedEventId", "必须指向一个已配置事件。")
+    }
+}
+
 function validateSkillLevelRange(errors, range, path, fallback = null) {
     const source = range ?? fallback
     if (!source) {
@@ -753,6 +908,7 @@ function validateAgent(item, context) {
     validateEffectSet(errors, item?.combatBuffs?.additionalAbility, "combatBuffs.additionalAbility", { sourceType: "self" })
     validateCinemaBuffs(errors, item?.combatBuffs?.cinemaBuffs)
     validatePreferredDriveDiscs(errors, item?.preferredDriveDiscs)
+    validateDefaultCalculationConfig(errors, item?.defaultCalculationConfig, context, item?.id)
 
     if (item?.coreSkill) {
         if (typeof item.coreSkill !== "object" || Array.isArray(item.coreSkill)) {
@@ -849,8 +1005,13 @@ function validateBuffPayload(item, context) {
 
 function validateAnomalyMaintenanceItem(item, context) {
     const errors = []
-    const maintenanceType = item?.maintenanceType ?? "anomaly"
+    const maintenanceType = item?.settlementType === "disorder" || item?.maintenanceType === "disorder"
+        ? "disorder"
+        : "anomaly"
     requireEnum(errors, maintenanceType, ANOMALY_MAINTENANCE_TYPE_VALUES, "maintenanceType")
+    if (item?.settlementType !== undefined) {
+        requireEnum(errors, item.settlementType, ANOMALY_SETTLEMENT_TYPE_VALUES, "settlementType")
+    }
     requireId(errors, item)
     requireName(errors, item?.label, "label.zhCN")
     requireEnum(errors, item?.element, DAMAGE_ELEMENT_VALUES, "element")

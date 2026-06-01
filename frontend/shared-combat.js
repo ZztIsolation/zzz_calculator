@@ -31,6 +31,7 @@ export const ANOMALY_EFFECT_LABELS = {
     shock: "感电",
     corruption: "侵蚀",
     frozen: "霜寒",
+    frost_frozen: "烈霜霜寒紊乱（星见雅）",
     flinch: "畏缩",
 }
 export const RES_IGNORE_STAT_BY_ELEMENT = {

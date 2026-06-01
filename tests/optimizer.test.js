@@ -48,6 +48,7 @@ function disc(id, setId, partition, mainStat, subStats = []) {
 
 const fourSet = "woodpecker_electro"
 const twoSet = "hormone_punk"
+const thirdSet = catalog.driveDiscSets.find(set => ![fourSet, twoSet].includes(set.id))?.id ?? twoSet
 const slotMain = {
     1: { stat: "hpFlat", value: 2200 },
     2: { stat: "atkFlat", value: 316 },
@@ -71,6 +72,11 @@ const store = {
             { stat: "critRate", value: 2.4, mode: "pct" },
             { stat: "critDmg", value: 4.8 + slot, mode: "pct" },
             { stat: "atkPct", value: 6, mode: "pct" },
+        ])),
+        ...[1, 2, 3, 4, 5, 6].map(slot => disc(`t${slot}`, thirdSet, slot, slotMain[slot], [
+            { stat: "critRate", value: 1.2, mode: "pct" },
+            { stat: "critDmg", value: 2.4 + slot, mode: "pct" },
+            { stat: "atkPct", value: 2, mode: "pct" },
         ])),
         disc("f4-atk", fourSet, 4, { stat: "atkPct", value: 30, mode: "pct" }, [
             { stat: "critDmg", value: 24, mode: "pct" },
@@ -103,6 +109,14 @@ function fourPieceIds(setId) {
 }
 
 function bruteForce(input) {
+    const rawTwoPieceSetIds = input.settings.twoPieceSetIds
+        ?? input.settings.twoPieceSetId
+        ?? []
+    const twoPieceSetIds = [
+        ...new Set((Array.isArray(rawTwoPieceSetIds) ? rawTwoPieceSetIds : [rawTwoPieceSetIds])
+            .map(item => String(item ?? "").trim())
+            .filter(Boolean)),
+    ]
     const bySlot = [1, 2, 3, 4, 5, 6].map(slot =>
         store.driveDiscs.filter(disc => {
             if (Number(disc.partition) !== slot) {
@@ -112,8 +126,8 @@ function bruteForce(input) {
             if (limits.length && !limits.includes(disc.mainStat.stat)) {
                 return false
             }
-            if (input.settings.twoPieceSetId && input.settings.twoPieceSetId !== input.settings.fourPieceSetId) {
-                return disc.setId === input.settings.fourPieceSetId || disc.setId === input.settings.twoPieceSetId
+            if (twoPieceSetIds.length) {
+                return disc.setId === input.settings.fourPieceSetId || twoPieceSetIds.includes(disc.setId)
             }
             return true
         })
@@ -127,7 +141,11 @@ function bruteForce(input) {
             if ((counts.get(input.settings.fourPieceSetId) ?? 0) < 4) {
                 return
             }
-            if (input.settings.twoPieceSetId && input.settings.twoPieceSetId !== input.settings.fourPieceSetId && (counts.get(input.settings.twoPieceSetId) ?? 0) < 2) {
+            if (twoPieceSetIds.length === 1 && twoPieceSetIds[0] === input.settings.fourPieceSetId && (counts.get(input.settings.fourPieceSetId) ?? 0) < 6) {
+                return
+            }
+            if (twoPieceSetIds.some(setId => setId !== input.settings.fourPieceSetId)
+                && !twoPieceSetIds.some(setId => setId !== input.settings.fourPieceSetId && (counts.get(setId) ?? 0) >= 2)) {
                 return
             }
 
@@ -145,7 +163,7 @@ function bruteForce(input) {
             }
             results.push({
                 ids: selected.map(item => item.id).join("|"),
-                score: data.damage.finalDamage,
+                score: data.damage.totalFinalDamage ?? data.damage.finalDamage,
                 appliedTwoPieceCount: data.outOfCombat.appliedEffects.filter(item => item.key.endsWith(".twoPiece")).length,
             })
             return
@@ -165,16 +183,122 @@ function bruteForce(input) {
 }
 
 const exact = optimizeDriveDiscs(catalog, store, optimizerInput())
+const exactAlias = optimizeDriveDiscs(catalog, store, optimizerInput({ settings: { algorithm: "exact" } }))
+const exactLegacy = optimizeDriveDiscs(catalog, store, optimizerInput({ settings: { algorithm: "exact-legacy" } }))
 const exactNoPrune = optimizeDriveDiscs(catalog, store, optimizerInput({ settings: { enableUpperBoundPruning: false } }))
 const brute = bruteForce(optimizerInput())
+assert.equal(exact.metrics.algorithmId, "exact-super-bound")
+assert.equal(exact.metrics.algorithmLabel, "精准 · 推荐")
+assert.equal(exact.metrics.strictExact, true)
+assert.equal(exact.metrics.pruningStrategy, "super-bound")
+assert.equal(exact.metrics.processedCombinationCount, exact.metrics.evaluated + exact.metrics.prunedBySuperBound)
+assert.equal(exactAlias.metrics.algorithmId, "exact-super-bound")
+assert.equal(exactLegacy.metrics.algorithmId, "exact-legacy")
+assert.equal(exactLegacy.metrics.strictExact, true)
 assert.equal(exact.results.length, brute.length)
 assert.equal(exact.results[0].driveDiscs.map(item => item.id).join("|"), brute[0].ids)
 assert.ok(Math.abs(exact.results[0].score - brute[0].score) < 1e-9)
 assert.deepEqual(
     exact.results.map(result => result.driveDiscs.map(item => item.id).join("|")),
+    exactLegacy.results.map(result => result.driveDiscs.map(item => item.id).join("|")),
+)
+assert.deepEqual(
+    exact.results.map(result => result.driveDiscs.map(item => item.id).join("|")),
     exactNoPrune.results.map(result => result.driveDiscs.map(item => item.id).join("|")),
 )
 assert.equal(exact.metrics.complexity.level, "low")
+
+const customDamageInput = optimizerInput({
+    damage: {
+        ...exampleInput.damage,
+        selectedEventId: "direct-hit",
+        events: [
+            {
+                id: "direct-hit",
+                kind: "direct",
+                skillMultiplier: 100,
+                critMode: "expected",
+                count: 2,
+            },
+            {
+                id: "assault-hit",
+                kind: "anomaly",
+                anomalyEffect: "assault",
+                procCount: 1,
+                count: 1,
+            },
+        ],
+    },
+})
+const customDamage = optimizeDriveDiscs(catalog, store, customDamageInput)
+const customDamageLegacy = optimizeDriveDiscs(catalog, store, {
+    ...customDamageInput,
+    settings: {
+        ...customDamageInput.settings,
+        algorithm: "exact-legacy",
+    },
+})
+const customDamageNoPrune = optimizeDriveDiscs(catalog, store, {
+    ...customDamageInput,
+    settings: {
+        ...customDamageInput.settings,
+        enableUpperBoundPruning: false,
+    },
+})
+const customDamageBrute = bruteForce(customDamageInput)
+assert.equal(customDamage.results[0].driveDiscs.map(item => item.id).join("|"), customDamageBrute[0].ids)
+assert.deepEqual(
+    customDamage.results.map(result => result.driveDiscs.map(item => item.id).join("|")),
+    customDamageLegacy.results.map(result => result.driveDiscs.map(item => item.id).join("|")),
+)
+assert.deepEqual(
+    customDamage.results.map(result => result.driveDiscs.map(item => item.id).join("|")),
+    customDamageNoPrune.results.map(result => result.driveDiscs.map(item => item.id).join("|")),
+)
+assert.ok(Math.abs(customDamage.results[0].score - customDamage.results[0].data.damage.totalFinalDamage) < 1e-9)
+assert.ok(customDamage.results[0].data.damage.totalFinalDamage > customDamage.results[0].data.damage.finalDamage)
+
+const anomalyObjective = optimizeDriveDiscs(catalog, store, optimizerInput({
+    damage: {
+        agentLevel: 60,
+        selectedEventId: "shatter-hit",
+        events: [
+            {
+                id: "shatter-hit",
+                kind: "anomaly",
+                anomalyEffect: "shatter",
+                procCount: 1,
+                count: 1,
+            },
+        ],
+    },
+}))
+assert.ok(anomalyObjective.results.length > 0)
+assert.equal(anomalyObjective.results[0].score, anomalyObjective.results[0].data.damage.totalFinalDamage)
+
+const heuristic = optimizeDriveDiscs(catalog, store, optimizerInput({ settings: { algorithm: "heuristic-potential" } }))
+assert.equal(heuristic.metrics.algorithmId, "heuristic-potential")
+assert.equal(heuristic.metrics.strictExact, false)
+assert.ok(heuristic.results.length > 0)
+
+const miyabi = catalog.agentsMap.get("hoshimi_miyabi")
+assert.ok(miyabi.defaultCalculationConfig, "Miyabi should expose an admin default calculation config")
+const miyabiDefaultDamage = calculateInCombatPanel(catalog, {
+    agentId: "hoshimi_miyabi",
+    coreSkillLevel: "F",
+    wEngineId: "hailfall_star_palace",
+    wEngineModificationLevel: 1,
+    driveDiscs: [],
+    combatBuffs: { activeBuffIds: [] },
+    damage: miyabi.defaultCalculationConfig,
+})
+assert.equal(miyabiDefaultDamage.damage.events.length, 6)
+const miyabiDisorder = miyabiDefaultDamage.damage.events.find(event => event.id === "miyabi_frozen_disorder")
+assert.equal(miyabiDisorder?.kind, "anomaly")
+assert.equal(miyabiDisorder?.settlementType, "disorder")
+assert.equal(miyabiDisorder?.input?.anomalyEffect, "frost_frozen")
+assert.equal(miyabiDisorder?.input?.durationSeconds, 20)
+assert.ok(miyabiDefaultDamage.damage.events.some(event => event.id === "miyabi_shatter" && event.kind === "anomaly"))
 
 const preview = previewDriveDiscOptimization(catalog, store, optimizerInput())
 assert.equal(preview.metrics.estimatedCombinationCount, exact.metrics.estimatedCombinationCount)
@@ -193,6 +317,17 @@ assert.ok(
     set22.results[0].data.inCombat.activeEffects.some(item => item.key === `driveDisc4pc:${fourSet}.self`),
     "4+2 candidates should automatically apply the wearer 4-piece Buff",
 )
+
+const multiTwoPieceInput = optimizerInput({ settings: { twoPieceSetIds: [twoSet, thirdSet] } })
+const multiTwoPiece = optimizeDriveDiscs(catalog, store, multiTwoPieceInput)
+const multiTwoPieceBrute = bruteForce(multiTwoPieceInput)
+assert.equal(multiTwoPiece.results[0].driveDiscs.map(item => item.id).join("|"), multiTwoPieceBrute[0].ids)
+assert.deepEqual(multiTwoPiece.settings.twoPieceSetIds, [twoSet, thirdSet])
+assert.ok(multiTwoPiece.results.every(result => {
+    const counts = result.driveDiscs.reduce((map, item) => map.set(item.setId, (map.get(item.setId) ?? 0) + 1), new Map())
+    return (counts.get(fourSet) ?? 0) >= 4
+        && ((counts.get(twoSet) ?? 0) >= 2 || (counts.get(thirdSet) ?? 0) >= 2)
+}))
 
 const limitedInput = optimizerInput({
     settings: {

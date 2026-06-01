@@ -116,7 +116,12 @@ function optimizerPercent(metrics = {}, status = "running") {
         return 0
     }
 
-    return Math.min(99.9, (Number(metrics.evaluated ?? 0) / estimated) * 100)
+    const completed = Number(metrics.processedCombinationCount ?? (Number(metrics.evaluated ?? 0) + Number(metrics.prunedBySuperBound ?? 0)))
+    return Math.min(99.9, (completed / estimated) * 100)
+}
+
+function optimizerProcessedCombinationCount(metrics = {}) {
+    return Number(metrics.processedCombinationCount ?? (Number(metrics.evaluated ?? 0) + Number(metrics.prunedBySuperBound ?? 0)))
 }
 
 function cleanupOptimizerJobs() {
@@ -136,7 +141,7 @@ function formatOptimizerJob(job) {
         jobId: job.id,
         status: job.status,
         elapsedMs,
-        evaluated: Number(metrics.evaluated ?? 0),
+        evaluated: optimizerProcessedCombinationCount(metrics),
         estimatedCombinationCount: Number(metrics.estimatedCombinationCount ?? 0),
         percent: optimizerPercent(metrics, job.status),
         metrics,
@@ -159,6 +164,8 @@ function createOptimizerJob(store, input) {
         metrics: {
             estimatedCombinationCount: 0,
             evaluated: 0,
+            processedCombinationCount: 0,
+            scoredCombinationCount: 0,
         },
         settings: null,
         result: null,
@@ -167,8 +174,8 @@ function createOptimizerJob(store, input) {
     optimizerJobs.set(job.id, job)
 
     job.promise = optimizeDriveDiscsAsync(catalog, store, input, {
-        chunkSize: 100,
-        progressIntervalMs: 100,
+        chunkSize: 10000,
+        progressIntervalMs: 250,
         shouldCancel: () => job.cancelRequested,
         onProgress: progress => {
             job.metrics = progress.metrics
@@ -462,8 +469,89 @@ function cleanPreferredDriveDiscs(preferredDriveDiscs = null) {
         : null
 }
 
+function cleanCalculationSkillRef(skillRef = null) {
+    if (!skillRef || typeof skillRef !== "object" || Array.isArray(skillRef)) {
+        return null
+    }
+    const result = {
+        agentSkillId: String(skillRef.agentSkillId ?? "").trim(),
+        categoryId: String(skillRef.categoryId ?? "").trim(),
+        moveId: String(skillRef.moveId ?? "").trim(),
+        rowId: String(skillRef.rowId ?? "").trim(),
+    }
+    return Object.values(result).every(Boolean) ? result : null
+}
+
+function cleanCalculationEvent(event = {}, index = 0) {
+    if (!event || typeof event !== "object" || Array.isArray(event)) {
+        return null
+    }
+    const inputKind = ["direct", "anomaly", "disorder"].includes(event.kind)
+        ? event.kind
+        : "direct"
+    const settlementType = inputKind === "disorder" || event.settlementType === "disorder" ? "disorder" : "attribute"
+    const kind = inputKind === "direct" ? "direct" : "anomaly"
+    const id = String(event.id ?? `${kind}-${index + 1}`).trim() || `${kind}-${index + 1}`
+    const count = Number(event.count ?? 1)
+    const base = {
+        id,
+        kind,
+        count: Number.isFinite(count) ? Math.max(0, count) : 1,
+    }
+    if (kind === "direct") {
+        const skillRef = cleanCalculationSkillRef(event.skillRef)
+        return {
+            ...base,
+            critMode: ["expected", "crit", "nonCrit"].includes(event.critMode) ? event.critMode : "expected",
+            ...(skillRef ? { skillRef } : {}),
+        }
+    }
+    if (kind === "anomaly") {
+        if (settlementType === "disorder") {
+            const elapsedSeconds = Number(event.elapsedSeconds ?? 0)
+            const durationSeconds = Number(event.durationSeconds ?? 10)
+            return {
+                ...base,
+                settlementType: "disorder",
+                anomalyEffect: String(event.anomalyEffect ?? event.previousAnomalyEffect ?? "").trim(),
+                elapsedSeconds: Number.isFinite(elapsedSeconds) ? Math.max(0, elapsedSeconds) : 0,
+                durationSeconds: Number.isFinite(durationSeconds) ? Math.max(0, durationSeconds) : 10,
+            }
+        }
+        const procCount = Number(event.procCount ?? 1)
+        return {
+            ...base,
+            settlementType: "attribute",
+            anomalyEffect: String(event.anomalyEffect ?? "").trim(),
+            procCount: Number.isFinite(procCount) ? Math.max(0, procCount) : 1,
+        }
+    }
+    return null
+}
+
+function cleanDefaultCalculationConfig(config = null) {
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+        return null
+    }
+    const events = Array.isArray(config.events)
+        ? config.events.map(cleanCalculationEvent).filter(Boolean)
+        : []
+    if (!events.length) {
+        return null
+    }
+    const mode = ["single", "anomaly", "custom"].includes(config.mode) ? config.mode : "custom"
+    const selectedEventId = String(config.selectedEventId ?? events[0]?.id ?? "").trim()
+    return {
+        mode,
+        ...(config.name ? { name: zhOnly(config.name) } : {}),
+        selectedEventId: events.some(event => event.id === selectedEventId) ? selectedEventId : events[0].id,
+        events,
+    }
+}
+
 function cleanAgent(item = {}) {
     const preferredDriveDiscs = cleanPreferredDriveDiscs(item.preferredDriveDiscs)
+    const defaultCalculationConfig = cleanDefaultCalculationConfig(item.defaultCalculationConfig)
     const next = {
         ...item,
         name: zhOnly(item.name),
@@ -482,6 +570,11 @@ function cleanAgent(item = {}) {
         next.preferredDriveDiscs = preferredDriveDiscs
     } else {
         delete next.preferredDriveDiscs
+    }
+    if (defaultCalculationConfig) {
+        next.defaultCalculationConfig = defaultCalculationConfig
+    } else {
+        delete next.defaultCalculationConfig
     }
     return next
 }
@@ -517,6 +610,7 @@ function cleanDriveDiscSet(item = {}) {
 function cleanAnomalyEffect(item = {}) {
     return {
         id: requireId(item),
+        settlementType: "attribute",
         label: zhOnly(item.label),
         element: item.element,
         baseMultiplier: Number(item.baseMultiplier ?? 0),
@@ -527,6 +621,7 @@ function cleanAnomalyEffect(item = {}) {
 function cleanDisorderEffect(item = {}) {
     return {
         id: requireId(item),
+        settlementType: "disorder",
         label: zhOnly(item.label),
         element: item.element,
         fixedMultiplier: Number(item.fixedMultiplier ?? 0),
@@ -534,6 +629,66 @@ function cleanDisorderEffect(item = {}) {
         tickIntervalSeconds: Number(item.tickIntervalSeconds ?? 1),
         defaultDurationSeconds: Number(item.defaultDurationSeconds ?? 10),
     }
+}
+
+function anomalyMaintenanceType(itemOrType = {}) {
+    const raw = typeof itemOrType === "string"
+        ? itemOrType
+        : itemOrType?.settlementType ?? itemOrType?.maintenanceType
+    return raw === "disorder" ? "disorder" : "attribute"
+}
+
+function anomalyMaintenanceTypeForUi(itemOrType = {}) {
+    return anomalyMaintenanceType(itemOrType) === "disorder" ? "disorder" : "anomaly"
+}
+
+function rawAnomalyEffectsFromPayload(payload = {}) {
+    if (Array.isArray(payload.effects)) {
+        return payload.effects
+    }
+    return [
+        ...(payload.anomalyEffects ?? []).map(effect => ({
+            ...effect,
+            settlementType: "attribute",
+        })),
+        ...(payload.disorderEffects ?? []).map(effect => ({
+            ...effect,
+            settlementType: "disorder",
+        })),
+    ]
+}
+
+function anomalyPayloadWithEffects(payload = {}, effects = []) {
+    const next = {
+        ...payload,
+        effects,
+    }
+    delete next.anomalyEffects
+    delete next.disorderEffects
+    return next
+}
+
+function anomalyEffectsForType(payload = {}, type = "attribute") {
+    return rawAnomalyEffectsFromPayload(payload)
+        .filter(effect => anomalyMaintenanceType(effect) === type)
+}
+
+function upsertAnomalyEffect(items, item) {
+    const id = requireId(item)
+    const settlementType = anomalyMaintenanceType(item)
+    const next = [...items]
+    const index = next.findIndex(entry => entry.id === id && anomalyMaintenanceType(entry) === settlementType)
+    if (index >= 0) {
+        next[index] = item
+    } else {
+        next.push(item)
+    }
+    return next
+}
+
+function deleteAnomalyEffectByType(items, type, id) {
+    const settlementType = anomalyMaintenanceType(type)
+    return items.filter(item => !(item.id === id && anomalyMaintenanceType(item) === settlementType))
 }
 
 function cleanMaintenanceItem(resource, item) {
@@ -586,18 +741,17 @@ function deleteById(items, id) {
 }
 
 function anomalyMaintenanceCollectionKey(itemOrType = {}) {
-    const maintenanceType = typeof itemOrType === "string"
-        ? itemOrType
-        : itemOrType?.maintenanceType
-    return maintenanceType === "disorder" ? "disorderEffects" : "anomalyEffects"
+    return anomalyMaintenanceType(itemOrType) === "disorder" ? "disorderEffects" : "anomalyEffects"
 }
 
 function cleanAnomalyMaintenanceItem(item = {}) {
-    const maintenanceType = item.maintenanceType === "disorder" ? "disorder" : "anomaly"
-    const cleaned = maintenanceType === "disorder"
+    const settlementType = anomalyMaintenanceType(item)
+    const maintenanceType = anomalyMaintenanceTypeForUi(item)
+    const cleaned = settlementType === "disorder"
         ? cleanDisorderEffect(item)
         : cleanAnomalyEffect(item)
     return {
+        settlementType,
         maintenanceType,
         cleaned,
         savedItem: {
@@ -609,26 +763,31 @@ function cleanAnomalyMaintenanceItem(item = {}) {
 
 async function saveAnomalyMaintenanceItem(item) {
     const payload = await readDataFile("anomaly_effects.json")
-    const collectionKey = anomalyMaintenanceCollectionKey(item)
+    const settlementType = anomalyMaintenanceType(item)
     assertValidMaintenanceItem("anomaly-effects", item, {
-        items: payload[collectionKey] ?? [],
+        items: anomalyEffectsForType(payload, settlementType),
         currentId: item?.id,
     })
     const { cleaned, savedItem } = cleanAnomalyMaintenanceItem(item)
-    payload[collectionKey] = upsertById(payload[collectionKey] ?? [], cleaned)
-    await writeDataFile("anomaly_effects.json", payload)
-    return {
+    const nextPayload = anomalyPayloadWithEffects(
         payload,
+        upsertAnomalyEffect(rawAnomalyEffectsFromPayload(payload), cleaned),
+    )
+    await writeDataFile("anomaly_effects.json", nextPayload)
+    return {
+        payload: nextPayload,
         savedItem,
     }
 }
 
 async function deleteAnomalyMaintenanceItem(maintenanceType, id) {
     const payload = await readDataFile("anomaly_effects.json")
-    const collectionKey = anomalyMaintenanceCollectionKey(maintenanceType)
-    payload[collectionKey] = deleteById(payload[collectionKey] ?? [], id)
-    await writeDataFile("anomaly_effects.json", payload)
-    return payload
+    const nextPayload = anomalyPayloadWithEffects(
+        payload,
+        deleteAnomalyEffectByType(rawAnomalyEffectsFromPayload(payload), maintenanceType, id),
+    )
+    await writeDataFile("anomaly_effects.json", nextPayload)
+    return nextPayload
 }
 
 async function saveMaintenanceItem(resource, item) {
@@ -642,10 +801,20 @@ async function saveMaintenanceItem(resource, item) {
     }
 
     const payload = await readDataFile(config.fileName)
-    assertValidMaintenanceItem(resource, item, {
+    const validationContext = {
         items: payload[config.collectionKey] ?? [],
         currentId: item?.id,
-    })
+    }
+    if (resource === "agents") {
+        const [agentSkillsPayload, anomalyEffectsPayload] = await Promise.all([
+            readDataFile("agent_skills.json"),
+            readDataFile("anomaly_effects.json"),
+        ])
+        validationContext.agentSkills = agentSkillsPayload.agentSkills ?? []
+        validationContext.anomalyEffects = anomalyEffectsForType(anomalyEffectsPayload, "attribute")
+        validationContext.disorderEffects = anomalyEffectsForType(anomalyEffectsPayload, "disorder")
+    }
+    assertValidMaintenanceItem(resource, item, validationContext)
     const savedItem = cleanMaintenanceItem(resource, item)
     payload[config.collectionKey] = upsertById(payload[config.collectionKey] ?? [], savedItem)
     await writeDataFile(config.fileName, payload)

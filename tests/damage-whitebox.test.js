@@ -434,6 +434,46 @@ const anomalyDefenseRows = anomalyCombo.damage.whiteBoxRows.filter(row => row.la
 assert.equal(anomalyDefenseRows.length, 1, "Anomaly whitebox should expose one defense multiplier row")
 assert.deepEqual(anomalyDefenseRows[0].formulaLines, comboDefenseRows[0].formulaLines)
 
+const frozenDisorderWhiteBox = calculateInCombatPanel(catalog, minimalInput({
+    damage: {
+        selectedEventId: "frozen-disorder",
+        events: [
+            {
+                id: "frozen-disorder",
+                kind: "disorder",
+                previousAnomalyEffect: "frozen",
+                elapsedSeconds: 0,
+                durationSeconds: 10,
+            },
+        ],
+    },
+}))
+assert.equal(
+    frozenDisorderWhiteBox.damage.whiteBoxRows.find(row => row.label === "紊乱倍率")?.formula,
+    "霜寒紊乱：450% + 10 × 7.5%",
+    "Frozen disorder whitebox should keep normal frozen formula",
+)
+
+const frostFrozenDisorderWhiteBox = calculateInCombatPanel(catalog, minimalInput({
+    damage: {
+        selectedEventId: "frost-frozen-disorder",
+        events: [
+            {
+                id: "frost-frozen-disorder",
+                kind: "disorder",
+                previousAnomalyEffect: "frost_frozen",
+                elapsedSeconds: 3,
+                durationSeconds: 20,
+            },
+        ],
+    },
+}))
+assert.equal(
+    frostFrozenDisorderWhiteBox.damage.whiteBoxRows.find(row => row.label === "紊乱倍率")?.formula,
+    "烈霜霜寒紊乱（星见雅）：600% + 17 × 75%",
+    "Miyabi frost disorder whitebox should use frost fixed multiplier",
+)
+
 const resistanceCatalog = cloneCatalog(catalog)
 resistanceCatalog.combatBuffs.push({
     id: "test.damage.resistance_combo",
@@ -742,6 +782,17 @@ assert.match(
     critClamped.damage.whiteBoxRows.find(row => row.label === "暴击乘区")?.formula ?? "",
     /^100% ×/,
 )
+assert.ok(critClamped.damage.events[0].damageVariants, "Direct event should expose crit damage variants")
+approx(
+    critClamped.damage.events[0].damageVariants.expected.finalDamage,
+    critClamped.damage.finalDamage,
+    "Expected variant should match selected direct damage",
+)
+assert.ok(
+    critClamped.damage.events[0].damageVariants.crit.finalDamage >= critClamped.damage.events[0].damageVariants.nonCrit.finalDamage,
+    "Crit variant should be at least non-crit damage",
+)
+assert.equal(critClamped.damage.events[0].panelSnapshot.atk, critClamped.inCombat.panel.atk)
 
 const skillTargetCatalog = cloneCatalog(catalog)
 skillTargetCatalog.combatBuffs.push({

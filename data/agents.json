@@ -641,6 +641,80 @@
           ]
         }
       },
+      "defaultCalculationConfig": {
+        "mode": "custom",
+        "name": {
+          "zhCN": "雅默认循环"
+        },
+        "selectedEventId": "miyabi_frost_moon_charge_3",
+        "events": [
+          {
+            "id": "miyabi_frost_moon_charge_3",
+            "kind": "direct",
+            "count": 4,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "hoshimi_miyabi",
+              "categoryId": "basic",
+              "moveId": "frost_moon",
+              "rowId": "charge_3"
+            }
+          },
+          {
+            "id": "miyabi_chain_spring_arrival",
+            "kind": "direct",
+            "count": 1,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "hoshimi_miyabi",
+              "categoryId": "chain",
+              "moveId": "chain_spring_arrival",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "miyabi_ultimate_lingering_snow",
+            "kind": "direct",
+            "count": 1,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "hoshimi_miyabi",
+              "categoryId": "chain",
+              "moveId": "ultimate_lingering_snow",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "miyabi_ex_flying_snow_slash",
+            "kind": "direct",
+            "count": 2,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "hoshimi_miyabi",
+              "categoryId": "special",
+              "moveId": "ex_flying_snow",
+              "rowId": "slash"
+            }
+          },
+          {
+            "id": "miyabi_frozen_disorder",
+            "kind": "anomaly",
+            "settlementType": "disorder",
+            "anomalyEffect": "frost_frozen",
+            "elapsedSeconds": 0,
+            "durationSeconds": 20,
+            "count": 2
+          },
+          {
+            "id": "miyabi_shatter",
+            "kind": "anomaly",
+            "settlementType": "attribute",
+            "anomalyEffect": "shatter",
+            "procCount": 1,
+            "count": 2
+          }
+        ]
+      },
       "sources": [
         "https://wiki.biligame.com/zzz/%E9%9B%85"
       ],

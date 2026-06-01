@@ -92,6 +92,13 @@ const EFFECT_SCOPE_OPTIONS = [
     ["inCombat", "局内"],
 ]
 const DAMAGE_ELEMENT_OPTIONS = ATTRIBUTE_OPTIONS.filter(([value]) => !["honed_edge", "frost"].includes(value))
+const DEFAULT_ANOMALY_PROC_COUNTS = {
+    assault: 1,
+    shatter: 1,
+    burn: 20,
+    shock: 10,
+    corruption: 20,
+}
 const SKILL_ROW_KIND_OPTIONS = [
     ["damageMultiplier", "伤害倍率"],
     ["dazeMultiplier", "失衡倍率"],
@@ -754,16 +761,7 @@ function rawCollections() {
         agentSkills: catalog?.agentSkills?.agentSkills ?? [],
         wEngines: catalog?.wEngines?.wEngines ?? [],
         driveDiscSets: catalog?.driveDiscSets?.sets ?? [],
-        anomalyEffects: [
-            ...(catalog?.anomalyEffects?.anomalyEffects ?? []).map(effect => ({
-                ...effect,
-                maintenanceType: "anomaly",
-            })),
-            ...(catalog?.anomalyEffects?.disorderEffects ?? []).map(effect => ({
-                ...effect,
-                maintenanceType: "disorder",
-            })),
-        ],
+        anomalyEffects: anomalyMaintenanceRecords(),
         teammateBuffs: [
             ...(catalog?.combatBuffs?.teammates ?? []).flatMap(teammate => (teammate.buffs ?? []).map(buff => ({
                 ...buff,
@@ -781,6 +779,37 @@ function rawCollections() {
             ...(catalog?.combatBuffs?.buffs ?? []).filter(buff => buff.sourceType === "boss"),
         ],
     }
+}
+
+function anomalyMaintenanceType(record = {}) {
+    return record.settlementType === "disorder" || record.maintenanceType === "disorder"
+        ? "disorder"
+        : "anomaly"
+}
+
+function anomalyMaintenanceRecords() {
+    if (Array.isArray(catalog?.anomalyEffects?.effects)) {
+        return catalog.anomalyEffects.effects.map(effect => ({
+            ...effect,
+            maintenanceType: anomalyMaintenanceType(effect),
+        }))
+    }
+    return [
+        ...(catalog?.anomalyEffects?.anomalyEffects ?? []).map(effect => ({
+            ...effect,
+            settlementType: "attribute",
+            maintenanceType: "anomaly",
+        })),
+        ...(catalog?.anomalyEffects?.disorderEffects ?? []).map(effect => ({
+            ...effect,
+            settlementType: "disorder",
+            maintenanceType: "disorder",
+        })),
+    ]
+}
+
+function anomalyMaintenanceRecordsByType(type = "anomaly") {
+    return anomalyMaintenanceRecords().filter(effect => anomalyMaintenanceType(effect) === type)
 }
 
 function collectionForActiveKind() {
@@ -871,6 +900,203 @@ function mainStatChoiceMarkup(slot, selected = [], datasetName = "preferred-main
           <span>${escapeHtml(statLabel(stat))}</span>
         </label>
     `).join("")
+}
+
+function agentSkillForAgentId(agentId = document.getElementById("recordId")?.value.trim()) {
+    return rawCollections().agentSkills.find(skill => skill.agentId === agentId) ?? null
+}
+
+function maintenanceDamageSkillCategories(skill = agentSkillForAgentId()) {
+    return (skill?.categories ?? [])
+        .map(category => ({
+            ...category,
+            moves: (category.moves ?? [])
+                .map(move => ({
+                    ...move,
+                    rows: damageSkillRowsWithGeneratedTotals(category, move)
+                        .filter(row => (row.kind ?? "damageMultiplier") === "damageMultiplier"),
+                }))
+                .filter(move => move.rows.length),
+        }))
+        .filter(category => category.moves.length)
+}
+
+function defaultCalculationEventDraft(kind = "direct") {
+    const index = [...els.maintenanceForm.querySelectorAll("[data-default-calc-event-row]")].length + 1
+    if (kind === "anomaly") {
+        return {
+            id: `anomaly-${index}`,
+            kind: "anomaly",
+            settlementType: "attribute",
+            anomalyEffect: "assault",
+            procCount: 1,
+            count: 1,
+        }
+    }
+    if (kind === "disorder") {
+        return {
+            id: `disorder-${index}`,
+            kind: "anomaly",
+            settlementType: "disorder",
+            anomalyEffect: "burn",
+            elapsedSeconds: 0,
+            durationSeconds: 10,
+            count: 1,
+        }
+    }
+    const skill = agentSkillForAgentId()
+    const category = maintenanceDamageSkillCategories(skill)[0]
+    const move = category?.moves?.[0]
+    const row = move?.rows?.[0]
+    return {
+        id: `direct-${index}`,
+        kind: "direct",
+        count: 1,
+        critMode: "expected",
+        skillRef: {
+            agentSkillId: skill?.id ?? "",
+            categoryId: category?.id ?? "",
+            moveId: move?.id ?? "",
+            rowId: row?.id ?? "",
+        },
+    }
+}
+
+function anomalyEffectMaintenanceOptions(selected = "") {
+    return selectOptions(anomalyMaintenanceRecordsByType("anomaly").map(effect => [
+        effect.id,
+        localized(effect.label) || effect.id,
+    ]), selected)
+}
+
+function disorderEffectMaintenanceOptions(selected = "") {
+    return selectOptions(anomalyMaintenanceRecordsByType("disorder").map(effect => [
+        effect.id,
+        localized(effect.label) || effect.id,
+    ]), selected)
+}
+
+function defaultCalculationEventKind(event = {}) {
+    if (event.kind === "direct") {
+        return "direct"
+    }
+    return event.kind === "disorder" || event.settlementType === "disorder" ? "disorder" : "anomaly"
+}
+
+function defaultCalculationAnomalyEffectId(event = {}) {
+    return event.anomalyEffect ?? event.previousAnomalyEffect ?? ""
+}
+
+function defaultCalcCategoryOptions(selected = "") {
+    return selectOptions(maintenanceDamageSkillCategories().map(category => [category.id, localized(category.name) || category.id]), selected)
+}
+
+function defaultCalcMoveOptions(categoryId, selected = "") {
+    const category = maintenanceDamageSkillCategories().find(item => item.id === categoryId)
+    return selectOptions((category?.moves ?? []).map(move => [move.id, localized(move.name) || move.id]), selected)
+}
+
+function defaultCalcRowOptions(categoryId, moveId, selected = "") {
+    const category = maintenanceDamageSkillCategories().find(item => item.id === categoryId)
+    const move = (category?.moves ?? []).find(item => item.id === moveId)
+    return selectOptions((move?.rows ?? []).map(row => [row.id, localized(row.label) || row.id]), selected)
+}
+
+function defaultCalculationEventHtml(event = {}, index = 0, selectedEventId = "") {
+    void selectedEventId
+    const kind = defaultCalculationEventKind(event)
+    const skill = agentSkillForAgentId()
+    const categories = maintenanceDamageSkillCategories(skill)
+    const skillRef = event.skillRef ?? defaultCalculationEventDraft("direct").skillRef ?? {}
+    const categoryId = skillRef.categoryId || categories[0]?.id || ""
+    const moveId = skillRef.moveId || categories.find(item => item.id === categoryId)?.moves?.[0]?.id || ""
+    const rowId = skillRef.rowId || categories.find(item => item.id === categoryId)?.moves?.find(item => item.id === moveId)?.rows?.[0]?.id || ""
+    return `
+        <article class="maintenance-subcard" data-default-calc-event-row>
+          <div class="maintenance-section-head">
+            <strong>计算事件</strong>
+            <button type="button" class="compact-btn danger-lite" data-remove-default-calc-event="${index}">删除</button>
+          </div>
+          <div class="maintenance-grid calculation-event-grid">
+            <label class="field"><span>事件 ID</span><input data-default-calc-event-id value="${escapeHtml(event.id ?? `${kind}-${index + 1}`)}"></label>
+            <label class="field"><span>类型</span><select data-default-calc-kind>${selectOptions([["direct", "直伤"], ["anomaly", "属性异常"], ["disorder", "紊乱"]], kind)}</select></label>
+            <label class="field"><span>次数</span><input data-default-calc-count type="number" min="0" step="1" value="${escapeHtml(event.count ?? 1)}"></label>
+            <label class="field default-calc-direct-only"${kind === "direct" ? "" : " hidden"}><span>技能大类</span><select data-default-calc-category>${defaultCalcCategoryOptions(categoryId)}</select></label>
+            <label class="field default-calc-direct-only"${kind === "direct" ? "" : " hidden"}><span>招式</span><select data-default-calc-move>${defaultCalcMoveOptions(categoryId, moveId)}</select></label>
+            <label class="field default-calc-direct-only"${kind === "direct" ? "" : " hidden"}><span>倍率行</span><select data-default-calc-row>${defaultCalcRowOptions(categoryId, moveId, rowId)}</select></label>
+            <label class="field default-calc-direct-only"${kind === "direct" ? "" : " hidden"}><span>暴击模式</span><select data-default-calc-crit-mode>${selectOptions([["expected", "期望"], ["crit", "暴击"], ["nonCrit", "非暴击"]], event.critMode ?? "expected")}</select></label>
+            <label class="field default-calc-anomaly-only"${kind === "anomaly" ? "" : " hidden"}><span>异常类型</span><select data-default-calc-anomaly-effect>${anomalyEffectMaintenanceOptions(event.anomalyEffect ?? "assault")}</select></label>
+            <label class="field default-calc-anomaly-only"${kind === "anomaly" ? "" : " hidden"}><span>结算次数</span><input data-default-calc-proc-count type="number" min="0" step="1" value="${escapeHtml(event.procCount ?? DEFAULT_ANOMALY_PROC_COUNTS[event.anomalyEffect] ?? 1)}"></label>
+            <label class="field default-calc-disorder-only"${kind === "disorder" ? "" : " hidden"}><span>紊乱类型</span><select data-default-calc-disorder-effect>${disorderEffectMaintenanceOptions(defaultCalculationAnomalyEffectId(event) || "burn")}</select></label>
+            <label class="field default-calc-disorder-only"${kind === "disorder" ? "" : " hidden"}><span>已生效秒数</span><input data-default-calc-elapsed type="number" min="0" step="0.1" value="${escapeHtml(event.elapsedSeconds ?? 0)}"></label>
+            <label class="field default-calc-disorder-only"${kind === "disorder" ? "" : " hidden"}><span>持续秒数</span><input data-default-calc-duration type="number" min="0" step="0.1" value="${escapeHtml(event.durationSeconds ?? 10)}"></label>
+          </div>
+        </article>
+    `
+}
+
+function renderDefaultCalculationEvents(events = null, selectedEventId = null) {
+    const container = document.getElementById("defaultCalculationEventRows")
+    if (!container) {
+        return
+    }
+    const source = events ?? readDefaultCalculationEvents()
+    container.innerHTML = source.map((event, index) => defaultCalculationEventHtml(event, index, selectedEventId ?? source[0]?.id ?? "")).join("")
+}
+
+function readDefaultCalculationEvents() {
+    const skill = agentSkillForAgentId()
+    return [...els.maintenanceForm.querySelectorAll("[data-default-calc-event-row]")].map((row, index) => {
+        const kind = row.querySelector("[data-default-calc-kind]")?.value ?? "direct"
+        const id = row.querySelector("[data-default-calc-event-id]")?.value.trim() || `${kind}-${index + 1}`
+        const count = Number(row.querySelector("[data-default-calc-count]")?.value || 1)
+        if (kind === "anomaly") {
+            return {
+                id,
+                kind: "anomaly",
+                settlementType: "attribute",
+                anomalyEffect: row.querySelector("[data-default-calc-anomaly-effect]")?.value || "assault",
+                procCount: Number(row.querySelector("[data-default-calc-proc-count]")?.value || 1),
+                count,
+            }
+        }
+        if (kind === "disorder") {
+            return {
+                id,
+                kind: "anomaly",
+                settlementType: "disorder",
+                anomalyEffect: row.querySelector("[data-default-calc-disorder-effect]")?.value || "burn",
+                elapsedSeconds: Number(row.querySelector("[data-default-calc-elapsed]")?.value || 0),
+                durationSeconds: Number(row.querySelector("[data-default-calc-duration]")?.value || 10),
+                count,
+            }
+        }
+        return {
+            id,
+            kind: "direct",
+            count,
+            critMode: row.querySelector("[data-default-calc-crit-mode]")?.value || "expected",
+            skillRef: {
+                agentSkillId: skill?.id ?? "",
+                categoryId: row.querySelector("[data-default-calc-category]")?.value ?? "",
+                moveId: row.querySelector("[data-default-calc-move]")?.value ?? "",
+                rowId: row.querySelector("[data-default-calc-row]")?.value ?? "",
+            },
+        }
+    })
+}
+
+function readDefaultCalculationConfig() {
+    const events = readDefaultCalculationEvents()
+    if (!events.length) {
+        return null
+    }
+    return {
+        mode: document.getElementById("defaultCalculationMode")?.value ?? "custom",
+        name: { zhCN: document.getElementById("defaultCalculationName")?.value.trim() || "默认计算配置" },
+        selectedEventId: events[0]?.id ?? null,
+        events,
+    }
 }
 
 function statsSummary(stats = []) {
@@ -1197,7 +1423,7 @@ function renderList() {
                     : activeKind === "bossBuffs"
                         ? [localized(item.bossSource), localized(item.sourcePeriod), effectsSummary(item)].filter(Boolean).join(" · ")
                         : activeKind === "anomalyEffects"
-                            ? `${item.maintenanceType === "disorder" ? "紊乱" : "异常"} · ${item.element ?? "-"} · ${item.id}`
+                            ? `${item.maintenanceType === "disorder" ? "紊乱" : "属性伤害"} · ${item.element ?? "-"} · ${item.id}`
                             : item.id
 
         button.innerHTML = `
@@ -1506,6 +1732,22 @@ function renderAgentForm(item = null) {
           </div>
         </section>
 
+        <section class="maintenance-section">
+          <div class="maintenance-section-head">
+            <h3>默认计算方式</h3>
+            <div class="skill-maintenance-actions">
+              <button type="button" class="compact-btn" data-add-default-calc-event="direct">添加直伤</button>
+              <button type="button" class="compact-btn" data-add-default-calc-event="anomaly">添加属性异常</button>
+              <button type="button" class="compact-btn" data-add-default-calc-event="disorder">添加紊乱</button>
+            </div>
+          </div>
+          <div class="maintenance-grid">
+            <label class="field"><span>计算方式</span><select id="defaultCalculationMode">${selectOptions([["custom", "自定义"], ["single", "最大化单个伤害"], ["anomaly", "最大化异常伤害"]], agent.defaultCalculationConfig?.mode ?? "custom")}</select></label>
+            <label class="field"><span>名称</span><input id="defaultCalculationName" value="${escapeHtml(localized(agent.defaultCalculationConfig?.name) || "")}" placeholder="默认计算配置"></label>
+          </div>
+          <div id="defaultCalculationEventRows" class="skill-category-list"></div>
+        </section>
+
         ${statBlock("核心被动 Buff", "corePassiveStats", effectStats(agent.combatBuffs?.corePassive), {
             descriptionId: "corePassiveDescription",
             description: agent.combatBuffs?.corePassive?.description,
@@ -1532,6 +1774,7 @@ function renderAgentForm(item = null) {
     `
     renderStatRows("corePassiveStats", effectStats(agent.combatBuffs?.corePassive), { allowDamageModifiers: true })
     renderStatRows("additionalAbilityStats", effectStats(agent.combatBuffs?.additionalAbility), { allowDamageModifiers: true })
+    renderDefaultCalculationEvents(agent.defaultCalculationConfig?.events ?? [], agent.defaultCalculationConfig?.selectedEventId)
     renderCinemaBuffRows(cinemaBuffsOf(agent))
     updatePreview()
 }
@@ -1605,6 +1848,13 @@ function buildAgent(options = {}) {
         item.preferredDriveDiscs = preferredDriveDiscs
     } else {
         delete item.preferredDriveDiscs
+    }
+
+    const defaultCalculationConfig = readDefaultCalculationConfig()
+    if (defaultCalculationConfig) {
+        item.defaultCalculationConfig = defaultCalculationConfig
+    } else {
+        delete item.defaultCalculationConfig
     }
 
     if (coreSkillText && options.allowInvalidCoreSkill) {
@@ -2520,14 +2770,14 @@ function readBuffEffectRows() {
 
 function renderAnomalyEffectForm(item = null) {
     const effect = item ?? blankDraftItem("anomalyEffects")
-    const maintenanceType = effect.maintenanceType === "disorder" ? "disorder" : "anomaly"
+    const maintenanceType = anomalyMaintenanceType(effect)
     els.editorTitle.textContent = "异常伤害"
-    els.editorTag.textContent = `${maintenanceType === "disorder" ? "紊乱" : "异常"} / ${effect.id || "新条目"}`
+    els.editorTag.textContent = `${maintenanceType === "disorder" ? "紊乱" : "属性伤害"} / ${effect.id || "新条目"}`
     els.maintenanceForm.innerHTML = `
         <section class="maintenance-section">
           <h3>基础信息</h3>
           <div class="maintenance-grid">
-            <label class="field">${fieldLabel("类型", true)}<select id="anomalyMaintenanceType">${selectOptions([["anomaly", "属性异常"], ["disorder", "紊乱"]], maintenanceType)}</select></label>
+            <label class="field">${fieldLabel("结算类型", true)}<select id="anomalyMaintenanceType">${selectOptions([["anomaly", "属性伤害"], ["disorder", "紊乱"]], maintenanceType)}</select></label>
             <label class="field">${fieldLabel("ID", true)}<input id="recordId" value="${escapeHtml(effect.id ?? "")}" required></label>
             ${localizedZhInput("label", effect.label, "中文名")}
             <label class="field">${fieldLabel("元素", true)}<select id="anomalyElement">${selectOptions(DAMAGE_ELEMENT_OPTIONS, effect.element ?? "physical")}</select></label>
@@ -2571,6 +2821,7 @@ function buildAnomalyEffect() {
     const base = {
         id: document.getElementById("recordId").value.trim(),
         maintenanceType,
+        settlementType: maintenanceType === "disorder" ? "disorder" : "attribute",
         label: readLocalizedZh("label"),
         element: document.getElementById("anomalyElement").value,
     }
@@ -3128,6 +3379,10 @@ function validationContextForCurrent(payload) {
         return {
             items: rawCollections().agents,
             currentId: isDraftKey() ? undefined : rawSelectedRecord()?.id,
+            agentSkills: rawCollections().agentSkills,
+            anomalyEffects: anomalyMaintenanceRecordsByType("anomaly"),
+            disorderEffects: anomalyMaintenanceRecordsByType("disorder"),
+            effects: anomalyMaintenanceRecords(),
         }
     }
     if (activeKind === "agentSkills") {
@@ -3149,7 +3404,7 @@ function validationContextForCurrent(payload) {
         }
     }
     if (activeKind === "anomalyEffects") {
-        const maintenanceType = payload?.maintenanceType === "disorder" ? "disorder" : "anomaly"
+        const maintenanceType = anomalyMaintenanceType(payload)
         return {
             items: rawCollections().anomalyEffects.filter(item => item.maintenanceType === maintenanceType),
             currentId: isDraftKey() ? undefined : rawSelectedRecord()?.id,
@@ -3419,6 +3674,27 @@ els.maintenanceForm.addEventListener("change", event => {
         event.target.closest(".main-stat-choice")?.classList.toggle("active", event.target.checked)
     }
 
+    if (event.target.matches("[data-default-calc-kind]")) {
+        const rows = readDefaultCalculationEvents()
+        renderDefaultCalculationEvents(rows)
+        updatePreview()
+        return
+    }
+
+    if (event.target.matches("[data-default-calc-category]")) {
+        const row = event.target.closest("[data-default-calc-event-row]")
+        const moveSelect = row.querySelector("[data-default-calc-move]")
+        const rowSelect = row.querySelector("[data-default-calc-row]")
+        moveSelect.innerHTML = defaultCalcMoveOptions(event.target.value)
+        rowSelect.innerHTML = defaultCalcRowOptions(event.target.value, moveSelect.value)
+    }
+
+    if (event.target.matches("[data-default-calc-move]")) {
+        const row = event.target.closest("[data-default-calc-event-row]")
+        const categoryId = row.querySelector("[data-default-calc-category]")?.value ?? ""
+        row.querySelector("[data-default-calc-row]").innerHTML = defaultCalcRowOptions(categoryId, event.target.value)
+    }
+
     updatePreview()
 })
 els.maintenanceForm.addEventListener("click", event => {
@@ -3515,6 +3791,27 @@ els.maintenanceForm.addEventListener("click", event => {
             input.checked = false
             input.closest(".main-stat-choice")?.classList.remove("active")
         }
+        updatePreview()
+        return
+    }
+
+    const addDefaultCalcEvent = event.target.closest("[data-add-default-calc-event]")
+    if (addDefaultCalcEvent) {
+        clearFeedback()
+        renderDefaultCalculationEvents([
+            ...readDefaultCalculationEvents(),
+            defaultCalculationEventDraft(addDefaultCalcEvent.dataset.addDefaultCalcEvent),
+        ])
+        updatePreview()
+        return
+    }
+
+    const removeDefaultCalcEvent = event.target.closest("[data-remove-default-calc-event]")
+    if (removeDefaultCalcEvent) {
+        clearFeedback()
+        const events = readDefaultCalculationEvents()
+        events.splice(Number(removeDefaultCalcEvent.dataset.removeDefaultCalcEvent), 1)
+        renderDefaultCalculationEvents(events)
         updatePreview()
         return
     }
