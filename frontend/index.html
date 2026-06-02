@@ -239,16 +239,19 @@
                     <input id="damageAnomalyProcCount" type="number" min="0" step="1" value="1">
                   </label>
                   <label class="field damage-disorder-field" hidden>
+                    <span>紊乱类型</span>
+                    <select id="damageDisorderType">
+                      <option value="normal">（普通）紊乱</option>
+                      <option value="polarized">极性紊乱</option>
+                    </select>
+                  </label>
+                  <label class="field damage-disorder-field" hidden>
                     <span>原异常</span>
                     <select id="damageDisorderEffect"></select>
                   </label>
                   <label class="field damage-disorder-field" hidden>
                     <span>已生效秒数</span>
                     <input id="damageDisorderElapsed" type="number" min="0" step="0.1" value="0">
-                  </label>
-                  <label class="field damage-disorder-field" hidden>
-                    <span>持续秒数</span>
-                    <input id="damageDisorderDuration" type="number" min="0" step="0.1" value="10">
                   </label>
                 </div>
                 <div id="bossCombatBuffs" class="combat-buff-list"></div>
@@ -385,6 +388,18 @@
         <button type="button" data-combat-buff-tab="wEngine">音擎引发的 Buff</button>
         <button type="button" data-combat-buff-tab="driveDisc">驱动盘引发的 Buff</button>
         <button type="button" data-combat-buff-tab="custom">自定义</button>
+      </div>
+
+      <div id="combatBuffTeammatePicker" class="combat-buff-teammate-picker" hidden>
+        <label class="field">
+          <span>队友</span>
+          <select id="combatBuffTeammateSelect"></select>
+        </label>
+        <div class="combat-buff-bulk-actions">
+          <button id="addTeammateBuffsBtn" type="button" class="compact-btn">添加该角色全部 Buff</button>
+          <button id="removeTeammateBuffsBtn" type="button" class="compact-btn">移除该角色 Buff</button>
+        </div>
+        <small id="combatBuffTeammateHint">最多选择 2 名角色</small>
       </div>
 
       <div id="combatBuffCandidateList" class="combat-buff-candidate-list"></div>

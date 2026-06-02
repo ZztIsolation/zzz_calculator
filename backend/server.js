@@ -509,13 +509,11 @@ function cleanCalculationEvent(event = {}, index = 0) {
     if (kind === "anomaly") {
         if (settlementType === "disorder") {
             const elapsedSeconds = Number(event.elapsedSeconds ?? 0)
-            const durationSeconds = Number(event.durationSeconds ?? 10)
             return {
                 ...base,
                 settlementType: "disorder",
                 anomalyEffect: String(event.anomalyEffect ?? event.previousAnomalyEffect ?? "").trim(),
                 elapsedSeconds: Number.isFinite(elapsedSeconds) ? Math.max(0, elapsedSeconds) : 0,
-                durationSeconds: Number.isFinite(durationSeconds) ? Math.max(0, durationSeconds) : 10,
             }
         }
         const procCount = Number(event.procCount ?? 1)

@@ -25,7 +25,10 @@
         "advancedStat": {
           "stat": "impact",
           "value": 15,
-          "mode": "pct"
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
         }
       },
       "modification": {
@@ -50,43 +53,54 @@
         },
         "selfBuff": {
           "scope": "inCombat",
-          "appliesToOutOfCombatPanel": false,
-          "effects": [
-            {
-              "id": "effect_q4n8v2k1",
-              "type": "fixed",
-              "stat": "electricDmg",
-              "value": 15,
-              "mode": "flat",
-              "modificationScaling": {
-                "value": {
-                  "base": 15,
-                  "step": 2.25,
-                  "displayValues": [15, 17.5, 20, 22, 24]
-                }
-              }
-            },
-            {
-              "id": "effect_l7p3x9za",
-              "type": "fixed",
-              "stat": "energyRegen",
-              "value": 18,
-              "mode": "flat",
-              "modificationScaling": {
-                "value": {
-                  "base": 18,
-                  "step": 2.375,
-                  "displayValues": [18, 20.5, 23, 25, 27.5]
-                }
-              }
-            }
-          ],
           "coverage": {
             "default": 1,
             "min": 0,
             "max": 1,
             "step": 0.1
-          }
+          },
+          "effects": [
+            {
+              "id": "effect_q4n8v2k1",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "electricDmg",
+              "mode": "flat",
+              "value": 15,
+              "modificationValues": {
+                "value": [
+                  15,
+                  17.5,
+                  20,
+                  22,
+                  24
+                ]
+              }
+            },
+            {
+              "id": "effect_l7p3x9za",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "energyRegen",
+              "mode": "flat",
+              "value": 18,
+              "modificationValues": {
+                "value": [
+                  18,
+                  20.5,
+                  23,
+                  25,
+                  27.5
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
         },
         "teamBuff": null
       },
@@ -148,12 +162,14 @@
               "stat": "physicalResIgnore",
               "mode": "flat",
               "value": 20,
-              "modificationScaling": {
-                "value": {
-                  "base": 20,
-                  "step": 2,
-                  "displayValues": [20, 22, 24, 26, 28]
-                }
+              "modificationValues": {
+                "value": [
+                  20,
+                  22,
+                  24,
+                  26,
+                  28
+                ]
               }
             },
             {
@@ -162,12 +178,14 @@
               "stat": "dmgBonus",
               "mode": "flat",
               "value": 25,
-              "modificationScaling": {
-                "value": {
-                  "base": 25,
-                  "step": 3.75,
-                  "displayValues": [25, 28.7, 32.5, 36.2, 40]
-                }
+              "modificationValues": {
+                "value": [
+                  25,
+                  28.7,
+                  32.5,
+                  36.2,
+                  40
+                ]
               }
             },
             {
@@ -176,12 +194,14 @@
               "stat": "critDmg",
               "mode": "flat",
               "value": 25,
-              "modificationScaling": {
-                "value": {
-                  "base": 25,
-                  "step": 3.75,
-                  "displayValues": [25, 28.7, 32.5, 36.2, 40]
-                }
+              "modificationValues": {
+                "value": [
+                  25,
+                  28.7,
+                  32.5,
+                  36.2,
+                  40
+                ]
               }
             }
           ],
@@ -247,12 +267,14 @@
               "stat": "critDmg",
               "mode": "flat",
               "value": 50,
-              "modificationScaling": {
-                "value": {
-                  "base": 50,
-                  "step": 7.5,
-                  "displayValues": [50, 57, 65, 72, 80]
-                }
+              "modificationValues": {
+                "value": [
+                  50,
+                  57,
+                  65,
+                  72,
+                  80
+                ]
               }
             },
             {
@@ -263,12 +285,14 @@
               "valuePerStack": 20,
               "maxStacks": 2,
               "defaultStacks": 2,
-              "modificationScaling": {
-                "valuePerStack": {
-                  "base": 20,
-                  "step": 3,
-                  "displayValues": [20, 23, 26, 29, 32]
-                }
+              "modificationValues": {
+                "valuePerStack": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
               }
             }
           ],
@@ -335,12 +359,14 @@
               "stat": "anomalyMasteryFlat",
               "mode": "flat",
               "value": 60,
-              "modificationScaling": {
-                "value": {
-                  "base": 60,
-                  "step": 9,
-                  "displayValues": [60, 69, 78, 87, 96]
-                }
+              "modificationValues": {
+                "value": [
+                  60,
+                  69,
+                  78,
+                  87,
+                  96
+                ]
               }
             },
             {
@@ -351,12 +377,14 @@
               "valuePerStack": 20,
               "maxStacks": 2,
               "defaultStacks": 2,
-              "modificationScaling": {
-                "valuePerStack": {
-                  "base": 20,
-                  "step": 3,
-                  "displayValues": [20, 23, 26, 29, 32]
-                }
+              "modificationValues": {
+                "valuePerStack": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
               }
             }
           ],
@@ -372,105 +400,6 @@
         "level60Stats": "source-checked",
         "effectText": "source-checked",
         "effectBuff": "source-checked-rank-1-default-full-stacks"
-      }
-    },
-    {
-      "id": "zzz_wiki_1826",
-      "name": {
-        "zhCN": "思络成歌"
-      },
-      "rarity": "S",
-      "specialty": "support",
-      "attribute": "physical",
-      "images": {
-        "icon": "/assets/w-engines/zzz_wiki_1826.png",
-        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
-      },
-      "level60": {
-        "atkBase": 713,
-        "advancedStat": {
-          "stat": "energyRegen",
-          "value": 60,
-          "mode": "pct"
-        }
-      },
-      "modification": {
-        "minLevel": 1,
-        "maxLevel": 5,
-        "defaultLevel": 1
-      },
-      "effect": {
-        "name": {
-          "zhCN": "喧响独白"
-        },
-        "requirement": {
-          "specialty": "support",
-          "label": {
-            "zhCN": "对于【支援】角色，能够触发以下效果",
-            "en": "For matching specialty characters, the following effect can be triggered."
-          }
-        },
-        "description": {
-          "zhCN": "装备者为非操作中角色时，能量自动回复提升0.6/0.69/0.78/0.87/0.96点/秒；装备者发动[强化特殊技]造成物理伤害时，使全队角色造成伤害提升12.5%/14.3%/16.1%/17.9%/20%，持续40秒，最多叠加2层；拥有2层效果时，角色的攻击力额外提升10%/11.5%/13%/14.5%/16%。",
-          "en": "When off-field, Energy Regen increases. When the equipper's EX Special Attack deals Physical DMG, the squad gains DMG Bonus, stacking up to 2 times; at 2 stacks, squad ATK further increases."
-        },
-        "selfBuff": {
-          "scope": "inCombat",
-          "effects": [
-            {
-              "type": "fixed",
-              "stat": "energyRegen",
-              "mode": "flat",
-              "value": 60
-            }
-          ],
-          "appliesToOutOfCombatPanel": false
-        },
-        "teamBuff": {
-          "scope": "inCombat",
-          "effects": [
-            {
-              "id": "effect_wiki_1826_team_dmg",
-              "type": "stacked",
-              "stat": "dmgBonus",
-              "mode": "flat",
-              "valuePerStack": 12.5,
-              "maxStacks": 2,
-              "defaultStacks": 2,
-              "modificationScaling": {
-                "valuePerStack": {
-                  "base": 12.5,
-                  "step": 1.875,
-                  "displayValues": [12.5, 14.3, 16.1, 17.9, 20]
-                }
-              }
-            },
-            {
-              "id": "effect_wiki_1826_team_atk",
-              "type": "fixed",
-              "stat": "atkPct",
-              "mode": "pct",
-              "basis": "outOfCombatAtk",
-              "value": 10,
-              "modificationScaling": {
-                "value": {
-                  "base": 10,
-                  "step": 1.5,
-                  "displayValues": [10, 11.5, 13, 14.5, 16]
-                }
-              }
-            }
-          ],
-          "appliesToOutOfCombatPanel": false
-        }
-      },
-      "sources": [
-        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
-      ],
-      "verification": {
-        "level60Stats": "source-checked",
-        "effectText": "source-checked",
-        "effectBuff": "partially-modeled"
       }
     },
     {
@@ -524,12 +453,14 @@
               "mode": "pct",
               "basis": "outOfCombatAtk",
               "value": 10,
-              "modificationScaling": {
-                "value": {
-                  "base": 10,
-                  "step": 1.5,
-                  "displayValues": [10, 11.5, 13, 14.5, 16]
-                }
+              "modificationValues": {
+                "value": [
+                  10,
+                  11.5,
+                  13,
+                  14.5,
+                  16
+                ]
               }
             },
             {
@@ -539,12 +470,14 @@
               "mode": "pct",
               "basis": "outOfCombatHp",
               "value": 10,
-              "modificationScaling": {
-                "value": {
-                  "base": 10,
-                  "step": 1.5,
-                  "displayValues": [10, 11.5, 13, 14.5, 16]
-                }
+              "modificationValues": {
+                "value": [
+                  10,
+                  11.5,
+                  13,
+                  14.5,
+                  16
+                ]
               }
             },
             {
@@ -553,12 +486,14 @@
               "stat": "critDmg",
               "mode": "flat",
               "value": 30,
-              "modificationScaling": {
-                "value": {
-                  "base": 30,
-                  "step": 4.5,
-                  "displayValues": [30, 34.5, 39, 43.5, 48]
-                }
+              "modificationValues": {
+                "value": [
+                  30,
+                  34.5,
+                  39,
+                  43.5,
+                  48
+                ]
               }
             }
           ],
@@ -628,12 +563,14 @@
               "valuePerStack": 9,
               "maxStacks": 3,
               "defaultStacks": 3,
-              "modificationScaling": {
-                "valuePerStack": {
-                  "base": 9,
-                  "step": 1.375,
-                  "displayValues": [9, 10.3, 11.7, 13, 14.5]
-                }
+              "modificationValues": {
+                "valuePerStack": [
+                  9,
+                  10.3,
+                  11.7,
+                  13,
+                  14.5
+                ]
               }
             }
           ],
@@ -652,12 +589,14 @@
               "stat": "critDmg",
               "mode": "flat",
               "value": 30,
-              "modificationScaling": {
-                "value": {
-                  "base": 30,
-                  "step": 4.5,
-                  "displayValues": [30, 34.5, 39, 43.5, 48]
-                }
+              "modificationValues": {
+                "value": [
+                  30,
+                  34.5,
+                  39,
+                  43.5,
+                  48
+                ]
               }
             }
           ],
@@ -673,6 +612,630 @@
         "level60Stats": "source-checked",
         "effectText": "source-checked",
         "effectBuff": "partially-modeled"
+      }
+    },
+    {
+      "id": "zzz_wiki_1826",
+      "name": {
+        "zhCN": "思络成歌"
+      },
+      "rarity": "S",
+      "specialty": "support",
+      "attribute": "physical",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1826.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/02/01/141353238/3987d1bb9b51933173c3219f3beb55e4_4300905692013614488.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "energyRegen",
+          "value": 60,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "喧响独白"
+        },
+        "requirement": {
+          "specialty": "support",
+          "label": {
+            "zhCN": "对于【支援】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者为非操作中角色时，能量自动回复提升0.6/0.69/0.78/0.87/0.96点/秒；装备者发动[强化特殊技]造成物理伤害时，使全队角色获得增益效果：角色造成伤害提升12.5%/14.3%/16.1%/17.9%/20%，效果持续40秒，最多叠加2层，重复触发时刷新持续时间；拥有2层效果时，角色的攻击力额外提升10%/11.5%/13%/14.5%/16%，该效果全队唯一。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1826_self_energy",
+              "type": "fixed",
+              "stat": "energyRegen",
+              "mode": "flat",
+              "value": 0.6,
+              "modificationValues": {
+                "value": [
+                  0.6,
+                  0.69,
+                  0.78,
+                  0.87,
+                  0.96
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "condition": "offField"
+        },
+        "teamBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1826_team_dmg",
+              "type": "stacked",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "valuePerStack": 12.5,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "modificationValues": {
+                "valuePerStack": [
+                  12.5,
+                  14.3,
+                  16.1,
+                  17.9,
+                  20
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_1826_team_atk",
+              "type": "fixed",
+              "stat": "atkPct",
+              "mode": "pct",
+              "value": 10,
+              "basis": "outOfCombatAtk",
+              "modificationValues": {
+                "value": [
+                  10,
+                  11.5,
+                  13,
+                  14.5,
+                  16
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "condition": "physicalExSpecialDamage",
+          "durationSeconds": 40
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1826/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1611",
+      "name": {
+        "zhCN": "铸梦炉歌"
+      },
+      "rarity": "S",
+      "specialty": "support",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1611.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/10/07/82500917/f3cafa53411fdf24d6b3ba7b8e284803_537961995919647485.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "hpPct",
+          "value": 30,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "月引颂篇"
+        },
+        "requirement": {
+          "specialty": "support",
+          "label": {
+            "zhCN": "对于【支援】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者的能量自动回复提升0.4/0.46/0.52/0.58/0.64点/秒；当装备者开启[以太帷幕]或延长[以太帷幕]的持续时间时，全队角色造成伤害提升25%/28.8%/32.5%/36.3%/40%，生命值上限提升15%/17.3%/19.5%/21.8%/24%，效果持续45秒，重复触发时刷新持续时间，该效果全队唯一。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1611_self_energy",
+              "type": "fixed",
+              "stat": "energyRegen",
+              "mode": "flat",
+              "value": 0.4,
+              "modificationValues": {
+                "value": [
+                  0.4,
+                  0.46,
+                  0.52,
+                  0.58,
+                  0.64
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false
+        },
+        "teamBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1611_team_dmg",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 25,
+              "modificationValues": {
+                "value": [
+                  25,
+                  28.8,
+                  32.5,
+                  36.3,
+                  40
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_1611_team_hp",
+              "type": "fixed",
+              "stat": "hpPct",
+              "mode": "pct",
+              "value": 15,
+              "basis": "outOfCombatHp",
+              "modificationValues": {
+                "value": [
+                  15,
+                  17.3,
+                  19.5,
+                  21.8,
+                  24
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "condition": "etherVeilStartOrExtend",
+          "durationSeconds": 45
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1611/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1463",
+      "name": {
+        "zhCN": "狸法七变化"
+      },
+      "rarity": "S",
+      "specialty": "support",
+      "attribute": "physical",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1463.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "energyRegen",
+          "value": 60,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "机巧玲珑"
+        },
+        "requirement": {
+          "specialty": "support",
+          "label": {
+            "zhCN": "对于【支援】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者的[强化特殊技]或[终结技]造成物理伤害时，装备者异常掌控提升30/34/39/43/48点，持续40秒；装备者的[追加攻击]命中敌人时，使全队角色的异常精通提升60/69/78/87/96点，持续40秒，该效果全队唯一。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1463_self_anomaly_mastery",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyMasteryFlat",
+              "mode": "flat",
+              "value": 30,
+              "modificationValues": {
+                "value": [
+                  30,
+                  34,
+                  39,
+                  43,
+                  48
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1463_team_anomaly_proficiency",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "value": 60,
+              "modificationValues": {
+                "value": [
+                  60,
+                  69,
+                  78,
+                  87,
+                  96
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1107",
+      "name": {
+        "zhCN": "玲珑妆匣"
+      },
+      "rarity": "S",
+      "specialty": "support",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1107.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 30,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "卓卓千华"
+        },
+        "requirement": {
+          "specialty": "support",
+          "label": {
+            "zhCN": "对于【支援】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "队伍中任意角色通过[快速支援]、[连携技]、[招架支援]、[回避支援]入场时，为装备者回复5/5.5/6/6.5/7点能量，5秒内最多触发一次；装备者消耗25点或以上能量时，全队角色造成的伤害提升10%/11.5%/13%/14.5%/16%，最多叠加2层，持续20秒，重复触发时刷新持续时间，该效果全队唯一。",
+          "en": ""
+        },
+        "teamBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1107_team_dmg",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "valuePerStack": 10,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "modificationValues": {
+                "valuePerStack": [
+                  10,
+                  11.5,
+                  13,
+                  14.5,
+                  16
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1908",
+      "name": {
+        "zhCN": "霓虹妄想"
+      },
+      "rarity": "S",
+      "specialty": "stun",
+      "attribute": "ether",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1908.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "anomalyMastery",
+          "value": 30,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "迪斯科恶魔"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者的异常精通提升90/103/117/130/145点；装备者[强化特殊技]或[普通攻击]造成以太属性伤害时，全队角色造成的伤害提升15%/17%/19.5%/21%/24%，持续40秒，最多叠加2层，同一招式内最多触发一次，重复触发时刷新持续时间，拥有2层效果时，装备者的异常精通额外提升60/69/78/87/96点，该效果全队唯一。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1908_self_ap",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "value": 90,
+              "modificationValues": {
+                "value": [
+                  90,
+                  103,
+                  117,
+                  130,
+                  145
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_1908_self_ap_bonus",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "value": 60,
+              "modificationValues": {
+                "value": [
+                  60,
+                  69,
+                  78,
+                  87,
+                  96
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1908_team_dmg",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "valuePerStack": 15,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "modificationValues": {
+                "valuePerStack": [
+                  15,
+                  17,
+                  19.5,
+                  21,
+                  24
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_217",
+      "name": {
+        "zhCN": "聚宝箱"
+      },
+      "rarity": "A",
+      "specialty": "support",
+      "attribute": "ether",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_217.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      },
+      "level60": {
+        "atkBase": 624,
+        "advancedStat": {
+          "stat": "energyRegen",
+          "value": 50,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "财迷心窍"
+        },
+        "requirement": {
+          "specialty": "support",
+          "label": {
+            "zhCN": "对于【支援】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "[强化特殊技]、[连携技]或[终结技]造成以太伤害时，所有单位对目标造成的伤害提升15%/17.5%/20%/22%/24%，装备者的能量自动回复提升0.5/0.58/0.65/0.72/0.8点/秒，持续2秒，同名被动效果之间不可叠加。",
+          "en": ""
+        },
+        "teamBuff": {
+          "scope": "inCombat",
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          },
+          "effects": [
+            {
+              "id": "effect_wiki_217_target_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 15,
+              "modificationValues": {
+                "value": [
+                  15,
+                  17.5,
+                  20,
+                  22,
+                  24
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
       }
     },
     {
@@ -711,14 +1274,11 @@
           }
         },
         "description": {
-          "zhCN": "队伍中任意友方单位攻击命中敌人时，全队攻击力提升2.5%/2.8%/3.2%/3.6%/4%，最多叠加4层，持续8秒，每层效果单独结算持续时间。",
-          "en": "When any friendly unit hits an enemy, squad ATK increases, stacking up to 4 times. Each stack's duration is counted separately."
+          "zhCN": "队伍中任意友方单位攻击命中敌人时，全队攻击力提升2.5%/2.8%/3.2%/3.6%/4%，最多叠加4层，持续8秒，每层效果单独结算持续时间，每名友方单位最多提供1层增益效果，同名被动效果之间不可叠加。"
         },
         "selfBuff": null,
         "teamBuff": {
           "scope": "inCombat",
-          "condition": "friendlyUnitHitEnemy",
-          "durationSeconds": 8,
           "effects": [
             {
               "id": "effect_wiki_486_team_atk",
@@ -728,19 +1288,175 @@
               "valuePerStack": 2.5,
               "maxStacks": 4,
               "defaultStacks": 4,
-              "modificationScaling": {
-                "valuePerStack": {
-                  "base": 2.5,
-                  "step": 0.375,
-                  "displayValues": [2.5, 2.8, 3.2, 3.6, 4]
-                }
+              "basis": "outOfCombatAtk",
+              "modificationValues": {
+                "valuePerStack": [
+                  2.5,
+                  2.8,
+                  3.2,
+                  3.6,
+                  4
+                ]
               }
             }
           ],
-          "effectText": {
-            "zhCN": "队伍中任意友方单位攻击命中敌人时，全队攻击力提升2.5%/2.8%/3.2%/3.6%/4%，最多叠加4层，持续8秒，每层效果单独结算持续时间。"
+          "appliesToOutOfCombatPanel": false,
+          "condition": "friendlyUnitHitEnemy",
+          "durationSeconds": 8
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/486/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_215",
+      "name": {
+        "zhCN": "含羞恶面"
+      },
+      "rarity": "A",
+      "specialty": "support",
+      "attribute": "ice",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_215.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/27/11536806/9fed705aa18fdde455ded51e4f907096_7899311830170267448.png"
+      },
+      "level60": {
+        "atkBase": 624,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 25,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "饕餮相"
+        },
+        "requirement": {
+          "specialty": "support",
+          "label": {
+            "zhCN": "对于【支援】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "冰属性伤害提升15%/17.5%/20%/22%/24%；发动[强化特殊技]时，全队角色攻击力提升2%/2.3%/2.6%/2.9%/3.2%，最多叠加4层，持续12秒，重复触发时刷新持续时间，同名被动效果之间不可叠加。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_215_self_ice_dmg",
+              "type": "fixed",
+              "stat": "iceDmg",
+              "mode": "flat",
+              "value": 15,
+              "modificationValues": {
+                "value": [
+                  15,
+                  17.5,
+                  20,
+                  22,
+                  24
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false
+        },
+        "teamBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_215_team_atk",
+              "type": "stacked",
+              "stat": "atkPct",
+              "mode": "pct",
+              "valuePerStack": 2,
+              "maxStacks": 4,
+              "defaultStacks": 4,
+              "basis": "outOfCombatAtk",
+              "modificationValues": {
+                "valuePerStack": [
+                  2,
+                  2.3,
+                  2.6,
+                  2.9,
+                  3.2
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "condition": "exSpecial",
+          "durationSeconds": 12
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/215/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_216",
+      "name": {
+        "zhCN": "时光切片"
+      },
+      "rarity": "A",
+      "specialty": "support",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_216.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "penRatio",
+          "value": 20,
+          "mode": "flat",
+          "target": {
+            "kind": "default"
           }
         }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "说「茄子」"
+        },
+        "requirement": {
+          "specialty": "support",
+          "label": {
+            "zhCN": "对于【支援】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "队伍中任意角色发动[闪避反击]/[强化特殊技]/[支援攻击]/[连携技]时，额外获得[20/25/30/35]/[23/28.5/34.5/40]/[26/32/39/45]/[29/35.5/43.5/50]/[32/40/48/55]点喧响值，并为装备者回复0.7/0.8/0.9/1/1.1点能量，12秒内最多触发一次，不同招式分别结算冷却时间，同名被动效果之间不可叠加。",
+          "en": ""
+        },
+        "teamBuff": null
       },
       "sources": [
         "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
@@ -749,6 +1465,764 @@
         "level60Stats": "source-checked",
         "effectText": "source-checked",
         "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_213",
+      "name": {
+        "zhCN": "逍遥游球"
+      },
+      "rarity": "A",
+      "specialty": "support",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_213.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/27/11536806/ebbceb9c733b032cc66fec9bab5b39cb_5028702273646752861.png"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "energyRegen",
+          "value": 50,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "电玩，启动！"
+        },
+        "requirement": {
+          "specialty": "support",
+          "label": {
+            "zhCN": "对于【支援】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者攻击命中敌人时，若触发属性克制效果，则所有单位对该目标的暴击率提升12%/13.5%/15.5%/17.5%/20%，持续12秒，同名被动效果之间不可叠加。"
+        },
+        "selfBuff": null,
+        "teamBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_213_target_crit_rate",
+              "type": "fixed",
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 12,
+              "modificationValues": {
+                "value": [
+                  12,
+                  13.5,
+                  15.5,
+                  17.5,
+                  20
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "condition": "attributeCounter",
+          "durationSeconds": 12
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/213/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1277",
+      "name": {
+        "zhCN": "飞鸟星梦"
+      },
+      "rarity": "S",
+      "specialty": "anomaly",
+      "attribute": "ether",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1277.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "anomalyProficiency",
+          "value": 90,
+          "mode": "flat",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "银刺幽羽"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "属性异常积蓄效率提升40%/46%/52%/58%/64%；装备者造成以太伤害时，自身异常精通提升20/23/26/29/32点，持续5秒，最多叠加6层，0.5秒内最多触发一次，重复触发时刷新持续时间。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1277_self_ap",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "valuePerStack": 20,
+              "maxStacks": 6,
+              "defaultStacks": 6,
+              "modificationValues": {
+                "valuePerStack": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_915",
+      "name": {
+        "zhCN": "时流贤者"
+      },
+      "rarity": "S",
+      "specialty": "anomaly",
+      "attribute": "electric",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_915.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 30,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "时喰奇谋"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者的电属性异常积蓄效率提升30%/35%/40%/45%/50%；[特殊技]或[强化特殊技]命中处于属性异常状态下的敌人时，装备者的异常精通提升75/85/95/105/115点，持续15秒；当装备者的异常精通大于等于375点时，由装备者造成的[紊乱]伤害提升25%/27.5%/30%/32.5%/35%。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_915_self_electric_anomaly_mastery",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyMastery",
+              "mode": "pct",
+              "value": 30,
+              "modificationValues": {
+                "value": [
+                  30,
+                  35,
+                  40,
+                  45,
+                  50
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_915_self_ap",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "value": 75,
+              "modificationValues": {
+                "value": [
+                  75,
+                  85,
+                  95,
+                  105,
+                  115
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_915_self_disorder_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "disorderDamageBonus",
+              "mode": "flat",
+              "value": 25,
+              "modificationValues": {
+                "value": [
+                  25,
+                  27.5,
+                  30,
+                  32.5,
+                  35
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_214",
+      "name": {
+        "zhCN": "嵌合编译器"
+      },
+      "rarity": "S",
+      "specialty": "anomaly",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_214.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/27/11536806/f870509a9a2979efe912c9d7785092b0_3413350005563459690.png"
+      },
+      "level60": {
+        "atkBase": 684,
+        "advancedStat": {
+          "stat": "penRatio",
+          "value": 24,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "数据洪流"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "攻击力提升12%/15%/18%/21%/24%；发动[特殊技]或[强化特殊技]时，装备者的异常精通提升25/31/37/43/50点，最多叠加3层，持续8秒，每层效果单独结算持续时间。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_214_self_atk",
+              "type": "fixed",
+              "stat": "atkPct",
+              "mode": "pct",
+              "value": 12,
+              "basis": "outOfCombatAtk",
+              "modificationValues": {
+                "value": [
+                  12,
+                  15,
+                  18,
+                  21,
+                  24
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_214_self_ap",
+              "type": "stacked",
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "valuePerStack": 25,
+              "maxStacks": 3,
+              "defaultStacks": 3,
+              "modificationValues": {
+                "valuePerStack": [
+                  25,
+                  31,
+                  37,
+                  43,
+                  50
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "condition": "specialOrExSpecial",
+          "durationSeconds": 8
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/214/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_494",
+      "name": {
+        "zhCN": "轰鸣座驾"
+      },
+      "rarity": "A",
+      "specialty": "anomaly",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_494.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/07/02/222203892/59d21937c3fed5bbd95981b7348905f2_2441560680559602996.png"
+      },
+      "level60": {
+        "atkBase": 624,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 25,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "碰撞势能"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "[强化特殊技]命中敌人时，随机触发以下三种效果中的一种，持续5秒，0.3秒内最多触发一次，同类效果不可叠加，重复触发时刷新持续时间，多个效果可以同时存在：装备者的攻击力提升8%/9.2%/10.4%/11.6%/12.8%；装备者的异常精通提升40/46/52/58/64点；装备者的属性异常积蓄效率提升25%/28%/32%/36%/40%。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_494_self_atk",
+              "type": "fixed",
+              "stat": "atkPct",
+              "mode": "pct",
+              "value": 8,
+              "basis": "outOfCombatAtk",
+              "modificationValues": {
+                "value": [
+                  8,
+                  9.2,
+                  10.4,
+                  11.6,
+                  12.8
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_494_self_ap",
+              "type": "fixed",
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "value": 40,
+              "modificationValues": {
+                "value": [
+                  40,
+                  46,
+                  52,
+                  58,
+                  64
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_494_self_anomaly_mastery",
+              "type": "fixed",
+              "stat": "anomalyMastery",
+              "mode": "pct",
+              "value": 25,
+              "modificationValues": {
+                "value": [
+                  25,
+                  28,
+                  32,
+                  36,
+                  40
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "condition": "exSpecialHit",
+          "durationSeconds": 5
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/494/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_212",
+      "name": {
+        "zhCN": "双生泣星"
+      },
+      "rarity": "A",
+      "specialty": "anomaly",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_212.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/27/11536806/198cf01b8c620882b72deab5a23c7cdd_3281667589262288413.png"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 25,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "呜咽余波"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "队伍中任意角色对敌人施加属性异常效果时，为装备者提供1层增益效果，每层增益效果使装备者的异常精通提升30/34/38/42/48点，最多叠加4层，目标从失衡状态恢复或死亡时，对应增益效果结束，每层效果单独结算持续时间。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_212_self_ap",
+              "type": "stacked",
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "valuePerStack": 30,
+              "maxStacks": 4,
+              "defaultStacks": 4,
+              "modificationValues": {
+                "valuePerStack": [
+                  30,
+                  34,
+                  38,
+                  42,
+                  48
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "condition": "anySquadAppliesAnomaly"
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/212/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_210",
+      "name": {
+        "zhCN": "触电唇彩"
+      },
+      "rarity": "A",
+      "specialty": "anomaly",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_210.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/27/11536806/d40322e5c28b18493b8893d34f0fc9ef_131091089874582327.png"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "anomalyProficiency",
+          "value": 75,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "致命拥吻"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "当场上存在处于属性异常状态下的敌人时，装备者的攻击力提升10%/11.5%/13%/14.5%/16%，对目标造成的伤害额外提升15%/17.5%/20%/22.5%/25%。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_210_self_atk",
+              "type": "fixed",
+              "stat": "atkPct",
+              "mode": "pct",
+              "value": 10,
+              "basis": "outOfCombatAtk",
+              "modificationValues": {
+                "value": [
+                  10,
+                  11.5,
+                  13,
+                  14.5,
+                  16
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_210_self_dmg",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 15,
+              "modificationValues": {
+                "value": [
+                  15,
+                  17.5,
+                  20,
+                  22.5,
+                  25
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "condition": "enemyHasAnomaly"
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/210/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "neon_fantasies",
+      "name": {
+        "zhCN": "霓虹妄想"
+      },
+      "rarity": "S",
+      "specialty": "stun",
+      "attribute": "ether",
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "anomalyMastery",
+          "value": 30,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "effect": {
+        "name": {
+          "zhCN": "迪斯科恶魔"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者的异常精通提升90/103/117/130/145点；装备者[强化特殊技]或[普通攻击]造成以太属性伤害时，全队角色造成的伤害提升15%/17%/19.5%/21%/24%，持续40秒，最多叠加2层，同一招式内最多触发一次，重复触发时刷新持续时间，拥有2层效果时，装备者的异常精通额外提升60/69/78/87/96点，该效果全队唯一。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "value": 90,
+              "modificationValues": {
+                "value": [
+                  90,
+                  103,
+                  117,
+                  130,
+                  145
+                ]
+              },
+              "id": "effect_8a81aef020"
+            },
+            {
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "value": 60,
+              "modificationValues": {
+                "value": [
+                  60,
+                  69,
+                  78,
+                  87,
+                  96
+                ]
+              },
+              "id": "effect_neon_fantasies_self_ap_bonus"
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "valuePerStack": 15,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "id": "effect_8256ce4483",
+              "modificationValues": {
+                "valuePerStack": [
+                  15,
+                  17,
+                  19.5,
+                  21,
+                  24
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        }
+      },
+      "images": {
+        "icon": "",
+        "source": ""
+      },
+      "sources": [],
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
       }
     }
   ]

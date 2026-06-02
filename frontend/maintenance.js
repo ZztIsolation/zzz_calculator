@@ -99,6 +99,10 @@ const DEFAULT_ANOMALY_PROC_COUNTS = {
     shock: 10,
     corruption: 20,
 }
+const DISORDER_TYPE_OPTIONS = [
+    ["normal", "（普通）紊乱"],
+    ["polarized", "极性紊乱"],
+]
 const SKILL_ROW_KIND_OPTIONS = [
     ["damageMultiplier", "伤害倍率"],
     ["dazeMultiplier", "失衡倍率"],
@@ -144,8 +148,11 @@ const STAT_OPTIONS = [
     ["enemyEtherResReduction", "敌方以太减抗%", "percentFlat"],
 ]
 const STAT_DAMAGE_MODIFIER_OPTIONS = [
-    ["anomalyDamageBonus", "异常伤害增伤%", {
+    ["anomalyDamageBonus", "属性异常增伤%", {
         stat: "anomalyDamageBonus",
+    }],
+    ["disorderDamageBonus", "紊乱增伤%", {
+        stat: "disorderDamageBonus",
     }],
     ["baseMultiplierBonus", "异常倍率加算%", {
         stat: "baseMultiplierBonus",
@@ -165,7 +172,8 @@ const SKILL_TARGET_STAT_OPTIONS = [
     ["iceDmg", "冰属性伤害加成%"],
     ["electricDmg", "电属性伤害加成%"],
     ["etherDmg", "以太伤害加成%"],
-    ["anomalyDamageBonus", "异常伤害增伤%"],
+    ["anomalyDamageBonus", "属性异常增伤%"],
+    ["disorderDamageBonus", "紊乱增伤%"],
     ["skillMultiplierBonus", "技能倍率加算%"],
     ["enemyDefReduction", "敌方减防率%"],
     ["enemyDefIgnore", "无视防御率%"],
@@ -223,6 +231,7 @@ const PERCENT_VALUE_STATS = new Set([
     "enemyElectricResReduction",
     "enemyEtherResReduction",
     "anomalyDamageBonus",
+    "disorderDamageBonus",
     "baseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
@@ -249,7 +258,8 @@ const BUFF_EFFECT_TYPE_OPTIONS = [
     ["stacked", "层数"],
 ]
 const DAMAGE_MODIFIER_KIND_OPTIONS = [
-    ["anomalyDamageBonus", "异常增伤%"],
+    ["anomalyDamageBonus", "属性异常增伤%"],
+    ["disorderDamageBonus", "紊乱增伤%"],
     ["baseMultiplierBonus", "异常倍率修正%"],
     ["anomalyCritRate", "异常暴击率%"],
     ["anomalyCritDmg", "异常暴击伤害%"],
@@ -258,7 +268,8 @@ const DAMAGE_MODIFIER_KIND_OPTIONS = [
 ]
 const DAMAGE_MODIFIER_LABELS = {
     ...Object.fromEntries(DAMAGE_MODIFIER_KIND_OPTIONS.map(([key, label]) => [key, label])),
-    anomalyDamageBonus: "异常伤害增伤%",
+    anomalyDamageBonus: "属性异常增伤%",
+    disorderDamageBonus: "紊乱增伤%",
 }
 const DAMAGE_KIND_OPTIONS = [
     ["direct", "直伤"],
@@ -705,13 +716,13 @@ function formatScalingNumber(value) {
     return Number.isFinite(Number(value)) ? String(Number(value)) : ""
 }
 
-function displayValuesInput(scaling = null) {
-    return Array.isArray(scaling?.displayValues)
-        ? scaling.displayValues.map(formatScalingNumber).join("/")
+function modificationValuesInput(values = null) {
+    return Array.isArray(values)
+        ? values.map(formatScalingNumber).join("/")
         : ""
 }
 
-function parseDisplayValuesInput(value = "") {
+function parseModificationValuesInput(value = "") {
     return String(value)
         .split("/")
         .map(item => item.trim())
@@ -938,9 +949,9 @@ function defaultCalculationEventDraft(kind = "direct") {
             id: `disorder-${index}`,
             kind: "anomaly",
             settlementType: "disorder",
+            disorderType: "normal",
             anomalyEffect: "burn",
             elapsedSeconds: 0,
-            durationSeconds: 10,
             count: 1,
         }
     }
@@ -987,6 +998,10 @@ function defaultCalculationAnomalyEffectId(event = {}) {
     return event.anomalyEffect ?? event.previousAnomalyEffect ?? ""
 }
 
+function defaultCalculationDisorderType(event = {}) {
+    return event.disorderType === "polarized" ? "polarized" : "normal"
+}
+
 function defaultCalcCategoryOptions(selected = "") {
     return selectOptions(maintenanceDamageSkillCategories().map(category => [category.id, localized(category.name) || category.id]), selected)
 }
@@ -1027,9 +1042,9 @@ function defaultCalculationEventHtml(event = {}, index = 0, selectedEventId = ""
             <label class="field default-calc-direct-only"${kind === "direct" ? "" : " hidden"}><span>暴击模式</span><select data-default-calc-crit-mode>${selectOptions([["expected", "期望"], ["crit", "暴击"], ["nonCrit", "非暴击"]], event.critMode ?? "expected")}</select></label>
             <label class="field default-calc-anomaly-only"${kind === "anomaly" ? "" : " hidden"}><span>异常类型</span><select data-default-calc-anomaly-effect>${anomalyEffectMaintenanceOptions(event.anomalyEffect ?? "assault")}</select></label>
             <label class="field default-calc-anomaly-only"${kind === "anomaly" ? "" : " hidden"}><span>结算次数</span><input data-default-calc-proc-count type="number" min="0" step="1" value="${escapeHtml(event.procCount ?? DEFAULT_ANOMALY_PROC_COUNTS[event.anomalyEffect] ?? 1)}"></label>
-            <label class="field default-calc-disorder-only"${kind === "disorder" ? "" : " hidden"}><span>紊乱类型</span><select data-default-calc-disorder-effect>${disorderEffectMaintenanceOptions(defaultCalculationAnomalyEffectId(event) || "burn")}</select></label>
+            <label class="field default-calc-disorder-only"${kind === "disorder" ? "" : " hidden"}><span>紊乱类型</span><select data-default-calc-disorder-type>${selectOptions(DISORDER_TYPE_OPTIONS, defaultCalculationDisorderType(event))}</select></label>
+            <label class="field default-calc-disorder-only"${kind === "disorder" ? "" : " hidden"}><span>原异常</span><select data-default-calc-disorder-effect>${disorderEffectMaintenanceOptions(defaultCalculationAnomalyEffectId(event) || "burn")}</select></label>
             <label class="field default-calc-disorder-only"${kind === "disorder" ? "" : " hidden"}><span>已生效秒数</span><input data-default-calc-elapsed type="number" min="0" step="0.1" value="${escapeHtml(event.elapsedSeconds ?? 0)}"></label>
-            <label class="field default-calc-disorder-only"${kind === "disorder" ? "" : " hidden"}><span>持续秒数</span><input data-default-calc-duration type="number" min="0" step="0.1" value="${escapeHtml(event.durationSeconds ?? 10)}"></label>
           </div>
         </article>
     `
@@ -1065,9 +1080,11 @@ function readDefaultCalculationEvents() {
                 id,
                 kind: "anomaly",
                 settlementType: "disorder",
+                disorderType: defaultCalculationDisorderType({
+                    disorderType: row.querySelector("[data-default-calc-disorder-type]")?.value,
+                }),
                 anomalyEffect: row.querySelector("[data-default-calc-disorder-effect]")?.value || "burn",
                 elapsedSeconds: Number(row.querySelector("[data-default-calc-elapsed]")?.value || 0),
-                durationSeconds: Number(row.querySelector("[data-default-calc-duration]")?.value || 10),
                 count,
             }
         }
@@ -2508,7 +2525,7 @@ function renderEffectRuleRows(containerId, effects = []) {
         return
     }
 
-    const allowModificationScaling = isWEngineEffectRuleContainer(containerId)
+    const allowModificationValues = isWEngineEffectRuleContainer(containerId)
     const rows = effects.length ? effects : [{ type: "fixed", stat: "atkFlat", value: 0, mode: "flat" }]
     container.innerHTML = ""
     rows.map(effect => editableEffectRule(effect)).forEach((effect, index) => {
@@ -2519,21 +2536,13 @@ function renderEffectRuleRows(containerId, effects = []) {
         const shownValue = type === "stacked"
             ? effect.valuePerStack ?? effect.value ?? 0
             : effect.value ?? 0
-        const scalingField = type === "stacked" ? "valuePerStack" : "value"
-        const scaling = effect.modificationScaling?.[scalingField] ?? null
-        const modificationScalingHtml = allowModificationScaling ? `
-            <div class="maintenance-modification-scaling modification-scaling-only" data-has-modification-scaling="${scaling ? "true" : "false"}">
-              <label class="field">
-                <span data-modification-base-label>${type === "stacked" ? "每层 1级计算值" : "1级计算值"}</span>
-                <input data-modification-base type="number" step="0.0001" value="${escapeHtml(formatScalingNumber(scaling?.base))}" placeholder="${escapeHtml(formatScalingNumber(shownValue))}">
-              </label>
-              <label class="field">
-                <span>每级精确增量</span>
-                <input data-modification-step type="number" step="0.0001" value="${escapeHtml(formatScalingNumber(scaling?.step))}">
-              </label>
+        const modificationField = type === "stacked" ? "valuePerStack" : "value"
+        const modificationValues = effect.modificationValues?.[modificationField] ?? null
+        const modificationValuesHtml = allowModificationValues ? `
+            <div class="maintenance-modification-values modification-values-only" data-has-modification-values="${modificationValues ? "true" : "false"}">
               <label class="field modification-display-values-field">
-                <span>1-5级展示值</span>
-                <input data-modification-display-values value="${escapeHtml(displayValuesInput(scaling))}" placeholder="15/17.5/20/22/24">
+                <span>1-5级实际值</span>
+                <input data-modification-values value="${escapeHtml(modificationValuesInput(modificationValues))}" placeholder="15/17.5/20/22/24">
               </label>
             </div>
         ` : ""
@@ -2607,7 +2616,7 @@ function renderEffectRuleRows(containerId, effects = []) {
               <input data-effect-default-stacks type="number" min="0" step="1" value="${escapeHtml(effect.defaultStacks ?? effect.maxStacks ?? 1)}">
             </label>
             <button type="button" class="compact-btn maintenance-remove-effect" data-remove-effect="${index}">删除</button>
-            ${modificationScalingHtml}
+            ${modificationValuesHtml}
         `
         container.appendChild(row)
         syncBuffEffectRow(row)
@@ -2643,43 +2652,28 @@ function syncBuffEffectRow(row) {
     for (const item of row.querySelectorAll(".stacked-only")) {
         item.hidden = type !== "stacked"
     }
-    for (const item of row.querySelectorAll(".modification-scaling-only")) {
+    for (const item of row.querySelectorAll(".modification-values-only")) {
         item.hidden = type !== "fixed" && type !== "stacked"
-    }
-    const modificationBaseLabel = row.querySelector("[data-modification-base-label]")
-    if (modificationBaseLabel) {
-        modificationBaseLabel.textContent = type === "stacked" ? "每层 1级计算值" : "1级计算值"
     }
 }
 
-function readRuleModificationScaling(row, type, stat, currentValue) {
-    const scaling = row.querySelector(".maintenance-modification-scaling")
-    if (!scaling || (type !== "fixed" && type !== "stacked")) {
+function readRuleModificationValues(row, type) {
+    const valuesBlock = row.querySelector(".maintenance-modification-values")
+    if (!valuesBlock || (type !== "fixed" && type !== "stacked")) {
         return {}
     }
 
-    const baseInput = scaling.querySelector("[data-modification-base]")
-    const stepInput = scaling.querySelector("[data-modification-step]")
-    const displayValuesInputEl = scaling.querySelector("[data-modification-display-values]")
-    const hasExistingScaling = scaling.dataset.hasModificationScaling === "true"
-    const hasEditedScaling = [baseInput?.value, stepInput?.value, displayValuesInputEl?.value]
-        .some(value => String(value ?? "").trim() !== "")
-    if (!hasExistingScaling && !hasEditedScaling) {
+    const valuesInput = valuesBlock.querySelector("[data-modification-values]")
+    const hasExistingValues = valuesBlock.dataset.hasModificationValues === "true"
+    const hasEditedValues = String(valuesInput?.value ?? "").trim() !== ""
+    if (!hasExistingValues && !hasEditedValues) {
         return {}
     }
 
     const key = type === "stacked" ? "valuePerStack" : "value"
-    const fallbackBase = Number.isFinite(Number(currentValue)) ? Number(currentValue) : inputToStoredValue(stat, row.querySelector("[data-effect-value]")?.value)
-    const base = String(baseInput?.value ?? "").trim() === ""
-        ? fallbackBase
-        : numberValue(baseInput.value)
     return {
-        modificationScaling: {
-            [key]: {
-                base,
-                step: numberValue(stepInput?.value),
-                displayValues: parseDisplayValuesInput(displayValuesInputEl?.value),
-            },
+        modificationValues: {
+            [key]: parseModificationValuesInput(valuesInput?.value),
         },
     }
 }
@@ -2747,7 +2741,7 @@ function readEffectRuleRows(containerId) {
                 valuePerStack,
                 maxStacks: numberValue(row.querySelector("[data-effect-max-stacks]")?.value, 1),
                 defaultStacks: numberValue(row.querySelector("[data-effect-default-stacks]")?.value, 1),
-                ...readRuleModificationScaling(row, type, stat, valuePerStack),
+                ...readRuleModificationValues(row, type),
             }
         }
 
@@ -2755,7 +2749,7 @@ function readEffectRuleRows(containerId) {
         return {
             ...base,
             value,
-            ...readRuleModificationScaling(row, type, stat, value),
+            ...readRuleModificationValues(row, type),
         }
     }).filter(effect => effect.stat)
 }

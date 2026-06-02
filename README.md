@@ -9,6 +9,31 @@ Chinese documentation is available in [README.zh-CN.md](README.zh-CN.md).
 
 ## Upload Update Summaries
 
+### 2026-06-03 00:50 +08:00
+
+This upload adds or expands these major areas:
+
+- Expanded the W-Engine catalog and image assets with a larger set of Support,
+  Stun, Anomaly, Attack, and Defense engines.
+- Migrated W-Engine modification modeling from legacy scaling rules to explicit
+  modification-rank value tables, with validation and regression tests for the
+  new `modificationValues` shape.
+- Expanded teammate combat buff data for Nangongyu, Youye cinema effects, Yao
+  Jiayin, Rina, Lucy, Nicole, and Soukaku.
+- Split attribute anomaly damage bonus and disorder damage bonus into separate
+  event modifier zones; disorder no longer inherits attribute anomaly damage
+  bonus or anomaly crit.
+- Added normal and polarized disorder handling, and made disorder duration use
+  catalog defaults instead of a user-entered duration field.
+- Upgraded combat buff selection with a teammate picker, source-grouped active
+  buffs, per-source remove actions, and limits for teammate, W-Engine team, and
+  Drive Disc team buff sources.
+- Grouped related runtime inputs for multi-effect formula and derived buffs so
+  one source input can drive all linked effect rules.
+- Updated homepage and optimizer damage controls, white-box rows, custom buff
+  options, maintenance validation, modeling docs, and regression tests for the
+  new disorder and W-Engine behavior.
+
 ### 2026-06-02 02:55 +08:00
 
 This upload adds or expands these major areas:
@@ -51,7 +76,8 @@ This upload added or expanded these major areas:
   and homepage selections.
 - Direct, anomaly, and disorder damage calculation with white-box multiplier
   rows for defense, resistance, PEN, RES ignore, anomaly proficiency, anomaly
-  level, anomaly damage bonus, anomaly crit, and final damage.
+  level, attribute anomaly damage bonus, disorder damage bonus, anomaly crit,
+  and final damage.
 - Data-backed anomaly and disorder catalogs in `data/anomaly_effects.json`.
 - Agent skill multiplier catalogs for Ye Shunguang, Hoshimi Miyabi, and Alice
   Thymefield, including generated total-hit rows for compatible multi-hit
@@ -82,8 +108,10 @@ This upload added or expanded these major areas:
   stats, Drive Discs, and unconditional set effects.
 - In-combat panel calculation from selected self, teammate, W-Engine, Drive Disc
   4-piece, field, boss, and manual buffs.
+- Combat buff selection with teammate, W-Engine team, Drive Disc team, and
+  custom sources grouped for review and removal.
 - Damage preview for direct, anomaly, and disorder events, with inspectable
-  white-box formula rows.
+  white-box formula rows and separate anomaly/disorder event modifier zones.
 - ZZZ Scanner Drive Disc import, manual inventory editing, duplicate handling,
   account-scoped storage, and optional remove-missing synchronization.
 - Saved Drive Disc loadouts that can be applied on the homepage or created from
@@ -254,8 +282,11 @@ node --check frontend/accounts-page.js
   Ye Shunguang is displayed as Honed Edge but calculates physical damage.
 - Anomaly and disorder damage use catalog-backed multipliers from the unified
   `data/anomaly_effects.json` `effects` list, split by `settlementType`.
-- W-Engine modification ranks materialize buff values without changing level 60
-  Base ATK or advanced stats.
+- Attribute anomaly and disorder damage use separate bonus zones:
+  `anomalyDamageBonus` applies to attribute anomaly, while
+  `disorderDamageBonus` applies to disorder.
+- W-Engine modification ranks materialize explicit per-rank buff values without
+  changing level 60 Base ATK or advanced stats.
 
 For deeper implementation detail, see [docs/modeling.md](docs/modeling.md) and
 [docs/changelog.md](docs/changelog.md).

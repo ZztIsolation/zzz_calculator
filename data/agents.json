@@ -644,7 +644,7 @@
       "defaultCalculationConfig": {
         "mode": "custom",
         "name": {
-          "zhCN": "雅默认循环"
+          "zhCN": "雅默认循环（四蓄一大二紊乱二碎冰）"
         },
         "selectedEventId": "miyabi_frost_moon_charge_3",
         "events": [
@@ -699,19 +699,30 @@
           {
             "id": "miyabi_frozen_disorder",
             "kind": "anomaly",
+            "count": 1,
             "settlementType": "disorder",
             "anomalyEffect": "frost_frozen",
-            "elapsedSeconds": 0,
-            "durationSeconds": 20,
-            "count": 2
+            "elapsedSeconds": 8
           },
           {
             "id": "miyabi_shatter",
             "kind": "anomaly",
+            "count": 2,
             "settlementType": "attribute",
             "anomalyEffect": "shatter",
-            "procCount": 1,
-            "count": 2
+            "procCount": 1
+          },
+          {
+            "id": "direct-7",
+            "kind": "direct",
+            "count": 1,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "hoshimi_miyabi",
+              "categoryId": "assist",
+              "moveId": "quick_support_flower_wind",
+              "rowId": "damage"
+            }
           }
         ]
       },

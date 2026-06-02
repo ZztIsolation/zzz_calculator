@@ -32,6 +32,11 @@ const els = {
     combatBuffModal: document.getElementById("combatBuffModal"),
     closeCombatBuffModalBtn: document.getElementById("closeCombatBuffModalBtn"),
     combatBuffSearchInput: document.getElementById("combatBuffSearchInput"),
+    combatBuffTeammatePicker: document.getElementById("combatBuffTeammatePicker"),
+    combatBuffTeammateSelect: document.getElementById("combatBuffTeammateSelect"),
+    combatBuffTeammateHint: document.getElementById("combatBuffTeammateHint"),
+    addTeammateBuffsBtn: document.getElementById("addTeammateBuffsBtn"),
+    removeTeammateBuffsBtn: document.getElementById("removeTeammateBuffsBtn"),
     combatBuffCandidateList: document.getElementById("combatBuffCandidateList"),
     combatBuffCustomPane: document.getElementById("combatBuffCustomPane"),
     combatBuffModalEmpty: document.getElementById("combatBuffModalEmpty"),
@@ -57,12 +62,16 @@ const els = {
     damageAnomalySettlementType: document.getElementById("damageAnomalySettlementType"),
     damageAnomalyEffect: document.getElementById("damageAnomalyEffect"),
     damageAnomalyProcCount: document.getElementById("damageAnomalyProcCount"),
+    damageDisorderType: document.getElementById("damageDisorderType"),
     damageDisorderEffect: document.getElementById("damageDisorderEffect"),
     damageDisorderElapsed: document.getElementById("damageDisorderElapsed"),
-    damageDisorderDuration: document.getElementById("damageDisorderDuration"),
     algorithmSelect: document.getElementById("algorithmSelect"),
     fourPieceSetSelect: document.getElementById("fourPieceSetSelect"),
     twoPieceSetSelect: document.getElementById("twoPieceSetSelect"),
+    openTwoPieceSetModalBtn: document.getElementById("openTwoPieceSetModalBtn"),
+    twoPieceSelectedSummary: document.getElementById("twoPieceSelectedSummary"),
+    twoPieceSetModal: document.getElementById("twoPieceSetModal"),
+    closeTwoPieceSetModalBtn: document.getElementById("closeTwoPieceSetModalBtn"),
     twoPieceSetChoices: document.getElementById("twoPieceSetChoices"),
     slot4MainStats: document.getElementById("slot4MainStats"),
     slot5MainStats: document.getElementById("slot5MainStats"),
@@ -79,8 +88,12 @@ const els = {
     calculationConfigModal: document.getElementById("calculationConfigModal"),
     closeCalculationConfigModalBtn: document.getElementById("closeCalculationConfigModalBtn"),
     calculationConfigMode: document.getElementById("calculationConfigMode"),
-    adminDefaultCalculationSummary: document.getElementById("adminDefaultCalculationSummary"),
-    applyAdminDefaultCalculationBtn: document.getElementById("applyAdminDefaultCalculationBtn"),
+    calculationCustomConfigEvents: document.getElementById("calculationCustomConfigEvents"),
+    adminDefaultCalculationPreview: document.getElementById("adminDefaultCalculationPreview"),
+    adminDefaultCalculationEventCount: document.getElementById("adminDefaultCalculationEventCount"),
+    adminDefaultCalculationEventList: document.getElementById("adminDefaultCalculationEventList"),
+    adminDefaultCalculationEventTitle: document.getElementById("adminDefaultCalculationEventTitle"),
+    adminDefaultCalculationEventFields: document.getElementById("adminDefaultCalculationEventFields"),
     calculationConfigEventCount: document.getElementById("calculationConfigEventCount"),
     calculationConfigEventList: document.getElementById("calculationConfigEventList"),
     calculationEventEditorTitle: document.getElementById("calculationEventEditorTitle"),
@@ -120,8 +133,13 @@ const els = {
 const HOME_SELECTION_STORAGE_KEY = "zzz-calculator.homeSelection.v1"
 const DEFAULT_DAMAGE_TARGET_PRESET_ID = "normal-boss"
 const DEFAULT_DAMAGE_LEVEL_COEFFICIENT = 794
+const ADMIN_DEFAULT_CALCULATION_MODE = "adminDefault"
+const CALCULATION_CONFIG_MODE_VALUES = new Set(["single", "anomaly", "custom", ADMIN_DEFAULT_CALCULATION_MODE])
 const DEFAULT_CHECKED_COMBAT_SOURCE_TYPES = new Set(["self", "wEngine", "wEngineTeam"])
 const TEAMMATE_DRIVE_DISC_LIMIT = 2
+const TEAMMATE_BUFF_OWNER_LIMIT = 2
+const W_ENGINE_TEAM_BUFF_LIMIT = 2
+const DRIVE_DISC_TEAM_BUFF_LIMIT = 2
 const DAMAGE_ELEMENTS = ["physical", "fire", "ice", "electric", "ether"]
 const DAMAGE_ELEMENT_SHORT_LABELS = {
     physical: "物",
@@ -141,7 +159,8 @@ const ANOMALY_EFFECT_LABELS = {
     flinch: "畏缩",
 }
 const DAMAGE_MODIFIER_KIND_LABELS = {
-    anomalyDamageBonus: "异常伤害增伤",
+    anomalyDamageBonus: "属性异常增伤",
+    disorderDamageBonus: "紊乱增伤",
     baseMultiplierBonus: "伤害倍率修正",
     anomalyCritRate: "异常暴击率",
     anomalyCritDmg: "异常暴击伤害",
@@ -162,6 +181,10 @@ const DEFAULT_ANOMALY_EFFECT_BY_ELEMENT = {
     electric: "shock",
     ether: "corruption",
 }
+const DISORDER_TYPE_OPTIONS = [
+    ["normal", "（普通）紊乱"],
+    ["polarized", "极性紊乱"],
+]
 const ELEMENT_DMG_KEYS = new Set(["physicalDmg", "fireDmg", "iceDmg", "electricDmg", "etherDmg"])
 const RES_IGNORE_STAT_BY_ELEMENT = {
     physical: "physicalResIgnore",
@@ -245,6 +268,8 @@ const STAT_LABELS = {
     enemyDefIgnore: "无视防御率",
     enemyDefFlatReduction: "敌方固定减防",
     enemyResReduction: "敌方当前属性减抗",
+    anomalyDamageBonus: "属性异常增伤",
+    disorderDamageBonus: "紊乱增伤",
 }
 const PERCENT_KEYS = new Set([
     "hpPct",
@@ -270,6 +295,8 @@ const PERCENT_KEYS = new Set([
     "enemyDefReduction",
     "enemyDefIgnore",
     "enemyResReduction",
+    "anomalyDamageBonus",
+    "disorderDamageBonus",
 ])
 const BASE_ORDER = ["hp", "atk", "def"]
 const PANEL_ORDER = [
@@ -311,6 +338,7 @@ let activeOptimizationAgentIdSnapshot = null
 let lastCompletedOptimizationSettings = null
 let lastCompletedOptimizationAgentId = null
 let activeCombatBuffTab = "agent"
+let activeCombatBuffTeammateId = ""
 const manuallyUncheckedDefaultCombatBuffIds = new Set()
 const damageTargetResistanceByElement = Object.fromEntries(DAMAGE_ELEMENTS.map(element => [element, 0]))
 let activeDamageResistanceElement = "physical"
@@ -902,12 +930,12 @@ function anomalyEffects() {
 
 function disorderEffects() {
     return meta?.disorderEffects ?? [
-        { id: "burn", label: { zhCN: "灼烧" } },
-        { id: "shock", label: { zhCN: "感电" } },
-        { id: "corruption", label: { zhCN: "侵蚀" } },
-        { id: "frozen", label: { zhCN: "霜寒" } },
+        { id: "burn", label: { zhCN: "灼烧" }, defaultDurationSeconds: 10 },
+        { id: "shock", label: { zhCN: "感电" }, defaultDurationSeconds: 10 },
+        { id: "corruption", label: { zhCN: "侵蚀" }, defaultDurationSeconds: 10 },
+        { id: "frozen", label: { zhCN: "霜寒" }, defaultDurationSeconds: 10 },
         { id: "frost_frozen", label: { zhCN: "烈霜霜寒紊乱（星见雅）" }, defaultDurationSeconds: 20 },
-        { id: "flinch", label: { zhCN: "畏缩" } },
+        { id: "flinch", label: { zhCN: "畏缩" }, defaultDurationSeconds: 10 },
     ]
 }
 
@@ -917,6 +945,15 @@ function anomalySettlementType(event = {}) {
 
 function anomalyEffectId(event = {}) {
     return event.anomalyEffect ?? event.previousAnomalyEffect ?? ""
+}
+
+function normalizeDisorderType(value) {
+    return value === "polarized" ? "polarized" : "normal"
+}
+
+function disorderTypeLabel(value) {
+    const normalized = normalizeDisorderType(value)
+    return DISORDER_TYPE_OPTIONS.find(([id]) => id === normalized)?.[1] ?? normalized
 }
 
 function populateDamageEventSelects() {
@@ -1010,17 +1047,146 @@ function calculationConfigFromStored(config = null) {
             kind: event.kind === "anomaly" || event.kind === "disorder" ? "anomaly" : "direct",
             settlementType: anomalySettlementType(event),
             ...(anomalySettlementType(event) === "disorder"
-                ? { anomalyEffect: anomalyEffectId(event) || "burn" }
+                ? {
+                    anomalyEffect: anomalyEffectId(event) || "burn",
+                    disorderType: normalizeDisorderType(event.disorderType),
+                }
                 : {}),
             count: Number(event.count ?? 1),
             ...(event.skillRef ? { skillRef: stripSkillRefLevel(event.skillRef) } : {}),
         }))
         : []
     return {
-        mode: ["single", "anomaly", "custom"].includes(config?.mode) ? config.mode : (events.length > 1 ? "custom" : "single"),
+        mode: CALCULATION_CONFIG_MODE_VALUES.has(config?.mode) ? config.mode : (events.length > 1 ? "custom" : "single"),
         selectedEventId: config?.selectedEventId ?? events[0]?.id ?? null,
         events,
     }
+}
+
+function cloneCalculationEvents(events = []) {
+    return events.map(event => structuredClone(event))
+}
+
+function adminDefaultCalculationConfig(agentId = els.agentSelect?.value) {
+    const rawConfig = getAgent(agentId)?.defaultCalculationConfig
+    if (!rawConfig) {
+        return null
+    }
+    const normalized = calculationConfigFromStored(rawConfig)
+    if (!normalized.events.length) {
+        return null
+    }
+    return {
+        ...normalized,
+        name: rawConfig.name,
+    }
+}
+
+function adminDefaultCalculationLabel(config = adminDefaultCalculationConfig()) {
+    if (!config) {
+        return "未配置默认循环"
+    }
+    return localizedText(config.name) || "默认循环"
+}
+
+function adminDefaultCalculationEvents(config = adminDefaultCalculationConfig()) {
+    return cloneCalculationEvents(config?.events ?? [])
+}
+
+function adminDefaultDamageConfigForAgent(agentId = els.agentSelect?.value) {
+    const config = adminDefaultCalculationConfig(agentId)
+    if (!config) {
+        return {}
+    }
+    return {
+        mode: ADMIN_DEFAULT_CALCULATION_MODE,
+        selectedEventId: config.selectedEventId,
+        events: adminDefaultCalculationEvents(config),
+    }
+}
+
+function isDefaultSingleDamageConfig(config = null) {
+    if (!config || typeof config !== "object") {
+        return true
+    }
+    const normalized = calculationConfigFromStored(config)
+    if (normalized.mode !== "single") {
+        return false
+    }
+    if (!normalized.events.length) {
+        return true
+    }
+    const event = normalized.events[0]
+    if (normalized.events.length > 1 || !event) {
+        return false
+    }
+    return event.id === "direct-1"
+        && event.kind === "direct"
+        && !event.skillRef
+        && Number(event.skillMultiplier ?? config.skillMultiplier ?? 100) === 100
+        && (event.critMode ?? config.critMode ?? "expected") === "expected"
+}
+
+function damageConfigForAgent(agentId, storedDamageConfig = null) {
+    const adminConfig = adminDefaultDamageConfigForAgent(agentId)
+    if (adminConfig.events?.length && isDefaultSingleDamageConfig(storedDamageConfig)) {
+        return adminConfig
+    }
+    return storedDamageConfig ?? adminConfig
+}
+
+function resolveCalculationConfigMode(mode = calculationConfigMode) {
+    const nextMode = CALCULATION_CONFIG_MODE_VALUES.has(mode) ? mode : "single"
+    return nextMode === ADMIN_DEFAULT_CALCULATION_MODE && !adminDefaultCalculationConfig()
+        ? "single"
+        : nextMode
+}
+
+function syncCalculationConfigModeOptions() {
+    const option = els.calculationConfigMode?.querySelector(`option[value="${ADMIN_DEFAULT_CALCULATION_MODE}"]`)
+    if (!option) {
+        return
+    }
+    const config = adminDefaultCalculationConfig()
+    option.textContent = adminDefaultCalculationLabel(config)
+    option.disabled = !config
+    if (!config && els.calculationConfigMode?.value === ADMIN_DEFAULT_CALCULATION_MODE) {
+        els.calculationConfigMode.value = "single"
+    }
+}
+
+function modalCalculationConfigMode() {
+    return resolveCalculationConfigMode(els.calculationConfigMode?.value ?? calculationConfigMode)
+}
+
+function calculationConfigModeReadonly(mode = modalCalculationConfigMode()) {
+    return mode === ADMIN_DEFAULT_CALCULATION_MODE
+}
+
+function ensureCustomCalculationEventsSeeded() {
+    if (calculationConfigEvents.length) {
+        return
+    }
+    const defaultConfig = adminDefaultCalculationConfig()
+    if (!defaultConfig) {
+        return
+    }
+    calculationConfigEvents = adminDefaultCalculationEvents(defaultConfig)
+    calculationConfigSelectedEventId = defaultConfig.selectedEventId ?? calculationConfigEvents[0]?.id ?? null
+    calculationConfigEditingIndex = Math.max(0, calculationConfigEvents.findIndex(event => event.id === calculationConfigSelectedEventId))
+}
+
+function calculationEventsForMode(mode = modalCalculationConfigMode()) {
+    if (mode === ADMIN_DEFAULT_CALCULATION_MODE) {
+        return adminDefaultCalculationEvents()
+    }
+    if (mode === "custom") {
+        return calculationConfigEvents
+    }
+    if (mode === "anomaly") {
+        return [anomalyEventFromControls()]
+    }
+    return [singleEventFromControls()]
 }
 
 function defaultAnomalyEffectIdForAgent(agent = getAgent(els.agentSelect.value)) {
@@ -1072,9 +1238,9 @@ function calculationEventDraft(kind = "direct") {
             id,
             kind: "anomaly",
             settlementType: "disorder",
+            disorderType: "normal",
             anomalyEffect: disorderEffects()[0]?.id ?? "burn",
             elapsedSeconds: 0,
-            durationSeconds: 10,
             count: 1,
         }
     }
@@ -1153,9 +1319,9 @@ function anomalyEventFromControls() {
             id: "disorder-1",
             kind: "anomaly",
             settlementType: "disorder",
+            disorderType: normalizeDisorderType(els.damageDisorderType?.value),
             anomalyEffect: els.damageDisorderEffect?.value || "burn",
             elapsedSeconds: Number(els.damageDisorderElapsed?.value || 0),
-            durationSeconds: Number(els.damageDisorderDuration?.value || 10),
             count: 1,
         }
     }
@@ -1171,10 +1337,15 @@ function anomalyEventFromControls() {
 }
 
 function configuredCalculationEventsForRequest() {
-    if (calculationConfigMode === "anomaly") {
+    const mode = resolveCalculationConfigMode()
+    if (mode === ADMIN_DEFAULT_CALCULATION_MODE) {
+        const events = adminDefaultCalculationEvents()
+        return (events.length ? events : [singleEventFromControls()]).map(eventWithCurrentSkillLevel)
+    }
+    if (mode === "anomaly") {
         return [anomalyEventFromControls()]
     }
-    if (calculationConfigMode === "custom") {
+    if (mode === "custom") {
         const events = calculationConfigEvents.length
             ? calculationConfigEvents
             : [calculationEventDraft("direct")]
@@ -1191,7 +1362,8 @@ function calculationEventTitle(event = {}) {
     if (event.kind === "anomaly" && anomalySettlementType(event) === "disorder") {
         const effectId = anomalyEffectId(event)
         const effect = disorderEffects().find(item => item.id === effectId)
-        return `${localizedText(effect?.label) || ANOMALY_EFFECT_LABELS[effectId] || effectId} ×${event.count ?? 1}`
+        const typePrefix = normalizeDisorderType(event.disorderType) === "polarized" ? "极性" : ""
+        return `${typePrefix}${localizedText(effect?.label) || ANOMALY_EFFECT_LABELS[effectId] || effectId} ×${event.count ?? 1}`
     }
     const skill = meta?.agentSkills?.find(item => item.id === event.skillRef?.agentSkillId) ?? agentSkillCatalog()
     const category = damageSkillCategories(skill).find(item => item.id === event.skillRef?.categoryId)
@@ -1203,6 +1375,14 @@ function calculationEventTitle(event = {}) {
 
 function calculationConfigSummaryText(config = null) {
     const mode = config?.mode ?? calculationConfigMode
+    if (mode === ADMIN_DEFAULT_CALCULATION_MODE) {
+        const defaultConfig = adminDefaultCalculationConfig()
+        const events = config?.events ?? defaultConfig?.events ?? []
+        if (!events.length) {
+            return "未配置默认循环"
+        }
+        return `${adminDefaultCalculationLabel(defaultConfig)}：${events.map(calculationEventTitle).join(" + ")}`
+    }
     if (mode === "anomaly") {
         return `最大化异常伤害：${calculationEventTitle(anomalyEventFromControls())}`
     }
@@ -1216,6 +1396,7 @@ function calculationConfigSummaryText(config = null) {
 
 function syncCalculationConfigSummary() {
     if (els.calculationConfigSummary) {
+        calculationConfigMode = resolveCalculationConfigMode()
         els.calculationConfigSummary.textContent = calculationConfigSummaryText()
     }
 }
@@ -1534,6 +1715,10 @@ function disorderEffectOptions(selected = "") {
     ]), selected)
 }
 
+function disorderTypeOptions(selected = "normal") {
+    return optionHtml(DISORDER_TYPE_OPTIONS, normalizeDisorderType(selected))
+}
+
 function calculationEventUiKind(event = {}) {
     return event.kind === "direct" ? "direct" : (anomalySettlementType(event) === "disorder" ? "disorder" : "anomaly")
 }
@@ -1546,17 +1731,17 @@ function calculationEventKindLabel(kind) {
     }[kind] ?? "事件"
 }
 
-function normalizeCalculationEditingIndex() {
-    if (!calculationConfigEvents.length) {
+function normalizeCalculationEditingIndex(events = calculationConfigEvents) {
+    if (!events.length) {
         calculationConfigEditingIndex = 0
         calculationConfigSelectedEventId = null
         return -1
     }
-    const selectedIndex = calculationConfigEvents.findIndex(event => event.id === calculationConfigSelectedEventId)
-    if (!Number.isInteger(calculationConfigEditingIndex) || calculationConfigEditingIndex < 0 || calculationConfigEditingIndex >= calculationConfigEvents.length) {
+    const selectedIndex = events.findIndex(event => event.id === calculationConfigSelectedEventId)
+    if (!Number.isInteger(calculationConfigEditingIndex) || calculationConfigEditingIndex < 0 || calculationConfigEditingIndex >= events.length) {
         calculationConfigEditingIndex = selectedIndex >= 0 ? selectedIndex : 0
     }
-    calculationConfigSelectedEventId = calculationConfigEvents[calculationConfigEditingIndex]?.id ?? null
+    calculationConfigSelectedEventId = events[calculationConfigEditingIndex]?.id ?? null
     return calculationConfigEditingIndex
 }
 
@@ -1579,12 +1764,16 @@ function duplicateCalculationEvent(event = {}) {
 
 function selectCalculationConfigEvent(index) {
     syncEditingEventFromEditor({ renderList: false })
-    calculationConfigEditingIndex = Math.max(0, Math.min(calculationConfigEvents.length - 1, Number(index)))
-    calculationConfigSelectedEventId = calculationConfigEvents[calculationConfigEditingIndex]?.id ?? null
+    const events = calculationEventsForMode()
+    calculationConfigEditingIndex = Math.max(0, Math.min(events.length - 1, Number(index)))
+    calculationConfigSelectedEventId = events[calculationConfigEditingIndex]?.id ?? null
     renderCalculationConfigEvents()
 }
 
 function addCalculationConfigEvent(kind = "direct") {
+    if (calculationConfigModeReadonly()) {
+        return
+    }
     syncEditingEventFromEditor({ renderList: false })
     calculationConfigEvents.push(calculationEventDraft(kind))
     calculationConfigEditingIndex = calculationConfigEvents.length - 1
@@ -1593,6 +1782,9 @@ function addCalculationConfigEvent(kind = "direct") {
 }
 
 function duplicateCalculationConfigEvent(index = calculationConfigEditingIndex) {
+    if (calculationConfigModeReadonly()) {
+        return
+    }
     syncEditingEventFromEditor({ renderList: false })
     const sourceIndex = Math.max(0, Math.min(calculationConfigEvents.length - 1, Number(index)))
     const source = calculationConfigEvents[sourceIndex]
@@ -1606,6 +1798,9 @@ function duplicateCalculationConfigEvent(index = calculationConfigEditingIndex) 
 }
 
 function removeCalculationConfigEvent(index = calculationConfigEditingIndex) {
+    if (calculationConfigModeReadonly()) {
+        return
+    }
     syncEditingEventFromEditor({ renderList: false })
     if (!calculationConfigEvents.length) {
         return
@@ -1622,9 +1817,10 @@ function removeCalculationConfigEvent(index = calculationConfigEditingIndex) {
     renderCalculationConfigEvents()
 }
 
-function calculationEventListItemHtml(event = {}, index = 0) {
+function calculationEventListItemHtml(event = {}, index = 0, { readonly = false } = {}) {
     const kind = calculationEventUiKind(event)
     const active = index === calculationConfigEditingIndex
+    const disabled = readonly ? " disabled" : ""
     return `
         <article class="calculation-event-list-item${active ? " active" : ""}" data-calculation-event-index="${index}">
           <button type="button" class="calculation-event-select" data-select-calculation-event="${index}">
@@ -1635,122 +1831,246 @@ function calculationEventListItemHtml(event = {}, index = 0) {
             </span>
           </button>
           <div class="calculation-event-inline-actions">
-            <button type="button" class="compact-btn" data-duplicate-calculation-event="${index}" aria-label="复制事件 ${index + 1}">复制</button>
-            <button type="button" class="compact-btn danger-lite" data-remove-calculation-event="${index}" aria-label="删除事件 ${index + 1}">删除</button>
+            <button type="button" class="compact-btn" data-duplicate-calculation-event="${index}" aria-label="复制事件 ${index + 1}"${disabled}>复制</button>
+            <button type="button" class="compact-btn danger-lite" data-remove-calculation-event="${index}" aria-label="删除事件 ${index + 1}"${disabled}>删除</button>
           </div>
         </article>
     `
 }
 
-function calculationEventEditorHtml(event = {}) {
+function calculationEventEditorHtml(event = {}, { readonly = false } = {}) {
     const kind = event.kind === "direct" ? "direct" : (anomalySettlementType(event) === "disorder" ? "disorder" : "anomaly")
     const skillRef = kind === "direct" ? (stripSkillRefLevel(event.skillRef) ?? firstDamageSkillRef()) : null
     const categoryId = skillRef?.categoryId ?? damageSkillCategories()[0]?.id ?? ""
     const moveId = skillRef?.moveId ?? damageSkillCategories().find(item => item.id === categoryId)?.moves?.[0]?.id ?? ""
     const rowId = skillRef?.rowId ?? damageSkillCategories().find(item => item.id === categoryId)?.moves?.find(item => item.id === moveId)?.rows?.[0]?.id ?? ""
+    const disabled = readonly ? " disabled" : ""
     return `
         <label class="field">
           <span>类型</span>
-          <select data-calculation-event-kind>${optionHtml([["direct", "直伤"], ["anomaly", "属性异常"], ["disorder", "紊乱"]], kind)}</select>
+          <select data-calculation-event-kind${disabled}>${optionHtml([["direct", "直伤"], ["anomaly", "属性异常"], ["disorder", "紊乱"]], kind)}</select>
         </label>
         <label class="field">
           <span>次数</span>
-          <input data-calculation-event-count type="number" min="0" step="1" value="${escapeHtml(event.count ?? 1)}">
+          <input data-calculation-event-count type="number" min="0" step="1" value="${escapeHtml(event.count ?? 1)}"${disabled}>
         </label>
         <label class="field calculation-direct-only"${kind === "direct" ? "" : " hidden"}>
           <span>技能大类</span>
-          <select data-calculation-skill-category>${calculationSkillCategoryOptions(categoryId)}</select>
+          <select data-calculation-skill-category${disabled}>${calculationSkillCategoryOptions(categoryId)}</select>
         </label>
         <label class="field calculation-direct-only"${kind === "direct" ? "" : " hidden"}>
           <span>招式</span>
-          <select data-calculation-skill-move>${calculationSkillMoveOptions(categoryId, moveId)}</select>
+          <select data-calculation-skill-move${disabled}>${calculationSkillMoveOptions(categoryId, moveId)}</select>
         </label>
         <label class="field calculation-direct-only"${kind === "direct" ? "" : " hidden"}>
           <span>倍率行</span>
-          <select data-calculation-skill-row>${calculationSkillRowOptions(categoryId, moveId, rowId)}</select>
+          <select data-calculation-skill-row${disabled}>${calculationSkillRowOptions(categoryId, moveId, rowId)}</select>
         </label>
         <label class="field calculation-direct-only"${kind === "direct" ? "" : " hidden"}>
           <span>暴击模式</span>
-          <select data-calculation-crit-mode>${optionHtml([["expected", "期望"], ["crit", "暴击"], ["nonCrit", "非暴击"]], event.critMode ?? "expected")}</select>
+          <select data-calculation-crit-mode${disabled}>${optionHtml([["expected", "期望"], ["crit", "暴击"], ["nonCrit", "非暴击"]], event.critMode ?? "expected")}</select>
         </label>
         <label class="field calculation-anomaly-only"${kind === "anomaly" ? "" : " hidden"}>
           <span>异常类型</span>
-          <select data-calculation-anomaly-effect>${anomalyEffectOptions(event.anomalyEffect ?? defaultAnomalyEffectIdForAgent())}</select>
+          <select data-calculation-anomaly-effect${disabled}>${anomalyEffectOptions(event.anomalyEffect ?? defaultAnomalyEffectIdForAgent())}</select>
         </label>
         <label class="field calculation-anomaly-only"${kind === "anomaly" ? "" : " hidden"}>
           <span>结算次数</span>
-          <input data-calculation-proc-count type="number" min="0" step="1" value="${escapeHtml(event.procCount ?? 1)}">
+          <input data-calculation-proc-count type="number" min="0" step="1" value="${escapeHtml(event.procCount ?? 1)}"${disabled}>
         </label>
         <label class="field calculation-disorder-only"${kind === "disorder" ? "" : " hidden"}>
           <span>紊乱类型</span>
-          <select data-calculation-disorder-effect>${disorderEffectOptions(anomalyEffectId(event) || "burn")}</select>
+          <select data-calculation-disorder-type${disabled}>${disorderTypeOptions(event.disorderType)}</select>
+        </label>
+        <label class="field calculation-disorder-only"${kind === "disorder" ? "" : " hidden"}>
+          <span>原异常</span>
+          <select data-calculation-disorder-effect${disabled}>${disorderEffectOptions(anomalyEffectId(event) || "burn")}</select>
         </label>
         <label class="field calculation-disorder-only"${kind === "disorder" ? "" : " hidden"}>
           <span>已生效秒数</span>
-          <input data-calculation-elapsed type="number" min="0" step="0.1" value="${escapeHtml(event.elapsedSeconds ?? 0)}">
-        </label>
-        <label class="field calculation-disorder-only"${kind === "disorder" ? "" : " hidden"}>
-          <span>持续秒数</span>
-          <input data-calculation-duration type="number" min="0" step="0.1" value="${escapeHtml(event.durationSeconds ?? 10)}">
+          <input data-calculation-elapsed type="number" min="0" step="0.1" value="${escapeHtml(event.elapsedSeconds ?? 0)}"${disabled}>
         </label>
     `
+}
+
+function directCalculationEventParts(event = {}) {
+    const skill = meta?.agentSkills?.find(item => item.id === event.skillRef?.agentSkillId) ?? agentSkillCatalog()
+    const category = damageSkillCategories(skill).find(item => item.id === event.skillRef?.categoryId)
+    const move = (category?.moves ?? []).find(item => item.id === event.skillRef?.moveId)
+    const row = (move?.rows ?? []).find(item => item.id === event.skillRef?.rowId)
+    return {
+        category: category ? nameOf(category) : "-",
+        move: move ? nameOf(move) : "-",
+        row: row ? (localizedText(row.label) || row.id) : "-",
+    }
+}
+
+function critModeLabel(mode = "expected") {
+    return {
+        expected: "期望",
+        crit: "暴击",
+        nonCrit: "非暴击",
+    }[mode] ?? mode
+}
+
+function anomalyEffectLabel(effectId = "", settlementType = "attribute") {
+    const effects = settlementType === "disorder" ? disorderEffects() : anomalyEffects()
+    const effect = effects.find(item => item.id === effectId)
+    return localizedText(effect?.label) || ANOMALY_EFFECT_LABELS[effectId] || effectId || "-"
+}
+
+function calculationEventPreviewRows(event = {}) {
+    const kind = calculationEventUiKind(event)
+    const rows = [
+        ["类型", calculationEventKindLabel(kind)],
+        ["次数", `×${event.count ?? 1}`],
+    ]
+    if (kind === "direct") {
+        const parts = directCalculationEventParts(event)
+        return [
+            ...rows,
+            ["技能大类", parts.category],
+            ["招式", parts.move],
+            ["倍率行", parts.row],
+            ["暴击模式", critModeLabel(event.critMode ?? "expected")],
+        ]
+    }
+    if (kind === "disorder") {
+        return [
+            ...rows,
+            ["紊乱类型", disorderTypeLabel(event.disorderType)],
+            ["原异常", anomalyEffectLabel(anomalyEffectId(event), "disorder")],
+            ["已生效秒数", `${event.elapsedSeconds ?? 0}s`],
+        ]
+    }
+    return [
+        ...rows,
+        ["异常类型", anomalyEffectLabel(event.anomalyEffect ?? defaultAnomalyEffectIdForAgent(), "attribute")],
+        ["结算次数", `×${event.procCount ?? 1}`],
+    ]
+}
+
+function adminDefaultCalculationEventListItemHtml(event = {}, index = 0) {
+    const kind = calculationEventUiKind(event)
+    const active = index === calculationConfigEditingIndex
+    return `
+        <article class="calculation-event-list-item calculation-default-event-list-item${active ? " active" : ""}" data-calculation-event-index="${index}">
+          <button type="button" class="calculation-event-select" data-select-calculation-event="${index}">
+            <span class="calculation-event-order">#${index + 1}</span>
+            <span class="calculation-event-copy">
+              <strong>${escapeHtml(calculationEventKindLabel(kind))} · ${escapeHtml(calculationEventTitle(event))}</strong>
+              <small>${escapeHtml(`次数 ×${event.count ?? 1}`)}</small>
+            </span>
+          </button>
+        </article>
+    `
+}
+
+function adminDefaultCalculationEventDetailHtml(event = {}) {
+    const rows = calculationEventPreviewRows(event)
+    return `
+        <div class="calculation-default-detail-list">
+          ${rows.map(([label, value]) => `
+            <div class="calculation-default-detail-item">
+              <span>${escapeHtml(label)}</span>
+              <strong>${escapeHtml(value ?? "-")}</strong>
+            </div>
+          `).join("")}
+        </div>
+    `
+}
+
+function renderAdminDefaultCalculationPreview(events = adminDefaultCalculationEvents()) {
+    normalizeCalculationEditingIndex(events)
+    if (els.adminDefaultCalculationEventList) {
+        els.adminDefaultCalculationEventList.innerHTML = events.length
+            ? events.map(adminDefaultCalculationEventListItemHtml).join("")
+            : `<div class="calculation-event-empty">未配置默认循环事件</div>`
+    }
+    if (els.adminDefaultCalculationEventCount) {
+        els.adminDefaultCalculationEventCount.textContent = `${events.length} 项`
+    }
+    const event = calculationConfigEditingIndex >= 0 ? events[calculationConfigEditingIndex] : null
+    if (els.adminDefaultCalculationEventTitle) {
+        els.adminDefaultCalculationEventTitle.textContent = event ? calculationEventTitle(event) : "暂无默认循环事件"
+    }
+    if (els.adminDefaultCalculationEventFields) {
+        els.adminDefaultCalculationEventFields.innerHTML = event
+            ? adminDefaultCalculationEventDetailHtml(event)
+            : `<div class="calculation-event-editor-empty">当前角色未配置默认循环事件。</div>`
+    }
 }
 
 function renderCalculationConfigEventList(events = calculationConfigEvents) {
     if (!els.calculationConfigEventList) {
         return
     }
+    const readonly = calculationConfigModeReadonly()
     els.calculationConfigEventList.innerHTML = events.length
-        ? events.map(calculationEventListItemHtml).join("")
+        ? events.map((event, index) => calculationEventListItemHtml(event, index, { readonly })).join("")
         : `<div class="calculation-event-empty">还没有目标事件</div>`
     if (els.calculationConfigEventCount) {
         els.calculationConfigEventCount.textContent = `${events.length} 项`
     }
 }
 
-function renderCalculationEventEditor() {
-    const index = normalizeCalculationEditingIndex()
-    const event = index >= 0 ? calculationConfigEvents[index] : null
+function renderCalculationEventEditor(events = calculationConfigEvents) {
+    const index = normalizeCalculationEditingIndex(events)
+    const event = index >= 0 ? events[index] : null
+    const readonly = calculationConfigModeReadonly()
     if (els.calculationEventEditorTitle) {
         els.calculationEventEditorTitle.textContent = event ? calculationEventTitle(event) : "添加一个事件开始配置"
     }
     if (els.calculationEventEditorFields) {
         els.calculationEventEditorFields.innerHTML = event
-            ? calculationEventEditorHtml(event)
+            ? calculationEventEditorHtml(event, { readonly })
             : `<div class="calculation-event-editor-empty">左侧添加直伤、属性异常或紊乱事件。</div>`
     }
     if (els.duplicateCalculationEventBtn) {
-        els.duplicateCalculationEventBtn.disabled = !event
+        els.duplicateCalculationEventBtn.disabled = !event || readonly
     }
     if (els.removeCalculationEventBtn) {
-        els.removeCalculationEventBtn.disabled = !event
+        els.removeCalculationEventBtn.disabled = !event || readonly
     }
 }
 
 function syncCalculationConfigModalSummary() {
     if (els.calculationConfigFooterSummary) {
-        const mode = els.calculationConfigMode?.value ?? calculationConfigMode
-        const events = mode === "custom"
-            ? calculationConfigEvents
-            : mode === "anomaly"
-                ? [anomalyEventFromControls()]
-                : [singleEventFromControls()]
+        const mode = modalCalculationConfigMode()
+        const events = calculationEventsForMode(mode)
         els.calculationConfigFooterSummary.textContent = calculationConfigSummaryText({ mode, events })
     }
 }
 
-function renderCalculationConfigEvents(events = calculationConfigEvents) {
-    calculationConfigEvents = events
-    normalizeCalculationEditingIndex()
-    renderCalculationConfigEventList()
-    renderCalculationEventEditor()
+function renderCalculationConfigEvents() {
+    const mode = modalCalculationConfigMode()
+    const events = calculationEventsForMode()
+    normalizeCalculationEditingIndex(events)
+    if (mode === ADMIN_DEFAULT_CALCULATION_MODE) {
+        renderAdminDefaultCalculationPreview(events)
+    } else {
+        renderCalculationConfigEventList(events)
+        renderCalculationEventEditor(events)
+    }
     syncCalculationConfigModalSummary()
 }
 
 function syncCalculationConfigModeFields() {
-    const mode = els.calculationConfigMode?.value ?? calculationConfigMode
-    if (els.calculationConfigEventList) {
-        els.calculationConfigEventList.closest(".calculation-config-events").hidden = mode !== "custom"
+    syncCalculationConfigModeOptions()
+    let mode = modalCalculationConfigMode()
+    if (els.calculationConfigMode && els.calculationConfigMode.value !== mode) {
+        els.calculationConfigMode.value = mode
+    }
+    if (mode === "custom") {
+        ensureCustomCalculationEventsSeeded()
+    }
+    const showCustomEvents = mode === "custom"
+    const showAdminPreview = mode === ADMIN_DEFAULT_CALCULATION_MODE
+    if (els.calculationCustomConfigEvents) {
+        els.calculationCustomConfigEvents.hidden = !showCustomEvents
+    }
+    if (els.adminDefaultCalculationPreview) {
+        els.adminDefaultCalculationPreview.hidden = !showAdminPreview
     }
     for (const button of [
         els.addCalculationDirectEventBtn,
@@ -1758,9 +2078,11 @@ function syncCalculationConfigModeFields() {
         els.addCalculationDisorderEventBtn,
     ]) {
         if (button) {
-            button.hidden = mode !== "custom"
+            button.hidden = !showCustomEvents
+            button.disabled = !showCustomEvents
         }
     }
+    renderCalculationConfigEvents()
     renderCalculationObjectiveControls()
     syncCalculationConfigModalSummary()
 }
@@ -1787,9 +2109,9 @@ function readCalculationEventFromEditor(index = calculationConfigEditingIndex) {
             id: current.id,
             kind: "anomaly",
             settlementType: "disorder",
+            disorderType: normalizeDisorderType(els.calculationEventEditorFields.querySelector("[data-calculation-disorder-type]")?.value),
             anomalyEffect: els.calculationEventEditorFields.querySelector("[data-calculation-disorder-effect]")?.value || "burn",
             elapsedSeconds: Number(els.calculationEventEditorFields.querySelector("[data-calculation-elapsed]")?.value || 0),
-            durationSeconds: Number(els.calculationEventEditorFields.querySelector("[data-calculation-duration]")?.value || 10),
             count,
         }
     }
@@ -1809,7 +2131,7 @@ function readCalculationEventFromEditor(index = calculationConfigEditingIndex) {
 }
 
 function syncEditingEventFromEditor({ renderList = true } = {}) {
-    if ((els.calculationConfigMode?.value ?? calculationConfigMode) !== "custom") {
+    if (modalCalculationConfigMode() !== "custom") {
         return
     }
     const index = normalizeCalculationEditingIndex()
@@ -1832,34 +2154,20 @@ function readCalculationConfigEventsFromModal() {
     return [...calculationConfigEvents]
 }
 
-function adminDefaultCalculationText(config = null) {
-    if (!config?.events?.length) {
-        return "未配置"
-    }
-    const name = localizedText(config.name) || "管理员默认"
-    return `${name} · ${config.events.length} 个事件`
-}
-
 function renderCalculationConfigModal() {
     if (!els.calculationConfigModal) {
         return
     }
+    calculationConfigMode = resolveCalculationConfigMode()
+    syncCalculationConfigModeOptions()
     if (els.calculationConfigMode) {
         els.calculationConfigMode.value = calculationConfigMode
     }
-    const selectedIndex = calculationConfigEvents.findIndex(event => event.id === calculationConfigSelectedEventId)
+    const events = calculationEventsForMode()
+    const selectedIndex = events.findIndex(event => event.id === calculationConfigSelectedEventId)
     if (selectedIndex >= 0) {
         calculationConfigEditingIndex = selectedIndex
     }
-    const defaultConfig = getAgent(els.agentSelect.value)?.defaultCalculationConfig
-    if (els.adminDefaultCalculationSummary) {
-        els.adminDefaultCalculationSummary.textContent = adminDefaultCalculationText(defaultConfig)
-        els.adminDefaultCalculationSummary.title = defaultConfig ? calculationConfigSummaryText(defaultConfig) : ""
-    }
-    if (els.applyAdminDefaultCalculationBtn) {
-        els.applyAdminDefaultCalculationBtn.disabled = !defaultConfig
-    }
-    renderCalculationConfigEvents()
     syncCalculationConfigModeFields()
 }
 
@@ -1874,39 +2182,24 @@ function closeCalculationConfigModal() {
     document.body.classList.remove("modal-open")
 }
 
-function applyCalculationConfig(config = {}) {
-    const next = calculationConfigFromStored(config)
-    calculationConfigMode = next.mode
-    calculationConfigEvents = next.events.length ? next.events : calculationConfigEvents
-    calculationConfigSelectedEventId = next.selectedEventId ?? calculationConfigEvents[0]?.id ?? null
-    const selected = calculationConfigEvents.find(event => event.id === calculationConfigSelectedEventId) ?? calculationConfigEvents[0]
-    if (selected) {
-        applyStoredDamageConfig({
-            mode: "single",
-            selectedEventId: selected.id,
-            events: [selected],
-            skillLevelsByCategory: damageSkillLevelsByCategory,
-            target: collectDamageTargetConfig(),
-        })
-        calculationConfigMode = next.mode
-        calculationConfigEvents = next.events
-        calculationConfigSelectedEventId = next.selectedEventId ?? selected.id
-        calculationConfigEditingIndex = Math.max(0, calculationConfigEvents.findIndex(event => event.id === calculationConfigSelectedEventId))
-    }
-    syncCalculationConfigSummary()
-    renderCalculationObjectiveControls()
-}
-
 function applyStoredDamageConfig(config = {}) {
-    const calculationConfig = calculationConfigFromStored(config)
-    calculationConfigMode = calculationConfig.mode
-    calculationConfigEvents = calculationConfig.events
-    calculationConfigSelectedEventId = calculationConfig.selectedEventId
-    calculationConfigEditingIndex = Math.max(0, calculationConfigEvents.findIndex(event => event.id === calculationConfigSelectedEventId))
+    const storedCalculationConfig = calculationConfigFromStored(config)
+    calculationConfigMode = resolveCalculationConfigMode(storedCalculationConfig.mode)
+    const activeCalculationConfig = calculationConfigMode === ADMIN_DEFAULT_CALCULATION_MODE
+        ? adminDefaultCalculationConfig()
+        : storedCalculationConfig.mode === ADMIN_DEFAULT_CALCULATION_MODE
+            ? { selectedEventId: null, events: [] }
+            : storedCalculationConfig
+    const activeEvents = activeCalculationConfig?.events ?? []
+    calculationConfigEvents = calculationConfigMode === "custom"
+        ? storedCalculationConfig.events
+        : []
+    calculationConfigSelectedEventId = activeCalculationConfig?.selectedEventId ?? activeEvents[0]?.id ?? null
+    calculationConfigEditingIndex = Math.max(0, activeEvents.findIndex(event => event.id === calculationConfigSelectedEventId))
     const target = config.target ?? {}
     const damageElement = currentDamageElement()
-    const selectedEvent = calculationConfig.events.find(event => event.id === calculationConfig.selectedEventId)
-        ?? calculationConfig.events[0]
+    const selectedEvent = activeEvents.find(event => event.id === calculationConfigSelectedEventId)
+        ?? activeEvents[0]
         ?? { kind: "direct" }
     activeDamageResistanceElement = damageElement
     for (const element of DAMAGE_ELEMENTS) {
@@ -1928,9 +2221,11 @@ function applyStoredDamageConfig(config = {}) {
             els.damageAnomalySettlementType.value = settlementType
         }
         if (settlementType === "disorder") {
+            if (els.damageDisorderType) {
+                els.damageDisorderType.value = normalizeDisorderType(selectedEvent.disorderType)
+            }
             els.damageDisorderEffect.value = anomalyEffectId(selectedEvent) || "burn"
             els.damageDisorderElapsed.value = selectedEvent.elapsedSeconds ?? 0
-            els.damageDisorderDuration.value = selectedEvent.durationSeconds ?? 10
         } else if (els.damageAnomalyEffect) {
             els.damageAnomalyEffect.value = selectedEvent.anomalyEffect ?? "assault"
             const defaultProcCount = els.damageAnomalyEffect.selectedOptions?.[0]?.dataset.defaultProcCount
@@ -2526,8 +2821,9 @@ function updateAddedCombatBuffRuntime(buffKey, updater) {
         if (addedCombatBuffKey(item) !== buffKey) {
             return item
         }
-        const runtime = runtimeForBuff(item, resolveAddedCombatBuff(item))
-        updater(runtime)
+        const buff = resolveAddedCombatBuff(item)
+        const runtime = runtimeForBuff(item, buff)
+        updater(runtime, buff)
         return { ...item, runtime }
     }))
 }
@@ -2582,7 +2878,7 @@ function updateCatalogCombatBuffRuntime(buffKey, updater) {
     const previous = byAgent[agentId] ?? {}
     const combat = previous.combat ?? {}
     const runtime = runtimeForBuff({ runtime: combat.catalogBuffRuntimes?.[buffId] ?? null }, buff)
-    updater(runtime)
+    updater(runtime, buff)
     byAgent[agentId] = {
         ...previous,
         combat: {
@@ -2719,6 +3015,196 @@ function addedCombatBuffKey(item) {
 
 function teammateDriveDiscAddedCount(addedBuffs = currentAddedCombatBuffs()) {
     return addedBuffs.filter(item => item.sourceKind === "teammateDriveDisc4pc").length
+}
+
+function wEngineTeamAddedCount(addedBuffs = currentAddedCombatBuffs()) {
+    return addedBuffs.filter(item => item.sourceKind === "wEngineTeam").length
+}
+
+function driveDiscAddedCount(addedBuffs = currentAddedCombatBuffs()) {
+    return addedBuffs.filter(item =>
+        item.sourceKind === "teammateDriveDisc4pc"
+        || item.sourceCategory === "driveDisc"
+    ).length
+}
+
+function teammateOwnerIdForBuff(item, buff = resolveAddedCombatBuff(item)) {
+    return item?.sourceKind === "teammate"
+        ? String(buff?.ownerId ?? item?.ownerId ?? "")
+        : ""
+}
+
+function teammateOwnerIdsForAddedBuffs(addedBuffs = currentAddedCombatBuffs()) {
+    const ownerIds = new Set()
+    for (const item of addedBuffs) {
+        const ownerId = teammateOwnerIdForBuff(item)
+        if (ownerId) {
+            ownerIds.add(ownerId)
+        }
+    }
+    return ownerIds
+}
+
+function candidateLimitMessage(candidate, addedBuffs = currentAddedCombatBuffs()) {
+    if (!candidate) {
+        return ""
+    }
+    const key = addedCombatBuffKey(candidate)
+    if (addedBuffs.some(item => addedCombatBuffKey(item) === key)) {
+        return ""
+    }
+
+    if (candidate.sourceKind === "teammate") {
+        const ownerIds = teammateOwnerIdsForAddedBuffs(addedBuffs)
+        const ownerId = String(candidate.ownerId ?? "")
+        if (ownerId && !ownerIds.has(ownerId) && ownerIds.size >= TEAMMATE_BUFF_OWNER_LIMIT) {
+            return `角色引发的 Buff 最多选择 ${TEAMMATE_BUFF_OWNER_LIMIT} 名角色`
+        }
+    }
+
+    if (candidate.sourceKind === "wEngineTeam" && wEngineTeamAddedCount(addedBuffs) >= W_ENGINE_TEAM_BUFF_LIMIT) {
+        return `音擎引发的 Buff 最多选择 ${W_ENGINE_TEAM_BUFF_LIMIT} 个`
+    }
+
+    if (
+        (candidate.sourceKind === "teammateDriveDisc4pc" || candidate.sourceCategory === "driveDisc")
+        && driveDiscAddedCount(addedBuffs) >= DRIVE_DISC_TEAM_BUFF_LIMIT
+    ) {
+        return `驱动盘引发的 Buff 最多选择 ${DRIVE_DISC_TEAM_BUFF_LIMIT} 个`
+    }
+
+    return ""
+}
+
+function addedCombatBuffEntry(candidate) {
+    return {
+        id: candidate.id,
+        sourceCategory: candidate.sourceCategory,
+        sourceKind: candidate.sourceKind,
+        setId: candidate.setId ?? null,
+        ...(candidate.sourceKind === "wEngineTeam" ? { wEngineModificationLevel: 1 } : {}),
+        runtime: defaultRuntimeForBuff(candidate),
+    }
+}
+
+function selectedTeammateBuffCandidates() {
+    return teammateBuffCandidates().filter(candidate => candidate.ownerId === activeCombatBuffTeammateId)
+}
+
+function ensureActiveCombatBuffTeammateId(groups = teammateCombatBuffGroups()) {
+    if (!groups.length) {
+        activeCombatBuffTeammateId = ""
+        return null
+    }
+    const selectedOwnerIds = teammateOwnerIdsForAddedBuffs()
+    const preferredGroup = groups.find(group => group.id === activeCombatBuffTeammateId)
+        ?? groups.find(group => selectedOwnerIds.has(group.id))
+        ?? groups[0]
+    activeCombatBuffTeammateId = preferredGroup.id
+    return preferredGroup
+}
+
+function renderCombatBuffTeammatePicker() {
+    const groups = teammateCombatBuffGroups()
+    const activeGroup = ensureActiveCombatBuffTeammateId(groups)
+    const selectedOwnerIds = teammateOwnerIdsForAddedBuffs()
+    const selectedLimitReached = selectedOwnerIds.size >= TEAMMATE_BUFF_OWNER_LIMIT
+
+    els.combatBuffTeammateSelect.innerHTML = ""
+    for (const group of groups) {
+        const option = document.createElement("option")
+        const alreadySelected = selectedOwnerIds.has(group.id)
+        option.value = group.id
+        option.textContent = `${nameOf(group)}${alreadySelected ? "（已添加）" : ""}`
+        option.selected = group.id === activeCombatBuffTeammateId
+        option.disabled = !alreadySelected && selectedLimitReached && group.id !== activeCombatBuffTeammateId
+        els.combatBuffTeammateSelect.appendChild(option)
+    }
+
+    const candidates = selectedTeammateBuffCandidates()
+    const addedKeys = new Set(currentAddedCombatBuffs().map(addedCombatBuffKey))
+    const hasAddedFromActive = candidates.some(candidate => addedKeys.has(addedCombatBuffKey(candidate)))
+    const allAddedFromActive = candidates.length > 0
+        && candidates.every(candidate => addedKeys.has(addedCombatBuffKey(candidate)))
+    const activeOwnerSelected = activeGroup && selectedOwnerIds.has(activeGroup.id)
+    const activeWouldExceedLimit = Boolean(activeGroup && !activeOwnerSelected && selectedLimitReached)
+
+    els.addTeammateBuffsBtn.disabled = !candidates.length || allAddedFromActive || activeWouldExceedLimit
+    els.removeTeammateBuffsBtn.disabled = !hasAddedFromActive
+    els.combatBuffTeammateHint.textContent = activeWouldExceedLimit
+        ? `最多选择 ${TEAMMATE_BUFF_OWNER_LIMIT} 名角色；请先移除一个角色来源`
+        : `已选择 ${selectedOwnerIds.size}/${TEAMMATE_BUFF_OWNER_LIMIT} 名角色`
+}
+
+function addedCombatBuffSourceGroupKey(item, buff = resolveAddedCombatBuff(item)) {
+    if (item?.sourceKind === "teammate") {
+        return `agent:${teammateOwnerIdForBuff(item, buff) || item.id}`
+    }
+    if (item?.sourceKind === "wEngineTeam") {
+        return "wEngine"
+    }
+    if (item?.sourceKind === "custom") {
+        return "custom"
+    }
+    if (item?.sourceKind === "teammateDriveDisc4pc" || item?.sourceCategory === "driveDisc") {
+        return "driveDisc"
+    }
+    return item?.sourceCategory ?? "other"
+}
+
+function addedCombatBuffSourceGroupOrder(item) {
+    if (item?.sourceKind === "teammate") {
+        return 0
+    }
+    if (item?.sourceKind === "wEngineTeam") {
+        return 1
+    }
+    if (item?.sourceKind === "teammateDriveDisc4pc" || item?.sourceCategory === "driveDisc") {
+        return 2
+    }
+    if (item?.sourceKind === "custom") {
+        return 3
+    }
+    return 2
+}
+
+function addedCombatBuffSourceGroups(addedBuffs = currentAddedCombatBuffs()) {
+    const groups = []
+    const byKey = new Map()
+    let agentGroupCount = 0
+
+    for (const item of addedBuffs) {
+        const buff = resolveAddedCombatBuff(item)
+        const key = addedCombatBuffSourceGroupKey(item, buff)
+        let group = byKey.get(key)
+        if (!group) {
+            const isAgent = item.sourceKind === "teammate"
+            const label = isAgent
+                ? localizedText(buff.ownerName) || "角色"
+                : item.sourceKind === "wEngineTeam"
+                    ? "音擎"
+                    : item.sourceKind === "custom"
+                        ? "自定义"
+                        : item.sourceKind === "teammateDriveDisc4pc" || item.sourceCategory === "driveDisc"
+                            ? "驱动盘"
+                            : sourceCategoryLabel(buff.sourceCategory)
+            group = {
+                key,
+                label,
+                order: addedCombatBuffSourceGroupOrder(item),
+                sequence: groups.length,
+                className: isAgent
+                    ? `combat-added-source-group--agent combat-added-source-group--agent-${(agentGroupCount++ % 2) + 1}`
+                    : `combat-added-source-group--${key}`,
+                items: [],
+            }
+            byKey.set(key, group)
+            groups.push(group)
+        }
+        group.items.push({ item, buff })
+    }
+
+    return groups.sort((left, right) => left.order - right.order || left.sequence - right.sequence)
 }
 
 function checkedCombatBuffIds() {
@@ -2858,40 +3344,67 @@ function renderAddedCombatBuffs() {
         return
     }
 
-    for (const item of added) {
-        const buff = resolveAddedCombatBuff(item)
-        const runtime = runtimeForBuff(item, buff)
-        const row = document.createElement("article")
-        row.className = "combat-added-card"
-        row.dataset.buffKey = addedCombatBuffKey(item)
+    for (const group of addedCombatBuffSourceGroups(added)) {
+        const section = document.createElement("section")
+        section.className = `combat-added-source-group ${group.className}`
+        section.dataset.buffGroupKey = group.key
 
-        const title = document.createElement("strong")
-        title.textContent = nameOf(buff)
-        const description = document.createElement("p")
-        description.textContent = localizedText(buff.description) || localizedText(buff.conditionLabel) || "已添加到局内计算"
-        const stats = document.createElement("span")
-        stats.className = "combat-added-stats combat-buff-effect-lines"
-        renderBuffEffectLines(stats, buff, runtime, { fallbackText: effectStatText(buff) })
-        const remove = document.createElement("button")
-        remove.type = "button"
-        remove.className = "combat-remove-btn"
-        remove.dataset.removeBuffKey = addedCombatBuffKey(item)
-        remove.textContent = "移除"
+        const head = document.createElement("div")
+        head.className = "combat-added-source-head"
+        const copy = document.createElement("div")
+        const source = document.createElement("small")
+        source.textContent = `来自${group.label}`
+        const count = document.createElement("strong")
+        count.textContent = `${group.items.length} 个 Buff`
+        copy.append(source, count)
 
-        row.append(title)
-        if (shouldShowCombatBuffMetaLine(buff)) {
-            const metaLine = document.createElement("span")
-            metaLine.textContent = [
-                localizedText(buff.ownerName),
-                localizedText(buff.sourceLabel),
-            ].filter(Boolean).join(" · ") || sourceCategoryLabel(buff.sourceCategory)
-            row.appendChild(metaLine)
+        const removeGroup = document.createElement("button")
+        removeGroup.type = "button"
+        removeGroup.className = "combat-remove-group-btn"
+        removeGroup.dataset.removeBuffGroupKey = group.key
+        removeGroup.textContent = "移除全部"
+        head.append(copy, removeGroup)
+
+        const items = document.createElement("div")
+        items.className = "combat-added-source-items"
+
+        for (const { item, buff } of group.items) {
+            const runtime = runtimeForBuff(item, buff)
+            const row = document.createElement("article")
+            row.className = "combat-added-card combat-added-item-card"
+            row.dataset.buffKey = addedCombatBuffKey(item)
+
+            const title = document.createElement("strong")
+            title.textContent = nameOf(buff)
+            const description = document.createElement("p")
+            description.textContent = localizedText(buff.description) || localizedText(buff.conditionLabel) || "已添加到局内计算"
+            const stats = document.createElement("span")
+            stats.className = "combat-added-stats combat-buff-effect-lines"
+            renderBuffEffectLines(stats, buff, runtime, { fallbackText: effectStatText(buff) })
+            const remove = document.createElement("button")
+            remove.type = "button"
+            remove.className = "combat-remove-btn"
+            remove.dataset.removeBuffKey = addedCombatBuffKey(item)
+            remove.textContent = "移除"
+
+            row.append(title)
+            if (shouldShowCombatBuffMetaLine(buff)) {
+                const metaLine = document.createElement("span")
+                metaLine.textContent = [
+                    localizedText(buff.ownerName),
+                    localizedText(buff.sourceLabel),
+                ].filter(Boolean).join(" · ") || sourceCategoryLabel(buff.sourceCategory)
+                row.appendChild(metaLine)
+            }
+            row.append(description, stats)
+            renderAddedWEngineModificationControl(row, item)
+            renderBuffRuntimeControls(row, item, buff, runtime)
+            row.appendChild(remove)
+            items.appendChild(row)
         }
-        row.append(description, stats)
-        renderAddedWEngineModificationControl(row, item)
-        renderBuffRuntimeControls(row, item, buff, runtime)
-        row.appendChild(remove)
-        els.addedCombatBuffs.appendChild(row)
+
+        section.append(head, items)
+        els.addedCombatBuffs.appendChild(section)
     }
 }
 
@@ -2946,19 +3459,23 @@ function renderBuffRuntimeControls(row, item, buff, runtime) {
         `
         controls.appendChild(field)
     }
+    const renderedSourceGroups = new Set()
     for (const rule of rules) {
-        const id = rule.id ?? rule.stat ?? "effect"
+        const id = SharedCombat.effectRuleId(rule)
         if (rule.type === "derived" || rule.type === "formula") {
-            const source = rule.source ?? {}
-            const defaultValue = rule.type === "formula" ? source.defaultValue : rule.defaultSourceValue
-            const sourceLabel = rule.type === "formula" ? source.label : rule.sourceLabel
-            const minAttr = rule.type === "formula" && Number.isFinite(Number(source.min)) ? ` min="${source.min}"` : ""
-            const maxAttr = rule.type === "formula" && Number.isFinite(Number(source.max)) ? ` max="${source.max}"` : ""
+            const sourceGroup = SharedCombat.runtimeSourceGroupForRule(buff, rule)
+            if (!sourceGroup || renderedSourceGroups.has(sourceGroup.key)) {
+                continue
+            }
+            renderedSourceGroups.add(sourceGroup.key)
+            const primaryId = sourceGroup.ruleIds[0] ?? id
+            const minAttr = Number.isFinite(sourceGroup.min) ? ` min="${sourceGroup.min}"` : ""
+            const maxAttr = Number.isFinite(sourceGroup.max) ? ` max="${sourceGroup.max}"` : ""
             const field = document.createElement("label")
             field.className = "field"
             field.innerHTML = `
-                <span>${escapeHtml(localizedText(sourceLabel) || "来源数值")}</span>
-                <input type="number"${minAttr}${maxAttr} step="1" value="${runtime.effects?.[id]?.sourceValue ?? defaultValue ?? 0}" data-runtime-effect="${escapeHtml(id)}" data-runtime-source-value>
+                <span>${escapeHtml(sourceGroup.label)}</span>
+                <input type="number"${minAttr}${maxAttr} step="1" value="${runtime.effects?.[primaryId]?.sourceValue ?? sourceGroup.defaultValue ?? 0}" data-runtime-effect="${escapeHtml(primaryId)}" data-runtime-source-group="${escapeHtml(sourceGroup.key)}" data-runtime-source-value>
             `
             controls.appendChild(field)
         } else if (rule.type === "stacked") {
@@ -3030,7 +3547,7 @@ function runtimeRuleForField(buff, field) {
     if (!id) {
         return null
     }
-    return effectRules(buff).find(rule => (rule.id ?? rule.stat ?? "effect") === id) ?? null
+    return effectRules(buff).find(rule => SharedCombat.effectRuleId(rule) === id) ?? null
 }
 
 function runtimeNumberConfig(buff, field) {
@@ -3044,11 +3561,21 @@ function runtimeNumberConfig(buff, field) {
             integer: false,
         }
     }
-    const rule = runtimeRuleForField(buff, field)
-    if (!rule) {
-        return null
-    }
     if (field.matches("[data-runtime-source-value]")) {
+        const sourceGroup = SharedCombat.runtimeSourceGroupForKey(buff, field.dataset.runtimeSourceGroup)
+        if (sourceGroup) {
+            return {
+                label: sourceGroup.label,
+                defaultValue: finiteOr(sourceGroup.defaultValue, 0),
+                min: sourceGroup.min ?? NaN,
+                max: sourceGroup.max ?? NaN,
+                integer: false,
+            }
+        }
+        const rule = runtimeRuleForField(buff, field)
+        if (!rule) {
+            return null
+        }
         const source = rule.source ?? {}
         return {
             label: localizedText(source.label ?? rule.sourceLabel) || "来源数值",
@@ -3057,6 +3584,10 @@ function runtimeNumberConfig(buff, field) {
             max: rule.type === "formula" ? Number(source.max) : NaN,
             integer: false,
         }
+    }
+    const rule = runtimeRuleForField(buff, field)
+    if (!rule) {
+        return null
     }
     if (field.matches("[data-runtime-stacks]")) {
         return {
@@ -3070,28 +3601,32 @@ function runtimeNumberConfig(buff, field) {
     return null
 }
 
-function setRuntimeValue(runtime, field, value) {
+function setRuntimeValue(runtime, field, value, buff) {
     if (field.matches("[data-runtime-coverage]")) {
         runtime.coverage = value
         return
     }
     const id = field.dataset.runtimeEffect
     runtime.effects = runtime.effects ?? {}
-    runtime.effects[id] = runtime.effects[id] ?? {}
     if (field.matches("[data-runtime-source-value]")) {
-        runtime.effects[id].sourceValue = value
+        const ruleIds = SharedCombat.runtimeSourceRuleIdsForGroup(buff, field.dataset.runtimeSourceGroup, id)
+        for (const ruleId of ruleIds) {
+            runtime.effects[ruleId] = runtime.effects[ruleId] ?? {}
+            runtime.effects[ruleId].sourceValue = value
+        }
     } else if (field.matches("[data-runtime-stacks]")) {
+        runtime.effects[id] = runtime.effects[id] ?? {}
         runtime.effects[id].stacks = value
     }
 }
 
 function updateRuntimeFieldValue(buffKey, field, value) {
     if (catalogCombatBuffIdFromKey(buffKey)) {
-        updateCatalogCombatBuffRuntime(buffKey, runtime => setRuntimeValue(runtime, field, value))
+        updateCatalogCombatBuffRuntime(buffKey, (runtime, buff) => setRuntimeValue(runtime, field, value, buff))
         return
     }
 
-    updateAddedCombatBuffRuntime(buffKey, runtime => setRuntimeValue(runtime, field, value))
+    updateAddedCombatBuffRuntime(buffKey, (runtime, buff) => setRuntimeValue(runtime, field, value, buff))
 }
 
 function refreshAddedCombatBuffSummary(buffKey) {
@@ -3226,14 +3761,16 @@ function collectCombatBuffConfig() {
     const wEngineTeamModificationLevels = {}
     for (const item of addedBuffs) {
         if (["teammate", "wEngineTeam"].includes(item.sourceKind)) {
+            const buff = resolveAddedCombatBuff(item)
             activeBuffIds.push(item.id)
-            runtimeInputs[item.id] = item.runtime ?? defaultRuntimeForBuff(resolveAddedCombatBuff(item))
+            runtimeInputs[item.id] = runtimeForBuff(item, buff)
         }
         if (item.sourceKind === "wEngineTeam") {
             wEngineTeamModificationLevels[item.id] = wEngineTeamModificationLevelForItem(item)
         }
         if (item.sourceKind === "teammateDriveDisc4pc") {
-            runtimeInputs[`teammateDriveDisc4pc:${item.setId}`] = item.runtime ?? defaultRuntimeForBuff(resolveAddedCombatBuff(item))
+            const buff = resolveAddedCombatBuff(item)
+            runtimeInputs[`teammateDriveDisc4pc:${item.setId}`] = runtimeForBuff(item, buff)
         }
     }
     for (const buff of [...combatBuffsByType("boss"), ...combatBuffsByType("field")]) {
@@ -3260,9 +3797,18 @@ function collectCombatBuffConfig() {
 function collectDamageConfig() {
     const agentLevel = Number(els.agentLevelInput?.value || 60)
     const target = collectDamageTargetConfig()
+    calculationConfigMode = resolveCalculationConfigMode()
     const events = configuredCalculationEventsForRequest()
-    const selectedEventId = calculationConfigMode === "custom"
-        ? calculationConfigSelectedEventId ?? events[0]?.id
+    const defaultConfig = calculationConfigMode === ADMIN_DEFAULT_CALCULATION_MODE
+        ? adminDefaultCalculationConfig()
+        : null
+    const preferredSelectedEventId = calculationConfigMode === "custom"
+        ? calculationConfigSelectedEventId
+        : calculationConfigMode === ADMIN_DEFAULT_CALCULATION_MODE
+            ? defaultConfig?.selectedEventId
+            : events[0]?.id
+    const selectedEventId = events.some(event => event.id === preferredSelectedEventId)
+        ? preferredSelectedEventId
         : events[0]?.id
     const selectedDirect = events.find(event => event.id === selectedEventId && event.kind === "direct")
         ?? events.find(event => event.kind === "direct")
@@ -3297,8 +3843,10 @@ function renderCombatBuffCandidates() {
     const search = els.combatBuffSearchInput.value.trim().toLowerCase()
     const addedKeys = new Set(currentAddedCombatBuffs().map(addedCombatBuffKey))
     const isCustom = activeCombatBuffTab === "custom"
+    const isAgent = activeCombatBuffTab === "agent"
     els.combatBuffCandidateList.hidden = isCustom
     els.combatBuffCustomPane.hidden = !isCustom
+    els.combatBuffTeammatePicker.hidden = !isAgent || isCustom
     els.combatBuffModalEmpty.hidden = true
 
     for (const button of els.combatBuffModal.querySelectorAll("[data-combat-buff-tab]")) {
@@ -3312,7 +3860,12 @@ function renderCombatBuffCandidates() {
         return
     }
 
+    if (isAgent) {
+        renderCombatBuffTeammatePicker()
+    }
+
     const candidates = combatBuffCandidates()
+        .filter(candidate => !isAgent || candidate.ownerId === activeCombatBuffTeammateId)
         .filter(candidate => {
             const haystack = [
                 nameOf(candidate),
@@ -3332,18 +3885,54 @@ function renderCombatBuffCandidates() {
         return
     }
 
-    const teammate4pcCount = teammateDriveDiscAddedCount()
     for (const candidate of candidates) {
         const key = addedCombatBuffKey(candidate)
         const alreadyAdded = addedKeys.has(key)
-        const overTeammateSetLimit = candidate.sourceKind === "teammateDriveDisc4pc"
-            && !alreadyAdded
-            && teammate4pcCount >= TEAMMATE_DRIVE_DISC_LIMIT
+        const limitMessage = candidateLimitMessage(candidate)
+
+        if (isAgent) {
+            const row = document.createElement("label")
+            row.className = [
+                "combat-candidate-row",
+                "combat-candidate-check-row",
+                alreadyAdded ? "active" : "",
+                limitMessage ? "disabled" : "",
+            ].filter(Boolean).join(" ")
+
+            const input = document.createElement("input")
+            input.type = "checkbox"
+            input.dataset.candidateCheckKey = key
+            input.checked = alreadyAdded
+            input.disabled = Boolean(limitMessage)
+
+            const copy = document.createElement("span")
+            copy.className = "combat-candidate-check-copy"
+
+            const title = document.createElement("strong")
+            title.textContent = localizedText(candidate.sourceLabel) || nameOf(candidate)
+            const metaLine = document.createElement("span")
+            metaLine.textContent = `来自${localizedText(candidate.ownerName) || "角色"}`
+            const description = document.createElement("p")
+            description.textContent = localizedText(candidate.description) || localizedText(candidate.conditionLabel) || ""
+            const stats = document.createElement("span")
+            stats.className = "combat-added-stats combat-buff-effect-lines"
+            if (limitMessage) {
+                setCombatStatLines(stats, [limitMessage])
+            } else {
+                renderBuffEffectLines(stats, candidate)
+            }
+
+            copy.append(title, metaLine, description, stats)
+            row.append(input, copy)
+            els.combatBuffCandidateList.appendChild(row)
+            continue
+        }
+
         const row = document.createElement("button")
         row.type = "button"
         row.className = "combat-candidate-row"
         row.dataset.candidateKey = key
-        row.disabled = alreadyAdded || overTeammateSetLimit
+        row.disabled = alreadyAdded || Boolean(limitMessage)
 
         const title = document.createElement("strong")
         title.textContent = nameOf(candidate)
@@ -3353,8 +3942,8 @@ function renderCombatBuffCandidates() {
         stats.className = "combat-added-stats combat-buff-effect-lines"
         if (alreadyAdded) {
             setCombatStatLines(stats, ["已添加"])
-        } else if (overTeammateSetLimit) {
-            setCombatStatLines(stats, [`队友 4 件套最多 ${TEAMMATE_DRIVE_DISC_LIMIT} 个`])
+        } else if (limitMessage) {
+            setCombatStatLines(stats, [limitMessage])
         } else {
             renderBuffEffectLines(stats, candidate)
         }
@@ -3388,7 +3977,7 @@ function closeCombatBuffModal() {
 }
 
 function addCombatBuffCandidateByKey(key) {
-    const candidate = combatBuffCandidates().find(item => addedCombatBuffKey(item) === key)
+    const candidate = allCombatBuffCandidates().find(item => addedCombatBuffKey(item) === key)
     if (!candidate) {
         return false
     }
@@ -3396,14 +3985,62 @@ function addCombatBuffCandidateByKey(key) {
     if (addedBuffs.some(item => addedCombatBuffKey(item) === key)) {
         return false
     }
-    saveCurrentAddedCombatBuffs([...addedBuffs, {
-        id: candidate.id,
-        sourceCategory: candidate.sourceCategory,
-        sourceKind: candidate.sourceKind,
-        setId: candidate.setId ?? null,
-        ...(candidate.sourceKind === "wEngineTeam" ? { wEngineModificationLevel: 1 } : {}),
-        runtime: defaultRuntimeForBuff(candidate),
-    }])
+    const limitMessage = candidateLimitMessage(candidate, addedBuffs)
+    if (limitMessage) {
+        setStatus(limitMessage, "error")
+        return false
+    }
+    saveCurrentAddedCombatBuffs([...addedBuffs, addedCombatBuffEntry(candidate)])
+    return true
+}
+
+function removeCombatBuffCandidateByKey(key) {
+    const addedBuffs = currentAddedCombatBuffs()
+    const next = addedBuffs.filter(item => addedCombatBuffKey(item) !== key)
+    if (next.length === addedBuffs.length) {
+        return false
+    }
+    saveCurrentAddedCombatBuffs(next)
+    return true
+}
+
+function addSelectedTeammateBuffs() {
+    const candidates = selectedTeammateBuffCandidates()
+    if (!candidates.length) {
+        return false
+    }
+    const addedBuffs = currentAddedCombatBuffs()
+    const firstNewCandidate = candidates.find(candidate =>
+        !addedBuffs.some(item => addedCombatBuffKey(item) === addedCombatBuffKey(candidate))
+    )
+    const limitMessage = candidateLimitMessage(firstNewCandidate, addedBuffs)
+    if (limitMessage) {
+        setStatus(limitMessage, "error")
+        return false
+    }
+    const addedKeys = new Set(addedBuffs.map(addedCombatBuffKey))
+    const nextEntries = candidates
+        .filter(candidate => !addedKeys.has(addedCombatBuffKey(candidate)))
+        .map(addedCombatBuffEntry)
+    if (!nextEntries.length) {
+        setStatus("该角色 Buff 已全部添加", "idle")
+        return false
+    }
+    saveCurrentAddedCombatBuffs([...addedBuffs, ...nextEntries])
+    return true
+}
+
+function removeSelectedTeammateBuffs() {
+    const ownerId = activeCombatBuffTeammateId
+    if (!ownerId) {
+        return false
+    }
+    const addedBuffs = currentAddedCombatBuffs()
+    const next = addedBuffs.filter(item => teammateOwnerIdForBuff(item) !== ownerId)
+    if (next.length === addedBuffs.length) {
+        return false
+    }
+    saveCurrentAddedCombatBuffs(next)
     return true
 }
 
@@ -3536,6 +4173,10 @@ function selectedValues(select) {
     return [...select.selectedOptions].map(option => option.value).filter(Boolean)
 }
 
+function driveDiscSetById(setId) {
+    return (meta?.driveDiscSets ?? []).find(set => set.id === setId) ?? null
+}
+
 function mainStatChoiceContainer(slot) {
     return els[`slot${slot}MainStatChoices`]
 }
@@ -3553,7 +4194,35 @@ function syncTwoPieceSetChoices() {
     const selected = new Set(selectedValues(els.twoPieceSetSelect))
     for (const input of els.twoPieceSetChoices.querySelectorAll("input[data-two-piece-set-limit]")) {
         input.checked = selected.has(input.value)
-        input.closest(".main-stat-choice")?.classList.toggle("active", input.checked)
+        input.closest(".two-piece-choice")?.classList.toggle("active", input.checked)
+    }
+    renderTwoPieceSelectedSummary()
+}
+
+function twoPieceSetEffectText(set) {
+    return storedEffectRulesText(set?.twoPiece) || "2件套效果未录入"
+}
+
+function renderTwoPieceSelectedSummary() {
+    const selected = selectedValues(els.twoPieceSetSelect)
+        .map(driveDiscSetById)
+        .filter(Boolean)
+    els.twoPieceSelectedSummary.innerHTML = ""
+    if (!selected.length) {
+        const empty = document.createElement("span")
+        empty.className = "two-piece-selected-empty"
+        empty.textContent = "未选择额外 2 件套"
+        els.twoPieceSelectedSummary.appendChild(empty)
+        return
+    }
+    for (const set of selected) {
+        const item = document.createElement("span")
+        item.className = "two-piece-selected-chip"
+        item.innerHTML = `
+            <span>${escapeHtml(nameOf(set))}</span>
+            <button type="button" data-remove-two-piece-set="${escapeHtml(set.id)}" aria-label="移除 ${escapeHtml(nameOf(set))}">×</button>
+        `
+        els.twoPieceSelectedSummary.appendChild(item)
     }
 }
 
@@ -3572,7 +4241,19 @@ function setTwoPieceSetSelected(setId, selected) {
         return
     }
     option.selected = selected
+    syncTwoPieceSetChoices()
     els.twoPieceSetSelect.dispatchEvent(new Event("change", { bubbles: true }))
+}
+
+function openTwoPieceSetModal() {
+    syncTwoPieceSetChoices()
+    els.twoPieceSetModal.hidden = false
+    document.body.classList.add("modal-open")
+}
+
+function closeTwoPieceSetModal() {
+    els.twoPieceSetModal.hidden = true
+    document.body.classList.remove("modal-open")
 }
 
 function clearTwoPieceSetLimits() {
@@ -4127,10 +4808,15 @@ function populateSetSelects() {
         els.twoPieceSetSelect.appendChild(option)
 
         const label = document.createElement("label")
-        label.className = "main-stat-choice"
+        label.className = "two-piece-choice"
+        const icon = set.images?.icon || "/assets/drive-discs/empty.svg"
         label.innerHTML = `
             <input type="checkbox" data-two-piece-set-limit value="${escapeHtml(set.id)}">
-            <span>${escapeHtml(nameOf(set))}</span>
+            <img src="${escapeHtml(icon)}" alt="" loading="lazy">
+            <span class="two-piece-choice-text">
+                <strong>${escapeHtml(nameOf(set))}</strong>
+                <span>${escapeHtml(twoPieceSetEffectText(set))}</span>
+            </span>
         `
         els.twoPieceSetChoices.appendChild(label)
     }
@@ -4146,7 +4832,7 @@ function restoreHomeState() {
     populateCinemaLevelSelect(cinemaLevelForAgent(agentId))
     els.wEngineSelect.value = getWEngine(config.wEngineId)?.id ?? meta.wEngines[0]?.id
     populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), config.wEngineModificationLevel)
-    applyStoredDamageConfig(config.damage ?? getAgent(agentId)?.defaultCalculationConfig ?? {})
+    applyStoredDamageConfig(damageConfigForAgent(agentId, config.damage))
     renderEntityCards()
     renderCombatControls()
 }
@@ -4191,7 +4877,7 @@ els.agentSelect.addEventListener("change", async () => {
         populateCinemaLevelSelect(cinemaLevelForAgent(agentId))
         els.wEngineSelect.value = getWEngine(config.wEngineId)?.id ?? meta.wEngines[0]?.id
         populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), config.wEngineModificationLevel)
-        applyStoredDamageConfig(config.damage ?? getAgent(agentId)?.defaultCalculationConfig ?? {})
+        applyStoredDamageConfig(damageConfigForAgent(agentId, config.damage))
         await refreshAfterConfigChange()
     } catch (error) {
         setStatus(error.message, "error")
@@ -4255,7 +4941,7 @@ document.querySelector(".optimizer-settings-grid").addEventListener("change", ev
     if (!event.target.matches("[data-two-piece-set-limit]")) {
         return
     }
-    event.target.closest(".main-stat-choice")?.classList.toggle("active", event.target.checked)
+    event.target.closest(".two-piece-choice")?.classList.toggle("active", event.target.checked)
     setTwoPieceSetSelected(event.target.value, event.target.checked)
 })
 document.querySelector(".optimizer-settings-grid").addEventListener("click", event => {
@@ -4263,6 +4949,27 @@ document.querySelector(".optimizer-settings-grid").addEventListener("click", eve
         return
     }
     clearTwoPieceSetLimits()
+})
+els.openTwoPieceSetModalBtn?.addEventListener("click", openTwoPieceSetModal)
+els.closeTwoPieceSetModalBtn?.addEventListener("click", closeTwoPieceSetModal)
+els.twoPieceSelectedSummary?.addEventListener("click", event => {
+    const remove = event.target.closest("[data-remove-two-piece-set]")
+    if (!remove) {
+        return
+    }
+    setTwoPieceSetSelected(remove.dataset.removeTwoPieceSet, false)
+})
+els.twoPieceSetModal?.addEventListener("click", event => {
+    if (event.target.matches("[data-close-two-piece-set-modal]")) {
+        closeTwoPieceSetModal()
+    }
+})
+els.twoPieceSetModal?.addEventListener("change", event => {
+    if (!event.target.matches("[data-two-piece-set-limit]")) {
+        return
+    }
+    event.target.closest(".two-piece-choice")?.classList.toggle("active", event.target.checked)
+    setTwoPieceSetSelected(event.target.value, event.target.checked)
 })
 document.querySelector(".optimizer-main-stat-grid").addEventListener("change", event => {
     if (!event.target.matches("[data-main-stat-limit]")) {
@@ -4379,9 +5086,6 @@ els.calculationSettingsCard?.addEventListener("change", async event => {
         if (event.target === els.damageAnomalyEffect) {
             els.damageAnomalyProcCount.value = event.target.selectedOptions?.[0]?.dataset.defaultProcCount ?? 1
         }
-        if (event.target === els.damageDisorderEffect) {
-            els.damageDisorderDuration.value = event.target.selectedOptions?.[0]?.dataset.defaultDurationSeconds ?? 10
-        }
         syncCalculationConfigSummary()
         await refreshAfterConfigChange()
     } catch (error) {
@@ -4396,7 +5100,7 @@ els.calculationSettingsCard?.addEventListener("input", event => {
         selectedDamageSkillRef = null
         renderDamageSkillSummary()
     }
-    if (event.target === els.damageSkillMultiplier || event.target === els.damageAnomalyProcCount || event.target === els.damageDisorderElapsed || event.target === els.damageDisorderDuration) {
+    if (event.target === els.damageSkillMultiplier || event.target === els.damageAnomalyProcCount || event.target === els.damageDisorderElapsed) {
         syncCalculationConfigSummary()
     }
     try {
@@ -4432,6 +5136,20 @@ els.combatSection.addEventListener("keydown", async event => {
     await commitGenericNumberInput(event.target)
 })
 els.addedCombatBuffs.addEventListener("click", async event => {
+    const removeGroup = event.target.closest("[data-remove-buff-group-key]")
+    if (removeGroup) {
+        try {
+            saveCurrentAddedCombatBuffs(currentAddedCombatBuffs().filter(item =>
+                addedCombatBuffSourceGroupKey(item) !== removeGroup.dataset.removeBuffGroupKey
+            ))
+            renderCombatControls()
+            await refreshAfterConfigChange()
+        } catch (error) {
+            setStatus(error.message, "error")
+        }
+        return
+    }
+
     const remove = event.target.closest("[data-remove-buff-key]")
     if (!remove) {
         return
@@ -4509,14 +5227,6 @@ els.calculationConfigModal?.addEventListener("click", async event => {
         closeCalculationConfigModal()
         return
     }
-    if (event.target === els.applyAdminDefaultCalculationBtn) {
-        const config = getAgent(els.agentSelect.value)?.defaultCalculationConfig
-        if (config) {
-            applyCalculationConfig(config)
-            renderCalculationConfigModal()
-        }
-        return
-    }
     const addKind = event.target.closest("[data-add-calculation-event-kind]")
     if (addKind) {
         addCalculationConfigEvent(addKind.dataset.addCalculationEventKind)
@@ -4546,11 +5256,21 @@ els.calculationConfigModal?.addEventListener("click", async event => {
         return
     }
     if (event.target === els.saveCalculationConfigBtn) {
-        calculationConfigMode = els.calculationConfigMode?.value ?? "single"
-        calculationConfigEvents = readCalculationConfigEventsFromModal()
-        calculationConfigSelectedEventId = calculationConfigEvents.some(item => item.id === calculationConfigSelectedEventId)
-            ? calculationConfigSelectedEventId
-            : calculationConfigEvents[0]?.id ?? null
+        const nextMode = resolveCalculationConfigMode(els.calculationConfigMode?.value ?? "single")
+        if (nextMode === "custom") {
+            calculationConfigEvents = readCalculationConfigEventsFromModal()
+        }
+        calculationConfigMode = nextMode
+        const events = calculationEventsForMode(calculationConfigMode)
+        const defaultConfig = calculationConfigMode === ADMIN_DEFAULT_CALCULATION_MODE
+            ? adminDefaultCalculationConfig()
+            : null
+        const preferredSelectedEventId = calculationConfigMode === ADMIN_DEFAULT_CALCULATION_MODE
+            ? defaultConfig?.selectedEventId
+            : calculationConfigSelectedEventId
+        calculationConfigSelectedEventId = events.some(item => item.id === preferredSelectedEventId)
+            ? preferredSelectedEventId
+            : events[0]?.id ?? null
         syncCalculationConfigSummary()
         renderCalculationObjectiveControls()
         closeCalculationConfigModal()
@@ -4564,6 +5284,9 @@ els.calculationConfigModal?.addEventListener("change", event => {
         return
     }
     if (!els.calculationEventEditorFields?.contains(event.target)) {
+        return
+    }
+    if (calculationConfigModeReadonly()) {
         return
     }
     if (event.target.matches("[data-calculation-event-kind]")) {
@@ -4596,6 +5319,9 @@ els.calculationConfigModal?.addEventListener("change", event => {
 })
 els.calculationConfigModal?.addEventListener("input", event => {
     if (!els.calculationEventEditorFields?.contains(event.target)) {
+        return
+    }
+    if (calculationConfigModeReadonly()) {
         return
     }
     syncEditingEventFromEditor()
@@ -4648,12 +5374,38 @@ els.combatBuffModal.addEventListener("click", async event => {
         renderCombatBuffCandidates()
         return
     }
+    if (event.target === els.addTeammateBuffsBtn) {
+        try {
+            if (addSelectedTeammateBuffs()) {
+                renderCombatControls()
+                renderCombatBuffCandidates()
+                await refreshAfterConfigChange()
+            }
+        } catch (error) {
+            setStatus(error.message, "error")
+        }
+        return
+    }
+
+    if (event.target === els.removeTeammateBuffsBtn) {
+        try {
+            if (removeSelectedTeammateBuffs()) {
+                renderCombatControls()
+                renderCombatBuffCandidates()
+                await refreshAfterConfigChange()
+            }
+        } catch (error) {
+            setStatus(error.message, "error")
+        }
+        return
+    }
+
     const candidate = event.target.closest("[data-candidate-key]")
     if (candidate && !candidate.disabled) {
         try {
             if (addCombatBuffCandidateByKey(candidate.dataset.candidateKey)) {
                 closeCombatBuffModal()
-                renderCombatBuffControls()
+                renderCombatControls()
                 await refreshAfterConfigChange()
             }
         } catch (error) {
@@ -4677,6 +5429,32 @@ els.combatBuffModal.addEventListener("click", async event => {
     }
 })
 els.combatBuffModal.addEventListener("change", event => {
+    if (event.target === els.combatBuffTeammateSelect) {
+        activeCombatBuffTeammateId = event.target.value
+        renderCombatBuffCandidates()
+        return
+    }
+
+    if (event.target.matches("[data-candidate-check-key]")) {
+        ;(async () => {
+            try {
+                const changed = event.target.checked
+                    ? addCombatBuffCandidateByKey(event.target.dataset.candidateCheckKey)
+                    : removeCombatBuffCandidateByKey(event.target.dataset.candidateCheckKey)
+                if (changed) {
+                    renderCombatControls()
+                    renderCombatBuffCandidates()
+                    await refreshAfterConfigChange()
+                } else {
+                    renderCombatBuffCandidates()
+                }
+            } catch (error) {
+                setStatus(error.message, "error")
+            }
+        })()
+        return
+    }
+
     if (event.target.matches("[data-custom-target-kind]")) {
         const rows = customBuffRowsFromDom()
         rows[0].optionIndex = 0

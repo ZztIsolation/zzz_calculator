@@ -282,19 +282,22 @@ assertInvalid("agent-skills", {
     ],
 }, "必须是有效数字")
 assertValid("wEngines", validWEngine)
-const wEngineWithModificationScaling = clone(validWEngine)
-wEngineWithModificationScaling.modification = { minLevel: 1, maxLevel: 5, defaultLevel: 1 }
-wEngineWithModificationScaling.effect.selfBuff.effects[0].modificationScaling = {
-    value: {
-        base: 20,
-        step: 2,
-        displayValues: [20, 22, 24, 26, 28],
+assertValid("wEngines", {
+    ...validWEngine,
+    effect: {
+        name: { zhCN: "无 Buff 测试效果" },
+        description: { zhCN: "该音擎暂未建模 Buff 规则。" },
     },
+})
+const wEngineWithModificationValues = clone(validWEngine)
+wEngineWithModificationValues.modification = { minLevel: 1, maxLevel: 5, defaultLevel: 1 }
+wEngineWithModificationValues.effect.selfBuff.effects[0].modificationValues = {
+    value: [20, 22, 24, 26, 28],
 }
-assertValid("wEngines", wEngineWithModificationScaling)
+assertValid("wEngines", wEngineWithModificationValues)
 
-const wEngineWithStackedModificationScaling = clone(validWEngine)
-wEngineWithStackedModificationScaling.effect.selfBuff.effects = [
+const wEngineWithStackedModificationValues = clone(validWEngine)
+wEngineWithStackedModificationValues.effect.selfBuff.effects = [
     {
         type: "stacked",
         stat: "dmgBonus",
@@ -302,28 +305,34 @@ wEngineWithStackedModificationScaling.effect.selfBuff.effects = [
         mode: "flat",
         maxStacks: 4,
         defaultStacks: 4,
-        modificationScaling: {
-            valuePerStack: {
-                base: 5,
-                step: 1,
-                displayValues: [5, 6, 7, 8, 9],
-            },
+        modificationValues: {
+            valuePerStack: [5, 6, 7, 8, 9],
         },
     },
 ]
-assertValid("wEngines", wEngineWithStackedModificationScaling)
+assertValid("wEngines", wEngineWithStackedModificationValues)
 
-const wEngineScalingMissingDisplay = clone(wEngineWithModificationScaling)
-wEngineScalingMissingDisplay.effect.selfBuff.effects[0].modificationScaling.value.displayValues = [20, 22, 24]
-assertInvalid("wEngines", wEngineScalingMissingDisplay, "必须覆盖 1-5")
+const wEngineValuesMissingRanks = clone(wEngineWithModificationValues)
+wEngineValuesMissingRanks.effect.selfBuff.effects[0].modificationValues.value = [20, 22, 24]
+assertInvalid("wEngines", wEngineValuesMissingRanks, "必须覆盖 1-5")
 
-const wEngineScalingBadDisplay = clone(wEngineWithModificationScaling)
-wEngineScalingBadDisplay.effect.selfBuff.effects[0].modificationScaling.value.displayValues = [20, 22, "oops", 26, 28]
-assertInvalid("wEngines", wEngineScalingBadDisplay, "必须是有效数字")
+const wEngineValuesBadNumber = clone(wEngineWithModificationValues)
+wEngineValuesBadNumber.effect.selfBuff.effects[0].modificationValues.value = [20, 22, "oops", 26, 28]
+assertInvalid("wEngines", wEngineValuesBadNumber, "必须是有效数字")
 
-const wEngineScalingBaseMismatch = clone(wEngineWithModificationScaling)
-wEngineScalingBaseMismatch.effect.selfBuff.effects[0].modificationScaling.value.base = 19
-assertInvalid("wEngines", wEngineScalingBaseMismatch, "1级计算值必须与规则当前数值一致")
+const wEngineValuesRankOneMismatch = clone(wEngineWithModificationValues)
+wEngineValuesRankOneMismatch.effect.selfBuff.effects[0].modificationValues.value[0] = 19
+assertInvalid("wEngines", wEngineValuesRankOneMismatch, "1级实际值必须与规则当前数值一致")
+
+const wEngineWithLegacyModificationScaling = clone(validWEngine)
+wEngineWithLegacyModificationScaling.effect.selfBuff.effects[0].modificationScaling = {
+    value: {
+        base: 20,
+        step: 2,
+        displayValues: [20, 22, 24, 26, 28],
+    },
+}
+assertInvalid("wEngines", wEngineWithLegacyModificationScaling, "旧的改装等级缩放格式已废弃")
 assertValid("driveDiscSets", validDriveDiscSet)
 assertValid("driveDiscSets", validDriveDiscSetWithSplitFourPiece)
 assertValid("buffs", validBuff)
@@ -521,9 +530,9 @@ const missingAdvanced = clone(validWEngine)
 missingAdvanced.level60.advancedStat = null
 assertInvalid("wEngines", missingAdvanced, "高级属性必填")
 
-const missingWEngineRule = clone(validWEngine)
-missingWEngineRule.effect.selfBuff.effects = []
-assertInvalid("wEngines", missingWEngineRule, "至少需要一条")
+const wEngineWithoutBuffRules = clone(validWEngine)
+wEngineWithoutBuffRules.effect.selfBuff.effects = []
+assertValid("wEngines", wEngineWithoutBuffRules)
 
 assertValid("driveDiscSets", validDriveDiscSet)
 
@@ -799,6 +808,32 @@ assertValid("agents", {
     ...validAgent,
     defaultCalculationConfig: validDefaultCalculationConfig,
 }, validCalculationContext)
+assertValid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: {
+        ...validDefaultCalculationConfig,
+        selectedEventId: "disorder-1",
+        events: [
+            {
+                ...validDefaultCalculationConfig.events[2],
+                disorderType: "polarized",
+            },
+        ],
+    },
+}, validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: {
+        ...validDefaultCalculationConfig,
+        selectedEventId: "disorder-1",
+        events: [
+            {
+                ...validDefaultCalculationConfig.events[2],
+                disorderType: "invalid",
+            },
+        ],
+    },
+}, "disorderType", validCalculationContext)
 assertInvalid("agents", {
     ...validAgent,
     defaultCalculationConfig: {
@@ -891,9 +926,29 @@ const buffWithDamageModifier = {
                 elements: ["physical"],
             },
         },
+        {
+            type: "damageModifier",
+            kind: "disorderDamageBonus",
+            value: 0.3,
+            appliesTo: {
+                damageKinds: ["disorder"],
+            },
+        },
     ],
 }
 assertValid("combat-buffs", buffWithDamageModifier)
+assertValid("combat-buffs", {
+    ...buffWithDamageModifier,
+    effects: [
+        {
+            id: "effect-disorder-fixed",
+            type: "fixed",
+            stat: "disorderDamageBonus",
+            value: 15,
+            mode: "flat",
+        },
+    ],
+})
 assertValid("combat-buffs", {
     ...buffWithDamageModifier,
     effects: [

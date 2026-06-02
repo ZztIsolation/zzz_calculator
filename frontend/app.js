@@ -69,14 +69,19 @@ const els = {
     damageCritMode: document.getElementById("damageCritMode"),
     damageAnomalyEffect: document.getElementById("damageAnomalyEffect"),
     damageAnomalyProcCount: document.getElementById("damageAnomalyProcCount"),
+    damageDisorderType: document.getElementById("damageDisorderType"),
     damageDisorderEffect: document.getElementById("damageDisorderEffect"),
     damageDisorderElapsed: document.getElementById("damageDisorderElapsed"),
-    damageDisorderDuration: document.getElementById("damageDisorderDuration"),
     damageFinalValue: document.getElementById("damageFinalValue"),
     damageWhiteBoxRows: document.getElementById("damageWhiteBoxRows"),
     combatBuffModal: document.getElementById("combatBuffModal"),
     closeCombatBuffModalBtn: document.getElementById("closeCombatBuffModalBtn"),
     combatBuffSearchInput: document.getElementById("combatBuffSearchInput"),
+    combatBuffTeammatePicker: document.getElementById("combatBuffTeammatePicker"),
+    combatBuffTeammateSelect: document.getElementById("combatBuffTeammateSelect"),
+    combatBuffTeammateHint: document.getElementById("combatBuffTeammateHint"),
+    addTeammateBuffsBtn: document.getElementById("addTeammateBuffsBtn"),
+    removeTeammateBuffsBtn: document.getElementById("removeTeammateBuffsBtn"),
     combatBuffCandidateList: document.getElementById("combatBuffCandidateList"),
     combatBuffCustomPane: document.getElementById("combatBuffCustomPane"),
     combatBuffModalEmpty: document.getElementById("combatBuffModalEmpty"),
@@ -147,6 +152,8 @@ const FALLBACK_LABELS = {
     enemyIceResReduction: "敌方冰减抗",
     enemyElectricResReduction: "敌方电减抗",
     enemyEtherResReduction: "敌方以太减抗",
+    anomalyDamageBonus: "属性异常增伤",
+    disorderDamageBonus: "紊乱增伤",
 }
 
 const ENUM_LABELS = {
@@ -208,6 +215,8 @@ const PERCENT_KEYS = new Set([
     "enemyIceResReduction",
     "enemyElectricResReduction",
     "enemyEtherResReduction",
+    "anomalyDamageBonus",
+    "disorderDamageBonus",
 ])
 
 const PERCENT_MODE_KEY = {
@@ -282,6 +291,8 @@ const STORED_STAT_LABELS = {
     enemyIceResReduction: "敌方冰减抗%",
     enemyElectricResReduction: "敌方电减抗%",
     enemyEtherResReduction: "敌方以太减抗%",
+    anomalyDamageBonus: "属性异常增伤%",
+    disorderDamageBonus: "紊乱增伤%",
 }
 
 const BASE_ORDER = ["hp", "atk", "def"]
@@ -376,6 +387,9 @@ const HOME_SELECTION_STORAGE_KEY = "zzz-calculator.homeSelection.v1"
 const DISC_SELECTION_STORAGE_KEY = "zzz-calculator.driveDiscSelections.v1"
 const HOME_DISC_MODES = new Set(["manual", "loadout"])
 const TEAMMATE_DRIVE_DISC_LIMIT = 2
+const TEAMMATE_BUFF_OWNER_LIMIT = 2
+const W_ENGINE_TEAM_BUFF_LIMIT = 2
+const DRIVE_DISC_TEAM_BUFF_LIMIT = 2
 const DEFAULT_DAMAGE_TARGET_PRESETS = [
     { id: "taichu-nightmare", name: { zhCN: "太初梦魇" }, defense: 476 },
     { id: "normal-boss", name: { zhCN: "普通 Boss" }, defense: 953 },
@@ -409,7 +423,8 @@ const ANOMALY_EFFECT_LABELS = {
     flinch: "畏缩",
 }
 const DAMAGE_MODIFIER_KIND_LABELS = {
-    anomalyDamageBonus: "异常伤害增伤",
+    anomalyDamageBonus: "属性异常增伤",
+    disorderDamageBonus: "紊乱增伤",
     baseMultiplierBonus: "伤害倍率修正",
     anomalyCritRate: "异常暴击率",
     anomalyCritDmg: "异常暴击伤害",
@@ -423,6 +438,11 @@ const DEFAULT_ANOMALY_PROC_COUNTS = {
     shock: 10,
     corruption: 20,
 }
+
+function normalizeDisorderType(value) {
+    return value === "polarized" ? "polarized" : "normal"
+}
+
 const SKILL_CATEGORY_ORDER = [
     ["basic", "普通攻击", "basicSkillLevelSelect"],
     ["dodge", "闪避", "dodgeSkillLevelSelect"],
@@ -438,6 +458,7 @@ let meta = null
 let userDriveDiscStore = null
 let activeDiscSlot = null
 let activeCombatBuffTab = "agent"
+let activeCombatBuffTeammateId = ""
 const manuallyUncheckedDefaultCombatBuffIds = new Set()
 const damageTargetResistanceByElement = Object.fromEntries(DAMAGE_ELEMENTS.map(element => [element, 0]))
 let activeDamageResistanceElement = "physical"
@@ -586,12 +607,12 @@ function anomalyEffects() {
 
 function disorderEffects() {
     return meta?.disorderEffects ?? [
-        { id: "burn", label: { zhCN: "灼烧" } },
-        { id: "shock", label: { zhCN: "感电" } },
-        { id: "corruption", label: { zhCN: "侵蚀" } },
-        { id: "frozen", label: { zhCN: "霜寒" } },
+        { id: "burn", label: { zhCN: "灼烧" }, defaultDurationSeconds: 10 },
+        { id: "shock", label: { zhCN: "感电" }, defaultDurationSeconds: 10 },
+        { id: "corruption", label: { zhCN: "侵蚀" }, defaultDurationSeconds: 10 },
+        { id: "frozen", label: { zhCN: "霜寒" }, defaultDurationSeconds: 10 },
         { id: "frost_frozen", label: { zhCN: "烈霜霜寒紊乱（星见雅）" }, defaultDurationSeconds: 20 },
-        { id: "flinch", label: { zhCN: "畏缩" } },
+        { id: "flinch", label: { zhCN: "畏缩" }, defaultDurationSeconds: 10 },
     ]
 }
 
@@ -1041,9 +1062,11 @@ function applyStoredDamageConfig(config = {}) {
         els.damageAnomalyProcCount.value = selectedEvent.procCount ?? defaultProcCount ?? 1
     }
     if (els.damageDisorderEffect) {
-        els.damageDisorderEffect.value = selectedEvent.previousAnomalyEffect ?? "burn"
+        if (els.damageDisorderType) {
+            els.damageDisorderType.value = normalizeDisorderType(selectedEvent.disorderType)
+        }
+        els.damageDisorderEffect.value = selectedEvent.previousAnomalyEffect ?? selectedEvent.anomalyEffect ?? "burn"
         els.damageDisorderElapsed.value = selectedEvent.elapsedSeconds ?? 0
-        els.damageDisorderDuration.value = selectedEvent.durationSeconds ?? 10
     }
     const storedSkillRef = selectedEvent.skillRef ?? config.skillRef ?? null
     const skillCatalog = agentSkillCatalog()
@@ -1797,7 +1820,7 @@ function updateAddedCombatBuffRuntime(buffKey, updater) {
 
         const buff = resolveAddedCombatBuff(item)
         const runtime = runtimeForBuff(item, buff)
-        updater(runtime)
+        updater(runtime, buff)
         return {
             ...item,
             runtime,
@@ -1858,7 +1881,7 @@ function updateCatalogCombatBuffRuntime(buffKey, updater) {
     const previousConfig = byAgent[agentId] ?? {}
     const combat = previousConfig.combat ?? {}
     const runtime = runtimeForBuff({ runtime: combat.catalogBuffRuntimes?.[buffId] ?? null }, buff)
-    updater(runtime)
+    updater(runtime, buff)
     byAgent[agentId] = {
         ...previousConfig,
         combat: {
@@ -2878,6 +2901,196 @@ function teammateDriveDiscAddedCount(addedBuffs = currentAddedCombatBuffs()) {
     return addedBuffs.filter(item => item.sourceKind === "teammateDriveDisc4pc").length
 }
 
+function wEngineTeamAddedCount(addedBuffs = currentAddedCombatBuffs()) {
+    return addedBuffs.filter(item => item.sourceKind === "wEngineTeam").length
+}
+
+function driveDiscAddedCount(addedBuffs = currentAddedCombatBuffs()) {
+    return addedBuffs.filter(item =>
+        item.sourceKind === "teammateDriveDisc4pc"
+        || item.sourceCategory === "driveDisc"
+    ).length
+}
+
+function teammateOwnerIdForBuff(item, buff = resolveAddedCombatBuff(item)) {
+    return item?.sourceKind === "teammate"
+        ? String(buff?.ownerId ?? item?.ownerId ?? "")
+        : ""
+}
+
+function teammateOwnerIdsForAddedBuffs(addedBuffs = currentAddedCombatBuffs()) {
+    const ownerIds = new Set()
+    for (const item of addedBuffs) {
+        const ownerId = teammateOwnerIdForBuff(item)
+        if (ownerId) {
+            ownerIds.add(ownerId)
+        }
+    }
+    return ownerIds
+}
+
+function candidateLimitMessage(candidate, addedBuffs = currentAddedCombatBuffs()) {
+    if (!candidate) {
+        return ""
+    }
+    const key = addedCombatBuffKey(candidate)
+    if (addedBuffs.some(item => addedCombatBuffKey(item) === key)) {
+        return ""
+    }
+
+    if (candidate.sourceKind === "teammate") {
+        const ownerIds = teammateOwnerIdsForAddedBuffs(addedBuffs)
+        const ownerId = String(candidate.ownerId ?? "")
+        if (ownerId && !ownerIds.has(ownerId) && ownerIds.size >= TEAMMATE_BUFF_OWNER_LIMIT) {
+            return `角色引发的 Buff 最多选择 ${TEAMMATE_BUFF_OWNER_LIMIT} 名角色`
+        }
+    }
+
+    if (candidate.sourceKind === "wEngineTeam" && wEngineTeamAddedCount(addedBuffs) >= W_ENGINE_TEAM_BUFF_LIMIT) {
+        return `音擎引发的 Buff 最多选择 ${W_ENGINE_TEAM_BUFF_LIMIT} 个`
+    }
+
+    if (
+        (candidate.sourceKind === "teammateDriveDisc4pc" || candidate.sourceCategory === "driveDisc")
+        && driveDiscAddedCount(addedBuffs) >= DRIVE_DISC_TEAM_BUFF_LIMIT
+    ) {
+        return `驱动盘引发的 Buff 最多选择 ${DRIVE_DISC_TEAM_BUFF_LIMIT} 个`
+    }
+
+    return ""
+}
+
+function addedCombatBuffEntry(candidate) {
+    return {
+        id: candidate.id,
+        sourceCategory: candidate.sourceCategory,
+        sourceKind: candidate.sourceKind,
+        setId: candidate.setId ?? null,
+        ...(candidate.sourceKind === "wEngineTeam" ? { wEngineModificationLevel: 1 } : {}),
+        runtime: defaultRuntimeForBuff(candidate),
+    }
+}
+
+function selectedTeammateBuffCandidates() {
+    return teammateBuffCandidates().filter(candidate => candidate.ownerId === activeCombatBuffTeammateId)
+}
+
+function ensureActiveCombatBuffTeammateId(groups = teammateCombatBuffGroups()) {
+    if (!groups.length) {
+        activeCombatBuffTeammateId = ""
+        return null
+    }
+    const selectedOwnerIds = teammateOwnerIdsForAddedBuffs()
+    const preferredGroup = groups.find(group => group.id === activeCombatBuffTeammateId)
+        ?? groups.find(group => selectedOwnerIds.has(group.id))
+        ?? groups[0]
+    activeCombatBuffTeammateId = preferredGroup.id
+    return preferredGroup
+}
+
+function renderCombatBuffTeammatePicker() {
+    const groups = teammateCombatBuffGroups()
+    const activeGroup = ensureActiveCombatBuffTeammateId(groups)
+    const selectedOwnerIds = teammateOwnerIdsForAddedBuffs()
+    const selectedLimitReached = selectedOwnerIds.size >= TEAMMATE_BUFF_OWNER_LIMIT
+
+    els.combatBuffTeammateSelect.innerHTML = ""
+    for (const group of groups) {
+        const option = document.createElement("option")
+        const alreadySelected = selectedOwnerIds.has(group.id)
+        option.value = group.id
+        option.textContent = `${nameOf(group)}${alreadySelected ? "（已添加）" : ""}`
+        option.selected = group.id === activeCombatBuffTeammateId
+        option.disabled = !alreadySelected && selectedLimitReached && group.id !== activeCombatBuffTeammateId
+        els.combatBuffTeammateSelect.appendChild(option)
+    }
+
+    const candidates = selectedTeammateBuffCandidates()
+    const addedKeys = new Set(currentAddedCombatBuffs().map(addedCombatBuffKey))
+    const hasAddedFromActive = candidates.some(candidate => addedKeys.has(addedCombatBuffKey(candidate)))
+    const allAddedFromActive = candidates.length > 0
+        && candidates.every(candidate => addedKeys.has(addedCombatBuffKey(candidate)))
+    const activeOwnerSelected = activeGroup && selectedOwnerIds.has(activeGroup.id)
+    const activeWouldExceedLimit = Boolean(activeGroup && !activeOwnerSelected && selectedLimitReached)
+
+    els.addTeammateBuffsBtn.disabled = !candidates.length || allAddedFromActive || activeWouldExceedLimit
+    els.removeTeammateBuffsBtn.disabled = !hasAddedFromActive
+    els.combatBuffTeammateHint.textContent = activeWouldExceedLimit
+        ? `最多选择 ${TEAMMATE_BUFF_OWNER_LIMIT} 名角色；请先移除一个角色来源`
+        : `已选择 ${selectedOwnerIds.size}/${TEAMMATE_BUFF_OWNER_LIMIT} 名角色`
+}
+
+function addedCombatBuffSourceGroupKey(item, buff = resolveAddedCombatBuff(item)) {
+    if (item?.sourceKind === "teammate") {
+        return `agent:${teammateOwnerIdForBuff(item, buff) || item.id}`
+    }
+    if (item?.sourceKind === "wEngineTeam") {
+        return "wEngine"
+    }
+    if (item?.sourceKind === "custom") {
+        return "custom"
+    }
+    if (item?.sourceKind === "teammateDriveDisc4pc" || item?.sourceCategory === "driveDisc") {
+        return "driveDisc"
+    }
+    return item?.sourceCategory ?? "other"
+}
+
+function addedCombatBuffSourceGroupOrder(item) {
+    if (item?.sourceKind === "teammate") {
+        return 0
+    }
+    if (item?.sourceKind === "wEngineTeam") {
+        return 1
+    }
+    if (item?.sourceKind === "teammateDriveDisc4pc" || item?.sourceCategory === "driveDisc") {
+        return 2
+    }
+    if (item?.sourceKind === "custom") {
+        return 3
+    }
+    return 2
+}
+
+function addedCombatBuffSourceGroups(addedBuffs = currentAddedCombatBuffs()) {
+    const groups = []
+    const byKey = new Map()
+    let agentGroupCount = 0
+
+    for (const item of addedBuffs) {
+        const buff = resolveAddedCombatBuff(item)
+        const key = addedCombatBuffSourceGroupKey(item, buff)
+        let group = byKey.get(key)
+        if (!group) {
+            const isAgent = item.sourceKind === "teammate"
+            const label = isAgent
+                ? localizedText(buff.ownerName) || "角色"
+                : item.sourceKind === "wEngineTeam"
+                    ? "音擎"
+                    : item.sourceKind === "custom"
+                        ? "自定义"
+                        : item.sourceKind === "teammateDriveDisc4pc" || item.sourceCategory === "driveDisc"
+                            ? "驱动盘"
+                            : sourceCategoryLabel(buff.sourceCategory)
+            group = {
+                key,
+                label,
+                order: addedCombatBuffSourceGroupOrder(item),
+                sequence: groups.length,
+                className: isAgent
+                    ? `combat-added-source-group--agent combat-added-source-group--agent-${(agentGroupCount++ % 2) + 1}`
+                    : `combat-added-source-group--${key}`,
+                items: [],
+            }
+            byKey.set(key, group)
+            groups.push(group)
+        }
+        group.items.push({ item, buff })
+    }
+
+    return groups.sort((left, right) => left.order - right.order || left.sequence - right.sequence)
+}
+
 function checkedCombatBuffIds() {
     if (!els.combatSection) {
         return new Set()
@@ -3090,43 +3303,70 @@ function renderAddedCombatBuffs() {
         return
     }
 
-    for (const item of addedBuffs) {
-        const buff = resolveAddedCombatBuff(item)
-        const runtime = runtimeForBuff(item, buff)
-        const row = document.createElement("article")
-        row.className = "combat-added-card"
-        row.dataset.buffKey = addedCombatBuffKey(item)
+    for (const group of addedCombatBuffSourceGroups(addedBuffs)) {
+        const section = document.createElement("section")
+        section.className = `combat-added-source-group ${group.className}`
+        section.dataset.buffGroupKey = group.key
 
-        const title = document.createElement("strong")
-        title.textContent = nameOf(buff)
+        const head = document.createElement("div")
+        head.className = "combat-added-source-head"
+        const copy = document.createElement("div")
+        const source = document.createElement("small")
+        source.textContent = `来自${group.label}`
+        const count = document.createElement("strong")
+        count.textContent = `${group.items.length} 个 Buff`
+        copy.append(source, count)
 
-        const description = document.createElement("p")
-        description.textContent = localizedText(buff.description) || localizedText(buff.conditionLabel) || "已添加到局内计算"
+        const removeGroup = document.createElement("button")
+        removeGroup.type = "button"
+        removeGroup.className = "combat-remove-group-btn"
+        removeGroup.dataset.removeBuffGroupKey = group.key
+        removeGroup.textContent = "移除全部"
+        head.append(copy, removeGroup)
 
-        const stats = document.createElement("span")
-        stats.className = "combat-added-stats combat-buff-effect-lines"
-        renderBuffEffectLines(stats, buff, runtime)
+        const items = document.createElement("div")
+        items.className = "combat-added-source-items"
 
-        const remove = document.createElement("button")
-        remove.type = "button"
-        remove.className = "combat-remove-btn"
-        remove.dataset.removeBuffKey = addedCombatBuffKey(item)
-        remove.textContent = "移除"
+        for (const { item, buff } of group.items) {
+            const runtime = runtimeForBuff(item, buff)
+            const row = document.createElement("article")
+            row.className = "combat-added-card combat-added-item-card"
+            row.dataset.buffKey = addedCombatBuffKey(item)
 
-        row.append(title)
-        if (shouldShowCombatBuffMetaLine(buff)) {
-            const metaLine = document.createElement("span")
-            metaLine.textContent = [
-                localizedText(buff.ownerName),
-                localizedText(buff.sourceLabel),
-            ].filter(Boolean).join(" · ") || sourceCategoryLabel(buff.sourceCategory)
-            row.appendChild(metaLine)
+            const title = document.createElement("strong")
+            title.textContent = nameOf(buff)
+
+            const description = document.createElement("p")
+            description.textContent = localizedText(buff.description) || localizedText(buff.conditionLabel) || "已添加到局内计算"
+
+            const stats = document.createElement("span")
+            stats.className = "combat-added-stats combat-buff-effect-lines"
+            renderBuffEffectLines(stats, buff, runtime)
+
+            const remove = document.createElement("button")
+            remove.type = "button"
+            remove.className = "combat-remove-btn"
+            remove.dataset.removeBuffKey = addedCombatBuffKey(item)
+            remove.textContent = "移除"
+
+            row.append(title)
+            if (shouldShowCombatBuffMetaLine(buff)) {
+                const metaLine = document.createElement("span")
+                metaLine.textContent = [
+                    localizedText(buff.ownerName),
+                    localizedText(buff.sourceLabel),
+                ].filter(Boolean).join(" · ") || sourceCategoryLabel(buff.sourceCategory)
+                row.appendChild(metaLine)
+            }
+            row.append(description, stats)
+            renderAddedWEngineModificationControl(row, item)
+            renderBuffRuntimeControls(row, item, buff, runtime)
+            row.appendChild(remove)
+            items.appendChild(row)
         }
-        row.append(description, stats)
-        renderAddedWEngineModificationControl(row, item)
-        renderBuffRuntimeControls(row, item, buff, runtime)
-        row.appendChild(remove)
-        els.addedCombatBuffs.appendChild(row)
+
+        section.append(head, items)
+        els.addedCombatBuffs.appendChild(section)
     }
 }
 
@@ -3185,19 +3425,23 @@ function renderBuffRuntimeControls(row, item, buff, runtime) {
         controls.appendChild(field)
     }
 
+    const renderedSourceGroups = new Set()
     for (const rule of rules) {
-        const id = rule.id ?? rule.stat ?? "effect"
+        const id = SharedCombat.effectRuleId(rule)
         if (rule.type === "derived" || rule.type === "formula") {
-            const source = rule.source ?? {}
-            const defaultValue = rule.type === "formula" ? source.defaultValue : rule.defaultSourceValue
-            const sourceLabel = rule.type === "formula" ? source.label : rule.sourceLabel
-            const minAttr = rule.type === "formula" && Number.isFinite(Number(source.min)) ? ` min="${source.min}"` : ""
-            const maxAttr = rule.type === "formula" && Number.isFinite(Number(source.max)) ? ` max="${source.max}"` : ""
+            const sourceGroup = SharedCombat.runtimeSourceGroupForRule(buff, rule)
+            if (!sourceGroup || renderedSourceGroups.has(sourceGroup.key)) {
+                continue
+            }
+            renderedSourceGroups.add(sourceGroup.key)
+            const primaryId = sourceGroup.ruleIds[0] ?? id
+            const minAttr = Number.isFinite(sourceGroup.min) ? ` min="${sourceGroup.min}"` : ""
+            const maxAttr = Number.isFinite(sourceGroup.max) ? ` max="${sourceGroup.max}"` : ""
             const field = document.createElement("label")
             field.className = "field"
             field.innerHTML = `
-                <span>${escapeHtml(localizedText(sourceLabel) || "来源数值")}</span>
-                <input type="number"${minAttr}${maxAttr} step="1" value="${runtime.effects?.[id]?.sourceValue ?? defaultValue ?? 0}" data-runtime-effect="${escapeHtml(id)}" data-runtime-source-value>
+                <span>${escapeHtml(sourceGroup.label)}</span>
+                <input type="number"${minAttr}${maxAttr} step="1" value="${runtime.effects?.[primaryId]?.sourceValue ?? sourceGroup.defaultValue ?? 0}" data-runtime-effect="${escapeHtml(primaryId)}" data-runtime-source-group="${escapeHtml(sourceGroup.key)}" data-runtime-source-value>
             `
             controls.appendChild(field)
         } else if (rule.type === "stacked") {
@@ -3219,7 +3463,7 @@ function runtimeRuleForField(buff, field) {
     if (!id) {
         return null
     }
-    return effectRules(buff).find(rule => (rule.id ?? rule.stat ?? "effect") === id) ?? null
+    return effectRules(buff).find(rule => SharedCombat.effectRuleId(rule) === id) ?? null
 }
 
 function runtimeNumberConfig(buff, field) {
@@ -3234,12 +3478,21 @@ function runtimeNumberConfig(buff, field) {
         }
     }
 
-    const rule = runtimeRuleForField(buff, field)
-    if (!rule) {
-        return null
-    }
-
     if (field.matches("[data-runtime-source-value]")) {
+        const sourceGroup = SharedCombat.runtimeSourceGroupForKey(buff, field.dataset.runtimeSourceGroup)
+        if (sourceGroup) {
+            return {
+                label: sourceGroup.label,
+                defaultValue: finiteOr(sourceGroup.defaultValue, 0),
+                min: sourceGroup.min ?? NaN,
+                max: sourceGroup.max ?? NaN,
+                integer: false,
+            }
+        }
+        const rule = runtimeRuleForField(buff, field)
+        if (!rule) {
+            return null
+        }
         const source = rule.source ?? {}
         return {
             label: localizedText(source.label ?? rule.sourceLabel) || "来源数值",
@@ -3248,6 +3501,11 @@ function runtimeNumberConfig(buff, field) {
             max: rule.type === "formula" ? Number(source.max) : NaN,
             integer: false,
         }
+    }
+
+    const rule = runtimeRuleForField(buff, field)
+    if (!rule) {
+        return null
     }
 
     if (field.matches("[data-runtime-stacks]")) {
@@ -3263,7 +3521,7 @@ function runtimeNumberConfig(buff, field) {
     return null
 }
 
-function setRuntimeValue(runtime, field, value) {
+function setRuntimeValue(runtime, field, value, buff) {
     if (field.matches("[data-runtime-coverage]")) {
         runtime.coverage = value
         return
@@ -3271,21 +3529,25 @@ function setRuntimeValue(runtime, field, value) {
 
     const id = field.dataset.runtimeEffect
     runtime.effects = runtime.effects ?? {}
-    runtime.effects[id] = runtime.effects[id] ?? {}
     if (field.matches("[data-runtime-source-value]")) {
-        runtime.effects[id].sourceValue = value
+        const ruleIds = SharedCombat.runtimeSourceRuleIdsForGroup(buff, field.dataset.runtimeSourceGroup, id)
+        for (const ruleId of ruleIds) {
+            runtime.effects[ruleId] = runtime.effects[ruleId] ?? {}
+            runtime.effects[ruleId].sourceValue = value
+        }
     } else if (field.matches("[data-runtime-stacks]")) {
+        runtime.effects[id] = runtime.effects[id] ?? {}
         runtime.effects[id].stacks = value
     }
 }
 
 function updateRuntimeFieldValue(buffKey, field, value) {
     if (catalogCombatBuffIdFromKey(buffKey)) {
-        updateCatalogCombatBuffRuntime(buffKey, runtime => setRuntimeValue(runtime, field, value))
+        updateCatalogCombatBuffRuntime(buffKey, (runtime, buff) => setRuntimeValue(runtime, field, value, buff))
         return
     }
 
-    updateAddedCombatBuffRuntime(buffKey, runtime => setRuntimeValue(runtime, field, value))
+    updateAddedCombatBuffRuntime(buffKey, (runtime, buff) => setRuntimeValue(runtime, field, value, buff))
 }
 
 function refreshAddedCombatBuffSummary(buffKey) {
@@ -3326,8 +3588,10 @@ function renderCombatBuffCandidates() {
     const search = els.combatBuffSearchInput.value.trim().toLowerCase()
     const addedKeys = new Set(currentAddedCombatBuffs().map(addedCombatBuffKey))
     const isCustom = activeCombatBuffTab === "custom"
+    const isAgent = activeCombatBuffTab === "agent"
     els.combatBuffCandidateList.hidden = isCustom
     els.combatBuffCustomPane.hidden = !isCustom
+    els.combatBuffTeammatePicker.hidden = !isAgent || isCustom
     els.combatBuffModalEmpty.hidden = true
 
     for (const button of els.combatBuffModal.querySelectorAll("[data-combat-buff-tab]")) {
@@ -3341,7 +3605,12 @@ function renderCombatBuffCandidates() {
         return
     }
 
+    if (isAgent) {
+        renderCombatBuffTeammatePicker()
+    }
+
     const candidates = combatBuffCandidates()
+        .filter(candidate => !isAgent || candidate.ownerId === activeCombatBuffTeammateId)
         .filter(candidate => {
             const haystack = [
                 nameOf(candidate),
@@ -3362,19 +3631,54 @@ function renderCombatBuffCandidates() {
         return
     }
 
-    const teammate4pcCount = teammateDriveDiscAddedCount()
     for (const candidate of candidates) {
         const key = addedCombatBuffKey(candidate)
         const alreadyAdded = addedKeys.has(key)
-        const overTeammateSetLimit = candidate.sourceKind === "teammateDriveDisc4pc"
-            && !alreadyAdded
-            && teammate4pcCount >= TEAMMATE_DRIVE_DISC_LIMIT
+        const limitMessage = candidateLimitMessage(candidate)
+
+        if (isAgent) {
+            const row = document.createElement("label")
+            row.className = [
+                "combat-candidate-row",
+                "combat-candidate-check-row",
+                alreadyAdded ? "active" : "",
+                limitMessage ? "disabled" : "",
+            ].filter(Boolean).join(" ")
+
+            const input = document.createElement("input")
+            input.type = "checkbox"
+            input.dataset.candidateCheckKey = key
+            input.checked = alreadyAdded
+            input.disabled = Boolean(limitMessage)
+
+            const copy = document.createElement("span")
+            copy.className = "combat-candidate-check-copy"
+
+            const title = document.createElement("strong")
+            title.textContent = localizedText(candidate.sourceLabel) || nameOf(candidate)
+            const metaLine = document.createElement("span")
+            metaLine.textContent = `来自${localizedText(candidate.ownerName) || "角色"}`
+            const description = document.createElement("p")
+            description.textContent = localizedText(candidate.description) || localizedText(candidate.conditionLabel) || ""
+            const stats = document.createElement("span")
+            stats.className = "combat-added-stats combat-buff-effect-lines"
+            if (limitMessage) {
+                setCombatStatLines(stats, [limitMessage])
+            } else {
+                renderBuffEffectLines(stats, candidate)
+            }
+
+            copy.append(title, metaLine, description, stats)
+            row.append(input, copy)
+            els.combatBuffCandidateList.appendChild(row)
+            continue
+        }
 
         const row = document.createElement("button")
         row.type = "button"
         row.className = "combat-candidate-row"
         row.dataset.candidateKey = key
-        row.disabled = alreadyAdded || overTeammateSetLimit
+        row.disabled = alreadyAdded || Boolean(limitMessage)
 
         const title = document.createElement("strong")
         title.textContent = nameOf(candidate)
@@ -3384,8 +3688,8 @@ function renderCombatBuffCandidates() {
         stats.className = "combat-added-stats combat-buff-effect-lines"
         if (alreadyAdded) {
             setCombatStatLines(stats, ["已添加"])
-        } else if (overTeammateSetLimit) {
-            setCombatStatLines(stats, [`队友 4 件套最多 ${TEAMMATE_DRIVE_DISC_LIMIT} 个`])
+        } else if (limitMessage) {
+            setCombatStatLines(stats, [limitMessage])
         } else {
             renderBuffEffectLines(stats, candidate)
         }
@@ -3419,7 +3723,7 @@ function closeCombatBuffModal() {
 }
 
 function addCombatBuffCandidateByKey(key) {
-    const candidate = combatBuffCandidates().find(item => addedCombatBuffKey(item) === key)
+    const candidate = allCombatBuffCandidates().find(item => addedCombatBuffKey(item) === key)
     if (!candidate) {
         return false
     }
@@ -3429,18 +3733,63 @@ function addCombatBuffCandidateByKey(key) {
         return false
     }
 
-    if (candidate.sourceKind === "teammateDriveDisc4pc" && teammateDriveDiscAddedCount(addedBuffs) >= TEAMMATE_DRIVE_DISC_LIMIT) {
+    const limitMessage = candidateLimitMessage(candidate, addedBuffs)
+    if (limitMessage) {
+        setStatus(limitMessage, "error")
         return false
     }
 
-    saveCurrentAddedCombatBuffs([...addedBuffs, {
-        id: candidate.id,
-        sourceCategory: candidate.sourceCategory,
-        sourceKind: candidate.sourceKind,
-        setId: candidate.setId ?? null,
-        ...(candidate.sourceKind === "wEngineTeam" ? { wEngineModificationLevel: 1 } : {}),
-        runtime: defaultRuntimeForBuff(candidate),
-    }])
+    saveCurrentAddedCombatBuffs([...addedBuffs, addedCombatBuffEntry(candidate)])
+    return true
+}
+
+function removeCombatBuffCandidateByKey(key) {
+    const addedBuffs = currentAddedCombatBuffs()
+    const next = addedBuffs.filter(item => addedCombatBuffKey(item) !== key)
+    if (next.length === addedBuffs.length) {
+        return false
+    }
+    saveCurrentAddedCombatBuffs(next)
+    return true
+}
+
+function addSelectedTeammateBuffs() {
+    const candidates = selectedTeammateBuffCandidates()
+    if (!candidates.length) {
+        return false
+    }
+    const addedBuffs = currentAddedCombatBuffs()
+    const firstNewCandidate = candidates.find(candidate =>
+        !addedBuffs.some(item => addedCombatBuffKey(item) === addedCombatBuffKey(candidate))
+    )
+    const limitMessage = candidateLimitMessage(firstNewCandidate, addedBuffs)
+    if (limitMessage) {
+        setStatus(limitMessage, "error")
+        return false
+    }
+    const addedKeys = new Set(addedBuffs.map(addedCombatBuffKey))
+    const nextEntries = candidates
+        .filter(candidate => !addedKeys.has(addedCombatBuffKey(candidate)))
+        .map(addedCombatBuffEntry)
+    if (!nextEntries.length) {
+        setStatus("该角色 Buff 已全部添加", "idle")
+        return false
+    }
+    saveCurrentAddedCombatBuffs([...addedBuffs, ...nextEntries])
+    return true
+}
+
+function removeSelectedTeammateBuffs() {
+    const ownerId = activeCombatBuffTeammateId
+    if (!ownerId) {
+        return false
+    }
+    const addedBuffs = currentAddedCombatBuffs()
+    const next = addedBuffs.filter(item => teammateOwnerIdForBuff(item) !== ownerId)
+    if (next.length === addedBuffs.length) {
+        return false
+    }
+    saveCurrentAddedCombatBuffs(next)
     return true
 }
 
@@ -3619,23 +3968,27 @@ function collectCombatBuffConfig() {
     const wEngineTeamModificationLevels = {}
     for (const item of addedBuffs) {
         if (item.sourceKind === "teammate") {
+            const buff = resolveAddedCombatBuff(item)
             activeBuffIds.push(item.id)
-            runtimeInputs[item.id] = item.runtime ?? defaultRuntimeForBuff(resolveAddedCombatBuff(item))
+            runtimeInputs[item.id] = runtimeForBuff(item, buff)
         }
 
         if (item.sourceKind === "ownDriveDisc4pc") {
+            const buff = resolveAddedCombatBuff(item)
             activeBuffIds.push(item.id)
-            runtimeInputs[item.id] = item.runtime ?? defaultRuntimeForBuff(resolveAddedCombatBuff(item))
+            runtimeInputs[item.id] = runtimeForBuff(item, buff)
         }
 
         if (item.sourceKind === "wEngineTeam") {
+            const buff = resolveAddedCombatBuff(item)
             activeBuffIds.push(item.id)
             wEngineTeamModificationLevels[item.id] = wEngineTeamModificationLevelForItem(item)
-            runtimeInputs[item.id] = item.runtime ?? defaultRuntimeForBuff(resolveAddedCombatBuff(item))
+            runtimeInputs[item.id] = runtimeForBuff(item, buff)
         }
 
         if (item.sourceKind === "teammateDriveDisc4pc") {
-            runtimeInputs[`teammateDriveDisc4pc:${item.setId}`] = item.runtime ?? defaultRuntimeForBuff(resolveAddedCombatBuff(item))
+            const buff = resolveAddedCombatBuff(item)
+            runtimeInputs[`teammateDriveDisc4pc:${item.setId}`] = runtimeForBuff(item, buff)
         }
     }
     for (const buff of [...combatBuffsByType("boss"), ...combatBuffsByType("field")]) {
@@ -3700,9 +4053,9 @@ function collectDamageConfig() {
                 {
                     id: "disorder-1",
                     kind: "disorder",
+                    disorderType: normalizeDisorderType(els.damageDisorderType?.value),
                     previousAnomalyEffect: els.damageDisorderEffect?.value || "burn",
                     elapsedSeconds: Number(els.damageDisorderElapsed?.value || 0),
-                    durationSeconds: Number(els.damageDisorderDuration?.value || 10),
                 },
             ],
             target,
@@ -4271,9 +4624,6 @@ els.combatSection.addEventListener("change", async event => {
         if (event.target === els.damageAnomalyEffect) {
             els.damageAnomalyProcCount.value = event.target.selectedOptions?.[0]?.dataset.defaultProcCount ?? 1
         }
-        if (event.target === els.damageDisorderEffect) {
-            els.damageDisorderDuration.value = event.target.selectedOptions?.[0]?.dataset.defaultDurationSeconds ?? 10
-        }
         await calculateNow()
     } catch (error) {
         setStatus(error.message, "error")
@@ -4361,6 +4711,21 @@ els.combatSection.addEventListener("keydown", async event => {
     await commitGenericNumberInput(event.target)
 })
 els.addedCombatBuffs.addEventListener("click", async event => {
+    const removeGroup = event.target.closest("[data-remove-buff-group-key]")
+    if (removeGroup) {
+        try {
+            setStatus("移除来源 Buff", "idle")
+            saveCurrentAddedCombatBuffs(currentAddedCombatBuffs().filter(item =>
+                addedCombatBuffSourceGroupKey(item) !== removeGroup.dataset.removeBuffGroupKey
+            ))
+            renderCombatBuffControls()
+            await calculate()
+        } catch (error) {
+            setStatus(error.message, "error")
+        }
+        return
+    }
+
     const remove = event.target.closest("[data-remove-buff-key]")
     if (!remove) {
         return
@@ -4492,6 +4857,34 @@ els.combatBuffModal.addEventListener("click", async event => {
         return
     }
 
+    if (event.target === els.addTeammateBuffsBtn) {
+        try {
+            setStatus("添加角色 Buff", "idle")
+            if (addSelectedTeammateBuffs()) {
+                renderCombatBuffControls()
+                renderCombatBuffCandidates()
+                await calculate()
+            }
+        } catch (error) {
+            setStatus(error.message, "error")
+        }
+        return
+    }
+
+    if (event.target === els.removeTeammateBuffsBtn) {
+        try {
+            setStatus("移除角色 Buff", "idle")
+            if (removeSelectedTeammateBuffs()) {
+                renderCombatBuffControls()
+                renderCombatBuffCandidates()
+                await calculate()
+            }
+        } catch (error) {
+            setStatus(error.message, "error")
+        }
+        return
+    }
+
     const candidate = event.target.closest("[data-candidate-key]")
     if (candidate && !candidate.disabled) {
         try {
@@ -4522,6 +4915,33 @@ els.combatBuffModal.addEventListener("click", async event => {
     }
 })
 els.combatBuffModal.addEventListener("change", event => {
+    if (event.target === els.combatBuffTeammateSelect) {
+        activeCombatBuffTeammateId = event.target.value
+        renderCombatBuffCandidates()
+        return
+    }
+
+    if (event.target.matches("[data-candidate-check-key]")) {
+        ;(async () => {
+            try {
+                setStatus(event.target.checked ? "添加 Buff" : "移除 Buff", "idle")
+                const changed = event.target.checked
+                    ? addCombatBuffCandidateByKey(event.target.dataset.candidateCheckKey)
+                    : removeCombatBuffCandidateByKey(event.target.dataset.candidateCheckKey)
+                if (changed) {
+                    renderCombatBuffControls()
+                    renderCombatBuffCandidates()
+                    await calculate()
+                } else {
+                    renderCombatBuffCandidates()
+                }
+            } catch (error) {
+                setStatus(error.message, "error")
+            }
+        })()
+        return
+    }
+
     if (event.target.matches("[data-custom-target-kind]")) {
         const rows = customBuffRowsFromDom()
         rows[0].optionIndex = 0

@@ -258,6 +258,7 @@ type EffectTarget =
 type BuffRuleStat =
   | ZzzStat
   | "anomalyDamageBonus"
+  | "disorderDamageBonus"
   | "baseMultiplierBonus"
   | "anomalyCritRate"
   | "anomalyCritDmg"
@@ -278,7 +279,7 @@ interface Effect {
     | { type: "formula"; stat: BuffRuleStat; mode: "flat" | "pct"; source: { variable: "x"; label?: { zhCN?: string }; defaultValue: number; min?: number; max?: number }; formula: { expression: string; valueUnit?: "storedValue" | "storedPercent" }; target?: EffectTarget }
     | { type: "stacked"; stat: BuffRuleStat; mode: "flat" | "pct"; valuePerStack: number; maxStacks: number; defaultStacks?: number; basis?: Effect["stats"][number]["basis"]; target?: EffectTarget }
     // Deprecated read-only compatibility. New UI/save paths must use target.kind + stat.
-    | { type: "damageModifier"; kind: "anomalyDamageBonus" | "baseMultiplierBonus" | "anomalyCritRate" | "anomalyCritDmg" | "directDamageBonus" | "skillMultiplierBonus"; value: number; valueUnit?: "decimal"; appliesTo?: { damageKinds?: Array<"direct" | "anomaly" | "disorder">; anomalyEffects?: string[]; elements?: Array<"physical" | "fire" | "ice" | "electric" | "ether">; skillTargets?: SkillTarget[] } }
+    | { type: "damageModifier"; kind: "anomalyDamageBonus" | "disorderDamageBonus" | "baseMultiplierBonus" | "anomalyCritRate" | "anomalyCritDmg" | "directDamageBonus" | "skillMultiplierBonus"; value: number; valueUnit?: "decimal"; appliesTo?: { damageKinds?: Array<"direct" | "anomaly" | "disorder">; anomalyEffects?: string[]; elements?: Array<"physical" | "fire" | "ice" | "electric" | "ether">; skillTargets?: SkillTarget[] } }
   >;
   buffModifiers?: Array<{
     id?: string;
@@ -402,7 +403,7 @@ interface InCombatRequest {
     events?: Array<
       | { id: string; kind: "direct"; skillMultiplier?: number; skillRef?: InCombatRequest["damage"]["skillRef"]; critMode?: "expected" | "crit" | "nonCrit"; count?: number }
       | { id: string; kind: "anomaly"; anomalyEffect: "assault" | "shatter" | "burn" | "shock" | "corruption"; procCount?: number; count?: number }
-      | { id: string; kind: "disorder"; previousAnomalyEffect: "burn" | "shock" | "corruption" | "frozen" | "flinch"; elapsedSeconds: number; durationSeconds?: number; count?: number }
+      | { id: string; kind: "disorder"; previousAnomalyEffect: "burn" | "shock" | "corruption" | "frozen" | "flinch"; elapsedSeconds: number; count?: number }
     >;
   };
 }
@@ -517,15 +518,15 @@ active, and the current rule id matches `targetEffectIds`, the rule's resolved
 stored value is multiplied by `factor`. Multiple matching modifiers multiply
 together. If the target Buff is not active, the modifier contributes no value.
 This is used for Youye's Cinema 1, which multiplies her additional ability's
-`anomalyDamageBonus` rule by `1.3`.
+`anomalyDamageBonus` and `disorderDamageBonus` rules by `1.3`.
 
 Every rule can choose an amplification target:
 
 - `target.kind: "default"` (or omitted) uses the ordinary Buff path. Panel and
   enemy-target stats are added to the in-combat panel/target totals. Default
-  event stats such as `anomalyDamageBonus`, `baseMultiplierBonus`,
-  `anomalyCritRate`, and `anomalyCritDmg` are kept out of the panel and applied
-  only inside the relevant damage event formula.
+  event stats such as `anomalyDamageBonus`, `disorderDamageBonus`,
+  `baseMultiplierBonus`, `anomalyCritRate`, and `anomalyCritDmg` are kept out
+  of the panel and applied only inside the relevant damage event formula.
 - `target.kind: "skill"` requires at least one `skillTargets` entry and is only
   valid for in-combat Buffs. It never writes into the global panel. It is
   evaluated against the selected damage event's `skillSource`; manually typed
@@ -536,7 +537,8 @@ Every rule can choose an amplification target:
 
 Skill-targeted rules may use only the event-safe stats: elemental resistance
 ignore, current/element resistance reduction, `enemyDefReduction`, generic and
-elemental damage bonuses, `anomalyDamageBonus`, and `skillMultiplierBonus`.
+elemental damage bonuses, `anomalyDamageBonus`, `disorderDamageBonus`, and
+`skillMultiplierBonus`.
 `skillMultiplierBonus` stores UI percentages, so `1500` means `+1500%` and the
 calculator adds `15` to the direct skill multiplier:
 
@@ -618,8 +620,8 @@ atk * skillMultiplier * critMultiplier * (1 + generic/element dmg bonus)
 ```
 
 Anomaly and disorder reuse the same attack, damage bonus, defense, resistance,
-PEN, RES ignore, and RES reduction logic as direct damage. They do not use CRIT
-unless an anomaly-specific crit modifier is present.
+PEN, RES ignore, and RES reduction logic as direct damage. Attribute anomaly can
+use anomaly-specific crit modifiers; disorder does not use anomaly crit.
 
 ### Anomaly Damage
 
@@ -634,9 +636,11 @@ atk * anomalyMultiplier * (1 + generic/element dmg bonus)
   * anomalyCritMultiplier
 ```
 
-`anomalyDamageBonus` is independent from the existing generic/elemental damage
-bonus bucket. A Buff can apply it to all anomaly damage, only disorder, one
-anomaly effect such as Shock, or one element.
+`anomalyDamageBonus` is the attribute anomaly damage bonus bucket. It is
+independent from the existing generic/elemental damage bonus bucket and does not
+affect disorder. `disorderDamageBonus` is the separate disorder-only bonus
+bucket. `damageKinds` scopes are mutually exclusive: `anomaly` matches attribute
+anomaly events and `disorder` matches disorder events.
 
 The anomaly and disorder catalogs live in `data/anomaly_effects.json` and are
 editable from the maintenance UI. v1 ships these default anomaly multipliers:
@@ -663,6 +667,18 @@ Disorder is manually modeled from the previous anomaly effect and elapsed time.
 The second anomaly that triggers Disorder is not treated as the damage source in
 v1; the current in-combat panel is used as the source snapshot.
 
+Disorder damage uses the same common zones as attribute anomaly, but replaces
+the attribute anomaly bonus and anomaly crit zones with `disorderDamageBonus`
+only:
+
+```text
+atk * disorderMultiplier * (1 + generic/element dmg bonus)
+  * defenseMultiplier * resistanceMultiplier
+  * anomalyProficiency / 100
+  * anomalyLevel
+  * (1 + disorderDamageBonus)
+```
+
 ```text
 Burn Disorder       = 450% + floor((duration - elapsed) / 0.5) * 50%
 Shock Disorder      = 450% + floor(duration - elapsed) * 125%
@@ -672,10 +688,10 @@ Frost Frozen Disorder (Miyabi) = 600% + floor(duration - elapsed) * 75%
 Flinch Disorder     = 450% + floor(duration - elapsed) * 7.5%
 ```
 
-`elapsed` is clamped to `0..duration`, and `duration` defaults to the catalog
-effect duration. Most effects default to `10` seconds; Miyabi's Frost Frozen
-Disorder defaults to `20` seconds. The frontend exposes duration so effects
-that extend anomaly duration can be entered manually.
+`elapsed` is clamped to `0..duration`, and `duration` always comes from the
+catalog effect duration. Most effects are fixed at `10` seconds; Miyabi's Frost
+Frozen Disorder is fixed at `20` seconds. Homepage and calculation-page inputs
+do not accept per-event disorder duration overrides.
 
 v1 explicitly does not model anomaly buildup, buildup ownership, multi-agent
 source weighting, polarity disorder, or wind/vortex-style newer special cases.

@@ -169,6 +169,52 @@
             }
           ],
           "id": "buff_1f08564414"
+        },
+        {
+          "source": {
+            "zhCN": "以太帷幕.妄想重奏"
+          },
+          "description": {
+            "zhCN": "招式发动时，南宫羽会开启「以太帷幕·妄想重奏」，「以太帷幕·妄想重奏」生效期间，全队角色攻击力额外提升50点，持续30秒，南宫羽重复开启「以太帷幕·妄想重奏」前，将关闭已有的「以太帷幕·妄想重奏」； 招式发动期间拥有无敌效果。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_884161bbba",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkFlat",
+              "mode": "flat",
+              "value": 50
+            }
+          ],
+          "buffModifiers": [],
+          "id": "buff_ee0be3abab"
+        },
+        {
+          "source": {
+            "zhCN": "影画一"
+          },
+          "description": {
+            "zhCN": "强化特殊技：相当沉重的爱意」或「普通攻击：可爱地雷飞天撞」命中敌人时，使敌人的全属性伤害抗性降低18%，持续40秒，重复触发时刷新持续时间；\n进入战场时，南宫羽的「重拍」回复至最大值，在勘域模式中此效果180秒内最多触发一次。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_884161bbba",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "enemyResReduction",
+              "mode": "flat",
+              "value": 18
+            }
+          ],
+          "buffModifiers": [],
+          "id": "buff_a9ab2c0d63"
         }
       ]
     },
@@ -246,6 +292,28 @@
                 "expression": "clamp((x - 100) * 0.2, 0, 20)",
                 "valueUnit": "storedPercent"
               }
+            },
+            {
+              "id": "youye_additional_disorder_damage_bonus",
+              "type": "formula",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "disorderDamageBonus",
+              "mode": "flat",
+              "source": {
+                "variable": "x",
+                "label": {
+                  "zhCN": "柚叶异常掌控"
+                },
+                "defaultValue": 200,
+                "min": 100,
+                "max": 200
+              },
+              "formula": {
+                "expression": "clamp((x - 100) * 0.2, 0, 20)",
+                "valueUnit": "storedPercent"
+              }
             }
           ],
           "buffModifiers": []
@@ -261,14 +329,14 @@
           "scope": "inCombat",
           "effects": [
             {
+              "id": "effect_4debdc78eb",
               "type": "fixed",
               "target": {
                 "kind": "default"
               },
               "stat": "enemyResReduction",
               "mode": "flat",
-              "value": 10,
-              "id": "effect_4debdc78eb"
+              "value": 10
             }
           ],
           "buffModifiers": [
@@ -283,8 +351,351 @@
                 "youye_additional_anomaly_damage_bonus"
               ],
               "label": {
-                "zhCN": "[额外能力]中属性异常伤害和[紊乱]伤害增益效果提升至原本的130%。"
+                "zhCN": "[额外能力]中属性异常伤害提升至原本的130%。"
               }
+            },
+            {
+              "id": "youye_cinema_1_amplify_additional_ability.modify_youye_additional_disorder_damage_bonus",
+              "operation": "multiplyResolvedValue",
+              "factor": 1.3,
+              "targetBuffIds": [
+                "youye.additional_ability.anomaly_damage_bonus"
+              ],
+              "targetEffectIds": [
+                "youye_additional_disorder_damage_bonus"
+              ],
+              "label": {
+                "zhCN": "[额外能力]中[紊乱]伤害增益效果提升至原本的130%。"
+              }
+            }
+          ]
+        },
+        {
+          "source": {
+            "zhCN": "影画二"
+          },
+          "description": {
+            "zhCN": "柚叶的「强化特殊技：小心蛀牙」、「强化特殊技：小心蛀牙，就是现在！」和「终结技：不投降就捣乱」攻击命中敌人时，会使全队角色造成的伤害提升15%，属性异常积蓄效率提升15%，持续40秒，重复触发时刷新持续时间，重击命中不处于失衡状态的敌人时，会强制触发「连携技」，通过该种方式发动的「连携技」，打断等级降低，强制触发「连携技」的效果每20秒最多触发一次；\n其他角色通过「连携技」入场时，会为柚叶恢复1点「甜度点」；\n柚叶触发「普通攻击：硬糖射击」的冷却时间减少25%。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_4debdc78eb",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 15
+            }
+          ],
+          "buffModifiers": [],
+          "id": "buff_8857e98214"
+        }
+      ]
+    },
+    {
+      "id": "yaojiayin",
+      "name": {
+        "zhCN": "耀嘉音"
+      },
+      "buffs": [
+        {
+          "id": "yaojiayin.core_andante_atk",
+          "source": {
+            "zhCN": "核心被动"
+          },
+          "description": {
+            "zhCN": "[咏叹华彩]状态下，队伍中其他角色通过[快速支援]、[连携技]、[招架支援]或[回避支援]入场，耀嘉音消耗能量追加释放[震音]进行攻击时，耀嘉音和入场角色的攻击力提升，提升效果等同于耀嘉音初始攻击力的35%，最高不超过1200点，持续20秒，重复触发时延长持续时间，最多不超过30秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "yaojiayin_core_andante_atk_flat",
+              "type": "derived",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkFlat",
+              "mode": "flat",
+              "sourceLabel": {
+                "zhCN": "耀嘉音初始攻击力"
+              },
+              "defaultSourceValue": 3429,
+              "ratio": 35,
+              "cap": 1200
+            }
+          ]
+        },
+        {
+          "id": "yaojiayin.special_aria_buff",
+          "source": {
+            "zhCN": "特殊技"
+          },
+          "description": {
+            "zhCN": "耀嘉音进入[咏叹华彩]状态后，全队角色造成的伤害提升9%~24%，全队角色暴击伤害提升8.5%~31%，具体数值由耀嘉音特殊技等级决定。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "yaojiayin_special_aria_dmg_bonus",
+              "type": "formula",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "source": {
+                "variable": "x",
+                "label": {
+                  "zhCN": "耀佳音特殊技等级"
+                },
+                "defaultValue": 12,
+                "min": 1,
+                "max": 16
+              },
+              "formula": {
+                "expression": "clamp(x + 8, 9, 24)",
+                "valueUnit": "storedPercent"
+              }
+            },
+            {
+              "id": "yaojiayin_special_aria_crit_dmg",
+              "type": "formula",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critDmg",
+              "mode": "flat",
+              "source": {
+                "variable": "x",
+                "label": {
+                  "zhCN": "耀佳音特殊技等级"
+                },
+                "defaultValue": 12,
+                "min": 1,
+                "max": 16
+              },
+              "formula": {
+                "expression": "clamp(x * 1.5 + 7, 8.5, 31)",
+                "valueUnit": "storedPercent"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rina",
+      "name": {
+        "zhCN": "丽娜"
+      },
+      "buffs": [
+        {
+          "id": "rina.core_pen_ratio",
+          "source": {
+            "zhCN": "核心被动"
+          },
+          "description": {
+            "zhCN": "指派杜苏拉或安娜塔莎进行攻击时，队伍中其他角色的穿透率随丽娜自身的穿透率提升，提升效果等同于丽娜自身穿透率的25%+12%，最高不超过30%，杜苏拉和安娜塔莎均返回丽娜身边后，对应增益效果结束。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "rina_core_pen_ratio",
+              "type": "formula",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "penRatio",
+              "mode": "flat",
+              "source": {
+                "variable": "x",
+                "label": {
+                  "zhCN": "丽娜穿透率"
+                },
+                "defaultValue": 72,
+                "min": 0,
+                "max": 72
+              },
+              "formula": {
+                "expression": "clamp(x * 0.25 + 12, 0, 30)",
+                "valueUnit": "storedPercent"
+              }
+            }
+          ]
+        },
+        {
+          "id": "rina.additional_electric_damage",
+          "source": {
+            "zhCN": "额外能力"
+          },
+          "description": {
+            "zhCN": "队伍中存在与自身属性或阵营相同的角色时触发：队伍中任意角色对敌人施加[感电]效果时，持续时间提升3秒；场上存在处于[感电]状态下的敌人时，全队角色造成的电属性伤害提升10%。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "rina_additional_electric_damage",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "electricDmg",
+              "mode": "flat",
+              "value": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lucy",
+      "name": {
+        "zhCN": "露西"
+      },
+      "buffs": [
+        {
+          "id": "lucy.ex_special_cheer_on",
+          "source": {
+            "zhCN": "强化特殊技"
+          },
+          "description": {
+            "zhCN": "发动[强化特殊技]后，亲卫队小猪引发爆炸时，将为全队角色、邦布和亲卫队小猪施加[加油！]状态。[加油！]状态下，友方单位的攻击力提升，提升数值等同于露西25.8%初始攻击力+104点，最高不超过600点。击出[平直球]时，[加油！]状态持续10秒，击出[高飞球]时，[加油！]状态持续15秒，重复触发时刷新持续时间。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "lucy_ex_special_cheer_on_atk",
+              "type": "formula",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkFlat",
+              "mode": "flat",
+              "source": {
+                "variable": "x",
+                "label": {
+                  "zhCN": "露西初始攻击力"
+                },
+                "defaultValue": 1923,
+                "min": 0,
+                "max": 1923
+              },
+              "formula": {
+                "expression": "clamp(x * 0.258 + 104, 0, 600)",
+                "valueUnit": "storedValue"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nicole",
+      "name": {
+        "zhCN": "妮可"
+      },
+      "buffs": [
+        {
+          "id": "nicole.core_def_reduction",
+          "source": {
+            "zhCN": "核心被动"
+          },
+          "description": {
+            "zhCN": "妮可在[特殊技]、[强化特殊技]、[连携技]、[终结技]等招式中，上弹并强化[普通攻击]与[冲刺攻击]；强化子弹或能量场命中敌人时，目标的防御力降低40%，持续3.5秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "nicole_core_def_reduction",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "enemyDefReduction",
+              "mode": "flat",
+              "value": 40
+            }
+          ]
+        },
+        {
+          "id": "nicole.additional_ether_damage",
+          "source": {
+            "zhCN": "额外能力"
+          },
+          "description": {
+            "zhCN": "队伍中存在与自身属性或阵营相同的角色时触发：妮可通过[核心被动：机关箱]对敌人施加减益效果时，所有单位对目标造成的以太伤害额外提升25%，持续3.5秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "nicole_additional_ether_damage",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "etherDmg",
+              "mode": "flat",
+              "value": 25
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "soukaku",
+      "name": {
+        "zhCN": "苍角"
+      },
+      "buffs": [
+        {
+          "id": "soukaku.core_fly_the_flag_atk",
+          "source": {
+            "zhCN": "核心被动"
+          },
+          "description": {
+            "zhCN": "苍角发动[展旗]时，自身攻击力提升，提升数值等同于苍角20%初始攻击力，最高不超过500点，持续22秒，发动[展旗]并消耗[涡流]时，该增益效果翻倍，最高不超过1000点。队伍中其他角色通过[展旗]所触发的[快速支援]或[连携技]入场时，该增益效果将传递给对应的角色，并刷新其持续时间。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "soukaku_core_fly_the_flag_atk",
+              "type": "derived",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkFlat",
+              "mode": "flat",
+              "sourceLabel": {
+                "zhCN": "苍角初始攻击力"
+              },
+              "defaultSourceValue": 2500,
+              "ratio": 40,
+              "cap": 1000
+            }
+          ]
+        },
+        {
+          "id": "soukaku.additional_ice_damage",
+          "source": {
+            "zhCN": "额外能力"
+          },
+          "description": {
+            "zhCN": "队伍中存在与自身属性或阵营相同的角色时触发：苍角消耗[涡流]发动[展旗]时，全队角色造成的冰属性伤害提升20%，持续22秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "soukaku_additional_ice_damage",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "iceDmg",
+              "mode": "flat",
+              "value": 20
             }
           ]
         }

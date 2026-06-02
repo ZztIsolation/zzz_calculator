@@ -53,24 +53,27 @@ function rule(engineId, part, ruleId) {
     return effectRulesFor(wEngine(engineId), part).find(item => item.id === ruleId)
 }
 
-const expectedScaling = {
-    "demara_battery_mark_ii:selfBuff:effect_q4n8v2k1:value": [15, 2.25, [15, 17.5, 20, 22, 24]],
-    "demara_battery_mark_ii:selfBuff:effect_l7p3x9za:value": [18, 2.375, [18, 20.5, 23, 25, 27.5]],
-    "cloudcleave_radiance:selfBuff:effect_r6m2c8tw:value": [20, 2, [20, 22, 24, 26, 28]],
-    "cloudcleave_radiance:selfBuff:effect_v9k5n1qp:value": [25, 3.75, [25, 28.7, 32.5, 36.2, 40]],
-    "cloudcleave_radiance:selfBuff:effect_b3x7d4la:value": [25, 3.75, [25, 28.7, 32.5, 36.2, 40]],
-    "hailfall_star_palace:selfBuff:effect_hailfall_crit_dmg:value": [50, 7.5, [50, 57, 65, 72, 80]],
-    "hailfall_star_palace:selfBuff:effect_hailfall_ice_dmg:valuePerStack": [20, 3, [20, 23, 26, 29, 32]],
-    "tenfold_starforge:selfBuff:effect_tenfold_anomaly_mastery:value": [60, 9, [60, 69, 78, 87, 96]],
-    "tenfold_starforge:selfBuff:effect_tenfold_physical_dmg:valuePerStack": [20, 3, [20, 23, 26, 29, 32]],
-    "zzz_wiki_1826:teamBuff:effect_wiki_1826_team_dmg:valuePerStack": [12.5, 1.875, [12.5, 14.3, 16.1, 17.9, 20]],
-    "zzz_wiki_1826:teamBuff:effect_wiki_1826_team_atk:value": [10, 1.5, [10, 11.5, 13, 14.5, 16]],
-    "zzz_wiki_1753:teamBuff:effect_wiki_1753_team_atk:value": [10, 1.5, [10, 11.5, 13, 14.5, 16]],
-    "zzz_wiki_1753:teamBuff:effect_wiki_1753_team_hp:value": [10, 1.5, [10, 11.5, 13, 14.5, 16]],
-    "zzz_wiki_1753:teamBuff:effect_wiki_1753_team_crit_dmg:value": [30, 4.5, [30, 34.5, 39, 43.5, 48]],
-    "zzz_wiki_1689:selfBuff:effect_wiki_1689_self_daze:valuePerStack": [9, 1.375, [9, 10.3, 11.7, 13, 14.5]],
-    "zzz_wiki_1689:teamBuff:effect_wiki_1689_team_crit_dmg:value": [30, 4.5, [30, 34.5, 39, 43.5, 48]],
-    "zzz_wiki_486:teamBuff:effect_wiki_486_team_atk:valuePerStack": [2.5, 0.375, [2.5, 2.8, 3.2, 3.6, 4]],
+const expectedModificationValues = {
+    "demara_battery_mark_ii:selfBuff:effect_q4n8v2k1:value": [15, 17.5, 20, 22, 24],
+    "demara_battery_mark_ii:selfBuff:effect_l7p3x9za:value": [18, 20.5, 23, 25, 27.5],
+    "cloudcleave_radiance:selfBuff:effect_r6m2c8tw:value": [20, 22, 24, 26, 28],
+    "cloudcleave_radiance:selfBuff:effect_v9k5n1qp:value": [25, 28.7, 32.5, 36.2, 40],
+    "cloudcleave_radiance:selfBuff:effect_b3x7d4la:value": [25, 28.7, 32.5, 36.2, 40],
+    "hailfall_star_palace:selfBuff:effect_hailfall_crit_dmg:value": [50, 57, 65, 72, 80],
+    "hailfall_star_palace:selfBuff:effect_hailfall_ice_dmg:valuePerStack": [20, 23, 26, 29, 32],
+    "tenfold_starforge:selfBuff:effect_tenfold_anomaly_mastery:value": [60, 69, 78, 87, 96],
+    "tenfold_starforge:selfBuff:effect_tenfold_physical_dmg:valuePerStack": [20, 23, 26, 29, 32],
+    "zzz_wiki_1826:teamBuff:effect_wiki_1826_team_dmg:valuePerStack": [12.5, 14.3, 16.1, 17.9, 20],
+    "zzz_wiki_1826:teamBuff:effect_wiki_1826_team_atk:value": [10, 11.5, 13, 14.5, 16],
+    "zzz_wiki_1753:teamBuff:effect_wiki_1753_team_atk:value": [10, 11.5, 13, 14.5, 16],
+    "zzz_wiki_1753:teamBuff:effect_wiki_1753_team_hp:value": [10, 11.5, 13, 14.5, 16],
+    "zzz_wiki_1753:teamBuff:effect_wiki_1753_team_crit_dmg:value": [30, 34.5, 39, 43.5, 48],
+    "zzz_wiki_1689:selfBuff:effect_wiki_1689_self_daze:valuePerStack": [9, 10.3, 11.7, 13, 14.5],
+    "zzz_wiki_1689:teamBuff:effect_wiki_1689_team_crit_dmg:value": [30, 34.5, 39, 43.5, 48],
+    "zzz_wiki_486:teamBuff:effect_wiki_486_team_atk:valuePerStack": [2.5, 2.8, 3.2, 3.6, 4],
+    "neon_fantasies:selfBuff:effect_8a81aef020:value": [90, 103, 117, 130, 145],
+    "neon_fantasies:selfBuff:effect_neon_fantasies_self_ap_bonus:value": [60, 69, 78, 87, 96],
+    "neon_fantasies:teamBuff:effect_8256ce4483:valuePerStack": [15, 17, 19.5, 21, 24],
 }
 
 for (const engine of catalog.wEngines) {
@@ -81,25 +84,37 @@ for (const engine of catalog.wEngines) {
     )
 }
 
-for (const [key, [base, step, displayValues]] of Object.entries(expectedScaling)) {
+function assertNoLegacyModificationScaling(value, path = "catalog") {
+    if (!value || typeof value !== "object") {
+        return
+    }
+    assert.equal(value.modificationScaling, undefined, `${path} should not use legacy modificationScaling`)
+    for (const [key, child] of Object.entries(value)) {
+        if (Array.isArray(child)) {
+            child.forEach((item, index) => assertNoLegacyModificationScaling(item, `${path}.${key}[${index}]`))
+        } else {
+            assertNoLegacyModificationScaling(child, `${path}.${key}`)
+        }
+    }
+}
+
+assertNoLegacyModificationScaling(catalog.wEngines, "wEngines")
+
+for (const [key, values] of Object.entries(expectedModificationValues)) {
     const [engineId, part, ruleId, field] = key.split(":")
     const rawRule = rule(engineId, part, ruleId)
     assert.ok(rawRule, `${key} should exist`)
-    assert.deepEqual(rawRule.modificationScaling?.[field], {
-        base,
-        step,
-        displayValues,
-    })
-    assert.equal(rawRule[field], base, `${key} should keep rank 1 as the stored base value`)
+    assert.deepEqual(rawRule.modificationValues?.[field], values, `${key} should store rank values directly`)
+    assert.equal(rawRule[field], values[0], `${key} should keep rank 1 as the stored base value`)
 
     for (let level = 1; level <= 5; level += 1) {
         const materialized = materializeWEngineForModificationLevel(wEngine(engineId), level)
         const scaledRule = effectRulesFor(materialized, part).find(item => item.id === ruleId)
-        approx(scaledRule[field], base + step * (level - 1), `${key} level ${level} should use exact equal increments`)
+        approx(scaledRule[field], values[level - 1], `${key} level ${level} should use stored rank value`)
         assert.equal(
             scaledRule[field === "value" ? "displayValue" : "displayValuePerStack"],
-            displayValues[level - 1],
-            `${key} level ${level} should keep official display value`,
+            values[level - 1],
+            `${key} level ${level} should expose the same display value`,
         )
     }
 }
@@ -138,10 +153,15 @@ const cloudRank3 = createInCombatPanelCalculator(catalog, {
     ...yeInput,
     wEngineModificationLevel: 3,
 }).calculate(yeInput.driveDiscs, { round: false })
+const cloudRank4 = createInCombatPanelCalculator(catalog, {
+    ...yeInput,
+    wEngineModificationLevel: 4,
+}).calculate(yeInput.driveDiscs, { round: false })
 approx(cloudRank1.inCombat.buffTotals.physicalResIgnore, 0.2, "Cloudcleave rank 1 should keep old RES ignore")
 approx(cloudRank3.inCombat.buffTotals.physicalResIgnore, 0.24, "Cloudcleave rank 3 should use exact RES ignore")
 approx(cloudRank3.inCombat.buffTotals.dmgBonus, 0.325, "Cloudcleave rank 3 should use exact damage bonus")
-approx(cloudRank3.inCombat.buffTotals.critDmg, cloudRank1.inCombat.buffTotals.critDmg + 0.075, "Cloudcleave rank 3 CRIT DMG should increase by two equal steps")
+approx(cloudRank3.inCombat.buffTotals.critDmg, cloudRank1.inCombat.buffTotals.critDmg + 0.075, "Cloudcleave rank 3 CRIT DMG should use stored rank value")
+approx(cloudRank4.inCombat.buffTotals.dmgBonus, 0.362, "Cloudcleave rank 4 should use 36.2% instead of an equal-step 36.25%")
 assert.equal(
     cloudRank3.inCombat.activeEffects[0].effects.find(item => item.id === "effect_v9k5n1qp").displayValue,
     32.5,
@@ -261,7 +281,7 @@ const externalCannonInvalidRank = createInCombatPanelCalculator(supportCatalog, 
     },
 }).calculate([], { round: false })
 approx(externalCannonRank1.inCombat.buffTotals.atkPctOutOfCombat, 0.1, "External Kaboom team Buff should default to rank 1")
-approx(externalCannonRank3.inCombat.buffTotals.atkPctOutOfCombat, 0.13, "External Kaboom team Buff should use exact rank 3 value")
+approx(externalCannonRank3.inCombat.buffTotals.atkPctOutOfCombat, 0.128, "External Kaboom team Buff should use exact rank 3 value")
 approx(externalCannonRank5.inCombat.buffTotals.atkPctOutOfCombat, 0.16, "External Kaboom team Buff should use rank 5 from its own map")
 approx(externalCannonInvalidRank.inCombat.buffTotals.atkPctOutOfCombat, 0.1, "Invalid external W-Engine team rank should fall back to rank 1")
 

@@ -172,9 +172,11 @@ const RES_REDUCTION_KEY_BY_ELEMENT = {
 const RES_IGNORE_KEYS = Object.values(RES_IGNORE_KEY_BY_ELEMENT)
 
 const DAMAGE_EVENT_KINDS = ["direct", "anomaly", "disorder"]
-const DAMAGE_MODIFIER_KINDS = ["anomalyDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "directDamageBonus", "skillMultiplierBonus"]
+const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
+const DAMAGE_MODIFIER_KINDS = ["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "directDamageBonus", "skillMultiplierBonus"]
 const EVENT_MODIFIER_STAT_KEYS = new Set([
     "anomalyDamageBonus",
+    "disorderDamageBonus",
     "baseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
@@ -200,6 +202,7 @@ const SKILL_TARGET_STAT_KEYS = new Set([
     "electricDmg",
     "etherDmg",
     "anomalyDamageBonus",
+    "disorderDamageBonus",
     "skillMultiplierBonus",
 ])
 const EVENT_MODIFIER_KIND_VALUES = new Set([
@@ -491,32 +494,30 @@ function materializedTeamWEngineEntry(sourceWEngine, levelMap = {}) {
     }
 }
 
-function modificationScalingValue(rule, key, level) {
-    const scaling = rule?.modificationScaling?.[key]
-    if (!scaling) {
+function modificationValueForLevel(rule, key, level) {
+    const values = rule?.modificationValues?.[key]
+    if (!Array.isArray(values)) {
         return null
     }
 
-    const base = Number(scaling.base ?? rule[key] ?? 0)
-    const step = Number(scaling.step ?? 0)
-    if (!Number.isFinite(base) || !Number.isFinite(step)) {
+    const value = Number(values[level - 1])
+    if (!Number.isFinite(value)) {
         return null
     }
 
-    const displayValues = Array.isArray(scaling.displayValues) ? scaling.displayValues : []
     return {
-        value: base + step * (level - 1),
-        displayValue: displayValues[level - 1],
+        value,
+        displayValue: value,
     }
 }
 
 function materializeEffectRuleForModificationLevel(rule, level) {
-    if (!rule?.modificationScaling) {
+    if (!rule?.modificationValues) {
         return rule
     }
 
     const next = { ...rule }
-    const fixedValue = modificationScalingValue(rule, "value", level)
+    const fixedValue = modificationValueForLevel(rule, "value", level)
     if (fixedValue) {
         next.value = fixedValue.value
         if (fixedValue.displayValue !== undefined) {
@@ -524,7 +525,7 @@ function materializeEffectRuleForModificationLevel(rule, level) {
         }
     }
 
-    const valuePerStack = modificationScalingValue(rule, "valuePerStack", level)
+    const valuePerStack = modificationValueForLevel(rule, "valuePerStack", level)
     if (valuePerStack) {
         next.valuePerStack = valuePerStack.value
         if (valuePerStack.displayValue !== undefined) {
@@ -1752,8 +1753,8 @@ function disorderEffectData(catalog, effectId) {
     return effect
 }
 
-function disorderBaseMultiplier(effect, elapsedSeconds, durationSeconds) {
-    const duration = Math.max(0, Number(durationSeconds ?? effect.defaultDurationSeconds ?? 10))
+function disorderBaseMultiplier(effect, elapsedSeconds) {
+    const duration = Math.max(0, Number(effect.defaultDurationSeconds ?? 10))
     const elapsed = clampNumber(Number(elapsedSeconds ?? 0), 0, duration)
     const remaining = Math.max(0, duration - elapsed)
     const interval = Math.max(0.0001, Number(effect.tickIntervalSeconds ?? 1))
@@ -1765,6 +1766,14 @@ function disorderBaseMultiplier(effect, elapsedSeconds, durationSeconds) {
         tickCount,
         baseMultiplier: Number(effect.fixedMultiplier ?? 4.5) + tickCount * Number(effect.tickMultiplier ?? 0),
     }
+}
+
+function normalizeDisorderType(value) {
+    return DISORDER_TYPE_VALUES.has(value) ? value : "normal"
+}
+
+function disorderMultiplierScale(type) {
+    return normalizeDisorderType(type) === "polarized" ? 0.25 : 1
 }
 
 function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index = 0) {
@@ -1844,34 +1853,47 @@ function normalizeAnomalyDamageEvent(event = {}, catalog = {}, index = 0) {
 }
 
 function normalizeDisorderDamageEvent(event = {}, catalog = {}, index = 0) {
+    const disorderType = normalizeDisorderType(event.disorderType)
     if (event.normalized === true) {
+        let effect = null
+        try {
+            effect = disorderEffectData(catalog, event.anomalyEffect ?? event.previousAnomalyEffect ?? "burn")
+        } catch {
+            effect = null
+        }
+        const disorder = effect ? disorderBaseMultiplier(effect, event.elapsedSeconds) : null
+        const duration = disorder?.duration ?? Math.max(0, Number(event.durationSeconds ?? 10))
+        const elapsed = disorder?.elapsed ?? clampNumber(Number(event.elapsedSeconds ?? 0), 0, duration)
         return {
             ...event,
             id: String(event.id ?? `disorder-${index + 1}`),
             kind: "anomaly",
             settlementType: "disorder",
+            disorderType,
             normalized: true,
-            previousAnomalyEffect: String(event.previousAnomalyEffect ?? event.anomalyEffect ?? ""),
-            anomalyEffect: String(event.anomalyEffect ?? event.previousAnomalyEffect ?? ""),
-            damageElement: DAMAGE_ELEMENTS.includes(event.damageElement) ? event.damageElement : "physical",
-            baseMultiplier: Math.max(0, Number(event.baseMultiplier ?? 0)),
-            fixedMultiplier: Math.max(0, Number(event.fixedMultiplier ?? 4.5)),
-            tickMultiplier: Math.max(0, Number(event.tickMultiplier ?? 0)),
-            tickIntervalSeconds: Math.max(0.0001, Number(event.tickIntervalSeconds ?? 1)),
-            tickCount: Math.max(0, Number(event.tickCount ?? 0)),
-            durationSeconds: Math.max(0, Number(event.durationSeconds ?? 10)),
-            elapsedSeconds: Math.max(0, Number(event.elapsedSeconds ?? 0)),
-            remainingSeconds: Math.max(0, Number(event.remainingSeconds ?? 0)),
+            previousAnomalyEffect: effect?.id ?? String(event.previousAnomalyEffect ?? event.anomalyEffect ?? ""),
+            anomalyEffect: effect?.id ?? String(event.anomalyEffect ?? event.previousAnomalyEffect ?? ""),
+            anomalyLabel: effect?.label ?? event.anomalyLabel,
+            damageElement: DAMAGE_ELEMENTS.includes(effect?.element) ? effect.element : DAMAGE_ELEMENTS.includes(event.damageElement) ? event.damageElement : "physical",
+            baseMultiplier: disorder?.baseMultiplier ?? Math.max(0, Number(event.baseMultiplier ?? 0)),
+            fixedMultiplier: effect ? Number(effect.fixedMultiplier ?? 4.5) : Math.max(0, Number(event.fixedMultiplier ?? 4.5)),
+            tickMultiplier: effect ? Number(effect.tickMultiplier ?? 0) : Math.max(0, Number(event.tickMultiplier ?? 0)),
+            tickIntervalSeconds: effect ? Number(effect.tickIntervalSeconds ?? 1) : Math.max(0.0001, Number(event.tickIntervalSeconds ?? 1)),
+            tickCount: disorder?.tickCount ?? Math.max(0, Number(event.tickCount ?? 0)),
+            durationSeconds: duration,
+            elapsedSeconds: elapsed,
+            remainingSeconds: disorder?.remaining ?? Math.max(0, duration - elapsed),
             count: normalizeDamageCount(event.count, 1),
         }
     }
 
     const effect = disorderEffectData(catalog, event.anomalyEffect ?? event.previousAnomalyEffect ?? "burn")
-    const disorder = disorderBaseMultiplier(effect, event.elapsedSeconds, event.durationSeconds)
+    const disorder = disorderBaseMultiplier(effect, event.elapsedSeconds)
     return {
         id: String(event.id ?? `disorder-${index + 1}`),
         kind: "anomaly",
         settlementType: "disorder",
+        disorderType,
         normalized: true,
         previousAnomalyEffect: effect.id,
         anomalyEffect: effect.id,
@@ -1982,7 +2004,7 @@ function eventDamageKindKeys(event = {}) {
     if (event.kind === "direct") {
         return ["direct"]
     }
-    return isDisorderDamageEvent(event) ? ["anomaly", "disorder"] : ["anomaly"]
+    return isDisorderDamageEvent(event) ? ["disorder"] : ["anomaly"]
 }
 
 function selectedDmgBonusForElement(panel, damageElement) {
@@ -2117,6 +2139,13 @@ function eventTargetTotalsForElement(bonusTotals, event) {
     const elementDmgKey = `${damageElement}Dmg`
     const resIgnoreKey = RES_IGNORE_KEY_BY_ELEMENT[damageElement]
     const resReductionKey = RES_REDUCTION_KEY_BY_ELEMENT[damageElement]
+    const isDisorder = isDisorderDamageEvent(event)
+    const attributeAnomalyDamageBonus = isDisorder
+        ? 0
+        : sumDamageModifiers(bonusTotals, event, "anomalyDamageBonus")
+    const disorderDamageBonus = isDisorder
+        ? sumDamageModifiers(bonusTotals, event, "disorderDamageBonus")
+        : 0
     return {
         dmgBonus: sumDamageModifiers(bonusTotals, event, "dmgBonus"),
         [elementDmgKey]: sumDamageModifiers(bonusTotals, event, elementDmgKey),
@@ -2124,12 +2153,22 @@ function eventTargetTotalsForElement(bonusTotals, event) {
         enemyResReduction: sumDamageModifiers(bonusTotals, event, "enemyResReduction"),
         [resReductionKey]: sumDamageModifiers(bonusTotals, event, resReductionKey),
         [resIgnoreKey]: sumDamageModifiers(bonusTotals, event, resIgnoreKey),
-        anomalyDamageBonus: sumDamageModifiers(bonusTotals, event, "anomalyDamageBonus"),
+        anomalyDamageBonus: isDisorder ? disorderDamageBonus : attributeAnomalyDamageBonus,
+        attributeAnomalyDamageBonus,
+        disorderDamageBonus,
         skillMultiplierBonus: sumDamageModifiers(bonusTotals, event, "skillMultiplierBonus"),
     }
 }
 
 function anomalyCritMultiplier(bonusTotals, event) {
+    if (isDisorderDamageEvent(event)) {
+        return {
+            critRate: 0,
+            critDmg: 0,
+            multiplier: 1,
+        }
+    }
+
     const critRate = clampNumber(sumDamageModifiers(bonusTotals, event, "anomalyCritRate"), 0, 1)
     const critDmg = Math.max(0, sumDamageModifiers(bonusTotals, event, "anomalyCritDmg"))
     return {
@@ -2221,6 +2260,9 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
     const damageElementText = damageElementLabel(event.damageElement)
     const effectLabel = localizedName(event.anomalyLabel, event.anomalyEffect ?? event.previousAnomalyEffect)
     const isDisorder = isDisorderDamageEvent(event)
+    const specialBonusLabel = isDisorder ? "紊乱增伤区" : "属性异常增伤区"
+    const specialBonusFormulaLabel = isDisorder ? "紊乱增伤" : "属性异常增伤"
+    const multiplierScale = disorderMultiplierScale(event.disorderType)
     const rows = [
         {
             label: "局内攻击力",
@@ -2231,7 +2273,9 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
         {
             label: isDisorder ? "紊乱倍率" : "异常倍率",
             formula: isDisorder
-                ? `${effectLabel}：${formatDamagePercent(event.fixedMultiplier)} + ${event.tickCount} × ${formatDamagePercent(event.tickMultiplier)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`
+                ? multiplierScale === 1
+                    ? `${effectLabel}：${formatDamagePercent(event.fixedMultiplier)} + ${event.tickCount} × ${formatDamagePercent(event.tickMultiplier)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`
+                    : `${effectLabel}：(${formatDamagePercent(event.fixedMultiplier)} + ${event.tickCount} × ${formatDamagePercent(event.tickMultiplier)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}) × 极性紊乱 ${formatDamagePercent(multiplierScale)}`
                 : `${effectLabel}：${formatDamagePercent(event.baseMultiplierPerProc)} × ${formatDamageNumber(event.procCount)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`,
             value: effectiveBaseMultiplier,
             displayValue: formatDamagePercent(effectiveBaseMultiplier),
@@ -2262,20 +2306,22 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
             displayValue: formatDamageNumber(levelMultiplier, 4),
         },
         {
-            label: "异常增伤区",
-            formula: `1 + 异常增伤 ${formatDamagePercent(anomalyDamageBonus - 1)}`,
+            label: specialBonusLabel,
+            formula: `1 + ${specialBonusFormulaLabel} ${formatDamagePercent(anomalyDamageBonus - 1)}`,
             value: anomalyDamageBonus,
             displayValue: formatDamageNumber(anomalyDamageBonus, 4),
         },
-        {
+    ]
+    if (!isDisorder) {
+        rows.push({
             label: "异常暴击区",
             formula: anomalyCrit.multiplier === 1
                 ? "未启用异常暴击"
                 : `1 + ${formatDamagePercent(anomalyCrit.critRate)} × ${formatDamagePercent(anomalyCrit.critDmg)}`,
             value: anomalyCrit.multiplier,
             displayValue: formatDamageNumber(anomalyCrit.multiplier, 4),
-        },
-    ]
+        })
+    }
     if (event.count !== 1) {
         rows.push({
             label: "事件次数",
@@ -2287,7 +2333,17 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
     rows.push({
         label: "最终伤害",
         formula: event.count === 1
-            ? `${formatDamageNumber(atk)} × ${formatDamagePercent(effectiveBaseMultiplier)} × ${formatDamageNumber(dmgMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.defenseMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.resistanceMultiplier, 4)} × ${formatDamageNumber(anomalyProficiencyMultiplier, 4)} × ${formatDamageNumber(levelMultiplier, 4)} × ${formatDamageNumber(anomalyDamageBonus, 4)} × ${formatDamageNumber(anomalyCrit.multiplier, 4)}`
+            ? [
+                formatDamageNumber(atk),
+                formatDamagePercent(effectiveBaseMultiplier),
+                formatDamageNumber(dmgMultiplier, 4),
+                formatDamageNumber(targetBreakdown.defenseMultiplier, 4),
+                formatDamageNumber(targetBreakdown.resistanceMultiplier, 4),
+                formatDamageNumber(anomalyProficiencyMultiplier, 4),
+                formatDamageNumber(levelMultiplier, 4),
+                formatDamageNumber(anomalyDamageBonus, 4),
+                ...(!isDisorder ? [formatDamageNumber(anomalyCrit.multiplier, 4)] : []),
+            ].join(" × ")
             : `${formatDamageNumber(singleDamage)} × ${formatDamageNumber(event.count)}`,
         value: finalDamage,
         displayValue: formatDamageNumber(finalDamage),
@@ -2391,6 +2447,7 @@ function calculateDirectDamageEvent({ event, panel, bonusTotals, target, include
 
 function calculateAnomalyDamageEvent({ event, panel, bonusTotals, target, agentLevel, includeWhiteBox }) {
     const atk = Number(panel.atk ?? 0)
+    const isDisorder = isDisorderDamageEvent(event)
     const selectedDmgBonus = selectedDmgBonusForElement(panel, event.damageElement)
     const eventTotals = eventTargetTotalsForElement(bonusTotals, event)
     const elementDmgKey = `${event.damageElement}Dmg`
@@ -2399,9 +2456,12 @@ function calculateAnomalyDamageEvent({ event, panel, bonusTotals, target, agentL
     const targetBreakdown = targetBreakdownForElement(panel, bonusTotals, target, event.damageElement, eventTotals)
     const anomalyProficiencyMultiplier = Math.max(0, Number(panel.anomalyProficiency ?? 0)) / 100
     const levelMultiplier = anomalyLevelMultiplier(agentLevel)
-    const anomalyDamageBonus = 1 + Number(eventTotals.anomalyDamageBonus ?? 0)
+    const attributeAnomalyDamageBonus = isDisorder ? 1 : 1 + Number(eventTotals.attributeAnomalyDamageBonus ?? 0)
+    const disorderDamageBonus = isDisorder ? 1 + Number(eventTotals.disorderDamageBonus ?? 0) : 1
+    const anomalyDamageBonus = isDisorder ? disorderDamageBonus : attributeAnomalyDamageBonus
     const baseMultiplierBonus = sumDamageModifiers(bonusTotals, event, "baseMultiplierBonus")
-    const effectiveBaseMultiplier = Math.max(0, Number(event.baseMultiplier ?? 0) + baseMultiplierBonus)
+    const baseMultiplierScale = isDisorder ? disorderMultiplierScale(event.disorderType) : 1
+    const effectiveBaseMultiplier = Math.max(0, Number(event.baseMultiplier ?? 0) + baseMultiplierBonus) * baseMultiplierScale
     const anomalyCrit = anomalyCritMultiplier(bonusTotals, event)
     const singleDamage = atk
         * effectiveBaseMultiplier
@@ -2440,11 +2500,14 @@ function calculateAnomalyDamageEvent({ event, panel, bonusTotals, target, agentL
             anomaly: effectiveBaseMultiplier,
             baseMultiplier: Number(event.baseMultiplier ?? 0),
             baseMultiplierBonus,
+            baseMultiplierScale,
             dmg: dmgMultiplier,
             defense: targetBreakdown.defenseMultiplier,
             resistance: targetBreakdown.resistanceMultiplier,
             anomalyProficiency: anomalyProficiencyMultiplier,
             anomalyLevel: levelMultiplier,
+            attributeAnomalyDamage: attributeAnomalyDamageBonus,
+            disorderDamage: disorderDamageBonus,
             anomalyDamage: anomalyDamageBonus,
             anomalyCrit: anomalyCrit.multiplier,
             anomalyCritRate: anomalyCrit.critRate,
@@ -2559,18 +2622,15 @@ function calculateAnomalyDamageFinalValue(event, panel, bonusTotals, target, age
     const anomalyProficiencyMultiplier = Math.max(0, Number(panel.anomalyProficiency ?? 0)) / 100
     const baseMultiplierBonus = sumDamageModifiers(bonusTotals, event, "baseMultiplierBonus")
     const effectiveBaseMultiplier = Math.max(0, Number(event.baseMultiplier ?? 0) + baseMultiplierBonus)
-    const anomalyCritRate = clampNumber(sumDamageModifiers(bonusTotals, event, "anomalyCritRate"), 0, 1)
-    const anomalyCritDmg = Math.max(0, sumDamageModifiers(bonusTotals, event, "anomalyCritDmg"))
-    const anomalyCritMultiplierValue = anomalyCritRate > 0 && anomalyCritDmg > 0
-        ? 1 + anomalyCritRate * anomalyCritDmg
-        : 1
+    const anomalyDamageBonus = 1 + Number(eventTotals.anomalyDamageBonus ?? 0)
+    const anomalyCritMultiplierValue = anomalyCritMultiplier(bonusTotals, event).multiplier
     return Number(panel.atk ?? 0)
         * effectiveBaseMultiplier
         * (1 + selectedDmgBonus + skillDamageBonus)
         * targetDamageMultiplierForElement(panel, bonusTotals, target, event.damageElement, eventTotals)
         * anomalyProficiencyMultiplier
         * anomalyLevelMultiplier(agentLevel)
-        * (1 + Number(eventTotals.anomalyDamageBonus ?? 0))
+        * anomalyDamageBonus
         * anomalyCritMultiplierValue
         * Number(event.count ?? 1)
 }

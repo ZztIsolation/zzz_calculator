@@ -18,7 +18,8 @@ export const DAMAGE_KIND_LABELS = {
     disorder: "紊乱",
 }
 export const DAMAGE_MODIFIER_KIND_LABELS = {
-    anomalyDamageBonus: "异常伤害增伤",
+    anomalyDamageBonus: "属性异常增伤",
+    disorderDamageBonus: "紊乱增伤",
     baseMultiplierBonus: "伤害倍率修正",
     anomalyCritRate: "异常暴击率",
     anomalyCritDmg: "异常暴击伤害",
@@ -55,7 +56,8 @@ export const CUSTOM_BUFF_STAT_OPTIONS = [
     ["critDmg", "暴击伤害%", "flat", null],
     ["penRatio", "穿透率%", "flat", null],
     ["dmgBonus", "通用伤害%", "flat", null],
-    ["anomalyDamageBonus", "异常伤害增伤%", "eventModifier", null],
+    ["anomalyDamageBonus", "属性异常增伤%", "eventModifier", null],
+    ["disorderDamageBonus", "紊乱增伤%", "eventModifier", null],
     ["baseMultiplierBonus", "异常倍率加算%", "eventModifier", null],
     ["anomalyCritRate", "异常暴击率%", "eventModifier", null],
     ["anomalyCritDmg", "异常暴击伤害%", "eventModifier", null],
@@ -87,7 +89,8 @@ export const CUSTOM_BUFF_SKILL_STAT_OPTIONS = [
     ["iceDmg", "冰属性伤害加成%", "skill", null],
     ["electricDmg", "电属性伤害加成%", "skill", null],
     ["etherDmg", "以太伤害加成%", "skill", null],
-    ["anomalyDamageBonus", "异常伤害增伤%", "skill", null],
+    ["anomalyDamageBonus", "属性异常增伤%", "skill", null],
+    ["disorderDamageBonus", "紊乱增伤%", "skill", null],
     ["skillMultiplierBonus", "技能倍率加算%", "skill", null],
     ["enemyDefReduction", "敌方减防率%", "skill", null],
     ["enemyDefIgnore", "无视防御率%", "skill", null],
@@ -156,7 +159,8 @@ export const FALLBACK_LABELS = {
     enemyIceResReduction: "敌方冰减抗",
     enemyElectricResReduction: "敌方电减抗",
     enemyEtherResReduction: "敌方以太减抗",
-    anomalyDamageBonus: "异常伤害增伤",
+    anomalyDamageBonus: "属性异常增伤",
+    disorderDamageBonus: "紊乱增伤",
     baseMultiplierBonus: "异常倍率加算",
     anomalyCritRate: "异常暴击率",
     anomalyCritDmg: "异常暴击伤害",
@@ -230,6 +234,7 @@ export const PERCENT_KEYS = new Set([
     "enemyElectricResReduction",
     "enemyEtherResReduction",
     "anomalyDamageBonus",
+    "disorderDamageBonus",
     "baseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
@@ -274,6 +279,7 @@ export const STORED_PERCENT_STATS = new Set([
     "enemyElectricResReduction",
     "enemyEtherResReduction",
     "anomalyDamageBonus",
+    "disorderDamageBonus",
     "baseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
@@ -310,7 +316,8 @@ export const STORED_STAT_LABELS = {
     enemyIceResReduction: "敌方冰减抗%",
     enemyElectricResReduction: "敌方电减抗%",
     enemyEtherResReduction: "敌方以太减抗%",
-    anomalyDamageBonus: "异常伤害增伤%",
+    anomalyDamageBonus: "属性异常增伤%",
+    disorderDamageBonus: "紊乱增伤%",
     baseMultiplierBonus: "异常倍率加算%",
     anomalyCritRate: "异常暴击率%",
     anomalyCritDmg: "异常暴击伤害%",
@@ -430,32 +437,30 @@ export function clampWEngineModificationLevel(value, wEngine = {}) {
     return Math.max(min, Math.min(max, level))
 }
 
-function modificationScalingValue(rule, key, level) {
-    const scaling = rule?.modificationScaling?.[key]
-    if (!scaling) {
+function modificationValueForLevel(rule, key, level) {
+    const values = rule?.modificationValues?.[key]
+    if (!Array.isArray(values)) {
         return null
     }
 
-    const base = Number(scaling.base ?? rule[key] ?? 0)
-    const step = Number(scaling.step ?? 0)
-    if (!Number.isFinite(base) || !Number.isFinite(step)) {
+    const value = Number(values[level - 1])
+    if (!Number.isFinite(value)) {
         return null
     }
 
-    const displayValues = Array.isArray(scaling.displayValues) ? scaling.displayValues : []
     return {
-        value: base + step * (level - 1),
-        displayValue: displayValues[level - 1],
+        value,
+        displayValue: value,
     }
 }
 
 function materializeEffectRuleForModificationLevel(rule, level) {
-    if (!rule?.modificationScaling) {
+    if (!rule?.modificationValues) {
         return rule
     }
 
     const next = { ...rule }
-    const fixedValue = modificationScalingValue(rule, "value", level)
+    const fixedValue = modificationValueForLevel(rule, "value", level)
     if (fixedValue) {
         next.value = fixedValue.value
         if (fixedValue.displayValue !== undefined) {
@@ -463,7 +468,7 @@ function materializeEffectRuleForModificationLevel(rule, level) {
         }
     }
 
-    const valuePerStack = modificationScalingValue(rule, "valuePerStack", level)
+    const valuePerStack = modificationValueForLevel(rule, "valuePerStack", level)
     if (valuePerStack) {
         next.valuePerStack = valuePerStack.value
         if (valuePerStack.displayValue !== undefined) {
@@ -637,8 +642,86 @@ export function effectRules(effect) {
     }))
 }
 
+export function effectRuleId(rule = {}) {
+    return rule.id ?? rule.stat ?? "effect"
+}
+
 export function buffModifiers(effect) {
     return Array.isArray(effect?.buffModifiers) ? effect.buffModifiers : []
+}
+
+function finiteSourceNumber(value, fallback = null) {
+    const numeric = Number(value)
+    return Number.isFinite(numeric) ? numeric : fallback
+}
+
+export function runtimeSourceConfigForRule(rule = {}) {
+    if (rule.type !== "derived" && rule.type !== "formula") {
+        return null
+    }
+    const source = rule.source ?? {}
+    return {
+        label: localizedText(source.label ?? rule.sourceLabel) || "来源数值",
+        defaultValue: finiteSourceNumber(source.defaultValue ?? rule.defaultSourceValue, 0),
+        min: finiteSourceNumber(source.min),
+        max: finiteSourceNumber(source.max),
+    }
+}
+
+export function runtimeSourceGroupKey(rule = {}) {
+    const config = runtimeSourceConfigForRule(rule)
+    return config
+        ? JSON.stringify([config.label, config.defaultValue, config.min, config.max])
+        : ""
+}
+
+export function runtimeSourceGroups(effect) {
+    const groups = []
+    const byKey = new Map()
+    for (const rule of effectRules(effect)) {
+        const key = runtimeSourceGroupKey(rule)
+        if (!key) {
+            continue
+        }
+        let group = byKey.get(key)
+        if (!group) {
+            const config = runtimeSourceConfigForRule(rule)
+            group = {
+                key,
+                ...config,
+                ruleIds: [],
+                rules: [],
+            }
+            byKey.set(key, group)
+            groups.push(group)
+        }
+        const id = effectRuleId(rule)
+        group.rules.push(rule)
+        if (!group.ruleIds.includes(id)) {
+            group.ruleIds.push(id)
+        }
+    }
+    return groups
+}
+
+export function runtimeSourceGroupForRule(effect, ruleOrId) {
+    const id = typeof ruleOrId === "string" ? ruleOrId : effectRuleId(ruleOrId)
+    const rule = typeof ruleOrId === "string"
+        ? effectRules(effect).find(item => effectRuleId(item) === id)
+        : ruleOrId
+    const key = runtimeSourceGroupKey(rule)
+    return key ? runtimeSourceGroupForKey(effect, key) : null
+}
+
+export function runtimeSourceGroupForKey(effect, key) {
+    return runtimeSourceGroups(effect).find(group => group.key === key) ?? null
+}
+
+export function runtimeSourceRuleIdsForGroup(effect, key, fallbackRuleId = "") {
+    const group = runtimeSourceGroupForKey(effect, key)
+    return group?.ruleIds?.length
+        ? [...group.ruleIds]
+        : fallbackRuleId ? [fallbackRuleId] : []
 }
 
 export function defaultRuntimeForBuff(buff = {}) {
@@ -648,7 +731,7 @@ export function defaultRuntimeForBuff(buff = {}) {
         effects: {},
     }
     for (const rule of effectRules(buff)) {
-        const id = rule.id ?? rule.stat ?? "effect"
+        const id = effectRuleId(rule)
         if (rule.type === "derived" || rule.type === "formula") {
             runtime.effects[id] = {
                 sourceValue: Number(rule.source?.defaultValue ?? rule.defaultSourceValue ?? 0),
@@ -662,16 +745,32 @@ export function defaultRuntimeForBuff(buff = {}) {
     return runtime
 }
 
-export function runtimeForBuff(item, buff) {
+export function normalizeRuntimeForBuff(buff = {}, runtime = {}) {
     const defaults = defaultRuntimeForBuff(buff)
-    return {
+    const input = runtime && typeof runtime === "object" ? runtime : {}
+    const next = {
         ...defaults,
-        ...(item?.runtime ?? {}),
+        ...input,
         effects: {
             ...defaults.effects,
-            ...(item?.runtime?.effects ?? {}),
+            ...(input.effects ?? {}),
         },
     }
+    for (const group of runtimeSourceGroups(buff)) {
+        const primaryId = group.ruleIds[0]
+        const sourceValue = next.effects?.[primaryId]?.sourceValue ?? group.defaultValue ?? 0
+        for (const id of group.ruleIds) {
+            next.effects[id] = {
+                ...(next.effects[id] ?? {}),
+                sourceValue,
+            }
+        }
+    }
+    return next
+}
+
+export function runtimeForBuff(item, buff) {
+    return normalizeRuntimeForBuff(buff, item?.runtime)
 }
 
 function ruleTargetText(rule = {}, meta) {
@@ -684,7 +783,7 @@ function ruleTargetText(rule = {}, meta) {
 }
 
 export function storedEffectRuleText(rule, runtime, effect, meta) {
-    const id = rule.id ?? rule.stat ?? "effect"
+    const id = effectRuleId(rule)
     const coverage = Number(runtime?.coverage ?? effect?.coverage?.default ?? 1)
     const ruleRuntime = runtime?.effects?.[id] ?? {}
     if (rule.type === "damageModifier") {
@@ -917,11 +1016,19 @@ export function createCombatUiController(options = {}) {
         agentAttributeText,
         effectStats,
         effectRules,
+        effectRuleId,
         clampWEngineModificationLevel,
         materializeWEngineForModificationLevel,
         buffModifiers,
         defaultRuntimeForBuff,
+        normalizeRuntimeForBuff,
         runtimeForBuff,
+        runtimeSourceConfigForRule,
+        runtimeSourceGroupKey,
+        runtimeSourceGroups,
+        runtimeSourceGroupForRule,
+        runtimeSourceGroupForKey,
+        runtimeSourceRuleIdsForGroup,
         storedBuffModifierText,
         storedBuffModifierTexts,
         storedEffectRulesText: (effect, runtime = defaultRuntimeForBuff(effect)) => storedEffectRulesText(effect, runtime, getMeta()),

@@ -101,13 +101,15 @@ approx(burnSingleTick.damage.multipliers.anomaly, 0.5, "Burn one proc multiplier
 
 for (const [effect, elapsedSeconds, durationSeconds, expectedMultiplier] of [
     ["burn", 0, 10, 14.5],
+    ["burn", 0, 99, 14.5],
     ["burn", 3.2, 10, 11],
     ["burn", 10, 10, 4.5],
     ["burn", 20, 10, 4.5],
-    ["shock", 0, 13, 20.75],
+    ["shock", 0, 13, 17],
     ["corruption", 0, 10, 17],
     ["frozen", 0, 10, 5.25],
     ["frost_frozen", 0, undefined, 21],
+    ["frost_frozen", 0, 10, 21],
     ["frost_frozen", 3, 20, 18.75],
     ["flinch", 0, 10, 5.25],
 ]) {
@@ -119,6 +121,44 @@ for (const [effect, elapsedSeconds, durationSeconds, expectedMultiplier] of [
         durationSeconds,
     })
     approx(result.damage.multipliers.anomaly, expectedMultiplier, `${effect} disorder multiplier`)
+}
+
+const ignoredDurationDisorder = calculateEvent({
+    id: "ignored-duration",
+    kind: "disorder",
+    previousAnomalyEffect: "burn",
+    elapsedSeconds: 0,
+    durationSeconds: 99,
+})
+assert.equal(ignoredDurationDisorder.damage.input.durationSeconds, 10, "Disorder duration should come from catalog defaults")
+approx(ignoredDurationDisorder.damage.multipliers.anomaly, 14.5, "Disorder duration input should be ignored")
+
+for (const [effect, elapsedSeconds] of [
+    ["burn", 0],
+    ["burn", 3.2],
+    ["burn", 10],
+    ["shock", 0],
+    ["corruption", 0],
+    ["frozen", 0],
+    ["frost_frozen", 3],
+    ["flinch", 0],
+]) {
+    const normal = calculateEvent({
+        id: `normal-disorder-${effect}-${elapsedSeconds}`,
+        kind: "disorder",
+        disorderType: "normal",
+        previousAnomalyEffect: effect,
+        elapsedSeconds,
+    })
+    const polarized = calculateEvent({
+        id: `polarized-disorder-${effect}-${elapsedSeconds}`,
+        kind: "disorder",
+        disorderType: "polarized",
+        previousAnomalyEffect: effect,
+        elapsedSeconds,
+    })
+    approx(polarized.damage.multipliers.anomaly, normal.damage.multipliers.anomaly / 4, `${effect} polarized disorder multiplier`)
+    approx(polarized.damage.finalDamage, normal.damage.finalDamage / 4, `${effect} polarized disorder final damage`)
 }
 
 const unifiedDisorder = calculateEvent({
@@ -176,6 +216,12 @@ modifierCatalog.combatBuffs.push({
             },
         },
         {
+            id: "all_disorder",
+            type: "damageModifier",
+            kind: "disorderDamageBonus",
+            value: 20,
+        },
+        {
             id: "disorder_base",
             type: "damageModifier",
             kind: "baseMultiplierBonus",
@@ -208,7 +254,9 @@ const assaultWithModifiers = calculateEvent({
         activeBuffIds: ["test.anomaly.modifiers"],
     },
 }, modifierCatalog)
-approx(assaultWithModifiers.damage.multipliers.anomalyDamage, 1.2, "Global anomaly damage bonus")
+approx(assaultWithModifiers.damage.multipliers.attributeAnomalyDamage, 1.2, "Global attribute anomaly damage bonus")
+approx(assaultWithModifiers.damage.multipliers.disorderDamage, 1, "Disorder damage bonus should not affect attribute anomaly")
+approx(assaultWithModifiers.damage.multipliers.anomalyDamage, 1.2, "Anomaly damage alias should reflect the active attribute anomaly bonus")
 approx(assaultWithModifiers.damage.multipliers.anomalyCrit, 1.5, "Anomaly crit multiplier")
 
 const shockWithModifiers = calculateEvent({
@@ -220,7 +268,7 @@ const shockWithModifiers = calculateEvent({
         activeBuffIds: ["test.anomaly.modifiers"],
     },
 }, modifierCatalog)
-approx(shockWithModifiers.damage.multipliers.anomalyDamage, 1.5, "Shock-specific anomaly damage bonus")
+approx(shockWithModifiers.damage.multipliers.attributeAnomalyDamage, 1.5, "Shock-specific attribute anomaly damage bonus")
 
 const manualEffectModifier = calculateEvent({
     id: "manual-effect",
@@ -231,7 +279,7 @@ const manualEffectModifier = calculateEvent({
         manualEffects: [
             {
                 id: "manual_anomaly_bonus",
-                label: "手动异常增伤",
+                label: "手动属性异常增伤",
                 effects: [
                     {
                         id: "manual_anomaly_bonus",
@@ -247,7 +295,7 @@ const manualEffectModifier = calculateEvent({
         ],
     },
 })
-approx(manualEffectModifier.damage.multipliers.anomalyDamage, 1.4, "Manual damageModifier effects should apply")
+approx(manualEffectModifier.damage.multipliers.attributeAnomalyDamage, 1.4, "Manual attribute anomaly damageModifier effects should apply")
 
 const anomalyOnlyModifier = calculateEvent({
     id: "manual-anomaly-only",
@@ -258,7 +306,7 @@ const anomalyOnlyModifier = calculateEvent({
         manualEffects: [
             {
                 id: "manual_anomaly_damage_bonus",
-                label: "异常伤害增伤",
+                label: "属性异常增伤",
                 effects: [
                     {
                         id: "manual_anomaly_damage_bonus",
@@ -274,7 +322,7 @@ const anomalyOnlyModifier = calculateEvent({
         ],
     },
 })
-approx(anomalyOnlyModifier.damage.multipliers.anomalyDamage, 1.15, "Anomaly-only damage bonus should apply to anomaly damage")
+approx(anomalyOnlyModifier.damage.multipliers.attributeAnomalyDamage, 1.15, "Attribute anomaly damage bonus should apply to attribute anomaly damage")
 
 const disorderWithModifiers = calculateEvent({
     id: "disorder-mod",
@@ -288,6 +336,26 @@ const disorderWithModifiers = calculateEvent({
 }, modifierCatalog)
 approx(disorderWithModifiers.damage.multipliers.baseMultiplierBonus, 0.25, "Disorder base multiplier bonus")
 approx(disorderWithModifiers.damage.multipliers.anomaly, 4.75, "Disorder base multiplier should include bonus")
+approx(disorderWithModifiers.damage.multipliers.attributeAnomalyDamage, 1, "Attribute anomaly bonus should not affect disorder")
+approx(disorderWithModifiers.damage.multipliers.disorderDamage, 1.2, "Disorder damage bonus should affect disorder")
+approx(disorderWithModifiers.damage.multipliers.anomalyDamage, 1.2, "Anomaly damage alias should reflect the active disorder bonus")
+approx(disorderWithModifiers.damage.multipliers.anomalyCrit, 1, "Anomaly crit should not affect disorder")
+approx(disorderWithModifiers.damage.multipliers.anomalyCritRate, 0, "Anomaly crit rate should be suppressed for disorder")
+approx(disorderWithModifiers.damage.multipliers.anomalyCritDmg, 0, "Anomaly crit damage should be suppressed for disorder")
+
+const polarizedDisorderWithModifiers = calculateEvent({
+    id: "polarized-disorder-mod",
+    kind: "disorder",
+    disorderType: "polarized",
+    previousAnomalyEffect: "burn",
+    elapsedSeconds: 10,
+}, {
+    combatBuffs: {
+        activeBuffIds: ["test.anomaly.modifiers"],
+    },
+}, modifierCatalog)
+approx(polarizedDisorderWithModifiers.damage.multipliers.anomaly, disorderWithModifiers.damage.multipliers.anomaly / 4, "Polarized disorder should scale modified disorder multiplier")
+approx(polarizedDisorderWithModifiers.damage.finalDamage, disorderWithModifiers.damage.finalDamage / 4, "Polarized disorder should scale modified final damage")
 
 const disorderWithAnomalyOnlyModifier = calculateEvent({
     id: "disorder-anomaly-only",
@@ -299,7 +367,7 @@ const disorderWithAnomalyOnlyModifier = calculateEvent({
         manualEffects: [
             {
                 id: "manual_anomaly_damage_bonus",
-                label: "异常伤害增伤",
+                label: "属性异常增伤",
                 effects: [
                     {
                         id: "manual_anomaly_damage_bonus",
@@ -315,11 +383,43 @@ const disorderWithAnomalyOnlyModifier = calculateEvent({
         ],
     },
 })
-approx(disorderWithAnomalyOnlyModifier.damage.multipliers.anomalyDamage, 1.15, "Anomaly-only damage bonus should apply to disorder subtype")
+approx(disorderWithAnomalyOnlyModifier.damage.multipliers.attributeAnomalyDamage, 1, "Attribute anomaly bonus should not apply to disorder")
+approx(disorderWithAnomalyOnlyModifier.damage.multipliers.disorderDamage, 1, "Disorder should stay unbuffed without disorder damage bonus")
+approx(disorderWithAnomalyOnlyModifier.damage.multipliers.anomalyDamage, 1, "Anomaly damage alias should stay neutral for unbuffed disorder")
+
+const disorderOnlyModifier = calculateEvent({
+    id: "manual-disorder-only",
+    kind: "disorder",
+    previousAnomalyEffect: "burn",
+    elapsedSeconds: 10,
+}, {
+    combatBuffs: {
+        manualEffects: [
+            {
+                id: "manual_disorder_damage_bonus",
+                label: "紊乱增伤",
+                effects: [
+                    {
+                        id: "manual_disorder_damage_bonus",
+                        type: "damageModifier",
+                        kind: "disorderDamageBonus",
+                        value: 0.15,
+                        appliesTo: {
+                            damageKinds: ["disorder"],
+                        },
+                    },
+                ],
+            },
+        ],
+    },
+})
+approx(disorderOnlyModifier.damage.multipliers.disorderDamage, 1.15, "Disorder damage bonus should apply to disorder")
+approx(disorderOnlyModifier.damage.multipliers.attributeAnomalyDamage, 1, "Disorder damage bonus should not affect attribute anomaly bonus bucket")
 
 const youyeAdditionalBuffId = "youye.additional_ability.anomaly_damage_bonus"
 const youyeCinemaOneBuffId = "youye.cinema_1.amplify_additional_ability"
 const youyeAdditionalEffectId = "youye_additional_anomaly_damage_bonus"
+const youyeAdditionalDisorderEffectId = "youye_additional_disorder_damage_bonus"
 
 const youyeAdditionalOnly = calculateEvent({
     id: "youye-additional",
@@ -330,7 +430,8 @@ const youyeAdditionalOnly = calculateEvent({
         activeBuffIds: [youyeAdditionalBuffId],
     },
 })
-approx(youyeAdditionalOnly.damage.multipliers.anomalyDamage, 1.2, "Youye additional ability should grant 20% anomaly damage at 200 AM")
+approx(youyeAdditionalOnly.damage.multipliers.attributeAnomalyDamage, 1.2, "Youye additional ability should grant 20% attribute anomaly damage at 200 AM")
+approx(youyeAdditionalOnly.damage.multipliers.disorderDamage, 1, "Youye disorder bonus should not affect attribute anomaly events")
 
 const youyeAdditionalWithCinema = calculateEvent({
     id: "youye-additional-cinema",
@@ -341,7 +442,7 @@ const youyeAdditionalWithCinema = calculateEvent({
         activeBuffIds: [youyeAdditionalBuffId, youyeCinemaOneBuffId],
     },
 })
-approx(youyeAdditionalWithCinema.damage.multipliers.anomalyDamage, 1.26, "Youye cinema 1 should multiply the additional ability by 130%")
+approx(youyeAdditionalWithCinema.damage.multipliers.attributeAnomalyDamage, 1.26, "Youye cinema 1 should multiply the attribute anomaly additional ability by 130%")
 
 const youyeCinemaOnly = calculateEvent({
     id: "youye-cinema-only",
@@ -352,7 +453,7 @@ const youyeCinemaOnly = calculateEvent({
         activeBuffIds: [youyeCinemaOneBuffId],
     },
 })
-approx(youyeCinemaOnly.damage.multipliers.anomalyDamage, 1, "Youye cinema 1 alone should not grant anomaly damage")
+approx(youyeCinemaOnly.damage.multipliers.attributeAnomalyDamage, 1, "Youye cinema 1 alone should not grant attribute anomaly damage")
 
 const youyeAdditionalAt150 = calculateEvent({
     id: "youye-additional-150",
@@ -372,7 +473,7 @@ const youyeAdditionalAt150 = calculateEvent({
         },
     },
 })
-approx(youyeAdditionalAt150.damage.multipliers.anomalyDamage, 1.1, "Youye additional ability should grant 10% anomaly damage at 150 AM")
+approx(youyeAdditionalAt150.damage.multipliers.attributeAnomalyDamage, 1.1, "Youye additional ability should grant 10% attribute anomaly damage at 150 AM")
 
 const youyeAdditionalAt150WithCinema = calculateEvent({
     id: "youye-additional-150-cinema",
@@ -392,7 +493,7 @@ const youyeAdditionalAt150WithCinema = calculateEvent({
         },
     },
 })
-approx(youyeAdditionalAt150WithCinema.damage.multipliers.anomalyDamage, 1.13, "Youye cinema 1 should multiply the 150 AM additional ability value")
+approx(youyeAdditionalAt150WithCinema.damage.multipliers.attributeAnomalyDamage, 1.13, "Youye cinema 1 should multiply the 150 AM attribute anomaly additional ability value")
 
 const youyeDisorderWithCinema = calculateEvent({
     id: "youye-disorder-cinema",
@@ -404,7 +505,33 @@ const youyeDisorderWithCinema = calculateEvent({
         activeBuffIds: [youyeAdditionalBuffId, youyeCinemaOneBuffId],
     },
 })
-approx(youyeDisorderWithCinema.damage.multipliers.anomalyDamage, 1.26, "Youye amplified additional ability should also apply to disorder")
+approx(youyeDisorderWithCinema.damage.multipliers.attributeAnomalyDamage, 1, "Youye attribute anomaly bonus should not affect disorder")
+approx(youyeDisorderWithCinema.damage.multipliers.disorderDamage, 1.26, "Youye amplified disorder bonus should apply to disorder")
+approx(youyeDisorderWithCinema.damage.multipliers.anomalyDamage, 1.26, "Anomaly damage alias should reflect Youye's active disorder bonus")
+
+const youyeDisorderAt150WithCinema = calculateEvent({
+    id: "youye-disorder-150-cinema",
+    kind: "disorder",
+    previousAnomalyEffect: "burn",
+    elapsedSeconds: 10,
+}, {
+    combatBuffs: {
+        activeBuffIds: [youyeAdditionalBuffId, youyeCinemaOneBuffId],
+        runtimeInputs: {
+            [youyeAdditionalBuffId]: {
+                effects: {
+                    [youyeAdditionalEffectId]: {
+                        sourceValue: 150,
+                    },
+                    [youyeAdditionalDisorderEffectId]: {
+                        sourceValue: 150,
+                    },
+                },
+            },
+        },
+    },
+})
+approx(youyeDisorderAt150WithCinema.damage.multipliers.disorderDamage, 1.13, "Youye cinema 1 should multiply the 150 AM disorder additional ability value")
 
 const reversedYouyeCatalog = cloneCatalog(catalog)
 reversedYouyeCatalog.combatBuffs = [...reversedYouyeCatalog.combatBuffs].sort((left, right) => {
@@ -425,7 +552,7 @@ const youyeReversedOrder = calculateEvent({
         activeBuffIds: [youyeAdditionalBuffId, youyeCinemaOneBuffId],
     },
 }, reversedYouyeCatalog)
-approx(youyeReversedOrder.damage.multipliers.anomalyDamage, 1.26, "Buff modifier result should not depend on catalog order")
+approx(youyeReversedOrder.damage.multipliers.attributeAnomalyDamage, 1.26, "Buff modifier result should not depend on catalog order")
 
 const directWithoutModifiers = calculateEvent({
     id: "direct",

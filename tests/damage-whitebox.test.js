@@ -434,6 +434,106 @@ const anomalyDefenseRows = anomalyCombo.damage.whiteBoxRows.filter(row => row.la
 assert.equal(anomalyDefenseRows.length, 1, "Anomaly whitebox should expose one defense multiplier row")
 assert.deepEqual(anomalyDefenseRows[0].formulaLines, comboDefenseRows[0].formulaLines)
 
+const anomalyBonusSplitCatalog = cloneCatalog(catalog)
+anomalyBonusSplitCatalog.combatBuffs.push({
+    id: "test.damage.anomaly_bonus_split",
+    sourceType: "manual",
+    scope: "inCombat",
+    effects: [
+        {
+            id: "attribute_anomaly_bonus",
+            type: "damageModifier",
+            kind: "anomalyDamageBonus",
+            value: 25,
+        },
+        {
+            id: "disorder_bonus",
+            type: "damageModifier",
+            kind: "disorderDamageBonus",
+            value: 40,
+        },
+        {
+            id: "anomaly_crit_rate",
+            type: "damageModifier",
+            kind: "anomalyCritRate",
+            value: 50,
+        },
+        {
+            id: "anomaly_crit_dmg",
+            type: "damageModifier",
+            kind: "anomalyCritDmg",
+            value: 100,
+        },
+    ],
+})
+const attributeAnomalyWhiteBox = calculateInCombatPanel(anomalyBonusSplitCatalog, minimalInput({
+    combatBuffs: {
+        activeBuffIds: ["test.damage.anomaly_bonus_split"],
+    },
+    damage: {
+        selectedEventId: "assault-whitebox",
+        events: [
+            {
+                id: "assault-whitebox",
+                kind: "anomaly",
+                anomalyEffect: "assault",
+            },
+        ],
+    },
+}))
+approx(attributeAnomalyWhiteBox.damage.multipliers.attributeAnomalyDamage, 1.25, "Attribute anomaly whitebox multiplier")
+approx(attributeAnomalyWhiteBox.damage.multipliers.disorderDamage, 1, "Disorder bonus should not affect attribute anomaly whitebox")
+approx(attributeAnomalyWhiteBox.damage.multipliers.anomalyCrit, 1.5, "Attribute anomaly should use anomaly crit")
+assert.equal(
+    attributeAnomalyWhiteBox.damage.whiteBoxRows.find(row => row.label === "属性异常增伤区")?.formula,
+    "1 + 属性异常增伤 25%",
+    "Attribute anomaly whitebox should expose attribute anomaly bonus row",
+)
+assert.ok(
+    attributeAnomalyWhiteBox.damage.whiteBoxRows.some(row => row.label === "异常暴击区"),
+    "Attribute anomaly whitebox should expose anomaly crit row",
+)
+assert.equal(
+    attributeAnomalyWhiteBox.damage.whiteBoxRows.some(row => row.label === "紊乱增伤区"),
+    false,
+    "Attribute anomaly whitebox should not expose disorder bonus row",
+)
+
+const disorderBonusWhiteBox = calculateInCombatPanel(anomalyBonusSplitCatalog, minimalInput({
+    combatBuffs: {
+        activeBuffIds: ["test.damage.anomaly_bonus_split"],
+    },
+    damage: {
+        selectedEventId: "burn-disorder-whitebox",
+        events: [
+            {
+                id: "burn-disorder-whitebox",
+                kind: "disorder",
+                previousAnomalyEffect: "burn",
+                elapsedSeconds: 10,
+            },
+        ],
+    },
+}))
+approx(disorderBonusWhiteBox.damage.multipliers.attributeAnomalyDamage, 1, "Attribute anomaly bonus should not affect disorder whitebox")
+approx(disorderBonusWhiteBox.damage.multipliers.disorderDamage, 1.4, "Disorder whitebox multiplier")
+approx(disorderBonusWhiteBox.damage.multipliers.anomalyCrit, 1, "Disorder should not use anomaly crit")
+assert.equal(
+    disorderBonusWhiteBox.damage.whiteBoxRows.find(row => row.label === "紊乱增伤区")?.formula,
+    "1 + 紊乱增伤 40%",
+    "Disorder whitebox should expose disorder bonus row",
+)
+assert.equal(
+    disorderBonusWhiteBox.damage.whiteBoxRows.some(row => row.label === "属性异常增伤区"),
+    false,
+    "Disorder whitebox should not expose attribute anomaly bonus row",
+)
+assert.equal(
+    disorderBonusWhiteBox.damage.whiteBoxRows.some(row => row.label === "异常暴击区"),
+    false,
+    "Disorder whitebox should not expose anomaly crit row",
+)
+
 const frozenDisorderWhiteBox = calculateInCombatPanel(catalog, minimalInput({
     damage: {
         selectedEventId: "frozen-disorder",

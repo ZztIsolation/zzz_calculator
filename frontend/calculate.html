@@ -215,15 +215,18 @@
               </label>
               <label class="field calculation-anomaly-disorder-field" hidden>
                 <span>紊乱类型</span>
+                <select id="damageDisorderType">
+                  <option value="normal">（普通）紊乱</option>
+                  <option value="polarized">极性紊乱</option>
+                </select>
+              </label>
+              <label class="field calculation-anomaly-disorder-field" hidden>
+                <span>原异常</span>
                 <select id="damageDisorderEffect"></select>
               </label>
               <label class="field calculation-anomaly-disorder-field" hidden>
                 <span>已生效秒数</span>
                 <input id="damageDisorderElapsed" type="number" min="0" step="0.1" value="0">
-              </label>
-              <label class="field calculation-anomaly-disorder-field" hidden>
-                <span>持续秒数</span>
-                <input id="damageDisorderDuration" type="number" min="0" step="0.1" value="10">
               </label>
             </div>
             <div class="optimizer-settings-grid">
@@ -245,7 +248,10 @@
                   <button type="button" class="compact-btn" data-clear-two-piece-sets>清空</button>
                 </div>
                 <select id="twoPieceSetSelect" multiple hidden></select>
-                <div id="twoPieceSetChoices" class="main-stat-choice-list two-piece-choice-list"></div>
+                <div class="two-piece-summary-actions">
+                  <button id="openTwoPieceSetModalBtn" type="button" class="ghost-btn">选择套装</button>
+                  <div id="twoPieceSelectedSummary" class="two-piece-selected-summary" aria-live="polite"></div>
+                </div>
               </div>
             </div>
 
@@ -419,6 +425,18 @@
         <button type="button" data-combat-buff-tab="custom">自定义</button>
       </div>
 
+      <div id="combatBuffTeammatePicker" class="combat-buff-teammate-picker" hidden>
+        <label class="field">
+          <span>队友</span>
+          <select id="combatBuffTeammateSelect"></select>
+        </label>
+        <div class="combat-buff-bulk-actions">
+          <button id="addTeammateBuffsBtn" type="button" class="compact-btn">添加该角色全部 Buff</button>
+          <button id="removeTeammateBuffsBtn" type="button" class="compact-btn">移除该角色 Buff</button>
+        </div>
+        <small id="combatBuffTeammateHint">最多选择 2 名角色</small>
+      </div>
+
       <div id="combatBuffCandidateList" class="combat-buff-candidate-list"></div>
       <div id="combatBuffCustomPane" class="combat-custom-pane" hidden>
         <label class="field">
@@ -434,6 +452,20 @@
         <strong>No Data</strong>
         <span>暂无可添加的 Buff</span>
       </div>
+    </section>
+  </div>
+
+  <div id="twoPieceSetModal" class="modal-layer" hidden>
+    <div class="modal-scrim" data-close-two-piece-set-modal></div>
+    <section class="disc-modal two-piece-set-modal" role="dialog" aria-modal="true" aria-labelledby="twoPieceSetModalTitle">
+      <button id="closeTwoPieceSetModalBtn" type="button" class="modal-close" aria-label="关闭">×</button>
+      <header class="modal-head">
+        <div>
+          <h2 id="twoPieceSetModalTitle">选择额外 2 件套</h2>
+          <p>勾选允许优化器使用的额外驱动盘 2 件套</p>
+        </div>
+      </header>
+      <div id="twoPieceSetChoices" class="two-piece-choice-list"></div>
     </section>
   </div>
 
@@ -454,19 +486,13 @@
           <select id="calculationConfigMode">
             <option value="single">最大化单个伤害</option>
             <option value="anomaly">最大化异常伤害</option>
+            <option value="adminDefault">未配置默认循环</option>
             <option value="custom">自定义</option>
           </select>
         </label>
-        <div class="field calculation-default-field">
-          <span>管理员默认</span>
-          <div class="calculation-default-row">
-            <strong id="adminDefaultCalculationSummary">未配置</strong>
-            <button id="applyAdminDefaultCalculationBtn" type="button" class="compact-btn">应用</button>
-          </div>
-        </div>
       </div>
 
-      <div class="calculation-config-events">
+      <div id="calculationCustomConfigEvents" class="calculation-config-events">
         <div class="calculation-config-workspace">
           <aside class="calculation-event-sidebar">
             <div class="calculation-event-sidebar-head">
@@ -492,6 +518,27 @@
               </div>
             </div>
             <div id="calculationEventEditorFields" class="maintenance-grid calculation-event-grid"></div>
+          </section>
+        </div>
+      </div>
+
+      <div id="adminDefaultCalculationPreview" class="calculation-config-events calculation-admin-default-preview" hidden>
+        <div class="calculation-config-workspace">
+          <aside class="calculation-event-sidebar">
+            <div class="calculation-event-sidebar-head">
+              <strong>目标事件</strong>
+              <span id="adminDefaultCalculationEventCount">0 项</span>
+            </div>
+            <div id="adminDefaultCalculationEventList" class="calculation-config-event-list calculation-default-event-list"></div>
+          </aside>
+          <section class="calculation-event-editor calculation-default-event-detail">
+            <div class="calculation-event-editor-head">
+              <div>
+                <span>默认循环事件</span>
+                <strong id="adminDefaultCalculationEventTitle">-</strong>
+              </div>
+            </div>
+            <div id="adminDefaultCalculationEventFields" class="calculation-default-detail-grid"></div>
           </section>
         </div>
       </div>

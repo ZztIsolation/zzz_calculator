@@ -14,6 +14,9 @@ import {
     defaultRuntimeForBuff,
     nameOf,
     normalizeCustomBuffEffect,
+    runtimeForBuff,
+    runtimeSourceGroups,
+    runtimeSourceRuleIdsForGroup,
     sanitizeAddedCombatBuffs,
     skillTargetLabel,
     storedBuffModifierTexts,
@@ -119,6 +122,167 @@ assert.equal(
     "测试 BOSS",
     "Boss Buff cards should display bossName when no name is present",
 )
+
+const groupedFormulaRuntimeBuff = {
+    id: "grouped-formula-runtime",
+    effects: [
+        {
+            id: "formula-anomaly",
+            type: "formula",
+            stat: "anomalyDamageBonus",
+            mode: "flat",
+            source: {
+                label: { zhCN: "柚叶异常掌控" },
+                defaultValue: 200,
+                min: 100,
+                max: 200,
+            },
+            formula: { expression: "x", valueUnit: "storedPercent" },
+        },
+        {
+            id: "formula-disorder",
+            type: "formula",
+            stat: "disorderDamageBonus",
+            mode: "flat",
+            source: {
+                label: { zhCN: "柚叶异常掌控" },
+                defaultValue: 200,
+                min: 100,
+                max: 200,
+            },
+            formula: { expression: "x * 2", valueUnit: "storedPercent" },
+        },
+        {
+            id: "stacked-dmg",
+            type: "stacked",
+            stat: "dmgBonus",
+            mode: "flat",
+            valuePerStack: 10,
+            maxStacks: 3,
+            defaultStacks: 2,
+        },
+    ],
+}
+const groupedFormulaRuntime = runtimeForBuff({
+    runtime: {
+        effects: {
+            "formula-anomaly": { sourceValue: 171 },
+            "formula-disorder": { sourceValue: 199 },
+            "stacked-dmg": { stacks: 1 },
+        },
+    },
+}, groupedFormulaRuntimeBuff)
+const groupedFormulaSources = runtimeSourceGroups(groupedFormulaRuntimeBuff)
+assert.deepEqual(
+    groupedFormulaSources.map(group => group.ruleIds),
+    [["formula-anomaly", "formula-disorder"]],
+    "Formula rules with matching source name/default/min/max should share one runtime source group",
+)
+assert.deepEqual(
+    runtimeSourceRuleIdsForGroup(groupedFormulaRuntimeBuff, groupedFormulaSources[0].key),
+    ["formula-anomaly", "formula-disorder"],
+    "Runtime source helper should return every rule in the same source group",
+)
+assert.equal(groupedFormulaRuntime.effects["formula-anomaly"].sourceValue, 171)
+assert.equal(
+    groupedFormulaRuntime.effects["formula-disorder"].sourceValue,
+    171,
+    "Grouped formula rules should normalize to the first rule's source value",
+)
+assert.equal(
+    groupedFormulaRuntime.effects["stacked-dmg"].stacks,
+    1,
+    "Stacked runtime values should not be affected by source grouping",
+)
+
+const splitRuntimeBuff = {
+    id: "split-runtime",
+    effects: [
+        {
+            id: "formula-default-a",
+            type: "formula",
+            stat: "dmgBonus",
+            source: { label: { zhCN: "同源" }, defaultValue: 200, min: 100, max: 200 },
+            formula: { expression: "x", valueUnit: "storedPercent" },
+        },
+        {
+            id: "formula-default-b",
+            type: "formula",
+            stat: "critDmg",
+            source: { label: { zhCN: "同源" }, defaultValue: 199, min: 100, max: 200 },
+            formula: { expression: "x", valueUnit: "storedPercent" },
+        },
+        {
+            id: "formula-min-b",
+            type: "formula",
+            stat: "critRate",
+            source: { label: { zhCN: "同源" }, defaultValue: 200, min: 0, max: 200 },
+            formula: { expression: "x", valueUnit: "storedPercent" },
+        },
+        {
+            id: "derived-no-bounds",
+            type: "derived",
+            stat: "atkFlat",
+            sourceLabel: { zhCN: "同源" },
+            defaultSourceValue: 200,
+            ratio: 10,
+        },
+    ],
+}
+const splitRuntime = runtimeForBuff({
+    runtime: {
+        effects: {
+            "formula-default-a": { sourceValue: 111 },
+            "formula-default-b": { sourceValue: 222 },
+            "formula-min-b": { sourceValue: 333 },
+            "derived-no-bounds": { sourceValue: 444 },
+        },
+    },
+}, splitRuntimeBuff)
+assert.equal(runtimeSourceGroups(splitRuntimeBuff).length, 4, "Different source defaults or bounds should not merge")
+assert.equal(splitRuntime.effects["formula-default-a"].sourceValue, 111)
+assert.equal(splitRuntime.effects["formula-default-b"].sourceValue, 222)
+assert.equal(splitRuntime.effects["formula-min-b"].sourceValue, 333)
+assert.equal(splitRuntime.effects["derived-no-bounds"].sourceValue, 444)
+
+const crossTypeRuntimeBuff = {
+    id: "cross-type-runtime",
+    effects: [
+        {
+            id: "derived-source",
+            type: "derived",
+            stat: "atkFlat",
+            sourceLabel: { zhCN: "共享来源" },
+            defaultSourceValue: 50,
+            ratio: 20,
+        },
+        {
+            id: "formula-source",
+            type: "formula",
+            stat: "dmgBonus",
+            source: {
+                label: { zhCN: "共享来源" },
+                defaultValue: 50,
+            },
+            formula: { expression: "x", valueUnit: "storedPercent" },
+        },
+    ],
+}
+const crossTypeRuntime = runtimeForBuff({
+    runtime: {
+        effects: {
+            "derived-source": { sourceValue: 60 },
+            "formula-source": { sourceValue: 70 },
+        },
+    },
+}, crossTypeRuntimeBuff)
+assert.deepEqual(
+    runtimeSourceGroups(crossTypeRuntimeBuff).map(group => group.ruleIds),
+    [["derived-source", "formula-source"]],
+    "Derived and formula rules can share a source group when name/default/bounds match",
+)
+assert.equal(crossTypeRuntime.effects["formula-source"].sourceValue, 60)
+
 assert.deepEqual(
     sanitizeAddedCombatBuffs([
         {
@@ -157,7 +321,7 @@ assert.equal(
             anomalyEffects: ["assault"],
         },
     }, {}, {}, catalog.meta),
-    "异常伤害增伤 +20%（异常 / 强击）",
+    "属性异常增伤 +20%（异常 / 强击）",
     "Damage modifier text should display decimal stored values as percentages",
 )
 assert.equal(
@@ -189,10 +353,14 @@ assert.equal(
     "敌方减防率% +30%（技能：星见雅/强化普攻：霜月）",
     "Skill-targeted rule text should show compact skill labels",
 )
-const anomalyDamageBonusOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[1] === "异常伤害增伤%")
+const anomalyDamageBonusOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[1] === "属性异常增伤%")
 assert.ok(anomalyDamageBonusOption, "Custom Buff stat options should include anomaly damage bonus")
 assert.equal(anomalyDamageBonusOption[0], "anomalyDamageBonus", "Anomaly damage bonus should be a fixed event stat")
 assert.equal(anomalyDamageBonusOption[2], "eventModifier", "Anomaly damage bonus option should use the default event modifier bucket")
+const disorderDamageBonusOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[1] === "紊乱增伤%")
+assert.ok(disorderDamageBonusOption, "Custom Buff stat options should include disorder damage bonus")
+assert.equal(disorderDamageBonusOption[0], "disorderDamageBonus", "Disorder damage bonus should be a fixed event stat")
+assert.equal(disorderDamageBonusOption[2], "eventModifier", "Disorder damage bonus option should use the default event modifier bucket")
 const defenseIgnoreOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[1] === "无视防御率%")
 assert.ok(defenseIgnoreOption, "Custom Buff stat options should include defense ignore alias")
 assert.equal(defenseIgnoreOption[0], "enemyDefIgnore", "Defense ignore should be exposed as a defense reduction alias")
@@ -213,6 +381,9 @@ assert.equal(directSkillDamageOption[2], "skill", "Skill-targeted damage bonus o
 const skillAnomalyDamageOption = CUSTOM_BUFF_SKILL_STAT_OPTIONS.find(option => option[0] === "anomalyDamageBonus")
 assert.ok(skillAnomalyDamageOption, "Skill Custom Buff stat options should include anomaly damage bonus")
 assert.equal(skillAnomalyDamageOption[2], "skill")
+const skillDisorderDamageOption = CUSTOM_BUFF_SKILL_STAT_OPTIONS.find(option => option[0] === "disorderDamageBonus")
+assert.ok(skillDisorderDamageOption, "Skill Custom Buff stat options should include disorder damage bonus")
+assert.equal(skillDisorderDamageOption[2], "skill")
 const skillMultiplierOption = CUSTOM_BUFF_SKILL_STAT_OPTIONS.find(option => option[0] === "skillMultiplierBonus")
 assert.ok(skillMultiplierOption, "Skill Custom Buff stat options should include skill multiplier bonus")
 assert.equal(skillMultiplierOption[1], "技能倍率加算%")
@@ -244,6 +415,25 @@ assert.deepEqual(
         label: null,
     },
     "Custom event modifier normalization should keep default target fixed rules",
+)
+assert.deepEqual(
+    normalizeCustomBuffEffect({
+        id: "custom-fixed-disorder",
+        type: "fixed",
+        stat: "disorderDamageBonus",
+        value: 15,
+        target: { kind: "default" },
+    }),
+    {
+        id: "custom-fixed-disorder",
+        type: "fixed",
+        stat: "disorderDamageBonus",
+        value: 15,
+        mode: "flat",
+        target: { kind: "default" },
+        label: null,
+    },
+    "Custom event modifier normalization should keep disorder damage bonus fixed rules",
 )
 assert.deepEqual(
     normalizeCustomBuffEffect({

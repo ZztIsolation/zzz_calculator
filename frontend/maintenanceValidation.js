@@ -15,12 +15,13 @@ const FORMULA_VALUE_UNIT_VALUES = new Set(["storedValue", "storedPercent"])
 const SKILL_ROW_KIND_VALUES = new Set(["damageMultiplier", "dazeMultiplier", "energyCost", "statBonus"])
 const DAMAGE_EVENT_KIND_VALUES = new Set(["direct", "anomaly", "disorder"])
 const ANOMALY_SETTLEMENT_TYPE_VALUES = new Set(["attribute", "disorder"])
+const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
 const CALCULATION_MODE_VALUES = new Set(["single", "anomaly", "custom"])
-const DAMAGE_MODIFIER_KIND_VALUES = new Set(["anomalyDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "directDamageBonus", "skillMultiplierBonus"])
+const DAMAGE_MODIFIER_KIND_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "directDamageBonus", "skillMultiplierBonus"])
 const SKILL_TARGET_DAMAGE_MODIFIER_KIND_VALUES = new Set(["directDamageBonus", "skillMultiplierBonus"])
 const DAMAGE_MODIFIER_VALUE_UNIT_VALUES = new Set(["decimal"])
 const RULE_TARGET_KIND_VALUES = new Set(["default", "skill"])
-const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["anomalyDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg"])
+const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg"])
 const SKILL_TARGET_STAT_VALUES = new Set([
     "physicalResIgnore",
     "fireResIgnore",
@@ -42,6 +43,7 @@ const SKILL_TARGET_STAT_VALUES = new Set([
     "electricDmg",
     "etherDmg",
     "anomalyDamageBonus",
+    "disorderDamageBonus",
     "skillMultiplierBonus",
 ])
 const ANOMALY_EFFECT_VALUES = new Set(["assault", "shatter", "burn", "shock", "corruption", "frozen", "flinch"])
@@ -238,37 +240,39 @@ function validateCoverage(errors, coverage, path) {
     }
 }
 
-function validateModificationScaling(errors, scaling, path, rankOneValue) {
-    if (!scaling) {
+function validateModificationValues(errors, container, key, path, rankOneValue) {
+    if (!container) {
         return
     }
 
-    if (typeof scaling !== "object" || Array.isArray(scaling)) {
+    if (typeof container !== "object" || Array.isArray(container)) {
         add(errors, path, "必须是 JSON 对象。")
         return
     }
 
-    const base = requireFinite(errors, scaling.base, `${path}.base`)
-    requireFinite(errors, scaling.step, `${path}.step`)
-    const displayValues = scaling.displayValues
-    if (!Array.isArray(displayValues) || displayValues.length !== 5) {
-        add(errors, `${path}.displayValues`, "必须覆盖 1-5 级五个展示值。")
+    const values = container[key]
+    if (!Array.isArray(values) || values.length !== 5) {
+        add(errors, `${path}.${key}`, "必须覆盖 1-5 级五个实际值。")
     } else {
-        displayValues.forEach((value, index) => requireFinite(errors, value, `${path}.displayValues[${index}]`))
+        values.forEach((value, index) => requireFinite(errors, value, `${path}.${key}[${index}]`))
     }
 
-    if (Number.isFinite(base) && Number.isFinite(rankOneValue) && Math.abs(base - rankOneValue) > 1e-9) {
-        add(errors, `${path}.base`, "1级计算值必须与规则当前数值一致。")
+    const rankOne = Number(values?.[0])
+    if (Number.isFinite(rankOne) && Number.isFinite(rankOneValue) && Math.abs(rankOne - rankOneValue) > 1e-9) {
+        add(errors, `${path}.${key}[0]`, "1级实际值必须与规则当前数值一致。")
     }
 }
 
 function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scope = "outOfCombat") {
     const type = rule.type ?? "fixed"
     requireEnum(errors, type, EFFECT_TYPE_VALUES, `${path}.type`)
+    if (rule.modificationScaling) {
+        add(errors, `${path}.modificationScaling`, "旧的改装等级缩放格式已废弃，请使用 modificationValues。")
+    }
 
     if (type === "damageModifier") {
-        if (rule.modificationScaling) {
-            add(errors, `${path}.modificationScaling`, "改装等级缩放只支持固定值或叠层规则。")
+        if (rule.modificationValues) {
+            add(errors, `${path}.modificationValues`, "改装等级实际值只支持固定值或叠层规则。")
         }
         requireEnum(errors, rule.kind, DAMAGE_MODIFIER_KIND_VALUES, `${path}.kind`)
         const value = requireFinite(errors, rule.value, `${path}.value`)
@@ -345,8 +349,8 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     }
 
     if (type === "derived") {
-        if (rule.modificationScaling) {
-            add(errors, `${path}.modificationScaling`, "改装等级缩放只支持固定值或叠层规则。")
+        if (rule.modificationValues) {
+            add(errors, `${path}.modificationValues`, "改装等级实际值只支持固定值或叠层规则。")
         }
         requireName(errors, rule.sourceLabel, `${path}.sourceLabel`)
         requireFinite(errors, rule.defaultSourceValue, `${path}.defaultSourceValue`)
@@ -364,8 +368,8 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     }
 
     if (type === "formula") {
-        if (rule.modificationScaling) {
-            add(errors, `${path}.modificationScaling`, "改装等级缩放只支持固定值或叠层规则。")
+        if (rule.modificationValues) {
+            add(errors, `${path}.modificationValues`, "改装等级实际值只支持固定值或叠层规则。")
         }
         const source = rule.source ?? {}
         requireName(errors, source.label ?? rule.sourceLabel, `${path}.source.label`)
@@ -425,7 +429,7 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
         if (Number.isFinite(defaultStacks) && Number.isFinite(maxStacks) && (defaultStacks < 0 || defaultStacks > maxStacks)) {
             add(errors, `${path}.defaultStacks`, "默认层数必须在 0 到最大层数之间。")
         }
-        validateModificationScaling(errors, rule.modificationScaling?.valuePerStack, `${path}.modificationScaling.valuePerStack`, value)
+        validateModificationValues(errors, rule.modificationValues, "valuePerStack", `${path}.modificationValues`, value)
         return
     }
 
@@ -433,7 +437,7 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     if (Number.isFinite(value) && value === 0) {
         add(errors, `${path}.value`, "数值不能为 0。")
     }
-    validateModificationScaling(errors, rule.modificationScaling?.value, `${path}.modificationScaling.value`, value)
+    validateModificationValues(errors, rule.modificationValues, "value", `${path}.modificationValues`, value)
 }
 
 function validateRequiredStringList(errors, value, path, label) {
@@ -666,8 +670,10 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
     if (!calculationAnomalyIds(context, "disorder").has(disorderEffectId)) {
         add(errors, event.anomalyEffect === undefined ? `${path}.previousAnomalyEffect` : `${path}.anomalyEffect`, "紊乱类型不存在。")
     }
+    if (event.disorderType !== undefined) {
+        requireEnum(errors, event.disorderType, DISORDER_TYPE_VALUES, `${path}.disorderType`)
+    }
     validateNonNegativeNumber(errors, event.elapsedSeconds ?? 0, `${path}.elapsedSeconds`, "已生效秒数")
-    validatePositiveNumber(errors, event.durationSeconds ?? 10, `${path}.durationSeconds`, "持续时间")
 }
 
 function validateDefaultCalculationConfig(errors, config, context = {}, agentId = "") {
@@ -951,9 +957,6 @@ function validateWEngine(item, context) {
     requireName(errors, item?.effect?.description, "effect.description.zhCN")
     const selfBuff = item?.effect?.selfBuff ?? item?.effect?.buff
     const teamBuff = item?.effect?.teamBuff
-    if (!hasRulesOrModifiers(selfBuff) && !hasRulesOrModifiers(teamBuff)) {
-        add(errors, "effect", "至少需要一条音擎 Buff 规则。")
-    }
     validateEffectSet(errors, selfBuff, "effect.selfBuff", { sourceType: "wEngine" })
     validateEffectSet(errors, teamBuff, "effect.teamBuff", { sourceType: "wEngineTeam" })
     validateDuplicateId(errors, item?.id, context, "id")
