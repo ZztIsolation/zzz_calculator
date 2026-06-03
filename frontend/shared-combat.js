@@ -16,6 +16,7 @@ export const DAMAGE_KIND_LABELS = {
     direct: "直伤",
     anomaly: "异常",
     disorder: "紊乱",
+    sheer: "贯穿",
 }
 export const DAMAGE_MODIFIER_KIND_LABELS = {
     anomalyDamageBonus: "属性异常增伤",
@@ -23,6 +24,12 @@ export const DAMAGE_MODIFIER_KIND_LABELS = {
     baseMultiplierBonus: "伤害倍率修正",
     anomalyCritRate: "异常暴击率",
     anomalyCritDmg: "异常暴击伤害",
+    sheerDmgBonus: "贯穿增伤",
+    physicalSheerDmg: "物理贯穿增伤",
+    fireSheerDmg: "火贯穿增伤",
+    iceSheerDmg: "冰贯穿增伤",
+    electricSheerDmg: "电贯穿增伤",
+    etherSheerDmg: "以太贯穿增伤",
     skillMultiplierBonus: "技能倍率加算",
 }
 export const ANOMALY_EFFECT_LABELS = {
@@ -55,9 +62,16 @@ export const CUSTOM_BUFF_STAT_OPTIONS = [
     ["critRate", "暴击率%", "flat", null],
     ["critDmg", "暴击伤害%", "flat", null],
     ["penRatio", "穿透率%", "flat", null],
+    ["sheerForceFlat", "固定贯穿力", "flat", null],
     ["dmgBonus", "通用伤害%", "flat", null],
     ["anomalyDamageBonus", "属性异常增伤%", "eventModifier", null],
     ["disorderDamageBonus", "紊乱增伤%", "eventModifier", null],
+    ["sheerDmgBonus", "贯穿增伤%", "eventModifier", null],
+    ["physicalSheerDmg", "物理贯穿增伤%", "eventModifier", null],
+    ["fireSheerDmg", "火贯穿增伤%", "eventModifier", null],
+    ["iceSheerDmg", "冰贯穿增伤%", "eventModifier", null],
+    ["electricSheerDmg", "电贯穿增伤%", "eventModifier", null],
+    ["etherSheerDmg", "以太贯穿增伤%", "eventModifier", null],
     ["baseMultiplierBonus", "异常倍率加算%", "eventModifier", null],
     ["anomalyCritRate", "异常暴击率%", "eventModifier", null],
     ["anomalyCritDmg", "异常暴击伤害%", "eventModifier", null],
@@ -91,6 +105,12 @@ export const CUSTOM_BUFF_SKILL_STAT_OPTIONS = [
     ["etherDmg", "以太伤害加成%", "skill", null],
     ["anomalyDamageBonus", "属性异常增伤%", "skill", null],
     ["disorderDamageBonus", "紊乱增伤%", "skill", null],
+    ["sheerDmgBonus", "贯穿增伤%", "skill", null],
+    ["physicalSheerDmg", "物理贯穿增伤%", "skill", null],
+    ["fireSheerDmg", "火贯穿增伤%", "skill", null],
+    ["iceSheerDmg", "冰贯穿增伤%", "skill", null],
+    ["electricSheerDmg", "电贯穿增伤%", "skill", null],
+    ["etherSheerDmg", "以太贯穿增伤%", "skill", null],
     ["skillMultiplierBonus", "技能倍率加算%", "skill", null],
     ["enemyDefReduction", "敌方减防率%", "skill", null],
     ["enemyDefIgnore", "无视防御率%", "skill", null],
@@ -137,6 +157,8 @@ export const FALLBACK_LABELS = {
     anomalyMasteryFlat: "异常掌控",
     penFlat: "穿透值",
     penRatio: "穿透率",
+    sheerForce: "贯穿力",
+    sheerForceFlat: "固定贯穿力",
     physicalResIgnore: "物理抗性无视",
     fireResIgnore: "火抗性无视",
     iceResIgnore: "冰抗性无视",
@@ -161,6 +183,12 @@ export const FALLBACK_LABELS = {
     enemyEtherResReduction: "敌方以太减抗",
     anomalyDamageBonus: "属性异常增伤",
     disorderDamageBonus: "紊乱增伤",
+    sheerDmgBonus: "贯穿增伤",
+    physicalSheerDmg: "物理贯穿增伤",
+    fireSheerDmg: "火贯穿增伤",
+    iceSheerDmg: "冰贯穿增伤",
+    electricSheerDmg: "电贯穿增伤",
+    etherSheerDmg: "以太贯穿增伤",
     baseMultiplierBonus: "异常倍率加算",
     anomalyCritRate: "异常暴击率",
     anomalyCritDmg: "异常暴击伤害",
@@ -172,6 +200,7 @@ export const ENUM_LABELS = {
         physical: "物理属性",
         honed_edge: "凛刃",
         frost: "烈霜",
+        xuanmo: "玄墨",
         fire: "火属性",
         ice: "冰属性",
         electric: "电属性",
@@ -235,6 +264,12 @@ export const PERCENT_KEYS = new Set([
     "enemyEtherResReduction",
     "anomalyDamageBonus",
     "disorderDamageBonus",
+    "sheerDmgBonus",
+    "physicalSheerDmg",
+    "fireSheerDmg",
+    "iceSheerDmg",
+    "electricSheerDmg",
+    "etherSheerDmg",
     "baseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
@@ -280,6 +315,12 @@ export const STORED_PERCENT_STATS = new Set([
     "enemyEtherResReduction",
     "anomalyDamageBonus",
     "disorderDamageBonus",
+    "sheerDmgBonus",
+    "physicalSheerDmg",
+    "fireSheerDmg",
+    "iceSheerDmg",
+    "electricSheerDmg",
+    "etherSheerDmg",
     "baseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
@@ -318,6 +359,12 @@ export const STORED_STAT_LABELS = {
     enemyEtherResReduction: "敌方以太减抗%",
     anomalyDamageBonus: "属性异常增伤%",
     disorderDamageBonus: "紊乱增伤%",
+    sheerDmgBonus: "贯穿增伤%",
+    physicalSheerDmg: "物理贯穿增伤%",
+    fireSheerDmg: "火贯穿增伤%",
+    iceSheerDmg: "冰贯穿增伤%",
+    electricSheerDmg: "电贯穿增伤%",
+    etherSheerDmg: "以太贯穿增伤%",
     baseMultiplierBonus: "异常倍率加算%",
     anomalyCritRate: "异常暴击率%",
     anomalyCritDmg: "异常暴击伤害%",
@@ -435,6 +482,63 @@ export function clampWEngineModificationLevel(value, wEngine = {}) {
     const numeric = Number(value ?? defaultLevel)
     const level = Number.isFinite(numeric) ? Math.trunc(numeric) : defaultLevel
     return Math.max(min, Math.min(max, level))
+}
+
+const W_ENGINE_RARITY_PRIORITY = {
+    S: 3,
+    A: 2,
+    B: 1,
+}
+
+export function relatedWEngineForAgent(wEngines = [], agentId = "") {
+    const normalizedAgentId = String(agentId ?? "").trim()
+    if (!normalizedAgentId || !Array.isArray(wEngines)) {
+        return null
+    }
+
+    return wEngines
+        .map((wEngine, index) => ({ wEngine, index }))
+        .filter(({ wEngine }) => wEngine?.relatedAgentId === normalizedAgentId)
+        .sort((left, right) => {
+            const leftPriority = W_ENGINE_RARITY_PRIORITY[left.wEngine?.rarity] ?? 0
+            const rightPriority = W_ENGINE_RARITY_PRIORITY[right.wEngine?.rarity] ?? 0
+            return rightPriority - leftPriority || left.index - right.index
+        })[0]?.wEngine ?? null
+}
+
+export function defaultWEngineIdForAgent(wEngines = [], agentId = "", savedWEngineId = "") {
+    if (!Array.isArray(wEngines) || wEngines.length === 0) {
+        return ""
+    }
+    const saved = wEngines.find(wEngine => wEngine?.id === savedWEngineId)
+    if (saved) {
+        return saved.id
+    }
+    return relatedWEngineForAgent(wEngines, agentId)?.id ?? wEngines[0]?.id ?? ""
+}
+
+export function sortWEnginesForAgent(wEngines = [], agent = null) {
+    if (!Array.isArray(wEngines) || wEngines.length === 0) {
+        return []
+    }
+    const specialty = String(agent?.specialty ?? "").trim()
+    if (!specialty) {
+        return [...wEngines]
+    }
+
+    return wEngines
+        .map((wEngine, index) => ({
+            wEngine,
+            index,
+            matchingSpecialty: wEngine?.specialty === specialty,
+        }))
+        .sort((left, right) => {
+            if (left.matchingSpecialty !== right.matchingSpecialty) {
+                return left.matchingSpecialty ? -1 : 1
+            }
+            return left.index - right.index
+        })
+        .map(item => item.wEngine)
 }
 
 function modificationValueForLevel(rule, key, level) {

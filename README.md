@@ -9,6 +9,31 @@ Chinese documentation is available in [README.zh-CN.md](README.zh-CN.md).
 
 ## Upload Update Summaries
 
+### 2026-06-04 00:46 +08:00
+
+This upload adds or expands these major areas:
+
+- Added Yixuan as a Rupture/Xuanmo agent, including portrait art, base stats,
+  Core Skill buffs, default sheer-damage calculation config, and a full skill
+  multiplier catalog modeled on sheer force.
+- Added the sheer damage system: `sheer` damage events, derived `sheerForce`,
+  flat sheer force, general and element-specific sheer damage bonuses, crit
+  support, resistance handling, and dedicated white-box formula rows.
+- Expanded stat rules, Drive Disc set effects, W-Engine effects, W-Engine image
+  assets, maintenance validation, custom buff options, and optimizer scoring for
+  sheer-damage builds.
+- Added new Rupture-focused W-Engines and modification value tests, including
+  physical, fire, ice, ether, and sheer-force buff variants.
+- Added Drive Disc analysis APIs and frontend tooling for substat effective
+  rolls and per-stat damage gain curves.
+- Improved the calculator and optimizer UI with sheer objective/event controls,
+  entity selection helpers, analysis panels, and styling updates.
+- Added `npm run test:drive-disc-analysis` plus regression coverage for sheer
+  damage white-box output, optimizer progress, shared combat helpers,
+  maintenance validation, and W-Engine modification values.
+- Added a frontend usability audit document for the current calculator and
+  optimizer experience.
+
 ### 2026-06-03 00:50 +08:00
 
 This upload adds or expands these major areas:
@@ -110,8 +135,8 @@ This upload added or expanded these major areas:
   4-piece, field, boss, and manual buffs.
 - Combat buff selection with teammate, W-Engine team, Drive Disc team, and
   custom sources grouped for review and removal.
-- Damage preview for direct, anomaly, and disorder events, with inspectable
-  white-box formula rows and separate anomaly/disorder event modifier zones.
+- Damage preview for direct, sheer, anomaly, and disorder events, with
+  inspectable white-box formula rows and separate damage modifier zones.
 - ZZZ Scanner Drive Disc import, manual inventory editing, duplicate handling,
   account-scoped storage, and optional remove-missing synchronization.
 - Saved Drive Disc loadouts that can be applied on the homepage or created from
@@ -120,6 +145,8 @@ This upload added or expanded these major areas:
   progress, cancelation, set-shape constraints, multiple optional 2-piece set
   choices, main-stat constraints, minimum stat filters, exact/fast algorithm
   choices, and damage scoring.
+- Drive Disc analysis tools for current substat effective rolls and projected
+  damage gains from extra substat rolls.
 - Browser maintenance pages for static game data and validation-oriented JSON
   editing.
 
@@ -133,6 +160,7 @@ zzz_calculator/
   backend/
     server.js
     calculator.js
+    driveDiscAnalysis.js
     driveDiscInventory.js
     driveDiscOptimizer.js
   data/
@@ -146,6 +174,7 @@ zzz_calculator/
     user_drive_discs.example.json
   docs/
     changelog.md
+    frontend-usability-audit.md
     goal.md
     modeling.md
   examples/
@@ -159,7 +188,9 @@ zzz_calculator/
     maintenance.html
     app.js
     calculate.js
+    drive-disc-analysis.js
     drive-discs.js
+    entity-select.js
     accounts.js
     accounts-page.js
     maintenance.js
@@ -221,6 +252,7 @@ npm run test:anomaly-damage
 npm run test:optimizer
 npm run test:optimizer-progress
 npm run test:optimizer-api
+npm run test:drive-disc-analysis
 npm run test:drive-disc-import
 npm run test:accounts
 ```
@@ -235,10 +267,13 @@ Useful syntax checks:
 
 ```bash
 node --check backend/calculator.js
+node --check backend/driveDiscAnalysis.js
 node --check backend/server.js
 node --check frontend/app.js
 node --check frontend/calculate.js
+node --check frontend/drive-disc-analysis.js
 node --check frontend/drive-discs.js
+node --check frontend/entity-select.js
 node --check frontend/maintenance.js
 node --check frontend/accounts-page.js
 ```
@@ -262,6 +297,8 @@ node --check frontend/accounts-page.js
 - `POST /api/optimize/drive-discs/jobs`
 - `GET|DELETE /api/optimize/drive-discs/jobs/:id`
 - `POST /api/optimize/drive-discs`
+- `POST /api/analysis/drive-disc-substats`
+- `POST /api/analysis/drive-disc-stat-gains`
 - `GET|DELETE /api/user-drive-discs`
 - `POST /api/user-drive-discs/import/zzz-scanner`
 - `POST /api/user-drive-discs`
@@ -276,10 +313,13 @@ node --check frontend/accounts-page.js
   buffs.
 - In-combat buffs can contribute plain stats, runtime-scaled effects, damage
   modifiers, W-Engine team buffs, and skill-targeted effects.
-- Optimizer damage targets can use one direct/anomaly event or a custom list of
-  weighted direct, anomaly, and disorder events.
+- Optimizer damage targets can use one direct, sheer, anomaly, or disorder event
+  or a custom list of weighted damage events.
 - Special display attributes can declare a real `damageElement`; for example,
   Ye Shunguang is displayed as Honed Edge but calculates physical damage.
+- Rupture/Xuanmo damage is modeled as sheer damage: sheer force derives from
+  in-combat HP, in-combat ATK, and flat sheer force, then uses sheer-specific
+  damage bonuses and skips defense/PEN multipliers.
 - Anomaly and disorder damage use catalog-backed multipliers from the unified
   `data/anomaly_effects.json` `effects` list, split by `settlementType`.
 - Attribute anomaly and disorder damage use separate bonus zones:

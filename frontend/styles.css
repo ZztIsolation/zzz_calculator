@@ -519,6 +519,133 @@ button {
   line-height: 1.5;
 }
 
+.native-image-select {
+  position: absolute;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0 !important;
+}
+
+.image-select {
+  position: relative;
+  min-width: 0;
+}
+
+.image-select-trigger {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 12px;
+  align-items: center;
+  width: 100%;
+  min-height: 38px;
+  gap: 8px;
+  padding: 5px 10px 5px 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.image-select-trigger:focus-visible {
+  outline: 2px solid rgba(47, 125, 246, 0.18);
+  border-color: var(--blue);
+}
+
+.image-select-trigger-icon,
+.image-select-option-icon {
+  display: block;
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.image-select-icon-fallback {
+  border-radius: 6px;
+  background: var(--panel-2);
+}
+
+.image-select-trigger-label,
+.image-select-option-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-select-trigger-label {
+  color: var(--ink);
+}
+
+.image-select-chevron {
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 0.16s ease;
+}
+
+.image-select.open .image-select-chevron {
+  transform: rotate(225deg) translateY(-2px);
+}
+
+.image-select-list {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  display: none;
+  max-height: min(320px, 52vh);
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 18px 42px rgba(16, 19, 24, 0.18);
+}
+
+.image-select.open .image-select-list {
+  display: grid;
+  gap: 2px;
+}
+
+.image-select-option {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  width: 100%;
+  min-height: 42px;
+  gap: 8px;
+  padding: 4px 8px 4px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.image-select-option-icon {
+  width: 36px;
+  height: 36px;
+}
+
+.image-select-option:hover,
+.image-select-option.active {
+  background: #f4f8ff;
+}
+
+.image-select-option.selected {
+  color: var(--blue);
+  font-weight: 800;
+}
+
 .field select:focus,
 .field textarea:focus {
   outline: 2px solid rgba(47, 125, 246, 0.18);
@@ -2519,6 +2646,181 @@ button {
   gap: 8px;
 }
 
+.analysis-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.drive-disc-analysis-modal {
+  width: min(980px, calc(100vw - 36px));
+  max-height: min(760px, calc(100vh - 48px));
+}
+
+.analysis-status {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.drive-disc-analysis-content {
+  display: grid;
+  gap: 16px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.analysis-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.analysis-summary-grid > div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--panel-2);
+}
+
+.analysis-summary-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.analysis-summary-grid strong {
+  font-size: 18px;
+}
+
+.analysis-distribution,
+.analysis-one-roll {
+  display: grid;
+  gap: 8px;
+}
+
+.analysis-mode-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.analysis-mode-toggle {
+  grid-template-columns: repeat(2, minmax(86px, 1fr));
+}
+
+.analysis-one-roll h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.analysis-bar-row {
+  display: grid;
+  grid-template-columns: 112px minmax(120px, 1fr) 72px;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.analysis-bar-row > strong {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis-bar-track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.analysis-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.analysis-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.analysis-table th,
+.analysis-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 6px;
+  text-align: left;
+}
+
+.analysis-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.analysis-empty {
+  padding: 28px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.analysis-line-chart-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.analysis-line-chart {
+  display: block;
+  width: 100%;
+  min-width: 640px;
+  height: 320px;
+}
+
+.analysis-grid-line {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.analysis-axis-line {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.analysis-axis-label {
+  fill: var(--muted);
+  font-size: 12px;
+}
+
+.analysis-axis-label-x {
+  text-anchor: middle;
+}
+
+.analysis-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.analysis-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.analysis-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
 .inline-check {
   display: inline-flex;
   align-items: center;
@@ -3945,13 +4247,28 @@ body.modal-open {
 }
 
 .optimizer-result-tabs button {
-  min-height: 34px;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  min-width: 110px;
+  min-height: 48px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel-2);
   color: var(--muted);
-  padding: 0 12px;
+  padding: 5px 12px 6px;
   cursor: pointer;
+  line-height: 1.15;
+}
+
+.optimizer-result-tabs button span {
+  white-space: nowrap;
+}
+
+.optimizer-result-tabs button small {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .optimizer-result-tabs button.active {

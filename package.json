@@ -17,6 +17,7 @@
     "test:optimizer-progress": "node tests/optimizer-progress.test.js",
     "test:optimizer-api": "node tests/optimizer-job-api.test.js",
     "benchmark:optimizer": "node tests/optimizer-benchmark.js",
+    "test:drive-disc-analysis": "node tests/drive-disc-analysis.test.js",
     "test:drive-disc-import": "node tests/drive-disc-import.test.js",
     "test:accounts": "node tests/accounts.test.js"
   }

@@ -78,6 +78,7 @@ const ATTRIBUTE_OPTIONS = [
     ["ether", "以太"],
     ["honed_edge", "凛刃"],
     ["frost", "烈霜"],
+    ["xuanmo", "玄墨"],
 ]
 const SPECIALTY_OPTIONS = [
     ["attack", "强攻"],
@@ -91,7 +92,7 @@ const EFFECT_SCOPE_OPTIONS = [
     ["outOfCombat", "局外"],
     ["inCombat", "局内"],
 ]
-const DAMAGE_ELEMENT_OPTIONS = ATTRIBUTE_OPTIONS.filter(([value]) => !["honed_edge", "frost"].includes(value))
+const DAMAGE_ELEMENT_OPTIONS = ATTRIBUTE_OPTIONS.filter(([value]) => !["honed_edge", "frost", "xuanmo"].includes(value))
 const DEFAULT_ANOMALY_PROC_COUNTS = {
     assault: 1,
     shatter: 1,
@@ -109,11 +110,16 @@ const SKILL_ROW_KIND_OPTIONS = [
     ["energyCost", "能量消耗"],
     ["statBonus", "属性加成"],
 ]
+const SKILL_ROW_DAMAGE_BASIS_OPTIONS = [
+    ["", "攻击力（默认）"],
+    ["sheerForce", "贯穿力"],
+]
 const STAT_OPTIONS = [
     ["atkFlat", "固定攻击力", "flat"],
     ["atkPct", "百分比攻击力%", "pct"],
     ["hpFlat", "固定生命值", "flat"],
     ["hpPct", "百分比生命值%", "pct"],
+    ["sheerForceFlat", "固定贯穿力", "flat"],
     ["defFlat", "固定防御力", "flat"],
     ["defPct", "百分比防御力%", "pct"],
     ["critRate", "暴击率%", "percentFlat"],
@@ -163,6 +169,24 @@ const STAT_DAMAGE_MODIFIER_OPTIONS = [
     ["anomalyCritDmg", "异常暴击伤害%", {
         stat: "anomalyCritDmg",
     }],
+    ["sheerDmgBonus", "贯穿增伤%", {
+        stat: "sheerDmgBonus",
+    }],
+    ["physicalSheerDmg", "物理贯穿增伤%", {
+        stat: "physicalSheerDmg",
+    }],
+    ["fireSheerDmg", "火属性贯穿增伤%", {
+        stat: "fireSheerDmg",
+    }],
+    ["iceSheerDmg", "冰属性贯穿增伤%", {
+        stat: "iceSheerDmg",
+    }],
+    ["electricSheerDmg", "电属性贯穿增伤%", {
+        stat: "electricSheerDmg",
+    }],
+    ["etherSheerDmg", "以太贯穿增伤%", {
+        stat: "etherSheerDmg",
+    }],
 ]
 const STAT_DAMAGE_MODIFIER_OPTION_BY_KEY = Object.fromEntries(STAT_DAMAGE_MODIFIER_OPTIONS.map(([key, , effect]) => [key, effect]))
 const SKILL_TARGET_STAT_OPTIONS = [
@@ -174,6 +198,12 @@ const SKILL_TARGET_STAT_OPTIONS = [
     ["etherDmg", "以太伤害加成%"],
     ["anomalyDamageBonus", "属性异常增伤%"],
     ["disorderDamageBonus", "紊乱增伤%"],
+    ["sheerDmgBonus", "贯穿增伤%"],
+    ["physicalSheerDmg", "物理贯穿增伤%"],
+    ["fireSheerDmg", "火属性贯穿增伤%"],
+    ["iceSheerDmg", "冰属性贯穿增伤%"],
+    ["electricSheerDmg", "电属性贯穿增伤%"],
+    ["etherSheerDmg", "以太贯穿增伤%"],
     ["skillMultiplierBonus", "技能倍率加算%"],
     ["enemyDefReduction", "敌方减防率%"],
     ["enemyDefIgnore", "无视防御率%"],
@@ -235,6 +265,12 @@ const PERCENT_VALUE_STATS = new Set([
     "baseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
+    "sheerDmgBonus",
+    "physicalSheerDmg",
+    "fireSheerDmg",
+    "iceSheerDmg",
+    "electricSheerDmg",
+    "etherSheerDmg",
     "skillMultiplierBonus",
 ])
 const PERCENT_INPUT_STATS = new Set([
@@ -264,6 +300,12 @@ const DAMAGE_MODIFIER_KIND_OPTIONS = [
     ["anomalyCritRate", "异常暴击率%"],
     ["anomalyCritDmg", "异常暴击伤害%"],
     ["directDamageBonus", "技能专属伤害增伤%"],
+    ["sheerDmgBonus", "贯穿增伤%"],
+    ["physicalSheerDmg", "物理贯穿增伤%"],
+    ["fireSheerDmg", "火属性贯穿增伤%"],
+    ["iceSheerDmg", "冰属性贯穿增伤%"],
+    ["electricSheerDmg", "电属性贯穿增伤%"],
+    ["etherSheerDmg", "以太贯穿增伤%"],
     ["skillMultiplierBonus", "技能倍率加算%"],
 ]
 const DAMAGE_MODIFIER_LABELS = {
@@ -273,6 +315,7 @@ const DAMAGE_MODIFIER_LABELS = {
 }
 const DAMAGE_KIND_OPTIONS = [
     ["direct", "直伤"],
+    ["sheer", "贯穿"],
     ["anomaly", "异常"],
     ["disorder", "紊乱"],
 ]
@@ -960,8 +1003,8 @@ function defaultCalculationEventDraft(kind = "direct") {
     const move = category?.moves?.[0]
     const row = move?.rows?.[0]
     return {
-        id: `direct-${index}`,
-        kind: "direct",
+        id: kind === "sheer" ? `sheer-${index}` : `direct-${index}`,
+        kind: kind === "sheer" ? "sheer" : "direct",
         count: 1,
         critMode: "expected",
         skillRef: {
@@ -990,6 +1033,9 @@ function disorderEffectMaintenanceOptions(selected = "") {
 function defaultCalculationEventKind(event = {}) {
     if (event.kind === "direct") {
         return "direct"
+    }
+    if (event.kind === "sheer") {
+        return "sheer"
     }
     return event.kind === "disorder" || event.settlementType === "disorder" ? "disorder" : "anomaly"
 }
@@ -1020,6 +1066,7 @@ function defaultCalcRowOptions(categoryId, moveId, selected = "") {
 function defaultCalculationEventHtml(event = {}, index = 0, selectedEventId = "") {
     void selectedEventId
     const kind = defaultCalculationEventKind(event)
+    const usesSkill = ["direct", "sheer"].includes(kind)
     const skill = agentSkillForAgentId()
     const categories = maintenanceDamageSkillCategories(skill)
     const skillRef = event.skillRef ?? defaultCalculationEventDraft("direct").skillRef ?? {}
@@ -1034,12 +1081,12 @@ function defaultCalculationEventHtml(event = {}, index = 0, selectedEventId = ""
           </div>
           <div class="maintenance-grid calculation-event-grid">
             <label class="field"><span>事件 ID</span><input data-default-calc-event-id value="${escapeHtml(event.id ?? `${kind}-${index + 1}`)}"></label>
-            <label class="field"><span>类型</span><select data-default-calc-kind>${selectOptions([["direct", "直伤"], ["anomaly", "属性异常"], ["disorder", "紊乱"]], kind)}</select></label>
+            <label class="field"><span>类型</span><select data-default-calc-kind>${selectOptions([["direct", "直伤"], ["sheer", "贯穿"], ["anomaly", "属性异常"], ["disorder", "紊乱"]], kind)}</select></label>
             <label class="field"><span>次数</span><input data-default-calc-count type="number" min="0" step="1" value="${escapeHtml(event.count ?? 1)}"></label>
-            <label class="field default-calc-direct-only"${kind === "direct" ? "" : " hidden"}><span>技能大类</span><select data-default-calc-category>${defaultCalcCategoryOptions(categoryId)}</select></label>
-            <label class="field default-calc-direct-only"${kind === "direct" ? "" : " hidden"}><span>招式</span><select data-default-calc-move>${defaultCalcMoveOptions(categoryId, moveId)}</select></label>
-            <label class="field default-calc-direct-only"${kind === "direct" ? "" : " hidden"}><span>倍率行</span><select data-default-calc-row>${defaultCalcRowOptions(categoryId, moveId, rowId)}</select></label>
-            <label class="field default-calc-direct-only"${kind === "direct" ? "" : " hidden"}><span>暴击模式</span><select data-default-calc-crit-mode>${selectOptions([["expected", "期望"], ["crit", "暴击"], ["nonCrit", "非暴击"]], event.critMode ?? "expected")}</select></label>
+            <label class="field default-calc-direct-only"${usesSkill ? "" : " hidden"}><span>技能大类</span><select data-default-calc-category>${defaultCalcCategoryOptions(categoryId)}</select></label>
+            <label class="field default-calc-direct-only"${usesSkill ? "" : " hidden"}><span>招式</span><select data-default-calc-move>${defaultCalcMoveOptions(categoryId, moveId)}</select></label>
+            <label class="field default-calc-direct-only"${usesSkill ? "" : " hidden"}><span>倍率行</span><select data-default-calc-row>${defaultCalcRowOptions(categoryId, moveId, rowId)}</select></label>
+            <label class="field default-calc-direct-only"${usesSkill ? "" : " hidden"}><span>暴击模式</span><select data-default-calc-crit-mode>${selectOptions([["expected", "期望"], ["crit", "暴击"], ["nonCrit", "非暴击"]], event.critMode ?? "expected")}</select></label>
             <label class="field default-calc-anomaly-only"${kind === "anomaly" ? "" : " hidden"}><span>异常类型</span><select data-default-calc-anomaly-effect>${anomalyEffectMaintenanceOptions(event.anomalyEffect ?? "assault")}</select></label>
             <label class="field default-calc-anomaly-only"${kind === "anomaly" ? "" : " hidden"}><span>结算次数</span><input data-default-calc-proc-count type="number" min="0" step="1" value="${escapeHtml(event.procCount ?? DEFAULT_ANOMALY_PROC_COUNTS[event.anomalyEffect] ?? 1)}"></label>
             <label class="field default-calc-disorder-only"${kind === "disorder" ? "" : " hidden"}><span>紊乱类型</span><select data-default-calc-disorder-type>${selectOptions(DISORDER_TYPE_OPTIONS, defaultCalculationDisorderType(event))}</select></label>
@@ -1090,7 +1137,7 @@ function readDefaultCalculationEvents() {
         }
         return {
             id,
-            kind: "direct",
+            kind: kind === "sheer" ? "sheer" : "direct",
             count,
             critMode: row.querySelector("[data-default-calc-crit-mode]")?.value || "expected",
             skillRef: {
@@ -1108,8 +1155,15 @@ function readDefaultCalculationConfig() {
     if (!events.length) {
         return null
     }
+    const agent = selectedCleanRecord() ?? {}
+    const mode = normalizeDefaultCalculationModeForAgent(
+        document.getElementById("defaultCalculationMode")?.value ?? "custom",
+        {
+            specialty: document.getElementById("specialty")?.value ?? agent.specialty,
+        }
+    )
     return {
-        mode: document.getElementById("defaultCalculationMode")?.value ?? "custom",
+        mode,
         name: { zhCN: document.getElementById("defaultCalculationName")?.value.trim() || "默认计算配置" },
         selectedEventId: events[0]?.id ?? null,
         events,
@@ -1147,6 +1201,38 @@ function checkboxOptions(options, selected = [], dataName) {
           `).join("")}
         </div>
     `
+}
+
+function isRuptureAgent(agent = {}) {
+    return agent.specialty === "rupture"
+}
+
+function primaryDefaultCalculationModeForAgent(agent = {}) {
+    return isRuptureAgent(agent) ? "sheer" : "single"
+}
+
+function defaultCalculationModeOptions(agent = {}) {
+    return [
+        ["custom", "自定义"],
+        ...(!isRuptureAgent(agent) ? [["single", "最大化单个伤害"]] : []),
+        ...(isRuptureAgent(agent) ? [["sheer", "最大化贯穿伤害"]] : []),
+        ["anomaly", "最大化异常伤害"],
+    ]
+}
+
+function normalizeDefaultCalculationModeForAgent(mode, agent = {}) {
+    const options = new Set(defaultCalculationModeOptions(agent).map(([value]) => value))
+    return options.has(mode) ? mode : primaryDefaultCalculationModeForAgent(agent)
+}
+
+function syncDefaultCalculationModeOptions() {
+    const select = document.getElementById("defaultCalculationMode")
+    const specialty = document.getElementById("specialty")?.value
+    if (!select || !specialty) {
+        return
+    }
+    const currentMode = normalizeDefaultCalculationModeForAgent(select.value, { specialty })
+    select.innerHTML = selectOptions(defaultCalculationModeOptions({ specialty }), currentMode)
 }
 
 function checkedValues(row, selector) {
@@ -1702,6 +1788,7 @@ function renderAgentForm(item = null) {
         level60: DEFAULT_LEVEL_60,
         combatBuffs: { corePassive: null, additionalAbility: null, cinemaBuffs: [] },
     }
+    const defaultCalculationMode = normalizeDefaultCalculationModeForAgent(agent.defaultCalculationConfig?.mode ?? "custom", agent)
 
     els.editorTitle.textContent = "角色资料"
     els.editorTag.textContent = agent.id || "草稿"
@@ -1754,12 +1841,13 @@ function renderAgentForm(item = null) {
             <h3>默认计算方式</h3>
             <div class="skill-maintenance-actions">
               <button type="button" class="compact-btn" data-add-default-calc-event="direct">添加直伤</button>
+              <button type="button" class="compact-btn" data-add-default-calc-event="sheer">添加贯穿</button>
               <button type="button" class="compact-btn" data-add-default-calc-event="anomaly">添加属性异常</button>
               <button type="button" class="compact-btn" data-add-default-calc-event="disorder">添加紊乱</button>
             </div>
           </div>
           <div class="maintenance-grid">
-            <label class="field"><span>计算方式</span><select id="defaultCalculationMode">${selectOptions([["custom", "自定义"], ["single", "最大化单个伤害"], ["anomaly", "最大化异常伤害"]], agent.defaultCalculationConfig?.mode ?? "custom")}</select></label>
+            <label class="field"><span>计算方式</span><select id="defaultCalculationMode">${selectOptions(defaultCalculationModeOptions(agent), defaultCalculationMode)}</select></label>
             <label class="field"><span>名称</span><input id="defaultCalculationName" value="${escapeHtml(localized(agent.defaultCalculationConfig?.name) || "")}" placeholder="默认计算配置"></label>
           </div>
           <div id="defaultCalculationEventRows" class="skill-category-list"></div>
@@ -1897,7 +1985,6 @@ function skillCategoryDraft() {
     return {
         id: `category_${Date.now()}`,
         name: { zhCN: "新技能大类" },
-        icon: "",
         levelRange: { min: 1, max: 16, default: 12 },
         moves: [],
     }
@@ -1967,6 +2054,7 @@ function renderSkillMultiplierTable(category = {}, move = {}) {
                 <th>倍率行 ID</th>
                 <th>行名</th>
                 <th>类型</th>
+                <th>伤害基准</th>
                 ${levels.map(level => `<th>LV${level}</th>`).join("")}
                 <th>操作</th>
               </tr>
@@ -1977,6 +2065,7 @@ function renderSkillMultiplierTable(category = {}, move = {}) {
                   <td><input data-skill-row-id value="${escapeHtml(row.id ?? "")}" placeholder="hit_1"></td>
                   <td><input data-skill-row-label value="${escapeHtml(localized(row.label) || "")}" placeholder="一段伤害倍率"></td>
                   <td><select data-skill-row-kind>${selectOptions(SKILL_ROW_KIND_OPTIONS, row.kind ?? "damageMultiplier")}</select></td>
+                  <td><select data-skill-row-damage-basis>${selectOptions(SKILL_ROW_DAMAGE_BASIS_OPTIONS, row.damageBasis ?? "")}</select></td>
                   ${levels.map(level => `
                     <td>
                       <input data-skill-value data-skill-level="${level}" type="number" step="0.01" value="${escapeHtml(skillValueForLevel(row, category, level))}">
@@ -2029,7 +2118,6 @@ function renderSkillCategoryCard(category = {}, categoryIndex = 0) {
           <div class="maintenance-grid skill-category-grid">
             <label class="field">${fieldLabel("大类 ID", true)}<input data-skill-category-id value="${escapeHtml(category.id ?? "")}" placeholder="basic"></label>
             <label class="field">${fieldLabel("大类名", true)}<input data-skill-category-name value="${escapeHtml(localized(category.name) || "")}" placeholder="普通攻击"></label>
-            <label class="field"><span>图标</span><input data-skill-category-icon value="${escapeHtml(category.icon ?? "")}" placeholder="/assets/... 或 https://..."></label>
             <label class="field">${fieldLabel("最低等级", true)}<input data-skill-level-min type="number" min="1" step="1" value="${escapeHtml(range.min)}"></label>
             <label class="field">${fieldLabel("最高等级", true)}<input data-skill-level-max type="number" min="1" step="1" value="${escapeHtml(range.max)}"></label>
             <label class="field">${fieldLabel("默认等级", true)}<input data-skill-level-default type="number" min="1" step="1" value="${escapeHtml(range.default)}"></label>
@@ -2056,10 +2144,12 @@ function readSkillRow(rowElement, categoryRange) {
         const raw = input?.value ?? ""
         values.push(raw === "" ? "" : numberValue(raw))
     }
+    const damageBasis = rowElement.querySelector("[data-skill-row-damage-basis]")?.value || ""
     return {
         id: rowElement.querySelector("[data-skill-row-id]")?.value.trim() ?? "",
         label: { zhCN: rowElement.querySelector("[data-skill-row-label]")?.value.trim() ?? "" },
         kind: rowElement.querySelector("[data-skill-row-kind]")?.value || "damageMultiplier",
+        ...(damageBasis ? { damageBasis } : {}),
         values,
     }
 }
@@ -2081,7 +2171,6 @@ function readSkillCategory(categoryElement) {
     const category = {
         id: categoryElement.querySelector("[data-skill-category-id]")?.value.trim() ?? "",
         name: { zhCN: categoryElement.querySelector("[data-skill-category-name]")?.value.trim() ?? "" },
-        icon: categoryElement.querySelector("[data-skill-category-icon]")?.value.trim() ?? "",
         levelRange: {
             min,
             max,
@@ -2092,9 +2181,6 @@ function readSkillCategory(categoryElement) {
     const range = skillLevelRangeOf(category)
     category.moves = [...categoryElement.querySelectorAll("[data-skill-move-row]")]
         .map(move => readSkillMove(move, range))
-    if (!category.icon) {
-        delete category.icon
-    }
     return category
 }
 
@@ -3621,6 +3707,10 @@ els.maintenanceForm.addEventListener("change", event => {
 
     if (event.target.id === "anomalyMaintenanceType") {
         syncAnomalyEffectTypeFields()
+    }
+
+    if (event.target.id === "specialty") {
+        syncDefaultCalculationModeOptions()
     }
 
     if (event.target.matches("[data-effect-type]")) {

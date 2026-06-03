@@ -699,10 +699,10 @@
           {
             "id": "miyabi_frozen_disorder",
             "kind": "anomaly",
-            "count": 1,
+            "count": 2,
             "settlementType": "disorder",
             "anomalyEffect": "frost_frozen",
-            "elapsedSeconds": 8
+            "elapsedSeconds": 7
           },
           {
             "id": "miyabi_shatter",
@@ -723,6 +723,14 @@
               "moveId": "quick_support_flower_wind",
               "rowId": "damage"
             }
+          },
+          {
+            "id": "disorder-8",
+            "kind": "anomaly",
+            "count": 1,
+            "settlementType": "disorder",
+            "anomalyEffect": "frost_frozen",
+            "elapsedSeconds": 5
           }
         ]
       },
@@ -733,6 +741,358 @@
         "level60Stats": "source-checked-biligame-wiki-2026-05-30",
         "panelDefaults": "source-checked-biligame-wiki-2026-05-30",
         "damageElement": "displayed as frost but settled as ice so it uses ice damage bonus and ice resistance"
+      }
+    },
+    {
+      "id": "yixuan",
+      "name": {
+        "zhCN": "仪玄"
+      },
+      "rarity": "S",
+      "attribute": "xuanmo",
+      "damageElement": "ether",
+      "specialty": "rupture",
+      "attackTypes": [
+        "strike"
+      ],
+      "faction": "云岿山",
+      "images": {
+        "portrait": "/assets/agents/yixuan.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/1299/detail"
+      },
+      "level60": {
+        "hpBase": 7953,
+        "atkBase": 872,
+        "defBase": 441,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 93,
+        "anomalyProficiency": 90,
+        "anomalyMastery": 92,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动"
+          },
+          "description": {
+            "zhCN": "施展「普通攻击：玄墨极阵」、「普通攻击：青溟震击」、「强化特殊技」、「支援突击」、「连携技」、「终结技」造成的伤害提升60%。"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          },
+          "effects": [
+            {
+              "id": "effect-1",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 60,
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "agentSkillId": "yixuan",
+                    "categoryId": "basic",
+                    "moveId": "xuanmo_formation"
+                  },
+                  {
+                    "agentSkillId": "yixuan",
+                    "categoryId": "basic",
+                    "moveId": "qingming_shock"
+                  },
+                  {
+                    "agentSkillId": "yixuan",
+                    "categoryId": "special",
+                    "moveId": "ember_shadow_art"
+                  },
+                  {
+                    "agentSkillId": "yixuan",
+                    "categoryId": "special",
+                    "moveId": "ink_trace_transform"
+                  },
+                  {
+                    "agentSkillId": "yixuan",
+                    "categoryId": "special",
+                    "moveId": "cloud_condensing_art"
+                  },
+                  {
+                    "agentSkillId": "yixuan",
+                    "categoryId": "special",
+                    "moveId": "ink_ember_shadow_dispel"
+                  },
+                  {
+                    "agentSkillId": "yixuan",
+                    "categoryId": "assist",
+                    "moveId": "assist_xiaoyun_swift_strike"
+                  },
+                  {
+                    "agentSkillId": "yixuan",
+                    "categoryId": "chain",
+                    "moveId": "chain_xuanmo_swift_strike"
+                  },
+                  {
+                    "agentSkillId": "yixuan",
+                    "categoryId": "chain",
+                    "moveId": "ultimate_qingming_cloud_shadow"
+                  },
+                  {
+                    "agentSkillId": "yixuan",
+                    "categoryId": "chain",
+                    "moveId": "ultimate_thousand_talismans"
+                  }
+                ]
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "additionalAbility": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "额外能力"
+          },
+          "description": {
+            "zhCN": "队伍中存在「击破」角色或「支援」角色或「防护」角色时触发：发动「终结技」后，仪玄进入「凝神」状态，「凝神」状态下，仪玄的暴击伤害提升40%，持续15秒。"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          },
+          "effects": [
+            {
+              "id": "effect-1",
+              "type": "fixed",
+              "stat": "critDmg",
+              "value": 40,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "cinemaBuffs": []
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "术法宗师"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "hpBase",
+                "value": 140,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "hpBase",
+                "value": 140,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "hpBase",
+                "value": 140,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "核心被动：术法宗师"
+          },
+          "levels": [
+            {
+              "level": 1,
+              "selectedSkillDmgBonusPct": 30
+            },
+            {
+              "level": 2,
+              "selectedSkillDmgBonusPct": 35
+            },
+            {
+              "level": 3,
+              "selectedSkillDmgBonusPct": 40
+            },
+            {
+              "level": 4,
+              "selectedSkillDmgBonusPct": 45
+            },
+            {
+              "level": 5,
+              "selectedSkillDmgBonusPct": 50
+            },
+            {
+              "level": 6,
+              "selectedSkillDmgBonusPct": 55
+            },
+            {
+              "level": 7,
+              "selectedSkillDmgBonusPct": 60
+            }
+          ],
+          "defaultLevelAtCoreSkill": "F"
+        },
+        "corePassiveMechanics": {
+          "ruptureDamage": "玄墨伤害按贯穿伤害建模，贯穿力由局内生命值、局内攻击力和固定贯穿力派生。"
+        },
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/1299/detail",
+          "https://wiki.biligame.com/zzz/%E4%BB%AA%E7%8E%84"
+        ],
+        "verification": {
+          "stats": "source-checked-biligame-wiki-2026-06-03",
+          "skillLevelBonuses": "A/C/E each add Crit Rate +4.8% and Core Passive level +1; B/D/F each add Base HP +140 and Core Passive level +1",
+          "corePassiveScaling": "source-checked; F corresponds to Core Passive level 7 and selected-skill damage bonus +60%",
+          "unsupportedBuffs": "resource generation, automatic lightning follow-ups, stun-only extra special damage, stun duration extension, and cinema effects are not modeled as automatic combat buffs"
+        }
+      },
+      "preferredDriveDiscs": {
+        "mainStatLimits": {
+          "4": [
+            "hpPct",
+            "critRate",
+            "critDmg"
+          ],
+          "5": [
+            "hpPct",
+            "etherDmg"
+          ],
+          "6": [
+            "hpPct"
+          ]
+        }
+      },
+      "defaultCalculationConfig": {
+        "mode": "sheer",
+        "name": {
+          "zhCN": "默认贯穿爆发"
+        },
+        "selectedEventId": "yixuan_ultimate_qingming_cloud_shadow",
+        "events": [
+          {
+            "id": "yixuan_ultimate_qingming_cloud_shadow",
+            "kind": "sheer",
+            "count": 1,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "yixuan",
+              "categoryId": "chain",
+              "moveId": "ultimate_qingming_cloud_shadow",
+              "rowId": "damage"
+            }
+          }
+        ]
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1299/detail"
+      ],
+      "verification": {
+        "level60HpAtkDef": "source-checked",
+        "panelDefaults": "source-checked-biligame-wiki-2026-06-03",
+        "attribute": "Biligame stores 属性=以太 and 属性名称=玄墨; shown as xuanmo and settled as ether for damage bonus and resistance buckets"
       }
     },
     {

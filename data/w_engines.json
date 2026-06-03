@@ -2224,6 +2224,811 @@
         "maxLevel": 5,
         "defaultLevel": 1
       }
+    },
+    {
+      "id": "zzz_wiki_2002",
+      "name": {
+        "zhCN": "辉骑面铠"
+      },
+      "rarity": "S",
+      "specialty": "rupture",
+      "attribute": "physical",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_2002.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/05/21/233874762/a3d4fe691c4ada9c9891f14291bf94cd_7698689263540140213.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "hpPct",
+          "value": 30,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "骑士气势"
+        },
+        "requirement": {
+          "specialty": "rupture",
+          "label": {
+            "zhCN": "对于【命破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "暴击率提升20%/23%/26%/29%/32%；装备者发动[特殊技]时，装备者造成的物理贯穿伤害提升10%/11.5%/13%/14.5%/16%，最多叠加2层，持续30秒，重复触发时刷新时间。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_2002_self_crit_rate",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 20,
+              "modificationValues": {
+                "value": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_2002_self_physical_sheer",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "physicalSheerDmg",
+              "mode": "flat",
+              "valuePerStack": 10,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "modificationValues": {
+                "valuePerStack": [
+                  10,
+                  11.5,
+                  13,
+                  14.5,
+                  16
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "specialSkill",
+          "durationSeconds": 30
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/2002/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1721",
+      "name": {
+        "zhCN": "怒目金刚"
+      },
+      "rarity": "S",
+      "specialty": "rupture",
+      "attribute": "fire",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1721.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/12/10/233874762/b7d0bfe7518b3998779f0397e0d5e5ba_2225664048757389503.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "hpPct",
+          "value": 30,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "焚心业火"
+        },
+        "requirement": {
+          "specialty": "rupture",
+          "label": {
+            "zhCN": "对于【命破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "暴击率提升20%/23%/26%/29%/32%；装备者启动[强化特殊技]时，装备者造成的火属性贯穿伤害提升9%/10.35%/11.7%/13.05%/14.4%，最多2层，持续20秒，每层效果结算单独持续时间。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1721_self_crit_rate",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 20,
+              "modificationValues": {
+                "value": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_1721_self_fire_sheer",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "fireSheerDmg",
+              "mode": "flat",
+              "valuePerStack": 9,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "modificationValues": {
+                "valuePerStack": [
+                  9,
+                  10.35,
+                  11.7,
+                  13.05,
+                  14.4
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "exSpecial",
+          "durationSeconds": 20
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1721/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1664",
+      "name": {
+        "zhCN": "海妖摇篮"
+      },
+      "rarity": "S",
+      "specialty": "rupture",
+      "attribute": "ice",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1664.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/10/31/76099754/9f57c94721f0822d7f94fc5a8403dd62_8407326177850056591.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "hpPct",
+          "value": 30,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "触抚心拥"
+        },
+        "requirement": {
+          "specialty": "rupture",
+          "label": {
+            "zhCN": "对于【命破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者的生命值降低时，造成的冰属性贯穿伤害提升6%/7%/8%/9%/10%，最多叠加3层，持续25秒，每层效果单独结算持续时间，0.5秒内最多触发一次；装备者生命值降低至最大值的50%时，暴击率提升20%/23%/26%/29%/32%。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1664_self_ice_sheer",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "iceSheerDmg",
+              "mode": "flat",
+              "valuePerStack": 6,
+              "maxStacks": 3,
+              "defaultStacks": 3,
+              "modificationValues": {
+                "valuePerStack": [
+                  6,
+                  7,
+                  8,
+                  9,
+                  10
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_1664_self_crit_rate",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 20,
+              "modificationValues": {
+                "value": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "hpReduced",
+          "durationSeconds": 25
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1664/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1342",
+      "name": {
+        "zhCN": "青溟笼舍"
+      },
+      "rarity": "S",
+      "specialty": "rupture",
+      "attribute": "ether",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1342.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      },
+      "level60": {
+        "atkBase": 743,
+        "advancedStat": {
+          "stat": "hpPct",
+          "value": 30,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "云流运转"
+        },
+        "requirement": {
+          "specialty": "rupture",
+          "label": {
+            "zhCN": "对于【命破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "暴击率提升20%/23%/26%/29%/32%；装备者释放[强化特殊技]时角色获得[青溟同行]效果，最多叠加2层，持续15秒，进入战斗时直接获得2层，重复触发时刷新持续时间；每层[青溟同行]效果使装备者造成的以太伤害提升8%/9.2%/10.4%/11.6%/12.8%，[终结技]或[强化特殊技]造成的以太贯穿伤害提升10%/11.5%/13%/14.5%/16%。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1342_self_crit_rate",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 20,
+              "modificationValues": {
+                "value": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_1342_self_ether_dmg",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "etherDmg",
+              "mode": "flat",
+              "valuePerStack": 8,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "modificationValues": {
+                "valuePerStack": [
+                  8,
+                  9.2,
+                  10.4,
+                  11.6,
+                  12.8
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_1342_self_ether_sheer",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "etherSheerDmg",
+              "mode": "flat",
+              "valuePerStack": 10,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "modificationValues": {
+                "valuePerStack": [
+                  10,
+                  11.5,
+                  13,
+                  14.5,
+                  16
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      },
+      "relatedAgentId": "yixuan"
+    },
+    {
+      "id": "zzz_wiki_1774",
+      "name": {
+        "zhCN": "青漪灵鼎"
+      },
+      "rarity": "A",
+      "specialty": "rupture",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1774.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/12/25/158441880/2174b7958f8d431fff46972fe4e06368_6459967918002705270.png"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "hpPct",
+          "value": 25,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "玄音唤灵"
+        },
+        "requirement": {
+          "specialty": "rupture",
+          "label": {
+            "zhCN": "对于【命破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者发动[强化特殊技]时可获得1层增益效果，每层增益效果使装备者造成的伤害提升4%/4.6%/5.2%/5.8%/6.4%，最多叠加3层，持续20秒，每0.5秒最多触发1次，重复触发时刷新持续时间；拥有3层增益效果时，装备者的暴击率提升6.5%/7.5%/8.5%/9.4%/10.4%。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1774_self_dmg",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "valuePerStack": 4,
+              "maxStacks": 3,
+              "defaultStacks": 3,
+              "modificationValues": {
+                "valuePerStack": [
+                  4,
+                  4.6,
+                  5.2,
+                  5.8,
+                  6.4
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_1774_self_crit_rate",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 6.5,
+              "modificationValues": {
+                "value": [
+                  6.5,
+                  7.5,
+                  8.5,
+                  9.4,
+                  10.4
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "exSpecial",
+          "durationSeconds": 20
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1774/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1612",
+      "name": {
+        "zhCN": "燔火胧夜"
+      },
+      "rarity": "A",
+      "specialty": "rupture",
+      "attribute": "fire",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1612.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/10/08/72175806/c7830130fa5187bd197bf37c6d98dc71_2043424059477558507.png"
+      },
+      "level60": {
+        "atkBase": 624,
+        "advancedStat": {
+          "stat": "hpPct",
+          "value": 25,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "笼中火"
+        },
+        "requirement": {
+          "specialty": "rupture",
+          "label": {
+            "zhCN": "对于【命破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者造成的火属性伤害15%/17.25%/19.5%/21.75%/24%；装备者的生命值降低时，暴击率提升15%/17.25%/19.5%/21.75%/24%，持续5秒。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1612_self_fire_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "fireDmg",
+              "mode": "flat",
+              "value": 15,
+              "modificationValues": {
+                "value": [
+                  15,
+                  17.25,
+                  19.5,
+                  21.75,
+                  24
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_1612_self_crit_rate",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 15,
+              "modificationValues": {
+                "value": [
+                  15,
+                  17.25,
+                  19.5,
+                  21.75,
+                  24
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "hpReduced",
+          "durationSeconds": 5
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1612/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1343",
+      "name": {
+        "zhCN": "幻变魔方"
+      },
+      "rarity": "A",
+      "specialty": "rupture",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1343.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/07/30/76099754/22ab13eca82dd5c7b0cbf40685b65ae6_3074278975611154037.png"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 25,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "奇机弄巧"
+        },
+        "requirement": {
+          "specialty": "rupture",
+          "label": {
+            "zhCN": "对于【命破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "发动[强化特殊技]时，装备者暴击伤害提升16%/18.4%/20.8%/23.2%/25.6%，持续12秒；且若目标当前生命值低于最大值的50%时，[强化特殊技]造成的伤害提升20%/23%/26%/29%/32%。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1343_self_crit_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critDmg",
+              "mode": "flat",
+              "value": 16,
+              "modificationValues": {
+                "value": [
+                  16,
+                  18.4,
+                  20.8,
+                  23.2,
+                  25.6
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_1343_self_ex_special_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 20,
+              "modificationValues": {
+                "value": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "exSpecialTargetBelowHalfHp",
+          "durationSeconds": 12
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1343/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1340",
+      "name": {
+        "zhCN": "电波漫步"
+      },
+      "rarity": "A",
+      "specialty": "rupture",
+      "attribute": "ether",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1340.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/07/30/76099754/8f60b89f02373910e197014d67d3a6df_4042554908935837917.png"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "hpPct",
+          "value": 25,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "自在步调"
+        },
+        "requirement": {
+          "specialty": "rupture",
+          "label": {
+            "zhCN": "对于【命破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "发动[连携技]或[终结技]时，装备者获得1层增益效果，每层增益效果使装备者的贯穿力提升80/92/104/116/128点，最多叠加3层，持续12秒，每层效果单独结算持续时间。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1340_self_sheer_force",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "sheerForceFlat",
+              "mode": "flat",
+              "valuePerStack": 80,
+              "maxStacks": 3,
+              "defaultStacks": 3,
+              "modificationValues": {
+                "valuePerStack": [
+                  80,
+                  92,
+                  104,
+                  116,
+                  128
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "chainOrUltimate",
+          "durationSeconds": 12
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1340/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
     }
   ]
 }

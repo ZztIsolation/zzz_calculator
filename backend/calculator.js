@@ -38,6 +38,7 @@ const BONUS_KEY_MAP = {
     iceDmg: "iceDmg",
     electricDmg: "electricDmg",
     etherDmg: "etherDmg",
+    sheerForceFlat: "sheerForceFlat",
 }
 
 const BONUS_KEYS = [
@@ -67,6 +68,7 @@ const BONUS_KEYS = [
     "iceDmg",
     "electricDmg",
     "etherDmg",
+    "sheerForceFlat",
 ]
 
 const OUTPUT_PANEL_KEYS = [
@@ -92,6 +94,8 @@ const OUTPUT_PANEL_KEYS = [
     "iceDmg",
     "electricDmg",
     "etherDmg",
+    "sheerForce",
+    "sheerForceFlat",
 ]
 
 const CORE_BASE_STAT_MAP = {
@@ -171,15 +175,29 @@ const RES_REDUCTION_KEY_BY_ELEMENT = {
 }
 const RES_IGNORE_KEYS = Object.values(RES_IGNORE_KEY_BY_ELEMENT)
 
-const DAMAGE_EVENT_KINDS = ["direct", "anomaly", "disorder"]
+const SHEER_DMG_KEY_BY_ELEMENT = {
+    physical: "physicalSheerDmg",
+    fire: "fireSheerDmg",
+    ice: "iceSheerDmg",
+    electric: "electricSheerDmg",
+    ether: "etherSheerDmg",
+}
+
+const DAMAGE_EVENT_KINDS = ["direct", "anomaly", "disorder", "sheer"]
 const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
-const DAMAGE_MODIFIER_KINDS = ["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "directDamageBonus", "skillMultiplierBonus"]
+const DAMAGE_MODIFIER_KINDS = ["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "directDamageBonus", "sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "skillMultiplierBonus"]
 const EVENT_MODIFIER_STAT_KEYS = new Set([
     "anomalyDamageBonus",
     "disorderDamageBonus",
     "baseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
+    "sheerDmgBonus",
+    "physicalSheerDmg",
+    "fireSheerDmg",
+    "iceSheerDmg",
+    "electricSheerDmg",
+    "etherSheerDmg",
     "skillMultiplierBonus",
 ])
 const SKILL_TARGET_STAT_KEYS = new Set([
@@ -203,6 +221,12 @@ const SKILL_TARGET_STAT_KEYS = new Set([
     "etherDmg",
     "anomalyDamageBonus",
     "disorderDamageBonus",
+    "sheerDmgBonus",
+    "physicalSheerDmg",
+    "fireSheerDmg",
+    "iceSheerDmg",
+    "electricSheerDmg",
+    "etherSheerDmg",
     "skillMultiplierBonus",
 ])
 const EVENT_MODIFIER_KIND_VALUES = new Set([
@@ -240,6 +264,8 @@ const DAMAGE_TARGET_PRESETS = [
 
 const DEFAULT_DAMAGE_TARGET_PRESET_ID = "normal-boss"
 const DEFAULT_DAMAGE_LEVEL_COEFFICIENT = 794
+const SHEER_FORCE_ATK_RATIO = 0.3
+const SHEER_FORCE_HP_RATIO = 0.1
 
 const OUT_OF_COMBAT_BASIS_SOURCE_TYPES = new Set(["teammate", "wEngineTeam", "driveDisc4pcTeam", "field", "boss", "manual"])
 const REQUIRED_ATK_PCT_BASIS_SOURCE_TYPES = new Set(["self", "wEngine", "driveDisc4pc"])
@@ -271,6 +297,12 @@ const STORED_PERCENT_STATS = new Set([
     "iceDmg",
     "electricDmg",
     "etherDmg",
+    "sheerDmgBonus",
+    "physicalSheerDmg",
+    "fireSheerDmg",
+    "iceSheerDmg",
+    "electricSheerDmg",
+    "etherSheerDmg",
     "enemyDefReduction",
     "enemyDefIgnore",
     "enemyResReduction",
@@ -1573,6 +1605,8 @@ function calculateCombatPanelFromTotals(agent, outOfCombat, bonusTotals) {
     panel.iceDmg = outOfCombat.panel.iceDmg + bonusTotals.iceDmg
     panel.electricDmg = outOfCombat.panel.electricDmg + bonusTotals.electricDmg
     panel.etherDmg = outOfCombat.panel.etherDmg + bonusTotals.etherDmg
+    panel.sheerForceFlat = bonusTotals.sheerForceFlat
+    panel.sheerForce = sheerForceFromPanel(panel)
 
     const selectedAttributeBonusKey = resolveAttributeBonusKey(agent)
     const selectedDmgBonus = (panel.dmgBonus ?? 0) + (panel[selectedAttributeBonusKey] ?? 0)
@@ -1690,6 +1724,7 @@ function resolveDamageSkillRef(catalog, agent, skillRef = null) {
             rowId,
             generatedFromRowIds: Array.isArray(row.generatedFromRowIds) ? row.generatedFromRowIds : [],
             level: requestedLevel,
+            damageBasis: row.damageBasis ?? "atk",
             damageElement: DAMAGE_ELEMENTS.includes(move.damageElement) ? move.damageElement : null,
             categoryName: category.name,
             moveName: move.name,
@@ -1818,6 +1853,48 @@ function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index 
     }
 }
 
+function normalizeSheerDamageEvent(event = {}, agent = {}, catalog = {}, index = 0) {
+    if (event.normalized === true) {
+        const damageElement = DAMAGE_ELEMENTS.includes(event.damageElement)
+            ? event.damageElement
+            : resolveDamageElement(agent)
+        return {
+            ...event,
+            id: String(event.id ?? `sheer-${index + 1}`),
+            kind: "sheer",
+            normalized: true,
+            skillMultiplier: Math.max(0, Number(event.skillMultiplier ?? 1)),
+            skillSource: event.skillSource ?? null,
+            critMode: ["expected", "crit", "nonCrit"].includes(event.critMode)
+                ? event.critMode
+                : "expected",
+            damageElement,
+            count: normalizeDamageCount(event.count, 1),
+        }
+    }
+
+    const skillRefResult = resolveDamageSkillRef(catalog, agent, event.skillRef)
+    const skillMultiplier = skillRefResult?.skillMultiplier
+        ?? Number(event.skillMultiplier ?? 100) / 100
+    const critMode = ["expected", "crit", "nonCrit"].includes(event.critMode)
+        ? event.critMode
+        : "expected"
+    const damageElement = DAMAGE_ELEMENTS.includes(event.damageElement)
+        ? event.damageElement
+        : skillRefResult?.skillSource?.damageElement ?? resolveDamageElement(agent)
+
+    return {
+        id: String(event.id ?? `sheer-${index + 1}`),
+        kind: "sheer",
+        normalized: true,
+        skillMultiplier: Number.isFinite(skillMultiplier) ? Math.max(0, skillMultiplier) : 1,
+        skillSource: skillRefResult?.skillSource ?? null,
+        critMode,
+        damageElement,
+        count: normalizeDamageCount(event.count, 1),
+    }
+}
+
 function normalizeAnomalyDamageEvent(event = {}, catalog = {}, index = 0) {
     if (event.normalized === true) {
         return {
@@ -1922,6 +1999,9 @@ function normalizeDamageEvent(event = {}, agent = {}, catalog = {}, index = 0) {
     if (kind === "disorder") {
         return normalizeDisorderDamageEvent(event, catalog, index)
     }
+    if (kind === "sheer") {
+        return normalizeSheerDamageEvent(event, agent, catalog, index)
+    }
     return normalizeDirectDamageEvent(event, agent, catalog, index)
 }
 
@@ -2004,12 +2084,24 @@ function eventDamageKindKeys(event = {}) {
     if (event.kind === "direct") {
         return ["direct"]
     }
+    if (event.kind === "sheer") {
+        return ["sheer"]
+    }
     return isDisorderDamageEvent(event) ? ["disorder"] : ["anomaly"]
 }
 
 function selectedDmgBonusForElement(panel, damageElement) {
     const elementKey = `${damageElement}Dmg`
     return Number(panel.dmgBonus ?? 0) + Number(panel[elementKey] ?? 0)
+}
+
+function sheerForceFromPanel(panel = {}) {
+    return Math.max(
+        0,
+        Number(panel.hp ?? 0) * SHEER_FORCE_HP_RATIO
+            + Number(panel.atk ?? 0) * SHEER_FORCE_ATK_RATIO
+            + Number(panel.sheerForceFlat ?? 0),
+    )
 }
 
 function damageElementLabel(damageElement) {
@@ -2058,6 +2150,20 @@ function targetBreakdownForElement(panel, bonusTotals, target, damageElement, ev
         effectiveResistance,
         rawResistanceMultiplier,
         resistanceMultiplier,
+    }
+}
+
+function sheerTargetBreakdownForElement(panel, bonusTotals, target, damageElement, eventTotals = {}) {
+    const breakdown = targetBreakdownForElement(panel, bonusTotals, target, damageElement, eventTotals)
+    return {
+        ...breakdown,
+        enemyDefReduction: 0,
+        enemyDefFlatReduction: 0,
+        targetDefenseAfterReduction: breakdown.targetDefense,
+        penRatio: 0,
+        penFlat: 0,
+        effectiveDefense: 0,
+        defenseMultiplier: 1,
     }
 }
 
@@ -2137,6 +2243,7 @@ function sumDamageModifiers(bonusTotals, event, kind) {
 function eventTargetTotalsForElement(bonusTotals, event) {
     const damageElement = event.damageElement
     const elementDmgKey = `${damageElement}Dmg`
+    const elementSheerDmgKey = SHEER_DMG_KEY_BY_ELEMENT[damageElement]
     const resIgnoreKey = RES_IGNORE_KEY_BY_ELEMENT[damageElement]
     const resReductionKey = RES_REDUCTION_KEY_BY_ELEMENT[damageElement]
     const isDisorder = isDisorderDamageEvent(event)
@@ -2153,6 +2260,8 @@ function eventTargetTotalsForElement(bonusTotals, event) {
         enemyResReduction: sumDamageModifiers(bonusTotals, event, "enemyResReduction"),
         [resReductionKey]: sumDamageModifiers(bonusTotals, event, resReductionKey),
         [resIgnoreKey]: sumDamageModifiers(bonusTotals, event, resIgnoreKey),
+        sheerDmgBonus: sumDamageModifiers(bonusTotals, event, "sheerDmgBonus"),
+        ...(elementSheerDmgKey ? { [elementSheerDmgKey]: sumDamageModifiers(bonusTotals, event, elementSheerDmgKey) } : {}),
         anomalyDamageBonus: isDisorder ? disorderDamageBonus : attributeAnomalyDamageBonus,
         attributeAnomalyDamageBonus,
         disorderDamageBonus,
@@ -2249,6 +2358,90 @@ function directDamageWhiteBoxRows({ event, atk, critMultiplier, critRateForDamag
         label: "最终伤害",
         formula: event.count === 1
             ? `${formatDamageNumber(atk)} × ${formatDamagePercent(effectiveSkillMultiplier)} × ${formatDamageNumber(critMultiplier, 4)} × ${formatDamageNumber(dmgMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.defenseMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.resistanceMultiplier, 4)}`
+            : `${formatDamageNumber(singleDamage)} × ${formatDamageNumber(event.count)}`,
+        value: finalDamage,
+        displayValue: formatDamageNumber(finalDamage),
+    })
+    return rows
+}
+
+function sheerDefenseWhiteBoxRow() {
+    return {
+        label: "防御乘区",
+        formula: "贯穿伤害不计算防御、减防、防御无视、穿透率或穿透值",
+        value: 1,
+        displayValue: "1",
+    }
+}
+
+function sheerDamageWhiteBoxRows({ event, hp, atk, sheerForceFlat, sheerForce, critMultiplier, critRateForDamage, critDmg, selectedDmgBonus, skillDamageBonus, dmgMultiplier, targetBreakdown, skillMultiplierBonus, effectiveSkillMultiplier, sheerDmgBonus, sheerDmgMultiplier, finalDamage, singleDamage }) {
+    const critModeLabel = {
+        expected: "期望",
+        crit: "暴击",
+        nonCrit: "非暴击",
+    }[event.critMode]
+    const damageElementText = damageElementLabel(event.damageElement)
+    const rows = [
+        {
+            label: "局内贯穿力",
+            formula: "来自局内生命值、局内攻击力和固定贯穿力",
+            value: sheerForce,
+            displayValue: formatDamageNumber(sheerForce),
+        },
+        {
+            label: "贯穿力换算",
+            formula: `${formatDamageNumber(hp)} × ${formatDamagePercent(SHEER_FORCE_HP_RATIO)} + ${formatDamageNumber(atk)} × ${formatDamagePercent(SHEER_FORCE_ATK_RATIO)} + ${formatDamageNumber(sheerForceFlat)}`,
+            value: sheerForce,
+            displayValue: formatDamageNumber(sheerForce),
+        },
+        {
+            label: "贯穿倍率",
+            formula: event.skillSource
+                ? `${event.skillSource.label} LV${event.skillSource.level}${skillMultiplierBonus ? ` + 技能倍率加算 ${formatDamagePercent(skillMultiplierBonus)}` : ""}`
+                : `本次贯穿倍率${skillMultiplierBonus ? ` + 技能倍率加算 ${formatDamagePercent(skillMultiplierBonus)}` : ""}`,
+            value: effectiveSkillMultiplier,
+            displayValue: formatDamagePercent(effectiveSkillMultiplier),
+        },
+        {
+            label: "暴击乘区",
+            formula: event.critMode === "expected"
+                ? `${formatDamagePercent(critRateForDamage)} × (1 + ${formatDamagePercent(critDmg)}) + (1 - ${formatDamagePercent(critRateForDamage)})`
+                : critModeLabel,
+            value: critMultiplier,
+            displayValue: formatDamageNumber(critMultiplier, 4),
+        },
+        {
+            label: "普通增伤区",
+            formula: `1 + 通用/属性增伤 ${formatDamagePercent(selectedDmgBonus)}${skillDamageBonus ? ` + 技能专属增伤 ${formatDamagePercent(skillDamageBonus)}` : ""}`,
+            value: dmgMultiplier,
+            displayValue: formatDamageNumber(dmgMultiplier, 4),
+        },
+        {
+            label: "贯穿增伤区",
+            formula: `1 + 贯穿增伤 ${formatDamagePercent(sheerDmgBonus)}`,
+            value: sheerDmgMultiplier,
+            displayValue: formatDamageNumber(sheerDmgMultiplier, 4),
+        },
+        sheerDefenseWhiteBoxRow(),
+        {
+            label: "抗性乘区",
+            formula: `clamp(1 - (${damageElementText}抗性 ${formatDamagePercent(targetBreakdown.targetResistance)} - 减抗 ${formatDamagePercent(targetBreakdown.enemyResReduction)} - 抗性无视 ${formatDamagePercent(targetBreakdown.resIgnore)}), 0.01, 2)`,
+            value: targetBreakdown.resistanceMultiplier,
+            displayValue: formatDamageNumber(targetBreakdown.resistanceMultiplier, 4),
+        },
+    ]
+    if (event.count !== 1) {
+        rows.push({
+            label: "事件次数",
+            formula: "单次伤害 × 次数",
+            value: event.count,
+            displayValue: formatDamageNumber(event.count),
+        })
+    }
+    rows.push({
+        label: "最终伤害",
+        formula: event.count === 1
+            ? `${formatDamageNumber(sheerForce)} × ${formatDamagePercent(effectiveSkillMultiplier)} × ${formatDamageNumber(critMultiplier, 4)} × ${formatDamageNumber(dmgMultiplier, 4)} × ${formatDamageNumber(sheerDmgMultiplier, 4)} × 1 × ${formatDamageNumber(targetBreakdown.resistanceMultiplier, 4)}`
             : `${formatDamageNumber(singleDamage)} × ${formatDamageNumber(event.count)}`,
         value: finalDamage,
         displayValue: formatDamageNumber(finalDamage),
@@ -2445,6 +2638,121 @@ function calculateDirectDamageEvent({ event, panel, bonusTotals, target, include
     }
 }
 
+function calculateSheerDamageEvent({ event, panel, bonusTotals, target, includeWhiteBox }) {
+    const hp = Number(panel.hp ?? 0)
+    const atk = Number(panel.atk ?? 0)
+    const sheerForceFlat = Number(panel.sheerForceFlat ?? 0)
+    const sheerForce = Number.isFinite(Number(panel.sheerForce))
+        ? Number(panel.sheerForce)
+        : sheerForceFromPanel(panel)
+    const rawCritRate = Number(panel.critRate ?? 0)
+    const critRateForDamage = damageCritRate(panel)
+    const critDmg = Number(panel.critDmg ?? 0)
+    const selectedDmgBonus = selectedDmgBonusForElement(panel, event.damageElement)
+    const eventTotals = eventTargetTotalsForElement(bonusTotals, event)
+    const elementDmgKey = `${event.damageElement}Dmg`
+    const elementSheerDmgKey = SHEER_DMG_KEY_BY_ELEMENT[event.damageElement]
+    const skillDamageBonus = Number(eventTotals.dmgBonus ?? 0) + Number(eventTotals[elementDmgKey] ?? 0)
+    const dmgMultiplier = 1 + selectedDmgBonus + skillDamageBonus
+    const sheerDmgBonus = Number(eventTotals.sheerDmgBonus ?? 0) + Number(eventTotals[elementSheerDmgKey] ?? 0)
+    const sheerDmgMultiplier = 1 + sheerDmgBonus
+    const skillMultiplierBonus = Number(eventTotals.skillMultiplierBonus ?? 0)
+    const effectiveSkillMultiplier = Math.max(0, Number(event.skillMultiplier ?? 0) + skillMultiplierBonus)
+    const targetBreakdown = sheerTargetBreakdownForElement(panel, bonusTotals, target, event.damageElement, eventTotals)
+    const baseSingleDamage = sheerForce
+        * effectiveSkillMultiplier
+        * dmgMultiplier
+        * sheerDmgMultiplier
+        * targetBreakdown.resistanceMultiplier
+    const damageVariant = mode => {
+        const critMultiplier = critMultiplierForMode(panel, mode)
+        const singleDamage = baseSingleDamage * critMultiplier
+        return {
+            critMode: mode,
+            critMultiplier,
+            singleDamage,
+            finalDamage: singleDamage * event.count,
+        }
+    }
+    const damageVariants = {
+        expected: damageVariant("expected"),
+        crit: damageVariant("crit"),
+        nonCrit: damageVariant("nonCrit"),
+    }
+    const selectedVariant = damageVariants[event.critMode] ?? damageVariants.expected
+    const critMultiplier = selectedVariant.critMultiplier
+    const singleDamage = selectedVariant.singleDamage
+    const finalDamage = singleDamage * event.count
+
+    return {
+        id: event.id,
+        kind: event.kind,
+        settlementType: event.settlementType ?? null,
+        label: event.skillSource?.label ?? "贯穿伤害",
+        finalDamage,
+        singleDamage,
+        damageVariants,
+        count: event.count,
+        input: {
+            ...event,
+            target,
+        },
+        panelSnapshot: {
+            hp,
+            atk,
+            sheerForceFlat,
+            sheerForce,
+            critRate: rawCritRate,
+            effectiveCritRate: critRateForDamage,
+            critDmg,
+            dmgBonus: Number(panel.dmgBonus ?? 0),
+            [elementDmgKey]: Number(panel[elementDmgKey] ?? 0),
+        },
+        multipliers: {
+            hp,
+            atk,
+            sheerForce,
+            sheerForceFlat,
+            skill: effectiveSkillMultiplier,
+            baseSkill: event.skillMultiplier,
+            skillMultiplierBonus,
+            crit: critMultiplier,
+            critRate: critRateForDamage,
+            rawCritRate,
+            critDmg,
+            dmg: dmgMultiplier,
+            skillDamageBonus,
+            sheerDamage: sheerDmgMultiplier,
+            sheerDmgBonus,
+            defense: 1,
+            resistance: targetBreakdown.resistanceMultiplier,
+        },
+        targetBreakdown,
+        whiteBoxRows: includeWhiteBox
+            ? sheerDamageWhiteBoxRows({
+                event,
+                hp,
+                atk,
+                sheerForceFlat,
+                sheerForce,
+                critMultiplier,
+                critRateForDamage,
+                critDmg,
+                selectedDmgBonus,
+                skillDamageBonus,
+                dmgMultiplier,
+                targetBreakdown,
+                skillMultiplierBonus,
+                effectiveSkillMultiplier,
+                sheerDmgBonus,
+                sheerDmgMultiplier,
+                finalDamage,
+                singleDamage,
+            })
+            : [],
+    }
+}
+
 function calculateAnomalyDamageEvent({ event, panel, bonusTotals, target, agentLevel, includeWhiteBox }) {
     const atk = Number(panel.atk ?? 0)
     const isDisorder = isDisorderDamageEvent(event)
@@ -2547,6 +2855,15 @@ function calculateDamageResult({ catalog, agent, panel, bonusTotals, input, incl
                 includeWhiteBox,
             })
         }
+        if (event.kind === "sheer") {
+            return calculateSheerDamageEvent({
+                event,
+                panel,
+                bonusTotals,
+                target: damageRequest.target,
+                includeWhiteBox,
+            })
+        }
         return calculateAnomalyDamageEvent({
             event,
             panel,
@@ -2586,6 +2903,10 @@ function targetDamageMultiplierForElement(panel, bonusTotals, target, damageElem
     const targetDefenseAfterReduction = Math.max(0, targetDefense * (1 - enemyDefReduction) - enemyDefFlatReduction)
     const effectiveDefense = Math.max(0, targetDefenseAfterReduction * (1 - penRatio) - penFlat)
     const defenseMultiplier = Math.min(1, levelCoefficient / (levelCoefficient + effectiveDefense))
+    return defenseMultiplier * targetResistanceMultiplierForElement(panel, bonusTotals, target, damageElement, eventTotals)
+}
+
+function targetResistanceMultiplierForElement(panel, bonusTotals, target, damageElement, eventTotals = {}) {
     const targetResistance = Number(target.resistanceByElement?.[damageElement] ?? 0)
     const enemyResReductionKey = RES_REDUCTION_KEY_BY_ELEMENT[damageElement]
     const enemyResReduction = Number(bonusTotals.enemyResReduction ?? 0)
@@ -2594,7 +2915,7 @@ function targetDamageMultiplierForElement(panel, bonusTotals, target, damageElem
         + Number(eventTotals[enemyResReductionKey] ?? 0)
     const resIgnoreKey = RES_IGNORE_KEY_BY_ELEMENT[damageElement]
     const resIgnore = Number(panel[resIgnoreKey] ?? 0) + Number(eventTotals[resIgnoreKey] ?? 0)
-    return defenseMultiplier * clampNumber(1 - (targetResistance - enemyResReduction - resIgnore), 0.01, 2)
+    return clampNumber(1 - (targetResistance - enemyResReduction - resIgnore), 0.01, 2)
 }
 
 function calculateDirectDamageFinalValue(event, panel, bonusTotals, target) {
@@ -2635,13 +2956,35 @@ function calculateAnomalyDamageFinalValue(event, panel, bonusTotals, target, age
         * Number(event.count ?? 1)
 }
 
+function calculateSheerDamageFinalValue(event, panel, bonusTotals, target) {
+    const eventTotals = eventTargetTotalsForElement(bonusTotals, event)
+    const elementDmgKey = `${event.damageElement}Dmg`
+    const elementSheerDmgKey = SHEER_DMG_KEY_BY_ELEMENT[event.damageElement]
+    const selectedDmgBonus = selectedDmgBonusForElement(panel, event.damageElement)
+    const skillDamageBonus = Number(eventTotals.dmgBonus ?? 0) + Number(eventTotals[elementDmgKey] ?? 0)
+    const sheerDmgBonus = Number(eventTotals.sheerDmgBonus ?? 0) + Number(eventTotals[elementSheerDmgKey] ?? 0)
+    const skillMultiplierBonus = Number(eventTotals.skillMultiplierBonus ?? 0)
+    const effectiveSkillMultiplier = Math.max(0, Number(event.skillMultiplier ?? 0) + skillMultiplierBonus)
+    return Number(panel.sheerForce ?? sheerForceFromPanel(panel))
+        * effectiveSkillMultiplier
+        * critMultiplierForMode(panel, event.critMode)
+        * (1 + selectedDmgBonus + skillDamageBonus)
+        * targetResistanceMultiplierForElement(panel, bonusTotals, target, event.damageElement, eventTotals)
+        * (1 + sheerDmgBonus)
+        * Number(event.count ?? 1)
+}
+
 function calculateDamageTotalFinalValue({ panel, bonusTotals, damageRequest }) {
     const target = damageRequest.target
     let total = 0
     for (const event of damageRequest.events ?? []) {
-        total += event.kind === "direct"
-            ? calculateDirectDamageFinalValue(event, panel, bonusTotals, target)
-            : calculateAnomalyDamageFinalValue(event, panel, bonusTotals, target, damageRequest.agentLevel)
+        if (event.kind === "direct") {
+            total += calculateDirectDamageFinalValue(event, panel, bonusTotals, target)
+        } else if (event.kind === "sheer") {
+            total += calculateSheerDamageFinalValue(event, panel, bonusTotals, target)
+        } else {
+            total += calculateAnomalyDamageFinalValue(event, panel, bonusTotals, target, damageRequest.agentLevel)
+        }
     }
     return total
 }
@@ -2894,6 +3237,8 @@ function calculatePanel({ agent, wEngine, driveDiscs, driveDiscSets, coreSkillLe
     panel.iceDmg = bonusTotals.iceDmg
     panel.electricDmg = bonusTotals.electricDmg
     panel.etherDmg = bonusTotals.etherDmg
+    panel.sheerForceFlat = bonusTotals.sheerForceFlat
+    panel.sheerForce = sheerForceFromPanel(panel)
 
     const selectedAttributeBonusKey = resolveAttributeBonusKey(agent)
     const selectedDmgBonus = (panel.dmgBonus ?? 0) + (panel[selectedAttributeBonusKey] ?? 0)
@@ -3023,6 +3368,8 @@ function createPreparedOutOfCombatPanelCalculator({ agent, wEngine, driveDiscSet
             panel.iceDmg = bonusTotals.iceDmg
             panel.electricDmg = bonusTotals.electricDmg
             panel.etherDmg = bonusTotals.etherDmg
+            panel.sheerForceFlat = bonusTotals.sheerForceFlat
+            panel.sheerForce = sheerForceFromPanel(panel)
 
             const selectedAttributeBonusKey = resolveAttributeBonusKey(agent)
             const selectedDmgBonus = (panel.dmgBonus ?? 0) + (panel[selectedAttributeBonusKey] ?? 0)
@@ -3097,6 +3444,8 @@ function createPreparedOutOfCombatPanelCalculator({ agent, wEngine, driveDiscSet
             panel.iceDmg = bonusTotals.iceDmg
             panel.electricDmg = bonusTotals.electricDmg
             panel.etherDmg = bonusTotals.etherDmg
+            panel.sheerForceFlat = bonusTotals.sheerForceFlat
+            panel.sheerForce = sheerForceFromPanel(panel)
 
             const selectedAttributeBonusKey = resolveAttributeBonusKey(agent)
             const selectedDmgBonus = (panel.dmgBonus ?? 0) + (panel[selectedAttributeBonusKey] ?? 0)
@@ -3384,6 +3733,7 @@ export function createInCombatPanelCalculator(catalog, input) {
     const currentWEngineRequirement = wEngineEffectData(wEngine)?.requirement?.specialty ?? wEngine.specialty
     const activeCurrentWEngineEntries = wEngineCombatBuffEntries(wEngine).filter(entry => activeBuffIds.has(entry.key))
     const appliedCurrentWEngineKeys = new Set(activeCurrentWEngineEntries.map(entry => entry.key))
+    // External team W-Engine Buffs represent another wearer that has already met its specialty/trigger requirements.
     const activeTeamWEngineEntries = (catalog.wEngines ?? [])
         .map(sourceWEngine => materializedTeamWEngineEntry(sourceWEngine, wEngineTeamModificationLevels))
         .filter(entry => activeBuffIds.has(entry.key) && !appliedCurrentWEngineKeys.has(entry.key))
@@ -3897,6 +4247,7 @@ export function calculateInCombatPanel(catalog, input) {
     const currentWEngineRequirement = wEngineEffectData(wEngine)?.requirement?.specialty ?? wEngine.specialty
     const activeCurrentWEngineEntries = wEngineCombatBuffEntries(wEngine).filter(entry => activeBuffIds.has(entry.key))
     const appliedWEngineKeys = new Set(activeCurrentWEngineEntries.map(entry => entry.key))
+    // External team W-Engine Buffs represent another wearer that has already met its specialty/trigger requirements.
     const activeTeamWEngineEntries = (catalog.wEngines ?? [])
         .map(sourceWEngine => materializedTeamWEngineEntry(sourceWEngine, wEngineTeamModificationLevels))
         .filter(entry => activeBuffIds.has(entry.key) && !appliedWEngineKeys.has(entry.key))

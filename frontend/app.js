@@ -5,6 +5,8 @@ import {
     skillRowValue,
 } from "./skillMultiplierCandidates.js"
 import * as SharedCombat from "./shared-combat.js"
+import { createImageSelect } from "./entity-select.js"
+import { initDriveDiscAnalysis } from "./drive-disc-analysis.js"
 
 const els = {
     status: document.getElementById("status"),
@@ -98,6 +100,8 @@ const els = {
     homeDiscSearchInput: document.getElementById("homeDiscSearchInput"),
     homeDiscOptionList: document.getElementById("homeDiscOptionList"),
     homeDiscEmpty: document.getElementById("homeDiscEmpty"),
+    driveDiscSubstatAnalysisBtn: document.getElementById("driveDiscSubstatAnalysisBtn"),
+    driveDiscStatGainBtn: document.getElementById("driveDiscStatGainBtn"),
 }
 
 const FALLBACK_LABELS = {
@@ -130,6 +134,8 @@ const FALLBACK_LABELS = {
     anomalyMasteryFlat: "异常掌控",
     penFlat: "穿透值",
     penRatio: "穿透率",
+    sheerForce: "贯穿力",
+    sheerForceFlat: "固定贯穿力",
     physicalResIgnore: "物理抗性无视",
     fireResIgnore: "火抗性无视",
     iceResIgnore: "冰抗性无视",
@@ -154,6 +160,12 @@ const FALLBACK_LABELS = {
     enemyEtherResReduction: "敌方以太减抗",
     anomalyDamageBonus: "属性异常增伤",
     disorderDamageBonus: "紊乱增伤",
+    sheerDmgBonus: "贯穿增伤",
+    physicalSheerDmg: "物理贯穿增伤",
+    fireSheerDmg: "火贯穿增伤",
+    iceSheerDmg: "冰贯穿增伤",
+    electricSheerDmg: "电贯穿增伤",
+    etherSheerDmg: "以太贯穿增伤",
 }
 
 const ENUM_LABELS = {
@@ -161,6 +173,7 @@ const ENUM_LABELS = {
         physical: "物理属性",
         honed_edge: "凛刃",
         frost: "烈霜",
+        xuanmo: "玄墨",
         fire: "火属性",
         ice: "冰属性",
         electric: "电属性",
@@ -217,6 +230,12 @@ const PERCENT_KEYS = new Set([
     "enemyEtherResReduction",
     "anomalyDamageBonus",
     "disorderDamageBonus",
+    "sheerDmgBonus",
+    "physicalSheerDmg",
+    "fireSheerDmg",
+    "iceSheerDmg",
+    "electricSheerDmg",
+    "etherSheerDmg",
 ])
 
 const PERCENT_MODE_KEY = {
@@ -258,6 +277,12 @@ const STORED_PERCENT_STATS = new Set([
     "enemyIceResReduction",
     "enemyElectricResReduction",
     "enemyEtherResReduction",
+    "sheerDmgBonus",
+    "physicalSheerDmg",
+    "fireSheerDmg",
+    "iceSheerDmg",
+    "electricSheerDmg",
+    "etherSheerDmg",
 ])
 
 const STORED_STAT_LABELS = {
@@ -293,6 +318,12 @@ const STORED_STAT_LABELS = {
     enemyEtherResReduction: "敌方以太减抗%",
     anomalyDamageBonus: "属性异常增伤%",
     disorderDamageBonus: "紊乱增伤%",
+    sheerDmgBonus: "贯穿增伤%",
+    physicalSheerDmg: "物理贯穿增伤%",
+    fireSheerDmg: "火贯穿增伤%",
+    iceSheerDmg: "冰贯穿增伤%",
+    electricSheerDmg: "电贯穿增伤%",
+    etherSheerDmg: "以太贯穿增伤%",
 }
 
 const BASE_ORDER = ["hp", "atk", "def"]
@@ -359,6 +390,7 @@ const COMBAT_BONUS_ORDER = [
 const PANEL_ORDER = [
     "hp",
     "atk",
+    "sheerForce",
     "def",
     "critRate",
     "critDmg",
@@ -641,7 +673,8 @@ function populateDamageEventSelects() {
 
 function renderDamageEventControls() {
     const type = els.damageEventType?.value || "direct"
-    document.querySelectorAll(".damage-direct-field").forEach(item => { item.hidden = type !== "direct" })
+    const usesSkillControls = type === "direct" || type === "sheer"
+    document.querySelectorAll(".damage-direct-field").forEach(item => { item.hidden = !usesSkillControls })
     document.querySelectorAll(".damage-anomaly-field").forEach(item => { item.hidden = type !== "anomaly" })
     document.querySelectorAll(".damage-disorder-field").forEach(item => { item.hidden = type !== "disorder" })
 }
@@ -1052,7 +1085,7 @@ function applyStoredDamageConfig(config = {}) {
     els.damageTargetDefense.value = target.defense ?? damageTargetPresetById(els.damageTargetPreset.value)?.defense ?? 953
     els.damageLevelCoefficient.value = target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT
     if (els.damageEventType) {
-        els.damageEventType.value = ["direct", "anomaly", "disorder"].includes(selectedEvent.kind) ? selectedEvent.kind : "direct"
+        els.damageEventType.value = ["direct", "anomaly", "disorder", "sheer"].includes(selectedEvent.kind) ? selectedEvent.kind : "direct"
     }
     els.damageSkillMultiplier.value = selectedEvent.skillMultiplier ?? config.skillMultiplier ?? 100
     els.damageCritMode.value = selectedEvent.critMode ?? config.critMode ?? "expected"
@@ -1343,6 +1376,10 @@ function validWEngineId(wEngineId) {
     return getWEngine(wEngineId)?.id ?? meta?.wEngines?.[0]?.id ?? ""
 }
 
+function defaultWEngineIdForAgent(agentId, savedWEngineId = "") {
+    return SharedCombat.defaultWEngineIdForAgent(meta?.wEngines ?? [], agentId, savedWEngineId)
+}
+
 function selectedWEngineModificationLevel(wEngine = getWEngine(els.wEngineSelect.value)) {
     return SharedCombat.clampWEngineModificationLevel(els.wEngineModificationSelect?.value, wEngine)
 }
@@ -1593,9 +1630,15 @@ function manualDiscIdsFromSavedConfig(agentId) {
     return equippedDriveDiscIdsForAgent(agentId)
 }
 
-function loadoutIdForAgent(agentId) {
-    const id = configForAgent(agentId).selectedLoadoutId ?? ""
-    return driveDiscLoadoutsForAgent(agentId).some(loadout => loadout.id === id && loadoutIsComplete(loadout)) ? id : ""
+function completeLoadoutForAgent(agentId, preferredLoadoutId = configForAgent(agentId).selectedLoadoutId ?? "") {
+    const loadouts = driveDiscLoadoutsForAgent(agentId)
+    return loadouts.find(loadout => loadout.id === preferredLoadoutId && loadoutIsComplete(loadout))
+        ?? loadouts.find(loadoutIsComplete)
+        ?? null
+}
+
+function loadoutIdForAgent(agentId, preferredLoadoutId) {
+    return completeLoadoutForAgent(agentId, preferredLoadoutId)?.id ?? ""
 }
 
 function loadoutDiscIdsForAgent(agentId, loadoutId = loadoutIdForAgent(agentId)) {
@@ -1631,9 +1674,7 @@ function saveCurrentHomeSelection({ mode = currentHomeDiscMode(), manualDriveDis
         : sanitizeDiscIdsBySlot(manualDriveDiscIdsBySlot)
     const nextSelectedLoadoutId = selectedLoadoutId === undefined
         ? loadoutIdForAgent(agentId)
-        : driveDiscLoadoutsForAgent(agentId).some(loadout => loadout.id === selectedLoadoutId)
-            ? selectedLoadoutId
-            : ""
+        : loadoutIdForAgent(agentId, selectedLoadoutId)
     const driveDiscIdsBySlot = activeDiscIdsForConfig(
         agentId,
         driveDiscMode,
@@ -2190,7 +2231,7 @@ function outOfCombatHighlightKeys() {
 }
 
 function inCombatHighlightKeys() {
-    return new Set(["atk", "critRate", "critDmg", currentElementDmgKey(), "dmgBonus"])
+    return new Set(["atk", "sheerForce", "critRate", "critDmg", currentElementDmgKey(), "dmgBonus"])
 }
 
 function renderOrderedKV(container, obj, order, options = {}) {
@@ -2548,7 +2589,7 @@ function wEngineTeamBuffCandidateFromWEngine(wEngine, modificationLevel = 1) {
         sourceKind: "wEngineTeam",
         wEngineModificationLevel: materializedWEngine.selectedModificationLevel ?? 1,
         ownerName: materializedWEngine.name,
-        name: effect?.name ?? buff.name ?? materializedWEngine.name,
+        name: { zhCN: `${nameOf(materializedWEngine)}（队友音擎团队）` },
         description: effect?.description ?? buff.description ?? buff.conditionLabel,
         conditionLabel: buff.condition ?? effect?.requirement?.label,
         stats: effectStats(buff),
@@ -3066,7 +3107,7 @@ function addedCombatBuffSourceGroups(addedBuffs = currentAddedCombatBuffs()) {
             const label = isAgent
                 ? localizedText(buff.ownerName) || "角色"
                 : item.sourceKind === "wEngineTeam"
-                    ? "音擎"
+                    ? "队友音擎"
                     : item.sourceKind === "custom"
                         ? "自定义"
                         : item.sourceKind === "teammateDriveDisc4pc" || item.sourceCategory === "driveDisc"
@@ -4062,8 +4103,8 @@ function collectDamageConfig() {
         }
     }
     const directEvent = {
-        id: "direct-1",
-        kind: "direct",
+        id: eventType === "sheer" ? "sheer-1" : "direct-1",
+        kind: eventType === "sheer" ? "sheer" : "direct",
         skillMultiplier: Number(els.damageSkillMultiplier?.value ?? 100),
         ...(resolvedSkill ? { skillRef: resolvedSkill.ref } : {}),
         critMode: els.damageCritMode?.value ?? "expected",
@@ -4213,6 +4254,24 @@ function populateSelect(select, items, selectedId) {
     }
 }
 
+function orderedWEnginesForAgent(agentId = els.agentSelect?.value) {
+    return SharedCombat.sortWEnginesForAgent(meta?.wEngines ?? [], getAgent(agentId))
+}
+
+function populateWEngineSelect(selectedId = els.wEngineSelect?.value, agentId = els.agentSelect?.value) {
+    const items = orderedWEnginesForAgent(agentId)
+    populateSelect(els.wEngineSelect, items, selectedId)
+    createImageSelect({
+        select: els.wEngineSelect,
+        items,
+        selectedId: els.wEngineSelect.value,
+        getLabel: nameOf,
+        getImage: item => imageOf(item, "wEngine"),
+        getFallbackImage: item => fallbackImageSvg(item, "wEngine"),
+        className: "w-engine-image-select",
+    })
+}
+
 async function api(path, options = {}) {
     const response = await fetch(path, {
         headers: {
@@ -4232,7 +4291,7 @@ async function loadMeta() {
     const response = await api("/api/meta")
     meta = response
     populateSelect(els.agentSelect, response.agents, response.agents[0]?.id)
-    populateSelect(els.wEngineSelect, response.wEngines, response.wEngines[0]?.id)
+    populateWEngineSelect(response.wEngines[0]?.id, els.agentSelect.value)
     populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), 1)
     populateDamageTargetPresets()
     populateDamageEventSelects()
@@ -4246,9 +4305,10 @@ async function loadUserDriveDiscStore() {
 function applySelectionForAgent(agentId) {
     const agent = getAgent(agentId)
     const config = configForAgent(agentId)
+    const wEngineId = defaultWEngineIdForAgent(agentId, config.wEngineId)
 
     els.agentSelect.value = agentId
-    els.wEngineSelect.value = validWEngineId(config.wEngineId)
+    populateWEngineSelect(wEngineId, agentId)
     populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), config.wEngineModificationLevel)
     populateCoreSkillSelect(agent, validCoreSkillLevel(agent, config.coreSkillLevel))
     populateCinemaLevelSelect(cinemaLevelForAgent(agentId))
@@ -4382,6 +4442,20 @@ async function calculate({ refreshSelection = true, refreshCombatBuffControls = 
 
     renderCalculationResult(response.data)
     setStatus("就绪", "success")
+}
+
+function collectDriveDiscAnalysisPayload() {
+    const agent = getAgent(els.agentSelect.value)
+    return {
+        objective: "damage",
+        agentId: els.agentSelect.value,
+        coreSkillLevel: validCoreSkillLevel(agent, els.coreSkillSelect.value),
+        wEngineId: els.wEngineSelect.value,
+        wEngineModificationLevel: selectedWEngineModificationLevel(getWEngine(els.wEngineSelect.value)),
+        driveDiscs: parseDriveDiscs(),
+        combatBuffs: collectCombatBuffConfig(),
+        damage: collectDamageConfig(),
+    }
 }
 
 function clearScheduledCalculate() {
@@ -4586,6 +4660,14 @@ for (const { categoryId, select } of skillLevelSelects()) {
     })
 }
 els.driveDiscInput.addEventListener("input", renderCurrentSelection)
+initDriveDiscAnalysis({
+    substatButton: els.driveDiscSubstatAnalysisBtn,
+    gainButton: els.driveDiscStatGainBtn,
+    getPayload: collectDriveDiscAnalysisPayload,
+    setStatus,
+    statLabel,
+    formatStoredValue: (stat, value, mode) => formatStoredStatValue(stat, value, { percentMode: mode === "pct", mode }),
+})
 els.combatSection.addEventListener("change", async event => {
     const runtimeField = event.target.closest("[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]")
     if (runtimeField && !els.addedCombatBuffs.contains(event.target)) {

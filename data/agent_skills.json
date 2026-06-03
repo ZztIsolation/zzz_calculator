@@ -14,7 +14,6 @@
           "name": {
             "zhCN": "普通攻击"
           },
-          "icon": "https://patchwiki.biligame.com/images/zzz/e/e8/l2xulkq8z1y6kzmp5j0o36q44cb91qh.png",
           "levelRange": {
             "min": 1,
             "max": 16,
@@ -441,7 +440,6 @@
           "name": {
             "zhCN": "闪避"
           },
-          "icon": "https://patchwiki.biligame.com/images/zzz/d/d5/d1cf7qkzfs2r810to84781bsuvy7vzi.png",
           "levelRange": {
             "min": 1,
             "max": 16,
@@ -523,7 +521,6 @@
           "name": {
             "zhCN": "支援技"
           },
-          "icon": "https://patchwiki.biligame.com/images/zzz/4/46/iyacfbd5q50nrqs7vcifukxl1l49dog.png",
           "levelRange": {
             "min": 1,
             "max": 16,
@@ -707,7 +704,6 @@
           "name": {
             "zhCN": "特殊技"
           },
-          "icon": "https://patchwiki.biligame.com/images/zzz/f/fb/6igddy97k08apxga9tfy7iiug8qny0f.png",
           "levelRange": {
             "min": 1,
             "max": 16,
@@ -941,7 +937,6 @@
           "name": {
             "zhCN": "连携技"
           },
-          "icon": "https://patchwiki.biligame.com/images/zzz/5/53/qsswotdbtz6nnqdo2jtyv2flhftsyex.png",
           "levelRange": {
             "min": 1,
             "max": 16,
@@ -1107,7 +1102,6 @@
           "name": {
             "zhCN": "普通攻击"
           },
-          "icon": "https://patchwiki.biligame.com/images/zzz/e/e8/l2xulkq8z1y6kzmp5j0o36q44cb91qh.png",
           "levelRange": {
             "min": 1,
             "max": 16,
@@ -1348,7 +1342,6 @@
           "name": {
             "zhCN": "闪避"
           },
-          "icon": "https://patchwiki.biligame.com/images/zzz/d/d5/d1cf7qkzfs2r810to84781bsuvy7vzi.png",
           "levelRange": {
             "min": 1,
             "max": 16,
@@ -1430,7 +1423,6 @@
           "name": {
             "zhCN": "支援技"
           },
-          "icon": "https://patchwiki.biligame.com/images/zzz/4/46/iyacfbd5q50nrqs7vcifukxl1l49dog.png",
           "levelRange": {
             "min": 1,
             "max": 16,
@@ -1512,7 +1504,6 @@
           "name": {
             "zhCN": "特殊技"
           },
-          "icon": "https://patchwiki.biligame.com/images/zzz/f/fb/6igddy97k08apxga9tfy7iiug8qny0f.png",
           "levelRange": {
             "min": 1,
             "max": 16,
@@ -1619,7 +1610,6 @@
           "name": {
             "zhCN": "连携技"
           },
-          "icon": "https://patchwiki.biligame.com/images/zzz/5/53/qsswotdbtz6nnqdo2jtyv2flhftsyex.png",
           "levelRange": {
             "min": 1,
             "max": 16,
@@ -1708,6 +1698,762 @@
       }
     },
     {
+      "id": "yixuan",
+      "agentId": "yixuan",
+      "name": {
+        "zhCN": "仪玄技能倍率"
+      },
+      "categories": [
+        {
+          "id": "basic",
+          "name": {
+            "zhCN": "普通攻击"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "basic_xiaoyun_force",
+              "name": {
+                "zhCN": "普通攻击：霄云劲"
+              },
+              "damageElement": "ether",
+              "rows": [
+                {
+                  "id": "hit_1",
+                  "label": {
+                    "zhCN": "一段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    45.8,
+                    50,
+                    54.2,
+                    58.4,
+                    62.6,
+                    66.8,
+                    71,
+                    75.2,
+                    79.4,
+                    83.6,
+                    87.8,
+                    92,
+                    96.2,
+                    100.4,
+                    104.6,
+                    108.8
+                  ]
+                },
+                {
+                  "id": "hit_2",
+                  "label": {
+                    "zhCN": "二段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    65.5,
+                    71.5,
+                    77.5,
+                    83.5,
+                    89.5,
+                    95.5,
+                    101.5,
+                    107.5,
+                    113.5,
+                    119.5,
+                    125.5,
+                    131.5,
+                    137.5,
+                    143.5,
+                    149.5,
+                    155.5
+                  ]
+                },
+                {
+                  "id": "hit_3",
+                  "label": {
+                    "zhCN": "三段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    87.1,
+                    95.1,
+                    103.1,
+                    111.1,
+                    119.1,
+                    127.1,
+                    135.1,
+                    143.1,
+                    151.1,
+                    159.1,
+                    167.1,
+                    175.1,
+                    183.1,
+                    191.1,
+                    199.1,
+                    207.1
+                  ]
+                },
+                {
+                  "id": "hit_4",
+                  "label": {
+                    "zhCN": "四段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    104.8,
+                    114.4,
+                    124,
+                    133.6,
+                    143.2,
+                    152.8,
+                    162.4,
+                    172,
+                    181.6,
+                    191.2,
+                    200.8,
+                    210.4,
+                    220,
+                    229.6,
+                    239.2,
+                    248.8
+                  ]
+                },
+                {
+                  "id": "hit_5",
+                  "label": {
+                    "zhCN": "五段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    113.7,
+                    124.1,
+                    134.5,
+                    144.9,
+                    155.3,
+                    165.7,
+                    176.1,
+                    186.5,
+                    196.9,
+                    207.3,
+                    217.7,
+                    228.1,
+                    238.5,
+                    248.9,
+                    259.3,
+                    269.7
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ink_shadow_condensing_cloud",
+              "name": {
+                "zhCN": "普通攻击：墨影凝云"
+              },
+              "damageElement": "ether",
+              "rows": [
+                {
+                  "id": "total_damage",
+                  "label": {
+                    "zhCN": "墨影凝云总伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    234.7,
+                    256.1,
+                    277.5,
+                    298.9,
+                    320.3,
+                    341.7,
+                    363.1,
+                    384.5,
+                    405.9,
+                    427.3,
+                    448.7,
+                    470.1,
+                    491.5,
+                    512.9,
+                    534.3,
+                    555.7
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "xuanmo_formation",
+              "name": {
+                "zhCN": "普通攻击：玄墨极阵"
+              },
+              "damageElement": "ether",
+              "rows": [
+                {
+                  "id": "total_damage",
+                  "label": {
+                    "zhCN": "玄墨极阵总伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    305.2,
+                    333,
+                    360.8,
+                    388.6,
+                    416.4,
+                    444.2,
+                    472,
+                    499.8,
+                    527.6,
+                    555.4,
+                    583.2,
+                    611,
+                    638.8,
+                    666.6,
+                    694.4,
+                    722.2
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "qingming_shock",
+              "name": {
+                "zhCN": "普通攻击：青溟震击"
+              },
+              "damageElement": "ether",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    110.6,
+                    120.7,
+                    130.8,
+                    140.9,
+                    151,
+                    161.1,
+                    171.2,
+                    181.3,
+                    191.4,
+                    201.5,
+                    211.6,
+                    221.7,
+                    231.8,
+                    241.9,
+                    252,
+                    262.1
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "dodge",
+          "name": {
+            "zhCN": "闪避"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "dash_lingyun_break",
+              "name": {
+                "zhCN": "冲刺攻击：凌云破"
+              },
+              "damageElement": "ether",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    49.9,
+                    54.5,
+                    59.1,
+                    63.7,
+                    68.3,
+                    72.9,
+                    77.5,
+                    82.1,
+                    86.7,
+                    91.3,
+                    95.9,
+                    100.5,
+                    105.1,
+                    109.7,
+                    114.3,
+                    118.9
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "dodge_counter_exorcising_strike",
+              "name": {
+                "zhCN": "闪避反击：除祟一击"
+              },
+              "damageElement": "ether",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    219.6,
+                    239.6,
+                    259.6,
+                    279.6,
+                    299.6,
+                    319.6,
+                    339.6,
+                    359.6,
+                    379.6,
+                    399.6,
+                    419.6,
+                    439.6,
+                    459.6,
+                    479.6,
+                    499.6,
+                    519.6
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "assist",
+          "name": {
+            "zhCN": "支援技"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "assist_xiaoyun_swift_strike",
+              "name": {
+                "zhCN": "支援突击：霄云迅击"
+              },
+              "damageElement": "ether",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    297,
+                    324,
+                    351,
+                    378,
+                    405,
+                    432,
+                    459,
+                    486,
+                    513,
+                    540,
+                    567,
+                    594,
+                    621,
+                    648,
+                    675,
+                    702
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "special",
+          "name": {
+            "zhCN": "特殊技"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "ember_shadow_art",
+              "name": {
+                "zhCN": "特殊技：烬影诀"
+              },
+              "damageElement": "ether",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    52.1,
+                    56.9,
+                    61.7,
+                    66.5,
+                    71.3,
+                    76.1,
+                    80.9,
+                    85.7,
+                    90.5,
+                    95.3,
+                    100.1,
+                    104.9,
+                    109.7,
+                    114.5,
+                    119.3,
+                    124.1
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ink_trace_transform",
+              "name": {
+                "zhCN": "强化特殊技：墨痕化形"
+              },
+              "damageElement": "ether",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    300.3,
+                    327.6,
+                    354.9,
+                    382.2,
+                    409.5,
+                    436.8,
+                    464.1,
+                    491.4,
+                    518.7,
+                    546,
+                    573.3,
+                    600.6,
+                    627.9,
+                    655.2,
+                    682.5,
+                    709.8
+                  ]
+                },
+                {
+                  "id": "charged_follow_up",
+                  "label": {
+                    "zhCN": "蓄力完成追加伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    149.6,
+                    163.2,
+                    176.8,
+                    190.4,
+                    204,
+                    217.6,
+                    231.2,
+                    244.8,
+                    258.4,
+                    272,
+                    285.6,
+                    299.2,
+                    312.8,
+                    326.4,
+                    340,
+                    353.6
+                  ]
+                },
+                {
+                  "id": "xiaoyun_swift_break_total",
+                  "label": {
+                    "zhCN": "「强化特殊技：霄云迅击-破」总伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    370.6,
+                    404.3,
+                    438,
+                    471.7,
+                    505.4,
+                    539.1,
+                    572.8,
+                    606.5,
+                    640.2,
+                    673.9,
+                    707.6,
+                    741.3,
+                    775,
+                    808.7,
+                    842.4,
+                    876.1
+                  ]
+                },
+                {
+                  "id": "qingming_shock_break_total",
+                  "label": {
+                    "zhCN": "「强化特殊技：青溟震击-破」总伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    426.4,
+                    465.2,
+                    504,
+                    542.8,
+                    581.6,
+                    620.4,
+                    659.2,
+                    698,
+                    736.8,
+                    775.6,
+                    814.4,
+                    853.2,
+                    892,
+                    930.8,
+                    969.6,
+                    1008.4
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "cloud_condensing_art",
+              "name": {
+                "zhCN": "强化特殊技：凝云术"
+              },
+              "damageElement": "ether",
+              "rows": [
+                {
+                  "id": "charged_total_damage",
+                  "label": {
+                    "zhCN": "蓄力期间总伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    671.8,
+                    732.9,
+                    794,
+                    855.1,
+                    916.2,
+                    977.3,
+                    1038.4,
+                    1099.5,
+                    1160.6,
+                    1221.7,
+                    1282.8,
+                    1343.9,
+                    1405,
+                    1466.1,
+                    1527.2,
+                    1588.3
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ink_ember_shadow_dispel",
+              "name": {
+                "zhCN": "强化特殊技：墨烬影消"
+              },
+              "damageElement": "ether",
+              "rows": [
+                {
+                  "id": "orb_total_damage",
+                  "label": {
+                    "zhCN": "能量球出现与收缩时总伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    234.3,
+                    255.6,
+                    276.9,
+                    298.2,
+                    319.5,
+                    340.8,
+                    362.1,
+                    383.4,
+                    404.7,
+                    426,
+                    447.3,
+                    468.6,
+                    489.9,
+                    511.2,
+                    532.5,
+                    553.8
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "chain",
+          "name": {
+            "zhCN": "连携技"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "chain_xuanmo_swift_strike",
+              "name": {
+                "zhCN": "连携技：玄墨迅击"
+              },
+              "damageElement": "ether",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    533.1,
+                    581.6,
+                    630.1,
+                    678.6,
+                    727.1,
+                    775.6,
+                    824.1,
+                    872.6,
+                    921.1,
+                    969.6,
+                    1018.1,
+                    1066.6,
+                    1115.1,
+                    1163.6,
+                    1212.1,
+                    1260.6
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ultimate_qingming_cloud_shadow",
+              "name": {
+                "zhCN": "终结技：青溟云影"
+              },
+              "damageElement": "ether",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    1853.4,
+                    2021.9,
+                    2190.4,
+                    2358.9,
+                    2527.4,
+                    2695.9,
+                    2864.4,
+                    3032.9,
+                    3201.4,
+                    3369.9,
+                    3538.4,
+                    3706.9,
+                    3875.4,
+                    4043.9,
+                    4212.4,
+                    4380.9
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ultimate_thousand_talismans",
+              "name": {
+                "zhCN": "终结技：符法千重"
+              },
+              "damageElement": "ether",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    1466.2,
+                    1599.5,
+                    1732.8,
+                    1866.1,
+                    1999.4,
+                    2132.7,
+                    2266,
+                    2399.3,
+                    2532.6,
+                    2665.9,
+                    2799.2,
+                    2932.5,
+                    3065.8,
+                    3199.1,
+                    3332.4,
+                    3465.7
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1299/detail",
+        "https://wiki.biligame.com/zzz/%E4%BB%AA%E7%8E%84"
+      ],
+      "verification": {
+        "skillMultipliers": "source-checked-biligame-wiki-2026-06-03",
+        "exclusions": "no-damage active skills, daze multipliers, support parry daze rows, energy costs, and state resource costs are intentionally omitted",
+        "damageBasis": "all stored Yixuan damage rows are modeled as sheerForce because Xuanmo damage is sheer damage",
+        "damageElement": "Biligame stores 属性=以太 and 属性名称=玄墨; stored rows settle as ether for damage bonus and resistance buckets"
+      }
+    },
+    {
       "id": "alice_thymefield",
       "agentId": "alice_thymefield",
       "name": {
@@ -1719,7 +2465,6 @@
           "name": {
             "zhCN": "普通攻击"
           },
-          "icon": "https://patchwiki.biligame.com/images/zzz/e/e8/l2xulkq8z1y6kzmp5j0o36q44cb91qh.png",
           "levelRange": {
             "min": 1,
             "max": 16,
@@ -1976,7 +2721,6 @@
           "name": {
             "zhCN": "闪避"
           },
-          "icon": "https://patchwiki.biligame.com/images/zzz/d/d5/d1cf7qkzfs2r810to84781bsuvy7vzi.png",
           "levelRange": {
             "min": 1,
             "max": 16,
@@ -2058,7 +2802,6 @@
           "name": {
             "zhCN": "支援技"
           },
-          "icon": "https://patchwiki.biligame.com/images/zzz/4/46/iyacfbd5q50nrqs7vcifukxl1l49dog.png",
           "levelRange": {
             "min": 1,
             "max": 16,
@@ -2140,7 +2883,6 @@
           "name": {
             "zhCN": "特殊技"
           },
-          "icon": "https://patchwiki.biligame.com/images/zzz/f/fb/6igddy97k08apxga9tfy7iiug8qny0f.png",
           "levelRange": {
             "min": 1,
             "max": 16,
@@ -2256,7 +2998,6 @@
           "name": {
             "zhCN": "连携技"
           },
-          "icon": "https://patchwiki.biligame.com/images/zzz/5/53/qsswotdbtz6nnqdo2jtyv2flhftsyex.png",
           "levelRange": {
             "min": 1,
             "max": 16,

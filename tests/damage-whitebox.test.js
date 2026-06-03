@@ -25,6 +25,21 @@ assert.ok(
     ),
     "Every stored Miyabi skill row should settle as ice",
 )
+const yixuan = meta.agents.find(item => item.id === "yixuan")
+assert.ok(yixuan, "Meta should expose Yixuan")
+assert.equal(yixuan.attribute, "xuanmo", "Yixuan should use Xuanmo as the display attribute")
+assert.equal(yixuan.damageElement, "ether", "Yixuan Xuanmo damage should settle as ether")
+assert.equal(yixuan.specialty, "rupture", "Yixuan should use rupture specialty")
+assert.equal(yixuan.defaultCalculationConfig?.mode, "sheer", "Yixuan should default to sheer damage calculation")
+const yixuanSkillCatalog = meta.agentSkills.find(item => item.id === "yixuan")
+assert.ok(yixuanSkillCatalog, "Meta should expose Yixuan skill catalog")
+assert.ok(
+    yixuanSkillCatalog.categories.every(category =>
+        category.moves.every(move => move.damageElement === "ether"
+            && move.rows.every(row => row.kind !== "damageMultiplier" || row.damageBasis === "sheerForce"))
+    ),
+    "Every stored Yixuan damage row should settle as ether and use sheer force",
+)
 
 function clone(value) {
     return JSON.parse(JSON.stringify(value))
@@ -746,6 +761,101 @@ approx(
     "Miyabi frost attribute should use ice damage bonus",
 )
 
+function elementDamageBuffResult(event, stat, value = 50) {
+    return calculateInCombatPanel(catalog, minimalInput({
+        combatBuffs: {
+            manualStats: [
+                {
+                    id: `test-${stat}`,
+                    stat,
+                    value,
+                    mode: "flat",
+                },
+            ],
+        },
+        damage: {
+            agentLevel: 60,
+            selectedEventId: event.id,
+            events: [event],
+            target: {
+                defense: 953,
+                levelCoefficient: 794,
+                resistanceByElement: {
+                    physical: 0,
+                    fire: 0,
+                    ice: 0,
+                    electric: 0,
+                    ether: 0,
+                },
+            },
+        },
+    }))
+}
+
+function assertElementDamageBonusGate({ event, matchingStat, offElementStat, label }) {
+    const base = elementDamageBuffResult(event, "dmgBonus", 0)
+    const matching = elementDamageBuffResult(event, matchingStat)
+    const offElement = elementDamageBuffResult(event, offElementStat)
+
+    approx(
+        matching.inCombat.panel[matchingStat] - base.inCombat.panel[matchingStat],
+        0.5,
+        `${label} matching element bonus should appear on the panel`,
+    )
+    approx(
+        offElement.inCombat.panel[offElementStat] - base.inCombat.panel[offElementStat],
+        0.5,
+        `${label} off-element bonus should appear on the panel`,
+    )
+    assert.ok(matching.damage.finalDamage > base.damage.finalDamage, `${label} matching element bonus should increase damage`)
+    approx(
+        offElement.damage.finalDamage,
+        base.damage.finalDamage,
+        `${label} off-element bonus should not affect final damage`,
+    )
+    approx(
+        offElement.damage.multipliers.dmg,
+        base.damage.multipliers.dmg,
+        `${label} off-element bonus should not enter the damage multiplier`,
+    )
+}
+
+assertElementDamageBonusGate({
+    label: "Direct physical event",
+    matchingStat: "physicalDmg",
+    offElementStat: "fireDmg",
+    event: {
+        id: "direct-physical-element-gate",
+        kind: "direct",
+        skillMultiplier: 100,
+        critMode: "nonCrit",
+        damageElement: "physical",
+    },
+})
+
+assertElementDamageBonusGate({
+    label: "Attribute anomaly physical event",
+    matchingStat: "physicalDmg",
+    offElementStat: "fireDmg",
+    event: {
+        id: "assault-element-gate",
+        kind: "anomaly",
+        anomalyEffect: "assault",
+    },
+})
+
+assertElementDamageBonusGate({
+    label: "Disorder fire event",
+    matchingStat: "fireDmg",
+    offElementStat: "physicalDmg",
+    event: {
+        id: "burn-disorder-element-gate",
+        kind: "disorder",
+        previousAnomalyEffect: "burn",
+        elapsedSeconds: 0,
+    },
+})
+
 const targetOnlyCatalog = cloneCatalog(catalog)
 targetOnlyCatalog.combatBuffs.push({
     id: "test.damage.target_only",
@@ -1286,5 +1396,356 @@ const generatedHitTotal = calculateInCombatPanel(generatedTargetCatalog, minimal
     },
 }))
 approx(generatedHitTotal.damage.multipliers.skillMultiplierBonus, 1, "Row target should match generated total source rows")
+
+const sheerBaseInput = {
+    combatBuffs: {
+        manualStats: [
+            {
+                id: "test-sheer-hp",
+                stat: "hpFlat",
+                value: 1000,
+                mode: "flat",
+            },
+            {
+                id: "test-sheer-atk",
+                stat: "atkFlat",
+                value: 100,
+                mode: "flat",
+            },
+            {
+                id: "test-sheer-force",
+                stat: "sheerForceFlat",
+                value: 50,
+                mode: "flat",
+            },
+        ],
+    },
+    damage: {
+        selectedEventId: "sheer-base",
+        events: [
+            {
+                id: "sheer-base",
+                kind: "sheer",
+                skillMultiplier: 100,
+                critMode: "nonCrit",
+            },
+        ],
+        target: {
+            defense: 953,
+            levelCoefficient: 794,
+            resistanceByElement: {
+                physical: 0,
+            },
+        },
+    },
+}
+const sheerBase = calculateInCombatPanel(catalog, minimalInput(sheerBaseInput))
+const expectedSheerForce = sheerBase.inCombat.panel.hp * 0.1
+    + sheerBase.inCombat.panel.atk * 0.3
+    + sheerBase.inCombat.panel.sheerForceFlat
+approx(sheerBase.inCombat.panel.sheerForce, expectedSheerForce, "Sheer force should derive from in-combat HP, ATK, and flat sheer force")
+approx(sheerBase.damage.multipliers.sheerForce, expectedSheerForce, "Sheer event should use derived sheer force")
+approx(sheerBase.damage.multipliers.defense, 1, "Sheer damage should ignore defense")
+approx(
+    sheerBase.damage.finalDamage,
+    sheerBase.damage.multipliers.sheerForce
+        * sheerBase.damage.multipliers.skill
+        * sheerBase.damage.multipliers.crit
+        * sheerBase.damage.multipliers.dmg
+        * sheerBase.damage.multipliers.sheerDamage
+        * sheerBase.damage.multipliers.resistance,
+    "Sheer final damage should use the expected multiplier route",
+)
+assert.equal(
+    sheerBase.damage.whiteBoxRows.find(row => row.label === "防御乘区")?.displayValue,
+    "1",
+    "Sheer whitebox should pin the defense multiplier at 1",
+)
+assert.ok(
+    ["局内贯穿力", "贯穿力换算", "贯穿倍率", "暴击乘区", "普通增伤区", "贯穿增伤区", "防御乘区", "抗性乘区", "最终伤害"]
+        .every(label => sheerBase.damage.whiteBoxRows.some(row => row.label === label)),
+    "Sheer whitebox should expose every required row",
+)
+
+const sheerHighDefense = calculateInCombatPanel(catalog, minimalInput({
+    ...sheerBaseInput,
+    damage: {
+        ...sheerBaseInput.damage,
+        target: {
+            ...sheerBaseInput.damage.target,
+            defense: 9999,
+        },
+    },
+}))
+approx(sheerHighDefense.damage.finalDamage, sheerBase.damage.finalDamage, "Target defense should not change sheer damage")
+
+const sheerWithDefenseTools = calculateInCombatPanel(comboCatalog, minimalInput({
+    ...sheerBaseInput,
+    combatBuffs: {
+        ...sheerBaseInput.combatBuffs,
+        activeBuffIds: ["test.damage.defense_combo"],
+    },
+}))
+approx(sheerWithDefenseTools.damage.finalDamage, sheerBase.damage.finalDamage, "DEF reduction and PEN should not change sheer damage")
+approx(sheerWithDefenseTools.damage.targetBreakdown.enemyDefReduction, 0, "Sheer target breakdown should hide defense reductions")
+approx(sheerWithDefenseTools.damage.targetBreakdown.penRatio, 0, "Sheer target breakdown should hide PEN ratio")
+approx(sheerWithDefenseTools.damage.targetBreakdown.penFlat, 0, "Sheer target breakdown should hide flat PEN")
+
+const sheerResisted = calculateInCombatPanel(catalog, minimalInput({
+    ...sheerBaseInput,
+    damage: {
+        ...sheerBaseInput.damage,
+        target: {
+            ...sheerBaseInput.damage.target,
+            resistanceByElement: {
+                physical: 20,
+            },
+        },
+    },
+}))
+approx(sheerResisted.damage.multipliers.resistance, 0.8, "Sheer damage should use target resistance")
+approx(sheerResisted.damage.finalDamage, sheerBase.damage.finalDamage * 0.8, "Target resistance should scale sheer damage")
+
+const sheerWithPhysicalDmg = calculateInCombatPanel(catalog, minimalInput({
+    ...sheerBaseInput,
+    combatBuffs: {
+        ...sheerBaseInput.combatBuffs,
+        manualStats: [
+            ...sheerBaseInput.combatBuffs.manualStats,
+            {
+                id: "test-sheer-physical-dmg",
+                stat: "physicalDmg",
+                value: 50,
+                mode: "flat",
+            },
+        ],
+    },
+}))
+const sheerWithFireDmg = calculateInCombatPanel(catalog, minimalInput({
+    ...sheerBaseInput,
+    combatBuffs: {
+        ...sheerBaseInput.combatBuffs,
+        manualStats: [
+            ...sheerBaseInput.combatBuffs.manualStats,
+            {
+                id: "test-sheer-fire-dmg",
+                stat: "fireDmg",
+                value: 50,
+                mode: "flat",
+            },
+        ],
+    },
+}))
+approx(sheerWithPhysicalDmg.inCombat.panel.physicalDmg - sheerBase.inCombat.panel.physicalDmg, 0.5, "Sheer matching element bonus should appear on the panel")
+approx(sheerWithFireDmg.inCombat.panel.fireDmg - sheerBase.inCombat.panel.fireDmg, 0.5, "Sheer off-element bonus should appear on the panel")
+assert.ok(sheerWithPhysicalDmg.damage.finalDamage > sheerBase.damage.finalDamage, "Sheer matching element bonus should increase damage")
+approx(sheerWithFireDmg.damage.finalDamage, sheerBase.damage.finalDamage, "Sheer off-element bonus should not affect final damage")
+approx(sheerWithFireDmg.damage.multipliers.dmg, sheerBase.damage.multipliers.dmg, "Sheer off-element bonus should not enter the ordinary damage multiplier")
+
+const sheerExpectedCrit = calculateInCombatPanel(catalog, minimalInput({
+    ...sheerBaseInput,
+    damage: {
+        ...sheerBaseInput.damage,
+        events: [
+            {
+                ...sheerBaseInput.damage.events[0],
+                critMode: "expected",
+            },
+        ],
+    },
+}))
+assert.ok(sheerExpectedCrit.damage.events[0].damageVariants, "Sheer event should expose crit damage variants")
+approx(
+    sheerExpectedCrit.damage.events[0].damageVariants.expected.finalDamage,
+    sheerExpectedCrit.damage.finalDamage,
+    "Expected variant should match selected sheer damage",
+)
+assert.ok(
+    sheerExpectedCrit.damage.events[0].damageVariants.crit.finalDamage >= sheerExpectedCrit.damage.events[0].damageVariants.nonCrit.finalDamage,
+    "Sheer crit variant should be at least non-crit damage",
+)
+
+const sheerBonusInput = {
+    combatBuffs: {
+        manualEffects: [
+            {
+                id: "manual_sheer_bonus",
+                label: "手动贯穿增伤",
+                effects: [
+                    {
+                        id: "manual_sheer_bonus",
+                        type: "fixed",
+                        stat: "sheerDmgBonus",
+                        value: 20,
+                        mode: "flat",
+                    },
+                    {
+                        id: "manual_physical_sheer_bonus",
+                        type: "fixed",
+                        stat: "physicalSheerDmg",
+                        value: 30,
+                        mode: "flat",
+                    },
+                ],
+            },
+        ],
+    },
+}
+const sheerWithBonus = calculateInCombatPanel(catalog, minimalInput({
+    ...sheerBaseInput,
+    combatBuffs: {
+        ...sheerBaseInput.combatBuffs,
+        manualEffects: sheerBonusInput.combatBuffs.manualEffects,
+    },
+}))
+approx(sheerWithBonus.damage.multipliers.sheerDamage, 1.5, "Generic and elemental sheer damage bonuses should stack for sheer")
+approx(sheerWithBonus.damage.finalDamage, sheerBase.damage.finalDamage * 1.5, "Sheer damage bonus should scale sheer damage")
+const directWithoutSheerBonus = calculateInCombatPanel(catalog, minimalInput({
+    damage: {
+        target: {
+            defense: 953,
+            levelCoefficient: 794,
+        },
+    },
+}))
+const directWithSheerBonus = calculateInCombatPanel(catalog, minimalInput({
+    ...sheerBonusInput,
+    damage: {
+        target: {
+            defense: 953,
+            levelCoefficient: 794,
+        },
+    },
+}))
+approx(directWithSheerBonus.damage.finalDamage, directWithoutSheerBonus.damage.finalDamage, "Sheer damage bonuses should not affect direct damage")
+
+const sheerSkillTargetCatalog = cloneCatalog(catalog)
+sheerSkillTargetCatalog.combatBuffs.push({
+    id: "test.damage.sheer_skill_target",
+    sourceType: "manual",
+    scope: "inCombat",
+    effects: [
+        {
+            id: "quick_sword_hit_1_sheer_multiplier",
+            type: "fixed",
+            stat: "skillMultiplierBonus",
+            value: 100,
+            mode: "flat",
+            target: {
+                kind: "skill",
+                skillTargets: [
+                    {
+                        agentSkillId: "ye_shunguang",
+                        categoryId: "basic",
+                        moveId: "quick_sword",
+                        rowId: "hit_1",
+                    },
+                ],
+            },
+        },
+    ],
+})
+const sheerSkillTarget = calculateInCombatPanel(sheerSkillTargetCatalog, minimalInput({
+    combatBuffs: {
+        activeBuffIds: ["test.damage.sheer_skill_target"],
+    },
+    damage: {
+        selectedEventId: "sheer-skill",
+        events: [
+            {
+                id: "sheer-skill",
+                kind: "sheer",
+                skillRef: {
+                    agentSkillId: "ye_shunguang",
+                    categoryId: "basic",
+                    moveId: "quick_sword",
+                    rowId: "hit_1",
+                    level: 12,
+                },
+                critMode: "nonCrit",
+            },
+        ],
+        target: {
+            defense: 953,
+            levelCoefficient: 794,
+        },
+    },
+}))
+approx(sheerSkillTarget.damage.multipliers.skillMultiplierBonus, 1, "Skill-targeted multiplier bonus should apply to matched sheer skills")
+approx(sheerSkillTarget.damage.multipliers.skill, sheerSkillTarget.damage.multipliers.baseSkill + 1, "Sheer skill multiplier should include matched skill multiplier bonus")
+
+const yixuanUltimate = calculateInCombatPanel(catalog, minimalInput({
+    agentId: "yixuan",
+    coreSkillLevel: "F",
+    combatBuffs: {
+        manualStats: [
+            {
+                id: "yixuan-test-hp",
+                stat: "hpFlat",
+                value: 1000,
+                mode: "flat",
+            },
+            {
+                id: "yixuan-test-atk",
+                stat: "atkFlat",
+                value: 100,
+                mode: "flat",
+            },
+            {
+                id: "yixuan-test-sheer-flat",
+                stat: "sheerForceFlat",
+                value: 104,
+                mode: "flat",
+            },
+        ],
+    },
+    damage: {
+        selectedEventId: "yixuan-ultimate",
+        events: [
+            {
+                id: "yixuan-ultimate",
+                kind: "sheer",
+                skillRef: {
+                    agentSkillId: "yixuan",
+                    categoryId: "chain",
+                    moveId: "ultimate_qingming_cloud_shadow",
+                    rowId: "damage",
+                    level: 12,
+                },
+                critMode: "nonCrit",
+            },
+        ],
+        target: {
+            defense: 953,
+            levelCoefficient: 794,
+            resistanceByElement: {
+                ether: 20,
+            },
+        },
+    },
+}))
+const expectedYixuanSkill = 3706.9 / 100
+const expectedYixuanSheerForce = yixuanUltimate.inCombat.panel.hp * 0.1
+    + yixuanUltimate.inCombat.panel.atk * 0.3
+    + yixuanUltimate.inCombat.panel.sheerForceFlat
+approx(yixuanUltimate.outOfCombat.base.hp, 7953 + 420, "Yixuan F core skill should add base HP")
+approx(yixuanUltimate.damage.input.skillMultiplier, expectedYixuanSkill, "Yixuan ultimate should resolve imported level 12 sheer multiplier")
+approx(yixuanUltimate.damage.multipliers.sheerForce, expectedYixuanSheerForce, "Yixuan sheer damage should derive sheer force from in-combat HP and ATK")
+approx(yixuanUltimate.damage.multipliers.defense, 1, "Yixuan sheer damage should ignore defense")
+approx(yixuanUltimate.damage.multipliers.resistance, 0.8, "Yixuan sheer damage should use ether resistance")
+assert.equal(
+    yixuanUltimate.damage.input.skillSource?.damageBasis,
+    "sheerForce",
+    "Yixuan skill source should expose sheerForce as damage basis",
+)
+
+const yixuanDefault = calculateInCombatPanel(catalog, minimalInput({
+    agentId: "yixuan",
+    coreSkillLevel: "F",
+    damage: yixuan.defaultCalculationConfig,
+}))
+assert.equal(yixuanDefault.damage.input.kind, "sheer", "Yixuan default calculation should produce a sheer event")
+assert.equal(yixuanDefault.damage.events[0]?.kind, "sheer", "Yixuan default event list should keep sheer kind")
+assert.ok(yixuanDefault.damage.whiteBoxRows.some(row => row.label === "局内贯穿力"), "Yixuan default whitebox should include sheer force")
 
 console.log("damage whitebox tests passed")

@@ -292,7 +292,7 @@ const miyabiDefaultDamage = calculateInCombatPanel(catalog, {
     combatBuffs: { activeBuffIds: [] },
     damage: miyabi.defaultCalculationConfig,
 })
-assert.equal(miyabiDefaultDamage.damage.events.length, 7)
+assert.equal(miyabiDefaultDamage.damage.events.length, 8)
 const miyabiDisorder = miyabiDefaultDamage.damage.events.find(event => event.id === "miyabi_frozen_disorder")
 assert.equal(miyabiDisorder?.kind, "anomaly")
 assert.equal(miyabiDisorder?.settlementType, "disorder")
@@ -300,6 +300,7 @@ assert.equal(miyabiDisorder?.input?.anomalyEffect, "frost_frozen")
 assert.equal(miyabiDisorder?.input?.durationSeconds, 20)
 assert.ok(miyabiDefaultDamage.damage.events.some(event => event.id === "miyabi_shatter" && event.kind === "anomaly"))
 assert.ok(miyabiDefaultDamage.damage.events.some(event => event.id === "direct-7" && event.input?.skillSource?.moveId === "quick_support_flower_wind"))
+assert.ok(miyabiDefaultDamage.damage.events.some(event => event.id === "disorder-8" && event.input?.settlementType === "disorder"))
 
 const preview = previewDriveDiscOptimization(catalog, store, optimizerInput())
 assert.equal(preview.metrics.estimatedCombinationCount, exact.metrics.estimatedCombinationCount)

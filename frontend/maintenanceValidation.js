@@ -3,7 +3,7 @@ import { evaluateFormulaExpression, validateFormulaExpression } from "./formulaE
 const ID_PATTERN = /^[a-z0-9][a-z0-9_.-]*$/
 const PLACEHOLDER_NAMES = new Set(["未命名"])
 
-const ATTRIBUTE_VALUES = new Set(["physical", "fire", "ice", "electric", "ether", "honed_edge", "frost"])
+const ATTRIBUTE_VALUES = new Set(["physical", "fire", "ice", "electric", "ether", "honed_edge", "frost", "xuanmo"])
 const DAMAGE_ELEMENT_VALUES = new Set(["physical", "fire", "ice", "electric", "ether"])
 const SPECIALTY_VALUES = new Set(["attack", "stun", "anomaly", "support", "defense", "rupture"])
 const RARITY_VALUES = new Set(["B", "A", "S"])
@@ -13,15 +13,17 @@ const EFFECT_TYPE_VALUES = new Set(["fixed", "derived", "formula", "stacked", "d
 const BUFF_MODIFIER_OPERATION_VALUES = new Set(["multiplyResolvedValue"])
 const FORMULA_VALUE_UNIT_VALUES = new Set(["storedValue", "storedPercent"])
 const SKILL_ROW_KIND_VALUES = new Set(["damageMultiplier", "dazeMultiplier", "energyCost", "statBonus"])
-const DAMAGE_EVENT_KIND_VALUES = new Set(["direct", "anomaly", "disorder"])
+const SKILL_ROW_DAMAGE_BASIS_VALUES = new Set(["atk", "sheerForce"])
+const DAMAGE_EVENT_KIND_VALUES = new Set(["direct", "anomaly", "disorder", "sheer"])
 const ANOMALY_SETTLEMENT_TYPE_VALUES = new Set(["attribute", "disorder"])
 const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
-const CALCULATION_MODE_VALUES = new Set(["single", "anomaly", "custom"])
-const DAMAGE_MODIFIER_KIND_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "directDamageBonus", "skillMultiplierBonus"])
+const CALCULATION_MODE_VALUES = new Set(["single", "sheer", "anomaly", "custom"])
+const SHEER_DAMAGE_MODIFIER_KIND_VALUES = ["sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg"]
+const DAMAGE_MODIFIER_KIND_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "directDamageBonus", "skillMultiplierBonus", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES])
 const SKILL_TARGET_DAMAGE_MODIFIER_KIND_VALUES = new Set(["directDamageBonus", "skillMultiplierBonus"])
 const DAMAGE_MODIFIER_VALUE_UNIT_VALUES = new Set(["decimal"])
 const RULE_TARGET_KIND_VALUES = new Set(["default", "skill"])
-const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg"])
+const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES])
 const SKILL_TARGET_STAT_VALUES = new Set([
     "physicalResIgnore",
     "fireResIgnore",
@@ -44,6 +46,7 @@ const SKILL_TARGET_STAT_VALUES = new Set([
     "etherDmg",
     "anomalyDamageBonus",
     "disorderDamageBonus",
+    ...SHEER_DAMAGE_MODIFIER_KIND_VALUES,
     "skillMultiplierBonus",
 ])
 const ANOMALY_EFFECT_VALUES = new Set(["assault", "shatter", "burn", "shock", "corruption", "frozen", "flinch"])
@@ -53,6 +56,7 @@ const STAT_VALUES = new Set([
     "atkPct",
     "hpFlat",
     "hpPct",
+    "sheerForceFlat",
     "defFlat",
     "defPct",
     "critRate",
@@ -73,6 +77,9 @@ const STAT_VALUES = new Set([
     "electricResIgnore",
     "etherResIgnore",
     "dmgBonus",
+    "hpBase",
+    "atkBase",
+    "defBase",
     "physicalDmg",
     "fireDmg",
     "iceDmg",
@@ -646,7 +653,7 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
     requireEnum(errors, event.kind, DAMAGE_EVENT_KIND_VALUES, `${path}.kind`)
     validatePositiveNumber(errors, event.count ?? 1, `${path}.count`, "次数")
 
-    if (event.kind === "direct") {
+    if (event.kind === "direct" || event.kind === "sheer") {
         validateCalculationSkillRef(errors, event.skillRef, `${path}.skillRef`, context, agentId)
         if (event.critMode !== undefined) {
             requireEnum(errors, event.critMode, new Set(["expected", "crit", "nonCrit"]), `${path}.critMode`)
@@ -791,10 +798,6 @@ function validateAgentSkill(item, context) {
                 seenCategories.add(category.id)
             }
             requireName(errors, category?.name, `${categoryPath}.name.zhCN`)
-            const icon = String(category?.icon ?? "").trim()
-            if (icon && !icon.startsWith("/assets/") && !isValidHttpUrl(icon)) {
-                add(errors, `${categoryPath}.icon`, "图标路径必须是 /assets/... 或 http(s) URL。")
-            }
             const categoryRange = validateSkillLevelRange(errors, category?.levelRange, `${categoryPath}.levelRange`)
 
             if (!Array.isArray(category?.moves)) {
@@ -843,6 +846,9 @@ function validateAgentSkill(item, context) {
                     }
                     requireName(errors, row?.label, `${rowPath}.label.zhCN`)
                     requireEnum(errors, row?.kind ?? "damageMultiplier", SKILL_ROW_KIND_VALUES, `${rowPath}.kind`)
+                    if (row?.damageBasis !== undefined && row.damageBasis !== "") {
+                        requireEnum(errors, row.damageBasis, SKILL_ROW_DAMAGE_BASIS_VALUES, `${rowPath}.damageBasis`)
+                    }
                     const rowRange = row?.levelRange
                         ? validateSkillLevelRange(errors, row.levelRange, `${rowPath}.levelRange`, moveRange)
                         : moveRange
@@ -939,6 +945,9 @@ function validateWEngine(item, context) {
     }
     if (item?.effect?.requirement?.specialty) {
         requireEnum(errors, item.effect.requirement.specialty, SPECIALTY_VALUES, "effect.requirement.specialty")
+        if (item?.specialty && item.effect.requirement.specialty !== item.specialty) {
+            add(errors, "effect.requirement.specialty", "必须与音擎适配特性一致；跨职业佩戴只提供基础攻击力和高级属性，不触发音擎被动。")
+        }
     }
     validateOptionalSources(errors, item, item?.images?.icon ?? item?.images?.portrait)
 

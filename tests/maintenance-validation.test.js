@@ -197,6 +197,12 @@ assertValid("agents", {
     attribute: "frost",
     damageElement: "ice",
 })
+assertValid("agents", {
+    ...validAgent,
+    attribute: "xuanmo",
+    damageElement: "ether",
+    specialty: "rupture",
+})
 assertInvalid("agents", {
     ...validAgent,
     attribute: "frost",
@@ -234,6 +240,12 @@ assertValid("agents", {
     },
 })
 assertValid("agent-skills", validAgentSkill)
+const agentSkillWithLegacyCategoryIcon = clone(validAgentSkill)
+agentSkillWithLegacyCategoryIcon.categories[0].icon = "not-a-maintained-field"
+assertValid(
+    "agent-skills",
+    agentSkillWithLegacyCategoryIcon,
+)
 assertInvalid("agent-skills", {
     ...validAgentSkill,
     categories: [
@@ -289,6 +301,12 @@ assertValid("wEngines", {
         description: { zhCN: "该音擎暂未建模 Buff 规则。" },
     },
 })
+const wEngineWithMismatchedRequirement = clone(validWEngine)
+wEngineWithMismatchedRequirement.effect.requirement = {
+    specialty: "stun",
+}
+assertInvalid("wEngines", wEngineWithMismatchedRequirement, "必须与音擎适配特性一致")
+
 const wEngineWithModificationValues = clone(validWEngine)
 wEngineWithModificationValues.modification = { minLevel: 1, maxLevel: 5, defaultLevel: 1 }
 wEngineWithModificationValues.effect.selfBuff.effects[0].modificationValues = {
@@ -896,6 +914,28 @@ assertValid("agents", {
     ...validAgent,
     defaultCalculationConfig: {
         ...validDefaultCalculationConfig,
+        mode: "sheer",
+        selectedEventId: "sheer-1",
+        events: [
+            {
+                id: "sheer-1",
+                kind: "sheer",
+                count: 1,
+                critMode: "expected",
+                skillRef: {
+                    agentSkillId: "test_agent_skill",
+                    categoryId: "basic",
+                    moveId: "normal",
+                    rowId: "hit_1",
+                },
+            },
+        ],
+    },
+}, validCalculationContext)
+assertValid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: {
+        ...validDefaultCalculationConfig,
         selectedEventId: "legacy-disorder",
         events: [
             {
@@ -953,12 +993,45 @@ assertValid("combat-buffs", {
     ...buffWithDamageModifier,
     effects: [
         {
+            id: "effect-sheer-fixed",
+            type: "fixed",
+            stat: "sheerDmgBonus",
+            value: 10,
+            mode: "flat",
+        },
+        {
+            id: "effect-physical-sheer-fixed",
+            type: "fixed",
+            stat: "physicalSheerDmg",
+            value: 15,
+            mode: "flat",
+        },
+    ],
+})
+assertValid("combat-buffs", {
+    ...buffWithDamageModifier,
+    effects: [
+        {
+            type: "damageModifier",
+            kind: "sheerDmgBonus",
+            value: 0.2,
+            valueUnit: "decimal",
+            appliesTo: {
+                damageKinds: ["sheer"],
+            },
+        },
+    ],
+})
+assertValid("combat-buffs", {
+    ...buffWithDamageModifier,
+    effects: [
+        {
             type: "damageModifier",
             kind: "skillMultiplierBonus",
             value: 15,
             valueUnit: "decimal",
             appliesTo: {
-                damageKinds: ["direct"],
+                damageKinds: ["sheer"],
                 skillTargets: [
                     {
                         agentSkillId: "test_agent_skill",

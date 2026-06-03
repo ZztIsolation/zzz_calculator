@@ -177,7 +177,7 @@
               <h2>计算设置</h2>
               <button id="openCalculationConfigBtn" type="button" class="ghost-btn">计算配置</button>
             </div>
-            <div id="calculationConfigSummary" class="calculation-config-summary">最大化单个伤害</div>
+            <div id="calculationConfigSummary" class="calculation-config-summary">未选择计算目标</div>
             <div id="calculationSingleControls" class="calculation-objective-grid">
               <div class="field damage-skill-picker-field">
                 <span>当前技能</span>
@@ -312,6 +312,10 @@
             <div class="card-head">
               <h2>计算结果</h2>
               <div class="tag" id="optimizerMetrics">未计算</div>
+            </div>
+            <div class="analysis-actions">
+              <button id="driveDiscSubstatAnalysisBtn" type="button" class="ghost-btn">词条分析</button>
+              <button id="driveDiscStatGainBtn" type="button" class="ghost-btn">词条收益曲线</button>
             </div>
             <div id="optimizerProgress" class="optimizer-progress" hidden>
               <div class="optimizer-progress-head">
@@ -485,6 +489,7 @@
           <span>计算方式</span>
           <select id="calculationConfigMode">
             <option value="single">最大化单个伤害</option>
+            <option value="sheer">最大化贯穿伤害</option>
             <option value="anomaly">最大化异常伤害</option>
             <option value="adminDefault">未配置默认循环</option>
             <option value="custom">自定义</option>
@@ -502,6 +507,7 @@
             <div id="calculationConfigEventList" class="calculation-config-event-list"></div>
             <div class="calculation-add-actions">
               <button id="addCalculationDirectEventBtn" type="button" class="compact-btn" data-add-calculation-event-kind="direct">直伤</button>
+              <button id="addCalculationSheerEventBtn" type="button" class="compact-btn" data-add-calculation-event-kind="sheer">贯穿</button>
               <button id="addCalculationAnomalyEventBtn" type="button" class="compact-btn" data-add-calculation-event-kind="anomaly">属性异常</button>
               <button id="addCalculationDisorderEventBtn" type="button" class="compact-btn" data-add-calculation-event-kind="disorder">紊乱</button>
             </div>

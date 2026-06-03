@@ -5,6 +5,7 @@ import { createReadStream, existsSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { buildMeta, calculateInCombatPanel, calculateOutOfCombatPanel, loadCalculatorContext } from "./calculator.js"
+import { analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "./driveDiscAnalysis.js"
 import { OptimizerCancelledError, optimizeDriveDiscs, optimizeDriveDiscsAsync, previewDriveDiscOptimization } from "./driveDiscOptimizer.js"
 import {
     accountSummary,
@@ -486,11 +487,11 @@ function cleanCalculationEvent(event = {}, index = 0) {
     if (!event || typeof event !== "object" || Array.isArray(event)) {
         return null
     }
-    const inputKind = ["direct", "anomaly", "disorder"].includes(event.kind)
+    const inputKind = ["direct", "sheer", "anomaly", "disorder"].includes(event.kind)
         ? event.kind
         : "direct"
     const settlementType = inputKind === "disorder" || event.settlementType === "disorder" ? "disorder" : "attribute"
-    const kind = inputKind === "direct" ? "direct" : "anomaly"
+    const kind = inputKind === "direct" || inputKind === "sheer" ? inputKind : "anomaly"
     const id = String(event.id ?? `${kind}-${index + 1}`).trim() || `${kind}-${index + 1}`
     const count = Number(event.count ?? 1)
     const base = {
@@ -498,7 +499,7 @@ function cleanCalculationEvent(event = {}, index = 0) {
         kind,
         count: Number.isFinite(count) ? Math.max(0, count) : 1,
     }
-    if (kind === "direct") {
+    if (kind === "direct" || kind === "sheer") {
         const skillRef = cleanCalculationSkillRef(event.skillRef)
         return {
             ...base,
@@ -537,7 +538,7 @@ function cleanDefaultCalculationConfig(config = null) {
     if (!events.length) {
         return null
     }
-    const mode = ["single", "anomaly", "custom"].includes(config.mode) ? config.mode : "custom"
+    const mode = ["single", "sheer", "anomaly", "custom"].includes(config.mode) ? config.mode : "custom"
     const selectedEventId = String(config.selectedEventId ?? events[0]?.id ?? "").trim()
     return {
         mode,
@@ -593,6 +594,16 @@ function cleanWEngine(item = {}) {
                 teamBuff: teamBuff ? cleanEffectSet(teamBuff) : teamBuff,
             }
             : effect,
+    }
+}
+
+function cleanAgentSkill(item = {}) {
+    return {
+        ...item,
+        categories: (item.categories ?? []).map(category => {
+            const { icon, ...categoryRest } = category ?? {}
+            return categoryRest
+        }),
     }
 }
 
@@ -700,7 +711,7 @@ function cleanMaintenanceItem(resource, item) {
         return cleanBossBuff(item)
     }
     if (resource === "agent-skills") {
-        return item
+        return cleanAgentSkill(item)
     }
     if (resource === "w-engines") {
         return cleanWEngine(item)
@@ -1159,6 +1170,42 @@ async function routeApi(req, res, pathname) {
             const body = await readBody(req)
             const input = JSON.parse(body || "{}")
             const result = calculateInCombatPanel(catalog, input)
+            sendJson(res, 200, {
+                ok: true,
+                data: result,
+            })
+        } catch (error) {
+            sendJson(res, 400, {
+                ok: false,
+                error: error instanceof Error ? error.message : String(error),
+            })
+        }
+        return
+    }
+
+    if (req.method === "POST" && pathname === "/api/analysis/drive-disc-substats") {
+        try {
+            const body = await readBody(req)
+            const input = JSON.parse(body || "{}")
+            const result = analyzeDriveDiscSubstats(catalog, input)
+            sendJson(res, 200, {
+                ok: true,
+                data: result,
+            })
+        } catch (error) {
+            sendJson(res, 400, {
+                ok: false,
+                error: error instanceof Error ? error.message : String(error),
+            })
+        }
+        return
+    }
+
+    if (req.method === "POST" && pathname === "/api/analysis/drive-disc-stat-gains") {
+        try {
+            const body = await readBody(req)
+            const input = JSON.parse(body || "{}")
+            const result = analyzeDriveDiscStatGains(catalog, input)
             sendJson(res, 200, {
                 ok: true,
                 data: result,

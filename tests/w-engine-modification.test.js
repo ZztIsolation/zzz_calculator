@@ -3,6 +3,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import {
     buildMeta,
+    calculateInCombatPanel,
     calculateOutOfCombatPanel,
     createInCombatPanelCalculator,
     loadCalculatorContext,
@@ -221,6 +222,65 @@ const stunRank5 = createInCombatPanelCalculator(catalog, {
 approx(stunRank5.inCombat.buffTotals.impactPct, 0.435, "Yesterday's Call rank 5 Daze should scale per stack")
 approx(stunRank5.inCombat.buffTotals.critDmg, 0.48, "Yesterday's Call rank 5 team CRIT DMG should scale")
 
+const crossSpecialtyCurrentWEngineInput = {
+    agentId: "ye_shunguang",
+    coreSkillLevel: "none",
+    wEngineId: "zzz_wiki_1689",
+    wEngineModificationLevel: 5,
+    combatBuffs: {
+        activeBuffIds: ["wEngine:zzz_wiki_1689.self", "wEngine:zzz_wiki_1689.team"],
+    },
+    damage: {
+        skillMultiplier: 100,
+        critMode: "nonCrit",
+        target: {
+            defense: 953,
+            levelCoefficient: 794,
+        },
+    },
+}
+const crossSpecialtyCurrentWEngine = calculateInCombatPanel(catalog, crossSpecialtyCurrentWEngineInput)
+assert.deepEqual(
+    crossSpecialtyCurrentWEngine.inCombat.ignoredEffects.filter(effect => effect.reason === "specialtyMismatch"),
+    [
+        {
+            key: "wEngine:zzz_wiki_1689.self",
+            sourceType: "wEngine",
+            reason: "specialtyMismatch",
+        },
+        {
+            key: "wEngine:zzz_wiki_1689.team",
+            sourceType: "wEngineTeam",
+            reason: "specialtyMismatch",
+        },
+    ],
+    "Current equipped cross-specialty W-Engine self and team Buffs should be ignored",
+)
+approx(crossSpecialtyCurrentWEngine.inCombat.buffTotals.impactPct, 0, "Cross-specialty current W-Engine self Buff should not apply")
+approx(crossSpecialtyCurrentWEngine.inCombat.buffTotals.critDmg, 0, "Cross-specialty current W-Engine team Buff should not apply")
+
+const crossSpecialtyPreparedCalculator = createInCombatPanelCalculator(catalog, crossSpecialtyCurrentWEngineInput)
+const crossSpecialtyPrepared = crossSpecialtyPreparedCalculator.calculate([], { round: false })
+assert.deepEqual(
+    crossSpecialtyPrepared.inCombat.ignoredEffects.filter(effect => effect.reason === "specialtyMismatch"),
+    crossSpecialtyCurrentWEngine.inCombat.ignoredEffects.filter(effect => effect.reason === "specialtyMismatch"),
+    "Prepared calculator should report the same current W-Engine specialty mismatches",
+)
+approx(crossSpecialtyPrepared.inCombat.buffTotals.impactPct, 0, "Prepared current W-Engine self Buff should respect specialty mismatch")
+approx(crossSpecialtyPrepared.inCombat.buffTotals.critDmg, 0, "Prepared current W-Engine team Buff should respect specialty mismatch")
+const crossSpecialtyNoBuffScore = createInCombatPanelCalculator(catalog, {
+    ...crossSpecialtyCurrentWEngineInput,
+    combatBuffs: {
+        activeBuffIds: [],
+    },
+}).scoreOnlyFromSummary(new Map(), new Map())
+const crossSpecialtyBuffScore = crossSpecialtyPreparedCalculator.scoreOnlyFromSummary(new Map(), new Map())
+approx(
+    crossSpecialtyBuffScore.finalDamage,
+    crossSpecialtyNoBuffScore.finalDamage,
+    "Optimizer score path should ignore cross-specialty current W-Engine Buffs",
+)
+
 const supportCatalog = cloneCatalog(catalog)
 supportCatalog.agents.find(item => item.id === "ye_shunguang").specialty = "support"
 const supportRank5 = createInCombatPanelCalculator(supportCatalog, {
@@ -284,6 +344,26 @@ approx(externalCannonRank1.inCombat.buffTotals.atkPctOutOfCombat, 0.1, "External
 approx(externalCannonRank3.inCombat.buffTotals.atkPctOutOfCombat, 0.128, "External Kaboom team Buff should use exact rank 3 value")
 approx(externalCannonRank5.inCombat.buffTotals.atkPctOutOfCombat, 0.16, "External Kaboom team Buff should use rank 5 from its own map")
 approx(externalCannonInvalidRank.inCombat.buffTotals.atkPctOutOfCombat, 0.1, "Invalid external W-Engine team rank should fall back to rank 1")
+
+const externalTeamBuffForAttackAgent = calculateInCombatPanel(catalog, {
+    agentId: "ye_shunguang",
+    coreSkillLevel: "none",
+    wEngineId: "cloudcleave_radiance",
+    wEngineModificationLevel: 1,
+    combatBuffs: {
+        activeBuffIds: ["wEngine:zzz_wiki_486.team"],
+    },
+})
+approx(
+    externalTeamBuffForAttackAgent.inCombat.buffTotals.atkPctOutOfCombat,
+    0.1,
+    "External W-Engine team Buffs are treated as already validly triggered by their source wearer",
+)
+assert.equal(
+    externalTeamBuffForAttackAgent.inCombat.ignoredEffects.some(effect => effect.key === "wEngine:zzz_wiki_486.team"),
+    false,
+    "External W-Engine team Buffs should not be checked against the current agent specialty",
+)
 
 const cannonRank5 = createInCombatPanelCalculator(supportCatalog, {
     agentId: "ye_shunguang",

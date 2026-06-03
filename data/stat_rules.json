@@ -110,6 +110,38 @@
       "label": "Ether DMG Bonus%",
       "display": "percent"
     },
+    "sheerForce": {
+      "label": "Sheer Force",
+      "display": "number"
+    },
+    "sheerForceFlat": {
+      "label": "Sheer Force",
+      "display": "number"
+    },
+    "sheerDmgBonus": {
+      "label": "Sheer DMG Bonus%",
+      "display": "percent"
+    },
+    "physicalSheerDmg": {
+      "label": "Physical Sheer DMG Bonus%",
+      "display": "percent"
+    },
+    "fireSheerDmg": {
+      "label": "Fire Sheer DMG Bonus%",
+      "display": "percent"
+    },
+    "iceSheerDmg": {
+      "label": "Ice Sheer DMG Bonus%",
+      "display": "percent"
+    },
+    "electricSheerDmg": {
+      "label": "Electric Sheer DMG Bonus%",
+      "display": "percent"
+    },
+    "etherSheerDmg": {
+      "label": "Ether Sheer DMG Bonus%",
+      "display": "percent"
+    },
     "dmgBonus": {
       "label": "DMG Bonus%",
       "display": "percent"

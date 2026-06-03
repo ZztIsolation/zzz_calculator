@@ -61,6 +61,7 @@ function generatedHitTotalRow(category, move, rows) {
         id: GENERATED_HIT_TOTAL_ROW_ID,
         label: GENERATED_HIT_TOTAL_LABEL,
         kind: "damageMultiplier",
+        ...(block.every(row => row.damageBasis === block[0].damageBasis) && block[0].damageBasis ? { damageBasis: block[0].damageBasis } : {}),
         values,
         levelRange: {
             min,

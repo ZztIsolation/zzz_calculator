@@ -257,7 +257,37 @@
         "effectText": {
           "zhCN": "发动[强化特殊技]、[连携技]、[终结技]时，暴击率提升4%，最多叠加3层，持续15秒，重复触发时刷新持续时间，拥有3层效果时，造成的贯穿伤害提升10%。"
         },
-        "selfBuff": null,
+        "selfBuff": {
+          "condition": "发动[强化特殊技]、[连携技]、[终结技]后，默认按3层计算",
+          "durationSeconds": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          },
+          "effects": [
+            {
+              "id": "effect_yunkui_tales_4pc_crit_rate",
+              "type": "stacked",
+              "stat": "critRate",
+              "valuePerStack": 4,
+              "maxStacks": 3,
+              "defaultStacks": 3,
+              "mode": "flat"
+            },
+            {
+              "id": "effect_yunkui_tales_4pc_sheer_dmg",
+              "type": "fixed",
+              "stat": "sheerDmgBonus",
+              "value": 10,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              }
+            }
+          ]
+        },
         "teamBuff": null
       }
     },

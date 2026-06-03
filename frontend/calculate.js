@@ -5,6 +5,8 @@ import {
     skillRowValue,
 } from "./skillMultiplierCandidates.js"
 import * as SharedCombat from "./shared-combat.js"
+import { createImageSelect } from "./entity-select.js"
+import { initDriveDiscAnalysis } from "./drive-disc-analysis.js"
 
 const els = {
     status: document.getElementById("status"),
@@ -101,6 +103,7 @@ const els = {
     duplicateCalculationEventBtn: document.getElementById("duplicateCalculationEventBtn"),
     removeCalculationEventBtn: document.getElementById("removeCalculationEventBtn"),
     addCalculationDirectEventBtn: document.getElementById("addCalculationDirectEventBtn"),
+    addCalculationSheerEventBtn: document.getElementById("addCalculationSheerEventBtn"),
     addCalculationAnomalyEventBtn: document.getElementById("addCalculationAnomalyEventBtn"),
     addCalculationDisorderEventBtn: document.getElementById("addCalculationDisorderEventBtn"),
     calculationConfigFooterSummary: document.getElementById("calculationConfigFooterSummary"),
@@ -128,13 +131,15 @@ const els = {
     inCombatActiveEffects: document.getElementById("inCombatActiveEffects"),
     damageFinalValue: document.getElementById("damageFinalValue"),
     damageWhiteBoxRows: document.getElementById("damageWhiteBoxRows"),
+    driveDiscSubstatAnalysisBtn: document.getElementById("driveDiscSubstatAnalysisBtn"),
+    driveDiscStatGainBtn: document.getElementById("driveDiscStatGainBtn"),
 }
 
 const HOME_SELECTION_STORAGE_KEY = "zzz-calculator.homeSelection.v1"
 const DEFAULT_DAMAGE_TARGET_PRESET_ID = "normal-boss"
 const DEFAULT_DAMAGE_LEVEL_COEFFICIENT = 794
 const ADMIN_DEFAULT_CALCULATION_MODE = "adminDefault"
-const CALCULATION_CONFIG_MODE_VALUES = new Set(["single", "anomaly", "custom", ADMIN_DEFAULT_CALCULATION_MODE])
+const CALCULATION_CONFIG_MODE_VALUES = new Set(["single", "sheer", "anomaly", "custom", ADMIN_DEFAULT_CALCULATION_MODE])
 const DEFAULT_CHECKED_COMBAT_SOURCE_TYPES = new Set(["self", "wEngine", "wEngineTeam"])
 const TEAMMATE_DRIVE_DISC_LIMIT = 2
 const TEAMMATE_BUFF_OWNER_LIMIT = 2
@@ -205,6 +210,7 @@ const ENUM_LABELS = {
     attribute: {
         physical: "物理",
         frost: "烈霜",
+        xuanmo: "玄墨",
         fire: "火",
         ice: "冰",
         electric: "电",
@@ -253,6 +259,8 @@ const STAT_LABELS = {
     energyRegenPct: "能量自动回复",
     penFlat: "穿透值",
     penRatio: "穿透率",
+    sheerForce: "贯穿力",
+    sheerForceFlat: "固定贯穿力",
     physicalResIgnore: "物理抗性无视",
     fireResIgnore: "火抗性无视",
     iceResIgnore: "冰抗性无视",
@@ -270,6 +278,12 @@ const STAT_LABELS = {
     enemyResReduction: "敌方当前属性减抗",
     anomalyDamageBonus: "属性异常增伤",
     disorderDamageBonus: "紊乱增伤",
+    sheerDmgBonus: "贯穿增伤",
+    physicalSheerDmg: "物理贯穿增伤",
+    fireSheerDmg: "火贯穿增伤",
+    iceSheerDmg: "冰贯穿增伤",
+    electricSheerDmg: "电贯穿增伤",
+    etherSheerDmg: "以太贯穿增伤",
 }
 const PERCENT_KEYS = new Set([
     "hpPct",
@@ -297,11 +311,18 @@ const PERCENT_KEYS = new Set([
     "enemyResReduction",
     "anomalyDamageBonus",
     "disorderDamageBonus",
+    "sheerDmgBonus",
+    "physicalSheerDmg",
+    "fireSheerDmg",
+    "iceSheerDmg",
+    "electricSheerDmg",
+    "etherSheerDmg",
 ])
 const BASE_ORDER = ["hp", "atk", "def"]
 const PANEL_ORDER = [
     "hp",
     "atk",
+    "sheerForce",
     "def",
     "critRate",
     "critDmg",
@@ -329,6 +350,7 @@ let store = null
 let optimizationResults = []
 let activeResultIndex = -1
 let activeOptimizationJobId = null
+let pendingOptimizationCancelPromise = null
 let optimizationStartedAt = 0
 let optimizationPollTimer = null
 let optimizationElapsedTimer = null
@@ -337,6 +359,8 @@ let activeOptimizationSettingsSnapshot = null
 let activeOptimizationAgentIdSnapshot = null
 let lastCompletedOptimizationSettings = null
 let lastCompletedOptimizationAgentId = null
+let optimizationResultsDirty = false
+let damagePreviewRequestSeq = 0
 let activeCombatBuffTab = "agent"
 let activeCombatBuffTeammateId = ""
 const manuallyUncheckedDefaultCombatBuffIds = new Set()
@@ -394,9 +418,9 @@ function formatRate(value) {
     return `${formatCount(Math.round(rate))}/秒`
 }
 
-function setOptimizeButtonRunning(isRunning) {
+function setOptimizeButtonRunning(isRunning, label = "") {
     els.optimizeBtn.disabled = isRunning
-    els.optimizeBtn.textContent = isRunning ? "计算中" : "开始计算"
+    els.optimizeBtn.textContent = label || (isRunning ? "计算中" : "开始计算")
     els.optimizeBtn.dataset.running = isRunning ? "true" : "false"
     els.cancelOptimizeBtn.hidden = !isRunning
     els.cancelOptimizeBtn.disabled = false
@@ -414,6 +438,9 @@ function stopOptimizationTimers() {
 }
 
 function progressTextForStatus(status) {
+    if (status === "preparing") {
+        return "正在准备计算"
+    }
     if (status === "preview") {
         return "已完成计算预估"
     }
@@ -678,6 +705,10 @@ function getWEngine(id) {
     return meta?.wEngines?.find(item => item.id === id) ?? meta?.wEngines?.[0]
 }
 
+function defaultWEngineIdForAgent(agentId, savedWEngineId = "") {
+    return SharedCombat.defaultWEngineIdForAgent(meta?.wEngines ?? [], agentId, savedWEngineId)
+}
+
 function selectedWEngineModificationLevel(wEngine = getWEngine(els.wEngineSelect.value)) {
     return SharedCombat.clampWEngineModificationLevel(els.wEngineModificationSelect?.value, wEngine)
 }
@@ -771,6 +802,24 @@ function populateSelect(select, items, selectedId) {
         option.selected = item.id === selectedId
         select.appendChild(option)
     }
+}
+
+function orderedWEnginesForAgent(agentId = els.agentSelect?.value) {
+    return SharedCombat.sortWEnginesForAgent(meta?.wEngines ?? [], getAgent(agentId))
+}
+
+function populateWEngineSelect(selectedId = els.wEngineSelect?.value, agentId = els.agentSelect?.value) {
+    const items = orderedWEnginesForAgent(agentId)
+    populateSelect(els.wEngineSelect, items, selectedId)
+    createImageSelect({
+        select: els.wEngineSelect,
+        items,
+        selectedId: els.wEngineSelect.value,
+        getLabel: nameOf,
+        getImage: item => imageOf(item, "w-engine"),
+        getFallbackImage: item => fallbackImageSvg(item, "w-engine"),
+        className: "w-engine-image-select",
+    })
 }
 
 function coreSkillDefaultLevel(agent) {
@@ -979,16 +1028,59 @@ function populateDamageEventSelects() {
     }
 }
 
-function renderCalculationObjectiveControls() {
+function renderCalculationObjectiveControls(mode = calculationConfigMode) {
     if (els.calculationSingleControls) {
-        els.calculationSingleControls.hidden = calculationConfigMode !== "single"
+        els.calculationSingleControls.hidden = !["single", "sheer"].includes(mode)
     }
     if (els.calculationAnomalyControls) {
-        els.calculationAnomalyControls.hidden = calculationConfigMode !== "anomaly"
+        els.calculationAnomalyControls.hidden = mode !== "anomaly"
     }
     const settlementType = els.damageAnomalySettlementType?.value === "disorder" ? "disorder" : "attribute"
     document.querySelectorAll(".calculation-anomaly-attribute-field").forEach(item => { item.hidden = settlementType !== "attribute" })
     document.querySelectorAll(".calculation-anomaly-disorder-field").forEach(item => { item.hidden = settlementType !== "disorder" })
+}
+
+function isRuptureAgent(agent = getAgent(els.agentSelect?.value)) {
+    return agent?.specialty === "rupture"
+}
+
+function primaryCalculationModeForAgent(agent = getAgent(els.agentSelect?.value)) {
+    return isRuptureAgent(agent) ? "sheer" : "single"
+}
+
+function isCalculationModeAllowedForAgent(mode, agent = getAgent(els.agentSelect?.value)) {
+    if (mode === "sheer") {
+        return isRuptureAgent(agent)
+    }
+    if (mode === "single") {
+        return !isRuptureAgent(agent)
+    }
+    return CALCULATION_CONFIG_MODE_VALUES.has(mode)
+}
+
+function normalizeCalculationModeForAgent(mode, agent = getAgent(els.agentSelect?.value)) {
+    const resolvedMode = CALCULATION_CONFIG_MODE_VALUES.has(mode) ? mode : primaryCalculationModeForAgent(agent)
+    return isCalculationModeAllowedForAgent(resolvedMode, agent)
+        ? resolvedMode
+        : primaryCalculationModeForAgent(agent)
+}
+
+function syncCalculationModeSelectOptions(selectedMode = calculationConfigMode) {
+    const select = els.calculationConfigMode
+    if (!select) {
+        return
+    }
+    const agent = getAgent(els.agentSelect?.value)
+    const normalizedMode = normalizeCalculationModeForAgent(selectedMode, agent)
+    const options = [
+        !isRuptureAgent(agent) ? ["single", "最大化单个伤害"] : null,
+        isRuptureAgent(agent) ? ["sheer", "最大化贯穿伤害"] : null,
+        ["anomaly", "最大化异常伤害"],
+        [ADMIN_DEFAULT_CALCULATION_MODE, adminDefaultCalculationLabel(adminDefaultCalculationConfig())],
+        ["custom", "自定义"],
+    ].filter(Boolean)
+    select.innerHTML = options.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join("")
+    select.value = normalizedMode
 }
 
 function agentSkillCatalog(agentId = els.agentSelect?.value) {
@@ -1044,7 +1136,7 @@ function calculationConfigFromStored(config = null) {
         ? config.events.map((event, index) => ({
             ...event,
             id: String(event.id ?? `${event.kind ?? "event"}-${index + 1}`),
-            kind: event.kind === "anomaly" || event.kind === "disorder" ? "anomaly" : "direct",
+            kind: event.kind === "sheer" ? "sheer" : event.kind === "anomaly" || event.kind === "disorder" ? "anomaly" : "direct",
             settlementType: anomalySettlementType(event),
             ...(anomalySettlementType(event) === "disorder"
                 ? {
@@ -1136,13 +1228,14 @@ function damageConfigForAgent(agentId, storedDamageConfig = null) {
 }
 
 function resolveCalculationConfigMode(mode = calculationConfigMode) {
-    const nextMode = CALCULATION_CONFIG_MODE_VALUES.has(mode) ? mode : "single"
+    const nextMode = normalizeCalculationModeForAgent(mode)
     return nextMode === ADMIN_DEFAULT_CALCULATION_MODE && !adminDefaultCalculationConfig()
-        ? "single"
+        ? primaryCalculationModeForAgent()
         : nextMode
 }
 
-function syncCalculationConfigModeOptions() {
+function syncCalculationConfigModeOptions(selectedMode = calculationConfigMode) {
+    syncCalculationModeSelectOptions(selectedMode)
     const option = els.calculationConfigMode?.querySelector(`option[value="${ADMIN_DEFAULT_CALCULATION_MODE}"]`)
     if (!option) {
         return
@@ -1151,7 +1244,7 @@ function syncCalculationConfigModeOptions() {
     option.textContent = adminDefaultCalculationLabel(config)
     option.disabled = !config
     if (!config && els.calculationConfigMode?.value === ADMIN_DEFAULT_CALCULATION_MODE) {
-        els.calculationConfigMode.value = "single"
+        els.calculationConfigMode.value = primaryCalculationModeForAgent()
     }
 }
 
@@ -1186,6 +1279,9 @@ function calculationEventsForMode(mode = modalCalculationConfigMode()) {
     if (mode === "anomaly") {
         return [anomalyEventFromControls()]
     }
+    if (mode === "sheer") {
+        return [sheerEventFromControls()]
+    }
     return [singleEventFromControls()]
 }
 
@@ -1211,7 +1307,7 @@ function firstDamageSkillRef() {
 }
 
 function uniqueCalculationEventId(kind = "event") {
-    const prefix = kind === "direct" ? "direct" : kind === "disorder" ? "disorder" : "anomaly"
+    const prefix = ["direct", "sheer", "disorder", "anomaly"].includes(kind) ? kind : "event"
     let index = calculationConfigEvents.length + 1
     const used = new Set(calculationConfigEvents.map(event => event.id))
     while (used.has(`${prefix}-${index}`)) {
@@ -1246,7 +1342,7 @@ function calculationEventDraft(kind = "direct") {
     }
     return {
         id,
-        kind: "direct",
+        kind: kind === "sheer" ? "sheer" : "direct",
         skillRef: firstDamageSkillRef(),
         skillMultiplier: Number(els.damageSkillMultiplier?.value || 100),
         critMode: "expected",
@@ -1272,7 +1368,7 @@ function skillRefWithCurrentLevel(skillRef = null) {
 }
 
 function eventWithCurrentSkillLevel(event = {}) {
-    if (event.kind !== "direct") {
+    if (!["direct", "sheer"].includes(event.kind)) {
         return { ...event }
     }
     const skillRef = skillRefWithCurrentLevel(event.skillRef)
@@ -1312,6 +1408,13 @@ function singleEventFromControls() {
     return directEventFromControls("direct-1")
 }
 
+function sheerEventFromControls(id = "sheer-1") {
+    return {
+        ...directEventFromControls(id),
+        kind: "sheer",
+    }
+}
+
 function anomalyEventFromControls() {
     const settlementType = els.damageAnomalySettlementType?.value === "disorder" ? "disorder" : "attribute"
     if (settlementType === "disorder") {
@@ -1345,13 +1448,16 @@ function configuredCalculationEventsForRequest() {
     if (mode === "anomaly") {
         return [anomalyEventFromControls()]
     }
+    if (mode === "sheer") {
+        return [sheerEventFromControls()].map(eventWithCurrentSkillLevel)
+    }
     if (mode === "custom") {
         const events = calculationConfigEvents.length
             ? calculationConfigEvents
             : [calculationEventDraft("direct")]
         return events.map(eventWithCurrentSkillLevel)
     }
-    return [singleEventFromControls()]
+    return [singleEventFromControls()].map(eventWithCurrentSkillLevel)
 }
 
 function calculationEventTitle(event = {}) {
@@ -1370,7 +1476,7 @@ function calculationEventTitle(event = {}) {
     const move = (category?.moves ?? []).find(item => item.id === event.skillRef?.moveId)
     const row = (move?.rows ?? []).find(item => item.id === event.skillRef?.rowId)
     const label = [category && nameOf(category), move && nameOf(move), row && (localizedText(row.label) || row.id)].filter(Boolean).join(" / ")
-    return `${label || "直伤"} ×${event.count ?? 1}`
+    return `${label || (event.kind === "sheer" ? "贯穿" : "直伤")} ×${event.count ?? 1}`
 }
 
 function calculationConfigSummaryText(config = null) {
@@ -1385,6 +1491,10 @@ function calculationConfigSummaryText(config = null) {
     }
     if (mode === "anomaly") {
         return `最大化异常伤害：${calculationEventTitle(anomalyEventFromControls())}`
+    }
+    if (mode === "sheer") {
+        const events = config?.events ?? [sheerEventFromControls()]
+        return `最大化贯穿伤害：${events.map(calculationEventTitle).join(" + ")}`
     }
     const events = config?.events ?? (mode === "single" ? [singleEventFromControls()] : calculationConfigEvents)
     if (!events.length) {
@@ -1720,12 +1830,16 @@ function disorderTypeOptions(selected = "normal") {
 }
 
 function calculationEventUiKind(event = {}) {
+    if (event.kind === "sheer") {
+        return "sheer"
+    }
     return event.kind === "direct" ? "direct" : (anomalySettlementType(event) === "disorder" ? "disorder" : "anomaly")
 }
 
 function calculationEventKindLabel(kind) {
     return {
         direct: "直伤",
+        sheer: "贯穿",
         anomaly: "属性异常",
         disorder: "紊乱",
     }[kind] ?? "事件"
@@ -1839,8 +1953,9 @@ function calculationEventListItemHtml(event = {}, index = 0, { readonly = false 
 }
 
 function calculationEventEditorHtml(event = {}, { readonly = false } = {}) {
-    const kind = event.kind === "direct" ? "direct" : (anomalySettlementType(event) === "disorder" ? "disorder" : "anomaly")
-    const skillRef = kind === "direct" ? (stripSkillRefLevel(event.skillRef) ?? firstDamageSkillRef()) : null
+    const kind = calculationEventUiKind(event)
+    const usesSkill = ["direct", "sheer"].includes(kind)
+    const skillRef = usesSkill ? (stripSkillRefLevel(event.skillRef) ?? firstDamageSkillRef()) : null
     const categoryId = skillRef?.categoryId ?? damageSkillCategories()[0]?.id ?? ""
     const moveId = skillRef?.moveId ?? damageSkillCategories().find(item => item.id === categoryId)?.moves?.[0]?.id ?? ""
     const rowId = skillRef?.rowId ?? damageSkillCategories().find(item => item.id === categoryId)?.moves?.find(item => item.id === moveId)?.rows?.[0]?.id ?? ""
@@ -1848,25 +1963,25 @@ function calculationEventEditorHtml(event = {}, { readonly = false } = {}) {
     return `
         <label class="field">
           <span>类型</span>
-          <select data-calculation-event-kind${disabled}>${optionHtml([["direct", "直伤"], ["anomaly", "属性异常"], ["disorder", "紊乱"]], kind)}</select>
+          <select data-calculation-event-kind${disabled}>${optionHtml([["direct", "直伤"], ["sheer", "贯穿"], ["anomaly", "属性异常"], ["disorder", "紊乱"]], kind)}</select>
         </label>
         <label class="field">
           <span>次数</span>
           <input data-calculation-event-count type="number" min="0" step="1" value="${escapeHtml(event.count ?? 1)}"${disabled}>
         </label>
-        <label class="field calculation-direct-only"${kind === "direct" ? "" : " hidden"}>
+        <label class="field calculation-direct-only"${usesSkill ? "" : " hidden"}>
           <span>技能大类</span>
           <select data-calculation-skill-category${disabled}>${calculationSkillCategoryOptions(categoryId)}</select>
         </label>
-        <label class="field calculation-direct-only"${kind === "direct" ? "" : " hidden"}>
+        <label class="field calculation-direct-only"${usesSkill ? "" : " hidden"}>
           <span>招式</span>
           <select data-calculation-skill-move${disabled}>${calculationSkillMoveOptions(categoryId, moveId)}</select>
         </label>
-        <label class="field calculation-direct-only"${kind === "direct" ? "" : " hidden"}>
+        <label class="field calculation-direct-only"${usesSkill ? "" : " hidden"}>
           <span>倍率行</span>
           <select data-calculation-skill-row${disabled}>${calculationSkillRowOptions(categoryId, moveId, rowId)}</select>
         </label>
-        <label class="field calculation-direct-only"${kind === "direct" ? "" : " hidden"}>
+        <label class="field calculation-direct-only"${usesSkill ? "" : " hidden"}>
           <span>暴击模式</span>
           <select data-calculation-crit-mode${disabled}>${optionHtml([["expected", "期望"], ["crit", "暴击"], ["nonCrit", "非暴击"]], event.critMode ?? "expected")}</select>
         </label>
@@ -1925,7 +2040,7 @@ function calculationEventPreviewRows(event = {}) {
         ["类型", calculationEventKindLabel(kind)],
         ["次数", `×${event.count ?? 1}`],
     ]
-    if (kind === "direct") {
+    if (["direct", "sheer"].includes(kind)) {
         const parts = directCalculationEventParts(event)
         return [
             ...rows,
@@ -2055,8 +2170,8 @@ function renderCalculationConfigEvents() {
     syncCalculationConfigModalSummary()
 }
 
-function syncCalculationConfigModeFields() {
-    syncCalculationConfigModeOptions()
+function syncCalculationConfigModeFields(selectedMode = els.calculationConfigMode?.value ?? calculationConfigMode) {
+    syncCalculationConfigModeOptions(selectedMode)
     let mode = modalCalculationConfigMode()
     if (els.calculationConfigMode && els.calculationConfigMode.value !== mode) {
         els.calculationConfigMode.value = mode
@@ -2074,6 +2189,7 @@ function syncCalculationConfigModeFields() {
     }
     for (const button of [
         els.addCalculationDirectEventBtn,
+        els.addCalculationSheerEventBtn,
         els.addCalculationAnomalyEventBtn,
         els.addCalculationDisorderEventBtn,
     ]) {
@@ -2083,7 +2199,7 @@ function syncCalculationConfigModeFields() {
         }
     }
     renderCalculationConfigEvents()
-    renderCalculationObjectiveControls()
+    renderCalculationObjectiveControls(mode)
     syncCalculationConfigModalSummary()
 }
 
@@ -2118,7 +2234,7 @@ function readCalculationEventFromEditor(index = calculationConfigEditingIndex) {
     const skill = agentSkillCatalog()
     return {
         id: current.id,
-        kind: "direct",
+        kind: kind === "sheer" ? "sheer" : "direct",
         count,
         critMode: els.calculationEventEditorFields.querySelector("[data-calculation-crit-mode]")?.value || "expected",
         skillRef: {
@@ -2212,7 +2328,7 @@ function applyStoredDamageConfig(config = {}) {
     els.damageTargetDefense.value = target.defense ?? damageTargetPresetById(els.damageTargetPreset.value)?.defense ?? 953
     els.damageLevelCoefficient.value = target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT
     els.damageTargetResistance.value = damageTargetResistanceByElement[damageElement] ?? 0
-    if (selectedEvent.kind === "direct") {
+    if (["direct", "sheer"].includes(selectedEvent.kind)) {
         els.damageSkillMultiplier.value = selectedEvent.skillMultiplier ?? config.skillMultiplier ?? 100
         els.damageCritMode.value = selectedEvent.critMode ?? config.critMode ?? "expected"
     } else {
@@ -2569,7 +2685,7 @@ function wEngineTeamBuffCandidateFromWEngine(wEngine, modificationLevel = 1) {
         sourceKind: "wEngineTeam",
         wEngineModificationLevel: materializedWEngine.selectedModificationLevel ?? 1,
         ownerName: materializedWEngine.name,
-        name: effect?.name ?? buff.name ?? materializedWEngine.name,
+        name: { zhCN: `${nameOf(materializedWEngine)}（队友音擎团队）` },
         description: effect?.description ?? buff.description ?? buff.conditionLabel,
         conditionLabel: buff.condition ?? effect?.requirement?.label,
         stats: effectStats(buff),
@@ -3182,7 +3298,7 @@ function addedCombatBuffSourceGroups(addedBuffs = currentAddedCombatBuffs()) {
             const label = isAgent
                 ? localizedText(buff.ownerName) || "角色"
                 : item.sourceKind === "wEngineTeam"
-                    ? "音擎"
+                    ? "队友音擎"
                     : item.sourceKind === "custom"
                         ? "自定义"
                         : item.sourceKind === "teammateDriveDisc4pc" || item.sourceCategory === "driveDisc"
@@ -3810,15 +3926,15 @@ function collectDamageConfig() {
     const selectedEventId = events.some(event => event.id === preferredSelectedEventId)
         ? preferredSelectedEventId
         : events[0]?.id
-    const selectedDirect = events.find(event => event.id === selectedEventId && event.kind === "direct")
-        ?? events.find(event => event.kind === "direct")
+    const selectedSkillEvent = events.find(event => event.id === selectedEventId && ["direct", "sheer"].includes(event.kind))
+        ?? events.find(event => ["direct", "sheer"].includes(event.kind))
     return {
         mode: calculationConfigMode,
         agentLevel,
         skillLevelsByCategory: { ...damageSkillLevelsByCategory },
-        ...(selectedDirect?.skillMultiplier ? { skillMultiplier: selectedDirect.skillMultiplier } : {}),
-        ...(selectedDirect?.skillRef ? { skillRef: selectedDirect.skillRef } : {}),
-        ...(selectedDirect?.critMode ? { critMode: selectedDirect.critMode } : {}),
+        ...(selectedSkillEvent?.skillMultiplier ? { skillMultiplier: selectedSkillEvent.skillMultiplier } : {}),
+        ...(selectedSkillEvent?.skillRef ? { skillRef: selectedSkillEvent.skillRef } : {}),
+        ...(selectedSkillEvent?.critMode ? { critMode: selectedSkillEvent.critMode } : {}),
         selectedEventId,
         events,
         target,
@@ -4311,6 +4427,31 @@ function collectRequestPayload({ driveDiscs = [] } = {}) {
     }
 }
 
+function collectDriveDiscAnalysisPayload() {
+    const result = optimizationResults[activeResultIndex]
+    if (!result) {
+        return null
+    }
+    const payload = collectRequestPayload({ driveDiscs: result.driveDiscs ?? [] })
+    const activeBuffIds = new Set(payload.combatBuffs?.activeBuffIds ?? [])
+    for (const summary of result.setSummary ?? []) {
+        if (!summary.fourPieceActive || !summary.setId) {
+            continue
+        }
+        const set = getSet(summary.setId)
+        if (!set?.fourPiece) {
+            continue
+        }
+        activeBuffIds.add(`driveDisc4pc:${summary.setId}.self`)
+        activeBuffIds.add(`driveDisc4pc:${summary.setId}.team`)
+    }
+    payload.combatBuffs = {
+        ...(payload.combatBuffs ?? {}),
+        activeBuffIds: [...activeBuffIds],
+    }
+    return payload
+}
+
 function renderOrderedKV(container, data = {}, order = PANEL_ORDER) {
     container.innerHTML = ""
     for (const key of order) {
@@ -4364,7 +4505,10 @@ function renderActiveEffects(effects = []) {
 }
 
 const DAMAGE_PANEL_SNAPSHOT_LABELS = {
+    hp: "局内生命值",
     atk: "局内攻击力",
+    sheerForce: "局内贯穿力",
+    sheerForceFlat: "固定贯穿力",
     critRate: "面板暴击率",
     effectiveCritRate: "有效暴击率",
     critDmg: "暴击伤害",
@@ -4461,7 +4605,7 @@ function renderDamageWhiteBox(damage) {
             <button type="button" data-select-damage-event-whitebox="${escapeHtml(event.id)}" class="${event.id === selectedEventId ? "active" : ""}">
               <span>
                 <span>${escapeHtml(event.label ?? event.id)} ×${escapeHtml(event.count ?? 1)}</span>
-                ${event.kind === "direct" ? directEventVariantHtml(event) : ""}
+                ${["direct", "sheer"].includes(event.kind) ? directEventVariantHtml(event) : ""}
               </span>
               <strong>${escapeHtml(damageNumber(event.finalDamage ?? 0))}</strong>
             </button>
@@ -4500,12 +4644,20 @@ function renderCalculationResult(data) {
 
 function renderResultTabs() {
     els.optimizerResultTabs.innerHTML = ""
+    const topScore = Number(optimizationResults[0]?.score ?? 0)
     for (const [index, result] of optimizationResults.entries()) {
         const button = document.createElement("button")
         button.type = "button"
         button.className = index === activeResultIndex ? "active" : ""
         button.dataset.resultIndex = String(index)
-        button.textContent = `#${index + 1} ${Number(result.score.toFixed(0))}`
+        const score = Number(result.score ?? 0)
+        const percent = topScore > 0
+            ? `${damageNumber((score / topScore) * 100, index === 0 ? 0 : 2)}%`
+            : "-"
+        button.innerHTML = `
+            <span>#${index + 1} ${escapeHtml(String(Number(score.toFixed(0))))}</span>
+            <small>${escapeHtml(percent)}</small>
+        `
         els.optimizerResultTabs.appendChild(button)
     }
 }
@@ -4555,21 +4707,67 @@ function selectResult(index) {
     renderResultList()
     const result = optimizationResults[index]
     if (result) {
-        renderCalculationResult(result.data)
+        if (optimizationResultsDirty) {
+            refreshSelectedResultPreview().catch(error => setStatus(error.message, "error"))
+        } else {
+            renderCalculationResult(result.data)
+        }
     }
 }
 
-function invalidateResults() {
+function clearOptimizationResults() {
     optimizationResults = []
     activeResultIndex = -1
+    optimizationResultsDirty = false
     lastCompletedOptimizationSettings = null
     lastCompletedOptimizationAgentId = null
-    els.optimizerMetrics.textContent = "需重新计算"
+    els.optimizerMetrics.textContent = "未计算"
     renderResultTabs()
     renderResultList()
     if (!activeOptimizationJobId) {
         clearOptimizationProgress()
     }
+}
+
+function markResultsDirty() {
+    const wasRunning = Boolean(activeOptimizationJobId)
+    if (optimizationResults.length) {
+        optimizationResultsDirty = true
+        els.optimizerMetrics.textContent = "条件已更改，请重新计算"
+        renderResultTabs()
+        renderResultList()
+        if (!activeOptimizationJobId) {
+            clearOptimizationProgress()
+        }
+        refreshSelectedResultPreview().catch(error => setStatus(error.message, "error"))
+        return
+    }
+    optimizationResultsDirty = wasRunning
+    lastCompletedOptimizationSettings = null
+    lastCompletedOptimizationAgentId = null
+    els.optimizerMetrics.textContent = wasRunning ? "条件已更改，请重新计算" : "需重新计算"
+    renderResultTabs()
+    renderResultList()
+    if (!activeOptimizationJobId) {
+        clearOptimizationProgress()
+    }
+}
+
+async function refreshSelectedResultPreview() {
+    const result = optimizationResults[activeResultIndex]
+    if (!result) {
+        return
+    }
+    const requestSeq = ++damagePreviewRequestSeq
+    const response = await api("/api/calculate/in-combat", {
+        method: "POST",
+        body: JSON.stringify(collectRequestPayload({ driveDiscs: result.driveDiscs ?? [] })),
+    })
+    if (requestSeq !== damagePreviewRequestSeq) {
+        return
+    }
+    renderCalculationResult(response.data)
+    setStatus(activeOptimizationJobId ? "计算中" : "条件已更改，请重新计算", "idle")
 }
 
 async function calculateEmptyPanel() {
@@ -4620,7 +4818,7 @@ async function finishOptimizationJob(job) {
     activeResultIndex = optimizationResults.length ? 0 : -1
     const metrics = data?.metrics ?? job.metrics
     const processedCount = processedOptimizationCount(metrics)
-    els.optimizerMetrics.textContent = metrics
+    const metricsText = metrics
         ? [
             `评估 ${formatCount(processedCount)} / 估算 ${formatCount(metrics.estimatedCombinationCount)}`,
             metrics.algorithmLabel,
@@ -4628,11 +4826,12 @@ async function finishOptimizationJob(job) {
             Number(metrics.prunedBySuperBound ?? 0) > 0 ? `剪枝 ${formatCount(metrics.prunedBySuperBound)}` : "",
         ].filter(Boolean).join(" · ")
         : "已计算"
+    els.optimizerMetrics.textContent = optimizationResultsDirty ? "条件已更改，请重新计算" : metricsText
     renderResultTabs()
     renderResultList()
     if (optimizationResults.length) {
         selectResult(0)
-        setStatus("计算完成", "success")
+        setStatus(optimizationResultsDirty ? "条件已更改，请重新计算" : "计算完成", optimizationResultsDirty ? "idle" : "success")
     } else {
         await calculateEmptyPanel()
         setStatus(data?.error?.reason ?? "没有符合条件的结果", "error")
@@ -4645,6 +4844,9 @@ async function pollOptimizationJob(jobId) {
     if (jobId !== activeOptimizationJobId) {
         return
     }
+    if (pendingOptimizationCancelPromise) {
+        return
+    }
     renderOptimizationProgress(job)
     if (["complete", "error", "cancelled"].includes(job.status)) {
         await finishOptimizationJob(job)
@@ -4652,15 +4854,17 @@ async function pollOptimizationJob(jobId) {
 }
 
 async function cancelActiveOptimization({ silent = false } = {}) {
+    if (pendingOptimizationCancelPromise) {
+        return pendingOptimizationCancelPromise
+    }
+
     const jobId = activeOptimizationJobId
     if (!jobId) {
         return
     }
-    activeOptimizationJobId = null
-    activeOptimizationSettingsSnapshot = null
-    activeOptimizationAgentIdSnapshot = null
     stopOptimizationTimers()
-    setOptimizeButtonRunning(false)
+    setOptimizeButtonRunning(true, "取消中")
+    els.cancelOptimizeBtn.disabled = true
     renderOptimizationProgress({
         status: "canceling",
         elapsedMs: Date.now() - optimizationStartedAt,
@@ -4669,33 +4873,60 @@ async function cancelActiveOptimization({ silent = false } = {}) {
     if (!silent) {
         setStatus("正在取消", "idle")
     }
-    try {
-        await api(`/api/optimize/drive-discs/jobs/${encodeURIComponent(jobId)}`, {
-            method: "DELETE",
-        })
-    } catch (error) {
-        if (!silent) {
-            setStatus(error.message, "error")
+
+    pendingOptimizationCancelPromise = (async () => {
+        try {
+            await api(`/api/optimize/drive-discs/jobs/${encodeURIComponent(jobId)}`, {
+                method: "DELETE",
+            })
+        } catch (error) {
+            if (!silent) {
+                setStatus(error.message, "error")
+            }
+            return
+        } finally {
+            if (activeOptimizationJobId === jobId) {
+                activeOptimizationJobId = null
+            }
+            activeOptimizationSettingsSnapshot = null
+            activeOptimizationAgentIdSnapshot = null
+            stopOptimizationTimers()
+            setOptimizeButtonRunning(false)
+            pendingOptimizationCancelPromise = null
         }
-        return
-    }
-    if (!silent) {
-        els.optimizerMetrics.textContent = "已取消"
-        els.optimizerProgressNote.textContent = "计算已取消"
-        setStatus("已取消", "idle")
-    }
+
+        if (!silent) {
+            els.optimizerMetrics.textContent = "已取消"
+            els.optimizerProgressNote.textContent = "计算已取消"
+            setStatus("已取消", "idle")
+        }
+    })()
+
+    return pendingOptimizationCancelPromise
 }
 
 async function runOptimization() {
+    if (pendingOptimizationCancelPromise) {
+        setStatus("正在取消上次计算", "idle")
+        await pendingOptimizationCancelPromise
+    }
     if (activeOptimizationJobId) {
         return
     }
 
     saveSyncedConfig()
-    invalidateResults()
+    clearOptimizationResults()
     lastCompletedOptimizationSettings = null
     setStatus("计算中", "idle")
     setOptimizeButtonRunning(true)
+    renderOptimizationProgress({
+        status: "preparing",
+        metrics: {},
+        evaluated: 0,
+        estimatedCombinationCount: 0,
+        percent: 0,
+        elapsedMs: 0,
+    })
     const payload = {
         ...collectRequestPayload({ driveDiscs: [] }),
         settings: collectOptimizationSettings(),
@@ -4827,10 +5058,11 @@ function restoreHomeState() {
     const selection = loadHomeSelection()
     const agentId = getAgent(selection.currentAgentId)?.id ?? meta.agents[0]?.id
     const config = configForAgent(agentId)
+    const wEngineId = defaultWEngineIdForAgent(agentId, config.wEngineId)
     els.agentSelect.value = agentId
     populateCoreSkillSelect(getAgent(agentId), config.coreSkillLevel)
     populateCinemaLevelSelect(cinemaLevelForAgent(agentId))
-    els.wEngineSelect.value = getWEngine(config.wEngineId)?.id ?? meta.wEngines[0]?.id
+    populateWEngineSelect(wEngineId, agentId)
     populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), config.wEngineModificationLevel)
     applyStoredDamageConfig(damageConfigForAgent(agentId, config.damage))
     renderEntityCards()
@@ -4841,7 +5073,7 @@ async function loadAll() {
     meta = await api("/api/meta")
     store = await api("/api/user-drive-discs")
     populateSelect(els.agentSelect, meta.agents, meta.agents[0]?.id)
-    populateSelect(els.wEngineSelect, meta.wEngines, meta.wEngines[0]?.id)
+    populateWEngineSelect(meta.wEngines[0]?.id, els.agentSelect.value)
     populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), 1)
     populateDamageTargetPresets()
     populateDamageEventSelects()
@@ -4858,11 +5090,14 @@ async function refreshAfterConfigChange() {
         renderEntityCards()
         renderCombatControls()
         saveSyncedConfig()
-        invalidateResults()
-        if (!wasRunning) {
+        markResultsDirty()
+        if (!wasRunning && !optimizationResults.length) {
             await calculateEmptyPanel()
         }
-        setStatus(wasRunning ? "计算中" : "就绪", wasRunning ? "idle" : "success")
+        setStatus(
+            wasRunning ? "计算中" : optimizationResults.length ? "条件已更改，请重新计算" : "就绪",
+            wasRunning || optimizationResults.length ? "idle" : "success",
+        )
     } catch (error) {
         setStatus(error.message, "error")
     }
@@ -4873,9 +5108,10 @@ els.agentSelect.addEventListener("change", async () => {
         persistCurrentDamageResistanceInput()
         const agentId = els.agentSelect.value
         const config = configForAgent(agentId)
+        const wEngineId = defaultWEngineIdForAgent(agentId, config.wEngineId)
         populateCoreSkillSelect(getAgent(agentId), config.coreSkillLevel)
         populateCinemaLevelSelect(cinemaLevelForAgent(agentId))
-        els.wEngineSelect.value = getWEngine(config.wEngineId)?.id ?? meta.wEngines[0]?.id
+        populateWEngineSelect(wEngineId, agentId)
         populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), config.wEngineModificationLevel)
         applyStoredDamageConfig(damageConfigForAgent(agentId, config.damage))
         await refreshAfterConfigChange()
@@ -4903,8 +5139,8 @@ for (const input of [
 els.agentLevelInput?.addEventListener("change", refreshAfterConfigChange)
 els.agentLevelInput?.addEventListener("input", () => {
     saveSyncedConfig()
-    invalidateResults()
-    setStatus(activeOptimizationJobId ? "计算中" : "需重新计算", "idle")
+    markResultsDirty()
+    setStatus(activeOptimizationJobId ? "计算中" : "条件已更改，请重新计算", "idle")
 })
 for (const { categoryId, select } of skillLevelSelects()) {
     select.addEventListener("change", async () => {
@@ -4932,8 +5168,8 @@ for (const input of [
     input.addEventListener("change", refreshAfterConfigChange)
     input.addEventListener("input", () => {
         if (input.tagName === "INPUT") {
-            invalidateResults()
-            setStatus(activeOptimizationJobId ? "计算中" : "需重新计算", "idle")
+            markResultsDirty()
+            setStatus(activeOptimizationJobId ? "计算中" : "条件已更改，请重新计算", "idle")
         }
     })
 }
@@ -5048,8 +5284,8 @@ els.combatSection.addEventListener("input", event => {
             updateRuntimeFieldValue(group.dataset.buffKey, runtimeField, value)
             refreshAddedCombatBuffSummary(group.dataset.buffKey)
             saveSyncedConfig()
-            invalidateResults()
-            setStatus(activeOptimizationJobId ? "计算中" : "需重新计算", "idle")
+            markResultsDirty()
+            setStatus(activeOptimizationJobId ? "计算中" : "条件已更改，请重新计算", "idle")
         } catch (error) {
             setStatus(error.message, "error")
         }
@@ -5072,8 +5308,8 @@ els.combatSection.addEventListener("input", event => {
     }
     try {
         saveSyncedConfig()
-        invalidateResults()
-        setStatus(activeOptimizationJobId ? "计算中" : "需重新计算", "idle")
+        markResultsDirty()
+        setStatus(activeOptimizationJobId ? "计算中" : "条件已更改，请重新计算", "idle")
     } catch (error) {
         setStatus(error.message, "error")
     }
@@ -5105,8 +5341,8 @@ els.calculationSettingsCard?.addEventListener("input", event => {
     }
     try {
         saveSyncedConfig()
-        invalidateResults()
-        setStatus(activeOptimizationJobId ? "计算中" : "需重新计算", "idle")
+        markResultsDirty()
+        setStatus(activeOptimizationJobId ? "计算中" : "条件已更改，请重新计算", "idle")
     } catch (error) {
         setStatus(error.message, "error")
     }
@@ -5179,8 +5415,8 @@ els.addedCombatBuffs.addEventListener("input", event => {
         updateRuntimeFieldValue(group.dataset.buffKey, runtimeField, value)
         refreshAddedCombatBuffSummary(group.dataset.buffKey)
         saveSyncedConfig()
-        invalidateResults()
-        setStatus(activeOptimizationJobId ? "计算中" : "需重新计算", "idle")
+        markResultsDirty()
+        setStatus(activeOptimizationJobId ? "计算中" : "条件已更改，请重新计算", "idle")
     } catch (error) {
         setStatus(error.message, "error")
     }
@@ -5280,7 +5516,7 @@ els.calculationConfigModal?.addEventListener("click", async event => {
 els.calculationConfigModal?.addEventListener("change", event => {
     if (event.target === els.calculationConfigMode) {
         syncEditingEventFromEditor({ renderList: false })
-        syncCalculationConfigModeFields()
+        syncCalculationConfigModeFields(event.target.value)
         return
     }
     if (!els.calculationEventEditorFields?.contains(event.target)) {
@@ -5555,6 +5791,16 @@ els.saveLoadoutBtn.addEventListener("click", async () => {
     } catch (error) {
         setStatus(error.message, "error")
     }
+})
+initDriveDiscAnalysis({
+    substatButton: els.driveDiscSubstatAnalysisBtn,
+    gainButton: els.driveDiscStatGainBtn,
+    getPayload: collectDriveDiscAnalysisPayload,
+    requireDriveDiscs: true,
+    emptyMessage: "请先开始计算，并选择一套优化结果后再分析。",
+    setStatus,
+    statLabel,
+    formatStoredValue,
 })
 
 async function bootstrap() {

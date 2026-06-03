@@ -10,8 +10,11 @@ import {
     agentAttributeText,
     CUSTOM_BUFF_SKILL_STAT_OPTIONS,
     CUSTOM_BUFF_STAT_OPTIONS,
+    DAMAGE_KIND_LABELS,
     damageElementForAgent,
+    defaultWEngineIdForAgent,
     defaultRuntimeForBuff,
+    ENUM_LABELS,
     nameOf,
     normalizeCustomBuffEffect,
     runtimeForBuff,
@@ -19,6 +22,7 @@ import {
     runtimeSourceRuleIdsForGroup,
     sanitizeAddedCombatBuffs,
     skillTargetLabel,
+    sortWEnginesForAgent,
     storedBuffModifierTexts,
     storedEffectRuleText,
     storedEffectRulesText,
@@ -29,9 +33,67 @@ const catalog = await loadCalculatorContext(rootDir)
 const meta = buildMeta(catalog)
 const exampleInput = catalog.examples.yeShunguang.input
 const miyabiMeta = catalog.agents.find(agent => agent.id === "hoshimi_miyabi")
+const yixuanMeta = catalog.agents.find(agent => agent.id === "yixuan")
 
 assert.equal(agentAttributeText(miyabiMeta), "烈霜（冰属性结算）")
 assert.equal(damageElementForAgent(miyabiMeta), "ice")
+assert.equal(agentAttributeText(yixuanMeta), "玄墨（以太属性结算）")
+assert.equal(damageElementForAgent(yixuanMeta), "ether")
+
+const defaultWEngines = [
+    { id: "catalog-first", rarity: "B" },
+    { id: "agent-a-rank", rarity: "A", relatedAgentId: "agent-a" },
+    { id: "agent-s-rank-first", rarity: "S", relatedAgentId: "agent-a" },
+    { id: "agent-s-rank-second", rarity: "S", relatedAgentId: "agent-a" },
+]
+assert.equal(
+    defaultWEngineIdForAgent(defaultWEngines, "agent-a", ""),
+    "agent-s-rank-first",
+    "Related W-Engine defaults should prefer S rank and keep catalog order within the same rarity",
+)
+assert.equal(
+    defaultWEngineIdForAgent(defaultWEngines, "agent-a", "agent-a-rank"),
+    "agent-a-rank",
+    "A saved valid W-Engine should not be replaced by the related default",
+)
+assert.equal(
+    defaultWEngineIdForAgent(defaultWEngines, "agent-a", "missing-w-engine"),
+    "agent-s-rank-first",
+    "An invalid saved W-Engine should fall back to the related default",
+)
+assert.equal(
+    defaultWEngineIdForAgent(defaultWEngines, "agent-without-related", ""),
+    "catalog-first",
+    "Agents without a related W-Engine should keep the catalog fallback",
+)
+
+const specialtySortEngines = [
+    { id: "attack-first", specialty: "attack" },
+    { id: "stun-first", specialty: "stun" },
+    { id: "attack-second", specialty: "attack" },
+    { id: "rupture-first", specialty: "rupture" },
+    { id: "stun-second", specialty: "stun" },
+]
+assert.deepEqual(
+    sortWEnginesForAgent(specialtySortEngines, { specialty: "stun" }).map(item => item.id),
+    ["stun-first", "stun-second", "attack-first", "attack-second", "rupture-first"],
+    "W-Engines matching the agent specialty should be moved before non-matching engines",
+)
+assert.deepEqual(
+    sortWEnginesForAgent(specialtySortEngines, { specialty: "anomaly" }).map(item => item.id),
+    specialtySortEngines.map(item => item.id),
+    "When no W-Engines match the agent specialty, catalog order should be preserved",
+)
+assert.deepEqual(
+    sortWEnginesForAgent(specialtySortEngines, null).map(item => item.id),
+    specialtySortEngines.map(item => item.id),
+    "Missing agent data should keep catalog order",
+)
+assert.deepEqual(
+    sortWEnginesForAgent([], { specialty: "stun" }),
+    [],
+    "Empty W-Engine lists should stay empty",
+)
 
 function approx(actual, expected, message) {
     assert.ok(
@@ -361,6 +423,15 @@ const disorderDamageBonusOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option
 assert.ok(disorderDamageBonusOption, "Custom Buff stat options should include disorder damage bonus")
 assert.equal(disorderDamageBonusOption[0], "disorderDamageBonus", "Disorder damage bonus should be a fixed event stat")
 assert.equal(disorderDamageBonusOption[2], "eventModifier", "Disorder damage bonus option should use the default event modifier bucket")
+assert.equal(DAMAGE_KIND_LABELS.sheer, "贯穿", "Damage kind labels should include sheer")
+assert.equal(ENUM_LABELS.attribute.xuanmo, "玄墨", "Attribute labels should include Yixuan's Xuanmo display attribute")
+const sheerForceFlatOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[0] === "sheerForceFlat")
+assert.ok(sheerForceFlatOption, "Custom Buff stat options should include flat sheer force")
+assert.equal(sheerForceFlatOption[2], "flat", "Flat sheer force should be a panel stat option")
+const sheerDamageBonusOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[1] === "贯穿增伤%")
+assert.ok(sheerDamageBonusOption, "Custom Buff stat options should include sheer damage bonus")
+assert.equal(sheerDamageBonusOption[0], "sheerDmgBonus", "Sheer damage bonus should be a fixed event stat")
+assert.equal(sheerDamageBonusOption[2], "eventModifier", "Sheer damage bonus option should use the default event modifier bucket")
 const defenseIgnoreOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[1] === "无视防御率%")
 assert.ok(defenseIgnoreOption, "Custom Buff stat options should include defense ignore alias")
 assert.equal(defenseIgnoreOption[0], "enemyDefIgnore", "Defense ignore should be exposed as a defense reduction alias")
@@ -384,6 +455,9 @@ assert.equal(skillAnomalyDamageOption[2], "skill")
 const skillDisorderDamageOption = CUSTOM_BUFF_SKILL_STAT_OPTIONS.find(option => option[0] === "disorderDamageBonus")
 assert.ok(skillDisorderDamageOption, "Skill Custom Buff stat options should include disorder damage bonus")
 assert.equal(skillDisorderDamageOption[2], "skill")
+const skillSheerDamageOption = CUSTOM_BUFF_SKILL_STAT_OPTIONS.find(option => option[0] === "sheerDmgBonus")
+assert.ok(skillSheerDamageOption, "Skill Custom Buff stat options should include sheer damage bonus")
+assert.equal(skillSheerDamageOption[2], "skill")
 const skillMultiplierOption = CUSTOM_BUFF_SKILL_STAT_OPTIONS.find(option => option[0] === "skillMultiplierBonus")
 assert.ok(skillMultiplierOption, "Skill Custom Buff stat options should include skill multiplier bonus")
 assert.equal(skillMultiplierOption[1], "技能倍率加算%")
@@ -434,6 +508,25 @@ assert.deepEqual(
         label: null,
     },
     "Custom event modifier normalization should keep disorder damage bonus fixed rules",
+)
+assert.deepEqual(
+    normalizeCustomBuffEffect({
+        id: "custom-fixed-sheer",
+        type: "fixed",
+        stat: "sheerDmgBonus",
+        value: 10,
+        target: { kind: "default" },
+    }),
+    {
+        id: "custom-fixed-sheer",
+        type: "fixed",
+        stat: "sheerDmgBonus",
+        value: 10,
+        mode: "flat",
+        target: { kind: "default" },
+        label: null,
+    },
+    "Custom event modifier normalization should keep sheer damage bonus fixed rules",
 )
 assert.deepEqual(
     normalizeCustomBuffEffect({

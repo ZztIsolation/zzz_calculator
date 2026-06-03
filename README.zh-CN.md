@@ -6,6 +6,19 @@
 
 ## 上传更新摘要
 
+### 2026-06-04 00:46 +08:00
+
+本次上传主要更新如下：
+
+- 新增仪玄作为命破/玄墨角色，包含头像素材、基础属性、核心技 Buff、默认贯穿伤害计算配置，以及按贯穿力建模的完整技能倍率资料。
+- 新增贯穿伤害体系：支持 `sheer` 伤害事件、派生贯穿力、固定贯穿力、通用/分属性贯穿增伤、暴击、抗性处理和专用伤害白盒公式行。
+- 扩展属性规则、驱动盘套装效果、音擎效果、音擎图片素材、维护校验、自定义 Buff 选项和优化器评分，使其支持贯穿伤害构筑。
+- 新增多把命破相关音擎及改装数值测试，覆盖物理、火、冰、以太和固定贯穿力等 Buff 变体。
+- 新增驱动盘分析 API 和前端工具，用于查看当前副词条有效词条数，以及额外副词条带来的伤害收益曲线。
+- 优化计算器和优化器界面，新增贯穿目标/事件控件、实体选择辅助、分析面板和相关样式。
+- 新增 `npm run test:drive-disc-analysis`，并扩展贯穿伤害白盒、优化器进度、共享战斗工具、维护校验和音擎改装值回归测试。
+- 新增当前计算器与优化器体验的前端可用性审计文档。
+
 ### 2026-06-03 00:50 +08:00
 
 本次上传主要更新如下：
@@ -58,10 +71,11 @@
 - 根据角色属性、核心技等级、音擎、驱动盘和无条件套装效果计算局外面板。
 - 在局外面板基础上叠加自身、队友、音擎、驱动盘 4 件套、场地、Boss 和手动 Buff，计算局内面板。
 - 战斗 Buff 支持队友、音擎团队、驱动盘团队和自定义来源分组，便于查看与移除。
-- 支持直伤、异常和紊乱事件的伤害预览，并输出可检查的公式拆解；属性异常与紊乱使用独立的事件修正区。
+- 支持直伤、贯穿、异常和紊乱事件的伤害预览，并输出可检查的公式拆解；不同伤害类型使用独立的事件修正区。
 - 支持 ZZZ Scanner 驱动盘导入、手动编辑、重复识别、账号隔离存储和可选的“移除缺失”同步。
 - 支持保存驱动盘套装预设，首页可套用，优化器结果也可保存。
 - 驱动盘优化器支持计算目标预设、预览、后台任务进度、取消、套装结构限制、多选额外 2 件套、主词条限制、最低属性限制、精确/快速算法选择和伤害评分。
+- 驱动盘分析工具支持查看当前副词条有效词条数，以及额外副词条带来的预测伤害收益。
 - 提供静态资料维护页，用于录入和校验游戏数据 JSON。
 
 ## 目录结构
@@ -74,6 +88,7 @@ zzz_calculator/
   backend/
     server.js
     calculator.js
+    driveDiscAnalysis.js
     driveDiscInventory.js
     driveDiscOptimizer.js
   data/
@@ -87,6 +102,7 @@ zzz_calculator/
     user_drive_discs.example.json
   docs/
     changelog.md
+    frontend-usability-audit.md
     goal.md
     modeling.md
   examples/
@@ -100,7 +116,9 @@ zzz_calculator/
     maintenance.html
     app.js
     calculate.js
+    drive-disc-analysis.js
     drive-discs.js
+    entity-select.js
     accounts.js
     accounts-page.js
     maintenance.js
@@ -153,6 +171,7 @@ npm run test:anomaly-damage
 npm run test:optimizer
 npm run test:optimizer-progress
 npm run test:optimizer-api
+npm run test:drive-disc-analysis
 npm run test:drive-disc-import
 npm run test:accounts
 ```
@@ -167,10 +186,13 @@ npm run benchmark:optimizer
 
 ```bash
 node --check backend/calculator.js
+node --check backend/driveDiscAnalysis.js
 node --check backend/server.js
 node --check frontend/app.js
 node --check frontend/calculate.js
+node --check frontend/drive-disc-analysis.js
 node --check frontend/drive-discs.js
+node --check frontend/entity-select.js
 node --check frontend/maintenance.js
 node --check frontend/accounts-page.js
 ```
@@ -194,6 +216,8 @@ node --check frontend/accounts-page.js
 - `POST /api/optimize/drive-discs/jobs`
 - `GET|DELETE /api/optimize/drive-discs/jobs/:id`
 - `POST /api/optimize/drive-discs`
+- `POST /api/analysis/drive-disc-substats`
+- `POST /api/analysis/drive-disc-stat-gains`
 - `GET|DELETE /api/user-drive-discs`
 - `POST /api/user-drive-discs/import/zzz-scanner`
 - `POST /api/user-drive-discs`
@@ -206,8 +230,9 @@ node --check frontend/accounts-page.js
 - 基础攻击力等于 `角色基础攻击力 + 音擎基础攻击力 + 核心技基础攻击力`。
 - 局外面板是后续条件性局内 Buff 的稳定基准。
 - 局内 Buff 可以贡献普通属性、运行时缩放效果、伤害修正、音擎团队 Buff 和指定技能效果。
-- 优化器伤害目标可以使用单个直伤/异常事件，也可以使用自定义的直伤、异常、紊乱多事件列表。
+- 优化器伤害目标可以使用单个直伤、贯穿、异常或紊乱事件，也可以使用自定义的多事件列表。
 - 特殊显示属性可以声明真实结算属性；例如叶瞬光显示为贯穿，但伤害按物理结算。
+- 命破/玄墨伤害按贯穿伤害建模：贯穿力由局内生命值、局内攻击力和固定贯穿力派生，再进入贯穿增伤区，并跳过防御/穿透乘区。
 - 异常和紊乱伤害使用 `data/anomaly_effects.json` 中统一 `effects` 列表的数据倍率，并通过 `settlementType` 区分结算类型。
 - 属性异常和紊乱伤害使用不同的增伤区：`anomalyDamageBonus` 只作用于属性异常，`disorderDamageBonus` 只作用于紊乱。
 - 音擎改装等级只物化每阶明确的 Buff 数值，不改变 60 级基础攻击力或高级属性。

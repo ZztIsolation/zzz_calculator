@@ -140,6 +140,10 @@
               <h2>驱动盘</h2>
               <div class="tag">仓库选择</div>
             </div>
+            <div class="analysis-actions">
+              <button id="driveDiscSubstatAnalysisBtn" type="button" class="ghost-btn">词条分析</button>
+              <button id="driveDiscStatGainBtn" type="button" class="ghost-btn">词条收益曲线</button>
+            </div>
             <div class="disc-source-toggle">
               <div class="segmented-control" role="group" aria-label="驱动盘来源">
                 <button id="manualDiscModeBtn" type="button" class="active" data-disc-mode="manual">自选</button>
@@ -209,6 +213,7 @@
                     <span>伤害类型</span>
                     <select id="damageEventType">
                       <option value="direct">直伤</option>
+                      <option value="sheer">贯穿</option>
                       <option value="anomaly">异常伤害</option>
                       <option value="disorder">紊乱</option>
                     </select>

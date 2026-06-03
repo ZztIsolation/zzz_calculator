@@ -37,6 +37,9 @@ const ALGORITHM_ALIASES = {
     "exact-super-bound-parallel": "exact-super-bound",
 }
 const DEFAULT_POTENTIAL_WEIGHTS = {
+    hpFlat: 0.02,
+    hpPct: 4,
+    sheerForceFlat: 0.1,
     atkFlat: 0.05,
     atkPct: 6,
     critRate: 12,
@@ -47,6 +50,12 @@ const DEFAULT_POTENTIAL_WEIGHTS = {
     iceDmg: 5,
     electricDmg: 5,
     etherDmg: 5,
+    sheerDmgBonus: 5,
+    physicalSheerDmg: 5,
+    fireSheerDmg: 5,
+    iceSheerDmg: 5,
+    electricSheerDmg: 5,
+    etherSheerDmg: 5,
     penRatio: 5,
     penFlat: 0.03,
     physicalResIgnore: 5,
@@ -63,6 +72,12 @@ const DEFAULT_POTENTIAL_WEIGHTS = {
 }
 const PERCENT_PANEL_STATS = new Set([
     "hpPct",
+    "sheerDmgBonus",
+    "physicalSheerDmg",
+    "fireSheerDmg",
+    "iceSheerDmg",
+    "electricSheerDmg",
+    "etherSheerDmg",
     "atkPct",
     "defPct",
     "critRate",
@@ -649,8 +664,11 @@ function candidatePotential(disc, vector, weights = DEFAULT_POTENTIAL_WEIGHTS) {
 }
 
 function probeValueForStat(stat) {
-    if (stat === "atkFlat" || stat === "penFlat") {
+    if (stat === "atkFlat" || stat === "penFlat" || stat === "sheerForceFlat") {
         return 100
+    }
+    if (stat === "hpFlat") {
+        return 1000
     }
     if (stat === "anomalyProficiency") {
         return 30
@@ -1415,7 +1433,9 @@ async function optimizeDriveDiscsLegacyExactAsync(catalog, store, input = {}, op
     const state = createOptimizerState(catalog, store, input)
     const chunkSize = Math.max(1, Number(options.chunkSize ?? 10000))
     const progressIntervalMs = Math.max(0, Number(options.progressIntervalMs ?? 250))
+    const yieldIntervalMs = Math.max(0, Number(options.yieldIntervalMs ?? 50))
     let lastProgressAt = 0
+    let lastYieldAt = 0
     let lastYieldEvaluated = 0
 
     function throwIfCancelled() {
@@ -1425,22 +1445,24 @@ async function optimizeDriveDiscsLegacyExactAsync(catalog, store, input = {}, op
     }
 
     async function maybeYield(force = false) {
+        const now = Date.now()
+        const currentEvaluated = state.metrics?.evaluated ?? 0
         const enoughEvaluated = state.isEmpty
-            || state.metrics.evaluated - lastYieldEvaluated >= chunkSize
-        if (!force && !enoughEvaluated) {
+            || currentEvaluated - lastYieldEvaluated >= chunkSize
+        const enoughYieldTime = now - lastYieldAt >= yieldIntervalMs
+        if (!force && !enoughEvaluated && !enoughYieldTime) {
             return
         }
 
         throwIfCancelled()
-        const now = Date.now()
-        const enoughTime = now - lastProgressAt >= progressIntervalMs
-        if (!force && !enoughTime) {
-            return
+        const enoughProgressTime = now - lastProgressAt >= progressIntervalMs
+        if (force || enoughProgressTime) {
+            options.onProgress?.(progressFromState(state, "running"))
+            lastProgressAt = now
         }
 
-        options.onProgress?.(progressFromState(state, "running"))
-        lastProgressAt = now
-        lastYieldEvaluated = state.metrics?.evaluated ?? 0
+        lastYieldEvaluated = currentEvaluated
+        lastYieldAt = now
         await yieldToEventLoop()
         throwIfCancelled()
     }
@@ -1489,7 +1511,9 @@ async function optimizeDriveDiscsSuperBoundExactAsync(catalog, store, input = {}
     const state = createOptimizerState(catalog, store, input)
     const chunkSize = Math.max(1, Number(options.chunkSize ?? 10000))
     const progressIntervalMs = Math.max(0, Number(options.progressIntervalMs ?? 250))
+    const yieldIntervalMs = Math.max(0, Number(options.yieldIntervalMs ?? 50))
     let lastProgressAt = 0
+    let lastYieldAt = 0
     let lastYieldWork = 0
 
     function throwIfCancelled() {
@@ -1503,22 +1527,23 @@ async function optimizeDriveDiscsSuperBoundExactAsync(catalog, store, input = {}
     }
 
     async function maybeYield(force = false) {
+        const now = Date.now()
         const currentWork = workUnits()
         const enoughWork = state.isEmpty || currentWork - lastYieldWork >= chunkSize
-        if (!force && !enoughWork) {
+        const enoughYieldTime = now - lastYieldAt >= yieldIntervalMs
+        if (!force && !enoughWork && !enoughYieldTime) {
             return
         }
 
         throwIfCancelled()
-        const now = Date.now()
-        const enoughTime = now - lastProgressAt >= progressIntervalMs
-        if (!force && !enoughTime) {
-            return
+        const enoughProgressTime = now - lastProgressAt >= progressIntervalMs
+        if (force || enoughProgressTime) {
+            options.onProgress?.(progressFromState(state, "running"))
+            lastProgressAt = now
         }
 
-        options.onProgress?.(progressFromState(state, "running"))
-        lastProgressAt = now
         lastYieldWork = currentWork
+        lastYieldAt = now
         await yieldToEventLoop()
         throwIfCancelled()
     }

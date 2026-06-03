@@ -74,6 +74,25 @@ const store = {
     ],
 }
 
+function responsiveCancellationStore(candidatesPerSet = 6) {
+    const driveDiscs = []
+    for (const slot of [1, 2, 3, 4, 5, 6]) {
+        for (const setId of [fourSet, twoSet]) {
+            for (let index = 0; index < candidatesPerSet; index += 1) {
+                driveDiscs.push(disc(`cancel-${setId}-${slot}-${index}`, setId, slot, slotMain[slot], [
+                    { stat: "critRate", value: 2 + index * 0.7, mode: "pct" },
+                    { stat: "critDmg", value: 24 - index * 2, mode: "pct" },
+                    { stat: "atkPct", value: index % 3, mode: "pct" },
+                ]))
+            }
+        }
+    }
+    return {
+        ...store,
+        driveDiscs,
+    }
+}
+
 function optimizerInput(overrides = {}) {
     const { settings: settingsOverride = {}, ...rest } = overrides
     return {
@@ -156,3 +175,28 @@ await assert.rejects(
 )
 assert.ok(cancelEvents.some(progress => progress.evaluated >= 1))
 assert.ok(cancelEvents.at(-1).evaluated < cancelEvents.at(-1).estimatedCombinationCount)
+
+let timedCancelRequested = false
+const timedCancelTimer = setTimeout(() => {
+    timedCancelRequested = true
+}, 10)
+try {
+    await assert.rejects(
+        () => optimizeDriveDiscsAsync(catalog, responsiveCancellationStore(), optimizerInput({
+            settings: {
+                algorithm: "exact-legacy",
+                twoPieceSetId: twoSet,
+                enableUpperBoundPruning: false,
+            },
+        }), {
+            chunkSize: Number.MAX_SAFE_INTEGER,
+            progressIntervalMs: 60_000,
+            yieldIntervalMs: 1,
+            shouldCancel: () => timedCancelRequested,
+        }),
+        OptimizerCancelledError,
+    )
+} finally {
+    clearTimeout(timedCancelTimer)
+}
+assert.equal(timedCancelRequested, true)
