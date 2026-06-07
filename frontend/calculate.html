@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>计算 | ZZZ 驱动盘计算器</title>
+  <title>优化器 | ZZZ 驱动盘计算器</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -20,7 +20,7 @@
       <nav class="side-nav">
         <a href="/" class="nav-item">首页</a>
         <a href="/drive-discs.html" class="nav-item">驱动盘</a>
-        <a href="/calculate.html" class="nav-item active">计算</a>
+        <a href="/calculate.html" class="nav-item active">优化器</a>
         <a href="/accounts.html" class="nav-item" data-account-label>账号 / 加载中</a>
         <a href="/maintenance.html" class="nav-item">维护</a>
       </nav>
@@ -49,7 +49,7 @@
           <article class="card optimizer-entity-card" id="agent-section">
             <div class="card-head">
               <h2>角色设置</h2>
-              <div class="tag">同步首页</div>
+              <div class="tag">套用首页设置</div>
             </div>
             <div class="optimizer-entity-head">
               <div class="entity-preview optimizer-entity-media agent-preview">
@@ -89,7 +89,7 @@
           <article class="card optimizer-entity-card" id="weapon-section">
             <div class="card-head">
               <h2>音擎设置</h2>
-              <div class="tag">同步首页</div>
+              <div class="tag">套用首页设置</div>
             </div>
             <div class="optimizer-entity-head">
               <div class="entity-preview optimizer-entity-media weapon-preview">
@@ -117,7 +117,7 @@
           <article class="card" id="combat-section">
             <div class="card-head">
               <h2>局内设置</h2>
-              <div class="tag">同步首页</div>
+              <div class="tag">套用首页设置</div>
             </div>
             <div class="combat-section-grid optimizer-combat-section-grid">
               <div class="combat-group">
@@ -158,7 +158,14 @@
                       <button type="button" data-resistance-preset="20">+20%</button>
                       <button type="button" data-resistance-preset="custom">自定义</button>
                     </div>
-                    <input id="damageTargetResistance" class="resistance-custom-input" type="number" min="-100" max="100" step="0.1" value="0" aria-label="Boss 抗性自定义百分比" hidden>
+                    <div id="damageTargetResistanceCustom" class="resistance-custom-control" hidden>
+                      <select id="damageTargetResistanceSign" aria-label="Boss 抗性自定义正负号">
+                        <option value="1">+</option>
+                        <option value="-1">-</option>
+                      </select>
+                      <input id="damageTargetResistance" class="resistance-custom-input" type="number" min="0" max="100" step="0.1" value="0" aria-label="Boss 抗性自定义百分比">
+                      <span class="resistance-custom-unit">%</span>
+                    </div>
                   </div>
                 </div>
                 <div id="bossCombatBuffs" class="combat-buff-list"></div>
@@ -306,6 +313,21 @@
                 </label>
               </div>
             </div>
+
+            <div id="optimizerRunSummary" class="optimizer-run-summary">
+              <div>
+                <span id="optimizerRunPercent">0%</span>
+                <strong id="optimizerRunMeta">未计算</strong>
+                <p id="optimizerRunNote">设置好目标和约束后开始计算</p>
+              </div>
+              <div id="optimizerRunProgress" class="optimizer-progress-track optimizer-run-progress" hidden>
+                <div id="optimizerRunProgressFill" class="optimizer-progress-fill"></div>
+              </div>
+              <div class="optimizer-run-actions">
+                <button id="optimizeInlineBtn" type="button" class="primary-btn">开始计算</button>
+                <button id="cancelOptimizeInlineBtn" type="button" class="ghost-btn" hidden>取消计算</button>
+              </div>
+            </div>
           </article>
 
           <article class="card">
@@ -375,7 +397,7 @@
           <article class="card">
             <div class="card-head">
               <h2>伤害白盒</h2>
-              <div class="tag">totalFinalDamage</div>
+              <div class="tag">伤害合计</div>
             </div>
             <div class="damage-result-head">
               <span>合计伤害</span>
@@ -398,9 +420,13 @@
           <p>按当前技能大类等级读取倍率</p>
         </div>
       </header>
+      <label class="field damage-skill-search-field">
+        <span>搜索</span>
+        <input id="damageSkillSearchInput" placeholder="搜索技能、倍率、段数">
+      </label>
       <div id="damageSkillModalList" class="damage-skill-modal-list"></div>
       <div id="damageSkillModalEmpty" class="inventory-empty home-disc-empty" hidden>
-        <strong>No Data</strong>
+        <strong>暂无技能倍率</strong>
         <span>当前角色暂无可选择的技能倍率</span>
       </div>
     </section>
@@ -453,7 +479,7 @@
         </div>
       </div>
       <div id="combatBuffModalEmpty" class="inventory-empty home-disc-empty" hidden>
-        <strong>No Data</strong>
+        <strong>暂无 Buff</strong>
         <span>暂无可添加的 Buff</span>
       </div>
     </section>

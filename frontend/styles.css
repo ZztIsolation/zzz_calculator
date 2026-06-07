@@ -373,6 +373,16 @@ button {
   overflow-wrap: anywhere;
 }
 
+.hero-stat small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .workspace {
   display: grid;
   grid-template-columns: minmax(520px, 1.03fr) minmax(440px, 0.97fr);
@@ -1082,8 +1092,25 @@ button {
   color: var(--blue);
 }
 
-.resistance-custom-input[hidden] {
+.resistance-custom-control[hidden] {
   display: none;
+}
+
+.resistance-custom-control {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.resistance-custom-control select,
+.resistance-custom-control input {
+  min-height: 36px;
+}
+
+.resistance-custom-unit {
+  color: var(--muted);
+  font-weight: 900;
 }
 
 .combat-check-row {
@@ -1878,6 +1905,8 @@ button {
 }
 
 .combat-buff-modal .modal-head {
+  top: 0;
+  margin: 0;
   align-items: center;
   min-height: 94px;
   padding: 22px 58px 20px 24px;
@@ -2102,6 +2131,8 @@ button {
 }
 
 .damage-skill-modal .modal-head {
+  top: 0;
+  margin: 0;
   align-items: center;
   min-height: 88px;
   padding: 20px 58px 18px 24px;
@@ -2118,6 +2149,15 @@ button {
 
 .damage-skill-modal .modal-head p {
   color: #cbd5e1;
+}
+
+.damage-skill-search-field {
+  margin: 18px 24px 0;
+}
+
+.damage-skill-search-field input {
+  min-height: 42px;
+  border-radius: 8px;
 }
 
 .damage-skill-modal .modal-close {
@@ -2356,6 +2396,22 @@ button {
   font-family: "Cascadia Mono", Consolas, "Liberation Mono", monospace;
   font-size: 12px;
   line-height: 1.5;
+}
+
+.modal-raw-details,
+.maintenance-preview-card {
+  margin-top: 18px;
+}
+
+.modal-raw-details summary,
+.maintenance-preview-card summary {
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.modal-raw-details .raw,
+.maintenance-preview-card .raw {
+  margin-top: 12px;
 }
 
 .hero-mini-mark {
@@ -3012,6 +3068,7 @@ body.modal-open {
 
 .modal-close {
   position: absolute;
+  z-index: 5;
   top: 14px;
   right: 14px;
   width: 34px;
@@ -3030,11 +3087,17 @@ body.modal-open {
 }
 
 .modal-head {
+  position: sticky;
+  top: -22px;
+  z-index: 3;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 42px;
-  padding-right: 28px;
+  margin: -22px -20px 0;
+  padding: 22px 48px 14px 20px;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
 }
 
 .modal-head h2 {
@@ -3050,6 +3113,33 @@ body.modal-open {
 
 .modal-editor {
   margin-top: 22px;
+}
+
+.app-dialog-layer {
+  z-index: 40;
+}
+
+.app-dialog {
+  width: min(520px, calc(100vw - 32px));
+  margin-top: min(120px, 18vh);
+  padding-bottom: 18px;
+}
+
+.app-dialog .modal-head {
+  position: static;
+  margin: -22px -20px 0;
+}
+
+.app-dialog-field {
+  margin-top: 18px;
+}
+
+.app-dialog-actions {
+  margin-top: 18px;
+}
+
+.app-dialog-danger .modal-head h2 {
+  color: var(--red);
 }
 
 .modal-section {
@@ -3407,6 +3497,46 @@ body.modal-open {
 .maintenance-feedback ul {
   margin: 6px 0 0;
   padding-left: 18px;
+}
+
+.maintenance-save-strip {
+  position: sticky;
+  top: 10px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 11px 12px;
+  border: 1px solid #cfe1ff;
+  border-radius: 8px;
+  background: rgba(248, 251, 255, 0.96);
+  box-shadow: 0 10px 24px rgba(16, 19, 24, 0.08);
+  backdrop-filter: blur(8px);
+}
+
+.maintenance-save-strip[data-tone="success"] {
+  border-color: rgba(21, 128, 61, 0.32);
+  background: rgba(240, 253, 244, 0.96);
+}
+
+.maintenance-save-strip[data-tone="error"] {
+  border-color: rgba(180, 35, 24, 0.32);
+  background: rgba(255, 245, 245, 0.96);
+}
+
+.maintenance-save-strip strong,
+.maintenance-save-strip span {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.maintenance-save-strip span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .field-label {
@@ -4186,6 +4316,64 @@ body.modal-open {
   align-content: start;
 }
 
+.optimizer-run-summary {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.7fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin: 18px -2px -2px;
+  padding: 12px;
+  border: 1px solid #cfe1ff;
+  border-radius: 8px;
+  background: rgba(248, 251, 255, 0.96);
+  box-shadow: 0 -10px 24px rgba(16, 19, 24, 0.08);
+  backdrop-filter: blur(8px);
+}
+
+.optimizer-run-summary[data-active="true"] {
+  border-color: #9ec5ff;
+}
+
+.optimizer-run-summary span {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.optimizer-run-summary strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  max-height: 2.7em;
+  overflow: hidden;
+}
+
+.optimizer-run-summary p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  max-height: 2.7em;
+  overflow: hidden;
+}
+
+.optimizer-run-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.optimizer-run-progress {
+  margin: 0;
+}
+
 .optimizer-progress {
   display: grid;
   gap: 10px;
@@ -4368,14 +4556,7 @@ body.modal-open {
     min-height: 0;
     overflow-y: auto;
     padding-right: 4px;
-    scrollbar-width: none;
-  }
-
-  .optimizer-left::-webkit-scrollbar,
-  .optimizer-center::-webkit-scrollbar,
-  .optimizer-right::-webkit-scrollbar {
-    width: 0;
-    height: 0;
+    scrollbar-width: thin;
   }
 }
 
@@ -4615,27 +4796,66 @@ body.modal-open {
   .combat-buff-bulk-actions {
     justify-content: flex-start;
   }
+
+  .optimizer-run-summary {
+    position: sticky;
+    bottom: 8px;
+    grid-template-columns: 1fr;
+  }
+
+  .optimizer-run-actions {
+    justify-content: stretch;
+  }
+
+  .optimizer-run-actions .primary-btn,
+  .optimizer-run-actions .ghost-btn {
+    flex: 1 1 160px;
+  }
+
+  .optimize-content > .page-header .header-actions {
+    display: none;
+  }
 }
 
 @media (max-width: 520px) {
   .sidebar {
-    padding: 14px 10px;
+    padding: 10px;
   }
 
   .brand {
-    align-items: flex-start;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 10px;
+  }
+
+  .brand-mark {
+    width: 34px;
+    height: 34px;
+  }
+
+  .brand-name {
+    font-size: 14px;
+  }
+
+  .brand-sub,
+  .sidebar-foot {
+    display: none;
   }
 
   .side-nav {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 5px;
+    margin-top: 10px;
   }
 
   .nav-item {
     min-width: 0;
+    min-height: 32px;
     justify-content: center;
-    padding: 8px;
+    padding: 6px 4px;
+    font-size: 12px;
+    text-align: center;
   }
 
   .header-actions {

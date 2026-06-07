@@ -1605,8 +1605,7 @@ function calculateCombatPanelFromTotals(agent, outOfCombat, bonusTotals) {
     panel.iceDmg = outOfCombat.panel.iceDmg + bonusTotals.iceDmg
     panel.electricDmg = outOfCombat.panel.electricDmg + bonusTotals.electricDmg
     panel.etherDmg = outOfCombat.panel.etherDmg + bonusTotals.etherDmg
-    panel.sheerForceFlat = bonusTotals.sheerForceFlat
-    panel.sheerForce = sheerForceFromPanel(panel)
+    applyPanelSheerForce(agent, panel, bonusTotals)
 
     const selectedAttributeBonusKey = resolveAttributeBonusKey(agent)
     const selectedDmgBonus = (panel.dmgBonus ?? 0) + (panel[selectedAttributeBonusKey] ?? 0)
@@ -2102,6 +2101,29 @@ function sheerForceFromPanel(panel = {}) {
             + Number(panel.atk ?? 0) * SHEER_FORCE_ATK_RATIO
             + Number(panel.sheerForceFlat ?? 0),
     )
+}
+
+function isRuptureAgent(agent = {}) {
+    return agent?.specialty === "rupture"
+}
+
+function effectiveSheerForceFromPanel(agent = {}, panel = {}) {
+    if (!isRuptureAgent(agent)) {
+        return 0
+    }
+    return Number.isFinite(Number(panel.sheerForce))
+        ? Number(panel.sheerForce)
+        : sheerForceFromPanel(panel)
+}
+
+function applyPanelSheerForce(agent = {}, panel = {}, bonusTotals = {}) {
+    if (!isRuptureAgent(agent)) {
+        panel.sheerForceFlat = 0
+        panel.sheerForce = 0
+        return
+    }
+    panel.sheerForceFlat = Number(bonusTotals.sheerForceFlat ?? 0)
+    panel.sheerForce = sheerForceFromPanel(panel)
 }
 
 function damageElementLabel(damageElement) {
@@ -2638,13 +2660,11 @@ function calculateDirectDamageEvent({ event, panel, bonusTotals, target, include
     }
 }
 
-function calculateSheerDamageEvent({ event, panel, bonusTotals, target, includeWhiteBox }) {
+function calculateSheerDamageEvent({ event, agent, panel, bonusTotals, target, includeWhiteBox }) {
     const hp = Number(panel.hp ?? 0)
     const atk = Number(panel.atk ?? 0)
-    const sheerForceFlat = Number(panel.sheerForceFlat ?? 0)
-    const sheerForce = Number.isFinite(Number(panel.sheerForce))
-        ? Number(panel.sheerForce)
-        : sheerForceFromPanel(panel)
+    const sheerForceFlat = isRuptureAgent(agent) ? Number(panel.sheerForceFlat ?? 0) : 0
+    const sheerForce = effectiveSheerForceFromPanel(agent, panel)
     const rawCritRate = Number(panel.critRate ?? 0)
     const critRateForDamage = damageCritRate(panel)
     const critDmg = Number(panel.critDmg ?? 0)
@@ -2858,6 +2878,7 @@ function calculateDamageResult({ catalog, agent, panel, bonusTotals, input, incl
         if (event.kind === "sheer") {
             return calculateSheerDamageEvent({
                 event,
+                agent,
                 panel,
                 bonusTotals,
                 target: damageRequest.target,
@@ -2956,7 +2977,7 @@ function calculateAnomalyDamageFinalValue(event, panel, bonusTotals, target, age
         * Number(event.count ?? 1)
 }
 
-function calculateSheerDamageFinalValue(event, panel, bonusTotals, target) {
+function calculateSheerDamageFinalValue(event, panel, bonusTotals, target, agent = {}) {
     const eventTotals = eventTargetTotalsForElement(bonusTotals, event)
     const elementDmgKey = `${event.damageElement}Dmg`
     const elementSheerDmgKey = SHEER_DMG_KEY_BY_ELEMENT[event.damageElement]
@@ -2965,7 +2986,7 @@ function calculateSheerDamageFinalValue(event, panel, bonusTotals, target) {
     const sheerDmgBonus = Number(eventTotals.sheerDmgBonus ?? 0) + Number(eventTotals[elementSheerDmgKey] ?? 0)
     const skillMultiplierBonus = Number(eventTotals.skillMultiplierBonus ?? 0)
     const effectiveSkillMultiplier = Math.max(0, Number(event.skillMultiplier ?? 0) + skillMultiplierBonus)
-    return Number(panel.sheerForce ?? sheerForceFromPanel(panel))
+    return effectiveSheerForceFromPanel(agent, panel)
         * effectiveSkillMultiplier
         * critMultiplierForMode(panel, event.critMode)
         * (1 + selectedDmgBonus + skillDamageBonus)
@@ -2974,14 +2995,14 @@ function calculateSheerDamageFinalValue(event, panel, bonusTotals, target) {
         * Number(event.count ?? 1)
 }
 
-function calculateDamageTotalFinalValue({ panel, bonusTotals, damageRequest }) {
+function calculateDamageTotalFinalValue({ agent, panel, bonusTotals, damageRequest }) {
     const target = damageRequest.target
     let total = 0
     for (const event of damageRequest.events ?? []) {
         if (event.kind === "direct") {
             total += calculateDirectDamageFinalValue(event, panel, bonusTotals, target)
         } else if (event.kind === "sheer") {
-            total += calculateSheerDamageFinalValue(event, panel, bonusTotals, target)
+            total += calculateSheerDamageFinalValue(event, panel, bonusTotals, target, agent)
         } else {
             total += calculateAnomalyDamageFinalValue(event, panel, bonusTotals, target, damageRequest.agentLevel)
         }
@@ -2994,6 +3015,7 @@ function calculateDamageFinalValue({ agent, panel, bonusTotals, damageInput }) {
         ? damageInput
         : normalizeDamageRequest(damageInput, agent, {})
     return calculateDamageTotalFinalValue({
+        agent,
         panel,
         bonusTotals,
         damageRequest,
@@ -3237,8 +3259,7 @@ function calculatePanel({ agent, wEngine, driveDiscs, driveDiscSets, coreSkillLe
     panel.iceDmg = bonusTotals.iceDmg
     panel.electricDmg = bonusTotals.electricDmg
     panel.etherDmg = bonusTotals.etherDmg
-    panel.sheerForceFlat = bonusTotals.sheerForceFlat
-    panel.sheerForce = sheerForceFromPanel(panel)
+    applyPanelSheerForce(agent, panel, bonusTotals)
 
     const selectedAttributeBonusKey = resolveAttributeBonusKey(agent)
     const selectedDmgBonus = (panel.dmgBonus ?? 0) + (panel[selectedAttributeBonusKey] ?? 0)
@@ -3368,8 +3389,7 @@ function createPreparedOutOfCombatPanelCalculator({ agent, wEngine, driveDiscSet
             panel.iceDmg = bonusTotals.iceDmg
             panel.electricDmg = bonusTotals.electricDmg
             panel.etherDmg = bonusTotals.etherDmg
-            panel.sheerForceFlat = bonusTotals.sheerForceFlat
-            panel.sheerForce = sheerForceFromPanel(panel)
+            applyPanelSheerForce(agent, panel, bonusTotals)
 
             const selectedAttributeBonusKey = resolveAttributeBonusKey(agent)
             const selectedDmgBonus = (panel.dmgBonus ?? 0) + (panel[selectedAttributeBonusKey] ?? 0)
@@ -3444,8 +3464,7 @@ function createPreparedOutOfCombatPanelCalculator({ agent, wEngine, driveDiscSet
             panel.iceDmg = bonusTotals.iceDmg
             panel.electricDmg = bonusTotals.electricDmg
             panel.etherDmg = bonusTotals.etherDmg
-            panel.sheerForceFlat = bonusTotals.sheerForceFlat
-            panel.sheerForce = sheerForceFromPanel(panel)
+            applyPanelSheerForce(agent, panel, bonusTotals)
 
             const selectedAttributeBonusKey = resolveAttributeBonusKey(agent)
             const selectedDmgBonus = (panel.dmgBonus ?? 0) + (panel[selectedAttributeBonusKey] ?? 0)
@@ -4200,6 +4219,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                 panel: inCombatPanel.panel,
                 selectedDmgBonus: inCombatPanel.selectedDmgBonus,
                 finalDamage: calculateDamageTotalFinalValue({
+                    agent,
                     panel: inCombatPanel.panel,
                     bonusTotals,
                     damageRequest: normalizedDamageInput,

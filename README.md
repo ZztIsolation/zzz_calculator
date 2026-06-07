@@ -9,6 +9,27 @@ Chinese documentation is available in [README.zh-CN.md](README.zh-CN.md).
 
 ## Upload Update Summaries
 
+### 2026-06-07 21:15 +08:00
+
+This upload adds or expands these major areas:
+
+- Improved frontend usability across the calculator, optimizer, Drive Disc,
+  account, and maintenance pages, including clearer empty states, compact
+  mobile navigation, sticky action bars, visible optimizer progress, and a
+  searchable skill multiplier picker.
+- Added a shared browser dialog helper and replaced native prompt/confirm flows
+  for account actions, Drive Disc deletion/import sync, loadout deletion, and
+  optimizer loadout naming.
+- Added homepage final-damage feedback after calculation and scroll-to-result
+  behavior so the damage white-box output is easier to find.
+- Preserved selected combat buff state per agent and refined custom resistance
+  input handling with explicit positive/negative controls.
+- Restricted sheer force and sheer damage to Rupture agents, with regression
+  coverage for non-Rupture agents attempting sheer events.
+- Expanded exact optimizer pruning instrumentation and warmup behavior,
+  including timing metrics, seed cutoffs, skipped bound checks, and a fuzz test
+  comparing exact-super-bound results with exact-legacy results.
+
 ### 2026-06-04 00:46 +08:00
 
 This upload adds or expands these major areas:
@@ -190,6 +211,7 @@ zzz_calculator/
     calculate.js
     drive-disc-analysis.js
     drive-discs.js
+    dialogs.js
     entity-select.js
     accounts.js
     accounts-page.js
@@ -252,6 +274,7 @@ npm run test:anomaly-damage
 npm run test:optimizer
 npm run test:optimizer-progress
 npm run test:optimizer-api
+npm run test:optimizer-fuzz
 npm run test:drive-disc-analysis
 npm run test:drive-disc-import
 npm run test:accounts
@@ -268,9 +291,11 @@ Useful syntax checks:
 ```bash
 node --check backend/calculator.js
 node --check backend/driveDiscAnalysis.js
+node --check backend/driveDiscOptimizer.js
 node --check backend/server.js
 node --check frontend/app.js
 node --check frontend/calculate.js
+node --check frontend/dialogs.js
 node --check frontend/drive-disc-analysis.js
 node --check frontend/drive-discs.js
 node --check frontend/entity-select.js

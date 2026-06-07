@@ -1,4 +1,5 @@
 import { accountLabel, api, currentAccount, loadAccounts } from "./accounts.js"
+import { confirmDialog, promptDialog } from "./dialogs.js"
 import { deleteOwnerSelection, setCurrentAccountId } from "./shared-combat.js"
 
 const els = {
@@ -59,7 +60,13 @@ async function refresh() {
 }
 
 async function addAccount() {
-    const name = window.prompt("账号名称", "新账号")
+    const name = await promptDialog({
+        title: "新增账号",
+        message: "新账号会拥有独立的驱动盘、套装预设和计算状态。",
+        label: "账号名称",
+        value: "新账号",
+        confirmText: "新增账号",
+    })
     if (name === null) {
         return
     }
@@ -77,7 +84,13 @@ async function renameAccount(id) {
     if (!owner) {
         return
     }
-    const name = window.prompt("账号名称", accountLabel(owner))
+    const name = await promptDialog({
+        title: "重命名账号",
+        message: `正在修改「${accountLabel(owner)}」的显示名称。`,
+        label: "账号名称",
+        value: accountLabel(owner),
+        confirmText: "保存名称",
+    })
     if (name === null) {
         return
     }
@@ -104,7 +117,12 @@ async function deleteAccount(id) {
     if (!owner) {
         return
     }
-    const ok = window.confirm(`确认删除账号「${accountLabel(owner)}」？该账号的驱动盘、套装预设和导入记录都会删除。`)
+    const ok = await confirmDialog({
+        title: "删除账号",
+        message: `确认删除「${accountLabel(owner)}」？将删除 ${Number(owner.driveDiscCount ?? 0)} 个驱动盘、${Number(owner.loadoutCount ?? 0)} 个套装预设和 ${Number(owner.importCount ?? 0)} 次导入记录。`,
+        confirmText: "删除账号",
+        tone: "danger",
+    })
     if (!ok) {
         return
     }

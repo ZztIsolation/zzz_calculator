@@ -1398,6 +1398,7 @@ const generatedHitTotal = calculateInCombatPanel(generatedTargetCatalog, minimal
 approx(generatedHitTotal.damage.multipliers.skillMultiplierBonus, 1, "Row target should match generated total source rows")
 
 const sheerBaseInput = {
+    agentId: "yixuan",
     combatBuffs: {
         manualStats: [
             {
@@ -1426,6 +1427,7 @@ const sheerBaseInput = {
             {
                 id: "sheer-base",
                 kind: "sheer",
+                damageElement: "physical",
                 skillMultiplier: 100,
                 critMode: "nonCrit",
             },
@@ -1466,6 +1468,55 @@ assert.ok(
         .every(label => sheerBase.damage.whiteBoxRows.some(row => row.label === label)),
     "Sheer whitebox should expose every required row",
 )
+
+const nonRuptureSheerInput = {
+    agentId: "anby_demara",
+    combatBuffs: {
+        manualStats: [
+            {
+                id: "test-non-rupture-sheer-hp",
+                stat: "hpFlat",
+                value: 1000,
+                mode: "flat",
+            },
+            {
+                id: "test-non-rupture-sheer-atk",
+                stat: "atkFlat",
+                value: 100,
+                mode: "flat",
+            },
+            {
+                id: "test-non-rupture-sheer-force",
+                stat: "sheerForceFlat",
+                value: 50,
+                mode: "flat",
+            },
+        ],
+    },
+    damage: {
+        selectedEventId: "non-rupture-sheer",
+        events: [
+            {
+                id: "non-rupture-sheer",
+                kind: "sheer",
+                skillMultiplier: 100,
+                critMode: "nonCrit",
+            },
+        ],
+        target: {
+            defense: 953,
+            levelCoefficient: 794,
+            resistanceByElement: {
+                electric: 0,
+            },
+        },
+    },
+}
+const nonRuptureSheer = calculateInCombatPanel(catalog, minimalInput(nonRuptureSheerInput))
+approx(nonRuptureSheer.inCombat.panel.sheerForceFlat, 0, "Non-rupture agents should not keep flat sheer force")
+approx(nonRuptureSheer.inCombat.panel.sheerForce, 0, "Non-rupture agents should not derive sheer force from HP or ATK")
+approx(nonRuptureSheer.damage.multipliers.sheerForce, 0, "Non-rupture sheer events should use zero sheer force")
+approx(nonRuptureSheer.damage.finalDamage, 0, "Non-rupture sheer events should deal zero sheer damage")
 
 const sheerHighDefense = calculateInCombatPanel(catalog, minimalInput({
     ...sheerBaseInput,

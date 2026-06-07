@@ -17,6 +17,8 @@ const els = {
     editorTitle: document.getElementById("editorTitle"),
     editorTag: document.getElementById("editorTag"),
     maintenanceFeedback: document.getElementById("maintenanceFeedback"),
+    maintenanceSaveState: document.getElementById("maintenanceSaveState"),
+    maintenanceSaveHint: document.getElementById("maintenanceSaveHint"),
     maintenanceForm: document.getElementById("maintenanceForm"),
     jsonPreview: document.getElementById("jsonPreview"),
 }
@@ -333,6 +335,19 @@ let isRenderingEditor = false
 function setStatus(text, tone = "idle") {
     els.status.textContent = text
     els.status.dataset.tone = tone
+}
+
+function setSaveStrip(state, hint, tone = "idle") {
+    if (els.maintenanceSaveState) {
+        els.maintenanceSaveState.textContent = state
+    }
+    if (els.maintenanceSaveHint) {
+        els.maintenanceSaveHint.textContent = hint
+    }
+    const strip = document.getElementById("maintenanceSaveStrip")
+    if (strip) {
+        strip.dataset.tone = tone
+    }
 }
 
 function setFeedback(title, details = [], tone = "idle") {
@@ -3588,6 +3603,7 @@ function renderAll() {
     selectFirstIfNeeded()
     renderList()
     renderEditor()
+    setSaveStrip("已加载", "修改字段后可在此保存", "idle")
 }
 
 async function loadCatalog() {
@@ -3626,6 +3642,7 @@ async function saveCurrent() {
     renderAll()
     const savedName = nameOf(response.savedItem ?? payload)
     setFeedback(`已保存：${savedName}`, [], "success")
+    setSaveStrip("已保存", `最近保存：${savedName}`, "success")
     setStatus("已保存", "success")
 }
 
@@ -3634,6 +3651,7 @@ function newRecord() {
     createDraft(blankDraftItem(activeKind))
     renderAll()
     setFeedback("已创建本地草稿", ["填写完成并通过校验后，点击保存写入正式数据。"], "success")
+    setSaveStrip("有未保存草稿", "填写完成并通过校验后保存", "idle")
     setStatus("已创建本地草稿", "success")
 }
 
@@ -3656,6 +3674,7 @@ function cloneRecord() {
     createDraft(copy)
     renderAll()
     setFeedback("已复制为本地草稿", ["保存时会由系统生成新的 Buff ID。"], "success")
+    setSaveStrip("有未保存草稿", "确认复制内容后保存", "idle")
     setStatus("已复制为本地草稿", "success")
 }
 
@@ -3690,10 +3709,12 @@ els.newBtn.addEventListener("click", newRecord)
 els.cloneBtn.addEventListener("click", cloneRecord)
 els.maintenanceForm.addEventListener("input", () => {
     clearFeedback()
+    setSaveStrip("有未保存修改", "保存前请留意校验结果", "idle")
     updatePreview()
 })
 els.maintenanceForm.addEventListener("change", event => {
     clearFeedback()
+    setSaveStrip("有未保存修改", "保存前请留意校验结果", "idle")
     if (activeKind === "agentSkills" && event.target.matches("[data-skill-level-min], [data-skill-level-max]")) {
         rerenderSkillCategories()
         updatePreview()
@@ -4035,6 +4056,7 @@ els.maintenanceForm.addEventListener("submit", async event => {
         const details = (error.details ?? String(error.message || error).split("\n").filter(Boolean))
             .map(friendlyValidationMessage)
         setFeedback("保存失败", details, "error")
+        setSaveStrip("保存失败", details[0] ?? "请检查错误汇总", "error")
         setStatus("保存失败", "error")
     }
 })

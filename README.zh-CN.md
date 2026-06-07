@@ -6,6 +6,17 @@
 
 ## 上传更新摘要
 
+### 2026-06-07 21:15 +08:00
+
+本次上传主要更新如下：
+
+- 深化计算器、优化器、驱动盘、账号和维护页的前端可用性：优化空状态、移动端导航、sticky 操作条、优化器运行反馈和技能倍率搜索选择。
+- 新增共享前端弹窗助手，替换账号操作、驱动盘删除/导入同步、套装删除和优化器套装命名中的浏览器原生 prompt/confirm。
+- 首页计算后会同步展示最终伤害摘要，并自动定位到伤害白盒区域，降低结果查找成本。
+- 按角色保存战斗 Buff 勾选状态，并把自定义抗性输入改为明确的正/负号与数值组合。
+- 将贯穿力和贯穿伤害限制为命破角色生效，并补充非命破角色触发贯穿事件时伤害为 0 的回归测试。
+- 扩展精确优化器剪枝与性能指标，增加预热种子分数、计时指标、跳过上界检查统计，以及 exact-super-bound 与 exact-legacy 对齐的 fuzz 测试。
+
 ### 2026-06-04 00:46 +08:00
 
 本次上传主要更新如下：
@@ -118,6 +129,7 @@ zzz_calculator/
     calculate.js
     drive-disc-analysis.js
     drive-discs.js
+    dialogs.js
     entity-select.js
     accounts.js
     accounts-page.js
@@ -171,6 +183,7 @@ npm run test:anomaly-damage
 npm run test:optimizer
 npm run test:optimizer-progress
 npm run test:optimizer-api
+npm run test:optimizer-fuzz
 npm run test:drive-disc-analysis
 npm run test:drive-disc-import
 npm run test:accounts
@@ -187,9 +200,11 @@ npm run benchmark:optimizer
 ```bash
 node --check backend/calculator.js
 node --check backend/driveDiscAnalysis.js
+node --check backend/driveDiscOptimizer.js
 node --check backend/server.js
 node --check frontend/app.js
 node --check frontend/calculate.js
+node --check frontend/dialogs.js
 node --check frontend/drive-disc-analysis.js
 node --check frontend/drive-discs.js
 node --check frontend/entity-select.js

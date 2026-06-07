@@ -101,6 +101,23 @@ const PERCENT_PANEL_STATS = new Set([
     "dmgBonus",
 ])
 
+function nowMs() {
+    return typeof performance !== "undefined" && typeof performance.now === "function"
+        ? performance.now()
+        : Date.now()
+}
+
+function elapsedMsSince(startedAt) {
+    return nowMs() - Number(startedAt ?? nowMs())
+}
+
+function addMetricTime(metrics, key, startedAt) {
+    if (!metrics) {
+        return
+    }
+    metrics[key] = Number(metrics[key] ?? 0) + elapsedMsSince(startedAt)
+}
+
 function normalizeAlgorithm(rawAlgorithm) {
     const raw = String(rawAlgorithm ?? "exact-super-bound").trim() || "exact-super-bound"
     const algorithm = ALGORITHM_ALIASES[raw] ?? raw
@@ -639,6 +656,14 @@ function createEmptySlotResult(settings, candidatesBySlot, emptySlots) {
             evaluated: 0,
             scoredCombinationCount: 0,
             processedCombinationCount: 0,
+            planBuildMs: 0,
+            boundCheckMs: 0,
+            scoreOnlyMs: 0,
+            fullResultMs: 0,
+            warmupMs: 0,
+            seededTopKCount: 0,
+            seededTopKAttempts: 0,
+            skippedDiscBoundChecks: 0,
             rejectedByMinimums: 0,
             prunedBySetFeasibility: 0,
             prunedByUpperBound: 0,
@@ -856,6 +881,72 @@ function optimisticTwoPieceStatEntries(catalog) {
     return [...totals.entries()].map(([stat, value]) => ({ stat, value }))
 }
 
+function optimisticTwoPieceVectors(catalog) {
+    const vectors = []
+    for (const set of catalog.driveDiscSets ?? []) {
+        const entries = optimisticEffectStatEntries(set.twoPiece)
+        if (entries === null) {
+            return null
+        }
+        const vector = new Map()
+        for (const { stat, value } of entries) {
+            addToVector(vector, stat, value)
+        }
+        if (vector.size) {
+            vectors.push({
+                setId: set.id,
+                vector,
+                potential: [...vector.entries()].reduce(
+                    (total, [stat, value]) => total + Number(value) * (DEFAULT_POTENTIAL_WEIGHTS[stat] ?? 0),
+                    0,
+                ),
+            })
+        }
+    }
+    return vectors
+}
+
+function optimisticTwoPieceStatEntriesForSlots(catalog, maxActiveSetCount = 0) {
+    const vectors = optimisticTwoPieceVectors(catalog)
+    if (vectors === null) {
+        return null
+    }
+    const count = Math.max(0, Math.floor(Number(maxActiveSetCount ?? 0)))
+    if (count <= 0 || !vectors.length) {
+        return []
+    }
+
+    const valuesByStat = new Map()
+    for (const item of vectors) {
+        for (const [stat, value] of item.vector.entries()) {
+            if (!valuesByStat.has(stat)) {
+                valuesByStat.set(stat, [])
+            }
+            valuesByStat.get(stat).push(Number(value))
+        }
+    }
+    return [...valuesByStat.entries()].map(([stat, values]) => ({
+        stat,
+        value: values
+            .filter(value => Number.isFinite(value) && value > 0)
+            .sort((left, right) => right - left)
+            .slice(0, count)
+            .reduce((total, value) => total + value, 0),
+    })).filter(item => item.value > 0)
+}
+
+function optimisticTwoPieceStatEntriesByActiveCount(catalog) {
+    const result = {}
+    for (let count = 0; count <= 3; count += 1) {
+        const entries = optimisticTwoPieceStatEntriesForSlots(catalog, count)
+        if (entries === null) {
+            return null
+        }
+        result[String(count)] = entries
+    }
+    return result
+}
+
 function fakeCompletionSetIds(remainingSlots, fourCount, twoCount, settings) {
     const setIds = []
     let nextFourCount = fourCount
@@ -978,6 +1069,13 @@ function needsOptimisticFreeTwoPiece(plan, settings) {
     return !hasTwoPieceLimit(settings) && (SLOT_NUMBERS.length - bitCount(plan.mask)) >= 2
 }
 
+function maxOptimisticFreeTwoPieceCount(plan, settings) {
+    if (!needsOptimisticFreeTwoPiece(plan, settings)) {
+        return 0
+    }
+    return Math.floor((SLOT_NUMBERS.length - bitCount(plan.mask)) / 2)
+}
+
 function suffixSuperVectors(orderedSlots) {
     const suffix = Array.from({ length: orderedSlots.length + 1 }, () => new Map())
     for (let index = orderedSlots.length - 1; index >= 0; index -= 1) {
@@ -1056,10 +1154,15 @@ function buildSuperBoundPlan(plan, state) {
         || left.slot - right.slot
     )
 
+    const maxFreeTwoPieceCount = maxOptimisticFreeTwoPieceCount(plan, state.settings)
     return {
         ...plan,
         completeSetCounts: superPlanSetCounts(plan, state.settings),
-        needsOptimisticFreeTwoPiece: needsOptimisticFreeTwoPiece(plan, state.settings),
+        needsOptimisticFreeTwoPiece: maxFreeTwoPieceCount > 0,
+        maxFreeTwoPieceCount,
+        freeTwoPieceOptimisticEntries: maxFreeTwoPieceCount > 0
+            ? state.optimisticTwoPieceStatEntriesByActiveCount?.[String(maxFreeTwoPieceCount)] ?? null
+            : [],
         orderedSlots,
         suffixSuperVectors: suffixSuperVectors(orderedSlots),
         suffixCandidateProducts: suffixCandidateProducts(orderedSlots),
@@ -1080,34 +1183,47 @@ function buildSuperBoundPlans(state) {
 }
 
 function superBoundScore(state, superPlan, nextOrderIndex, branchSuperVector = null) {
-    if (superPlan.needsOptimisticFreeTwoPiece && !state.optimisticTwoPieceStatEntries) {
+    if (superPlan.needsOptimisticFreeTwoPiece && !superPlan.freeTwoPieceOptimisticEntries) {
         return Number.POSITIVE_INFINITY
     }
 
+    const startedAt = nowMs()
     const statTotals = new Map(state.selectedStatTotals)
-    if (branchSuperVector) {
-        addVectorToTotals(statTotals, branchSuperVector)
-    }
-    addVectorToTotals(statTotals, superPlan.suffixSuperVectors[nextOrderIndex] ?? new Map())
-    if (superPlan.needsOptimisticFreeTwoPiece) {
-        addVectorEntriesToTotals(statTotals, state.optimisticTwoPieceStatEntries)
-    }
+    try {
+        if (branchSuperVector) {
+            addVectorToTotals(statTotals, branchSuperVector)
+        }
+        addVectorToTotals(statTotals, superPlan.suffixSuperVectors[nextOrderIndex] ?? new Map())
+        if (superPlan.needsOptimisticFreeTwoPiece) {
+            addVectorEntriesToTotals(statTotals, superPlan.freeTwoPieceOptimisticEntries)
+        }
 
-    state.metrics.superBoundChecks += 1
-    state.metrics.upperBoundChecks += 1
-    const summary = (state.panelCalculator.scoreOnlyFromSummary ?? state.panelCalculator.scoreFromSummary)
-        .call(state.panelCalculator, statTotals, superPlan.completeSetCounts)
-    if (!passesMinimumPanel(summary.panel, state.settings)) {
-        return Number.NEGATIVE_INFINITY
+        state.metrics.superBoundChecks += 1
+        state.metrics.upperBoundChecks += 1
+        const summary = (state.panelCalculator.scoreOnlyFromSummary ?? state.panelCalculator.scoreFromSummary)
+            .call(state.panelCalculator, statTotals, superPlan.completeSetCounts)
+        if (!passesMinimumPanel(summary.panel, state.settings)) {
+            return Number.NEGATIVE_INFINITY
+        }
+        return Number(summary.finalDamage ?? Number.NEGATIVE_INFINITY)
+    } finally {
+        addMetricTime(state.metrics, "boundCheckMs", startedAt)
     }
-    return Number(summary.finalDamage ?? Number.NEGATIVE_INFINITY)
+}
+
+function pruningCutoffScore(state) {
+    const resultCutoff = state.results.length >= RESULT_LIMIT
+        ? Number(state.results.at(-1)?.score ?? Number.NEGATIVE_INFINITY)
+        : Number.NEGATIVE_INFINITY
+    const seedCutoff = Number(state.seedCutoffScore ?? Number.NEGATIVE_INFINITY)
+    return Math.max(resultCutoff, seedCutoff)
 }
 
 function shouldPruneBySuperBound(state, superPlan, nextOrderIndex, branchSuperVector, prunedLeafCount) {
-    if (!state.settings.enableUpperBoundPruning || state.results.length < RESULT_LIMIT) {
+    if (!state.settings.enableUpperBoundPruning) {
         return false
     }
-    const cutoff = Number(state.results.at(-1)?.score ?? Number.NEGATIVE_INFINITY)
+    const cutoff = pruningCutoffScore(state)
     if (!Number.isFinite(cutoff)) {
         return false
     }
@@ -1160,11 +1276,15 @@ function createOptimizerState(catalog, store, input = {}) {
     const potentialWeights = inferPotentialWeights(panelCalculator)
     sortCandidatesByPotential(candidatesBySlot, candidateData.vectorById, potentialWeights)
     candidatesBySlot = filterCandidatesByPotential(candidatesBySlot, candidateData.vectorById, potentialWeights, settings)
+    const planBuildStartedAt = nowMs()
     const enumerationPlans = buildEnumerationPlans(candidatesBySlot, settings)
+    const planBuildMs = elapsedMsSince(planBuildStartedAt)
     const estimatedCombinationCount = enumerationPlans.reduce(
         (total, plan) => total + Number(plan.combinationCount ?? 0),
         0,
     )
+    const optimisticTwoPieceEntries = optimisticTwoPieceStatEntries(catalog)
+    const optimisticTwoPieceEntriesByActiveCount = optimisticTwoPieceStatEntriesByActiveCount(catalog)
     const state = {
         isEmpty: false,
         startedAtMs: Date.now(),
@@ -1174,13 +1294,16 @@ function createOptimizerState(catalog, store, input = {}) {
         ...candidateData,
         potentialWeights,
         results: [],
+        seedScores: [],
+        seedCutoffScore: Number.NEGATIVE_INFINITY,
         selected: [],
         selectedCalcDiscs: [],
         selectedStatTotals: new Map(),
         selectedSetCounts: new Map(),
         combatBuffs,
         remainingMaxStatEntriesByIndex: maxStatVectorsByRemainingIndex(candidatesBySlot, candidateData.vectorById),
-        optimisticTwoPieceStatEntries: optimisticTwoPieceStatEntries(catalog),
+        optimisticTwoPieceStatEntries: optimisticTwoPieceEntries,
+        optimisticTwoPieceStatEntriesByActiveCount: optimisticTwoPieceEntriesByActiveCount,
         scoreInputBase,
         panelCalculator,
         metrics: {
@@ -1193,6 +1316,14 @@ function createOptimizerState(catalog, store, input = {}) {
             evaluated: 0,
             scoredCombinationCount: 0,
             processedCombinationCount: 0,
+            planBuildMs,
+            boundCheckMs: 0,
+            scoreOnlyMs: 0,
+            fullResultMs: 0,
+            warmupMs: 0,
+            seededTopKCount: 0,
+            seededTopKAttempts: 0,
+            skippedDiscBoundChecks: 0,
             rejectedByMinimums: 0,
             prunedBySetFeasibility: 0,
             prunedByUpperBound: 0,
@@ -1204,7 +1335,9 @@ function createOptimizerState(catalog, store, input = {}) {
         },
     }
     if (usesSuperBoundAlgorithm(settings.algorithm)) {
+        const superPlanBuildStartedAt = nowMs()
         state.superBoundPlans = buildSuperBoundPlans(state)
+        addMetricTime(state.metrics, "planBuildMs", superPlanBuildStartedAt)
         state.metrics.groupPlanCount = state.superBoundPlans.reduce(
             (total, plan) => total + Number(plan.groupCombinationCount ?? 0),
             0,
@@ -1258,8 +1391,14 @@ export function previewDriveDiscOptimization(catalog, store, input = {}) {
 }
 
 function evaluateSelected(catalog, input, state) {
-    const summary = (state.panelCalculator.scoreOnlyFromSummary ?? state.panelCalculator.scoreFromSummary)
-        .call(state.panelCalculator, state.selectedStatTotals, state.selectedSetCounts)
+    const scoreStartedAt = nowMs()
+    let summary
+    try {
+        summary = (state.panelCalculator.scoreOnlyFromSummary ?? state.panelCalculator.scoreFromSummary)
+            .call(state.panelCalculator, state.selectedStatTotals, state.selectedSetCounts)
+    } finally {
+        addMetricTime(state.metrics, "scoreOnlyMs", scoreStartedAt)
+    }
     state.metrics.evaluated += 1
     if (!passesMinimumPanel(summary.panel, state.settings)) {
         state.metrics.rejectedByMinimums += 1
@@ -1280,13 +1419,16 @@ function evaluateSelected(catalog, input, state) {
     }
 
     const calcDiscs = inventoryDiscs.map(disc => state.calcDiscById.get(disc.id) ?? toCalculatorDriveDisc(disc))
+    const fullResultStartedAt = nowMs()
+    const data = state.panelCalculator.calculate(calcDiscs)
+    addMetricTime(state.metrics, "fullResultMs", fullResultStartedAt)
     insertTopResult(state.results, {
         rank: 0,
         score,
         driveDiscIdsBySlot: Object.fromEntries(inventoryDiscs.map(disc => [String(disc.partition), disc.id])),
         driveDiscs: inventoryDiscs,
         setSummary: setSummary(inventoryDiscs, catalog),
-        data: state.panelCalculator.calculate(calcDiscs),
+        data,
     })
 }
 
@@ -1339,6 +1481,71 @@ function popSelectedDisc(state) {
     }
 }
 
+function insertSeedScore(state, score) {
+    if (!Number.isFinite(Number(score))) {
+        return
+    }
+    state.seedScores.push(Number(score))
+    state.seedScores.sort((left, right) => right - left)
+    if (state.seedScores.length > RESULT_LIMIT) {
+        state.seedScores.length = RESULT_LIMIT
+    }
+    state.seedCutoffScore = state.seedScores.length >= RESULT_LIMIT
+        ? Number(state.seedScores.at(-1))
+        : Number.NEGATIVE_INFINITY
+}
+
+function evaluateSelectedForSeedCutoff(state) {
+    const summary = (state.panelCalculator.scoreOnlyFromSummary ?? state.panelCalculator.scoreFromSummary)
+        .call(state.panelCalculator, state.selectedStatTotals, state.selectedSetCounts)
+    if (!passesMinimumPanel(summary.panel, state.settings)) {
+        return
+    }
+    insertSeedScore(state, Number(Number(summary.finalDamage ?? Number.NEGATIVE_INFINITY).toFixed(12)))
+}
+
+function seedTopKCutoffForSuperBound(state, maxAttempts = 512) {
+    if (normalizeAlgorithm(state.settings.algorithm) !== "exact-super-bound" || !state.settings.enableUpperBoundPruning) {
+        return
+    }
+    const startedAt = nowMs()
+    let attempts = 0
+
+    function walkPlan(superPlan, orderIndex) {
+        if (attempts >= maxAttempts || state.seedScores.length >= RESULT_LIMIT) {
+            return
+        }
+        if (orderIndex >= superPlan.orderedSlots.length) {
+            attempts += 1
+            evaluateSelectedForSeedCutoff(state)
+            return
+        }
+
+        const slotEntry = superPlan.orderedSlots[orderIndex]
+        for (const group of slotEntry.groups) {
+            for (const disc of group.discs) {
+                pushSelectedDisc(state, disc)
+                walkPlan(superPlan, orderIndex + 1)
+                popSelectedDisc(state)
+                if (attempts >= maxAttempts || state.seedScores.length >= RESULT_LIMIT) {
+                    return
+                }
+            }
+        }
+    }
+
+    for (const superPlan of state.superBoundPlans ?? []) {
+        walkPlan(superPlan, 0)
+        if (attempts >= maxAttempts || state.seedScores.length >= RESULT_LIMIT) {
+            break
+        }
+    }
+
+    state.metrics.seededTopKCount = state.seedScores.length
+    state.metrics.seededTopKAttempts = attempts
+    addMetricTime(state.metrics, "warmupMs", startedAt)
+}
+
 function optimizeDriveDiscsLegacyExact(catalog, store, input = {}) {
     const state = createOptimizerState(catalog, store, input)
     if (state.isEmpty) {
@@ -1378,6 +1585,7 @@ function optimizeDriveDiscsSuperBoundExact(catalog, store, input = {}) {
     if (state.isEmpty) {
         return finalizeOptimizerResult(state)
     }
+    seedTopKCutoffForSuperBound(state)
 
     function walkPlan(superPlan, orderIndex) {
         if (orderIndex >= superPlan.orderedSlots.length) {
@@ -1395,7 +1603,11 @@ function optimizeDriveDiscsSuperBoundExact(catalog, store, input = {}) {
 
             for (const disc of group.discs) {
                 pushSelectedDisc(state, disc)
-                if (!shouldPruneBySuperBound(state, superPlan, orderIndex + 1, null, remainingProduct)) {
+                const skipDiscBoundCheck = group.discs.length === 1
+                if (skipDiscBoundCheck) {
+                    state.metrics.skippedDiscBoundChecks += 1
+                }
+                if (skipDiscBoundCheck || !shouldPruneBySuperBound(state, superPlan, orderIndex + 1, null, remainingProduct)) {
                     walkPlan(superPlan, orderIndex + 1)
                 }
                 popSelectedDisc(state)
@@ -1553,6 +1765,7 @@ async function optimizeDriveDiscsSuperBoundExactAsync(catalog, store, input = {}
         return finalizeOptimizerResult(state)
     }
 
+    seedTopKCutoffForSuperBound(state)
     await maybeYield(true)
 
     async function walkPlan(superPlan, orderIndex) {
@@ -1574,7 +1787,11 @@ async function optimizeDriveDiscsSuperBoundExactAsync(catalog, store, input = {}
 
             for (const disc of group.discs) {
                 pushSelectedDisc(state, disc)
-                if (shouldPruneBySuperBound(state, superPlan, orderIndex + 1, null, remainingProduct)) {
+                const skipDiscBoundCheck = group.discs.length === 1
+                if (skipDiscBoundCheck) {
+                    state.metrics.skippedDiscBoundChecks += 1
+                }
+                if (!skipDiscBoundCheck && shouldPruneBySuperBound(state, superPlan, orderIndex + 1, null, remainingProduct)) {
                     popSelectedDisc(state)
                     await maybeYield()
                     continue

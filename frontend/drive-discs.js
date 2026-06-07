@@ -1,3 +1,5 @@
+import { confirmDialog } from "./dialogs.js"
+
 const els = {
     status: document.getElementById("status"),
     refreshBtn: document.getElementById("refreshBtn"),
@@ -253,8 +255,17 @@ function availableSets() {
 }
 
 function syncSlotTabs() {
+    const discs = store?.driveDiscs ?? []
+    const countBySlot = new Map()
+    for (const disc of discs) {
+        const slot = String(disc.partition ?? "")
+        countBySlot.set(slot, (countBySlot.get(slot) ?? 0) + 1)
+    }
     for (const button of els.slotTabs.querySelectorAll("button[data-slot]")) {
-        button.classList.toggle("active", button.dataset.slot === els.slotFilter.value)
+        const slot = String(button.dataset.slot ?? "")
+        button.classList.toggle("active", slot === els.slotFilter.value)
+        button.setAttribute("aria-pressed", String(slot === els.slotFilter.value))
+        button.textContent = slot ? `${slot}号位 ${countBySlot.get(slot) ?? 0}` : `全部 ${discs.length}`
     }
 }
 
@@ -670,7 +681,12 @@ async function deleteCurrentLoadout() {
     if (!existing) {
         return
     }
-    const ok = window.confirm(`确认删除套装预设「${existing.name}」？`)
+    const ok = await confirmDialog({
+        title: "删除套装预设",
+        message: `确认删除套装预设「${existing.name}」？这不会删除仓库里的驱动盘。`,
+        confirmText: "删除预设",
+        tone: "danger",
+    })
     if (!ok) {
         return
     }
@@ -772,7 +788,12 @@ async function importScannerFile(file) {
 
     const removeMissing = Boolean(els.removeMissingInput?.checked)
     if (removeMissing) {
-        const ok = window.confirm("确认按本次完整导入删除不存在的驱动盘？这会删除同账号下未出现在文件中的所有驱动盘，并清空相关套装预设槽位。")
+        const ok = await confirmDialog({
+            title: "同步删除缺失驱动盘",
+            message: `本次导入会按「${file.name}」进行完整同步，删除当前账号下未出现在文件中的驱动盘，并清空相关套装预设槽位。`,
+            confirmText: "继续同步删除",
+            tone: "danger",
+        })
         if (!ok) {
             return false
         }
@@ -796,7 +817,12 @@ async function clearInventory() {
     const driveDiscCount = store?.driveDiscs?.length ?? 0
     const importCount = store?.imports?.length ?? 0
     const loadoutCount = store?.driveDiscLoadouts?.length ?? 0
-    const ok = window.confirm(`确认清空驱动盘仓库？将删除 ${driveDiscCount} 个驱动盘、${importCount} 次导入记录和 ${loadoutCount} 个套装预设。维护界面的驱动盘资料不会受影响。`)
+    const ok = await confirmDialog({
+        title: "清空驱动盘仓库",
+        message: `将删除 ${driveDiscCount} 个驱动盘、${importCount} 次导入记录和 ${loadoutCount} 个套装预设。维护界面的驱动盘资料不会受影响。`,
+        confirmText: "清空仓库",
+        tone: "danger",
+    })
     if (!ok) {
         return false
     }
@@ -833,7 +859,12 @@ async function deleteCurrentDisc() {
         return
     }
 
-    const ok = window.confirm(`确认删除 ${disc.setName} ${disc.partition}号位？`)
+    const ok = await confirmDialog({
+        title: "删除驱动盘",
+        message: `确认删除「${disc.setName} ${disc.partition}号位」？相关套装预设中的槽位会被清理。`,
+        confirmText: "删除驱动盘",
+        tone: "danger",
+    })
     if (!ok) {
         return
     }

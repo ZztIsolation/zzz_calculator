@@ -25,6 +25,11 @@ const subStatPool = [
     "anomalyProficiency",
     "atkFlat",
 ]
+const scales = [
+    { id: "small", variantsPerSetSlot: 3 },
+    { id: "medium", variantsPerSetSlot: 4 },
+    { id: "large", variantsPerSetSlot: 5 },
+]
 
 function disc(id, setId, partition, variant) {
     return {
@@ -66,20 +71,21 @@ function disc(id, setId, partition, variant) {
     }
 }
 
-const driveDiscs = []
-for (const slot of [1, 2, 3, 4, 5, 6]) {
-    for (let variant = 0; variant < 4; variant += 1) {
-        driveDiscs.push(disc(`f${slot}-${variant}`, fourSet, slot, variant))
-        driveDiscs.push(disc(`h${slot}-${variant}`, twoSet, slot, variant + 8))
+function benchmarkStore(variantsPerSetSlot) {
+    const driveDiscs = []
+    for (const slot of [1, 2, 3, 4, 5, 6]) {
+        for (let variant = 0; variant < variantsPerSetSlot; variant += 1) {
+            driveDiscs.push(disc(`f${slot}-${variant}`, fourSet, slot, variant))
+            driveDiscs.push(disc(`h${slot}-${variant}`, twoSet, slot, variant + variantsPerSetSlot))
+        }
     }
-}
-
-const store = {
-    version: 1,
-    owners: [{ id: "default", label: "默认用户" }],
-    imports: [],
-    driveDiscLoadouts: [],
-    driveDiscs,
+    return {
+        version: 1,
+        owners: [{ id: "default", label: "默认用户" }],
+        imports: [],
+        driveDiscLoadouts: [],
+        driveDiscs,
+    }
 }
 
 function optimizerInput(algorithm) {
@@ -96,38 +102,72 @@ function optimizerInput(algorithm) {
             twoPieceSetId: twoSet,
             objective: "damage",
             algorithm,
+            ...(algorithm === "exact-legacy" ? { enableUpperBoundPruning: false } : {}),
         },
     }
 }
 
-function runBenchmark(algorithm) {
+function runBenchmark(scale, store, algorithm) {
     const started = performance.now()
     const result = optimizeDriveDiscs(catalog, store, optimizerInput(algorithm))
     const elapsedMs = performance.now() - started
     return {
+        scale: scale.id,
         algorithm,
         elapsedMs,
-        topScore: result.results[0]?.score ?? 0,
+        top: result.results.map(item => ({
+            ids: item.driveDiscs.map(disc => disc.id).join("|"),
+            score: Number(item.score.toFixed(6)),
+        })),
         metrics: result.metrics,
     }
 }
 
-const legacy = runBenchmark("exact-legacy")
-const superBound = runBenchmark("exact-super-bound")
+function assertTopMatches(scale, legacy, superBound) {
+    const legacyScores = legacy.top.map(item => item.score)
+    const superBoundScores = superBound.top.map(item => item.score)
+    if (JSON.stringify(legacyScores) !== JSON.stringify(superBoundScores)) {
+        throw new Error([
+            `exact-super-bound Top5 scores do not match exact-legacy for ${scale.id}`,
+            `legacy=${JSON.stringify(legacy.top)}`,
+            `superBound=${JSON.stringify(superBound.top)}`,
+            `metrics=${JSON.stringify(superBound.metrics)}`,
+        ].join("\n"))
+    }
+}
 
-const rows = [legacy, superBound].map(item => ({
-    algorithm: item.algorithm,
-    strictExact: item.metrics.strictExact,
-    elapsedMs: Math.round(item.elapsedMs),
-    evaluated: item.metrics.processedCombinationCount ?? (item.metrics.evaluated + (item.metrics.prunedBySuperBound ?? 0)),
-    scored: item.metrics.scoredCombinationCount ?? item.metrics.evaluated,
-    evalPerSecond: Math.round(item.metrics.evaluationsPerSecond ?? 0),
-    prunedBySuperBound: item.metrics.prunedBySuperBound ?? 0,
-    superBoundChecks: item.metrics.superBoundChecks ?? 0,
-    topScore: Math.round(item.topScore),
-}))
+function row(item) {
+    const metrics = item.metrics
+    return {
+        scale: item.scale,
+        algorithm: item.algorithm,
+        strictExact: metrics.strictExact,
+        elapsedMs: Math.round(item.elapsedMs),
+        evaluated: metrics.processedCombinationCount ?? (metrics.evaluated + (metrics.prunedBySuperBound ?? 0)),
+        scored: metrics.scoredCombinationCount ?? metrics.evaluated,
+        evalPerSecond: Math.round(metrics.evaluationsPerSecond ?? 0),
+        planBuildMs: Number(metrics.planBuildMs ?? 0).toFixed(1),
+        boundCheckMs: Number(metrics.boundCheckMs ?? 0).toFixed(1),
+        scoreOnlyMs: Number(metrics.scoreOnlyMs ?? 0).toFixed(1),
+        fullResultMs: Number(metrics.fullResultMs ?? 0).toFixed(1),
+        warmupMs: Number(metrics.warmupMs ?? 0).toFixed(1),
+        superBoundChecks: metrics.superBoundChecks ?? 0,
+        prunedBySuperBound: metrics.prunedBySuperBound ?? 0,
+        skippedDiscBoundChecks: metrics.skippedDiscBoundChecks ?? 0,
+        topScore: Math.round(item.top[0]?.score ?? 0),
+    }
+}
+
+const rows = []
+for (const scale of scales) {
+    const store = benchmarkStore(scale.variantsPerSetSlot)
+    const legacy = runBenchmark(scale, store, "exact-legacy")
+    const superBound = runBenchmark(scale, store, "exact-super-bound")
+    assertTopMatches(scale, legacy, superBound)
+    if (scale.id === "medium" && superBound.elapsedMs > legacy.elapsedMs) {
+        throw new Error(`exact-super-bound should not be slower than exact-legacy on medium benchmark (${superBound.elapsedMs.toFixed(1)}ms > ${legacy.elapsedMs.toFixed(1)}ms)`)
+    }
+    rows.push(row(legacy), row(superBound))
+}
 
 console.table(rows)
-if (Math.abs(legacy.topScore - superBound.topScore) > 1e-6) {
-    throw new Error("exact-super-bound top score does not match exact-legacy")
-}

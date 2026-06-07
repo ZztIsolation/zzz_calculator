@@ -6,6 +6,7 @@ import {
 } from "./skillMultiplierCandidates.js"
 import * as SharedCombat from "./shared-combat.js"
 import { createImageSelect } from "./entity-select.js"
+import { promptDialog } from "./dialogs.js"
 import { initDriveDiscAnalysis } from "./drive-disc-analysis.js"
 
 const els = {
@@ -52,12 +53,15 @@ const els = {
     damageLevelCoefficient: document.getElementById("damageLevelCoefficient"),
     damageTargetResistancePreset: document.getElementById("damageTargetResistancePreset"),
     damageTargetResistanceLabel: document.getElementById("damageTargetResistanceLabel"),
+    damageTargetResistanceCustom: document.getElementById("damageTargetResistanceCustom"),
+    damageTargetResistanceSign: document.getElementById("damageTargetResistanceSign"),
     damageTargetResistance: document.getElementById("damageTargetResistance"),
     damageSkillMultiplier: document.getElementById("damageSkillMultiplier"),
     openDamageSkillModalBtn: document.getElementById("openDamageSkillModalBtn"),
     damageSkillSummary: document.getElementById("damageSkillSummary"),
     damageSkillModal: document.getElementById("damageSkillModal"),
     closeDamageSkillModalBtn: document.getElementById("closeDamageSkillModalBtn"),
+    damageSkillSearchInput: document.getElementById("damageSkillSearchInput"),
     damageSkillModalList: document.getElementById("damageSkillModalList"),
     damageSkillModalEmpty: document.getElementById("damageSkillModalEmpty"),
     damageCritMode: document.getElementById("damageCritMode"),
@@ -111,6 +115,14 @@ const els = {
     optimizeBtn: document.getElementById("optimizeBtn"),
     cancelOptimizeBtn: document.getElementById("cancelOptimizeBtn"),
     optimizerMetrics: document.getElementById("optimizerMetrics"),
+    optimizerRunSummary: document.getElementById("optimizerRunSummary"),
+    optimizerRunProgress: document.getElementById("optimizerRunProgress"),
+    optimizerRunProgressFill: document.getElementById("optimizerRunProgressFill"),
+    optimizerRunPercent: document.getElementById("optimizerRunPercent"),
+    optimizerRunMeta: document.getElementById("optimizerRunMeta"),
+    optimizerRunNote: document.getElementById("optimizerRunNote"),
+    optimizeInlineBtn: document.getElementById("optimizeInlineBtn"),
+    cancelOptimizeInlineBtn: document.getElementById("cancelOptimizeInlineBtn"),
     optimizerProgress: document.getElementById("optimizerProgress"),
     optimizerProgressFill: document.getElementById("optimizerProgressFill"),
     optimizerProgressPercent: document.getElementById("optimizerProgressPercent"),
@@ -206,6 +218,8 @@ const SKILL_CATEGORY_ORDER = [
     ["chain", "连携技", "chainSkillLevelSelect"],
 ]
 const RESISTANCE_PRESET_VALUES = new Set(["-20", "0", "20"])
+const CUSTOM_RESISTANCE_MIN = 0
+const CUSTOM_RESISTANCE_MAX = 100
 const ENUM_LABELS = {
     attribute: {
         physical: "物理",
@@ -363,11 +377,13 @@ let optimizationResultsDirty = false
 let damagePreviewRequestSeq = 0
 let activeCombatBuffTab = "agent"
 let activeCombatBuffTeammateId = ""
+let renderedCombatBuffAgentId = ""
 const manuallyUncheckedDefaultCombatBuffIds = new Set()
 const damageTargetResistanceByElement = Object.fromEntries(DAMAGE_ELEMENTS.map(element => [element, 0]))
 let activeDamageResistanceElement = "physical"
 let selectedDamageSkillRef = null
 let activeDamageSkillPickerMoveRef = null
+let damageSkillSearchQuery = ""
 let damageSkillLevelsByCategory = {}
 let calculationConfigMode = "single"
 let calculationConfigEvents = []
@@ -419,11 +435,43 @@ function formatRate(value) {
 }
 
 function setOptimizeButtonRunning(isRunning, label = "") {
-    els.optimizeBtn.disabled = isRunning
-    els.optimizeBtn.textContent = label || (isRunning ? "计算中" : "开始计算")
-    els.optimizeBtn.dataset.running = isRunning ? "true" : "false"
-    els.cancelOptimizeBtn.hidden = !isRunning
-    els.cancelOptimizeBtn.disabled = false
+    for (const button of [els.optimizeBtn, els.optimizeInlineBtn].filter(Boolean)) {
+        button.disabled = isRunning
+        button.textContent = label || (isRunning ? "计算中" : "开始计算")
+        button.dataset.running = isRunning ? "true" : "false"
+    }
+    for (const button of [els.cancelOptimizeBtn, els.cancelOptimizeInlineBtn].filter(Boolean)) {
+        button.hidden = !isRunning
+        button.disabled = false
+    }
+}
+
+function setRunSummaryVisible(visible) {
+    if (els.optimizerRunSummary) {
+        els.optimizerRunSummary.dataset.active = visible ? "true" : "false"
+    }
+}
+
+function updateRunSummary({ percent = 0, meta = "", note = "", fillPercent = percent, status = "", showProgress = true } = {}) {
+    if (!els.optimizerRunSummary) {
+        return
+    }
+    setRunSummaryVisible(true)
+    if (els.optimizerRunProgress) {
+        els.optimizerRunProgress.hidden = !showProgress
+    }
+    if (els.optimizerRunProgressFill) {
+        els.optimizerRunProgressFill.style.width = `${Math.max(0, Math.min(100, Number(fillPercent ?? 0)))}%`
+    }
+    if (els.optimizerRunPercent) {
+        els.optimizerRunPercent.textContent = formatPercent(percent)
+    }
+    if (els.optimizerRunMeta) {
+        els.optimizerRunMeta.textContent = meta || status || "准备计算"
+    }
+    if (els.optimizerRunNote) {
+        els.optimizerRunNote.textContent = note || status || "等待开始"
+    }
 }
 
 function stopOptimizationTimers() {
@@ -561,14 +609,15 @@ function renderOptimizationProgress(job = {}) {
     const candidateText = Object.keys(candidateCounts).length
         ? `候选 ${Object.entries(candidateCounts).map(([slot, count]) => `${slot}号位 ${formatCount(count)}`).join(" / ")}`
         : ""
-    els.optimizerProgressNote.textContent = [
+    const progressNote = [
         progressTextForStatus(merged.status),
         algorithmProgressText(metrics),
         candidateText,
         complexityText(metrics, merged.settings),
         appliedPreferredText(merged.settings),
     ].filter(Boolean).join(" · ")
-    els.optimizerMetrics.textContent = estimated
+    els.optimizerProgressNote.textContent = progressNote
+    const metricsText = estimated
         ? [
             formatPercent(percent),
             `${formatCount(evaluated)} / ${formatCount(estimated)}`,
@@ -576,6 +625,14 @@ function renderOptimizationProgress(job = {}) {
             Number(metrics.prunedBySuperBound ?? 0) > 0 ? `剪枝 ${formatCount(metrics.prunedBySuperBound)}` : "",
         ].filter(Boolean).join(" · ")
         : progressTextForStatus(merged.status)
+    els.optimizerMetrics.textContent = metricsText
+    updateRunSummary({
+        percent,
+        fillPercent: percent,
+        meta: metricsText,
+        note: progressNote,
+        status: progressTextForStatus(merged.status),
+    })
 }
 
 function clearOptimizationProgress() {
@@ -592,6 +649,15 @@ function clearOptimizationProgress() {
     els.optimizerEvaluated.textContent = "已评估 0"
     els.optimizerEstimate.textContent = "估算 0"
     els.optimizerProgressNote.textContent = "等待开始"
+    updateRunSummary({
+        percent: 0,
+        fillPercent: 0,
+        meta: "未计算",
+        note: "设置好目标和约束后开始计算",
+        status: "未计算",
+        showProgress: false,
+    })
+    setRunSummaryVisible(false)
     setOptimizeButtonRunning(false)
 }
 
@@ -675,6 +741,7 @@ function saveSyncedConfig() {
         cinemaLevel: selectedCinemaLevel(),
         combat: {
             ...((byAgent[agentId] ?? {}).combat ?? {}),
+            activeBuffIds: [...checkedCombatBuffIds()],
             addedBuffs: ((byAgent[agentId] ?? {}).combat?.addedBuffs ?? []),
         },
         damage: collectDamageConfig(),
@@ -1221,8 +1288,13 @@ function isDefaultSingleDamageConfig(config = null) {
 
 function damageConfigForAgent(agentId, storedDamageConfig = null) {
     const adminConfig = adminDefaultDamageConfigForAgent(agentId)
-    if (adminConfig.events?.length && isDefaultSingleDamageConfig(storedDamageConfig)) {
-        return adminConfig
+    if (adminConfig.events?.length) {
+        return {
+            ...(storedDamageConfig ?? {}),
+            mode: adminConfig.mode,
+            selectedEventId: adminConfig.selectedEventId,
+            events: adminConfig.events,
+        }
     }
     return storedDamageConfig ?? adminConfig
 }
@@ -1387,7 +1459,7 @@ function collectDamageTargetConfig() {
         levelCoefficient: Number(els.damageLevelCoefficient?.value || DEFAULT_DAMAGE_LEVEL_COEFFICIENT),
         resistanceByElement: {
             ...damageTargetResistanceByElement,
-            [damageElement]: Number(els.damageTargetResistance?.value || 0),
+            [damageElement]: damageResistanceControlValue(),
         },
     }
 }
@@ -1584,6 +1656,13 @@ function resolveDamageSkillRef(ref = null) {
 }
 
 function renderDamageSkillSummary() {
+    if (!damageSkillCategories(agentSkillCatalog()).length) {
+        selectedDamageSkillRef = null
+        if (els.damageSkillSummary) {
+            els.damageSkillSummary.textContent = "当前角色暂无技能倍率资料，可手填倍率"
+        }
+        return
+    }
     const resolved = resolveDamageSkillRef(selectedDamageSkillRef)
     if (!resolved) {
         selectedDamageSkillRef = null
@@ -1680,11 +1759,32 @@ function renderDamageSkillModal() {
     if (!els.damageSkillModalList || !els.damageSkillModalEmpty) {
         return
     }
-    const categories = damageSkillCategories(agentSkillCatalog())
+    const allCategories = damageSkillCategories(agentSkillCatalog())
+    const query = damageSkillSearchQuery.trim().toLowerCase()
+    const categories = query
+        ? allCategories.map(category => ({
+            ...category,
+            moves: (category.moves ?? []).filter(move => {
+                const level = selectedSkillLevel(category)
+                const rowText = (move.rows ?? []).map(row => {
+                    const value = skillRowValue(category, move, row, level)
+                    return `${localizedText(row.label) || row.id} ${Number.isFinite(value) ? value : ""}`
+                }).join(" ")
+                return `${nameOf(category)} ${nameOf(move)} ${rowText}`.toLowerCase().includes(query)
+            }),
+        })).filter(category => (category.moves ?? []).length)
+        : allCategories
+    if (els.damageSkillSearchInput && els.damageSkillSearchInput.value !== damageSkillSearchQuery) {
+        els.damageSkillSearchInput.value = damageSkillSearchQuery
+    }
     els.damageSkillModalList.innerHTML = ""
     els.damageSkillModalEmpty.hidden = categories.length > 0
     if (!categories.length) {
         activeDamageSkillPickerMoveRef = null
+        const emptyText = els.damageSkillModalEmpty.querySelector("span")
+        if (emptyText) {
+            emptyText.textContent = query ? "没有匹配的技能倍率" : "当前角色暂无可选择的技能倍率"
+        }
         return
     }
 
@@ -2327,7 +2427,7 @@ function applyStoredDamageConfig(config = {}) {
     els.damageTargetPreset.value = target.presetId ?? DEFAULT_DAMAGE_TARGET_PRESET_ID
     els.damageTargetDefense.value = target.defense ?? damageTargetPresetById(els.damageTargetPreset.value)?.defense ?? 953
     els.damageLevelCoefficient.value = target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT
-    els.damageTargetResistance.value = damageTargetResistanceByElement[damageElement] ?? 0
+    setDamageResistanceControlValue(damageTargetResistanceByElement[damageElement] ?? 0)
     if (["direct", "sheer"].includes(selectedEvent.kind)) {
         els.damageSkillMultiplier.value = selectedEvent.skillMultiplier ?? config.skillMultiplier ?? 100
         els.damageCritMode.value = selectedEvent.critMode ?? config.critMode ?? "expected"
@@ -2387,40 +2487,93 @@ function syncDamagePresetFromDefense() {
     }
 }
 
+function clampCustomResistanceMagnitude(value) {
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric)) {
+        return 0
+    }
+    return Math.min(CUSTOM_RESISTANCE_MAX, Math.max(CUSTOM_RESISTANCE_MIN, Math.abs(numeric)))
+}
+
+function setDamageResistanceControlValue(value = 0) {
+    if (!els.damageTargetResistance) {
+        return
+    }
+    const numeric = Number(value)
+    const clamped = Number.isFinite(numeric)
+        ? Math.min(CUSTOM_RESISTANCE_MAX, Math.max(-CUSTOM_RESISTANCE_MAX, numeric))
+        : 0
+    if (els.damageTargetResistanceSign) {
+        els.damageTargetResistanceSign.value = clamped < 0 ? "-1" : "1"
+    }
+    els.damageTargetResistance.value = String(Number(Math.abs(clamped).toFixed(3)))
+}
+
+function damageResistanceControlValue() {
+    if (!els.damageTargetResistance) {
+        return 0
+    }
+    const magnitude = clampCustomResistanceMagnitude(els.damageTargetResistance.value)
+    if (Number(els.damageTargetResistance.value) !== magnitude) {
+        els.damageTargetResistance.value = String(Number(magnitude.toFixed(3)))
+    }
+    const sign = els.damageTargetResistanceSign?.value === "-1" ? -1 : 1
+    return magnitude === 0 ? 0 : sign * magnitude
+}
+
+function setDamageResistanceCustomHidden(hidden) {
+    if (els.damageTargetResistanceCustom) {
+        els.damageTargetResistanceCustom.hidden = hidden
+        return
+    }
+    if (els.damageTargetResistance) {
+        els.damageTargetResistance.hidden = hidden
+    }
+}
+
 function persistCurrentDamageResistanceInput() {
     if (!activeDamageResistanceElement) {
         activeDamageResistanceElement = currentDamageElement()
     }
-    damageTargetResistanceByElement[activeDamageResistanceElement] = Number(els.damageTargetResistance.value || 0)
+    damageTargetResistanceByElement[activeDamageResistanceElement] = damageResistanceControlValue()
 }
 
-function syncDamageResistancePresetFromValue() {
-    const value = String(Number(els.damageTargetResistance.value || 0))
+function syncDamageResistancePresetFromValue({ forceCustom = false } = {}) {
+    const value = String(Number(damageResistanceControlValue().toFixed(3)))
     let matched = false
     for (const button of els.damageTargetResistancePreset.querySelectorAll("[data-resistance-preset]")) {
         const preset = button.dataset.resistancePreset
-        const active = preset !== "custom" && String(Number(preset)) === value
+        const active = !forceCustom && preset !== "custom" && String(Number(preset)) === value
         button.classList.toggle("active", active)
+        button.setAttribute("aria-pressed", String(active))
         matched = matched || active
     }
     const customButton = els.damageTargetResistancePreset.querySelector("[data-resistance-preset='custom']")
     if (customButton) {
         customButton.classList.toggle("active", !matched)
+        customButton.setAttribute("aria-pressed", String(!matched))
     }
-    els.damageTargetResistance.hidden = matched
+    setDamageResistanceCustomHidden(matched)
 }
 
 function syncDamageResistanceToPreset(value) {
     if (value === "custom") {
-        els.damageTargetResistance.hidden = false
+        const currentValue = damageResistanceControlValue()
+        const normalized = Number.isFinite(currentValue) ? String(Number(currentValue.toFixed(3))) : "custom"
+        if (!Number.isFinite(currentValue) || RESISTANCE_PRESET_VALUES.has(normalized)) {
+            setDamageResistanceControlValue(0)
+        } else {
+            setDamageResistanceControlValue(currentValue)
+        }
+        persistCurrentDamageResistanceInput()
+        syncDamageResistancePresetFromValue({ forceCustom: true })
         els.damageTargetResistance.focus()
-        syncDamageResistancePresetFromValue()
         return
     }
     if (!RESISTANCE_PRESET_VALUES.has(String(value))) {
         return
     }
-    els.damageTargetResistance.value = Number(value)
+    setDamageResistanceControlValue(Number(value))
     persistCurrentDamageResistanceInput()
     syncDamageResistancePresetFromValue()
 }
@@ -2428,7 +2581,7 @@ function syncDamageResistanceToPreset(value) {
 function syncDamageResistanceControlsToAgent() {
     const element = currentDamageElement()
     activeDamageResistanceElement = element
-    els.damageTargetResistance.value = damageTargetResistanceByElement[element] ?? 0
+    setDamageResistanceControlValue(damageTargetResistanceByElement[element] ?? 0)
     if (els.damageTargetResistanceLabel) {
         els.damageTargetResistanceLabel.textContent = `Boss ${damageElementShortLabel(element)}抗性`
     }
@@ -2904,6 +3057,11 @@ function currentAddedCombatBuffs() {
     return combatConfigForAgent(els.agentSelect.value).addedBuffs.filter(item => !isDriveDiscAddedBuff(item))
 }
 
+function savedActiveCombatBuffIds(agentId = els.agentSelect.value) {
+    const ids = configForAgent(agentId).combat?.activeBuffIds
+    return Array.isArray(ids) ? new Set(ids) : null
+}
+
 function hiddenDriveDiscAddedBuffs() {
     return combatConfigForAgent(els.agentSelect.value).addedBuffs.filter(isDriveDiscAddedBuff)
 }
@@ -2925,6 +3083,7 @@ function saveCurrentAddedCombatBuffs(addedBuffs) {
         ...previous,
         combat: {
             ...(previous.combat ?? {}),
+            activeBuffIds: [...checkedCombatBuffIds()],
             addedBuffs: sanitizeAddedCombatBuffs([...hidden, ...addedBuffs])
                 .filter(item => isDriveDiscAddedBuff(item) || isResolvableAddedCombatBuff(item)),
         },
@@ -3330,6 +3489,22 @@ function checkedCombatBuffIds() {
     )
 }
 
+function activeCombatBuffIdsForRender() {
+    const agentId = els.agentSelect?.value ?? ""
+    const inputs = [...els.combatSection.querySelectorAll("input[data-combat-buff-id]")]
+    if (inputs.length > 0 && renderedCombatBuffAgentId === agentId) {
+        return {
+            checkedIds: checkedCombatBuffIds(),
+            useDefaultChecked: false,
+        }
+    }
+    const savedIds = savedActiveCombatBuffIds(agentId)
+    return {
+        checkedIds: savedIds ?? new Set(),
+        useDefaultChecked: !savedIds,
+    }
+}
+
 function isDefaultCheckedCombatBuff(buff) {
     if (buff?.defaultChecked === false) {
         return false
@@ -3340,7 +3515,7 @@ function isDefaultCheckedCombatBuff(buff) {
     return DEFAULT_CHECKED_COMBAT_SOURCE_TYPES.has(buff?.sourceType)
 }
 
-function renderCombatCheckboxList(container, buffs, checkedIds = checkedCombatBuffIds()) {
+function renderCombatCheckboxList(container, buffs, checkedIds = checkedCombatBuffIds(), { useDefaultChecked = true } = {}) {
     container.innerHTML = ""
     if (!buffs.length) {
         const empty = document.createElement("div")
@@ -3352,7 +3527,7 @@ function renderCombatCheckboxList(container, buffs, checkedIds = checkedCombatBu
 
     for (const buff of buffs) {
         const checked = checkedIds.has(buff.id)
-            || (isDefaultCheckedCombatBuff(buff) && !manuallyUncheckedDefaultCombatBuffIds.has(buff.id))
+            || (useDefaultChecked && isDefaultCheckedCombatBuff(buff) && !manuallyUncheckedDefaultCombatBuffIds.has(buff.id))
         const row = document.createElement("label")
         row.className = checked ? "combat-check-row active" : "combat-check-row"
         const input = document.createElement("input")
@@ -3818,7 +3993,7 @@ async function commitGenericNumberInput(input) {
         }
         if (input === els.damageTargetResistance) {
             persistCurrentDamageResistanceInput()
-            syncDamageResistancePresetFromValue()
+            syncDamageResistancePresetFromValue({ forceCustom: !els.damageTargetResistanceCustom?.hidden })
         }
         await refreshAfterConfigChange()
         setStatus(message, "error")
@@ -3829,19 +4004,20 @@ async function commitGenericNumberInput(input) {
     }
     if (input === els.damageTargetResistance) {
         persistCurrentDamageResistanceInput()
-        syncDamageResistancePresetFromValue()
+        syncDamageResistancePresetFromValue({ forceCustom: !els.damageTargetResistanceCustom?.hidden })
     }
     await refreshAfterConfigChange()
     return true
 }
 
 function renderCombatControls() {
-    const checkedIds = checkedCombatBuffIds()
-    renderCombatCheckboxList(els.selfCombatBuffs, [...agentCombatBuffs(), ...combatBuffsByType("self")], checkedIds)
-    renderCombatCheckboxList(els.wEngineCombatBuffs, wEngineEquippedBuffs(), checkedIds)
+    const { checkedIds, useDefaultChecked } = activeCombatBuffIdsForRender()
+    renderCombatCheckboxList(els.selfCombatBuffs, [...agentCombatBuffs(), ...combatBuffsByType("self")], checkedIds, { useDefaultChecked })
+    renderCombatCheckboxList(els.wEngineCombatBuffs, wEngineEquippedBuffs(), checkedIds, { useDefaultChecked })
     renderAddedCombatBuffs()
     renderCatalogCombatBuffCards(els.bossCombatBuffs, combatBuffsByType("boss"), checkedIds)
     renderCatalogCombatBuffCards(els.fieldCombatBuffs, combatBuffsByType("field"), checkedIds)
+    renderedCombatBuffAgentId = els.agentSelect?.value ?? ""
 }
 
 function collectManualStats() {
@@ -4864,7 +5040,9 @@ async function cancelActiveOptimization({ silent = false } = {}) {
     }
     stopOptimizationTimers()
     setOptimizeButtonRunning(true, "取消中")
-    els.cancelOptimizeBtn.disabled = true
+    for (const button of [els.cancelOptimizeBtn, els.cancelOptimizeInlineBtn].filter(Boolean)) {
+        button.disabled = true
+    }
     renderOptimizationProgress({
         status: "canceling",
         elapsedMs: Date.now() - optimizationStartedAt,
@@ -4898,6 +5076,13 @@ async function cancelActiveOptimization({ silent = false } = {}) {
         if (!silent) {
             els.optimizerMetrics.textContent = "已取消"
             els.optimizerProgressNote.textContent = "计算已取消"
+            updateRunSummary({
+                percent: lastOptimizationProgress?.percent ?? 0,
+                fillPercent: lastOptimizationProgress?.percent ?? 0,
+                meta: "已取消",
+                note: "计算已取消",
+                status: "已取消",
+            })
             setStatus("已取消", "idle")
         }
     })()
@@ -4982,7 +5167,13 @@ async function saveActiveLoadout() {
     const agentId = lastCompletedOptimizationAgentId ?? els.agentSelect.value
     const agentName = nameOf(getAgent(agentId))
     const defaultName = `${agentName}-${Number(result.score.toFixed(0))}-第${result.rank}名`
-    const name = window.prompt("套装名称", defaultName)
+    const name = await promptDialog({
+        title: "保存优化结果",
+        message: `将第 ${result.rank} 名结果保存为「${agentName}」的套装预设。`,
+        label: "套装名称",
+        value: defaultName,
+        confirmText: "保存套装",
+    })
     if (name === null) {
         return
     }
@@ -5251,6 +5442,10 @@ els.combatSection.addEventListener("change", async event => {
         if (event.target === els.damageTargetPreset) {
             syncDamageDefenseToPreset()
         }
+        if (event.target === els.damageTargetResistanceSign) {
+            persistCurrentDamageResistanceInput()
+            syncDamageResistancePresetFromValue({ forceCustom: true })
+        }
         syncCalculationConfigSummary()
         await refreshAfterConfigChange()
     } catch (error) {
@@ -5304,7 +5499,7 @@ els.combatSection.addEventListener("input", event => {
     }
     if (event.target === els.damageTargetResistance) {
         persistCurrentDamageResistanceInput()
-        syncDamageResistancePresetFromValue()
+        syncDamageResistancePresetFromValue({ forceCustom: !els.damageTargetResistanceCustom?.hidden })
     }
     try {
         saveSyncedConfig()
@@ -5456,6 +5651,10 @@ els.addedCombatBuffs.addEventListener("keydown", async event => {
 })
 els.openDamageSkillModalBtn?.addEventListener("click", openDamageSkillModal)
 els.closeDamageSkillModalBtn?.addEventListener("click", closeDamageSkillModal)
+els.damageSkillSearchInput?.addEventListener("input", event => {
+    damageSkillSearchQuery = event.target.value
+    renderDamageSkillModal()
+})
 els.openCalculationConfigBtn?.addEventListener("click", openCalculationConfigModal)
 els.closeCalculationConfigModalBtn?.addEventListener("click", closeCalculationConfigModal)
 els.calculationConfigModal?.addEventListener("click", async event => {
@@ -5778,7 +5977,24 @@ els.optimizeBtn.addEventListener("click", async () => {
         setStatus(error.message, "error")
     }
 })
+els.optimizeInlineBtn?.addEventListener("click", async () => {
+    try {
+        await runOptimization()
+    } catch (error) {
+        stopOptimizationTimers()
+        activeOptimizationJobId = null
+        setOptimizeButtonRunning(false)
+        setStatus(error.message, "error")
+    }
+})
 els.cancelOptimizeBtn.addEventListener("click", async () => {
+    try {
+        await cancelActiveOptimization()
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
+})
+els.cancelOptimizeInlineBtn?.addEventListener("click", async () => {
     try {
         await cancelActiveOptimization()
     } catch (error) {

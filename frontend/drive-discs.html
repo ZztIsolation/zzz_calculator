@@ -20,7 +20,7 @@
       <nav class="side-nav">
         <a href="/" class="nav-item">首页</a>
         <a href="/drive-discs.html" class="nav-item active">驱动盘</a>
-        <a href="/calculate.html" class="nav-item">计算</a>
+        <a href="/calculate.html" class="nav-item">优化器</a>
         <a href="/accounts.html" class="nav-item" data-account-label>账号 / 加载中</a>
         <a href="/maintenance.html" class="nav-item">维护</a>
       </nav>
@@ -53,7 +53,7 @@
           <div class="inventory-actions">
             <label class="inline-check import-remove-missing">
               <input id="removeMissingInput" type="checkbox">
-              <span>删除不存在的驱动盘</span>
+              <span>高级：同步删除缺失</span>
             </label>
             <button id="importBtn" type="button" class="ghost-btn">导入</button>
             <button id="clearInventoryBtn" type="button" class="danger-btn">清空仓库</button>
@@ -125,7 +125,7 @@
         </div>
         <div id="emptyInventory" class="inventory-empty" hidden>
           <img src="/assets/drive-discs/empty.svg" alt="">
-          <strong>No Data</strong>
+          <strong>暂无驱动盘</strong>
           <span>暂无符合筛选条件的驱动盘</span>
         </div>
         <div class="inventory-footline">
@@ -156,7 +156,7 @@
         </div>
         <div id="emptyLoadouts" class="inventory-empty" hidden>
           <img src="/assets/drive-discs/empty.svg" alt="">
-          <strong>No Data</strong>
+          <strong>暂无套装预设</strong>
           <span>暂无保存的套装预设</span>
         </div>
       </section>
@@ -253,7 +253,10 @@
         </section>
       </form>
 
-      <pre id="rawPreview" class="raw modal-raw"></pre>
+      <details class="modal-raw-details">
+        <summary>原始 JSON 预览</summary>
+        <pre id="rawPreview" class="raw modal-raw"></pre>
+      </details>
     </section>
   </div>
 
