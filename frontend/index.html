@@ -43,6 +43,8 @@
         </div>
       </header>
 
+      <div id="pageNotice" class="page-notice-host" data-page-notice aria-live="polite" hidden></div>
+
       <section class="hero-strip">
         <div class="hero-left">
           <div class="hero-media">
@@ -199,6 +201,17 @@
                   <label class="field">
                     <span>等级基数</span>
                     <input id="damageLevelCoefficient" type="number" min="1" step="1" value="794">
+                  </label>
+                  <div class="field target-stun-toggle">
+                    <span>Boss 已失衡</span>
+                    <label class="target-stun-check">
+                      <input id="damageTargetStunned" type="checkbox">
+                      <span>启用失衡乘区</span>
+                    </label>
+                  </div>
+                  <label class="field target-stun-multiplier-field">
+                    <span>失衡倍率%</span>
+                    <input id="damageTargetStunMultiplier" type="number" min="0" step="0.1" value="150">
                   </label>
                   <div class="field target-resistance-field">
                     <span id="damageTargetResistanceLabel">Boss 抗性</span>

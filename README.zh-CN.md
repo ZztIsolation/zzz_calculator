@@ -6,6 +6,19 @@
 
 ## 上传更新摘要
 
+### 2026-06-09 20:28 +08:00
+
+本次上传主要更新如下：
+
+- 新增 Boss 失衡状态与失衡倍率建模，覆盖直伤、贯穿、属性异常和紊乱伤害，并补充伤害白盒行、建模文档和回归测试。
+- 新增按核心技等级缩放的技能倍率支持，技能倍率可以使用 `0`、`A-F` 等核心技等级；星见雅补充「霜灼·破」核心技伤害数据和影画定向 Buff。
+- 驱动盘优化器新增 `exact-super-bound-parallel` worker 并行精确搜索路径、compiled/dense 评分内核、worker 指标和并行 benchmark 覆盖。
+- 优化器新增推荐 4 件套选择、角色默认 4 件套、以及 4 件套 Buff 自动/手动运行时输入控制。
+- 新增共享前端页面通知组件，首页、优化器、驱动盘、账号和维护页的错误/成功反馈更统一。
+- 队友 Buff 维护升级为按队友分组编辑，并支持头像/图标元数据；战斗 Buff 浏览也会展示队友头像。
+- 维护页保存时保留“无视防御”作为独立属性，不再折叠成“防御降低”。
+- 新增 compiled-score、compiled-panel-score、维护属性、失衡倍率、推荐驱动盘和队友图片校验等测试覆盖。
+
 ### 2026-06-07 21:15 +08:00
 
 本次上传主要更新如下：
@@ -82,10 +95,10 @@
 - 根据角色属性、核心技等级、音擎、驱动盘和无条件套装效果计算局外面板。
 - 在局外面板基础上叠加自身、队友、音擎、驱动盘 4 件套、场地、Boss 和手动 Buff，计算局内面板。
 - 战斗 Buff 支持队友、音擎团队、驱动盘团队和自定义来源分组，便于查看与移除。
-- 支持直伤、贯穿、异常和紊乱事件的伤害预览，并输出可检查的公式拆解；不同伤害类型使用独立的事件修正区。
+- 支持直伤、贯穿、异常和紊乱事件的伤害预览，并输出可检查的公式拆解；目标防御、抗性与失衡乘区可配置，不同伤害类型使用独立的事件修正区。
 - 支持 ZZZ Scanner 驱动盘导入、手动编辑、重复识别、账号隔离存储和可选的“移除缺失”同步。
 - 支持保存驱动盘套装预设，首页可套用，优化器结果也可保存。
-- 驱动盘优化器支持计算目标预设、预览、后台任务进度、取消、套装结构限制、多选额外 2 件套、主词条限制、最低属性限制、精确/快速算法选择和伤害评分。
+- 驱动盘优化器支持计算目标预设、预览、后台任务进度、取消、套装结构限制、多选额外 2 件套、推荐/默认 4 件套辅助、4 件套 Buff 自动或手动处理、主词条限制、最低属性限制、精确/快速/并行算法选择和伤害评分。
 - 驱动盘分析工具支持查看当前副词条有效词条数，以及额外副词条带来的预测伤害收益。
 - 提供静态资料维护页，用于录入和校验游戏数据 JSON。
 
@@ -102,6 +115,7 @@ zzz_calculator/
     driveDiscAnalysis.js
     driveDiscInventory.js
     driveDiscOptimizer.js
+    driveDiscOptimizerWorker.js
   data/
     agents.json
     agent_skills.json
@@ -131,9 +145,11 @@ zzz_calculator/
     drive-discs.js
     dialogs.js
     entity-select.js
+    feedback.js
     accounts.js
     accounts-page.js
     maintenance.js
+    maintenanceStats.js
     shared-combat.js
     skillMultiplierCandidates.js
     assets/
@@ -180,6 +196,9 @@ npm run test:damage-whitebox
 npm run test:shared-combat
 npm run test:w-engine-modification
 npm run test:anomaly-damage
+npm run test:maintenance-stats
+npm run test:compiled-score
+npm run test:compiled-panel-score
 npm run test:optimizer
 npm run test:optimizer-progress
 npm run test:optimizer-api
@@ -245,6 +264,7 @@ node --check frontend/accounts-page.js
 - 基础攻击力等于 `角色基础攻击力 + 音擎基础攻击力 + 核心技基础攻击力`。
 - 局外面板是后续条件性局内 Buff 的稳定基准。
 - 局内 Buff 可以贡献普通属性、运行时缩放效果、伤害修正、音擎团队 Buff 和指定技能效果。
+- 目标配置支持防御力、等级基数、分元素抗性，以及可选的失衡倍率。
 - 优化器伤害目标可以使用单个直伤、贯穿、异常或紊乱事件，也可以使用自定义的多事件列表。
 - 特殊显示属性可以声明真实结算属性；例如叶瞬光显示为贯穿，但伤害按物理结算。
 - 命破/玄墨伤害按贯穿伤害建模：贯穿力由局内生命值、局内攻击力和固定贯穿力派生，再进入贯穿增伤区，并跳过防御/穿透乘区。

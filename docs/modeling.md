@@ -391,6 +391,15 @@ interface InCombatRequest {
   };
   damage?: {
     agentLevel?: number; // default 60; only used by anomaly level zone for now.
+    target?: {
+      presetId?: string;
+      defense?: number;
+      levelCoefficient?: number;
+      resistance?: number; // percent; fallback for all elements.
+      resistanceByElement?: Partial<Record<"physical" | "fire" | "ice" | "electric" | "ether", number>>; // percent.
+      stunned?: boolean; // default false.
+      stunMultiplierPercent?: number; // default 150; only active when stunned is true.
+    };
     skillMultiplier?: number;
     skillRef?: {
       agentSkillId: string;
@@ -402,6 +411,7 @@ interface InCombatRequest {
     selectedEventId?: string;
     events?: Array<
       | { id: string; kind: "direct"; skillMultiplier?: number; skillRef?: InCombatRequest["damage"]["skillRef"]; critMode?: "expected" | "crit" | "nonCrit"; count?: number }
+      | { id: string; kind: "sheer"; skillMultiplier?: number; skillRef?: InCombatRequest["damage"]["skillRef"]; critMode?: "expected" | "crit" | "nonCrit"; count?: number }
       | { id: string; kind: "anomaly"; anomalyEffect: "assault" | "shatter" | "burn" | "shock" | "corruption"; procCount?: number; count?: number }
       | { id: string; kind: "disorder"; previousAnomalyEffect: "burn" | "shock" | "corruption" | "frozen" | "flinch"; elapsedSeconds: number; count?: number }
     >;
@@ -616,12 +626,17 @@ Direct damage uses:
 
 ```text
 atk * skillMultiplier * critMultiplier * (1 + generic/element dmg bonus)
-  * defenseMultiplier * resistanceMultiplier
+  * defenseMultiplier * resistanceMultiplier * stunMultiplier
 ```
 
+`stunMultiplier` is `1` unless `damage.target.stunned` is true. The UI stores
+`stunMultiplierPercent` as a percent, so `150` becomes an internal multiplier
+of `1.5`.
+
 Anomaly and disorder reuse the same attack, damage bonus, defense, resistance,
-PEN, RES ignore, and RES reduction logic as direct damage. Attribute anomaly can
-use anomaly-specific crit modifiers; disorder does not use anomaly crit.
+PEN, RES ignore, RES reduction, and stun multiplier logic as direct damage.
+Attribute anomaly can use anomaly-specific crit modifiers; disorder does not
+use anomaly crit.
 
 ### Anomaly Damage
 
@@ -629,7 +644,7 @@ Attribute anomaly damage uses:
 
 ```text
 atk * anomalyMultiplier * (1 + generic/element dmg bonus)
-  * defenseMultiplier * resistanceMultiplier
+  * defenseMultiplier * resistanceMultiplier * stunMultiplier
   * anomalyProficiency / 100
   * anomalyLevel
   * (1 + anomalyDamageBonus)
@@ -673,7 +688,7 @@ only:
 
 ```text
 atk * disorderMultiplier * (1 + generic/element dmg bonus)
-  * defenseMultiplier * resistanceMultiplier
+  * defenseMultiplier * resistanceMultiplier * stunMultiplier
   * anomalyProficiency / 100
   * anomalyLevel
   * (1 + disorderDamageBonus)
@@ -1017,7 +1032,7 @@ optimizer pass should expose at least these objectives:
 - Conditional W-Engine passives.
 - Conditional Drive Disc 4-piece effects.
 - Teammate and field buffs.
-- Enemy defense, resistance, weakness, and stun multipliers.
+- Enemy weakness handling.
 - Daze, stun windows, anomaly buildup, anomaly ownership weighting, polarity
   disorder, and multi-hit rotation totals.
 - Data imports from external databases.

@@ -1,7 +1,7 @@
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { loadCalculatorContext } from "../backend/calculator.js"
-import { optimizeDriveDiscs } from "../backend/driveDiscOptimizer.js"
+import { optimizeDriveDiscs, optimizeDriveDiscsAsync } from "../backend/driveDiscOptimizer.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
@@ -102,6 +102,7 @@ function optimizerInput(algorithm) {
             twoPieceSetId: twoSet,
             objective: "damage",
             algorithm,
+            ...(algorithm === "exact-super-bound-parallel" ? { workerCount: 2 } : {}),
             ...(algorithm === "exact-legacy" ? { enableUpperBoundPruning: false } : {}),
         },
     }
@@ -110,6 +111,22 @@ function optimizerInput(algorithm) {
 function runBenchmark(scale, store, algorithm) {
     const started = performance.now()
     const result = optimizeDriveDiscs(catalog, store, optimizerInput(algorithm))
+    const elapsedMs = performance.now() - started
+    return {
+        scale: scale.id,
+        algorithm,
+        elapsedMs,
+        top: result.results.map(item => ({
+            ids: item.driveDiscs.map(disc => disc.id).join("|"),
+            score: Number(item.score.toFixed(6)),
+        })),
+        metrics: result.metrics,
+    }
+}
+
+async function runBenchmarkAsync(scale, store, algorithm) {
+    const started = performance.now()
+    const result = await optimizeDriveDiscsAsync(catalog, store, optimizerInput(algorithm))
     const elapsedMs = performance.now() - started
     return {
         scale: scale.id,
@@ -142,6 +159,14 @@ function row(item) {
         scale: item.scale,
         algorithm: item.algorithm,
         strictExact: metrics.strictExact,
+        scoreKernel: metrics.scoreKernel ?? "map",
+        kernelProbeMs: Number(metrics.scoreKernelProbeMs ?? 0).toFixed(1),
+        kernelDenseMs: Number(metrics.scoreKernelDenseProbeMs ?? 0).toFixed(1),
+        kernelMapMs: Number(metrics.scoreKernelMapProbeMs ?? 0).toFixed(1),
+        avgKernelMs: Number(metrics.avgScoreKernelMs ?? 0).toFixed(5),
+        kernelFallback: metrics.scoreKernelFallbackReason ?? "",
+        indexedScore: metrics.indexedScoreEnabled ?? false,
+        workerCount: metrics.workerCount ?? 1,
         elapsedMs: Math.round(item.elapsedMs),
         evaluated: metrics.processedCombinationCount ?? (metrics.evaluated + (metrics.prunedBySuperBound ?? 0)),
         scored: metrics.scoredCombinationCount ?? metrics.evaluated,
@@ -149,11 +174,31 @@ function row(item) {
         planBuildMs: Number(metrics.planBuildMs ?? 0).toFixed(1),
         boundCheckMs: Number(metrics.boundCheckMs ?? 0).toFixed(1),
         scoreOnlyMs: Number(metrics.scoreOnlyMs ?? 0).toFixed(1),
+        denseScoreMs: Number(metrics.denseScoreMs ?? 0).toFixed(1),
+        vectorScoreMs: Number(metrics.vectorScoreMs ?? 0).toFixed(1),
         fullResultMs: Number(metrics.fullResultMs ?? 0).toFixed(1),
+        taskStateBuildMs: Number(metrics.taskStateBuildMs ?? 0).toFixed(1),
         warmupMs: Number(metrics.warmupMs ?? 0).toFixed(1),
+        parallelPrewarmMs: Number(metrics.parallelPrewarmMs ?? 0).toFixed(1),
         superBoundChecks: metrics.superBoundChecks ?? 0,
+        groupBoundChecks: metrics.groupBoundChecks ?? 0,
+        discBoundChecks: metrics.discBoundChecks ?? 0,
+        avgBoundCheckMs: Number(metrics.avgBoundCheckMs ?? 0).toFixed(4),
         prunedBySuperBound: metrics.prunedBySuperBound ?? 0,
+        prunedByGlobalCutoff: metrics.prunedByGlobalCutoff ?? 0,
         skippedDiscBoundChecks: metrics.skippedDiscBoundChecks ?? 0,
+        skippedDiscByPolicy: metrics.skippedDiscBoundChecksByPolicy ?? 0,
+        parallelTasks: metrics.parallelTaskCount ?? 0,
+        completedTasks: metrics.completedTaskCount ?? 0,
+        taskSteals: metrics.taskStealCount ?? 0,
+        workerIdlePct: `${(Number(metrics.workerIdleRatio ?? 0) * 100).toFixed(1)}%`,
+        slowestWorkerMs: Number(metrics.slowestWorkerMs ?? 0).toFixed(1),
+        workerStartupMs: Number(metrics.workerStartupMs ?? 0).toFixed(1),
+        taskDispatchMs: Number(metrics.taskDispatchMs ?? 0).toFixed(3),
+        globalCutoffUpdates: metrics.globalCutoffUpdates ?? 0,
+        denseScoreCalls: metrics.denseScoreCalls ?? 0,
+        vectorScoreCalls: metrics.vectorScoreCalls ?? 0,
+        vectorScoreFallbacks: metrics.vectorScoreFallbacks ?? 0,
         topScore: Math.round(item.top[0]?.score ?? 0),
     }
 }
@@ -163,11 +208,13 @@ for (const scale of scales) {
     const store = benchmarkStore(scale.variantsPerSetSlot)
     const legacy = runBenchmark(scale, store, "exact-legacy")
     const superBound = runBenchmark(scale, store, "exact-super-bound")
+    const parallel = await runBenchmarkAsync(scale, store, "exact-super-bound-parallel")
     assertTopMatches(scale, legacy, superBound)
+    assertTopMatches(scale, legacy, parallel)
     if (scale.id === "medium" && superBound.elapsedMs > legacy.elapsedMs) {
         throw new Error(`exact-super-bound should not be slower than exact-legacy on medium benchmark (${superBound.elapsedMs.toFixed(1)}ms > ${legacy.elapsedMs.toFixed(1)}ms)`)
     }
-    rows.push(row(legacy), row(superBound))
+    rows.push(row(legacy), row(superBound), row(parallel))
 }
 
 console.table(rows)

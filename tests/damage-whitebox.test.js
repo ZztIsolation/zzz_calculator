@@ -69,6 +69,59 @@ function approx(actual, expected, message) {
     )
 }
 
+function zeroResistanceTarget(overrides = {}) {
+    return {
+        defense: 953,
+        levelCoefficient: 794,
+        resistanceByElement: {
+            physical: 0,
+            fire: 0,
+            ice: 0,
+            electric: 0,
+            ether: 0,
+        },
+        ...overrides,
+    }
+}
+
+function calculateStunEvent(event, { targetOverrides = {}, inputOverrides = {} } = {}) {
+    return calculateInCombatPanel(catalog, minimalInput({
+        ...inputOverrides,
+        damage: {
+            agentLevel: 60,
+            selectedEventId: event.id,
+            events: [event],
+            target: zeroResistanceTarget(targetOverrides),
+        },
+    }))
+}
+
+function assertStunMultiplierScales({ label, event, inputOverrides = {} }) {
+    const base = calculateStunEvent(event, {
+        inputOverrides,
+        targetOverrides: {
+            stunned: false,
+            stunMultiplierPercent: 150,
+        },
+    })
+    const stunned = calculateStunEvent(event, {
+        inputOverrides,
+        targetOverrides: {
+            stunned: true,
+            stunMultiplierPercent: 150,
+        },
+    })
+
+    assert.ok(base.damage.finalDamage > 0, `${label} baseline damage should be positive`)
+    approx(base.damage.multipliers.stun, 1, `${label} unstunned multiplier`)
+    approx(stunned.damage.multipliers.stun, 1.5, `${label} stunned multiplier`)
+    approx(stunned.damage.finalDamage, base.damage.finalDamage * 1.5, `${label} stunned damage`)
+    assert.ok(
+        stunned.damage.whiteBoxRows.some(row => row.label === "失衡乘区" && Number(row.value) === 1.5),
+        `${label} whitebox should expose the stun multiplier`,
+    )
+}
+
 function skillMove(skillId, categoryId, moveId) {
     const skill = catalog.agentSkills.find(item => item.id === skillId)
     assert.ok(skill, `Missing skill catalog ${skillId}`)
@@ -116,6 +169,62 @@ approx(
     "Normal Boss defense multiplier should match 794 / (794 + 953)",
 )
 assert.equal(normalBoss.damage.multipliers.resistance, 1)
+
+const directStunEvent = {
+    id: "direct-stun",
+    kind: "direct",
+    damageElement: "physical",
+    skillMultiplier: 100,
+    critMode: "nonCrit",
+}
+assertStunMultiplierScales({
+    label: "Direct damage",
+    event: directStunEvent,
+})
+const legacyUnstunnedDirect = calculateStunEvent(directStunEvent)
+const configuredUnstunnedDirect = calculateStunEvent(directStunEvent, {
+    targetOverrides: {
+        stunned: false,
+        stunMultiplierPercent: 200,
+    },
+})
+approx(
+    legacyUnstunnedDirect.damage.finalDamage,
+    configuredUnstunnedDirect.damage.finalDamage,
+    "Unstunned direct damage should ignore configured stun multiplier",
+)
+
+const anomalyStunInput = {
+    combatBuffs: {
+        manualStats: [
+            {
+                id: "test-stun-anomaly-proficiency",
+                stat: "anomalyProficiency",
+                value: 100,
+                mode: "flat",
+            },
+        ],
+    },
+}
+assertStunMultiplierScales({
+    label: "Attribute anomaly damage",
+    event: {
+        id: "assault-stun",
+        kind: "anomaly",
+        anomalyEffect: "assault",
+    },
+    inputOverrides: anomalyStunInput,
+})
+assertStunMultiplierScales({
+    label: "Disorder damage",
+    event: {
+        id: "burn-disorder-stun",
+        kind: "disorder",
+        previousAnomalyEffect: "burn",
+        elapsedSeconds: 0,
+    },
+    inputOverrides: anomalyStunInput,
+})
 
 for (const [level, expectedPercent] of [
     [1, 79.4],
@@ -1455,7 +1564,8 @@ approx(
         * sheerBase.damage.multipliers.crit
         * sheerBase.damage.multipliers.dmg
         * sheerBase.damage.multipliers.sheerDamage
-        * sheerBase.damage.multipliers.resistance,
+        * sheerBase.damage.multipliers.resistance
+        * sheerBase.damage.multipliers.stun,
     "Sheer final damage should use the expected multiplier route",
 )
 assert.equal(
@@ -1464,10 +1574,24 @@ assert.equal(
     "Sheer whitebox should pin the defense multiplier at 1",
 )
 assert.ok(
-    ["局内贯穿力", "贯穿力换算", "贯穿倍率", "暴击乘区", "普通增伤区", "贯穿增伤区", "防御乘区", "抗性乘区", "最终伤害"]
+    ["局内贯穿力", "贯穿力换算", "贯穿倍率", "暴击乘区", "普通增伤区", "贯穿增伤区", "防御乘区", "抗性乘区", "失衡乘区", "最终伤害"]
         .every(label => sheerBase.damage.whiteBoxRows.some(row => row.label === label)),
     "Sheer whitebox should expose every required row",
 )
+const sheerStunned = calculateInCombatPanel(catalog, minimalInput({
+    ...sheerBaseInput,
+    damage: {
+        ...sheerBaseInput.damage,
+        target: {
+            ...sheerBaseInput.damage.target,
+            stunned: true,
+            stunMultiplierPercent: 150,
+        },
+    },
+}))
+approx(sheerBase.damage.multipliers.stun, 1, "Unstunned sheer damage should use neutral stun multiplier")
+approx(sheerStunned.damage.multipliers.stun, 1.5, "Stunned sheer damage should use configured stun multiplier")
+approx(sheerStunned.damage.finalDamage, sheerBase.damage.finalDamage * 1.5, "Stunned sheer damage should scale final damage")
 
 const nonRuptureSheerInput = {
     agentId: "anby_demara",

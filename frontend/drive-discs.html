@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>驱动盘仓库 | ZZZ 驱动盘计算器</title>
+  <title>驱动盘与套装预设 | ZZZ 驱动盘计算器</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -35,8 +35,8 @@
       <header class="page-header" id="page-top">
         <div class="title-block">
           <div class="eyebrow">DRIVE DISC INVENTORY</div>
-          <h1>驱动盘仓库</h1>
-          <p>导入、筛选、查看和维护驱动盘</p>
+          <h1>驱动盘与套装预设</h1>
+          <p>导入、筛选、查看和维护驱动盘与套装预设</p>
         </div>
         <div class="header-actions">
           <button id="newDiscBtn" type="button" class="primary-btn">+ 新增</button>
@@ -44,7 +44,20 @@
         </div>
       </header>
 
-      <section class="inventory-shell">
+      <div id="pageNotice" class="page-notice-host" data-page-notice aria-live="polite" hidden></div>
+
+      <nav id="inventoryViewTabs" class="inventory-view-tabs" aria-label="驱动盘页面模块">
+        <button type="button" class="active" data-inventory-view="inventory" aria-pressed="true">
+          <span>驱动盘仓库</span>
+          <strong id="inventoryTabCount">0</strong>
+        </button>
+        <button type="button" data-inventory-view="loadouts" aria-pressed="false">
+          <span>套装预设</span>
+          <strong id="loadoutTabCount">0</strong>
+        </button>
+      </nav>
+
+      <section id="inventorySection" class="inventory-shell" data-inventory-panel="inventory">
         <div class="inventory-topline">
           <div>
             <h2>驱动盘（<span id="totalCount">0</span>）</h2>
@@ -108,7 +121,7 @@
           <option value="6">6号位</option>
         </select>
 
-        <div class="disc-table-wrap clean-table-wrap">
+        <div id="inventoryTableWrap" class="disc-table-wrap clean-table-wrap">
           <table class="disc-table clean-disc-table">
             <thead>
               <tr>
@@ -133,14 +146,14 @@
         </div>
       </section>
 
-      <section class="inventory-shell loadout-shell">
+      <section id="loadoutSection" class="inventory-shell loadout-shell" data-inventory-panel="loadouts" hidden>
         <div class="inventory-topline">
           <div>
             <h2>套装预设（<span id="loadoutCount">0</span>）</h2>
             <p>由计算页保存，可在首页按角色应用</p>
           </div>
         </div>
-        <div class="disc-table-wrap clean-table-wrap">
+        <div id="loadoutTableWrap" class="disc-table-wrap clean-table-wrap">
           <table class="disc-table clean-disc-table">
             <thead>
               <tr>
@@ -262,7 +275,7 @@
 
   <div id="loadoutModal" class="modal-layer" hidden>
     <div class="modal-scrim" data-close-loadout-modal></div>
-    <section class="disc-modal" role="dialog" aria-modal="true" aria-labelledby="loadoutModalTitle">
+    <section class="disc-modal loadout-modal" role="dialog" aria-modal="true" aria-labelledby="loadoutModalTitle">
       <button id="closeLoadoutModalBtn" type="button" class="modal-close" aria-label="关闭">×</button>
       <header class="modal-head">
         <div>
@@ -275,16 +288,18 @@
         </div>
       </header>
 
-      <form class="disc-editor modal-editor">
+      <form class="disc-editor modal-editor loadout-editor">
         <input id="loadoutIdInput" type="hidden">
-        <label class="field">
-          <span>名称</span>
-          <input id="loadoutNameInput">
-        </label>
-        <label class="field">
-          <span>角色</span>
-          <select id="loadoutAgentSelect"></select>
-        </label>
+        <div class="loadout-editor-fields">
+          <label class="field">
+            <span>名称</span>
+            <input id="loadoutNameInput">
+          </label>
+          <label class="field">
+            <span>角色</span>
+            <select id="loadoutAgentSelect"></select>
+          </label>
+        </div>
         <div id="loadoutSlotEditors" class="loadout-slot-editors"></div>
       </form>
     </section>

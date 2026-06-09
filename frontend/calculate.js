@@ -1,12 +1,17 @@
 import { evaluateFormulaExpression } from "./formulaEvaluator.js"
 import {
     damageSkillRowsWithGeneratedTotals,
-    skillLevelRange,
+    defaultSkillLevel as candidateDefaultSkillLevel,
+    isCoreSkillLevelScale,
+    normalizeSkillLevel,
+    skillLevelLabel,
+    skillLevelValues,
     skillRowValue,
 } from "./skillMultiplierCandidates.js"
 import * as SharedCombat from "./shared-combat.js"
 import { createImageSelect } from "./entity-select.js"
 import { promptDialog } from "./dialogs.js"
+import { clearPageNotice, setStatusChip, showErrorNotice, showSuccessNotice } from "./feedback.js"
 import { initDriveDiscAnalysis } from "./drive-disc-analysis.js"
 
 const els = {
@@ -37,6 +42,7 @@ const els = {
     combatBuffSearchInput: document.getElementById("combatBuffSearchInput"),
     combatBuffTeammatePicker: document.getElementById("combatBuffTeammatePicker"),
     combatBuffTeammateSelect: document.getElementById("combatBuffTeammateSelect"),
+    combatBuffTeammatePreview: document.getElementById("combatBuffTeammatePreview"),
     combatBuffTeammateHint: document.getElementById("combatBuffTeammateHint"),
     addTeammateBuffsBtn: document.getElementById("addTeammateBuffsBtn"),
     removeTeammateBuffsBtn: document.getElementById("removeTeammateBuffsBtn"),
@@ -51,6 +57,8 @@ const els = {
     damageTargetPreset: document.getElementById("damageTargetPreset"),
     damageTargetDefense: document.getElementById("damageTargetDefense"),
     damageLevelCoefficient: document.getElementById("damageLevelCoefficient"),
+    damageTargetStunned: document.getElementById("damageTargetStunned"),
+    damageTargetStunMultiplier: document.getElementById("damageTargetStunMultiplier"),
     damageTargetResistancePreset: document.getElementById("damageTargetResistancePreset"),
     damageTargetResistanceLabel: document.getElementById("damageTargetResistanceLabel"),
     damageTargetResistanceCustom: document.getElementById("damageTargetResistanceCustom"),
@@ -73,6 +81,16 @@ const els = {
     damageDisorderElapsed: document.getElementById("damageDisorderElapsed"),
     algorithmSelect: document.getElementById("algorithmSelect"),
     fourPieceSetSelect: document.getElementById("fourPieceSetSelect"),
+    openFourPieceSetModalBtn: document.getElementById("openFourPieceSetModalBtn"),
+    fourPieceSelectedSummary: document.getElementById("fourPieceSelectedSummary"),
+    fourPieceSetModal: document.getElementById("fourPieceSetModal"),
+    closeFourPieceSetModalBtn: document.getElementById("closeFourPieceSetModalBtn"),
+    fourPieceSetChoices: document.getElementById("fourPieceSetChoices"),
+    fourPieceBuffSection: document.getElementById("fourPieceBuffSection"),
+    fourPieceBuffModeAuto: document.getElementById("fourPieceBuffModeAuto"),
+    fourPieceBuffModeManual: document.getElementById("fourPieceBuffModeManual"),
+    fourPieceBuffSummary: document.getElementById("fourPieceBuffSummary"),
+    fourPieceBuffManualList: document.getElementById("fourPieceBuffManualList"),
     twoPieceSetSelect: document.getElementById("twoPieceSetSelect"),
     openTwoPieceSetModalBtn: document.getElementById("openTwoPieceSetModalBtn"),
     twoPieceSelectedSummary: document.getElementById("twoPieceSelectedSummary"),
@@ -150,6 +168,8 @@ const els = {
 const HOME_SELECTION_STORAGE_KEY = "zzz-calculator.homeSelection.v1"
 const DEFAULT_DAMAGE_TARGET_PRESET_ID = "normal-boss"
 const DEFAULT_DAMAGE_LEVEL_COEFFICIENT = 794
+const DEFAULT_DAMAGE_STUN_MULTIPLIER_PERCENT = 150
+const DEFAULT_OPTIMIZER_ALGORITHM = "exact-super-bound"
 const ADMIN_DEFAULT_CALCULATION_MODE = "adminDefault"
 const CALCULATION_CONFIG_MODE_VALUES = new Set(["single", "sheer", "anomaly", "custom", ADMIN_DEFAULT_CALCULATION_MODE])
 const DEFAULT_CHECKED_COMBAT_SOURCE_TYPES = new Set(["self", "wEngine", "wEngineTeam"])
@@ -157,6 +177,13 @@ const TEAMMATE_DRIVE_DISC_LIMIT = 2
 const TEAMMATE_BUFF_OWNER_LIMIT = 2
 const W_ENGINE_TEAM_BUFF_LIMIT = 2
 const DRIVE_DISC_TEAM_BUFF_LIMIT = 2
+const OPTIMIZER_MAIN_STAT_SLOTS = [4, 5, 6]
+const OPTIMIZER_MINIMUM_FIELDS = [
+    ["energyRegen", "minEnergyRegen"],
+    ["anomalyProficiency", "minAnomalyProficiency"],
+    ["critRate", "minCritRate"],
+    ["critDmg", "minCritDmg"],
+]
 const DAMAGE_ELEMENTS = ["physical", "fire", "ice", "electric", "ether"]
 const DAMAGE_ELEMENT_SHORT_LABELS = {
     physical: "物",
@@ -381,6 +408,8 @@ let renderedCombatBuffAgentId = ""
 const manuallyUncheckedDefaultCombatBuffIds = new Set()
 const damageTargetResistanceByElement = Object.fromEntries(DAMAGE_ELEMENTS.map(element => [element, 0]))
 let activeDamageResistanceElement = "physical"
+let optimizerFourPieceBuffModeBySetId = {}
+let optimizerFourPieceBuffRuntimeInputsBySetId = {}
 let selectedDamageSkillRef = null
 let activeDamageSkillPickerMoveRef = null
 let damageSkillSearchQuery = ""
@@ -397,8 +426,11 @@ const combatUi = SharedCombat.createCombatUiController({
 })
 
 function setStatus(text, tone = "idle") {
-    els.status.textContent = text
-    els.status.dataset.tone = tone
+    setStatusChip(els.status, text, tone)
+}
+
+function errorMessage(error) {
+    return error instanceof Error ? error.message : String(error)
 }
 
 function formatCount(value) {
@@ -514,13 +546,41 @@ function algorithmProgressText(metrics = {}) {
     }
     const exactText = metrics.strictExact === false ? "非严格精准" : "严格精准"
     const parts = [`算法：${label}`, exactText]
+    if (metrics.scoreKernel) {
+        parts.push(`内核 ${metrics.scoreKernel === "compiled-dense" ? "dense" : "map"}`)
+        if (metrics.scoreKernel !== "compiled-dense" && metrics.scoreKernelFallbackReason) {
+            parts.push(`回退 ${metrics.scoreKernelFallbackReason}`)
+        }
+    }
     const pruned = Number(metrics.prunedBySuperBound ?? 0)
     const checks = Number(metrics.superBoundChecks ?? 0)
     if (pruned > 0) {
         parts.push(`真实评分 ${formatCount(metrics.scoredCombinationCount ?? metrics.evaluated ?? 0)}`)
         parts.push(`剪枝 ${formatCount(pruned)}`)
+        if (checks > 0) {
+            parts.push(`上界 ${formatRate(metrics.boundChecksPerSecond ?? 0)}`)
+        }
+        if (Number(metrics.avgBoundCheckMs ?? 0) > 0) {
+            parts.push(`均耗 ${Number(metrics.avgBoundCheckMs).toFixed(3)}ms`)
+        }
+        if (Number(metrics.avgScoreKernelMs ?? 0) > 0) {
+            parts.push(`内核均耗 ${Number(metrics.avgScoreKernelMs).toFixed(3)}ms`)
+        }
     } else if (checks > 0) {
         parts.push(`上界检查 ${formatCount(checks)}`)
+        parts.push(`上界 ${formatRate(metrics.boundChecksPerSecond ?? 0)}`)
+    }
+    if (Number(metrics.workerCount ?? 0) > 1) {
+        parts.push(`并行 x${metrics.workerCount}`)
+    }
+    if (Number(metrics.parallelTaskCount ?? 0) > 0) {
+        parts.push(`任务 ${formatCount(metrics.completedTaskCount ?? 0)}/${formatCount(metrics.parallelTaskCount)}`)
+    }
+    if (Number(metrics.prunedByGlobalCutoff ?? 0) > 0) {
+        parts.push(`全局剪枝 ${formatCount(metrics.prunedByGlobalCutoff)}`)
+    }
+    if (Number(metrics.workerIdleRatio ?? 0) > 0) {
+        parts.push(`空闲 ${(Number(metrics.workerIdleRatio) * 100).toFixed(1)}%`)
     }
     return parts.join(" · ")
 }
@@ -733,18 +793,20 @@ function saveSyncedConfig() {
     const agentId = els.agentSelect.value
     const selection = loadHomeSelection()
     const byAgent = { ...(selection.byAgent ?? {}) }
+    const previousConfig = byAgent[agentId] ?? {}
     byAgent[agentId] = {
-        ...(byAgent[agentId] ?? {}),
+        ...previousConfig,
         wEngineId: els.wEngineSelect.value,
         wEngineModificationLevel: selectedWEngineModificationLevel(getWEngine(els.wEngineSelect.value)),
         coreSkillLevel: els.coreSkillSelect.value,
         cinemaLevel: selectedCinemaLevel(),
         combat: {
-            ...((byAgent[agentId] ?? {}).combat ?? {}),
+            ...(previousConfig.combat ?? {}),
             activeBuffIds: [...checkedCombatBuffIds()],
-            addedBuffs: ((byAgent[agentId] ?? {}).combat?.addedBuffs ?? []),
+            addedBuffs: previousConfig.combat?.addedBuffs ?? [],
         },
         damage: collectDamageConfig(),
+        optimizer: collectStoredOptimizerConfig(),
     }
     saveHomeSelection({ currentAgentId: agentId, byAgent })
 }
@@ -849,6 +911,26 @@ function damageElementForAgent(agent = {}) {
 
 function currentDamageElement() {
     return damageElementForAgent(getAgent(els.agentSelect.value))
+}
+
+function targetStunnedFromConfig(target = {}) {
+    if (Object.prototype.hasOwnProperty.call(target, "stunned")) {
+        return target.stunned === true || target.stunned === "true" || target.stunned === 1 || target.stunned === "1"
+    }
+    const activeMultiplier = Number(target.activeStunMultiplier)
+    return Number.isFinite(activeMultiplier) ? activeMultiplier !== 1 : false
+}
+
+function stunMultiplierPercentFromConfig(target = {}) {
+    const percent = Number(target.stunMultiplierPercent)
+    if (Number.isFinite(percent)) {
+        return Math.max(0, percent)
+    }
+    const multiplier = Number(target.stunMultiplier)
+    if (Number.isFinite(multiplier)) {
+        return Math.max(0, multiplier) * 100
+    }
+    return DEFAULT_DAMAGE_STUN_MULTIPLIER_PERCENT
 }
 
 function currentElementDmgKey() {
@@ -1169,20 +1251,17 @@ function damageSkillCategories(skill = agentSkillCatalog()) {
 }
 
 function defaultSkillLevel(category = {}) {
-    const range = skillLevelRange(category)
-    return Number(range.default ?? range.max ?? range.min ?? 1)
+    return candidateDefaultSkillLevel(category)
 }
 
 function clampSkillLevel(category = {}, level) {
-    const range = skillLevelRange(category)
-    const numeric = Number(level)
-    if (!Number.isInteger(numeric)) {
-        return defaultSkillLevel(category)
-    }
-    return Math.max(Number(range.min ?? 1), Math.min(Number(range.max ?? numeric), numeric))
+    return normalizeSkillLevel(category, {}, {}, level)
 }
 
 function selectedSkillLevel(category = {}) {
+    if (isCoreSkillLevelScale(category)) {
+        return normalizeSkillLevel(category, {}, {}, els.coreSkillSelect?.value ?? coreSkillDefaultLevel(getAgent()))
+    }
     return clampSkillLevel(category, damageSkillLevelsByCategory[category.id] ?? defaultSkillLevel(category))
 }
 
@@ -1195,6 +1274,7 @@ function stripSkillRefLevel(skillRef = null) {
         categoryId: String(skillRef.categoryId ?? "").trim(),
         moveId: String(skillRef.moveId ?? "").trim(),
         rowId: String(skillRef.rowId ?? "").trim(),
+        ...(skillRef.level !== undefined && skillRef.level !== null && skillRef.level !== "" ? { level: skillRef.level } : {}),
     }
 }
 
@@ -1457,6 +1537,8 @@ function collectDamageTargetConfig() {
         presetId: els.damageTargetPreset?.value || DEFAULT_DAMAGE_TARGET_PRESET_ID,
         defense: Number(els.damageTargetDefense?.value || 953),
         levelCoefficient: Number(els.damageLevelCoefficient?.value || DEFAULT_DAMAGE_LEVEL_COEFFICIENT),
+        stunned: Boolean(els.damageTargetStunned?.checked),
+        stunMultiplierPercent: Number(els.damageTargetStunMultiplier?.value ?? DEFAULT_DAMAGE_STUN_MULTIPLIER_PERCENT),
         resistanceByElement: {
             ...damageTargetResistanceByElement,
             [damageElement]: damageResistanceControlValue(),
@@ -1592,7 +1674,9 @@ function skillLevelSelects() {
 function normalizeSkillLevelsByCategory(skill = agentSkillCatalog(), stored = {}) {
     const next = {}
     for (const category of damageSkillCategories(skill)) {
-        next[category.id] = clampSkillLevel(category, stored?.[category.id] ?? defaultSkillLevel(category))
+        next[category.id] = isCoreSkillLevelScale(category)
+            ? selectedSkillLevel(category)
+            : clampSkillLevel(category, stored?.[category.id] ?? defaultSkillLevel(category))
     }
     return next
 }
@@ -1677,7 +1761,7 @@ function renderDamageSkillSummary() {
         els.damageSkillMultiplier.value = resolved.value
     }
     if (els.damageSkillSummary) {
-        els.damageSkillSummary.textContent = `${nameOf(resolved.category)} / ${nameOf(resolved.move)} / ${localizedText(resolved.row.label) || resolved.row.id} · LV${resolved.level} · ${Number.isFinite(resolved.value) ? `${resolved.value}%` : "-"}`
+        els.damageSkillSummary.textContent = `${nameOf(resolved.category)} / ${nameOf(resolved.move)} / ${localizedText(resolved.row.label) || resolved.row.id} · ${skillLevelLabel(resolved.category, resolved.level)} · ${Number.isFinite(resolved.value) ? `${resolved.value}%` : "-"}`
     }
 }
 
@@ -1702,12 +1786,11 @@ function renderAgentSkillLevelControls() {
             select.disabled = true
             continue
         }
-        const range = skillLevelRange(category)
         const selected = selectedSkillLevel(category)
-        for (let level = Number(range.min ?? 1); level <= Number(range.max ?? selected); level += 1) {
+        for (const level of skillLevelValues(category)) {
             const option = document.createElement("option")
             option.value = String(level)
-            option.textContent = `LV${level}`
+            option.textContent = skillLevelLabel(category, level)
             option.selected = level === selected
             select.appendChild(option)
         }
@@ -1797,7 +1880,7 @@ function renderDamageSkillModal() {
         const level = selectedSkillLevel(category)
         const group = document.createElement("section")
         group.className = "damage-skill-move-group"
-        group.innerHTML = `<h3>${escapeHtml(nameOf(category))}<span>LV${level}</span></h3>`
+        group.innerHTML = `<h3>${escapeHtml(nameOf(category))}<span>${escapeHtml(skillLevelLabel(category, level))}</span></h3>`
         for (const move of category.moves ?? []) {
             const button = document.createElement("button")
             button.type = "button"
@@ -1824,7 +1907,7 @@ function renderDamageSkillModal() {
         rowPane.innerHTML = `
             <div class="damage-skill-row-head">
                 <strong>${escapeHtml(nameOf(active.move))}</strong>
-                <span>${escapeHtml(nameOf(active.category))} · LV${level}</span>
+                <span>${escapeHtml(nameOf(active.category))} · ${escapeHtml(skillLevelLabel(active.category, level))}</span>
             </div>
         `
         const rows = document.createElement("div")
@@ -2427,6 +2510,12 @@ function applyStoredDamageConfig(config = {}) {
     els.damageTargetPreset.value = target.presetId ?? DEFAULT_DAMAGE_TARGET_PRESET_ID
     els.damageTargetDefense.value = target.defense ?? damageTargetPresetById(els.damageTargetPreset.value)?.defense ?? 953
     els.damageLevelCoefficient.value = target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT
+    if (els.damageTargetStunned) {
+        els.damageTargetStunned.checked = targetStunnedFromConfig(target)
+    }
+    if (els.damageTargetStunMultiplier) {
+        els.damageTargetStunMultiplier.value = stunMultiplierPercentFromConfig(target)
+    }
     setDamageResistanceControlValue(damageTargetResistanceByElement[damageElement] ?? 0)
     if (["direct", "sheer"].includes(selectedEvent.kind)) {
         els.damageSkillMultiplier.value = selectedEvent.skillMultiplier ?? config.skillMultiplier ?? 100
@@ -2704,6 +2793,7 @@ function teammateCombatBuffGroups() {
                     sourceType: "teammate",
                     teammateId: group.id,
                     teammateName: group.name,
+                    teammateImages: group.images ?? null,
                 }
             })
             return { ...group, buffs }
@@ -2718,6 +2808,10 @@ function teammateCombatBuffGroups() {
         })
     }
     return groups
+}
+
+function teammateGroupImage(group = {}) {
+    return group.images?.icon ?? group.images?.portrait ?? ""
 }
 
 function cinemaBuffName(buff = {}) {
@@ -2760,7 +2854,7 @@ function agentCombatBuffs() {
             id: `agent:${agent.id}.cinema.${buff.cinemaLevel}`,
             sourceType: "self",
             sourceKind: "cinema",
-            defaultChecked: buff.defaultChecked ?? false,
+            defaultChecked: true,
             name: buff.name ?? cinemaBuffName(buff),
             description: buff.description ?? null,
             conditionLabel: localizedText(buff.conditionLabel) || buff.condition,
@@ -3103,6 +3197,16 @@ function updateAddedCombatBuffRuntime(buffKey, updater) {
     }))
 }
 
+function updateOptimizerFourPieceBuffRuntime(buffKey, updater) {
+    const item = optimizerFourPieceBuffItemByKey(buffKey)
+    if (!item?.buff) {
+        return
+    }
+    const runtime = runtimeForBuff(item, item.buff)
+    updater(runtime, item.buff)
+    setCurrentFourPieceBuffRuntimeInput(item.id, runtime, item.setId)
+}
+
 function updateAddedCombatBuffModificationLevel(buffKey, value) {
     saveCurrentAddedCombatBuffs(currentAddedCombatBuffs().map(item => {
         if (addedCombatBuffKey(item) !== buffKey || item.sourceKind !== "wEngineTeam") {
@@ -3180,6 +3284,8 @@ function teammateBuffCandidates() {
             sourceKind: "teammate",
             ownerId: group.id,
             ownerName: group.name,
+            ownerImages: group.images ?? buff.teammateImages ?? null,
+            teammateImages: group.images ?? buff.teammateImages ?? null,
             sourceLabel: buff.sourceLabel,
             name: buff.name,
             description: buff.description,
@@ -3201,9 +3307,139 @@ function driveDiscFourPiece(set) {
     return set?.fourPiece ?? null
 }
 
+function legacyDriveDiscFourPieceBuff(fourPiece) {
+    if (!fourPiece || fourPiece.selfBuff || !effectRules(fourPiece).length) {
+        return null
+    }
+
+    return {
+        scope: "inCombat",
+        condition: fourPiece.condition ?? null,
+        durationSeconds: fourPiece.durationSeconds ?? null,
+        cooldownSeconds: fourPiece.cooldownSeconds ?? null,
+        appliesToOutOfCombatPanel: false,
+        ...(fourPiece.coverage ? { coverage: fourPiece.coverage } : {}),
+        effects: effectRules(fourPiece),
+    }
+}
+
+function driveDiscFourPieceSelfBuff(set) {
+    const fourPiece = driveDiscFourPiece(set)
+    const buff = fourPiece?.selfBuff ?? legacyDriveDiscFourPieceBuff(fourPiece)
+    return effectRules(buff).length ? { ...buff, scope: "inCombat" } : null
+}
+
 function driveDiscFourPieceTeamBuff(set) {
     const buff = driveDiscFourPiece(set)?.teamBuff ?? null
     return effectRules(buff).length ? { ...buff, scope: "inCombat" } : null
+}
+
+function driveDisc4pcRuntimeKey(setId, part) {
+    return `driveDisc4pc:${setId}.${part}`
+}
+
+function optimizerDriveDisc4pcBuffKey(runtimeKey) {
+    return `optimizerDriveDisc4pc:${runtimeKey}`
+}
+
+function optimizerDriveDisc4pcRuntimeKeyFromBuffKey(buffKey) {
+    return String(buffKey ?? "").startsWith("optimizerDriveDisc4pc:")
+        ? String(buffKey).slice("optimizerDriveDisc4pc:".length)
+        : ""
+}
+
+function currentFourPieceSetId() {
+    return els.fourPieceSetSelect?.value ?? ""
+}
+
+function normalizeFourPieceBuffMode(mode) {
+    return String(mode ?? "auto") === "manual" ? "manual" : "auto"
+}
+
+function clonePlainObject(value, fallback = {}) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return fallback
+    }
+    try {
+        return structuredClone(value)
+    } catch {
+        return JSON.parse(JSON.stringify(value))
+    }
+}
+
+function ownFourPieceBuffParts(set = driveDiscSetById(currentFourPieceSetId())) {
+    if (!set?.id) {
+        return []
+    }
+    return [
+        {
+            part: "self",
+            label: "装备者效果",
+            key: driveDisc4pcRuntimeKey(set.id, "self"),
+            buff: driveDiscFourPieceSelfBuff(set),
+        },
+        {
+            part: "team",
+            label: "团队效果",
+            key: driveDisc4pcRuntimeKey(set.id, "team"),
+            buff: driveDiscFourPieceTeamBuff(set),
+        },
+    ].filter(item => item.buff)
+}
+
+function currentFourPieceBuffMode(setId = currentFourPieceSetId()) {
+    return normalizeFourPieceBuffMode(optimizerFourPieceBuffModeBySetId?.[setId])
+}
+
+function currentFourPieceBuffRuntimeInputs(setId = currentFourPieceSetId()) {
+    const source = optimizerFourPieceBuffRuntimeInputsBySetId?.[setId]
+    return source && typeof source === "object" && !Array.isArray(source) ? source : {}
+}
+
+function setCurrentFourPieceBuffMode(mode, setId = currentFourPieceSetId()) {
+    if (!setId) {
+        return
+    }
+    optimizerFourPieceBuffModeBySetId = {
+        ...optimizerFourPieceBuffModeBySetId,
+        [setId]: normalizeFourPieceBuffMode(mode),
+    }
+}
+
+function setCurrentFourPieceBuffRuntimeInput(runtimeKey, runtime, setId = currentFourPieceSetId()) {
+    if (!setId || !runtimeKey) {
+        return
+    }
+    optimizerFourPieceBuffRuntimeInputsBySetId = {
+        ...optimizerFourPieceBuffRuntimeInputsBySetId,
+        [setId]: {
+            ...currentFourPieceBuffRuntimeInputs(setId),
+            [runtimeKey]: clonePlainObject(runtime),
+        },
+    }
+}
+
+function runtimeForOwnFourPieceBuff(part, setId = currentFourPieceSetId()) {
+    const stored = currentFourPieceBuffRuntimeInputs(setId)[part.key]
+    return runtimeForBuff({ runtime: stored ?? null }, part.buff)
+}
+
+function optimizerFourPieceBuffItemByKey(buffKey) {
+    const runtimeKey = optimizerDriveDisc4pcRuntimeKeyFromBuffKey(buffKey)
+    if (!runtimeKey) {
+        return null
+    }
+    const part = ownFourPieceBuffParts().find(item => item.key === runtimeKey)
+    if (!part) {
+        return null
+    }
+    return {
+        id: runtimeKey,
+        sourceKind: "optimizerDriveDisc4pc",
+        setId: currentFourPieceSetId(),
+        runtime: runtimeForOwnFourPieceBuff(part),
+        ...part,
+    }
 }
 
 function driveDisc4pcSetOptions() {
@@ -3379,6 +3615,37 @@ function ensureActiveCombatBuffTeammateId(groups = teammateCombatBuffGroups()) {
     return preferredGroup
 }
 
+function renderCombatBuffTeammatePreview(group) {
+    if (!els.combatBuffTeammatePreview) {
+        return
+    }
+    els.combatBuffTeammatePreview.innerHTML = ""
+    if (!group) {
+        els.combatBuffTeammatePreview.hidden = true
+        return
+    }
+
+    const image = teammateGroupImage(group)
+    const avatar = image ? document.createElement("img") : document.createElement("span")
+    avatar.className = image ? "combat-team-avatar" : "combat-team-avatar empty"
+    if (image) {
+        avatar.src = image
+        avatar.alt = nameOf(group)
+    } else {
+        avatar.setAttribute("aria-hidden", "true")
+    }
+
+    const copy = document.createElement("span")
+    copy.className = "combat-team-head-copy"
+    const title = document.createElement("strong")
+    title.textContent = nameOf(group)
+    const metaLine = document.createElement("span")
+    metaLine.textContent = `${group.buffs?.length ?? 0} 个 Buff`
+    copy.append(title, metaLine)
+    els.combatBuffTeammatePreview.append(avatar, copy)
+    els.combatBuffTeammatePreview.hidden = false
+}
+
 function renderCombatBuffTeammatePicker() {
     const groups = teammateCombatBuffGroups()
     const activeGroup = ensureActiveCombatBuffTeammateId(groups)
@@ -3395,6 +3662,7 @@ function renderCombatBuffTeammatePicker() {
         option.disabled = !alreadySelected && selectedLimitReached && group.id !== activeCombatBuffTeammateId
         els.combatBuffTeammateSelect.appendChild(option)
     }
+    renderCombatBuffTeammatePreview(activeGroup)
 
     const candidates = selectedTeammateBuffCandidates()
     const addedKeys = new Set(currentAddedCombatBuffs().map(addedCombatBuffKey))
@@ -3515,6 +3783,13 @@ function isDefaultCheckedCombatBuff(buff) {
     return DEFAULT_CHECKED_COMBAT_SOURCE_TYPES.has(buff?.sourceType)
 }
 
+function shouldUseDefaultCheckedCombatBuff(buff, useDefaultChecked) {
+    const defaultApplies = useDefaultChecked || buff?.sourceKind === "cinema"
+    return defaultApplies
+        && isDefaultCheckedCombatBuff(buff)
+        && !manuallyUncheckedDefaultCombatBuffIds.has(buff.id)
+}
+
 function renderCombatCheckboxList(container, buffs, checkedIds = checkedCombatBuffIds(), { useDefaultChecked = true } = {}) {
     container.innerHTML = ""
     if (!buffs.length) {
@@ -3527,7 +3802,7 @@ function renderCombatCheckboxList(container, buffs, checkedIds = checkedCombatBu
 
     for (const buff of buffs) {
         const checked = checkedIds.has(buff.id)
-            || (useDefaultChecked && isDefaultCheckedCombatBuff(buff) && !manuallyUncheckedDefaultCombatBuffIds.has(buff.id))
+            || shouldUseDefaultCheckedCombatBuff(buff, useDefaultChecked)
         const row = document.createElement("label")
         row.className = checked ? "combat-check-row active" : "combat-check-row"
         const input = document.createElement("input")
@@ -3737,7 +4012,11 @@ function renderBuffRuntimeControls(row, item, buff, runtime) {
     if (!needsRuntime) {
         return
     }
-    const buffKey = item?.sourceKind === "catalogBuff" ? catalogCombatBuffKey(item) : addedCombatBuffKey(item)
+    const buffKey = item?.sourceKind === "catalogBuff"
+        ? catalogCombatBuffKey(item)
+        : item?.sourceKind === "optimizerDriveDisc4pc"
+            ? optimizerDriveDisc4pcBuffKey(item.id)
+            : addedCombatBuffKey(item)
     const controls = document.createElement("div")
     controls.className = "combat-runtime-grid"
     controls.dataset.buffKey = buffKey
@@ -3912,6 +4191,10 @@ function setRuntimeValue(runtime, field, value, buff) {
 }
 
 function updateRuntimeFieldValue(buffKey, field, value) {
+    if (optimizerDriveDisc4pcRuntimeKeyFromBuffKey(buffKey)) {
+        updateOptimizerFourPieceBuffRuntime(buffKey, (runtime, buff) => setRuntimeValue(runtime, field, value, buff))
+        return
+    }
     if (catalogCombatBuffIdFromKey(buffKey)) {
         updateCatalogCombatBuffRuntime(buffKey, (runtime, buff) => setRuntimeValue(runtime, field, value, buff))
         return
@@ -3921,18 +4204,20 @@ function updateRuntimeFieldValue(buffKey, field, value) {
 }
 
 function refreshAddedCombatBuffSummary(buffKey) {
+    const optimizerItem = optimizerFourPieceBuffItemByKey(buffKey)
     const catalogBuffId = catalogCombatBuffIdFromKey(buffKey)
-    const item = catalogBuffId
+    const item = optimizerItem ?? (catalogBuffId
         ? catalogCombatBuffRuntimeItem((meta?.combatBuffs ?? []).find(buff => buff.id === catalogBuffId) ?? {})
-        : addedCombatBuffByKey(buffKey)
-    const row = els.combatSection.querySelector(`[data-buff-key="${CSS.escape(buffKey)}"]`)
+        : addedCombatBuffByKey(buffKey))
+    const row = els.fourPieceBuffManualList?.querySelector(`[data-buff-key="${CSS.escape(buffKey)}"]`)
+        ?? els.combatSection.querySelector(`[data-buff-key="${CSS.escape(buffKey)}"]`)
     const summary = row?.querySelector(".combat-added-stats")
     if (!item || !summary) {
         return
     }
-    const buff = catalogBuffId
+    const buff = optimizerItem?.buff ?? (catalogBuffId
         ? (meta?.combatBuffs ?? []).find(candidate => candidate.id === catalogBuffId)
-        : resolveAddedCombatBuff(item)
+        : resolveAddedCombatBuff(item))
     if (!buff) {
         return
     }
@@ -3942,6 +4227,14 @@ function refreshAddedCombatBuffSummary(buffKey) {
 function runtimeFieldContext(field) {
     const group = field.closest("[data-buff-key]")
     const buffKey = group?.dataset.buffKey
+    const optimizerItem = optimizerFourPieceBuffItemByKey(buffKey)
+    if (optimizerItem) {
+        return {
+            buffKey,
+            item: optimizerItem,
+            buff: optimizerItem.buff,
+        }
+    }
     const catalogBuffId = catalogCombatBuffIdFromKey(buffKey)
     if (catalogBuffId) {
         const buff = (meta?.combatBuffs ?? []).find(item => item.id === catalogBuffId)
@@ -4465,8 +4758,49 @@ function selectedValues(select) {
     return [...select.selectedOptions].map(option => option.value).filter(Boolean)
 }
 
+function validSelectValues(select, values = []) {
+    const available = new Set([...select.options].map(option => option.value))
+    const raw = Array.isArray(values) ? values : [values]
+    return [...new Set(raw
+        .map(value => String(value ?? "").trim())
+        .filter(value => value && available.has(value)))]
+}
+
+function firstValidSelectValue(select, values = []) {
+    return validSelectValues(select, values)[0] ?? ""
+}
+
+function setSelectedValues(select, values = []) {
+    const selected = new Set(validSelectValues(select, values))
+    for (const option of select.options) {
+        option.selected = selected.has(option.value)
+    }
+}
+
 function driveDiscSetById(setId) {
     return (meta?.driveDiscSets ?? []).find(set => set.id === setId) ?? null
+}
+
+function driveDiscSetIcon(set) {
+    return set?.images?.icon || "/assets/drive-discs/empty.svg"
+}
+
+function preferredDriveDiscDefaultSetId(agent = {}) {
+    return String(
+        agent.preferredDriveDiscs?.defaultSetId
+            ?? agent.preferredDriveDiscs?.defaultSet
+            ?? agent.defaultDriveDiscSetId
+            ?? "",
+    )
+}
+
+function defaultFourPieceSetIdForAgent(agentId = els.agentSelect?.value) {
+    const agent = getAgent(agentId)
+    const preferredSetId = preferredDriveDiscDefaultSetId(agent)
+    if (driveDiscSetById(preferredSetId)) {
+        return preferredSetId
+    }
+    return meta?.driveDiscSets?.[0]?.id ?? ""
 }
 
 function mainStatChoiceContainer(slot) {
@@ -4491,8 +4825,111 @@ function syncTwoPieceSetChoices() {
     renderTwoPieceSelectedSummary()
 }
 
+function syncFourPieceSetChoices() {
+    const selected = els.fourPieceSetSelect.value
+    for (const input of els.fourPieceSetChoices.querySelectorAll("input[data-four-piece-set-limit]")) {
+        input.checked = input.value === selected
+        input.closest(".two-piece-choice")?.classList.toggle("active", input.checked)
+    }
+    renderFourPieceSelectedSummary()
+}
+
 function twoPieceSetEffectText(set) {
     return storedEffectRulesText(set?.twoPiece) || "2件套效果未录入"
+}
+
+function renderFourPieceSelectedSummary() {
+    const set = driveDiscSetById(els.fourPieceSetSelect.value)
+    els.fourPieceSelectedSummary.innerHTML = ""
+    if (!set) {
+        const empty = document.createElement("span")
+        empty.className = "two-piece-selected-empty"
+        empty.textContent = "未选择限定 4 件套"
+        els.fourPieceSelectedSummary.appendChild(empty)
+        return
+    }
+    const item = document.createElement("span")
+    item.className = "two-piece-selected-chip set-selected-chip"
+    item.innerHTML = `
+        <img src="${escapeHtml(driveDiscSetIcon(set))}" alt="" loading="lazy">
+        <span>${escapeHtml(nameOf(set))}</span>
+    `
+    els.fourPieceSelectedSummary.appendChild(item)
+}
+
+function renderFourPieceBuffMode(mode = currentFourPieceBuffMode()) {
+    els.fourPieceBuffModeAuto?.classList.toggle("active", mode === "auto")
+    els.fourPieceBuffModeManual?.classList.toggle("active", mode === "manual")
+    els.fourPieceBuffModeAuto?.setAttribute("aria-pressed", String(mode === "auto"))
+    els.fourPieceBuffModeManual?.setAttribute("aria-pressed", String(mode === "manual"))
+}
+
+function renderFourPieceBuffSettings() {
+    if (!els.fourPieceBuffSection) {
+        return
+    }
+    const set = driveDiscSetById(currentFourPieceSetId())
+    const parts = ownFourPieceBuffParts(set)
+    const mode = currentFourPieceBuffMode(set?.id)
+    renderFourPieceBuffMode(mode)
+    els.fourPieceBuffSummary.innerHTML = ""
+    els.fourPieceBuffManualList.innerHTML = ""
+
+    if (!set) {
+        els.fourPieceBuffSummary.textContent = "请选择限定 4 件套。"
+        els.fourPieceBuffManualList.hidden = true
+        return
+    }
+    if (!parts.length) {
+        els.fourPieceBuffSummary.textContent = "当前 4 件套没有可自动应用的局内 Buff。"
+        els.fourPieceBuffManualList.hidden = true
+        return
+    }
+
+    const summaryPrefix = mode === "manual" ? "手动" : "自动"
+    for (const part of parts) {
+        const runtime = mode === "manual"
+            ? runtimeForOwnFourPieceBuff(part, set.id)
+            : defaultRuntimeForBuff(part.buff)
+        const line = document.createElement("span")
+        line.textContent = `${summaryPrefix}｜${part.label}：${storedEffectRulesText(part.buff, runtime) || effectStatText(part.buff) || "-"}`
+        els.fourPieceBuffSummary.appendChild(line)
+    }
+
+    els.fourPieceBuffManualList.hidden = mode !== "manual"
+    if (mode !== "manual") {
+        return
+    }
+
+    for (const part of parts) {
+        const runtime = runtimeForOwnFourPieceBuff(part, set.id)
+        setCurrentFourPieceBuffRuntimeInput(part.key, runtime, set.id)
+        const row = document.createElement("article")
+        row.className = "optimizer-four-piece-buff-card combat-added-card"
+        row.dataset.buffKey = optimizerDriveDisc4pcBuffKey(part.key)
+
+        const title = document.createElement("strong")
+        title.textContent = `${nameOf(set)}｜${part.label}`
+        const description = document.createElement("p")
+        description.textContent = localizedText(part.buff.description) || localizedText(part.buff.conditionLabel) || localizedText(part.buff.condition) || "手动覆盖本次优化评分使用的 4 件套效果参数。"
+        const stats = document.createElement("span")
+        stats.className = "combat-added-stats combat-buff-effect-lines"
+        renderBuffEffectLines(stats, part.buff, runtime, { fallbackText: effectStatText(part.buff) })
+
+        row.append(title, description, stats)
+        renderBuffRuntimeControls(row, {
+            id: part.key,
+            sourceKind: "optimizerDriveDisc4pc",
+            runtime,
+        }, part.buff, runtime)
+        if (!row.querySelector(".combat-runtime-grid")) {
+            const note = document.createElement("span")
+            note.className = "optimizer-four-piece-buff-note"
+            note.textContent = "此效果没有可调参数，将按当前默认建模生效。"
+            row.appendChild(note)
+        }
+        els.fourPieceBuffManualList.appendChild(row)
+    }
 }
 
 function renderTwoPieceSelectedSummary() {
@@ -4537,6 +4974,27 @@ function setTwoPieceSetSelected(setId, selected) {
     els.twoPieceSetSelect.dispatchEvent(new Event("change", { bubbles: true }))
 }
 
+function setFourPieceSetSelected(setId) {
+    const option = [...els.fourPieceSetSelect.options].find(item => item.value === setId)
+    if (!option) {
+        return
+    }
+    els.fourPieceSetSelect.value = setId
+    syncFourPieceSetChoices()
+    els.fourPieceSetSelect.dispatchEvent(new Event("change", { bubbles: true }))
+}
+
+function openFourPieceSetModal() {
+    syncFourPieceSetChoices()
+    els.fourPieceSetModal.hidden = false
+    document.body.classList.add("modal-open")
+}
+
+function closeFourPieceSetModal() {
+    els.fourPieceSetModal.hidden = true
+    document.body.classList.remove("modal-open")
+}
+
 function openTwoPieceSetModal() {
     syncTwoPieceSetChoices()
     els.twoPieceSetModal.hidden = false
@@ -4565,29 +5023,156 @@ function clearMainStatLimits(slot) {
     select.dispatchEvent(new Event("change", { bubbles: true }))
 }
 
+function collectMainStatLimits() {
+    return Object.fromEntries(OPTIMIZER_MAIN_STAT_SLOTS.map(slot => [
+        slot,
+        selectedValues(els[`slot${slot}MainStats`]),
+    ]))
+}
+
+function finiteInputNumber(value) {
+    const text = String(value ?? "").trim()
+    if (!text) {
+        return null
+    }
+    const number = Number(text)
+    return Number.isFinite(number) ? number : null
+}
+
 function collectMinimums() {
-    const entries = [
-        ["energyRegen", els.minEnergyRegen.value],
-        ["anomalyProficiency", els.minAnomalyProficiency.value],
-        ["critRate", els.minCritRate.value],
-        ["critDmg", els.minCritDmg.value],
-    ]
-    return Object.fromEntries(entries.filter(([, value]) => value !== "").map(([key, value]) => [key, Number(value)]))
+    return Object.fromEntries(OPTIMIZER_MINIMUM_FIELDS
+        .map(([stat, elementKey]) => [stat, finiteInputNumber(els[elementKey].value)])
+        .filter(([, value]) => value !== null))
+}
+
+function collectParallelSettings() {
+    return {
+        workerCount: "auto",
+    }
+}
+
+function collectFourPieceBuffRuntimeInputsForSet(setId = currentFourPieceSetId()) {
+    if (!setId || currentFourPieceBuffMode(setId) !== "manual") {
+        return {}
+    }
+    return Object.fromEntries(
+        ownFourPieceBuffParts(driveDiscSetById(setId))
+            .map(part => [part.key, runtimeForOwnFourPieceBuff(part, setId)])
+    )
+}
+
+function collectStoredFourPieceBuffRuntimeInputsForSet(setId = currentFourPieceSetId()) {
+    if (!setId) {
+        return {}
+    }
+    const stored = clonePlainObject(currentFourPieceBuffRuntimeInputs(setId))
+    if (currentFourPieceBuffMode(setId) !== "manual") {
+        return stored
+    }
+    return {
+        ...stored,
+        ...Object.fromEntries(
+            ownFourPieceBuffParts(driveDiscSetById(setId))
+                .map(part => [part.key, runtimeForOwnFourPieceBuff(part, setId)]),
+        ),
+    }
+}
+
+function collectFourPieceBuffSettingsForRequest() {
+    const setId = currentFourPieceSetId()
+    const mode = currentFourPieceBuffMode(setId)
+    return {
+        fourPieceBuffMode: mode,
+        ...(mode === "manual"
+            ? { fourPieceBuffRuntimeInputs: collectFourPieceBuffRuntimeInputsForSet(setId) }
+            : {}),
+    }
 }
 
 function collectOptimizationSettings() {
     return {
         algorithm: els.algorithmSelect.value,
+        ...collectParallelSettings(),
         fourPieceSetId: els.fourPieceSetSelect.value,
         twoPieceSetIds: selectedValues(els.twoPieceSetSelect),
+        ...collectFourPieceBuffSettingsForRequest(),
         objective: "damage",
-        mainStatLimits: {
-            4: selectedValues(els.slot4MainStats),
-            5: selectedValues(els.slot5MainStats),
-            6: selectedValues(els.slot6MainStats),
-        },
+        mainStatLimits: collectMainStatLimits(),
         minimums: collectMinimums(),
     }
+}
+
+function collectStoredOptimizerConfig() {
+    return {
+        algorithm: els.algorithmSelect.value,
+        fourPieceSetId: els.fourPieceSetSelect.value,
+        twoPieceSetIds: selectedValues(els.twoPieceSetSelect),
+        fourPieceBuffMode: currentFourPieceBuffMode(),
+        fourPieceBuffModeBySetId: {
+            ...optimizerFourPieceBuffModeBySetId,
+            ...(currentFourPieceSetId() ? { [currentFourPieceSetId()]: currentFourPieceBuffMode() } : {}),
+        },
+        fourPieceBuffRuntimeInputs: collectStoredFourPieceBuffRuntimeInputsForSet(currentFourPieceSetId()),
+        fourPieceBuffRuntimeInputsBySetId: {
+            ...clonePlainObject(optimizerFourPieceBuffRuntimeInputsBySetId),
+            ...(currentFourPieceSetId() ? { [currentFourPieceSetId()]: collectStoredFourPieceBuffRuntimeInputsForSet(currentFourPieceSetId()) } : {}),
+        },
+        mainStatLimits: collectMainStatLimits(),
+        minimums: collectMinimums(),
+    }
+}
+
+function applyStoredFourPieceBuffConfig(fourPieceSetId, optimizer = {}) {
+    optimizerFourPieceBuffModeBySetId = clonePlainObject(optimizer.fourPieceBuffModeBySetId)
+    optimizerFourPieceBuffRuntimeInputsBySetId = clonePlainObject(optimizer.fourPieceBuffRuntimeInputsBySetId)
+
+    if (fourPieceSetId && optimizer.fourPieceBuffMode) {
+        optimizerFourPieceBuffModeBySetId[fourPieceSetId] = normalizeFourPieceBuffMode(optimizer.fourPieceBuffMode)
+    }
+    if (fourPieceSetId && optimizer.fourPieceBuffRuntimeInputs && typeof optimizer.fourPieceBuffRuntimeInputs === "object") {
+        optimizerFourPieceBuffRuntimeInputsBySetId[fourPieceSetId] = clonePlainObject(optimizer.fourPieceBuffRuntimeInputs)
+    }
+}
+
+function applyStoredMainStatLimits(mainStatLimits = {}) {
+    for (const slot of OPTIMIZER_MAIN_STAT_SLOTS) {
+        const select = els[`slot${slot}MainStats`]
+        setSelectedValues(select, mainStatLimits?.[slot] ?? mainStatLimits?.[String(slot)] ?? [])
+        syncMainStatChoices(select, slot)
+    }
+}
+
+function applyStoredMinimums(minimums = {}) {
+    for (const [stat, elementKey] of OPTIMIZER_MINIMUM_FIELDS) {
+        const value = finiteInputNumber(minimums?.[stat])
+        els[elementKey].value = value === null ? "" : String(value)
+    }
+}
+
+function applyStoredOptimizerConfig(agentId = els.agentSelect.value, storedOptimizerConfig = configForAgent(agentId).optimizer) {
+    const optimizer = storedOptimizerConfig && typeof storedOptimizerConfig === "object" ? storedOptimizerConfig : {}
+    const algorithm = firstValidSelectValue(els.algorithmSelect, optimizer.algorithm)
+        || firstValidSelectValue(els.algorithmSelect, DEFAULT_OPTIMIZER_ALGORITHM)
+        || els.algorithmSelect.options[0]?.value
+        || ""
+    const fourPieceSetId = firstValidSelectValue(els.fourPieceSetSelect, optimizer.fourPieceSetId)
+        || firstValidSelectValue(els.fourPieceSetSelect, defaultFourPieceSetIdForAgent(agentId))
+        || els.fourPieceSetSelect.options[0]?.value
+        || ""
+
+    if (algorithm) {
+        els.algorithmSelect.value = algorithm
+    }
+    if (fourPieceSetId) {
+        els.fourPieceSetSelect.value = fourPieceSetId
+    }
+    setSelectedValues(els.twoPieceSetSelect, optimizer.twoPieceSetIds ?? optimizer.twoPieceSetId ?? [])
+    applyStoredFourPieceBuffConfig(fourPieceSetId, optimizer)
+    applyStoredMainStatLimits(optimizer.mainStatLimits)
+    applyStoredMinimums(optimizer.minimums)
+    syncFourPieceSetChoices()
+    syncTwoPieceSetChoices()
+    renderFourPieceBuffSettings()
 }
 
 function collectRequestPayload({ driveDiscs = [] } = {}) {
@@ -4603,28 +5188,71 @@ function collectRequestPayload({ driveDiscs = [] } = {}) {
     }
 }
 
+function activeDriveDisc4pcBuffIdsForResult(result = {}) {
+    const counts = new Map()
+    for (const disc of result.driveDiscs ?? []) {
+        if (disc?.setId) {
+            counts.set(disc.setId, (counts.get(disc.setId) ?? 0) + 1)
+        }
+    }
+    if (!counts.size) {
+        for (const summary of result.setSummary ?? []) {
+            if (summary?.fourPieceActive && summary?.setId) {
+                counts.set(summary.setId, Math.max(4, Number(summary.count ?? 4)))
+            }
+        }
+    }
+    const ids = []
+    for (const [setId, count] of counts.entries()) {
+        if (count < 4) {
+            continue
+        }
+        const set = getSet(setId)
+        if (driveDiscFourPieceSelfBuff(set)) {
+            ids.push(`driveDisc4pc:${setId}.self`)
+        }
+        if (driveDiscFourPieceTeamBuff(set)) {
+            ids.push(`driveDisc4pc:${setId}.team`)
+        }
+    }
+    return ids
+}
+
+function collectRequestPayloadForResult(result) {
+    const payload = collectRequestPayload({ driveDiscs: result?.driveDiscs ?? [] })
+    const activeBuffIds = new Set(payload.combatBuffs?.activeBuffIds ?? [])
+    const fourPieceBuffIds = activeDriveDisc4pcBuffIdsForResult(result)
+    for (const id of fourPieceBuffIds) {
+        activeBuffIds.add(id)
+    }
+    const settings = lastCompletedOptimizationSettings ?? collectOptimizationSettings()
+    const fourPieceRuntimeInputs = normalizeFourPieceBuffMode(settings?.fourPieceBuffMode) === "manual"
+        && settings?.fourPieceBuffRuntimeInputs
+        && typeof settings.fourPieceBuffRuntimeInputs === "object"
+        && !Array.isArray(settings.fourPieceBuffRuntimeInputs)
+            ? Object.fromEntries(fourPieceBuffIds
+                .map(id => [id, settings.fourPieceBuffRuntimeInputs[id]])
+                .filter(([, runtime]) => runtime && typeof runtime === "object" && !Array.isArray(runtime))
+                .map(([id, runtime]) => [id, clonePlainObject(runtime)]))
+            : {}
+    const runtimeInputs = {
+        ...(payload.combatBuffs?.runtimeInputs ?? {}),
+        ...fourPieceRuntimeInputs,
+    }
+    payload.combatBuffs = {
+        ...(payload.combatBuffs ?? {}),
+        activeBuffIds: [...activeBuffIds],
+        runtimeInputs,
+    }
+    return payload
+}
+
 function collectDriveDiscAnalysisPayload() {
     const result = optimizationResults[activeResultIndex]
     if (!result) {
         return null
     }
-    const payload = collectRequestPayload({ driveDiscs: result.driveDiscs ?? [] })
-    const activeBuffIds = new Set(payload.combatBuffs?.activeBuffIds ?? [])
-    for (const summary of result.setSummary ?? []) {
-        if (!summary.fourPieceActive || !summary.setId) {
-            continue
-        }
-        const set = getSet(summary.setId)
-        if (!set?.fourPiece) {
-            continue
-        }
-        activeBuffIds.add(`driveDisc4pc:${summary.setId}.self`)
-        activeBuffIds.add(`driveDisc4pc:${summary.setId}.team`)
-    }
-    payload.combatBuffs = {
-        ...(payload.combatBuffs ?? {}),
-        activeBuffIds: [...activeBuffIds],
-    }
+    const payload = collectRequestPayloadForResult(result)
     return payload
 }
 
@@ -4937,7 +5565,7 @@ async function refreshSelectedResultPreview() {
     const requestSeq = ++damagePreviewRequestSeq
     const response = await api("/api/calculate/in-combat", {
         method: "POST",
-        body: JSON.stringify(collectRequestPayload({ driveDiscs: result.driveDiscs ?? [] })),
+        body: JSON.stringify(collectRequestPayloadForResult(result)),
     })
     if (requestSeq !== damagePreviewRequestSeq) {
         return
@@ -4982,8 +5610,12 @@ async function finishOptimizationJob(job) {
         return
     }
     if (job.status === "error") {
-        setStatus(job.error || "计算失败", "error")
+        setStatus("计算失败", "error")
         els.optimizerMetrics.textContent = "计算失败"
+        showErrorNotice({
+            title: "计算失败",
+            message: job.error || "优化任务执行失败，请调整条件后重试。",
+        })
         return
     }
 
@@ -4998,6 +5630,8 @@ async function finishOptimizationJob(job) {
         ? [
             `评估 ${formatCount(processedCount)} / 估算 ${formatCount(metrics.estimatedCombinationCount)}`,
             metrics.algorithmLabel,
+            metrics.scoreKernel ? `内核 ${metrics.scoreKernel === "compiled-dense" ? "dense" : "map"}` : "",
+            metrics.scoreKernel !== "compiled-dense" && metrics.scoreKernelFallbackReason ? `回退 ${metrics.scoreKernelFallbackReason}` : "",
             Number(metrics.prunedBySuperBound ?? 0) > 0 ? `真实评分 ${formatCount(metrics.scoredCombinationCount ?? metrics.evaluated ?? 0)}` : "",
             Number(metrics.prunedBySuperBound ?? 0) > 0 ? `剪枝 ${formatCount(metrics.prunedBySuperBound)}` : "",
         ].filter(Boolean).join(" · ")
@@ -5010,7 +5644,12 @@ async function finishOptimizationJob(job) {
         setStatus(optimizationResultsDirty ? "条件已更改，请重新计算" : "计算完成", optimizationResultsDirty ? "idle" : "success")
     } else {
         await calculateEmptyPanel()
-        setStatus(data?.error?.reason ?? "没有符合条件的结果", "error")
+        const reason = data?.error?.reason ?? "没有符合条件的结果"
+        setStatus("没有结果", "error")
+        showErrorNotice({
+            title: "没有符合条件的结果",
+            message: reason,
+        })
     }
 }
 
@@ -5100,6 +5739,7 @@ async function runOptimization() {
     }
 
     saveSyncedConfig()
+    clearPageNotice()
     clearOptimizationResults()
     lastCompletedOptimizationSettings = null
     setStatus("计算中", "idle")
@@ -5153,7 +5793,12 @@ async function runOptimization() {
             stopOptimizationTimers()
             activeOptimizationJobId = null
             setOptimizeButtonRunning(false)
-            setStatus(error.message, "error")
+            const message = errorMessage(error)
+            setStatus("计算失败", "error")
+            showErrorNotice({
+                title: "计算失败",
+                message,
+            })
         })
     }, 500)
     await pollOptimizationJob(activeOptimizationJobId)
@@ -5177,6 +5822,7 @@ async function saveActiveLoadout() {
     if (name === null) {
         return
     }
+    clearPageNotice()
     setStatus("保存套装", "idle")
     const response = await api("/api/user-drive-disc-loadouts", {
         method: "POST",
@@ -5194,6 +5840,22 @@ async function saveActiveLoadout() {
     })
     store = response.store
     setStatus("已保存套装", "success")
+    showSuccessNotice({
+        title: "套装预设已保存",
+        message: `「${name.trim() || defaultName}」已保存到驱动盘页。`,
+        actions: [
+            {
+                label: "去驱动盘页查看",
+                onClick: () => {
+                    window.location.href = "/drive-discs.html#loadouts"
+                },
+            },
+            {
+                label: "关闭",
+                closeOnClick: true,
+            },
+        ],
+    })
 }
 
 function populateMainStatSelect(select, slot) {
@@ -5220,10 +5882,22 @@ function populateMainStatSelect(select, slot) {
 function populateSetSelects() {
     const sets = [...(meta?.driveDiscSets ?? [])]
         .sort((left, right) => nameOf(left).localeCompare(nameOf(right), "zh-CN"))
-    populateSelect(els.fourPieceSetSelect, sets, sets[0]?.id)
+    populateSelect(els.fourPieceSetSelect, sets, defaultFourPieceSetIdForAgent(els.agentSelect?.value) || sets[0]?.id)
+    els.fourPieceSetChoices.innerHTML = ""
     els.twoPieceSetSelect.innerHTML = ""
     els.twoPieceSetChoices.innerHTML = ""
     for (const set of sets) {
+        const fourPieceLabel = document.createElement("label")
+        fourPieceLabel.className = "two-piece-choice four-piece-choice"
+        fourPieceLabel.innerHTML = `
+            <input type="radio" name="fourPieceSetLimit" data-four-piece-set-limit value="${escapeHtml(set.id)}">
+            <img src="${escapeHtml(driveDiscSetIcon(set))}" alt="" loading="lazy">
+            <span class="two-piece-choice-text">
+                <strong>${escapeHtml(nameOf(set))}</strong>
+            </span>
+        `
+        els.fourPieceSetChoices.appendChild(fourPieceLabel)
+
         const option = document.createElement("option")
         option.value = set.id
         option.textContent = nameOf(set)
@@ -5231,10 +5905,9 @@ function populateSetSelects() {
 
         const label = document.createElement("label")
         label.className = "two-piece-choice"
-        const icon = set.images?.icon || "/assets/drive-discs/empty.svg"
         label.innerHTML = `
             <input type="checkbox" data-two-piece-set-limit value="${escapeHtml(set.id)}">
-            <img src="${escapeHtml(icon)}" alt="" loading="lazy">
+            <img src="${escapeHtml(driveDiscSetIcon(set))}" alt="" loading="lazy">
             <span class="two-piece-choice-text">
                 <strong>${escapeHtml(nameOf(set))}</strong>
                 <span>${escapeHtml(twoPieceSetEffectText(set))}</span>
@@ -5242,6 +5915,7 @@ function populateSetSelects() {
         `
         els.twoPieceSetChoices.appendChild(label)
     }
+    syncFourPieceSetChoices()
     syncTwoPieceSetChoices()
 }
 
@@ -5256,6 +5930,7 @@ function restoreHomeState() {
     populateWEngineSelect(wEngineId, agentId)
     populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), config.wEngineModificationLevel)
     applyStoredDamageConfig(damageConfigForAgent(agentId, config.damage))
+    applyStoredOptimizerConfig(agentId, config.optimizer)
     renderEntityCards()
     renderCombatControls()
 }
@@ -5305,6 +5980,7 @@ els.agentSelect.addEventListener("change", async () => {
         populateWEngineSelect(wEngineId, agentId)
         populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), config.wEngineModificationLevel)
         applyStoredDamageConfig(damageConfigForAgent(agentId, config.damage))
+        applyStoredOptimizerConfig(agentId, config.optimizer)
         await refreshAfterConfigChange()
     } catch (error) {
         setStatus(error.message, "error")
@@ -5346,6 +6022,7 @@ for (const { categoryId, select } of skillLevelSelects()) {
     })
 }
 for (const input of [
+    els.algorithmSelect,
     els.fourPieceSetSelect,
     els.twoPieceSetSelect,
     els.slot4MainStats,
@@ -5356,14 +6033,91 @@ for (const input of [
     els.minCritRate,
     els.minCritDmg,
 ]) {
-    input.addEventListener("change", refreshAfterConfigChange)
+    if (!input) {
+        continue
+    }
+    input.addEventListener("change", async () => {
+        try {
+            if (input === els.fourPieceSetSelect) {
+                syncFourPieceSetChoices()
+                renderFourPieceBuffSettings()
+            }
+            await refreshAfterConfigChange()
+        } catch (error) {
+            setStatus(error.message, "error")
+        }
+    })
     input.addEventListener("input", () => {
         if (input.tagName === "INPUT") {
-            markResultsDirty()
-            setStatus(activeOptimizationJobId ? "计算中" : "条件已更改，请重新计算", "idle")
+            try {
+                saveSyncedConfig()
+                markResultsDirty()
+                setStatus(activeOptimizationJobId ? "计算中" : "条件已更改，请重新计算", "idle")
+            } catch (error) {
+                setStatus(error.message, "error")
+            }
         }
     })
 }
+els.fourPieceBuffSection?.addEventListener("click", async event => {
+    const modeButton = event.target.closest("[data-four-piece-buff-mode]")
+    if (!modeButton) {
+        return
+    }
+    try {
+        const nextMode = normalizeFourPieceBuffMode(modeButton.dataset.fourPieceBuffMode)
+        if (currentFourPieceBuffMode() !== nextMode) {
+            setCurrentFourPieceBuffMode(nextMode)
+            renderFourPieceBuffSettings()
+            await refreshAfterConfigChange()
+        }
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
+})
+els.fourPieceBuffSection?.addEventListener("input", event => {
+    const runtimeField = event.target.closest("[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]")
+    if (!runtimeField) {
+        return
+    }
+    const group = runtimeField.closest("[data-buff-key]")
+    if (!group) {
+        return
+    }
+    try {
+        const value = inputNumberValue(runtimeField)
+        if (value === null || !Number.isFinite(value)) {
+            return
+        }
+        updateRuntimeFieldValue(group.dataset.buffKey, runtimeField, value)
+        refreshAddedCombatBuffSummary(group.dataset.buffKey)
+        saveSyncedConfig()
+        markResultsDirty()
+        setStatus(activeOptimizationJobId ? "计算中" : "条件已更改，请重新计算", "idle")
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
+})
+els.fourPieceBuffSection?.addEventListener("change", async event => {
+    const runtimeField = event.target.closest("[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]")
+    if (!runtimeField) {
+        return
+    }
+    await commitRuntimeField(runtimeField)
+    renderFourPieceBuffSettings()
+})
+els.fourPieceBuffSection?.addEventListener("keydown", async event => {
+    if (event.key !== "Enter") {
+        return
+    }
+    const runtimeField = event.target.closest("[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]")
+    if (!runtimeField) {
+        return
+    }
+    event.preventDefault()
+    await commitRuntimeField(runtimeField)
+    renderFourPieceBuffSettings()
+})
 document.querySelector(".optimizer-settings-grid").addEventListener("change", event => {
     if (!event.target.matches("[data-two-piece-set-limit]")) {
         return
@@ -5379,12 +6133,25 @@ document.querySelector(".optimizer-settings-grid").addEventListener("click", eve
 })
 els.openTwoPieceSetModalBtn?.addEventListener("click", openTwoPieceSetModal)
 els.closeTwoPieceSetModalBtn?.addEventListener("click", closeTwoPieceSetModal)
+els.openFourPieceSetModalBtn?.addEventListener("click", openFourPieceSetModal)
+els.closeFourPieceSetModalBtn?.addEventListener("click", closeFourPieceSetModal)
 els.twoPieceSelectedSummary?.addEventListener("click", event => {
     const remove = event.target.closest("[data-remove-two-piece-set]")
     if (!remove) {
         return
     }
     setTwoPieceSetSelected(remove.dataset.removeTwoPieceSet, false)
+})
+els.fourPieceSetModal?.addEventListener("click", event => {
+    if (event.target.matches("[data-close-four-piece-set-modal]")) {
+        closeFourPieceSetModal()
+    }
+})
+els.fourPieceSetModal?.addEventListener("change", event => {
+    if (!event.target.matches("[data-four-piece-set-limit]")) {
+        return
+    }
+    setFourPieceSetSelected(event.target.value)
 })
 els.twoPieceSetModal?.addEventListener("click", event => {
     if (event.target.matches("[data-close-two-piece-set-modal]")) {
@@ -5428,7 +6195,7 @@ els.combatSection.addEventListener("change", async event => {
         await commitGenericNumberInput(event.target)
         return
     }
-    if (!event.target.matches("input[data-combat-buff-id], select")) {
+    if (!event.target.matches("input[data-combat-buff-id], select") && event.target !== els.damageTargetStunned) {
         return
     }
     try {
@@ -5974,7 +6741,12 @@ els.optimizeBtn.addEventListener("click", async () => {
         stopOptimizationTimers()
         activeOptimizationJobId = null
         setOptimizeButtonRunning(false)
-        setStatus(error.message, "error")
+        const message = errorMessage(error)
+        setStatus("计算失败", "error")
+        showErrorNotice({
+            title: "启动计算失败",
+            message,
+        })
     }
 })
 els.optimizeInlineBtn?.addEventListener("click", async () => {
@@ -5984,7 +6756,12 @@ els.optimizeInlineBtn?.addEventListener("click", async () => {
         stopOptimizationTimers()
         activeOptimizationJobId = null
         setOptimizeButtonRunning(false)
-        setStatus(error.message, "error")
+        const message = errorMessage(error)
+        setStatus("计算失败", "error")
+        showErrorNotice({
+            title: "启动计算失败",
+            message,
+        })
     }
 })
 els.cancelOptimizeBtn.addEventListener("click", async () => {
@@ -6005,7 +6782,12 @@ els.saveLoadoutBtn.addEventListener("click", async () => {
     try {
         await saveActiveLoadout()
     } catch (error) {
-        setStatus(error.message, "error")
+        const message = errorMessage(error)
+        setStatus("保存失败", "error")
+        showErrorNotice({
+            title: "保存套装失败",
+            message,
+        })
     }
 })
 initDriveDiscAnalysis({
@@ -6027,7 +6809,12 @@ async function bootstrap() {
         renderResultList()
         setStatus("就绪", "success")
     } catch (error) {
-        setStatus(error.message, "error")
+        const message = errorMessage(error)
+        setStatus("加载失败", "error")
+        showErrorNotice({
+            title: "优化器加载失败",
+            message,
+        })
         console.error(error)
     }
 }

@@ -1,4 +1,5 @@
 import { confirmDialog } from "./dialogs.js"
+import { clearPageNotice, setStatusChip, showErrorNotice, showSuccessNotice } from "./feedback.js"
 
 const els = {
     status: document.getElementById("status"),
@@ -18,6 +19,13 @@ const els = {
     setFilter: document.getElementById("setFilter"),
     mainStatFilter: document.getElementById("mainStatFilter"),
     sortSelect: document.getElementById("sortSelect"),
+    inventoryViewTabs: document.getElementById("inventoryViewTabs"),
+    inventorySection: document.getElementById("inventorySection"),
+    loadoutSection: document.getElementById("loadoutSection"),
+    inventoryTabCount: document.getElementById("inventoryTabCount"),
+    loadoutTabCount: document.getElementById("loadoutTabCount"),
+    inventoryTableWrap: document.getElementById("inventoryTableWrap"),
+    loadoutTableWrap: document.getElementById("loadoutTableWrap"),
     discTableBody: document.getElementById("discTableBody"),
     emptyInventory: document.getElementById("emptyInventory"),
     loadoutCount: document.getElementById("loadoutCount"),
@@ -99,6 +107,7 @@ const PERCENT_STATS = new Set([
     "electricDmg",
     "etherDmg",
 ])
+const INVENTORY_VIEWS = new Set(["inventory", "loadouts"])
 
 let meta = null
 let store = null
@@ -106,10 +115,41 @@ let selectedId = null
 let selectedSetId = null
 let selectedSetName = ""
 let selectedLoadoutId = null
+let activeInventoryView = "inventory"
 
 function setStatus(text, tone = "idle") {
-    els.status.textContent = text
-    els.status.dataset.tone = tone
+    setStatusChip(els.status, text, tone)
+}
+
+function errorMessage(error) {
+    return error instanceof Error ? error.message : String(error)
+}
+
+function normalizeInventoryView(view) {
+    const normalized = String(view ?? "").replace(/^#/, "")
+    return INVENTORY_VIEWS.has(normalized) ? normalized : "inventory"
+}
+
+function inventoryViewFromHash() {
+    return normalizeInventoryView(window.location.hash)
+}
+
+function setInventoryView(view, { updateHash = false } = {}) {
+    activeInventoryView = normalizeInventoryView(view)
+    if (els.inventorySection) {
+        els.inventorySection.hidden = activeInventoryView !== "inventory"
+    }
+    if (els.loadoutSection) {
+        els.loadoutSection.hidden = activeInventoryView !== "loadouts"
+    }
+    for (const button of els.inventoryViewTabs?.querySelectorAll("[data-inventory-view]") ?? []) {
+        const active = button.dataset.inventoryView === activeInventoryView
+        button.classList.toggle("active", active)
+        button.setAttribute("aria-pressed", String(active))
+    }
+    if (updateHash && window.location.hash !== `#${activeInventoryView}`) {
+        history.replaceState(null, "", `#${activeInventoryView}`)
+    }
 }
 
 function escapeHtml(value) {
@@ -348,6 +388,12 @@ function renderSummary() {
     const imports = store?.imports ?? []
     const loadouts = store?.driveDiscLoadouts ?? []
     els.totalCount.textContent = String(discs.length)
+    if (els.inventoryTabCount) {
+        els.inventoryTabCount.textContent = String(discs.length)
+    }
+    if (els.loadoutTabCount) {
+        els.loadoutTabCount.textContent = String(loadouts.length)
+    }
     els.setCount.textContent = `${new Set(discs.map(item => item.setName)).size} 套`
     els.importCount.textContent = `${imports.length} 次导入`
     els.clearInventoryBtn.disabled = discs.length === 0 && imports.length === 0 && loadouts.length === 0
@@ -359,7 +405,9 @@ function renderTable() {
     els.filteredCount.textContent = `显示 ${discs.length} / ${total}`
     els.discTableBody.innerHTML = ""
     els.emptyInventory.hidden = discs.length !== 0
-    document.querySelector(".clean-table-wrap").hidden = discs.length === 0
+    if (els.inventoryTableWrap) {
+        els.inventoryTableWrap.hidden = discs.length === 0
+    }
 
     for (const disc of discs) {
         const set = resolveSet(disc)
@@ -409,6 +457,32 @@ function loadoutSlotText(loadout) {
     }).join(" / ")
 }
 
+function loadoutSlotChipsHtml(loadout) {
+    return `
+        <div class="loadout-slot-chip-list" aria-label="${escapeHtml(loadoutSlotText(loadout))}">
+            ${[1, 2, 3, 4, 5, 6].map(slot => {
+                const storedId = loadout.driveDiscIdsBySlot?.[String(slot)]
+                const disc = discById(storedId)
+                const missing = Boolean(storedId && !disc)
+                const set = disc ? resolveSet(disc) : null
+                const label = disc
+                    ? (disc.setName || nameOf(set))
+                    : missing ? "已缺失" : "未选择"
+                const detail = disc ? statText(disc.mainStat) : missing ? "待修复" : "空槽位"
+                return `
+                    <span class="loadout-slot-chip${disc ? "" : " missing"}" title="${escapeHtml(`${slot}号位 · ${label} · ${detail}`)}">
+                        <img src="${escapeHtml(disc ? setIcon(set ?? disc) : EMPTY_DISC_IMAGE)}" alt="">
+                        <span>
+                            <strong>${slot}号位</strong>
+                            <em>${escapeHtml(label)}</em>
+                        </span>
+                    </span>
+                `
+            }).join("")}
+        </div>
+    `
+}
+
 function renderLoadouts() {
     const loadouts = store?.driveDiscLoadouts ?? []
     if (!els.loadoutTableBody) {
@@ -416,8 +490,14 @@ function renderLoadouts() {
     }
 
     els.loadoutCount.textContent = String(loadouts.length)
+    if (els.loadoutTabCount) {
+        els.loadoutTabCount.textContent = String(loadouts.length)
+    }
     els.loadoutTableBody.innerHTML = ""
     els.emptyLoadouts.hidden = loadouts.length !== 0
+    if (els.loadoutTableWrap) {
+        els.loadoutTableWrap.hidden = loadouts.length === 0
+    }
     for (const loadout of loadouts) {
         const missingSlots = loadoutMissingSlots(loadout)
         const statusText = missingSlots.length ? `待修复：缺 ${missingSlots.join("、")} 号位` : "完整"
@@ -427,7 +507,7 @@ function renderLoadouts() {
         row.innerHTML = `
             <td><strong>${escapeHtml(loadout.name)}</strong><br><span>${escapeHtml(loadout.updatedAt ?? "-")}</span></td>
             <td>${escapeHtml(agentName(loadout.agentId))}</td>
-            <td class="substat-cell">${escapeHtml(loadoutSlotText(loadout))}<br><span class="${missingSlots.length ? "danger-text" : "muted-text"}">${escapeHtml(statusText)}</span></td>
+            <td class="loadout-slots-cell">${loadoutSlotChipsHtml(loadout)}<span class="${missingSlots.length ? "danger-text" : "muted-text"}">${escapeHtml(statusText)}</span></td>
             <td>${Number.isFinite(Number(loadout.score)) ? Number(loadout.score).toFixed(0) : "-"}</td>
             <td><button type="button" class="compact-btn" data-action="edit-loadout" data-loadout-id="${escapeHtml(loadout.id)}">编辑</button></td>
         `
@@ -440,6 +520,7 @@ function renderAll() {
     renderSummary()
     renderTable()
     renderLoadouts()
+    setInventoryView(activeInventoryView)
 }
 
 function currentDisc() {
@@ -596,34 +677,96 @@ function populateLoadoutAgentSelect(selectedAgentId) {
     }
 }
 
+function sortedDiscsForSlot(slot) {
+    return (store?.driveDiscs ?? [])
+        .filter(disc => Number(disc.partition) === Number(slot))
+        .sort((left, right) =>
+            String(left.setName).localeCompare(String(right.setName), "zh-CN")
+            || Number(left.source?.sequence ?? 999999) - Number(right.source?.sequence ?? 999999)
+        )
+}
+
+function loadoutSlotSelectOptionText(disc, slot) {
+    return `${disc.setName || nameOf(resolveSet(disc))} · ${slot}号位 · ${statText(disc.mainStat)}${disc.source?.sequence ? ` · #${disc.source.sequence}` : ""}`
+}
+
+function loadoutSlotPreviewHtml({ slot, disc, missingId = "" }) {
+    if (disc) {
+        const set = resolveSet(disc)
+        const subStats = (disc.subStats ?? []).slice(0, 4).map(statText)
+        return `
+            <div class="loadout-slot-card-visual">
+                <img src="${escapeHtml(setIcon(set ?? disc))}" alt="">
+                <div class="loadout-slot-card-copy">
+                    <span class="loadout-slot-kicker">${slot}号位</span>
+                    <strong>${escapeHtml(disc.setName || nameOf(set))}</strong>
+                    <span class="loadout-slot-main">${escapeHtml(statText(disc.mainStat))}</span>
+                    <p>${escapeHtml(subStats.join(" / ") || "暂无副词条")}</p>
+                    <div class="loadout-slot-card-meta">
+                        <span class="rarity-pill">${escapeHtml(disc.rarity ?? "-")} +${Number(disc.level ?? 0)}</span>
+                        <span>${escapeHtml(disc.source?.sequence ? `#${disc.source.sequence}` : disc.id)}</span>
+                    </div>
+                </div>
+            </div>
+        `
+    }
+
+    const missing = Boolean(missingId)
+    return `
+        <div class="loadout-slot-card-visual empty">
+            <img src="${escapeHtml(EMPTY_DISC_IMAGE)}" alt="">
+            <div class="loadout-slot-card-copy">
+                <span class="loadout-slot-kicker">${slot}号位</span>
+                <strong>${missing ? "驱动盘已缺失" : "未选择驱动盘"}</strong>
+                <span class="loadout-slot-main">${missing ? "保存后会清空该槽位" : "从下方选择同槽位驱动盘"}</span>
+                <p>${missing ? escapeHtml(`原 ID：${missingId}`) : "该槽位暂未绑定到套装预设"}</p>
+            </div>
+        </div>
+    `
+}
+
+function renderLoadoutSlotCardPreview(card, selectedId, slot, loadout) {
+    const originalId = loadout?.driveDiscIdsBySlot?.[String(slot)] ?? ""
+    const disc = selectedId ? discById(selectedId) : null
+    const missingId = selectedId ? "" : (originalId && !discById(originalId) ? originalId : "")
+    const preview = card.querySelector("[data-loadout-slot-preview]")
+    if (preview) {
+        preview.innerHTML = loadoutSlotPreviewHtml({ slot, disc, missingId })
+    }
+    card.classList.toggle("missing", Boolean(missingId))
+    card.classList.toggle("empty", !disc && !missingId)
+}
+
 function renderLoadoutSlotEditors(loadout) {
     els.loadoutSlotEditors.innerHTML = ""
     for (let slot = 1; slot <= 6; slot += 1) {
-        const label = document.createElement("label")
-        label.className = "field"
+        const originalId = loadout.driveDiscIdsBySlot?.[String(slot)] ?? ""
+        const card = document.createElement("article")
+        card.className = "loadout-slot-card"
+        card.dataset.slot = String(slot)
+        card.innerHTML = `<div data-loadout-slot-preview></div>`
+
+        const field = document.createElement("label")
+        field.className = "field loadout-slot-select-field"
         const select = document.createElement("select")
         select.dataset.loadoutSlot = String(slot)
         const empty = document.createElement("option")
         empty.value = ""
-        empty.textContent = "未选择"
-        empty.selected = !loadout.driveDiscIdsBySlot?.[String(slot)]
+        empty.textContent = originalId && !discById(originalId) ? "保存时清空缺失槽位" : "未选择"
+        empty.selected = !originalId || !discById(originalId)
         select.appendChild(empty)
-        const discs = (store?.driveDiscs ?? [])
-            .filter(disc => Number(disc.partition) === slot)
-            .sort((left, right) =>
-                String(left.setName).localeCompare(String(right.setName), "zh-CN")
-                || Number(left.source?.sequence ?? 999999) - Number(right.source?.sequence ?? 999999)
-            )
-        for (const disc of discs) {
+        for (const disc of sortedDiscsForSlot(slot)) {
             const option = document.createElement("option")
             option.value = disc.id
-            option.textContent = `${disc.setName || nameOf(resolveSet(disc))} · ${slot}号位 · ${statText(disc.mainStat)}${disc.source?.sequence ? ` · #${disc.source.sequence}` : ""}`
-            option.selected = disc.id === loadout.driveDiscIdsBySlot?.[String(slot)]
+            option.textContent = loadoutSlotSelectOptionText(disc, slot)
+            option.selected = disc.id === originalId
             select.appendChild(option)
         }
-        label.innerHTML = `<span>${slot}号位</span>`
-        label.appendChild(select)
-        els.loadoutSlotEditors.appendChild(label)
+        field.innerHTML = `<span>替换 ${slot}号位</span>`
+        field.appendChild(select)
+        card.appendChild(field)
+        els.loadoutSlotEditors.appendChild(card)
+        renderLoadoutSlotCardPreview(card, select.value, slot, loadout)
     }
 }
 
@@ -656,13 +799,14 @@ function readLoadoutSlotIds() {
 async function saveCurrentLoadout() {
     const existing = currentLoadout()
     if (!existing) {
-        return
+        return null
     }
+    const name = els.loadoutNameInput.value.trim() || existing.name
     const response = await api(`/api/user-drive-disc-loadouts/${encodeURIComponent(existing.id)}`, {
         method: "PUT",
         body: JSON.stringify({
             ...existing,
-            name: els.loadoutNameInput.value.trim() || existing.name,
+            name,
             agentId: els.loadoutAgentSelect.value,
             driveDiscIdsBySlot: readLoadoutSlotIds(),
             source: {
@@ -674,21 +818,23 @@ async function saveCurrentLoadout() {
     store = response.store
     closeLoadoutModal()
     renderAll()
+    return { name }
 }
 
 async function deleteCurrentLoadout() {
     const existing = currentLoadout()
     if (!existing) {
-        return
+        return null
     }
+    const name = existing.name
     const ok = await confirmDialog({
         title: "删除套装预设",
-        message: `确认删除套装预设「${existing.name}」？这不会删除仓库里的驱动盘。`,
+        message: `确认删除套装预设「${name}」？这不会删除仓库里的驱动盘。`,
         confirmText: "删除预设",
         tone: "danger",
     })
     if (!ok) {
-        return
+        return null
     }
     const response = await api(`/api/user-drive-disc-loadouts/${encodeURIComponent(existing.id)}`, {
         method: "DELETE",
@@ -696,6 +842,7 @@ async function deleteCurrentLoadout() {
     store = response.store
     closeLoadoutModal()
     renderAll()
+    return { name }
 }
 
 function readSubStats() {
@@ -768,10 +915,46 @@ async function loadStore() {
 
 function importSummaryText(summary) {
     if (!summary) {
-        return "导入完成"
+        return "仓库已更新"
     }
 
-    return `导入完成：新增 ${summary.added ?? 0}，跳过 ${summary.skipped ?? 0}，更新 ${summary.updated ?? 0}，删除 ${summary.removed ?? 0}，文件内重复 ${summary.duplicateInImport ?? 0}`
+    return `新增 ${summary.added ?? 0}，跳过 ${summary.skipped ?? 0}，更新 ${summary.updated ?? 0}，删除 ${summary.removed ?? 0}，文件内重复 ${summary.duplicateInImport ?? 0}`
+}
+
+function focusImportRecords() {
+    const target = els.importCount?.closest(".inventory-topline") ?? els.importCount
+    if (!target) {
+        return
+    }
+
+    target.scrollIntoView({ behavior: "smooth", block: "center" })
+    target.tabIndex = -1
+    target.focus({ preventScroll: true })
+}
+
+function showImportSuccessNotice(summary) {
+    showSuccessNotice({
+        title: "导入完成",
+        message: importSummaryText(summary),
+        persist: true,
+        actions: [
+            {
+                label: "查看导入记录",
+                onClick: focusImportRecords,
+            },
+            {
+                label: "关闭",
+                closeOnClick: true,
+            },
+        ],
+    })
+}
+
+function showImportErrorNotice(message) {
+    showErrorNotice({
+        title: "导入失败",
+        message,
+    })
 }
 
 async function importScannerFile(file) {
@@ -809,7 +992,8 @@ async function importScannerFile(file) {
     })
     store = response.store
     renderAll()
-    setStatus(importSummaryText(response.summary ?? store.lastImportSummary), "success")
+    setStatus("导入完成", "success")
+    showImportSuccessNotice(response.summary ?? store.lastImportSummary)
     return true
 }
 
@@ -851,12 +1035,13 @@ async function saveCurrentDisc() {
     selectedId = disc.id
     closeModal()
     renderAll()
+    return { disc, exists }
 }
 
 async function deleteCurrentDisc() {
     const disc = currentDisc()
     if (!disc) {
-        return
+        return null
     }
 
     const ok = await confirmDialog({
@@ -866,7 +1051,7 @@ async function deleteCurrentDisc() {
         tone: "danger",
     })
     if (!ok) {
-        return
+        return null
     }
 
     const response = await api(`/api/user-drive-discs/${encodeURIComponent(disc.id)}`, {
@@ -876,6 +1061,7 @@ async function deleteCurrentDisc() {
     selectedId = null
     closeModal()
     renderAll()
+    return { disc }
 }
 
 els.refreshBtn.addEventListener("click", async () => {
@@ -884,11 +1070,28 @@ els.refreshBtn.addEventListener("click", async () => {
         await loadStore()
         setStatus("就绪", "success")
     } catch (error) {
-        setStatus(error.message, "error")
+        const message = errorMessage(error)
+        setStatus("刷新失败", "error")
+        showErrorNotice({
+            title: "刷新失败",
+            message,
+        })
     }
 })
 
 els.newDiscBtn.addEventListener("click", () => openModal(null))
+
+els.inventoryViewTabs?.addEventListener("click", event => {
+    const button = event.target.closest("[data-inventory-view]")
+    if (!button) {
+        return
+    }
+    setInventoryView(button.dataset.inventoryView, { updateHash: true })
+})
+
+window.addEventListener("hashchange", () => {
+    setInventoryView(inventoryViewFromHash())
+})
 
 els.importBtn.addEventListener("click", () => {
     els.importFileInput.value = ""
@@ -903,6 +1106,7 @@ els.importFileInput.addEventListener("change", async () => {
 
     try {
         els.importBtn.disabled = true
+        clearPageNotice()
         setStatus("导入中", "idle")
         const imported = await importScannerFile(file)
         if (!imported) {
@@ -910,8 +1114,8 @@ els.importFileInput.addEventListener("change", async () => {
         }
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        setStatus(message, "error")
-        window.alert(message)
+        setStatus("导入失败", "error")
+        showImportErrorNotice(message)
     } finally {
         els.importBtn.disabled = false
     }
@@ -919,11 +1123,25 @@ els.importFileInput.addEventListener("change", async () => {
 
 els.clearInventoryBtn.addEventListener("click", async () => {
     try {
+        clearPageNotice()
         setStatus("清空仓库", "idle")
         const cleared = await clearInventory()
-        setStatus(cleared ? "仓库已清空" : "就绪", cleared ? "success" : "idle")
+        if (cleared) {
+            setStatus("仓库已清空", "success")
+            showSuccessNotice({
+                title: "仓库已清空",
+                message: "驱动盘、导入记录和套装预设已清空。",
+            })
+        } else {
+            setStatus("就绪", "idle")
+        }
     } catch (error) {
-        setStatus(error.message, "error")
+        const message = errorMessage(error)
+        setStatus("清空失败", "error")
+        showErrorNotice({
+            title: "清空仓库失败",
+            message,
+        })
     }
 })
 
@@ -1017,49 +1235,113 @@ els.loadoutModal?.addEventListener("click", event => {
         closeLoadoutModal()
     }
 })
+els.loadoutSlotEditors?.addEventListener("change", event => {
+    const select = event.target.closest("select[data-loadout-slot]")
+    if (!select) {
+        return
+    }
+    const card = select.closest(".loadout-slot-card")
+    if (!card) {
+        return
+    }
+    renderLoadoutSlotCardPreview(card, select.value, Number(select.dataset.loadoutSlot), currentLoadout())
+})
 els.saveLoadoutBtn?.addEventListener("click", async () => {
     try {
+        clearPageNotice()
         setStatus("保存套装", "idle")
-        await saveCurrentLoadout()
-        setStatus("已保存", "success")
+        const saved = await saveCurrentLoadout()
+        if (saved) {
+            setStatus("已保存", "success")
+            showSuccessNotice({
+                title: "套装预设已保存",
+                message: `「${saved.name}」已更新。`,
+            })
+        } else {
+            setStatus("就绪", "idle")
+        }
     } catch (error) {
-        setStatus(error.message, "error")
+        const message = errorMessage(error)
+        setStatus("保存失败", "error")
+        showErrorNotice({
+            title: "保存套装预设失败",
+            message,
+        })
     }
 })
 els.deleteLoadoutBtn?.addEventListener("click", async () => {
     try {
+        clearPageNotice()
         setStatus("删除套装", "idle")
-        await deleteCurrentLoadout()
-        setStatus("已删除", "success")
+        const deleted = await deleteCurrentLoadout()
+        if (deleted) {
+            setStatus("已删除", "success")
+            showSuccessNotice({
+                title: "套装预设已删除",
+                message: `「${deleted.name}」已删除，仓库驱动盘未受影响。`,
+            })
+        } else {
+            setStatus("就绪", "idle")
+        }
     } catch (error) {
-        setStatus(error.message, "error")
+        const message = errorMessage(error)
+        setStatus("删除失败", "error")
+        showErrorNotice({
+            title: "删除套装预设失败",
+            message,
+        })
     }
 })
 
 els.discForm.addEventListener("submit", async event => {
     event.preventDefault()
     try {
+        clearPageNotice()
         setStatus("保存中", "idle")
-        await saveCurrentDisc()
+        const saved = await saveCurrentDisc()
         setStatus("已保存", "success")
+        showSuccessNotice({
+            title: "驱动盘已保存",
+            message: `${saved.disc.setName} ${saved.disc.partition}号位已${saved.exists ? "更新" : "加入仓库"}。`,
+        })
     } catch (error) {
-        setStatus(error.message, "error")
+        const message = errorMessage(error)
+        setStatus("保存失败", "error")
+        showErrorNotice({
+            title: "保存驱动盘失败",
+            message,
+        })
     }
 })
 
 els.deleteDiscBtn.addEventListener("click", async () => {
     try {
+        clearPageNotice()
         setStatus("删除中", "idle")
-        await deleteCurrentDisc()
-        setStatus("已删除", "success")
+        const deleted = await deleteCurrentDisc()
+        if (deleted) {
+            setStatus("已删除", "success")
+            showSuccessNotice({
+                title: "驱动盘已删除",
+                message: `${deleted.disc.setName} ${deleted.disc.partition}号位已删除，相关套装槽位已清理。`,
+            })
+        } else {
+            setStatus("就绪", "idle")
+        }
     } catch (error) {
-        setStatus(error.message, "error")
+        const message = errorMessage(error)
+        setStatus("删除失败", "error")
+        showErrorNotice({
+            title: "删除驱动盘失败",
+            message,
+        })
     }
 })
 
 async function bootstrap() {
     try {
         setStatus("加载中", "idle")
+        setInventoryView(inventoryViewFromHash())
         await loadMeta()
         await loadStore()
         if (new URLSearchParams(window.location.search).get("new") === "1") {
@@ -1067,7 +1349,12 @@ async function bootstrap() {
         }
         setStatus("就绪", "success")
     } catch (error) {
-        setStatus(error.message, "error")
+        const message = errorMessage(error)
+        setStatus("加载失败", "error")
+        showErrorNotice({
+            title: "驱动盘加载失败",
+            message,
+        })
         console.error(error)
     }
 }

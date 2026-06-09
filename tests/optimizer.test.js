@@ -4,7 +4,7 @@ import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { calculateInCombatPanel, loadCalculatorContext } from "../backend/calculator.js"
-import { optimizeDriveDiscs, previewDriveDiscOptimization } from "../backend/driveDiscOptimizer.js"
+import { optimizeDriveDiscs, optimizeDriveDiscsAsync, previewDriveDiscOptimization } from "../backend/driveDiscOptimizer.js"
 import {
     clearUserDriveDiscStore,
     deleteDriveDiscLoadout,
@@ -83,6 +83,20 @@ const store = {
             { stat: "atkPct", value: 9, mode: "pct" },
         ]),
     ],
+}
+
+function storeWithFourPieceSet(setId) {
+    const setName = catalog.driveDiscSetsMap.get(setId)?.name?.zhCN ?? setId
+    return {
+        ...store,
+        driveDiscs: store.driveDiscs.map(item => item.setId === fourSet
+            ? {
+                ...item,
+                setId,
+                setName,
+            }
+            : item),
+    }
 }
 
 function optimizerInput(overrides = {}) {
@@ -180,6 +194,14 @@ function bruteForce(input) {
     return results
         .sort((left, right) => right.score - left.score || left.ids.localeCompare(right.ids))
         .slice(0, 5)
+}
+
+function resultIds(result) {
+    return result.results.map(item => item.driveDiscs.map(disc => disc.id).join("|"))
+}
+
+function resultScores(result) {
+    return result.results.map(item => Number(item.score.toFixed(6)))
 }
 
 const exact = optimizeDriveDiscs(catalog, store, optimizerInput())
@@ -281,6 +303,136 @@ assert.equal(heuristic.metrics.algorithmId, "heuristic-potential")
 assert.equal(heuristic.metrics.strictExact, false)
 assert.ok(heuristic.results.length > 0)
 
+const parallel = await optimizeDriveDiscsAsync(catalog, store, optimizerInput({
+    settings: {
+        algorithm: "exact-super-bound-parallel",
+        workerCount: 2,
+    },
+}))
+assert.equal(parallel.metrics.algorithmId, "exact-super-bound-parallel")
+assert.equal(parallel.metrics.strictExact, true)
+assert.equal(parallel.metrics.workerCount, 2)
+assert.ok(parallel.metrics.parallelTaskCount > 0)
+assert.equal(parallel.metrics.completedTaskCount, parallel.metrics.parallelTaskCount)
+assert.deepEqual(
+    parallel.results.map(result => Number(result.score.toFixed(6))),
+    exact.results.map(result => Number(result.score.toFixed(6))),
+)
+assert.deepEqual(
+    parallel.results.map(result => result.driveDiscs.map(item => item.id).join("|")).sort(),
+    exact.results.map(result => result.driveDiscs.map(item => item.id).join("|")).sort(),
+)
+
+const fangedSet = "fanged_metal"
+const fangedStore = storeWithFourPieceSet(fangedSet)
+const fangedAuto = optimizeDriveDiscs(catalog, fangedStore, optimizerInput({
+    settings: {
+        fourPieceSetId: fangedSet,
+    },
+}))
+const fangedManualZeroInput = optimizerInput({
+    settings: {
+        fourPieceSetId: fangedSet,
+        fourPieceBuffMode: "manual",
+        fourPieceBuffRuntimeInputs: {
+            [`driveDisc4pc:${fangedSet}.self`]: {
+                coverage: 0,
+            },
+        },
+    },
+})
+const fangedManualZero = optimizeDriveDiscs(catalog, fangedStore, fangedManualZeroInput)
+const fangedManualZeroLegacy = optimizeDriveDiscs(catalog, fangedStore, {
+    ...fangedManualZeroInput,
+    settings: {
+        ...fangedManualZeroInput.settings,
+        algorithm: "exact-legacy",
+    },
+})
+const fangedManualZeroNoPrune = optimizeDriveDiscs(catalog, fangedStore, {
+    ...fangedManualZeroInput,
+    settings: {
+        ...fangedManualZeroInput.settings,
+        enableUpperBoundPruning: false,
+    },
+})
+const fangedZeroEffect = fangedManualZero.results[0].data.inCombat.activeEffects
+    .find(item => item.key === `driveDisc4pc:${fangedSet}.self`)
+assert.ok(fangedAuto.results[0].score > fangedManualZero.results[0].score)
+assert.equal(fangedManualZero.settings.fourPieceBuffMode, "manual")
+assert.equal(fangedZeroEffect?.runtime?.coverage, 0)
+assert.equal(fangedZeroEffect?.resolvedStats?.find(item => item.stat === "dmgBonus")?.value, 0)
+assert.deepEqual(resultIds(fangedManualZero), resultIds(fangedManualZeroLegacy))
+assert.deepEqual(resultScores(fangedManualZero), resultScores(fangedManualZeroLegacy))
+assert.deepEqual(resultIds(fangedManualZero), resultIds(fangedManualZeroNoPrune))
+assert.deepEqual(resultScores(fangedManualZero), resultScores(fangedManualZeroNoPrune))
+
+const yunkuiSet = "yunkui_tales"
+const yunkuiStore = storeWithFourPieceSet(yunkuiSet)
+const yunkuiManualZeroStackInput = optimizerInput({
+    settings: {
+        fourPieceSetId: yunkuiSet,
+        fourPieceBuffMode: "manual",
+        fourPieceBuffRuntimeInputs: {
+            [`driveDisc4pc:${yunkuiSet}.self`]: {
+                coverage: 1,
+                effects: {
+                    effect_yunkui_tales_4pc_crit_rate: {
+                        stacks: 0,
+                    },
+                },
+            },
+        },
+    },
+})
+const yunkuiManualZeroStack = optimizeDriveDiscs(catalog, yunkuiStore, yunkuiManualZeroStackInput)
+const yunkuiManualMaxStack = optimizeDriveDiscs(catalog, yunkuiStore, optimizerInput({
+    settings: {
+        fourPieceSetId: yunkuiSet,
+        fourPieceBuffMode: "manual",
+        fourPieceBuffRuntimeInputs: {
+            [`driveDisc4pc:${yunkuiSet}.self`]: {
+                coverage: 1,
+                effects: {
+                    effect_yunkui_tales_4pc_crit_rate: {
+                        stacks: 3,
+                    },
+                },
+            },
+        },
+    },
+}))
+const yunkuiManualZeroStackLegacy = optimizeDriveDiscs(catalog, yunkuiStore, {
+    ...yunkuiManualZeroStackInput,
+    settings: {
+        ...yunkuiManualZeroStackInput.settings,
+        algorithm: "exact-legacy",
+    },
+})
+const yunkuiManualZeroStackParallel = await optimizeDriveDiscsAsync(catalog, yunkuiStore, {
+    ...yunkuiManualZeroStackInput,
+    settings: {
+        ...yunkuiManualZeroStackInput.settings,
+        algorithm: "exact-super-bound-parallel",
+        workerCount: 2,
+    },
+})
+const yunkuiZeroStackEffect = yunkuiManualZeroStack.results[0].data.inCombat.activeEffects
+    .find(item => item.key === `driveDisc4pc:${yunkuiSet}.self`)
+assert.ok(yunkuiManualMaxStack.results[0].score > yunkuiManualZeroStack.results[0].score)
+assert.equal(
+    yunkuiZeroStackEffect?.runtime?.effects?.effect_yunkui_tales_4pc_crit_rate?.stacks,
+    0,
+)
+assert.equal(
+    yunkuiZeroStackEffect?.resolvedStats?.find(item => item.stat === "critRate")?.value,
+    0,
+)
+assert.deepEqual(resultIds(yunkuiManualZeroStack), resultIds(yunkuiManualZeroStackLegacy))
+assert.deepEqual(resultScores(yunkuiManualZeroStack), resultScores(yunkuiManualZeroStackLegacy))
+assert.deepEqual(resultIds(yunkuiManualZeroStackParallel).sort(), resultIds(yunkuiManualZeroStack).sort())
+assert.deepEqual(resultScores(yunkuiManualZeroStackParallel), resultScores(yunkuiManualZeroStack))
+
 const miyabi = catalog.agentsMap.get("hoshimi_miyabi")
 assert.ok(miyabi.defaultCalculationConfig, "Miyabi should expose an admin default calculation config")
 const miyabiDefaultDamage = calculateInCombatPanel(catalog, {
@@ -373,6 +525,30 @@ const explicitOverridesPreferred = optimizeDriveDiscs(preferredCatalog, store, o
 }))
 assert.ok(explicitOverridesPreferred.results.length > 0)
 assert.ok(explicitOverridesPreferred.results.every(result => result.driveDiscs.find(disc => disc.partition === 4).mainStat.stat === "atkPct"))
+
+const preferredDefaultSetCatalog = {
+    ...catalog,
+    agents: catalog.agents.map(agent => agent.id === exampleInput.agentId
+        ? {
+            ...agent,
+            preferredDriveDiscs: {
+                defaultSetId: thirdSet,
+            },
+        }
+        : agent),
+}
+preferredDefaultSetCatalog.agentsMap = new Map(preferredDefaultSetCatalog.agents.map(agent => [agent.id, agent]))
+const defaultSetLimited = optimizeDriveDiscs(preferredDefaultSetCatalog, store, optimizerInput({
+    settings: {
+        fourPieceSetId: undefined,
+    },
+}))
+assert.equal(defaultSetLimited.settings.fourPieceSetId, thirdSet)
+assert.ok(defaultSetLimited.results.length > 0)
+assert.ok(defaultSetLimited.results.every(result => {
+    const counts = result.driveDiscs.reduce((map, disc) => map.set(disc.setId, (map.get(disc.setId) ?? 0) + 1), new Map())
+    return (counts.get(thirdSet) ?? 0) >= 4
+}))
 
 const allSame = optimizeDriveDiscs(catalog, store, optimizerInput({ settings: { twoPieceSetId: fourSet } }))
 assert.ok(allSame.results.length > 0)

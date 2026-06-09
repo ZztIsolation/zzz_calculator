@@ -58,8 +58,81 @@
               "value": 50
             }
           ]
+        },
+        {
+          "id": "qianxia.cinema_1.cat_gaze_def_reduction",
+          "source": {
+            "zhCN": "影画一"
+          },
+          "description": {
+            "zhCN": "千夏进入战场时，回复15能量，在勘域模式中此效果180秒内最多触发一次；「猫的凝视」触发并命中敌人时，使目标的防御力降低7%，持续40秒，最多叠加3层，每层效果单独结算持续时间。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "qianxia_cinema_1_enemy_def_reduction",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "enemyDefReduction",
+              "mode": "flat",
+              "valuePerStack": 7,
+              "maxStacks": 3,
+              "defaultStacks": 3
+            }
+          ]
+        },
+        {
+          "id": "qianxia.cinema_2.aether_curtain_atk_pct",
+          "source": {
+            "zhCN": "影画二"
+          },
+          "description": {
+            "zhCN": "千夏处于任意「以太帷幕」内时，使全队角色攻击力提升10%，每10秒获得1个「磨爪器」；「猫的凝视」触发所需的攻击次数减少；触发造成的伤害倍率提升：「强攻」角色触发时，伤害倍率增加200%；「异常」角色触发时，伤害倍率增加300%。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "qianxia_cinema_2_team_atk_pct",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkPct",
+              "mode": "pct",
+              "basis": "outOfCombatAtk",
+              "value": 10
+            }
+          ]
+        },
+        {
+          "id": "qianxia.cinema_4.ultimate_team_dmg_bonus",
+          "source": {
+            "zhCN": "影画四"
+          },
+          "description": {
+            "zhCN": "千夏发动「终结技」时，使全队角色造成的伤害提升18%，持续60秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "qianxia_cinema_4_team_dmg_bonus",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 18
+            }
+          ]
         }
-      ]
+      ],
+      "images": {
+        "icon": "/assets/agents/qianxia.png",
+        "source": "https://patchwiki.biligame.com/images/zzz/4/46/gidrjjm8ujx5v07rwaofdyjzhwzzfjk.png"
+      }
     },
     {
       "id": "liuyin",
@@ -85,8 +158,56 @@
             }
           ],
           "id": "buff_6646686e01"
+        },
+        {
+          "id": "liuyin.cinema_1.good_review_res_ignore",
+          "source": {
+            "zhCN": "影画一"
+          },
+          "description": {
+            "zhCN": "每秒积累的「好评」与发动「强化特殊技：石头」、「强化特殊技：剪刀」、「强化特殊技：布！」命中敌人时积累的「好评」提升16%，「好评如潮」状态下的角色无视敌人15%全属性伤害抗性。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "liuyin_cinema_1_res_ignore_as_res_reduction",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "enemyResReduction",
+              "mode": "flat",
+              "value": 15
+            }
+          ]
+        },
+        {
+          "id": "liuyin.cinema_2.complaint_damage_bonus",
+          "source": {
+            "zhCN": "影画二"
+          },
+          "description": {
+            "zhCN": "「恶意投诉」效果下敌人进入失衡状态后的失衡易伤倍率额外提升20%，所有单位对「恶意投诉」效果下的敌人造成的伤害提升15%。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "liuyin_cinema_2_damage_bonus",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 15
+            }
+          ]
         }
-      ]
+      ],
+      "images": {
+        "icon": "/assets/agents/liuyin.png",
+        "source": "https://patchwiki.biligame.com/images/zzz/f/f4/ootwjjl52b9idun1izgsm6nfzyc06gh.png"
+      }
     },
     {
       "id": "zhao",
@@ -139,8 +260,57 @@
             }
           ],
           "id": "buff_7a09645b2f"
+        },
+        {
+          "id": "zhao.cinema_1.off_field_res_ignore",
+          "source": {
+            "zhCN": "影画一"
+          },
+          "description": {
+            "zhCN": "照被切换为非当前操作角色时，使全队角色造成的伤害无视目标15%属性伤害抗性，持续50秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "zhao_cinema_1_res_ignore_as_res_reduction",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "enemyResReduction",
+              "mode": "flat",
+              "value": 15
+            }
+          ]
+        },
+        {
+          "id": "zhao.cinema_2.heal_team_atk_pct",
+          "source": {
+            "zhCN": "影画二"
+          },
+          "description": {
+            "zhCN": "照的生命值回复时，提升20%攻击力，并使队伍中其他角色提升15%攻击力，持续50秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "zhao_cinema_2_team_atk_pct",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkPct",
+              "mode": "pct",
+              "basis": "outOfCombatAtk",
+              "value": 15
+            }
+          ]
         }
-      ]
+      ],
+      "images": {
+        "icon": "/assets/agents/zhao.png",
+        "source": "https://patchwiki.biligame.com/images/zzz/a/a7/4x6ftmp0p7f3aiy07e2c05ramfc0gr7.png"
+      }
     },
     {
       "id": "nangongyu",
@@ -216,7 +386,11 @@
           "buffModifiers": [],
           "id": "buff_a9ab2c0d63"
         }
-      ]
+      ],
+      "images": {
+        "icon": "/assets/agents/nangongyu.png",
+        "source": "https://patchwiki.biligame.com/images/zzz/6/61/m3sghl98vjnpi06nnqfbk7hjqha8n1d.png"
+      }
     },
     {
       "id": "youye",
@@ -392,8 +566,37 @@
           ],
           "buffModifiers": [],
           "id": "buff_8857e98214"
+        },
+        {
+          "id": "youye.cinema_6.disorder_multiplier_bonus",
+          "source": {
+            "zhCN": "影画六"
+          },
+          "description": {
+            "zhCN": "「支援突击：夹心硬糖射击」的任意强力炮弹命中敌人时，会使全队角色「紊乱」效果的伤害倍率提升105%，持续40秒，最多叠加3层，每层单独结算持续时间；额外强力炮弹命中处于「甜蜜惊吓」状态的敌人时也会触发1次「普通攻击：彩糖花火·极」攻击。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "youye_cinema_6_disorder_damage_bonus",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "disorderDamageBonus",
+              "mode": "flat",
+              "valuePerStack": 105,
+              "maxStacks": 3,
+              "defaultStacks": 3
+            }
+          ],
+          "buffModifiers": []
         }
-      ]
+      ],
+      "images": {
+        "icon": "/assets/agents/youye.png",
+        "source": "https://patchwiki.biligame.com/images/zzz/b/be/p6n16r8ky85he83f9dp2yzv0pi51xjv.png"
+      }
     },
     {
       "id": "yaojiayin",
@@ -483,8 +686,70 @@
               }
             }
           ]
+        },
+        {
+          "id": "yaojiayin.cinema_1.enemy_res_reduction",
+          "source": {
+            "zhCN": "影画一"
+          },
+          "description": {
+            "zhCN": "耀嘉音攻击命中敌人时，目标的全属性伤害抗性降低6%，最多叠加3层，持续30秒，重复触发时刷新持续时间；进入战场时，耀嘉音立刻获得1000点喧响值；发动[终结技]时，全队各自获得1层[庇佑之音]效果，持续60秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "yaojiayin_cinema_1_enemy_res_reduction",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "enemyResReduction",
+              "mode": "flat",
+              "valuePerStack": 6,
+              "maxStacks": 3,
+              "defaultStacks": 3
+            }
+          ]
+        },
+        {
+          "id": "yaojiayin.cinema_2.core_andante_atk_bonus",
+          "source": {
+            "zhCN": "影画二"
+          },
+          "description": {
+            "zhCN": "[核心被动：《如歌的行板》]中的攻击力提升效果额外提升19%，上限额外提升400点；[咏叹华彩]状态下，队伍中其他角色通过[快速支援]、[连携技]、[招架支援]或[回避支援]入场时，耀嘉音将额外追加释放1道[震音]和3枚[音簇]进行攻击，3秒内最多触发一次。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "yaojiayin_cinema_2_core_atk_delta",
+              "type": "formula",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkFlat",
+              "mode": "flat",
+              "source": {
+                "variable": "x",
+                "label": {
+                  "zhCN": "耀嘉音初始攻击力"
+                },
+                "defaultValue": 3429,
+                "min": 0,
+                "max": 4000
+              },
+              "formula": {
+                "expression": "clamp(x * 0.54, 0, 1600) - clamp(x * 0.35, 0, 1200)",
+                "valueUnit": "storedValue"
+              }
+            }
+          ]
         }
-      ]
+      ],
+      "images": {
+        "icon": "/assets/agents/yaojiayin.png",
+        "source": "https://patchwiki.biligame.com/images/zzz/d/da/322lo9l3y2krzkkwukc3om19aa76l7s.png"
+      }
     },
     {
       "id": "rina",
@@ -547,8 +812,61 @@
               "value": 10
             }
           ]
+        },
+        {
+          "id": "rina.cinema_1.core_pen_ratio_amplify",
+          "source": {
+            "zhCN": "影画一"
+          },
+          "description": {
+            "zhCN": "被指派并发动攻击后，返回丽娜身边前，杜苏拉和安娜塔莎会在远处额外逗留5.5秒；在杜苏拉或安娜塔莎附近10米范围内的角色，从[核心被动：迷你毁灭拍档]中获得的增益效果提升至原本的130%。"
+          },
+          "scope": "inCombat",
+          "effects": [],
+          "buffModifiers": [
+            {
+              "id": "rina_cinema_1_amplify_core_pen_ratio",
+              "operation": "multiplyResolvedValue",
+              "factor": 1.3,
+              "targetBuffIds": [
+                "rina.core_pen_ratio"
+              ],
+              "targetEffectIds": [
+                "rina_core_pen_ratio"
+              ],
+              "label": {
+                "zhCN": "[核心被动]中穿透率增益效果提升至原本的130%。"
+              }
+            }
+          ]
+        },
+        {
+          "id": "rina.cinema_6.electric_damage_bonus",
+          "source": {
+            "zhCN": "影画六"
+          },
+          "description": {
+            "zhCN": "[强化特殊技]、[连携技]或[终结技]命中敌人时，全队造成的电属性伤害提升15%，持续8秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "rina_cinema_6_electric_damage_bonus",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "electricDmg",
+              "mode": "flat",
+              "value": 15
+            }
+          ]
         }
-      ]
+      ],
+      "images": {
+        "icon": "/assets/agents/rina.png",
+        "source": "https://patchwiki.biligame.com/images/zzz/8/8b/9y0kt391kj33gzaifu4uh8v2ljwguhw.png"
+      }
     },
     {
       "id": "lucy",
@@ -589,8 +907,34 @@
               }
             }
           ]
+        },
+        {
+          "id": "lucy.cinema_4.cheer_on_crit_dmg",
+          "source": {
+            "zhCN": "影画四"
+          },
+          "description": {
+            "zhCN": "处于「加油！」状态下的友方单位，暴击伤害额外提升10%。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "lucy_cinema_4_crit_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critDmg",
+              "mode": "flat",
+              "value": 10
+            }
+          ]
         }
-      ]
+      ],
+      "images": {
+        "icon": "/assets/agents/lucy.png",
+        "source": "https://patchwiki.biligame.com/images/zzz/4/4b/nun3urflupvt1lq85o81qxeoie6t9vk.png"
+      }
     },
     {
       "id": "nicole",
@@ -641,8 +985,36 @@
               "value": 25
             }
           ]
+        },
+        {
+          "id": "nicole.cinema_6.energy_field_crit_rate",
+          "source": {
+            "zhCN": "影画六"
+          },
+          "description": {
+            "zhCN": "能量场对敌人造成伤害时，全队对该目标的暴击率提升1.5%，最多叠加10层，持续12秒，每层效果单独结算持续时间。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "nicole_cinema_6_crit_rate",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critRate",
+              "mode": "flat",
+              "valuePerStack": 1.5,
+              "maxStacks": 10,
+              "defaultStacks": 10
+            }
+          ]
         }
-      ]
+      ],
+      "images": {
+        "icon": "/assets/agents/nicole.png",
+        "source": "https://patchwiki.biligame.com/images/zzz/a/ae/posa7yw93z9vnzep092rtnrqxksdx4k.png"
+      }
     },
     {
       "id": "soukaku",
@@ -698,8 +1070,34 @@
               "value": 20
             }
           ]
+        },
+        {
+          "id": "soukaku.cinema_4.fly_the_flag_ice_res_reduction",
+          "source": {
+            "zhCN": "影画四"
+          },
+          "description": {
+            "zhCN": "「展旗」攻击命中敌人时，目标的冰属性伤害抗性降低10%，持续8秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "soukaku_cinema_4_enemy_ice_res_reduction",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "enemyIceResReduction",
+              "mode": "flat",
+              "value": 10
+            }
+          ]
         }
-      ]
+      ],
+      "images": {
+        "icon": "/assets/agents/soukaku.png",
+        "source": "https://patchwiki.biligame.com/images/zzz/1/17/co1tz6xt4fuspz27d1dp4a29mla8i8x.png"
+      }
     }
   ],
   "fieldBuffs": [],

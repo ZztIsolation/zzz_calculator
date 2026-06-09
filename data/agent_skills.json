@@ -1685,6 +1685,52 @@
               ]
             }
           ]
+        },
+        {
+          "id": "core_skill",
+          "name": {
+            "zhCN": "核心技"
+          },
+          "levelScale": "coreSkill",
+          "levelRange": {
+            "levels": [
+              "0",
+              "A",
+              "B",
+              "C",
+              "D",
+              "E",
+              "F"
+            ],
+            "default": "F"
+          },
+          "moves": [
+            {
+              "id": "frostburn_break",
+              "name": {
+                "zhCN": "核心被动：霜灼·破"
+              },
+              "damageElement": "ice",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    750,
+                    875,
+                    1000,
+                    1125,
+                    1250,
+                    1375,
+                    1500
+                  ]
+                }
+              ]
+            }
+          ]
         }
       ],
       "sources": [
@@ -1692,8 +1738,9 @@
       ],
       "verification": {
         "skillMultipliers": "source-checked-biligame-wiki-2026-05-30",
-        "exclusions": "core skill, no-damage active skills, daze multipliers, and special energy costs are intentionally omitted",
+        "exclusions": "no-damage active skills, daze multipliers, and special energy costs are intentionally omitted",
         "damageElement": "Miyabi's displayed frost attribute and all stored Miyabi skill rows settle as ice so they use ice damage bonus and ice resistance",
+        "coreSkillMultipliers": "Frostburn Break uses Core Passive level 1 at core level 0, then A-F map to Core Passive levels 2-7.",
         "corrections": "Biligame raw row for 强化特殊技：飞雪/追击伤害倍率 has malformed LV1-LV3 values; stored as the monotonic sequence 483.2 + 44.0 * (lv - 1), matching LV4-LV16"
       }
     },

@@ -14,6 +14,8 @@ const BUFF_MODIFIER_OPERATION_VALUES = new Set(["multiplyResolvedValue"])
 const FORMULA_VALUE_UNIT_VALUES = new Set(["storedValue", "storedPercent"])
 const SKILL_ROW_KIND_VALUES = new Set(["damageMultiplier", "dazeMultiplier", "energyCost", "statBonus"])
 const SKILL_ROW_DAMAGE_BASIS_VALUES = new Set(["atk", "sheerForce"])
+const SKILL_LEVEL_SCALE_VALUES = new Set(["skill", "coreSkill"])
+const CORE_SKILL_LEVEL_VALUES = new Set(["0", "A", "B", "C", "D", "E", "F"])
 const DAMAGE_EVENT_KIND_VALUES = new Set(["direct", "anomaly", "disorder", "sheer"])
 const ANOMALY_SETTLEMENT_TYPE_VALUES = new Set(["attribute", "disorder"])
 const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
@@ -537,13 +539,23 @@ function validateEffectSet(errors, effect, path, options = {}) {
     ))
 }
 
-function validatePreferredDriveDiscs(errors, preferredDriveDiscs) {
+function validatePreferredDriveDiscs(errors, preferredDriveDiscs, context = {}) {
     if (!preferredDriveDiscs) {
         return
     }
     if (typeof preferredDriveDiscs !== "object" || Array.isArray(preferredDriveDiscs)) {
         add(errors, "preferredDriveDiscs", "必须是对象。")
         return
+    }
+
+    if (preferredDriveDiscs.defaultSetId !== undefined) {
+        validateOptionalId(errors, { id: preferredDriveDiscs.defaultSetId }, "preferredDriveDiscs.defaultSetId")
+        const driveDiscSets = Array.isArray(context.driveDiscSets) ? context.driveDiscSets : []
+        if (String(preferredDriveDiscs.defaultSetId ?? "").trim()
+            && driveDiscSets.length
+            && !driveDiscSets.some(set => set?.id === preferredDriveDiscs.defaultSetId)) {
+            add(errors, "preferredDriveDiscs.defaultSetId", "驱动盘套装不存在。")
+        }
     }
 
     const mainStatLimits = preferredDriveDiscs.mainStatLimits ?? preferredDriveDiscs
@@ -718,7 +730,7 @@ function validateDefaultCalculationConfig(errors, config, context = {}, agentId 
     }
 }
 
-function validateSkillLevelRange(errors, range, path, fallback = null) {
+function validateSkillLevelRange(errors, range, path, fallback = null, levelScale = "skill") {
     const source = range ?? fallback
     if (!source) {
         add(errors, path, "等级范围必填。")
@@ -727,6 +739,35 @@ function validateSkillLevelRange(errors, range, path, fallback = null) {
     if (typeof source !== "object" || Array.isArray(source)) {
         add(errors, path, "必须是对象。")
         return null
+    }
+
+    if (levelScale === "coreSkill") {
+        const levels = Array.isArray(source.levels)
+            ? source.levels.map(level => String(level ?? "").trim())
+            : []
+        if (!levels.length) {
+            add(errors, `${path}.levels`, "核心技等级至少需要一项。")
+            return null
+        }
+        const seenLevels = new Set()
+        levels.forEach((level, index) => {
+            if (!CORE_SKILL_LEVEL_VALUES.has(level)) {
+                add(errors, `${path}.levels[${index}]`, "核心技等级必须是 0 或 A-F。")
+            } else if (seenLevels.has(level)) {
+                add(errors, `${path}.levels[${index}]`, "核心技等级不能重复。")
+            }
+            seenLevels.add(level)
+        })
+        const defaultLevel = String(source.default ?? "").trim()
+        if (!defaultLevel) {
+            add(errors, `${path}.default`, "默认核心技等级必填。")
+        } else if (!levels.includes(defaultLevel)) {
+            add(errors, `${path}.default`, "默认核心技等级必须在等级列表内。")
+        }
+        return {
+            levels,
+            default: defaultLevel || levels.at(-1),
+        }
     }
 
     const min = requireFinite(errors, source.min, `${path}.min`)
@@ -761,7 +802,11 @@ function validateSkillValues(errors, row, levelRange, path) {
         return
     }
 
-    const expectedLength = levelRange ? levelRange.max - levelRange.min + 1 : NaN
+    const expectedLength = Array.isArray(levelRange?.levels)
+        ? levelRange.levels.length
+        : levelRange
+            ? levelRange.max - levelRange.min + 1
+            : NaN
     if (Number.isFinite(expectedLength) && row.values.length !== expectedLength) {
         add(errors, `${path}.values`, `数量必须等于等级范围长度 ${expectedLength}。`)
     }
@@ -798,7 +843,9 @@ function validateAgentSkill(item, context) {
                 seenCategories.add(category.id)
             }
             requireName(errors, category?.name, `${categoryPath}.name.zhCN`)
-            const categoryRange = validateSkillLevelRange(errors, category?.levelRange, `${categoryPath}.levelRange`)
+            const levelScale = category?.levelScale ?? "skill"
+            requireEnum(errors, levelScale, SKILL_LEVEL_SCALE_VALUES, `${categoryPath}.levelScale`)
+            const categoryRange = validateSkillLevelRange(errors, category?.levelRange, `${categoryPath}.levelRange`, null, levelScale)
 
             if (!Array.isArray(category?.moves)) {
                 add(errors, `${categoryPath}.moves`, "必须是数组。")
@@ -823,7 +870,7 @@ function validateAgentSkill(item, context) {
                     requireEnum(errors, move.damageElement, DAMAGE_ELEMENT_VALUES, `${movePath}.damageElement`)
                 }
                 const moveRange = move?.levelRange
-                    ? validateSkillLevelRange(errors, move.levelRange, `${movePath}.levelRange`, categoryRange)
+                    ? validateSkillLevelRange(errors, move.levelRange, `${movePath}.levelRange`, categoryRange, levelScale)
                     : categoryRange
 
                 if (!Array.isArray(move?.rows)) {
@@ -850,7 +897,7 @@ function validateAgentSkill(item, context) {
                         requireEnum(errors, row.damageBasis, SKILL_ROW_DAMAGE_BASIS_VALUES, `${rowPath}.damageBasis`)
                     }
                     const rowRange = row?.levelRange
-                        ? validateSkillLevelRange(errors, row.levelRange, `${rowPath}.levelRange`, moveRange)
+                        ? validateSkillLevelRange(errors, row.levelRange, `${rowPath}.levelRange`, moveRange, levelScale)
                         : moveRange
                     validateSkillValues(errors, { ...row, kind: row?.kind ?? "damageMultiplier" }, rowRange, rowPath)
                 })
@@ -919,7 +966,7 @@ function validateAgent(item, context) {
     validateEffectSet(errors, item?.combatBuffs?.corePassive, "combatBuffs.corePassive", { sourceType: "self" })
     validateEffectSet(errors, item?.combatBuffs?.additionalAbility, "combatBuffs.additionalAbility", { sourceType: "self" })
     validateCinemaBuffs(errors, item?.combatBuffs?.cinemaBuffs)
-    validatePreferredDriveDiscs(errors, item?.preferredDriveDiscs)
+    validatePreferredDriveDiscs(errors, item?.preferredDriveDiscs, context)
     validateDefaultCalculationConfig(errors, item?.defaultCalculationConfig, context, item?.id)
 
     if (item?.coreSkill) {
@@ -1070,6 +1117,7 @@ function validateTeammateBuff(item, context) {
     const errors = []
     requireId(errors, item?.teammate, "teammate.id")
     requireName(errors, item?.teammate?.name, "teammate.name.zhCN")
+    validateOptionalSources(errors, item?.teammate, item?.teammate?.images?.icon ?? item?.teammate?.images?.portrait)
     validateOptionalId(errors, item?.buff, "buff.id")
     requireName(errors, item?.buff?.source, "buff.source.zhCN")
     requireEnum(errors, item?.buff?.scope, EFFECT_SCOPE_VALUES, "buff.scope")

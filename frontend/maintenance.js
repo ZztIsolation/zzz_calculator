@@ -1,11 +1,19 @@
 import { validateMaintenanceItem } from "./maintenanceValidation.js"
+import { storedBuffStat } from "./maintenanceStats.js"
 import {
     defaultRuntimeForBuff,
     materializeWEngineForModificationLevel,
     storedEffectRuleText as storedCombatEffectRuleText,
     storedEffectRulesText,
 } from "./shared-combat.js"
-import { damageSkillRowsWithGeneratedTotals } from "./skillMultiplierCandidates.js"
+import {
+    CORE_SKILL_LEVEL_SCALE,
+    CORE_SKILL_LEVELS,
+    SKILL_LEVEL_SCALE,
+    damageSkillRowsWithGeneratedTotals,
+    isCoreSkillLevelScale,
+} from "./skillMultiplierCandidates.js"
+import { showErrorNotice } from "./feedback.js"
 
 const els = {
     status: document.getElementById("status"),
@@ -115,6 +123,10 @@ const SKILL_ROW_KIND_OPTIONS = [
 const SKILL_ROW_DAMAGE_BASIS_OPTIONS = [
     ["", "攻击力（默认）"],
     ["sheerForce", "贯穿力"],
+]
+const SKILL_LEVEL_SCALE_OPTIONS = [
+    [SKILL_LEVEL_SCALE, "技能等级"],
+    [CORE_SKILL_LEVEL_SCALE, "核心技等级"],
 ]
 const STAT_OPTIONS = [
     ["atkFlat", "固定攻击力", "flat"],
@@ -330,11 +342,16 @@ const DRAFT_STORAGE_KEY = "zzz_maintenance_drafts_v1"
 const DRAFT_KIND_KEYS = ["agents", "agentSkills", "wEngines", "driveDiscSets", "anomalyEffects", "teammateBuffs", "fieldBuffs", "bossBuffs"]
 let drafts = loadDrafts()
 const unsavedEdits = new Map()
+const selectedTeammateBuffIds = new Map()
 let isRenderingEditor = false
 
 function setStatus(text, tone = "idle") {
     els.status.textContent = text
     els.status.dataset.tone = tone
+}
+
+function errorMessage(error) {
+    return error instanceof Error ? error.message : String(error)
 }
 
 function setSaveStrip(state, hint, tone = "idle") {
@@ -527,17 +544,7 @@ function blankDraftItem(kind) {
     }
 
     if (kind === "teammateBuffs") {
-        return {
-            id: "",
-            maintenanceType: "teammate",
-            teammateId: "",
-            teammateName: { zhCN: "未命名" },
-            source: { zhCN: "" },
-            description: { zhCN: "" },
-            scope: "inCombat",
-            effects: [],
-            coverage: { default: 1, min: 0, max: 1, step: 0.1 },
-        }
+        return blankTeammateGroupDraft()
     }
 
     if (kind === "fieldBuffs") {
@@ -721,10 +728,6 @@ function isEventModifierStat(stat) {
     return isStatDamageModifierOption(stat) || stat === "skillMultiplierBonus"
 }
 
-function canonicalBuffStat(stat) {
-    return stat === "enemyDefIgnore" ? "enemyDefReduction" : stat
-}
-
 function ruleTargetKind(rule = {}) {
     return rule.target?.kind === "skill" ? "skill" : "default"
 }
@@ -824,6 +827,127 @@ async function api(path, options = {}) {
     return json
 }
 
+function blankTeammateBuffDraft() {
+    return {
+        id: "",
+        source: { zhCN: "" },
+        description: { zhCN: "" },
+        scope: "inCombat",
+        effects: [],
+        buffModifiers: [],
+        coverage: { default: 1, min: 0, max: 1, step: 0.1 },
+    }
+}
+
+function blankTeammateGroupDraft() {
+    return {
+        id: "",
+        maintenanceType: "teammateGroup",
+        name: { zhCN: "未命名" },
+        teammateId: "",
+        teammateName: { zhCN: "未命名" },
+        images: { icon: "", source: "" },
+        buffs: [blankTeammateBuffDraft()],
+    }
+}
+
+function teammateBuffRecord(teammate = {}, buff = {}) {
+    const teammateId = teammate.id ?? teammate.teammateId ?? ""
+    const teammateName = teammate.name ?? teammate.teammateName ?? { zhCN: "" }
+    return {
+        ...buff,
+        maintenanceType: "teammate",
+        sourceType: "teammate",
+        teammateId,
+        teammateName,
+    }
+}
+
+function teammateGroupRecord(teammate = {}) {
+    const teammateId = teammate.id ?? teammate.teammateId ?? ""
+    const teammateName = teammate.name ?? teammate.teammateName ?? { zhCN: "" }
+    return {
+        ...teammate,
+        id: teammateId,
+        maintenanceType: "teammateGroup",
+        name: teammateName,
+        teammateId,
+        teammateName,
+        images: teammate.images ?? { icon: "", source: "" },
+        buffs: (teammate.buffs ?? []).map(buff => teammateBuffRecord({
+            id: teammateId,
+            name: teammateName,
+        }, buff)),
+    }
+}
+
+function normalizeTeammateGroupRecord(item = {}) {
+    if (item?.maintenanceType === "teammate" || (!Array.isArray(item?.buffs) && item?.teammateId)) {
+        return {
+            ...teammateGroupRecord({
+                id: item.teammateId ?? item.id ?? "",
+                name: item.teammateName ?? item.name ?? { zhCN: "" },
+                images: item.images ?? { icon: "", source: "" },
+                buffs: [item],
+            }),
+            ...(item.__isDraft ? { __isDraft: item.__isDraft } : {}),
+            ...(item.__draftId ? { __draftId: item.__draftId } : {}),
+            ...(item.__sessionKey ? { __sessionKey: item.__sessionKey } : {}),
+        }
+    }
+
+    return teammateGroupRecord(item ?? blankTeammateGroupDraft())
+}
+
+function teammateBuffSelectionValue(buff = {}, index = 0) {
+    return buff?.id ? `id:${buff.id}` : `index:${index}`
+}
+
+function selectedTeammateBuffSelection(group) {
+    return selectedTeammateBuffIds.get(recordKey(group))
+        ?? (activeKind === "teammateBuffs" && selectedKey ? selectedTeammateBuffIds.get(selectedKey) : "")
+        ?? ""
+}
+
+function selectedTeammateBuffIndex(group = selectedRecord()) {
+    const buffs = group?.buffs ?? []
+    if (!buffs.length) {
+        return -1
+    }
+
+    const selection = selectedTeammateBuffSelection(group)
+    if (selection.startsWith("id:")) {
+        const id = selection.slice("id:".length)
+        const index = buffs.findIndex(buff => buff.id === id)
+        if (index >= 0) {
+            return index
+        }
+    }
+    if (selection.startsWith("index:")) {
+        const index = Number(selection.slice("index:".length))
+        if (Number.isInteger(index) && index >= 0 && index < buffs.length) {
+            return index
+        }
+    }
+
+    return 0
+}
+
+function selectedTeammateBuff(group = selectedRecord()) {
+    const index = selectedTeammateBuffIndex(group)
+    return index >= 0 ? group?.buffs?.[index] ?? null : null
+}
+
+function setSelectedTeammateBuff(group, buff, index = 0) {
+    selectedTeammateBuffIds.set(recordKey(group), teammateBuffSelectionValue(buff, index))
+}
+
+function flattenedTeammateBuffRecords(groups = collectionForKind("teammateBuffs")) {
+    return (groups ?? []).flatMap(group =>
+        (group.buffs ?? []).map(buff => teammateBuffRecord(group, buff))
+    )
+}
+
 function rawCollections() {
     return {
         agents: catalog?.agents?.agents ?? [],
@@ -831,14 +955,7 @@ function rawCollections() {
         wEngines: catalog?.wEngines?.wEngines ?? [],
         driveDiscSets: catalog?.driveDiscSets?.sets ?? [],
         anomalyEffects: anomalyMaintenanceRecords(),
-        teammateBuffs: [
-            ...(catalog?.combatBuffs?.teammates ?? []).flatMap(teammate => (teammate.buffs ?? []).map(buff => ({
-                ...buff,
-                maintenanceType: "teammate",
-                teammateId: teammate.id,
-                teammateName: teammate.name,
-            }))),
-        ],
+        teammateBuffs: (catalog?.combatBuffs?.teammates ?? []).map(teammateGroupRecord),
         fieldBuffs: [
             ...(catalog?.combatBuffs?.fieldBuffs ?? []),
             ...(catalog?.combatBuffs?.buffs ?? []).filter(buff => buff.sourceType === "field"),
@@ -884,13 +1001,14 @@ function anomalyMaintenanceRecordsByType(type = "anomaly") {
 function collectionForActiveKind() {
     const records = rawCollections()[activeKind] ?? []
     return [
-        ...activeDraftEntries().map(draftRecord),
+        ...activeDraftEntries().map(draftRecord).map(item => activeKind === "teammateBuffs" ? normalizeTeammateGroupRecord(item) : item),
         ...records.map(item => {
             const key = baseRecordKey(item)
             const edit = unsavedEdits.get(sessionKey(activeKind, key))
-            return edit
+            const record = edit
                 ? { ...item, ...structuredClone(edit), __sessionKey: key }
                 : { ...item, __sessionKey: key }
+            return activeKind === "teammateBuffs" ? normalizeTeammateGroupRecord(record) : record
         }),
     ]
 }
@@ -898,6 +1016,9 @@ function collectionForActiveKind() {
 function baseRecordKey(record) {
     if (record.maintenanceType === "anomaly" || record.maintenanceType === "disorder") {
         return `${record.maintenanceType}:${record.id}`
+    }
+    if (record.maintenanceType === "teammateGroup") {
+        return `teammate:${record.id ?? record.teammateId ?? ""}`
     }
 
     return record.maintenanceType === "teammate"
@@ -925,23 +1046,44 @@ function rawSelectedRecord() {
     return (rawCollections()[activeKind] ?? []).find(item => baseRecordKey(item) === selectedKey) ?? null
 }
 
+function teammateGroupFromPayload(payload, baseGroup = selectedCleanRecord()) {
+    const teammate = payload?.teammate ?? {}
+    const buff = payload?.buff ?? blankTeammateBuffDraft()
+    const group = normalizeTeammateGroupRecord(baseGroup ?? {
+        id: teammate.id ?? "",
+        name: teammate.name ?? { zhCN: "" },
+        buffs: [],
+    })
+    const teammateId = teammate.id ?? group.id ?? ""
+    const teammateName = teammate.name ?? group.name ?? { zhCN: "" }
+    const teammateImages = teammate.images ?? group.images ?? { icon: "", source: "" }
+    const updatedBuff = teammateBuffRecord({ id: teammateId, name: teammateName }, buff)
+    const buffs = [...(group.buffs ?? [])]
+    const selectedIndex = selectedTeammateBuffIndex(group)
+    const existingIndex = updatedBuff.id
+        ? buffs.findIndex(item => item.id === updatedBuff.id)
+        : selectedIndex
+    const targetIndex = existingIndex >= 0 ? existingIndex : buffs.length
+    buffs[targetIndex] = updatedBuff
+    const nextGroup = {
+        ...group,
+        id: teammateId,
+        name: teammateName,
+        teammateId,
+        teammateName,
+        images: teammateImages,
+        buffs,
+    }
+    setSelectedTeammateBuff(nextGroup, updatedBuff, targetIndex)
+    return nextGroup
+}
+
 function editorRecordFromPayload(payload) {
     if (activeKind !== "teammateBuffs" || !payload?.teammate || !payload?.buff) {
         return stripDraftMetadata(payload)
     }
 
-    return {
-        ...payload.buff,
-        maintenanceType: "teammate",
-        teammateId: payload.teammate.id,
-        teammateName: payload.teammate.name,
-        sourceType: "teammate",
-        source: payload.buff.source,
-        description: payload.buff.description,
-        scope: payload.buff.scope,
-        effects: payload.buff.effects ?? [],
-        ...(payload.buff.coverage ? { coverage: payload.buff.coverage } : {}),
-    }
+    return teammateGroupFromPayload(payload)
 }
 
 function statLabel(stat) {
@@ -959,6 +1101,21 @@ function preferredMainStats(item = {}, slot) {
         ?? {}
     const raw = source[String(slot)] ?? source[slot] ?? []
     return Array.isArray(raw) ? raw.map(String) : raw ? [String(raw)] : []
+}
+
+function preferredDriveDiscDefaultSetId(item = {}) {
+    return String(
+        item.preferredDriveDiscs?.defaultSetId
+            ?? item.preferredDriveDiscs?.defaultSet
+            ?? item.defaultDriveDiscSetId
+            ?? "",
+    )
+}
+
+function driveDiscSetOptions(selected = "") {
+    const sets = [...(rawCollections().driveDiscSets ?? [])]
+        .sort((left, right) => nameOf(left).localeCompare(nameOf(right), "zh-CN"))
+    return selectOptions(sets.map(set => [set.id, nameOf(set)]), selected)
 }
 
 function mainStatChoiceMarkup(slot, selected = [], datasetName = "preferred-main-stat") {
@@ -1490,9 +1647,60 @@ function effectsSummary(item = {}) {
     return [...ruleSummaries, ...modifierSummaries].join(" / ")
 }
 
+function teammateGroupSourceSummary(group = {}) {
+    const sources = (group.buffs ?? [])
+        .map(buff => localized(buff.source) || localized(buff.sourceLabel) || buff.id)
+        .filter(Boolean)
+    const uniqueSources = [...new Set(sources)]
+    return uniqueSources.slice(0, 3).join(" / ")
+}
+
+function teammateGroupSearchText(group = {}) {
+    const buffText = (group.buffs ?? []).flatMap(buff => [
+        buff.id,
+        localized(buff.source),
+        localized(buff.sourceLabel),
+        localized(buff.description),
+        localized(buff.conditionLabel),
+        effectsSummary(buff),
+    ])
+    return [
+        group.id,
+        group.teammateId,
+        nameOf(group),
+        localized(group.teammateName),
+        group.images?.icon,
+        group.images?.source,
+        teammateGroupSourceSummary(group),
+        ...buffText,
+    ].join(" ").toLowerCase()
+}
+
+function teammateGroupDetail(group = {}) {
+    const count = group.buffs?.length ?? 0
+    const sources = teammateGroupSourceSummary(group)
+    return [`${count} 个 Buff`, group.id, sources].filter(Boolean).join(" · ")
+}
+
+function teammateGroupImage(group = {}) {
+    return group.images?.icon ?? group.images?.portrait ?? ""
+}
+
+function teammateAvatarMarkup(group = {}, className = "teammate-maintenance-avatar") {
+    const image = teammateGroupImage(group)
+    const label = nameOf(group)
+    return image
+        ? `<img class="${className}" src="${escapeHtml(image)}" alt="${escapeHtml(label)}">`
+        : `<span class="${className} empty" aria-hidden="true"></span>`
+}
+
 function renderList() {
     const search = els.searchInput.value.trim().toLowerCase()
     const records = collectionForActiveKind().filter(item => {
+        if (activeKind === "teammateBuffs") {
+            return !search || teammateGroupSearchText(item).includes(search)
+        }
+
         const haystack = [
             item.id,
             nameOf(item),
@@ -1524,18 +1732,18 @@ function renderList() {
         button.dataset.key = recordKey(item)
 
         const title = item.__isDraft
-            ? (activeKind === "teammateBuffs" && item.maintenanceType === "teammate"
-                ? nameOf(item.teammateName)
+            ? (activeKind === "teammateBuffs"
+                ? nameOf(item)
                 : nameOf(item))
-            : activeKind === "teammateBuffs" && item.maintenanceType === "teammate"
-                ? `${nameOf(item.teammateName)}｜${localized(item.source) || nameOf(item)}`
+            : activeKind === "teammateBuffs"
+                ? nameOf(item)
                 : activeKind === "bossBuffs"
                     ? nameOf(item.bossName)
                 : nameOf(item)
         const detail = item.__isDraft
-            ? `草稿 · ${item.id || "尚未填写 ID"}`
+            ? (activeKind === "teammateBuffs" ? `草稿 · ${teammateGroupDetail(item)}` : `草稿 · ${item.id || "尚未填写 ID"}`)
             : activeKind === "teammateBuffs"
-                ? effectsSummary(item)
+                ? teammateGroupDetail(item)
                 : activeKind === "fieldBuffs"
                     ? [localized(item.source), localized(item.sourcePeriod), effectsSummary(item)].filter(Boolean).join(" · ")
                     : activeKind === "bossBuffs"
@@ -1544,10 +1752,18 @@ function renderList() {
                             ? `${item.maintenanceType === "disorder" ? "紊乱" : "属性伤害"} · ${item.element ?? "-"} · ${item.id}`
                             : item.id
 
-        button.innerHTML = `
-            <strong>${escapeHtml(title)}</strong>
-            <span>${escapeHtml(detail || item.id)}</span>
-        `
+        button.innerHTML = activeKind === "teammateBuffs"
+            ? `
+                ${teammateAvatarMarkup(item, "maintenance-record-avatar")}
+                <span class="maintenance-record-copy">
+                  <strong>${escapeHtml(title)}</strong>
+                  <span>${escapeHtml(detail || item.id)}</span>
+                </span>
+            `
+            : `
+                <strong>${escapeHtml(title)}</strong>
+                <span>${escapeHtml(detail || item.id)}</span>
+            `
         els.recordList.appendChild(button)
     }
 }
@@ -1620,7 +1836,7 @@ function readStatRows(containerId) {
             const target = targetKind === "skill"
                 ? { kind: "skill", skillTargets: readSkillTargets(row) }
                 : { kind: "default" }
-            const stat = canonicalBuffStat(row.querySelector("[data-stat-key]")?.value)
+            const stat = storedBuffStat(row.querySelector("[data-stat-key]")?.value)
             const value = inputToStoredValue(stat, row.querySelector("[data-stat-value]")?.value)
             if (container.dataset.allowDamageModifiers === "true" && (targetKind === "skill" || isEventModifierStat(stat))) {
                 return eventModifierRuleFromStatRow(stat, value, index, target)
@@ -1837,6 +2053,13 @@ function renderAgentForm(item = null) {
         <section class="maintenance-section">
           <h3>优先驱动盘</h3>
           <div class="maintenance-grid preferred-drive-disc-grid">
+            <label class="field preferred-drive-disc-default-field">
+              <span>默认驱动盘套装</span>
+              <select id="preferredDriveDiscDefaultSet">
+                <option value="">不指定</option>
+                ${driveDiscSetOptions(preferredDriveDiscDefaultSetId(agent))}
+              </select>
+            </label>
             ${[4, 5, 6].map(slot => `
               <div class="field preferred-drive-disc-field">
                 <div class="field-row-head">
@@ -1900,15 +2123,21 @@ function renderAgentForm(item = null) {
 }
 
 function readPreferredDriveDiscs() {
+    const defaultSetId = document.getElementById("preferredDriveDiscDefaultSet")?.value.trim() ?? ""
     const mainStatLimits = {}
     for (const slot of [4, 5, 6]) {
         mainStatLimits[String(slot)] = [...els.maintenanceForm.querySelectorAll(`input[data-preferred-main-stat="${slot}"]:checked`)]
             .map(input => input.value)
             .filter(Boolean)
     }
-    return Object.values(mainStatLimits).some(values => values.length)
-        ? { mainStatLimits }
-        : null
+    const hasMainStatLimits = Object.values(mainStatLimits).some(values => values.length)
+    if (!defaultSetId && !hasMainStatLimits) {
+        return null
+    }
+    return {
+        ...(defaultSetId ? { defaultSetId } : {}),
+        ...(hasMainStatLimits ? { mainStatLimits } : {}),
+    }
 }
 
 function buildAgent(options = {}) {
@@ -2000,6 +2229,7 @@ function skillCategoryDraft() {
     return {
         id: `category_${Date.now()}`,
         name: { zhCN: "新技能大类" },
+        levelScale: SKILL_LEVEL_SCALE,
         levelRange: { min: 1, max: 16, default: 12 },
         moves: [],
     }
@@ -2015,9 +2245,9 @@ function skillMoveDraft() {
 }
 
 function skillRowDraft(levelRange = { min: 1, max: 16 }) {
-    const min = Number(levelRange.min ?? 1)
-    const max = Number(levelRange.max ?? 16)
-    const length = Math.max(1, max - min + 1)
+    const length = Array.isArray(levelRange.levels)
+        ? Math.max(1, levelRange.levels.length)
+        : Math.max(1, Number(levelRange.max ?? 16) - Number(levelRange.min ?? 1) + 1)
     return {
         id: `row_${Date.now()}`,
         label: { zhCN: "伤害倍率" },
@@ -2028,6 +2258,21 @@ function skillRowDraft(levelRange = { min: 1, max: 16 }) {
 
 function skillLevelRangeOf(category = {}) {
     const raw = category.levelRange ?? {}
+    if (isCoreSkillLevelScale(category)) {
+        const levels = Array.isArray(raw.levels) && raw.levels.length
+            ? raw.levels.map(level => String(level ?? "").trim()).filter(Boolean)
+            : CORE_SKILL_LEVELS
+        const defaultLevel = levels.includes(String(raw.default ?? ""))
+            ? String(raw.default)
+            : levels.includes("F")
+                ? "F"
+                : levels.at(-1) ?? "0"
+        return {
+            levels,
+            default: defaultLevel,
+        }
+    }
+
     let min = Number(raw.min ?? 1)
     let max = Number(raw.max ?? 16)
     let defaultLevel = Number(raw.default ?? min)
@@ -2045,6 +2290,9 @@ function skillLevelRangeOf(category = {}) {
 
 function skillLevelsForCategory(category = {}) {
     const range = skillLevelRangeOf(category)
+    if (Array.isArray(range.levels)) {
+        return range.levels
+    }
     const levels = []
     for (let level = range.min; level <= range.max; level += 1) {
         levels.push(level)
@@ -2054,7 +2302,9 @@ function skillLevelsForCategory(category = {}) {
 
 function skillValueForLevel(row = {}, category = {}, level) {
     const range = skillLevelRangeOf(category)
-    const index = Number(level) - range.min
+    const index = Array.isArray(range.levels)
+        ? range.levels.indexOf(String(level ?? ""))
+        : Number(level) - range.min
     return row.values?.[index] ?? ""
 }
 
@@ -2070,7 +2320,7 @@ function renderSkillMultiplierTable(category = {}, move = {}) {
                 <th>行名</th>
                 <th>类型</th>
                 <th>伤害基准</th>
-                ${levels.map(level => `<th>LV${level}</th>`).join("")}
+                ${levels.map(level => `<th>${escapeHtml(isCoreSkillLevelScale(category) ? level : `LV${level}`)}</th>`).join("")}
                 <th>操作</th>
               </tr>
             </thead>
@@ -2117,6 +2367,7 @@ function renderSkillMoveCard(category = {}, move = {}, moveIndex = 0) {
 
 function renderSkillCategoryCard(category = {}, categoryIndex = 0) {
     const range = skillLevelRangeOf(category)
+    const levelScale = isCoreSkillLevelScale(category) ? CORE_SKILL_LEVEL_SCALE : SKILL_LEVEL_SCALE
     return `
         <details class="maintenance-subcard skill-category-card" data-skill-category-row open>
           <summary>
@@ -2133,9 +2384,12 @@ function renderSkillCategoryCard(category = {}, categoryIndex = 0) {
           <div class="maintenance-grid skill-category-grid">
             <label class="field">${fieldLabel("大类 ID", true)}<input data-skill-category-id value="${escapeHtml(category.id ?? "")}" placeholder="basic"></label>
             <label class="field">${fieldLabel("大类名", true)}<input data-skill-category-name value="${escapeHtml(localized(category.name) || "")}" placeholder="普通攻击"></label>
-            <label class="field">${fieldLabel("最低等级", true)}<input data-skill-level-min type="number" min="1" step="1" value="${escapeHtml(range.min)}"></label>
-            <label class="field">${fieldLabel("最高等级", true)}<input data-skill-level-max type="number" min="1" step="1" value="${escapeHtml(range.max)}"></label>
-            <label class="field">${fieldLabel("默认等级", true)}<input data-skill-level-default type="number" min="1" step="1" value="${escapeHtml(range.default)}"></label>
+            <label class="field">${fieldLabel("等级模式", true)}<select data-skill-level-scale>${selectOptions(SKILL_LEVEL_SCALE_OPTIONS, levelScale)}</select></label>
+            <label class="field skill-level-skill-only"${levelScale === SKILL_LEVEL_SCALE ? "" : " hidden"}>${fieldLabel("最低等级", true)}<input data-skill-level-min type="number" min="1" step="1" value="${escapeHtml(range.min ?? 1)}"></label>
+            <label class="field skill-level-skill-only"${levelScale === SKILL_LEVEL_SCALE ? "" : " hidden"}>${fieldLabel("最高等级", true)}<input data-skill-level-max type="number" min="1" step="1" value="${escapeHtml(range.max ?? 16)}"></label>
+            <label class="field skill-level-skill-only"${levelScale === SKILL_LEVEL_SCALE ? "" : " hidden"}>${fieldLabel("默认等级", true)}<input data-skill-level-default type="number" min="1" step="1" value="${escapeHtml(range.default ?? 1)}"></label>
+            <label class="field skill-level-core-only"${levelScale === CORE_SKILL_LEVEL_SCALE ? "" : " hidden"}><span>核心技等级</span><input value="${escapeHtml(CORE_SKILL_LEVELS.join(" / "))}" disabled></label>
+            <label class="field skill-level-core-only"${levelScale === CORE_SKILL_LEVEL_SCALE ? "" : " hidden"}>${fieldLabel("默认核心等级", true)}<select data-skill-core-default>${selectOptions(CORE_SKILL_LEVELS.map(level => [level, level]), range.default ?? "F")}</select></label>
           </div>
           <div class="skill-move-list">
             ${(category.moves ?? []).map((move, moveIndex) => renderSkillMoveCard(category, move, moveIndex)).join("")}
@@ -2154,7 +2408,13 @@ function renderSkillCategoryRows(categories = []) {
 
 function readSkillRow(rowElement, categoryRange) {
     const values = []
-    for (let level = categoryRange.min; level <= categoryRange.max; level += 1) {
+    const levels = Array.isArray(categoryRange.levels)
+        ? categoryRange.levels
+        : Array.from(
+            { length: Math.max(0, Number(categoryRange.max ?? 1) - Number(categoryRange.min ?? 1) + 1) },
+            (_, index) => Number(categoryRange.min ?? 1) + index,
+        )
+    for (const level of levels) {
         const input = rowElement.querySelector(`[data-skill-value][data-skill-level="${level}"]`)
         const raw = input?.value ?? ""
         values.push(raw === "" ? "" : numberValue(raw))
@@ -2180,17 +2440,27 @@ function readSkillMove(moveElement, categoryRange) {
 }
 
 function readSkillCategory(categoryElement) {
+    const levelScale = categoryElement.querySelector("[data-skill-level-scale]")?.value === CORE_SKILL_LEVEL_SCALE
+        ? CORE_SKILL_LEVEL_SCALE
+        : SKILL_LEVEL_SCALE
     const min = numberValue(categoryElement.querySelector("[data-skill-level-min]")?.value, 1)
     const max = numberValue(categoryElement.querySelector("[data-skill-level-max]")?.value, min)
     const defaultLevel = numberValue(categoryElement.querySelector("[data-skill-level-default]")?.value, min)
+    const defaultCoreLevel = categoryElement.querySelector("[data-skill-core-default]")?.value || "F"
     const category = {
         id: categoryElement.querySelector("[data-skill-category-id]")?.value.trim() ?? "",
         name: { zhCN: categoryElement.querySelector("[data-skill-category-name]")?.value.trim() ?? "" },
-        levelRange: {
-            min,
-            max,
-            default: defaultLevel,
-        },
+        ...(levelScale === CORE_SKILL_LEVEL_SCALE ? { levelScale } : {}),
+        levelRange: levelScale === CORE_SKILL_LEVEL_SCALE
+            ? {
+                levels: [...CORE_SKILL_LEVELS],
+                default: CORE_SKILL_LEVELS.includes(defaultCoreLevel) ? defaultCoreLevel : "F",
+            }
+            : {
+                min,
+                max,
+                default: defaultLevel,
+            },
         moves: [],
     }
     const range = skillLevelRangeOf(category)
@@ -2792,7 +3062,7 @@ function readEffectRuleRows(containerId) {
             target,
         }
 
-        const stat = canonicalBuffStat(row.querySelector("[data-effect-stat]")?.value ?? "atkFlat")
+        const stat = storedBuffStat(row.querySelector("[data-effect-stat]")?.value ?? "atkFlat")
         const base = {
             ...commonBase,
             stat,
@@ -2997,13 +3267,14 @@ function buffModifierSection() {
 function collectionForKind(kind) {
     const records = rawCollections()[kind] ?? []
     return [
-        ...(drafts[kind] ?? []).map(draftRecord),
+        ...(drafts[kind] ?? []).map(draftRecord).map(item => kind === "teammateBuffs" ? normalizeTeammateGroupRecord(item) : item),
         ...records.map(item => {
             const key = baseRecordKey(item)
             const edit = unsavedEdits.get(sessionKey(kind, key))
-            return edit
+            const record = edit
                 ? { ...item, ...structuredClone(edit), __sessionKey: key }
                 : { ...item, __sessionKey: key }
+            return kind === "teammateBuffs" ? normalizeTeammateGroupRecord(record) : record
         }),
     ]
 }
@@ -3021,6 +3292,7 @@ function shortInternalId(id = "") {
 
 function currentTeammateIdForBuffModifierOptions() {
     return document.getElementById("teammateId")?.value.trim()
+        || selectedCleanRecord()?.id
         || selectedCleanRecord()?.teammateId
         || ""
 }
@@ -3042,7 +3314,7 @@ function buffModifierTargetBuffCandidates() {
         })
     }
 
-    for (const item of collectionForKind("teammateBuffs")) {
+    for (const item of flattenedTeammateBuffRecords()) {
         const owner = localized(item.teammateName) || item.teammateId || "队友"
         const source = localized(item.source) || localized(item.sourceLabel) || nameOf(item)
         addCandidate("teammate", item, `${owner}｜${source || item.id}`, item.teammateId)
@@ -3180,7 +3452,9 @@ function selectedModifierTargetArray(row, selector, datasetKey) {
 }
 
 function currentBuffModifierSourceId() {
-    const existing = selectedCleanRecord()
+    const existing = activeKind === "teammateBuffs"
+        ? selectedTeammateBuff(selectedCleanRecord())
+        : selectedCleanRecord()
     if (activeKind === "fieldBuffs" || activeKind === "bossBuffs") {
         return document.getElementById("recordId")?.value.trim() || existing?.id || ""
     }
@@ -3271,16 +3545,57 @@ function readBuffModifierRows() {
         )
 }
 
+function teammateBuffTitle(buff = {}) {
+    return localized(buff.source) || localized(buff.sourceLabel) || buff.id || "新 Buff"
+}
+
 function renderTeammateBuffForm(item = null) {
-    const buff = item ?? blankDraftItem("teammateBuffs")
+    const rawGroup = normalizeTeammateGroupRecord(item ?? blankDraftItem("teammateBuffs"))
+    const group = rawGroup.buffs?.length ? rawGroup : { ...rawGroup, buffs: [blankTeammateBuffDraft()] }
+    const selectedIndex = selectedTeammateBuffIndex(group)
+    const buff = group.buffs[selectedIndex] ?? group.buffs[0] ?? blankTeammateBuffDraft()
+    const realSelectedIndex = Math.max(0, selectedIndex)
+    setSelectedTeammateBuff(group, buff, realSelectedIndex)
+    const isSavedGroup = !group.__isDraft && Boolean(group.id)
+    const buffButtons = group.buffs.map((candidate, index) => {
+        const value = teammateBuffSelectionValue(candidate, index)
+        const active = index === realSelectedIndex
+        const summary = effectsSummary(candidate)
+        return `
+            <button type="button" class="teammate-buff-choice${active ? " active" : ""}" data-select-teammate-buff="${escapeHtml(value)}">
+              <strong>${escapeHtml(teammateBuffTitle(candidate))}</strong>
+              <span>${escapeHtml([candidate.id, summary].filter(Boolean).join(" · ") || "尚未保存")}</span>
+            </button>
+        `
+    }).join("")
+
     els.editorTitle.textContent = "队友 Buff 资料"
-    els.editorTag.textContent = `${buff.teammateId || "新队友"} / ${localized(buff.source) || "新 Buff"}`
+    els.editorTag.textContent = `${group.id || "新队友"} / ${teammateBuffTitle(buff)}`
     els.maintenanceForm.innerHTML = `
         <section class="maintenance-section">
-          <h3>Buff 归属</h3>
+          <h3>队友角色</h3>
           <div class="maintenance-grid">
-            <label class="field">${fieldLabel("队友 ID", true)}<input id="teammateId" value="${escapeHtml(buff.teammateId ?? "")}" required></label>
-            <label class="field">${fieldLabel("队友中文名", true)}<input id="teammateNameZh" value="${escapeHtml(buff.teammateName?.zhCN ?? "")}" required></label>
+            <div class="teammate-maintenance-image">
+              ${teammateAvatarMarkup(group)}
+            </div>
+            <label class="field">${fieldLabel("队友 ID", true)}<input id="teammateId" value="${escapeHtml(group.id ?? group.teammateId ?? "")}"${isSavedGroup ? " readonly" : ""} required></label>
+            <label class="field">${fieldLabel("队友中文名", true)}<input id="teammateNameZh" value="${escapeHtml((group.name ?? group.teammateName)?.zhCN ?? "")}" required></label>
+            <label class="field">${fieldLabel("头像路径")}<input id="teammateImagePath" value="${escapeHtml(teammateGroupImage(group))}" placeholder="/assets/agents/..."></label>
+            <label class="field">${fieldLabel("头像来源")}<input id="teammateImageSource" value="${escapeHtml(group.images?.source ?? "")}" placeholder="https://..."></label>
+          </div>
+        </section>
+        <section class="maintenance-section">
+          <div class="maintenance-section-head">
+            <h3>Buff 列表</h3>
+            <button type="button" class="compact-btn" data-add-teammate-buff>添加 Buff</button>
+          </div>
+          <div class="teammate-buff-choice-list">
+            ${buffButtons || `<div class="list-item empty">暂无 Buff</div>`}
+          </div>
+        </section>
+        <section class="maintenance-section">
+          <h3>当前 Buff</h3>
+          <div class="maintenance-grid">
             <label class="field">${fieldLabel("来源中文名", true)}<input id="buffSourceZh" value="${escapeHtml((buff.source ?? buff.sourceLabel)?.zhCN ?? "")}" required></label>
             <label class="field">${fieldLabel("范围", true)}<select id="buffScope">${selectOptions(EFFECT_SCOPE_OPTIONS, buff.scope ?? "inCombat")}</select></label>
             <label class="field"><span>条件标签</span><input id="conditionLabel" value="${escapeHtml(localized(buff.conditionLabel) || "")}"></label>
@@ -3352,12 +3667,12 @@ function buildBuff() {
         return buildBossBuff()
     }
 
-    const existing = selectedCleanRecord()
+    const group = selectedCleanRecord()
+    const existing = selectedTeammateBuff(group)
     const buff = {
         ...(existing?.id ? { id: existing.id } : {}),
         scope: document.getElementById("buffScope").value,
         sourceType: "teammate",
-        name: readLocalizedZh("buffName"),
         source: readLocalizedZh("buffSource"),
         sourceLabel: readLocalizedZh("buffSource"),
         conditionLabel: document.getElementById("conditionLabel").value.trim(),
@@ -3373,12 +3688,17 @@ function buildBuff() {
         teammate: {
             id: document.getElementById("teammateId").value.trim(),
             name: readLocalizedZh("teammateName"),
+            images: {
+                icon: document.getElementById("teammateImagePath")?.value.trim() ?? "",
+                source: document.getElementById("teammateImageSource")?.value.trim() ?? "",
+            },
         },
         buff: {
             ...(buff.id ? { id: buff.id } : {}),
             source: buff.source,
             description: buff.description,
             scope: buff.scope,
+            ...(buff.conditionLabel ? { conditionLabel: buff.conditionLabel } : {}),
             ...(buff.coverage ? { coverage: buff.coverage } : {}),
             effects: buff.effects,
             buffModifiers: buff.buffModifiers,
@@ -3469,12 +3789,28 @@ function persistCurrentEditor(payload = null) {
     unsavedEdits.set(sessionKey(), editorRecordFromPayload(nextPayload))
 }
 
+function persistTeammateGroupRecord(group) {
+    const cleanGroup = normalizeTeammateGroupRecord(stripDraftMetadata(group))
+    if (isDraftKey()) {
+        const entry = selectedDraftEntry()
+        if (entry) {
+            entry.item = cleanGroup
+            entry.updatedAt = new Date().toISOString()
+            saveDrafts()
+        }
+        return
+    }
+
+    unsavedEdits.set(sessionKey(), cleanGroup)
+}
+
 function validationContextForCurrent(payload) {
     if (activeKind === "agents") {
         return {
             items: rawCollections().agents,
             currentId: isDraftKey() ? undefined : rawSelectedRecord()?.id,
             agentSkills: rawCollections().agentSkills,
+            driveDiscSets: rawCollections().driveDiscSets,
             anomalyEffects: anomalyMaintenanceRecordsByType("anomaly"),
             disorderEffects: anomalyMaintenanceRecordsByType("disorder"),
             effects: anomalyMaintenanceRecords(),
@@ -3508,7 +3844,7 @@ function validationContextForCurrent(payload) {
     if (activeKind === "teammateBuffs" || payload?.teammate || payload?.buff) {
         return {
             teammates: catalog?.combatBuffs?.teammates ?? [],
-            currentBuffId: isDraftKey() ? undefined : rawSelectedRecord()?.id,
+            currentBuffId: isDraftKey() ? undefined : selectedTeammateBuff(selectedCleanRecord())?.id,
         }
     }
     if (activeKind === "fieldBuffs") {
@@ -3634,13 +3970,24 @@ async function saveCurrent() {
     } else if (previousSessionKey) {
         unsavedEdits.delete(previousSessionKey)
     }
-    selectedKey = response.savedItem
-        ? recordKey(response.savedItem)
-        : activeKind === "teammateBuffs" && endpoint === "teammate-buffs"
-            ? `teammate:${payload.teammate.id}:${payload.buff.id}`
-            : payload.id
+    if (activeKind === "teammateBuffs" && endpoint === "teammate-buffs") {
+        selectedKey = baseRecordKey({
+            maintenanceType: "teammateGroup",
+            id: response.savedItem?.teammateId ?? payload.teammate.id,
+        })
+        if (response.savedItem?.id) {
+            selectedTeammateBuffIds.set(selectedKey, `id:${response.savedItem.id}`)
+        }
+    } else {
+        selectedKey = response.savedItem ? recordKey(response.savedItem) : payload.id
+    }
     renderAll()
-    const savedName = nameOf(response.savedItem ?? payload)
+    const savedName = activeKind === "teammateBuffs"
+        ? [
+            localized(response.savedItem?.teammateName ?? payload.teammate?.name),
+            localized(response.savedItem?.source ?? payload.buff?.source),
+        ].filter(Boolean).join("｜") || "队友 Buff"
+        : nameOf(response.savedItem ?? payload)
     setFeedback(`已保存：${savedName}`, [], "success")
     setSaveStrip("已保存", `最近保存：${savedName}`, "success")
     setStatus("已保存", "success")
@@ -3660,6 +4007,28 @@ function cloneRecord() {
     const current = selectedCleanRecord()
     if (!current) {
         newRecord()
+        return
+    }
+
+    if (activeKind === "teammateBuffs") {
+        const group = normalizeTeammateGroupRecord(current)
+        const buff = selectedTeammateBuff(group)
+        if (!buff) {
+            newRecord()
+            return
+        }
+        const copy = structuredClone(buff)
+        delete copy.id
+        const nextGroup = {
+            ...group,
+            buffs: [...(group.buffs ?? []), copy],
+        }
+        persistTeammateGroupRecord(nextGroup)
+        selectedTeammateBuffIds.set(selectedKey, teammateBuffSelectionValue(copy, nextGroup.buffs.length - 1))
+        renderAll()
+        setFeedback("已复制当前 Buff", ["复制项已追加到当前角色下，保存时会由系统生成新的 Buff ID。"], "success")
+        setSaveStrip("有未保存草稿", "确认复制内容后保存", "idle")
+        setStatus("已复制当前 Buff", "success")
         return
     }
 
@@ -3715,7 +4084,7 @@ els.maintenanceForm.addEventListener("input", () => {
 els.maintenanceForm.addEventListener("change", event => {
     clearFeedback()
     setSaveStrip("有未保存修改", "保存前请留意校验结果", "idle")
-    if (activeKind === "agentSkills" && event.target.matches("[data-skill-level-min], [data-skill-level-max]")) {
+    if (activeKind === "agentSkills" && event.target.matches("[data-skill-level-scale], [data-skill-level-min], [data-skill-level-max], [data-skill-level-default], [data-skill-core-default]")) {
         rerenderSkillCategories()
         updatePreview()
         return
@@ -3803,6 +4172,35 @@ els.maintenanceForm.addEventListener("change", event => {
     updatePreview()
 })
 els.maintenanceForm.addEventListener("click", event => {
+    const selectTeammateBuff = event.target.closest("[data-select-teammate-buff]")
+    if (selectTeammateBuff) {
+        clearFeedback()
+        persistCurrentEditor()
+        selectedTeammateBuffIds.set(selectedKey, selectTeammateBuff.dataset.selectTeammateBuff)
+        renderEditor()
+        setSaveStrip("已切换 Buff", "修改字段后可在此保存", "idle")
+        return
+    }
+
+    const addTeammateBuff = event.target.closest("[data-add-teammate-buff]")
+    if (addTeammateBuff) {
+        clearFeedback()
+        persistCurrentEditor()
+        const group = normalizeTeammateGroupRecord(selectedCleanRecord() ?? blankDraftItem("teammateBuffs"))
+        const nextBuff = blankTeammateBuffDraft()
+        const nextGroup = {
+            ...group,
+            buffs: [...(group.buffs ?? []), nextBuff],
+        }
+        persistTeammateGroupRecord(nextGroup)
+        selectedTeammateBuffIds.set(selectedKey, teammateBuffSelectionValue(nextBuff, nextGroup.buffs.length - 1))
+        renderAll()
+        setFeedback("已添加 Buff", ["填写当前 Buff 后保存，会写入当前角色名下。"], "success")
+        setSaveStrip("有未保存草稿", "填写完成并通过校验后保存", "idle")
+        setStatus("已添加 Buff", "success")
+        return
+    }
+
     const addSkillCategory = event.target.closest("[data-add-skill-category]")
     if (addSkillCategory) {
         clearFeedback()
@@ -4068,7 +4466,12 @@ async function bootstrap() {
         renderAll()
         setStatus("就绪", "success")
     } catch (error) {
-        setStatus(error.message, "error")
+        const message = errorMessage(error)
+        setStatus("加载失败", "error")
+        showErrorNotice({
+            title: "维护数据加载失败",
+            message,
+        })
         console.error(error)
     }
 }

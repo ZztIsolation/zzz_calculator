@@ -1,11 +1,16 @@
 import { evaluateFormulaExpression } from "./formulaEvaluator.js"
 import {
     damageSkillRowsWithGeneratedTotals,
-    skillLevelRange,
+    defaultSkillLevel as candidateDefaultSkillLevel,
+    isCoreSkillLevelScale,
+    normalizeSkillLevel,
+    skillLevelLabel,
+    skillLevelValues,
     skillRowValue,
 } from "./skillMultiplierCandidates.js"
 import * as SharedCombat from "./shared-combat.js"
 import { createImageSelect } from "./entity-select.js"
+import { showErrorNotice } from "./feedback.js"
 import { initDriveDiscAnalysis } from "./drive-disc-analysis.js"
 
 const els = {
@@ -59,6 +64,8 @@ const els = {
     damageTargetPreset: document.getElementById("damageTargetPreset"),
     damageTargetDefense: document.getElementById("damageTargetDefense"),
     damageLevelCoefficient: document.getElementById("damageLevelCoefficient"),
+    damageTargetStunned: document.getElementById("damageTargetStunned"),
+    damageTargetStunMultiplier: document.getElementById("damageTargetStunMultiplier"),
     damageTargetResistanceLabel: document.getElementById("damageTargetResistanceLabel"),
     damageTargetResistanceCustom: document.getElementById("damageTargetResistanceCustom"),
     damageTargetResistanceSign: document.getElementById("damageTargetResistanceSign"),
@@ -434,6 +441,7 @@ const DEFAULT_DAMAGE_TARGET_PRESETS = [
 ]
 const DEFAULT_DAMAGE_TARGET_PRESET_ID = "normal-boss"
 const DEFAULT_DAMAGE_LEVEL_COEFFICIENT = 794
+const DEFAULT_DAMAGE_STUN_MULTIPLIER_PERCENT = 150
 const DAMAGE_ELEMENTS = ["physical", "fire", "ice", "electric", "ether"]
 const DAMAGE_ELEMENT_SHORT_LABELS = {
     physical: "物理",
@@ -518,6 +526,10 @@ function setStatus(text, tone = "idle") {
     els.status.dataset.tone = tone
 }
 
+function errorMessage(error) {
+    return error instanceof Error ? error.message : String(error)
+}
+
 function damageEventTypeLabel(type) {
     if (type === "sheer") {
         return "贯穿"
@@ -595,6 +607,26 @@ function damageElementForAgent(agent = {}) {
 
 function currentDamageElement() {
     return damageElementForAgent(getAgent(els.agentSelect.value))
+}
+
+function targetStunnedFromConfig(target = {}) {
+    if (Object.prototype.hasOwnProperty.call(target, "stunned")) {
+        return target.stunned === true || target.stunned === "true" || target.stunned === 1 || target.stunned === "1"
+    }
+    const activeMultiplier = Number(target.activeStunMultiplier)
+    return Number.isFinite(activeMultiplier) ? activeMultiplier !== 1 : false
+}
+
+function stunMultiplierPercentFromConfig(target = {}) {
+    const percent = Number(target.stunMultiplierPercent)
+    if (Number.isFinite(percent)) {
+        return Math.max(0, percent)
+    }
+    const multiplier = Number(target.stunMultiplier)
+    if (Number.isFinite(multiplier)) {
+        return Math.max(0, multiplier) * 100
+    }
+    return DEFAULT_DAMAGE_STUN_MULTIPLIER_PERCENT
 }
 
 function damageElementShortLabel(element) {
@@ -720,20 +752,17 @@ function damageSkillCategories(skill = agentSkillCatalog()) {
 }
 
 function defaultSkillLevel(category = {}) {
-    const range = skillLevelRange(category)
-    return Number(range.default ?? range.max ?? range.min ?? 1)
+    return candidateDefaultSkillLevel(category)
 }
 
 function clampSkillLevel(category = {}, level) {
-    const range = skillLevelRange(category)
-    const numeric = Number(level)
-    if (!Number.isInteger(numeric)) {
-        return defaultSkillLevel(category)
-    }
-    return Math.max(Number(range.min ?? 1), Math.min(Number(range.max ?? numeric), numeric))
+    return normalizeSkillLevel(category, {}, {}, level)
 }
 
 function selectedSkillLevel(category = {}) {
+    if (isCoreSkillLevelScale(category)) {
+        return normalizeSkillLevel(category, {}, {}, els.coreSkillSelect?.value ?? coreSkillDefaultLevel(getAgent()))
+    }
     return clampSkillLevel(category, damageSkillLevelsByCategory[category.id] ?? defaultSkillLevel(category))
 }
 
@@ -746,7 +775,9 @@ function skillLevelSelects() {
 function normalizeSkillLevelsByCategory(skill = agentSkillCatalog(), stored = {}) {
     const next = {}
     for (const category of damageSkillCategories(skill)) {
-        next[category.id] = clampSkillLevel(category, stored?.[category.id] ?? defaultSkillLevel(category))
+        next[category.id] = isCoreSkillLevelScale(category)
+            ? selectedSkillLevel(category)
+            : clampSkillLevel(category, stored?.[category.id] ?? defaultSkillLevel(category))
     }
     return next
 }
@@ -831,7 +862,7 @@ function renderDamageSkillSummary() {
         els.damageSkillMultiplier.value = resolved.value
     }
     if (els.damageSkillSummary) {
-        els.damageSkillSummary.textContent = `${nameOf(resolved.category)} / ${nameOf(resolved.move)} / ${localizedText(resolved.row.label) || resolved.row.id} · LV${resolved.level} · ${Number.isFinite(resolved.value) ? `${resolved.value}%` : "-"}`
+        els.damageSkillSummary.textContent = `${nameOf(resolved.category)} / ${nameOf(resolved.move)} / ${localizedText(resolved.row.label) || resolved.row.id} · ${skillLevelLabel(resolved.category, resolved.level)} · ${Number.isFinite(resolved.value) ? `${resolved.value}%` : "-"}`
     }
 }
 
@@ -856,12 +887,11 @@ function renderAgentSkillLevelControls() {
             select.disabled = true
             continue
         }
-        const range = skillLevelRange(category)
         const selected = selectedSkillLevel(category)
-        for (let level = Number(range.min ?? 1); level <= Number(range.max ?? selected); level += 1) {
+        for (const level of skillLevelValues(category)) {
             const option = document.createElement("option")
             option.value = String(level)
-            option.textContent = `LV${level}`
+            option.textContent = skillLevelLabel(category, level)
             option.selected = level === selected
             select.appendChild(option)
         }
@@ -953,7 +983,7 @@ function renderDamageSkillModal() {
         const level = selectedSkillLevel(category)
         const group = document.createElement("section")
         group.className = "damage-skill-move-group"
-        group.innerHTML = `<h3>${escapeHtml(nameOf(category))}<span>LV${level}</span></h3>`
+        group.innerHTML = `<h3>${escapeHtml(nameOf(category))}<span>${escapeHtml(skillLevelLabel(category, level))}</span></h3>`
         for (const move of category.moves ?? []) {
             const button = document.createElement("button")
             button.type = "button"
@@ -980,7 +1010,7 @@ function renderDamageSkillModal() {
         rowPane.innerHTML = `
             <div class="damage-skill-row-head">
                 <strong>${escapeHtml(nameOf(active.move))}</strong>
-                <span>${escapeHtml(nameOf(active.category))} · LV${level}</span>
+                <span>${escapeHtml(nameOf(active.category))} · ${escapeHtml(skillLevelLabel(active.category, level))}</span>
             </div>
         `
         const rows = document.createElement("div")
@@ -1185,6 +1215,12 @@ function applyStoredDamageConfig(config = {}) {
     els.damageTargetPreset.value = target.presetId ?? DEFAULT_DAMAGE_TARGET_PRESET_ID
     els.damageTargetDefense.value = target.defense ?? damageTargetPresetById(els.damageTargetPreset.value)?.defense ?? 953
     els.damageLevelCoefficient.value = target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT
+    if (els.damageTargetStunned) {
+        els.damageTargetStunned.checked = targetStunnedFromConfig(target)
+    }
+    if (els.damageTargetStunMultiplier) {
+        els.damageTargetStunMultiplier.value = stunMultiplierPercentFromConfig(target)
+    }
     if (els.damageEventType) {
         els.damageEventType.value = ["direct", "anomaly", "disorder", "sheer"].includes(selectedEvent.kind) ? selectedEvent.kind : "direct"
     }
@@ -2765,6 +2801,7 @@ function teammateCombatBuffGroups() {
                     sourceType: "teammate",
                     teammateId: group.id,
                     teammateName: group.name,
+                    teammateImages: group.images ?? null,
                 }
             })
 
@@ -2838,7 +2875,7 @@ function agentCombatBuffs() {
             id: `agent:${agent.id}.cinema.${buff.cinemaLevel}`,
             sourceType: "self",
             sourceKind: "cinema",
-            defaultChecked: buff.defaultChecked ?? false,
+            defaultChecked: true,
             name: buff.name ?? cinemaBuffName(buff),
             description: buff.description ?? null,
             conditionLabel: localizedText(buff.conditionLabel) || buff.condition,
@@ -3289,6 +3326,13 @@ function isDefaultCheckedCombatBuff(buff) {
     return DEFAULT_CHECKED_COMBAT_SOURCE_TYPES.has(buff?.sourceType)
 }
 
+function shouldUseDefaultCheckedCombatBuff(buff, useDefaultChecked) {
+    const defaultApplies = useDefaultChecked || buff?.sourceKind === "cinema"
+    return defaultApplies
+        && isDefaultCheckedCombatBuff(buff)
+        && !manuallyUncheckedDefaultCombatBuffIds.has(buff.id)
+}
+
 function renderCombatCheckboxList(container, buffs, checkedIds, { useDefaultChecked = true } = {}) {
     container.innerHTML = ""
     if (!buffs.length) {
@@ -3301,7 +3345,7 @@ function renderCombatCheckboxList(container, buffs, checkedIds, { useDefaultChec
 
     for (const buff of buffs) {
         const checked = checkedIds.has(buff.id)
-            || (useDefaultChecked && isDefaultCheckedCombatBuff(buff) && !manuallyUncheckedDefaultCombatBuffIds.has(buff.id))
+            || shouldUseDefaultCheckedCombatBuff(buff, useDefaultChecked)
         const row = document.createElement("label")
         row.className = checked ? "combat-check-row active" : "combat-check-row"
 
@@ -3400,6 +3444,38 @@ function renderCatalogCombatBuffCards(container, buffs, checkedIds) {
     }
 }
 
+function teammateGroupImage(group = {}) {
+    return group.images?.icon ?? group.images?.portrait ?? ""
+}
+
+function renderCombatTeamHead(section, group = {}) {
+    const head = document.createElement("div")
+    head.className = "combat-team-head"
+
+    const image = teammateGroupImage(group)
+    const avatar = image ? document.createElement("img") : document.createElement("span")
+    avatar.className = image ? "combat-team-avatar" : "combat-team-avatar empty"
+    if (image) {
+        avatar.src = image
+        avatar.alt = nameOf(group)
+    } else {
+        avatar.setAttribute("aria-hidden", "true")
+    }
+
+    const copy = document.createElement("span")
+    copy.className = "combat-team-head-copy"
+
+    const title = document.createElement("strong")
+    title.textContent = nameOf(group)
+
+    const meta = document.createElement("span")
+    meta.textContent = `${group.buffs?.length ?? 0} 个 Buff`
+
+    copy.append(title, meta)
+    head.append(avatar, copy)
+    section.appendChild(head)
+}
+
 function renderTeammateCombatBuffGroups(container, groups, checkedIds) {
     container.innerHTML = ""
     if (!groups.length) {
@@ -3414,9 +3490,7 @@ function renderTeammateCombatBuffGroups(container, groups, checkedIds) {
         const section = document.createElement("section")
         section.className = "combat-team-group"
 
-        const title = document.createElement("h4")
-        title.textContent = nameOf(group)
-        section.appendChild(title)
+        renderCombatTeamHead(section, group)
 
         for (const buff of group.buffs ?? []) {
             const row = document.createElement("label")
@@ -4200,6 +4274,8 @@ function collectDamageConfig() {
         presetId: els.damageTargetPreset?.value || DEFAULT_DAMAGE_TARGET_PRESET_ID,
         defense: Number(els.damageTargetDefense?.value ?? 953),
         levelCoefficient: Number(els.damageLevelCoefficient?.value ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT),
+        stunned: Boolean(els.damageTargetStunned?.checked),
+        stunMultiplierPercent: Number(els.damageTargetStunMultiplier?.value ?? DEFAULT_DAMAGE_STUN_MULTIPLIER_PERCENT),
         resistanceByElement: {
             ...damageTargetResistanceByElement,
             [damageElement]: damageResistanceControlValue(),
@@ -4768,6 +4844,7 @@ els.coreSkillSelect.addEventListener("change", async () => {
     try {
         setStatus("计算中", "idle")
         saveCurrentHomeSelection()
+        renderAgentSkillLevelControls()
         await calculate()
     } catch (error) {
         setStatus(error.message, "error")
@@ -4834,7 +4911,7 @@ els.combatSection.addEventListener("change", async event => {
         return
     }
 
-    if (!event.target.matches("input[data-combat-buff-id], select")) {
+    if (!event.target.matches("input[data-combat-buff-id], select") && event.target !== els.damageTargetStunned) {
         return
     }
 
@@ -5365,7 +5442,12 @@ async function bootstrap() {
         restoreHomeSelection()
         await calculate()
     } catch (error) {
-        setStatus(error.message, "error")
+        const message = errorMessage(error)
+        setStatus("加载失败", "error")
+        showErrorNotice({
+            title: "首页加载失败",
+            message,
+        })
         console.error(error)
     }
 }

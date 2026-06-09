@@ -231,8 +231,13 @@ function cleanOptionalZh(value) {
     return clean.zhCN ? clean : null
 }
 
-function canonicalBuffStat(stat) {
-    return stat === "enemyDefIgnore" ? "enemyDefReduction" : stat
+function cleanImages(images = {}, key = "icon") {
+    const imagePath = String(images?.[key] ?? images?.icon ?? images?.portrait ?? "").trim()
+    const source = String(images?.source ?? "").trim()
+    return {
+        ...(imagePath ? { [key]: imagePath } : {}),
+        ...(source ? { source } : {}),
+    }
 }
 
 function cleanEffectRule(effect = {}) {
@@ -240,10 +245,6 @@ function cleanEffectRule(effect = {}) {
     const next = {
         ...rest,
         id: rest.id || randomId("effect"),
-    }
-
-    if (next.stat) {
-        next.stat = canonicalBuffStat(next.stat)
     }
 
     if (rest.sourceLabel) {
@@ -356,7 +357,6 @@ function cleanEffectSet(effect = {}) {
             ? {
                 stats: effect.stats.map(stat => ({
                     ...stat,
-                    stat: canonicalBuffStat(stat.stat),
                 })),
             }
             : {}),
@@ -456,6 +456,7 @@ function cleanPreferredDriveDiscs(preferredDriveDiscs = null) {
     if (!preferredDriveDiscs || typeof preferredDriveDiscs !== "object" || Array.isArray(preferredDriveDiscs)) {
         return null
     }
+    const defaultSetId = String(preferredDriveDiscs.defaultSetId ?? preferredDriveDiscs.defaultSet ?? "").trim()
     const source = preferredDriveDiscs.mainStatLimits
         ?? preferredDriveDiscs.mainStats
         ?? preferredDriveDiscs
@@ -465,9 +466,14 @@ function cleanPreferredDriveDiscs(preferredDriveDiscs = null) {
         const values = Array.isArray(raw) ? raw : raw ? [raw] : []
         mainStatLimits[slot] = [...new Set(values.filter(Boolean).map(String))]
     }
-    return Object.values(mainStatLimits).some(values => values.length)
-        ? { mainStatLimits }
-        : null
+    const hasMainStatLimits = Object.values(mainStatLimits).some(values => values.length)
+    if (!defaultSetId && !hasMainStatLimits) {
+        return null
+    }
+    return {
+        ...(defaultSetId ? { defaultSetId } : {}),
+        ...(hasMainStatLimits ? { mainStatLimits } : {}),
+    }
 }
 
 function cleanCalculationSkillRef(skillRef = null) {
@@ -700,7 +706,7 @@ function deleteAnomalyEffectByType(items, type, id) {
     return items.filter(item => !(item.id === id && anomalyMaintenanceType(item) === settlementType))
 }
 
-function cleanMaintenanceItem(resource, item) {
+export function cleanMaintenanceItem(resource, item) {
     if (resource === "combat-buffs") {
         return cleanBuff(item)
     }
@@ -726,10 +732,17 @@ function cleanMaintenanceItem(resource, item) {
 }
 
 function cleanTeammate(teammate = {}) {
-    return {
+    const images = cleanImages(teammate.images, "icon")
+    const next = {
         ...teammate,
         name: zhOnly(teammate.name),
     }
+    if (Object.keys(images).length) {
+        next.images = images
+    } else {
+        delete next.images
+    }
+    return next
 }
 
 function upsertById(items, item) {
@@ -815,13 +828,15 @@ async function saveMaintenanceItem(resource, item) {
         currentId: item?.id,
     }
     if (resource === "agents") {
-        const [agentSkillsPayload, anomalyEffectsPayload] = await Promise.all([
+        const [agentSkillsPayload, anomalyEffectsPayload, driveDiscSetsPayload] = await Promise.all([
             readDataFile("agent_skills.json"),
             readDataFile("anomaly_effects.json"),
+            readDataFile("drive_disc_sets.json"),
         ])
         validationContext.agentSkills = agentSkillsPayload.agentSkills ?? []
         validationContext.anomalyEffects = anomalyEffectsForType(anomalyEffectsPayload, "attribute")
         validationContext.disorderEffects = anomalyEffectsForType(anomalyEffectsPayload, "disorder")
+        validationContext.driveDiscSets = driveDiscSetsPayload.sets ?? []
     }
     assertValidMaintenanceItem(resource, item, validationContext)
     const savedItem = cleanMaintenanceItem(resource, item)
@@ -1529,6 +1544,8 @@ const server = createServer(async (req, res) => {
     }
 })
 
-server.listen(port, () => {
-    console.log(`ZZZ calculator running at http://localhost:${port}`)
-})
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+    server.listen(port, () => {
+        console.log(`ZZZ calculator running at http://localhost:${port}`)
+    })
+}

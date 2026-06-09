@@ -201,7 +201,7 @@ function settingsForScenario(index) {
     return { ...base, twoPieceSetId: twoSet }
 }
 
-function optimizerInput(seed, scenarioIndex, algorithm, store) {
+function optimizerInput(seed, scenarioIndex, algorithm, store, extraSettings = {}) {
     return {
         agentId: exampleInput.agentId,
         coreSkillLevel: exampleInput.coreSkillLevel,
@@ -212,6 +212,7 @@ function optimizerInput(seed, scenarioIndex, algorithm, store) {
             ...settingsForScenario(scenarioIndex),
             algorithm,
             ...(algorithm === "exact-legacy" ? { enableUpperBoundPruning: false } : {}),
+            ...extraSettings,
         },
         _debug: {
             seed,
@@ -254,6 +255,17 @@ for (let seed = 1; seed <= FUZZ_SEEDS; seed += 1) {
     const superBound = optimizeDriveDiscs(catalog, store, optimizerInput(seed, scenarioIndex, "exact-super-bound", store))
     assert.equal(superBound.metrics.strictExact, true)
     assertSameTop(seed, scenarioIndex, legacy, superBound)
+    if (seed <= 20) {
+        const indexed = optimizeDriveDiscs(
+            catalog,
+            store,
+            optimizerInput(seed, scenarioIndex, "exact-super-bound", store, { useIndexedScoreOnly: "force" }),
+        )
+        if (Number(indexed.metrics.estimatedCombinationCount ?? 0) > 0) {
+            assert.equal(indexed.metrics.indexedScoreEnabled, true)
+        }
+        assertSameTop(seed, scenarioIndex, legacy, indexed)
+    }
 }
 
 console.log(`optimizer fuzz tests passed (${FUZZ_SEEDS} seeds)`)

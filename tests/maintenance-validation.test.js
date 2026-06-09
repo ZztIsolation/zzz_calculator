@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { cleanMaintenanceItem } from "../backend/server.js"
 import { validateMaintenanceItem } from "../frontend/maintenanceValidation.js"
 
 const validAgent = {
@@ -220,6 +221,25 @@ assertValid("agents", {
 })
 assertValid("agents", {
     ...validAgent,
+    preferredDriveDiscs: {
+        defaultSetId: validDriveDiscSet.id,
+        mainStatLimits: {
+            4: ["critRate"],
+        },
+    },
+}, {
+    driveDiscSets: [validDriveDiscSet],
+})
+assertInvalid("agents", {
+    ...validAgent,
+    preferredDriveDiscs: {
+        defaultSetId: "missing_drive_disc",
+    },
+}, "驱动盘套装不存在", {
+    driveDiscSets: [validDriveDiscSet],
+})
+assertValid("agents", {
+    ...validAgent,
     combatBuffs: {
         ...validAgent.combatBuffs,
         cinemaBuffs: [1, 4, 6].map(level => ({
@@ -372,6 +392,38 @@ assertValid("buffs", {
         },
     ],
 })
+const defenseIgnoreBuff = {
+    ...validBuff,
+    effects: [
+        {
+            id: "effect-defense-ignore",
+            type: "fixed",
+            stat: "enemyDefIgnore",
+            value: 20,
+            mode: "flat",
+        },
+    ],
+}
+assert.equal(
+    cleanMaintenanceItem("combat-buffs", defenseIgnoreBuff).effects[0].stat,
+    "enemyDefIgnore",
+    "Maintenance save cleanup should preserve defense ignore as a display-distinct stat",
+)
+assert.equal(
+    cleanMaintenanceItem("combat-buffs", {
+        ...defenseIgnoreBuff,
+        effects: [],
+        stats: [
+            {
+                stat: "enemyDefIgnore",
+                value: 20,
+                mode: "flat",
+            },
+        ],
+    }).stats[0].stat,
+    "enemyDefIgnore",
+    "Legacy stat cleanup should preserve defense ignore as a display-distinct stat",
+)
 assertValid("buffs", {
     ...validBuff,
     sourceType: "boss",
@@ -711,6 +763,26 @@ const validTeammateBuff = {
     },
 }
 assertValid("teammate-buffs", validTeammateBuff)
+assertValid("teammate-buffs", {
+    ...validTeammateBuff,
+    teammate: {
+        ...validTeammateBuff.teammate,
+        images: {
+            icon: "/assets/agents/lucy.png",
+            source: "https://wiki.biligame.com/zzz/%E8%A7%92%E8%89%B2%E5%9B%BE%E9%89%B4",
+        },
+    },
+})
+assertInvalid("teammate-buffs", {
+    ...validTeammateBuff,
+    teammate: {
+        ...validTeammateBuff.teammate,
+        images: {
+            icon: "assets/agents/lucy.png",
+            source: "wiki.biligame.com/zzz",
+        },
+    },
+}, "图片路径必须是")
 assertValid("teammate-buffs", {
     ...validTeammateBuff,
     buff: {

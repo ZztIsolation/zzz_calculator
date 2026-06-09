@@ -1,5 +1,6 @@
 import { accountLabel, api, currentAccount, loadAccounts } from "./accounts.js"
 import { confirmDialog, promptDialog } from "./dialogs.js"
+import { clearPageNotice, setStatusChip, showErrorNotice, showSuccessNotice } from "./feedback.js"
 import { deleteOwnerSelection, setCurrentAccountId } from "./shared-combat.js"
 
 const els = {
@@ -12,8 +13,11 @@ const els = {
 let accounts = null
 
 function setStatus(text, tone = "idle") {
-    els.status.textContent = text
-    els.status.dataset.tone = tone
+    setStatusChip(els.status, text, tone)
+}
+
+function errorMessage(error) {
+    return error instanceof Error ? error.message : String(error)
 }
 
 function escapeHtml(value) {
@@ -68,39 +72,44 @@ async function addAccount() {
         confirmText: "新增账号",
     })
     if (name === null) {
-        return
+        return null
     }
+    const label = name.trim() || "新账号"
     accounts = await api("/api/accounts", {
         method: "POST",
         body: JSON.stringify({
-            label: name.trim() || "新账号",
+            label,
         }),
     })
     renderAccounts()
+    return accounts.owners?.find(owner => accountLabel(owner) === label) ?? currentAccount(accounts)
 }
 
 async function renameAccount(id) {
     const owner = accounts.owners.find(item => item.id === id)
     if (!owner) {
-        return
+        return null
     }
+    const previousLabel = accountLabel(owner)
     const name = await promptDialog({
         title: "重命名账号",
-        message: `正在修改「${accountLabel(owner)}」的显示名称。`,
+        message: `正在修改「${previousLabel}」的显示名称。`,
         label: "账号名称",
-        value: accountLabel(owner),
+        value: previousLabel,
         confirmText: "保存名称",
     })
     if (name === null) {
-        return
+        return null
     }
+    const label = name.trim() || previousLabel
     accounts = await api(`/api/accounts/${encodeURIComponent(id)}`, {
         method: "PUT",
         body: JSON.stringify({
-            label: name.trim() || accountLabel(owner),
+            label,
         }),
     })
     renderAccounts()
+    return { previousLabel, label }
 }
 
 async function switchAccount(id) {
@@ -110,36 +119,53 @@ async function switchAccount(id) {
     })
     setCurrentAccountId(accounts.currentOwnerId)
     renderAccounts()
+    return currentAccount(accounts)
 }
 
 async function deleteAccount(id) {
     const owner = accounts.owners.find(item => item.id === id)
     if (!owner) {
-        return
+        return null
     }
+    const label = accountLabel(owner)
     const ok = await confirmDialog({
         title: "删除账号",
-        message: `确认删除「${accountLabel(owner)}」？将删除 ${Number(owner.driveDiscCount ?? 0)} 个驱动盘、${Number(owner.loadoutCount ?? 0)} 个套装预设和 ${Number(owner.importCount ?? 0)} 次导入记录。`,
+        message: `确认删除「${label}」？将删除 ${Number(owner.driveDiscCount ?? 0)} 个驱动盘、${Number(owner.loadoutCount ?? 0)} 个套装预设和 ${Number(owner.importCount ?? 0)} 次导入记录。`,
         confirmText: "删除账号",
         tone: "danger",
     })
     if (!ok) {
-        return
+        return null
     }
     accounts = await api(`/api/accounts/${encodeURIComponent(id)}`, {
         method: "DELETE",
     })
     deleteOwnerSelection(id)
     renderAccounts()
+    return { label }
 }
 
 els.addAccountBtn.addEventListener("click", async () => {
     try {
+        clearPageNotice()
         setStatus("新增账号", "idle")
-        await addAccount()
-        setStatus("已新增", "success")
+        const owner = await addAccount()
+        if (owner) {
+            setStatus("已新增", "success")
+            showSuccessNotice({
+                title: "账号已新增",
+                message: `已创建「${accountLabel(owner)}」。`,
+            })
+        } else {
+            setStatus("就绪", "idle")
+        }
     } catch (error) {
-        setStatus(error.message, "error")
+        const message = errorMessage(error)
+        setStatus("新增失败", "error")
+        showErrorNotice({
+            title: "新增账号失败",
+            message,
+        })
     }
 })
 
@@ -151,19 +177,45 @@ els.accountTableBody.addEventListener("click", async event => {
     }
     try {
         const action = button.dataset.action
+        clearPageNotice()
         setStatus("处理中", "idle")
         if (action === "switch") {
-            await switchAccount(row.dataset.accountId)
+            const owner = await switchAccount(row.dataset.accountId)
             setStatus("已切换", "success")
+            showSuccessNotice({
+                title: "账号已切换",
+                message: `当前账号为「${accountLabel(owner)}」。`,
+            })
         } else if (action === "rename") {
-            await renameAccount(row.dataset.accountId)
-            setStatus("已改名", "success")
+            const renamed = await renameAccount(row.dataset.accountId)
+            if (renamed) {
+                setStatus("已改名", "success")
+                showSuccessNotice({
+                    title: "账号已改名",
+                    message: `「${renamed.previousLabel}」已改为「${renamed.label}」。`,
+                })
+            } else {
+                setStatus("就绪", "idle")
+            }
         } else if (action === "delete") {
-            await deleteAccount(row.dataset.accountId)
-            setStatus("已删除", "success")
+            const deleted = await deleteAccount(row.dataset.accountId)
+            if (deleted) {
+                setStatus("已删除", "success")
+                showSuccessNotice({
+                    title: "账号已删除",
+                    message: `「${deleted.label}」及其本地数据已删除。`,
+                })
+            } else {
+                setStatus("就绪", "idle")
+            }
         }
     } catch (error) {
-        setStatus(error.message, "error")
+        const message = errorMessage(error)
+        setStatus("操作失败", "error")
+        showErrorNotice({
+            title: "账号操作失败",
+            message,
+        })
     }
 })
 
@@ -172,5 +224,10 @@ try {
     await refresh()
     setStatus("就绪", "success")
 } catch (error) {
-    setStatus(error.message, "error")
+    const message = errorMessage(error)
+    setStatus("加载失败", "error")
+    showErrorNotice({
+        title: "账号加载失败",
+        message,
+    })
 }

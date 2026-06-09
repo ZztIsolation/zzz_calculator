@@ -343,6 +343,7 @@
         }
       },
       "preferredDriveDiscs": {
+        "defaultSetId": "scanner-set-fcf8ae93d798",
         "mainStatLimits": {
           "4": [
             "atkPct",
@@ -451,7 +452,213 @@
           ],
           "buffModifiers": []
         },
-        "cinemaBuffs": []
+        "cinemaBuffs": [
+          {
+            "cinemaLevel": 1,
+            "cinemaName": {
+              "zhCN": "雪上加霜"
+            },
+            "description": {
+              "zhCN": "在「霜月架势」期间，每消耗1点「落霜」，「普通攻击：霜月」将无视目标6%防御力，最多叠加6层，退出「霜月架势」后增益效果结束；\n在「普通攻击：霜月」中进行三段蓄力，斩击命中处于「霜灼」状态下的敌人时，可以立即消除目标的「霜灼」状态，并使全队角色属性异常积蓄效率提升20%，持续10秒。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "coverage": {
+              "default": 1,
+              "min": 0,
+              "max": 1,
+              "step": 0.1
+            },
+            "effects": [
+              {
+                "id": "effect-1",
+                "type": "fixed",
+                "stat": "enemyDefReduction",
+                "value": 12,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "agentSkillId": "hoshimi_miyabi",
+                      "categoryId": "basic",
+                      "moveId": "frost_moon",
+                      "rowId": "charge_1"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "effect-2",
+                "type": "fixed",
+                "stat": "enemyDefReduction",
+                "value": 24,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "agentSkillId": "hoshimi_miyabi",
+                      "categoryId": "basic",
+                      "moveId": "frost_moon",
+                      "rowId": "charge_2"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "effect-3",
+                "type": "fixed",
+                "stat": "enemyDefReduction",
+                "value": 36,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "agentSkillId": "hoshimi_miyabi",
+                      "categoryId": "basic",
+                      "moveId": "frost_moon",
+                      "rowId": "charge_3"
+                    }
+                  ]
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 2,
+            "cinemaName": {
+              "zhCN": "吐纳法"
+            },
+            "description": {
+              "zhCN": "「普通攻击：风花」与「闪避反击」造成的伤害提升30%；\n「普通攻击：风花」第五段攻击的最后一击命中敌人时，星见雅获得1点「落霜」；进入战场时，星见雅立即获得6点「落霜」，自身暴击率提升15%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "coverage": {
+              "default": 1,
+              "min": 0,
+              "max": 1,
+              "step": 0.1
+            },
+            "effects": [
+              {
+                "id": "effect-1",
+                "type": "fixed",
+                "stat": "dmgBonus",
+                "value": 30,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "agentSkillId": "hoshimi_miyabi",
+                      "categoryId": "basic",
+                      "moveId": "windflower_opening"
+                    },
+                    {
+                      "agentSkillId": "hoshimi_miyabi",
+                      "categoryId": "basic",
+                      "moveId": "windflower_frost"
+                    },
+                    {
+                      "agentSkillId": "hoshimi_miyabi",
+                      "categoryId": "dodge",
+                      "moveId": "dodge_counter_cold_sparrow"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "effect-2",
+                "type": "fixed",
+                "stat": "critRate",
+                "value": 15,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 4,
+            "cinemaName": {
+              "zhCN": "皲裂"
+            },
+            "description": {
+              "zhCN": "「霜灼·破」造成的伤害提升30%，触发「霜灼·破」时，星见雅额外获得250点喧响值。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "coverage": {
+              "default": 1,
+              "min": 0,
+              "max": 1,
+              "step": 0.1
+            },
+            "effects": [
+              {
+                "id": "effect-1",
+                "type": "fixed",
+                "stat": "dmgBonus",
+                "value": 30,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "agentSkillId": "hoshimi_miyabi",
+                      "categoryId": "core_skill",
+                      "moveId": "frostburn_break"
+                    }
+                  ]
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 6,
+            "cinemaName": {
+              "zhCN": "天资卓越"
+            },
+            "description": {
+              "zhCN": "进入「霜月架势」后，星见雅获得「极意」效果，使「普通攻击：霜月」造成的伤害提升30%；\n拥有「极意」效果期间，若星见雅当前拥有的「落霜」足够消耗，会在「霜月架势」下依据当前蓄力段数自动发动拔刀斩。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "coverage": {
+              "default": 1,
+              "min": 0,
+              "max": 1,
+              "step": 0.1
+            },
+            "effects": [
+              {
+                "id": "effect-1",
+                "type": "fixed",
+                "stat": "dmgBonus",
+                "value": 30,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "agentSkillId": "hoshimi_miyabi",
+                      "categoryId": "basic",
+                      "moveId": "frost_moon"
+                    }
+                  ]
+                }
+              }
+            ],
+            "buffModifiers": []
+          }
+        ]
       },
       "coreSkill": {
         "name": {
@@ -623,12 +830,12 @@
         }
       },
       "preferredDriveDiscs": {
+        "defaultSetId": "scanner-set-48ee0a14625f",
         "mainStatLimits": {
           "4": [
             "atkPct",
             "critRate",
-            "critDmg",
-            "anomalyProficiency"
+            "critDmg"
           ],
           "5": [
             "atkPct",
@@ -636,8 +843,7 @@
             "iceDmg"
           ],
           "6": [
-            "atkPct",
-            "anomalyMastery"
+            "atkPct"
           ]
         }
       },
@@ -740,7 +946,8 @@
       "verification": {
         "level60Stats": "source-checked-biligame-wiki-2026-05-30",
         "panelDefaults": "source-checked-biligame-wiki-2026-05-30",
-        "damageElement": "displayed as frost but settled as ice so it uses ice damage bonus and ice resistance"
+        "damageElement": "displayed as frost but settled as ice so it uses ice damage bonus and ice resistance",
+        "cinemaBuffs": "source-checked-zzz.gg-2026-06-09; M4 frostburn break damage is modeled through the core_skill/frostburn_break skill target"
       }
     },
     {
@@ -881,7 +1088,169 @@
           ],
           "buffModifiers": []
         },
-        "cinemaBuffs": []
+        "cinemaBuffs": [
+          {
+            "cinemaLevel": 1,
+            "cinemaName": {
+              "zhCN": "清灵道心"
+            },
+            "description": {
+              "zhCN": "「玄墨值」消耗速度降低至原本的70%；\n仪玄即将受到敌方攻击时，若「术法点」足够，可以自动消耗「术法点」规避伤害并触发「招架」效果；\n仪玄发动「招架」效果时，将对前方敌人释放一道落雷，造成仪玄50%贯穿力的玄墨伤害；\n仪玄触发「招架」效果后，暴击率提升10%，持续12秒。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "coverage": {
+              "default": 1,
+              "min": 0,
+              "max": 1,
+              "step": 0.1
+            },
+            "effects": [
+              {
+                "id": "effect-1",
+                "type": "fixed",
+                "stat": "critRate",
+                "value": 10,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 2,
+            "cinemaName": {
+              "zhCN": "消灾渡厄"
+            },
+            "description": {
+              "zhCN": "「终结技」与「强化特殊技」命中敌人时，无视15%以太伤害抗性；\n每隔1秒，仪玄可以使「强化特殊技」发动的「霄云迅击-破」或「青溟震击-破」造成的失衡值提升25%；\n每隔15秒，仪玄释放「终结技：符法千重」后可以自动对主目标释放一次「终结技：符法千重-破」，最多造成仪玄1200%贯穿力的玄墨伤害。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "coverage": {
+              "default": 1,
+              "min": 0,
+              "max": 1,
+              "step": 0.1
+            },
+            "effects": [
+              {
+                "id": "effect-1",
+                "type": "fixed",
+                "stat": "etherResIgnore",
+                "value": 15,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "agentSkillId": "yixuan",
+                      "categoryId": "special",
+                      "moveId": "ink_trace_transform"
+                    },
+                    {
+                      "agentSkillId": "yixuan",
+                      "categoryId": "special",
+                      "moveId": "cloud_condensing_art"
+                    },
+                    {
+                      "agentSkillId": "yixuan",
+                      "categoryId": "special",
+                      "moveId": "ink_ember_shadow_dispel"
+                    },
+                    {
+                      "agentSkillId": "yixuan",
+                      "categoryId": "chain",
+                      "moveId": "ultimate_qingming_cloud_shadow"
+                    },
+                    {
+                      "agentSkillId": "yixuan",
+                      "categoryId": "chain",
+                      "moveId": "ultimate_thousand_talismans"
+                    }
+                  ]
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 4,
+            "cinemaName": {
+              "zhCN": "烦恼尽空"
+            },
+            "description": {
+              "zhCN": "释放「终结技」后，仪玄恢复10点「术法点」，并获得1层「诸相化生」，最多叠加2层，持续到本次战斗结束；\n拥有「诸相化生」时，「强化特殊技：凝云术」与「强化特殊技：墨烬影消」造成的伤害提升，每层使伤害提升30%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "coverage": {
+              "default": 1,
+              "min": 0,
+              "max": 1,
+              "step": 0.1
+            },
+            "effects": [
+              {
+                "id": "effect-1",
+                "type": "stacked",
+                "stat": "dmgBonus",
+                "valuePerStack": 30,
+                "mode": "flat",
+                "maxStacks": 2,
+                "defaultStacks": 2,
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "agentSkillId": "yixuan",
+                      "categoryId": "special",
+                      "moveId": "cloud_condensing_art"
+                    },
+                    {
+                      "agentSkillId": "yixuan",
+                      "categoryId": "special",
+                      "moveId": "ink_ember_shadow_dispel"
+                    }
+                  ]
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 6,
+            "cinemaName": {
+              "zhCN": "清净自然"
+            },
+            "description": {
+              "zhCN": "仪玄处于「凝神」状态下造成的贯穿伤害提升20%；\n仪玄进入「凝神」状态时获得1层「真功」，「真功」状态下发动「强化特殊技：墨烬影消」后，将消耗「真功」自动衔接发动「终结技：符法千重」。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "coverage": {
+              "default": 1,
+              "min": 0,
+              "max": 1,
+              "step": 0.1
+            },
+            "effects": [
+              {
+                "id": "effect-1",
+                "type": "fixed",
+                "stat": "sheerDmgBonus",
+                "value": 20,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                }
+              }
+            ],
+            "buffModifiers": []
+          }
+        ]
       },
       "coreSkill": {
         "name": {
@@ -1046,10 +1415,11 @@
           "stats": "source-checked-biligame-wiki-2026-06-03",
           "skillLevelBonuses": "A/C/E each add Crit Rate +4.8% and Core Passive level +1; B/D/F each add Base HP +140 and Core Passive level +1",
           "corePassiveScaling": "source-checked; F corresponds to Core Passive level 7 and selected-skill damage bonus +60%",
-          "unsupportedBuffs": "resource generation, automatic lightning follow-ups, stun-only extra special damage, stun duration extension, and cinema effects are not modeled as automatic combat buffs"
+          "unsupportedBuffs": "resource generation, automatic lightning follow-ups, stun-only extra special damage, stun duration extension, and cinema extra-action damage are not modeled as automatic combat buffs"
         }
       },
       "preferredDriveDiscs": {
+        "defaultSetId": "yunkui_tales",
         "mainStatLimits": {
           "4": [
             "hpPct",
@@ -1087,12 +1457,14 @@
         ]
       },
       "sources": [
-        "https://baike.mihoyo.com/zzz/wiki/content/1299/detail"
+        "https://baike.mihoyo.com/zzz/wiki/content/1299/detail",
+        "https://zzz.gg/zh-hans/characters/%E4%BB%AA%E7%8E%84"
       ],
       "verification": {
         "level60HpAtkDef": "source-checked",
         "panelDefaults": "source-checked-biligame-wiki-2026-06-03",
-        "attribute": "Biligame stores 属性=以太 and 属性名称=玄墨; shown as xuanmo and settled as ether for damage bonus and resistance buckets"
+        "attribute": "Biligame stores 属性=以太 and 属性名称=玄墨; shown as xuanmo and settled as ether for damage bonus and resistance buckets",
+        "cinemaBuffs": "source-checked-zzz.gg-2026-06-09; M1 lightning and M2/M6 extra ultimate damage are not modeled because cinema Buffs cannot add extra damage events"
       }
     },
     {
@@ -1126,7 +1498,8 @@
       },
       "combatBuffs": {
         "corePassive": null,
-        "additionalAbility": null
+        "additionalAbility": null,
+        "cinemaBuffs": []
       },
       "coreSkill": {
         "name": {
@@ -1298,14 +1671,15 @@
         }
       },
       "preferredDriveDiscs": {
+        "defaultSetId": "fanged_metal",
         "mainStatLimits": {
           "4": [
             "anomalyProficiency"
           ],
           "5": [
-            "physicalDmg",
+            "atkPct",
             "penRatio",
-            "atkPct"
+            "physicalDmg"
           ],
           "6": [
             "anomalyMastery"

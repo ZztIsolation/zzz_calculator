@@ -9,6 +9,32 @@ Chinese documentation is available in [README.zh-CN.md](README.zh-CN.md).
 
 ## Upload Update Summaries
 
+### 2026-06-09 20:28 +08:00
+
+This upload adds or expands these major areas:
+
+- Added boss stun target controls and stun multiplier modeling for direct,
+  sheer, anomaly, and disorder damage, including white-box formula rows,
+  modeling docs, and regression coverage.
+- Added Core Skill-scaled skill multiplier support so damage rows can use
+  Core Skill levels such as `0` and `A-F`; Hoshimi Miyabi now includes
+  Frostburn Break core-skill damage data and cinema-targeted buffs.
+- Upgraded the Drive Disc optimizer with an `exact-super-bound-parallel`
+  worker-thread path, compiled/dense score kernels, worker metrics, and
+  benchmark coverage for parallel exact searches.
+- Added optimizer controls for recommended 4-piece set selection, agent
+  default 4-piece sets, and automatic/manual 4-piece buff runtime inputs.
+- Improved page-level feedback and error reporting with a shared frontend
+  notice helper across the homepage, optimizer, Drive Disc, account, and
+  maintenance pages.
+- Expanded teammate buff maintenance into grouped teammate records with
+  portrait/icon metadata, and added teammate portraits for combat buff
+  browsing.
+- Preserved defense ignore as a distinct maintenance stat instead of folding it
+  into defense reduction during form cleanup.
+- Added compiled-score, compiled-panel-score, maintenance-stat, stun-multiplier,
+  preferred-Drive-Disc, and teammate-image validation coverage.
+
 ### 2026-06-07 21:15 +08:00
 
 This upload adds or expands these major areas:
@@ -157,15 +183,17 @@ This upload added or expanded these major areas:
 - Combat buff selection with teammate, W-Engine team, Drive Disc team, and
   custom sources grouped for review and removal.
 - Damage preview for direct, sheer, anomaly, and disorder events, with
-  inspectable white-box formula rows and separate damage modifier zones.
+  inspectable white-box formula rows, target resistance/defense/stun controls,
+  and separate damage modifier zones.
 - ZZZ Scanner Drive Disc import, manual inventory editing, duplicate handling,
   account-scoped storage, and optional remove-missing synchronization.
 - Saved Drive Disc loadouts that can be applied on the homepage or created from
   optimizer results.
 - Drive Disc optimizer with calculation target presets, preview, background job
   progress, cancelation, set-shape constraints, multiple optional 2-piece set
-  choices, main-stat constraints, minimum stat filters, exact/fast algorithm
-  choices, and damage scoring.
+  choices, recommended/default 4-piece set helpers, automatic or manual 4-piece
+  buff handling, main-stat constraints, minimum stat filters, exact/fast/parallel
+  algorithm choices, and damage scoring.
 - Drive Disc analysis tools for current substat effective rolls and projected
   damage gains from extra substat rolls.
 - Browser maintenance pages for static game data and validation-oriented JSON
@@ -184,6 +212,7 @@ zzz_calculator/
     driveDiscAnalysis.js
     driveDiscInventory.js
     driveDiscOptimizer.js
+    driveDiscOptimizerWorker.js
   data/
     agents.json
     agent_skills.json
@@ -213,9 +242,11 @@ zzz_calculator/
     drive-discs.js
     dialogs.js
     entity-select.js
+    feedback.js
     accounts.js
     accounts-page.js
     maintenance.js
+    maintenanceStats.js
     shared-combat.js
     skillMultiplierCandidates.js
     assets/
@@ -271,6 +302,9 @@ npm run test:damage-whitebox
 npm run test:shared-combat
 npm run test:w-engine-modification
 npm run test:anomaly-damage
+npm run test:maintenance-stats
+npm run test:compiled-score
+npm run test:compiled-panel-score
 npm run test:optimizer
 npm run test:optimizer-progress
 npm run test:optimizer-api
@@ -338,6 +372,8 @@ node --check frontend/accounts-page.js
   buffs.
 - In-combat buffs can contribute plain stats, runtime-scaled effects, damage
   modifiers, W-Engine team buffs, and skill-targeted effects.
+- Target configuration supports defense, level coefficient, per-element
+  resistance, and an optional stun multiplier.
 - Optimizer damage targets can use one direct, sheer, anomaly, or disorder event
   or a custom list of weighted damage events.
 - Special display attributes can declare a real `damageElement`; for example,
