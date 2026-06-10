@@ -272,15 +272,19 @@ Main pages:
 - `/drive-discs.html` - Drive Disc inventory and loadout management
 - `/calculate.html` - Drive Disc optimizer workspace
 - `/accounts.html` - account creation, switching, rename, and deletion
-- `/maintenance.html` - static catalog maintenance
+- `/maintenance.html` - static catalog maintenance. Enabled by default during
+  local development and disabled by default when `NODE_ENV=production`.
 
 ## Local Runtime Data
 
-`data/user_drive_discs.json` is intentionally ignored by Git because it stores
-local player inventory, imports, account records, loadouts, and current account
-selection. A fresh clone can run without this file: the backend uses an empty
-store when it is missing, then creates the local file after importing or
-editing Drive Discs.
+User-owned data is stored in browser-local IndexedDB: accounts, current account,
+Drive Disc inventory, import history, and loadouts. In production, one user's
+uploads, edits, deletes, and account switches stay in that user's browser and do
+not write to a shared server inventory.
+
+The legacy `data/user_drive_discs.json` file remains ignored by Git for backend
+history tests and local migration reference. Public pages no longer read or
+write it through server user-data APIs.
 
 Use `data/user_drive_discs.example.json` as the documented empty-store shape.
 Scanner exports copied into `imports/` or `data/imports/` are also ignored.
@@ -288,6 +292,19 @@ Scanner exports copied into `imports/` or `data/imports/` are also ignored.
 The public static data under `data/`, frontend assets, examples, docs, and tests
 should stay committed so other users can clone the repository and run it
 normally.
+
+## Production
+
+Set production services with:
+
+```bash
+NODE_ENV=production
+```
+
+The server then reports `maintenanceEnabled: false` and blocks
+`/maintenance.html`, `/maintenance.js`, and `/api/maintenance/*`. Set
+`MAINTENANCE_ENABLED=true|false` only when you intentionally need an explicit
+override.
 
 ## Tests
 
@@ -340,14 +357,11 @@ node --check frontend/accounts-page.js
 ## API Overview
 
 - `GET /api/health`
+- `GET /api/app-config`
 - `GET /api/meta`
-- `GET /api/accounts`
-- `POST /api/accounts`
-- `POST /api/accounts/current`
-- `PUT|DELETE /api/accounts/:id`
-- `GET /api/maintenance/catalog`
-- `POST|PUT|DELETE /api/maintenance/:resource`
-- `DELETE /api/maintenance/anomaly-effects/:type/:id`
+- `GET /api/maintenance/catalog` (defaults to `403` in production)
+- `POST|PUT|DELETE /api/maintenance/:resource` (defaults to `403` in production)
+- `DELETE /api/maintenance/anomaly-effects/:type/:id` (defaults to `403` in production)
 - `GET /api/example/out-of-combat`
 - `GET /api/example/ye-shunguang`
 - `POST /api/calculate/out-of-combat`
@@ -358,12 +372,13 @@ node --check frontend/accounts-page.js
 - `POST /api/optimize/drive-discs`
 - `POST /api/analysis/drive-disc-substats`
 - `POST /api/analysis/drive-disc-stat-gains`
-- `GET|DELETE /api/user-drive-discs`
-- `POST /api/user-drive-discs/import/zzz-scanner`
-- `POST /api/user-drive-discs`
-- `PUT|DELETE /api/user-drive-discs/:id`
-- `GET|POST /api/user-drive-disc-loadouts`
-- `PUT|DELETE /api/user-drive-disc-loadouts/:id`
+
+The legacy user-data APIs now return `410 Gone` because user data is stored in
+the browser:
+
+- `/api/accounts*`
+- `/api/user-drive-discs*`
+- `/api/user-drive-disc-loadouts*`
 
 ## Modeling Notes
 

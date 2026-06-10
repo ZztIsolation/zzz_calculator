@@ -1,5 +1,14 @@
 import { confirmDialog } from "./dialogs.js"
 import { clearPageNotice, setStatusChip, showErrorNotice, showSuccessNotice } from "./feedback.js"
+import {
+    clearUserDriveDiscStore,
+    deleteDriveDiscLoadout,
+    deleteUserDriveDisc,
+    importScannerExportToStore,
+    loadCurrentUserDriveDiscStore,
+    upsertDriveDiscLoadout,
+    upsertUserDriveDisc,
+} from "./local-store.js"
 
 const els = {
     status: document.getElementById("status"),
@@ -256,6 +265,18 @@ function getSetByName(setName) {
     return driveDiscSets().find(item =>
         item.name?.zhCN === setName || item.name?.en === setName || item.id === setName
     ) ?? null
+}
+
+function scannerSetAliases() {
+    return Object.fromEntries(
+        driveDiscSets()
+            .flatMap(set => [
+                [set.name?.zhCN, { id: set.id, name: set.name }],
+                [set.name?.en, { id: set.id, name: set.name }],
+                [set.id, { id: set.id, name: set.name }],
+            ])
+            .filter(([key]) => key)
+    )
 }
 
 function resolveSet(discOrId, setName = "") {
@@ -802,18 +823,15 @@ async function saveCurrentLoadout() {
         return null
     }
     const name = els.loadoutNameInput.value.trim() || existing.name
-    const response = await api(`/api/user-drive-disc-loadouts/${encodeURIComponent(existing.id)}`, {
-        method: "PUT",
-        body: JSON.stringify({
-            ...existing,
-            name,
-            agentId: els.loadoutAgentSelect.value,
-            driveDiscIdsBySlot: readLoadoutSlotIds(),
-            source: {
-                ...(existing.source ?? {}),
-                editedFromInventory: true,
-            },
-        }),
+    const response = await upsertDriveDiscLoadout({
+        ...existing,
+        name,
+        agentId: els.loadoutAgentSelect.value,
+        driveDiscIdsBySlot: readLoadoutSlotIds(),
+        source: {
+            ...(existing.source ?? {}),
+            editedFromInventory: true,
+        },
     })
     store = response.store
     closeLoadoutModal()
@@ -836,9 +854,7 @@ async function deleteCurrentLoadout() {
     if (!ok) {
         return null
     }
-    const response = await api(`/api/user-drive-disc-loadouts/${encodeURIComponent(existing.id)}`, {
-        method: "DELETE",
-    })
+    const response = await deleteDriveDiscLoadout(existing.id)
     store = response.store
     closeLoadoutModal()
     renderAll()
@@ -909,7 +925,7 @@ async function loadMeta() {
 }
 
 async function loadStore() {
-    store = await api("/api/user-drive-discs")
+    store = await loadCurrentUserDriveDiscStore()
     renderAll()
 }
 
@@ -982,15 +998,12 @@ async function importScannerFile(file) {
         }
     }
 
-    const response = await api("/api/user-drive-discs/import/zzz-scanner", {
-        method: "POST",
-        body: JSON.stringify({
-            sourcePath: file.name,
-            items,
-            removeMissing,
-        }),
+    const response = await importScannerExportToStore(items, {
+        sourcePath: file.name,
+        removeMissing,
+        setAliases: scannerSetAliases(),
     })
-    store = response.store
+    store = response
     renderAll()
     setStatus("导入完成", "success")
     showImportSuccessNotice(response.summary ?? store.lastImportSummary)
@@ -1011,9 +1024,7 @@ async function clearInventory() {
         return false
     }
 
-    const response = await api("/api/user-drive-discs", {
-        method: "DELETE",
-    })
+    const response = await clearUserDriveDiscStore()
     store = response.store
     selectedId = null
     selectedLoadoutId = null
@@ -1027,11 +1038,7 @@ async function clearInventory() {
 async function saveCurrentDisc() {
     const disc = buildDiscFromForm()
     const exists = Boolean((store?.driveDiscs ?? []).find(item => item.id === disc.id))
-    const response = await api(exists ? `/api/user-drive-discs/${encodeURIComponent(disc.id)}` : "/api/user-drive-discs", {
-        method: exists ? "PUT" : "POST",
-        body: JSON.stringify(disc),
-    })
-    store = response.store
+    store = await upsertUserDriveDisc(disc)
     selectedId = disc.id
     closeModal()
     renderAll()
@@ -1054,9 +1061,7 @@ async function deleteCurrentDisc() {
         return null
     }
 
-    const response = await api(`/api/user-drive-discs/${encodeURIComponent(disc.id)}`, {
-        method: "DELETE",
-    })
+    const response = await deleteUserDriveDisc(disc.id)
     store = response.store
     selectedId = null
     closeModal()

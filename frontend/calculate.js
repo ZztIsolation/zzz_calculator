@@ -13,6 +13,7 @@ import { createImageSelect } from "./entity-select.js"
 import { promptDialog } from "./dialogs.js"
 import { clearPageNotice, setStatusChip, showErrorNotice, showSuccessNotice } from "./feedback.js"
 import { initDriveDiscAnalysis } from "./drive-disc-analysis.js"
+import { loadCurrentUserDriveDiscStore, upsertDriveDiscLoadout } from "./local-store.js"
 
 const els = {
     status: document.getElementById("status"),
@@ -5755,6 +5756,7 @@ async function runOptimization() {
     const payload = {
         ...collectRequestPayload({ driveDiscs: [] }),
         settings: collectOptimizationSettings(),
+        store,
     }
     activeOptimizationSettingsSnapshot = structuredClone(payload.settings)
     activeOptimizationAgentIdSnapshot = payload.agentId
@@ -5824,19 +5826,16 @@ async function saveActiveLoadout() {
     }
     clearPageNotice()
     setStatus("保存套装", "idle")
-    const response = await api("/api/user-drive-disc-loadouts", {
-        method: "POST",
-        body: JSON.stringify({
-            agentId,
-            name: name.trim() || defaultName,
-            driveDiscIdsBySlot: result.driveDiscIdsBySlot,
-            score: result.score,
-            source: {
-                type: "optimizer",
-                rank: result.rank,
-                settings: lastCompletedOptimizationSettings ?? collectOptimizationSettings(),
-            },
-        }),
+    const response = await upsertDriveDiscLoadout({
+        agentId,
+        name: name.trim() || defaultName,
+        driveDiscIdsBySlot: result.driveDiscIdsBySlot,
+        score: result.score,
+        source: {
+            type: "optimizer",
+            rank: result.rank,
+            settings: lastCompletedOptimizationSettings ?? collectOptimizationSettings(),
+        },
     })
     store = response.store
     setStatus("已保存套装", "success")
@@ -5937,7 +5936,7 @@ function restoreHomeState() {
 
 async function loadAll() {
     meta = await api("/api/meta")
-    store = await api("/api/user-drive-discs")
+    store = await loadCurrentUserDriveDiscStore()
     populateSelect(els.agentSelect, meta.agents, meta.agents[0]?.id)
     populateWEngineSelect(meta.wEngines[0]?.id, els.agentSelect.value)
     populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), 1)

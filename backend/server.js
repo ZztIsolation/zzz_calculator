@@ -30,6 +30,64 @@ const rootDir = path.resolve(__dirname, "..")
 const dataDir = path.join(rootDir, "data")
 const frontendDir = path.join(rootDir, "frontend")
 const port = Number(process.env.PORT || 8787)
+const nodeEnv = String(process.env.NODE_ENV ?? "development").toLowerCase()
+
+function envFlag(name) {
+    const value = process.env[name]
+    if (value === undefined) {
+        return null
+    }
+    if (["1", "true", "yes", "on"].includes(String(value).toLowerCase())) {
+        return true
+    }
+    if (["0", "false", "no", "off"].includes(String(value).toLowerCase())) {
+        return false
+    }
+    return null
+}
+
+function isMaintenanceEnabled() {
+    return envFlag("MAINTENANCE_ENABLED") ?? nodeEnv !== "production"
+}
+
+function isMaintenanceStaticPath(pathname) {
+    return pathname === "/maintenance.html" || pathname === "/maintenance.js"
+}
+
+function isRetiredUserDataPath(pathname) {
+    return pathname === "/api/accounts"
+        || pathname === "/api/accounts/current"
+        || pathname.startsWith("/api/accounts/")
+        || pathname === "/api/user-drive-discs"
+        || pathname.startsWith("/api/user-drive-discs/")
+        || pathname === "/api/user-drive-disc-loadouts"
+        || pathname.startsWith("/api/user-drive-disc-loadouts/")
+}
+
+function createRequestStore(input = {}) {
+    const rawStore = input.store && typeof input.store === "object" && !Array.isArray(input.store)
+        ? input.store
+        : {}
+    const ownerId = String(
+        input.settings?.ownerId
+        ?? input.ownerId
+        ?? rawStore.currentOwnerId
+        ?? "default",
+    ).trim() || "default"
+    const owners = Array.isArray(rawStore.owners) && rawStore.owners.some(owner => owner?.id === ownerId)
+        ? rawStore.owners
+        : [{ id: ownerId, label: ownerId === "default" ? "默认用户" : ownerId }]
+    return {
+        version: 1,
+        updatedAt: rawStore.updatedAt ?? null,
+        ...rawStore,
+        currentOwnerId: ownerId,
+        owners,
+        imports: Array.isArray(rawStore.imports) ? rawStore.imports : [],
+        driveDiscs: Array.isArray(rawStore.driveDiscs) ? rawStore.driveDiscs : [],
+        driveDiscLoadouts: Array.isArray(rawStore.driveDiscLoadouts) ? rawStore.driveDiscLoadouts : [],
+    }
+}
 
 let catalog = await loadCalculatorContext(rootDir)
 const optimizerJobs = new Map()
@@ -946,6 +1004,11 @@ function contentType(filePath) {
 }
 
 async function serveStatic(res, pathname) {
+    if (!isMaintenanceEnabled() && isMaintenanceStaticPath(pathname)) {
+        sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
+        return
+    }
+
     const fileName = pathname === "/" ? "index.html" : pathname.replace(/^\//, "")
     const absPath = path.resolve(frontendDir, fileName)
     const relativePath = path.relative(frontendDir, absPath)
@@ -989,8 +1052,31 @@ async function routeApi(req, res, pathname) {
         return
     }
 
+    if (req.method === "GET" && pathname === "/api/app-config") {
+        sendJson(res, 200, {
+            maintenanceEnabled: isMaintenanceEnabled(),
+        })
+        return
+    }
+
     if (req.method === "GET" && pathname === "/api/meta") {
         sendJson(res, 200, buildMeta(catalog))
+        return
+    }
+
+    if (!isMaintenanceEnabled() && pathname.startsWith("/api/maintenance/")) {
+        sendJson(res, 403, {
+            ok: false,
+            error: "Maintenance is disabled in production.",
+        })
+        return
+    }
+
+    if (isRetiredUserDataPath(pathname)) {
+        sendJson(res, 410, {
+            ok: false,
+            error: "User data is stored in the browser locally. This server endpoint is retired.",
+        })
         return
     }
 
@@ -1238,7 +1324,7 @@ async function routeApi(req, res, pathname) {
         try {
             const body = await readBody(req)
             const input = JSON.parse(body || "{}")
-            const store = await loadUserDriveDiscStore(dataDir)
+            const store = createRequestStore(input)
             input.ownerId = input.ownerId ?? store.currentOwnerId
             input.settings = {
                 ...(input.settings ?? {}),
@@ -1263,7 +1349,7 @@ async function routeApi(req, res, pathname) {
         try {
             const body = await readBody(req)
             const input = JSON.parse(body || "{}")
-            const store = await loadUserDriveDiscStore(dataDir)
+            const store = createRequestStore(input)
             input.ownerId = input.ownerId ?? store.currentOwnerId
             input.settings = {
                 ...(input.settings ?? {}),
@@ -1320,7 +1406,7 @@ async function routeApi(req, res, pathname) {
         try {
             const body = await readBody(req)
             const input = JSON.parse(body || "{}")
-            const store = await loadUserDriveDiscStore(dataDir)
+            const store = createRequestStore(input)
             input.ownerId = input.ownerId ?? store.currentOwnerId
             input.settings = {
                 ...(input.settings ?? {}),

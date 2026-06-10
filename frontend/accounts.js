@@ -1,3 +1,11 @@
+import {
+    accountSummary,
+    createAccount as createLocalAccount,
+    deleteAccount as deleteLocalAccount,
+    switchAccount as switchLocalAccount,
+    updateAccount as updateLocalAccount,
+} from "./local-store.js"
+
 export async function api(path, options = {}) {
     const response = await fetch(path, {
         headers: {
@@ -13,12 +21,45 @@ export async function api(path, options = {}) {
     return json
 }
 
+let appConfigPromise = null
+
+export function loadAppConfig() {
+    appConfigPromise ??= fetch("/api/app-config")
+        .then(response => response.ok ? response.json() : { maintenanceEnabled: false })
+        .catch(() => ({ maintenanceEnabled: false }))
+    return appConfigPromise
+}
+
+export async function syncMaintenanceLinks() {
+    const config = await loadAppConfig()
+    for (const link of document.querySelectorAll('a[href="/maintenance.html"]')) {
+        link.hidden = !config.maintenanceEnabled
+    }
+    return config
+}
+
 export function accountLabel(account) {
     return account?.label ?? account?.name ?? account?.id ?? "default"
 }
 
 export async function loadAccounts() {
-    return api("/api/accounts")
+    return accountSummary()
+}
+
+export async function createAccount(account) {
+    return createLocalAccount(account)
+}
+
+export async function updateAccount(id, patch) {
+    return updateLocalAccount(id, patch)
+}
+
+export async function switchAccount(id) {
+    return switchLocalAccount(id)
+}
+
+export async function deleteAccount(id) {
+    return deleteLocalAccount(id)
 }
 
 export function currentAccount(accounts) {
@@ -34,6 +75,7 @@ export async function renderSidebarAccount() {
     }
 
     try {
+        await syncMaintenanceLinks()
         const accounts = await loadAccounts()
         const current = currentAccount(accounts)
         localStorage.setItem("zzz-calculator.currentAccount.v1", current.id)
@@ -42,6 +84,7 @@ export async function renderSidebarAccount() {
         }
         return accounts
     } catch (error) {
+        await syncMaintenanceLinks()
         for (const el of els) {
             el.textContent = "账号 / 加载失败"
         }

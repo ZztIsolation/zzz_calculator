@@ -1,4 +1,12 @@
-import { accountLabel, api, currentAccount, loadAccounts } from "./accounts.js"
+import {
+    accountLabel,
+    createAccount as createLocalAccount,
+    currentAccount,
+    deleteAccount as deleteLocalAccount,
+    loadAccounts,
+    switchAccount as switchLocalAccount,
+    updateAccount as updateLocalAccount,
+} from "./accounts.js"
 import { confirmDialog, promptDialog } from "./dialogs.js"
 import { clearPageNotice, setStatusChip, showErrorNotice, showSuccessNotice } from "./feedback.js"
 import { deleteOwnerSelection, setCurrentAccountId } from "./shared-combat.js"
@@ -75,12 +83,7 @@ async function addAccount() {
         return null
     }
     const label = name.trim() || "新账号"
-    accounts = await api("/api/accounts", {
-        method: "POST",
-        body: JSON.stringify({
-            label,
-        }),
-    })
+    accounts = await createLocalAccount({ label })
     renderAccounts()
     return accounts.owners?.find(owner => accountLabel(owner) === label) ?? currentAccount(accounts)
 }
@@ -102,21 +105,13 @@ async function renameAccount(id) {
         return null
     }
     const label = name.trim() || previousLabel
-    accounts = await api(`/api/accounts/${encodeURIComponent(id)}`, {
-        method: "PUT",
-        body: JSON.stringify({
-            label,
-        }),
-    })
+    accounts = await updateLocalAccount(id, { label })
     renderAccounts()
     return { previousLabel, label }
 }
 
 async function switchAccount(id) {
-    accounts = await api("/api/accounts/current", {
-        method: "POST",
-        body: JSON.stringify({ id }),
-    })
+    accounts = await switchLocalAccount(id)
     setCurrentAccountId(accounts.currentOwnerId)
     renderAccounts()
     return currentAccount(accounts)
@@ -137,9 +132,7 @@ async function deleteAccount(id) {
     if (!ok) {
         return null
     }
-    accounts = await api(`/api/accounts/${encodeURIComponent(id)}`, {
-        method: "DELETE",
-    })
+    accounts = await deleteLocalAccount(id)
     deleteOwnerSelection(id)
     renderAccounts()
     return { label }

@@ -12,6 +12,7 @@ import * as SharedCombat from "./shared-combat.js"
 import { createImageSelect } from "./entity-select.js"
 import { showErrorNotice } from "./feedback.js"
 import { initDriveDiscAnalysis } from "./drive-disc-analysis.js"
+import { loadCurrentUserDriveDiscStore } from "./local-store.js"
 
 const els = {
     status: document.getElementById("status"),
@@ -4525,7 +4526,7 @@ async function loadMeta() {
 }
 
 async function loadUserDriveDiscStore() {
-    userDriveDiscStore = await api("/api/user-drive-discs")
+    userDriveDiscStore = await loadCurrentUserDriveDiscStore()
 }
 
 function applySelectionForAgent(agentId) {

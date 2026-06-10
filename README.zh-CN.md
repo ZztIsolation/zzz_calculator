@@ -173,15 +173,27 @@ npm start
 - `/drive-discs.html`：驱动盘仓库和套装预设
 - `/calculate.html`：驱动盘优化器
 - `/accounts.html`：账号新增、切换、改名和删除
-- `/maintenance.html`：静态资料维护
+- `/maintenance.html`：静态资料维护。本地开发默认可用；`NODE_ENV=production` 时默认禁用。
 
 ## 本地运行数据
 
-`data/user_drive_discs.json` 会被 Git 忽略，因为它保存本地玩家的驱动盘、导入记录、账号、套装预设和当前账号状态。全新克隆仓库时可以没有这个文件；后端会先使用空仓库，并在导入或编辑驱动盘后创建本地文件。
+用户态数据保存在浏览器本地 IndexedDB 中，包括账号、当前账号、驱动盘仓库、导入记录和套装预设。线上部署后，A 用户在自己浏览器里的上传、编辑、删除和账号切换不会写入服务器公共仓库，也不会影响 B 用户。
+
+旧版的 `data/user_drive_discs.json` 仍被 Git 忽略，只用于后端历史测试和本地迁移参考；公开页面不再通过服务器用户数据 API 读写它。
 
 `data/user_drive_discs.example.json` 是空仓库结构示例。复制到 `imports/` 或 `data/imports/` 的扫描器导出文件也会被忽略。
 
 `data/` 下的公开静态数据、前端素材、示例、文档和测试应保持提交状态，这样其他用户克隆后可以直接运行。
+
+## 生产环境
+
+生产部署建议设置：
+
+```bash
+NODE_ENV=production
+```
+
+此时服务端会返回 `maintenanceEnabled: false`，并硬拦截 `/maintenance.html`、`/maintenance.js` 和 `/api/maintenance/*`。如确需显式覆盖，可设置 `MAINTENANCE_ENABLED=true|false`。
 
 ## 测试
 
@@ -234,14 +246,11 @@ node --check frontend/accounts-page.js
 ## API 概览
 
 - `GET /api/health`
+- `GET /api/app-config`
 - `GET /api/meta`
-- `GET /api/accounts`
-- `POST /api/accounts`
-- `POST /api/accounts/current`
-- `PUT|DELETE /api/accounts/:id`
-- `GET /api/maintenance/catalog`
-- `POST|PUT|DELETE /api/maintenance/:resource`
-- `DELETE /api/maintenance/anomaly-effects/:type/:id`
+- `GET /api/maintenance/catalog`（生产环境默认 `403`）
+- `POST|PUT|DELETE /api/maintenance/:resource`（生产环境默认 `403`）
+- `DELETE /api/maintenance/anomaly-effects/:type/:id`（生产环境默认 `403`）
 - `GET /api/example/out-of-combat`
 - `GET /api/example/ye-shunguang`
 - `POST /api/calculate/out-of-combat`
@@ -252,12 +261,12 @@ node --check frontend/accounts-page.js
 - `POST /api/optimize/drive-discs`
 - `POST /api/analysis/drive-disc-substats`
 - `POST /api/analysis/drive-disc-stat-gains`
-- `GET|DELETE /api/user-drive-discs`
-- `POST /api/user-drive-discs/import/zzz-scanner`
-- `POST /api/user-drive-discs`
-- `PUT|DELETE /api/user-drive-discs/:id`
-- `GET|POST /api/user-drive-disc-loadouts`
-- `PUT|DELETE /api/user-drive-disc-loadouts/:id`
+
+以下旧用户数据接口已退役并返回 `410 Gone`，用户数据改由浏览器本地保存：
+
+- `/api/accounts*`
+- `/api/user-drive-discs*`
+- `/api/user-drive-disc-loadouts*`
 
 ## 建模说明
 
