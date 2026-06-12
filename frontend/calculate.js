@@ -13,6 +13,8 @@ import { createImageSelect } from "./entity-select.js"
 import { promptDialog } from "./dialogs.js"
 import { clearPageNotice, setStatusChip, showErrorNotice, showSuccessNotice } from "./feedback.js"
 import { initDriveDiscAnalysis } from "./drive-disc-analysis.js"
+import { loadCatalog } from "./catalog-loader.js"
+import { calculateInCombatPanel } from "./calculator-core.js"
 import { loadCurrentUserDriveDiscStore, upsertDriveDiscLoadout } from "./local-store.js"
 
 const els = {
@@ -392,6 +394,7 @@ let store = null
 let optimizationResults = []
 let activeResultIndex = -1
 let activeOptimizationJobId = null
+let activeOptimizationWorker = null
 let pendingOptimizationCancelPromise = null
 let optimizationStartedAt = 0
 let optimizationPollTimer = null
@@ -516,6 +519,14 @@ function stopOptimizationTimers() {
         clearInterval(optimizationElapsedTimer)
         optimizationElapsedTimer = null
     }
+}
+
+function disposeActiveOptimizationWorker() {
+    if (!activeOptimizationWorker) {
+        return
+    }
+    activeOptimizationWorker.terminate()
+    activeOptimizationWorker = null
 }
 
 function progressTextForStatus(status) {
@@ -698,6 +709,7 @@ function renderOptimizationProgress(job = {}) {
 
 function clearOptimizationProgress() {
     stopOptimizationTimers()
+    disposeActiveOptimizationWorker()
     activeOptimizationJobId = null
     optimizationStartedAt = 0
     lastOptimizationProgress = null
@@ -5564,23 +5576,16 @@ async function refreshSelectedResultPreview() {
         return
     }
     const requestSeq = ++damagePreviewRequestSeq
-    const response = await api("/api/calculate/in-combat", {
-        method: "POST",
-        body: JSON.stringify(collectRequestPayloadForResult(result)),
-    })
+    const data = calculateInCombatPanel(meta, collectRequestPayloadForResult(result))
     if (requestSeq !== damagePreviewRequestSeq) {
         return
     }
-    renderCalculationResult(response.data)
+    renderCalculationResult(data)
     setStatus(activeOptimizationJobId ? "计算中" : "条件已更改，请重新计算", "idle")
 }
 
 async function calculateEmptyPanel() {
-    const response = await api("/api/calculate/in-combat", {
-        method: "POST",
-        body: JSON.stringify(collectRequestPayload({ driveDiscs: [] })),
-    })
-    renderCalculationResult(response.data)
+    renderCalculationResult(calculateInCombatPanel(meta, collectRequestPayload({ driveDiscs: [] })))
 }
 
 function startOptimizationTimers() {
@@ -5598,11 +5603,13 @@ function startOptimizationTimers() {
 
 async function finishOptimizationJob(job) {
     stopOptimizationTimers()
+    disposeActiveOptimizationWorker()
     const settingsSnapshot = activeOptimizationSettingsSnapshot
     const agentIdSnapshot = activeOptimizationAgentIdSnapshot
     activeOptimizationJobId = null
     activeOptimizationSettingsSnapshot = null
     activeOptimizationAgentIdSnapshot = null
+    pendingOptimizationCancelPromise = null
     setOptimizeButtonRunning(false)
     renderOptimizationProgress(job)
     if (job.status === "cancelled") {
@@ -5654,21 +5661,6 @@ async function finishOptimizationJob(job) {
     }
 }
 
-async function pollOptimizationJob(jobId) {
-    const response = await api(`/api/optimize/drive-discs/jobs/${encodeURIComponent(jobId)}`)
-    const job = response.data
-    if (jobId !== activeOptimizationJobId) {
-        return
-    }
-    if (pendingOptimizationCancelPromise) {
-        return
-    }
-    renderOptimizationProgress(job)
-    if (["complete", "error", "cancelled"].includes(job.status)) {
-        await finishOptimizationJob(job)
-    }
-}
-
 async function cancelActiveOptimization({ silent = false } = {}) {
     if (pendingOptimizationCancelPromise) {
         return pendingOptimizationCancelPromise
@@ -5693,25 +5685,16 @@ async function cancelActiveOptimization({ silent = false } = {}) {
     }
 
     pendingOptimizationCancelPromise = (async () => {
-        try {
-            await api(`/api/optimize/drive-discs/jobs/${encodeURIComponent(jobId)}`, {
-                method: "DELETE",
-            })
-        } catch (error) {
-            if (!silent) {
-                setStatus(error.message, "error")
-            }
-            return
-        } finally {
-            if (activeOptimizationJobId === jobId) {
-                activeOptimizationJobId = null
-            }
-            activeOptimizationSettingsSnapshot = null
-            activeOptimizationAgentIdSnapshot = null
-            stopOptimizationTimers()
-            setOptimizeButtonRunning(false)
-            pendingOptimizationCancelPromise = null
+        activeOptimizationWorker?.postMessage({ type: "cancel", runId: jobId })
+        disposeActiveOptimizationWorker()
+        if (activeOptimizationJobId === jobId) {
+            activeOptimizationJobId = null
         }
+        activeOptimizationSettingsSnapshot = null
+        activeOptimizationAgentIdSnapshot = null
+        stopOptimizationTimers()
+        setOptimizeButtonRunning(false)
+        pendingOptimizationCancelPromise = null
 
         if (!silent) {
             els.optimizerMetrics.textContent = "已取消"
@@ -5760,50 +5743,46 @@ async function runOptimization() {
     }
     activeOptimizationSettingsSnapshot = structuredClone(payload.settings)
     activeOptimizationAgentIdSnapshot = payload.agentId
-    const previewResponse = await api("/api/optimize/drive-discs/preview", {
-        method: "POST",
-        body: JSON.stringify(payload),
-    })
-    renderOptimizationProgress({
-        status: "preview",
-        settings: previewResponse.data.settings,
-        metrics: previewResponse.data.metrics,
-        evaluated: 0,
-        estimatedCombinationCount: previewResponse.data.metrics?.estimatedCombinationCount ?? 0,
-        percent: 0,
-        elapsedMs: 0,
-    })
-    const response = await api("/api/optimize/drive-discs/jobs", {
-        method: "POST",
-        body: JSON.stringify(payload),
-    })
-    const job = response.data
-    activeOptimizationJobId = job.jobId ?? job.id
-    optimizationStartedAt = Date.now() - Number(job.elapsedMs ?? 0)
-    renderOptimizationProgress(job)
-    startOptimizationTimers()
-    if (["complete", "error", "cancelled"].includes(job.status)) {
-        await finishOptimizationJob(job)
-        return
-    }
-    optimizationPollTimer = setInterval(() => {
-        const jobId = activeOptimizationJobId
-        if (!jobId) {
+    const jobId = `local-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    activeOptimizationJobId = jobId
+    optimizationStartedAt = Date.now()
+    const worker = new Worker(new URL("./optimizer-worker.js", import.meta.url), { type: "module" })
+    activeOptimizationWorker = worker
+    worker.onmessage = async event => {
+        const message = event.data ?? {}
+        if (message.runId !== activeOptimizationJobId || pendingOptimizationCancelPromise) {
             return
         }
-        pollOptimizationJob(jobId).catch(error => {
-            stopOptimizationTimers()
-            activeOptimizationJobId = null
-            setOptimizeButtonRunning(false)
-            const message = errorMessage(error)
-            setStatus("计算失败", "error")
-            showErrorNotice({
-                title: "计算失败",
-                message,
-            })
+        if (message.type === "preview" || message.type === "progress") {
+            renderOptimizationProgress(message.job)
+            return
+        }
+        if (["complete", "error", "cancelled"].includes(message.type)) {
+            await finishOptimizationJob(message.job)
+        }
+    }
+    worker.onerror = async event => {
+        if (jobId !== activeOptimizationJobId) {
+            return
+        }
+        await finishOptimizationJob({
+            status: "error",
+            error: event.message || "优化 Worker 执行失败。",
+            elapsedMs: Date.now() - optimizationStartedAt,
         })
-    }, 500)
-    await pollOptimizationJob(activeOptimizationJobId)
+    }
+    worker.postMessage({
+        type: "start",
+        runId: jobId,
+        catalog: meta,
+        store,
+        input: payload,
+        settings: {
+            progressIntervalMs: 250,
+            yieldIntervalMs: 50,
+        },
+    })
+    startOptimizationTimers()
 }
 
 async function saveActiveLoadout() {
@@ -5935,7 +5914,7 @@ function restoreHomeState() {
 }
 
 async function loadAll() {
-    meta = await api("/api/meta")
+    meta = await loadCatalog()
     store = await loadCurrentUserDriveDiscStore()
     populateSelect(els.agentSelect, meta.agents, meta.agents[0]?.id)
     populateWEngineSelect(meta.wEngines[0]?.id, els.agentSelect.value)
@@ -6792,6 +6771,7 @@ els.saveLoadoutBtn.addEventListener("click", async () => {
 initDriveDiscAnalysis({
     substatButton: els.driveDiscSubstatAnalysisBtn,
     gainButton: els.driveDiscStatGainBtn,
+    getCatalog: () => meta,
     getPayload: collectDriveDiscAnalysisPayload,
     requireDriveDiscs: true,
     emptyMessage: "请先开始计算，并选择一套优化结果后再分析。",

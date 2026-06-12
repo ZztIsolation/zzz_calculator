@@ -1,3 +1,8 @@
+import {
+    analyzeDriveDiscStatGains,
+    analyzeDriveDiscSubstats,
+} from "./driveDiscAnalysis-core.js"
+
 const CHART_COLORS = [
     "#2f80ed",
     "#16a085",
@@ -34,21 +39,6 @@ function percentText(value, digits = 2) {
         return "-"
     }
     return `${Number((number * 100).toFixed(digits))}%`
-}
-
-async function api(path, payload) {
-    const response = await fetch(path, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-    })
-    const json = await response.json()
-    if (!response.ok || json.ok === false) {
-        throw new Error(json.error || response.statusText)
-    }
-    return json.data
 }
 
 function createModal() {
@@ -132,6 +122,14 @@ async function resolvePayload(options) {
         throw new Error(options.emptyMessage ?? "请先选择或计算一套驱动盘。")
     }
     return payload
+}
+
+async function resolveCatalog(options) {
+    const catalog = await options.getCatalog?.()
+    if (!catalog) {
+        throw new Error("计算数据尚未加载完成。")
+    }
+    return catalog
 }
 
 function statName(options, stat) {
@@ -385,7 +383,7 @@ function statGainsHtml(data, options, mode = "cumulative") {
 async function openSubstatAnalysis(options) {
     setModalState("词条分析", "统计当前六件驱动盘副词条的有效词条数", "分析中...")
     const payload = await resolvePayload(options)
-    const data = await api("/api/analysis/drive-disc-substats", payload)
+    const data = analyzeDriveDiscSubstats(await resolveCatalog(options), payload)
     setModalState(
         "词条分析",
         "统计当前六件驱动盘副词条的有效词条数；主词条不计入",
@@ -397,7 +395,7 @@ async function openSubstatAnalysis(options) {
 async function openStatGainAnalysis(options) {
     setModalState("词条收益曲线", "新增词条会先进入局外驱动盘面板，再重新计算局内 Buff 与伤害", "分析中...")
     const payload = await resolvePayload(options)
-    const data = await api("/api/analysis/drive-disc-stat-gains", {
+    const data = analyzeDriveDiscStatGains(await resolveCatalog(options), {
         ...payload,
         maxRolls: options.maxRolls ?? 10,
     })

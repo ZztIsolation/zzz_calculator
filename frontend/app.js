@@ -12,6 +12,8 @@ import * as SharedCombat from "./shared-combat.js"
 import { createImageSelect } from "./entity-select.js"
 import { showErrorNotice } from "./feedback.js"
 import { initDriveDiscAnalysis } from "./drive-disc-analysis.js"
+import { loadCatalog } from "./catalog-loader.js"
+import { calculateInCombatPanel } from "./calculator-core.js"
 import { loadCurrentUserDriveDiscStore } from "./local-store.js"
 
 const els = {
@@ -4515,7 +4517,7 @@ async function api(path, options = {}) {
 }
 
 async function loadMeta() {
-    const response = await api("/api/meta")
+    const response = await loadCatalog()
     meta = response
     populateSelect(els.agentSelect, response.agents, response.agents[0]?.id)
     populateWEngineSelect(response.wEngines[0]?.id, els.agentSelect.value)
@@ -4662,12 +4664,7 @@ async function calculate({ refreshSelection = true, refreshCombatBuffControls = 
         damage: collectDamageConfig(),
     }
 
-    const response = await api("/api/calculate/in-combat", {
-        method: "POST",
-        body: JSON.stringify(payload),
-    })
-
-    renderCalculationResult(response.data)
+    renderCalculationResult(calculateInCombatPanel(meta, payload))
     setStatus("就绪", "success")
 }
 
@@ -4891,6 +4888,7 @@ els.driveDiscInput.addEventListener("input", renderCurrentSelection)
 initDriveDiscAnalysis({
     substatButton: els.driveDiscSubstatAnalysisBtn,
     gainButton: els.driveDiscStatGainBtn,
+    getCatalog: () => meta,
     getPayload: collectDriveDiscAnalysisPayload,
     setStatus,
     statLabel,

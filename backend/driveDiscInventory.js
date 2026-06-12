@@ -2,6 +2,9 @@ import { createHash } from "node:crypto"
 import { existsSync } from "node:fs"
 import { readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
+import { toCalculatorDriveDisc } from "../frontend/drive-disc-core.js"
+
+export { toCalculatorDriveDisc } from "../frontend/drive-disc-core.js"
 
 const STORE_FILE = "user_drive_discs.json"
 
@@ -918,23 +921,5 @@ export async function deleteAccount(dataDir, id) {
         store: nextStore,
         summary: await accountSummary(dataDir),
         deleted: true,
-    }
-}
-
-export function toCalculatorDriveDisc(inventoryDisc) {
-    return {
-        id: inventoryDisc.id,
-        setId: inventoryDisc.setId,
-        partition: inventoryDisc.partition,
-        rarity: inventoryDisc.rarity,
-        level: inventoryDisc.level,
-        mainStat: {
-            stat: inventoryDisc.mainStat.stat,
-            value: inventoryDisc.mainStat.value,
-        },
-        subStats: (inventoryDisc.subStats ?? []).map(item => ({
-            stat: item.stat,
-            value: item.value,
-        })),
     }
 }

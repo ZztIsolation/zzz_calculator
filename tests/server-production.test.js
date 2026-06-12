@@ -64,6 +64,26 @@ try {
     assert.equal(maintenanceCatalog.status, 403)
     assert.equal(JSON.parse(maintenanceCatalog.body).ok, false)
 
+    const catalog = await getText("/api/catalog")
+    assert.equal(catalog.status, 200)
+    assert.ok(Array.isArray(JSON.parse(catalog.body).agents))
+
+    for (const pathname of [
+        "/api/calculate/in-combat",
+        "/api/analysis/drive-disc-substats",
+        "/api/optimize/drive-discs/preview",
+        "/api/optimize/drive-discs/jobs",
+    ]) {
+        const response = await fetch(`${baseUrl}${pathname}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+        })
+        const body = await response.json()
+        assert.equal(response.status, 403, `${pathname} should be disabled in production`)
+        assert.match(body.error, /disabled in production/i)
+    }
+
     for (const pathname of [
         "/api/accounts",
         "/api/accounts/current",

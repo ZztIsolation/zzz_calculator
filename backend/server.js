@@ -64,6 +64,12 @@ function isRetiredUserDataPath(pathname) {
         || pathname.startsWith("/api/user-drive-disc-loadouts/")
 }
 
+function isServerComputePath(pathname) {
+    return pathname.startsWith("/api/calculate/")
+        || pathname.startsWith("/api/analysis/")
+        || pathname.startsWith("/api/optimize/")
+}
+
 function createRequestStore(input = {}) {
     const rawStore = input.store && typeof input.store === "object" && !Array.isArray(input.store)
         ? input.store
@@ -1064,10 +1070,23 @@ async function routeApi(req, res, pathname) {
         return
     }
 
+    if (req.method === "GET" && pathname === "/api/catalog") {
+        sendJson(res, 200, catalog)
+        return
+    }
+
     if (!isMaintenanceEnabled() && pathname.startsWith("/api/maintenance/")) {
         sendJson(res, 403, {
             ok: false,
             error: "Maintenance is disabled in production.",
+        })
+        return
+    }
+
+    if (nodeEnv === "production" && isServerComputePath(pathname)) {
+        sendJson(res, 403, {
+            ok: false,
+            error: "Server-side calculation APIs are disabled in production. Calculations run in the browser.",
         })
         return
     }
