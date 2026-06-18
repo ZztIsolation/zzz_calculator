@@ -21,7 +21,7 @@
       "faction": "cunning_hares",
       "images": {
         "portrait": "/assets/agents/anby_demara.webp",
-        "source": "https://zenless-zone-zero.fandom.com/wiki/File:Agent_Anby_Demara_Portrait.png"
+        "source": "https://zenless-zone-zero.fandom.com/wiki/Anby_Demara"
       },
       "level60": {
         "hpBase": 7500,
@@ -32,11 +32,13 @@
         "impact": 118,
         "anomalyProficiency": 94,
         "anomalyMastery": 93,
-        "energyRegen": 120
+        "energyRegen": 120,
+        "penRatio": 0
       },
       "combatBuffs": {
         "corePassive": null,
-        "additionalAbility": null
+        "additionalAbility": null,
+        "cinemaBuffs": []
       },
       "preferredDriveDiscs": {
         "mainStatLimits": {
@@ -45,14 +47,14 @@
             "critDmg"
           ],
           "5": [
-            "electricDmg",
             "atkPct",
-            "penRatio"
+            "penRatio",
+            "electricDmg"
           ],
           "6": [
+            "atkPct",
             "impact",
-            "energyRegen",
-            "atkPct"
+            "energyRegen"
           ]
         }
       },
@@ -62,7 +64,8 @@
       "verification": {
         "level60HpAtkDef": "source-checked",
         "otherPanelDefaults": "needs-screenshot"
-      }
+      },
+      "hidden": true
     },
     {
       "id": "ye_shunguang",
@@ -937,6 +940,18 @@
             "settlementType": "disorder",
             "anomalyEffect": "frost_frozen",
             "elapsedSeconds": 5
+          },
+          {
+            "id": "direct-9",
+            "kind": "direct",
+            "count": 2,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "hoshimi_miyabi",
+              "categoryId": "core_skill",
+              "moveId": "frostburn_break",
+              "rowId": "damage"
+            }
           }
         ]
       },
@@ -1692,7 +1707,8 @@
       "verification": {
         "level60Stats": "source-checked-biligame-wiki-2026-05-30",
         "panelDefaults": "source-checked-biligame-wiki-2026-05-30"
-      }
+      },
+      "hidden": true
     }
   ]
 }

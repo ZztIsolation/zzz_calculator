@@ -390,6 +390,25 @@ export function localizedText(value) {
     return value.zhCN ?? value.en ?? ""
 }
 
+export function combatBuffDisplayName(buff) {
+    if (buff?.sourceKind === "teammate" || buff?.sourceCategory === "agent") {
+        return localizedText(buff?.source)
+            || localizedText(buff?.sourceLabel)
+            || localizedText(buff?.name)
+            || buff?.id
+            || "-"
+    }
+
+    return localizedText(buff?.name)
+        || localizedText(buff?.source)
+        || localizedText(buff?.sourceLabel)
+        || localizedText(buff?.bossName)
+        || localizedText(buff?.bossSource)
+        || buff?.setName
+        || buff?.id
+        || "-"
+}
+
 export function enumLabel(type, value) {
     return ENUM_LABELS[type]?.[value] ?? value ?? "-"
 }

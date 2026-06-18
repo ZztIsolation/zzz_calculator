@@ -1143,7 +1143,6 @@ button {
   margin-bottom: 10px;
 }
 
-.target-settings-grid .field:last-child,
 .target-settings-grid .target-resistance-field {
   grid-column: 1 / -1;
 }
@@ -1211,7 +1210,7 @@ button {
 
 .resistance-custom-control {
   display: grid;
-  grid-template-columns: 54px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 6px;
   align-items: center;
 }
@@ -5050,6 +5049,26 @@ body.modal-open {
   font-weight: 800;
 }
 
+.maintenance-inline-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.maintenance-inline-checkbox input[type="checkbox"] {
+  width: 16px;
+  min-height: 16px;
+  margin: 0;
+  padding: 0;
+}
+
 .loadout-slot-select-field {
   margin-top: 10px;
 }
@@ -5293,7 +5312,6 @@ body.modal-open {
     grid-template-columns: 1fr;
   }
 
-  .target-settings-grid .field:last-child,
   .target-settings-grid .target-resistance-field {
     grid-column: auto;
   }

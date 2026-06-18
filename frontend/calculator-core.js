@@ -250,28 +250,28 @@ const DAMAGE_MODIFIER_SUM_KEY_INDEX = new Map(DAMAGE_MODIFIER_SUM_KEYS.map((key,
 
 const DAMAGE_TARGET_PRESETS = [
     {
-        id: "taichu-nightmare",
-        name: {
-            zhCN: "太初梦魇",
-            en: "Taichu Nightmare",
-        },
-        defense: 476,
-    },
-    {
-        id: "normal-boss",
-        name: {
-            zhCN: "普通 Boss",
-            en: "Normal Boss",
-        },
-        defense: 953,
-    },
-    {
         id: "wandering-hunter",
         name: {
             zhCN: "彷徨猎手",
             en: "Wandering Hunter",
         },
         defense: 1588,
+    },
+    {
+        id: "taichu-nightmare",
+        name: {
+            zhCN: "低防怪如太初梦魇",
+            en: "Low DEF Enemy such as Taichu Nightmare",
+        },
+        defense: 476,
+    },
+    {
+        id: "normal-boss",
+        name: {
+            zhCN: "正常boss",
+            en: "Normal Boss",
+        },
+        defense: 953,
     },
 ]
 
@@ -1145,6 +1145,34 @@ function buildMaps(catalog) {
     }
 }
 
+function catalogItemVisible(item = {}) {
+    return item?.hidden !== true
+}
+
+function visibleTeammateCombatBuffGroups(groups = []) {
+    return groups
+        .filter(catalogItemVisible)
+        .map(group => ({
+            ...group,
+            buffs: (group.buffs ?? []).filter(catalogItemVisible),
+        }))
+        .filter(group => group.buffs.length > 0)
+}
+
+function visibleCatalogCollections(catalog = {}) {
+    return {
+        displayAgents: (catalog.agents ?? []).filter(catalogItemVisible),
+        displayWEngines: (catalog.wEngines ?? []).filter(catalogItemVisible),
+        displayDriveDiscSets: (catalog.driveDiscSets ?? []).filter(catalogItemVisible),
+        displayCombatBuffs: (catalog.combatBuffs ?? []).filter(catalogItemVisible),
+        displayTeammateCombatBuffGroups: visibleTeammateCombatBuffGroups(catalog.teammateCombatBuffGroups ?? []),
+        displayTeammateCombatBuffs: (catalog.teammateCombatBuffs ?? []).filter(catalogItemVisible),
+        displayFieldCombatBuffs: (catalog.fieldCombatBuffs ?? []).filter(catalogItemVisible),
+        displayBossCombatBuffs: (catalog.bossCombatBuffs ?? []).filter(catalogItemVisible),
+        displaySystemCombatBuffs: (catalog.systemCombatBuffs ?? []).filter(catalogItemVisible),
+    }
+}
+
 function applyEffectSet(bonusTotals, effect, label, appliedEffects, ignoredEffects) {
     const normalized = normalizeEffect(effect)
     if (!normalized) {
@@ -1960,7 +1988,7 @@ function normalizeDamageTarget(input = {}, damageElement) {
     const targetInput = input.target ?? {}
     const preset = damageTargetPreset(targetInput.presetId ?? DEFAULT_DAMAGE_TARGET_PRESET_ID)
     const defense = Number(targetInput.defense ?? preset?.defense ?? 953)
-    const levelCoefficient = Number(targetInput.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT)
+    const levelCoefficient = DEFAULT_DAMAGE_LEVEL_COEFFICIENT
     const stunned = normalizeStunned(targetInput.stunned)
     const stunMultiplierPercent = normalizeStunMultiplierPercent(targetInput)
     const stunMultiplier = stunMultiplierPercent / 100
@@ -1968,9 +1996,7 @@ function normalizeDamageTarget(input = {}, damageElement) {
     return {
         presetId: targetInput.presetId ?? preset?.id ?? DEFAULT_DAMAGE_TARGET_PRESET_ID,
         defense: Number.isFinite(defense) ? Math.max(0, defense) : Number(preset?.defense ?? 953),
-        levelCoefficient: Number.isFinite(levelCoefficient) && levelCoefficient > 0
-            ? levelCoefficient
-            : DEFAULT_DAMAGE_LEVEL_COEFFICIENT,
+        levelCoefficient,
         resistanceByElement: normalizeResistanceByElement(targetInput, damageElement),
         stunned,
         stunMultiplier,
@@ -4370,6 +4396,7 @@ export function normalizeCatalogPayload({
     validateCatalogModeling(catalog)
     return {
         ...catalog,
+        ...visibleCatalogCollections(catalog),
         ...maps,
     }
 }
@@ -4379,6 +4406,7 @@ export function normalizeCatalog(catalog = {}) {
     validateCatalogModeling(catalog)
     return {
         ...catalog,
+        ...visibleCatalogCollections(catalog),
         ...maps,
     }
 }

@@ -59,13 +59,11 @@ const els = {
     fieldCombatBuffs: document.getElementById("fieldCombatBuffs"),
     damageTargetPreset: document.getElementById("damageTargetPreset"),
     damageTargetDefense: document.getElementById("damageTargetDefense"),
-    damageLevelCoefficient: document.getElementById("damageLevelCoefficient"),
     damageTargetStunned: document.getElementById("damageTargetStunned"),
     damageTargetStunMultiplier: document.getElementById("damageTargetStunMultiplier"),
     damageTargetResistancePreset: document.getElementById("damageTargetResistancePreset"),
     damageTargetResistanceLabel: document.getElementById("damageTargetResistanceLabel"),
     damageTargetResistanceCustom: document.getElementById("damageTargetResistanceCustom"),
-    damageTargetResistanceSign: document.getElementById("damageTargetResistanceSign"),
     damageTargetResistance: document.getElementById("damageTargetResistance"),
     damageSkillMultiplier: document.getElementById("damageSkillMultiplier"),
     openDamageSkillModalBtn: document.getElementById("openDamageSkillModalBtn"),
@@ -169,6 +167,11 @@ const els = {
 }
 
 const HOME_SELECTION_STORAGE_KEY = "zzz-calculator.homeSelection.v1"
+const DEFAULT_DAMAGE_TARGET_PRESETS = [
+    { id: "wandering-hunter", name: { zhCN: "彷徨猎手" }, defense: 1588 },
+    { id: "taichu-nightmare", name: { zhCN: "低防怪如太初梦魇" }, defense: 476 },
+    { id: "normal-boss", name: { zhCN: "正常boss" }, defense: 953 },
+]
 const DEFAULT_DAMAGE_TARGET_PRESET_ID = "normal-boss"
 const DEFAULT_DAMAGE_LEVEL_COEFFICIENT = 794
 const DEFAULT_DAMAGE_STUN_MULTIPLIER_PERCENT = 150
@@ -248,7 +251,6 @@ const SKILL_CATEGORY_ORDER = [
     ["chain", "连携技", "chainSkillLevelSelect"],
 ]
 const RESISTANCE_PRESET_VALUES = new Set(["-20", "0", "20"])
-const CUSTOM_RESISTANCE_MIN = 0
 const CUSTOM_RESISTANCE_MAX = 100
 const ENUM_LABELS = {
     attribute: {
@@ -746,6 +748,10 @@ function nameOf(item) {
     return combatUi.nameOf(item)
 }
 
+function combatBuffDisplayName(buff) {
+    return SharedCombat.combatBuffDisplayName(buff)
+}
+
 function localizedText(value) {
     return combatUi.localizedText(value)
 }
@@ -840,15 +846,35 @@ async function api(path, options = {}) {
 }
 
 function getAgent(id) {
-    return meta?.agents?.find(item => item.id === id) ?? meta?.agents?.[0]
+    return displayAgents().find(item => item.id === id) ?? displayAgents()[0]
 }
 
 function getWEngine(id) {
-    return meta?.wEngines?.find(item => item.id === id) ?? meta?.wEngines?.[0]
+    return displayWEngines().find(item => item.id === id) ?? displayWEngines()[0]
+}
+
+function displayAgents() {
+    return meta?.displayAgents ?? meta?.agents ?? []
+}
+
+function displayWEngines() {
+    return meta?.displayWEngines ?? meta?.wEngines ?? []
+}
+
+function displayDriveDiscSets() {
+    return meta?.displayDriveDiscSets ?? meta?.driveDiscSets ?? []
+}
+
+function displayCombatBuffs() {
+    return meta?.displayCombatBuffs ?? (meta?.combatBuffs ?? []).filter(item => item?.hidden !== true)
+}
+
+function displayTeammateCombatBuffGroups() {
+    return meta?.displayTeammateCombatBuffGroups ?? (meta?.teammateCombatBuffGroups ?? [])
 }
 
 function defaultWEngineIdForAgent(agentId, savedWEngineId = "") {
-    return SharedCombat.defaultWEngineIdForAgent(meta?.wEngines ?? [], agentId, savedWEngineId)
+    return SharedCombat.defaultWEngineIdForAgent(displayWEngines(), agentId, savedWEngineId)
 }
 
 function selectedWEngineModificationLevel(wEngine = getWEngine(els.wEngineSelect.value)) {
@@ -967,7 +993,7 @@ function populateSelect(select, items, selectedId) {
 }
 
 function orderedWEnginesForAgent(agentId = els.agentSelect?.value) {
-    return SharedCombat.sortWEnginesForAgent(meta?.wEngines ?? [], getAgent(agentId))
+    return SharedCombat.sortWEnginesForAgent(displayWEngines(), getAgent(agentId))
 }
 
 function populateWEngineSelect(selectedId = els.wEngineSelect?.value, agentId = els.agentSelect?.value) {
@@ -1109,7 +1135,9 @@ function renderEntityCards() {
 }
 
 function damageTargetPresets() {
-    return meta?.damageTargetPresets ?? []
+    return meta?.damageTargetPresets?.length
+        ? meta.damageTargetPresets
+        : DEFAULT_DAMAGE_TARGET_PRESETS
 }
 
 function damageTargetPresetById(id) {
@@ -1118,15 +1146,30 @@ function damageTargetPresetById(id) {
         ?? damageTargetPresets()[0]
 }
 
+function resolveDamageTargetPresetId(target = {}) {
+    if (target.presetId) {
+        return target.presetId
+    }
+    const defense = Number(target.defense)
+    const matched = damageTargetPresets().find(preset => Number(preset.defense) === defense)
+    return matched?.id ?? DEFAULT_DAMAGE_TARGET_PRESET_ID
+}
+
 function populateDamageTargetPresets() {
     els.damageTargetPreset.innerHTML = ""
     for (const preset of damageTargetPresets()) {
         const option = document.createElement("option")
         option.value = preset.id
-        option.textContent = `${nameOf(preset)}（${preset.defense}）`
+        option.textContent = `${preset.defense}（${nameOf(preset)}）`
         option.selected = preset.id === DEFAULT_DAMAGE_TARGET_PRESET_ID
         els.damageTargetPreset.appendChild(option)
     }
+
+    const custom = document.createElement("option")
+    custom.value = "custom"
+    custom.textContent = "自定义"
+    els.damageTargetPreset.appendChild(custom)
+    syncDamageTargetDefenseVisibility()
 }
 
 function anomalyEffects() {
@@ -1548,8 +1591,8 @@ function collectDamageTargetConfig() {
     const damageElement = currentDamageElement()
     return {
         presetId: els.damageTargetPreset?.value || DEFAULT_DAMAGE_TARGET_PRESET_ID,
-        defense: Number(els.damageTargetDefense?.value || 953),
-        levelCoefficient: Number(els.damageLevelCoefficient?.value || DEFAULT_DAMAGE_LEVEL_COEFFICIENT),
+        defense: selectedDamageTargetDefense(),
+        levelCoefficient: DEFAULT_DAMAGE_LEVEL_COEFFICIENT,
         stunned: Boolean(els.damageTargetStunned?.checked),
         stunMultiplierPercent: Number(els.damageTargetStunMultiplier?.value ?? DEFAULT_DAMAGE_STUN_MULTIPLIER_PERCENT),
         resistanceByElement: {
@@ -2520,9 +2563,9 @@ function applyStoredDamageConfig(config = {}) {
     if (els.agentLevelInput) {
         els.agentLevelInput.value = config.agentLevel ?? 60
     }
-    els.damageTargetPreset.value = target.presetId ?? DEFAULT_DAMAGE_TARGET_PRESET_ID
+    els.damageTargetPreset.value = resolveDamageTargetPresetId(target)
     els.damageTargetDefense.value = target.defense ?? damageTargetPresetById(els.damageTargetPreset.value)?.defense ?? 953
-    els.damageLevelCoefficient.value = target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT
+    syncDamageTargetDefenseVisibility()
     if (els.damageTargetStunned) {
         els.damageTargetStunned.checked = targetStunnedFromConfig(target)
     }
@@ -2563,64 +2606,54 @@ function applyStoredDamageConfig(config = {}) {
     renderAgentSkillLevelControls()
     renderCalculationObjectiveControls()
     syncDamageResistanceControlsToAgent()
-    syncDamagePresetFromDefense()
+    syncDamageTargetDefenseVisibility()
     syncCalculationConfigSummary()
 }
 
 function syncDamageDefenseToPreset() {
     const preset = damageTargetPresetById(els.damageTargetPreset.value)
-    if (preset) {
+    if (preset && els.damageTargetPreset.value !== "custom") {
         els.damageTargetDefense.value = preset.defense
     }
-    syncDamagePresetFromDefense()
+    syncDamageTargetDefenseVisibility()
 }
 
-function syncDamagePresetFromDefense() {
-    const defense = Number(els.damageTargetDefense.value)
-    let matched = false
-    for (const option of els.damageTargetPreset.options) {
-        const preset = damageTargetPresetById(option.value)
-        const isMatch = preset && Number(preset.defense) === defense
-        option.selected = isMatch
-        matched = matched || isMatch
-    }
-    if (!matched && els.damageTargetPreset.querySelector("option[value='custom']")) {
-        els.damageTargetPreset.value = "custom"
-    }
+function syncDamageTargetDefenseVisibility() {
+    const visible = els.damageTargetPreset?.value === "custom"
+    els.damageTargetDefense?.closest(".target-defense-field")?.toggleAttribute("hidden", !visible)
 }
 
-function clampCustomResistanceMagnitude(value) {
+function selectedDamageTargetDefense() {
+    const presetId = els.damageTargetPreset?.value || DEFAULT_DAMAGE_TARGET_PRESET_ID
+    const preset = presetId === "custom" ? null : damageTargetPresetById(presetId)
+    return preset ? Number(preset.defense) : Number(els.damageTargetDefense?.value || 953)
+}
+
+function clampCustomResistanceValue(value) {
     const numeric = Number(value)
     if (!Number.isFinite(numeric)) {
         return 0
     }
-    return Math.min(CUSTOM_RESISTANCE_MAX, Math.max(CUSTOM_RESISTANCE_MIN, Math.abs(numeric)))
+    return Math.min(CUSTOM_RESISTANCE_MAX, Math.max(-CUSTOM_RESISTANCE_MAX, numeric))
 }
 
 function setDamageResistanceControlValue(value = 0) {
     if (!els.damageTargetResistance) {
         return
     }
-    const numeric = Number(value)
-    const clamped = Number.isFinite(numeric)
-        ? Math.min(CUSTOM_RESISTANCE_MAX, Math.max(-CUSTOM_RESISTANCE_MAX, numeric))
-        : 0
-    if (els.damageTargetResistanceSign) {
-        els.damageTargetResistanceSign.value = clamped < 0 ? "-1" : "1"
-    }
-    els.damageTargetResistance.value = String(Number(Math.abs(clamped).toFixed(3)))
+    const clamped = clampCustomResistanceValue(value)
+    els.damageTargetResistance.value = String(Number(clamped.toFixed(3)))
 }
 
 function damageResistanceControlValue() {
     if (!els.damageTargetResistance) {
         return 0
     }
-    const magnitude = clampCustomResistanceMagnitude(els.damageTargetResistance.value)
-    if (Number(els.damageTargetResistance.value) !== magnitude) {
-        els.damageTargetResistance.value = String(Number(magnitude.toFixed(3)))
+    const value = clampCustomResistanceValue(els.damageTargetResistance.value)
+    if (Number(els.damageTargetResistance.value) !== value) {
+        els.damageTargetResistance.value = String(Number(value.toFixed(3)))
     }
-    const sign = els.damageTargetResistanceSign?.value === "-1" ? -1 : 1
-    return magnitude === 0 ? 0 : sign * magnitude
+    return value
 }
 
 function setDamageResistanceCustomHidden(hidden) {
@@ -2792,17 +2825,18 @@ function storedEffectRuleText(rule, runtime, effect) {
 }
 
 function combatBuffsByType(sourceType) {
-    return (meta?.combatBuffs ?? []).filter(item => item.sourceType === sourceType)
+    return displayCombatBuffs().filter(item => item.sourceType === sourceType)
 }
 
 function teammateCombatBuffGroups() {
     const groupedIds = new Set()
-    const groups = (meta?.teammateCombatBuffGroups ?? [])
+    const groups = displayTeammateCombatBuffGroups()
         .map(group => {
             const buffs = (group.buffs ?? []).map(buff => {
                 groupedIds.add(buff.id)
                 return {
                     ...buff,
+                    sourceLabel: buff.sourceLabel ?? buff.source,
                     sourceType: "teammate",
                     teammateId: group.id,
                     teammateName: group.name,
@@ -2918,7 +2952,7 @@ function wEngineIdFromTeamBuffKey(key) {
 
 function rawWEngineForTeamBuffKey(key) {
     const wEngineId = wEngineIdFromTeamBuffKey(key)
-    return meta?.wEngines?.find(item => item.id === wEngineId) ?? null
+    return displayWEngines().find(item => item.id === wEngineId) ?? null
 }
 
 function wEngineTeamModificationLevelForItem(item) {
@@ -3259,7 +3293,7 @@ function catalogCombatBuffRuntimeItem(buff) {
 
 function updateCatalogCombatBuffRuntime(buffKey, updater) {
     const buffId = catalogCombatBuffIdFromKey(buffKey)
-    const buff = (meta?.combatBuffs ?? []).find(item => item.id === buffId)
+    const buff = displayCombatBuffs().find(item => item.id === buffId)
     const agentId = els.agentSelect.value
     if (!buff || !agentId) {
         return
@@ -3299,7 +3333,8 @@ function teammateBuffCandidates() {
             ownerName: group.name,
             ownerImages: group.images ?? buff.teammateImages ?? null,
             teammateImages: group.images ?? buff.teammateImages ?? null,
-            sourceLabel: buff.sourceLabel,
+            sourceLabel: buff.sourceLabel ?? buff.source,
+            source: buff.source,
             name: buff.name,
             description: buff.description,
             conditionLabel: buff.conditionLabel,
@@ -3311,7 +3346,7 @@ function teammateBuffCandidates() {
 }
 
 function wEngineTeamBuffCandidates() {
-    return (meta?.wEngines ?? [])
+    return displayWEngines()
         .map(wEngine => wEngineTeamBuffCandidateFromWEngine(wEngine, 1))
         .filter(Boolean)
 }
@@ -3456,7 +3491,7 @@ function optimizerFourPieceBuffItemByKey(buffKey) {
 }
 
 function driveDisc4pcSetOptions() {
-    return (meta?.driveDiscSets ?? [])
+    return displayDriveDiscSets()
         .filter(set => set.fourPiece)
         .sort((left, right) => nameOf(left).localeCompare(nameOf(right), "zh-CN"))
 }
@@ -3827,7 +3862,7 @@ function renderCombatCheckboxList(container, buffs, checkedIds = checkedCombatBu
         const copy = document.createElement("span")
         copy.className = "combat-check-copy"
         const title = document.createElement("strong")
-        title.textContent = nameOf(buff)
+        title.textContent = combatBuffDisplayName(buff)
         const description = document.createElement("span")
         description.className = "combat-check-description"
         description.textContent = localizedText(buff.description)
@@ -3886,7 +3921,7 @@ function renderCatalogCombatBuffCards(container, buffs, checkedIds = checkedComb
         input.checked = checked
 
         const title = document.createElement("strong")
-        title.textContent = nameOf(buff)
+        title.textContent = combatBuffDisplayName(buff)
         toggle.append(input, title)
         row.appendChild(toggle)
 
@@ -3954,7 +3989,7 @@ function renderAddedCombatBuffs() {
             row.dataset.buffKey = addedCombatBuffKey(item)
 
             const title = document.createElement("strong")
-            title.textContent = nameOf(buff)
+            title.textContent = combatBuffDisplayName(buff)
             const description = document.createElement("p")
             description.textContent = localizedText(buff.description) || localizedText(buff.conditionLabel) || "已添加到局内计算"
             const stats = document.createElement("span")
@@ -3971,7 +4006,7 @@ function renderAddedCombatBuffs() {
                 const metaLine = document.createElement("span")
                 metaLine.textContent = [
                     localizedText(buff.ownerName),
-                    localizedText(buff.sourceLabel),
+                    localizedText(buff.sourceLabel) || localizedText(buff.source),
                 ].filter(Boolean).join(" · ") || sourceCategoryLabel(buff.sourceCategory)
                 row.appendChild(metaLine)
             }
@@ -4113,12 +4148,9 @@ function inputLabel(input) {
 }
 
 function genericNumberConfig(input) {
-    const preset = input === els.damageTargetDefense && els.damageTargetPreset?.value !== "custom"
-        ? damageTargetPresetById(els.damageTargetPreset.value)?.defense
-        : null
     return {
         label: inputLabel(input),
-        defaultValue: finiteOr(preset, finiteOr(input.defaultValue, 0)),
+        defaultValue: finiteOr(input.defaultValue, 0),
         min: input.min !== "" ? Number(input.min) : NaN,
         max: input.max !== "" ? Number(input.max) : NaN,
         integer: false,
@@ -4220,7 +4252,7 @@ function refreshAddedCombatBuffSummary(buffKey) {
     const optimizerItem = optimizerFourPieceBuffItemByKey(buffKey)
     const catalogBuffId = catalogCombatBuffIdFromKey(buffKey)
     const item = optimizerItem ?? (catalogBuffId
-        ? catalogCombatBuffRuntimeItem((meta?.combatBuffs ?? []).find(buff => buff.id === catalogBuffId) ?? {})
+        ? catalogCombatBuffRuntimeItem(displayCombatBuffs().find(buff => buff.id === catalogBuffId) ?? {})
         : addedCombatBuffByKey(buffKey))
     const row = els.fourPieceBuffManualList?.querySelector(`[data-buff-key="${CSS.escape(buffKey)}"]`)
         ?? els.combatSection.querySelector(`[data-buff-key="${CSS.escape(buffKey)}"]`)
@@ -4229,7 +4261,7 @@ function refreshAddedCombatBuffSummary(buffKey) {
         return
     }
     const buff = optimizerItem?.buff ?? (catalogBuffId
-        ? (meta?.combatBuffs ?? []).find(candidate => candidate.id === catalogBuffId)
+        ? displayCombatBuffs().find(candidate => candidate.id === catalogBuffId)
         : resolveAddedCombatBuff(item))
     if (!buff) {
         return
@@ -4250,7 +4282,7 @@ function runtimeFieldContext(field) {
     }
     const catalogBuffId = catalogCombatBuffIdFromKey(buffKey)
     if (catalogBuffId) {
-        const buff = (meta?.combatBuffs ?? []).find(item => item.id === catalogBuffId)
+        const buff = displayCombatBuffs().find(item => item.id === catalogBuffId)
         return {
             buffKey,
             item: buff ? catalogCombatBuffRuntimeItem(buff) : null,
@@ -4294,9 +4326,6 @@ async function commitGenericNumberInput(input) {
     const message = validateNumberInputValue(value, config)
     if (message) {
         input.value = formatInputNumber(config.defaultValue)
-        if (input === els.damageTargetDefense) {
-            syncDamagePresetFromDefense()
-        }
         if (input === els.damageTargetResistance) {
             persistCurrentDamageResistanceInput()
             syncDamageResistancePresetFromValue({ forceCustom: !els.damageTargetResistanceCustom?.hidden })
@@ -4304,9 +4333,6 @@ async function commitGenericNumberInput(input) {
         await refreshAfterConfigChange()
         setStatus(message, "error")
         return false
-    }
-    if (input === els.damageTargetDefense) {
-        syncDamagePresetFromDefense()
     }
     if (input === els.damageTargetResistance) {
         persistCurrentDamageResistanceInput()
@@ -4507,7 +4533,7 @@ function renderCombatBuffCandidates() {
             copy.className = "combat-candidate-check-copy"
 
             const title = document.createElement("strong")
-            title.textContent = localizedText(candidate.sourceLabel) || nameOf(candidate)
+            title.textContent = combatBuffDisplayName(candidate)
             const metaLine = document.createElement("span")
             metaLine.textContent = `来自${localizedText(candidate.ownerName) || "角色"}`
             const description = document.createElement("p")
@@ -4791,7 +4817,7 @@ function setSelectedValues(select, values = []) {
 }
 
 function driveDiscSetById(setId) {
-    return (meta?.driveDiscSets ?? []).find(set => set.id === setId) ?? null
+    return displayDriveDiscSets().find(set => set.id === setId) ?? null
 }
 
 function driveDiscSetIcon(set) {
@@ -4813,7 +4839,7 @@ function defaultFourPieceSetIdForAgent(agentId = els.agentSelect?.value) {
     if (driveDiscSetById(preferredSetId)) {
         return preferredSetId
     }
-    return meta?.driveDiscSets?.[0]?.id ?? ""
+    return displayDriveDiscSets()[0]?.id ?? ""
 }
 
 function mainStatChoiceContainer(slot) {
@@ -5858,7 +5884,7 @@ function populateMainStatSelect(select, slot) {
 }
 
 function populateSetSelects() {
-    const sets = [...(meta?.driveDiscSets ?? [])]
+    const sets = [...displayDriveDiscSets()]
         .sort((left, right) => nameOf(left).localeCompare(nameOf(right), "zh-CN"))
     populateSelect(els.fourPieceSetSelect, sets, defaultFourPieceSetIdForAgent(els.agentSelect?.value) || sets[0]?.id)
     els.fourPieceSetChoices.innerHTML = ""
@@ -5899,7 +5925,7 @@ function populateSetSelects() {
 
 function restoreHomeState() {
     const selection = loadHomeSelection()
-    const agentId = getAgent(selection.currentAgentId)?.id ?? meta.agents[0]?.id
+    const agentId = getAgent(selection.currentAgentId)?.id ?? displayAgents()[0]?.id
     const config = configForAgent(agentId)
     const wEngineId = defaultWEngineIdForAgent(agentId, config.wEngineId)
     els.agentSelect.value = agentId
@@ -5916,8 +5942,8 @@ function restoreHomeState() {
 async function loadAll() {
     meta = await loadCatalog()
     store = await loadCurrentUserDriveDiscStore()
-    populateSelect(els.agentSelect, meta.agents, meta.agents[0]?.id)
-    populateWEngineSelect(meta.wEngines[0]?.id, els.agentSelect.value)
+    populateSelect(els.agentSelect, displayAgents(), displayAgents()[0]?.id)
+    populateWEngineSelect(displayWEngines()[0]?.id, els.agentSelect.value)
     populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), 1)
     populateDamageTargetPresets()
     populateDamageEventSelects()
@@ -6187,10 +6213,6 @@ els.combatSection.addEventListener("change", async event => {
         if (event.target === els.damageTargetPreset) {
             syncDamageDefenseToPreset()
         }
-        if (event.target === els.damageTargetResistanceSign) {
-            persistCurrentDamageResistanceInput()
-            syncDamageResistancePresetFromValue({ forceCustom: true })
-        }
         syncCalculationConfigSummary()
         await refreshAfterConfigChange()
     } catch (error) {
@@ -6238,9 +6260,6 @@ els.combatSection.addEventListener("input", event => {
     const value = inputNumberValue(event.target)
     if (value === null || !Number.isFinite(value)) {
         return
-    }
-    if (event.target === els.damageTargetDefense) {
-        syncDamagePresetFromDefense()
     }
     if (event.target === els.damageTargetResistance) {
         persistCurrentDamageResistanceInput()

@@ -2008,6 +2008,28 @@ function sourceFields(item = {}) {
     `
 }
 
+function displayToggleField(item = {}) {
+    return `
+        <div class="field">
+          <span>首页/优化器显示</span>
+          <label class="maintenance-inline-checkbox">
+            <input id="displayInUi" type="checkbox"${item.hidden === true ? "" : " checked"}>
+            <span>显示在首页与优化器</span>
+          </label>
+        </div>
+    `
+}
+
+function applyDisplayVisibility(item = {}) {
+    const next = { ...item }
+    if (document.getElementById("displayInUi")?.checked === false) {
+        next.hidden = true
+    } else {
+        delete next.hidden
+    }
+    return next
+}
+
 function renderAgentForm(item = null) {
     const agent = item ?? {
         id: `new_agent_${++draftCounter}`,
@@ -2034,6 +2056,7 @@ function renderAgentForm(item = null) {
             <label class="field"><span>伤害结算属性</span><select id="damageElement"><option value="">同角色属性</option>${selectOptions(DAMAGE_ELEMENT_OPTIONS, agent.damageElement)}</select></label>
             <label class="field">${fieldLabel("特性", true)}<select id="specialty">${selectOptions(SPECIALTY_OPTIONS, agent.specialty)}</select></label>
             <label class="field"><span>阵营</span><input id="faction" value="${escapeHtml(agent.faction ?? "")}"></label>
+            ${displayToggleField(agent)}
             ${sourceFields(agent)}
           </div>
         </section>
@@ -2222,7 +2245,7 @@ function buildAgent(options = {}) {
         delete item.coreSkillDraft
     }
 
-    return item
+    return applyDisplayVisibility(item)
 }
 
 function skillCategoryDraft() {
@@ -2547,6 +2570,7 @@ function renderWEngineForm(item = null) {
             <label class="field">${fieldLabel("特性", true)}<select id="specialty">${selectOptions(SPECIALTY_OPTIONS, wEngine.specialty)}</select></label>
             <label class="field"><span>属性</span><select id="attribute"><option value="">无</option>${selectOptions(ATTRIBUTE_OPTIONS, wEngine.attribute)}</select></label>
             <label class="field"><span>关联角色</span><select id="relatedAgentId"><option value="">无</option>${selectOptions((catalog?.meta?.agents ?? []).map(agent => [agent.id, nameOf(agent)]), wEngine.relatedAgentId)}</select></label>
+            ${displayToggleField(wEngine)}
             ${sourceFields(wEngine)}
             <label class="field">${fieldLabel("基础攻击力", true)}<input id="atkBase" type="number" step="1" value="${escapeHtml(wEngine.level60?.atkBase ?? 0)}"></label>
           </div>
@@ -2614,7 +2638,7 @@ function buildWEngine() {
     const advancedStats = readStatRows("advancedStatRows").filter(item => item.stat)
     const selfBuffRules = readEffectRuleRows("wEngineSelfBuffRules").filter(hasBuffRuleValue)
     const teamBuffRules = readEffectRuleRows("wEngineTeamBuffRules").filter(hasBuffRuleValue)
-    return {
+    return applyDisplayVisibility({
         ...(selectedCleanRecord() ?? {}),
         id: document.getElementById("recordId").value.trim(),
         name: readLocalizedZh("name"),
@@ -2658,7 +2682,7 @@ function buildWEngine() {
             } : null,
         },
         sources: [document.getElementById("sourceUrl").value.trim()].filter(Boolean),
-    }
+    })
 }
 
 function renderWEngineModificationPreview(wEngine = null, error = "") {
@@ -2783,6 +2807,7 @@ function renderDriveDiscSetForm(item = null) {
           <div class="maintenance-grid">
             <label class="field">${fieldLabel("ID", true)}<input id="recordId" value="${escapeHtml(set.id)}" required></label>
             ${localizedZhInput("name", set.name)}
+            ${displayToggleField(set)}
             ${sourceFields(set)}
           </div>
         </section>
@@ -2876,7 +2901,7 @@ function readEffect(prefix) {
 }
 
 function buildDriveDiscSet() {
-    return {
+    return applyDisplayVisibility({
         ...(selectedCleanRecord() ?? {}),
         id: document.getElementById("recordId").value.trim(),
         name: readLocalizedZh("name"),
@@ -2887,7 +2912,7 @@ function buildDriveDiscSet() {
         twoPiece: readEffect("twoPiece"),
         fourPiece: readFourPieceEffect("fourPiece"),
         sources: [document.getElementById("sourceUrl").value.trim()].filter(Boolean),
-    }
+    })
 }
 
 function renderEffectRuleRows(containerId, effects = []) {
@@ -3599,6 +3624,7 @@ function renderTeammateBuffForm(item = null) {
             <label class="field">${fieldLabel("来源中文名", true)}<input id="buffSourceZh" value="${escapeHtml((buff.source ?? buff.sourceLabel)?.zhCN ?? "")}" required></label>
             <label class="field">${fieldLabel("范围", true)}<select id="buffScope">${selectOptions(EFFECT_SCOPE_OPTIONS, buff.scope ?? "inCombat")}</select></label>
             <label class="field"><span>条件标签</span><input id="conditionLabel" value="${escapeHtml(localized(buff.conditionLabel) || "")}"></label>
+            ${displayToggleField(buff)}
             <label class="field"><span>中文说明</span><textarea id="descriptionZh">${escapeHtml(buff.description?.zhCN ?? "")}</textarea></label>
           </div>
         </section>
@@ -3623,6 +3649,7 @@ function renderFieldBuffForm(item = null) {
             <label class="field">${fieldLabel("中文名称", true)}<input id="buffNameZh" value="${escapeHtml(buff.name?.zhCN ?? "")}" required></label>
             <label class="field">${fieldLabel("Buff 来源", true)}<input id="buffSourceZh" value="${escapeHtml((buff.source ?? buff.sourceLabel)?.zhCN ?? "")}" required></label>
             <label class="field">${fieldLabel("来源期数", true)}<input id="sourcePeriodZh" value="${escapeHtml(buff.sourcePeriod?.zhCN ?? "")}" required></label>
+            ${displayToggleField(buff)}
             <label class="field"><span>中文说明</span><textarea id="descriptionZh" required>${escapeHtml(buff.description?.zhCN ?? "")}</textarea></label>
           </div>
         </section>
@@ -3647,6 +3674,7 @@ function renderBossBuffForm(item = null) {
             <label class="field">${fieldLabel("BOSS 名称", true)}<input id="bossNameZh" value="${escapeHtml(buff.bossName?.zhCN ?? "")}" required></label>
             <label class="field">${fieldLabel("BOSS 来源", true)}<input id="bossSourceZh" value="${escapeHtml(buff.bossSource?.zhCN ?? "")}" required></label>
             <label class="field">${fieldLabel("来源期数", true)}<input id="sourcePeriodZh" value="${escapeHtml(buff.sourcePeriod?.zhCN ?? "")}" required></label>
+            ${displayToggleField(buff)}
             <label class="field"><span>中文说明</span><textarea id="descriptionZh" required>${escapeHtml(buff.description?.zhCN ?? "")}</textarea></label>
           </div>
         </section>
@@ -3693,7 +3721,7 @@ function buildBuff() {
                 source: document.getElementById("teammateImageSource")?.value.trim() ?? "",
             },
         },
-        buff: {
+        buff: applyDisplayVisibility({
             ...(buff.id ? { id: buff.id } : {}),
             source: buff.source,
             description: buff.description,
@@ -3702,13 +3730,13 @@ function buildBuff() {
             ...(buff.coverage ? { coverage: buff.coverage } : {}),
             effects: buff.effects,
             buffModifiers: buff.buffModifiers,
-        },
+        }),
     }
 }
 
 function buildFieldBuff() {
     const existing = selectedCleanRecord()
-    return {
+    return applyDisplayVisibility({
         ...(existing?.id ? { id: existing.id } : {}),
         ...(document.getElementById("recordId")?.value.trim() ? { id: document.getElementById("recordId").value.trim() } : {}),
         sourceType: "field",
@@ -3722,12 +3750,12 @@ function buildFieldBuff() {
         coverage: readCoverageConfig("buff"),
         effects: readBuffEffectRows(),
         buffModifiers: readBuffModifierRows(),
-    }
+    })
 }
 
 function buildBossBuff() {
     const existing = selectedCleanRecord()
-    return {
+    return applyDisplayVisibility({
         ...(existing?.id ? { id: existing.id } : {}),
         ...(document.getElementById("recordId")?.value.trim() ? { id: document.getElementById("recordId").value.trim() } : {}),
         sourceType: "boss",
@@ -3741,7 +3769,7 @@ function buildBossBuff() {
         coverage: readCoverageConfig("buff"),
         effects: readBuffEffectRows(),
         buffModifiers: readBuffModifierRows(),
-    }
+    })
 }
 
 function buildCurrentPayload(options = {}) {

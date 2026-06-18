@@ -8,6 +8,7 @@ import {
 } from "../backend/calculator.js"
 import {
     agentAttributeText,
+    combatBuffDisplayName,
     CUSTOM_BUFF_SKILL_STAT_OPTIONS,
     CUSTOM_BUFF_STAT_OPTIONS,
     DAMAGE_KIND_LABELS,
@@ -183,6 +184,22 @@ assert.equal(
     nameOf({ bossName: { zhCN: "测试 BOSS" } }),
     "测试 BOSS",
     "Boss Buff cards should display bossName when no name is present",
+)
+
+const youyeBuffs = meta.teammateCombatBuffGroups
+    .find(group => group.id === "youye")
+    ?.buffs ?? []
+const youyeCoreBuff = youyeBuffs.find(buff => buff.id === "buff_883a921c63")
+const youyeAdditionalBuff = youyeBuffs.find(buff => buff.id === "youye.additional_ability.anomaly_damage_bonus")
+assert.equal(
+    combatBuffDisplayName(youyeCoreBuff),
+    "核心被动",
+    "Teammate Buff cards should display source text instead of generated backend ids",
+)
+assert.equal(
+    combatBuffDisplayName(youyeAdditionalBuff),
+    "额外能力",
+    "Named backend ids should not leak into teammate Buff titles when source text exists",
 )
 
 const groupedFormulaRuntimeBuff = {
