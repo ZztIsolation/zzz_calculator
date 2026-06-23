@@ -49,7 +49,7 @@ function createModal() {
     layer.innerHTML = `
       <div class="modal-scrim" data-close-drive-disc-analysis></div>
       <section class="disc-modal drive-disc-analysis-modal" role="dialog" aria-modal="true" aria-labelledby="driveDiscAnalysisTitle">
-        <button type="button" class="modal-close" data-close-drive-disc-analysis aria-label="关闭">×</button>
+        <button type="button" class="modal-close" data-close-drive-disc-analysis aria-label="关闭"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M6 18L18 6"/></svg></button>
         <header class="modal-head">
           <div>
             <h2 id="driveDiscAnalysisTitle">驱动盘分析</h2>

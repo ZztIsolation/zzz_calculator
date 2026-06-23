@@ -6,6 +6,16 @@
 
 ## 上传更新摘要
 
+### 2026-06-23 12:55 +08:00
+
+本次上传主要更新如下：
+
+- 将驱动盘优化器工作区合并到首页，`/` 现在同时承载自选驱动盘、套装预设、优化结果候选、局外面板、局内面板和伤害白盒。
+- 移除旧的 `/calculate.html` 独立页面，改为兼容重定向到 `/`；不存在的静态文件现在返回 `404`。
+- 首页驱动盘方案改为统一切换：自选、套装和优化候选共用同一个方案列表，并支持当前方案 4 件套 Buff 运行时设置、保存套装和应用套装。
+- 扩展战斗 Buff 与驱动盘套装资料，补充新队友和 4 件套行为，并新增多名队友头像素材。
+- 新增统一优化器 UI、旧入口重定向、伤害修正、维护校验、优化器套装逻辑、共享战斗工具和音擎改装数值等回归测试。
+
 ### 2026-06-09 20:28 +08:00
 
 本次上传主要更新如下：
@@ -136,7 +146,6 @@ zzz_calculator/
   frontend/
     index.html
     drive-discs.html
-    calculate.html
     accounts.html
     maintenance.html
     app.js
@@ -169,9 +178,9 @@ npm start
 
 主要页面：
 
-- `/`：首页计算器、面板、局内 Buff 和伤害白盒
+- `/`：驱动盘优化器首页，支持自选、套装和优化结果方案预览
 - `/drive-discs.html`：驱动盘仓库和套装预设
-- `/calculate.html`：驱动盘优化器
+- `/calculate.html`：旧优化器兼容入口，自动跳转到 `/`
 - `/accounts.html`：账号新增、切换、改名和删除
 - `/maintenance.html`：静态资料维护。本地开发默认可用；`NODE_ENV=production` 时默认禁用。
 
@@ -214,6 +223,7 @@ npm run test:compiled-panel-score
 npm run test:optimizer
 npm run test:optimizer-progress
 npm run test:optimizer-api
+npm run test:optimizer-ui
 npm run test:optimizer-fuzz
 npm run test:drive-disc-analysis
 npm run test:drive-disc-import

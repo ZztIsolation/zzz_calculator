@@ -1,4 +1,3 @@
-import { evaluateFormulaExpression } from "./formulaEvaluator.js"
 import {
     damageSkillRowsWithGeneratedTotals,
     defaultSkillLevel as candidateDefaultSkillLevel,
@@ -149,10 +148,29 @@ const els = {
     optimizerEvaluated: document.getElementById("optimizerEvaluated"),
     optimizerEstimate: document.getElementById("optimizerEstimate"),
     optimizerProgressNote: document.getElementById("optimizerProgressNote"),
+    applyLoadoutBtn: document.getElementById("applyLoadoutBtn"),
+    driveDiscSchemeTabs: document.getElementById("driveDiscSchemeTabs"),
+    driveDiscSchemeList: document.getElementById("driveDiscSchemeList"),
+    manualDiscModeBtn: document.getElementById("manualDiscModeBtn"),
+    loadoutDiscModeBtn: document.getElementById("loadoutDiscModeBtn"),
+    homeLoadoutSelect: document.getElementById("homeLoadoutSelect"),
     optimizerResultTabs: document.getElementById("optimizerResultTabs"),
-    optimizerResultList: document.getElementById("optimizerResultList"),
-    optimizerEmpty: document.getElementById("optimizerEmpty"),
     saveLoadoutBtn: document.getElementById("saveLoadoutBtn"),
+    homeDiscModal: document.getElementById("homeDiscModal"),
+    closeHomeDiscModalBtn: document.getElementById("closeHomeDiscModalBtn"),
+    homeDiscModalTitle: document.getElementById("homeDiscModalTitle"),
+    homeDiscModalSubtitle: document.getElementById("homeDiscModalSubtitle"),
+    clearSlotDiscBtn: document.getElementById("clearSlotDiscBtn"),
+    homeDiscSetFilter: document.getElementById("homeDiscSetFilter"),
+    homeDiscMainStatFilter: document.getElementById("homeDiscMainStatFilter"),
+    homeDiscSearchInput: document.getElementById("homeDiscSearchInput"),
+    homeDiscOptionList: document.getElementById("homeDiscOptionList"),
+    homeDiscEmpty: document.getElementById("homeDiscEmpty"),
+    currentSchemeFourPieceBuffSection: document.getElementById("currentSchemeFourPieceBuffSection"),
+    currentSchemeFourPieceBuffModeAuto: document.getElementById("currentSchemeFourPieceBuffModeAuto"),
+    currentSchemeFourPieceBuffModeManual: document.getElementById("currentSchemeFourPieceBuffModeManual"),
+    currentSchemeFourPieceBuffSummary: document.getElementById("currentSchemeFourPieceBuffSummary"),
+    currentSchemeFourPieceBuffManualList: document.getElementById("currentSchemeFourPieceBuffManualList"),
     slot4MainStatChoices: document.getElementById("slot4MainStatChoices"),
     slot5MainStatChoices: document.getElementById("slot5MainStatChoices"),
     slot6MainStatChoices: document.getElementById("slot6MainStatChoices"),
@@ -179,8 +197,10 @@ const DEFAULT_OPTIMIZER_ALGORITHM = "exact-super-bound"
 const ADMIN_DEFAULT_CALCULATION_MODE = "adminDefault"
 const CALCULATION_CONFIG_MODE_VALUES = new Set(["single", "sheer", "anomaly", "custom", ADMIN_DEFAULT_CALCULATION_MODE])
 const DEFAULT_CHECKED_COMBAT_SOURCE_TYPES = new Set(["self", "wEngine", "wEngineTeam"])
+const HOME_DISC_MODES = new Set(["manual", "loadout"])
+const MANUAL_SCHEME_KEY = "manual"
+const LOADOUT_SCHEME_KEY = "loadout"
 const TEAMMATE_DRIVE_DISC_LIMIT = 2
-const TEAMMATE_BUFF_OWNER_LIMIT = 2
 const W_ENGINE_TEAM_BUFF_LIMIT = 2
 const DRIVE_DISC_TEAM_BUFF_LIMIT = 2
 const OPTIMIZER_MAIN_STAT_SLOTS = [4, 5, 6]
@@ -212,8 +232,11 @@ const DAMAGE_MODIFIER_KIND_LABELS = {
     anomalyDamageBonus: "属性异常增伤",
     disorderDamageBonus: "紊乱增伤",
     baseMultiplierBonus: "伤害倍率修正",
+    disorderBaseMultiplierBonus: "紊乱倍率加算",
     anomalyCritRate: "异常暴击率",
     anomalyCritDmg: "异常暴击伤害",
+    stunDmgMultiplierBonus: "失衡易伤倍率加算",
+    stunDmgMultiplierBonusAlways: "失衡易伤倍率加算（未失衡生效）",
     directDamageBonus: "技能专属伤害增伤",
     skillMultiplierBonus: "技能倍率加算",
 }
@@ -324,6 +347,7 @@ const STAT_LABELS = {
     enemyResReduction: "敌方当前属性减抗",
     anomalyDamageBonus: "属性异常增伤",
     disorderDamageBonus: "紊乱增伤",
+    disorderBaseMultiplierBonus: "紊乱倍率加算",
     sheerDmgBonus: "贯穿增伤",
     physicalSheerDmg: "物理贯穿增伤",
     fireSheerDmg: "火贯穿增伤",
@@ -357,6 +381,7 @@ const PERCENT_KEYS = new Set([
     "enemyResReduction",
     "anomalyDamageBonus",
     "disorderDamageBonus",
+    "disorderBaseMultiplierBonus",
     "sheerDmgBonus",
     "physicalSheerDmg",
     "fireSheerDmg",
@@ -408,6 +433,8 @@ let lastCompletedOptimizationSettings = null
 let lastCompletedOptimizationAgentId = null
 let optimizationResultsDirty = false
 let damagePreviewRequestSeq = 0
+let activeSchemeKey = MANUAL_SCHEME_KEY
+let activeDiscSlot = null
 let activeCombatBuffTab = "agent"
 let activeCombatBuffTeammateId = ""
 let renderedCombatBuffAgentId = ""
@@ -416,6 +443,8 @@ const damageTargetResistanceByElement = Object.fromEntries(DAMAGE_ELEMENTS.map(e
 let activeDamageResistanceElement = "physical"
 let optimizerFourPieceBuffModeBySetId = {}
 let optimizerFourPieceBuffRuntimeInputsBySetId = {}
+let currentSchemeFourPieceBuffModeBySetId = {}
+let currentSchemeFourPieceBuffRuntimeInputsBySetId = {}
 let selectedDamageSkillRef = null
 let activeDamageSkillPickerMoveRef = null
 let damageSkillSearchQuery = ""
@@ -813,18 +842,32 @@ function saveSyncedConfig() {
     const selection = loadHomeSelection()
     const byAgent = { ...(selection.byAgent ?? {}) }
     const previousConfig = byAgent[agentId] ?? {}
+    const driveDiscMode = normalizeHomeDiscMode(previousConfig.driveDiscMode ?? currentHomeDiscMode())
+    const manualDriveDiscIdsBySlot = manualDiscIdsFromSavedConfig(agentId)
+    const selectedLoadoutId = loadoutIdForAgent(agentId, previousConfig.selectedLoadoutId)
     byAgent[agentId] = {
         ...previousConfig,
         wEngineId: els.wEngineSelect.value,
         wEngineModificationLevel: selectedWEngineModificationLevel(getWEngine(els.wEngineSelect.value)),
         coreSkillLevel: els.coreSkillSelect.value,
         cinemaLevel: selectedCinemaLevel(),
+        driveDiscMode,
+        manualDriveDiscIdsBySlot,
+        selectedLoadoutId,
+        driveDiscIdsBySlot: sanitizeDiscIdsBySlot(activeDiscIdsForConfig(
+            agentId,
+            driveDiscMode,
+            manualDriveDiscIdsBySlot,
+            selectedLoadoutId,
+        )),
         combat: {
             ...(previousConfig.combat ?? {}),
             activeBuffIds: [...checkedCombatBuffIds()],
             addedBuffs: previousConfig.combat?.addedBuffs ?? [],
         },
         damage: collectDamageConfig(),
+        currentSchemeFourPieceBuffModeBySetId: clonePlainObject(currentSchemeFourPieceBuffModeBySetId),
+        currentSchemeFourPieceBuffRuntimeInputsBySetId: clonePlainObject(currentSchemeFourPieceBuffRuntimeInputsBySetId),
         optimizer: collectStoredOptimizerConfig(),
     }
     saveHomeSelection({ currentAgentId: agentId, byAgent })
@@ -1132,6 +1175,7 @@ function renderEntityCards() {
     renderAgentSkillLevelControls()
     renderWEngineMeta(wEngine)
     renderWEngineEffect(wEngine)
+    syncDiscSourceControls(agent?.id)
 }
 
 function damageTargetPresets() {
@@ -2775,53 +2819,15 @@ function setCombatStatLines(container, lines = []) {
 }
 
 function renderBuffEffectLines(container, buff, runtime = defaultRuntimeForBuff(buff), options = {}) {
-    const normalText = storedEffectRulesText(buff, runtime) || options.fallbackText || ""
+    const normalText = storedEffectRulesText(buff, runtime)
+        || (effectRules(buff).length ? "" : options.fallbackText)
+        || ""
     const modifierTexts = storedBuffModifierTexts(buff)
     const lines = [
         normalText ? `${options.normalPrefix ?? ""}${normalText}` : "",
         ...modifierTexts,
     ].filter(Boolean)
     setCombatStatLines(container, lines.length ? lines : [options.emptyText ?? "-"])
-}
-
-function storedEffectRuleText(rule, runtime, effect) {
-    const id = rule.id ?? rule.stat ?? "effect"
-    const coverage = Number(runtime?.coverage ?? effect?.coverage?.default ?? 1)
-    const ruleRuntime = runtime?.effects?.[id] ?? {}
-    if (rule.type === "derived") {
-        const sourceValue = Number(ruleRuntime.sourceValue ?? rule.defaultSourceValue ?? 0)
-        const ratio = Number(rule.ratio ?? rule.ratioPct ?? 0)
-        const uncapped = sourceValue * ratio / 100
-        const capped = Number.isFinite(Number(rule.cap)) ? Math.min(uncapped, Number(rule.cap)) : uncapped
-        const finalValue = capped * coverage
-        const source = localizedText(rule.sourceLabel) || "来源数值"
-        const capText = Number.isFinite(Number(rule.cap)) ? `，上限 ${rule.cap}` : ""
-        return `${statLabel(rule.stat)} +${formatStoredValue(rule.stat, finalValue, rule.mode)}（${source} ${sourceValue} × ${ratio}%${capText}，覆盖率 ${coverage}）`
-    }
-    if (rule.type === "formula") {
-        const source = rule.source ?? {}
-        const rawSourceValue = Number(ruleRuntime.sourceValue ?? source.defaultValue ?? 0)
-        const sourceValue = Math.max(
-            Number.isFinite(Number(source.min)) ? Number(source.min) : rawSourceValue,
-            Math.min(Number.isFinite(Number(source.max)) ? Number(source.max) : rawSourceValue, rawSourceValue),
-        )
-        const expression = rule.formula?.expression ?? ""
-        try {
-            const finalValue = evaluateFormulaExpression(expression, { [source.variable ?? "x"]: sourceValue }) * coverage
-            const sourceLabel = localizedText(source.label ?? rule.sourceLabel) || "来源数值"
-            const coverageText = coverage !== 1 ? `，覆盖率 ${coverage}` : ""
-            return `${statLabel(rule.stat)} +${formatStoredValue(rule.stat, finalValue, rule.mode)}（${sourceLabel} x=${sourceValue}；公式 ${expression}${coverageText}）`
-        } catch {
-            return `${statLabel(rule.stat)}：公式无效`
-        }
-    }
-    if (rule.type === "stacked") {
-        const stacks = Number(ruleRuntime.stacks ?? rule.defaultStacks ?? rule.maxStacks ?? 1)
-        const value = Number(rule.valuePerStack ?? rule.value ?? 0) * stacks * coverage
-        return `${statLabel(rule.stat)} +${formatStoredValue(rule.stat, value, rule.mode)}（${stacks}/${rule.maxStacks ?? stacks} 层，覆盖率 ${coverage}）`
-    }
-    const value = Number(rule.value ?? 0) * coverage
-    return `${statLabel(rule.stat)} +${formatStoredValue(rule.stat, value, rule.mode)}${coverage !== 1 ? `（覆盖率 ${coverage}）` : ""}`
 }
 
 function combatBuffsByType(sourceType) {
@@ -2869,9 +2875,16 @@ function cinemaBuffName(buff = {}) {
     }
 }
 
+function agentBuffSourceLabel(key, buff = {}) {
+    if (buff.source || buff.sourceLabel) {
+        return buff.source ?? buff.sourceLabel
+    }
+    const labels = { corePassive: "核心被动", additionalAbility: "额外能力" }
+    return { zhCN: labels[key] ?? key }
+}
+
 function agentCombatBuffs() {
     const agent = getAgent(els.agentSelect.value)
-    const labels = { corePassive: "核心被动", additionalAbility: "额外能力" }
     const combatBuffs = agent?.combatBuffs ?? {}
     const unlockedCinemaLevel = selectedCinemaLevel()
     const fixedBuffs = [
@@ -2882,7 +2895,14 @@ function agentCombatBuffs() {
         .map(([key, buff]) => ({
             id: `agent:${agent.id}.${key}`,
             sourceType: "self",
-            name: buff.name ?? { zhCN: labels[key] ?? key },
+            sourceCategory: "agent",
+            sourceKind: "self",
+            ownerId: agent.id,
+            ownerName: agent.name,
+            agentName: agent.name,
+            source: agentBuffSourceLabel(key, buff),
+            sourceLabel: agentBuffSourceLabel(key, buff),
+            name: buff.name ?? agentBuffSourceLabel(key, buff),
             description: buff.description ?? null,
             conditionLabel: localizedText(buff.conditionLabel) || buff.condition,
             effects: buff.effects ?? null,
@@ -2900,7 +2920,13 @@ function agentCombatBuffs() {
         .map(buff => ({
             id: `agent:${agent.id}.cinema.${buff.cinemaLevel}`,
             sourceType: "self",
+            sourceCategory: "agent",
             sourceKind: "cinema",
+            ownerId: agent.id,
+            ownerName: agent.name,
+            agentName: agent.name,
+            source: cinemaBuffName(buff),
+            sourceLabel: cinemaBuffName(buff),
             defaultChecked: true,
             name: buff.name ?? cinemaBuffName(buff),
             description: buff.description ?? null,
@@ -3203,6 +3229,36 @@ function savedActiveCombatBuffIds(agentId = els.agentSelect.value) {
     return Array.isArray(ids) ? new Set(ids) : null
 }
 
+function checkboxCombatBuffRuntimes() {
+    return configForAgent(els.agentSelect.value)?.combat?.checkboxBuffRuntimes ?? {}
+}
+
+function checkboxCombatBuffKey(item) {
+    return `checkbox:${item.id}`
+}
+
+function checkboxCombatBuffIdFromKey(buffKey) {
+    return String(buffKey ?? "").startsWith("checkbox:")
+        ? String(buffKey).slice("checkbox:".length)
+        : ""
+}
+
+function checkboxCombatBuffRuntimeItem(buff) {
+    return {
+        id: buff.id,
+        sourceKind: "checkboxBuff",
+        runtime: checkboxCombatBuffRuntimes()[buff.id] ?? null,
+    }
+}
+
+function allCheckboxCombatBuffs() {
+    return [
+        ...agentCombatBuffs(),
+        ...combatBuffsByType("self"),
+        ...wEngineEquippedBuffs(),
+    ]
+}
+
 function hiddenDriveDiscAddedBuffs() {
     return combatConfigForAgent(els.agentSelect.value).addedBuffs.filter(isDriveDiscAddedBuff)
 }
@@ -3252,6 +3308,43 @@ function updateOptimizerFourPieceBuffRuntime(buffKey, updater) {
     const runtime = runtimeForBuff(item, item.buff)
     updater(runtime, item.buff)
     setCurrentFourPieceBuffRuntimeInput(item.id, runtime, item.setId)
+}
+
+function updateCurrentSchemeFourPieceBuffRuntime(buffKey, updater) {
+    const item = currentSchemeFourPieceBuffItemByKey(buffKey)
+    if (!item?.buff) {
+        return
+    }
+    const runtime = runtimeForBuff(item, item.buff)
+    updater(runtime, item.buff)
+    setCurrentSchemeFourPieceBuffRuntimeInput(item.id, runtime, item.setId)
+}
+
+function updateCheckboxCombatBuffRuntime(buffKey, updater) {
+    const buffId = checkboxCombatBuffIdFromKey(buffKey)
+    const buff = allCheckboxCombatBuffs().find(item => item.id === buffId)
+    const agentId = els.agentSelect.value
+    if (!buff || !agentId) {
+        return
+    }
+
+    const selection = loadHomeSelection()
+    const byAgent = { ...(selection.byAgent ?? {}) }
+    const previous = byAgent[agentId] ?? {}
+    const combat = previous.combat ?? {}
+    const runtime = runtimeForBuff({ runtime: combat.checkboxBuffRuntimes?.[buffId] ?? null }, buff)
+    updater(runtime, buff)
+    byAgent[agentId] = {
+        ...previous,
+        combat: {
+            ...combat,
+            checkboxBuffRuntimes: {
+                ...(combat.checkboxBuffRuntimes ?? {}),
+                [buffId]: runtime,
+            },
+        },
+    }
+    saveHomeSelection({ currentAgentId: agentId, byAgent })
 }
 
 function updateAddedCombatBuffModificationLevel(buffKey, value) {
@@ -3396,6 +3489,16 @@ function optimizerDriveDisc4pcRuntimeKeyFromBuffKey(buffKey) {
         : ""
 }
 
+function currentSchemeDriveDisc4pcBuffKey(runtimeKey) {
+    return `currentSchemeDriveDisc4pc:${runtimeKey}`
+}
+
+function currentSchemeDriveDisc4pcRuntimeKeyFromBuffKey(buffKey) {
+    return String(buffKey ?? "").startsWith("currentSchemeDriveDisc4pc:")
+        ? String(buffKey).slice("currentSchemeDriveDisc4pc:".length)
+        : ""
+}
+
 function currentFourPieceSetId() {
     return els.fourPieceSetSelect?.value ?? ""
 }
@@ -3470,6 +3573,83 @@ function setCurrentFourPieceBuffRuntimeInput(runtimeKey, runtime, setId = curren
 function runtimeForOwnFourPieceBuff(part, setId = currentFourPieceSetId()) {
     const stored = currentFourPieceBuffRuntimeInputs(setId)[part.key]
     return runtimeForBuff({ runtime: stored ?? null }, part.buff)
+}
+
+function fourPieceSetIdsForDriveDiscs(driveDiscs = []) {
+    const counts = new Map()
+    for (const disc of driveDiscs) {
+        if (disc?.setId) {
+            counts.set(disc.setId, (counts.get(disc.setId) ?? 0) + 1)
+        }
+    }
+    return [...counts.entries()]
+        .filter(([, count]) => count >= 4)
+        .map(([setId]) => setId)
+}
+
+function currentSchemeFourPieceSetId() {
+    const scheme = activeScheme()
+    return scheme.kind === "optimized" ? "" : fourPieceSetIdsForDriveDiscs(scheme.driveDiscs)[0] ?? ""
+}
+
+function currentSchemeFourPieceBuffMode(setId = currentSchemeFourPieceSetId()) {
+    return normalizeFourPieceBuffMode(currentSchemeFourPieceBuffModeBySetId?.[setId])
+}
+
+function currentSchemeFourPieceBuffRuntimeInputs(setId = currentSchemeFourPieceSetId()) {
+    const source = currentSchemeFourPieceBuffRuntimeInputsBySetId?.[setId]
+    return source && typeof source === "object" && !Array.isArray(source) ? source : {}
+}
+
+function setCurrentSchemeFourPieceBuffMode(mode, setId = currentSchemeFourPieceSetId()) {
+    if (!setId) {
+        return
+    }
+    currentSchemeFourPieceBuffModeBySetId = {
+        ...currentSchemeFourPieceBuffModeBySetId,
+        [setId]: normalizeFourPieceBuffMode(mode),
+    }
+}
+
+function setCurrentSchemeFourPieceBuffRuntimeInput(runtimeKey, runtime, setId = currentSchemeFourPieceSetId()) {
+    if (!setId || !runtimeKey) {
+        return
+    }
+    currentSchemeFourPieceBuffRuntimeInputsBySetId = {
+        ...currentSchemeFourPieceBuffRuntimeInputsBySetId,
+        [setId]: {
+            ...currentSchemeFourPieceBuffRuntimeInputs(setId),
+            [runtimeKey]: clonePlainObject(runtime),
+        },
+    }
+}
+
+function currentSchemeFourPieceBuffParts(set = driveDiscSetById(currentSchemeFourPieceSetId())) {
+    return ownFourPieceBuffParts(set)
+}
+
+function runtimeForCurrentSchemeFourPieceBuff(part, setId = currentSchemeFourPieceSetId()) {
+    const stored = currentSchemeFourPieceBuffRuntimeInputs(setId)[part.key]
+    return runtimeForBuff({ runtime: stored ?? null }, part.buff)
+}
+
+function currentSchemeFourPieceBuffItemByKey(buffKey) {
+    const runtimeKey = currentSchemeDriveDisc4pcRuntimeKeyFromBuffKey(buffKey)
+    if (!runtimeKey) {
+        return null
+    }
+    const setId = currentSchemeFourPieceSetId()
+    const part = currentSchemeFourPieceBuffParts(driveDiscSetById(setId)).find(item => item.key === runtimeKey)
+    if (!part) {
+        return null
+    }
+    return {
+        id: runtimeKey,
+        sourceKind: "currentSchemeDriveDisc4pc",
+        setId,
+        runtime: runtimeForCurrentSchemeFourPieceBuff(part, setId),
+        ...part,
+    }
 }
 
 function optimizerFourPieceBuffItemByKey(buffKey) {
@@ -3613,14 +3793,6 @@ function candidateLimitMessage(candidate, addedBuffs = currentAddedCombatBuffs()
         return ""
     }
 
-    if (candidate.sourceKind === "teammate") {
-        const ownerIds = teammateOwnerIdsForAddedBuffs(addedBuffs)
-        const ownerId = String(candidate.ownerId ?? "")
-        if (ownerId && !ownerIds.has(ownerId) && ownerIds.size >= TEAMMATE_BUFF_OWNER_LIMIT) {
-            return `角色引发的 Buff 最多选择 ${TEAMMATE_BUFF_OWNER_LIMIT} 名角色`
-        }
-    }
-
     if (candidate.sourceKind === "wEngineTeam" && wEngineTeamAddedCount(addedBuffs) >= W_ENGINE_TEAM_BUFF_LIMIT) {
         return `音擎引发的 Buff 最多选择 ${W_ENGINE_TEAM_BUFF_LIMIT} 个`
     }
@@ -3644,6 +3816,35 @@ function addedCombatBuffEntry(candidate) {
         ...(candidate.sourceKind === "wEngineTeam" ? { wEngineModificationLevel: 1 } : {}),
         runtime: defaultRuntimeForBuff(candidate),
     }
+}
+
+function teammateCoreOrAdditionalCandidates(ownerId) {
+    const normalizedOwnerId = String(ownerId ?? "")
+    if (!normalizedOwnerId) {
+        return []
+    }
+    return teammateBuffCandidates().filter(candidate => {
+        if (String(candidate.ownerId ?? "") !== normalizedOwnerId) {
+            return false
+        }
+        const source = [
+            localizedText(candidate.source),
+            localizedText(candidate.sourceLabel),
+            localizedText(candidate.name),
+        ].filter(Boolean).join(" ")
+        return source.includes("核心被动") || source.includes("额外能力")
+    })
+}
+
+function candidateWithSameSourceDefaults(candidate) {
+    if (candidate?.sourceKind !== "teammate") {
+        return candidate ? [candidate] : []
+    }
+    const byKey = new Map()
+    for (const item of [candidate, ...teammateCoreOrAdditionalCandidates(candidate.ownerId)]) {
+        byKey.set(addedCombatBuffKey(item), item)
+    }
+    return [...byKey.values()]
 }
 
 function selectedTeammateBuffCandidates() {
@@ -3698,7 +3899,6 @@ function renderCombatBuffTeammatePicker() {
     const groups = teammateCombatBuffGroups()
     const activeGroup = ensureActiveCombatBuffTeammateId(groups)
     const selectedOwnerIds = teammateOwnerIdsForAddedBuffs()
-    const selectedLimitReached = selectedOwnerIds.size >= TEAMMATE_BUFF_OWNER_LIMIT
 
     els.combatBuffTeammateSelect.innerHTML = ""
     for (const group of groups) {
@@ -3707,7 +3907,6 @@ function renderCombatBuffTeammatePicker() {
         option.value = group.id
         option.textContent = `${nameOf(group)}${alreadySelected ? "（已添加）" : ""}`
         option.selected = group.id === activeCombatBuffTeammateId
-        option.disabled = !alreadySelected && selectedLimitReached && group.id !== activeCombatBuffTeammateId
         els.combatBuffTeammateSelect.appendChild(option)
     }
     renderCombatBuffTeammatePreview(activeGroup)
@@ -3717,14 +3916,10 @@ function renderCombatBuffTeammatePicker() {
     const hasAddedFromActive = candidates.some(candidate => addedKeys.has(addedCombatBuffKey(candidate)))
     const allAddedFromActive = candidates.length > 0
         && candidates.every(candidate => addedKeys.has(addedCombatBuffKey(candidate)))
-    const activeOwnerSelected = activeGroup && selectedOwnerIds.has(activeGroup.id)
-    const activeWouldExceedLimit = Boolean(activeGroup && !activeOwnerSelected && selectedLimitReached)
 
-    els.addTeammateBuffsBtn.disabled = !candidates.length || allAddedFromActive || activeWouldExceedLimit
+    els.addTeammateBuffsBtn.disabled = !candidates.length || allAddedFromActive
     els.removeTeammateBuffsBtn.disabled = !hasAddedFromActive
-    els.combatBuffTeammateHint.textContent = activeWouldExceedLimit
-        ? `最多选择 ${TEAMMATE_BUFF_OWNER_LIMIT} 名角色；请先移除一个角色来源`
-        : `已选择 ${selectedOwnerIds.size}/${TEAMMATE_BUFF_OWNER_LIMIT} 名角色`
+    els.combatBuffTeammateHint.textContent = `已选择 ${selectedOwnerIds.size} 名角色`
 }
 
 function addedCombatBuffSourceGroupKey(item, buff = resolveAddedCombatBuff(item)) {
@@ -3851,8 +4046,13 @@ function renderCombatCheckboxList(container, buffs, checkedIds = checkedCombatBu
     for (const buff of buffs) {
         const checked = checkedIds.has(buff.id)
             || shouldUseDefaultCheckedCombatBuff(buff, useDefaultChecked)
-        const row = document.createElement("label")
+        const item = checkboxCombatBuffRuntimeItem(buff)
+        const runtime = runtimeForBuff(item, buff)
+        const row = document.createElement("div")
         row.className = checked ? "combat-check-row active" : "combat-check-row"
+        row.dataset.buffKey = checkboxCombatBuffKey(buff)
+        const toggle = document.createElement("label")
+        toggle.className = "combat-check-toggle"
         const input = document.createElement("input")
         input.type = "checkbox"
         input.dataset.combatBuffId = buff.id
@@ -3872,9 +4072,13 @@ function renderCombatCheckboxList(container, buffs, checkedIds = checkedCombatBu
             || "勾选后计入局内"
         const stats = document.createElement("span")
         stats.className = "combat-check-stats combat-buff-effect-lines"
-        renderBuffEffectLines(stats, buff, defaultRuntimeForBuff(buff), { fallbackText: effectStatText(buff) })
+        renderBuffEffectLines(stats, buff, runtime, { fallbackText: effectStatText(buff) })
         copy.append(title, description, stats)
-        row.append(input, copy)
+        toggle.append(input, copy)
+        row.appendChild(toggle)
+        if (checked) {
+            renderBuffRuntimeControls(row, item, buff, runtime)
+        }
         container.appendChild(row)
     }
 }
@@ -4056,14 +4260,20 @@ function renderAddedWEngineModificationControl(row, item) {
 function renderBuffRuntimeControls(row, item, buff, runtime) {
     const rules = effectRules(buff)
     const hasCoverage = Boolean(buff.coverage)
-    const needsRuntime = hasCoverage || rules.some(rule => rule.type === "derived" || rule.type === "formula" || rule.type === "stacked")
+    const sourceGroups = SharedCombat.runtimeSourceGroups(buff)
+    const stackedRules = rules.filter(rule => rule.type === "stacked")
+    const needsRuntime = hasCoverage || sourceGroups.length > 0 || stackedRules.length > 0
     if (!needsRuntime) {
         return
     }
     const buffKey = item?.sourceKind === "catalogBuff"
         ? catalogCombatBuffKey(item)
+        : item?.sourceKind === "checkboxBuff"
+            ? checkboxCombatBuffKey(item)
         : item?.sourceKind === "optimizerDriveDisc4pc"
             ? optimizerDriveDisc4pcBuffKey(item.id)
+            : item?.sourceKind === "currentSchemeDriveDisc4pc"
+                ? currentSchemeDriveDisc4pcBuffKey(item.id)
             : addedCombatBuffKey(item)
     const controls = document.createElement("div")
     controls.className = "combat-runtime-grid"
@@ -4077,36 +4287,33 @@ function renderBuffRuntimeControls(row, item, buff, runtime) {
         `
         controls.appendChild(field)
     }
-    const renderedSourceGroups = new Set()
-    for (const rule of rules) {
+    for (const sourceGroup of sourceGroups) {
+        const primaryId = sourceGroup.ruleIds[0] ?? ""
+        const minAttr = Number.isFinite(sourceGroup.min) ? ` min="${sourceGroup.min}"` : ""
+        const maxAttr = Number.isFinite(sourceGroup.max) ? ` max="${sourceGroup.max}"` : ""
+        const field = document.createElement("label")
+        field.className = "field"
+        field.innerHTML = `
+            <span>${escapeHtml(sourceGroup.label)}</span>
+            <input type="number"${minAttr}${maxAttr} step="1" value="${runtime.effects?.[primaryId]?.sourceValue ?? sourceGroup.defaultValue ?? 0}" data-runtime-effect="${escapeHtml(primaryId)}" data-runtime-source-group="${escapeHtml(sourceGroup.key)}" data-runtime-source-value>
+        `
+        controls.appendChild(field)
+    }
+    for (const rule of stackedRules) {
         const id = SharedCombat.effectRuleId(rule)
-        if (rule.type === "derived" || rule.type === "formula") {
-            const sourceGroup = SharedCombat.runtimeSourceGroupForRule(buff, rule)
-            if (!sourceGroup || renderedSourceGroups.has(sourceGroup.key)) {
-                continue
-            }
-            renderedSourceGroups.add(sourceGroup.key)
-            const primaryId = sourceGroup.ruleIds[0] ?? id
-            const minAttr = Number.isFinite(sourceGroup.min) ? ` min="${sourceGroup.min}"` : ""
-            const maxAttr = Number.isFinite(sourceGroup.max) ? ` max="${sourceGroup.max}"` : ""
-            const field = document.createElement("label")
-            field.className = "field"
-            field.innerHTML = `
-                <span>${escapeHtml(sourceGroup.label)}</span>
-                <input type="number"${minAttr}${maxAttr} step="1" value="${runtime.effects?.[primaryId]?.sourceValue ?? sourceGroup.defaultValue ?? 0}" data-runtime-effect="${escapeHtml(primaryId)}" data-runtime-source-group="${escapeHtml(sourceGroup.key)}" data-runtime-source-value>
-            `
-            controls.appendChild(field)
-        } else if (rule.type === "stacked") {
-            const field = document.createElement("label")
-            field.className = "field"
-            field.innerHTML = `
-                <span>层数</span>
-                <input type="number" min="0" max="${rule.maxStacks ?? 1}" step="1" value="${runtime.effects?.[id]?.stacks ?? rule.defaultStacks ?? rule.maxStacks ?? 1}" data-runtime-effect="${escapeHtml(id)}" data-runtime-stacks>
-            `
-            controls.appendChild(field)
-        }
+        const field = document.createElement("label")
+        field.className = "field"
+        field.innerHTML = `
+            <span>层数</span>
+            <input type="number" min="0" max="${rule.maxStacks ?? 1}" step="1" value="${runtime.effects?.[id]?.stacks ?? rule.defaultStacks ?? rule.maxStacks ?? 1}" data-runtime-effect="${escapeHtml(id)}" data-runtime-stacks>
+        `
+        controls.appendChild(field)
     }
     row.appendChild(controls)
+}
+
+function runtimeFieldSelector() {
+    return "[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]"
 }
 
 function finiteOr(value, fallback) {
@@ -4240,6 +4447,14 @@ function updateRuntimeFieldValue(buffKey, field, value) {
         updateOptimizerFourPieceBuffRuntime(buffKey, (runtime, buff) => setRuntimeValue(runtime, field, value, buff))
         return
     }
+    if (currentSchemeDriveDisc4pcRuntimeKeyFromBuffKey(buffKey)) {
+        updateCurrentSchemeFourPieceBuffRuntime(buffKey, (runtime, buff) => setRuntimeValue(runtime, field, value, buff))
+        return
+    }
+    if (checkboxCombatBuffIdFromKey(buffKey)) {
+        updateCheckboxCombatBuffRuntime(buffKey, (runtime, buff) => setRuntimeValue(runtime, field, value, buff))
+        return
+    }
     if (catalogCombatBuffIdFromKey(buffKey)) {
         updateCatalogCombatBuffRuntime(buffKey, (runtime, buff) => setRuntimeValue(runtime, field, value, buff))
         return
@@ -4250,17 +4465,24 @@ function updateRuntimeFieldValue(buffKey, field, value) {
 
 function refreshAddedCombatBuffSummary(buffKey) {
     const optimizerItem = optimizerFourPieceBuffItemByKey(buffKey)
+    const currentSchemeItem = currentSchemeFourPieceBuffItemByKey(buffKey)
+    const checkboxBuffId = checkboxCombatBuffIdFromKey(buffKey)
     const catalogBuffId = catalogCombatBuffIdFromKey(buffKey)
-    const item = optimizerItem ?? (catalogBuffId
+    const item = optimizerItem ?? currentSchemeItem ?? (checkboxBuffId
+        ? checkboxCombatBuffRuntimeItem(allCheckboxCombatBuffs().find(buff => buff.id === checkboxBuffId) ?? {})
+        : catalogBuffId
         ? catalogCombatBuffRuntimeItem(displayCombatBuffs().find(buff => buff.id === catalogBuffId) ?? {})
         : addedCombatBuffByKey(buffKey))
     const row = els.fourPieceBuffManualList?.querySelector(`[data-buff-key="${CSS.escape(buffKey)}"]`)
+        ?? els.currentSchemeFourPieceBuffManualList?.querySelector(`[data-buff-key="${CSS.escape(buffKey)}"]`)
         ?? els.combatSection.querySelector(`[data-buff-key="${CSS.escape(buffKey)}"]`)
-    const summary = row?.querySelector(".combat-added-stats")
+    const summary = row?.querySelector(".combat-added-stats, .combat-check-stats")
     if (!item || !summary) {
         return
     }
-    const buff = optimizerItem?.buff ?? (catalogBuffId
+    const buff = optimizerItem?.buff ?? currentSchemeItem?.buff ?? (checkboxBuffId
+        ? allCheckboxCombatBuffs().find(candidate => candidate.id === checkboxBuffId)
+        : catalogBuffId
         ? displayCombatBuffs().find(candidate => candidate.id === catalogBuffId)
         : resolveAddedCombatBuff(item))
     if (!buff) {
@@ -4278,6 +4500,23 @@ function runtimeFieldContext(field) {
             buffKey,
             item: optimizerItem,
             buff: optimizerItem.buff,
+        }
+    }
+    const currentSchemeItem = currentSchemeFourPieceBuffItemByKey(buffKey)
+    if (currentSchemeItem) {
+        return {
+            buffKey,
+            item: currentSchemeItem,
+            buff: currentSchemeItem.buff,
+        }
+    }
+    const checkboxBuffId = checkboxCombatBuffIdFromKey(buffKey)
+    if (checkboxBuffId) {
+        const buff = allCheckboxCombatBuffs().find(item => item.id === checkboxBuffId)
+        return {
+            buffKey,
+            item: buff ? checkboxCombatBuffRuntimeItem(buff) : null,
+            buff,
         }
     }
     const catalogBuffId = catalogCombatBuffIdFromKey(buffKey)
@@ -4352,6 +4591,10 @@ function renderCombatControls() {
     renderedCombatBuffAgentId = els.agentSelect?.value ?? ""
 }
 
+function activeCheckboxCombatBuffs(activeBuffIds = checkedCombatBuffIds()) {
+    return allCheckboxCombatBuffs().filter(buff => activeBuffIds.has(buff.id))
+}
+
 function collectManualStats() {
     return currentAddedCombatBuffs()
         .filter(item => item.sourceKind === "custom")
@@ -4402,6 +4645,10 @@ function collectCombatBuffConfig() {
             const item = catalogCombatBuffRuntimeItem(buff)
             runtimeInputs[buff.id] = runtimeForBuff(item, buff)
         }
+    }
+    for (const buff of activeCheckboxCombatBuffs(new Set(activeBuffIds))) {
+        const item = checkboxCombatBuffRuntimeItem(buff)
+        runtimeInputs[buff.id] = runtimeForBuff(item, buff)
     }
 
     return {
@@ -4554,9 +4801,10 @@ function renderCombatBuffCandidates() {
 
         const row = document.createElement("button")
         row.type = "button"
-        row.className = "combat-candidate-row"
+        row.className = ["combat-candidate-row", alreadyAdded ? "active" : ""].filter(Boolean).join(" ")
         row.dataset.candidateKey = key
-        row.disabled = alreadyAdded || Boolean(limitMessage)
+        row.dataset.candidateAdded = String(alreadyAdded)
+        row.disabled = Boolean(limitMessage)
 
         const title = document.createElement("strong")
         title.textContent = nameOf(candidate)
@@ -4565,7 +4813,7 @@ function renderCombatBuffCandidates() {
         const stats = document.createElement("span")
         stats.className = "combat-added-stats combat-buff-effect-lines"
         if (alreadyAdded) {
-            setCombatStatLines(stats, ["已添加"])
+            setCombatStatLines(stats, ["已添加，点击移除"])
         } else if (limitMessage) {
             setCombatStatLines(stats, [limitMessage])
         } else {
@@ -4614,7 +4862,11 @@ function addCombatBuffCandidateByKey(key) {
         setStatus(limitMessage, "error")
         return false
     }
-    saveCurrentAddedCombatBuffs([...addedBuffs, addedCombatBuffEntry(candidate)])
+    const addedKeys = new Set(addedBuffs.map(addedCombatBuffKey))
+    const nextEntries = candidateWithSameSourceDefaults(candidate)
+        .filter(item => !addedKeys.has(addedCombatBuffKey(item)))
+        .map(addedCombatBuffEntry)
+    saveCurrentAddedCombatBuffs([...addedBuffs, ...nextEntries])
     return true
 }
 
@@ -4643,7 +4895,13 @@ function addSelectedTeammateBuffs() {
         return false
     }
     const addedKeys = new Set(addedBuffs.map(addedCombatBuffKey))
-    const nextEntries = candidates
+    const nextCandidatesByKey = new Map()
+    for (const candidate of candidates) {
+        for (const item of candidateWithSameSourceDefaults(candidate)) {
+            nextCandidatesByKey.set(addedCombatBuffKey(item), item)
+        }
+    }
+    const nextEntries = [...nextCandidatesByKey.values()]
         .filter(candidate => !addedKeys.has(addedCombatBuffKey(candidate)))
         .map(addedCombatBuffEntry)
     if (!nextEntries.length) {
@@ -4971,6 +5229,83 @@ function renderFourPieceBuffSettings() {
     }
 }
 
+function renderCurrentSchemeFourPieceBuffMode(mode = currentSchemeFourPieceBuffMode()) {
+    els.currentSchemeFourPieceBuffModeAuto?.classList.toggle("active", mode === "auto")
+    els.currentSchemeFourPieceBuffModeManual?.classList.toggle("active", mode === "manual")
+    els.currentSchemeFourPieceBuffModeAuto?.setAttribute("aria-pressed", String(mode === "auto"))
+    els.currentSchemeFourPieceBuffModeManual?.setAttribute("aria-pressed", String(mode === "manual"))
+}
+
+function renderCurrentSchemeFourPieceBuffSettings() {
+    if (!els.currentSchemeFourPieceBuffSection) {
+        return
+    }
+    const setId = currentSchemeFourPieceSetId()
+    const set = driveDiscSetById(setId)
+    const parts = currentSchemeFourPieceBuffParts(set)
+    const mode = currentSchemeFourPieceBuffMode(setId)
+    renderCurrentSchemeFourPieceBuffMode(mode)
+    els.currentSchemeFourPieceBuffSummary.innerHTML = ""
+    els.currentSchemeFourPieceBuffManualList.innerHTML = ""
+    els.currentSchemeFourPieceBuffSection.hidden = !setId
+
+    if (!setId) {
+        els.currentSchemeFourPieceBuffSummary.textContent = "当前方案没有激活 4 件套 Buff。"
+        els.currentSchemeFourPieceBuffManualList.hidden = true
+        return
+    }
+    if (!parts.length) {
+        els.currentSchemeFourPieceBuffSummary.textContent = "当前方案的 4 件套没有可自动应用的局内 Buff。"
+        els.currentSchemeFourPieceBuffManualList.hidden = true
+        return
+    }
+
+    const summaryPrefix = mode === "manual" ? "手动" : "自动"
+    for (const part of parts) {
+        const runtime = mode === "manual"
+            ? runtimeForCurrentSchemeFourPieceBuff(part, set.id)
+            : defaultRuntimeForBuff(part.buff)
+        const line = document.createElement("span")
+        line.textContent = `${summaryPrefix}｜${part.label}：${storedEffectRulesText(part.buff, runtime) || effectStatText(part.buff) || "-"}`
+        els.currentSchemeFourPieceBuffSummary.appendChild(line)
+    }
+
+    els.currentSchemeFourPieceBuffManualList.hidden = mode !== "manual"
+    if (mode !== "manual") {
+        return
+    }
+
+    for (const part of parts) {
+        const runtime = runtimeForCurrentSchemeFourPieceBuff(part, set.id)
+        setCurrentSchemeFourPieceBuffRuntimeInput(part.key, runtime, set.id)
+        const row = document.createElement("article")
+        row.className = "optimizer-four-piece-buff-card combat-added-card"
+        row.dataset.buffKey = currentSchemeDriveDisc4pcBuffKey(part.key)
+
+        const title = document.createElement("strong")
+        title.textContent = `${nameOf(set)}｜${part.label}`
+        const description = document.createElement("p")
+        description.textContent = localizedText(part.buff.description) || localizedText(part.buff.conditionLabel) || localizedText(part.buff.condition) || "手动覆盖当前方案预览使用的 4 件套效果参数。"
+        const stats = document.createElement("span")
+        stats.className = "combat-added-stats combat-buff-effect-lines"
+        renderBuffEffectLines(stats, part.buff, runtime, { fallbackText: effectStatText(part.buff) })
+
+        row.append(title, description, stats)
+        renderBuffRuntimeControls(row, {
+            id: part.key,
+            sourceKind: "currentSchemeDriveDisc4pc",
+            runtime,
+        }, part.buff, runtime)
+        if (!row.querySelector(".combat-runtime-grid")) {
+            const note = document.createElement("span")
+            note.className = "optimizer-four-piece-buff-note"
+            note.textContent = "此效果没有可调参数，将按当前默认建模生效。"
+            row.appendChild(note)
+        }
+        els.currentSchemeFourPieceBuffManualList.appendChild(row)
+    }
+}
+
 function renderTwoPieceSelectedSummary() {
     const selected = selectedValues(els.twoPieceSetSelect)
         .map(driveDiscSetById)
@@ -4988,7 +5323,7 @@ function renderTwoPieceSelectedSummary() {
         item.className = "two-piece-selected-chip"
         item.innerHTML = `
             <span>${escapeHtml(nameOf(set))}</span>
-            <button type="button" data-remove-two-piece-set="${escapeHtml(set.id)}" aria-label="移除 ${escapeHtml(nameOf(set))}">×</button>
+            <button type="button" data-remove-two-piece-set="${escapeHtml(set.id)}" aria-label="移除 ${escapeHtml(nameOf(set))}"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M6 18L18 6"/></svg></button>
         `
         els.twoPieceSelectedSummary.appendChild(item)
     }
@@ -5286,13 +5621,41 @@ function collectRequestPayloadForResult(result) {
     return payload
 }
 
+function collectRequestPayloadForScheme(scheme = activeScheme()) {
+    if (scheme.kind === "optimized") {
+        return collectRequestPayloadForResult(optimizationResults[scheme.resultIndex])
+    }
+
+    const payload = collectRequestPayload({ driveDiscs: scheme.driveDiscs ?? [] })
+    const activeBuffIds = new Set(payload.combatBuffs?.activeBuffIds ?? [])
+    const fourPieceBuffIds = activeDriveDisc4pcBuffIdsForResult(scheme)
+    for (const id of fourPieceBuffIds) {
+        activeBuffIds.add(id)
+    }
+    const setId = fourPieceSetIdsForDriveDiscs(scheme.driveDiscs)[0] ?? ""
+    const fourPieceRuntimeInputs = setId && currentSchemeFourPieceBuffMode(setId) === "manual"
+        ? Object.fromEntries(fourPieceBuffIds
+            .map(id => [id, currentSchemeFourPieceBuffRuntimeInputs(setId)[id]])
+            .filter(([, runtime]) => runtime && typeof runtime === "object" && !Array.isArray(runtime))
+            .map(([id, runtime]) => [id, clonePlainObject(runtime)]))
+        : {}
+    payload.combatBuffs = {
+        ...(payload.combatBuffs ?? {}),
+        activeBuffIds: [...activeBuffIds],
+        runtimeInputs: {
+            ...(payload.combatBuffs?.runtimeInputs ?? {}),
+            ...fourPieceRuntimeInputs,
+        },
+    }
+    return payload
+}
+
 function collectDriveDiscAnalysisPayload() {
-    const result = optimizationResults[activeResultIndex]
-    if (!result) {
+    const scheme = activeScheme()
+    if ((scheme.driveDiscs ?? []).length < 6) {
         return null
     }
-    const payload = collectRequestPayloadForResult(result)
-    return payload
+    return collectRequestPayloadForScheme(scheme)
 }
 
 function renderOrderedKV(container, data = {}, order = PANEL_ORDER) {
@@ -5378,6 +5741,510 @@ const DAMAGE_PANEL_PERCENT_KEYS = new Set([
     "etherDmg",
     "penRatio",
 ])
+
+function storedStatLabel(key, mode = "") {
+    return combatUi.storedStatLabel(key, mode)
+}
+
+function driveDiscSetForDisc(disc) {
+    return getSet(disc?.setId)
+        ?? displayDriveDiscSets().find(item =>
+            item.name?.zhCN === disc?.setName
+            || item.name?.en === disc?.setName
+            || item.id === disc?.setName
+        )
+        ?? null
+}
+
+function discIcon(discOrSet) {
+    const set = discOrSet?.partition ? driveDiscSetForDisc(discOrSet) : discOrSet
+    return set?.images?.icon ?? "/assets/drive-discs/empty.svg"
+}
+
+function driveDiscById(id) {
+    return (store?.driveDiscs ?? []).find(disc => disc.id === id) ?? null
+}
+
+function discDisplaySetName(disc) {
+    return disc?.setName || nameOf(driveDiscSetForDisc(disc))
+}
+
+function toCalculatorDriveDisc(disc) {
+    return {
+        id: disc.id,
+        setId: disc.setId,
+        setName: disc.setName,
+        partition: disc.partition,
+        rarity: disc.rarity,
+        level: disc.level,
+        maxLevel: disc.maxLevel,
+        mainStat: {
+            stat: disc.mainStat?.stat,
+            value: disc.mainStat?.value,
+            mode: disc.mainStat?.mode,
+        },
+        subStats: (disc.subStats ?? []).map(item => ({
+            stat: item.stat,
+            value: item.value,
+            mode: item.mode,
+        })),
+        source: disc.source ?? null,
+    }
+}
+
+function sanitizeDiscIdsBySlot(selectedIdsBySlot = {}) {
+    return Object.fromEntries(
+        Object.entries(selectedIdsBySlot ?? {})
+            .map(([slot, id]) => [String(Number(slot)), String(id ?? "").trim()])
+            .filter(([slot, id]) => {
+                const disc = driveDiscById(id)
+                return Number(slot) >= 1 && Number(slot) <= 6 && disc && Number(disc.partition) === Number(slot)
+            }),
+    )
+}
+
+function equippedDriveDiscIdsForAgent(agentId) {
+    const byPartition = new Map()
+    for (const disc of store?.driveDiscs ?? []) {
+        if (disc.equippedBy !== agentId || !disc.partition) {
+            continue
+        }
+        if (!byPartition.has(disc.partition)) {
+            byPartition.set(String(disc.partition), disc.id)
+        }
+    }
+    return Object.fromEntries(byPartition)
+}
+
+function normalizeHomeDiscMode(mode) {
+    return HOME_DISC_MODES.has(mode) ? mode : "manual"
+}
+
+function currentHomeDiscMode() {
+    return els.loadoutDiscModeBtn?.classList.contains("active") ? "loadout" : "manual"
+}
+
+function selectedDiscModeForAgent(agentId) {
+    return normalizeHomeDiscMode(configForAgent(agentId).driveDiscMode)
+}
+
+function manualDiscIdsFromSavedConfig(agentId) {
+    const config = configForAgent(agentId)
+    if (config && Object.prototype.hasOwnProperty.call(config, "manualDriveDiscIdsBySlot")) {
+        return sanitizeDiscIdsBySlot(config.manualDriveDiscIdsBySlot)
+    }
+    if (config && Object.prototype.hasOwnProperty.call(config, "driveDiscIdsBySlot")) {
+        return sanitizeDiscIdsBySlot(config.driveDiscIdsBySlot)
+    }
+    return equippedDriveDiscIdsForAgent(agentId)
+}
+
+function driveDiscLoadoutsForAgent(agentId) {
+    return (store?.driveDiscLoadouts ?? [])
+        .filter(loadout => loadout.agentId === agentId)
+        .sort((left, right) =>
+            String(right.updatedAt ?? "").localeCompare(String(left.updatedAt ?? ""))
+            || String(left.name).localeCompare(String(right.name), "zh-CN")
+        )
+}
+
+function loadoutMissingSlots(loadout) {
+    return [1, 2, 3, 4, 5, 6].filter(slot => {
+        const id = loadout?.driveDiscIdsBySlot?.[String(slot)]
+        const disc = id ? driveDiscById(id) : null
+        return !disc || Number(disc.partition) !== slot
+    })
+}
+
+function loadoutIsComplete(loadout) {
+    return loadoutMissingSlots(loadout).length === 0
+}
+
+function completeLoadoutForAgent(agentId, preferredLoadoutId = configForAgent(agentId).selectedLoadoutId ?? "") {
+    const loadouts = driveDiscLoadoutsForAgent(agentId)
+    return loadouts.find(loadout => loadout.id === preferredLoadoutId && loadoutIsComplete(loadout))
+        ?? loadouts.find(loadoutIsComplete)
+        ?? null
+}
+
+function loadoutIdForAgent(agentId, preferredLoadoutId) {
+    return completeLoadoutForAgent(agentId, preferredLoadoutId)?.id ?? ""
+}
+
+function loadoutDiscIdsForAgent(agentId, loadoutId = loadoutIdForAgent(agentId)) {
+    const loadout = driveDiscLoadoutsForAgent(agentId).find(item => item.id === loadoutId)
+    return loadout && loadoutIsComplete(loadout) ? sanitizeDiscIdsBySlot(loadout.driveDiscIdsBySlot) : {}
+}
+
+function selectedDiscIdsFromSavedConfig(agentId) {
+    return selectedDiscModeForAgent(agentId) === "loadout"
+        ? loadoutDiscIdsForAgent(agentId)
+        : manualDiscIdsFromSavedConfig(agentId)
+}
+
+function activeDiscIdsForConfig(agentId, mode, manualDriveDiscIdsBySlot, selectedLoadoutId) {
+    return normalizeHomeDiscMode(mode) === "loadout"
+        ? loadoutDiscIdsForAgent(agentId, selectedLoadoutId)
+        : manualDriveDiscIdsBySlot
+}
+
+function selectedDriveDiscsForAgent(agentId, mode = selectedDiscModeForAgent(agentId), selectedLoadoutId = loadoutIdForAgent(agentId)) {
+    const selectedIds = normalizeHomeDiscMode(mode) === "loadout"
+        ? loadoutDiscIdsForAgent(agentId, selectedLoadoutId)
+        : manualDiscIdsFromSavedConfig(agentId)
+    return Object.entries(selectedIds)
+        .map(([slot, id]) => {
+            const disc = driveDiscById(id)
+            return disc && Number(disc.partition) === Number(slot)
+                ? toCalculatorDriveDisc(disc)
+                : null
+        })
+        .filter(Boolean)
+        .sort((left, right) => Number(left.partition) - Number(right.partition))
+}
+
+function saveCurrentHomeSelection({ mode = currentHomeDiscMode(), manualDriveDiscIdsBySlot, selectedLoadoutId } = {}) {
+    const agentId = els.agentSelect.value
+    if (!agentId) {
+        return
+    }
+
+    const selection = loadHomeSelection()
+    const byAgent = { ...(selection.byAgent ?? {}) }
+    const previousConfig = byAgent[agentId] ?? {}
+    const driveDiscMode = normalizeHomeDiscMode(mode)
+    const nextManualDriveDiscIdsBySlot = manualDriveDiscIdsBySlot === undefined
+        ? manualDiscIdsFromSavedConfig(agentId)
+        : sanitizeDiscIdsBySlot(manualDriveDiscIdsBySlot)
+    const nextSelectedLoadoutId = selectedLoadoutId === undefined
+        ? loadoutIdForAgent(agentId, previousConfig.selectedLoadoutId)
+        : loadoutIdForAgent(agentId, selectedLoadoutId)
+    const driveDiscIdsBySlot = activeDiscIdsForConfig(
+        agentId,
+        driveDiscMode,
+        nextManualDriveDiscIdsBySlot,
+        nextSelectedLoadoutId,
+    )
+
+    byAgent[agentId] = {
+        ...previousConfig,
+        wEngineId: els.wEngineSelect.value,
+        wEngineModificationLevel: selectedWEngineModificationLevel(getWEngine(els.wEngineSelect.value)),
+        coreSkillLevel: els.coreSkillSelect.value,
+        cinemaLevel: selectedCinemaLevel(),
+        driveDiscMode,
+        manualDriveDiscIdsBySlot: nextManualDriveDiscIdsBySlot,
+        selectedLoadoutId: nextSelectedLoadoutId,
+        driveDiscIdsBySlot: sanitizeDiscIdsBySlot(driveDiscIdsBySlot),
+        combat: {
+            ...(previousConfig.combat ?? {}),
+            activeBuffIds: [...checkedCombatBuffIds()],
+            addedBuffs: sanitizeAddedCombatBuffs(previousConfig.combat?.addedBuffs ?? []),
+        },
+        damage: collectDamageConfig(),
+        currentSchemeFourPieceBuffModeBySetId: clonePlainObject(currentSchemeFourPieceBuffModeBySetId),
+        currentSchemeFourPieceBuffRuntimeInputsBySetId: clonePlainObject(currentSchemeFourPieceBuffRuntimeInputsBySetId),
+        optimizer: collectStoredOptimizerConfig(),
+    }
+    saveHomeSelection({ currentAgentId: agentId, byAgent })
+}
+
+function setHomeDiscMode(mode) {
+    const useLoadout = normalizeHomeDiscMode(mode) === "loadout"
+    const loadoutField = els.homeLoadoutSelect?.closest(".loadout-apply-field")
+    if (loadoutField) {
+        loadoutField.hidden = !useLoadout
+    }
+}
+
+function renderHomeLoadoutSelect(agentId) {
+    if (!els.homeLoadoutSelect) {
+        return
+    }
+
+    const loadouts = driveDiscLoadoutsForAgent(agentId)
+    const selectedLoadoutId = loadoutIdForAgent(agentId, configForAgent(agentId).selectedLoadoutId)
+    els.homeLoadoutSelect.innerHTML = ""
+    const empty = document.createElement("option")
+    empty.value = ""
+    empty.textContent = loadouts.length ? "未选择套装" : "当前角色暂无套装"
+    empty.selected = !selectedLoadoutId
+    els.homeLoadoutSelect.appendChild(empty)
+
+    for (const loadout of loadouts) {
+        const missingSlots = loadoutMissingSlots(loadout)
+        const option = document.createElement("option")
+        option.value = loadout.id
+        option.textContent = `${loadout.name}${Number.isFinite(Number(loadout.score)) ? ` · ${Number(loadout.score).toFixed(0)}` : ""}${missingSlots.length ? ` · 缺 ${missingSlots.join("、")}号位` : ""}`
+        option.disabled = missingSlots.length > 0
+        option.selected = loadout.id === selectedLoadoutId
+        els.homeLoadoutSelect.appendChild(option)
+    }
+    els.homeLoadoutSelect.disabled = loadouts.every(loadout => !loadoutIsComplete(loadout))
+}
+
+function syncDiscSourceControls(agentId = els.agentSelect.value) {
+    renderHomeLoadoutSelect(agentId)
+    setHomeDiscMode(selectedDiscModeForAgent(agentId))
+}
+
+function schemeDriveDiscIdsBySlot(driveDiscs = []) {
+    return Object.fromEntries(
+        [...driveDiscs]
+            .filter(disc => disc?.id && Number(disc.partition) >= 1 && Number(disc.partition) <= 6)
+            .map(disc => [String(Number(disc.partition)), disc.id]),
+    )
+}
+
+function manualScheme() {
+    const agentId = els.agentSelect.value
+    const driveDiscs = selectedDriveDiscsForAgent(agentId, "manual")
+    return {
+        kind: "manual",
+        key: MANUAL_SCHEME_KEY,
+        label: "自选",
+        driveDiscs,
+        driveDiscIdsBySlot: schemeDriveDiscIdsBySlot(driveDiscs),
+    }
+}
+
+function loadoutScheme() {
+    const agentId = els.agentSelect.value
+    const selectedLoadoutId = loadoutIdForAgent(agentId, configForAgent(agentId).selectedLoadoutId)
+    const loadout = driveDiscLoadoutsForAgent(agentId).find(item => item.id === selectedLoadoutId) ?? null
+    const driveDiscs = selectedDriveDiscsForAgent(agentId, "loadout", selectedLoadoutId)
+    return {
+        kind: "loadout",
+        key: LOADOUT_SCHEME_KEY,
+        label: "套装",
+        name: loadout?.name ?? "",
+        driveDiscs,
+        driveDiscIdsBySlot: schemeDriveDiscIdsBySlot(driveDiscs),
+    }
+}
+
+function optimizedScheme(result, index) {
+    return {
+        kind: "optimized",
+        key: `optimized:${index}`,
+        label: `#${index + 1}`,
+        rank: result.rank,
+        score: result.score,
+        data: result.data,
+        stale: optimizationResultsDirty,
+        resultIndex: index,
+        driveDiscs: result.driveDiscs ?? [],
+        driveDiscIdsBySlot: result.driveDiscIdsBySlot ?? schemeDriveDiscIdsBySlot(result.driveDiscs ?? []),
+    }
+}
+
+function currentInputScheme(mode = selectedDiscModeForAgent(els.agentSelect.value)) {
+    return normalizeHomeDiscMode(mode) === "loadout" ? loadoutScheme() : manualScheme()
+}
+
+function optimizedSchemes() {
+    return optimizationResults.map(optimizedScheme)
+}
+
+function schemeTabs() {
+    return [
+        manualScheme(),
+        loadoutScheme(),
+        ...optimizedSchemes(),
+    ]
+}
+
+function activeScheme() {
+    return schemeTabs().find(item => item.key === activeSchemeKey)
+        ?? currentInputScheme()
+}
+
+function setActiveSchemeKey(key) {
+    const normalizedKey = String(key ?? "")
+    const scheme = schemeTabs().find(item => item.key === normalizedKey)
+    activeSchemeKey = scheme?.key ?? selectedDiscModeForAgent(els.agentSelect.value)
+}
+
+function syncActiveResultIndexFromScheme() {
+    const scheme = activeScheme()
+    activeResultIndex = scheme.kind === "optimized" ? Number(scheme.resultIndex) : -1
+}
+
+function setActiveDiscModeScheme(mode) {
+    const nextMode = normalizeHomeDiscMode(mode)
+    activeSchemeKey = nextMode
+    setHomeDiscMode(nextMode)
+}
+
+function selectedOptimizedScheme() {
+    const scheme = activeScheme()
+    return scheme.kind === "optimized" ? scheme : null
+}
+
+function driveDiscSetSummary(driveDiscs = []) {
+    const counts = new Map()
+    for (const disc of driveDiscs) {
+        if (!disc?.setId) {
+            continue
+        }
+        counts.set(disc.setId, (counts.get(disc.setId) ?? 0) + 1)
+    }
+    return [...counts.entries()]
+        .sort((a, b) => b[1] - a[1] || nameOf(getSet(a[0])).localeCompare(nameOf(getSet(b[0])), "zh-CN"))
+        .map(([setId, count]) => `${nameOf(getSet(setId)) || setId} ${count}`)
+        .join(" / ")
+}
+
+function populateHomeDiscModalFilters(slot) {
+    const discs = (store?.driveDiscs ?? []).filter(disc => Number(disc.partition) === Number(slot))
+    const selectedSet = els.homeDiscSetFilter.value
+    const selectedMainStat = els.homeDiscMainStatFilter.value
+    const sets = new Map()
+    for (const disc of discs) {
+        const set = driveDiscSetForDisc(disc)
+        const key = set?.id ?? disc.setId
+        sets.set(key, discDisplaySetName(disc))
+    }
+    els.homeDiscSetFilter.innerHTML = `<option value="">全部</option>`
+    for (const [id, label] of [...sets.entries()].sort((a, b) => a[1].localeCompare(b[1], "zh-CN"))) {
+        const option = document.createElement("option")
+        option.value = id
+        option.textContent = label
+        option.selected = id === selectedSet
+        els.homeDiscSetFilter.appendChild(option)
+    }
+    const stats = [...new Set(discs.map(disc => disc.mainStat?.stat).filter(Boolean))]
+        .sort((a, b) => statLabel(a).localeCompare(statLabel(b), "zh-CN"))
+    els.homeDiscMainStatFilter.innerHTML = `<option value="">全部</option>`
+    for (const stat of stats) {
+        const option = document.createElement("option")
+        option.value = stat
+        option.textContent = statLabel(stat)
+        option.selected = stat === selectedMainStat
+        els.homeDiscMainStatFilter.appendChild(option)
+    }
+}
+
+function filteredHomeDiscOptions() {
+    const slot = activeDiscSlot
+    const setId = els.homeDiscSetFilter.value
+    const mainStat = els.homeDiscMainStatFilter.value
+    const search = els.homeDiscSearchInput.value.trim().toLowerCase()
+    const selectedIds = manualDiscIdsFromSavedConfig(els.agentSelect.value)
+    const selectedId = selectedIds[String(slot)]
+    return (store?.driveDiscs ?? [])
+        .filter(disc => {
+            const set = driveDiscSetForDisc(disc)
+            const haystack = [
+                disc.id,
+                disc.setId,
+                disc.setName,
+                nameOf(set),
+                disc.source?.sequence,
+                storedStatLabel(disc.mainStat?.stat, disc.mainStat?.mode),
+                disc.mainStat?.label,
+                ...(disc.subStats ?? []).flatMap(item => [storedStatLabel(item.stat, item.mode), item.label]),
+            ].join(" ").toLowerCase()
+            return Number(disc.partition) === Number(slot)
+                && (!setId || disc.setId === setId || set?.id === setId)
+                && (!mainStat || disc.mainStat?.stat === mainStat)
+                && (!search || haystack.includes(search))
+        })
+        .sort((left, right) => {
+            const leftSelected = left.id === selectedId ? 0 : 1
+            const rightSelected = right.id === selectedId ? 0 : 1
+            return leftSelected - rightSelected
+                || String(left.setName).localeCompare(String(right.setName), "zh-CN")
+                || Number(left.source?.sequence ?? 999999) - Number(right.source?.sequence ?? 999999)
+        })
+}
+
+function renderHomeDiscOptions() {
+    const discs = filteredHomeDiscOptions()
+    const selectedId = manualDiscIdsFromSavedConfig(els.agentSelect.value)[String(activeDiscSlot)]
+    els.homeDiscOptionList.innerHTML = ""
+    els.homeDiscEmpty.hidden = discs.length !== 0
+    for (const disc of discs) {
+        const subStats = (disc.subStats ?? [])
+            .map(item => `${storedStatLabel(item.stat, item.mode)} ${formatStoredValue(item.stat, item.value, item.mode)}`)
+            .join(" / ")
+        const button = document.createElement("button")
+        button.type = "button"
+        button.className = disc.id === selectedId ? "home-disc-option active" : "home-disc-option"
+        button.dataset.discId = disc.id
+        button.innerHTML = `
+            <img src="${escapeHtml(discIcon(disc))}" alt="">
+            <div class="home-disc-option-main">
+                <strong>${escapeHtml(discDisplaySetName(disc))}</strong>
+                <span>${escapeHtml(`${disc.partition}号位 · ${disc.rarity}+${disc.level}${disc.source?.sequence ? ` · #${disc.source.sequence}` : ""}`)}</span>
+            </div>
+            <div class="home-disc-option-stat">
+                <strong>${escapeHtml(`${storedStatLabel(disc.mainStat?.stat, disc.mainStat?.mode)} ${formatStoredValue(disc.mainStat?.stat, disc.mainStat?.value, disc.mainStat?.mode)}`)}</strong>
+                <span>${escapeHtml(subStats || "-")}</span>
+            </div>
+        `
+        els.homeDiscOptionList.appendChild(button)
+    }
+}
+
+function openHomeDiscModal(slot) {
+    if (!els.homeDiscModal) {
+        return
+    }
+    activeDiscSlot = Number(slot)
+    els.homeDiscModalTitle.textContent = `选择 ${activeDiscSlot} 号位驱动盘`
+    els.homeDiscModalSubtitle.textContent = "只显示当前号位的已有驱动盘"
+    els.homeDiscSearchInput.value = ""
+    els.homeDiscSetFilter.value = ""
+    els.homeDiscMainStatFilter.value = ""
+    populateHomeDiscModalFilters(activeDiscSlot)
+    renderHomeDiscOptions()
+    els.homeDiscModal.hidden = false
+    document.body.classList.add("modal-open")
+}
+
+function closeHomeDiscModal() {
+    if (!els.homeDiscModal) {
+        return
+    }
+    els.homeDiscModal.hidden = true
+    document.body.classList.remove("modal-open")
+    activeDiscSlot = null
+}
+
+async function refreshManualSelectionAfterChange() {
+    activeSchemeKey = MANUAL_SCHEME_KEY
+    setHomeDiscMode("manual")
+    syncDiscSourceControls()
+    saveCurrentHomeSelection({ mode: "manual" })
+    renderResultTabs()
+    renderResultList()
+    await refreshActiveSchemePreview()
+}
+
+async function selectHomeDisc(discId) {
+    if (!activeDiscSlot) {
+        return
+    }
+    const next = {
+        ...manualDiscIdsFromSavedConfig(els.agentSelect.value),
+        [String(activeDiscSlot)]: discId,
+    }
+    saveCurrentHomeSelection({ mode: "manual", manualDriveDiscIdsBySlot: next })
+    await refreshManualSelectionAfterChange()
+    closeHomeDiscModal()
+}
+
+async function clearHomeDiscSlot() {
+    if (!activeDiscSlot) {
+        return
+    }
+    const next = { ...manualDiscIdsFromSavedConfig(els.agentSelect.value) }
+    delete next[String(activeDiscSlot)]
+    saveCurrentHomeSelection({ mode: "manual", manualDriveDiscIdsBySlot: next })
+    await refreshManualSelectionAfterChange()
+    closeHomeDiscModal()
+}
 
 function damageNumber(value, digits = 3) {
     const number = Number(value)
@@ -5485,66 +6352,169 @@ function renderCalculationResult(data) {
     renderDamageWhiteBox(data?.damage)
 }
 
-function renderResultTabs() {
-    els.optimizerResultTabs.innerHTML = ""
-    const topScore = Number(optimizationResults[0]?.score ?? 0)
-    for (const [index, result] of optimizationResults.entries()) {
-        const button = document.createElement("button")
-        button.type = "button"
-        button.className = index === activeResultIndex ? "active" : ""
-        button.dataset.resultIndex = String(index)
-        const score = Number(result.score ?? 0)
-        const percent = topScore > 0
-            ? `${damageNumber((score / topScore) * 100, index === 0 ? 0 : 2)}%`
+function schemeHeading(scheme = {}) {
+    if (scheme.kind === "optimized") {
+        return `第 ${scheme.rank} 名 · ${Number(Number(scheme.score ?? 0).toFixed(3))}`
+    }
+    return scheme.name ? `${scheme.label} · ${scheme.name}` : `${scheme.label}方案`
+}
+
+function renderDriveDiscSchemeSummary(container, scheme = {}) {
+    if (!container) {
+        return
+    }
+    const summary = document.createElement("div")
+    summary.className = "optimizer-result-summary"
+    const setSummary = driveDiscSetSummary(scheme.driveDiscs)
+    summary.innerHTML = `
+        <strong>${escapeHtml(schemeHeading(scheme))}</strong>
+        <span>${escapeHtml(setSummary || "未形成套装")}</span>
+    `
+    container.appendChild(summary)
+}
+
+function schemeTabMeta(scheme = {}, topScore = 0) {
+    if (scheme.kind === "optimized") {
+        const score = Number(scheme.score ?? 0)
+        if (scheme.stale) {
+            return "需刷新"
+        }
+        return topScore > 0 && Number.isFinite(score)
+            ? `${damageNumber((score / topScore) * 100, Number(scheme.resultIndex) === 0 ? 0 : 2)}%`
             : "-"
-        button.innerHTML = `
-            <span>#${index + 1} ${escapeHtml(String(Number(score.toFixed(0))))}</span>
-            <small>${escapeHtml(percent)}</small>
+    }
+    return `${scheme.driveDiscs?.length ?? 0}/6`
+}
+
+function schemeTabLabel(scheme = {}) {
+    if (scheme.kind === "optimized") {
+        const score = Number(scheme.score ?? 0)
+        return Number.isFinite(score) && score > 0
+            ? `${scheme.label} ${Number(score.toFixed(0))}`
+            : scheme.label
+    }
+    return scheme.name ? `${scheme.label} · ${scheme.name}` : scheme.label
+}
+
+function createSchemeDiscRow(scheme = {}, slot, disc = null) {
+    const editable = scheme.kind === "manual"
+    if (!disc) {
+        const empty = document.createElement(editable ? "button" : "div")
+        if (editable) {
+            empty.type = "button"
+        }
+        empty.className = "optimizer-disc-row optimizer-disc-row-empty"
+        empty.dataset.slot = String(slot)
+        empty.innerHTML = `
+            <img src="/assets/drive-discs/empty.svg" alt="">
+            <div>
+                <strong>${slot}号位 · 未选择</strong>
+                <span>${editable ? "点击选择驱动盘" : "-"}</span>
+                <small>-</small>
+            </div>
         `
-        els.optimizerResultTabs.appendChild(button)
+        return empty
+    }
+
+    const subStats = (disc.subStats ?? [])
+        .map(stat => `${statLabel(stat.stat)} ${formatStoredValue(stat.stat, stat.value, stat.mode)}`)
+        .join(" / ")
+    const item = document.createElement(editable ? "button" : "div")
+    item.className = "optimizer-disc-row"
+    if (editable) {
+        item.type = "button"
+        item.dataset.slot = String(disc.partition)
+    }
+    item.innerHTML = `
+        <img src="${escapeHtml(discIcon(disc))}" alt="">
+        <div>
+            <strong>${escapeHtml(`${disc.partition}号位 · ${disc.setName || nameOf(getSet(disc.setId))}`)}</strong>
+            <span>${escapeHtml(`${statLabel(disc.mainStat?.stat)} ${formatStoredValue(disc.mainStat?.stat, disc.mainStat?.value, disc.mainStat?.mode)}${disc.source?.sequence ? ` · #${disc.source.sequence}` : ""}`)}</span>
+            <small>${escapeHtml(subStats || "-")}</small>
+        </div>
+    `
+    return item
+}
+
+function renderSchemeDiscRows(container, scheme = {}) {
+    if (!container) {
+        return
+    }
+    const bySlot = new Map((scheme.driveDiscs ?? []).map(disc => [Number(disc.partition), disc]))
+    for (let slot = 1; slot <= 6; slot += 1) {
+        container.appendChild(createSchemeDiscRow(scheme, slot, bySlot.get(slot) ?? null))
     }
 }
 
-function discIcon(disc) {
-    return getSet(disc.setId)?.images?.icon ?? "/assets/drive-discs/empty.svg"
+function renderSchemeTabs() {
+    const topScore = Number(optimizationResults[0]?.score ?? 0)
+    const resultContainer = els.optimizerResultTabs
+    if (resultContainer) {
+        resultContainer.innerHTML = ""
+    }
+    for (const scheme of schemeTabs()) {
+        const existingButton = scheme.kind === "manual"
+            ? els.manualDiscModeBtn
+            : scheme.kind === "loadout"
+                ? els.loadoutDiscModeBtn
+                : null
+        const button = existingButton ?? document.createElement("button")
+        if (!existingButton) {
+            button.type = "button"
+            button.dataset.schemeKey = scheme.key
+        }
+        button.classList.toggle("active", scheme.key === activeScheme().key)
+        button.dataset.schemeKey = scheme.key
+        const meta = schemeTabMeta(scheme, topScore)
+        button.innerHTML = `
+            <span>${escapeHtml(schemeTabLabel(scheme))}</span>
+            <small>${escapeHtml(meta)}</small>
+        `
+        if (!existingButton && resultContainer) {
+            resultContainer.appendChild(button)
+        }
+    }
+}
+
+function renderActiveSchemeList() {
+    if (!els.driveDiscSchemeList) {
+        return
+    }
+    const scheme = activeScheme()
+    syncActiveResultIndexFromScheme()
+    setHomeDiscMode(scheme.kind === "loadout" ? "loadout" : "manual")
+    els.driveDiscSchemeList.innerHTML = ""
+    if (els.saveLoadoutBtn) {
+        els.saveLoadoutBtn.disabled = scheme.kind !== "optimized"
+    }
+    renderDriveDiscSchemeSummary(els.driveDiscSchemeList, scheme)
+    renderSchemeDiscRows(els.driveDiscSchemeList, scheme)
+}
+
+function renderResultTabs() {
+    renderSchemeTabs()
 }
 
 function renderResultList() {
-    els.optimizerResultList.innerHTML = ""
-    els.optimizerEmpty.hidden = optimizationResults.length > 0
-    els.saveLoadoutBtn.disabled = activeResultIndex < 0
-    const active = optimizationResults[activeResultIndex]
-    if (!active) {
-        return
-    }
+    renderSchemeTabs()
+    renderActiveSchemeList()
+    renderCurrentSchemeFourPieceBuffSettings()
+}
 
-    const summary = document.createElement("div")
-    summary.className = "optimizer-result-summary"
-    summary.innerHTML = `
-        <strong>第 ${active.rank} 名 · ${Number(active.score.toFixed(3))}</strong>
-        <span>${escapeHtml(active.setSummary.map(item => `${item.name} ${item.count}`).join(" / "))}</span>
-    `
-    els.optimizerResultList.appendChild(summary)
+function renderOptimizerResultTabs() {
+    renderSchemeTabs()
+}
 
-    for (const disc of [...active.driveDiscs].sort((a, b) => Number(a.partition) - Number(b.partition))) {
-        const subStats = (disc.subStats ?? [])
-            .map(stat => `${statLabel(stat.stat)} ${formatStoredValue(stat.stat, stat.value, stat.mode)}`)
-            .join(" / ")
-        const item = document.createElement("div")
-        item.className = "optimizer-disc-row"
-        item.innerHTML = `
-            <img src="${escapeHtml(discIcon(disc))}" alt="">
-            <div>
-                <strong>${escapeHtml(`${disc.partition}号位 · ${disc.setName || nameOf(getSet(disc.setId))}`)}</strong>
-                <span>${escapeHtml(`${statLabel(disc.mainStat?.stat)} ${formatStoredValue(disc.mainStat?.stat, disc.mainStat?.value, disc.mainStat?.mode)}${disc.source?.sequence ? ` · #${disc.source.sequence}` : ""}`)}</span>
-                <small>${escapeHtml(subStats || "-")}</small>
-            </div>
-        `
-        els.optimizerResultList.appendChild(item)
-    }
+function renderOptimizerResultList() {
+    renderActiveSchemeList()
+}
+
+function renderCurrentPlan() {
+    renderActiveSchemeList()
 }
 
 function selectResult(index) {
+    activeSchemeKey = `optimized:${index}`
     activeResultIndex = index
     renderResultTabs()
     renderResultList()
@@ -5556,6 +6526,28 @@ function selectResult(index) {
             renderCalculationResult(result.data)
         }
     }
+}
+
+async function selectScheme(key) {
+    setActiveSchemeKey(key)
+    syncActiveResultIndexFromScheme()
+    const scheme = activeScheme()
+    if (scheme.kind === "loadout" && !loadoutIdForAgent(els.agentSelect.value)) {
+        setActiveSchemeKey(selectedDiscModeForAgent(els.agentSelect.value))
+        throw new Error("当前角色没有可应用的完整套装，请先在驱动盘页修复缺失槽位。")
+    }
+    if (scheme.kind === "manual" || scheme.kind === "loadout") {
+        setHomeDiscMode(scheme.kind)
+        saveCurrentHomeSelection({ mode: scheme.kind })
+        syncDiscSourceControls()
+    }
+    renderResultTabs()
+    renderResultList()
+    if (scheme.kind === "optimized" && scheme.data && !scheme.stale) {
+        renderCalculationResult(scheme.data)
+        return
+    }
+    await refreshActiveSchemePreview()
 }
 
 function clearOptimizationResults() {
@@ -5582,7 +6574,7 @@ function markResultsDirty() {
         if (!activeOptimizationJobId) {
             clearOptimizationProgress()
         }
-        refreshSelectedResultPreview().catch(error => setStatus(error.message, "error"))
+        refreshActiveSchemePreview().catch(error => setStatus(error.message, "error"))
         return
     }
     optimizationResultsDirty = wasRunning
@@ -5610,8 +6602,19 @@ async function refreshSelectedResultPreview() {
     setStatus(activeOptimizationJobId ? "计算中" : "条件已更改，请重新计算", "idle")
 }
 
+async function refreshActiveSchemePreview() {
+    const scheme = activeScheme()
+    const requestSeq = ++damagePreviewRequestSeq
+    const data = calculateInCombatPanel(meta, collectRequestPayloadForScheme(scheme))
+    if (requestSeq !== damagePreviewRequestSeq) {
+        return
+    }
+    renderCalculationResult(data)
+    setStatus(activeOptimizationJobId ? "计算中" : optimizationResultsDirty ? "条件已更改，请重新计算" : "就绪", activeOptimizationJobId || optimizationResultsDirty ? "idle" : "success")
+}
+
 async function calculateEmptyPanel() {
-    renderCalculationResult(calculateInCombatPanel(meta, collectRequestPayload({ driveDiscs: [] })))
+    await refreshActiveSchemePreview()
 }
 
 function startOptimizationTimers() {
@@ -5658,6 +6661,7 @@ async function finishOptimizationJob(job) {
     lastCompletedOptimizationAgentId = agentIdSnapshot ?? els.agentSelect.value
     optimizationResults = data?.results ?? []
     activeResultIndex = optimizationResults.length ? 0 : -1
+    activeSchemeKey = optimizationResults.length ? "optimized:0" : activeSchemeKey
     const metrics = data?.metrics ?? job.metrics
     const processedCount = processedOptimizationCount(metrics)
     const metricsText = metrics
@@ -5674,7 +6678,7 @@ async function finishOptimizationJob(job) {
     renderResultTabs()
     renderResultList()
     if (optimizationResults.length) {
-        selectResult(0)
+        await selectScheme("optimized:0")
         setStatus(optimizationResultsDirty ? "条件已更改，请重新计算" : "计算完成", optimizationResultsDirty ? "idle" : "success")
     } else {
         await calculateEmptyPanel()
@@ -5935,6 +6939,10 @@ function restoreHomeState() {
     populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), config.wEngineModificationLevel)
     applyStoredDamageConfig(damageConfigForAgent(agentId, config.damage))
     applyStoredOptimizerConfig(agentId, config.optimizer)
+    currentSchemeFourPieceBuffModeBySetId = clonePlainObject(config.currentSchemeFourPieceBuffModeBySetId)
+    currentSchemeFourPieceBuffRuntimeInputsBySetId = clonePlainObject(config.currentSchemeFourPieceBuffRuntimeInputsBySetId)
+    activeSchemeKey = selectedDiscModeForAgent(agentId)
+    saveCurrentHomeSelection({ mode: selectedDiscModeForAgent(agentId) })
     renderEntityCards()
     renderCombatControls()
 }
@@ -5964,6 +6972,8 @@ async function refreshAfterConfigChange() {
         if (!wasRunning && !optimizationResults.length) {
             await calculateEmptyPanel()
         }
+        renderResultTabs()
+        renderResultList()
         setStatus(
             wasRunning ? "计算中" : optimizationResults.length ? "条件已更改，请重新计算" : "就绪",
             wasRunning || optimizationResults.length ? "idle" : "success",
@@ -5985,6 +6995,8 @@ els.agentSelect.addEventListener("change", async () => {
         populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), config.wEngineModificationLevel)
         applyStoredDamageConfig(damageConfigForAgent(agentId, config.damage))
         applyStoredOptimizerConfig(agentId, config.optimizer)
+        activeSchemeKey = selectedDiscModeForAgent(agentId)
+        clearOptimizationResults()
         await refreshAfterConfigChange()
     } catch (error) {
         setStatus(error.message, "error")
@@ -6080,7 +7092,7 @@ els.fourPieceBuffSection?.addEventListener("click", async event => {
     }
 })
 els.fourPieceBuffSection?.addEventListener("input", event => {
-    const runtimeField = event.target.closest("[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]")
+    const runtimeField = event.target.closest(runtimeFieldSelector())
     if (!runtimeField) {
         return
     }
@@ -6103,7 +7115,7 @@ els.fourPieceBuffSection?.addEventListener("input", event => {
     }
 })
 els.fourPieceBuffSection?.addEventListener("change", async event => {
-    const runtimeField = event.target.closest("[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]")
+    const runtimeField = event.target.closest(runtimeFieldSelector())
     if (!runtimeField) {
         return
     }
@@ -6114,7 +7126,7 @@ els.fourPieceBuffSection?.addEventListener("keydown", async event => {
     if (event.key !== "Enter") {
         return
     }
-    const runtimeField = event.target.closest("[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]")
+    const runtimeField = event.target.closest(runtimeFieldSelector())
     if (!runtimeField) {
         return
     }
@@ -6186,7 +7198,7 @@ document.querySelector(".optimizer-main-stat-grid").addEventListener("click", ev
     clearMainStatLimits(clear.dataset.clearMainStats)
 })
 els.combatSection.addEventListener("change", async event => {
-    const runtimeField = event.target.closest("[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]")
+    const runtimeField = event.target.closest(runtimeFieldSelector())
     if (runtimeField && !els.addedCombatBuffs.contains(event.target)) {
         await commitRuntimeField(runtimeField)
         return
@@ -6232,7 +7244,7 @@ els.combatSection.addEventListener("click", async event => {
     }
 })
 els.combatSection.addEventListener("input", event => {
-    const runtimeField = event.target.closest("[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]")
+    const runtimeField = event.target.closest(runtimeFieldSelector())
     if (runtimeField && !els.addedCombatBuffs.contains(event.target)) {
         const group = runtimeField.closest("[data-buff-key]")
         if (!group) {
@@ -6314,7 +7326,7 @@ els.calculationSettingsCard?.addEventListener("keydown", async event => {
     await refreshAfterConfigChange()
 })
 els.combatSection.addEventListener("keydown", async event => {
-    const runtimeField = event.target.closest("[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]")
+    const runtimeField = event.target.closest(runtimeFieldSelector())
     if (runtimeField && !els.addedCombatBuffs.contains(event.target)) {
         if (event.key !== "Enter") {
             return
@@ -6358,7 +7370,7 @@ els.addedCombatBuffs.addEventListener("click", async event => {
     }
 })
 els.addedCombatBuffs.addEventListener("input", event => {
-    const runtimeField = event.target.closest("[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]")
+    const runtimeField = event.target.closest(runtimeFieldSelector())
     if (!runtimeField) {
         return
     }
@@ -6397,7 +7409,7 @@ els.addedCombatBuffs.addEventListener("change", async event => {
         return
     }
 
-    const runtimeField = event.target.closest("[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]")
+    const runtimeField = event.target.closest(runtimeFieldSelector())
     if (runtimeField) {
         await commitRuntimeField(runtimeField)
     }
@@ -6406,7 +7418,7 @@ els.addedCombatBuffs.addEventListener("keydown", async event => {
     if (event.key !== "Enter") {
         return
     }
-    const runtimeField = event.target.closest("[data-runtime-coverage], [data-runtime-source-value], [data-runtime-stacks]")
+    const runtimeField = event.target.closest(runtimeFieldSelector())
     if (!runtimeField) {
         return
     }
@@ -6602,7 +7614,11 @@ els.combatBuffModal.addEventListener("click", async event => {
     const candidate = event.target.closest("[data-candidate-key]")
     if (candidate && !candidate.disabled) {
         try {
-            if (addCombatBuffCandidateByKey(candidate.dataset.candidateKey)) {
+            const alreadyAdded = candidate.dataset.candidateAdded === "true"
+            const changed = alreadyAdded
+                ? removeCombatBuffCandidateByKey(candidate.dataset.candidateKey)
+                : addCombatBuffCandidateByKey(candidate.dataset.candidateKey)
+            if (changed) {
                 closeCombatBuffModal()
                 renderCombatControls()
                 await refreshAfterConfigChange()
@@ -6714,12 +7730,139 @@ els.saveCustomBuffBtn.addEventListener("click", async () => {
         setStatus(error.message, "error")
     }
 })
-els.optimizerResultTabs.addEventListener("click", event => {
-    const button = event.target.closest("button[data-result-index]")
-    if (button) {
-        selectResult(Number(button.dataset.resultIndex))
+els.driveDiscSchemeTabs?.addEventListener("click", event => {
+    const button = event.target.closest("button[data-scheme-key]")
+    if (!button) {
+        return
+    }
+    selectScheme(button.dataset.schemeKey).catch(error => setStatus(error.message, "error"))
+})
+els.driveDiscSchemeList?.addEventListener("click", event => {
+    const target = event.target.closest("[data-slot]")
+    if (!target || activeScheme().kind !== "manual") {
+        return
+    }
+    openHomeDiscModal(target.dataset.slot)
+})
+els.currentSchemeFourPieceBuffSection?.addEventListener("click", async event => {
+    const modeButton = event.target.closest("[data-current-scheme-four-piece-buff-mode]")
+    if (!modeButton) {
+        return
+    }
+    try {
+        setCurrentSchemeFourPieceBuffMode(modeButton.dataset.currentSchemeFourPieceBuffMode)
+        renderCurrentSchemeFourPieceBuffSettings()
+        await refreshActiveSchemePreview()
+    } catch (error) {
+        setStatus(error.message, "error")
     }
 })
+els.currentSchemeFourPieceBuffSection?.addEventListener("input", event => {
+    const runtimeField = event.target.closest(runtimeFieldSelector())
+    if (!runtimeField) {
+        return
+    }
+    const group = runtimeField.closest("[data-buff-key]")
+    if (!group) {
+        return
+    }
+    try {
+        const value = inputNumberValue(runtimeField)
+        if (value === null || !Number.isFinite(value)) {
+            return
+        }
+        updateRuntimeFieldValue(group.dataset.buffKey, runtimeField, value)
+        refreshAddedCombatBuffSummary(group.dataset.buffKey)
+        refreshActiveSchemePreview().catch(error => setStatus(error.message, "error"))
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
+})
+els.currentSchemeFourPieceBuffSection?.addEventListener("change", async event => {
+    const runtimeField = event.target.closest(runtimeFieldSelector())
+    if (runtimeField) {
+        await commitRuntimeField(runtimeField)
+    }
+})
+els.currentSchemeFourPieceBuffSection?.addEventListener("keydown", async event => {
+    if (event.key !== "Enter") {
+        return
+    }
+    const runtimeField = event.target.closest(runtimeFieldSelector())
+    if (!runtimeField) {
+        return
+    }
+    event.preventDefault()
+    await commitRuntimeField(runtimeField)
+})
+els.applyLoadoutBtn?.addEventListener("click", async () => {
+    try {
+        const agentId = els.agentSelect.value
+        if (!loadoutIdForAgent(agentId)) {
+            throw new Error("当前角色没有可应用的完整套装，请先在驱动盘页修复缺失槽位。")
+        }
+        setStatus("应用套装", "idle")
+        setActiveDiscModeScheme("loadout")
+        saveCurrentHomeSelection({ mode: "loadout" })
+        syncDiscSourceControls()
+        renderResultTabs()
+        renderResultList()
+        await refreshActiveSchemePreview()
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
+})
+els.homeLoadoutSelect?.addEventListener("change", async () => {
+    try {
+        const selectedLoadout = driveDiscLoadoutsForAgent(els.agentSelect.value)
+            .find(loadout => loadout.id === els.homeLoadoutSelect.value)
+        if (selectedLoadout && !loadoutIsComplete(selectedLoadout)) {
+            throw new Error("该套装缺少驱动盘槽位，请先在驱动盘页修复。")
+        }
+        setStatus("切换套装", "idle")
+        setActiveDiscModeScheme("loadout")
+        saveCurrentHomeSelection({
+            mode: "loadout",
+            selectedLoadoutId: els.homeLoadoutSelect.value,
+        })
+        syncDiscSourceControls()
+        renderResultTabs()
+        renderResultList()
+        await refreshActiveSchemePreview()
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
+})
+els.closeHomeDiscModalBtn?.addEventListener("click", closeHomeDiscModal)
+els.homeDiscModal?.addEventListener("click", event => {
+    if (event.target.matches("[data-close-home-disc-modal]")) {
+        closeHomeDiscModal()
+    }
+})
+els.homeDiscOptionList?.addEventListener("click", async event => {
+    const option = event.target.closest(".home-disc-option[data-disc-id]")
+    if (!option) {
+        return
+    }
+    try {
+        setStatus("保存驱动盘选择", "idle")
+        await selectHomeDisc(option.dataset.discId)
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
+})
+els.clearSlotDiscBtn?.addEventListener("click", async () => {
+    try {
+        setStatus("卸下驱动盘", "idle")
+        await clearHomeDiscSlot()
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
+})
+for (const input of [els.homeDiscSetFilter, els.homeDiscMainStatFilter, els.homeDiscSearchInput].filter(Boolean)) {
+    input.addEventListener("input", renderHomeDiscOptions)
+    input.addEventListener("change", renderHomeDiscOptions)
+}
 els.damageWhiteBoxRows.addEventListener("click", event => {
     const button = event.target.closest("[data-select-damage-event-whitebox]")
     if (!button || !currentRenderedDamage) {
@@ -6775,7 +7918,7 @@ els.cancelOptimizeInlineBtn?.addEventListener("click", async () => {
         setStatus(error.message, "error")
     }
 })
-els.saveLoadoutBtn.addEventListener("click", async () => {
+els.saveLoadoutBtn?.addEventListener("click", async () => {
     try {
         await saveActiveLoadout()
     } catch (error) {
@@ -6793,7 +7936,7 @@ initDriveDiscAnalysis({
     getCatalog: () => meta,
     getPayload: collectDriveDiscAnalysisPayload,
     requireDriveDiscs: true,
-    emptyMessage: "请先开始计算，并选择一套优化结果后再分析。",
+    emptyMessage: "请先选满当前方案或选择一个优化结果后再分析。",
     setStatus,
     statLabel,
     formatStoredValue,

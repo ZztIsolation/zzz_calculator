@@ -196,13 +196,16 @@ const SHEER_DMG_KEY_BY_ELEMENT = {
 
 const DAMAGE_EVENT_KINDS = ["direct", "anomaly", "disorder", "sheer"]
 const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
-const DAMAGE_MODIFIER_KINDS = ["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "directDamageBonus", "sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "skillMultiplierBonus"]
+const DAMAGE_MODIFIER_KINDS = ["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "directDamageBonus", "sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "skillMultiplierBonus"]
 const EVENT_MODIFIER_STAT_KEYS = new Set([
     "anomalyDamageBonus",
     "disorderDamageBonus",
     "baseMultiplierBonus",
+    "disorderBaseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
+    "stunDmgMultiplierBonus",
+    "stunDmgMultiplierBonusAlways",
     "sheerDmgBonus",
     "physicalSheerDmg",
     "fireSheerDmg",
@@ -232,6 +235,8 @@ const SKILL_TARGET_STAT_KEYS = new Set([
     "etherDmg",
     "anomalyDamageBonus",
     "disorderDamageBonus",
+    "stunDmgMultiplierBonus",
+    "stunDmgMultiplierBonusAlways",
     "sheerDmgBonus",
     "physicalSheerDmg",
     "fireSheerDmg",
@@ -311,12 +316,21 @@ const STORED_PERCENT_STATS = new Set([
     "iceDmg",
     "electricDmg",
     "etherDmg",
+    "anomalyDamageBonus",
+    "disorderDamageBonus",
     "sheerDmgBonus",
     "physicalSheerDmg",
     "fireSheerDmg",
     "iceSheerDmg",
     "electricSheerDmg",
     "etherSheerDmg",
+    "baseMultiplierBonus",
+    "disorderBaseMultiplierBonus",
+    "anomalyCritRate",
+    "anomalyCritDmg",
+    "stunDmgMultiplierBonus",
+    "stunDmgMultiplierBonusAlways",
+    "skillMultiplierBonus",
     "enemyDefReduction",
     "enemyDefIgnore",
     "enemyResReduction",
@@ -654,6 +668,10 @@ function effectRuntimeFor(rule, runtimeInput = {}) {
     return runtimeInput.effects?.[id] ?? runtimeInput[id] ?? {}
 }
 
+function effectRuleEnabled(rule, runtimeInput = {}) {
+    return effectRuntimeFor(rule, runtimeInput).enabled !== false
+}
+
 function effectBuffModifiers(effect) {
     return Array.isArray(effect?.buffModifiers) ? effect.buffModifiers : []
 }
@@ -746,11 +764,24 @@ function ruleTargetKind(rule = {}) {
     return normalizedRuleTarget(rule).kind
 }
 
+function hasEventAppliesToFilters(rule = {}) {
+    const appliesTo = rule.appliesTo ?? null
+    return Boolean(appliesTo) && [
+        appliesTo.damageKinds,
+        appliesTo.anomalyEffects,
+        appliesTo.elements,
+        appliesTo.skillTargets,
+    ].some(values => Array.isArray(values) && values.length > 0)
+}
+
 function isRuleEventModifier(rule = {}) {
     if ((rule.type ?? "fixed") === "damageModifier") {
         return true
     }
-    return ruleTargetKind(rule) === "skill" || EVENT_MODIFIER_STAT_KEYS.has(canonicalBuffStat(rule.stat))
+    const stat = canonicalBuffStat(rule.stat)
+    return ruleTargetKind(rule) === "skill"
+        || EVENT_MODIFIER_STAT_KEYS.has(stat)
+        || (hasEventAppliesToFilters(rule) && EVENT_MODIFIER_KIND_VALUES.has(stat))
 }
 
 function eventModifierCalcValue(rule = {}) {
@@ -863,6 +894,7 @@ function resolveEffectRule(rule, effect, runtimeInput = {}, modifierContext = {}
 
 function resolveEffectStats(effect, runtimeInput = {}, modifierContext = {}) {
     return effectRules(effect)
+        .filter(rule => effectRuleEnabled(rule, runtimeInput))
         .filter(rule => !isRuleEventModifier(rule))
         .map(rule => resolveEffectRule(rule, effect, runtimeInput, modifierContext))
         .filter(rule => rule.stat && Number.isFinite(Number(rule.value)))
@@ -870,6 +902,7 @@ function resolveEffectStats(effect, runtimeInput = {}, modifierContext = {}) {
 
 function resolveEffectDamageModifiers(effect, runtimeInput = {}, modifierContext = {}) {
     return effectRules(effect)
+        .filter(rule => effectRuleEnabled(rule, runtimeInput))
         .filter(rule => isRuleEventModifier(rule))
         .map(rule => {
             const resolved = resolveEffectRule(rule, effect, runtimeInput, modifierContext)
@@ -882,7 +915,9 @@ function resolveEffectDamageModifiers(effect, runtimeInput = {}, modifierContext
                 type: "eventModifier",
                 kind: resolved.stat,
                 value: eventModifierCalcValue(resolved),
-                appliesTo: target.kind === "skill" ? { skillTargets: target.skillTargets } : null,
+                appliesTo: target.kind === "skill"
+                    ? { ...(rule.appliesTo ?? {}), skillTargets: target.skillTargets }
+                    : rule.appliesTo ?? null,
             }
         })
         .filter(rule => EVENT_MODIFIER_KIND_VALUES.has(rule.kind) && Number.isFinite(Number(rule.value)))
@@ -1154,9 +1189,33 @@ function visibleTeammateCombatBuffGroups(groups = []) {
         .filter(catalogItemVisible)
         .map(group => ({
             ...group,
-            buffs: (group.buffs ?? []).filter(catalogItemVisible),
+            buffs: (group.buffs ?? [])
+                .filter(catalogItemVisible)
+                .map(buff => normalizeTeammateCombatBuffForGroup(group, buff)),
         }))
         .filter(group => group.buffs.length > 0)
+}
+
+function normalizeTeammateCombatBuffForGroup(teammate = {}, buff = {}) {
+    const sourceLabel = buff.source ?? buff.sourceLabel ?? {}
+    const description = buff.description ?? buff.conditionLabel ?? null
+    return {
+        ...buff,
+        sourceType: "teammate",
+        sourceCategory: "agent",
+        sourceKind: "teammate",
+        ownerId: teammate.id,
+        ownerName: teammate.name,
+        teammateId: teammate.id,
+        teammateName: teammate.name,
+        teammateImages: teammate.images ?? null,
+        source: buff.source ?? sourceLabel,
+        sourceLabel,
+        name: buff.name ?? nameWithSource(teammate.name, sourceLabel),
+        description,
+        conditionLabel: buff.conditionLabel ?? description,
+        scope: buff.scope ?? "inCombat",
+    }
 }
 
 function visibleCatalogCollections(catalog = {}) {
@@ -1363,26 +1422,7 @@ function nameWithSource(teammateName, sourceLabel) {
 
 function flattenTeammateCombatBuffs(teammates) {
     return (teammates ?? []).flatMap(teammate =>
-        (teammate.buffs ?? []).map(buff => {
-            const sourceLabel = buff.source ?? buff.sourceLabel ?? {}
-            const description = buff.description ?? buff.conditionLabel ?? null
-
-            return {
-                ...buff,
-                id: buff.id,
-                sourceType: "teammate",
-                sourceCategory: "agent",
-                sourceKind: "teammate",
-                teammateId: teammate.id,
-                teammateName: teammate.name,
-                teammateImages: teammate.images ?? null,
-                sourceLabel,
-                description,
-                name: buff.name ?? nameWithSource(teammate.name, sourceLabel),
-                conditionLabel: buff.conditionLabel ?? description,
-                scope: buff.scope ?? "inCombat",
-            }
-        })
+        (teammate.buffs ?? []).map(buff => normalizeTeammateCombatBuffForGroup(teammate, buff))
     )
 }
 
@@ -2409,12 +2449,16 @@ function targetIsStunned(target = {}) {
     return Number.isFinite(explicitActiveMultiplier) ? explicitActiveMultiplier !== 1 : false
 }
 
-function targetActiveStunMultiplier(target = {}) {
+function targetActiveStunMultiplier(target = {}, eventTotals = {}) {
     const explicitActiveMultiplier = Number(target.activeStunMultiplier)
+    const stunDmgMultiplierBonus = Number(eventTotals.stunDmgMultiplierBonus ?? 0)
+    const alwaysStunDmgMultiplierBonus = Number(eventTotals.stunDmgMultiplierBonusAlways ?? 0)
     if (Number.isFinite(explicitActiveMultiplier)) {
-        return Math.max(0, explicitActiveMultiplier)
+        return Math.max(0, explicitActiveMultiplier + alwaysStunDmgMultiplierBonus + (explicitActiveMultiplier !== 1 ? stunDmgMultiplierBonus : 0))
     }
-    return targetIsStunned(target) ? targetConfiguredStunMultiplier(target) : 1
+    return targetIsStunned(target)
+        ? Math.max(0, targetConfiguredStunMultiplier(target) + stunDmgMultiplierBonus + alwaysStunDmgMultiplierBonus)
+        : Math.max(0, 1 + alwaysStunDmgMultiplierBonus)
 }
 
 function targetBreakdownForElement(panel, bonusTotals, target, damageElement, eventTotals = {}) {
@@ -2438,8 +2482,10 @@ function targetBreakdownForElement(panel, bonusTotals, target, damageElement, ev
     const effectiveResistance = targetResistance - enemyResReduction - resIgnore
     const rawResistanceMultiplier = 1 - effectiveResistance
     const resistanceMultiplier = clampNumber(rawResistanceMultiplier, 0.01, 2)
+    const stunDmgMultiplierBonus = Number(eventTotals.stunDmgMultiplierBonus ?? 0)
+    const stunDmgMultiplierBonusAlways = Number(eventTotals.stunDmgMultiplierBonusAlways ?? 0)
     const stunMultiplier = targetConfiguredStunMultiplier(target)
-    const activeStunMultiplier = targetActiveStunMultiplier(target)
+    const activeStunMultiplier = targetActiveStunMultiplier(target, eventTotals)
 
     return {
         presetId: target.presetId,
@@ -2463,6 +2509,8 @@ function targetBreakdownForElement(panel, bonusTotals, target, damageElement, ev
         resistanceMultiplier,
         stunned: targetIsStunned(target),
         stunMultiplier,
+        stunDmgMultiplierBonus,
+        stunDmgMultiplierBonusAlways,
         activeStunMultiplier,
     }
 }
@@ -2574,6 +2622,8 @@ function eventTargetTotalsForElement(bonusTotals, event) {
         enemyResReduction: sumDamageModifiers(bonusTotals, event, "enemyResReduction"),
         [resReductionKey]: sumDamageModifiers(bonusTotals, event, resReductionKey),
         [resIgnoreKey]: sumDamageModifiers(bonusTotals, event, resIgnoreKey),
+        stunDmgMultiplierBonus: sumDamageModifiers(bonusTotals, event, "stunDmgMultiplierBonus"),
+        stunDmgMultiplierBonusAlways: sumDamageModifiers(bonusTotals, event, "stunDmgMultiplierBonusAlways"),
         sheerDmgBonus: sumDamageModifiers(bonusTotals, event, "sheerDmgBonus"),
         ...(elementSheerDmgKey ? { [elementSheerDmgKey]: sumDamageModifiers(bonusTotals, event, elementSheerDmgKey) } : {}),
         anomalyDamageBonus: isDisorder ? disorderDamageBonus : attributeAnomalyDamageBonus,
@@ -2617,11 +2667,17 @@ function defenseWhiteBoxRow(targetBreakdown) {
 }
 
 function stunWhiteBoxRow(targetBreakdown) {
+    const bonus = Number(targetBreakdown.stunDmgMultiplierBonus ?? 0)
+    const alwaysBonus = Number(targetBreakdown.stunDmgMultiplierBonusAlways ?? 0)
+    const bonusText = [
+        bonus ? `失衡易伤倍率加算 ${formatDamagePercent(bonus)}` : "",
+        alwaysBonus ? `失衡易伤倍率加算（未失衡生效） ${formatDamagePercent(alwaysBonus)}` : "",
+    ].filter(Boolean).join(" + ")
     return {
         label: "失衡乘区",
         formula: targetBreakdown.stunned
-            ? `Boss 已失衡，使用失衡倍率 ${formatDamagePercent(targetBreakdown.stunMultiplier)}`
-            : `Boss 未失衡，配置倍率 ${formatDamagePercent(targetBreakdown.stunMultiplier)} 不生效`,
+            ? `Boss 已失衡，使用失衡倍率 ${formatDamagePercent(targetBreakdown.stunMultiplier)}${bonusText ? ` + ${bonusText}` : ""}`
+            : `Boss 未失衡，配置倍率 ${formatDamagePercent(targetBreakdown.stunMultiplier)} 不生效${alwaysBonus ? ` + 失衡易伤倍率加算（未失衡生效） ${formatDamagePercent(alwaysBonus)}` : ""}`,
         value: targetBreakdown.activeStunMultiplier,
         displayValue: formatDamageNumber(targetBreakdown.activeStunMultiplier, 4),
     }
@@ -3102,7 +3158,9 @@ function calculateAnomalyDamageEvent({ event, panel, bonusTotals, target, agentL
     const attributeAnomalyDamageBonus = isDisorder ? 1 : 1 + Number(eventTotals.attributeAnomalyDamageBonus ?? 0)
     const disorderDamageBonus = isDisorder ? 1 + Number(eventTotals.disorderDamageBonus ?? 0) : 1
     const anomalyDamageBonus = isDisorder ? disorderDamageBonus : attributeAnomalyDamageBonus
-    const baseMultiplierBonus = sumDamageModifiers(bonusTotals, event, "baseMultiplierBonus")
+    const baseMultiplierBonus = isDisorder
+        ? sumDamageModifiers(bonusTotals, event, "disorderBaseMultiplierBonus")
+        : sumDamageModifiers(bonusTotals, event, "baseMultiplierBonus")
     const baseMultiplierScale = isDisorder ? disorderMultiplierScale(event.disorderType) : 1
     const effectiveBaseMultiplier = Math.max(0, Number(event.baseMultiplier ?? 0) + baseMultiplierBonus) * baseMultiplierScale
     const anomalyCrit = anomalyCritMultiplier(bonusTotals, event)
@@ -3144,6 +3202,7 @@ function calculateAnomalyDamageEvent({ event, panel, bonusTotals, target, agentL
             anomaly: effectiveBaseMultiplier,
             baseMultiplier: Number(event.baseMultiplier ?? 0),
             baseMultiplierBonus,
+            disorderBaseMultiplierBonus: isDisorder ? baseMultiplierBonus : 0,
             baseMultiplierScale,
             dmg: dmgMultiplier,
             defense: targetBreakdown.defenseMultiplier,
@@ -3243,7 +3302,7 @@ function targetDamageMultiplierForElement(panel, bonusTotals, target, damageElem
     const defenseMultiplier = Math.min(1, levelCoefficient / (levelCoefficient + effectiveDefense))
     return defenseMultiplier
         * targetResistanceMultiplierForElement(panel, bonusTotals, target, damageElement, eventTotals)
-        * targetActiveStunMultiplier(target)
+        * targetActiveStunMultiplier(target, eventTotals)
 }
 
 function targetResistanceMultiplierForElement(panel, bonusTotals, target, damageElement, eventTotals = {}) {
@@ -3276,13 +3335,17 @@ function calculateDirectDamageFinalValue(event, panel, bonusTotals, target) {
 }
 
 function calculateAnomalyDamageFinalValue(event, panel, bonusTotals, target, agentLevel) {
+    const isDisorder = isDisorderDamageEvent(event)
     const eventTotals = eventTargetTotalsForElement(bonusTotals, event)
     const elementDmgKey = `${event.damageElement}Dmg`
     const selectedDmgBonus = selectedDmgBonusForElement(panel, event.damageElement)
     const skillDamageBonus = Number(eventTotals.dmgBonus ?? 0) + Number(eventTotals[elementDmgKey] ?? 0)
     const anomalyProficiencyMultiplier = Math.max(0, Number(panel.anomalyProficiency ?? 0)) / 100
-    const baseMultiplierBonus = sumDamageModifiers(bonusTotals, event, "baseMultiplierBonus")
-    const effectiveBaseMultiplier = Math.max(0, Number(event.baseMultiplier ?? 0) + baseMultiplierBonus)
+    const baseMultiplierBonus = isDisorder
+        ? sumDamageModifiers(bonusTotals, event, "disorderBaseMultiplierBonus")
+        : sumDamageModifiers(bonusTotals, event, "baseMultiplierBonus")
+    const baseMultiplierScale = isDisorder ? disorderMultiplierScale(event.disorderType) : 1
+    const effectiveBaseMultiplier = Math.max(0, Number(event.baseMultiplier ?? 0) + baseMultiplierBonus) * baseMultiplierScale
     const anomalyDamageBonus = 1 + Number(eventTotals.anomalyDamageBonus ?? 0)
     const anomalyCritMultiplierValue = anomalyCritMultiplier(bonusTotals, event).multiplier
     return Number(panel.atk ?? 0)
@@ -3311,7 +3374,7 @@ function calculateSheerDamageFinalValue(event, panel, bonusTotals, target, agent
         * (1 + selectedDmgBonus + skillDamageBonus)
         * targetResistanceMultiplierForElement(panel, bonusTotals, target, event.damageElement, eventTotals)
         * (1 + sheerDmgBonus)
-        * targetActiveStunMultiplier(target)
+        * targetActiveStunMultiplier(target, eventTotals)
         * Number(event.count ?? 1)
 }
 
@@ -3398,7 +3461,10 @@ function compiledTargetDamageMultiplier(panel, bonusTotals, target, compiledEven
     const defenseMultiplier = Math.min(1, levelCoefficient / (levelCoefficient + effectiveDefense))
     return defenseMultiplier
         * compiledResistanceMultiplier(panel, bonusTotals, target, compiledEvent, sums)
-        * targetActiveStunMultiplier(target)
+        * targetActiveStunMultiplier(target, {
+            stunDmgMultiplierBonus: compiledModifierSum(sums, "stunDmgMultiplierBonus"),
+            stunDmgMultiplierBonusAlways: compiledModifierSum(sums, "stunDmgMultiplierBonusAlways"),
+        })
 }
 
 function compiledCritMultiplier(panel, critMode) {
@@ -3463,14 +3529,20 @@ function calculateCompiledDamageScoreValue({ agent, panel, bonusTotals, compiled
                 * (1 + selectedDmgBonus + skillDamageBonus)
                 * compiledResistanceMultiplier(panel, bonusTotals, target, compiledEvent, sums)
                 * (1 + sheerDmgBonus)
-                * targetActiveStunMultiplier(target)
+                * targetActiveStunMultiplier(target, {
+                    stunDmgMultiplierBonus: compiledModifierSum(sums, "stunDmgMultiplierBonus"),
+                    stunDmgMultiplierBonusAlways: compiledModifierSum(sums, "stunDmgMultiplierBonusAlways"),
+                })
                 * compiledEvent.count
             continue
         }
 
         const effectiveBaseMultiplier = Math.max(
             0,
-            compiledEvent.baseMultiplier + compiledModifierSum(sums, "baseMultiplierBonus"),
+            compiledEvent.baseMultiplier + compiledModifierSum(
+                sums,
+                compiledEvent.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
+            ),
         )
         const anomalyDamageBonus = 1 + (
             compiledEvent.isDisorder
@@ -3528,7 +3600,10 @@ function denseTargetDamageMultiplier(panelValues, combatValues, target, compiled
     const defenseMultiplier = Math.min(1, levelCoefficient / (levelCoefficient + effectiveDefense))
     return defenseMultiplier
         * denseResistanceMultiplier(panelValues, combatValues, target, compiledEvent, sums)
-        * targetActiveStunMultiplier(target)
+        * targetActiveStunMultiplier(target, {
+            stunDmgMultiplierBonus: denseModifierSum(sums, "stunDmgMultiplierBonus"),
+            stunDmgMultiplierBonusAlways: denseModifierSum(sums, "stunDmgMultiplierBonusAlways"),
+        })
 }
 
 function denseCritMultiplier(panelValues, critMode) {
@@ -3605,14 +3680,20 @@ function calculateCompiledDamageScoreValueDense({
                 * (1 + selectedDmgBonus + skillDamageBonus)
                 * denseResistanceMultiplier(panelValues, combatValues, target, compiledEvent, modifierSums)
                 * (1 + sheerDmgBonus)
-                * targetActiveStunMultiplier(target)
+                * targetActiveStunMultiplier(target, {
+                    stunDmgMultiplierBonus: denseModifierSum(modifierSums, "stunDmgMultiplierBonus"),
+                    stunDmgMultiplierBonusAlways: denseModifierSum(modifierSums, "stunDmgMultiplierBonusAlways"),
+                })
                 * compiledEvent.count
             continue
         }
 
         const effectiveBaseMultiplier = Math.max(
             0,
-            compiledEvent.baseMultiplier + denseModifierSum(modifierSums, "baseMultiplierBonus"),
+            compiledEvent.baseMultiplier + denseModifierSum(
+                modifierSums,
+                compiledEvent.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
+            ),
         )
         const anomalyDamageBonus = 1 + (
             compiledEvent.isDisorder
@@ -4379,7 +4460,7 @@ export function normalizeCatalogPayload({
             ...bossCombatBuffs,
             ...rawSystemBuffs,
         ],
-        teammateCombatBuffGroups: combatBuffsRaw.teammates ?? [],
+        teammateCombatBuffGroups: visibleTeammateCombatBuffGroups(combatBuffsRaw.teammates ?? []),
         teammateCombatBuffs,
         fieldCombatBuffs: rawFieldBuffs,
         bossCombatBuffs: rawBossBuffs,
@@ -4464,6 +4545,8 @@ export function buildMeta(catalog) {
                 sourceType: item.sourceType,
                 sourceCategory: item.sourceCategory,
                 sourceKind: item.sourceKind,
+                ownerId: item.ownerId,
+                ownerName: item.ownerName,
                 teammateId: item.teammateId,
                 teammateName: item.teammateName,
                 teammateImages: item.teammateImages ?? null,
@@ -4485,24 +4568,26 @@ export function buildMeta(catalog) {
             name: teammate.name,
             images: teammate.images ?? null,
             buffs: (teammate.buffs ?? []).map(buff => {
-                const sourceLabel = buff.source ?? buff.sourceLabel ?? {}
-                const description = buff.description ?? buff.conditionLabel ?? null
+                const normalizedBuff = normalizeTeammateCombatBuffForGroup(teammate, buff)
                 return {
                     id: buff.id,
-                    sourceType: "teammate",
-                    sourceCategory: "agent",
-                    sourceKind: "teammate",
-                    teammateId: teammate.id,
-                    teammateName: teammate.name,
-                    teammateImages: teammate.images ?? null,
-                    sourceLabel,
-                    name: buff.name ?? nameWithSource(teammate.name, sourceLabel),
-                    description,
-                    conditionLabel: buff.conditionLabel ?? description,
-                    stats: buff.stats ?? [],
-                    effects: buff.effects ?? null,
-                    buffModifiers: buff.buffModifiers ?? null,
-                    coverage: buff.coverage ?? null,
+                    sourceType: normalizedBuff.sourceType,
+                    sourceCategory: normalizedBuff.sourceCategory,
+                    sourceKind: normalizedBuff.sourceKind,
+                    ownerId: normalizedBuff.ownerId,
+                    ownerName: normalizedBuff.ownerName,
+                    teammateId: normalizedBuff.teammateId,
+                    teammateName: normalizedBuff.teammateName,
+                    teammateImages: normalizedBuff.teammateImages,
+                    source: normalizedBuff.source,
+                    sourceLabel: normalizedBuff.sourceLabel,
+                    name: normalizedBuff.name,
+                    description: normalizedBuff.description,
+                    conditionLabel: normalizedBuff.conditionLabel,
+                    stats: normalizedBuff.stats ?? [],
+                    effects: normalizedBuff.effects ?? null,
+                    buffModifiers: normalizedBuff.buffModifiers ?? null,
+                    coverage: normalizedBuff.coverage ?? null,
                 }
             }),
         })),

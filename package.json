@@ -20,6 +20,7 @@
     "test:optimizer-progress": "node tests/optimizer-progress.test.js",
     "test:optimizer-api": "node tests/optimizer-job-api.test.js",
     "test:browser-local-compute": "node tests/browser-local-compute.test.js",
+    "test:optimizer-ui": "node tests/optimizer-ui.test.js",
     "test:optimizer-fuzz": "node tests/optimizer-fuzz.test.js",
     "test:server-production": "node tests/server-production.test.js",
     "benchmark:optimizer": "node tests/optimizer-benchmark.js",

@@ -173,6 +173,7 @@ const FALLBACK_LABELS = {
     enemyEtherResReduction: "敌方以太减抗",
     anomalyDamageBonus: "属性异常增伤",
     disorderDamageBonus: "紊乱增伤",
+    disorderBaseMultiplierBonus: "紊乱倍率加算",
     sheerDmgBonus: "贯穿增伤",
     physicalSheerDmg: "物理贯穿增伤",
     fireSheerDmg: "火贯穿增伤",
@@ -243,6 +244,7 @@ const PERCENT_KEYS = new Set([
     "enemyEtherResReduction",
     "anomalyDamageBonus",
     "disorderDamageBonus",
+    "disorderBaseMultiplierBonus",
     "sheerDmgBonus",
     "physicalSheerDmg",
     "fireSheerDmg",
@@ -290,12 +292,15 @@ const STORED_PERCENT_STATS = new Set([
     "enemyIceResReduction",
     "enemyElectricResReduction",
     "enemyEtherResReduction",
+    "anomalyDamageBonus",
+    "disorderDamageBonus",
     "sheerDmgBonus",
     "physicalSheerDmg",
     "fireSheerDmg",
     "iceSheerDmg",
     "electricSheerDmg",
     "etherSheerDmg",
+    "disorderBaseMultiplierBonus",
 ])
 
 const STORED_STAT_LABELS = {
@@ -331,6 +336,7 @@ const STORED_STAT_LABELS = {
     enemyEtherResReduction: "敌方以太减抗%",
     anomalyDamageBonus: "属性异常增伤%",
     disorderDamageBonus: "紊乱增伤%",
+    disorderBaseMultiplierBonus: "紊乱倍率加算%",
     sheerDmgBonus: "贯穿增伤%",
     physicalSheerDmg: "物理贯穿增伤%",
     fireSheerDmg: "火贯穿增伤%",
@@ -432,7 +438,6 @@ const HOME_SELECTION_STORAGE_KEY = "zzz-calculator.homeSelection.v1"
 const DISC_SELECTION_STORAGE_KEY = "zzz-calculator.driveDiscSelections.v1"
 const HOME_DISC_MODES = new Set(["manual", "loadout"])
 const TEAMMATE_DRIVE_DISC_LIMIT = 2
-const TEAMMATE_BUFF_OWNER_LIMIT = 2
 const W_ENGINE_TEAM_BUFF_LIMIT = 2
 const DRIVE_DISC_TEAM_BUFF_LIMIT = 2
 const DEFAULT_DAMAGE_TARGET_PRESETS = [
@@ -472,8 +477,11 @@ const DAMAGE_MODIFIER_KIND_LABELS = {
     anomalyDamageBonus: "属性异常增伤",
     disorderDamageBonus: "紊乱增伤",
     baseMultiplierBonus: "伤害倍率修正",
+    disorderBaseMultiplierBonus: "紊乱倍率加算",
     anomalyCritRate: "异常暴击率",
     anomalyCritDmg: "异常暴击伤害",
+    stunDmgMultiplierBonus: "失衡易伤倍率加算",
+    stunDmgMultiplierBonusAlways: "失衡易伤倍率加算（未失衡生效）",
     directDamageBonus: "技能专属伤害增伤",
     skillMultiplierBonus: "技能倍率加算",
 }
@@ -3168,14 +3176,6 @@ function candidateLimitMessage(candidate, addedBuffs = currentAddedCombatBuffs()
         return ""
     }
 
-    if (candidate.sourceKind === "teammate") {
-        const ownerIds = teammateOwnerIdsForAddedBuffs(addedBuffs)
-        const ownerId = String(candidate.ownerId ?? "")
-        if (ownerId && !ownerIds.has(ownerId) && ownerIds.size >= TEAMMATE_BUFF_OWNER_LIMIT) {
-            return `角色引发的 Buff 最多选择 ${TEAMMATE_BUFF_OWNER_LIMIT} 名角色`
-        }
-    }
-
     if (candidate.sourceKind === "wEngineTeam" && wEngineTeamAddedCount(addedBuffs) >= W_ENGINE_TEAM_BUFF_LIMIT) {
         return `音擎引发的 Buff 最多选择 ${W_ENGINE_TEAM_BUFF_LIMIT} 个`
     }
@@ -3222,7 +3222,6 @@ function renderCombatBuffTeammatePicker() {
     const groups = teammateCombatBuffGroups()
     const activeGroup = ensureActiveCombatBuffTeammateId(groups)
     const selectedOwnerIds = teammateOwnerIdsForAddedBuffs()
-    const selectedLimitReached = selectedOwnerIds.size >= TEAMMATE_BUFF_OWNER_LIMIT
 
     els.combatBuffTeammateSelect.innerHTML = ""
     for (const group of groups) {
@@ -3231,7 +3230,6 @@ function renderCombatBuffTeammatePicker() {
         option.value = group.id
         option.textContent = `${nameOf(group)}${alreadySelected ? "（已添加）" : ""}`
         option.selected = group.id === activeCombatBuffTeammateId
-        option.disabled = !alreadySelected && selectedLimitReached && group.id !== activeCombatBuffTeammateId
         els.combatBuffTeammateSelect.appendChild(option)
     }
 
@@ -3240,14 +3238,10 @@ function renderCombatBuffTeammatePicker() {
     const hasAddedFromActive = candidates.some(candidate => addedKeys.has(addedCombatBuffKey(candidate)))
     const allAddedFromActive = candidates.length > 0
         && candidates.every(candidate => addedKeys.has(addedCombatBuffKey(candidate)))
-    const activeOwnerSelected = activeGroup && selectedOwnerIds.has(activeGroup.id)
-    const activeWouldExceedLimit = Boolean(activeGroup && !activeOwnerSelected && selectedLimitReached)
 
-    els.addTeammateBuffsBtn.disabled = !candidates.length || allAddedFromActive || activeWouldExceedLimit
+    els.addTeammateBuffsBtn.disabled = !candidates.length || allAddedFromActive
     els.removeTeammateBuffsBtn.disabled = !hasAddedFromActive
-    els.combatBuffTeammateHint.textContent = activeWouldExceedLimit
-        ? `最多选择 ${TEAMMATE_BUFF_OWNER_LIMIT} 名角色；请先移除一个角色来源`
-        : `已选择 ${selectedOwnerIds.size}/${TEAMMATE_BUFF_OWNER_LIMIT} 名角色`
+    els.combatBuffTeammateHint.textContent = `已选择 ${selectedOwnerIds.size} 名角色`
 }
 
 function addedCombatBuffSourceGroupKey(item, buff = resolveAddedCombatBuff(item)) {
@@ -3961,9 +3955,10 @@ function renderCombatBuffCandidates() {
 
         const row = document.createElement("button")
         row.type = "button"
-        row.className = "combat-candidate-row"
+        row.className = ["combat-candidate-row", alreadyAdded ? "active" : ""].filter(Boolean).join(" ")
         row.dataset.candidateKey = key
-        row.disabled = alreadyAdded || Boolean(limitMessage)
+        row.dataset.candidateAdded = String(alreadyAdded)
+        row.disabled = Boolean(limitMessage)
 
         const title = document.createElement("strong")
         title.textContent = nameOf(candidate)
@@ -3972,7 +3967,7 @@ function renderCombatBuffCandidates() {
         const stats = document.createElement("span")
         stats.className = "combat-added-stats combat-buff-effect-lines"
         if (alreadyAdded) {
-            setCombatStatLines(stats, ["已添加"])
+            setCombatStatLines(stats, ["已添加，点击移除"])
         } else if (limitMessage) {
             setCombatStatLines(stats, [limitMessage])
         } else {
@@ -5219,8 +5214,12 @@ els.combatBuffModal.addEventListener("click", async event => {
     const candidate = event.target.closest("[data-candidate-key]")
     if (candidate && !candidate.disabled) {
         try {
-            setStatus("添加 Buff", "idle")
-            if (addCombatBuffCandidateByKey(candidate.dataset.candidateKey)) {
+            const alreadyAdded = candidate.dataset.candidateAdded === "true"
+            setStatus(alreadyAdded ? "移除 Buff" : "添加 Buff", "idle")
+            const changed = alreadyAdded
+                ? removeCombatBuffCandidateByKey(candidate.dataset.candidateKey)
+                : addCombatBuffCandidateByKey(candidate.dataset.candidateKey)
+            if (changed) {
                 closeCombatBuffModal()
                 renderCombatBuffControls()
                 await calculate()

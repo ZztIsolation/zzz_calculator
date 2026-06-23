@@ -1049,7 +1049,13 @@ function isCompleteSetMatch(fourCount, twoCount, settings) {
 }
 
 function yieldToEventLoop() {
-    return new Promise(resolve => setImmediate(resolve))
+    return new Promise(resolve => {
+        if (typeof setImmediate === "function") {
+            setImmediate(resolve)
+            return
+        }
+        setTimeout(resolve, 0)
+    })
 }
 
 function processedCombinationCount(metrics = {}) {

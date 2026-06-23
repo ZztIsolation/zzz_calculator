@@ -21,11 +21,11 @@ const ANOMALY_SETTLEMENT_TYPE_VALUES = new Set(["attribute", "disorder"])
 const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
 const CALCULATION_MODE_VALUES = new Set(["single", "sheer", "anomaly", "custom"])
 const SHEER_DAMAGE_MODIFIER_KIND_VALUES = ["sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg"]
-const DAMAGE_MODIFIER_KIND_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "directDamageBonus", "skillMultiplierBonus", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES])
+const DAMAGE_MODIFIER_KIND_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "directDamageBonus", "skillMultiplierBonus", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES])
 const SKILL_TARGET_DAMAGE_MODIFIER_KIND_VALUES = new Set(["directDamageBonus", "skillMultiplierBonus"])
 const DAMAGE_MODIFIER_VALUE_UNIT_VALUES = new Set(["decimal"])
 const RULE_TARGET_KIND_VALUES = new Set(["default", "skill"])
-const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES])
+const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES])
 const SKILL_TARGET_STAT_VALUES = new Set([
     "physicalResIgnore",
     "fireResIgnore",
@@ -48,6 +48,8 @@ const SKILL_TARGET_STAT_VALUES = new Set([
     "etherDmg",
     "anomalyDamageBonus",
     "disorderDamageBonus",
+    "stunDmgMultiplierBonus",
+    "stunDmgMultiplierBonusAlways",
     ...SHEER_DAMAGE_MODIFIER_KIND_VALUES,
     "skillMultiplierBonus",
 ])
@@ -338,6 +340,25 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     }
     if (DEFAULT_EVENT_MODIFIER_STAT_VALUES.has(rule.stat) && scope !== "inCombat") {
         add(errors, `${path}.stat`, "事件增幅只能用于局内 Buff。")
+    }
+    if (rule.appliesTo != null) {
+        const appliesTo = rule.appliesTo ?? {}
+        if (Array.isArray(appliesTo.damageKinds)) {
+            appliesTo.damageKinds.forEach((kind, index) => requireEnum(errors, kind, DAMAGE_EVENT_KIND_VALUES, `${path}.appliesTo.damageKinds[${index}]`))
+        }
+        if (Array.isArray(appliesTo.anomalyEffects)) {
+            appliesTo.anomalyEffects.forEach((effect, index) => {
+                if (!ANOMALY_EFFECT_VALUES.has(effect) && !ID_PATTERN.test(String(effect ?? ""))) {
+                    add(errors, `${path}.appliesTo.anomalyEffects[${index}]`, "不是有效异常 ID。")
+                }
+            })
+        }
+        if (Array.isArray(appliesTo.elements)) {
+            appliesTo.elements.forEach((element, index) => requireEnum(errors, element, DAMAGE_ELEMENT_VALUES, `${path}.appliesTo.elements[${index}]`))
+        }
+        if (Array.isArray(appliesTo.skillTargets)) {
+            appliesTo.skillTargets.forEach((skillTarget, index) => validateSkillTarget(errors, skillTarget, `${path}.appliesTo.skillTargets[${index}]`))
+        }
     }
 
     requireEnum(errors, rule.stat, RULE_STAT_VALUES, `${path}.stat`)

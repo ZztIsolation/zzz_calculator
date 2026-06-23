@@ -224,7 +224,7 @@ modifierCatalog.combatBuffs.push({
         {
             id: "disorder_base",
             type: "damageModifier",
-            kind: "baseMultiplierBonus",
+            kind: "disorderBaseMultiplierBonus",
             value: 25,
             appliesTo: {
                 damageKinds: ["disorder"],
@@ -335,6 +335,7 @@ const disorderWithModifiers = calculateEvent({
     },
 }, modifierCatalog)
 approx(disorderWithModifiers.damage.multipliers.baseMultiplierBonus, 0.25, "Disorder base multiplier bonus")
+approx(disorderWithModifiers.damage.multipliers.disorderBaseMultiplierBonus, 0.25, "Disorder-specific base multiplier bonus alias")
 approx(disorderWithModifiers.damage.multipliers.anomaly, 4.75, "Disorder base multiplier should include bonus")
 approx(disorderWithModifiers.damage.multipliers.attributeAnomalyDamage, 1, "Attribute anomaly bonus should not affect disorder")
 approx(disorderWithModifiers.damage.multipliers.disorderDamage, 1.2, "Disorder damage bonus should affect disorder")
@@ -416,8 +417,68 @@ const disorderOnlyModifier = calculateEvent({
 approx(disorderOnlyModifier.damage.multipliers.disorderDamage, 1.15, "Disorder damage bonus should apply to disorder")
 approx(disorderOnlyModifier.damage.multipliers.attributeAnomalyDamage, 1, "Disorder damage bonus should not affect attribute anomaly bonus bucket")
 
+const anomalyBaseMultiplierOnlyModifier = calculateEvent({
+    id: "disorder-base-anomaly-only",
+    kind: "disorder",
+    previousAnomalyEffect: "burn",
+    elapsedSeconds: 10,
+}, {
+    combatBuffs: {
+        manualEffects: [
+            {
+                id: "manual_anomaly_base_multiplier_bonus",
+                label: "异常倍率加算",
+                effects: [
+                    {
+                        id: "manual_anomaly_base_multiplier_bonus",
+                        type: "damageModifier",
+                        kind: "baseMultiplierBonus",
+                        value: 0.25,
+                        appliesTo: {
+                            damageKinds: ["disorder"],
+                        },
+                    },
+                ],
+            },
+        ],
+    },
+})
+approx(anomalyBaseMultiplierOnlyModifier.damage.multipliers.baseMultiplierBonus, 0, "Attribute anomaly base multiplier bonus should not affect disorder")
+approx(anomalyBaseMultiplierOnlyModifier.damage.multipliers.anomaly, 4.5, "Disorder should ignore baseMultiplierBonus")
+
+const disorderBaseMultiplierOnlyModifier = calculateEvent({
+    id: "disorder-base-only",
+    kind: "disorder",
+    previousAnomalyEffect: "burn",
+    elapsedSeconds: 10,
+}, {
+    combatBuffs: {
+        manualEffects: [
+            {
+                id: "manual_disorder_base_multiplier_bonus",
+                label: "紊乱倍率加算",
+                effects: [
+                    {
+                        id: "manual_disorder_base_multiplier_bonus",
+                        type: "damageModifier",
+                        kind: "disorderBaseMultiplierBonus",
+                        value: 0.25,
+                        appliesTo: {
+                            damageKinds: ["disorder"],
+                        },
+                    },
+                ],
+            },
+        ],
+    },
+})
+approx(disorderBaseMultiplierOnlyModifier.damage.multipliers.baseMultiplierBonus, 0.25, "Disorder base multiplier bonus should be exposed in base multiplier bucket")
+approx(disorderBaseMultiplierOnlyModifier.damage.multipliers.disorderBaseMultiplierBonus, 0.25, "Disorder base multiplier bonus should expose a disorder-specific bucket")
+approx(disorderBaseMultiplierOnlyModifier.damage.multipliers.anomaly, 4.75, "Disorder base multiplier bonus should add to disorder multiplier")
+
 const youyeAdditionalBuffId = "youye.additional_ability.anomaly_damage_bonus"
 const youyeCinemaOneBuffId = "youye.cinema_1.amplify_additional_ability"
+const youyeCinemaSixBuffId = "youye.cinema_6.disorder_multiplier_bonus"
 const youyeAdditionalEffectId = "youye_additional_anomaly_damage_bonus"
 const youyeAdditionalDisorderEffectId = "youye_additional_disorder_damage_bonus"
 
@@ -532,6 +593,54 @@ const youyeDisorderAt150WithCinema = calculateEvent({
     },
 })
 approx(youyeDisorderAt150WithCinema.damage.multipliers.disorderDamage, 1.13, "Youye cinema 1 should multiply the 150 AM disorder additional ability value")
+
+const youyeCinemaSixDisorder = calculateEvent({
+    id: "youye-cinema-6-disorder",
+    kind: "disorder",
+    previousAnomalyEffect: "burn",
+    elapsedSeconds: 10,
+}, {
+    combatBuffs: {
+        activeBuffIds: [youyeCinemaSixBuffId],
+    },
+})
+approx(youyeCinemaSixDisorder.damage.multipliers.disorderBaseMultiplierBonus, 3.15, "Youye cinema 6 should add 315% disorder multiplier at 3 stacks")
+approx(youyeCinemaSixDisorder.damage.multipliers.disorderDamage, 1, "Youye cinema 6 should not enter the disorder damage bonus bucket")
+approx(youyeCinemaSixDisorder.damage.multipliers.anomaly, 7.65, "Youye cinema 6 should add directly to disorder multiplier")
+
+const youyeCinemaSixOneStackDisorder = calculateEvent({
+    id: "youye-cinema-6-disorder-one-stack",
+    kind: "disorder",
+    previousAnomalyEffect: "burn",
+    elapsedSeconds: 10,
+}, {
+    combatBuffs: {
+        activeBuffIds: [youyeCinemaSixBuffId],
+        runtimeInputs: {
+            [youyeCinemaSixBuffId]: {
+                effects: {
+                    youye_cinema_6_disorder_damage_bonus: {
+                        stacks: 1,
+                    },
+                },
+            },
+        },
+    },
+})
+approx(youyeCinemaSixOneStackDisorder.damage.multipliers.disorderBaseMultiplierBonus, 1.05, "Youye cinema 6 should add 105% disorder multiplier per stack")
+approx(youyeCinemaSixOneStackDisorder.damage.multipliers.anomaly, 5.55, "Youye cinema 6 one stack should add directly to disorder multiplier")
+
+const youyeCinemaSixAnomaly = calculateEvent({
+    id: "youye-cinema-6-anomaly",
+    kind: "anomaly",
+    anomalyEffect: "assault",
+}, {
+    combatBuffs: {
+        activeBuffIds: [youyeCinemaSixBuffId],
+    },
+})
+approx(youyeCinemaSixAnomaly.damage.multipliers.baseMultiplierBonus, 0, "Youye cinema 6 should not affect attribute anomaly multiplier")
+approx(youyeCinemaSixAnomaly.damage.multipliers.anomaly, 7.13, "Youye cinema 6 should only affect disorder events")
 
 const reversedYouyeCatalog = cloneCatalog(catalog)
 reversedYouyeCatalog.combatBuffs = [...reversedYouyeCatalog.combatBuffs].sort((left, right) => {

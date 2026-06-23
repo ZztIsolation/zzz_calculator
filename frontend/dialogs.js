@@ -43,7 +43,7 @@ function openDialog({ title, message = "", confirmText = "确认", cancelText = 
     layer.innerHTML = `
         <div class="modal-scrim" data-dialog-cancel></div>
         <section class="disc-modal app-dialog app-dialog-${escapeHtml(tone)}" role="dialog" aria-modal="true" aria-labelledby="appDialogTitle">
-          <button type="button" class="modal-close" aria-label="关闭" data-dialog-cancel>×</button>
+          <button type="button" class="modal-close" aria-label="关闭" data-dialog-cancel><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M6 18L18 6"/></svg></button>
           <header class="modal-head">
             <div>
               <h2 id="appDialogTitle">${escapeHtml(title)}</h2>

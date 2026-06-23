@@ -59,7 +59,7 @@
       },
       "images": {
         "icon": "/assets/drive-discs/zzz_wiki_1906.png",
-        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/03/16/141353238/4ebfdd28579fa98ff24f948ec172d845_1224104404961001766.png"
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
       },
       "sources": [
         "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
@@ -67,19 +67,59 @@
       "twoPiece": {
         "effects": [
           {
-            "id": "effect_wiki_1906_2pc",
+            "id": "effect-1",
             "type": "fixed",
             "stat": "iceDmg",
             "value": 10,
-            "mode": "flat"
+            "mode": "flat",
+            "target": {
+              "kind": "default"
+            }
           }
-        ]
+        ],
+        "buffModifiers": []
       },
       "fourPiece": {
         "effectText": {
-          "zhCN": "装备者触发[异放]时，装备者异常精通提升48点，持续30秒；重复触发时刷新持续时间；装备者触发[冻结]效果时，装备者造成的所有属性异常伤害、[紊乱]伤害提升16%，持续30秒，重复触发时刷新持续时间。"
+          "zhCN": "装备者触发[异放]时，装备者异常精通提升48点，持续30秒；重复触发时刷新持续时间；装备者触发[冻结]效果时，装备者造成的所有属性异常伤害、[紊乱]伤害提升16%，持续30秒，重复触发时刷新持续时间。",
+          "en": ""
         },
-        "selfBuff": null,
+        "selfBuff": {
+          "condition": null,
+          "effects": [
+            {
+              "id": "effect_b4b0ddbf11",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "value": 48
+            },
+            {
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyDamageBonus",
+              "mode": "flat",
+              "value": 16,
+              "id": "effect_d3a9ff8d78"
+            },
+            {
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "disorderDamageBonus",
+              "mode": "flat",
+              "value": 16,
+              "id": "effect_98cea86df5"
+            }
+          ],
+          "buffModifiers": []
+        },
         "teamBuff": null
       }
     },
@@ -374,18 +414,22 @@
       },
       "images": {
         "icon": "/assets/drive-discs/scanner-set-48ee0a14625f.png",
-        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/12/13/158441880/36b1daf1b269c3c44caa36511c0d1262_2994496140477816610.PNG"
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
       },
       "twoPiece": {
         "effects": [
           {
-            "id": "effect_t1q7z4vb",
+            "id": "effect-1",
             "type": "fixed",
             "stat": "critDmg",
             "value": 16,
-            "mode": "flat"
+            "mode": "flat",
+            "target": {
+              "kind": "default"
+            }
           }
-        ]
+        ],
+        "buffModifiers": []
       },
       "fourPiece": {
         "effectText": {
@@ -398,24 +442,36 @@
             {
               "id": "effect_d8w3n6px",
               "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
               "stat": "critDmg",
-              "value": 30,
-              "mode": "flat"
+              "mode": "flat",
+              "value": 30
             },
             {
               "id": "effect_l5c9r2qa",
               "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
               "stat": "critRate",
-              "value": 12,
-              "mode": "flat"
+              "mode": "flat",
+              "value": 12
             }
-          ]
+          ],
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          },
+          "buffModifiers": []
         },
         "teamBuff": null
       },
       "sources": [
-        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46",
-        "https://game8.co/games/Zenless-Zone-Zero/archives/488264"
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
       ]
     },
     {

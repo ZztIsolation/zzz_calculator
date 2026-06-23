@@ -260,6 +260,7 @@ type BuffRuleStat =
   | "anomalyDamageBonus"
   | "disorderDamageBonus"
   | "baseMultiplierBonus"
+  | "disorderBaseMultiplierBonus"
   | "anomalyCritRate"
   | "anomalyCritDmg"
   | "skillMultiplierBonus";
@@ -279,7 +280,7 @@ interface Effect {
     | { type: "formula"; stat: BuffRuleStat; mode: "flat" | "pct"; source: { variable: "x"; label?: { zhCN?: string }; defaultValue: number; min?: number; max?: number }; formula: { expression: string; valueUnit?: "storedValue" | "storedPercent" }; target?: EffectTarget }
     | { type: "stacked"; stat: BuffRuleStat; mode: "flat" | "pct"; valuePerStack: number; maxStacks: number; defaultStacks?: number; basis?: Effect["stats"][number]["basis"]; target?: EffectTarget }
     // Deprecated read-only compatibility. New UI/save paths must use target.kind + stat.
-    | { type: "damageModifier"; kind: "anomalyDamageBonus" | "disorderDamageBonus" | "baseMultiplierBonus" | "anomalyCritRate" | "anomalyCritDmg" | "directDamageBonus" | "skillMultiplierBonus"; value: number; valueUnit?: "decimal"; appliesTo?: { damageKinds?: Array<"direct" | "anomaly" | "disorder">; anomalyEffects?: string[]; elements?: Array<"physical" | "fire" | "ice" | "electric" | "ether">; skillTargets?: SkillTarget[] } }
+    | { type: "damageModifier"; kind: "anomalyDamageBonus" | "disorderDamageBonus" | "baseMultiplierBonus" | "disorderBaseMultiplierBonus" | "anomalyCritRate" | "anomalyCritDmg" | "directDamageBonus" | "skillMultiplierBonus"; value: number; valueUnit?: "decimal"; appliesTo?: { damageKinds?: Array<"direct" | "anomaly" | "disorder">; anomalyEffects?: string[]; elements?: Array<"physical" | "fire" | "ice" | "electric" | "ether">; skillTargets?: SkillTarget[] } }
   >;
   buffModifiers?: Array<{
     id?: string;
@@ -535,8 +536,10 @@ Every rule can choose an amplification target:
 - `target.kind: "default"` (or omitted) uses the ordinary Buff path. Panel and
   enemy-target stats are added to the in-combat panel/target totals. Default
   event stats such as `anomalyDamageBonus`, `disorderDamageBonus`,
-  `baseMultiplierBonus`, `anomalyCritRate`, and `anomalyCritDmg` are kept out
+  `baseMultiplierBonus`, `disorderBaseMultiplierBonus`, `anomalyCritRate`, and `anomalyCritDmg` are kept out
   of the panel and applied only inside the relevant damage event formula.
+  Use `baseMultiplierBonus` for attribute anomaly multiplier additions and
+  `disorderBaseMultiplierBonus` for disorder multiplier additions.
 - `target.kind: "skill"` requires at least one `skillTargets` entry and is only
   valid for in-combat Buffs. It never writes into the global panel. It is
   evaluated against the selected damage event's `skillSource`; manually typed

@@ -50,6 +50,17 @@ async function getText(pathname) {
     }
 }
 
+async function getRedirect(pathname) {
+    const response = await fetch(`${baseUrl}${pathname}`, {
+        redirect: "manual",
+    })
+    return {
+        status: response.status,
+        location: response.headers.get("location"),
+        body: await response.text(),
+    }
+}
+
 try {
     await waitForServer()
 
@@ -99,8 +110,17 @@ try {
         assert.match(JSON.parse(response.body).error, /browser locally/i)
     }
 
-    const calculatorPage = await getText("/calculate.html")
-    assert.equal(calculatorPage.status, 200)
+    const optimizerPage = await getText("/")
+    assert.equal(optimizerPage.status, 200)
+    assert.match(optimizerPage.body, /驱动盘最优计算/)
+
+    const legacyOptimizerPage = await getRedirect("/calculate.html")
+    assert.equal(legacyOptimizerPage.status, 308)
+    assert.equal(legacyOptimizerPage.location, "/")
+
+    assert.equal((await getText("/missing.html")).status, 404)
+    assert.equal((await getText("/drive-discs.html")).status, 200)
+    assert.equal((await getText("/accounts.html")).status, 200)
 } finally {
     server.kill()
 }

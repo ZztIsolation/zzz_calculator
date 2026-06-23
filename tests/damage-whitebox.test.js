@@ -194,6 +194,150 @@ approx(
     "Unstunned direct damage should ignore configured stun multiplier",
 )
 
+const stunMultiplierBonusCatalog = cloneCatalog(catalog)
+stunMultiplierBonusCatalog.combatBuffs.push({
+    id: "test.damage.stun_multiplier_bonus",
+    sourceType: "manual",
+    scope: "inCombat",
+    effects: [
+        {
+            id: "stun_multiplier_bonus",
+            type: "fixed",
+            stat: "stunDmgMultiplierBonus",
+            value: 20,
+            mode: "flat",
+        },
+    ],
+})
+const directStunnedNoBonus = calculateStunEvent(directStunEvent, {
+    targetOverrides: {
+        stunned: true,
+        stunMultiplierPercent: 150,
+    },
+})
+const directStunnedWithBonus = calculateInCombatPanel(stunMultiplierBonusCatalog, minimalInput({
+    combatBuffs: {
+        activeBuffIds: ["test.damage.stun_multiplier_bonus"],
+    },
+    damage: {
+        agentLevel: 60,
+        selectedEventId: directStunEvent.id,
+        events: [directStunEvent],
+        target: zeroResistanceTarget({
+            stunned: true,
+            stunMultiplierPercent: 150,
+        }),
+    },
+}))
+approx(directStunnedWithBonus.damage.multipliers.stun, 1.7, "Stun multiplier bonus should add to active stun multiplier")
+approx(
+    directStunnedWithBonus.damage.finalDamage,
+    directStunnedNoBonus.damage.finalDamage * (1.7 / 1.5),
+    "Stun multiplier bonus should scale stunned direct damage",
+)
+assert.match(
+    directStunnedWithBonus.damage.whiteBoxRows.find(row => row.label === "失衡乘区")?.formula ?? "",
+    /失衡易伤倍率加算 20%/,
+)
+const directUnstunnedWithBonus = calculateInCombatPanel(stunMultiplierBonusCatalog, minimalInput({
+    combatBuffs: {
+        activeBuffIds: ["test.damage.stun_multiplier_bonus"],
+    },
+    damage: {
+        agentLevel: 60,
+        selectedEventId: directStunEvent.id,
+        events: [directStunEvent],
+        target: zeroResistanceTarget({
+            stunned: false,
+            stunMultiplierPercent: 150,
+        }),
+    },
+}))
+approx(directUnstunnedWithBonus.damage.multipliers.stun, 1, "Stun multiplier bonus should stay inactive while target is unstunned")
+
+stunMultiplierBonusCatalog.combatBuffs.push({
+    id: "test.damage.stun_multiplier_bonus_always",
+    sourceType: "manual",
+    scope: "inCombat",
+    effects: [
+        {
+            id: "stun_multiplier_bonus_always",
+            type: "fixed",
+            stat: "stunDmgMultiplierBonusAlways",
+            value: 20,
+            mode: "flat",
+        },
+    ],
+})
+const directUnstunnedWithAlwaysBonus = calculateInCombatPanel(stunMultiplierBonusCatalog, minimalInput({
+    combatBuffs: {
+        activeBuffIds: ["test.damage.stun_multiplier_bonus_always"],
+    },
+    damage: {
+        agentLevel: 60,
+        selectedEventId: directStunEvent.id,
+        events: [directStunEvent],
+        target: zeroResistanceTarget({
+            stunned: false,
+            stunMultiplierPercent: 150,
+        }),
+    },
+}))
+approx(directUnstunnedWithAlwaysBonus.damage.multipliers.stun, 1.2, "Always-active stun multiplier bonus should affect unstunned targets")
+
+const elementalTargetModifierCatalog = cloneCatalog(catalog)
+elementalTargetModifierCatalog.combatBuffs.push({
+    id: "test.damage.electric_only_def_ignore",
+    sourceType: "manual",
+    scope: "inCombat",
+    effects: [
+        {
+            id: "electric_only_def_ignore",
+            type: "fixed",
+            stat: "enemyDefIgnore",
+            value: 20,
+            mode: "flat",
+            appliesTo: {
+                elements: ["electric"],
+            },
+        },
+    ],
+})
+const electricOnlyDefIgnoreTarget = zeroResistanceTarget({
+    defense: 1000,
+    levelCoefficient: 1000,
+})
+function calculateElectricOnlyDefIgnore(element, activeBuffIds = []) {
+    return calculateInCombatPanel(elementalTargetModifierCatalog, minimalInput({
+        combatBuffs: {
+            activeBuffIds,
+        },
+        damage: {
+            agentLevel: 60,
+            selectedEventId: `electric-only-def-ignore-${element}`,
+            events: [{
+                ...directStunEvent,
+                id: `electric-only-def-ignore-${element}`,
+                damageElement: element,
+            }],
+            target: electricOnlyDefIgnoreTarget,
+        },
+    }))
+}
+const electricOnlyDefIgnoreElectricBase = calculateElectricOnlyDefIgnore("electric")
+const electricOnlyDefIgnoreElectric = calculateElectricOnlyDefIgnore("electric", ["test.damage.electric_only_def_ignore"])
+const electricOnlyDefIgnoreFireBase = calculateElectricOnlyDefIgnore("fire")
+const electricOnlyDefIgnoreFire = calculateElectricOnlyDefIgnore("fire", ["test.damage.electric_only_def_ignore"])
+assert.ok(
+    electricOnlyDefIgnoreElectric.damage.multipliers.defense > electricOnlyDefIgnoreElectricBase.damage.multipliers.defense,
+    "Element-filtered target modifier should affect matching damage element",
+)
+approx(
+    electricOnlyDefIgnoreFire.damage.multipliers.defense,
+    electricOnlyDefIgnoreFireBase.damage.multipliers.defense,
+    "Element-filtered target modifier should not affect other damage elements",
+)
+
 const anomalyStunInput = {
     combatBuffs: {
         manualStats: [
@@ -577,6 +721,12 @@ anomalyBonusSplitCatalog.combatBuffs.push({
             value: 40,
         },
         {
+            id: "disorder_multiplier_bonus",
+            type: "damageModifier",
+            kind: "disorderBaseMultiplierBonus",
+            value: 25,
+        },
+        {
             id: "anomaly_crit_rate",
             type: "damageModifier",
             kind: "anomalyCritRate",
@@ -641,7 +791,13 @@ const disorderBonusWhiteBox = calculateInCombatPanel(anomalyBonusSplitCatalog, m
 }))
 approx(disorderBonusWhiteBox.damage.multipliers.attributeAnomalyDamage, 1, "Attribute anomaly bonus should not affect disorder whitebox")
 approx(disorderBonusWhiteBox.damage.multipliers.disorderDamage, 1.4, "Disorder whitebox multiplier")
+approx(disorderBonusWhiteBox.damage.multipliers.disorderBaseMultiplierBonus, 0.25, "Disorder whitebox multiplier bonus")
 approx(disorderBonusWhiteBox.damage.multipliers.anomalyCrit, 1, "Disorder should not use anomaly crit")
+assert.equal(
+    disorderBonusWhiteBox.damage.whiteBoxRows.find(row => row.label === "紊乱倍率")?.formula,
+    "灼烧紊乱：450% + 0 × 50% + 倍率修正 25%",
+    "Disorder whitebox should expose disorder multiplier bonus in the multiplier row",
+)
 assert.equal(
     disorderBonusWhiteBox.damage.whiteBoxRows.find(row => row.label === "紊乱增伤区")?.formula,
     "1 + 紊乱增伤 40%",

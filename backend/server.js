@@ -154,6 +154,16 @@ function sendText(res, statusCode, text, contentType) {
     res.end(text)
 }
 
+function sendRedirect(res, location, statusCode = 308) {
+    res.writeHead(statusCode, {
+        "Location": location,
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+    })
+    res.end()
+}
+
 async function readBody(req) {
     const chunks = []
     for await (const chunk of req) {
@@ -1015,6 +1025,11 @@ async function serveStatic(res, pathname) {
         return
     }
 
+    if (pathname === "/calculate.html") {
+        sendRedirect(res, "/")
+        return
+    }
+
     const fileName = pathname === "/" ? "index.html" : pathname.replace(/^\//, "")
     const absPath = path.resolve(frontendDir, fileName)
     const relativePath = path.relative(frontendDir, absPath)
@@ -1024,14 +1039,7 @@ async function serveStatic(res, pathname) {
     }
 
     if (!existsSync(absPath)) {
-        const indexPath = path.join(frontendDir, "index.html")
-        if (!existsSync(indexPath)) {
-            sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
-            return
-        }
-
-        const html = await readFile(indexPath, "utf8")
-        sendText(res, 200, html, "text/html; charset=utf-8")
+        sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
         return
     }
 

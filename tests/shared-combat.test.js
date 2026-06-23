@@ -193,12 +193,12 @@ const youyeCoreBuff = youyeBuffs.find(buff => buff.id === "buff_883a921c63")
 const youyeAdditionalBuff = youyeBuffs.find(buff => buff.id === "youye.additional_ability.anomaly_damage_bonus")
 assert.equal(
     combatBuffDisplayName(youyeCoreBuff),
-    "核心被动",
-    "Teammate Buff cards should display source text instead of generated backend ids",
+    "浮波柚叶 | 核心被动",
+    "Teammate Buff cards should display owner and source text instead of generated backend ids",
 )
 assert.equal(
     combatBuffDisplayName(youyeAdditionalBuff),
-    "额外能力",
+    "浮波柚叶 | 额外能力",
     "Named backend ids should not leak into teammate Buff titles when source text exists",
 )
 
@@ -252,6 +252,21 @@ const groupedFormulaRuntime = runtimeForBuff({
     },
 }, groupedFormulaRuntimeBuff)
 const groupedFormulaSources = runtimeSourceGroups(groupedFormulaRuntimeBuff)
+assert.equal(
+    defaultRuntimeForBuff(groupedFormulaRuntimeBuff).effects["formula-anomaly"].enabled,
+    true,
+    "Default runtime should mark formula effects enabled",
+)
+assert.equal(
+    defaultRuntimeForBuff(groupedFormulaRuntimeBuff).effects["stacked-dmg"].enabled,
+    true,
+    "Default runtime should mark stacked effects enabled",
+)
+assert.equal(
+    groupedFormulaRuntime.effects["stacked-dmg"].enabled,
+    true,
+    "Legacy runtime without enabled flag should normalize to enabled",
+)
 assert.deepEqual(
     groupedFormulaSources.map(group => group.ruleIds),
     [["formula-anomaly", "formula-disorder"]],
@@ -272,6 +287,29 @@ assert.equal(
     groupedFormulaRuntime.effects["stacked-dmg"].stacks,
     1,
     "Stacked runtime values should not be affected by source grouping",
+)
+assert.equal(
+    runtimeForBuff({
+        runtime: {
+            effects: {
+                "formula-anomaly": { sourceValue: 171, enabled: false },
+                "formula-disorder": { sourceValue: 199, enabled: false },
+            },
+        },
+    }, groupedFormulaRuntimeBuff).effects["formula-anomaly"].enabled,
+    true,
+    "Legacy disabled runtime flags should normalize back to enabled",
+)
+const groupedFormulaSummary = storedEffectRulesText(groupedFormulaRuntimeBuff, groupedFormulaRuntime)
+assert.equal(
+    groupedFormulaSummary,
+    "属性异常增伤% +171%，紊乱增伤% +342%，通用伤害加成% +10%（1/3 层，覆盖率 1）",
+    "Formula summaries should show final values without source or expression internals",
+)
+assert.equal(
+    groupedFormulaSummary.includes("公式") || groupedFormulaSummary.includes("x="),
+    false,
+    "Formula summaries should not expose formula internals",
 )
 
 const splitRuntimeBuff = {
@@ -440,6 +478,10 @@ const disorderDamageBonusOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option
 assert.ok(disorderDamageBonusOption, "Custom Buff stat options should include disorder damage bonus")
 assert.equal(disorderDamageBonusOption[0], "disorderDamageBonus", "Disorder damage bonus should be a fixed event stat")
 assert.equal(disorderDamageBonusOption[2], "eventModifier", "Disorder damage bonus option should use the default event modifier bucket")
+const disorderBaseMultiplierBonusOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[1] === "紊乱倍率加算%")
+assert.ok(disorderBaseMultiplierBonusOption, "Custom Buff stat options should include disorder multiplier bonus")
+assert.equal(disorderBaseMultiplierBonusOption[0], "disorderBaseMultiplierBonus", "Disorder multiplier bonus should be a fixed event stat")
+assert.equal(disorderBaseMultiplierBonusOption[2], "eventModifier", "Disorder multiplier bonus option should use the default event modifier bucket")
 assert.equal(DAMAGE_KIND_LABELS.sheer, "贯穿", "Damage kind labels should include sheer")
 assert.equal(ENUM_LABELS.attribute.xuanmo, "玄墨", "Attribute labels should include Yixuan's Xuanmo display attribute")
 const sheerForceFlatOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[0] === "sheerForceFlat")
@@ -472,6 +514,11 @@ assert.equal(skillAnomalyDamageOption[2], "skill")
 const skillDisorderDamageOption = CUSTOM_BUFF_SKILL_STAT_OPTIONS.find(option => option[0] === "disorderDamageBonus")
 assert.ok(skillDisorderDamageOption, "Skill Custom Buff stat options should include disorder damage bonus")
 assert.equal(skillDisorderDamageOption[2], "skill")
+assert.equal(
+    CUSTOM_BUFF_SKILL_STAT_OPTIONS.some(option => option[0] === "disorderBaseMultiplierBonus"),
+    false,
+    "Skill Custom Buff stat options should not include disorder multiplier bonus",
+)
 const skillSheerDamageOption = CUSTOM_BUFF_SKILL_STAT_OPTIONS.find(option => option[0] === "sheerDmgBonus")
 assert.ok(skillSheerDamageOption, "Skill Custom Buff stat options should include sheer damage bonus")
 assert.equal(skillSheerDamageOption[2], "skill")

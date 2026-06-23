@@ -134,11 +134,18 @@ const backendOptimized = await backendOptimizeDriveDiscsAsync(catalog, store, op
     progressIntervalMs: 0,
     yieldIntervalMs: 0,
 })
-const browserOptimized = await browserOptimizeDriveDiscsAsync(catalog, store, optimizerInput, {
-    chunkSize: 2,
-    progressIntervalMs: 0,
-    yieldIntervalMs: 0,
-})
+const originalSetImmediate = globalThis.setImmediate
+let browserOptimized
+try {
+    globalThis.setImmediate = undefined
+    browserOptimized = await browserOptimizeDriveDiscsAsync(catalog, store, optimizerInput, {
+        chunkSize: 2,
+        progressIntervalMs: 0,
+        yieldIntervalMs: 0,
+    })
+} finally {
+    globalThis.setImmediate = originalSetImmediate
+}
 
 assert.deepEqual(
     browserOptimized.results.slice(0, 5).map(result => result.driveDiscs.map(disc => disc.id)),

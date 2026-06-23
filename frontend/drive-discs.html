@@ -18,9 +18,8 @@
       </div>
 
       <nav class="side-nav">
-        <a href="/" class="nav-item">首页</a>
+        <a href="/" class="nav-item">优化器</a>
         <a href="/drive-discs.html" class="nav-item active">驱动盘</a>
-        <a href="/calculate.html" class="nav-item">优化器</a>
         <a href="/accounts.html" class="nav-item" data-account-label>账号 / 加载中</a>
         <a href="/maintenance.html" class="nav-item" hidden>维护</a>
       </nav>
@@ -150,7 +149,7 @@
         <div class="inventory-topline">
           <div>
             <h2>套装预设（<span id="loadoutCount">0</span>）</h2>
-            <p>由计算页保存，可在首页按角色应用</p>
+            <p>由优化器保存，可按角色应用</p>
           </div>
         </div>
         <div id="loadoutTableWrap" class="disc-table-wrap clean-table-wrap">
@@ -179,7 +178,7 @@
   <div id="discModal" class="modal-layer" hidden>
     <div class="modal-scrim" data-close-modal></div>
     <section class="disc-modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <button id="closeDiscModalBtn" type="button" class="modal-close" aria-label="关闭">×</button>
+      <button id="closeDiscModalBtn" type="button" class="modal-close" aria-label="关闭"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M6 18L18 6"/></svg></button>
       <header class="modal-head">
         <div>
           <h2 id="modalTitle">添加驱动盘</h2>
@@ -236,9 +235,9 @@
             <div class="level-control">
               <input id="levelRange" type="range" min="0" max="15" value="15">
               <div class="stepper">
-                <button id="levelMinusBtn" type="button">−</button>
+                <button id="levelMinusBtn" type="button"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
                 <input id="levelInput" type="number" min="0" max="15" step="1" value="15">
-                <button id="levelPlusBtn" type="button">+</button>
+                <button id="levelPlusBtn" type="button"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
               </div>
             </div>
           </div>
@@ -276,7 +275,7 @@
   <div id="loadoutModal" class="modal-layer" hidden>
     <div class="modal-scrim" data-close-loadout-modal></div>
     <section class="disc-modal loadout-modal" role="dialog" aria-modal="true" aria-labelledby="loadoutModalTitle">
-      <button id="closeLoadoutModalBtn" type="button" class="modal-close" aria-label="关闭">×</button>
+      <button id="closeLoadoutModalBtn" type="button" class="modal-close" aria-label="关闭"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M6 18L18 6"/></svg></button>
       <header class="modal-head">
         <div>
           <h2 id="loadoutModalTitle">编辑套装预设</h2>

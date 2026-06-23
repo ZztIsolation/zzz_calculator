@@ -1059,6 +1059,13 @@ assertValid("combat-buffs", {
             value: 15,
             mode: "flat",
         },
+        {
+            id: "effect-disorder-multiplier-fixed",
+            type: "fixed",
+            stat: "disorderBaseMultiplierBonus",
+            value: 105,
+            mode: "flat",
+        },
     ],
 })
 assertValid("combat-buffs", {
@@ -1476,7 +1483,7 @@ const wEngineWithDamageModifier = clone(validWEngine)
 wEngineWithDamageModifier.effect.selfBuff.effects = [
     {
         type: "damageModifier",
-        kind: "baseMultiplierBonus",
+        kind: "disorderBaseMultiplierBonus",
         value: 0.1,
         appliesTo: {
             damageKinds: ["disorder"],
@@ -1495,7 +1502,7 @@ const driveDiscWithDamageModifier = {
             effects: [
                 {
                     type: "damageModifier",
-                    kind: "baseMultiplierBonus",
+                    kind: "disorderBaseMultiplierBonus",
                     value: 0.1,
                     appliesTo: {
                         damageKinds: ["disorder"],

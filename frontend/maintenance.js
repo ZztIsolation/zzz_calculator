@@ -177,11 +177,20 @@ const STAT_DAMAGE_MODIFIER_OPTIONS = [
     ["baseMultiplierBonus", "异常倍率加算%", {
         stat: "baseMultiplierBonus",
     }],
+    ["disorderBaseMultiplierBonus", "紊乱倍率加算%", {
+        stat: "disorderBaseMultiplierBonus",
+    }],
     ["anomalyCritRate", "异常暴击率%", {
         stat: "anomalyCritRate",
     }],
     ["anomalyCritDmg", "异常暴击伤害%", {
         stat: "anomalyCritDmg",
+    }],
+    ["stunDmgMultiplierBonus", "失衡易伤倍率加算%", {
+        stat: "stunDmgMultiplierBonus",
+    }],
+    ["stunDmgMultiplierBonusAlways", "失衡易伤倍率加算（未失衡生效）%", {
+        stat: "stunDmgMultiplierBonusAlways",
     }],
     ["sheerDmgBonus", "贯穿增伤%", {
         stat: "sheerDmgBonus",
@@ -212,6 +221,8 @@ const SKILL_TARGET_STAT_OPTIONS = [
     ["etherDmg", "以太伤害加成%"],
     ["anomalyDamageBonus", "属性异常增伤%"],
     ["disorderDamageBonus", "紊乱增伤%"],
+    ["stunDmgMultiplierBonus", "失衡易伤倍率加算%"],
+    ["stunDmgMultiplierBonusAlways", "失衡易伤倍率加算（未失衡生效）%"],
     ["sheerDmgBonus", "贯穿增伤%"],
     ["physicalSheerDmg", "物理贯穿增伤%"],
     ["fireSheerDmg", "火属性贯穿增伤%"],
@@ -277,8 +288,11 @@ const PERCENT_VALUE_STATS = new Set([
     "anomalyDamageBonus",
     "disorderDamageBonus",
     "baseMultiplierBonus",
+    "disorderBaseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
+    "stunDmgMultiplierBonus",
+    "stunDmgMultiplierBonusAlways",
     "sheerDmgBonus",
     "physicalSheerDmg",
     "fireSheerDmg",
@@ -311,8 +325,11 @@ const DAMAGE_MODIFIER_KIND_OPTIONS = [
     ["anomalyDamageBonus", "属性异常增伤%"],
     ["disorderDamageBonus", "紊乱增伤%"],
     ["baseMultiplierBonus", "异常倍率修正%"],
+    ["disorderBaseMultiplierBonus", "紊乱倍率加算%"],
     ["anomalyCritRate", "异常暴击率%"],
     ["anomalyCritDmg", "异常暴击伤害%"],
+    ["stunDmgMultiplierBonus", "失衡易伤倍率加算%"],
+    ["stunDmgMultiplierBonusAlways", "失衡易伤倍率加算（未失衡生效）%"],
     ["directDamageBonus", "技能专属伤害增伤%"],
     ["sheerDmgBonus", "贯穿增伤%"],
     ["physicalSheerDmg", "物理贯穿增伤%"],
@@ -326,6 +343,9 @@ const DAMAGE_MODIFIER_LABELS = {
     ...Object.fromEntries(DAMAGE_MODIFIER_KIND_OPTIONS.map(([key, label]) => [key, label])),
     anomalyDamageBonus: "属性异常增伤%",
     disorderDamageBonus: "紊乱增伤%",
+    disorderBaseMultiplierBonus: "紊乱倍率加算%",
+    stunDmgMultiplierBonus: "失衡易伤倍率加算%",
+    stunDmgMultiplierBonusAlways: "失衡易伤倍率加算（未失衡生效）%",
 }
 const DAMAGE_KIND_OPTIONS = [
     ["direct", "直伤"],

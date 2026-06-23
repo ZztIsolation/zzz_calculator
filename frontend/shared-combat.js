@@ -22,8 +22,11 @@ export const DAMAGE_MODIFIER_KIND_LABELS = {
     anomalyDamageBonus: "属性异常增伤",
     disorderDamageBonus: "紊乱增伤",
     baseMultiplierBonus: "伤害倍率修正",
+    disorderBaseMultiplierBonus: "紊乱倍率加算",
     anomalyCritRate: "异常暴击率",
     anomalyCritDmg: "异常暴击伤害",
+    stunDmgMultiplierBonus: "失衡易伤倍率加算",
+    stunDmgMultiplierBonusAlways: "失衡易伤倍率加算（未失衡生效）",
     sheerDmgBonus: "贯穿增伤",
     physicalSheerDmg: "物理贯穿增伤",
     fireSheerDmg: "火贯穿增伤",
@@ -73,8 +76,11 @@ export const CUSTOM_BUFF_STAT_OPTIONS = [
     ["electricSheerDmg", "电贯穿增伤%", "eventModifier", null],
     ["etherSheerDmg", "以太贯穿增伤%", "eventModifier", null],
     ["baseMultiplierBonus", "异常倍率加算%", "eventModifier", null],
+    ["disorderBaseMultiplierBonus", "紊乱倍率加算%", "eventModifier", null],
     ["anomalyCritRate", "异常暴击率%", "eventModifier", null],
     ["anomalyCritDmg", "异常暴击伤害%", "eventModifier", null],
+    ["stunDmgMultiplierBonus", "失衡易伤倍率加算%", "eventModifier", null],
+    ["stunDmgMultiplierBonusAlways", "失衡易伤倍率加算（未失衡生效）%", "eventModifier", null],
     ["physicalDmg", "物理伤害%", "flat", null],
     ["fireDmg", "火属性伤害%", "flat", null],
     ["iceDmg", "冰属性伤害%", "flat", null],
@@ -105,6 +111,8 @@ export const CUSTOM_BUFF_SKILL_STAT_OPTIONS = [
     ["etherDmg", "以太伤害加成%", "skill", null],
     ["anomalyDamageBonus", "属性异常增伤%", "skill", null],
     ["disorderDamageBonus", "紊乱增伤%", "skill", null],
+    ["stunDmgMultiplierBonus", "失衡易伤倍率加算%", "skill", null],
+    ["stunDmgMultiplierBonusAlways", "失衡易伤倍率加算（未失衡生效）%", "skill", null],
     ["sheerDmgBonus", "贯穿增伤%", "skill", null],
     ["physicalSheerDmg", "物理贯穿增伤%", "skill", null],
     ["fireSheerDmg", "火贯穿增伤%", "skill", null],
@@ -190,8 +198,11 @@ export const FALLBACK_LABELS = {
     electricSheerDmg: "电贯穿增伤",
     etherSheerDmg: "以太贯穿增伤",
     baseMultiplierBonus: "异常倍率加算",
+    disorderBaseMultiplierBonus: "紊乱倍率加算",
     anomalyCritRate: "异常暴击率",
     anomalyCritDmg: "异常暴击伤害",
+    stunDmgMultiplierBonus: "失衡易伤倍率加算",
+    stunDmgMultiplierBonusAlways: "失衡易伤倍率加算（未失衡生效）",
     skillMultiplierBonus: "技能倍率加算",
 }
 
@@ -271,8 +282,11 @@ export const PERCENT_KEYS = new Set([
     "electricSheerDmg",
     "etherSheerDmg",
     "baseMultiplierBonus",
+    "disorderBaseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
+    "stunDmgMultiplierBonus",
+    "stunDmgMultiplierBonusAlways",
     "skillMultiplierBonus",
 ])
 export const PERCENT_MODE_KEY = {
@@ -322,8 +336,11 @@ export const STORED_PERCENT_STATS = new Set([
     "electricSheerDmg",
     "etherSheerDmg",
     "baseMultiplierBonus",
+    "disorderBaseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
+    "stunDmgMultiplierBonus",
+    "stunDmgMultiplierBonusAlways",
     "skillMultiplierBonus",
 ])
 export const STORED_STAT_LABELS = {
@@ -366,8 +383,11 @@ export const STORED_STAT_LABELS = {
     electricSheerDmg: "电贯穿增伤%",
     etherSheerDmg: "以太贯穿增伤%",
     baseMultiplierBonus: "异常倍率加算%",
+    disorderBaseMultiplierBonus: "紊乱倍率加算%",
     anomalyCritRate: "异常暴击率%",
     anomalyCritDmg: "异常暴击伤害%",
+    stunDmgMultiplierBonus: "失衡易伤倍率加算%",
+    stunDmgMultiplierBonusAlways: "失衡易伤倍率加算（未失衡生效）%",
     skillMultiplierBonus: "技能倍率加算%",
 }
 
@@ -392,11 +412,15 @@ export function localizedText(value) {
 
 export function combatBuffDisplayName(buff) {
     if (buff?.sourceKind === "teammate" || buff?.sourceCategory === "agent") {
-        return localizedText(buff?.source)
+        const owner = localizedText(buff?.ownerName)
+            || localizedText(buff?.teammateName)
+            || localizedText(buff?.agentName)
+        const source = localizedText(buff?.source)
             || localizedText(buff?.sourceLabel)
             || localizedText(buff?.name)
             || buff?.id
             || "-"
+        return owner ? `${owner} | ${source}` : source
     }
 
     return localizedText(buff?.name)
@@ -857,11 +881,17 @@ export function defaultRuntimeForBuff(buff = {}) {
         const id = effectRuleId(rule)
         if (rule.type === "derived" || rule.type === "formula") {
             runtime.effects[id] = {
+                enabled: true,
                 sourceValue: Number(rule.source?.defaultValue ?? rule.defaultSourceValue ?? 0),
             }
         } else if (rule.type === "stacked") {
             runtime.effects[id] = {
+                enabled: true,
                 stacks: Number(rule.defaultStacks ?? rule.maxStacks ?? 1),
+            }
+        } else {
+            runtime.effects[id] = {
+                enabled: true,
             }
         }
     }
@@ -878,6 +908,14 @@ export function normalizeRuntimeForBuff(buff = {}, runtime = {}) {
             ...defaults.effects,
             ...(input.effects ?? {}),
         },
+    }
+    for (const rule of effectRules(buff)) {
+        const id = effectRuleId(rule)
+        next.effects[id] = {
+            ...(defaults.effects[id] ?? { enabled: true }),
+            ...(next.effects[id] ?? {}),
+            enabled: true,
+        }
     }
     for (const group of runtimeSourceGroups(buff)) {
         const primaryId = group.ruleIds[0]
@@ -909,6 +947,7 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
     const id = effectRuleId(rule)
     const coverage = Number(runtime?.coverage ?? effect?.coverage?.default ?? 1)
     const ruleRuntime = runtime?.effects?.[id] ?? {}
+    const coverageText = coverage !== 1 ? `（覆盖率 ${coverage}）` : ""
     if (rule.type === "damageModifier") {
         const rawValue = Number(rule.value ?? 0)
         const value = (rule.valueUnit === "decimal" ? rawValue * 100 : Math.abs(rawValue) > 1 ? rawValue : rawValue * 100) * coverage
@@ -919,7 +958,7 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
             ...(appliesTo.elements ?? []).map(item => DAMAGE_ELEMENT_SHORT_LABELS[item] ?? item),
             ...(appliesTo.skillTargets ?? []).map(item => skillTargetLabel(item, meta)),
         ]
-        return `${DAMAGE_MODIFIER_KIND_LABELS[rule.kind] ?? rule.kind} +${formatStoredStatValue("dmgBonus", value)}${scopes.length ? `（${scopes.join(" / ")}）` : ""}${coverage !== 1 ? `（覆盖率 ${coverage}）` : ""}`
+        return `${DAMAGE_MODIFIER_KIND_LABELS[rule.kind] ?? rule.kind} +${formatStoredStatValue("dmgBonus", value)}${scopes.length ? `（${scopes.join(" / ")}）` : ""}${coverageText}`
     }
     if (rule.type === "derived") {
         const sourceValue = Number(ruleRuntime.sourceValue ?? rule.defaultSourceValue ?? 0)
@@ -927,9 +966,7 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
         const uncapped = sourceValue * ratio / 100
         const capped = Number.isFinite(Number(rule.cap)) ? Math.min(uncapped, Number(rule.cap)) : uncapped
         const finalValue = capped * coverage
-        const source = localizedText(rule.sourceLabel) || "来源数值"
-        const capText = Number.isFinite(Number(rule.cap)) ? `，上限 ${rule.cap}` : ""
-        return `${storedStatLabel(rule.stat, rule.mode, meta)} +${formatStoredStatValue(rule.stat, finalValue, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}（${source} ${sourceValue} × ${ratio}%${capText}，覆盖率 ${coverage}）`
+        return `${storedStatLabel(rule.stat, rule.mode, meta)} +${formatStoredStatValue(rule.stat, finalValue, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${coverageText}`
     }
     if (rule.type === "formula") {
         const source = rule.source ?? {}
@@ -941,9 +978,7 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
         const expression = rule.formula?.expression ?? ""
         try {
             const finalValue = evaluateFormulaExpression(expression, { [source.variable ?? "x"]: sourceValue }) * coverage
-            const sourceLabel = localizedText(source.label ?? rule.sourceLabel) || "来源数值"
-            const coverageText = coverage !== 1 ? `，覆盖率 ${coverage}` : ""
-            return `${storedStatLabel(rule.stat, rule.mode, meta)} +${formatStoredStatValue(rule.stat, finalValue, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}（${sourceLabel} x=${sourceValue}；公式 ${expression}${coverageText}）`
+            return `${storedStatLabel(rule.stat, rule.mode, meta)} +${formatStoredStatValue(rule.stat, finalValue, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${coverageText}`
         } catch {
             return `${storedStatLabel(rule.stat, rule.mode, meta)}：公式无效`
         }
@@ -959,7 +994,7 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
     }
     const displayValue = Number(rule.displayValue ?? rule.value ?? 0)
     const value = (Number.isFinite(displayValue) ? displayValue : Number(rule.value ?? 0)) * coverage
-    return `${storedStatLabel(rule.stat, rule.mode, meta)} +${formatStoredStatValue(rule.stat, value, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${coverage !== 1 ? `（覆盖率 ${coverage}）` : ""}`
+    return `${storedStatLabel(rule.stat, rule.mode, meta)} +${formatStoredStatValue(rule.stat, value, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${coverageText}`
 }
 
 export function storedBuffModifierText(modifier = {}) {

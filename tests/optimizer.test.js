@@ -367,6 +367,42 @@ assert.deepEqual(resultScores(fangedManualZero), resultScores(fangedManualZeroLe
 assert.deepEqual(resultIds(fangedManualZero), resultIds(fangedManualZeroNoPrune))
 assert.deepEqual(resultScores(fangedManualZero), resultScores(fangedManualZeroNoPrune))
 
+const branchBladeSet = "scanner-set-48ee0a14625f"
+const branchBladeStore = storeWithFourPieceSet(branchBladeSet)
+const branchBladeCritDmgDisabledInput = optimizerInput({
+    settings: {
+        fourPieceSetId: branchBladeSet,
+        fourPieceBuffMode: "manual",
+        fourPieceBuffRuntimeInputs: {
+            [`driveDisc4pc:${branchBladeSet}.self`]: {
+                coverage: 1,
+                effects: {
+                    effect_d8w3n6px: {
+                        enabled: false,
+                    },
+                    effect_l5c9r2qa: {
+                        enabled: true,
+                    },
+                },
+            },
+        },
+    },
+})
+const branchBladeCritDmgDisabled = optimizeDriveDiscs(catalog, branchBladeStore, branchBladeCritDmgDisabledInput)
+const branchBladeCritDmgDisabledLegacy = optimizeDriveDiscs(catalog, branchBladeStore, {
+    ...branchBladeCritDmgDisabledInput,
+    settings: {
+        ...branchBladeCritDmgDisabledInput.settings,
+        algorithm: "exact-legacy",
+    },
+})
+const branchBladeEffect = branchBladeCritDmgDisabled.results[0].data.inCombat.activeEffects
+    .find(item => item.key === `driveDisc4pc:${branchBladeSet}.self`)
+assert.equal(branchBladeEffect?.resolvedStats?.find(item => item.stat === "critDmg"), undefined)
+assert.equal(branchBladeEffect?.resolvedStats?.find(item => item.stat === "critRate")?.value, 0.12)
+assert.deepEqual(resultIds(branchBladeCritDmgDisabled), resultIds(branchBladeCritDmgDisabledLegacy))
+assert.deepEqual(resultScores(branchBladeCritDmgDisabled), resultScores(branchBladeCritDmgDisabledLegacy))
+
 const yunkuiSet = "yunkui_tales"
 const yunkuiStore = storeWithFourPieceSet(yunkuiSet)
 const yunkuiManualZeroStackInput = optimizerInput({
@@ -444,7 +480,7 @@ const miyabiDefaultDamage = calculateInCombatPanel(catalog, {
     combatBuffs: { activeBuffIds: [] },
     damage: miyabi.defaultCalculationConfig,
 })
-assert.equal(miyabiDefaultDamage.damage.events.length, 8)
+assert.equal(miyabiDefaultDamage.damage.events.length, 9)
 const miyabiDisorder = miyabiDefaultDamage.damage.events.find(event => event.id === "miyabi_frozen_disorder")
 assert.equal(miyabiDisorder?.kind, "anomaly")
 assert.equal(miyabiDisorder?.settlementType, "disorder")
@@ -453,6 +489,7 @@ assert.equal(miyabiDisorder?.input?.durationSeconds, 20)
 assert.ok(miyabiDefaultDamage.damage.events.some(event => event.id === "miyabi_shatter" && event.kind === "anomaly"))
 assert.ok(miyabiDefaultDamage.damage.events.some(event => event.id === "direct-7" && event.input?.skillSource?.moveId === "quick_support_flower_wind"))
 assert.ok(miyabiDefaultDamage.damage.events.some(event => event.id === "disorder-8" && event.input?.settlementType === "disorder"))
+assert.ok(miyabiDefaultDamage.damage.events.some(event => event.id === "direct-9" && event.input?.skillSource?.moveId === "frostburn_break"))
 
 const preview = previewDriveDiscOptimization(catalog, store, optimizerInput())
 assert.equal(preview.metrics.estimatedCombinationCount, exact.metrics.estimatedCombinationCount)

@@ -9,6 +9,24 @@ Chinese documentation is available in [README.zh-CN.md](README.zh-CN.md).
 
 ## Upload Update Summaries
 
+### 2026-06-23 12:55 +08:00
+
+This upload adds or expands these major areas:
+
+- Merged the optimizer workspace into the homepage so `/` now shows manual
+  Drive Disc selection, saved loadout selection, optimized candidate tabs,
+  out-of-combat panel, in-combat panel, and damage white-box output together.
+- Replaced the old `/calculate.html` page with a compatibility redirect to `/`
+  and tightened missing static file handling so unknown files return `404`.
+- Added unified Drive Disc scheme controls for manual picks, saved loadouts,
+  and optimizer results, including current-scheme 4-piece buff runtime controls
+  and save/apply loadout actions from the same workspace.
+- Expanded combat buff and Drive Disc set data for newer teammates and 4-piece
+  behavior, including additional teammate portrait assets.
+- Added regression coverage for the unified optimizer UI, compatibility
+  redirect, damage modifier handling, maintenance validation, optimizer set
+  behavior, shared combat helpers, and W-Engine modification values.
+
 ### 2026-06-09 20:28 +08:00
 
 This upload adds or expands these major areas:
@@ -233,7 +251,6 @@ zzz_calculator/
   frontend/
     index.html
     drive-discs.html
-    calculate.html
     accounts.html
     maintenance.html
     app.js
@@ -268,9 +285,9 @@ the port with `PORT=8791 npm start`.
 
 Main pages:
 
-- `/` - homepage calculator, panel view, combat buffs, and damage white box
+- `/` - Drive Disc optimizer homepage with manual, loadout, and optimized scheme previews
 - `/drive-discs.html` - Drive Disc inventory and loadout management
-- `/calculate.html` - Drive Disc optimizer workspace
+- `/calculate.html` - legacy optimizer compatibility entry that redirects to `/`
 - `/accounts.html` - account creation, switching, rename, and deletion
 - `/maintenance.html` - static catalog maintenance. Enabled by default during
   local development and disabled by default when `NODE_ENV=production`.
@@ -325,6 +342,7 @@ npm run test:compiled-panel-score
 npm run test:optimizer
 npm run test:optimizer-progress
 npm run test:optimizer-api
+npm run test:optimizer-ui
 npm run test:optimizer-fuzz
 npm run test:drive-disc-analysis
 npm run test:drive-disc-import

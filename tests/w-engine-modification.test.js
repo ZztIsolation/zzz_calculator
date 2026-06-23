@@ -198,6 +198,30 @@ const hailfallRank5 = createInCombatPanelCalculator(catalog, {
 approx(hailfallRank5.inCombat.buffTotals.critDmg, 0.8, "Hailfall rank 5 CRIT DMG should scale")
 approx(hailfallRank5.inCombat.buffTotals.iceDmg, 0.64, "Hailfall rank 5 stacked Ice DMG should scale per stack")
 
+const hailfallCritDisabled = createInCombatPanelCalculator(catalog, {
+    agentId: "hoshimi_miyabi",
+    coreSkillLevel: "none",
+    wEngineId: "hailfall_star_palace",
+    wEngineModificationLevel: 5,
+    combatBuffs: {
+        activeBuffIds: ["wEngine:hailfall_star_palace.self"],
+        runtimeInputs: {
+            "wEngine:hailfall_star_palace.self": {
+                effects: {
+                    effect_hailfall_crit_dmg: {
+                        enabled: false,
+                    },
+                    effect_hailfall_ice_dmg: {
+                        stacks: 1,
+                    },
+                },
+            },
+        },
+    },
+}).calculate([], { round: false })
+approx(hailfallCritDisabled.inCombat.buffTotals.critDmg, 0, "Disabled W-Engine fixed effect should not apply")
+approx(hailfallCritDisabled.inCombat.buffTotals.iceDmg, 0.32, "Enabled W-Engine stacked effect should still honor selected stacks")
+
 const tenfoldRank4 = createInCombatPanelCalculator(catalog, {
     agentId: "alice_thymefield",
     coreSkillLevel: "none",
