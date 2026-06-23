@@ -8,6 +8,123 @@
   ],
   "sets": [
     {
+      "id": "zzz_wiki_2038",
+      "name": {
+        "zhCN": "呼啸沙龙"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/howling_salon.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/06/09/141353238/7589a4b9181ef956d0b22e3a60fc3908_6032173077704371616.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_wiki_2038_2pc",
+            "type": "fixed",
+            "stat": "windDmg",
+            "value": 10,
+            "mode": "flat"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "装备者发动[强化特殊技]时，装备者异常精通提升25点，最多叠加2层，持续40秒，重复触发时刷新持续时间；装备者触发[风化]效果后，装备者造成的伤害提升18%，持续40秒，重复触发时刷新持续时间。",
+          "en": ""
+        },
+        "selfBuff": {
+          "condition": "发动[强化特殊技]并触发[风化]效果后，默认按2层计算",
+          "durationSeconds": 40,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          },
+          "effects": [
+            {
+              "id": "effect_wiki_2038_4pc_anomaly_proficiency",
+              "type": "stacked",
+              "stat": "anomalyProficiency",
+              "valuePerStack": 25,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "mode": "flat"
+            },
+            {
+              "id": "effect_wiki_2038_4pc_dmg_bonus",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 18,
+              "mode": "flat"
+            }
+          ]
+        },
+        "teamBuff": null
+      }
+    },
+    {
+      "id": "zzz_wiki_2029",
+      "name": {
+        "zhCN": "拂晓行纪"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/dawn_bloom_journey.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/06/09/141353238/91f29d38112168981497192118064c28_2298427936707118135.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
+      ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_wiki_2029_2pc",
+            "type": "fixed",
+            "stat": "etherDmg",
+            "value": 10,
+            "mode": "flat"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "装备者为以太属性代理人时，暴击伤害提升30%；装备者发动[强化特殊技]或[终结技]时，装备者的攻击力提升10%，持续30秒，重复触发时刷新持续时间。",
+          "en": ""
+        },
+        "selfBuff": {
+          "condition": "以太属性代理人发动[强化特殊技]或[终结技]后",
+          "durationSeconds": 30,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          },
+          "effects": [
+            {
+              "id": "effect_wiki_2029_4pc_crit_dmg",
+              "type": "fixed",
+              "stat": "critDmg",
+              "value": 30,
+              "mode": "flat"
+            },
+            {
+              "id": "effect_wiki_2029_4pc_atk_pct",
+              "type": "fixed",
+              "stat": "atkPct",
+              "value": 10,
+              "mode": "pct",
+              "basis": "baseAtk"
+            }
+          ]
+        },
+        "teamBuff": null
+      }
+    },
+    {
       "id": "zzz_wiki_1907",
       "name": {
         "zhCN": "雪兔梦游仙境"

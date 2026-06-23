@@ -34,12 +34,14 @@ const BONUS_KEY_MAP = {
     iceResIgnore: "iceResIgnore",
     electricResIgnore: "electricResIgnore",
     etherResIgnore: "etherResIgnore",
+    windResIgnore: "windResIgnore",
     dmgBonus: "dmgBonus",
     physicalDmg: "physicalDmg",
     fireDmg: "fireDmg",
     iceDmg: "iceDmg",
     electricDmg: "electricDmg",
     etherDmg: "etherDmg",
+    windDmg: "windDmg",
     sheerForceFlat: "sheerForceFlat",
 }
 
@@ -64,12 +66,14 @@ const BONUS_KEYS = [
     "iceResIgnore",
     "electricResIgnore",
     "etherResIgnore",
+    "windResIgnore",
     "dmgBonus",
     "physicalDmg",
     "fireDmg",
     "iceDmg",
     "electricDmg",
     "etherDmg",
+    "windDmg",
     "sheerForceFlat",
 ]
 
@@ -90,12 +94,14 @@ const OUTPUT_PANEL_KEYS = [
     "iceResIgnore",
     "electricResIgnore",
     "etherResIgnore",
+    "windResIgnore",
     "dmgBonus",
     "physicalDmg",
     "fireDmg",
     "iceDmg",
     "electricDmg",
     "etherDmg",
+    "windDmg",
     "sheerForce",
     "sheerForceFlat",
 ]
@@ -151,6 +157,7 @@ const COMBAT_TARGET_BONUS_KEYS = [
     "enemyIceResReduction",
     "enemyElectricResReduction",
     "enemyEtherResReduction",
+    "enemyWindResReduction",
 ]
 
 const COMBAT_BONUS_KEYS = [
@@ -162,13 +169,14 @@ const BONUS_KEY_INDEX = new Map(BONUS_KEYS.map((key, index) => [key, index]))
 const COMBAT_BONUS_KEY_INDEX = new Map(COMBAT_BONUS_KEYS.map((key, index) => [key, index]))
 const PANEL_KEY_INDEX = new Map(OUTPUT_PANEL_KEYS.map((key, index) => [key, index]))
 
-const DAMAGE_ELEMENTS = ["physical", "fire", "ice", "electric", "ether"]
+const DAMAGE_ELEMENTS = ["physical", "fire", "ice", "electric", "ether", "wind"]
 const DAMAGE_ELEMENT_LABELS = {
     physical: "物理",
     fire: "火",
     ice: "冰",
     electric: "电",
     ether: "以太",
+    wind: "风",
 }
 const RES_IGNORE_KEY_BY_ELEMENT = {
     physical: "physicalResIgnore",
@@ -176,6 +184,7 @@ const RES_IGNORE_KEY_BY_ELEMENT = {
     ice: "iceResIgnore",
     electric: "electricResIgnore",
     ether: "etherResIgnore",
+    wind: "windResIgnore",
 }
 const RES_REDUCTION_KEY_BY_ELEMENT = {
     physical: "enemyPhysicalResReduction",
@@ -183,6 +192,7 @@ const RES_REDUCTION_KEY_BY_ELEMENT = {
     ice: "enemyIceResReduction",
     electric: "enemyElectricResReduction",
     ether: "enemyEtherResReduction",
+    wind: "enemyWindResReduction",
 }
 const RES_IGNORE_KEYS = Object.values(RES_IGNORE_KEY_BY_ELEMENT)
 
@@ -192,11 +202,12 @@ const SHEER_DMG_KEY_BY_ELEMENT = {
     ice: "iceSheerDmg",
     electric: "electricSheerDmg",
     ether: "etherSheerDmg",
+    wind: "windSheerDmg",
 }
 
 const DAMAGE_EVENT_KINDS = ["direct", "anomaly", "disorder", "sheer"]
 const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
-const DAMAGE_MODIFIER_KINDS = ["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "directDamageBonus", "sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "skillMultiplierBonus"]
+const DAMAGE_MODIFIER_KINDS = ["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "directDamageBonus", "sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg", "skillMultiplierBonus"]
 const EVENT_MODIFIER_STAT_KEYS = new Set([
     "anomalyDamageBonus",
     "disorderDamageBonus",
@@ -212,6 +223,7 @@ const EVENT_MODIFIER_STAT_KEYS = new Set([
     "iceSheerDmg",
     "electricSheerDmg",
     "etherSheerDmg",
+    "windSheerDmg",
     "skillMultiplierBonus",
 ])
 const SKILL_TARGET_STAT_KEYS = new Set([
@@ -220,6 +232,7 @@ const SKILL_TARGET_STAT_KEYS = new Set([
     "iceResIgnore",
     "electricResIgnore",
     "etherResIgnore",
+    "windResIgnore",
     "enemyDefReduction",
     "enemyResReduction",
     "enemyPhysicalResReduction",
@@ -227,12 +240,14 @@ const SKILL_TARGET_STAT_KEYS = new Set([
     "enemyIceResReduction",
     "enemyElectricResReduction",
     "enemyEtherResReduction",
+    "enemyWindResReduction",
     "dmgBonus",
     "physicalDmg",
     "fireDmg",
     "iceDmg",
     "electricDmg",
     "etherDmg",
+    "windDmg",
     "anomalyDamageBonus",
     "disorderDamageBonus",
     "stunDmgMultiplierBonus",
@@ -243,6 +258,7 @@ const SKILL_TARGET_STAT_KEYS = new Set([
     "iceSheerDmg",
     "electricSheerDmg",
     "etherSheerDmg",
+    "windSheerDmg",
     "skillMultiplierBonus",
 ])
 const EVENT_MODIFIER_KIND_VALUES = new Set([
@@ -310,12 +326,14 @@ const STORED_PERCENT_STATS = new Set([
     "iceResIgnore",
     "electricResIgnore",
     "etherResIgnore",
+    "windResIgnore",
     "dmgBonus",
     "physicalDmg",
     "fireDmg",
     "iceDmg",
     "electricDmg",
     "etherDmg",
+    "windDmg",
     "anomalyDamageBonus",
     "disorderDamageBonus",
     "sheerDmgBonus",
@@ -324,6 +342,7 @@ const STORED_PERCENT_STATS = new Set([
     "iceSheerDmg",
     "electricSheerDmg",
     "etherSheerDmg",
+    "windSheerDmg",
     "baseMultiplierBonus",
     "disorderBaseMultiplierBonus",
     "anomalyCritRate",
@@ -339,6 +358,7 @@ const STORED_PERCENT_STATS = new Set([
     "enemyIceResReduction",
     "enemyElectricResReduction",
     "enemyEtherResReduction",
+    "enemyWindResReduction",
 ])
 
 const BASE_PERCENT_STATS = new Set([
@@ -351,12 +371,14 @@ const BASE_PERCENT_STATS = new Set([
     "iceResIgnore",
     "electricResIgnore",
     "etherResIgnore",
+    "windResIgnore",
     "dmgBonus",
     "physicalDmg",
     "fireDmg",
     "iceDmg",
     "electricDmg",
     "etherDmg",
+    "windDmg",
 ])
 
 function roundNumbers(value) {
@@ -1872,11 +1894,10 @@ function calculateCombatPanelFromTotals(agent, outOfCombat, bonusTotals) {
         panel[key] = outOfCombat.panel[key] + bonusTotals[key]
     }
     panel.dmgBonus = outOfCombat.panel.dmgBonus + bonusTotals.dmgBonus
-    panel.physicalDmg = outOfCombat.panel.physicalDmg + bonusTotals.physicalDmg
-    panel.fireDmg = outOfCombat.panel.fireDmg + bonusTotals.fireDmg
-    panel.iceDmg = outOfCombat.panel.iceDmg + bonusTotals.iceDmg
-    panel.electricDmg = outOfCombat.panel.electricDmg + bonusTotals.electricDmg
-    panel.etherDmg = outOfCombat.panel.etherDmg + bonusTotals.etherDmg
+    for (const element of DAMAGE_ELEMENTS) {
+        const key = `${element}Dmg`
+        panel[key] = outOfCombat.panel[key] + bonusTotals[key]
+    }
     applyPanelSheerForce(agent, panel, bonusTotals)
 
     const selectedAttributeBonusKey = resolveAttributeBonusKey(agent)
@@ -3958,11 +3979,10 @@ function calculatePanel({ agent, wEngine, driveDiscs, driveDiscSets, coreSkillLe
         panel[key] = bonusTotals[key]
     }
     panel.dmgBonus = basePanelStats.dmgBonus + bonusTotals.dmgBonus
-    panel.physicalDmg = bonusTotals.physicalDmg
-    panel.fireDmg = bonusTotals.fireDmg
-    panel.iceDmg = bonusTotals.iceDmg
-    panel.electricDmg = bonusTotals.electricDmg
-    panel.etherDmg = bonusTotals.etherDmg
+    for (const element of DAMAGE_ELEMENTS) {
+        const key = `${element}Dmg`
+        panel[key] = bonusTotals[key]
+    }
     applyPanelSheerForce(agent, panel, bonusTotals)
 
     const selectedAttributeBonusKey = resolveAttributeBonusKey(agent)
@@ -4144,11 +4164,10 @@ function createPreparedOutOfCombatPanelCalculator({ agent, wEngine, driveDiscSet
                     panelValues[PANEL_KEY_INDEX.get(key)] = denseValue(bonusValues, BONUS_KEY_INDEX, key)
                 }
                 panelValues[PANEL_KEY_INDEX.get("dmgBonus")] = basePanelStats.dmgBonus + denseValue(bonusValues, BONUS_KEY_INDEX, "dmgBonus")
-                panelValues[PANEL_KEY_INDEX.get("physicalDmg")] = denseValue(bonusValues, BONUS_KEY_INDEX, "physicalDmg")
-                panelValues[PANEL_KEY_INDEX.get("fireDmg")] = denseValue(bonusValues, BONUS_KEY_INDEX, "fireDmg")
-                panelValues[PANEL_KEY_INDEX.get("iceDmg")] = denseValue(bonusValues, BONUS_KEY_INDEX, "iceDmg")
-                panelValues[PANEL_KEY_INDEX.get("electricDmg")] = denseValue(bonusValues, BONUS_KEY_INDEX, "electricDmg")
-                panelValues[PANEL_KEY_INDEX.get("etherDmg")] = denseValue(bonusValues, BONUS_KEY_INDEX, "etherDmg")
+                for (const element of DAMAGE_ELEMENTS) {
+                    const key = `${element}Dmg`
+                    panelValues[PANEL_KEY_INDEX.get(key)] = denseValue(bonusValues, BONUS_KEY_INDEX, key)
+                }
                 panelValues[PANEL_KEY_INDEX.get("sheerForceFlat")] = isRupture
                     ? denseValue(bonusValues, BONUS_KEY_INDEX, "sheerForceFlat")
                     : 0
@@ -4218,11 +4237,10 @@ function createPreparedOutOfCombatPanelCalculator({ agent, wEngine, driveDiscSet
                 panel[key] = bonusTotals[key]
             }
             panel.dmgBonus = basePanelStats.dmgBonus + bonusTotals.dmgBonus
-            panel.physicalDmg = bonusTotals.physicalDmg
-            panel.fireDmg = bonusTotals.fireDmg
-            panel.iceDmg = bonusTotals.iceDmg
-            panel.electricDmg = bonusTotals.electricDmg
-            panel.etherDmg = bonusTotals.etherDmg
+            for (const element of DAMAGE_ELEMENTS) {
+                const key = `${element}Dmg`
+                panel[key] = bonusTotals[key]
+            }
             applyPanelSheerForce(agent, panel, bonusTotals)
 
             const selectedAttributeBonusKey = resolveAttributeBonusKey(agent)
@@ -4297,11 +4315,10 @@ function createPreparedOutOfCombatPanelCalculator({ agent, wEngine, driveDiscSet
                 panel[key] = bonusTotals[key]
             }
             panel.dmgBonus = basePanelStats.dmgBonus + bonusTotals.dmgBonus
-            panel.physicalDmg = bonusTotals.physicalDmg
-            panel.fireDmg = bonusTotals.fireDmg
-            panel.iceDmg = bonusTotals.iceDmg
-            panel.electricDmg = bonusTotals.electricDmg
-            panel.etherDmg = bonusTotals.etherDmg
+            for (const element of DAMAGE_ELEMENTS) {
+                const key = `${element}Dmg`
+                panel[key] = bonusTotals[key]
+            }
             applyPanelSheerForce(agent, panel, bonusTotals)
 
             const selectedAttributeBonusKey = resolveAttributeBonusKey(agent)
@@ -4383,11 +4400,10 @@ function createPreparedOutOfCombatPanelCalculator({ agent, wEngine, driveDiscSet
                 panel[key] = bonusTotals[key]
             }
             panel.dmgBonus = basePanelStats.dmgBonus + bonusTotals.dmgBonus
-            panel.physicalDmg = bonusTotals.physicalDmg
-            panel.fireDmg = bonusTotals.fireDmg
-            panel.iceDmg = bonusTotals.iceDmg
-            panel.electricDmg = bonusTotals.electricDmg
-            panel.etherDmg = bonusTotals.etherDmg
+            for (const element of DAMAGE_ELEMENTS) {
+                const key = `${element}Dmg`
+                panel[key] = bonusTotals[key]
+            }
             applyPanelSheerForce(agent, panel, bonusTotals)
 
             const selectedAttributeBonusKey = resolveAttributeBonusKey(agent)
@@ -4980,16 +4996,11 @@ export function createInCombatPanelCalculator(catalog, input) {
                 }
                 panelValues[PANEL_KEY_INDEX.get("dmgBonus")] = densePanelValue(outPanelValues, "dmgBonus")
                     + denseCombatValue(combatValues, "dmgBonus")
-                panelValues[PANEL_KEY_INDEX.get("physicalDmg")] = densePanelValue(outPanelValues, "physicalDmg")
-                    + denseCombatValue(combatValues, "physicalDmg")
-                panelValues[PANEL_KEY_INDEX.get("fireDmg")] = densePanelValue(outPanelValues, "fireDmg")
-                    + denseCombatValue(combatValues, "fireDmg")
-                panelValues[PANEL_KEY_INDEX.get("iceDmg")] = densePanelValue(outPanelValues, "iceDmg")
-                    + denseCombatValue(combatValues, "iceDmg")
-                panelValues[PANEL_KEY_INDEX.get("electricDmg")] = densePanelValue(outPanelValues, "electricDmg")
-                    + denseCombatValue(combatValues, "electricDmg")
-                panelValues[PANEL_KEY_INDEX.get("etherDmg")] = densePanelValue(outPanelValues, "etherDmg")
-                    + denseCombatValue(combatValues, "etherDmg")
+                for (const element of DAMAGE_ELEMENTS) {
+                    const key = `${element}Dmg`
+                    panelValues[PANEL_KEY_INDEX.get(key)] = densePanelValue(outPanelValues, key)
+                        + denseCombatValue(combatValues, key)
+                }
                 panelValues[PANEL_KEY_INDEX.get("sheerForceFlat")] = isRupture
                     ? densePanelValue(outPanelValues, "sheerForceFlat") + denseCombatValue(combatValues, "sheerForceFlat")
                     : 0

@@ -3,8 +3,8 @@ import { evaluateFormulaExpression, validateFormulaExpression } from "./formulaE
 const ID_PATTERN = /^[a-z0-9][a-z0-9_.-]*$/
 const PLACEHOLDER_NAMES = new Set(["未命名"])
 
-const ATTRIBUTE_VALUES = new Set(["physical", "fire", "ice", "electric", "ether", "honed_edge", "frost", "xuanmo"])
-const DAMAGE_ELEMENT_VALUES = new Set(["physical", "fire", "ice", "electric", "ether"])
+const ATTRIBUTE_VALUES = new Set(["physical", "fire", "ice", "electric", "ether", "wind", "honed_edge", "frost", "xuanmo"])
+const DAMAGE_ELEMENT_VALUES = new Set(["physical", "fire", "ice", "electric", "ether", "wind"])
 const SPECIALTY_VALUES = new Set(["attack", "stun", "anomaly", "support", "defense", "rupture"])
 const RARITY_VALUES = new Set(["B", "A", "S"])
 const SOURCE_TYPE_VALUES = new Set(["teammate", "self", "boss", "field", "manual"])
@@ -20,7 +20,7 @@ const DAMAGE_EVENT_KIND_VALUES = new Set(["direct", "anomaly", "disorder", "shee
 const ANOMALY_SETTLEMENT_TYPE_VALUES = new Set(["attribute", "disorder"])
 const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
 const CALCULATION_MODE_VALUES = new Set(["single", "sheer", "anomaly", "custom"])
-const SHEER_DAMAGE_MODIFIER_KIND_VALUES = ["sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg"]
+const SHEER_DAMAGE_MODIFIER_KIND_VALUES = ["sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg"]
 const DAMAGE_MODIFIER_KIND_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "directDamageBonus", "skillMultiplierBonus", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES])
 const SKILL_TARGET_DAMAGE_MODIFIER_KIND_VALUES = new Set(["directDamageBonus", "skillMultiplierBonus"])
 const DAMAGE_MODIFIER_VALUE_UNIT_VALUES = new Set(["decimal"])
@@ -32,6 +32,7 @@ const SKILL_TARGET_STAT_VALUES = new Set([
     "iceResIgnore",
     "electricResIgnore",
     "etherResIgnore",
+    "windResIgnore",
     "enemyDefReduction",
     "enemyDefIgnore",
     "enemyResReduction",
@@ -40,12 +41,14 @@ const SKILL_TARGET_STAT_VALUES = new Set([
     "enemyIceResReduction",
     "enemyElectricResReduction",
     "enemyEtherResReduction",
+    "enemyWindResReduction",
     "dmgBonus",
     "physicalDmg",
     "fireDmg",
     "iceDmg",
     "electricDmg",
     "etherDmg",
+    "windDmg",
     "anomalyDamageBonus",
     "disorderDamageBonus",
     "stunDmgMultiplierBonus",
@@ -80,6 +83,7 @@ const STAT_VALUES = new Set([
     "iceResIgnore",
     "electricResIgnore",
     "etherResIgnore",
+    "windResIgnore",
     "dmgBonus",
     "hpBase",
     "atkBase",
@@ -89,6 +93,7 @@ const STAT_VALUES = new Set([
     "iceDmg",
     "electricDmg",
     "etherDmg",
+    "windDmg",
     "enemyDefReduction",
     "enemyDefIgnore",
     "enemyDefFlatReduction",
@@ -98,6 +103,7 @@ const STAT_VALUES = new Set([
     "enemyIceResReduction",
     "enemyElectricResReduction",
     "enemyEtherResReduction",
+    "enemyWindResReduction",
 ])
 const RULE_STAT_VALUES = new Set([...STAT_VALUES, ...DEFAULT_EVENT_MODIFIER_STAT_VALUES, ...SKILL_TARGET_STAT_VALUES])
 const TARGET_STAT_VALUES = new Set([
@@ -110,6 +116,7 @@ const TARGET_STAT_VALUES = new Set([
     "enemyIceResReduction",
     "enemyElectricResReduction",
     "enemyEtherResReduction",
+    "enemyWindResReduction",
 ])
 const MODE_VALUES = new Set(["flat", "pct"])
 const BASIS_VALUES = new Set(["baseHp", "outOfCombatHp", "baseAtk", "outOfCombatAtk", "baseDef", "outOfCombatDef"])
