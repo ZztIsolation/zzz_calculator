@@ -210,13 +210,14 @@ const OPTIMIZER_MINIMUM_FIELDS = [
     ["critRate", "minCritRate"],
     ["critDmg", "minCritDmg"],
 ]
-const DAMAGE_ELEMENTS = ["physical", "fire", "ice", "electric", "ether"]
+const DAMAGE_ELEMENTS = ["physical", "fire", "ice", "electric", "ether", "wind"]
 const DAMAGE_ELEMENT_SHORT_LABELS = {
     physical: "物",
     fire: "火",
     ice: "冰",
     electric: "电",
     ether: "以太",
+    wind: "风",
 }
 const ANOMALY_EFFECT_LABELS = {
     assault: "强击",
@@ -238,6 +239,13 @@ const DAMAGE_MODIFIER_KIND_LABELS = {
     stunDmgMultiplierBonus: "失衡易伤倍率加算",
     stunDmgMultiplierBonusAlways: "失衡易伤倍率加算（未失衡生效）",
     directDamageBonus: "技能专属伤害增伤",
+    sheerDmgBonus: "贯穿增伤",
+    physicalSheerDmg: "物理贯穿增伤",
+    fireSheerDmg: "火贯穿增伤",
+    iceSheerDmg: "冰贯穿增伤",
+    electricSheerDmg: "电贯穿增伤",
+    etherSheerDmg: "以太贯穿增伤",
+    windSheerDmg: "风贯穿增伤",
     skillMultiplierBonus: "技能倍率加算",
 }
 const DEFAULT_ANOMALY_PROC_COUNTS = {
@@ -258,13 +266,14 @@ const DISORDER_TYPE_OPTIONS = [
     ["normal", "（普通）紊乱"],
     ["polarized", "极性紊乱"],
 ]
-const ELEMENT_DMG_KEYS = new Set(["physicalDmg", "fireDmg", "iceDmg", "electricDmg", "etherDmg"])
+const ELEMENT_DMG_KEYS = new Set(["physicalDmg", "fireDmg", "iceDmg", "electricDmg", "etherDmg", "windDmg"])
 const RES_IGNORE_STAT_BY_ELEMENT = {
     physical: "physicalResIgnore",
     fire: "fireResIgnore",
     ice: "iceResIgnore",
     electric: "electricResIgnore",
     ether: "etherResIgnore",
+    wind: "windResIgnore",
 }
 const SKILL_CATEGORY_ORDER = [
     ["basic", "普通攻击", "basicSkillLevelSelect"],
@@ -284,6 +293,7 @@ const ENUM_LABELS = {
         ice: "冰",
         electric: "电",
         ether: "以太",
+        wind: "风",
     },
     specialty: {
         attack: "强攻",
@@ -335,11 +345,13 @@ const STAT_LABELS = {
     iceResIgnore: "冰抗性无视",
     electricResIgnore: "电抗性无视",
     etherResIgnore: "以太抗性无视",
+    windResIgnore: "风抗性无视",
     physicalDmg: "物理伤害加成",
     fireDmg: "火属性伤害加成",
     iceDmg: "冰属性伤害加成",
     electricDmg: "电属性伤害加成",
     etherDmg: "以太伤害加成",
+    windDmg: "风属性伤害加成",
     dmgBonus: "通用伤害加成",
     enemyDefReduction: "敌方减防率",
     enemyDefIgnore: "无视防御率",
@@ -354,6 +366,7 @@ const STAT_LABELS = {
     iceSheerDmg: "冰贯穿增伤",
     electricSheerDmg: "电贯穿增伤",
     etherSheerDmg: "以太贯穿增伤",
+    windSheerDmg: "风贯穿增伤",
 }
 const PERCENT_KEYS = new Set([
     "hpPct",
@@ -370,11 +383,13 @@ const PERCENT_KEYS = new Set([
     "iceResIgnore",
     "electricResIgnore",
     "etherResIgnore",
+    "windResIgnore",
     "physicalDmg",
     "fireDmg",
     "iceDmg",
     "electricDmg",
     "etherDmg",
+    "windDmg",
     "dmgBonus",
     "enemyDefReduction",
     "enemyDefIgnore",
@@ -388,6 +403,7 @@ const PERCENT_KEYS = new Set([
     "iceSheerDmg",
     "electricSheerDmg",
     "etherSheerDmg",
+    "windSheerDmg",
 ])
 const BASE_ORDER = ["hp", "atk", "def"]
 const PANEL_ORDER = [
@@ -408,12 +424,14 @@ const PANEL_ORDER = [
     "iceResIgnore",
     "electricResIgnore",
     "etherResIgnore",
+    "windResIgnore",
     "dmgBonus",
     "physicalDmg",
     "fireDmg",
     "iceDmg",
     "electricDmg",
     "etherDmg",
+    "windDmg",
 ]
 
 let meta = null
@@ -5725,6 +5743,7 @@ const DAMAGE_PANEL_SNAPSHOT_LABELS = {
     iceDmg: "冰属性增伤",
     electricDmg: "电属性增伤",
     etherDmg: "以太增伤",
+    windDmg: "风属性增伤",
     penRatio: "穿透率",
     penFlat: "穿透值",
 }
@@ -5739,6 +5758,7 @@ const DAMAGE_PANEL_PERCENT_KEYS = new Set([
     "iceDmg",
     "electricDmg",
     "etherDmg",
+    "windDmg",
     "penRatio",
 ])
 

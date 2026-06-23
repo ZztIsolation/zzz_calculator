@@ -98,6 +98,7 @@ const STAT_OPTIONS = [
     ["iceDmg", "冰属性伤害加成%"],
     ["electricDmg", "电属性伤害加成%"],
     ["etherDmg", "以太伤害加成%"],
+    ["windDmg", "风属性伤害加成%"],
 ]
 const STAT_LABELS = Object.fromEntries(STAT_OPTIONS)
 const PERCENT_STATS = new Set([
@@ -115,6 +116,7 @@ const PERCENT_STATS = new Set([
     "iceDmg",
     "electricDmg",
     "etherDmg",
+    "windDmg",
 ])
 const INVENTORY_VIEWS = new Set(["inventory", "loadouts"])
 

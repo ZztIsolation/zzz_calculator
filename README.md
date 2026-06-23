@@ -9,6 +9,22 @@ Chinese documentation is available in [README.zh-CN.md](README.zh-CN.md).
 
 ## Upload Update Summaries
 
+### 2026-06-24 01:31 +08:00
+
+This upload adds or expands these major areas:
+
+- Added the official Drive Disc sets Howling Salon and Dawn Bloom Journey,
+  including local icon assets, 2-piece stats, and modeled 4-piece self buffs.
+- Completed Wind stat support across maintenance, homepage panels, the
+  calculator page, Drive Disc inventory, scanner import, optimizer scoring, and
+  stat rules for `windDmg`, `windResIgnore`, `enemyWindResReduction`, and
+  `windSheerDmg`.
+- Added Wind DMG Bonus to slot-5 Drive Disc main-stat pools, using the same
+  30% S-rank main-stat cap as the existing elemental DMG bonus stats.
+- Extended regression validation through percent sanity, maintenance
+  validation, shared combat helpers, Drive Disc import/analysis, optimizer,
+  compiled panel, and damage white-box tests.
+
 ### 2026-06-23 12:55 +08:00
 
 This upload adds or expands these major areas:

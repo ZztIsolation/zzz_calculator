@@ -27,12 +27,14 @@ const STORED_PERCENT_LIMITS = {
     iceResIgnore: 100,
     electricResIgnore: 100,
     etherResIgnore: 100,
+    windResIgnore: 100,
     dmgBonus: 300,
     physicalDmg: 300,
     fireDmg: 300,
     iceDmg: 300,
     electricDmg: 300,
     etherDmg: 300,
+    windDmg: 300,
     enemyDefReduction: 100,
     enemyResReduction: 100,
     enemyPhysicalResReduction: 100,
@@ -40,6 +42,7 @@ const STORED_PERCENT_LIMITS = {
     enemyIceResReduction: 100,
     enemyElectricResReduction: 100,
     enemyEtherResReduction: 100,
+    enemyWindResReduction: 100,
 }
 
 const PANEL_PERCENT_LIMITS = {
@@ -52,12 +55,14 @@ const PANEL_PERCENT_LIMITS = {
     iceResIgnore: 2,
     electricResIgnore: 2,
     etherResIgnore: 2,
+    windResIgnore: 2,
     dmgBonus: 5,
     physicalDmg: 5,
     fireDmg: 5,
     iceDmg: 5,
     electricDmg: 5,
     etherDmg: 5,
+    windDmg: 5,
     enemyDefReduction: 2,
     enemyResReduction: 2,
     enemyPhysicalResReduction: 2,
@@ -65,6 +70,7 @@ const PANEL_PERCENT_LIMITS = {
     enemyIceResReduction: 2,
     enemyElectricResReduction: 2,
     enemyEtherResReduction: 2,
+    enemyWindResReduction: 2,
 }
 
 function visit(value, pathParts, callback) {

@@ -31,6 +31,8 @@ const DRIVE_DISC_SET_ALIASES = {
     "月光骑士颂": { id: "moonlight_lullaby", name: { zhCN: "月光骑士颂" } },
     "如影相随": { id: "shadow_harmony", name: { zhCN: "如影相随" } },
     "山大王": { id: "king_of_the_summit", name: { zhCN: "山大王" } },
+    "呼啸沙龙": { id: "zzz_wiki_2038", name: { zhCN: "呼啸沙龙" } },
+    "拂晓行纪": { id: "zzz_wiki_2029", name: { zhCN: "拂晓行纪" } },
 }
 
 const STAT_LABELS = {
@@ -50,6 +52,7 @@ const STAT_LABELS = {
     "冰属性伤害加成": { pct: "iceDmg" },
     "电属性伤害加成": { pct: "electricDmg" },
     "以太伤害加成": { pct: "etherDmg" },
+    "风属性伤害加成": { pct: "windDmg" },
 }
 
 function clone(value) {

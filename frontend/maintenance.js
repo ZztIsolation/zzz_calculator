@@ -86,6 +86,7 @@ const ATTRIBUTE_OPTIONS = [
     ["ice", "冰"],
     ["electric", "电"],
     ["ether", "以太"],
+    ["wind", "风"],
     ["honed_edge", "凛刃"],
     ["frost", "烈霜"],
     ["xuanmo", "玄墨"],
@@ -151,12 +152,14 @@ const STAT_OPTIONS = [
     ["iceResIgnore", "冰抗性无视%", "percentFlat"],
     ["electricResIgnore", "电抗性无视%", "percentFlat"],
     ["etherResIgnore", "以太抗性无视%", "percentFlat"],
+    ["windResIgnore", "风抗性无视%", "percentFlat"],
     ["dmgBonus", "通用伤害加成%", "percentFlat"],
     ["physicalDmg", "物理伤害加成%", "percentFlat"],
     ["fireDmg", "火属性伤害加成%", "percentFlat"],
     ["iceDmg", "冰属性伤害加成%", "percentFlat"],
     ["electricDmg", "电属性伤害加成%", "percentFlat"],
     ["etherDmg", "以太伤害加成%", "percentFlat"],
+    ["windDmg", "风属性伤害加成%", "percentFlat"],
     ["enemyDefReduction", "敌方减防率%", "percentFlat"],
     ["enemyDefIgnore", "无视防御率%", "percentFlat"],
     ["enemyDefFlatReduction", "敌方固定减防", "flat"],
@@ -166,6 +169,7 @@ const STAT_OPTIONS = [
     ["enemyIceResReduction", "敌方冰减抗%", "percentFlat"],
     ["enemyElectricResReduction", "敌方电减抗%", "percentFlat"],
     ["enemyEtherResReduction", "敌方以太减抗%", "percentFlat"],
+    ["enemyWindResReduction", "敌方风减抗%", "percentFlat"],
 ]
 const STAT_DAMAGE_MODIFIER_OPTIONS = [
     ["anomalyDamageBonus", "属性异常增伤%", {
@@ -210,6 +214,9 @@ const STAT_DAMAGE_MODIFIER_OPTIONS = [
     ["etherSheerDmg", "以太贯穿增伤%", {
         stat: "etherSheerDmg",
     }],
+    ["windSheerDmg", "风属性贯穿增伤%", {
+        stat: "windSheerDmg",
+    }],
 ]
 const STAT_DAMAGE_MODIFIER_OPTION_BY_KEY = Object.fromEntries(STAT_DAMAGE_MODIFIER_OPTIONS.map(([key, , effect]) => [key, effect]))
 const SKILL_TARGET_STAT_OPTIONS = [
@@ -219,6 +226,7 @@ const SKILL_TARGET_STAT_OPTIONS = [
     ["iceDmg", "冰属性伤害加成%"],
     ["electricDmg", "电属性伤害加成%"],
     ["etherDmg", "以太伤害加成%"],
+    ["windDmg", "风属性伤害加成%"],
     ["anomalyDamageBonus", "属性异常增伤%"],
     ["disorderDamageBonus", "紊乱增伤%"],
     ["stunDmgMultiplierBonus", "失衡易伤倍率加算%"],
@@ -229,6 +237,7 @@ const SKILL_TARGET_STAT_OPTIONS = [
     ["iceSheerDmg", "冰属性贯穿增伤%"],
     ["electricSheerDmg", "电属性贯穿增伤%"],
     ["etherSheerDmg", "以太贯穿增伤%"],
+    ["windSheerDmg", "风属性贯穿增伤%"],
     ["skillMultiplierBonus", "技能倍率加算%"],
     ["enemyDefReduction", "敌方减防率%"],
     ["enemyDefIgnore", "无视防御率%"],
@@ -238,11 +247,13 @@ const SKILL_TARGET_STAT_OPTIONS = [
     ["enemyIceResReduction", "敌方冰减抗%"],
     ["enemyElectricResReduction", "敌方电减抗%"],
     ["enemyEtherResReduction", "敌方以太减抗%"],
+    ["enemyWindResReduction", "敌方风减抗%"],
     ["physicalResIgnore", "物理抗性无视%"],
     ["fireResIgnore", "火抗性无视%"],
     ["iceResIgnore", "冰抗性无视%"],
     ["electricResIgnore", "电抗性无视%"],
     ["etherResIgnore", "以太抗性无视%"],
+    ["windResIgnore", "风抗性无视%"],
 ]
 const SKILL_TARGET_STAT_KEYS = new Set(SKILL_TARGET_STAT_OPTIONS.map(([key]) => key))
 const BUFF_STAT_OPTIONS = [
@@ -271,12 +282,14 @@ const PERCENT_VALUE_STATS = new Set([
     "iceResIgnore",
     "electricResIgnore",
     "etherResIgnore",
+    "windResIgnore",
     "dmgBonus",
     "physicalDmg",
     "fireDmg",
     "iceDmg",
     "electricDmg",
     "etherDmg",
+    "windDmg",
     "enemyDefReduction",
     "enemyDefIgnore",
     "enemyResReduction",
@@ -285,6 +298,7 @@ const PERCENT_VALUE_STATS = new Set([
     "enemyIceResReduction",
     "enemyElectricResReduction",
     "enemyEtherResReduction",
+    "enemyWindResReduction",
     "anomalyDamageBonus",
     "disorderDamageBonus",
     "baseMultiplierBonus",
@@ -299,6 +313,7 @@ const PERCENT_VALUE_STATS = new Set([
     "iceSheerDmg",
     "electricSheerDmg",
     "etherSheerDmg",
+    "windSheerDmg",
     "skillMultiplierBonus",
 ])
 const PERCENT_INPUT_STATS = new Set([
@@ -337,6 +352,7 @@ const DAMAGE_MODIFIER_KIND_OPTIONS = [
     ["iceSheerDmg", "冰属性贯穿增伤%"],
     ["electricSheerDmg", "电属性贯穿增伤%"],
     ["etherSheerDmg", "以太贯穿增伤%"],
+    ["windSheerDmg", "风属性贯穿增伤%"],
     ["skillMultiplierBonus", "技能倍率加算%"],
 ]
 const DAMAGE_MODIFIER_LABELS = {
