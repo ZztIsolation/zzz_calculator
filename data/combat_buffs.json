@@ -1271,23 +1271,33 @@
           "effects": [
             {
               "id": "lighter_additional_ice_dmg",
-              "type": "fixed",
+              "type": "derived",
               "target": {
                 "kind": "default"
               },
               "stat": "iceDmg",
               "mode": "flat",
-              "value": 75
+              "sourceLabel": {
+                "zhCN": "冰属性伤害"
+              },
+              "defaultSourceValue": 75,
+              "ratio": 100,
+              "cap": 75
             },
             {
               "id": "lighter_additional_fire_dmg",
-              "type": "fixed",
+              "type": "derived",
               "target": {
                 "kind": "default"
               },
               "stat": "fireDmg",
               "mode": "flat",
-              "value": 75
+              "sourceLabel": {
+                "zhCN": "火属性伤害"
+              },
+              "defaultSourceValue": 75,
+              "ratio": 100,
+              "cap": 75
             }
           ],
           "buffModifiers": []
@@ -1331,7 +1341,7 @@
             "zhCN": "影画二"
           },
           "description": {
-            "zhCN": "[溃败]使目标在失衡状态下受到的伤害额外提升25%；[额外能力]中[昂扬]的冰属性伤害与火属性伤害增益提升至原本的120%。"
+            "zhCN": "[溃败]使目标的失衡易伤倍率提升25%；[额外能力]中[昂扬]的冰属性伤害与火属性伤害增益提升至原本的120%。"
           },
           "scope": "inCombat",
           "effects": [
@@ -1398,13 +1408,13 @@
               "value": 10
             }
           ],
-          "buffModifiers": []
+          "buffModifiers": [],
+          "hidden": true
         }
       ],
       "images": {
         "icon": "/assets/agents/lighter.png",
-        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/11/21/76099754/97be522aa2bce70b13167df8b42e176f_6973279715938714866.png",
-        "officialPage": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/43"
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/11/21/76099754/97be522aa2bce70b13167df8b42e176f_6973279715938714866.png"
       }
     },
     {
@@ -1576,7 +1586,7 @@
             "zhCN": "影画二"
           },
           "description": {
-            "zhCN": "扳机造成电属性伤害时可使全队获得[慧眼]，每层暴击伤害提升6%，最多4层，持续15秒。"
+            "zhCN": "扳机发动追加攻击可使全队获得一层[猎眸]，每层暴击伤害提升6%，最多4层，持续10秒。"
           },
           "scope": "inCombat",
           "effects": [
@@ -1598,8 +1608,7 @@
       ],
       "images": {
         "icon": "/assets/agents/trigger.png",
-        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/03/13/82500917/ba2daa1aecb62503215a1e0ef5711ba1_2157824041282199096.jpg",
-        "officialPage": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/43"
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/03/13/82500917/ba2daa1aecb62503215a1e0ef5711ba1_2157824041282199096.jpg"
       }
     },
     {
@@ -1680,8 +1689,7 @@
       ],
       "images": {
         "icon": "/assets/agents/juhufu.png",
-        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/06/11/158441880/27d747ee1c225cb739aeff92465972c4_5361421654416153803.png",
-        "officialPage": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/43"
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/06/11/158441880/27d747ee1c225cb739aeff92465972c4_5361421654416153803.png"
       }
     },
     {
