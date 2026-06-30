@@ -1,7 +1,7 @@
 const HELPER_PORT = 22355
 const LEGACY_PORT = 22350
 const CONNECT_TIMEOUT_MS = 2500
-const ENSURE_TIMEOUT_MS = 90000
+const ENSURE_TIMEOUT_MS = 10 * 60 * 1000
 const HELPER_BASE_URL = `http://127.0.0.1:${HELPER_PORT}`
 const HELPER_PROTOCOL_URL = `zzz-scanner://launch?origin=${encodeURIComponent(window.location.origin)}`
 const DEFAULT_SCAN_TUNING = {
@@ -85,7 +85,7 @@ export class ScannerBridge {
             rejectEnsure = reject
         })
         const timer = setTimeout(() => {
-            this._ensureResolver?.reject(new Error("准备 OCR 扫描器超时，请重启扫描助手后重试。"))
+            this._ensureResolver?.reject(new Error("准备 OCR 扫描器超时，请检查网络后重启扫描助手。"))
             this._ensureResolver = null
         }, ENSURE_TIMEOUT_MS)
         this._ensureResolver = { resolve: resolveEnsure, reject: rejectEnsure, promise, timer }
@@ -161,7 +161,7 @@ export class ScannerBridge {
         }
 
         this._mode = "helper"
-        this._scannerReady = false
+        this._scannerReady = Boolean(info?.scanner?.installed)
         return await this._openWebSocket(`ws://127.0.0.1:${HELPER_PORT}/ws/${encodeURIComponent(tokenData.token)}`, "helper")
     }
 

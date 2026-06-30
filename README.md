@@ -9,6 +9,17 @@ Chinese documentation is available in [README.zh-CN.md](README.zh-CN.md).
 
 ## Upload Update Summaries
 
+### 2026-07-01 02:55 +08:00
+
+This upload fixes first-run OCR scanner preparation on the public Pages site:
+
+- Uploaded the `1.0.28` OCR zip to the ECS mirror and made the generated
+  scanner manifest try that mirror before GitHub Releases.
+- Extended the browser-side scanner preparation timeout to cover the current
+  130MB package download time on the low-bandwidth mirror.
+- If the helper probe already reports the scanner as installed, the Drive Disc
+  page now enables scanning without waiting for another launcher progress cycle.
+
 ### 2026-06-30 22:20 +08:00
 
 This upload moves the public site toward the no-ICP GitHub Pages + GitHub
@@ -19,9 +30,9 @@ Releases deployment path:
   `downloads/zzz-scanner/manifest.json`, and `CNAME`.
 - Frontend catalog/config loading now prefers static JSON while keeping the
   local Node server APIs as development fallbacks.
-- The Drive Disc helper download now points to GitHub Releases as the primary
-  source and exposes a mirror link; the OCR manifest supports `packageUrls` so
-  the helper can try a mirror if the primary package source fails.
+- The Drive Disc helper download now points to GitHub Releases and exposes a
+  mirror link; the OCR manifest supports `packageUrls` so the helper can try
+  multiple package sources.
 - Added a GitHub Actions Pages workflow that publishes the Pages artifact
   without committing `dist/pages` or large `downloads/` files.
 
@@ -333,8 +344,10 @@ the port with `PORT=8791 npm start`.
 
 The Drive Disc page can launch a small local scanner helper. Public builds link
 the helper download to GitHub Releases with a mirror fallback; local Node server
-development can still serve it from `/downloads/ZZZ-Scanner-Helper.exe`. The
-helper registers `zzz-scanner://`, connects back to the page on
+development can still serve it from `/downloads/ZZZ-Scanner-Helper.exe`. The OCR
+package manifest currently tries the ECS mirror before GitHub Releases for
+better first-run availability in mainland networks. The helper registers
+`zzz-scanner://`, connects back to the page on
 `127.0.0.1:22355`, and downloads the OCR scanner package declared by
 `/downloads/zzz-scanner/manifest.json` when needed. The current scanner package
 is ZZZ Scanner Next `1.0.28`.

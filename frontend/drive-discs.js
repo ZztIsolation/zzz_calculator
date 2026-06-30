@@ -1471,7 +1471,11 @@ function setScannerConnected(message = "已连接，正在准备 OCR 扫描器..
         els.scanProgressArea.hidden = false
         els.scanProgressFill.style.width = "12%"
         setScanProgress("正在检查扫描器版本...")
-        scanner.ensureScanner().catch((error) => {
+        scanner.ensureScanner().then(() => {
+            els.scanStartBtn.disabled = false
+            els.scanProgressArea.hidden = true
+            els.scanStatusText.textContent = "已连接，可以开始扫描"
+        }).catch((error) => {
             const message = error instanceof Error ? error.message : String(error)
             els.scanStartBtn.disabled = false
             els.scanProgressArea.hidden = true
@@ -1558,7 +1562,10 @@ function bindScannerEvents() {
             : 20
         els.scanProgressArea.hidden = false
         els.scanProgressFill.style.width = `${pct}%`
-        setScanProgress(data?.message || "正在准备扫描器...")
+        const message = stage === "download"
+            ? "正在下载 OCR 扫描器，首次准备可能需要几分钟..."
+            : data?.message || "正在准备扫描器..."
+        setScanProgress(message)
         els.scanStatusText.textContent = "正在准备本地 OCR 扫描器..."
     }
 

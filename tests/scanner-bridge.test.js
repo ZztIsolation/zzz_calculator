@@ -53,13 +53,15 @@ function assertScannerPackageManifest() {
 
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
     const localPackageUrl = "./1.0.28/ZZZ-Scanner.Next-win-x64.zip"
+    const mirrorPackageUrl = "http://121.199.21.10/downloads/zzz-scanner/1.0.28/ZZZ-Scanner.Next-win-x64.zip"
     const packagePath = normalize(join(scannerRoot, localPackageUrl))
 
     assert.equal(manifest.scannerVersion, "1.0.28")
     assert.equal(manifest.packageUrl, "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.28/ZZZ-Scanner.Next-win-x64.zip")
     assert.ok(Array.isArray(manifest.packageUrls))
+    assert.equal(manifest.packageUrls[0], mirrorPackageUrl)
     assert.ok(manifest.packageUrls.includes(manifest.packageUrl))
-    assert.ok(manifest.packageUrls.includes("http://121.199.21.10/downloads/zzz-scanner/1.0.28/ZZZ-Scanner.Next-win-x64.zip"))
+    assert.ok(manifest.packageUrls.includes(mirrorPackageUrl))
     assert.ok(manifest.packageUrls.includes(localPackageUrl))
     assert.equal(manifest.entry, "ZZZ-Scanner.Next.exe")
     assert.equal(existsSync(join(scannerRoot, "1.0.0")), false)
@@ -141,6 +143,33 @@ try {
 
     bridge.launchHelper()
     assert.equal(appended.at(-1).src, "zzz-scanner://launch?origin=http%3A%2F%2Flocalhost%3A8787")
+
+    globalThis.fetch = async (url) => {
+        fetchUrls.push(String(url))
+        if (String(url).endsWith("/")) {
+            return okJson({ scanner: { installed: true, version: "1.0.28" } })
+        }
+        return okJson({ token: "ready" })
+    }
+    class ReadySocket {
+        static OPEN = 1
+        constructor(url) {
+            this.url = url
+            this.readyState = ReadySocket.OPEN
+            ReadySocket.last = this
+            this.sent = []
+            queueMicrotask(() => this.onmessage?.({ data: JSON.stringify({ cmd: "hello", data: { ok: true } }) }))
+        }
+        send(raw) {
+            this.sent.push(JSON.parse(raw))
+        }
+        close() {}
+    }
+    globalThis.WebSocket = ReadySocket
+    const readyBridge = new ScannerBridge()
+    await readyBridge.connect()
+    await readyBridge.ensureScanner()
+    assert.deepEqual(ReadySocket.last.sent, [])
 
     let legacyAttempted = false
     globalThis.fetch = async () => {
