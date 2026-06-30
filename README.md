@@ -25,17 +25,18 @@ Releases deployment path:
 - Added a GitHub Actions Pages workflow that publishes the Pages artifact
   without committing `dist/pages` or large `downloads/` files.
 
-### 2026-06-30 00:09 +08:00
+### 2026-07-01 01:00 +08:00
 
-This upload fixes the web-launched OCR scanner integration:
+This upload updates the web-launched OCR scanner integration for the 1.0.28
+stability release:
 
 - Updated `/downloads/zzz-scanner/manifest.json` to serve ZZZ Scanner Next
-  `1.0.26` from `/downloads/zzz-scanner/1.0.26/ZZZ-Scanner.Next-win-x64.zip`.
-- Removed the old `1.0.27` scanner package from the calculator download tree so
-  the repository does not carry duplicate OCR bundles.
-- The web scanner request now sends the validated fast DXGI route:
-  `fastMode=true`, `captureMode=dxgi`, `panelMinAcceptFloorMs=110`, and
-  `postScrollPanelAcceptMode=adaptive-after-scroll`.
+  `1.0.28` from `/downloads/zzz-scanner/1.0.28/ZZZ-Scanner.Next-win-x64.zip`.
+- The web scanner request now sends the stable fast DXGI route:
+  `overlapConflictMode=recover`, `panelMinAcceptFloorMs=120`, and
+  `postScrollPanelAcceptMode=safe`, with non-15 scanning still opt-in only.
+- Scanner error dialogs now include the scanner version and runtime directory,
+  making it clear which local OCR package actually handled the request.
 - Added scanner package and `scan_req` payload validation to
   `npm run test:scanner-bridge`.
 
@@ -336,7 +337,7 @@ development can still serve it from `/downloads/ZZZ-Scanner-Helper.exe`. The
 helper registers `zzz-scanner://`, connects back to the page on
 `127.0.0.1:22355`, and downloads the OCR scanner package declared by
 `/downloads/zzz-scanner/manifest.json` when needed. The current scanner package
-is ZZZ Scanner Next `1.0.26`.
+is ZZZ Scanner Next `1.0.28`.
 
 Main pages:
 
@@ -384,7 +385,7 @@ same command from `main` and deploys the Pages artifact; do not commit
 
 Publish Helper and OCR packages through GitHub Releases instead of Git:
 
-- tag: `scanner-1.0.26`
+- tag: `scanner-1.0.28`
 - `ZZZ-Scanner-Helper.exe`
 - `ZZZ-Scanner.Next-win-x64.zip`
 

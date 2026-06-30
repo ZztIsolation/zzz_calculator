@@ -52,14 +52,14 @@ function assertScannerPackageManifest() {
     }
 
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
-    const localPackageUrl = "./1.0.26/ZZZ-Scanner.Next-win-x64.zip"
+    const localPackageUrl = "./1.0.28/ZZZ-Scanner.Next-win-x64.zip"
     const packagePath = normalize(join(scannerRoot, localPackageUrl))
 
-    assert.equal(manifest.scannerVersion, "1.0.26")
-    assert.equal(manifest.packageUrl, "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.26/ZZZ-Scanner.Next-win-x64.zip")
+    assert.equal(manifest.scannerVersion, "1.0.28")
+    assert.equal(manifest.packageUrl, "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.28/ZZZ-Scanner.Next-win-x64.zip")
     assert.ok(Array.isArray(manifest.packageUrls))
     assert.ok(manifest.packageUrls.includes(manifest.packageUrl))
-    assert.ok(manifest.packageUrls.includes("http://121.199.21.10/downloads/zzz-scanner/1.0.26/ZZZ-Scanner.Next-win-x64.zip"))
+    assert.ok(manifest.packageUrls.includes("http://121.199.21.10/downloads/zzz-scanner/1.0.28/ZZZ-Scanner.Next-win-x64.zip"))
     assert.ok(manifest.packageUrls.includes(localPackageUrl))
     assert.equal(manifest.entry, "ZZZ-Scanner.Next.exe")
     assert.equal(existsSync(join(scannerRoot, "1.0.0")), false)
@@ -112,20 +112,21 @@ try {
     assert.equal(HelperSocket.last.url, "ws://127.0.0.1:22355/ws/abc")
     await bridge.ensureScanner()
     assert.equal(HelperSocket.last.sent.cmd, "ensure_scanner")
-    bridge.startScan({ maxItems: 12, rarities: ["S", "A"], stopAtNonLevel15: false })
+    bridge.startScan({ maxItems: 12, rarities: ["S", "A"] })
     assert.deepEqual(HelperSocket.last.sent, {
         cmd: "scan_req",
         data: {
             maxItems: 12,
             rarities: ["S", "A"],
-            stopAtNonLevel15: false,
+            stopAtNonLevel15: true,
             profileName: "",
             fastMode: true,
             captureMode: "dxgi",
-            panelMinAcceptFloorMs: 110,
-            postScrollPanelAcceptMode: "adaptive-after-scroll",
+            panelMinAcceptFloorMs: 120,
+            postScrollPanelAcceptMode: "safe",
             sameRowPanelMinAcceptFloorMs: 105,
             postScrollPanelMinAcceptFloorMs: 110,
+            overlapConflictMode: "recover",
         },
     })
 

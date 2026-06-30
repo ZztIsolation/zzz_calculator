@@ -1609,8 +1609,12 @@ function bindScannerEvents() {
         setScanningState(false)
         els.scanStartBtn.disabled = false
         const msg = data?.message || "扫描出错"
+        const scannerInfo = data?.scanner
+        const detail = scannerInfo
+            ? `\n\nScanner ${scannerInfo.appVersion || "unknown"}\n${scannerInfo.runtimeDirectory || ""}`
+            : ""
         els.scanStatusText.textContent = `扫描失败：${msg}`
-        showErrorNotice({ title: "扫描失败", message: msg })
+        showErrorNotice({ title: "扫描失败", message: `${msg}${detail}` })
     }
 
     scanner.onDisconnect = () => {
@@ -1653,8 +1657,11 @@ async function startLiveScan() {
         stopAtNonLevel15: els.scanStopNon15.checked,
         fastMode: true,
         captureMode: "dxgi",
-        panelMinAcceptFloorMs: 110,
-        postScrollPanelAcceptMode: "adaptive-after-scroll",
+        overlapConflictMode: "recover",
+        panelMinAcceptFloorMs: 120,
+        postScrollPanelAcceptMode: "safe",
+        sameRowPanelMinAcceptFloorMs: 105,
+        postScrollPanelMinAcceptFloorMs: 110,
     })
 }
 

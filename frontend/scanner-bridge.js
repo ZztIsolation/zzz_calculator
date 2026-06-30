@@ -7,10 +7,11 @@ const HELPER_PROTOCOL_URL = `zzz-scanner://launch?origin=${encodeURIComponent(wi
 const DEFAULT_SCAN_TUNING = {
     fastMode: true,
     captureMode: "dxgi",
-    panelMinAcceptFloorMs: 110,
-    postScrollPanelAcceptMode: "adaptive-after-scroll",
+    panelMinAcceptFloorMs: 120,
+    postScrollPanelAcceptMode: "safe",
     sameRowPanelMinAcceptFloorMs: 105,
     postScrollPanelMinAcceptFloorMs: 110,
+    overlapConflictMode: "recover",
 }
 
 export class ScannerBridge {
@@ -122,6 +123,7 @@ export class ScannerBridge {
             postScrollPanelAcceptMode: options.postScrollPanelAcceptMode ?? DEFAULT_SCAN_TUNING.postScrollPanelAcceptMode,
             sameRowPanelMinAcceptFloorMs: options.sameRowPanelMinAcceptFloorMs ?? DEFAULT_SCAN_TUNING.sameRowPanelMinAcceptFloorMs,
             postScrollPanelMinAcceptFloorMs: options.postScrollPanelMinAcceptFloorMs ?? DEFAULT_SCAN_TUNING.postScrollPanelMinAcceptFloorMs,
+            overlapConflictMode: options.overlapConflictMode ?? DEFAULT_SCAN_TUNING.overlapConflictMode,
         })
     }
 
