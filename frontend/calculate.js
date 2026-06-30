@@ -878,11 +878,9 @@ function saveSyncedConfig() {
             manualDriveDiscIdsBySlot,
             selectedLoadoutId,
         )),
-        combat: {
-            ...(previousConfig.combat ?? {}),
-            activeBuffIds: [...checkedCombatBuffIds()],
+        combat: combatConfigForSave(previousConfig.combat, {
             addedBuffs: previousConfig.combat?.addedBuffs ?? [],
-        },
+        }),
         damage: collectDamageConfig(),
         currentSchemeFourPieceBuffModeBySetId: clonePlainObject(currentSchemeFourPieceBuffModeBySetId),
         currentSchemeFourPieceBuffRuntimeInputsBySetId: clonePlainObject(currentSchemeFourPieceBuffRuntimeInputsBySetId),
@@ -1018,7 +1016,7 @@ function targetStunnedFromConfig(target = {}) {
         return target.stunned === true || target.stunned === "true" || target.stunned === 1 || target.stunned === "1"
     }
     const activeMultiplier = Number(target.activeStunMultiplier)
-    return Number.isFinite(activeMultiplier) ? activeMultiplier !== 1 : false
+    return Number.isFinite(activeMultiplier) ? activeMultiplier !== 1 : true
 }
 
 function stunMultiplierPercentFromConfig(target = {}) {
@@ -3247,6 +3245,59 @@ function savedActiveCombatBuffIds(agentId = els.agentSelect.value) {
     return Array.isArray(ids) ? new Set(ids) : null
 }
 
+function savedManuallyUncheckedDefaultCombatBuffIds(agentId = els.agentSelect.value) {
+    const ids = configForAgent(agentId).combat?.manuallyUncheckedDefaultBuffIds
+    return Array.isArray(ids) ? new Set(ids) : new Set()
+}
+
+function syncManuallyUncheckedDefaultCombatBuffIds(agentId = els.agentSelect.value) {
+    manuallyUncheckedDefaultCombatBuffIds.clear()
+    for (const id of savedManuallyUncheckedDefaultCombatBuffIds(agentId)) {
+        manuallyUncheckedDefaultCombatBuffIds.add(id)
+    }
+}
+
+function combatBuffInputsForAgent(agentId = els.agentSelect.value) {
+    const inputs = [...els.combatSection.querySelectorAll("input[data-combat-buff-id]")]
+    return renderedCombatBuffAgentId === agentId ? inputs : []
+}
+
+function activeCombatBuffIdsForSave(agentId = els.agentSelect.value) {
+    if (combatBuffInputsForAgent(agentId).length > 0) {
+        return [...checkedCombatBuffIds()]
+    }
+    const savedIds = savedActiveCombatBuffIds(agentId)
+    return savedIds ? [...savedIds] : null
+}
+
+function manuallyUncheckedDefaultCombatBuffIdsForSave(agentId = els.agentSelect.value) {
+    if (combatBuffInputsForAgent(agentId).length > 0) {
+        return [...manuallyUncheckedDefaultCombatBuffIds]
+    }
+    return [...savedManuallyUncheckedDefaultCombatBuffIds(agentId)]
+}
+
+function combatConfigForSave(previousCombat = {}, overrides = {}) {
+    const next = {
+        ...previousCombat,
+        ...overrides,
+    }
+    const activeBuffIds = activeCombatBuffIdsForSave()
+    if (activeBuffIds) {
+        next.activeBuffIds = activeBuffIds
+    } else {
+        delete next.activeBuffIds
+    }
+
+    const manuallyUncheckedIds = manuallyUncheckedDefaultCombatBuffIdsForSave()
+    if (manuallyUncheckedIds.length) {
+        next.manuallyUncheckedDefaultBuffIds = manuallyUncheckedIds
+    } else {
+        delete next.manuallyUncheckedDefaultBuffIds
+    }
+    return next
+}
+
 function checkboxCombatBuffRuntimes() {
     return configForAgent(els.agentSelect.value)?.combat?.checkboxBuffRuntimes ?? {}
 }
@@ -3294,14 +3345,13 @@ function saveCurrentAddedCombatBuffs(addedBuffs) {
     const byAgent = { ...(selection.byAgent ?? {}) }
     const previous = byAgent[agentId] ?? {}
     const hidden = hiddenDriveDiscAddedBuffs()
+    const sanitizedAddedBuffs = sanitizeAddedCombatBuffs([...hidden, ...addedBuffs])
+        .filter(item => isDriveDiscAddedBuff(item) || isResolvableAddedCombatBuff(item))
     byAgent[agentId] = {
         ...previous,
-        combat: {
-            ...(previous.combat ?? {}),
-            activeBuffIds: [...checkedCombatBuffIds()],
-            addedBuffs: sanitizeAddedCombatBuffs([...hidden, ...addedBuffs])
-                .filter(item => isDriveDiscAddedBuff(item) || isResolvableAddedCombatBuff(item)),
-        },
+        combat: combatConfigForSave(previous.combat, {
+            addedBuffs: sanitizedAddedBuffs,
+        }),
     }
     saveHomeSelection({ currentAgentId: agentId, byAgent })
 }
@@ -4024,13 +4074,14 @@ function activeCombatBuffIdsForRender() {
     if (inputs.length > 0 && renderedCombatBuffAgentId === agentId) {
         return {
             checkedIds: checkedCombatBuffIds(),
-            useDefaultChecked: false,
+            useDefaultChecked: true,
         }
     }
     const savedIds = savedActiveCombatBuffIds(agentId)
+    syncManuallyUncheckedDefaultCombatBuffIds(agentId)
     return {
         checkedIds: savedIds ?? new Set(),
-        useDefaultChecked: !savedIds,
+        useDefaultChecked: true,
     }
 }
 
@@ -5956,11 +6007,9 @@ function saveCurrentHomeSelection({ mode = currentHomeDiscMode(), manualDriveDis
         manualDriveDiscIdsBySlot: nextManualDriveDiscIdsBySlot,
         selectedLoadoutId: nextSelectedLoadoutId,
         driveDiscIdsBySlot: sanitizeDiscIdsBySlot(driveDiscIdsBySlot),
-        combat: {
-            ...(previousConfig.combat ?? {}),
-            activeBuffIds: [...checkedCombatBuffIds()],
+        combat: combatConfigForSave(previousConfig.combat, {
             addedBuffs: sanitizeAddedCombatBuffs(previousConfig.combat?.addedBuffs ?? []),
-        },
+        }),
         damage: collectDamageConfig(),
         currentSchemeFourPieceBuffModeBySetId: clonePlainObject(currentSchemeFourPieceBuffModeBySetId),
         currentSchemeFourPieceBuffRuntimeInputsBySetId: clonePlainObject(currentSchemeFourPieceBuffRuntimeInputsBySetId),

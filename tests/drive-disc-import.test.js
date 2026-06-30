@@ -40,6 +40,7 @@ try {
         updated: 0,
         removed: 0,
         duplicateInImport: 0,
+        deduplicated: 0,
         warnings: [],
     })
 
@@ -175,6 +176,66 @@ try {
     const legacy = await loadUserDriveDiscStore(tempDir)
     assert.ok(legacy.driveDiscs[0].contentFingerprint)
     assert.ok(legacy.driveDiscs[0].identityFingerprint)
+
+    const legacyAliasDisc = {
+        id: "legacy-alias-disc",
+        ownerId: "default",
+        setId: "scanner-set-old",
+        setName: "流光咏叹",
+        partition: 1,
+        rarity: "S",
+        level: 15,
+        maxLevel: 15,
+        locked: true,
+        equippedBy: "agent-a",
+        mainStat: { stat: "hpFlat", value: 2200, mode: "flat" },
+        subStats: [
+            { stat: "atkPct", value: 6, mode: "pct" },
+            { stat: "critRate", value: 4.8, mode: "pct" },
+            { stat: "critDmg", value: 14.4, mode: "pct" },
+            { stat: "atkFlat", value: 38, mode: "flat" },
+        ],
+        source: { type: "zzz-scanner", sequence: 1 },
+    }
+    await saveUserDriveDiscStore(tempDir, {
+        version: 1,
+        owners: [{ id: "default", label: "默认用户" }],
+        currentOwnerId: "default",
+        imports: [],
+        driveDiscs: [
+            legacyAliasDisc,
+            {
+                ...legacyAliasDisc,
+                id: "legacy-alias-duplicate",
+            },
+        ],
+        driveDiscLoadouts: [
+            {
+                id: "alias-loadout",
+                ownerId: "default",
+                agentId: "ye_shunguang",
+                name: "旧重复引用",
+                driveDiscIdsBySlot: {
+                    1: "legacy-alias-duplicate",
+                },
+                source: { type: "manual" },
+            },
+        ],
+    })
+    const cleanedAliases = await importScannerExportToStore(tempDir, [
+        scannerDisc(1),
+    ], { ownerId: "default", sourcePath: "alias-upgrade.json" })
+    assert.equal(cleanedAliases.driveDiscs.length, 1)
+    assert.equal(cleanedAliases.driveDiscs[0].id, "legacy-alias-disc")
+    assert.equal(cleanedAliases.driveDiscs[0].setId, "astral_voice")
+    assert.equal(cleanedAliases.driveDiscs[0].locked, true)
+    assert.equal(cleanedAliases.driveDiscs[0].equippedBy, "agent-a")
+    assert.equal(cleanedAliases.lastImportSummary.added, 0)
+    assert.equal(cleanedAliases.lastImportSummary.skipped, 1)
+    assert.equal(cleanedAliases.lastImportSummary.deduplicated, 1)
+    const aliasLoadout = cleanedAliases.driveDiscLoadouts.find(item => item.id === "alias-loadout")
+    assert.ok(aliasLoadout)
+    assert.equal(aliasLoadout.driveDiscIdsBySlot["1"], "legacy-alias-disc")
 } finally {
     await rm(tempDir, { recursive: true, force: true })
 }

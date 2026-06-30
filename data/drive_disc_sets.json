@@ -73,7 +73,7 @@
       },
       "images": {
         "icon": "/assets/drive-discs/dawn_bloom_journey.png",
-        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/06/09/141353238/91f29d38112168981497192118064c28_2298427936707118135.png"
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
       },
       "sources": [
         "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
@@ -81,13 +81,17 @@
       "twoPiece": {
         "effects": [
           {
-            "id": "effect_wiki_2029_2pc",
+            "id": "effect-1",
             "type": "fixed",
             "stat": "etherDmg",
             "value": 10,
-            "mode": "flat"
+            "mode": "flat",
+            "target": {
+              "kind": "default"
+            }
           }
-        ]
+        ],
+        "buffModifiers": []
       },
       "fourPiece": {
         "effectText": {
@@ -96,30 +100,37 @@
         },
         "selfBuff": {
           "condition": "以太属性代理人发动[强化特殊技]或[终结技]后",
-          "durationSeconds": 30,
+          "effects": [
+            {
+              "id": "effect_wiki_2029_4pc_crit_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critDmg",
+              "mode": "flat",
+              "value": 30
+            },
+            {
+              "id": "effect_wiki_2029_4pc_atk_pct",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkPct",
+              "mode": "pct",
+              "basis": "outOfCombatAtk",
+              "value": 10
+            }
+          ],
           "coverage": {
             "default": 1,
             "min": 0,
             "max": 1,
             "step": 0.1
           },
-          "effects": [
-            {
-              "id": "effect_wiki_2029_4pc_crit_dmg",
-              "type": "fixed",
-              "stat": "critDmg",
-              "value": 30,
-              "mode": "flat"
-            },
-            {
-              "id": "effect_wiki_2029_4pc_atk_pct",
-              "type": "fixed",
-              "stat": "atkPct",
-              "value": 10,
-              "mode": "pct",
-              "basis": "baseAtk"
-            }
-          ]
+          "durationSeconds": 30,
+          "buffModifiers": []
         },
         "teamBuff": null
       }

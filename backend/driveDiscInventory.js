@@ -113,6 +113,14 @@ const DRIVE_DISC_SET_ALIASES = {
         id: "king_of_the_summit",
         name: { zhCN: "山大王" },
     },
+    "呼啸沙龙": {
+        id: "zzz_wiki_2038",
+        name: { zhCN: "呼啸沙龙" },
+    },
+    "拂晓行纪": {
+        id: "zzz_wiki_2029",
+        name: { zhCN: "拂晓行纪" },
+    },
 }
 
 const STAT_LABELS = {
@@ -203,7 +211,6 @@ function statFingerprintEntry(stat, { includeValue = true } = {}) {
 
 export function driveDiscContentFingerprint(disc) {
     return hashText(stableStringify({
-        setId: disc?.setId ?? "",
         setName: disc?.setName ?? "",
         partition: Number(disc?.partition ?? 0),
         rarity: String(disc?.rarity ?? ""),
@@ -215,7 +222,6 @@ export function driveDiscContentFingerprint(disc) {
 
 export function driveDiscIdentityFingerprint(disc) {
     return hashText(stableStringify({
-        setId: disc?.setId ?? "",
         setName: disc?.setName ?? "",
         partition: Number(disc?.partition ?? 0),
         rarity: String(disc?.rarity ?? ""),
@@ -271,32 +277,61 @@ function mergeImportedDriveDisc(existing, imported) {
     })
 }
 
-function clearDeletedDriveDiscLoadoutSlots(loadouts, deletedIds) {
-    if (!deletedIds?.size) {
+function removeDuplicateContentMatches(contentMatches, keepId, nextSameOwner, remappedIds, deletedIds) {
+    let removed = 0
+    for (const duplicate of contentMatches ?? []) {
+        if (!duplicate?.id || duplicate.id === keepId || !nextSameOwner.has(duplicate.id)) {
+            continue
+        }
+
+        nextSameOwner.delete(duplicate.id)
+        remappedIds.set(duplicate.id, keepId)
+        deletedIds.add(duplicate.id)
+        removed += 1
+    }
+    return removed
+}
+
+function reconcileDriveDiscLoadoutSlots(loadouts, { deletedIds = new Set(), remappedIds = new Map() } = {}) {
+    if (!deletedIds?.size && !remappedIds?.size) {
         return loadouts ?? []
     }
 
     return (loadouts ?? []).map(loadout => {
         const idsBySlot = { ...(loadout.driveDiscIdsBySlot ?? {}) }
         const removedFromLoadout = []
+        let changed = false
         for (const [slot, id] of Object.entries(idsBySlot)) {
-            if (deletedIds.has(id)) {
+            const replacementId = remappedIds.get(id)
+            if (replacementId && replacementId !== id) {
+                idsBySlot[slot] = replacementId
+                changed = true
+            }
+
+            const currentId = idsBySlot[slot]
+            if (deletedIds.has(currentId)) {
                 delete idsBySlot[slot]
-                removedFromLoadout.push(id)
+                removedFromLoadout.push(currentId)
+                changed = true
             }
         }
 
-        if (!removedFromLoadout.length) {
+        if (!changed) {
             return loadout
         }
 
-        return {
+        const nextLoadout = {
             ...loadout,
             driveDiscIdsBySlot: idsBySlot,
-            status: "incomplete",
-            missingDriveDiscIds: [...new Set([...(loadout.missingDriveDiscIds ?? []), ...removedFromLoadout])],
             updatedAt: new Date().toISOString(),
         }
+
+        if (removedFromLoadout.length) {
+            nextLoadout.status = "incomplete"
+            nextLoadout.missingDriveDiscIds = [...new Set([...(loadout.missingDriveDiscIds ?? []), ...removedFromLoadout])]
+        }
+
+        return nextLoadout
     })
 }
 
@@ -591,12 +626,16 @@ export async function importScannerExportToStore(dataDir, input, options = {}) {
     const nextSameOwner = new Map(existingSameOwner.map(item => [item.id, item]))
     const matchedExistingIds = new Set()
     const seenImportContent = new Set()
+    const deletedIds = new Set()
+    const removedMissingIds = new Set()
+    const remappedIds = new Map()
     const summary = {
         added: 0,
         skipped: 0,
         updated: 0,
         removed: 0,
         duplicateInImport: 0,
+        deduplicated: 0,
         warnings: normalized.importRecord.warnings ?? [],
     }
 
@@ -609,22 +648,16 @@ export async function importScannerExportToStore(dataDir, input, options = {}) {
 
         const contentMatches = byContent.get(imported.contentFingerprint) ?? []
         if (contentMatches.length > 0) {
-            const existing = contentMatches[0]
+            const existing = contentMatches.find(item => nextSameOwner.has(item.id)) ?? contentMatches[0]
             matchedExistingIds.add(existing.id)
-            nextSameOwner.set(existing.id, {
-                ...existing,
-                source: matchedImportSource({
-                    ...(existing.source ?? {}),
-                    importId: imported.source?.importId,
-                    importedAt: imported.source?.importedAt,
-                    sourcePath: imported.source?.sourcePath,
-                    sequence: imported.source?.sequence,
-                    rawIndex: imported.source?.rawIndex,
-                }),
-                raw: imported.raw ?? existing.raw ?? null,
-                contentFingerprint: imported.contentFingerprint,
-                identityFingerprint: imported.identityFingerprint,
-            })
+            nextSameOwner.set(existing.id, mergeImportedDriveDisc(existing, imported))
+            summary.deduplicated += removeDuplicateContentMatches(
+                contentMatches,
+                existing.id,
+                nextSameOwner,
+                remappedIds,
+                deletedIds,
+            )
             summary.skipped += 1
             continue
         }
@@ -654,15 +687,15 @@ export async function importScannerExportToStore(dataDir, input, options = {}) {
         summary.added += 1
     }
 
-    const deletedIds = new Set()
     if (options.removeMissing) {
         for (const disc of existingSameOwner) {
-            if (!matchedExistingIds.has(disc.id)) {
+            if (!matchedExistingIds.has(disc.id) && nextSameOwner.has(disc.id)) {
                 nextSameOwner.delete(disc.id)
                 deletedIds.add(disc.id)
+                removedMissingIds.add(disc.id)
             }
         }
-        summary.removed = deletedIds.size
+        summary.removed = removedMissingIds.size
     }
 
     const nextStore = {
@@ -680,7 +713,7 @@ export async function importScannerExportToStore(dataDir, input, options = {}) {
             ...existingOtherOwners,
             ...nextSameOwner.values(),
         ],
-        driveDiscLoadouts: clearDeletedDriveDiscLoadoutSlots(store.driveDiscLoadouts ?? [], deletedIds),
+        driveDiscLoadouts: reconcileDriveDiscLoadoutSlots(store.driveDiscLoadouts ?? [], { deletedIds, remappedIds }),
     }
 
     const saved = await saveUserDriveDiscStore(dataDir, nextStore)
@@ -746,7 +779,7 @@ export async function deleteUserDriveDisc(dataDir, id) {
         ...store,
         driveDiscs,
         driveDiscLoadouts: deletedDisc
-            ? clearDeletedDriveDiscLoadoutSlots(store.driveDiscLoadouts ?? [], new Set([id]))
+            ? reconcileDriveDiscLoadoutSlots(store.driveDiscLoadouts ?? [], { deletedIds: new Set([id]) })
             : store.driveDiscLoadouts ?? [],
     })
 

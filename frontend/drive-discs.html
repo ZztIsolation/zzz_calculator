@@ -45,6 +45,7 @@
 
       <div id="pageNotice" class="page-notice-host" data-page-notice aria-live="polite" hidden></div>
 
+
       <nav id="inventoryViewTabs" class="inventory-view-tabs" aria-label="驱动盘页面模块">
         <button type="button" class="active" data-inventory-view="inventory" aria-pressed="true">
           <span>驱动盘仓库</span>
@@ -67,6 +68,7 @@
               <input id="removeMissingInput" type="checkbox">
               <span>高级：同步删除缺失</span>
             </label>
+            <button id="scanBtn" type="button" class="primary-btn">扫描</button>
             <button id="importBtn" type="button" class="ghost-btn">导入</button>
             <button id="clearInventoryBtn" type="button" class="danger-btn">清空仓库</button>
           </div>
@@ -301,6 +303,105 @@
         </div>
         <div id="loadoutSlotEditors" class="loadout-slot-editors"></div>
       </form>
+    </section>
+  </div>
+
+  <div id="importRecordsModal" class="modal-layer" hidden>
+    <div class="modal-scrim" data-close-import-records-modal></div>
+    <section class="disc-modal import-records-modal" role="dialog" aria-modal="true" aria-labelledby="importRecordsModalTitle">
+      <button id="importRecordsCloseBtn" type="button" class="modal-close" aria-label="关闭"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M6 18L18 6"/></svg></button>
+      <header class="modal-head">
+        <div>
+          <h2 id="importRecordsModalTitle">导入记录</h2>
+          <p id="importRecordsSummaryText">查看最近的扫描和手动导入结果</p>
+        </div>
+      </header>
+
+      <div id="importRecordsTableWrap" class="disc-table-wrap clean-table-wrap">
+        <table class="disc-table clean-disc-table import-records-table">
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>来源</th>
+              <th>条目</th>
+              <th>结果</th>
+            </tr>
+          </thead>
+          <tbody id="importRecordsTableBody"></tbody>
+        </table>
+      </div>
+
+      <div id="importRecordsEmpty" class="inventory-empty" hidden>
+        <img src="/assets/drive-discs/empty.svg" alt="">
+        <strong>暂无导入记录</strong>
+        <span>当前账号还没有扫描或导入过驱动盘</span>
+      </div>
+    </section>
+  </div>
+
+  <div id="scanModal" class="modal-layer" hidden>
+    <div class="modal-scrim" data-close-scan-modal></div>
+    <section class="disc-modal scan-modal" role="dialog" aria-modal="true" aria-labelledby="scanModalTitle">
+      <button id="scanCloseBtn" type="button" class="modal-close" aria-label="关闭"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M6 18L18 6"/></svg></button>
+      <header class="modal-head">
+        <div>
+          <h2 id="scanModalTitle">驱动盘扫描</h2>
+          <p id="scanStatusText">正在连接扫描助手...</p>
+        </div>
+      </header>
+
+      <div id="scanHelperGuide" class="scan-helper-guide" hidden>
+        <div class="scan-guide-step">
+          <span class="scan-guide-num">1</span>
+          <div>
+            <p><strong>安装本地扫描助手</strong></p>
+            <p>小助手只负责连接网页、更新本地 OCR 扫描器和启动扫描；截图与识别都在本机完成。</p>
+            <a id="scanDownloadLink" href="/downloads/ZZZ-Scanner-Helper.exe" download class="primary-btn scan-download-btn">下载 ZZZ Scanner Helper</a>
+          </div>
+        </div>
+        <div class="scan-guide-step">
+          <span class="scan-guide-num">2</span>
+          <div>
+            <p><strong>运行一次后回到网页</strong></p>
+            <p>之后点击「扫描」会自动唤起小助手，并在需要控制游戏窗口时弹出管理员权限确认。</p>
+          </div>
+        </div>
+        <div id="scanAutoRetry" class="scan-auto-retry">
+          <span class="scan-auto-retry-dot"></span>
+          <span>正在等待扫描助手连接...</span>
+        </div>
+      </div>
+
+      <div id="scanControls" class="scan-controls" hidden>
+        <div class="scan-options">
+          <label class="scan-option">
+            <span>品质：</span>
+            <label class="inline-check"><input id="scanRarityS" type="checkbox" checked><span>S</span></label>
+            <label class="inline-check"><input id="scanRarityA" type="checkbox"><span>A</span></label>
+          </label>
+          <label class="scan-option">
+            <span>上限：</span>
+            <input id="scanMaxItems" type="number" min="0" max="9999" value="0" class="scan-max-input">
+            <span class="scan-hint">0 = 不限</span>
+          </label>
+          <label class="inline-check scan-option">
+            <input id="scanStopNon15" type="checkbox" checked>
+            <span>遇到非15级时停止</span>
+          </label>
+          <label class="inline-check scan-option">
+            <input id="scanRemoveMissing" type="checkbox">
+            <span>同步删除缺失</span>
+          </label>
+        </div>
+        <div class="scan-progress-area" id="scanProgressArea" hidden>
+          <div class="scan-progress-bar"><div id="scanProgressFill" class="scan-progress-fill"></div></div>
+          <div id="scanProgressText" class="scan-progress-text">准备中...</div>
+        </div>
+        <div class="scan-actions">
+          <button id="scanStartBtn" type="button" class="primary-btn">开始扫描</button>
+          <button id="scanStopBtn" type="button" class="danger-btn" hidden>停止扫描</button>
+        </div>
+      </div>
     </section>
   </div>
 

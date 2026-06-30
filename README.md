@@ -9,6 +9,20 @@ Chinese documentation is available in [README.zh-CN.md](README.zh-CN.md).
 
 ## Upload Update Summaries
 
+### 2026-06-30 00:09 +08:00
+
+This upload fixes the web-launched OCR scanner integration:
+
+- Updated `/downloads/zzz-scanner/manifest.json` to serve ZZZ Scanner Next
+  `1.0.26` from `/downloads/zzz-scanner/1.0.26/ZZZ-Scanner.Next-win-x64.zip`.
+- Removed the old `1.0.27` scanner package from the calculator download tree so
+  the repository does not carry duplicate OCR bundles.
+- The web scanner request now sends the validated fast DXGI route:
+  `fastMode=true`, `captureMode=dxgi`, `panelMinAcceptFloorMs=110`, and
+  `postScrollPanelAcceptMode=adaptive-after-scroll`.
+- Added scanner package and `scan_req` payload validation to
+  `npm run test:scanner-bridge`.
+
 ### 2026-06-24 01:31 +08:00
 
 This upload adds or expands these major areas:
@@ -219,8 +233,9 @@ This upload added or expanded these major areas:
 - Damage preview for direct, sheer, anomaly, and disorder events, with
   inspectable white-box formula rows, target resistance/defense/stun controls,
   and separate damage modifier zones.
-- ZZZ Scanner Drive Disc import, manual inventory editing, duplicate handling,
-  account-scoped storage, and optional remove-missing synchronization.
+- ZZZ Scanner Drive Disc import, one-click local helper scanning, manual
+  inventory editing, duplicate handling, account-scoped storage, and optional
+  remove-missing synchronization.
 - Saved Drive Disc loadouts that can be applied on the homepage or created from
   optimizer results.
 - Drive Disc optimizer with calculation target presets, preview, background job
@@ -298,6 +313,12 @@ npm start
 
 Open the printed local URL, usually `http://localhost:8787`. You can override
 the port with `PORT=8791 npm start`.
+
+The Drive Disc page can launch a small local scanner helper from
+`/downloads/ZZZ-Scanner-Helper.exe`. The helper registers `zzz-scanner://`,
+connects back to the page on `127.0.0.1:22355`, and downloads the OCR scanner
+package declared by `/downloads/zzz-scanner/manifest.json` when needed. The
+current scanner package is ZZZ Scanner Next `1.0.26`.
 
 Main pages:
 

@@ -9,6 +9,7 @@ import {
     upsertDriveDiscLoadout,
     upsertUserDriveDisc,
 } from "./local-store.js"
+import { ScannerBridge } from "./scanner-bridge.js"
 
 const els = {
     status: document.getElementById("status"),
@@ -75,6 +76,29 @@ const els = {
     loadoutSlotEditors: document.getElementById("loadoutSlotEditors"),
     saveLoadoutBtn: document.getElementById("saveLoadoutBtn"),
     deleteLoadoutBtn: document.getElementById("deleteLoadoutBtn"),
+    importRecordsModal: document.getElementById("importRecordsModal"),
+    importRecordsCloseBtn: document.getElementById("importRecordsCloseBtn"),
+    importRecordsSummaryText: document.getElementById("importRecordsSummaryText"),
+    importRecordsTableWrap: document.getElementById("importRecordsTableWrap"),
+    importRecordsTableBody: document.getElementById("importRecordsTableBody"),
+    importRecordsEmpty: document.getElementById("importRecordsEmpty"),
+    scanBtn: document.getElementById("scanBtn"),
+    scanModal: document.getElementById("scanModal"),
+    scanCloseBtn: document.getElementById("scanCloseBtn"),
+    scanStatusText: document.getElementById("scanStatusText"),
+    scanHelperGuide: document.getElementById("scanHelperGuide"),
+    scanControls: document.getElementById("scanControls"),
+    scanAutoRetry: document.getElementById("scanAutoRetry"),
+    scanRarityS: document.getElementById("scanRarityS"),
+    scanRarityA: document.getElementById("scanRarityA"),
+    scanMaxItems: document.getElementById("scanMaxItems"),
+    scanStopNon15: document.getElementById("scanStopNon15"),
+    scanRemoveMissing: document.getElementById("scanRemoveMissing"),
+    scanStartBtn: document.getElementById("scanStartBtn"),
+    scanStopBtn: document.getElementById("scanStopBtn"),
+    scanProgressArea: document.getElementById("scanProgressArea"),
+    scanProgressFill: document.getElementById("scanProgressFill"),
+    scanProgressText: document.getElementById("scanProgressText"),
 }
 
 const EMPTY_DISC_IMAGE = "/assets/drive-discs/empty.svg"
@@ -936,18 +960,88 @@ function importSummaryText(summary) {
         return "仓库已更新"
     }
 
-    return `新增 ${summary.added ?? 0}，跳过 ${summary.skipped ?? 0}，更新 ${summary.updated ?? 0}，删除 ${summary.removed ?? 0}，文件内重复 ${summary.duplicateInImport ?? 0}`
+    const parts = [
+        `新增 ${summary.added ?? 0}`,
+        `跳过 ${summary.skipped ?? 0}`,
+        `更新 ${summary.updated ?? 0}`,
+        `删除 ${summary.removed ?? 0}`,
+        `文件内重复 ${summary.duplicateInImport ?? 0}`,
+    ]
+    if ((summary.deduplicated ?? 0) > 0) {
+        parts.push(`清理旧重复 ${summary.deduplicated}`)
+    }
+    return parts.join("，")
 }
 
-function focusImportRecords() {
-    const target = els.importCount?.closest(".inventory-topline") ?? els.importCount
-    if (!target) {
+function formatImportTime(value) {
+    if (!value) {
+        return "-"
+    }
+
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) {
+        return value
+    }
+
+    return date.toLocaleString("zh-CN", { hour12: false })
+}
+
+function importSourceText(record) {
+    if (record?.sourcePath === "live-scan") {
+        return "扫描导入"
+    }
+
+    return record?.sourcePath || "手动导入"
+}
+
+function renderImportRecordsModal() {
+    const imports = [...(store?.imports ?? [])].reverse()
+    if (els.importRecordsSummaryText) {
+        els.importRecordsSummaryText.textContent = imports.length
+            ? `当前账号共 ${imports.length} 次导入`
+            : "当前账号还没有导入记录"
+    }
+    if (els.importRecordsTableWrap) {
+        els.importRecordsTableWrap.hidden = imports.length === 0
+    }
+    if (els.importRecordsEmpty) {
+        els.importRecordsEmpty.hidden = imports.length !== 0
+    }
+    if (!els.importRecordsTableBody) {
         return
     }
 
-    target.scrollIntoView({ behavior: "smooth", block: "center" })
-    target.tabIndex = -1
-    target.focus({ preventScroll: true })
+    els.importRecordsTableBody.innerHTML = ""
+    for (const record of imports) {
+        const warnings = record.warnings?.length ? ` · 警告 ${record.warnings.length}` : ""
+        const row = document.createElement("tr")
+        row.innerHTML = `
+            <td><strong>${escapeHtml(formatImportTime(record.importedAt))}</strong></td>
+            <td>${escapeHtml(importSourceText(record))}</td>
+            <td>${escapeHtml(`${record.itemCount ?? 0} 条${record.removeMissing ? " · 同步删除" : ""}${warnings}`)}</td>
+            <td>${escapeHtml(importSummaryText(record.summary))}</td>
+        `
+        els.importRecordsTableBody.appendChild(row)
+    }
+}
+
+function openImportRecordsModal() {
+    if (!els.importRecordsModal) {
+        return
+    }
+
+    renderImportRecordsModal()
+    els.importRecordsModal.hidden = false
+    document.body.classList.add("modal-open")
+}
+
+function closeImportRecordsModal() {
+    if (!els.importRecordsModal) {
+        return
+    }
+
+    els.importRecordsModal.hidden = true
+    document.body.classList.remove("modal-open")
 }
 
 function showImportSuccessNotice(summary) {
@@ -958,7 +1052,7 @@ function showImportSuccessNotice(summary) {
         actions: [
             {
                 label: "查看导入记录",
-                onClick: focusImportRecords,
+                onClick: openImportRecordsModal,
             },
             {
                 label: "关闭",
@@ -1242,6 +1336,12 @@ els.loadoutModal?.addEventListener("click", event => {
         closeLoadoutModal()
     }
 })
+els.importRecordsCloseBtn?.addEventListener("click", closeImportRecordsModal)
+els.importRecordsModal?.addEventListener("click", event => {
+    if (event.target.matches("[data-close-import-records-modal]")) {
+        closeImportRecordsModal()
+    }
+})
 els.loadoutSlotEditors?.addEventListener("change", event => {
     const select = event.target.closest("select[data-loadout-slot]")
     if (!select) {
@@ -1343,6 +1443,227 @@ els.deleteDiscBtn.addEventListener("click", async () => {
             message,
         })
     }
+})
+
+// --- Scanner bridge ---
+
+const scanner = new ScannerBridge()
+let scanPollTimer = null
+
+function openScanModal(connected) {
+    els.scanModal.hidden = false
+    document.body.classList.add("modal-open")
+    els.scanHelperGuide.hidden = connected
+    els.scanControls.hidden = !connected
+    els.scanProgressArea.hidden = true
+    els.scanStartBtn.hidden = false
+    els.scanStopBtn.hidden = true
+    els.scanStatusText.textContent = connected ? "已连接，可以开始扫描" : "未检测到扫描助手"
+}
+
+function setScannerConnected(message = "已连接，正在准备 OCR 扫描器...") {
+    els.scanHelperGuide.hidden = true
+    els.scanControls.hidden = false
+    els.scanStartBtn.disabled = scanner.mode === "helper"
+    els.scanStatusText.textContent = message
+    if (scanner.mode === "helper") {
+        els.scanProgressArea.hidden = false
+        els.scanProgressFill.style.width = "12%"
+        setScanProgress("正在检查扫描器版本...")
+        scanner.ensureScanner().catch((error) => {
+            const message = error instanceof Error ? error.message : String(error)
+            els.scanStartBtn.disabled = false
+            els.scanProgressArea.hidden = true
+            els.scanStatusText.textContent = `准备失败：${message}`
+            showErrorNotice({ title: "准备扫描器失败", message })
+        })
+    } else {
+        els.scanStartBtn.disabled = false
+        els.scanProgressArea.hidden = true
+    }
+}
+
+function closeScanModal() {
+    stopScanPoll()
+    els.scanModal.hidden = true
+    document.body.classList.remove("modal-open")
+    if (scanner.scanning) {
+        scanner.stopScan()
+    }
+    scanner.disconnect()
+}
+
+function startScanPoll() {
+    stopScanPoll()
+    scanner.launchHelper()
+    scanPollTimer = setInterval(async () => {
+        try {
+            await scanner.connect()
+            stopScanPoll()
+            setScannerConnected()
+        } catch {}
+    }, 3000)
+}
+
+function stopScanPoll() {
+    if (scanPollTimer) {
+        clearInterval(scanPollTimer)
+        scanPollTimer = null
+    }
+}
+
+function setScanProgress(text, percent = null) {
+    els.scanProgressText.textContent = text
+    if (percent !== null) {
+        els.scanProgressFill.style.width = `${Math.min(100, Math.max(0, percent))}%`
+    }
+}
+
+function setScanningState(active) {
+    els.scanStartBtn.hidden = active
+    els.scanStopBtn.hidden = !active
+    els.scanProgressArea.hidden = !active
+    els.scanBtn.disabled = active
+    els.scanStatusText.textContent = active ? "扫描进行中..." : "扫描就绪"
+    if (active) {
+        els.scanProgressFill.style.width = "0%"
+        setScanProgress("准备中...")
+    }
+}
+
+async function tryConnectScanner() {
+    openScanModal(false)
+    bindScannerEvents()
+    try {
+        await scanner.connect()
+        setScannerConnected()
+    } catch {
+        scanner.launchHelper()
+        els.scanHelperGuide.hidden = false
+        els.scanControls.hidden = true
+        els.scanStatusText.textContent = "正在唤起扫描助手..."
+        startScanPoll()
+    }
+}
+
+function bindScannerEvents() {
+    scanner.onLauncherProgress = (data) => {
+        const stage = data?.stage || ""
+        const pct = stage === "manifest" ? 18
+            : stage === "download" ? 34
+            : stage === "checksum" ? 68
+            : stage === "extract" ? 82
+            : stage === "ready" ? 100
+            : 20
+        els.scanProgressArea.hidden = false
+        els.scanProgressFill.style.width = `${pct}%`
+        setScanProgress(data?.message || "正在准备扫描器...")
+        els.scanStatusText.textContent = "正在准备本地 OCR 扫描器..."
+    }
+
+    scanner.onScannerReady = () => {
+        els.scanStartBtn.disabled = false
+        els.scanProgressArea.hidden = true
+        els.scanStatusText.textContent = "已连接，可以开始扫描"
+    }
+
+    scanner.onProgress = (data) => {
+        const total = data.queued || 1
+        const done = data.completed + data.failed
+        const pct = total > 0 ? (done / total) * 100 : 0
+        setScanProgress(
+            `访问 ${data.visited} / 完成 ${data.completed} / 失败 ${data.failed}`,
+            pct,
+        )
+    }
+
+    scanner.onItem = () => {}
+
+    scanner.onComplete = async (data) => {
+        setScanningState(false)
+        closeScanModal()
+        if (!data?.items?.length) {
+            setStatus("扫描完成（无结果）", "idle")
+            showSuccessNotice({ title: "扫描完成", message: "未扫描到驱动盘。" })
+            return
+        }
+        try {
+            setStatus("导入中", "idle")
+            const response = await importScannerExportToStore(data.items, {
+                sourcePath: "live-scan",
+                removeMissing: Boolean(els.scanRemoveMissing.checked),
+                setAliases: scannerSetAliases(),
+            })
+            store = response
+            renderAll()
+            setStatus("扫描导入完成", "success")
+            showImportSuccessNotice(response.summary ?? store.lastImportSummary)
+        } catch (error) {
+            setStatus("导入失败", "error")
+            showErrorNotice({ title: "扫描导入失败", message: error instanceof Error ? error.message : String(error) })
+        }
+    }
+
+    scanner.onError = (data) => {
+        setScanningState(false)
+        els.scanStartBtn.disabled = false
+        const msg = data?.message || "扫描出错"
+        els.scanStatusText.textContent = `扫描失败：${msg}`
+        showErrorNotice({ title: "扫描失败", message: msg })
+    }
+
+    scanner.onDisconnect = () => {
+        if (scanner.scanning) {
+            setScanningState(false)
+            els.scanStatusText.textContent = "扫描助手连接断开"
+            showErrorNotice({ title: "扫描中断", message: "与扫描助手的连接已断开。" })
+        }
+    }
+}
+
+async function startLiveScan() {
+    const rarities = []
+    if (els.scanRarityS.checked) rarities.push("S")
+    if (els.scanRarityA.checked) rarities.push("A")
+    if (rarities.length === 0) {
+        showErrorNotice({ title: "请至少选择一个品质" })
+        return
+    }
+
+    const removeMissing = Boolean(els.scanRemoveMissing.checked)
+    if (removeMissing) {
+        const ok = await confirmDialog({
+            title: "同步删除缺失驱动盘",
+            message: "本次扫描导入会进行完整同步，删除当前账号下未出现在扫描结果中的驱动盘，并清空相关套装预设槽位。",
+            confirmText: "继续",
+            tone: "danger",
+        })
+        if (!ok) return
+    }
+
+    setScanningState(true)
+    clearPageNotice()
+    bindScannerEvents()
+    await scanner.ensureScanner()
+
+    scanner.startScan({
+        maxItems: Number(els.scanMaxItems.value) || 0,
+        rarities,
+        stopAtNonLevel15: els.scanStopNon15.checked,
+        fastMode: true,
+        captureMode: "dxgi",
+        panelMinAcceptFloorMs: 110,
+        postScrollPanelAcceptMode: "adaptive-after-scroll",
+    })
+}
+
+els.scanBtn.addEventListener("click", () => tryConnectScanner())
+els.scanCloseBtn.addEventListener("click", () => closeScanModal())
+els.scanModal.querySelector("[data-close-scan-modal]")?.addEventListener("click", () => closeScanModal())
+els.scanStartBtn.addEventListener("click", () => startLiveScan())
+els.scanStopBtn.addEventListener("click", () => {
+    scanner.stopScan()
+    els.scanStatusText.textContent = "正在停止..."
 })
 
 async function bootstrap() {

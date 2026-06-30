@@ -6,6 +6,15 @@
 
 ## 上传更新摘要
 
+### 2026-06-30 00:09 +08:00
+
+本次上传修复网页唤起 OCR 扫描器的集成参数：
+
+- `/downloads/zzz-scanner/manifest.json` 已改为提供 ZZZ Scanner Next `1.0.26`，下载路径为 `/downloads/zzz-scanner/1.0.26/ZZZ-Scanner.Next-win-x64.zip`。
+- 从计算器下载目录移除旧的 `1.0.27` 扫描器包，避免仓库同时携带两份 OCR 大包。
+- 网页扫描请求现在会发送已验证的 fast DXGI 路线：`fastMode=true`、`captureMode=dxgi`、`panelMinAcceptFloorMs=110` 和 `postScrollPanelAcceptMode=adaptive-after-scroll`。
+- `npm run test:scanner-bridge` 新增扫描器 manifest、包大小、SHA-256 和 `scan_req` payload 校验。
+
 ### 2026-06-24 01:31 +08:00
 
 本次上传主要更新如下：
@@ -115,7 +124,7 @@
 - 在局外面板基础上叠加自身、队友、音擎、驱动盘 4 件套、场地、Boss 和手动 Buff，计算局内面板。
 - 战斗 Buff 支持队友、音擎团队、驱动盘团队和自定义来源分组，便于查看与移除。
 - 支持直伤、贯穿、异常和紊乱事件的伤害预览，并输出可检查的公式拆解；目标防御、抗性与失衡乘区可配置，不同伤害类型使用独立的事件修正区。
-- 支持 ZZZ Scanner 驱动盘导入、手动编辑、重复识别、账号隔离存储和可选的“移除缺失”同步。
+- 支持 ZZZ Scanner 驱动盘导入、一键唤起本地扫描助手、手动编辑、重复识别、账号隔离存储和可选的“移除缺失”同步。
 - 支持保存驱动盘套装预设，首页可套用，优化器结果也可保存。
 - 驱动盘优化器支持计算目标预设、预览、后台任务进度、取消、套装结构限制、多选额外 2 件套、推荐/默认 4 件套辅助、4 件套 Buff 自动或手动处理、主词条限制、最低属性限制、精确/快速/并行算法选择和伤害评分。
 - 驱动盘分析工具支持查看当前副词条有效词条数，以及额外副词条带来的预测伤害收益。
@@ -184,6 +193,9 @@ npm start
 ```
 
 启动后打开终端打印的本地地址，通常是 `http://localhost:8787`。如需指定端口，可以使用 `PORT=8791 npm start`。
+
+驱动盘页的「扫描」会优先连接本地小助手 `/downloads/ZZZ-Scanner-Helper.exe`。小助手会注册 `zzz-scanner://` 协议，在 `127.0.0.1:22355` 与网页通信，并按 `/downloads/zzz-scanner/manifest.json` 自动下载/更新真正的 OCR 扫描器大包。
+当前网页发布的大包版本是 ZZZ Scanner Next `1.0.26`。
 
 主要页面：
 

@@ -1052,6 +1052,27 @@ async function serveStatic(res, pathname) {
     createReadStream(absPath).pipe(res)
 }
 
+async function serveDownload(res, pathname) {
+    const fileName = pathname.replace(/^\/downloads\//, "")
+    const absPath = path.resolve(downloadsDir, fileName)
+    const relativePath = path.relative(downloadsDir, absPath)
+    if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+        sendText(res, 403, "Forbidden", "text/plain; charset=utf-8")
+        return
+    }
+    if (!existsSync(absPath)) {
+        sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
+        return
+    }
+    const stat = await import("node:fs/promises").then(m => m.stat(absPath))
+    res.writeHead(200, {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${encodeURIComponent(path.basename(absPath))}"`,
+        "Content-Length": stat.size,
+    })
+    createReadStream(absPath).pipe(res)
+}
+
 async function routeApi(req, res, pathname) {
     if (req.method === "OPTIONS") {
         sendText(res, 204, "", "text/plain; charset=utf-8")
@@ -1638,6 +1659,8 @@ async function routeApi(req, res, pathname) {
     })
 }
 
+const downloadsDir = path.join(rootDir, "downloads")
+
 const server = createServer(async (req, res) => {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`)
     const pathname = decodeURIComponent(url.pathname)
@@ -1645,6 +1668,11 @@ const server = createServer(async (req, res) => {
     try {
         if (pathname.startsWith("/api/")) {
             await routeApi(req, res, pathname)
+            return
+        }
+
+        if (pathname.startsWith("/downloads/")) {
+            await serveDownload(res, pathname)
             return
         }
 

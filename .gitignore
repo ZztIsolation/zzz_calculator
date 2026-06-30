@@ -21,6 +21,7 @@ data/user_drive_discs.json
 # local scanner exports, if copied into this repo
 data/imports/
 imports/
+downloads/
 *.scanner-export.json
 
 .vscode/

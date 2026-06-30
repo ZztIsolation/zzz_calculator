@@ -13,6 +13,8 @@ assert.match(indexHtml, /id="optimizerResultTabs"/, "Optimizer result tabs shoul
 assert.doesNotMatch(indexHtml, /id="discPicker"/, "Manual drive-disc selection should no longer use the old six-select picker.")
 assert.doesNotMatch(indexHtml, /id="currentPlanList"/, "Current plan should not render as a separate list.")
 assert.doesNotMatch(indexHtml, /id="optimizerResultList"/, "Optimizer results should not render as a separate list.")
+assert.match(indexHtml, /id="damageTargetStunned"[^>]*checked/, "Boss stun multiplier should be enabled by default.")
+assert.match(indexHtml, /BOSS初始失衡倍率%/, "Boss stun multiplier label should name the initial multiplier.")
 
 const workbenchIndex = indexHtml.indexOf('id="driveDiscSchemeTabs"')
 const resultTabsIndex = indexHtml.indexOf('id="optimizerResultTabs"')
@@ -22,5 +24,7 @@ assert.ok(schemeListIndex > resultTabsIndex, "Only one active scheme list should
 
 assert.match(calculateJs, /function optimizedSchemes\(\) \{\s*return optimizationResults\.map\(optimizedScheme\)/s)
 assert.match(calculateJs, /function schemeTabs\(\) \{\s*return \[\s*manualScheme\(\),\s*loadoutScheme\(\),\s*\.\.\.optimizedSchemes\(\),\s*\]/s)
+assert.match(calculateJs, /return Number\.isFinite\(activeMultiplier\) \? activeMultiplier !== 1 : true/, "Missing stored stun state should default to enabled.")
+assert.match(calculateJs, /manuallyUncheckedDefaultBuffIds/, "Default combat Buff exclusions should be persisted separately from active ids.")
 assert.doesNotMatch(calculateJs, /function allSchemes\(\)/, "Mixed manual/loadout/result scheme tabs should not be reintroduced.")
 assert.doesNotMatch(calculateJs, /renderDiscPicker|selectedDiscIdsFromPicker/, "Old select-based manual picker should stay removed.")
