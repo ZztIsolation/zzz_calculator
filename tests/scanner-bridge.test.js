@@ -52,10 +52,15 @@ function assertScannerPackageManifest() {
     }
 
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
-    const packagePath = normalize(join(scannerRoot, manifest.packageUrl))
+    const localPackageUrl = "./1.0.26/ZZZ-Scanner.Next-win-x64.zip"
+    const packagePath = normalize(join(scannerRoot, localPackageUrl))
 
     assert.equal(manifest.scannerVersion, "1.0.26")
-    assert.equal(manifest.packageUrl, "./1.0.26/ZZZ-Scanner.Next-win-x64.zip")
+    assert.equal(manifest.packageUrl, "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.26/ZZZ-Scanner.Next-win-x64.zip")
+    assert.ok(Array.isArray(manifest.packageUrls))
+    assert.ok(manifest.packageUrls.includes(manifest.packageUrl))
+    assert.ok(manifest.packageUrls.includes("http://121.199.21.10/downloads/zzz-scanner/1.0.26/ZZZ-Scanner.Next-win-x64.zip"))
+    assert.ok(manifest.packageUrls.includes(localPackageUrl))
     assert.equal(manifest.entry, "ZZZ-Scanner.Next.exe")
     assert.equal(existsSync(join(scannerRoot, "1.0.0")), false)
     assert.equal(existsSync(join(scannerRoot, "1.0.1")), false)

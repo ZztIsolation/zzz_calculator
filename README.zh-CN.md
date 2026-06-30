@@ -6,6 +6,15 @@
 
 ## 上传更新摘要
 
+### 2026-06-30 22:20 +08:00
+
+本次上传迁移到不备案的 GitHub Pages + GitHub Releases 发布方式：
+
+- 新增 `npm run build:pages`，生成 `dist/pages` 静态站点，导出 `static/catalog.json`、`static/app-config.json`、`downloads/zzz-scanner/manifest.json` 和 `CNAME`。
+- 前端优先读取静态 JSON，保留本地 Node server 的 `/api/catalog`、`/api/meta`、`/api/app-config` 作为开发兜底。
+- 驱动盘页的小助手下载改为 GitHub Release 主下载与备用镜像下载；OCR manifest 增加 `packageUrls`，便于小助手在主源失败时尝试镜像。
+- 新增 GitHub Actions Pages 工作流，只上传 Pages artifact，不提交 `dist/pages` 或 `downloads/` 大文件。
+
 ### 2026-06-30 00:09 +08:00
 
 本次上传修复网页唤起 OCR 扫描器的集成参数：
@@ -194,8 +203,7 @@ npm start
 
 启动后打开终端打印的本地地址，通常是 `http://localhost:8787`。如需指定端口，可以使用 `PORT=8791 npm start`。
 
-驱动盘页的「扫描」会优先连接本地小助手 `/downloads/ZZZ-Scanner-Helper.exe`。小助手会注册 `zzz-scanner://` 协议，在 `127.0.0.1:22355` 与网页通信，并按 `/downloads/zzz-scanner/manifest.json` 自动下载/更新真正的 OCR 扫描器大包。
-当前网页发布的大包版本是 ZZZ Scanner Next `1.0.26`。
+驱动盘页的「扫描」会优先连接本地小助手。公开站点上的小助手下载按钮指向 GitHub Releases，并提供备用镜像；本地 Node server 开发模式仍可从 `/downloads/ZZZ-Scanner-Helper.exe` 提供文件。小助手会注册 `zzz-scanner://` 协议，在 `127.0.0.1:22355` 与网页通信，并按 `/downloads/zzz-scanner/manifest.json` 自动下载/更新真正的 OCR 扫描器大包。当前网页发布的大包版本是 ZZZ Scanner Next `1.0.26`。
 
 主要页面：
 
@@ -216,6 +224,26 @@ npm start
 `data/` 下的公开静态数据、前端素材、示例、文档和测试应保持提交状态，这样其他用户克隆后可以直接运行。
 
 ## 生产环境
+
+当前公开站点推荐部署到 GitHub Pages，不再把 `zzzcaculator.top` 解析到中国内地 ECS，因此不走 ICP 备案。
+
+静态站构建命令：
+
+```bash
+npm run build:pages
+```
+
+构建产物在 `dist/pages`，包含首页、驱动盘页、账号页、静态资料 JSON、`CNAME` 和 OCR manifest。GitHub Actions 会在 `main` 分支更新后运行同一命令，并用 Pages artifact 发布；不要提交 `dist/pages`。
+
+Helper 和 OCR 大包通过 GitHub Releases 发布，不进入 Git 仓库：
+
+- tag：`scanner-1.0.26`
+- `ZZZ-Scanner-Helper.exe`
+- `ZZZ-Scanner.Next-win-x64.zip`
+
+域名设置完成后，GitHub Pages 自定义域名为 `zzzcaculator.top`，`www.zzzcaculator.top` 作为兼容入口。DNS 记录应指向 GitHub Pages，而不是旧 ECS 公网 IP。
+
+本地或自托管 Node 服务仍可使用原生产模式。
 
 生产部署建议设置：
 

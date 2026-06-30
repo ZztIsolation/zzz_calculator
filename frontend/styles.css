@@ -5868,9 +5868,15 @@ button.optimizer-disc-row:disabled {
   font-size: 0.82rem !important;
 }
 
+.scan-download-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
 .scan-download-btn {
   display: inline-flex;
-  margin-top: 6px;
   font-size: 0.85rem;
   text-decoration: none;
 }

@@ -5,6 +5,7 @@
   "scripts": {
     "serve": "node backend/server.js",
     "start": "node backend/server.js",
+    "build:pages": "node scripts/build-pages.js",
     "test:atk-basis": "node tests/atk-basis.test.js",
     "test:percent-sanity": "node tests/percent-sanity.test.js",
     "test:maintenance-validation": "node tests/maintenance-validation.test.js",

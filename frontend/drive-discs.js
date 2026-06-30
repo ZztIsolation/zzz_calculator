@@ -10,6 +10,7 @@ import {
     upsertUserDriveDisc,
 } from "./local-store.js"
 import { ScannerBridge } from "./scanner-bridge.js"
+import { loadMeta as loadCatalogMeta } from "./catalog-loader.js"
 
 const els = {
     status: document.getElementById("status"),
@@ -947,7 +948,7 @@ function buildDiscFromForm() {
 }
 
 async function loadMeta() {
-    meta = await api("/api/meta")
+    meta = await loadCatalogMeta()
 }
 
 async function loadStore() {

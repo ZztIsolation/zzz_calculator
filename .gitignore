@@ -14,6 +14,7 @@ pnpm-debug.log*
 dist/
 build/
 coverage/
+.playwright-cli/
 
 # user-local runtime data
 data/user_drive_discs.json

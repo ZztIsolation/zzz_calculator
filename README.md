@@ -9,6 +9,22 @@ Chinese documentation is available in [README.zh-CN.md](README.zh-CN.md).
 
 ## Upload Update Summaries
 
+### 2026-06-30 22:20 +08:00
+
+This upload moves the public site toward the no-ICP GitHub Pages + GitHub
+Releases deployment path:
+
+- Added `npm run build:pages` to generate a `dist/pages` static site with
+  `static/catalog.json`, `static/app-config.json`,
+  `downloads/zzz-scanner/manifest.json`, and `CNAME`.
+- Frontend catalog/config loading now prefers static JSON while keeping the
+  local Node server APIs as development fallbacks.
+- The Drive Disc helper download now points to GitHub Releases as the primary
+  source and exposes a mirror link; the OCR manifest supports `packageUrls` so
+  the helper can try a mirror if the primary package source fails.
+- Added a GitHub Actions Pages workflow that publishes the Pages artifact
+  without committing `dist/pages` or large `downloads/` files.
+
 ### 2026-06-30 00:09 +08:00
 
 This upload fixes the web-launched OCR scanner integration:
@@ -314,11 +330,13 @@ npm start
 Open the printed local URL, usually `http://localhost:8787`. You can override
 the port with `PORT=8791 npm start`.
 
-The Drive Disc page can launch a small local scanner helper from
-`/downloads/ZZZ-Scanner-Helper.exe`. The helper registers `zzz-scanner://`,
-connects back to the page on `127.0.0.1:22355`, and downloads the OCR scanner
-package declared by `/downloads/zzz-scanner/manifest.json` when needed. The
-current scanner package is ZZZ Scanner Next `1.0.26`.
+The Drive Disc page can launch a small local scanner helper. Public builds link
+the helper download to GitHub Releases with a mirror fallback; local Node server
+development can still serve it from `/downloads/ZZZ-Scanner-Helper.exe`. The
+helper registers `zzz-scanner://`, connects back to the page on
+`127.0.0.1:22355`, and downloads the OCR scanner package declared by
+`/downloads/zzz-scanner/manifest.json` when needed. The current scanner package
+is ZZZ Scanner Next `1.0.26`.
 
 Main pages:
 
@@ -348,6 +366,34 @@ should stay committed so other users can clone the repository and run it
 normally.
 
 ## Production
+
+The public site is intended to run on GitHub Pages so `zzzcaculator.top` no
+longer needs to point at a mainland China ECS instance and does not require ICP
+filing.
+
+Build the static Pages artifact with:
+
+```bash
+npm run build:pages
+```
+
+The artifact is written to `dist/pages` and includes the app pages, static JSON
+catalog/config files, `CNAME`, and the OCR manifest. GitHub Actions runs the
+same command from `main` and deploys the Pages artifact; do not commit
+`dist/pages`.
+
+Publish Helper and OCR packages through GitHub Releases instead of Git:
+
+- tag: `scanner-1.0.26`
+- `ZZZ-Scanner-Helper.exe`
+- `ZZZ-Scanner.Next-win-x64.zip`
+
+After DNS is switched, GitHub Pages should serve `zzzcaculator.top`, with
+`www.zzzcaculator.top` as a compatibility entry. DNS records should point to
+GitHub Pages rather than the old ECS public IP.
+
+The Node server deployment path remains available for local or self-hosted
+production use.
 
 Set production services with:
 

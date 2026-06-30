@@ -24,9 +24,11 @@ export async function api(path, options = {}) {
 let appConfigPromise = null
 
 export function loadAppConfig() {
-    appConfigPromise ??= fetch("/api/app-config")
-        .then(response => response.ok ? response.json() : { maintenanceEnabled: false })
-        .catch(() => ({ maintenanceEnabled: false }))
+    appConfigPromise ??= fetch("/static/app-config.json")
+        .then(response => response.ok ? response.json() : Promise.reject(new Error("No static app config")))
+        .catch(() => fetch("/api/app-config")
+            .then(response => response.ok ? response.json() : Promise.reject(new Error("No API app config")))
+            .catch(() => ({ maintenanceEnabled: false })))
     return appConfigPromise
 }
 

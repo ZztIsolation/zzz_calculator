@@ -19,9 +19,22 @@ async function requestJson(path) {
     return response.json()
 }
 
+async function requestFirstJson(paths) {
+    const errors = []
+    for (const path of paths) {
+        try {
+            return await requestJson(path)
+        } catch (error) {
+            errors.push(error)
+        }
+    }
+
+    throw errors.at(-1) ?? new Error("Request failed")
+}
+
 export async function loadCatalog() {
     if (!catalogPromise) {
-        catalogPromise = requestJson("/api/catalog").then(normalizeCatalog)
+        catalogPromise = requestFirstJson(["/static/catalog.json", "/api/catalog"]).then(normalizeCatalog)
     }
     return catalogPromise
 }
