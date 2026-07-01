@@ -6850,7 +6850,7 @@ async function cancelActiveOptimization({ silent = false } = {}) {
         setStatus("正在取消", "idle")
     }
 
-    pendingOptimizationCancelPromise = (async () => {
+    const cancelPromise = Promise.resolve().then(() => {
         activeOptimizationWorker?.postMessage({ type: "cancel", runId: jobId })
         disposeActiveOptimizationWorker()
         if (activeOptimizationJobId === jobId) {
@@ -6874,9 +6874,14 @@ async function cancelActiveOptimization({ silent = false } = {}) {
             })
             setStatus("已取消", "idle")
         }
-    })()
+    }).finally(() => {
+        if (pendingOptimizationCancelPromise === cancelPromise) {
+            pendingOptimizationCancelPromise = null
+        }
+    })
 
-    return pendingOptimizationCancelPromise
+    pendingOptimizationCancelPromise = cancelPromise
+    return cancelPromise
 }
 
 async function runOptimization() {

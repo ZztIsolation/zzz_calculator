@@ -20,6 +20,8 @@ the browser workflow:
   payloads, reducing the package from about 129.9MB to 115.2MB.
 - Updated the scanner manifest hash/size and kept the same helper protocol,
   scanner version, entry point, and OCR model.
+- The public Pages manifest now serves the verified GitHub Release package
+  first so the stale ECS mirror cannot return the old larger scanner package.
 
 ### 2026-07-01 02:55 +08:00
 
@@ -42,9 +44,9 @@ Releases deployment path:
   `downloads/zzz-scanner/manifest.json`, and `CNAME`.
 - Frontend catalog/config loading now prefers static JSON while keeping the
   local Node server APIs as development fallbacks.
-- The Drive Disc helper download now points to GitHub Releases and exposes a
-  mirror link; the OCR manifest supports `packageUrls` so the helper can try
-  multiple package sources.
+- The Drive Disc helper download now points to GitHub Releases; the OCR
+  manifest supports `packageUrls` so the helper can try multiple package
+  sources when an up-to-date mirror is available.
 - Added a GitHub Actions Pages workflow that publishes the Pages artifact
   without committing `dist/pages` or large `downloads/` files.
 
@@ -355,10 +357,9 @@ Open the printed local URL, usually `http://localhost:8787`. You can override
 the port with `PORT=8791 npm start`.
 
 The Drive Disc page can launch a small local scanner helper. Public builds link
-the helper download to GitHub Releases with a mirror fallback; local Node server
-development can still serve it from `/downloads/ZZZ-Scanner-Helper.exe`. The OCR
-package manifest currently tries the ECS mirror before GitHub Releases for
-better first-run availability in mainland networks. The helper registers
+the helper download to GitHub Releases; local Node server development can still
+serve it from `/downloads/ZZZ-Scanner-Helper.exe`. The OCR package manifest
+currently uses the verified GitHub Release package. The helper registers
 `zzz-scanner://`, connects back to the page on
 `127.0.0.1:22355`, and downloads the OCR scanner package declared by
 `/downloads/zzz-scanner/manifest.json` when needed. The current scanner package

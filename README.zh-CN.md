@@ -13,6 +13,7 @@
 - `ZZZ-Scanner-Helper.exe` 改为 NativeAOT 小助手，下载体积从约 67.6MB 降到 7.4MB。
 - `1.0.28` OCR 扫描器 zip 去掉未使用的视频/诊断负载，包体从约 129.9MB 降到 115.2MB。
 - 已同步扫描器 manifest 的 hash/size；Helper 协议、扫描器版本、入口程序和 OCR 模型保持不变。
+- 公开 Pages manifest 现在优先使用已验证的 GitHub Release 新包，避免旧 ECS 镜像返回瘦身前的大包。
 
 ### 2026-07-01 02:55 +08:00
 
@@ -28,7 +29,7 @@
 
 - 新增 `npm run build:pages`，生成 `dist/pages` 静态站点，导出 `static/catalog.json`、`static/app-config.json`、`downloads/zzz-scanner/manifest.json` 和 `CNAME`。
 - 前端优先读取静态 JSON，保留本地 Node server 的 `/api/catalog`、`/api/meta`、`/api/app-config` 作为开发兜底。
-- 驱动盘页的小助手下载改为 GitHub Releases 下载并提供备用镜像；OCR manifest 增加 `packageUrls`，便于小助手尝试多个 OCR 包来源。
+- 驱动盘页的小助手下载改为 GitHub Releases 下载；OCR manifest 增加 `packageUrls`，便于小助手在镜像更新后尝试多个 OCR 包来源。
 - 新增 GitHub Actions Pages 工作流，只上传 Pages artifact，不提交 `dist/pages` 或 `downloads/` 大文件。
 
 ### 2026-07-01 01:00 +08:00
@@ -219,7 +220,7 @@ npm start
 
 启动后打开终端打印的本地地址，通常是 `http://localhost:8787`。如需指定端口，可以使用 `PORT=8791 npm start`。
 
-驱动盘页的「扫描」会优先连接本地小助手。公开站点上的小助手下载按钮指向 GitHub Releases，并提供备用镜像；本地 Node server 开发模式仍可从 `/downloads/ZZZ-Scanner-Helper.exe` 提供文件。OCR 包 manifest 当前会优先尝试 ECS 镜像，再尝试 GitHub Releases，以改善大陆网络下首次下载的可用性。小助手会注册 `zzz-scanner://` 协议，在 `127.0.0.1:22355` 与网页通信，并按 `/downloads/zzz-scanner/manifest.json` 自动下载/更新真正的 OCR 扫描器大包。当前网页发布的大包版本是 ZZZ Scanner Next `1.0.28`。
+驱动盘页的「扫描」会优先连接本地小助手。公开站点上的小助手下载按钮指向 GitHub Releases；本地 Node server 开发模式仍可从 `/downloads/ZZZ-Scanner-Helper.exe` 提供文件。OCR 包 manifest 当前使用已验证的 GitHub Release 新包。小助手会注册 `zzz-scanner://` 协议，在 `127.0.0.1:22355` 与网页通信，并按 `/downloads/zzz-scanner/manifest.json` 自动下载/更新真正的 OCR 扫描器大包。当前网页发布的大包版本是 ZZZ Scanner Next `1.0.28`。
 
 主要页面：
 

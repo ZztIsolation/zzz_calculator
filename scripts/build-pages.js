@@ -12,7 +12,6 @@ const scannerReleaseTag = "scanner-1.0.28"
 const scannerReleaseBase = `https://github.com/ZztIsolation/zzz_calculator/releases/download/${scannerReleaseTag}`
 const scannerVersion = "1.0.28"
 const scannerZipName = "ZZZ-Scanner.Next-win-x64.zip"
-const scannerMirrorBase = `http://121.199.21.10/downloads/zzz-scanner/${scannerVersion}`
 
 async function writeJson(filePath, value) {
     await mkdir(path.dirname(filePath), { recursive: true })
@@ -35,7 +34,6 @@ await writeJson(path.join(outDir, "downloads", "zzz-scanner", "manifest.json"), 
     scannerVersion,
     packageUrl: `${scannerReleaseBase}/${scannerZipName}`,
     packageUrls: [
-        `${scannerMirrorBase}/${scannerZipName}`,
         `${scannerReleaseBase}/${scannerZipName}`,
     ],
     sha256: "27bbe95181c33068cc833c913add7635065a9a238bb40d52ca6231b80fee5d08",

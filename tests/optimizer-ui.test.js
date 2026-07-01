@@ -31,5 +31,8 @@ assert.match(calculateJs, /rawIndex: disc\.source\.rawIndex/, "Optimizer worker 
 assert.match(calculateJs, /store: optimizerStore/, "Worker should receive the trimmed optimizer store.")
 assert.doesNotMatch(calculateJs, /settings: collectOptimizationSettings\(\),\s*store,/s, "Worker input should not duplicate the full browser store.")
 assert.match(calculateJs, /OPTIMIZER_WORKER_STALL_TIMEOUT_MS/, "Optimizer worker should have a no-progress watchdog.")
+assert.doesNotMatch(calculateJs, /pendingOptimizationCancelPromise\s*=\s*\(async\s*\(\)\s*=>\s*\{/s, "Cancel cleanup should not be hidden inside a synchronously-resolving async IIFE.")
+assert.match(calculateJs, /const cancelPromise = Promise\.resolve\(\)\.then\(\(\) => \{/s, "Cancel promise should be assigned before the cleanup body runs.")
+assert.match(calculateJs, /\.finally\(\(\) => \{\s*if \(pendingOptimizationCancelPromise === cancelPromise\) \{\s*pendingOptimizationCancelPromise = null\s*\}/s, "Cancel promise should clear its pending marker after cancellation finishes.")
 assert.doesNotMatch(calculateJs, /function allSchemes\(\)/, "Mixed manual/loadout/result scheme tabs should not be reintroduced.")
 assert.doesNotMatch(calculateJs, /renderDiscPicker|selectedDiscIdsFromPicker/, "Old select-based manual picker should stay removed.")
