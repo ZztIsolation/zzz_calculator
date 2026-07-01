@@ -34,6 +34,22 @@ and commits the pending optimizer/inventory UI updates:
   `stackGroup`; Qingming Cage now keeps its two "Qingming Companion" effects in
   sync.
 
+### 2026-07-02 Scanner Helper Download Progress
+
+This upload refreshes `ZZZ-Scanner-Helper.exe` for the existing
+`scanner-1.0.33` release:
+
+- Helper download now reports downloaded bytes, total bytes, percentage, speed,
+  and retry attempt while preparing the OCR runtime.
+- The Drive Disc page renders that progress instead of staying on a fixed
+  "downloading" message.
+- If the connected Helper is older than `1.0.1`, the page asks the user to
+  download the refreshed Helper because older helpers cannot emit byte-level
+  download progress.
+- Local diagnostics showed the GitHub Release asset exists, but full downloads
+  from the current network can reset or fail to connect, so the symptom is a
+  flaky/blocked download path rather than a pure UI freeze.
+
 ### 2026-07-01 Role-Aware Drive Disc Stat Difference Analysis
 
 This update reuses the existing "stat analysis" modal and adds a "difference

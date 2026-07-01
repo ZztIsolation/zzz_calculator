@@ -136,6 +136,60 @@ Ran the remaining npm regression scripts:
 - `npm run test:drive-disc-import`
 - `npm run test:accounts`
 
+## 2026-07-02 - Added Helper Download Progress Reporting
+
+### Request Context
+
+The Drive Disc scan modal could sit on "正在下载 OCR 扫描器" for a long time
+without telling the user whether bytes were still moving. This made slow or
+blocked GitHub Release downloads indistinguishable from a frozen page.
+
+### Helper Changes
+
+Updated `Launcher/Program.cs` in ZZZ Scanner Next so Helper `1.0.1` downloads
+the OCR package in explicit chunks instead of using a single `CopyToAsync`.
+During the download it emits `launcher_progress` messages containing:
+
+- `bytesDownloaded`
+- `totalBytes`
+- `percent`
+- `bytesPerSecond`
+- `attempt`
+- `maxAttempts`
+- `url`
+
+The helper now keeps a temporary `.download` file during a package attempt and
+reports connection interruptions before retrying. If the download still fails
+after the configured retries, the thrown error names the retry exhaustion
+instead of leaving the browser with a generic preparation timeout.
+
+### Web Changes
+
+The Drive Disc page formats Helper progress as downloaded size, total size,
+percentage, speed, and retry count. The Helper download link includes a
+`v=1.0.1` cache buster, and the scan modal warns when a connected Helper is
+older than `1.0.1` because older Helpers do not send byte-level download
+progress.
+
+### Diagnosis
+
+The `scanner-1.0.33` GitHub Release assets were reachable by HEAD and reported
+the expected sizes, but full zip download probes from this machine failed with
+connection reset/empty reply/connection timeout errors. The ECS mirror at
+`121.199.21.10` still serves the old `1.0.26` manifest and returns 404 for the
+`1.0.33` zip. That means the observed "stuck" state is very likely a flaky or
+blocked GitHub download path, not merely the browser failing to repaint.
+
+### Verification
+
+Ran:
+
+- `dotnet build Launcher\ZZZ-Scanner.Helper.csproj -c Release`
+- `dotnet publish Launcher\ZZZ-Scanner.Helper.csproj -c Release -r win-x64 --self-contained true -o dist\publish-helper`
+- `node --check frontend\drive-discs.js`
+- `node --check frontend\scanner-bridge.js`
+- `npm run test:scanner-bridge`
+
 ## 2026-07-01 - Added Role-Aware Drive Disc Stat Difference Analysis
 
 ### Request Context

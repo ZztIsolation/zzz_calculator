@@ -44,6 +44,10 @@ export class ScannerBridge {
         return this._mode
     }
 
+    get helperVersion() {
+        return this._mode === "helper" ? String(this._helloData?.version ?? "") : ""
+    }
+
     async connect() {
         if (this.connected) {
             return this._helloData

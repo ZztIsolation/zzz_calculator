@@ -1482,7 +1482,10 @@ function setScannerConnected(message = "已连接，正在准备 OCR 扫描器..
     if (scanner.mode === "helper") {
         els.scanProgressArea.hidden = false
         els.scanProgressFill.style.width = "12%"
-        setScanProgress("正在检查扫描器版本...")
+        const helperVersion = scanner.helperVersion
+        setScanProgress(helperVersionAtLeast(helperVersion)
+            ? "正在检查扫描器版本..."
+            : "正在检查扫描器版本... 当前 Helper 版本较旧，下载进度可能无法显示；请重新下载新版 Helper。")
         scanner.ensureScanner().then(() => {
             els.scanStartBtn.disabled = false
             els.scanProgressArea.hidden = true
@@ -1536,6 +1539,73 @@ function setScanProgress(text, percent = null) {
     }
 }
 
+function numericProgressValue(value) {
+    const number = Number(value)
+    return Number.isFinite(number) ? number : null
+}
+
+function formatByteCount(bytes) {
+    const number = Number(bytes)
+    if (!Number.isFinite(number) || number < 0) {
+        return ""
+    }
+    const units = ["B", "KB", "MB", "GB"]
+    let value = number
+    let unitIndex = 0
+    while (value >= 1024 && unitIndex < units.length - 1) {
+        value /= 1024
+        unitIndex += 1
+    }
+    const digits = unitIndex === 0 ? 0 : value >= 100 ? 1 : 2
+    return `${value.toFixed(digits)} ${units[unitIndex]}`
+}
+
+function helperVersionAtLeast(actual = "", required = "1.0.1") {
+    const parse = value => String(value).split(".").map(part => Number(part) || 0)
+    const current = parse(actual)
+    const target = parse(required)
+    for (let i = 0; i < Math.max(current.length, target.length); i += 1) {
+        const left = current[i] ?? 0
+        const right = target[i] ?? 0
+        if (left !== right) {
+            return left > right
+        }
+    }
+    return true
+}
+
+function launcherDownloadProgress(data = {}) {
+    const downloaded = numericProgressValue(data.bytesDownloaded)
+    const total = numericProgressValue(data.totalBytes)
+    const speed = numericProgressValue(data.bytesPerSecond)
+    const rawPercent = numericProgressValue(data.percent)
+    const percent = rawPercent !== null
+        ? rawPercent
+        : downloaded !== null && total > 0
+            ? (downloaded / total) * 100
+            : null
+    const parts = []
+    if (downloaded !== null && total > 0) {
+        parts.push(`${formatByteCount(downloaded)} / ${formatByteCount(total)}`)
+    } else if (downloaded !== null) {
+        parts.push(`已下载 ${formatByteCount(downloaded)}`)
+    }
+    if (percent !== null) {
+        parts.push(`${percent.toFixed(1)}%`)
+    }
+    if (speed !== null && speed > 0) {
+        parts.push(`${formatByteCount(speed)}/s`)
+    }
+    if (Number(data.attempt) > 1 && Number(data.maxAttempts) > 1) {
+        parts.push(`第 ${data.attempt}/${data.maxAttempts} 次尝试`)
+    }
+    const message = data.message || "正在下载 OCR 扫描器..."
+    return {
+        percent,
+        text: parts.length ? `${message} ${parts.join("，")}` : `${message} 首次准备可能需要几分钟...`,
+    }
+}
+
 function setScanningState(active) {
     els.scanStartBtn.hidden = active
     els.scanStopBtn.hidden = !active
@@ -1566,16 +1636,17 @@ async function tryConnectScanner() {
 function bindScannerEvents() {
     scanner.onLauncherProgress = (data) => {
         const stage = data?.stage || ""
-        const pct = stage === "manifest" ? 18
+        const downloadProgress = stage === "download" ? launcherDownloadProgress(data) : null
+        const pct = downloadProgress?.percent ?? (stage === "manifest" ? 18
             : stage === "download" ? 34
             : stage === "checksum" ? 68
             : stage === "extract" ? 82
             : stage === "ready" ? 100
-            : 20
+            : 20)
         els.scanProgressArea.hidden = false
         els.scanProgressFill.style.width = `${pct}%`
         const message = stage === "download"
-            ? "正在下载 OCR 扫描器，首次准备可能需要几分钟..."
+            ? downloadProgress.text
             : data?.message || "正在准备扫描器..."
         setScanProgress(message)
         els.scanStatusText.textContent = "正在准备本地 OCR 扫描器..."
