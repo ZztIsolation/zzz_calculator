@@ -1337,6 +1337,18 @@ els.loadoutModal?.addEventListener("click", event => {
         closeLoadoutModal()
     }
 })
+document.addEventListener("keydown", event => {
+    if (event.key !== "Escape") {
+        return
+    }
+    if (els.discModal && !els.discModal.hidden) {
+        event.preventDefault()
+        closeModal()
+    } else if (els.loadoutModal && !els.loadoutModal.hidden) {
+        event.preventDefault()
+        closeLoadoutModal()
+    }
+})
 els.importRecordsCloseBtn?.addEventListener("click", closeImportRecordsModal)
 els.importRecordsModal?.addEventListener("click", event => {
     if (event.target.matches("[data-close-import-records-modal]")) {
@@ -1664,11 +1676,12 @@ async function startLiveScan() {
         stopAtNonLevel15: els.scanStopNon15.checked,
         fastMode: true,
         captureMode: "dxgi",
+        profileRouting: "strict",
         overlapConflictMode: "recover",
-        panelMinAcceptFloorMs: 120,
+        panelAcceptMode: "adaptive-early-full-roi",
+        scrollAcceptMode: "early-one-row",
         postScrollPanelAcceptMode: "safe",
-        sameRowPanelMinAcceptFloorMs: 105,
-        postScrollPanelMinAcceptFloorMs: 110,
+        panelMinAcceptFloorMs: 120,
     })
 }
 

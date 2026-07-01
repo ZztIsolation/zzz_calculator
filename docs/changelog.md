@@ -6,6 +6,230 @@ This changelog is the long-form maintenance log for `zzz_calculator`. Every
 future change to the Zenless Zone Zero calculator should be appended here with
 the reason, the files touched, the model impact, and the verification performed.
 
+## 2026-07-02 - Published Scanner 1.0.33 and Batched Modal Updates
+
+### Request Context
+
+The public Drive Disc scanner needed to move from the prior 1.0.28 web package
+to the locally fixed ZZZ Scanner Next 1.0.33 runtime. The web page also needed
+to stop carrying older aggressive OCR tuning knobs and instead send the stable
+1.0.33 scan request shape. At the same time, the current working tree already
+contained pending optimizer, analysis, maintenance, and modal UX changes, so
+this release commits them together and documents them in the README.
+
+### Scanner Package And Payload Changes
+
+Repacked the OCR runtime from `E:\yan1\zzz\ZZZ-Scanner.Next\publish 1.0.33`
+into `downloads/zzz-scanner/1.0.33/ZZZ-Scanner.Next-win-x64.zip`, excluding the
+generated `Scans` directory. The package contains the built-in
+`Data/ocr_fast_templates.json`, so the browser no longer needs to pass any
+`ocrFastIndex` override. The new package checksum is
+`4abae2da99e3afbbd76a1ab59a3666e9cec1f09f96ca414e795a69d4cea6fe73`, and the
+package size is `46947741` bytes.
+
+Updated both the local ignored scanner manifest and the generated Pages
+manifest source to publish scanner version `1.0.33` under the GitHub Release tag
+`scanner-1.0.33`. The Drive Disc scanner helper download links now point to the
+same release tag.
+
+The browser `scan_req` payload now uses:
+
+- `fastMode: true`
+- `captureMode: "dxgi"`
+- `profileRouting: "strict"`
+- `overlapConflictMode: "recover"`
+- `panelAcceptMode: "adaptive-early-full-roi"`
+- `scrollAcceptMode: "early-one-row"`
+- `postScrollPanelAcceptMode: "safe"`
+- `panelMinAcceptFloorMs: 120`
+- `stopAtNonLevel15: true` by default from the checked UI option
+
+The page does not send `includeNon15`, `ocrFastIndex`,
+`sameRowPanelMinAcceptFloorMs`, or `postScrollPanelMinAcceptFloorMs`, leaving
+1.0.33 to use its bundled strict profile routing and fast-template data.
+
+### Modal Workflow Changes
+
+The Combat Buff modal on both the homepage and calculation page now edits a
+draft list and applies it only when the user clicks "应用选择". Candidate clicks,
+checkbox changes, teammate group add/remove actions, and custom Buff creation
+update the pending draft instead of immediately recalculating and closing the
+modal. The footer shows the current selected count plus pending add/remove
+counts.
+
+The optimizer two-piece and four-piece restriction modals also edit drafts and
+apply them explicitly. The calculation config modal keeps a snapshot so closing
+or cancelling restores the prior event/objective state. Combat Buff,
+two-piece/four-piece, calculation config, Drive Disc edit, and loadout edit
+modals now share sticky footer styling with clear cancel/apply or cancel/save
+actions, and Escape closes the active modal without applying pending changes.
+
+### Shared Stack Controls
+
+Stacked W-Engine effects can now declare `stackGroup` and `stackLabel`. Runtime
+UI reads these groups through shared combat helpers and renders one stack input
+that writes the same selected stack count to every rule in the group. The
+maintenance form can edit the group id and display label, and validation ensures
+rules in the same group have matching `maxStacks` and `defaultStacks`.
+
+The Qingming Cage W-Engine uses this for its two Qingming Companion stacked
+effects, so Ether DMG and Ether Sheer DMG share the same layer count in previews
+and in-combat calculations.
+
+### Files Touched
+
+- `downloads/zzz-scanner/manifest.json`
+- `downloads/zzz-scanner/1.0.33/ZZZ-Scanner.Next-win-x64.zip`
+- `scripts/build-pages.js`
+- `frontend/scanner-bridge.js`
+- `frontend/drive-discs.html`
+- `frontend/drive-discs.js`
+- `frontend/app.js`
+- `frontend/calculate.js`
+- `frontend/index.html`
+- `frontend/styles.css`
+- `frontend/shared-combat.js`
+- `frontend/maintenance.js`
+- `frontend/maintenanceValidation.js`
+- `backend/server.js`
+- `backend/driveDiscAnalysis.js`
+- `frontend/driveDiscAnalysis-core.js`
+- `frontend/drive-disc-analysis.js`
+- `data/w_engines.json`
+- `data/drive_disc_sets.json`
+- `README.md`
+- `README.zh-CN.md`
+- scanner, optimizer, maintenance, shared combat, analysis, production, import,
+  and account regression tests under `tests/`
+
+### Verification
+
+Generated the static Pages artifact:
+
+- `npm run build:pages`
+
+Ran scanner and directly related feature tests:
+
+- `npm run test:scanner-bridge`
+- `npm run test:drive-disc-analysis`
+- `npm run test:browser-local-compute`
+- `npm run test:optimizer-ui`
+- `npm run test:server-production`
+- `npm run test:maintenance-validation`
+- `npm run test:shared-combat`
+- `npm run test:w-engine-modification`
+
+Ran the remaining npm regression scripts:
+
+- `npm run test:atk-basis`
+- `npm run test:percent-sanity`
+- `npm run test:formula`
+- `npm run test:damage-whitebox`
+- `npm run test:anomaly-damage`
+- `npm run test:maintenance-stats`
+- `npm run test:compiled-score`
+- `npm run test:compiled-panel-score`
+- `npm run test:optimizer`
+- `npm run test:optimizer-progress`
+- `npm run test:optimizer-api`
+- `npm run test:optimizer-fuzz`
+- `npm run test:drive-disc-import`
+- `npm run test:accounts`
+
+## 2026-07-01 - Added Role-Aware Drive Disc Stat Difference Analysis
+
+### Request Context
+
+The Drive Disc analysis modal already showed the current substat distribution
+and stat gain curves, but it did not answer the more direct optimizer question:
+"if I replace one meaningful stat on this exact six-disc build, how much does
+the current damage target move?" The requested behavior was modeled after the
+bottom tables in external character cards, while avoiding a blind full-pool
+enumeration. Main-stat candidates needed to reuse the same role preference data
+that the optimizer already consumes, especially `agent.preferredDriveDiscs.
+mainStatLimits`, so the analysis would not suggest irrelevant slot-4/5/6
+main-stat swaps for a character.
+
+### Model Changes
+
+Added `analyzeDriveDiscStatDiffs` to both `backend/driveDiscAnalysis.js` and
+`frontend/driveDiscAnalysis-core.js`. The function returns a unified difference
+result with `baseline`, `substatDiffs`, `substatReplacements`, and
+`mainStatDiffsBySlot`.
+
+The baseline is the current six equipped Drive Discs, current set counts, the
+current agent, W-Engine, runtime Buff settings, and selected damage objective.
+Each candidate is evaluated by rebuilding the Drive Disc stat totals and running
+the same in-combat panel calculator used by the existing damage analysis, rather
+than using a static weight table.
+
+Substat differences add one current S-rank substat step at a time and discard
+zero-impact entries, so the table follows the real marginal value for the
+current damage event. Main-stat differences are limited to slots 4, 5, and 6.
+For each slot, the candidate list first reads the agent's
+`preferredDriveDiscs.mainStatLimits`; if the agent has no role preference for
+that slot, the function falls back to `statRules.driveDisc.mainStatPools`. The
+current main stat is filtered out before scoring, which prevents fake reverse
+rows such as a physical-damage disc showing a meaningless `-30 physicalDmg`
+entry.
+
+The backend and browser implementations were kept isomorphic so static Pages
+local computation and the Node API produce the same difference table.
+
+### API Changes
+
+Added `POST /api/analysis/drive-disc-stat-diffs` beside the existing Drive Disc
+analysis endpoints. It uses the same production guard as the other heavy
+compute endpoints because all `/api/analysis/` routes are disabled on the public
+production server.
+
+### UI Changes
+
+The existing homepage "词条分析" button now opens a combined "驱动盘分析" modal
+instead of adding another entry point. The modal has three sibling views:
+
+- "差异计算" for role-aware substat and slot-4/5/6 main-stat replacement tables.
+- "当前副词条" for the previous substat distribution view.
+- "收益曲线" for the previous stat gain curve view.
+
+The difference tables show the current value or current main stat, replacement
+candidate, absolute damage delta, and relative damage delta. Main-stat sections
+also label whether candidates came from the agent's preferred Drive Disc config
+or the generic slot pool fallback.
+
+### Files Touched
+
+- `backend/driveDiscAnalysis.js`
+- `frontend/driveDiscAnalysis-core.js`
+- `frontend/drive-disc-analysis.js`
+- `frontend/styles.css`
+- `backend/server.js`
+- `tests/drive-disc-analysis.test.js`
+- `tests/browser-local-compute.test.js`
+- `tests/server-production.test.js`
+
+### Verification
+
+Ran `node --check` for the changed backend/frontend JavaScript entry points:
+
+- `frontend/drive-disc-analysis.js`
+- `frontend/driveDiscAnalysis-core.js`
+- `backend/driveDiscAnalysis.js`
+- `backend/server.js`
+
+Ran targeted regression tests:
+
+- `npm run test:drive-disc-analysis`
+- `npm run test:browser-local-compute`
+- `npm run test:optimizer-ui`
+- `npm run test:server-production`
+
+The new regression coverage checks that slot-5 physical-damage discs do not
+generate a fake negative physical-damage row, that main-stat candidates come
+only from the role's preferred Drive Disc config when present, that a scored
+main-stat replacement matches a full damage recomputation, and that browser and
+backend difference-analysis results stay identical.
+
 ## 2026-05-28 - Removed Homepage Effect Record Card
 
 ### Request Context

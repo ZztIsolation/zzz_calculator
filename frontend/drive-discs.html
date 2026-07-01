@@ -187,10 +187,6 @@
           <h2 id="modalTitle">添加驱动盘</h2>
           <p id="selectedTag">选择套装、槽位和词条</p>
         </div>
-        <div class="modal-actions">
-          <button id="deleteDiscBtn" type="button" class="danger-btn">删除</button>
-          <button id="saveDiscBtn" type="submit" form="discForm" class="primary-btn">保存</button>
-        </div>
       </header>
 
       <form id="discForm" class="disc-editor modal-editor">
@@ -272,6 +268,14 @@
         <summary>原始 JSON 预览</summary>
         <pre id="rawPreview" class="raw modal-raw"></pre>
       </details>
+      <footer class="modal-footer">
+        <span class="modal-footer-summary">修改只会在点击保存后写入当前账号仓库</span>
+        <div class="modal-footer-actions">
+          <button type="button" class="ghost-btn" data-close-modal>取消</button>
+          <button id="deleteDiscBtn" type="button" class="danger-btn">删除</button>
+          <button id="saveDiscBtn" type="submit" form="discForm" class="primary-btn">保存</button>
+        </div>
+      </footer>
     </section>
   </div>
 
@@ -283,10 +287,6 @@
         <div>
           <h2 id="loadoutModalTitle">编辑套装预设</h2>
           <p id="loadoutSelectedTag">调整名称和六个槽位</p>
-        </div>
-        <div class="modal-actions">
-          <button id="deleteLoadoutBtn" type="button" class="danger-btn">删除</button>
-          <button id="saveLoadoutBtn" type="button" class="primary-btn">保存</button>
         </div>
       </header>
 
@@ -304,6 +304,14 @@
         </div>
         <div id="loadoutSlotEditors" class="loadout-slot-editors"></div>
       </form>
+      <footer class="modal-footer">
+        <span class="modal-footer-summary">保存后会更新驱动盘页中的套装预设</span>
+        <div class="modal-footer-actions">
+          <button type="button" class="ghost-btn" data-close-loadout-modal>取消</button>
+          <button id="deleteLoadoutBtn" type="button" class="danger-btn">删除</button>
+          <button id="saveLoadoutBtn" type="button" class="primary-btn">保存</button>
+        </div>
+      </footer>
     </section>
   </div>
 
@@ -358,8 +366,8 @@
             <p><strong>安装本地扫描助手</strong></p>
             <p>小助手只负责连接网页、更新本地 OCR 扫描器和启动扫描；截图与识别都在本机完成。</p>
             <div class="scan-download-actions">
-              <a id="scanDownloadLink" href="https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.28/ZZZ-Scanner-Helper.exe" class="primary-btn scan-download-btn">下载 ZZZ Scanner Helper</a>
-              <a id="scanMirrorDownloadLink" href="https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.28/ZZZ-Scanner-Helper.exe" class="ghost-btn scan-download-btn">备用下载</a>
+              <a id="scanDownloadLink" href="https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.33/ZZZ-Scanner-Helper.exe" class="primary-btn scan-download-btn">下载 ZZZ Scanner Helper</a>
+              <a id="scanMirrorDownloadLink" href="https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.33/ZZZ-Scanner-Helper.exe" class="ghost-btn scan-download-btn">备用下载</a>
             </div>
           </div>
         </div>

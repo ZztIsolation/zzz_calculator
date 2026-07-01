@@ -6,6 +6,26 @@
 
 ## 上传更新摘要
 
+### 2026-07-02 扫描器 1.0.33 与弹窗流程更新
+
+本次上传发布网页唤起的 ZZZ Scanner Next `1.0.33`，并一并提交当前优化器/仓库页的待提交 UI 更新：
+
+- OCR 运行时重新来自本机 `publish 1.0.33` 输出包，包内包含 `Data/ocr_fast_templates.json`，网页不会再传 `ocrFastIndex` 覆盖参数。
+- 驱动盘扫描请求改用 `1.0.33` 稳定 payload：`fastMode=true`、`captureMode=dxgi`、`profileRouting=strict`、`overlapConflictMode=recover`、`panelAcceptMode=adaptive-early-full-roi`、`scrollAcceptMode=early-one-row`、`postScrollPanelAcceptMode=safe`、`panelMinAcceptFloorMs=120`。
+- 非 15 级全仓读取仍不作为默认能力开放，网页默认保持 `stopAtNonLevel15=true`。
+- 驱动盘分析弹窗现在默认展示角色感知的“差异计算”，并保留“当前副词条”和“收益曲线”视图。
+- 战斗 Buff、优化器 2 件套/4 件套限制、计算配置、驱动盘编辑和套装预设编辑弹窗改为明确的取消/应用或取消/保存页脚，临时选择不会立刻改动当前方案。
+- 堆叠型音擎效果支持通过 `stackGroup` 共用一个层数输入；「青溟笼舍」的两个“青溟同行”效果会同步同一层数。
+
+### 2026-07-01 角色感知词条差异分析
+
+本次更新复用现有“词条分析”弹窗，新增“差异计算”视图：
+
+- 副词条差异以当前六件驱动盘、当前 Buff 和当前伤害目标为基线，按真实边际伤害排序。
+- 4/5/6 号位主词条候选直接读取角色 `preferredDriveDiscs.mainStatLimits`，缺省才回退槽位可选池。
+- 当前已经装备的主词条不会生成无意义的反向扣除行，例如物伤盘不会再出现 `-30 physicalDmg`。
+- 前端本地计算、后端分析 API 和回归测试已保持一致。
+
 ### 2026-07-01 扫描器包体瘦身
 
 本次上传在不改变网页唤起流程的前提下降低扫描器下载体积：
@@ -220,7 +240,7 @@ npm start
 
 启动后打开终端打印的本地地址，通常是 `http://localhost:8787`。如需指定端口，可以使用 `PORT=8791 npm start`。
 
-驱动盘页的「扫描」会优先连接本地小助手。公开站点上的小助手下载按钮指向 GitHub Releases；本地 Node server 开发模式仍可从 `/downloads/ZZZ-Scanner-Helper.exe` 提供文件。OCR 包 manifest 当前使用已验证的 GitHub Release 新包。小助手会注册 `zzz-scanner://` 协议，在 `127.0.0.1:22355` 与网页通信，并按 `/downloads/zzz-scanner/manifest.json` 自动下载/更新真正的 OCR 扫描器大包。当前网页发布的大包版本是 ZZZ Scanner Next `1.0.28`。
+驱动盘页的「扫描」会优先连接本地小助手。公开站点上的小助手下载按钮指向 GitHub Releases；本地 Node server 开发模式仍可从 `/downloads/ZZZ-Scanner-Helper.exe` 提供文件。OCR 包 manifest 当前使用已验证的 GitHub Release 新包。小助手会注册 `zzz-scanner://` 协议，在 `127.0.0.1:22355` 与网页通信，并按 `/downloads/zzz-scanner/manifest.json` 自动下载/更新真正的 OCR 扫描器大包。当前网页发布的大包版本是 ZZZ Scanner Next `1.0.33`。
 
 主要页面：
 
@@ -254,7 +274,7 @@ npm run build:pages
 
 Helper 和 OCR 大包通过 GitHub Releases 发布，不进入 Git 仓库：
 
-- tag：`scanner-1.0.28`
+- tag：`scanner-1.0.33`
 - `ZZZ-Scanner-Helper.exe`
 - `ZZZ-Scanner.Next-win-x64.zip`
 

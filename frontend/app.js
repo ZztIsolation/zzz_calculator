@@ -91,6 +91,9 @@ const els = {
     damageWhiteBoxRows: document.getElementById("damageWhiteBoxRows"),
     combatBuffModal: document.getElementById("combatBuffModal"),
     closeCombatBuffModalBtn: document.getElementById("closeCombatBuffModalBtn"),
+    cancelCombatBuffModalBtn: document.getElementById("cancelCombatBuffModalBtn"),
+    applyCombatBuffModalBtn: document.getElementById("applyCombatBuffModalBtn"),
+    combatBuffModalSummary: document.getElementById("combatBuffModalSummary"),
     combatBuffSearchInput: document.getElementById("combatBuffSearchInput"),
     combatBuffTeammatePicker: document.getElementById("combatBuffTeammatePicker"),
     combatBuffTeammateSelect: document.getElementById("combatBuffTeammateSelect"),
@@ -547,6 +550,7 @@ let activeDiscSlot = null
 let activeCombatBuffTab = "agent"
 let activeCombatBuffTeammateId = ""
 let renderedCombatBuffAgentId = ""
+let combatBuffDraftAddedBuffs = null
 const manuallyUncheckedDefaultCombatBuffIds = new Set()
 const damageTargetResistanceByElement = Object.fromEntries(DAMAGE_ELEMENTS.map(element => [element, 0]))
 let activeDamageResistanceElement = "physical"
@@ -2009,6 +2013,52 @@ function currentAddedCombatBuffs() {
         .filter(isResolvableAddedCombatBuff)
 }
 
+function cloneCombatBuffList(addedBuffs = []) {
+    try {
+        return structuredClone(addedBuffs)
+    } catch {
+        return JSON.parse(JSON.stringify(addedBuffs))
+    }
+}
+
+function activeCombatBuffModalAddedBuffs() {
+    return combatBuffDraftAddedBuffs ?? currentAddedCombatBuffs()
+}
+
+function combatBuffListKeys(addedBuffs = []) {
+    return addedBuffs.map(addedCombatBuffKey).filter(Boolean)
+}
+
+function combatBuffDraftChanged() {
+    if (!combatBuffDraftAddedBuffs) {
+        return false
+    }
+    const before = combatBuffListKeys(currentAddedCombatBuffs()).sort()
+    const after = combatBuffListKeys(combatBuffDraftAddedBuffs).sort()
+    return before.length !== after.length || before.some((key, index) => key !== after[index])
+}
+
+function setCombatBuffDraftAddedBuffs(addedBuffs) {
+    combatBuffDraftAddedBuffs = sanitizeAddedCombatBuffs(cloneCombatBuffList(addedBuffs))
+        .filter(isResolvableAddedCombatBuff)
+    updateCombatBuffModalSummary()
+}
+
+function updateCombatBuffModalSummary() {
+    if (!els.combatBuffModalSummary) {
+        return
+    }
+    const beforeKeys = new Set(combatBuffListKeys(currentAddedCombatBuffs()))
+    const afterKeys = new Set(combatBuffListKeys(activeCombatBuffModalAddedBuffs()))
+    const added = [...afterKeys].filter(key => !beforeKeys.has(key)).length
+    const removed = [...beforeKeys].filter(key => !afterKeys.has(key)).length
+    const changeText = added || removed ? ` / 本次新增 ${added} / 移除 ${removed}` : " / 无未应用改动"
+    els.combatBuffModalSummary.textContent = `已选择 ${afterKeys.size} 个 Buff${changeText}`
+    if (els.applyCombatBuffModalBtn) {
+        els.applyCombatBuffModalBtn.disabled = !combatBuffDraftChanged()
+    }
+}
+
 function savedActiveCombatBuffIds(agentId = els.agentSelect.value) {
     const ids = configForAgent(agentId).combat?.activeBuffIds
     return Array.isArray(ids) ? new Set(ids) : null
@@ -3253,7 +3303,7 @@ function ensureActiveCombatBuffTeammateId(groups = teammateCombatBuffGroups()) {
 function renderCombatBuffTeammatePicker() {
     const groups = teammateCombatBuffGroups()
     const activeGroup = ensureActiveCombatBuffTeammateId(groups)
-    const selectedOwnerIds = teammateOwnerIdsForAddedBuffs()
+    const selectedOwnerIds = teammateOwnerIdsForAddedBuffs(activeCombatBuffModalAddedBuffs())
 
     els.combatBuffTeammateSelect.innerHTML = ""
     for (const group of groups) {
@@ -3266,7 +3316,7 @@ function renderCombatBuffTeammatePicker() {
     }
 
     const candidates = selectedTeammateBuffCandidates()
-    const addedKeys = new Set(currentAddedCombatBuffs().map(addedCombatBuffKey))
+    const addedKeys = new Set(activeCombatBuffModalAddedBuffs().map(addedCombatBuffKey))
     const hasAddedFromActive = candidates.some(candidate => addedKeys.has(addedCombatBuffKey(candidate)))
     const allAddedFromActive = candidates.length > 0
         && candidates.every(candidate => addedKeys.has(addedCombatBuffKey(candidate)))
@@ -3716,7 +3766,8 @@ function renderAddedWEngineModificationControl(row, item) {
 function renderBuffRuntimeControls(row, item, buff, runtime) {
     const rules = effectRules(buff)
     const hasCoverage = Boolean(buff.coverage)
-    const needsRuntime = hasCoverage || rules.some(rule => rule.type === "derived" || rule.type === "formula" || rule.type === "stacked")
+    const stackGroups = SharedCombat.runtimeStackGroups(buff)
+    const needsRuntime = hasCoverage || rules.some(rule => rule.type === "derived" || rule.type === "formula") || stackGroups.length > 0
     if (!needsRuntime) {
         return
     }
@@ -3755,15 +3806,17 @@ function renderBuffRuntimeControls(row, item, buff, runtime) {
                 <input type="number"${minAttr}${maxAttr} step="1" value="${runtime.effects?.[primaryId]?.sourceValue ?? sourceGroup.defaultValue ?? 0}" data-runtime-effect="${escapeHtml(primaryId)}" data-runtime-source-group="${escapeHtml(sourceGroup.key)}" data-runtime-source-value>
             `
             controls.appendChild(field)
-        } else if (rule.type === "stacked") {
-            const field = document.createElement("label")
-            field.className = "field"
-            field.innerHTML = `
-                <span>层数</span>
-                <input type="number" min="0" max="${rule.maxStacks ?? 1}" step="1" value="${runtime.effects?.[id]?.stacks ?? rule.defaultStacks ?? rule.maxStacks ?? 1}" data-runtime-effect="${escapeHtml(id)}" data-runtime-stacks>
-            `
-            controls.appendChild(field)
         }
+    }
+    for (const stackGroup of stackGroups) {
+        const primaryId = stackGroup.ruleIds[0] ?? ""
+        const field = document.createElement("label")
+        field.className = "field"
+        field.innerHTML = `
+            <span>${escapeHtml(stackGroup.label)}</span>
+            <input type="number" min="0" max="${stackGroup.maxStacks ?? 1}" step="1" value="${runtime.effects?.[primaryId]?.stacks ?? stackGroup.defaultStacks ?? stackGroup.maxStacks ?? 1}" data-runtime-effect="${escapeHtml(primaryId)}" data-runtime-stack-group="${escapeHtml(stackGroup.key)}" data-runtime-stacks>
+        `
+        controls.appendChild(field)
     }
 
     row.appendChild(controls)
@@ -3820,6 +3873,16 @@ function runtimeNumberConfig(buff, field) {
     }
 
     if (field.matches("[data-runtime-stacks]")) {
+        const stackGroup = SharedCombat.runtimeStackGroupForKey(buff, field.dataset.runtimeStackGroup)
+        if (stackGroup) {
+            return {
+                label: stackGroup.label,
+                defaultValue: finiteOr(stackGroup.defaultStacks ?? stackGroup.maxStacks, 1),
+                min: 0,
+                max: finiteOr(stackGroup.maxStacks, 1),
+                integer: true,
+            }
+        }
         return {
             label: "层数",
             defaultValue: finiteOr(rule.defaultStacks ?? rule.maxStacks, 1),
@@ -3847,8 +3910,11 @@ function setRuntimeValue(runtime, field, value, buff) {
             runtime.effects[ruleId].sourceValue = value
         }
     } else if (field.matches("[data-runtime-stacks]")) {
-        runtime.effects[id] = runtime.effects[id] ?? {}
-        runtime.effects[id].stacks = value
+        const ruleIds = SharedCombat.runtimeStackRuleIdsForGroup(buff, field.dataset.runtimeStackGroup, id)
+        for (const ruleId of ruleIds) {
+            runtime.effects[ruleId] = runtime.effects[ruleId] ?? {}
+            runtime.effects[ruleId].stacks = value
+        }
     }
 }
 
@@ -3897,13 +3963,15 @@ function shouldShowCombatBuffMetaLine(buff) {
 
 function renderCombatBuffCandidates() {
     const search = els.combatBuffSearchInput.value.trim().toLowerCase()
-    const addedKeys = new Set(currentAddedCombatBuffs().map(addedCombatBuffKey))
+    const activeAddedBuffs = activeCombatBuffModalAddedBuffs()
+    const addedKeys = new Set(activeAddedBuffs.map(addedCombatBuffKey))
     const isCustom = activeCombatBuffTab === "custom"
     const isAgent = activeCombatBuffTab === "agent"
     els.combatBuffCandidateList.hidden = isCustom
     els.combatBuffCustomPane.hidden = !isCustom
     els.combatBuffTeammatePicker.hidden = !isAgent || isCustom
     els.combatBuffModalEmpty.hidden = true
+    updateCombatBuffModalSummary()
 
     for (const button of els.combatBuffModal.querySelectorAll("[data-combat-buff-tab]")) {
         button.classList.toggle("active", button.dataset.combatBuffTab === activeCombatBuffTab)
@@ -3945,7 +4013,7 @@ function renderCombatBuffCandidates() {
     for (const candidate of candidates) {
         const key = addedCombatBuffKey(candidate)
         const alreadyAdded = addedKeys.has(key)
-        const limitMessage = candidateLimitMessage(candidate)
+        const limitMessage = candidateLimitMessage(candidate, activeAddedBuffs)
 
         if (isAgent) {
             const row = document.createElement("label")
@@ -4023,6 +4091,7 @@ function renderCombatBuffCandidates() {
 
 function openCombatBuffModal(tab = "agent") {
     activeCombatBuffTab = tab
+    combatBuffDraftAddedBuffs = cloneCombatBuffList(currentAddedCombatBuffs())
     els.combatBuffSearchInput.value = ""
     els.combatBuffModal.hidden = false
     document.body.classList.add("modal-open")
@@ -4032,6 +4101,19 @@ function openCombatBuffModal(tab = "agent") {
 function closeCombatBuffModal() {
     els.combatBuffModal.hidden = true
     document.body.classList.remove("modal-open")
+    combatBuffDraftAddedBuffs = null
+}
+
+async function applyCombatBuffModalSelection() {
+    if (!combatBuffDraftAddedBuffs || !combatBuffDraftChanged()) {
+        closeCombatBuffModal()
+        return
+    }
+    setStatus("应用 Buff 选择", "idle")
+    saveCurrentAddedCombatBuffs(combatBuffDraftAddedBuffs)
+    closeCombatBuffModal()
+    renderCombatBuffControls()
+    await calculate()
 }
 
 function addCombatBuffCandidateByKey(key) {
@@ -4040,7 +4122,7 @@ function addCombatBuffCandidateByKey(key) {
         return false
     }
 
-    const addedBuffs = currentAddedCombatBuffs()
+    const addedBuffs = activeCombatBuffModalAddedBuffs()
     if (addedBuffs.some(item => addedCombatBuffKey(item) === key)) {
         return false
     }
@@ -4051,17 +4133,17 @@ function addCombatBuffCandidateByKey(key) {
         return false
     }
 
-    saveCurrentAddedCombatBuffs([...addedBuffs, addedCombatBuffEntry(candidate)])
+    setCombatBuffDraftAddedBuffs([...addedBuffs, addedCombatBuffEntry(candidate)])
     return true
 }
 
 function removeCombatBuffCandidateByKey(key) {
-    const addedBuffs = currentAddedCombatBuffs()
+    const addedBuffs = activeCombatBuffModalAddedBuffs()
     const next = addedBuffs.filter(item => addedCombatBuffKey(item) !== key)
     if (next.length === addedBuffs.length) {
         return false
     }
-    saveCurrentAddedCombatBuffs(next)
+    setCombatBuffDraftAddedBuffs(next)
     return true
 }
 
@@ -4070,7 +4152,7 @@ function addSelectedTeammateBuffs() {
     if (!candidates.length) {
         return false
     }
-    const addedBuffs = currentAddedCombatBuffs()
+    const addedBuffs = activeCombatBuffModalAddedBuffs()
     const firstNewCandidate = candidates.find(candidate =>
         !addedBuffs.some(item => addedCombatBuffKey(item) === addedCombatBuffKey(candidate))
     )
@@ -4087,7 +4169,7 @@ function addSelectedTeammateBuffs() {
         setStatus("该角色 Buff 已全部添加", "idle")
         return false
     }
-    saveCurrentAddedCombatBuffs([...addedBuffs, ...nextEntries])
+    setCombatBuffDraftAddedBuffs([...addedBuffs, ...nextEntries])
     return true
 }
 
@@ -4096,12 +4178,12 @@ function removeSelectedTeammateBuffs() {
     if (!ownerId) {
         return false
     }
-    const addedBuffs = currentAddedCombatBuffs()
+    const addedBuffs = activeCombatBuffModalAddedBuffs()
     const next = addedBuffs.filter(item => teammateOwnerIdForBuff(item) !== ownerId)
     if (next.length === addedBuffs.length) {
         return false
     }
-    saveCurrentAddedCombatBuffs(next)
+    setCombatBuffDraftAddedBuffs(next)
     return true
 }
 
@@ -5202,6 +5284,14 @@ els.damageSkillModal?.addEventListener("click", async event => {
 })
 els.openCombatBuffModalBtn.addEventListener("click", () => openCombatBuffModal())
 els.closeCombatBuffModalBtn.addEventListener("click", closeCombatBuffModal)
+els.cancelCombatBuffModalBtn?.addEventListener("click", closeCombatBuffModal)
+els.applyCombatBuffModalBtn?.addEventListener("click", async () => {
+    try {
+        await applyCombatBuffModalSelection()
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
+})
 els.combatBuffModal.addEventListener("click", async event => {
     if (event.target.matches("[data-close-combat-buff-modal]")) {
         closeCombatBuffModal()
@@ -5217,11 +5307,9 @@ els.combatBuffModal.addEventListener("click", async event => {
 
     if (event.target === els.addTeammateBuffsBtn) {
         try {
-            setStatus("添加角色 Buff", "idle")
             if (addSelectedTeammateBuffs()) {
-                renderCombatBuffControls()
                 renderCombatBuffCandidates()
-                await calculate()
+                setStatus("已加入本次选择", "idle")
             }
         } catch (error) {
             setStatus(error.message, "error")
@@ -5231,11 +5319,9 @@ els.combatBuffModal.addEventListener("click", async event => {
 
     if (event.target === els.removeTeammateBuffsBtn) {
         try {
-            setStatus("移除角色 Buff", "idle")
             if (removeSelectedTeammateBuffs()) {
-                renderCombatBuffControls()
                 renderCombatBuffCandidates()
-                await calculate()
+                setStatus("已从本次选择移除", "idle")
             }
         } catch (error) {
             setStatus(error.message, "error")
@@ -5247,14 +5333,12 @@ els.combatBuffModal.addEventListener("click", async event => {
     if (candidate && !candidate.disabled) {
         try {
             const alreadyAdded = candidate.dataset.candidateAdded === "true"
-            setStatus(alreadyAdded ? "移除 Buff" : "添加 Buff", "idle")
             const changed = alreadyAdded
                 ? removeCombatBuffCandidateByKey(candidate.dataset.candidateKey)
                 : addCombatBuffCandidateByKey(candidate.dataset.candidateKey)
             if (changed) {
-                closeCombatBuffModal()
-                renderCombatBuffControls()
-                await calculate()
+                renderCombatBuffCandidates()
+                setStatus(alreadyAdded ? "已从本次选择移除" : "已加入本次选择", "idle")
             }
         } catch (error) {
             setStatus(error.message, "error")
@@ -5286,14 +5370,12 @@ els.combatBuffModal.addEventListener("change", event => {
     if (event.target.matches("[data-candidate-check-key]")) {
         ;(async () => {
             try {
-                setStatus(event.target.checked ? "添加 Buff" : "移除 Buff", "idle")
                 const changed = event.target.checked
                     ? addCombatBuffCandidateByKey(event.target.dataset.candidateCheckKey)
                     : removeCombatBuffCandidateByKey(event.target.dataset.candidateCheckKey)
                 if (changed) {
-                    renderCombatBuffControls()
                     renderCombatBuffCandidates()
-                    await calculate()
+                    setStatus(event.target.checked ? "已加入本次选择" : "已从本次选择移除", "idle")
                 } else {
                     renderCombatBuffCandidates()
                 }
@@ -5350,9 +5432,9 @@ els.saveCustomBuffBtn.addEventListener("click", async () => {
             return
         }
 
-        setStatus("保存自定义 Buff", "idle")
-        saveCurrentAddedCombatBuffs([
-            ...currentAddedCombatBuffs(),
+        setStatus("添加自定义 Buff 到本次选择", "idle")
+        setCombatBuffDraftAddedBuffs([
+            ...activeCombatBuffModalAddedBuffs(),
             {
                 id: `custom-${Date.now()}`,
                 sourceCategory: "custom",
@@ -5362,12 +5444,19 @@ els.saveCustomBuffBtn.addEventListener("click", async () => {
                 effects,
             },
         ])
-        closeCombatBuffModal()
         renderCustomBuffStatRows([{ optionIndex: 0, value: 0 }])
-        renderCombatBuffControls()
-        await calculate()
+        renderCombatBuffCandidates()
     } catch (error) {
         setStatus(error.message, "error")
+    }
+})
+document.addEventListener("keydown", event => {
+    if (event.key !== "Escape") {
+        return
+    }
+    if (els.combatBuffModal && !els.combatBuffModal.hidden) {
+        event.preventDefault()
+        closeCombatBuffModal()
     }
 })
 els.discGrid.addEventListener("click", event => {

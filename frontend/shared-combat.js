@@ -899,6 +899,77 @@ export function runtimeSourceRuleIdsForGroup(effect, key, fallbackRuleId = "") {
         : fallbackRuleId ? [fallbackRuleId] : []
 }
 
+export function runtimeStackConfigForRule(rule = {}) {
+    if (rule.type !== "stacked") {
+        return null
+    }
+    return {
+        stackGroup: String(rule.stackGroup ?? "").trim(),
+        label: localizedText(rule.stackLabel) || "层数",
+        maxStacks: finiteSourceNumber(rule.maxStacks, 1),
+        defaultStacks: finiteSourceNumber(rule.defaultStacks ?? rule.maxStacks, 1),
+    }
+}
+
+export function runtimeStackGroupKey(rule = {}) {
+    const config = runtimeStackConfigForRule(rule)
+    if (!config) {
+        return ""
+    }
+    return config.stackGroup
+        ? JSON.stringify(["stackGroup", config.stackGroup])
+        : JSON.stringify(["rule", effectRuleId(rule)])
+}
+
+export function runtimeStackGroups(effect) {
+    const groups = []
+    const byKey = new Map()
+    for (const rule of effectRules(effect)) {
+        const key = runtimeStackGroupKey(rule)
+        if (!key) {
+            continue
+        }
+        let group = byKey.get(key)
+        if (!group) {
+            const config = runtimeStackConfigForRule(rule)
+            group = {
+                key,
+                ...config,
+                ruleIds: [],
+                rules: [],
+            }
+            byKey.set(key, group)
+            groups.push(group)
+        }
+        const id = effectRuleId(rule)
+        group.rules.push(rule)
+        if (!group.ruleIds.includes(id)) {
+            group.ruleIds.push(id)
+        }
+    }
+    return groups
+}
+
+export function runtimeStackGroupForRule(effect, ruleOrId) {
+    const id = typeof ruleOrId === "string" ? ruleOrId : effectRuleId(ruleOrId)
+    const rule = typeof ruleOrId === "string"
+        ? effectRules(effect).find(item => effectRuleId(item) === id)
+        : ruleOrId
+    const key = runtimeStackGroupKey(rule)
+    return key ? runtimeStackGroupForKey(effect, key) : null
+}
+
+export function runtimeStackGroupForKey(effect, key) {
+    return runtimeStackGroups(effect).find(group => group.key === key) ?? null
+}
+
+export function runtimeStackRuleIdsForGroup(effect, key, fallbackRuleId = "") {
+    const group = runtimeStackGroupForKey(effect, key)
+    return group?.ruleIds?.length
+        ? [...group.ruleIds]
+        : fallbackRuleId ? [fallbackRuleId] : []
+}
+
 export function defaultRuntimeForBuff(buff = {}) {
     buff = buff ?? {}
     const runtime = {
@@ -952,6 +1023,26 @@ export function normalizeRuntimeForBuff(buff = {}, runtime = {}) {
             next.effects[id] = {
                 ...(next.effects[id] ?? {}),
                 sourceValue,
+            }
+        }
+    }
+    const inputEffects = input.effects ?? {}
+    for (const group of runtimeStackGroups(buff)) {
+        const primaryId = group.ruleIds[0]
+        let stacks = undefined
+        for (const id of group.ruleIds) {
+            if (inputEffects[id]?.stacks !== undefined) {
+                stacks = inputEffects[id].stacks
+                break
+            }
+        }
+        if (stacks === undefined) {
+            stacks = next.effects?.[primaryId]?.stacks ?? group.defaultStacks ?? group.maxStacks ?? 1
+        }
+        for (const id of group.ruleIds) {
+            next.effects[id] = {
+                ...(next.effects[id] ?? {}),
+                stacks,
             }
         }
     }
@@ -1221,6 +1312,12 @@ export function createCombatUiController(options = {}) {
         runtimeSourceGroupForRule,
         runtimeSourceGroupForKey,
         runtimeSourceRuleIdsForGroup,
+        runtimeStackConfigForRule,
+        runtimeStackGroupKey,
+        runtimeStackGroups,
+        runtimeStackGroupForRule,
+        runtimeStackGroupForKey,
+        runtimeStackRuleIdsForGroup,
         storedBuffModifierText,
         storedBuffModifierTexts,
         storedEffectRulesText: (effect, runtime = defaultRuntimeForBuff(effect)) => storedEffectRulesText(effect, runtime, getMeta()),

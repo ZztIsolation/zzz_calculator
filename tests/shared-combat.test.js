@@ -21,6 +21,8 @@ import {
     runtimeForBuff,
     runtimeSourceGroups,
     runtimeSourceRuleIdsForGroup,
+    runtimeStackGroups,
+    runtimeStackRuleIdsForGroup,
     sanitizeAddedCombatBuffs,
     skillTargetLabel,
     sortWEnginesForAgent,
@@ -318,6 +320,63 @@ assert.equal(
     groupedFormulaSummary.includes("公式") || groupedFormulaSummary.includes("x="),
     false,
     "Formula summaries should not expose formula internals",
+)
+
+const sharedStackRuntimeBuff = {
+    id: "shared-stack-runtime",
+    effects: [
+        {
+            id: "shared-stack-ether-dmg",
+            type: "stacked",
+            stat: "etherDmg",
+            mode: "flat",
+            valuePerStack: 8,
+            maxStacks: 2,
+            defaultStacks: 2,
+            stackGroup: "qingming_companion",
+            stackLabel: { zhCN: "青溟同行层数" },
+        },
+        {
+            id: "shared-stack-ether-sheer",
+            type: "stacked",
+            stat: "etherSheerDmg",
+            mode: "flat",
+            valuePerStack: 10,
+            maxStacks: 2,
+            defaultStacks: 2,
+            stackGroup: "qingming_companion",
+            stackLabel: { zhCN: "青溟同行层数" },
+        },
+    ],
+}
+const sharedStackGroups = runtimeStackGroups(sharedStackRuntimeBuff)
+assert.deepEqual(
+    sharedStackGroups.map(group => [group.label, group.ruleIds]),
+    [["青溟同行层数", ["shared-stack-ether-dmg", "shared-stack-ether-sheer"]]],
+    "Stacked rules with the same stackGroup should share one runtime stack group",
+)
+assert.deepEqual(
+    runtimeStackRuleIdsForGroup(sharedStackRuntimeBuff, sharedStackGroups[0].key),
+    ["shared-stack-ether-dmg", "shared-stack-ether-sheer"],
+    "Runtime stack helper should return every rule in the same stack group",
+)
+const sharedStackRuntime = runtimeForBuff({
+    runtime: {
+        effects: {
+            "shared-stack-ether-sheer": { stacks: 1 },
+        },
+    },
+}, sharedStackRuntimeBuff)
+assert.equal(sharedStackRuntime.effects["shared-stack-ether-dmg"].stacks, 1)
+assert.equal(
+    sharedStackRuntime.effects["shared-stack-ether-sheer"].stacks,
+    1,
+    "Grouped stacked rules should normalize to one selected stack value even when only one rule carried legacy runtime",
+)
+assert.equal(
+    storedEffectRulesText(sharedStackRuntimeBuff, sharedStackRuntime),
+    "以太伤害加成% +8%（1/2 层，覆盖率 1），以太贯穿增伤% +10%（1/2 层，覆盖率 1）",
+    "Grouped stacked rules should still summarize each stat effect separately with the shared stack count",
 )
 
 const splitRuntimeBuff = {

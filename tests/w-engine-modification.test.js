@@ -12,6 +12,7 @@ import {
 import {
     defaultRuntimeForBuff,
     materializeWEngineForModificationLevel as materializeFrontendWEngine,
+    runtimeStackGroups,
     storedEffectRulesText,
 } from "../frontend/shared-combat.js"
 
@@ -245,6 +246,73 @@ const stunRank5 = createInCombatPanelCalculator(catalog, {
 }).calculate([], { round: false })
 approx(stunRank5.inCombat.buffTotals.impactPct, 0.435, "Yesterday's Call rank 5 Daze should scale per stack")
 approx(stunRank5.inCombat.buffTotals.critDmg, 0.48, "Yesterday's Call rank 5 team CRIT DMG should scale")
+
+const qingmingRank5Engine = materializeFrontendWEngine(wEngine("zzz_wiki_1342"), 5)
+const qingmingStackGroups = runtimeStackGroups(qingmingRank5Engine.effect.selfBuff)
+assert.deepEqual(
+    qingmingStackGroups.map(group => group.ruleIds),
+    [["effect_wiki_1342_self_ether_dmg", "effect_wiki_1342_self_ether_sheer"]],
+    "Yunliu W-Engine ether damage and ether sheer damage should share one stack group",
+)
+assert.equal(
+    storedEffectRulesText(qingmingRank5Engine.effect.selfBuff, defaultRuntimeForBuff(qingmingRank5Engine.effect.selfBuff), meta),
+    "暴击率% +32%，以太伤害加成% +25.6%（2/2 层，覆盖率 1），以太贯穿增伤% +32%（2/2 层，覆盖率 1）",
+    "Yunliu rank 5 default preview should apply both shared-stack effects at two stacks",
+)
+const qingmingOneStackRuntime = defaultRuntimeForBuff(qingmingRank5Engine.effect.selfBuff)
+qingmingOneStackRuntime.effects.effect_wiki_1342_self_ether_dmg.stacks = 1
+qingmingOneStackRuntime.effects.effect_wiki_1342_self_ether_sheer.stacks = 1
+assert.equal(
+    storedEffectRulesText(qingmingRank5Engine.effect.selfBuff, qingmingOneStackRuntime, meta),
+    "暴击率% +32%，以太伤害加成% +12.8%（1/2 层，覆盖率 1），以太贯穿增伤% +16%（1/2 层，覆盖率 1）",
+    "Yunliu rank 5 one-stack preview should apply the same selected stack count to both effects",
+)
+const qingmingRank5 = calculateInCombatPanel(catalog, {
+    agentId: "yixuan",
+    coreSkillLevel: "none",
+    wEngineId: "zzz_wiki_1342",
+    wEngineModificationLevel: 5,
+    combatBuffs: {
+        activeBuffIds: ["wEngine:zzz_wiki_1342.self"],
+    },
+})
+approx(qingmingRank5.inCombat.buffTotals.critRate, 0.32, "Yunliu rank 5 fixed CRIT Rate should apply")
+approx(qingmingRank5.inCombat.buffTotals.etherDmg, 0.256, "Yunliu rank 5 shared stacks should add two stacks of Ether DMG")
+const qingmingRank5SheerModifier = qingmingRank5.inCombat.buffTotals.damageModifiers
+    .find(item => item.id === "effect_wiki_1342_self_ether_sheer")
+approx(qingmingRank5SheerModifier?.value, 0.32, "Yunliu rank 5 shared stacks should add two stacks of Ether sheer damage")
+assert.equal(qingmingRank5SheerModifier?.stacks, 2, "Yunliu rank 5 Ether sheer modifier should keep the shared default stack count")
+
+const qingmingOneStackInput = {
+    agentId: "yixuan",
+    coreSkillLevel: "none",
+    wEngineId: "zzz_wiki_1342",
+    wEngineModificationLevel: 5,
+    combatBuffs: {
+        activeBuffIds: ["wEngine:zzz_wiki_1342.self"],
+        runtimeInputs: {
+            "wEngine:zzz_wiki_1342.self": {
+                effects: {
+                    effect_wiki_1342_self_ether_dmg: {
+                        stacks: 1,
+                    },
+                },
+            },
+        },
+    },
+}
+const qingmingOneStack = calculateInCombatPanel(catalog, qingmingOneStackInput)
+const qingmingOneStackSheerModifier = qingmingOneStack.inCombat.buffTotals.damageModifiers
+    .find(item => item.id === "effect_wiki_1342_self_ether_sheer")
+approx(qingmingOneStack.inCombat.buffTotals.etherDmg, 0.128, "Yunliu one runtime stack should add one stack of Ether DMG")
+approx(qingmingOneStackSheerModifier?.value, 0.16, "Yunliu one runtime stack should also drive Ether sheer damage")
+assert.equal(qingmingOneStackSheerModifier?.stacks, 1, "Yunliu grouped runtime should sync the selected stack count to Ether sheer damage")
+const qingmingOneStackPrepared = createInCombatPanelCalculator(catalog, qingmingOneStackInput).calculate([], { round: false })
+const qingmingOneStackPreparedSheerModifier = qingmingOneStackPrepared.inCombat.buffTotals.damageModifiers
+    .find(item => item.id === "effect_wiki_1342_self_ether_sheer")
+approx(qingmingOneStackPrepared.inCombat.buffTotals.etherDmg, 0.128, "Prepared calculator should keep Yunliu shared one-stack Ether DMG")
+approx(qingmingOneStackPreparedSheerModifier?.value, 0.16, "Prepared calculator should keep Yunliu shared one-stack Ether sheer damage")
+assert.equal(qingmingOneStackPreparedSheerModifier?.stacks, 1, "Prepared calculator should sync Yunliu grouped runtime stacks")
 
 const crossSpecialtyCurrentWEngineInput = {
     agentId: "ye_shunguang",

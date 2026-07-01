@@ -82,6 +82,8 @@ try {
     for (const pathname of [
         "/api/calculate/in-combat",
         "/api/analysis/drive-disc-substats",
+        "/api/analysis/drive-disc-stat-diffs",
+        "/api/analysis/drive-disc-stat-gains",
         "/api/optimize/drive-discs/preview",
         "/api/optimize/drive-discs/jobs",
     ]) {

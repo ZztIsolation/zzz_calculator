@@ -454,6 +454,7 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     }
 
     if (type === "stacked") {
+        validateOptionalId(errors, { id: rule.stackGroup }, `${path}.stackGroup`)
         const value = requireFinite(errors, rule.valuePerStack ?? rule.value, `${path}.valuePerStack`)
         if (Number.isFinite(value) && value === 0) {
             add(errors, `${path}.valuePerStack`, "每层数值不能为 0。")
@@ -475,6 +476,40 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
         add(errors, `${path}.value`, "数值不能为 0。")
     }
     validateModificationValues(errors, rule.modificationValues, "value", `${path}.modificationValues`, value)
+}
+
+function validateStackRuleGroups(errors, rules = [], path) {
+    const groups = new Map()
+    rules.forEach((rule, index) => {
+        if ((rule?.type ?? "fixed") !== "stacked") {
+            return
+        }
+        const stackGroup = String(rule.stackGroup ?? "").trim()
+        if (!stackGroup) {
+            return
+        }
+        const maxStacks = Number(rule.maxStacks)
+        const defaultStacks = Number(rule.defaultStacks)
+        const groupPath = `${path}.effects[${index}].stackGroup`
+        const existing = groups.get(stackGroup)
+        if (!existing) {
+            groups.set(stackGroup, {
+                maxStacks,
+                defaultStacks,
+            })
+            return
+        }
+        if (Number.isFinite(maxStacks)
+            && Number.isFinite(existing.maxStacks)
+            && Math.abs(maxStacks - existing.maxStacks) > 1e-9) {
+            add(errors, groupPath, "同一共享层数组的最大层数必须一致。")
+        }
+        if (Number.isFinite(defaultStacks)
+            && Number.isFinite(existing.defaultStacks)
+            && Math.abs(defaultStacks - existing.defaultStacks) > 1e-9) {
+            add(errors, groupPath, "同一共享层数组的默认层数必须一致。")
+        }
+    })
 }
 
 function validateRequiredStringList(errors, value, path, label) {
@@ -573,6 +608,7 @@ function validateEffectSet(errors, effect, path, options = {}) {
         options.sourceType,
         effect.scope ?? "outOfCombat",
     ))
+    validateStackRuleGroups(errors, rules, path)
     buffModifiers.forEach((modifier, index) => validateBuffModifier(
         errors,
         modifier,

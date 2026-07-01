@@ -9,6 +9,46 @@ Chinese documentation is available in [README.zh-CN.md](README.zh-CN.md).
 
 ## Upload Update Summaries
 
+### 2026-07-02 Scanner 1.0.33 and Modal Workflow Update
+
+This upload publishes the web-launched scanner as ZZZ Scanner Next `1.0.33`
+and commits the pending optimizer/inventory UI updates:
+
+- Repacked the OCR runtime from the local `publish 1.0.33` output. The package
+  includes the built-in `Data/ocr_fast_templates.json`, so the web page does not
+  pass any `ocrFastIndex` override.
+- The Drive Disc scan request now uses the stable `1.0.33` payload:
+  `fastMode=true`, `captureMode=dxgi`, `profileRouting=strict`,
+  `overlapConflictMode=recover`, `panelAcceptMode=adaptive-early-full-roi`,
+  `scrollAcceptMode=early-one-row`, `postScrollPanelAcceptMode=safe`, and
+  `panelMinAcceptFloorMs=120`.
+- Non-level-15 full-inventory scanning remains disabled by default through
+  `stopAtNonLevel15=true`.
+- The Drive Disc analysis modal now starts from the role-aware difference view,
+  while keeping the current substat and gain-curve views available.
+- Combat Buff, two-piece/four-piece optimizer filters, calculation config,
+  Drive Disc edit, and loadout edit modals now use explicit cancel/apply or
+  cancel/save footers, so tentative edits do not immediately mutate the active
+  build.
+- Stacked W-Engine effects can share one runtime stack control through
+  `stackGroup`; Qingming Cage now keeps its two "Qingming Companion" effects in
+  sync.
+
+### 2026-07-01 Role-Aware Drive Disc Stat Difference Analysis
+
+This update reuses the existing "stat analysis" modal and adds a "difference
+analysis" view:
+
+- Substat differences use the current six equipped Drive Discs, Buff runtime
+  state, and damage target as the baseline, then sort by real marginal damage.
+- Slot 4/5/6 main-stat candidates read the agent's
+  `preferredDriveDiscs.mainStatLimits`, falling back to the generic slot pool
+  only when no role preference exists.
+- The currently equipped main stat is filtered out, so a physical-damage disc no
+  longer produces a meaningless `-30 physicalDmg` reverse row.
+- Browser-local analysis, backend analysis, and regression tests are kept in
+  parity.
+
 ### 2026-07-01 Slim Scanner Packages
 
 This upload reduces the web-launched scanner download footprint without changing
@@ -363,7 +403,7 @@ currently uses the verified GitHub Release package. The helper registers
 `zzz-scanner://`, connects back to the page on
 `127.0.0.1:22355`, and downloads the OCR scanner package declared by
 `/downloads/zzz-scanner/manifest.json` when needed. The current scanner package
-is ZZZ Scanner Next `1.0.28`.
+is ZZZ Scanner Next `1.0.33`.
 
 Main pages:
 
@@ -411,7 +451,7 @@ same command from `main` and deploys the Pages artifact; do not commit
 
 Publish Helper and OCR packages through GitHub Releases instead of Git:
 
-- tag: `scanner-1.0.28`
+- tag: `scanner-1.0.33`
 - `ZZZ-Scanner-Helper.exe`
 - `ZZZ-Scanner.Next-win-x64.zip`
 

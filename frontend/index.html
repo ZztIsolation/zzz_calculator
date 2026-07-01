@@ -518,14 +518,19 @@
           <input id="customBuffNameInput" value="自定义 Buff">
         </label>
         <div id="customBuffStatRows" class="custom-buff-stat-rows"></div>
-        <div class="modal-actions">
-          <button id="saveCustomBuffBtn" type="button" class="primary-btn">保存并添加</button>
-        </div>
+        <button id="saveCustomBuffBtn" type="button" class="compact-btn">添加到本次选择</button>
       </div>
       <div id="combatBuffModalEmpty" class="inventory-empty home-disc-empty" hidden>
         <strong>暂无 Buff</strong>
         <span>暂无可添加的 Buff</span>
       </div>
+      <footer class="modal-footer combat-buff-modal-footer">
+        <span id="combatBuffModalSummary" class="modal-footer-summary">已选择 0 个 Buff</span>
+        <div class="modal-footer-actions">
+          <button id="cancelCombatBuffModalBtn" type="button" class="ghost-btn">取消</button>
+          <button id="applyCombatBuffModalBtn" type="button" class="primary-btn">应用选择</button>
+        </div>
+      </footer>
     </section>
   </div>
 
@@ -540,6 +545,13 @@
         </div>
       </header>
       <div id="twoPieceSetChoices" class="two-piece-choice-list"></div>
+      <footer class="modal-footer two-piece-set-footer">
+        <span id="twoPieceSetModalSummary" class="modal-footer-summary">未选择额外 2 件套</span>
+        <div class="modal-footer-actions">
+          <button id="cancelTwoPieceSetModalBtn" type="button" class="ghost-btn">取消</button>
+          <button id="applyTwoPieceSetModalBtn" type="button" class="primary-btn">应用限制</button>
+        </div>
+      </footer>
     </section>
   </div>
 
@@ -596,6 +608,13 @@
         </div>
       </header>
       <div id="fourPieceSetChoices" class="two-piece-choice-list"></div>
+      <footer class="modal-footer two-piece-set-footer">
+        <span id="fourPieceSetModalSummary" class="modal-footer-summary">未选择限定 4 件套</span>
+        <div class="modal-footer-actions">
+          <button id="cancelFourPieceSetModalBtn" type="button" class="ghost-btn">取消</button>
+          <button id="applyFourPieceSetModalBtn" type="button" class="primary-btn">应用限制</button>
+        </div>
+      </footer>
     </section>
   </div>
 
@@ -675,10 +694,13 @@
         </div>
       </div>
 
-      <div class="modal-actions calculation-config-footer">
-        <span id="calculationConfigFooterSummary">-</span>
-        <button id="saveCalculationConfigBtn" type="button" class="primary-btn">保存配置</button>
-      </div>
+      <footer class="modal-footer calculation-config-footer">
+        <span id="calculationConfigFooterSummary" class="modal-footer-summary">-</span>
+        <div class="modal-footer-actions">
+          <button id="cancelCalculationConfigBtn" type="button" class="ghost-btn">取消</button>
+          <button id="saveCalculationConfigBtn" type="button" class="primary-btn">保存配置</button>
+        </div>
+      </footer>
     </section>
   </div>
 

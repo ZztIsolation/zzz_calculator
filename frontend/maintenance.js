@@ -3080,6 +3080,14 @@ function renderEffectRuleRows(containerId, effects = []) {
               ${fieldLabel("默认层数", true)}
               <input data-effect-default-stacks type="number" min="0" step="1" value="${escapeHtml(effect.defaultStacks ?? effect.maxStacks ?? 1)}">
             </label>
+            <label class="field stacked-only">
+              <span>共享层数组 ID</span>
+              <input data-effect-stack-group value="${escapeHtml(effect.stackGroup ?? "")}" placeholder="qingming_companion">
+            </label>
+            <label class="field stacked-only">
+              <span>共享层数组显示名</span>
+              <input data-effect-stack-label value="${escapeHtml(localized(effect.stackLabel) || "")}" placeholder="青溟同行层数">
+            </label>
             <button type="button" class="compact-btn maintenance-remove-effect" data-remove-effect="${index}">删除</button>
             ${modificationValuesHtml}
         `
@@ -3201,11 +3209,15 @@ function readEffectRuleRows(containerId) {
 
         if (type === "stacked") {
             const valuePerStack = inputToStoredValue(stat, row.querySelector("[data-effect-value]")?.value)
+            const stackGroup = row.querySelector("[data-effect-stack-group]")?.value.trim() ?? ""
+            const stackLabel = row.querySelector("[data-effect-stack-label]")?.value.trim() ?? ""
             return {
                 ...base,
                 valuePerStack,
                 maxStacks: numberValue(row.querySelector("[data-effect-max-stacks]")?.value, 1),
                 defaultStacks: numberValue(row.querySelector("[data-effect-default-stacks]")?.value, 1),
+                ...(stackGroup ? { stackGroup } : {}),
+                ...(stackLabel ? { stackLabel: { zhCN: stackLabel } } : {}),
                 ...readRuleModificationValues(row, type),
             }
         }

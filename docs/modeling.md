@@ -278,7 +278,7 @@ interface Effect {
     | { type: "fixed"; stat: BuffRuleStat; value: number; mode: "flat" | "pct"; basis?: Effect["stats"][number]["basis"]; target?: EffectTarget }
     | { type: "derived"; stat: BuffRuleStat; mode: "flat" | "pct"; sourceLabel?: { zhCN?: string }; defaultSourceValue: number; ratio: number; cap?: number; target?: EffectTarget }
     | { type: "formula"; stat: BuffRuleStat; mode: "flat" | "pct"; source: { variable: "x"; label?: { zhCN?: string }; defaultValue: number; min?: number; max?: number }; formula: { expression: string; valueUnit?: "storedValue" | "storedPercent" }; target?: EffectTarget }
-    | { type: "stacked"; stat: BuffRuleStat; mode: "flat" | "pct"; valuePerStack: number; maxStacks: number; defaultStacks?: number; basis?: Effect["stats"][number]["basis"]; target?: EffectTarget }
+    | { type: "stacked"; stat: BuffRuleStat; mode: "flat" | "pct"; valuePerStack: number; maxStacks: number; defaultStacks?: number; stackGroup?: string; stackLabel?: { zhCN?: string; en?: string }; basis?: Effect["stats"][number]["basis"]; target?: EffectTarget }
     // Deprecated read-only compatibility. New UI/save paths must use target.kind + stat.
     | { type: "damageModifier"; kind: "anomalyDamageBonus" | "disorderDamageBonus" | "baseMultiplierBonus" | "disorderBaseMultiplierBonus" | "anomalyCritRate" | "anomalyCritDmg" | "directDamageBonus" | "skillMultiplierBonus"; value: number; valueUnit?: "decimal"; appliesTo?: { damageKinds?: Array<"direct" | "anomaly" | "disorder">; anomalyEffects?: string[]; elements?: Array<"physical" | "fire" | "ice" | "electric" | "ether">; skillTargets?: SkillTarget[] } }
   >;
@@ -520,7 +520,11 @@ Structured Buffs can use these calculation rules:
 - `formula`: evaluates a safe single-variable expression from source `x` into
   the stored stat value. It only permits numbers, `x`, arithmetic, parentheses,
   and `floor/ceil/round/min/max/clamp`.
-- `stacked`: multiplies `valuePerStack` by runtime stack count.
+- `stacked`: multiplies `valuePerStack` by runtime stack count. Multiple
+  stacked rules can share one runtime stack input by using the same
+  `stackGroup`, for cases where one in-game stack state drives several stat
+  bonuses. Rules in the same group should use the same `maxStacks` and
+  `defaultStacks`; `stackLabel` controls the shared UI label.
 
 Buffs can also declare `buffModifiers` for effects that amplify another active
 Buff rather than directly adding a stat. The first supported operation is

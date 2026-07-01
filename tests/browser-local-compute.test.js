@@ -3,10 +3,10 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { calculateInCombatPanel as backendCalculateInCombatPanel, loadCalculatorContext } from "../backend/calculator.js"
-import { analyzeDriveDiscStatGains as backendAnalyzeDriveDiscStatGains, analyzeDriveDiscSubstats as backendAnalyzeDriveDiscSubstats } from "../backend/driveDiscAnalysis.js"
+import { analyzeDriveDiscStatDiffs as backendAnalyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains as backendAnalyzeDriveDiscStatGains, analyzeDriveDiscSubstats as backendAnalyzeDriveDiscSubstats } from "../backend/driveDiscAnalysis.js"
 import { optimizeDriveDiscsAsync as backendOptimizeDriveDiscsAsync, previewDriveDiscOptimization as backendPreviewDriveDiscOptimization } from "../backend/driveDiscOptimizer.js"
 import { calculateInCombatPanel as browserCalculateInCombatPanel } from "../frontend/calculator-core.js"
-import { analyzeDriveDiscStatGains as browserAnalyzeDriveDiscStatGains, analyzeDriveDiscSubstats as browserAnalyzeDriveDiscSubstats } from "../frontend/driveDiscAnalysis-core.js"
+import { analyzeDriveDiscStatDiffs as browserAnalyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains as browserAnalyzeDriveDiscStatGains, analyzeDriveDiscSubstats as browserAnalyzeDriveDiscSubstats } from "../frontend/driveDiscAnalysis-core.js"
 import { optimizeDriveDiscsAsync as browserOptimizeDriveDiscsAsync, previewDriveDiscOptimization as browserPreviewDriveDiscOptimization } from "../frontend/driveDiscOptimizer-core.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
@@ -120,6 +120,12 @@ assert.deepEqual(
     browserAnalyzeDriveDiscStatGains(catalog, payload),
     backendAnalyzeDriveDiscStatGains(catalog, payload),
     "Browser drive-disc gain analysis should match backend.",
+)
+
+assert.deepEqual(
+    browserAnalyzeDriveDiscStatDiffs(catalog, payload),
+    backendAnalyzeDriveDiscStatDiffs(catalog, payload),
+    "Browser drive-disc difference analysis should match backend.",
 )
 
 const browserPreview = browserPreviewDriveDiscOptimization(catalog, store, optimizerInput)

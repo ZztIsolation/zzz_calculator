@@ -7,11 +7,12 @@ const HELPER_PROTOCOL_URL = `zzz-scanner://launch?origin=${encodeURIComponent(wi
 const DEFAULT_SCAN_TUNING = {
     fastMode: true,
     captureMode: "dxgi",
-    panelMinAcceptFloorMs: 120,
-    postScrollPanelAcceptMode: "safe",
-    sameRowPanelMinAcceptFloorMs: 105,
-    postScrollPanelMinAcceptFloorMs: 110,
+    profileRouting: "strict",
     overlapConflictMode: "recover",
+    panelAcceptMode: "adaptive-early-full-roi",
+    scrollAcceptMode: "early-one-row",
+    postScrollPanelAcceptMode: "safe",
+    panelMinAcceptFloorMs: 120,
 }
 
 export class ScannerBridge {
@@ -119,11 +120,12 @@ export class ScannerBridge {
             profileName: options.profileName ?? "",
             fastMode: options.fastMode ?? DEFAULT_SCAN_TUNING.fastMode,
             captureMode: options.captureMode ?? DEFAULT_SCAN_TUNING.captureMode,
-            panelMinAcceptFloorMs: options.panelMinAcceptFloorMs ?? DEFAULT_SCAN_TUNING.panelMinAcceptFloorMs,
-            postScrollPanelAcceptMode: options.postScrollPanelAcceptMode ?? DEFAULT_SCAN_TUNING.postScrollPanelAcceptMode,
-            sameRowPanelMinAcceptFloorMs: options.sameRowPanelMinAcceptFloorMs ?? DEFAULT_SCAN_TUNING.sameRowPanelMinAcceptFloorMs,
-            postScrollPanelMinAcceptFloorMs: options.postScrollPanelMinAcceptFloorMs ?? DEFAULT_SCAN_TUNING.postScrollPanelMinAcceptFloorMs,
+            profileRouting: options.profileRouting ?? DEFAULT_SCAN_TUNING.profileRouting,
             overlapConflictMode: options.overlapConflictMode ?? DEFAULT_SCAN_TUNING.overlapConflictMode,
+            panelAcceptMode: options.panelAcceptMode ?? DEFAULT_SCAN_TUNING.panelAcceptMode,
+            scrollAcceptMode: options.scrollAcceptMode ?? DEFAULT_SCAN_TUNING.scrollAcceptMode,
+            postScrollPanelAcceptMode: options.postScrollPanelAcceptMode ?? DEFAULT_SCAN_TUNING.postScrollPanelAcceptMode,
+            panelMinAcceptFloorMs: options.panelMinAcceptFloorMs ?? DEFAULT_SCAN_TUNING.panelMinAcceptFloorMs,
         })
     }
 

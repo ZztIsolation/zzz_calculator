@@ -1,4 +1,5 @@
 import {
+    analyzeDriveDiscStatDiffs,
     analyzeDriveDiscStatGains,
     analyzeDriveDiscSubstats,
 } from "./driveDiscAnalysis-core.js"
@@ -41,6 +42,28 @@ function percentText(value, digits = 2) {
     return `${Number((number * 100).toFixed(digits))}%`
 }
 
+function signedNumberText(value, digits = 3) {
+    const number = Number(value)
+    if (!Number.isFinite(number)) {
+        return "-"
+    }
+    if (Math.abs(number) < 1e-9) {
+        return "0"
+    }
+    return `${number > 0 ? "+" : "-"}${numberText(Math.abs(number), digits)}`
+}
+
+function signedPercentText(value, digits = 3) {
+    const number = Number(value)
+    if (!Number.isFinite(number)) {
+        return "-"
+    }
+    if (Math.abs(number) < 1e-12) {
+        return "0%"
+    }
+    return `${number > 0 ? "+" : "-"}${percentText(Math.abs(number), digits)}`
+}
+
 function createModal() {
     const layer = document.createElement("div")
     layer.id = "driveDiscAnalysisModal"
@@ -69,7 +92,16 @@ function createModal() {
         const gainModeButton = event.target.closest("[data-gain-display-mode]")
         if (gainModeButton) {
             activeGainDisplayMode = gainModeButton.dataset.gainDisplayMode === "marginal" ? "marginal" : "cumulative"
-            renderLastGainData()
+            if (lastAnalysisData && activeAnalysisView === "gains") {
+                renderAnalysisView("gains")
+            } else {
+                renderLastGainData()
+            }
+            return
+        }
+        const analysisViewButton = event.target.closest("[data-analysis-view]")
+        if (analysisViewButton) {
+            renderAnalysisView(analysisViewButton.dataset.analysisView)
         }
     })
     return {
@@ -85,6 +117,9 @@ let modal = null
 let activeGainDisplayMode = "cumulative"
 let lastGainData = null
 let lastGainOptions = null
+let lastAnalysisData = null
+let lastAnalysisOptions = null
+let activeAnalysisView = "diff"
 
 function ensureModal() {
     if (!modal) {
@@ -107,6 +142,14 @@ function renderLastGainData() {
         return
     }
     modal.content.innerHTML = statGainsHtml(lastGainData, lastGainOptions, activeGainDisplayMode)
+}
+
+function renderAnalysisView(view = activeAnalysisView) {
+    if (!modal || !lastAnalysisData || !lastAnalysisOptions) {
+        return
+    }
+    activeAnalysisView = ["diff", "substats", "gains"].includes(view) ? view : "diff"
+    modal.content.innerHTML = analysisShellHtml(lastAnalysisData, lastAnalysisOptions, activeAnalysisView)
 }
 
 function payloadDriveDiscCount(payload) {
@@ -138,6 +181,17 @@ function statName(options, stat) {
 
 function storedValue(options, stat, value, mode) {
     return options.formatStoredValue?.(stat, Number(value), mode) ?? numberText(value)
+}
+
+function diffTone(value) {
+    const number = Number(value)
+    if (number > 0) {
+        return "positive"
+    }
+    if (number < 0) {
+        return "negative"
+    }
+    return "neutral"
 }
 
 function substatDistributionHtml(data, options) {
@@ -380,15 +434,145 @@ function statGainsHtml(data, options, mode = "cumulative") {
     `
 }
 
+function analysisTabsHtml(active = "diff") {
+    return `
+      <div class="analysis-mode-bar">
+        <div class="segmented-control analysis-view-toggle" role="group" aria-label="驱动盘分析视图">
+          <button type="button" class="${active === "diff" ? "active" : ""}" data-analysis-view="diff">差异计算</button>
+          <button type="button" class="${active === "substats" ? "active" : ""}" data-analysis-view="substats">当前副词条</button>
+          <button type="button" class="${active === "gains" ? "active" : ""}" data-analysis-view="gains">收益曲线</button>
+        </div>
+        <span>以当前六件装配和当前伤害目标为基线</span>
+      </div>
+    `
+}
+
+function substatDiffHtml(data, options) {
+    const rows = data.substatDiffs ?? []
+    if (!rows.length) {
+        return `<div class="analysis-empty">当前伤害目标下没有可见的副词条边际收益。</div>`
+    }
+    return `
+      <section class="analysis-section">
+        <h3>副词条差异计算</h3>
+        <table class="analysis-table analysis-diff-table">
+          <thead>
+            <tr>
+              <th>候选副词条</th>
+              <th>当前值</th>
+              <th>新增一条</th>
+              <th>伤害差值</th>
+              <th>百分比差值</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(item => `
+              <tr>
+                <td>${escapeHtml(statName(options, item.stat))}</td>
+                <td>${escapeHtml(storedValue(options, item.stat, item.currentValue, item.mode))}</td>
+                <td>${escapeHtml(storedValue(options, item.stat, item.addedValue, item.mode))}</td>
+                <td class="analysis-diff-cell ${diffTone(item.absoluteDiff)}">${escapeHtml(signedNumberText(item.absoluteDiff))}</td>
+                <td class="analysis-diff-cell ${diffTone(item.relativeDiff)}">${escapeHtml(signedPercentText(item.relativeDiff))}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </section>
+    `
+}
+
+function mainStatDiffHtml(data, options) {
+    const slots = Object.values(data.mainStatDiffsBySlot ?? {})
+    if (!slots.length) {
+        return `<div class="analysis-empty">暂无可分析的主词条槽位。</div>`
+    }
+    return `
+      <section class="analysis-section">
+        <h3>主词条差异计算</h3>
+        ${slots.map(slot => {
+            const current = slot.current
+            const candidates = slot.candidates ?? []
+            return `
+              <div class="analysis-slot-block">
+                <div class="analysis-slot-head">
+                  <strong>${escapeHtml(slot.slot)}号位</strong>
+                  <span>当前：${current ? `${escapeHtml(statName(options, current.stat))} ${escapeHtml(storedValue(options, current.stat, current.value, current.mode))}` : "未选择"}</span>
+                  <em>${slot.source === "preferredDriveDiscs" ? "角色优先配置" : "槽位可选池"}</em>
+                </div>
+                ${candidates.length ? `
+                  <table class="analysis-table analysis-diff-table">
+                    <thead>
+                      <tr>
+                        <th>替换为</th>
+                        <th>候选数值</th>
+                        <th>伤害差值</th>
+                        <th>百分比差值</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${candidates.map(item => `
+                        <tr>
+                          <td>${escapeHtml(statName(options, item.stat))}</td>
+                          <td>${escapeHtml(storedValue(options, item.stat, item.value, item.mode))}</td>
+                          <td class="analysis-diff-cell ${diffTone(item.absoluteDiff)}">${escapeHtml(signedNumberText(item.absoluteDiff))}</td>
+                          <td class="analysis-diff-cell ${diffTone(item.relativeDiff)}">${escapeHtml(signedPercentText(item.relativeDiff))}</td>
+                        </tr>
+                      `).join("")}
+                    </tbody>
+                  </table>
+                ` : `<div class="analysis-empty compact">当前主词条已经是该槽位唯一候选。</div>`}
+              </div>
+            `
+        }).join("")}
+      </section>
+    `
+}
+
+function statDiffsHtml(data, options) {
+    return `
+      <div class="analysis-summary-grid">
+        <div><span>基准伤害</span><strong>${escapeHtml(numberText(data.baseline?.finalDamage, 3))}</strong></div>
+        <div><span>副词条候选</span><strong>${escapeHtml(data.substatDiffs?.length ?? 0)}</strong></div>
+        <div><span>主词条槽位</span><strong>4 / 5 / 6</strong></div>
+      </div>
+      ${substatDiffHtml(data, options)}
+      ${mainStatDiffHtml(data, options)}
+    `
+}
+
+function analysisShellHtml(data, options, view = "diff") {
+    const body = view === "substats"
+        ? substatDistributionHtml(data.substats, options)
+        : view === "gains"
+            ? statGainsHtml(data.gains, options, activeGainDisplayMode)
+            : statDiffsHtml(data.diffs, options)
+    return `
+      ${analysisTabsHtml(view)}
+      ${body}
+    `
+}
+
 async function openSubstatAnalysis(options) {
-    setModalState("词条分析", "统计当前六件驱动盘副词条的有效词条数", "分析中...")
+    setModalState("驱动盘分析", "按当前角色、音擎、局内 Buff 与伤害目标计算", "分析中...")
     const payload = await resolvePayload(options)
-    const data = analyzeDriveDiscSubstats(await resolveCatalog(options), payload)
+    const catalog = await resolveCatalog(options)
+    const data = {
+        diffs: analyzeDriveDiscStatDiffs(catalog, payload),
+        substats: analyzeDriveDiscSubstats(catalog, payload),
+        gains: analyzeDriveDiscStatGains(catalog, {
+            ...payload,
+            maxRolls: options.maxRolls ?? 10,
+        }),
+    }
+    activeAnalysisView = "diff"
+    activeGainDisplayMode = "cumulative"
+    lastAnalysisData = data
+    lastAnalysisOptions = options
     setModalState(
-        "词条分析",
-        "统计当前六件驱动盘副词条的有效词条数；主词条不计入",
+        "驱动盘分析",
+        "差异计算复用角色优先驱动盘主词条配置",
         "分析完成",
-        substatDistributionHtml(data, options),
+        analysisShellHtml(data, options, activeAnalysisView),
     )
 }
 
@@ -399,6 +583,9 @@ async function openStatGainAnalysis(options) {
         ...payload,
         maxRolls: options.maxRolls ?? 10,
     })
+    lastAnalysisData = null
+    lastAnalysisOptions = null
+    activeAnalysisView = "diff"
     activeGainDisplayMode = "cumulative"
     lastGainData = data
     lastGainOptions = options

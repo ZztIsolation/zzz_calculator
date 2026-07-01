@@ -690,6 +690,70 @@ function effectRuntimeFor(rule, runtimeInput = {}) {
     return runtimeInput.effects?.[id] ?? runtimeInput[id] ?? {}
 }
 
+function runtimeStackGroupKey(rule = {}) {
+    if ((rule.type ?? "fixed") !== "stacked") {
+        return ""
+    }
+    const stackGroup = String(rule.stackGroup ?? "").trim()
+    return stackGroup
+        ? `stackGroup:${stackGroup}`
+        : `rule:${rule.id ?? rule.stat ?? "effect"}`
+}
+
+function normalizeEffectRuntimeInput(effect, runtimeInput = {}) {
+    const input = runtimeInput && typeof runtimeInput === "object" ? runtimeInput : {}
+    const rules = effectRules(effect)
+    const grouped = new Map()
+    for (const rule of rules) {
+        const key = runtimeStackGroupKey(rule)
+        if (!key) {
+            continue
+        }
+        const id = rule.id ?? rule.stat ?? "effect"
+        if (!grouped.has(key)) {
+            grouped.set(key, [])
+        }
+        grouped.get(key).push(id)
+    }
+
+    if (![...grouped.values()].some(ids => ids.length > 1)) {
+        return input
+    }
+
+    const effects = {
+        ...(input.effects ?? {}),
+    }
+    for (const ids of grouped.values()) {
+        if (ids.length < 2) {
+            continue
+        }
+        let stacks = undefined
+        for (const id of ids) {
+            if (input.effects?.[id]?.stacks !== undefined) {
+                stacks = input.effects[id].stacks
+                break
+            }
+            if (input[id]?.stacks !== undefined) {
+                stacks = input[id].stacks
+                break
+            }
+        }
+        if (stacks === undefined) {
+            continue
+        }
+        for (const id of ids) {
+            effects[id] = {
+                ...(effects[id] ?? {}),
+                stacks,
+            }
+        }
+    }
+    return {
+        ...input,
+        effects,
+    }
+}
+
 function effectRuleEnabled(rule, runtimeInput = {}) {
     return effectRuntimeFor(rule, runtimeInput).enabled !== false
 }
@@ -1000,8 +1064,9 @@ function normalizeEffect(effect, runtimeInput = {}, modifierContext = {}) {
         return null
     }
 
-    const stats = resolveEffectStats(effect, runtimeInput, modifierContext)
-    const damageModifiers = resolveEffectDamageModifiers(effect, runtimeInput, modifierContext)
+    const normalizedRuntimeInput = normalizeEffectRuntimeInput(effect, runtimeInput)
+    const stats = resolveEffectStats(effect, normalizedRuntimeInput, modifierContext)
+    const damageModifiers = resolveEffectDamageModifiers(effect, normalizedRuntimeInput, modifierContext)
 
     return {
         name: effect.name ?? null,

@@ -41,6 +41,9 @@ const els = {
     openCombatBuffModalBtn: document.getElementById("openCombatBuffModalBtn"),
     combatBuffModal: document.getElementById("combatBuffModal"),
     closeCombatBuffModalBtn: document.getElementById("closeCombatBuffModalBtn"),
+    cancelCombatBuffModalBtn: document.getElementById("cancelCombatBuffModalBtn"),
+    applyCombatBuffModalBtn: document.getElementById("applyCombatBuffModalBtn"),
+    combatBuffModalSummary: document.getElementById("combatBuffModalSummary"),
     combatBuffSearchInput: document.getElementById("combatBuffSearchInput"),
     combatBuffTeammatePicker: document.getElementById("combatBuffTeammatePicker"),
     combatBuffTeammateSelect: document.getElementById("combatBuffTeammateSelect"),
@@ -85,6 +88,9 @@ const els = {
     fourPieceSelectedSummary: document.getElementById("fourPieceSelectedSummary"),
     fourPieceSetModal: document.getElementById("fourPieceSetModal"),
     closeFourPieceSetModalBtn: document.getElementById("closeFourPieceSetModalBtn"),
+    cancelFourPieceSetModalBtn: document.getElementById("cancelFourPieceSetModalBtn"),
+    applyFourPieceSetModalBtn: document.getElementById("applyFourPieceSetModalBtn"),
+    fourPieceSetModalSummary: document.getElementById("fourPieceSetModalSummary"),
     fourPieceSetChoices: document.getElementById("fourPieceSetChoices"),
     fourPieceBuffSection: document.getElementById("fourPieceBuffSection"),
     fourPieceBuffModeAuto: document.getElementById("fourPieceBuffModeAuto"),
@@ -96,6 +102,9 @@ const els = {
     twoPieceSelectedSummary: document.getElementById("twoPieceSelectedSummary"),
     twoPieceSetModal: document.getElementById("twoPieceSetModal"),
     closeTwoPieceSetModalBtn: document.getElementById("closeTwoPieceSetModalBtn"),
+    cancelTwoPieceSetModalBtn: document.getElementById("cancelTwoPieceSetModalBtn"),
+    applyTwoPieceSetModalBtn: document.getElementById("applyTwoPieceSetModalBtn"),
+    twoPieceSetModalSummary: document.getElementById("twoPieceSetModalSummary"),
     twoPieceSetChoices: document.getElementById("twoPieceSetChoices"),
     slot4MainStats: document.getElementById("slot4MainStats"),
     slot5MainStats: document.getElementById("slot5MainStats"),
@@ -111,6 +120,7 @@ const els = {
     calculationAnomalyControls: document.getElementById("calculationAnomalyControls"),
     calculationConfigModal: document.getElementById("calculationConfigModal"),
     closeCalculationConfigModalBtn: document.getElementById("closeCalculationConfigModalBtn"),
+    cancelCalculationConfigBtn: document.getElementById("cancelCalculationConfigBtn"),
     calculationConfigMode: document.getElementById("calculationConfigMode"),
     calculationCustomConfigEvents: document.getElementById("calculationCustomConfigEvents"),
     adminDefaultCalculationPreview: document.getElementById("adminDefaultCalculationPreview"),
@@ -458,6 +468,7 @@ let activeDiscSlot = null
 let activeCombatBuffTab = "agent"
 let activeCombatBuffTeammateId = ""
 let renderedCombatBuffAgentId = ""
+let combatBuffDraftAddedBuffs = null
 const manuallyUncheckedDefaultCombatBuffIds = new Set()
 const damageTargetResistanceByElement = Object.fromEntries(DAMAGE_ELEMENTS.map(element => [element, 0]))
 let activeDamageResistanceElement = "physical"
@@ -473,6 +484,9 @@ let calculationConfigMode = "single"
 let calculationConfigEvents = []
 let calculationConfigSelectedEventId = null
 let calculationConfigEditingIndex = 0
+let calculationConfigModalSnapshot = null
+let twoPieceSetDraftIds = null
+let fourPieceSetDraftId = null
 let currentRenderedDamage = null
 const combatUi = SharedCombat.createCombatUiController({
     getMeta: () => meta,
@@ -2637,15 +2651,41 @@ function renderCalculationConfigModal() {
     syncCalculationConfigModeFields()
 }
 
+function captureCalculationConfigModalSnapshot() {
+    return {
+        mode: calculationConfigMode,
+        events: cloneCalculationEvents(calculationConfigEvents),
+        selectedEventId: calculationConfigSelectedEventId,
+        editingIndex: calculationConfigEditingIndex,
+    }
+}
+
+function restoreCalculationConfigModalSnapshot() {
+    if (!calculationConfigModalSnapshot) {
+        return
+    }
+    calculationConfigMode = calculationConfigModalSnapshot.mode
+    calculationConfigEvents = cloneCalculationEvents(calculationConfigModalSnapshot.events)
+    calculationConfigSelectedEventId = calculationConfigModalSnapshot.selectedEventId
+    calculationConfigEditingIndex = calculationConfigModalSnapshot.editingIndex
+    syncCalculationConfigSummary()
+    renderCalculationObjectiveControls()
+}
+
 function openCalculationConfigModal() {
+    calculationConfigModalSnapshot = captureCalculationConfigModalSnapshot()
     renderCalculationConfigModal()
     els.calculationConfigModal.hidden = false
     document.body.classList.add("modal-open")
 }
 
-function closeCalculationConfigModal() {
+function closeCalculationConfigModal({ restore = true } = {}) {
     els.calculationConfigModal.hidden = true
     document.body.classList.remove("modal-open")
+    if (restore) {
+        restoreCalculationConfigModalSnapshot()
+    }
+    calculationConfigModalSnapshot = null
 }
 
 function applyStoredDamageConfig(config = {}) {
@@ -3289,6 +3329,52 @@ function combatConfigForAgent(agentId) {
 
 function currentAddedCombatBuffs() {
     return combatConfigForAgent(els.agentSelect.value).addedBuffs.filter(item => !isDriveDiscAddedBuff(item))
+}
+
+function cloneCombatBuffList(addedBuffs = []) {
+    try {
+        return structuredClone(addedBuffs)
+    } catch {
+        return JSON.parse(JSON.stringify(addedBuffs))
+    }
+}
+
+function activeCombatBuffModalAddedBuffs() {
+    return combatBuffDraftAddedBuffs ?? currentAddedCombatBuffs()
+}
+
+function combatBuffListKeys(addedBuffs = []) {
+    return addedBuffs.map(addedCombatBuffKey).filter(Boolean)
+}
+
+function combatBuffDraftChanged() {
+    if (!combatBuffDraftAddedBuffs) {
+        return false
+    }
+    const before = combatBuffListKeys(currentAddedCombatBuffs()).sort()
+    const after = combatBuffListKeys(combatBuffDraftAddedBuffs).sort()
+    return before.length !== after.length || before.some((key, index) => key !== after[index])
+}
+
+function setCombatBuffDraftAddedBuffs(addedBuffs) {
+    combatBuffDraftAddedBuffs = sanitizeAddedCombatBuffs(cloneCombatBuffList(addedBuffs))
+        .filter(item => !isDriveDiscAddedBuff(item) && isResolvableAddedCombatBuff(item))
+    updateCombatBuffModalSummary()
+}
+
+function updateCombatBuffModalSummary() {
+    if (!els.combatBuffModalSummary) {
+        return
+    }
+    const beforeKeys = new Set(combatBuffListKeys(currentAddedCombatBuffs()))
+    const afterKeys = new Set(combatBuffListKeys(activeCombatBuffModalAddedBuffs()))
+    const added = [...afterKeys].filter(key => !beforeKeys.has(key)).length
+    const removed = [...beforeKeys].filter(key => !afterKeys.has(key)).length
+    const changeText = added || removed ? ` / 本次新增 ${added} / 移除 ${removed}` : " / 无未应用改动"
+    els.combatBuffModalSummary.textContent = `已选择 ${afterKeys.size} 个 Buff${changeText}`
+    if (els.applyCombatBuffModalBtn) {
+        els.applyCombatBuffModalBtn.disabled = !combatBuffDraftChanged()
+    }
 }
 
 function savedActiveCombatBuffIds(agentId = els.agentSelect.value) {
@@ -4017,7 +4103,7 @@ function renderCombatBuffTeammatePreview(group) {
 function renderCombatBuffTeammatePicker() {
     const groups = teammateCombatBuffGroups()
     const activeGroup = ensureActiveCombatBuffTeammateId(groups)
-    const selectedOwnerIds = teammateOwnerIdsForAddedBuffs()
+    const selectedOwnerIds = teammateOwnerIdsForAddedBuffs(activeCombatBuffModalAddedBuffs())
 
     els.combatBuffTeammateSelect.innerHTML = ""
     for (const group of groups) {
@@ -4031,7 +4117,7 @@ function renderCombatBuffTeammatePicker() {
     renderCombatBuffTeammatePreview(activeGroup)
 
     const candidates = selectedTeammateBuffCandidates()
-    const addedKeys = new Set(currentAddedCombatBuffs().map(addedCombatBuffKey))
+    const addedKeys = new Set(activeCombatBuffModalAddedBuffs().map(addedCombatBuffKey))
     const hasAddedFromActive = candidates.some(candidate => addedKeys.has(addedCombatBuffKey(candidate)))
     const allAddedFromActive = candidates.length > 0
         && candidates.every(candidate => addedKeys.has(addedCombatBuffKey(candidate)))
@@ -4381,8 +4467,8 @@ function renderBuffRuntimeControls(row, item, buff, runtime) {
     const rules = effectRules(buff)
     const hasCoverage = Boolean(buff.coverage)
     const sourceGroups = SharedCombat.runtimeSourceGroups(buff)
-    const stackedRules = rules.filter(rule => rule.type === "stacked")
-    const needsRuntime = hasCoverage || sourceGroups.length > 0 || stackedRules.length > 0
+    const stackGroups = SharedCombat.runtimeStackGroups(buff)
+    const needsRuntime = hasCoverage || sourceGroups.length > 0 || stackGroups.length > 0
     if (!needsRuntime) {
         return
     }
@@ -4419,13 +4505,13 @@ function renderBuffRuntimeControls(row, item, buff, runtime) {
         `
         controls.appendChild(field)
     }
-    for (const rule of stackedRules) {
-        const id = SharedCombat.effectRuleId(rule)
+    for (const stackGroup of stackGroups) {
+        const primaryId = stackGroup.ruleIds[0] ?? ""
         const field = document.createElement("label")
         field.className = "field"
         field.innerHTML = `
-            <span>层数</span>
-            <input type="number" min="0" max="${rule.maxStacks ?? 1}" step="1" value="${runtime.effects?.[id]?.stacks ?? rule.defaultStacks ?? rule.maxStacks ?? 1}" data-runtime-effect="${escapeHtml(id)}" data-runtime-stacks>
+            <span>${escapeHtml(stackGroup.label)}</span>
+            <input type="number" min="0" max="${stackGroup.maxStacks ?? 1}" step="1" value="${runtime.effects?.[primaryId]?.stacks ?? stackGroup.defaultStacks ?? stackGroup.maxStacks ?? 1}" data-runtime-effect="${escapeHtml(primaryId)}" data-runtime-stack-group="${escapeHtml(stackGroup.key)}" data-runtime-stacks>
         `
         controls.appendChild(field)
     }
@@ -4532,6 +4618,16 @@ function runtimeNumberConfig(buff, field) {
         return null
     }
     if (field.matches("[data-runtime-stacks]")) {
+        const stackGroup = SharedCombat.runtimeStackGroupForKey(buff, field.dataset.runtimeStackGroup)
+        if (stackGroup) {
+            return {
+                label: stackGroup.label,
+                defaultValue: finiteOr(stackGroup.defaultStacks ?? stackGroup.maxStacks, 1),
+                min: 0,
+                max: finiteOr(stackGroup.maxStacks, 1),
+                integer: true,
+            }
+        }
         return {
             label: "层数",
             defaultValue: finiteOr(rule.defaultStacks ?? rule.maxStacks, 1),
@@ -4557,8 +4653,11 @@ function setRuntimeValue(runtime, field, value, buff) {
             runtime.effects[ruleId].sourceValue = value
         }
     } else if (field.matches("[data-runtime-stacks]")) {
-        runtime.effects[id] = runtime.effects[id] ?? {}
-        runtime.effects[id].stacks = value
+        const ruleIds = SharedCombat.runtimeStackRuleIdsForGroup(buff, field.dataset.runtimeStackGroup, id)
+        for (const ruleId of ruleIds) {
+            runtime.effects[ruleId] = runtime.effects[ruleId] ?? {}
+            runtime.effects[ruleId].stacks = value
+        }
     }
 }
 
@@ -4832,13 +4931,15 @@ function shouldShowCombatBuffMetaLine(buff) {
 
 function renderCombatBuffCandidates() {
     const search = els.combatBuffSearchInput.value.trim().toLowerCase()
-    const addedKeys = new Set(currentAddedCombatBuffs().map(addedCombatBuffKey))
+    const activeAddedBuffs = activeCombatBuffModalAddedBuffs()
+    const addedKeys = new Set(activeAddedBuffs.map(addedCombatBuffKey))
     const isCustom = activeCombatBuffTab === "custom"
     const isAgent = activeCombatBuffTab === "agent"
     els.combatBuffCandidateList.hidden = isCustom
     els.combatBuffCustomPane.hidden = !isCustom
     els.combatBuffTeammatePicker.hidden = !isAgent || isCustom
     els.combatBuffModalEmpty.hidden = true
+    updateCombatBuffModalSummary()
 
     for (const button of els.combatBuffModal.querySelectorAll("[data-combat-buff-tab]")) {
         button.classList.toggle("active", button.dataset.combatBuffTab === activeCombatBuffTab)
@@ -4879,7 +4980,7 @@ function renderCombatBuffCandidates() {
     for (const candidate of candidates) {
         const key = addedCombatBuffKey(candidate)
         const alreadyAdded = addedKeys.has(key)
-        const limitMessage = candidateLimitMessage(candidate)
+        const limitMessage = candidateLimitMessage(candidate, activeAddedBuffs)
 
         if (isAgent) {
             const row = document.createElement("label")
@@ -4957,6 +5058,7 @@ function renderCombatBuffCandidates() {
 
 function openCombatBuffModal(tab = "agent") {
     activeCombatBuffTab = tab
+    combatBuffDraftAddedBuffs = cloneCombatBuffList(currentAddedCombatBuffs())
     els.combatBuffSearchInput.value = ""
     els.combatBuffModal.hidden = false
     document.body.classList.add("modal-open")
@@ -4966,6 +5068,19 @@ function openCombatBuffModal(tab = "agent") {
 function closeCombatBuffModal() {
     els.combatBuffModal.hidden = true
     document.body.classList.remove("modal-open")
+    combatBuffDraftAddedBuffs = null
+}
+
+async function applyCombatBuffModalSelection() {
+    if (!combatBuffDraftAddedBuffs || !combatBuffDraftChanged()) {
+        closeCombatBuffModal()
+        return
+    }
+    setStatus("应用 Buff 选择", "idle")
+    saveCurrentAddedCombatBuffs(combatBuffDraftAddedBuffs)
+    closeCombatBuffModal()
+    renderCombatControls()
+    await refreshAfterConfigChange()
 }
 
 function addCombatBuffCandidateByKey(key) {
@@ -4973,7 +5088,7 @@ function addCombatBuffCandidateByKey(key) {
     if (!candidate) {
         return false
     }
-    const addedBuffs = currentAddedCombatBuffs()
+    const addedBuffs = activeCombatBuffModalAddedBuffs()
     if (addedBuffs.some(item => addedCombatBuffKey(item) === key)) {
         return false
     }
@@ -4986,17 +5101,17 @@ function addCombatBuffCandidateByKey(key) {
     const nextEntries = candidateWithSameSourceDefaults(candidate)
         .filter(item => !addedKeys.has(addedCombatBuffKey(item)))
         .map(addedCombatBuffEntry)
-    saveCurrentAddedCombatBuffs([...addedBuffs, ...nextEntries])
+    setCombatBuffDraftAddedBuffs([...addedBuffs, ...nextEntries])
     return true
 }
 
 function removeCombatBuffCandidateByKey(key) {
-    const addedBuffs = currentAddedCombatBuffs()
+    const addedBuffs = activeCombatBuffModalAddedBuffs()
     const next = addedBuffs.filter(item => addedCombatBuffKey(item) !== key)
     if (next.length === addedBuffs.length) {
         return false
     }
-    saveCurrentAddedCombatBuffs(next)
+    setCombatBuffDraftAddedBuffs(next)
     return true
 }
 
@@ -5005,7 +5120,7 @@ function addSelectedTeammateBuffs() {
     if (!candidates.length) {
         return false
     }
-    const addedBuffs = currentAddedCombatBuffs()
+    const addedBuffs = activeCombatBuffModalAddedBuffs()
     const firstNewCandidate = candidates.find(candidate =>
         !addedBuffs.some(item => addedCombatBuffKey(item) === addedCombatBuffKey(candidate))
     )
@@ -5028,7 +5143,7 @@ function addSelectedTeammateBuffs() {
         setStatus("该角色 Buff 已全部添加", "idle")
         return false
     }
-    saveCurrentAddedCombatBuffs([...addedBuffs, ...nextEntries])
+    setCombatBuffDraftAddedBuffs([...addedBuffs, ...nextEntries])
     return true
 }
 
@@ -5037,12 +5152,12 @@ function removeSelectedTeammateBuffs() {
     if (!ownerId) {
         return false
     }
-    const addedBuffs = currentAddedCombatBuffs()
+    const addedBuffs = activeCombatBuffModalAddedBuffs()
     const next = addedBuffs.filter(item => teammateOwnerIdForBuff(item) !== ownerId)
     if (next.length === addedBuffs.length) {
         return false
     }
-    saveCurrentAddedCombatBuffs(next)
+    setCombatBuffDraftAddedBuffs(next)
     return true
 }
 
@@ -5234,21 +5349,58 @@ function syncMainStatChoices(select, slot) {
 }
 
 function syncTwoPieceSetChoices() {
-    const selected = new Set(selectedValues(els.twoPieceSetSelect))
+    const selected = new Set(twoPieceSetDraftIds ?? selectedValues(els.twoPieceSetSelect))
     for (const input of els.twoPieceSetChoices.querySelectorAll("input[data-two-piece-set-limit]")) {
         input.checked = selected.has(input.value)
         input.closest(".two-piece-choice")?.classList.toggle("active", input.checked)
     }
-    renderTwoPieceSelectedSummary()
+    if (twoPieceSetDraftIds) {
+        updateTwoPieceSetModalSummary()
+    } else {
+        renderTwoPieceSelectedSummary()
+    }
 }
 
 function syncFourPieceSetChoices() {
-    const selected = els.fourPieceSetSelect.value
+    const selected = fourPieceSetDraftId ?? els.fourPieceSetSelect.value
     for (const input of els.fourPieceSetChoices.querySelectorAll("input[data-four-piece-set-limit]")) {
         input.checked = input.value === selected
         input.closest(".two-piece-choice")?.classList.toggle("active", input.checked)
     }
-    renderFourPieceSelectedSummary()
+    if (fourPieceSetDraftId !== null) {
+        updateFourPieceSetModalSummary()
+    } else {
+        renderFourPieceSelectedSummary()
+    }
+}
+
+function updateTwoPieceSetModalSummary() {
+    if (!els.twoPieceSetModalSummary) {
+        return
+    }
+    const selected = (twoPieceSetDraftIds ?? selectedValues(els.twoPieceSetSelect))
+        .map(driveDiscSetById)
+        .filter(Boolean)
+    els.twoPieceSetModalSummary.textContent = selected.length
+        ? `已选择 ${selected.length} 个额外 2 件套`
+        : "未选择额外 2 件套"
+    if (els.applyTwoPieceSetModalBtn) {
+        const current = selectedValues(els.twoPieceSetSelect).sort().join("|")
+        const draft = [...(twoPieceSetDraftIds ?? [])].sort().join("|")
+        els.applyTwoPieceSetModalBtn.disabled = current === draft
+    }
+}
+
+function updateFourPieceSetModalSummary() {
+    if (!els.fourPieceSetModalSummary) {
+        return
+    }
+    const selectedId = fourPieceSetDraftId ?? els.fourPieceSetSelect.value
+    const set = driveDiscSetById(selectedId)
+    els.fourPieceSetModalSummary.textContent = set ? `已选择 ${nameOf(set)}` : "未选择限定 4 件套"
+    if (els.applyFourPieceSetModalBtn) {
+        els.applyFourPieceSetModalBtn.disabled = selectedId === els.fourPieceSetSelect.value
+    }
 }
 
 function twoPieceSetEffectText(set) {
@@ -5479,6 +5631,7 @@ function setFourPieceSetSelected(setId) {
 }
 
 function openFourPieceSetModal() {
+    fourPieceSetDraftId = els.fourPieceSetSelect.value
     syncFourPieceSetChoices()
     els.fourPieceSetModal.hidden = false
     document.body.classList.add("modal-open")
@@ -5487,9 +5640,12 @@ function openFourPieceSetModal() {
 function closeFourPieceSetModal() {
     els.fourPieceSetModal.hidden = true
     document.body.classList.remove("modal-open")
+    fourPieceSetDraftId = null
+    syncFourPieceSetChoices()
 }
 
 function openTwoPieceSetModal() {
+    twoPieceSetDraftIds = selectedValues(els.twoPieceSetSelect)
     syncTwoPieceSetChoices()
     els.twoPieceSetModal.hidden = false
     document.body.classList.add("modal-open")
@@ -5498,6 +5654,30 @@ function openTwoPieceSetModal() {
 function closeTwoPieceSetModal() {
     els.twoPieceSetModal.hidden = true
     document.body.classList.remove("modal-open")
+    twoPieceSetDraftIds = null
+    syncTwoPieceSetChoices()
+}
+
+async function applyFourPieceSetModalSelection() {
+    if (fourPieceSetDraftId !== null && fourPieceSetDraftId !== els.fourPieceSetSelect.value) {
+        els.fourPieceSetSelect.value = fourPieceSetDraftId
+        syncFourPieceSetChoices()
+        els.fourPieceSetSelect.dispatchEvent(new Event("change", { bubbles: true }))
+    }
+    closeFourPieceSetModal()
+}
+
+async function applyTwoPieceSetModalSelection() {
+    if (twoPieceSetDraftIds) {
+        const current = selectedValues(els.twoPieceSetSelect).sort().join("|")
+        const draft = [...twoPieceSetDraftIds].sort().join("|")
+        if (current !== draft) {
+            setSelectedValues(els.twoPieceSetSelect, twoPieceSetDraftIds)
+            syncTwoPieceSetChoices()
+            els.twoPieceSetSelect.dispatchEvent(new Event("change", { bubbles: true }))
+        }
+    }
+    closeTwoPieceSetModal()
 }
 
 function clearTwoPieceSetLimits() {
@@ -7292,8 +7472,24 @@ document.querySelector(".optimizer-settings-grid").addEventListener("click", eve
 })
 els.openTwoPieceSetModalBtn?.addEventListener("click", openTwoPieceSetModal)
 els.closeTwoPieceSetModalBtn?.addEventListener("click", closeTwoPieceSetModal)
+els.cancelTwoPieceSetModalBtn?.addEventListener("click", closeTwoPieceSetModal)
+els.applyTwoPieceSetModalBtn?.addEventListener("click", async () => {
+    try {
+        await applyTwoPieceSetModalSelection()
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
+})
 els.openFourPieceSetModalBtn?.addEventListener("click", openFourPieceSetModal)
 els.closeFourPieceSetModalBtn?.addEventListener("click", closeFourPieceSetModal)
+els.cancelFourPieceSetModalBtn?.addEventListener("click", closeFourPieceSetModal)
+els.applyFourPieceSetModalBtn?.addEventListener("click", async () => {
+    try {
+        await applyFourPieceSetModalSelection()
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
+})
 els.twoPieceSelectedSummary?.addEventListener("click", event => {
     const remove = event.target.closest("[data-remove-two-piece-set]")
     if (!remove) {
@@ -7310,7 +7506,8 @@ els.fourPieceSetModal?.addEventListener("change", event => {
     if (!event.target.matches("[data-four-piece-set-limit]")) {
         return
     }
-    setFourPieceSetSelected(event.target.value)
+    fourPieceSetDraftId = event.target.value
+    syncFourPieceSetChoices()
 })
 els.twoPieceSetModal?.addEventListener("click", event => {
     if (event.target.matches("[data-close-two-piece-set-modal]")) {
@@ -7321,8 +7518,14 @@ els.twoPieceSetModal?.addEventListener("change", event => {
     if (!event.target.matches("[data-two-piece-set-limit]")) {
         return
     }
-    event.target.closest(".two-piece-choice")?.classList.toggle("active", event.target.checked)
-    setTwoPieceSetSelected(event.target.value, event.target.checked)
+    const selected = new Set(twoPieceSetDraftIds ?? selectedValues(els.twoPieceSetSelect))
+    if (event.target.checked) {
+        selected.add(event.target.value)
+    } else {
+        selected.delete(event.target.value)
+    }
+    twoPieceSetDraftIds = [...selected]
+    syncTwoPieceSetChoices()
 })
 document.querySelector(".optimizer-main-stat-grid").addEventListener("change", event => {
     if (!event.target.matches("[data-main-stat-limit]")) {
@@ -7576,6 +7779,7 @@ els.damageSkillSearchInput?.addEventListener("input", event => {
 })
 els.openCalculationConfigBtn?.addEventListener("click", openCalculationConfigModal)
 els.closeCalculationConfigModalBtn?.addEventListener("click", closeCalculationConfigModal)
+els.cancelCalculationConfigBtn?.addEventListener("click", () => closeCalculationConfigModal())
 els.calculationConfigModal?.addEventListener("click", async event => {
     if (event.target.matches("[data-close-calculation-config-modal]")) {
         closeCalculationConfigModal()
@@ -7627,7 +7831,7 @@ els.calculationConfigModal?.addEventListener("click", async event => {
             : events[0]?.id ?? null
         syncCalculationConfigSummary()
         renderCalculationObjectiveControls()
-        closeCalculationConfigModal()
+        closeCalculationConfigModal({ restore: false })
         await refreshAfterConfigChange()
     }
 })
@@ -7717,6 +7921,14 @@ els.damageSkillModal?.addEventListener("click", async event => {
 })
 els.openCombatBuffModalBtn.addEventListener("click", () => openCombatBuffModal())
 els.closeCombatBuffModalBtn.addEventListener("click", closeCombatBuffModal)
+els.cancelCombatBuffModalBtn?.addEventListener("click", closeCombatBuffModal)
+els.applyCombatBuffModalBtn?.addEventListener("click", async () => {
+    try {
+        await applyCombatBuffModalSelection()
+    } catch (error) {
+        setStatus(error.message, "error")
+    }
+})
 els.combatBuffModal.addEventListener("click", async event => {
     if (event.target.matches("[data-close-combat-buff-modal]")) {
         closeCombatBuffModal()
@@ -7731,9 +7943,8 @@ els.combatBuffModal.addEventListener("click", async event => {
     if (event.target === els.addTeammateBuffsBtn) {
         try {
             if (addSelectedTeammateBuffs()) {
-                renderCombatControls()
                 renderCombatBuffCandidates()
-                await refreshAfterConfigChange()
+                setStatus("已加入本次选择", "idle")
             }
         } catch (error) {
             setStatus(error.message, "error")
@@ -7744,9 +7955,8 @@ els.combatBuffModal.addEventListener("click", async event => {
     if (event.target === els.removeTeammateBuffsBtn) {
         try {
             if (removeSelectedTeammateBuffs()) {
-                renderCombatControls()
                 renderCombatBuffCandidates()
-                await refreshAfterConfigChange()
+                setStatus("已从本次选择移除", "idle")
             }
         } catch (error) {
             setStatus(error.message, "error")
@@ -7762,9 +7972,8 @@ els.combatBuffModal.addEventListener("click", async event => {
                 ? removeCombatBuffCandidateByKey(candidate.dataset.candidateKey)
                 : addCombatBuffCandidateByKey(candidate.dataset.candidateKey)
             if (changed) {
-                closeCombatBuffModal()
-                renderCombatControls()
-                await refreshAfterConfigChange()
+                renderCombatBuffCandidates()
+                setStatus(alreadyAdded ? "已从本次选择移除" : "已加入本次选择", "idle")
             }
         } catch (error) {
             setStatus(error.message, "error")
@@ -7800,9 +8009,8 @@ els.combatBuffModal.addEventListener("change", event => {
                     ? addCombatBuffCandidateByKey(event.target.dataset.candidateCheckKey)
                     : removeCombatBuffCandidateByKey(event.target.dataset.candidateCheckKey)
                 if (changed) {
-                    renderCombatControls()
                     renderCombatBuffCandidates()
-                    await refreshAfterConfigChange()
+                    setStatus(event.target.checked ? "已加入本次选择" : "已从本次选择移除", "idle")
                 } else {
                     renderCombatBuffCandidates()
                 }
@@ -7854,8 +8062,8 @@ els.saveCustomBuffBtn.addEventListener("click", async () => {
             setStatus("自定义 Buff 至少需要一个非零属性", "error")
             return
         }
-        saveCurrentAddedCombatBuffs([
-            ...currentAddedCombatBuffs(),
+        setCombatBuffDraftAddedBuffs([
+            ...activeCombatBuffModalAddedBuffs(),
             {
                 id: `custom-${Date.now()}`,
                 sourceCategory: "custom",
@@ -7865,12 +8073,29 @@ els.saveCustomBuffBtn.addEventListener("click", async () => {
                 effects,
             },
         ])
-        closeCombatBuffModal()
         renderCustomBuffStatRows([{ optionIndex: 0, value: 0 }])
-        renderCombatControls()
-        await refreshAfterConfigChange()
+        renderCombatBuffCandidates()
+        setStatus("已加入本次选择", "idle")
     } catch (error) {
         setStatus(error.message, "error")
+    }
+})
+document.addEventListener("keydown", event => {
+    if (event.key !== "Escape") {
+        return
+    }
+    if (els.combatBuffModal && !els.combatBuffModal.hidden) {
+        event.preventDefault()
+        closeCombatBuffModal()
+    } else if (els.twoPieceSetModal && !els.twoPieceSetModal.hidden) {
+        event.preventDefault()
+        closeTwoPieceSetModal()
+    } else if (els.fourPieceSetModal && !els.fourPieceSetModal.hidden) {
+        event.preventDefault()
+        closeFourPieceSetModal()
+    } else if (els.calculationConfigModal && !els.calculationConfigModal.hidden) {
+        event.preventDefault()
+        closeCalculationConfigModal()
     }
 })
 els.driveDiscSchemeTabs?.addEventListener("click", event => {

@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { calculateInCombatPanel, loadCalculatorContext } from "../backend/calculator.js"
-import { analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "../backend/driveDiscAnalysis.js"
+import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "../backend/driveDiscAnalysis.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
@@ -88,6 +88,54 @@ const gains = analyzeDriveDiscStatGains(catalog, payload)
 const gainByStat = new Map(gains.stats.map(item => [item.stat, item]))
 const baseline = calculateInCombatPanel(catalog, payload)
 approx(gains.baseline.finalDamage, finalDamage(baseline), "Gain baseline should match full whitebox damage")
+
+const diffs = analyzeDriveDiscStatDiffs(catalog, payload)
+approx(diffs.baseline.finalDamage, finalDamage(baseline), "Diff baseline should match full whitebox damage")
+assert.deepEqual(
+    diffs.substatDiffs.map(item => item.stat),
+    [...diffs.substatDiffs].sort((left, right) =>
+        Number(right.absoluteDiff) - Number(left.absoluteDiff)
+        || String(left.stat).localeCompare(String(right.stat))
+    ).map(item => item.stat),
+    "Substat diffs should be sorted by current marginal damage gain.",
+)
+assert.ok(
+    diffs.substatDiffs.every(item => Number(item.absoluteDiff) !== 0),
+    "Substat diffs should hide stats with no current target relevance.",
+)
+
+const yePreferredSlot5 = catalog.agentsMap.get(payload.agentId)?.preferredDriveDiscs?.mainStatLimits?.["5"] ?? []
+const slot5Diffs = diffs.mainStatDiffsBySlot["5"]
+assert.equal(slot5Diffs.current.stat, "physicalDmg", "Fixture should keep the physical DMG slot-5 main stat.")
+assert.equal(slot5Diffs.source, "preferredDriveDiscs", "Main stat candidates should reuse the agent preferred drive-disc config.")
+assert.deepEqual(
+    slot5Diffs.candidates.map(item => item.stat).sort(),
+    yePreferredSlot5.filter(stat => stat !== "physicalDmg").sort(),
+    "Slot-5 main stat diffs should include only preferred alternatives except the current main stat.",
+)
+assert.equal(
+    slot5Diffs.candidates.some(item => item.stat === "physicalDmg"),
+    false,
+    "Slot-5 main stat diffs should not generate a fake -30 physical DMG row for the current physical disc.",
+)
+
+const firstSlot5Candidate = slot5Diffs.candidates[0]
+if (firstSlot5Candidate) {
+    const swappedMainStatDiscs = JSON.parse(JSON.stringify(driveDiscs))
+    swappedMainStatDiscs[4].mainStat = {
+        stat: firstSlot5Candidate.stat,
+        value: firstSlot5Candidate.value,
+    }
+    const fullSwapRecalc = calculateInCombatPanel(catalog, {
+        ...payload,
+        driveDiscs: swappedMainStatDiscs,
+    })
+    approx(
+        firstSlot5Candidate.finalDamage,
+        finalDamage(fullSwapRecalc),
+        "Main stat diff should match full recomputation with the replacement main stat.",
+    )
+}
 
 const atkPctPoint1 = gainByStat.get("atkPct").points[0]
 const withOneMoreAtkPctRoll = JSON.parse(JSON.stringify(driveDiscs))

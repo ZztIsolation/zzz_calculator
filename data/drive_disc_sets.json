@@ -404,57 +404,59 @@
       },
       "images": {
         "icon": "/assets/drive-discs/yunkui_tales.png",
-        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/05/31/82500917/dc6808d5dd3bc7b61298c1e235e8fbd6_6869244274463995040.png"
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
       },
       "sources": [
-        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46",
-        "https://zenless-zone-zero.fandom.com/wiki/Yunkui_Tales"
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
       ],
       "twoPiece": {
         "effects": [
           {
-            "id": "effect_wiki_1347_2pc",
+            "id": "effect-1",
             "type": "fixed",
             "stat": "hpPct",
             "value": 10,
-            "mode": "pct"
+            "mode": "pct",
+            "target": {
+              "kind": "default"
+            }
           }
-        ]
+        ],
+        "buffModifiers": []
       },
       "fourPiece": {
         "effectText": {
-          "zhCN": "发动[强化特殊技]、[连携技]、[终结技]时，暴击率提升4%，最多叠加3层，持续15秒，重复触发时刷新持续时间，拥有3层效果时，造成的贯穿伤害提升10%。"
+          "zhCN": "发动[强化特殊技]、[连携技]、[终结技]时，暴击率提升4%，最多叠加3层，持续15秒，重复触发时刷新持续时间，拥有3层效果时，造成的贯穿伤害提升10%。",
+          "en": ""
         },
         "selfBuff": {
           "condition": "发动[强化特殊技]、[连携技]、[终结技]后，默认按3层计算",
-          "durationSeconds": 15,
-          "coverage": {
-            "default": 1,
-            "min": 0,
-            "max": 1,
-            "step": 0.1
-          },
           "effects": [
             {
               "id": "effect_yunkui_tales_4pc_crit_rate",
               "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
               "stat": "critRate",
+              "mode": "flat",
               "valuePerStack": 4,
               "maxStacks": 3,
-              "defaultStacks": 3,
-              "mode": "flat"
+              "defaultStacks": 3
             },
             {
               "id": "effect_yunkui_tales_4pc_sheer_dmg",
               "type": "fixed",
-              "stat": "sheerDmgBonus",
-              "value": 10,
-              "mode": "flat",
               "target": {
                 "kind": "default"
-              }
+              },
+              "stat": "sheerDmgBonus",
+              "mode": "flat",
+              "value": 10
             }
-          ]
+          ],
+          "durationSeconds": 15,
+          "buffModifiers": []
         },
         "teamBuff": null
       }

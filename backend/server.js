@@ -5,7 +5,7 @@ import { createReadStream, existsSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { buildMeta, calculateInCombatPanel, calculateOutOfCombatPanel, loadCalculatorContext } from "./calculator.js"
-import { analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "./driveDiscAnalysis.js"
+import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "./driveDiscAnalysis.js"
 import { OptimizerCancelledError, optimizeDriveDiscs, optimizeDriveDiscsAsync, previewDriveDiscOptimization } from "./driveDiscOptimizer.js"
 import {
     accountSummary,
@@ -1337,6 +1337,24 @@ async function routeApi(req, res, pathname) {
             const body = await readBody(req)
             const input = JSON.parse(body || "{}")
             const result = analyzeDriveDiscSubstats(catalog, input)
+            sendJson(res, 200, {
+                ok: true,
+                data: result,
+            })
+        } catch (error) {
+            sendJson(res, 400, {
+                ok: false,
+                error: error instanceof Error ? error.message : String(error),
+            })
+        }
+        return
+    }
+
+    if (req.method === "POST" && pathname === "/api/analysis/drive-disc-stat-diffs") {
+        try {
+            const body = await readBody(req)
+            const input = JSON.parse(body || "{}")
+            const result = analyzeDriveDiscStatDiffs(catalog, input)
             sendJson(res, 200, {
                 ok: true,
                 data: result,

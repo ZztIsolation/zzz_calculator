@@ -2604,6 +2604,10 @@
               "valuePerStack": 8,
               "maxStacks": 2,
               "defaultStacks": 2,
+              "stackGroup": "qingming_companion",
+              "stackLabel": {
+                "zhCN": "青溟同行层数"
+              },
               "modificationValues": {
                 "valuePerStack": [
                   8,
@@ -2625,6 +2629,10 @@
               "valuePerStack": 10,
               "maxStacks": 2,
               "defaultStacks": 2,
+              "stackGroup": "qingming_companion",
+              "stackLabel": {
+                "zhCN": "青溟同行层数"
+              },
               "modificationValues": {
                 "valuePerStack": [
                   10,

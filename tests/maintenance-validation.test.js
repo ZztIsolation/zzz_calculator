@@ -678,6 +678,35 @@ const badStacked = {
 }
 assertInvalid("buffs", badStacked, "默认层数")
 
+const badSharedStackGroup = {
+    ...validBuff,
+    effects: [
+        {
+            id: "stack-a",
+            type: "stacked",
+            stat: "etherDmg",
+            mode: "flat",
+            valuePerStack: 8,
+            maxStacks: 2,
+            defaultStacks: 2,
+            stackGroup: "qingming_companion",
+            stackLabel: { zhCN: "青溟同行层数" },
+        },
+        {
+            id: "stack-b",
+            type: "stacked",
+            stat: "etherSheerDmg",
+            mode: "flat",
+            valuePerStack: 10,
+            maxStacks: 3,
+            defaultStacks: 2,
+            stackGroup: "qingming_companion",
+            stackLabel: { zhCN: "青溟同行层数" },
+        },
+    ],
+}
+assertInvalid("buffs", badSharedStackGroup, "共享层数组")
+
 const validFormula = {
     ...validBuff,
     effects: [
