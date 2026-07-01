@@ -1415,6 +1415,88 @@ const manualSkillMultiplier = calculateInCombatPanel(skillTargetCatalog, {
 approx(manualSkillMultiplier.damage.multipliers.directDamageBonus, 0, "Skill-targeted modifier should not match manual direct multiplier")
 approx(manualSkillMultiplier.damage.multipliers.skillMultiplierBonus, 0, "Skill-targeted multiplier bonus should not match manual direct multiplier")
 
+const juhufuBaseInput = {
+    agentId: "hoshimi_miyabi",
+    wEngineId: "hailfall_star_palace",
+    driveDiscs: [],
+    combatBuffs: {
+        activeBuffIds: ["juhufu.core_tiger_roar_crit_dmg"],
+    },
+}
+const juhufuChain = calculateInCombatPanel(catalog, {
+    ...juhufuBaseInput,
+    damage: {
+        skillRef: {
+            agentSkillId: "hoshimi_miyabi",
+            categoryId: "chain",
+            moveId: "chain_spring_arrival",
+            rowId: "damage",
+            level: 12,
+        },
+        target: {
+            defense: 953,
+            levelCoefficient: 794,
+        },
+    },
+})
+approx(juhufuChain.damage.multipliers.directDamageBonus, 0.2, "Juhufu core passive should boost all chain skills")
+assert.match(
+    juhufuChain.damage.whiteBoxRows.find(row => row.label === "增伤乘区")?.formula ?? "",
+    /技能专属增伤 20%/,
+)
+
+const juhufuUltimate = calculateInCombatPanel(catalog, {
+    ...juhufuBaseInput,
+    damage: {
+        skillRef: {
+            agentSkillId: "hoshimi_miyabi",
+            categoryId: "chain",
+            moveId: "ultimate_lingering_snow",
+            rowId: "damage",
+            level: 12,
+        },
+        target: {
+            defense: 953,
+            levelCoefficient: 794,
+        },
+    },
+})
+approx(juhufuUltimate.damage.multipliers.directDamageBonus, 0.4, "Juhufu core passive should boost all ultimate skills")
+assert.match(
+    juhufuUltimate.damage.whiteBoxRows.find(row => row.label === "增伤乘区")?.formula ?? "",
+    /技能专属增伤 40%/,
+)
+
+const juhufuBasic = calculateInCombatPanel(catalog, {
+    ...juhufuBaseInput,
+    damage: {
+        skillRef: {
+            agentSkillId: "hoshimi_miyabi",
+            categoryId: "basic",
+            moveId: "frost_moon",
+            rowId: "charge_3",
+            level: 12,
+        },
+        target: {
+            defense: 953,
+            levelCoefficient: 794,
+        },
+    },
+})
+approx(juhufuBasic.damage.multipliers.directDamageBonus, 0, "Juhufu chain/ultimate bonus should not boost other skills")
+
+const juhufuManualSkillMultiplier = calculateInCombatPanel(catalog, {
+    ...juhufuBaseInput,
+    damage: {
+        skillMultiplier: 500,
+        target: {
+            defense: 953,
+            levelCoefficient: 794,
+        },
+    },
+})
+approx(juhufuManualSkillMultiplier.damage.multipliers.directDamageBonus, 0, "Juhufu skill bonus should not match manual direct multipliers")
+
 const skillObjectTargetCatalog = cloneCatalog(catalog)
 skillObjectTargetCatalog.combatBuffs.push({
     id: "test.damage.skill_target_object_rules",

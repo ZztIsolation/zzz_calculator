@@ -1,6 +1,11 @@
 import assert from "node:assert/strict"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
 import { cleanMaintenanceItem } from "../backend/server.js"
+import { loadCalculatorContext } from "../backend/calculator.js"
 import { validateMaintenanceItem } from "../frontend/maintenanceValidation.js"
+
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 
 const validAgent = {
     id: "test_agent",
@@ -88,6 +93,9 @@ const validAgentSkill = {
         },
     ],
 }
+const catalog = await loadCalculatorContext(rootDir)
+const juhufuCoreBuff = catalog.combatBuffs.find(buff => buff.id === "juhufu.core_tiger_roar_crit_dmg")
+assert.ok(juhufuCoreBuff, "Juhufu core passive teammate Buff should exist")
 
 const validDriveDiscSetWithSplitFourPiece = {
     ...validDriveDiscSet,
@@ -1199,6 +1207,30 @@ const buffWithSkillTargetRules = {
     ],
 }
 assertValid("combat-buffs", buffWithSkillTargetRules)
+assertValid("combat-buffs", {
+    ...validBuff,
+    id: "test_skill_category_target",
+    scope: "inCombat",
+    effects: [
+        {
+            id: "effect-chain-dmg",
+            type: "fixed",
+            stat: "dmgBonus",
+            value: 20,
+            mode: "flat",
+            target: {
+                kind: "skill",
+                skillTargets: [
+                    {
+                        categoryId: "chain",
+                        moveIdPrefixes: ["chain_"],
+                    },
+                ],
+            },
+        },
+    ],
+})
+assertValid("combat-buffs", juhufuCoreBuff)
 assertValid("agents", {
     ...validAgent,
     combatBuffs: {
@@ -1319,7 +1351,7 @@ assertInvalid("combat-buffs", {
         },
     ],
 }, "不是支持的选项")
-assertInvalid("combat-buffs", {
+assertValid("combat-buffs", {
     ...buffWithDamageModifier,
     effects: [
         {
@@ -1330,14 +1362,13 @@ assertInvalid("combat-buffs", {
             appliesTo: {
                 skillTargets: [
                     {
-                        agentSkillId: "test_agent_skill",
                         categoryId: "basic",
                     },
                 ],
             },
         },
     ],
-}, "必须填写角色技能表、技能大类和招式")
+})
 assertValid("agents", {
     ...validAgent,
     combatBuffs: {

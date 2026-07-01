@@ -1623,7 +1623,7 @@
             "zhCN": "核心被动（F级）"
           },
           "description": {
-            "zhCN": "拥有[威风]时，橘福福可为全队施加[虎啸]，使全队暴击伤害提升20%；根据橘福福初始攻击力额外提升，合计最高50%。"
+            "zhCN": "拥有[威风]时，橘福福可为全队施加[虎啸]，使全队暴击伤害提升20%；根据橘福福初始攻击力额外提升，合计最高50%。[虎啸]状态下，角色的[连携技]造成的伤害提升20%，[终结技]造成的伤害提升40%。"
           },
           "scope": "inCombat",
           "effects": [
@@ -1636,6 +1636,42 @@
               "stat": "critDmg",
               "mode": "flat",
               "value": 50
+            },
+            {
+              "id": "juhufu_core_tiger_roar_chain_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "categoryId": "chain",
+                    "moveIdPrefixes": [
+                      "chain_"
+                    ]
+                  }
+                ]
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 20
+            },
+            {
+              "id": "juhufu_core_tiger_roar_ultimate_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "categoryId": "chain",
+                    "moveIdPrefixes": [
+                      "ultimate_"
+                    ]
+                  }
+                ]
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 40
             }
           ],
           "buffModifiers": []

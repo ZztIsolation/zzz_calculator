@@ -369,6 +369,14 @@ const DAMAGE_KIND_OPTIONS = [
     ["anomaly", "异常"],
     ["disorder", "紊乱"],
 ]
+const GENERIC_SKILL_CATEGORY_OPTIONS = [
+    ["basic", "普通攻击"],
+    ["dodge", "闪避"],
+    ["assist", "支援技"],
+    ["special", "特殊技"],
+    ["chain", "连携技"],
+    ["core_skill", "核心技"],
+]
 
 let catalog = null
 let activeKind = "agents"
@@ -1448,7 +1456,7 @@ function checkedValues(row, selector) {
 }
 
 function agentSkillOptions() {
-    return (rawCollections().agentSkills ?? []).map(skill => [skill.id, nameOf(skill)])
+    return [["", "全部角色"], ...(rawCollections().agentSkills ?? []).map(skill => [skill.id, nameOf(skill)])]
 }
 
 function agentSkillById(agentSkillId) {
@@ -1467,26 +1475,36 @@ function skillTargetLabel(target = {}) {
     const category = (skillSet?.categories ?? []).find(item => item.id === target.categoryId)
     const move = (category?.moves ?? []).find(item => item.id === target.moveId)
     const row = damageSkillRowsWithGeneratedTotals(category ?? {}, move ?? {}).find(item => item.id === target.rowId)
+    const categoryLabel = localized(category?.name) || target.categoryId
+    const prefixLabel = Array.isArray(target.moveIdPrefixes) && target.moveIdPrefixes.length
+        ? `${target.moveIdPrefixes.join(" / ")}*`
+        : ""
     return [
-        agentLabel,
+        agentLabel || "全部角色",
+        !target.moveId && !target.rowId ? categoryLabel : "",
         localized(move?.name) || target.moveId,
+        prefixLabel,
         target.rowId ? localized(row?.label) || target.rowId : "",
     ].filter(Boolean).join("/")
 }
 
 function skillTargetFieldsHtml(target = {}, targetIndex = 0) {
     const skills = agentSkillOptions()
-    const selectedSkillId = target.agentSkillId || skills[0]?.[0] || ""
+    const selectedSkillId = target.agentSkillId || ""
     const skillSet = agentSkillById(selectedSkillId)
-    const categories = skillSet?.categories ?? []
+    const categories = skillSet?.categories ?? GENERIC_SKILL_CATEGORY_OPTIONS.map(([id, label]) => ({ id, name: { zhCN: label }, moves: [] }))
     const selectedCategoryId = target.categoryId || categories[0]?.id || ""
     const category = categories.find(item => item.id === selectedCategoryId) ?? categories[0] ?? null
     const moves = category?.moves ?? []
-    const selectedMoveId = target.moveId || moves[0]?.id || ""
-    const move = moves.find(item => item.id === selectedMoveId) ?? moves[0] ?? null
+    const selectedMoveId = target.moveId || ""
+    const move = moves.find(item => item.id === selectedMoveId) ?? null
     const rowOptions = [
         ["", "整招式"],
         ...damageSkillRowsWithGeneratedTotals(category ?? {}, move ?? {}).map(row => [row.id, localized(row.label) || row.id]),
+    ]
+    const moveOptions = [
+        ["", "不限招式"],
+        ...moves.map(item => [item.id, localized(item.name) || item.id]),
     ]
     return `
         <div class="maintenance-skill-target-row" data-skill-target-row="${targetIndex}">
@@ -1500,7 +1518,11 @@ function skillTargetFieldsHtml(target = {}, targetIndex = 0) {
           </label>
           <label class="field">
             <span>招式</span>
-            <select data-effect-skill-target-move>${selectOptions(moves.map(item => [item.id, localized(item.name) || item.id]), selectedMoveId)}</select>
+            <select data-effect-skill-target-move>${selectOptions(moveOptions, selectedMoveId)}</select>
+          </label>
+          <label class="field">
+            <span>招式 ID 前缀</span>
+            <input type="text" data-effect-skill-target-move-prefixes value="${escapeHtml((target.moveIdPrefixes ?? []).join(", "))}" placeholder="如 chain_, ultimate_">
           </label>
           <label class="field">
             <span>倍率行</span>
@@ -1529,13 +1551,20 @@ function readSkillTargets(row) {
                 categoryId: targetRow.querySelector("[data-effect-skill-target-category]")?.value ?? "",
                 moveId: targetRow.querySelector("[data-effect-skill-target-move]")?.value ?? "",
             }
+            const moveIdPrefixes = String(targetRow.querySelector("[data-effect-skill-target-move-prefixes]")?.value ?? "")
+                .split(",")
+                .map(item => item.trim())
+                .filter(Boolean)
             const rowId = targetRow.querySelector("[data-effect-skill-target-row-id]")?.value ?? ""
             if (rowId) {
                 target.rowId = rowId
             }
+            if (moveIdPrefixes.length) {
+                target.moveIdPrefixes = moveIdPrefixes
+            }
             return target
         })
-        .filter(target => target.agentSkillId && target.categoryId && target.moveId)
+        .filter(target => target.agentSkillId || target.categoryId || target.moveId || target.rowId || target.moveIdPrefixes?.length)
 }
 
 function refreshSkillTargetRow(targetRow, target = null) {
@@ -1547,6 +1576,10 @@ function refreshSkillTargetRow(targetRow, target = null) {
         categoryId: targetRow.querySelector("[data-effect-skill-target-category]")?.value ?? "",
         moveId: targetRow.querySelector("[data-effect-skill-target-move]")?.value ?? "",
         rowId: targetRow.querySelector("[data-effect-skill-target-row-id]")?.value ?? "",
+        moveIdPrefixes: String(targetRow.querySelector("[data-effect-skill-target-move-prefixes]")?.value ?? "")
+            .split(",")
+            .map(item => item.trim())
+            .filter(Boolean),
     }
     const index = Number(targetRow.dataset.skillTargetRow ?? 0)
     targetRow.outerHTML = skillTargetFieldsHtml(current, index)

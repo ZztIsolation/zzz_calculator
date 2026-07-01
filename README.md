@@ -9,6 +9,18 @@ Chinese documentation is available in [README.zh-CN.md](README.zh-CN.md).
 
 ## Upload Update Summaries
 
+### 2026-07-01 Slim Scanner Packages
+
+This upload reduces the web-launched scanner download footprint without changing
+the browser workflow:
+
+- Rebuilt `ZZZ-Scanner-Helper.exe` as a NativeAOT helper, reducing the local
+  helper download from about 67.6MB to 7.4MB.
+- Repacked the `1.0.28` OCR scanner zip without unused video/diagnostic
+  payloads, reducing the package from about 129.9MB to 115.2MB.
+- Updated the scanner manifest hash/size and kept the same helper protocol,
+  scanner version, entry point, and OCR model.
+
 ### 2026-07-01 02:55 +08:00
 
 This upload fixes first-run OCR scanner preparation on the public Pages site:

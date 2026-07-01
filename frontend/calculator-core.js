@@ -2552,11 +2552,11 @@ function sheerTargetBreakdownForElement(panel, bonusTotals, target, damageElemen
 
 function damageModifierAppliesTo(modifier, event) {
     const appliesTo = modifier.appliesTo ?? {}
-    if (modifier.target?.kind === "skill" && (!Array.isArray(appliesTo.skillTargets) || !appliesTo.skillTargets.length)) {
+    const hasSkillTargets = Array.isArray(appliesTo.skillTargets) && appliesTo.skillTargets.length
+    if (modifier.target?.kind === "skill" && !hasSkillTargets) {
         return false
     }
-    if (["directDamageBonus", "skillMultiplierBonus"].includes(modifier.kind)
-        && (!Array.isArray(appliesTo.skillTargets) || !appliesTo.skillTargets.length)) {
+    if (["directDamageBonus", "skillMultiplierBonus"].includes(modifier.kind) && !hasSkillTargets) {
         return false
     }
     if (Array.isArray(appliesTo.damageKinds) && appliesTo.damageKinds.length) {
@@ -2593,16 +2593,22 @@ function skillTargetAppliesTo(target = {}, source = {}) {
     if (!target || typeof target !== "object") {
         return false
     }
-    if (!target.agentSkillId || !target.categoryId || !target.moveId) {
+
+    const hasMoveIdPrefixes = Array.isArray(target.moveIdPrefixes)
+        && target.moveIdPrefixes.some(prefix => String(prefix ?? "").trim())
+    if (!target.agentSkillId && !target.categoryId && !target.moveId && !target.rowId && !hasMoveIdPrefixes) {
         return false
     }
-    if (target.agentSkillId !== source.agentSkillId) {
+    if (target.agentSkillId && target.agentSkillId !== source.agentSkillId) {
         return false
     }
-    if (target.categoryId !== source.categoryId) {
+    if (target.categoryId && target.categoryId !== source.categoryId) {
         return false
     }
-    if (target.moveId !== source.moveId) {
+    if (target.moveId && target.moveId !== source.moveId) {
+        return false
+    }
+    if (hasMoveIdPrefixes && !target.moveIdPrefixes.some(prefix => source.moveId?.startsWith(String(prefix ?? "").trim()))) {
         return false
     }
     if (target.rowId) {

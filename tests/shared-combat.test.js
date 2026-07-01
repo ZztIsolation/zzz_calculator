@@ -181,6 +181,14 @@ assert.equal(
     "Field Buff runtime text should include effective coverage",
 )
 assert.equal(
+    skillTargetLabel({
+        categoryId: "chain",
+        moveIdPrefixes: ["ultimate_"],
+    }, meta),
+    "全部角色/chain/ultimate_*",
+    "Generic skill targets should display without pretending to target a specific agent",
+)
+assert.equal(
     nameOf({ bossName: { zhCN: "测试 BOSS" } }),
     "测试 BOSS",
     "Boss Buff cards should display bossName when no name is present",

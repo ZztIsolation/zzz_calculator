@@ -1133,9 +1133,15 @@ export function skillTargetLabel(target = {}, meta = {}) {
     const agentLabel = String(localizedText(agent?.name) || localizedText(skillSet?.name) || target.agentSkillId || "")
         .replace(/技能倍率$/, "")
         .trim()
+    const categoryLabel = localizedText(category?.name) || target.categoryId
+    const prefixLabel = Array.isArray(target.moveIdPrefixes) && target.moveIdPrefixes.length
+        ? `${target.moveIdPrefixes.join(" / ")}*`
+        : ""
     return [
-        agentLabel,
+        agentLabel || "全部角色",
+        !target.moveId && !target.rowId ? categoryLabel : "",
         localizedText(move?.name) || target.moveId,
+        prefixLabel,
         target.rowId ? localizedText(row?.label) || target.rowId : "",
     ].filter(Boolean).join("/")
 }

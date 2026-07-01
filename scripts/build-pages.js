@@ -38,8 +38,8 @@ await writeJson(path.join(outDir, "downloads", "zzz-scanner", "manifest.json"), 
         `${scannerMirrorBase}/${scannerZipName}`,
         `${scannerReleaseBase}/${scannerZipName}`,
     ],
-    sha256: "7930ae949589201713fa626ac7d77a2a0029cc2d726a64d1d8cdbe2db1ec6972",
-    size: 129866070,
+    sha256: "27bbe95181c33068cc833c913add7635065a9a238bb40d52ca6231b80fee5d08",
+    size: 115188606,
     entry: "ZZZ-Scanner.Next.exe",
 })
 

@@ -525,9 +525,23 @@ function validateSkillTarget(errors, target = {}, path) {
     validateOptionalId(errors, { id: target.categoryId }, `${path}.categoryId`)
     validateOptionalId(errors, { id: target.moveId }, `${path}.moveId`)
     validateOptionalId(errors, { id: target.rowId }, `${path}.rowId`)
+    if (target.moveIdPrefixes !== undefined) {
+        if (!Array.isArray(target.moveIdPrefixes)) {
+            add(errors, `${path}.moveIdPrefixes`, "必须是招式 ID 前缀数组。")
+        } else {
+            target.moveIdPrefixes.forEach((prefix, index) => {
+                const text = String(prefix ?? "").trim()
+                if (!text) {
+                    add(errors, `${path}.moveIdPrefixes[${index}]`, "不能为空。")
+                }
+            })
+        }
+    }
 
-    if (!target.agentSkillId || !target.categoryId || !target.moveId) {
-        add(errors, path, "必须填写角色技能表、技能大类和招式。")
+    const hasMoveIdPrefixes = Array.isArray(target.moveIdPrefixes)
+        && target.moveIdPrefixes.some(prefix => String(prefix ?? "").trim())
+    if (!target.agentSkillId && !target.categoryId && !target.moveId && !target.rowId && !hasMoveIdPrefixes) {
+        add(errors, path, "必须至少填写一个技能目标条件。")
     }
 }
 
