@@ -444,6 +444,8 @@ let pendingOptimizationCancelPromise = null
 let optimizationStartedAt = 0
 let optimizationPollTimer = null
 let optimizationElapsedTimer = null
+let optimizationWatchdogTimer = null
+let lastOptimizationWorkerMessageAt = 0
 let lastOptimizationProgress = null
 let activeOptimizationSettingsSnapshot = null
 let activeOptimizationAgentIdSnapshot = null
@@ -477,6 +479,8 @@ const combatUi = SharedCombat.createCombatUiController({
     includeDriveDiscBuffs: false,
     preserveHiddenDriveDiscBuffs: true,
 })
+
+const OPTIMIZER_WORKER_STALL_TIMEOUT_MS = 2 * 60 * 1000
 
 function setStatus(text, tone = "idle") {
     setStatusChip(els.status, text, tone)
@@ -568,6 +572,10 @@ function stopOptimizationTimers() {
         clearInterval(optimizationElapsedTimer)
         optimizationElapsedTimer = null
     }
+    if (optimizationWatchdogTimer) {
+        clearInterval(optimizationWatchdogTimer)
+        optimizationWatchdogTimer = null
+    }
 }
 
 function disposeActiveOptimizationWorker() {
@@ -578,9 +586,48 @@ function disposeActiveOptimizationWorker() {
     activeOptimizationWorker = null
 }
 
+function cloneOptimizerDriveDisc(disc = {}, ownerId = "default") {
+    return {
+        id: disc.id,
+        ownerId: disc.ownerId ?? ownerId,
+        setId: disc.setId,
+        setName: disc.setName,
+        partition: disc.partition,
+        rarity: disc.rarity,
+        level: disc.level,
+        maxLevel: disc.maxLevel,
+        locked: Boolean(disc.locked),
+        equippedBy: disc.equippedBy ?? null,
+        mainStat: disc.mainStat ? { ...disc.mainStat } : null,
+        subStats: Array.isArray(disc.subStats) ? disc.subStats.map(stat => ({ ...stat })) : [],
+        source: disc.source
+            ? {
+                type: disc.source.type,
+                sequence: disc.source.sequence,
+                rawIndex: disc.source.rawIndex,
+            }
+            : undefined,
+    }
+}
+
+function optimizerStorePayload(sourceStore = store) {
+    const ownerId = sourceStore?.currentOwnerId ?? SharedCombat.currentAccountId()
+    const owner = (sourceStore?.owners ?? []).find(item => item.id === ownerId)
+    return {
+        version: sourceStore?.version ?? 1,
+        currentOwnerId: ownerId,
+        owners: [owner ?? { id: ownerId, label: ownerId || "默认用户" }],
+        imports: [],
+        driveDiscLoadouts: [],
+        driveDiscs: (sourceStore?.driveDiscs ?? [])
+            .filter(disc => (disc.ownerId ?? "default") === ownerId)
+            .map(disc => cloneOptimizerDriveDisc(disc, ownerId)),
+    }
+}
+
 function progressTextForStatus(status) {
     if (status === "preparing") {
-        return "正在准备计算"
+        return "正在准备候选数据"
     }
     if (status === "preview") {
         return "已完成计算预估"
@@ -730,8 +777,12 @@ function renderOptimizationProgress(job = {}) {
     const candidateText = Object.keys(candidateCounts).length
         ? `候选 ${Object.entries(candidateCounts).map(([slot, count]) => `${slot}号位 ${formatCount(count)}`).join(" / ")}`
         : ""
+    const preparingHint = merged.status === "preparing" && !estimated
+        ? "正在构建候选与剪枝计划，仓库较大时这一步会先停在 0%"
+        : ""
     const progressNote = [
         progressTextForStatus(merged.status),
+        preparingHint,
         algorithmProgressText(metrics),
         candidateText,
         complexityText(metrics, merged.settings),
@@ -6693,10 +6744,26 @@ function startOptimizationTimers() {
             return
         }
         renderOptimizationProgress({
-            status: "running",
+            status: lastOptimizationProgress?.status ?? "preparing",
             elapsedMs: Date.now() - optimizationStartedAt,
         })
     }, 250)
+    optimizationWatchdogTimer = setInterval(() => {
+        if (!activeOptimizationJobId || pendingOptimizationCancelPromise) {
+            return
+        }
+        const lastMessageAt = lastOptimizationWorkerMessageAt || optimizationStartedAt
+        if (Date.now() - lastMessageAt < OPTIMIZER_WORKER_STALL_TIMEOUT_MS) {
+            return
+        }
+        finishOptimizationJob({
+            status: "error",
+            error: "优化 Worker 长时间没有返回进度，已自动停止。请收窄 2 件套或主词条后重试。",
+            elapsedMs: Date.now() - optimizationStartedAt,
+        }).catch(error => {
+            setStatus(errorMessage(error), "error")
+        })
+    }, 1000)
 }
 
 async function finishOptimizationJob(job) {
@@ -6835,16 +6902,17 @@ async function runOptimization() {
         percent: 0,
         elapsedMs: 0,
     })
+    const optimizerStore = optimizerStorePayload(store)
     const payload = {
         ...collectRequestPayload({ driveDiscs: [] }),
         settings: collectOptimizationSettings(),
-        store,
     }
     activeOptimizationSettingsSnapshot = structuredClone(payload.settings)
     activeOptimizationAgentIdSnapshot = payload.agentId
     const jobId = `local-${Date.now()}-${Math.random().toString(36).slice(2)}`
     activeOptimizationJobId = jobId
     optimizationStartedAt = Date.now()
+    lastOptimizationWorkerMessageAt = optimizationStartedAt
     const worker = new Worker(new URL("./optimizer-worker.js", import.meta.url), { type: "module" })
     activeOptimizationWorker = worker
     worker.onmessage = async event => {
@@ -6852,6 +6920,7 @@ async function runOptimization() {
         if (message.runId !== activeOptimizationJobId || pendingOptimizationCancelPromise) {
             return
         }
+        lastOptimizationWorkerMessageAt = Date.now()
         if (message.type === "preview" || message.type === "progress") {
             renderOptimizationProgress(message.job)
             return
@@ -6870,18 +6939,18 @@ async function runOptimization() {
             elapsedMs: Date.now() - optimizationStartedAt,
         })
     }
+    startOptimizationTimers()
     worker.postMessage({
         type: "start",
         runId: jobId,
         catalog: meta,
-        store,
+        store: optimizerStore,
         input: payload,
         settings: {
             progressIntervalMs: 250,
             yieldIntervalMs: 50,
         },
     })
-    startOptimizationTimers()
 }
 
 async function saveActiveLoadout() {
