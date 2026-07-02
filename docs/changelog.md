@@ -29,7 +29,8 @@ The new OCR package metadata is:
 
 Updated `scripts/build-pages.js`, the local ignored scanner manifest, the
 scanner helper download links, and `tests/scanner-bridge.test.js` to use the
-GitHub Release tag `scanner-1.0.34`.
+GitHub Release tag `scanner-1.0.34`. Helper `1.0.2` is now required for the
+download link so users get the fixed progress/resume behavior.
 
 ### Runtime Behavior
 
@@ -39,6 +40,15 @@ The web `scan_req` payload remains on the stable 1.0.33/1.0.34 route:
 `scrollAcceptMode=early-one-row`, `postScrollPanelAcceptMode=safe`, and
 `panelMinAcceptFloorMs=120`. The page still does not send `ocrFastIndex` or
 `includeNon15`.
+
+### Helper Resume Fix
+
+Helper `1.0.1` could report `45.04 MB / 45.04 MB, 100.0%` and then retry with a
+Range request starting at the file end. GitHub correctly answered `416 Range
+Not Satisfiable`, which surfaced as a failed scanner preparation even though
+the bytes were already present. Helper `1.0.2` treats an exact-size `.download`
+file as complete and moves it into the package cache so the normal size/SHA-256
+verification can decide whether it is valid.
 
 ### Verification
 

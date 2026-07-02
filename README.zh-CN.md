@@ -13,7 +13,7 @@
 - OCR 运行时重新来自本机 `publish 1.0.34`，压包时排除生成的 `Scans` 输出，并保留包内 `Data/ocr_fast_templates.json`。
 - Pages scanner manifest 和本地 package manifest 已更新为 `scannerVersion=1.0.34`。
 - OCR zip 已发布到 GitHub Release tag `scanner-1.0.34`，SHA-256 为 `d87a993e15a0f9103942b0284d8d5fc552bed348147180682ef42f7b0fc51c30`，大小 `47228531` bytes。
-- 网页扫描 payload 继续保持稳定 strict DXGI 路线，并复用 Helper `1.0.1`，首次下载仍会显示字节数、百分比、速度和重试次数。
+- 网页扫描 payload 继续保持稳定 strict DXGI 路线，并刷新 Helper `1.0.2`：完整下载后的临时包会先进入校验流程，不会继续发 Range 重试；首次下载仍会显示字节数、百分比、速度和重试次数。
 
 ### 2026-07-02 扫描器 1.0.33 与弹窗流程更新
 

@@ -21,9 +21,9 @@ This upload replaces the web-launched OCR runtime with ZZZ Scanner Next
 - Published the OCR zip under GitHub Release tag `scanner-1.0.34` with SHA-256
   `d87a993e15a0f9103942b0284d8d5fc552bed348147180682ef42f7b0fc51c30` and size
   `47228531` bytes.
-- Kept the web scan payload on the stable strict DXGI route and reused Helper
-  `1.0.1` so first-run downloads still show bytes, percentage, speed, and
-  retries.
+- Kept the web scan payload on the stable strict DXGI route and refreshed
+  Helper `1.0.2`, which accepts a fully downloaded temporary package before
+  retrying Range requests and still shows bytes, percentage, speed, and retries.
 
 ### 2026-07-02 Scanner 1.0.33 and Modal Workflow Update
 

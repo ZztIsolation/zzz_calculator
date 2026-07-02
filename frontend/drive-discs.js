@@ -1560,7 +1560,7 @@ function formatByteCount(bytes) {
     return `${value.toFixed(digits)} ${units[unitIndex]}`
 }
 
-function helperVersionAtLeast(actual = "", required = "1.0.1") {
+function helperVersionAtLeast(actual = "", required = "1.0.2") {
     const parse = value => String(value).split(".").map(part => Number(part) || 0)
     const current = parse(actual)
     const target = parse(required)
