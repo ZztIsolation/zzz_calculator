@@ -9,6 +9,24 @@ Chinese documentation is available in [README.zh-CN.md](README.zh-CN.md).
 
 ## Upload Update Summaries
 
+### 2026-07-02 Scanner 1.0.35 Cloud Client Selection
+
+This upload adds an explicit Drive Disc scanner client switch. The default
+remains local Zenless Zone Zero, while Cloud Zenless Zone Zero sends
+`processName="Zenless Zone Zero Cloud"` and `visualProfileClient="cloud"` so
+the scanner can use the bundled cloud visual profiles.
+
+- Repacked the OCR runtime from local `publish 1.0.35`, excluding generated
+  `Scans` output while keeping the bundled `Data/ocr_fast_templates.json`.
+- Updated the Pages scanner manifest and local package manifest to
+  `scannerVersion=1.0.35`.
+- Published the OCR zip under GitHub Release tag `scanner-1.0.35` with SHA-256
+  `2a10aa3dc92e50c7ea930d75eda82fef741eff16e8c39f2839240b6fc36b0255` and size
+  `47228425` bytes.
+- The web scan payload still uses the stable strict DXGI route, now with an
+  explicit local/cloud target so cloud scans no longer search for the local
+  `ZenlessZoneZero` process.
+
 ### 2026-07-02 Scanner 1.0.34 Release
 
 This upload replaces the web-launched OCR runtime with ZZZ Scanner Next
@@ -435,7 +453,7 @@ currently uses the verified GitHub Release package. The helper registers
 `zzz-scanner://`, connects back to the page on
 `127.0.0.1:22355`, and downloads the OCR scanner package declared by
 `/downloads/zzz-scanner/manifest.json` when needed. The current scanner package
-is ZZZ Scanner Next `1.0.34`.
+is ZZZ Scanner Next `1.0.35`.
 
 Main pages:
 
@@ -483,7 +501,7 @@ same command from `main` and deploys the Pages artifact; do not commit
 
 Publish Helper and OCR packages through GitHub Releases instead of Git:
 
-- tag: `scanner-1.0.34`
+- tag: `scanner-1.0.35`
 - `ZZZ-Scanner-Helper.exe`
 - `ZZZ-Scanner.Next-win-x64.zip`
 

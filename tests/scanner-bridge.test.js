@@ -52,12 +52,12 @@ function assertScannerPackageManifest() {
     }
 
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
-    const localPackageUrl = "./1.0.34/ZZZ-Scanner.Next-win-x64.zip"
-    const mirrorPackageUrl = "http://121.199.21.10/downloads/zzz-scanner/1.0.34/ZZZ-Scanner.Next-win-x64.zip"
+    const localPackageUrl = "./1.0.35/ZZZ-Scanner.Next-win-x64.zip"
+    const mirrorPackageUrl = "http://121.199.21.10/downloads/zzz-scanner/1.0.35/ZZZ-Scanner.Next-win-x64.zip"
     const packagePath = normalize(join(scannerRoot, localPackageUrl))
 
-    assert.equal(manifest.scannerVersion, "1.0.34")
-    assert.equal(manifest.packageUrl, "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.34/ZZZ-Scanner.Next-win-x64.zip")
+    assert.equal(manifest.scannerVersion, "1.0.35")
+    assert.equal(manifest.packageUrl, "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.35/ZZZ-Scanner.Next-win-x64.zip")
     assert.ok(Array.isArray(manifest.packageUrls))
     assert.equal(manifest.packageUrls[0], manifest.packageUrl)
     assert.ok(manifest.packageUrls.includes(manifest.packageUrl))
@@ -122,6 +122,9 @@ try {
             rarities: ["S", "A"],
             stopAtNonLevel15: true,
             profileName: "",
+            processName: "ZenlessZoneZero",
+            visualProfileClient: "local",
+            visualProfileQuality: "current",
             fastMode: true,
             captureMode: "dxgi",
             profileRouting: "strict",
@@ -132,6 +135,16 @@ try {
             panelMinAcceptFloorMs: 120,
         },
     })
+
+    bridge.startScan({
+        maxItems: 3,
+        processName: "Zenless Zone Zero Cloud",
+        visualProfileClient: "cloud",
+        visualProfileQuality: "current",
+    })
+    assert.equal(HelperSocket.last.sent.data.processName, "Zenless Zone Zero Cloud")
+    assert.equal(HelperSocket.last.sent.data.visualProfileClient, "cloud")
+    assert.equal(HelperSocket.last.sent.data.visualProfileQuality, "current")
 
     let completedItems = null
     bridge.onComplete = (data) => {
@@ -148,7 +161,7 @@ try {
     globalThis.fetch = async (url) => {
         fetchUrls.push(String(url))
         if (String(url).endsWith("/")) {
-            return okJson({ scanner: { installed: true, version: "1.0.34" } })
+            return okJson({ scanner: { installed: true, version: "1.0.35" } })
         }
         return okJson({ token: "ready" })
     }

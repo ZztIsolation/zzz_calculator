@@ -6039,6 +6039,22 @@ button.optimizer-disc-row:disabled {
   white-space: nowrap;
 }
 
+.scan-client-option {
+  flex-basis: 100%;
+  gap: 8px;
+}
+
+.scan-client-toggle {
+  grid-template-columns: repeat(2, minmax(108px, 1fr));
+}
+
+.scan-client-toggle button {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
 .scan-max-input {
   width: 70px;
   padding: 4px 8px;

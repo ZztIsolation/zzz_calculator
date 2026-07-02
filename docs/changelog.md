@@ -6,6 +6,64 @@ This changelog is the long-form maintenance log for `zzz_calculator`. Every
 future change to the Zenless Zone Zero calculator should be appended here with
 the reason, the files touched, the model impact, and the verification performed.
 
+## 2026-07-02 - Published Scanner 1.0.35 With Cloud Client Selection
+
+### Request Context
+
+The Drive Disc scanner page needed a visible "本地绝区零 / 云绝区零" selector
+because the 1.0.34 runtime already contained cloud Fast OCR templates, but the
+web request still targeted the default local `ZenlessZoneZero` process. Users
+who opened Cloud Zenless Zone Zero therefore failed before OCR started with
+`未找到游戏窗口进程：ZenlessZoneZero`.
+
+### UI And Payload Changes
+
+Added a segmented client selector to `frontend/drive-discs.html`. It defaults
+to "本地绝区零" and disables while a scan is running. `frontend/drive-discs.js`
+maps the selected client to the exact process/profile pair:
+
+- local: `processName="ZenlessZoneZero"`, `visualProfileClient="local"`
+- cloud: `processName="Zenless Zone Zero Cloud"`, `visualProfileClient="cloud"`
+
+`frontend/scanner-bridge.js` now includes `processName`,
+`visualProfileClient`, and `visualProfileQuality="current"` in every
+`scan_req`, while preserving the stable strict DXGI route:
+`fastMode=true`, `captureMode=dxgi`, `profileRouting=strict`,
+`overlapConflictMode=recover`, `panelAcceptMode=adaptive-early-full-roi`,
+`scrollAcceptMode=early-one-row`, `postScrollPanelAcceptMode=safe`, and
+`panelMinAcceptFloorMs=120`.
+
+### Scanner Runtime Package
+
+Updated ZZZ Scanner Next WebSocket handling so `scan_req.processName` overrides
+the default `ScanOptions.ProcessName`. Without this runtime change, the page
+could send the cloud process name but an already cached 1.0.34 scanner would
+still look for `ZenlessZoneZero`.
+
+Repacked `E:\yan1\zzz\ZZZ-Scanner.Next\publish 1.0.35` into
+`downloads/zzz-scanner/1.0.35/ZZZ-Scanner.Next-win-x64.zip`. The package
+excludes `Scans`, includes `Data/ocr_fast_templates.json`, and contains
+`ZZZ-Scanner.Next.exe` with file version `1.0.35.0`.
+
+The new OCR package metadata is:
+
+- SHA-256: `2a10aa3dc92e50c7ea930d75eda82fef741eff16e8c39f2839240b6fc36b0255`
+- size: `47228425`
+- entry: `ZZZ-Scanner.Next.exe`
+
+Updated `scripts/build-pages.js`, the local ignored scanner manifest, scanner
+helper download links, README files, and `tests/scanner-bridge.test.js` to use
+the GitHub Release tag `scanner-1.0.35`.
+
+### Verification
+
+Ran:
+
+- `npm run test:scanner-bridge`
+- `dotnet build ZZZ-Scanner.Next.csproj -c Release`
+- `dotnet publish ZZZ-Scanner.Next.csproj -c Release -r win-x64 --self-contained false -p:DebugType=none -p:DebugSymbols=false -o "publish 1.0.35"`
+- `npm run build:pages`
+
 ## 2026-07-02 - Published Scanner 1.0.34
 
 ### Request Context

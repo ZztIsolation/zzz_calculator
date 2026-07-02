@@ -90,6 +90,8 @@ const els = {
     scanHelperGuide: document.getElementById("scanHelperGuide"),
     scanControls: document.getElementById("scanControls"),
     scanAutoRetry: document.getElementById("scanAutoRetry"),
+    scanClientLocal: document.getElementById("scanClientLocal"),
+    scanClientCloud: document.getElementById("scanClientCloud"),
     scanRarityS: document.getElementById("scanRarityS"),
     scanRarityA: document.getElementById("scanRarityA"),
     scanMaxItems: document.getElementById("scanMaxItems"),
@@ -103,6 +105,20 @@ const els = {
 }
 
 const EMPTY_DISC_IMAGE = "/assets/drive-discs/empty.svg"
+const SCAN_CLIENTS = {
+    local: {
+        label: "本地绝区零",
+        processName: "ZenlessZoneZero",
+        visualProfileClient: "local",
+    },
+    cloud: {
+        label: "云绝区零",
+        processName: "Zenless Zone Zero Cloud",
+        visualProfileClient: "cloud",
+    },
+}
+let activeScanClient = "local"
+
 const STAT_OPTIONS = [
     ["hpFlat", "生命值"],
     ["hpPct", "百分比生命值%"],
@@ -1539,6 +1555,19 @@ function setScanProgress(text, percent = null) {
     }
 }
 
+function setScanClient(client) {
+    activeScanClient = SCAN_CLIENTS[client] ? client : "local"
+    const isLocal = activeScanClient === "local"
+    els.scanClientLocal.classList.toggle("active", isLocal)
+    els.scanClientCloud.classList.toggle("active", !isLocal)
+    els.scanClientLocal.setAttribute("aria-pressed", String(isLocal))
+    els.scanClientCloud.setAttribute("aria-pressed", String(!isLocal))
+}
+
+function selectedScanClient() {
+    return SCAN_CLIENTS[activeScanClient] ?? SCAN_CLIENTS.local
+}
+
 function numericProgressValue(value) {
     const number = Number(value)
     return Number.isFinite(number) ? number : null
@@ -1607,11 +1636,14 @@ function launcherDownloadProgress(data = {}) {
 }
 
 function setScanningState(active) {
+    const client = selectedScanClient()
     els.scanStartBtn.hidden = active
     els.scanStopBtn.hidden = !active
     els.scanProgressArea.hidden = !active
     els.scanBtn.disabled = active
-    els.scanStatusText.textContent = active ? "扫描进行中..." : "扫描就绪"
+    els.scanClientLocal.disabled = active
+    els.scanClientCloud.disabled = active
+    els.scanStatusText.textContent = active ? `正在扫描${client.label}...` : "扫描就绪"
     if (active) {
         els.scanProgressFill.style.width = "0%"
         setScanProgress("准备中...")
@@ -1740,11 +1772,15 @@ async function startLiveScan() {
     clearPageNotice()
     bindScannerEvents()
     await scanner.ensureScanner()
+    const scanClient = selectedScanClient()
 
     scanner.startScan({
         maxItems: Number(els.scanMaxItems.value) || 0,
         rarities,
         stopAtNonLevel15: els.scanStopNon15.checked,
+        processName: scanClient.processName,
+        visualProfileClient: scanClient.visualProfileClient,
+        visualProfileQuality: "current",
         fastMode: true,
         captureMode: "dxgi",
         profileRouting: "strict",
@@ -1759,6 +1795,8 @@ async function startLiveScan() {
 els.scanBtn.addEventListener("click", () => tryConnectScanner())
 els.scanCloseBtn.addEventListener("click", () => closeScanModal())
 els.scanModal.querySelector("[data-close-scan-modal]")?.addEventListener("click", () => closeScanModal())
+els.scanClientLocal.addEventListener("click", () => setScanClient("local"))
+els.scanClientCloud.addEventListener("click", () => setScanClient("cloud"))
 els.scanStartBtn.addEventListener("click", () => startLiveScan())
 els.scanStopBtn.addEventListener("click", () => {
     scanner.stopScan()
