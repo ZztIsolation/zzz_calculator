@@ -6,6 +6,49 @@ This changelog is the long-form maintenance log for `zzz_calculator`. Every
 future change to the Zenless Zone Zero calculator should be appended here with
 the reason, the files touched, the model impact, and the verification performed.
 
+## 2026-07-02 - Published Scanner 1.0.34
+
+### Request Context
+
+The web-launched scanner needed to move from the current `1.0.33` package to
+the new local `publish 1.0.34` runtime and be uploaded to GitHub Releases plus
+deployed through GitHub Pages.
+
+### Package Changes
+
+Repacked `E:\yan1\zzz\ZZZ-Scanner.Next\publish 1.0.34` into
+`downloads/zzz-scanner/1.0.34/ZZZ-Scanner.Next-win-x64.zip`. The package
+excludes `Scans`, includes `Data/ocr_fast_templates.json`, and contains
+`ZZZ-Scanner.Next.exe` with file version `1.0.34.0`.
+
+The new OCR package metadata is:
+
+- SHA-256: `d87a993e15a0f9103942b0284d8d5fc552bed348147180682ef42f7b0fc51c30`
+- size: `47228531`
+- entry: `ZZZ-Scanner.Next.exe`
+
+Updated `scripts/build-pages.js`, the local ignored scanner manifest, the
+scanner helper download links, and `tests/scanner-bridge.test.js` to use the
+GitHub Release tag `scanner-1.0.34`.
+
+### Runtime Behavior
+
+The web `scan_req` payload remains on the stable 1.0.33/1.0.34 route:
+`fastMode=true`, `captureMode=dxgi`, `profileRouting=strict`,
+`overlapConflictMode=recover`, `panelAcceptMode=adaptive-early-full-roi`,
+`scrollAcceptMode=early-one-row`, `postScrollPanelAcceptMode=safe`, and
+`panelMinAcceptFloorMs=120`. The page still does not send `ocrFastIndex` or
+`includeNon15`.
+
+### Verification
+
+Ran:
+
+- `npm run build:pages`
+- `npm run test:scanner-bridge`
+- `node --check frontend\drive-discs.js`
+- `node --check frontend\scanner-bridge.js`
+
 ## 2026-07-02 - Published Scanner 1.0.33 and Batched Modal Updates
 
 ### Request Context

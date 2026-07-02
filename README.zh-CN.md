@@ -6,6 +6,15 @@
 
 ## 上传更新摘要
 
+### 2026-07-02 扫描器 1.0.34 发布
+
+本次上传将网页唤起的 OCR 运行时替换为 ZZZ Scanner Next `1.0.34`：
+
+- OCR 运行时重新来自本机 `publish 1.0.34`，压包时排除生成的 `Scans` 输出，并保留包内 `Data/ocr_fast_templates.json`。
+- Pages scanner manifest 和本地 package manifest 已更新为 `scannerVersion=1.0.34`。
+- OCR zip 已发布到 GitHub Release tag `scanner-1.0.34`，SHA-256 为 `d87a993e15a0f9103942b0284d8d5fc552bed348147180682ef42f7b0fc51c30`，大小 `47228531` bytes。
+- 网页扫描 payload 继续保持稳定 strict DXGI 路线，并复用 Helper `1.0.1`，首次下载仍会显示字节数、百分比、速度和重试次数。
+
 ### 2026-07-02 扫描器 1.0.33 与弹窗流程更新
 
 本次上传发布网页唤起的 ZZZ Scanner Next `1.0.33`，并一并提交当前优化器/仓库页的待提交 UI 更新：
@@ -249,7 +258,7 @@ npm start
 
 启动后打开终端打印的本地地址，通常是 `http://localhost:8787`。如需指定端口，可以使用 `PORT=8791 npm start`。
 
-驱动盘页的「扫描」会优先连接本地小助手。公开站点上的小助手下载按钮指向 GitHub Releases；本地 Node server 开发模式仍可从 `/downloads/ZZZ-Scanner-Helper.exe` 提供文件。OCR 包 manifest 当前使用已验证的 GitHub Release 新包。小助手会注册 `zzz-scanner://` 协议，在 `127.0.0.1:22355` 与网页通信，并按 `/downloads/zzz-scanner/manifest.json` 自动下载/更新真正的 OCR 扫描器大包。当前网页发布的大包版本是 ZZZ Scanner Next `1.0.33`。
+驱动盘页的「扫描」会优先连接本地小助手。公开站点上的小助手下载按钮指向 GitHub Releases；本地 Node server 开发模式仍可从 `/downloads/ZZZ-Scanner-Helper.exe` 提供文件。OCR 包 manifest 当前使用已验证的 GitHub Release 新包。小助手会注册 `zzz-scanner://` 协议，在 `127.0.0.1:22355` 与网页通信，并按 `/downloads/zzz-scanner/manifest.json` 自动下载/更新真正的 OCR 扫描器大包。当前网页发布的大包版本是 ZZZ Scanner Next `1.0.34`。
 
 主要页面：
 
@@ -283,7 +292,7 @@ npm run build:pages
 
 Helper 和 OCR 大包通过 GitHub Releases 发布，不进入 Git 仓库：
 
-- tag：`scanner-1.0.33`
+- tag：`scanner-1.0.34`
 - `ZZZ-Scanner-Helper.exe`
 - `ZZZ-Scanner.Next-win-x64.zip`
 
