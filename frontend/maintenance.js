@@ -1193,6 +1193,16 @@ function maintenanceDamageSkillCategories(skill = agentSkillForAgentId()) {
 
 function defaultCalculationEventDraft(kind = "direct") {
     const index = [...els.maintenanceForm.querySelectorAll("[data-default-calc-event-row]")].length + 1
+    if (kind === "skillGroup") {
+        const groups = readDefaultCalculationSkillGroups()
+        const group = groups[0]
+        return {
+            id: `skillGroup-${index}`,
+            kind: "skillGroup",
+            skillGroupId: group?.id ?? "",
+            count: Number(group?.defaultCount ?? 1),
+        }
+    }
     if (kind === "anomaly") {
         return {
             id: `anomaly-${index}`,
@@ -1247,6 +1257,9 @@ function disorderEffectMaintenanceOptions(selected = "") {
 }
 
 function defaultCalculationEventKind(event = {}) {
+    if (event.kind === "skillGroup") {
+        return "skillGroup"
+    }
     if (event.kind === "direct") {
         return "direct"
     }
@@ -1279,26 +1292,57 @@ function defaultCalcRowOptions(categoryId, moveId, selected = "") {
     return selectOptions((move?.rows ?? []).map(row => [row.id, localized(row.label) || row.id]), selected)
 }
 
-function defaultCalculationEventHtml(event = {}, index = 0, selectedEventId = "") {
+function defaultCalcSkillGroupOptions(selected = "") {
+    return selectOptions(readDefaultCalculationSkillGroups().map(group => [
+        group.id,
+        localized(group.name) || group.id,
+    ]), selected)
+}
+
+function defaultCalculationEventHtml(event = {}, index = 0, selectedEventId = "", options = {}) {
     void selectedEventId
     const kind = defaultCalculationEventKind(event)
     const usesSkill = ["direct", "sheer"].includes(kind)
+    const usesSkillGroup = kind === "skillGroup"
     const skill = agentSkillForAgentId()
     const categories = maintenanceDamageSkillCategories(skill)
     const skillRef = event.skillRef ?? defaultCalculationEventDraft("direct").skillRef ?? {}
     const categoryId = skillRef.categoryId || categories[0]?.id || ""
     const moveId = skillRef.moveId || categories.find(item => item.id === categoryId)?.moves?.[0]?.id || ""
     const rowId = skillRef.rowId || categories.find(item => item.id === categoryId)?.moves?.find(item => item.id === moveId)?.rows?.[0]?.id || ""
+    const isGroupEvent = Number.isInteger(options.groupIndex)
+    const rowAttr = isGroupEvent
+        ? `data-default-calc-group-event-row="${options.groupIndex}"`
+        : "data-default-calc-event-row"
+    const removeAttr = isGroupEvent
+        ? `data-remove-default-calc-group-event="${options.groupIndex}:${index}"`
+        : `data-remove-default-calc-event="${index}"`
+    const kindOptions = [
+        ["direct", "直伤"],
+        ["sheer", "贯穿"],
+        ["anomaly", "属性异常"],
+        ["disorder", "紊乱"],
+        ...(!isGroupEvent ? [["skillGroup", "技能组"]] : []),
+    ]
+    const group = readDefaultCalculationSkillGroups().find(item => item.id === event.skillGroupId)
+    const groupLimits = group ? {
+        min: Number(group.minCount ?? 0),
+        max: group.maxCount === undefined || group.maxCount === null || group.maxCount === "" ? null : Number(group.maxCount),
+        step: Number(group.step ?? 1),
+    } : { min: 0, max: null, step: 1 }
+    const countMax = groupLimits.max === null ? "" : ` max="${escapeHtml(groupLimits.max)}"`
     return `
-        <article class="maintenance-subcard" data-default-calc-event-row>
+        <article class="maintenance-subcard" ${rowAttr}>
           <div class="maintenance-section-head">
             <strong>计算事件</strong>
-            <button type="button" class="compact-btn danger-lite" data-remove-default-calc-event="${index}">删除</button>
+            <button type="button" class="compact-btn danger-lite" ${removeAttr}>删除</button>
           </div>
           <div class="maintenance-grid calculation-event-grid">
             <label class="field"><span>事件 ID</span><input data-default-calc-event-id value="${escapeHtml(event.id ?? `${kind}-${index + 1}`)}"></label>
-            <label class="field"><span>类型</span><select data-default-calc-kind>${selectOptions([["direct", "直伤"], ["sheer", "贯穿"], ["anomaly", "属性异常"], ["disorder", "紊乱"]], kind)}</select></label>
-            <label class="field"><span>次数</span><input data-default-calc-count type="number" min="0" step="1" value="${escapeHtml(event.count ?? 1)}"></label>
+            <label class="field"><span>类型</span><select data-default-calc-kind>${selectOptions(kindOptions, kind)}</select></label>
+            <label class="field"><span>次数</span><input data-default-calc-count type="number" min="${escapeHtml(groupLimits.min)}"${countMax} step="${escapeHtml(groupLimits.step)}" value="${escapeHtml(event.count ?? 1)}"></label>
+            <label class="field default-calc-skill-group-only"${usesSkillGroup ? "" : " hidden"}><span>技能组</span><select data-default-calc-skill-group>${defaultCalcSkillGroupOptions(event.skillGroupId)}</select></label>
+            <label class="field default-calc-skill-group-only"${usesSkillGroup ? "" : " hidden"}><span>组内事件</span><input type="text" value="${escapeHtml(Array.isArray(group?.events) ? `${group.events.length} 项` : "未选择")}" disabled></label>
             <label class="field default-calc-direct-only"${usesSkill ? "" : " hidden"}><span>技能大类</span><select data-default-calc-category>${defaultCalcCategoryOptions(categoryId)}</select></label>
             <label class="field default-calc-direct-only"${usesSkill ? "" : " hidden"}><span>招式</span><select data-default-calc-move>${defaultCalcMoveOptions(categoryId, moveId)}</select></label>
             <label class="field default-calc-direct-only"${usesSkill ? "" : " hidden"}><span>倍率行</span><select data-default-calc-row>${defaultCalcRowOptions(categoryId, moveId, rowId)}</select></label>
@@ -1322,12 +1366,20 @@ function renderDefaultCalculationEvents(events = null, selectedEventId = null) {
     container.innerHTML = source.map((event, index) => defaultCalculationEventHtml(event, index, selectedEventId ?? source[0]?.id ?? "")).join("")
 }
 
-function readDefaultCalculationEvents() {
+function readDefaultCalculationEventRows(rows) {
     const skill = agentSkillForAgentId()
-    return [...els.maintenanceForm.querySelectorAll("[data-default-calc-event-row]")].map((row, index) => {
+    return [...rows].map((row, index) => {
         const kind = row.querySelector("[data-default-calc-kind]")?.value ?? "direct"
         const id = row.querySelector("[data-default-calc-event-id]")?.value.trim() || `${kind}-${index + 1}`
         const count = Number(row.querySelector("[data-default-calc-count]")?.value || 1)
+        if (kind === "skillGroup") {
+            return {
+                id,
+                kind: "skillGroup",
+                skillGroupId: row.querySelector("[data-default-calc-skill-group]")?.value ?? "",
+                count,
+            }
+        }
         if (kind === "anomaly") {
             return {
                 id,
@@ -1362,6 +1414,82 @@ function readDefaultCalculationEvents() {
                 moveId: row.querySelector("[data-default-calc-move]")?.value ?? "",
                 rowId: row.querySelector("[data-default-calc-row]")?.value ?? "",
             },
+        }
+    })
+}
+
+function readDefaultCalculationEvents() {
+    return readDefaultCalculationEventRows(els.maintenanceForm.querySelectorAll("[data-default-calc-event-row]"))
+}
+
+function defaultCalculationSkillGroupDraft() {
+    const index = [...els.maintenanceForm.querySelectorAll("[data-default-calc-skill-group-row]")].length + 1
+    return {
+        id: `skill_group_${index}`,
+        name: { zhCN: `技能组${index}` },
+        description: { zhCN: "" },
+        defaultCount: 1,
+        minCount: 0,
+        maxCount: 30,
+        step: 1,
+        events: [defaultCalculationEventDraft("direct")],
+    }
+}
+
+function defaultCalculationSkillGroupHtml(group = {}, index = 0) {
+    const events = Array.isArray(group.events) && group.events.length
+        ? group.events
+        : [defaultCalculationEventDraft("direct")]
+    return `
+        <article class="maintenance-subcard default-calc-skill-group-card" data-default-calc-skill-group-row>
+          <div class="maintenance-section-head">
+            <strong>技能组</strong>
+            <div class="skill-maintenance-actions">
+              <button type="button" class="compact-btn" data-add-default-calc-group-event="${index}:direct">添加直伤</button>
+              <button type="button" class="compact-btn" data-add-default-calc-group-event="${index}:sheer">添加贯穿</button>
+              <button type="button" class="compact-btn" data-add-default-calc-group-event="${index}:anomaly">添加属性异常</button>
+              <button type="button" class="compact-btn" data-add-default-calc-group-event="${index}:disorder">添加紊乱</button>
+              <button type="button" class="compact-btn danger-lite" data-remove-default-calc-skill-group="${index}">删除组</button>
+            </div>
+          </div>
+          <div class="maintenance-grid">
+            <label class="field"><span>组 ID</span><input data-default-calc-skill-group-id value="${escapeHtml(group.id ?? `skill_group_${index + 1}`)}"></label>
+            <label class="field"><span>名称</span><input data-default-calc-skill-group-name value="${escapeHtml(localized(group.name) || "")}"></label>
+            <label class="field"><span>默认次数</span><input data-default-calc-skill-group-default-count type="number" min="0" step="1" value="${escapeHtml(group.defaultCount ?? 1)}"></label>
+            <label class="field"><span>最小次数</span><input data-default-calc-skill-group-min-count type="number" min="0" step="1" value="${escapeHtml(group.minCount ?? 0)}"></label>
+            <label class="field"><span>最大次数</span><input data-default-calc-skill-group-max-count type="number" min="0" step="1" value="${escapeHtml(group.maxCount ?? 30)}"></label>
+            <label class="field"><span>步长</span><input data-default-calc-skill-group-step type="number" min="0.000001" step="1" value="${escapeHtml(group.step ?? 1)}"></label>
+            <label class="field field-wide"><span>描述</span><input data-default-calc-skill-group-description value="${escapeHtml(localized(group.description) || "")}"></label>
+          </div>
+          <div class="skill-category-list default-calc-skill-group-events">
+            ${events.map((event, eventIndex) => defaultCalculationEventHtml(event, eventIndex, null, { groupIndex: index })).join("")}
+          </div>
+        </article>
+    `
+}
+
+function renderDefaultCalculationSkillGroups(groups = null) {
+    const container = document.getElementById("defaultCalculationSkillGroupRows")
+    if (!container) {
+        return
+    }
+    const source = groups ?? readDefaultCalculationSkillGroups()
+    container.innerHTML = source.map(defaultCalculationSkillGroupHtml).join("")
+}
+
+function readDefaultCalculationSkillGroups() {
+    return [...els.maintenanceForm.querySelectorAll("[data-default-calc-skill-group-row]")].map((row, index) => {
+        const id = row.querySelector("[data-default-calc-skill-group-id]")?.value.trim() || `skill_group_${index + 1}`
+        const maxCountText = row.querySelector("[data-default-calc-skill-group-max-count]")?.value.trim() ?? ""
+        return {
+            id,
+            name: { zhCN: row.querySelector("[data-default-calc-skill-group-name]")?.value.trim() || id },
+            description: { zhCN: row.querySelector("[data-default-calc-skill-group-description]")?.value.trim() || "" },
+            defaultCount: Number(row.querySelector("[data-default-calc-skill-group-default-count]")?.value || 0),
+            minCount: Number(row.querySelector("[data-default-calc-skill-group-min-count]")?.value || 0),
+            ...(maxCountText ? { maxCount: Number(maxCountText) } : {}),
+            step: Number(row.querySelector("[data-default-calc-skill-group-step]")?.value || 1),
+            events: readDefaultCalculationEventRows(row.querySelectorAll("[data-default-calc-group-event-row]")),
         }
     })
 }
@@ -1430,7 +1558,7 @@ function primaryDefaultCalculationModeForAgent(agent = {}) {
 function defaultCalculationModeOptions(agent = {}) {
     return [
         ["custom", "自定义"],
-        ...(!isRuptureAgent(agent) ? [["single", "最大化单个伤害"]] : []),
+        ...(!isRuptureAgent(agent) ? [["single", "最大化单个技能伤害"]] : []),
         ...(isRuptureAgent(agent) ? [["sheer", "最大化贯穿伤害"]] : []),
         ["anomaly", "最大化异常伤害"],
     ]
@@ -2168,12 +2296,22 @@ function renderAgentForm(item = null) {
 
         <section class="maintenance-section">
           <div class="maintenance-section-head">
+            <h3>技能组定义</h3>
+            <button type="button" class="compact-btn" data-add-default-calc-skill-group-definition>定义技能组</button>
+          </div>
+          <p class="form-help">定义“一变”“一大”等可复用技能组合；默认计算方式和用户自定义都可以把它当作一个事件加入。</p>
+          <div id="defaultCalculationSkillGroupRows" class="skill-category-list"></div>
+        </section>
+
+        <section class="maintenance-section">
+          <div class="maintenance-section-head">
             <h3>默认计算方式</h3>
             <div class="skill-maintenance-actions">
               <button type="button" class="compact-btn" data-add-default-calc-event="direct">添加直伤</button>
               <button type="button" class="compact-btn" data-add-default-calc-event="sheer">添加贯穿</button>
               <button type="button" class="compact-btn" data-add-default-calc-event="anomaly">添加属性异常</button>
               <button type="button" class="compact-btn" data-add-default-calc-event="disorder">添加紊乱</button>
+              <button type="button" class="compact-btn" data-add-default-calc-event="skillGroup">添加技能组</button>
             </div>
           </div>
           <div class="maintenance-grid">
@@ -2209,6 +2347,7 @@ function renderAgentForm(item = null) {
     `
     renderStatRows("corePassiveStats", effectStats(agent.combatBuffs?.corePassive), { allowDamageModifiers: true })
     renderStatRows("additionalAbilityStats", effectStats(agent.combatBuffs?.additionalAbility), { allowDamageModifiers: true })
+    renderDefaultCalculationSkillGroups(agent.skillGroups ?? agent.defaultCalculationConfig?.skillGroups ?? [])
     renderDefaultCalculationEvents(agent.defaultCalculationConfig?.events ?? [], agent.defaultCalculationConfig?.selectedEventId)
     renderCinemaBuffRows(cinemaBuffsOf(agent))
     updatePreview()
@@ -2289,6 +2428,13 @@ function buildAgent(options = {}) {
         item.preferredDriveDiscs = preferredDriveDiscs
     } else {
         delete item.preferredDriveDiscs
+    }
+
+    const skillGroups = readDefaultCalculationSkillGroups()
+    if (skillGroups.length) {
+        item.skillGroups = skillGroups
+    } else {
+        delete item.skillGroups
     }
 
     const defaultCalculationConfig = readDefaultCalculationConfig()
@@ -4258,24 +4404,40 @@ els.maintenanceForm.addEventListener("change", event => {
     }
 
     if (event.target.matches("[data-default-calc-kind]")) {
-        const rows = readDefaultCalculationEvents()
-        renderDefaultCalculationEvents(rows)
+        const groupRow = event.target.closest("[data-default-calc-group-event-row]")
+        if (groupRow) {
+            const groups = readDefaultCalculationSkillGroups()
+            renderDefaultCalculationSkillGroups(groups)
+        } else {
+            const rows = readDefaultCalculationEvents()
+            renderDefaultCalculationEvents(rows)
+        }
         updatePreview()
         return
     }
 
     if (event.target.matches("[data-default-calc-category]")) {
-        const row = event.target.closest("[data-default-calc-event-row]")
+        const row = event.target.closest("[data-default-calc-event-row], [data-default-calc-group-event-row]")
         const moveSelect = row.querySelector("[data-default-calc-move]")
         const rowSelect = row.querySelector("[data-default-calc-row]")
         moveSelect.innerHTML = defaultCalcMoveOptions(event.target.value)
         rowSelect.innerHTML = defaultCalcRowOptions(event.target.value, moveSelect.value)
     }
 
+    if (event.target.matches("[data-default-calc-skill-group]")) {
+        renderDefaultCalculationEvents(readDefaultCalculationEvents())
+        updatePreview()
+        return
+    }
+
     if (event.target.matches("[data-default-calc-move]")) {
-        const row = event.target.closest("[data-default-calc-event-row]")
+        const row = event.target.closest("[data-default-calc-event-row], [data-default-calc-group-event-row]")
         const categoryId = row.querySelector("[data-default-calc-category]")?.value ?? ""
         row.querySelector("[data-default-calc-row]").innerHTML = defaultCalcRowOptions(categoryId, event.target.value)
+    }
+
+    if (event.target.matches("[data-default-calc-skill-group-id], [data-default-calc-skill-group-name], [data-default-calc-skill-group-default-count], [data-default-calc-skill-group-step]")) {
+        renderDefaultCalculationEvents(readDefaultCalculationEvents())
     }
 
     updatePreview()
@@ -4414,6 +4576,57 @@ els.maintenanceForm.addEventListener("click", event => {
             ...readDefaultCalculationEvents(),
             defaultCalculationEventDraft(addDefaultCalcEvent.dataset.addDefaultCalcEvent),
         ])
+        updatePreview()
+        return
+    }
+
+    const addDefaultCalcSkillGroup = event.target.closest("[data-add-default-calc-skill-group-definition]")
+    if (addDefaultCalcSkillGroup) {
+        clearFeedback()
+        renderDefaultCalculationSkillGroups([
+            ...readDefaultCalculationSkillGroups(),
+            defaultCalculationSkillGroupDraft(),
+        ])
+        renderDefaultCalculationEvents(readDefaultCalculationEvents())
+        updatePreview()
+        return
+    }
+
+    const removeDefaultCalcSkillGroup = event.target.closest("[data-remove-default-calc-skill-group]")
+    if (removeDefaultCalcSkillGroup) {
+        clearFeedback()
+        const groups = readDefaultCalculationSkillGroups()
+        groups.splice(Number(removeDefaultCalcSkillGroup.dataset.removeDefaultCalcSkillGroup), 1)
+        renderDefaultCalculationSkillGroups(groups)
+        renderDefaultCalculationEvents(readDefaultCalculationEvents())
+        updatePreview()
+        return
+    }
+
+    const addDefaultCalcGroupEvent = event.target.closest("[data-add-default-calc-group-event]")
+    if (addDefaultCalcGroupEvent) {
+        clearFeedback()
+        const [groupIndex, kind] = String(addDefaultCalcGroupEvent.dataset.addDefaultCalcGroupEvent).split(":")
+        const groups = readDefaultCalculationSkillGroups()
+        const group = groups[Number(groupIndex)]
+        if (group) {
+            group.events = [...(group.events ?? []), defaultCalculationEventDraft(kind)]
+        }
+        renderDefaultCalculationSkillGroups(groups)
+        updatePreview()
+        return
+    }
+
+    const removeDefaultCalcGroupEvent = event.target.closest("[data-remove-default-calc-group-event]")
+    if (removeDefaultCalcGroupEvent) {
+        clearFeedback()
+        const [groupIndex, eventIndex] = String(removeDefaultCalcGroupEvent.dataset.removeDefaultCalcGroupEvent).split(":")
+        const groups = readDefaultCalculationSkillGroups()
+        const group = groups[Number(groupIndex)]
+        if (group?.events) {
+            group.events.splice(Number(eventIndex), 1)
+        }
+        renderDefaultCalculationSkillGroups(groups)
         updatePreview()
         return
     }

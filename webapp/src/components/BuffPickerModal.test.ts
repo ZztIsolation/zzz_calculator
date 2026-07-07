@@ -77,7 +77,7 @@ const meta = {
   },
 }
 
-function mountModal() {
+function mountModal(propOverrides: Record<string, any> = {}) {
   return mount(BuffPickerModal, {
     props: {
       show: false,
@@ -92,6 +92,7 @@ function mountModal() {
       cinemaLevel: 0,
       wEngineId: "",
       wEngineModificationLevel: 1,
+      ...propOverrides,
     },
     global: {
       stubs: {
@@ -142,6 +143,19 @@ describe("BuffPickerModal", () => {
 
     const payload = wrapper.emitted("apply")?.[0]?.[0] as any
     expect(payload.selectedBuffIds).toEqual(["agent:agent_a.corePassive"])
+  })
+
+  it("keeps unchecked default buffs unselected when reopening the picker", async () => {
+    const wrapper = mountModal({
+      defaultIds: ["agent:agent_a.corePassive"],
+      selectedIds: [],
+    })
+
+    await openModal(wrapper)
+
+    const row = wrapper.find(".buff-row")
+    expect(row.exists()).toBe(true)
+    expect(row.classes()).not.toContain("is-selected")
   })
 
   it("stores custom percentage effects with the core pct mode", () => {

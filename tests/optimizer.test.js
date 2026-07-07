@@ -280,6 +280,66 @@ assert.deepEqual(
 assert.ok(Math.abs(customDamage.results[0].score - customDamage.results[0].data.damage.totalFinalDamage) < 1e-9)
 assert.ok(customDamage.results[0].data.damage.totalFinalDamage > customDamage.results[0].data.damage.finalDamage)
 
+const groupedDamageAgent = catalog.agentsMap.get(exampleInput.agentId)
+const originalGroupedDamageSkillGroups = groupedDamageAgent.skillGroups
+groupedDamageAgent.skillGroups = [
+    {
+        id: "loop",
+        defaultCount: 2,
+        minCount: 0,
+        maxCount: 30,
+        step: 1,
+        events: [
+            {
+                id: "direct-hit",
+                kind: "direct",
+                skillMultiplier: 100,
+                critMode: "expected",
+                count: 1,
+            },
+        ],
+    },
+    {
+        id: "anomaly",
+        defaultCount: 1,
+        minCount: 0,
+        maxCount: 10,
+        step: 1,
+        events: [
+            {
+                id: "assault-hit",
+                kind: "anomaly",
+                anomalyEffect: "assault",
+                procCount: 1,
+                count: 1,
+            },
+        ],
+    },
+]
+const groupedDamage = optimizeDriveDiscs(catalog, store, optimizerInput({
+    damage: {
+        ...exampleInput.damage,
+        selectedEventId: "loop-ref",
+        events: [
+            {
+                id: "loop-ref",
+                kind: "skillGroup",
+                skillGroupId: "loop",
+                count: 2,
+            },
+            {
+                id: "anomaly-ref",
+                kind: "skillGroup",
+                skillGroupId: "anomaly",
+                count: 1,
+            },
+        ],
+    },
+}))
+groupedDamageAgent.skillGroups = originalGroupedDamageSkillGroups
+assert.equal(groupedDamage.results[0].driveDiscs.map(item => item.id).join("|"), customDamage.results[0].driveDiscs.map(item => item.id).join("|"))
+assert.ok(Math.abs(groupedDamage.results[0].score - customDamage.results[0].score) < 1e-9)
+
 const anomalyObjective = optimizeDriveDiscs(catalog, store, optimizerInput({
     damage: {
         agentLevel: 60,

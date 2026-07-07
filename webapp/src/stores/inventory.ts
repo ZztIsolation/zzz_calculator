@@ -263,7 +263,7 @@ export const useInventoryStore = defineStore("inventory", {
             selected.set(Number(slot), disc)
           }
         }
-      } else {
+      } else if (mode === "loadout") {
         const loadout = options.loadoutId
           ? this.loadouts.find((item: any) => item.id === options.loadoutId)
           : null
@@ -277,7 +277,7 @@ export const useInventoryStore = defineStore("inventory", {
           }
         }
       }
-      if (!selected.size && options.autoFill !== false) {
+      if (!selected.size && mode === "auto" && options.autoFill !== false) {
         for (const disc of this.driveDiscs) {
           const slot = Number(disc.partition)
           if (slot >= 1 && slot <= 6 && !selected.has(slot)) {

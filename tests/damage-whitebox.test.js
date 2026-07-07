@@ -372,8 +372,8 @@ assertStunMultiplierScales({
 
 for (const [level, expectedPercent] of [
     [1, 79.4],
-    [12, 159.8],
-    [16, 189.1],
+    [12, 159.7],
+    [16, 188.9],
 ]) {
     const skillResult = calculateInCombatPanel(catalog, minimalInput({
         damage: {

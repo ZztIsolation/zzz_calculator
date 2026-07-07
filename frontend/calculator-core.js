@@ -8,6 +8,7 @@ import {
     skillLevelScale,
     skillRowValue,
 } from "./skillMultiplierCandidates.js"
+import { expandCalculationConfigSkillGroups } from "./calculationSkillGroups.js"
 
 const BONUS_KEY_MAP = {
     hpFlat: "hpFlat",
@@ -2369,7 +2370,15 @@ function normalizeDisorderDamageEvent(event = {}, catalog = {}, index = 0) {
 }
 
 function normalizeDamageEvent(event = {}, agent = {}, catalog = {}, index = 0, options = {}) {
-    const kind = DAMAGE_EVENT_KINDS.includes(event.kind) ? event.kind : "direct"
+    if (event.kind === "skillGroup") {
+        throw new Error(`技能组引用无法展开：事件 ${event.id ?? index + 1} 仍是技能组引用。`)
+    }
+    const kind = event.kind === undefined || event.kind === null || event.kind === ""
+        ? "direct"
+        : event.kind
+    if (!DAMAGE_EVENT_KINDS.includes(kind)) {
+        throw new Error(`不支持的伤害事件类型：${kind}`)
+    }
     if (kind === "anomaly" && event.settlementType === "disorder") {
         return normalizeDisorderDamageEvent(event, catalog, index)
     }
@@ -2398,15 +2407,20 @@ function legacyDirectDamageEvent(input = {}) {
 }
 
 function normalizeDamageRequest(input = {}, agent = {}, catalog = {}, options = {}) {
-    const rawEvents = Array.isArray(input.events) && input.events.length
-        ? input.events
-        : [legacyDirectDamageEvent(input)]
+    const expandedInput = expandCalculationConfigSkillGroups(input, agent, { strict: true })
+    const hasConfiguredEvents = Array.isArray(input.events) && input.events.length > 0
+    if (hasConfiguredEvents && (!Array.isArray(expandedInput.events) || !expandedInput.events.length)) {
+        throw new Error("技能组引用无法展开：没有可用于计算的普通事件。")
+    }
+    const rawEvents = Array.isArray(expandedInput.events) && expandedInput.events.length
+        ? expandedInput.events
+        : [legacyDirectDamageEvent(expandedInput)]
     const events = rawEvents.map((event, index) => normalizeDamageEvent(event, agent, catalog, index, options))
     const firstElement = events[0]?.damageElement ?? resolveDamageElement(agent)
     return {
-        agentLevel: normalizeAgentLevel(input.agentLevel),
-        target: normalizeDamageTarget(input, firstElement),
-        selectedEventId: input.selectedEventId ?? events[0]?.id ?? null,
+        agentLevel: normalizeAgentLevel(expandedInput.agentLevel),
+        target: normalizeDamageTarget(expandedInput, firstElement),
+        selectedEventId: expandedInput.selectedEventId ?? events[0]?.id ?? null,
         events,
     }
 }
@@ -4593,6 +4607,7 @@ export function buildMeta(catalog) {
             coreSkill: agent.coreSkill,
             combatBuffs: agent.combatBuffs ?? {},
             preferredDriveDiscs: agent.preferredDriveDiscs ?? null,
+            skillGroups: agent.skillGroups ?? [],
             defaultCalculationConfig: agent.defaultCalculationConfig ?? null,
         })),
         agentSkills: (catalog.agentSkills ?? []).map(item => ({

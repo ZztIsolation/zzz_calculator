@@ -11,7 +11,7 @@ function cloneJson(value) {
 }
 
 async function requestJson(path) {
-    const response = await fetch(path)
+    const response = await fetch(path, { cache: "no-store" })
     if (!response.ok) {
         const text = await response.text()
         throw new Error(text || `Request failed: ${response.status}`)
@@ -34,7 +34,7 @@ async function requestFirstJson(paths) {
 
 export async function loadCatalog() {
     if (!catalogPromise) {
-        catalogPromise = requestFirstJson(["/static/catalog.json", "/api/catalog"]).then(normalizeCatalog)
+        catalogPromise = requestFirstJson(["/api/catalog", "/static/catalog.json"]).then(normalizeCatalog)
     }
     return catalogPromise
 }

@@ -71,6 +71,13 @@ describe("DamageWhiteBox", () => {
           },
         ],
       },
+      {
+        id: "loop-ref",
+        kind: "skillGroup",
+        label: "技能组 · 一变",
+        count: 10,
+        finalDamage: 999999,
+      },
     ],
   }
 
@@ -83,6 +90,9 @@ describe("DamageWhiteBox", () => {
     expect(wrapper.text()).toContain("总计 3,456.75")
     expect(wrapper.text()).toContain("期望 1,234.5")
     expect(wrapper.find(".damage-event-select .n-select").exists()).toBe(true)
+    const options = wrapper.getComponent(NSelect).props("options") as Array<{ label: string, value: string }>
+    expect(options.map(option => option.value)).toEqual(["direct-1", "disorder-1"])
+    expect(options.map(option => option.label).join("|")).not.toContain("技能组")
     expect(wrapper.findAll(".damage-event-button")).toHaveLength(0)
     expect(wrapper.text()).not.toContain("结算面板")
     expect(wrapper.text()).toContain("技能倍率")

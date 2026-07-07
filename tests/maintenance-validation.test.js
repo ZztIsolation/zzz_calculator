@@ -935,6 +935,176 @@ assertValid("agents", {
     ...validAgent,
     defaultCalculationConfig: validDefaultCalculationConfig,
 }, validCalculationContext)
+const validSkillGroups = [
+    {
+        id: "loop",
+        name: { zhCN: "一变" },
+        description: { zhCN: "一轮技能循环" },
+        defaultCount: 10,
+        minCount: 0,
+        maxCount: 30,
+        step: 1,
+        events: [
+            {
+                ...validDefaultCalculationConfig.events[0],
+                id: "loop-direct",
+                count: 2,
+            },
+        ],
+    },
+    {
+        id: "ultimate",
+        name: { zhCN: "一大" },
+        defaultCount: 2,
+        minCount: 0,
+        maxCount: 10,
+        step: 1,
+        events: [
+            {
+                ...validDefaultCalculationConfig.events[0],
+                id: "ultimate-direct",
+                count: 1,
+            },
+        ],
+    },
+]
+const validSkillGroupCalculationConfig = {
+    ...validDefaultCalculationConfig,
+    selectedEventId: "loop-ref",
+    events: [
+        {
+            id: "loop-ref",
+            kind: "skillGroup",
+            skillGroupId: "loop",
+            count: 10,
+        },
+        {
+            id: "ultimate-ref",
+            kind: "skillGroup",
+            skillGroupId: "ultimate",
+            count: 2,
+        },
+    ],
+}
+assertValid("agents", {
+    ...validAgent,
+    skillGroups: validSkillGroups,
+    defaultCalculationConfig: validSkillGroupCalculationConfig,
+}, validCalculationContext)
+const cleanedSkillGroupAgent = cleanMaintenanceItem("agents", {
+    ...validAgent,
+    skillGroups: validSkillGroups,
+    defaultCalculationConfig: validSkillGroupCalculationConfig,
+})
+assert.equal(cleanedSkillGroupAgent.skillGroups[0].id, "loop")
+assert.equal(cleanedSkillGroupAgent.skillGroups[0].events[0].id, "loop-direct")
+assert.equal(cleanedSkillGroupAgent.defaultCalculationConfig.events[0].kind, "skillGroup")
+assert.equal(cleanedSkillGroupAgent.defaultCalculationConfig.events[0].skillGroupId, "loop")
+assert.equal(cleanedSkillGroupAgent.defaultCalculationConfig.skillGroups, undefined)
+assert.equal(cleanedSkillGroupAgent.defaultCalculationConfig.skillGroupPresets, undefined)
+const legacySkillGroupOnlyCalculationConfig = {
+    ...validSkillGroupCalculationConfig,
+    selectedEventId: null,
+    events: [],
+    skillGroups: validSkillGroups,
+    skillGroupPresets: [
+        {
+            id: "10_loop_2_ult",
+            name: { zhCN: "10变2大" },
+            counts: {
+                loop: 10,
+                ultimate: 2,
+            },
+        },
+    ],
+    defaultSkillGroupPresetId: "10_loop_2_ult",
+}
+assertValid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: legacySkillGroupOnlyCalculationConfig,
+}, validCalculationContext)
+const cleanedLegacySkillGroupOnlyAgent = cleanMaintenanceItem("agents", {
+    ...validAgent,
+    defaultCalculationConfig: legacySkillGroupOnlyCalculationConfig,
+})
+assert.equal(cleanedLegacySkillGroupOnlyAgent.skillGroups[0].id, "loop")
+assert.equal(cleanedLegacySkillGroupOnlyAgent.defaultCalculationConfig.events[0].kind, "skillGroup")
+assert.equal(cleanedLegacySkillGroupOnlyAgent.defaultCalculationConfig.events[0].count, 10)
+assert.equal(cleanedLegacySkillGroupOnlyAgent.defaultCalculationConfig.events[1].skillGroupId, "ultimate")
+assert.equal(cleanedLegacySkillGroupOnlyAgent.defaultCalculationConfig.skillGroups, undefined)
+assert.equal(cleanedLegacySkillGroupOnlyAgent.defaultCalculationConfig.skillGroupPresets, undefined)
+assertInvalid("agents", {
+    ...validAgent,
+    skillGroups: validSkillGroups.map(group => ({ ...group, id: "loop" })),
+    defaultCalculationConfig: validSkillGroupCalculationConfig,
+}, "技能组 ID 不能重复", validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    skillGroups: [
+        {
+            ...validSkillGroups[0],
+            id: "",
+        },
+    ],
+    defaultCalculationConfig: validSkillGroupCalculationConfig,
+}, "必填", validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    skillGroups: [
+        {
+            ...validSkillGroups[0],
+            events: [
+                {
+                    ...validSkillGroups[0].events[0],
+                    skillRef: {
+                        ...validSkillGroups[0].events[0].skillRef,
+                        rowId: "missing",
+                    },
+                },
+            ],
+        },
+    ],
+    defaultCalculationConfig: validSkillGroupCalculationConfig,
+}, "技能倍率行不存在", validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    skillGroups: validSkillGroups,
+    defaultCalculationConfig: {
+        ...validSkillGroupCalculationConfig,
+        events: [
+            {
+                ...validSkillGroupCalculationConfig.events[0],
+                skillGroupId: "missing",
+            },
+        ],
+    },
+}, "技能组不存在", validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    skillGroups: validSkillGroups,
+    defaultCalculationConfig: {
+        ...validSkillGroupCalculationConfig,
+        events: [
+            {
+                ...validSkillGroupCalculationConfig.events[0],
+                count: -1,
+            },
+        ],
+    },
+}, "次数不能小于 0", validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    skillGroups: validSkillGroups,
+    defaultCalculationConfig: {
+        ...validSkillGroupCalculationConfig,
+        events: [
+            {
+                ...validSkillGroupCalculationConfig.events[1],
+                count: 99,
+            },
+        ],
+    },
+}, "次数不能大于技能组最大次数", validCalculationContext)
 assertValid("agents", {
     ...validAgent,
     defaultCalculationConfig: {
@@ -965,9 +1135,10 @@ assertInvalid("agents", {
     ...validAgent,
     defaultCalculationConfig: {
         ...validDefaultCalculationConfig,
+        selectedEventId: null,
         events: [],
     },
-}, "至少需要一个事件", validCalculationContext)
+}, "至少需要一个事件或技能组", validCalculationContext)
 assertInvalid("agents", {
     ...validAgent,
     defaultCalculationConfig: {

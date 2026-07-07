@@ -32,6 +32,40 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("词条分析")
   })
 
+  it("shows every active combat buff badge instead of truncating the list", () => {
+    expect(source).toContain("activeBuffIdsForPanel")
+    expect(source).not.toContain(".slice(0, 8).map(id =>")
+    expect(source).toContain("v-if=\"!activeBuffIdsForPanel.length\"")
+  })
+
+  it("merges damage and optimizer into one three-column workbench", () => {
+    expect(source).not.toContain("<NTabs")
+    expect(source).not.toContain("NTabPane")
+    expect(source).toContain("workbench-merged-grid")
+    expect(source).toContain("workbench-left")
+    expect(source).toContain("workbench-center")
+    expect(source).toContain("workbench-right")
+    expect(source).toContain("DamageWhiteBox")
+    expect(source).toContain("PanelStatTable")
+  })
+
+  it("splits event management from optimizer configuration", () => {
+    expect(source).toContain("showCalculationConfig")
+    expect(source).toContain("showOptimizerConfig")
+    expect(source).toContain("OptimizerConfigModal")
+    expect(source).toContain("showOptimizerConfig = true")
+    expect(source).toContain("计算配置")
+    expect(source).toContain("@save=\"saveCalculationConfig\"")
+    expect(source).toContain("@save=\"saveOptimizerConfig\"")
+    expect(source).not.toContain("@save-optimizer")
+  })
+
+  it("syncs optimizer defaults from the selected agent", () => {
+    expect(source).toContain("optimizerStore.initialize(catalogStore.catalog, catalogStore.agents.find")
+    expect(source).toContain("optimizerStore.applyAgentPreferredDriveDiscSet")
+    expect(source).toContain("@update:value=\"value => selectAgent(String(value))\"")
+  })
+
   it("reuses completed optimized four-piece runtime for calculation and analysis", () => {
     expect(source).toContain("selectedOptimizedRuntimeInputs")
     expect(source).toContain("optimizerStore.completedSettings")
@@ -45,19 +79,32 @@ describe("WorkbenchView optimizer result details", () => {
     expect(source).toContain("OPTIMIZED_RESULT_LIMIT = 5")
     expect(source).toContain("topOptimizedResultSchemes")
     expect(source).toContain("optimizer-result-rank-select")
-    expect(source).toContain("selectedOptimizerResultRank")
+    expect(source).toContain("buildStore.selectedOptimizedRank")
     expect(source).not.toContain("optimizerStore.results.slice(0, 10)")
   })
 
   it("renders every optimizer result slot with full drive disc attributes", () => {
     expect(source).toContain("OPTIMIZER_RESULT_SLOTS = [1, 2, 3, 4, 5, 6]")
-    expect(source).toContain("selectedOptimizerResultRows")
-    expect(source).toContain("optimizer-result-disc-row")
+    expect(source).toContain("selectedDriveDiscRows")
+    expect(source).toContain("disc-slot-card")
     expect(source).toContain("driveDiscSetIcon")
     expect(source).toContain("driveDiscStatText(row.disc.mainStat)")
     expect(source).toContain("driveDiscSubStatText(row.disc)")
     expect(source).toContain("driveDiscRarityLevelText(row.disc)")
-    expect(source).toContain("driveDiscIdentityMeta(row.disc)")
+  })
+
+  it("uses a modal picker and current-scheme save for manual drive discs", () => {
+    expect(source).toContain("showManualDiscPicker")
+    expect(source).toContain("manual-disc-option-list")
+    expect(source).toContain("manualDiscSetFilterOptions")
+    expect(source).toContain("manualDiscMainStatFilterOptions")
+    expect(source).toContain("manualDiscSearch")
+    expect(source).toContain("clearManualDriveDiscSlot")
+    expect(source).toContain("showSaveLoadoutModal")
+    expect(source).toContain("openSaveCurrentLoadout")
+    expect(source).toContain("source: { type: \"manual\", scope: \"workbench\" }")
+    expect(source).not.toContain("disc-slot-picker")
+    expect(source).not.toContain("discOptions(row.slot)")
   })
 
   it("formats stored drive disc stats through the shared combat formatter", () => {

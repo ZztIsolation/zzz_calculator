@@ -56,10 +56,7 @@ const customTarget = ref({
 
 watch(() => props.show, value => {
   if (value) {
-    draft.value = new Set([
-      ...(props.defaultIds ?? []),
-      ...props.selectedIds,
-    ])
+    draft.value = new Set(props.selectedIds)
     draftAddedBuffs.value = JSON.parse(JSON.stringify(props.addedBuffs ?? []))
     draftRuntimeInputs.value = JSON.parse(JSON.stringify(props.runtimeInputs ?? {}))
     query.value = ""

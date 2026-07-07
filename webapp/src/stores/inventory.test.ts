@@ -146,6 +146,34 @@ describe("inventory store", () => {
     expect(store.loadouts[0].status).toBe("incomplete")
   })
 
+  it("does not auto-fill explicit manual or loadout selections", async () => {
+    const store = useInventoryStore()
+    await store.load()
+    await store.saveDisc({
+      id: "disc-slot-1",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 1,
+      mainStat: { stat: "hpFlat", value: 2200 },
+      subStats: [],
+      level: 15,
+    })
+    await store.saveDisc({
+      id: "disc-slot-2",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 2,
+      mainStat: { stat: "atkFlat", value: 316 },
+      subStats: [],
+      level: 15,
+    })
+
+    expect(store.calculatorDriveDiscs({ mode: "manual" })).toEqual([])
+    expect(store.calculatorDriveDiscs({ mode: "loadout" })).toEqual([])
+    expect(store.calculatorDriveDiscs({ mode: "manual", idsBySlot: { "2": "disc-slot-2" } }).map((disc: any) => disc.id)).toEqual(["disc-slot-2"])
+    expect(store.calculatorDriveDiscs({ mode: "auto" }).map((disc: any) => disc.id)).toEqual(["disc-slot-1", "disc-slot-2"])
+  })
+
   it("previews scanner imports with a real diff before writing", async () => {
     const store = useInventoryStore()
     await store.load()

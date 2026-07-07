@@ -110,6 +110,7 @@ if (maintenanceEnabled) {
         "accounts.js",
         "local-store.js",
         "shared-combat.js",
+        "calculationSkillGroups.js",
         "skillMultiplierCandidates.js",
         "formulaEvaluator.js",
         "feedback.js",

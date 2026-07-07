@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "npm run test:atk-basis && npm run test:percent-sanity && npm run test:maintenance-validation && npm run test:formula && npm run test:damage-whitebox && npm run test:shared-combat && npm run test:w-engine-modification && npm run test:anomaly-damage && npm run test:maintenance-stats && npm run test:compiled-score && npm run test:compiled-panel-score && npm run test:optimizer && npm run test:optimizer-progress && npm run test:optimizer-api && npm run test:browser-local-compute && npm run test:optimizer-ui && npm run test:optimizer-fuzz && npm run test:server-production && npm run test:drive-disc-analysis && npm run test:drive-disc-import && npm run test:scanner-bridge && npm run test:accounts && npm run test:webapp",
+    "test": "npm run test:atk-basis && npm run test:percent-sanity && npm run test:maintenance-validation && npm run test:calculation-skill-groups && npm run test:catalog-loader && npm run test:formula && npm run test:damage-whitebox && npm run test:shared-combat && npm run test:w-engine-modification && npm run test:anomaly-damage && npm run test:maintenance-stats && npm run test:compiled-score && npm run test:compiled-panel-score && npm run test:optimizer && npm run test:optimizer-progress && npm run test:optimizer-api && npm run test:browser-local-compute && npm run test:optimizer-ui && npm run test:optimizer-fuzz && npm run test:server-production && npm run test:drive-disc-analysis && npm run test:drive-disc-import && npm run test:scanner-bridge && npm run test:accounts && npm run test:webapp",
     "serve": "node backend/server.js",
     "start": "node backend/server.js",
     "dev:webapp": "npm --prefix webapp run dev",
@@ -13,6 +13,8 @@
     "test:atk-basis": "node tests/atk-basis.test.js",
     "test:percent-sanity": "node tests/percent-sanity.test.js",
     "test:maintenance-validation": "node tests/maintenance-validation.test.js",
+    "test:calculation-skill-groups": "node tests/calculation-skill-groups.test.js",
+    "test:catalog-loader": "node tests/catalog-loader.test.js",
     "test:formula": "node tests/formula.test.js",
     "test:damage-whitebox": "node tests/damage-whitebox.test.js",
     "test:shared-combat": "node tests/shared-combat.test.js",

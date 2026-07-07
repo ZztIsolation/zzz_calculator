@@ -13,6 +13,7 @@ import {
   anomalyEffectLabel,
   damageEventKindLabel,
   damageEventNeedsSkillMultiplier,
+  damageEventSubjectLabel,
   damageEventTitle as formatDamageEventTitle,
   damageSkillRefPathLabel,
   labelOf,
@@ -25,6 +26,14 @@ import {
   normalizeSkillLevel,
   skillRowValue,
 } from "@core/skillMultiplierCandidates.js"
+import {
+  calculationSkillGroups,
+  defaultSkillGroupReferenceEvent,
+  hasCalculationSkillGroups,
+  normalizeSkillGroupReferenceEvent,
+  skillGroupById,
+  skillGroupCountLimits,
+} from "@core/calculationSkillGroups.js"
 
 const props = defineProps<{
   show: boolean
@@ -45,8 +54,15 @@ const showSkillPicker = ref(false)
 const isAdminDefaultMode = computed(() => draft.value.mode === "adminDefault")
 const canUseSheerDamage = computed(() => isRuptureAgent(props.agent))
 const canUseAdminDefault = computed(() => hasAdminDefaultCalculation(props.agent))
+const adminCalculationConfig = computed(() => props.agent?.defaultCalculationConfig ?? null)
+const skillGroups = computed(() => calculationSkillGroups(props.agent))
+const hasSkillGroups = computed(() => hasCalculationSkillGroups(props.agent))
+const skillGroupOptions = computed(() => skillGroups.value.map((group: any) => ({
+  label: skillGroupLabel(group),
+  value: group.id,
+})))
 const calculationModeOptions = computed(() => [
-  !canUseSheerDamage.value ? { label: "最大化单个伤害", value: "single" } : null,
+  !canUseSheerDamage.value ? { label: "最大化单个技能伤害", value: "single" } : null,
   canUseSheerDamage.value ? { label: "最大化贯穿伤害", value: "sheer" } : null,
   { label: "最大化异常伤害", value: "anomaly" },
   { label: canUseAdminDefault.value ? "管理员默认循环" : "管理员默认循环（未配置）", value: "adminDefault", disabled: !canUseAdminDefault.value },
@@ -75,9 +91,16 @@ watch(() => props.show, value => {
   if (value) {
     const { target: _target, targetConfig: _targetConfig, ...damageConfig } = props.damageConfig ?? {}
     const fallback = defaultDamageConfig(props.agent)
+    const shouldUseFallbackEvents = damageConfig?.mode === "adminDefault"
+      && Array.isArray(fallback.events)
+      && fallback.events.length > 0
     draft.value = JSON.parse(JSON.stringify(normalizeDraftForAgent({
       ...fallback,
       ...damageConfig,
+      ...(shouldUseFallbackEvents ? {
+        selectedEventId: fallback.selectedEventId ?? fallback.events[0]?.id,
+        events: fallback.events,
+      } : {}),
     })))
     normalizeDraftSkillSelections()
   }
@@ -107,7 +130,65 @@ const skillCategoryOptions = computed(() => skillCategories.value.map((category:
 })))
 
 function eventTitle(event: any) {
+  if (event?.kind === "skillGroup") {
+    return `技能组 · ${skillGroupLabel(selectedSkillGroup(event))} ×${event?.count ?? 1}`
+  }
   return formatDamageEventTitle(eventWithSkillSelection(event), props.meta, props.skillCatalog)
+}
+
+function skillGroupLabel(group: any) {
+  return labelOf(group) || group?.id || "技能组"
+}
+
+function skillGroupEventCount(group: any) {
+  return Array.isArray(group?.events) ? group.events.length : 0
+}
+
+function selectedSkillGroup(event: any = selectedEvent.value) {
+  return skillGroupById(props.agent, event?.skillGroupId)
+}
+
+function skillGroupChildEvents(group: any = selectedSkillGroup()) {
+  return Array.isArray(group?.events) ? group.events : []
+}
+
+function eventCount(event: any) {
+  const count = Number(event?.count ?? 1)
+  return Number.isFinite(count) ? count : 1
+}
+
+function skillGroupChildTotalCount(childEvent: any, groupEvent: any = selectedEvent.value) {
+  return eventCount(childEvent) * eventCount(groupEvent)
+}
+
+function skillGroupChildTitle(childEvent: any) {
+  const displayEvent = eventWithSkillSelection(childEvent)
+  return `${damageEventKindLabel(displayEvent)} · ${damageEventSubjectLabel(displayEvent, props.meta, props.skillCatalog)}`
+}
+
+function selectedEventCountLimits(event: any = selectedEvent.value) {
+  if (event?.kind !== "skillGroup") {
+    return { min: 0, max: null, step: 1 }
+  }
+  return skillGroupCountLimits(selectedSkillGroup(event) ?? {})
+}
+
+function normalizeSkillGroupEvent(event: any, index = 0) {
+  return normalizeSkillGroupReferenceEvent(event, props.agent, index)
+}
+
+function updateSelectedSkillGroup(groupId: string) {
+  const normalized = normalizeSkillGroupEvent({
+    ...selectedEvent.value,
+    skillGroupId: groupId,
+  })
+  if (!normalized) {
+    return
+  }
+  updateSelectedEvent({
+    skillGroupId: normalized.skillGroupId,
+    count: normalized.count,
+  }, { clearLabel: true })
 }
 
 function selectEvent(eventId: string) {
@@ -301,6 +382,13 @@ function updateSelectedEvent(patch: any, options: { clearLabel?: boolean } = {})
 
 function newEvent(kind: string) {
   const id = `${kind}-${Date.now().toString(36)}`
+  if (kind === "skillGroup") {
+    const event = defaultSkillGroupReferenceEvent(props.agent, skillGroups.value[0]?.id, (draft.value.events?.length ?? 0) + 1)
+    return {
+      ...(event ?? { kind: "skillGroup", skillGroupId: "", count: 1 }),
+      id,
+    }
+  }
   if (kind === "anomaly") {
     return { id, kind, settlementType: "attribute", anomalyEffect: anomalyOptions.value[0]?.value ?? "assault", procCount: 1, count: 1 }
   }
@@ -323,6 +411,9 @@ function addEvent(kind: string) {
     return
   }
   if (kind === "sheer" && !canUseSheerDamage.value) {
+    return
+  }
+  if (kind === "skillGroup" && !hasSkillGroups.value) {
     return
   }
   const event = newEvent(kind)
@@ -391,6 +482,14 @@ const eventWarnings = computed(() => {
   const warnings: string[] = []
   if (!Number.isFinite(Number(event.count)) || Number(event.count) <= 0) {
     warnings.push("次数需要大于 0")
+  }
+  if (event.kind === "skillGroup") {
+    if (!event.skillGroupId) {
+      warnings.push("技能组事件需要选择技能组")
+    } else if (!selectedSkillGroup(event)) {
+      warnings.push("技能组不存在")
+    }
+    return warnings
   }
   if (damageEventNeedsSkillMultiplier(event, props.meta, props.skillCatalog)) {
     warnings.push("直伤/贯穿事件需要技能倍率")
@@ -495,7 +594,7 @@ function save() {
 </script>
 
 <template>
-  <NModal :show="show" preset="card" title="计算配置" style="width: min(1280px, calc(100vw - 16px)); max-width: 1280px" @update:show="emit('update:show', $event)">
+  <NModal :show="show" preset="card" title="事件管理" style="width: min(1080px, calc(100vw - 16px)); max-width: 1080px" @update:show="emit('update:show', $event)">
     <div class="calculation-grid">
       <aside class="section-band">
         <label class="metric">
@@ -535,11 +634,11 @@ function save() {
               </article>
             </div>
             <div v-else class="calculation-event-empty">还没有目标事件</div>
-            <div v-if="!isAdminDefaultMode" class="toolbar">
-              <NButton size="small" @click="addEvent('direct')">直伤</NButton>
-              <NButton v-if="canUseSheerDamage" size="small" @click="addEvent('sheer')">贯穿</NButton>
-              <NButton size="small" @click="addEvent('anomaly')">异常</NButton>
-              <NButton size="small" @click="addEvent('disorder')">紊乱</NButton>
+            <div v-if="!isAdminDefaultMode" class="toolbar calculation-add-toolbar">
+              <NButton class="calculation-add-button" size="medium" @click="addEvent('direct')">添加技能</NButton>
+              <NButton v-if="canUseSheerDamage" class="calculation-add-button" size="medium" @click="addEvent('sheer')">添加贯穿</NButton>
+              <NButton class="calculation-add-button" size="medium" @click="addEvent('anomaly')">添加异常事件</NButton>
+              <NButton v-if="hasSkillGroups" class="calculation-add-button" size="medium" @click="addEvent('skillGroup')">添加技能组</NButton>
             </div>
           </div>
         </div>
@@ -555,7 +654,24 @@ function save() {
             <div class="metric-grid calculation-editor-grid">
               <label class="metric calculation-editor-field calculation-editor-field-short">
                 <dt>次数</dt>
-                <dd><NInputNumber :value="selectedEvent?.count ?? 1" :min="0" :step="1" :disabled="isAdminDefaultMode" @update:value="updateSelectedEvent({ count: Number($event ?? 1) })" /></dd>
+                <dd>
+                  <NInputNumber
+                    :value="selectedEvent?.count ?? 1"
+                    :min="selectedEventCountLimits().min"
+                    :max="selectedEventCountLimits().max ?? undefined"
+                    :step="selectedEventCountLimits().step"
+                    :disabled="isAdminDefaultMode"
+                    @update:value="updateSelectedEvent({ count: Number($event ?? 1) })"
+                  />
+                </dd>
+              </label>
+              <label v-if="selectedEvent?.kind === 'skillGroup'" class="metric calculation-editor-field calculation-editor-field-wide">
+                <dt>技能组</dt>
+                <dd><NSelect :value="selectedEvent?.skillGroupId" :options="skillGroupOptions" :disabled="isAdminDefaultMode" @update:value="updateSelectedSkillGroup(String($event))" /></dd>
+              </label>
+              <label v-if="selectedEvent?.kind === 'skillGroup'" class="metric calculation-editor-field calculation-editor-field-medium">
+                <dt>组内事件</dt>
+                <dd>{{ skillGroupEventCount(selectedSkillGroup()) }} 项</dd>
               </label>
               <label v-if="['direct', 'sheer'].includes(selectedEvent?.kind) && skillCategoryOptions.length" class="metric calculation-editor-field calculation-editor-field-medium">
                 <dt>技能大类</dt>
@@ -627,6 +743,23 @@ function save() {
               <NButton :disabled="isAdminDefaultMode" @click="showSkillPicker = true">选择技能倍率</NButton>
               <span class="muted">{{ selectedSkillSummary(selectedEvent) }}</span>
             </div>
+            <section v-if="selectedEvent?.kind === 'skillGroup'" class="skill-group-child-preview" aria-label="技能组内技能只读预览">
+              <div class="skill-group-child-preview-head">
+                <strong>组内技能（只读）</strong>
+                <span>按当前技能组次数 ×{{ eventCount(selectedEvent) }} 展示合计次数</span>
+              </div>
+              <div v-if="!selectedSkillGroup()" class="skill-group-child-preview-empty">未找到技能组</div>
+              <div v-else-if="!skillGroupChildEvents().length" class="skill-group-child-preview-empty">组内暂无事件</div>
+              <ol v-else class="skill-group-child-list">
+                <li v-for="(childEvent, index) in skillGroupChildEvents()" :key="childEvent.id ?? index" class="skill-group-child-item">
+                  <span class="skill-group-child-order">#{{ index + 1 }}</span>
+                  <span class="skill-group-child-copy">
+                    <strong>{{ skillGroupChildTitle(childEvent) }}</strong>
+                    <small>组内次数 ×{{ eventCount(childEvent) }} · 当前合计 ×{{ skillGroupChildTotalCount(childEvent) }}</small>
+                  </span>
+                </li>
+              </ol>
+            </section>
           </div>
         </div>
 
@@ -659,6 +792,26 @@ function save() {
 
 .calculation-editor-column {
   min-width: 0;
+}
+
+.calculation-add-toolbar {
+  gap: 8px;
+}
+
+.calculation-add-button {
+  min-width: 88px;
+}
+
+.calculation-add-button :deep(.n-button__border) {
+  border-color: #b8cceb;
+}
+
+.calculation-add-button :deep(.n-button__state-border) {
+  border-color: #8fb0df;
+}
+
+.calculation-add-button :deep(.n-button__content) {
+  font-weight: 700;
 }
 
 .calculation-editor-panel {
@@ -700,6 +853,146 @@ function save() {
 .calculation-editor-field :deep(.n-base-selection-label),
 .calculation-editor-field :deep(.n-input-wrapper) {
   min-width: 0;
+}
+
+.skill-group-panel .panel-body {
+  gap: 10px;
+}
+
+.skill-group-preset-field {
+  min-height: 0;
+}
+
+.skill-group-count-list {
+  display: grid;
+  gap: 8px;
+}
+
+.skill-group-count-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  background: #fff;
+}
+
+.skill-group-count-row span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.skill-group-count-row strong,
+.skill-group-count-row small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-group-count-row small {
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.skill-group-count-row :deep(.n-input-number) {
+  width: 100%;
+}
+
+.skill-group-child-preview {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--app-border);
+}
+
+.skill-group-child-preview-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.skill-group-child-preview-head strong {
+  color: var(--app-text);
+  font-size: 14px;
+}
+
+.skill-group-child-preview-head span {
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.skill-group-child-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.skill-group-child-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  background: #fff;
+}
+
+.skill-group-child-order {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--app-surface);
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.skill-group-child-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.skill-group-child-copy strong,
+.skill-group-child-copy small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.skill-group-child-copy strong {
+  color: var(--app-text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.skill-group-child-copy small,
+.skill-group-child-preview-empty {
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.skill-group-child-preview-empty {
+  padding: 14px;
+  border: 1px dashed var(--app-border);
+  border-radius: var(--app-radius-sm);
+  text-align: center;
 }
 
 @media (max-width: 1180px) {

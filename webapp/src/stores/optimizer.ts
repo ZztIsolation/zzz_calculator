@@ -69,6 +69,34 @@ function cleanMinimums(value: any = {}) {
   )
 }
 
+function cleanMainStatLimits(value: any = {}) {
+  return {
+    ...defaultMainStatLimits(),
+    ...Object.fromEntries(Object.entries(value ?? {}).map(([slot, values]) => [String(slot), normalizeArray(values)])),
+  }
+}
+
+function plainObject(value: any = {}) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {}
+  }
+  return JSON.parse(JSON.stringify(value))
+}
+
+function preferredDriveDiscDefaultSetId(agent: any = null, catalog: any = null) {
+  const setId = String(
+    agent?.preferredDriveDiscs?.defaultSetId
+      ?? agent?.preferredDriveDiscs?.defaultSet
+      ?? agent?.defaultDriveDiscSetId
+      ?? "",
+  ).trim()
+  if (!setId) {
+    return ""
+  }
+  const validIds = new Set((catalog?.driveDiscSets ?? []).map((set: any) => String(set?.id ?? "")).filter(Boolean))
+  return !validIds.size || validIds.has(setId) ? setId : ""
+}
+
 function numeric(value: unknown, fallback = 0) {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : fallback
@@ -230,6 +258,7 @@ export const useOptimizerStore = defineStore("optimizer", {
     status: "idle" as OptimizerStatus,
     algorithm: "exact-super-bound",
     fourPieceSetId: "",
+    fourPieceSetSource: "preferred" as "preferred" | "manual",
     twoPieceSetIds: [] as string[],
     fourPieceBuffMode: "auto" as "auto" | "manual",
     fourPieceBuffRuntimeInputs: {} as Record<string, any>,
@@ -262,27 +291,40 @@ export const useOptimizerStore = defineStore("optimizer", {
     },
   },
   actions: {
-    initialize(catalog: any = null) {
+    initialize(catalog: any = null, agent: any = null) {
       const saved = readSettings() ?? {}
+      const preferredFourPieceSetId = preferredDriveDiscDefaultSetId(agent, catalog)
       this.algorithm = saved.algorithm ?? this.algorithm
-      this.fourPieceSetId = saved.fourPieceSetId ?? catalog?.driveDiscSets?.[0]?.id ?? this.fourPieceSetId
+      const savedFourPieceSetId = String(saved.fourPieceSetId ?? "").trim()
+      const hasManualFourPieceSet = saved.fourPieceSetSource === "manual" && savedFourPieceSetId
+      this.fourPieceSetId = hasManualFourPieceSet
+        ? savedFourPieceSetId
+        : preferredFourPieceSetId || savedFourPieceSetId || catalog?.driveDiscSets?.[0]?.id || this.fourPieceSetId
+      this.fourPieceSetSource = hasManualFourPieceSet ? "manual" : "preferred"
       this.twoPieceSetIds = normalizeArray(saved.twoPieceSetIds)
       this.fourPieceBuffMode = saved.fourPieceBuffMode === "manual" ? "manual" : "auto"
       this.fourPieceBuffRuntimeInputs = saved.fourPieceBuffRuntimeInputs ?? {}
-      this.mainStatLimits = {
-        ...defaultMainStatLimits(),
-        ...Object.fromEntries(Object.entries(saved.mainStatLimits ?? {}).map(([slot, values]) => [String(slot), normalizeArray(values)])),
-      }
+      this.mainStatLimits = cleanMainStatLimits(saved.mainStatLimits)
       this.minimums = {
         ...defaultMinimums(),
         ...cleanMinimums(saved.minimums),
       }
       this.persistSettings()
     },
+    applyAgentPreferredDriveDiscSet(agent: any = null, catalog: any = null) {
+      const preferredFourPieceSetId = preferredDriveDiscDefaultSetId(agent, catalog)
+      if (!preferredFourPieceSetId || preferredFourPieceSetId === this.fourPieceSetId) {
+        return
+      }
+      this.fourPieceSetId = preferredFourPieceSetId
+      this.fourPieceSetSource = "preferred"
+      this.persistSettings()
+    },
     persistSettings() {
       writeSettings({
         algorithm: this.algorithm,
         fourPieceSetId: this.fourPieceSetId,
+        fourPieceSetSource: this.fourPieceSetSource,
         twoPieceSetIds: this.twoPieceSetIds,
         fourPieceBuffMode: this.fourPieceBuffMode,
         fourPieceBuffRuntimeInputs: this.fourPieceBuffRuntimeInputs,
@@ -296,10 +338,37 @@ export const useOptimizerStore = defineStore("optimizer", {
     },
     setFourPieceSet(id: string) {
       this.fourPieceSetId = id
+      this.fourPieceSetSource = "manual"
       this.persistSettings()
     },
     setTwoPieceSetIds(ids: string[]) {
       this.twoPieceSetIds = normalizeArray(ids)
+      this.persistSettings()
+    },
+    applyAdvancedSettings(settings: any = {}) {
+      this.algorithm = String(settings.algorithm || this.algorithm || "exact-super-bound")
+      this.fourPieceBuffMode = settings.fourPieceBuffMode === "manual" ? "manual" : "auto"
+      this.fourPieceBuffRuntimeInputs = plainObject(settings.fourPieceBuffRuntimeInputs)
+      this.mainStatLimits = cleanMainStatLimits(settings.mainStatLimits)
+      this.minimums = {
+        ...defaultMinimums(),
+        ...cleanMinimums(settings.minimums),
+      }
+      this.persistSettings()
+    },
+    setMainStatLimits(limits: any = {}) {
+      this.mainStatLimits = cleanMainStatLimits(limits)
+      this.persistSettings()
+    },
+    setMinimums(minimums: any = {}) {
+      this.minimums = {
+        ...defaultMinimums(),
+        ...cleanMinimums(minimums),
+      }
+      this.persistSettings()
+    },
+    setFourPieceBuffRuntimeInputs(inputs: any = {}) {
+      this.fourPieceBuffRuntimeInputs = plainObject(inputs)
       this.persistSettings()
     },
     toggleMainStatLimit(slot: string | number, stat: string) {

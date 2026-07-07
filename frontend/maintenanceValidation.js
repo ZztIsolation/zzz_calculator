@@ -17,6 +17,7 @@ const SKILL_ROW_DAMAGE_BASIS_VALUES = new Set(["atk", "sheerForce"])
 const SKILL_LEVEL_SCALE_VALUES = new Set(["skill", "coreSkill"])
 const CORE_SKILL_LEVEL_VALUES = new Set(["0", "A", "B", "C", "D", "E", "F"])
 const DAMAGE_EVENT_KIND_VALUES = new Set(["direct", "anomaly", "disorder", "sheer"])
+const CALCULATION_EVENT_KIND_VALUES = new Set([...DAMAGE_EVENT_KIND_VALUES, "skillGroup"])
 const ANOMALY_SETTLEMENT_TYPE_VALUES = new Set(["attribute", "disorder"])
 const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
 const CALCULATION_MODE_VALUES = new Set(["single", "sheer", "anomaly", "custom"])
@@ -734,13 +735,40 @@ function validateNonNegativeNumber(errors, value, path, label = "数值") {
     }
 }
 
-function validateCalculationEvent(errors, event, path, context = {}, agentId = "") {
+function validateCalculationEvent(errors, event, path, context = {}, agentId = "", options = {}) {
     if (!event || typeof event !== "object" || Array.isArray(event)) {
         add(errors, path, "必须是对象。")
         return
     }
     validateOptionalId(errors, event, `${path}.id`)
-    requireEnum(errors, event.kind, DAMAGE_EVENT_KIND_VALUES, `${path}.kind`)
+    requireEnum(errors, event.kind, options.allowSkillGroup ? CALCULATION_EVENT_KIND_VALUES : DAMAGE_EVENT_KIND_VALUES, `${path}.kind`)
+    if (event.kind === "skillGroup") {
+        if (!options.allowSkillGroup) {
+            return
+        }
+        const skillGroupId = String(event.skillGroupId ?? event.groupId ?? "").trim()
+        if (!skillGroupId) {
+            add(errors, `${path}.skillGroupId`, "必须选择技能组。")
+        }
+        const group = options.skillGroupById?.get(skillGroupId)
+        if (skillGroupId && !group) {
+            add(errors, `${path}.skillGroupId`, "技能组不存在。")
+        }
+        const count = validateSkillGroupCount(errors, event.count ?? group?.defaultCount ?? 1, `${path}.count`)
+        if (group) {
+            const minCount = Number(group.minCount ?? 0)
+            const maxCount = group.maxCount === undefined || group.maxCount === null || group.maxCount === ""
+                ? null
+                : Number(group.maxCount)
+            if (Number.isFinite(count) && Number.isFinite(minCount) && count < minCount) {
+                add(errors, `${path}.count`, "次数不能小于技能组最小次数。")
+            }
+            if (Number.isFinite(count) && Number.isFinite(maxCount) && count > maxCount) {
+                add(errors, `${path}.count`, "次数不能大于技能组最大次数。")
+            }
+        }
+        return
+    }
     validatePositiveNumber(errors, event.count ?? 1, `${path}.count`, "次数")
 
     if (event.kind === "direct" || event.kind === "sheer") {
@@ -773,7 +801,101 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
     validateNonNegativeNumber(errors, event.elapsedSeconds ?? 0, `${path}.elapsedSeconds`, "已生效秒数")
 }
 
-function validateDefaultCalculationConfig(errors, config, context = {}, agentId = "") {
+function validateCalculationEventList(errors, events, path, context = {}, agentId = "", options = {}) {
+    if (!Array.isArray(events)) {
+        add(errors, path, "必须是数组。")
+        return new Set()
+    }
+    if (!events.length) {
+        if (!options.allowEmpty) {
+            add(errors, path, "至少需要一个事件。")
+        }
+        return new Set()
+    }
+    const ids = new Set()
+    events.forEach((event, index) => {
+        validateCalculationEvent(errors, event, `${path}[${index}]`, context, agentId, options)
+        if (event?.id) {
+            if (ids.has(event.id)) {
+                add(errors, `${path}[${index}].id`, "事件 ID 不能重复。")
+            }
+            ids.add(event.id)
+        }
+    })
+    return ids
+}
+
+function validateSkillGroupCount(errors, value, path, label = "次数") {
+    const numericValue = requireFinite(errors, value, path)
+    if (Number.isFinite(numericValue) && numericValue < 0) {
+        add(errors, path, `${label}不能小于 0。`)
+    }
+    return numericValue
+}
+
+function validateCalculationSkillGroups(errors, groups, path, context = {}, agentId = "") {
+    if (groups === undefined || groups === null) {
+        return new Map()
+    }
+    if (!Array.isArray(groups)) {
+        add(errors, path, "必须是数组。")
+        return new Map()
+    }
+    const groupById = new Map()
+    groups.forEach((group, index) => {
+        const groupPath = `${path}[${index}]`
+        if (!group || typeof group !== "object" || Array.isArray(group)) {
+            add(errors, groupPath, "必须是对象。")
+            return
+        }
+        requireId(errors, group, `${groupPath}.id`)
+        const id = String(group.id ?? "").trim()
+        if (id) {
+            if (groupById.has(id)) {
+                add(errors, `${groupPath}.id`, "技能组 ID 不能重复。")
+            }
+            groupById.set(id, group)
+        }
+        if (group.name !== undefined) {
+            requireName(errors, group.name, `${groupPath}.name.zhCN`)
+        }
+        if (group.description !== undefined && hasText(group.description)) {
+            requireName(errors, group.description, `${groupPath}.description.zhCN`)
+        }
+        const minCount = validateSkillGroupCount(errors, group.minCount ?? 0, `${groupPath}.minCount`)
+        const maxCount = group.maxCount === undefined || group.maxCount === null || group.maxCount === ""
+            ? null
+            : validateSkillGroupCount(errors, group.maxCount, `${groupPath}.maxCount`)
+        const defaultCount = validateSkillGroupCount(errors, group.defaultCount ?? 0, `${groupPath}.defaultCount`)
+        const step = requireFinite(errors, group.step ?? 1, `${groupPath}.step`)
+        if (Number.isFinite(step) && step <= 0) {
+            add(errors, `${groupPath}.step`, "步长必须大于 0。")
+        }
+        if (Number.isFinite(minCount) && Number.isFinite(maxCount) && maxCount < minCount) {
+            add(errors, `${groupPath}.maxCount`, "最大次数不能小于最小次数。")
+        }
+        if (Number.isFinite(defaultCount) && Number.isFinite(minCount) && defaultCount < minCount) {
+            add(errors, `${groupPath}.defaultCount`, "默认次数不能小于最小次数。")
+        }
+        if (Number.isFinite(defaultCount) && Number.isFinite(maxCount) && defaultCount > maxCount) {
+            add(errors, `${groupPath}.defaultCount`, "默认次数不能大于最大次数。")
+        }
+        validateCalculationEventList(errors, group.events, `${groupPath}.events`, context, agentId)
+    })
+    return groupById
+}
+
+function mergedSkillGroupMap(primary = new Map(), legacy = new Map()) {
+    const merged = new Map(primary)
+    for (const [id, group] of legacy.entries()) {
+        if (!merged.has(id)) {
+            merged.set(id, group)
+        }
+    }
+    return merged
+}
+
+function validateDefaultCalculationConfig(errors, config, context = {}, agentId = "", roleSkillGroupById = new Map()) {
     if (config === undefined || config === null) {
         return
     }
@@ -785,26 +907,18 @@ function validateDefaultCalculationConfig(errors, config, context = {}, agentId 
     if (config.name !== undefined) {
         requireName(errors, config.name, "defaultCalculationConfig.name.zhCN")
     }
-    if (!Array.isArray(config.events)) {
-        add(errors, "defaultCalculationConfig.events", "必须是数组。")
-        return
-    }
-    if (!config.events.length) {
-        add(errors, "defaultCalculationConfig.events", "至少需要一个事件。")
-        return
-    }
-    const ids = new Set()
-    config.events.forEach((event, index) => {
-        validateCalculationEvent(errors, event, `defaultCalculationConfig.events[${index}]`, context, agentId)
-        if (event?.id) {
-            if (ids.has(event.id)) {
-                add(errors, `defaultCalculationConfig.events[${index}].id`, "事件 ID 不能重复。")
-            }
-            ids.add(event.id)
-        }
+    const legacyGroupById = validateCalculationSkillGroups(errors, config.skillGroups, "defaultCalculationConfig.skillGroups", context, agentId)
+    const skillGroupById = mergedSkillGroupMap(roleSkillGroupById, legacyGroupById)
+    const ids = validateCalculationEventList(errors, config.events, "defaultCalculationConfig.events", context, agentId, {
+        allowEmpty: true,
+        allowSkillGroup: true,
+        skillGroupById,
     })
     if (config.selectedEventId && !ids.has(config.selectedEventId)) {
         add(errors, "defaultCalculationConfig.selectedEventId", "必须指向一个已配置事件。")
+    }
+    if (!ids.size && !legacyGroupById.size) {
+        add(errors, "defaultCalculationConfig.events", "至少需要一个事件或技能组。")
     }
 }
 
@@ -1045,7 +1159,8 @@ function validateAgent(item, context) {
     validateEffectSet(errors, item?.combatBuffs?.additionalAbility, "combatBuffs.additionalAbility", { sourceType: "self" })
     validateCinemaBuffs(errors, item?.combatBuffs?.cinemaBuffs)
     validatePreferredDriveDiscs(errors, item?.preferredDriveDiscs, context)
-    validateDefaultCalculationConfig(errors, item?.defaultCalculationConfig, context, item?.id)
+    const roleSkillGroupById = validateCalculationSkillGroups(errors, item?.skillGroups, "skillGroups", context, item?.id)
+    validateDefaultCalculationConfig(errors, item?.defaultCalculationConfig, context, item?.id, roleSkillGroupById)
 
     if (item?.coreSkill) {
         if (typeof item.coreSkill !== "object" || Array.isArray(item.coreSkill)) {

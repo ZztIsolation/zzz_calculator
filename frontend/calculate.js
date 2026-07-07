@@ -15,6 +15,14 @@ import { initDriveDiscAnalysis } from "./drive-disc-analysis.js"
 import { loadCatalog } from "./catalog-loader.js"
 import { calculateInCombatPanel } from "./calculator-core.js"
 import { loadCurrentUserDriveDiscStore, upsertDriveDiscLoadout } from "./local-store.js"
+import {
+    calculationSkillGroups,
+    defaultSkillGroupReferenceEvent,
+    hasCalculationSkillGroups,
+    normalizeSkillGroupReferenceEvent,
+    skillGroupById,
+    skillGroupCountLimits,
+} from "./calculationSkillGroups.js"
 
 const els = {
     status: document.getElementById("status"),
@@ -138,6 +146,7 @@ const els = {
     addCalculationSheerEventBtn: document.getElementById("addCalculationSheerEventBtn"),
     addCalculationAnomalyEventBtn: document.getElementById("addCalculationAnomalyEventBtn"),
     addCalculationDisorderEventBtn: document.getElementById("addCalculationDisorderEventBtn"),
+    addCalculationSkillGroupEventBtn: document.getElementById("addCalculationSkillGroupEventBtn"),
     calculationConfigFooterSummary: document.getElementById("calculationConfigFooterSummary"),
     saveCalculationConfigBtn: document.getElementById("saveCalculationConfigBtn"),
     optimizeBtn: document.getElementById("optimizeBtn"),
@@ -1403,7 +1412,7 @@ function syncCalculationModeSelectOptions(selectedMode = calculationConfigMode) 
     const agent = getAgent(els.agentSelect?.value)
     const normalizedMode = normalizeCalculationModeForAgent(selectedMode, agent)
     const options = [
-        !isRuptureAgent(agent) ? ["single", "最大化单个伤害"] : null,
+        !isRuptureAgent(agent) ? ["single", "最大化单个技能伤害"] : null,
         isRuptureAgent(agent) ? ["sheer", "最大化贯穿伤害"] : null,
         ["anomaly", "最大化异常伤害"],
         [ADMIN_DEFAULT_CALCULATION_MODE, adminDefaultCalculationLabel(adminDefaultCalculationConfig())],
@@ -1459,23 +1468,39 @@ function stripSkillRefLevel(skillRef = null) {
     }
 }
 
-function calculationConfigFromStored(config = null) {
+function calculationConfigFromStored(config = null, source = getAgent(els.agentSelect?.value)) {
+    const groupSource = hasCalculationSkillGroups(source) ? source : config
     const events = Array.isArray(config?.events)
-        ? config.events.map((event, index) => ({
-            ...event,
-            id: String(event.id ?? `${event.kind ?? "event"}-${index + 1}`),
-            kind: event.kind === "sheer" ? "sheer" : event.kind === "anomaly" || event.kind === "disorder" ? "anomaly" : "direct",
-            settlementType: anomalySettlementType(event),
-            ...(anomalySettlementType(event) === "disorder"
-                ? {
-                    anomalyEffect: anomalyEffectId(event) || "burn",
-                    disorderType: normalizeDisorderType(event.disorderType),
+        ? config.events.map((event, index) => {
+            if (event?.kind === "skillGroup") {
+                return {
+                    id: String(event.id ?? `skillGroup-${index + 1}`),
+                    kind: "skillGroup",
+                    skillGroupId: String(event.skillGroupId ?? event.groupId ?? ""),
+                    count: Number(event.count ?? 1),
                 }
-                : {}),
-            count: Number(event.count ?? 1),
-            ...(event.skillRef ? { skillRef: stripSkillRefLevel(event.skillRef) } : {}),
-        }))
+            }
+            return {
+                ...event,
+                id: String(event.id ?? `${event.kind ?? "event"}-${index + 1}`),
+                kind: event.kind === "sheer" ? "sheer" : event.kind === "anomaly" || event.kind === "disorder" ? "anomaly" : "direct",
+                settlementType: anomalySettlementType(event),
+                ...(anomalySettlementType(event) === "disorder"
+                    ? {
+                        anomalyEffect: anomalyEffectId(event) || "burn",
+                        disorderType: normalizeDisorderType(event.disorderType),
+                    }
+                    : {}),
+                count: Number(event.count ?? 1),
+                ...(event.skillRef ? { skillRef: stripSkillRefLevel(event.skillRef) } : {}),
+            }
+        })
         : []
+    if (!events.length && hasCalculationSkillGroups(groupSource)) {
+        events.push(...calculationSkillGroups(groupSource)
+            .map((group, index) => defaultSkillGroupReferenceEvent(groupSource, group.id, index))
+            .filter(Boolean))
+    }
     return {
         mode: CALCULATION_CONFIG_MODE_VALUES.has(config?.mode) ? config.mode : (events.length > 1 ? "custom" : "single"),
         selectedEventId: config?.selectedEventId ?? events[0]?.id ?? null,
@@ -1488,11 +1513,12 @@ function cloneCalculationEvents(events = []) {
 }
 
 function adminDefaultCalculationConfig(agentId = els.agentSelect?.value) {
-    const rawConfig = getAgent(agentId)?.defaultCalculationConfig
+    const agent = getAgent(agentId)
+    const rawConfig = agent?.defaultCalculationConfig
     if (!rawConfig) {
         return null
     }
-    const normalized = calculationConfigFromStored(rawConfig)
+    const normalized = calculationConfigFromStored(rawConfig, agent)
     if (!normalized.events.length) {
         return null
     }
@@ -1511,6 +1537,10 @@ function adminDefaultCalculationLabel(config = adminDefaultCalculationConfig()) 
 
 function adminDefaultCalculationEvents(config = adminDefaultCalculationConfig()) {
     return cloneCalculationEvents(config?.events ?? [])
+}
+
+function skillGroupLabel(group = {}) {
+    return localizedText(group.name) || group.id || "技能组"
 }
 
 function adminDefaultDamageConfigForAgent(agentId = els.agentSelect?.value) {
@@ -1640,7 +1670,7 @@ function firstDamageSkillRef() {
 }
 
 function uniqueCalculationEventId(kind = "event") {
-    const prefix = ["direct", "sheer", "disorder", "anomaly"].includes(kind) ? kind : "event"
+    const prefix = ["direct", "sheer", "disorder", "anomaly", "skillGroup"].includes(kind) ? kind : "event"
     let index = calculationConfigEvents.length + 1
     const used = new Set(calculationConfigEvents.map(event => event.id))
     while (used.has(`${prefix}-${index}`)) {
@@ -1651,6 +1681,16 @@ function uniqueCalculationEventId(kind = "event") {
 
 function calculationEventDraft(kind = "direct") {
     const id = uniqueCalculationEventId(kind)
+    if (kind === "skillGroup") {
+        return {
+            ...(defaultSkillGroupReferenceEvent(getAgent(els.agentSelect?.value), calculationSkillGroups(getAgent(els.agentSelect?.value))[0]?.id, calculationConfigEvents.length) ?? {
+                kind: "skillGroup",
+                skillGroupId: "",
+                count: 1,
+            }),
+            id,
+        }
+    }
     if (kind === "anomaly") {
         const anomalyEffect = defaultAnomalyEffectIdForAgent()
         return {
@@ -1796,6 +1836,10 @@ function configuredCalculationEventsForRequest() {
 }
 
 function calculationEventTitle(event = {}) {
+    if (event.kind === "skillGroup") {
+        const group = skillGroupById(getAgent(els.agentSelect?.value), event.skillGroupId)
+        return `${skillGroupLabel(group ?? { id: event.skillGroupId })} ×${event.count ?? 1}`
+    }
     if (event.kind === "anomaly" && anomalySettlementType(event) === "attribute") {
         const effect = anomalyEffects().find(item => item.id === event.anomalyEffect)
         return `${localizedText(effect?.label) || ANOMALY_EFFECT_LABELS[event.anomalyEffect] || event.anomalyEffect} ×${event.count ?? 1}`
@@ -1812,6 +1856,29 @@ function calculationEventTitle(event = {}) {
     const row = (move?.rows ?? []).find(item => item.id === event.skillRef?.rowId)
     const label = [category && nameOf(category), move && nameOf(move), row && (localizedText(row.label) || row.id)].filter(Boolean).join(" / ")
     return `${label || (event.kind === "sheer" ? "贯穿" : "直伤")} ×${event.count ?? 1}`
+}
+
+function calculationEventSubjectLabel(event = {}) {
+    const kind = calculationEventUiKind(event)
+    if (kind === "skillGroup") {
+        const group = skillGroupById(getAgent(els.agentSelect?.value), event.skillGroupId)
+        return skillGroupLabel(group ?? { id: event.skillGroupId })
+    }
+    if (kind === "anomaly" && anomalySettlementType(event) === "attribute") {
+        return anomalyEffectLabel(event.anomalyEffect ?? defaultAnomalyEffectIdForAgent(), "attribute")
+    }
+    if (kind === "disorder") {
+        const effectLabel = anomalyEffectLabel(anomalyEffectId(event), "disorder")
+        return `${normalizeDisorderType(event.disorderType) === "polarized" ? "极性" : ""}${effectLabel}`
+    }
+    const parts = directCalculationEventParts(event)
+    const label = [parts.category, parts.move, parts.row].filter(value => value && value !== "-").join(" / ")
+    return label || calculationEventKindLabel(kind)
+}
+
+function calculationEventFullLabel(event = {}) {
+    const kind = calculationEventUiKind(event)
+    return `${calculationEventKindLabel(kind)} · ${calculationEventSubjectLabel(event)}`
 }
 
 function calculationConfigSummaryText(config = null) {
@@ -1833,9 +1900,9 @@ function calculationConfigSummaryText(config = null) {
     }
     const events = config?.events ?? (mode === "single" ? [singleEventFromControls()] : calculationConfigEvents)
     if (!events.length) {
-        return mode === "custom" ? "自定义：未配置事件" : "最大化单个伤害"
+        return mode === "custom" ? "自定义：未配置事件" : "最大化单个技能伤害"
     }
-    const prefix = mode === "custom" ? "自定义" : "单个伤害"
+    const prefix = mode === "custom" ? "自定义" : "单个技能伤害"
     return `${prefix}：${events.map(calculationEventTitle).join(" + ")}`
 }
 
@@ -2193,7 +2260,72 @@ function disorderTypeOptions(selected = "normal") {
     return optionHtml(DISORDER_TYPE_OPTIONS, normalizeDisorderType(selected))
 }
 
+function calculationSkillGroupOptions(selected = "") {
+    return optionHtml(calculationSkillGroups(getAgent(els.agentSelect?.value)).map(group => [group.id, skillGroupLabel(group)]), selected)
+}
+
+function selectedCalculationSkillGroup(event = {}) {
+    return skillGroupById(getAgent(els.agentSelect?.value), event.skillGroupId)
+}
+
+function calculationEventCountLimits(event = {}) {
+    if (event.kind !== "skillGroup") {
+        return { min: 0, max: null, step: 1 }
+    }
+    return skillGroupCountLimits(selectedCalculationSkillGroup(event) ?? {})
+}
+
+function calculationEventCount(event = {}) {
+    const count = Number(event?.count ?? 1)
+    return Number.isFinite(count) ? count : 1
+}
+
+function calculationSkillGroupChildPreviewHtml(event = {}) {
+    const group = selectedCalculationSkillGroup(event)
+    const groupCount = calculationEventCount(event)
+    if (!group) {
+        return `
+          <section class="calculation-skill-group-child-preview">
+            <div class="calculation-skill-group-child-preview-head">
+              <strong>组内技能（只读）</strong>
+              <span>按当前技能组次数 ×${escapeHtml(groupCount)} 展示合计次数</span>
+            </div>
+            <div class="calculation-skill-group-child-empty">未找到技能组</div>
+          </section>
+        `
+    }
+    const childEvents = Array.isArray(group.events) ? group.events : []
+    const body = childEvents.length
+        ? `<ol class="calculation-skill-group-child-list">
+            ${childEvents.map((childEvent, index) => {
+                const childCount = calculationEventCount(childEvent)
+                return `
+                  <li class="calculation-skill-group-child-item">
+                    <span class="calculation-skill-group-child-order">#${index + 1}</span>
+                    <span class="calculation-skill-group-child-copy">
+                      <strong>${escapeHtml(calculationEventFullLabel(eventWithCurrentSkillLevel(childEvent)))}</strong>
+                      <small>${escapeHtml(`组内次数 ×${childCount} · 当前合计 ×${childCount * groupCount}`)}</small>
+                    </span>
+                  </li>
+                `
+            }).join("")}
+          </ol>`
+        : `<div class="calculation-skill-group-child-empty">组内暂无事件</div>`
+    return `
+      <section class="calculation-skill-group-child-preview">
+        <div class="calculation-skill-group-child-preview-head">
+          <strong>组内技能（只读）</strong>
+          <span>按当前技能组次数 ×${escapeHtml(groupCount)} 展示合计次数</span>
+        </div>
+        ${body}
+      </section>
+    `
+}
+
 function calculationEventUiKind(event = {}) {
+    if (event.kind === "skillGroup") {
+        return "skillGroup"
+    }
     if (event.kind === "sheer") {
         return "sheer"
     }
@@ -2206,6 +2338,7 @@ function calculationEventKindLabel(kind) {
         sheer: "贯穿",
         anomaly: "属性异常",
         disorder: "紊乱",
+        skillGroup: "技能组",
     }[kind] ?? "事件"
 }
 
@@ -2250,6 +2383,9 @@ function selectCalculationConfigEvent(index) {
 
 function addCalculationConfigEvent(kind = "direct") {
     if (calculationConfigModeReadonly()) {
+        return
+    }
+    if (kind === "skillGroup" && !hasCalculationSkillGroups(getAgent(els.agentSelect?.value))) {
         return
     }
     syncEditingEventFromEditor({ renderList: false })
@@ -2319,19 +2455,38 @@ function calculationEventListItemHtml(event = {}, index = 0, { readonly = false 
 function calculationEventEditorHtml(event = {}, { readonly = false } = {}) {
     const kind = calculationEventUiKind(event)
     const usesSkill = ["direct", "sheer"].includes(kind)
+    const usesSkillGroup = kind === "skillGroup"
     const skillRef = usesSkill ? (stripSkillRefLevel(event.skillRef) ?? firstDamageSkillRef()) : null
     const categoryId = skillRef?.categoryId ?? damageSkillCategories()[0]?.id ?? ""
     const moveId = skillRef?.moveId ?? damageSkillCategories().find(item => item.id === categoryId)?.moves?.[0]?.id ?? ""
     const rowId = skillRef?.rowId ?? damageSkillCategories().find(item => item.id === categoryId)?.moves?.find(item => item.id === moveId)?.rows?.[0]?.id ?? ""
+    const skillGroup = selectedCalculationSkillGroup(event)
+    const countLimits = calculationEventCountLimits(event)
+    const countMax = countLimits.max === null ? "" : ` max="${escapeHtml(countLimits.max)}"`
+    const kindOptions = [
+        ["direct", "直伤"],
+        ["sheer", "贯穿"],
+        ["anomaly", "属性异常"],
+        ["disorder", "紊乱"],
+        ...(hasCalculationSkillGroups(getAgent(els.agentSelect?.value)) || usesSkillGroup ? [["skillGroup", "技能组"]] : []),
+    ]
     const disabled = readonly ? " disabled" : ""
     return `
         <label class="field">
           <span>类型</span>
-          <select data-calculation-event-kind${disabled}>${optionHtml([["direct", "直伤"], ["sheer", "贯穿"], ["anomaly", "属性异常"], ["disorder", "紊乱"]], kind)}</select>
+          <select data-calculation-event-kind${disabled}>${optionHtml(kindOptions, kind)}</select>
         </label>
         <label class="field">
           <span>次数</span>
-          <input data-calculation-event-count type="number" min="0" step="1" value="${escapeHtml(event.count ?? 1)}"${disabled}>
+          <input data-calculation-event-count type="number" min="${escapeHtml(countLimits.min)}"${countMax} step="${escapeHtml(countLimits.step)}" value="${escapeHtml(event.count ?? 1)}"${disabled}>
+        </label>
+        <label class="field calculation-skill-group-only"${usesSkillGroup ? "" : " hidden"}>
+          <span>技能组</span>
+          <select data-calculation-skill-group${disabled}>${calculationSkillGroupOptions(event.skillGroupId)}</select>
+        </label>
+        <label class="field calculation-skill-group-only"${usesSkillGroup ? "" : " hidden"}>
+          <span>组内事件</span>
+          <input type="text" value="${escapeHtml(Array.isArray(skillGroup?.events) ? `${skillGroup.events.length} 项` : "未选择")}" disabled>
         </label>
         <label class="field calculation-direct-only"${usesSkill ? "" : " hidden"}>
           <span>技能大类</span>
@@ -2369,6 +2524,7 @@ function calculationEventEditorHtml(event = {}, { readonly = false } = {}) {
           <span>已生效秒数</span>
           <input data-calculation-elapsed type="number" min="0" step="0.1" value="${escapeHtml(event.elapsedSeconds ?? 0)}"${disabled}>
         </label>
+        ${usesSkillGroup ? calculationSkillGroupChildPreviewHtml(event) : ""}
     `
 }
 
@@ -2404,6 +2560,14 @@ function calculationEventPreviewRows(event = {}) {
         ["类型", calculationEventKindLabel(kind)],
         ["次数", `×${event.count ?? 1}`],
     ]
+    if (kind === "skillGroup") {
+        const group = selectedCalculationSkillGroup(event)
+        return [
+            ...rows,
+            ["技能组", skillGroupLabel(group ?? { id: event.skillGroupId })],
+            ["组内事件", Array.isArray(group?.events) ? `${group.events.length} 项` : "未选择"],
+        ]
+    }
     if (["direct", "sheer"].includes(kind)) {
         const parts = directCalculationEventParts(event)
         return [
@@ -2456,6 +2620,7 @@ function adminDefaultCalculationEventDetailHtml(event = {}) {
             </div>
           `).join("")}
         </div>
+        ${calculationEventUiKind(event) === "skillGroup" ? calculationSkillGroupChildPreviewHtml(event) : ""}
     `
 }
 
@@ -2503,7 +2668,7 @@ function renderCalculationEventEditor(events = calculationConfigEvents) {
     if (els.calculationEventEditorFields) {
         els.calculationEventEditorFields.innerHTML = event
             ? calculationEventEditorHtml(event, { readonly })
-            : `<div class="calculation-event-editor-empty">左侧添加直伤、属性异常或紊乱事件。</div>`
+            : `<div class="calculation-event-editor-empty">左侧添加技能、异常或技能组事件。</div>`
     }
     if (els.duplicateCalculationEventBtn) {
         els.duplicateCalculationEventBtn.disabled = !event || readonly
@@ -2556,11 +2721,17 @@ function syncCalculationConfigModeFields(selectedMode = els.calculationConfigMod
         els.addCalculationSheerEventBtn,
         els.addCalculationAnomalyEventBtn,
         els.addCalculationDisorderEventBtn,
+        els.addCalculationSkillGroupEventBtn,
     ]) {
         if (button) {
             button.hidden = !showCustomEvents
             button.disabled = !showCustomEvents
         }
+    }
+    if (els.addCalculationSkillGroupEventBtn) {
+        const canUseSkillGroup = showCustomEvents && hasCalculationSkillGroups(getAgent(els.agentSelect?.value))
+        els.addCalculationSkillGroupEventBtn.hidden = !canUseSkillGroup
+        els.addCalculationSkillGroupEventBtn.disabled = !canUseSkillGroup
     }
     renderCalculationConfigEvents()
     renderCalculationObjectiveControls(mode)
@@ -2574,6 +2745,19 @@ function readCalculationEventFromEditor(index = calculationConfigEditingIndex) {
     }
     const kind = els.calculationEventEditorFields.querySelector("[data-calculation-event-kind]")?.value ?? calculationEventUiKind(current)
     const count = Number(els.calculationEventEditorFields.querySelector("[data-calculation-event-count]")?.value || 1)
+    if (kind === "skillGroup") {
+        return normalizeSkillGroupReferenceEvent({
+            id: current.id,
+            kind: "skillGroup",
+            skillGroupId: els.calculationEventEditorFields.querySelector("[data-calculation-skill-group]")?.value ?? current.skillGroupId,
+            count,
+        }, getAgent(els.agentSelect?.value), index) ?? {
+            id: current.id,
+            kind: "skillGroup",
+            skillGroupId: "",
+            count,
+        }
+    }
     if (kind === "anomaly") {
         return {
             id: current.id,
@@ -7871,6 +8055,13 @@ els.calculationConfigModal?.addEventListener("change", event => {
         const rowSelect = els.calculationEventEditorFields.querySelector("[data-calculation-skill-row]")
         rowSelect.innerHTML = calculationSkillRowOptions(categoryId, event.target.value)
         syncEditingEventFromEditor()
+        return
+    }
+    if (event.target.matches("[data-calculation-skill-group]")) {
+        syncEditingEventFromEditor({ renderList: false })
+        renderCalculationEventEditor()
+        renderCalculationConfigEventList()
+        syncCalculationConfigModalSummary()
         return
     }
     syncEditingEventFromEditor()

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref, watch } from "vue"
-import { NButton, NCheckbox, NInputNumber, NModal, NSelect, NTabPane, NTabs, NTag } from "naive-ui"
+import { NButton, NInput, NInputNumber, NModal, NSelect, NTag } from "naive-ui"
 import { LineChart, RefreshCcw, Save, SlidersHorizontal, Sparkles, X } from "lucide-vue-next"
 import BuffPickerModal from "@/components/BuffPickerModal.vue"
 import CalculationConfigModal from "@/components/CalculationConfigModal.vue"
@@ -9,13 +9,12 @@ import DamageWhiteBox from "@/components/DamageWhiteBox.vue"
 import DriveDiscAnalysisModal from "@/components/DriveDiscAnalysisModal.vue"
 import EnemyTargetConfigPanel from "@/components/EnemyTargetConfigPanel.vue"
 import ImageAvatar from "@/components/ImageAvatar.vue"
-import LayerSlider from "@/components/LayerSlider.vue"
+import OptimizerConfigModal from "@/components/OptimizerConfigModal.vue"
 import PanelStatTable from "@/components/PanelStatTable.vue"
-import { imageForAgent, imageForDriveDiscSet, imageForWEngine } from "@/utils/assets"
+import { fallbackIcon, imageForAgent, imageForDriveDiscSet, imageForWEngine } from "@/utils/assets"
 import { buffLabelForId } from "@/utils/combatBuffs"
 import {
   attributeLabel,
-  buffDisplayName,
   buffEffectLines,
   damageEventSummaryTitle,
   damageModeLabel,
@@ -42,12 +41,6 @@ import {
   skillLevelLabel,
   skillLevelValues,
 } from "@core/skillMultiplierCandidates.js"
-import {
-  defaultRuntimeForBuff,
-  normalizeRuntimeForBuff,
-  runtimeSourceGroups,
-  runtimeStackGroups,
-} from "@core/shared-combat.js"
 
 const catalogStore = useCatalogStore()
 const accountStore = useAccountStore()
@@ -57,14 +50,22 @@ const optimizerStore = useOptimizerStore()
 
 const showBuffPicker = ref(false)
 const showCalculationConfig = ref(false)
+const showOptimizerConfig = ref(false)
 const showDriveDiscAnalysis = ref(false)
 const showOptimizedApplyConfirm = ref(false)
 const showFourPieceSetModal = ref(false)
 const showTwoPieceSetModal = ref(false)
+const showManualDiscPicker = ref(false)
+const showSaveLoadoutModal = ref(false)
 const pendingOptimizedRank = ref(0)
-const selectedOptimizerResultRank = ref(0)
 const draftFourPieceSetId = ref("")
 const draftTwoPieceSetIds = ref<string[]>([])
+const activeManualDiscSlot = ref(0)
+const manualDiscSetFilter = ref("")
+const manualDiscMainStatFilter = ref("")
+const manualDiscSearch = ref("")
+const loadoutNameDraft = ref("")
+const saveLoadoutMode = ref<"manual" | "optimized">("manual")
 const OPTIMIZED_RESULT_LIMIT = 5
 const OPTIMIZER_RESULT_SLOTS = [1, 2, 3, 4, 5, 6]
 
@@ -73,7 +74,7 @@ onMounted(async () => {
   await inventoryStore.load()
   if (catalogStore.catalog && catalogStore.meta) {
     buildStore.initialize(catalogStore.catalog, catalogStore.meta)
-    optimizerStore.initialize(catalogStore.catalog)
+    optimizerStore.initialize(catalogStore.catalog, catalogStore.agents.find((item: any) => item.id === buildStore.agentId))
     if (!optimizerStore.fourPieceSetId) {
       optimizerStore.setFourPieceSet(catalogStore.driveDiscSets[0]?.id ?? "")
     }
@@ -86,6 +87,10 @@ watch(() => accountStore.currentOwnerId, async () => {
   optimizerStore.reset()
   if (catalogStore.catalog && catalogStore.meta) {
     buildStore.initialize(catalogStore.catalog, catalogStore.meta)
+    optimizerStore.applyAgentPreferredDriveDiscSet(
+      catalogStore.agents.find((item: any) => item.id === buildStore.agentId),
+      catalogStore.catalog,
+    )
   }
   recalculate()
 })
@@ -220,31 +225,140 @@ const optimizedRankOptions = computed(() => topOptimizedResultSchemes.value.map(
   label: `第 ${scheme.rank} 名 · ${formatNumber(scheme.score)}`,
   value: scheme.rank,
 })))
-const selectedOptimizerResultScheme = computed(() => {
-  const rank = Number(selectedOptimizerResultRank.value)
-  return topOptimizedResultSchemes.value.find((scheme: any) => Number(scheme.rank) === rank)
-    ?? topOptimizedResultSchemes.value[0]
-    ?? null
-})
-const selectedOptimizerResultRows = computed<Array<{ slot: number, disc: any | null }>>(() => {
+const selectedDriveDiscRows = computed<Array<{ slot: number, disc: any | null }>>(() => {
   const bySlot = new Map<number, any>(
-    (selectedOptimizerResultScheme.value?.driveDiscs ?? [])
-      .map((disc: any) => [Number(disc.partition), disc] as [number, any]),
+    selectedDriveDiscs.value.map((disc: any) => [Number(disc.partition), disc] as [number, any]),
   )
   return OPTIMIZER_RESULT_SLOTS.map(slot => ({
     slot,
     disc: bySlot.get(slot) ?? null,
   }))
 })
-const selectedOptimizerResultDiscCount = computed(() => selectedOptimizerResultRows.value.filter(row => row.disc).length)
+const currentSchemeScoreLabel = computed(() => {
+  if (buildStore.discMode === "optimized" && selectedOptimizedScheme.value) {
+    return `第 ${selectedOptimizedScheme.value.rank} 名 · ${formatNumber(selectedOptimizedScheme.value.score, 0)}`
+  }
+  if (buildStore.discMode === "loadout" && selectedLoadout.value?.score !== undefined) {
+    return `评分 ${formatNumber(selectedLoadout.value.score, 0)}`
+  }
+  return selectedDriveDiscs.value.length ? `${selectedDriveDiscs.value.length} / 6` : "未选择"
+})
+const activeManualDiscSlotDiscs = computed(() => inventoryStore.discOptionsForSlot(activeManualDiscSlot.value))
+const manualDiscPickerTitle = computed(() => activeManualDiscSlot.value ? `选择 ${activeManualDiscSlot.value} 号位驱动盘` : "选择驱动盘")
+const manualDiscSetFilterOptions = computed(() => {
+  const sets = new Map<string, string>()
+  for (const disc of activeManualDiscSlotDiscs.value) {
+    const set = driveDiscSetForDisc(disc)
+    const id = String(set?.id || disc?.setId || "")
+    if (id) {
+      sets.set(id, driveDiscSetName(disc))
+    }
+  }
+  return [
+    { label: "全部套装", value: "" },
+    ...[...sets.entries()]
+      .sort((left, right) => left[1].localeCompare(right[1], "zh-CN"))
+      .map(([value, label]) => ({ label, value })),
+  ]
+})
+const manualDiscMainStatFilterOptions = computed(() => {
+  const stats = Array.from(new Set<string>(activeManualDiscSlotDiscs.value
+    .map((disc: any) => String(disc.mainStat?.stat ?? ""))
+    .filter(Boolean)))
+    .sort((left: string, right: string) => statLabel(left, catalogStore.meta).localeCompare(statLabel(right, catalogStore.meta), "zh-CN"))
+  return [
+    { label: "全部主词条", value: "" },
+    ...stats.map((stat: string) => ({ label: statLabel(stat, catalogStore.meta), value: stat })),
+  ]
+})
+const filteredManualDiscOptions = computed(() => {
+  const slot = Number(activeManualDiscSlot.value)
+  const setId = manualDiscSetFilter.value
+  const mainStat = manualDiscMainStatFilter.value
+  const search = manualDiscSearch.value.trim().toLowerCase()
+  const selectedId = buildStore.manualDriveDiscIdsBySlot[String(slot)] ?? ""
+  return inventoryStore.driveDiscs
+    .filter((disc: any) => {
+      const set = driveDiscSetForDisc(disc)
+      const haystack = [
+        disc.id,
+        disc.setId,
+        disc.setName,
+        driveDiscSetName(disc),
+        disc.source?.sequence,
+        storedStatLabel(disc.mainStat?.stat, disc.mainStat?.mode, catalogStore.meta),
+        disc.mainStat?.label,
+        ...(disc.subStats ?? []).flatMap((stat: any) => [
+          storedStatLabel(stat.stat, stat.mode, catalogStore.meta),
+          stat.label,
+        ]),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+      return Number(disc.partition) === slot
+        && (!setId || disc.setId === setId || set?.id === setId)
+        && (!mainStat || disc.mainStat?.stat === mainStat)
+        && (!search || haystack.includes(search))
+    })
+    .sort((left: any, right: any) => {
+      const leftSelected = left.id === selectedId ? 0 : 1
+      const rightSelected = right.id === selectedId ? 0 : 1
+      return leftSelected - rightSelected
+        || driveDiscSetName(left).localeCompare(driveDiscSetName(right), "zh-CN")
+        || Number(left.source?.sequence ?? 999999) - Number(right.source?.sequence ?? 999999)
+    })
+})
+const saveLoadoutDiscs = computed(() => saveLoadoutMode.value === "optimized"
+  ? selectedOptimizedScheme.value?.driveDiscs ?? []
+  : selectedDriveDiscs.value)
+const saveLoadoutIdsBySlot = computed(() => driveDiscIdsBySlotFromDiscs(saveLoadoutDiscs.value))
+const saveLoadoutMissingSlots = computed(() => OPTIMIZER_RESULT_SLOTS.filter(slot => !saveLoadoutIdsBySlot.value[String(slot)]))
+const saveLoadoutTitle = computed(() => saveLoadoutMode.value === "optimized" ? "保存优化结果" : "保存自选套装")
+const saveLoadoutSourceLabel = computed(() => saveLoadoutMode.value === "optimized" ? "优化结果" : "手动选择")
+const canSaveCurrentScheme = computed(() => {
+  if (buildStore.discMode === "manual") {
+    return selectedDriveDiscs.value.length > 0
+  }
+  if (buildStore.discMode === "optimized") {
+    return Boolean(selectedOptimizedScheme.value?.driveDiscs?.length)
+  }
+  return false
+})
+const activeMainStatLimitCount = computed(() => Object.values(optimizerStore.mainStatLimits ?? {})
+  .reduce((total: number, values: any) => total + (Array.isArray(values) ? values.length : 0), 0))
+const activeMinimumCount = computed(() => Object.values(optimizerStore.minimums ?? {})
+  .filter(value => value !== null && value !== undefined).length)
+const optimizerConstraintChips = computed(() => [
+  `算法：${optimizerAlgorithmOptions.find(option => option.value === optimizerStore.algorithm)?.label ?? optimizerStore.algorithm}`,
+  `4件套 Buff：${optimizerStore.fourPieceBuffMode === "manual" ? "手动" : "自动"}`,
+  activeMainStatLimitCount.value ? `主词条限制 ${activeMainStatLimitCount.value} 项` : "未限定主词条",
+  activeMinimumCount.value ? `最小值 ${activeMinimumCount.value} 项` : "未限定最小值",
+])
+const totalDamageLabel = computed(() => {
+  const damage = buildStore.result?.damage
+  const value = damage?.totalFinalDamage ?? damage?.finalDamage
+  return value === undefined || value === null ? "-" : formatNumber(value, 0)
+})
+const panelSummaryText = computed(() => {
+  const panel = buildStore.result?.inCombat?.panel ?? buildStore.outOfCombat?.panel ?? {}
+  const atk = panel.finalAtk ?? panel.atk ?? panel.baseAtk
+  const critRate = panel.critRate
+  const critDmg = panel.critDmg
+  return [
+    atk !== undefined ? `攻击 ${formatNumber(atk, 0)}` : "",
+    critRate !== undefined ? `暴击 ${formatNumber(Number(critRate) * 100, 1)}%` : "",
+    critDmg !== undefined ? `爆伤 ${formatNumber(Number(critDmg) * 100, 1)}%` : "",
+  ].filter(Boolean).join(" · ") || "等待计算"
+})
 watch(optimizedRankOptions, options => {
   const values = options.map(option => Number(option.value))
   if (!values.length) {
-    selectedOptimizerResultRank.value = 0
+    buildStore.selectOptimizedRank(0)
     return
   }
-  if (!values.includes(Number(selectedOptimizerResultRank.value))) {
-    selectedOptimizerResultRank.value = values[0]
+  if (!values.includes(Number(buildStore.selectedOptimizedRank))) {
+    buildStore.selectOptimizedRank(values[0])
   }
 }, { immediate: true })
 const skillLevelControls = computed(() => SKILL_CATEGORIES.map(categoryId => {
@@ -318,7 +432,8 @@ const fourPieceRuntimeBuffs = computed(() => {
   }
   return buffs
 })
-const activeBuffBadges = computed(() => buildStore.activeBuffIds(catalogStore.meta, catalogStore.catalog, selectedDriveDiscs.value).slice(0, 8).map(id => ({
+const activeBuffIdsForPanel = computed(() => buildStore.activeBuffIds(catalogStore.meta, catalogStore.catalog, selectedDriveDiscs.value))
+const activeBuffBadges = computed(() => activeBuffIdsForPanel.value.map(id => ({
   id,
   label: buffLabelForId(id, {
     meta: catalogStore.meta,
@@ -447,6 +562,18 @@ function saveCalculationConfig(config: any) {
   buildStore.setDamageConfig(config, selectedAgent.value)
 }
 
+function saveOptimizerConfig(config: any) {
+  optimizerStore.applyAdvancedSettings(config)
+}
+
+function selectAgent(agentId: string) {
+  buildStore.selectAgent(agentId, catalogStore.meta)
+  optimizerStore.applyAgentPreferredDriveDiscSet(
+    catalogStore.agents.find((item: any) => item.id === agentId),
+    catalogStore.catalog,
+  )
+}
+
 function updateTargetConfig(config: any) {
   buildStore.setTargetConfig(config)
 }
@@ -473,7 +600,7 @@ async function runOptimization() {
   }
   await optimizerStore.run(catalogStore.catalog, inventoryStore.store, input)
   if (optimizerStore.resultSchemes[0]) {
-    selectedOptimizerResultRank.value = Number(optimizerStore.resultSchemes[0].rank)
+    buildStore.selectOptimizedRank(Number(optimizerStore.resultSchemes[0].rank))
   }
 }
 
@@ -489,38 +616,106 @@ function applyPendingOptimizedRank() {
   showOptimizedApplyConfirm.value = false
 }
 
-function selectOptimizerResultRank(rank: number) {
-  selectedOptimizerResultRank.value = Number(rank ?? 0)
-}
-
 function applySelectedOptimizerResult() {
-  if (selectedOptimizerResultScheme.value?.rank) {
-    requestApplyOptimizedRank(Number(selectedOptimizerResultScheme.value.rank))
+  if (selectedOptimizedScheme.value?.rank) {
+    requestApplyOptimizedRank(Number(selectedOptimizedScheme.value.rank))
   }
 }
 
-async function saveOptimizedLoadout() {
-  const scheme = selectedOptimizedScheme.value
-  if (!scheme?.driveDiscs?.length) {
+function driveDiscIdsBySlotFromDiscs(discs: any[] = []) {
+  return Object.fromEntries(
+    discs
+      .map((disc: any): [string, string] => [String(Number(disc.partition)), String(disc.id ?? "")])
+      .filter(([slot, id]) => Number(slot) >= 1 && Number(slot) <= 6 && Boolean(id)),
+  )
+}
+
+function defaultLoadoutName(mode: "manual" | "optimized") {
+  const agentName = labelOf(selectedAgent.value) || buildStore.agentId || "当前角色"
+  if (mode === "optimized" && selectedOptimizedScheme.value) {
+    const scheme = selectedOptimizedScheme.value
+    return scheme.loadoutName || `${agentName}-${Math.round(Number(scheme.score ?? 0))}-第${scheme.rank}名`
+  }
+  return `${agentName}-自选套装`
+}
+
+function openSaveCurrentLoadout() {
+  if (buildStore.discMode === "optimized") {
+    openSaveOptimizedLoadout()
     return
   }
-  const driveDiscIdsBySlot = Object.fromEntries(
-    scheme.driveDiscs
-      .map((disc: any) => [String(Number(disc.partition)), disc.id])
-      .filter(([slot, id]: [string, string]) => slot && id),
-  )
-  const loadout = await inventoryStore.saveLoadout({
-    name: scheme.loadoutName,
-    agentId: buildStore.agentId,
-    driveDiscIdsBySlot,
-    score: scheme.score,
-    source: { type: "optimizer", rank: scheme.rank },
-  })
-  buildStore.selectLoadout(loadout.id)
+  openSaveManualLoadout()
 }
 
-function discOptionLabel(disc: any) {
-  return `${disc.setName || disc.setId} · ${disc.partition}号位 · ${statLabel(disc.mainStat?.stat, catalogStore.meta)} ${disc.mainStat?.value ?? ""}${disc.source?.sequence ? ` · #${disc.source.sequence}` : ""}`
+function openSaveManualLoadout() {
+  if (!selectedDriveDiscs.value.length) {
+    return
+  }
+  saveLoadoutMode.value = "manual"
+  loadoutNameDraft.value = defaultLoadoutName("manual")
+  showSaveLoadoutModal.value = true
+}
+
+function openSaveOptimizedLoadout() {
+  if (!selectedOptimizedScheme.value?.driveDiscs?.length) {
+    return
+  }
+  saveLoadoutMode.value = "optimized"
+  loadoutNameDraft.value = defaultLoadoutName("optimized")
+  showSaveLoadoutModal.value = true
+}
+
+async function saveLoadoutFromModal() {
+  const driveDiscIdsBySlot = saveLoadoutIdsBySlot.value
+  if (!Object.keys(driveDiscIdsBySlot).length) {
+    return
+  }
+  const mode = saveLoadoutMode.value
+  const scheme = selectedOptimizedScheme.value
+  const loadout = await inventoryStore.saveLoadout({
+    name: loadoutNameDraft.value.trim() || defaultLoadoutName(mode),
+    agentId: buildStore.agentId,
+    driveDiscIdsBySlot,
+    ...(mode === "optimized"
+      ? {
+          score: scheme?.score,
+          source: { type: "optimizer", rank: scheme?.rank },
+        }
+      : {
+          source: { type: "manual", scope: "workbench" },
+        }),
+  })
+  showSaveLoadoutModal.value = false
+  if (mode === "optimized") {
+    buildStore.selectLoadout(loadout.id)
+  }
+}
+
+function openManualDiscPicker(slot: number) {
+  if (buildStore.discMode !== "manual") {
+    return
+  }
+  activeManualDiscSlot.value = Number(slot)
+  manualDiscSetFilter.value = ""
+  manualDiscMainStatFilter.value = ""
+  manualDiscSearch.value = ""
+  showManualDiscPicker.value = true
+}
+
+function selectManualDriveDisc(disc: any) {
+  if (!activeManualDiscSlot.value || !disc?.id) {
+    return
+  }
+  buildStore.setManualDriveDisc(activeManualDiscSlot.value, disc.id)
+  showManualDiscPicker.value = false
+}
+
+function clearManualDriveDiscSlot() {
+  if (!activeManualDiscSlot.value) {
+    return
+  }
+  buildStore.setManualDriveDisc(activeManualDiscSlot.value, "")
+  showManualDiscPicker.value = false
 }
 
 function driveDiscSetForDisc(disc: any) {
@@ -570,17 +765,6 @@ function driveDiscRarityLevelText(disc: any) {
   return `${rarity}${Number.isFinite(level) ? ` +${level}` : ""}`
 }
 
-function driveDiscIdentityMeta(disc: any) {
-  return disc?.source?.sequence ? `#${disc.source.sequence}` : disc?.id ?? "-"
-}
-
-function discOptions(slot: number) {
-  return [
-    { label: "空槽位", value: "" },
-    ...inventoryStore.discOptionsForSlot(slot).map((disc: any) => ({ label: discOptionLabel(disc), value: disc.id })),
-  ]
-}
-
 function twoPieceSetEffectText(set: any) {
   return buffEffectLines(set?.twoPiece, undefined, catalogStore.meta).join("；") || "2件套效果未录入"
 }
@@ -625,53 +809,6 @@ function removeTwoPieceSet(id: string) {
 
 function clearTwoPieceSetLimits() {
   optimizerStore.setTwoPieceSetIds([])
-}
-
-function hasMainStatLimit(slot: string, stat: string) {
-  return (optimizerStore.mainStatLimits[slot] ?? []).includes(stat)
-}
-
-function fourPieceRuntimeFor(buff: any) {
-  return normalizeRuntimeForBuff(buff, optimizerStore.fourPieceBuffRuntimeInputs[buff.id] ?? defaultRuntimeForBuff(buff))
-}
-
-function fourPieceRuntimePartLabel(buff: any) {
-  return String(buff?.id ?? "").endsWith(".team") ? "团队效果" : "装备者效果"
-}
-
-function updateFourPieceRuntime(buff: any, runtime: any) {
-  optimizerStore.setFourPieceBuffRuntimeInput(buff.id, normalizeRuntimeForBuff(buff, runtime))
-}
-
-function setFourPieceCoverage(buff: any, value: number | null) {
-  updateFourPieceRuntime(buff, {
-    ...fourPieceRuntimeFor(buff),
-    coverage: Number(value ?? 0),
-  })
-}
-
-function setFourPieceSourceValue(buff: any, group: any, value: number | null) {
-  const runtime = fourPieceRuntimeFor(buff)
-  const effects = { ...(runtime.effects ?? {}) }
-  for (const id of group.ruleIds ?? []) {
-    effects[id] = {
-      ...(effects[id] ?? {}),
-      sourceValue: Number(value ?? 0),
-    }
-  }
-  updateFourPieceRuntime(buff, { ...runtime, effects })
-}
-
-function setFourPieceStacks(buff: any, group: any, value: number | null) {
-  const runtime = fourPieceRuntimeFor(buff)
-  const effects = { ...(runtime.effects ?? {}) }
-  for (const id of group.ruleIds ?? []) {
-    effects[id] = {
-      ...(effects[id] ?? {}),
-      stacks: Number(value ?? 0),
-    }
-  }
-  updateFourPieceRuntime(buff, { ...runtime, effects })
 }
 
 function processedOptimizationCount(metrics: any = {}, fallback: any = null) {
@@ -791,8 +928,8 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 </script>
 
 <template>
-  <section class="workbench-grid">
-    <aside class="section-band">
+  <section class="workbench-grid workbench-merged-grid">
+    <aside class="workbench-left section-band">
       <div class="panel">
         <div class="panel-header">
           <h1 class="panel-title">角色</h1>
@@ -812,7 +949,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
             :filter="filterSelectOption"
             filterable
             placeholder="选择角色"
-            @update:value="value => buildStore.selectAgent(String(value), catalogStore.meta)"
+            @update:value="value => selectAgent(String(value))"
           />
           <div class="build-compact-grid build-profile-grid">
             <label class="compact-field">
@@ -888,7 +1025,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
         <div class="panel-body section-band">
           <div class="chip-row">
             <NTag v-for="item in activeBuffBadges" :key="item.id" round>{{ item.label }}</NTag>
-            <NTag v-if="!buildStore.activeBuffIds(catalogStore.meta).length" round>未启用 Buff</NTag>
+            <NTag v-if="!activeBuffIdsForPanel.length" round>未启用 Buff</NTag>
           </div>
           <NTag v-if="buildStore.addedBuffs.length" type="info" round>自定义 {{ buildStore.addedBuffs.length }} 条</NTag>
         </div>
@@ -926,346 +1063,230 @@ function complexityText(metrics: any = {}, settings: any = {}) {
         :damage-element="currentDamageElement"
         @update:target-config="updateTargetConfig"
       />
+    </aside>
 
-      <div class="panel">
+    <main class="workbench-center section-band">
+      <div class="panel optimizer-constraint-panel">
         <div class="panel-header">
-          <h2 class="panel-title">驱动盘方案</h2>
+          <div>
+            <h2 class="panel-title">优化约束</h2>
+            <p class="panel-subtitle">外部只保留套装限制，高级项在计算配置中调整</p>
+          </div>
+          <div class="toolbar optimizer-config-actions">
+            <NButton size="small" @click="showOptimizerConfig = true">
+              <template #icon><SlidersHorizontal :size="16" /></template>
+              计算配置
+            </NButton>
+            <NTag :type="optimizerStore.status === 'error' ? 'error' : optimizerStore.status === 'done' ? 'success' : 'info'" round>{{ optimizerStatusLabel(optimizerStore.status) }}</NTag>
+          </div>
+        </div>
+        <div class="panel-body section-band">
+          <div class="optimizer-set-grid">
+            <div class="metric optimizer-set-choice-field">
+              <dt>限定 4 件套</dt>
+              <dd class="set-summary-actions">
+                <NButton size="small" @click="openFourPieceSetModal">选择</NButton>
+                <div class="selected-set-summary" aria-live="polite">
+                  <span v-if="selectedOptimizerSet" class="selected-set-chip selected-set-chip-with-icon">
+                    <img :src="imageForDriveDiscSet(selectedOptimizerSet)" alt="" loading="lazy">
+                    <span>{{ labelOf(selectedOptimizerSet) }}</span>
+                  </span>
+                  <span v-else class="selected-set-empty">未选择限定 4 件套</span>
+                </div>
+              </dd>
+            </div>
+            <div class="metric optimizer-set-choice-field">
+              <dt class="metric-title-row">
+                <span>额外 2 件套</span>
+                <NButton size="tiny" text :disabled="!optimizerStore.twoPieceSetIds.length" @click="clearTwoPieceSetLimits">清空</NButton>
+              </dt>
+              <dd class="set-summary-actions">
+                <NButton size="small" @click="openTwoPieceSetModal">选择</NButton>
+                <div class="selected-set-summary" aria-live="polite">
+                  <span v-if="!selectedTwoPieceSets.length" class="selected-set-empty">未选择额外 2 件套</span>
+                  <template v-else>
+                    <span v-for="set in selectedTwoPieceSets" :key="set.id" class="selected-set-chip selected-set-chip-with-icon">
+                      <img :src="imageForDriveDiscSet(set)" alt="" loading="lazy">
+                      <span>{{ labelOf(set) }}</span>
+                      <button type="button" class="selected-set-remove" :aria-label="`移除 ${labelOf(set)}`" @click="removeTwoPieceSet(set.id)">
+                        <X :size="14" />
+                      </button>
+                    </span>
+                  </template>
+                </div>
+              </dd>
+            </div>
+          </div>
+          <div class="chip-row optimizer-constraint-chips">
+            <NTag v-for="chip in optimizerConstraintChips" :key="chip" round>{{ chip }}</NTag>
+          </div>
+          <div class="optimizer-run-row">
+            <div class="toolbar">
+              <NButton v-if="!optimizerStore.isBusy" type="primary" @click="runOptimization">
+                <template #icon><Sparkles :size="16" /></template>
+                开始优化
+              </NButton>
+              <NButton v-else type="warning" disabled>
+                {{ optimizerStore.status === "preparing" ? "准备中" : optimizerStore.status === "cancelling" ? "正在取消..." : "运行中" }}
+              </NButton>
+              <NButton v-if="optimizerStore.status === 'preparing' || optimizerStore.status === 'running' || optimizerStore.status === 'cancelling'" type="warning" @click="optimizerStore.cancel">取消优化</NButton>
+              <NButton :disabled="!selectedOptimizedScheme" @click="openSaveOptimizedLoadout">
+                <template #icon><Save :size="16" /></template>
+                存为套装
+              </NButton>
+            </div>
+            <div class="optimizer-progress-card" :data-active="optimizerProgress ? 'true' : 'false'">
+              <div class="optimizer-progress-head">
+                <strong>{{ formatPercentValue(optimizerProgressPercent) }}</strong>
+                <span>{{ optimizerElapsed }}</span>
+              </div>
+              <div class="optimizer-progress-track" aria-hidden="true">
+                <div class="optimizer-progress-fill" :style="optimizerProgressFillStyle"></div>
+              </div>
+              <div class="optimizer-progress-copy">
+                <strong>{{ optimizerRunMeta }}</strong>
+                <p>{{ optimizerRunNote }}</p>
+              </div>
+              <div v-if="optimizerDetailChips.length" class="chip-row optimizer-detail-chips">
+                <NTag v-for="chip in optimizerDetailChips" :key="chip" round>{{ chip }}</NTag>
+              </div>
+            </div>
+          </div>
+          <div v-if="optimizerStore.error" class="empty-state optimizer-error-state">{{ optimizerStore.error }}</div>
+        </div>
+      </div>
+
+      <div class="panel drive-disc-workbench-panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">驱动盘方案</h2>
+            <p class="panel-subtitle">{{ driveDiscAnalysisSourceLabel }} · {{ currentSchemeScoreLabel }}</p>
+          </div>
           <NTag round>{{ selectedDriveDiscs.length }} / 6</NTag>
         </div>
         <div class="panel-body section-band">
-          <div class="toolbar">
-            <NButton size="small" :type="buildStore.discMode === 'manual' ? 'primary' : 'default'" @click="buildStore.setDiscMode('manual')">手动</NButton>
-            <NButton size="small" :type="buildStore.discMode === 'loadout' ? 'primary' : 'default'" @click="buildStore.setDiscMode('loadout')">套装</NButton>
-            <NButton size="small" :type="buildStore.discMode === 'optimized' ? 'primary' : 'default'" :disabled="!optimizerStore.resultSchemes.length" @click="buildStore.setDiscMode('optimized')">优化结果</NButton>
-            <NButton size="small" :disabled="!selectedDriveDiscs.length" @click="showDriveDiscAnalysis = true">
-              <template #icon><LineChart :size="16" /></template>
-              词条分析
+          <div class="drive-disc-mode-row">
+            <div class="toolbar drive-disc-mode-toolbar">
+              <NButton size="small" :type="buildStore.discMode === 'manual' ? 'primary' : 'default'" @click="buildStore.setDiscMode('manual')">自选</NButton>
+              <NButton size="small" :type="buildStore.discMode === 'loadout' ? 'primary' : 'default'" @click="buildStore.setDiscMode('loadout')">已有套装</NButton>
+              <NButton size="small" :type="buildStore.discMode === 'optimized' ? 'primary' : 'default'" :disabled="!optimizerStore.resultSchemes.length" @click="buildStore.setDiscMode('optimized')">优化结果</NButton>
+            </div>
+            <div class="toolbar drive-disc-action-toolbar">
+              <NButton size="small" :disabled="!canSaveCurrentScheme" @click="openSaveCurrentLoadout">
+                <template #icon><Save :size="16" /></template>
+                存为套装
+              </NButton>
+              <NButton size="small" :disabled="!selectedDriveDiscs.length" @click="showDriveDiscAnalysis = true">
+                <template #icon><LineChart :size="16" /></template>
+                词条分析
+              </NButton>
+            </div>
+          </div>
+
+          <div class="drive-disc-analysis-strip">
+            <div>
+              <strong>{{ driveDiscAnalysisSourceLabel }}</strong>
+              <span>{{ selectedDriveDiscs.length ? `${selectedDriveDiscs.length} 件驱动盘参与当前伤害计算` : "选择驱动盘后可查看词条分析" }}</span>
+            </div>
+            <NTag round>{{ panelSummaryText }}</NTag>
+          </div>
+
+          <div v-if="buildStore.discMode === 'loadout'" class="drive-disc-mode-control">
+            <NSelect
+              :value="buildStore.selectedLoadoutId"
+              :options="loadoutOptions"
+              filterable
+              @update:value="buildStore.selectLoadout(String($event ?? ''))"
+            />
+          </div>
+          <div v-else-if="buildStore.discMode === 'optimized'" class="optimizer-result-toolbar drive-disc-mode-control">
+            <NSelect
+              class="optimizer-result-rank-select"
+              :value="buildStore.selectedOptimizedRank"
+              :options="optimizedRankOptions"
+              @update:value="buildStore.selectOptimizedRank(Number($event ?? 0))"
+            />
+            <div class="toolbar">
+              <NTag v-if="selectedOptimizedScheme" type="success" round>评分 {{ formatNumber(selectedOptimizedScheme.score ?? 0) }}</NTag>
+              <NButton size="small" :disabled="!selectedOptimizedScheme" @click="applySelectedOptimizerResult">应用</NButton>
+            </div>
+          </div>
+
+          <div class="drive-disc-slot-grid">
+            <article
+              v-for="row in selectedDriveDiscRows"
+              :key="row.slot"
+              class="disc-slot-card"
+              :class="{ 'disc-slot-card-empty': !row.disc, 'disc-slot-card-manual': buildStore.discMode === 'manual' }"
+              @click="openManualDiscPicker(row.slot)"
+            >
+              <img :src="row.disc ? driveDiscSetIcon(row.disc) : fallbackIcon" alt="" loading="lazy">
+              <div class="disc-slot-card-copy">
+                <strong>{{ row.disc ? `${row.slot}号位 · ${driveDiscSetName(row.disc)}` : `${row.slot}号位 · 未选择` }}</strong>
+                <span>{{ row.disc ? driveDiscStatText(row.disc.mainStat) : "空槽位" }}</span>
+                <small>{{ row.disc ? driveDiscSubStatText(row.disc) : "可在自选模式选择已有驱动盘" }}</small>
+              </div>
+              <div class="disc-slot-card-meta">
+                <NTag v-if="row.disc" round>{{ driveDiscRarityLevelText(row.disc) }}</NTag>
+                <NButton
+                  v-if="buildStore.discMode === 'manual'"
+                  size="tiny"
+                  @click.stop="openManualDiscPicker(row.slot)"
+                >
+                  {{ row.disc ? "更换" : "选择" }}
+                </NButton>
+              </div>
+            </article>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="workbench-right section-band">
+      <div class="workbench-right-sticky section-band">
+        <DamageSummaryBar :result="buildStore.result" :error="buildStore.error" :loading="catalogStore.loading" />
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">伤害白盒</h2>
+              <p class="panel-subtitle">随当前驱动盘方案实时刷新</p>
+            </div>
+            <NButton size="small" @click="recalculate">
+              <template #icon><RefreshCcw :size="16" /></template>
+              刷新
             </NButton>
           </div>
-          <div v-if="buildStore.discMode === 'manual'" class="section-band">
-            <label v-for="slot in [1,2,3,4,5,6]" :key="slot" class="metric">
-              <dt>{{ slot }}号位</dt>
-              <dd>
-                <NSelect
-                  :value="buildStore.manualDriveDiscIdsBySlot[String(slot)] ?? ''"
-                  :options="discOptions(slot)"
-                  filterable
-                  clearable
-                  @update:value="buildStore.setManualDriveDisc(slot, String($event ?? ''))"
-                />
-              </dd>
-            </label>
+          <div class="panel-body">
+            <div v-if="buildStore.error" class="empty-state">{{ buildStore.error }}</div>
+            <DamageWhiteBox
+              v-else
+              :damage="buildStore.result?.damage"
+              :meta="catalogStore.meta"
+              :skill-catalog="selectedSkillCatalog"
+            />
           </div>
-          <NSelect
-            v-else-if="buildStore.discMode === 'loadout'"
-            :value="buildStore.selectedLoadoutId"
-            :options="loadoutOptions"
-            filterable
-            @update:value="buildStore.selectLoadout(String($event ?? ''))"
-          />
-          <NSelect
-            v-else
-            :value="buildStore.selectedOptimizedRank"
-            :options="optimizedRankOptions"
-            @update:value="buildStore.selectOptimizedRank(Number($event ?? 0))"
-          />
-          <div class="metric-grid">
-            <div v-for="disc in selectedDriveDiscs" :key="disc.id" class="metric">
-              <dt>{{ disc.partition }}号位 · {{ disc.setName || disc.setId }}</dt>
-              <dd>{{ statLabel(disc.mainStat?.stat, catalogStore.meta) }} {{ disc.mainStat?.value }}</dd>
+        </div>
+        <div class="panel damage-panel-card">
+          <div class="panel-header">
+            <div>
+              <h2 class="panel-title">面板</h2>
+              <p class="panel-subtitle">局外与局内对照</p>
+            </div>
+            <NTag round>{{ totalDamageLabel }}</NTag>
+          </div>
+          <div class="panel-body damage-panel-grid">
+            <div>
+              <h3>局外</h3>
+              <PanelStatTable :panel="buildStore.outOfCombat?.panel" :meta="catalogStore.meta" />
+            </div>
+            <div>
+              <h3>局内</h3>
+              <PanelStatTable :panel="buildStore.result?.inCombat?.panel" :meta="catalogStore.meta" />
             </div>
           </div>
         </div>
       </div>
     </aside>
-
-    <section>
-      <DamageSummaryBar :result="buildStore.result" :error="buildStore.error" :loading="catalogStore.loading" />
-      <NTabs type="line" animated>
-        <NTabPane name="damage" tab="伤害详情">
-          <div class="section-band">
-            <div class="panel">
-              <div class="panel-header">
-                <h2 class="panel-title">白盒结果</h2>
-                <NButton size="small" @click="recalculate">
-                  <template #icon><RefreshCcw :size="16" /></template>
-                  刷新
-                </NButton>
-              </div>
-              <div class="panel-body">
-                <div v-if="buildStore.error" class="empty-state">{{ buildStore.error }}</div>
-                <DamageWhiteBox
-                  v-else
-                  :damage="buildStore.result?.damage"
-                  :meta="catalogStore.meta"
-                  :skill-catalog="selectedSkillCatalog"
-                />
-              </div>
-            </div>
-            <div class="panel">
-              <div class="panel-header">
-                <h2 class="panel-title">面板</h2>
-              </div>
-              <div class="panel-body metric-grid">
-                <div>
-                  <h3>局外</h3>
-                  <PanelStatTable :panel="buildStore.outOfCombat?.panel" :meta="catalogStore.meta" />
-                </div>
-                <div>
-                  <h3>局内</h3>
-                  <PanelStatTable :panel="buildStore.result?.inCombat?.panel" :meta="catalogStore.meta" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </NTabPane>
-        <NTabPane name="optimizer" tab="驱动盘优化">
-          <div class="panel">
-            <div class="panel-header">
-              <h2 class="panel-title">优化设置</h2>
-              <NTag :type="optimizerStore.status === 'error' ? 'error' : optimizerStore.status === 'done' ? 'success' : 'info'" round>{{ optimizerStatusLabel(optimizerStore.status) }}</NTag>
-            </div>
-            <div class="panel-body section-band">
-              <div class="metric-grid">
-                <label class="metric">
-                  <dt>算法</dt>
-                  <dd><NSelect :value="optimizerStore.algorithm" :options="optimizerAlgorithmOptions" @update:value="optimizerStore.setAlgorithm(String($event))" /></dd>
-                </label>
-                <div class="metric optimizer-set-choice-field">
-                  <dt>四件套</dt>
-                  <dd class="set-summary-actions">
-                    <NButton size="small" @click="openFourPieceSetModal">选择套装</NButton>
-                    <div class="selected-set-summary" aria-live="polite">
-                      <span v-if="selectedOptimizerSet" class="selected-set-chip selected-set-chip-with-icon">
-                        <img :src="imageForDriveDiscSet(selectedOptimizerSet)" alt="" loading="lazy">
-                        <span>{{ labelOf(selectedOptimizerSet) }}</span>
-                      </span>
-                      <span v-else class="selected-set-empty">未选择限定 4 件套</span>
-                    </div>
-                  </dd>
-                </div>
-                <div class="metric optimizer-set-choice-field">
-                  <dt class="metric-title-row">
-                    <span>二件套</span>
-                    <NButton size="tiny" text :disabled="!optimizerStore.twoPieceSetIds.length" @click="clearTwoPieceSetLimits">清空</NButton>
-                  </dt>
-                  <dd class="set-summary-actions">
-                    <NButton size="small" @click="openTwoPieceSetModal">选择套装</NButton>
-                    <div class="selected-set-summary" aria-live="polite">
-                      <span v-if="!selectedTwoPieceSets.length" class="selected-set-empty">未选择额外 2 件套</span>
-                      <template v-else>
-                        <span v-for="set in selectedTwoPieceSets" :key="set.id" class="selected-set-chip selected-set-chip-with-icon">
-                          <img :src="imageForDriveDiscSet(set)" alt="" loading="lazy">
-                          <span>{{ labelOf(set) }}</span>
-                          <button type="button" class="selected-set-remove" :aria-label="`移除 ${labelOf(set)}`" @click="removeTwoPieceSet(set.id)">
-                            <X :size="14" />
-                          </button>
-                        </span>
-                      </template>
-                    </div>
-                  </dd>
-                </div>
-                <label class="metric">
-                  <dt>4 件套 Buff</dt>
-                  <dd><NCheckbox :checked="optimizerStore.fourPieceBuffMode === 'manual'" @update:checked="optimizerStore.setFourPieceBuffMode($event ? 'manual' : 'auto')">手动</NCheckbox></dd>
-                </label>
-              </div>
-              <div v-if="optimizerStore.fourPieceBuffMode === 'manual'" class="panel">
-                <div class="panel-header">
-                  <h3 class="panel-title">4 件套 Buff 参数</h3>
-                  <NTag round>{{ fourPieceRuntimeBuffs.length }} 项</NTag>
-                </div>
-                <div class="panel-body section-band">
-                  <article v-for="buff in fourPieceRuntimeBuffs" :key="buff.id" class="panel">
-                    <div class="panel-header">
-                      <h4 class="panel-title">{{ buffDisplayName(buff) }}</h4>
-                      <NTag round>{{ fourPieceRuntimePartLabel(buff) }}</NTag>
-                    </div>
-                    <div class="panel-body buff-runtime-grid">
-                      <label v-if="buff.coverage" class="metric buff-runtime-metric">
-                        <dt>覆盖率</dt>
-                        <dd>
-                          <NInputNumber
-                            :value="fourPieceRuntimeFor(buff).coverage"
-                            :min="buff.coverage.min ?? 0"
-                            :max="buff.coverage.max ?? 1"
-                            :step="buff.coverage.step ?? 0.1"
-                            @update:value="setFourPieceCoverage(buff, Number($event))"
-                          />
-                        </dd>
-                      </label>
-                      <label v-for="group in runtimeSourceGroups(buff)" :key="group.key" class="metric buff-runtime-metric">
-                        <dt>{{ group.label || '来源数值' }}</dt>
-                        <dd>
-                          <NInputNumber
-                            :value="fourPieceRuntimeFor(buff).effects?.[group.ruleIds?.[0]]?.sourceValue ?? group.defaultValue ?? 0"
-                            :min="Number.isFinite(group.min) ? group.min : undefined"
-                            :max="Number.isFinite(group.max) ? group.max : undefined"
-                            @update:value="setFourPieceSourceValue(buff, group, Number($event))"
-                          />
-                        </dd>
-                      </label>
-                      <label v-for="group in runtimeStackGroups(buff)" :key="group.key" class="metric layer-metric buff-runtime-layer">
-                        <dd>
-                          <LayerSlider
-                            :label="group.label || '层数'"
-                            :value="fourPieceRuntimeFor(buff).effects?.[group.ruleIds?.[0]]?.stacks ?? group.defaultStacks ?? group.maxStacks ?? 1"
-                            :min="0"
-                            :max="group.maxStacks ?? 99"
-                            :step="1"
-                            @update:value="setFourPieceStacks(buff, group, Number($event))"
-                          />
-                        </dd>
-                      </label>
-                    </div>
-                  </article>
-                  <div v-if="!fourPieceRuntimeBuffs.length" class="empty-state">当前四件套没有可手动配置的 Buff</div>
-                </div>
-              </div>
-              <div class="panel">
-                <div class="panel-header">
-                  <h3 class="panel-title">限定主词条</h3>
-                </div>
-                <div class="panel-body optimizer-main-stat-grid">
-                  <div v-for="slot in ['4','5','6']" :key="slot" class="metric optimizer-main-stat-field">
-                    <dt class="metric-title-row">
-                      <span>{{ slot }}号位</span>
-                      <NButton size="tiny" text :disabled="!(optimizerStore.mainStatLimits[slot] ?? []).length" @click="optimizerStore.clearMainStatLimit(slot)">清空</NButton>
-                    </dt>
-                    <dd class="main-stat-choice-list">
-                      <label
-                        v-for="option in mainStatOptionsBySlot[slot]"
-                        :key="option.value"
-                        class="main-stat-choice"
-                        :class="{ active: hasMainStatLimit(slot, option.value) }"
-                      >
-                        <input
-                          type="checkbox"
-                          :checked="hasMainStatLimit(slot, option.value)"
-                          @change="optimizerStore.toggleMainStatLimit(slot, option.value)"
-                        >
-                        <span>{{ option.label }}</span>
-                      </label>
-                    </dd>
-                  </div>
-                </div>
-              </div>
-              <div class="panel">
-                <div class="panel-header">
-                  <h3 class="panel-title">限定最小值</h3>
-                </div>
-                <div class="panel-body metric-grid">
-                  <label v-for="item in minimumStats" :key="item.key" class="metric">
-                    <dt>{{ item.label }}</dt>
-                    <dd>
-                      <NInputNumber
-                        :value="optimizerStore.minimums[item.key]"
-                        clearable
-                        :step="item.key === 'anomalyProficiency' ? 1 : 0.1"
-                        placeholder="不限定"
-                        @update:value="optimizerStore.setMinimum(item.key, $event === null ? null : Number($event))"
-                      />
-                    </dd>
-                  </label>
-                </div>
-              </div>
-              <div class="toolbar">
-                <NButton v-if="!optimizerStore.isBusy" type="primary" @click="runOptimization">
-                  <template #icon><Sparkles :size="16" /></template>
-                  开始优化
-                </NButton>
-                <NButton v-else type="warning" disabled>
-                  {{ optimizerStore.status === "preparing" ? "准备中" : optimizerStore.status === "cancelling" ? "正在取消..." : "运行中" }}
-                </NButton>
-                <NButton v-if="optimizerStore.status === 'preparing' || optimizerStore.status === 'running' || optimizerStore.status === 'cancelling'" type="warning" @click="optimizerStore.cancel">取消优化</NButton>
-                <NButton :disabled="!selectedOptimizedScheme" @click="saveOptimizedLoadout">
-                  <template #icon><Save :size="16" /></template>
-                  存为套装
-                </NButton>
-              </div>
-              <div class="optimizer-progress-card" :data-active="optimizerProgress ? 'true' : 'false'">
-                <div class="optimizer-progress-head">
-                  <strong>{{ formatPercentValue(optimizerProgressPercent) }}</strong>
-                  <span>{{ optimizerElapsed }}</span>
-                </div>
-                <div class="optimizer-progress-track" aria-hidden="true">
-                  <div class="optimizer-progress-fill" :style="optimizerProgressFillStyle"></div>
-                </div>
-                <div class="optimizer-progress-copy">
-                  <strong>{{ optimizerRunMeta }}</strong>
-                  <p>{{ optimizerRunNote }}</p>
-                </div>
-                <div v-if="optimizerDetailChips.length" class="chip-row optimizer-detail-chips">
-                  <NTag v-for="chip in optimizerDetailChips" :key="chip" round>{{ chip }}</NTag>
-                </div>
-              </div>
-              <div class="metric-grid optimizer-metric-grid">
-                <dl class="metric">
-                  <dt>预估组合</dt>
-                  <dd class="num">{{ formatNumber(optimizerEstimated) }}</dd>
-                </dl>
-                <dl class="metric">
-                  <dt>已处理</dt>
-                  <dd class="num">{{ formatNumber(optimizerProcessed) }}</dd>
-                </dl>
-                <dl class="metric">
-                  <dt>百分比</dt>
-                  <dd class="num">{{ formatPercentValue(optimizerProgressPercent) }}</dd>
-                </dl>
-                <dl class="metric">
-                  <dt>速度</dt>
-                  <dd class="num">{{ optimizerRate || "-" }}</dd>
-                </dl>
-                <dl class="metric">
-                  <dt>耗时</dt>
-                  <dd class="num">{{ optimizerElapsed }}</dd>
-                </dl>
-                <dl class="metric">
-                  <dt>结果</dt>
-                  <dd class="num">{{ optimizerStore.results.length }}</dd>
-                </dl>
-              </div>
-              <div v-if="optimizerStore.error" class="empty-state">{{ optimizerStore.error }}</div>
-              <div v-else-if="optimizerStore.results.length" class="section-band optimizer-result-detail-shell">
-                <div class="optimizer-result-toolbar">
-                  <NSelect
-                    class="optimizer-result-rank-select"
-                    :value="selectedOptimizerResultRank"
-                    :options="optimizedRankOptions"
-                    @update:value="selectOptimizerResultRank(Number($event ?? 0))"
-                  />
-                  <div class="toolbar">
-                    <NTag type="success" round>评分 {{ formatNumber(selectedOptimizerResultScheme?.score ?? 0) }}</NTag>
-                    <NTag round>{{ selectedOptimizerResultDiscCount }} / 6</NTag>
-                    <NButton size="small" :disabled="!selectedOptimizerResultScheme" @click="applySelectedOptimizerResult">应用</NButton>
-                  </div>
-                </div>
-                <div v-if="selectedOptimizerResultScheme" class="optimizer-result-disc-list">
-                  <div
-                    v-for="row in selectedOptimizerResultRows"
-                    :key="row.slot"
-                    class="optimizer-result-disc-row"
-                    :class="{ 'optimizer-result-disc-row-empty': !row.disc }"
-                  >
-                    <img :src="row.disc ? driveDiscSetIcon(row.disc) : '/assets/drive-discs/empty.svg'" alt="" loading="lazy">
-                    <div class="optimizer-result-disc-copy">
-                      <strong>{{ row.disc ? `${row.slot}号位 · ${driveDiscSetName(row.disc)}` : `${row.slot}号位 · 未选择` }}</strong>
-                      <span>{{ row.disc ? driveDiscStatText(row.disc.mainStat) : "无驱动盘" }}</span>
-                      <small>{{ row.disc ? driveDiscSubStatText(row.disc) : "-" }}</small>
-                    </div>
-                    <div v-if="row.disc" class="optimizer-result-disc-meta">
-                      <NTag round>{{ driveDiscRarityLevelText(row.disc) }}</NTag>
-                      <span>{{ driveDiscIdentityMeta(row.disc) }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div v-else class="empty-state">完成后将在这里选择并展示前 5 套方案</div>
-            </div>
-          </div>
-        </NTabPane>
-      </NTabs>
-    </section>
   </section>
 
   <NModal v-model:show="showOptimizedApplyConfirm" preset="card" title="应用优化结果" style="max-width: 760px">
@@ -1295,6 +1316,109 @@ function complexityText(metrics: any = {}, settings: any = {}) {
       <div class="drawer-footer">
         <NButton @click="showOptimizedApplyConfirm = false">取消</NButton>
         <NButton type="primary" @click="applyPendingOptimizedRank">应用到当前角色</NButton>
+      </div>
+    </template>
+  </NModal>
+
+  <NModal v-model:show="showManualDiscPicker" preset="card" :title="manualDiscPickerTitle" style="width: min(980px, calc(100vw - 16px)); max-width: 980px">
+    <div class="section-band manual-disc-picker">
+      <div class="manual-disc-picker-head">
+        <span>只显示当前号位的已有驱动盘</span>
+        <NTag round>{{ filteredManualDiscOptions.length }} 件可选</NTag>
+      </div>
+      <div class="manual-disc-filter-row">
+        <div class="metric">
+          <dt>套装</dt>
+          <dd>
+            <NSelect
+              :value="manualDiscSetFilter"
+              :options="manualDiscSetFilterOptions"
+              clearable
+              @update:value="manualDiscSetFilter = String($event ?? '')"
+            />
+          </dd>
+        </div>
+        <div class="metric">
+          <dt>主词条</dt>
+          <dd>
+            <NSelect
+              :value="manualDiscMainStatFilter"
+              :options="manualDiscMainStatFilterOptions"
+              clearable
+              @update:value="manualDiscMainStatFilter = String($event ?? '')"
+            />
+          </dd>
+        </div>
+        <div class="metric">
+          <dt>搜索</dt>
+          <dd><NInput v-model:value="manualDiscSearch" clearable placeholder="套装、属性、序号" /></dd>
+        </div>
+      </div>
+
+      <div v-if="filteredManualDiscOptions.length" class="manual-disc-option-list">
+        <button
+          v-for="disc in filteredManualDiscOptions"
+          :key="disc.id"
+          type="button"
+          class="manual-disc-option"
+          :class="{ active: buildStore.manualDriveDiscIdsBySlot[String(activeManualDiscSlot)] === disc.id }"
+          @click="selectManualDriveDisc(disc)"
+        >
+          <img :src="driveDiscSetIcon(disc)" alt="" loading="lazy">
+          <span class="manual-disc-option-main">
+            <strong>{{ driveDiscSetName(disc) }}</strong>
+            <span>{{ disc.partition }}号位 · {{ driveDiscRarityLevelText(disc) }}{{ disc.source?.sequence ? ` · #${disc.source.sequence}` : "" }}</span>
+          </span>
+          <span class="manual-disc-option-stat">
+            <strong>{{ driveDiscStatText(disc.mainStat) }}</strong>
+            <span>{{ driveDiscSubStatText(disc) }}</span>
+          </span>
+        </button>
+      </div>
+      <div v-else class="empty-state manual-disc-empty">
+        <img :src="fallbackIcon" alt="">
+        <strong>暂无驱动盘</strong>
+        <span>暂无符合筛选条件的驱动盘</span>
+      </div>
+    </div>
+    <template #footer>
+      <div class="drawer-footer">
+        <span class="modal-summary">{{ activeManualDiscSlot ? `${activeManualDiscSlot} 号位` : "未选择槽位" }}</span>
+        <span class="toolbar">
+          <NButton
+            type="error"
+            :disabled="!buildStore.manualDriveDiscIdsBySlot[String(activeManualDiscSlot)]"
+            @click="clearManualDriveDiscSlot"
+          >
+            卸下此槽位
+          </NButton>
+          <NButton @click="showManualDiscPicker = false">关闭</NButton>
+        </span>
+      </div>
+    </template>
+  </NModal>
+
+  <NModal v-model:show="showSaveLoadoutModal" preset="card" :title="saveLoadoutTitle" style="max-width: 640px">
+    <div class="section-band">
+      <div class="metric">
+        <dt>套装名称</dt>
+        <dd><NInput v-model:value="loadoutNameDraft" clearable placeholder="输入套装名称" /></dd>
+      </div>
+      <div class="chip-row save-loadout-summary">
+        <NTag round>{{ saveLoadoutSourceLabel }}</NTag>
+        <NTag round>{{ saveLoadoutDiscs.length }} / 6</NTag>
+        <NTag :type="saveLoadoutMissingSlots.length ? 'warning' : 'success'" round>
+          {{ saveLoadoutMissingSlots.length ? `缺失 ${saveLoadoutMissingSlots.join('、')} 号位` : '六槽完整' }}
+        </NTag>
+      </div>
+    </div>
+    <template #footer>
+      <div class="drawer-footer">
+        <span class="modal-summary">保存后会更新驱动盘页中的套装预设</span>
+        <span class="toolbar">
+          <NButton @click="showSaveLoadoutModal = false">取消</NButton>
+          <NButton type="primary" :disabled="!saveLoadoutDiscs.length" @click="saveLoadoutFromModal">保存套装</NButton>
+        </span>
       </div>
     </template>
   </NModal>
@@ -1387,6 +1511,16 @@ function complexityText(metrics: any = {}, settings: any = {}) {
     @save="saveCalculationConfig"
   />
 
+  <OptimizerConfigModal
+    v-model:show="showOptimizerConfig"
+    :optimizer-config="optimizerStore.settings"
+    :optimizer-algorithm-options="optimizerAlgorithmOptions"
+    :main-stat-options-by-slot="mainStatOptionsBySlot"
+    :minimum-stats="minimumStats"
+    :four-piece-runtime-buffs="fourPieceRuntimeBuffs"
+    @save="saveOptimizerConfig"
+  />
+
   <DriveDiscAnalysisModal
     v-model:show="showDriveDiscAnalysis"
     :catalog="catalogStore.catalog"
@@ -1397,6 +1531,282 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 </template>
 
 <style scoped>
+.workbench-merged-grid {
+  grid-template-columns: minmax(250px, 300px) minmax(480px, 1fr) minmax(340px, 430px);
+  gap: 14px;
+}
+
+.workbench-left,
+.workbench-center,
+.workbench-right {
+  min-width: 0;
+}
+
+.workbench-right-sticky {
+  position: sticky;
+  top: 74px;
+}
+
+.panel-subtitle {
+  margin: 4px 0 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.optimizer-set-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.optimizer-constraint-chips {
+  gap: 6px;
+}
+
+.optimizer-run-row {
+  display: grid;
+  grid-template-columns: minmax(170px, auto) minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+.optimizer-run-row > .toolbar {
+  align-content: start;
+}
+
+.optimizer-error-state {
+  min-height: 72px;
+}
+
+.drive-disc-mode-row,
+.drive-disc-analysis-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.drive-disc-mode-toolbar {
+  gap: 6px;
+}
+
+.drive-disc-action-toolbar {
+  justify-content: flex-end;
+}
+
+.drive-disc-analysis-strip {
+  padding: 10px 12px;
+  border: 1px solid #dbeafe;
+  border-radius: var(--app-radius-sm);
+  background: #f7fbff;
+}
+
+.drive-disc-analysis-strip > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.drive-disc-analysis-strip strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--app-text);
+  font-size: 13px;
+}
+
+.drive-disc-analysis-strip span {
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.drive-disc-mode-control {
+  min-width: 0;
+}
+
+.drive-disc-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.disc-slot-card {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 112px;
+  padding: 10px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  background: #fff;
+}
+
+.disc-slot-card-empty {
+  background: var(--app-panel-muted);
+}
+
+.disc-slot-card-manual {
+  cursor: pointer;
+}
+
+.disc-slot-card-manual:hover {
+  border-color: #93c5fd;
+  background: #f8fbff;
+}
+
+.disc-slot-card img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: var(--app-radius-sm);
+  background: var(--app-panel-muted);
+}
+
+.disc-slot-card-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.disc-slot-card-copy strong {
+  color: var(--app-text);
+  font-size: 13px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.disc-slot-card-copy span,
+.disc-slot-card-copy small {
+  color: var(--app-muted);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.disc-slot-card-copy span {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.disc-slot-card-copy small {
+  font-size: 11px;
+}
+
+.disc-slot-card-meta {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+
+.manual-disc-picker {
+  gap: 12px;
+}
+
+.manual-disc-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.manual-disc-filter-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.7fr) minmax(150px, 0.7fr) minmax(220px, 1fr);
+  gap: 10px;
+}
+
+.manual-disc-option-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(560px, calc(100vh - 300px));
+  overflow: auto;
+}
+
+.manual-disc-option {
+  display: grid;
+  grid-template-columns: 54px minmax(160px, 0.78fr) minmax(220px, 1.22fr);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 72px;
+  padding: 10px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  background: #fff;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.manual-disc-option:hover,
+.manual-disc-option.active {
+  border-color: #2563eb;
+  background: #f8fbff;
+}
+
+.manual-disc-option.active {
+  box-shadow: inset 4px 0 0 #facc15;
+}
+
+.manual-disc-option img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-panel-muted);
+}
+
+.manual-disc-option-main,
+.manual-disc-option-stat {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.manual-disc-option-main strong,
+.manual-disc-option-stat strong,
+.manual-disc-option-main span,
+.manual-disc-option-stat span {
+  min-width: 0;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.manual-disc-option-main strong,
+.manual-disc-option-stat strong {
+  color: var(--app-text);
+  font-size: 13px;
+}
+
+.manual-disc-option-main span,
+.manual-disc-option-stat span {
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.manual-disc-empty {
+  min-height: 260px;
+}
+
+.save-loadout-summary {
+  margin-top: 10px;
+}
+
+.damage-panel-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.damage-panel-grid h3 {
+  margin: 0 0 8px;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
 .selection-summary {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -1887,6 +2297,52 @@ function complexityText(metrics: any = {}, settings: any = {}) {
   overflow-wrap: anywhere;
 }
 
+@media (max-width: 1280px) {
+  .workbench-merged-grid {
+    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  }
+
+  .workbench-right {
+    grid-column: 1 / -1;
+  }
+
+  .workbench-right-sticky {
+    position: static;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 980px) {
+  .workbench-merged-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workbench-right {
+    order: -1;
+  }
+
+  .workbench-left {
+    order: 0;
+  }
+
+  .workbench-center {
+    order: 1;
+  }
+
+  .optimizer-set-grid,
+  .optimizer-run-row,
+  .drive-disc-slot-grid,
+  .manual-disc-filter-row {
+    grid-template-columns: 1fr;
+  }
+
+  .drive-disc-mode-row,
+  .drive-disc-analysis-strip {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 @media (max-width: 680px) {
   .optimizer-result-toolbar {
     grid-template-columns: minmax(0, 1fr);
@@ -1917,6 +2373,19 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 
   .set-choice-list {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .manual-disc-option {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .manual-disc-option-stat {
+    grid-column: 2;
+  }
+
+  .manual-disc-option img {
+    width: 42px;
+    height: 42px;
   }
 
   .set-modal-footer {

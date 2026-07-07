@@ -132,7 +132,7 @@ function setResistance(value: number | null) {
           <dd class="target-stun-row">
             <NCheckbox :checked="target.stunned" @update:checked="updateTarget({ stunned: Boolean($event) })">启用</NCheckbox>
             <div class="target-stun-multiplier">
-              <span>初始倍率</span>
+              <span>初始失衡倍率</span>
               <NInputNumber
                 :value="target.stunMultiplierPercent"
                 :min="0"
@@ -180,15 +180,20 @@ function setResistance(value: number | null) {
 
 .target-stun-multiplier {
   display: grid;
-  grid-template-columns: auto minmax(72px, 1fr) auto;
-  gap: 8px;
+  grid-template-columns: minmax(104px, 124px) auto;
+  gap: 4px 8px;
   align-items: center;
   color: var(--app-muted);
   font-size: 12px;
 }
 
+.target-stun-multiplier > span:first-child {
+  grid-column: 1 / -1;
+}
+
 .target-stun-multiplier :deep(.n-input-number) {
-  min-width: 0;
+  width: 100%;
+  min-width: 104px;
 }
 
 .target-defense-value {

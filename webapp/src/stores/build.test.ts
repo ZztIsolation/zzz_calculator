@@ -416,6 +416,119 @@ describe("build store", () => {
     expect(input.damage.target.resistanceByElement.physical).toBe(20)
   })
 
+  it("expands skill group references for calculation input without rewriting the saved config", () => {
+    const store = useBuildStore()
+    const agent = {
+      id: "agent_a",
+      name: { zhCN: "角色 A" },
+      skillGroups: [
+        {
+          id: "loop",
+          name: { zhCN: "一变" },
+          defaultCount: 10,
+          minCount: 0,
+          maxCount: 30,
+          step: 1,
+          events: [{ id: "hit", kind: "direct", skillMultiplier: 100, count: 2 }],
+        },
+        {
+          id: "ultimate",
+          name: { zhCN: "一大" },
+          defaultCount: 2,
+          minCount: 0,
+          maxCount: 10,
+          step: 1,
+          events: [{ id: "burst", kind: "direct", skillMultiplier: 500, count: 1 }],
+        },
+      ],
+    }
+    const meta = {
+      agents: [agent],
+      wEngines: [{ id: "engine_a", name: { zhCN: "音擎 A" } }],
+      combatBuffs: [],
+    }
+    store.agentId = "agent_a"
+    store.wEngineId = "engine_a"
+    store.setDamageConfig({
+      mode: "custom",
+      selectedEventId: "loop-ref",
+      events: [
+        { id: "intro", kind: "direct", skillMultiplier: 50, count: 1 },
+        { id: "loop-ref", kind: "skillGroup", skillGroupId: "loop", count: 3 },
+        { id: "ult-ref", kind: "skillGroup", skillGroupId: "ultimate", count: 2 },
+      ],
+    }, agent)
+
+    expect(store.damageConfig.events.map((event: any) => event.kind)).toEqual(["direct", "skillGroup", "skillGroup"])
+
+    const input = store.buildInput({}, meta, [])
+    expect(input.damage.selectedEventId).toBe("loop-ref__hit")
+    expect(input.damage.events.map((event: any) => event.id)).toEqual(["intro", "loop-ref__hit", "ult-ref__burst"])
+    expect(input.damage.events.map((event: any) => event.kind)).toEqual(["direct", "direct", "direct"])
+    expect(input.damage.events.map((event: any) => event.count)).toEqual([1, 6, 2])
+
+    const metaWithoutSkillGroups = {
+      ...meta,
+      agents: [{ id: "agent_a", name: { zhCN: "角色 A" } }],
+    }
+    const catalogWithSkillGroups = {
+      agents: [agent],
+      agentsMap: new Map([[agent.id, agent]]),
+    }
+    const inputFromCatalogFallback = store.buildInput(catalogWithSkillGroups, metaWithoutSkillGroups, [])
+    expect(inputFromCatalogFallback.damage.selectedEventId).toBe("loop-ref__hit")
+    expect(inputFromCatalogFallback.damage.events.map((event: any) => event.kind)).toEqual(["direct", "direct", "direct"])
+    expect(inputFromCatalogFallback.damage.events.map((event: any) => event.count)).toEqual([1, 6, 2])
+  })
+
+  it("ignores stale saved events when admin default mode uses role skill groups", () => {
+    const store = useBuildStore()
+    const agent = {
+      id: "agent_a",
+      name: { zhCN: "角色 A" },
+      defaultCalculationConfig: {
+        mode: "custom",
+        selectedEventId: "loop-ref",
+        events: [{ id: "loop-ref", kind: "skillGroup", skillGroupId: "loop", count: 10 }],
+      },
+      skillGroups: [{
+        id: "loop",
+        name: { zhCN: "一变" },
+        defaultCount: 10,
+        minCount: 0,
+        maxCount: 30,
+        step: 1,
+        events: [{ id: "real-hit", kind: "direct", skillMultiplier: 500, count: 2 }],
+      }],
+    }
+    const meta = {
+      agents: [agent],
+      wEngines: [{ id: "engine_a", name: { zhCN: "音擎 A" } }],
+      combatBuffs: [],
+    }
+    store.agentId = "agent_a"
+    store.wEngineId = "engine_a"
+    store.setDamageConfig({
+      mode: "adminDefault",
+      selectedEventId: "stale-direct",
+      events: [{ id: "stale-direct", kind: "direct", skillMultiplier: 100, count: 10 }],
+    }, agent)
+
+    expect(store.damageConfig.selectedEventId).toBe("loop-ref")
+    expect(store.damageConfig.events.map((event: any) => event.kind)).toEqual(["skillGroup"])
+
+    const input = store.buildInput({}, meta, [])
+    expect(input.damage.selectedEventId).toBe("loop-ref__real-hit")
+    expect(input.damage.events).toEqual([
+      expect.objectContaining({
+        id: "loop-ref__real-hit",
+        kind: "direct",
+        skillMultiplier: 500,
+        count: 20,
+      }),
+    ])
+  })
+
   it("normalizes the sheer objective away from non-rupture agents", () => {
     const store = useBuildStore()
     const agent = { id: "agent_a", specialty: "attack" }
@@ -434,6 +547,22 @@ describe("build store", () => {
 
   it("normalizes admin default away when the agent has no default calculation", () => {
     expect(normalizeDamageModeForAgent("adminDefault", { id: "agent_a", specialty: "attack" })).toBe("single")
+  })
+
+  it("allows admin default mode when the agent only has skill groups", () => {
+    expect(normalizeDamageModeForAgent("adminDefault", {
+      id: "agent_a",
+      specialty: "attack",
+      skillGroups: [{
+        id: "loop",
+        events: [{ id: "hit", kind: "direct", skillMultiplier: 100, count: 1 }],
+      }],
+      defaultCalculationConfig: {
+        mode: "custom",
+        selectedEventId: null,
+        events: [],
+      },
+    })).toBe("adminDefault")
   })
 
   it("keeps the sheer objective for rupture agents", () => {

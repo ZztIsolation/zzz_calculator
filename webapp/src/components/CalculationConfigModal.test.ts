@@ -13,6 +13,83 @@ const disorderEffects = (anomalyEffectsData as any).effects.filter((effect: any)
 const yixuan = (agentsData as any).agents.find((agent: any) => agent.id === "yixuan")
 const yixuanSkillCatalog = (agentSkillsData as any).agentSkills.find((skill: any) => skill.id === "yixuan")
 
+const miyabiWithSkillGroups = {
+  ...JSON.parse(JSON.stringify(miyabi)),
+  skillGroups: [
+    {
+      id: "loop",
+      name: { zhCN: "一变" },
+      defaultCount: 10,
+      minCount: 0,
+      maxCount: 30,
+      step: 1,
+      events: [
+        {
+          id: "charge",
+          kind: "direct",
+          count: 2,
+          critMode: "expected",
+          skillRef: {
+            agentSkillId: "hoshimi_miyabi",
+            categoryId: "basic",
+            moveId: "frost_moon",
+            rowId: "charge_3",
+          },
+        },
+      ],
+    },
+    {
+      id: "ultimate",
+      name: { zhCN: "一大" },
+      defaultCount: 2,
+      minCount: 0,
+      maxCount: 10,
+      step: 1,
+      events: [
+        {
+          id: "ult",
+          kind: "direct",
+          count: 1,
+          critMode: "expected",
+          skillRef: {
+            agentSkillId: "hoshimi_miyabi",
+            categoryId: "chain",
+            moveId: "ultimate_lingering_snow",
+            rowId: "damage",
+          },
+        },
+      ],
+    },
+  ],
+  defaultCalculationConfig: {
+    ...JSON.parse(JSON.stringify(miyabi.defaultCalculationConfig)),
+    selectedEventId: "loop-ref",
+    events: [
+      {
+        id: "loop-ref",
+        kind: "skillGroup",
+        skillGroupId: "loop",
+        count: 10,
+      },
+      {
+        id: "ultimate-ref",
+        kind: "skillGroup",
+        skillGroupId: "ultimate",
+        count: 2,
+      },
+    ],
+  },
+}
+
+const miyabiWithOnlySkillGroups = {
+  ...JSON.parse(JSON.stringify(miyabiWithSkillGroups)),
+  defaultCalculationConfig: {
+    ...JSON.parse(JSON.stringify(miyabiWithSkillGroups.defaultCalculationConfig)),
+    selectedEventId: null,
+    events: [],
+  },
+}
+
 const naiveStubs = {
   NButton: {
     props: ["disabled"],
@@ -129,12 +206,12 @@ describe("CalculationConfigModal", () => {
     await openModal(wrapper)
 
     const modeOptions = selectLabelsWithOption(wrapper, "custom")
-    expect(modeOptions).toContain("最大化单个伤害")
+    expect(modeOptions).toContain("最大化单个技能伤害")
     expect(modeOptions).not.toContain("最大化贯穿伤害")
     const addButtons = Array.from(document.body.querySelectorAll(".toolbar button"))
       .map(button => button.textContent?.trim())
-      .filter(text => ["直伤", "贯穿", "异常", "紊乱"].includes(text ?? ""))
-    expect(addButtons).toEqual(["直伤", "异常", "紊乱"])
+      .filter(text => ["添加技能", "添加贯穿", "添加异常事件", "添加技能组", "紊乱"].includes(text ?? ""))
+    expect(addButtons).toEqual(["添加技能", "添加异常事件"])
   })
 
   it("keeps the sheer objective available for rupture agents", async () => {
@@ -151,12 +228,12 @@ describe("CalculationConfigModal", () => {
     await openModal(wrapper)
 
     const modeOptions = selectLabelsWithOption(wrapper, "custom")
-    expect(modeOptions).not.toContain("最大化单个伤害")
+    expect(modeOptions).not.toContain("最大化单个技能伤害")
     expect(modeOptions).toContain("最大化贯穿伤害")
     const addButtons = Array.from(document.body.querySelectorAll(".toolbar button"))
       .map(button => button.textContent?.trim())
-      .filter(text => ["直伤", "贯穿", "异常", "紊乱"].includes(text ?? ""))
-    expect(addButtons).toEqual(["直伤", "贯穿", "异常", "紊乱"])
+      .filter(text => ["添加技能", "添加贯穿", "添加异常事件", "添加技能组", "紊乱"].includes(text ?? ""))
+    expect(addButtons).toEqual(["添加技能", "添加贯穿", "添加异常事件"])
   })
 
   it("renders target events as a full selectable list", async () => {
@@ -192,7 +269,7 @@ describe("CalculationConfigModal", () => {
 
     expect(document.body.querySelector(".calculation-event-inline-actions")).toBeNull()
     const addButtons = Array.from(document.body.querySelectorAll(".toolbar button"))
-      .filter(button => ["直伤", "贯穿", "异常", "紊乱"].includes(button.textContent?.trim() ?? ""))
+      .filter(button => ["添加技能", "添加贯穿", "添加异常事件", "添加技能组", "紊乱"].includes(button.textContent?.trim() ?? ""))
     expect(addButtons).toHaveLength(0)
   })
 
@@ -238,6 +315,149 @@ describe("CalculationConfigModal", () => {
     expect(document.body.textContent).not.toContain("紊乱事件需要选择")
     expect(document.body.querySelectorAll(".panel-title")[1].textContent).toContain("紊乱 · 烈霜霜寒紊乱（星见雅）")
     expect(document.body.querySelectorAll(".panel-title")[1].textContent).not.toContain("异常紊乱")
+  })
+
+  it("keeps optimizer constraints out of the event management modal", async () => {
+    const wrapper = mountModal()
+
+    await openModal(wrapper)
+
+    expect(document.body.textContent).not.toContain("优化约束")
+    expect(document.body.textContent).not.toContain("4号位主词条")
+    await saveModal(wrapper)
+    expect(wrapper.emitted("save-optimizer")).toBeUndefined()
+  })
+
+  it("adds editable skill group references to custom events", async () => {
+    const wrapper = mountModal({
+      agent: miyabiWithSkillGroups,
+      damageConfig: {
+        mode: "custom",
+        selectedEventId: "direct-1",
+        events: [{ id: "direct-1", kind: "direct", skillMultiplier: 100, count: 1 }],
+      },
+    })
+
+    await openModal(wrapper)
+
+    const addSkillGroupButton = Array.from(document.body.querySelectorAll("button"))
+      .find(button => button.textContent?.trim() === "添加技能组")
+    expect(addSkillGroupButton).toBeTruthy()
+    addSkillGroupButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+    await nextTick()
+
+    expect(document.body.textContent).toContain("技能组 · 一变")
+    const countInput = document.body.querySelector(".calculation-editor-grid input") as HTMLInputElement
+    countInput.value = "3"
+    countInput.dispatchEvent(new Event("input", { bubbles: true }))
+    await nextTick()
+
+    const saved = await saveModal(wrapper)
+    expect(saved.mode).toBe("custom")
+    expect(saved.events).toHaveLength(2)
+    expect(saved.events[1]).toMatchObject({
+      kind: "skillGroup",
+      skillGroupId: "loop",
+      count: 3,
+    })
+  })
+
+  it("shows skill group child events as a read-only resolved preview", async () => {
+    const wrapper = mountModal({
+      agent: miyabiWithSkillGroups,
+      damageConfig: {
+        mode: "custom",
+        selectedEventId: "loop-ref",
+        events: [{ id: "loop-ref", kind: "skillGroup", skillGroupId: "loop", count: 10 }],
+      },
+    })
+
+    await openModal(wrapper)
+
+    const preview = document.body.querySelector(".skill-group-child-preview") as HTMLElement
+    expect(preview).toBeTruthy()
+    expect(preview.textContent).toContain("组内技能（只读）")
+    expect(preview.textContent).toContain("强化普攻：霜月")
+    expect(preview.textContent).toContain("三段蓄力斩击伤害倍率")
+    expect(preview.textContent).toContain("组内次数 ×2")
+    expect(preview.textContent).toContain("当前合计 ×20")
+    expect(preview.textContent).not.toContain("手填倍率")
+    expect(preview.querySelector("input")).toBeNull()
+    expect(preview.querySelector("select")).toBeNull()
+
+    const saved = await saveModal(wrapper)
+    expect(saved.events).toEqual([
+      expect.objectContaining({
+        kind: "skillGroup",
+        skillGroupId: "loop",
+        count: 10,
+      }),
+    ])
+  })
+
+  it("refreshes the read-only skill group preview when the selected group changes", async () => {
+    const wrapper = mountModal({
+      agent: miyabiWithSkillGroups,
+      damageConfig: {
+        mode: "custom",
+        selectedEventId: "loop-ref",
+        events: [{ id: "loop-ref", kind: "skillGroup", skillGroupId: "loop", count: 10 }],
+      },
+    })
+
+    await openModal(wrapper)
+
+    expect(document.body.querySelector(".skill-group-child-preview")?.textContent).toContain("三段蓄力斩击伤害倍率")
+    const skillGroupSelect = selectComponentWithOption(wrapper, "ultimate")
+    expect(skillGroupSelect).toBeTruthy()
+    await skillGroupSelect!.vm.$emit("update:value", "ultimate")
+    await nextTick()
+
+    const preview = document.body.querySelector(".skill-group-child-preview") as HTMLElement
+    expect(preview.textContent).toContain("终结技")
+    expect(preview.textContent).toContain("当前合计 ×10")
+    expect(preview.textContent).not.toContain("三段蓄力斩击伤害倍率")
+  })
+
+  it("uses skill group references when the admin config has no base events", async () => {
+    const wrapper = mountModal({
+      agent: miyabiWithOnlySkillGroups,
+      damageConfig: {
+        mode: "adminDefault",
+        selectedEventId: null,
+        events: [],
+      },
+    })
+
+    await openModal(wrapper)
+
+    expect(document.body.textContent).toContain("技能组")
+    const saved = await saveModal(wrapper)
+    expect(saved.mode).toBe("adminDefault")
+    expect(saved.selectedEventId).toBe("loop-ref-1")
+    expect(saved.events.map((event: any) => event.kind)).toEqual(["skillGroup", "skillGroup"])
+    expect(saved.events.map((event: any) => event.skillGroupId)).toEqual(["loop", "ultimate"])
+    expect(saved.events.map((event: any) => event.count)).toEqual([10, 2])
+  })
+
+  it("uses the role admin default instead of stale saved admin events", async () => {
+    const wrapper = mountModal({
+      agent: miyabiWithSkillGroups,
+      damageConfig: {
+        mode: "adminDefault",
+        selectedEventId: "stale-direct",
+        events: [{ id: "stale-direct", kind: "direct", skillMultiplier: 100, count: 10 }],
+      },
+    })
+
+    await openModal(wrapper)
+
+    expect(document.body.textContent).toContain("技能组 · 一变")
+    expect(document.body.textContent).not.toContain("快剑")
+    const saved = await saveModal(wrapper)
+    expect(saved.mode).toBe("adminDefault")
+    expect(saved.selectedEventId).toBe("loop-ref")
+    expect(saved.events.map((event: any) => event.kind)).toEqual(["skillGroup", "skillGroup"])
   })
 
   it("hydrates legacy direct events with the displayed skill ref instead of manual multiplier text", async () => {

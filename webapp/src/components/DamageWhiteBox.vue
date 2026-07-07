@@ -14,7 +14,8 @@ const props = defineProps<{
 
 const selectedEventId = ref<string | null>(null)
 
-const events = computed<any[]>(() => Array.isArray(props.damage?.events) ? props.damage.events : [])
+const events = computed<any[]>(() => (Array.isArray(props.damage?.events) ? props.damage.events : [])
+  .filter((event: any) => event?.kind !== "skillGroup"))
 const selectedEvent = computed(() => {
   const selectedId = selectedEventId.value ?? String(props.damage?.selectedEventId ?? "")
   return events.value.find(event => String(event?.id ?? "") === selectedId) ?? events.value[0] ?? null

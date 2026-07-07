@@ -1256,8 +1256,8 @@ button {
 
 .target-stun-multiplier-control {
   display: grid;
-  grid-template-columns: auto minmax(64px, 1fr) auto;
-  gap: 8px;
+  grid-template-columns: minmax(104px, 124px) auto;
+  gap: 4px 8px;
   align-items: center;
   min-width: 0;
   color: var(--muted);
@@ -1265,8 +1265,13 @@ button {
   font-weight: 900;
 }
 
+.target-stun-multiplier-control > span:first-child {
+  grid-column: 1 / -1;
+}
+
 .target-stun-multiplier-control input {
-  min-width: 0;
+  width: 100%;
+  min-width: 104px;
 }
 
 .target-stun-multiplier-unit {
@@ -1924,6 +1929,56 @@ button {
   margin-bottom: 16px;
 }
 
+.calculation-skill-group-panel {
+  margin-bottom: 16px;
+  border: 1px solid rgba(16, 20, 27, 0.08);
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.calculation-skill-group-panel .calculation-event-sidebar-head {
+  min-height: 46px;
+}
+
+.calculation-skill-group-grid {
+  padding: 12px;
+}
+
+.calculation-skill-group-counts {
+  display: grid;
+  grid-column: span 2;
+  gap: 8px;
+}
+
+.calculation-skill-group-count-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(16, 20, 27, 0.08);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.calculation-skill-group-count-row strong,
+.calculation-skill-group-count-row small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calculation-skill-group-count-row small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.calculation-skill-group-action {
+  align-self: end;
+}
+
 .calculation-config-workspace {
   display: grid;
   grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.35fr);
@@ -2064,6 +2119,21 @@ button {
   flex: 1 1 72px;
 }
 
+.calculation-add-actions .calculation-add-btn {
+  flex-basis: 112px;
+  min-height: 38px;
+  padding: 8px 12px;
+  border-color: #acc7ed;
+  background: #f8fbff;
+  box-shadow: inset 0 0 0 1px rgba(47, 125, 246, 0.08);
+  font-size: 13px;
+}
+
+.calculation-add-actions .calculation-add-btn:hover {
+  border-color: #75a5e8;
+  background: #eef6ff;
+}
+
 .calculation-event-editor {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -2141,6 +2211,104 @@ button {
   font-size: 14px;
   line-height: 1.4;
   overflow-wrap: anywhere;
+}
+
+.calculation-skill-group-child-preview {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 10px;
+  min-width: 0;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.calculation-default-detail-list + .calculation-skill-group-child-preview {
+  margin: 12px 0 0;
+}
+
+.calculation-skill-group-child-preview-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.calculation-skill-group-child-preview-head strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.calculation-skill-group-child-preview-head span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.calculation-skill-group-child-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.calculation-skill-group-child-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(16, 20, 27, 0.08);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.calculation-skill-group-child-order {
+  display: inline-grid;
+  place-items: center;
+  min-width: 34px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(47, 94, 255, 0.08);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.calculation-skill-group-child-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.calculation-skill-group-child-copy strong,
+.calculation-skill-group-child-copy small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.calculation-skill-group-child-copy strong {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.calculation-skill-group-child-copy small,
+.calculation-skill-group-child-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.calculation-skill-group-child-empty {
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  text-align: center;
 }
 
 .calculation-event-editor-empty,

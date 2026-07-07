@@ -567,13 +567,30 @@ function cleanCalculationSkillRef(skillRef = null) {
     return Object.values(result).every(Boolean) ? result : null
 }
 
-function cleanCalculationEvent(event = {}, index = 0) {
+function cleanCalculationEvent(event = {}, index = 0, options = {}) {
     if (!event || typeof event !== "object" || Array.isArray(event)) {
         return null
     }
-    const inputKind = ["direct", "sheer", "anomaly", "disorder"].includes(event.kind)
+    if (event.kind === "skillGroup" && !options.allowSkillGroup) {
+        return null
+    }
+    const inputKind = ["direct", "sheer", "anomaly", "disorder", ...(options.allowSkillGroup ? ["skillGroup"] : [])].includes(event.kind)
         ? event.kind
         : "direct"
+    if (inputKind === "skillGroup") {
+        const id = String(event.id ?? `skill-group-${index + 1}`).trim() || `skill-group-${index + 1}`
+        const skillGroupId = String(event.skillGroupId ?? event.groupId ?? "").trim()
+        const count = Number(event.count ?? 1)
+        if (!skillGroupId || (options.skillGroupIds instanceof Set && !options.skillGroupIds.has(skillGroupId))) {
+            return null
+        }
+        return {
+            id,
+            kind: "skillGroup",
+            skillGroupId,
+            count: Number.isFinite(count) ? Math.max(0, count) : 1,
+        }
+    }
     const settlementType = inputKind === "disorder" || event.settlementType === "disorder" ? "disorder" : "attribute"
     const kind = inputKind === "direct" || inputKind === "sheer" ? inputKind : "anomaly"
     const id = String(event.id ?? `${kind}-${index + 1}`).trim() || `${kind}-${index + 1}`
@@ -612,29 +629,110 @@ function cleanCalculationEvent(event = {}, index = 0) {
     return null
 }
 
-function cleanDefaultCalculationConfig(config = null) {
+function legacySkillGroupCount(config = {}, group = {}) {
+    const presets = Array.isArray(config.skillGroupPresets)
+        ? config.skillGroupPresets.filter(preset => preset && typeof preset === "object" && !Array.isArray(preset))
+        : []
+    const selectedPresetId = String(config.defaultSkillGroupPresetId ?? "").trim()
+    const preset = presets.find(item => String(item.id ?? "").trim() === selectedPresetId) ?? presets[0] ?? null
+    const presetCount = preset?.counts && typeof preset.counts === "object" && !Array.isArray(preset.counts)
+        ? Number(preset.counts[group.id])
+        : Number.NaN
+    return Number.isFinite(presetCount) ? Math.max(0, presetCount) : Number(group.defaultCount ?? 0)
+}
+
+function legacySkillGroupReferenceEvents(config = {}, skillGroups = []) {
+    return skillGroups.map((group, index) => ({
+        id: `${group.id}-ref-${index + 1}`,
+        kind: "skillGroup",
+        skillGroupId: group.id,
+        count: legacySkillGroupCount(config, group),
+    }))
+}
+
+function cleanDefaultCalculationConfig(config = null, skillGroups = []) {
     if (!config || typeof config !== "object" || Array.isArray(config)) {
         return null
     }
-    const events = Array.isArray(config.events)
-        ? config.events.map(cleanCalculationEvent).filter(Boolean)
+    const skillGroupIds = new Set(skillGroups.map(group => group.id).filter(Boolean))
+    let events = Array.isArray(config.events)
+        ? config.events.map((event, index) => cleanCalculationEvent(event, index, { allowSkillGroup: true, skillGroupIds })).filter(Boolean)
         : []
+    if (!events.length && skillGroups.length) {
+        events = legacySkillGroupReferenceEvents(config, skillGroups)
+            .map((event, index) => cleanCalculationEvent(event, index, { allowSkillGroup: true, skillGroupIds }))
+            .filter(Boolean)
+    }
     if (!events.length) {
         return null
     }
     const mode = ["single", "sheer", "anomaly", "custom"].includes(config.mode) ? config.mode : "custom"
     const selectedEventId = String(config.selectedEventId ?? events[0]?.id ?? "").trim()
-    return {
+    const result = {
         mode,
         ...(config.name ? { name: zhOnly(config.name) } : {}),
-        selectedEventId: events.some(event => event.id === selectedEventId) ? selectedEventId : events[0].id,
         events,
     }
+    if (events.length) {
+        result.selectedEventId = events.some(event => event.id === selectedEventId) ? selectedEventId : events[0].id
+    }
+    return result
+}
+
+function cleanCalculationSkillGroups(groups = []) {
+    if (!Array.isArray(groups)) {
+        return []
+    }
+    return groups
+        .map((group, index) => {
+            if (!group || typeof group !== "object" || Array.isArray(group)) {
+                return null
+            }
+            const id = String(group.id ?? "").trim()
+            const events = Array.isArray(group.events)
+                ? group.events.map((event, eventIndex) => cleanCalculationEvent(event, eventIndex, { allowSkillGroup: false })).filter(Boolean)
+                : []
+            if (!id || !events.length) {
+                return null
+            }
+            const minCount = Number(group.minCount ?? 0)
+            const maxCount = Number(group.maxCount ?? "")
+            const defaultCount = Number(group.defaultCount ?? 0)
+            const step = Number(group.step ?? 1)
+            return {
+                id,
+                ...(group.name ? { name: zhOnly(group.name) } : {}),
+                ...(cleanOptionalZh(group.description) ? { description: cleanOptionalZh(group.description) } : {}),
+                defaultCount: Number.isFinite(defaultCount) ? Math.max(0, defaultCount) : 0,
+                minCount: Number.isFinite(minCount) ? Math.max(0, minCount) : 0,
+                ...(Number.isFinite(maxCount) ? { maxCount: Math.max(0, maxCount) } : {}),
+                step: Number.isFinite(step) && step > 0 ? step : 1,
+                events,
+            }
+        })
+        .filter(Boolean)
+}
+
+function mergeCalculationSkillGroups(primaryGroups = [], legacyGroups = []) {
+    const groups = []
+    const seen = new Set()
+    for (const group of [...primaryGroups, ...legacyGroups]) {
+        if (!group?.id || seen.has(group.id)) {
+            continue
+        }
+        seen.add(group.id)
+        groups.push(group)
+    }
+    return groups
 }
 
 function cleanAgent(item = {}) {
     const preferredDriveDiscs = cleanPreferredDriveDiscs(item.preferredDriveDiscs)
-    const defaultCalculationConfig = cleanDefaultCalculationConfig(item.defaultCalculationConfig)
+    const skillGroups = mergeCalculationSkillGroups(
+        cleanCalculationSkillGroups(item.skillGroups),
+        cleanCalculationSkillGroups(item.defaultCalculationConfig?.skillGroups),
+    )
+    const defaultCalculationConfig = cleanDefaultCalculationConfig(item.defaultCalculationConfig, skillGroups)
     const next = {
         ...item,
         name: zhOnly(item.name),
@@ -653,6 +751,11 @@ function cleanAgent(item = {}) {
         next.preferredDriveDiscs = preferredDriveDiscs
     } else {
         delete next.preferredDriveDiscs
+    }
+    if (skillGroups.length) {
+        next.skillGroups = skillGroups
+    } else {
+        delete next.skillGroups
     }
     if (defaultCalculationConfig) {
         next.defaultCalculationConfig = defaultCalculationConfig

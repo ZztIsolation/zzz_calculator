@@ -10,6 +10,21 @@ declare module "@core/calculator-core.js" {
   export function calculateInCombatPanel(catalog: any, input: any): any
 }
 
+declare module "@core/calculationSkillGroups.js" {
+  export function calculationSkillGroups(source?: any): any[]
+  export function hasCalculationSkillGroups(source?: any): boolean
+  export function skillGroupById(source?: any, groupId?: string): any
+  export function skillGroupCountLimits(group?: any): { min: number, max: number | null, step: number }
+  export function normalizeSkillGroupCounts(source?: any, inputCounts?: Record<string, any>): Record<string, number>
+  export function isSkillGroupReferenceEvent(event?: any): boolean
+  export function normalizeSkillGroupReferenceEvent(event?: any, source?: any, index?: number, options?: any): any
+  export function defaultSkillGroupReferenceEvent(source?: any, groupId?: string, index?: number): any
+  export function normalizeCalculationEventsWithSkillGroups(events?: any[], source?: any, options?: any): any[]
+  export function expandCalculationEvents(events?: any[], source?: any, options?: any): any
+  export function expandCalculationConfigSkillGroups(config?: any, source?: any, options?: any): any
+  export function expandCalculationSkillGroups(config?: any, options?: any): any
+}
+
 declare module "@core/driveDiscOptimizer-core.js" {
   export function previewDriveDiscOptimization(catalog: any, store: any, input?: any, options?: any): any
   export function optimizeDriveDiscsAsync(catalog: any, store: any, input?: any, options?: any): Promise<any>

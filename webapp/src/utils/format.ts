@@ -243,7 +243,7 @@ export function entitySearchText(item: any): string {
 
 export function damageModeLabel(value: unknown): string {
   const labels: Record<string, string> = {
-    single: "最大化单个伤害",
+    single: "最大化单个技能伤害",
     sheer: "最大化贯穿伤害",
     anomaly: "最大化异常伤害",
     adminDefault: "管理员默认循环",
@@ -268,6 +268,9 @@ export function optimizerStatusLabel(value: unknown): string {
 
 export function damageEventKindLabel(event: any): string {
   const kind = event?.kind
+  if (kind === "skillGroup") {
+    return "技能组"
+  }
   if (kind === "direct") {
     return "直伤"
   }
@@ -295,9 +298,25 @@ export function anomalyEffectLabel(value: unknown, meta?: any): string {
   return (effect ? localizedText(effect.label) || labelOf(effect) : "") || ANOMALY_EFFECT_LABELS[id] || id
 }
 
+function skillGroupSubjectLabel(event: any, meta?: any, fallbackSkillCatalog?: any): string {
+  const groupId = String(event?.skillGroupId ?? event?.groupId ?? "")
+  const agentId = String(fallbackSkillCatalog?.agentId ?? fallbackSkillCatalog?.id ?? "")
+  const agents = Array.isArray(meta?.agents) ? meta.agents : []
+  const agentCandidates = agentId
+    ? agents.filter((agent: any) => agent?.id === agentId)
+    : agents
+  const group = agentCandidates
+    .flatMap((agent: any) => Array.isArray(agent?.skillGroups) ? agent.skillGroups : [])
+    .find((item: any) => item?.id === groupId)
+  return labelOf(group) || groupId || "技能组"
+}
+
 export function damageEventSubjectLabel(event: any, meta?: any, fallbackSkillCatalog?: any): string {
   if (!event) {
     return "-"
+  }
+  if (event.kind === "skillGroup") {
+    return skillGroupSubjectLabel(event, meta, fallbackSkillCatalog)
   }
   if (isDirectSkillEvent(event)) {
     const skillLabel = damageSkillRefPathLabel(event.skillRef, meta, fallbackSkillCatalog)

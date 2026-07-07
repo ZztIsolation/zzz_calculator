@@ -36,6 +36,12 @@ class MockWorker {
 }
 
 const catalog = { driveDiscSets: [{ id: "woodpecker_electro" }] }
+const preferredCatalog = {
+  driveDiscSets: [
+    { id: "woodpecker_electro" },
+    { id: "fanged_metal" },
+  ],
+}
 const originalWorker = globalThis.Worker
 
 function optimizerInput(overrides: any = {}) {
@@ -134,6 +140,72 @@ describe("optimizer store", () => {
     expect(input.settings.fourPieceBuffMode).toBe("manual")
     expect(input.ownerId).toBe("default")
     expect(input.settings.ownerId).toBe("default")
+  })
+
+  it("uses the active agent preferred four-piece drive-disc set by default", () => {
+    localStorage.setItem("zzz-calculator.webapp.optimizer.v1", JSON.stringify({
+      fourPieceSetId: "woodpecker_electro",
+    }))
+    const store = useOptimizerStore()
+
+    store.initialize(preferredCatalog, {
+      id: "agent_a",
+      preferredDriveDiscs: { defaultSetId: "fanged_metal" },
+    })
+
+    expect(store.fourPieceSetId).toBe("fanged_metal")
+    expect(store.inputWithSettings({ agentId: "agent_a" }).settings.fourPieceSetId).toBe("fanged_metal")
+  })
+
+  it("preserves an explicitly selected four-piece drive-disc set on reload", () => {
+    const agent = {
+      id: "agent_a",
+      preferredDriveDiscs: { defaultSetId: "fanged_metal" },
+    }
+    const store = useOptimizerStore()
+    store.initialize(preferredCatalog, agent)
+    store.setFourPieceSet("woodpecker_electro")
+
+    setActivePinia(createPinia())
+    const reloaded = useOptimizerStore()
+    reloaded.initialize(preferredCatalog, agent)
+
+    expect(reloaded.fourPieceSetId).toBe("woodpecker_electro")
+  })
+
+  it("updates the four-piece drive-disc set when the active agent changes", () => {
+    const store = useOptimizerStore()
+    store.initialize(preferredCatalog)
+
+    store.applyAgentPreferredDriveDiscSet({
+      id: "agent_b",
+      preferredDriveDiscs: { defaultSetId: "fanged_metal" },
+    }, preferredCatalog)
+
+    expect(store.fourPieceSetId).toBe("fanged_metal")
+  })
+
+  it("applies advanced settings in one payload without changing worker input shape", () => {
+    const store = useOptimizerStore()
+    store.initialize({ driveDiscSets: [{ id: "woodpecker_electro" }] })
+
+    store.applyAdvancedSettings({
+      algorithm: "heuristic-potential",
+      fourPieceBuffMode: "manual",
+      fourPieceBuffRuntimeInputs: { "driveDisc4pc:woodpecker_electro.self": { coverage: 0.5 } },
+      mainStatLimits: { "4": ["critRate"], "6": ["anomalyMastery"] },
+      minimums: { critRate: 45 },
+    })
+
+    const input = store.inputWithSettings({ agentId: "agent_a" })
+    expect(input.settings).toMatchObject({
+      objective: "damage",
+      algorithm: "heuristic-potential",
+      fourPieceBuffMode: "manual",
+      mainStatLimits: { "4": ["critRate"], "6": ["anomalyMastery"] },
+      minimums: { critRate: 45 },
+    })
+    expect(input.settings.fourPieceBuffRuntimeInputs["driveDisc4pc:woodpecker_electro.self"]).toEqual({ coverage: 0.5 })
   })
 
   it("preserves progress envelope fields and stores completed results", async () => {

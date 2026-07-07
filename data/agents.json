@@ -370,7 +370,216 @@
         "level60Stats": "source-checked",
         "panelDefaults": "source-checked",
         "damageElement": "modeled-from-physical-resistance-wording"
-      }
+      },
+      "defaultCalculationConfig": {
+        "mode": "custom",
+        "name": {
+          "zhCN": "0命叶10变2大"
+        },
+        "events": [
+          {
+            "id": "skill_group_1-ref-1",
+            "kind": "skillGroup",
+            "skillGroupId": "skill_group_1",
+            "count": 10
+          },
+          {
+            "id": "direct-2",
+            "kind": "direct",
+            "count": 2,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "ye_shunguang",
+              "categoryId": "chain",
+              "moveId": "ultimate_cut_delusion_open_heaven",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "direct-3",
+            "kind": "direct",
+            "count": 2,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "ye_shunguang",
+              "categoryId": "chain",
+              "moveId": "ultimate_chase_cloud_thunder",
+              "rowId": "damage"
+            }
+          }
+        ],
+        "selectedEventId": "skill_group_1-ref-1"
+      },
+      "skillGroups": [
+        {
+          "id": "skill_group_1",
+          "name": {
+            "zhCN": "0命叶变身短轴"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "maxCount": 30,
+          "step": 1,
+          "events": [
+            {
+              "id": "direct-1",
+              "kind": "direct",
+              "count": 2,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "ye_shunguang",
+                "categoryId": "basic",
+                "moveId": "clarity_cut_light_extreme",
+                "rowId": "damage"
+              }
+            },
+            {
+              "id": "direct-2",
+              "kind": "direct",
+              "count": 2,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "ye_shunguang",
+                "categoryId": "basic",
+                "moveId": "clarity_cut_light_annihilation",
+                "rowId": "with_sword_force"
+              }
+            },
+            {
+              "id": "direct-3",
+              "kind": "direct",
+              "count": 2,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "ye_shunguang",
+                "categoryId": "basic",
+                "moveId": "clarity_soaring",
+                "rowId": "damage"
+              }
+            },
+            {
+              "id": "direct-4",
+              "kind": "direct",
+              "count": 1,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "ye_shunguang",
+                "categoryId": "assist",
+                "moveId": "entry_shadow",
+                "rowId": "damage"
+              }
+            },
+            {
+              "id": "direct-5",
+              "kind": "direct",
+              "count": 1,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "ye_shunguang",
+                "categoryId": "special",
+                "moveId": "ex_clarity_return_dust",
+                "rowId": "damage"
+              }
+            },
+            {
+              "id": "direct-6",
+              "kind": "direct",
+              "count": 2,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "ye_shunguang",
+                "categoryId": "special",
+                "moveId": "ex_clarity_flying_light",
+                "rowId": "consume_1_sword_force"
+              }
+            }
+          ]
+        },
+        {
+          "id": "skill_group_2",
+          "name": {
+            "zhCN": "2命叶变身短轴"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "maxCount": 30,
+          "step": 1,
+          "events": [
+            {
+              "id": "direct-1",
+              "kind": "direct",
+              "count": 2,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "ye_shunguang",
+                "categoryId": "basic",
+                "moveId": "clarity_cut_light_extreme",
+                "rowId": "damage"
+              }
+            },
+            {
+              "id": "direct-2",
+              "kind": "direct",
+              "count": 2,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "ye_shunguang",
+                "categoryId": "basic",
+                "moveId": "clarity_soaring",
+                "rowId": "damage"
+              }
+            },
+            {
+              "id": "direct-3",
+              "kind": "direct",
+              "count": 1,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "ye_shunguang",
+                "categoryId": "basic",
+                "moveId": "clarity_cut_light_annihilation",
+                "rowId": "with_sword_force"
+              }
+            },
+            {
+              "id": "direct-4",
+              "kind": "direct",
+              "count": 1,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "ye_shunguang",
+                "categoryId": "special",
+                "moveId": "ex_clarity_return_dust",
+                "rowId": "damage"
+              }
+            },
+            {
+              "id": "direct-5",
+              "kind": "direct",
+              "count": 1,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "ye_shunguang",
+                "categoryId": "assist",
+                "moveId": "entry_shadow",
+                "rowId": "damage"
+              }
+            },
+            {
+              "id": "direct-6",
+              "kind": "direct",
+              "count": 8,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "ye_shunguang",
+                "categoryId": "special",
+                "moveId": "ex_clarity_flying_light",
+                "rowId": "consume_1_sword_force"
+              }
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "hoshimi_miyabi",

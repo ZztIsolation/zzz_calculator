@@ -156,7 +156,7 @@
                         <span>启用</span>
                       </label>
                       <label class="target-stun-multiplier-control">
-                        <span>初始倍率</span>
+                        <span>初始失衡倍率</span>
                         <input id="damageTargetStunMultiplier" type="number" min="0" step="0.1" value="150" aria-label="Boss 初始失衡倍率百分比">
                         <span class="target-stun-multiplier-unit">%</span>
                       </label>
@@ -636,7 +636,7 @@
         <label class="field">
           <span>计算方式</span>
           <select id="calculationConfigMode">
-            <option value="single">最大化单个伤害</option>
+            <option value="single">最大化单个技能伤害</option>
             <option value="sheer">最大化贯穿伤害</option>
             <option value="anomaly">最大化异常伤害</option>
             <option value="adminDefault">未配置默认循环</option>
@@ -654,10 +654,10 @@
             </div>
             <div id="calculationConfigEventList" class="calculation-config-event-list"></div>
             <div class="calculation-add-actions">
-              <button id="addCalculationDirectEventBtn" type="button" class="compact-btn" data-add-calculation-event-kind="direct">直伤</button>
-              <button id="addCalculationSheerEventBtn" type="button" class="compact-btn" data-add-calculation-event-kind="sheer">贯穿</button>
-              <button id="addCalculationAnomalyEventBtn" type="button" class="compact-btn" data-add-calculation-event-kind="anomaly">属性异常</button>
-              <button id="addCalculationDisorderEventBtn" type="button" class="compact-btn" data-add-calculation-event-kind="disorder">紊乱</button>
+              <button id="addCalculationDirectEventBtn" type="button" class="compact-btn calculation-add-btn" data-add-calculation-event-kind="direct">添加技能</button>
+              <button id="addCalculationSheerEventBtn" type="button" class="compact-btn calculation-add-btn" data-add-calculation-event-kind="sheer">添加贯穿</button>
+              <button id="addCalculationAnomalyEventBtn" type="button" class="compact-btn calculation-add-btn" data-add-calculation-event-kind="anomaly">添加异常事件</button>
+              <button id="addCalculationSkillGroupEventBtn" type="button" class="compact-btn calculation-add-btn" data-add-calculation-event-kind="skillGroup">添加技能组</button>
             </div>
           </aside>
           <section class="calculation-event-editor">

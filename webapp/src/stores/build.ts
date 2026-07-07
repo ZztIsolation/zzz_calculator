@@ -3,6 +3,12 @@ import {
   calculateInCombatPanel,
   calculateOutOfCombatPanel,
 } from "@core/calculator-core.js"
+import {
+  calculationSkillGroups,
+  defaultSkillGroupReferenceEvent,
+  expandCalculationConfigSkillGroups,
+  hasCalculationSkillGroups,
+} from "@core/calculationSkillGroups.js"
 import { teammateDriveDiscSetIdsFromBuffIds } from "@/utils/combatBuffs"
 import {
   clampWEngineModificationLevel,
@@ -130,7 +136,8 @@ export function primaryDamageModeForAgent(agent: any = null) {
 }
 
 export function hasAdminDefaultCalculation(agent: any = null) {
-  return Boolean(agent?.defaultCalculationConfig?.events?.length)
+  const config = agent?.defaultCalculationConfig
+  return Boolean(config?.events?.length || hasCalculationSkillGroups(agent) || hasCalculationSkillGroups(config))
 }
 
 export function isDamageModeAllowedForAgent(mode: unknown, agent: any = null) {
@@ -180,10 +187,58 @@ export function defaultDamageConfig(agent: any = null) {
       events: clone(config.events),
     }
   }
+  const skillGroupSource = hasCalculationSkillGroups(agent) ? agent : config
+  if (hasCalculationSkillGroups(skillGroupSource)) {
+    const events = calculationSkillGroups(skillGroupSource)
+      .map((group: any, index: number) => defaultSkillGroupReferenceEvent(skillGroupSource, group.id, index))
+      .filter(Boolean)
+    if (events.length) {
+      return {
+        mode: "custom",
+        agentLevel: 60,
+        skillLevelsByCategory: {},
+        selectedEventId: events[0]?.id,
+        events,
+      }
+    }
+  }
   return primaryDamageConfigForAgent(agent)
 }
 
+function catalogAgentById(catalog: any = null, agentId = "") {
+  if (!catalog || !agentId) {
+    return null
+  }
+  const map = catalog.agentsMap
+  if (map && typeof map.get === "function") {
+    return map.get(agentId) ?? null
+  }
+  return Array.isArray(catalog.agents)
+    ? catalog.agents.find((item: any) => item?.id === agentId) ?? null
+    : null
+}
+
+function calculationAgentFor(metaAgent: any = null, catalog: any = null, agentId = "") {
+  const catalogAgent = catalogAgentById(catalog, agentId)
+  if (hasCalculationSkillGroups(metaAgent)) {
+    return metaAgent
+  }
+  if (hasCalculationSkillGroups(catalogAgent)) {
+    return catalogAgent
+  }
+  return metaAgent ?? catalogAgent
+}
+
 function normalizeDamageEvent(event: any, index = 0) {
+  if (event?.kind === "skillGroup") {
+    const id = String(event?.id ?? `skillGroup-${index + 1}`)
+    return {
+      id,
+      kind: "skillGroup",
+      skillGroupId: String(event?.skillGroupId ?? event?.groupId ?? ""),
+      count: Math.max(0, numeric(event?.count, 1)),
+    }
+  }
   const kind = ["direct", "sheer", "anomaly", "disorder"].includes(event?.kind) ? event.kind : "direct"
   const fallback = defaultEvent(kind, `${kind}-${index + 1}`)
   return {
@@ -210,7 +265,8 @@ function normalizeDamageConfig(value: any, agent: any = null) {
   const modeAllowed = isDamageModeAllowedForAgent(rawMode, agent)
   const mode = normalizeDamageModeForAgent(rawMode, agent)
   const eventFallback = modeAllowed ? fallback : primaryDamageConfigForAgent(agent)
-  const eventSource = modeAllowed && Array.isArray(value?.events) && value.events.length
+  const usesAdminDefault = mode === "adminDefault"
+  const eventSource = !usesAdminDefault && modeAllowed && Array.isArray(value?.events) && value.events.length
     ? value.events
     : eventFallback.events
   const events = Array.isArray(eventSource) && eventSource.length
@@ -221,7 +277,7 @@ function normalizeDamageConfig(value: any, agent: any = null) {
     : events[0]?.id
   return {
     ...eventFallback,
-    ...damageConfigFields(value),
+    ...(!usesAdminDefault ? damageConfigFields(value) : {}),
     mode,
     agentLevel: numeric(value?.agentLevel, fallback.agentLevel),
     skillLevelsByCategory: {
@@ -638,6 +694,7 @@ export const useBuildStore = defineStore("build", {
     },
     buildInput(catalog: any, meta: any, driveDiscs: any[], options: { runtimeInputs?: Record<string, any> } = {}) {
       const agent = meta?.agents?.find((item: any) => item.id === this.agentId)
+      const damageAgent = calculationAgentFor(agent, catalog, this.agentId)
       const wEngine = meta?.wEngines?.find((item: any) => item.id === this.wEngineId)
       const runtimeDefaults = Object.fromEntries([
         ...(meta?.combatBuffs ?? []),
@@ -658,8 +715,10 @@ export const useBuildStore = defineStore("build", {
         && this.damageConfig?.selectedEventId === "direct-1"
         && this.damageConfig?.events?.length === 1
         && this.damageConfig?.events?.[0]?.id === "direct-1"
-        && agent?.defaultCalculationConfig?.events?.length
-      const sourceDamageConfig = untouchedFallbackDamage ? defaultDamageConfig(agent) : this.damageConfig
+        && damageAgent?.defaultCalculationConfig?.events?.length
+      const sourceDamageConfig = this.damageConfig?.mode === "adminDefault" || untouchedFallbackDamage
+        ? defaultDamageConfig(damageAgent)
+        : this.damageConfig
       const damage = normalizeDamageConfig({
         ...sourceDamageConfig,
         agentLevel: this.agentLevel,
@@ -667,7 +726,8 @@ export const useBuildStore = defineStore("build", {
           ...this.skillLevels,
           ...(sourceDamageConfig.skillLevelsByCategory ?? {}),
         },
-      }, agent)
+      }, damageAgent)
+      const expandedDamage = expandCalculationConfigSkillGroups(damage, damageAgent, { strict: true })
       const activeBuffIds = this.activeBuffIds(meta, catalog, driveDiscs)
       return {
         agentId: this.agentId,
@@ -686,7 +746,7 @@ export const useBuildStore = defineStore("build", {
           wEngineTeamModificationLevels: wEngineTeamModificationLevelsFromAddedBuffs(this.addedBuffs),
         },
         damage: {
-          ...damage,
+          ...expandedDamage,
           target: clone(this.targetConfig),
         },
         label: `${nameOf(agent)} / ${nameOf(wEngine)}`,
