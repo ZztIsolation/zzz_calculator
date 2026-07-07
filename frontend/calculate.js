@@ -2793,16 +2793,16 @@ function setDamageResistanceControlValue(value = 0) {
         return
     }
     const clamped = clampCustomResistanceValue(value)
-    els.damageTargetResistance.value = String(Number(clamped.toFixed(3)))
+    els.damageTargetResistance.value = String(Math.round(clamped))
 }
 
 function damageResistanceControlValue() {
     if (!els.damageTargetResistance) {
         return 0
     }
-    const value = clampCustomResistanceValue(els.damageTargetResistance.value)
+    const value = Math.round(clampCustomResistanceValue(els.damageTargetResistance.value))
     if (Number(els.damageTargetResistance.value) !== value) {
-        els.damageTargetResistance.value = String(Number(value.toFixed(3)))
+        els.damageTargetResistance.value = String(value)
     }
     return value
 }
@@ -2869,7 +2869,7 @@ function syncDamageResistanceControlsToAgent() {
     activeDamageResistanceElement = element
     setDamageResistanceControlValue(damageTargetResistanceByElement[element] ?? 0)
     if (els.damageTargetResistanceLabel) {
-        els.damageTargetResistanceLabel.textContent = `Boss ${damageElementShortLabel(element)}抗性`
+        els.damageTargetResistanceLabel.textContent = `${damageElementShortLabel(element)}抗性`
     }
     syncDamageResistancePresetFromValue()
 }
@@ -4446,7 +4446,7 @@ function renderAddedWEngineModificationControl(row, item) {
     controls.dataset.buffKey = addedCombatBuffKey(item)
 
     const field = document.createElement("label")
-    field.className = "field"
+    field.className = "field combat-runtime-field combat-runtime-select-field"
     const label = document.createElement("span")
     label.textContent = "改装等级"
     const select = document.createElement("select")
@@ -4486,7 +4486,7 @@ function renderBuffRuntimeControls(row, item, buff, runtime) {
     controls.dataset.buffKey = buffKey
     if (hasCoverage) {
         const field = document.createElement("label")
-        field.className = "field"
+        field.className = "field combat-runtime-field combat-runtime-number-field"
         field.innerHTML = `
             <span>覆盖率</span>
             <input type="number" min="${buff.coverage.min ?? 0}" max="${buff.coverage.max ?? 1}" step="${buff.coverage.step ?? 0.1}" value="${runtime.coverage}" data-runtime-coverage>
@@ -4498,7 +4498,7 @@ function renderBuffRuntimeControls(row, item, buff, runtime) {
         const minAttr = Number.isFinite(sourceGroup.min) ? ` min="${sourceGroup.min}"` : ""
         const maxAttr = Number.isFinite(sourceGroup.max) ? ` max="${sourceGroup.max}"` : ""
         const field = document.createElement("label")
-        field.className = "field"
+        field.className = "field combat-runtime-field combat-runtime-number-field"
         field.innerHTML = `
             <span>${escapeHtml(sourceGroup.label)}</span>
             <input type="number"${minAttr}${maxAttr} step="1" value="${runtime.effects?.[primaryId]?.sourceValue ?? sourceGroup.defaultValue ?? 0}" data-runtime-effect="${escapeHtml(primaryId)}" data-runtime-source-group="${escapeHtml(sourceGroup.key)}" data-runtime-source-value>
@@ -4508,7 +4508,7 @@ function renderBuffRuntimeControls(row, item, buff, runtime) {
     for (const stackGroup of stackGroups) {
         const primaryId = stackGroup.ruleIds[0] ?? ""
         const field = document.createElement("label")
-        field.className = "field"
+        field.className = "field combat-runtime-field combat-runtime-number-field"
         field.innerHTML = `
             <span>${escapeHtml(stackGroup.label)}</span>
             <input type="number" min="0" max="${stackGroup.maxStacks ?? 1}" step="1" value="${runtime.effects?.[primaryId]?.stacks ?? stackGroup.defaultStacks ?? stackGroup.maxStacks ?? 1}" data-runtime-effect="${escapeHtml(primaryId)}" data-runtime-stack-group="${escapeHtml(stackGroup.key)}" data-runtime-stacks>

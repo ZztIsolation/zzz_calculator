@@ -457,12 +457,15 @@ is ZZZ Scanner Next `1.0.35`.
 
 Main pages:
 
-- `/` - Drive Disc optimizer homepage with manual, loadout, and optimized scheme previews
-- `/drive-discs.html` - Drive Disc inventory and loadout management
-- `/calculate.html` - legacy optimizer compatibility entry that redirects to `/`
-- `/accounts.html` - account creation, switching, rename, and deletion
-- `/maintenance.html` - static catalog maintenance. Enabled by default during
-  local development and disabled by default when `NODE_ENV=production`.
+- `/` - Vue workbench for character setup, damage config, Buffs, Drive Disc schemes, and optimization
+- `/discs` - Vue Drive Disc inventory, loadouts, import preview, scanner flow, and analysis
+- `/accounts` - Vue account creation, switching, rename, and deletion
+- `/maintenance.html` - the original static maintenance UI for game-data JSON.
+  It is available in local development or when maintenance is explicitly enabled,
+  and stays hidden in normal production builds.
+- `/maintenance` redirects to `/maintenance.html`.
+- `/calculate.html`, `/drive-discs.html`, and `/accounts.html` remain
+  compatibility entries for the Vue workbench, inventory, and account routes.
 
 ## Local Runtime Data
 
@@ -519,9 +522,9 @@ NODE_ENV=production
 ```
 
 The server then reports `maintenanceEnabled: false` and blocks
-`/maintenance.html`, `/maintenance.js`, and `/api/maintenance/*`. Set
-`MAINTENANCE_ENABLED=true|false` only when you intentionally need an explicit
-override.
+`/maintenance.html`, `/maintenance.js`, `/maintenanceValidation.js`,
+`/maintenanceStats.js`, and `/api/maintenance/*`. Set
+`MAINTENANCE_ENABLED=true|false` only when you intentionally need an explicit override.
 
 ## Tests
 

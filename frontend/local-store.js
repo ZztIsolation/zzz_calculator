@@ -554,8 +554,7 @@ function reconcileDriveDiscLoadoutSlots(loadouts = [], { deletedIds = new Set(),
     })
 }
 
-export async function importScannerExportToStore(input, options = {}) {
-    const currentStore = await loadUserDriveDiscStore()
+function buildScannerImportPlan(currentStore, input, options = {}) {
     const effectiveOwnerId = options.ownerId ?? currentStore.currentOwnerId
     const normalized = normalizeScannerExport(input, {
         ...options,
@@ -576,6 +575,10 @@ export async function importScannerExportToStore(input, options = {}) {
     const deletedIds = new Set()
     const removedMissingIds = new Set()
     const remappedIds = new Map()
+    const added = []
+    const updated = []
+    const unchanged = []
+    const removed = []
     const summary = {
         added: 0,
         skipped: 0,
@@ -595,8 +598,10 @@ export async function importScannerExportToStore(input, options = {}) {
         const contentMatches = byContent.get(imported.contentFingerprint) ?? []
         if (contentMatches.length > 0) {
             const existing = contentMatches.find(item => nextSameOwner.has(item.id)) ?? contentMatches[0]
+            const before = nextSameOwner.get(existing.id) ?? existing
+            const after = mergeImportedDriveDisc(before, imported)
             matchedExistingIds.add(existing.id)
-            nextSameOwner.set(existing.id, mergeImportedDriveDisc(existing, imported))
+            nextSameOwner.set(existing.id, after)
             summary.deduplicated += removeDuplicateContentMatches(
                 contentMatches,
                 existing.id,
@@ -605,15 +610,19 @@ export async function importScannerExportToStore(input, options = {}) {
                 deletedIds,
             )
             summary.skipped += 1
+            unchanged.push({ id: existing.id, before, after, imported, reason: "same-content" })
             continue
         }
 
         const identityMatches = byIdentity.get(imported.identityFingerprint) ?? []
         if (identityMatches.length === 1 && Number(imported.level ?? 0) > Number(identityMatches[0].level ?? 0)) {
             const existing = identityMatches[0]
+            const before = nextSameOwner.get(existing.id) ?? existing
+            const after = mergeImportedDriveDisc(before, imported)
             matchedExistingIds.add(existing.id)
-            nextSameOwner.set(existing.id, mergeImportedDriveDisc(existing, imported))
+            nextSameOwner.set(existing.id, after)
             summary.updated += 1
+            updated.push({ id: existing.id, before, after, imported, reason: "higher-level-same-identity" })
             continue
         }
 
@@ -630,6 +639,7 @@ export async function importScannerExportToStore(input, options = {}) {
         nextSameOwner.set(nextDisc.id, nextDisc)
         matchedExistingIds.add(nextDisc.id)
         summary.added += 1
+        added.push(nextDisc)
     }
 
     if (options.removeMissing) {
@@ -638,12 +648,13 @@ export async function importScannerExportToStore(input, options = {}) {
                 nextSameOwner.delete(disc.id)
                 deletedIds.add(disc.id)
                 removedMissingIds.add(disc.id)
+                removed.push(disc)
             }
         }
         summary.removed = removedMissingIds.size
     }
 
-    const saved = await saveUserDriveDiscStore({
+    const nextStore = {
         ...currentStore,
         owners,
         imports: [
@@ -655,10 +666,45 @@ export async function importScannerExportToStore(input, options = {}) {
             ...nextSameOwner.values(),
         ],
         driveDiscLoadouts: reconcileDriveDiscLoadoutSlots(currentStore.driveDiscLoadouts ?? [], { deletedIds, remappedIds }),
+    }
+
+    return {
+        currentStore,
+        ownerId,
+        normalized,
+        summary,
+        nextStore,
+        preview: {
+            ownerId,
+            sourcePath: normalized.importRecord.sourcePath,
+            removeMissing: Boolean(options.removeMissing),
+            currentCount: existingSameOwner.length,
+            nextCount: nextSameOwner.size,
+            normalizedDiscs: normalized.driveDiscs,
+            added,
+            updated,
+            unchanged,
+            removed,
+            warnings: summary.warnings,
+            summary,
+        },
+    }
+}
+
+export async function previewScannerExportImport(input, options = {}) {
+    const currentStore = await loadUserDriveDiscStore()
+    return buildScannerImportPlan(currentStore, input, options).preview
+}
+
+export async function importScannerExportToStore(input, options = {}) {
+    const currentStore = await loadUserDriveDiscStore()
+    const plan = buildScannerImportPlan(currentStore, input, options)
+    const saved = await saveUserDriveDiscStore({
+        ...plan.nextStore,
     })
     return {
-        ...ownerScopedStore(saved, ownerId),
-        lastImportSummary: summary,
+        ...ownerScopedStore(saved, plan.ownerId),
+        lastImportSummary: plan.summary,
     }
 }
 

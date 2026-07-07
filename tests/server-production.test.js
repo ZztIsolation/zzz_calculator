@@ -4,25 +4,33 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
-const port = 20000 + Math.floor(Math.random() * 1000)
-const baseUrl = `http://127.0.0.1:${port}`
-const server = spawn(process.execPath, ["backend/server.js"], {
-    cwd: rootDir,
-    env: {
-        ...process.env,
-        NODE_ENV: "production",
-        PORT: String(port),
-    },
-    stdio: ["ignore", "pipe", "pipe"],
-})
-
+let port = 20000 + Math.floor(Math.random() * 1000)
+let baseUrl = `http://127.0.0.1:${port}`
 let serverOutput = ""
-server.stdout.on("data", chunk => {
-    serverOutput += chunk.toString()
-})
-server.stderr.on("data", chunk => {
-    serverOutput += chunk.toString()
-})
+let server = null
+
+function startServer(extraEnv = {}) {
+    port = 20000 + Math.floor(Math.random() * 1000)
+    baseUrl = `http://127.0.0.1:${port}`
+    serverOutput = ""
+    server = spawn(process.execPath, ["backend/server.js"], {
+        cwd: rootDir,
+        env: {
+            ...process.env,
+            NODE_ENV: "production",
+            PORT: String(port),
+            ...extraEnv,
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+    })
+    server.stdout.on("data", chunk => {
+        serverOutput += chunk.toString()
+    })
+    server.stderr.on("data", chunk => {
+        serverOutput += chunk.toString()
+    })
+    return server
+}
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -62,14 +70,20 @@ async function getRedirect(pathname) {
 }
 
 try {
+    startServer()
     await waitForServer()
 
     const appConfig = await getText("/api/app-config")
     assert.equal(appConfig.status, 200)
     assert.equal(JSON.parse(appConfig.body).maintenanceEnabled, false)
 
+    const maintenanceRedirect = await getRedirect("/maintenance")
+    assert.equal(maintenanceRedirect.status, 308)
+    assert.equal(maintenanceRedirect.location, "/maintenance.html")
     assert.equal((await getText("/maintenance.html")).status, 404)
     assert.equal((await getText("/maintenance.js")).status, 404)
+    assert.equal((await getText("/maintenanceValidation.js")).status, 404)
+    assert.equal((await getText("/maintenanceStats.js")).status, 404)
 
     const maintenanceCatalog = await getText("/api/maintenance/catalog")
     assert.equal(maintenanceCatalog.status, 403)
@@ -112,17 +126,50 @@ try {
         assert.match(JSON.parse(response.body).error, /browser locally/i)
     }
 
-    const optimizerPage = await getText("/")
-    assert.equal(optimizerPage.status, 200)
-    assert.match(optimizerPage.body, /驱动盘最优计算/)
-
-    const legacyOptimizerPage = await getRedirect("/calculate.html")
-    assert.equal(legacyOptimizerPage.status, 308)
-    assert.equal(legacyOptimizerPage.location, "/")
+    const appPage = await getText("/")
+    assert.equal(appPage.status, 200)
+    const servesVueApp = /<div id="app"><\/div>/.test(appPage.body)
+    if (servesVueApp) {
+        assert.match(appPage.body, /ZZZ Calculator/)
+        assert.equal((await getText("/discs")).status, 200)
+        assert.equal((await getText("/accounts")).status, 200)
+        assert.deepEqual(await getRedirect("/maintenance"), { status: 308, location: "/maintenance.html", body: "" })
+        assert.deepEqual(await getRedirect("/calculate.html"), { status: 308, location: "/", body: "" })
+        assert.deepEqual(await getRedirect("/drive-discs.html"), { status: 308, location: "/discs", body: "" })
+        assert.deepEqual(await getRedirect("/accounts.html"), { status: 308, location: "/accounts", body: "" })
+        assert.equal((await getText("/maintenance.html")).status, 404)
+        assert.equal((await getText("/downloads/zzz-scanner/manifest.json")).status, 200)
+        assert.equal((await getText("/missing-route")).status, 200)
+    } else {
+        assert.match(appPage.body, /驱动盘最优计算/)
+        const legacyOptimizerPage = await getRedirect("/calculate.html")
+        assert.equal(legacyOptimizerPage.status, 308)
+        assert.equal(legacyOptimizerPage.location, "/")
+        assert.equal((await getRedirect("/drive-discs.html")).location, "/discs")
+        assert.equal((await getRedirect("/accounts.html")).location, "/accounts")
+        assert.equal((await getText("/maintenance.html")).status, 404)
+    }
 
     assert.equal((await getText("/missing.html")).status, 404)
-    assert.equal((await getText("/drive-discs.html")).status, 200)
-    assert.equal((await getText("/accounts.html")).status, 200)
-} finally {
+
     server.kill()
+    await sleep(100)
+    startServer({ MAINTENANCE_ENABLED: "true" })
+    await waitForServer()
+
+    const enabledConfig = await getText("/api/app-config")
+    assert.equal(enabledConfig.status, 200)
+    assert.equal(JSON.parse(enabledConfig.body).maintenanceEnabled, true)
+    assert.deepEqual(await getRedirect("/maintenance"), { status: 308, location: "/maintenance.html", body: "" })
+    const oldMaintenancePage = await getText("/maintenance.html")
+    assert.equal(oldMaintenancePage.status, 200)
+    assert.match(oldMaintenancePage.body, /维护界面/)
+    assert.match(oldMaintenancePage.body, /maintenance\.js/)
+    assert.equal((await getText("/maintenance.js")).status, 200)
+    assert.equal((await getText("/maintenanceValidation.js")).status, 200)
+    assert.equal((await getText("/maintenanceStats.js")).status, 200)
+    const enabledMaintenanceCatalog = await getText("/api/maintenance/catalog")
+    assert.equal(enabledMaintenanceCatalog.status, 200)
+} finally {
+    server?.kill()
 }

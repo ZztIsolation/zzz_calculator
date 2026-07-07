@@ -167,7 +167,7 @@
               {
                 "id": "effect-2",
                 "type": "fixed",
-                "stat": "enemyDefReduction",
+                "stat": "enemyDefIgnore",
                 "value": 20,
                 "mode": "flat",
                 "target": {

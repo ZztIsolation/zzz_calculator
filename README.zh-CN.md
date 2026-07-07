@@ -273,11 +273,12 @@ npm start
 
 主要页面：
 
-- `/`：驱动盘优化器首页，支持自选、套装和优化结果方案预览
-- `/drive-discs.html`：驱动盘仓库和套装预设
-- `/calculate.html`：旧优化器兼容入口，自动跳转到 `/`
-- `/accounts.html`：账号新增、切换、改名和删除
-- `/maintenance.html`：静态资料维护。本地开发默认可用；`NODE_ENV=production` 时默认禁用。
+- `/`：Vue 工作台，承载角色配置、伤害配置、Buff、驱动盘方案和优化器
+- `/discs`：Vue 驱动盘仓库，包含套装预设、导入预览、扫描流程和词条分析
+- `/accounts`：Vue 账号新增、切换、改名和删除
+- `/maintenance.html`：旧版静态资料维护界面，用于维护游戏数据 JSON；本地开发或显式开启维护时可用，普通生产构建默认隐藏
+- `/maintenance`：兼容入口，跳转到 `/maintenance.html`
+- `/calculate.html`、`/drive-discs.html`、`/accounts.html` 保留为旧入口兼容，分别跳转到 Vue 工作台、仓库和账号页。
 
 ## 本地运行数据
 
@@ -317,7 +318,7 @@ Helper 和 OCR 大包通过 GitHub Releases 发布，不进入 Git 仓库：
 NODE_ENV=production
 ```
 
-此时服务端会返回 `maintenanceEnabled: false`，并硬拦截 `/maintenance.html`、`/maintenance.js` 和 `/api/maintenance/*`。如确需显式覆盖，可设置 `MAINTENANCE_ENABLED=true|false`。
+此时服务端会返回 `maintenanceEnabled: false`，并硬拦截 `/maintenance.html`、`/maintenance.js`、`/maintenanceValidation.js`、`/maintenanceStats.js` 和 `/api/maintenance/*`。如确需显式覆盖，可设置 `MAINTENANCE_ENABLED=true|false`。
 
 ## 测试
 

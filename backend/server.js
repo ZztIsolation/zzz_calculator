@@ -29,6 +29,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, "..")
 const dataDir = path.join(rootDir, "data")
 const frontendDir = path.join(rootDir, "frontend")
+const pagesDir = path.join(rootDir, "dist", "pages")
 const port = Number(process.env.PORT || 8787)
 const nodeEnv = String(process.env.NODE_ENV ?? "development").toLowerCase()
 
@@ -51,7 +52,10 @@ function isMaintenanceEnabled() {
 }
 
 function isMaintenanceStaticPath(pathname) {
-    return pathname === "/maintenance.html" || pathname === "/maintenance.js"
+    return pathname === "/maintenance.html"
+        || pathname === "/maintenance.js"
+        || pathname === "/maintenanceValidation.js"
+        || pathname === "/maintenanceStats.js"
 }
 
 function isRetiredUserDataPath(pathname) {
@@ -1019,30 +1023,12 @@ function contentType(filePath) {
     }
 }
 
-async function serveStatic(res, pathname) {
-    if (!isMaintenanceEnabled() && isMaintenanceStaticPath(pathname)) {
-        sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
-        return
-    }
+function isSafeStaticPath(root, absPath) {
+    const relativePath = path.relative(root, absPath)
+    return !(relativePath.startsWith("..") || path.isAbsolute(relativePath))
+}
 
-    if (pathname === "/calculate.html") {
-        sendRedirect(res, "/")
-        return
-    }
-
-    const fileName = pathname === "/" ? "index.html" : pathname.replace(/^\//, "")
-    const absPath = path.resolve(frontendDir, fileName)
-    const relativePath = path.relative(frontendDir, absPath)
-    if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
-        sendText(res, 403, "Forbidden", "text/plain; charset=utf-8")
-        return
-    }
-
-    if (!existsSync(absPath)) {
-        sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
-        return
-    }
-
+function streamStaticFile(res, absPath) {
     res.writeHead(200, {
         "Content-Type": contentType(absPath),
         "Access-Control-Allow-Origin": "*",
@@ -1052,25 +1038,93 @@ async function serveStatic(res, pathname) {
     createReadStream(absPath).pipe(res)
 }
 
-async function serveDownload(res, pathname) {
-    const fileName = pathname.replace(/^\/downloads\//, "")
-    const absPath = path.resolve(downloadsDir, fileName)
-    const relativePath = path.relative(downloadsDir, absPath)
-    if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
-        sendText(res, 403, "Forbidden", "text/plain; charset=utf-8")
+function resolveStaticCandidate(root, fileName) {
+    const absPath = path.resolve(root, fileName)
+    if (!isSafeStaticPath(root, absPath)) {
+        return { forbidden: true, absPath }
+    }
+    return { forbidden: false, absPath, exists: existsSync(absPath) }
+}
+
+async function serveStatic(res, pathname) {
+    if (pathname === "/maintenance") {
+        sendRedirect(res, "/maintenance.html")
         return
     }
-    if (!existsSync(absPath)) {
+    if (pathname === "/calculate.html") {
+        sendRedirect(res, "/")
+        return
+    }
+    if (pathname === "/drive-discs.html") {
+        sendRedirect(res, "/discs")
+        return
+    }
+    if (pathname === "/accounts.html") {
+        sendRedirect(res, "/accounts")
+        return
+    }
+
+    if (!isMaintenanceEnabled() && isMaintenanceStaticPath(pathname)) {
         sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
         return
     }
-    const stat = await import("node:fs/promises").then(m => m.stat(absPath))
-    res.writeHead(200, {
-        "Content-Type": "application/octet-stream",
-        "Content-Disposition": `attachment; filename="${encodeURIComponent(path.basename(absPath))}"`,
-        "Content-Length": stat.size,
-    })
-    createReadStream(absPath).pipe(res)
+
+    const fileName = pathname === "/" ? "index.html" : pathname.replace(/^\//, "")
+
+    if (isMaintenanceEnabled() && isMaintenanceStaticPath(pathname)) {
+        const candidate = resolveStaticCandidate(frontendDir, fileName)
+        if (candidate.forbidden) {
+            sendText(res, 403, "Forbidden", "text/plain; charset=utf-8")
+            return
+        }
+        if (candidate.exists) {
+            streamStaticFile(res, candidate.absPath)
+            return
+        }
+    }
+
+    for (const root of [pagesDir, frontendDir]) {
+        const candidate = resolveStaticCandidate(root, fileName)
+        if (candidate.forbidden) {
+            sendText(res, 403, "Forbidden", "text/plain; charset=utf-8")
+            return
+        }
+        if (candidate.exists) {
+            streamStaticFile(res, candidate.absPath)
+            return
+        }
+    }
+
+    const spaIndex = path.join(pagesDir, "index.html")
+    if (!path.extname(pathname) && existsSync(spaIndex)) {
+        streamStaticFile(res, spaIndex)
+        return
+    }
+
+    sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
+}
+
+async function serveDownload(res, pathname) {
+    const fileName = pathname.replace(/^\/downloads\//, "")
+    for (const root of [path.join(pagesDir, "downloads"), downloadsDir]) {
+        const absPath = path.resolve(root, fileName)
+        if (!isSafeStaticPath(root, absPath)) {
+            sendText(res, 403, "Forbidden", "text/plain; charset=utf-8")
+            return
+        }
+        if (!existsSync(absPath)) {
+            continue
+        }
+        const stat = await import("node:fs/promises").then(m => m.stat(absPath))
+        res.writeHead(200, {
+            "Content-Type": contentType(absPath),
+            "Content-Disposition": `attachment; filename="${encodeURIComponent(path.basename(absPath))}"`,
+            "Content-Length": stat.size,
+        })
+        createReadStream(absPath).pipe(res)
+        return
+    }
+    sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
 }
 
 async function routeApi(req, res, pathname) {

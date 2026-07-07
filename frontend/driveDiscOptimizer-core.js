@@ -2209,17 +2209,52 @@ function shouldRunDiscBoundCheck(state, groupUpperBound, remainingProduct) {
     return groupUpperBound <= cutoff * 1.5
 }
 
-function createOptimizerState(catalog, store, input = {}) {
+function createOptimizerState(catalog, store, input = {}, options = {}) {
+    const prepareStartedAt = nowMs()
+    function reportPrepare(stage, label, settings = null, metrics = {}) {
+        if (typeof options.onPrepareProgress !== "function") {
+            return
+        }
+        try {
+            options.onPrepareProgress({
+                status: "preparing",
+                settings,
+                metrics: {
+                    ...metrics,
+                    prepareStage: stage,
+                    prepareStageLabel: label,
+                    prepareMs: elapsedMsSince(prepareStartedAt),
+                },
+                evaluated: Number(metrics.processedCombinationCount ?? metrics.evaluated ?? 0),
+                estimatedCombinationCount: Number(metrics.estimatedCombinationCount ?? 0),
+                percent: 0,
+                elapsedMs: elapsedMsSince(prepareStartedAt),
+                prepareStage: stage,
+                prepareStageLabel: label,
+            })
+        } catch {
+            // Progress reporting should never break optimizer setup.
+        }
+    }
+
     const agent = catalog.agentsMap?.get(input.agentId)
         ?? catalog.agents?.find(item => item.id === input.agentId)
     const rawSettings = normalizeSettings(input, agent)
     const settings = applyPreferredMainStatLimits(rawSettings, agent)
+    reportPrepare("settings", "正在读取优化设置", settings)
     if (settings.objective !== "damage") {
         throw new Error(`Unsupported objective: ${settings.objective}`)
     }
 
     let candidatesBySlot = groupCandidatesBySlot(store, settings)
     const emptySlots = SLOT_NUMBERS.filter(slot => !candidatesBySlot[String(slot)]?.length)
+    reportPrepare("candidates", "正在筛选候选驱动盘", settings, {
+        emptySlots,
+        candidateCountsBySlot: candidateCountsBySlot(candidatesBySlot),
+        estimatedCombinationCount: 0,
+        evaluated: 0,
+        processedCombinationCount: 0,
+    })
     if (emptySlots.length) {
         return {
             isEmpty: true,
@@ -2229,6 +2264,12 @@ function createOptimizerState(catalog, store, input = {}) {
     }
 
     const candidateData = prepareCandidateData(candidatesBySlot)
+    reportPrepare("candidate-vectors", "正在整理候选词条向量", settings, {
+        candidateCountsBySlot: candidateCountsBySlot(candidatesBySlot),
+        estimatedCombinationCount: 0,
+        evaluated: 0,
+        processedCombinationCount: 0,
+    })
     const combatBuffs = combatBuffsForCandidate(catalog, input, settings)
     const scoreInputBase = {
         agentId: input.agentId,
@@ -2242,6 +2283,12 @@ function createOptimizerState(catalog, store, input = {}) {
     const potentialWeights = inferPotentialWeights(panelCalculator)
     sortCandidatesByPotential(candidatesBySlot, candidateData.vectorById, potentialWeights)
     candidatesBySlot = filterCandidatesByPotential(candidatesBySlot, candidateData.vectorById, potentialWeights, settings)
+    reportPrepare("potential", "正在排序候选评分潜力", settings, {
+        candidateCountsBySlot: candidateCountsBySlot(candidatesBySlot),
+        estimatedCombinationCount: 0,
+        evaluated: 0,
+        processedCombinationCount: 0,
+    })
     const planBuildStartedAt = nowMs()
     const enumerationPlans = buildEnumerationPlans(candidatesBySlot, settings)
     const planBuildMs = elapsedMsSince(planBuildStartedAt)
@@ -2249,6 +2296,15 @@ function createOptimizerState(catalog, store, input = {}) {
         (total, plan) => total + Number(plan.combinationCount ?? 0),
         0,
     )
+    reportPrepare("enumeration-plans", "正在构建枚举计划", settings, {
+        candidateCountsBySlot: candidateCountsBySlot(candidatesBySlot),
+        estimatedCombinationCount,
+        enumerationPlanCount: enumerationPlans.length,
+        evaluated: 0,
+        processedCombinationCount: 0,
+        planBuildMs,
+        complexity: complexityForEstimate(estimatedCombinationCount),
+    })
     const optimisticTwoPieceEntries = optimisticTwoPieceStatEntries(catalog)
     const optimisticTwoPieceEntriesByActiveCount = optimisticTwoPieceStatEntriesByActiveCount(catalog)
     const forceIndexedSearch = String(settings.useIndexedScoreOnly ?? "").trim().toLowerCase() === "force"
@@ -2270,6 +2326,15 @@ function createOptimizerState(catalog, store, input = {}) {
             optimisticTwoPieceEntriesByActiveCount,
         )
         : {}
+    reportPrepare("indexed-data", "正在准备评分索引", settings, {
+        candidateCountsBySlot: candidateCountsBySlot(candidatesBySlot),
+        estimatedCombinationCount,
+        enumerationPlanCount: enumerationPlans.length,
+        evaluated: 0,
+        processedCombinationCount: 0,
+        planBuildMs,
+        complexity: complexityForEstimate(estimatedCombinationCount),
+    })
     const densePanelScoreTarget = canCompileDenseScore
         ? panelCalculator.compileDensePanelScoreTarget({
             statIds: indexedCandidateData.statIds ?? [],
@@ -2289,6 +2354,22 @@ function createOptimizerState(catalog, store, input = {}) {
             avgScoreKernelMs: 0,
             scoreKernelFallbackReason: "unsupported",
         }
+    reportPrepare("score-kernel", "正在探测评分内核", settings, {
+        candidateCountsBySlot: candidateCountsBySlot(candidatesBySlot),
+        estimatedCombinationCount,
+        enumerationPlanCount: enumerationPlans.length,
+        evaluated: 0,
+        processedCombinationCount: 0,
+        planBuildMs,
+        scoreKernel: denseProbe.enabled ? "compiled-dense" : "map",
+        scoreKernelProbeMs: denseProbe.scoreKernelProbeMs,
+        scoreKernelMapProbeMs: denseProbe.scoreKernelMapProbeMs,
+        scoreKernelDenseProbeMs: denseProbe.scoreKernelDenseProbeMs,
+        scoreKernelProbeCount: denseProbe.scoreKernelProbeCount,
+        scoreKernelFallbackReason: denseProbe.scoreKernelFallbackReason,
+        avgScoreKernelMs: Number(denseProbe.avgScoreKernelMs ?? 0),
+        complexity: complexityForEstimate(estimatedCombinationCount),
+    })
     const useCompiledDenseScore = Boolean(denseProbe.enabled)
     const canUseIndexedScore = canPrepareIndexedSearch
         && typeof panelCalculator.scoreOnlyFromIndexedSummary === "function"
@@ -2415,6 +2496,9 @@ function createOptimizerState(catalog, store, input = {}) {
             (total, plan) => total + Number(plan.groupCombinationCount ?? 0),
             0,
         )
+        reportPrepare("super-bound-plans", "正在构建超级上界剪枝计划", settings, {
+            ...state.metrics,
+        })
     }
     return state
 }
@@ -2569,8 +2653,8 @@ function progressFromState(state, status = "running") {
     }
 }
 
-export function previewDriveDiscOptimization(catalog, store, input = {}) {
-    const state = createOptimizerState(catalog, store, input)
+export function previewDriveDiscOptimization(catalog, store, input = {}, options = {}) {
+    const state = createOptimizerState(catalog, store, input, { onPrepareProgress: options.onProgress })
     const result = state.isEmpty ? state.result : null
     const metrics = result?.metrics ?? state.metrics
     return {
@@ -2909,7 +2993,7 @@ export function createDriveDiscOptimizerWorkerSession(catalog, store, input = {}
 }
 
 async function optimizeDriveDiscsLegacyExactAsync(catalog, store, input = {}, options = {}) {
-    const state = createOptimizerState(catalog, store, input)
+    const state = createOptimizerState(catalog, store, input, { onPrepareProgress: options.onProgress })
     const chunkSize = Math.max(1, Number(options.chunkSize ?? 10000))
     const progressIntervalMs = Math.max(0, Number(options.progressIntervalMs ?? 250))
     const yieldIntervalMs = Math.max(0, Number(options.yieldIntervalMs ?? 50))
@@ -2987,7 +3071,7 @@ async function optimizeDriveDiscsLegacyExactAsync(catalog, store, input = {}, op
 }
 
 async function optimizeDriveDiscsSuperBoundExactAsync(catalog, store, input = {}, options = {}, prebuiltState = null) {
-    const state = prebuiltState ?? createOptimizerState(catalog, store, input)
+    const state = prebuiltState ?? createOptimizerState(catalog, store, input, { onPrepareProgress: options.onProgress })
     const chunkSize = Math.max(1, Number(options.chunkSize ?? 10000))
     const progressIntervalMs = Math.max(0, Number(options.progressIntervalMs ?? 250))
     const yieldIntervalMs = Math.max(0, Number(options.yieldIntervalMs ?? 50))
@@ -3296,7 +3380,7 @@ export async function optimizeDriveDiscsAsync(catalog, store, input = {}, option
     if (algorithm === "exact-legacy") {
         return optimizeDriveDiscsLegacyExactAsync(catalog, store, normalizedInput, options)
     }
-    const state = createOptimizerState(catalog, store, normalizedInput)
+    const state = createOptimizerState(catalog, store, normalizedInput, { onPrepareProgress: options.onProgress })
     if (state.isEmpty) {
         const result = finalizeOptimizerResult(state)
         options.onProgress?.(progressFromState(state, "complete"))

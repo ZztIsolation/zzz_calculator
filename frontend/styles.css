@@ -1213,6 +1213,17 @@ button {
   grid-column: 1 / -1;
 }
 
+.target-settings-grid .target-stun-field {
+  grid-column: 1 / -1;
+}
+
+.target-stun-controls {
+  display: grid;
+  grid-template-columns: minmax(86px, auto) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
 .target-stun-check {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);
@@ -1241,6 +1252,25 @@ button {
 .target-stun-check span {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.target-stun-multiplier-control {
+  display: grid;
+  grid-template-columns: auto minmax(64px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.target-stun-multiplier-control input {
+  min-width: 0;
+}
+
+.target-stun-multiplier-unit {
+  color: var(--muted);
 }
 
 .target-resistance-field {
@@ -1627,10 +1657,33 @@ button {
 }
 
 .combat-runtime-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px 10px;
   margin-top: 6px;
+}
+
+.combat-runtime-field {
+  width: max-content;
+  max-width: 100%;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.combat-runtime-field > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.combat-runtime-number-field input,
+.combat-runtime-select-field select {
+  width: 108px;
+  max-width: 100%;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .combat-runtime-effect-toggle {
@@ -5613,7 +5666,6 @@ button.optimizer-disc-row:disabled {
   .stat-number-grid,
   .maintenance-stat-row,
   .maintenance-buff-effect-row,
-  .combat-runtime-grid,
   .combat-buff-teammate-picker,
   .target-settings-grid,
   .disc-source-toggle,
