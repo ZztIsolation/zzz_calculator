@@ -21,6 +21,10 @@ This upload replaces the web-launched OCR runtime with ZZZ Scanner Next
 - Published the OCR zip under GitHub Release tag `scanner-1.0.36` with SHA-256
   `d885c0aef6da61cfcbf994ad2b4e712a31efe8bd87631260fe4f87ea8711c63d` and size
   `47231570` bytes.
+- The Pages artifact now also carries the same OCR zip at
+  `/downloads/zzz-scanner/1.0.36/ZZZ-Scanner.Next-win-x64.zip`; the scanner
+  manifest prefers that same-origin file and keeps GitHub Releases as fallback,
+  avoiding local stalls when the user's network resets GitHub release downloads.
 - Verified the local `1.0.36` scanner with a 120-item benchmark:
   `Completed=120`, `Failed=0`, duplicate exports 0, `IncompleteRoi=0`,
   `slot_safety=pass`, and `profile_route=exact:7`.

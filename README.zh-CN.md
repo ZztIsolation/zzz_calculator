@@ -13,6 +13,7 @@
 - OCR 运行时重新来自本机 `publish 1.0.36`，压包时排除生成的 `Scans` 输出，并保留包内 `Data/ocr_fast_templates.json`。
 - Pages scanner manifest、本地 package manifest 和扫描助手下载链接已更新为 `scannerVersion=1.0.36`。
 - OCR zip 已发布到 GitHub Release tag `scanner-1.0.36`，SHA-256 为 `d885c0aef6da61cfcbf994ad2b4e712a31efe8bd87631260fe4f87ea8711c63d`，大小 `47231570` bytes。
+- Pages 构建产物现在也会携带同一份 OCR zip，路径为 `/downloads/zzz-scanner/1.0.36/ZZZ-Scanner.Next-win-x64.zip`；manifest 会优先让 Helper 下载同站静态文件，GitHub Release 仅作为兜底，避免用户本机网络在拉 GitHub 大文件时 0B 断连。
 - 已用本地 `1.0.36` 扫描器完成 120 件 benchmark：`Completed=120`、`Failed=0`、重复导出 0、`IncompleteRoi=0`、`slot_safety=pass`、`profile_route=exact:7`。
 
 ### 2026-07-02 扫描器 1.0.35 与云绝区零客户端选择

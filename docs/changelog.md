@@ -33,6 +33,15 @@ Updated `scripts/build-pages.js`, the local scanner manifest,
 `tests/scanner-bridge.test.js`, legacy `frontend/drive-discs.html`, and README
 files to use GitHub Release tag `scanner-1.0.36`.
 
+After deployment, local download probes reproduced the user's stuck download:
+the GitHub Release zip connection reset or timed out before any response body
+arrived, leaving progress at `0 B / 45.04 MB`. To avoid making the Helper depend
+on that fragile large-file path, `scripts/build-pages.js` now copies the
+verified OCR zip into the Pages artifact at
+`downloads/zzz-scanner/1.0.36/ZZZ-Scanner.Next-win-x64.zip`, verifies its size
+and SHA-256 during the build, and writes the scanner manifest with the same-site
+relative URL first. The GitHub Release URL remains in `packageUrls` as fallback.
+
 ### Runtime Verification
 
 Ran `dotnet build ZZZ-Scanner.Next.csproj -c Release` successfully before
