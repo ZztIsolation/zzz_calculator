@@ -9,6 +9,22 @@ Chinese documentation is available in [README.zh-CN.md](README.zh-CN.md).
 
 ## Upload Update Summaries
 
+### 2026-07-09 Scanner 1.0.36 Release
+
+This upload replaces the web-launched OCR runtime with ZZZ Scanner Next
+`1.0.36`:
+
+- Repacked the OCR runtime from local `publish 1.0.36`, excluding generated
+  `Scans` output while keeping the bundled `Data/ocr_fast_templates.json`.
+- Updated the Pages scanner manifest, local package manifest, and scanner
+  helper download links to `scannerVersion=1.0.36`.
+- Published the OCR zip under GitHub Release tag `scanner-1.0.36` with SHA-256
+  `d885c0aef6da61cfcbf994ad2b4e712a31efe8bd87631260fe4f87ea8711c63d` and size
+  `47231570` bytes.
+- Verified the local `1.0.36` scanner with a 120-item benchmark:
+  `Completed=120`, `Failed=0`, duplicate exports 0, `IncompleteRoi=0`,
+  `slot_safety=pass`, and `profile_route=exact:7`.
+
 ### 2026-07-02 Scanner 1.0.35 Cloud Client Selection
 
 This upload adds an explicit Drive Disc scanner client switch. The default
@@ -453,7 +469,7 @@ currently uses the verified GitHub Release package. The helper registers
 `zzz-scanner://`, connects back to the page on
 `127.0.0.1:22355`, and downloads the OCR scanner package declared by
 `/downloads/zzz-scanner/manifest.json` when needed. The current scanner package
-is ZZZ Scanner Next `1.0.35`.
+is ZZZ Scanner Next `1.0.36`.
 
 Main pages:
 
@@ -501,7 +517,7 @@ same command from `main` and deploys the Pages artifact; do not commit
 
 Publish Helper and OCR packages through GitHub Releases instead of Git:
 
-- tag: `scanner-1.0.35`
+- tag: `scanner-1.0.36`
 - `ZZZ-Scanner-Helper.exe`
 - `ZZZ-Scanner.Next-win-x64.zip`
 

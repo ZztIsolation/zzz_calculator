@@ -8,9 +8,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, "..")
 const outDir = path.join(rootDir, "dist", "pages")
 
-const scannerReleaseTag = "scanner-1.0.35"
+const scannerReleaseTag = "scanner-1.0.36"
 const scannerReleaseBase = `https://github.com/ZztIsolation/zzz_calculator/releases/download/${scannerReleaseTag}`
-const scannerVersion = "1.0.35"
+const scannerVersion = "1.0.36"
 const scannerZipName = "ZZZ-Scanner.Next-win-x64.zip"
 
 async function writeJson(filePath, value) {
@@ -36,8 +36,8 @@ await writeJson(path.join(outDir, "downloads", "zzz-scanner", "manifest.json"), 
     packageUrls: [
         `${scannerReleaseBase}/${scannerZipName}`,
     ],
-    sha256: "2a10aa3dc92e50c7ea930d75eda82fef741eff16e8c39f2839240b6fc36b0255",
-    size: 47228425,
+    sha256: "d885c0aef6da61cfcbf994ad2b4e712a31efe8bd87631260fe4f87ea8711c63d",
+    size: 47231570,
     entry: "ZZZ-Scanner.Next.exe",
 })
 

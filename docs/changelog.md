@@ -6,6 +6,44 @@ This changelog is the long-form maintenance log for `zzz_calculator`. Every
 future change to the Zenless Zone Zero calculator should be appended here with
 the reason, the files touched, the model impact, and the verification performed.
 
+## 2026-07-09 - Published Scanner 1.0.36
+
+### Request Context
+
+The web-launched OCR scanner needed to move from the deployed `1.0.35` runtime
+to the latest local ZZZ Scanner Next `1.0.36` package while keeping the stable
+local/cloud scanner client selection added in 1.0.35.
+
+### Package Changes
+
+Repacked `E:\yan1\zzz\ZZZ-Scanner.Next\publish 1.0.36` into
+`downloads/zzz-scanner/1.0.36/ZZZ-Scanner.Next-win-x64.zip`. The package
+excludes generated `Scans`, includes the bundled
+`Data/ocr_fast_templates.json`, and contains `ZZZ-Scanner.Next.exe` with file
+version `1.0.36.0`.
+
+The new OCR package metadata is:
+
+- SHA-256: `d885c0aef6da61cfcbf994ad2b4e712a31efe8bd87631260fe4f87ea8711c63d`
+- size: `47231570`
+- entry: `ZZZ-Scanner.Next.exe`
+- bundled template SHA-256: `814e28114378756e7c541c0efe6cfa2469e1e723d0498ba8e73edea58266a076`
+
+Updated `scripts/build-pages.js`, the local scanner manifest,
+`tests/scanner-bridge.test.js`, legacy `frontend/drive-discs.html`, and README
+files to use GitHub Release tag `scanner-1.0.36`.
+
+### Runtime Verification
+
+Ran `dotnet build ZZZ-Scanner.Next.csproj -c Release` successfully before
+packaging.
+
+The local 120-item smoke benchmark
+`publish 1.0.36\Scans\2026-07-09-16-07-11-507-p2784-e284` reported
+`Completed=120`, `Failed=0`, duplicate exports 0, `IncompleteRoi=0`,
+`slot_safety=pass`, `profile_route=exact:7`, and
+`acceptance.no_incomplete_roi/no_error_files/export_consistency/no_export_duplicates/slot_safety/backlog_not_saturated/overlap_rows_complete/overlap_no_hard_stop` all pass.
+
 ## 2026-07-02 - Published Scanner 1.0.35 With Cloud Client Selection
 
 ### Request Context
