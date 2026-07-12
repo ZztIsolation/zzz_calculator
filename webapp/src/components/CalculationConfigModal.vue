@@ -34,6 +34,7 @@ import {
   skillGroupById,
   skillGroupCountLimits,
 } from "@core/calculationSkillGroups.js"
+import { resolveDefaultCalculationConfig } from "@core/defaultCalculationConfig.js"
 
 const props = defineProps<{
   show: boolean
@@ -42,6 +43,7 @@ const props = defineProps<{
   skillLevels: Record<string, any>
   meta: any
   agent?: any
+  cinemaLevel?: number
 }>()
 
 const emit = defineEmits<{
@@ -53,8 +55,8 @@ const draft = ref<any>(defaultDamageConfig())
 const showSkillPicker = ref(false)
 const isAdminDefaultMode = computed(() => draft.value.mode === "adminDefault")
 const canUseSheerDamage = computed(() => isRuptureAgent(props.agent))
-const canUseAdminDefault = computed(() => hasAdminDefaultCalculation(props.agent))
-const adminCalculationConfig = computed(() => props.agent?.defaultCalculationConfig ?? null)
+const canUseAdminDefault = computed(() => hasAdminDefaultCalculation(props.agent, props.cinemaLevel ?? 0))
+const adminCalculationConfig = computed(() => resolveDefaultCalculationConfig(props.agent?.defaultCalculationConfig, props.cinemaLevel ?? 0))
 const skillGroups = computed(() => calculationSkillGroups(props.agent))
 const hasSkillGroups = computed(() => hasCalculationSkillGroups(props.agent))
 const skillGroupOptions = computed(() => skillGroups.value.map((group: any) => ({
@@ -65,7 +67,7 @@ const calculationModeOptions = computed(() => [
   !canUseSheerDamage.value ? { label: "最大化单个技能伤害", value: "single" } : null,
   canUseSheerDamage.value ? { label: "最大化贯穿伤害", value: "sheer" } : null,
   { label: "最大化异常伤害", value: "anomaly" },
-  { label: canUseAdminDefault.value ? "管理员默认循环" : "管理员默认循环（未配置）", value: "adminDefault", disabled: !canUseAdminDefault.value },
+  { label: canUseAdminDefault.value ? labelOf(adminCalculationConfig.value) : "管理员默认循环（未配置）", value: "adminDefault", disabled: !canUseAdminDefault.value },
   { label: "自定义", value: "custom" },
 ].filter((option): option is { label: string, value: string, disabled?: boolean } => Boolean(option)))
 
@@ -74,7 +76,7 @@ function eventForMode(mode: string) {
 }
 
 function normalizeDraftForAgent(config: any) {
-  const mode = normalizeDamageModeForAgent(config?.mode, props.agent)
+  const mode = normalizeDamageModeForAgent(config?.mode, props.agent, props.cinemaLevel ?? 0)
   if (mode === config?.mode) {
     return config
   }
@@ -90,7 +92,7 @@ function normalizeDraftForAgent(config: any) {
 watch(() => props.show, value => {
   if (value) {
     const { target: _target, targetConfig: _targetConfig, ...damageConfig } = props.damageConfig ?? {}
-    const fallback = defaultDamageConfig(props.agent)
+    const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0)
     const shouldUseFallbackEvents = damageConfig?.mode === "adminDefault"
       && Array.isArray(fallback.events)
       && fallback.events.length > 0
@@ -456,7 +458,7 @@ function removeEvent(eventId = selectedEvent.value?.id) {
 }
 
 function applyMode(mode: string) {
-  const nextMode = normalizeDamageModeForAgent(mode, props.agent)
+  const nextMode = normalizeDamageModeForAgent(mode, props.agent, props.cinemaLevel ?? 0)
   draft.value.mode = nextMode
   if (nextMode === "single") {
     draft.value.events = [newEvent("direct")]
@@ -468,7 +470,7 @@ function applyMode(mode: string) {
     draft.value.events = [newEvent("anomaly")]
     draft.value.selectedEventId = draft.value.events[0].id
   } else if (nextMode === "adminDefault") {
-    const fallback = defaultDamageConfig(props.agent)
+    const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0)
     draft.value.events = JSON.parse(JSON.stringify(fallback.events ?? [newEvent("direct")]))
     draft.value.selectedEventId = fallback.selectedEventId ?? draft.value.events[0]?.id
   }
@@ -573,7 +575,7 @@ function close() {
 
 function save() {
   if (draft.value.mode === "adminDefault") {
-    const fallback = defaultDamageConfig(props.agent)
+    const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0)
     emit("save", {
       ...fallback,
       mode: "adminDefault",
@@ -584,7 +586,7 @@ function save() {
     return
   }
   normalizeDraftSkillSelections()
-  const normalizedDraft = isDamageModeAllowedForAgent(draft.value.mode, props.agent)
+  const normalizedDraft = isDamageModeAllowedForAgent(draft.value.mode, props.agent, props.cinemaLevel ?? 0)
     ? draft.value
     : normalizeDraftForAgent(draft.value)
   const { target: _target, targetConfig: _targetConfig, ...damageConfig } = normalizedDraft

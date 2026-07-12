@@ -129,7 +129,7 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value))
 }
 
-function mountModal(overrides: { agent?: any, damageConfig?: any, meta?: any, skillCatalog?: any } = {}) {
+function mountModal(overrides: { agent?: any, damageConfig?: any, meta?: any, skillCatalog?: any, cinemaLevel?: number } = {}) {
   const agent = overrides.agent ?? miyabi
   const skillCatalog = overrides.skillCatalog ?? (agent?.id === "yixuan" ? yixuanSkillCatalog : miyabiSkillCatalog)
   const wrapper = mount(CalculationConfigModal, {
@@ -149,6 +149,7 @@ function mountModal(overrides: { agent?: any, damageConfig?: any, meta?: any, sk
       },
       skillCatalog,
       skillLevels: { basic: 12, dodge: 12, assist: 12, special: 12, chain: 12, core_skill: "F" },
+      cinemaLevel: overrides.cinemaLevel ?? 0,
     },
     global: {
       stubs: naiveStubs,
@@ -211,7 +212,7 @@ describe("CalculationConfigModal", () => {
     const addButtons = Array.from(document.body.querySelectorAll(".toolbar button"))
       .map(button => button.textContent?.trim())
       .filter(text => ["添加技能", "添加贯穿", "添加异常事件", "添加技能组", "紊乱"].includes(text ?? ""))
-    expect(addButtons).toEqual(["添加技能", "添加异常事件"])
+    expect(addButtons).toEqual(["添加技能", "添加异常事件", "添加技能组"])
   })
 
   it("keeps the sheer objective available for rupture agents", async () => {
@@ -242,7 +243,7 @@ describe("CalculationConfigModal", () => {
     await openModal(wrapper)
 
     const items = Array.from(document.body.querySelectorAll(".calculation-event-list-item"))
-    expect(items).toHaveLength(9)
+    expect(items).toHaveLength(8)
     expect(document.body.querySelector(".calculation-event-list select")).toBeNull()
     expect(items[0].textContent).toContain("强化普攻：霜月")
     expect(items[0].textContent).toContain("三段蓄力斩击伤害倍率")
@@ -458,6 +459,48 @@ describe("CalculationConfigModal", () => {
     expect(saved.mode).toBe("adminDefault")
     expect(saved.selectedEventId).toBe("loop-ref")
     expect(saved.events.map((event: any) => event.kind)).toEqual(["skillGroup", "skillGroup"])
+  })
+
+  it("uses the current-cinema admin default variant instead of stale saved events", async () => {
+    const agent = {
+      id: "agent_variant",
+      name: { zhCN: "变体角色" },
+      specialty: "attack",
+      defaultCalculationConfig: {
+        mode: "custom",
+        selectedEventId: "loop-0",
+        events: [{ id: "loop-0", kind: "direct", count: 1, skillMultiplier: 100 }],
+        variants: [
+          {
+            cinemaLevel: 2,
+            mode: "custom",
+            selectedEventId: "loop-2",
+            events: [{ id: "loop-2", kind: "direct", count: 2, skillMultiplier: 200 }],
+          },
+        ],
+      },
+    }
+    const wrapper = mountModal({
+      agent,
+      skillCatalog: { id: "agent_variant", agentId: "agent_variant", categories: [] },
+      cinemaLevel: 5,
+      damageConfig: {
+        mode: "adminDefault",
+        selectedEventId: "stale-direct",
+        events: [{ id: "stale-direct", kind: "direct", skillMultiplier: 50, count: 10 }],
+      },
+    })
+
+    await openModal(wrapper)
+
+    expect(document.body.textContent).toContain("默认循环（2影）")
+    expect(document.body.textContent).not.toContain("stale-direct")
+    const saved = await saveModal(wrapper)
+    expect(saved.mode).toBe("adminDefault")
+    expect(saved.selectedEventId).toBe("loop-2")
+    expect(saved.events).toEqual([
+      expect.objectContaining({ id: "loop-2", count: 2, skillMultiplier: 200 }),
+    ])
   })
 
   it("hydrates legacy direct events with the displayed skill ref instead of manual multiplier text", async () => {

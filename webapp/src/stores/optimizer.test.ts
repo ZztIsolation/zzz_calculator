@@ -42,6 +42,14 @@ const preferredCatalog = {
     { id: "fanged_metal" },
   ],
 }
+const preferredAgentA = {
+  id: "agent_a",
+  preferredDriveDiscs: { defaultSetId: "woodpecker_electro" },
+}
+const preferredAgentB = {
+  id: "agent_b",
+  preferredDriveDiscs: { defaultSetId: "fanged_metal" },
+}
 const originalWorker = globalThis.Worker
 
 function optimizerInput(overrides: any = {}) {
@@ -158,31 +166,92 @@ describe("optimizer store", () => {
   })
 
   it("preserves an explicitly selected four-piece drive-disc set on reload", () => {
-    const agent = {
-      id: "agent_a",
-      preferredDriveDiscs: { defaultSetId: "fanged_metal" },
-    }
     const store = useOptimizerStore()
-    store.initialize(preferredCatalog, agent)
+    store.initialize(preferredCatalog, preferredAgentB)
     store.setFourPieceSet("woodpecker_electro")
 
     setActivePinia(createPinia())
     const reloaded = useOptimizerStore()
-    reloaded.initialize(preferredCatalog, agent)
+    reloaded.initialize(preferredCatalog, preferredAgentB)
 
     expect(reloaded.fourPieceSetId).toBe("woodpecker_electro")
   })
 
-  it("updates the four-piece drive-disc set when the active agent changes", () => {
+  it("keeps optimizer constraints scoped to each active agent", () => {
     const store = useOptimizerStore()
-    store.initialize(preferredCatalog)
+    store.initialize(preferredCatalog, preferredAgentA)
+    store.setAlgorithm("heuristic-potential")
+    store.setFourPieceSet("woodpecker_electro")
+    store.setTwoPieceSetIds(["swing_jazz"])
+    store.setFourPieceBuffMode("manual")
+    store.setFourPieceBuffRuntimeInput("driveDisc4pc:woodpecker_electro.self", { coverage: 0.5 })
+    store.toggleMainStatLimit("4", "critRate")
+    store.setMinimum("critRate", 50)
 
-    store.applyAgentPreferredDriveDiscSet({
-      id: "agent_b",
-      preferredDriveDiscs: { defaultSetId: "fanged_metal" },
-    }, preferredCatalog)
+    store.loadAgentSettings(preferredAgentB, preferredCatalog)
 
     expect(store.fourPieceSetId).toBe("fanged_metal")
+    expect(store.fourPieceSetSource).toBe("preferred")
+    expect(store.algorithm).toBe("exact-super-bound")
+    expect(store.twoPieceSetIds).toEqual([])
+    expect(store.fourPieceBuffMode).toBe("auto")
+    expect(store.fourPieceBuffRuntimeInputs).toEqual({})
+    expect(store.mainStatLimits).toEqual({ "4": [], "5": [], "6": [] })
+    expect(store.minimums).toMatchObject({ critRate: null, critDmg: null })
+
+    store.setAlgorithm("exact-legacy")
+    store.setTwoPieceSetIds(["fanged_metal"])
+    store.loadAgentSettings(preferredAgentA, preferredCatalog)
+
+    expect(store.algorithm).toBe("heuristic-potential")
+    expect(store.fourPieceSetId).toBe("woodpecker_electro")
+    expect(store.fourPieceSetSource).toBe("manual")
+    expect(store.twoPieceSetIds).toEqual(["swing_jazz"])
+    expect(store.fourPieceBuffMode).toBe("manual")
+    expect(store.fourPieceBuffRuntimeInputs["driveDisc4pc:woodpecker_electro.self"]).toEqual({ coverage: 0.5 })
+    expect(store.mainStatLimits["4"]).toEqual(["critRate"])
+    expect(store.minimums.critRate).toBe(50)
+
+    store.loadAgentSettings(preferredAgentB, preferredCatalog)
+
+    expect(store.algorithm).toBe("exact-legacy")
+    expect(store.twoPieceSetIds).toEqual(["fanged_metal"])
+  })
+
+  it("migrates legacy flat optimizer settings to only the initialized agent", () => {
+    localStorage.setItem("zzz-calculator.webapp.optimizer.v1", JSON.stringify({
+      algorithm: "heuristic-potential",
+      fourPieceSetId: "woodpecker_electro",
+      fourPieceSetSource: "manual",
+      twoPieceSetIds: ["swing_jazz"],
+      fourPieceBuffMode: "manual",
+      fourPieceBuffRuntimeInputs: { "driveDisc4pc:woodpecker_electro.self": { coverage: 0.5 } },
+      mainStatLimits: { "4": ["critRate"] },
+      minimums: { critRate: 50 },
+    }))
+    const store = useOptimizerStore()
+
+    store.initialize(preferredCatalog, preferredAgentA)
+
+    expect(store.algorithm).toBe("heuristic-potential")
+    expect(store.fourPieceSetId).toBe("woodpecker_electro")
+    expect(store.twoPieceSetIds).toEqual(["swing_jazz"])
+    expect(store.mainStatLimits["4"]).toEqual(["critRate"])
+    expect(store.minimums.critRate).toBe(50)
+
+    store.loadAgentSettings(preferredAgentB, preferredCatalog)
+
+    expect(store.algorithm).toBe("exact-super-bound")
+    expect(store.fourPieceSetId).toBe("fanged_metal")
+    expect(store.twoPieceSetIds).toEqual([])
+    expect(store.mainStatLimits).toEqual({ "4": [], "5": [], "6": [] })
+    expect(store.minimums.critRate).toBe(null)
+
+    const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer.v1") || "{}")
+    expect(saved.version).toBe(2)
+    expect(saved.currentAgentId).toBe("agent_b")
+    expect(saved.byAgent.agent_a.twoPieceSetIds).toEqual(["swing_jazz"])
+    expect(saved.byAgent.agent_b.twoPieceSetIds).toEqual([])
   })
 
   it("applies advanced settings in one payload without changing worker input shape", () => {

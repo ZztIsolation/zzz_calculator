@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import { computed } from "vue"
 import { statLabel, formatNumber, formatPercent } from "@/utils/format"
 
-defineProps<{
+const props = withDefaults(defineProps<{
   panel: Record<string, number> | null | undefined
   meta?: any
-}>()
+  includeSheerForce?: boolean
+}>(), {
+  includeSheerForce: false,
+})
 
 const percentStats = new Set([
   "critRate",
@@ -20,7 +24,7 @@ const percentStats = new Set([
   "energyRegen",
 ])
 
-const keys = [
+const baseKeys = [
   "hp",
   "atk",
   "def",
@@ -33,6 +37,10 @@ const keys = [
   "penRatio",
   "dmgBonus",
 ]
+
+const keys = computed(() => props.includeSheerForce
+  ? ["hp", "atk", "sheerForce", ...baseKeys.slice(2)]
+  : baseKeys)
 </script>
 
 <template>

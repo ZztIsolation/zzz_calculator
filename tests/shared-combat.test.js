@@ -187,8 +187,31 @@ assert.equal(
         categoryId: "chain",
         moveIdPrefixes: ["ultimate_"],
     }, meta),
-    "全部角色/chain/ultimate_*",
-    "Generic skill targets should display without pretending to target a specific agent",
+    "终结技",
+    "Generic skill targets should display player-facing skill names without raw id paths",
+)
+assert.equal(
+    storedEffectRuleText({
+        type: "fixed",
+        stat: "dmgBonus",
+        value: 40,
+        mode: "flat",
+        target: {
+            kind: "skill",
+            skillTargets: [
+                {
+                    categoryId: "chain",
+                    moveIdPrefixes: ["chain_"],
+                },
+                {
+                    categoryId: "chain",
+                    moveIdPrefixes: ["ultimate_"],
+                },
+            ],
+        },
+    }, {}, {}, meta),
+    "通用伤害加成% +40%（技能：终结技；连携技）",
+    "Generic chain and ultimate targets should display as compact skill names in player-facing order",
 )
 assert.equal(
     nameOf({ bossName: { zhCN: "测试 BOSS" } }),

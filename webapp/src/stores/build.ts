@@ -9,6 +9,7 @@ import {
   expandCalculationConfigSkillGroups,
   hasCalculationSkillGroups,
 } from "@core/calculationSkillGroups.js"
+import { resolveDefaultCalculationConfig } from "@core/defaultCalculationConfig.js"
 import { teammateDriveDiscSetIdsFromBuffIds } from "@/utils/combatBuffs"
 import {
   clampWEngineModificationLevel,
@@ -135,12 +136,12 @@ export function primaryDamageModeForAgent(agent: any = null) {
   return isRuptureAgent(agent) ? "sheer" : "single"
 }
 
-export function hasAdminDefaultCalculation(agent: any = null) {
-  const config = agent?.defaultCalculationConfig
+export function hasAdminDefaultCalculation(agent: any = null, cinemaLevel = 0) {
+  const config = resolveDefaultCalculationConfig(agent?.defaultCalculationConfig, cinemaLevel)
   return Boolean(config?.events?.length || hasCalculationSkillGroups(agent) || hasCalculationSkillGroups(config))
 }
 
-export function isDamageModeAllowedForAgent(mode: unknown, agent: any = null) {
+export function isDamageModeAllowedForAgent(mode: unknown, agent: any = null, cinemaLevel = 0) {
   const value = String(mode ?? "")
   if (value === "sheer") {
     return isRuptureAgent(agent)
@@ -149,14 +150,14 @@ export function isDamageModeAllowedForAgent(mode: unknown, agent: any = null) {
     return !isRuptureAgent(agent)
   }
   if (value === "adminDefault") {
-    return hasAdminDefaultCalculation(agent)
+    return hasAdminDefaultCalculation(agent, cinemaLevel)
   }
   return ["anomaly", "custom"].includes(value)
 }
 
-export function normalizeDamageModeForAgent(mode: unknown, agent: any = null) {
+export function normalizeDamageModeForAgent(mode: unknown, agent: any = null, cinemaLevel = 0) {
   const value = String(mode ?? "")
-  return isDamageModeAllowedForAgent(value, agent) ? value : primaryDamageModeForAgent(agent)
+  return isDamageModeAllowedForAgent(value, agent, cinemaLevel) ? value : primaryDamageModeForAgent(agent)
 }
 
 function primaryDamageConfigForAgent(agent: any = null) {
@@ -172,11 +173,11 @@ function primaryDamageConfigForAgent(agent: any = null) {
   }
 }
 
-export function defaultDamageConfig(agent: any = null) {
-  const config = agent?.defaultCalculationConfig
+export function defaultDamageConfig(agent: any = null, cinemaLevel = 0) {
+  const config = resolveDefaultCalculationConfig(agent?.defaultCalculationConfig, cinemaLevel)
   if (config?.events?.length) {
     const mode = config.mode ?? "adminDefault"
-    if (!isDamageModeAllowedForAgent(mode, agent)) {
+    if (!isDamageModeAllowedForAgent(mode, agent, cinemaLevel)) {
       return primaryDamageConfigForAgent(agent)
     }
     return {
@@ -259,11 +260,11 @@ function damageConfigFields(value: any = {}) {
   return damage
 }
 
-function normalizeDamageConfig(value: any, agent: any = null) {
-  const fallback = defaultDamageConfig(agent)
+function normalizeDamageConfig(value: any, agent: any = null, cinemaLevel = 0) {
+  const fallback = defaultDamageConfig(agent, cinemaLevel)
   const rawMode = value?.mode ?? fallback.mode
-  const modeAllowed = isDamageModeAllowedForAgent(rawMode, agent)
-  const mode = normalizeDamageModeForAgent(rawMode, agent)
+  const modeAllowed = isDamageModeAllowedForAgent(rawMode, agent, cinemaLevel)
+  const mode = normalizeDamageModeForAgent(rawMode, agent, cinemaLevel)
   const eventFallback = modeAllowed ? fallback : primaryDamageConfigForAgent(agent)
   const usesAdminDefault = mode === "adminDefault"
   const eventSource = !usesAdminDefault && modeAllowed && Array.isArray(value?.events) && value.events.length
@@ -564,7 +565,7 @@ export const useBuildStore = defineStore("build", {
       this.runtimeInputs = combat.runtimeInputs ?? config.runtimeInputs ?? {}
       this.manuallyUncheckedDefaultBuffIds = stringArray(combat.manuallyUncheckedDefaultBuffIds)
       const rawDamageConfig = config.damage ?? config.damageConfig
-      this.damageConfig = normalizeDamageConfig(rawDamageConfig, agent)
+      this.damageConfig = normalizeDamageConfig(rawDamageConfig, agent, this.cinemaLevel)
       this.targetConfig = normalizeTargetConfig(config.targetConfig ?? rawDamageConfig?.target ?? rawDamageConfig?.targetConfig)
       this.discMode = normalizeDiscMode(config.discMode ?? config.driveDiscMode ?? config.mode)
       this.manualDriveDiscIdsBySlot = stringRecord(
@@ -581,6 +582,15 @@ export const useBuildStore = defineStore("build", {
     },
     selectAgent(agentId: string, meta: any) {
       this.applyAgentConfig(agentId, meta, savedConfigForAgent(agentId))
+      this.persist()
+    },
+    setCinemaLevel(level: number, meta: any = null) {
+      const nextLevel = Math.max(0, Math.min(6, Math.trunc(numeric(level, 0))))
+      this.cinemaLevel = nextLevel
+      if (this.damageConfig?.mode === "adminDefault") {
+        const agent = meta?.agents?.find((item: any) => item.id === this.agentId)
+        this.damageConfig = normalizeDamageConfig({ mode: "adminDefault" }, agent, this.cinemaLevel)
+      }
       this.persist()
     },
     selectWEngine(id: string, meta: any) {
@@ -612,7 +622,7 @@ export const useBuildStore = defineStore("build", {
       if (hasTargetConfig) {
         this.targetConfig = normalizeTargetConfig(config.target ?? config.targetConfig)
       }
-      this.damageConfig = normalizeDamageConfig(config, agent)
+      this.damageConfig = normalizeDamageConfig(config, agent, this.cinemaLevel)
       this.persist()
     },
     setTargetConfig(target: any) {
@@ -715,9 +725,9 @@ export const useBuildStore = defineStore("build", {
         && this.damageConfig?.selectedEventId === "direct-1"
         && this.damageConfig?.events?.length === 1
         && this.damageConfig?.events?.[0]?.id === "direct-1"
-        && damageAgent?.defaultCalculationConfig?.events?.length
+        && hasAdminDefaultCalculation(damageAgent, this.cinemaLevel)
       const sourceDamageConfig = this.damageConfig?.mode === "adminDefault" || untouchedFallbackDamage
-        ? defaultDamageConfig(damageAgent)
+        ? defaultDamageConfig(damageAgent, this.cinemaLevel)
         : this.damageConfig
       const damage = normalizeDamageConfig({
         ...sourceDamageConfig,
@@ -726,7 +736,7 @@ export const useBuildStore = defineStore("build", {
           ...this.skillLevels,
           ...(sourceDamageConfig.skillLevelsByCategory ?? {}),
         },
-      }, damageAgent)
+      }, damageAgent, this.cinemaLevel)
       const expandedDamage = expandCalculationConfigSkillGroups(damage, damageAgent, { strict: true })
       const activeBuffIds = this.activeBuffIds(meta, catalog, driveDiscs)
       return {

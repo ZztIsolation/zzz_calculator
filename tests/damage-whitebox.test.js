@@ -11,6 +11,7 @@ import {
     damageSkillRowsWithGeneratedTotals,
     skillRowValue,
 } from "../frontend/skillMultiplierCandidates.js"
+import { resolveDefaultCalculationConfig } from "../frontend/defaultCalculationConfig.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
@@ -2159,6 +2160,223 @@ const yixuanDefault = calculateInCombatPanel(catalog, minimalInput({
 }))
 assert.equal(yixuanDefault.damage.input.kind, "sheer", "Yixuan default calculation should produce a sheer event")
 assert.equal(yixuanDefault.damage.events[0]?.kind, "sheer", "Yixuan default event list should keep sheer kind")
+assert.equal(yixuanDefault.damage.events.length, 7, "Yixuan default calculation should model the 0-cinema stun burst axis")
+function axisEntry(event) {
+    return `${event.skillRef?.categoryId}/${event.skillRef?.moveId}/${event.skillRef?.rowId} x${event.count ?? 1}`
+}
+const yixuanBaseAxis = [
+    "chain/chain_xuanmo_swift_strike/damage x2",
+    "chain/ultimate_thousand_talismans/damage x1",
+    "chain/ultimate_qingming_cloud_shadow/damage x1",
+    "special/cloud_condensing_art/charged_total_damage x1",
+    "special/ink_ember_shadow_dispel/orb_total_damage x1",
+    "special/ink_trace_transform/damage x1",
+    "special/ink_trace_transform/charged_follow_up x1",
+]
+assert.deepEqual(
+    resolveDefaultCalculationConfig(yixuan.defaultCalculationConfig, 0).events.map(axisEntry),
+    yixuanBaseAxis,
+    "Yixuan 0-cinema default axis should use double chain, double ultimate, and EX specials",
+)
+assert.deepEqual(
+    resolveDefaultCalculationConfig(yixuan.defaultCalculationConfig, 1).events.map(axisEntry),
+    yixuanBaseAxis,
+    "Yixuan 1-cinema should still use the 0-cinema default axis",
+)
+assert.equal(
+    yixuan.defaultCalculationConfig.events.some(event => event.skillRef?.categoryId === "additional_ability"),
+    false,
+    "Yixuan default stun burst axis should not automatically include additional ability falling thunder",
+)
+assert.ok(
+    yixuanDefault.damage.totalFinalDamage > yixuanDefault.damage.finalDamage,
+    "Yixuan total default damage should include the full stun burst axis in addition to the selected ultimate",
+)
 assert.ok(yixuanDefault.damage.whiteBoxRows.some(row => row.label === "局内贯穿力"), "Yixuan default whitebox should include sheer force")
+
+const yixuanAdditionalFallingThunder = calculateInCombatPanel(catalog, minimalInput({
+    agentId: "yixuan",
+    coreSkillLevel: "F",
+    damage: {
+        selectedEventId: "yixuan-additional-falling-thunder",
+        events: [
+            {
+                id: "yixuan-additional-falling-thunder",
+                kind: "sheer",
+                skillRef: {
+                    agentSkillId: "yixuan",
+                    categoryId: "additional_ability",
+                    moveId: "xuanmo_dark_surge_falling_thunder",
+                    rowId: "damage",
+                },
+                critMode: "nonCrit",
+            },
+        ],
+    },
+}))
+approx(yixuanAdditionalFallingThunder.damage.input.skillMultiplier, 2.25, "Yixuan additional ability falling thunder should remain selectable as the official 225% sheer multiplier")
+assert.equal(yixuanAdditionalFallingThunder.damage.input.skillSource?.categoryId, "additional_ability", "Yixuan additional ability falling thunder should resolve from the additional ability skill category")
+assert.equal(yixuanAdditionalFallingThunder.damage.input.skillSource?.damageBasis, "sheerForce", "Yixuan additional ability falling thunder should use sheer force as its damage basis")
+
+const yixuanCinemaOneFallingThunder = calculateInCombatPanel(catalog, minimalInput({
+    agentId: "yixuan",
+    coreSkillLevel: "F",
+    damage: {
+        selectedEventId: "yixuan-c1-falling-thunder",
+        events: [
+            {
+                id: "yixuan-c1-falling-thunder",
+                kind: "sheer",
+                skillRef: {
+                    agentSkillId: "yixuan",
+                    categoryId: "cinema",
+                    moveId: "cinema_1_clear_spirit_dao_heart_falling_thunder",
+                    rowId: "damage",
+                },
+                critMode: "nonCrit",
+            },
+        ],
+    },
+}))
+approx(yixuanCinemaOneFallingThunder.damage.input.skillMultiplier, 0.5, "Yixuan cinema 1 falling thunder should resolve the official 50% sheer multiplier")
+assert.equal(yixuanCinemaOneFallingThunder.damage.input.skillSource?.categoryId, "cinema", "Yixuan cinema 1 falling thunder should resolve from the cinema skill category")
+assert.equal(yixuanCinemaOneFallingThunder.damage.input.skillSource?.damageBasis, "sheerForce", "Yixuan cinema 1 falling thunder should use sheer force as its damage basis")
+
+const yixuanCinemaTwoBreak = calculateInCombatPanel(catalog, minimalInput({
+    agentId: "yixuan",
+    coreSkillLevel: "F",
+    damage: {
+        selectedEventId: "yixuan-c2-break",
+        events: [
+            {
+                id: "yixuan-c2-break",
+                kind: "sheer",
+                skillRef: {
+                    agentSkillId: "yixuan",
+                    categoryId: "cinema",
+                    moveId: "cinema_2_thousand_talismans_break",
+                    rowId: "damage",
+                },
+                critMode: "nonCrit",
+            },
+        ],
+    },
+}))
+approx(yixuanCinemaTwoBreak.damage.input.skillMultiplier, 12, "Yixuan cinema 2 Thousand Talismans Break should resolve the official 1200% sheer multiplier")
+assert.equal(yixuanCinemaTwoBreak.damage.input.skillSource?.damageBasis, "sheerForce", "Yixuan cinema 2 Thousand Talismans Break should use sheer force as its damage basis")
+
+const yixuanCinemaTwoAxis = resolveDefaultCalculationConfig(yixuan.defaultCalculationConfig, 2)
+assert.equal(yixuanCinemaTwoAxis.name.zhCN, "2影失衡双连携爆发", "Yixuan cinema 2 should select the cinema 2 default axis")
+assert.equal(
+    yixuanCinemaTwoAxis.events.filter(event => event.skillRef?.moveId === "cinema_2_thousand_talismans_break").length,
+    1,
+    "Yixuan cinema 2 axis should include one Thousand Talismans Break event",
+)
+assert.equal(
+    yixuanCinemaTwoAxis.events.filter(event => event.skillRef?.moveId === "cloud_condensing_art").length,
+    2,
+    "Yixuan cinema 2 axis should include two Cloud Condensing Art events",
+)
+
+const yixuanCinemaSixAxis = resolveDefaultCalculationConfig(yixuan.defaultCalculationConfig, 6)
+assert.equal(yixuanCinemaSixAxis.name.zhCN, "6影失衡双连携爆发", "Yixuan cinema 6 should select the cinema 6 default axis")
+assert.equal(
+    yixuanCinemaSixAxis.events.filter(event => event.skillRef?.moveId === "ultimate_thousand_talismans").length,
+    2,
+    "Yixuan cinema 6 axis should include the paid and free Thousand Talismans ultimates",
+)
+assert.equal(
+    yixuanCinemaSixAxis.events.filter(event => event.skillRef?.moveId === "cinema_2_thousand_talismans_break").length,
+    2,
+    "Yixuan cinema 6 axis should include two Thousand Talismans Break events",
+)
+
+const yixuanCloudCondensing = {
+    id: "yixuan-cloud-condensing",
+    kind: "sheer",
+    skillRef: {
+        agentSkillId: "yixuan",
+        categoryId: "special",
+        moveId: "cloud_condensing_art",
+        rowId: "charged_total_damage",
+        level: 12,
+    },
+    critMode: "nonCrit",
+}
+const yixuanCloudWithoutAdditional = calculateInCombatPanel(catalog, minimalInput({
+    agentId: "yixuan",
+    coreSkillLevel: "F",
+    combatBuffs: {
+        activeBuffIds: [],
+    },
+    damage: {
+        selectedEventId: yixuanCloudCondensing.id,
+        events: [yixuanCloudCondensing],
+        target: zeroResistanceTarget({ stunned: true, stunMultiplierPercent: 150 }),
+    },
+}))
+const yixuanCloudWithAdditional = calculateInCombatPanel(catalog, minimalInput({
+    agentId: "yixuan",
+    coreSkillLevel: "F",
+    combatBuffs: {
+        activeBuffIds: ["agent:yixuan.additionalAbility"],
+    },
+    damage: {
+        selectedEventId: yixuanCloudCondensing.id,
+        events: [yixuanCloudCondensing],
+        target: zeroResistanceTarget({ stunned: true, stunMultiplierPercent: 150 }),
+    },
+}))
+approx(yixuanCloudWithoutAdditional.damage.multipliers.skillDamageBonus, 0, "Yixuan additional ability should be inactive by default")
+approx(yixuanCloudWithAdditional.damage.multipliers.skillDamageBonus, 0.3, "Yixuan additional ability should boost stunned-target extra specials by 30% when selected")
+
+function calculateYixuanCinemaTwoEvent(event) {
+    return calculateInCombatPanel(catalog, minimalInput({
+        agentId: "yixuan",
+        coreSkillLevel: "F",
+        combatBuffs: {
+            activeBuffIds: ["agent:yixuan.cinema.2"],
+        },
+        damage: {
+            selectedEventId: event.id,
+            events: [event],
+            target: {
+                ...zeroResistanceTarget(),
+                resistanceByElement: {
+                    ...zeroResistanceTarget().resistanceByElement,
+                    ether: 20,
+                },
+            },
+        },
+    }))
+}
+
+const yixuanCinemaTwoUltimate = calculateYixuanCinemaTwoEvent({
+    id: "yixuan-c2-ultimate",
+    kind: "sheer",
+    skillRef: {
+        agentSkillId: "yixuan",
+        categoryId: "chain",
+        moveId: "ultimate_qingming_cloud_shadow",
+        rowId: "damage",
+        level: 12,
+    },
+    critMode: "nonCrit",
+})
+const yixuanCinemaTwoChain = calculateYixuanCinemaTwoEvent({
+    id: "yixuan-c2-chain",
+    kind: "sheer",
+    skillRef: {
+        agentSkillId: "yixuan",
+        categoryId: "chain",
+        moveId: "chain_xuanmo_swift_strike",
+        rowId: "damage",
+        level: 12,
+    },
+    critMode: "nonCrit",
+})
+approx(yixuanCinemaTwoUltimate.damage.targetBreakdown.resIgnore, 0.15, "Yixuan cinema 2 should ignore ether RES for ultimates")
+approx(yixuanCinemaTwoUltimate.damage.multipliers.resistance, 0.95, "Yixuan cinema 2 ultimate RES multiplier should reflect 15% RES ignore")
+approx(yixuanCinemaTwoChain.damage.targetBreakdown.resIgnore, 0, "Yixuan cinema 2 should not ignore ether RES for non-ultimate chain skills")
 
 console.log("damage whitebox tests passed")

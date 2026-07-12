@@ -373,15 +373,16 @@
       },
       "defaultCalculationConfig": {
         "mode": "custom",
+        "cinemaLevel": 0,
         "name": {
-          "zhCN": "0命叶10变2大"
+          "zhCN": "0影叶12变2大"
         },
         "events": [
           {
             "id": "skill_group_1-ref-1",
             "kind": "skillGroup",
             "skillGroupId": "skill_group_1",
-            "count": 10
+            "count": 12
           },
           {
             "id": "direct-2",
@@ -406,15 +407,81 @@
               "moveId": "ultimate_chase_cloud_thunder",
               "rowId": "damage"
             }
+          },
+          {
+            "id": "direct-7",
+            "kind": "direct",
+            "count": 10,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "ye_shunguang",
+              "categoryId": "special",
+              "moveId": "ex_clarity_return_dust",
+              "rowId": "damage"
+            }
           }
         ],
-        "selectedEventId": "skill_group_1-ref-1"
+        "selectedEventId": "skill_group_1-ref-1",
+        "variants": [
+          {
+            "mode": "custom",
+            "cinemaLevel": 2,
+            "name": {
+              "zhCN": "2影12变2大"
+            },
+            "events": [
+              {
+                "id": "direct-1",
+                "kind": "skillGroup",
+                "skillGroupId": "skill_group_2",
+                "count": 12
+              },
+              {
+                "id": "direct-2",
+                "kind": "direct",
+                "count": 2,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "ye_shunguang",
+                  "categoryId": "chain",
+                  "moveId": "ultimate_cut_delusion_open_heaven",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "direct-3",
+                "kind": "direct",
+                "count": 2,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "ye_shunguang",
+                  "categoryId": "chain",
+                  "moveId": "ultimate_chase_cloud_thunder",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "direct-4",
+                "kind": "direct",
+                "count": 10,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "ye_shunguang",
+                  "categoryId": "special",
+                  "moveId": "ex_clarity_return_dust",
+                  "rowId": "damage"
+                }
+              }
+            ],
+            "selectedEventId": "direct-1"
+          }
+        ]
       },
       "skillGroups": [
         {
           "id": "skill_group_1",
           "name": {
-            "zhCN": "0命叶变身短轴"
+            "zhCN": "0命叶变身短轴（不含归尘）"
           },
           "defaultCount": 1,
           "minCount": 0,
@@ -470,18 +537,6 @@
               }
             },
             {
-              "id": "direct-5",
-              "kind": "direct",
-              "count": 1,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "ye_shunguang",
-                "categoryId": "special",
-                "moveId": "ex_clarity_return_dust",
-                "rowId": "damage"
-              }
-            },
-            {
               "id": "direct-6",
               "kind": "direct",
               "count": 2,
@@ -498,7 +553,7 @@
         {
           "id": "skill_group_2",
           "name": {
-            "zhCN": "2命叶变身短轴"
+            "zhCN": "2命叶变身短轴（不含归尘）"
           },
           "defaultCount": 1,
           "minCount": 0,
@@ -539,18 +594,6 @@
                 "categoryId": "basic",
                 "moveId": "clarity_cut_light_annihilation",
                 "rowId": "with_sword_force"
-              }
-            },
-            {
-              "id": "direct-4",
-              "kind": "direct",
-              "count": 1,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "ye_shunguang",
-                "categoryId": "special",
-                "moveId": "ex_clarity_return_dust",
-                "rowId": "damage"
               }
             },
             {
@@ -1061,10 +1104,10 @@
       },
       "defaultCalculationConfig": {
         "mode": "custom",
+        "cinemaLevel": 0,
         "name": {
-          "zhCN": "雅默认循环（四蓄一大二紊乱二碎冰）"
+          "zhCN": "0影雅四蓄一大二紊乱二碎冰"
         },
-        "selectedEventId": "miyabi_frost_moon_charge_3",
         "events": [
           {
             "id": "miyabi_frost_moon_charge_3",
@@ -1120,7 +1163,7 @@
             "count": 2,
             "settlementType": "disorder",
             "anomalyEffect": "frost_frozen",
-            "elapsedSeconds": 7
+            "elapsedSeconds": 6
           },
           {
             "id": "miyabi_shatter",
@@ -1143,15 +1186,7 @@
             }
           },
           {
-            "id": "disorder-8",
-            "kind": "anomaly",
-            "count": 1,
-            "settlementType": "disorder",
-            "anomalyEffect": "frost_frozen",
-            "elapsedSeconds": 5
-          },
-          {
-            "id": "direct-9",
+            "id": "direct-8",
             "kind": "direct",
             "count": 2,
             "critMode": "expected",
@@ -1161,6 +1196,101 @@
               "moveId": "frostburn_break",
               "rowId": "damage"
             }
+          }
+        ],
+        "selectedEventId": "miyabi_frost_moon_charge_3",
+        "variants": [
+          {
+            "mode": "custom",
+            "cinemaLevel": 6,
+            "name": {
+              "zhCN": "6影雅四蓄一大二紊乱二碎冰"
+            },
+            "events": [
+              {
+                "id": "direct-1",
+                "kind": "skillGroup",
+                "skillGroupId": "skill_group_1",
+                "count": 4
+              },
+              {
+                "id": "direct-2",
+                "kind": "direct",
+                "count": 1,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "hoshimi_miyabi",
+                  "categoryId": "chain",
+                  "moveId": "ultimate_lingering_snow",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "direct-3",
+                "kind": "anomaly",
+                "count": 2,
+                "settlementType": "attribute",
+                "anomalyEffect": "shatter",
+                "procCount": 1
+              },
+              {
+                "id": "direct-4",
+                "kind": "direct",
+                "count": 1,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "hoshimi_miyabi",
+                  "categoryId": "assist",
+                  "moveId": "quick_support_flower_wind",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "direct-5",
+                "kind": "anomaly",
+                "count": 2,
+                "settlementType": "disorder",
+                "anomalyEffect": "frost_frozen",
+                "elapsedSeconds": 6
+              },
+              {
+                "id": "direct-6",
+                "kind": "direct",
+                "count": 2,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "hoshimi_miyabi",
+                  "categoryId": "core_skill",
+                  "moveId": "frostburn_break",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "direct-7",
+                "kind": "direct",
+                "count": 1,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "hoshimi_miyabi",
+                  "categoryId": "chain",
+                  "moveId": "chain_spring_arrival",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "direct-8",
+                "kind": "direct",
+                "count": 2,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "hoshimi_miyabi",
+                  "categoryId": "special",
+                  "moveId": "ex_flying_snow",
+                  "rowId": "slash"
+                }
+              }
+            ],
+            "selectedEventId": "direct-1"
           }
         ]
       },
@@ -1172,7 +1302,57 @@
         "panelDefaults": "source-checked-biligame-wiki-2026-05-30",
         "damageElement": "displayed as frost but settled as ice so it uses ice damage bonus and ice resistance",
         "cinemaBuffs": "source-checked-zzz.gg-2026-06-09; M4 frostburn break damage is modeled through the core_skill/frostburn_break skill target"
-      }
+      },
+      "skillGroups": [
+        {
+          "id": "skill_group_1",
+          "name": {
+            "zhCN": "6影一蓄（2豆、4豆、6豆各一次）"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "maxCount": 30,
+          "step": 1,
+          "events": [
+            {
+              "id": "direct-1",
+              "kind": "direct",
+              "count": 1,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "hoshimi_miyabi",
+                "categoryId": "basic",
+                "moveId": "frost_moon",
+                "rowId": "charge_1"
+              }
+            },
+            {
+              "id": "direct-2",
+              "kind": "direct",
+              "count": 1,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "hoshimi_miyabi",
+                "categoryId": "basic",
+                "moveId": "frost_moon",
+                "rowId": "charge_2"
+              }
+            },
+            {
+              "id": "direct-3",
+              "kind": "direct",
+              "count": 1,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "hoshimi_miyabi",
+                "categoryId": "basic",
+                "moveId": "frost_moon",
+                "rowId": "charge_3"
+              }
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "yixuan",
@@ -1241,22 +1421,7 @@
                   {
                     "agentSkillId": "yixuan",
                     "categoryId": "special",
-                    "moveId": "ember_shadow_art"
-                  },
-                  {
-                    "agentSkillId": "yixuan",
-                    "categoryId": "special",
-                    "moveId": "ink_trace_transform"
-                  },
-                  {
-                    "agentSkillId": "yixuan",
-                    "categoryId": "special",
-                    "moveId": "cloud_condensing_art"
-                  },
-                  {
-                    "agentSkillId": "yixuan",
-                    "categoryId": "special",
-                    "moveId": "ink_ember_shadow_dispel"
+                    "moveId": ""
                   },
                   {
                     "agentSkillId": "yixuan",
@@ -1266,17 +1431,7 @@
                   {
                     "agentSkillId": "yixuan",
                     "categoryId": "chain",
-                    "moveId": "chain_xuanmo_swift_strike"
-                  },
-                  {
-                    "agentSkillId": "yixuan",
-                    "categoryId": "chain",
-                    "moveId": "ultimate_qingming_cloud_shadow"
-                  },
-                  {
-                    "agentSkillId": "yixuan",
-                    "categoryId": "chain",
-                    "moveId": "ultimate_thousand_talismans"
+                    "moveId": ""
                   }
                 ]
               }
@@ -1290,7 +1445,7 @@
             "zhCN": "额外能力"
           },
           "description": {
-            "zhCN": "队伍中存在「击破」角色或「支援」角色或「防护」角色时触发：发动「终结技」后，仪玄进入「凝神」状态，「凝神」状态下，仪玄的暴击伤害提升40%，持续15秒。"
+            "zhCN": "队伍中存在「击破」角色或「支援」角色或「防护」角色时触发：队友释放「终结技」时，仪玄持续回复2点「闪能」，持续10秒；仪玄被「极限支援」换下场时，自动追加一道落雷，造成仪玄225%贯穿力的玄墨伤害，并回复5点「闪能」；「强化特殊技：凝云术」与「强化特殊技：墨烬影消」命中失衡状态下的敌人时，造成的伤害提升30%；发动「终结技」后，仪玄进入「凝神」状态，「凝神」状态下，仪玄的暴击伤害提升40%，持续15秒。"
           },
           "coverage": {
             "default": 1,
@@ -1308,6 +1463,28 @@
               "target": {
                 "kind": "default"
               }
+            },
+            {
+              "id": "effect-2",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 30,
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "agentSkillId": "yixuan",
+                    "categoryId": "special",
+                    "moveId": "cloud_condensing_art"
+                  },
+                  {
+                    "agentSkillId": "yixuan",
+                    "categoryId": "special",
+                    "moveId": "ink_ember_shadow_dispel"
+                  }
+                ]
+              }
             }
           ],
           "buffModifiers": []
@@ -1319,7 +1496,7 @@
               "zhCN": "清灵道心"
             },
             "description": {
-              "zhCN": "「玄墨值」消耗速度降低至原本的70%；\n仪玄即将受到敌方攻击时，若「术法点」足够，可以自动消耗「术法点」规避伤害并触发「招架」效果；\n仪玄发动「招架」效果时，将对前方敌人释放一道落雷，造成仪玄50%贯穿力的玄墨伤害；\n仪玄触发「招架」效果后，暴击率提升10%，持续12秒。"
+              "zhCN": "进入战场时，仪玄的暴击率提升10%，并立即获得120点「术法值」，在勘域模式中此效果180秒内最多触发一次；队伍中任意角色命中敌人时，仪玄会自动追加一道落雷，造成等同于仪玄50%贯穿力的玄墨伤害，并额外回复5点「闪能」，6秒内最多追加一次落雷。"
             },
             "scope": "inCombat",
             "defaultChecked": false,
@@ -1349,7 +1526,7 @@
               "zhCN": "消灾渡厄"
             },
             "description": {
-              "zhCN": "「终结技」与「强化特殊技」命中敌人时，无视15%以太伤害抗性；\n每隔1秒，仪玄可以使「强化特殊技」发动的「霄云迅击-破」或「青溟震击-破」造成的失衡值提升25%；\n每隔15秒，仪玄释放「终结技：符法千重」后可以自动对主目标释放一次「终结技：符法千重-破」，最多造成仪玄1200%贯穿力的玄墨伤害。"
+              "zhCN": "「终结技」或「强化特殊技」造成伤害时，无视目标15%以太伤害抗性；「终结技：青溟云影」命中失衡状态下的敌人时，使所有失衡状态下的敌人的失衡持续时间延长3秒，每次失衡期间最多触发一次，重复触发不会刷新持续时间；释放「终结技：符法千重」后，仪玄获得1层「聚墨」效果，发动「普通攻击：青溟震击」、「强化特殊技：墨烬影消」后点按普通攻击键，或发动「强化特殊技：青溟震击-破」后点按特殊技键，可消耗1层「聚墨」发动「强化特殊技：符法千重-破」，最多造成仪玄1200%贯穿力的玄墨伤害。"
             },
             "scope": "inCombat",
             "defaultChecked": false,
@@ -1372,27 +1549,15 @@
                     {
                       "agentSkillId": "yixuan",
                       "categoryId": "special",
-                      "moveId": "ink_trace_transform"
-                    },
-                    {
-                      "agentSkillId": "yixuan",
-                      "categoryId": "special",
-                      "moveId": "cloud_condensing_art"
-                    },
-                    {
-                      "agentSkillId": "yixuan",
-                      "categoryId": "special",
-                      "moveId": "ink_ember_shadow_dispel"
+                      "moveId": ""
                     },
                     {
                       "agentSkillId": "yixuan",
                       "categoryId": "chain",
-                      "moveId": "ultimate_qingming_cloud_shadow"
-                    },
-                    {
-                      "agentSkillId": "yixuan",
-                      "categoryId": "chain",
-                      "moveId": "ultimate_thousand_talismans"
+                      "moveId": "",
+                      "moveIdPrefixes": [
+                        "ultimate_"
+                      ]
                     }
                   ]
                 }
@@ -1403,10 +1568,10 @@
           {
             "cinemaLevel": 4,
             "cinemaName": {
-              "zhCN": "烦恼尽空"
+              "zhCN": "术道归一"
             },
             "description": {
-              "zhCN": "释放「终结技」后，仪玄恢复10点「术法点」，并获得1层「诸相化生」，最多叠加2层，持续到本次战斗结束；\n拥有「诸相化生」时，「强化特殊技：凝云术」与「强化特殊技：墨烬影消」造成的伤害提升，每层使伤害提升30%。"
+              "zhCN": "发动「终结技」时，仪玄获得1层「静心」，最多拥有2层；拥有「静心」时，「强化特殊技：凝云术」与「强化特殊技：墨烬影消」造成的伤害提升，每层使下一次伤害提升30%。"
             },
             "scope": "inCombat",
             "defaultChecked": false,
@@ -1419,12 +1584,10 @@
             "effects": [
               {
                 "id": "effect-1",
-                "type": "stacked",
+                "type": "fixed",
                 "stat": "dmgBonus",
-                "valuePerStack": 30,
+                "value": 60,
                 "mode": "flat",
-                "maxStacks": 2,
-                "defaultStacks": 2,
                 "target": {
                   "kind": "skill",
                   "skillTargets": [
@@ -1447,10 +1610,10 @@
           {
             "cinemaLevel": 6,
             "cinemaName": {
-              "zhCN": "清净自然"
+              "zhCN": "动静相宜"
             },
             "description": {
-              "zhCN": "仪玄处于「凝神」状态下造成的贯穿伤害提升20%；\n仪玄进入「凝神」状态时获得1层「真功」，「真功」状态下发动「强化特殊技：墨烬影消」后，将消耗「真功」自动衔接发动「终结技：符法千重」。"
+              "zhCN": "仪玄发动「终结技：青溟云影」后，获得「调息」效果，拥有「调息」时可无视「术法值」发动一次「终结技：符法千重」，每30秒最多触发一次；此外，仪玄处于「凝神」状态下造成的贯穿伤害提升20%。"
             },
             "scope": "inCombat",
             "defaultChecked": false,
@@ -1639,7 +1802,7 @@
           "stats": "source-checked-biligame-wiki-2026-06-03",
           "skillLevelBonuses": "A/C/E each add Crit Rate +4.8% and Core Passive level +1; B/D/F each add Base HP +140 and Core Passive level +1",
           "corePassiveScaling": "source-checked; F corresponds to Core Passive level 7 and selected-skill damage bonus +60%",
-          "unsupportedBuffs": "resource generation, automatic lightning follow-ups, stun-only extra special damage, stun duration extension, and cinema extra-action damage are not modeled as automatic combat buffs"
+          "unsupportedBuffs": "resource generation, stun duration extension, and cinema extra-action damage are not modeled as automatic combat buffs; additional ability and cinema falling thunder are available as optional sheer skill events"
         }
       },
       "preferredDriveDiscs": {
@@ -1661,11 +1824,35 @@
       },
       "defaultCalculationConfig": {
         "mode": "sheer",
+        "cinemaLevel": 0,
         "name": {
-          "zhCN": "默认贯穿爆发"
+          "zhCN": "0影失衡双连携爆发"
         },
-        "selectedEventId": "yixuan_ultimate_qingming_cloud_shadow",
         "events": [
+          {
+            "id": "yixuan_chain_xuanmo_swift_strike",
+            "kind": "sheer",
+            "count": 2,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "yixuan",
+              "categoryId": "chain",
+              "moveId": "chain_xuanmo_swift_strike",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "yixuan_ultimate_thousand_talismans",
+            "kind": "sheer",
+            "count": 1,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "yixuan",
+              "categoryId": "chain",
+              "moveId": "ultimate_thousand_talismans",
+              "rowId": "damage"
+            }
+          },
           {
             "id": "yixuan_ultimate_qingming_cloud_shadow",
             "kind": "sheer",
@@ -1677,18 +1864,293 @@
               "moveId": "ultimate_qingming_cloud_shadow",
               "rowId": "damage"
             }
+          },
+          {
+            "id": "yixuan_ex_cloud_condensing_art",
+            "kind": "sheer",
+            "count": 2,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "yixuan",
+              "categoryId": "special",
+              "moveId": "cloud_condensing_art",
+              "rowId": "charged_total_damage"
+            }
+          },
+          {
+            "id": "yixuan_ex_ink_ember_shadow_dispel",
+            "kind": "sheer",
+            "count": 1,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "yixuan",
+              "categoryId": "special",
+              "moveId": "ink_ember_shadow_dispel",
+              "rowId": "orb_total_damage"
+            }
+          },
+          {
+            "id": "yixuan_ex_ink_trace_transform",
+            "kind": "sheer",
+            "count": 1,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "yixuan",
+              "categoryId": "special",
+              "moveId": "ink_trace_transform",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "yixuan_ex_ink_trace_transform_follow_up",
+            "kind": "sheer",
+            "count": 1,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "yixuan",
+              "categoryId": "special",
+              "moveId": "ink_trace_transform",
+              "rowId": "charged_follow_up"
+            }
+          }
+        ],
+        "selectedEventId": "yixuan_chain_xuanmo_swift_strike",
+        "variants": [
+          {
+            "mode": "custom",
+            "cinemaLevel": 2,
+            "name": {
+              "zhCN": "2影失衡双连携爆发"
+            },
+            "events": [
+              {
+                "id": "yixuan_chain_xuanmo_swift_strike",
+                "kind": "sheer",
+                "count": 2,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "yixuan",
+                  "categoryId": "chain",
+                  "moveId": "chain_xuanmo_swift_strike",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "yixuan_ultimate_thousand_talismans",
+                "kind": "sheer",
+                "count": 1,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "yixuan",
+                  "categoryId": "chain",
+                  "moveId": "ultimate_thousand_talismans",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "yixuan_ultimate_qingming_cloud_shadow",
+                "kind": "sheer",
+                "count": 1,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "yixuan",
+                  "categoryId": "chain",
+                  "moveId": "ultimate_qingming_cloud_shadow",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "yixuan_ex_cloud_condensing_art_1",
+                "kind": "sheer",
+                "count": 2,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "yixuan",
+                  "categoryId": "special",
+                  "moveId": "cloud_condensing_art",
+                  "rowId": "charged_total_damage"
+                }
+              },
+              {
+                "id": "yixuan_cinema_2_thousand_talismans_break",
+                "kind": "sheer",
+                "count": 1,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "yixuan",
+                  "categoryId": "special",
+                  "moveId": "thousand_talismans_break",
+                  "rowId": "row_1783851000658"
+                }
+              },
+              {
+                "id": "yixuan_ex_ink_ember_shadow_dispel",
+                "kind": "sheer",
+                "count": 1,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "yixuan",
+                  "categoryId": "special",
+                  "moveId": "ink_ember_shadow_dispel",
+                  "rowId": "orb_total_damage"
+                }
+              },
+              {
+                "id": "yixuan_ex_ink_trace_transform",
+                "kind": "sheer",
+                "count": 1,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "yixuan",
+                  "categoryId": "special",
+                  "moveId": "ink_trace_transform",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "yixuan_ex_ink_trace_transform_follow_up",
+                "kind": "sheer",
+                "count": 1,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "yixuan",
+                  "categoryId": "special",
+                  "moveId": "ink_trace_transform",
+                  "rowId": "charged_follow_up"
+                }
+              }
+            ],
+            "selectedEventId": "yixuan_chain_xuanmo_swift_strike"
+          },
+          {
+            "mode": "sheer",
+            "cinemaLevel": 6,
+            "name": {
+              "zhCN": "6影失衡双连携爆发"
+            },
+            "events": [
+              {
+                "id": "yixuan_chain_xuanmo_swift_strike",
+                "kind": "sheer",
+                "count": 2,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "yixuan",
+                  "categoryId": "chain",
+                  "moveId": "chain_xuanmo_swift_strike",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "yixuan_ultimate_thousand_talismans",
+                "kind": "sheer",
+                "count": 1,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "yixuan",
+                  "categoryId": "chain",
+                  "moveId": "ultimate_thousand_talismans",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "yixuan_ultimate_qingming_cloud_shadow",
+                "kind": "sheer",
+                "count": 1,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "yixuan",
+                  "categoryId": "chain",
+                  "moveId": "ultimate_qingming_cloud_shadow",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "yixuan_ultimate_thousand_talismans_free",
+                "kind": "sheer",
+                "count": 1,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "yixuan",
+                  "categoryId": "chain",
+                  "moveId": "ultimate_thousand_talismans",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "yixuan_ex_cloud_condensing_art_1",
+                "kind": "sheer",
+                "count": 2,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "yixuan",
+                  "categoryId": "special",
+                  "moveId": "cloud_condensing_art",
+                  "rowId": "charged_total_damage"
+                }
+              },
+              {
+                "id": "yixuan_cinema_2_thousand_talismans_break_1",
+                "kind": "sheer",
+                "count": 1,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "yixuan",
+                  "categoryId": "special",
+                  "moveId": "thousand_talismans_break",
+                  "rowId": "row_1783851000658"
+                }
+              },
+              {
+                "id": "yixuan_ex_ink_ember_shadow_dispel",
+                "kind": "sheer",
+                "count": 1,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "yixuan",
+                  "categoryId": "special",
+                  "moveId": "ink_ember_shadow_dispel",
+                  "rowId": "orb_total_damage"
+                }
+              },
+              {
+                "id": "yixuan_ex_ink_trace_transform",
+                "kind": "sheer",
+                "count": 1,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "yixuan",
+                  "categoryId": "special",
+                  "moveId": "ink_trace_transform",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "yixuan_ex_ink_trace_transform_follow_up",
+                "kind": "sheer",
+                "count": 1,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "yixuan",
+                  "categoryId": "special",
+                  "moveId": "ink_trace_transform",
+                  "rowId": "charged_follow_up"
+                }
+              }
+            ],
+            "selectedEventId": "yixuan_chain_xuanmo_swift_strike"
           }
         ]
       },
       "sources": [
-        "https://baike.mihoyo.com/zzz/wiki/content/1299/detail",
-        "https://zzz.gg/zh-hans/characters/%E4%BB%AA%E7%8E%84"
+        "https://baike.mihoyo.com/zzz/wiki/content/1299/detail"
       ],
       "verification": {
         "level60HpAtkDef": "source-checked",
         "panelDefaults": "source-checked-biligame-wiki-2026-06-03",
         "attribute": "Biligame stores 属性=以太 and 属性名称=玄墨; shown as xuanmo and settled as ether for damage bonus and resistance buckets",
-        "cinemaBuffs": "source-checked-zzz.gg-2026-06-09; M1 lightning and M2/M6 extra ultimate damage are not modeled because cinema Buffs cannot add extra damage events"
+        "combatBuffs": "source-checked-mihoyo-baike-2026-07-09; additional ability stunned-target extra-special damage is modeled as skill-targeted damage bonus, and falling thunder is available as an optional sheer skill event",
+        "cinemaBuffs": "source-checked-mihoyo-baike-2026-07-09; M2 resistance ignore is skill-targeted to EX special and ultimate events, M4 uses the 2-stack maximum, and M1/M2/M6 resource or extra-action effects remain descriptive"
       }
     },
     {

@@ -47,6 +47,7 @@
   - 自定义事件
   - 角色 `defaultCalculationConfig` 管理员默认循环
 - 角色存在 `defaultCalculationConfig` 时，默认优先使用管理员默认循环，并展示事件摘要。
+- `defaultCalculationConfig.variants` 按单个影画等级触发；当前影画使用不超过当前等级的最高已配置循环，不在维护里配置区间。
 
 ## Buff 行为
 

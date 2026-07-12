@@ -47,6 +47,12 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("workbench-right")
     expect(source).toContain("DamageWhiteBox")
     expect(source).toContain("PanelStatTable")
+    expect(source).toContain("damage-panel-grid")
+    expect(source).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));")
+  })
+
+  it("passes the rupture sheer-force flag to both panel tables", () => {
+    expect(source.match(/:include-sheer-force=\"selectedAgent\?\.specialty === 'rupture'\"/g)).toHaveLength(2)
   })
 
   it("splits event management from optimizer configuration", () => {
@@ -60,9 +66,19 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).not.toContain("@save-optimizer")
   })
 
-  it("syncs optimizer defaults from the selected agent", () => {
-    expect(source).toContain("optimizerStore.initialize(catalogStore.catalog, catalogStore.agents.find")
-    expect(source).toContain("optimizerStore.applyAgentPreferredDriveDiscSet")
+  it("shows the resolved admin default calculation name in the settings summary", () => {
+    expect(source).toContain("const calculationModeLabel = computed")
+    expect(source).toContain("resolveDefaultCalculationConfig(selectedAgent.value?.defaultCalculationConfig, buildStore.cinemaLevel)")
+    expect(source).toContain("`默认循环（${name}）`")
+    expect(source).toContain("<dd>{{ calculationModeLabel }}</dd>")
+    expect(source).not.toContain("<dd>{{ damageModeLabel(buildStore.damageConfig.mode) }}</dd>")
+  })
+
+  it("loads optimizer constraints from the selected agent", () => {
+    expect(source).toContain("optimizerStore.initialize(")
+    expect(source).toContain("catalogStore.agents.find((item: any) => item.id === buildStore.agentId)")
+    expect(source).toContain("optimizerStore.loadAgentSettings")
+    expect(source).not.toContain("optimizerStore.applyAgentPreferredDriveDiscSet")
     expect(source).toContain("@update:value=\"value => selectAgent(String(value))\"")
   })
 

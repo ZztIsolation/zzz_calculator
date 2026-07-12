@@ -1202,6 +1202,13 @@ button {
   gap: 8px;
 }
 
+.field-buff-filter-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.72fr) minmax(140px, 1fr) minmax(140px, 1fr);
+  gap: 8px;
+  margin: 8px 0;
+}
+
 .target-settings-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5207,6 +5214,7 @@ body.modal-open {
   grid-template-columns: minmax(0, 1fr) minmax(180px, 0.7fr) auto;
   gap: 12px;
   align-items: center;
+  min-width: 0;
   margin: 18px -2px -2px;
   padding: 12px;
   border: 1px solid #cfe1ff;
@@ -5218,6 +5226,10 @@ body.modal-open {
 
 .optimizer-run-summary[data-active="true"] {
   border-color: #9ec5ff;
+}
+
+.optimizer-run-summary > * {
+  min-width: 0;
 }
 
 .optimizer-run-summary span {
@@ -5260,6 +5272,7 @@ body.modal-open {
 .optimizer-progress {
   display: grid;
   gap: 10px;
+  min-width: 0;
   margin-bottom: 14px;
   padding: 14px;
   border: 1px solid var(--line);
@@ -5277,6 +5290,7 @@ body.modal-open {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
 }
 
 .optimizer-progress-head strong {
@@ -5289,6 +5303,8 @@ body.modal-open {
 .optimizer-progress-note {
   color: var(--muted);
   font-size: 13px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .optimizer-progress-track {

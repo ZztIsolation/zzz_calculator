@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { loadCalculatorContext } from "../backend/calculator.js"
-import { optimizeDriveDiscs } from "../backend/driveDiscOptimizer.js"
+import { optimizeDriveDiscs, optimizeDriveDiscsAsync } from "../backend/driveDiscOptimizer.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
@@ -42,6 +42,8 @@ const subStatPool = [
     "anomalyProficiency",
     "atkFlat",
     "hpPct",
+    "defPct",
+    "energyRegen",
     "dmgBonus",
 ]
 
@@ -133,6 +135,38 @@ function fuzzStore(seed) {
     }
 }
 
+function chunkBoundStore() {
+    const seed = 9001
+    const rng = createRng(seed)
+    const focusStats = ["critRate", "critDmg", "atkPct", "penRatio", "anomalyProficiency", "atkFlat", "hpPct", "defPct", "energyRegen", "dmgBonus"]
+    const driveDiscs = []
+    for (let variant = 0; variant < 10; variant += 1) {
+        const stat = focusStats[variant]
+        driveDiscs.push({
+            ...disc(seed, `${fourSet}-chunk-1-${variant}`, fourSet, 1, rng),
+            subStats: [{
+                stat,
+                value: subStatValue(stat, rng) + 20,
+                mode: stat === "atkFlat" || stat === "anomalyProficiency" ? "flat" : "pct",
+                label: stat,
+            }],
+        })
+    }
+    for (const slot of [2, 3, 4]) {
+        driveDiscs.push(disc(seed, `${fourSet}-chunk-${slot}-0`, fourSet, slot, rng))
+    }
+    for (const slot of [5, 6]) {
+        driveDiscs.push(disc(seed, `${twoSet}-chunk-${slot}-0`, twoSet, slot, rng))
+    }
+    return {
+        version: 1,
+        owners: [{ id: "default", label: "默认用户" }],
+        imports: [],
+        driveDiscLoadouts: [],
+        driveDiscs,
+    }
+}
+
 function damageForScenario(index) {
     if (index === 1) {
         return {
@@ -170,6 +204,26 @@ function damageForScenario(index) {
             ],
         }
     }
+    if (index === 8) {
+        return {
+            ...exampleInput.damage,
+            selectedEventId: "mixed-direct",
+            events: [
+                { id: "mixed-direct", kind: "direct", skillMultiplier: 180, critMode: "expected", count: 1 },
+                { id: "mixed-extra", kind: "direct", skillMultiplier: 80, critMode: "never", count: 3 },
+                { id: "mixed-assault", kind: "anomaly", anomalyEffect: "assault", procCount: 1, count: 1 },
+            ],
+        }
+    }
+    if (index === 9) {
+        return {
+            agentLevel: 60,
+            selectedEventId: "energy-direct",
+            events: [
+                { id: "energy-direct", kind: "direct", skillMultiplier: 240, critMode: "always", count: 1 },
+            ],
+        }
+    }
     return exampleInput.damage
 }
 
@@ -197,6 +251,20 @@ function settingsForScenario(index) {
     }
     if (index === 6) {
         return base
+    }
+    if (index === 8) {
+        return {
+            ...base,
+            twoPieceSetIds: [twoSet, thirdSet],
+            mainStatLimits: { 4: ["critRate", "critDmg", "atkPct"], 5: ["physicalDmg", "electricDmg", "atkPct"], 6: ["atkPct", "energyRegen"] },
+            minimums: { critRate: 20, atk: 1800 },
+        }
+    }
+    if (index === 9) {
+        return {
+            ...base,
+            mainStatLimits: { 4: ["critDmg", "atkPct"], 5: ["atkPct", "penRatio"], 6: ["atkPct"] },
+        }
     }
     return { ...base, twoPieceSetId: twoSet }
 }
@@ -247,14 +315,22 @@ function assertSameTop(seed, scenarioIndex, legacy, superBound) {
     }
 }
 
-const FUZZ_SEEDS = 100
+const FUZZ_SEEDS = 160
+let suffixTopKBoundCoverage = 0
+let chunkBoundCoverage = 0
 for (let seed = 1; seed <= FUZZ_SEEDS; seed += 1) {
     const store = fuzzStore(seed)
-    const scenarioIndex = (seed - 1) % 8
+    const scenarioIndex = (seed - 1) % 10
     const legacy = optimizeDriveDiscs(catalog, store, optimizerInput(seed, scenarioIndex, "exact-legacy", store))
     const superBound = optimizeDriveDiscs(catalog, store, optimizerInput(seed, scenarioIndex, "exact-super-bound", store))
     assert.equal(superBound.metrics.strictExact, true)
     assertSameTop(seed, scenarioIndex, legacy, superBound)
+    if (Number(superBound.metrics.suffixTopKBoundChecks ?? 0) > 0) {
+        suffixTopKBoundCoverage += 1
+    }
+    if (Number(superBound.metrics.chunkBoundChecks ?? 0) > 0) {
+        chunkBoundCoverage += 1
+    }
     if (seed <= 20) {
         const indexed = optimizeDriveDiscs(
             catalog,
@@ -266,6 +342,23 @@ for (let seed = 1; seed <= FUZZ_SEEDS; seed += 1) {
         }
         assertSameTop(seed, scenarioIndex, legacy, indexed)
     }
+    if (seed <= 30) {
+        const parallel = await optimizeDriveDiscsAsync(
+            catalog,
+            store,
+            optimizerInput(seed, scenarioIndex, "exact-super-bound-parallel", store, { workerCount: 2 }),
+        )
+        assert.equal(parallel.metrics.strictExact, true)
+        assertSameTop(seed, scenarioIndex, legacy, parallel)
+    }
 }
 
-console.log(`optimizer fuzz tests passed (${FUZZ_SEEDS} seeds)`)
+const chunkStore = chunkBoundStore()
+const chunkLegacy = optimizeDriveDiscs(catalog, chunkStore, optimizerInput("chunk", 0, "exact-legacy", chunkStore))
+const chunkSuperBound = optimizeDriveDiscs(catalog, chunkStore, optimizerInput("chunk", 0, "exact-super-bound", chunkStore))
+assert.equal(chunkSuperBound.metrics.strictExact, true)
+assertSameTop("chunk", 0, chunkLegacy, chunkSuperBound)
+assert.ok(Number(chunkSuperBound.metrics.chunkBoundChecks ?? 0) > 0, "chunk bound fixture should exercise chunk checks")
+chunkBoundCoverage += 1
+
+console.log(`optimizer fuzz tests passed (${FUZZ_SEEDS} seeds, suffixTopK=${suffixTopKBoundCoverage}, chunk=${chunkBoundCoverage})`)

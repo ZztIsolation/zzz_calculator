@@ -2,6 +2,14 @@
 import { computed, onMounted, ref } from "vue"
 import { NButton, NInput, NSelect, NTag } from "naive-ui"
 import { Copy, Plus, Save, Trash2 } from "lucide-vue-next"
+import { formatStoredStatValue, statLabel } from "@core/shared-combat.js"
+import {
+  FIELD_BUFF_GAME_VERSIONS,
+  FIELD_BUFF_MODE_OPTIONS,
+  FIELD_BUFF_PHASE_OPTIONS,
+  fieldBuffModeOption,
+  fieldBuffPhaseName,
+} from "@core/maintenanceValidation.js"
 
 const resources = [
   { label: "角色", value: "agents", path: ["agents", "agents"] },
@@ -27,6 +35,18 @@ const draftText = ref("")
 const validationError = ref("")
 
 const resourceOptions = resources.map(({ label, value }) => ({ label, value }))
+const fieldBuffModeOptions = FIELD_BUFF_MODE_OPTIONS.map(option => ({
+  label: option.selectLabel?.zhCN ?? option.source.zhCN,
+  value: option.modeId,
+}))
+const fieldBuffVersionOptions = FIELD_BUFF_GAME_VERSIONS.map(version => ({
+  label: `${version}版本`,
+  value: version,
+}))
+const fieldBuffPhaseOptions = FIELD_BUFF_PHASE_OPTIONS.map(option => ({
+  label: option.phaseName.zhCN,
+  value: option.phaseNo,
+}))
 const currentResource = computed(() => resources.find(item => item.value === resource.value) ?? resources[0])
 const maintenanceEnabled = computed(() => appConfig.value?.maintenanceEnabled === true)
 const records = computed(() => {
@@ -60,6 +80,47 @@ function recordKey(item: any) {
 
 function recordLabel(item: any) {
   return item.name?.zhCN ?? item.label?.zhCN ?? item.id ?? item.teammateId ?? "未命名"
+}
+
+function textOf(value: any) {
+  if (!value) {
+    return ""
+  }
+  return typeof value === "string" ? value : value.zhCN ?? value.en ?? ""
+}
+
+function effectSummary(item: any) {
+  const effects = Array.isArray(item?.effects) ? item.effects : []
+  if (!effects.length) {
+    return "无结构化效果"
+  }
+  const meta = catalog.value?.meta
+  const labels = effects.slice(0, 2).map((effect: any) => {
+    const stat = effect.stat
+    if (!stat) {
+      return textOf(effect.label) || effect.id || effect.type || "效果"
+    }
+    const value = typeof effect.value === "number"
+      ? ` ${formatStoredStatValue(stat, effect.value, { mode: effect.mode })}`
+      : ""
+    return `${statLabel(stat, meta)}${value}`
+  })
+  return effects.length > labels.length
+    ? `${labels.join("、")} 等${effects.length}项`
+    : labels.join("、")
+}
+
+function recordMeta(item: any) {
+  if (resource.value === "field-buffs") {
+    const period = item.period ?? {}
+    return [
+      textOf(item.source),
+      period.gameVersion ? `${period.gameVersion}版本` : "",
+      textOf(period.phaseName) || textOf(item.sourcePeriod),
+      effectSummary(item),
+    ].filter(Boolean).join(" · ") || recordKey(item)
+  }
+  return recordKey(item)
 }
 
 async function load() {
@@ -101,7 +162,27 @@ function selectRecord(item: any) {
 
 function newRecord() {
   const id = `${resource.value.replace(/[^a-z0-9]+/gi, "-")}-${Date.now()}`
-  const item = { id, name: { zhCN: "新条目" } }
+  const defaultMode = fieldBuffModeOption("defense_v5")
+  const defaultPhaseName = fieldBuffPhaseName(1) ?? { zhCN: "第一期" }
+  const item = resource.value === "field-buffs"
+    ? {
+        sourceType: "field",
+        scope: "inCombat",
+        name: { zhCN: "新场地 Buff" },
+        source: { zhCN: defaultMode?.source?.zhCN ?? "防卫战 v5" },
+        period: {
+          modeId: "defense_v5",
+          gameVersion: "3.0",
+          phaseNo: 1,
+          phaseName: defaultPhaseName,
+        },
+        sourcePeriod: { zhCN: `3.0版本${defaultPhaseName.zhCN}` },
+        description: { zhCN: "" },
+        coverage: { default: 1, min: 0, max: 1, step: 0.1 },
+        effects: [],
+        buffModifiers: [],
+      }
+    : { id, name: { zhCN: "新条目" } }
   selectedKey.value = id
   draftText.value = JSON.stringify(item, null, 2)
   validationError.value = ""
@@ -148,6 +229,23 @@ function patchDraft(patch: any) {
   saveHint.value = "本次修改尚未保存"
 }
 
+function patchFieldBuffPeriod(patch: { modeId?: string, gameVersion?: string, phaseNo?: number | string }) {
+  const current = draftObject.value ?? {}
+  const modeId = patch.modeId ?? current.period?.modeId ?? "defense_v5"
+  const gameVersion = patch.gameVersion ?? current.period?.gameVersion ?? "3.0"
+  const phaseNo = Number(patch.phaseNo ?? current.period?.phaseNo ?? 1)
+  const mode = fieldBuffModeOption(modeId)
+  const phaseName = fieldBuffPhaseName(phaseNo) ?? { zhCN: "" }
+  patchDraft({
+    "source.zhCN": mode?.source?.zhCN ?? "",
+    "period.modeId": modeId,
+    "period.gameVersion": gameVersion,
+    "period.phaseNo": phaseNo,
+    "period.phaseName": phaseName,
+    "sourcePeriod.zhCN": gameVersion && phaseName.zhCN ? `${gameVersion}版本${phaseName.zhCN}` : "",
+  })
+}
+
 async function saveDraft() {
   if (!maintenanceEnabled.value) {
     saveState.value = "只读"
@@ -158,13 +256,16 @@ async function saveDraft() {
   if (!item) {
     return
   }
+  const requestItem = resource.value === "field-buffs" && selectedRecord.value?.id
+    ? { ...item, _maintenanceOriginalId: selectedRecord.value.id }
+    : item
   saveState.value = "保存中"
   saveHint.value = "正在写入维护数据"
   try {
     const response = await fetch(`/api/maintenance/${resource.value}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(item),
+      body: JSON.stringify(requestItem),
     })
     const payload = await response.json().catch(() => ({}))
     if (!response.ok) {
@@ -257,7 +358,7 @@ onMounted(load)
             >
               <span>
                 <span class="entity-name">{{ recordLabel(item) }}</span>
-                <span class="entity-meta">{{ recordKey(item) }}</span>
+                <span class="entity-meta">{{ recordMeta(item) }}</span>
               </span>
             </button>
           </div>
@@ -283,7 +384,7 @@ onMounted(load)
               <NTag round>{{ resource }}</NTag>
             </div>
             <div class="panel-body metric-grid">
-              <label class="metric">
+              <label v-if="resource !== 'field-buffs'" class="metric">
                 <dt>ID</dt>
                 <dd><NInput :value="draftObject.id ?? draftObject.teammateId ?? ''" :disabled="!maintenanceEnabled" @update:value="patchDraft({ id: $event })" /></dd>
               </label>
@@ -291,7 +392,21 @@ onMounted(load)
                 <dt>中文名</dt>
                 <dd><NInput :value="draftObject.name?.zhCN ?? draftObject.label?.zhCN ?? ''" :disabled="!maintenanceEnabled" @update:value="patchDraft({ 'name.zhCN': $event })" /></dd>
               </label>
-              <label class="metric">
+              <template v-if="resource === 'field-buffs'">
+                <label class="metric">
+                  <dt>模式</dt>
+                  <dd><NSelect :value="draftObject.period?.modeId ?? 'defense_v5'" :disabled="!maintenanceEnabled" :options="fieldBuffModeOptions" @update:value="patchFieldBuffPeriod({ modeId: String($event) })" /></dd>
+                </label>
+                <label class="metric">
+                  <dt>版本</dt>
+                  <dd><NSelect :value="draftObject.period?.gameVersion ?? '3.0'" :disabled="!maintenanceEnabled" :options="fieldBuffVersionOptions" @update:value="patchFieldBuffPeriod({ gameVersion: String($event) })" /></dd>
+                </label>
+                <label class="metric">
+                  <dt>第几期</dt>
+                  <dd><NSelect :value="Number(draftObject.period?.phaseNo ?? 1)" :disabled="!maintenanceEnabled" :options="fieldBuffPhaseOptions" @update:value="patchFieldBuffPeriod({ phaseNo: Number($event) })" /></dd>
+                </label>
+              </template>
+              <label v-if="resource !== 'field-buffs'" class="metric">
                 <dt>来源</dt>
                 <dd><NInput :value="draftObject.source?.zhCN ?? draftObject.sourceLabel?.zhCN ?? draftObject.source ?? ''" :disabled="!maintenanceEnabled" @update:value="patchDraft({ 'source.zhCN': $event })" /></dd>
               </label>

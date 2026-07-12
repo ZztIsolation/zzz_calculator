@@ -25,6 +25,40 @@ const subStatPool = [
     "anomalyProficiency",
     "atkFlat",
 ]
+const warehouseSlotMainOptions = {
+    1: [{ stat: "hpFlat", value: 2200 }],
+    2: [{ stat: "atkFlat", value: 316 }],
+    3: [{ stat: "defFlat", value: 184 }],
+    4: [
+        { stat: "critRate", value: 24, mode: "pct" },
+        { stat: "critDmg", value: 48, mode: "pct" },
+        { stat: "atkPct", value: 30, mode: "pct" },
+        { stat: "anomalyProficiency", value: 92 },
+    ],
+    5: [
+        { stat: "physicalDmg", value: 30, mode: "pct" },
+        { stat: "electricDmg", value: 30, mode: "pct" },
+        { stat: "atkPct", value: 30, mode: "pct" },
+        { stat: "penRatio", value: 24, mode: "pct" },
+    ],
+    6: [
+        { stat: "atkPct", value: 30, mode: "pct" },
+        { stat: "anomalyMastery", value: 30, mode: "pct" },
+        { stat: "energyRegen", value: 60, mode: "pct" },
+    ],
+}
+const warehouseSubStatPool = [
+    "critRate",
+    "critDmg",
+    "atkPct",
+    "penRatio",
+    "anomalyProficiency",
+    "atkFlat",
+    "hpPct",
+    "defPct",
+    "energyRegen",
+    "impact",
+]
 const scales = [
     { id: "small", variantsPerSetSlot: 3 },
     { id: "medium", variantsPerSetSlot: 4 },
@@ -108,6 +142,83 @@ function optimizerInput(algorithm) {
     }
 }
 
+function warehouseDisc(id, setId, partition, mainStat, variant) {
+    const used = new Set([mainStat.stat])
+    const subStats = []
+    let cursor = 0
+    while (subStats.length < 4 && cursor < warehouseSubStatPool.length * 2) {
+        const stat = warehouseSubStatPool[(variant + cursor + partition) % warehouseSubStatPool.length]
+        cursor += 1
+        if (used.has(stat)) {
+            continue
+        }
+        used.add(stat)
+        const value = stat === "critRate"
+            ? 2.4 + ((variant + partition + cursor) % 4) * 1.2
+            : stat === "critDmg"
+                ? 4.8 + ((variant + partition + cursor) % 5) * 2.4
+                : stat === "atkFlat"
+                    ? 19 + ((variant + partition + cursor) % 5) * 19
+                    : stat === "anomalyProficiency"
+                        ? 9 + ((variant + partition + cursor) % 5) * 9
+                        : 3 + ((variant + partition + cursor) % 5) * 1.5
+        subStats.push({
+            stat,
+            value,
+            mode: stat === "atkFlat" || stat === "anomalyProficiency" ? "flat" : "pct",
+            label: stat,
+        })
+    }
+    return {
+        id,
+        ownerId: "default",
+        setId,
+        setName: catalog.driveDiscSetsMap.get(setId)?.name?.zhCN ?? setId,
+        partition,
+        rarity: "S",
+        level: 15,
+        maxLevel: 15,
+        locked: false,
+        equippedBy: null,
+        mainStat: {
+            ...mainStat,
+            mode: mainStat.mode ?? "flat",
+            label: mainStat.stat,
+        },
+        subStats,
+        source: {
+            type: "benchmark-warehouse",
+            sequence: Number(id.replace(/\D/g, "")) || 9999,
+        },
+    }
+}
+
+function warehouseStore(variantsPerMainSetSlot = 4) {
+    const driveDiscs = []
+    for (const slot of [1, 2, 3, 4, 5, 6]) {
+        for (const setId of [fourSet, twoSet]) {
+            for (const mainStat of warehouseSlotMainOptions[slot]) {
+                for (let variant = 0; variant < variantsPerMainSetSlot; variant += 1) {
+                    driveDiscs.push(warehouseDisc(
+                        `w-${setId}-${slot}-${mainStat.stat}-${variant}`,
+                        setId,
+                        slot,
+                        mainStat,
+                        variant + slot,
+                    ))
+                }
+            }
+        }
+    }
+    return {
+        version: 1,
+        owners: [{ id: "default", label: "默认用户" }],
+        imports: [],
+        driveDiscLoadouts: [],
+        driveDiscs,
+    }
+}
+
 function runBenchmark(scale, store, algorithm) {
     const started = performance.now()
     const result = optimizeDriveDiscs(catalog, store, optimizerInput(algorithm))
@@ -141,9 +252,7 @@ async function runBenchmarkAsync(scale, store, algorithm) {
 }
 
 function assertTopMatches(scale, legacy, superBound) {
-    const legacyScores = legacy.top.map(item => item.score)
-    const superBoundScores = superBound.top.map(item => item.score)
-    if (JSON.stringify(legacyScores) !== JSON.stringify(superBoundScores)) {
+    if (JSON.stringify(legacy.top) !== JSON.stringify(superBound.top)) {
         throw new Error([
             `exact-super-bound Top5 scores do not match exact-legacy for ${scale.id}`,
             `legacy=${JSON.stringify(legacy.top)}`,
@@ -179,12 +288,19 @@ function row(item) {
         fullResultMs: Number(metrics.fullResultMs ?? 0).toFixed(1),
         taskStateBuildMs: Number(metrics.taskStateBuildMs ?? 0).toFixed(1),
         warmupMs: Number(metrics.warmupMs ?? 0).toFixed(1),
+        seedBudgetUsed: metrics.seedBudgetUsed ?? 0,
         parallelPrewarmMs: Number(metrics.parallelPrewarmMs ?? 0).toFixed(1),
         superBoundChecks: metrics.superBoundChecks ?? 0,
         groupBoundChecks: metrics.groupBoundChecks ?? 0,
+        chunkBoundChecks: metrics.chunkBoundChecks ?? 0,
         discBoundChecks: metrics.discBoundChecks ?? 0,
+        suffixTopKChecks: metrics.suffixTopKBoundChecks ?? 0,
+        boundOracleChecks: metrics.boundOracleChecks ?? 0,
+        safeBoundFallbacks: metrics.safeBoundFallbacks ?? 0,
         avgBoundCheckMs: Number(metrics.avgBoundCheckMs ?? 0).toFixed(4),
         prunedBySuperBound: metrics.prunedBySuperBound ?? 0,
+        prunedByChunkBound: metrics.prunedByChunkBound ?? 0,
+        prunedBySuffixTopK: metrics.prunedBySuffixTopKBound ?? 0,
         prunedByGlobalCutoff: metrics.prunedByGlobalCutoff ?? 0,
         skippedDiscBoundChecks: metrics.skippedDiscBoundChecks ?? 0,
         skippedDiscByPolicy: metrics.skippedDiscBoundChecksByPolicy ?? 0,
@@ -197,6 +313,7 @@ function row(item) {
         taskDispatchMs: Number(metrics.taskDispatchMs ?? 0).toFixed(3),
         globalCutoffUpdates: metrics.globalCutoffUpdates ?? 0,
         denseScoreCalls: metrics.denseScoreCalls ?? 0,
+        scratchBufferReuses: metrics.scratchBufferReuses ?? 0,
         vectorScoreCalls: metrics.vectorScoreCalls ?? 0,
         vectorScoreFallbacks: metrics.vectorScoreFallbacks ?? 0,
         topScore: Math.round(item.top[0]?.score ?? 0),
@@ -216,5 +333,25 @@ for (const scale of scales) {
     }
     rows.push(row(legacy), row(superBound), row(parallel))
 }
+
+const chunked = runBenchmark(
+    { id: "chunked" },
+    benchmarkStore(9),
+    "exact-super-bound",
+)
+if (!chunked.metrics.strictExact || Number(chunked.metrics.chunkBoundChecks ?? 0) <= 0) {
+    throw new Error("chunked exact-super-bound benchmark must exercise strict chunk bounds")
+}
+rows.push(row(chunked))
+
+const warehouse = runBenchmark(
+    { id: "warehouse" },
+    warehouseStore(4),
+    "exact-super-bound",
+)
+if (!warehouse.metrics.strictExact) {
+    throw new Error("warehouse exact-super-bound benchmark must remain strict exact")
+}
+rows.push(row(warehouse))
 
 console.table(rows)

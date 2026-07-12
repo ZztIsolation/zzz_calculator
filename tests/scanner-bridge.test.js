@@ -52,17 +52,18 @@ function assertScannerPackageManifest() {
     }
 
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
-    const localPackageUrl = "./1.0.35/ZZZ-Scanner.Next-win-x64.zip"
-    const mirrorPackageUrl = "http://121.199.21.10/downloads/zzz-scanner/1.0.35/ZZZ-Scanner.Next-win-x64.zip"
+    const localPackageUrl = "./1.0.36/ZZZ-Scanner.Next-win-x64.zip"
+    const githubPackageUrl = "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.36/ZZZ-Scanner.Next-win-x64.zip"
+    const mirrorPackageUrl = "http://121.199.21.10/downloads/zzz-scanner/1.0.36/ZZZ-Scanner.Next-win-x64.zip"
     const packagePath = normalize(join(scannerRoot, localPackageUrl))
 
-    assert.equal(manifest.scannerVersion, "1.0.35")
-    assert.equal(manifest.packageUrl, "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.35/ZZZ-Scanner.Next-win-x64.zip")
+    assert.equal(manifest.scannerVersion, "1.0.36")
+    assert.equal(manifest.packageUrl, localPackageUrl)
     assert.ok(Array.isArray(manifest.packageUrls))
     assert.equal(manifest.packageUrls[0], manifest.packageUrl)
-    assert.ok(manifest.packageUrls.includes(manifest.packageUrl))
-    assert.equal(manifest.packageUrls.includes(mirrorPackageUrl), false)
     assert.ok(manifest.packageUrls.includes(localPackageUrl))
+    assert.ok(manifest.packageUrls.includes(githubPackageUrl))
+    assert.equal(manifest.packageUrls.includes(mirrorPackageUrl), false)
     assert.equal(manifest.entry, "ZZZ-Scanner.Next.exe")
     assert.equal(existsSync(join(scannerRoot, "1.0.0")), false)
     assert.equal(existsSync(join(scannerRoot, "1.0.1")), false)
@@ -161,7 +162,7 @@ try {
     globalThis.fetch = async (url) => {
         fetchUrls.push(String(url))
         if (String(url).endsWith("/")) {
-            return okJson({ scanner: { installed: true, version: "1.0.35" } })
+            return okJson({ scanner: { installed: true, version: "1.0.36" } })
         }
         return okJson({ token: "ready" })
     }

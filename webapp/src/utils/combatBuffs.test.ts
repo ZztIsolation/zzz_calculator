@@ -64,7 +64,23 @@ describe("combat buff display helpers", () => {
         effects: [{ id: "atk", type: "fixed", stat: "atkFlat", value: 10 }],
       }],
     }],
-    combatBuffs: [],
+    combatBuffs: [{
+      id: "field.defense_v5.v3_0.p2.jijing_chefeng",
+      sourceType: "field",
+      sourceCategory: "field",
+      sourceKind: "field",
+      source: { zhCN: "防卫战 v5" },
+      sourcePeriod: { zhCN: "3.0版本第二期" },
+      period: {
+        modeId: "defense_v5",
+        gameVersion: "3.0",
+        phaseNo: 2,
+        phaseName: { zhCN: "第二期" },
+      },
+      name: { zhCN: "极境彻风" },
+      description: { zhCN: "场地 Buff" },
+      effects: [{ id: "field-dmg", type: "fixed", stat: "dmgBonus", value: 10 }],
+    }],
   }
   const driveDiscSets = [{
     id: "set_a",
@@ -78,7 +94,7 @@ describe("combat buff display helpers", () => {
     },
   }]
 
-  it("builds the six workbench buff categories from current metadata", () => {
+  it("builds the workbench buff categories from current metadata", () => {
     const groups = buildCombatBuffGroups({
       meta,
       driveDiscSets,
@@ -99,6 +115,9 @@ describe("combat buff display helpers", () => {
     expect(groups.teammate.map(item => item.id)).toEqual(["teammate_buff"])
     expect(groups.teammateWEngine.map(item => item.id)).toEqual(["wEngine:engine_team.team"])
     expect(groups.teammateDriveDisc.map(item => item.id)).toEqual(["teammateDriveDisc4pc:set_a"])
+    expect(groups.field.map(item => item.id)).toEqual(["field.defense_v5.v3_0.p2.jijing_chefeng"])
+    expect(groups.field[0].period.gameVersion).toBe("3.0")
+    expect(groups.field[0].period.phaseNo).toBe(2)
     expect(groups.self[0].agentImages?.portrait).toBe("/assets/agents/agent-a.png")
     expect(groups.selfWEngine[0].ownerImages?.icon).toBe("/assets/w-engines/engine-self.png")
     expect(groups.teammateWEngine[0].ownerImages?.icon).toBe("/assets/w-engines/engine-team.png")
@@ -117,6 +136,7 @@ describe("combat buff display helpers", () => {
 
     expect(buffLabelForId("agent:agent_a.corePassive", context)).toBe("角色甲 | 核心被动")
     expect(buffLabelForId("teammate_buff", context)).toBe("队友甲 | 强化特殊技")
+    expect(buffLabelForId("field.defense_v5.v3_0.p2.jijing_chefeng", context)).toBe("极境彻风")
     expect(buffLabelForId("driveDisc4pc:set_a.self", context)).toBe("队友套装 4 件套（自身）")
     expect(buffLabelForId("driveDisc4pc:set_a.team", context)).toBe("队友套装 4 件套（团队）")
     expect(teammateDriveDiscSetIdsFromBuffIds(["teammateDriveDisc4pc:set_a"])).toEqual(["set_a"])

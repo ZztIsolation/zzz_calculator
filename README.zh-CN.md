@@ -6,6 +6,16 @@
 
 ## 上传更新摘要
 
+### 2026-07-09 扫描器 1.0.36 发布
+
+本次上传将网页唤起的 OCR 运行时替换为 ZZZ Scanner Next `1.0.36`：
+
+- OCR 运行时重新来自本机 `publish 1.0.36`，压包时排除生成的 `Scans` 输出，并保留包内 `Data/ocr_fast_templates.json`。
+- Pages scanner manifest、本地 package manifest、旧静态页 Helper 链接和 Vue 工作台 Helper 链接已更新为 `scannerVersion=1.0.36`。
+- OCR zip 已发布到 GitHub Release tag `scanner-1.0.36`，SHA-256 为 `d885c0aef6da61cfcbf994ad2b4e712a31efe8bd87631260fe4f87ea8711c63d`，大小 `47231570` bytes。
+- Pages 构建产物现在也会携带同一份 OCR zip，路径为 `/downloads/zzz-scanner/1.0.36/ZZZ-Scanner.Next-win-x64.zip`；manifest 会优先让 Helper 下载同站静态文件，GitHub Release 仅作为兜底，避免用户本机网络在拉 GitHub 大文件时 0B 断连。
+- 已用本地 `1.0.36` 扫描器完成 120 件 benchmark：`Completed=120`、`Failed=0`、重复导出 0、`IncompleteRoi=0`、`slot_safety=pass`、`profile_route=exact:7`。
+
 ### 2026-07-02 扫描器 1.0.35 与云绝区零客户端选择
 
 本次上传为驱动盘扫描弹窗增加明确的客户端选择。默认仍为本地绝区零；选择云绝区零时，网页会发送
@@ -269,7 +279,7 @@ npm start
 
 启动后打开终端打印的本地地址，通常是 `http://localhost:8787`。如需指定端口，可以使用 `PORT=8791 npm start`。
 
-驱动盘页的「扫描」会优先连接本地小助手。公开站点上的小助手下载按钮指向 GitHub Releases；本地 Node server 开发模式仍可从 `/downloads/ZZZ-Scanner-Helper.exe` 提供文件。OCR 包 manifest 当前使用已验证的 GitHub Release 新包。小助手会注册 `zzz-scanner://` 协议，在 `127.0.0.1:22355` 与网页通信，并按 `/downloads/zzz-scanner/manifest.json` 自动下载/更新真正的 OCR 扫描器大包。当前网页发布的大包版本是 ZZZ Scanner Next `1.0.35`。
+驱动盘页的「扫描」会优先连接本地小助手。公开站点上的小助手下载按钮指向 GitHub Releases；本地 Node server 开发模式仍可从 `/downloads/ZZZ-Scanner-Helper.exe` 提供文件。OCR 包 manifest 当前使用已验证的 GitHub Release 新包。小助手会注册 `zzz-scanner://` 协议，在 `127.0.0.1:22355` 与网页通信，并按 `/downloads/zzz-scanner/manifest.json` 自动下载/更新真正的 OCR 扫描器大包。当前网页发布的大包版本是 ZZZ Scanner Next `1.0.36`。
 
 主要页面：
 
@@ -304,7 +314,7 @@ npm run build:pages
 
 Helper 和 OCR 大包通过 GitHub Releases 发布，不进入 Git 仓库：
 
-- tag：`scanner-1.0.35`
+- tag：`scanner-1.0.36`
 - `ZZZ-Scanner-Helper.exe`
 - `ZZZ-Scanner.Next-win-x64.zip`
 
@@ -402,6 +412,7 @@ node --check frontend/accounts-page.js
 - 目标配置支持防御力、等级基数、分元素抗性，以及可选的失衡倍率。
 - 优化器伤害目标可以使用单个直伤、贯穿、异常或紊乱事件，也可以使用自定义的多事件列表。
 - 管理员可在角色级 `skillGroups` 中定义“一变”“一大”等技能组，再在 `defaultCalculationConfig.events` 或用户自定义事件里用 `kind: "skillGroup"` 引用它们；计算和优化前会展开为普通 `events`，白盒仍基于展开后的事件明细。
+- 角色级 `defaultCalculationConfig.variants` 可按单个影画等级配置默认循环；用户当前影画会自动使用不超过当前等级的最高已配置循环，例如配置 0、2、6 影时，0-1 用 0 影循环、2-5 用 2 影循环、6 用 6 影循环。
 - 特殊显示属性可以声明真实结算属性；例如叶瞬光显示为贯穿，但伤害按物理结算。
 - 命破/玄墨伤害按贯穿伤害建模：贯穿力由局内生命值、局内攻击力和固定贯穿力派生，再进入贯穿增伤区，并跳过防御/穿透乘区。
 - 异常和紊乱伤害使用 `data/anomaly_effects.json` 中统一 `effects` 列表的数据倍率，并通过 `settlementType` 区分结算类型。

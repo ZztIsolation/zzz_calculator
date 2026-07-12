@@ -23,6 +23,7 @@ import {
     skillGroupById,
     skillGroupCountLimits,
 } from "./calculationSkillGroups.js"
+import { resolveDefaultCalculationConfig } from "./defaultCalculationConfig.js"
 
 const els = {
     status: document.getElementById("status"),
@@ -66,6 +67,10 @@ const els = {
     customBuffStatRows: document.getElementById("customBuffStatRows"),
     saveCustomBuffBtn: document.getElementById("saveCustomBuffBtn"),
     bossCombatBuffs: document.getElementById("bossCombatBuffs"),
+    fieldCombatBuffFilters: document.getElementById("fieldCombatBuffFilters"),
+    fieldCombatBuffVersion: document.getElementById("fieldCombatBuffVersion"),
+    fieldCombatBuffPeriod: document.getElementById("fieldCombatBuffPeriod"),
+    fieldCombatBuffName: document.getElementById("fieldCombatBuffName"),
     fieldCombatBuffs: document.getElementById("fieldCombatBuffs"),
     damageTargetPreset: document.getElementById("damageTargetPreset"),
     damageTargetDefense: document.getElementById("damageTargetDefense"),
@@ -1512,9 +1517,9 @@ function cloneCalculationEvents(events = []) {
     return events.map(event => structuredClone(event))
 }
 
-function adminDefaultCalculationConfig(agentId = els.agentSelect?.value) {
+function adminDefaultCalculationConfig(agentId = els.agentSelect?.value, cinemaLevel = selectedCinemaLevel()) {
     const agent = getAgent(agentId)
-    const rawConfig = agent?.defaultCalculationConfig
+    const rawConfig = resolveDefaultCalculationConfig(agent?.defaultCalculationConfig, cinemaLevel)
     if (!rawConfig) {
         return null
     }
@@ -1525,6 +1530,7 @@ function adminDefaultCalculationConfig(agentId = els.agentSelect?.value) {
     return {
         ...normalized,
         name: rawConfig.name,
+        cinemaLevel: rawConfig.cinemaLevel,
     }
 }
 
@@ -3800,6 +3806,31 @@ function updateCatalogCombatBuffRuntime(buffKey, updater) {
     saveHomeSelection({ currentAgentId: agentId, byAgent })
 }
 
+function deleteCatalogCombatBuffRuntimes(buffIds = []) {
+    const ids = new Set(buffIds.filter(Boolean))
+    const agentId = els.agentSelect.value
+    if (!ids.size || !agentId) {
+        return
+    }
+
+    const selection = loadHomeSelection()
+    const byAgent = { ...(selection.byAgent ?? {}) }
+    const previous = byAgent[agentId] ?? {}
+    const combat = previous.combat ?? {}
+    const catalogBuffRuntimes = { ...(combat.catalogBuffRuntimes ?? {}) }
+    for (const id of ids) {
+        delete catalogBuffRuntimes[id]
+    }
+    byAgent[agentId] = {
+        ...previous,
+        combat: {
+            ...combat,
+            catalogBuffRuntimes,
+        },
+    }
+    saveHomeSelection({ currentAgentId: agentId, byAgent })
+}
+
 function addedCombatBuffByKey(buffKey) {
     return currentAddedCombatBuffs().find(item => addedCombatBuffKey(item) === buffKey) ?? null
 }
@@ -4389,6 +4420,35 @@ function checkedCombatBuffIds() {
     )
 }
 
+function enforceFieldCombatBuffSingleSelection(changedInput) {
+    if (!changedInput?.checked || changedInput.dataset.combatBuffSourceType !== "field") {
+        return
+    }
+
+    const selectedBuff = displayCombatBuffs().find(buff => buff.id === changedInput.dataset.combatBuffId)
+    const selectedPeriodKey = SharedCombat.fieldBuffPeriodKey(selectedBuff)
+    if (!selectedPeriodKey) {
+        return
+    }
+
+    const candidateIds = new Set([...savedActiveCombatBuffIds(), ...checkedCombatBuffIds()])
+    const clearedIds = []
+    for (const id of candidateIds) {
+        if (!id || id === changedInput.dataset.combatBuffId) {
+            continue
+        }
+        const buff = displayCombatBuffs().find(item => item.id === id)
+        if (SharedCombat.fieldBuffPeriodKey(buff) === selectedPeriodKey) {
+            const input = els.combatSection.querySelector(`input[data-combat-buff-id="${CSS.escape(id)}"]`)
+            if (input) {
+                input.checked = false
+            }
+            clearedIds.push(id)
+        }
+    }
+    deleteCatalogCombatBuffRuntimes(clearedIds)
+}
+
 function activeCombatBuffIdsForRender() {
     const agentId = els.agentSelect?.value ?? ""
     const inputs = [...els.combatSection.querySelectorAll("input[data-combat-buff-id]")]
@@ -4480,11 +4540,86 @@ function catalogBuffMetaLine(buff) {
             localizedText(buff.sourcePeriod),
         ].filter(Boolean).join(" · ")
     }
+    if (buff.sourceType === "field") {
+        return SharedCombat.fieldBuffPeriodLabel(buff) || [
+            localizedText(buff.source) || localizedText(buff.sourceLabel),
+            localizedText(buff.sourcePeriod),
+        ].filter(Boolean).join(" · ")
+    }
 
     return [
         localizedText(buff.source) || localizedText(buff.sourceLabel),
         localizedText(buff.sourcePeriod),
     ].filter(Boolean).join(" · ")
+}
+
+function setSelectOptions(select, options, preferredValue = select?.value ?? "") {
+    if (!select) {
+        return ""
+    }
+    const values = new Set(options.map(option => option.value))
+    const selectedValue = values.has(preferredValue)
+        ? preferredValue
+        : options[0]?.value ?? ""
+    select.replaceChildren(...options.map(option => new Option(option.label, option.value)))
+    select.value = selectedValue
+    return selectedValue
+}
+
+function fieldCombatBuffVersionOptions(buffs) {
+    return [...new Set(buffs
+        .map(buff => SharedCombat.fieldBuffPeriod(buff).gameVersion)
+        .filter(Boolean))]
+        .sort((left, right) => SharedCombat.compareGameVersions(right, left))
+        .map(version => ({ value: version, label: `${version}版本` }))
+}
+
+function fieldCombatBuffPeriodOptions(buffs, version) {
+    const seen = new Set()
+    return buffs
+        .filter(buff => SharedCombat.fieldBuffPeriod(buff).gameVersion === version)
+        .sort((left, right) => SharedCombat.fieldBuffPeriod(right).phaseNo - SharedCombat.fieldBuffPeriod(left).phaseNo)
+        .map(buff => {
+            const value = SharedCombat.fieldBuffPeriodKey(buff)
+            if (!value || seen.has(value)) {
+                return null
+            }
+            seen.add(value)
+            return { value, label: SharedCombat.fieldBuffPeriodLabel(buff) || value }
+        })
+        .filter(Boolean)
+}
+
+function fieldCombatBuffNameOptions(buffs, version, periodKey) {
+    return [
+        { value: "", label: "全部名称" },
+        ...buffs
+            .filter(buff => SharedCombat.fieldBuffPeriod(buff).gameVersion === version)
+            .filter(buff => !periodKey || SharedCombat.fieldBuffPeriodKey(buff) === periodKey)
+            .map(buff => ({ value: buff.id, label: combatBuffDisplayName(buff) })),
+    ]
+}
+
+function filteredFieldCombatBuffs(buffs) {
+    if (!els.fieldCombatBuffFilters || !els.fieldCombatBuffVersion || !els.fieldCombatBuffPeriod || !els.fieldCombatBuffName) {
+        return buffs
+    }
+    els.fieldCombatBuffFilters.hidden = !buffs.length
+    if (!buffs.length) {
+        return []
+    }
+
+    const version = setSelectOptions(els.fieldCombatBuffVersion, fieldCombatBuffVersionOptions(buffs))
+    const periodKey = setSelectOptions(els.fieldCombatBuffPeriod, fieldCombatBuffPeriodOptions(buffs, version))
+    const name = setSelectOptions(els.fieldCombatBuffName, fieldCombatBuffNameOptions(buffs, version, periodKey))
+    const matching = buffs
+        .filter(buff => SharedCombat.fieldBuffPeriod(buff).gameVersion === version)
+        .filter(buff => !periodKey || SharedCombat.fieldBuffPeriodKey(buff) === periodKey)
+        .filter(buff => !name || buff.id === name)
+    const selectedIds = new Set([...savedActiveCombatBuffIds(), ...checkedCombatBuffIds()])
+    const matchingIds = new Set(matching.map(buff => buff.id))
+    const selectedOutsideFilters = buffs.filter(buff => selectedIds.has(buff.id) && !matchingIds.has(buff.id))
+    return [...matching, ...selectedOutsideFilters]
 }
 
 function renderCatalogCombatBuffCards(container, buffs, checkedIds = checkedCombatBuffIds()) {
@@ -4990,7 +5125,7 @@ function renderCombatControls() {
     renderCombatCheckboxList(els.wEngineCombatBuffs, wEngineEquippedBuffs(), checkedIds, { useDefaultChecked })
     renderAddedCombatBuffs()
     renderCatalogCombatBuffCards(els.bossCombatBuffs, combatBuffsByType("boss"), checkedIds)
-    renderCatalogCombatBuffCards(els.fieldCombatBuffs, combatBuffsByType("field"), checkedIds)
+    renderCatalogCombatBuffCards(els.fieldCombatBuffs, filteredFieldCombatBuffs(combatBuffsByType("field")), checkedIds)
     renderedCombatBuffAgentId = els.agentSelect?.value ?? ""
 }
 
@@ -7520,6 +7655,10 @@ for (const input of [
             if (input === els.wEngineSelect) {
                 populateWEngineModificationSelect(getWEngine(els.wEngineSelect.value), els.wEngineModificationSelect?.value ?? 1)
             }
+            if (input === els.cinemaLevelSelect) {
+                syncCalculationConfigModeOptions()
+                syncCalculationConfigSummary()
+            }
             await refreshAfterConfigChange()
         } catch (error) {
             setStatus(error.message, "error")
@@ -7741,6 +7880,10 @@ els.combatSection.addEventListener("change", async event => {
         await commitGenericNumberInput(event.target)
         return
     }
+    if ([els.fieldCombatBuffVersion, els.fieldCombatBuffPeriod, els.fieldCombatBuffName].includes(event.target)) {
+        renderCombatControls()
+        return
+    }
     if (!event.target.matches("input[data-combat-buff-id], select") && event.target !== els.damageTargetStunned) {
         return
     }
@@ -7751,6 +7894,9 @@ els.combatSection.addEventListener("change", async event => {
             } else {
                 manuallyUncheckedDefaultCombatBuffIds.add(event.target.dataset.combatBuffId)
             }
+        }
+        if (event.target.matches("input[data-combat-buff-id]")) {
+            enforceFieldCombatBuffSingleSelection(event.target)
         }
         if (event.target === els.damageTargetPreset) {
             syncDamageDefenseToPreset()

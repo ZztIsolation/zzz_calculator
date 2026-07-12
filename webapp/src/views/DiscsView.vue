@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue"
-import { NButton, NCheckbox, NDrawer, NDrawerContent, NInput, NInputNumber, NModal, NProgress, NSelect, NTab, NTabs, NTag } from "naive-ui"
-import { Download, Plus, Radar, Trash2, Upload } from "lucide-vue-next"
+import { NButton, NCheckbox, NDrawer, NDrawerContent, NInput, NInputNumber, NModal, NProgress, NSelect, NSpin, NTab, NTabs, NTag, useMessage } from "naive-ui"
+import { Download, FileText, Plus, Radar, Trash2, Upload } from "lucide-vue-next"
 import ConfirmDialog from "@/components/ConfirmDialog.vue"
 import ImageAvatar from "@/components/ImageAvatar.vue"
+import ScannerErrorState from "@/components/ScannerErrorState.vue"
 import { statLabel, labelOf } from "@/utils/format"
 import { imageForDriveDiscSet } from "@/utils/assets"
 import { useCatalogStore } from "@/stores/catalog"
@@ -11,6 +12,7 @@ import { useInventoryStore } from "@/stores/inventory"
 
 const catalogStore = useCatalogStore()
 const inventoryStore = useInventoryStore()
+const message = useMessage()
 
 const selectedDisc = ref<any | null>(null)
 const showDiscEditor = ref(false)
@@ -29,6 +31,7 @@ const confirmRemoveMissingImport = ref(false)
 const pendingDangerImport = ref<"paste" | "">("")
 
 const showScan = ref(false)
+const confirmRemoveMissingScan = ref(false)
 
 onMounted(async () => {
   await Promise.all([catalogStore.load(), inventoryStore.load()])
@@ -38,9 +41,43 @@ watch(showScan, visible => {
   if (visible) {
     inventoryStore.openScannerPanel()
   } else {
+    const wasScanning = inventoryStore.scanStatus === "scanning"
     inventoryStore.closeScannerPanel()
+    if (wasScanning) {
+      message.warning("扫描仍在后台运行，可从驱动盘工具栏 › 扫描 回来查看进度")
+    }
   }
 })
+
+function requestStartScan() {
+  if (inventoryStore.scanRemoveMissing) {
+    confirmRemoveMissingScan.value = true
+    return
+  }
+  inventoryStore.startScan()
+}
+
+function confirmDangerScan() {
+  confirmRemoveMissingScan.value = false
+  inventoryStore.startScan()
+}
+
+function handleScannerError() {
+  const variant = inventoryStore.scanErrorVariant
+  if (variant === "helper-missing" || variant === "helper-outdated") {
+    window.open(inventoryStore.scanHelperDownloadUrl, "_blank")
+    return
+  }
+  if (variant === "scan-failed" || variant === "game-not-found") {
+    inventoryStore.startScan()
+    return
+  }
+  inventoryStore.connectScanner()
+}
+
+function handleScannerErrorSecondary() {
+  inventoryStore.connectScanner()
+}
 
 const slotTabs = computed(() => [
   { name: "全部", value: 0, count: inventoryStore.driveDiscs.length },
@@ -269,31 +306,23 @@ const scanPreviewSections = computed(() => {
     { key: "removed", label: "将删除", count: preview.summary.removed ?? 0, rows: preview.removed ?? [] },
   ].filter(section => section.count > 0)
 })
-const scanStatusType = computed(() => {
-  if (inventoryStore.scanStatus === "error") {
-    return "error"
-  }
-  if (inventoryStore.scanStatus === "complete" || inventoryStore.scanStatus === "ready") {
-    return "success"
-  }
-  if (inventoryStore.scanStatus === "waiting-helper") {
-    return "warning"
-  }
-  return "info"
-})
-const scanStatusLabel = computed(() => ({
-  idle: "待连接",
-  connecting: "连接中",
-  "waiting-helper": "等待助手",
-  preparing: "准备中",
-  downloading: "下载中",
-  ready: "就绪",
-  scanning: "扫描中",
-  complete: "已完成",
-  error: "异常",
-}[inventoryStore.scanStatus] ?? inventoryStore.scanStatus))
 const scanControlsDisabled = computed(() => inventoryStore.scanStatus === "scanning" || inventoryStore.scanPreparing)
 const scanProgressPercentage = computed(() => Math.min(100, Math.max(0, Math.round(inventoryStore.scanProgressPercent ?? 0))))
+
+const scanPhaseTitle = computed(() => ({
+  a: "连接扫描助手",
+  b: "准备 OCR 扫描器",
+  c: "扫描配置",
+  d: "扫描进行 / 完成",
+}[inventoryStore.scanPhase] ?? ""))
+
+const scannerErrorMessage = computed(() => {
+  const raw = inventoryStore.scanMessage
+  if (!raw) {
+    return ""
+  }
+  return raw.length > 240 ? `${raw.slice(0, 240)}…` : raw
+})
 
 async function previewImport() {
   importError.value = ""
@@ -385,7 +414,24 @@ function confirmDangerImport() {
             {{ slot.name }} {{ slot.count }}
           </NTab>
         </NTabs>
-        <div class="panel" style="max-height: 620px; overflow: auto;">
+        <div v-if="!inventoryStore.hasDriveDiscs" class="scan-empty-state">
+          <div class="scan-empty-icon">
+            <Radar :size="32" :stroke-width="1.6" />
+          </div>
+          <h3 class="scan-empty-title">还没有驱动盘</h3>
+          <p class="scan-empty-subtext">使用扫描助手一键从游戏读取，或从 JSON 导入。</p>
+          <div class="scan-empty-actions">
+            <NButton type="primary" size="large" @click="showScan = true">
+              <template #icon><Radar :size="16" /></template>
+              立即扫描
+            </NButton>
+            <NButton size="large" @click="showImport = true">
+              <template #icon><FileText :size="16" /></template>
+              粘贴 JSON 导入
+            </NButton>
+          </div>
+        </div>
+        <div v-else class="panel" style="max-height: 620px; overflow: auto;">
           <table class="data-table">
             <thead>
               <tr>
@@ -610,40 +656,43 @@ function confirmDangerImport() {
   <NDrawer v-model:show="showScan" width="460" placement="right">
     <NDrawerContent title="驱动盘扫描">
       <div class="section-band">
-        <div class="toolbar">
-          <NTag :type="scanStatusType" round>{{ scanStatusLabel }}</NTag>
-          <NButton v-if="inventoryStore.scanStatus === 'error'" size="small" @click="inventoryStore.connectScanner">
-            重新尝试
-          </NButton>
-        </div>
-        <p class="muted">{{ inventoryStore.scanMessage }}</p>
+        <ol class="scan-phase-indicator" :data-active="inventoryStore.scanPhase">
+          <li v-for="step in [
+            { key: 'a', label: '连接助手' },
+            { key: 'b', label: '准备 OCR' },
+            { key: 'c', label: '扫描配置' },
+            { key: 'd', label: '扫描 / 完成' },
+          ]" :key="step.key" :class="{ active: inventoryStore.scanPhase === step.key, done: ['a','b','c','d'].indexOf(inventoryStore.scanPhase) > ['a','b','c','d'].indexOf(step.key) }">
+            <span class="scan-phase-dot" />
+            <span class="scan-phase-label">{{ step.label }}</span>
+          </li>
+        </ol>
+        <p class="muted scan-phase-title">{{ scanPhaseTitle }}</p>
 
-        <div v-if="inventoryStore.scanWaitingForHelper" class="scan-helper-panel">
-          <div class="scan-guide-step">
-            <span class="scan-guide-num">1</span>
-            <div>
-              <strong>安装本地扫描助手</strong>
-              <p class="muted">小助手会连接网页、更新本地 OCR 扫描器并启动扫描。</p>
-              <div class="toolbar">
-                <a class="scan-download-link primary" :href="inventoryStore.scanHelperDownloadUrl" download>下载 ZZZ Scanner Helper</a>
-                <a class="scan-download-link" :href="inventoryStore.scanHelperMirrorDownloadUrl" download>备用下载</a>
-              </div>
-            </div>
-          </div>
-          <div class="scan-guide-step">
-            <span class="scan-guide-num">2</span>
-            <div>
-              <strong>运行一次后回到网页</strong>
-              <p class="muted">之后点击扫描会自动唤起小助手，并在这里继续连接。</p>
-            </div>
-          </div>
-          <div class="toolbar">
-            <NButton @click="inventoryStore.launchScannerHelper">重新唤起</NButton>
-            <NButton @click="inventoryStore.connectScanner">重新连接</NButton>
-          </div>
+        <ScannerErrorState
+          v-if="inventoryStore.scanErrorVariant"
+          :variant="inventoryStore.scanErrorVariant"
+          :message="scannerErrorMessage"
+          :helper-version="inventoryStore.scanHelperVersion"
+          @primary="handleScannerError"
+          @secondary="handleScannerErrorSecondary"
+        />
+
+        <div v-else-if="inventoryStore.scanPhase === 'a'" class="scan-phase-panel scan-phase-a">
+          <NSpin size="medium" />
+          <p class="muted">{{ inventoryStore.scanMessage || "正在连接扫描助手" }}</p>
         </div>
 
-        <div v-else class="section-band">
+        <div v-else-if="inventoryStore.scanPhase === 'b'" class="scan-phase-panel scan-phase-b">
+          <NProgress
+            type="circle"
+            :percentage="scanProgressPercentage"
+            :status="inventoryStore.scanStatus === 'error' ? 'error' : 'default'"
+          />
+          <p class="scan-phase-b-message">{{ inventoryStore.scanProgressText || inventoryStore.scanMessage || "正在准备 OCR 扫描器..." }}</p>
+        </div>
+
+        <div v-else-if="inventoryStore.scanPhase === 'c'" class="section-band">
           <label class="metric">
             <dt>客户端</dt>
             <dd><NSelect v-model:value="inventoryStore.scanClient" :disabled="scanControlsDisabled" :options="[{ label: '本地绝区零', value: 'local' }, { label: '云绝区零', value: 'cloud' }]" /></dd>
@@ -665,44 +714,52 @@ function confirmDangerImport() {
             <NCheckbox v-model:checked="inventoryStore.scanStopAtNonLevel15" :disabled="scanControlsDisabled">遇到非 15 级时停止</NCheckbox>
             <NCheckbox v-model:checked="inventoryStore.scanRemoveMissing" :disabled="scanControlsDisabled">同步删除缺失</NCheckbox>
           </div>
-          <div v-if="inventoryStore.scanProgressText || inventoryStore.scanProgressPercent !== null" class="scan-progress">
-            <NProgress type="line" :percentage="scanProgressPercentage" :show-indicator="false" :status="inventoryStore.scanStatus === 'error' ? 'error' : undefined" />
-            <p class="muted">{{ inventoryStore.scanProgressText }}</p>
-          </div>
+          <p v-if="!inventoryStore.scanRaritySelected" class="scan-inline-warning">请至少选择一个品质</p>
           <div class="toolbar">
-            <NButton type="primary" :disabled="!inventoryStore.scanCanStart" @click="inventoryStore.startScan">
+            <NButton type="primary" size="large" :disabled="!inventoryStore.scanCanStart" @click="requestStartScan">
               开始扫描
-            </NButton>
-            <NButton v-if="inventoryStore.scanStatus === 'scanning'" type="error" @click="inventoryStore.stopScan">
-              停止扫描
             </NButton>
           </div>
         </div>
 
-        <div v-if="inventoryStore.scanSession?.preview" class="section-band">
-          <div class="toolbar">
-            <NTag type="success" round>新增 {{ inventoryStore.scanSession.preview.summary.added }}</NTag>
-            <NTag type="info" round>更新 {{ inventoryStore.scanSession.preview.summary.updated }}</NTag>
-            <NTag round>未变 {{ inventoryStore.scanSession.preview.summary.skipped }}</NTag>
-            <NTag v-if="inventoryStore.scanSession.preview.summary.removed" type="error" round>删除 {{ inventoryStore.scanSession.preview.summary.removed }}</NTag>
-            <NTag v-if="inventoryStore.scanSession.imported" type="success" round>已自动导入</NTag>
+        <div v-else-if="inventoryStore.scanPhase === 'd'" class="section-band">
+          <NProgress
+            type="line"
+            :percentage="scanProgressPercentage"
+            :status="inventoryStore.scanStatus === 'error' ? 'error' : undefined"
+          />
+          <p class="muted">{{ inventoryStore.scanProgressText || inventoryStore.scanMessage }}</p>
+          <div v-if="inventoryStore.scanStatus === 'scanning'" class="toolbar">
+            <NButton type="error" @click="inventoryStore.stopScan">
+              停止扫描
+            </NButton>
           </div>
-          <div v-if="scanPreviewSections.length" class="panel" style="max-height: 260px; overflow: auto;">
-            <table class="data-table">
-              <tbody>
-                <template v-for="section in scanPreviewSections" :key="section.key">
-                  <tr v-for="disc in section.rows.slice(0, 8)" :key="`${section.key}-${disc.id}`">
-                    <th><NTag :type="section.key === 'removed' ? 'error' : section.key === 'added' ? 'success' : 'info'" size="small" round>{{ section.label }}</NTag></th>
-                    <td>{{ disc.partition }}号位</td>
-                    <td>{{ disc.setName || disc.setId }}</td>
-                    <td>{{ mainStatText(disc) }}</td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
+
+          <div v-if="inventoryStore.scanSession?.preview" class="section-band">
+            <div class="toolbar">
+              <NTag type="success" round>新增 {{ inventoryStore.scanSession.preview.summary.added }}</NTag>
+              <NTag type="info" round>更新 {{ inventoryStore.scanSession.preview.summary.updated }}</NTag>
+              <NTag round>未变 {{ inventoryStore.scanSession.preview.summary.skipped }}</NTag>
+              <NTag v-if="inventoryStore.scanSession.preview.summary.removed" type="error" round>删除 {{ inventoryStore.scanSession.preview.summary.removed }}</NTag>
+              <NTag v-if="inventoryStore.scanSession.imported" type="success" round>已自动导入</NTag>
+            </div>
+            <div v-if="scanPreviewSections.length" class="panel" style="max-height: 260px; overflow: auto;">
+              <table class="data-table">
+                <tbody>
+                  <template v-for="section in scanPreviewSections" :key="section.key">
+                    <tr v-for="disc in section.rows.slice(0, 8)" :key="`${section.key}-${disc.id}`">
+                      <th><NTag :type="section.key === 'removed' ? 'error' : section.key === 'added' ? 'success' : 'info'" size="small" round>{{ section.label }}</NTag></th>
+                      <td>{{ disc.partition }}号位</td>
+                      <td>{{ disc.setName || disc.setId }}</td>
+                      <td>{{ mainStatText(disc) }}</td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
           </div>
+          <NTag v-if="inventoryStore.scanSession?.error" type="error">{{ inventoryStore.scanSession.error }}</NTag>
         </div>
-        <NTag v-if="inventoryStore.scanSession?.error" type="error">{{ inventoryStore.scanSession.error }}</NTag>
       </div>
     </NDrawerContent>
   </NDrawer>
@@ -733,6 +790,15 @@ function confirmDangerImport() {
     message="本次导入会删除当前账号中未出现在扫描结果里的驱动盘，并清理相关套装预设槽位。"
     confirm-text="确认同步删除"
     @confirm="confirmDangerImport"
+  />
+
+  <ConfirmDialog
+    v-model:show="confirmRemoveMissingScan"
+    danger
+    title="扫描后同步删除缺失盘"
+    message="扫描完成后会删除当前账号中未出现在扫描结果里的驱动盘，并清理相关套装预设槽位，且无法恢复。"
+    confirm-text="继续扫描"
+    @confirm="confirmDangerScan"
   />
 </template>
 
@@ -786,56 +852,155 @@ function confirmDangerImport() {
   font-weight: 800;
 }
 
-.scan-helper-panel {
+.scan-phase-indicator {
   display: grid;
-  gap: 14px;
-  padding: 14px;
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-sm);
-  background: #f8fafc;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.scan-guide-step {
-  display: grid;
-  grid-template-columns: 28px 1fr;
-  gap: 10px;
-  align-items: start;
-}
-
-.scan-guide-num {
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
+.scan-phase-indicator li {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  gap: 6px;
+  padding-top: 6px;
+  position: relative;
+}
+
+.scan-phase-indicator li::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: -50%;
+  width: 100%;
+  height: 2px;
+  background: var(--app-border);
+}
+
+.scan-phase-indicator li:first-child::before {
+  display: none;
+}
+
+.scan-phase-indicator li.done::before,
+.scan-phase-indicator li.active::before {
+  background: var(--app-blue);
+}
+
+.scan-phase-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
   border-radius: 999px;
-  background: #111827;
-  color: #fff;
-  font-size: 13px;
+  background: var(--app-panel);
+  border: 2px solid var(--app-border);
+  position: relative;
+  z-index: 1;
+}
+
+.scan-phase-indicator li.active .scan-phase-dot {
+  background: var(--app-blue);
+  border-color: var(--app-blue);
+  box-shadow: 0 0 0 4px rgba(47, 125, 246, 0.15);
+}
+
+.scan-phase-indicator li.done .scan-phase-dot {
+  background: var(--app-blue);
+  border-color: var(--app-blue);
+}
+
+.scan-phase-label {
+  color: var(--app-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.scan-phase-indicator li.active .scan-phase-label {
+  color: var(--app-text);
   font-weight: 700;
 }
 
-.scan-download-link {
+.scan-phase-title {
+  margin: 0;
+  font-size: 13px;
+  text-align: center;
+}
+
+.scan-phase-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 20px 24px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  background: var(--app-panel-muted);
+}
+
+.scan-phase-b-message {
+  margin: 0;
+  max-width: 340px;
+  color: var(--app-muted);
+  font-size: 13px;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.scan-inline-warning {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--app-radius-sm);
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 12px;
+}
+
+.scan-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 20px 40px;
+  border: 1px dashed var(--app-border-strong);
+  border-radius: var(--app-radius);
+  background: var(--app-panel);
+  text-align: center;
+}
+
+.scan-empty-icon {
   display: inline-flex;
-  min-height: 34px;
   align-items: center;
   justify-content: center;
-  padding: 0 12px;
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-sm);
-  color: #111827;
-  text-decoration: none;
-  font-weight: 600;
+  width: 60px;
+  height: 60px;
+  border-radius: 999px;
+  background: var(--app-panel-muted);
+  color: var(--app-blue);
+  margin-bottom: 4px;
 }
 
-.scan-download-link.primary {
-  border-color: #2563eb;
-  background: #2563eb;
-  color: #fff;
+.scan-empty-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--app-text);
 }
 
-.scan-progress {
-  display: grid;
-  gap: 6px;
+.scan-empty-subtext {
+  margin: 0;
+  max-width: 320px;
+  color: var(--app-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.scan-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 8px;
 }
 </style>

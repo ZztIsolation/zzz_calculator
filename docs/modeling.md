@@ -301,6 +301,7 @@ interface CombatBuff {
   sourceLabel?: { zhCN?: string; en?: string };
   source?: { zhCN?: string; en?: string };
   sourcePeriod?: { zhCN?: string; en?: string };
+  period?: FieldCombatBuffPeriod | null;
   bossName?: { zhCN?: string; en?: string };
   bossSource?: { zhCN?: string; en?: string };
   name: { zhCN?: string; en?: string };
@@ -308,6 +309,13 @@ interface CombatBuff {
   conditionLabel?: string | { zhCN?: string; en?: string } | null;
   scope: "inCombat";
   stats: Effect["stats"];
+}
+
+interface FieldCombatBuffPeriod {
+  modeId: string;
+  gameVersion: string;
+  phaseNo: number;
+  phaseName: { zhCN?: string; en?: string };
 }
 
 interface AgentCinemaBuff extends Effect {
@@ -357,6 +365,7 @@ interface FieldCombatBuff extends Effect {
   id: string;
   sourceType: "field";
   name: { zhCN?: string; en?: string };
+  period: FieldCombatBuffPeriod;
   source: { zhCN?: string; en?: string };
   sourcePeriod: { zhCN?: string; en?: string };
   description: { zhCN?: string; en?: string };
@@ -808,6 +817,12 @@ Field Buffs are stored in `fieldBuffs`:
       "sourceType": "field",
       "name": { "zhCN": "场地效果名" },
       "source": { "zhCN": "危局" },
+      "period": {
+        "modeId": "critical_node",
+        "gameVersion": "2.8",
+        "phaseNo": 3,
+        "phaseName": { "zhCN": "第三期" }
+      },
       "sourcePeriod": { "zhCN": "2.8版本第三期" },
       "description": { "zhCN": "字面说明" },
       "scope": "inCombat",
@@ -818,10 +833,15 @@ Field Buffs are stored in `fieldBuffs`:
 }
 ```
 
-Boss Buffs are stored in `bossBuffs` with `bossName`, `bossSource`,
-`sourcePeriod`, `description`, `coverage`, and `effects`. Hidden validation
-entries live in `systemBuffs`; they remain calculable but are filtered from
-`/api/meta`.
+Field Buffs keep `sourcePeriod` as a compatibility display string, but filtering
+and maintenance should use `period.modeId`, `period.gameVersion`,
+`period.phaseNo`, and `period.phaseName`. Maintenance limits `modeId` to
+`defense_v5` / `critical_assault`, `gameVersion` to `3.0` through `3.3`, and
+`phaseNo` to `1` through `4`; `source`, `sourcePeriod`, `phaseName`, and missing
+new-record IDs are generated from those controlled values. Boss Buffs are stored
+in `bossBuffs` with `bossName`, `bossSource`, `sourcePeriod`, `description`,
+`coverage`, and `effects`. Hidden validation entries live in `systemBuffs`; they
+remain calculable but are filtered from `/api/meta`.
 
 ### Custom Buff Input Rule
 

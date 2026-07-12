@@ -438,6 +438,59 @@ export function localizedText(value) {
     return value.zhCN ?? value.en ?? ""
 }
 
+export function compareGameVersions(left = "", right = "") {
+    const leftParts = String(left ?? "").split(".").map(part => Number(part))
+    const rightParts = String(right ?? "").split(".").map(part => Number(part))
+    const length = Math.max(leftParts.length, rightParts.length)
+    for (let index = 0; index < length; index += 1) {
+        const leftValue = Number.isFinite(leftParts[index]) ? leftParts[index] : 0
+        const rightValue = Number.isFinite(rightParts[index]) ? rightParts[index] : 0
+        if (leftValue !== rightValue) {
+            return leftValue - rightValue
+        }
+    }
+    return 0
+}
+
+export function fieldBuffPeriod(buff = {}) {
+    const period = buff?.period ?? {}
+    const phaseNo = Number(period.phaseNo)
+    return {
+        modeId: String(period.modeId ?? "").trim(),
+        gameVersion: String(period.gameVersion ?? "").trim(),
+        phaseNo: Number.isFinite(phaseNo) ? phaseNo : 0,
+        phaseName: period.phaseName ?? null,
+    }
+}
+
+export function fieldBuffPeriodKey(buff = {}) {
+    const period = fieldBuffPeriod(buff)
+    if (!period.modeId && !period.gameVersion && !period.phaseNo) {
+        return ""
+    }
+    return [
+        period.modeId,
+        period.gameVersion,
+        period.phaseNo ? String(period.phaseNo) : "",
+    ].join("|")
+}
+
+export function fieldBuffPhaseLabel(buff = {}) {
+    const period = fieldBuffPeriod(buff)
+    return localizedText(period.phaseName)
+        || localizedText(buff?.sourcePeriod)
+        || (period.phaseNo ? `第${period.phaseNo}期` : "")
+}
+
+export function fieldBuffPeriodLabel(buff = {}) {
+    const period = fieldBuffPeriod(buff)
+    return [
+        localizedText(buff?.source) || localizedText(buff?.sourceLabel),
+        period.gameVersion ? `${period.gameVersion}版本` : "",
+        fieldBuffPhaseLabel(buff),
+    ].filter(Boolean).join(" · ")
+}
+
 export function combatBuffDisplayName(buff) {
     if (buff?.sourceKind === "teammate" || buff?.sourceCategory === "agent") {
         const owner = localizedText(buff?.ownerName)
@@ -1059,7 +1112,7 @@ function ruleTargetText(rule = {}, meta) {
         return ""
     }
     const targets = Array.isArray(target.skillTargets) ? target.skillTargets : []
-    return targets.length ? `（技能：${targets.map(item => skillTargetLabel(item, meta)).join("；")}）` : "（技能：未选择）"
+    return targets.length ? `（技能：${skillTargetLabels(targets, meta).join("；")}）` : "（技能：未选择）"
 }
 
 export function storedEffectRuleText(rule, runtime, effect, meta) {
@@ -1075,7 +1128,7 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
             ...(appliesTo.damageKinds ?? []).map(kind => DAMAGE_KIND_LABELS[kind] ?? kind),
             ...(appliesTo.anomalyEffects ?? []).map(item => ANOMALY_EFFECT_LABELS[item] ?? item),
             ...(appliesTo.elements ?? []).map(item => DAMAGE_ELEMENT_SHORT_LABELS[item] ?? item),
-            ...(appliesTo.skillTargets ?? []).map(item => skillTargetLabel(item, meta)),
+            ...skillTargetLabels(appliesTo.skillTargets ?? [], meta),
         ]
         return `${DAMAGE_MODIFIER_KIND_LABELS[rule.kind] ?? rule.kind} +${formatStoredStatValue("dmgBonus", value)}${scopes.length ? `（${scopes.join(" / ")}）` : ""}${coverageText}`
     }
@@ -1215,6 +1268,64 @@ function wEngineForTeamBuffKey(key, meta) {
     return (meta?.wEngines ?? []).find(item => item.id === wEngineId) ?? null
 }
 
+const SKILL_CATEGORY_FALLBACK_LABELS = {
+    basic: "普通攻击",
+    dodge: "闪避",
+    assist: "支援技",
+    special: "特殊技",
+    chain: "连携技",
+    core_skill: "核心技",
+}
+
+const SKILL_TARGET_PREFIX_LABELS = {
+    ultimate_: "终结技",
+    chain_: "连携技",
+}
+
+const SKILL_TARGET_DISPLAY_ORDER = {
+    ultimate_: 0,
+    chain_: 1,
+}
+
+function skillTargetMovePrefixes(target = {}) {
+    return (Array.isArray(target.moveIdPrefixes) ? target.moveIdPrefixes : [])
+        .map(prefix => String(prefix ?? "").trim())
+        .filter(Boolean)
+}
+
+function orderedSkillTargetMovePrefixes(target = {}) {
+    return skillTargetMovePrefixes(target)
+        .map((prefix, index) => ({ prefix, index }))
+        .sort((a, b) => {
+            const aOrder = SKILL_TARGET_DISPLAY_ORDER[a.prefix] ?? 100
+            const bOrder = SKILL_TARGET_DISPLAY_ORDER[b.prefix] ?? 100
+            return aOrder - bOrder || a.index - b.index
+        })
+        .map(item => item.prefix)
+}
+
+function skillTargetDisplayOrder(target = {}) {
+    const prefixOrders = skillTargetMovePrefixes(target)
+        .map(prefix => SKILL_TARGET_DISPLAY_ORDER[prefix])
+        .filter(Number.isFinite)
+    if (prefixOrders.length) {
+        return Math.min(...prefixOrders)
+    }
+    return 100
+}
+
+function skillTargetLabels(targets = [], meta = {}) {
+    return targets
+        .map((target, index) => ({
+            label: skillTargetLabel(target, meta),
+            order: skillTargetDisplayOrder(target),
+            index,
+        }))
+        .filter(item => item.label)
+        .sort((a, b) => a.order - b.order || a.index - b.index)
+        .map(item => item.label)
+}
+
 export function skillTargetLabel(target = {}, meta = {}) {
     const skillSet = (meta?.agentSkills ?? []).find(item => item.id === target.agentSkillId)
     const agent = (meta?.agents ?? []).find(item => item.id === skillSet?.agentId || item.id === target.agentSkillId)
@@ -1224,13 +1335,19 @@ export function skillTargetLabel(target = {}, meta = {}) {
     const agentLabel = String(localizedText(agent?.name) || localizedText(skillSet?.name) || target.agentSkillId || "")
         .replace(/技能倍率$/, "")
         .trim()
-    const categoryLabel = localizedText(category?.name) || target.categoryId
-    const prefixLabel = Array.isArray(target.moveIdPrefixes) && target.moveIdPrefixes.length
-        ? `${target.moveIdPrefixes.join(" / ")}*`
-        : ""
+    const categoryLabel = localizedText(category?.name) || SKILL_CATEGORY_FALLBACK_LABELS[target.categoryId] || target.categoryId
+    const prefixLabel = orderedSkillTargetMovePrefixes(target)
+        .map(prefix => SKILL_TARGET_PREFIX_LABELS[prefix] ?? `${prefix}*`)
+        .filter(Boolean)
+        .join(" / ")
+    if (!target.moveId && !target.rowId) {
+        return [
+            agentLabel,
+            prefixLabel || categoryLabel,
+        ].filter(Boolean).join("/") || "全部角色"
+    }
     return [
         agentLabel || "全部角色",
-        !target.moveId && !target.rowId ? categoryLabel : "",
         localizedText(move?.name) || target.moveId,
         prefixLabel,
         target.rowId ? localizedText(row?.label) || target.rowId : "",

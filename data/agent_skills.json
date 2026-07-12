@@ -2369,6 +2369,41 @@
                   ]
                 }
               ]
+            },
+            {
+              "id": "thousand_talismans_break",
+              "name": {
+                "zhCN": "强化特殊技：符法千重-破"
+              },
+              "damageElement": "ether",
+              "rows": [
+                {
+                  "id": "row_1783851000658",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    1200,
+                    1200,
+                    1200,
+                    1200,
+                    1200,
+                    1200,
+                    1200,
+                    1200,
+                    1200,
+                    1200,
+                    1200,
+                    1200,
+                    1200,
+                    1200,
+                    1200,
+                    1200
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -2489,11 +2524,76 @@
               ]
             }
           ]
+        },
+        {
+          "id": "additional_ability",
+          "name": {
+            "zhCN": "额外能力"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 1,
+            "default": 1
+          },
+          "moves": [
+            {
+              "id": "xuanmo_dark_surge_falling_thunder",
+              "name": {
+                "zhCN": "额外能力：玄墨暗涌·落雷"
+              },
+              "damageElement": "ether",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    225
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "cinema",
+          "name": {
+            "zhCN": "影画"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 1,
+            "default": 1
+          },
+          "moves": [
+            {
+              "id": "cinema_1_clear_spirit_dao_heart_falling_thunder",
+              "name": {
+                "zhCN": "影画1：清灵道心·落雷"
+              },
+              "damageElement": "ether",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "sheerForce",
+                  "values": [
+                    50
+                  ]
+                }
+              ]
+            }
+          ]
         }
       ],
       "sources": [
-        "https://baike.mihoyo.com/zzz/wiki/content/1299/detail",
-        "https://wiki.biligame.com/zzz/%E4%BB%AA%E7%8E%84"
+        "https://baike.mihoyo.com/zzz/wiki/content/1299/detail"
       ],
       "verification": {
         "skillMultipliers": "source-checked-biligame-wiki-2026-06-03",

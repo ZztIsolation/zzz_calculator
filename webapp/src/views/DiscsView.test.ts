@@ -73,6 +73,9 @@ vi.mock("naive-ui", () => ({
       </select>
     `,
   },
+  NSpin: {
+    template: "<div class=\"spin\"></div>",
+  },
   NTab: {
     props: ["name"],
     template: "<button type=\"button\"><slot /></button>",
@@ -83,6 +86,12 @@ vi.mock("naive-ui", () => ({
   NTag: {
     template: "<span><slot /></span>",
   },
+  useMessage: () => ({
+    info: vi.fn(),
+    success: vi.fn(),
+    warning: vi.fn(),
+    error: vi.fn(),
+  }),
 }))
 
 function seedInventory(driveDiscs: any[]) {

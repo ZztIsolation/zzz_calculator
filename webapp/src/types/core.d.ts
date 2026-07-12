@@ -25,6 +25,15 @@ declare module "@core/calculationSkillGroups.js" {
   export function expandCalculationSkillGroups(config?: any, options?: any): any
 }
 
+declare module "@core/defaultCalculationConfig.js" {
+  export function isDefaultCalculationCinemaLevel(value: any): boolean
+  export function normalizeDefaultCalculationCinemaLevel(value: any, fallback?: number): number
+  export function defaultCalculationVariantName(cinemaLevel?: number): { zhCN: string }
+  export function withDefaultCalculationVariantName(config?: any): any
+  export function defaultCalculationConfigEntries(config?: any): any[]
+  export function resolveDefaultCalculationConfig(config?: any, cinemaLevel?: number): any
+}
+
 declare module "@core/driveDiscOptimizer-core.js" {
   export function previewDriveDiscOptimization(catalog: any, store: any, input?: any, options?: any): any
   export function optimizeDriveDiscsAsync(catalog: any, store: any, input?: any, options?: any): Promise<any>
@@ -49,9 +58,19 @@ declare module "@core/local-store.js" {
 
 declare module "@core/shared-combat.js" {
   export const ANOMALY_EFFECT_LABELS: Record<string, string>
+  export const CUSTOM_BUFF_SKILL_STAT_OPTIONS: Array<[string, string, string, string | null]>
+  export const CUSTOM_BUFF_STAT_OPTIONS: Array<[string, string, string, string | null]>
+  export const RES_IGNORE_STAT_BY_ELEMENT: Record<string, string>
   export function nameOf(item: any): string
   export function localizedText(value: any): string
+  export function compareGameVersions(left: string, right: string): number
+  export function fieldBuffPeriod(buff?: any): { modeId: string, gameVersion: string, phaseNo: number, phaseName: any }
+  export function fieldBuffPeriodKey(buff?: any): string
+  export function fieldBuffPhaseLabel(buff?: any): string
+  export function fieldBuffPeriodLabel(buff?: any): string
   export function combatBuffDisplayName(buff: any): string
+  export function damageElementForAgent(agent?: any): string
+  export function damageElementShortLabel(element?: string): string
   export function enumLabel(type: string, value: any): string
   export function rarityLabel(value: any): string
   export function statLabel(key: string, meta?: any): string
@@ -77,6 +96,14 @@ declare module "@core/shared-combat.js" {
   export function saveCurrentOwnerSelection(selection: any, ownerId?: string): void
   export function setCurrentAccountId(ownerId: string): void
   export function deleteOwnerSelection(ownerId: string): void
+}
+
+declare module "@core/maintenanceValidation.js" {
+  export const FIELD_BUFF_MODE_OPTIONS: Array<{ modeId: string, label: string, selectLabel?: { zhCN?: string }, source: { zhCN: string, en?: string } }>
+  export const FIELD_BUFF_GAME_VERSIONS: string[]
+  export const FIELD_BUFF_PHASE_OPTIONS: Array<{ phaseNo: number, phaseName: { zhCN: string } }>
+  export function fieldBuffModeOption(modeId?: any): { modeId: string, label: string, selectLabel?: { zhCN?: string }, source: { zhCN: string, en?: string } } | null
+  export function fieldBuffPhaseName(phaseNo?: any): { zhCN: string } | null
 }
 
 declare module "@core/drive-disc-core.js" {

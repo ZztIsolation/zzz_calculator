@@ -4,6 +4,8 @@ import { toRaw } from "vue"
 type OptimizerStatus = "idle" | "estimating" | "preparing" | "running" | "cancelling" | "cancelled" | "done" | "error"
 
 const SETTINGS_KEY = "zzz-calculator.webapp.optimizer.v1"
+const SETTINGS_VERSION = 2
+const FALLBACK_AGENT_SETTINGS_ID = "__default__"
 const OPTIMIZER_WORKER_STALL_TIMEOUT_MS = 45_000
 
 let activeWorker: Worker | null = null
@@ -38,6 +40,23 @@ function readSettings() {
 
 function writeSettings(value: any) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(value))
+}
+
+function plainObject(value: any = {}) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {}
+  }
+  return JSON.parse(JSON.stringify(value))
+}
+
+function settingsEnvelope(value: any = null) {
+  return value?.version === SETTINGS_VERSION && value?.byAgent && typeof value.byAgent === "object" && !Array.isArray(value.byAgent)
+    ? value
+    : null
+}
+
+function agentSettingsId(agent: any = null, saved: any = null, fallback = "") {
+  return String(agent?.id ?? settingsEnvelope(saved)?.currentAgentId ?? fallback ?? "").trim() || FALLBACK_AGENT_SETTINGS_ID
 }
 
 function defaultMainStatLimits(): Record<string, string[]> {
@@ -76,13 +95,6 @@ function cleanMainStatLimits(value: any = {}) {
   }
 }
 
-function plainObject(value: any = {}) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {}
-  }
-  return JSON.parse(JSON.stringify(value))
-}
-
 function preferredDriveDiscDefaultSetId(agent: any = null, catalog: any = null) {
   const setId = String(
     agent?.preferredDriveDiscs?.defaultSetId
@@ -95,6 +107,57 @@ function preferredDriveDiscDefaultSetId(agent: any = null, catalog: any = null) 
   }
   const validIds = new Set((catalog?.driveDiscSets ?? []).map((set: any) => String(set?.id ?? "")).filter(Boolean))
   return !validIds.size || validIds.has(setId) ? setId : ""
+}
+
+function firstDriveDiscSetId(catalog: any = null) {
+  return String(catalog?.driveDiscSets?.[0]?.id ?? "").trim()
+}
+
+function normalizeOptimizerSettings(value: any = {}, catalog: any = null, agent: any = null) {
+  const saved = value && typeof value === "object" && !Array.isArray(value) ? value : {}
+  const preferredFourPieceSetId = preferredDriveDiscDefaultSetId(agent, catalog)
+  const savedFourPieceSetId = String(saved.fourPieceSetId ?? "").trim()
+  const hasManualFourPieceSet = saved.fourPieceSetSource === "manual" && savedFourPieceSetId
+  const fourPieceSetId = hasManualFourPieceSet
+    ? savedFourPieceSetId
+    : preferredFourPieceSetId || savedFourPieceSetId || firstDriveDiscSetId(catalog)
+  return {
+    algorithm: String(saved.algorithm || "exact-super-bound"),
+    fourPieceSetId,
+    fourPieceSetSource: hasManualFourPieceSet ? "manual" : "preferred",
+    twoPieceSetIds: normalizeArray(saved.twoPieceSetIds ?? saved.twoPieceSetId),
+    fourPieceBuffMode: saved.fourPieceBuffMode === "manual" ? "manual" : "auto",
+    fourPieceBuffRuntimeInputs: plainObject(saved.fourPieceBuffRuntimeInputs),
+    mainStatLimits: cleanMainStatLimits(saved.mainStatLimits),
+    minimums: {
+      ...defaultMinimums(),
+      ...cleanMinimums(saved.minimums),
+    },
+  }
+}
+
+function optimizerSettingsPayload(state: any = {}) {
+  return {
+    algorithm: String(state.algorithm || "exact-super-bound"),
+    fourPieceSetId: String(state.fourPieceSetId ?? "").trim(),
+    fourPieceSetSource: state.fourPieceSetSource === "manual" ? "manual" : "preferred",
+    twoPieceSetIds: normalizeArray(state.twoPieceSetIds),
+    fourPieceBuffMode: state.fourPieceBuffMode === "manual" ? "manual" : "auto",
+    fourPieceBuffRuntimeInputs: plainObject(state.fourPieceBuffRuntimeInputs),
+    mainStatLimits: cleanMainStatLimits(state.mainStatLimits),
+    minimums: {
+      ...defaultMinimums(),
+      ...cleanMinimums(state.minimums),
+    },
+  }
+}
+
+function storedOptimizerSettingsForAgent(saved: any = null, agentId = "") {
+  const envelope = settingsEnvelope(saved)
+  if (envelope) {
+    return envelope.byAgent?.[agentId] ?? {}
+  }
+  return saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {}
 }
 
 function numeric(value: unknown, fallback = 0) {
@@ -256,6 +319,7 @@ function resultReason(result: any = {}) {
 export const useOptimizerStore = defineStore("optimizer", {
   state: () => ({
     status: "idle" as OptimizerStatus,
+    activeAgentId: "",
     algorithm: "exact-super-bound",
     fourPieceSetId: "",
     fourPieceSetSource: "preferred" as "preferred" | "manual",
@@ -292,23 +356,24 @@ export const useOptimizerStore = defineStore("optimizer", {
   },
   actions: {
     initialize(catalog: any = null, agent: any = null) {
-      const saved = readSettings() ?? {}
-      const preferredFourPieceSetId = preferredDriveDiscDefaultSetId(agent, catalog)
-      this.algorithm = saved.algorithm ?? this.algorithm
-      const savedFourPieceSetId = String(saved.fourPieceSetId ?? "").trim()
-      const hasManualFourPieceSet = saved.fourPieceSetSource === "manual" && savedFourPieceSetId
-      this.fourPieceSetId = hasManualFourPieceSet
-        ? savedFourPieceSetId
-        : preferredFourPieceSetId || savedFourPieceSetId || catalog?.driveDiscSets?.[0]?.id || this.fourPieceSetId
-      this.fourPieceSetSource = hasManualFourPieceSet ? "manual" : "preferred"
-      this.twoPieceSetIds = normalizeArray(saved.twoPieceSetIds)
-      this.fourPieceBuffMode = saved.fourPieceBuffMode === "manual" ? "manual" : "auto"
-      this.fourPieceBuffRuntimeInputs = saved.fourPieceBuffRuntimeInputs ?? {}
-      this.mainStatLimits = cleanMainStatLimits(saved.mainStatLimits)
-      this.minimums = {
-        ...defaultMinimums(),
-        ...cleanMinimums(saved.minimums),
-      }
+      this.loadAgentSettings(agent, catalog)
+    },
+    applySettings(settings: any = {}) {
+      this.algorithm = settings.algorithm
+      this.fourPieceSetId = settings.fourPieceSetId
+      this.fourPieceSetSource = settings.fourPieceSetSource
+      this.twoPieceSetIds = settings.twoPieceSetIds
+      this.fourPieceBuffMode = settings.fourPieceBuffMode
+      this.fourPieceBuffRuntimeInputs = settings.fourPieceBuffRuntimeInputs
+      this.mainStatLimits = settings.mainStatLimits
+      this.minimums = settings.minimums
+    },
+    loadAgentSettings(agent: any = null, catalog: any = null) {
+      const saved = readSettings()
+      const agentId = agentSettingsId(agent, saved, this.activeAgentId)
+      const settings = normalizeOptimizerSettings(storedOptimizerSettingsForAgent(saved, agentId), catalog, agent)
+      this.activeAgentId = agentId
+      this.applySettings(settings)
       this.persistSettings()
     },
     applyAgentPreferredDriveDiscSet(agent: any = null, catalog: any = null) {
@@ -321,15 +386,17 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.persistSettings()
     },
     persistSettings() {
+      const saved = readSettings()
+      const envelope = settingsEnvelope(saved)
+      const currentAgentId = this.activeAgentId || agentSettingsId(null, saved)
+      const byAgent = {
+        ...(envelope?.byAgent ?? {}),
+        [currentAgentId]: optimizerSettingsPayload(this),
+      }
       writeSettings({
-        algorithm: this.algorithm,
-        fourPieceSetId: this.fourPieceSetId,
-        fourPieceSetSource: this.fourPieceSetSource,
-        twoPieceSetIds: this.twoPieceSetIds,
-        fourPieceBuffMode: this.fourPieceBuffMode,
-        fourPieceBuffRuntimeInputs: this.fourPieceBuffRuntimeInputs,
-        mainStatLimits: this.mainStatLimits,
-        minimums: this.minimums,
+        version: SETTINGS_VERSION,
+        currentAgentId,
+        byAgent,
       })
     },
     setAlgorithm(value: string) {

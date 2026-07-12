@@ -1,7 +1,48 @@
 import { evaluateFormulaExpression, validateFormulaExpression } from "./formulaEvaluator.js"
+import { isDefaultCalculationCinemaLevel } from "./defaultCalculationConfig.js"
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9_.-]*$/
 const PLACEHOLDER_NAMES = new Set(["未命名"])
+
+export const FIELD_BUFF_MODE_OPTIONS = Object.freeze([
+    {
+        modeId: "defense_v5",
+        label: "Defense Battle",
+        selectLabel: { zhCN: "防卫战" },
+        source: { zhCN: "防卫战 v5", en: "Defense Battle" },
+    },
+    {
+        modeId: "critical_assault",
+        label: "Perilous Situation",
+        selectLabel: { zhCN: "危局" },
+        source: { zhCN: "危局强袭战", en: "Perilous Situation" },
+    },
+])
+export const FIELD_BUFF_GAME_VERSIONS = Object.freeze(["3.0", "3.1", "3.2", "3.3"])
+export const FIELD_BUFF_PHASE_OPTIONS = Object.freeze([
+    { phaseNo: 1, phaseName: { zhCN: "第一期" } },
+    { phaseNo: 2, phaseName: { zhCN: "第二期" } },
+    { phaseNo: 3, phaseName: { zhCN: "第三期" } },
+    { phaseNo: 4, phaseName: { zhCN: "第四期" } },
+])
+
+const FIELD_BUFF_MODE_IDS = new Set(FIELD_BUFF_MODE_OPTIONS.map(option => option.modeId))
+const FIELD_BUFF_GAME_VERSION_VALUES = new Set(FIELD_BUFF_GAME_VERSIONS)
+const FIELD_BUFF_PHASE_VALUES = new Set(FIELD_BUFF_PHASE_OPTIONS.map(option => option.phaseNo))
+
+export function fieldBuffModeOption(modeId) {
+    const id = String(modeId ?? "").trim()
+    return FIELD_BUFF_MODE_OPTIONS.find(option => option.modeId === id) ?? null
+}
+
+export function fieldBuffPhaseOption(phaseNo) {
+    const no = Number(phaseNo)
+    return FIELD_BUFF_PHASE_OPTIONS.find(option => option.phaseNo === no) ?? null
+}
+
+export function fieldBuffPhaseName(phaseNo) {
+    return fieldBuffPhaseOption(phaseNo)?.phaseName ?? null
+}
 
 const ATTRIBUTE_VALUES = new Set(["physical", "fire", "ice", "electric", "ether", "wind", "honed_edge", "frost", "xuanmo"])
 const DAMAGE_ELEMENT_VALUES = new Set(["physical", "fire", "ice", "electric", "ether", "wind"])
@@ -772,7 +813,20 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
     validatePositiveNumber(errors, event.count ?? 1, `${path}.count`, "次数")
 
     if (event.kind === "direct" || event.kind === "sheer") {
-        validateCalculationSkillRef(errors, event.skillRef, `${path}.skillRef`, context, agentId)
+        const hasSkillRef = event.skillRef && typeof event.skillRef === "object" && !Array.isArray(event.skillRef)
+        const hasManualSkillMultiplier = event.skillMultiplier !== undefined
+            && event.skillMultiplier !== null
+            && String(event.skillMultiplier).trim() !== ""
+        if (hasSkillRef) {
+            validateCalculationSkillRef(errors, event.skillRef, `${path}.skillRef`, context, agentId)
+        } else if (hasManualSkillMultiplier) {
+            validatePositiveNumber(errors, event.skillMultiplier, `${path}.skillMultiplier`, "手填倍率")
+            if (event.damageElement !== undefined && event.damageElement !== "") {
+                requireEnum(errors, event.damageElement, DAMAGE_ELEMENT_VALUES, `${path}.damageElement`)
+            }
+        } else {
+            add(errors, `${path}.skillRef`, "必须选择技能倍率或填写手填倍率。")
+        }
         if (event.critMode !== undefined) {
             requireEnum(errors, event.critMode, new Set(["expected", "crit", "nonCrit"]), `${path}.critMode`)
         }
@@ -895,6 +949,46 @@ function mergedSkillGroupMap(primary = new Map(), legacy = new Map()) {
     return merged
 }
 
+function validateDefaultCalculationCinemaLevel(errors, value, path, seenLevels) {
+    if (!isDefaultCalculationCinemaLevel(value)) {
+        add(errors, path, "影画等级必须是 0 到 6 的整数。")
+        return null
+    }
+    const level = Number(value)
+    if (seenLevels.has(level)) {
+        add(errors, path, "默认循环影画等级不能重复。")
+    }
+    seenLevels.add(level)
+    return level
+}
+
+function validateDefaultCalculationConfigEntry(errors, config, path, context = {}, agentId = "", roleSkillGroupById = new Map(), options = {}) {
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+        add(errors, path, "必须是对象。")
+        return { legacyGroupById: new Map(), eventIds: new Set() }
+    }
+    requireEnum(errors, config.mode ?? "custom", CALCULATION_MODE_VALUES, `${path}.mode`)
+    if (config.name !== undefined) {
+        requireName(errors, config.name, `${path}.name.zhCN`)
+    }
+    const legacyGroupById = options.allowLegacySkillGroups
+        ? validateCalculationSkillGroups(errors, config.skillGroups, `${path}.skillGroups`, context, agentId)
+        : new Map()
+    const skillGroupById = mergedSkillGroupMap(roleSkillGroupById, legacyGroupById)
+    const eventIds = validateCalculationEventList(errors, config.events, `${path}.events`, context, agentId, {
+        allowEmpty: true,
+        allowSkillGroup: true,
+        skillGroupById,
+    })
+    if (config.selectedEventId && !eventIds.has(config.selectedEventId)) {
+        add(errors, `${path}.selectedEventId`, "必须指向一个已配置事件。")
+    }
+    if (!eventIds.size && !legacyGroupById.size) {
+        add(errors, `${path}.events`, "至少需要一个事件或技能组。")
+    }
+    return { legacyGroupById, eventIds }
+}
+
 function validateDefaultCalculationConfig(errors, config, context = {}, agentId = "", roleSkillGroupById = new Map()) {
     if (config === undefined || config === null) {
         return
@@ -903,22 +997,35 @@ function validateDefaultCalculationConfig(errors, config, context = {}, agentId 
         add(errors, "defaultCalculationConfig", "必须是对象。")
         return
     }
-    requireEnum(errors, config.mode ?? "custom", CALCULATION_MODE_VALUES, "defaultCalculationConfig.mode")
-    if (config.name !== undefined) {
-        requireName(errors, config.name, "defaultCalculationConfig.name.zhCN")
+    const seenLevels = new Set()
+    const baseCinemaLevel = validateDefaultCalculationCinemaLevel(errors, config.cinemaLevel ?? 0, "defaultCalculationConfig.cinemaLevel", seenLevels)
+    if (baseCinemaLevel !== null && baseCinemaLevel !== 0) {
+        add(errors, "defaultCalculationConfig.cinemaLevel", "基础默认循环必须是 0 影。")
     }
-    const legacyGroupById = validateCalculationSkillGroups(errors, config.skillGroups, "defaultCalculationConfig.skillGroups", context, agentId)
+    const { legacyGroupById } = validateDefaultCalculationConfigEntry(
+        errors,
+        config,
+        "defaultCalculationConfig",
+        context,
+        agentId,
+        roleSkillGroupById,
+        { allowLegacySkillGroups: true },
+    )
     const skillGroupById = mergedSkillGroupMap(roleSkillGroupById, legacyGroupById)
-    const ids = validateCalculationEventList(errors, config.events, "defaultCalculationConfig.events", context, agentId, {
-        allowEmpty: true,
-        allowSkillGroup: true,
-        skillGroupById,
-    })
-    if (config.selectedEventId && !ids.has(config.selectedEventId)) {
-        add(errors, "defaultCalculationConfig.selectedEventId", "必须指向一个已配置事件。")
-    }
-    if (!ids.size && !legacyGroupById.size) {
-        add(errors, "defaultCalculationConfig.events", "至少需要一个事件或技能组。")
+    if (config.variants !== undefined) {
+        if (!Array.isArray(config.variants)) {
+            add(errors, "defaultCalculationConfig.variants", "必须是数组。")
+        } else {
+            config.variants.forEach((variant, index) => {
+                const path = `defaultCalculationConfig.variants[${index}]`
+                if (!variant || typeof variant !== "object" || Array.isArray(variant)) {
+                    add(errors, path, "必须是对象。")
+                    return
+                }
+                validateDefaultCalculationCinemaLevel(errors, variant.cinemaLevel, `${path}.cinemaLevel`, seenLevels)
+                validateDefaultCalculationConfigEntry(errors, variant, path, context, agentId, skillGroupById)
+            })
+        }
     }
 }
 
@@ -1334,12 +1441,40 @@ function validateFieldBuff(item, context) {
     requireEnum(errors, item?.scope, new Set(["inCombat"]), "scope")
     requireName(errors, item?.name, "name.zhCN")
     requireName(errors, item?.source, "source.zhCN")
-    requireName(errors, item?.sourcePeriod, "sourcePeriod.zhCN")
+    validateFieldPeriod(errors, item?.period)
     requireName(errors, item?.description, "description.zhCN")
     validateCoverage(errors, item?.coverage, "coverage")
     validateEffectSet(errors, item, "effects", { requireRule: true, sourceType: "field" })
     validateDuplicateId(errors, item?.id, context, "id")
     return errors
+}
+
+function validateFieldPeriod(errors, period = {}) {
+    if (!period || typeof period !== "object" || Array.isArray(period)) {
+        add(errors, "period", "必须填写版本和期数信息。")
+        return
+    }
+
+    const modeId = String(period.modeId ?? "").trim()
+    if (!modeId) {
+        add(errors, "period.modeId", "必填。")
+    } else if (!FIELD_BUFF_MODE_IDS.has(modeId)) {
+        add(errors, "period.modeId", "只能选择防卫战或危局。")
+    }
+
+    const version = String(period.gameVersion ?? "").trim()
+    if (!version) {
+        add(errors, "period.gameVersion", "必填。")
+    } else if (!FIELD_BUFF_GAME_VERSION_VALUES.has(version)) {
+        add(errors, "period.gameVersion", "只能选择 3.0、3.1、3.2 或 3.3。")
+    }
+
+    const phaseNo = requireFinite(errors, period.phaseNo, "period.phaseNo")
+    if (Number.isFinite(phaseNo) && (!Number.isInteger(phaseNo) || !FIELD_BUFF_PHASE_VALUES.has(phaseNo))) {
+        add(errors, "period.phaseNo", "只能选择第 1 到第 4 期。")
+    }
+
+    requireName(errors, period.phaseName, "period.phaseName.zhCN")
 }
 
 function validateBossBuff(item, context) {

@@ -1,6 +1,6 @@
 import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it } from "vitest"
-import { normalizeDamageModeForAgent, useBuildStore } from "@/stores/build"
+import { defaultDamageConfig, normalizeDamageModeForAgent, useBuildStore } from "@/stores/build"
 
 describe("build store", () => {
   beforeEach(() => {
@@ -527,6 +527,72 @@ describe("build store", () => {
         count: 20,
       }),
     ])
+  })
+
+  it("selects the highest configured admin default loop at or below the current cinema", () => {
+    const agent = {
+      id: "agent_a",
+      name: { zhCN: "角色 A" },
+      defaultCalculationConfig: {
+        mode: "custom",
+        selectedEventId: "loop-0",
+        events: [{ id: "loop-0", kind: "direct", skillMultiplier: 100, count: 1 }],
+        variants: [
+          {
+            cinemaLevel: 2,
+            mode: "custom",
+            selectedEventId: "loop-2",
+            events: [{ id: "loop-2", kind: "direct", skillMultiplier: 200, count: 2 }],
+          },
+          {
+            cinemaLevel: 6,
+            mode: "custom",
+            selectedEventId: "loop-6",
+            events: [{ id: "loop-6", kind: "direct", skillMultiplier: 600, count: 6 }],
+          },
+        ],
+      },
+    }
+
+    expect(defaultDamageConfig(agent, 0).selectedEventId).toBe("loop-0")
+    expect(defaultDamageConfig(agent, 1).selectedEventId).toBe("loop-0")
+    expect(defaultDamageConfig(agent, 2).selectedEventId).toBe("loop-2")
+    expect(defaultDamageConfig(agent, 5).selectedEventId).toBe("loop-2")
+    expect(defaultDamageConfig(agent, 6).selectedEventId).toBe("loop-6")
+  })
+
+  it("refreshes saved admin default events when the current cinema changes", () => {
+    const store = useBuildStore()
+    const agent = {
+      id: "agent_a",
+      name: { zhCN: "角色 A" },
+      defaultCalculationConfig: {
+        mode: "custom",
+        selectedEventId: "loop-0",
+        events: [{ id: "loop-0", kind: "direct", skillMultiplier: 100, count: 1 }],
+        variants: [
+          {
+            cinemaLevel: 2,
+            mode: "custom",
+            selectedEventId: "loop-2",
+            events: [{ id: "loop-2", kind: "direct", skillMultiplier: 200, count: 2 }],
+          },
+        ],
+      },
+    }
+    const meta = { agents: [agent], wEngines: [], combatBuffs: [] }
+
+    store.agentId = "agent_a"
+    store.setDamageConfig({
+      mode: "adminDefault",
+      selectedEventId: "stale",
+      events: [{ id: "stale", kind: "direct", skillMultiplier: 50, count: 1 }],
+    }, agent)
+    expect(store.damageConfig.selectedEventId).toBe("loop-0")
+
+    store.setCinemaLevel(5, meta)
+    expect(store.damageConfig.selectedEventId).toBe("loop-2")
+    expect(store.damageConfig.events[0]).toMatchObject({ id: "loop-2", skillMultiplier: 200 })
   })
 
   it("normalizes the sheer objective away from non-rupture agents", () => {

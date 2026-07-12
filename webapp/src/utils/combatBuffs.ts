@@ -6,14 +6,15 @@ import {
 } from "@core/shared-combat.js"
 import { buffDisplayName } from "@/utils/format"
 
-export type BuffCategory = "self" | "selfWEngine" | "teammate" | "teammateWEngine" | "teammateDriveDisc" | "custom"
+export type BuffCategory = "self" | "selfWEngine" | "teammate" | "teammateWEngine" | "teammateDriveDisc" | "field" | "custom"
 
 export const BUFF_CATEGORY_TABS: Array<{ name: BuffCategory, label: string }> = [
   { name: "self", label: "自身 Buff" },
   { name: "selfWEngine", label: "自身音擎 Buff" },
   { name: "teammate", label: "队友 Buff" },
-  { name: "teammateWEngine", label: "音擎 Buff（队友携带）" },
-  { name: "teammateDriveDisc", label: "驱动盘 Buff（队友携带）" },
+  { name: "teammateWEngine", label: "队友音擎buff" },
+  { name: "teammateDriveDisc", label: "队友驱动盘buff" },
+  { name: "field", label: "场地 Buff" },
   { name: "custom", label: "自定义 Buff" },
 ]
 
@@ -286,6 +287,11 @@ export function teammateDriveDiscBuffCandidates(driveDiscSets: any[] = []): any[
     .filter(Boolean)
 }
 
+export function fieldBuffCandidates(context: CombatBuffContext): any[] {
+  return dedupeById(combatBuffsFromContext(context)
+    .filter((buff: any) => buff?.sourceType === "field"))
+}
+
 export function buildCombatBuffGroups(context: CombatBuffContext): Record<BuffCategory, any[]> {
   const catalogBuffs = combatBuffsFromContext(context)
   return {
@@ -297,6 +303,7 @@ export function buildCombatBuffGroups(context: CombatBuffContext): Record<BuffCa
     teammate: teammateBuffCandidates(context.meta),
     teammateWEngine: teamWEngineBuffCandidates(context.meta, context.wEngineId),
     teammateDriveDisc: teammateDriveDiscBuffCandidates(context.driveDiscSets),
+    field: fieldBuffCandidates(context),
     custom: context.addedBuffs ?? [],
   }
 }

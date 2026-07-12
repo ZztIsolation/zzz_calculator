@@ -8,6 +8,12 @@ function availableParallelism() {
 const SLOT_NUMBERS = [1, 2, 3, 4, 5, 6]
 const RESULT_LIMIT = 5
 const UPPER_BOUND_PRUNE_DEPTH = 3
+const SUPER_BOUND_CHUNK_SIZE = 8
+const DEFAULT_SEED_CUTOFF_ATTEMPTS = 768
+const SUFFIX_TOPK_BOUND_MAX_LEAVES = 192
+const SCORE_TIE_EPSILON = 1e-8
+const SUFFIX_TOPK_PRUNE_EPSILON = SCORE_TIE_EPSILON
+const SUFFIX_TOPK_SCORE_SAFETY_EPSILON = 1e-6
 const COMPLEXITY_LEVELS = [
     { level: "low", max: 100_000, label: "较快" },
     { level: "medium", max: 1_000_000, label: "中等" },
@@ -175,6 +181,14 @@ function stableDiscSignature(discs) {
 
 function compareStable(left, right) {
     return stableDiscSignature(left.driveDiscs).localeCompare(stableDiscSignature(right.driveDiscs))
+}
+
+function compareTopResult(left, right) {
+    const scoreDelta = Number(right.score) - Number(left.score)
+    if (Math.abs(scoreDelta) > SCORE_TIE_EPSILON) {
+        return scoreDelta
+    }
+    return compareStable(left, right)
 }
 
 function preferredDriveDiscDefaultSetId(agent = {}) {
@@ -692,18 +706,25 @@ function probeCompiledDenseScoreKernel(panelCalculator, indexedData, denseTarget
     }
 }
 
-function dominates(left, right) {
-    if (left.setId !== right.setId || Number(left.partition) !== Number(right.partition)) {
+function dominanceRow(disc, index) {
+    return {
+        disc,
+        index,
+        vector: statVector(disc),
+    }
+}
+
+function dominatesRow(left, right) {
+    if (left.disc.setId !== right.disc.setId || Number(left.disc.partition) !== Number(right.disc.partition)) {
         return false
     }
 
-    const leftVector = statVector(left)
-    const rightVector = statVector(right)
-    const keys = new Set([...leftVector.keys(), ...rightVector.keys()])
-    let strictlyBetter = sourceOrder(left) < sourceOrder(right) || String(left.id) < String(right.id)
+    const keys = new Set([...left.vector.keys(), ...right.vector.keys()])
+    let strictlyBetter = sourceOrder(left.disc) < sourceOrder(right.disc)
+        || String(left.disc.id) < String(right.disc.id)
     for (const key of keys) {
-        const leftValue = leftVector.get(key) ?? 0
-        const rightValue = rightVector.get(key) ?? 0
+        const leftValue = left.vector.get(key) ?? 0
+        const rightValue = right.vector.get(key) ?? 0
         if (leftValue < rightValue) {
             return false
         }
@@ -716,11 +737,26 @@ function dominates(left, right) {
 }
 
 function removeDominatedDiscs(discs) {
-    return discs.filter((disc, index) =>
-        !discs.some((candidate, candidateIndex) =>
-            candidateIndex !== index && dominates(candidate, disc)
-        )
-    )
+    const rowsBySet = new Map()
+    const rows = discs.map((disc, index) => dominanceRow(disc, index))
+    for (const row of rows) {
+        const key = String(row.disc.setId ?? "")
+        if (!rowsBySet.has(key)) {
+            rowsBySet.set(key, [])
+        }
+        rowsBySet.get(key).push(row)
+    }
+
+    const removed = new Set()
+    for (const group of rowsBySet.values()) {
+        for (const row of group) {
+            if (group.some(candidate => candidate.index !== row.index && dominatesRow(candidate, row))) {
+                removed.add(row.index)
+            }
+        }
+    }
+
+    return discs.filter((_, index) => !removed.has(index))
 }
 
 function mainStatValuesForSlot(mainStatLimits = {}, slot) {
@@ -1016,10 +1052,7 @@ function setSummary(discs, catalog) {
 
 function insertTopResult(results, candidate, limit = RESULT_LIMIT) {
     results.push(candidate)
-    results.sort((left, right) =>
-        Number(right.score) - Number(left.score)
-        || compareStable(left, right)
-    )
+    results.sort(compareTopResult)
     if (results.length > limit) {
         results.length = limit
     }
@@ -1031,10 +1064,10 @@ function shouldKeepTopCandidate(results, score, driveDiscs, limit = RESULT_LIMIT
     }
 
     const cutoff = results.at(-1)
-    if (Number(score) > Number(cutoff.score)) {
+    if (Number(score) > Number(cutoff.score) + SCORE_TIE_EPSILON) {
         return true
     }
-    if (Number(score) < Number(cutoff.score)) {
+    if (Number(score) + SCORE_TIE_EPSILON < Number(cutoff.score)) {
         return false
     }
 
@@ -1121,10 +1154,15 @@ function createEmptySlotResult(settings, candidatesBySlot, emptySlots) {
             warmupMs: 0,
             seededTopKCount: 0,
             seededTopKAttempts: 0,
+            seedBudgetUsed: 0,
             skippedDiscBoundChecks: 0,
             skippedDiscBoundChecksByPolicy: 0,
             groupBoundChecks: 0,
+            chunkBoundChecks: 0,
             discBoundChecks: 0,
+            suffixTopKBoundChecks: 0,
+            boundOracleChecks: 0,
+            safeBoundFallbacks: 0,
             avgBoundCheckMs: 0,
             boundChecksPerSecond: 0,
             indexedScoreEnabled: false,
@@ -1137,6 +1175,7 @@ function createEmptySlotResult(settings, candidatesBySlot, emptySlots) {
             avgScoreKernelMs: 0,
             denseScoreCalls: 0,
             denseScoreMs: 0,
+            scratchBufferReuses: 0,
             vectorScoreCalls: 0,
             vectorScoreFallbacks: 0,
             vectorScoreMs: 0,
@@ -1145,6 +1184,8 @@ function createEmptySlotResult(settings, candidatesBySlot, emptySlots) {
             prunedByUpperBound: 0,
             upperBoundChecks: 0,
             prunedBySuperBound: 0,
+            prunedByChunkBound: 0,
+            prunedBySuffixTopKBound: 0,
             prunedByGlobalCutoff: 0,
             superBoundChecks: 0,
             parallelTaskCount: 0,
@@ -1503,7 +1544,7 @@ function shouldPruneByUpperBound(catalog, input, state, index, fourCount, twoCou
     }
     try {
         const upperBound = optimisticUpperBoundScore(catalog, input, state, index, fourCount, twoCount)
-        if (Number.isFinite(upperBound) && upperBound + 1e-9 < cutoff) {
+        if (Number.isFinite(upperBound) && upperBound + SCORE_TIE_EPSILON < cutoff) {
             state.metrics.prunedByUpperBound += 1
             return true
         }
@@ -1530,6 +1571,39 @@ function maxVectorForDiscs(discs, vectorById) {
         }
     }
     return max
+}
+
+function buildSuperBoundChunks(discs, state, chunkSize = SUPER_BOUND_CHUNK_SIZE) {
+    if (!Array.isArray(discs) || discs.length <= chunkSize) {
+        return []
+    }
+    const chunks = []
+    for (let start = 0; start < discs.length; start += chunkSize) {
+        const chunkDiscs = discs.slice(start, start + chunkSize)
+        const superVector = maxVectorForDiscs(chunkDiscs, state.vectorById)
+        chunks.push({
+            start,
+            end: start + chunkDiscs.length,
+            discs: chunkDiscs,
+            superVector,
+            indexedSuperVector: mapToIndexedVector(superVector, state.statIndexById ?? new Map()),
+        })
+    }
+    return chunks
+}
+
+function adaptiveSuperBoundChunkSize(discs) {
+    const count = Number(discs?.length ?? 0)
+    if (count <= SUPER_BOUND_CHUNK_SIZE) {
+        return SUPER_BOUND_CHUNK_SIZE
+    }
+    if (count <= 24) {
+        return 4
+    }
+    if (count >= 96) {
+        return 16
+    }
+    return SUPER_BOUND_CHUNK_SIZE
 }
 
 function addVectorToTotals(totals, vector) {
@@ -1607,20 +1681,23 @@ function buildSuperBoundPlan(plan, state) {
                 || String(left.id).localeCompare(String(right.id))
             )
             const superVector = maxVectorForDiscs(sortedDiscs, state.vectorById)
+            const potentials = sortedDiscs.map(disc =>
+                candidatePotential(disc, state.vectorById.get(disc.id) ?? new Map(), state.potentialWeights)
+            )
+            const bestPotentialScore = Math.max(0, ...potentials)
+            const worstPotentialScore = Math.min(bestPotentialScore, ...potentials)
             return {
                 mainStat,
                 discs: sortedDiscs,
                 superVector,
                 indexedSuperVector: mapToIndexedVector(superVector, state.statIndexById ?? new Map()),
-                bestPotentialScore: Math.max(
-                    0,
-                    ...sortedDiscs.map(disc =>
-                        candidatePotential(disc, state.vectorById.get(disc.id) ?? new Map(), state.potentialWeights)
-                    ),
-                ),
+                chunks: buildSuperBoundChunks(sortedDiscs, state, adaptiveSuperBoundChunkSize(sortedDiscs)),
+                bestPotentialScore,
+                potentialSpread: bestPotentialScore - worstPotentialScore,
             }
         }).sort((left, right) =>
             right.bestPotentialScore - left.bestPotentialScore
+            || right.potentialSpread - left.potentialSpread
             || String(left.mainStat).localeCompare(String(right.mainStat))
         )
 
@@ -1642,12 +1719,14 @@ function buildSuperBoundPlan(plan, state) {
             superVector,
             indexedSuperVector: mapToIndexedVector(superVector, state.statIndexById ?? new Map()),
             bestPotentialScore: groups.reduce((total, group) => total + group.bestPotentialScore, 0),
+            potentialSpread: Math.max(0, ...groups.map(group => group.potentialSpread ?? 0)),
         }
     })
 
     const orderedSlots = [...slotEntries].sort((left, right) =>
         left.candidateCount - right.candidateCount
         || left.groupCount - right.groupCount
+        || right.potentialSpread - left.potentialSpread
         || right.bestPotentialScore - left.bestPotentialScore
         || left.slot - right.slot
     )
@@ -1710,6 +1789,9 @@ function restrictedSlotEntryForGroup(slotEntry, groupIndex, state, discSlice = n
         indexedSuperVector: discSlice
             ? mapToIndexedVector(superVector, state.statIndexById ?? new Map())
             : sourceGroup.indexedSuperVector,
+        chunks: discSlice
+            ? buildSuperBoundChunks(discs, state, adaptiveSuperBoundChunkSize(discs))
+            : sourceGroup.chunks,
     }
     return {
         ...slotEntry,
@@ -2025,7 +2107,28 @@ function scoreOnlyFromDenseState(state, statValues, setCountValues) {
     }
 }
 
+function selectedDiscsInSlotOrder(state) {
+    return [...state.selected].sort((left, right) =>
+        Number(left.partition) - Number(right.partition)
+        || sourceOrder(left) - sourceOrder(right)
+        || String(left.id).localeCompare(String(right.id))
+    )
+}
+
+function scoreSelectedDiscsInSlotOrder(state) {
+    const statTotals = new Map()
+    const setCounts = new Map()
+    for (const disc of selectedDiscsInSlotOrder(state)) {
+        addDiscVectorToTotals(statTotals, state.vectorById.get(disc.id) ?? statVector(disc), 1)
+        setCounts.set(disc.setId, (setCounts.get(disc.setId) ?? 0) + 1)
+    }
+    return scoreOnlyFromMaps(state, statTotals, setCounts)
+}
+
 function selectedScoreOnlySummary(state) {
+    if (usesSuperBoundAlgorithm(state.settings.algorithm)) {
+        return scoreSelectedDiscsInSlotOrder(state)
+    }
     if (state.useCompiledDenseScore && state.selectedStatValues && state.selectedSetCountValues) {
         return scoreOnlyFromDenseState(state, state.selectedStatValues, state.selectedSetCountValues)
     }
@@ -2035,14 +2138,37 @@ function selectedScoreOnlySummary(state) {
     return scoreOnlyFromMaps(state, state.selectedStatTotals, state.selectedSetCounts)
 }
 
+function denseBoundScratch(state, nextOrderIndex) {
+    const source = state.selectedStatValues
+    if (!source) {
+        return null
+    }
+    const index = Math.max(0, Math.min(6, Number(nextOrderIndex ?? 0)))
+    if (!state.boundScratchBuffers) {
+        state.boundScratchBuffers = []
+    }
+    let scratch = state.boundScratchBuffers[index]
+    if (!scratch || scratch.length !== source.length) {
+        scratch = new Float64Array(source.length)
+        state.boundScratchBuffers[index] = scratch
+    } else {
+        state.metrics.scratchBufferReuses += 1
+    }
+    scratch.set(source)
+    return scratch
+}
+
 function superBoundScoreDense(state, superPlan, nextOrderIndex, branchIndexedSuperVector = null, scoreFn = scoreOnlyFromDenseState) {
     if (superPlan.needsOptimisticFreeTwoPiece && !superPlan.freeTwoPieceOptimisticEntries) {
         return Number.POSITIVE_INFINITY
     }
 
     const startedAt = nowMs()
-    const statTotals = new Float64Array(state.selectedStatValues)
+    const statTotals = denseBoundScratch(state, nextOrderIndex)
     try {
+        if (!statTotals) {
+            return Number.POSITIVE_INFINITY
+        }
         if (branchIndexedSuperVector) {
             addIndexedVectorToTotals(statTotals, branchIndexedSuperVector, 1)
         }
@@ -2114,6 +2240,86 @@ function superBoundScore(state, superPlan, nextOrderIndex, branchSuperVector = n
     }
 }
 
+function usableBoundScore(value) {
+    return Number.isFinite(Number(value)) || Number(value) === Number.NEGATIVE_INFINITY
+}
+
+function shouldRunSuffixTopKBound(state, kind, prunedLeafCount, upperBound, cutoff) {
+    if (kind !== "disc") {
+        return false
+    }
+    const leafCount = Number(prunedLeafCount ?? 0)
+    if (!Number.isFinite(leafCount) || leafCount < 2) {
+        return false
+    }
+    if (leafCount > SUFFIX_TOPK_BOUND_MAX_LEAVES) {
+        if (Number.isFinite(upperBound) && Number.isFinite(cutoff) && upperBound <= cutoff * 1.25) {
+            state.metrics.safeBoundFallbacks += 1
+        }
+        return false
+    }
+    if (!state.useDenseSearchState && leafCount > 24) {
+        state.metrics.safeBoundFallbacks += 1
+        return false
+    }
+    if (!Number.isFinite(upperBound) || !Number.isFinite(cutoff) || cutoff <= 0) {
+        return false
+    }
+    return leafCount <= 24 || upperBound <= cutoff * 1.5
+}
+
+function suffixTopKReachableBoundScore(state, superPlan, nextOrderIndex, maxLeaves = SUFFIX_TOPK_BOUND_MAX_LEAVES) {
+    const leafBudget = Math.max(1, Number(maxLeaves ?? SUFFIX_TOPK_BOUND_MAX_LEAVES))
+    let leaves = 0
+    let best = Number.NEGATIVE_INFINITY
+    state.metrics.suffixTopKBoundChecks += 1
+
+    function walk(orderIndex) {
+        if (leaves > leafBudget) {
+            return false
+        }
+        if (orderIndex >= superPlan.orderedSlots.length) {
+            leaves += 1
+            state.metrics.boundOracleChecks += 1
+            const summary = state.useDenseSearchState && state.selectedStatValues && state.selectedSetCountValues
+                ? scoreOnlyFromDenseState(state, state.selectedStatValues, state.selectedSetCountValues)
+                : selectedScoreOnlySummary(state)
+            const rawScore = Number(summary.finalDamage ?? Number.NEGATIVE_INFINITY)
+            const score = Number.isFinite(rawScore)
+                ? Number(rawScore.toFixed(12)) + SUFFIX_TOPK_SCORE_SAFETY_EPSILON
+                : rawScore
+            if (score > best) {
+                best = score
+            }
+            return leaves <= leafBudget
+        }
+
+        const slotEntry = superPlan.orderedSlots[orderIndex]
+        for (const group of slotEntry.groups) {
+            for (const disc of group.discs) {
+                pushSelectedDisc(state, disc)
+                const completed = walk(orderIndex + 1)
+                popSelectedDisc(state)
+                if (!completed) {
+                    return false
+                }
+            }
+        }
+        return true
+    }
+
+    try {
+        if (!walk(nextOrderIndex)) {
+            state.metrics.safeBoundFallbacks += 1
+            return null
+        }
+        return best
+    } catch {
+        state.metrics.safeBoundFallbacks += 1
+        return null
+    }
+}
+
 function finiteScoreOrNegativeInfinity(value) {
     const numeric = Number(value)
     return Number.isFinite(numeric) ? numeric : Number.NEGATIVE_INFINITY
@@ -2159,6 +2365,8 @@ function recordBoundCheckKind(state, kind, beforeChecks) {
     }
     if (kind === "group") {
         state.metrics.groupBoundChecks += afterChecks - beforeChecks
+    } else if (kind === "chunk") {
+        state.metrics.chunkBoundChecks += afterChecks - beforeChecks
     } else if (kind === "disc") {
         state.metrics.discBoundChecks += afterChecks - beforeChecks
     }
@@ -2179,17 +2387,40 @@ function checkSuperBoundPrune(state, superPlan, nextOrderIndex, branchSuperVecto
     try {
         upperBound = superBoundScore(state, superPlan, nextOrderIndex, branchSuperVector)
     } catch {
+        state.metrics.safeBoundFallbacks += 1
         return { pruned: false, upperBound: Number.POSITIVE_INFINITY }
     }
     recordBoundCheckKind(state, kind, beforeChecks)
-    if (Number.isFinite(upperBound) && upperBound + 1e-9 < cutoff) {
+    let prunedBySuffixTopK = false
+    if (
+        !(usableBoundScore(upperBound) && upperBound + SCORE_TIE_EPSILON < cutoff)
+        && shouldRunSuffixTopKBound(state, kind, prunedLeafCount, upperBound, cutoff)
+    ) {
+        const suffixBound = suffixTopKReachableBoundScore(state, superPlan, nextOrderIndex, prunedLeafCount)
+        if (
+            suffixBound !== null
+            && usableBoundScore(suffixBound)
+            && suffixBound < upperBound
+            && suffixBound + SUFFIX_TOPK_PRUNE_EPSILON < cutoff
+        ) {
+            upperBound = suffixBound
+            prunedBySuffixTopK = true
+        }
+    }
+    if (usableBoundScore(upperBound) && upperBound + SCORE_TIE_EPSILON < cutoff) {
         const count = Math.max(1, Number(prunedLeafCount ?? 1))
         state.metrics.prunedBySuperBound += count
         state.metrics.prunedByUpperBound += count
+        if (kind === "chunk") {
+            state.metrics.prunedByChunkBound += count
+        }
+        if (prunedBySuffixTopK) {
+            state.metrics.prunedBySuffixTopKBound += count
+        }
         if (
             Number.isFinite(cutoffParts.globalCutoff)
             && cutoffParts.globalCutoff >= Math.max(cutoffParts.resultCutoff, cutoffParts.seedCutoff)
-            && upperBound + 1e-9 < cutoffParts.globalCutoff
+            && upperBound + SCORE_TIE_EPSILON < cutoffParts.globalCutoff
         ) {
             state.metrics.prunedByGlobalCutoff += count
         }
@@ -2424,10 +2655,15 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
             warmupMs: 0,
             seededTopKCount: 0,
             seededTopKAttempts: 0,
+            seedBudgetUsed: 0,
             skippedDiscBoundChecks: 0,
             skippedDiscBoundChecksByPolicy: 0,
             groupBoundChecks: 0,
+            chunkBoundChecks: 0,
             discBoundChecks: 0,
+            suffixTopKBoundChecks: 0,
+            boundOracleChecks: 0,
+            safeBoundFallbacks: 0,
             avgBoundCheckMs: 0,
             boundChecksPerSecond: 0,
             indexedScoreEnabled: useIndexedSearch,
@@ -2440,6 +2676,7 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
             avgScoreKernelMs: Number(denseProbe.avgScoreKernelMs ?? 0),
             denseScoreCalls: 0,
             denseScoreMs: 0,
+            scratchBufferReuses: 0,
             vectorScoreCalls: 0,
             vectorScoreFallbacks: 0,
             vectorScoreMs: 0,
@@ -2448,6 +2685,8 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
             prunedByUpperBound: 0,
             upperBoundChecks: 0,
             prunedBySuperBound: 0,
+            prunedByChunkBound: 0,
+            prunedBySuffixTopKBound: 0,
             prunedByGlobalCutoff: 0,
             superBoundChecks: 0,
             parallelTaskCount: 0,
@@ -2531,10 +2770,15 @@ function createTaskOptimizerStateFromBase(baseState, task = {}, input = {}) {
         warmupMs: 0,
         seededTopKCount: 0,
         seededTopKAttempts: 0,
+        seedBudgetUsed: 0,
         skippedDiscBoundChecks: 0,
         skippedDiscBoundChecksByPolicy: 0,
         groupBoundChecks: 0,
+        chunkBoundChecks: 0,
         discBoundChecks: 0,
+        suffixTopKBoundChecks: 0,
+        boundOracleChecks: 0,
+        safeBoundFallbacks: 0,
         avgBoundCheckMs: 0,
         boundChecksPerSecond: 0,
         indexedScoreEnabled: useIndexedSearch,
@@ -2547,6 +2791,7 @@ function createTaskOptimizerStateFromBase(baseState, task = {}, input = {}) {
         avgScoreKernelMs: 0,
         denseScoreCalls: 0,
         denseScoreMs: 0,
+        scratchBufferReuses: 0,
         vectorScoreCalls: 0,
         vectorScoreFallbacks: 0,
         vectorScoreMs: 0,
@@ -2555,6 +2800,8 @@ function createTaskOptimizerStateFromBase(baseState, task = {}, input = {}) {
         prunedByUpperBound: 0,
         upperBoundChecks: 0,
         prunedBySuperBound: 0,
+        prunedByChunkBound: 0,
+        prunedBySuffixTopKBound: 0,
         prunedByGlobalCutoff: 0,
         superBoundChecks: 0,
         parallelTaskCount: 0,
@@ -2685,11 +2932,7 @@ function evaluateSelected(catalog, input, state) {
     if (!Number.isFinite(score)) {
         return
     }
-    const inventoryDiscs = [...state.selected].sort((left, right) =>
-        Number(left.partition) - Number(right.partition)
-        || sourceOrder(left) - sourceOrder(right)
-        || String(left.id).localeCompare(String(right.id))
-    )
+    const inventoryDiscs = selectedDiscsInSlotOrder(state)
     if (!shouldKeepTopCandidate(state.results, score, inventoryDiscs)) {
         return
     }
@@ -2757,14 +3000,15 @@ export class OptimizerCancelledError extends Error {
 function pushSelectedDisc(state, disc) {
     state.selected.push(disc)
     state.selectedCalcDiscs.push(state.calcDiscById.get(disc.id) ?? toCalculatorDriveDisc(disc))
-    addDiscVectorToTotals(state.selectedStatTotals, state.vectorById.get(disc.id) ?? statVector(disc), 1)
-    state.selectedSetCounts.set(disc.setId, (state.selectedSetCounts.get(disc.setId) ?? 0) + 1)
     if (state.useDenseSearchState) {
         addIndexedVectorToTotals(state.selectedStatValues, state.indexedVectorById?.get(disc.id), 1)
         const setIndex = state.setIndexById?.get(disc.setId)
         if (setIndex !== undefined) {
             state.selectedSetCountValues[setIndex] += 1
         }
+    } else {
+        addDiscVectorToTotals(state.selectedStatTotals, state.vectorById.get(disc.id) ?? statVector(disc), 1)
+        state.selectedSetCounts.set(disc.setId, (state.selectedSetCounts.get(disc.setId) ?? 0) + 1)
     }
 }
 
@@ -2772,18 +3016,19 @@ function popSelectedDisc(state) {
     const disc = state.selected.pop()
     state.selectedCalcDiscs.pop()
     if (disc) {
-        addDiscVectorToTotals(state.selectedStatTotals, state.vectorById.get(disc.id) ?? statVector(disc), -1)
-        const nextCount = (state.selectedSetCounts.get(disc.setId) ?? 0) - 1
-        if (nextCount > 0) {
-            state.selectedSetCounts.set(disc.setId, nextCount)
-        } else {
-            state.selectedSetCounts.delete(disc.setId)
-        }
         if (state.useDenseSearchState) {
             addIndexedVectorToTotals(state.selectedStatValues, state.indexedVectorById?.get(disc.id), -1)
             const setIndex = state.setIndexById?.get(disc.setId)
             if (setIndex !== undefined) {
                 state.selectedSetCountValues[setIndex] -= 1
+            }
+        } else {
+            addDiscVectorToTotals(state.selectedStatTotals, state.vectorById.get(disc.id) ?? statVector(disc), -1)
+            const nextCount = (state.selectedSetCounts.get(disc.setId) ?? 0) - 1
+            if (nextCount > 0) {
+                state.selectedSetCounts.set(disc.setId, nextCount)
+            } else {
+                state.selectedSetCounts.delete(disc.setId)
             }
         }
     }
@@ -2811,7 +3056,7 @@ function evaluateSelectedForSeedCutoff(state) {
     insertSeedScore(state, Number(Number(summary.finalDamage ?? Number.NEGATIVE_INFINITY).toFixed(12)))
 }
 
-function seedTopKCutoffForSuperBound(state, maxAttempts = 512) {
+function seedTopKCutoffForSuperBound(state, maxAttempts = DEFAULT_SEED_CUTOFF_ATTEMPTS) {
     if (!["exact-super-bound", "exact-super-bound-parallel"].includes(normalizeAlgorithm(state.settings.algorithm)) || !state.settings.enableUpperBoundPruning) {
         return
     }
@@ -2819,7 +3064,7 @@ function seedTopKCutoffForSuperBound(state, maxAttempts = 512) {
     let attempts = 0
 
     function walkPlan(superPlan, orderIndex) {
-        if (attempts >= maxAttempts || state.seedScores.length >= RESULT_LIMIT) {
+        if (attempts >= maxAttempts) {
             return
         }
         if (orderIndex >= superPlan.orderedSlots.length) {
@@ -2834,7 +3079,7 @@ function seedTopKCutoffForSuperBound(state, maxAttempts = 512) {
                 pushSelectedDisc(state, disc)
                 walkPlan(superPlan, orderIndex + 1)
                 popSelectedDisc(state)
-                if (attempts >= maxAttempts || state.seedScores.length >= RESULT_LIMIT) {
+                if (attempts >= maxAttempts) {
                     return
                 }
             }
@@ -2843,13 +3088,14 @@ function seedTopKCutoffForSuperBound(state, maxAttempts = 512) {
 
     for (const superPlan of state.superBoundPlans ?? []) {
         walkPlan(superPlan, 0)
-        if (attempts >= maxAttempts || state.seedScores.length >= RESULT_LIMIT) {
+        if (attempts >= maxAttempts) {
             break
         }
     }
 
     state.metrics.seededTopKCount = state.seedScores.length
     state.metrics.seededTopKAttempts = attempts
+    state.metrics.seedBudgetUsed = Math.min(attempts, maxAttempts)
     addMetricTime(state.metrics, "warmupMs", startedAt)
 }
 
@@ -2910,25 +3156,41 @@ function optimizeDriveDiscsSuperBoundExact(catalog, store, input = {}) {
                 continue
             }
 
-            for (const disc of group.discs) {
-                pushSelectedDisc(state, disc)
-                const skipDiscBoundCheck = group.discs.length === 1
-                if (skipDiscBoundCheck) {
-                    state.metrics.skippedDiscBoundChecks += 1
+            const chunks = group.chunks?.length ? group.chunks : [{ discs: group.discs, upperBound: groupBound.upperBound }]
+            for (const chunk of chunks) {
+                let branchUpperBound = Number(chunk.upperBound ?? groupBound.upperBound)
+                if (group.chunks?.length) {
+                    const chunkLeafCount = chunk.discs.length * remainingProduct
+                    const chunkSuperVector = state.useDenseSearchState ? chunk.indexedSuperVector : chunk.superVector
+                    const chunkBound = checkSuperBoundPrune(state, superPlan, orderIndex + 1, chunkSuperVector, chunkLeafCount, "chunk")
+                    if (chunkBound.pruned) {
+                        continue
+                    }
+                    branchUpperBound = chunkBound.upperBound
                 }
-                const skipDiscBoundCheckByPolicy = !skipDiscBoundCheck
-                    && !shouldRunDiscBoundCheck(state, groupBound.upperBound, remainingProduct)
-                if (skipDiscBoundCheckByPolicy) {
-                    state.metrics.skippedDiscBoundChecksByPolicy += 1
+
+                for (const disc of chunk.discs) {
+                    pushSelectedDisc(state, disc)
+                    const skipDiscBoundCheck = chunk.discs.length === 1
+                    if (skipDiscBoundCheck) {
+                        state.metrics.skippedDiscBoundChecks += 1
+                    }
+                    const allowSuffixTopKBound = remainingProduct <= SUFFIX_TOPK_BOUND_MAX_LEAVES
+                    const skipDiscBoundCheckByPolicy = !skipDiscBoundCheck
+                        && !allowSuffixTopKBound
+                        && !shouldRunDiscBoundCheck(state, branchUpperBound, remainingProduct)
+                    if (skipDiscBoundCheckByPolicy) {
+                        state.metrics.skippedDiscBoundChecksByPolicy += 1
+                    }
+                    if (
+                        skipDiscBoundCheck
+                        || skipDiscBoundCheckByPolicy
+                        || !checkSuperBoundPrune(state, superPlan, orderIndex + 1, null, remainingProduct, "disc").pruned
+                    ) {
+                        walkPlan(superPlan, orderIndex + 1)
+                    }
+                    popSelectedDisc(state)
                 }
-                if (
-                    skipDiscBoundCheck
-                    || skipDiscBoundCheckByPolicy
-                    || !checkSuperBoundPrune(state, superPlan, orderIndex + 1, null, remainingProduct, "disc").pruned
-                ) {
-                    walkPlan(superPlan, orderIndex + 1)
-                }
-                popSelectedDisc(state)
             }
         }
     }
@@ -3142,28 +3404,46 @@ async function optimizeDriveDiscsSuperBoundExactAsync(catalog, store, input = {}
                 continue
             }
 
-            for (const disc of group.discs) {
-                pushSelectedDisc(state, disc)
-                const skipDiscBoundCheck = group.discs.length === 1
-                if (skipDiscBoundCheck) {
-                    state.metrics.skippedDiscBoundChecks += 1
+            const chunks = group.chunks?.length ? group.chunks : [{ discs: group.discs, upperBound: groupBound.upperBound }]
+            for (const chunk of chunks) {
+                let branchUpperBound = Number(chunk.upperBound ?? groupBound.upperBound)
+                if (group.chunks?.length) {
+                    const chunkLeafCount = chunk.discs.length * remainingProduct
+                    const chunkSuperVector = state.useDenseSearchState ? chunk.indexedSuperVector : chunk.superVector
+                    const chunkBound = checkSuperBoundPrune(state, superPlan, orderIndex + 1, chunkSuperVector, chunkLeafCount, "chunk")
+                    if (chunkBound.pruned) {
+                        await maybeYield()
+                        continue
+                    }
+                    branchUpperBound = chunkBound.upperBound
                 }
-                const skipDiscBoundCheckByPolicy = !skipDiscBoundCheck
-                    && !shouldRunDiscBoundCheck(state, groupBound.upperBound, remainingProduct)
-                if (skipDiscBoundCheckByPolicy) {
-                    state.metrics.skippedDiscBoundChecksByPolicy += 1
-                }
-                if (
-                    !skipDiscBoundCheck
-                    && !skipDiscBoundCheckByPolicy
-                    && checkSuperBoundPrune(state, superPlan, orderIndex + 1, null, remainingProduct, "disc").pruned
-                ) {
+
+                for (const disc of chunk.discs) {
+                    pushSelectedDisc(state, disc)
+                    const skipDiscBoundCheck = chunk.discs.length === 1
+                    if (skipDiscBoundCheck) {
+                        state.metrics.skippedDiscBoundChecks += 1
+                    }
+                    const allowSuffixTopKBound = remainingProduct <= SUFFIX_TOPK_BOUND_MAX_LEAVES
+                    const skipDiscBoundCheckByPolicy = !skipDiscBoundCheck
+                        && !allowSuffixTopKBound
+                        && !shouldRunDiscBoundCheck(state, branchUpperBound, remainingProduct)
+                    if (skipDiscBoundCheckByPolicy) {
+                        state.metrics.skippedDiscBoundChecksByPolicy += 1
+                    }
+                    if (
+                        !skipDiscBoundCheck
+                        && !skipDiscBoundCheckByPolicy
+                        && checkSuperBoundPrune(state, superPlan, orderIndex + 1, null, remainingProduct, "disc").pruned
+                    ) {
+                        popSelectedDisc(state)
+                        await maybeYield()
+                        continue
+                    }
+                    await walkPlan(superPlan, orderIndex + 1)
                     popSelectedDisc(state)
                     await maybeYield()
-                    continue
                 }
-                await walkPlan(superPlan, orderIndex + 1)
-                popSelectedDisc(state)
             }
         }
     }
@@ -3210,19 +3490,27 @@ const PARALLEL_SUM_METRIC_KEYS = [
     "warmupMs",
     "seededTopKCount",
     "seededTopKAttempts",
+    "seedBudgetUsed",
     "skippedDiscBoundChecks",
     "skippedDiscBoundChecksByPolicy",
     "groupBoundChecks",
+    "chunkBoundChecks",
     "discBoundChecks",
+    "suffixTopKBoundChecks",
+    "boundOracleChecks",
+    "safeBoundFallbacks",
     "rejectedByMinimums",
     "prunedBySetFeasibility",
     "prunedByUpperBound",
     "upperBoundChecks",
     "prunedBySuperBound",
+    "prunedByChunkBound",
+    "prunedBySuffixTopKBound",
     "prunedByGlobalCutoff",
     "superBoundChecks",
     "denseScoreCalls",
     "denseScoreMs",
+    "scratchBufferReuses",
     "vectorScoreCalls",
     "vectorScoreFallbacks",
     "vectorScoreMs",
@@ -3274,19 +3562,27 @@ function combineParallelMetrics(baseMetrics = {}, workerMetricsList = [], starte
         warmupMs: 0,
         seededTopKCount: 0,
         seededTopKAttempts: 0,
+        seedBudgetUsed: 0,
         skippedDiscBoundChecks: 0,
         skippedDiscBoundChecksByPolicy: 0,
         groupBoundChecks: 0,
+        chunkBoundChecks: 0,
         discBoundChecks: 0,
+        suffixTopKBoundChecks: 0,
+        boundOracleChecks: 0,
+        safeBoundFallbacks: 0,
         rejectedByMinimums: 0,
         prunedBySetFeasibility: 0,
         prunedByUpperBound: 0,
         upperBoundChecks: 0,
         prunedBySuperBound: 0,
+        prunedByChunkBound: 0,
+        prunedBySuffixTopKBound: 0,
         prunedByGlobalCutoff: 0,
         superBoundChecks: 0,
         denseScoreCalls: 0,
         denseScoreMs: 0,
+        scratchBufferReuses: 0,
         vectorScoreCalls: 0,
         vectorScoreFallbacks: 0,
         vectorScoreMs: 0,

@@ -1524,6 +1524,7 @@ function flattenFieldCombatBuffs(fieldBuffs) {
             sourceCategory: "field",
             sourceKind: "field",
             sourceLabel,
+            period: buff.period ?? null,
             description,
             conditionLabel: buff.conditionLabel ?? description,
             scope: buff.scope ?? "inCombat",
@@ -2136,6 +2137,13 @@ function normalizeDamageCount(value, fallback = 1) {
     return Number.isFinite(numeric) ? Math.max(0, numeric) : fallback
 }
 
+function normalizeDamageEventLabel(event = {}) {
+    const label = typeof event.label === "string"
+        ? event.label.trim()
+        : localizedName(event.label, "").trim()
+    return label || null
+}
+
 function normalizeAgentLevel(value) {
     const numeric = Number(value ?? 60)
     return Number.isFinite(numeric) ? clampNumber(numeric, 1, 60) : 60
@@ -2204,6 +2212,7 @@ function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index 
             normalized: true,
             skillMultiplier: Math.max(0, Number(event.skillMultiplier ?? 1)),
             skillSource: event.skillSource ?? null,
+            label: normalizeDamageEventLabel(event),
             critMode: ["expected", "crit", "nonCrit"].includes(event.critMode)
                 ? event.critMode
                 : "expected",
@@ -2228,6 +2237,7 @@ function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index 
         normalized: true,
         skillMultiplier: Number.isFinite(skillMultiplier) ? Math.max(0, skillMultiplier) : 1,
         skillSource: skillRefResult?.skillSource ?? null,
+        label: normalizeDamageEventLabel(event),
         critMode,
         damageElement,
         count: normalizeDamageCount(event.count, 1),
@@ -2246,6 +2256,7 @@ function normalizeSheerDamageEvent(event = {}, agent = {}, catalog = {}, index =
             normalized: true,
             skillMultiplier: Math.max(0, Number(event.skillMultiplier ?? 1)),
             skillSource: event.skillSource ?? null,
+            label: normalizeDamageEventLabel(event),
             critMode: ["expected", "crit", "nonCrit"].includes(event.critMode)
                 ? event.critMode
                 : "expected",
@@ -2270,6 +2281,7 @@ function normalizeSheerDamageEvent(event = {}, agent = {}, catalog = {}, index =
         normalized: true,
         skillMultiplier: Number.isFinite(skillMultiplier) ? Math.max(0, skillMultiplier) : 1,
         skillSource: skillRefResult?.skillSource ?? null,
+        label: normalizeDamageEventLabel(event),
         critMode,
         damageElement,
         count: normalizeDamageCount(event.count, 1),
@@ -2807,7 +2819,7 @@ function directDamageWhiteBoxRows({ event, atk, critMultiplier, critRateForDamag
             label: "技能倍率",
             formula: event.skillSource
                 ? `${event.skillSource.label} ${event.skillSource.levelLabel ?? `LV${event.skillSource.level}`}${skillMultiplierBonus ? ` + 技能倍率加算 ${formatDamagePercent(skillMultiplierBonus)}` : ""}`
-                : `本次直伤倍率${skillMultiplierBonus ? ` + 技能倍率加算 ${formatDamagePercent(skillMultiplierBonus)}` : ""}`,
+                : `${event.label ?? "本次直伤倍率"}${skillMultiplierBonus ? ` + 技能倍率加算 ${formatDamagePercent(skillMultiplierBonus)}` : ""}`,
             value: effectiveSkillMultiplier,
             displayValue: formatDamagePercent(effectiveSkillMultiplier),
         },
@@ -2886,7 +2898,7 @@ function sheerDamageWhiteBoxRows({ event, hp, atk, sheerForceFlat, sheerForce, c
             label: "贯穿倍率",
             formula: event.skillSource
                 ? `${event.skillSource.label} ${event.skillSource.levelLabel ?? `LV${event.skillSource.level}`}${skillMultiplierBonus ? ` + 技能倍率加算 ${formatDamagePercent(skillMultiplierBonus)}` : ""}`
-                : `本次贯穿倍率${skillMultiplierBonus ? ` + 技能倍率加算 ${formatDamagePercent(skillMultiplierBonus)}` : ""}`,
+                : `${event.label ?? "本次贯穿倍率"}${skillMultiplierBonus ? ` + 技能倍率加算 ${formatDamagePercent(skillMultiplierBonus)}` : ""}`,
             value: effectiveSkillMultiplier,
             displayValue: formatDamagePercent(effectiveSkillMultiplier),
         },
@@ -3080,7 +3092,7 @@ function calculateDirectDamageEvent({ event, panel, bonusTotals, target, include
         id: event.id,
         kind: event.kind,
         settlementType: event.settlementType ?? null,
-        label: event.skillSource?.label ?? "直伤",
+        label: event.skillSource?.label ?? event.label ?? "直伤",
         finalDamage,
         singleDamage,
         damageVariants,
@@ -3184,7 +3196,7 @@ function calculateSheerDamageEvent({ event, agent, panel, bonusTotals, target, i
         id: event.id,
         kind: event.kind,
         settlementType: event.settlementType ?? null,
-        label: event.skillSource?.label ?? "贯穿伤害",
+        label: event.skillSource?.label ?? event.label ?? "贯穿伤害",
         finalDamage,
         singleDamage,
         damageVariants,
@@ -4655,6 +4667,7 @@ export function buildMeta(catalog) {
                 source: item.source,
                 sourceLabel: item.sourceLabel,
                 sourcePeriod: item.sourcePeriod,
+                period: item.period ?? null,
                 bossName: item.bossName,
                 bossSource: item.bossSource,
                 name: item.name,
@@ -4703,6 +4716,7 @@ export function buildMeta(catalog) {
                 source: item.source,
                 sourceLabel: item.sourceLabel,
                 sourcePeriod: item.sourcePeriod,
+                period: item.period ?? null,
                 name: item.name,
                 description: item.description,
                 conditionLabel: item.conditionLabel,

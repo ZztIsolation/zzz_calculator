@@ -148,7 +148,13 @@ const validFieldBuff = {
     scope: "inCombat",
     name: { zhCN: "测试场地 Buff" },
     source: { zhCN: "危局强袭战" },
-    sourcePeriod: { zhCN: "2.8版本第三期" },
+    period: {
+        modeId: "critical_assault",
+        gameVersion: "3.0",
+        phaseNo: 3,
+        phaseName: { zhCN: "第三期" },
+    },
+    sourcePeriod: { zhCN: "3.0版本第三期" },
     description: { zhCN: "场地使代理人造成的伤害提升。" },
     coverage: { default: 0.5, min: 0, max: 1, step: 0.1 },
     effects: [
@@ -456,10 +462,100 @@ assertValid("buffs", {
         },
     ],
 })
+assert.equal(
+    cleanMaintenanceItem("field-buffs", {
+        ...validFieldBuff,
+        sourcePeriod: undefined,
+    }).sourcePeriod.zhCN,
+    "3.0版本第三期",
+)
+assert.equal(
+    cleanMaintenanceItem("field-buffs", {
+        ...validFieldBuff,
+        id: "existing_field_id",
+    }).id,
+    "existing_field_id",
+    "Existing Field Buff ids should be preserved on save",
+)
+{
+    const cleanedFieldBuff = cleanMaintenanceItem("field-buffs", {
+        ...validFieldBuff,
+        id: "hand_edited_wrong_id",
+        _maintenanceOriginalId: "existing_field_id",
+    }, { originalId: "existing_field_id" })
+    assert.equal(cleanedFieldBuff.id, "existing_field_id")
+    assert.equal(
+        Object.hasOwn(cleanedFieldBuff, "_maintenanceOriginalId"),
+        false,
+        "Internal maintenance id hints should not be persisted",
+    )
+}
+assert.equal(
+    cleanMaintenanceItem("field-buffs", {
+        ...validFieldBuff,
+        id: undefined,
+        name: { zhCN: "stage buff" },
+    }).id,
+    "field.critical_assault.v3_0.p3.stage_buff",
+    "Missing Field Buff ids should be generated from period and name",
+)
+{
+    const cleanedFieldBuff = cleanMaintenanceItem("field-buffs", {
+        ...validFieldBuff,
+        source: { zhCN: "管理员乱填" },
+        sourcePeriod: { zhCN: "管理员乱填" },
+        period: {
+            ...validFieldBuff.period,
+            phaseName: { zhCN: "管理员乱填" },
+        },
+    })
+    assert.equal(cleanedFieldBuff.source.zhCN, "危局强袭战")
+    assert.equal(cleanedFieldBuff.period.phaseName.zhCN, "第三期")
+    assert.equal(cleanedFieldBuff.sourcePeriod.zhCN, "3.0版本第三期")
+}
 assertInvalid("field-buffs", {
     ...validFieldBuff,
-    sourcePeriod: { zhCN: "" },
-}, "中文名必填")
+    period: {
+        ...validFieldBuff.period,
+        modeId: "free_text_mode",
+    },
+}, "period.modeId")
+assertInvalid("field-buffs", {
+    ...validFieldBuff,
+    period: {
+        ...validFieldBuff.period,
+        gameVersion: "",
+    },
+}, "period.gameVersion")
+assertInvalid("field-buffs", {
+    ...validFieldBuff,
+    period: {
+        ...validFieldBuff.period,
+        gameVersion: "3.4",
+    },
+}, "period.gameVersion")
+assertInvalid("field-buffs", {
+    ...validFieldBuff,
+    period: {
+        ...validFieldBuff.period,
+        phaseNo: "",
+    },
+}, "period.phaseNo")
+assertInvalid("field-buffs", {
+    ...validFieldBuff,
+    period: {
+        ...validFieldBuff.period,
+        phaseNo: 5,
+        phaseName: { zhCN: "第五期" },
+    },
+}, "period.phaseNo")
+assertInvalid("field-buffs", {
+    ...validFieldBuff,
+    period: {
+        ...validFieldBuff.period,
+        phaseName: { zhCN: "" },
+    },
+}, "period.phaseName.zhCN")
 assertInvalid("field-buffs", {
     ...validFieldBuff,
     scope: "outOfCombat",
@@ -935,6 +1031,86 @@ assertValid("agents", {
     ...validAgent,
     defaultCalculationConfig: validDefaultCalculationConfig,
 }, validCalculationContext)
+const validCinemaVariantCalculationConfig = {
+    ...validDefaultCalculationConfig,
+    cinemaLevel: 0,
+    name: { zhCN: "默认循环（0影）" },
+    variants: [
+        {
+            cinemaLevel: 2,
+            mode: "custom",
+            name: { zhCN: "默认循环（2影）" },
+            selectedEventId: "direct-2",
+            events: [
+                {
+                    ...validDefaultCalculationConfig.events[0],
+                    id: "direct-2",
+                    count: 4,
+                },
+            ],
+        },
+        {
+            cinemaLevel: 6,
+            mode: "custom",
+            selectedEventId: "direct-6",
+            events: [
+                {
+                    ...validDefaultCalculationConfig.events[0],
+                    id: "direct-6",
+                    count: 6,
+                },
+            ],
+        },
+    ],
+}
+assertValid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: validCinemaVariantCalculationConfig,
+}, validCalculationContext)
+const cleanedCinemaVariantAgent = cleanMaintenanceItem("agents", {
+    ...validAgent,
+    defaultCalculationConfig: validCinemaVariantCalculationConfig,
+})
+assert.equal(cleanedCinemaVariantAgent.defaultCalculationConfig.cinemaLevel, 0)
+assert.equal(cleanedCinemaVariantAgent.defaultCalculationConfig.variants[0].cinemaLevel, 2)
+assert.equal(cleanedCinemaVariantAgent.defaultCalculationConfig.variants[0].selectedEventId, "direct-2")
+assert.equal(cleanedCinemaVariantAgent.defaultCalculationConfig.variants[1].name.zhCN, "默认循环（6影）")
+assertInvalid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: {
+        ...validCinemaVariantCalculationConfig,
+        variants: [
+            {
+                ...validCinemaVariantCalculationConfig.variants[0],
+                cinemaLevel: 0,
+            },
+        ],
+    },
+}, "默认循环影画等级不能重复", validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: {
+        ...validCinemaVariantCalculationConfig,
+        variants: [
+            {
+                ...validCinemaVariantCalculationConfig.variants[0],
+                cinemaLevel: 7,
+            },
+        ],
+    },
+}, "影画等级必须是 0 到 6", validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: {
+        ...validCinemaVariantCalculationConfig,
+        variants: [
+            {
+                ...validCinemaVariantCalculationConfig.variants[0],
+                events: [],
+            },
+        ],
+    },
+}, "至少需要一个事件或技能组", validCalculationContext)
 const validSkillGroups = [
     {
         id: "loop",
@@ -1212,6 +1388,33 @@ assertValid("agents", {
         ],
     },
 }, validCalculationContext)
+const manualSheerCalculationConfig = {
+    ...validDefaultCalculationConfig,
+    mode: "sheer",
+    selectedEventId: "manual-sheer",
+    events: [
+        {
+            id: "manual-sheer",
+            kind: "sheer",
+            label: "额外能力：落雷",
+            skillMultiplier: 225,
+            damageElement: "ether",
+            count: 1,
+            critMode: "expected",
+        },
+    ],
+}
+assertValid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: manualSheerCalculationConfig,
+}, validCalculationContext)
+const cleanedManualSheerAgent = cleanMaintenanceItem("agents", {
+    ...validAgent,
+    defaultCalculationConfig: manualSheerCalculationConfig,
+})
+assert.equal(cleanedManualSheerAgent.defaultCalculationConfig.events[0].label, "额外能力：落雷")
+assert.equal(cleanedManualSheerAgent.defaultCalculationConfig.events[0].skillMultiplier, 225)
+assert.equal(cleanedManualSheerAgent.defaultCalculationConfig.events[0].damageElement, "ether")
 assertValid("agents", {
     ...validAgent,
     defaultCalculationConfig: {

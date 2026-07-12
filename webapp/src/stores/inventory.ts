@@ -13,7 +13,7 @@ import { toCalculatorDriveDisc } from "@core/drive-disc-core.js"
 import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "@core/driveDiscAnalysis-core.js"
 import { ScannerBridge } from "@core/scanner-bridge.js"
 
-const HELPER_DOWNLOAD_URL = "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.35/ZZZ-Scanner-Helper.exe?v=1.0.2"
+const HELPER_DOWNLOAD_URL = "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.36/ZZZ-Scanner-Helper.exe?v=1.0.2"
 const HELPER_POLL_INTERVAL_MS = 3000
 const REQUIRED_HELPER_VERSION = "1.0.2"
 const SCAN_CLIENTS = {
@@ -29,6 +29,21 @@ const SCAN_CLIENTS = {
 
 type ScanStatus = "idle" | "connecting" | "waiting-helper" | "preparing" | "downloading" | "ready" | "scanning" | "complete" | "error"
 type ScanClient = keyof typeof SCAN_CLIENTS
+type ScanPhase = "a" | "b" | "c" | "d"
+type ScanErrorContext = "" | "prepare" | "scan" | "helper-missing" | "game-not-found"
+type ScanErrorVariant = "helper-missing" | "helper-outdated" | "prepare-failed" | "scan-failed" | "game-not-found"
+
+const GAME_NOT_FOUND_PATTERNS = [
+  /未找到/,
+  /找不到.*(进程|窗口|游戏)/,
+  /process.*not.*found/i,
+  /window.*not.*found/i,
+  /ZenlessZoneZero/,
+]
+
+function detectGameNotFound(message: string) {
+  return GAME_NOT_FOUND_PATTERNS.some(pattern => pattern.test(message))
+}
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value ?? null))
@@ -187,6 +202,8 @@ export const useInventoryStore = defineStore("inventory", {
     scanHelperDownloadUrl: HELPER_DOWNLOAD_URL,
     scanHelperMirrorDownloadUrl: HELPER_DOWNLOAD_URL,
     scanSession: null as any,
+    scanErrorContext: "" as ScanErrorContext,
+    scanHelperVersion: "" as string,
   }),
   getters: {
     driveDiscs: state => state.store?.driveDiscs ?? [],
@@ -232,9 +249,59 @@ export const useInventoryStore = defineStore("inventory", {
       })
     },
     scanCanStart: state => Boolean(state.scanConnected)
+      && (state.scanRarityS || state.scanRarityA)
       && !["connecting", "waiting-helper", "preparing", "downloading", "scanning"].includes(state.scanStatus),
     scanPreparing: state => ["connecting", "preparing", "downloading"].includes(state.scanStatus),
     scanWaitingForHelper: state => state.scanStatus === "waiting-helper",
+    hasDriveDiscs: state => (state.store?.driveDiscs ?? []).length > 0,
+    scanRaritySelected: state => state.scanRarityS || state.scanRarityA,
+    scanPhase(state): ScanPhase {
+      const status = state.scanStatus
+      if (status === "scanning" || status === "complete") {
+        return "d"
+      }
+      if (status === "ready") {
+        return "c"
+      }
+      if (status === "preparing" || status === "downloading") {
+        return "b"
+      }
+      if (status === "error") {
+        // 保持在最能反映错误发生位置的段位上
+        if (state.scanErrorContext === "scan") {
+          return "d"
+        }
+        if (state.scanErrorContext === "prepare") {
+          return "b"
+        }
+        return "a"
+      }
+      return "a"
+    },
+    scanErrorVariant(state): ScanErrorVariant | "" {
+      if (state.scanStatus === "waiting-helper") {
+        return "helper-missing"
+      }
+      if (state.scanStatus !== "error") {
+        return ""
+      }
+      if (state.scanErrorContext === "helper-missing") {
+        return "helper-missing"
+      }
+      if (state.scanErrorContext === "game-not-found") {
+        return "game-not-found"
+      }
+      if (state.scanErrorContext === "scan") {
+        return detectGameNotFound(state.scanMessage) ? "game-not-found" : "scan-failed"
+      }
+      if (state.scanErrorContext === "prepare") {
+        if (state.scanHelperVersion && !helperVersionAtLeast(state.scanHelperVersion)) {
+          return "helper-outdated"
+        }
+        return "prepare-failed"
+      }
+      return "prepare-failed"
+    },
   },
   actions: {
     async load() {
@@ -415,6 +482,7 @@ export const useInventoryStore = defineStore("inventory", {
         const failed = Number(progress?.failed) || 0
         const percent = total > 0 ? ((completed + failed) / total) * 100 : 0
         this.scanStatus = "scanning"
+        this.scanErrorContext = ""
         this.scanProgress = progress
         this.scanProgressPercent = Math.min(100, Math.max(0, percent))
         this.scanProgressText = progress?.message ?? `访问 ${progress?.visited ?? 0} / 完成 ${completed} / 失败 ${failed}`
@@ -458,6 +526,7 @@ export const useInventoryStore = defineStore("inventory", {
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
           this.scanStatus = "error"
+          this.scanErrorContext = "scan"
           this.scanSession = {
             ...this.scanSession,
             error: message,
@@ -470,7 +539,11 @@ export const useInventoryStore = defineStore("inventory", {
         this.stopScannerPolling()
         this.scanStatus = "error"
         this.scanConnected = Boolean(scanner?.connected)
-        this.scanMessage = error?.message ?? String(error ?? "扫描失败")
+        const message = error?.message ?? String(error ?? "扫描失败")
+        this.scanMessage = message
+        this.scanErrorContext = detectGameNotFound(String(message ?? ""))
+          ? "game-not-found"
+          : "scan"
       }
       activeScanner.onDisconnect = () => {
         this.scanConnected = false
@@ -485,9 +558,11 @@ export const useInventoryStore = defineStore("inventory", {
       this.stopScannerPolling()
       this.scanConnected = true
       this.scanStatus = "preparing"
+      this.scanErrorContext = ""
       this.scanProgress = null
       this.scanProgressPercent = 12
       const helperVersion = activeScanner.helperVersion
+      this.scanHelperVersion = helperVersion ?? ""
       this.scanProgressText = helperVersion && !helperVersionAtLeast(helperVersion)
         ? "正在检查扫描器版本... 当前 Helper 版本较旧，下载进度可能无法显示；请重新下载新版 Helper。"
         : "正在检查扫描器版本..."
@@ -500,9 +575,11 @@ export const useInventoryStore = defineStore("inventory", {
         this.scanProgressText = ""
         this.scanMessage = `扫描助手已连接${hello?.version ? ` · ${hello.version}` : ""}`
       } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
         this.scanStatus = "error"
+        this.scanErrorContext = "prepare"
         this.scanProgressPercent = null
-        this.scanMessage = error instanceof Error ? error.message : String(error)
+        this.scanMessage = message
       }
     },
     startScannerPolling() {
@@ -536,6 +613,7 @@ export const useInventoryStore = defineStore("inventory", {
         this.scanProgress = null
         this.scanProgressText = ""
         this.scanProgressPercent = null
+        this.scanErrorContext = ""
       }
     },
     async connectScanner() {
@@ -543,6 +621,7 @@ export const useInventoryStore = defineStore("inventory", {
       this.bindScannerEvents()
       this.stopScannerPolling()
       this.scanStatus = "connecting"
+      this.scanErrorContext = ""
       this.scanMessage = "正在连接扫描助手"
       this.scanProgress = null
       this.scanProgressText = ""
@@ -554,6 +633,7 @@ export const useInventoryStore = defineStore("inventory", {
       } catch {
         activeScanner.launchHelper()
         this.scanStatus = "waiting-helper"
+        this.scanErrorContext = "helper-missing"
         this.scanMessage = "未检测到扫描助手。请下载并运行 Helper；如果已安装，浏览器会尝试自动唤起。"
         this.startScannerPolling()
       }
@@ -564,6 +644,7 @@ export const useInventoryStore = defineStore("inventory", {
       activeScanner.launchHelper()
       this.scanConnected = false
       this.scanStatus = "waiting-helper"
+      this.scanErrorContext = "helper-missing"
       this.scanMessage = "已请求打开扫描助手，正在等待连接..."
       this.startScannerPolling()
     },
@@ -580,7 +661,6 @@ export const useInventoryStore = defineStore("inventory", {
     async startScan() {
       const rarities = this.selectedScanRarities()
       if (!rarities.length) {
-        this.scanStatus = "error"
         this.scanMessage = "请至少选择一个品质"
         return
       }
@@ -594,6 +674,7 @@ export const useInventoryStore = defineStore("inventory", {
         await scanner.ensureScanner()
         const client = SCAN_CLIENTS[this.scanClient] ?? SCAN_CLIENTS.local
         this.scanStatus = "scanning"
+        this.scanErrorContext = ""
         this.scanMessage = "正在扫描驱动盘"
         this.scanProgress = null
         this.scanProgressText = "准备中..."
@@ -615,14 +696,17 @@ export const useInventoryStore = defineStore("inventory", {
           panelMinAcceptFloorMs: 120,
         })
       } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
         this.scanStatus = "error"
+        this.scanErrorContext = detectGameNotFound(message) ? "game-not-found" : "prepare"
         this.scanProgressPercent = null
-        this.scanMessage = error instanceof Error ? error.message : String(error)
+        this.scanMessage = message
       }
     },
     stopScan() {
       scanner?.stopScan()
       this.scanStatus = "ready"
+      this.scanErrorContext = ""
       this.scanMessage = "已发送停止扫描请求"
       this.scanProgressText = ""
       this.scanProgressPercent = null

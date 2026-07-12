@@ -5,11 +5,24 @@ import ImageAvatar from "@/components/ImageAvatar.vue"
 import LayerSlider from "@/components/LayerSlider.vue"
 import { imageForBuff } from "@/utils/assets"
 import { BUFF_CATEGORY_TABS, buildCombatBuffGroups, type BuffCategory } from "@/utils/combatBuffs"
-import { buffDisplayName, buffEffectLines, buffSubtitle, statLabel } from "@/utils/format"
+import { damageSkillRowsWithGeneratedTotals } from "@core/skillMultiplierCandidates.js"
+import { buffDisplayName, buffEffectLines, buffSubtitle, labelOf, statLabel } from "@/utils/format"
 import {
+  CUSTOM_BUFF_SKILL_STAT_OPTIONS,
+  CUSTOM_BUFF_STAT_OPTIONS,
+  RES_IGNORE_STAT_BY_ELEMENT,
+  compareGameVersions,
+  damageElementForAgent,
+  damageElementShortLabel,
   defaultRuntimeForBuff,
   effectRules,
+  fieldBuffPeriod,
+  fieldBuffPeriodKey,
+  fieldBuffPeriodLabel,
+  fieldBuffPhaseLabel,
   localizedText,
+  normalizeCustomBuffEffect,
+  normalizeCustomBuffStat,
   normalizeRuntimeForBuff,
   runtimeSourceGroups,
   runtimeStackGroups,
@@ -45,13 +58,15 @@ const query = ref("")
 const draft = ref<Set<string>>(new Set())
 const draftAddedBuffs = ref<any[]>([])
 const draftRuntimeInputs = ref<Record<string, any>>({})
+const fieldVersion = ref("")
+const fieldPeriod = ref("")
+const fieldName = ref("")
 const customName = ref("自定义 Buff")
-const customScope = ref("inCombat")
-const customEffects = ref<any[]>([{ stat: "atkFlat", value: 0, mode: "flat" }])
-const customTarget = ref({
-  categoryId: "",
-  moveId: "",
-  rowId: "",
+const customRow = ref<any>({
+  targetKind: "default",
+  optionIndex: 0,
+  value: 0,
+  skillTargets: [{}],
 })
 
 watch(() => props.show, value => {
@@ -60,13 +75,159 @@ watch(() => props.show, value => {
     draftAddedBuffs.value = JSON.parse(JSON.stringify(props.addedBuffs ?? []))
     draftRuntimeInputs.value = JSON.parse(JSON.stringify(props.runtimeInputs ?? {}))
     query.value = ""
+    fieldVersion.value = ""
+    fieldPeriod.value = ""
+    fieldName.value = ""
     activeTab.value = "self"
+    syncFieldFilters()
   }
 })
 
-const statOptions = computed(() => Object.entries(props.meta?.statRules?.statDisplay ?? {})
-  .map(([value, info]: [string, any]) => ({ label: localizedText(info?.label) || statLabel(value, props.meta), value }))
-  .sort((left, right) => left.label.localeCompare(right.label, "zh-CN")))
+watch(() => customRow.value.targetKind, () => {
+  customRow.value = {
+    ...customRow.value,
+    optionIndex: 0,
+    skillTargets: customRow.value.targetKind === "skill" ? [normalizedCustomSkillTarget({})] : [{}],
+  }
+})
+
+const customTargetKindOptions = [
+  { label: "默认", value: "default" },
+  { label: "技能", value: "skill" },
+]
+
+type CustomBuffOption = [string, string, string, string | null]
+
+const customOptionList = computed<CustomBuffOption[]>(() =>
+  customRow.value.targetKind === "skill" ? CUSTOM_BUFF_SKILL_STAT_OPTIONS : CUSTOM_BUFF_STAT_OPTIONS)
+
+const customStatOptions = computed(() => customOptionList.value.map((option, index) => ({
+  label: option[1],
+  value: index,
+})))
+
+const selectedAgent = computed(() => (props.meta?.agents ?? [])
+  .find((agent: any) => agent?.id === props.agentId) ?? null)
+
+const currentDamageElement = computed(() => damageElementForAgent(selectedAgent.value ?? {}))
+
+const agentSkillOptions = computed(() => (props.meta?.agentSkills ?? []).map((skill: any) => {
+  const agent = (props.meta?.agents ?? []).find((item: any) => item?.id === skill?.agentId || item?.id === skill?.id)
+  const label = localizedText(agent?.name) || localizedText(skill?.name) || skill?.id
+  return {
+    label: String(label).replace(/技能倍率$/u, "").trim() || skill?.id,
+    value: skill?.id,
+  }
+}).filter((option: any) => option.value))
+
+const defaultSkillCatalog = computed(() => (props.meta?.agentSkills ?? [])
+  .find((skill: any) => skill?.id === props.agentId || skill?.agentId === props.agentId)
+  ?? (props.meta?.agentSkills ?? [])[0]
+  ?? null)
+
+function skillCatalogById(agentSkillId = "") {
+  return (props.meta?.agentSkills ?? []).find((skill: any) => skill?.id === agentSkillId || skill?.agentId === agentSkillId)
+    ?? defaultSkillCatalog.value
+    ?? null
+}
+
+function rowsForSkillTarget(category: any, move: any) {
+  return damageSkillRowsWithGeneratedTotals(category ?? {}, move ?? {})
+}
+
+function optionValueExists(options: Array<{ value: string }>, value = "") {
+  return options.some(option => option.value === value)
+}
+
+function normalizedCustomSkillTarget(target: any = {}) {
+  const selectedSkillId = target.agentSkillId && optionValueExists(agentSkillOptions.value, target.agentSkillId)
+    ? target.agentSkillId
+    : defaultSkillCatalog.value?.id ?? agentSkillOptions.value[0]?.value ?? ""
+  const skill = skillCatalogById(selectedSkillId)
+  const categories = skill?.categories ?? []
+  const category = categories.find((item: any) => item?.id === target.categoryId) ?? categories[0] ?? null
+  const moves = category?.moves ?? []
+  const move = moves.find((item: any) => item?.id === target.moveId) ?? moves[0] ?? null
+  const rows = rowsForSkillTarget(category, move)
+  const row = rows.find((item: any) => item?.id === target.rowId) ?? null
+  return {
+    agentSkillId: selectedSkillId,
+    categoryId: category?.id ?? "",
+    moveId: move?.id ?? "",
+    ...(row ? { rowId: row.id } : {}),
+  }
+}
+
+const customSkillTargetFields = computed(() => {
+  const current = normalizedCustomSkillTarget(customRow.value.skillTargets?.[0] ?? {})
+  const skill = skillCatalogById(current.agentSkillId)
+  const categories = skill?.categories ?? []
+  const category = categories.find((item: any) => item?.id === current.categoryId) ?? categories[0] ?? null
+  const moves = category?.moves ?? []
+  const move = moves.find((item: any) => item?.id === current.moveId) ?? moves[0] ?? null
+  return {
+    target: current,
+    skillOptions: agentSkillOptions.value,
+    categoryOptions: categories.map((item: any) => ({ label: labelOf(item), value: item.id })),
+    moveOptions: moves.map((item: any) => ({ label: labelOf(item), value: item.id })),
+    rowOptions: [
+      { label: "整招式", value: "" },
+      ...rowsForSkillTarget(category, move).map((item: any) => ({
+        label: localizedText(item?.label) || labelOf(item) || item?.id,
+        value: item.id,
+      })),
+    ],
+  }
+})
+
+function setCustomTargetKind(value: string) {
+  customRow.value = {
+    targetKind: value === "skill" ? "skill" : "default",
+    optionIndex: 0,
+    value: customRow.value.value ?? 0,
+    skillTargets: value === "skill" ? [normalizedCustomSkillTarget({})] : [{}],
+  }
+}
+
+function setCustomOptionIndex(value: number | string) {
+  customRow.value = {
+    ...customRow.value,
+    optionIndex: Number(value) || 0,
+  }
+}
+
+function setCustomSkillTarget(target: any) {
+  customRow.value = {
+    ...customRow.value,
+    skillTargets: [normalizedCustomSkillTarget(target)],
+  }
+}
+
+function updateCustomSkillAgent(agentSkillId: string) {
+  setCustomSkillTarget({ agentSkillId })
+}
+
+function updateCustomSkillCategory(categoryId: string) {
+  const current = customSkillTargetFields.value.target
+  setCustomSkillTarget({ agentSkillId: current.agentSkillId, categoryId })
+}
+
+function updateCustomSkillMove(moveId: string) {
+  const current = customSkillTargetFields.value.target
+  setCustomSkillTarget({
+    agentSkillId: current.agentSkillId,
+    categoryId: current.categoryId,
+    moveId,
+  })
+}
+
+function updateCustomSkillRow(rowId: string) {
+  const current = customSkillTargetFields.value.target
+  setCustomSkillTarget({
+    ...current,
+    rowId,
+  })
+}
 
 function fallbackCategoryForDefaultId(id: string): BuffCategory {
   if (id.startsWith("wEngine:")) {
@@ -109,20 +270,112 @@ const groupedBuffs = computed(() => {
 })
 
 function buffText(buff: any) {
+  const period = fieldBuffPeriod(buff)
   return [
     buffDisplayName(buff),
     localizedText(buff?.name),
     localizedText(buff?.description),
     localizedText(buff?.conditionLabel),
     localizedText(buff?.sourceLabel),
+    localizedText(buff?.source),
+    localizedText(buff?.sourcePeriod),
+    period.gameVersion,
+    fieldBuffPhaseLabel(buff),
     localizedText(buff?.ownerName),
     buff?.id,
   ].filter(Boolean).join(" ").toLowerCase()
 }
 
+const fieldBuffs = computed(() => groupedBuffs.value.field ?? [])
+
+const fieldVersionOptions = computed(() => {
+  const versions = [...new Set(fieldBuffs.value
+    .map(buff => fieldBuffPeriod(buff).gameVersion)
+    .filter(Boolean))]
+  return versions
+    .sort((left, right) => compareGameVersions(right, left))
+    .map(version => ({ label: `${version}版本`, value: version }))
+})
+
+const selectedFieldVersion = computed(() => fieldVersion.value || fieldVersionOptions.value[0]?.value || "")
+
+const fieldPeriodOptions = computed(() => {
+  const seen = new Set<string>()
+  return fieldBuffs.value
+    .filter(buff => fieldBuffPeriod(buff).gameVersion === selectedFieldVersion.value)
+    .sort((left, right) => {
+      const leftPeriod = fieldBuffPeriod(left)
+      const rightPeriod = fieldBuffPeriod(right)
+      return rightPeriod.phaseNo - leftPeriod.phaseNo
+        || String(localizedText(right.source)).localeCompare(String(localizedText(left.source)), "zh-CN")
+    })
+    .map(buff => {
+      const key = fieldBuffPeriodKey(buff)
+      if (!key || seen.has(key)) {
+        return null
+      }
+      seen.add(key)
+      return {
+        label: fieldBuffPeriodLabel(buff) || fieldBuffPhaseLabel(buff) || key,
+        value: key,
+      }
+    })
+    .filter(Boolean) as Array<{ label: string, value: string }>
+})
+
+const selectedFieldPeriod = computed(() => fieldPeriod.value || fieldPeriodOptions.value[0]?.value || "")
+
+const fieldNameOptions = computed(() => [
+  { label: "全部名称", value: "" },
+  ...fieldBuffs.value
+    .filter(buff => fieldBuffPeriod(buff).gameVersion === selectedFieldVersion.value)
+    .filter(buff => !selectedFieldPeriod.value || fieldBuffPeriodKey(buff) === selectedFieldPeriod.value)
+    .map(buff => ({
+      label: buffDisplayName(buff),
+      value: buff.id,
+    })),
+])
+
+function syncFieldFilters() {
+  const nextVersion = fieldVersionOptions.value[0]?.value ?? ""
+  if (!fieldVersion.value || !fieldVersionOptions.value.some(option => option.value === fieldVersion.value)) {
+    fieldVersion.value = nextVersion
+  }
+
+  const nextPeriod = fieldPeriodOptions.value[0]?.value ?? ""
+  if (!fieldPeriod.value || !fieldPeriodOptions.value.some(option => option.value === fieldPeriod.value)) {
+    fieldPeriod.value = nextPeriod
+  }
+
+  if (fieldName.value && !fieldNameOptions.value.some(option => option.value === fieldName.value)) {
+    fieldName.value = ""
+  }
+}
+
+watch(fieldBuffs, syncFieldFilters)
+watch(fieldVersion, () => {
+  fieldPeriod.value = ""
+  fieldName.value = ""
+  syncFieldFilters()
+})
+watch(fieldPeriod, () => {
+  fieldName.value = ""
+  syncFieldFilters()
+})
+
+function fieldBuffMatchesFilters(buff: any) {
+  const period = fieldBuffPeriod(buff)
+  return (!selectedFieldVersion.value || period.gameVersion === selectedFieldVersion.value)
+    && (!selectedFieldPeriod.value || fieldBuffPeriodKey(buff) === selectedFieldPeriod.value)
+    && (!fieldName.value || buff.id === fieldName.value)
+}
+
 const categoryBuffs = computed(() => {
   const needle = query.value.trim().toLowerCase()
-  return (groupedBuffs.value[activeTab.value] ?? [])
+  const source = activeTab.value === "field"
+    ? fieldBuffs.value.filter(fieldBuffMatchesFilters)
+    : groupedBuffs.value[activeTab.value] ?? []
+  return source
     .filter(buff => !needle || buffText(buff).includes(needle))
 })
 
@@ -133,6 +386,7 @@ const customBuffs = computed(() => {
 
 const visibleBuffs = computed(() => activeTab.value === "custom" ? customBuffs.value : categoryBuffs.value)
 const selectedCount = computed(() => draft.value.size + draftAddedBuffs.value.length)
+const canBulkAddVisible = computed(() => activeTab.value !== "custom" && activeTab.value !== "field")
 
 function hasRuntimeControls(buff: any) {
   return Boolean(buff?.coverage || runtimeSourceGroups(buff).length || runtimeStackGroups(buff).length)
@@ -186,16 +440,31 @@ function setStacks(buff: any, group: any, value: number | null) {
 
 function toggle(id: string, checked: boolean) {
   const next = new Set(draft.value)
+  const nextRuntime = { ...draftRuntimeInputs.value }
   if (checked) {
+    const fieldBuff = fieldBuffs.value.find(buff => buff.id === id)
+    if (fieldBuff) {
+      const key = fieldBuffPeriodKey(fieldBuff)
+      if (key) {
+        for (const buff of fieldBuffs.value) {
+          if (buff.id !== id && fieldBuffPeriodKey(buff) === key) {
+            next.delete(buff.id)
+            delete nextRuntime[buff.id]
+          }
+        }
+      }
+    }
     next.add(id)
   } else {
     next.delete(id)
+    delete nextRuntime[id]
   }
   draft.value = next
+  draftRuntimeInputs.value = nextRuntime
 }
 
 function addVisibleBuffs() {
-  if (activeTab.value === "custom") {
+  if (!canBulkAddVisible.value) {
     return
   }
   const next = new Set(draft.value)
@@ -210,52 +479,47 @@ function removeVisibleBuffs() {
     return
   }
   const next = new Set(draft.value)
+  const nextRuntime = { ...draftRuntimeInputs.value }
   for (const buff of visibleBuffs.value) {
     next.delete(buff.id)
+    delete nextRuntime[buff.id]
   }
   draft.value = next
-}
-
-function customEffectTarget() {
-  const target = Object.fromEntries(
-    Object.entries(customTarget.value)
-      .map(([key, value]) => [key, String(value ?? "").trim()])
-      .filter(([, value]) => value),
-  )
-  return Object.keys(target).length
-    ? { kind: "skill", skillTargets: [target] }
-    : null
-}
-
-function addCustomEffect() {
-  customEffects.value = [
-    ...customEffects.value,
-    { stat: "atkFlat", value: 0, mode: "flat" },
-  ]
-}
-
-function removeCustomEffect(index: number) {
-  customEffects.value = customEffects.value.filter((_, itemIndex) => itemIndex !== index)
+  draftRuntimeInputs.value = nextRuntime
 }
 
 function addCustomBuff() {
-  const target = customEffectTarget()
-  const effects = customEffects.value
-    .map((effect, index) => {
-      const value = Number(effect.value)
-      return Number.isFinite(value) && value !== 0
-        ? {
-            id: `custom-effect-${Date.now()}-${index}`,
-            type: "fixed",
-            stat: effect.stat,
-            value,
-            mode: effect.mode,
-            ...(target ? { target } : {}),
-          }
-        : null
-    })
-    .filter(Boolean)
-  if (!effects.length) {
+  const option = customOptionList.value[Number(customRow.value.optionIndex) || 0]
+  const value = Number(customRow.value.value ?? 0)
+  if (!option || !Number.isFinite(value) || value === 0) {
+    return
+  }
+  const [optionStat, label, mode, basis] = option
+  const stat = resolveCustomBuffStatOption(optionStat)
+  const stats = mode !== "eventModifier" && customRow.value.targetKind !== "skill"
+    ? [normalizeCustomBuffStat({
+        id: "stat-1",
+        label: resolveCustomBuffStatLabel(optionStat, label),
+        stat,
+        value,
+        mode,
+        basis,
+      }, props.meta)].filter(Boolean)
+    : []
+  const effects = mode === "eventModifier" || customRow.value.targetKind === "skill"
+    ? [normalizeCustomBuffEffect({
+        id: "effect-1",
+        type: "fixed",
+        stat,
+        label: resolveCustomBuffStatLabel(optionStat, label),
+        value,
+        mode: "flat",
+        target: customRow.value.targetKind === "skill"
+          ? { kind: "skill", skillTargets: [normalizedCustomSkillTarget(customRow.value.skillTargets?.[0] ?? {})] }
+          : { kind: "default" },
+      })].filter(Boolean)
+    : []
+  if (!stats.length && !effects.length) {
     return
   }
   const id = `custom-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`
@@ -263,18 +527,41 @@ function addCustomBuff() {
     ...draftAddedBuffs.value,
     {
       id,
-      label: customName.value.trim() || "自定义 Buff",
-      name: { zhCN: customName.value.trim() || "自定义 Buff" },
       sourceCategory: "custom",
-      sourceType: "manual",
       sourceKind: "custom",
-      scope: customScope.value,
+      name: { zhCN: customName.value.trim() || "自定义 Buff" },
+      stats,
       effects,
     },
   ]
   customName.value = "自定义 Buff"
-  customEffects.value = [{ stat: "atkFlat", value: 0, mode: "flat" }]
-  customTarget.value = { categoryId: "", moveId: "", rowId: "" }
+  customRow.value = {
+    targetKind: "default",
+    optionIndex: 0,
+    value: 0,
+    skillTargets: [{}],
+  }
+}
+
+function resolveCustomBuffStatOption(stat: string) {
+  if (stat === "enemyDefIgnore") {
+    return "enemyDefReduction"
+  }
+  if (stat === "currentResIgnore") {
+    return RES_IGNORE_STAT_BY_ELEMENT[currentDamageElement.value] ?? "physicalResIgnore"
+  }
+  return stat
+}
+
+function resolveCustomBuffStatLabel(stat: string, fallbackLabel: string) {
+  const elementLabel = damageElementShortLabel(currentDamageElement.value)
+  if (stat === "currentResIgnore") {
+    return `${elementLabel}抗性无视%`
+  }
+  if (stat === "enemyResReduction") {
+    return `${elementLabel}减抗%`
+  }
+  return fallbackLabel
 }
 
 function removeCustomBuff(id: string) {
@@ -305,7 +592,7 @@ function apply() {
       <div class="toolbar">
         <NInput v-model:value="query" clearable placeholder="搜索来源、名称、效果" style="max-width: 360px" />
         <NTag round>已选 {{ selectedCount }} 项</NTag>
-        <NButton size="small" :disabled="activeTab === 'custom'" @click="addVisibleBuffs">添加当前列表</NButton>
+        <NButton size="small" :disabled="!canBulkAddVisible" @click="addVisibleBuffs">添加当前列表</NButton>
         <NButton size="small" :disabled="activeTab === 'custom'" @click="removeVisibleBuffs">移除当前列表</NButton>
       </div>
 
@@ -313,24 +600,91 @@ function apply() {
         <NTabPane v-for="tab in categoryTabs" :key="tab.name" :name="tab.name" :tab="tab.label" />
       </NTabs>
 
+      <div v-if="activeTab === 'field'" class="field-buff-filter-row">
+        <label class="custom-field">
+          <span>版本</span>
+          <NSelect
+            v-model:value="fieldVersion"
+            :options="fieldVersionOptions"
+          />
+        </label>
+        <label class="custom-field">
+          <span>期数</span>
+          <NSelect
+            v-model:value="fieldPeriod"
+            :options="fieldPeriodOptions"
+          />
+        </label>
+        <label class="custom-field">
+          <span>名称</span>
+          <NSelect
+            v-model:value="fieldName"
+            :options="fieldNameOptions"
+          />
+        </label>
+      </div>
+
       <div v-if="activeTab === 'custom'" class="custom-buff-editor">
         <NInput v-model:value="customName" placeholder="名称" />
-        <NSelect v-model:value="customScope" :options="[
-          { label: '局内生效', value: 'inCombat' },
-          { label: '局外面板', value: 'outOfCombat' },
-        ]" />
-        <NInput v-model:value="customTarget.categoryId" placeholder="技能分类 ID（可选）" />
-        <NInput v-model:value="customTarget.moveId" placeholder="招式 ID（可选）" />
-        <NInput v-model:value="customTarget.rowId" placeholder="倍率行 ID（可选）" />
         <div class="custom-effect-list">
-          <div v-for="(_, index) in customEffects" :key="index" class="custom-effect-row">
-            <NSelect v-model:value="customEffects[index].stat" :options="statOptions" filterable />
-            <NInputNumber v-model:value="customEffects[index].value" :step="1" />
-            <NSelect v-model:value="customEffects[index].mode" :options="[{ label: '平铺数值', value: 'flat' }, { label: '倍率', value: 'pct' }]" />
-            <NButton size="small" type="error" :disabled="customEffects.length <= 1" @click="removeCustomEffect(index)">移除</NButton>
+          <div class="custom-effect-row">
+            <label class="custom-field">
+              <span>增幅对象</span>
+              <NSelect
+                :value="customRow.targetKind"
+                :options="customTargetKindOptions"
+                @update:value="setCustomTargetKind(String($event))"
+              />
+            </label>
+            <label class="custom-field">
+              <span>增幅类型</span>
+              <NSelect
+                :value="customRow.optionIndex"
+                :options="customStatOptions"
+                filterable
+                @update:value="setCustomOptionIndex"
+              />
+            </label>
+            <label class="custom-field">
+              <span>数值</span>
+              <NInputNumber v-model:value="customRow.value" :step="0.1" />
+            </label>
+          </div>
+          <div v-if="customRow.targetKind === 'skill'" class="custom-skill-target-row">
+            <label class="custom-field">
+              <span>技能表</span>
+              <NSelect
+                :value="customSkillTargetFields.target.agentSkillId"
+                :options="customSkillTargetFields.skillOptions"
+                @update:value="updateCustomSkillAgent(String($event))"
+              />
+            </label>
+            <label class="custom-field">
+              <span>技能大类</span>
+              <NSelect
+                :value="customSkillTargetFields.target.categoryId"
+                :options="customSkillTargetFields.categoryOptions"
+                @update:value="updateCustomSkillCategory(String($event))"
+              />
+            </label>
+            <label class="custom-field">
+              <span>招式</span>
+              <NSelect
+                :value="customSkillTargetFields.target.moveId"
+                :options="customSkillTargetFields.moveOptions"
+                @update:value="updateCustomSkillMove(String($event))"
+              />
+            </label>
+            <label class="custom-field">
+              <span>倍率行</span>
+              <NSelect
+                :value="customSkillTargetFields.target.rowId ?? ''"
+                :options="customSkillTargetFields.rowOptions"
+                @update:value="updateCustomSkillRow(String($event))"
+              />
+            </label>
           </div>
         </div>
-        <NButton @click="addCustomEffect">新增效果</NButton>
         <NButton type="primary" @click="addCustomBuff">添加到本次选择</NButton>
       </div>
 
@@ -501,6 +855,13 @@ function apply() {
 
 .buff-category-tabs :deep(.n-tabs-capsule) {
   display: none;
+}
+
+.field-buff-filter-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.72fr) minmax(180px, 1fr) minmax(180px, 1fr);
+  gap: 10px;
+  align-items: end;
 }
 
 .buff-row {
@@ -677,9 +1038,25 @@ button.buff-row-toggle:focus-visible {
 
 .custom-effect-row {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) 120px 140px auto;
+  grid-template-columns: minmax(120px, 0.8fr) minmax(220px, 1.4fr) minmax(120px, 0.8fr);
   gap: 8px;
-  align-items: center;
+  align-items: end;
+}
+
+.custom-skill-target-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.custom-field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 @media (max-width: 720px) {
@@ -697,7 +1074,9 @@ button.buff-row-toggle:focus-visible {
     min-width: max-content;
   }
 
-  .custom-effect-row {
+  .custom-effect-row,
+  .field-buff-filter-row,
+  .custom-skill-target-row {
     grid-template-columns: 1fr;
   }
 }

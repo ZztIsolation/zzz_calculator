@@ -98,7 +98,9 @@ describe("inventory store", () => {
   beforeEach(() => {
     vi.useRealTimers()
     setActivePinia(createPinia())
-    useInventoryStore().closeScannerPanel()
+    const store = useInventoryStore()
+    store.stopScan()
+    store.closeScannerPanel()
     scannerMockState.instances.length = 0
     scannerMockState.connectResults.length = 0
     scannerMockState.ensureResults.length = 0
@@ -114,7 +116,9 @@ describe("inventory store", () => {
   })
 
   afterEach(() => {
-    useInventoryStore().closeScannerPanel()
+    const store = useInventoryStore()
+    store.stopScan()
+    store.closeScannerPanel()
     vi.useRealTimers()
   })
 
@@ -231,7 +235,7 @@ describe("inventory store", () => {
     expect(helper.launchCalls).toBe(1)
     expect(store.scanStatus).toBe("waiting-helper")
     expect(store.scanPolling).toBe(true)
-    expect(store.scanHelperDownloadUrl).toContain("scanner-1.0.35")
+    expect(store.scanHelperDownloadUrl).toContain("scanner-1.0.36")
 
     scannerMockState.connectResults.push({ version: "1.0.2" })
     await vi.advanceTimersByTimeAsync(3000)
@@ -298,5 +302,112 @@ describe("inventory store", () => {
       visualProfileClient: "cloud",
       visualProfileQuality: "current",
     })
+  })
+
+  it("maps 9 scan statuses to 4 visible phases", () => {
+    const store = useInventoryStore()
+    expect(store.scanPhase).toBe("a") // idle
+
+    store.$patch({ scanStatus: "connecting" })
+    expect(store.scanPhase).toBe("a")
+
+    store.$patch({ scanStatus: "waiting-helper" })
+    expect(store.scanPhase).toBe("a")
+
+    store.$patch({ scanStatus: "preparing" })
+    expect(store.scanPhase).toBe("b")
+
+    store.$patch({ scanStatus: "downloading" })
+    expect(store.scanPhase).toBe("b")
+
+    store.$patch({ scanStatus: "ready" })
+    expect(store.scanPhase).toBe("c")
+
+    store.$patch({ scanStatus: "scanning" })
+    expect(store.scanPhase).toBe("d")
+
+    store.$patch({ scanStatus: "complete" })
+    expect(store.scanPhase).toBe("d")
+  })
+
+  it("keeps error state on its originating phase via scanErrorContext", () => {
+    const store = useInventoryStore()
+    store.$patch({ scanStatus: "error", scanErrorContext: "prepare" })
+    expect(store.scanPhase).toBe("b")
+    expect(store.scanErrorVariant).toBe("prepare-failed")
+
+    store.$patch({ scanErrorContext: "scan", scanMessage: "WebSocket disconnected" })
+    expect(store.scanPhase).toBe("d")
+    expect(store.scanErrorVariant).toBe("scan-failed")
+
+    store.$patch({ scanErrorContext: "scan", scanMessage: "未找到 ZenlessZoneZero 进程" })
+    expect(store.scanErrorVariant).toBe("game-not-found")
+  })
+
+  it("surfaces helper-outdated when helper version is below required", () => {
+    const store = useInventoryStore()
+    store.$patch({
+      scanStatus: "error",
+      scanErrorContext: "prepare",
+      scanHelperVersion: "1.0.1",
+      scanMessage: "扫描器准备超时",
+    })
+    expect(store.scanErrorVariant).toBe("helper-outdated")
+
+    store.$patch({ scanHelperVersion: "1.0.2" })
+    expect(store.scanErrorVariant).toBe("prepare-failed")
+  })
+
+  it("surfaces helper-missing while waiting for helper", () => {
+    const store = useInventoryStore()
+    store.$patch({ scanStatus: "waiting-helper" })
+    expect(store.scanPhase).toBe("a")
+    expect(store.scanErrorVariant).toBe("helper-missing")
+  })
+
+  it("disables start-scan when no rarity is selected", () => {
+    const store = useInventoryStore()
+    store.$patch({ scanConnected: true, scanStatus: "ready", scanRarityS: false, scanRarityA: false })
+    expect(store.scanRaritySelected).toBe(false)
+    expect(store.scanCanStart).toBe(false)
+
+    store.$patch({ scanRarityA: true })
+    expect(store.scanCanStart).toBe(true)
+  })
+
+  it("does not switch to error status for the rarity validation", async () => {
+    const store = useInventoryStore()
+    scannerMockState.connectResults.push({ version: "1.0.2" })
+    await store.openScannerPanel()
+    store.$patch({ scanRarityS: false, scanRarityA: false })
+    await store.startScan()
+
+    expect(store.scanStatus).not.toBe("error")
+    expect(store.scanMessage).toContain("请至少选择一个品质")
+    expect(scannerMockState.instances[0].startScanPayloads).toHaveLength(0)
+  })
+
+  it("reports hasDriveDiscs off when the local store is empty", async () => {
+    const store = useInventoryStore()
+    await store.load()
+    expect(store.hasDriveDiscs).toBe(false)
+
+    await store.saveDisc({
+      id: "empty-check",
+      setId: "manual",
+      setName: "test",
+      partition: 4,
+      mainStat: { stat: "critRate", value: 24 },
+      subStats: [],
+      level: 15,
+    })
+    expect(store.hasDriveDiscs).toBe(true)
+  })
+
+  it("records helper version at prepare time", async () => {
+    const store = useInventoryStore()
+    scannerMockState.connectResults.push({ version: "1.0.2" })
+    await store.openScannerPanel()
+    expect(store.scanHelperVersion).toBe("1.0.2")
   })
 })

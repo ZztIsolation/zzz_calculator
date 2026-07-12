@@ -41,6 +41,7 @@ import {
   skillLevelLabel,
   skillLevelValues,
 } from "@core/skillMultiplierCandidates.js"
+import { resolveDefaultCalculationConfig } from "@core/defaultCalculationConfig.js"
 
 const catalogStore = useCatalogStore()
 const accountStore = useAccountStore()
@@ -74,7 +75,10 @@ onMounted(async () => {
   await inventoryStore.load()
   if (catalogStore.catalog && catalogStore.meta) {
     buildStore.initialize(catalogStore.catalog, catalogStore.meta)
-    optimizerStore.initialize(catalogStore.catalog, catalogStore.agents.find((item: any) => item.id === buildStore.agentId))
+    optimizerStore.initialize(
+      catalogStore.catalog,
+      catalogStore.agents.find((item: any) => item.id === buildStore.agentId),
+    )
     if (!optimizerStore.fourPieceSetId) {
       optimizerStore.setFourPieceSet(catalogStore.driveDiscSets[0]?.id ?? "")
     }
@@ -87,7 +91,7 @@ watch(() => accountStore.currentOwnerId, async () => {
   optimizerStore.reset()
   if (catalogStore.catalog && catalogStore.meta) {
     buildStore.initialize(catalogStore.catalog, catalogStore.meta)
-    optimizerStore.applyAgentPreferredDriveDiscSet(
+    optimizerStore.loadAgentSettings(
       catalogStore.agents.find((item: any) => item.id === buildStore.agentId),
       catalogStore.catalog,
     )
@@ -242,6 +246,20 @@ const currentSchemeScoreLabel = computed(() => {
     return `评分 ${formatNumber(selectedLoadout.value.score, 0)}`
   }
   return selectedDriveDiscs.value.length ? `${selectedDriveDiscs.value.length} / 6` : "未选择"
+})
+const calculationModeLabel = computed(() => {
+  if (buildStore.damageConfig.mode !== "adminDefault") {
+    return damageModeLabel(buildStore.damageConfig.mode)
+  }
+  const config = resolveDefaultCalculationConfig(selectedAgent.value?.defaultCalculationConfig, buildStore.cinemaLevel)
+  if (!config) {
+    return "默认循环"
+  }
+  const name = labelOf(config).trim()
+  if (!name || name === "-") {
+    return "默认循环"
+  }
+  return /^默认循环[（(]/u.test(name) ? name : `默认循环（${name}）`
 })
 const activeManualDiscSlotDiscs = computed(() => inventoryStore.discOptionsForSlot(activeManualDiscSlot.value))
 const manualDiscPickerTitle = computed(() => activeManualDiscSlot.value ? `选择 ${activeManualDiscSlot.value} 号位驱动盘` : "选择驱动盘")
@@ -496,7 +514,7 @@ const optimizerDetailChips = computed(() => [
   Number(optimizerMetrics.value?.workerCount ?? 0) > 1 ? `并行 x${optimizerMetrics.value.workerCount}` : "",
   Number(optimizerMetrics.value?.parallelTaskCount ?? 0) > 0
     ? `任务 ${formatNumber(optimizerMetrics.value.completedTaskCount ?? 0)}/${formatNumber(optimizerMetrics.value.parallelTaskCount)}` : "",
-  candidateText(optimizerMetrics.value),
+  ...candidateChipTexts(optimizerMetrics.value),
   complexityText(optimizerMetrics.value, optimizerProgress.value?.settings ?? optimizerStore.settings),
 ].filter(Boolean))
 
@@ -568,7 +586,7 @@ function saveOptimizerConfig(config: any) {
 
 function selectAgent(agentId: string) {
   buildStore.selectAgent(agentId, catalogStore.meta)
-  optimizerStore.applyAgentPreferredDriveDiscSet(
+  optimizerStore.loadAgentSettings(
     catalogStore.agents.find((item: any) => item.id === agentId),
     catalogStore.catalog,
   )
@@ -901,6 +919,11 @@ function candidateText(metrics: any = {}) {
   return `候选 ${entries.map(([slot, count]) => `${slot}号位 ${formatNumber(count)}`).join(" / ")}`
 }
 
+function candidateChipTexts(metrics: any = {}) {
+  const counts = metrics.candidateCountsBySlot ?? {}
+  return Object.entries(counts).map(([slot, count]) => `候选 ${slot}号位 ${formatNumber(count)}`)
+}
+
 function complexityText(metrics: any = {}, settings: any = {}) {
   const complexity = metrics.complexity
   if (!complexity?.label) {
@@ -958,7 +981,12 @@ function complexityText(metrics: any = {}, settings: any = {}) {
             </label>
             <label class="compact-field">
               <span>影画</span>
-              <NSelect v-model:value="buildStore.cinemaLevel" :options="cinemaLevelOptions" size="small" />
+              <NSelect
+                :value="buildStore.cinemaLevel"
+                :options="cinemaLevelOptions"
+                size="small"
+                @update:value="buildStore.setCinemaLevel(Number($event ?? 0), catalogStore.meta)"
+              />
             </label>
             <label class="compact-field compact-field-wide">
               <span>核心技</span>
@@ -1042,7 +1070,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
         <div class="panel-body metric-grid">
           <dl class="metric">
             <dt>模式</dt>
-            <dd>{{ damageModeLabel(buildStore.damageConfig.mode) }}</dd>
+            <dd>{{ calculationModeLabel }}</dd>
           </dl>
           <dl class="metric">
             <dt>事件</dt>
@@ -1277,11 +1305,19 @@ function complexityText(metrics: any = {}, settings: any = {}) {
           <div class="panel-body damage-panel-grid">
             <div>
               <h3>局外</h3>
-              <PanelStatTable :panel="buildStore.outOfCombat?.panel" :meta="catalogStore.meta" />
+              <PanelStatTable
+                :panel="buildStore.outOfCombat?.panel"
+                :meta="catalogStore.meta"
+                :include-sheer-force="selectedAgent?.specialty === 'rupture'"
+              />
             </div>
             <div>
               <h3>局内</h3>
-              <PanelStatTable :panel="buildStore.result?.inCombat?.panel" :meta="catalogStore.meta" />
+              <PanelStatTable
+                :panel="buildStore.result?.inCombat?.panel"
+                :meta="catalogStore.meta"
+                :include-sheer-force="selectedAgent?.specialty === 'rupture'"
+              />
             </div>
           </div>
         </div>
@@ -1508,6 +1544,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
     :skill-levels="buildStore.skillLevels"
     :meta="catalogStore.meta"
     :agent="selectedAgent"
+    :cinema-level="buildStore.cinemaLevel"
     @save="saveCalculationConfig"
   />
 
@@ -1569,6 +1606,11 @@ function complexityText(metrics: any = {}, settings: any = {}) {
   grid-template-columns: minmax(170px, auto) minmax(0, 1fr);
   align-items: start;
   gap: 10px;
+  min-width: 0;
+}
+
+.optimizer-run-row > * {
+  min-width: 0;
 }
 
 .optimizer-run-row > .toolbar {
@@ -1798,13 +1840,45 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 
 .damage-panel-grid {
   display: grid;
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px 12px 12px;
+}
+
+.damage-panel-card > .panel-header {
+  padding: 10px 12px;
+}
+
+.damage-panel-grid > div {
+  min-width: 0;
 }
 
 .damage-panel-grid h3 {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   color: var(--app-muted);
   font-size: 12px;
+  line-height: 1.2;
+}
+
+.damage-panel-card :deep(.data-table) {
+  table-layout: fixed;
+}
+
+.damage-panel-card :deep(.data-table th),
+.damage-panel-card :deep(.data-table td) {
+  padding: 6px 8px;
+  line-height: 1.25;
+}
+
+.damage-panel-card :deep(.data-table th) {
+  width: 54%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.damage-panel-card :deep(.data-table td) {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .selection-summary {
@@ -2221,7 +2295,9 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 .optimizer-progress-card {
   display: grid;
   gap: 8px;
+  min-width: 0;
   padding: 12px;
+  overflow: hidden;
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-sm);
   background: var(--app-panel-muted);
@@ -2237,14 +2313,17 @@ function complexityText(metrics: any = {}, settings: any = {}) {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
   color: var(--app-muted);
   font-size: 12px;
   font-weight: 750;
 }
 
 .optimizer-progress-head strong {
+  min-width: 0;
   color: var(--app-blue);
   font-size: 18px;
+  overflow-wrap: anywhere;
 }
 
 .optimizer-progress-track {
@@ -2269,12 +2348,14 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 }
 
 .optimizer-progress-copy strong {
+  min-width: 0;
   color: var(--app-text);
   font-size: 13px;
   overflow-wrap: anywhere;
 }
 
 .optimizer-progress-copy p {
+  min-width: 0;
   margin: 0;
   color: var(--app-muted);
   font-size: 12px;
@@ -2284,6 +2365,21 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 
 .optimizer-detail-chips {
   gap: 6px;
+  min-width: 0;
+}
+
+.optimizer-detail-chips :deep(.n-tag) {
+  max-width: 100%;
+  height: auto;
+  min-height: 28px;
+  white-space: normal;
+}
+
+.optimizer-detail-chips :deep(.n-tag__content) {
+  min-width: 0;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .optimizer-metric-grid {
@@ -2344,6 +2440,10 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 }
 
 @media (max-width: 680px) {
+  .damage-panel-grid {
+    grid-template-columns: 1fr;
+  }
+
   .optimizer-result-toolbar {
     grid-template-columns: minmax(0, 1fr);
   }

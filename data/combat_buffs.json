@@ -5,7 +5,7 @@
     "Combat buff catalog. Teammate, field, boss, and hidden system buffs are stored separately for maintenance, then flattened by the backend for calculation.",
     "Visible self buffs remain in their existing source files. Verified W-Engine passives and Drive Disc 4-piece effects remain in their existing source files and are exposed as runtime candidates.",
     "Teammate buffs are grouped by teammate first. Each teammate owns multiple buff entries, and each entry separates source label, literal description, and structured stats used by calculation.",
-    "Field buffs use fieldBuffs entries with name, source, sourcePeriod, description, coverage, and effects.",
+    "Field buffs use fieldBuffs entries with name, source, structured period metadata, compatibility sourcePeriod, description, coverage, and effects.",
     "Boss buffs use bossBuffs entries with bossName, bossSource, sourcePeriod, description, coverage, and effects.",
     "Hidden entries exist only for backend validation of different percentage attack bases."
   ],
@@ -1418,6 +1418,84 @@
       }
     },
     {
+      "id": "lycaon",
+      "name": {
+        "zhCN": "冯·莱卡恩"
+      },
+      "buffs": [
+        {
+          "id": "lycaon.core_metal_legs_res_and_other_dmg",
+          "source": {
+            "zhCN": "核心被动（F级）"
+          },
+          "description": {
+            "zhCN": "[强化特殊技：狂猎时刻]、[支援突击：反扑]或[支援突击：反扑·冰舞]命中敌人时，目标的冰属性伤害抗性降低25%，受到的其他属性伤害提升30%，持续30秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "lycaon_core_enemy_ice_res_reduction",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "enemyIceResReduction",
+              "mode": "flat",
+              "value": 25
+            },
+            {
+              "id": "lycaon_core_other_attribute_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "appliesTo": {
+                "elements": [
+                  "physical",
+                  "fire",
+                  "electric",
+                  "ether",
+                  "wind"
+                ]
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 30
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "lycaon.additional_graceful_pack_stun_multiplier",
+          "source": {
+            "zhCN": "额外能力"
+          },
+          "description": {
+            "zhCN": "队伍中存在与自身属性或阵营相同的角色或其他[异常]角色时触发：莱卡恩攻击命中处于失衡状态下的敌人时，目标的失衡易伤倍率提升35%。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "lycaon_additional_stun_multiplier",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "stunDmgMultiplierBonus",
+              "mode": "flat",
+              "value": 35
+            }
+          ],
+          "buffModifiers": []
+        }
+      ],
+      "images": {
+        "icon": "/assets/agents/lycaon.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/25/76099754/66038988b3920216f826555eb31ec7d3_1374786350678823683.png",
+        "officialPage": "https://baike.mihoyo.com/zzz/wiki/content/65/detail?mhy_presentation_style=fullscreen"
+      }
+    },
+    {
       "id": "qingyi",
       "name": {
         "zhCN": "青衣"
@@ -2107,7 +2185,225 @@
       }
     }
   ],
-  "fieldBuffs": [],
+  "fieldBuffs": [
+    {
+      "id": "field.defense_v5.v3_0.p2.jijing_chefeng",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "defense_v5",
+        "gameVersion": "3.0",
+        "phaseNo": 2,
+        "phaseName": {
+          "zhCN": "第二期"
+        }
+      },
+      "name": {
+        "zhCN": "极境彻风"
+      },
+      "source": {
+        "zhCN": "防卫战 v5"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.0版本第二期"
+      },
+      "description": {
+        "zhCN": "代理人的风属性伤害和冰属性伤害提升10%。命中处于属性异常状态中的敌人时，造成的伤害提升15%，无视其10%的全属性伤害抗性。"
+      },
+      "coverage": {
+        "default": 1,
+        "min": 0,
+        "max": 1,
+        "step": 0.1
+      },
+      "effects": [
+        {
+          "id": "field_defense_v5_v3_0_p2_jijing_wind_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "windDmg",
+          "mode": "flat",
+          "value": 10
+        },
+        {
+          "id": "field_defense_v5_v3_0_p2_jijing_ice_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "iceDmg",
+          "mode": "flat",
+          "value": 10
+        },
+        {
+          "id": "field_defense_v5_v3_0_p2_jijing_dmg_vs_anomaly",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "dmgBonus",
+          "mode": "flat",
+          "value": 15
+        },
+        {
+          "id": "field_defense_v5_v3_0_p2_jijing_wind_res_ignore",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "windResIgnore",
+          "mode": "flat",
+          "value": 10
+        },
+        {
+          "id": "field_defense_v5_v3_0_p2_jijing_ice_res_ignore",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "iceResIgnore",
+          "mode": "flat",
+          "value": 10
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.defense_v5.v3_0.p2.zhongmu_xiezou",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "defense_v5",
+        "gameVersion": "3.0",
+        "phaseNo": 2,
+        "phaseName": {
+          "zhCN": "第二期"
+        }
+      },
+      "name": {
+        "zhCN": "终幕协奏"
+      },
+      "source": {
+        "zhCN": "防卫战 v5"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.0版本第二期"
+      },
+      "description": {
+        "zhCN": "代理人的[终结技]、[连携技]造成的伤害提升40%。[连携技]命中敌人后，其失衡易伤倍率提升20%，失衡恢复速度降低15%，持续15秒，重复触发时刷新持续时间。"
+      },
+      "coverage": {
+        "default": 1,
+        "min": 0,
+        "max": 1,
+        "step": 0.1
+      },
+      "effects": [
+        {
+          "id": "field_defense_v5_v3_0_p2_zhongmu_chain_ultimate_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "skill",
+            "skillTargets": [
+              {
+                "categoryId": "chain",
+                "moveIdPrefixes": [
+                  "chain_"
+                ]
+              },
+              {
+                "categoryId": "chain",
+                "moveIdPrefixes": [
+                  "ultimate_"
+                ]
+              }
+            ]
+          },
+          "stat": "dmgBonus",
+          "mode": "flat",
+          "value": 40
+        },
+        {
+          "id": "field_defense_v5_v3_0_p2_zhongmu_stun_vulnerable",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "stunDmgMultiplierBonus",
+          "mode": "flat",
+          "value": 20
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.defense_v5.v3_0.p2.mingse_yinguang",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "defense_v5",
+        "gameVersion": "3.0",
+        "phaseNo": 2,
+        "phaseName": {
+          "zhCN": "第二期"
+        }
+      },
+      "name": {
+        "zhCN": "暝色引光"
+      },
+      "source": {
+        "zhCN": "防卫战 v5"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.0版本第二期"
+      },
+      "description": {
+        "zhCN": "代理人的攻击力提升30%，暴击伤害提升15%。敌人的失衡易伤倍率提升20%。"
+      },
+      "coverage": {
+        "default": 1,
+        "min": 0,
+        "max": 1,
+        "step": 0.1
+      },
+      "effects": [
+        {
+          "id": "field_defense_v5_v3_0_p2_mingse_atk",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "atkPct",
+          "mode": "pct",
+          "basis": "outOfCombatAtk",
+          "value": 30
+        },
+        {
+          "id": "field_defense_v5_v3_0_p2_mingse_crit_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "critDmg",
+          "mode": "flat",
+          "value": 15
+        },
+        {
+          "id": "field_defense_v5_v3_0_p2_mingse_stun_vulnerable",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "stunDmgMultiplierBonus",
+          "mode": "flat",
+          "value": 20
+        }
+      ],
+      "buffModifiers": []
+    }
+  ],
   "bossBuffs": [],
   "systemBuffs": [
     {

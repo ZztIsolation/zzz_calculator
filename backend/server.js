@@ -1,5 +1,5 @@
 import { createServer } from "node:http"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { readFile, writeFile } from "node:fs/promises"
 import { createReadStream, existsSync } from "node:fs"
 import path from "node:path"
@@ -23,7 +23,16 @@ import {
     upsertDriveDiscLoadout,
     upsertUserDriveDisc,
 } from "./driveDiscInventory.js"
-import { assertValidMaintenanceItem } from "../frontend/maintenanceValidation.js"
+import {
+    assertValidMaintenanceItem,
+    fieldBuffModeOption,
+    fieldBuffPhaseName,
+} from "../frontend/maintenanceValidation.js"
+import {
+    defaultCalculationVariantName,
+    isDefaultCalculationCinemaLevel,
+    normalizeDefaultCalculationCinemaLevel,
+} from "../frontend/defaultCalculationConfig.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, "..")
@@ -32,6 +41,7 @@ const frontendDir = path.join(rootDir, "frontend")
 const pagesDir = path.join(rootDir, "dist", "pages")
 const port = Number(process.env.PORT || 8787)
 const nodeEnv = String(process.env.NODE_ENV ?? "development").toLowerCase()
+const DAMAGE_ELEMENTS = new Set(["physical", "fire", "ice", "electric", "ether", "wind"])
 
 function envFlag(name) {
     const value = process.env[name]
@@ -294,6 +304,19 @@ function randomId(prefix) {
     return `${prefix}_${randomUUID().replaceAll("-", "").slice(0, 10)}`
 }
 
+function stableSlug(value, fallback = "item") {
+    const raw = String(value ?? "").trim()
+    const slug = raw
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "")
+    if (slug) {
+        return slug
+    }
+    const hashSource = raw || fallback
+    return `${fallback}_${createHash("sha1").update(hashSource, "utf8").digest("hex").slice(0, 8)}`
+}
+
 function zhOnly(value) {
     if (typeof value === "string") {
         return { zhCN: value }
@@ -388,17 +411,63 @@ function cleanBuff(buff = {}) {
     return next
 }
 
-function cleanFieldBuff(buff = {}) {
+function cleanFieldPeriod(period = {}) {
+    const modeId = String(period.modeId ?? "").trim()
+    const gameVersion = String(period.gameVersion ?? "").trim()
+    const phaseNo = Number(period.phaseNo)
+    const canonicalPhaseName = fieldBuffPhaseName(phaseNo)
+    return {
+        modeId,
+        gameVersion,
+        phaseNo: Number.isFinite(phaseNo) ? phaseNo : period.phaseNo,
+        phaseName: canonicalPhaseName ?? zhOnly(period.phaseName),
+    }
+}
+
+function fieldSourcePeriod(period = {}) {
+    const version = String(period.gameVersion ?? "").trim()
+    const phase = String(period.phaseName?.zhCN ?? period.phaseName ?? "").trim()
+    if (!version || !phase) {
+        return null
+    }
+    return { zhCN: `${version}版本${phase}` }
+}
+
+function cleanFieldBuff(buff = {}, options = {}) {
+    const originalId = String(options.originalId ?? buff.id ?? "").trim()
     const next = cleanBuff({
         ...buff,
+        ...(originalId ? { id: originalId } : {}),
         sourceType: "field",
         scope: "inCombat",
     })
+    delete next._maintenanceOriginalId
+    next.period = cleanFieldPeriod(buff.period)
+    const mode = fieldBuffModeOption(next.period.modeId)
+    if (mode?.source) {
+        next.source = zhOnly(mode.source)
+        delete next.sourceLabel
+    }
 
-    if (buff.sourcePeriod) {
-        next.sourcePeriod = zhOnly(buff.sourcePeriod)
+    const generatedSourcePeriod = fieldSourcePeriod(next.period)
+    if (generatedSourcePeriod) {
+        next.sourcePeriod = generatedSourcePeriod
     } else {
         delete next.sourcePeriod
+    }
+
+    if (!originalId) {
+        const versionSlug = String(next.period.gameVersion ?? "").replace(/\./g, "_")
+        const nameSlug = stableSlug(next.name?.en ?? next.name?.zhCN ?? next.name, "buff")
+        next.id = [
+            "field",
+            next.period.modeId || "unknown",
+            versionSlug ? `v${versionSlug}` : "vunknown",
+            next.period.phaseNo ? `p${next.period.phaseNo}` : "punknown",
+            nameSlug,
+        ].join(".")
+    } else {
+        next.id = originalId
     }
 
     return next
@@ -602,11 +671,25 @@ function cleanCalculationEvent(event = {}, index = 0, options = {}) {
     }
     if (kind === "direct" || kind === "sheer") {
         const skillRef = cleanCalculationSkillRef(event.skillRef)
-        return {
+        const result = {
             ...base,
             critMode: ["expected", "crit", "nonCrit"].includes(event.critMode) ? event.critMode : "expected",
-            ...(skillRef ? { skillRef } : {}),
         }
+        const label = String(event.label ?? "").trim()
+        if (label) {
+            result.label = label
+        }
+        if (skillRef) {
+            result.skillRef = skillRef
+            return result
+        }
+        const skillMultiplier = Number(event.skillMultiplier ?? 100)
+        result.skillMultiplier = Number.isFinite(skillMultiplier) ? Math.max(0, skillMultiplier) : 100
+        const damageElement = String(event.damageElement ?? "").trim()
+        if (DAMAGE_ELEMENTS.has(damageElement)) {
+            result.damageElement = damageElement
+        }
+        return result
     }
     if (kind === "anomaly") {
         if (settlementType === "disorder") {
@@ -650,7 +733,7 @@ function legacySkillGroupReferenceEvents(config = {}, skillGroups = []) {
     }))
 }
 
-function cleanDefaultCalculationConfig(config = null, skillGroups = []) {
+function cleanDefaultCalculationConfigEntry(config = null, skillGroups = [], options = {}) {
     if (!config || typeof config !== "object" || Array.isArray(config)) {
         return null
     }
@@ -668,15 +751,57 @@ function cleanDefaultCalculationConfig(config = null, skillGroups = []) {
     }
     const mode = ["single", "sheer", "anomaly", "custom"].includes(config.mode) ? config.mode : "custom"
     const selectedEventId = String(config.selectedEventId ?? events[0]?.id ?? "").trim()
+    const cinemaLevel = normalizeDefaultCalculationCinemaLevel(config.cinemaLevel, options.defaultCinemaLevel ?? 0)
+    const name = config.name ? zhOnly(config.name) : defaultCalculationVariantName(cinemaLevel)
     const result = {
         mode,
-        ...(config.name ? { name: zhOnly(config.name) } : {}),
+        ...(options.includeCinemaLevel ? { cinemaLevel } : {}),
+        ...(name ? { name } : {}),
         events,
     }
     if (events.length) {
         result.selectedEventId = events.some(event => event.id === selectedEventId) ? selectedEventId : events[0].id
     }
     return result
+}
+
+function cleanDefaultCalculationConfig(config = null, skillGroups = []) {
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+        return null
+    }
+    const rawVariants = Array.isArray(config.variants) ? config.variants : []
+    const baseConfig = cleanDefaultCalculationConfigEntry(config, skillGroups, {
+        defaultCinemaLevel: 0,
+        includeCinemaLevel: config.cinemaLevel !== undefined || rawVariants.length > 0,
+    })
+    if (!baseConfig) {
+        return null
+    }
+    const seenLevels = new Set([Number(baseConfig.cinemaLevel ?? 0)])
+    const variants = rawVariants
+        .map(variant => {
+            if (!variant || typeof variant !== "object" || Array.isArray(variant) || !isDefaultCalculationCinemaLevel(variant.cinemaLevel)) {
+                return null
+            }
+            const cinemaLevel = Number(variant.cinemaLevel)
+            if (seenLevels.has(cinemaLevel)) {
+                return null
+            }
+            const cleanVariant = cleanDefaultCalculationConfigEntry(variant, skillGroups, {
+                defaultCinemaLevel: cinemaLevel,
+                includeCinemaLevel: true,
+            })
+            if (cleanVariant) {
+                seenLevels.add(cinemaLevel)
+            }
+            return cleanVariant
+        })
+        .filter(Boolean)
+        .sort((left, right) => Number(left.cinemaLevel ?? 0) - Number(right.cinemaLevel ?? 0))
+    if (variants.length) {
+        baseConfig.variants = variants
+    }
+    return baseConfig
 }
 
 function cleanCalculationSkillGroups(groups = []) {
@@ -887,12 +1012,12 @@ function deleteAnomalyEffectByType(items, type, id) {
     return items.filter(item => !(item.id === id && anomalyMaintenanceType(item) === settlementType))
 }
 
-export function cleanMaintenanceItem(resource, item) {
+export function cleanMaintenanceItem(resource, item, options = {}) {
     if (resource === "combat-buffs") {
         return cleanBuff(item)
     }
     if (resource === "field-buffs") {
-        return cleanFieldBuff(item)
+        return cleanFieldBuff(item, options)
     }
     if (resource === "boss-buffs") {
         return cleanBossBuff(item)
@@ -937,6 +1062,11 @@ function upsertById(items, item) {
     }
 
     return next
+}
+
+function existingMaintenanceOriginalId(item = {}, items = []) {
+    const originalId = String(item?._maintenanceOriginalId ?? "").trim()
+    return originalId && items.some(entry => entry?.id === originalId) ? originalId : ""
 }
 
 function deleteById(items, id) {
@@ -1004,9 +1134,14 @@ async function saveMaintenanceItem(resource, item) {
     }
 
     const payload = await readDataFile(config.fileName)
+    const collection = payload[config.collectionKey] ?? []
+    const fieldBuffOriginalId = resource === "field-buffs"
+        ? existingMaintenanceOriginalId(item, collection)
+        : ""
+    const cleanOptions = fieldBuffOriginalId ? { originalId: fieldBuffOriginalId } : {}
     const validationContext = {
-        items: payload[config.collectionKey] ?? [],
-        currentId: item?.id,
+        items: collection,
+        currentId: fieldBuffOriginalId || item?.id,
     }
     if (resource === "agents") {
         const [agentSkillsPayload, anomalyEffectsPayload, driveDiscSetsPayload] = await Promise.all([
@@ -1019,9 +1154,14 @@ async function saveMaintenanceItem(resource, item) {
         validationContext.disorderEffects = anomalyEffectsForType(anomalyEffectsPayload, "disorder")
         validationContext.driveDiscSets = driveDiscSetsPayload.sets ?? []
     }
-    assertValidMaintenanceItem(resource, item, validationContext)
-    const savedItem = cleanMaintenanceItem(resource, item)
-    payload[config.collectionKey] = upsertById(payload[config.collectionKey] ?? [], savedItem)
+    const itemForValidation = resource === "field-buffs"
+        ? cleanMaintenanceItem(resource, item, cleanOptions)
+        : item
+    assertValidMaintenanceItem(resource, itemForValidation, validationContext)
+    const savedItem = resource === "field-buffs"
+        ? itemForValidation
+        : cleanMaintenanceItem(resource, item)
+    payload[config.collectionKey] = upsertById(collection, savedItem)
     await writeDataFile(config.fileName, payload)
     return {
         payload,

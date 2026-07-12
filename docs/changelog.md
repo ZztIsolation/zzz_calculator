@@ -6,6 +6,60 @@ This changelog is the long-form maintenance log for `zzz_calculator`. Every
 future change to the Zenless Zone Zero calculator should be appended here with
 the reason, the files touched, the model impact, and the verification performed.
 
+## 2026-07-09 - Published Scanner 1.0.36
+
+### Request Context
+
+The web-launched OCR scanner needed to move from the deployed `1.0.35` runtime
+to the latest local ZZZ Scanner Next `1.0.36` package and remain runnable for
+both the legacy static scanner page and the current Vue workbench scanner flow.
+
+### Package Changes
+
+Repacked `E:\yan1\zzz\ZZZ-Scanner.Next\publish 1.0.36` into
+`downloads/zzz-scanner/1.0.36/ZZZ-Scanner.Next-win-x64.zip`. The package
+excludes generated `Scans`, includes the bundled
+`Data/ocr_fast_templates.json`, and contains `ZZZ-Scanner.Next.exe` with file
+version `1.0.36.0`.
+
+The new OCR package metadata is:
+
+- SHA-256: `d885c0aef6da61cfcbf994ad2b4e712a31efe8bd87631260fe4f87ea8711c63d`
+- size: `47231570`
+- entry: `ZZZ-Scanner.Next.exe`
+- bundled template SHA-256: `814e28114378756e7c541c0efe6cfa2469e1e723d0498ba8e73edea58266a076`
+
+Updated `scripts/build-pages.js`, the local scanner manifest,
+`tests/scanner-bridge.test.js`, legacy `frontend/drive-discs.html`, and Vue
+`webapp/src/stores/inventory.ts`/test expectations to use GitHub Release tag
+`scanner-1.0.36`.
+
+After deployment, local download probes reproduced the user's stuck download:
+the GitHub Release zip connection reset or timed out before any response body
+arrived, leaving progress at `0 B / 45.04 MB`. To avoid making the Helper depend
+on that fragile large-file path, `scripts/build-pages.js` now copies the
+verified OCR zip into the Pages artifact at
+`downloads/zzz-scanner/1.0.36/ZZZ-Scanner.Next-win-x64.zip`, verifies its size
+and SHA-256 during the build, and writes the scanner manifest with the same-site
+relative URL first. The GitHub Release URL remains in `packageUrls` as fallback.
+
+### Runtime Verification
+
+Ran `dotnet build ZZZ-Scanner.Next.csproj -c Release` successfully before
+packaging.
+
+The local 120-item smoke benchmark
+`publish 1.0.36\Scans\2026-07-09-16-07-11-507-p2784-e284` reported
+`Completed=120`, `Failed=0`, duplicate exports 0, `IncompleteRoi=0`,
+`slot_safety=pass`, `profile_route=exact:7`, and
+`acceptance.no_incomplete_roi/no_error_files/export_consistency/no_export_duplicates/slot_safety/backlog_not_saturated/overlap_rows_complete/overlap_no_hard_stop` all pass.
+
+The longer scan
+`publish 1.0.36\Scans\2026-07-09-16-08-54-977-p3e2c-ddf0` reached
+`Completed=466`, `Failed=0`, duplicate exports 0, and `IncompleteRoi=0`, but
+its stop reason was `Scan canceled`, so it is recorded as a runtime sanity
+signal rather than a full-scan completion gate.
+
 ## 2026-07-02 - Published Scanner 1.0.35 With Cloud Client Selection
 
 ### Request Context
