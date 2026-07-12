@@ -132,6 +132,7 @@ await writeJson(path.join(outDir, "static", "catalog.json"), catalog)
 await writeJson(path.join(outDir, "static", "app-config.json"), {
     maintenanceEnabled,
 })
+await ensurePagesScannerPackage()
 
 await cp(path.join(rootDir, "frontend", "assets"), path.join(outDir, "assets"), { recursive: true })
 await copyFile(path.join(rootDir, "frontend", "zzz-mark.svg"), path.join(outDir, "zzz-mark.svg"))

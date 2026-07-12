@@ -59,7 +59,6 @@ The longer scan
 `Completed=466`, `Failed=0`, duplicate exports 0, and `IncompleteRoi=0`, but
 its stop reason was `Scan canceled`, so it is recorded as a runtime sanity
 signal rather than a full-scan completion gate.
-
 ## 2026-07-02 - Published Scanner 1.0.35 With Cloud Client Selection
 
 ### Request Context
