@@ -3,7 +3,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { cleanMaintenanceItem } from "../backend/server.js"
 import { loadCalculatorContext } from "../backend/calculator.js"
-import { validateMaintenanceItem } from "../frontend/maintenanceValidation.js"
+import { validateMaintenanceItem } from "../core/maintenanceValidation.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 

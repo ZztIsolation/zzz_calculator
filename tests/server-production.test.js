@@ -1,16 +1,31 @@
 import assert from "node:assert/strict"
 import { spawn } from "node:child_process"
+import { request as httpRequest } from "node:http"
+import { createServer as createNetServer } from "node:net"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
-let port = 20000 + Math.floor(Math.random() * 1000)
+let port = 0
 let baseUrl = `http://127.0.0.1:${port}`
 let serverOutput = ""
 let server = null
 
-function startServer(extraEnv = {}) {
-    port = 20000 + Math.floor(Math.random() * 1000)
+function availablePort() {
+    return new Promise((resolve, reject) => {
+        const probe = createNetServer()
+        probe.unref()
+        probe.once("error", reject)
+        probe.listen(0, "127.0.0.1", () => {
+            const address = probe.address()
+            const selectedPort = typeof address === "object" && address ? address.port : 0
+            probe.close(error => error ? reject(error) : resolve(selectedPort))
+        })
+    })
+}
+
+async function startServer(extraEnv = {}) {
+    port = await availablePort()
     baseUrl = `http://127.0.0.1:${port}`
     serverOutput = ""
     server = spawn(process.execPath, ["backend/server.js"], {
@@ -34,6 +49,36 @@ function startServer(extraEnv = {}) {
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function buildVueApp() {
+    const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm"
+    return new Promise((resolve, reject) => {
+        let output = ""
+        const child = spawn(npmCommand, ["--prefix", "webapp", "run", "build"], {
+            cwd: rootDir,
+            env: {
+                ...process.env,
+                VITE_INCLUDE_MAINTENANCE: "true",
+            },
+            shell: process.platform === "win32",
+            stdio: ["ignore", "pipe", "pipe"],
+        })
+        child.stdout.on("data", chunk => {
+            output += chunk.toString()
+        })
+        child.stderr.on("data", chunk => {
+            output += chunk.toString()
+        })
+        child.on("error", reject)
+        child.on("exit", code => {
+            if (code === 0) {
+                resolve()
+                return
+            }
+            reject(new Error(`Vue production build failed with exit code ${code}.\n${output}`))
+        })
+    })
 }
 
 async function waitForServer() {
@@ -69,17 +114,42 @@ async function getRedirect(pathname) {
     }
 }
 
+function getRaw(pathname) {
+    return new Promise((resolve, reject) => {
+        const request = httpRequest({
+            hostname: "127.0.0.1",
+            port,
+            method: "GET",
+            path: pathname,
+        }, response => {
+            let body = ""
+            response.setEncoding("utf8")
+            response.on("data", chunk => { body += chunk })
+            response.on("end", () => resolve({ status: response.statusCode, body }))
+        })
+        request.on("error", reject)
+        request.end()
+    })
+}
+
 try {
-    startServer()
+    await buildVueApp()
+    await startServer()
     await waitForServer()
 
     const appConfig = await getText("/api/app-config")
     assert.equal(appConfig.status, 200)
     assert.equal(JSON.parse(appConfig.body).maintenanceEnabled, false)
 
+    const malformedUrl = await getRaw("/%")
+    assert.equal(malformedUrl.status, 400)
+    assert.match(JSON.parse(malformedUrl.body).error, /malformed url/i)
+    assert.equal((await getText("/api/health")).status, 200, "server must remain healthy after malformed URL")
+
     const maintenanceRedirect = await getRedirect("/maintenance")
-    assert.equal(maintenanceRedirect.status, 308)
-    assert.equal(maintenanceRedirect.location, "/maintenance.html")
+    assert.equal(maintenanceRedirect.status, 404)
+    assert.equal(maintenanceRedirect.location, null)
+    assert.equal((await getText("/maintenance/")).status, 404)
     assert.equal((await getText("/maintenance.html")).status, 404)
     assert.equal((await getText("/maintenance.js")).status, 404)
     assert.equal((await getText("/maintenanceValidation.js")).status, 404)
@@ -128,48 +198,51 @@ try {
 
     const appPage = await getText("/")
     assert.equal(appPage.status, 200)
-    const servesVueApp = /<div id="app"><\/div>/.test(appPage.body)
-    if (servesVueApp) {
-        assert.match(appPage.body, /ZZZ Calculator/)
-        assert.equal((await getText("/discs")).status, 200)
-        assert.equal((await getText("/accounts")).status, 200)
-        assert.deepEqual(await getRedirect("/maintenance"), { status: 308, location: "/maintenance.html", body: "" })
-        assert.deepEqual(await getRedirect("/calculate.html"), { status: 308, location: "/", body: "" })
-        assert.deepEqual(await getRedirect("/drive-discs.html"), { status: 308, location: "/discs", body: "" })
-        assert.deepEqual(await getRedirect("/accounts.html"), { status: 308, location: "/accounts", body: "" })
-        assert.equal((await getText("/maintenance.html")).status, 404)
-        assert.equal((await getText("/downloads/zzz-scanner/manifest.json")).status, 200)
-        assert.equal((await getText("/missing-route")).status, 200)
-    } else {
-        assert.match(appPage.body, /驱动盘最优计算/)
-        const legacyOptimizerPage = await getRedirect("/calculate.html")
-        assert.equal(legacyOptimizerPage.status, 308)
-        assert.equal(legacyOptimizerPage.location, "/")
-        assert.equal((await getRedirect("/drive-discs.html")).location, "/discs")
-        assert.equal((await getRedirect("/accounts.html")).location, "/accounts")
-        assert.equal((await getText("/maintenance.html")).status, 404)
-    }
+    assert.match(appPage.body, /<div id="app"><\/div>/)
+    assert.match(appPage.body, /ZZZ Calculator/)
+    assert.equal((await getText("/discs")).status, 200)
+    assert.equal((await getText("/accounts")).status, 200)
+    assert.equal((await getText("/static")).status, 404)
+    assert.equal((await getText("/assets")).status, 404)
+    assert.equal((await getText("/downloads/zzz-scanner")).status, 404)
+    assert.equal((await getText("/api/health")).status, 200, "server must remain healthy after directory requests")
+    assert.equal((await getText("/maintenance")).status, 404)
+    assert.deepEqual(await getRedirect("/calculate.html"), { status: 308, location: "/", body: "" })
+    assert.deepEqual(await getRedirect("/drive-discs.html"), { status: 308, location: "/discs", body: "" })
+    assert.deepEqual(await getRedirect("/accounts.html"), { status: 308, location: "/accounts", body: "" })
+    assert.equal((await getText("/maintenance.html")).status, 404)
+    assert.equal((await getText("/downloads/zzz-scanner/manifest.json")).status, 200)
+    assert.equal((await getText("/missing-route")).status, 200)
 
     assert.equal((await getText("/missing.html")).status, 404)
 
     server.kill()
     await sleep(100)
-    startServer({ MAINTENANCE_ENABLED: "true" })
+    await startServer({ MAINTENANCE_ENABLED: "true" })
     await waitForServer()
 
     const enabledConfig = await getText("/api/app-config")
     assert.equal(enabledConfig.status, 200)
     assert.equal(JSON.parse(enabledConfig.body).maintenanceEnabled, true)
-    assert.deepEqual(await getRedirect("/maintenance"), { status: 308, location: "/maintenance.html", body: "" })
-    const oldMaintenancePage = await getText("/maintenance.html")
-    assert.equal(oldMaintenancePage.status, 200)
-    assert.match(oldMaintenancePage.body, /维护界面/)
-    assert.match(oldMaintenancePage.body, /maintenance\.js/)
-    assert.equal((await getText("/maintenance.js")).status, 200)
-    assert.equal((await getText("/maintenanceValidation.js")).status, 200)
-    assert.equal((await getText("/maintenanceStats.js")).status, 200)
+    const enabledMaintenancePage = await getText("/maintenance")
+    assert.equal(enabledMaintenancePage.status, 200)
+    assert.match(enabledMaintenancePage.body, /<div id="app"><\/div>/)
+    assert.deepEqual(await getRedirect("/maintenance.html"), { status: 308, location: "/maintenance", body: "" })
+    assert.deepEqual(await getRedirect("/maintenance/"), { status: 308, location: "/maintenance", body: "" })
+    assert.equal((await getText("/maintenance.js")).status, 404)
+    assert.equal((await getText("/maintenanceValidation.js")).status, 404)
+    assert.equal((await getText("/maintenanceStats.js")).status, 404)
     const enabledMaintenanceCatalog = await getText("/api/maintenance/catalog")
     assert.equal(enabledMaintenanceCatalog.status, 200)
+    const maintenanceData = JSON.parse(enabledMaintenanceCatalog.body).data
+    assert.ok(Array.isArray(maintenanceData.agents.agents))
+    assert.ok(Array.isArray(maintenanceData.agentSkills.agentSkills))
+    assert.ok(Array.isArray(maintenanceData.wEngines.wEngines))
+    assert.ok(Array.isArray(maintenanceData.driveDiscSets.sets))
+    assert.ok(Array.isArray(maintenanceData.anomalyEffects.effects))
+    assert.ok(Array.isArray(maintenanceData.combatBuffs.teammates))
+    assert.ok(Array.isArray(maintenanceData.combatBuffs.fieldBuffs))
+    assert.ok(Array.isArray(maintenanceData.combatBuffs.bossBuffs))
 } finally {
     server?.kill()
 }

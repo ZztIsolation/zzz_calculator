@@ -88,6 +88,15 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("activeDriveDisc4pcBuffIds")
     expect(source).toContain("selectedBuildOptions.value")
   })
+
+  it("keeps two-piece and four-piece limits in drafts until explicitly applied", () => {
+    expect(source).toContain("draftFourPieceSetId.value = optimizerStore.fourPieceSetId")
+    expect(source).toContain("optimizerStore.setFourPieceSet(draftFourPieceSetId.value)")
+    expect(source).toContain("draftTwoPieceSetIds.value = [...optimizerStore.twoPieceSetIds]")
+    expect(source).toContain("optimizerStore.setTwoPieceSetIds(draftTwoPieceSetIds.value)")
+    expect(source).toContain('@click="showFourPieceSetModal = false">取消')
+    expect(source).toContain('@click="showTwoPieceSetModal = false">取消')
+  })
 })
 
 describe("WorkbenchView optimizer result details", () => {

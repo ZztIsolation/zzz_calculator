@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { calculateInCombatPanel, loadCalculatorContext } from "../backend/calculator.js"
-import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "../backend/driveDiscAnalysis.js"
+import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "../core/driveDiscAnalysis-core.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)

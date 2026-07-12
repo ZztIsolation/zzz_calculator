@@ -5,7 +5,7 @@ import {
     expandCalculationConfigSkillGroups,
     expandCalculationEvents,
     normalizeSkillGroupCounts,
-} from "../frontend/calculationSkillGroups.js"
+} from "../core/calculationSkillGroups.js"
 
 const agent = {
     id: "test_agent",

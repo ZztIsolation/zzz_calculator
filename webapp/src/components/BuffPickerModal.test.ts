@@ -305,6 +305,17 @@ describe("BuffPickerModal", () => {
     expect(payload.selectedBuffIds).toEqual(["agent:agent_a.corePassive"])
   })
 
+  it("discards the draft selection when cancelled", async () => {
+    const wrapper = mountModal()
+    await openModal(wrapper)
+    await wrapper.find(".buff-row-toggle").trigger("click")
+    await nextTick()
+    await buttonByText(wrapper, "取消").trigger("click")
+
+    expect(wrapper.emitted("apply")).toBeUndefined()
+    expect(wrapper.emitted("update:show")?.at(-1)).toEqual([false])
+  })
+
   it("keeps unchecked default buffs unselected when reopening the picker", async () => {
     const wrapper = mountModal({
       defaultIds: ["agent:agent_a.corePassive"],

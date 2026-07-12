@@ -14,7 +14,7 @@ import {
     materializeWEngineForModificationLevel as materializeFrontendWEngine,
     runtimeStackGroups,
     storedEffectRulesText,
-} from "../frontend/shared-combat.js"
+} from "../core/shared-combat.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)

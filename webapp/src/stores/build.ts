@@ -22,10 +22,12 @@ import {
   normalizeRuntimeForBuff,
   defaultWEngineIdForAgent,
   sortWEnginesForAgent,
+} from "@core/shared-combat.js"
+import {
   currentAccountId,
   loadCurrentOwnerSelection,
   saveCurrentOwnerSelection,
-} from "@core/shared-combat.js"
+} from "@runtime/selection-storage.js"
 
 export const STORAGE_KEY = "zzz-calculator.webapp.build.v1"
 const OLD_HOME_SELECTION_KEY = "zzz-calculator.homeSelection.v1"

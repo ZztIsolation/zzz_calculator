@@ -3,11 +3,11 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { calculateInCombatPanel as backendCalculateInCombatPanel, loadCalculatorContext } from "../backend/calculator.js"
-import { analyzeDriveDiscStatDiffs as backendAnalyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains as backendAnalyzeDriveDiscStatGains, analyzeDriveDiscSubstats as backendAnalyzeDriveDiscSubstats } from "../backend/driveDiscAnalysis.js"
+import { analyzeDriveDiscStatDiffs as backendAnalyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains as backendAnalyzeDriveDiscStatGains, analyzeDriveDiscSubstats as backendAnalyzeDriveDiscSubstats } from "../core/driveDiscAnalysis-core.js"
 import { optimizeDriveDiscsAsync as backendOptimizeDriveDiscsAsync, previewDriveDiscOptimization as backendPreviewDriveDiscOptimization } from "../backend/driveDiscOptimizer.js"
-import { calculateInCombatPanel as browserCalculateInCombatPanel } from "../frontend/calculator-core.js"
-import { analyzeDriveDiscStatDiffs as browserAnalyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains as browserAnalyzeDriveDiscStatGains, analyzeDriveDiscSubstats as browserAnalyzeDriveDiscSubstats } from "../frontend/driveDiscAnalysis-core.js"
-import { optimizeDriveDiscsAsync as browserOptimizeDriveDiscsAsync, previewDriveDiscOptimization as browserPreviewDriveDiscOptimization } from "../frontend/driveDiscOptimizer-core.js"
+import { calculateInCombatPanel as browserCalculateInCombatPanel } from "../core/calculator-core.js"
+import { analyzeDriveDiscStatDiffs as browserAnalyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains as browserAnalyzeDriveDiscStatGains, analyzeDriveDiscSubstats as browserAnalyzeDriveDiscSubstats } from "../core/driveDiscAnalysis-core.js"
+import { createDriveDiscOptimizerRuntime, previewDriveDiscOptimization as browserPreviewDriveDiscOptimization } from "../core/driveDiscOptimizer-core.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
@@ -142,9 +142,16 @@ const backendOptimized = await backendOptimizeDriveDiscsAsync(catalog, store, op
 })
 const originalSetImmediate = globalThis.setImmediate
 let browserOptimized
+let browserYieldCount = 0
 try {
     globalThis.setImmediate = undefined
-    browserOptimized = await browserOptimizeDriveDiscsAsync(catalog, store, optimizerInput, {
+    const browserRuntime = createDriveDiscOptimizerRuntime({
+        availableParallelism: () => 1,
+        yieldControl: async () => {
+            browserYieldCount += 1
+        },
+    })
+    browserOptimized = await browserRuntime.optimizeDriveDiscsAsync(catalog, store, optimizerInput, {
         chunkSize: 2,
         progressIntervalMs: 0,
         yieldIntervalMs: 0,
@@ -152,6 +159,8 @@ try {
 } finally {
     globalThis.setImmediate = originalSetImmediate
 }
+
+assert.ok(browserYieldCount > 0, "Browser optimizer should use the injected event-loop yield adapter.")
 
 assert.deepEqual(
     browserOptimized.results.slice(0, 5).map(result => result.driveDiscs.map(disc => disc.id)),

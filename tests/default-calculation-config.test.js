@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import {
     defaultCalculationConfigEntries,
     resolveDefaultCalculationConfig,
-} from "../frontend/defaultCalculationConfig.js"
+} from "../core/defaultCalculationConfig.js"
 
 const config = {
     mode: "custom",

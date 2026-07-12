@@ -599,16 +599,17 @@ function save() {
   <NModal :show="show" preset="card" title="事件管理" style="width: min(1080px, calc(100vw - 16px)); max-width: 1080px" @update:show="emit('update:show', $event)">
     <div class="calculation-grid">
       <aside class="section-band">
-        <label class="metric">
-          <dt>计算方式</dt>
-          <dd>
+        <div class="metric">
+          <span class="metric-title">计算方式</span>
+          <div class="metric-value">
             <NSelect
               :value="draft.mode"
               :options="calculationModeOptions"
+              aria-label="计算方式"
               @update:value="applyMode(String($event))"
             />
-          </dd>
-        </label>
+          </div>
+        </div>
         <div class="panel">
           <div class="panel-header">
             <h3 class="panel-title">目标事件</h3>
@@ -654,46 +655,47 @@ function save() {
           </div>
           <div class="panel-body section-band">
             <div class="metric-grid calculation-editor-grid">
-              <label class="metric calculation-editor-field calculation-editor-field-short">
-                <dt>次数</dt>
-                <dd>
+              <div class="metric calculation-editor-field calculation-editor-field-short">
+                <span class="metric-title">次数</span>
+                <div class="metric-value">
                   <NInputNumber
                     :value="selectedEvent?.count ?? 1"
                     :min="selectedEventCountLimits().min"
                     :max="selectedEventCountLimits().max ?? undefined"
                     :step="selectedEventCountLimits().step"
                     :disabled="isAdminDefaultMode"
+                    aria-label="事件次数"
                     @update:value="updateSelectedEvent({ count: Number($event ?? 1) })"
                   />
-                </dd>
-              </label>
-              <label v-if="selectedEvent?.kind === 'skillGroup'" class="metric calculation-editor-field calculation-editor-field-wide">
-                <dt>技能组</dt>
-                <dd><NSelect :value="selectedEvent?.skillGroupId" :options="skillGroupOptions" :disabled="isAdminDefaultMode" @update:value="updateSelectedSkillGroup(String($event))" /></dd>
-              </label>
-              <label v-if="selectedEvent?.kind === 'skillGroup'" class="metric calculation-editor-field calculation-editor-field-medium">
-                <dt>组内事件</dt>
-                <dd>{{ skillGroupEventCount(selectedSkillGroup()) }} 项</dd>
-              </label>
-              <label v-if="['direct', 'sheer'].includes(selectedEvent?.kind) && skillCategoryOptions.length" class="metric calculation-editor-field calculation-editor-field-medium">
-                <dt>技能大类</dt>
-                <dd><NSelect :value="selectedCategoryId(selectedEvent)" :options="skillCategoryOptions" :disabled="isAdminDefaultMode" @update:value="updateSkillCategory(String($event))" /></dd>
-              </label>
-              <label v-if="['direct', 'sheer'].includes(selectedEvent?.kind) && skillCategoryOptions.length" class="metric calculation-editor-field calculation-editor-field-wide">
-                <dt>招式</dt>
-                <dd><NSelect :value="selectedMoveId(selectedEvent)" :options="moveOptions(selectedEvent)" :disabled="isAdminDefaultMode" @update:value="updateSkillMove(String($event))" /></dd>
-              </label>
-              <label v-if="['direct', 'sheer'].includes(selectedEvent?.kind) && skillCategoryOptions.length" class="metric calculation-editor-field calculation-editor-field-wide">
-                <dt>倍率行</dt>
-                <dd><NSelect :value="selectedRowId(selectedEvent)" :options="rowOptions(selectedEvent)" :disabled="isAdminDefaultMode" @update:value="updateSkillRow(String($event))" /></dd>
-              </label>
-              <label v-if="['direct', 'sheer'].includes(selectedEvent?.kind) && !skillCategoryOptions.length" class="metric calculation-editor-field calculation-editor-field-medium">
-                <dt>技能倍率%</dt>
-                <dd><NInputNumber :value="selectedEvent?.skillMultiplier ?? 100" :min="0" :step="0.1" :disabled="isAdminDefaultMode" @update:value="updateSelectedEvent({ skillMultiplier: Number($event ?? 0) })" /></dd>
-              </label>
-              <label v-if="['direct', 'sheer'].includes(selectedEvent?.kind)" class="metric calculation-editor-field calculation-editor-field-short">
-                <dt>暴击模式</dt>
-                <dd>
+                </div>
+              </div>
+              <div v-if="selectedEvent?.kind === 'skillGroup'" class="metric calculation-editor-field calculation-editor-field-wide">
+                <span class="metric-title">技能组</span>
+                <div class="metric-value"><NSelect :value="selectedEvent?.skillGroupId" :options="skillGroupOptions" :disabled="isAdminDefaultMode" aria-label="技能组" @update:value="updateSelectedSkillGroup(String($event))" /></div>
+              </div>
+              <div v-if="selectedEvent?.kind === 'skillGroup'" class="metric calculation-editor-field calculation-editor-field-medium">
+                <span class="metric-title">组内事件</span>
+                <div class="metric-value">{{ skillGroupEventCount(selectedSkillGroup()) }} 项</div>
+              </div>
+              <div v-if="['direct', 'sheer'].includes(selectedEvent?.kind) && skillCategoryOptions.length" class="metric calculation-editor-field calculation-editor-field-medium">
+                <span class="metric-title">技能大类</span>
+                <div class="metric-value"><NSelect :value="selectedCategoryId(selectedEvent)" :options="skillCategoryOptions" :disabled="isAdminDefaultMode" aria-label="技能大类" @update:value="updateSkillCategory(String($event))" /></div>
+              </div>
+              <div v-if="['direct', 'sheer'].includes(selectedEvent?.kind) && skillCategoryOptions.length" class="metric calculation-editor-field calculation-editor-field-wide">
+                <span class="metric-title">招式</span>
+                <div class="metric-value"><NSelect :value="selectedMoveId(selectedEvent)" :options="moveOptions(selectedEvent)" :disabled="isAdminDefaultMode" aria-label="招式" @update:value="updateSkillMove(String($event))" /></div>
+              </div>
+              <div v-if="['direct', 'sheer'].includes(selectedEvent?.kind) && skillCategoryOptions.length" class="metric calculation-editor-field calculation-editor-field-wide">
+                <span class="metric-title">倍率行</span>
+                <div class="metric-value"><NSelect :value="selectedRowId(selectedEvent)" :options="rowOptions(selectedEvent)" :disabled="isAdminDefaultMode" aria-label="倍率行" @update:value="updateSkillRow(String($event))" /></div>
+              </div>
+              <div v-if="['direct', 'sheer'].includes(selectedEvent?.kind) && !skillCategoryOptions.length" class="metric calculation-editor-field calculation-editor-field-medium">
+                <span class="metric-title">技能倍率%</span>
+                <div class="metric-value"><NInputNumber :value="selectedEvent?.skillMultiplier ?? 100" :min="0" :step="0.1" :disabled="isAdminDefaultMode" aria-label="技能倍率百分比" @update:value="updateSelectedEvent({ skillMultiplier: Number($event ?? 0) })" /></div>
+              </div>
+              <div v-if="['direct', 'sheer'].includes(selectedEvent?.kind)" class="metric calculation-editor-field calculation-editor-field-short">
+                <span class="metric-title">暴击模式</span>
+                <div class="metric-value">
                   <NSelect
                     :value="selectedEvent?.critMode ?? 'expected'"
                     :disabled="isAdminDefaultMode"
@@ -702,41 +704,43 @@ function save() {
                       { label: '暴击', value: 'crit' },
                       { label: '不暴击', value: 'nonCrit' },
                     ]"
+                    aria-label="暴击模式"
                     @update:value="updateSelectedEvent({ critMode: $event })"
                   />
-                </dd>
-              </label>
-              <label v-if="selectedEvent?.kind === 'anomaly'" class="metric calculation-editor-field calculation-editor-field-medium">
-                <dt>结算</dt>
-                <dd>
+                </div>
+              </div>
+              <div v-if="selectedEvent?.kind === 'anomaly'" class="metric calculation-editor-field calculation-editor-field-medium">
+                <span class="metric-title">结算</span>
+                <div class="metric-value">
                   <NSelect
                     :value="selectedEvent?.settlementType ?? 'attribute'"
                     :disabled="isAdminDefaultMode"
                     :options="[{ label: '属性异常', value: 'attribute' }, { label: '紊乱结算', value: 'disorder' }]"
+                    aria-label="异常结算方式"
                     @update:value="updateAnomalySettlementType(String($event))"
                   />
-                </dd>
-              </label>
-              <label v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType !== 'disorder'" class="metric calculation-editor-field calculation-editor-field-wide">
-                <dt>异常类型</dt>
-                <dd><NSelect :value="selectedAnomalyEffectValue(selectedEvent)" :options="anomalyOptionsFor(selectedEvent)" :disabled="isAdminDefaultMode" @update:value="updateSelectedEvent({ anomalyEffect: $event }, { clearLabel: true })" /></dd>
-              </label>
-              <label v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType !== 'disorder'" class="metric calculation-editor-field calculation-editor-field-short">
-                <dt>触发次数</dt>
-                <dd><NInputNumber :value="selectedEvent?.procCount ?? 1" :min="0" :step="1" :disabled="isAdminDefaultMode" @update:value="updateSelectedEvent({ procCount: Number($event ?? 1) })" /></dd>
-              </label>
-              <label v-if="selectedEvent?.kind === 'disorder' || selectedEvent?.settlementType === 'disorder'" class="metric calculation-editor-field calculation-editor-field-wide">
-                <dt>原异常</dt>
-                <dd><NSelect :value="selectedDisorderEffectValue(selectedEvent)" :options="disorderOptionsFor(selectedEvent)" :disabled="isAdminDefaultMode" @update:value="updateDisorderEffect(String($event))" /></dd>
-              </label>
-              <label v-if="selectedEvent?.kind === 'disorder' || selectedEvent?.settlementType === 'disorder'" class="metric calculation-editor-field calculation-editor-field-medium">
-                <dt>紊乱类型</dt>
-                <dd><NSelect :value="selectedEvent?.disorderType ?? 'normal'" :options="[{ label: '普通紊乱', value: 'normal' }, { label: '极性紊乱', value: 'polarized' }]" :disabled="isAdminDefaultMode" @update:value="updateSelectedEvent({ disorderType: $event })" /></dd>
-              </label>
-              <label v-if="selectedEvent?.kind === 'disorder' || selectedEvent?.settlementType === 'disorder'" class="metric calculation-editor-field calculation-editor-field-short">
-                <dt>已流逝秒数</dt>
-                <dd><NInputNumber :value="selectedEvent?.elapsedSeconds ?? 0" :min="0" :step="0.1" :disabled="isAdminDefaultMode" @update:value="updateSelectedEvent({ elapsedSeconds: Number($event ?? 0) })" /></dd>
-              </label>
+                </div>
+              </div>
+              <div v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType !== 'disorder'" class="metric calculation-editor-field calculation-editor-field-wide">
+                <span class="metric-title">异常类型</span>
+                <div class="metric-value"><NSelect :value="selectedAnomalyEffectValue(selectedEvent)" :options="anomalyOptionsFor(selectedEvent)" :disabled="isAdminDefaultMode" aria-label="异常类型" @update:value="updateSelectedEvent({ anomalyEffect: $event }, { clearLabel: true })" /></div>
+              </div>
+              <div v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType !== 'disorder'" class="metric calculation-editor-field calculation-editor-field-short">
+                <span class="metric-title">触发次数</span>
+                <div class="metric-value"><NInputNumber :value="selectedEvent?.procCount ?? 1" :min="0" :step="1" :disabled="isAdminDefaultMode" aria-label="异常触发次数" @update:value="updateSelectedEvent({ procCount: Number($event ?? 1) })" /></div>
+              </div>
+              <div v-if="selectedEvent?.kind === 'disorder' || selectedEvent?.settlementType === 'disorder'" class="metric calculation-editor-field calculation-editor-field-wide">
+                <span class="metric-title">原异常</span>
+                <div class="metric-value"><NSelect :value="selectedDisorderEffectValue(selectedEvent)" :options="disorderOptionsFor(selectedEvent)" :disabled="isAdminDefaultMode" aria-label="紊乱原异常" @update:value="updateDisorderEffect(String($event))" /></div>
+              </div>
+              <div v-if="selectedEvent?.kind === 'disorder' || selectedEvent?.settlementType === 'disorder'" class="metric calculation-editor-field calculation-editor-field-medium">
+                <span class="metric-title">紊乱类型</span>
+                <div class="metric-value"><NSelect :value="selectedEvent?.disorderType ?? 'normal'" :options="[{ label: '普通紊乱', value: 'normal' }, { label: '极性紊乱', value: 'polarized' }]" :disabled="isAdminDefaultMode" aria-label="紊乱类型" @update:value="updateSelectedEvent({ disorderType: $event })" /></div>
+              </div>
+              <div v-if="selectedEvent?.kind === 'disorder' || selectedEvent?.settlementType === 'disorder'" class="metric calculation-editor-field calculation-editor-field-short">
+                <span class="metric-title">已流逝秒数</span>
+                <div class="metric-value"><NInputNumber :value="selectedEvent?.elapsedSeconds ?? 0" :min="0" :step="0.1" :disabled="isAdminDefaultMode" aria-label="异常已流逝秒数" @update:value="updateSelectedEvent({ elapsedSeconds: Number($event ?? 0) })" /></div>
+              </div>
             </div>
             <div v-if="eventWarnings.length" class="chip-row">
               <NTag v-for="warning in eventWarnings" :key="warning" type="warning" round>{{ warning }}</NTag>
@@ -843,7 +847,19 @@ function save() {
   grid-column: span 4;
 }
 
-.calculation-editor-field dd {
+.metric-title {
+  display: block;
+  margin: 0 0 5px;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.metric-value {
+  margin: 0;
+  font-weight: 750;
+}
+
+.calculation-editor-field .metric-value {
   min-width: 0;
 }
 

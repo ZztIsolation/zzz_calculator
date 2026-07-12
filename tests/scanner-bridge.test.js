@@ -40,7 +40,7 @@ function okJson(payload) {
 }
 
 async function loadBridge() {
-    return await import(`../frontend/scanner-bridge.js?case=${Date.now()}-${Math.random()}`)
+    return await import(`../webapp/src/runtime/scanner-bridge.js?case=${Date.now()}-${Math.random()}`)
 }
 
 function assertScannerPackageManifest() {

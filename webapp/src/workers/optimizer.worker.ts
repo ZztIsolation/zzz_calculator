@@ -1,4 +1,9 @@
-import { optimizeDriveDiscsAsync, previewDriveDiscOptimization } from "@core/driveDiscOptimizer-core.js"
+import { createDriveDiscOptimizerRuntime, previewDriveDiscOptimization } from "@core/driveDiscOptimizer-core.js"
+
+const browserOptimizerRuntime = createDriveDiscOptimizerRuntime({
+  yieldControl: () => new Promise(resolve => setTimeout(resolve, 0)),
+  availableParallelism: () => Math.max(1, Number(self.navigator?.hardwareConcurrency ?? 1)),
+})
 
 let activeRunId = ""
 let cancelRequested = false
@@ -84,7 +89,7 @@ self.onmessage = async event => {
       },
     })
 
-    const result = await optimizeDriveDiscsAsync(message.catalog, message.store, input, {
+    const result = await browserOptimizerRuntime.optimizeDriveDiscsAsync(message.catalog, message.store, input, {
       chunkSize: 5000,
       progressIntervalMs: message.settings?.progressIntervalMs ?? 200,
       yieldIntervalMs: message.settings?.yieldIntervalMs ?? 50,

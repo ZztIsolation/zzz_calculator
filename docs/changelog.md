@@ -6,6 +6,184 @@ This changelog is the long-form maintenance log for `zzz_calculator`. Every
 future change to the Zenless Zone Zero calculator should be appended here with
 the reason, the files touched, the model impact, and the verification performed.
 
+## 2026-07-12 - Archived Vue Rewrite And Completed Lossless Repository Cleanup
+
+### Archive And Branch Safety
+
+Before removing legacy code, the complete source snapshot was committed on
+`codex/vue-ui-rewrite` as `5c6e1c8` with message
+`chore(archive): snapshot Vue UI rewrite before cleanup`. Annotated tag
+`archive/vue-ui-rewrite-pre-cleanup-20260712` points to the same commit. Cleanup
+continues only on `codex/vue-ui-rewrite-cleanup`; the archived branch and tag
+remain unchanged so the pre-cleanup implementation can be restored exactly.
+
+The cleanup branch merged the current `origin/main` scanner 1.0.36 work before
+starting migration. It must not be merged into or deployed from `main`
+automatically.
+
+### Cleanup Contract
+
+The cleanup replaces the duplicated static frontend with the Vue application,
+moves platform-neutral calculations, validation, inventory rules and optimizer
+search into `core/`, and keeps browser-only catalog/storage/scanner/Worker
+adapters under `webapp/src/runtime/`. Node and browser adapters must continue to
+share the same business rules while preserving Node worker-thread parallelism
+and browser-local heavy computation.
+
+Feature parity is a hard gate for deletion. The calculator, Buff drafts,
+optimizer progress/cancellation, account-scoped IndexedDB/localStorage data,
+Drive Disc import and scanner flows, all eight maintenance resource types,
+legacy route redirects, Pages catalog/config output, and scanner manifest
+hash/size validation must remain covered by regression tests. The complete
+behavioral requirements now live in `docs/regression-contract.md`.
+
+### Repository Hygiene And Tooling
+
+The cleanup removes tracked Playwright screenshots, the unreferenced root HTML
+calculator, obsolete planning/usability documents, and unused `tailwindcss` and
+`katex` dependencies. `output/` and `.claude/` are ignored without deleting
+untracked local logs or settings. The optimizer benchmark moved from `tests/`
+to `benchmarks/`, keeping `npm run benchmark:optimizer` as its stable entry.
+
+Webapp dependency installation is now explicit: CI and first-time setup run
+`npm --prefix webapp ci`, while `npm run test:webapp` only executes tests. A
+Node 20 CI workflow installs the locked webapp dependencies, runs the complete
+root regression suite and builds the Vue application for branches and pull
+requests. The existing Pages workflow is triggered only by updates to `main`;
+the cleanup branch cannot deploy Pages by itself.
+
+README files now describe only the current Vue/core/backend architecture,
+installation, runtime, routes, tests, Pages deployment and scanner integration.
+All earlier release and modeling history remains in this changelog rather than
+being repeated in the project landing documentation.
+
+### Shared Core And Runtime Migration
+
+Platform-neutral calculation, skill-group expansion, default event loops,
+formula evaluation, combat helpers, maintenance validation, Drive Disc
+analysis, inventory rules and optimizer search now live under `core/`. Browser
+catalog loading, account selection persistence, IndexedDB/localStorage,
+scanner bridging and Worker integration live under `webapp/src/runtime/` or the
+Vue stores. No shared-core module accesses browser globals.
+
+The Node and browser inventory adapters now share normalization, account
+scoping, scanner import and deduplication, content/identity fingerprints,
+loadout remapping and CRUD behavior. The existing database name, object store,
+record key, localStorage key and account ownership defaults remain unchanged so
+previous local data opens without migration or loss.
+
+Loadout reconciliation is scoped by owner as well as Drive Disc ID. Deleting,
+deduplicating or remove-missing synchronization in one account therefore cannot
+clear a same-ID slot in another account; changed loadouts recompute their
+missing slots and completion status.
+
+Drive Disc analysis has one implementation. The optimizer now uses one search
+engine with injected `yieldControl`, `availableParallelism` and optional
+`runParallel` capabilities. Node keeps `worker_threads`; the browser keeps its
+dedicated Worker, preparation progress, cancellation and event-loop yielding.
+Existing algorithms, result structure, progress metrics and cancellation error
+contracts remain stable, including wind-stat weighting.
+
+### Vue Maintenance And Route Completion
+
+The Vue maintenance page now loads and edits agents, agent skills, W-Engines,
+Drive Disc sets, anomaly/disorder effects, teammate Buffs, field Buffs and Boss
+Buffs. It reads the combined `anomalyEffects.effects` shape, preserves anomaly
+settlement types and flattens teammate ID plus Buff ID without losing the
+parent teammate record. The generic combat-Buff category and hidden system
+Buffs are not exposed.
+
+New, copy, edit, business validation, save, delete confirmation, local draft
+recovery and unsaved-navigation protection are implemented. Every successful
+save or delete reloads the complete maintenance catalog. A real HTTP integration
+test copies public data into an isolated temporary directory and verifies that
+all eight resource types can be saved, reloaded and deleted without touching
+the repository's data or local user inventory.
+
+Write acknowledgement is separate from catalog refresh. Once POST or DELETE
+succeeds, a failed follow-up GET is shown as a refresh failure and retrying only
+reloads the catalog, so generated Boss or teammate IDs cannot be inserted
+twice. Mutation buttons are disabled while a request is active. Server-side
+maintenance mutations run through one serialized read-modify-write queue and
+replace JSON through a same-directory temporary file plus atomic rename, which
+prevents concurrent tabs from losing each other's updates or exposing a
+partially written catalog.
+
+The resource selector, record list, common fields and raw JSON editor are also
+locked while a mutation or refresh is in flight. Delayed-response tests verify
+that an in-flight save cannot be redirected to another resource or overwrite
+newly typed content.
+
+When maintenance is disabled, `/maintenance` and `/maintenance.html` return
+404, the API returns 403 and navigation hides the entry. When enabled,
+`/maintenance` serves the Vue app and `/maintenance.html` redirects with 308.
+The calculate, Drive Disc and account legacy HTML paths continue to redirect to
+their Vue routes. The server now serves only `dist/pages`; a missing build gives
+an explicit 503 instruction instead of falling back to retired source files.
+
+The Node service binds to `127.0.0.1` unless `HOST` is explicitly set.
+Maintenance writes accept loopback origins or exact entries from
+`MAINTENANCE_ALLOWED_ORIGINS`, reject DNS-rebinding-style Origin/Host matches,
+and retain the existing wildcard CORS contract for read-only routes. Malformed
+URL percent encoding returns 400 and leaves the process healthy; decoded route
+segments are never decoded a second time.
+
+The scanner manifest now has one tracked source at
+`config/scanner-manifest.json`, while every `downloads/` directory and scanner
+ZIP remains ignored. The Vite build copies that manifest only into the ignored
+runtime artifact, so a plain `npm start` serves scanner metadata from a clean
+checkout and falls back to the GitHub Release when the same-site ZIP is absent.
+The Pages builder reads the same config as its canonical version, size, hash and
+URL source before embedding and re-verifying the package.
+
+### Legacy Removal And Asset Consolidation
+
+After parity tests passed, the entire `frontend/` tree, standalone root
+calculator, duplicate analysis implementation, pass-through maintenance stats,
+obsolete optimizer UI test, old maintenance page, old Worker, CSS and UI helper
+modules were removed. Still-useful optimizer UI assertions moved into Vue
+component, store and Worker tests. The benchmark now lives under `benchmarks/`.
+
+All public images moved to `webapp/public/assets/`. Eleven Drive Disc catalog
+entries now use the smaller higher-resolution WebP files, including the two
+scanner-hash set IDs, and their superseded PNG files were deleted. Repository
+integrity tests validate every catalog `/assets/...` reference and reject
+tracked legacy, build, download, output or local-tool directories.
+
+Ignored scanner archives 1.0.26, 1.0.28, 1.0.33, 1.0.34 and 1.0.35 plus the
+old Helper backup were removed only after the 1.0.36 GitHub Release size and
+SHA-256 matched the local package and manifest. Scanner 1.0.36, the current
+Helper, manifest and `data/user_drive_discs.json` were explicitly retained.
+
+### Verification
+
+The cleanup passed the complete Node and Vue regression suite, including 160
+optimizer fuzz seeds, fixed optimizer fixtures, Node parallel execution,
+browser Worker progress/cancellation, account and historical storage
+compatibility, real maintenance API persistence and production route behavior.
+The final Vue run passed 21 files and 146 tests, and the production build emitted
+no invalid HTML warnings. The Pages builder
+verified SPA and compatibility routes, catalog/config, scanner manifest,
+package size and SHA-256, and absence of maintenance code in the default
+artifact.
+
+The final main-workspace Pages artifact contains 121 files totaling 64,376,889
+bytes, with whole-artifact SHA-256
+`f7414763906a6f9e584b23ff6579485265d2667c8f2f06ed200db7ea1439829c`. The
+independent clean-checkout build downloaded the Release package itself and
+produced 121 files totaling 64,376,930 bytes, with whole-artifact SHA-256
+`65108803660750eecc8a11ac0a7dc6ab3720482e38e8b9827e32f872192c6d79`.
+Vite chunk names can differ with the absolute checkout path, so the aggregate
+artifact hash is build-instance evidence rather than a cross-path reproducible
+identifier. The embedded scanner ZIP remains invariant at SHA-256
+`d885c0aef6da61cfcbf994ad2b4e712a31efe8bd87631260fe4f87ea8711c63d`.
+
+Desktop and 390-pixel mobile browser smoke tests covered calculation, Buff draft
+cancellation, optimizer cancellation, Drive Disc import, scanner fallback,
+account switching and maintenance save/delete against a temporary data copy.
+Both layouts rendered without horizontal overflow, overlapping controls or
+visible broken images.
+
 ## 2026-07-09 - Published Scanner 1.0.36
 
 ### Request Context

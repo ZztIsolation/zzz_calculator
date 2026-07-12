@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 
-import { normalizeCatalogPayload } from "../frontend/calculator-core.js"
+import { normalizeCatalogPayload } from "../core/calculator-core.js"
 
 export {
     buildMeta,
@@ -12,7 +12,7 @@ export {
     materializeWEngineForModificationLevel,
     normalizeCatalog,
     normalizeCatalogPayload,
-} from "../frontend/calculator-core.js"
+} from "../core/calculator-core.js"
 
 async function readJson(filePath) {
     const text = await readFile(filePath, "utf8")

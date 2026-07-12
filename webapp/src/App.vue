@@ -1,13 +1,18 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue"
+import { computed, onMounted, ref } from "vue"
 import { NConfigProvider, NMessageProvider } from "naive-ui"
 import { Calculator, Database, Settings2, UserRound } from "lucide-vue-next"
+import { loadAppConfig } from "@/runtime/app-config"
 import { useAccountStore } from "@/stores/account"
 
 const accountStore = useAccountStore()
+const maintenanceEnabled = ref(false)
 
 onMounted(() => {
   void accountStore.load()
+  void loadAppConfig().then(config => {
+    maintenanceEnabled.value = config.maintenanceEnabled
+  })
 })
 
 const currentAccountLabel = computed(() => accountStore.currentOwner?.label ?? accountStore.currentOwnerId)
@@ -48,10 +53,10 @@ const themeOverrides = {
               <UserRound :size="16" />
               <span>账号</span>
             </RouterLink>
-            <a href="/maintenance.html">
+            <RouterLink v-if="maintenanceEnabled" to="/maintenance">
               <Settings2 :size="16" />
               <span>维护</span>
-            </a>
+            </RouterLink>
           </nav>
           <span class="account-chip">账号 / {{ currentAccountLabel }}</span>
         </header>

@@ -1,4 +1,4 @@
-declare module "@core/catalog-loader.js" {
+declare module "@runtime/catalog-loader.js" {
   export function loadCatalog(): Promise<any>
   export function loadMeta(): Promise<any>
 }
@@ -37,9 +37,15 @@ declare module "@core/defaultCalculationConfig.js" {
 declare module "@core/driveDiscOptimizer-core.js" {
   export function previewDriveDiscOptimization(catalog: any, store: any, input?: any, options?: any): any
   export function optimizeDriveDiscsAsync(catalog: any, store: any, input?: any, options?: any): Promise<any>
+  export function createDriveDiscOptimizerRuntime(runtime?: any): {
+    optimizeDriveDiscsAsync(catalog: any, store: any, input?: any, options?: any): Promise<any>
+  }
 }
 
-declare module "@core/local-store.js" {
+declare module "@runtime/local-store.js" {
+  export function driveDiscContentFingerprint(disc: any): string
+  export function driveDiscIdentityFingerprint(disc: any): string
+  export function ownerScopedStore(store: any, ownerId?: string): any
   export function accountSummary(): Promise<any>
   export function createAccount(account?: any): Promise<any>
   export function updateAccount(id: string, patch?: any): Promise<any>
@@ -47,6 +53,7 @@ declare module "@core/local-store.js" {
   export function deleteAccount(id: string): Promise<any>
   export function loadCurrentUserDriveDiscStore(): Promise<any>
   export function loadUserDriveDiscStore(): Promise<any>
+  export function saveUserDriveDiscStore(store: any): Promise<any>
   export function clearUserDriveDiscStore(ownerId?: string | null): Promise<any>
   export function previewScannerExportImport(input: any, options?: any): Promise<any>
   export function importScannerExportToStore(input: any, options?: any): Promise<any>
@@ -91,6 +98,9 @@ declare module "@core/shared-combat.js" {
   export function runtimeStackGroups(effect?: any): any[]
   export function storedBuffModifierTexts(effect: any): string[]
   export function storedEffectRulesText(effect: any, runtime?: any, meta?: any): string
+}
+
+declare module "@runtime/selection-storage.js" {
   export function currentAccountId(): string
   export function loadCurrentOwnerSelection(ownerId?: string): any
   export function saveCurrentOwnerSelection(selection: any, ownerId?: string): void
@@ -104,10 +114,29 @@ declare module "@core/maintenanceValidation.js" {
   export const FIELD_BUFF_PHASE_OPTIONS: Array<{ phaseNo: number, phaseName: { zhCN: string } }>
   export function fieldBuffModeOption(modeId?: any): { modeId: string, label: string, selectLabel?: { zhCN?: string }, source: { zhCN: string, en?: string } } | null
   export function fieldBuffPhaseName(phaseNo?: any): { zhCN: string } | null
+  export function validateMaintenanceItem(kind: string, item: any, context?: any): { ok: boolean, errors: string[] }
 }
 
 declare module "@core/drive-disc-core.js" {
   export function toCalculatorDriveDisc(inventoryDisc?: any): any
+}
+
+declare module "@core/inventory-model.js" {
+  export function driveDiscContentFingerprint(disc: any, options?: any): string
+  export function driveDiscIdentityFingerprint(disc: any, options?: any): string
+  export function normalizeInventoryStore(store?: any, options?: any): any
+  export function ownerScopedStore(store: any, ownerId?: string, options?: any): any
+  export function buildScannerImportPlan(store: any, input: any, options?: any): any
+  export function clearOwnerInventory(store: any, ownerId?: string | null): any
+  export function upsertDriveDisc(store: any, driveDisc: any, options?: any): any
+  export function deleteDriveDisc(store: any, id: string): any
+  export function upsertDriveDiscLoadout(store: any, loadout: any): any
+  export function deleteDriveDiscLoadout(store: any, id: string): any
+  export function accountSummary(store: any): any
+  export function createAccount(store: any, account?: any): any
+  export function updateAccount(store: any, id: string, patch?: any): any
+  export function switchAccount(store: any, id: string): any
+  export function deleteAccount(store: any, id: string): any
 }
 
 declare module "@core/driveDiscAnalysis-core.js" {
@@ -116,7 +145,7 @@ declare module "@core/driveDiscAnalysis-core.js" {
   export function analyzeDriveDiscStatDiffs(catalog: any, input?: any): any
 }
 
-declare module "@core/scanner-bridge.js" {
+declare module "@runtime/scanner-bridge.js" {
   export class ScannerBridge {
     onProgress: ((payload: any) => void) | null
     onLauncherProgress: ((payload: any) => void) | null

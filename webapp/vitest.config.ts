@@ -10,7 +10,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
-      "@core": path.resolve(__dirname, "../frontend"),
+      "@core": path.resolve(__dirname, "../core"),
+      "@runtime": path.resolve(__dirname, "src/runtime"),
     },
   },
   test: {

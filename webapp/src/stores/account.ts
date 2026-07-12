@@ -5,8 +5,8 @@ import {
   deleteAccount,
   switchAccount,
   updateAccount,
-} from "@core/local-store.js"
-import { deleteOwnerSelection, setCurrentAccountId } from "@core/shared-combat.js"
+} from "@runtime/local-store.js"
+import { deleteOwnerSelection, setCurrentAccountId } from "@runtime/selection-storage.js"
 
 export const useAccountStore = defineStore("account", {
   state: () => ({

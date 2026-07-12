@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "launcherMinVersion": "1.0.0",
+  "scannerVersion": "1.0.36",
+  "packageUrl": "./1.0.36/ZZZ-Scanner.Next-win-x64.zip",
+  "packageUrls": [
+    "./1.0.36/ZZZ-Scanner.Next-win-x64.zip",
+    "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.36/ZZZ-Scanner.Next-win-x64.zip"
+  ],
+  "sha256": "d885c0aef6da61cfcbf994ad2b4e712a31efe8bd87631260fe4f87ea8711c63d",
+  "size": 47231570,
+  "entry": "ZZZ-Scanner.Next.exe"
+}

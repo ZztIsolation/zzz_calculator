@@ -1,11 +1,11 @@
 import { createServer } from "node:http"
 import { createHash, randomUUID } from "node:crypto"
-import { readFile, writeFile } from "node:fs/promises"
-import { createReadStream, existsSync } from "node:fs"
+import { readFile, rename, rm, writeFile } from "node:fs/promises"
+import { createReadStream, existsSync, statSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { buildMeta, calculateInCombatPanel, calculateOutOfCombatPanel, loadCalculatorContext } from "./calculator.js"
-import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "./driveDiscAnalysis.js"
+import { buildMeta, calculateInCombatPanel, calculateOutOfCombatPanel, loadCatalog } from "./calculator.js"
+import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "../core/driveDiscAnalysis-core.js"
 import { OptimizerCancelledError, optimizeDriveDiscs, optimizeDriveDiscsAsync, previewDriveDiscOptimization } from "./driveDiscOptimizer.js"
 import {
     accountSummary,
@@ -27,21 +27,38 @@ import {
     assertValidMaintenanceItem,
     fieldBuffModeOption,
     fieldBuffPhaseName,
-} from "../frontend/maintenanceValidation.js"
+} from "../core/maintenanceValidation.js"
 import {
     defaultCalculationVariantName,
     isDefaultCalculationCinemaLevel,
     normalizeDefaultCalculationCinemaLevel,
-} from "../frontend/defaultCalculationConfig.js"
+} from "../core/defaultCalculationConfig.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, "..")
-const dataDir = path.join(rootDir, "data")
-const frontendDir = path.join(rootDir, "frontend")
+const dataDir = process.env.ZZZ_CALCULATOR_DATA_DIR
+    ? path.resolve(process.env.ZZZ_CALCULATOR_DATA_DIR)
+    : path.join(rootDir, "data")
+const exampleDir = path.join(rootDir, "examples")
 const pagesDir = path.join(rootDir, "dist", "pages")
 const port = Number(process.env.PORT || 8787)
+const host = String(process.env.HOST || "127.0.0.1").trim() || "127.0.0.1"
 const nodeEnv = String(process.env.NODE_ENV ?? "development").toLowerCase()
 const DAMAGE_ELEMENTS = new Set(["physical", "fire", "ice", "electric", "ether", "wind"])
+const maintenanceAllowedOrigins = new Set(
+    String(process.env.MAINTENANCE_ALLOWED_ORIGINS ?? "")
+        .split(",")
+        .map(value => value.trim())
+        .filter(Boolean)
+        .map(value => {
+            try {
+                return new URL(value).origin
+            } catch {
+                return ""
+            }
+        })
+        .filter(Boolean),
+)
 
 function envFlag(name) {
     const value = process.env[name]
@@ -61,9 +78,54 @@ function isMaintenanceEnabled() {
     return envFlag("MAINTENANCE_ENABLED") ?? nodeEnv !== "production"
 }
 
-function isMaintenanceStaticPath(pathname) {
-    return pathname === "/maintenance.html"
-        || pathname === "/maintenance.js"
+function maintenanceRequestMethod(req) {
+    if (req.method === "OPTIONS") {
+        return String(req.headers["access-control-request-method"] ?? "").toUpperCase()
+    }
+    return String(req.method ?? "GET").toUpperCase()
+}
+
+function isMaintenanceWriteRequest(req, pathname) {
+    return pathname.startsWith("/api/maintenance/")
+        && ["POST", "PUT", "PATCH", "DELETE"].includes(maintenanceRequestMethod(req))
+}
+
+function isLoopbackHostname(hostname) {
+    const normalized = String(hostname ?? "").toLowerCase().replace(/^\[|\]$/g, "")
+    return normalized === "localhost"
+        || normalized.endsWith(".localhost")
+        || normalized === "::1"
+        || /^127(?:\.\d{1,3}){3}$/.test(normalized)
+}
+
+function isAllowedMaintenanceOrigin(req) {
+    const origin = String(req.headers.origin ?? "").trim()
+    if (!origin) {
+        return true
+    }
+    let parsedOrigin
+    try {
+        parsedOrigin = new URL(origin)
+    } catch {
+        return false
+    }
+    return maintenanceAllowedOrigins.has(parsedOrigin.origin)
+        || isLoopbackHostname(parsedOrigin.hostname)
+}
+
+function applyMaintenanceCors(req, res) {
+    const origin = String(req.headers.origin ?? "").trim()
+    if (!origin) {
+        return
+    }
+    res.setHeader("Access-Control-Allow-Origin", origin)
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type")
+    res.setHeader("Vary", "Origin")
+}
+
+function isLegacyMaintenanceStaticPath(pathname) {
+    return pathname === "/maintenance.js"
         || pathname === "/maintenanceValidation.js"
         || pathname === "/maintenanceStats.js"
 }
@@ -109,7 +171,7 @@ function createRequestStore(input = {}) {
     }
 }
 
-let catalog = await loadCalculatorContext(rootDir)
+let catalog = await loadCatalog(dataDir, exampleDir)
 const optimizerJobs = new Map()
 const OPTIMIZER_JOB_TTL_MS = 10 * 60 * 1000
 
@@ -130,10 +192,6 @@ const maintenanceResources = {
         fileName: "drive_disc_sets.json",
         collectionKey: "sets",
     },
-    "combat-buffs": {
-        fileName: "combat_buffs.json",
-        collectionKey: "buffs",
-    },
     "field-buffs": {
         fileName: "combat_buffs.json",
         collectionKey: "fieldBuffs",
@@ -147,33 +205,39 @@ const maintenanceResources = {
     },
 }
 
+function applyDefaultCors(res) {
+    if (!res.hasHeader("Access-Control-Allow-Origin")) {
+        res.setHeader("Access-Control-Allow-Origin", "*")
+    }
+    if (!res.hasHeader("Access-Control-Allow-Methods")) {
+        res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
+    }
+    if (!res.hasHeader("Access-Control-Allow-Headers")) {
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type")
+    }
+}
+
 function sendJson(res, statusCode, payload) {
     const text = JSON.stringify(payload, null, 2)
+    applyDefaultCors(res)
     res.writeHead(statusCode, {
         "Content-Type": "application/json; charset=utf-8",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
     })
     res.end(text)
 }
 
 function sendText(res, statusCode, text, contentType) {
+    applyDefaultCors(res)
     res.writeHead(statusCode, {
         "Content-Type": contentType,
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
     })
     res.end(text)
 }
 
 function sendRedirect(res, location, statusCode = 308) {
+    applyDefaultCors(res)
     res.writeHead(statusCode, {
         "Location": location,
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
     })
     res.end()
 }
@@ -191,8 +255,28 @@ async function readDataFile(fileName) {
 }
 
 async function writeDataFile(fileName, payload) {
-    await writeFile(path.join(dataDir, fileName), `${JSON.stringify(payload, null, 2)}\n`, "utf8")
-    catalog = await loadCalculatorContext(rootDir)
+    const targetPath = path.join(dataDir, fileName)
+    const tempPath = path.join(dataDir, `.${fileName}.${process.pid}.${randomUUID()}.tmp`)
+    try {
+        await writeFile(tempPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8")
+        await rename(tempPath, targetPath)
+    } finally {
+        await rm(tempPath, { force: true }).catch(() => {})
+    }
+    catalog = await loadCatalog(dataDir, exampleDir)
+}
+
+let maintenanceMutationQueue = Promise.resolve()
+
+function mutateDataFile(fileName, mutation) {
+    const run = maintenanceMutationQueue.then(async () => {
+        const payload = await readDataFile(fileName)
+        const result = await mutation(payload)
+        await writeDataFile(fileName, result.payload)
+        return result.value
+    })
+    maintenanceMutationQueue = run.then(() => undefined, () => undefined)
+    return run
 }
 
 function optimizerPercent(metrics = {}, status = "running") {
@@ -1095,32 +1179,35 @@ function cleanAnomalyMaintenanceItem(item = {}) {
 }
 
 async function saveAnomalyMaintenanceItem(item) {
-    const payload = await readDataFile("anomaly_effects.json")
-    const settlementType = anomalyMaintenanceType(item)
-    assertValidMaintenanceItem("anomaly-effects", item, {
-        items: anomalyEffectsForType(payload, settlementType),
-        currentId: item?.id,
+    return mutateDataFile("anomaly_effects.json", payload => {
+        const settlementType = anomalyMaintenanceType(item)
+        assertValidMaintenanceItem("anomaly-effects", item, {
+            items: anomalyEffectsForType(payload, settlementType),
+            currentId: item?.id,
+        })
+        const { cleaned, savedItem } = cleanAnomalyMaintenanceItem(item)
+        const nextPayload = anomalyPayloadWithEffects(
+            payload,
+            upsertAnomalyEffect(rawAnomalyEffectsFromPayload(payload), cleaned),
+        )
+        return {
+            payload: nextPayload,
+            value: {
+                payload: nextPayload,
+                savedItem,
+            },
+        }
     })
-    const { cleaned, savedItem } = cleanAnomalyMaintenanceItem(item)
-    const nextPayload = anomalyPayloadWithEffects(
-        payload,
-        upsertAnomalyEffect(rawAnomalyEffectsFromPayload(payload), cleaned),
-    )
-    await writeDataFile("anomaly_effects.json", nextPayload)
-    return {
-        payload: nextPayload,
-        savedItem,
-    }
 }
 
 async function deleteAnomalyMaintenanceItem(maintenanceType, id) {
-    const payload = await readDataFile("anomaly_effects.json")
-    const nextPayload = anomalyPayloadWithEffects(
-        payload,
-        deleteAnomalyEffectByType(rawAnomalyEffectsFromPayload(payload), maintenanceType, id),
-    )
-    await writeDataFile("anomaly_effects.json", nextPayload)
-    return nextPayload
+    return mutateDataFile("anomaly_effects.json", payload => {
+        const nextPayload = anomalyPayloadWithEffects(
+            payload,
+            deleteAnomalyEffectByType(rawAnomalyEffectsFromPayload(payload), maintenanceType, id),
+        )
+        return { payload: nextPayload, value: nextPayload }
+    })
 }
 
 async function saveMaintenanceItem(resource, item) {
@@ -1133,40 +1220,46 @@ async function saveMaintenanceItem(resource, item) {
         throw new Error(`Unsupported maintenance resource: ${resource}`)
     }
 
-    const payload = await readDataFile(config.fileName)
-    const collection = payload[config.collectionKey] ?? []
-    const fieldBuffOriginalId = resource === "field-buffs"
-        ? existingMaintenanceOriginalId(item, collection)
-        : ""
-    const cleanOptions = fieldBuffOriginalId ? { originalId: fieldBuffOriginalId } : {}
-    const validationContext = {
-        items: collection,
-        currentId: fieldBuffOriginalId || item?.id,
-    }
-    if (resource === "agents") {
-        const [agentSkillsPayload, anomalyEffectsPayload, driveDiscSetsPayload] = await Promise.all([
-            readDataFile("agent_skills.json"),
-            readDataFile("anomaly_effects.json"),
-            readDataFile("drive_disc_sets.json"),
-        ])
-        validationContext.agentSkills = agentSkillsPayload.agentSkills ?? []
-        validationContext.anomalyEffects = anomalyEffectsForType(anomalyEffectsPayload, "attribute")
-        validationContext.disorderEffects = anomalyEffectsForType(anomalyEffectsPayload, "disorder")
-        validationContext.driveDiscSets = driveDiscSetsPayload.sets ?? []
-    }
-    const itemForValidation = resource === "field-buffs"
-        ? cleanMaintenanceItem(resource, item, cleanOptions)
-        : item
-    assertValidMaintenanceItem(resource, itemForValidation, validationContext)
-    const savedItem = resource === "field-buffs"
-        ? itemForValidation
-        : cleanMaintenanceItem(resource, item)
-    payload[config.collectionKey] = upsertById(collection, savedItem)
-    await writeDataFile(config.fileName, payload)
-    return {
-        payload,
-        savedItem,
-    }
+    return mutateDataFile(config.fileName, async payload => {
+        const collection = payload[config.collectionKey] ?? []
+        const fieldBuffOriginalId = resource === "field-buffs"
+            ? existingMaintenanceOriginalId(item, collection)
+            : ""
+        const cleanOptions = fieldBuffOriginalId ? { originalId: fieldBuffOriginalId } : {}
+        const validationContext = {
+            items: collection,
+            currentId: fieldBuffOriginalId || item?.id,
+        }
+        if (resource === "agents") {
+            const [agentSkillsPayload, anomalyEffectsPayload, driveDiscSetsPayload] = await Promise.all([
+                readDataFile("agent_skills.json"),
+                readDataFile("anomaly_effects.json"),
+                readDataFile("drive_disc_sets.json"),
+            ])
+            validationContext.agentSkills = agentSkillsPayload.agentSkills ?? []
+            validationContext.anomalyEffects = anomalyEffectsForType(anomalyEffectsPayload, "attribute")
+            validationContext.disorderEffects = anomalyEffectsForType(anomalyEffectsPayload, "disorder")
+            validationContext.driveDiscSets = driveDiscSetsPayload.sets ?? []
+        }
+        const itemForValidation = resource === "field-buffs"
+            ? cleanMaintenanceItem(resource, item, cleanOptions)
+            : item
+        assertValidMaintenanceItem(resource, itemForValidation, validationContext)
+        const savedItem = resource === "field-buffs"
+            ? itemForValidation
+            : cleanMaintenanceItem(resource, item)
+        const nextPayload = {
+            ...payload,
+            [config.collectionKey]: upsertById(collection, savedItem),
+        }
+        return {
+            payload: nextPayload,
+            value: {
+                payload: nextPayload,
+                savedItem,
+            },
+        }
+    })
 }
 
 async function deleteMaintenanceItem(resource, id) {
@@ -1179,66 +1272,75 @@ async function deleteMaintenanceItem(resource, id) {
         throw new Error(`Unsupported maintenance resource: ${resource}`)
     }
 
-    const payload = await readDataFile(config.fileName)
-    payload[config.collectionKey] = deleteById(payload[config.collectionKey] ?? [], id)
-    await writeDataFile(config.fileName, payload)
-    return payload
+    return mutateDataFile(config.fileName, payload => {
+        const nextPayload = {
+            ...payload,
+            [config.collectionKey]: deleteById(payload[config.collectionKey] ?? [], id),
+        }
+        return { payload: nextPayload, value: nextPayload }
+    })
 }
 
 async function saveTeammateBuff(input) {
-    const payload = await readDataFile("combat_buffs.json")
-    assertValidMaintenanceItem("teammate-buffs", input, {
-        teammates: payload.teammates ?? [],
-        currentBuffId: input?.buff?.id,
+    return mutateDataFile("combat_buffs.json", payload => {
+        assertValidMaintenanceItem("teammate-buffs", input, {
+            teammates: payload.teammates ?? [],
+            currentBuffId: input?.buff?.id,
+        })
+        const teammate = cleanTeammate(input?.teammate ?? {})
+        const buff = cleanBuff(input?.buff ?? {})
+        delete buff.sourceLabel
+        const teammateId = requireId(teammate, "teammate")
+        requireId(buff, "buff")
+
+        const teammates = [...(payload.teammates ?? [])]
+        const index = teammates.findIndex(item => item.id === teammateId)
+        const nextTeammate = {
+            ...(index >= 0 ? teammates[index] : {}),
+            ...teammate,
+            id: teammateId,
+            buffs: upsertById(index >= 0 ? teammates[index].buffs ?? [] : [], buff),
+        }
+
+        if (index >= 0) {
+            teammates[index] = nextTeammate
+        } else {
+            teammates.push(nextTeammate)
+        }
+
+        const nextPayload = { ...payload, teammates }
+        return {
+            payload: nextPayload,
+            value: {
+                payload: nextPayload,
+                savedItem: {
+                    ...buff,
+                    maintenanceType: "teammate",
+                    teammateId,
+                    teammateName: teammate.name,
+                },
+            },
+        }
     })
-    const teammate = cleanTeammate(input?.teammate ?? {})
-    const buff = cleanBuff(input?.buff ?? {})
-    delete buff.sourceLabel
-    const teammateId = requireId(teammate, "teammate")
-    requireId(buff, "buff")
-
-    const teammates = [...(payload.teammates ?? [])]
-    const index = teammates.findIndex(item => item.id === teammateId)
-    const nextTeammate = {
-        ...(index >= 0 ? teammates[index] : {}),
-        ...teammate,
-        id: teammateId,
-        buffs: upsertById(index >= 0 ? teammates[index].buffs ?? [] : [], buff),
-    }
-
-    if (index >= 0) {
-        teammates[index] = nextTeammate
-    } else {
-        teammates.push(nextTeammate)
-    }
-
-    payload.teammates = teammates
-    await writeDataFile("combat_buffs.json", payload)
-    return {
-        payload,
-        savedItem: {
-            ...buff,
-            maintenanceType: "teammate",
-            teammateId,
-            teammateName: teammate.name,
-        },
-    }
 }
 
 async function deleteTeammateBuff(teammateId, buffId) {
-    const payload = await readDataFile("combat_buffs.json")
-    payload.teammates = (payload.teammates ?? []).map(teammate => {
-        if (teammate.id !== teammateId) {
-            return teammate
-        }
+    return mutateDataFile("combat_buffs.json", payload => {
+        const nextPayload = {
+            ...payload,
+            teammates: (payload.teammates ?? []).map(teammate => {
+                if (teammate.id !== teammateId) {
+                    return teammate
+                }
 
-        return {
-            ...teammate,
-            buffs: deleteById(teammate.buffs ?? [], buffId),
+                return {
+                    ...teammate,
+                    buffs: deleteById(teammate.buffs ?? [], buffId),
+                }
+            }),
         }
+        return { payload: nextPayload, value: nextPayload }
     })
-    await writeDataFile("combat_buffs.json", payload)
-    return payload
 }
 
 function contentType(filePath) {
@@ -1271,14 +1373,37 @@ function isSafeStaticPath(root, absPath) {
     return !(relativePath.startsWith("..") || path.isAbsolute(relativePath))
 }
 
-function streamStaticFile(res, absPath) {
-    res.writeHead(200, {
-        "Content-Type": contentType(absPath),
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
+function streamFileResponse(res, absPath, headers = {}) {
+    return new Promise(resolve => {
+        const stream = createReadStream(absPath)
+        let settled = false
+        const finish = () => {
+            if (settled) return
+            settled = true
+            resolve()
+        }
+        stream.once("open", () => {
+            applyDefaultCors(res)
+            res.writeHead(200, headers)
+            stream.pipe(res)
+        })
+        stream.once("error", error => {
+            if (!res.headersSent) {
+                sendText(res, error?.code === "ENOENT" ? 404 : 500, error?.code === "ENOENT" ? "Not Found" : "File read failed", "text/plain; charset=utf-8")
+            } else {
+                res.destroy(error)
+            }
+            finish()
+        })
+        stream.once("end", finish)
+        res.once("close", finish)
     })
-    createReadStream(absPath).pipe(res)
+}
+
+function streamStaticFile(res, absPath) {
+    return streamFileResponse(res, absPath, {
+        "Content-Type": contentType(absPath),
+    })
 }
 
 function resolveStaticCandidate(root, fileName) {
@@ -1286,13 +1411,29 @@ function resolveStaticCandidate(root, fileName) {
     if (!isSafeStaticPath(root, absPath)) {
         return { forbidden: true, absPath }
     }
-    return { forbidden: false, absPath, exists: existsSync(absPath) }
+    try {
+        const fileStat = statSync(absPath)
+        return {
+            forbidden: false,
+            absPath,
+            exists: fileStat.isFile(),
+            isDirectory: fileStat.isDirectory(),
+        }
+    } catch {
+        return { forbidden: false, absPath, exists: false, isDirectory: false }
+    }
 }
 
 async function serveStatic(res, pathname) {
-    if (pathname === "/maintenance") {
-        sendRedirect(res, "/maintenance.html")
-        return
+    if (pathname === "/maintenance" || pathname === "/maintenance/" || pathname === "/maintenance.html") {
+        if (!isMaintenanceEnabled()) {
+            sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
+            return
+        }
+        if (pathname !== "/maintenance") {
+            sendRedirect(res, "/maintenance")
+            return
+        }
     }
     if (pathname === "/calculate.html") {
         sendRedirect(res, "/")
@@ -1307,40 +1448,35 @@ async function serveStatic(res, pathname) {
         return
     }
 
-    if (!isMaintenanceEnabled() && isMaintenanceStaticPath(pathname)) {
+    if (isLegacyMaintenanceStaticPath(pathname)) {
         sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
         return
     }
 
     const fileName = pathname === "/" ? "index.html" : pathname.replace(/^\//, "")
 
-    if (isMaintenanceEnabled() && isMaintenanceStaticPath(pathname)) {
-        const candidate = resolveStaticCandidate(frontendDir, fileName)
-        if (candidate.forbidden) {
-            sendText(res, 403, "Forbidden", "text/plain; charset=utf-8")
-            return
-        }
-        if (candidate.exists) {
-            streamStaticFile(res, candidate.absPath)
-            return
-        }
+    const candidate = resolveStaticCandidate(pagesDir, fileName)
+    if (candidate.forbidden) {
+        sendText(res, 403, "Forbidden", "text/plain; charset=utf-8")
+        return
     }
-
-    for (const root of [pagesDir, frontendDir]) {
-        const candidate = resolveStaticCandidate(root, fileName)
-        if (candidate.forbidden) {
-            sendText(res, 403, "Forbidden", "text/plain; charset=utf-8")
-            return
-        }
-        if (candidate.exists) {
-            streamStaticFile(res, candidate.absPath)
-            return
-        }
+    if (candidate.isDirectory) {
+        sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
+        return
+    }
+    if (candidate.exists) {
+        await streamStaticFile(res, candidate.absPath)
+        return
     }
 
     const spaIndex = path.join(pagesDir, "index.html")
     if (!path.extname(pathname) && existsSync(spaIndex)) {
-        streamStaticFile(res, spaIndex)
+        await streamStaticFile(res, spaIndex)
+        return
+    }
+
+    if (!existsSync(spaIndex) && !path.extname(pathname)) {
+        sendText(res, 503, "Vue build not found. Run `npm run build:webapp` before `npm run serve`.", "text/plain; charset=utf-8")
         return
     }
 
@@ -1359,18 +1495,39 @@ async function serveDownload(res, pathname) {
             continue
         }
         const stat = await import("node:fs/promises").then(m => m.stat(absPath))
-        res.writeHead(200, {
+        if (!stat.isFile()) {
+            continue
+        }
+        await streamFileResponse(res, absPath, {
             "Content-Type": contentType(absPath),
             "Content-Disposition": `attachment; filename="${encodeURIComponent(path.basename(absPath))}"`,
             "Content-Length": stat.size,
         })
-        createReadStream(absPath).pipe(res)
         return
     }
     sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
 }
 
 async function routeApi(req, res, pathname) {
+    if (!isMaintenanceEnabled() && pathname.startsWith("/api/maintenance/")) {
+        sendJson(res, 403, {
+            ok: false,
+            error: "Maintenance is disabled in production.",
+        })
+        return
+    }
+
+    if (isMaintenanceWriteRequest(req, pathname)) {
+        if (!isAllowedMaintenanceOrigin(req)) {
+            sendJson(res, 403, {
+                ok: false,
+                error: "Cross-origin maintenance writes are not allowed.",
+            })
+            return
+        }
+        applyMaintenanceCors(req, res)
+    }
+
     if (req.method === "OPTIONS") {
         sendText(res, 204, "", "text/plain; charset=utf-8")
         return
@@ -1398,14 +1555,6 @@ async function routeApi(req, res, pathname) {
 
     if (req.method === "GET" && pathname === "/api/catalog") {
         sendJson(res, 200, catalog)
-        return
-    }
-
-    if (!isMaintenanceEnabled() && pathname.startsWith("/api/maintenance/")) {
-        sendJson(res, 403, {
-            ok: false,
-            error: "Maintenance is disabled in production.",
-        })
         return
     }
 
@@ -1472,7 +1621,7 @@ async function routeApi(req, res, pathname) {
     }
 
     if (pathname.startsWith("/api/accounts/")) {
-        const id = decodeURIComponent(pathname.slice("/api/accounts/".length))
+        const id = pathname.slice("/api/accounts/".length)
         if (!id) {
             sendJson(res, 400, {
                 ok: false,
@@ -1562,11 +1711,11 @@ async function routeApi(req, res, pathname) {
 
             if (req.method === "DELETE") {
                 if (resource === "teammate-buffs") {
-                    await deleteTeammateBuff(decodeURIComponent(parts[1] ?? ""), decodeURIComponent(parts[2] ?? ""))
+                    await deleteTeammateBuff(parts[1] ?? "", parts[2] ?? "")
                 } else if (resource === "anomaly-effects") {
-                    await deleteAnomalyMaintenanceItem(decodeURIComponent(parts[1] ?? "anomaly"), decodeURIComponent(parts[2] ?? ""))
+                    await deleteAnomalyMaintenanceItem(parts[1] ?? "anomaly", parts[2] ?? "")
                 } else {
-                    await deleteMaintenanceItem(resource, decodeURIComponent(parts[1] ?? ""))
+                    await deleteMaintenanceItem(resource, parts[1] ?? "")
                 }
                 sendJson(res, 200, {
                     ok: true,
@@ -1733,7 +1882,7 @@ async function routeApi(req, res, pathname) {
     }
 
     if (pathname.startsWith("/api/optimize/drive-discs/jobs/")) {
-        const id = decodeURIComponent(pathname.slice("/api/optimize/drive-discs/jobs/".length))
+        const id = pathname.slice("/api/optimize/drive-discs/jobs/".length)
         const job = optimizerJobs.get(id)
         if (!id || !job) {
             sendJson(res, 404, {
@@ -1836,7 +1985,7 @@ async function routeApi(req, res, pathname) {
     }
 
     if (pathname.startsWith("/api/user-drive-disc-loadouts/")) {
-        const id = decodeURIComponent(pathname.slice("/api/user-drive-disc-loadouts/".length))
+        const id = pathname.slice("/api/user-drive-disc-loadouts/".length)
         if (!id) {
             sendJson(res, 400, {
                 ok: false,
@@ -1927,7 +2076,7 @@ async function routeApi(req, res, pathname) {
     }
 
     if (pathname.startsWith("/api/user-drive-discs/")) {
-        const id = decodeURIComponent(pathname.slice("/api/user-drive-discs/".length))
+        const id = pathname.slice("/api/user-drive-discs/".length)
         if (!id) {
             sendJson(res, 400, {
                 ok: false,
@@ -1977,10 +2126,22 @@ async function routeApi(req, res, pathname) {
 const downloadsDir = path.join(rootDir, "downloads")
 
 const server = createServer(async (req, res) => {
-    const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`)
-    const pathname = decodeURIComponent(url.pathname)
-
     try {
+        const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`)
+        let pathname
+        try {
+            pathname = decodeURIComponent(url.pathname)
+        } catch (error) {
+            if (error instanceof URIError) {
+                sendJson(res, 400, {
+                    ok: false,
+                    error: "Malformed URL encoding.",
+                })
+                return
+            }
+            throw error
+        }
+
         if (pathname.startsWith("/api/")) {
             await routeApi(req, res, pathname)
             return
@@ -2001,7 +2162,10 @@ const server = createServer(async (req, res) => {
 })
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-    server.listen(port, () => {
-        console.log(`ZZZ calculator running at http://localhost:${port}`)
+    if (!existsSync(path.join(pagesDir, "index.html"))) {
+        console.warn("Vue build not found. Run `npm run build:webapp` before `npm run serve`.")
+    }
+    server.listen(port, host, () => {
+        console.log(`ZZZ calculator running at http://${host}:${port}`)
     })
 }

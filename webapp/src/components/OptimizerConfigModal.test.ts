@@ -45,7 +45,7 @@ const naiveStubs = {
 
 let wrappers: Array<ReturnType<typeof mount>> = []
 
-function mountModal() {
+function mountModal(propOverrides: Record<string, any> = {}) {
   const wrapper = mount(OptimizerConfigModal, {
     attachTo: document.body,
     props: {
@@ -71,6 +71,7 @@ function mountModal() {
         { key: "critDmg", label: "暴击伤害%" },
       ],
       fourPieceRuntimeBuffs: [],
+      ...propOverrides,
     },
     global: {
       stubs: naiveStubs,
@@ -140,6 +141,56 @@ describe("OptimizerConfigModal", () => {
       minimums: {
         critRate: 50,
       },
+    })
+  })
+
+  it("discards draft changes when cancelled", async () => {
+    const wrapper = mountModal()
+    await openModal(wrapper)
+    const algorithmSelect = selectComponentWithOption(wrapper, "heuristic-potential")
+    await algorithmSelect!.vm.$emit("update:value", "heuristic-potential")
+    await nextTick()
+
+    const cancelButton = Array.from(document.body.querySelectorAll("button"))
+      .find(button => button.textContent?.trim() === "取消")
+    cancelButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+    await nextTick()
+    expect(wrapper.emitted("save")).toBeUndefined()
+
+    await wrapper.setProps({ show: false })
+    await openModal(wrapper)
+    expect((await saveModal(wrapper)).algorithm).toBe("exact-super-bound")
+  })
+
+  it("writes one stack value to every rule in a shared runtime group", async () => {
+    const buff = {
+      id: "shared-stack-runtime",
+      name: { zhCN: "共享层数" },
+      effects: [
+        { id: "stack-dmg", type: "stacked", stat: "etherDmg", mode: "flat", valuePerStack: 8, maxStacks: 2, defaultStacks: 2, stackGroup: "shared", stackLabel: { zhCN: "共享层数" } },
+        { id: "stack-sheer", type: "stacked", stat: "etherSheerDmg", mode: "flat", valuePerStack: 10, maxStacks: 2, defaultStacks: 2, stackGroup: "shared", stackLabel: { zhCN: "共享层数" } },
+      ],
+    }
+    const wrapper = mountModal({
+      optimizerConfig: {
+        algorithm: "exact-super-bound",
+        fourPieceBuffMode: "manual",
+        fourPieceBuffRuntimeInputs: {},
+        mainStatLimits: { "4": [], "5": [], "6": [] },
+        minimums: {},
+      },
+      fourPieceRuntimeBuffs: [buff],
+    })
+    await openModal(wrapper)
+    const stackInput = document.body.querySelector(".optimizer-runtime-layer input") as HTMLInputElement | null
+    expect(stackInput).toBeTruthy()
+    stackInput!.value = "1"
+    stackInput!.dispatchEvent(new Event("input", { bubbles: true }))
+    await nextTick()
+    const saved = await saveModal(wrapper)
+    expect(saved.fourPieceBuffRuntimeInputs["shared-stack-runtime"].effects).toMatchObject({
+      "stack-dmg": { stacks: 1 },
+      "stack-sheer": { stacks: 1 },
     })
   })
 })

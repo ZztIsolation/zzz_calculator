@@ -195,6 +195,24 @@ afterEach(() => {
 })
 
 describe("CalculationConfigModal", () => {
+  it("restores the saved configuration after cancelling draft changes", async () => {
+    const wrapper = mountModal()
+    await openModal(wrapper)
+    const modeSelect = selectComponentWithOption(wrapper, "custom")
+    await modeSelect!.vm.$emit("update:value", "custom")
+    await nextTick()
+
+    const cancelButton = Array.from(document.body.querySelectorAll("button"))
+      .find(button => button.textContent?.trim() === "取消")
+    cancelButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+    await nextTick()
+    expect(wrapper.emitted("save")).toBeUndefined()
+
+    await wrapper.setProps({ show: false })
+    await openModal(wrapper)
+    expect((await saveModal(wrapper)).mode).toBe("adminDefault")
+  })
+
   it("only offers the sheer objective for rupture agents", async () => {
     const wrapper = mountModal({
       damageConfig: {

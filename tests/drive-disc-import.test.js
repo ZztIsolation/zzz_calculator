@@ -130,6 +130,30 @@ try {
                 subStats: [],
                 source: { type: "manual" },
             },
+            {
+                id: "cross-owner-shared",
+                ownerId: "default",
+                setId: "manual-default-shared",
+                setName: "默认账号同 ID",
+                partition: 5,
+                rarity: "S",
+                level: 15,
+                mainStat: { stat: "electricDmg", value: 30, mode: "pct" },
+                subStats: [],
+                source: { type: "manual" },
+            },
+            {
+                id: "cross-owner-shared",
+                ownerId: "alt",
+                setId: "manual-alt-shared",
+                setName: "其他账号同 ID",
+                partition: 5,
+                rarity: "S",
+                level: 15,
+                mainStat: { stat: "fireDmg", value: 30, mode: "pct" },
+                subStats: [],
+                source: { type: "manual" },
+            },
         ],
         driveDiscLoadouts: [
             {
@@ -143,6 +167,22 @@ try {
                 },
                 source: { type: "manual" },
             },
+            {
+                id: "cross-owner-loadout",
+                agentId: "ye_shunguang",
+                ownerId: "default",
+                name: "默认账号同 ID 引用",
+                driveDiscIdsBySlot: { 5: "cross-owner-shared" },
+                source: { type: "manual" },
+            },
+            {
+                id: "cross-owner-loadout",
+                agentId: "ye_shunguang",
+                ownerId: "alt",
+                name: "其他账号同 ID 引用",
+                driveDiscIdsBySlot: { 5: "cross-owner-shared" },
+                source: { type: "manual" },
+            },
         ],
     })
 
@@ -151,11 +191,19 @@ try {
     ], { ownerId: "default", sourcePath: "remove.json", removeMissing: true })
     assert.equal(removed.driveDiscs.some(item => item.id === "manual-delete-me"), false)
     assert.equal(removed.driveDiscs.some(item => item.id === "alt-keep-me"), true)
+    assert.equal(removed.driveDiscs.some(item => item.id === "cross-owner-shared" && item.ownerId === "default"), false)
+    assert.equal(removed.driveDiscs.some(item => item.id === "cross-owner-shared" && item.ownerId === "alt"), true)
     assert.ok(removed.lastImportSummary.removed >= 1)
     const loadout = removed.driveDiscLoadouts.find(item => item.id === "loadout-1")
     assert.ok(loadout)
     assert.equal(loadout.driveDiscIdsBySlot["6"], undefined)
     assert.equal(loadout.status, "incomplete")
+    assert.ok(loadout.missingSlots.includes(6))
+    const defaultSharedLoadout = removed.driveDiscLoadouts.find(item => item.id === "cross-owner-loadout" && item.ownerId === "default")
+    const altSharedLoadout = removed.driveDiscLoadouts.find(item => item.id === "cross-owner-loadout" && item.ownerId === "alt")
+    assert.equal(defaultSharedLoadout.driveDiscIdsBySlot["5"], undefined)
+    assert.ok(defaultSharedLoadout.missingSlots.includes(5))
+    assert.equal(altSharedLoadout.driveDiscIdsBySlot["5"], "cross-owner-shared")
 
     await writeFile(path.join(tempDir, "user_drive_discs.json"), JSON.stringify({
         version: 1,

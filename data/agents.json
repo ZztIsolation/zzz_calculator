@@ -2092,7 +2092,7 @@
               {
                 "id": "yixuan_cinema_2_thousand_talismans_break_1",
                 "kind": "sheer",
-                "count": 1,
+                "count": 2,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "yixuan",

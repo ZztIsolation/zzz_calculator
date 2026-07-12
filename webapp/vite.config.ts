@@ -1,18 +1,33 @@
 import vue from "@vitejs/plugin-vue"
+import { copyFileSync, mkdirSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { defineConfig } from "vite"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, "..")
-const frontendDir = path.join(rootDir, "frontend")
+const coreDir = path.join(rootDir, "core")
+const runtimeDir = path.join(__dirname, "src", "runtime")
+const pagesDir = path.join(rootDir, "dist", "pages")
+
+function scannerManifestPlugin() {
+  return {
+    name: "zzz-scanner-manifest",
+    closeBundle() {
+      const targetDir = path.join(pagesDir, "downloads", "zzz-scanner")
+      mkdirSync(targetDir, { recursive: true })
+      copyFileSync(path.join(rootDir, "config", "scanner-manifest.json"), path.join(targetDir, "manifest.json"))
+    },
+  }
+}
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), scannerManifestPlugin()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
-      "@core": frontendDir,
+      "@core": coreDir,
+      "@runtime": runtimeDir,
     },
   },
   server: {
@@ -27,7 +42,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: path.join(rootDir, "dist", "pages"),
+    outDir: pagesDir,
     emptyOutDir: true,
     assetsDir: "static/app",
     rollupOptions: {
@@ -51,13 +66,13 @@ export default defineConfig({
           if (normalizedId.includes("node_modules/lucide-vue-next")) {
             return "icons"
           }
-          if (normalizedId.includes("frontend/scanner-bridge")) {
+          if (normalizedId.includes("webapp/src/runtime/scanner-bridge")) {
             return "scanner"
           }
-          if (normalizedId.includes("frontend/driveDiscOptimizer-core") || normalizedId.includes("optimizer.worker")) {
+          if (normalizedId.includes("core/driveDiscOptimizer-core") || normalizedId.includes("optimizer.worker")) {
             return "optimizer-core"
           }
-          if (normalizedId.includes("frontend/calculator-core") || normalizedId.includes("frontend/shared-combat")) {
+          if (normalizedId.includes("core/calculator-core") || normalizedId.includes("core/shared-combat")) {
             return "calculator-core"
           }
         },

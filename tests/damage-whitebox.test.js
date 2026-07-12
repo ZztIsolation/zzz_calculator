@@ -10,8 +10,8 @@ import {
     GENERATED_HIT_TOTAL_ROW_ID,
     damageSkillRowsWithGeneratedTotals,
     skillRowValue,
-} from "../frontend/skillMultiplierCandidates.js"
-import { resolveDefaultCalculationConfig } from "../frontend/defaultCalculationConfig.js"
+} from "../core/skillMultiplierCandidates.js"
+import { resolveDefaultCalculationConfig } from "../core/defaultCalculationConfig.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
@@ -2168,7 +2168,7 @@ const yixuanBaseAxis = [
     "chain/chain_xuanmo_swift_strike/damage x2",
     "chain/ultimate_thousand_talismans/damage x1",
     "chain/ultimate_qingming_cloud_shadow/damage x1",
-    "special/cloud_condensing_art/charged_total_damage x1",
+    "special/cloud_condensing_art/charged_total_damage x2",
     "special/ink_ember_shadow_dispel/orb_total_damage x1",
     "special/ink_trace_transform/damage x1",
     "special/ink_trace_transform/charged_follow_up x1",
@@ -2253,9 +2253,9 @@ const yixuanCinemaTwoBreak = calculateInCombatPanel(catalog, minimalInput({
                 kind: "sheer",
                 skillRef: {
                     agentSkillId: "yixuan",
-                    categoryId: "cinema",
-                    moveId: "cinema_2_thousand_talismans_break",
-                    rowId: "damage",
+                    categoryId: "special",
+                    moveId: "thousand_talismans_break",
+                    rowId: "row_1783851000658",
                 },
                 critMode: "nonCrit",
             },
@@ -2268,12 +2268,14 @@ assert.equal(yixuanCinemaTwoBreak.damage.input.skillSource?.damageBasis, "sheerF
 const yixuanCinemaTwoAxis = resolveDefaultCalculationConfig(yixuan.defaultCalculationConfig, 2)
 assert.equal(yixuanCinemaTwoAxis.name.zhCN, "2影失衡双连携爆发", "Yixuan cinema 2 should select the cinema 2 default axis")
 assert.equal(
-    yixuanCinemaTwoAxis.events.filter(event => event.skillRef?.moveId === "cinema_2_thousand_talismans_break").length,
+    yixuanCinemaTwoAxis.events.filter(event => event.skillRef?.moveId === "thousand_talismans_break").length,
     1,
     "Yixuan cinema 2 axis should include one Thousand Talismans Break event",
 )
 assert.equal(
-    yixuanCinemaTwoAxis.events.filter(event => event.skillRef?.moveId === "cloud_condensing_art").length,
+    yixuanCinemaTwoAxis.events
+        .filter(event => event.skillRef?.moveId === "cloud_condensing_art")
+        .reduce((total, event) => total + Number(event.count ?? 1), 0),
     2,
     "Yixuan cinema 2 axis should include two Cloud Condensing Art events",
 )
@@ -2286,7 +2288,9 @@ assert.equal(
     "Yixuan cinema 6 axis should include the paid and free Thousand Talismans ultimates",
 )
 assert.equal(
-    yixuanCinemaSixAxis.events.filter(event => event.skillRef?.moveId === "cinema_2_thousand_talismans_break").length,
+    yixuanCinemaSixAxis.events
+        .filter(event => event.skillRef?.moveId === "thousand_talismans_break")
+        .reduce((total, event) => total + Number(event.count ?? 1), 0),
     2,
     "Yixuan cinema 6 axis should include two Thousand Talismans Break events",
 )

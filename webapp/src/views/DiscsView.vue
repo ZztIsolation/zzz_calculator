@@ -493,44 +493,44 @@ function confirmDangerImport() {
   <NModal v-model:show="showDiscEditor" preset="card" :title="discDraft.id ? '编辑驱动盘' : '新增驱动盘'" style="max-width: 920px">
     <div class="section-band">
       <div class="metric-grid">
-        <label class="metric">
-          <dt>ID</dt>
-          <dd><NInput v-model:value="discDraft.id" /></dd>
-        </label>
-        <label class="metric">
-          <dt>套装</dt>
-          <dd><NSelect v-model:value="discDraft.setId" :options="setOptions" filterable /></dd>
-        </label>
-        <label class="metric">
-          <dt>位置</dt>
-          <dd><NSelect v-model:value="discDraft.partition" :options="[1,2,3,4,5,6].map(slot => ({ label: `${slot}号位`, value: slot }))" /></dd>
-        </label>
-        <label class="metric">
-          <dt>品质</dt>
-          <dd><NSelect v-model:value="discDraft.rarity" :options="['S','A','B'].map(value => ({ label: value, value }))" /></dd>
-        </label>
-        <label class="metric">
-          <dt>等级</dt>
-          <dd><NInputNumber v-model:value="discDraft.level" :min="0" :max="15" /></dd>
-        </label>
-        <label class="metric">
-          <dt>装备角色</dt>
-          <dd><NSelect v-model:value="discDraft.equippedBy" clearable :options="agentOptions" filterable /></dd>
-        </label>
+        <div class="metric">
+          <span class="metric-title">ID</span>
+          <div class="metric-value"><NInput v-model:value="discDraft.id" aria-label="驱动盘 ID" /></div>
+        </div>
+        <div class="metric">
+          <span class="metric-title">套装</span>
+          <div class="metric-value"><NSelect v-model:value="discDraft.setId" :options="setOptions" aria-label="驱动盘套装" filterable /></div>
+        </div>
+        <div class="metric">
+          <span class="metric-title">位置</span>
+          <div class="metric-value"><NSelect v-model:value="discDraft.partition" :options="[1,2,3,4,5,6].map(slot => ({ label: `${slot}号位`, value: slot }))" aria-label="驱动盘位置" /></div>
+        </div>
+        <div class="metric">
+          <span class="metric-title">品质</span>
+          <div class="metric-value"><NSelect v-model:value="discDraft.rarity" :options="['S','A','B'].map(value => ({ label: value, value }))" aria-label="驱动盘品质" /></div>
+        </div>
+        <div class="metric">
+          <span class="metric-title">等级</span>
+          <div class="metric-value"><NInputNumber v-model:value="discDraft.level" :min="0" :max="15" aria-label="驱动盘等级" /></div>
+        </div>
+        <div class="metric">
+          <span class="metric-title">装备角色</span>
+          <div class="metric-value"><NSelect v-model:value="discDraft.equippedBy" clearable :options="agentOptions" aria-label="驱动盘装备角色" filterable /></div>
+        </div>
       </div>
       <div class="metric-grid">
-        <label class="metric">
-          <dt>主词条</dt>
-          <dd><NSelect v-model:value="discDraft.mainStat.stat" :options="mainStatOptions" filterable /></dd>
-        </label>
-        <label class="metric">
-          <dt>主词条数值</dt>
-          <dd><NInputNumber v-model:value="discDraft.mainStat.value" :step="0.1" /></dd>
-        </label>
-        <label class="metric">
-          <dt>锁定</dt>
-          <dd><NCheckbox v-model:checked="discDraft.locked">锁定</NCheckbox></dd>
-        </label>
+        <div class="metric">
+          <span class="metric-title">主词条</span>
+          <div class="metric-value"><NSelect v-model:value="discDraft.mainStat.stat" :options="mainStatOptions" aria-label="驱动盘主词条" filterable /></div>
+        </div>
+        <div class="metric">
+          <span class="metric-title">主词条数值</span>
+          <div class="metric-value"><NInputNumber v-model:value="discDraft.mainStat.value" :step="0.1" aria-label="驱动盘主词条数值" /></div>
+        </div>
+        <div class="metric">
+          <span class="metric-title">锁定</span>
+          <div class="metric-value"><NCheckbox v-model:checked="discDraft.locked">锁定</NCheckbox></div>
+        </div>
       </div>
       <div class="panel">
         <div class="panel-header">
@@ -538,16 +538,16 @@ function confirmDangerImport() {
           <NButton size="small" :disabled="(discDraft.subStats ?? []).length >= 4" @click="addSubStatRow">新增副词条</NButton>
         </div>
         <div class="panel-body metric-grid">
-          <div v-for="(_, index) in discDraft.subStats" :key="index" class="metric">
-            <dt>副词条 {{ index + 1 }}</dt>
-            <dd class="section-band">
-              <NSelect v-model:value="discDraft.subStats[index].stat" clearable :options="statOptions" filterable />
-              <NInputNumber v-model:value="discDraft.subStats[index].value" :step="0.1" />
+          <div v-for="(_, index) in discDraft.subStats" :key="index" class="metric" role="group" :aria-label="`副词条 ${index + 1}`">
+            <span class="metric-title">副词条 {{ index + 1 }}</span>
+            <div class="metric-value section-band">
+              <NSelect v-model:value="discDraft.subStats[index].stat" clearable :options="statOptions" :aria-label="`副词条 ${index + 1} 类型`" filterable />
+              <NInputNumber v-model:value="discDraft.subStats[index].value" :step="0.1" :aria-label="`副词条 ${index + 1} 数值`" />
               <NButton size="small" type="error" @click="removeSubStatRow(index)">
                 <template #icon><Trash2 :size="14" /></template>
                 移除
               </NButton>
-            </dd>
+            </div>
           </div>
         </div>
       </div>
@@ -568,20 +568,20 @@ function confirmDangerImport() {
   <NModal v-model:show="showLoadoutEditor" preset="card" title="编辑套装预设" style="max-width: 880px">
     <div class="section-band">
       <div class="metric-grid">
-        <label class="metric">
-          <dt>名称</dt>
-          <dd><NInput v-model:value="loadoutDraft.name" /></dd>
-        </label>
-        <label class="metric">
-          <dt>角色</dt>
-          <dd><NSelect v-model:value="loadoutDraft.agentId" :options="agentOptions" filterable /></dd>
-        </label>
+        <div class="metric">
+          <span class="metric-title">名称</span>
+          <div class="metric-value"><NInput v-model:value="loadoutDraft.name" aria-label="套装预设名称" /></div>
+        </div>
+        <div class="metric">
+          <span class="metric-title">角色</span>
+          <div class="metric-value"><NSelect v-model:value="loadoutDraft.agentId" :options="agentOptions" aria-label="套装预设角色" filterable /></div>
+        </div>
       </div>
       <div class="metric-grid">
-        <label v-for="slot in [1,2,3,4,5,6]" :key="slot" class="metric">
-          <dt>{{ slot }}号位</dt>
-          <dd><NSelect v-model:value="loadoutDraft.driveDiscIdsBySlot[String(slot)]" clearable filterable :options="discOptionsForSlot(slot)" /></dd>
-        </label>
+        <div v-for="slot in [1,2,3,4,5,6]" :key="slot" class="metric">
+          <span class="metric-title">{{ slot }}号位</span>
+          <div class="metric-value"><NSelect v-model:value="loadoutDraft.driveDiscIdsBySlot[String(slot)]" clearable filterable :options="discOptionsForSlot(slot)" :aria-label="`${slot}号位驱动盘`" /></div>
+        </div>
       </div>
       <div class="chip-row">
         <NTag :type="loadoutMissingSlots.length ? 'warning' : 'success'" round>
@@ -693,22 +693,22 @@ function confirmDangerImport() {
         </div>
 
         <div v-else-if="inventoryStore.scanPhase === 'c'" class="section-band">
-          <label class="metric">
-            <dt>客户端</dt>
-            <dd><NSelect v-model:value="inventoryStore.scanClient" :disabled="scanControlsDisabled" :options="[{ label: '本地绝区零', value: 'local' }, { label: '云绝区零', value: 'cloud' }]" /></dd>
-          </label>
+          <div class="metric">
+            <span class="metric-title">客户端</span>
+            <div class="metric-value"><NSelect v-model:value="inventoryStore.scanClient" :disabled="scanControlsDisabled" :options="[{ label: '本地绝区零', value: 'local' }, { label: '云绝区零', value: 'cloud' }]" aria-label="扫描客户端" /></div>
+          </div>
           <div class="metric-grid">
-            <label class="metric">
-              <dt>品质</dt>
-              <dd class="chip-row">
+            <div class="metric" role="group" aria-label="扫描品质">
+              <span class="metric-title">品质</span>
+              <div class="metric-value chip-row">
                 <NCheckbox v-model:checked="inventoryStore.scanRarityS" :disabled="scanControlsDisabled">S</NCheckbox>
                 <NCheckbox v-model:checked="inventoryStore.scanRarityA" :disabled="scanControlsDisabled">A</NCheckbox>
-              </dd>
-            </label>
-            <label class="metric">
-              <dt>上限</dt>
-              <dd><NInputNumber v-model:value="inventoryStore.scanMaxItems" :disabled="scanControlsDisabled" :min="0" :max="9999" /></dd>
-            </label>
+              </div>
+            </div>
+            <div class="metric">
+              <span class="metric-title">上限</span>
+              <div class="metric-value"><NInputNumber v-model:value="inventoryStore.scanMaxItems" :disabled="scanControlsDisabled" :min="0" :max="9999" aria-label="扫描数量上限" /></div>
+            </div>
           </div>
           <div class="section-band">
             <NCheckbox v-model:checked="inventoryStore.scanStopAtNonLevel15" :disabled="scanControlsDisabled">遇到非 15 级时停止</NCheckbox>
@@ -803,6 +803,18 @@ function confirmDangerImport() {
 </template>
 
 <style scoped>
+.metric-title {
+  display: block;
+  margin: 0 0 5px;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.metric-value {
+  margin: 0;
+  font-weight: 750;
+}
+
 .raw {
   max-height: 260px;
   overflow: auto;

@@ -8,10 +8,10 @@ import {
   previewScannerExportImport,
   upsertDriveDiscLoadout,
   upsertUserDriveDisc,
-} from "@core/local-store.js"
+} from "@runtime/local-store.js"
 import { toCalculatorDriveDisc } from "@core/drive-disc-core.js"
 import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "@core/driveDiscAnalysis-core.js"
-import { ScannerBridge } from "@core/scanner-bridge.js"
+import { ScannerBridge } from "@runtime/scanner-bridge.js"
 
 const HELPER_DOWNLOAD_URL = "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.36/ZZZ-Scanner-Helper.exe?v=1.0.2"
 const HELPER_POLL_INTERVAL_MS = 3000

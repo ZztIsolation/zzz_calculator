@@ -1,6 +1,6 @@
 import { defineStore } from "pinia"
 import { markRaw } from "vue"
-import { loadCatalog, loadMeta } from "@core/catalog-loader.js"
+import { loadCatalog, loadMeta } from "@runtime/catalog-loader.js"
 import { auditIconCoverage } from "@/utils/assets"
 
 export const useCatalogStore = defineStore("catalog", {

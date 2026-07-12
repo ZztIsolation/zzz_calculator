@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process"
 import { createHash } from "node:crypto"
 import { createReadStream, createWriteStream, existsSync } from "node:fs"
-import { copyFile, cp, mkdir, stat, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { Readable } from "node:stream"
 import { pipeline } from "node:stream/promises"
@@ -14,19 +14,25 @@ const rootDir = path.resolve(__dirname, "..")
 const webappDir = path.join(rootDir, "webapp")
 const outDir = path.join(rootDir, "dist", "pages")
 
-const scannerReleaseTag = "scanner-1.0.36"
-const scannerReleaseBase = `https://github.com/ZztIsolation/zzz_calculator/releases/download/${scannerReleaseTag}`
-const scannerVersion = "1.0.36"
-const scannerZipName = "ZZZ-Scanner.Next-win-x64.zip"
-const scannerGitHubPackageUrl = `${scannerReleaseBase}/${scannerZipName}`
-const scannerPagesPackageUrl = `./${scannerVersion}/${scannerZipName}`
-const scannerPackageSha256 = "d885c0aef6da61cfcbf994ad2b4e712a31efe8bd87631260fe4f87ea8711c63d"
-const scannerPackageSize = 47231570
+const scannerManifestSource = JSON.parse(await readFile(
+    path.join(rootDir, "config", "scanner-manifest.json"),
+    "utf8",
+))
+const scannerVersion = String(scannerManifestSource.scannerVersion)
+const scannerPagesPackageUrl = String(scannerManifestSource.packageUrl)
+const scannerGitHubPackageUrl = scannerManifestSource.packageUrls.find(url => /^https:\/\//i.test(url))
+const scannerZipName = path.posix.basename(new URL(scannerGitHubPackageUrl).pathname)
+const scannerPackageSha256 = String(scannerManifestSource.sha256)
+const scannerPackageSize = Number(scannerManifestSource.size)
 
-function run(command, args, cwd) {
+function run(command, args, cwd, extraEnv = {}) {
     return new Promise((resolve, reject) => {
         const child = spawn(command, args, {
             cwd,
+            env: {
+                ...process.env,
+                ...extraEnv,
+            },
             stdio: "inherit",
             shell: process.platform === "win32",
         })
@@ -92,6 +98,78 @@ async function ensurePagesScannerPackage() {
     await verifyScannerPackage(pagesPackagePath)
 }
 
+function assertArtifact(condition, message) {
+    if (!condition) {
+        throw new Error(`Pages artifact verification failed: ${message}`)
+    }
+}
+
+async function artifactFiles(directory, base = directory) {
+    const result = []
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+        const absolutePath = path.join(directory, entry.name)
+        if (entry.isDirectory()) {
+            result.push(...await artifactFiles(absolutePath, base))
+        } else if (entry.isFile()) {
+            result.push({
+                absolutePath,
+                relativePath: path.relative(base, absolutePath).replace(/\\/g, "/"),
+                size: (await stat(absolutePath)).size,
+            })
+        }
+    }
+    return result
+}
+
+async function verifyPagesArtifact(maintenanceEnabled) {
+    const files = (await artifactFiles(outDir)).sort((left, right) => left.relativePath.localeCompare(right.relativePath))
+    const paths = new Set(files.map(file => file.relativePath))
+    for (const requiredPath of [
+        "index.html",
+        "404.html",
+        "calculate.html",
+        "drive-discs.html",
+        "accounts.html",
+        "static/catalog.json",
+        "static/app-config.json",
+        `downloads/zzz-scanner/${scannerVersion}/${scannerZipName}`,
+        "downloads/zzz-scanner/manifest.json",
+    ]) {
+        assertArtifact(paths.has(requiredPath), `missing ${requiredPath}`)
+    }
+
+    const appConfig = JSON.parse(await readFile(path.join(outDir, "static", "app-config.json"), "utf8"))
+    const manifest = JSON.parse(await readFile(path.join(outDir, "downloads", "zzz-scanner", "manifest.json"), "utf8"))
+    assertArtifact(appConfig.maintenanceEnabled === maintenanceEnabled, "app-config maintenance flag mismatch")
+    assertArtifact(manifest.scannerVersion === scannerVersion, "scanner version mismatch")
+    assertArtifact(manifest.sha256 === scannerPackageSha256, "scanner manifest SHA-256 mismatch")
+    assertArtifact(manifest.size === scannerPackageSize, "scanner manifest size mismatch")
+    await verifyScannerPackage(path.join(outDir, "downloads", "zzz-scanner", scannerVersion, scannerZipName))
+
+    for (const [fileName, target] of [
+        ["calculate.html", "/"],
+        ["drive-discs.html", "/discs"],
+        ["accounts.html", "/accounts"],
+    ]) {
+        assertArtifact((await readFile(path.join(outDir, fileName), "utf8")).includes(`url=${target}`), `${fileName} redirect mismatch`)
+    }
+
+    if (maintenanceEnabled) {
+        assertArtifact(paths.has("maintenance.html"), "maintenance redirect missing when enabled")
+    } else {
+        assertArtifact(!paths.has("maintenance.html"), "maintenance redirect must be absent by default")
+        assertArtifact(!files.some(file => /(^|\/)MaintenanceView-|maintenance(?:Stats|Validation)?\.js$/i.test(file.relativePath)), "maintenance code leaked into the default Pages artifact")
+    }
+
+    const artifactHash = createHash("sha256")
+    for (const file of files) {
+        artifactHash.update(file.relativePath)
+        artifactHash.update(await readFile(file.absolutePath))
+    }
+    const totalSize = files.reduce((sum, file) => sum + file.size, 0)
+    console.log(`Pages artifact verified: ${files.length} files, ${totalSize} bytes, SHA-256 ${artifactHash.digest("hex")}`)
+}
+
 function legacyRedirect(title, target) {
     return `<!doctype html>
 <html lang="zh-CN">
@@ -124,8 +202,9 @@ function envFlag(name) {
 
 const maintenanceEnabled = envFlag("MAINTENANCE_ENABLED") === true
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm"
-await run(npmCommand, ["ci"], webappDir)
-await run(npmCommand, ["run", "build"], webappDir)
+await run(npmCommand, ["run", "build"], webappDir, {
+    VITE_INCLUDE_MAINTENANCE: String(maintenanceEnabled),
+})
 
 const catalog = await loadCalculatorContext(rootDir)
 await writeJson(path.join(outDir, "static", "catalog.json"), catalog)
@@ -134,23 +213,7 @@ await writeJson(path.join(outDir, "static", "app-config.json"), {
 })
 await ensurePagesScannerPackage()
 
-await cp(path.join(rootDir, "frontend", "assets"), path.join(outDir, "assets"), { recursive: true })
-await copyFile(path.join(rootDir, "frontend", "zzz-mark.svg"), path.join(outDir, "zzz-mark.svg"))
-await ensurePagesScannerPackage()
-
-await writeJson(path.join(outDir, "downloads", "zzz-scanner", "manifest.json"), {
-    schemaVersion: 1,
-    launcherMinVersion: "1.0.0",
-    scannerVersion,
-    packageUrl: scannerPagesPackageUrl,
-    packageUrls: [
-        scannerPagesPackageUrl,
-        scannerGitHubPackageUrl,
-    ],
-    sha256: scannerPackageSha256,
-    size: scannerPackageSize,
-    entry: "ZZZ-Scanner.Next.exe",
-})
+await writeJson(path.join(outDir, "downloads", "zzz-scanner", "manifest.json"), scannerManifestSource)
 
 await writeFile(path.join(outDir, "CNAME"), "zzzcaculator.top\n", "utf8")
 await copyFile(path.join(outDir, "index.html"), path.join(outDir, "404.html"))
@@ -159,22 +222,8 @@ await writeFile(path.join(outDir, "drive-discs.html"), legacyRedirect("前往驱
 await writeFile(path.join(outDir, "accounts.html"), legacyRedirect("前往账号页", "/accounts"), "utf8")
 
 if (maintenanceEnabled) {
-    for (const fileName of [
-        "maintenance.html",
-        "maintenance.js",
-        "maintenanceValidation.js",
-        "maintenanceStats.js",
-        "accounts.js",
-        "local-store.js",
-        "shared-combat.js",
-        "calculationSkillGroups.js",
-        "skillMultiplierCandidates.js",
-        "formulaEvaluator.js",
-        "feedback.js",
-        "styles.css",
-    ]) {
-        await copyFile(path.join(rootDir, "frontend", fileName), path.join(outDir, fileName))
-    }
+    await writeFile(path.join(outDir, "maintenance.html"), legacyRedirect("前往维护页", "/maintenance"), "utf8")
 }
 
+await verifyPagesArtifact(maintenanceEnabled)
 console.log(`GitHub Pages artifact written to ${outDir}`)

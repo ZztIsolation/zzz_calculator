@@ -8,7 +8,7 @@ const catalogFixture = vi.hoisted(() => ({
     driveDiscSets: [{
       id: "woodpecker_electro",
       name: { zhCN: "啄木鸟电音" },
-      images: { icon: "/assets/drive-discs/woodpecker_electro.png" },
+      images: { icon: "/assets/drive-discs/woodpecker_electro.webp" },
     }],
   },
   meta: {
@@ -24,7 +24,7 @@ const catalogFixture = vi.hoisted(() => ({
   },
 }))
 
-vi.mock("@core/catalog-loader.js", () => ({
+vi.mock("@runtime/catalog-loader.js", () => ({
   loadCatalog: vi.fn(async () => catalogFixture.catalog),
   loadMeta: vi.fn(async () => catalogFixture.meta),
 }))
@@ -145,7 +145,7 @@ describe("DiscsView", () => {
     const identity = wrapper.find(".disc-row-identity")
 
     expect(identity.exists()).toBe(true)
-    expect(identity.find("img").attributes("src")).toBe("/assets/drive-discs/woodpecker_electro.png")
+    expect(identity.find("img").attributes("src")).toBe("/assets/drive-discs/woodpecker_electro.webp")
     expect(identity.text()).toContain("啄木鸟电音")
     expect(identity.text()).toContain("#7")
   })

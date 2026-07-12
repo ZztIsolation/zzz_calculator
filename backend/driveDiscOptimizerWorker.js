@@ -35,6 +35,7 @@ async function runTask(task, initialGlobalCutoffScore = Number.NEGATIVE_INFINITY
     try {
         const result = await session.runTask(task, {
             globalCutoffScore: latestGlobalCutoffScore,
+            yieldControl: () => new Promise(resolve => setImmediate(resolve)),
             chunkSize: options.chunkSize ?? 10000,
             progressIntervalMs: options.progressIntervalMs ?? 250,
             yieldIntervalMs: options.yieldIntervalMs ?? 50,

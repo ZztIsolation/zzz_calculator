@@ -7,7 +7,7 @@ const scannerMockState = vi.hoisted(() => ({
   ensureResults: [] as any[],
 }))
 
-vi.mock("@core/scanner-bridge.js", () => {
+vi.mock("@runtime/scanner-bridge.js", () => {
   class MockScannerBridge {
     onProgress: ((payload: any) => void) | null = null
     onLauncherProgress: ((payload: any) => void) | null = null

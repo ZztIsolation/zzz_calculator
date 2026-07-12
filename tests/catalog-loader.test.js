@@ -16,7 +16,7 @@ let importCounter = 0
 
 function loaderUrl(label) {
     importCounter += 1
-    return new URL(`../frontend/catalog-loader.js?test=${label}-${importCounter}`, import.meta.url).href
+    return new URL(`../webapp/src/runtime/catalog-loader.js?test=${label}-${importCounter}`, import.meta.url).href
 }
 
 function response(body, options = {}) {
