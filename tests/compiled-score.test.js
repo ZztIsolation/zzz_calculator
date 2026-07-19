@@ -82,6 +82,24 @@ compareCalculator("miyabi-custom", {
     damage: miyabi.defaultCalculationConfig,
 })
 
+compareCalculator("miyabi-mixed-event-stun", {
+    agentId: "hoshimi_miyabi",
+    coreSkillLevel: "F",
+    wEngineId: "hailfall_star_palace",
+    wEngineModificationLevel: 1,
+    combatBuffs: { activeBuffIds: [] },
+    damage: {
+        ...miyabi.defaultCalculationConfig,
+        events: miyabi.defaultCalculationConfig.events.map((event, index) => ({
+            ...event,
+            stunned: index % 2 === 0,
+        })),
+        target: {
+            stunMultiplierPercent: 175,
+        },
+    },
+})
+
 const yixuan = catalog.agentsMap.get("yixuan")
 compareCalculator("sheer", {
     agentId: "yixuan",
@@ -95,6 +113,23 @@ compareCalculator("sheer", {
             stunned: true,
             stunMultiplierPercent: 150,
         },
+    },
+})
+
+compareCalculator("jane-extended-flinch-disorder", {
+    agentId: exampleInput.agentId,
+    coreSkillLevel: exampleInput.coreSkillLevel,
+    wEngineId: exampleInput.wEngineId,
+    combatBuffs: { activeBuffIds: ["jane_doe.core_insight"] },
+    damage: {
+        events: [{
+            id: "flinch-disorder",
+            kind: "anomaly",
+            settlementType: "disorder",
+            anomalyEffect: "flinch",
+            elapsedSeconds: 12,
+            count: 1,
+        }],
     },
 })
 

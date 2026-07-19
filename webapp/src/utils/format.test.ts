@@ -7,6 +7,7 @@ import {
   damageEventNeedsSkillMultiplier,
   damageEventSummaryTitle,
   damageEventTitle,
+  disorderEffectLabel,
   entityMetaText,
   entitySearchText,
   entitySelectLabel,
@@ -163,5 +164,13 @@ describe("format helpers", () => {
     const disorderTitle = damageEventTitle({ kind: "anomaly", settlementType: "disorder", anomalyEffect: "frost_frozen", count: 1 })
     expect(disorderTitle).toContain("紊乱 · 烈霜霜寒紊乱（星见雅）")
     expect(disorderTitle).not.toContain("异常紊乱")
+  })
+
+  it("keeps attribute anomaly and disorder labels distinct when ids overlap", () => {
+    expect(damageEventTitle({ kind: "anomaly", anomalyEffect: "burn", count: 1 }))
+      .toContain("属性异常 · 灼烧 ×1")
+    expect(damageEventTitle({ kind: "anomaly", settlementType: "disorder", anomalyEffect: "burn", count: 1 }))
+      .toContain("紊乱 · 灼烧紊乱 ×1")
+    expect(disorderEffectLabel("shock")).toBe("感电紊乱")
   })
 })

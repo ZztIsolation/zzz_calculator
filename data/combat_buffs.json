@@ -15,6 +15,8 @@
       "name": {
         "zhCN": "千夏"
       },
+      "attribute": "physical",
+      "specialty": "support",
       "buffs": [
         {
           "id": "buff_j8kf2r9m4q",
@@ -138,6 +140,30 @@
             }
           ],
           "buffModifiers": []
+        },
+        {
+          "id": "buff_23620b7000",
+          "source": {
+            "zhCN": "额外能力"
+          },
+          "description": {
+            "zhCN": "处于「以太帷幕·妄想重奏」内的角色攻击命中敌人时，目标的失衡易伤倍率提升30%，持续40秒"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_3e2511fe0a",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "stunDmgMultiplierBonus",
+              "mode": "flat",
+              "value": 30
+            }
+          ],
+          "buffModifiers": [],
+          "hidden": false
         }
       ],
       "images": {
@@ -150,6 +176,8 @@
       "name": {
         "zhCN": "琉音"
       },
+      "attribute": "physical",
+      "specialty": "stun",
       "buffs": [
         {
           "id": "buff_6646686e01",
@@ -170,6 +198,16 @@
               "stat": "dmgBonus",
               "mode": "flat",
               "value": 40
+            },
+            {
+              "id": "effect_8615efa7f4",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "stunDmgMultiplierBonus",
+              "mode": "flat",
+              "value": 30
             }
           ],
           "buffModifiers": []
@@ -185,12 +223,12 @@
           "scope": "inCombat",
           "effects": [
             {
-              "id": "liuyin_cinema_1_res_ignore_as_res_reduction",
+              "id": "liuyin_cinema_1_all_res_ignore",
               "type": "fixed",
               "target": {
                 "kind": "default"
               },
-              "stat": "enemyResReduction",
+              "stat": "allResIgnore",
               "mode": "flat",
               "value": 15
             }
@@ -219,6 +257,30 @@
             }
           ],
           "buffModifiers": []
+        },
+        {
+          "id": "buff_81803b7f10",
+          "source": {
+            "zhCN": "核心被动"
+          },
+          "description": {
+            "zhCN": "「恶意投诉」效果下敌人进入失衡状态后的失衡持续时间提升2秒，失衡易伤倍率提升30%"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_323da6c809",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "stunDmgMultiplierBonus",
+              "mode": "flat",
+              "value": 30
+            }
+          ],
+          "buffModifiers": [],
+          "hidden": false
         }
       ],
       "images": {
@@ -231,6 +293,8 @@
       "name": {
         "zhCN": "照"
       },
+      "attribute": "ice",
+      "specialty": "defense",
       "buffs": [
         {
           "id": "buff_7a09645b2f",
@@ -344,6 +408,8 @@
       "name": {
         "zhCN": "南宫羽"
       },
+      "attribute": "ether",
+      "specialty": "stun",
       "buffs": [
         {
           "id": "buff_1f08564414",
@@ -413,6 +479,54 @@
             }
           ],
           "buffModifiers": []
+        },
+        {
+          "id": "buff_ce11acbda2",
+          "source": {
+            "zhCN": "额外能力"
+          },
+          "description": {
+            "zhCN": "南宫羽的「普通攻击：可爱地雷飞天撞」第三段攻击或「终结技：流落星群」命中敌人时，敌人获得「踉跄」效果，失衡易伤倍率提升30%"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_b37f029a3a",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "stunDmgMultiplierBonus",
+              "mode": "flat",
+              "value": 30
+            }
+          ],
+          "buffModifiers": [],
+          "hidden": false
+        },
+        {
+          "id": "buff_2c59dfda5b",
+          "source": {
+            "zhCN": "影画二"
+          },
+          "description": {
+            "zhCN": "每层「颤音」使「核心被动：天才偶像」中「异放」的伤害比例额外提升10%；\n「额外能力：天使队长」提供的失衡易伤倍率额外提升30%"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_4b7e6ff2ed",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "stunDmgMultiplierBonus",
+              "mode": "flat",
+              "value": 30
+            }
+          ],
+          "buffModifiers": [],
+          "hidden": false
         }
       ],
       "images": {
@@ -425,6 +539,8 @@
       "name": {
         "zhCN": "浮波柚叶"
       },
+      "attribute": "physical",
+      "specialty": "support",
       "buffs": [
         {
           "id": "buff_883a921c63",
@@ -632,6 +748,8 @@
       "name": {
         "zhCN": "耀嘉音"
       },
+      "attribute": "ether",
+      "specialty": "support",
       "buffs": [
         {
           "id": "yaojiayin.core_andante_atk",
@@ -788,6 +906,8 @@
       "name": {
         "zhCN": "丽娜"
       },
+      "attribute": "electric",
+      "specialty": "support",
       "buffs": [
         {
           "id": "rina.core_pen_ratio",
@@ -905,6 +1025,8 @@
       "name": {
         "zhCN": "露西"
       },
+      "attribute": "fire",
+      "specialty": "support",
       "buffs": [
         {
           "id": "lucy.ex_special_cheer_on",
@@ -962,6 +1084,8 @@
       "name": {
         "zhCN": "妮可"
       },
+      "attribute": "ether",
+      "specialty": "support",
       "buffs": [
         {
           "id": "nicole.core_def_reduction",
@@ -1044,6 +1168,8 @@
       "name": {
         "zhCN": "苍角"
       },
+      "attribute": "ice",
+      "specialty": "support",
       "buffs": [
         {
           "id": "soukaku.core_fly_the_flag_atk",
@@ -1128,6 +1254,8 @@
       "name": {
         "zhCN": "月城柳"
       },
+      "attribute": "electric",
+      "specialty": "anomaly",
       "buffs": [
         {
           "id": "yanagi.core_disorder_multiplier_bonus",
@@ -1187,6 +1315,8 @@
       "name": {
         "zhCN": "柏妮思·怀特"
       },
+      "attribute": "fire",
+      "specialty": "anomaly",
       "buffs": [
         {
           "id": "burnice.cinema_2_heat_pierce",
@@ -1225,6 +1355,8 @@
       "name": {
         "zhCN": "莱特"
       },
+      "attribute": "fire",
+      "specialty": "stun",
       "buffs": [
         {
           "id": "lighter.core_morale_res_reduction",
@@ -1422,6 +1554,8 @@
       "name": {
         "zhCN": "冯·莱卡恩"
       },
+      "attribute": "ice",
+      "specialty": "stun",
       "buffs": [
         {
           "id": "lycaon.core_metal_legs_res_and_other_dmg",
@@ -1444,21 +1578,52 @@
               "value": 25
             },
             {
-              "id": "lycaon_core_other_attribute_dmg",
+              "id": "lycaon_core_other_attribute_physical_dmg",
               "type": "fixed",
               "target": {
                 "kind": "default"
               },
-              "appliesTo": {
-                "elements": [
-                  "physical",
-                  "fire",
-                  "electric",
-                  "ether",
-                  "wind"
-                ]
+              "stat": "physicalDmg",
+              "mode": "flat",
+              "value": 30
+            },
+            {
+              "id": "lycaon_core_other_attribute_fire_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
               },
-              "stat": "dmgBonus",
+              "stat": "fireDmg",
+              "mode": "flat",
+              "value": 30
+            },
+            {
+              "id": "lycaon_core_other_attribute_electric_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "electricDmg",
+              "mode": "flat",
+              "value": 30
+            },
+            {
+              "id": "lycaon_core_other_attribute_ether_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "etherDmg",
+              "mode": "flat",
+              "value": 30
+            },
+            {
+              "id": "lycaon_core_other_attribute_wind_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "windDmg",
               "mode": "flat",
               "value": 30
             }
@@ -1500,6 +1665,8 @@
       "name": {
         "zhCN": "青衣"
       },
+      "attribute": "electric",
+      "specialty": "stun",
       "buffs": [
         {
           "id": "qingyi.core_subjugation_stun_multiplier",
@@ -1611,6 +1778,8 @@
       "name": {
         "zhCN": "「扳机」"
       },
+      "attribute": "electric",
+      "specialty": "stun",
       "buffs": [
         {
           "id": "trigger.core_gap_stun_multiplier",
@@ -1694,6 +1863,8 @@
       "name": {
         "zhCN": "橘福福"
       },
+      "attribute": "fire",
+      "specialty": "stun",
       "buffs": [
         {
           "id": "juhufu.core_tiger_roar_crit_dmg",
@@ -1722,10 +1893,8 @@
                 "kind": "skill",
                 "skillTargets": [
                   {
-                    "categoryId": "chain",
-                    "moveIdPrefixes": [
-                      "chain_"
-                    ]
+                    "kind": "skillType",
+                    "skillType": "chain"
                   }
                 ]
               },
@@ -1740,10 +1909,8 @@
                 "kind": "skill",
                 "skillTargets": [
                   {
-                    "categoryId": "chain",
-                    "moveIdPrefixes": [
-                      "ultimate_"
-                    ]
+                    "kind": "skillType",
+                    "skillType": "ultimate"
                   }
                 ]
               },
@@ -1811,6 +1978,8 @@
       "name": {
         "zhCN": "凯撒·金"
       },
+      "attribute": "physical",
+      "specialty": "defense",
       "buffs": [
         {
           "id": "caesar.core_radiant_aegis_atk",
@@ -1920,6 +2089,8 @@
       "name": {
         "zhCN": "希希芙"
       },
+      "attribute": "electric",
+      "specialty": "attack",
       "buffs": [
         {
           "id": "xixifu.core_electric_def_ignore",
@@ -1937,12 +2108,7 @@
               "target": {
                 "kind": "default"
               },
-              "appliesTo": {
-                "elements": [
-                  "electric"
-                ]
-              },
-              "stat": "enemyDefIgnore",
+              "stat": "electricDefIgnore",
               "mode": "flat",
               "source": {
                 "variable": "x",
@@ -2000,11 +2166,6 @@
               "target": {
                 "kind": "default"
               },
-              "appliesTo": {
-                "elements": [
-                  "electric"
-                ]
-              },
               "stat": "electricResIgnore",
               "mode": "flat",
               "value": 5
@@ -2039,6 +2200,8 @@
       "name": {
         "zhCN": "奥菲丝&「鬼火」"
       },
+      "attribute": "fire",
+      "specialty": "attack",
       "buffs": [
         {
           "id": "orphie.core_crosshair_focus_atk",
@@ -2110,6 +2273,8 @@
       "name": {
         "zhCN": "「席德」"
       },
+      "attribute": "electric",
+      "specialty": "attack",
       "buffs": [
         {
           "id": "seed.core_vanguard_bright_attack",
@@ -2183,6 +2348,429 @@
         "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/08/30/439466880/90e7d7b87f30e735ce89c2321035db49_42538056491852002.png",
         "officialPage": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/43"
       }
+    },
+    {
+      "id": "lucia_elowen",
+      "name": {
+        "zhCN": "卢西娅·艾洛温"
+      },
+      "attribute": "ether",
+      "specialty": "support",
+      "buffs": [
+        {
+          "id": "lucia_elowen.core_dream_song",
+          "source": {
+            "zhCN": "核心被动（F级）"
+          },
+          "description": {
+            "zhCN": "进入[梦境]状态时开启[以太帷幕·涌泉]，使全队角色最大生命值提升5%，持续40秒；卢西娅发动招式升级或[追加攻击]时，为全队施加[巡梦童谣]，使角色造成的伤害提升20%，持续12秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "lucia_elowen_core_team_hp_pct",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "hpPct",
+              "mode": "pct",
+              "basis": "outOfCombatHp",
+              "value": 5
+            },
+            {
+              "id": "lucia_elowen_core_dream_song_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 20
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "lucia_elowen.ex_special_darkbreaker_sheer_force",
+          "source": {
+            "zhCN": "强化特殊技（12级）"
+          },
+          "description": {
+            "zhCN": "卢西娅发动[合唱]时为全队施加[破暗]；按12级强化特殊技计算，[破暗]使贯穿力提升12点，卢西娅每拥有200点初始最大生命值额外提升7.4点，最多提升900点，持续20秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "lucia_elowen_ex_special_sheer_force",
+              "type": "formula",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "sheerForceFlat",
+              "mode": "flat",
+              "source": {
+                "variable": "x",
+                "label": {
+                  "zhCN": "卢西娅初始最大生命值（强化特殊技12级）"
+                },
+                "defaultValue": 24000,
+                "min": 0,
+                "max": 24000
+              },
+              "formula": {
+                "expression": "clamp(12 + floor(x / 200) * 7.4, 12, 900)",
+                "valueUnit": "storedValue"
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "lucia_elowen.additional_long_night_crit_dmg",
+          "source": {
+            "zhCN": "额外能力"
+          },
+          "description": {
+            "zhCN": "队伍中存在[命破]角色或[击破]角色时，卢西娅施加[破暗]状态时，额外附加暴击伤害提升30%效果。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "lucia_elowen_additional_crit_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critDmg",
+              "mode": "flat",
+              "value": 30
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "lucia_elowen.cinema_1_dream_song_res_ignore",
+          "source": {
+            "zhCN": "影画一"
+          },
+          "description": {
+            "zhCN": "[巡梦童谣]额外附加造成伤害时无视敌人18%全属性伤害抗性和喧响值获取效率提升5%的效果；卢西娅还能通过[回音]延续[巡梦童谣]。喧响值获取效率仅保留在说明中。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "lucia_elowen_cinema_1_all_res_ignore",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "allResIgnore",
+              "mode": "flat",
+              "value": 18
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "lucia_elowen.cinema_2_darkbreaker_sheer_dmg",
+          "source": {
+            "zhCN": "影画二"
+          },
+          "description": {
+            "zhCN": "拥有[破暗]状态的代理人处于[以太帷幕·涌泉]内时，额外获得贯穿伤害提升15%的效果。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "lucia_elowen_cinema_2_sheer_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "sheerDmgBonus",
+              "mode": "flat",
+              "value": 15
+            }
+          ],
+          "buffModifiers": []
+        }
+      ],
+      "images": {
+        "icon": "/assets/agents/lucia_elowen.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/10/10/76099754/59a4a2aca9680e8ddf9ebf8c2985007e_9204633087739368852.png",
+        "officialPage": "https://baike.mihoyo.com/zzz/wiki/content/1533/detail?mhy_presentation_style=fullscreen"
+      }
+    },
+    {
+      "id": "pan_yinhu",
+      "name": {
+        "zhCN": "潘引壶"
+      },
+      "attribute": "physical",
+      "specialty": "defense",
+      "buffs": [
+        {
+          "id": "pan_yinhu.core_open_meridians_sheer_force",
+          "source": {
+            "zhCN": "核心被动（F级）"
+          },
+          "description": {
+            "zhCN": "通过潘引壶触发的[快速支援]或[连携技]入场的代理人获得[通窍]，贯穿力提升潘引壶初始攻击力的18%，最多提升540点，持续25秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "pan_yinhu_core_sheer_force",
+              "type": "derived",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "sheerForceFlat",
+              "mode": "flat",
+              "sourceLabel": {
+                "zhCN": "潘引壶初始攻击力"
+              },
+              "defaultSourceValue": 3000,
+              "ratio": 18,
+              "cap": 540
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "pan_yinhu.additional_stupefaction_dmg",
+          "source": {
+            "zhCN": "额外能力"
+          },
+          "description": {
+            "zhCN": "队伍中存在[命破]角色或与自身阵营相同的角色时，潘引壶通过[特殊技：断脉破穴手]对敌人施加[气绝]，使所有单位对其造成的伤害提升20%，持续10秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "pan_yinhu_additional_stupefaction_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 20
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "pan_yinhu.cinema_1_stupefaction_dmg",
+          "source": {
+            "zhCN": "影画一"
+          },
+          "description": {
+            "zhCN": "所有单位对被施加[气绝]效果的敌人造成伤害时，造成的伤害额外提升10%。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "pan_yinhu_cinema_1_stupefaction_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 10
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "pan_yinhu.cinema_6_open_meridians_amplify",
+          "source": {
+            "zhCN": "影画六"
+          },
+          "description": {
+            "zhCN": "[核心被动：脉中乾坤]提供的[通窍]额外获得潘引壶初始攻击力6%的贯穿力，合计提升比例为24%，贯穿力上限提升至720点。"
+          },
+          "scope": "inCombat",
+          "effects": [],
+          "buffModifiers": [
+            {
+              "id": "pan_yinhu_cinema_6_amplify_core_sheer_force",
+              "operation": "multiplyResolvedValue",
+              "factor": 1.3333333333333333,
+              "targetBuffIds": [
+                "pan_yinhu.core_open_meridians_sheer_force"
+              ],
+              "targetEffectIds": [
+                "pan_yinhu_core_sheer_force"
+              ],
+              "label": {
+                "zhCN": "[通窍]贯穿力提升比例由18%提高至24%，上限由540点提高至720点。"
+              }
+            }
+          ]
+        }
+      ],
+      "images": {
+        "icon": "/assets/agents/pan_yinhu.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/04/26/73751405/7151eee6ba7f9ad07176f604b37d8799_4441778457614666765.png",
+        "officialPage": "https://baike.mihoyo.com/zzz/wiki/content/1300/detail?mhy_presentation_style=fullscreen"
+      }
+    },
+    {
+      "id": "jane_doe",
+      "name": {
+        "zhCN": "简"
+      },
+      "attribute": "physical",
+      "specialty": "anomaly",
+      "buffs": [
+        {
+          "id": "jane_doe.core_insight",
+          "source": {
+            "zhCN": "核心被动（F级）"
+          },
+          "description": {
+            "zhCN": "简的攻击命中敌人时会使其陷入[啮咬]状态，持续10秒；队伍中任意角色对处于[啮咬]状态下的敌人触发[强击]并施加[畏缩]效果时，[畏缩]效果的持续时间提升5秒；对处于[啮咬]状态下的敌人造成的[强击]伤害有概率触发暴击，基础暴击率为40%，暴击伤害为50%，简的每点异常精通会使该效果的暴击率额外提升0.16%。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "jane_doe_core_flinch_duration",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "disorder",
+                "anomalyEffects": [
+                  "flinch"
+                ]
+              },
+              "stat": "anomalyDurationBonusSeconds",
+              "mode": "flat",
+              "value": 5
+            },
+            {
+              "id": "jane_doe_core_assault_crit_rate",
+              "type": "formula",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute",
+                "anomalyEffects": [
+                  "assault"
+                ]
+              },
+              "stat": "anomalyCritRate",
+              "mode": "flat",
+              "source": {
+                "variable": "x",
+                "label": {
+                  "zhCN": "简异常精通"
+                },
+                "defaultValue": 375,
+                "min": 0,
+                "max": 375
+              },
+              "formula": {
+                "expression": "clamp(40 + x * 0.16, 0, 100)",
+                "valueUnit": "storedPercent"
+              }
+            },
+            {
+              "id": "jane_doe_core_assault_crit_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute",
+                "anomalyEffects": [
+                  "assault"
+                ]
+              },
+              "stat": "anomalyCritDmg",
+              "mode": "flat",
+              "value": 50
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "jane_doe.cinema_2_assault_crit",
+          "source": {
+            "zhCN": "影画二"
+          },
+          "description": {
+            "zhCN": "简的攻击命中处于[啮咬]状态下的敌人，或队伍中任意角色对处于[啮咬]状态下的敌人触发[强击]时，会无视目标15%的防御力；[强击]伤害触发暴击时，暴击伤害额外提升50%。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "jane_doe_cinema_2_assault_def_ignore",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute",
+                "anomalyEffects": [
+                  "assault"
+                ]
+              },
+              "stat": "enemyDefIgnore",
+              "mode": "flat",
+              "value": 15
+            },
+            {
+              "id": "jane_doe_cinema_2_assault_crit_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute",
+                "anomalyEffects": [
+                  "assault"
+                ]
+              },
+              "stat": "anomalyCritDmg",
+              "mode": "flat",
+              "value": 50
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "jane_doe.cinema_4_anomaly_damage",
+          "source": {
+            "zhCN": "影画四"
+          },
+          "description": {
+            "zhCN": "队伍中任意角色对敌人触发[强击]或[紊乱]效果时，全队造成的属性异常伤害提升18%，持续15秒。选中本 Buff 表示触发条件已经满足。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "jane_doe_cinema_4_attribute_anomaly_damage",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute",
+                "anomalyEffects": [
+                  "assault",
+                  "shatter",
+                  "burn",
+                  "shock",
+                  "corruption"
+                ]
+              },
+              "stat": "anomalyDamageBonus",
+              "mode": "flat",
+              "value": 18
+            }
+          ],
+          "buffModifiers": []
+        }
+      ],
+      "images": {
+        "icon": "/assets/agents/jane_doe.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/08/16/15559334/671b9f8d9227c19355e2eceb9f23ef28_7055750575833971395.png",
+        "officialPage": "https://baike.mihoyo.com/zzz/wiki/content/759/detail?mhy_presentation_style=fullscreen"
+      }
     }
   ],
   "fieldBuffs": [
@@ -2210,12 +2798,6 @@
       "description": {
         "zhCN": "代理人的风属性伤害和冰属性伤害提升10%。命中处于属性异常状态中的敌人时，造成的伤害提升15%，无视其10%的全属性伤害抗性。"
       },
-      "coverage": {
-        "default": 1,
-        "min": 0,
-        "max": 1,
-        "step": 0.1
-      },
       "effects": [
         {
           "id": "field_defense_v5_v3_0_p2_jijing_wind_dmg",
@@ -2225,7 +2807,13 @@
           },
           "stat": "windDmg",
           "mode": "flat",
-          "value": 10
+          "value": 10,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         },
         {
           "id": "field_defense_v5_v3_0_p2_jijing_ice_dmg",
@@ -2235,7 +2823,13 @@
           },
           "stat": "iceDmg",
           "mode": "flat",
-          "value": 10
+          "value": 10,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         },
         {
           "id": "field_defense_v5_v3_0_p2_jijing_dmg_vs_anomaly",
@@ -2245,27 +2839,29 @@
           },
           "stat": "dmgBonus",
           "mode": "flat",
-          "value": 15
+          "value": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         },
         {
-          "id": "field_defense_v5_v3_0_p2_jijing_wind_res_ignore",
+          "id": "field_defense_v5_v3_0_p2_jijing_all_res_ignore",
           "type": "fixed",
           "target": {
             "kind": "default"
           },
-          "stat": "windResIgnore",
+          "stat": "allResIgnore",
           "mode": "flat",
-          "value": 10
-        },
-        {
-          "id": "field_defense_v5_v3_0_p2_jijing_ice_res_ignore",
-          "type": "fixed",
-          "target": {
-            "kind": "default"
-          },
-          "stat": "iceResIgnore",
-          "mode": "flat",
-          "value": 10
+          "value": 10,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         }
       ],
       "buffModifiers": []
@@ -2294,12 +2890,6 @@
       "description": {
         "zhCN": "代理人的[终结技]、[连携技]造成的伤害提升40%。[连携技]命中敌人后，其失衡易伤倍率提升20%，失衡恢复速度降低15%，持续15秒，重复触发时刷新持续时间。"
       },
-      "coverage": {
-        "default": 1,
-        "min": 0,
-        "max": 1,
-        "step": 0.1
-      },
       "effects": [
         {
           "id": "field_defense_v5_v3_0_p2_zhongmu_chain_ultimate_dmg",
@@ -2308,22 +2898,24 @@
             "kind": "skill",
             "skillTargets": [
               {
-                "categoryId": "chain",
-                "moveIdPrefixes": [
-                  "chain_"
-                ]
+                "kind": "skillType",
+                "skillType": "chain"
               },
               {
-                "categoryId": "chain",
-                "moveIdPrefixes": [
-                  "ultimate_"
-                ]
+                "kind": "skillType",
+                "skillType": "ultimate"
               }
             ]
           },
           "stat": "dmgBonus",
           "mode": "flat",
-          "value": 40
+          "value": 40,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         },
         {
           "id": "field_defense_v5_v3_0_p2_zhongmu_stun_vulnerable",
@@ -2333,7 +2925,13 @@
           },
           "stat": "stunDmgMultiplierBonus",
           "mode": "flat",
-          "value": 20
+          "value": 20,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         }
       ],
       "buffModifiers": []
@@ -2362,12 +2960,6 @@
       "description": {
         "zhCN": "代理人的攻击力提升30%，暴击伤害提升15%。敌人的失衡易伤倍率提升20%。"
       },
-      "coverage": {
-        "default": 1,
-        "min": 0,
-        "max": 1,
-        "step": 0.1
-      },
       "effects": [
         {
           "id": "field_defense_v5_v3_0_p2_mingse_atk",
@@ -2378,7 +2970,13 @@
           "stat": "atkPct",
           "mode": "pct",
           "basis": "outOfCombatAtk",
-          "value": 30
+          "value": 30,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         },
         {
           "id": "field_defense_v5_v3_0_p2_mingse_crit_dmg",
@@ -2388,7 +2986,13 @@
           },
           "stat": "critDmg",
           "mode": "flat",
-          "value": 15
+          "value": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         },
         {
           "id": "field_defense_v5_v3_0_p2_mingse_stun_vulnerable",
@@ -2398,7 +3002,254 @@
           },
           "stat": "stunDmgMultiplierBonus",
           "mode": "flat",
+          "value": 20,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.critical_assault.v3_0.p3.yanwang",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "critical_assault",
+        "gameVersion": "3.0",
+        "phaseNo": 3,
+        "phaseName": {
+          "zhCN": "第三期"
+        }
+      },
+      "name": {
+        "zhCN": "湮亡"
+      },
+      "source": {
+        "zhCN": "危局强袭战"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.0版本第三期"
+      },
+      "description": {
+        "zhCN": "代理人造成的失衡值提升20%，[终结技]/[连携技]无视敌人30%的全属性伤害抗性。发动[连携技]后，全队的攻击力提升10%，暴击伤害提升15%，持续20秒，最多可叠加3层，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_critical_assault_v3_0_p3_yanwang_all_res_ignore",
+          "type": "fixed",
+          "target": {
+            "kind": "skill",
+            "skillTargets": [
+              {
+                "kind": "skillType",
+                "skillType": "chain"
+              },
+              {
+                "kind": "skillType",
+                "skillType": "ultimate"
+              }
+            ]
+          },
+          "stat": "allResIgnore",
+          "mode": "flat",
+          "value": 30
+        },
+        {
+          "id": "field_critical_assault_v3_0_p3_yanwang_chain_atk",
+          "type": "stacked",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "atkPct",
+          "mode": "pct",
+          "basis": "outOfCombatAtk",
+          "valuePerStack": 10,
+          "maxStacks": 3,
+          "defaultStacks": 3,
+          "stackGroup": "field_critical_assault_v3_0_p3_yanwang_chain_stacks",
+          "stackLabel": {
+            "zhCN": "连携技增益层数"
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_0_p3_yanwang_chain_crit_dmg",
+          "type": "stacked",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "critDmg",
+          "mode": "flat",
+          "valuePerStack": 15,
+          "maxStacks": 3,
+          "defaultStacks": 3,
+          "stackGroup": "field_critical_assault_v3_0_p3_yanwang_chain_stacks",
+          "stackLabel": {
+            "zhCN": "连携技增益层数"
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.critical_assault.v3_0.p3.linxi",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "critical_assault",
+        "gameVersion": "3.0",
+        "phaseNo": 3,
+        "phaseName": {
+          "zhCN": "第三期"
+        }
+      },
+      "name": {
+        "zhCN": "凛息"
+      },
+      "source": {
+        "zhCN": "危局强袭战"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.0版本第三期"
+      },
+      "description": {
+        "zhCN": "代理人的风属性伤害、冰属性伤害提升20%，异常精通提升20点。对敌人施加属性异常状态时，敌人的全伤害抗性降低10%，且全队造成的属性异常伤害提升10%，持续15秒，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_critical_assault_v3_0_p3_linxi_wind_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "windDmg",
+          "mode": "flat",
           "value": 20
+        },
+        {
+          "id": "field_critical_assault_v3_0_p3_linxi_ice_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "iceDmg",
+          "mode": "flat",
+          "value": 20
+        },
+        {
+          "id": "field_critical_assault_v3_0_p3_linxi_anomaly_proficiency",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "anomalyProficiency",
+          "mode": "flat",
+          "value": 20
+        },
+        {
+          "id": "field_critical_assault_v3_0_p3_linxi_enemy_res_reduction",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "enemyResReduction",
+          "mode": "flat",
+          "value": 10,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_0_p3_linxi_anomaly_damage",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "anomalyDamageBonus",
+          "mode": "flat",
+          "value": 10,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.critical_assault.v3_0.p3.gouxi",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "critical_assault",
+        "gameVersion": "3.0",
+        "phaseNo": 3,
+        "phaseName": {
+          "zhCN": "第三期"
+        }
+      },
+      "name": {
+        "zhCN": "构析"
+      },
+      "source": {
+        "zhCN": "危局强袭战"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.0版本第三期"
+      },
+      "description": {
+        "zhCN": "代理人的异常精通提升45点。使敌人进入属性异常状态后，敌人防御力降低10%，持续10秒，触发[紊乱]后，敌人防御力额外降低15%，持续10秒，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_critical_assault_v3_0_p3_gouxi_anomaly_proficiency",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "anomalyProficiency",
+          "mode": "flat",
+          "value": 45
+        },
+        {
+          "id": "field_critical_assault_v3_0_p3_gouxi_anomaly_def_reduction",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "enemyDefReduction",
+          "mode": "flat",
+          "value": 10,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_0_p3_gouxi_disorder_def_reduction",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "enemyDefReduction",
+          "mode": "flat",
+          "value": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         }
       ],
       "buffModifiers": []
@@ -2422,15 +3273,15 @@
           "stat": "atkPct",
           "value": 10,
           "mode": "pct",
-          "basis": "baseAtk"
+          "basis": "baseAtk",
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         }
-      ],
-      "coverage": {
-        "default": 1,
-        "min": 0,
-        "max": 1,
-        "step": 0.1
-      }
+      ]
     },
     {
       "id": "buff_h2r7x5p1kd",
@@ -2448,15 +3299,15 @@
           "stat": "atkPct",
           "value": 10,
           "mode": "pct",
-          "basis": "outOfCombatAtk"
+          "basis": "outOfCombatAtk",
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         }
-      ],
-      "coverage": {
-        "default": 1,
-        "min": 0,
-        "max": 1,
-        "step": 0.1
-      }
+      ]
     }
   ]
 }

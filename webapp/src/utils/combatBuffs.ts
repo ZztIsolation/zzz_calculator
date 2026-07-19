@@ -1,4 +1,5 @@
 import {
+  clampWEngineModificationLevel,
   effectRules,
   localizedText,
   materializeWEngineForModificationLevel,
@@ -6,7 +7,7 @@ import {
 } from "@core/shared-combat.js"
 import { buffDisplayName } from "@/utils/format"
 
-export type BuffCategory = "self" | "selfWEngine" | "teammate" | "teammateWEngine" | "teammateDriveDisc" | "field" | "custom"
+export type BuffCategory = "self" | "selfWEngine" | "teammate" | "teammateWEngine" | "teammateDriveDisc" | "field" | "boss" | "custom"
 
 export const BUFF_CATEGORY_TABS: Array<{ name: BuffCategory, label: string }> = [
   { name: "self", label: "自身 Buff" },
@@ -15,6 +16,7 @@ export const BUFF_CATEGORY_TABS: Array<{ name: BuffCategory, label: string }> = 
   { name: "teammateWEngine", label: "队友音擎buff" },
   { name: "teammateDriveDisc", label: "队友驱动盘buff" },
   { name: "field", label: "场地 Buff" },
+  { name: "boss", label: "Boss Buff" },
   { name: "custom", label: "自定义 Buff" },
 ]
 
@@ -157,6 +159,21 @@ function wEngineTeamBuff(wEngine: any) {
   return effect?.teamBuff ?? wEngine?.teamBuff ?? null
 }
 
+export function wEngineIdFromTeamBuffId(id = ""): string {
+  return String(id ?? "").match(/^wEngine:(.+)\.team$/)?.[1] ?? ""
+}
+
+function wEngineTeamBuffReference(addedBuffs: any[] = [], id = "") {
+  return addedBuffs.find(item => item?.sourceKind === "wEngineTeam" && item?.id === id) ?? null
+}
+
+function wEngineModificationRange(wEngine: any = {}) {
+  const modification = wEngine?.modification ?? {}
+  const min = Number.isInteger(Number(modification.minLevel)) ? Number(modification.minLevel) : 1
+  const max = Number.isInteger(Number(modification.maxLevel)) ? Number(modification.maxLevel) : 5
+  return { min, max: Math.max(min, max) }
+}
+
 export function currentWEngineBuffCandidates(meta: any, wEngineId = "", modificationLevel = 1): any[] {
   const rawWEngine = (meta?.wEngines ?? []).find((item: any) => item.id === wEngineId)
   if (!rawWEngine) {
@@ -219,6 +236,8 @@ export function teammateBuffCandidates(meta: any): any[] {
         ownerId: group.id,
         ownerName: group.name,
         ownerImages: group.images ?? buff.teammateImages ?? null,
+        teammateAttribute: group.attribute ?? null,
+        teammateSpecialty: group.specialty ?? null,
         teammateImages: group.images ?? buff.teammateImages ?? null,
         sourceLabel: buff.sourceLabel ?? buff.source,
         source: buff.source,
@@ -229,23 +248,30 @@ export function teammateBuffCandidates(meta: any): any[] {
   return dedupeById([...groups, ...fallback])
 }
 
-export function teamWEngineBuffCandidates(meta: any, currentWEngineId = ""): any[] {
-  return (meta?.wEngines ?? [])
+export function teamWEngineBuffCandidates(meta: any, currentWEngineId = "", addedBuffs: any[] = []): any[] {
+  return (meta?.displayWEngines ?? meta?.wEngines ?? [])
     .filter((wEngine: any) => wEngine?.id && wEngine.id !== currentWEngineId)
     .map((rawWEngine: any) => {
-      const wEngine = materializeWEngineForModificationLevel(rawWEngine, 1)
+      const id = `wEngine:${rawWEngine.id}.team`
+      const reference = wEngineTeamBuffReference(addedBuffs, id)
+      const modificationLevel = clampWEngineModificationLevel(reference?.wEngineModificationLevel, rawWEngine)
+      const wEngine = materializeWEngineForModificationLevel(rawWEngine, modificationLevel)
       const effect = wEngineEffectData(wEngine)
       const buff = wEngineTeamBuff(wEngine)
       if (!inCombatEffect(buff)) {
         return null
       }
+      const modificationRange = wEngineModificationRange(rawWEngine)
       return {
         ...buff,
-        id: `wEngine:${wEngine.id}.team`,
+        id,
         sourceType: "wEngineTeam",
         sourceCategory: "wEngine",
         sourceKind: "wEngineTeam",
-        wEngineModificationLevel: wEngine.selectedModificationLevel ?? 1,
+        isTeammateWEngine: true,
+        wEngineModificationLevel: wEngine.selectedModificationLevel ?? modificationLevel,
+        wEngineModificationMin: modificationRange.min,
+        wEngineModificationMax: modificationRange.max,
         ownerName: wEngine.name,
         ownerImages: wEngine.images ?? null,
         name: { zhCN: `${nameOf(wEngine)}（队友携带）` },
@@ -292,6 +318,19 @@ export function fieldBuffCandidates(context: CombatBuffContext): any[] {
     .filter((buff: any) => buff?.sourceType === "field"))
 }
 
+export function bossBuffCandidates(context: CombatBuffContext): any[] {
+  const byId = new Map<string, any>()
+  for (const buff of combatBuffsFromContext(context).filter((item: any) => item?.sourceType === "boss")) {
+    if (buff?.id) byId.set(String(buff.id), buff)
+  }
+  for (const buff of context.meta?.bossCombatBuffs ?? []) {
+    if (!buff?.id) continue
+    const id = String(buff.id)
+    byId.set(id, { ...(byId.get(id) ?? {}), ...buff })
+  }
+  return dedupeById([...byId.values()])
+}
+
 export function buildCombatBuffGroups(context: CombatBuffContext): Record<BuffCategory, any[]> {
   const catalogBuffs = combatBuffsFromContext(context)
   return {
@@ -301,10 +340,11 @@ export function buildCombatBuffGroups(context: CombatBuffContext): Record<BuffCa
     ]),
     selfWEngine: currentWEngineBuffCandidates(context.meta, context.wEngineId, context.wEngineModificationLevel),
     teammate: teammateBuffCandidates(context.meta),
-    teammateWEngine: teamWEngineBuffCandidates(context.meta, context.wEngineId),
+    teammateWEngine: teamWEngineBuffCandidates(context.meta, context.wEngineId, context.addedBuffs),
     teammateDriveDisc: teammateDriveDiscBuffCandidates(context.driveDiscSets),
     field: fieldBuffCandidates(context),
-    custom: context.addedBuffs ?? [],
+    boss: bossBuffCandidates(context),
+    custom: (context.addedBuffs ?? []).filter((buff: any) => buff?.sourceKind === "custom"),
   }
 }
 
@@ -313,14 +353,17 @@ export function allDisplayCombatBuffCandidates(context: CombatBuffContext): any[
   return dedupeById([
     ...Object.values(groups).flat(),
     ...combatBuffsFromContext(context),
-    ...(context.addedBuffs ?? []),
+    ...(context.addedBuffs ?? []).filter((buff: any) => buff?.sourceKind === "custom"),
   ])
 }
 
 export function buffLabelForId(id: string, context: CombatBuffContext): string {
   const buff = allDisplayCombatBuffCandidates(context).find(item => item?.id === id)
   if (buff) {
-    return buffDisplayName(buff)
+    const label = buffDisplayName(buff)
+    return buff?.isTeammateWEngine && Number.isInteger(Number(buff.wEngineModificationLevel))
+      ? `${label} · 精 ${Number(buff.wEngineModificationLevel)}`
+      : label
   }
   const driveDiscMatch = String(id ?? "").match(/^driveDisc4pc:([^.:]+)(?:\.(self|team))?$/)
   if (driveDiscMatch) {

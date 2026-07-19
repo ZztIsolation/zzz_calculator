@@ -89,6 +89,7 @@ textarea {
 
 .nav a {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 7px;
   height: 34px;
@@ -96,6 +97,7 @@ textarea {
   color: var(--app-muted);
   text-decoration: none;
   border-radius: var(--app-radius-sm);
+  white-space: nowrap;
 }
 
 .nav a.router-link-active {
@@ -244,13 +246,87 @@ textarea {
   gap: 8px;
 }
 
+.ui-layout-scope,
+[data-layout-surface] {
+  min-width: 0;
+  container: ui-layout / inline-size;
+}
+
+.ui-master-detail {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.ui-field-grid {
+  --ui-field-min: 144px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--ui-field-min)), 1fr));
+  gap: 12px;
+  min-width: 0;
+  container: ui-fields / inline-size;
+}
+
+.ui-field-grid--comfortable {
+  --ui-field-min: 180px;
+}
+
+.ui-field,
+[data-layout-field],
+.metric,
+.maintenance-field,
+.custom-field,
+.compact-field,
+.optimizer-config-field {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ui-field--wide {
+  grid-column: span 2;
+}
+
+.ui-field--full {
+  grid-column: 1 / -1;
+}
+
+:where(.ui-field, [data-layout-field], .metric, .maintenance-field, .custom-field, .compact-field, .optimizer-config-field)
+  > :where(span, dt, .metric-title),
+:where(.metric-title, .metric-value, .maintenance-help, .validation-summary) {
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+:where(.ui-field, [data-layout-field], .metric, .maintenance-field, .custom-field, .compact-field, .optimizer-config-field)
+  :where(.n-input, .n-input-number, .n-select, .n-base-selection, .n-input-wrapper, .n-base-selection-label) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+:where(.ui-field, [data-layout-field], .metric, .maintenance-field, .custom-field, .compact-field, .optimizer-config-field)
+  :where(.n-input, .n-input-number, .n-select) {
+  width: 100%;
+}
+
+:where(.ui-field, [data-layout-field], .metric, .maintenance-field, .custom-field, .compact-field, .optimizer-config-field)
+  .n-base-selection-label__render-label {
+  min-width: 0;
+}
+
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 144px), 1fr));
   gap: 8px;
+  min-width: 0;
+  container: ui-fields / inline-size;
 }
 
 .metric {
+  min-width: 0;
   padding: 10px 12px;
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-sm);
@@ -264,8 +340,10 @@ textarea {
 }
 
 .metric dd {
+  min-width: 0;
   margin: 0;
   font-weight: 750;
+  overflow-wrap: anywhere;
 }
 
 .metric.layer-metric {
@@ -351,6 +429,19 @@ textarea {
   background: #fff;
 }
 
+@container ui-layout (max-width: 760px) {
+  .ui-master-detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container ui-fields (max-width: 480px) {
+  .ui-field--wide,
+  .ui-field--full {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 900px) {
   .app-topbar {
     align-items: flex-start;
@@ -383,5 +474,20 @@ textarea {
 
   .entity-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .nav {
+    gap: 2px;
+    overflow: hidden;
+  }
+
+  .nav a {
+    flex: 1 1 0;
+    justify-content: center;
+    min-width: 0;
+    gap: 5px;
+    padding: 0 4px;
   }
 }

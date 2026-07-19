@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import DiscsView from "@/views/DiscsView.vue"
 
 const catalogFixture = vi.hoisted(() => ({
@@ -12,13 +12,57 @@ const catalogFixture = vi.hoisted(() => ({
     }],
   },
   meta: {
-    agents: [],
+    agents: [{ id: "agent-a", name: { zhCN: "测试代理人" } }],
     wEngines: [],
     combatBuffs: [],
     statRules: {
       statDisplay: {
         hpFlat: { label: { zhCN: "生命值" } },
+        atkFlat: { label: { zhCN: "攻击力" } },
+        defFlat: { label: { zhCN: "防御力" } },
+        hpPct: { label: { zhCN: "生命值%" } },
+        atkPct: { label: { zhCN: "攻击力%" } },
+        defPct: { label: { zhCN: "防御力%" } },
         critRate: { label: { zhCN: "暴击率" } },
+        critDmg: { label: { zhCN: "暴击伤害" } },
+        anomalyProficiency: { label: { zhCN: "异常精通" } },
+        penFlat: { label: { zhCN: "穿透值" } },
+        fireDmg: { label: { zhCN: "火属性伤害加成" } },
+        iceResIgnore: { label: { zhCN: "冰抗性无视" } },
+      },
+      driveDisc: {
+        mainStatPools: {
+          1: ["hpFlat"],
+          2: ["atkFlat"],
+          3: ["defFlat"],
+          4: ["hpPct", "atkPct", "defPct", "critRate", "critDmg", "anomalyProficiency"],
+          5: ["fireDmg"],
+          6: ["hpPct"],
+        },
+        subStatPool: [
+          "hpFlat",
+          "atkFlat",
+          "defFlat",
+          "hpPct",
+          "atkPct",
+          "defPct",
+          "critRate",
+          "critDmg",
+          "anomalyProficiency",
+          "penFlat",
+        ],
+        sRankSubStatBaseStep: {
+          hpFlat: 112,
+          atkFlat: 19,
+          defFlat: 15,
+          hpPct: 3,
+          atkPct: 3,
+          defPct: 4.8,
+          critRate: 2.4,
+          critDmg: 4.8,
+          anomalyProficiency: 9,
+          penFlat: 9,
+        },
       },
     },
   },
@@ -31,9 +75,9 @@ vi.mock("@runtime/catalog-loader.js", () => ({
 
 vi.mock("naive-ui", () => ({
   NButton: {
-    props: ["disabled"],
+    props: ["disabled", "type"],
     emits: ["click"],
-    template: "<button :disabled=\"disabled\" @click=\"$emit('click', $event)\"><slot name=\"icon\" /><slot /></button>",
+    template: "<button :disabled=\"disabled\" :data-button-type=\"type || undefined\" @click=\"$emit('click', $event)\"><slot name=\"icon\" /><slot /></button>",
   },
   NCheckbox: {
     props: ["checked", "disabled"],
@@ -58,8 +102,8 @@ vi.mock("naive-ui", () => ({
     template: "<input :value=\"value\" @input=\"$emit('update:value', Number($event.target.value))\">",
   },
   NModal: {
-    props: ["show"],
-    template: "<div v-if=\"show\"><slot /><slot name=\"footer\" /></div>",
+    props: ["show", "title"],
+    template: "<div v-if=\"show\" class=\"test-modal\"><h2>{{ title }}</h2><slot /><slot name=\"footer\" /></div>",
   },
   NProgress: {
     template: "<div class=\"progress\"></div>",
@@ -122,9 +166,29 @@ async function mountView() {
   return wrapper
 }
 
+function button(wrapper: any, label: string) {
+  const match = wrapper.findAll("button").find((item: any) => item.text().trim() === label)
+  if (!match) {
+    throw new Error(`Button not found: ${label}`)
+  }
+  return match
+}
+
+async function setSubStat(wrapper: any, index: number, stat: string, rolls: number) {
+  const row = wrapper.findAll(".substat-editor-row")[index]
+  const selects = row.findAll("select")
+  await selects[0].setValue(stat)
+  await selects[1].setValue(String(rolls))
+  return row
+}
+
 describe("DiscsView", () => {
   beforeEach(() => {
     localStorage.clear()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it("renders drive disc set icons from the catalog in the inventory table", async () => {
@@ -175,5 +239,238 @@ describe("DiscsView", () => {
     const wrapper = await mountView()
 
     expect(wrapper.text()).not.toContain("词条分析")
+  })
+
+  it("labels bulk actions and makes scan the only primary toolbar command", async () => {
+    const wrapper = await mountView()
+    const toolbar = wrapper.find('[data-layout-surface="drive-discs-page"] > .panel > .panel-header .toolbar')
+    const toolbarButtons = toolbar.findAll("button")
+
+    expect(toolbarButtons.map(item => item.text().trim())).toEqual([
+      "新增单个",
+      "刷新",
+      "批量导入",
+      "批量导出",
+      "扫描",
+    ])
+    expect(toolbarButtons
+      .filter(item => item.attributes("data-button-type") === "primary")
+      .map(item => item.text().trim())).toEqual(["扫描"])
+  })
+
+  it("downloads the current account export and disables export for an empty inventory", async () => {
+    const emptyWrapper = await mountView()
+    expect(button(emptyWrapper, "批量导出").attributes()).toHaveProperty("disabled")
+    emptyWrapper.unmount()
+
+    seedInventory([{
+      id: "disc-export",
+      ownerId: "default",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 1,
+      rarity: "S",
+      level: 15,
+      maxLevel: 15,
+      mainStat: { stat: "hpFlat", value: 2200 },
+      subStats: [],
+    }])
+    const createObjectURL = vi.fn(() => "blob:drive-disc-export")
+    const revokeObjectURL = vi.fn()
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectURL })
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revokeObjectURL })
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {})
+    const wrapper = await mountView()
+
+    await button(wrapper, "批量导出").trigger("click")
+    await flushPromises()
+
+    expect(createObjectURL).toHaveBeenCalledTimes(1)
+    const blob = createObjectURL.mock.calls[0][0] as Blob
+    expect(blob.type).toBe("application/json;charset=utf-8")
+    expect(click).toHaveBeenCalledTimes(1)
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:drive-disc-export")
+  })
+
+  it("uses a refresh icon and hides manual identity, equipped agent, and rarity controls", async () => {
+    const wrapper = await mountView()
+
+    const refreshButton = button(wrapper, "刷新")
+    expect(refreshButton.find("svg").classes()).toContain("lucide-refresh-cw-icon")
+
+    await button(wrapper, "新增单个").trigger("click")
+    const modal = wrapper.find(".test-modal")
+    expect(modal.find("h2").text()).toBe("新增驱动盘")
+    expect(modal.find('[aria-label="驱动盘 ID"]').exists()).toBe(false)
+    expect(modal.find('[aria-label="驱动盘装备角色"]').exists()).toBe(false)
+    expect(modal.find('[aria-label="驱动盘品质"]').exists()).toBe(false)
+    expect(modal.text()).toContain("品质")
+    expect(modal.text()).toContain("S")
+    expect(modal.findAll(".substat-editor-row")).toHaveLength(4)
+    expect(modal.text()).not.toContain("新增副词条")
+    expect(modal.find('[aria-label^="移除副词条"]').exists()).toBe(false)
+  })
+
+  it("offers only legal S-rank substats with clear large and small stat labels", async () => {
+    const wrapper = await mountView()
+    await button(wrapper, "新增单个").trigger("click")
+
+    await wrapper.find('[aria-label="驱动盘位置"]').setValue("5")
+    await flushPromises()
+
+    const typeSelect = wrapper.find('[aria-label="副词条 1 类型"]')
+    const optionLabels = typeSelect.findAll("option").map(option => option.text())
+    expect(optionLabels).toEqual([
+      "小生命（固定生命值）",
+      "小攻击（固定攻击力）",
+      "小防御（固定防御力）",
+      "大生命（生命值%）",
+      "大攻击（攻击力%）",
+      "大防御（防御力%）",
+      "暴击率",
+      "暴击伤害",
+      "异常精通",
+      "穿透值",
+    ])
+    expect(optionLabels).not.toContain("冰抗性无视")
+
+    await typeSelect.setValue("critRate")
+    const secondOptions = wrapper.find('[aria-label="副词条 2 类型"]').findAll("option").map(option => option.attributes("value"))
+    expect(secondOptions).not.toContain("critRate")
+    expect(secondOptions).toContain("hpFlat")
+
+    const rollOptions = wrapper.find('[aria-label="副词条 1 词条数"]').findAll("option").map(option => option.attributes("value"))
+    expect(rollOptions).toEqual(["1", "2", "3", "4", "5", "6"])
+  })
+
+  it("clears a conflicting substat without removing its fixed row", async () => {
+    const wrapper = await mountView()
+    await button(wrapper, "新增单个").trigger("click")
+    await wrapper.find('[aria-label="驱动盘位置"]').setValue("4")
+    await flushPromises()
+    await setSubStat(wrapper, 0, "critRate", 2)
+    expect(wrapper.findAll(".substat-editor-row")).toHaveLength(4)
+
+    await wrapper.find('[aria-label="驱动盘主词条"]').setValue("critRate")
+    await flushPromises()
+    expect(wrapper.findAll(".substat-editor-row")).toHaveLength(4)
+    expect(wrapper.find('[aria-label="副词条 1 类型"]').attributes("value")).toBe("")
+    expect(wrapper.find(".disc-editor-warning").text()).toContain("四个副词条")
+  })
+
+  it("converts roll counts into stored values and generates the id on save", async () => {
+    const wrapper = await mountView()
+    await button(wrapper, "新增单个").trigger("click")
+
+    await setSubStat(wrapper, 0, "critRate", 3)
+    await setSubStat(wrapper, 1, "critDmg", 6)
+    await setSubStat(wrapper, 2, "anomalyProficiency", 1)
+    await setSubStat(wrapper, 3, "atkFlat", 1)
+
+    expect(wrapper.find('[aria-label="副词条 1 换算结果"]').text()).toBe("7.2%")
+    expect(wrapper.find('[aria-label="副词条 2 换算结果"]').text()).toBe("28.8%")
+    expect(wrapper.find('[aria-label="副词条 3 换算结果"]').text()).toBe("9")
+    expect(wrapper.find('[aria-label="副词条 4 换算结果"]').text()).toBe("19")
+
+    await button(wrapper, "保存").trigger("click")
+    await flushPromises()
+
+    const store = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
+    const saved = store.driveDiscs[0]
+    expect(saved.id).toMatch(/^disc-\d+-[a-f0-9]+$/)
+    expect(saved.rarity).toBe("S")
+    expect(saved.maxLevel).toBe(15)
+    expect(saved.subStats).toEqual([
+      { stat: "critRate", value: 7.2 },
+      { stat: "critDmg", value: 28.8 },
+      { stat: "anomalyProficiency", value: 9 },
+      { stat: "atkFlat", value: 19 },
+    ])
+    expect(saved.subStats.every((item: any) => !("rolls" in item))).toBe(true)
+  })
+
+  it("restores roll counts and preserves hidden equipped-agent data while editing", async () => {
+    seedInventory([{
+      id: "disc-equipped",
+      ownerId: "default",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 5,
+      rarity: "S",
+      level: 15,
+      maxLevel: 15,
+      mainStat: { stat: "fireDmg", value: 30 },
+      subStats: [
+        { stat: "critRate", value: 7.2 },
+        { stat: "critDmg", value: 28.8 },
+        { stat: "anomalyProficiency", value: 9 },
+        { stat: "atkFlat", value: 19 },
+      ],
+      equippedBy: "agent-a",
+      locked: false,
+    }])
+    const wrapper = await mountView()
+
+    await wrapper.find("tbody tr").trigger("click")
+    expect(wrapper.find(".test-modal h2").text()).toBe("编辑驱动盘")
+    expect(wrapper.find('[aria-label="副词条 1 词条数"]').attributes("value")).toBe("3")
+    expect(wrapper.find('[aria-label="副词条 1 换算结果"]').text()).toBe("7.2%")
+    expect(wrapper.find('[aria-label="驱动盘装备角色"]').exists()).toBe(false)
+
+    await button(wrapper, "保存").trigger("click")
+    await flushPromises()
+    const store = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
+    expect(store.driveDiscs[0].equippedBy).toBe("agent-a")
+    expect(store.driveDiscs[0].subStats).toEqual([
+      { stat: "critRate", value: 7.2 },
+      { stat: "critDmg", value: 28.8 },
+      { stat: "anomalyProficiency", value: 9 },
+      { stat: "atkFlat", value: 19 },
+    ])
+  })
+
+  it("blocks non-S records without changing stored data", async () => {
+    seedInventory([{
+      id: "disc-a-rank",
+      ownerId: "default",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 5,
+      rarity: "A",
+      level: 9,
+      maxLevel: 12,
+      mainStat: { stat: "fireDmg", value: 20 },
+      subStats: [{ stat: "critRate", value: 3.1 }],
+      equippedBy: "agent-a",
+    }])
+    const wrapper = await mountView()
+
+    await wrapper.find("tbody tr").trigger("click")
+    const modal = wrapper.find(".test-modal")
+    expect(modal.text()).toContain("手动编辑仅支持 S 级驱动盘")
+    expect(button(wrapper, "保存").attributes()).toHaveProperty("disabled")
+    expect(modal.find(".raw").text()).toContain('"value": 3.1')
+  })
+
+  it("does not round a non-integral legacy S-rank value", async () => {
+    seedInventory([{
+      id: "disc-invalid-rolls",
+      ownerId: "default",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 5,
+      rarity: "S",
+      level: 15,
+      maxLevel: 15,
+      mainStat: { stat: "fireDmg", value: 30 },
+      subStats: [{ stat: "critRate", value: 3.1 }],
+    }])
+    const wrapper = await mountView()
+
+    await wrapper.find("tbody tr").trigger("click")
+    const modal = wrapper.find(".test-modal")
+    expect(modal.text()).toContain("无法精确换算为 1～6 个词条")
+    expect(button(wrapper, "保存").attributes()).toHaveProperty("disabled")
+    expect(modal.find(".raw").text()).toContain('"value": 3.1')
   })
 })

@@ -79,4 +79,36 @@ describe("local-store IndexedDB compatibility", () => {
     expect(transactionCalls).toContainEqual(["state", "readwrite"])
     expect(records.get("userDriveDiscStore").driveDiscs).toHaveLength(2)
   })
+
+  it("closes and deletes IndexedDB while clearing calculator storage keys", async () => {
+    const close = vi.fn()
+    const database: any = {
+      close,
+      objectStoreNames: { contains: () => true },
+      transaction() {
+        return { objectStore: () => ({ get: () => asyncRequest(null) }) }
+      },
+    }
+    const deleteCalls: string[] = []
+    vi.stubGlobal("indexedDB", {
+      open: () => asyncRequest(database),
+      deleteDatabase(name: string) {
+        deleteCalls.push(name)
+        return asyncRequest()
+      },
+    })
+    localStorage.setItem("zzz-calculator.webapp.build.v1", "{}")
+    localStorage.setItem("zzz_maintenance_vue_draft_v3", "{}")
+    localStorage.setItem("unrelated-key", "keep")
+
+    const localStore = await import("@runtime/local-store.js?indexeddb-clear")
+    await localStore.loadUserDriveDiscStore()
+    await localStore.clearAllBrowserData()
+
+    expect(close).toHaveBeenCalled()
+    expect(deleteCalls).toEqual(["zzz-calculator-user-store"])
+    expect(localStorage.getItem("zzz-calculator.webapp.build.v1")).toBeNull()
+    expect(localStorage.getItem("zzz_maintenance_vue_draft_v3")).toBeNull()
+    expect(localStorage.getItem("unrelated-key")).toBe("keep")
+  })
 })

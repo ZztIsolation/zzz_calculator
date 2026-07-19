@@ -5,6 +5,7 @@ const scannerMockState = vi.hoisted(() => ({
   instances: [] as any[],
   connectResults: [] as any[],
   ensureResults: [] as any[],
+  updateResults: [] as any[],
 }))
 
 vi.mock("@runtime/scanner-bridge.js", () => {
@@ -15,13 +16,21 @@ vi.mock("@runtime/scanner-bridge.js", () => {
     onItem: ((payload: any) => void) | null = null
     onComplete: ((payload: any) => void) | null = null
     onError: ((payload: any) => void) | null = null
+    onDiagnostics: ((payload: any) => void) | null = null
+    onHelperUpdateProgress: ((payload: any) => void) | null = null
     onDisconnect: (() => void) | null = null
     connected = false
     scanning = false
     mode = "helper"
-    helperVersion = "1.0.2"
+    helperVersion = "1.2.1"
+    protocolVersion = 3
     connectCalls = 0
     ensureCalls = 0
+    updateCalls = 0
+    repairCalls = 0
+    elevatedCalls = 0
+    openLogCalls = 0
+    diagnosticsCalls = 0
     launchCalls = 0
     disconnectCalls = 0
     stopCalls = 0
@@ -38,6 +47,8 @@ vi.mock("@runtime/scanner-bridge.js", () => {
         throw result
       }
       const hello = await (result ?? { version: this.helperVersion })
+      this.helperVersion = String(hello?.version ?? this.helperVersion)
+      this.protocolVersion = Number(hello?.protocolVersion ?? this.protocolVersion)
       this.connected = true
       return hello
     }
@@ -53,6 +64,30 @@ vi.mock("@runtime/scanner-bridge.js", () => {
         throw result
       }
       return await result
+    }
+
+    async updateHelper() {
+      this.updateCalls += 1
+      const result = scannerMockState.updateResults.shift()
+      if (result instanceof Error) throw result
+      return await (result ?? { updateAvailable: true, availableVersion: "1.2.1", restarting: true })
+    }
+
+    async repairScanner() {
+      this.repairCalls += 1
+    }
+
+    async restartScannerElevated() {
+      this.elevatedCalls += 1
+    }
+
+    openLogFolder() {
+      this.openLogCalls += 1
+    }
+
+    requestDiagnostics() {
+      this.diagnosticsCalls += 1
+      this.onDiagnostics?.({ helperVersion: this.helperVersion })
     }
 
     disconnect() {
@@ -104,6 +139,7 @@ describe("inventory store", () => {
     scannerMockState.instances.length = 0
     scannerMockState.connectResults.length = 0
     scannerMockState.ensureResults.length = 0
+    scannerMockState.updateResults.length = 0
     localStorage.clear()
     localStorage.setItem("zzz-calculator.userStore.v1", JSON.stringify({
       version: 1,
@@ -207,7 +243,7 @@ describe("inventory store", () => {
   it("automatically imports a completed scan session", async () => {
     const store = useInventoryStore()
     await store.load()
-    scannerMockState.connectResults.push({ version: "1.0.2" })
+    scannerMockState.connectResults.push({ version: "1.2.1", protocolVersion: 3 })
     await store.openScannerPanel()
     await store.startScan()
 
@@ -235,9 +271,9 @@ describe("inventory store", () => {
     expect(helper.launchCalls).toBe(1)
     expect(store.scanStatus).toBe("waiting-helper")
     expect(store.scanPolling).toBe(true)
-    expect(store.scanHelperDownloadUrl).toContain("scanner-1.0.36")
+    expect(store.scanHelperDownloadUrl).toContain("helper-1.2.1")
 
-    scannerMockState.connectResults.push({ version: "1.0.2" })
+    scannerMockState.connectResults.push({ version: "1.2.1", protocolVersion: 3 })
     await vi.advanceTimersByTimeAsync(3000)
 
     expect(helper.connectCalls).toBe(2)
@@ -265,7 +301,7 @@ describe("inventory store", () => {
 
   it("sends the stable local and cloud scanner payloads", async () => {
     const store = useInventoryStore()
-    scannerMockState.connectResults.push({ version: "1.0.2" })
+    scannerMockState.connectResults.push({ version: "1.2.1", protocolVersion: 3 })
     await store.openScannerPanel()
     const helper = scannerMockState.instances[0]
 
@@ -354,8 +390,84 @@ describe("inventory store", () => {
     })
     expect(store.scanErrorVariant).toBe("helper-outdated")
 
-    store.$patch({ scanHelperVersion: "1.0.2" })
+    store.$patch({ scanHelperVersion: "1.2.1" })
     expect(store.scanErrorVariant).toBe("prepare-failed")
+  })
+
+  it("stops before ensure_scanner and keeps the upgrade recovery card for Helper 1.1", async () => {
+    const store = useInventoryStore()
+    scannerMockState.connectResults.push({ version: "1.1.0", protocolVersion: 2 })
+
+    await store.openScannerPanel()
+    const helper = scannerMockState.instances[0]
+
+    expect(helper.ensureCalls).toBe(0)
+    expect(helper.updateCalls).toBe(0)
+    expect(store.scanHelperVersion).toBe("1.1.0")
+    expect(store.scanHelperProtocolVersion).toBe(2)
+    expect(store.scanHelperUpgradeMode).toBe("legacy-manual")
+    expect(store.scanErrorVariant).toBe("helper-outdated")
+    expect(store.scanFailure).toBeNull()
+
+    helper.onError?.({
+      code: "manifest_invalid",
+      phase: "prepare",
+      title: "扫描器版本信息无效",
+      message: "Unsupported scanner manifest schema 3; expected 1 or 2.",
+      actions: [{ kind: "retry", label: "重试" }],
+    })
+
+    expect(store.scanErrorVariant).toBe("helper-outdated")
+    expect(store.scanFailure).toBeNull()
+  })
+
+  it("automatically self-updates a protocol v3 Helper before preparing Scanner", async () => {
+    const store = useInventoryStore()
+    scannerMockState.connectResults.push({ version: "1.2.0", protocolVersion: 3 })
+    scannerMockState.updateResults.push({ updateAvailable: true, availableVersion: "1.2.1", restarting: true })
+
+    await store.openScannerPanel()
+    const helper = scannerMockState.instances[0]
+
+    expect(helper.ensureCalls).toBe(0)
+    expect(helper.updateCalls).toBe(1)
+    expect(store.scanHelperUpgradeMode).toBe("awaiting-restart")
+    expect(store.scanStatus).toBe("downloading")
+    expect(store.scanProgressText).toContain("正在重启")
+    expect(store.scanPolling).toBe(true)
+  })
+
+  it("reconnects after self-update and resumes Scanner preparation", async () => {
+    vi.useFakeTimers()
+    const store = useInventoryStore()
+    scannerMockState.connectResults.push(
+      { version: "1.2.0", protocolVersion: 3 },
+      { version: "1.2.1", protocolVersion: 3 },
+    )
+    scannerMockState.updateResults.push({ updateAvailable: true, availableVersion: "1.2.1", restarting: true })
+
+    await store.openScannerPanel()
+    await vi.advanceTimersByTimeAsync(3000)
+
+    const helper = scannerMockState.instances[0]
+    expect(helper.updateCalls).toBe(1)
+    expect(helper.ensureCalls).toBe(1)
+    expect(store.scanHelperVersion).toBe("1.2.1")
+    expect(store.scanHelperUpgradeMode).toBe("")
+    expect(store.scanStatus).toBe("ready")
+  })
+
+  it("offers retry and manual download when protocol v3 self-update fails", async () => {
+    const store = useInventoryStore()
+    scannerMockState.connectResults.push({ version: "1.2.0", protocolVersion: 3 })
+    scannerMockState.updateResults.push(new Error("checksum mismatch"))
+
+    await store.openScannerPanel()
+
+    expect(store.scanErrorVariant).toBe("helper-outdated")
+    expect(store.scanHelperUpgradeMode).toBe("self-update-failed")
+    expect(store.scanMessage).toContain("checksum mismatch")
+    expect(store.scanPolling).toBe(false)
   })
 
   it("surfaces helper-missing while waiting for helper", () => {
@@ -363,6 +475,32 @@ describe("inventory store", () => {
     store.$patch({ scanStatus: "waiting-helper" })
     expect(store.scanPhase).toBe("a")
     expect(store.scanErrorVariant).toBe("helper-missing")
+  })
+
+  it("preserves structured helper failures and executes repair actions", async () => {
+    const store = useInventoryStore()
+    scannerMockState.connectResults.push({ version: "1.2.1", protocolVersion: 3 })
+    await store.openScannerPanel()
+    const helper = scannerMockState.instances[0]
+
+    helper.onError?.({
+      code: "package_corrupt",
+      phase: "install",
+      title: "扫描器安装包校验失败",
+      message: "SHA-256 不匹配",
+      remedy: "请重新下载并修复。",
+      retryable: true,
+      actions: [{ kind: "repair", label: "重新下载并修复" }],
+      diagnosticId: "diag-1",
+      details: { packageId: "win-x64-fdd" },
+    })
+
+    expect(store.scanErrorVariant).toBe("diagnostic-failure")
+    expect(store.scanFailure?.code).toBe("package_corrupt")
+    expect(store.scanFailure?.diagnosticId).toBe("diag-1")
+    await store.handleScannerFailureAction("repair")
+    expect(helper.repairCalls).toBe(1)
+    expect(store.scanStatus).toBe("ready")
   })
 
   it("disables start-scan when no rarity is selected", () => {
@@ -377,7 +515,7 @@ describe("inventory store", () => {
 
   it("does not switch to error status for the rarity validation", async () => {
     const store = useInventoryStore()
-    scannerMockState.connectResults.push({ version: "1.0.2" })
+    scannerMockState.connectResults.push({ version: "1.2.1", protocolVersion: 3 })
     await store.openScannerPanel()
     store.$patch({ scanRarityS: false, scanRarityA: false })
     await store.startScan()
@@ -404,10 +542,68 @@ describe("inventory store", () => {
     expect(store.hasDriveDiscs).toBe(true)
   })
 
+  it("prepares an account-scoped native JSON export with a safe filename", async () => {
+    localStorage.setItem("zzz-calculator.userStore.v1", JSON.stringify({
+      version: 1,
+      currentOwnerId: "default",
+      owners: [
+        { id: "default", label: "主账号/测试" },
+        { id: "alt", label: "其他账号" },
+      ],
+      imports: [],
+      driveDiscs: [
+        {
+          id: "default-disc",
+          ownerId: "default",
+          setId: "woodpecker_electro",
+          setName: "啄木鸟电音",
+          partition: 1,
+          rarity: "S",
+          level: 15,
+          maxLevel: 15,
+          locked: true,
+          equippedBy: "agent-a",
+          mainStat: { stat: "hpFlat", value: 2200 },
+          subStats: [],
+          contentFingerprint: "stale-content",
+          identityFingerprint: "stale-identity",
+        },
+        {
+          id: "alt-disc",
+          ownerId: "alt",
+          setId: "swing_jazz",
+          setName: "摇摆爵士",
+          partition: 2,
+          rarity: "S",
+          level: 15,
+          maxLevel: 15,
+          mainStat: { stat: "atkFlat", value: 316 },
+          subStats: [],
+        },
+      ],
+      driveDiscLoadouts: [{ id: "loadout-a", ownerId: "default" }],
+    }))
+    const store = useInventoryStore()
+    await store.load()
+    store.slotFilter = 6
+    store.search = "不会命中"
+
+    const exported = await store.prepareCurrentAccountExport(new Date(2026, 6, 18, 12, 0, 0))
+
+    expect(exported.fileName).toBe("zzz-drive-discs-主账号-测试-2026-07-18.json")
+    expect(exported.mimeType).toBe("application/json;charset=utf-8")
+    expect(exported.payload.sourceAccount).toEqual({ label: "主账号/测试" })
+    expect(exported.payload.driveDiscs.map((disc: any) => disc.id)).toEqual(["default-disc"])
+    expect(exported.payload.driveDiscs[0]).not.toHaveProperty("ownerId")
+    expect(exported.payload.driveDiscs[0]).not.toHaveProperty("contentFingerprint")
+    expect(exported.payload).not.toHaveProperty("driveDiscLoadouts")
+    expect(JSON.parse(exported.text)).toEqual(exported.payload)
+  })
+
   it("records helper version at prepare time", async () => {
     const store = useInventoryStore()
-    scannerMockState.connectResults.push({ version: "1.0.2" })
+    scannerMockState.connectResults.push({ version: "1.2.1", protocolVersion: 3 })
     await store.openScannerPanel()
-    expect(store.scanHelperVersion).toBe("1.0.2")
+    expect(store.scanHelperVersion).toBe("1.2.1")
   })
 })

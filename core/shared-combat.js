@@ -1,4 +1,13 @@
 import { evaluateFormulaExpression } from "./formulaEvaluator.js"
+import {
+    SKILL_TYPES,
+    normalizeSkillTarget,
+    normalizeSkillTargets,
+    normalizeSkillTargetsInValue,
+    skillTypeLabel,
+    unknownLegacySkillTargetPrefixes,
+} from "./skillTargets.js"
+import { ELEMENT_CRIT_DMG_STATS, ELEMENT_DEF_IGNORE_STATS } from "./effectRuleTargets.js"
 
 export const DEFAULT_DAMAGE_TARGET_PRESET_ID = "normal-boss"
 export const DEFAULT_DAMAGE_LEVEL_COEFFICIENT = 794
@@ -24,8 +33,10 @@ export const DAMAGE_MODIFIER_KIND_LABELS = {
     disorderBaseMultiplierBonus: "紊乱倍率加算",
     anomalyCritRate: "异常暴击率",
     anomalyCritDmg: "异常暴击伤害",
+    anomalyDurationBonusSeconds: "异常持续时间延长",
     stunDmgMultiplierBonus: "失衡易伤倍率加算",
     stunDmgMultiplierBonusAlways: "失衡易伤倍率加算（未失衡生效）",
+    stunDmgMultiplierBonusCapAlways: "捕获的失衡易伤加成上限",
     sheerDmgBonus: "贯穿增伤",
     physicalSheerDmg: "物理贯穿增伤",
     fireSheerDmg: "火贯穿增伤",
@@ -33,6 +44,18 @@ export const DAMAGE_MODIFIER_KIND_LABELS = {
     electricSheerDmg: "电贯穿增伤",
     etherSheerDmg: "以太贯穿增伤",
     windSheerDmg: "风贯穿增伤",
+    physicalCritDmg: "物理伤害暴击伤害",
+    fireCritDmg: "火属性伤害暴击伤害",
+    iceCritDmg: "冰属性伤害暴击伤害",
+    electricCritDmg: "电属性伤害暴击伤害",
+    etherCritDmg: "以太伤害暴击伤害",
+    windCritDmg: "风属性伤害暴击伤害",
+    physicalDefIgnore: "物理伤害无视防御",
+    fireDefIgnore: "火属性伤害无视防御",
+    iceDefIgnore: "冰属性伤害无视防御",
+    electricDefIgnore: "电属性伤害无视防御",
+    etherDefIgnore: "以太伤害无视防御",
+    windDefIgnore: "风属性伤害无视防御",
     skillMultiplierBonus: "技能倍率加算",
 }
 export const ANOMALY_EFFECT_LABELS = {
@@ -44,6 +67,14 @@ export const ANOMALY_EFFECT_LABELS = {
     frozen: "霜寒",
     frost_frozen: "烈霜霜寒紊乱（星见雅）",
     flinch: "畏缩",
+}
+export const DISORDER_EFFECT_LABELS = {
+    burn: "灼烧紊乱",
+    shock: "感电紊乱",
+    corruption: "侵蚀紊乱",
+    frozen: "霜寒紊乱",
+    frost_frozen: "烈霜霜寒紊乱（星见雅）",
+    flinch: "畏缩紊乱",
 }
 export const RES_IGNORE_STAT_BY_ELEMENT = {
     physical: "physicalResIgnore",
@@ -71,12 +102,6 @@ export const CUSTOM_BUFF_STAT_OPTIONS = [
     ["anomalyDamageBonus", "属性异常增伤%", "eventModifier", null],
     ["disorderDamageBonus", "紊乱增伤%", "eventModifier", null],
     ["sheerDmgBonus", "贯穿增伤%", "eventModifier", null],
-    ["physicalSheerDmg", "物理贯穿增伤%", "eventModifier", null],
-    ["fireSheerDmg", "火贯穿增伤%", "eventModifier", null],
-    ["iceSheerDmg", "冰贯穿增伤%", "eventModifier", null],
-    ["electricSheerDmg", "电贯穿增伤%", "eventModifier", null],
-    ["etherSheerDmg", "以太贯穿增伤%", "eventModifier", null],
-    ["windSheerDmg", "风贯穿增伤%", "eventModifier", null],
     ["baseMultiplierBonus", "异常倍率加算%", "eventModifier", null],
     ["disorderBaseMultiplierBonus", "紊乱倍率加算%", "eventModifier", null],
     ["anomalyCritRate", "异常暴击率%", "eventModifier", null],
@@ -93,22 +118,11 @@ export const CUSTOM_BUFF_STAT_OPTIONS = [
     ["enemyDefIgnore", "无视防御率%", "flat", null],
     ["enemyDefFlatReduction", "敌方固定减防", "flat", null],
     ["enemyResReduction", "当前属性减抗%", "flat", null],
+    ["allResIgnore", "全属性抗性无视%", "flat", null],
     ["currentResIgnore", "当前属性抗性无视%", "flat", null],
-    ["enemyPhysicalResReduction", "物理减抗%", "flat", null],
-    ["enemyFireResReduction", "火减抗%", "flat", null],
-    ["enemyIceResReduction", "冰减抗%", "flat", null],
-    ["enemyElectricResReduction", "电减抗%", "flat", null],
-    ["enemyEtherResReduction", "以太减抗%", "flat", null],
-    ["enemyWindResReduction", "风减抗%", "flat", null],
-    ["physicalResIgnore", "物理抗性无视%", "flat", null],
-    ["fireResIgnore", "火抗性无视%", "flat", null],
-    ["iceResIgnore", "冰抗性无视%", "flat", null],
-    ["electricResIgnore", "电抗性无视%", "flat", null],
-    ["etherResIgnore", "以太抗性无视%", "flat", null],
-    ["windResIgnore", "风抗性无视%", "flat", null],
 ]
 export const CUSTOM_BUFF_SKILL_STAT_OPTIONS = [
-    ["dmgBonus", "通用伤害加成%", "skill", null],
+    ["dmgBonus", "技能目标伤害加成%", "skill", null],
     ["physicalDmg", "物理伤害加成%", "skill", null],
     ["fireDmg", "火属性伤害加成%", "skill", null],
     ["iceDmg", "冰属性伤害加成%", "skill", null],
@@ -120,28 +134,12 @@ export const CUSTOM_BUFF_SKILL_STAT_OPTIONS = [
     ["stunDmgMultiplierBonus", "失衡易伤倍率加算%", "skill", null],
     ["stunDmgMultiplierBonusAlways", "失衡易伤倍率加算（未失衡生效）%", "skill", null],
     ["sheerDmgBonus", "贯穿增伤%", "skill", null],
-    ["physicalSheerDmg", "物理贯穿增伤%", "skill", null],
-    ["fireSheerDmg", "火贯穿增伤%", "skill", null],
-    ["iceSheerDmg", "冰贯穿增伤%", "skill", null],
-    ["electricSheerDmg", "电贯穿增伤%", "skill", null],
-    ["etherSheerDmg", "以太贯穿增伤%", "skill", null],
-    ["windSheerDmg", "风贯穿增伤%", "skill", null],
     ["skillMultiplierBonus", "技能倍率加算%", "skill", null],
     ["enemyDefReduction", "敌方减防率%", "skill", null],
     ["enemyDefIgnore", "无视防御率%", "skill", null],
     ["enemyResReduction", "当前属性减抗%", "skill", null],
-    ["enemyPhysicalResReduction", "物理减抗%", "skill", null],
-    ["enemyFireResReduction", "火减抗%", "skill", null],
-    ["enemyIceResReduction", "冰减抗%", "skill", null],
-    ["enemyElectricResReduction", "电减抗%", "skill", null],
-    ["enemyEtherResReduction", "以太减抗%", "skill", null],
-    ["enemyWindResReduction", "风减抗%", "skill", null],
-    ["physicalResIgnore", "物理抗性无视%", "skill", null],
-    ["fireResIgnore", "火抗性无视%", "skill", null],
-    ["iceResIgnore", "冰抗性无视%", "skill", null],
-    ["electricResIgnore", "电抗性无视%", "skill", null],
-    ["etherResIgnore", "以太抗性无视%", "skill", null],
-    ["windResIgnore", "风抗性无视%", "skill", null],
+    ["allResIgnore", "全属性抗性无视%", "skill", null],
+    ["currentResIgnore", "当前属性抗性无视%", "skill", null],
 ]
 
 export const FALLBACK_LABELS = {
@@ -170,12 +168,14 @@ export const FALLBACK_LABELS = {
     impactFlat: "冲击力",
     anomalyProficiency: "异常精通",
     anomalyProficiencyFlat: "异常精通",
+    anomalyProficiencyPerMasteryAbove140: "异常掌控转异常精通",
     anomalyMastery: "异常掌控",
     anomalyMasteryFlat: "异常掌控",
     penFlat: "穿透值",
     penRatio: "穿透率",
     sheerForce: "贯穿力",
     sheerForceFlat: "固定贯穿力",
+    allResIgnore: "全属性抗性无视",
     physicalResIgnore: "物理抗性无视",
     fireResIgnore: "火抗性无视",
     iceResIgnore: "冰抗性无视",
@@ -210,12 +210,26 @@ export const FALLBACK_LABELS = {
     electricSheerDmg: "电贯穿增伤",
     etherSheerDmg: "以太贯穿增伤",
     windSheerDmg: "风贯穿增伤",
+    physicalCritDmg: "物理伤害暴击伤害",
+    fireCritDmg: "火属性伤害暴击伤害",
+    iceCritDmg: "冰属性伤害暴击伤害",
+    electricCritDmg: "电属性伤害暴击伤害",
+    etherCritDmg: "以太伤害暴击伤害",
+    windCritDmg: "风属性伤害暴击伤害",
+    physicalDefIgnore: "物理伤害无视防御",
+    fireDefIgnore: "火属性伤害无视防御",
+    iceDefIgnore: "冰属性伤害无视防御",
+    electricDefIgnore: "电属性伤害无视防御",
+    etherDefIgnore: "以太伤害无视防御",
+    windDefIgnore: "风属性伤害无视防御",
     baseMultiplierBonus: "异常倍率加算",
     disorderBaseMultiplierBonus: "紊乱倍率加算",
     anomalyCritRate: "异常暴击率",
     anomalyCritDmg: "异常暴击伤害",
+    anomalyDurationBonusSeconds: "异常持续时间延长（秒）",
     stunDmgMultiplierBonus: "失衡易伤倍率加算",
     stunDmgMultiplierBonusAlways: "失衡易伤倍率加算（未失衡生效）",
+    stunDmgMultiplierBonusCapAlways: "捕获的失衡易伤加成上限",
     skillMultiplierBonus: "技能倍率加算",
 }
 
@@ -268,6 +282,7 @@ export const PERCENT_KEYS = new Set([
     "energyRegen",
     "energyRegenPct",
     "penRatio",
+    "allResIgnore",
     "physicalResIgnore",
     "fireResIgnore",
     "iceResIgnore",
@@ -299,12 +314,15 @@ export const PERCENT_KEYS = new Set([
     "electricSheerDmg",
     "etherSheerDmg",
     "windSheerDmg",
+    ...ELEMENT_CRIT_DMG_STATS,
+    ...ELEMENT_DEF_IGNORE_STATS,
     "baseMultiplierBonus",
     "disorderBaseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
     "stunDmgMultiplierBonus",
     "stunDmgMultiplierBonusAlways",
+    "stunDmgMultiplierBonusCapAlways",
     "skillMultiplierBonus",
 ])
 export const PERCENT_MODE_KEY = {
@@ -326,6 +344,7 @@ export const STORED_PERCENT_STATS = new Set([
     "energyRegen",
     "energyRegenPct",
     "penRatio",
+    "allResIgnore",
     "physicalResIgnore",
     "fireResIgnore",
     "iceResIgnore",
@@ -357,12 +376,15 @@ export const STORED_PERCENT_STATS = new Set([
     "electricSheerDmg",
     "etherSheerDmg",
     "windSheerDmg",
+    ...ELEMENT_CRIT_DMG_STATS,
+    ...ELEMENT_DEF_IGNORE_STATS,
     "baseMultiplierBonus",
     "disorderBaseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
     "stunDmgMultiplierBonus",
     "stunDmgMultiplierBonusAlways",
+    "stunDmgMultiplierBonusCapAlways",
     "skillMultiplierBonus",
 ])
 export const STORED_STAT_LABELS = {
@@ -377,6 +399,7 @@ export const STORED_STAT_LABELS = {
     energyRegen: "能量自动回复%",
     energyRegenPct: "百分比能量自动回复%",
     penRatio: "穿透率%",
+    allResIgnore: "全属性抗性无视%",
     physicalResIgnore: "物理抗性无视%",
     fireResIgnore: "火抗性无视%",
     iceResIgnore: "冰抗性无视%",
@@ -408,12 +431,26 @@ export const STORED_STAT_LABELS = {
     electricSheerDmg: "电贯穿增伤%",
     etherSheerDmg: "以太贯穿增伤%",
     windSheerDmg: "风贯穿增伤%",
+    physicalCritDmg: "物理伤害暴击伤害%",
+    fireCritDmg: "火属性伤害暴击伤害%",
+    iceCritDmg: "冰属性伤害暴击伤害%",
+    electricCritDmg: "电属性伤害暴击伤害%",
+    etherCritDmg: "以太伤害暴击伤害%",
+    windCritDmg: "风属性伤害暴击伤害%",
+    physicalDefIgnore: "物理伤害无视防御率%",
+    fireDefIgnore: "火属性伤害无视防御率%",
+    iceDefIgnore: "冰属性伤害无视防御率%",
+    electricDefIgnore: "电属性伤害无视防御率%",
+    etherDefIgnore: "以太伤害无视防御率%",
+    windDefIgnore: "风属性伤害无视防御率%",
     baseMultiplierBonus: "异常倍率加算%",
     disorderBaseMultiplierBonus: "紊乱倍率加算%",
     anomalyCritRate: "异常暴击率%",
     anomalyCritDmg: "异常暴击伤害%",
+    anomalyDurationBonusSeconds: "异常持续时间延长（秒）",
     stunDmgMultiplierBonus: "失衡易伤倍率加算%",
     stunDmgMultiplierBonusAlways: "失衡易伤倍率加算（未失衡生效）%",
+    stunDmgMultiplierBonusCapAlways: "捕获的失衡易伤加成上限%",
     skillMultiplierBonus: "技能倍率加算%",
 }
 
@@ -783,6 +820,32 @@ export function effectRuleId(rule = {}) {
     return rule.id ?? rule.stat ?? "effect"
 }
 
+export function effectRuleCoverage(rule = {}, effect = {}) {
+    return rule?.coverage ?? effect?.coverage ?? null
+}
+
+function clampCoverage(value, coverage) {
+    const numeric = Number(value)
+    const fallback = Number(coverage?.default ?? 1)
+    const resolved = Number.isFinite(numeric) ? numeric : Number.isFinite(fallback) ? fallback : 1
+    return Math.max(Number(coverage?.min ?? 0), Math.min(Number(coverage?.max ?? 1), resolved))
+}
+
+export function defaultCoverageForEffectRule(rule = {}, effect = {}) {
+    const coverage = effectRuleCoverage(rule, effect)
+    return coverage ? clampCoverage(coverage.default, coverage) : 1
+}
+
+export function runtimeCoverageForEffectRule(rule = {}, effect = {}, runtime = {}) {
+    const coverage = effectRuleCoverage(rule, effect)
+    if (!coverage) {
+        return 1
+    }
+    const id = effectRuleId(rule)
+    const ruleRuntime = runtime?.effects?.[id] ?? runtime?.[id] ?? {}
+    return clampCoverage(ruleRuntime.coverage ?? runtime?.coverage ?? coverage.default, coverage)
+}
+
 export function buffModifiers(effect) {
     return Array.isArray(effect?.buffModifiers) ? effect.buffModifiers : []
 }
@@ -935,11 +998,11 @@ export function runtimeStackRuleIdsForGroup(effect, key, fallbackRuleId = "") {
 export function defaultRuntimeForBuff(buff = {}) {
     buff = buff ?? {}
     const runtime = {
-        coverage: Number(buff.coverage?.default ?? 1),
         effects: {},
     }
     for (const rule of effectRules(buff)) {
         const id = effectRuleId(rule)
+        const coverage = effectRuleCoverage(rule, buff)
         if (rule.type === "derived" || rule.type === "formula") {
             runtime.effects[id] = {
                 enabled: true,
@@ -955,6 +1018,9 @@ export function defaultRuntimeForBuff(buff = {}) {
                 enabled: true,
             }
         }
+        if (coverage) {
+            runtime.effects[id].coverage = defaultCoverageForEffectRule(rule, buff)
+        }
     }
     return runtime
 }
@@ -962,9 +1028,10 @@ export function defaultRuntimeForBuff(buff = {}) {
 export function normalizeRuntimeForBuff(buff = {}, runtime = {}) {
     const defaults = defaultRuntimeForBuff(buff)
     const input = runtime && typeof runtime === "object" ? runtime : {}
+    const { coverage: legacyCoverage, ...inputWithoutLegacyCoverage } = input
     const next = {
         ...defaults,
-        ...input,
+        ...inputWithoutLegacyCoverage,
         effects: {
             ...defaults.effects,
             ...(input.effects ?? {}),
@@ -972,10 +1039,24 @@ export function normalizeRuntimeForBuff(buff = {}, runtime = {}) {
     }
     for (const rule of effectRules(buff)) {
         const id = effectRuleId(rule)
+        const legacyRuleRuntime = input[id] && typeof input[id] === "object" ? input[id] : {}
         next.effects[id] = {
             ...(defaults.effects[id] ?? { enabled: true }),
+            ...legacyRuleRuntime,
             ...(next.effects[id] ?? {}),
             enabled: true,
+        }
+        const coverage = effectRuleCoverage(rule, buff)
+        if (coverage) {
+            const explicitCoverage = input.effects?.[id]?.coverage
+                ?? legacyRuleRuntime.coverage
+                ?? legacyCoverage
+            next.effects[id].coverage = clampCoverage(
+                explicitCoverage ?? coverage.default,
+                coverage,
+            )
+        } else {
+            delete next.effects[id].coverage
         }
     }
     for (const group of runtimeSourceGroups(buff)) {
@@ -1017,18 +1098,33 @@ export function runtimeForBuff(item, buff) {
 
 function ruleTargetText(rule = {}, meta) {
     const target = rule.target ?? {}
-    if (target.kind !== "skill") {
-        return ""
+    if (target.kind === "skill") {
+        const targets = Array.isArray(target.skillTargets) ? target.skillTargets : []
+        return targets.length ? `（技能：${skillTargetLabels(targets, meta).join("；")}）` : "（技能：未选择）"
     }
-    const targets = Array.isArray(target.skillTargets) ? target.skillTargets : []
-    return targets.length ? `（技能：${skillTargetLabels(targets, meta).join("；")}）` : "（技能：未选择）"
+    if (target.kind === "anomaly") {
+        const settlementLabel = target.settlementType === "disorder" ? "紊乱" : "属性异常"
+        const effects = Array.isArray(target.anomalyEffects) ? target.anomalyEffects : []
+        const labels = effects.map(effect => ANOMALY_EFFECT_LABELS[effect] ?? effect)
+        return `（${settlementLabel}：${labels.length ? labels.join("；") : "未选择"}）`
+    }
+    return ""
+}
+
+function storedRuleStatLabel(rule = {}, meta) {
+    if (rule.target?.kind === "skill" && rule.stat === "dmgBonus") {
+        return "技能目标伤害加成%"
+    }
+    return storedStatLabel(rule.stat, rule.mode, meta)
 }
 
 export function storedEffectRuleText(rule, runtime, effect, meta) {
     const id = effectRuleId(rule)
-    const coverage = Number(runtime?.coverage ?? effect?.coverage?.default ?? 1)
     const ruleRuntime = runtime?.effects?.[id] ?? {}
-    const coverageText = coverage !== 1 ? `（覆盖率 ${coverage}）` : ""
+    const coverageConfig = effectRuleCoverage(rule, effect)
+    const coverage = runtimeCoverageForEffectRule(rule, effect, runtime)
+    const coverageValue = Number(coverage.toFixed(4))
+    const coverageText = coverageConfig && coverage !== 1 ? `（覆盖率 ${coverageValue}）` : ""
     if (rule.type === "damageModifier") {
         const rawValue = Number(rule.value ?? 0)
         const value = (rule.valueUnit === "decimal" ? rawValue * 100 : Math.abs(rawValue) > 1 ? rawValue : rawValue * 100) * coverage
@@ -1047,7 +1143,7 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
         const uncapped = sourceValue * ratio / 100
         const capped = Number.isFinite(Number(rule.cap)) ? Math.min(uncapped, Number(rule.cap)) : uncapped
         const finalValue = capped * coverage
-        return `${storedStatLabel(rule.stat, rule.mode, meta)} +${formatStoredStatValue(rule.stat, finalValue, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${coverageText}`
+        return `${storedRuleStatLabel(rule, meta)} +${formatStoredStatValue(rule.stat, finalValue, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${coverageText}`
     }
     if (rule.type === "formula") {
         const source = rule.source ?? {}
@@ -1059,9 +1155,9 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
         const expression = rule.formula?.expression ?? ""
         try {
             const finalValue = evaluateFormulaExpression(expression, { [source.variable ?? "x"]: sourceValue }) * coverage
-            return `${storedStatLabel(rule.stat, rule.mode, meta)} +${formatStoredStatValue(rule.stat, finalValue, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${coverageText}`
+            return `${storedRuleStatLabel(rule, meta)} +${formatStoredStatValue(rule.stat, finalValue, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${coverageText}`
         } catch {
-            return `${storedStatLabel(rule.stat, rule.mode, meta)}：公式无效`
+            return `${storedRuleStatLabel(rule, meta)}：公式无效`
         }
     }
     if (rule.type === "stacked") {
@@ -1071,11 +1167,14 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
             ? displayValuePerStack
             : Number(rule.valuePerStack ?? rule.value ?? 0)
         const value = valuePerStack * stacks * coverage
-        return `${storedStatLabel(rule.stat, rule.mode, meta)} +${formatStoredStatValue(rule.stat, value, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}（${stacks}/${rule.maxStacks ?? stacks} 层，覆盖率 ${coverage}）`
+        const runtimeText = coverageConfig
+            ? `${stacks}/${rule.maxStacks ?? stacks} 层，覆盖率 ${coverageValue}`
+            : `${stacks}/${rule.maxStacks ?? stacks} 层`
+        return `${storedRuleStatLabel(rule, meta)} +${formatStoredStatValue(rule.stat, value, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}（${runtimeText}）`
     }
     const displayValue = Number(rule.displayValue ?? rule.value ?? 0)
     const value = (Number.isFinite(displayValue) ? displayValue : Number(rule.value ?? 0)) * coverage
-    return `${storedStatLabel(rule.stat, rule.mode, meta)} +${formatStoredStatValue(rule.stat, value, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${coverageText}`
+    return `${storedRuleStatLabel(rule, meta)} +${formatStoredStatValue(rule.stat, value, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${coverageText}`
 }
 
 export function storedBuffModifierText(modifier = {}) {
@@ -1141,7 +1240,7 @@ export function normalizeCustomBuffEffect(effect) {
     }
     if ((effect?.type ?? "") === "fixed") {
         const target = effect.target?.kind === "skill"
-            ? { kind: "skill", skillTargets: Array.isArray(effect.target.skillTargets) ? effect.target.skillTargets : [] }
+            ? { kind: "skill", skillTargets: normalizeSkillTargets(effect.target.skillTargets) }
             : { kind: "default" }
         if (target.kind === "skill" && !target.skillTargets.length) {
             return null
@@ -1162,7 +1261,7 @@ export function normalizeCustomBuffEffect(effect) {
         kind: effect.kind,
         value,
         valueUnit: effect.valueUnit ?? null,
-        appliesTo: effect.appliesTo ?? null,
+        appliesTo: effect.appliesTo ? normalizeSkillTargetsInValue(effect.appliesTo) : null,
         label: effect.label ?? null,
     }
 }
@@ -1177,54 +1276,14 @@ function wEngineForTeamBuffKey(key, meta) {
     return (meta?.wEngines ?? []).find(item => item.id === wEngineId) ?? null
 }
 
-const SKILL_CATEGORY_FALLBACK_LABELS = {
-    basic: "普通攻击",
-    dodge: "闪避",
-    assist: "支援技",
-    special: "特殊技",
-    chain: "连携技",
-    core_skill: "核心技",
-}
-
-const SKILL_TARGET_PREFIX_LABELS = {
-    ultimate_: "终结技",
-    chain_: "连携技",
-}
-
-const SKILL_TARGET_DISPLAY_ORDER = {
-    ultimate_: 0,
-    chain_: 1,
-}
-
-function skillTargetMovePrefixes(target = {}) {
-    return (Array.isArray(target.moveIdPrefixes) ? target.moveIdPrefixes : [])
-        .map(prefix => String(prefix ?? "").trim())
-        .filter(Boolean)
-}
-
-function orderedSkillTargetMovePrefixes(target = {}) {
-    return skillTargetMovePrefixes(target)
-        .map((prefix, index) => ({ prefix, index }))
-        .sort((a, b) => {
-            const aOrder = SKILL_TARGET_DISPLAY_ORDER[a.prefix] ?? 100
-            const bOrder = SKILL_TARGET_DISPLAY_ORDER[b.prefix] ?? 100
-            return aOrder - bOrder || a.index - b.index
-        })
-        .map(item => item.prefix)
-}
-
 function skillTargetDisplayOrder(target = {}) {
-    const prefixOrders = skillTargetMovePrefixes(target)
-        .map(prefix => SKILL_TARGET_DISPLAY_ORDER[prefix])
-        .filter(Number.isFinite)
-    if (prefixOrders.length) {
-        return Math.min(...prefixOrders)
-    }
-    return 100
+    const order = SKILL_TYPES.indexOf(String(target.skillType ?? ""))
+    return order >= 0 ? order : 100
 }
 
 function skillTargetLabels(targets = [], meta = {}) {
     return targets
+        .flatMap(target => normalizeSkillTarget(target))
         .map((target, index) => ({
             label: skillTargetLabel(target, meta),
             order: skillTargetDisplayOrder(target),
@@ -1236,30 +1295,35 @@ function skillTargetLabels(targets = [], meta = {}) {
 }
 
 export function skillTargetLabel(target = {}, meta = {}) {
-    const skillSet = (meta?.agentSkills ?? []).find(item => item.id === target.agentSkillId)
-    const agent = (meta?.agents ?? []).find(item => item.id === skillSet?.agentId || item.id === target.agentSkillId)
-    const category = (skillSet?.categories ?? []).find(item => item.id === target.categoryId)
-    const move = (category?.moves ?? []).find(item => item.id === target.moveId)
-    const row = (move?.rows ?? []).find(item => item.id === target.rowId)
-    const agentLabel = String(localizedText(agent?.name) || localizedText(skillSet?.name) || target.agentSkillId || "")
+    const normalizedTargets = normalizeSkillTarget(target)
+    if (normalizedTargets.length > 1) {
+        return normalizedTargets.map(item => skillTargetLabel(item, meta)).filter(Boolean).join(" / ")
+    }
+    const normalized = normalizedTargets[0] ?? target
+    if (normalized.kind === "skillType") {
+        return skillTypeLabel(normalized.skillType) || "未选择技能大类"
+    }
+    if (unknownLegacySkillTargetPrefixes(normalized).length) {
+        return "旧版招式目标"
+    }
+    const skillSet = (meta?.agentSkills ?? []).find(item => item.id === normalized.agentSkillId)
+    const agent = (meta?.agents ?? []).find(item => item.id === skillSet?.agentId || item.id === normalized.agentSkillId)
+    const category = (skillSet?.categories ?? []).find(item => item.id === normalized.categoryId)
+    const move = (category?.moves ?? []).find(item => item.id === normalized.moveId)
+    const row = (move?.rows ?? []).find(item => item.id === normalized.rowId)
+    const agentLabel = String(localizedText(agent?.name) || localizedText(skillSet?.name) || normalized.agentSkillId || "")
         .replace(/技能倍率$/, "")
         .trim()
-    const categoryLabel = localizedText(category?.name) || SKILL_CATEGORY_FALLBACK_LABELS[target.categoryId] || target.categoryId
-    const prefixLabel = orderedSkillTargetMovePrefixes(target)
-        .map(prefix => SKILL_TARGET_PREFIX_LABELS[prefix] ?? `${prefix}*`)
-        .filter(Boolean)
-        .join(" / ")
-    if (!target.moveId && !target.rowId) {
+    if (!normalized.moveId && !normalized.rowId) {
         return [
             agentLabel,
-            prefixLabel || categoryLabel,
+            skillTypeLabel(normalized.skillType) || localizedText(category?.name),
         ].filter(Boolean).join("/") || "全部角色"
     }
     return [
         agentLabel || "全部角色",
-        localizedText(move?.name) || target.moveId,
-        prefixLabel,
-        target.rowId ? localizedText(row?.label) || target.rowId : "",
+        localizedText(move?.name) || normalized.moveId,
+        normalized.rowId ? localizedText(row?.label) || normalized.rowId : "",
     ].filter(Boolean).join("/")
 }
 
@@ -1326,6 +1390,9 @@ export function createCombatUiController(options = {}) {
         effectStats,
         effectRules,
         effectRuleId,
+        effectRuleCoverage,
+        defaultCoverageForEffectRule,
+        runtimeCoverageForEffectRule,
         clampWEngineModificationLevel,
         materializeWEngineForModificationLevel,
         buffModifiers,

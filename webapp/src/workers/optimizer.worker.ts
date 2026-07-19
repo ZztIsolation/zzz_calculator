@@ -1,12 +1,13 @@
-import { createDriveDiscOptimizerRuntime, previewDriveDiscOptimization } from "@core/driveDiscOptimizer-core.js"
+import { createDriveDiscOptimizerRuntime } from "@core/driveDiscOptimizer-core.js"
 
 const browserOptimizerRuntime = createDriveDiscOptimizerRuntime({
   yieldControl: () => new Promise(resolve => setTimeout(resolve, 0)),
-  availableParallelism: () => Math.max(1, Number(self.navigator?.hardwareConcurrency ?? 1)),
 })
 
 let activeRunId = ""
 let cancelRequested = false
+let cachedCatalog: any = null
+let cachedCatalogKey = ""
 
 function post(type: string, payload: Record<string, any> = {}) {
   self.postMessage({
@@ -31,6 +32,17 @@ function normalizeWorkerInput(input: any = {}) {
 
 self.onmessage = async event => {
   const message = event.data ?? {}
+  if (message.type === "init-catalog") {
+    cachedCatalog = message.catalog
+    cachedCatalogKey = String(message.catalogKey ?? "")
+    post("catalog-ready", { catalogKey: cachedCatalogKey })
+    return
+  }
+  if (message.catalog) {
+    cachedCatalog = message.catalog
+    cachedCatalogKey = String(message.catalogKey ?? cachedCatalogKey)
+  }
+  const catalog = cachedCatalog
   if (message.type === "cancel") {
     if (!message.runId || message.runId === activeRunId) {
       cancelRequested = true
@@ -40,7 +52,10 @@ self.onmessage = async event => {
 
   if (message.type === "preview") {
     try {
-      const preview = previewDriveDiscOptimization(message.catalog, message.store, message.input)
+      if (!catalog) {
+        throw new Error("Optimizer catalog is not initialized.")
+      }
+      const preview = browserOptimizerRuntime.createJob(catalog, message.store, normalizeWorkerInput(message.input)).preview()
       post("preview", { runId: message.runId, preview })
     } catch (error) {
       post("error", { runId: message.runId, error: error instanceof Error ? error.message : String(error) })
@@ -57,6 +72,9 @@ self.onmessage = async event => {
   const startedAt = Date.now()
   const input = normalizeWorkerInput(message.input)
   try {
+    if (!catalog) {
+      throw new Error("Optimizer catalog is not initialized.")
+    }
     post("started", {
       runId: message.runId,
       job: {
@@ -65,7 +83,7 @@ self.onmessage = async event => {
       },
     })
 
-    const preview = previewDriveDiscOptimization(message.catalog, message.store, input, {
+    const job = browserOptimizerRuntime.createJob(catalog, message.store, input, {
       onProgress: (progress: any) => {
         post("progress", {
           runId: message.runId,
@@ -77,6 +95,7 @@ self.onmessage = async event => {
         })
       },
     })
+    const preview = job.preview()
     post("preview", {
       runId: message.runId,
       job: {
@@ -89,7 +108,7 @@ self.onmessage = async event => {
       },
     })
 
-    const result = await browserOptimizerRuntime.optimizeDriveDiscsAsync(message.catalog, message.store, input, {
+    const result = await job.run({
       chunkSize: 5000,
       progressIntervalMs: message.settings?.progressIntervalMs ?? 200,
       yieldIntervalMs: message.settings?.yieldIntervalMs ?? 50,

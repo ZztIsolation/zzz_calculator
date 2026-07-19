@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
 import { NConfigProvider, NMessageProvider } from "naive-ui"
-import { Calculator, Database, Settings2, UserRound } from "lucide-vue-next"
+import { Calculator, Database, HardDrive, Settings2, UserRound } from "lucide-vue-next"
 import { loadAppConfig } from "@/runtime/app-config"
 import { useAccountStore } from "@/stores/account"
 
@@ -52,6 +52,10 @@ const themeOverrides = {
             <RouterLink to="/accounts">
               <UserRound :size="16" />
               <span>账号</span>
+            </RouterLink>
+            <RouterLink to="/settings">
+              <HardDrive :size="16" />
+              <span>设置</span>
             </RouterLink>
             <RouterLink v-if="maintenanceEnabled" to="/maintenance">
               <Settings2 :size="16" />

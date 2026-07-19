@@ -8,6 +8,17 @@ declare module "@core/calculator-core.js" {
   export function normalizeCatalog(catalog: any): any
   export function calculateOutOfCombatPanel(catalog: any, input: any): any
   export function calculateInCombatPanel(catalog: any, input: any): any
+  export function damageModifierAppliesTo(modifier?: any, event?: any): boolean
+}
+
+declare module "@core/damageEventMultipliers.js" {
+  export function disorderElapsedStepSeconds(event?: any, catalog?: any): number
+  export function normalizeElapsedSeconds(value: unknown, durationSeconds?: number, stepSeconds?: number): number
+  export function normalizeDamageScale(event?: any): number
+  export function disorderBaseMultiplier(effect?: any, elapsedSeconds?: unknown, durationBonusSeconds?: unknown): { baseDuration: number, durationBonus: number, duration: number, elapsed: number, remaining: number, tickIntervalSeconds: number, tickCount: number, baseMultiplier: number }
+  export function disorderMultiplierScale(type?: unknown): number
+  export function resolveDamageEventMultiplier(event?: any, catalog?: any): number | null
+  export function disorderDurationSeconds(event?: any, catalog?: any, durationBonusSeconds?: unknown): number
 }
 
 declare module "@core/calculationSkillGroups.js" {
@@ -38,11 +49,16 @@ declare module "@core/driveDiscOptimizer-core.js" {
   export function previewDriveDiscOptimization(catalog: any, store: any, input?: any, options?: any): any
   export function optimizeDriveDiscsAsync(catalog: any, store: any, input?: any, options?: any): Promise<any>
   export function createDriveDiscOptimizerRuntime(runtime?: any): {
+    createJob(catalog: any, store: any, input?: any, options?: any): {
+      preview(): any
+      run(options?: any): Promise<any>
+    }
     optimizeDriveDiscsAsync(catalog: any, store: any, input?: any, options?: any): Promise<any>
   }
 }
 
 declare module "@runtime/local-store.js" {
+  export function clearAllBrowserData(): Promise<void>
   export function driveDiscContentFingerprint(disc: any): string
   export function driveDiscIdentityFingerprint(disc: any): string
   export function ownerScopedStore(store: any, ownerId?: string): any
@@ -53,6 +69,7 @@ declare module "@runtime/local-store.js" {
   export function deleteAccount(id: string): Promise<any>
   export function loadCurrentUserDriveDiscStore(): Promise<any>
   export function loadUserDriveDiscStore(): Promise<any>
+  export function exportCurrentUserDriveDiscs(options?: { ownerId?: string; exportedAt?: string }): Promise<any>
   export function saveUserDriveDiscStore(store: any): Promise<any>
   export function clearUserDriveDiscStore(ownerId?: string | null): Promise<any>
   export function previewScannerExportImport(input: any, options?: any): Promise<any>
@@ -65,6 +82,7 @@ declare module "@runtime/local-store.js" {
 
 declare module "@core/shared-combat.js" {
   export const ANOMALY_EFFECT_LABELS: Record<string, string>
+  export const DISORDER_EFFECT_LABELS: Record<string, string>
   export const CUSTOM_BUFF_SKILL_STAT_OPTIONS: Array<[string, string, string, string | null]>
   export const CUSTOM_BUFF_STAT_OPTIONS: Array<[string, string, string, string | null]>
   export const RES_IGNORE_STAT_BY_ELEMENT: Record<string, string>
@@ -94,10 +112,46 @@ declare module "@core/shared-combat.js" {
   export function normalizeCustomBuffStat(stat?: any, meta?: any): any
   export function normalizeRuntimeForBuff(buff?: any, runtime?: any): any
   export function effectRules(effect?: any): any[]
+  export function effectRuleId(rule?: any): string
+  export function effectRuleCoverage(rule?: any, effect?: any): any
+  export function defaultCoverageForEffectRule(rule?: any, effect?: any): number
+  export function runtimeCoverageForEffectRule(rule?: any, effect?: any, runtime?: any): number
   export function runtimeSourceGroups(effect?: any): any[]
   export function runtimeStackGroups(effect?: any): any[]
   export function storedBuffModifierTexts(effect: any): string[]
+  export function storedEffectRuleText(rule: any, runtime?: any, effect?: any, meta?: any): string
   export function storedEffectRulesText(effect: any, runtime?: any, meta?: any): string
+}
+
+declare module "@core/skillTargets.js" {
+  export const SKILL_TYPES: readonly string[]
+  export const SKILL_TYPE_LABELS: Readonly<Record<string, string>>
+  export const SKILL_TYPE_VALUES: Set<string>
+  export const SKILL_TAGS: readonly string[]
+  export const SKILL_TAG_LABELS: Readonly<Record<string, string>>
+  export const SKILL_TAG_VALUES: Set<string>
+  export function skillTypeLabel(value?: any): string
+  export function skillTagLabel(value?: any): string
+  export function skillTagsForMove(move?: any): string[]
+  export function skillTypeForMove(category?: any, move?: any): string
+  export function legacySkillTypeForMove(category?: any, move?: any): string
+  export function skillTypeForSource(source?: any): string
+  export function skillTagsForSource(source?: any): string[]
+  export function normalizeSkillTarget(target?: any): any[]
+  export function normalizeSkillTargets(targets?: any[]): any[]
+  export function normalizeSkillTargetsInValue<T>(value: T): T
+  export function unknownLegacySkillTargetPrefixes(target?: any): string[]
+  export function skillTargetMatches(target?: any, source?: any): boolean
+}
+
+declare module "@core/effectRuleTargets.js" {
+  export const DAMAGE_ELEMENTS: readonly string[]
+  export const ELEMENT_CRIT_DMG_STAT_BY_ELEMENT: Readonly<Record<string, string>>
+  export const ELEMENT_DEF_IGNORE_STAT_BY_ELEMENT: Readonly<Record<string, string>>
+  export const ELEMENT_CRIT_DMG_STATS: readonly string[]
+  export const ELEMENT_DEF_IGNORE_STATS: readonly string[]
+  export function normalizeLegacyEffectAppliesToInValue<T>(value: T): T
+  export function hasLegacyEffectAppliesTo(value: any): boolean
 }
 
 declare module "@runtime/selection-storage.js" {
@@ -109,6 +163,10 @@ declare module "@runtime/selection-storage.js" {
 }
 
 declare module "@core/maintenanceValidation.js" {
+  export const SYSTEM_MANAGED_SKILL_GROUP_COUNTS: Readonly<{ defaultCount: 1, minCount: 0, maxCount: 100, step: 1 }>
+  export const SYSTEM_MANAGED_COVERAGE: Readonly<{ default: 1, min: 0, max: 1, step: 0.1 }>
+  export function createSystemManagedCoverage(defaultValue?: number): { default: number, min: 0, max: 1, step: 0.1 }
+  export function applySystemManagedMaintenanceFields<T>(value: T): T
   export const FIELD_BUFF_MODE_OPTIONS: Array<{ modeId: string, label: string, selectLabel?: { zhCN?: string }, source: { zhCN: string, en?: string } }>
   export const FIELD_BUFF_GAME_VERSIONS: string[]
   export const FIELD_BUFF_PHASE_OPTIONS: Array<{ phaseNo: number, phaseName: { zhCN: string } }>
@@ -147,20 +205,30 @@ declare module "@core/driveDiscAnalysis-core.js" {
 
 declare module "@runtime/scanner-bridge.js" {
   export class ScannerBridge {
+    onHelperUpdateProgress: ((progress: any) => void) | null
     onProgress: ((payload: any) => void) | null
     onLauncherProgress: ((payload: any) => void) | null
     onScannerReady: ((payload: any) => void) | null
     onItem: ((payload: any) => void) | null
     onComplete: ((payload: any) => void) | null
     onError: ((payload: any) => void) | null
+    onDiagnostics: ((payload: any) => void) | null
     onDisconnect: (() => void) | null
     readonly connected: boolean
     readonly scanning: boolean
     readonly mode: string
     readonly helperVersion: string
+    readonly protocolVersion: number
     connect(): Promise<any>
     launchHelper(): void
+    getStorageInfo(): Promise<any>
+    cleanupStorage(): Promise<any>
+    updateHelper(): Promise<any>
     ensureScanner(): Promise<any>
+    repairScanner(): Promise<any>
+    restartScannerElevated(): Promise<any>
+    openLogFolder(): void
+    requestDiagnostics(): void
     disconnect(): void
     startScan(options?: any): void
     stopScan(): void

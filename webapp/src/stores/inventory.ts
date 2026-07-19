@@ -3,6 +3,7 @@ import {
   clearUserDriveDiscStore,
   deleteDriveDiscLoadout,
   deleteUserDriveDisc,
+  exportCurrentUserDriveDiscs,
   importScannerExportToStore,
   loadCurrentUserDriveDiscStore,
   previewScannerExportImport,
@@ -13,9 +14,9 @@ import { toCalculatorDriveDisc } from "@core/drive-disc-core.js"
 import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "@core/driveDiscAnalysis-core.js"
 import { ScannerBridge } from "@runtime/scanner-bridge.js"
 
-const HELPER_DOWNLOAD_URL = "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.36/ZZZ-Scanner-Helper.exe?v=1.0.2"
+const HELPER_DOWNLOAD_URL = "https://github.com/ZztIsolation/zzz_calculator/releases/download/helper-1.2.1/ZZZ-Scanner-Helper.exe?v=1.2.1"
 const HELPER_POLL_INTERVAL_MS = 3000
-const REQUIRED_HELPER_VERSION = "1.0.2"
+export const REQUIRED_HELPER_VERSION = "1.2.1"
 const SCAN_CLIENTS = {
   local: {
     processName: "ZenlessZoneZero",
@@ -30,8 +31,21 @@ const SCAN_CLIENTS = {
 type ScanStatus = "idle" | "connecting" | "waiting-helper" | "preparing" | "downloading" | "ready" | "scanning" | "complete" | "error"
 type ScanClient = keyof typeof SCAN_CLIENTS
 type ScanPhase = "a" | "b" | "c" | "d"
-type ScanErrorContext = "" | "prepare" | "scan" | "helper-missing" | "game-not-found"
-type ScanErrorVariant = "helper-missing" | "helper-outdated" | "prepare-failed" | "scan-failed" | "game-not-found"
+type ScanErrorContext = "" | "prepare" | "scan" | "helper-missing" | "helper-outdated" | "game-not-found"
+type ScanErrorVariant = "helper-missing" | "helper-outdated" | "prepare-failed" | "scan-failed" | "game-not-found" | "diagnostic-failure"
+type ScanHelperUpgradeMode = "" | "legacy-manual" | "manual-download" | "self-updating" | "awaiting-restart" | "self-update-failed"
+
+type ScanFailure = {
+  code: string
+  phase: string
+  title: string
+  message: string
+  remedy: string
+  retryable: boolean
+  actions: Array<{ kind: string; label: string }>
+  diagnosticId: string
+  details: Record<string, string>
+}
 
 const GAME_NOT_FOUND_PATTERNS = [
   /未找到/,
@@ -43,6 +57,27 @@ const GAME_NOT_FOUND_PATTERNS = [
 
 function detectGameNotFound(message: string) {
   return GAME_NOT_FOUND_PATTERNS.some(pattern => pattern.test(message))
+}
+
+function normalizeScanFailure(value: any): ScanFailure | null {
+  if (!value || typeof value !== "object" || !String(value.code ?? "").trim()) {
+    return null
+  }
+  return {
+    code: String(value.code),
+    phase: String(value.phase ?? "prepare"),
+    title: String(value.title ?? "OCR 扫描器发生错误"),
+    message: String(value.message ?? "扫描器发生未知错误。"),
+    remedy: String(value.remedy ?? "请重试；如果问题持续，请打开日志。"),
+    retryable: value.retryable !== false,
+    actions: Array.isArray(value.actions)
+      ? value.actions
+        .filter((action: any) => action?.kind && action?.label)
+        .map((action: any) => ({ kind: String(action.kind), label: String(action.label) }))
+      : [],
+    diagnosticId: String(value.diagnosticId ?? ""),
+    details: value.details && typeof value.details === "object" ? value.details : {},
+  }
 }
 
 function clone<T>(value: T): T {
@@ -60,6 +95,26 @@ function discId() {
 
 function loadoutId() {
   return `loadout-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
+}
+
+function exportFileSegment(value: unknown) {
+  const cleaned = String(value ?? "")
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[. ]+$/g, "")
+    .slice(0, 80)
+  if (!cleaned) return "account"
+  return /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i.test(cleaned)
+    ? `account-${cleaned}`
+    : cleaned
+}
+
+function localDateStamp(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
 }
 
 function normalizeDiscDraft(input: any = {}, fallback: any = {}) {
@@ -162,7 +217,7 @@ function launcherProgressDisplay(data: any = {}) {
   }
 }
 
-function helperVersionAtLeast(actual = "", required = REQUIRED_HELPER_VERSION) {
+export function helperVersionAtLeast(actual = "", required = REQUIRED_HELPER_VERSION) {
   const parse = (value: string) => String(value).split(".").map(part => Number(part) || 0)
   const current = parse(actual)
   const target = parse(required)
@@ -204,6 +259,11 @@ export const useInventoryStore = defineStore("inventory", {
     scanSession: null as any,
     scanErrorContext: "" as ScanErrorContext,
     scanHelperVersion: "" as string,
+    scanHelperProtocolVersion: 0,
+    scanHelperUpgradeMode: "" as ScanHelperUpgradeMode,
+    scanHelperUpdateStartedAt: 0,
+    scanFailure: null as ScanFailure | null,
+    scanDiagnostics: null as any,
   }),
   getters: {
     driveDiscs: state => state.store?.driveDiscs ?? [],
@@ -255,6 +315,8 @@ export const useInventoryStore = defineStore("inventory", {
     scanWaitingForHelper: state => state.scanStatus === "waiting-helper",
     hasDriveDiscs: state => (state.store?.driveDiscs ?? []).length > 0,
     scanRaritySelected: state => state.scanRarityS || state.scanRarityA,
+    scanHelperOutdated: state => Boolean(state.scanHelperVersion) && !helperVersionAtLeast(state.scanHelperVersion),
+    scanHelperCanSelfUpdate: state => state.scanHelperProtocolVersion >= 3,
     scanPhase(state): ScanPhase {
       const status = state.scanStatus
       if (status === "scanning" || status === "complete") {
@@ -285,6 +347,12 @@ export const useInventoryStore = defineStore("inventory", {
       if (state.scanStatus !== "error") {
         return ""
       }
+      if (state.scanHelperVersion && !helperVersionAtLeast(state.scanHelperVersion)) {
+        return "helper-outdated"
+      }
+      if (state.scanFailure) {
+        return "diagnostic-failure"
+      }
       if (state.scanErrorContext === "helper-missing") {
         return "helper-missing"
       }
@@ -295,9 +363,6 @@ export const useInventoryStore = defineStore("inventory", {
         return detectGameNotFound(state.scanMessage) ? "game-not-found" : "scan-failed"
       }
       if (state.scanErrorContext === "prepare") {
-        if (state.scanHelperVersion && !helperVersionAtLeast(state.scanHelperVersion)) {
-          return "helper-outdated"
-        }
         return "prepare-failed"
       }
       return "prepare-failed"
@@ -378,6 +443,16 @@ export const useInventoryStore = defineStore("inventory", {
       this.store = result.store
       return result.previous
     },
+    async prepareCurrentAccountExport(now = new Date()) {
+      const payload = await exportCurrentUserDriveDiscs({ exportedAt: now.toISOString() })
+      const accountLabel = String(payload.sourceAccount?.label ?? "account")
+      return {
+        payload,
+        fileName: `zzz-drive-discs-${exportFileSegment(accountLabel)}-${localDateStamp(now)}.json`,
+        text: `${JSON.stringify(payload, null, 2)}\n`,
+        mimeType: "application/json;charset=utf-8",
+      }
+    },
     async saveLoadout(loadout: any) {
       const result = await upsertDriveDiscLoadout(normalizeLoadoutDraft(loadout))
       this.store = result.store
@@ -451,6 +526,8 @@ export const useInventoryStore = defineStore("inventory", {
       const stage = progress?.stage || ""
       const downloadProgress = stage === "download" ? launcherProgressDisplay(progress) : null
       const percent = downloadProgress?.percent ?? (stage === "manifest" ? 18
+        : stage === "select" ? 24
+          : stage === "repair" ? 28
         : stage === "download" ? 34
           : stage === "checksum" ? 68
             : stage === "extract" ? 82
@@ -460,18 +537,33 @@ export const useInventoryStore = defineStore("inventory", {
         ? downloadProgress?.text ?? "正在下载 OCR 扫描器..."
         : progress?.message || "正在准备扫描器..."
       this.scanStatus = stage === "download" ? "downloading" : "preparing"
+      this.scanFailure = null
       this.scanProgress = progress
       this.scanProgressPercent = percent
       this.scanProgressText = text
       this.scanMessage = text
+    },
+    applyHelperUpdateProgress(progress: any = {}) {
+      const percent = numericProgressValue(progress.percent)
+      this.scanStatus = "downloading"
+      this.scanErrorContext = "helper-outdated"
+      this.scanFailure = null
+      this.scanProgress = progress
+      this.scanProgressPercent = percent === null ? 20 : Math.min(100, Math.max(0, percent))
+      this.scanProgressText = progress.message || "正在更新扫描助手..."
+      this.scanMessage = this.scanProgressText
     },
     bindScannerEvents() {
       const activeScanner = this.ensureScannerBridge()
       activeScanner.onLauncherProgress = (progress: any) => {
         this.applyLauncherProgress(progress)
       }
+      activeScanner.onHelperUpdateProgress = (progress: any) => {
+        this.applyHelperUpdateProgress(progress)
+      }
       activeScanner.onScannerReady = () => {
         this.scanStatus = "ready"
+        this.scanFailure = null
         this.scanMessage = "已连接，可以开始扫描"
         this.scanProgressPercent = 100
         this.scanProgressText = "OCR 扫描器已准备"
@@ -483,6 +575,7 @@ export const useInventoryStore = defineStore("inventory", {
         const percent = total > 0 ? ((completed + failed) / total) * 100 : 0
         this.scanStatus = "scanning"
         this.scanErrorContext = ""
+        this.scanFailure = null
         this.scanProgress = progress
         this.scanProgressPercent = Math.min(100, Math.max(0, percent))
         this.scanProgressText = progress?.message ?? `访问 ${progress?.visited ?? 0} / 完成 ${completed} / 失败 ${failed}`
@@ -490,6 +583,7 @@ export const useInventoryStore = defineStore("inventory", {
       }
       activeScanner.onComplete = async (payload: any) => {
         this.scanStatus = "complete"
+        this.scanFailure = null
         this.scanMessage = "扫描完成，正在导入仓库"
         this.scanProgress = payload
         this.scanProgressPercent = 100
@@ -540,32 +634,134 @@ export const useInventoryStore = defineStore("inventory", {
         this.scanStatus = "error"
         this.scanConnected = Boolean(scanner?.connected)
         const message = error?.message ?? String(error ?? "扫描失败")
+        if (this.scanHelperOutdated) {
+          this.scanFailure = null
+          this.scanErrorContext = "helper-outdated"
+          this.scanMessage = `当前 Helper ${this.scanHelperVersion} 低于所需版本 ${REQUIRED_HELPER_VERSION}。`
+          if (!this.scanHelperCanSelfUpdate) {
+            this.scanHelperUpgradeMode = "legacy-manual"
+            this.startScannerPolling()
+          }
+          return
+        }
+        const failure = normalizeScanFailure(error)
+        this.scanFailure = failure
         this.scanMessage = message
-        this.scanErrorContext = detectGameNotFound(String(message ?? ""))
+        this.scanErrorContext = failure?.code === "game_not_found" || detectGameNotFound(String(message ?? ""))
           ? "game-not-found"
-          : "scan"
+          : failure?.phase === "scan" ? "scan" : "prepare"
+      }
+      activeScanner.onDiagnostics = (diagnostics: any) => {
+        this.scanDiagnostics = diagnostics
       }
       activeScanner.onDisconnect = () => {
         this.scanConnected = false
+        if (["legacy-manual", "manual-download", "self-updating", "awaiting-restart"].includes(this.scanHelperUpgradeMode)) {
+          return
+        }
         if (this.scanStatus === "scanning") {
           this.scanStatus = "idle"
           this.scanMessage = "扫描助手已断开"
         }
       }
     },
+    async updateOutdatedHelper() {
+      const activeScanner = this.ensureScannerBridge()
+      if (!activeScanner.connected || !this.scanHelperCanSelfUpdate) {
+        this.scanStatus = "error"
+        this.scanErrorContext = "helper-outdated"
+        this.scanFailure = null
+        this.scanHelperUpgradeMode = "legacy-manual"
+        this.scanMessage = `Helper ${this.scanHelperVersion || "旧版"} 需要下载新版安装器后完成一次接管升级。`
+        if (!this.scanPolling) this.startScannerPolling()
+        return
+      }
+
+      this.stopScannerPolling()
+      this.scanHelperUpgradeMode = "self-updating"
+      this.scanHelperUpdateStartedAt = Date.now()
+      this.applyHelperUpdateProgress({ stage: "manifest", percent: 8, message: "正在检查 Helper 更新..." })
+      try {
+        const response = await activeScanner.updateHelper()
+        if (!response?.restarting) {
+          throw new Error(`更新清单未提供 ${REQUIRED_HELPER_VERSION} 或更高版本，请手动下载最新版。`)
+        }
+        this.scanHelperUpgradeMode = "awaiting-restart"
+        this.scanConnected = false
+        this.scanProgressPercent = 100
+        this.scanProgressText = `Helper ${response.availableVersion} 已校验，正在重启并重新连接...`
+        this.scanMessage = this.scanProgressText
+        activeScanner.disconnect()
+        this.startScannerPolling()
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        this.stopScannerPolling()
+        this.scanStatus = "error"
+        this.scanErrorContext = "helper-outdated"
+        this.scanFailure = null
+        this.scanHelperUpgradeMode = "self-update-failed"
+        this.scanProgressPercent = null
+        this.scanMessage = `Helper 自动更新失败：${message}`
+        this.scanProgressText = ""
+      }
+    },
     async prepareConnectedScanner(hello: any = {}) {
       const activeScanner = this.ensureScannerBridge()
-      this.stopScannerPolling()
       this.scanConnected = true
       this.scanStatus = "preparing"
       this.scanErrorContext = ""
+      this.scanFailure = null
       this.scanProgress = null
       this.scanProgressPercent = 12
-      const helperVersion = activeScanner.helperVersion
+      const helperVersion = String(hello?.version ?? activeScanner.helperVersion ?? "")
+      const helperProtocolVersion = Number(hello?.protocolVersion ?? activeScanner.protocolVersion ?? 0)
       this.scanHelperVersion = helperVersion ?? ""
-      this.scanProgressText = helperVersion && !helperVersionAtLeast(helperVersion)
-        ? "正在检查扫描器版本... 当前 Helper 版本较旧，下载进度可能无法显示；请重新下载新版 Helper。"
-        : "正在检查扫描器版本..."
+      this.scanHelperProtocolVersion = helperProtocolVersion
+      if (this.scanHelperOutdated) {
+        this.scanFailure = null
+        this.scanErrorContext = "helper-outdated"
+        if (["legacy-manual", "manual-download"].includes(this.scanHelperUpgradeMode)) {
+          this.scanStatus = "error"
+          this.scanProgressPercent = null
+          this.scanProgressText = ""
+          this.scanMessage = `Helper ${helperVersion || "旧版"} 需要更新到 ${REQUIRED_HELPER_VERSION}。下载后运行安装器，它会自动接管当前旧 Helper。`
+          if (!this.scanPolling) this.startScannerPolling()
+          return
+        }
+        if (this.scanHelperUpgradeMode === "awaiting-restart") {
+          if (Date.now() - this.scanHelperUpdateStartedAt <= 60_000) {
+            this.scanStatus = "downloading"
+            this.scanProgressPercent = 100
+            this.scanProgressText = "正在等待新版 Helper 启动..."
+            this.scanMessage = this.scanProgressText
+            activeScanner.disconnect()
+            if (!this.scanPolling) this.startScannerPolling()
+            return
+          }
+          this.scanStatus = "error"
+          this.scanHelperUpgradeMode = "self-update-failed"
+          this.scanProgressPercent = null
+          this.scanMessage = "Helper 更新后未能在 60 秒内启动，请重试自动更新或手动下载安装。"
+          this.stopScannerPolling()
+          return
+        }
+        if (this.scanHelperCanSelfUpdate) {
+          await this.updateOutdatedHelper()
+          return
+        }
+        this.scanStatus = "error"
+        this.scanHelperUpgradeMode = "legacy-manual"
+        this.scanProgressPercent = null
+        this.scanProgressText = ""
+        this.scanMessage = `Helper ${helperVersion || "旧版"} 需要更新到 ${REQUIRED_HELPER_VERSION}。下载后运行安装器，它会自动接管当前旧 Helper。`
+        if (!this.scanPolling) this.startScannerPolling()
+        return
+      }
+
+      this.stopScannerPolling()
+      this.scanHelperUpgradeMode = ""
+      this.scanHelperUpdateStartedAt = 0
+      this.scanProgressText = "正在检查扫描器版本..."
       this.scanMessage = "已连接，正在准备 OCR 扫描器..."
       try {
         await activeScanner.ensureScanner()
@@ -576,11 +772,30 @@ export const useInventoryStore = defineStore("inventory", {
         this.scanMessage = `扫描助手已连接${hello?.version ? ` · ${hello.version}` : ""}`
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
+        this.scanFailure = normalizeScanFailure(error)
         this.scanStatus = "error"
         this.scanErrorContext = "prepare"
         this.scanProgressPercent = null
         this.scanMessage = message
       }
+    },
+    async retryHelperUpgrade() {
+      if (this.scanHelperCanSelfUpdate) {
+        await this.updateOutdatedHelper()
+        return
+      }
+      this.scanHelperUpgradeMode = "legacy-manual"
+      this.scanStatus = "error"
+      this.scanErrorContext = "helper-outdated"
+      if (!this.scanPolling) this.startScannerPolling()
+    },
+    waitForManualHelperUpgrade() {
+      this.scanHelperUpgradeMode = this.scanHelperCanSelfUpdate ? "manual-download" : "legacy-manual"
+      this.scanStatus = "error"
+      this.scanErrorContext = "helper-outdated"
+      this.scanFailure = null
+      this.scanMessage = "新版 Helper 下载后请直接运行；安装器确认一次后会自动接管旧版，网页会继续检测。"
+      if (!this.scanPolling) this.startScannerPolling()
     },
     startScannerPolling() {
       this.stopScannerPolling()
@@ -614,6 +829,7 @@ export const useInventoryStore = defineStore("inventory", {
         this.scanProgressText = ""
         this.scanProgressPercent = null
         this.scanErrorContext = ""
+        this.scanFailure = null
       }
     },
     async connectScanner() {
@@ -622,6 +838,7 @@ export const useInventoryStore = defineStore("inventory", {
       this.stopScannerPolling()
       this.scanStatus = "connecting"
       this.scanErrorContext = ""
+      this.scanFailure = null
       this.scanMessage = "正在连接扫描助手"
       this.scanProgress = null
       this.scanProgressText = ""
@@ -634,6 +851,7 @@ export const useInventoryStore = defineStore("inventory", {
         activeScanner.launchHelper()
         this.scanStatus = "waiting-helper"
         this.scanErrorContext = "helper-missing"
+        this.scanFailure = null
         this.scanMessage = "未检测到扫描助手。请下载并运行 Helper；如果已安装，浏览器会尝试自动唤起。"
         this.startScannerPolling()
       }
@@ -645,6 +863,7 @@ export const useInventoryStore = defineStore("inventory", {
       this.scanConnected = false
       this.scanStatus = "waiting-helper"
       this.scanErrorContext = "helper-missing"
+      this.scanFailure = null
       this.scanMessage = "已请求打开扫描助手，正在等待连接..."
       this.startScannerPolling()
     },
@@ -675,6 +894,7 @@ export const useInventoryStore = defineStore("inventory", {
         const client = SCAN_CLIENTS[this.scanClient] ?? SCAN_CLIENTS.local
         this.scanStatus = "scanning"
         this.scanErrorContext = ""
+        this.scanFailure = null
         this.scanMessage = "正在扫描驱动盘"
         this.scanProgress = null
         this.scanProgressText = "准备中..."
@@ -697,6 +917,7 @@ export const useInventoryStore = defineStore("inventory", {
         })
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
+        this.scanFailure = normalizeScanFailure(error)
         this.scanStatus = "error"
         this.scanErrorContext = detectGameNotFound(message) ? "game-not-found" : "prepare"
         this.scanProgressPercent = null
@@ -707,9 +928,62 @@ export const useInventoryStore = defineStore("inventory", {
       scanner?.stopScan()
       this.scanStatus = "ready"
       this.scanErrorContext = ""
+      this.scanFailure = null
       this.scanMessage = "已发送停止扫描请求"
       this.scanProgressText = ""
       this.scanProgressPercent = null
+    },
+    async handleScannerFailureAction(kind: string) {
+      const activeScanner = this.ensureScannerBridge()
+      if (kind === "open_logs") {
+        activeScanner.openLogFolder()
+        return
+      }
+      if (kind === "copy_diagnostics") {
+        activeScanner.requestDiagnostics()
+        return
+      }
+      if (kind === "retry_scan" || (kind === "retry" && this.scanFailure?.phase === "scan")) {
+        await this.startScan()
+        return
+      }
+
+      this.scanStatus = "preparing"
+      this.scanErrorContext = ""
+      this.scanProgressPercent = 12
+      this.scanProgressText = kind === "repair" ? "正在重新下载并修复扫描器..." : "正在重新启动扫描器..."
+      const shouldResumeScan = kind === "restart_elevated"
+      try {
+        if (kind === "repair") {
+          await activeScanner.repairScanner()
+        } else if (kind === "restart_elevated") {
+          await activeScanner.restartScannerElevated()
+        } else {
+          await activeScanner.ensureScanner()
+        }
+        this.scanStatus = "ready"
+        this.scanFailure = null
+        this.scanProgressPercent = 100
+        this.scanProgressText = "OCR 扫描器已准备"
+        if (shouldResumeScan) {
+          await this.startScan()
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        this.scanStatus = "error"
+        this.scanFailure = normalizeScanFailure(error)
+        this.scanErrorContext = this.scanFailure?.phase === "scan" ? "scan" : "prepare"
+        this.scanMessage = message
+        this.scanProgressPercent = null
+      }
+    },
+    scannerDiagnosticText() {
+      return JSON.stringify({
+        failure: this.scanFailure,
+        helper: this.scanDiagnostics,
+        helperVersion: this.scanHelperVersion,
+        progress: this.scanProgress,
+      }, null, 2)
     },
   },
 })

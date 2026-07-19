@@ -29,6 +29,9 @@ const DRIVE_DISC_SET_ALIASES = {
     "拂晓行纪": { id: "zzz_wiki_2029", name: { zhCN: "拂晓行纪" } },
 }
 
+export const DRIVE_DISC_EXPORT_FORMAT = "zzz-calculator-drive-disc-export"
+export const DRIVE_DISC_EXPORT_VERSION = 1
+
 const STAT_LABELS = {
     "生命值": { flat: "hpFlat", pct: "hpPct" },
     "攻击力": { flat: "atkFlat", pct: "atkPct" },
@@ -79,6 +82,10 @@ function hashWith(options, value) {
 
 function nowIso() {
     return new Date().toISOString()
+}
+
+function cloneJsonValue(value) {
+    return JSON.parse(JSON.stringify(value))
 }
 
 function normalizedStatValue(value) {
@@ -187,6 +194,34 @@ export function ownerScopedStore(store, ownerId = store?.currentOwnerId, options
 
 export function currentOwnerId(store, options = {}) {
     return normalizeInventoryStore(store, options).currentOwnerId
+}
+
+function driveDiscForExport(disc) {
+    const {
+        ownerId: _ownerId,
+        contentFingerprint: _contentFingerprint,
+        identityFingerprint: _identityFingerprint,
+        ...exported
+    } = disc ?? {}
+    return cloneJsonValue(exported)
+}
+
+export function createDriveDiscExport(store, options = {}) {
+    const normalized = normalizeInventoryStore(store, options)
+    const ownerId = options.ownerId ?? normalized.currentOwnerId
+    const owner = normalized.owners.find(item => item.id === ownerId)
+    if (!owner) {
+        throw new Error(`Cannot export unknown account "${ownerId}".`)
+    }
+    return {
+        format: DRIVE_DISC_EXPORT_FORMAT,
+        version: DRIVE_DISC_EXPORT_VERSION,
+        exportedAt: options.exportedAt ?? nowIso(),
+        sourceAccount: { label: owner.label },
+        driveDiscs: normalized.driveDiscs
+            .filter(item => (item.ownerId ?? "default") === ownerId)
+            .map(driveDiscForExport),
+    }
 }
 
 function pickScannerItems(input) {
@@ -308,6 +343,131 @@ export function normalizeScannerExport(input, options = {}) {
     }
 }
 
+function assertPlainObject(value, context) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        throw new Error(`${context} must be an object.`)
+    }
+}
+
+function normalizeNativeStat(rawStat, context) {
+    assertPlainObject(rawStat, context)
+    const stat = String(rawStat.stat ?? "").trim()
+    const value = Number(rawStat.value)
+    if (!stat) {
+        throw new Error(`${context}.stat is required.`)
+    }
+    if (!Number.isFinite(value)) {
+        throw new Error(`${context}.value must be a finite number.`)
+    }
+    return {
+        ...cloneJsonValue(rawStat),
+        stat,
+        value,
+    }
+}
+
+function normalizeNativeDriveDisc(rawItem, index, options) {
+    const context = `driveDiscs[${index}]`
+    assertPlainObject(rawItem, context)
+    const id = String(rawItem.id ?? "").trim()
+    const setId = String(rawItem.setId ?? "").trim()
+    const setName = String(rawItem.setName ?? "").trim()
+    const partition = Number(rawItem.partition)
+    const rarity = String(rawItem.rarity ?? "").trim()
+    const level = Number(rawItem.level)
+    const maxLevel = Number(rawItem.maxLevel ?? rawItem.level)
+    if (!id) throw new Error(`${context}.id is required.`)
+    if (!setId && !setName) throw new Error(`${context} must include setId or setName.`)
+    if (!Number.isInteger(partition) || partition < 1 || partition > 6) {
+        throw new Error(`${context}.partition must be an integer from 1 to 6.`)
+    }
+    if (!rarity) throw new Error(`${context}.rarity is required.`)
+    if (!Number.isFinite(level) || !Number.isFinite(maxLevel)) {
+        throw new Error(`${context} level values must be finite numbers.`)
+    }
+    if (!Array.isArray(rawItem.subStats)) {
+        throw new Error(`${context}.subStats must be an array.`)
+    }
+    const {
+        ownerId: _ownerId,
+        contentFingerprint: _contentFingerprint,
+        identityFingerprint: _identityFingerprint,
+        ...record
+    } = cloneJsonValue(rawItem)
+    return withDriveDiscFingerprints({
+        ...record,
+        id,
+        ownerId: options.ownerId,
+        setId,
+        setName,
+        partition,
+        rarity,
+        level,
+        maxLevel,
+        mainStat: normalizeNativeStat(rawItem.mainStat, `${context}.mainStat`),
+        subStats: rawItem.subStats.map((stat, statIndex) =>
+            normalizeNativeStat(stat, `${context}.subStats[${statIndex}]`)
+        ),
+    }, options)
+}
+
+function normalizeNativeDriveDiscExport(input, options = {}) {
+    assertPlainObject(input, "Drive Disc export")
+    if (input.version !== DRIVE_DISC_EXPORT_VERSION) {
+        throw new Error(`Unsupported Drive Disc export version "${input.version}". Expected version ${DRIVE_DISC_EXPORT_VERSION}.`)
+    }
+    assertPlainObject(input.sourceAccount, "Drive Disc export sourceAccount")
+    if (!String(input.sourceAccount.label ?? "").trim()) {
+        throw new Error("Drive Disc export sourceAccount.label is required.")
+    }
+    if (!String(input.exportedAt ?? "").trim() || !Number.isFinite(Date.parse(input.exportedAt))) {
+        throw new Error("Drive Disc export exportedAt must be a valid ISO date string.")
+    }
+    if (!Array.isArray(input.driveDiscs)) {
+        throw new Error("Drive Disc export driveDiscs must be an array.")
+    }
+    const ownerId = options.ownerId ?? "default"
+    const importedAt = options.importedAt ?? nowIso()
+    const sourcePath = options.sourcePath ?? null
+    const importId = options.importId ?? `zzz-calculator-export-${hashWith(options, `${ownerId}:${sourcePath ?? ""}:${importedAt}`)}`
+    const driveDiscs = input.driveDiscs.map((item, index) =>
+        normalizeNativeDriveDisc(item, index, { ...options, ownerId })
+    )
+    const ids = new Set()
+    for (const disc of driveDiscs) {
+        if (ids.has(disc.id)) {
+            throw new Error(`Drive Disc export contains duplicate id "${disc.id}".`)
+        }
+        ids.add(disc.id)
+    }
+    return {
+        importRecord: {
+            id: importId,
+            type: DRIVE_DISC_EXPORT_FORMAT,
+            version: DRIVE_DISC_EXPORT_VERSION,
+            ownerId,
+            sourcePath,
+            sourceAccount: cloneJsonValue(input.sourceAccount),
+            sourceExportedAt: input.exportedAt,
+            importedAt,
+            itemCount: driveDiscs.length,
+            warnings: [],
+            removeMissing: Boolean(options.removeMissing),
+        },
+        driveDiscs,
+    }
+}
+
+export function normalizeDriveDiscImport(input, options = {}) {
+    if (input && typeof input === "object" && !Array.isArray(input) && Object.hasOwn(input, "format")) {
+        if (input.format !== DRIVE_DISC_EXPORT_FORMAT) {
+            throw new Error(`Unsupported Drive Disc import format "${input.format}".`)
+        }
+        return normalizeNativeDriveDiscExport(input, options)
+    }
+    return normalizeScannerExport(input, options)
+}
+
 function buildDuplicateAwareIndex(items, keyOf) {
     const result = new Map()
     for (const item of items ?? []) {
@@ -345,6 +505,19 @@ function mergeImportedDriveDisc(existing, imported, options) {
             ...(imported.source ?? {}),
             previousImportId: existing.source?.importId ?? null,
         }, options),
+    }, options)
+}
+
+function nativeDriveDiscComparable(disc) {
+    return stableStringify(driveDiscForExport(disc))
+}
+
+function mergeNativeDriveDisc(existing, imported, options) {
+    return withDriveDiscFingerprints({
+        ...existing,
+        ...imported,
+        id: existing.id,
+        ownerId: existing.ownerId ?? imported.ownerId,
     }, options)
 }
 
@@ -410,11 +583,12 @@ export function reconcileDriveDiscLoadoutSlots(loadouts = [], {
 
 export function buildScannerImportPlan(currentStore, input, options = {}) {
     const effectiveOwnerId = options.ownerId ?? currentStore.currentOwnerId
-    const normalized = normalizeScannerExport(input, {
+    const normalized = normalizeDriveDiscImport(input, {
         ...options,
         ownerId: effectiveOwnerId,
         removeMissing: Boolean(options.removeMissing),
     })
+    const nativeImport = normalized.importRecord.type === DRIVE_DISC_EXPORT_FORMAT
     const ownerId = normalized.importRecord.ownerId
     const owners = currentStore.owners?.some(owner => owner.id === ownerId)
         ? currentStore.owners
@@ -445,11 +619,27 @@ export function buildScannerImportPlan(currentStore, input, options = {}) {
     }
 
     for (const imported of normalized.driveDiscs) {
-        if (seenImportContent.has(imported.contentFingerprint)) {
+        if (nativeImport) {
+            const existing = nextSameOwner.get(imported.id)
+            if (existing) {
+                const before = existing
+                const after = mergeNativeDriveDisc(before, imported, options)
+                matchedExistingIds.add(existing.id)
+                nextSameOwner.set(existing.id, after)
+                if (nativeDriveDiscComparable(before) === nativeDriveDiscComparable(after)) {
+                    summary.skipped += 1
+                    unchanged.push({ id: existing.id, before, after, imported, reason: "same-native-record" })
+                } else {
+                    summary.updated += 1
+                    updated.push({ id: existing.id, before, after, imported, reason: "same-native-id" })
+                }
+                continue
+            }
+        } else if (seenImportContent.has(imported.contentFingerprint)) {
             summary.duplicateInImport += 1
             continue
         }
-        seenImportContent.add(imported.contentFingerprint)
+        if (!nativeImport) seenImportContent.add(imported.contentFingerprint)
         const contentMatches = byContent.get(imported.contentFingerprint) ?? []
         if (contentMatches.length) {
             const existing = contentMatches.find(item => nextSameOwner.has(item.id)) ?? contentMatches[0]
@@ -476,7 +666,7 @@ export function buildScannerImportPlan(currentStore, input, options = {}) {
         }
 
         let nextId = imported.id
-        while (nextSameOwner.has(nextId) || existingOtherOwners.some(item => item.id === nextId)) {
+        while (nextSameOwner.has(nextId) || (!nativeImport && existingOtherOwners.some(item => item.id === nextId))) {
             nextId = `scanner-${imported.contentFingerprint}-${hashWith(options, `${nextId}:${nextSameOwner.size}`)}`
         }
         const nextDisc = withDriveDiscFingerprints({

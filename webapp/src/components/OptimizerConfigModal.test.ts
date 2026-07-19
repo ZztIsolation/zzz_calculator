@@ -15,9 +15,15 @@ const naiveStubs = {
     template: "<label><input type=\"checkbox\" :checked=\"checked\" @change=\"$emit('update:checked', $event.target.checked)\"><slot /></label>",
   },
   NInputNumber: {
-    props: ["value", "disabled"],
+    props: {
+      value: { default: null },
+      disabled: Boolean,
+      min: Number,
+      precision: Number,
+      step: { type: Number, default: 1 },
+    },
     emits: ["update:value"],
-    template: "<input :value=\"value\" :disabled=\"disabled\" @input=\"$emit('update:value', Number($event.target.value))\">",
+    template: "<input type=\"number\" :value=\"value\" :disabled=\"disabled\" :step=\"step\" @input=\"$emit('update:value', Number($event.target.value))\">",
   },
   NModal: {
     props: ["show"],
@@ -55,7 +61,7 @@ function mountModal(propOverrides: Record<string, any> = {}) {
         fourPieceBuffMode: "manual",
         fourPieceBuffRuntimeInputs: {},
         mainStatLimits: { "4": [], "5": [], "6": [] },
-        minimums: { energyRegen: null, anomalyProficiency: null, critRate: 50, critDmg: null },
+        minimums: {},
       },
       optimizerAlgorithmOptions: [
         { label: "精确搜索（超界剪枝）", value: "exact-super-bound" },
@@ -67,6 +73,8 @@ function mountModal(propOverrides: Record<string, any> = {}) {
         "6": [{ label: "异常掌控", value: "anomalyMastery" }],
       },
       minimumStats: [
+        { key: "atk", label: "攻击力" },
+        { key: "anomalyProficiency", label: "异常精通" },
         { key: "critRate", label: "暴击率%" },
         { key: "critDmg", label: "暴击伤害%" },
       ],
@@ -119,6 +127,23 @@ describe("OptimizerConfigModal", () => {
     expect(document.body.textContent).toContain("优化约束")
     expect(document.body.textContent).toContain("计算配置")
     expect(document.body.textContent).toContain("4号位主词条")
+    expect(document.body.textContent).toContain("攻击力")
+    expect(document.body.textContent).toContain("异常精通")
+    expect(document.body.textContent).toContain("以下四项均按局外面板数值判断，不计入局内 Buff。")
+    expect(document.body.textContent).not.toContain("能量自动回复")
+
+    const minimumInputs = document.body.querySelectorAll(".optimizer-minimum-grid input")
+    expect(minimumInputs).toHaveLength(4)
+    const minimumComponents = wrapper.findAllComponents({ name: "InputNumber" })
+    expect(minimumComponents.map(input => input.props("value"))).toEqual([null, null, null, null])
+    expect(minimumComponents.map(input => input.props("step"))).toEqual([50, 10, 10, 10])
+    expect(minimumComponents.map(input => input.props("min"))).toEqual([0, 0, 0, 0])
+    expect(minimumComponents.map(input => input.props("precision"))).toEqual([0, 0, 0, 0])
+
+    for (const [index, value] of [2521, 257, 83, 167].entries()) {
+      await minimumComponents[index].vm.$emit("update:value", value)
+    }
+    await nextTick()
 
     const algorithmSelect = selectComponentWithOption(wrapper, "heuristic-potential")
     expect(algorithmSelect).toBeTruthy()
@@ -139,9 +164,13 @@ describe("OptimizerConfigModal", () => {
         "4": ["critRate"],
       },
       minimums: {
-        critRate: 50,
+        atk: 2521,
+        anomalyProficiency: 257,
+        critRate: 83,
+        critDmg: 167,
       },
     })
+    expect(saved.minimums).not.toHaveProperty("energyRegen")
   })
 
   it("discards draft changes when cancelled", async () => {
@@ -192,5 +221,39 @@ describe("OptimizerConfigModal", () => {
       "stack-dmg": { stacks: 1 },
       "stack-sheer": { stacks: 1 },
     })
+  })
+
+  it("writes independent per-rule coverage and migrates legacy parent runtime", async () => {
+    const buff = {
+      id: "independent-coverage-runtime",
+      name: { zhCN: "独立覆盖率" },
+      effects: [
+        { id: "covered-dmg", type: "fixed", stat: "dmgBonus", mode: "flat", value: 20, coverage: { default: 0.6, min: 0, max: 1, step: 0.1 } },
+        { id: "fixed-crit", type: "fixed", stat: "critRate", mode: "flat", value: 10 },
+      ],
+    }
+    const wrapper = mountModal({
+      optimizerConfig: {
+        algorithm: "exact-super-bound",
+        fourPieceBuffMode: "manual",
+        fourPieceBuffRuntimeInputs: { "independent-coverage-runtime": { coverage: 0.4 } },
+        mainStatLimits: { "4": [], "5": [], "6": [] },
+        minimums: {},
+      },
+      fourPieceRuntimeBuffs: [buff],
+    })
+    await openModal(wrapper)
+    const inputs = document.body.querySelectorAll(".optimizer-coverage-metric input")
+    expect(inputs).toHaveLength(1)
+    expect((inputs[0] as HTMLInputElement).value).toBe("0.4")
+    ;(inputs[0] as HTMLInputElement).value = "0.3"
+    inputs[0].dispatchEvent(new Event("input", { bubbles: true }))
+    await nextTick()
+
+    const saved = await saveModal(wrapper)
+    const runtime = saved.fourPieceBuffRuntimeInputs["independent-coverage-runtime"]
+    expect(runtime.coverage).toBeUndefined()
+    expect(runtime.effects["covered-dmg"].coverage).toBe(0.3)
+    expect(runtime.effects["fixed-crit"].coverage).toBeUndefined()
   })
 })

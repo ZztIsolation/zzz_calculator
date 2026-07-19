@@ -26,3 +26,9 @@ jobs:
         run: npm test
       - name: Build Vue application
         run: npm --prefix webapp run build
+      - name: Install Chromium for layout tests
+        working-directory: webapp
+        run: npx playwright install --with-deps chromium
+      - name: Run browser layout regression suite
+        working-directory: webapp
+        run: npm run test:layout

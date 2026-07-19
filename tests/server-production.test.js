@@ -51,17 +51,15 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-function buildVueApp() {
-    const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm"
+function runNodeTool(entry, args = [], cwd = rootDir) {
     return new Promise((resolve, reject) => {
         let output = ""
-        const child = spawn(npmCommand, ["--prefix", "webapp", "run", "build"], {
-            cwd: rootDir,
+        const child = spawn(process.execPath, [entry, ...args], {
+            cwd,
             env: {
                 ...process.env,
                 VITE_INCLUDE_MAINTENANCE: "true",
             },
-            shell: process.platform === "win32",
             stdio: ["ignore", "pipe", "pipe"],
         })
         child.stdout.on("data", chunk => {
@@ -76,9 +74,15 @@ function buildVueApp() {
                 resolve()
                 return
             }
-            reject(new Error(`Vue production build failed with exit code ${code}.\n${output}`))
+            reject(new Error(`${path.basename(entry)} failed with exit code ${code}.\n${output}`))
         })
     })
+}
+
+async function buildVueApp() {
+    const webappDir = path.join(rootDir, "webapp")
+    await runNodeTool(path.join(webappDir, "node_modules", "vue-tsc", "bin", "vue-tsc.js"), ["--noEmit"], webappDir)
+    await runNodeTool(path.join(webappDir, "node_modules", "vite", "bin", "vite.js"), ["build"], webappDir)
 }
 
 async function waitForServer() {
@@ -99,6 +103,7 @@ async function getText(pathname) {
     const response = await fetch(`${baseUrl}${pathname}`)
     return {
         status: response.status,
+        headers: response.headers,
         body: await response.text(),
     }
 }
@@ -198,8 +203,17 @@ try {
 
     const appPage = await getText("/")
     assert.equal(appPage.status, 200)
+    assert.equal(appPage.headers.get("cache-control"), "no-store")
     assert.match(appPage.body, /<div id="app"><\/div>/)
     assert.match(appPage.body, /ZZZ Calculator/)
+    const appAssetPath = appPage.body.match(/src="(\/static\/app\/[^"]+\.js)"/)?.[1]
+    assert.ok(appAssetPath, "built page should reference a hashed JavaScript asset")
+    const appAsset = await getText(appAssetPath)
+    assert.equal(appAsset.status, 200)
+    assert.equal(appAsset.headers.get("cache-control"), "public, max-age=31536000, immutable")
+    const stableAsset = await getText("/zzz-mark.svg")
+    assert.equal(stableAsset.status, 200)
+    assert.equal(stableAsset.headers.get("cache-control"), "no-cache")
     assert.equal((await getText("/discs")).status, 200)
     assert.equal((await getText("/accounts")).status, 200)
     assert.equal((await getText("/static")).status, 404)
@@ -212,7 +226,9 @@ try {
     assert.deepEqual(await getRedirect("/accounts.html"), { status: 308, location: "/accounts", body: "" })
     assert.equal((await getText("/maintenance.html")).status, 404)
     assert.equal((await getText("/downloads/zzz-scanner/manifest.json")).status, 200)
-    assert.equal((await getText("/missing-route")).status, 200)
+    const missingRoute = await getText("/missing-route")
+    assert.equal(missingRoute.status, 200)
+    assert.equal(missingRoute.headers.get("cache-control"), "no-store")
 
     assert.equal((await getText("/missing.html")).status, 404)
 

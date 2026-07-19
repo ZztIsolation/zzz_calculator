@@ -155,6 +155,15 @@ function bruteForce(input) {
             if ((counts.get(input.settings.fourPieceSetId) ?? 0) < 4) {
                 return
             }
+            if (!twoPieceSetIds.length) {
+                const fourPieceCount = counts.get(input.settings.fourPieceSetId) ?? 0
+                const hasCompleteExtraSet = [...counts.entries()].some(([setId, count]) =>
+                    setId !== input.settings.fourPieceSetId && count === 2
+                )
+                if (fourPieceCount !== 6 && !(fourPieceCount === 4 && hasCompleteExtraSet)) {
+                    return
+                }
+            }
             if (twoPieceSetIds.length === 1 && twoPieceSetIds[0] === input.settings.fourPieceSetId && (counts.get(input.settings.fourPieceSetId) ?? 0) < 6) {
                 return
             }
@@ -171,7 +180,7 @@ function bruteForce(input) {
                     activeBuffIds: fourPieceIds(input.settings.fourPieceSetId),
                 },
             })
-            const panel = data.inCombat.panel
+            const panel = data.outOfCombat.panel
             if (input.settings.minimums?.critRate && panel.critRate < input.settings.minimums.critRate / 100) {
                 return
             }
@@ -193,7 +202,7 @@ function bruteForce(input) {
     walk(0)
     return results
         .sort((left, right) => right.score - left.score || left.ids.localeCompare(right.ids))
-        .slice(0, 5)
+        .slice(0, 10)
 }
 
 function resultIds(result) {
@@ -214,9 +223,11 @@ assert.equal(exact.metrics.algorithmLabel, "精准 · 推荐")
 assert.equal(exact.metrics.strictExact, true)
 assert.equal(exact.metrics.pruningStrategy, "super-bound")
 assert.equal(exact.metrics.processedCombinationCount, exact.metrics.evaluated + exact.metrics.prunedBySuperBound)
+assert.equal(exact.metrics.processedCombinationCount, exact.metrics.estimatedCombinationCount)
 assert.equal(exactAlias.metrics.algorithmId, "exact-super-bound")
 assert.equal(exactLegacy.metrics.algorithmId, "exact-legacy")
 assert.equal(exactLegacy.metrics.strictExact, true)
+assert.equal(exact.results.length, 10)
 assert.equal(exact.results.length, brute.length)
 assert.equal(exact.results[0].driveDiscs.map(item => item.id).join("|"), brute[0].ids)
 assert.ok(Math.abs(exact.results[0].score - brute[0].score) < 1e-9)
@@ -229,6 +240,54 @@ assert.deepEqual(
     exactNoPrune.results.map(result => result.driveDiscs.map(item => item.id).join("|")),
 )
 assert.equal(exact.metrics.complexity.level, "low")
+assert.equal(exact.metrics.freeTwoPieceAutoSetCount, 2)
+assert.ok(exact.metrics.freeFourTwoPlanCount > 0)
+assert.equal(exact.metrics.freeSixPiecePlanCount, 1)
+assert.ok(exact.metrics.freeFourTwoCombinationCount > 0)
+assert.ok(exact.metrics.freeSixPieceCombinationCount > 0)
+assert.ok(exact.metrics.freeSpecializedScorePlanCount > 0)
+assert.ok(exact.results.every(result => {
+    const counts = result.driveDiscs.reduce((map, item) => map.set(item.setId, (map.get(item.setId) ?? 0) + 1), new Map())
+    const fourPieceCount = counts.get(fourSet) ?? 0
+    return fourPieceCount === 6
+        || (fourPieceCount === 4 && [...counts.entries()].some(([setId, count]) => setId !== fourSet && count === 2))
+}))
+
+const incompleteFreeStore = {
+    ...store,
+    driveDiscs: [
+        ...[1, 2, 3, 4, 5, 6].map(slot => disc(`free-f${slot}`, fourSet, slot, slotMain[slot], [
+            { stat: "critRate", value: 1.2, mode: "pct" },
+        ])),
+        disc("free-h5", twoSet, 5, slotMain[5], [
+            { stat: "critRate", value: 48, mode: "pct" },
+            { stat: "critDmg", value: 96, mode: "pct" },
+        ]),
+        disc("free-t6", thirdSet, 6, slotMain[6], [
+            { stat: "critRate", value: 48, mode: "pct" },
+            { stat: "critDmg", value: 96, mode: "pct" },
+        ]),
+    ],
+}
+const incompleteFree = optimizeDriveDiscs(catalog, incompleteFreeStore, optimizerInput())
+assert.equal(incompleteFree.results.length, 1)
+assert.ok(incompleteFree.results.every(result => result.driveDiscs.every(item => item.setId === fourSet)))
+assert.equal(incompleteFree.metrics.freeFourTwoPlanCount, 0)
+assert.equal(incompleteFree.metrics.freeSixPiecePlanCount, 1)
+
+const tooSmallFreeStore = {
+    ...store,
+    driveDiscs: [1, 2, 3, 4, 5].map(slot => disc(`small-f${slot}`, fourSet, slot, slotMain[slot])),
+}
+const tooSmallFree = optimizeDriveDiscs(catalog, tooSmallFreeStore, optimizerInput())
+assert.equal(tooSmallFree.results.length, 0)
+assert.equal(tooSmallFree.error.reason, "已有驱动盘太少，无法组成 4+2 或 6 件同套。")
+
+const impossibleMinimum = optimizeDriveDiscs(catalog, store, optimizerInput({
+    settings: { minimums: { critRate: 999 } },
+}))
+assert.equal(impossibleMinimum.results.length, 0)
+assert.equal(impossibleMinimum.error.reason, "没有符合限定条件和最小面板要求的驱动盘套装。")
 
 const customDamageInput = optimizerInput({
     damage: {
@@ -267,6 +326,13 @@ const customDamageNoPrune = optimizeDriveDiscs(catalog, store, {
         enableUpperBoundPruning: false,
     },
 })
+const customDamageGenericKernel = optimizeDriveDiscs(catalog, store, {
+    ...customDamageInput,
+    settings: {
+        ...customDamageInput.settings,
+        enableObjectiveScalarKernel: false,
+    },
+})
 const customDamageBrute = bruteForce(customDamageInput)
 assert.equal(customDamage.results[0].driveDiscs.map(item => item.id).join("|"), customDamageBrute[0].ids)
 assert.deepEqual(
@@ -279,6 +345,12 @@ assert.deepEqual(
 )
 assert.ok(Math.abs(customDamage.results[0].score - customDamage.results[0].data.damage.totalFinalDamage) < 1e-9)
 assert.ok(customDamage.results[0].data.damage.totalFinalDamage > customDamage.results[0].data.damage.finalDamage)
+assert.deepEqual(
+    customDamage.results.map(result => [result.driveDiscs.map(item => item.id).join("|"), result.score]),
+    customDamageGenericKernel.results.map(result => [result.driveDiscs.map(item => item.id).join("|"), result.score]),
+)
+assert.ok(customDamage.metrics.objectiveScalarCalls > 0, JSON.stringify(customDamage.metrics))
+assert.equal(customDamageGenericKernel.metrics.objectiveScalarCalls, 0)
 
 const groupedDamageAgent = catalog.agentsMap.get(exampleInput.agentId)
 const originalGroupedDamageSkillGroups = groupedDamageAgent.skillGroups
@@ -356,7 +428,9 @@ const anomalyObjective = optimizeDriveDiscs(catalog, store, optimizerInput({
     },
 }))
 assert.ok(anomalyObjective.results.length > 0)
-assert.equal(anomalyObjective.results[0].score, anomalyObjective.results[0].data.damage.totalFinalDamage)
+assert.ok(Math.abs(
+    anomalyObjective.results[0].score - anomalyObjective.results[0].data.damage.totalFinalDamage,
+) < 1e-9)
 
 const heuristic = optimizeDriveDiscs(catalog, store, optimizerInput({ settings: { algorithm: "heuristic-potential" } }))
 assert.equal(heuristic.metrics.algorithmId, "heuristic-potential")
@@ -374,6 +448,9 @@ assert.equal(parallel.metrics.strictExact, true)
 assert.equal(parallel.metrics.workerCount, 2)
 assert.ok(parallel.metrics.parallelTaskCount > 0)
 assert.equal(parallel.metrics.completedTaskCount, parallel.metrics.parallelTaskCount)
+assert.equal(parallel.metrics.freeTwoPieceAutoSetCount, exact.metrics.freeTwoPieceAutoSetCount)
+assert.equal(parallel.metrics.freeFourTwoPlanCount, exact.metrics.freeFourTwoPlanCount)
+assert.equal(parallel.metrics.freeSixPiecePlanCount, exact.metrics.freeSixPiecePlanCount)
 assert.deepEqual(
     parallel.results.map(result => Number(result.score.toFixed(6))),
     exact.results.map(result => Number(result.score.toFixed(6))),
@@ -420,7 +497,8 @@ const fangedZeroEffect = fangedManualZero.results[0].data.inCombat.activeEffects
     .find(item => item.key === `driveDisc4pc:${fangedSet}.self`)
 assert.ok(fangedAuto.results[0].score > fangedManualZero.results[0].score)
 assert.equal(fangedManualZero.settings.fourPieceBuffMode, "manual")
-assert.equal(fangedZeroEffect?.runtime?.coverage, 0)
+assert.equal(fangedZeroEffect?.runtime?.coverage, undefined)
+assert.equal(fangedZeroEffect?.runtime?.effects?.effect_03c221a712?.coverage, 0)
 assert.equal(fangedZeroEffect?.resolvedStats?.find(item => item.stat === "dmgBonus")?.value, 0)
 assert.deepEqual(resultIds(fangedManualZero), resultIds(fangedManualZeroLegacy))
 assert.deepEqual(resultScores(fangedManualZero), resultScores(fangedManualZeroLegacy))
@@ -557,8 +635,21 @@ assert.deepEqual(preview.metrics.candidateCountsBySlot, exact.metrics.candidateC
 
 const set22Input = optimizerInput({ settings: { twoPieceSetId: twoSet } })
 const set22 = optimizeDriveDiscs(catalog, store, set22Input)
+const set22GenericKernel = optimizeDriveDiscs(catalog, store, {
+    ...set22Input,
+    settings: {
+        ...set22Input.settings,
+        enableSpecializedScoreKernel: false,
+        enableSuffixFrontierCache: false,
+    },
+})
 const set22Brute = bruteForce(set22Input)
 assert.equal(set22.results[0].driveDiscs.map(item => item.id).join("|"), set22Brute[0].ids)
+assert.deepEqual(resultIds(set22), resultIds(set22GenericKernel))
+assert.deepEqual(resultScores(set22), resultScores(set22GenericKernel))
+assert.ok(Number(set22.metrics.specializedScorePlanCount ?? 0) > 0)
+assert.ok(Number(set22.metrics.specializedScoreCalls ?? 0) > 0)
+assert.ok(Number(set22.metrics.suffixFrontierRawCount ?? 0) >= Number(set22.metrics.suffixFrontierCompressedCount ?? 0))
 assert.equal(
     set22.results[0].data.outOfCombat.appliedEffects.filter(item => item.key.endsWith(".twoPiece")).length,
     2,
@@ -574,6 +665,11 @@ const multiTwoPiece = optimizeDriveDiscs(catalog, store, multiTwoPieceInput)
 const multiTwoPieceBrute = bruteForce(multiTwoPieceInput)
 assert.equal(multiTwoPiece.results[0].driveDiscs.map(item => item.id).join("|"), multiTwoPieceBrute[0].ids)
 assert.deepEqual(multiTwoPiece.settings.twoPieceSetIds, [twoSet, thirdSet])
+assert.equal(
+    multiTwoPiece.metrics.seedPlanCount,
+    Math.min(multiTwoPiece.metrics.enumerationPlanCount, 768),
+    "seed search should cover every eligible fixed-set plan before exact enumeration",
+)
 assert.ok(multiTwoPiece.results.every(result => {
     const counts = result.driveDiscs.reduce((map, item) => map.set(item.setId, (map.get(item.setId) ?? 0) + 1), new Map())
     return (counts.get(fourSet) ?? 0) >= 4
@@ -593,7 +689,73 @@ const limitedInput = optimizerInput({
 const limited = optimizeDriveDiscs(catalog, store, limitedInput)
 assert.ok(limited.results.length > 0)
 assert.ok(limited.results.every(result => result.driveDiscs.find(disc => disc.partition === 4).mainStat.stat === "critRate"))
-assert.ok(limited.results.every(result => result.data.inCombat.panel.critRate >= 0.5))
+assert.ok(limited.results.every(result => result.data.outOfCombat.panel.critRate >= 0.5))
+
+const panelConstraintStore = {
+    ...store,
+    driveDiscs: store.driveDiscs.filter(item => /^f[1-6]$/.test(item.id)),
+}
+const panelConstraintManualStats = [
+    { id: "constraint-atk", stat: "atkFlat", value: 1000, mode: "flat" },
+    { id: "constraint-proficiency", stat: "anomalyProficiency", value: 100, mode: "flat" },
+    { id: "constraint-crit-rate", stat: "critRate", value: 30, mode: "pct" },
+    { id: "constraint-crit-dmg", stat: "critDmg", value: 60, mode: "pct" },
+]
+const panelConstraintStats = ["atk", "anomalyProficiency", "critRate", "critDmg"]
+const panelConstraintAlgorithms = ["exact-super-bound", "heuristic-potential", "exact-legacy"]
+const displayMinimumValue = (stat, value) => ["critRate", "critDmg"].includes(stat) ? value * 100 : value
+const panelConstraintInput = (algorithm, minimums = {}) => optimizerInput({
+    combatBuffs: {
+        activeBuffIds: [],
+        manualStats: panelConstraintManualStats,
+    },
+    settings: {
+        algorithm,
+        minimums,
+    },
+})
+const panelConstraintBaseline = optimizeDriveDiscs(
+    catalog,
+    panelConstraintStore,
+    panelConstraintInput("exact-super-bound"),
+)
+assert.equal(panelConstraintBaseline.results.length, 1, "Panel constraint fixture should have one legal combination")
+const panelConstraintOutOfCombat = panelConstraintBaseline.results[0].data.outOfCombat.panel
+const panelConstraintInCombat = panelConstraintBaseline.results[0].data.inCombat.panel
+for (const stat of panelConstraintStats) {
+    assert.ok(
+        panelConstraintInCombat[stat] > panelConstraintOutOfCombat[stat],
+        `${stat} fixture should gain an in-combat-only bonus`,
+    )
+}
+const passingPanelMinimums = Object.fromEntries(panelConstraintStats.map(stat => [
+    stat,
+    displayMinimumValue(stat, panelConstraintOutOfCombat[stat]),
+]))
+for (const algorithm of panelConstraintAlgorithms) {
+    const passing = optimizeDriveDiscs(
+        catalog,
+        panelConstraintStore,
+        panelConstraintInput(algorithm, passingPanelMinimums),
+    )
+    assert.equal(passing.results.length, 1, `${algorithm} should accept all four exact out-of-combat panel minimums`)
+    for (const stat of panelConstraintStats) {
+        const inCombatOnlyMinimum = displayMinimumValue(
+            stat,
+            (panelConstraintOutOfCombat[stat] + panelConstraintInCombat[stat]) / 2,
+        )
+        const rejected = optimizeDriveDiscs(
+            catalog,
+            panelConstraintStore,
+            panelConstraintInput(algorithm, { [stat]: inCombatOnlyMinimum }),
+        )
+        assert.equal(
+            rejected.results.length,
+            0,
+            `${algorithm} ${stat} minimum should ignore in-combat-only bonuses`,
+        )
+    }
+}
 
 const preferredCatalog = {
     ...catalog,
@@ -654,6 +816,71 @@ assert.equal(
     1,
     "6 same-set discs should activate the 2-piece effect only once",
 )
+
+const aliceFourSet = "fanged_metal"
+const aliceTwoSet = "phaethons_melody"
+const aliceSlotMain = {
+    1: { stat: "hpFlat", value: 2200 },
+    2: { stat: "atkFlat", value: 316 },
+    3: { stat: "defFlat", value: 184 },
+    4: { stat: "anomalyProficiency", value: 92 },
+}
+const aliceStore = {
+    ...store,
+    driveDiscs: [
+        ...[1, 2, 3, 4].flatMap(slot => [
+            disc(`alice-ap-${slot}`, aliceFourSet, slot, aliceSlotMain[slot], [
+                { stat: "anomalyProficiency", value: 9 },
+            ]),
+            disc(`alice-atk-${slot}`, aliceFourSet, slot, aliceSlotMain[slot], [
+                { stat: "atkPct", value: 6, mode: "pct" },
+            ]),
+        ]),
+        disc("alice-physical-5", aliceTwoSet, 5, { stat: "physicalDmg", value: 30, mode: "pct" }),
+        disc("alice-mastery-6", aliceTwoSet, 6, { stat: "anomalyMastery", value: 30, mode: "pct" }),
+        disc("alice-atk-6", aliceTwoSet, 6, { stat: "atkPct", value: 30, mode: "pct" }),
+    ],
+}
+const aliceOptimizerInput = {
+    agentId: "alice_thymefield",
+    coreSkillLevel: "F",
+    wEngineId: "tenfold_starforge",
+    wEngineModificationLevel: 1,
+    combatBuffs: {
+        activeBuffIds: [
+            "agent:alice_thymefield.corePassive",
+            "agent:alice_thymefield.additionalAbility",
+        ],
+    },
+    damage: catalog.agentsMap.get("alice_thymefield").defaultCalculationConfig,
+    settings: {
+        objective: "damage",
+        fourPieceSetId: aliceFourSet,
+        twoPieceSetId: aliceTwoSet,
+        mainStatLimits: {
+            6: ["anomalyMastery", "atkPct"],
+        },
+        algorithm: "exact-super-bound",
+    },
+}
+const aliceExact = optimizeDriveDiscs(catalog, aliceStore, aliceOptimizerInput)
+const aliceLegacy = optimizeDriveDiscs(catalog, aliceStore, {
+    ...aliceOptimizerInput,
+    settings: {
+        ...aliceOptimizerInput.settings,
+        algorithm: "exact-legacy",
+    },
+})
+assert.equal(aliceExact.results.length, 10, "Alice strict optimizer fixture should return a full Top 10")
+assert.deepEqual(resultIds(aliceExact), resultIds(aliceLegacy), "Alice strict and legacy Top 10 IDs should match")
+assert.deepEqual(resultScores(aliceExact), resultScores(aliceLegacy), "Alice strict and legacy Top 10 scores should match")
+assert.equal(
+    aliceExact.results[0].driveDiscs.find(item => Number(item.partition) === 6)?.mainStat?.stat,
+    "anomalyMastery",
+    "Corrected mastery scaling should let Alice select the mastery slot 6 when it scores higher",
+)
+assert.equal(aliceExact.results[0].data.outOfCombat.panel.anomalyMastery, 195.96)
+assert.equal(aliceExact.results[0].data.outOfCombat.bonusTotals.anomalyMasteryPct, 0.38)
 
 const noResult = optimizeDriveDiscs(catalog, store, optimizerInput({ settings: { fourPieceSetId: "shadow_harmony" } }))
 assert.equal(noResult.results.length, 0)

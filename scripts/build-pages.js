@@ -18,12 +18,43 @@ const scannerManifestSource = JSON.parse(await readFile(
     path.join(rootDir, "config", "scanner-manifest.json"),
     "utf8",
 ))
+const helperManifestSource = JSON.parse(await readFile(
+    path.join(rootDir, "config", "helper-manifest.json"),
+    "utf8",
+))
 const scannerVersion = String(scannerManifestSource.scannerVersion)
-const scannerPagesPackageUrl = String(scannerManifestSource.packageUrl)
-const scannerGitHubPackageUrl = scannerManifestSource.packageUrls.find(url => /^https:\/\//i.test(url))
-const scannerZipName = path.posix.basename(new URL(scannerGitHubPackageUrl).pathname)
-const scannerPackageSha256 = String(scannerManifestSource.sha256)
-const scannerPackageSize = Number(scannerManifestSource.size)
+const scannerPackages = (scannerManifestSource.packages ?? []).map(packageInfo => {
+    const packageUrls = Array.isArray(packageInfo.packageUrls) ? packageInfo.packageUrls : []
+    const pagesUrl = packageUrls.find(url => String(url).startsWith("./"))
+    const githubUrl = packageUrls.find(url => /^https:\/\//i.test(url))
+    if (!pagesUrl || !githubUrl) {
+        throw new Error(`Scanner package ${packageInfo.id} must define local and HTTPS package URLs.`)
+    }
+    return {
+        ...packageInfo,
+        id: String(packageInfo.id),
+        pagesUrl: String(pagesUrl),
+        githubUrl: String(githubUrl),
+        zipName: path.posix.basename(new URL(githubUrl).pathname),
+        sha256: String(packageInfo.sha256),
+        size: Number(packageInfo.size),
+    }
+})
+if (scannerManifestSource.schemaVersion !== 3 || scannerPackages.length !== 2) {
+    throw new Error("Scanner manifest must use schema 3 and contain exactly two packages.")
+}
+for (const packageInfo of scannerPackages) {
+    if (!Array.isArray(packageInfo.files) || packageInfo.files.length === 0) {
+        throw new Error(`Scanner package ${packageInfo.id} must contain a file manifest.`)
+    }
+    const fileBytes = packageInfo.files.reduce((sum, file) => sum + Number(file.size), 0)
+    if (fileBytes !== Number(packageInfo.expandedSize)) {
+        throw new Error(`Scanner package ${packageInfo.id} file manifest size mismatch.`)
+    }
+}
+if (helperManifestSource.schemaVersion !== 1 || helperManifestSource.version !== "1.2.1") {
+    throw new Error("Helper manifest must use schema 1 and publish Helper 1.2.1.")
+}
 
 function run(command, args, cwd, extraEnv = {}) {
     return new Promise((resolve, reject) => {
@@ -72,30 +103,32 @@ async function downloadFile(url, destination) {
     await pipeline(Readable.fromWeb(response.body), createWriteStream(destination))
 }
 
-async function verifyScannerPackage(filePath) {
+async function verifyScannerPackage(filePath, packageInfo) {
     const packageStat = await stat(filePath)
-    if (packageStat.size !== scannerPackageSize) {
-        throw new Error(`Scanner package size mismatch. Expected ${scannerPackageSize}, got ${packageStat.size}.`)
+    if (packageStat.size !== packageInfo.size) {
+        throw new Error(`Scanner package ${packageInfo.id} size mismatch. Expected ${packageInfo.size}, got ${packageStat.size}.`)
     }
 
     const actualHash = await sha256File(filePath)
-    if (actualHash !== scannerPackageSha256) {
-        throw new Error(`Scanner package sha256 mismatch. Expected ${scannerPackageSha256}, got ${actualHash}.`)
+    if (actualHash !== packageInfo.sha256) {
+        throw new Error(`Scanner package ${packageInfo.id} sha256 mismatch. Expected ${packageInfo.sha256}, got ${actualHash}.`)
     }
 }
 
-async function ensurePagesScannerPackage() {
-    const localPackagePath = path.join(rootDir, "downloads", "zzz-scanner", scannerVersion, scannerZipName)
-    const pagesPackagePath = path.join(outDir, "downloads", "zzz-scanner", scannerVersion, scannerZipName)
-    await mkdir(path.dirname(pagesPackagePath), { recursive: true })
+async function ensurePagesScannerPackages() {
+    for (const packageInfo of scannerPackages) {
+        const localPackagePath = path.join(rootDir, "downloads", "zzz-scanner", scannerVersion, packageInfo.zipName)
+        const pagesPackagePath = path.join(outDir, "downloads", "zzz-scanner", scannerVersion, packageInfo.zipName)
+        await mkdir(path.dirname(pagesPackagePath), { recursive: true })
 
-    if (existsSync(localPackagePath)) {
-        await copyFile(localPackagePath, pagesPackagePath)
-    } else {
-        await downloadFile(scannerGitHubPackageUrl, pagesPackagePath)
+        if (existsSync(localPackagePath)) {
+            await copyFile(localPackagePath, pagesPackagePath)
+        } else {
+            await downloadFile(packageInfo.githubUrl, pagesPackagePath)
+        }
+
+        await verifyScannerPackage(pagesPackagePath, packageInfo)
     }
-
-    await verifyScannerPackage(pagesPackagePath)
 }
 
 function assertArtifact(condition, message) {
@@ -130,21 +163,41 @@ async function verifyPagesArtifact(maintenanceEnabled) {
         "calculate.html",
         "drive-discs.html",
         "accounts.html",
+        "settings.html",
         "static/catalog.json",
         "static/app-config.json",
-        `downloads/zzz-scanner/${scannerVersion}/${scannerZipName}`,
         "downloads/zzz-scanner/manifest.json",
+        "downloads/zzz-scanner/helper-manifest.json",
     ]) {
         assertArtifact(paths.has(requiredPath), `missing ${requiredPath}`)
+    }
+    for (const packageInfo of scannerPackages) {
+        assertArtifact(
+            paths.has(`downloads/zzz-scanner/${scannerVersion}/${packageInfo.zipName}`),
+            `missing scanner package ${packageInfo.id}`,
+        )
     }
 
     const appConfig = JSON.parse(await readFile(path.join(outDir, "static", "app-config.json"), "utf8"))
     const manifest = JSON.parse(await readFile(path.join(outDir, "downloads", "zzz-scanner", "manifest.json"), "utf8"))
     assertArtifact(appConfig.maintenanceEnabled === maintenanceEnabled, "app-config maintenance flag mismatch")
+    assertArtifact(manifest.schemaVersion === 3, "scanner manifest schema mismatch")
     assertArtifact(manifest.scannerVersion === scannerVersion, "scanner version mismatch")
-    assertArtifact(manifest.sha256 === scannerPackageSha256, "scanner manifest SHA-256 mismatch")
-    assertArtifact(manifest.size === scannerPackageSize, "scanner manifest size mismatch")
-    await verifyScannerPackage(path.join(outDir, "downloads", "zzz-scanner", scannerVersion, scannerZipName))
+    assertArtifact(Array.isArray(manifest.packages) && manifest.packages.length === scannerPackages.length, "scanner package count mismatch")
+    for (const packageInfo of scannerPackages) {
+        const emitted = manifest.packages.find(candidate => candidate.id === packageInfo.id)
+        assertArtifact(Boolean(emitted), `scanner package ${packageInfo.id} missing from manifest`)
+        assertArtifact(emitted.sha256 === packageInfo.sha256, `scanner package ${packageInfo.id} SHA-256 mismatch`)
+        assertArtifact(emitted.size === packageInfo.size, `scanner package ${packageInfo.id} size mismatch`)
+        assertArtifact(Array.isArray(emitted.files) && emitted.files.length === packageInfo.files.length, `scanner package ${packageInfo.id} file manifest mismatch`)
+        await verifyScannerPackage(
+            path.join(outDir, "downloads", "zzz-scanner", scannerVersion, packageInfo.zipName),
+            packageInfo,
+        )
+    }
+    const helperManifest = JSON.parse(await readFile(path.join(outDir, "downloads", "zzz-scanner", "helper-manifest.json"), "utf8"))
+    assertArtifact(helperManifest.version === helperManifestSource.version, "Helper manifest version mismatch")
+    assertArtifact(helperManifest.sha256 === helperManifestSource.sha256, "Helper manifest SHA-256 mismatch")
 
     for (const [fileName, target] of [
         ["calculate.html", "/"],
@@ -201,25 +254,30 @@ function envFlag(name) {
 }
 
 const maintenanceEnabled = envFlag("MAINTENANCE_ENABLED") === true
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm"
-await run(npmCommand, ["run", "build"], webappDir, {
-    VITE_INCLUDE_MAINTENANCE: String(maintenanceEnabled),
-})
+const skipWebappBuild = envFlag("SKIP_WEBAPP_BUILD") === true
+if (!skipWebappBuild) {
+    const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm"
+    await run(npmCommand, ["run", "build"], webappDir, {
+        VITE_INCLUDE_MAINTENANCE: String(maintenanceEnabled),
+    })
+}
 
 const catalog = await loadCalculatorContext(rootDir)
 await writeJson(path.join(outDir, "static", "catalog.json"), catalog)
 await writeJson(path.join(outDir, "static", "app-config.json"), {
     maintenanceEnabled,
 })
-await ensurePagesScannerPackage()
+await ensurePagesScannerPackages()
 
 await writeJson(path.join(outDir, "downloads", "zzz-scanner", "manifest.json"), scannerManifestSource)
+await writeJson(path.join(outDir, "downloads", "zzz-scanner", "helper-manifest.json"), helperManifestSource)
 
 await writeFile(path.join(outDir, "CNAME"), "zzzcaculator.top\n", "utf8")
 await copyFile(path.join(outDir, "index.html"), path.join(outDir, "404.html"))
 await writeFile(path.join(outDir, "calculate.html"), legacyRedirect("返回计算工作台", "/"), "utf8")
 await writeFile(path.join(outDir, "drive-discs.html"), legacyRedirect("前往驱动盘仓库", "/discs"), "utf8")
 await writeFile(path.join(outDir, "accounts.html"), legacyRedirect("前往账号页", "/accounts"), "utf8")
+await writeFile(path.join(outDir, "settings.html"), legacyRedirect("前往设置页", "/settings"), "utf8")
 
 if (maintenanceEnabled) {
     await writeFile(path.join(outDir, "maintenance.html"), legacyRedirect("前往维护页", "/maintenance"), "utf8")

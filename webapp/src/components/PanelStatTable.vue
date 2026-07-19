@@ -41,6 +41,13 @@ const baseKeys = [
 const keys = computed(() => props.includeSheerForce
   ? ["hp", "atk", "sheerForce", ...baseKeys.slice(2)]
   : baseKeys)
+
+function formatPanelValue(key: string, value: number): string {
+  if (key === "anomalyMastery") {
+    return formatNumber(Math.trunc(value), 0)
+  }
+  return percentStats.has(key) ? formatPercent(value) : formatNumber(value, key === "atk" ? 0 : 1)
+}
 </script>
 
 <template>
@@ -49,7 +56,7 @@ const keys = computed(() => props.includeSheerForce
       <tr v-for="key in keys" :key="key">
         <th>{{ statLabel(key, meta) }}</th>
         <td class="num">
-          {{ percentStats.has(key) ? formatPercent(panel?.[key] ?? 0) : formatNumber(panel?.[key] ?? 0, key === "atk" ? 0 : 1) }}
+          {{ formatPanelValue(key, panel?.[key] ?? 0) }}
         </td>
       </tr>
     </tbody>

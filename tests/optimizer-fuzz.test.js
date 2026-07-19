@@ -355,7 +355,13 @@ for (let seed = 1; seed <= FUZZ_SEEDS; seed += 1) {
 
 const chunkStore = chunkBoundStore()
 const chunkLegacy = optimizeDriveDiscs(catalog, chunkStore, optimizerInput("chunk", 0, "exact-legacy", chunkStore))
-const chunkSuperBound = optimizeDriveDiscs(catalog, chunkStore, optimizerInput("chunk", 0, "exact-super-bound", chunkStore))
+const chunkSuperBound = optimizeDriveDiscs(catalog, chunkStore, optimizerInput(
+    "chunk",
+    0,
+    "exact-super-bound",
+    chunkStore,
+    { enableObjectiveRelevantDominance: false },
+))
 assert.equal(chunkSuperBound.metrics.strictExact, true)
 assertSameTop("chunk", 0, chunkLegacy, chunkSuperBound)
 assert.ok(Number(chunkSuperBound.metrics.chunkBoundChecks ?? 0) > 0, "chunk bound fixture should exercise chunk checks")

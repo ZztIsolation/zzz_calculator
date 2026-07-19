@@ -12,8 +12,12 @@ export const useCatalogStore = defineStore("catalog", {
   }),
   getters: {
     agents: state => state.meta?.agents ?? [],
+    displayAgents: state => state.meta?.displayAgents ?? state.catalog?.displayAgents ?? state.meta?.agents ?? [],
+    displayAgentSkills: state => state.meta?.displayAgentSkills ?? state.meta?.agentSkills ?? [],
     wEngines: state => state.meta?.wEngines ?? [],
+    displayWEngines: state => state.meta?.displayWEngines ?? state.catalog?.displayWEngines ?? state.meta?.wEngines ?? [],
     driveDiscSets: state => state.catalog?.driveDiscSets ?? [],
+    displayDriveDiscSets: state => state.meta?.displayDriveDiscSets ?? state.catalog?.displayDriveDiscSets ?? state.catalog?.driveDiscSets ?? [],
     combatBuffs: state => state.meta?.combatBuffs ?? [],
     iconAudit: state => auditIconCoverage(state.meta),
   },

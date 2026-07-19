@@ -40,6 +40,7 @@ const preferredCatalog = {
   driveDiscSets: [
     { id: "woodpecker_electro" },
     { id: "fanged_metal" },
+    { id: "swing_jazz" },
   ],
 }
 const preferredAgentA = {
@@ -84,6 +85,7 @@ describe("optimizer store", () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    useOptimizerStore().disposeRuntime()
     if (originalWorker) {
       vi.stubGlobal("Worker", originalWorker)
     } else {
@@ -130,7 +132,7 @@ describe("optimizer store", () => {
 
   it("persists optimizer constraints and exposes them in worker input", () => {
     const store = useOptimizerStore()
-    store.initialize({ driveDiscSets: [{ id: "woodpecker_electro" }] })
+    store.initialize({ driveDiscSets: [{ id: "woodpecker_electro" }, { id: "swing_jazz" }] })
     store.setAlgorithm("heuristic-potential")
     store.setFourPieceSet("woodpecker_electro")
     store.setTwoPieceSetIds(["swing_jazz"])
@@ -148,6 +150,49 @@ describe("optimizer store", () => {
     expect(input.settings.fourPieceBuffMode).toBe("manual")
     expect(input.ownerId).toBe("default")
     expect(input.settings.ownerId).toBe("default")
+  })
+
+  it("drops saved hidden optimizer sets and falls back to the first visible set", () => {
+    localStorage.setItem("zzz-calculator.webapp.optimizer.v1", JSON.stringify({
+      fourPieceSetId: "hidden_set",
+      fourPieceSetSource: "manual",
+      twoPieceSetIds: ["hidden_set", "visible_two_piece"],
+    }))
+    const store = useOptimizerStore()
+    const visibilityCatalog = {
+      driveDiscSets: [
+        { id: "hidden_set" },
+        { id: "visible_four_piece" },
+        { id: "visible_two_piece" },
+      ],
+      displayDriveDiscSets: [
+        { id: "visible_four_piece" },
+        { id: "visible_two_piece" },
+      ],
+    }
+
+    store.initialize(visibilityCatalog, {
+      id: "agent_a",
+      preferredDriveDiscs: { defaultSetId: "hidden_set" },
+    })
+
+    expect(store.fourPieceSetId).toBe("visible_four_piece")
+    expect(store.fourPieceSetSource).toBe("preferred")
+    expect(store.twoPieceSetIds).toEqual(["visible_two_piece"])
+  })
+
+  it("keeps optimizer set selections empty when no sets are visible", () => {
+    const store = useOptimizerStore()
+    store.initialize({
+      driveDiscSets: [{ id: "hidden_set" }],
+      displayDriveDiscSets: [],
+    }, {
+      id: "agent_a",
+      preferredDriveDiscs: { defaultSetId: "hidden_set" },
+    })
+
+    expect(store.fourPieceSetId).toBe("")
+    expect(store.twoPieceSetIds).toEqual([])
   })
 
   it("uses the active agent preferred four-piece drive-disc set by default", () => {
@@ -197,7 +242,7 @@ describe("optimizer store", () => {
     expect(store.fourPieceBuffMode).toBe("auto")
     expect(store.fourPieceBuffRuntimeInputs).toEqual({})
     expect(store.mainStatLimits).toEqual({ "4": [], "5": [], "6": [] })
-    expect(store.minimums).toMatchObject({ critRate: null, critDmg: null })
+    expect(store.minimums).toEqual({})
 
     store.setAlgorithm("exact-legacy")
     store.setTwoPieceSetIds(["fanged_metal"])
@@ -245,13 +290,70 @@ describe("optimizer store", () => {
     expect(store.fourPieceSetId).toBe("fanged_metal")
     expect(store.twoPieceSetIds).toEqual([])
     expect(store.mainStatLimits).toEqual({ "4": [], "5": [], "6": [] })
-    expect(store.minimums.critRate).toBe(null)
+    expect(store.minimums).toEqual({})
 
     const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer.v1") || "{}")
     expect(saved.version).toBe(2)
     expect(saved.currentAgentId).toBe("agent_b")
     expect(saved.byAgent.agent_a.twoPieceSetIds).toEqual(["swing_jazz"])
     expect(saved.byAgent.agent_b.twoPieceSetIds).toEqual([])
+  })
+
+  it("drops removed fields and legacy defaults while preserving custom minimums", () => {
+    localStorage.setItem("zzz-calculator.webapp.optimizer.v1", JSON.stringify({
+      version: 2,
+      currentAgentId: "agent_a",
+      byAgent: {
+        agent_a: {
+          fourPieceSetId: "woodpecker_electro",
+          fourPieceSetSource: "manual",
+          minimumDefaultsVersion: 1,
+          minimums: { atk: 2500, anomalyProficiency: 250, critRate: 50, critDmg: 160, energyRegen: 140 },
+        },
+      },
+    }))
+    const store = useOptimizerStore()
+
+    store.initialize(preferredCatalog, preferredAgentA)
+
+    expect(store.minimums).toEqual({ critRate: 50 })
+    expect(store.minimums).not.toHaveProperty("energyRegen")
+    store.setMinimum("energyRegen", 160)
+    expect(store.minimums).not.toHaveProperty("energyRegen")
+    const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer.v1") || "{}")
+    expect(saved.byAgent.agent_a.minimums).not.toHaveProperty("energyRegen")
+    expect(saved.byAgent.agent_a.minimumDefaultsVersion).toBe(2)
+    expect(saved.byAgent.agent_a.minimums).toEqual({ critRate: 50 })
+
+    store.setMinimum("atk", null)
+    setActivePinia(createPinia())
+    const reloaded = useOptimizerStore()
+    reloaded.initialize(preferredCatalog, preferredAgentA)
+    expect(reloaded.minimums.atk).toBe(null)
+    expect(reloaded.minimums).not.toHaveProperty("anomalyProficiency")
+  })
+
+  it("silently migrates the removed browser parallel algorithm to strict serial exact", () => {
+    localStorage.setItem("zzz-calculator.webapp.optimizer.v1", JSON.stringify({
+      version: 2,
+      currentAgentId: "agent_a",
+      byAgent: {
+        agent_a: {
+          algorithm: "exact-super-bound-parallel",
+          fourPieceSetId: "woodpecker_electro",
+          fourPieceSetSource: "manual",
+          twoPieceSetIds: ["swing_jazz"],
+        },
+      },
+    }))
+    const store = useOptimizerStore()
+
+    store.initialize(preferredCatalog, preferredAgentA)
+
+    expect(store.algorithm).toBe("exact-super-bound")
+    expect(store.inputWithSettings({ agentId: "agent_a" }).settings.algorithm).toBe("exact-super-bound")
+    const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer.v1") || "{}")
+    expect(saved.byAgent.agent_a.algorithm).toBe("exact-super-bound")
   })
 
   it("applies advanced settings in one payload without changing worker input shape", () => {
@@ -345,7 +447,59 @@ describe("optimizer store", () => {
         "driveDisc4pc:woodpecker_electro.self": { coverage: 0.5 },
       },
     })
-    expect(worker.terminated).toBe(true)
+    expect(worker.terminated).toBe(false)
+  })
+
+  it("reuses one worker and transfers an unchanged catalog only once", async () => {
+    const store = useOptimizerStore()
+    store.initialize(catalog)
+
+    const firstRun = store.run(catalog, inventoryStore(), optimizerInput())
+    const worker = MockWorker.instances[0]
+    const firstMessage = worker.messages[0]
+    expect(firstMessage.catalog).toEqual(catalog)
+    worker.emit({
+      type: "complete",
+      runId: firstMessage.runId,
+      result: {
+        settings: { ownerId: "default" },
+        metrics: { estimatedCombinationCount: 1, processedCombinationCount: 1 },
+        results: [{ rank: 1, score: 1, driveDiscs: [] }],
+      },
+    })
+    await firstRun
+
+    const secondRun = store.run(catalog, inventoryStore(), optimizerInput())
+    const secondMessage = worker.messages[1]
+    expect(MockWorker.instances).toHaveLength(1)
+    expect(secondMessage.catalog).toBeUndefined()
+    worker.emit({
+      type: "complete",
+      runId: secondMessage.runId,
+      result: {
+        settings: { ownerId: "default" },
+        metrics: { estimatedCombinationCount: 1, processedCombinationCount: 1 },
+        results: [{ rank: 1, score: 1, driveDiscs: [] }],
+      },
+    })
+    await secondRun
+    expect(worker.terminated).toBe(false)
+  })
+
+  it("creates a fresh worker and retransfers catalog after cancellation", async () => {
+    const store = useOptimizerStore()
+    store.initialize(catalog)
+
+    const firstRun = store.run(catalog, inventoryStore(), optimizerInput())
+    store.cancel()
+    await firstRun
+
+    const secondRun = store.run(catalog, inventoryStore(), optimizerInput())
+    const secondWorker = MockWorker.instances[1]
+    expect(MockWorker.instances).toHaveLength(2)
+    expect(secondWorker.messages[0].catalog).toEqual(catalog)
+    store.cancel()
+    await secondRun
   })
 
   it("keeps preparation stage progress visible before enumeration starts", async () => {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue"
 import { NButton, NCheckbox, NDrawer, NDrawerContent, NInput, NInputNumber, NModal, NProgress, NSelect, NSpin, NTab, NTabs, NTag, useMessage } from "naive-ui"
-import { Download, FileText, Plus, Radar, Trash2, Upload } from "lucide-vue-next"
+import { Download, FileText, Plus, Radar, RefreshCw, Upload } from "lucide-vue-next"
 import ConfirmDialog from "@/components/ConfirmDialog.vue"
 import ImageAvatar from "@/components/ImageAvatar.vue"
 import ScannerErrorState from "@/components/ScannerErrorState.vue"
@@ -13,6 +13,25 @@ import { useInventoryStore } from "@/stores/inventory"
 const catalogStore = useCatalogStore()
 const inventoryStore = useInventoryStore()
 const message = useMessage()
+
+const SUB_STAT_LABELS: Record<string, string> = {
+  hpFlat: "小生命（固定生命值）",
+  atkFlat: "小攻击（固定攻击力）",
+  defFlat: "小防御（固定防御力）",
+  hpPct: "大生命（生命值%）",
+  atkPct: "大攻击（攻击力%）",
+  defPct: "大防御（防御力%）",
+  critRate: "暴击率",
+  critDmg: "暴击伤害",
+  anomalyProficiency: "异常精通",
+  penFlat: "穿透值",
+}
+const PERCENT_SUB_STATS = new Set(["hpPct", "atkPct", "defPct", "critRate", "critDmg"])
+const ROLL_COUNT_OPTIONS = Array.from({ length: 6 }, (_, index) => ({
+  label: `${index + 1} 个词条`,
+  value: index + 1,
+}))
+const ROLL_EPSILON = 1e-6
 
 const selectedDisc = ref<any | null>(null)
 const showDiscEditor = ref(false)
@@ -62,9 +81,18 @@ function confirmDangerScan() {
   inventoryStore.startScan()
 }
 
-function handleScannerError() {
+async function handleScannerError() {
   const variant = inventoryStore.scanErrorVariant
-  if (variant === "helper-missing" || variant === "helper-outdated") {
+  if (variant === "helper-outdated") {
+    if (inventoryStore.scanHelperCanSelfUpdate) {
+      await inventoryStore.retryHelperUpgrade()
+      return
+    }
+    window.open(inventoryStore.scanHelperDownloadUrl, "_blank")
+    inventoryStore.waitForManualHelperUpgrade()
+    return
+  }
+  if (variant === "helper-missing") {
     window.open(inventoryStore.scanHelperDownloadUrl, "_blank")
     return
   }
@@ -76,7 +104,26 @@ function handleScannerError() {
 }
 
 function handleScannerErrorSecondary() {
+  if (inventoryStore.scanErrorVariant === "helper-outdated" && inventoryStore.scanHelperCanSelfUpdate) {
+    window.open(inventoryStore.scanHelperDownloadUrl, "_blank")
+    inventoryStore.waitForManualHelperUpgrade()
+    return
+  }
   inventoryStore.connectScanner()
+}
+
+async function handleScannerDiagnosticAction(kind: string) {
+  if (kind === "copy_diagnostics") {
+    await inventoryStore.handleScannerFailureAction(kind)
+    try {
+      await navigator.clipboard.writeText(inventoryStore.scannerDiagnosticText())
+      message.success("诊断信息已复制")
+    } catch {
+      message.error("浏览器无法复制诊断信息，请打开日志目录查看")
+    }
+    return
+  }
+  await inventoryStore.handleScannerFailureAction(kind)
 }
 
 const slotTabs = computed(() => [
@@ -93,6 +140,11 @@ const agentOptions = computed(() => catalogStore.agents.map((agent: any) => ({ l
 const statOptions = computed(() => Object.entries(catalogStore.meta?.statRules?.statDisplay ?? {})
   .map(([value]) => ({ label: statLabel(value, catalogStore.meta), value }))
   .sort((left, right) => left.label.localeCompare(right.label, "zh-CN")))
+const subStatSteps = computed<Record<string, number>>(() => catalogStore.meta?.statRules?.driveDisc?.sRankSubStatBaseStep ?? {})
+const allowedSubStatKeys = computed<string[]>(() => {
+  const pool = catalogStore.meta?.statRules?.driveDisc?.subStatPool ?? []
+  return pool.filter((stat: string) => Number(subStatSteps.value[stat]) > 0 && SUB_STAT_LABELS[stat])
+})
 const mainStatOptions = computed(() => {
   const slot = String(discDraft.value.partition ?? 1)
   const pool = catalogStore.meta?.statRules?.driveDisc?.mainStatPools?.[slot] ?? statOptions.value.map(item => item.value)
@@ -101,6 +153,11 @@ const mainStatOptions = computed(() => {
 const loadoutDeleteTarget = computed(() => inventoryStore.loadouts.find((item: any) => item.id === deleteLoadoutId.value))
 const loadoutMissingSlots = computed(() => [1, 2, 3, 4, 5, 6]
   .filter(slot => !loadoutDraft.value.driveDiscIdsBySlot?.[String(slot)]))
+const discEditorValidationMessage = computed(() => validateDiscDraft())
+const discDraftStoragePreview = computed(() => ({
+  ...discDraft.value,
+  subStats: (discDraft.value.subStats ?? []).map((item: any) => storedSubStat(item)),
+}))
 
 function mainStatText(disc: any) {
   const main = disc?.mainStat ?? {}
@@ -174,25 +231,141 @@ function defaultMainStatValue(stat: string) {
   return defaults[stat] ?? 30
 }
 
+function subStatStep(stat: string) {
+  const step = Number(subStatSteps.value[stat] ?? 0)
+  return Number.isFinite(step) && step > 0 ? step : 0
+}
+
+function subStatValue(stat: string, rolls: unknown) {
+  const value = subStatStep(stat) * Number(rolls)
+  return Number.isFinite(value) ? Number(value.toFixed(6)) : 0
+}
+
+function inferredRollCount(item: any) {
+  const step = subStatStep(String(item?.stat ?? ""))
+  const value = Number(item?.value)
+  if (!step || !Number.isFinite(value)) {
+    return null
+  }
+  const rolls = value / step
+  const integerRolls = Math.round(rolls)
+  if (Math.abs(rolls - integerRolls) > ROLL_EPSILON || integerRolls < 1 || integerRolls > 6) {
+    return null
+  }
+  return integerRolls
+}
+
+function editorSubStat(item: any) {
+  return {
+    ...item,
+    rolls: inferredRollCount(item),
+  }
+}
+
+function emptyEditorSubStat() {
+  return { stat: "", value: 0, rolls: 1 }
+}
+
+function fixedEditorSubStats(items: any[] = []) {
+  return [
+    ...items.slice(0, 4).map((item: any) => editorSubStat(item)),
+    ...Array.from({ length: 4 }, () => emptyEditorSubStat()),
+  ].slice(0, 4)
+}
+
+function storedSubStat(item: any) {
+  const stat = String(item?.stat ?? "")
+  const rollCount = Number(item?.rolls)
+  if (!Number.isInteger(rollCount) || rollCount < 1 || rollCount > 6) {
+    return { stat, value: item?.value }
+  }
+  return {
+    stat,
+    value: subStatValue(stat, rollCount),
+  }
+}
+
+function subStatOptionsForRow(index: number) {
+  const current = String(discDraft.value.subStats?.[index]?.stat ?? "")
+  const selectedElsewhere = new Set((discDraft.value.subStats ?? [])
+    .filter((_: any, itemIndex: number) => itemIndex !== index)
+    .map((item: any) => String(item?.stat ?? ""))
+    .filter(Boolean))
+  const mainStat = String(discDraft.value.mainStat?.stat ?? "")
+  return allowedSubStatKeys.value
+    .filter(stat => stat === current || (!selectedElsewhere.has(stat) && stat !== mainStat))
+    .map(stat => ({ label: SUB_STAT_LABELS[stat], value: stat }))
+}
+
+function updateSubStatType(index: number, stat: string) {
+  const item = discDraft.value.subStats[index]
+  const rolls = Number(item?.rolls)
+  item.stat = stat
+  item.rolls = Number.isInteger(rolls) && rolls >= 1 && rolls <= 6 ? rolls : 1
+  item.value = subStatValue(stat, item.rolls)
+}
+
+function updateSubStatRolls(index: number, rolls: number | string) {
+  const item = discDraft.value.subStats[index]
+  item.rolls = Number(rolls)
+  item.value = subStatValue(String(item?.stat ?? ""), item.rolls)
+}
+
+function formattedSubStatValue(item: any) {
+  if (!item?.stat || !Number.isInteger(Number(item?.rolls))) {
+    return "待选择"
+  }
+  const value = subStatValue(item.stat, item.rolls)
+  return PERCENT_SUB_STATS.has(item.stat) ? `${value}%` : String(value)
+}
+
+function validateDiscDraft() {
+  if (!showDiscEditor.value) {
+    return ""
+  }
+  if (String(discDraft.value.rarity ?? "S") !== "S") {
+    return "手动编辑仅支持 S 级驱动盘；当前导入记录会保持原样。"
+  }
+  const subStats = discDraft.value.subStats ?? []
+  if (subStats.length !== 4) {
+    return "请为四个副词条分别选择属性。"
+  }
+  const seen = new Set<string>()
+  for (const item of subStats) {
+    const stat = String(item?.stat ?? "")
+    if (!stat) {
+      return "请为四个副词条分别选择属性。"
+    }
+    if (!allowedSubStatKeys.value.includes(stat)) {
+      return "请选择合法的驱动盘副词条。"
+    }
+    if (stat === String(discDraft.value.mainStat?.stat ?? "")) {
+      return "副词条不能与主词条相同。"
+    }
+    if (seen.has(stat)) {
+      return "同一种副词条不能重复选择。"
+    }
+    seen.add(stat)
+    const rolls = Number(item?.rolls)
+    if (!Number.isInteger(rolls) || rolls < 1 || rolls > 6) {
+      return `${SUB_STAT_LABELS[stat]}的现有数值无法精确换算为 1～6 个词条，请重新选择词条数。`
+    }
+  }
+  return ""
+}
+
 function openNewDisc() {
   selectedDisc.value = null
   const stat = defaultMainStatForSlot(1)
   discDraft.value = {
-    id: `disc-${Date.now()}`,
     setId: catalogStore.driveDiscSets[0]?.id ?? "woodpecker_electro",
     partition: 1,
     rarity: "S",
     level: 15,
     maxLevel: 15,
     mainStat: { stat, value: defaultMainStatValue(stat) },
-    subStats: [
-      { stat: "critRate", value: 0 },
-      { stat: "critDmg", value: 0 },
-      { stat: "atkPct", value: 0 },
-      { stat: "anomalyProficiency", value: 0 },
-    ],
+    subStats: fixedEditorSubStats(),
     locked: false,
-    equippedBy: "",
   }
   showDiscEditor.value = true
 }
@@ -200,30 +373,26 @@ function openNewDisc() {
 function openEditDisc(disc: any) {
   selectedDisc.value = disc
   discDraft.value = JSON.parse(JSON.stringify(disc))
-  discDraft.value.subStats = [...(discDraft.value.subStats ?? []), {}, {}, {}, {}].slice(0, 4)
+  discDraft.value.subStats = fixedEditorSubStats(discDraft.value.subStats ?? [])
   showDiscEditor.value = true
 }
 
 async function saveDisc() {
+  const validationMessage = validateDiscDraft()
+  if (validationMessage) {
+    message.error(validationMessage)
+    return
+  }
   const set = catalogStore.driveDiscSets.find((item: any) => item.id === discDraft.value.setId)
   await inventoryStore.saveDisc({
     ...discDraft.value,
+    rarity: "S",
+    maxLevel: 15,
     setName: discDraft.value.setName || labelOf(set),
-    subStats: (discDraft.value.subStats ?? []).filter((item: any) => item?.stat),
+    subStats: (discDraft.value.subStats ?? []).map((item: any) => storedSubStat(item)),
   })
   showDiscEditor.value = false
   selectedDisc.value = null
-}
-
-function addSubStatRow() {
-  discDraft.value.subStats = [
-    ...(discDraft.value.subStats ?? []),
-    { stat: "", value: 0 },
-  ].slice(0, 4)
-}
-
-function removeSubStatRow(index: number) {
-  discDraft.value.subStats = (discDraft.value.subStats ?? []).filter((_: any, itemIndex: number) => itemIndex !== index)
 }
 
 watch(() => discDraft.value.partition, slot => {
@@ -238,6 +407,15 @@ watch(() => discDraft.value.partition, slot => {
       value: defaultMainStatValue(stat),
     }
   }
+})
+
+watch(() => discDraft.value.mainStat?.stat, stat => {
+  if (!showDiscEditor.value || !stat) {
+    return
+  }
+  discDraft.value.subStats = (discDraft.value.subStats ?? []).map((item: any) =>
+    item?.stat === stat ? emptyEditorSubStat() : item
+  )
 })
 
 async function deleteSelectedDisc() {
@@ -323,6 +501,15 @@ const scannerErrorMessage = computed(() => {
   }
   return raw.length > 240 ? `${raw.slice(0, 240)}…` : raw
 })
+const scannerErrorPrimaryLabel = computed(() => (
+  inventoryStore.scanErrorVariant === "helper-outdated" && inventoryStore.scanHelperCanSelfUpdate
+    ? "重试自动更新"
+    : ""
+))
+const scannerErrorSecondaryLabel = computed(() => {
+  if (inventoryStore.scanErrorVariant !== "helper-outdated") return undefined
+  return inventoryStore.scanHelperCanSelfUpdate ? "手动下载最新版" : "重新检测"
+})
 
 async function previewImport() {
   importError.value = ""
@@ -354,6 +541,27 @@ async function importScannerJson(forceRemoveMissing = false) {
   }
 }
 
+async function exportDriveDiscs() {
+  let objectUrl = ""
+  try {
+    const exported = await inventoryStore.prepareCurrentAccountExport()
+    const blob = new Blob([exported.text], { type: exported.mimeType })
+    objectUrl = URL.createObjectURL(blob)
+    const anchor = document.createElement("a")
+    anchor.href = objectUrl
+    anchor.download = exported.fileName
+    anchor.style.display = "none"
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    message.success(`已导出 ${exported.payload.driveDiscs.length} 个驱动盘`)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : String(error))
+  } finally {
+    if (objectUrl) URL.revokeObjectURL(objectUrl)
+  }
+}
+
 async function previewFileImport(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file) {
@@ -379,24 +587,32 @@ function confirmDangerImport() {
 </script>
 
 <template>
-  <section class="section-band">
+  <section class="section-band ui-layout-scope" data-layout-surface="drive-discs-page">
     <div class="panel">
-      <div class="panel-header">
+      <div class="panel-header inventory-toolbar-header">
         <h1 class="panel-title">驱动盘仓库</h1>
-        <div class="toolbar">
-          <NButton @click="openNewDisc">
+        <div class="toolbar inventory-toolbar-actions">
+          <NButton data-testid="open-drive-disc-editor" @click="openNewDisc">
             <template #icon><Plus :size="16" /></template>
-            新增
+            新增单个
           </NButton>
           <NButton @click="inventoryStore.load">
-            <template #icon><Download :size="16" /></template>
+            <template #icon><RefreshCw :size="16" /></template>
             刷新
           </NButton>
-          <NButton type="primary" @click="showImport = true">
+          <NButton @click="showImport = true">
             <template #icon><Upload :size="16" /></template>
-            导入
+            批量导入
           </NButton>
-          <NButton @click="showScan = true">
+          <NButton
+            :disabled="inventoryStore.loading || !inventoryStore.hasDriveDiscs"
+            :title="inventoryStore.hasDriveDiscs ? '导出当前账号的全部驱动盘' : '当前账号没有可导出的驱动盘'"
+            @click="exportDriveDiscs"
+          >
+            <template #icon><Download :size="16" /></template>
+            批量导出
+          </NButton>
+          <NButton type="primary" @click="showScan = true">
             <template #icon><Radar :size="16" /></template>
             扫描
           </NButton>
@@ -448,8 +664,8 @@ function confirmDangerImport() {
                   <div class="disc-row-identity">
                     <ImageAvatar :src="driveDiscSetIcon(disc)" :name="driveDiscSetName(disc)" :size="44" />
                     <div class="disc-row-meta">
-                      <strong>{{ driveDiscSetName(disc) }}</strong>
-                      <span>{{ driveDiscIdentityMeta(disc) }}</span>
+                      <strong :title="driveDiscSetName(disc)">{{ driveDiscSetName(disc) }}</strong>
+                      <span :title="driveDiscIdentityMeta(disc)">{{ driveDiscIdentityMeta(disc) }}</span>
                     </div>
                   </div>
                 </td>
@@ -490,44 +706,36 @@ function confirmDangerImport() {
     </div>
   </section>
 
-  <NModal v-model:show="showDiscEditor" preset="card" :title="discDraft.id ? '编辑驱动盘' : '新增驱动盘'" style="max-width: 920px">
-    <div class="section-band">
-      <div class="metric-grid">
-        <div class="metric">
-          <span class="metric-title">ID</span>
-          <div class="metric-value"><NInput v-model:value="discDraft.id" aria-label="驱动盘 ID" /></div>
-        </div>
-        <div class="metric">
+  <NModal v-model:show="showDiscEditor" preset="card" :title="selectedDisc ? '编辑驱动盘' : '新增驱动盘'" style="width: min(920px, calc(100vw - 16px)); max-width: 920px">
+    <div class="section-band ui-layout-scope" data-layout-surface="drive-disc-editor">
+      <div class="metric-grid ui-field-grid">
+        <div class="metric" data-layout-field>
           <span class="metric-title">套装</span>
           <div class="metric-value"><NSelect v-model:value="discDraft.setId" :options="setOptions" aria-label="驱动盘套装" filterable /></div>
         </div>
-        <div class="metric">
+        <div class="metric" data-layout-field>
           <span class="metric-title">位置</span>
           <div class="metric-value"><NSelect v-model:value="discDraft.partition" :options="[1,2,3,4,5,6].map(slot => ({ label: `${slot}号位`, value: slot }))" aria-label="驱动盘位置" /></div>
         </div>
-        <div class="metric">
+        <div class="metric" data-layout-field>
           <span class="metric-title">品质</span>
-          <div class="metric-value"><NSelect v-model:value="discDraft.rarity" :options="['S','A','B'].map(value => ({ label: value, value }))" aria-label="驱动盘品质" /></div>
+          <div class="metric-value"><NTag :type="discDraft.rarity === 'S' ? 'success' : 'warning'" round>{{ discDraft.rarity || 'S' }}</NTag></div>
         </div>
-        <div class="metric">
+        <div class="metric" data-layout-field>
           <span class="metric-title">等级</span>
           <div class="metric-value"><NInputNumber v-model:value="discDraft.level" :min="0" :max="15" aria-label="驱动盘等级" /></div>
         </div>
-        <div class="metric">
-          <span class="metric-title">装备角色</span>
-          <div class="metric-value"><NSelect v-model:value="discDraft.equippedBy" clearable :options="agentOptions" aria-label="驱动盘装备角色" filterable /></div>
-        </div>
       </div>
-      <div class="metric-grid">
-        <div class="metric">
+      <div class="metric-grid ui-field-grid">
+        <div class="metric" data-layout-field>
           <span class="metric-title">主词条</span>
           <div class="metric-value"><NSelect v-model:value="discDraft.mainStat.stat" :options="mainStatOptions" aria-label="驱动盘主词条" filterable /></div>
         </div>
-        <div class="metric">
+        <div class="metric" data-layout-field>
           <span class="metric-title">主词条数值</span>
           <div class="metric-value"><NInputNumber v-model:value="discDraft.mainStat.value" :step="0.1" aria-label="驱动盘主词条数值" /></div>
         </div>
-        <div class="metric">
+        <div class="metric" data-layout-field>
           <span class="metric-title">锁定</span>
           <div class="metric-value"><NCheckbox v-model:checked="discDraft.locked">锁定</NCheckbox></div>
         </div>
@@ -535,50 +743,63 @@ function confirmDangerImport() {
       <div class="panel">
         <div class="panel-header">
           <h3 class="panel-title">副词条</h3>
-          <NButton size="small" :disabled="(discDraft.subStats ?? []).length >= 4" @click="addSubStatRow">新增副词条</NButton>
         </div>
-        <div class="panel-body metric-grid">
-          <div v-for="(_, index) in discDraft.subStats" :key="index" class="metric" role="group" :aria-label="`副词条 ${index + 1}`">
+        <div class="panel-body substat-editor-list">
+          <div v-for="(_, index) in discDraft.subStats" :key="index" class="substat-editor-row" role="group" :aria-label="`副词条 ${index + 1}`">
             <span class="metric-title">副词条 {{ index + 1 }}</span>
-            <div class="metric-value section-band">
-              <NSelect v-model:value="discDraft.subStats[index].stat" clearable :options="statOptions" :aria-label="`副词条 ${index + 1} 类型`" filterable />
-              <NInputNumber v-model:value="discDraft.subStats[index].value" :step="0.1" :aria-label="`副词条 ${index + 1} 数值`" />
-              <NButton size="small" type="error" @click="removeSubStatRow(index)">
-                <template #icon><Trash2 :size="14" /></template>
-                移除
-              </NButton>
+            <div class="substat-editor-fields ui-field-grid" data-layout-surface="drive-disc-substat">
+              <NSelect
+                data-layout-field
+                :value="discDraft.subStats[index].stat"
+                :options="subStatOptionsForRow(index)"
+                :aria-label="`副词条 ${index + 1} 类型`"
+                placeholder="选择属性"
+                filterable
+                @update:value="updateSubStatType(index, String($event ?? ''))"
+              />
+              <NSelect
+                data-layout-field
+                :value="discDraft.subStats[index].rolls"
+                :options="ROLL_COUNT_OPTIONS"
+                :aria-label="`副词条 ${index + 1} 词条数`"
+                @update:value="updateSubStatRolls(index, $event)"
+              />
+              <output class="substat-roll-result" :aria-label="`副词条 ${index + 1} 换算结果`" data-layout-field>
+                {{ formattedSubStatValue(discDraft.subStats[index]) }}
+              </output>
             </div>
           </div>
         </div>
       </div>
+      <p v-if="discEditorValidationMessage" class="disc-editor-warning" role="alert">{{ discEditorValidationMessage }}</p>
       <details>
         <summary>原始 JSON 预览</summary>
-        <pre class="raw">{{ JSON.stringify(discDraft, null, 2) }}</pre>
+        <pre class="raw">{{ JSON.stringify(discDraftStoragePreview, null, 2) }}</pre>
       </details>
     </div>
     <template #footer>
       <div class="drawer-footer">
         <NButton @click="showDiscEditor = false">取消</NButton>
         <NButton v-if="selectedDisc" type="error" @click="confirmDelete = true">删除</NButton>
-        <NButton type="primary" @click="saveDisc">保存</NButton>
+        <NButton type="primary" :disabled="Boolean(discEditorValidationMessage)" @click="saveDisc">保存</NButton>
       </div>
     </template>
   </NModal>
 
-  <NModal v-model:show="showLoadoutEditor" preset="card" title="编辑套装预设" style="max-width: 880px">
-    <div class="section-band">
-      <div class="metric-grid">
-        <div class="metric">
+  <NModal v-model:show="showLoadoutEditor" preset="card" title="编辑套装预设" style="width: min(880px, calc(100vw - 16px)); max-width: 880px">
+    <div class="section-band ui-layout-scope" data-layout-surface="loadout-editor">
+      <div class="metric-grid ui-field-grid">
+        <div class="metric" data-layout-field>
           <span class="metric-title">名称</span>
           <div class="metric-value"><NInput v-model:value="loadoutDraft.name" aria-label="套装预设名称" /></div>
         </div>
-        <div class="metric">
+        <div class="metric" data-layout-field>
           <span class="metric-title">角色</span>
           <div class="metric-value"><NSelect v-model:value="loadoutDraft.agentId" :options="agentOptions" aria-label="套装预设角色" filterable /></div>
         </div>
       </div>
-      <div class="metric-grid">
-        <div v-for="slot in [1,2,3,4,5,6]" :key="slot" class="metric">
+      <div class="metric-grid ui-field-grid">
+        <div v-for="slot in [1,2,3,4,5,6]" :key="slot" class="metric" data-layout-field>
           <span class="metric-title">{{ slot }}号位</span>
           <div class="metric-value"><NSelect v-model:value="loadoutDraft.driveDiscIdsBySlot[String(slot)]" clearable filterable :options="discOptionsForSlot(slot)" :aria-label="`${slot}号位驱动盘`" /></div>
         </div>
@@ -598,9 +819,9 @@ function confirmDangerImport() {
     </template>
   </NModal>
 
-  <NModal v-model:show="showImport" preset="card" title="导入扫描器 JSON" style="max-width: 760px">
+  <NModal v-model:show="showImport" preset="card" title="导入驱动盘 JSON" style="max-width: 760px">
     <div class="section-band">
-      <NInput v-model:value="importText" type="textarea" placeholder="粘贴扫描器导出的 JSON" :autosize="{ minRows: 8, maxRows: 16 }" />
+      <NInput v-model:value="importText" type="textarea" placeholder="粘贴扫描器或计算器导出的 JSON" :autosize="{ minRows: 8, maxRows: 16 }" />
       <div class="toolbar">
         <input type="file" accept=".json,application/json" @change="previewFileImport">
         <NCheckbox v-model:checked="removeMissing">同步删除本地存在但本次扫描缺失的驱动盘</NCheckbox>
@@ -674,8 +895,12 @@ function confirmDangerImport() {
           :variant="inventoryStore.scanErrorVariant"
           :message="scannerErrorMessage"
           :helper-version="inventoryStore.scanHelperVersion"
+          :primary-label="scannerErrorPrimaryLabel"
+          :secondary-label="scannerErrorSecondaryLabel"
+          :failure="inventoryStore.scanFailure"
           @primary="handleScannerError"
           @secondary="handleScannerErrorSecondary"
+          @action="handleScannerDiagnosticAction"
         />
 
         <div v-else-if="inventoryStore.scanPhase === 'a'" class="scan-phase-panel scan-phase-a">
@@ -692,20 +917,20 @@ function confirmDangerImport() {
           <p class="scan-phase-b-message">{{ inventoryStore.scanProgressText || inventoryStore.scanMessage || "正在准备 OCR 扫描器..." }}</p>
         </div>
 
-        <div v-else-if="inventoryStore.scanPhase === 'c'" class="section-band">
-          <div class="metric">
+        <div v-else-if="inventoryStore.scanPhase === 'c'" class="section-band ui-layout-scope" data-layout-surface="scanner-config">
+          <div class="metric" data-layout-field>
             <span class="metric-title">客户端</span>
             <div class="metric-value"><NSelect v-model:value="inventoryStore.scanClient" :disabled="scanControlsDisabled" :options="[{ label: '本地绝区零', value: 'local' }, { label: '云绝区零', value: 'cloud' }]" aria-label="扫描客户端" /></div>
           </div>
-          <div class="metric-grid">
-            <div class="metric" role="group" aria-label="扫描品质">
+          <div class="metric-grid ui-field-grid">
+            <div class="metric" role="group" aria-label="扫描品质" data-layout-field>
               <span class="metric-title">品质</span>
               <div class="metric-value chip-row">
                 <NCheckbox v-model:checked="inventoryStore.scanRarityS" :disabled="scanControlsDisabled">S</NCheckbox>
                 <NCheckbox v-model:checked="inventoryStore.scanRarityA" :disabled="scanControlsDisabled">A</NCheckbox>
               </div>
             </div>
-            <div class="metric">
+            <div class="metric" data-layout-field>
               <span class="metric-title">上限</span>
               <div class="metric-value"><NInputNumber v-model:value="inventoryStore.scanMaxItems" :disabled="scanControlsDisabled" :min="0" :max="9999" aria-label="扫描数量上限" /></div>
             </div>
@@ -813,6 +1038,54 @@ function confirmDangerImport() {
 .metric-value {
   margin: 0;
   font-weight: 750;
+}
+
+.substat-editor-list {
+  display: grid;
+  gap: 14px;
+}
+
+.substat-editor-row {
+  min-width: 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.substat-editor-row:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.substat-editor-fields {
+  --ui-field-min: 160px;
+  align-items: center;
+  gap: 10px;
+}
+
+.substat-roll-result {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-panel-muted);
+  color: var(--app-text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.disc-editor-warning {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #f3d46f;
+  border-radius: var(--app-radius-sm);
+  background: #fff8d8;
+  color: #7c5b00;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .raw {
@@ -1015,4 +1288,20 @@ function confirmDangerImport() {
   gap: 10px;
   margin-top: 8px;
 }
+
+@media (max-width: 720px) {
+  .inventory-toolbar-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .inventory-toolbar-header .panel-title {
+    white-space: nowrap;
+  }
+
+  .inventory-toolbar-actions {
+    width: 100%;
+  }
+}
+
 </style>

@@ -9,6 +9,19 @@ import {
     skillRowValue,
 } from "./skillMultiplierCandidates.js"
 import { expandCalculationConfigSkillGroups } from "./calculationSkillGroups.js"
+import { skillTagsForMove, skillTargetMatches, skillTypeForMove } from "./skillTargets.js"
+import {
+    disorderBaseMultiplier,
+    disorderMultiplierScale,
+    normalizeDamageScale,
+    normalizeElapsedSeconds,
+} from "./damageEventMultipliers.js"
+import {
+    ELEMENT_CRIT_DMG_STAT_BY_ELEMENT,
+    ELEMENT_CRIT_DMG_STATS,
+    ELEMENT_DEF_IGNORE_STAT_BY_ELEMENT,
+    ELEMENT_DEF_IGNORE_STATS,
+} from "./effectRuleTargets.js"
 
 const BONUS_KEY_MAP = {
     hpFlat: "hpFlat",
@@ -24,12 +37,13 @@ const BONUS_KEY_MAP = {
     impactFlat: "impactFlat",
     anomalyProficiency: "anomalyProficiencyFlat",
     anomalyProficiencyFlat: "anomalyProficiencyFlat",
-    anomalyMastery: "anomalyMasteryFlat",
+    anomalyMastery: "anomalyMasteryPct",
     anomalyMasteryFlat: "anomalyMasteryFlat",
     energyRegen: "energyRegenPct",
     energyRegenPct: "energyRegenPct",
     penFlat: "penFlat",
     penRatio: "penRatio",
+    allResIgnore: "allResIgnore",
     physicalResIgnore: "physicalResIgnore",
     fireResIgnore: "fireResIgnore",
     iceResIgnore: "iceResIgnore",
@@ -44,6 +58,7 @@ const BONUS_KEY_MAP = {
     etherDmg: "etherDmg",
     windDmg: "windDmg",
     sheerForceFlat: "sheerForceFlat",
+    anomalyProficiencyPerMasteryAbove140: "anomalyProficiencyPerMasteryAbove140",
 }
 
 const BONUS_KEYS = [
@@ -58,10 +73,12 @@ const BONUS_KEYS = [
     "impactPct",
     "impactFlat",
     "anomalyProficiencyFlat",
+    "anomalyMasteryPct",
     "anomalyMasteryFlat",
     "energyRegenPct",
     "penFlat",
     "penRatio",
+    "allResIgnore",
     "physicalResIgnore",
     "fireResIgnore",
     "iceResIgnore",
@@ -76,6 +93,7 @@ const BONUS_KEYS = [
     "etherDmg",
     "windDmg",
     "sheerForceFlat",
+    "anomalyProficiencyPerMasteryAbove140",
 ]
 
 const OUTPUT_PANEL_KEYS = [
@@ -90,6 +108,7 @@ const OUTPUT_PANEL_KEYS = [
     "energyRegen",
     "penFlat",
     "penRatio",
+    "allResIgnore",
     "physicalResIgnore",
     "fireResIgnore",
     "iceResIgnore",
@@ -106,6 +125,36 @@ const OUTPUT_PANEL_KEYS = [
     "sheerForce",
     "sheerForceFlat",
 ]
+
+const OPTIMIZER_INPUT_STATS_BY_PANEL_STAT = {
+    hp: ["hpFlat", "hpPct"],
+    atk: ["atkFlat", "atkPct"],
+    def: ["defFlat", "defPct"],
+    critRate: ["critRate"],
+    critDmg: ["critDmg"],
+    impact: ["impact", "impactPct", "impactFlat"],
+    anomalyProficiency: ["anomalyProficiency", "anomalyProficiencyFlat"],
+    anomalyMastery: ["anomalyMastery", "anomalyMasteryFlat"],
+    energyRegen: ["energyRegen", "energyRegenPct"],
+    penFlat: ["penFlat"],
+    penRatio: ["penRatio"],
+    allResIgnore: ["allResIgnore"],
+    physicalResIgnore: ["physicalResIgnore"],
+    fireResIgnore: ["fireResIgnore"],
+    iceResIgnore: ["iceResIgnore"],
+    electricResIgnore: ["electricResIgnore"],
+    etherResIgnore: ["etherResIgnore"],
+    windResIgnore: ["windResIgnore"],
+    dmgBonus: ["dmgBonus"],
+    physicalDmg: ["physicalDmg"],
+    fireDmg: ["fireDmg"],
+    iceDmg: ["iceDmg"],
+    electricDmg: ["electricDmg"],
+    etherDmg: ["etherDmg"],
+    windDmg: ["windDmg"],
+    sheerForce: ["hpFlat", "hpPct", "atkFlat", "atkPct", "sheerForceFlat"],
+    sheerForceFlat: ["sheerForceFlat"],
+}
 
 const CORE_BASE_STAT_MAP = {
     hpBase: "hp",
@@ -169,6 +218,9 @@ const COMBAT_BONUS_KEYS = [
 const BONUS_KEY_INDEX = new Map(BONUS_KEYS.map((key, index) => [key, index]))
 const COMBAT_BONUS_KEY_INDEX = new Map(COMBAT_BONUS_KEYS.map((key, index) => [key, index]))
 const PANEL_KEY_INDEX = new Map(OUTPUT_PANEL_KEYS.map((key, index) => [key, index]))
+const BONUS_KEY_LOOKUP = Object.freeze(Object.fromEntries(BONUS_KEY_INDEX))
+const COMBAT_BONUS_KEY_LOOKUP = Object.freeze(Object.fromEntries(COMBAT_BONUS_KEY_INDEX))
+const PANEL_KEY_LOOKUP = Object.freeze(Object.fromEntries(PANEL_KEY_INDEX))
 
 const DAMAGE_ELEMENTS = ["physical", "fire", "ice", "electric", "ether", "wind"]
 const DAMAGE_ELEMENT_LABELS = {
@@ -195,7 +247,8 @@ const RES_REDUCTION_KEY_BY_ELEMENT = {
     ether: "enemyEtherResReduction",
     wind: "enemyWindResReduction",
 }
-const RES_IGNORE_KEYS = Object.values(RES_IGNORE_KEY_BY_ELEMENT)
+const ALL_RES_IGNORE_KEY = "allResIgnore"
+const RES_IGNORE_KEYS = [ALL_RES_IGNORE_KEY, ...Object.values(RES_IGNORE_KEY_BY_ELEMENT)]
 
 const SHEER_DMG_KEY_BY_ELEMENT = {
     physical: "physicalSheerDmg",
@@ -206,9 +259,12 @@ const SHEER_DMG_KEY_BY_ELEMENT = {
     wind: "windSheerDmg",
 }
 
+const CRIT_DMG_KEY_BY_ELEMENT = ELEMENT_CRIT_DMG_STAT_BY_ELEMENT
+const DEF_IGNORE_KEY_BY_ELEMENT = ELEMENT_DEF_IGNORE_STAT_BY_ELEMENT
+
 const DAMAGE_EVENT_KINDS = ["direct", "anomaly", "disorder", "sheer"]
 const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
-const DAMAGE_MODIFIER_KINDS = ["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "directDamageBonus", "sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg", "skillMultiplierBonus"]
+const DAMAGE_MODIFIER_KINDS = ["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyDurationBonusSeconds", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg", "skillMultiplierBonus", ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS]
 const EVENT_MODIFIER_STAT_KEYS = new Set([
     "anomalyDamageBonus",
     "disorderDamageBonus",
@@ -216,8 +272,10 @@ const EVENT_MODIFIER_STAT_KEYS = new Set([
     "disorderBaseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
+    "anomalyDurationBonusSeconds",
     "stunDmgMultiplierBonus",
     "stunDmgMultiplierBonusAlways",
+    "stunDmgMultiplierBonusCapAlways",
     "sheerDmgBonus",
     "physicalSheerDmg",
     "fireSheerDmg",
@@ -226,8 +284,11 @@ const EVENT_MODIFIER_STAT_KEYS = new Set([
     "etherSheerDmg",
     "windSheerDmg",
     "skillMultiplierBonus",
+    ...ELEMENT_CRIT_DMG_STATS,
+    ...ELEMENT_DEF_IGNORE_STATS,
 ])
 const SKILL_TARGET_STAT_KEYS = new Set([
+    "allResIgnore",
     "physicalResIgnore",
     "fireResIgnore",
     "iceResIgnore",
@@ -253,6 +314,7 @@ const SKILL_TARGET_STAT_KEYS = new Set([
     "disorderDamageBonus",
     "stunDmgMultiplierBonus",
     "stunDmgMultiplierBonusAlways",
+    "stunDmgMultiplierBonusCapAlways",
     "sheerDmgBonus",
     "physicalSheerDmg",
     "fireSheerDmg",
@@ -261,6 +323,8 @@ const SKILL_TARGET_STAT_KEYS = new Set([
     "etherSheerDmg",
     "windSheerDmg",
     "skillMultiplierBonus",
+    ...ELEMENT_CRIT_DMG_STATS,
+    ...ELEMENT_DEF_IGNORE_STATS,
 ])
 const EVENT_MODIFIER_KIND_VALUES = new Set([
     ...DAMAGE_MODIFIER_KINDS,
@@ -269,6 +333,7 @@ const EVENT_MODIFIER_KIND_VALUES = new Set([
 ])
 const DAMAGE_MODIFIER_SUM_KEYS = [...EVENT_MODIFIER_KIND_VALUES]
 const DAMAGE_MODIFIER_SUM_KEY_INDEX = new Map(DAMAGE_MODIFIER_SUM_KEYS.map((key, index) => [key, index]))
+const DAMAGE_MODIFIER_SUM_KEY_LOOKUP = Object.freeze(Object.fromEntries(DAMAGE_MODIFIER_SUM_KEY_INDEX))
 
 const DAMAGE_TARGET_PRESETS = [
     {
@@ -322,6 +387,7 @@ const STORED_PERCENT_STATS = new Set([
     "energyRegen",
     "energyRegenPct",
     "penRatio",
+    "allResIgnore",
     "physicalResIgnore",
     "fireResIgnore",
     "iceResIgnore",
@@ -344,12 +410,15 @@ const STORED_PERCENT_STATS = new Set([
     "electricSheerDmg",
     "etherSheerDmg",
     "windSheerDmg",
+    ...ELEMENT_CRIT_DMG_STATS,
+    ...ELEMENT_DEF_IGNORE_STATS,
     "baseMultiplierBonus",
     "disorderBaseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
     "stunDmgMultiplierBonus",
     "stunDmgMultiplierBonusAlways",
+    "stunDmgMultiplierBonusCapAlways",
     "skillMultiplierBonus",
     "enemyDefReduction",
     "enemyDefIgnore",
@@ -367,6 +436,7 @@ const BASE_PERCENT_STATS = new Set([
     "critDmg",
     "energyRegen",
     "penRatio",
+    "allResIgnore",
     "physicalResIgnore",
     "fireResIgnore",
     "iceResIgnore",
@@ -415,6 +485,11 @@ function createCombatBonusTotals() {
 
 function createPanel() {
     return Object.fromEntries(OUTPUT_PANEL_KEYS.map(key => [key, 0]))
+}
+
+function calculateAnomalyMastery(baseAnomalyMastery, anomalyMasteryPct = 0, anomalyMasteryFlat = 0) {
+    return Number(baseAnomalyMastery ?? 0) * (1 + Number(anomalyMasteryPct ?? 0))
+        + Number(anomalyMasteryFlat ?? 0)
 }
 
 function isStoredPercentStat(stat, mode) {
@@ -655,12 +730,29 @@ export function materializeWEngineForModificationLevel(wEngine, value) {
     }
 }
 
-function defaultCoverage(effect) {
-    return clampNumber(effect.coverage?.default ?? 1, effect.coverage?.min ?? 0, effect.coverage?.max ?? 1)
+function coverageConfigForRule(rule, effect) {
+    return rule?.coverage ?? effect?.coverage ?? null
 }
 
-function coverageFromRuntime(effect, runtimeInput = {}) {
-    return clampNumber(runtimeInput.coverage ?? defaultCoverage(effect), effect.coverage?.min ?? 0, effect.coverage?.max ?? 1)
+function defaultCoverage(rule, effect) {
+    const coverage = coverageConfigForRule(rule, effect)
+    if (!coverage) {
+        return 1
+    }
+    return clampNumber(coverage.default ?? 1, coverage.min ?? 0, coverage.max ?? 1)
+}
+
+function coverageFromRuntime(rule, effect, runtimeInput = {}) {
+    const coverage = coverageConfigForRule(rule, effect)
+    if (!coverage) {
+        return 1
+    }
+    const ruleRuntime = effectRuntimeFor(rule, runtimeInput)
+    return clampNumber(
+        ruleRuntime.coverage ?? runtimeInput.coverage ?? defaultCoverage(rule, effect),
+        coverage.min ?? 0,
+        coverage.max ?? 1,
+    )
 }
 
 function legacyStatsToEffects(stats = []) {
@@ -704,6 +796,28 @@ function runtimeStackGroupKey(rule = {}) {
 function normalizeEffectRuntimeInput(effect, runtimeInput = {}) {
     const input = runtimeInput && typeof runtimeInput === "object" ? runtimeInput : {}
     const rules = effectRules(effect)
+    const effects = {}
+    for (const rule of rules) {
+        const id = rule.id ?? rule.stat ?? "effect"
+        const legacyRuleRuntime = input[id] && typeof input[id] === "object" ? input[id] : {}
+        const nestedRuleRuntime = input.effects?.[id] && typeof input.effects[id] === "object" ? input.effects[id] : {}
+        const ruleRuntime = {
+            ...legacyRuleRuntime,
+            ...nestedRuleRuntime,
+        }
+        const coverage = coverageConfigForRule(rule, effect)
+        if (coverage) {
+            ruleRuntime.coverage = clampNumber(
+                ruleRuntime.coverage ?? input.coverage ?? coverage.default ?? 1,
+                coverage.min ?? 0,
+                coverage.max ?? 1,
+            )
+        } else {
+            delete ruleRuntime.coverage
+        }
+        effects[id] = ruleRuntime
+    }
+
     const grouped = new Map()
     for (const rule of rules) {
         const key = runtimeStackGroupKey(rule)
@@ -717,25 +831,14 @@ function normalizeEffectRuntimeInput(effect, runtimeInput = {}) {
         grouped.get(key).push(id)
     }
 
-    if (![...grouped.values()].some(ids => ids.length > 1)) {
-        return input
-    }
-
-    const effects = {
-        ...(input.effects ?? {}),
-    }
     for (const ids of grouped.values()) {
         if (ids.length < 2) {
             continue
         }
         let stacks = undefined
         for (const id of ids) {
-            if (input.effects?.[id]?.stacks !== undefined) {
-                stacks = input.effects[id].stacks
-                break
-            }
-            if (input[id]?.stacks !== undefined) {
-                stacks = input[id].stacks
+            if (effects[id]?.stacks !== undefined) {
+                stacks = effects[id].stacks
                 break
             }
         }
@@ -749,10 +852,8 @@ function normalizeEffectRuntimeInput(effect, runtimeInput = {}) {
             }
         }
     }
-    return {
-        ...input,
-        effects,
-    }
+    const { coverage, ...rest } = input
+    return { ...rest, effects }
 }
 
 function effectRuleEnabled(rule, runtimeInput = {}) {
@@ -844,6 +945,13 @@ function normalizedRuleTarget(rule = {}) {
             skillTargets: Array.isArray(target.skillTargets) ? target.skillTargets : [],
         }
     }
+    if (target.kind === "anomaly") {
+        return {
+            kind: "anomaly",
+            settlementType: target.settlementType === "disorder" ? "disorder" : "attribute",
+            anomalyEffects: Array.isArray(target.anomalyEffects) ? target.anomalyEffects : [],
+        }
+    }
     return { kind: "default" }
 }
 
@@ -866,7 +974,7 @@ function isRuleEventModifier(rule = {}) {
         return true
     }
     const stat = canonicalBuffStat(rule.stat)
-    return ruleTargetKind(rule) === "skill"
+    return ["skill", "anomaly"].includes(ruleTargetKind(rule))
         || EVENT_MODIFIER_STAT_KEYS.has(stat)
         || (hasEventAppliesToFilters(rule) && EVENT_MODIFIER_KIND_VALUES.has(stat))
 }
@@ -880,16 +988,24 @@ function eventModifierCalcValue(rule = {}) {
     if (stat === "skillMultiplierBonus") {
         return value / 100
     }
+    if (stat === "anomalyDurationBonusSeconds") {
+        return value
+    }
     if (EVENT_MODIFIER_STAT_KEYS.has(stat)) {
         return value / 100
     }
     return toCalcValue(stat, value, rule.mode)
 }
 
+function effectRuleRequirementMatches(rule = {}, modifierContext = {}) {
+    const requiredSpecialty = String(rule?.requirement?.specialty ?? "").trim()
+    return !requiredSpecialty || requiredSpecialty === modifierContext.agent?.specialty
+}
+
 function resolveEffectRule(rule, effect, runtimeInput = {}, modifierContext = {}) {
     const type = rule.type ?? "fixed"
     const runtime = effectRuntimeFor(rule, runtimeInput)
-    const coverage = coverageFromRuntime(effect, runtimeInput)
+    const coverage = coverageFromRuntime(rule, effect, runtimeInput)
     const common = {
         id: rule.id ?? rule.stat ?? type,
         label: rule.label ?? null,
@@ -899,6 +1015,10 @@ function resolveEffectRule(rule, effect, runtimeInput = {}, modifierContext = {}
         basis: rule.basis ?? null,
         target: normalizedRuleTarget(rule),
         coverage,
+        condition: rule.condition ?? null,
+        durationSeconds: rule.durationSeconds ?? null,
+        cooldownSeconds: rule.cooldownSeconds ?? null,
+        requirement: rule.requirement ?? null,
     }
 
     if (type === "damageModifier") {
@@ -982,6 +1102,7 @@ function resolveEffectRule(rule, effect, runtimeInput = {}, modifierContext = {}
 function resolveEffectStats(effect, runtimeInput = {}, modifierContext = {}) {
     return effectRules(effect)
         .filter(rule => effectRuleEnabled(rule, runtimeInput))
+        .filter(rule => effectRuleRequirementMatches(rule, modifierContext))
         .filter(rule => !isRuleEventModifier(rule))
         .map(rule => resolveEffectRule(rule, effect, runtimeInput, modifierContext))
         .filter(rule => rule.stat && Number.isFinite(Number(rule.value)))
@@ -990,6 +1111,7 @@ function resolveEffectStats(effect, runtimeInput = {}, modifierContext = {}) {
 function resolveEffectDamageModifiers(effect, runtimeInput = {}, modifierContext = {}) {
     return effectRules(effect)
         .filter(rule => effectRuleEnabled(rule, runtimeInput))
+        .filter(rule => effectRuleRequirementMatches(rule, modifierContext))
         .filter(rule => isRuleEventModifier(rule))
         .map(rule => {
             const resolved = resolveEffectRule(rule, effect, runtimeInput, modifierContext)
@@ -997,14 +1119,21 @@ function resolveEffectDamageModifiers(effect, runtimeInput = {}, modifierContext
                 return resolved
             }
             const target = normalizedRuleTarget(rule)
+            const targetAppliesTo = target.kind === "skill"
+                ? { ...(rule.appliesTo ?? {}), skillTargets: target.skillTargets }
+                : target.kind === "anomaly"
+                    ? {
+                        ...(rule.appliesTo ?? {}),
+                        damageKinds: [target.settlementType === "disorder" ? "disorder" : "anomaly"],
+                        anomalyEffects: target.anomalyEffects,
+                    }
+                    : rule.appliesTo ?? null
             return {
                 ...resolved,
                 type: "eventModifier",
                 kind: resolved.stat,
                 value: eventModifierCalcValue(resolved),
-                appliesTo: target.kind === "skill"
-                    ? { ...(rule.appliesTo ?? {}), skillTargets: target.skillTargets }
-                    : rule.appliesTo ?? null,
+                appliesTo: targetAppliesTo,
             }
         })
         .filter(rule => EVENT_MODIFIER_KIND_VALUES.has(rule.kind) && Number.isFinite(Number(rule.value)))
@@ -1078,17 +1207,18 @@ function normalizeEffect(effect, runtimeInput = {}, modifierContext = {}) {
         effects: effectRules(effect),
         buffModifiers: effectBuffModifiers(effect),
         coverage: effect.coverage ?? null,
+        runtime: normalizedRuntimeInput,
         appliesToOutOfCombatPanel: effect.appliesToOutOfCombatPanel ?? true,
     }
 }
 
 function densePanelValue(panelValues, key) {
-    const index = PANEL_KEY_INDEX.get(key)
+    const index = PANEL_KEY_LOOKUP[key]
     return index === undefined ? 0 : Number(panelValues[index] ?? 0)
 }
 
 function denseCombatValue(combatValues, key) {
-    const index = COMBAT_BONUS_KEY_INDEX.get(key)
+    const index = COMBAT_BONUS_KEY_LOOKUP[key]
     return index === undefined ? 0 : Number(combatValues[index] ?? 0)
 }
 
@@ -1131,8 +1261,9 @@ function compileDenseCombatEffectEntry({
     buffModifiers = [],
     setIndex = null,
     minSetCount = 0,
+    agent = null,
 } = {}) {
-    const normalized = normalizeEffect(effect, runtimeInput, { sourceKey: key, buffModifiers })
+    const normalized = normalizeEffect(effect, runtimeInput, { sourceKey: key, buffModifiers, agent })
     if (!normalized || normalized.scope !== "inCombat") {
         return null
     }
@@ -1144,6 +1275,7 @@ function compileDenseCombatEffectEntry({
         sourceType,
         setIndex,
         minSetCount,
+        exclusiveGroup: String(effect.exclusiveGroup ?? "").trim() || null,
         stats: normalized.stats,
         damageModifiers: normalized.damageModifiers,
     }
@@ -1419,6 +1551,23 @@ function driveDiscFourPiece(set) {
     return set?.fourPiece ?? null
 }
 
+function driveDiscTwoPieceCombatBuff(set) {
+    const twoPiece = set?.twoPiece ?? null
+    const effects = effectRules(twoPiece).filter(isRuleEventModifier)
+    return effects.length
+        ? {
+            ...twoPiece,
+            scope: "inCombat",
+            appliesToOutOfCombatPanel: false,
+            effects,
+        }
+        : null
+}
+
+function driveDisc2pcKey(setId) {
+    return `driveDisc2pc:${setId}`
+}
+
 function legacyFourPieceBuff(fourPiece) {
     if (!fourPiece || fourPiece.selfBuff || !effectRules(fourPiece).length) {
         return null
@@ -1655,10 +1804,16 @@ function validateCatalogModeling(catalog) {
     }
 }
 
-function applyCombatEffect({ bonusTotals, effect, key, name, sourceType, conditionLabel, outOfCombat, runtimeInput, buffModifiers, activeEffects, ignoredEffects }) {
+function applyCombatEffect({ bonusTotals, effect, key, name, sourceType, conditionLabel, outOfCombat, runtimeInput, buffModifiers, activeEffects, ignoredEffects, agent, exclusiveGroups }) {
+    const exclusiveGroup = String(effect?.exclusiveGroup ?? "").trim()
+    if (exclusiveGroup && exclusiveGroups?.has(exclusiveGroup)) {
+        ignoredEffects?.push({ key, sourceType, reason: "exclusiveGroup", exclusiveGroup })
+        return
+    }
     const normalized = normalizeEffect(effect, runtimeInput, {
         sourceKey: key,
         buffModifiers,
+        agent,
     })
     if (!normalized) {
         ignoredEffects?.push({
@@ -1702,6 +1857,9 @@ function applyCombatEffect({ bonusTotals, effect, key, name, sourceType, conditi
         }))
         : normalized.damageModifiers
     bonusTotals.damageModifiers.push(...resolvedDamageModifiers)
+    if (exclusiveGroup) {
+        exclusiveGroups?.add(exclusiveGroup)
+    }
 
     if (!activeEffects) {
         return
@@ -1721,7 +1879,7 @@ function applyCombatEffect({ bonusTotals, effect, key, name, sourceType, conditi
         effects: normalized.effects,
         buffModifiers: normalized.buffModifiers,
         coverage: normalized.coverage,
-        runtime: runtimeInput ?? null,
+        runtime: normalized.runtime,
         resolvedStats,
         resolvedDamageModifiers,
     })
@@ -1863,7 +2021,7 @@ function addBonusArrayCalcValue(totals, keyIndex, stat, value) {
 }
 
 function denseValue(values, keyIndex, key) {
-    const index = keyIndex.get(key)
+    const index = keyIndex === BONUS_KEY_INDEX ? BONUS_KEY_LOOKUP[key] : keyIndex.get(key)
     return index === undefined ? 0 : Number(values[index] ?? 0)
 }
 
@@ -1952,8 +2110,15 @@ function calculateCombatPanelFromTotals(agent, outOfCombat, bonusTotals) {
     panel.critRate = outOfCombat.panel.critRate + bonusTotals.critRate
     panel.critDmg = outOfCombat.panel.critDmg + bonusTotals.critDmg
     panel.impact = (outOfCombat.panel.impact * (1 + bonusTotals.impactPct)) + bonusTotals.impactFlat
-    panel.anomalyProficiency = outOfCombat.panel.anomalyProficiency + bonusTotals.anomalyProficiencyFlat
-    panel.anomalyMastery = outOfCombat.panel.anomalyMastery + bonusTotals.anomalyMasteryFlat
+    panel.anomalyMastery = calculateAnomalyMastery(
+        outOfCombat.panel.anomalyMastery,
+        bonusTotals.anomalyMasteryPct,
+        bonusTotals.anomalyMasteryFlat,
+    )
+    panel.anomalyProficiency = outOfCombat.panel.anomalyProficiency
+        + bonusTotals.anomalyProficiencyFlat
+        + Math.max(0, panel.anomalyMastery - 140)
+            * Math.max(0, Number(bonusTotals.anomalyProficiencyPerMasteryAbove140 ?? 0))
     panel.energyRegen = outOfCombat.panel.energyRegen * (1 + bonusTotals.energyRegenPct)
     panel.penFlat = outOfCombat.panel.penFlat + bonusTotals.penFlat
     panel.penRatio = outOfCombat.panel.penRatio + bonusTotals.penRatio
@@ -2020,6 +2185,10 @@ function normalizeStunMultiplierPercent(targetInput = {}) {
 
 function normalizeStunned(value) {
     return value === true || value === "true" || value === 1 || value === "1"
+}
+
+function normalizeEventStunned(value, fallback = true) {
+    return value === undefined ? fallback : normalizeStunned(value)
 }
 
 function localizedName(value, fallback = "") {
@@ -2089,6 +2258,10 @@ function resolveDamageSkillRef(catalog, agent, skillRef = null, options = {}) {
         localizedName(move.name, move.id),
         localizedName(row.label, row.id),
     ].filter(Boolean)
+    const skillType = skillTypeForMove(category, move)
+    if (!skillType) {
+        throw new Error(`Skill move has invalid skillType: ${skillSet.id}.${categoryId}.${moveId}`)
+    }
 
     return {
         skillMultiplier: Math.max(0, value / 100),
@@ -2098,6 +2271,8 @@ function resolveDamageSkillRef(catalog, agent, skillRef = null, options = {}) {
             categoryId,
             moveId,
             rowId,
+            skillType,
+            skillTags: skillTagsForMove(move),
             generatedFromRowIds: Array.isArray(row.generatedFromRowIds) ? row.generatedFromRowIds : [],
             level: requestedLevel,
             levelScale: skillLevelScale(category),
@@ -2117,7 +2292,6 @@ function normalizeDamageTarget(input = {}, damageElement) {
     const preset = damageTargetPreset(targetInput.presetId ?? DEFAULT_DAMAGE_TARGET_PRESET_ID)
     const defense = Number(targetInput.defense ?? preset?.defense ?? 953)
     const levelCoefficient = DEFAULT_DAMAGE_LEVEL_COEFFICIENT
-    const stunned = normalizeStunned(targetInput.stunned)
     const stunMultiplierPercent = normalizeStunMultiplierPercent(targetInput)
     const stunMultiplier = stunMultiplierPercent / 100
 
@@ -2126,15 +2300,64 @@ function normalizeDamageTarget(input = {}, damageElement) {
         defense: Number.isFinite(defense) ? Math.max(0, defense) : Number(preset?.defense ?? 953),
         levelCoefficient,
         resistanceByElement: normalizeResistanceByElement(targetInput, damageElement),
-        stunned,
         stunMultiplier,
-        activeStunMultiplier: stunned ? stunMultiplier : 1,
     }
 }
 
 function normalizeDamageCount(value, fallback = 1) {
     const numeric = Number(value ?? fallback)
     return Number.isFinite(numeric) ? Math.max(0, numeric) : fallback
+}
+
+function bossAppearanceLabel(appearance = {}) {
+    const version = String(appearance.gameVersion ?? "").trim()
+    const phaseNo = Number(appearance.phaseNo)
+    if (!version && !Number.isFinite(phaseNo)) {
+        return "敌情规则"
+    }
+    return `${version ? `${version}版本` : ""}${Number.isFinite(phaseNo) ? `第${phaseNo}期` : ""}`
+}
+
+function modeledBossEncounterEffects(encounter = {}) {
+    return [
+        ...(encounter.playerBuffs ?? []),
+        ...(encounter.playerDebuffs ?? []),
+    ].flatMap(item => item?.calculationStatus === "modeled" ? (item.effects ?? []) : [])
+}
+
+export function flattenBossCatalog(bosses = []) {
+    return (bosses ?? []).flatMap(boss => (boss.encounters ?? []).map(encounter => {
+        const appearance = encounter.appearances?.at(-1) ?? {}
+        const sourcePeriod = { zhCN: bossAppearanceLabel(appearance) }
+        const bossName = boss.name ?? { zhCN: "未命名 Boss" }
+        return {
+            id: encounter.id,
+            bossId: boss.id,
+            sourceType: "boss",
+            sourceCategory: "boss",
+            sourceKind: "boss",
+            scope: "inCombat",
+            bossName,
+            aliases: boss.aliases ?? [],
+            images: boss.images ?? null,
+            target: boss.target ?? null,
+            bossSource: { zhCN: "危局强袭战" },
+            sourcePeriod,
+            period: appearance,
+            appearances: encounter.appearances ?? [],
+            name: { zhCN: `${bossName.zhCN ?? "未命名 Boss"}｜${sourcePeriod.zhCN}敌情` },
+            description: encounter.enemyIntel ?? null,
+            conditionLabel: encounter.enemyIntel ?? null,
+            enemyIntel: encounter.enemyIntel ?? null,
+            recommendedSpecialties: encounter.recommendedSpecialties ?? [],
+            playerBuffs: encounter.playerBuffs ?? [],
+            playerDebuffs: encounter.playerDebuffs ?? [],
+            sources: encounter.sources ?? [],
+            effects: modeledBossEncounterEffects(encounter),
+            buffModifiers: [],
+            hidden: boss.hidden === true || encounter.hidden === true,
+        }
+    }))
 }
 
 function normalizeDamageEventLabel(event = {}) {
@@ -2177,27 +2400,18 @@ function disorderEffectData(catalog, effectId) {
     return effect
 }
 
-function disorderBaseMultiplier(effect, elapsedSeconds) {
-    const duration = Math.max(0, Number(effect.defaultDurationSeconds ?? 10))
-    const elapsed = clampNumber(Number(elapsedSeconds ?? 0), 0, duration)
-    const remaining = Math.max(0, duration - elapsed)
-    const interval = Math.max(0.0001, Number(effect.tickIntervalSeconds ?? 1))
-    const tickCount = Math.floor((remaining + 1e-9) / interval)
-    return {
-        duration,
-        elapsed,
-        remaining,
-        tickCount,
-        baseMultiplier: Number(effect.fixedMultiplier ?? 4.5) + tickCount * Number(effect.tickMultiplier ?? 0),
-    }
-}
-
 function normalizeDisorderType(value) {
     return DISORDER_TYPE_VALUES.has(value) ? value : "normal"
 }
 
-function disorderMultiplierScale(type) {
-    return normalizeDisorderType(type) === "polarized" ? 0.25 : 1
+function normalizeDirectDamageBasis(value) {
+    return value === "anomalyProficiency" ? value : "atk"
+}
+
+function directDamageBasisValue(panel = {}, event = {}) {
+    return event.damageBasis === "anomalyProficiency"
+        ? Number(panel.anomalyProficiency ?? 0)
+        : Number(panel.atk ?? 0)
 }
 
 function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index = 0, options = {}) {
@@ -2212,12 +2426,15 @@ function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index 
             normalized: true,
             skillMultiplier: Math.max(0, Number(event.skillMultiplier ?? 1)),
             skillSource: event.skillSource ?? null,
+            damageBasis: normalizeDirectDamageBasis(event.damageBasis ?? event.skillSource?.damageBasis),
+            damageScale: normalizeDamageScale(event),
             label: normalizeDamageEventLabel(event),
             critMode: ["expected", "crit", "nonCrit"].includes(event.critMode)
                 ? event.critMode
                 : "expected",
             damageElement,
             count: normalizeDamageCount(event.count, 1),
+            stunned: normalizeEventStunned(event.stunned),
         }
     }
 
@@ -2237,10 +2454,13 @@ function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index 
         normalized: true,
         skillMultiplier: Number.isFinite(skillMultiplier) ? Math.max(0, skillMultiplier) : 1,
         skillSource: skillRefResult?.skillSource ?? null,
+        damageBasis: normalizeDirectDamageBasis(skillRefResult?.skillSource?.damageBasis ?? event.damageBasis),
+        damageScale: normalizeDamageScale(event),
         label: normalizeDamageEventLabel(event),
         critMode,
         damageElement,
         count: normalizeDamageCount(event.count, 1),
+        stunned: normalizeEventStunned(event.stunned),
     }
 }
 
@@ -2256,12 +2476,14 @@ function normalizeSheerDamageEvent(event = {}, agent = {}, catalog = {}, index =
             normalized: true,
             skillMultiplier: Math.max(0, Number(event.skillMultiplier ?? 1)),
             skillSource: event.skillSource ?? null,
+            damageScale: normalizeDamageScale(event),
             label: normalizeDamageEventLabel(event),
             critMode: ["expected", "crit", "nonCrit"].includes(event.critMode)
                 ? event.critMode
                 : "expected",
             damageElement,
             count: normalizeDamageCount(event.count, 1),
+            stunned: normalizeEventStunned(event.stunned),
         }
     }
 
@@ -2281,10 +2503,12 @@ function normalizeSheerDamageEvent(event = {}, agent = {}, catalog = {}, index =
         normalized: true,
         skillMultiplier: Number.isFinite(skillMultiplier) ? Math.max(0, skillMultiplier) : 1,
         skillSource: skillRefResult?.skillSource ?? null,
+        damageScale: normalizeDamageScale(event),
         label: normalizeDamageEventLabel(event),
         critMode,
         damageElement,
         count: normalizeDamageCount(event.count, 1),
+        stunned: normalizeEventStunned(event.stunned),
     }
 }
 
@@ -2297,11 +2521,15 @@ function normalizeAnomalyDamageEvent(event = {}, catalog = {}, index = 0) {
             settlementType: "attribute",
             normalized: true,
             anomalyEffect: String(event.anomalyEffect ?? ""),
+            anomalyVariant: event.anomalyVariant === "polarizedAssault" ? "polarizedAssault" : "normal",
+            label: normalizeDamageEventLabel(event),
+            damageScale: normalizeDamageScale(event),
             damageElement: DAMAGE_ELEMENTS.includes(event.damageElement) ? event.damageElement : "physical",
             baseMultiplier: Math.max(0, Number(event.baseMultiplier ?? 0)),
             baseMultiplierPerProc: Math.max(0, Number(event.baseMultiplierPerProc ?? event.baseMultiplier ?? 0)),
             procCount: normalizeDamageCount(event.procCount, 1),
             count: normalizeDamageCount(event.count, 1),
+            stunned: normalizeEventStunned(event.stunned),
         }
     }
 
@@ -2314,11 +2542,15 @@ function normalizeAnomalyDamageEvent(event = {}, catalog = {}, index = 0) {
         normalized: true,
         anomalyEffect: effect.id,
         anomalyLabel: effect.label,
+        anomalyVariant: event.anomalyVariant === "polarizedAssault" && effect.id === "assault" ? "polarizedAssault" : "normal",
+        label: normalizeDamageEventLabel(event),
+        damageScale: normalizeDamageScale(event),
         damageElement: effect.element,
         baseMultiplier: Number(effect.baseMultiplier ?? 0) * procCount,
         baseMultiplierPerProc: Number(effect.baseMultiplier ?? 0),
         procCount,
         count: normalizeDamageCount(event.count, 1),
+        stunned: normalizeEventStunned(event.stunned),
     }
 }
 
@@ -2331,9 +2563,19 @@ function normalizeDisorderDamageEvent(event = {}, catalog = {}, index = 0) {
         } catch {
             effect = null
         }
-        const disorder = effect ? disorderBaseMultiplier(effect, event.elapsedSeconds) : null
-        const duration = disorder?.duration ?? Math.max(0, Number(event.durationSeconds ?? 10))
-        const elapsed = disorder?.elapsed ?? clampNumber(Number(event.elapsedSeconds ?? 0), 0, duration)
+        const fixedMultiplier = effect ? Number(effect.fixedMultiplier ?? 4.5) : Math.max(0, Number(event.fixedMultiplier ?? 4.5))
+        const tickMultiplier = effect ? Number(effect.tickMultiplier ?? 0) : Math.max(0, Number(event.tickMultiplier ?? 0))
+        const tickIntervalSeconds = effect ? Number(effect.tickIntervalSeconds ?? 1) : Math.max(0.0001, Number(event.tickIntervalSeconds ?? 1))
+        const baseDurationSeconds = effect
+            ? Number(effect.defaultDurationSeconds ?? 10)
+            : Math.max(0, Number(event.baseDurationSeconds ?? event.durationSeconds ?? 10))
+        const elapsed = normalizeElapsedSeconds(event.elapsedSeconds, Number.POSITIVE_INFINITY, tickIntervalSeconds)
+        const disorder = disorderBaseMultiplier({
+            defaultDurationSeconds: baseDurationSeconds,
+            fixedMultiplier,
+            tickMultiplier,
+            tickIntervalSeconds,
+        }, elapsed)
         return {
             ...event,
             id: String(event.id ?? `disorder-${index + 1}`),
@@ -2344,21 +2586,31 @@ function normalizeDisorderDamageEvent(event = {}, catalog = {}, index = 0) {
             previousAnomalyEffect: effect?.id ?? String(event.previousAnomalyEffect ?? event.anomalyEffect ?? ""),
             anomalyEffect: effect?.id ?? String(event.anomalyEffect ?? event.previousAnomalyEffect ?? ""),
             anomalyLabel: effect?.label ?? event.anomalyLabel,
+            label: normalizeDamageEventLabel(event),
+            damageScale: normalizeDamageScale(event),
             damageElement: DAMAGE_ELEMENTS.includes(effect?.element) ? effect.element : DAMAGE_ELEMENTS.includes(event.damageElement) ? event.damageElement : "physical",
-            baseMultiplier: disorder?.baseMultiplier ?? Math.max(0, Number(event.baseMultiplier ?? 0)),
-            fixedMultiplier: effect ? Number(effect.fixedMultiplier ?? 4.5) : Math.max(0, Number(event.fixedMultiplier ?? 4.5)),
-            tickMultiplier: effect ? Number(effect.tickMultiplier ?? 0) : Math.max(0, Number(event.tickMultiplier ?? 0)),
-            tickIntervalSeconds: effect ? Number(effect.tickIntervalSeconds ?? 1) : Math.max(0.0001, Number(event.tickIntervalSeconds ?? 1)),
-            tickCount: disorder?.tickCount ?? Math.max(0, Number(event.tickCount ?? 0)),
-            durationSeconds: duration,
+            baseMultiplier: disorder.baseMultiplier,
+            fixedMultiplier,
+            tickMultiplier,
+            tickIntervalSeconds,
+            tickCount: disorder.tickCount,
+            baseDurationSeconds: disorder.baseDuration,
+            durationBonusSeconds: 0,
+            durationSeconds: disorder.duration,
             elapsedSeconds: elapsed,
-            remainingSeconds: disorder?.remaining ?? Math.max(0, duration - elapsed),
+            remainingSeconds: disorder.remaining,
             count: normalizeDamageCount(event.count, 1),
+            stunned: normalizeEventStunned(event.stunned),
         }
     }
 
     const effect = disorderEffectData(catalog, event.anomalyEffect ?? event.previousAnomalyEffect ?? "burn")
-    const disorder = disorderBaseMultiplier(effect, event.elapsedSeconds)
+    const elapsed = normalizeElapsedSeconds(
+        event.elapsedSeconds,
+        Number.POSITIVE_INFINITY,
+        Number(effect.tickIntervalSeconds ?? 1),
+    )
+    const disorder = disorderBaseMultiplier(effect, elapsed)
     return {
         id: String(event.id ?? `disorder-${index + 1}`),
         kind: "anomaly",
@@ -2368,16 +2620,21 @@ function normalizeDisorderDamageEvent(event = {}, catalog = {}, index = 0) {
         previousAnomalyEffect: effect.id,
         anomalyEffect: effect.id,
         anomalyLabel: effect.label,
+        label: normalizeDamageEventLabel(event),
+        damageScale: normalizeDamageScale(event),
         damageElement: effect.element,
         baseMultiplier: disorder.baseMultiplier,
         fixedMultiplier: Number(effect.fixedMultiplier ?? 4.5),
         tickMultiplier: Number(effect.tickMultiplier ?? 0),
         tickIntervalSeconds: Number(effect.tickIntervalSeconds ?? 1),
         tickCount: disorder.tickCount,
+        baseDurationSeconds: disorder.baseDuration,
+        durationBonusSeconds: 0,
         durationSeconds: disorder.duration,
-        elapsedSeconds: disorder.elapsed,
+        elapsedSeconds: elapsed,
         remainingSeconds: disorder.remaining,
         count: normalizeDamageCount(event.count, 1),
+        stunned: normalizeEventStunned(event.stunned),
     }
 }
 
@@ -2419,7 +2676,16 @@ function legacyDirectDamageEvent(input = {}) {
 }
 
 function normalizeDamageRequest(input = {}, agent = {}, catalog = {}, options = {}) {
-    const expandedInput = expandCalculationConfigSkillGroups(input, agent, { strict: true })
+    const legacyTargetInput = input.target ?? {}
+    const legacyStunnedFallback = input.mode === "adminDefault"
+        ? true
+        : Object.prototype.hasOwnProperty.call(legacyTargetInput, "stunned")
+            ? normalizeStunned(legacyTargetInput.stunned)
+            : true
+    const expandedInput = expandCalculationConfigSkillGroups(input, agent, {
+        strict: true,
+        defaultStunned: legacyStunnedFallback,
+    })
     const hasConfiguredEvents = Array.isArray(input.events) && input.events.length > 0
     if (hasConfiguredEvents && (!Array.isArray(expandedInput.events) || !expandedInput.events.length)) {
         throw new Error("技能组引用无法展开：没有可用于计算的普通事件。")
@@ -2427,7 +2693,10 @@ function normalizeDamageRequest(input = {}, agent = {}, catalog = {}, options = 
     const rawEvents = Array.isArray(expandedInput.events) && expandedInput.events.length
         ? expandedInput.events
         : [legacyDirectDamageEvent(expandedInput)]
-    const events = rawEvents.map((event, index) => normalizeDamageEvent(event, agent, catalog, index, options))
+    const events = rawEvents.map((event, index) => normalizeDamageEvent({
+        ...event,
+        stunned: normalizeEventStunned(event?.stunned, legacyStunnedFallback),
+    }, agent, catalog, index, options))
     const firstElement = events[0]?.damageElement ?? resolveDamageElement(agent)
     return {
         agentLevel: normalizeAgentLevel(expandedInput.agentLevel),
@@ -2467,9 +2736,9 @@ function damageCritRate(panel) {
     return Math.max(0, Math.min(1, Number(panel.critRate ?? 0)))
 }
 
-function critMultiplierForMode(panel, mode) {
+function critMultiplierForMode(panel, mode, critDmgBonus = 0) {
     const critRate = damageCritRate(panel)
-    const critDmg = Number(panel.critDmg ?? 0)
+    const critDmg = Number(panel.critDmg ?? 0) + Number(critDmgBonus ?? 0)
 
     if (mode === "crit") {
         return 1 + critDmg
@@ -2553,27 +2822,23 @@ function targetConfiguredStunMultiplier(target = {}) {
     return DEFAULT_DAMAGE_STUN_MULTIPLIER_PERCENT / 100
 }
 
-function targetIsStunned(target = {}) {
-    if (Object.prototype.hasOwnProperty.call(target, "stunned")) {
-        return normalizeStunned(target.stunned)
-    }
-    const explicitActiveMultiplier = Number(target.activeStunMultiplier)
-    return Number.isFinite(explicitActiveMultiplier) ? explicitActiveMultiplier !== 1 : false
-}
-
-function targetActiveStunMultiplier(target = {}, eventTotals = {}) {
-    const explicitActiveMultiplier = Number(target.activeStunMultiplier)
+function targetActiveStunMultiplier(target = {}, stunned = true, eventTotals = {}) {
     const stunDmgMultiplierBonus = Number(eventTotals.stunDmgMultiplierBonus ?? 0)
     const alwaysStunDmgMultiplierBonus = Number(eventTotals.stunDmgMultiplierBonusAlways ?? 0)
-    if (Number.isFinite(explicitActiveMultiplier)) {
-        return Math.max(0, explicitActiveMultiplier + alwaysStunDmgMultiplierBonus + (explicitActiveMultiplier !== 1 ? stunDmgMultiplierBonus : 0))
+    const alwaysStunDmgMultiplierBonusCap = Number(eventTotals.stunDmgMultiplierBonusCapAlways ?? 0)
+    if (alwaysStunDmgMultiplierBonusCap > 0) {
+        const capturedStunMultiplier = Math.max(
+            0,
+            targetConfiguredStunMultiplier(target) + stunDmgMultiplierBonus + alwaysStunDmgMultiplierBonus,
+        )
+        return Math.min(capturedStunMultiplier, 1 + alwaysStunDmgMultiplierBonusCap)
     }
-    return targetIsStunned(target)
+    return normalizeEventStunned(stunned)
         ? Math.max(0, targetConfiguredStunMultiplier(target) + stunDmgMultiplierBonus + alwaysStunDmgMultiplierBonus)
         : Math.max(0, 1 + alwaysStunDmgMultiplierBonus)
 }
 
-function targetBreakdownForElement(panel, bonusTotals, target, damageElement, eventTotals = {}) {
+function targetBreakdownForElement(panel, bonusTotals, target, damageElement, eventTotals = {}, stunned = true) {
     const targetDefense = target.defense
     const levelCoefficient = target.levelCoefficient
     const enemyDefReduction = Number(bonusTotals.enemyDefReduction ?? 0) + Number(eventTotals.enemyDefReduction ?? 0)
@@ -2590,14 +2855,20 @@ function targetBreakdownForElement(panel, bonusTotals, target, damageElement, ev
         + Number(eventTotals.enemyResReduction ?? 0)
         + Number(eventTotals[enemyResReductionKey] ?? 0)
     const resIgnoreKey = RES_IGNORE_KEY_BY_ELEMENT[damageElement]
-    const resIgnore = Number(panel[resIgnoreKey] ?? 0) + Number(eventTotals[resIgnoreKey] ?? 0)
+    const resIgnore = Number(panel[ALL_RES_IGNORE_KEY] ?? 0)
+        + Number(panel[resIgnoreKey] ?? 0)
+        + Number(eventTotals[ALL_RES_IGNORE_KEY] ?? 0)
+        + Number(eventTotals[resIgnoreKey] ?? 0)
     const effectiveResistance = targetResistance - enemyResReduction - resIgnore
     const rawResistanceMultiplier = 1 - effectiveResistance
     const resistanceMultiplier = clampNumber(rawResistanceMultiplier, 0.01, 2)
     const stunDmgMultiplierBonus = Number(eventTotals.stunDmgMultiplierBonus ?? 0)
     const stunDmgMultiplierBonusAlways = Number(eventTotals.stunDmgMultiplierBonusAlways ?? 0)
+    const stunDmgMultiplierBonusCapAlways = Number(eventTotals.stunDmgMultiplierBonusCapAlways ?? 0)
     const stunMultiplier = targetConfiguredStunMultiplier(target)
-    const activeStunMultiplier = targetActiveStunMultiplier(target, eventTotals)
+    const capturedStunMultiplier = Math.max(0, stunMultiplier + stunDmgMultiplierBonus + stunDmgMultiplierBonusAlways)
+    const normalizedStunned = normalizeEventStunned(stunned)
+    const activeStunMultiplier = targetActiveStunMultiplier(target, normalizedStunned, eventTotals)
 
     return {
         presetId: target.presetId,
@@ -2619,16 +2890,18 @@ function targetBreakdownForElement(panel, bonusTotals, target, damageElement, ev
         effectiveResistance,
         rawResistanceMultiplier,
         resistanceMultiplier,
-        stunned: targetIsStunned(target),
+        stunned: normalizedStunned,
         stunMultiplier,
         stunDmgMultiplierBonus,
         stunDmgMultiplierBonusAlways,
+        stunDmgMultiplierBonusCapAlways,
+        capturedStunMultiplier,
         activeStunMultiplier,
     }
 }
 
-function sheerTargetBreakdownForElement(panel, bonusTotals, target, damageElement, eventTotals = {}) {
-    const breakdown = targetBreakdownForElement(panel, bonusTotals, target, damageElement, eventTotals)
+function sheerTargetBreakdownForElement(panel, bonusTotals, target, damageElement, eventTotals = {}, stunned = true) {
+    const breakdown = targetBreakdownForElement(panel, bonusTotals, target, damageElement, eventTotals, stunned)
     return {
         ...breakdown,
         enemyDefReduction: 0,
@@ -2641,7 +2914,7 @@ function sheerTargetBreakdownForElement(panel, bonusTotals, target, damageElemen
     }
 }
 
-function damageModifierAppliesTo(modifier, event) {
+export function damageModifierAppliesTo(modifier, event) {
     const appliesTo = modifier.appliesTo ?? {}
     const hasSkillTargets = Array.isArray(appliesTo.skillTargets) && appliesTo.skillTargets.length
     if (modifier.target?.kind === "skill" && !hasSkillTargets) {
@@ -2677,41 +2950,7 @@ function skillTargetsApplyTo(skillTargets, event) {
         return false
     }
 
-    return skillTargets.some(target => skillTargetAppliesTo(target, source))
-}
-
-function skillTargetAppliesTo(target = {}, source = {}) {
-    if (!target || typeof target !== "object") {
-        return false
-    }
-
-    const hasMoveIdPrefixes = Array.isArray(target.moveIdPrefixes)
-        && target.moveIdPrefixes.some(prefix => String(prefix ?? "").trim())
-    if (!target.agentSkillId && !target.categoryId && !target.moveId && !target.rowId && !hasMoveIdPrefixes) {
-        return false
-    }
-    if (target.agentSkillId && target.agentSkillId !== source.agentSkillId) {
-        return false
-    }
-    if (target.categoryId && target.categoryId !== source.categoryId) {
-        return false
-    }
-    if (target.moveId && target.moveId !== source.moveId) {
-        return false
-    }
-    if (hasMoveIdPrefixes && !target.moveIdPrefixes.some(prefix => source.moveId?.startsWith(String(prefix ?? "").trim()))) {
-        return false
-    }
-    if (target.rowId) {
-        const sourceRowIds = [
-            source.rowId,
-            ...(Array.isArray(source.generatedFromRowIds) ? source.generatedFromRowIds : []),
-        ].filter(Boolean)
-        if (!sourceRowIds.includes(target.rowId)) {
-            return false
-        }
-    }
-    return true
+    return skillTargets.some(target => skillTargetMatches(target, source))
 }
 
 function sumDamageModifiers(bonusTotals, event, kind) {
@@ -2724,6 +2963,8 @@ function eventTargetTotalsForElement(bonusTotals, event) {
     const damageElement = event.damageElement
     const elementDmgKey = `${damageElement}Dmg`
     const elementSheerDmgKey = SHEER_DMG_KEY_BY_ELEMENT[damageElement]
+    const elementCritDmgKey = CRIT_DMG_KEY_BY_ELEMENT[damageElement]
+    const elementDefIgnoreKey = DEF_IGNORE_KEY_BY_ELEMENT[damageElement]
     const resIgnoreKey = RES_IGNORE_KEY_BY_ELEMENT[damageElement]
     const resReductionKey = RES_REDUCTION_KEY_BY_ELEMENT[damageElement]
     const isDisorder = isDisorderDamageEvent(event)
@@ -2736,14 +2977,18 @@ function eventTargetTotalsForElement(bonusTotals, event) {
     return {
         dmgBonus: sumDamageModifiers(bonusTotals, event, "dmgBonus"),
         [elementDmgKey]: sumDamageModifiers(bonusTotals, event, elementDmgKey),
-        enemyDefReduction: sumDamageModifiers(bonusTotals, event, "enemyDefReduction"),
+        enemyDefReduction: sumDamageModifiers(bonusTotals, event, "enemyDefReduction")
+            + sumDamageModifiers(bonusTotals, event, elementDefIgnoreKey),
         enemyResReduction: sumDamageModifiers(bonusTotals, event, "enemyResReduction"),
         [resReductionKey]: sumDamageModifiers(bonusTotals, event, resReductionKey),
+        [ALL_RES_IGNORE_KEY]: sumDamageModifiers(bonusTotals, event, ALL_RES_IGNORE_KEY),
         [resIgnoreKey]: sumDamageModifiers(bonusTotals, event, resIgnoreKey),
         stunDmgMultiplierBonus: sumDamageModifiers(bonusTotals, event, "stunDmgMultiplierBonus"),
         stunDmgMultiplierBonusAlways: sumDamageModifiers(bonusTotals, event, "stunDmgMultiplierBonusAlways"),
+        stunDmgMultiplierBonusCapAlways: sumDamageModifiers(bonusTotals, event, "stunDmgMultiplierBonusCapAlways"),
         sheerDmgBonus: sumDamageModifiers(bonusTotals, event, "sheerDmgBonus"),
         ...(elementSheerDmgKey ? { [elementSheerDmgKey]: sumDamageModifiers(bonusTotals, event, elementSheerDmgKey) } : {}),
+        ...(elementCritDmgKey ? { [elementCritDmgKey]: sumDamageModifiers(bonusTotals, event, elementCritDmgKey) } : {}),
         anomalyDamageBonus: isDisorder ? disorderDamageBonus : attributeAnomalyDamageBonus,
         attributeAnomalyDamageBonus,
         disorderDamageBonus,
@@ -2769,6 +3014,30 @@ function anomalyCritMultiplier(bonusTotals, event) {
     }
 }
 
+function effectiveDisorderDamageEvent(event, bonusTotals) {
+    if (!isDisorderDamageEvent(event)) {
+        return event
+    }
+    const durationBonusSeconds = sumDamageModifiers(bonusTotals, event, "anomalyDurationBonusSeconds")
+    const timing = disorderBaseMultiplier({
+        defaultDurationSeconds: event.baseDurationSeconds ?? event.durationSeconds ?? 10,
+        fixedMultiplier: event.fixedMultiplier ?? 4.5,
+        tickMultiplier: event.tickMultiplier ?? 0,
+        tickIntervalSeconds: event.tickIntervalSeconds ?? 0.5,
+    }, event.elapsedSeconds, durationBonusSeconds)
+    return {
+        ...event,
+        baseMultiplier: timing.baseMultiplier,
+        baseDurationSeconds: timing.baseDuration,
+        durationBonusSeconds: timing.durationBonus,
+        durationSeconds: timing.duration,
+        elapsedSeconds: timing.elapsed,
+        remainingSeconds: timing.remaining,
+        tickIntervalSeconds: timing.tickIntervalSeconds,
+        tickCount: timing.tickCount,
+    }
+}
+
 function defenseWhiteBoxRow(targetBreakdown) {
     const formulaLines = [
         `减防后防御（减防/无视防御）= ${formatDamageNumber(targetBreakdown.targetDefense)} × (1 - ${formatDamagePercent(targetBreakdown.enemyDefReduction)}) - ${formatDamageNumber(targetBreakdown.enemyDefFlatReduction)}`,
@@ -2787,21 +3056,24 @@ function defenseWhiteBoxRow(targetBreakdown) {
 function stunWhiteBoxRow(targetBreakdown) {
     const bonus = Number(targetBreakdown.stunDmgMultiplierBonus ?? 0)
     const alwaysBonus = Number(targetBreakdown.stunDmgMultiplierBonusAlways ?? 0)
+    const alwaysBonusCap = Number(targetBreakdown.stunDmgMultiplierBonusCapAlways ?? 0)
     const bonusText = [
         bonus ? `失衡易伤倍率加算 ${formatDamagePercent(bonus)}` : "",
         alwaysBonus ? `失衡易伤倍率加算（未失衡生效） ${formatDamagePercent(alwaysBonus)}` : "",
     ].filter(Boolean).join(" + ")
     return {
         label: "失衡乘区",
-        formula: targetBreakdown.stunned
-            ? `Boss 已失衡，使用失衡倍率 ${formatDamagePercent(targetBreakdown.stunMultiplier)}${bonusText ? ` + ${bonusText}` : ""}`
-            : `Boss 未失衡，配置倍率 ${formatDamagePercent(targetBreakdown.stunMultiplier)} 不生效${alwaysBonus ? ` + 失衡易伤倍率加算（未失衡生效） ${formatDamagePercent(alwaysBonus)}` : ""}`,
+        formula: alwaysBonusCap > 0
+            ? `捕获失衡倍率 ${formatDamagePercent(targetBreakdown.capturedStunMultiplier)}，帷幕易伤加成上限 ${formatDamagePercent(alwaysBonusCap)}，最终倍率不超过 ${formatDamagePercent(1 + alwaysBonusCap)}`
+            : targetBreakdown.stunned
+                ? `Boss 已失衡，使用失衡倍率 ${formatDamagePercent(targetBreakdown.stunMultiplier)}${bonusText ? ` + ${bonusText}` : ""}`
+                : `Boss 未失衡，配置倍率 ${formatDamagePercent(targetBreakdown.stunMultiplier)} 不生效${alwaysBonus ? ` + 失衡易伤倍率加算（未失衡生效） ${formatDamagePercent(alwaysBonus)}` : ""}`,
         value: targetBreakdown.activeStunMultiplier,
         displayValue: formatDamageNumber(targetBreakdown.activeStunMultiplier, 4),
     }
 }
 
-function directDamageWhiteBoxRows({ event, atk, critMultiplier, critRateForDamage, critDmg, selectedDmgBonus, directDamageBonus, dmgMultiplier, targetBreakdown, skillMultiplierBonus, effectiveSkillMultiplier, finalDamage, singleDamage }) {
+function directDamageWhiteBoxRows({ event, damageBasisValue, critMultiplier, critRateForDamage, critDmg, baseCritDmg, elementCritDmgBonus, selectedDmgBonus, directDamageBonus, dmgMultiplier, targetBreakdown, skillMultiplierBonus, effectiveSkillMultiplier, finalDamage, singleDamage }) {
     const critModeLabel = {
         expected: "期望",
         crit: "暴击",
@@ -2810,10 +3082,10 @@ function directDamageWhiteBoxRows({ event, atk, critMultiplier, critRateForDamag
     const damageElementText = damageElementLabel(event.damageElement)
     const rows = [
         {
-            label: "局内攻击力",
-            formula: "来自局内面板攻击力",
-            value: atk,
-            displayValue: formatDamageNumber(atk),
+            label: event.damageBasis === "anomalyProficiency" ? "局内异常精通" : "局内攻击力",
+            formula: event.damageBasis === "anomalyProficiency" ? "本次伤害以局内异常精通为基础值" : "来自局内面板攻击力",
+            value: damageBasisValue,
+            displayValue: formatDamageNumber(damageBasisValue),
         },
         {
             label: "技能倍率",
@@ -2826,14 +3098,16 @@ function directDamageWhiteBoxRows({ event, atk, critMultiplier, critRateForDamag
         {
             label: "暴击乘区",
             formula: event.critMode === "expected"
-                ? `${formatDamagePercent(critRateForDamage)} × (1 + ${formatDamagePercent(critDmg)}) + (1 - ${formatDamagePercent(critRateForDamage)})`
-                : critModeLabel,
+                ? `${formatDamagePercent(critRateForDamage)} × (1 + ${formatDamagePercent(baseCritDmg)}${elementCritDmgBonus ? ` + 属性伤害暴击伤害 ${formatDamagePercent(elementCritDmgBonus)}` : ""}) + (1 - ${formatDamagePercent(critRateForDamage)})`
+                : elementCritDmgBonus
+                    ? `${critModeLabel}（面板暴击伤害 ${formatDamagePercent(baseCritDmg)} + 属性伤害暴击伤害 ${formatDamagePercent(elementCritDmgBonus)}）`
+                    : critModeLabel,
             value: critMultiplier,
             displayValue: formatDamageNumber(critMultiplier, 4),
         },
         {
             label: "增伤乘区",
-            formula: `1 + 通用/属性增伤 ${formatDamagePercent(selectedDmgBonus)}${directDamageBonus ? ` + 技能专属增伤 ${formatDamagePercent(directDamageBonus)}` : ""}`,
+            formula: `1 + 通用/属性增伤 ${formatDamagePercent(selectedDmgBonus)}${directDamageBonus ? ` + 技能目标增伤 ${formatDamagePercent(directDamageBonus)}` : ""}`,
             value: dmgMultiplier,
             displayValue: formatDamageNumber(dmgMultiplier, 4),
         },
@@ -2846,6 +3120,14 @@ function directDamageWhiteBoxRows({ event, atk, critMultiplier, critRateForDamag
         },
         stunWhiteBoxRow(targetBreakdown),
     ]
+    if (event.damageScale !== 1) {
+        rows.push({
+            label: "伤害比例",
+            formula: `本次额外伤害为原伤害的 ${formatDamagePercent(event.damageScale)}`,
+            value: event.damageScale,
+            displayValue: formatDamagePercent(event.damageScale),
+        })
+    }
     if (event.count !== 1) {
         rows.push({
             label: "事件次数",
@@ -2857,7 +3139,7 @@ function directDamageWhiteBoxRows({ event, atk, critMultiplier, critRateForDamag
     rows.push({
         label: "最终伤害",
         formula: event.count === 1
-            ? `${formatDamageNumber(atk)} × ${formatDamagePercent(effectiveSkillMultiplier)} × ${formatDamageNumber(critMultiplier, 4)} × ${formatDamageNumber(dmgMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.defenseMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.resistanceMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.activeStunMultiplier, 4)}`
+            ? `${formatDamageNumber(damageBasisValue)} × ${formatDamagePercent(effectiveSkillMultiplier)} × ${formatDamageNumber(critMultiplier, 4)} × ${formatDamageNumber(dmgMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.defenseMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.resistanceMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.activeStunMultiplier, 4)}${event.damageScale !== 1 ? ` × ${formatDamagePercent(event.damageScale)}` : ""}`
             : `${formatDamageNumber(singleDamage)} × ${formatDamageNumber(event.count)}`,
         value: finalDamage,
         displayValue: formatDamageNumber(finalDamage),
@@ -2874,7 +3156,7 @@ function sheerDefenseWhiteBoxRow() {
     }
 }
 
-function sheerDamageWhiteBoxRows({ event, hp, atk, sheerForceFlat, sheerForce, critMultiplier, critRateForDamage, critDmg, selectedDmgBonus, skillDamageBonus, dmgMultiplier, targetBreakdown, skillMultiplierBonus, effectiveSkillMultiplier, sheerDmgBonus, sheerDmgMultiplier, finalDamage, singleDamage }) {
+function sheerDamageWhiteBoxRows({ event, hp, atk, sheerForceFlat, sheerForce, critMultiplier, critRateForDamage, critDmg, baseCritDmg, elementCritDmgBonus, selectedDmgBonus, skillDamageBonus, dmgMultiplier, targetBreakdown, skillMultiplierBonus, effectiveSkillMultiplier, sheerDmgBonus, sheerDmgMultiplier, finalDamage, singleDamage }) {
     const critModeLabel = {
         expected: "期望",
         crit: "暴击",
@@ -2905,14 +3187,16 @@ function sheerDamageWhiteBoxRows({ event, hp, atk, sheerForceFlat, sheerForce, c
         {
             label: "暴击乘区",
             formula: event.critMode === "expected"
-                ? `${formatDamagePercent(critRateForDamage)} × (1 + ${formatDamagePercent(critDmg)}) + (1 - ${formatDamagePercent(critRateForDamage)})`
-                : critModeLabel,
+                ? `${formatDamagePercent(critRateForDamage)} × (1 + ${formatDamagePercent(baseCritDmg)}${elementCritDmgBonus ? ` + 属性伤害暴击伤害 ${formatDamagePercent(elementCritDmgBonus)}` : ""}) + (1 - ${formatDamagePercent(critRateForDamage)})`
+                : elementCritDmgBonus
+                    ? `${critModeLabel}（面板暴击伤害 ${formatDamagePercent(baseCritDmg)} + 属性伤害暴击伤害 ${formatDamagePercent(elementCritDmgBonus)}）`
+                    : critModeLabel,
             value: critMultiplier,
             displayValue: formatDamageNumber(critMultiplier, 4),
         },
         {
             label: "普通增伤区",
-            formula: `1 + 通用/属性增伤 ${formatDamagePercent(selectedDmgBonus)}${skillDamageBonus ? ` + 技能专属增伤 ${formatDamagePercent(skillDamageBonus)}` : ""}`,
+            formula: `1 + 通用/属性增伤 ${formatDamagePercent(selectedDmgBonus)}${skillDamageBonus ? ` + 技能目标增伤 ${formatDamagePercent(skillDamageBonus)}` : ""}`,
             value: dmgMultiplier,
             displayValue: formatDamageNumber(dmgMultiplier, 4),
         },
@@ -2931,6 +3215,14 @@ function sheerDamageWhiteBoxRows({ event, hp, atk, sheerForceFlat, sheerForce, c
         },
         stunWhiteBoxRow(targetBreakdown),
     ]
+    if (event.damageScale !== 1) {
+        rows.push({
+            label: "伤害比例",
+            formula: `本次额外伤害为原伤害的 ${formatDamagePercent(event.damageScale)}`,
+            value: event.damageScale,
+            displayValue: formatDamagePercent(event.damageScale),
+        })
+    }
     if (event.count !== 1) {
         rows.push({
             label: "事件次数",
@@ -2942,7 +3234,7 @@ function sheerDamageWhiteBoxRows({ event, hp, atk, sheerForceFlat, sheerForce, c
     rows.push({
         label: "最终伤害",
         formula: event.count === 1
-            ? `${formatDamageNumber(sheerForce)} × ${formatDamagePercent(effectiveSkillMultiplier)} × ${formatDamageNumber(critMultiplier, 4)} × ${formatDamageNumber(dmgMultiplier, 4)} × ${formatDamageNumber(sheerDmgMultiplier, 4)} × 1 × ${formatDamageNumber(targetBreakdown.resistanceMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.activeStunMultiplier, 4)}`
+            ? `${formatDamageNumber(sheerForce)} × ${formatDamagePercent(effectiveSkillMultiplier)} × ${formatDamageNumber(critMultiplier, 4)} × ${formatDamageNumber(dmgMultiplier, 4)} × ${formatDamageNumber(sheerDmgMultiplier, 4)} × 1 × ${formatDamageNumber(targetBreakdown.resistanceMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.activeStunMultiplier, 4)}${event.damageScale !== 1 ? ` × ${formatDamagePercent(event.damageScale)}` : ""}`
             : `${formatDamageNumber(singleDamage)} × ${formatDamageNumber(event.count)}`,
         value: finalDamage,
         displayValue: formatDamageNumber(finalDamage),
@@ -2968,15 +3260,15 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
             label: isDisorder ? "紊乱倍率" : "异常倍率",
             formula: isDisorder
                 ? multiplierScale === 1
-                    ? `${effectLabel}：${formatDamagePercent(event.fixedMultiplier)} + ${event.tickCount} × ${formatDamagePercent(event.tickMultiplier)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`
-                    : `${effectLabel}：(${formatDamagePercent(event.fixedMultiplier)} + ${event.tickCount} × ${formatDamagePercent(event.tickMultiplier)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}) × 极性紊乱 ${formatDamagePercent(multiplierScale)}`
+                    ? `${effectLabel}${event.durationBonusSeconds ? `（基础 ${formatDamageNumber(event.baseDurationSeconds)} 秒 + 延长 ${formatDamageNumber(event.durationBonusSeconds)} 秒 = ${formatDamageNumber(event.durationSeconds)} 秒；已流逝 ${formatDamageNumber(event.elapsedSeconds)} 秒，剩余 ${formatDamageNumber(event.remainingSeconds)} 秒）` : ""}：${formatDamagePercent(event.fixedMultiplier)} + ${event.tickCount} × ${formatDamagePercent(event.tickMultiplier)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`
+                    : `${effectLabel}${event.durationBonusSeconds ? `（基础 ${formatDamageNumber(event.baseDurationSeconds)} 秒 + 延长 ${formatDamageNumber(event.durationBonusSeconds)} 秒 = ${formatDamageNumber(event.durationSeconds)} 秒；已流逝 ${formatDamageNumber(event.elapsedSeconds)} 秒，剩余 ${formatDamageNumber(event.remainingSeconds)} 秒）` : ""}：(${formatDamagePercent(event.fixedMultiplier)} + ${event.tickCount} × ${formatDamagePercent(event.tickMultiplier)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}) × 极性紊乱 ${formatDamagePercent(multiplierScale)}`
                 : `${effectLabel}：${formatDamagePercent(event.baseMultiplierPerProc)} × ${formatDamageNumber(event.procCount)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`,
             value: effectiveBaseMultiplier,
             displayValue: formatDamagePercent(effectiveBaseMultiplier),
         },
         {
             label: "增伤乘区",
-            formula: `1 + 通用/属性增伤 ${formatDamagePercent(selectedDmgBonus)}${skillDamageBonus ? ` + 技能专属增伤 ${formatDamagePercent(skillDamageBonus)}` : ""}`,
+            formula: `1 + 通用/属性增伤 ${formatDamagePercent(selectedDmgBonus)}${skillDamageBonus ? ` + 技能目标增伤 ${formatDamagePercent(skillDamageBonus)}` : ""}`,
             value: dmgMultiplier,
             displayValue: formatDamageNumber(dmgMultiplier, 4),
         },
@@ -3017,6 +3309,14 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
             displayValue: formatDamageNumber(anomalyCrit.multiplier, 4),
         })
     }
+    if (event.damageScale !== 1) {
+        rows.push({
+            label: "伤害比例",
+            formula: `本次额外伤害为原异常伤害的 ${formatDamagePercent(event.damageScale)}`,
+            value: event.damageScale,
+            displayValue: formatDamagePercent(event.damageScale),
+        })
+    }
     if (event.count !== 1) {
         rows.push({
             label: "事件次数",
@@ -3039,6 +3339,7 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
                 formatDamageNumber(levelMultiplier, 4),
                 formatDamageNumber(anomalyDamageBonus, 4),
                 ...(!isDisorder ? [formatDamageNumber(anomalyCrit.multiplier, 4)] : []),
+                ...(event.damageScale !== 1 ? [formatDamagePercent(event.damageScale)] : []),
             ].join(" × ")
             : `${formatDamageNumber(singleDamage)} × ${formatDamageNumber(event.count)}`,
         value: finalDamage,
@@ -3049,27 +3350,32 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
 
 function calculateDirectDamageEvent({ event, panel, bonusTotals, target, includeWhiteBox }) {
     const atk = Number(panel.atk ?? 0)
+    const damageBasisValue = directDamageBasisValue(panel, event)
     const rawCritRate = Number(panel.critRate ?? 0)
     const critRateForDamage = damageCritRate(panel)
-    const critDmg = Number(panel.critDmg ?? 0)
+    const baseCritDmg = Number(panel.critDmg ?? 0)
     const selectedDmgBonus = selectedDmgBonusForElement(panel, event.damageElement)
     const eventTotals = eventTargetTotalsForElement(bonusTotals, event)
     const elementDmgKey = `${event.damageElement}Dmg`
+    const elementCritDmgKey = CRIT_DMG_KEY_BY_ELEMENT[event.damageElement]
+    const elementCritDmgBonus = Number(eventTotals[elementCritDmgKey] ?? 0)
+    const critDmg = baseCritDmg + elementCritDmgBonus
     const directDamageBonus = sumDamageModifiers(bonusTotals, event, "directDamageBonus")
         + Number(eventTotals.dmgBonus ?? 0)
         + Number(eventTotals[elementDmgKey] ?? 0)
     const dmgMultiplier = 1 + selectedDmgBonus + directDamageBonus
     const skillMultiplierBonus = Number(eventTotals.skillMultiplierBonus ?? 0)
     const effectiveSkillMultiplier = Math.max(0, Number(event.skillMultiplier ?? 0) + skillMultiplierBonus)
-    const targetBreakdown = targetBreakdownForElement(panel, bonusTotals, target, event.damageElement, eventTotals)
-    const baseSingleDamage = atk
+    const targetBreakdown = targetBreakdownForElement(panel, bonusTotals, target, event.damageElement, eventTotals, event.stunned)
+    const baseSingleDamage = damageBasisValue
         * effectiveSkillMultiplier
         * dmgMultiplier
         * targetBreakdown.defenseMultiplier
         * targetBreakdown.resistanceMultiplier
         * targetBreakdown.activeStunMultiplier
+        * event.damageScale
     const damageVariant = mode => {
-        const critMultiplier = critMultiplierForMode(panel, mode)
+        const critMultiplier = critMultiplierForMode(panel, mode, elementCritDmgBonus)
         const singleDamage = baseSingleDamage * critMultiplier
         return {
             critMode: mode,
@@ -3103,9 +3409,12 @@ function calculateDirectDamageEvent({ event, panel, bonusTotals, target, include
         },
         panelSnapshot: {
             atk,
+            anomalyProficiency: Number(panel.anomalyProficiency ?? 0),
             critRate: rawCritRate,
             effectiveCritRate: critRateForDamage,
             critDmg,
+            baseCritDmg,
+            elementCritDmgBonus,
             dmgBonus: Number(panel.dmgBonus ?? 0),
             [elementDmgKey]: Number(panel[elementDmgKey] ?? 0),
             penRatio: Number(panel.penRatio ?? 0),
@@ -3113,6 +3422,9 @@ function calculateDirectDamageEvent({ event, panel, bonusTotals, target, include
         },
         multipliers: {
             atk,
+            damageBasis: event.damageBasis,
+            damageBasisValue,
+            damageScale: event.damageScale,
             skill: effectiveSkillMultiplier,
             baseSkill: event.skillMultiplier,
             skillMultiplierBonus,
@@ -3130,10 +3442,12 @@ function calculateDirectDamageEvent({ event, panel, bonusTotals, target, include
         whiteBoxRows: includeWhiteBox
             ? directDamageWhiteBoxRows({
                 event,
-                atk,
+                damageBasisValue,
                 critMultiplier,
                 critRateForDamage,
                 critDmg,
+                baseCritDmg,
+                elementCritDmgBonus,
                 selectedDmgBonus,
                 directDamageBonus,
                 dmgMultiplier,
@@ -3154,26 +3468,30 @@ function calculateSheerDamageEvent({ event, agent, panel, bonusTotals, target, i
     const sheerForce = effectiveSheerForceFromPanel(agent, panel)
     const rawCritRate = Number(panel.critRate ?? 0)
     const critRateForDamage = damageCritRate(panel)
-    const critDmg = Number(panel.critDmg ?? 0)
+    const baseCritDmg = Number(panel.critDmg ?? 0)
     const selectedDmgBonus = selectedDmgBonusForElement(panel, event.damageElement)
     const eventTotals = eventTargetTotalsForElement(bonusTotals, event)
     const elementDmgKey = `${event.damageElement}Dmg`
     const elementSheerDmgKey = SHEER_DMG_KEY_BY_ELEMENT[event.damageElement]
+    const elementCritDmgKey = CRIT_DMG_KEY_BY_ELEMENT[event.damageElement]
+    const elementCritDmgBonus = Number(eventTotals[elementCritDmgKey] ?? 0)
+    const critDmg = baseCritDmg + elementCritDmgBonus
     const skillDamageBonus = Number(eventTotals.dmgBonus ?? 0) + Number(eventTotals[elementDmgKey] ?? 0)
     const dmgMultiplier = 1 + selectedDmgBonus + skillDamageBonus
     const sheerDmgBonus = Number(eventTotals.sheerDmgBonus ?? 0) + Number(eventTotals[elementSheerDmgKey] ?? 0)
     const sheerDmgMultiplier = 1 + sheerDmgBonus
     const skillMultiplierBonus = Number(eventTotals.skillMultiplierBonus ?? 0)
     const effectiveSkillMultiplier = Math.max(0, Number(event.skillMultiplier ?? 0) + skillMultiplierBonus)
-    const targetBreakdown = sheerTargetBreakdownForElement(panel, bonusTotals, target, event.damageElement, eventTotals)
+    const targetBreakdown = sheerTargetBreakdownForElement(panel, bonusTotals, target, event.damageElement, eventTotals, event.stunned)
     const baseSingleDamage = sheerForce
         * effectiveSkillMultiplier
         * dmgMultiplier
         * sheerDmgMultiplier
         * targetBreakdown.resistanceMultiplier
         * targetBreakdown.activeStunMultiplier
+        * event.damageScale
     const damageVariant = mode => {
-        const critMultiplier = critMultiplierForMode(panel, mode)
+        const critMultiplier = critMultiplierForMode(panel, mode, elementCritDmgBonus)
         const singleDamage = baseSingleDamage * critMultiplier
         return {
             critMode: mode,
@@ -3209,10 +3527,13 @@ function calculateSheerDamageEvent({ event, agent, panel, bonusTotals, target, i
             hp,
             atk,
             sheerForceFlat,
+            damageScale: event.damageScale,
             sheerForce,
             critRate: rawCritRate,
             effectiveCritRate: critRateForDamage,
             critDmg,
+            baseCritDmg,
+            elementCritDmgBonus,
             dmgBonus: Number(panel.dmgBonus ?? 0),
             [elementDmgKey]: Number(panel[elementDmgKey] ?? 0),
         },
@@ -3247,6 +3568,8 @@ function calculateSheerDamageEvent({ event, agent, panel, bonusTotals, target, i
                 critMultiplier,
                 critRateForDamage,
                 critDmg,
+                baseCritDmg,
+                elementCritDmgBonus,
                 selectedDmgBonus,
                 skillDamageBonus,
                 dmgMultiplier,
@@ -3263,6 +3586,7 @@ function calculateSheerDamageEvent({ event, agent, panel, bonusTotals, target, i
 }
 
 function calculateAnomalyDamageEvent({ event, panel, bonusTotals, target, agentLevel, includeWhiteBox }) {
+    event = effectiveDisorderDamageEvent(event, bonusTotals)
     const atk = Number(panel.atk ?? 0)
     const isDisorder = isDisorderDamageEvent(event)
     const selectedDmgBonus = selectedDmgBonusForElement(panel, event.damageElement)
@@ -3270,7 +3594,7 @@ function calculateAnomalyDamageEvent({ event, panel, bonusTotals, target, agentL
     const elementDmgKey = `${event.damageElement}Dmg`
     const skillDamageBonus = Number(eventTotals.dmgBonus ?? 0) + Number(eventTotals[elementDmgKey] ?? 0)
     const dmgMultiplier = 1 + selectedDmgBonus + skillDamageBonus
-    const targetBreakdown = targetBreakdownForElement(panel, bonusTotals, target, event.damageElement, eventTotals)
+    const targetBreakdown = targetBreakdownForElement(panel, bonusTotals, target, event.damageElement, eventTotals, event.stunned)
     const anomalyProficiencyMultiplier = Math.max(0, Number(panel.anomalyProficiency ?? 0)) / 100
     const levelMultiplier = anomalyLevelMultiplier(agentLevel)
     const attributeAnomalyDamageBonus = isDisorder ? 1 : 1 + Number(eventTotals.attributeAnomalyDamageBonus ?? 0)
@@ -3292,13 +3616,16 @@ function calculateAnomalyDamageEvent({ event, panel, bonusTotals, target, agentL
         * levelMultiplier
         * anomalyDamageBonus
         * anomalyCrit.multiplier
+        * event.damageScale
     const finalDamage = singleDamage * event.count
 
     return {
         id: event.id,
         kind: event.kind,
         settlementType: event.settlementType ?? (isDisorderDamageEvent(event) ? "disorder" : "attribute"),
-        label: localizedName(event.anomalyLabel, event.anomalyEffect ?? event.previousAnomalyEffect),
+        label: event.label ?? (event.anomalyVariant === "polarizedAssault"
+            ? "极性强击"
+            : localizedName(event.anomalyLabel, event.anomalyEffect ?? event.previousAnomalyEffect)),
         finalDamage,
         singleDamage,
         count: event.count,
@@ -3334,6 +3661,13 @@ function calculateAnomalyDamageEvent({ event, panel, bonusTotals, target, agentL
             anomalyCrit: anomalyCrit.multiplier,
             anomalyCritRate: anomalyCrit.critRate,
             anomalyCritDmg: anomalyCrit.critDmg,
+            baseDurationSeconds: Number(event.baseDurationSeconds ?? 0),
+            durationBonusSeconds: Number(event.durationBonusSeconds ?? 0),
+            durationSeconds: Number(event.durationSeconds ?? 0),
+            elapsedSeconds: Number(event.elapsedSeconds ?? 0),
+            remainingSeconds: Number(event.remainingSeconds ?? 0),
+            tickCount: Number(event.tickCount ?? 0),
+            damageScale: event.damageScale,
         },
         targetBreakdown,
         whiteBoxRows: includeWhiteBox
@@ -3408,7 +3742,7 @@ function calculateDamageResult({ catalog, agent, panel, bonusTotals, input, incl
     }
 }
 
-function targetDamageMultiplierForElement(panel, bonusTotals, target, damageElement, eventTotals = {}) {
+function targetDamageMultiplierForElement(panel, bonusTotals, target, damageElement, eventTotals = {}, stunned = true) {
     const targetDefense = Number(target.defense ?? 0)
     const levelCoefficient = Number(target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT)
     const enemyDefReduction = Number(bonusTotals.enemyDefReduction ?? 0) + Number(eventTotals.enemyDefReduction ?? 0)
@@ -3420,7 +3754,7 @@ function targetDamageMultiplierForElement(panel, bonusTotals, target, damageElem
     const defenseMultiplier = Math.min(1, levelCoefficient / (levelCoefficient + effectiveDefense))
     return defenseMultiplier
         * targetResistanceMultiplierForElement(panel, bonusTotals, target, damageElement, eventTotals)
-        * targetActiveStunMultiplier(target, eventTotals)
+        * targetActiveStunMultiplier(target, stunned, eventTotals)
 }
 
 function targetResistanceMultiplierForElement(panel, bonusTotals, target, damageElement, eventTotals = {}) {
@@ -3431,28 +3765,34 @@ function targetResistanceMultiplierForElement(panel, bonusTotals, target, damage
         + Number(eventTotals.enemyResReduction ?? 0)
         + Number(eventTotals[enemyResReductionKey] ?? 0)
     const resIgnoreKey = RES_IGNORE_KEY_BY_ELEMENT[damageElement]
-    const resIgnore = Number(panel[resIgnoreKey] ?? 0) + Number(eventTotals[resIgnoreKey] ?? 0)
+    const resIgnore = Number(panel[ALL_RES_IGNORE_KEY] ?? 0)
+        + Number(panel[resIgnoreKey] ?? 0)
+        + Number(eventTotals[ALL_RES_IGNORE_KEY] ?? 0)
+        + Number(eventTotals[resIgnoreKey] ?? 0)
     return clampNumber(1 - (targetResistance - enemyResReduction - resIgnore), 0.01, 2)
 }
 
 function calculateDirectDamageFinalValue(event, panel, bonusTotals, target) {
     const eventTotals = eventTargetTotalsForElement(bonusTotals, event)
     const elementDmgKey = `${event.damageElement}Dmg`
+    const elementCritDmgKey = CRIT_DMG_KEY_BY_ELEMENT[event.damageElement]
     const selectedDmgBonus = selectedDmgBonusForElement(panel, event.damageElement)
     const directDamageBonus = sumDamageModifiers(bonusTotals, event, "directDamageBonus")
         + Number(eventTotals.dmgBonus ?? 0)
         + Number(eventTotals[elementDmgKey] ?? 0)
     const skillMultiplierBonus = Number(eventTotals.skillMultiplierBonus ?? 0)
     const effectiveSkillMultiplier = Math.max(0, Number(event.skillMultiplier ?? 0) + skillMultiplierBonus)
-    return Number(panel.atk ?? 0)
+    return directDamageBasisValue(panel, event)
         * effectiveSkillMultiplier
         * (1 + selectedDmgBonus + directDamageBonus)
-        * targetDamageMultiplierForElement(panel, bonusTotals, target, event.damageElement, eventTotals)
-        * critMultiplierForMode(panel, event.critMode)
+        * targetDamageMultiplierForElement(panel, bonusTotals, target, event.damageElement, eventTotals, event.stunned)
+        * critMultiplierForMode(panel, event.critMode, eventTotals[elementCritDmgKey])
+        * event.damageScale
         * Number(event.count ?? 1)
 }
 
 function calculateAnomalyDamageFinalValue(event, panel, bonusTotals, target, agentLevel) {
+    event = effectiveDisorderDamageEvent(event, bonusTotals)
     const isDisorder = isDisorderDamageEvent(event)
     const eventTotals = eventTargetTotalsForElement(bonusTotals, event)
     const elementDmgKey = `${event.damageElement}Dmg`
@@ -3469,11 +3809,12 @@ function calculateAnomalyDamageFinalValue(event, panel, bonusTotals, target, age
     return Number(panel.atk ?? 0)
         * effectiveBaseMultiplier
         * (1 + selectedDmgBonus + skillDamageBonus)
-        * targetDamageMultiplierForElement(panel, bonusTotals, target, event.damageElement, eventTotals)
+        * targetDamageMultiplierForElement(panel, bonusTotals, target, event.damageElement, eventTotals, event.stunned)
         * anomalyProficiencyMultiplier
         * anomalyLevelMultiplier(agentLevel)
         * anomalyDamageBonus
         * anomalyCritMultiplierValue
+        * event.damageScale
         * Number(event.count ?? 1)
 }
 
@@ -3481,6 +3822,7 @@ function calculateSheerDamageFinalValue(event, panel, bonusTotals, target, agent
     const eventTotals = eventTargetTotalsForElement(bonusTotals, event)
     const elementDmgKey = `${event.damageElement}Dmg`
     const elementSheerDmgKey = SHEER_DMG_KEY_BY_ELEMENT[event.damageElement]
+    const elementCritDmgKey = CRIT_DMG_KEY_BY_ELEMENT[event.damageElement]
     const selectedDmgBonus = selectedDmgBonusForElement(panel, event.damageElement)
     const skillDamageBonus = Number(eventTotals.dmgBonus ?? 0) + Number(eventTotals[elementDmgKey] ?? 0)
     const sheerDmgBonus = Number(eventTotals.sheerDmgBonus ?? 0) + Number(eventTotals[elementSheerDmgKey] ?? 0)
@@ -3488,11 +3830,12 @@ function calculateSheerDamageFinalValue(event, panel, bonusTotals, target, agent
     const effectiveSkillMultiplier = Math.max(0, Number(event.skillMultiplier ?? 0) + skillMultiplierBonus)
     return effectiveSheerForceFromPanel(agent, panel)
         * effectiveSkillMultiplier
-        * critMultiplierForMode(panel, event.critMode)
+        * critMultiplierForMode(panel, event.critMode, eventTotals[elementCritDmgKey])
         * (1 + selectedDmgBonus + skillDamageBonus)
         * targetResistanceMultiplierForElement(panel, bonusTotals, target, event.damageElement, eventTotals)
         * (1 + sheerDmgBonus)
-        * targetActiveStunMultiplier(target, eventTotals)
+        * targetActiveStunMultiplier(target, event.stunned, eventTotals)
+        * event.damageScale
         * Number(event.count ?? 1)
 }
 
@@ -3520,12 +3863,24 @@ function compileDamageScoreEvent(event = {}) {
         damageElement,
         elementDmgKey: `${damageElement}Dmg`,
         elementSheerDmgKey: SHEER_DMG_KEY_BY_ELEMENT[damageElement],
+        elementCritDmgKey: CRIT_DMG_KEY_BY_ELEMENT[damageElement],
+        elementDefIgnoreKey: DEF_IGNORE_KEY_BY_ELEMENT[damageElement],
         resIgnoreKey: RES_IGNORE_KEY_BY_ELEMENT[damageElement],
         resReductionKey: RES_REDUCTION_KEY_BY_ELEMENT[damageElement],
         skillMultiplier: Number(event.skillMultiplier ?? 0),
         baseMultiplier: Number(event.baseMultiplier ?? 0),
+        fixedMultiplier: Number(event.fixedMultiplier ?? 0),
+        tickMultiplier: Number(event.tickMultiplier ?? 0),
+        tickIntervalSeconds: Number(event.tickIntervalSeconds ?? 0.5),
+        baseDurationSeconds: Number(event.baseDurationSeconds ?? event.durationSeconds ?? 0),
+        elapsedSeconds: Number(event.elapsedSeconds ?? 0),
+        baseMultiplierScale: isDisorderDamageEvent(event) ? disorderMultiplierScale(event.disorderType) : 1,
+        damageBasis: normalizeDirectDamageBasis(event.damageBasis),
+        damageScale: Number(event.damageScale ?? 1),
+        remainingSeconds: Number(event.remainingSeconds ?? 0),
         count: Number(event.count ?? 1),
         critMode: event.critMode,
+        stunned: normalizeEventStunned(event.stunned),
     }
 }
 
@@ -3537,6 +3892,18 @@ function compileDamageScoreTarget(damageRequest = {}, agent = {}) {
         isRuptureAgent: isRuptureAgent(agent),
         events: (damageRequest.events ?? []).map(event => compileDamageScoreEvent(event)),
     }
+}
+
+function compiledEventBaseMultiplier(compiledEvent, durationBonusSeconds = 0) {
+    if (!compiledEvent.isDisorder) {
+        return compiledEvent.baseMultiplier
+    }
+    return disorderBaseMultiplier({
+        defaultDurationSeconds: compiledEvent.baseDurationSeconds,
+        fixedMultiplier: compiledEvent.fixedMultiplier,
+        tickMultiplier: compiledEvent.tickMultiplier,
+        tickIntervalSeconds: compiledEvent.tickIntervalSeconds,
+    }, compiledEvent.elapsedSeconds, durationBonusSeconds).baseMultiplier
 }
 
 function modifierSumsForCompiledEvent(modifiers = [], event = {}) {
@@ -3561,7 +3928,9 @@ function compiledResistanceMultiplier(panel, bonusTotals, target, compiledEvent,
         + Number(bonusTotals[compiledEvent.resReductionKey] ?? 0)
         + compiledModifierSum(sums, "enemyResReduction")
         + compiledModifierSum(sums, compiledEvent.resReductionKey)
-    const resIgnore = Number(panel[compiledEvent.resIgnoreKey] ?? 0)
+    const resIgnore = Number(panel[ALL_RES_IGNORE_KEY] ?? 0)
+        + Number(panel[compiledEvent.resIgnoreKey] ?? 0)
+        + compiledModifierSum(sums, ALL_RES_IGNORE_KEY)
         + compiledModifierSum(sums, compiledEvent.resIgnoreKey)
     return clampNumber(1 - (targetResistance - enemyResReduction - resIgnore), 0.01, 2)
 }
@@ -3571,6 +3940,7 @@ function compiledTargetDamageMultiplier(panel, bonusTotals, target, compiledEven
     const levelCoefficient = Number(target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT)
     const enemyDefReduction = Number(bonusTotals.enemyDefReduction ?? 0)
         + compiledModifierSum(sums, "enemyDefReduction")
+        + compiledModifierSum(sums, compiledEvent.elementDefIgnoreKey)
     const enemyDefFlatReduction = Number(bonusTotals.enemyDefFlatReduction ?? 0)
     const penRatio = Number(panel.penRatio ?? 0)
     const penFlat = Number(panel.penFlat ?? 0)
@@ -3579,15 +3949,17 @@ function compiledTargetDamageMultiplier(panel, bonusTotals, target, compiledEven
     const defenseMultiplier = Math.min(1, levelCoefficient / (levelCoefficient + effectiveDefense))
     return defenseMultiplier
         * compiledResistanceMultiplier(panel, bonusTotals, target, compiledEvent, sums)
-        * targetActiveStunMultiplier(target, {
+        * targetActiveStunMultiplier(target, compiledEvent.stunned, {
             stunDmgMultiplierBonus: compiledModifierSum(sums, "stunDmgMultiplierBonus"),
             stunDmgMultiplierBonusAlways: compiledModifierSum(sums, "stunDmgMultiplierBonusAlways"),
+            stunDmgMultiplierBonusCapAlways: compiledModifierSum(sums, "stunDmgMultiplierBonusCapAlways"),
         })
 }
 
-function compiledCritMultiplier(panel, critMode) {
+function compiledCritMultiplier(panel, critMode, compiledEvent, sums) {
     const critRate = damageCritRate(panel)
     const critDmg = Number(panel.critDmg ?? 0)
+        + compiledModifierSum(sums, compiledEvent.elementCritDmgKey)
     if (critMode === "crit") {
         return 1 + critDmg
     }
@@ -3623,11 +3995,12 @@ function calculateCompiledDamageScoreValue({ agent, panel, bonusTotals, compiled
                 compiledEvent.skillMultiplier + compiledModifierSum(sums, "skillMultiplierBonus"),
             )
             const directDamageBonus = compiledModifierSum(sums, "directDamageBonus") + skillDamageBonus
-            total += Number(panel.atk ?? 0)
+            total += directDamageBasisValue(panel, compiledEvent)
                 * effectiveSkillMultiplier
                 * (1 + selectedDmgBonus + directDamageBonus)
                 * compiledTargetDamageMultiplier(panel, bonusTotals, target, compiledEvent, sums)
-                * compiledCritMultiplier(panel, compiledEvent.critMode)
+                * compiledCritMultiplier(panel, compiledEvent.critMode, compiledEvent, sums)
+                * compiledEvent.damageScale
                 * compiledEvent.count
             continue
         }
@@ -3643,25 +4016,30 @@ function calculateCompiledDamageScoreValue({ agent, panel, bonusTotals, compiled
                 ? effectiveSheerForceFromPanel(agent, panel)
                 : 0)
                 * effectiveSkillMultiplier
-                * compiledCritMultiplier(panel, compiledEvent.critMode)
+                * compiledCritMultiplier(panel, compiledEvent.critMode, compiledEvent, sums)
                 * (1 + selectedDmgBonus + skillDamageBonus)
                 * compiledResistanceMultiplier(panel, bonusTotals, target, compiledEvent, sums)
                 * (1 + sheerDmgBonus)
-                * targetActiveStunMultiplier(target, {
+                * targetActiveStunMultiplier(target, compiledEvent.stunned, {
                     stunDmgMultiplierBonus: compiledModifierSum(sums, "stunDmgMultiplierBonus"),
                     stunDmgMultiplierBonusAlways: compiledModifierSum(sums, "stunDmgMultiplierBonusAlways"),
+                    stunDmgMultiplierBonusCapAlways: compiledModifierSum(sums, "stunDmgMultiplierBonusCapAlways"),
                 })
+                * compiledEvent.damageScale
                 * compiledEvent.count
             continue
         }
 
         const effectiveBaseMultiplier = Math.max(
             0,
-            compiledEvent.baseMultiplier + compiledModifierSum(
+            compiledEventBaseMultiplier(
+                compiledEvent,
+                compiledModifierSum(sums, "anomalyDurationBonusSeconds"),
+            ) + compiledModifierSum(
                 sums,
                 compiledEvent.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
             ),
-        )
+        ) * compiledEvent.baseMultiplierScale
         const anomalyDamageBonus = 1 + (
             compiledEvent.isDisorder
                 ? compiledModifierSum(sums, "disorderDamageBonus")
@@ -3675,13 +4053,14 @@ function calculateCompiledDamageScoreValue({ agent, panel, bonusTotals, compiled
             * compiledDamageTarget.anomalyLevelMultiplier
             * anomalyDamageBonus
             * compiledAnomalyCritMultiplier(compiledEvent, sums)
+            * compiledEvent.damageScale
             * compiledEvent.count
     }
     return total
 }
 
 function denseModifierSum(sums, kind) {
-    const index = DAMAGE_MODIFIER_SUM_KEY_INDEX.get(kind)
+    const index = DAMAGE_MODIFIER_SUM_KEY_LOOKUP[kind]
     return index === undefined ? 0 : Number(sums[index] ?? 0)
 }
 
@@ -3700,7 +4079,9 @@ function denseResistanceMultiplier(panelValues, combatValues, target, compiledEv
         + denseCombatValue(combatValues, compiledEvent.resReductionKey)
         + denseModifierSum(sums, "enemyResReduction")
         + denseModifierSum(sums, compiledEvent.resReductionKey)
-    const resIgnore = densePanelValue(panelValues, compiledEvent.resIgnoreKey)
+    const resIgnore = densePanelValue(panelValues, ALL_RES_IGNORE_KEY)
+        + densePanelValue(panelValues, compiledEvent.resIgnoreKey)
+        + denseModifierSum(sums, ALL_RES_IGNORE_KEY)
         + denseModifierSum(sums, compiledEvent.resIgnoreKey)
     return clampNumber(1 - (targetResistance - enemyResReduction - resIgnore), 0.01, 2)
 }
@@ -3710,6 +4091,7 @@ function denseTargetDamageMultiplier(panelValues, combatValues, target, compiled
     const levelCoefficient = Number(target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT)
     const enemyDefReduction = denseCombatValue(combatValues, "enemyDefReduction")
         + denseModifierSum(sums, "enemyDefReduction")
+        + denseModifierSum(sums, compiledEvent.elementDefIgnoreKey)
     const enemyDefFlatReduction = denseCombatValue(combatValues, "enemyDefFlatReduction")
     const penRatio = densePanelValue(panelValues, "penRatio")
     const penFlat = densePanelValue(panelValues, "penFlat")
@@ -3718,15 +4100,17 @@ function denseTargetDamageMultiplier(panelValues, combatValues, target, compiled
     const defenseMultiplier = Math.min(1, levelCoefficient / (levelCoefficient + effectiveDefense))
     return defenseMultiplier
         * denseResistanceMultiplier(panelValues, combatValues, target, compiledEvent, sums)
-        * targetActiveStunMultiplier(target, {
+        * targetActiveStunMultiplier(target, compiledEvent.stunned, {
             stunDmgMultiplierBonus: denseModifierSum(sums, "stunDmgMultiplierBonus"),
             stunDmgMultiplierBonusAlways: denseModifierSum(sums, "stunDmgMultiplierBonusAlways"),
+            stunDmgMultiplierBonusCapAlways: denseModifierSum(sums, "stunDmgMultiplierBonusCapAlways"),
         })
 }
 
-function denseCritMultiplier(panelValues, critMode) {
+function denseCritMultiplier(panelValues, critMode, compiledEvent, sums) {
     const critRate = clampNumber(densePanelValue(panelValues, "critRate"), 0, 1)
     const critDmg = densePanelValue(panelValues, "critDmg")
+        + denseModifierSum(sums, compiledEvent.elementCritDmgKey)
     if (critMode === "crit") {
         return 1 + critDmg
     }
@@ -3774,11 +4158,12 @@ function calculateCompiledDamageScoreValueDense({
                 compiledEvent.skillMultiplier + denseModifierSum(modifierSums, "skillMultiplierBonus"),
             )
             const directDamageBonus = denseModifierSum(modifierSums, "directDamageBonus") + skillDamageBonus
-            total += densePanelValue(panelValues, "atk")
+            total += densePanelValue(panelValues, compiledEvent.damageBasis === "anomalyProficiency" ? "anomalyProficiency" : "atk")
                 * effectiveSkillMultiplier
                 * (1 + selectedDmgBonus + directDamageBonus)
                 * denseTargetDamageMultiplier(panelValues, combatValues, target, compiledEvent, modifierSums)
-                * denseCritMultiplier(panelValues, compiledEvent.critMode)
+                * denseCritMultiplier(panelValues, compiledEvent.critMode, compiledEvent, modifierSums)
+                * compiledEvent.damageScale
                 * compiledEvent.count
             continue
         }
@@ -3794,25 +4179,30 @@ function calculateCompiledDamageScoreValueDense({
                 ? densePanelValue(panelValues, "sheerForce")
                 : 0)
                 * effectiveSkillMultiplier
-                * denseCritMultiplier(panelValues, compiledEvent.critMode)
+                * denseCritMultiplier(panelValues, compiledEvent.critMode, compiledEvent, modifierSums)
                 * (1 + selectedDmgBonus + skillDamageBonus)
                 * denseResistanceMultiplier(panelValues, combatValues, target, compiledEvent, modifierSums)
                 * (1 + sheerDmgBonus)
-                * targetActiveStunMultiplier(target, {
+                * targetActiveStunMultiplier(target, compiledEvent.stunned, {
                     stunDmgMultiplierBonus: denseModifierSum(modifierSums, "stunDmgMultiplierBonus"),
                     stunDmgMultiplierBonusAlways: denseModifierSum(modifierSums, "stunDmgMultiplierBonusAlways"),
+                    stunDmgMultiplierBonusCapAlways: denseModifierSum(modifierSums, "stunDmgMultiplierBonusCapAlways"),
                 })
+                * compiledEvent.damageScale
                 * compiledEvent.count
             continue
         }
 
         const effectiveBaseMultiplier = Math.max(
             0,
-            compiledEvent.baseMultiplier + denseModifierSum(
+            compiledEventBaseMultiplier(
+                compiledEvent,
+                denseModifierSum(modifierSums, "anomalyDurationBonusSeconds"),
+            ) + denseModifierSum(
                 modifierSums,
                 compiledEvent.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
             ),
-        )
+        ) * compiledEvent.baseMultiplierScale
         const anomalyDamageBonus = 1 + (
             compiledEvent.isDisorder
                 ? denseModifierSum(modifierSums, "disorderDamageBonus")
@@ -3826,6 +4216,7 @@ function calculateCompiledDamageScoreValueDense({
             * compiledDamageTarget.anomalyLevelMultiplier
             * anomalyDamageBonus
             * denseAnomalyCritMultiplier(compiledEvent, modifierSums)
+            * compiledEvent.damageScale
             * compiledEvent.count
     }
     return total
@@ -3934,6 +4325,9 @@ function collectCoreSkillBonuses(agent, requestedLevel) {
         atk: 0,
         def: 0,
     }
+    const panelBaseAdditions = {
+        anomalyMastery: 0,
+    }
     const panelBonuses = []
     const appliedEffects = []
 
@@ -3949,6 +4343,8 @@ function collectCoreSkillBonuses(agent, requestedLevel) {
             const baseKey = CORE_BASE_STAT_MAP[stat.stat]
             if (stat.target === "base" && baseKey) {
                 baseAdditions[baseKey] += stat.value
+            } else if (stat.target === "panel" && stat.stat === "anomalyMasteryFlat" && stat.mode === "flat") {
+                panelBaseAdditions.anomalyMastery += stat.value
             } else {
                 panelBonuses.push(stat)
             }
@@ -3971,6 +4367,7 @@ function collectCoreSkillBonuses(agent, requestedLevel) {
         selectedLevel: active.selectedLevel,
         appliedLevels: active.levels.map(level => level.level),
         baseAdditions,
+        panelBaseAdditions,
         panelBonuses,
         appliedEffects,
     }
@@ -4004,7 +4401,7 @@ function calculatePanel({ agent, wEngine, driveDiscs, driveDiscSets, coreSkillLe
         critDmg: toBaseCalcValue("critDmg", agent.level60.critDmg ?? 0),
         impact: Number(agent.level60.impact ?? 0),
         anomalyProficiency: Number(agent.level60.anomalyProficiency ?? 0),
-        anomalyMastery: Number(agent.level60.anomalyMastery ?? 0),
+        anomalyMastery: Number(agent.level60.anomalyMastery ?? 0) + coreSkill.panelBaseAdditions.anomalyMastery,
         energyRegen: toBaseCalcValue("energyRegen", agent.level60.energyRegen ?? 100),
         penFlat: Number(agent.level60.penFlat ?? 0),
         penRatio: toBaseCalcValue("penRatio", agent.level60.penRatio ?? 0),
@@ -4068,7 +4465,11 @@ function calculatePanel({ agent, wEngine, driveDiscs, driveDiscSets, coreSkillLe
     panel.critDmg = basePanelStats.critDmg + bonusTotals.critDmg
     panel.impact = (basePanelStats.impact * (1 + bonusTotals.impactPct)) + bonusTotals.impactFlat
     panel.anomalyProficiency = basePanelStats.anomalyProficiency + bonusTotals.anomalyProficiencyFlat
-    panel.anomalyMastery = basePanelStats.anomalyMastery + bonusTotals.anomalyMasteryFlat
+    panel.anomalyMastery = calculateAnomalyMastery(
+        basePanelStats.anomalyMastery,
+        bonusTotals.anomalyMasteryPct,
+        bonusTotals.anomalyMasteryFlat,
+    )
     panel.energyRegen = basePanelStats.energyRegen * (1 + bonusTotals.energyRegenPct)
     panel.penFlat = basePanelStats.penFlat + bonusTotals.penFlat
     panel.penRatio = basePanelStats.penRatio + bonusTotals.penRatio
@@ -4131,7 +4532,7 @@ function createPreparedOutOfCombatPanelCalculator({ agent, wEngine, driveDiscSet
         critDmg: toBaseCalcValue("critDmg", agent.level60.critDmg ?? 0),
         impact: Number(agent.level60.impact ?? 0),
         anomalyProficiency: Number(agent.level60.anomalyProficiency ?? 0),
-        anomalyMastery: Number(agent.level60.anomalyMastery ?? 0),
+        anomalyMastery: Number(agent.level60.anomalyMastery ?? 0) + coreSkill.panelBaseAdditions.anomalyMastery,
         energyRegen: toBaseCalcValue("energyRegen", agent.level60.energyRegen ?? 100),
         penFlat: Number(agent.level60.penFlat ?? 0),
         penRatio: toBaseCalcValue("penRatio", agent.level60.penRatio ?? 0),
@@ -4209,73 +4610,164 @@ function createPreparedOutOfCombatPanelCalculator({ agent, wEngine, driveDiscSet
         return bonusTotals
     }
 
-    function compileDenseOutOfCombatTarget(statIds = [], setIds = []) {
+    function compileDenseOutOfCombatTarget(statIds = [], setIds = [], candidateStatIndexes = []) {
         const baseBonusValues = new Float64Array(BONUS_KEYS.length)
         for (const key of BONUS_KEYS) {
             baseBonusValues[BONUS_KEY_INDEX.get(key)] = Number(staticBonusTotals[key] ?? 0)
         }
         const statToBonusIndexes = (statIds ?? []).map(stat => ({
-            stat,
             index: BONUS_KEY_INDEX.get(BONUS_KEY_MAP[stat]),
+            factor: STORED_PERCENT_STATS.has(stat) ? 0.01 : 1,
         }))
+        const statTermsByBonusIndex = Array.from({ length: BONUS_KEYS.length }, () => [])
+        for (let statIndex = 0; statIndex < statToBonusIndexes.length; statIndex += 1) {
+            const target = statToBonusIndexes[statIndex]
+            if (target.index !== undefined) {
+                statTermsByBonusIndex[target.index].push({ statIndex, factor: target.factor })
+            }
+        }
         const compiledSetBonuses = compileDenseOutOfCombatSetBonuses(driveDiscSets, setIds)
+        const allStatIndexes = statToBonusIndexes.map((_, index) => index)
         const bonusValues = new Float64Array(BONUS_KEYS.length)
         const panelValues = new Float64Array(OUTPUT_PANEL_KEYS.length)
         const isRupture = isRuptureAgent(agent)
+
+        function scorePrepared(statValues = [], activeStatIndexes = null) {
+            const indexes = activeStatIndexes?.length
+                ? activeStatIndexes
+                : allStatIndexes
+            for (const index of indexes) {
+                const value = Number(statValues[index] ?? 0)
+                const target = statToBonusIndexes[index]
+                if (value !== 0 && target.index !== undefined) {
+                    bonusValues[target.index] += value * target.factor
+                }
+            }
+
+            const hp = base.hp * (1 + denseValue(bonusValues, BONUS_KEY_INDEX, "hpPct"))
+                + denseValue(bonusValues, BONUS_KEY_INDEX, "hpFlat")
+            const atk = base.atk * (1 + denseValue(bonusValues, BONUS_KEY_INDEX, "atkPct"))
+                + denseValue(bonusValues, BONUS_KEY_INDEX, "atkFlat")
+            const def = base.def * (1 + denseValue(bonusValues, BONUS_KEY_INDEX, "defPct"))
+                + denseValue(bonusValues, BONUS_KEY_INDEX, "defFlat")
+            panelValues[PANEL_KEY_LOOKUP.hp] = hp
+            panelValues[PANEL_KEY_LOOKUP.atk] = atk
+            panelValues[PANEL_KEY_LOOKUP.def] = def
+            panelValues[PANEL_KEY_LOOKUP.critRate] = basePanelStats.critRate + denseValue(bonusValues, BONUS_KEY_INDEX, "critRate")
+            panelValues[PANEL_KEY_LOOKUP.critDmg] = basePanelStats.critDmg + denseValue(bonusValues, BONUS_KEY_INDEX, "critDmg")
+            panelValues[PANEL_KEY_LOOKUP.impact] = (basePanelStats.impact * (1 + denseValue(bonusValues, BONUS_KEY_INDEX, "impactPct")))
+                + denseValue(bonusValues, BONUS_KEY_INDEX, "impactFlat")
+            panelValues[PANEL_KEY_LOOKUP.anomalyProficiency] = basePanelStats.anomalyProficiency
+                + denseValue(bonusValues, BONUS_KEY_INDEX, "anomalyProficiencyFlat")
+            panelValues[PANEL_KEY_LOOKUP.anomalyMastery] = calculateAnomalyMastery(
+                basePanelStats.anomalyMastery,
+                denseValue(bonusValues, BONUS_KEY_INDEX, "anomalyMasteryPct"),
+                denseValue(bonusValues, BONUS_KEY_INDEX, "anomalyMasteryFlat"),
+            )
+            panelValues[PANEL_KEY_LOOKUP.energyRegen] = basePanelStats.energyRegen
+                * (1 + denseValue(bonusValues, BONUS_KEY_INDEX, "energyRegenPct"))
+            panelValues[PANEL_KEY_LOOKUP.penFlat] = basePanelStats.penFlat + denseValue(bonusValues, BONUS_KEY_INDEX, "penFlat")
+            panelValues[PANEL_KEY_LOOKUP.penRatio] = basePanelStats.penRatio + denseValue(bonusValues, BONUS_KEY_INDEX, "penRatio")
+            for (const key of RES_IGNORE_KEYS) {
+                panelValues[PANEL_KEY_LOOKUP[key]] = denseValue(bonusValues, BONUS_KEY_INDEX, key)
+            }
+            panelValues[PANEL_KEY_LOOKUP.dmgBonus] = basePanelStats.dmgBonus + denseValue(bonusValues, BONUS_KEY_INDEX, "dmgBonus")
+            for (const element of DAMAGE_ELEMENTS) {
+                const key = `${element}Dmg`
+                panelValues[PANEL_KEY_LOOKUP[key]] = denseValue(bonusValues, BONUS_KEY_INDEX, key)
+            }
+            panelValues[PANEL_KEY_LOOKUP.sheerForceFlat] = isRupture
+                ? denseValue(bonusValues, BONUS_KEY_INDEX, "sheerForceFlat")
+                : 0
+            panelValues[PANEL_KEY_LOOKUP.sheerForce] = isRupture
+                ? Math.max(0, (hp * SHEER_FORCE_HP_RATIO) + (atk * SHEER_FORCE_ATK_RATIO) + panelValues[PANEL_KEY_LOOKUP.sheerForceFlat])
+                : 0
+
+            return {
+                base,
+                bonusValues,
+                panelValues,
+            }
+        }
 
         return {
             score(statValues = [], setCountValues = []) {
                 bonusValues.set(baseBonusValues)
                 addDenseSetBonuses(bonusValues, setCountValues, compiledSetBonuses)
-                const length = Math.min(statValues.length ?? 0, statToBonusIndexes.length)
-                for (let index = 0; index < length; index += 1) {
-                    const value = Number(statValues[index] ?? 0)
-                    const target = statToBonusIndexes[index]
-                    if (value !== 0 && target.index !== undefined) {
-                        bonusValues[target.index] += toCalcValue(target.stat, value)
+                return scorePrepared(statValues)
+            },
+            compileForSetCounts(setCountValues = []) {
+                const fixedBonusValues = new Float64Array(baseBonusValues)
+                addDenseSetBonuses(fixedBonusValues, setCountValues, compiledSetBonuses)
+
+                function indexedVectorValue(vector, statIndex) {
+                    if (!vector) {
+                        return 0
                     }
+                    for (let cursor = 0; cursor < vector.indexes.length; cursor += 1) {
+                        if (vector.indexes[cursor] === statIndex) {
+                            return Number(vector.values[cursor] ?? 0)
+                        }
+                    }
+                    return 0
                 }
 
-                const hp = base.hp * (1 + denseValue(bonusValues, BONUS_KEY_INDEX, "hpPct"))
-                    + denseValue(bonusValues, BONUS_KEY_INDEX, "hpFlat")
-                const atk = base.atk * (1 + denseValue(bonusValues, BONUS_KEY_INDEX, "atkPct"))
-                    + denseValue(bonusValues, BONUS_KEY_INDEX, "atkFlat")
-                const def = base.def * (1 + denseValue(bonusValues, BONUS_KEY_INDEX, "defPct"))
-                    + denseValue(bonusValues, BONUS_KEY_INDEX, "defFlat")
-                panelValues[PANEL_KEY_INDEX.get("hp")] = hp
-                panelValues[PANEL_KEY_INDEX.get("atk")] = atk
-                panelValues[PANEL_KEY_INDEX.get("def")] = def
-                panelValues[PANEL_KEY_INDEX.get("critRate")] = basePanelStats.critRate + denseValue(bonusValues, BONUS_KEY_INDEX, "critRate")
-                panelValues[PANEL_KEY_INDEX.get("critDmg")] = basePanelStats.critDmg + denseValue(bonusValues, BONUS_KEY_INDEX, "critDmg")
-                panelValues[PANEL_KEY_INDEX.get("impact")] = (basePanelStats.impact * (1 + denseValue(bonusValues, BONUS_KEY_INDEX, "impactPct")))
-                    + denseValue(bonusValues, BONUS_KEY_INDEX, "impactFlat")
-                panelValues[PANEL_KEY_INDEX.get("anomalyProficiency")] = basePanelStats.anomalyProficiency
-                    + denseValue(bonusValues, BONUS_KEY_INDEX, "anomalyProficiencyFlat")
-                panelValues[PANEL_KEY_INDEX.get("anomalyMastery")] = basePanelStats.anomalyMastery
-                    + denseValue(bonusValues, BONUS_KEY_INDEX, "anomalyMasteryFlat")
-                panelValues[PANEL_KEY_INDEX.get("energyRegen")] = basePanelStats.energyRegen
-                    * (1 + denseValue(bonusValues, BONUS_KEY_INDEX, "energyRegenPct"))
-                panelValues[PANEL_KEY_INDEX.get("penFlat")] = basePanelStats.penFlat + denseValue(bonusValues, BONUS_KEY_INDEX, "penFlat")
-                panelValues[PANEL_KEY_INDEX.get("penRatio")] = basePanelStats.penRatio + denseValue(bonusValues, BONUS_KEY_INDEX, "penRatio")
-                for (const key of RES_IGNORE_KEYS) {
-                    panelValues[PANEL_KEY_INDEX.get(key)] = denseValue(bonusValues, BONUS_KEY_INDEX, key)
+                function bonusValue(statValues, key, denseVector = null, indexedVectorA = null, indexedVectorB = null) {
+                    const bonusIndex = BONUS_KEY_INDEX.get(key)
+                    if (bonusIndex === undefined) {
+                        return 0
+                    }
+                    let value = Number(fixedBonusValues[bonusIndex] ?? 0)
+                    for (const term of statTermsByBonusIndex[bonusIndex]) {
+                        const statIndex = term.statIndex
+                        const statValue = Number(statValues[statIndex] ?? 0)
+                            + Number(denseVector?.[statIndex] ?? 0)
+                            + indexedVectorValue(indexedVectorA, statIndex)
+                            + indexedVectorValue(indexedVectorB, statIndex)
+                        value += statValue * term.factor
+                    }
+                    return value
                 }
-                panelValues[PANEL_KEY_INDEX.get("dmgBonus")] = basePanelStats.dmgBonus + denseValue(bonusValues, BONUS_KEY_INDEX, "dmgBonus")
-                for (const element of DAMAGE_ELEMENTS) {
-                    const key = `${element}Dmg`
-                    panelValues[PANEL_KEY_INDEX.get(key)] = denseValue(bonusValues, BONUS_KEY_INDEX, key)
+
+                function panelValue(statValues, key, denseVector = null, indexedVectorA = null, indexedVectorB = null) {
+                    if (key === "hp") return base.hp * (1 + bonusValue(statValues, "hpPct", denseVector, indexedVectorA, indexedVectorB))
+                        + bonusValue(statValues, "hpFlat", denseVector, indexedVectorA, indexedVectorB)
+                    if (key === "atk") return base.atk * (1 + bonusValue(statValues, "atkPct", denseVector, indexedVectorA, indexedVectorB))
+                        + bonusValue(statValues, "atkFlat", denseVector, indexedVectorA, indexedVectorB)
+                    if (key === "def") return base.def * (1 + bonusValue(statValues, "defPct", denseVector, indexedVectorA, indexedVectorB))
+                        + bonusValue(statValues, "defFlat", denseVector, indexedVectorA, indexedVectorB)
+                    if (key === "critRate") return basePanelStats.critRate
+                        + bonusValue(statValues, "critRate", denseVector, indexedVectorA, indexedVectorB)
+                    if (key === "critDmg") return basePanelStats.critDmg
+                        + bonusValue(statValues, "critDmg", denseVector, indexedVectorA, indexedVectorB)
+                    if (key === "impact") return basePanelStats.impact
+                        * (1 + bonusValue(statValues, "impactPct", denseVector, indexedVectorA, indexedVectorB))
+                        + bonusValue(statValues, "impactFlat", denseVector, indexedVectorA, indexedVectorB)
+                    if (key === "anomalyProficiency") return basePanelStats.anomalyProficiency
+                        + bonusValue(statValues, "anomalyProficiencyFlat", denseVector, indexedVectorA, indexedVectorB)
+                    if (key === "anomalyMastery") return calculateAnomalyMastery(
+                        basePanelStats.anomalyMastery,
+                        bonusValue(statValues, "anomalyMasteryPct", denseVector, indexedVectorA, indexedVectorB),
+                        bonusValue(statValues, "anomalyMasteryFlat", denseVector, indexedVectorA, indexedVectorB),
+                    )
+                    if (key === "energyRegen") return basePanelStats.energyRegen
+                        * (1 + bonusValue(statValues, "energyRegenPct", denseVector, indexedVectorA, indexedVectorB))
+                    if (key === "penFlat") return basePanelStats.penFlat
+                        + bonusValue(statValues, "penFlat", denseVector, indexedVectorA, indexedVectorB)
+                    if (key === "penRatio") return basePanelStats.penRatio
+                        + bonusValue(statValues, "penRatio", denseVector, indexedVectorA, indexedVectorB)
+                    if (key === "dmgBonus") return basePanelStats.dmgBonus
+                        + bonusValue(statValues, "dmgBonus", denseVector, indexedVectorA, indexedVectorB)
+                    return bonusValue(statValues, key, denseVector, indexedVectorA, indexedVectorB)
                 }
-                panelValues[PANEL_KEY_INDEX.get("sheerForceFlat")] = isRupture
-                    ? denseValue(bonusValues, BONUS_KEY_INDEX, "sheerForceFlat")
-                    : 0
-                panelValues[PANEL_KEY_INDEX.get("sheerForce")] = isRupture
-                    ? Math.max(0, (hp * SHEER_FORCE_HP_RATIO) + (atk * SHEER_FORCE_ATK_RATIO) + panelValues[PANEL_KEY_INDEX.get("sheerForceFlat")])
-                    : 0
 
                 return {
                     base,
-                    bonusValues,
-                    panelValues,
+                    panelValue,
+                    score(statValues = []) {
+                        bonusValues.set(fixedBonusValues)
+                        return scorePrepared(statValues, candidateStatIndexes)
+                    },
                 }
             },
         }
@@ -4326,7 +4818,11 @@ function createPreparedOutOfCombatPanelCalculator({ agent, wEngine, driveDiscSet
             panel.critDmg = basePanelStats.critDmg + bonusTotals.critDmg
             panel.impact = (basePanelStats.impact * (1 + bonusTotals.impactPct)) + bonusTotals.impactFlat
             panel.anomalyProficiency = basePanelStats.anomalyProficiency + bonusTotals.anomalyProficiencyFlat
-            panel.anomalyMastery = basePanelStats.anomalyMastery + bonusTotals.anomalyMasteryFlat
+            panel.anomalyMastery = calculateAnomalyMastery(
+                basePanelStats.anomalyMastery,
+                bonusTotals.anomalyMasteryPct,
+                bonusTotals.anomalyMasteryFlat,
+            )
             panel.energyRegen = basePanelStats.energyRegen * (1 + bonusTotals.energyRegenPct)
             panel.penFlat = basePanelStats.penFlat + bonusTotals.penFlat
             panel.penRatio = basePanelStats.penRatio + bonusTotals.penRatio
@@ -4404,7 +4900,11 @@ function createPreparedOutOfCombatPanelCalculator({ agent, wEngine, driveDiscSet
             panel.critDmg = basePanelStats.critDmg + bonusTotals.critDmg
             panel.impact = (basePanelStats.impact * (1 + bonusTotals.impactPct)) + bonusTotals.impactFlat
             panel.anomalyProficiency = basePanelStats.anomalyProficiency + bonusTotals.anomalyProficiencyFlat
-            panel.anomalyMastery = basePanelStats.anomalyMastery + bonusTotals.anomalyMasteryFlat
+            panel.anomalyMastery = calculateAnomalyMastery(
+                basePanelStats.anomalyMastery,
+                bonusTotals.anomalyMasteryPct,
+                bonusTotals.anomalyMasteryFlat,
+            )
             panel.energyRegen = basePanelStats.energyRegen * (1 + bonusTotals.energyRegenPct)
             panel.penFlat = basePanelStats.penFlat + bonusTotals.penFlat
             panel.penRatio = basePanelStats.penRatio + bonusTotals.penRatio
@@ -4489,7 +4989,11 @@ function createPreparedOutOfCombatPanelCalculator({ agent, wEngine, driveDiscSet
             panel.critDmg = basePanelStats.critDmg + bonusTotals.critDmg
             panel.impact = (basePanelStats.impact * (1 + bonusTotals.impactPct)) + bonusTotals.impactFlat
             panel.anomalyProficiency = basePanelStats.anomalyProficiency + bonusTotals.anomalyProficiencyFlat
-            panel.anomalyMastery = basePanelStats.anomalyMastery + bonusTotals.anomalyMasteryFlat
+            panel.anomalyMastery = calculateAnomalyMastery(
+                basePanelStats.anomalyMastery,
+                bonusTotals.anomalyMasteryPct,
+                bonusTotals.anomalyMasteryFlat,
+            )
             panel.energyRegen = basePanelStats.energyRegen * (1 + bonusTotals.energyRegenPct)
             panel.penFlat = basePanelStats.penFlat + bonusTotals.penFlat
             panel.penRatio = basePanelStats.penRatio + bonusTotals.penRatio
@@ -4537,6 +5041,7 @@ export function normalizeCatalogPayload({
     wEnginesRaw = {},
     driveDiscSetsRaw = {},
     combatBuffsRaw = {},
+    bossesRaw = {},
     anomalyEffectsRaw = {},
     statRulesRaw = {},
     exampleRaw = {},
@@ -4557,7 +5062,9 @@ export function normalizeCatalogPayload({
     ]
     const teammateCombatBuffs = flattenTeammateCombatBuffs(combatBuffsRaw.teammates ?? [])
     const fieldCombatBuffs = flattenFieldCombatBuffs(rawFieldBuffs)
-    const bossCombatBuffs = flattenBossCombatBuffs(rawBossBuffs)
+    const archivedBossCombatBuffs = flattenBossCatalog(bossesRaw.bosses ?? [])
+    const allBossCombatBuffs = [...rawBossBuffs, ...archivedBossCombatBuffs]
+    const bossCombatBuffs = flattenBossCombatBuffs(allBossCombatBuffs)
     const anomalyCatalog = normalizeAnomalyCatalogPayload(anomalyEffectsRaw)
     const catalog = {
         agents: agentsRaw.agents ?? [],
@@ -4574,9 +5081,10 @@ export function normalizeCatalogPayload({
             ...rawSystemBuffs,
         ],
         teammateCombatBuffGroups: visibleTeammateCombatBuffGroups(combatBuffsRaw.teammates ?? []),
+        bosses: bossesRaw.bosses ?? [],
         teammateCombatBuffs,
         fieldCombatBuffs: rawFieldBuffs,
-        bossCombatBuffs: rawBossBuffs,
+        bossCombatBuffs: allBossCombatBuffs,
         systemCombatBuffs: rawSystemBuffs,
         statRules: statRulesRaw,
         example: exampleRaw,
@@ -4606,52 +5114,74 @@ export function normalizeCatalog(catalog = {}) {
 }
 
 export function buildMeta(catalog) {
+    const agents = (catalog.agents ?? []).map(agent => ({
+        id: agent.id,
+        name: agent.name,
+        rarity: agent.rarity,
+        attribute: agent.attribute,
+        damageElement: agent.damageElement,
+        specialty: agent.specialty,
+        faction: agent.faction,
+        images: agent.images,
+        coreSkill: agent.coreSkill,
+        combatBuffs: agent.combatBuffs ?? {},
+        preferredDriveDiscs: agent.preferredDriveDiscs ?? null,
+        skillGroups: agent.skillGroups ?? [],
+        defaultCalculationConfig: agent.defaultCalculationConfig ?? null,
+    }))
+    const visibleAgentIds = new Set(
+        (catalog.displayAgents ?? (catalog.agents ?? []).filter(catalogItemVisible))
+            .map(agent => agent.id),
+    )
+    const agentSkills = (catalog.agentSkills ?? []).map(item => ({
+        id: item.id,
+        agentId: item.agentId,
+        name: item.name,
+        categories: item.categories ?? [],
+        sources: item.sources ?? [],
+        verification: item.verification ?? null,
+    }))
+    const wEngines = (catalog.wEngines ?? []).map(item => ({
+        id: item.id,
+        name: item.name,
+        rarity: item.rarity,
+        specialty: item.specialty,
+        attribute: item.attribute,
+        level60: item.level60,
+        modification: item.modification ?? { minLevel: 1, maxLevel: 5, defaultLevel: 1 },
+        effect: item.effect ?? null,
+        passive: wEngineEffectSelfBuff(item),
+        selfBuff: wEngineEffectSelfBuff(item),
+        teamBuff: wEngineEffectTeamBuff(item),
+        relatedAgentId: item.relatedAgentId,
+        images: item.images,
+    }))
+    const visibleWEngineIds = new Set(
+        (catalog.displayWEngines ?? (catalog.wEngines ?? []).filter(catalogItemVisible))
+            .map(item => item.id),
+    )
+    const driveDiscSets = (catalog.driveDiscSets ?? []).map(item => ({
+        id: item.id,
+        name: item.name,
+        images: item.images,
+        twoPiece: item.twoPiece,
+        fourPiece: item.fourPiece,
+    }))
+    const visibleDriveDiscSetIds = new Set(
+        (catalog.displayDriveDiscSets ?? (catalog.driveDiscSets ?? []).filter(catalogItemVisible))
+            .map(item => item.id),
+    )
+
     return {
-        agents: catalog.agents.map(agent => ({
-            id: agent.id,
-            name: agent.name,
-            rarity: agent.rarity,
-            attribute: agent.attribute,
-            damageElement: agent.damageElement,
-            specialty: agent.specialty,
-            faction: agent.faction,
-            images: agent.images,
-            coreSkill: agent.coreSkill,
-            combatBuffs: agent.combatBuffs ?? {},
-            preferredDriveDiscs: agent.preferredDriveDiscs ?? null,
-            skillGroups: agent.skillGroups ?? [],
-            defaultCalculationConfig: agent.defaultCalculationConfig ?? null,
-        })),
-        agentSkills: (catalog.agentSkills ?? []).map(item => ({
-            id: item.id,
-            agentId: item.agentId,
-            name: item.name,
-            categories: item.categories ?? [],
-            sources: item.sources ?? [],
-            verification: item.verification ?? null,
-        })),
-        wEngines: catalog.wEngines.map(item => ({
-            id: item.id,
-            name: item.name,
-            rarity: item.rarity,
-            specialty: item.specialty,
-            attribute: item.attribute,
-            level60: item.level60,
-            modification: item.modification ?? { minLevel: 1, maxLevel: 5, defaultLevel: 1 },
-            effect: item.effect ?? null,
-            passive: wEngineEffectSelfBuff(item),
-            selfBuff: wEngineEffectSelfBuff(item),
-            teamBuff: wEngineEffectTeamBuff(item),
-            relatedAgentId: item.relatedAgentId,
-            images: item.images,
-        })),
-        driveDiscSets: catalog.driveDiscSets.map(item => ({
-            id: item.id,
-            name: item.name,
-            images: item.images,
-            twoPiece: item.twoPiece,
-            fourPiece: item.fourPiece,
-        })),
+        bosses: (catalog.bosses ?? []).filter(catalogItemVisible),
+        agents,
+        displayAgents: agents.filter(agent => visibleAgentIds.has(agent.id)),
+        agentSkills,
+        displayAgentSkills: agentSkills.filter(item => visibleAgentIds.has(item.agentId ?? item.id)),
+        wEngines,
+        displayWEngines: wEngines.filter(item => visibleWEngineIds.has(item.id)),
+        driveDiscSets,
+        displayDriveDiscSets: driveDiscSets.filter(item => visibleDriveDiscSetIds.has(item.id)),
         combatBuffs: (catalog.combatBuffs ?? [])
             .filter(item => !item.hidden)
             .map(item => ({
@@ -4678,9 +5208,11 @@ export function buildMeta(catalog) {
                 buffModifiers: item.buffModifiers ?? null,
                 coverage: item.coverage ?? null,
             })),
-        teammateCombatBuffGroups: (catalog.teammateCombatBuffGroups ?? []).map(teammate => ({
+        teammateCombatBuffGroups: (catalog.displayTeammateCombatBuffGroups ?? catalog.teammateCombatBuffGroups ?? []).map(teammate => ({
             id: teammate.id,
             name: teammate.name,
+            attribute: teammate.attribute,
+            specialty: teammate.specialty,
             images: teammate.images ?? null,
             buffs: (teammate.buffs ?? []).map(buff => {
                 const normalizedBuff = normalizeTeammateCombatBuffForGroup(teammate, buff)
@@ -4706,7 +5238,7 @@ export function buildMeta(catalog) {
                 }
             }),
         })),
-        fieldCombatBuffs: flattenFieldCombatBuffs(catalog.fieldCombatBuffs ?? [])
+        fieldCombatBuffs: flattenFieldCombatBuffs(catalog.displayFieldCombatBuffs ?? catalog.fieldCombatBuffs ?? [])
             .filter(item => !item.hidden)
             .map(item => ({
                 id: item.id,
@@ -4725,7 +5257,7 @@ export function buildMeta(catalog) {
                 buffModifiers: item.buffModifiers ?? null,
                 coverage: item.coverage ?? null,
             })),
-        bossCombatBuffs: flattenBossCombatBuffs(catalog.bossCombatBuffs ?? [])
+        bossCombatBuffs: flattenBossCombatBuffs(catalog.displayBossCombatBuffs ?? catalog.bossCombatBuffs ?? [])
             .filter(item => !item.hidden)
             .map(item => ({
                 id: item.id,
@@ -4733,6 +5265,10 @@ export function buildMeta(catalog) {
                 sourceCategory: item.sourceCategory,
                 sourceKind: item.sourceKind,
                 bossName: item.bossName,
+                bossId: item.bossId,
+                aliases: item.aliases ?? [],
+                images: item.images ?? null,
+                target: item.target ?? null,
                 bossSource: item.bossSource,
                 sourceLabel: item.sourceLabel,
                 sourcePeriod: item.sourcePeriod,
@@ -4743,6 +5279,12 @@ export function buildMeta(catalog) {
                 effects: item.effects ?? null,
                 buffModifiers: item.buffModifiers ?? null,
                 coverage: item.coverage ?? null,
+                appearances: item.appearances ?? [],
+                enemyIntel: item.enemyIntel ?? null,
+                recommendedSpecialties: item.recommendedSpecialties ?? [],
+                playerBuffs: item.playerBuffs ?? [],
+                playerDebuffs: item.playerDebuffs ?? [],
+                sources: item.sources ?? [],
             })),
         statRules: catalog.statRules,
         damageTargetPresets: DAMAGE_TARGET_PRESETS,
@@ -4815,6 +5357,65 @@ export function createInCombatPanelCalculator(catalog, input) {
     const activeDriveDisc4pcIds = [...activeBuffIds].filter(activeId => String(activeId).startsWith("driveDisc4pc:"))
     const normalizedDamageInput = normalizeDamageRequest(input.damage, agent, catalog, { coreSkillLevel: input.coreSkillLevel })
     const compiledDamageTarget = compileDamageScoreTarget(normalizedDamageInput, agent)
+    const hasMasteryToProficiencyConversion = activeAgentBuffs.some(entry =>
+        effectRules(entry.buff).some(rule => rule?.stat === "anomalyProficiencyPerMasteryAbove140")
+    )
+
+    function optimizerStatMetadata({ minimums = {} } = {}) {
+        const panelStats = new Set()
+        for (const event of compiledDamageTarget.events ?? []) {
+            const damageElement = String(event.damageElement ?? "physical")
+            panelStats.add("dmgBonus")
+            panelStats.add(`${damageElement}Dmg`)
+            panelStats.add(`${damageElement}ResIgnore`)
+
+            const usesAnomalyFormula = event.kind !== "direct" && event.kind !== "sheer"
+            if (event.kind === "sheer") {
+                if (compiledDamageTarget.isRuptureAgent) {
+                    panelStats.add("sheerForce")
+                }
+            } else {
+                if (event.kind === "direct" && event.damageBasis === "anomalyProficiency") {
+                    panelStats.add("anomalyProficiency")
+                } else {
+                    panelStats.add("atk")
+                }
+                panelStats.add("penFlat")
+                panelStats.add("penRatio")
+            }
+
+            if (!usesAnomalyFormula) {
+                if (event.critMode !== "nonCrit") {
+                    panelStats.add("critDmg")
+                }
+                if (event.critMode !== "crit" && event.critMode !== "nonCrit") {
+                    panelStats.add("critRate")
+                }
+            } else {
+                panelStats.add("anomalyProficiency")
+            }
+        }
+        if (hasMasteryToProficiencyConversion && panelStats.has("anomalyProficiency")) {
+            panelStats.add("anomalyMastery")
+        }
+        for (const [stat, value] of Object.entries(minimums ?? {})) {
+            if (value !== null && value !== undefined && Number.isFinite(Number(value))) {
+                panelStats.add(stat)
+            }
+        }
+
+        const relevantStatIds = new Set()
+        for (const panelStat of panelStats) {
+            for (const stat of OPTIMIZER_INPUT_STATS_BY_PANEL_STAT[panelStat] ?? [panelStat]) {
+                relevantStatIds.add(stat)
+            }
+        }
+        return {
+            strictMonotonic: true,
+            panelStatIds: [...panelStats].sort(),
+            relevantStatIds: [...relevantStatIds].sort(),
+        }
+    }
     const activeManualEntries = manualStats
         .map((item, index) => {
             const value = Number(item?.value ?? 0)
@@ -4864,7 +5465,7 @@ export function createInCombatPanelCalculator(catalog, input) {
         })
         .filter(Boolean)
 
-    function compileDensePanelScoreTarget({ statIds = [], setIds = [], setIndexById = null } = {}) {
+    function compileDensePanelScoreTarget({ statIds = [], setIds = [], setIndexById = null, candidateStatIndexes = [] } = {}) {
         if (typeof outOfCombatCalculator.compileDenseOutOfCombatTarget !== "function") {
             return null
         }
@@ -4901,6 +5502,7 @@ export function createInCombatPanelCalculator(catalog, input) {
             const entry = compileDenseCombatEffectEntry({
                 ...options,
                 buffModifiers: denseBuffModifiers,
+                agent,
             })
             if (entry) {
                 entries.push(entry)
@@ -4950,6 +5552,22 @@ export function createInCombatPanelCalculator(catalog, input) {
                 key: entry.key,
                 sourceType: "wEngineTeam",
                 runtimeInput: runtimeInputs[entry.key],
+            })) {
+                return null
+            }
+        }
+
+        for (let setIndex = 0; setIndex < setIds.length; setIndex += 1) {
+            const setId = setIds[setIndex]
+            const set = driveDiscSets.get(setId)
+            const effect = driveDiscTwoPieceCombatBuff(set)
+            if (!effect) continue
+            if (!pushEntry({
+                effect,
+                key: driveDisc2pcKey(setId),
+                sourceType: "driveDisc2pc",
+                setIndex,
+                minSetCount: 2,
             })) {
                 return null
             }
@@ -5022,40 +5640,68 @@ export function createInCombatPanelCalculator(catalog, input) {
             }
         }
 
-        const denseOutOfCombat = outOfCombatCalculator.compileDenseOutOfCombatTarget(statIds, setIds)
+        const denseOutOfCombat = outOfCombatCalculator.compileDenseOutOfCombatTarget(statIds, setIds, candidateStatIndexes)
         const combatValues = new Float64Array(COMBAT_BONUS_KEYS.length)
         const panelValues = new Float64Array(OUTPUT_PANEL_KEYS.length)
         const panel = createPanel()
         const result = {
             panel,
+            outOfCombatPanelValues: null,
             selectedDmgBonus: 0,
             finalDamage: 0,
             minPanelPass: true,
             requiredPanel: null,
         }
+        const scalarResult = {
+            panelValues,
+            outOfCombatPanelValues: null,
+            selectedDmgBonus: 0,
+            finalDamage: 0,
+        }
         const activeEntryFlags = new Uint8Array(entries.length)
+        const activeExclusiveGroups = new Set()
+        const allEntryIndexes = entries.map((_, index) => index)
         const eventModifierEntries = compileDenseDamageModifierEntries(entries, compiledDamageTarget.events)
         const modifierSums = new Float64Array(DAMAGE_MODIFIER_SUM_KEYS.length)
         const selectedAttributeBonusKey = resolveAttributeBonusKey(agent)
         const isRupture = isRuptureAgent(agent)
 
-        return {
-            scoreKernel: "compiled-dense",
-            scoreDense(statValues = [], setCountValues = []) {
-                const outOfCombat = denseOutOfCombat.score(statValues, setCountValues)
+        function scoreDense(
+            statValues = [],
+            setCountValues = [],
+            includePanel = true,
+            fixedOutOfCombatTarget = null,
+            fixedActiveEntryIndexes = null,
+            fixedCombatValues = null,
+            fixedEntryFlags = null,
+        ) {
+                const outOfCombat = fixedOutOfCombatTarget
+                    ? fixedOutOfCombatTarget.score(statValues)
+                    : denseOutOfCombat.score(statValues, setCountValues)
                 const outPanelValues = outOfCombat.panelValues
+                result.outOfCombatPanelValues = outPanelValues
                 const outBase = outOfCombat.base
-                combatValues.fill(0)
-                activeEntryFlags.fill(0)
-
-                for (let entryIndex = 0; entryIndex < entries.length; entryIndex += 1) {
-                    const entry = entries[entryIndex]
-                    if (entry.setIndex !== null && Number(setCountValues[entry.setIndex] ?? 0) < Number(entry.minSetCount ?? 0)) {
-                        continue
-                    }
-                    activeEntryFlags[entryIndex] = 1
-                    for (const stat of entry.stats ?? []) {
-                        addDenseCombatStat(combatValues, stat, entry.sourceType, outBase, outPanelValues)
+                if (fixedCombatValues && fixedEntryFlags) {
+                    combatValues.set(fixedCombatValues)
+                    activeEntryFlags.set(fixedEntryFlags)
+                } else {
+                    combatValues.fill(0)
+                    activeEntryFlags.fill(0)
+                    activeExclusiveGroups.clear()
+                    const entryIndexes = fixedActiveEntryIndexes ?? allEntryIndexes
+                    for (const entryIndex of entryIndexes) {
+                        const entry = entries[entryIndex]
+                        if (!fixedActiveEntryIndexes && entry.setIndex !== null && Number(setCountValues[entry.setIndex] ?? 0) < Number(entry.minSetCount ?? 0)) {
+                            continue
+                        }
+                        if (entry.exclusiveGroup && activeExclusiveGroups.has(entry.exclusiveGroup)) {
+                            continue
+                        }
+                        if (entry.exclusiveGroup) activeExclusiveGroups.add(entry.exclusiveGroup)
+                        activeEntryFlags[entryIndex] = 1
+                        for (const stat of entry.stats ?? []) {
+                            addDenseCombatStat(combatValues, stat, entry.sourceType, outBase, outPanelValues)
+                        }
                     }
                 }
 
@@ -5072,44 +5718,49 @@ export function createInCombatPanelCalculator(catalog, input) {
                     + Number(outBase.def ?? 0) * (denseCombatValue(combatValues, "defPct") + denseCombatValue(combatValues, "defPctBase"))
                     + densePanelValue(outPanelValues, "def") * denseCombatValue(combatValues, "defPctOutOfCombat")
 
-                panelValues[PANEL_KEY_INDEX.get("hp")] = hp
-                panelValues[PANEL_KEY_INDEX.get("atk")] = atk
-                panelValues[PANEL_KEY_INDEX.get("def")] = def
-                panelValues[PANEL_KEY_INDEX.get("critRate")] = densePanelValue(outPanelValues, "critRate")
+                panelValues[PANEL_KEY_LOOKUP.hp] = hp
+                panelValues[PANEL_KEY_LOOKUP.atk] = atk
+                panelValues[PANEL_KEY_LOOKUP.def] = def
+                panelValues[PANEL_KEY_LOOKUP.critRate] = densePanelValue(outPanelValues, "critRate")
                     + denseCombatValue(combatValues, "critRate")
-                panelValues[PANEL_KEY_INDEX.get("critDmg")] = densePanelValue(outPanelValues, "critDmg")
+                panelValues[PANEL_KEY_LOOKUP.critDmg] = densePanelValue(outPanelValues, "critDmg")
                     + denseCombatValue(combatValues, "critDmg")
-                panelValues[PANEL_KEY_INDEX.get("impact")] = (densePanelValue(outPanelValues, "impact") * (1 + denseCombatValue(combatValues, "impactPct")))
+                panelValues[PANEL_KEY_LOOKUP.impact] = (densePanelValue(outPanelValues, "impact") * (1 + denseCombatValue(combatValues, "impactPct")))
                     + denseCombatValue(combatValues, "impactFlat")
-                panelValues[PANEL_KEY_INDEX.get("anomalyProficiency")] = densePanelValue(outPanelValues, "anomalyProficiency")
+                panelValues[PANEL_KEY_LOOKUP.anomalyMastery] = calculateAnomalyMastery(
+                    densePanelValue(outPanelValues, "anomalyMastery"),
+                    denseCombatValue(combatValues, "anomalyMasteryPct"),
+                    denseCombatValue(combatValues, "anomalyMasteryFlat"),
+                )
+                panelValues[PANEL_KEY_LOOKUP.anomalyProficiency] = densePanelValue(outPanelValues, "anomalyProficiency")
                     + denseCombatValue(combatValues, "anomalyProficiencyFlat")
-                panelValues[PANEL_KEY_INDEX.get("anomalyMastery")] = densePanelValue(outPanelValues, "anomalyMastery")
-                    + denseCombatValue(combatValues, "anomalyMasteryFlat")
-                panelValues[PANEL_KEY_INDEX.get("energyRegen")] = densePanelValue(outPanelValues, "energyRegen")
+                    + Math.max(0, panelValues[PANEL_KEY_LOOKUP.anomalyMastery] - 140)
+                        * Math.max(0, denseCombatValue(combatValues, "anomalyProficiencyPerMasteryAbove140"))
+                panelValues[PANEL_KEY_LOOKUP.energyRegen] = densePanelValue(outPanelValues, "energyRegen")
                     * (1 + denseCombatValue(combatValues, "energyRegenPct"))
-                panelValues[PANEL_KEY_INDEX.get("penFlat")] = densePanelValue(outPanelValues, "penFlat")
+                panelValues[PANEL_KEY_LOOKUP.penFlat] = densePanelValue(outPanelValues, "penFlat")
                     + denseCombatValue(combatValues, "penFlat")
-                panelValues[PANEL_KEY_INDEX.get("penRatio")] = densePanelValue(outPanelValues, "penRatio")
+                panelValues[PANEL_KEY_LOOKUP.penRatio] = densePanelValue(outPanelValues, "penRatio")
                     + denseCombatValue(combatValues, "penRatio")
                 for (const key of RES_IGNORE_KEYS) {
-                    panelValues[PANEL_KEY_INDEX.get(key)] = densePanelValue(outPanelValues, key) + denseCombatValue(combatValues, key)
+                    panelValues[PANEL_KEY_LOOKUP[key]] = densePanelValue(outPanelValues, key) + denseCombatValue(combatValues, key)
                 }
-                panelValues[PANEL_KEY_INDEX.get("dmgBonus")] = densePanelValue(outPanelValues, "dmgBonus")
+                panelValues[PANEL_KEY_LOOKUP.dmgBonus] = densePanelValue(outPanelValues, "dmgBonus")
                     + denseCombatValue(combatValues, "dmgBonus")
                 for (const element of DAMAGE_ELEMENTS) {
                     const key = `${element}Dmg`
-                    panelValues[PANEL_KEY_INDEX.get(key)] = densePanelValue(outPanelValues, key)
+                    panelValues[PANEL_KEY_LOOKUP[key]] = densePanelValue(outPanelValues, key)
                         + denseCombatValue(combatValues, key)
                 }
-                panelValues[PANEL_KEY_INDEX.get("sheerForceFlat")] = isRupture
+                panelValues[PANEL_KEY_LOOKUP.sheerForceFlat] = isRupture
                     ? densePanelValue(outPanelValues, "sheerForceFlat") + denseCombatValue(combatValues, "sheerForceFlat")
                     : 0
-                panelValues[PANEL_KEY_INDEX.get("sheerForce")] = isRupture
-                    ? Math.max(0, (hp * SHEER_FORCE_HP_RATIO) + (atk * SHEER_FORCE_ATK_RATIO) + panelValues[PANEL_KEY_INDEX.get("sheerForceFlat")])
+                panelValues[PANEL_KEY_LOOKUP.sheerForce] = isRupture
+                    ? Math.max(0, (hp * SHEER_FORCE_HP_RATIO) + (atk * SHEER_FORCE_ATK_RATIO) + panelValues[PANEL_KEY_LOOKUP.sheerForceFlat])
                     : 0
 
-                for (const key of OUTPUT_PANEL_KEYS) {
-                    panel[key] = panelValues[PANEL_KEY_INDEX.get(key)] ?? 0
+                if (includePanel) for (const key of OUTPUT_PANEL_KEYS) {
+                    panel[key] = panelValues[PANEL_KEY_LOOKUP[key]] ?? 0
                 }
                 result.selectedDmgBonus = densePanelValue(panelValues, "dmgBonus")
                     + densePanelValue(panelValues, selectedAttributeBonusKey)
@@ -5122,7 +5773,525 @@ export function createInCombatPanelCalculator(catalog, input) {
                     activeEntryFlags,
                     modifierSums,
                 })
-                return result
+            return result
+        }
+
+        function compileFixedDirectScoreKernel(fixedOutOfCombatTarget, fixedCombatValues, fixedEntryFlags) {
+            const events = compiledDamageTarget.events ?? []
+            if (!events.length
+                || events.some(event => event.kind !== "direct" || event.damageBasis === "anomalyProficiency")
+                || typeof fixedOutOfCombatTarget.panelValue !== "function") {
+                return null
+            }
+            const target = compiledDamageTarget.target
+            const compiledEvents = events.map((event, eventIndex) => {
+                const sums = new Float64Array(DAMAGE_MODIFIER_SUM_KEYS.length)
+                fillDenseModifierSums(sums, eventModifierEntries[eventIndex], fixedEntryFlags)
+                const targetDefenseAfterReduction = Math.max(
+                    0,
+                    Number(target.defense ?? 0)
+                        * (1 - (
+                            fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.enemyDefReduction]
+                            + denseModifierSum(sums, "enemyDefReduction")
+                            + denseModifierSum(sums, event.elementDefIgnoreKey)
+                        ))
+                        - fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.enemyDefFlatReduction],
+                )
+                return {
+                    count: event.count,
+                    damageScale: event.damageScale,
+                    critMode: event.critMode,
+                    damageIndex: PANEL_KEY_LOOKUP[`${event.damageElement}Dmg`],
+                    resIgnoreIndex: PANEL_KEY_LOOKUP[event.resIgnoreKey],
+                    effectiveSkillMultiplier: Math.max(0, event.skillMultiplier + denseModifierSum(sums, "skillMultiplierBonus")),
+                    directDamageBonus: denseModifierSum(sums, "directDamageBonus")
+                        + denseModifierSum(sums, "dmgBonus")
+                        + denseModifierSum(sums, event.elementDmgKey),
+                    elementCritDmgBonus: denseModifierSum(sums, event.elementCritDmgKey),
+                    targetDefenseAfterReduction,
+                    levelCoefficient: Number(target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT),
+                    targetResistance: Number(target.resistanceByElement?.[event.damageElement] ?? 0),
+                    enemyResReduction: fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.enemyResReduction]
+                        + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP[event.resReductionKey]]
+                        + denseModifierSum(sums, "enemyResReduction")
+                        + denseModifierSum(sums, event.resReductionKey),
+                    modifierResIgnore: denseModifierSum(sums, ALL_RES_IGNORE_KEY)
+                        + denseModifierSum(sums, event.resIgnoreKey),
+                    stunMultiplier: targetActiveStunMultiplier(target, event.stunned, {
+                        stunDmgMultiplierBonus: denseModifierSum(sums, "stunDmgMultiplierBonus"),
+                        stunDmgMultiplierBonusAlways: denseModifierSum(sums, "stunDmgMultiplierBonusAlways"),
+                        stunDmgMultiplierBonusCapAlways: denseModifierSum(sums, "stunDmgMultiplierBonusCapAlways"),
+                    }),
+                }
+            })
+
+            function scoreObjectiveScalar(
+                statValues = [],
+                suffixDenseVector = null,
+                branchIndexedVector = null,
+                optimisticIndexedVector = null,
+            ) {
+                scalarResult.outOfCombatPanelValues = null
+                const outPanelValue = key => fixedOutOfCombatTarget.panelValue(
+                    statValues,
+                    key,
+                    suffixDenseVector,
+                    branchIndexedVector,
+                    optimisticIndexedVector,
+                )
+                const outBase = fixedOutOfCombatTarget.base
+                const outAtk = outPanelValue("atk")
+                const atk = outAtk
+                    + denseCombatValue(fixedCombatValues, "atkFlat")
+                    + Number(outBase.atk ?? 0) * (
+                        denseCombatValue(fixedCombatValues, "atkPct")
+                        + denseCombatValue(fixedCombatValues, "atkPctBase")
+                    )
+                    + outAtk * denseCombatValue(fixedCombatValues, "atkPctOutOfCombat")
+                const critRate = clampNumber(
+                    outPanelValue("critRate") + denseCombatValue(fixedCombatValues, "critRate"),
+                    0,
+                    1,
+                )
+                const critDmg = outPanelValue("critDmg") + denseCombatValue(fixedCombatValues, "critDmg")
+                const penFlat = outPanelValue("penFlat") + denseCombatValue(fixedCombatValues, "penFlat")
+                const penRatio = outPanelValue("penRatio") + denseCombatValue(fixedCombatValues, "penRatio")
+                const dmgBonus = outPanelValue("dmgBonus") + denseCombatValue(fixedCombatValues, "dmgBonus")
+                let total = 0
+                for (const event of compiledEvents) {
+                    const resIgnoreKey = OUTPUT_PANEL_KEYS[event.resIgnoreIndex]
+                    const damageKey = OUTPUT_PANEL_KEYS[event.damageIndex]
+                    const resIgnore = outPanelValue(ALL_RES_IGNORE_KEY)
+                        + denseCombatValue(fixedCombatValues, ALL_RES_IGNORE_KEY)
+                        + outPanelValue(resIgnoreKey)
+                        + denseCombatValue(fixedCombatValues, resIgnoreKey)
+                    const elementDmg = outPanelValue(damageKey) + denseCombatValue(fixedCombatValues, damageKey)
+                    const effectiveDefense = Math.max(0, event.targetDefenseAfterReduction * (1 - penRatio) - penFlat)
+                    const defenseMultiplier = Math.min(1, event.levelCoefficient / (event.levelCoefficient + effectiveDefense))
+                    const resistanceMultiplier = clampNumber(
+                        1 - (event.targetResistance - event.enemyResReduction - (resIgnore + event.modifierResIgnore)),
+                        0.01,
+                        2,
+                    )
+                    const effectiveCritDmg = critDmg + event.elementCritDmgBonus
+                    const critMultiplier = event.critMode === "crit"
+                        ? 1 + effectiveCritDmg
+                        : event.critMode === "nonCrit"
+                            ? 1
+                            : critRate * (1 + effectiveCritDmg) + (1 - critRate)
+                    total += atk
+                        * event.effectiveSkillMultiplier
+                        * (1 + dmgBonus + elementDmg + event.directDamageBonus)
+                        * defenseMultiplier
+                        * resistanceMultiplier
+                        * event.stunMultiplier
+                        * critMultiplier
+                        * event.damageScale
+                        * event.count
+                }
+                scalarResult.selectedDmgBonus = dmgBonus
+                scalarResult.finalDamage = total
+                return scalarResult
+            }
+
+            return {
+                scoreObjectiveScalar,
+                scoreCombinedScalar(statValues = [], branchIndexedVector = null, suffixDenseVector = null, optimisticIndexedVector = null) {
+                    return scoreObjectiveScalar(statValues, suffixDenseVector, branchIndexedVector, optimisticIndexedVector)
+                },
+                scoreScalar(statValues = []) {
+                    const outOfCombat = fixedOutOfCombatTarget.score(statValues)
+                    const outPanelValues = outOfCombat.panelValues
+                    scalarResult.outOfCombatPanelValues = outPanelValues
+                    const outBase = outOfCombat.base
+                    const hp = outPanelValues[PANEL_KEY_LOOKUP.hp]
+                        + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.hpFlat]
+                        + Number(outBase.hp ?? 0) * (
+                            fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.hpPct]
+                            + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.hpPctBase]
+                        )
+                        + outPanelValues[PANEL_KEY_LOOKUP.hp] * fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.hpPctOutOfCombat]
+                    const atk = outPanelValues[PANEL_KEY_LOOKUP.atk]
+                        + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.atkFlat]
+                        + Number(outBase.atk ?? 0) * (
+                            fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.atkPct]
+                            + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.atkPctBase]
+                        )
+                        + outPanelValues[PANEL_KEY_LOOKUP.atk] * fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.atkPctOutOfCombat]
+                    const def = outPanelValues[PANEL_KEY_LOOKUP.def]
+                        + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.defFlat]
+                        + Number(outBase.def ?? 0) * (
+                            fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.defPct]
+                            + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.defPctBase]
+                        )
+                        + outPanelValues[PANEL_KEY_LOOKUP.def] * fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.defPctOutOfCombat]
+
+                    panelValues[PANEL_KEY_LOOKUP.hp] = hp
+                    panelValues[PANEL_KEY_LOOKUP.atk] = atk
+                    panelValues[PANEL_KEY_LOOKUP.def] = def
+                    panelValues[PANEL_KEY_LOOKUP.critRate] = outPanelValues[PANEL_KEY_LOOKUP.critRate]
+                        + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.critRate]
+                    panelValues[PANEL_KEY_LOOKUP.critDmg] = outPanelValues[PANEL_KEY_LOOKUP.critDmg]
+                        + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.critDmg]
+                    panelValues[PANEL_KEY_LOOKUP.impact] = outPanelValues[PANEL_KEY_LOOKUP.impact]
+                        * (1 + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.impactPct])
+                        + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.impactFlat]
+                    panelValues[PANEL_KEY_LOOKUP.anomalyMastery] = calculateAnomalyMastery(
+                        outPanelValues[PANEL_KEY_LOOKUP.anomalyMastery],
+                        fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.anomalyMasteryPct],
+                        fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.anomalyMasteryFlat],
+                    )
+                    panelValues[PANEL_KEY_LOOKUP.anomalyProficiency] = outPanelValues[PANEL_KEY_LOOKUP.anomalyProficiency]
+                        + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.anomalyProficiencyFlat]
+                        + Math.max(0, panelValues[PANEL_KEY_LOOKUP.anomalyMastery] - 140)
+                            * Math.max(0, fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.anomalyProficiencyPerMasteryAbove140])
+                    panelValues[PANEL_KEY_LOOKUP.energyRegen] = outPanelValues[PANEL_KEY_LOOKUP.energyRegen]
+                        * (1 + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.energyRegenPct])
+                    panelValues[PANEL_KEY_LOOKUP.penFlat] = outPanelValues[PANEL_KEY_LOOKUP.penFlat]
+                        + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.penFlat]
+                    panelValues[PANEL_KEY_LOOKUP.penRatio] = outPanelValues[PANEL_KEY_LOOKUP.penRatio]
+                        + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.penRatio]
+                    for (const key of RES_IGNORE_KEYS) {
+                        panelValues[PANEL_KEY_LOOKUP[key]] = outPanelValues[PANEL_KEY_LOOKUP[key]]
+                            + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP[key]]
+                    }
+                    panelValues[PANEL_KEY_LOOKUP.dmgBonus] = outPanelValues[PANEL_KEY_LOOKUP.dmgBonus]
+                        + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.dmgBonus]
+                    for (const element of DAMAGE_ELEMENTS) {
+                        const key = `${element}Dmg`
+                        panelValues[PANEL_KEY_LOOKUP[key]] = outPanelValues[PANEL_KEY_LOOKUP[key]]
+                            + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP[key]]
+                    }
+                    panelValues[PANEL_KEY_LOOKUP.sheerForceFlat] = isRupture
+                        ? outPanelValues[PANEL_KEY_LOOKUP.sheerForceFlat]
+                            + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.sheerForceFlat]
+                        : 0
+                    panelValues[PANEL_KEY_LOOKUP.sheerForce] = isRupture
+                        ? Math.max(
+                            0,
+                            (hp * SHEER_FORCE_HP_RATIO)
+                                + (atk * SHEER_FORCE_ATK_RATIO)
+                                + panelValues[PANEL_KEY_LOOKUP.sheerForceFlat],
+                        )
+                        : 0
+
+                    let total = 0
+                    for (const event of compiledEvents) {
+                        const effectiveDefense = Math.max(
+                            0,
+                            event.targetDefenseAfterReduction * (1 - panelValues[PANEL_KEY_LOOKUP.penRatio])
+                                - panelValues[PANEL_KEY_LOOKUP.penFlat],
+                        )
+                        const defenseMultiplier = Math.min(
+                            1,
+                            event.levelCoefficient / (event.levelCoefficient + effectiveDefense),
+                        )
+                        const resistanceMultiplier = clampNumber(
+                            1 - (
+                                event.targetResistance
+                                - event.enemyResReduction
+                                - (
+                                    panelValues[PANEL_KEY_LOOKUP[ALL_RES_IGNORE_KEY]]
+                                    + panelValues[event.resIgnoreIndex]
+                                    + event.modifierResIgnore
+                                )
+                            ),
+                            0.01,
+                            2,
+                        )
+                        const critRate = clampNumber(panelValues[PANEL_KEY_LOOKUP.critRate], 0, 1)
+                        const critDmg = panelValues[PANEL_KEY_LOOKUP.critDmg]
+                        const effectiveCritDmg = critDmg + event.elementCritDmgBonus
+                        const critMultiplier = event.critMode === "crit"
+                            ? 1 + effectiveCritDmg
+                            : event.critMode === "nonCrit"
+                                ? 1
+                                : critRate * (1 + effectiveCritDmg) + (1 - critRate)
+                        const targetMultiplier = defenseMultiplier * resistanceMultiplier * event.stunMultiplier
+                        total += atk
+                            * event.effectiveSkillMultiplier
+                            * (1 + panelValues[PANEL_KEY_LOOKUP.dmgBonus] + panelValues[event.damageIndex] + event.directDamageBonus)
+                            * targetMultiplier
+                            * critMultiplier
+                            * event.damageScale
+                            * event.count
+                    }
+                    scalarResult.selectedDmgBonus = panelValues[PANEL_KEY_LOOKUP.dmgBonus]
+                        + panelValues[PANEL_KEY_LOOKUP[selectedAttributeBonusKey]]
+                    scalarResult.finalDamage = total
+                    return scalarResult
+                },
+            }
+        }
+
+        function compileFixedNonDirectObjectiveKernel(fixedOutOfCombatTarget, fixedCombatValues, fixedEntryFlags) {
+            const events = compiledDamageTarget.events ?? []
+            if (!events.length
+                || events.every(event => event.kind === "direct")
+                || events.some(event => !["direct", "anomaly", "disorder", "sheer"].includes(event.kind))
+                || typeof fixedOutOfCombatTarget.panelValue !== "function") {
+                return null
+            }
+            const target = compiledDamageTarget.target
+            const compiledEvents = events.map((event, eventIndex) => {
+                const sums = new Float64Array(DAMAGE_MODIFIER_SUM_KEYS.length)
+                fillDenseModifierSums(sums, eventModifierEntries[eventIndex], fixedEntryFlags)
+                const targetDefenseAfterReduction = Math.max(
+                    0,
+                    Number(target.defense ?? 0)
+                        * (1 - (
+                            denseCombatValue(fixedCombatValues, "enemyDefReduction")
+                            + denseModifierSum(sums, "enemyDefReduction")
+                            + denseModifierSum(sums, event.elementDefIgnoreKey)
+                        ))
+                        - denseCombatValue(fixedCombatValues, "enemyDefFlatReduction"),
+                )
+                const skillDamageBonus = denseModifierSum(sums, "dmgBonus")
+                    + denseModifierSum(sums, event.elementDmgKey)
+                return {
+                    kind: event.kind,
+                    isDisorder: event.isDisorder,
+                    count: event.count,
+                    damageBasis: event.damageBasis,
+                    damageScale: event.damageScale,
+                    critMode: event.critMode,
+                    damageKey: `${event.damageElement}Dmg`,
+                    resIgnoreKey: event.resIgnoreKey,
+                    effectiveSkillMultiplier: Math.max(0, event.skillMultiplier + denseModifierSum(sums, "skillMultiplierBonus")),
+                    directDamageBonus: denseModifierSum(sums, "directDamageBonus") + skillDamageBonus,
+                    skillDamageBonus,
+                    elementCritDmgBonus: denseModifierSum(sums, event.elementCritDmgKey),
+                    sheerDmgBonus: denseModifierSum(sums, "sheerDmgBonus")
+                        + denseModifierSum(sums, event.elementSheerDmgKey),
+                    effectiveBaseMultiplier: Math.max(
+                        0,
+                        compiledEventBaseMultiplier(
+                            event,
+                            denseModifierSum(sums, "anomalyDurationBonusSeconds"),
+                        ) + denseModifierSum(
+                            sums,
+                            event.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
+                        ),
+                    ) * event.baseMultiplierScale,
+                    anomalyDamageBonus: 1 + denseModifierSum(
+                        sums,
+                        event.isDisorder ? "disorderDamageBonus" : "anomalyDamageBonus",
+                    ),
+                    anomalyCritMultiplier: denseAnomalyCritMultiplier(event, sums),
+                    targetDefenseAfterReduction,
+                    levelCoefficient: Number(target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT),
+                    targetResistance: Number(target.resistanceByElement?.[event.damageElement] ?? 0),
+                    enemyResReduction: denseCombatValue(fixedCombatValues, "enemyResReduction")
+                        + denseCombatValue(fixedCombatValues, event.resReductionKey)
+                        + denseModifierSum(sums, "enemyResReduction")
+                        + denseModifierSum(sums, event.resReductionKey),
+                    modifierResIgnore: denseModifierSum(sums, ALL_RES_IGNORE_KEY)
+                        + denseModifierSum(sums, event.resIgnoreKey),
+                    stunMultiplier: targetActiveStunMultiplier(target, event.stunned, {
+                        stunDmgMultiplierBonus: denseModifierSum(sums, "stunDmgMultiplierBonus"),
+                        stunDmgMultiplierBonusAlways: denseModifierSum(sums, "stunDmgMultiplierBonusAlways"),
+                        stunDmgMultiplierBonusCapAlways: denseModifierSum(sums, "stunDmgMultiplierBonusCapAlways"),
+                    }),
+                }
+            })
+            const needsSheer = compiledEvents.some(event => event.kind === "sheer")
+            const needsAnomaly = compiledEvents.some(event => !["direct", "sheer"].includes(event.kind)
+                || (event.kind === "direct" && event.damageBasis === "anomalyProficiency"))
+            const needsCrit = compiledEvents.some(event => ["direct", "sheer"].includes(event.kind))
+            const needsDefense = compiledEvents.some(event => event.kind !== "sheer")
+
+            function scoreObjectiveScalar(
+                statValues = [],
+                suffixDenseVector = null,
+                branchIndexedVector = null,
+                optimisticIndexedVector = null,
+            ) {
+                scalarResult.outOfCombatPanelValues = null
+                const outPanelValue = key => fixedOutOfCombatTarget.panelValue(
+                    statValues,
+                    key,
+                    suffixDenseVector,
+                    branchIndexedVector,
+                    optimisticIndexedVector,
+                )
+                const outBase = fixedOutOfCombatTarget.base
+                const outAtk = outPanelValue("atk")
+                const atk = outAtk
+                    + denseCombatValue(fixedCombatValues, "atkFlat")
+                    + Number(outBase.atk ?? 0) * (
+                        denseCombatValue(fixedCombatValues, "atkPct")
+                        + denseCombatValue(fixedCombatValues, "atkPctBase")
+                    )
+                    + outAtk * denseCombatValue(fixedCombatValues, "atkPctOutOfCombat")
+                const critRate = needsCrit
+                    ? clampNumber(outPanelValue("critRate") + denseCombatValue(fixedCombatValues, "critRate"), 0, 1)
+                    : 0
+                const critDmg = needsCrit
+                    ? outPanelValue("critDmg") + denseCombatValue(fixedCombatValues, "critDmg")
+                    : 0
+                const penFlat = needsDefense
+                    ? outPanelValue("penFlat") + denseCombatValue(fixedCombatValues, "penFlat")
+                    : 0
+                const penRatio = needsDefense
+                    ? outPanelValue("penRatio") + denseCombatValue(fixedCombatValues, "penRatio")
+                    : 0
+                const dmgBonus = outPanelValue("dmgBonus") + denseCombatValue(fixedCombatValues, "dmgBonus")
+                const anomalyMastery = needsAnomaly
+                    ? calculateAnomalyMastery(
+                        outPanelValue("anomalyMastery"),
+                        denseCombatValue(fixedCombatValues, "anomalyMasteryPct"),
+                        denseCombatValue(fixedCombatValues, "anomalyMasteryFlat"),
+                    )
+                    : 0
+                const anomalyProficiency = needsAnomaly
+                    ? outPanelValue("anomalyProficiency")
+                        + denseCombatValue(fixedCombatValues, "anomalyProficiencyFlat")
+                        + Math.max(0, anomalyMastery - 140)
+                            * Math.max(0, denseCombatValue(fixedCombatValues, "anomalyProficiencyPerMasteryAbove140"))
+                    : 0
+                let sheerForce = 0
+                if (needsSheer && compiledDamageTarget.isRuptureAgent) {
+                    const outHp = outPanelValue("hp")
+                    const hp = outHp
+                        + denseCombatValue(fixedCombatValues, "hpFlat")
+                        + Number(outBase.hp ?? 0) * (
+                            denseCombatValue(fixedCombatValues, "hpPct")
+                            + denseCombatValue(fixedCombatValues, "hpPctBase")
+                        )
+                        + outHp * denseCombatValue(fixedCombatValues, "hpPctOutOfCombat")
+                    const sheerForceFlat = outPanelValue("sheerForceFlat")
+                        + denseCombatValue(fixedCombatValues, "sheerForceFlat")
+                    sheerForce = Math.max(0, hp * SHEER_FORCE_HP_RATIO + atk * SHEER_FORCE_ATK_RATIO + sheerForceFlat)
+                }
+
+                let total = 0
+                for (const event of compiledEvents) {
+                    const elementDmg = outPanelValue(event.damageKey) + denseCombatValue(fixedCombatValues, event.damageKey)
+                    const resIgnore = outPanelValue(ALL_RES_IGNORE_KEY)
+                        + denseCombatValue(fixedCombatValues, ALL_RES_IGNORE_KEY)
+                        + outPanelValue(event.resIgnoreKey)
+                        + denseCombatValue(fixedCombatValues, event.resIgnoreKey)
+                        + event.modifierResIgnore
+                    const resistanceMultiplier = clampNumber(
+                        1 - (event.targetResistance - event.enemyResReduction - resIgnore),
+                        0.01,
+                        2,
+                    )
+                    const effectiveCritDmg = critDmg + event.elementCritDmgBonus
+                    const critMultiplier = event.critMode === "crit"
+                        ? 1 + effectiveCritDmg
+                        : event.critMode === "nonCrit"
+                            ? 1
+                            : critRate * (1 + effectiveCritDmg) + (1 - critRate)
+                    if (event.kind === "sheer") {
+                        total += sheerForce
+                            * event.effectiveSkillMultiplier
+                            * critMultiplier
+                            * (1 + dmgBonus + elementDmg + event.skillDamageBonus)
+                            * resistanceMultiplier
+                            * (1 + event.sheerDmgBonus)
+                            * event.stunMultiplier
+                            * event.damageScale
+                            * event.count
+                        continue
+                    }
+                    const effectiveDefense = Math.max(0, event.targetDefenseAfterReduction * (1 - penRatio) - penFlat)
+                    const defenseMultiplier = Math.min(1, event.levelCoefficient / (event.levelCoefficient + effectiveDefense))
+                    if (event.kind === "direct") {
+                        total += (event.damageBasis === "anomalyProficiency" ? anomalyProficiency : atk)
+                            * event.effectiveSkillMultiplier
+                            * (1 + dmgBonus + elementDmg + event.directDamageBonus)
+                            * defenseMultiplier
+                            * resistanceMultiplier
+                            * event.stunMultiplier
+                            * critMultiplier
+                            * event.damageScale
+                            * event.count
+                        continue
+                    }
+                    total += atk
+                        * event.effectiveBaseMultiplier
+                        * (1 + dmgBonus + elementDmg + event.skillDamageBonus)
+                        * defenseMultiplier
+                        * resistanceMultiplier
+                        * event.stunMultiplier
+                        * (Math.max(0, anomalyProficiency) / 100)
+                        * compiledDamageTarget.anomalyLevelMultiplier
+                        * event.anomalyDamageBonus
+                        * event.anomalyCritMultiplier
+                        * event.damageScale
+                        * event.count
+                }
+                scalarResult.selectedDmgBonus = dmgBonus
+                scalarResult.finalDamage = total
+                return scalarResult
+            }
+
+            return {
+                scoreObjectiveScalar,
+                scoreCombinedScalar(statValues = [], branchIndexedVector = null, suffixDenseVector = null, optimisticIndexedVector = null) {
+                    return scoreObjectiveScalar(statValues, suffixDenseVector, branchIndexedVector, optimisticIndexedVector)
+                },
+            }
+        }
+
+        return {
+            scoreKernel: "compiled-dense",
+            panelStatIds: OUTPUT_PANEL_KEYS,
+            scoreDense,
+            compileForSetCounts(setCountValues = []) {
+                const fixedSetCountValues = new Int16Array(setCountValues)
+                const fixedOutOfCombatTarget = denseOutOfCombat.compileForSetCounts?.(fixedSetCountValues) ?? null
+                const fixedCandidates = entries
+                    .map((entry, index) => ({ entry, index }))
+                    .filter(({ entry }) => entry.setIndex === null || Number(fixedSetCountValues[entry.setIndex] ?? 0) >= Number(entry.minSetCount ?? 0))
+                const fixedExclusiveGroups = new Set()
+                const fixedActiveEntryIndexes = fixedCandidates
+                    .filter(({ entry }) => {
+                        if (!entry.exclusiveGroup) return true
+                        if (fixedExclusiveGroups.has(entry.exclusiveGroup)) return false
+                        fixedExclusiveGroups.add(entry.exclusiveGroup)
+                        return true
+                    })
+                    .map(({ index }) => index)
+                const fixedCombatValues = new Float64Array(COMBAT_BONUS_KEYS.length)
+                const fixedEntryFlags = new Uint8Array(entries.length)
+                for (const entryIndex of fixedActiveEntryIndexes) {
+                    const entry = entries[entryIndex]
+                    fixedEntryFlags[entryIndex] = 1
+                    for (const stat of entry.stats ?? []) {
+                        addDenseCombatStat(fixedCombatValues, stat, entry.sourceType, null, null)
+                    }
+                }
+                const fixedDirectKernel = fixedOutOfCombatTarget
+                    ? compileFixedDirectScoreKernel(fixedOutOfCombatTarget, fixedCombatValues, fixedEntryFlags)
+                    : null
+                const fixedObjectiveKernel = fixedDirectKernel ?? (fixedOutOfCombatTarget
+                    ? compileFixedNonDirectObjectiveKernel(fixedOutOfCombatTarget, fixedCombatValues, fixedEntryFlags)
+                    : null)
+                return {
+                    scoreKernel: fixedObjectiveKernel ? "compiled-objective-fixed-sets" : "compiled-dense-fixed-sets",
+                    scoreObjectiveScalar: fixedObjectiveKernel?.scoreObjectiveScalar,
+                    scoreCombinedScalar: fixedObjectiveKernel?.scoreCombinedScalar,
+                    scoreScalar(statValues = []) {
+                        if (fixedDirectKernel) {
+                            return fixedDirectKernel.scoreScalar(statValues)
+                        }
+                        const summary = scoreDense(
+                            statValues,
+                            fixedSetCountValues,
+                            false,
+                            fixedOutOfCombatTarget,
+                            fixedActiveEntryIndexes,
+                            fixedCombatValues,
+                            fixedEntryFlags,
+                        )
+                        scalarResult.outOfCombatPanelValues = summary.outOfCombatPanelValues
+                        scalarResult.selectedDmgBonus = summary.selectedDmgBonus
+                        scalarResult.finalDamage = summary.finalDamage
+                        return scalarResult
+                    },
+                }
             },
         }
     }
@@ -5131,6 +6300,7 @@ export function createInCombatPanelCalculator(catalog, input) {
         const bonusTotals = createCombatBonusTotals()
         const activeEffects = null
         const ignoredEffects = null
+        const exclusiveGroups = new Set()
         const readSetCount = typeof getSetCount === "function"
             ? getSetCount
             : setId => setCounts.get(setId) ?? 0
@@ -5151,6 +6321,7 @@ export function createInCombatPanelCalculator(catalog, input) {
         for (const buff of activeCatalogBuffs) {
             applyCombatEffect({
                 bonusTotals,
+                agent,
                 effect: buff,
                 key: buff.id,
                 name: buff.name,
@@ -5167,6 +6338,7 @@ export function createInCombatPanelCalculator(catalog, input) {
         for (const entry of activeAgentBuffs) {
             applyCombatEffect({
                 bonusTotals,
+                agent,
                 effect: entry.buff,
                 key: entry.id,
                 name: entry.buff.name,
@@ -5187,6 +6359,7 @@ export function createInCombatPanelCalculator(catalog, input) {
 
             applyCombatEffect({
                 bonusTotals,
+                agent,
                 effect: entry.effect,
                 key: entry.key,
                 name: entry.effect.name ?? entry.name,
@@ -5203,6 +6376,7 @@ export function createInCombatPanelCalculator(catalog, input) {
         for (const entry of activeTeamWEngineEntries) {
             applyCombatEffect({
                 bonusTotals,
+                agent,
                 effect: entry.teamBuff,
                 key: entry.key,
                 name: entry.teamBuff?.name ?? wEngineEffectData(entry.sourceWEngine)?.name ?? entry.sourceWEngine.name,
@@ -5210,6 +6384,25 @@ export function createInCombatPanelCalculator(catalog, input) {
                 conditionLabel: entry.teamBuff?.condition,
                 outOfCombat,
                 runtimeInput: runtimeInputs[entry.key],
+                buffModifiers: activeBuffModifiers,
+                activeEffects,
+                ignoredEffects,
+            })
+        }
+
+        for (const [setId, set] of driveDiscSets) {
+            if (readSetCount(setId) < 2) continue
+            const effect = driveDiscTwoPieceCombatBuff(set)
+            if (!effect) continue
+            applyCombatEffect({
+                bonusTotals,
+                agent,
+                effect,
+                key: driveDisc2pcKey(setId),
+                name: set.name,
+                sourceType: "driveDisc2pc",
+                outOfCombat,
+                runtimeInput: runtimeInputs[driveDisc2pcKey(setId)],
                 buffModifiers: activeBuffModifiers,
                 activeEffects,
                 ignoredEffects,
@@ -5230,6 +6423,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                 : driveDiscFourPieceSelfBuff(set)
             applyCombatEffect({
                 bonusTotals,
+                agent,
                 effect,
                 key: activeId,
                 name: set.name,
@@ -5240,6 +6434,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                 buffModifiers: activeBuffModifiers,
                 activeEffects,
                 ignoredEffects,
+                exclusiveGroups,
             })
         }
 
@@ -5257,6 +6452,7 @@ export function createInCombatPanelCalculator(catalog, input) {
             const teamBuff = driveDiscFourPieceTeamBuff(set)
             applyCombatEffect({
                 bonusTotals,
+                agent,
                 effect: teamBuff,
                 key,
                 name: set.name,
@@ -5267,12 +6463,14 @@ export function createInCombatPanelCalculator(catalog, input) {
                 buffModifiers: activeBuffModifiers,
                 activeEffects,
                 ignoredEffects,
+                exclusiveGroups,
             })
         })
 
         for (const entry of activeManualEntries) {
             applyCombatEffect({
                 bonusTotals,
+                agent,
                 effect: entry.effect,
                 key: entry.key,
                 name: entry.name,
@@ -5287,6 +6485,7 @@ export function createInCombatPanelCalculator(catalog, input) {
         for (const entry of activeManualEffectEntries) {
             applyCombatEffect({
                 bonusTotals,
+                agent,
                 effect: entry.effect,
                 key: entry.key,
                 name: entry.name,
@@ -5302,6 +6501,7 @@ export function createInCombatPanelCalculator(catalog, input) {
         const inCombatPanel = calculateCombatPanelFromTotals(agent, outOfCombat, bonusTotals)
         return {
             panel: inCombatPanel.panel,
+            outOfCombatPanel: outOfCombat.panel,
             selectedDmgBonus: inCombatPanel.selectedDmgBonus,
             finalDamage: useCompiledDamage
                 ? calculateCompiledDamageScoreValue({
@@ -5322,11 +6522,13 @@ export function createInCombatPanelCalculator(catalog, input) {
     return {
         compiledScoreOnly: true,
         compileDensePanelScoreTarget,
+        optimizerStatMetadata,
         calculate(driveDiscs = [], options = {}) {
             const outOfCombat = outOfCombatCalculator.calculate(driveDiscs, { round: false })
             const bonusTotals = createCombatBonusTotals()
             const activeEffects = []
             const ignoredEffects = []
+            const exclusiveGroups = new Set()
             const setCounts = new Map()
             for (const disc of driveDiscs) {
                 if (!disc.setId) {
@@ -5352,6 +6554,7 @@ export function createInCombatPanelCalculator(catalog, input) {
             for (const buff of activeCatalogBuffs) {
                 applyCombatEffect({
                     bonusTotals,
+                    agent,
                     effect: buff,
                     key: buff.id,
                     name: buff.name,
@@ -5368,6 +6571,7 @@ export function createInCombatPanelCalculator(catalog, input) {
             for (const entry of activeAgentBuffs) {
                 applyCombatEffect({
                     bonusTotals,
+                    agent,
                     effect: entry.buff,
                     key: entry.id,
                     name: entry.name,
@@ -5393,6 +6597,7 @@ export function createInCombatPanelCalculator(catalog, input) {
 
                 applyCombatEffect({
                     bonusTotals,
+                    agent,
                     effect: entry.effect,
                     key: entry.key,
                     name: entry.effect.name ?? entry.name,
@@ -5409,6 +6614,7 @@ export function createInCombatPanelCalculator(catalog, input) {
             for (const entry of activeTeamWEngineEntries) {
                 applyCombatEffect({
                     bonusTotals,
+                    agent,
                     effect: entry.teamBuff,
                     key: entry.key,
                     name: entry.teamBuff?.name ?? wEngineEffectData(entry.sourceWEngine)?.name ?? entry.sourceWEngine.name,
@@ -5416,6 +6622,25 @@ export function createInCombatPanelCalculator(catalog, input) {
                     conditionLabel: entry.teamBuff?.condition,
                     outOfCombat,
                     runtimeInput: runtimeInputs[entry.key],
+                    buffModifiers: activeBuffModifiers,
+                    activeEffects,
+                    ignoredEffects,
+                })
+            }
+
+            for (const [setId, set] of driveDiscSets) {
+                if ((setCounts.get(setId) ?? 0) < 2) continue
+                const effect = driveDiscTwoPieceCombatBuff(set)
+                if (!effect) continue
+                applyCombatEffect({
+                    bonusTotals,
+                    agent,
+                    effect,
+                    key: driveDisc2pcKey(setId),
+                    name: set.name,
+                    sourceType: "driveDisc2pc",
+                    outOfCombat,
+                    runtimeInput: runtimeInputs[driveDisc2pcKey(setId)],
                     buffModifiers: activeBuffModifiers,
                     activeEffects,
                     ignoredEffects,
@@ -5452,6 +6677,7 @@ export function createInCombatPanelCalculator(catalog, input) {
 
                 applyCombatEffect({
                     bonusTotals,
+                    agent,
                     effect,
                     key: activeId,
                     name: set.name,
@@ -5462,6 +6688,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     buffModifiers: activeBuffModifiers,
                     activeEffects,
                     ignoredEffects,
+                    exclusiveGroups,
                 })
             }
 
@@ -5484,6 +6711,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                 const teamBuff = driveDiscFourPieceTeamBuff(set)
                 applyCombatEffect({
                     bonusTotals,
+                    agent,
                     effect: teamBuff,
                     key,
                     name: set.name,
@@ -5494,12 +6722,14 @@ export function createInCombatPanelCalculator(catalog, input) {
                     buffModifiers: activeBuffModifiers,
                     activeEffects,
                     ignoredEffects,
+                    exclusiveGroups,
                 })
             })
 
             for (const entry of activeManualEntries) {
                 applyCombatEffect({
                     bonusTotals,
+                    agent,
                     effect: entry.effect,
                     key: entry.key,
                     name: entry.name,
@@ -5514,6 +6744,7 @@ export function createInCombatPanelCalculator(catalog, input) {
             for (const entry of activeManualEffectEntries) {
                 applyCombatEffect({
                     bonusTotals,
+                    agent,
                     effect: entry.effect,
                     key: entry.key,
                     name: entry.name,
@@ -5617,6 +6848,7 @@ export function calculateInCombatPanel(catalog, input) {
     const bonusTotals = createCombatBonusTotals()
     const activeEffects = []
     const ignoredEffects = []
+    const exclusiveGroups = new Set()
     const activeCatalogBuffs = (catalog.combatBuffs ?? []).filter(buff => activeBuffIds.has(buff.id))
     const activeAgentBuffs = agentCombatBuffEntries(agent).filter(entry => activeBuffIds.has(entry.id))
     const currentWEngineRequirement = wEngineEffectData(wEngine)?.requirement?.specialty ?? wEngine.specialty
@@ -5651,6 +6883,7 @@ export function calculateInCombatPanel(catalog, input) {
     for (const buff of activeCatalogBuffs) {
         applyCombatEffect({
             bonusTotals,
+            agent,
             effect: buff,
             key: buff.id,
             name: buff.name,
@@ -5667,6 +6900,7 @@ export function calculateInCombatPanel(catalog, input) {
     for (const entry of activeAgentBuffs) {
         applyCombatEffect({
             bonusTotals,
+            agent,
             effect: entry.buff,
             key: entry.id,
             name: entry.name,
@@ -5692,6 +6926,7 @@ export function calculateInCombatPanel(catalog, input) {
 
         applyCombatEffect({
             bonusTotals,
+            agent,
             effect: entry.effect,
             key: entry.key,
             name: entry.effect.name ?? entry.name,
@@ -5708,6 +6943,7 @@ export function calculateInCombatPanel(catalog, input) {
     for (const entry of activeTeamWEngineEntries) {
         applyCombatEffect({
             bonusTotals,
+            agent,
             effect: entry.teamBuff,
             key: entry.key,
             name: entry.teamBuff?.name ?? wEngineEffectData(entry.sourceWEngine)?.name ?? entry.sourceWEngine.name,
@@ -5715,6 +6951,25 @@ export function calculateInCombatPanel(catalog, input) {
             conditionLabel: entry.teamBuff?.condition,
             outOfCombat,
             runtimeInput: runtimeInputs[entry.key],
+            buffModifiers: activeBuffModifiers,
+            activeEffects,
+            ignoredEffects,
+        })
+    }
+
+    for (const [setId, set] of driveDiscSets) {
+        if ((setCounts.get(setId) ?? 0) < 2) continue
+        const effect = driveDiscTwoPieceCombatBuff(set)
+        if (!effect) continue
+        applyCombatEffect({
+            bonusTotals,
+            agent,
+            effect,
+            key: driveDisc2pcKey(setId),
+            name: set.name,
+            sourceType: "driveDisc2pc",
+            outOfCombat,
+            runtimeInput: runtimeInputs[driveDisc2pcKey(setId)],
             buffModifiers: activeBuffModifiers,
             activeEffects,
             ignoredEffects,
@@ -5751,6 +7006,7 @@ export function calculateInCombatPanel(catalog, input) {
 
         applyCombatEffect({
             bonusTotals,
+            agent,
             effect,
             key: activeId,
             name: set.name,
@@ -5761,6 +7017,7 @@ export function calculateInCombatPanel(catalog, input) {
             buffModifiers: activeBuffModifiers,
             activeEffects,
             ignoredEffects,
+            exclusiveGroups,
         })
     }
 
@@ -5783,6 +7040,7 @@ export function calculateInCombatPanel(catalog, input) {
         const teamBuff = driveDiscFourPieceTeamBuff(set)
         applyCombatEffect({
             bonusTotals,
+            agent,
             effect: teamBuff,
             key,
             name: set.name,
@@ -5793,6 +7051,7 @@ export function calculateInCombatPanel(catalog, input) {
             buffModifiers: activeBuffModifiers,
             activeEffects,
             ignoredEffects,
+            exclusiveGroups,
         })
     })
 
@@ -5805,6 +7064,7 @@ export function calculateInCombatPanel(catalog, input) {
         const key = item.id ? `manual:${item.id}` : `manual:${index + 1}`
         applyCombatEffect({
             bonusTotals,
+            agent,
             effect: {
                 scope: "inCombat",
                 condition: null,
@@ -5839,6 +7099,7 @@ export function calculateInCombatPanel(catalog, input) {
         const key = item.id ? `manualEffect:${item.id}` : `manualEffect:${index + 1}`
         applyCombatEffect({
             bonusTotals,
+            agent,
             effect: {
                 scope: "inCombat",
                 condition: null,

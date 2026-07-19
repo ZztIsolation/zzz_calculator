@@ -97,7 +97,7 @@ function selectEventId(value: string | number | null) {
 </script>
 
 <template>
-  <div v-if="damage" class="damage-whitebox">
+  <div v-if="damage" class="damage-whitebox ui-layout-scope" data-layout-surface="damage-whitebox">
     <div class="damage-whitebox-current">
       <div>
         <span>当前白盒</span>
@@ -254,7 +254,7 @@ function selectEventId(value: string | number | null) {
   font-size: 15px;
 }
 
-@media (max-width: 640px) {
+@container ui-layout (max-width: 640px) {
   .damage-whitebox-row {
     grid-template-columns: 1fr;
   }

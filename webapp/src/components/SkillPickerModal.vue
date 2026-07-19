@@ -90,8 +90,8 @@ function choose(item: any) {
       <div class="skill-list">
         <button v-for="item in rows" :key="`${item.category.id}:${item.move.id}:${item.row.id}`" type="button" class="skill-row" @click="choose(item)">
           <span>
-            <strong>{{ labelOf(item.move) }}</strong>
-            <small>{{ labelOf(item.category) }} / {{ labelOf(item.row) }} · {{ skillLevelLabel(item.category, item.level) }}</small>
+            <strong :title="labelOf(item.move)">{{ labelOf(item.move) }}</strong>
+            <small :title="`${labelOf(item.category)} / ${labelOf(item.row)} · ${skillLevelLabel(item.category, item.level)}`">{{ labelOf(item.category) }} / {{ labelOf(item.row) }} · {{ skillLevelLabel(item.category, item.level) }}</small>
           </span>
           <span class="num">{{ item.value }}%</span>
         </button>

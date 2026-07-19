@@ -35,6 +35,10 @@ function normalizeId(value) {
     return String(value ?? "").trim()
 }
 
+function normalizeStunned(value, fallback = true) {
+    return value === undefined ? fallback : Boolean(value)
+}
+
 export function calculationSkillGroups(source = {}) {
     const groups = Array.isArray(source?.skillGroups)
         ? source.skillGroups
@@ -113,6 +117,7 @@ export function normalizeSkillGroupReferenceEvent(event = {}, source = {}, index
         kind: "skillGroup",
         skillGroupId: groupId,
         count,
+        stunned: normalizeStunned(event.stunned, options.defaultStunned ?? true),
     }
 }
 
@@ -168,6 +173,7 @@ export function expandCalculationEvents(events = [], source = {}, options = {}) 
             const childId = normalizeId(next.id) || `event-${childIndex + 1}`
             next.id = `${refId}__${childId}`
             next.count = finiteNumber(next.count, 1) * groupCount
+            next.stunned = normalizeStunned(event.stunned)
             if (!selectedIdMap.has(refId)) {
                 selectedIdMap.set(refId, next.id)
             }

@@ -1,5 +1,6 @@
 import {
   ANOMALY_EFFECT_LABELS,
+  DISORDER_EFFECT_LABELS,
   combatBuffDisplayName as sharedCombatBuffDisplayName,
   enumLabel as sharedEnumLabel,
   localizedText,
@@ -291,11 +292,19 @@ export function anomalyEffectLabel(value: unknown, meta?: any): string {
     return ""
   }
   const id = String(value)
-  const effect = [
-    ...(meta?.anomalyEffects ?? []),
-    ...(meta?.disorderEffects ?? []),
-  ].find((item: any) => item?.id === id || item?.type === id)
+  const effect = (meta?.anomalyEffects ?? [])
+    .find((item: any) => item?.id === id || item?.type === id)
   return (effect ? localizedText(effect.label) || labelOf(effect) : "") || ANOMALY_EFFECT_LABELS[id] || id
+}
+
+export function disorderEffectLabel(value: unknown, meta?: any): string {
+  if (value === null || value === undefined || value === "") {
+    return ""
+  }
+  const id = String(value)
+  const effect = (meta?.disorderEffects ?? [])
+    .find((item: any) => item?.id === id || item?.type === id)
+  return (effect ? localizedText(effect.label) || labelOf(effect) : "") || DISORDER_EFFECT_LABELS[id] || id
 }
 
 function skillGroupSubjectLabel(event: any, meta?: any, fallbackSkillCatalog?: any): string {
@@ -332,11 +341,20 @@ export function damageEventSubjectLabel(event: any, meta?: any, fallbackSkillCat
     return damageEventKindLabel(event)
   }
   if (event.kind === "anomaly" && event.settlementType !== "disorder") {
+    if (isReadableDisplayText(event.label)) {
+      return event.label
+    }
+    if (event.anomalyVariant === "polarizedAssault") {
+      return "极性强击"
+    }
     return anomalyEffectLabel(event.anomalyEffect, meta) || "属性异常"
   }
   if (event.kind === "disorder" || event.settlementType === "disorder") {
+    if (isReadableDisplayText(event.label)) {
+      return event.label
+    }
     const effectId = event.anomalyEffect ?? event.previousAnomalyEffect
-    return anomalyEffectLabel(effectId, meta) || "紊乱"
+    return disorderEffectLabel(effectId, meta) || "紊乱"
   }
   return isReadableDisplayText(event.label) ? event.label : damageEventKindLabel(event)
 }

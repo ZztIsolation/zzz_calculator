@@ -10,6 +10,7 @@ import DriveDiscAnalysisModal from "@/components/DriveDiscAnalysisModal.vue"
 import EnemyTargetConfigPanel from "@/components/EnemyTargetConfigPanel.vue"
 import ImageAvatar from "@/components/ImageAvatar.vue"
 import OptimizerConfigModal from "@/components/OptimizerConfigModal.vue"
+import OptimizerResultSelector from "@/components/OptimizerResultSelector.vue"
 import PanelStatTable from "@/components/PanelStatTable.vue"
 import { fallbackIcon, imageForAgent, imageForDriveDiscSet, imageForWEngine } from "@/utils/assets"
 import { buffLabelForId } from "@/utils/combatBuffs"
@@ -53,21 +54,19 @@ const showBuffPicker = ref(false)
 const showCalculationConfig = ref(false)
 const showOptimizerConfig = ref(false)
 const showDriveDiscAnalysis = ref(false)
-const showOptimizedApplyConfirm = ref(false)
 const showFourPieceSetModal = ref(false)
 const showTwoPieceSetModal = ref(false)
 const showManualDiscPicker = ref(false)
 const showSaveLoadoutModal = ref(false)
-const pendingOptimizedRank = ref(0)
 const draftFourPieceSetId = ref("")
 const draftTwoPieceSetIds = ref<string[]>([])
 const activeManualDiscSlot = ref(0)
-const manualDiscSetFilter = ref("")
+const manualDiscSetFilterIds = ref<string[]>([])
 const manualDiscMainStatFilter = ref("")
 const manualDiscSearch = ref("")
 const loadoutNameDraft = ref("")
 const saveLoadoutMode = ref<"manual" | "optimized">("manual")
-const OPTIMIZED_RESULT_LIMIT = 5
+const OPTIMIZED_RESULT_LIMIT = 10
 const OPTIMIZER_RESULT_SLOTS = [1, 2, 3, 4, 5, 6]
 
 onMounted(async () => {
@@ -77,10 +76,10 @@ onMounted(async () => {
     buildStore.initialize(catalogStore.catalog, catalogStore.meta)
     optimizerStore.initialize(
       catalogStore.catalog,
-      catalogStore.agents.find((item: any) => item.id === buildStore.agentId),
+      catalogStore.displayAgents.find((item: any) => item.id === buildStore.agentId),
     )
     if (!optimizerStore.fourPieceSetId) {
-      optimizerStore.setFourPieceSet(catalogStore.driveDiscSets[0]?.id ?? "")
+      optimizerStore.setFourPieceSet(catalogStore.displayDriveDiscSets[0]?.id ?? "")
     }
     recalculate()
   }
@@ -92,17 +91,17 @@ watch(() => accountStore.currentOwnerId, async () => {
   if (catalogStore.catalog && catalogStore.meta) {
     buildStore.initialize(catalogStore.catalog, catalogStore.meta)
     optimizerStore.loadAgentSettings(
-      catalogStore.agents.find((item: any) => item.id === buildStore.agentId),
+      catalogStore.displayAgents.find((item: any) => item.id === buildStore.agentId),
       catalogStore.catalog,
     )
   }
   recalculate()
 })
 
-const selectedAgent = computed(() => catalogStore.agents.find((item: any) => item.id === buildStore.agentId))
-const selectedWEngine = computed(() => catalogStore.wEngines.find((item: any) => item.id === buildStore.wEngineId))
-const selectedSkillCatalog = computed(() => catalogStore.meta?.agentSkills?.find((item: any) => item.id === buildStore.agentId || item.agentId === buildStore.agentId))
-const agentSelectOptions = computed(() => catalogStore.agents.map((agent: any) => ({
+const selectedAgent = computed(() => catalogStore.displayAgents.find((item: any) => item.id === buildStore.agentId))
+const selectedWEngine = computed(() => catalogStore.displayWEngines.find((item: any) => item.id === buildStore.wEngineId))
+const selectedSkillCatalog = computed(() => catalogStore.displayAgentSkills.find((item: any) => item.id === buildStore.agentId || item.agentId === buildStore.agentId))
+const agentSelectOptions = computed(() => catalogStore.displayAgents.map((agent: any) => ({
   label: entitySelectLabel(agent),
   value: agent.id,
   searchText: entitySearchText(agent),
@@ -114,8 +113,12 @@ const wEngineSelectOptions = computed(() => wEngineOptions.value.map((wEngine: a
   searchText: entitySearchText(wEngine),
   wEngine,
 })))
+const canRunOptimization = computed(() => Boolean(
+  buildStore.agentId
+  && buildStore.wEngineId
+  && optimizerStore.fourPieceSetId,
+))
 const selectedOptimizedScheme = computed(() => optimizerStore.selectedResult(buildStore.selectedOptimizedRank))
-const pendingOptimizedScheme = computed(() => optimizerStore.selectedResult(pendingOptimizedRank.value))
 const selectedDriveDiscs = computed(() => inventoryStore.calculatorDriveDiscs({
   mode: buildStore.discMode,
   idsBySlot: buildStore.manualDriveDiscIdsBySlot,
@@ -193,20 +196,19 @@ const modificationOptions = computed(() => {
     return { label: `${value} 精`, value }
   })
 })
-const optimizerSetChoices = computed(() => [...catalogStore.driveDiscSets].sort((left: any, right: any) => labelOf(left).localeCompare(labelOf(right), "zh-CN")))
-const selectedOptimizerSet = computed(() => catalogStore.driveDiscSets.find((set: any) => set.id === optimizerStore.fourPieceSetId))
-const draftFourPieceSet = computed(() => catalogStore.driveDiscSets.find((set: any) => set.id === draftFourPieceSetId.value))
+const optimizerSetChoices = computed(() => [...catalogStore.displayDriveDiscSets].sort((left: any, right: any) => labelOf(left).localeCompare(labelOf(right), "zh-CN")))
+const selectedOptimizerSet = computed(() => catalogStore.displayDriveDiscSets.find((set: any) => set.id === optimizerStore.fourPieceSetId))
+const draftFourPieceSet = computed(() => catalogStore.displayDriveDiscSets.find((set: any) => set.id === draftFourPieceSetId.value))
 const selectedTwoPieceSets = computed(() => optimizerStore.twoPieceSetIds
-  .map(id => catalogStore.driveDiscSets.find((set: any) => set.id === id))
+  .map(id => catalogStore.displayDriveDiscSets.find((set: any) => set.id === id))
   .filter(Boolean))
 const optimizerAlgorithmOptions = [
   { label: "精确搜索（超界剪枝）", value: "exact-super-bound" },
-  { label: "精确搜索（并行）", value: "exact-super-bound-parallel" },
   { label: "启发式潜力", value: "heuristic-potential" },
   { label: "旧版精确", value: "exact-legacy" },
 ]
 const minimumStats = [
-  { key: "energyRegen", label: "能量自动回复%" },
+  { key: "atk", label: "攻击力" },
   { key: "anomalyProficiency", label: "异常精通" },
   { key: "critRate", label: "暴击率%" },
   { key: "critDmg", label: "暴击伤害%" },
@@ -221,14 +223,10 @@ const mainStatOptionsBySlot = computed(() => {
 })
 const draftTwoPieceSetSummary = computed(() => {
   const count = draftTwoPieceSetIds.value.length
-  return count ? `已选择 ${count} 个额外 2 件套` : "未选择额外 2 件套"
+  return count ? `已选择 ${count} 个额外 2 件套` : "自动匹配任意 2 件套"
 })
 const twoPieceDraftUnchanged = computed(() => [...draftTwoPieceSetIds.value].sort().join("|") === [...optimizerStore.twoPieceSetIds].sort().join("|"))
 const topOptimizedResultSchemes = computed(() => optimizerStore.resultSchemes.slice(0, OPTIMIZED_RESULT_LIMIT))
-const optimizedRankOptions = computed(() => topOptimizedResultSchemes.value.map((scheme: any) => ({
-  label: `第 ${scheme.rank} 名 · ${formatNumber(scheme.score)}`,
-  value: scheme.rank,
-})))
 const selectedDriveDiscRows = computed<Array<{ slot: number, disc: any | null }>>(() => {
   const bySlot = new Map<number, any>(
     selectedDriveDiscs.value.map((disc: any) => [Number(disc.partition), disc] as [number, any]),
@@ -264,20 +262,29 @@ const calculationModeLabel = computed(() => {
 const activeManualDiscSlotDiscs = computed(() => inventoryStore.discOptionsForSlot(activeManualDiscSlot.value))
 const manualDiscPickerTitle = computed(() => activeManualDiscSlot.value ? `选择 ${activeManualDiscSlot.value} 号位驱动盘` : "选择驱动盘")
 const manualDiscSetFilterOptions = computed(() => {
-  const sets = new Map<string, string>()
-  for (const disc of activeManualDiscSlotDiscs.value) {
+  const sets = new Map<string, { label: string, value: string, set: any, searchText: string }>()
+  for (const disc of inventoryStore.driveDiscs) {
     const set = driveDiscSetForDisc(disc)
     const id = String(set?.id || disc?.setId || "")
     if (id) {
-      sets.set(id, driveDiscSetName(disc))
+      const label = driveDiscSetName(disc)
+      sets.set(id, {
+        label,
+        value: id,
+        set,
+        searchText: `${label} ${id}`,
+      })
     }
   }
-  return [
-    { label: "全部套装", value: "" },
-    ...[...sets.entries()]
-      .sort((left, right) => left[1].localeCompare(right[1], "zh-CN"))
-      .map(([value, label]) => ({ label, value })),
-  ]
+  return [...sets.values()]
+    .sort((left, right) => left.label.localeCompare(right.label, "zh-CN"))
+})
+watch(manualDiscSetFilterOptions, options => {
+  const availableSetIds = new Set(options.map(option => option.value))
+  const validSetIds = manualDiscSetFilterIds.value.filter(id => availableSetIds.has(id))
+  if (validSetIds.length !== manualDiscSetFilterIds.value.length) {
+    manualDiscSetFilterIds.value = validSetIds
+  }
 })
 const manualDiscMainStatFilterOptions = computed(() => {
   const stats = Array.from(new Set<string>(activeManualDiscSlotDiscs.value
@@ -291,13 +298,14 @@ const manualDiscMainStatFilterOptions = computed(() => {
 })
 const filteredManualDiscOptions = computed(() => {
   const slot = Number(activeManualDiscSlot.value)
-  const setId = manualDiscSetFilter.value
+  const setIds = manualDiscSetFilterIds.value
   const mainStat = manualDiscMainStatFilter.value
   const search = manualDiscSearch.value.trim().toLowerCase()
   const selectedId = buildStore.manualDriveDiscIdsBySlot[String(slot)] ?? ""
   return inventoryStore.driveDiscs
     .filter((disc: any) => {
       const set = driveDiscSetForDisc(disc)
+      const discSetId = String(set?.id || disc?.setId || "")
       const haystack = [
         disc.id,
         disc.setId,
@@ -315,7 +323,7 @@ const filteredManualDiscOptions = computed(() => {
         .join(" ")
         .toLowerCase()
       return Number(disc.partition) === slot
-        && (!setId || disc.setId === setId || set?.id === setId)
+        && (!setIds.length || setIds.includes(discSetId))
         && (!mainStat || disc.mainStat?.stat === mainStat)
         && (!search || haystack.includes(search))
     })
@@ -369,8 +377,8 @@ const panelSummaryText = computed(() => {
     critDmg !== undefined ? `爆伤 ${formatNumber(Number(critDmg) * 100, 1)}%` : "",
   ].filter(Boolean).join(" · ") || "等待计算"
 })
-watch(optimizedRankOptions, options => {
-  const values = options.map(option => Number(option.value))
+watch(topOptimizedResultSchemes, schemes => {
+  const values = schemes.map(scheme => Number(scheme.rank))
   if (!values.length) {
     buildStore.selectOptimizedRank(0)
     return
@@ -464,6 +472,8 @@ const activeBuffBadges = computed(() => activeBuffIdsForPanel.value.map(id => ({
     addedBuffs: buildStore.addedBuffs,
   }),
 })))
+const customAddedBuffCount = computed(() => buildStore.addedBuffs
+  .filter((buff: any) => buff?.sourceKind === "custom").length)
 const optimizerProgress = computed(() => optimizerStore.progress ?? null)
 const optimizerMetrics = computed(() => optimizerProgress.value?.metrics ?? optimizerStore.metrics ?? {})
 const optimizerProcessed = computed(() => optimizerProgress.value?.evaluated ?? processedOptimizationCount(optimizerMetrics.value))
@@ -503,6 +513,17 @@ const optimizerRunNote = computed(() => {
     complexityText(optimizerMetrics.value, optimizerProgress.value?.settings ?? optimizerStore.settings),
   ].filter(Boolean).join(" · ")
 })
+const optimizerHasFreeTwoPieceMetrics = computed(() => {
+  const settings = optimizerProgress.value?.settings ?? optimizerStore.settings
+  const twoPieceSetIds = Array.isArray(settings?.twoPieceSetIds)
+    ? settings.twoPieceSetIds
+    : settings?.twoPieceSetId
+      ? [settings.twoPieceSetId]
+      : []
+  return twoPieceSetIds.length === 0
+    && optimizerMetrics.value
+    && Object.hasOwn(optimizerMetrics.value, "freeTwoPieceAutoSetCount")
+})
 const optimizerDetailChips = computed(() => [
   optimizerPrepareStageLabel.value ? `阶段：${optimizerPrepareStageLabel.value}` : "",
   optimizerMetrics.value?.algorithmLabel ? `算法：${optimizerMetrics.value.algorithmLabel}` : "",
@@ -511,9 +532,11 @@ const optimizerDetailChips = computed(() => [
     ? `真实评分 ${formatNumber(optimizerMetrics.value.scoredCombinationCount ?? optimizerMetrics.value.evaluated)}` : "",
   Number(optimizerMetrics.value?.prunedBySuperBound ?? 0) > 0 ? `剪枝 ${formatNumber(optimizerMetrics.value.prunedBySuperBound)}` : "",
   Number(optimizerMetrics.value?.boundChecksPerSecond ?? 0) > 0 ? `上界 ${formatRate(optimizerMetrics.value.boundChecksPerSecond)}` : "",
-  Number(optimizerMetrics.value?.workerCount ?? 0) > 1 ? `并行 x${optimizerMetrics.value.workerCount}` : "",
-  Number(optimizerMetrics.value?.parallelTaskCount ?? 0) > 0
-    ? `任务 ${formatNumber(optimizerMetrics.value.completedTaskCount ?? 0)}/${formatNumber(optimizerMetrics.value.parallelTaskCount)}` : "",
+  optimizerHasFreeTwoPieceMetrics.value ? `自动套装 ${formatNumber(optimizerMetrics.value.freeTwoPieceAutoSetCount ?? 0)}` : "",
+  optimizerHasFreeTwoPieceMetrics.value ? `4+2 计划 ${formatNumber(optimizerMetrics.value.freeFourTwoPlanCount ?? 0)}` : "",
+  optimizerHasFreeTwoPieceMetrics.value ? `4+2 组合 ${formatNumber(optimizerMetrics.value.freeFourTwoCombinationCount ?? 0)}` : "",
+  optimizerHasFreeTwoPieceMetrics.value ? `六件计划 ${formatNumber(optimizerMetrics.value.freeSixPiecePlanCount ?? 0)}` : "",
+  optimizerHasFreeTwoPieceMetrics.value ? `六件组合 ${formatNumber(optimizerMetrics.value.freeSixPieceCombinationCount ?? 0)}` : "",
   ...candidateChipTexts(optimizerMetrics.value),
   complexityText(optimizerMetrics.value, optimizerProgress.value?.settings ?? optimizerStore.settings),
 ].filter(Boolean))
@@ -556,7 +579,7 @@ function filterSelectOption(pattern: string, option: any) {
 }
 
 function renderWEngineSelectLabel(option: any) {
-  const wEngine = option?.wEngine ?? catalogStore.wEngines.find((item: any) => item.id === option?.value)
+  const wEngine = option?.wEngine ?? catalogStore.displayWEngines.find((item: any) => item.id === option?.value)
   const label = labelOf(wEngine) || String(option?.label ?? option?.value ?? "")
   return h("span", { class: "w-engine-select-label" }, [
     h("img", {
@@ -566,10 +589,27 @@ function renderWEngineSelectLabel(option: any) {
       loading: "lazy",
     }),
     h("span", { class: "w-engine-select-copy" }, [
-      h("span", { class: "w-engine-select-name" }, label),
-      h("span", { class: "w-engine-select-meta" }, entityMetaText(wEngine)),
+      h("span", { class: "w-engine-select-name", title: label }, label),
+      h("span", { class: "w-engine-select-meta", title: entityMetaText(wEngine) }, entityMetaText(wEngine)),
     ]),
   ])
+}
+
+function renderManualDiscSetLabel(option: any) {
+  const set = option?.set ?? catalogStore.driveDiscSets.find((item: any) => item.id === option?.value)
+  const label = labelOf(set) || String(option?.label ?? option?.value ?? "未知套装")
+  return h("span", { class: "manual-disc-set-select-label" }, [
+    h(ImageAvatar, {
+      src: imageForDriveDiscSet(set),
+      name: label,
+      size: 20,
+    }),
+    h("span", { class: "manual-disc-set-select-name", title: label }, label),
+  ])
+}
+
+function updateManualDiscSetFilter(value: Array<string | number> | null) {
+  manualDiscSetFilterIds.value = Array.isArray(value) ? value.map(String) : []
 }
 
 function applyBuffs(payload: any) {
@@ -587,7 +627,7 @@ function saveOptimizerConfig(config: any) {
 function selectAgent(agentId: string) {
   buildStore.selectAgent(agentId, catalogStore.meta)
   optimizerStore.loadAgentSettings(
-    catalogStore.agents.find((item: any) => item.id === agentId),
+    catalogStore.displayAgents.find((item: any) => item.id === agentId),
     catalogStore.catalog,
   )
 }
@@ -607,6 +647,13 @@ async function runOptimization() {
   await inventoryStore.load()
   const ownerId = inventoryStore.store?.currentOwnerId ?? accountStore.currentOwnerId ?? "default"
   const owner = (inventoryStore.store?.owners ?? accountStore.owners ?? []).find((item: any) => item.id === ownerId)
+  if (!canRunOptimization.value) {
+    optimizerStore.failBeforeRun(
+      "当前没有可用于优化的可见角色、音擎或驱动盘套装。请先在维护页启用至少一项。",
+      optimizerStore.settings,
+    )
+    return
+  }
   const input = optimizerInput(ownerId)
   const inputWithSettings = optimizerStore.inputWithSettings(input, inventoryStore.store)
   if (!inventoryStore.driveDiscs.length) {
@@ -619,24 +666,6 @@ async function runOptimization() {
   await optimizerStore.run(catalogStore.catalog, inventoryStore.store, input)
   if (optimizerStore.resultSchemes[0]) {
     buildStore.selectOptimizedRank(Number(optimizerStore.resultSchemes[0].rank))
-  }
-}
-
-function requestApplyOptimizedRank(rank: number) {
-  pendingOptimizedRank.value = rank
-  showOptimizedApplyConfirm.value = true
-}
-
-function applyPendingOptimizedRank() {
-  if (pendingOptimizedRank.value) {
-    buildStore.selectOptimizedRank(pendingOptimizedRank.value)
-  }
-  showOptimizedApplyConfirm.value = false
-}
-
-function applySelectedOptimizerResult() {
-  if (selectedOptimizedScheme.value?.rank) {
-    requestApplyOptimizedRank(Number(selectedOptimizedScheme.value.rank))
   }
 }
 
@@ -714,7 +743,6 @@ function openManualDiscPicker(slot: number) {
     return
   }
   activeManualDiscSlot.value = Number(slot)
-  manualDiscSetFilter.value = ""
   manualDiscMainStatFilter.value = ""
   manualDiscSearch.value = ""
   showManualDiscPicker.value = true
@@ -951,7 +979,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 </script>
 
 <template>
-  <section class="workbench-grid workbench-merged-grid">
+  <section class="workbench-grid workbench-merged-grid ui-layout-scope" data-layout-surface="workbench">
     <aside class="workbench-left section-band">
       <div class="panel">
         <div class="panel-header">
@@ -962,8 +990,8 @@ function complexityText(metrics: any = {}, settings: any = {}) {
           <div v-if="selectedAgent" class="selection-summary">
             <ImageAvatar :src="imageForAgent(selectedAgent)" :name="labelOf(selectedAgent)" :size="56" round />
             <div class="selection-summary-copy">
-              <strong>{{ labelOf(selectedAgent) }}</strong>
-              <div class="muted">{{ entityMetaText(selectedAgent) }}</div>
+              <strong :title="labelOf(selectedAgent)">{{ labelOf(selectedAgent) }}</strong>
+              <div class="muted" :title="entityMetaText(selectedAgent)">{{ entityMetaText(selectedAgent) }}</div>
             </div>
           </div>
           <NSelect
@@ -974,12 +1002,12 @@ function complexityText(metrics: any = {}, settings: any = {}) {
             placeholder="选择角色"
             @update:value="value => selectAgent(String(value))"
           />
-          <div class="build-compact-grid build-profile-grid">
-            <label class="compact-field">
+          <div class="build-compact-grid build-profile-grid ui-field-grid" data-layout-surface="agent-profile-fields">
+            <label class="compact-field ui-field" data-layout-field>
               <span>等级</span>
               <NInputNumber v-model:value="buildStore.agentLevel" :min="1" :max="60" size="small" />
             </label>
-            <label class="compact-field">
+            <label class="compact-field ui-field" data-layout-field>
               <span>影画</span>
               <NSelect
                 :value="buildStore.cinemaLevel"
@@ -988,13 +1016,13 @@ function complexityText(metrics: any = {}, settings: any = {}) {
                 @update:value="buildStore.setCinemaLevel(Number($event ?? 0), catalogStore.meta)"
               />
             </label>
-            <label class="compact-field compact-field-wide">
+            <label class="compact-field compact-field-wide ui-field ui-field--full" data-layout-field>
               <span>核心技</span>
               <NSelect v-model:value="buildStore.coreSkillLevel" :options="coreSkillOptions" size="small" />
             </label>
           </div>
-          <div class="build-skill-grid">
-            <label v-for="control in skillLevelControls" :key="control.id" class="compact-field">
+          <div class="build-skill-grid ui-field-grid" data-layout-surface="skill-level-fields">
+            <label v-for="control in skillLevelControls" :key="control.id" class="compact-field ui-field" data-layout-field>
               <span>{{ control.label }}</span>
               <NSelect
                 :value="control.value"
@@ -1016,8 +1044,8 @@ function complexityText(metrics: any = {}, settings: any = {}) {
           <div v-if="selectedWEngine" class="selection-summary">
             <ImageAvatar :src="imageForWEngine(selectedWEngine)" :name="labelOf(selectedWEngine)" :size="46" />
             <div class="selection-summary-copy">
-              <strong>{{ labelOf(selectedWEngine) }}</strong>
-              <div class="muted">{{ entityMetaText(selectedWEngine) }}</div>
+              <strong :title="labelOf(selectedWEngine)">{{ labelOf(selectedWEngine) }}</strong>
+              <div class="muted" :title="entityMetaText(selectedWEngine)">{{ entityMetaText(selectedWEngine) }}</div>
             </div>
           </div>
           <NSelect
@@ -1029,12 +1057,12 @@ function complexityText(metrics: any = {}, settings: any = {}) {
             placeholder="选择音擎"
             @update:value="value => buildStore.selectWEngine(String(value), catalogStore.meta)"
           />
-          <div class="build-compact-grid">
-            <label class="compact-field">
+          <div class="build-compact-grid ui-field-grid" data-layout-surface="w-engine-fields">
+            <label class="compact-field ui-field" data-layout-field>
               <span>等级</span>
               <NInputNumber v-model:value="buildStore.wEngineLevel" :min="1" :max="60" size="small" />
             </label>
-            <label class="compact-field">
+            <label class="compact-field ui-field" data-layout-field>
               <span>精修</span>
               <NSelect v-model:value="buildStore.wEngineModificationLevel" :options="modificationOptions" size="small" />
             </label>
@@ -1045,9 +1073,9 @@ function complexityText(metrics: any = {}, settings: any = {}) {
       <div class="panel">
         <div class="panel-header">
           <h2 class="panel-title">局内 Buff</h2>
-          <NButton size="small" @click="showBuffPicker = true">
-            <template #icon><SlidersHorizontal :size="16" /></template>
-            选择
+          <NButton class="prominent-config-button" type="primary" secondary size="large" data-testid="open-buff-picker" @click="showBuffPicker = true">
+            <template #icon><SlidersHorizontal :size="18" /></template>
+            选择 Buff
           </NButton>
         </div>
         <div class="panel-body section-band">
@@ -1055,30 +1083,30 @@ function complexityText(metrics: any = {}, settings: any = {}) {
             <NTag v-for="item in activeBuffBadges" :key="item.id" round>{{ item.label }}</NTag>
             <NTag v-if="!activeBuffIdsForPanel.length" round>未启用 Buff</NTag>
           </div>
-          <NTag v-if="buildStore.addedBuffs.length" type="info" round>自定义 {{ buildStore.addedBuffs.length }} 条</NTag>
+          <NTag v-if="customAddedBuffCount" type="info" round>自定义 {{ customAddedBuffCount }} 条</NTag>
         </div>
       </div>
 
       <div class="panel">
         <div class="panel-header">
           <h2 class="panel-title">计算设置</h2>
-          <NButton size="small" @click="showCalculationConfig = true">
-            <template #icon><SlidersHorizontal :size="16" /></template>
+          <NButton class="prominent-config-button" type="primary" secondary size="large" data-testid="open-calculation-config" @click="showCalculationConfig = true">
+            <template #icon><SlidersHorizontal :size="18" /></template>
             配置
           </NButton>
         </div>
-        <div class="panel-body metric-grid">
-          <dl class="metric">
+        <div class="panel-body metric-grid calculation-summary-grid">
+          <dl class="metric" data-layout-field>
             <dt>模式</dt>
             <dd>{{ calculationModeLabel }}</dd>
           </dl>
-          <dl class="metric">
+          <dl class="metric" data-layout-field>
             <dt>事件</dt>
             <dd>{{ buildStore.damageConfig.events?.length ?? 1 }} 项</dd>
           </dl>
-          <div class="metric" style="grid-column: 1 / -1;">
+          <div class="metric calculation-event-summary" data-layout-field>
             <dt>事件摘要</dt>
-            <dd class="chip-row">
+            <dd class="chip-row calculation-event-summary-tags">
               <NTag v-for="event in damageEventSummary" :key="event.id" round>{{ event.label }}</NTag>
             </dd>
           </div>
@@ -1101,16 +1129,16 @@ function complexityText(metrics: any = {}, settings: any = {}) {
             <p class="panel-subtitle">外部只保留套装限制，高级项在计算配置中调整</p>
           </div>
           <div class="toolbar optimizer-config-actions">
-            <NButton size="small" @click="showOptimizerConfig = true">
-              <template #icon><SlidersHorizontal :size="16" /></template>
+            <NButton class="prominent-config-button" type="primary" secondary size="large" data-testid="open-optimizer-config" @click="showOptimizerConfig = true">
+              <template #icon><SlidersHorizontal :size="18" /></template>
               计算配置
             </NButton>
             <NTag :type="optimizerStore.status === 'error' ? 'error' : optimizerStore.status === 'done' ? 'success' : 'info'" round>{{ optimizerStatusLabel(optimizerStore.status) }}</NTag>
           </div>
         </div>
         <div class="panel-body section-band">
-          <div class="optimizer-set-grid">
-            <div class="metric optimizer-set-choice-field">
+          <div class="optimizer-set-grid ui-field-grid ui-field-grid--comfortable" data-layout-surface="optimizer-set-fields">
+            <div class="metric optimizer-set-choice-field ui-field" data-layout-field>
               <dt>限定 4 件套</dt>
               <dd class="set-summary-actions">
                 <NButton size="small" @click="openFourPieceSetModal">选择</NButton>
@@ -1123,7 +1151,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
                 </div>
               </dd>
             </div>
-            <div class="metric optimizer-set-choice-field">
+            <div class="metric optimizer-set-choice-field ui-field" data-layout-field>
               <dt class="metric-title-row">
                 <span>额外 2 件套</span>
                 <NButton size="tiny" text :disabled="!optimizerStore.twoPieceSetIds.length" @click="clearTwoPieceSetLimits">清空</NButton>
@@ -1131,7 +1159,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
               <dd class="set-summary-actions">
                 <NButton size="small" @click="openTwoPieceSetModal">选择</NButton>
                 <div class="selected-set-summary" aria-live="polite">
-                  <span v-if="!selectedTwoPieceSets.length" class="selected-set-empty">未选择额外 2 件套</span>
+                  <span v-if="!selectedTwoPieceSets.length" class="selected-set-empty">自动匹配任意 2 件套</span>
                   <template v-else>
                     <span v-for="set in selectedTwoPieceSets" :key="set.id" class="selected-set-chip selected-set-chip-with-icon">
                       <img :src="imageForDriveDiscSet(set)" alt="" loading="lazy">
@@ -1150,7 +1178,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
           </div>
           <div class="optimizer-run-row">
             <div class="toolbar">
-              <NButton v-if="!optimizerStore.isBusy" type="primary" @click="runOptimization">
+              <NButton v-if="!optimizerStore.isBusy" type="primary" :disabled="!canRunOptimization" @click="runOptimization">
                 <template #icon><Sparkles :size="16" /></template>
                 开始优化
               </NButton>
@@ -1204,7 +1232,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
                 <template #icon><Save :size="16" /></template>
                 存为套装
               </NButton>
-              <NButton size="small" :disabled="!selectedDriveDiscs.length" @click="showDriveDiscAnalysis = true">
+              <NButton size="small" data-testid="open-drive-disc-analysis" :disabled="!selectedDriveDiscs.length" @click="showDriveDiscAnalysis = true">
                 <template #icon><LineChart :size="16" /></template>
                 词条分析
               </NButton>
@@ -1227,18 +1255,13 @@ function complexityText(metrics: any = {}, settings: any = {}) {
               @update:value="buildStore.selectLoadout(String($event ?? ''))"
             />
           </div>
-          <div v-else-if="buildStore.discMode === 'optimized'" class="optimizer-result-toolbar drive-disc-mode-control">
-            <NSelect
-              class="optimizer-result-rank-select"
-              :value="buildStore.selectedOptimizedRank"
-              :options="optimizedRankOptions"
-              @update:value="buildStore.selectOptimizedRank(Number($event ?? 0))"
-            />
-            <div class="toolbar">
-              <NTag v-if="selectedOptimizedScheme" type="success" round>评分 {{ formatNumber(selectedOptimizedScheme.score ?? 0) }}</NTag>
-              <NButton size="small" :disabled="!selectedOptimizedScheme" @click="applySelectedOptimizerResult">应用</NButton>
-            </div>
-          </div>
+          <OptimizerResultSelector
+            v-else-if="buildStore.discMode === 'optimized'"
+            class="drive-disc-mode-control"
+            :model-value="buildStore.selectedOptimizedRank"
+            :results="topOptimizedResultSchemes"
+            @update:model-value="buildStore.selectOptimizedRank"
+          />
 
           <div class="drive-disc-slot-grid">
             <article
@@ -1325,56 +1348,32 @@ function complexityText(metrics: any = {}, settings: any = {}) {
     </aside>
   </section>
 
-  <NModal v-model:show="showOptimizedApplyConfirm" preset="card" title="应用优化结果" style="max-width: 760px">
-    <div class="section-band">
-      <div class="toolbar">
-        <NTag type="success" round>第 {{ pendingOptimizedScheme?.rank }} 名</NTag>
-        <NTag round>评分 {{ formatNumber(pendingOptimizedScheme?.score ?? 0) }}</NTag>
-      </div>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>槽位</th>
-            <th>套装</th>
-            <th>主词条</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="disc in pendingOptimizedScheme?.driveDiscs ?? []" :key="disc.id">
-            <td class="num">{{ disc.partition }}</td>
-            <td>{{ disc.setName || disc.setId }}</td>
-            <td>{{ statLabel(disc.mainStat?.stat, catalogStore.meta) }} {{ disc.mainStat?.value ?? "" }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <template #footer>
-      <div class="drawer-footer">
-        <NButton @click="showOptimizedApplyConfirm = false">取消</NButton>
-        <NButton type="primary" @click="applyPendingOptimizedRank">应用到当前角色</NButton>
-      </div>
-    </template>
-  </NModal>
-
   <NModal v-model:show="showManualDiscPicker" preset="card" :title="manualDiscPickerTitle" style="width: min(980px, calc(100vw - 16px)); max-width: 980px">
-    <div class="section-band manual-disc-picker">
+    <div class="section-band manual-disc-picker ui-layout-scope" data-layout-surface="manual-drive-disc-picker">
       <div class="manual-disc-picker-head">
         <span>只显示当前号位的已有驱动盘</span>
         <NTag round>{{ filteredManualDiscOptions.length }} 件可选</NTag>
       </div>
-      <div class="manual-disc-filter-row">
-        <div class="metric">
+      <div class="manual-disc-filter-row ui-field-grid ui-field-grid--comfortable" data-layout-surface="manual-drive-disc-filters">
+        <div class="metric" data-layout-field>
           <dt>套装</dt>
           <dd>
             <NSelect
-              :value="manualDiscSetFilter"
+              class="manual-disc-set-select"
+              :value="manualDiscSetFilterIds"
               :options="manualDiscSetFilterOptions"
+              :filter="filterSelectOption"
+              :render-label="renderManualDiscSetLabel"
+              max-tag-count="responsive"
+              multiple
+              filterable
               clearable
-              @update:value="manualDiscSetFilter = String($event ?? '')"
+              placeholder="全部套装"
+              @update:value="updateManualDiscSetFilter"
             />
           </dd>
         </div>
-        <div class="metric">
+        <div class="metric" data-layout-field>
           <dt>主词条</dt>
           <dd>
             <NSelect
@@ -1385,7 +1384,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
             />
           </dd>
         </div>
-        <div class="metric">
+        <div class="metric" data-layout-field>
           <dt>搜索</dt>
           <dd><NInput v-model:value="manualDiscSearch" clearable placeholder="套装、属性、序号" /></dd>
         </div>
@@ -1434,9 +1433,9 @@ function complexityText(metrics: any = {}, settings: any = {}) {
     </template>
   </NModal>
 
-  <NModal v-model:show="showSaveLoadoutModal" preset="card" :title="saveLoadoutTitle" style="max-width: 640px">
-    <div class="section-band">
-      <div class="metric">
+  <NModal v-model:show="showSaveLoadoutModal" preset="card" :title="saveLoadoutTitle" style="width: min(640px, calc(100vw - 16px)); max-width: 640px">
+    <div class="section-band ui-layout-scope" data-layout-surface="save-loadout">
+      <div class="metric" data-layout-field>
         <dt>套装名称</dt>
         <dd><NInput v-model:value="loadoutNameDraft" clearable placeholder="输入套装名称" /></dd>
       </div>
@@ -1529,7 +1528,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
     :added-buffs="buildStore.addedBuffs"
     :runtime-inputs="buildStore.runtimeInputs"
     :meta="catalogStore.meta"
-    :drive-disc-sets="catalogStore.driveDiscSets"
+    :drive-disc-sets="catalogStore.displayDriveDiscSets"
     :agent-id="buildStore.agentId"
     :cinema-level="buildStore.cinemaLevel"
     :w-engine-id="buildStore.wEngineId"
@@ -1545,6 +1544,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
     :meta="catalogStore.meta"
     :agent="selectedAgent"
     :cinema-level="buildStore.cinemaLevel"
+    :combat-effects="buildStore.result?.inCombat?.activeEffects ?? []"
     @save="saveCalculationConfig"
   />
 
@@ -1579,6 +1579,60 @@ function complexityText(metrics: any = {}, settings: any = {}) {
   min-width: 0;
 }
 
+.workbench-left {
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  max-width: 100%;
+}
+
+.workbench-left > *,
+.workbench-left .section-band,
+.workbench-left .metric-grid,
+.workbench-left .metric,
+.workbench-left .chip-row {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.workbench-left .section-band {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.workbench-left :deep(.n-select),
+.workbench-left :deep(.n-input),
+.workbench-left :deep(.n-input-number),
+.workbench-left :deep(.n-base-selection),
+.workbench-left :deep(.n-input-wrapper) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.calculation-summary-grid .metric dd,
+.calculation-event-summary,
+.calculation-event-summary-tags {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.calculation-event-summary {
+  grid-column: 1 / -1;
+}
+
+.calculation-event-summary-tags :deep(.n-tag) {
+  max-width: 100%;
+  height: auto;
+  min-height: 28px;
+  white-space: normal;
+}
+
+.calculation-event-summary-tags :deep(.n-tag__content) {
+  min-width: 0;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .workbench-right-sticky {
   position: sticky;
   top: 74px;
@@ -1591,9 +1645,40 @@ function complexityText(metrics: any = {}, settings: any = {}) {
   line-height: 1.35;
 }
 
+.prominent-config-button {
+  min-width: 116px;
+  height: 40px;
+  padding: 0 16px;
+  border: 2px solid var(--app-blue);
+  background: #eef5ff;
+  color: #185abd;
+  font-weight: 750;
+  box-shadow: 0 2px 5px rgba(47, 125, 246, 0.12);
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.prominent-config-button:not(.n-button--disabled):hover {
+  border-color: #1f6fe6;
+  background: #dbeafe;
+  color: #124b9c;
+  box-shadow: 0 3px 8px rgba(47, 125, 246, 0.18);
+  transform: translateY(-1px);
+}
+
+.prominent-config-button:not(.n-button--disabled):active {
+  background: #cfe1ff;
+  color: #0f438c;
+  box-shadow: 0 1px 3px rgba(47, 125, 246, 0.16);
+  transform: translateY(0);
+}
+
+.prominent-config-button:focus-visible {
+  outline: 3px solid rgba(47, 125, 246, 0.28);
+  outline-offset: 2px;
+}
+
 .optimizer-set-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  --ui-field-min: 220px;
   gap: 10px;
 }
 
@@ -1755,9 +1840,41 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 }
 
 .manual-disc-filter-row {
-  display: grid;
-  grid-template-columns: minmax(150px, 0.7fr) minmax(150px, 0.7fr) minmax(220px, 1fr);
+  --ui-field-min: 180px;
   gap: 10px;
+}
+
+.manual-disc-set-select-label {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
+  gap: 6px;
+  vertical-align: middle;
+}
+
+.manual-disc-set-select-label :deep(.avatar) {
+  flex: 0 0 auto;
+}
+
+.manual-disc-set-select-label :deep(.avatar img) {
+  object-fit: contain;
+}
+
+.manual-disc-set-select-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manual-disc-set-select :deep(.n-base-selection-tags) {
+  min-width: 0;
+}
+
+.manual-disc-set-select :deep(.n-tag__content) {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .manual-disc-option-list {
@@ -1904,8 +2021,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 
 .build-compact-grid,
 .build-skill-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  --ui-field-min: 124px;
   gap: 8px;
 }
 
@@ -1916,12 +2032,13 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 }
 
 .compact-field > span {
-  overflow: hidden;
+  overflow: visible;
   color: var(--app-muted);
   font-size: 12px;
   font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .compact-field-wide {
@@ -2206,18 +2323,6 @@ function complexityText(metrics: any = {}, settings: any = {}) {
   gap: 10px;
 }
 
-.optimizer-result-toolbar {
-  display: grid;
-  grid-template-columns: minmax(220px, 320px) auto;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.optimizer-result-rank-select {
-  width: 100%;
-}
-
 .optimizer-result-disc-list {
   display: grid;
   gap: 8px;
@@ -2425,7 +2530,6 @@ function complexityText(metrics: any = {}, settings: any = {}) {
     order: 1;
   }
 
-  .optimizer-set-grid,
   .optimizer-run-row,
   .drive-disc-slot-grid,
   .manual-disc-filter-row {
@@ -2442,10 +2546,6 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 @media (max-width: 680px) {
   .damage-panel-grid {
     grid-template-columns: 1fr;
-  }
-
-  .optimizer-result-toolbar {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .optimizer-result-disc-row {

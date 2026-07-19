@@ -5,9 +5,14 @@ import LayerSlider from "@/components/LayerSlider.vue"
 import { buffDisplayName } from "@/utils/format"
 import {
   defaultRuntimeForBuff,
+  effectRuleCoverage,
+  effectRuleId,
+  effectRules,
   normalizeRuntimeForBuff,
+  runtimeCoverageForEffectRule,
   runtimeSourceGroups,
   runtimeStackGroups,
+  storedEffectRuleText,
 } from "@core/shared-combat.js"
 
 const props = defineProps<{
@@ -36,7 +41,7 @@ const optimizerAlgorithmChoices = computed(() => props.optimizerAlgorithmOptions
 const optimizerMinimumFields = computed(() => props.minimumStats?.length
   ? props.minimumStats
   : [
-      { key: "energyRegen", label: "能量自动回复%" },
+      { key: "atk", label: "攻击力" },
       { key: "anomalyProficiency", label: "异常精通" },
       { key: "critRate", label: "暴击率%" },
       { key: "critDmg", label: "暴击伤害%" },
@@ -50,6 +55,17 @@ function stringArray(value: any): string[] {
   return Array.isArray(value) ? value.map(item => String(item)).filter(Boolean) : []
 }
 
+function optimizerMinimumValue(value: any, key: string) {
+  const minimums = value?.minimums
+  return minimums && Object.prototype.hasOwnProperty.call(minimums, key)
+    ? minimums[key]
+    : null
+}
+
+function optimizerMinimumStep(key: string) {
+  return key === "atk" ? 50 : 10
+}
+
 function normalizeOptimizerDraft(value: any = {}) {
   return {
     algorithm: String(value?.algorithm || "exact-super-bound"),
@@ -61,10 +77,10 @@ function normalizeOptimizerDraft(value: any = {}) {
       "6": stringArray(value?.mainStatLimits?.["6"]),
     },
     minimums: {
-      energyRegen: value?.minimums?.energyRegen ?? null,
-      anomalyProficiency: value?.minimums?.anomalyProficiency ?? null,
-      critRate: value?.minimums?.critRate ?? null,
-      critDmg: value?.minimums?.critDmg ?? null,
+      atk: optimizerMinimumValue(value, "atk"),
+      anomalyProficiency: optimizerMinimumValue(value, "anomalyProficiency"),
+      critRate: optimizerMinimumValue(value, "critRate"),
+      critDmg: optimizerMinimumValue(value, "critDmg"),
     },
   }
 }
@@ -146,10 +162,22 @@ function updateOptimizerRuntime(buff: any, runtime: any) {
   }
 }
 
-function setOptimizerCoverage(buff: any, value: number | null) {
+function coverageRules(buff: any) {
+  return effectRules(buff).filter((rule: any) => effectRuleCoverage(rule, buff))
+}
+
+function setOptimizerRuleCoverage(buff: any, rule: any, value: number | null) {
+  const runtime = optimizerRuntimeFor(buff)
+  const id = effectRuleId(rule)
   updateOptimizerRuntime(buff, {
-    ...optimizerRuntimeFor(buff),
-    coverage: Number(value ?? 0),
+    ...runtime,
+    effects: {
+      ...(runtime.effects ?? {}),
+      [id]: {
+        ...(runtime.effects?.[id] ?? {}),
+        coverage: Math.max(0, Math.min(1, Number(value ?? 0))),
+      },
+    },
   })
 }
 
@@ -182,14 +210,20 @@ function close() {
 }
 
 function save() {
-  emit("save", normalizeOptimizerDraft(optimizerDraft.value))
+  const payload = normalizeOptimizerDraft(optimizerDraft.value)
+  const buffById = new Map((props.fourPieceRuntimeBuffs ?? []).map((buff: any) => [buff.id, buff]))
+  payload.fourPieceBuffRuntimeInputs = Object.fromEntries(Object.entries(payload.fourPieceBuffRuntimeInputs).flatMap(([id, runtime]) => {
+    const buff = buffById.get(id)
+    return buff ? [[id, normalizeRuntimeForBuff(buff, runtime)]] : []
+  }))
+  emit("save", payload)
   close()
 }
 </script>
 
 <template>
   <NModal :show="show" preset="card" title="优化约束" style="width: min(920px, calc(100vw - 16px)); max-width: 920px" @update:show="emit('update:show', $event)">
-    <section class="optimizer-config-panel">
+    <section class="optimizer-config-panel ui-layout-scope" data-layout-surface="optimizer-config">
       <div class="optimizer-config-header">
         <div>
           <h3 class="panel-title">计算配置</h3>
@@ -197,8 +231,8 @@ function save() {
         </div>
         <NTag round>高级设置</NTag>
       </div>
-      <div class="optimizer-config-body">
-        <div class="metric optimizer-config-field">
+      <div class="optimizer-config-body ui-field-grid" data-layout-surface="optimizer-fields">
+        <div class="metric optimizer-config-field ui-field" data-layout-field>
           <dt>算法</dt>
           <dd>
             <NSelect
@@ -209,7 +243,7 @@ function save() {
           </dd>
         </div>
 
-        <div class="metric optimizer-config-field optimizer-config-field-wide">
+        <div class="metric optimizer-config-field optimizer-config-field-wide ui-field ui-field--full" data-layout-field>
           <dt>4 件套 Buff</dt>
           <dd class="optimizer-inline-control">
             <NCheckbox
@@ -224,7 +258,7 @@ function save() {
 
         <div
           v-if="optimizerDraft.fourPieceBuffMode === 'manual'"
-          class="optimizer-runtime-list optimizer-config-field-wide"
+          class="optimizer-runtime-list optimizer-config-field-wide ui-field--full"
         >
           <article
             v-for="buff in props.fourPieceRuntimeBuffs ?? []"
@@ -236,19 +270,19 @@ function save() {
               <NTag round>{{ fourPieceRuntimePartLabel(buff) }}</NTag>
             </div>
             <div class="optimizer-runtime-grid">
-              <div v-if="buff.coverage" class="metric optimizer-runtime-metric">
-                <dt>覆盖率</dt>
+              <div v-for="rule in coverageRules(buff)" :key="`coverage-${effectRuleId(rule)}`" class="metric optimizer-runtime-metric optimizer-coverage-metric ui-field" data-layout-field>
+                <dt>{{ storedEffectRuleText(rule, optimizerRuntimeFor(buff), buff) }}</dt>
                 <dd>
                   <NInputNumber
-                    :value="optimizerRuntimeFor(buff).coverage"
-                    :min="buff.coverage.min ?? 0"
-                    :max="buff.coverage.max ?? 1"
-                    :step="buff.coverage.step ?? 0.1"
-                    @update:value="setOptimizerCoverage(buff, Number($event))"
+                    :value="runtimeCoverageForEffectRule(rule, buff, optimizerRuntimeFor(buff))"
+                    :min="0"
+                    :max="1"
+                    :step="0.1"
+                    @update:value="setOptimizerRuleCoverage(buff, rule, $event)"
                   />
                 </dd>
               </div>
-              <div v-for="group in runtimeSourceGroups(buff)" :key="group.key" class="metric optimizer-runtime-metric">
+              <div v-for="group in runtimeSourceGroups(buff)" :key="group.key" class="metric optimizer-runtime-metric ui-field" data-layout-field>
                 <dt>{{ group.label || "来源数值" }}</dt>
                 <dd>
                   <NInputNumber
@@ -259,7 +293,7 @@ function save() {
                   />
                 </dd>
               </div>
-              <div v-for="group in runtimeStackGroups(buff)" :key="group.key" class="metric layer-metric optimizer-runtime-layer">
+              <div v-for="group in runtimeStackGroups(buff)" :key="group.key" class="metric layer-metric optimizer-runtime-layer ui-field" data-layout-field>
                 <dd>
                   <LayerSlider
                     :label="group.label || '层数'"
@@ -276,8 +310,8 @@ function save() {
           <div v-if="!(props.fourPieceRuntimeBuffs ?? []).length" class="optimizer-config-empty">当前四件套没有可手动配置的 Buff</div>
         </div>
 
-        <div class="optimizer-main-stat-config optimizer-config-field-wide">
-          <div v-for="slot in optimizerMainStatSlots" :key="slot" class="metric optimizer-main-stat-field">
+        <div class="optimizer-main-stat-config optimizer-config-field-wide ui-field-grid ui-field--full" data-layout-surface="optimizer-main-stats">
+          <div v-for="slot in optimizerMainStatSlots" :key="slot" class="metric optimizer-main-stat-field ui-field" data-layout-field>
             <dt class="optimizer-field-title-row">
               <span>{{ slot }}号位主词条</span>
               <NButton size="tiny" text :disabled="!(optimizerDraft.mainStatLimits?.[slot] ?? []).length" @click="clearOptimizerMainStat(slot)">清空</NButton>
@@ -300,14 +334,20 @@ function save() {
           </div>
         </div>
 
-        <div class="optimizer-minimum-grid optimizer-config-field-wide">
-          <div v-for="item in optimizerMinimumFields" :key="item.key" class="metric optimizer-config-field">
+        <div class="optimizer-minimum-grid optimizer-config-field-wide ui-field-grid ui-field--full" data-layout-surface="optimizer-minimums">
+          <p class="optimizer-minimum-note">
+            <strong>面板最低值</strong>
+            <span>以下四项均按局外面板数值判断，不计入局内 Buff。</span>
+          </p>
+          <div v-for="item in optimizerMinimumFields" :key="item.key" class="metric optimizer-config-field ui-field" data-layout-field>
             <dt>{{ item.label }}</dt>
             <dd>
               <NInputNumber
                 :value="optimizerDraft.minimums?.[item.key]"
                 clearable
-                :step="item.key === 'anomalyProficiency' ? 1 : 0.1"
+                :min="0"
+                :precision="0"
+                :step="optimizerMinimumStep(item.key)"
                 placeholder="不限定"
                 @update:value="setOptimizerMinimum(item.key, $event === null ? null : Number($event))"
               />
@@ -355,12 +395,11 @@ function save() {
 .optimizer-config-body,
 .optimizer-minimum-grid,
 .optimizer-main-stat-config {
-  display: grid;
   gap: 10px;
 }
 
 .optimizer-config-body {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  --ui-field-min: 280px;
 }
 
 .optimizer-config-field {
@@ -427,6 +466,16 @@ function save() {
   width: 112px;
 }
 
+.optimizer-coverage-metric {
+  flex: 1 1 280px;
+}
+
+.optimizer-coverage-metric dd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .optimizer-runtime-layer {
   flex: 1 1 240px;
   min-width: min(100%, 240px);
@@ -443,7 +492,7 @@ function save() {
 }
 
 .optimizer-main-stat-config {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  --ui-field-min: 180px;
 }
 
 .main-stat-choice-list {
@@ -486,7 +535,28 @@ function save() {
 }
 
 .optimizer-minimum-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  --ui-field-min: 144px;
+}
+
+.optimizer-minimum-note {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.optimizer-minimum-note strong {
+  flex: 0 0 auto;
+  color: var(--app-text);
+}
+
+.optimizer-minimum-note span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .modal-actions {
@@ -495,18 +565,4 @@ function save() {
   gap: 8px;
 }
 
-@media (max-width: 1180px) {
-  .optimizer-main-stat-config,
-  .optimizer-minimum-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 860px) {
-  .optimizer-config-body,
-  .optimizer-main-stat-config,
-  .optimizer-minimum-grid {
-    grid-template-columns: 1fr;
-  }
-}
 </style>

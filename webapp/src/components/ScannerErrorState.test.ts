@@ -44,8 +44,8 @@ describe("ScannerErrorState", () => {
 
     expect(wrapper.text()).toContain("扫描助手版本过低")
     expect(wrapper.text()).toContain("v1.0.1")
-    expect(wrapper.text()).toContain("下载新版助手")
-    expect(wrapper.text()).toContain("我已更新")
+    expect(wrapper.text()).toContain("下载并更新 Helper")
+    expect(wrapper.text()).toContain("重新检测")
   })
 
   it("renders prepare-failed with a custom message and only a primary action", async () => {
@@ -100,5 +100,31 @@ describe("ScannerErrorState", () => {
     const buttons = wrapper.findAll("button")
     expect(buttons[0]!.text()).toBe("自定义主按钮")
     expect(buttons[1]!.text()).toBe("自定义副按钮")
+  })
+
+  it("renders structured diagnostics and emits declared actions", async () => {
+    const wrapper = mount(ScannerErrorState, {
+      props: {
+        variant: "diagnostic-failure",
+        failure: {
+          title: "磁盘空间不足",
+          message: "至少需要 300 MB，当前只有 100 MB。",
+          remedy: "请释放系统盘空间后重试。",
+          diagnosticId: "abc123",
+          actions: [
+            { kind: "retry", label: "重试" },
+            { kind: "open_logs", label: "打开日志目录" },
+          ],
+        },
+      },
+    })
+
+    expect(wrapper.text()).toContain("磁盘空间不足")
+    expect(wrapper.text()).toContain("请释放系统盘空间")
+    expect(wrapper.text()).toContain("abc123")
+    const buttons = wrapper.findAll("button")
+    expect(buttons).toHaveLength(2)
+    await buttons[1]!.trigger("click")
+    expect(wrapper.emitted("action")?.[0]).toEqual(["open_logs"])
   })
 })

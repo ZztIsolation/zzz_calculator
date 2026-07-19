@@ -127,7 +127,8 @@
                     870.5
                   ]
                 }
-              ]
+              ],
+              "skillType": "basic"
             },
             {
               "id": "cloud_sword_intent",
@@ -161,7 +162,8 @@
                     39.6
                   ]
                 }
-              ]
+              ],
+              "skillType": "basic"
             },
             {
               "id": "clarity_parting_water",
@@ -245,7 +247,8 @@
                     512.1
                   ]
                 }
-              ]
+              ],
+              "skillType": "basic"
             },
             {
               "id": "clarity_soaring",
@@ -279,7 +282,8 @@
                     215.5
                   ]
                 }
-              ]
+              ],
+              "skillType": "basic"
             },
             {
               "id": "clarity_cut_light_extreme",
@@ -313,7 +317,8 @@
                     1429.8
                   ]
                 }
-              ]
+              ],
+              "skillType": "basic"
             },
             {
               "id": "clarity_cut_light",
@@ -372,7 +377,8 @@
                     371
                   ]
                 }
-              ]
+              ],
+              "skillType": "basic"
             },
             {
               "id": "clarity_cut_light_annihilation",
@@ -431,7 +437,8 @@
                     378.9
                   ]
                 }
-              ]
+              ],
+              "skillType": "basic"
             }
           ]
         },
@@ -448,6 +455,7 @@
           "moves": [
             {
               "id": "dash_shadow_rush",
+              "skillTags": ["dashAttack"],
               "name": {
                 "zhCN": "冲刺攻击：如影疾行"
               },
@@ -478,7 +486,8 @@
                     249.8
                   ]
                 }
-              ]
+              ],
+              "skillType": "dodge"
             },
             {
               "id": "dodge_counter_swallow",
@@ -512,7 +521,8 @@
                     818.7
                   ]
                 }
-              ]
+              ],
+              "skillType": "dodge"
             }
           ]
         },
@@ -559,10 +569,12 @@
                     946.4
                   ]
                 }
-              ]
+              ],
+              "skillType": "assist"
             },
             {
               "id": "quick_assist_guard",
+              "skillTags": ["assistAttack"],
               "name": {
                 "zhCN": "快速支援：援守"
               },
@@ -593,10 +605,12 @@
                     191.5
                   ]
                 }
-              ]
+              ],
+              "skillType": "assist"
             },
             {
               "id": "assist_followup_stop_war",
+              "skillTags": ["assistAttack"],
               "name": {
                 "zhCN": "支援突击：止戈"
               },
@@ -627,10 +641,12 @@
                     979.2
                   ]
                 }
-              ]
+              ],
+              "skillType": "assist"
             },
             {
               "id": "clarity_quick_assist_response",
+              "skillTags": ["assistAttack"],
               "name": {
                 "zhCN": "快速支援：明心境·策应"
               },
@@ -661,10 +677,12 @@
                     160.3
                   ]
                 }
-              ]
+              ],
+              "skillType": "assist"
             },
             {
               "id": "clarity_assist_followup_unity",
+              "skillTags": ["assistAttack"],
               "name": {
                 "zhCN": "支援突击：明心境·抱一"
               },
@@ -695,7 +713,8 @@
                     1016.5
                   ]
                 }
-              ]
+              ],
+              "skillType": "assist"
             }
           ]
         },
@@ -767,10 +786,12 @@
                     747.9
                   ]
                 }
-              ]
+              ],
+              "skillType": "special"
             },
             {
               "id": "ex_calm_waves",
+              "skillTags": ["exSpecial"],
               "name": {
                 "zhCN": "强化特殊技：定风波"
               },
@@ -801,7 +822,8 @@
                     2786.4
                   ]
                 }
-              ]
+              ],
+              "skillType": "special"
             },
             {
               "id": "clarity_brush_sleeve",
@@ -835,10 +857,12 @@
                     168.5
                   ]
                 }
-              ]
+              ],
+              "skillType": "special"
             },
             {
               "id": "ex_clarity_flying_light",
+              "skillTags": ["exSpecial"],
               "name": {
                 "zhCN": "强化特殊技：明心境·飞光"
               },
@@ -894,10 +918,12 @@
                     2501
                   ]
                 }
-              ]
+              ],
+              "skillType": "special"
             },
             {
               "id": "ex_clarity_return_dust",
+              "skillTags": ["exSpecial"],
               "name": {
                 "zhCN": "强化特殊技：明心境·归尘"
               },
@@ -928,7 +954,8 @@
                     2745.1
                   ]
                 }
-              ]
+              ],
+              "skillType": "special"
             }
           ]
         },
@@ -975,7 +1002,8 @@
                     2061.1
                   ]
                 }
-              ]
+              ],
+              "skillType": "chain"
             },
             {
               "id": "ultimate_chase_cloud_thunder",
@@ -1009,7 +1037,8 @@
                     4550
                   ]
                 }
-              ]
+              ],
+              "skillType": "ultimate"
             },
             {
               "id": "chain_clarity_pull_thunder",
@@ -1043,7 +1072,8 @@
                     2147.6
                   ]
                 }
-              ]
+              ],
+              "skillType": "chain"
             },
             {
               "id": "ultimate_cut_delusion_open_heaven",
@@ -1077,7 +1107,8 @@
                     7290.3
                   ]
                 }
-              ]
+              ],
+              "skillType": "ultimate"
             }
           ]
         }
@@ -1167,7 +1198,8 @@
                     70.1
                   ]
                 }
-              ]
+              ],
+              "skillType": "basic"
             },
             {
               "id": "windflower_frost",
@@ -1251,7 +1283,8 @@
                     306
                   ]
                 }
-              ]
+              ],
+              "skillType": "basic"
             },
             {
               "id": "frost_moon",
@@ -1335,7 +1368,8 @@
                     5061.6
                   ]
                 }
-              ]
+              ],
+              "skillType": "basic"
             }
           ]
         },
@@ -1352,6 +1386,7 @@
           "moves": [
             {
               "id": "dash_winter_bee",
+              "skillTags": ["dashAttack"],
               "name": {
                 "zhCN": "冲刺攻击：冬蜂"
               },
@@ -1382,7 +1417,8 @@
                     61.8
                   ]
                 }
-              ]
+              ],
+              "skillType": "dodge"
             },
             {
               "id": "dodge_counter_cold_sparrow",
@@ -1416,7 +1452,8 @@
                     581.9
                   ]
                 }
-              ]
+              ],
+              "skillType": "dodge"
             }
           ]
         },
@@ -1433,6 +1470,7 @@
           "moves": [
             {
               "id": "quick_support_flower_wind",
+              "skillTags": ["assistAttack"],
               "name": {
                 "zhCN": "快速支援：花信风"
               },
@@ -1463,10 +1501,12 @@
                     247
                   ]
                 }
-              ]
+              ],
+              "skillType": "assist"
             },
             {
               "id": "assist_followup_flower_parting",
+              "skillTags": ["assistAttack"],
               "name": {
                 "zhCN": "支援突击：花辞"
               },
@@ -1497,7 +1537,8 @@
                     799.8
                   ]
                 }
-              ]
+              ],
+              "skillType": "assist"
             }
           ]
         },
@@ -1544,10 +1585,12 @@
                     85.3
                   ]
                 }
-              ]
+              ],
+              "skillType": "special"
             },
             {
               "id": "ex_flying_snow",
+              "skillTags": ["exSpecial"],
               "name": {
                 "zhCN": "强化特殊技：飞雪"
               },
@@ -1603,7 +1646,8 @@
                     1143.2
                   ]
                 }
-              ]
+              ],
+              "skillType": "special"
             }
           ]
         },
@@ -1650,7 +1694,8 @@
                     1487.5
                   ]
                 }
-              ]
+              ],
+              "skillType": "chain"
             },
             {
               "id": "ultimate_lingering_snow",
@@ -1684,7 +1729,8 @@
                     5644.5
                   ]
                 }
-              ]
+              ],
+              "skillType": "ultimate"
             }
           ]
         },
@@ -1730,7 +1776,8 @@
                     1500
                   ]
                 }
-              ]
+              ],
+              "skillType": "core_skill"
             }
           ]
         }
@@ -1901,7 +1948,8 @@
                     269.7
                   ]
                 }
-              ]
+              ],
+              "skillType": "basic"
             },
             {
               "id": "ink_shadow_condensing_cloud",
@@ -1936,7 +1984,8 @@
                     555.7
                   ]
                 }
-              ]
+              ],
+              "skillType": "basic"
             },
             {
               "id": "xuanmo_formation",
@@ -1971,7 +2020,8 @@
                     722.2
                   ]
                 }
-              ]
+              ],
+              "skillType": "basic"
             },
             {
               "id": "qingming_shock",
@@ -2006,9 +2056,11 @@
                     262.1
                   ]
                 }
-              ]
+              ],
+              "skillType": "basic"
             }
-          ]
+          ],
+          "levelScale": "skill"
         },
         {
           "id": "dodge",
@@ -2023,6 +2075,7 @@
           "moves": [
             {
               "id": "dash_lingyun_break",
+              "skillTags": ["dashAttack"],
               "name": {
                 "zhCN": "冲刺攻击：凌云破"
               },
@@ -2054,7 +2107,8 @@
                     118.9
                   ]
                 }
-              ]
+              ],
+              "skillType": "dodge"
             },
             {
               "id": "dodge_counter_exorcising_strike",
@@ -2089,9 +2143,11 @@
                     519.6
                   ]
                 }
-              ]
+              ],
+              "skillType": "dodge"
             }
-          ]
+          ],
+          "levelScale": "skill"
         },
         {
           "id": "assist",
@@ -2106,6 +2162,7 @@
           "moves": [
             {
               "id": "assist_xiaoyun_swift_strike",
+              "skillTags": ["assistAttack"],
               "name": {
                 "zhCN": "支援突击：霄云迅击"
               },
@@ -2137,9 +2194,11 @@
                     702
                   ]
                 }
-              ]
+              ],
+              "skillType": "assist"
             }
-          ]
+          ],
+          "levelScale": "skill"
         },
         {
           "id": "special",
@@ -2185,10 +2244,12 @@
                     124.1
                   ]
                 }
-              ]
+              ],
+              "skillType": "special"
             },
             {
               "id": "ink_trace_transform",
+              "skillTags": ["exSpecial"],
               "name": {
                 "zhCN": "强化特殊技：墨痕化形"
               },
@@ -2298,10 +2359,12 @@
                     1008.4
                   ]
                 }
-              ]
+              ],
+              "skillType": "special"
             },
             {
               "id": "cloud_condensing_art",
+              "skillTags": ["exSpecial"],
               "name": {
                 "zhCN": "强化特殊技：凝云术"
               },
@@ -2333,10 +2396,12 @@
                     1588.3
                   ]
                 }
-              ]
+              ],
+              "skillType": "special"
             },
             {
               "id": "ink_ember_shadow_dispel",
+              "skillTags": ["exSpecial"],
               "name": {
                 "zhCN": "强化特殊技：墨烬影消"
               },
@@ -2345,7 +2410,7 @@
                 {
                   "id": "orb_total_damage",
                   "label": {
-                    "zhCN": "能量球出现与收缩时总伤害倍率"
+                    "zhCN": "总伤害倍率"
                   },
                   "kind": "damageMultiplier",
                   "damageBasis": "sheerForce",
@@ -2368,10 +2433,12 @@
                     553.8
                   ]
                 }
-              ]
+              ],
+              "skillType": "special"
             },
             {
               "id": "thousand_talismans_break",
+              "skillTags": ["exSpecial"],
               "name": {
                 "zhCN": "强化特殊技：符法千重-破"
               },
@@ -2403,9 +2470,11 @@
                     1200
                   ]
                 }
-              ]
+              ],
+              "skillType": "special"
             }
-          ]
+          ],
+          "levelScale": "skill"
         },
         {
           "id": "chain",
@@ -2451,7 +2520,8 @@
                     1260.6
                   ]
                 }
-              ]
+              ],
+              "skillType": "chain"
             },
             {
               "id": "ultimate_qingming_cloud_shadow",
@@ -2486,7 +2556,8 @@
                     4380.9
                   ]
                 }
-              ]
+              ],
+              "skillType": "ultimate"
             },
             {
               "id": "ultimate_thousand_talismans",
@@ -2521,9 +2592,11 @@
                     3465.7
                   ]
                 }
-              ]
+              ],
+              "skillType": "ultimate"
             }
-          ]
+          ],
+          "levelScale": "skill"
         },
         {
           "id": "additional_ability",
@@ -2554,9 +2627,11 @@
                     225
                   ]
                 }
-              ]
+              ],
+              "skillType": "additional_ability"
             }
-          ]
+          ],
+          "levelScale": "skill"
         },
         {
           "id": "cinema",
@@ -2587,9 +2662,11 @@
                     50
                   ]
                 }
-              ]
+              ],
+              "skillType": "cinema"
             }
-          ]
+          ],
+          "levelScale": "skill"
         }
       ],
       "sources": [
@@ -2777,7 +2854,8 @@
                     516.8
                   ]
                 }
-              ]
+              ],
+              "skillType": "basic"
             },
             {
               "id": "star_waltz",
@@ -2861,7 +2939,8 @@
                     2282.7
                   ]
                 }
-              ]
+              ],
+              "skillType": "basic"
             }
           ]
         },
@@ -2878,6 +2957,7 @@
           "moves": [
             {
               "id": "dash_sword_dance_wind",
+              "skillTags": ["dashAttack"],
               "name": {
                 "zhCN": "冲刺攻击：剑舞之风"
               },
@@ -2908,7 +2988,8 @@
                     178.8
                   ]
                 }
-              ]
+              ],
+              "skillType": "dodge"
             },
             {
               "id": "dodge_counter_sword_flash_rite",
@@ -2942,7 +3023,8 @@
                     672.5
                   ]
                 }
-              ]
+              ],
+              "skillType": "dodge"
             }
           ]
         },
@@ -2959,6 +3041,7 @@
           "moves": [
             {
               "id": "quick_assist_alternate_pierce",
+              "skillTags": ["assistAttack"],
               "name": {
                 "zhCN": "快速支援：交替穿刺"
               },
@@ -2989,10 +3072,12 @@
                     386.8
                   ]
                 }
-              ]
+              ],
+              "skillType": "assist"
             },
             {
               "id": "assist_followup_cross_counter",
+              "skillTags": ["assistAttack"],
               "name": {
                 "zhCN": "支援突击：交叉还击"
               },
@@ -3023,7 +3108,8 @@
                     787.2
                   ]
                 }
-              ]
+              ],
+              "skillType": "assist"
             }
           ]
         },
@@ -3070,10 +3156,12 @@
                     147.9
                   ]
                 }
-              ]
+              ],
+              "skillType": "special"
             },
             {
               "id": "ex_aurora_pierce_north_cross",
+              "skillTags": ["exSpecial"],
               "name": {
                 "zhCN": "强化特殊技：极光突刺·北十字"
               },
@@ -3104,10 +3192,12 @@
                     1088.5
                   ]
                 }
-              ]
+              ],
+              "skillType": "special"
             },
             {
               "id": "ex_aurora_pierce_south_cross",
+              "skillTags": ["exSpecial"],
               "name": {
                 "zhCN": "强化特殊技：极光突刺·南十字"
               },
@@ -3138,7 +3228,8 @@
                     1258
                   ]
                 }
-              ]
+              ],
+              "skillType": "special"
             }
           ]
         },
@@ -3185,7 +3276,8 @@
                     1575.3
                   ]
                 }
-              ]
+              ],
+              "skillType": "chain"
             },
             {
               "id": "ultimate_starlight_finale",
@@ -3219,17 +3311,53 @@
                     5347.5
                   ]
                 }
-              ]
+              ],
+              "skillType": "ultimate"
+            }
+          ]
+        },
+        {
+          "id": "cinema",
+          "name": {
+            "zhCN": "影画追加攻击"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 1,
+            "default": 1
+          },
+          "moves": [
+            {
+              "id": "winning_state_followup",
+              "name": {
+                "zhCN": "影画6：决胜状态额外攻击"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "异常精通伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "damageBasis": "anomalyProficiency",
+                  "values": [
+                    3300
+                  ]
+                }
+              ],
+              "skillType": "core_skill"
             }
           ]
         }
       ],
       "sources": [
-        "https://wiki.biligame.com/zzz/%E7%88%B1%E4%B8%BD%E4%B8%9D"
+        "https://baike.mihoyo.com/zzz/wiki/content/1385/detail?mhy_presentation_style=fullscreen"
       ],
       "verification": {
-        "skillMultipliers": "source-checked-biligame-wiki-2026-05-30",
-        "exclusions": "core skill, no-damage active skills, daze multipliers, special energy costs, and anomaly/polarized assault mechanics are intentionally omitted"
+        "skillMultipliers": "source-checked-mihoyo-baike-2026-07-17",
+        "cinema6": "source-checked-mihoyo-baike-2026-07-17; winning-state follow-up is 3300% anomaly proficiency and guaranteed crit",
+        "exclusions": "no-damage active skills, daze multipliers, special energy costs, and anomaly buildup efficiency are intentionally omitted"
       }
     }
   ]

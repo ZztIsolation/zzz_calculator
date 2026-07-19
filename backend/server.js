@@ -24,15 +24,20 @@ import {
     upsertUserDriveDisc,
 } from "./driveDiscInventory.js"
 import {
+    applySystemManagedMaintenanceFields,
     assertValidMaintenanceItem,
     fieldBuffModeOption,
     fieldBuffPhaseName,
+    SYSTEM_MANAGED_SKILL_GROUP_COUNTS,
 } from "../core/maintenanceValidation.js"
 import {
     defaultCalculationVariantName,
     isDefaultCalculationCinemaLevel,
     normalizeDefaultCalculationCinemaLevel,
 } from "../core/defaultCalculationConfig.js"
+import { normalizeSkillTargetsInValue } from "../core/skillTargets.js"
+import { normalizeLegacyEffectAppliesToInValue } from "../core/effectRuleTargets.js"
+import { disorderElapsedStepSeconds, normalizeElapsedSeconds } from "../core/damageEventMultipliers.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, "..")
@@ -203,6 +208,123 @@ const maintenanceResources = {
     "anomaly-effects": {
         fileName: "anomaly_effects.json",
     },
+}
+
+function materializeBossMaintenanceInput(input = {}) {
+    const next = applySystemManagedMaintenanceFields(structuredClone(input ?? {}))
+    ensureMaintenanceId(next.boss ??= {}, "boss")
+    ensureMaintenanceId(next.encounter ??= {}, "boss_encounter")
+    for (const group of [next.encounter.playerBuffs ??= [], next.encounter.playerDebuffs ??= []]) {
+        for (const entry of group) {
+            ensureMaintenanceId(entry, "boss_effect")
+            materializeEffectSetIds(entry)
+        }
+    }
+    return next
+}
+
+function cleanBossProfile(boss = {}) {
+    const next = structuredClone(boss)
+    delete next.encounters
+    next.name = zhOnly(boss.name)
+    next.aliases = [...new Set((boss.aliases ?? []).map(value => String(value).trim()).filter(Boolean))]
+    next.images = {
+        icon: String(boss.images?.icon ?? "").trim(),
+        source: String(boss.images?.source ?? "").trim(),
+    }
+    next.target = {
+        defense: Number(boss.target?.defense),
+        weaknessElements: [...new Set(boss.target?.weaknessElements ?? [])],
+        resistanceElements: [...new Set(boss.target?.resistanceElements ?? [])],
+        resistanceOverrides: Object.fromEntries(Object.entries(boss.target?.resistanceOverrides ?? {}).map(([key, value]) => [key, Number(value)])),
+    }
+    next.hidden = boss.hidden === true
+    return next
+}
+
+function cleanBossEncounter(encounter = {}) {
+    const next = {
+        id: String(encounter.id ?? "").trim(),
+        appearances: (encounter.appearances ?? []).map(appearance => ({
+            modeId: String(appearance.modeId ?? "").trim(),
+            gameVersion: String(appearance.gameVersion ?? "").trim(),
+            phaseNo: Number(appearance.phaseNo),
+            ...(appearance.startDate ? { startDate: String(appearance.startDate) } : {}),
+            ...(appearance.endDate ? { endDate: String(appearance.endDate) } : {}),
+        })),
+        enemyIntel: zhOnly(encounter.enemyIntel),
+        recommendedSpecialties: [...new Set(encounter.recommendedSpecialties ?? [])],
+        playerBuffs: [],
+        playerDebuffs: [],
+        sources: (encounter.sources ?? []).map(item => ({ label: zhOnly(item.label), url: String(item.url ?? "").trim() })),
+        hidden: encounter.hidden === true,
+    }
+    for (const key of ["playerBuffs", "playerDebuffs"]) {
+        next[key] = (encounter[key] ?? []).map(entry => ({
+            ...entry,
+            name: zhOnly(entry.name),
+            description: zhOnly(entry.description),
+            ...(entry.unmodeledReason ? { unmodeledReason: zhOnly(entry.unmodeledReason) } : {}),
+            effects: entry.calculationStatus === "modeled" ? (entry.effects ?? []).map(cleanEffectRule) : [],
+        }))
+    }
+    return next
+}
+
+async function saveBossEncounter(input) {
+    const materialized = normalizeSkillTargetsInValue(materializeBossMaintenanceInput(input))
+    return mutateDataFile("bosses.json", payload => {
+        const boss = cleanBossProfile(materialized.boss)
+        const encounter = cleanBossEncounter(materialized.encounter)
+        const existingBoss = (payload.bosses ?? []).find(item => item.id === boss.id)
+        const validationInput = { boss, encounter }
+        assertValidMaintenanceItem("boss-buffs", validationInput, {
+            bosses: payload.bosses ?? [],
+            currentBossId: existingBoss?.id ?? "",
+            currentEncounterId: encounter.id,
+        })
+        const savedBoss = {
+            ...(existingBoss ?? {}),
+            ...boss,
+            encounters: upsertById(existingBoss?.encounters ?? [], encounter),
+        }
+        const nextPayload = {
+            ...payload,
+            version: 2,
+            bosses: upsertById(payload.bosses ?? [], savedBoss),
+        }
+        const savedItem = {
+            ...encounter,
+            bossId: savedBoss.id,
+            bossName: savedBoss.name,
+            images: savedBoss.images,
+            target: savedBoss.target,
+        }
+        return { payload: nextPayload, value: { payload: nextPayload, savedItem, savedBoss, savedEncounter: encounter } }
+    })
+}
+
+async function deleteBossMaintenanceItem(bossOrEncounterId, encounterId = "") {
+    let deleted = false
+    await mutateDataFile("bosses.json", payload => {
+        let bosses = payload.bosses ?? []
+        if (encounterId) {
+            bosses = bosses.map(boss => boss.id === bossOrEncounterId
+                ? { ...boss, encounters: deleteById(boss.encounters ?? [], encounterId) }
+                : boss)
+            deleted = true
+        } else if (bosses.some(boss => boss.id === bossOrEncounterId)) {
+            bosses = deleteById(bosses, bossOrEncounterId)
+            deleted = true
+        } else if (bosses.some(boss => (boss.encounters ?? []).some(item => item.id === bossOrEncounterId))) {
+            bosses = bosses.map(boss => ({ ...boss, encounters: deleteById(boss.encounters ?? [], bossOrEncounterId) }))
+            deleted = true
+        }
+        return { payload: { ...payload, bosses }, value: payload }
+    })
+    if (!deleted) {
+        await deleteMaintenanceItem("boss-buffs", bossOrEncounterId)
+    }
 }
 
 function applyDefaultCors(res) {
@@ -742,6 +864,7 @@ function cleanCalculationEvent(event = {}, index = 0, options = {}) {
             kind: "skillGroup",
             skillGroupId,
             count: Number.isFinite(count) ? Math.max(0, count) : 1,
+            stunned: event.stunned === undefined ? true : Boolean(event.stunned),
         }
     }
     const settlementType = inputKind === "disorder" || event.settlementType === "disorder" ? "disorder" : "attribute"
@@ -752,6 +875,15 @@ function cleanCalculationEvent(event = {}, index = 0, options = {}) {
         id,
         kind,
         count: Number.isFinite(count) ? Math.max(0, count) : 1,
+        stunned: event.stunned === undefined ? true : Boolean(event.stunned),
+    }
+    const damageRatioPct = Number(event.damageRatioPct)
+    if (event.damageRatioPct !== undefined && Number.isFinite(damageRatioPct)) {
+        base.damageRatioPct = Math.max(0, damageRatioPct)
+    }
+    const eventLabel = String(event.label ?? "").trim()
+    if (eventLabel) {
+        base.label = eventLabel
     }
     if (kind === "direct" || kind === "sheer") {
         const skillRef = cleanCalculationSkillRef(event.skillRef)
@@ -759,9 +891,8 @@ function cleanCalculationEvent(event = {}, index = 0, options = {}) {
             ...base,
             critMode: ["expected", "crit", "nonCrit"].includes(event.critMode) ? event.critMode : "expected",
         }
-        const label = String(event.label ?? "").trim()
-        if (label) {
-            result.label = label
+        if (["atk", "anomalyProficiency"].includes(event.damageBasis)) {
+            result.damageBasis = event.damageBasis
         }
         if (skillRef) {
             result.skillRef = skillRef
@@ -777,12 +908,16 @@ function cleanCalculationEvent(event = {}, index = 0, options = {}) {
     }
     if (kind === "anomaly") {
         if (settlementType === "disorder") {
-            const elapsedSeconds = Number(event.elapsedSeconds ?? 0)
             return {
                 ...base,
                 settlementType: "disorder",
                 anomalyEffect: String(event.anomalyEffect ?? event.previousAnomalyEffect ?? "").trim(),
-                elapsedSeconds: Number.isFinite(elapsedSeconds) ? Math.max(0, elapsedSeconds) : 0,
+                disorderType: ["normal", "polarized"].includes(event.disorderType) ? event.disorderType : "normal",
+                elapsedSeconds: normalizeElapsedSeconds(
+                    event.elapsedSeconds,
+                    Number.POSITIVE_INFINITY,
+                    disorderElapsedStepSeconds(event, options),
+                ),
             }
         }
         const procCount = Number(event.procCount ?? 1)
@@ -790,6 +925,7 @@ function cleanCalculationEvent(event = {}, index = 0, options = {}) {
             ...base,
             settlementType: "attribute",
             anomalyEffect: String(event.anomalyEffect ?? "").trim(),
+            anomalyVariant: event.anomalyVariant === "polarizedAssault" ? "polarizedAssault" : "normal",
             procCount: Number.isFinite(procCount) ? Math.max(0, procCount) : 1,
         }
     }
@@ -823,11 +959,19 @@ function cleanDefaultCalculationConfigEntry(config = null, skillGroups = [], opt
     }
     const skillGroupIds = new Set(skillGroups.map(group => group.id).filter(Boolean))
     let events = Array.isArray(config.events)
-        ? config.events.map((event, index) => cleanCalculationEvent(event, index, { allowSkillGroup: true, skillGroupIds })).filter(Boolean)
+        ? config.events.map((event, index) => cleanCalculationEvent(event, index, {
+            ...options,
+            allowSkillGroup: true,
+            skillGroupIds,
+        })).filter(Boolean)
         : []
     if (!events.length && skillGroups.length) {
         events = legacySkillGroupReferenceEvents(config, skillGroups)
-            .map((event, index) => cleanCalculationEvent(event, index, { allowSkillGroup: true, skillGroupIds }))
+            .map((event, index) => cleanCalculationEvent(event, index, {
+                ...options,
+                allowSkillGroup: true,
+                skillGroupIds,
+            }))
             .filter(Boolean)
     }
     if (!events.length) {
@@ -849,12 +993,13 @@ function cleanDefaultCalculationConfigEntry(config = null, skillGroups = [], opt
     return result
 }
 
-function cleanDefaultCalculationConfig(config = null, skillGroups = []) {
+function cleanDefaultCalculationConfig(config = null, skillGroups = [], options = {}) {
     if (!config || typeof config !== "object" || Array.isArray(config)) {
         return null
     }
     const rawVariants = Array.isArray(config.variants) ? config.variants : []
     const baseConfig = cleanDefaultCalculationConfigEntry(config, skillGroups, {
+        ...options,
         defaultCinemaLevel: 0,
         includeCinemaLevel: config.cinemaLevel !== undefined || rawVariants.length > 0,
     })
@@ -872,6 +1017,7 @@ function cleanDefaultCalculationConfig(config = null, skillGroups = []) {
                 return null
             }
             const cleanVariant = cleanDefaultCalculationConfigEntry(variant, skillGroups, {
+                ...options,
                 defaultCinemaLevel: cinemaLevel,
                 includeCinemaLevel: true,
             })
@@ -888,7 +1034,7 @@ function cleanDefaultCalculationConfig(config = null, skillGroups = []) {
     return baseConfig
 }
 
-function cleanCalculationSkillGroups(groups = []) {
+function cleanCalculationSkillGroups(groups = [], options = {}) {
     if (!Array.isArray(groups)) {
         return []
     }
@@ -899,23 +1045,19 @@ function cleanCalculationSkillGroups(groups = []) {
             }
             const id = String(group.id ?? "").trim()
             const events = Array.isArray(group.events)
-                ? group.events.map((event, eventIndex) => cleanCalculationEvent(event, eventIndex, { allowSkillGroup: false })).filter(Boolean)
+                ? group.events.map((event, eventIndex) => cleanCalculationEvent(event, eventIndex, {
+                    ...options,
+                    allowSkillGroup: false,
+                })).filter(Boolean)
                 : []
             if (!id || !events.length) {
                 return null
             }
-            const minCount = Number(group.minCount ?? 0)
-            const maxCount = Number(group.maxCount ?? "")
-            const defaultCount = Number(group.defaultCount ?? 0)
-            const step = Number(group.step ?? 1)
             return {
                 id,
                 ...(group.name ? { name: zhOnly(group.name) } : {}),
                 ...(cleanOptionalZh(group.description) ? { description: cleanOptionalZh(group.description) } : {}),
-                defaultCount: Number.isFinite(defaultCount) ? Math.max(0, defaultCount) : 0,
-                minCount: Number.isFinite(minCount) ? Math.max(0, minCount) : 0,
-                ...(Number.isFinite(maxCount) ? { maxCount: Math.max(0, maxCount) } : {}),
-                step: Number.isFinite(step) && step > 0 ? step : 1,
+                ...SYSTEM_MANAGED_SKILL_GROUP_COUNTS,
                 events,
             }
         })
@@ -935,13 +1077,13 @@ function mergeCalculationSkillGroups(primaryGroups = [], legacyGroups = []) {
     return groups
 }
 
-function cleanAgent(item = {}) {
+function cleanAgent(item = {}, options = {}) {
     const preferredDriveDiscs = cleanPreferredDriveDiscs(item.preferredDriveDiscs)
     const skillGroups = mergeCalculationSkillGroups(
-        cleanCalculationSkillGroups(item.skillGroups),
-        cleanCalculationSkillGroups(item.defaultCalculationConfig?.skillGroups),
+        cleanCalculationSkillGroups(item.skillGroups, options),
+        cleanCalculationSkillGroups(item.defaultCalculationConfig?.skillGroups, options),
     )
-    const defaultCalculationConfig = cleanDefaultCalculationConfig(item.defaultCalculationConfig, skillGroups)
+    const defaultCalculationConfig = cleanDefaultCalculationConfig(item.defaultCalculationConfig, skillGroups, options)
     const next = {
         ...item,
         name: zhOnly(item.name),
@@ -1097,6 +1239,9 @@ function deleteAnomalyEffectByType(items, type, id) {
 }
 
 export function cleanMaintenanceItem(resource, item, options = {}) {
+    item = normalizeLegacyEffectAppliesToInValue(
+        normalizeSkillTargetsInValue(applySystemManagedMaintenanceFields(structuredClone(item ?? {}))),
+    )
     if (resource === "combat-buffs") {
         return cleanBuff(item)
     }
@@ -1116,7 +1261,7 @@ export function cleanMaintenanceItem(resource, item, options = {}) {
         return cleanDriveDiscSet(item)
     }
     if (resource === "agents") {
-        return cleanAgent(item)
+        return cleanAgent(item, options)
     }
     return item
 }
@@ -1126,6 +1271,8 @@ function cleanTeammate(teammate = {}) {
     const next = {
         ...teammate,
         name: zhOnly(teammate.name),
+        attribute: String(teammate.attribute ?? "").trim(),
+        specialty: String(teammate.specialty ?? "").trim(),
     }
     if (Object.keys(images).length) {
         next.images = images
@@ -1145,6 +1292,142 @@ function upsertById(items, item) {
         next.push(item)
     }
 
+    return next
+}
+
+function ensureMaintenanceId(item, prefix) {
+    if (item && typeof item === "object" && !Array.isArray(item) && !String(item.id ?? "").trim()) {
+        item.id = randomId(prefix)
+    }
+    return item
+}
+
+function materializeEffectSetIds(effect) {
+    if (!effect || typeof effect !== "object" || Array.isArray(effect)) {
+        return effect
+    }
+    if (Array.isArray(effect.effects)) {
+        effect.effects = effect.effects.map(rule => ensureMaintenanceId(rule, "effect"))
+    }
+    if (Array.isArray(effect.buffModifiers)) {
+        effect.buffModifiers = effect.buffModifiers.map(modifier => ensureMaintenanceId(modifier, "modifier"))
+    }
+    return effect
+}
+
+function materializeCalculationEventIds(events = []) {
+    return Array.isArray(events)
+        ? events.map(event => ensureMaintenanceId(event, "event"))
+        : events
+}
+
+function materializeCalculationConfigIds(config) {
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+        return config
+    }
+    config.events = materializeCalculationEventIds(config.events)
+    if (Array.isArray(config.variants)) {
+        config.variants = config.variants.map(variant => materializeCalculationConfigIds(variant))
+    }
+    return config
+}
+
+function materializeAgentIds(item) {
+    ensureMaintenanceId(item, "agent")
+    const combatBuffs = item.combatBuffs ?? {}
+    materializeEffectSetIds(combatBuffs.corePassive)
+    materializeEffectSetIds(combatBuffs.additionalAbility)
+    if (Array.isArray(combatBuffs.cinemaBuffs)) {
+        combatBuffs.cinemaBuffs.forEach(materializeEffectSetIds)
+    }
+    if (Array.isArray(item.skillGroups)) {
+        item.skillGroups = item.skillGroups.map(group => {
+            ensureMaintenanceId(group, "skill_group")
+            group.events = materializeCalculationEventIds(group.events)
+            return group
+        })
+    }
+    materializeCalculationConfigIds(item.defaultCalculationConfig)
+    return item
+}
+
+function materializeAgentSkillIds(item) {
+    ensureMaintenanceId(item, "agent_skill")
+    if (!Array.isArray(item.categories)) {
+        return item
+    }
+    item.categories = item.categories.map(category => {
+        ensureMaintenanceId(category, "skill_category")
+        if (Array.isArray(category.moves)) {
+            category.moves = category.moves.map(move => {
+                ensureMaintenanceId(move, "skill_move")
+                if (Array.isArray(move.rows)) {
+                    move.rows = move.rows.map(row => ensureMaintenanceId(row, "skill_row"))
+                }
+                return move
+            })
+        }
+        return category
+    })
+    return item
+}
+
+function materializeWEngineIds(item) {
+    ensureMaintenanceId(item, "w_engine")
+    materializeEffectSetIds(item.effect?.selfBuff ?? item.effect?.buff)
+    materializeEffectSetIds(item.effect?.teamBuff)
+    return item
+}
+
+function materializeDriveDiscSetIds(item) {
+    ensureMaintenanceId(item, "drive_disc_set")
+    materializeEffectSetIds(item.twoPiece)
+    materializeEffectSetIds(item.fourPiece)
+    materializeEffectSetIds(item.fourPiece?.selfBuff)
+    materializeEffectSetIds(item.fourPiece?.teamBuff)
+    return item
+}
+
+function materializeBuffIds(item, prefix = "buff") {
+    ensureMaintenanceId(item, prefix)
+    materializeEffectSetIds(item)
+    return item
+}
+
+function materializeMaintenanceItem(resource, input = {}) {
+    const item = applySystemManagedMaintenanceFields(structuredClone(input ?? {}))
+    if (resource === "agents") {
+        return materializeAgentIds(item)
+    }
+    if (resource === "agent-skills") {
+        return materializeAgentSkillIds(item)
+    }
+    if (resource === "w-engines") {
+        return materializeWEngineIds(item)
+    }
+    if (resource === "drive-disc-sets") {
+        return materializeDriveDiscSetIds(item)
+    }
+    if (resource === "anomaly-effects") {
+        const prefix = item.settlementType === "disorder" || item.maintenanceType === "disorder"
+            ? "disorder"
+            : "anomaly"
+        return ensureMaintenanceId(item, prefix)
+    }
+    if (resource === "field-buffs") {
+        materializeEffectSetIds(item)
+        return item
+    }
+    if (resource === "boss-buffs") {
+        return materializeBuffIds(item, "boss_buff")
+    }
+    return item
+}
+
+function materializeTeammateBuffInput(input = {}) {
+    const next = applySystemManagedMaintenanceFields(structuredClone(input ?? {}))
+    ensureMaintenanceId(next.teammate ??= {}, "teammate")
+    materializeBuffIds(next.buff ??= {}, "buff")
     return next
 }
 
@@ -1178,7 +1461,8 @@ function cleanAnomalyMaintenanceItem(item = {}) {
     }
 }
 
-async function saveAnomalyMaintenanceItem(item) {
+async function saveAnomalyMaintenanceItem(input) {
+    const item = materializeMaintenanceItem("anomaly-effects", input)
     return mutateDataFile("anomaly_effects.json", payload => {
         const settlementType = anomalyMaintenanceType(item)
         assertValidMaintenanceItem("anomaly-effects", item, {
@@ -1215,6 +1499,7 @@ async function saveMaintenanceItem(resource, item) {
         return saveAnomalyMaintenanceItem(item)
     }
 
+    item = materializeMaintenanceItem(resource, item)
     const config = maintenanceResources[resource]
     if (!config) {
         throw new Error(`Unsupported maintenance resource: ${resource}`)
@@ -1230,24 +1515,25 @@ async function saveMaintenanceItem(resource, item) {
             items: collection,
             currentId: fieldBuffOriginalId || item?.id,
         }
+        const normalizedItem = normalizeSkillTargetsInValue(item)
+        if (resource !== "agent-skills") {
+            const agentSkillsPayload = await readDataFile("agent_skills.json")
+            validationContext.agentSkills = agentSkillsPayload.agentSkills ?? []
+        }
         if (resource === "agents") {
-            const [agentSkillsPayload, anomalyEffectsPayload, driveDiscSetsPayload] = await Promise.all([
-                readDataFile("agent_skills.json"),
+            const [anomalyEffectsPayload, driveDiscSetsPayload] = await Promise.all([
                 readDataFile("anomaly_effects.json"),
                 readDataFile("drive_disc_sets.json"),
             ])
-            validationContext.agentSkills = agentSkillsPayload.agentSkills ?? []
             validationContext.anomalyEffects = anomalyEffectsForType(anomalyEffectsPayload, "attribute")
             validationContext.disorderEffects = anomalyEffectsForType(anomalyEffectsPayload, "disorder")
             validationContext.driveDiscSets = driveDiscSetsPayload.sets ?? []
+            cleanOptions.anomalyEffects = validationContext.anomalyEffects
+            cleanOptions.disorderEffects = validationContext.disorderEffects
         }
-        const itemForValidation = resource === "field-buffs"
-            ? cleanMaintenanceItem(resource, item, cleanOptions)
-            : item
+        const itemForValidation = cleanMaintenanceItem(resource, normalizedItem, cleanOptions)
         assertValidMaintenanceItem(resource, itemForValidation, validationContext)
-        const savedItem = resource === "field-buffs"
-            ? itemForValidation
-            : cleanMaintenanceItem(resource, item)
+        const savedItem = itemForValidation
         const nextPayload = {
             ...payload,
             [config.collectionKey]: upsertById(collection, savedItem),
@@ -1282,13 +1568,17 @@ async function deleteMaintenanceItem(resource, id) {
 }
 
 async function saveTeammateBuff(input) {
+    input = normalizeSkillTargetsInValue(materializeTeammateBuffInput(input))
+    const agentSkillsPayload = await readDataFile("agent_skills.json")
     return mutateDataFile("combat_buffs.json", payload => {
-        assertValidMaintenanceItem("teammate-buffs", input, {
-            teammates: payload.teammates ?? [],
-            currentBuffId: input?.buff?.id,
-        })
         const teammate = cleanTeammate(input?.teammate ?? {})
-        const buff = cleanBuff(input?.buff ?? {})
+        const buff = cleanMaintenanceItem("combat-buffs", input?.buff ?? {})
+        const cleanedInput = { ...input, teammate, buff }
+        assertValidMaintenanceItem("teammate-buffs", cleanedInput, {
+            teammates: payload.teammates ?? [],
+            currentBuffId: buff.id,
+            agentSkills: agentSkillsPayload.agentSkills ?? [],
+        })
         delete buff.sourceLabel
         const teammateId = requireId(teammate, "teammate")
         requireId(buff, "buff")
@@ -1338,6 +1628,16 @@ async function deleteTeammateBuff(teammateId, buffId) {
                     buffs: deleteById(teammate.buffs ?? [], buffId),
                 }
             }),
+        }
+        return { payload: nextPayload, value: nextPayload }
+    })
+}
+
+async function deleteTeammate(teammateId) {
+    return mutateDataFile("combat_buffs.json", payload => {
+        const nextPayload = {
+            ...payload,
+            teammates: (payload.teammates ?? []).filter(teammate => teammate.id !== teammateId),
         }
         return { payload: nextPayload, value: nextPayload }
     })
@@ -1400,9 +1700,21 @@ function streamFileResponse(res, absPath, headers = {}) {
     })
 }
 
+function staticCacheControl(absPath) {
+    const relativePath = path.relative(pagesDir, absPath).split(path.sep).join("/")
+    if (path.extname(absPath).toLowerCase() === ".html") {
+        return "no-store"
+    }
+    if (relativePath.startsWith("static/app/") && /\.(?:js|css)$/i.test(relativePath)) {
+        return "public, max-age=31536000, immutable"
+    }
+    return "no-cache"
+}
+
 function streamStaticFile(res, absPath) {
     return streamFileResponse(res, absPath, {
         "Content-Type": contentType(absPath),
+        "Cache-Control": staticCacheControl(absPath),
     })
 }
 
@@ -1667,12 +1979,13 @@ async function routeApi(req, res, pathname) {
     }
 
     if (req.method === "GET" && pathname === "/api/maintenance/catalog") {
-        const [agents, agentSkills, wEngines, driveDiscSets, combatBuffs, anomalyEffects] = await Promise.all([
+        const [agents, agentSkills, wEngines, driveDiscSets, combatBuffs, bosses, anomalyEffects] = await Promise.all([
             readDataFile("agents.json"),
             readDataFile("agent_skills.json"),
             readDataFile("w_engines.json"),
             readDataFile("drive_disc_sets.json"),
             readDataFile("combat_buffs.json"),
+            readDataFile("bosses.json"),
             readDataFile("anomaly_effects.json"),
         ])
         sendJson(res, 200, {
@@ -1683,6 +1996,7 @@ async function routeApi(req, res, pathname) {
                 wEngines,
                 driveDiscSets,
                 combatBuffs,
+                bosses,
                 anomalyEffects,
                 meta: buildMeta(catalog),
             },
@@ -1699,11 +2013,15 @@ async function routeApi(req, res, pathname) {
                 const body = JSON.parse(await readBody(req) || "{}")
                 const result = resource === "teammate-buffs"
                     ? await saveTeammateBuff(body)
-                    : await saveMaintenanceItem(resource, body)
+                    : resource === "boss-buffs" && body?.boss && body?.encounter
+                        ? await saveBossEncounter(body)
+                        : await saveMaintenanceItem(resource, body)
                 sendJson(res, 200, {
                     ok: true,
                     data: result.payload,
                     savedItem: result.savedItem,
+                    ...(result.savedBoss ? { savedBoss: result.savedBoss } : {}),
+                    ...(result.savedEncounter ? { savedEncounter: result.savedEncounter } : {}),
                     meta: buildMeta(catalog),
                 })
                 return
@@ -1711,7 +2029,13 @@ async function routeApi(req, res, pathname) {
 
             if (req.method === "DELETE") {
                 if (resource === "teammate-buffs") {
-                    await deleteTeammateBuff(parts[1] ?? "", parts[2] ?? "")
+                    if (parts[2]) {
+                        await deleteTeammateBuff(parts[1] ?? "", parts[2])
+                    } else {
+                        await deleteTeammate(parts[1] ?? "")
+                    }
+                } else if (resource === "boss-buffs") {
+                    await deleteBossMaintenanceItem(parts[1] ?? "", parts[2] ?? "")
                 } else if (resource === "anomaly-effects") {
                     await deleteAnomalyMaintenanceItem(parts[1] ?? "anomaly", parts[2] ?? "")
                 } else {

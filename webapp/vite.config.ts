@@ -46,6 +46,10 @@ export default defineConfig({
     emptyOutDir: true,
     assetsDir: "static/app",
     rollupOptions: {
+      input: {
+        app: path.resolve(__dirname, "index.html"),
+        optimizerBenchmark: path.resolve(__dirname, "optimizer-benchmark.html"),
+      },
       output: {
         manualChunks(id) {
           const normalizedId = id.replace(/\\/g, "/")

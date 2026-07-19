@@ -9,14 +9,16 @@ const DEFAULT_OPTIMIZER_RUNTIME = Object.freeze({
     yieldControl: defaultYieldControl,
     availableParallelism: browserAvailableParallelism,
     runParallel: null,
+    maxWorkerCount: 6,
 })
 
 const SLOT_NUMBERS = [1, 2, 3, 4, 5, 6]
-const RESULT_LIMIT = 5
+const RESULT_LIMIT = 10
 const UPPER_BOUND_PRUNE_DEPTH = 3
 const SUPER_BOUND_CHUNK_SIZE = 8
 const DEFAULT_SEED_CUTOFF_ATTEMPTS = 768
-const SUFFIX_TOPK_BOUND_MAX_LEAVES = 192
+const SUFFIX_TOPK_BOUND_MAX_LEAVES = 64
+const FREE_TWO_PIECE_INSUFFICIENT_REASON = "已有驱动盘太少，无法组成 4+2 或 6 件同套。"
 const SCORE_TIE_EPSILON = 1e-8
 const SUFFIX_TOPK_PRUNE_EPSILON = SCORE_TIE_EPSILON
 const SUFFIX_TOPK_SCORE_SAFETY_EPSILON = 1e-6
@@ -81,6 +83,7 @@ const DEFAULT_POTENTIAL_WEIGHTS = {
     windSheerDmg: 5,
     penRatio: 5,
     penFlat: 0.03,
+    allResIgnore: 5,
     physicalResIgnore: 5,
     fireResIgnore: 5,
     iceResIgnore: 5,
@@ -113,6 +116,7 @@ const PERCENT_PANEL_STATS = new Set([
     "energyRegen",
     "energyRegenPct",
     "penRatio",
+    "allResIgnore",
     "physicalResIgnore",
     "fireResIgnore",
     "iceResIgnore",
@@ -189,6 +193,26 @@ function compareStable(left, right) {
     return stableDiscSignature(left.driveDiscs).localeCompare(stableDiscSignature(right.driveDiscs))
 }
 
+function hotMetricSample(metrics, key, callCount) {
+    const count = Number(callCount ?? 0)
+    if (count > 64 && count % 256 !== 0) {
+        return null
+    }
+    return {
+        startedAt: nowMs(),
+        weight: count > 64 ? 256 : 1,
+        samplesKey: `${key}Samples`,
+    }
+}
+
+function finishHotMetricSample(metrics, key, sample) {
+    if (!sample) {
+        return
+    }
+    metrics[key] = Number(metrics[key] ?? 0) + elapsedMsSince(sample.startedAt) * sample.weight
+    metrics[sample.samplesKey] = Number(metrics[sample.samplesKey] ?? 0) + 1
+}
+
 function compareTopResult(left, right) {
     const scoreDelta = Number(right.score) - Number(left.score)
     if (Math.abs(scoreDelta) > SCORE_TIE_EPSILON) {
@@ -255,6 +279,11 @@ function normalizeSettings(input = {}, agent = null) {
         mainStatLimits,
         minimums,
         enableUpperBoundPruning: settings.enableUpperBoundPruning !== false,
+        enableSpecializedScoreKernel: settings.enableSpecializedScoreKernel !== false,
+        enableObjectiveScalarKernel: settings.enableObjectiveScalarKernel !== false,
+        enableSuffixFrontierCache: settings.enableSuffixFrontierCache !== false,
+        enableSuffixFrontierDominance: settings.enableSuffixFrontierDominance !== false,
+        enableObjectiveRelevantDominance: settings.enableObjectiveRelevantDominance !== false,
         useIndexedScoreOnly: settings.useIndexedScoreOnly ?? input.useIndexedScoreOnly ?? "auto",
         workerCount: settings.workerCount ?? input.workerCount ?? "auto",
         parallelThreshold: Number(settings.parallelThreshold ?? input.parallelThreshold ?? 2_000_000),
@@ -453,8 +482,13 @@ function prepareIndexedCandidateData(candidatesBySlot, candidateData, settings, 
     const statIndexById = indexMapFromIds(statIds)
     const setIndexById = indexMapFromIds(setIds)
     const indexedVectorById = new Map()
+    const candidateStatIndexes = new Set()
     for (const [discId, vector] of candidateData.vectorById.entries()) {
-        indexedVectorById.set(discId, mapToIndexedVector(vector, statIndexById))
+        const indexedVector = mapToIndexedVector(vector, statIndexById)
+        indexedVectorById.set(discId, indexedVector)
+        for (const index of indexedVector.indexes) {
+            candidateStatIndexes.add(index)
+        }
     }
     const indexedOptimisticTwoPieceEntries = entriesToIndexedVector(optimisticEntries ?? [], statIndexById)
     const indexedOptimisticTwoPieceEntriesByActiveCount = Object.fromEntries(
@@ -467,6 +501,7 @@ function prepareIndexedCandidateData(candidatesBySlot, candidateData, settings, 
         setIds,
         setIndexById,
         indexedVectorById,
+        candidateStatIndexes: [...candidateStatIndexes].sort((left, right) => left - right),
         indexedOptimisticTwoPieceEntries,
         indexedOptimisticTwoPieceEntriesByActiveCount,
     }
@@ -495,15 +530,50 @@ function nearlyEqual(left, right, epsilon = 1e-8) {
     return Math.abs(a - b) <= epsilon * Math.max(1, Math.abs(a), Math.abs(b))
 }
 
-function scoreOnlySummariesMatch(left, right) {
+function summaryPanelValue(summary, key, panelStatIndexById, objectKey, valuesKey) {
+    const panel = summary?.[objectKey]
+    if (panel && Object.prototype.hasOwnProperty.call(panel, key)) {
+        return panel[key]
+    }
+    const index = panelStatIndexById.get(key)
+    return index === undefined ? undefined : summary?.[valuesKey]?.[index]
+}
+
+function scoreOnlySummariesMatch(left, right, panelStatIds = [], comparePanels = true) {
     if (!nearlyEqual(left?.finalDamage, right?.finalDamage)) {
         return false
     }
+    if (!comparePanels) {
+        return true
+    }
+    const panelStatIndexById = new Map(panelStatIds.map((key, index) => [key, index]))
     const leftPanel = left?.panel ?? {}
     const rightPanel = right?.panel ?? {}
-    const keys = new Set([...Object.keys(leftPanel), ...Object.keys(rightPanel)])
+    const keys = new Set([
+        ...Object.keys(leftPanel),
+        ...Object.keys(rightPanel),
+        ...(left?.panelValues || right?.panelValues ? panelStatIds : []),
+    ])
     for (const key of keys) {
-        if (!nearlyEqual(leftPanel[key], rightPanel[key])) {
+        if (!nearlyEqual(
+            summaryPanelValue(left, key, panelStatIndexById, "panel", "panelValues"),
+            summaryPanelValue(right, key, panelStatIndexById, "panel", "panelValues"),
+        )) {
+            return false
+        }
+    }
+    const leftOutOfCombatPanel = left?.outOfCombatPanel ?? {}
+    const rightOutOfCombatPanel = right?.outOfCombatPanel ?? {}
+    const outOfCombatKeys = new Set([
+        ...Object.keys(leftOutOfCombatPanel),
+        ...Object.keys(rightOutOfCombatPanel),
+        ...(left?.outOfCombatPanelValues || right?.outOfCombatPanelValues ? panelStatIds : []),
+    ])
+    for (const key of outOfCombatKeys) {
+        if (!nearlyEqual(
+            summaryPanelValue(left, key, panelStatIndexById, "outOfCombatPanel", "outOfCombatPanelValues"),
+            summaryPanelValue(right, key, panelStatIndexById, "outOfCombatPanel", "outOfCombatPanelValues"),
+        )) {
             return false
         }
     }
@@ -600,7 +670,7 @@ function shouldUseIndexedScoreOnly(panelCalculator, indexedData, settings) {
     }
 }
 
-function denseProbeInputs(indexedData, candidatesBySlot, limit = 240) {
+function denseProbeInputs(indexedData, candidatesBySlot, limit = 64) {
     const probes = []
     const pushProbe = (statValues, setCountValues) => {
         probes.push({
@@ -658,14 +728,14 @@ function probeCompiledDenseScoreKernel(panelCalculator, indexedData, denseTarget
         return result
     }
 
-    const probes = denseProbeInputs(indexedData, candidatesBySlot, Number(options.limit ?? 240))
+    const probes = denseProbeInputs(indexedData, candidatesBySlot, Number(options.limit ?? 64))
     result.scoreKernelProbeCount = probes.length
     try {
         const probeState = { panelCalculator }
-        for (const probe of probes.slice(0, Math.min(64, probes.length))) {
+        for (const probe of probes.slice(0, Math.min(16, probes.length))) {
             const mapSummary = scoreOnlyFromMaps(probeState, probe.statTotals, probe.setCounts)
             const denseSummary = denseTarget.scoreDense(probe.statValues, probe.setCountValues)
-            if (!scoreOnlySummariesMatch(mapSummary, denseSummary)) {
+            if (!scoreOnlySummariesMatch(mapSummary, denseSummary, denseTarget.panelStatIds ?? [])) {
                 result.scoreKernelFallbackReason = "mismatch"
                 result.scoreKernelProbeMs = elapsedMsSince(startedAt)
                 return result
@@ -720,12 +790,14 @@ function dominanceRow(disc, index) {
     }
 }
 
-function dominatesRow(left, right) {
+function dominatesRow(left, right, relevantStatIds = null) {
     if (left.disc.setId !== right.disc.setId || Number(left.disc.partition) !== Number(right.disc.partition)) {
         return false
     }
 
-    const keys = new Set([...left.vector.keys(), ...right.vector.keys()])
+    const keys = relevantStatIds?.size
+        ? relevantStatIds
+        : new Set([...left.vector.keys(), ...right.vector.keys()])
     let strictlyBetter = sourceOrder(left.disc) < sourceOrder(right.disc)
         || String(left.disc.id) < String(right.disc.id)
     for (const key of keys) {
@@ -742,7 +814,7 @@ function dominatesRow(left, right) {
     return strictlyBetter
 }
 
-function removeDominatedDiscs(discs) {
+function removeDominatedDiscs(discs, relevantStatIds = null) {
     const rowsBySet = new Map()
     const rows = discs.map((disc, index) => dominanceRow(disc, index))
     for (const row of rows) {
@@ -756,7 +828,11 @@ function removeDominatedDiscs(discs) {
     const removed = new Set()
     for (const group of rowsBySet.values()) {
         for (const row of group) {
-            if (group.some(candidate => candidate.index !== row.index && dominatesRow(candidate, row))) {
+            const requiredDominators = relevantStatIds?.size ? RESULT_LIMIT : 1
+            const dominatorCount = group.reduce((count, candidate) =>
+                count + (candidate.index !== row.index && dominatesRow(candidate, row, relevantStatIds) ? 1 : 0),
+            0)
+            if (dominatorCount >= requiredDominators) {
                 removed.add(row.index)
             }
         }
@@ -813,7 +889,7 @@ function applyPreferredMainStatLimits(settings, agent) {
     }
 }
 
-function groupCandidatesBySlot(store, settings) {
+function groupCandidatesBySlot(store, settings, relevantStatIds = null) {
     const mainStatLimits = normalizeMainStatLimits(settings.mainStatLimits)
     const filtered = (store.driveDiscs ?? [])
         .filter(disc => (disc.ownerId ?? "default") === settings.ownerId)
@@ -838,7 +914,10 @@ function groupCandidatesBySlot(store, settings) {
                 sourceOrder(left) - sourceOrder(right)
                 || String(left.id).localeCompare(String(right.id))
             )
-        return [String(slot), removeDominatedDiscs(slotDiscs)]
+        const baselineCandidates = removeDominatedDiscs(slotDiscs)
+        return [String(slot), relevantStatIds?.size
+            ? removeDominatedDiscs(baselineCandidates, relevantStatIds)
+            : baselineCandidates]
     }))
 }
 
@@ -905,54 +984,86 @@ function productOfCandidateLengths(slotCandidates) {
 function buildEnumerationPlans(candidatesBySlot, settings) {
     const plans = []
     const allSlotsMask = (1 << SLOT_NUMBERS.length) - 1
-    const masks = []
     const extraSetIds = allowedExtraTwoPieceSetIds(settings)
+    const autoMatchTwoPiece = !hasTwoPieceLimit(settings)
 
-    if (allowsSixPieceSameSet(settings)) {
-        masks.push(allSlotsMask)
-    }
-    if (extraSetIds.length) {
-        for (let mask = 0; mask <= allSlotsMask; mask += 1) {
-            if (bitCount(mask) === 4) {
-                masks.push(mask)
-            }
-        }
-    } else if (!hasTwoPieceLimit(settings)) {
-        for (let mask = 0; mask <= allSlotsMask; mask += 1) {
-            const count = bitCount(mask)
-            if (count >= 4) {
-                masks.push(mask)
-            }
-        }
-    }
-
-    const planExtraSetIds = hasTwoPieceLimit(settings) ? (extraSetIds.length ? extraSetIds : [settings.fourPieceSetId]) : [""]
-    for (const mask of masks) {
-        const extraSetCandidates = mask === allSlotsMask ? [settings.fourPieceSetId] : planExtraSetIds
-        for (const extraSetId of extraSetCandidates) {
+    function appendPlan(mask, extraSetId, freeTwoPieceMode = null) {
         const slotCandidates = SLOT_NUMBERS.map((slot, index) => {
-            const needsFourPieceSet = Boolean(mask & (1 << index))
-            const candidates = candidatesBySlot[String(slot)] ?? []
-            if (needsFourPieceSet) {
-                return candidates.filter(disc => disc.setId === settings.fourPieceSetId)
-            }
-            if (extraSetId) {
-                return candidates.filter(disc => disc.setId === extraSetId)
-            }
-            return candidates.filter(disc => disc.setId !== settings.fourPieceSetId)
+            const requiredSetId = mask & (1 << index) ? settings.fourPieceSetId : extraSetId
+            return (candidatesBySlot[String(slot)] ?? []).filter(disc => disc.setId === requiredSetId)
         })
-        if (slotCandidates.every(candidates => candidates.length > 0)) {
-            plans.push({
-                mask,
-                extraSetId,
-                slotCandidates,
-                combinationCount: productOfCandidateLengths(slotCandidates),
-            })
+        if (!slotCandidates.every(candidates => candidates.length > 0)) {
+            return
         }
+        plans.push({
+            mask,
+            extraSetId,
+            slotCandidates,
+            combinationCount: productOfCandidateLengths(slotCandidates),
+            freeTwoPieceMode,
+        })
+    }
+
+    if (autoMatchTwoPiece || allowsSixPieceSameSet(settings)) {
+        appendPlan(allSlotsMask, settings.fourPieceSetId, autoMatchTwoPiece ? "6-piece" : null)
+    }
+
+    if (autoMatchTwoPiece) {
+        for (let mask = 0; mask <= allSlotsMask; mask += 1) {
+            if (bitCount(mask) !== 4) {
+                continue
+            }
+            const freeSlotIndexes = SLOT_NUMBERS
+                .map((_, index) => index)
+                .filter(index => !(mask & (1 << index)))
+            const [leftIndex, rightIndex] = freeSlotIndexes
+            const leftSetIds = new Set((candidatesBySlot[String(SLOT_NUMBERS[leftIndex])] ?? [])
+                .map(disc => disc.setId)
+                .filter(setId => setId && setId !== settings.fourPieceSetId))
+            const rightSetIds = new Set((candidatesBySlot[String(SLOT_NUMBERS[rightIndex])] ?? [])
+                .map(disc => disc.setId)
+                .filter(setId => setId && setId !== settings.fourPieceSetId))
+            const matchingSetIds = [...leftSetIds]
+                .filter(setId => rightSetIds.has(setId))
+                .sort((left, right) => String(left).localeCompare(String(right)))
+            for (const extraSetId of matchingSetIds) {
+                appendPlan(mask, extraSetId, "4+2")
+            }
+        }
+        return plans
+    }
+
+    for (let mask = 0; mask <= allSlotsMask; mask += 1) {
+        if (bitCount(mask) !== 4) {
+            continue
+        }
+        for (const extraSetId of extraSetIds) {
+            appendPlan(mask, extraSetId)
         }
     }
 
     return plans
+}
+
+function freeTwoPiecePlanMetrics(plans, settings) {
+    if (hasTwoPieceLimit(settings)) {
+        return {
+            freeTwoPieceAutoSetCount: 0,
+            freeFourTwoPlanCount: 0,
+            freeSixPiecePlanCount: 0,
+            freeFourTwoCombinationCount: 0,
+            freeSixPieceCombinationCount: 0,
+        }
+    }
+    const fourTwoPlans = plans.filter(plan => plan.freeTwoPieceMode === "4+2")
+    const sixPiecePlans = plans.filter(plan => plan.freeTwoPieceMode === "6-piece")
+    return {
+        freeTwoPieceAutoSetCount: new Set(fourTwoPlans.map(plan => plan.extraSetId)).size,
+        freeFourTwoPlanCount: fourTwoPlans.length,
+        freeSixPiecePlanCount: sixPiecePlans.length,
+        freeFourTwoCombinationCount: fourTwoPlans.reduce((total, plan) => total + Number(plan.combinationCount ?? 0), 0),
+        freeSixPieceCombinationCount: sixPiecePlans.reduce((total, plan) => total + Number(plan.combinationCount ?? 0), 0),
+    }
 }
 
 function hasEffectRules(effect) {
@@ -1025,7 +1136,7 @@ function normalizedMinimumValue(stat, value) {
 }
 
 function passesMinimums(result, settings) {
-    const panel = result.inCombat?.panel ?? result.outOfCombat?.panel ?? {}
+    const panel = result.outOfCombat?.panel ?? {}
     return passesMinimumPanel(panel, settings)
 }
 
@@ -1138,7 +1249,7 @@ function appliedPreferredSlots(settings = {}) {
         .map(([slot]) => slot)
 }
 
-function createEmptySlotResult(settings, candidatesBySlot, emptySlots) {
+function createEmptySlotResult(settings, candidatesBySlot, emptySlots, reason = null) {
     const estimatedCombinationCount = 0
     return {
         results: [],
@@ -1161,6 +1272,8 @@ function createEmptySlotResult(settings, candidatesBySlot, emptySlots) {
             seededTopKCount: 0,
             seededTopKAttempts: 0,
             seedBudgetUsed: 0,
+            seedPlanCount: 0,
+            seedBeamWidth: 0,
             skippedDiscBoundChecks: 0,
             skippedDiscBoundChecksByPolicy: 0,
             groupBoundChecks: 0,
@@ -1181,6 +1294,28 @@ function createEmptySlotResult(settings, candidatesBySlot, emptySlots) {
             avgScoreKernelMs: 0,
             denseScoreCalls: 0,
             denseScoreMs: 0,
+            denseScoreMsSamples: 0,
+            specializedScoreCalls: 0,
+            specializedScorePlanCount: 0,
+            specializedScoreKernelCount: 0,
+            specializedScoreKernelCacheHits: 0,
+            specializedScoreFallbacks: 0,
+            specializedScoreFallbackReason: null,
+            objectiveScalarCalls: 0,
+            objectiveScalarPlanCount: 0,
+            objectiveScalarFallbacks: 0,
+            objectiveScalarFallbackReason: null,
+            boundCheckMsSamples: 0,
+            suffixFrontierBuildMs: 0,
+            suffixFrontierRawCount: 0,
+            suffixFrontierCompressedCount: 0,
+            suffixFrontierScoreCalls: 0,
+            freeTwoPieceAutoSetCount: 0,
+            freeFourTwoPlanCount: 0,
+            freeSixPiecePlanCount: 0,
+            freeFourTwoCombinationCount: 0,
+            freeSixPieceCombinationCount: 0,
+            freeSpecializedScorePlanCount: 0,
             scratchBufferReuses: 0,
             vectorScoreCalls: 0,
             vectorScoreFallbacks: 0,
@@ -1195,6 +1330,8 @@ function createEmptySlotResult(settings, candidatesBySlot, emptySlots) {
             prunedByGlobalCutoff: 0,
             superBoundChecks: 0,
             parallelTaskCount: 0,
+            browserWorkerCount: 0,
+            parallelFallbackReason: null,
             completedTaskCount: 0,
             taskStealCount: 0,
             workerIdleMs: 0,
@@ -1208,7 +1345,7 @@ function createEmptySlotResult(settings, candidatesBySlot, emptySlots) {
         },
         error: {
             isError: true,
-            reason: `没有符合筛选条件的 ${emptySlots.join(", ")} 号位驱动盘。`,
+            reason: reason ?? `没有符合筛选条件的 ${emptySlots.join(", ")} 号位驱动盘。`,
         },
     }
 }
@@ -1632,7 +1769,7 @@ function superPlanSetCounts(plan, settings) {
 }
 
 function needsOptimisticFreeTwoPiece(plan, settings) {
-    return !hasTwoPieceLimit(settings) && (SLOT_NUMBERS.length - bitCount(plan.mask)) >= 2
+    return !plan.extraSetId && !hasTwoPieceLimit(settings) && (SLOT_NUMBERS.length - bitCount(plan.mask)) >= 2
 }
 
 function maxOptimisticFreeTwoPieceCount(plan, settings) {
@@ -1666,6 +1803,88 @@ function suffixCandidateProducts(orderedSlots) {
         suffix[index] = suffix[index + 1] * Math.max(1, Number(orderedSlots[index].candidateCount ?? 0))
     }
     return suffix
+}
+
+function compileSpecializedPlanScoreKernel(state, setCountValues, orderedSlots) {
+    const target = state.densePanelScoreTarget
+    if (!state.settings.enableSpecializedScoreKernel || !state.useCompiledDenseScore || typeof target?.compileForSetCounts !== "function") {
+        return null
+    }
+    const cacheKey = Array.from(setCountValues ?? [])
+        .map((count, index) => Number(count) > 0 ? `${index}:${Number(count)}` : "")
+        .filter(Boolean)
+        .join("|")
+    if (state.specializedScoreKernelCache?.has(cacheKey)) {
+        state.metrics.specializedScoreKernelCacheHits += 1
+        const cached = state.specializedScoreKernelCache.get(cacheKey)
+        if (cached) {
+            state.metrics.specializedScorePlanCount += 1
+        }
+        return cached
+    }
+    try {
+        const baseCompiled = target.compileForSetCounts(setCountValues)
+        if (typeof baseCompiled?.scoreScalar !== "function") {
+            state.specializedScoreKernelCache?.set(cacheKey, null)
+            return null
+        }
+        const useObjectiveScalar = state.settings.enableObjectiveScalarKernel
+            && state.minimumPanelChecks?.length === 0
+            && typeof baseCompiled.scoreObjectiveScalar === "function"
+        const compiled = useObjectiveScalar
+            ? {
+                ...baseCompiled,
+                scoreKernel: "objective-scalar",
+                scoreScalar: baseCompiled.scoreObjectiveScalar,
+                scoreCombinedScalar: baseCompiled.scoreCombinedScalar,
+            }
+            : {
+                ...baseCompiled,
+                scoreCombinedScalar: null,
+            }
+        if (state.settings.enableObjectiveScalarKernel && !useObjectiveScalar) {
+            state.metrics.objectiveScalarFallbacks += 1
+            state.metrics.objectiveScalarFallbackReason = state.minimumPanelChecks?.length
+                ? "minimum-panel"
+                : "unsupported-objective"
+        }
+        const probes = [new Float64Array(state.statIds?.length ?? 0)]
+        const representative = new Float64Array(state.statIds?.length ?? 0)
+        for (const slotEntry of orderedSlots ?? []) {
+            const disc = slotEntry.groups?.[0]?.discs?.[0]
+            if (disc) {
+                addIndexedVectorToTotals(representative, state.indexedVectorById?.get(disc.id), 1)
+            }
+        }
+        probes.push(representative)
+        for (const statValues of probes) {
+            const genericSummary = target.scoreDense(statValues, setCountValues)
+            const specializedSummary = compiled.scoreScalar(statValues)
+            if (!scoreOnlySummariesMatch(
+                genericSummary,
+                specializedSummary,
+                target.panelStatIds ?? [],
+                state.minimumPanelChecks?.length > 0,
+            )) {
+                state.metrics.specializedScoreFallbacks += 1
+                state.metrics.specializedScoreFallbackReason = "mismatch"
+                state.specializedScoreKernelCache?.set(cacheKey, null)
+                return null
+            }
+        }
+        state.metrics.specializedScorePlanCount += 1
+        state.metrics.specializedScoreKernelCount += 1
+        if (useObjectiveScalar) {
+            state.metrics.objectiveScalarPlanCount += 1
+        }
+        state.specializedScoreKernelCache?.set(cacheKey, compiled)
+        return compiled
+    } catch (error) {
+        state.metrics.specializedScoreFallbacks += 1
+        state.metrics.specializedScoreFallbackReason = error?.message || "error"
+        state.specializedScoreKernelCache?.set(cacheKey, null)
+        return null
+    }
 }
 
 function buildSuperBoundPlan(plan, state) {
@@ -1742,10 +1961,18 @@ function buildSuperBoundPlan(plan, state) {
     const freeTwoPieceOptimisticEntries = maxFreeTwoPieceCount > 0
         ? state.optimisticTwoPieceStatEntriesByActiveCount?.[String(maxFreeTwoPieceCount)] ?? null
         : []
+    const completeSetCountsArray = setCountsMapToArray(completeSetCounts, state.setIndexById ?? new Map(), state.setIds?.length ?? 0)
+    const specializedScoreKernel = maxFreeTwoPieceCount === 0
+        ? compileSpecializedPlanScoreKernel(state, completeSetCountsArray, orderedSlots)
+        : null
+    if (plan.freeTwoPieceMode && specializedScoreKernel) {
+        state.metrics.freeSpecializedScorePlanCount += 1
+    }
     return {
         ...plan,
         completeSetCounts,
-        completeSetCountsArray: setCountsMapToArray(completeSetCounts, state.setIndexById ?? new Map(), state.setIds?.length ?? 0),
+        completeSetCountsArray,
+        specializedScoreKernel,
         needsOptimisticFreeTwoPiece: maxFreeTwoPieceCount > 0,
         maxFreeTwoPieceCount,
         freeTwoPieceOptimisticEntries,
@@ -2096,10 +2323,18 @@ function scoreOnlyFromIndexedState(state, statValues, setCountValues) {
     }
 }
 
-function scoreOnlyFromDenseState(state, statValues, setCountValues) {
-    const startedAt = nowMs()
-    state.metrics.denseScoreCalls += 1
+function scoreOnlyFromDenseState(state, statValues, setCountValues, specializedScoreKernel = null) {
+    const callCount = Number(state.metrics.denseScoreCalls ?? 0) + 1
+    state.metrics.denseScoreCalls = callCount
+    const sample = hotMetricSample(state.metrics, "denseScoreMs", callCount)
     try {
+        if (typeof specializedScoreKernel?.scoreScalar === "function") {
+            state.metrics.specializedScoreCalls += 1
+            if (specializedScoreKernel.scoreKernel === "objective-scalar") {
+                state.metrics.objectiveScalarCalls += 1
+            }
+            return specializedScoreKernel.scoreScalar(statValues)
+        }
         if (state.densePanelScoreTarget && typeof state.densePanelScoreTarget.scoreDense === "function") {
             return state.densePanelScoreTarget.scoreDense(statValues, setCountValues)
         }
@@ -2109,7 +2344,7 @@ function scoreOnlyFromDenseState(state, statValues, setCountValues) {
             indexedSetCountsToMap(setCountValues, state.setIds ?? []),
         )
     } finally {
-        addMetricTime(state.metrics, "denseScoreMs", startedAt)
+        finishHotMetricSample(state.metrics, "denseScoreMs", sample)
     }
 }
 
@@ -2169,9 +2404,35 @@ function superBoundScoreDense(state, superPlan, nextOrderIndex, branchIndexedSup
         return Number.POSITIVE_INFINITY
     }
 
-    const startedAt = nowMs()
-    const statTotals = denseBoundScratch(state, nextOrderIndex)
+    const boundCallCount = Number(state.metrics.superBoundChecks ?? 0) + 1
+    const sample = hotMetricSample(state.metrics, "boundCheckMs", boundCallCount)
     try {
+        if (scoreFn === scoreOnlyFromDenseState && typeof superPlan.specializedScoreKernel?.scoreCombinedScalar === "function") {
+            state.metrics.superBoundChecks += 1
+            state.metrics.upperBoundChecks += 1
+            const scoreCallCount = Number(state.metrics.denseScoreCalls ?? 0) + 1
+            state.metrics.denseScoreCalls = scoreCallCount
+            state.metrics.specializedScoreCalls += 1
+            state.metrics.objectiveScalarCalls += 1
+            const scoreSample = hotMetricSample(state.metrics, "denseScoreMs", scoreCallCount)
+            let summary
+            try {
+                summary = superPlan.specializedScoreKernel.scoreCombinedScalar(
+                    state.selectedStatValues,
+                    branchIndexedSuperVector,
+                    superPlan.suffixIndexedSuperVectors?.[nextOrderIndex],
+                    superPlan.needsOptimisticFreeTwoPiece ? superPlan.indexedFreeTwoPieceOptimisticEntries : null,
+                )
+            } finally {
+                finishHotMetricSample(state.metrics, "denseScoreMs", scoreSample)
+            }
+            if (!passesMinimumScoreSummary(summary, state)) {
+                return Number.NEGATIVE_INFINITY
+            }
+            return Number(summary.finalDamage ?? Number.NEGATIVE_INFINITY)
+        }
+
+        const statTotals = denseBoundScratch(state, nextOrderIndex)
         if (!statTotals) {
             return Number.POSITIVE_INFINITY
         }
@@ -2185,13 +2446,20 @@ function superBoundScoreDense(state, superPlan, nextOrderIndex, branchIndexedSup
 
         state.metrics.superBoundChecks += 1
         state.metrics.upperBoundChecks += 1
-        const summary = scoreFn(state, statTotals, superPlan.completeSetCountsArray ?? new Int16Array())
-        if (!passesMinimumPanel(summary.panel, state.settings)) {
+        const summary = scoreFn === scoreOnlyFromDenseState
+            ? scoreOnlyFromDenseState(
+                state,
+                statTotals,
+                superPlan.completeSetCountsArray ?? new Int16Array(),
+                superPlan.specializedScoreKernel,
+            )
+            : scoreFn(state, statTotals, superPlan.completeSetCountsArray ?? new Int16Array())
+        if (!passesMinimumScoreSummary(summary, state)) {
             return Number.NEGATIVE_INFINITY
         }
         return Number(summary.finalDamage ?? Number.NEGATIVE_INFINITY)
     } finally {
-        addMetricTime(state.metrics, "boundCheckMs", startedAt)
+        finishHotMetricSample(state.metrics, "boundCheckMs", sample)
     }
 }
 
@@ -2237,7 +2505,7 @@ function superBoundScore(state, superPlan, nextOrderIndex, branchSuperVector = n
         state.metrics.superBoundChecks += 1
         state.metrics.upperBoundChecks += 1
         const summary = scoreOnlyFromMaps(state, statTotals, superPlan.completeSetCounts)
-        if (!passesMinimumPanel(summary.panel, state.settings)) {
+        if (!passesMinimumScoreSummary(summary, state)) {
             return Number.NEGATIVE_INFINITY
         }
         return Number(summary.finalDamage ?? Number.NEGATIVE_INFINITY)
@@ -2274,11 +2542,125 @@ function shouldRunSuffixTopKBound(state, kind, prunedLeafCount, upperBound, cuto
     return leafCount <= 24 || upperBound <= cutoff * 1.5
 }
 
+function denseVectorDominates(left, right, relevantIndexes) {
+    let strictlyBetter = false
+    for (const index of relevantIndexes) {
+        const leftValue = Number(left[index] ?? 0)
+        const rightValue = Number(right[index] ?? 0)
+        if (leftValue < rightValue) {
+            return false
+        }
+        if (leftValue > rightValue) {
+            strictlyBetter = true
+        }
+    }
+    return strictlyBetter
+}
+
+function compressSuffixFrontier(vectors, relevantIndexes) {
+    if (!relevantIndexes?.length || vectors.length < 2) {
+        return vectors
+    }
+    const unique = []
+    const signatures = new Set()
+    for (const vector of vectors) {
+        const signature = relevantIndexes.map(index => Number(vector[index] ?? 0)).join("|")
+        if (!signatures.has(signature)) {
+            signatures.add(signature)
+            unique.push(vector)
+        }
+    }
+    return unique.filter((vector, index) =>
+        !unique.some((candidate, candidateIndex) =>
+            candidateIndex !== index && denseVectorDominates(candidate, vector, relevantIndexes)
+        )
+    )
+}
+
+function suffixFrontierForPlan(state, superPlan, nextOrderIndex, maxLeaves) {
+    const leafCount = Number(superPlan.suffixCandidateProducts?.[nextOrderIndex] ?? 0)
+    if (
+        !state.settings.enableSuffixFrontierCache
+        || superPlan.needsOptimisticFreeTwoPiece
+        || !state.useDenseSearchState
+        || leafCount < 1
+        || leafCount > maxLeaves
+    ) {
+        return null
+    }
+    if (!superPlan.suffixFrontierCache) {
+        superPlan.suffixFrontierCache = new Map()
+    }
+    if (superPlan.suffixFrontierCache.has(nextOrderIndex)) {
+        return superPlan.suffixFrontierCache.get(nextOrderIndex)
+    }
+
+    const startedAt = nowMs()
+    const scratch = new Float64Array(state.statIds?.length ?? 0)
+    const vectors = []
+    function walk(orderIndex) {
+        if (orderIndex >= superPlan.orderedSlots.length) {
+            vectors.push(new Float64Array(scratch))
+            return
+        }
+        const slotEntry = superPlan.orderedSlots[orderIndex]
+        for (const group of slotEntry.groups) {
+            for (const disc of group.discs) {
+                const indexedVector = state.indexedVectorById?.get(disc.id)
+                addIndexedVectorToTotals(scratch, indexedVector, 1)
+                walk(orderIndex + 1)
+                addIndexedVectorToTotals(scratch, indexedVector, -1)
+            }
+        }
+    }
+    walk(nextOrderIndex)
+    const frontier = state.settings.enableSuffixFrontierDominance && state.optimizerStatMetadata?.strictMonotonic
+        ? compressSuffixFrontier(vectors, state.relevantStatIndexes)
+        : vectors
+    state.metrics.suffixFrontierRawCount += vectors.length
+    state.metrics.suffixFrontierCompressedCount += frontier.length
+    addMetricTime(state.metrics, "suffixFrontierBuildMs", startedAt)
+    superPlan.suffixFrontierCache.set(nextOrderIndex, frontier)
+    return frontier
+}
+
 function suffixTopKReachableBoundScore(state, superPlan, nextOrderIndex, maxLeaves = SUFFIX_TOPK_BOUND_MAX_LEAVES) {
     const leafBudget = Math.max(1, Number(maxLeaves ?? SUFFIX_TOPK_BOUND_MAX_LEAVES))
     let leaves = 0
     let best = Number.NEGATIVE_INFINITY
     state.metrics.suffixTopKBoundChecks += 1
+
+    const suffixFrontier = suffixFrontierForPlan(state, superPlan, nextOrderIndex, leafBudget)
+    if (suffixFrontier) {
+        if (!state.suffixScoreScratchBuffers) {
+            state.suffixScoreScratchBuffers = []
+        }
+        let scratch = state.suffixScoreScratchBuffers[nextOrderIndex]
+        if (!scratch || scratch.length !== state.selectedStatValues.length) {
+            scratch = new Float64Array(state.selectedStatValues.length)
+            state.suffixScoreScratchBuffers[nextOrderIndex] = scratch
+        }
+        for (const suffixVector of suffixFrontier) {
+            scratch.set(state.selectedStatValues)
+            addDenseVectorToTotals(scratch, suffixVector, 1)
+            state.metrics.boundOracleChecks += 1
+            state.metrics.suffixFrontierScoreCalls += 1
+            const summary = scoreOnlyFromDenseState(
+                state,
+                scratch,
+                superPlan.completeSetCountsArray,
+                superPlan.specializedScoreKernel,
+            )
+            const rawScore = Number(summary.finalDamage ?? Number.NEGATIVE_INFINITY)
+            const score = Number.isFinite(rawScore)
+                ? Number(rawScore.toFixed(12)) + SUFFIX_TOPK_SCORE_SAFETY_EPSILON
+                : rawScore
+            if (score > best) {
+                best = score
+            }
+        }
+        return best
+    }
 
     function walk(orderIndex) {
         if (leaves > leafBudget) {
@@ -2288,7 +2670,12 @@ function suffixTopKReachableBoundScore(state, superPlan, nextOrderIndex, maxLeav
             leaves += 1
             state.metrics.boundOracleChecks += 1
             const summary = state.useDenseSearchState && state.selectedStatValues && state.selectedSetCountValues
-                ? scoreOnlyFromDenseState(state, state.selectedStatValues, state.selectedSetCountValues)
+                ? scoreOnlyFromDenseState(
+                    state,
+                    state.selectedStatValues,
+                    state.selectedSetCountValues,
+                    superPlan.specializedScoreKernel,
+                )
                 : selectedScoreOnlySummary(state)
             const rawScore = Number(summary.finalDamage ?? Number.NEGATIVE_INFINITY)
             const score = Number.isFinite(rawScore)
@@ -2483,7 +2870,24 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
         throw new Error(`Unsupported objective: ${settings.objective}`)
     }
 
-    let candidatesBySlot = groupCandidatesBySlot(store, settings)
+    const combatBuffs = combatBuffsForCandidate(catalog, input, settings)
+    const scoreInputBase = {
+        agentId: input.agentId,
+        coreSkillLevel: input.coreSkillLevel,
+        wEngineId: input.wEngineId,
+        wEngineModificationLevel: input.wEngineModificationLevel,
+        combatBuffs,
+        damage: input.damage,
+    }
+    const panelCalculator = createInCombatPanelCalculator(catalog, scoreInputBase)
+    const optimizerStatMetadata = typeof panelCalculator.optimizerStatMetadata === "function"
+        ? panelCalculator.optimizerStatMetadata({ minimums: settings.minimums })
+        : null
+    const relevantStatIds = settings.enableObjectiveRelevantDominance && optimizerStatMetadata?.strictMonotonic
+        ? new Set(optimizerStatMetadata.relevantStatIds ?? [])
+        : null
+
+    let candidatesBySlot = groupCandidatesBySlot(store, settings, relevantStatIds)
     const emptySlots = SLOT_NUMBERS.filter(slot => !candidatesBySlot[String(slot)]?.length)
     reportPrepare("candidates", "正在筛选候选驱动盘", settings, {
         emptySlots,
@@ -2493,9 +2897,10 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
         processedCombinationCount: 0,
     })
     if (emptySlots.length) {
+        const reason = hasTwoPieceLimit(settings) ? null : FREE_TWO_PIECE_INSUFFICIENT_REASON
         return {
             isEmpty: true,
-            result: createEmptySlotResult(settings, candidatesBySlot, emptySlots),
+            result: createEmptySlotResult(settings, candidatesBySlot, emptySlots, reason),
             settings,
         }
     }
@@ -2507,16 +2912,6 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
         evaluated: 0,
         processedCombinationCount: 0,
     })
-    const combatBuffs = combatBuffsForCandidate(catalog, input, settings)
-    const scoreInputBase = {
-        agentId: input.agentId,
-        coreSkillLevel: input.coreSkillLevel,
-        wEngineId: input.wEngineId,
-        wEngineModificationLevel: input.wEngineModificationLevel,
-        combatBuffs,
-        damage: input.damage,
-    }
-    const panelCalculator = createInCombatPanelCalculator(catalog, scoreInputBase)
     const potentialWeights = inferPotentialWeights(panelCalculator)
     sortCandidatesByPotential(candidatesBySlot, candidateData.vectorById, potentialWeights)
     candidatesBySlot = filterCandidatesByPotential(candidatesBySlot, candidateData.vectorById, potentialWeights, settings)
@@ -2529,6 +2924,7 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
     const planBuildStartedAt = nowMs()
     const enumerationPlans = buildEnumerationPlans(candidatesBySlot, settings)
     const planBuildMs = elapsedMsSince(planBuildStartedAt)
+    const freePlanMetrics = freeTwoPiecePlanMetrics(enumerationPlans, settings)
     const estimatedCombinationCount = enumerationPlans.reduce(
         (total, plan) => total + Number(plan.combinationCount ?? 0),
         0,
@@ -2540,8 +2936,23 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
         evaluated: 0,
         processedCombinationCount: 0,
         planBuildMs,
+        ...freePlanMetrics,
         complexity: complexityForEstimate(estimatedCombinationCount),
     })
+    if (!enumerationPlans.length && !hasTwoPieceLimit(settings)) {
+        const result = createEmptySlotResult(
+            settings,
+            candidatesBySlot,
+            [],
+            FREE_TWO_PIECE_INSUFFICIENT_REASON,
+        )
+        Object.assign(result.metrics, freePlanMetrics, { planBuildMs })
+        return {
+            isEmpty: true,
+            result,
+            settings,
+        }
+    }
     const optimisticTwoPieceEntries = optimisticTwoPieceStatEntries(catalog)
     const optimisticTwoPieceEntriesByActiveCount = optimisticTwoPieceStatEntriesByActiveCount(catalog)
     const forceIndexedSearch = String(settings.useIndexedScoreOnly ?? "").trim().toLowerCase() === "force"
@@ -2577,6 +2988,7 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
             statIds: indexedCandidateData.statIds ?? [],
             setIds: indexedCandidateData.setIds ?? [],
             setIndexById: indexedCandidateData.setIndexById,
+            candidateStatIndexes: indexedCandidateData.candidateStatIndexes ?? [],
         })
         : null
     const denseProbe = canCompileDenseScore
@@ -2614,6 +3026,15 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
         ? shouldUseIndexedScoreOnly(panelCalculator, indexedCandidateData, settings)
         : false
     const useDenseSearchState = useCompiledDenseScore || useIndexedSearch
+    const panelStatIndexById = new Map(
+        (densePanelScoreTarget?.panelStatIds ?? []).map((stat, index) => [stat, index]),
+    )
+    const minimumPanelChecks = Object.entries(settings.minimums ?? {})
+        .map(([stat, value]) => ({
+            index: panelStatIndexById.get(stat),
+            minimum: normalizedMinimumValue(stat, value),
+        }))
+        .filter(item => item.minimum !== null)
     const state = {
         isEmpty: false,
         startedAtMs: Date.now(),
@@ -2626,6 +3047,12 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
         useCompiledDenseScore,
         useDenseSearchState,
         densePanelScoreTarget: useCompiledDenseScore ? densePanelScoreTarget : null,
+        minimumPanelChecks,
+        optimizerStatMetadata,
+        relevantStatIds,
+        relevantStatIndexes: relevantStatIds
+            ? [...relevantStatIds].map(stat => indexedCandidateData.statIndexById?.get(stat)).filter(index => index !== undefined)
+            : null,
         potentialWeights,
         results: [],
         seedScores: [],
@@ -2644,12 +3071,14 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
         optimisticTwoPieceStatEntriesByActiveCount: optimisticTwoPieceEntriesByActiveCount,
         scoreInputBase,
         panelCalculator,
+        specializedScoreKernelCache: new Map(),
         metrics: {
             ...algorithmMetricFields(settings.algorithm),
             emptySlots: [],
             candidateCountsBySlot: candidateCountsBySlot(candidatesBySlot),
             estimatedCombinationCount,
             enumerationPlanCount: enumerationPlans.length,
+            ...freePlanMetrics,
             groupPlanCount: 0,
             evaluated: 0,
             scoredCombinationCount: 0,
@@ -2662,6 +3091,8 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
             seededTopKCount: 0,
             seededTopKAttempts: 0,
             seedBudgetUsed: 0,
+            seedPlanCount: 0,
+            seedBeamWidth: 0,
             skippedDiscBoundChecks: 0,
             skippedDiscBoundChecksByPolicy: 0,
             groupBoundChecks: 0,
@@ -2679,9 +3110,28 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
             scoreKernelDenseProbeMs: denseProbe.scoreKernelDenseProbeMs,
             scoreKernelProbeCount: denseProbe.scoreKernelProbeCount,
             scoreKernelFallbackReason: denseProbe.scoreKernelFallbackReason,
+            relevantStatCount: relevantStatIds?.size ?? 0,
+            dominanceMode: relevantStatIds ? "objective-relevant" : "all-stats",
             avgScoreKernelMs: Number(denseProbe.avgScoreKernelMs ?? 0),
             denseScoreCalls: 0,
             denseScoreMs: 0,
+            denseScoreMsSamples: 0,
+            specializedScoreCalls: 0,
+            specializedScorePlanCount: 0,
+            specializedScoreKernelCount: 0,
+            specializedScoreKernelCacheHits: 0,
+            specializedScoreFallbacks: 0,
+            specializedScoreFallbackReason: null,
+            objectiveScalarCalls: 0,
+            objectiveScalarPlanCount: 0,
+            objectiveScalarFallbacks: 0,
+            objectiveScalarFallbackReason: null,
+            boundCheckMsSamples: 0,
+            suffixFrontierBuildMs: 0,
+            suffixFrontierRawCount: 0,
+            suffixFrontierCompressedCount: 0,
+            suffixFrontierScoreCalls: 0,
+            freeSpecializedScorePlanCount: 0,
             scratchBufferReuses: 0,
             vectorScoreCalls: 0,
             vectorScoreFallbacks: 0,
@@ -2696,6 +3146,8 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
             prunedByGlobalCutoff: 0,
             superBoundChecks: 0,
             parallelTaskCount: 0,
+            browserWorkerCount: 0,
+            parallelFallbackReason: null,
             completedTaskCount: 0,
             taskStealCount: 0,
             workerIdleMs: 0,
@@ -2777,6 +3229,8 @@ function createTaskOptimizerStateFromBase(baseState, task = {}, input = {}) {
         seededTopKCount: 0,
         seededTopKAttempts: 0,
         seedBudgetUsed: 0,
+        seedPlanCount: 0,
+        seedBeamWidth: 0,
         skippedDiscBoundChecks: 0,
         skippedDiscBoundChecksByPolicy: 0,
         groupBoundChecks: 0,
@@ -2797,6 +3251,14 @@ function createTaskOptimizerStateFromBase(baseState, task = {}, input = {}) {
         avgScoreKernelMs: 0,
         denseScoreCalls: 0,
         denseScoreMs: 0,
+        specializedScoreCalls: 0,
+        specializedScorePlanCount: Number(baseState.metrics?.specializedScorePlanCount ?? 0),
+        specializedScoreFallbacks: 0,
+        specializedScoreFallbackReason: baseState.metrics?.specializedScoreFallbackReason ?? null,
+        suffixFrontierBuildMs: 0,
+        suffixFrontierRawCount: 0,
+        suffixFrontierCompressedCount: 0,
+        suffixFrontierScoreCalls: 0,
         scratchBufferReuses: 0,
         vectorScoreCalls: 0,
         vectorScoreFallbacks: 0,
@@ -2811,6 +3273,8 @@ function createTaskOptimizerStateFromBase(baseState, task = {}, input = {}) {
         prunedByGlobalCutoff: 0,
         superBoundChecks: 0,
         parallelTaskCount: 0,
+        browserWorkerCount: 0,
+        parallelFallbackReason: null,
         completedTaskCount: 0,
         taskStealCount: 0,
         workerIdleMs: 0,
@@ -2906,8 +3370,7 @@ function progressFromState(state, status = "running") {
     }
 }
 
-export function previewDriveDiscOptimization(catalog, store, input = {}, options = {}) {
-    const state = createOptimizerState(catalog, store, input, { onPrepareProgress: options.onProgress })
+function previewFromOptimizerState(state) {
     const result = state.isEmpty ? state.result : null
     const metrics = result?.metrics ?? state.metrics
     return {
@@ -2929,7 +3392,7 @@ function evaluateSelected(catalog, input, state) {
         addMetricTime(state.metrics, "scoreOnlyMs", scoreStartedAt)
     }
     state.metrics.evaluated += 1
-    if (!passesMinimumPanel(summary.panel, state.settings)) {
+    if (!passesMinimumScoreSummary(summary, state)) {
         state.metrics.rejectedByMinimums += 1
         return
     }
@@ -3055,8 +3518,18 @@ function insertSeedScore(state, score) {
 }
 
 function evaluateSelectedForSeedCutoff(state) {
-    const summary = selectedScoreOnlySummary(state)
-    if (!passesMinimumPanel(summary.panel, state.settings)) {
+    const specializedScoreKernel = state.useCompiledDenseScore
+        ? compileSpecializedPlanScoreKernel(state, state.selectedSetCountValues, [])
+        : null
+    const summary = state.useCompiledDenseScore
+        ? scoreOnlyFromDenseState(
+            state,
+            state.selectedStatValues,
+            state.selectedSetCountValues,
+            specializedScoreKernel,
+        )
+        : selectedScoreOnlySummary(state)
+    if (!passesMinimumScoreSummary(summary, state)) {
         return
     }
     insertSeedScore(state, Number(Number(summary.finalDamage ?? Number.NEGATIVE_INFINITY).toFixed(12)))
@@ -3068,40 +3541,68 @@ function seedTopKCutoffForSuperBound(state, maxAttempts = DEFAULT_SEED_CUTOFF_AT
     }
     const startedAt = nowMs()
     let attempts = 0
+    const plans = state.superBoundPlans ?? []
+    const activePlanCount = Math.min(plans.length, Math.max(1, maxAttempts))
+    const baseBudget = activePlanCount > 0 ? Math.floor(maxAttempts / activePlanCount) : 0
+    const remainder = activePlanCount > 0 ? maxAttempts % activePlanCount : 0
+    let maxBeamWidth = 0
 
-    function walkPlan(superPlan, orderIndex) {
-        if (attempts >= maxAttempts) {
-            return
-        }
-        if (orderIndex >= superPlan.orderedSlots.length) {
-            attempts += 1
-            evaluateSelectedForSeedCutoff(state)
-            return
-        }
-
-        const slotEntry = superPlan.orderedSlots[orderIndex]
-        for (const group of slotEntry.groups) {
-            for (const disc of group.discs) {
-                pushSelectedDisc(state, disc)
-                walkPlan(superPlan, orderIndex + 1)
-                popSelectedDisc(state)
-                if (attempts >= maxAttempts) {
-                    return
+    for (let planIndex = 0; planIndex < activePlanCount; planIndex += 1) {
+        const superPlan = plans[planIndex]
+        const planBudget = Math.max(1, baseBudget + (planIndex < remainder ? 1 : 0))
+        const beamWidth = Math.min(96, planBudget)
+        maxBeamWidth = Math.max(maxBeamWidth, beamWidth)
+        let beam = [{ discs: [], potential: 0 }]
+        for (const slotEntry of superPlan.orderedSlots) {
+            const candidates = slotEntry.groups
+                .flatMap(group => group.discs)
+                .map(disc => ({
+                    disc,
+                    potential: candidatePotential(disc, state.vectorById.get(disc.id) ?? new Map(), state.potentialWeights),
+                }))
+                .sort((left, right) =>
+                    right.potential - left.potential
+                    || sourceOrder(left.disc) - sourceOrder(right.disc)
+                    || String(left.disc.id).localeCompare(String(right.disc.id))
+                )
+            const expanded = []
+            for (const partial of beam) {
+                for (const candidate of candidates) {
+                    expanded.push({
+                        discs: [...partial.discs, candidate.disc],
+                        potential: partial.potential + candidate.potential,
+                    })
                 }
             }
+            expanded.sort((left, right) =>
+                right.potential - left.potential
+                || stableDiscSignature(left.discs).localeCompare(stableDiscSignature(right.discs))
+            )
+            beam = expanded.slice(0, beamWidth)
+            if (!beam.length) {
+                break
+            }
         }
-    }
-
-    for (const superPlan of state.superBoundPlans ?? []) {
-        walkPlan(superPlan, 0)
-        if (attempts >= maxAttempts) {
-            break
+        for (const candidate of beam.slice(0, planBudget)) {
+            for (const disc of candidate.discs) {
+                pushSelectedDisc(state, disc)
+            }
+            attempts += 1
+            evaluateSelectedForSeedCutoff(state)
+            for (let index = candidate.discs.length - 1; index >= 0; index -= 1) {
+                popSelectedDisc(state)
+            }
+            if (attempts >= maxAttempts) {
+                break
+            }
         }
     }
 
     state.metrics.seededTopKCount = state.seedScores.length
     state.metrics.seededTopKAttempts = attempts
     state.metrics.seedBudgetUsed = Math.min(attempts, maxAttempts)
+    state.metrics.seedPlanCount = activePlanCount
+    state.metrics.seedBeamWidth = maxBeamWidth
     addMetricTime(state.metrics, "warmupMs", startedAt)
 }
 
@@ -3468,7 +3969,8 @@ function configuredWorkerCount(settings = {}, estimatedCombinationCount = Number
         return Math.max(1, Math.min(8, explicit))
     }
     const available = typeof runtime.availableParallelism === "function" ? runtime.availableParallelism() : 2
-    const maxAvailableWorkers = Math.max(1, Math.min(6, available - 1))
+    const runtimeMaxWorkerCount = Math.max(1, Number(runtime.maxWorkerCount ?? 6))
+    const maxAvailableWorkers = Math.max(1, Math.min(runtimeMaxWorkerCount, available - 1))
     const estimate = Number(estimatedCombinationCount ?? 0)
     if (estimate < 8_000_000) {
         return Math.min(maxAvailableWorkers, 2)
@@ -3514,6 +4016,7 @@ const PARALLEL_SUM_METRIC_KEYS = [
     "seededTopKCount",
     "seededTopKAttempts",
     "seedBudgetUsed",
+    "seedPlanCount",
     "skippedDiscBoundChecks",
     "skippedDiscBoundChecksByPolicy",
     "groupBoundChecks",
@@ -3533,6 +4036,17 @@ const PARALLEL_SUM_METRIC_KEYS = [
     "superBoundChecks",
     "denseScoreCalls",
     "denseScoreMs",
+    "denseScoreMsSamples",
+    "specializedScoreCalls",
+    "specializedScoreFallbacks",
+    "objectiveScalarCalls",
+    "objectiveScalarPlanCount",
+    "objectiveScalarFallbacks",
+    "boundCheckMsSamples",
+    "suffixFrontierBuildMs",
+    "suffixFrontierRawCount",
+    "suffixFrontierCompressedCount",
+    "suffixFrontierScoreCalls",
     "scratchBufferReuses",
     "vectorScoreCalls",
     "vectorScoreFallbacks",
@@ -3562,6 +4076,8 @@ function combineParallelMetrics(baseMetrics = {}, workerMetricsList = [], starte
         ...baseMetrics,
         ...algorithmMetricFields("exact-super-bound-parallel"),
         workerCount: workerMetricsList.length,
+        browserWorkerCount: Number(parallelStats.browserWorkerCount ?? baseMetrics.browserWorkerCount ?? 0),
+        parallelFallbackReason: parallelStats.parallelFallbackReason ?? baseMetrics.parallelFallbackReason ?? null,
         workerMergeMs: Number(baseMetrics.workerMergeMs ?? 0),
         parallelTaskCount: Number(parallelStats.parallelTaskCount ?? baseMetrics.parallelTaskCount ?? 0),
         completedTaskCount: Number(parallelStats.completedTaskCount ?? baseMetrics.completedTaskCount ?? 0),
@@ -3586,6 +4102,8 @@ function combineParallelMetrics(baseMetrics = {}, workerMetricsList = [], starte
         seededTopKCount: 0,
         seededTopKAttempts: 0,
         seedBudgetUsed: 0,
+        seedPlanCount: 0,
+        seedBeamWidth: 0,
         skippedDiscBoundChecks: 0,
         skippedDiscBoundChecksByPolicy: 0,
         groupBoundChecks: 0,
@@ -3605,6 +4123,12 @@ function combineParallelMetrics(baseMetrics = {}, workerMetricsList = [], starte
         superBoundChecks: 0,
         denseScoreCalls: 0,
         denseScoreMs: 0,
+        specializedScoreCalls: 0,
+        specializedScoreFallbacks: 0,
+        suffixFrontierBuildMs: 0,
+        suffixFrontierRawCount: 0,
+        suffixFrontierCompressedCount: 0,
+        suffixFrontierScoreCalls: 0,
         scratchBufferReuses: 0,
         vectorScoreCalls: 0,
         vectorScoreFallbacks: 0,
@@ -3735,32 +4259,86 @@ async function optimizeDriveDiscsSuperBoundParallelExactAsync(catalog, store, in
     })
 }
 
-async function optimizeDriveDiscsAsyncWithRuntime(runtime, catalog, store, input = {}, options = {}) {
-    const runtimeOptions = {
-        ...options,
-        yieldControl: options.yieldControl ?? runtime.yieldControl,
+function passesMinimumScoreSummary(summary, state) {
+    if (!state.minimumPanelChecks?.length) {
+        return true
     }
+    if (summary?.outOfCombatPanel) {
+        return passesMinimumPanel(summary.outOfCombatPanel, state.settings)
+    }
+    if (!summary?.outOfCombatPanelValues) {
+        return false
+    }
+    return state.minimumPanelChecks.every(({ index, minimum }) =>
+        index === undefined || Number(summary.outOfCombatPanelValues[index] ?? Number.NEGATIVE_INFINITY) >= minimum
+    )
+}
+
+function normalizedOptimizationInput(input = {}) {
     const algorithm = normalizeAlgorithm(input.settings?.algorithm ?? input.algorithm ?? "exact-super-bound")
-    const normalizedInput = {
+    return {
         ...input,
         settings: {
             ...(input.settings ?? {}),
             algorithm,
         },
     }
-    if (algorithm === "exact-legacy") {
-        return optimizeDriveDiscsLegacyExactAsync(catalog, store, normalizedInput, runtimeOptions)
+}
+
+function createDriveDiscOptimizationJobWithRuntime(runtime, catalog, store, input = {}, options = {}) {
+    const runtimeOptions = {
+        ...options,
+        yieldControl: options.yieldControl ?? runtime.yieldControl,
     }
+    const normalizedInput = normalizedOptimizationInput(input)
+    const algorithm = normalizedInput.settings.algorithm
+    const prepareStartedAt = nowMs()
     const state = createOptimizerState(catalog, store, normalizedInput, { onPrepareProgress: runtimeOptions.onProgress })
-    if (state.isEmpty) {
-        const result = finalizeOptimizerResult(state)
-        runtimeOptions.onProgress?.(progressFromState(state, "complete"))
-        return result
+    const metrics = state.result?.metrics ?? state.metrics
+    metrics.preparationMs = elapsedMsSince(prepareStartedAt)
+    let runStarted = false
+
+    return {
+        preview() {
+            return previewFromOptimizerState(state)
+        },
+        async run(runOptions = {}) {
+            if (runStarted) {
+                throw new Error("Optimization job can only be run once.")
+            }
+            runStarted = true
+            const jobOptions = {
+                ...runtimeOptions,
+                ...runOptions,
+                yieldControl: runOptions.yieldControl ?? runtimeOptions.yieldControl,
+            }
+            if (algorithm === "exact-legacy") {
+                return optimizeDriveDiscsLegacyExactAsync(catalog, store, normalizedInput, jobOptions)
+            }
+            if (state.isEmpty) {
+                const result = finalizeOptimizerResult(state)
+                jobOptions.onProgress?.(progressFromState(state, "complete"))
+                return result
+            }
+            if (shouldUseParallelSuperBound(state, normalizedInput, runtime)) {
+                return optimizeDriveDiscsSuperBoundParallelExactAsync(catalog, store, normalizedInput, jobOptions, state, runtime)
+            }
+            if (algorithm === "exact-super-bound-parallel") {
+                state.metrics.parallelFallbackReason = typeof runtime.runParallel !== "function"
+                    ? "worker-unavailable"
+                    : configuredWorkerCount(state.settings, state.metrics.estimatedCombinationCount, runtime) <= 1
+                        ? "insufficient-parallelism"
+                        : state.settings.disableParallel
+                            ? "disabled"
+                            : "serial-fallback"
+            }
+            return optimizeDriveDiscsSuperBoundExactAsync(catalog, store, normalizedInput, jobOptions, state)
+        },
     }
-    if (shouldUseParallelSuperBound(state, normalizedInput, runtime)) {
-        return optimizeDriveDiscsSuperBoundParallelExactAsync(catalog, store, normalizedInput, runtimeOptions, state, runtime)
-    }
-    return optimizeDriveDiscsSuperBoundExactAsync(catalog, store, normalizedInput, runtimeOptions, state)
+}
+
+async function optimizeDriveDiscsAsyncWithRuntime(runtime, catalog, store, input = {}, options = {}) {
+    return createDriveDiscOptimizationJobWithRuntime(runtime, catalog, store, input, options).run()
 }
 
 export function createDriveDiscOptimizerRuntime(runtime = {}) {
@@ -3769,10 +4347,21 @@ export function createDriveDiscOptimizerRuntime(runtime = {}) {
         ...runtime,
     }
     return {
+        createJob(catalog, store, input = {}, options = {}) {
+            return createDriveDiscOptimizationJobWithRuntime(configuredRuntime, catalog, store, input, options)
+        },
         optimizeDriveDiscsAsync(catalog, store, input = {}, options = {}) {
             return optimizeDriveDiscsAsyncWithRuntime(configuredRuntime, catalog, store, input, options)
         },
     }
+}
+
+export function previewDriveDiscOptimization(catalog, store, input = {}, options = {}) {
+    const prepareStartedAt = nowMs()
+    const state = createOptimizerState(catalog, store, input, { onPrepareProgress: options.onProgress })
+    const metrics = state.result?.metrics ?? state.metrics
+    metrics.preparationMs = elapsedMsSince(prepareStartedAt)
+    return previewFromOptimizerState(state)
 }
 
 export async function optimizeDriveDiscsAsync(catalog, store, input = {}, options = {}) {

@@ -9,6 +9,15 @@ type Variant =
   | "prepare-failed"
   | "scan-failed"
   | "game-not-found"
+  | "diagnostic-failure"
+
+type Failure = {
+  title?: string
+  message?: string
+  remedy?: string
+  diagnosticId?: string
+  actions?: Array<{ kind: string; label: string }>
+}
 
 const props = defineProps<{
   variant: Variant
@@ -16,11 +25,13 @@ const props = defineProps<{
   helperVersion?: string
   primaryLabel?: string
   secondaryLabel?: string
+  failure?: Failure | null
 }>()
 
 const emit = defineEmits<{
   primary: []
   secondary: []
+  action: [kind: string]
 }>()
 
 const preset = computed(() => {
@@ -30,7 +41,7 @@ const preset = computed(() => {
         Icon: Download,
         tone: "info" as const,
         title: "未检测到扫描助手",
-        subtext: "浏览器已尝试自动唤起。如果没反应，请下载并运行扫描助手，然后回到本页面。",
+        subtext: "浏览器已尝试自动唤起。如果下载后仍没反应，请确认 Helper 已运行，并检查 Windows SmartScreen 或企业安全策略是否拦截了未签名程序。",
         primary: "下载扫描助手",
         secondary: "我已运行，重新连接",
       }
@@ -41,9 +52,9 @@ const preset = computed(() => {
         title: props.helperVersion
           ? `扫描助手版本过低（v${props.helperVersion}）`
           : "扫描助手版本过低",
-        subtext: "下载进度需要新版助手才能正确显示，请下载新版助手并重新运行。",
-        primary: "下载新版助手",
-        secondary: "我已更新并重新运行",
+        subtext: props.message || "请下载并运行新版 Helper。安装器确认一次后会自动接管当前旧版，网页将自动重新连接。",
+        primary: "下载并更新 Helper",
+        secondary: "重新检测",
       }
     case "prepare-failed":
       return {
@@ -72,6 +83,15 @@ const preset = computed(() => {
         primary: "重试连接",
         secondary: "",
       }
+    case "diagnostic-failure":
+      return {
+        Icon: AlertCircle,
+        tone: "error" as const,
+        title: props.failure?.title || "OCR 扫描器发生错误",
+        subtext: props.failure?.message || props.message || "扫描器发生未知错误。",
+        primary: "",
+        secondary: "",
+      }
   }
 })
 
@@ -86,7 +106,24 @@ const secondaryLabel = computed(() => props.secondaryLabel ?? preset.value.secon
     </div>
     <h3 class="scanner-error-title">{{ preset.title }}</h3>
     <p class="scanner-error-subtext">{{ preset.subtext }}</p>
-    <div class="scanner-error-actions">
+    <p v-if="variant === 'diagnostic-failure' && failure?.remedy" class="scanner-error-remedy">
+      {{ failure.remedy }}
+    </p>
+    <p v-if="variant === 'diagnostic-failure' && failure?.diagnosticId" class="scanner-error-diagnostic">
+      诊断编号：{{ failure.diagnosticId }}
+    </p>
+    <div v-if="variant === 'diagnostic-failure'" class="scanner-error-actions">
+      <NButton
+        v-for="(action, index) in failure?.actions ?? []"
+        :key="action.kind"
+        :type="index === 0 ? 'primary' : 'default'"
+        size="large"
+        @click="emit('action', action.kind)"
+      >
+        {{ action.label }}
+      </NButton>
+    </div>
+    <div v-else class="scanner-error-actions">
       <NButton type="primary" size="large" @click="emit('primary')">
         {{ primaryLabel }}
       </NButton>
@@ -147,6 +184,21 @@ const secondaryLabel = computed(() => props.secondaryLabel ?? preset.value.secon
   color: var(--app-muted);
   font-size: 13px;
   line-height: 1.6;
+}
+
+.scanner-error-remedy {
+  margin: 0;
+  max-width: 360px;
+  color: var(--app-text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.scanner-error-diagnostic {
+  margin: 0;
+  color: var(--app-muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
 }
 
 .scanner-error-actions {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue"
-import { NButton, NCheckbox, NInputNumber, NSelect, NTag } from "naive-ui"
+import { NButton, NInputNumber, NSelect, NTag } from "naive-ui"
 import { ELEMENTS, defaultTargetConfig } from "@/stores/build"
 import { labelOf } from "@/utils/format"
 
@@ -36,7 +36,7 @@ const target = computed(() => {
 })
 
 const targetPresets = computed(() => (props.meta?.damageTargetPresets ?? []).map((preset: any) => ({
-  label: Number.isFinite(Number(preset.defense)) ? `${labelOf(preset)} · 防御 ${preset.defense}` : labelOf(preset),
+  label: Number.isFinite(Number(preset.defense)) ? `${preset.defense}（${labelOf(preset)}）` : labelOf(preset),
   value: preset.id,
   defense: Number.isFinite(Number(preset.defense)) ? Number(preset.defense) : null,
 })).concat([{ label: "自定义", value: "custom", defense: null }]))
@@ -74,8 +74,10 @@ function normalizeResistanceValue(value: unknown) {
 }
 
 function updateTarget(patch: any) {
+  const currentTarget = { ...target.value }
+  delete currentTarget.stunned
   emit("update:targetConfig", {
-    ...target.value,
+    ...currentTarget,
     ...patch,
     resistanceByElement: {
       ...(target.value.resistanceByElement ?? {}),
@@ -102,18 +104,18 @@ function setResistance(value: number | null) {
 </script>
 
 <template>
-  <section class="panel">
+  <section class="panel ui-layout-scope" data-layout-surface="enemy-target-config">
     <div class="panel-header">
       <h2 class="panel-title">Boss / 敌方效果</h2>
       <NTag round>{{ targetPresetName }}</NTag>
     </div>
     <div class="panel-body section-band">
-      <div class="metric-grid">
-        <div class="metric">
+      <div class="metric-grid ui-field-grid">
+        <div class="metric" data-layout-field>
           <dt>防御预设</dt>
           <dd><NSelect data-testid="target-preset-select" :value="target.presetId" :options="targetPresets" @update:value="applyPreset(String($event))" /></dd>
         </div>
-        <div class="metric">
+        <div class="metric" data-layout-field>
           <dt>防御值</dt>
           <dd>
             <NInputNumber
@@ -121,29 +123,26 @@ function setResistance(value: number | null) {
               data-testid="target-defense-input"
               :value="target.defense"
               :min="0"
-              :step="1"
+              :step="50"
               @update:value="updateTarget({ defense: Number($event ?? 0) })"
             />
             <span v-else class="target-defense-value">{{ displayDefense }}</span>
           </dd>
         </div>
-        <div class="metric target-stun-metric">
-          <dt>失衡</dt>
-          <dd class="target-stun-row">
-            <NCheckbox :checked="target.stunned" @update:checked="updateTarget({ stunned: Boolean($event) })">启用</NCheckbox>
-            <div class="target-stun-multiplier">
-              <span>初始失衡倍率</span>
-              <NInputNumber
-                :value="target.stunMultiplierPercent"
-                :min="0"
-                :step="0.1"
-                @update:value="updateTarget({ stunMultiplierPercent: Number($event ?? 0) })"
-              />
-              <span>%</span>
-            </div>
+        <div class="metric" data-layout-field>
+          <dt>初始失衡倍率</dt>
+          <dd class="target-stun-multiplier">
+            <NInputNumber
+              data-testid="target-stun-multiplier-input"
+              :value="target.stunMultiplierPercent"
+              :min="0"
+              :step="5"
+              @update:value="updateTarget({ stunMultiplierPercent: Number($event ?? 0) })"
+            />
+            <span>%</span>
           </dd>
         </div>
-        <div class="metric">
+        <div class="metric" data-layout-field>
           <dt>{{ resistanceLabel }}</dt>
           <dd>
             <NInputNumber
@@ -167,28 +166,13 @@ function setResistance(value: number | null) {
 </template>
 
 <style scoped>
-.target-stun-metric {
-  grid-column: 1 / -1;
-}
-
-.target-stun-row {
-  display: grid;
-  grid-template-columns: minmax(78px, auto) minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-}
-
 .target-stun-multiplier {
   display: grid;
-  grid-template-columns: minmax(104px, 124px) auto;
-  gap: 4px 8px;
+  grid-template-columns: minmax(104px, 1fr) auto;
+  gap: 8px;
   align-items: center;
   color: var(--app-muted);
   font-size: 12px;
-}
-
-.target-stun-multiplier > span:first-child {
-  grid-column: 1 / -1;
 }
 
 .target-stun-multiplier :deep(.n-input-number) {
@@ -204,9 +188,4 @@ function setResistance(value: number | null) {
   font-weight: 650;
 }
 
-@media (max-width: 520px) {
-  .target-stun-row {
-    grid-template-columns: 1fr;
-  }
-}
 </style>

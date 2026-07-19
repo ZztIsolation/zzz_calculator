@@ -53,12 +53,6 @@
         },
         "selfBuff": {
           "scope": "inCombat",
-          "coverage": {
-            "default": 1,
-            "min": 0,
-            "max": 1,
-            "step": 0.1
-          },
           "effects": [
             {
               "id": "effect_q4n8v2k1",
@@ -77,6 +71,12 @@
                   22,
                   24
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             },
             {
@@ -96,6 +96,12 @@
                   25,
                   27.5
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -1198,12 +1204,6 @@
         },
         "teamBuff": {
           "scope": "inCombat",
-          "coverage": {
-            "default": 1,
-            "min": 0,
-            "max": 1,
-            "step": 0.1
-          },
           "effects": [
             {
               "id": "effect_wiki_217_target_dmg",
@@ -1222,6 +1222,12 @@
                   22,
                   24
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -2622,7 +2628,17 @@
               "id": "effect_wiki_1342_self_ether_sheer",
               "type": "stacked",
               "target": {
-                "kind": "default"
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "special"
+                  },
+                  {
+                    "kind": "skillType",
+                    "skillType": "ultimate"
+                  }
+                ]
               },
               "stat": "etherSheerDmg",
               "mode": "flat",
@@ -3322,22 +3338,45 @@
           "durationSeconds": 30,
           "effects": [
             {
-              "id": "effect_wiki_951_team_crit_dmg",
+              "id": "effect_wiki_951_team_crit_dmg_iceCritDmg",
               "type": "stacked",
               "target": {
                 "kind": "default"
               },
-              "appliesTo": {
-                "elements": [
-                  "ice",
-                  "fire"
-                ]
-              },
-              "stat": "critDmg",
+              "stat": "iceCritDmg",
               "mode": "flat",
               "valuePerStack": 1.5,
               "maxStacks": 20,
               "defaultStacks": 20,
+              "stackGroup": "effect_wiki_951_team_crit_dmg_element_values",
+              "stackLabel": {
+                "zhCN": "萎靡"
+              },
+              "modificationValues": {
+                "valuePerStack": [
+                  1.5,
+                  1.72,
+                  1.95,
+                  2.17,
+                  2.4
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_951_team_crit_dmg_fireCritDmg",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "fireCritDmg",
+              "mode": "flat",
+              "valuePerStack": 1.5,
+              "maxStacks": 20,
+              "defaultStacks": 20,
+              "stackGroup": "effect_wiki_951_team_crit_dmg_element_values",
+              "stackLabel": {
+                "zhCN": "萎靡"
+              },
               "modificationValues": {
                 "valuePerStack": [
                   1.5,

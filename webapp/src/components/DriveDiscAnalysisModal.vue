@@ -299,10 +299,10 @@ function lastPoint(item: any) {
     :show="props.show"
     preset="card"
     title="驱动盘词条分析"
-    style="max-width: 1080px"
+    style="width: min(1120px, calc(100vw - 32px)); max-width: 1120px"
     @update:show="setShow"
   >
-    <div class="drive-disc-analysis section-band">
+    <div class="drive-disc-analysis section-band ui-layout-scope" data-layout-surface="drive-disc-analysis">
       <div class="analysis-context">
         <div class="section-band">
           <div class="chip-row">
@@ -335,9 +335,9 @@ function lastPoint(item: any) {
 
       <template v-else-if="activeView === 'substats'">
         <div class="metric-grid analysis-summary-grid">
-          <dl class="metric"><dt>驱动盘数量</dt><dd>{{ analysisData.substats.driveDiscCount }}</dd></dl>
-          <dl class="metric"><dt>总有效词条</dt><dd>{{ numberText(analysisData.substats.totalEffectiveRolls, 3) }}</dd></dl>
-          <dl class="metric"><dt>统计口径</dt><dd>副词条</dd></dl>
+          <dl class="metric" data-layout-field><dt>驱动盘数量</dt><dd>{{ analysisData.substats.driveDiscCount }}</dd></dl>
+          <dl class="metric" data-layout-field><dt>总有效词条</dt><dd>{{ numberText(analysisData.substats.totalEffectiveRolls, 3) }}</dd></dl>
+          <dl class="metric" data-layout-field><dt>统计口径</dt><dd>副词条</dd></dl>
         </div>
 
         <div v-if="!substatRows.length" class="empty-state">当前驱动盘没有可统计的副词条。</div>
@@ -382,9 +382,9 @@ function lastPoint(item: any) {
 
       <template v-else-if="activeView === 'gains'">
         <div class="metric-grid analysis-summary-grid">
-          <dl class="metric"><dt>基准伤害</dt><dd>{{ numberText(analysisData.gains.baseline?.finalDamage, 3) }}</dd></dl>
-          <dl class="metric"><dt>最大新增</dt><dd>{{ analysisData.gains.maxRolls ?? props.maxRolls }} 词条</dd></dl>
-          <dl class="metric"><dt>显示模式</dt><dd>{{ gainModeLabel() }}</dd></dl>
+          <dl class="metric" data-layout-field><dt>基准伤害</dt><dd>{{ numberText(analysisData.gains.baseline?.finalDamage, 3) }}</dd></dl>
+          <dl class="metric" data-layout-field><dt>最大新增</dt><dd>{{ analysisData.gains.maxRolls ?? props.maxRolls }} 词条</dd></dl>
+          <dl class="metric" data-layout-field><dt>显示模式</dt><dd>{{ gainModeLabel() }}</dd></dl>
         </div>
 
         <div class="analysis-mode-row">
@@ -475,9 +475,9 @@ function lastPoint(item: any) {
 
       <template v-else>
         <div class="metric-grid analysis-summary-grid">
-          <dl class="metric"><dt>基准伤害</dt><dd>{{ numberText(analysisData.diffs.baseline?.finalDamage, 3) }}</dd></dl>
-          <dl class="metric"><dt>副词条候选</dt><dd>{{ substatDiffRows.length }}</dd></dl>
-          <dl class="metric"><dt>主词条槽位</dt><dd>4 / 5 / 6</dd></dl>
+          <dl class="metric" data-layout-field><dt>基准伤害</dt><dd>{{ numberText(analysisData.diffs.baseline?.finalDamage, 3) }}</dd></dl>
+          <dl class="metric" data-layout-field><dt>副词条候选</dt><dd>{{ substatDiffRows.length }}</dd></dl>
+          <dl class="metric" data-layout-field><dt>主词条槽位</dt><dd>4 / 5 / 6</dd></dl>
         </div>
 
         <section class="analysis-section">
@@ -538,7 +538,7 @@ function lastPoint(item: any) {
         <section class="analysis-section">
           <h3>主词条差异计算</h3>
           <div v-if="!mainStatSlots.length" class="empty-state compact">暂无可分析的主词条槽位。</div>
-          <div v-else class="analysis-slot-grid">
+          <div v-else class="analysis-slot-grid ui-field-grid ui-field-grid--comfortable" data-layout-surface="drive-disc-analysis-slots">
             <article v-for="slot in mainStatSlots" :key="slot.slot" class="analysis-slot-block">
               <div class="analysis-slot-head">
                 <strong>{{ slot.slot }}号位</strong>
@@ -546,8 +546,8 @@ function lastPoint(item: any) {
                 <em>{{ slotSourceText(slot.source) }}</em>
               </div>
               <div v-if="!(slot.candidates ?? []).length" class="empty-state compact">当前主词条已经是该槽位唯一候选。</div>
-              <div v-else class="analysis-table-wrap">
-                <table class="data-table analysis-table">
+              <div v-else class="analysis-table-wrap analysis-slot-table-wrap">
+                <table class="data-table analysis-table analysis-slot-table">
                   <thead>
                     <tr>
                       <th>替换为</th>
@@ -558,10 +558,10 @@ function lastPoint(item: any) {
                   </thead>
                   <tbody>
                     <tr v-for="item in slot.candidates" :key="item.stat">
-                      <td>{{ statName(item.stat) }}</td>
-                      <td class="num">{{ storedValue(item.stat, item.value, item.mode) }}</td>
-                      <td class="num analysis-diff-cell" :class="diffTone(item.absoluteDiff)">{{ signedNumberText(item.absoluteDiff, 3) }}</td>
-                      <td class="num analysis-diff-cell" :class="diffTone(item.relativeDiff)">{{ signedPercentText(item.relativeDiff, 3) }}</td>
+                      <td data-label="替换为">{{ statName(item.stat) }}</td>
+                      <td class="num" data-label="候选数值">{{ storedValue(item.stat, item.value, item.mode) }}</td>
+                      <td class="num analysis-diff-cell" data-label="伤害差值" :class="diffTone(item.absoluteDiff)">{{ signedNumberText(item.absoluteDiff, 3) }}</td>
+                      <td class="num analysis-diff-cell" data-label="百分比差值" :class="diffTone(item.relativeDiff)">{{ signedPercentText(item.relativeDiff, 3) }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -576,9 +576,11 @@ function lastPoint(item: any) {
 
 <style scoped>
 .drive-disc-analysis {
-  max-height: min(76vh, 760px);
+  max-height: min(calc(100dvh - 120px), 820px);
   overflow: auto;
   padding-right: 2px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .analysis-context {
@@ -594,7 +596,7 @@ function lastPoint(item: any) {
 }
 
 .analysis-summary-grid {
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  --ui-field-min: 160px;
 }
 
 .analysis-mode-row {
@@ -663,12 +665,13 @@ function lastPoint(item: any) {
 
 .analysis-bar-row span {
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   color: var(--app-text);
   font-size: 13px;
   font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .analysis-bar-row strong {
@@ -748,9 +751,8 @@ function lastPoint(item: any) {
 }
 
 .analysis-slot-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 10px;
+  --ui-field-min: 360px;
+  gap: 12px;
 }
 
 .analysis-slot-block {
@@ -788,13 +790,52 @@ function lastPoint(item: any) {
   font-weight: 700;
 }
 
+.analysis-slot-table-wrap {
+  overflow-x: hidden;
+}
+
+.analysis-slot-table {
+  table-layout: fixed;
+}
+
+.analysis-slot-table th,
+.analysis-slot-table td {
+  padding: 9px 8px;
+}
+
+.analysis-slot-table th {
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.analysis-slot-table th:nth-child(1) {
+  width: 30%;
+}
+
+.analysis-slot-table th:nth-child(2) {
+  width: 20%;
+}
+
+.analysis-slot-table th:nth-child(3) {
+  width: 28%;
+}
+
+.analysis-slot-table th:nth-child(4) {
+  width: 22%;
+}
+
+.analysis-slot-table td:first-child {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .empty-state.compact {
   min-height: 72px;
   padding: 12px;
   text-align: center;
 }
 
-@media (max-width: 720px) {
+@container ui-layout (max-width: 720px) {
   .analysis-context {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -805,6 +846,57 @@ function lastPoint(item: any) {
 
   .analysis-bar-row strong {
     text-align: left;
+  }
+}
+
+@container ui-layout (max-width: 520px) {
+  .drive-disc-analysis {
+    max-height: calc(100dvh - 104px);
+  }
+
+  .analysis-slot-block {
+    padding: 10px;
+  }
+
+  .analysis-slot-table,
+  .analysis-slot-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .analysis-slot-table thead {
+    display: none;
+  }
+
+  .analysis-slot-table tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
+    padding: 10px;
+    border-bottom: 1px solid var(--app-border);
+  }
+
+  .analysis-slot-table tr:last-child {
+    border-bottom: 0;
+  }
+
+  .analysis-slot-table td {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+    padding: 0;
+    border-bottom: 0;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .analysis-slot-table td::before {
+    content: attr(data-label);
+    color: var(--app-muted);
+    font-size: 11px;
+    font-weight: 700;
   }
 }
 </style>

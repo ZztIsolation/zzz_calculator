@@ -2,6 +2,30 @@ import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it } from "vitest"
 import { defaultDamageConfig, normalizeDamageModeForAgent, useBuildStore } from "@/stores/build"
 
+function teammateWEngineMeta() {
+  const teamWEngine = (id: string) => ({
+    id,
+    name: { zhCN: id },
+    modification: { minLevel: 1, maxLevel: 5, defaultLevel: 1 },
+    effect: {
+      teamBuff: {
+        scope: "inCombat",
+        effects: [{ id: `${id}-atk`, type: "fixed", stat: "atkFlat", value: 10 }],
+      },
+    },
+  })
+  return {
+    agents: [{ id: "agent_a", name: { zhCN: "角色 A" } }],
+    wEngines: [
+      { id: "engine_a", name: { zhCN: "当前音擎" } },
+      teamWEngine("engine_team"),
+      teamWEngine("engine_team_default"),
+      teamWEngine("engine_team_invalid"),
+    ],
+    combatBuffs: [],
+  }
+}
+
 describe("build store", () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -41,11 +65,124 @@ describe("build store", () => {
 
     const input = store.buildInput({}, meta, [])
     expect(input.damage.selectedEventId).toBe("default-hit")
-    expect(input.damage.target.stunned).toBe(true)
+    expect(input.damage.target.stunned).toBeUndefined()
+    expect(input.damage.events[0].stunned).toBe(true)
     expect(input.combatBuffs.activeBuffIds).toContain("agent:agent_a.corePassive")
     expect(input.combatBuffs.activeBuffIds).toContain("agent:agent_a.cinema.1")
     expect(input.combatBuffs.activeBuffIds).toContain("wEngine:engine_a.self")
     expect(input.combatBuffs.activeBuffIds).toContain("teammate_buff")
+  })
+
+  it("migrates legacy target stun state only into non-admin events", () => {
+    const store = useBuildStore()
+    const agent = {
+      id: "agent_a",
+      name: { zhCN: "角色 A" },
+      defaultCalculationConfig: {
+        selectedEventId: "admin-hit",
+        events: [{ id: "admin-hit", kind: "direct", skillMultiplier: 200, count: 1 }],
+      },
+    }
+    const meta = {
+      agents: [agent],
+      wEngines: [{ id: "engine_a", name: { zhCN: "音擎 A" } }],
+      combatBuffs: [],
+    }
+
+    store.applyAgentConfig("agent_a", meta, {
+      wEngineId: "engine_a",
+      targetConfig: { stunned: false, stunMultiplierPercent: 175 },
+      damage: {
+        mode: "custom",
+        selectedEventId: "legacy-hit",
+        events: [
+          { id: "legacy-hit", kind: "direct", skillMultiplier: 100, count: 1 },
+          { id: "explicit-hit", kind: "direct", skillMultiplier: 100, count: 1, stunned: true },
+        ],
+      },
+    })
+
+    expect(store.damageConfig.events.map((event: any) => event.stunned)).toEqual([false, true])
+    expect(store.targetConfig.stunned).toBeUndefined()
+
+    store.applyAgentConfig("agent_a", meta, {
+      wEngineId: "engine_a",
+      targetConfig: { stunned: false, stunMultiplierPercent: 175 },
+      damage: { mode: "adminDefault", events: [] },
+    })
+
+    expect(store.damageConfig.mode).toBe("adminDefault")
+    expect(store.damageConfig.events[0]).toMatchObject({ id: "admin-hit", stunned: true })
+  })
+
+  it("keeps field buffs independent while allowing exactly one selected Boss Buff", () => {
+    const store = useBuildStore()
+    const meta = {
+      agents: [],
+      wEngines: [],
+      combatBuffs: [
+        { id: "field.v3.p1", sourceType: "field", effects: [] },
+        { id: "boss.encounter.a", sourceType: "boss", effects: [] },
+        { id: "boss.encounter.b", sourceType: "boss", effects: [] },
+      ],
+    }
+    store.applyBuffState({
+      selectedBuffIds: ["field.v3.p1", "boss.encounter.a", "boss.encounter.b"],
+      runtimeInputs: {
+        "boss.encounter.a": { effects: { a: { stacks: 1 } } },
+        "boss.encounter.b": { effects: { b: { stacks: 2 } } },
+      },
+    }, meta)
+
+    expect(store.activeBuffIds(meta)).toEqual(["field.v3.p1", "boss.encounter.a"])
+    expect(store.runtimeInputs).toHaveProperty("boss.encounter.a")
+    expect(store.runtimeInputs).not.toHaveProperty("boss.encounter.b")
+  })
+
+  it("migrates a legacy concrete Boss target into Buff selection and resets target values", () => {
+    const store = useBuildStore()
+    const meta = {
+      agents: [{ id: "agent_a", name: { zhCN: "角色 A" } }],
+      wEngines: [{ id: "engine_a", name: { zhCN: "音擎 A" } }],
+      combatBuffs: [
+        { id: "field.v3.p1", sourceType: "field", effects: [] },
+        { id: "boss.encounter.a", sourceType: "boss", effects: [] },
+        { id: "boss.encounter.b", sourceType: "boss", effects: [] },
+      ],
+    }
+
+    store.applyAgentConfig("agent_a", meta, {
+      wEngineId: "engine_a",
+      combat: {
+        activeBuffIds: ["field.v3.p1", "boss.encounter.a"],
+        runtimeInputs: {
+          "boss.encounter.a": { effects: { a: { stacks: 1 } } },
+          "boss.encounter.b": { effects: { b: { stacks: 2 } } },
+        },
+      },
+      targetConfig: {
+        targetMode: "specific",
+        bossId: "boss.b",
+        bossEncounterId: "boss.encounter.b",
+        defense: 952,
+        levelCoefficient: 794,
+        stunned: false,
+        stunMultiplierPercent: 175,
+        resistanceByElement: { physical: 20, fire: -20 },
+      },
+    })
+
+    expect(store.selectedBuffIds).toEqual(["field.v3.p1", "boss.encounter.b"])
+    expect(store.activeBuffIds(meta)).toEqual(["field.v3.p1", "boss.encounter.b"])
+    expect(store.runtimeInputs).not.toHaveProperty("boss.encounter.a")
+    expect(store.runtimeInputs).toHaveProperty("boss.encounter.b")
+    expect(store.targetConfig).toEqual({
+      presetId: "normal-boss",
+      defense: 953,
+      levelCoefficient: 794,
+      stunMultiplierPercent: 175,
+      resistanceByElement: Object.fromEntries(["physical", "fire", "ice", "electric", "ether", "wind"].map(element => [element, 0])),
+    })
   })
 
   it("only enables default agent and w-engine buffs that are in-combat", () => {
@@ -159,11 +296,78 @@ describe("build store", () => {
     expect(input.combatBuffs.activeBuffIds).toContain("manual_buff")
   })
 
+  it("falls back from saved hidden agents and w-engines without deleting their configs", () => {
+    localStorage.setItem("zzz-calculator.webapp.build.v1", JSON.stringify({
+      version: 2,
+      currentOwnerId: "default",
+      byOwner: {
+        default: {
+          currentAgentId: "hidden_agent",
+          byAgent: {
+            hidden_agent: { agentLevel: 42, wEngineId: "hidden_engine" },
+            visible_agent: { agentLevel: 55, wEngineId: "hidden_engine" },
+          },
+        },
+      },
+    }))
+    const hiddenAgent = { id: "hidden_agent", name: { zhCN: "隐藏角色" } }
+    const visibleAgent = { id: "visible_agent", name: { zhCN: "可见角色" } }
+    const hiddenEngine = { id: "hidden_engine", name: { zhCN: "隐藏音擎" } }
+    const visibleEngine = { id: "visible_engine", name: { zhCN: "可见音擎" } }
+    const meta = {
+      agents: [hiddenAgent, visibleAgent],
+      displayAgents: [visibleAgent],
+      wEngines: [hiddenEngine, visibleEngine],
+      displayWEngines: [visibleEngine],
+      combatBuffs: [],
+    }
+    const store = useBuildStore()
+
+    store.initialize({}, meta)
+
+    expect(store.agentId).toBe("visible_agent")
+    expect(store.agentLevel).toBe(55)
+    expect(store.wEngineId).toBe("visible_engine")
+
+    store.persist()
+    const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "{}")
+    expect(saved.byOwner.default.currentAgentId).toBe("visible_agent")
+    expect(saved.byOwner.default.byAgent.hidden_agent).toEqual({ agentLevel: 42, wEngineId: "hidden_engine" })
+  })
+
+  it("clears active selections when the workbench has no visible agents", () => {
+    const store = useBuildStore()
+    store.agentId = "previous_agent"
+    store.wEngineId = "previous_engine"
+    store.result = { damage: 1 }
+    store.outOfCombat = { panel: {} }
+
+    store.initialize({}, {
+      agents: [{ id: "hidden_agent" }],
+      displayAgents: [],
+      wEngines: [{ id: "hidden_engine" }],
+      displayWEngines: [],
+    })
+
+    expect(store.agentId).toBe("")
+    expect(store.wEngineId).toBe("")
+    expect(store.result).toBe(null)
+    expect(store.outOfCombat).toBe(null)
+  })
+
   it("passes teammate drive-disc team buffs through the core input shape", () => {
     const store = useBuildStore()
     const meta = {
       agents: [{ id: "agent_a", name: { zhCN: "角色 A" } }],
-      wEngines: [{ id: "engine_a", name: { zhCN: "音擎 A" } }],
+      wEngines: [
+        { id: "engine_a", name: { zhCN: "音擎 A" } },
+        {
+          id: "engine_team",
+          name: { zhCN: "队友音擎" },
+          modification: { minLevel: 1, maxLevel: 5 },
+          effect: { teamBuff: { scope: "inCombat", effects: [] } },
+        },
+      ],
       combatBuffs: [],
     }
     store.agentId = "agent_a"
@@ -228,8 +432,7 @@ describe("build store", () => {
         fourPiece: {
           selfBuff: {
             scope: "inCombat",
-            coverage: { default: 1 },
-            effects: [{ id: "self", type: "fixed", stat: "dmgBonus", value: 10 }],
+            effects: [{ id: "self", type: "fixed", stat: "dmgBonus", value: 10, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
           },
         },
       }],
@@ -246,12 +449,12 @@ describe("build store", () => {
 
     const input = store.buildInput(catalog, meta, driveDiscs, {
       runtimeInputs: {
-        "driveDisc4pc:set_a.self": { coverage: 0.25, effects: { self: { enabled: true } } },
+        "driveDisc4pc:set_a.self": { effects: { self: { enabled: true, coverage: 0.25 } } },
       },
     })
 
     expect(input.combatBuffs.activeBuffIds).toContain("driveDisc4pc:set_a.self")
-    expect(input.combatBuffs.runtimeInputs["driveDisc4pc:set_a.self"].coverage).toBe(0.25)
+    expect(input.combatBuffs.runtimeInputs["driveDisc4pc:set_a.self"].effects.self.coverage).toBe(0.25)
   })
 
   it("matches main branch custom buff payload semantics", () => {
@@ -298,7 +501,130 @@ describe("build store", () => {
     expect(input.combatBuffs.wEngineTeamModificationLevels).toEqual({
       "wEngine:engine_team.team": 5,
     })
-    expect(input.combatBuffs.runtimeInputs["wEngine:engine_team.team"].coverage).toBe(0.5)
+    expect(input.combatBuffs.runtimeInputs["wEngine:engine_team.team"].coverage).toBeUndefined()
+  })
+
+  it("activates legacy added-only teammate w-engines and clamps persisted ranks by metadata", () => {
+    const id = "wEngine:engine_team.team"
+    localStorage.setItem("zzz-calculator.currentAccount.v1", "alice")
+    localStorage.setItem("zzz-calculator.webapp.build.v1", JSON.stringify({
+      version: 2,
+      currentOwnerId: "alice",
+      byOwner: {
+        alice: {
+          currentAgentId: "agent_a",
+          byAgent: {
+            agent_a: {
+              wEngineId: "engine_a",
+              combat: {
+                activeBuffIds: [],
+                addedBuffs: [{
+                  id,
+                  sourceCategory: "wEngine",
+                  sourceKind: "wEngineTeam",
+                  wEngineModificationLevel: 99,
+                }],
+              },
+            },
+          },
+        },
+      },
+    }))
+    const meta = teammateWEngineMeta()
+    const store = useBuildStore()
+
+    store.initialize({}, meta)
+
+    expect(store.selectedBuffIds).toEqual([])
+    expect(store.addedBuffs[0].wEngineModificationLevel).toBe(5)
+    expect(store.activeBuffIds(meta)).toContain(id)
+    const input = store.buildInput({}, meta, [])
+    expect(input.combatBuffs.activeBuffIds).toContain(id)
+    expect(input.combatBuffs.wEngineTeamModificationLevels).toEqual({ [id]: 5 })
+
+    store.persist()
+    for (const key of ["zzz-calculator.webapp.build.v1", "zzz-calculator.homeSelection.v1"]) {
+      const saved = JSON.parse(localStorage.getItem(key) || "{}")
+      const combat = saved.byOwner.alice.byAgent.agent_a.combat
+      expect(combat.activeBuffIds).toEqual([])
+      expect(combat.addedBuffs[0].wEngineModificationLevel).toBe(5)
+    }
+
+    setActivePinia(createPinia())
+    const restored = useBuildStore()
+    restored.initialize({}, meta)
+    expect(restored.activeBuffIds(meta)).toContain(id)
+    expect(restored.buildInput({}, meta, []).combatBuffs.wEngineTeamModificationLevels[id]).toBe(5)
+  })
+
+  it("normalizes missing and non-numeric teammate w-engine ranks to refinement 1", () => {
+    const meta = teammateWEngineMeta()
+    const store = useBuildStore()
+    store.applyAgentConfig("agent_a", meta, { wEngineId: "engine_a" })
+    const defaultId = "wEngine:engine_team_default.team"
+    const invalidId = "wEngine:engine_team_invalid.team"
+
+    store.applyBuffState({
+      selectedBuffIds: [defaultId, invalidId],
+      addedBuffs: [
+        {
+          id: defaultId,
+          sourceCategory: "wEngine",
+          sourceKind: "wEngineTeam",
+        },
+        {
+          id: invalidId,
+          sourceCategory: "wEngine",
+          sourceKind: "wEngineTeam",
+          wEngineModificationLevel: "not-a-rank",
+        },
+      ],
+      runtimeInputs: {},
+    }, meta)
+
+    expect(store.addedBuffs.map(item => item.wEngineModificationLevel)).toEqual([1, 1])
+    expect(store.buildInput({}, meta, []).combatBuffs.wEngineTeamModificationLevels).toEqual({
+      [defaultId]: 1,
+      [invalidId]: 1,
+    })
+  })
+
+  it("migrates known legacy skill prefixes when loading and applying added buffs", () => {
+    const store = useBuildStore()
+    const meta = {
+      agents: [{ id: "agent_a", name: { zhCN: "角色 A" }, combatBuffs: {} }],
+      wEngines: [],
+      combatBuffs: [],
+    }
+    const legacyBuff = {
+      id: "legacy-ultimate",
+      sourceCategory: "custom",
+      sourceKind: "custom",
+      name: { zhCN: "旧终结技 Buff" },
+      effects: [{
+        type: "fixed",
+        stat: "dmgBonus",
+        value: 20,
+        target: { kind: "skill", skillTargets: [{ categoryId: "chain", moveIdPrefixes: ["ultimate_"] }] },
+      }],
+    }
+
+    store.applyAgentConfig("agent_a", meta, { combat: { addedBuffs: [legacyBuff] } })
+    expect(store.addedBuffs[0].effects[0].target.skillTargets).toEqual([
+      { kind: "skillType", skillType: "ultimate" },
+    ])
+
+    store.applyBuffState({ selectedBuffIds: [], addedBuffs: [{
+      ...legacyBuff,
+      id: "legacy-chain",
+      effects: [{
+        ...legacyBuff.effects[0],
+        target: { kind: "skill", skillTargets: [{ categoryId: "chain", moveIdPrefixes: ["chain_"] }] },
+      }],
+    }] }, meta)
+    expect(store.addedBuffs[0].effects[0].target.skillTargets).toEqual([
+      { kind: "skillType", skillType: "chain" },
+    ])
   })
 
   it("persists advanced damage, buff runtime, and default-buff exclusions", () => {
@@ -323,6 +649,7 @@ describe("build store", () => {
       selectedEventId: "anomaly-1",
       events: [{ id: "anomaly-1", kind: "anomaly", anomalyEffect: "assault", procCount: 1 }],
       target: {
+        presetId: "custom",
         defense: 1000,
         stunned: false,
         stunMultiplierPercent: 200,
@@ -337,7 +664,8 @@ describe("build store", () => {
     const input = store.buildInput({}, meta, [])
     expect(input.damage.selectedEventId).toBe("anomaly-1")
     expect(input.damage.target.defense).toBe(1000)
-    expect(input.damage.target.stunned).toBe(false)
+    expect(input.damage.target.stunned).toBeUndefined()
+    expect(input.damage.events[0].stunned).toBe(false)
     expect(store.targetConfig.defense).toBe(1000)
     expect(store.damageConfig.target).toBeUndefined()
     expect(input.combatBuffs.activeBuffIds).not.toContain("agent:agent_a.corePassive")
@@ -346,6 +674,7 @@ describe("build store", () => {
     const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "{}")
     expect(saved.byOwner.default.byAgent.agent_a.combat.manuallyUncheckedDefaultBuffIds).toContain("agent:agent_a.corePassive")
     expect(saved.byOwner.default.byAgent.agent_a.targetConfig.defense).toBe(1000)
+    expect(saved.byOwner.default.byAgent.agent_a.targetConfig.stunned).toBeUndefined()
     expect(saved.byOwner.default.byAgent.agent_a.damage.target).toBeUndefined()
   })
 
@@ -376,6 +705,8 @@ describe("build store", () => {
     const webappSaved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "{}")
     expect(webappSaved.byOwner.alice.currentAgentId).toBe("agent_a")
     expect(webappSaved.byOwner.alice.byAgent.agent_a.targetConfig.defense).toBe(1234)
+    expect(webappSaved.byOwner.alice.byAgent.agent_a.targetConfig.stunned).toBeUndefined()
+    expect(webappSaved.byOwner.alice.byAgent.agent_a.damage.events[0].stunned).toBe(true)
     expect(webappSaved.byOwner.alice.byAgent.agent_a.damage.target).toBeUndefined()
 
     const legacySaved = JSON.parse(localStorage.getItem("zzz-calculator.homeSelection.v1") || "{}")
@@ -394,6 +725,7 @@ describe("build store", () => {
     store.agentId = "agent_a"
     store.wEngineId = "engine_a"
     store.setTargetConfig({
+      presetId: "custom",
       defense: 1234,
       stunned: false,
       stunMultiplierPercent: 180,
@@ -407,8 +739,9 @@ describe("build store", () => {
     })
 
     expect(store.targetConfig.defense).toBe(1234)
-    expect(store.targetConfig.stunned).toBe(false)
+    expect(store.targetConfig.stunned).toBeUndefined()
     expect(store.damageConfig.target).toBeUndefined()
+    expect(store.damageConfig.events[0].stunned).toBe(true)
 
     const input = store.buildInput({}, meta, [])
     expect(input.damage.selectedEventId).toBe("direct-2")
@@ -454,8 +787,8 @@ describe("build store", () => {
       selectedEventId: "loop-ref",
       events: [
         { id: "intro", kind: "direct", skillMultiplier: 50, count: 1 },
-        { id: "loop-ref", kind: "skillGroup", skillGroupId: "loop", count: 3 },
-        { id: "ult-ref", kind: "skillGroup", skillGroupId: "ultimate", count: 2 },
+        { id: "loop-ref", kind: "skillGroup", skillGroupId: "loop", count: 3, stunned: false },
+        { id: "ult-ref", kind: "skillGroup", skillGroupId: "ultimate", count: 2, stunned: true },
       ],
     }, agent)
 
@@ -466,6 +799,7 @@ describe("build store", () => {
     expect(input.damage.events.map((event: any) => event.id)).toEqual(["intro", "loop-ref__hit", "ult-ref__burst"])
     expect(input.damage.events.map((event: any) => event.kind)).toEqual(["direct", "direct", "direct"])
     expect(input.damage.events.map((event: any) => event.count)).toEqual([1, 6, 2])
+    expect(input.damage.events.map((event: any) => event.stunned)).toEqual([true, false, true])
 
     const metaWithoutSkillGroups = {
       ...meta,
@@ -479,6 +813,7 @@ describe("build store", () => {
     expect(inputFromCatalogFallback.damage.selectedEventId).toBe("loop-ref__hit")
     expect(inputFromCatalogFallback.damage.events.map((event: any) => event.kind)).toEqual(["direct", "direct", "direct"])
     expect(inputFromCatalogFallback.damage.events.map((event: any) => event.count)).toEqual([1, 6, 2])
+    expect(inputFromCatalogFallback.damage.events.map((event: any) => event.stunned)).toEqual([true, false, true])
   })
 
   it("ignores stale saved events when admin default mode uses role skill groups", () => {
@@ -555,6 +890,7 @@ describe("build store", () => {
     }
 
     expect(defaultDamageConfig(agent, 0).selectedEventId).toBe("loop-0")
+    expect(defaultDamageConfig(agent, 0).mode).toBe("adminDefault")
     expect(defaultDamageConfig(agent, 1).selectedEventId).toBe("loop-0")
     expect(defaultDamageConfig(agent, 2).selectedEventId).toBe("loop-2")
     expect(defaultDamageConfig(agent, 5).selectedEventId).toBe("loop-2")

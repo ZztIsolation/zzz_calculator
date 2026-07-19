@@ -10,7 +10,8 @@ import {
   hasCalculationSkillGroups,
 } from "@core/calculationSkillGroups.js"
 import { resolveDefaultCalculationConfig } from "@core/defaultCalculationConfig.js"
-import { teammateDriveDiscSetIdsFromBuffIds } from "@/utils/combatBuffs"
+import { normalizeSkillTargetsInValue } from "@core/skillTargets.js"
+import { teammateDriveDiscSetIdsFromBuffIds, wEngineIdFromTeamBuffId } from "@/utils/combatBuffs"
 import {
   clampWEngineModificationLevel,
   coreSkillDefaultLevel,
@@ -37,6 +38,12 @@ export const SKILL_CATEGORIES = ["basic", "dodge", "assist", "special", "chain"]
 export const DISC_MODES = ["manual", "loadout", "optimized"] as const
 type DiscMode = typeof DISC_MODES[number]
 
+const TARGET_PRESET_DEFENSES: Record<string, number> = {
+  "wandering-hunter": 1588,
+  "taichu-nightmare": 476,
+  "normal-boss": 953,
+}
+
 function readJson(key: string) {
   try {
     return JSON.parse(localStorage.getItem(key) || "null")
@@ -47,6 +54,32 @@ function readJson(key: string) {
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value ?? null))
+}
+
+function wEngineForTeamBuffId(meta: any, id: string) {
+  const wEngineId = wEngineIdFromTeamBuffId(id)
+  return wEngineId
+    ? (meta?.wEngines ?? []).find((item: any) => item?.id === wEngineId) ?? null
+    : null
+}
+
+function normalizeAddedBuffs(value: any, meta: any = null): any[] {
+  const normalized = Array.isArray(value) ? normalizeSkillTargetsInValue(clone(value)) : []
+  return normalized.map((item: any) => {
+    if (item?.sourceKind !== "wEngineTeam" || !item?.id) {
+      return item
+    }
+    const wEngine = wEngineForTeamBuffId(meta, String(item.id))
+    if (!wEngine) {
+      return item
+    }
+    return {
+      ...item,
+      sourceCategory: "wEngine",
+      sourceKind: "wEngineTeam",
+      wEngineModificationLevel: clampWEngineModificationLevel(item.wEngineModificationLevel, wEngine),
+    }
+  })
 }
 
 function numeric(value: unknown, fallback: number) {
@@ -78,7 +111,6 @@ export function defaultTargetConfig() {
     presetId: "normal-boss",
     defense: 953,
     levelCoefficient: 794,
-    stunned: true,
     stunMultiplierPercent: 150,
     resistanceByElement: Object.fromEntries(ELEMENTS.map(element => [element, 0])),
   }
@@ -86,18 +118,45 @@ export function defaultTargetConfig() {
 
 function normalizeTargetConfig(value: any = {}) {
   const fallback = defaultTargetConfig()
+  const requestedPresetId = String(value?.presetId ?? "")
+  const matchingPresetId = Object.entries(TARGET_PRESET_DEFENSES)
+    .find(([, defense]) => defense === Number(value?.defense))?.[0]
+  const presetId = requestedPresetId === "custom" || TARGET_PRESET_DEFENSES[requestedPresetId] !== undefined
+    ? requestedPresetId
+    : matchingPresetId ?? fallback.presetId
   const resistanceByElement = { ...fallback.resistanceByElement }
   for (const element of ELEMENTS) {
     resistanceByElement[element] = numeric(value?.resistanceByElement?.[element], resistanceByElement[element])
   }
   return {
-    presetId: String(value?.presetId ?? fallback.presetId),
-    defense: Math.max(0, numeric(value?.defense, fallback.defense)),
+    presetId,
+    defense: presetId === "custom"
+      ? Math.max(0, numeric(value?.defense, fallback.defense))
+      : TARGET_PRESET_DEFENSES[presetId] ?? fallback.defense,
     levelCoefficient: numeric(value?.levelCoefficient, fallback.levelCoefficient),
-    stunned: value?.stunned === undefined ? fallback.stunned : Boolean(value.stunned),
     stunMultiplierPercent: Math.max(0, numeric(value?.stunMultiplierPercent, fallback.stunMultiplierPercent)),
     resistanceByElement,
   }
+}
+
+function bossBuffIdSet(meta: any) {
+  return new Set<string>((meta?.combatBuffs ?? [])
+    .filter((buff: any) => buff?.sourceType === "boss")
+    .map((buff: any) => String(buff.id)))
+}
+
+function normalizeBossBuffSelection(selectedIds: string[], runtimeInputs: Record<string, any>, meta: any, preferredBossId = "") {
+  const bossIds = bossBuffIdSet(meta)
+  const winner = preferredBossId && bossIds.has(preferredBossId)
+    ? preferredBossId
+    : selectedIds.find(id => bossIds.has(id)) ?? ""
+  const normalizedIds = selectedIds.filter(id => !bossIds.has(id) || id === winner)
+  const normalizedRuntimeInputs = { ...(runtimeInputs ?? {}) }
+  for (const id of bossIds) {
+    if (id !== winner) delete normalizedRuntimeInputs[id]
+  }
+  if (preferredBossId && preferredBossId !== winner) delete normalizedRuntimeInputs[preferredBossId]
+  return { selectedIds: normalizedIds, runtimeInputs: normalizedRuntimeInputs, winner }
 }
 
 function defaultEvent(kind = "direct", id = `${kind}-1`) {
@@ -109,6 +168,7 @@ function defaultEvent(kind = "direct", id = `${kind}-1`) {
       anomalyEffect: "assault",
       procCount: 1,
       count: 1,
+      stunned: true,
     }
   }
   if (kind === "disorder") {
@@ -119,6 +179,7 @@ function defaultEvent(kind = "direct", id = `${kind}-1`) {
       previousAnomalyEffect: "burn",
       elapsedSeconds: 0,
       count: 1,
+      stunned: true,
     }
   }
   return {
@@ -127,6 +188,7 @@ function defaultEvent(kind = "direct", id = `${kind}-1`) {
     skillMultiplier: 100,
     critMode: "expected",
     count: 1,
+    stunned: true,
   }
 }
 
@@ -178,12 +240,12 @@ function primaryDamageConfigForAgent(agent: any = null) {
 export function defaultDamageConfig(agent: any = null, cinemaLevel = 0) {
   const config = resolveDefaultCalculationConfig(agent?.defaultCalculationConfig, cinemaLevel)
   if (config?.events?.length) {
-    const mode = config.mode ?? "adminDefault"
-    if (!isDamageModeAllowedForAgent(mode, agent, cinemaLevel)) {
+    const configuredMode = config.mode ?? "custom"
+    if (!isDamageModeAllowedForAgent(configuredMode, agent, cinemaLevel)) {
       return primaryDamageConfigForAgent(agent)
     }
     return {
-      mode,
+      mode: "adminDefault",
       agentLevel: 60,
       skillLevelsByCategory: {},
       selectedEventId: config.selectedEventId ?? config.events[0]?.id,
@@ -232,7 +294,8 @@ function calculationAgentFor(metaAgent: any = null, catalog: any = null, agentId
   return metaAgent ?? catalogAgent
 }
 
-function normalizeDamageEvent(event: any, index = 0) {
+function normalizeDamageEvent(event: any, index = 0, fallbackStunned = true) {
+  const stunned = event?.stunned === undefined ? fallbackStunned : Boolean(event.stunned)
   if (event?.kind === "skillGroup") {
     const id = String(event?.id ?? `skillGroup-${index + 1}`)
     return {
@@ -240,6 +303,7 @@ function normalizeDamageEvent(event: any, index = 0) {
       kind: "skillGroup",
       skillGroupId: String(event?.skillGroupId ?? event?.groupId ?? ""),
       count: Math.max(0, numeric(event?.count, 1)),
+      stunned,
     }
   }
   const kind = ["direct", "sheer", "anomaly", "disorder"].includes(event?.kind) ? event.kind : "direct"
@@ -250,7 +314,15 @@ function normalizeDamageEvent(event: any, index = 0) {
     id: String(event?.id ?? fallback.id),
     kind,
     count: Math.max(0, numeric(event?.count, fallback.count ?? 1)),
+    stunned,
   }
+}
+
+function legacyTargetStunned(value: any = {}) {
+  const target = value?.target ?? value?.targetConfig
+  return target && Object.prototype.hasOwnProperty.call(target, "stunned")
+    ? Boolean(target.stunned)
+    : undefined
 }
 
 function damageConfigFields(value: any = {}) {
@@ -269,12 +341,13 @@ function normalizeDamageConfig(value: any, agent: any = null, cinemaLevel = 0) {
   const mode = normalizeDamageModeForAgent(rawMode, agent, cinemaLevel)
   const eventFallback = modeAllowed ? fallback : primaryDamageConfigForAgent(agent)
   const usesAdminDefault = mode === "adminDefault"
+  const fallbackStunned = usesAdminDefault ? true : (legacyTargetStunned(value) ?? true)
   const eventSource = !usesAdminDefault && modeAllowed && Array.isArray(value?.events) && value.events.length
     ? value.events
     : eventFallback.events
   const events = Array.isArray(eventSource) && eventSource.length
-    ? eventSource.map(normalizeDamageEvent)
-    : eventFallback.events.map(normalizeDamageEvent)
+    ? eventSource.map((event: any, index: number) => normalizeDamageEvent(event, index, fallbackStunned))
+    : eventFallback.events.map((event: any, index: number) => normalizeDamageEvent(event, index, fallbackStunned))
   const selectedEventId = events.some((event: any) => event.id === value?.selectedEventId)
     ? String(value.selectedEventId)
     : events[0]?.id
@@ -351,6 +424,14 @@ function savedCurrentAgentId() {
   const legacy = legacyOwnerSelection()
   const fallback = webappFallbackSelection()
   return saved?.currentAgentId ?? legacy?.currentAgentId ?? fallback?.currentAgentId ?? ""
+}
+
+function displayAgents(meta: any = null) {
+  return meta?.displayAgents ?? meta?.agents ?? []
+}
+
+function displayWEngines(meta: any = null) {
+  return meta?.displayWEngines ?? meta?.wEngines ?? []
 }
 
 export function defaultBuffIdsFor(agent: any, cinemaLevel: number, wEngine: any) {
@@ -433,11 +514,26 @@ function addedBuffRuntimeInputs(addedBuffs: any[] = []) {
   return Object.fromEntries(entries)
 }
 
-function wEngineTeamModificationLevelsFromAddedBuffs(addedBuffs: any[] = []) {
+function activeWEngineTeamReferences(addedBuffs: any[] = [], meta: any = null) {
+  return (Array.isArray(addedBuffs) ? addedBuffs : []).filter(item => {
+    if (item?.sourceKind !== "wEngineTeam" || !item?.id) {
+      return false
+    }
+    return Boolean(wEngineForTeamBuffId(meta, String(item.id)))
+  })
+}
+
+function wEngineTeamModificationLevelsFromAddedBuffs(addedBuffs: any[] = [], meta: any = null) {
   return Object.fromEntries(
     (Array.isArray(addedBuffs) ? addedBuffs : [])
       .filter(item => item?.sourceKind === "wEngineTeam" && item?.id)
-      .map(item => [String(item.id), numeric(item.wEngineModificationLevel, 1)]),
+      .map(item => {
+        const wEngine = wEngineForTeamBuffId(meta, String(item.id))
+        return [
+          String(item.id),
+          clampWEngineModificationLevel(item.wEngineModificationLevel, wEngine ?? {}),
+        ]
+      }),
   )
 }
 
@@ -533,23 +629,28 @@ export const useBuildStore = defineStore("build", {
   },
   actions: {
     initialize(catalog: any, meta: any) {
-      const agents = meta?.agents ?? []
-      const wEngines = meta?.wEngines ?? []
+      const agents = displayAgents(meta)
       const initialAgentId = savedCurrentAgentId() || agents[0]?.id || ""
       const agent = agents.find((item: any) => item.id === initialAgentId) ?? agents[0]
       if (!agent) {
+        this.agentId = ""
+        this.wEngineId = ""
+        this.result = null
+        this.outOfCombat = null
         return
       }
       this.applyAgentConfig(agent.id, meta, savedConfigForAgent(agent.id))
     },
     applyAgentConfig(agentId: string, meta: any, config: any = {}) {
-      const agent = meta?.agents?.find((item: any) => item.id === agentId)
+      const agent = displayAgents(meta).find((item: any) => item.id === agentId)
       if (!agent) {
         return
       }
-      const wEngineId = defaultWEngineIdForAgent(meta?.wEngines ?? [], agentId, config.wEngineId)
-      const wEngine = meta?.wEngines?.find((item: any) => item.id === wEngineId)
+      const availableWEngines = displayWEngines(meta)
+      const wEngineId = defaultWEngineIdForAgent(availableWEngines, agentId, config.wEngineId)
+      const wEngine = availableWEngines.find((item: any) => item.id === wEngineId)
       const combat = config.combat ?? {}
+      const rawDamageConfig = config.damage ?? config.damageConfig
 
       this.agentId = agent.id
       this.agentLevel = numeric(config.agentLevel, 60)
@@ -562,13 +663,32 @@ export const useBuildStore = defineStore("build", {
       this.wEngineId = wEngineId
       this.wEngineLevel = numeric(config.wEngineLevel, 60)
       this.wEngineModificationLevel = clampWEngineModificationLevel(config.wEngineModificationLevel ?? 1, wEngine)
-      this.selectedBuffIds = stringArray(combat.activeBuffIds ?? config.selectedBuffIds)
-      this.addedBuffs = Array.isArray(combat.addedBuffs ?? config.addedBuffs) ? clone(combat.addedBuffs ?? config.addedBuffs) : []
-      this.runtimeInputs = combat.runtimeInputs ?? config.runtimeInputs ?? {}
+      const rawTargetConfig = config.targetConfig ?? rawDamageConfig?.target ?? rawDamageConfig?.targetConfig ?? {}
+      const legacyBossEncounterId = String(rawTargetConfig?.bossEncounterId ?? "")
+      const rawSelectedBuffIds = stringArray(combat.activeBuffIds ?? config.selectedBuffIds)
+      const selectedWithLegacyBoss = legacyBossEncounterId && !rawSelectedBuffIds.includes(legacyBossEncounterId)
+        ? [...rawSelectedBuffIds, legacyBossEncounterId]
+        : rawSelectedBuffIds
+      const normalizedBossSelection = normalizeBossBuffSelection(
+        selectedWithLegacyBoss,
+        combat.runtimeInputs ?? config.runtimeInputs ?? {},
+        meta,
+        legacyBossEncounterId,
+      )
+      this.selectedBuffIds = normalizedBossSelection.selectedIds
+      this.addedBuffs = normalizeAddedBuffs(combat.addedBuffs ?? config.addedBuffs, meta)
+      this.runtimeInputs = normalizedBossSelection.runtimeInputs
       this.manuallyUncheckedDefaultBuffIds = stringArray(combat.manuallyUncheckedDefaultBuffIds)
-      const rawDamageConfig = config.damage ?? config.damageConfig
-      this.damageConfig = normalizeDamageConfig(rawDamageConfig, agent, this.cinemaLevel)
-      this.targetConfig = normalizeTargetConfig(config.targetConfig ?? rawDamageConfig?.target ?? rawDamageConfig?.targetConfig)
+      this.damageConfig = normalizeDamageConfig({
+        ...(rawDamageConfig ?? {}),
+        target: rawDamageConfig?.target ?? rawTargetConfig,
+      }, agent, this.cinemaLevel)
+      this.targetConfig = normalizeTargetConfig(legacyBossEncounterId ? {
+        ...rawTargetConfig,
+        presetId: "normal-boss",
+        defense: 953,
+        resistanceByElement: Object.fromEntries(ELEMENTS.map(element => [element, 0])),
+      } : rawTargetConfig)
       this.discMode = normalizeDiscMode(config.discMode ?? config.driveDiscMode ?? config.mode)
       this.manualDriveDiscIdsBySlot = stringRecord(
         config.manualDriveDiscIdsBySlot
@@ -579,8 +699,8 @@ export const useBuildStore = defineStore("build", {
       this.selectedOptimizedRank = numeric(config.selectedOptimizedRank, 0)
     },
     wEnginesForAgent(meta: any) {
-      const agent = meta?.agents?.find((item: any) => item.id === this.agentId)
-      return sortWEnginesForAgent(meta?.wEngines ?? [], agent)
+      const agent = displayAgents(meta).find((item: any) => item.id === this.agentId)
+      return sortWEnginesForAgent(displayWEngines(meta), agent)
     },
     selectAgent(agentId: string, meta: any) {
       this.applyAgentConfig(agentId, meta, savedConfigForAgent(agentId))
@@ -596,7 +716,7 @@ export const useBuildStore = defineStore("build", {
       this.persist()
     },
     selectWEngine(id: string, meta: any) {
-      const wEngine = meta?.wEngines?.find((item: any) => item.id === id)
+      const wEngine = displayWEngines(meta).find((item: any) => item.id === id)
       if (!wEngine) {
         return
       }
@@ -631,6 +751,10 @@ export const useBuildStore = defineStore("build", {
       this.targetConfig = normalizeTargetConfig(target)
       this.persist()
     },
+    setRuntimeInputs(runtimeInputs: Record<string, any>) {
+      this.runtimeInputs = runtimeInputs && typeof runtimeInputs === "object" ? runtimeInputs : {}
+      this.persist()
+    },
     upsertDamageEvent(event: any) {
       const next = normalizeDamageEvent(event)
       const events = [...(this.damageConfig.events ?? [])]
@@ -656,14 +780,15 @@ export const useBuildStore = defineStore("build", {
     },
     applyBuffState(payload: any, meta: any) {
       const selectedIds = stringArray(payload?.selectedBuffIds ?? payload?.activeBuffIds)
-      const addedBuffs = Array.isArray(payload?.addedBuffs) ? clone(payload.addedBuffs) : this.addedBuffs
+      const addedBuffs = Array.isArray(payload?.addedBuffs) ? normalizeAddedBuffs(payload.addedBuffs, meta) : this.addedBuffs
       const runtimeInputs = payload?.runtimeInputs && typeof payload.runtimeInputs === "object"
         ? payload.runtimeInputs
         : this.runtimeInputs
       const defaultIds = this.defaultBuffIds(meta)
-      this.selectedBuffIds = selectedIds.filter(id => !defaultIds.includes(id))
+      const normalizedBossSelection = normalizeBossBuffSelection(selectedIds, runtimeInputs, meta)
+      this.selectedBuffIds = normalizedBossSelection.selectedIds.filter(id => !defaultIds.includes(id))
       this.addedBuffs = addedBuffs
-      this.runtimeInputs = runtimeInputs
+      this.runtimeInputs = normalizedBossSelection.runtimeInputs
       this.manuallyUncheckedDefaultBuffIds = defaultIds.filter(id => !selectedIds.includes(id))
       this.persist()
     },
@@ -675,8 +800,9 @@ export const useBuildStore = defineStore("build", {
     activeBuffIds(meta: any, catalog: any = null, driveDiscs: any[] = []) {
       const unchecked = new Set(this.manuallyUncheckedDefaultBuffIds)
       const defaults = this.defaultBuffIds(meta).filter(id => !unchecked.has(id))
+      const legacyWEngineTeamIds = activeWEngineTeamReferences(this.addedBuffs, meta).map(item => String(item.id))
       const driveDiscBuffIds = catalog ? activeDriveDisc4pcBuffIds(catalog, driveDiscs) : []
-      return [...new Set([...defaults, ...this.selectedBuffIds, ...driveDiscBuffIds])]
+      return [...new Set([...defaults, ...this.selectedBuffIds, ...legacyWEngineTeamIds, ...driveDiscBuffIds])]
     },
     setDiscMode(mode: DiscMode) {
       this.discMode = normalizeDiscMode(mode)
@@ -755,7 +881,7 @@ export const useBuildStore = defineStore("build", {
           manualStats: customManualStats(this.addedBuffs, meta),
           manualEffects: customManualEffects(this.addedBuffs),
           runtimeInputs: normalizedRuntimeInputs,
-          wEngineTeamModificationLevels: wEngineTeamModificationLevelsFromAddedBuffs(this.addedBuffs),
+          wEngineTeamModificationLevels: wEngineTeamModificationLevelsFromAddedBuffs(this.addedBuffs, meta),
         },
         damage: {
           ...expandedDamage,

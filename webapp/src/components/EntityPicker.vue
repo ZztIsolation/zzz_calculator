@@ -66,8 +66,8 @@ function metaOf(item: any) {
         >
           <ImageAvatar :src="iconForEntity(item, kind)" :name="labelOf(item)" :round="kind === 'agent' || kind === 'buff'" />
           <span>
-            <span class="entity-name">{{ labelOf(item) }}</span>
-            <span class="entity-meta">{{ metaOf(item) }}</span>
+            <span class="entity-name" :title="labelOf(item)">{{ labelOf(item) }}</span>
+            <span class="entity-meta" :title="metaOf(item)">{{ metaOf(item) }}</span>
           </span>
         </button>
       </div>

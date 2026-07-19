@@ -9,6 +9,7 @@ export const router = createRouter({
     { path: "/", name: "workbench", component: () => import("@/views/WorkbenchView.vue") },
     { path: "/discs", name: "discs", component: () => import("@/views/DiscsView.vue") },
     { path: "/accounts", name: "accounts", component: () => import("@/views/AccountsView.vue") },
+    { path: "/settings", name: "settings", component: () => import("@/views/SettingsView.vue") },
     ...(includeMaintenance
       ? [{ path: "/maintenance", name: "maintenance", component: () => import("@/views/MaintenanceView.vue") }]
       : []),

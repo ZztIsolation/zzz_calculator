@@ -22,6 +22,13 @@ function collectAssetPaths(value, output) {
     }
 }
 
+function containsObjectKey(value, targetKey) {
+    if (Array.isArray(value)) return value.some(item => containsObjectKey(item, targetKey))
+    if (!value || typeof value !== "object") return false
+    if (Object.hasOwn(value, targetKey)) return true
+    return Object.values(value).some(item => containsObjectKey(item, targetKey))
+}
+
 const trackedFiles = execFileSync("git", ["ls-files"], {
     cwd: rootDir,
     encoding: "utf8",
@@ -31,6 +38,7 @@ const referencedAssets = new Set()
 for (const trackedPath of trackedFiles.filter(fileName => /^data\/[^/]+\.json$/.test(fileName))) {
     const value = JSON.parse(await readFile(path.join(rootDir, trackedPath), "utf8"))
     collectAssetPaths(value, referencedAssets)
+    assert.equal(containsObjectKey(value, "appliesTo"), false, `${trackedPath} must not persist legacy appliesTo filters`)
 }
 
 assert.ok(referencedAssets.size > 0, "catalog data should reference local assets")
@@ -48,15 +56,32 @@ for (const prefix of ["frontend/", "dist/", "output/", "downloads/", ".claude/"]
 
 const webappPackage = JSON.parse(await readFile(path.join(rootDir, "webapp", "package.json"), "utf8"))
 const scannerManifest = JSON.parse(await readFile(path.join(rootDir, "config", "scanner-manifest.json"), "utf8"))
+const helperManifest = JSON.parse(await readFile(path.join(rootDir, "config", "helper-manifest.json"), "utf8"))
 const directDependencies = {
     ...webappPackage.dependencies,
     ...webappPackage.devDependencies,
 }
 assert.equal("tailwindcss" in directDependencies, false)
 assert.equal("katex" in directDependencies, false)
-assert.equal(scannerManifest.scannerVersion, "1.0.36")
-assert.equal(scannerManifest.packageUrls.some(url => /^https:\/\//.test(url)), true)
-assert.match(scannerManifest.sha256, /^[a-f0-9]{64}$/)
-assert.equal(scannerManifest.size, 47231570)
+assert.equal(scannerManifest.schemaVersion, 3)
+assert.equal(scannerManifest.launcherMinVersion, "1.2.1")
+assert.equal(scannerManifest.scannerVersion, "1.0.38")
+assert.equal(helperManifest.schemaVersion, 1)
+assert.equal(helperManifest.version, "1.2.1")
+assert.match(helperManifest.sha256, /^[a-f0-9]{64}$/)
+assert.ok(helperManifest.size > 0)
+assert.equal(scannerManifest.support.minWindowsBuild, 17763)
+assert.deepEqual(scannerManifest.support.architectures, ["x64"])
+assert.deepEqual(scannerManifest.packages.map(packageInfo => packageInfo.id), ["win-x64-fdd", "win-x64-self-contained"])
+for (const packageInfo of scannerManifest.packages) {
+    assert.equal(packageInfo.packageUrls.some(url => /^https:\/\//.test(url)), true)
+    assert.match(packageInfo.sha256, /^[a-f0-9]{64}$/)
+    assert.ok(packageInfo.size > 0)
+    assert.ok(packageInfo.expandedSize >= packageInfo.size)
+    assert.ok(Array.isArray(packageInfo.files) && packageInfo.files.length > 0)
+    assert.equal(packageInfo.files.reduce((sum, file) => sum + file.size, 0), packageInfo.expandedSize)
+}
+assert.ok(scannerManifest.packages[0].size <= 25 * 1024 * 1024)
+assert.ok(scannerManifest.packages[1].size <= 90 * 1024 * 1024)
 
 console.log(`repository integrity: ok (${referencedAssets.size} catalog assets verified)`)

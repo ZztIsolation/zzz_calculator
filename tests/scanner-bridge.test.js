@@ -46,34 +46,39 @@ async function loadBridge() {
 function assertScannerPackageManifest() {
     const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)))
     const scannerRoot = join(repoRoot, "downloads", "zzz-scanner")
-    const manifestPath = join(scannerRoot, "manifest.json")
-    if (!existsSync(manifestPath)) {
-        return
-    }
-
+    const manifestPath = join(repoRoot, "config", "scanner-manifest.json")
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
-    const localPackageUrl = "./1.0.36/ZZZ-Scanner.Next-win-x64.zip"
-    const githubPackageUrl = "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.36/ZZZ-Scanner.Next-win-x64.zip"
-    const mirrorPackageUrl = "http://121.199.21.10/downloads/zzz-scanner/1.0.36/ZZZ-Scanner.Next-win-x64.zip"
-    const packagePath = normalize(join(scannerRoot, localPackageUrl))
+    const helperManifest = JSON.parse(readFileSync(join(repoRoot, "config", "helper-manifest.json"), "utf8"))
+    assert.equal(manifest.schemaVersion, 3)
+    assert.equal(manifest.launcherMinVersion, "1.2.1")
+    assert.equal(manifest.scannerVersion, "1.0.38")
+    assert.equal(helperManifest.schemaVersion, 1)
+    assert.equal(helperManifest.version, "1.2.1")
+    assert.equal(manifest.support.minWindowsBuild, 17763)
+    assert.deepEqual(manifest.support.architectures, ["x64"])
+    assert.deepEqual(manifest.packages.map(packageInfo => packageInfo.id), ["win-x64-fdd", "win-x64-self-contained"])
+    assert.equal(manifest.packages[0].framework.name, "Microsoft.WindowsDesktop.App")
+    assert.equal(manifest.packages[1].framework, undefined)
 
-    assert.equal(manifest.scannerVersion, "1.0.36")
-    assert.equal(manifest.packageUrl, localPackageUrl)
-    assert.ok(Array.isArray(manifest.packageUrls))
-    assert.equal(manifest.packageUrls[0], manifest.packageUrl)
-    assert.ok(manifest.packageUrls.includes(localPackageUrl))
-    assert.ok(manifest.packageUrls.includes(githubPackageUrl))
-    assert.equal(manifest.packageUrls.includes(mirrorPackageUrl), false)
-    assert.equal(manifest.entry, "ZZZ-Scanner.Next.exe")
-    assert.equal(existsSync(join(scannerRoot, "1.0.0")), false)
-    assert.equal(existsSync(join(scannerRoot, "1.0.1")), false)
-    assert.equal(existsSync(join(scannerRoot, "1.0.3")), false)
-    assert.equal(existsSync(join(scannerRoot, "1.0.27")), false)
-    assert.equal(existsSync(packagePath), true)
+    for (const packageInfo of manifest.packages) {
+        assert.ok(packageInfo.size > 0)
+        assert.ok(packageInfo.expandedSize >= packageInfo.size)
+        assert.equal(packageInfo.entry, "ZZZ-Scanner.Next.exe")
+        assert.ok(packageInfo.packageUrls.some(url => url.startsWith("./1.0.38/")))
+        assert.ok(packageInfo.packageUrls.some(url => url.startsWith("https://github.com/")))
+        assert.equal(packageInfo.packageUrls.some(url => url.startsWith("http://121.199.21.10")), false)
+        assert.ok(packageInfo.files.length > 0)
+        assert.equal(packageInfo.files.reduce((sum, file) => sum + file.size, 0), packageInfo.expandedSize)
+        assert.ok(packageInfo.files.some(file => file.path === packageInfo.entry))
 
-    const packageStat = statSync(packagePath)
-    assert.equal(packageStat.size, manifest.size)
-    assert.equal(createHash("sha256").update(readFileSync(packagePath)).digest("hex"), manifest.sha256)
+        const localUrl = packageInfo.packageUrls.find(url => url.startsWith("./"))
+        const packagePath = normalize(join(scannerRoot, localUrl))
+        if (existsSync(packagePath)) {
+            const packageStat = statSync(packagePath)
+            assert.equal(packageStat.size, packageInfo.size)
+            assert.equal(createHash("sha256").update(readFileSync(packagePath)).digest("hex"), packageInfo.sha256)
+        }
+    }
 }
 
 try {
@@ -97,7 +102,7 @@ try {
         }
         send(raw) {
             this.sent = JSON.parse(raw)
-            if (this.sent.cmd === "ensure_scanner") {
+            if (["ensure_scanner", "repair_scanner", "restart_scanner_elevated"].includes(this.sent.cmd)) {
                 queueMicrotask(() => this.onmessage?.({
                     data: JSON.stringify({ cmd: "scanner_ready", data: { installed: true } }),
                 }))
@@ -115,6 +120,22 @@ try {
     assert.equal(HelperSocket.last.url, "ws://127.0.0.1:22355/ws/abc")
     await bridge.ensureScanner()
     assert.equal(HelperSocket.last.sent.cmd, "ensure_scanner")
+    await bridge.repairScanner()
+    assert.equal(HelperSocket.last.sent.cmd, "repair_scanner")
+    await bridge.restartScannerElevated()
+    assert.equal(HelperSocket.last.sent.cmd, "restart_scanner_elevated")
+    bridge.openLogFolder()
+    assert.equal(HelperSocket.last.sent.cmd, "open_log_folder")
+
+    let structuredError = null
+    bridge.onError = data => { structuredError = data }
+    HelperSocket.last.onmessage({
+        data: JSON.stringify({
+            cmd: "scan_error",
+            data: { code: "disk_insufficient", phase: "preflight", message: "磁盘空间不足" },
+        }),
+    })
+    assert.equal(structuredError.code, "disk_insufficient")
     bridge.startScan({ maxItems: 12, rarities: ["S", "A"] })
     assert.deepEqual(HelperSocket.last.sent, {
         cmd: "scan_req",

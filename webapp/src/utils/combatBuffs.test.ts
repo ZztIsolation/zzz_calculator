@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   buffLabelForId,
   buildCombatBuffGroups,
+  teamWEngineBuffCandidates,
   teammateDriveDiscSetIdsFromBuffIds,
 } from "@/utils/combatBuffs"
 
@@ -50,7 +51,13 @@ describe("combat buff display helpers", () => {
         effect: {
           teamBuff: {
             scope: "inCombat",
-            effects: [{ id: "team", type: "fixed", stat: "atkFlat", value: 5 }],
+            effects: [{
+              id: "team",
+              type: "fixed",
+              stat: "atkFlat",
+              value: 5,
+              modificationValues: { value: [5, 10, 15, 20, 25] },
+            }],
           },
         },
       },
@@ -80,6 +87,13 @@ describe("combat buff display helpers", () => {
       name: { zhCN: "极境彻风" },
       description: { zhCN: "场地 Buff" },
       effects: [{ id: "field-dmg", type: "fixed", stat: "dmgBonus", value: 10 }],
+    }, {
+      id: "boss.encounter.a",
+      bossId: "boss.a",
+      sourceType: "boss",
+      bossName: { zhCN: "测试 Boss" },
+      appearances: [{ modeId: "critical_assault", gameVersion: "3.0", phaseNo: 3 }],
+      effects: [{ id: "boss-dmg", type: "fixed", stat: "dmgBonus", value: 10 }],
     }],
   }
   const driveDiscSets = [{
@@ -116,6 +130,7 @@ describe("combat buff display helpers", () => {
     expect(groups.teammateWEngine.map(item => item.id)).toEqual(["wEngine:engine_team.team"])
     expect(groups.teammateDriveDisc.map(item => item.id)).toEqual(["teammateDriveDisc4pc:set_a"])
     expect(groups.field.map(item => item.id)).toEqual(["field.defense_v5.v3_0.p2.jijing_chefeng"])
+    expect(groups.boss.map(item => item.id)).toEqual(["boss.encounter.a"])
     expect(groups.field[0].period.gameVersion).toBe("3.0")
     expect(groups.field[0].period.phaseNo).toBe(2)
     expect(groups.self[0].agentImages?.portrait).toBe("/assets/agents/agent-a.png")
@@ -140,5 +155,105 @@ describe("combat buff display helpers", () => {
     expect(buffLabelForId("driveDisc4pc:set_a.self", context)).toBe("队友套装 4 件套（自身）")
     expect(buffLabelForId("driveDisc4pc:set_a.team", context)).toBe("队友套装 4 件套（团队）")
     expect(teammateDriveDiscSetIdsFromBuffIds(["teammateDriveDisc4pc:set_a"])).toEqual(["set_a"])
+  })
+
+  it("materializes teammate w-engine candidates at their independent refinement level", () => {
+    const candidateAt = (level?: number) => teamWEngineBuffCandidates(
+      meta,
+      "engine_self",
+      level === undefined
+        ? []
+        : [{
+            id: "wEngine:engine_team.team",
+            sourceCategory: "wEngine",
+            sourceKind: "wEngineTeam",
+            wEngineModificationLevel: level,
+          }],
+    )[0]
+
+    const rank1 = candidateAt()
+    const rank3 = candidateAt(3)
+    const rank5 = candidateAt(5)
+
+    expect(rank1).toEqual(expect.objectContaining({
+      id: "wEngine:engine_team.team",
+      isTeammateWEngine: true,
+      wEngineModificationLevel: 1,
+      wEngineModificationMin: 1,
+      wEngineModificationMax: 5,
+    }))
+    expect(rank1.effects[0].value).toBe(5)
+    expect(rank3.effects[0].value).toBe(15)
+    expect(rank5.effects[0].value).toBe(25)
+
+    const rangedMeta = {
+      ...meta,
+      wEngines: meta.wEngines.map(wEngine => wEngine.id === "engine_team"
+        ? { ...wEngine, modification: { minLevel: 2, maxLevel: 4, defaultLevel: 2 } }
+        : wEngine),
+    }
+    expect(teamWEngineBuffCandidates(rangedMeta, "engine_self")[0]).toEqual(expect.objectContaining({
+      wEngineModificationLevel: 2,
+      wEngineModificationMin: 2,
+      wEngineModificationMax: 4,
+    }))
+  })
+
+  it("keeps teammate w-engine references out of custom rows and includes refinement in labels", () => {
+    const addedBuffs = [
+      {
+        id: "wEngine:engine_team.team",
+        sourceCategory: "wEngine",
+        sourceKind: "wEngineTeam",
+        wEngineModificationLevel: 5,
+      },
+      {
+        id: "custom-a",
+        sourceCategory: "custom",
+        sourceKind: "custom",
+        name: { zhCN: "自定义 A" },
+        stats: [{ stat: "atkFlat", value: 10 }],
+      },
+    ]
+    const context = {
+      meta,
+      driveDiscSets,
+      agentId: "agent_a",
+      cinemaLevel: 1,
+      wEngineId: "engine_self",
+      wEngineModificationLevel: 1,
+      addedBuffs,
+    }
+
+    const groups = buildCombatBuffGroups(context)
+
+    expect(groups.custom.map(item => item.id)).toEqual(["custom-a"])
+    expect(groups.teammateWEngine[0].wEngineModificationLevel).toBe(5)
+    expect(buffLabelForId("wEngine:engine_team.team", context)).toBe("队友音擎（队友携带） · 精 5")
+  })
+
+  it("merges rich Boss archive metadata into generic combat Buff candidates", () => {
+    const richMeta = {
+      ...meta,
+      bossCombatBuffs: [{
+        id: "boss.encounter.a",
+        sourceType: "boss",
+        bossId: "boss.a",
+        bossName: { zhCN: "测试 Boss" },
+        target: { defense: 952, weaknessElements: ["ice"], resistanceElements: ["fire"] },
+        playerBuffs: [{ id: "boss-player-buff", calculationStatus: "modeled" }],
+        playerDebuffs: [],
+        appearances: [{ modeId: "critical_assault", gameVersion: "3.0", phaseNo: 3 }],
+      }],
+    }
+
+    const groups = buildCombatBuffGroups({ meta: richMeta })
+
+    expect(groups.boss[0]).toEqual(expect.objectContaining({
+      id: "boss.encounter.a",
+      target: expect.objectContaining({ defense: 952 }),
+      playerBuffs: [expect.objectContaining({ id: "boss-player-buff" })],
+    }))
+    expect(groups.boss[0].effects).toHaveLength(1)
   })
 })

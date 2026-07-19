@@ -103,13 +103,7 @@
             "zhCN": "核心被动"
           },
           "description": {
-            "zhCN": "进入战场时，获得[合道]效果，暴击率提升30%，造成的伤害提升25%。"
-          },
-          "coverage": {
-            "default": 1,
-            "min": 0,
-            "max": 1,
-            "step": 0.1
+            "zhCN": "进入战场时，获得[合道]效果，暴击率提升30%，造成的伤害提升25%；\n[以太帷幕·决裁]持续期间，叶瞬光使用敌人进入帷幕时的失衡易伤倍率计算帷幕易伤，帷幕易伤加成上限为110%。"
           },
           "effects": [
             {
@@ -120,6 +114,12 @@
               "mode": "flat",
               "target": {
                 "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             },
             {
@@ -130,6 +130,108 @@
               "mode": "flat",
               "target": {
                 "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "curtain-vulnerability-cap",
+              "type": "fixed",
+              "stat": "stunDmgMultiplierBonusCapAlways",
+              "value": 110,
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ye_shunguang",
+                    "categoryId": "basic",
+                    "skillType": "basic",
+                    "moveId": "clarity_parting_water"
+                  },
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ye_shunguang",
+                    "categoryId": "basic",
+                    "skillType": "basic",
+                    "moveId": "clarity_soaring"
+                  },
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ye_shunguang",
+                    "categoryId": "basic",
+                    "skillType": "basic",
+                    "moveId": "clarity_cut_light_extreme"
+                  },
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ye_shunguang",
+                    "categoryId": "basic",
+                    "skillType": "basic",
+                    "moveId": "clarity_cut_light"
+                  },
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ye_shunguang",
+                    "categoryId": "basic",
+                    "skillType": "basic",
+                    "moveId": "clarity_cut_light_annihilation"
+                  },
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ye_shunguang",
+                    "categoryId": "assist",
+                    "skillType": "assist",
+                    "moveId": "clarity_quick_assist_response"
+                  },
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ye_shunguang",
+                    "categoryId": "assist",
+                    "skillType": "assist",
+                    "moveId": "clarity_assist_followup_unity"
+                  },
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ye_shunguang",
+                    "categoryId": "special",
+                    "skillType": "special",
+                    "moveId": "clarity_brush_sleeve"
+                  },
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ye_shunguang",
+                    "categoryId": "special",
+                    "skillType": "special",
+                    "moveId": "ex_clarity_flying_light"
+                  },
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ye_shunguang",
+                    "categoryId": "special",
+                    "skillType": "special",
+                    "moveId": "ex_clarity_return_dust"
+                  },
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ye_shunguang",
+                    "categoryId": "chain",
+                    "skillType": "chain",
+                    "moveId": "chain_clarity_pull_thunder"
+                  },
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "ye_shunguang",
+                    "categoryId": "chain",
+                    "skillType": "ultimate",
+                    "moveId": "ultimate_cut_delusion_open_heaven"
+                  }
+                ]
               }
             }
           ],
@@ -147,12 +249,6 @@
             },
             "scope": "inCombat",
             "defaultChecked": false,
-            "coverage": {
-              "default": 1,
-              "min": 0,
-              "max": 1,
-              "step": 0.1
-            },
             "effects": [
               {
                 "id": "effect-1",
@@ -162,6 +258,12 @@
                 "mode": "flat",
                 "target": {
                   "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
                 }
               },
               {
@@ -172,6 +274,12 @@
                 "mode": "flat",
                 "target": {
                   "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
                 }
               }
             ],
@@ -187,33 +295,129 @@
             },
             "scope": "inCombat",
             "defaultChecked": false,
-            "coverage": {
-              "default": 1,
-              "min": 0,
-              "max": 1,
-              "step": 0.1
-            },
             "effects": [
               {
                 "id": "effect-1",
                 "type": "fixed",
-                "stat": "enemyDefReduction",
+                "stat": "enemyDefIgnore",
                 "value": 40,
                 "mode": "flat",
                 "target": {
                   "kind": "skill",
                   "skillTargets": [
                     {
+                      "kind": "specific",
                       "agentSkillId": "ye_shunguang",
                       "categoryId": "special",
+                      "skillType": "special",
                       "moveId": "ex_clarity_flying_light"
                     },
                     {
+                      "kind": "specific",
                       "agentSkillId": "ye_shunguang",
                       "categoryId": "chain",
+                      "skillType": "ultimate",
                       "moveId": "ultimate_cut_delusion_open_heaven"
                     }
                   ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 4,
+            "cinemaName": {
+              "zhCN": "共黯尘"
+            },
+            "description": {
+              "zhCN": "进入战场时，获得1000点喧响值，在勘域模式中此效果180秒内最多触发一次；\n[以太帷幕·决裁]提供的帷幕易伤加成上限提升至200%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [],
+            "buffModifiers": [
+              {
+                "id": "curtain-vulnerability-cap-amplify",
+                "operation": "multiplyResolvedValue",
+                "factor": 1.8181818181818181,
+                "targetBuffIds": [
+                  "agent:ye_shunguang.corePassive"
+                ],
+                "targetEffectIds": [
+                  "curtain-vulnerability-cap"
+                ],
+                "label": {
+                  "zhCN": "帷幕易伤加成上限提升至200%"
+                }
+              }
+            ]
+          },
+          {
+            "cinemaLevel": 6,
+            "cinemaName": {
+              "zhCN": "明灯愿"
+            },
+            "description": {
+              "zhCN": "进入战场时，获得2层[明灯愿]；每次进入[明心境]状态会获得1层[明灯愿]，至多叠加4层；\n拥有3层[明灯愿]时，将[强化特殊技：明心境·归尘]替换为[终结技：斩妄开天]，发动时消耗3层[明灯愿]；\n[强化特殊技：明心境·归尘]和[终结技：斩妄开天]最后一击额外造成1500%攻击力的物理伤害。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "return-dust-final-hit",
+                "type": "fixed",
+                "stat": "skillMultiplierBonus",
+                "value": 1500,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "kind": "specific",
+                      "agentSkillId": "ye_shunguang",
+                      "categoryId": "special",
+                      "skillType": "special",
+                      "moveId": "ex_clarity_return_dust"
+                    }
+                  ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              },
+              {
+                "id": "cut-delusion-final-hit",
+                "type": "fixed",
+                "stat": "skillMultiplierBonus",
+                "value": 1500,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "kind": "specific",
+                      "agentSkillId": "ye_shunguang",
+                      "categoryId": "chain",
+                      "skillType": "ultimate",
+                      "moveId": "ultimate_cut_delusion_open_heaven"
+                    }
+                  ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
                 }
               }
             ],
@@ -364,7 +568,8 @@
         }
       },
       "sources": [
-        "https://wiki.biligame.com/zzz/%E5%8F%B6%E7%9E%AC%E5%85%89"
+        "https://wiki.biligame.com/zzz/%E5%8F%B6%E7%9E%AC%E5%85%89",
+        "https://baike.mihoyo.com/zzz/wiki/content/1687/detail?mhy_presentation_style=fullscreen"
       ],
       "verification": {
         "level60Stats": "source-checked",
@@ -474,6 +679,58 @@
               }
             ],
             "selectedEventId": "direct-1"
+          },
+          {
+            "mode": "custom",
+            "cinemaLevel": 6,
+            "name": {
+              "zhCN": "6影叶12变6大"
+            },
+            "events": [
+              {
+                "id": "direct-1",
+                "kind": "skillGroup",
+                "skillGroupId": "skill_group_2",
+                "count": 12
+              },
+              {
+                "id": "direct-2",
+                "kind": "direct",
+                "count": 6,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "ye_shunguang",
+                  "categoryId": "chain",
+                  "moveId": "ultimate_cut_delusion_open_heaven",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "direct-3",
+                "kind": "direct",
+                "count": 2,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "ye_shunguang",
+                  "categoryId": "chain",
+                  "moveId": "ultimate_chase_cloud_thunder",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "direct-4",
+                "kind": "direct",
+                "count": 6,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "ye_shunguang",
+                  "categoryId": "special",
+                  "moveId": "ex_clarity_return_dust",
+                  "rowId": "damage"
+                }
+              }
+            ],
+            "selectedEventId": "direct-1"
           }
         ]
       },
@@ -485,7 +742,7 @@
           },
           "defaultCount": 1,
           "minCount": 0,
-          "maxCount": 30,
+          "maxCount": 100,
           "step": 1,
           "events": [
             {
@@ -557,7 +814,7 @@
           },
           "defaultCount": 1,
           "minCount": 0,
-          "maxCount": 30,
+          "maxCount": 100,
           "step": 1,
           "events": [
             {
@@ -663,12 +920,6 @@
           "description": {
             "zhCN": "队伍中存在「支援」角色或与自身阵营相同的角色时触发：\n「普通攻击：霜月」造成的伤害提升60%；队伍中任意角色触发「紊乱」效果时，星见雅获得2点「落霜」，且在下一次「霜月架势」期间，「普通攻击：霜月」将无视目标30%冰属性伤害抗性。"
           },
-          "coverage": {
-            "default": 1,
-            "min": 0,
-            "max": 1,
-            "step": 0.1
-          },
           "effects": [
             {
               "id": "effect-1",
@@ -680,11 +931,19 @@
                 "kind": "skill",
                 "skillTargets": [
                   {
+                    "kind": "specific",
                     "agentSkillId": "hoshimi_miyabi",
                     "categoryId": "basic",
+                    "skillType": "basic",
                     "moveId": "frost_moon"
                   }
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             },
             {
@@ -697,11 +956,19 @@
                 "kind": "skill",
                 "skillTargets": [
                   {
+                    "kind": "specific",
                     "agentSkillId": "hoshimi_miyabi",
                     "categoryId": "basic",
+                    "skillType": "basic",
                     "moveId": "frost_moon"
                   }
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -718,12 +985,6 @@
             },
             "scope": "inCombat",
             "defaultChecked": false,
-            "coverage": {
-              "default": 1,
-              "min": 0,
-              "max": 1,
-              "step": 0.1
-            },
             "effects": [
               {
                 "id": "effect-1",
@@ -735,12 +996,20 @@
                   "kind": "skill",
                   "skillTargets": [
                     {
+                      "kind": "specific",
                       "agentSkillId": "hoshimi_miyabi",
                       "categoryId": "basic",
+                      "skillType": "basic",
                       "moveId": "frost_moon",
                       "rowId": "charge_1"
                     }
                   ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
                 }
               },
               {
@@ -753,12 +1022,20 @@
                   "kind": "skill",
                   "skillTargets": [
                     {
+                      "kind": "specific",
                       "agentSkillId": "hoshimi_miyabi",
                       "categoryId": "basic",
+                      "skillType": "basic",
                       "moveId": "frost_moon",
                       "rowId": "charge_2"
                     }
                   ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
                 }
               },
               {
@@ -771,12 +1048,20 @@
                   "kind": "skill",
                   "skillTargets": [
                     {
+                      "kind": "specific",
                       "agentSkillId": "hoshimi_miyabi",
                       "categoryId": "basic",
+                      "skillType": "basic",
                       "moveId": "frost_moon",
                       "rowId": "charge_3"
                     }
                   ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
                 }
               }
             ],
@@ -792,12 +1077,6 @@
             },
             "scope": "inCombat",
             "defaultChecked": false,
-            "coverage": {
-              "default": 1,
-              "min": 0,
-              "max": 1,
-              "step": 0.1
-            },
             "effects": [
               {
                 "id": "effect-1",
@@ -809,21 +1088,33 @@
                   "kind": "skill",
                   "skillTargets": [
                     {
+                      "kind": "specific",
                       "agentSkillId": "hoshimi_miyabi",
                       "categoryId": "basic",
+                      "skillType": "basic",
                       "moveId": "windflower_opening"
                     },
                     {
+                      "kind": "specific",
                       "agentSkillId": "hoshimi_miyabi",
                       "categoryId": "basic",
+                      "skillType": "basic",
                       "moveId": "windflower_frost"
                     },
                     {
+                      "kind": "specific",
                       "agentSkillId": "hoshimi_miyabi",
                       "categoryId": "dodge",
+                      "skillType": "dodge",
                       "moveId": "dodge_counter_cold_sparrow"
                     }
                   ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
                 }
               },
               {
@@ -834,6 +1125,12 @@
                 "mode": "flat",
                 "target": {
                   "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
                 }
               }
             ],
@@ -849,12 +1146,6 @@
             },
             "scope": "inCombat",
             "defaultChecked": false,
-            "coverage": {
-              "default": 1,
-              "min": 0,
-              "max": 1,
-              "step": 0.1
-            },
             "effects": [
               {
                 "id": "effect-1",
@@ -866,11 +1157,19 @@
                   "kind": "skill",
                   "skillTargets": [
                     {
+                      "kind": "specific",
                       "agentSkillId": "hoshimi_miyabi",
                       "categoryId": "core_skill",
+                      "skillType": "core_skill",
                       "moveId": "frostburn_break"
                     }
                   ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
                 }
               }
             ],
@@ -886,12 +1185,6 @@
             },
             "scope": "inCombat",
             "defaultChecked": false,
-            "coverage": {
-              "default": 1,
-              "min": 0,
-              "max": 1,
-              "step": 0.1
-            },
             "effects": [
               {
                 "id": "effect-1",
@@ -903,11 +1196,19 @@
                   "kind": "skill",
                   "skillTargets": [
                     {
+                      "kind": "specific",
                       "agentSkillId": "hoshimi_miyabi",
                       "categoryId": "basic",
+                      "skillType": "basic",
                       "moveId": "frost_moon"
                     }
                   ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
                 }
               }
             ],
@@ -1311,7 +1612,7 @@
           },
           "defaultCount": 1,
           "minCount": 0,
-          "maxCount": 30,
+          "maxCount": 100,
           "step": 1,
           "events": [
             {
@@ -1392,12 +1693,6 @@
           "description": {
             "zhCN": "施展「普通攻击：玄墨极阵」、「普通攻击：青溟震击」、「强化特殊技」、「支援突击」、「连携技」、「终结技」造成的伤害提升60%。"
           },
-          "coverage": {
-            "default": 1,
-            "min": 0,
-            "max": 1,
-            "step": 0.1
-          },
           "effects": [
             {
               "id": "effect-1",
@@ -1409,31 +1704,51 @@
                 "kind": "skill",
                 "skillTargets": [
                   {
+                    "kind": "specific",
                     "agentSkillId": "yixuan",
                     "categoryId": "basic",
+                    "skillType": "basic",
                     "moveId": "xuanmo_formation"
                   },
                   {
+                    "kind": "specific",
                     "agentSkillId": "yixuan",
                     "categoryId": "basic",
+                    "skillType": "basic",
                     "moveId": "qingming_shock"
                   },
                   {
+                    "kind": "specific",
                     "agentSkillId": "yixuan",
                     "categoryId": "special",
-                    "moveId": ""
+                    "skillType": "special"
                   },
                   {
+                    "kind": "specific",
                     "agentSkillId": "yixuan",
                     "categoryId": "assist",
+                    "skillType": "assist",
                     "moveId": "assist_xiaoyun_swift_strike"
                   },
                   {
+                    "kind": "specific",
                     "agentSkillId": "yixuan",
                     "categoryId": "chain",
-                    "moveId": ""
+                    "skillType": "chain"
+                  },
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "yixuan",
+                    "categoryId": "chain",
+                    "skillType": "ultimate"
                   }
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -1447,12 +1762,6 @@
           "description": {
             "zhCN": "队伍中存在「击破」角色或「支援」角色或「防护」角色时触发：队友释放「终结技」时，仪玄持续回复2点「闪能」，持续10秒；仪玄被「极限支援」换下场时，自动追加一道落雷，造成仪玄225%贯穿力的玄墨伤害，并回复5点「闪能」；「强化特殊技：凝云术」与「强化特殊技：墨烬影消」命中失衡状态下的敌人时，造成的伤害提升30%；发动「终结技」后，仪玄进入「凝神」状态，「凝神」状态下，仪玄的暴击伤害提升40%，持续15秒。"
           },
-          "coverage": {
-            "default": 1,
-            "min": 0,
-            "max": 1,
-            "step": 0.1
-          },
           "effects": [
             {
               "id": "effect-1",
@@ -1462,6 +1771,12 @@
               "mode": "flat",
               "target": {
                 "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             },
             {
@@ -1474,16 +1789,26 @@
                 "kind": "skill",
                 "skillTargets": [
                   {
+                    "kind": "specific",
                     "agentSkillId": "yixuan",
                     "categoryId": "special",
+                    "skillType": "special",
                     "moveId": "cloud_condensing_art"
                   },
                   {
+                    "kind": "specific",
                     "agentSkillId": "yixuan",
                     "categoryId": "special",
+                    "skillType": "special",
                     "moveId": "ink_ember_shadow_dispel"
                   }
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -1500,12 +1825,6 @@
             },
             "scope": "inCombat",
             "defaultChecked": false,
-            "coverage": {
-              "default": 1,
-              "min": 0,
-              "max": 1,
-              "step": 0.1
-            },
             "effects": [
               {
                 "id": "effect-1",
@@ -1515,6 +1834,13 @@
                 "mode": "flat",
                 "target": {
                   "kind": "default"
+                },
+                "basis": "",
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
                 }
               }
             ],
@@ -1530,12 +1856,6 @@
             },
             "scope": "inCombat",
             "defaultChecked": false,
-            "coverage": {
-              "default": 1,
-              "min": 0,
-              "max": 1,
-              "step": 0.1
-            },
             "effects": [
               {
                 "id": "effect-1",
@@ -1547,19 +1867,24 @@
                   "kind": "skill",
                   "skillTargets": [
                     {
+                      "kind": "specific",
                       "agentSkillId": "yixuan",
                       "categoryId": "special",
-                      "moveId": ""
+                      "skillType": "special"
                     },
                     {
+                      "kind": "specific",
                       "agentSkillId": "yixuan",
                       "categoryId": "chain",
-                      "moveId": "",
-                      "moveIdPrefixes": [
-                        "ultimate_"
-                      ]
+                      "skillType": "ultimate"
                     }
                   ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
                 }
               }
             ],
@@ -1575,16 +1900,10 @@
             },
             "scope": "inCombat",
             "defaultChecked": false,
-            "coverage": {
-              "default": 1,
-              "min": 0,
-              "max": 1,
-              "step": 0.1
-            },
             "effects": [
               {
                 "id": "effect-1",
-                "type": "fixed",
+                "type": "stacked",
                 "stat": "dmgBonus",
                 "value": 60,
                 "mode": "flat",
@@ -1592,16 +1911,34 @@
                   "kind": "skill",
                   "skillTargets": [
                     {
+                      "kind": "specific",
                       "agentSkillId": "yixuan",
                       "categoryId": "special",
+                      "skillType": "special",
                       "moveId": "cloud_condensing_art"
                     },
                     {
+                      "kind": "specific",
                       "agentSkillId": "yixuan",
                       "categoryId": "special",
+                      "skillType": "special",
                       "moveId": "ink_ember_shadow_dispel"
                     }
                   ]
+                },
+                "sourceLabel": {
+                  "zhCN": "来源数值"
+                },
+                "defaultSourceValue": 0,
+                "ratio": 0,
+                "valuePerStack": 30,
+                "maxStacks": 2,
+                "defaultStacks": 2,
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
                 }
               }
             ],
@@ -1617,12 +1954,6 @@
             },
             "scope": "inCombat",
             "defaultChecked": false,
-            "coverage": {
-              "default": 1,
-              "min": 0,
-              "max": 1,
-              "step": 0.1
-            },
             "effects": [
               {
                 "id": "effect-1",
@@ -1632,6 +1963,12 @@
                 "mode": "flat",
                 "target": {
                   "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
                 }
               }
             ],
@@ -1823,7 +2160,7 @@
         }
       },
       "defaultCalculationConfig": {
-        "mode": "sheer",
+        "mode": "custom",
         "cinemaLevel": 0,
         "name": {
           "zhCN": "0影失衡双连携爆发"
@@ -2168,7 +2505,7 @@
       "faction": "怪啖屋",
       "images": {
         "portrait": "/assets/agents/alice_thymefield.png",
-        "source": "https://wiki.biligame.com/zzz/%E7%88%B1%E4%B8%BD%E4%B8%9D"
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/1385/detail?mhy_presentation_style=fullscreen"
       },
       "level60": {
         "hpBase": 7673,
@@ -2183,9 +2520,179 @@
         "penRatio": 0
       },
       "combatBuffs": {
-        "corePassive": null,
-        "additionalAbility": null,
-        "cinemaBuffs": []
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动：剑心双虹"
+          },
+          "description": {
+            "zhCN": "物理异常持续期间，每0.95秒额外造成该物理异常伤害2.5%的伤害；对处于物理异常状态的敌人触发紊乱时，每有1秒物理异常剩余时间，紊乱伤害倍率提升18%，最多提升180%。三段蓄力的「普通攻击：星芒圆舞曲」触发相当于原强击100%伤害的「极性强击」。"
+          },
+          "effects": [
+            {
+              "id": "disorder-multiplier-bonus",
+              "type": "stacked",
+              "stat": "disorderBaseMultiplierBonus",
+              "valuePerStack": 18,
+              "maxStacks": 10,
+              "defaultStacks": 10,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "additionalAbility": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "额外能力：寻奇猎幽"
+          },
+          "description": {
+            "zhCN": "队伍中存在另一名「异常」或「支援」角色时触发：若爱丽丝的异常掌控大于140点，每超过1点异常掌控会提升1.6点异常精通；队伍触发紊乱时回复30点「剑仪」，进入战场时获得300点「剑仪」。"
+          },
+          "effects": [
+            {
+              "id": "mastery-to-proficiency",
+              "type": "fixed",
+              "stat": "anomalyProficiencyPerMasteryAbove140",
+              "value": 1.6,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "cinemaBuffs": [
+          {
+            "cinemaLevel": 1,
+            "cinemaName": {
+              "zhCN": "掌心的芫荽"
+            },
+            "description": {
+              "zhCN": "触发「极性强击」时回复25点「剑仪」；触发「强击」时，目标防御力降低20%，持续30秒。默认计算按减防已触发处理。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "assault-defense-reduction",
+                "type": "fixed",
+                "stat": "enemyDefReduction",
+                "value": 20,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 2,
+            "cinemaName": {
+              "zhCN": "剑尖的鼠尾草"
+            },
+            "description": {
+              "zhCN": "「终结技：星芒终章」终结一击触发「极性强击」；全队造成的「强击」伤害提升15%；物理异常状态下的敌人被结算的「紊乱」伤害提升15%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "assault-damage-bonus",
+                "type": "fixed",
+                "stat": "anomalyDamageBonus",
+                "value": 15,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              },
+              {
+                "id": "physical-disorder-damage-bonus",
+                "type": "fixed",
+                "stat": "disorderDamageBonus",
+                "value": 15,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 4,
+            "cinemaName": {
+              "zhCN": "唇间的迷迭香"
+            },
+            "description": {
+              "zhCN": "爱丽丝无视目标10%物理伤害抗性；强化后的「普通攻击：星仪序曲」累积的物理异常积蓄值提升25%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "physical-res-ignore",
+                "type": "fixed",
+                "stat": "physicalResIgnore",
+                "value": 10,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 6,
+            "cinemaName": {
+              "zhCN": "心中的百里香"
+            },
+            "description": {
+              "zhCN": "发动三段蓄力的「普通攻击：星芒圆舞曲」或「终结技：星芒终章」时进入「决胜状态」30秒；队伍攻击命中后，爱丽丝发动等同于3300%异常精通的物理额外攻击，必定暴击，每秒最多1次、最多6次。默认6影循环按触发6次处理。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [],
+            "buffModifiers": []
+          }
+        ]
       },
       "coreSkill": {
         "name": {
@@ -2341,26 +2848,28 @@
         },
         "corePassiveMechanics": {
           "physicalAnomalyExtraDamageRatioPct": 2.5,
-          "disorderMultiplierBonusPerRemainingSecondPct": 18,
-          "disorderMultiplierBonusCapPct": 180,
+          "disorderMultiplierBonusPerStackPct": 18,
+          "disorderMultiplierBonusDefaultStacks": 10,
+          "disorderMultiplierBonusMaxStacks": 10,
           "polarizedAssaultBaseAssaultDamagePct": 100,
           "swordMeterMax": 300
         },
         "sources": [
-          "https://wiki.biligame.com/zzz/%E7%88%B1%E4%B8%BD%E4%B8%9D"
+          "https://baike.mihoyo.com/zzz/wiki/content/1385/detail?mhy_presentation_style=fullscreen"
         ],
         "verification": {
-          "stats": "source-checked-biligame-wiki-2026-05-30",
+          "stats": "source-checked-mihoyo-baike-2026-07-17",
           "skillLevelBonuses": "A/C/E each add Anomaly Mastery +12 and Core Passive level +1; B/D/F each add Base ATK +25 and Core Passive level +1",
           "corePassiveScaling": "source-checked; F corresponds to Core Passive level 7 and physical anomaly buildup efficiency +25%",
-          "unsupportedBuffs": "physical anomaly buildup efficiency, physical anomaly extra damage tick, disorder multiplier bonus, polarized assault, and additional ability's anomaly-mastery-to-proficiency conversion are not modeled as automatic combat buffs"
+          "modeledMechanics": "physical anomaly extra damage ratio, stacked disorder base-multiplier bonus, polarized assault, and anomaly-mastery-to-proficiency conversion are modeled; buildup efficiency remains descriptive because the calculator has no buildup-time objective"
         }
       },
       "preferredDriveDiscs": {
         "defaultSetId": "fanged_metal",
         "mainStatLimits": {
           "4": [
-            "anomalyProficiency"
+            "anomalyProficiency",
+            "atkPct"
           ],
           "5": [
             "atkPct",
@@ -2368,18 +2877,148 @@
             "physicalDmg"
           ],
           "6": [
-            "anomalyMastery"
+            "anomalyMastery",
+            "atkPct"
           ]
         }
       },
+      "defaultCalculationConfig": {
+        "mode": "custom",
+        "cinemaLevel": 0,
+        "name": {
+          "zhCN": "0影爱丽丝：极性强击、满时长物理紊乱与10跳追伤"
+        },
+        "events": [
+          {
+            "id": "alice_polarized_assault",
+            "kind": "anomaly",
+            "count": 1,
+            "settlementType": "attribute",
+            "anomalyEffect": "assault",
+            "anomalyVariant": "polarizedAssault",
+            "procCount": 1
+          },
+          {
+            "id": "alice_physical_anomaly_followup",
+            "kind": "anomaly",
+            "label": "核心被动：物理异常追伤",
+            "count": 10,
+            "damageRatioPct": 2.5,
+            "settlementType": "attribute",
+            "anomalyEffect": "assault",
+            "procCount": 1
+          },
+          {
+            "id": "alice_full_duration_physical_disorder",
+            "kind": "anomaly",
+            "count": 1,
+            "settlementType": "disorder",
+            "anomalyEffect": "flinch",
+            "disorderType": "normal",
+            "elapsedSeconds": 0
+          }
+        ],
+        "selectedEventId": "alice_polarized_assault",
+        "variants": [
+          {
+            "mode": "custom",
+            "cinemaLevel": 2,
+            "name": {
+              "zhCN": "2影爱丽丝：两次极性强击、满时长物理紊乱与10跳追伤"
+            },
+            "events": [
+              {
+                "id": "alice_polarized_assault",
+                "kind": "anomaly",
+                "count": 2,
+                "settlementType": "attribute",
+                "anomalyEffect": "assault",
+                "anomalyVariant": "polarizedAssault",
+                "procCount": 1
+              },
+              {
+                "id": "alice_physical_anomaly_followup",
+                "kind": "anomaly",
+                "label": "核心被动：物理异常追伤",
+                "count": 10,
+                "damageRatioPct": 2.5,
+                "settlementType": "attribute",
+                "anomalyEffect": "assault",
+                "procCount": 1
+              },
+              {
+                "id": "alice_full_duration_physical_disorder",
+                "kind": "anomaly",
+                "count": 1,
+                "settlementType": "disorder",
+                "anomalyEffect": "flinch",
+                "disorderType": "normal",
+                "elapsedSeconds": 0
+              }
+            ],
+            "selectedEventId": "alice_polarized_assault"
+          },
+          {
+            "mode": "custom",
+            "cinemaLevel": 6,
+            "name": {
+              "zhCN": "6影爱丽丝：两次极性强击、物理紊乱、10跳追伤与6次决胜追击"
+            },
+            "events": [
+              {
+                "id": "alice_polarized_assault",
+                "kind": "anomaly",
+                "count": 2,
+                "settlementType": "attribute",
+                "anomalyEffect": "assault",
+                "anomalyVariant": "polarizedAssault",
+                "procCount": 1
+              },
+              {
+                "id": "alice_physical_anomaly_followup",
+                "kind": "anomaly",
+                "label": "核心被动：物理异常追伤",
+                "count": 10,
+                "damageRatioPct": 2.5,
+                "settlementType": "attribute",
+                "anomalyEffect": "assault",
+                "procCount": 1
+              },
+              {
+                "id": "alice_full_duration_physical_disorder",
+                "kind": "anomaly",
+                "count": 1,
+                "settlementType": "disorder",
+                "anomalyEffect": "flinch",
+                "disorderType": "normal",
+                "elapsedSeconds": 0
+              },
+              {
+                "id": "alice_winning_state_followup",
+                "kind": "direct",
+                "count": 6,
+                "critMode": "crit",
+                "skillRef": {
+                  "agentSkillId": "alice_thymefield",
+                  "categoryId": "cinema",
+                  "moveId": "winning_state_followup",
+                  "rowId": "damage"
+                }
+              }
+            ],
+            "selectedEventId": "alice_winning_state_followup"
+          }
+        ]
+      },
       "sources": [
-        "https://wiki.biligame.com/zzz/%E7%88%B1%E4%B8%BD%E4%B8%9D"
+        "https://baike.mihoyo.com/zzz/wiki/content/1385/detail?mhy_presentation_style=fullscreen"
       ],
       "verification": {
-        "level60Stats": "source-checked-biligame-wiki-2026-05-30",
-        "panelDefaults": "source-checked-biligame-wiki-2026-05-30"
+        "level60Stats": "source-checked-mihoyo-baike-2026-07-17",
+        "panelDefaults": "source-checked-mihoyo-baike-2026-07-17",
+        "combatMechanics": "source-checked-mihoyo-baike-2026-07-17; default rotation assumes one full 10-second physical anomaly window, 10 core-passive ticks, and cinema-triggered extra actions"
       },
-      "hidden": true
+      "hidden": false
     }
   ]
 }

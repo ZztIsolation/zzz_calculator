@@ -7,23 +7,54 @@ const SETTINGS_KEY = "zzz-calculator.webapp.optimizer.v1"
 const SETTINGS_VERSION = 2
 const FALLBACK_AGENT_SETTINGS_ID = "__default__"
 const OPTIMIZER_WORKER_STALL_TIMEOUT_MS = 45_000
+const MINIMUM_STAT_KEYS = ["atk", "anomalyProficiency", "critRate", "critDmg"] as const
+const MINIMUM_DEFAULTS_VERSION = 2
+const LEGACY_MINIMUM_DEFAULTS: Record<typeof MINIMUM_STAT_KEYS[number], number> = {
+  atk: 2500,
+  anomalyProficiency: 250,
+  critRate: 80,
+  critDmg: 160,
+}
 
 let activeWorker: Worker | null = null
 let activeRunId = ""
 let activeRunResolve: (() => void) | null = null
 let activeWatchdogTimer: ReturnType<typeof setInterval> | null = null
 let lastWorkerMessageAt = 0
+let activeWorkerCatalog: any = null
 
-function disposeWorker() {
+function clearActiveRun() {
   if (activeWatchdogTimer) {
     clearInterval(activeWatchdogTimer)
     activeWatchdogTimer = null
   }
-  activeWorker?.terminate()
-  activeWorker = null
   activeRunId = ""
   activeRunResolve = null
   lastWorkerMessageAt = 0
+}
+
+function disposeWorker() {
+  clearActiveRun()
+  activeWorker?.terminate()
+  activeWorker = null
+  activeWorkerCatalog = null
+}
+
+function reusableWorker() {
+  if (!activeWorker) {
+    activeWorker = new Worker(new URL("../workers/optimizer.worker.ts", import.meta.url), { type: "module" })
+    activeWorkerCatalog = null
+  }
+  return activeWorker
+}
+
+function catalogForWorker(catalog: any) {
+  const rawCatalog = toRaw(catalog)
+  if (rawCatalog === activeWorkerCatalog) {
+    return undefined
+  }
+  activeWorkerCatalog = rawCatalog
+  return cloneWorkerPayload(catalog)
 }
 
 function runId() {
@@ -68,24 +99,38 @@ function defaultMainStatLimits(): Record<string, string[]> {
 }
 
 function defaultMinimums(): Record<string, number | null> {
-  return {
-    energyRegen: null,
-    anomalyProficiency: null,
-    critRate: null,
-    critDmg: null,
-  }
+  return {}
 }
 
 function normalizeArray(value: any) {
   return Array.isArray(value) ? value.map(String).filter(Boolean) : []
 }
 
+function normalizeBrowserOptimizerAlgorithm(value: any) {
+  const algorithm = String(value || "exact-super-bound")
+  return algorithm === "exact-super-bound-parallel" ? "exact-super-bound" : algorithm
+}
+
 function cleanMinimums(value: any = {}) {
   return Object.fromEntries(
-    Object.entries(value)
+    MINIMUM_STAT_KEYS
+      .filter(key => Object.prototype.hasOwnProperty.call(value ?? {}, key))
+      .map(key => [key, value?.[key]] as const)
       .map(([key, raw]) => [key, raw === "" || raw === null || raw === undefined ? null : Number(raw)])
       .filter(([, raw]) => raw === null || Number.isFinite(raw as number)),
   )
+}
+
+function normalizeMinimums(value: any = {}, removeLegacyDefaults = false) {
+  const minimums = cleanMinimums(value)
+  if (removeLegacyDefaults) {
+    for (const key of MINIMUM_STAT_KEYS) {
+      if (minimums[key] === LEGACY_MINIMUM_DEFAULTS[key]) {
+        delete minimums[key]
+      }
+    }
+  }
+  return minimums
 }
 
 function cleanMainStatLimits(value: any = {}) {
@@ -93,6 +138,10 @@ function cleanMainStatLimits(value: any = {}) {
     ...defaultMainStatLimits(),
     ...Object.fromEntries(Object.entries(value ?? {}).map(([slot, values]) => [String(slot), normalizeArray(values)])),
   }
+}
+
+function optimizerDriveDiscSets(catalog: any = null) {
+  return catalog?.displayDriveDiscSets ?? catalog?.driveDiscSets ?? []
 }
 
 function preferredDriveDiscDefaultSetId(agent: any = null, catalog: any = null) {
@@ -105,50 +154,58 @@ function preferredDriveDiscDefaultSetId(agent: any = null, catalog: any = null) 
   if (!setId) {
     return ""
   }
-  const validIds = new Set((catalog?.driveDiscSets ?? []).map((set: any) => String(set?.id ?? "")).filter(Boolean))
-  return !validIds.size || validIds.has(setId) ? setId : ""
+  if (!catalog) {
+    return setId
+  }
+  const validIds = new Set(optimizerDriveDiscSets(catalog).map((set: any) => String(set?.id ?? "")).filter(Boolean))
+  return validIds.has(setId) ? setId : ""
 }
 
 function firstDriveDiscSetId(catalog: any = null) {
-  return String(catalog?.driveDiscSets?.[0]?.id ?? "").trim()
+  return String(optimizerDriveDiscSets(catalog)[0]?.id ?? "").trim()
 }
 
 function normalizeOptimizerSettings(value: any = {}, catalog: any = null, agent: any = null) {
   const saved = value && typeof value === "object" && !Array.isArray(value) ? value : {}
+  const visibleSetIds = new Set(
+    optimizerDriveDiscSets(catalog)
+      .map((set: any) => String(set?.id ?? "").trim())
+      .filter(Boolean),
+  )
   const preferredFourPieceSetId = preferredDriveDiscDefaultSetId(agent, catalog)
   const savedFourPieceSetId = String(saved.fourPieceSetId ?? "").trim()
-  const hasManualFourPieceSet = saved.fourPieceSetSource === "manual" && savedFourPieceSetId
+  const savedFourPieceSetVisible = !catalog || visibleSetIds.has(savedFourPieceSetId)
+  const hasManualFourPieceSet = saved.fourPieceSetSource === "manual" && savedFourPieceSetVisible
   const fourPieceSetId = hasManualFourPieceSet
     ? savedFourPieceSetId
-    : preferredFourPieceSetId || savedFourPieceSetId || firstDriveDiscSetId(catalog)
+    : preferredFourPieceSetId || (savedFourPieceSetVisible ? savedFourPieceSetId : "") || firstDriveDiscSetId(catalog)
   return {
-    algorithm: String(saved.algorithm || "exact-super-bound"),
+    algorithm: normalizeBrowserOptimizerAlgorithm(saved.algorithm),
     fourPieceSetId,
     fourPieceSetSource: hasManualFourPieceSet ? "manual" : "preferred",
-    twoPieceSetIds: normalizeArray(saved.twoPieceSetIds ?? saved.twoPieceSetId),
+    twoPieceSetIds: normalizeArray(saved.twoPieceSetIds ?? saved.twoPieceSetId)
+      .filter(id => !catalog || visibleSetIds.has(id)),
     fourPieceBuffMode: saved.fourPieceBuffMode === "manual" ? "manual" : "auto",
     fourPieceBuffRuntimeInputs: plainObject(saved.fourPieceBuffRuntimeInputs),
     mainStatLimits: cleanMainStatLimits(saved.mainStatLimits),
-    minimums: {
-      ...defaultMinimums(),
-      ...cleanMinimums(saved.minimums),
-    },
+    minimums: normalizeMinimums(
+      saved.minimums,
+      saved.minimumDefaultsVersion !== MINIMUM_DEFAULTS_VERSION,
+    ),
   }
 }
 
 function optimizerSettingsPayload(state: any = {}) {
   return {
-    algorithm: String(state.algorithm || "exact-super-bound"),
+    algorithm: normalizeBrowserOptimizerAlgorithm(state.algorithm),
     fourPieceSetId: String(state.fourPieceSetId ?? "").trim(),
     fourPieceSetSource: state.fourPieceSetSource === "manual" ? "manual" : "preferred",
     twoPieceSetIds: normalizeArray(state.twoPieceSetIds),
     fourPieceBuffMode: state.fourPieceBuffMode === "manual" ? "manual" : "auto",
     fourPieceBuffRuntimeInputs: plainObject(state.fourPieceBuffRuntimeInputs),
     mainStatLimits: cleanMainStatLimits(state.mainStatLimits),
-    minimums: {
-      ...defaultMinimums(),
-      ...cleanMinimums(state.minimums),
-    },
+    minimumDefaultsVersion: MINIMUM_DEFAULTS_VERSION,
+    minimums: normalizeMinimums(state.minimums),
   }
 }
 
@@ -400,7 +457,7 @@ export const useOptimizerStore = defineStore("optimizer", {
       })
     },
     setAlgorithm(value: string) {
-      this.algorithm = value || "exact-super-bound"
+      this.algorithm = normalizeBrowserOptimizerAlgorithm(value)
       this.persistSettings()
     },
     setFourPieceSet(id: string) {
@@ -413,14 +470,11 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.persistSettings()
     },
     applyAdvancedSettings(settings: any = {}) {
-      this.algorithm = String(settings.algorithm || this.algorithm || "exact-super-bound")
+      this.algorithm = normalizeBrowserOptimizerAlgorithm(settings.algorithm || this.algorithm)
       this.fourPieceBuffMode = settings.fourPieceBuffMode === "manual" ? "manual" : "auto"
       this.fourPieceBuffRuntimeInputs = plainObject(settings.fourPieceBuffRuntimeInputs)
       this.mainStatLimits = cleanMainStatLimits(settings.mainStatLimits)
-      this.minimums = {
-        ...defaultMinimums(),
-        ...cleanMinimums(settings.minimums),
-      }
+      this.minimums = normalizeMinimums(settings.minimums)
       this.persistSettings()
     },
     setMainStatLimits(limits: any = {}) {
@@ -428,10 +482,7 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.persistSettings()
     },
     setMinimums(minimums: any = {}) {
-      this.minimums = {
-        ...defaultMinimums(),
-        ...cleanMinimums(minimums),
-      }
+      this.minimums = normalizeMinimums(minimums)
       this.persistSettings()
     },
     setFourPieceBuffRuntimeInputs(inputs: any = {}) {
@@ -460,6 +511,9 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.persistSettings()
     },
     setMinimum(stat: string, value: number | null) {
+      if (!MINIMUM_STAT_KEYS.includes(stat as typeof MINIMUM_STAT_KEYS[number])) {
+        return
+      }
       this.minimums = {
         ...this.minimums,
         [stat]: value === null || value === undefined || !Number.isFinite(Number(value)) ? null : Number(value),
@@ -487,6 +541,9 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.completedSettings = null
       this.error = ""
       this.cancelRequested = false
+    },
+    disposeRuntime() {
+      disposeWorker()
     },
     failBeforeRun(message: string, settings: any = null) {
       disposeWorker()
@@ -531,18 +588,20 @@ export const useOptimizerStore = defineStore("optimizer", {
     preview(catalog: any, store: any, input: any) {
       this.status = "estimating"
       this.error = ""
-      const worker = new Worker(new URL("../workers/optimizer.worker.ts", import.meta.url), { type: "module" })
+      if (activeRunResolve) {
+        disposeWorker()
+      }
+      const worker = reusableWorker()
       const id = runId()
       const workerInput = this.inputWithSettings(input, store)
       const workerStore = optimizerStorePayload(store, workerInput.ownerId)
-      const workerCatalog = cloneWorkerPayload(catalog)
+      const workerCatalog = catalogForWorker(catalog)
       return new Promise(resolve => {
         worker.onmessage = event => {
           const message = event.data ?? {}
           if (message.runId !== id) {
             return
           }
-          worker.terminate()
           if (message.type === "preview") {
             this.applyProgress({
               status: "preview",
@@ -557,27 +616,36 @@ export const useOptimizerStore = defineStore("optimizer", {
           } else {
             this.error = message.error ?? "预估失败"
             this.status = "error"
+            disposeWorker()
             resolve(null)
           }
         }
         worker.onerror = event => {
-          worker.terminate()
           this.error = event.message
           this.status = "error"
+          disposeWorker()
           resolve(null)
         }
         try {
-          worker.postMessage({ type: "preview", runId: id, catalog: workerCatalog, store: workerStore, input: cloneWorkerPayload(workerInput) })
+          worker.postMessage({
+            type: "preview",
+            runId: id,
+            ...(workerCatalog ? { catalog: workerCatalog } : {}),
+            store: workerStore,
+            input: cloneWorkerPayload(workerInput),
+          })
         } catch (error) {
-          worker.terminate()
           this.error = error instanceof Error ? error.message : String(error)
           this.status = "error"
+          disposeWorker()
           resolve(null)
         }
       })
     },
     async run(catalog: any, store: any, input: any) {
-      disposeWorker()
+      if (activeRunResolve) {
+        disposeWorker()
+      }
       this.status = "preparing"
       this.error = ""
       this.results = []
@@ -595,17 +663,20 @@ export const useOptimizerStore = defineStore("optimizer", {
       })
       activeRunId = runId()
       lastWorkerMessageAt = Date.now()
-      activeWorker = new Worker(new URL("../workers/optimizer.worker.ts", import.meta.url), { type: "module" })
-      const worker = activeWorker
+      const worker = reusableWorker()
       const workerInput = this.inputWithSettings(input, store)
       const workerStore = optimizerStorePayload(store, workerInput.ownerId)
-      const workerCatalog = cloneWorkerPayload(catalog)
+      const workerCatalog = catalogForWorker(catalog)
       const workerRequestInput = cloneWorkerPayload(workerInput)
       await new Promise<void>(resolve => {
         activeRunResolve = resolve
-        const finishRun = () => {
+        const finishRun = (terminateWorker = false) => {
           if (activeRunResolve === resolve) {
-            disposeWorker()
+            if (terminateWorker) {
+              disposeWorker()
+            } else {
+              clearActiveRun()
+            }
           }
           resolve()
         }
@@ -617,7 +688,7 @@ export const useOptimizerStore = defineStore("optimizer", {
             percent: this.progress?.percent ?? 0,
             elapsedMs: this.progress?.elapsedMs ?? 0,
           })
-          finishRun()
+          finishRun(true)
         }
         activeWatchdogTimer = setInterval(() => {
           if (!activeRunResolve || activeRunResolve !== resolve) {
@@ -707,7 +778,7 @@ export const useOptimizerStore = defineStore("optimizer", {
               elapsedMs: this.progress?.elapsedMs ?? 0,
             })
             this.status = "cancelled"
-            finishRun()
+            finishRun(true)
             return
           }
           if (message.type === "error") {
@@ -718,7 +789,7 @@ export const useOptimizerStore = defineStore("optimizer", {
               percent: this.progress?.percent ?? 0,
               elapsedMs: this.progress?.elapsedMs ?? 0,
             })
-            finishRun()
+            finishRun(true)
           }
         }
         worker.onerror = event => {
@@ -729,13 +800,13 @@ export const useOptimizerStore = defineStore("optimizer", {
             percent: this.progress?.percent ?? 0,
             elapsedMs: this.progress?.elapsedMs ?? 0,
           })
-          finishRun()
+          finishRun(true)
         }
         try {
           worker.postMessage({
             type: "start",
             runId: activeRunId,
-            catalog: workerCatalog,
+            ...(workerCatalog ? { catalog: workerCatalog } : {}),
             store: workerStore,
             input: workerRequestInput,
             settings: {
@@ -751,7 +822,7 @@ export const useOptimizerStore = defineStore("optimizer", {
             percent: this.progress?.percent ?? 0,
             elapsedMs: this.progress?.elapsedMs ?? 0,
           })
-          finishRun()
+          finishRun(true)
         }
       })
     },

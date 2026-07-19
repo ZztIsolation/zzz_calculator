@@ -8,6 +8,7 @@ import {
     deleteDriveDiscLoadout as deleteInventoryLoadout,
     driveDiscContentFingerprint,
     driveDiscIdentityFingerprint,
+    createDriveDiscExport,
     normalizeInventoryStore,
     ownerScopedStore,
     switchAccount as switchInventoryAccount,
@@ -48,7 +49,22 @@ function openDb() {
         request.onsuccess = () => resolve(request.result)
         request.onerror = () => reject(request.error)
     })
+    dbPromise.then(db => {
+        db.onversionchange = () => db.close()
+    }).catch(() => {})
     return dbPromise
+}
+
+function deleteDatabase() {
+    if (typeof indexedDB === "undefined") {
+        return Promise.resolve()
+    }
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.deleteDatabase(DB_NAME)
+        request.onsuccess = () => resolve()
+        request.onerror = () => reject(request.error ?? new Error("删除浏览器数据库失败。"))
+        request.onblocked = () => reject(new Error("数据库仍被其他标签页占用，请关闭其他计算器标签页后重试。"))
+    })
 }
 
 async function readPersistedStore() {
@@ -79,8 +95,35 @@ export async function loadUserDriveDiscStore() {
     return normalizeInventoryStore(await readPersistedStore())
 }
 
+export async function clearAllBrowserData() {
+    if (dbPromise) {
+        try {
+            const db = await dbPromise
+            db.close()
+        } catch {
+        }
+        dbPromise = null
+    }
+
+    await deleteDatabase()
+    try {
+        const keys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+            .filter(Boolean)
+        for (const key of keys) {
+            if (key.startsWith("zzz-calculator.") || key.startsWith("zzz_maintenance_vue_draft_")) {
+                localStorage.removeItem(key)
+            }
+        }
+    } catch {
+    }
+}
+
 export async function loadCurrentUserDriveDiscStore() {
     return ownerScopedStore(await loadUserDriveDiscStore())
+}
+
+export async function exportCurrentUserDriveDiscs(options = {}) {
+    return createDriveDiscExport(await loadUserDriveDiscStore(), options)
 }
 
 export async function saveUserDriveDiscStore(store) {

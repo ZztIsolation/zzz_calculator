@@ -2,6 +2,7 @@ const HELPER_PORT = 22355
 const LEGACY_PORT = 22350
 const CONNECT_TIMEOUT_MS = 2500
 const ENSURE_TIMEOUT_MS = 10 * 60 * 1000
+const REQUEST_TIMEOUT_MS = 60 * 1000
 const HELPER_BASE_URL = `http://127.0.0.1:${HELPER_PORT}`
 const HELPER_PROTOCOL_URL = `zzz-scanner://launch?origin=${encodeURIComponent(window.location.origin)}`
 const DEFAULT_SCAN_TUNING = {
@@ -26,12 +27,15 @@ export class ScannerBridge {
         this._scanning = false
         this._scannerReady = false
         this._ensureResolver = null
+        this._requestResolvers = new Map()
         this.onProgress = null
         this.onLauncherProgress = null
         this.onScannerReady = null
         this.onItem = null
         this.onComplete = null
         this.onError = null
+        this.onDiagnostics = null
+        this.onHelperUpdateProgress = null
         this.onDisconnect = null
     }
 
@@ -49,6 +53,10 @@ export class ScannerBridge {
 
     get helperVersion() {
         return this._mode === "helper" ? String(this._helloData?.version ?? "") : ""
+    }
+
+    get protocolVersion() {
+        return this._mode === "helper" ? Number(this._helloData?.protocolVersion ?? 0) : 0
     }
 
     async connect() {
@@ -83,6 +91,76 @@ export class ScannerBridge {
         if (this._mode !== "helper" || this._scannerReady) {
             return
         }
+        return this._runEnsureCommand("ensure_scanner")
+    }
+
+    async repairScanner() {
+        if (!this.connected) {
+            await this.connect()
+        }
+        this._scannerReady = false
+        return this._runEnsureCommand("repair_scanner")
+    }
+
+    async restartScannerElevated() {
+        if (!this.connected) {
+            await this.connect()
+        }
+        this._scannerReady = false
+        return this._runEnsureCommand("restart_scanner_elevated")
+    }
+
+    openLogFolder() {
+        this._send("open_log_folder", {})
+    }
+
+    requestDiagnostics() {
+        this._send("get_diagnostics", {})
+    }
+
+    async getStorageInfo() {
+        if (!this.connected) {
+            await this.connect()
+        }
+        this._requireProtocolV3()
+        return this._request("get_storage_info", "storage_info")
+    }
+
+    async cleanupStorage() {
+        if (!this.connected) {
+            await this.connect()
+        }
+        this._requireProtocolV3()
+        return this._request("cleanup_storage", "storage_cleanup_result")
+    }
+
+    async updateHelper() {
+        if (!this.connected) {
+            await this.connect()
+        }
+        this._requireProtocolV3()
+        return this._request("update_helper", "helper_update_result", {}, 10 * 60 * 1000)
+    }
+
+    _requireProtocolV3() {
+        if (this._mode !== "helper" || this.protocolVersion < 3) {
+            throw new Error("当前 Helper 不支持存储管理，请先安装 1.2.0 或更高版本。")
+        }
+    }
+
+    _request(command, responseCommand, data = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+        const requestId = `${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+                this._requestResolvers.delete(requestId)
+                reject(new Error("扫描助手响应超时，请重试。"))
+            }, timeoutMs)
+            this._requestResolvers.set(requestId, { responseCommand, resolve, reject, timer })
+            this._send(command, { ...data, requestId })
+        })
+    }
+
+    _runEnsureCommand(command) {
         if (this._ensureResolver) {
             return this._ensureResolver.promise
         }
@@ -97,7 +175,7 @@ export class ScannerBridge {
             this._ensureResolver = null
         }, ENSURE_TIMEOUT_MS)
         this._ensureResolver = { resolve: resolveEnsure, reject: rejectEnsure, promise, timer }
-        this._send("ensure_scanner", {})
+        this._send(command, {})
         return promise
     }
 
@@ -109,6 +187,7 @@ export class ScannerBridge {
         }
         this._ensureResolver?.reject(new Error("Scanner helper disconnected"))
         this._ensureResolver = null
+        this._rejectRequests(new Error("Scanner helper disconnected"))
         if (this._ws) {
             try { this._ws.close() } catch {}
             this._ws = null
@@ -237,6 +316,7 @@ export class ScannerBridge {
             }
             this._scanning = false
             this._rejectEnsure(new Error("扫描助手连接已断开，请重新点击扫描。"))
+            this._rejectRequests(new Error("扫描助手连接已断开，请重试。"))
             this.onDisconnect?.()
         }
         })
@@ -256,6 +336,14 @@ export class ScannerBridge {
         this._ensureResolver = null
     }
 
+    _rejectRequests(error) {
+        for (const pending of this._requestResolvers.values()) {
+            clearTimeout(pending.timer)
+            pending.reject(error)
+        }
+        this._requestResolvers.clear()
+    }
+
     _bindMessageHandler() {
         if (!this._ws) {
             return
@@ -270,6 +358,13 @@ export class ScannerBridge {
     _handleMessage(envelope) {
         const cmd = this._envelopeCmd(envelope)
         const data = this._envelopeData(envelope)
+        const requestId = String(data?.requestId ?? "")
+        const pending = requestId ? this._requestResolvers.get(requestId) : null
+        if (pending && pending.responseCommand === cmd) {
+            clearTimeout(pending.timer)
+            this._requestResolvers.delete(requestId)
+            pending.resolve(data)
+        }
         switch (cmd) {
             case "launcher_progress":
                 this.onLauncherProgress?.(data)
@@ -293,8 +388,14 @@ export class ScannerBridge {
                 break
             case "scan_error":
                 this._scanning = false
-                this._rejectEnsure(new Error(data?.message || "Scanner error"))
+                this._rejectEnsure(Object.assign(new Error(data?.message || "Scanner error"), data ?? {}))
                 this.onError?.(data)
+                break
+            case "helper_diagnostics":
+                this.onDiagnostics?.(data)
+                break
+            case "helper_update_progress":
+                this.onHelperUpdateProgress?.(data)
                 break
         }
     }

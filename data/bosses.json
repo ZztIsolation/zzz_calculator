@@ -1,0 +1,282 @@
+{
+  "version": 2,
+  "bosses": [
+    {
+      "id": "boss.scorched_horizon_phaethon",
+      "name": {
+        "zhCN": "焚昼余火·法厄同（异变能量体）"
+      },
+      "aliases": [
+        "焚昼余火·法厄同",
+        "异变能量体",
+        "焦天残火"
+      ],
+      "images": {
+        "icon": "/assets/bosses/scorched-horizon-phaethon.webp",
+        "source": "https://cdn.wikiwiki.jp/to/w/zenless/%E7%94%BB%E5%83%8F/::ref/%E3%82%A8%E3%83%8D%E3%83%9F%E3%83%BC_%E7%84%A6%E5%A4%A9%E6%AE%8B%E7%81%AB%E3%83%BB%E3%83%91%E3%82%A8%E3%83%88%E3%83%BC%E3%83%B3.webp?rev=d9244c370def8ad79665dec839148dc6&t=20260509190011"
+      },
+      "target": {
+        "defense": 953,
+        "weaknessElements": [
+          "ice",
+          "wind"
+        ],
+        "resistanceElements": [
+          "physical"
+        ],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.scorched_horizon_phaethon.v3_0.p3",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.0",
+              "phaseNo": 3,
+              "startDate": "2026-07-17",
+              "endDate": "2026-07-29"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "焚昼余火·法厄同进入炎风状态时获得 5 层赴火。每层使其造成的伤害提升 10%，并使代理人对其造成的暴击伤害降低 25%。使其进入属性异常可移除 1 层赴火，并使其受到的异放伤害提升 10%，最多叠加 3 层，持续 15 秒。"
+          },
+          "recommendedSpecialties": [
+            "anomaly"
+          ],
+          "playerBuffs": [],
+          "playerDebuffs": [
+            {
+              "id": "scorched_departing_flame",
+              "name": {
+                "zhCN": "赴火"
+              },
+              "description": {
+                "zhCN": "焚昼余火·法厄同进入炎风状态时获得 5 层赴火；每层使代理人对其造成的暴击伤害降低 25%。代理人使其进入属性异常可移除 1 层。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "scorched_departing_flame_crit_dmg",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "critDmg",
+                  "mode": "flat",
+                  "valuePerStack": -25,
+                  "maxStacks": 5,
+                  "defaultStacks": 0,
+                  "stackGroup": "scorched_departing_flame_stacks",
+                  "stackLabel": {
+                    "zhCN": "赴火层数"
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "危局强袭战敌人一览"
+              },
+              "url": "https://wikiwiki.jp/zenless/%E5%8D%B1%E5%B1%80%E5%BC%B7%E8%A5%B2%E6%88%A6/%E6%95%B5%E4%B8%80%E8%A6%A7"
+            },
+            {
+              "label": {
+                "zhCN": "3.0 第三期官方阵容公告"
+              },
+              "url": "https://weibo.com/ttarticle/p/show?id=2309405310690738176159"
+            }
+          ],
+          "hidden": false
+        }
+      ],
+      "hidden": false
+    },
+    {
+      "id": "boss.notorious_pompey",
+      "name": {
+        "zhCN": "恶名·庞培"
+      },
+      "aliases": [
+        "要警戒·庞培",
+        "庞培"
+      ],
+      "images": {
+        "icon": "/assets/bosses/notorious-pompey.webp",
+        "source": "https://cdn.wikiwiki.jp/to/w/zenless/%E7%94%BB%E5%83%8F/::ref/%E3%82%A8%E3%83%8D%E3%83%9F%E3%83%BC_%E8%A6%81%E8%AD%A6%E6%88%92%E3%83%BB%E3%83%9D%E3%83%B3%E3%83%9A%E3%82%A4.webp.webp?rev=54c612c15e5f1ed9d68b76143244bd76&t=20250420141636"
+      },
+      "target": {
+        "defense": 952,
+        "weaknessElements": [
+          "fire"
+        ],
+        "resistanceElements": [
+          "electric"
+        ],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.notorious_pompey.v3_0.p3",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.0",
+              "phaseNo": 3,
+              "startDate": "2026-07-17",
+              "endDate": "2026-07-29"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "对恶名·庞培发动招架支援或连携技后，为其施加 1 层持续 20 秒且独立计时的“不利”。每层使代理人对其造成的暴击伤害提升 15%；叠加至 4 层后，下一次成功招架会使其陷入硬直。"
+          },
+          "recommendedSpecialties": [
+            "anomaly"
+          ],
+          "playerBuffs": [
+            {
+              "id": "pompey_disadvantage",
+              "name": {
+                "zhCN": "不利"
+              },
+              "description": {
+                "zhCN": "招架支援或连携技施加 1 层不利，持续 20 秒且各层独立计时；每层使暴击伤害提升 15%，最多 4 层。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "pompey_disadvantage_crit_dmg",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "critDmg",
+                  "mode": "flat",
+                  "valuePerStack": 15,
+                  "maxStacks": 4,
+                  "defaultStacks": 4,
+                  "stackGroup": "pompey_disadvantage_stacks",
+                  "stackLabel": {
+                    "zhCN": "不利层数"
+                  }
+                }
+              ]
+            }
+          ],
+          "playerDebuffs": [],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "危局强袭战敌人一览"
+              },
+              "url": "https://wikiwiki.jp/zenless/%E5%8D%B1%E5%B1%80%E5%BC%B7%E8%A5%B2%E6%88%A6/%E6%95%B5%E4%B8%80%E8%A6%A7"
+            },
+            {
+              "label": {
+                "zhCN": "3.0 第三期官方阵容公告"
+              },
+              "url": "https://weibo.com/ttarticle/p/show?id=2309405310690738176159"
+            }
+          ],
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "id": "boss.miasma_fiend_named",
+      "name": {
+        "zhCN": "秽息妖鬼·名可名"
+      },
+      "aliases": [
+        "名可名",
+        "秽息妖鬼"
+      ],
+      "images": {
+        "icon": "/assets/bosses/miasma-fiend-named.webp",
+        "source": "https://cdn.wikiwiki.jp/to/w/zenless/%E7%94%BB%E5%83%8F/::ref/%E3%82%A8%E3%83%8D%E3%83%9F%E3%83%BC_%E3%83%9F%E3%82%A2%E3%82%BA%E3%83%9E%E3%83%BB%E3%83%95%E3%82%A3%E3%83%BC%E3%83%B3%E3%83%89%E3%83%BB%E5%90%8D%E3%81%AF%E5%90%8D%E3%81%AA%E3%82%8C%E3%81%A9.webp?rev=b888a8d30372c6e0cc691ce2b4ff0e4a&t=20250716195027"
+      },
+      "target": {
+        "defense": 952,
+        "weaknessElements": [
+          "physical",
+          "ether"
+        ],
+        "resistanceElements": [
+          "fire"
+        ],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.miasma_fiend_named.v3_0.p3",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.0",
+              "phaseNo": 3,
+              "startDate": "2026-07-17",
+              "endDate": "2026-07-29"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "秽息妖鬼·名可名每次进入属性异常时，代理人对其造成的异常伤害提升 8%，最多叠加 6 层。目标开启秽盾时清空所有层数，每层使其受到的护盾削减效率提升 2.5%。"
+          },
+          "recommendedSpecialties": [
+            "anomaly"
+          ],
+          "playerBuffs": [
+            {
+              "id": "miasma_anomaly_damage",
+              "name": {
+                "zhCN": "异常伤害提升"
+              },
+              "description": {
+                "zhCN": "每次使秽息妖鬼·名可名进入属性异常，代理人对其造成的异常伤害提升 8%，最多 6 层。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "miasma_anomaly_damage_stacks",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyDamageBonus",
+                  "mode": "flat",
+                  "valuePerStack": 8,
+                  "maxStacks": 6,
+                  "defaultStacks": 6,
+                  "stackGroup": "miasma_anomaly_damage_stack_group",
+                  "stackLabel": {
+                    "zhCN": "异常伤害提升层数"
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "危局强袭战敌人一览"
+              },
+              "url": "https://wikiwiki.jp/zenless/%E5%8D%B1%E5%B1%80%E5%BC%B7%E8%A5%B2%E6%88%A6/%E6%95%B5%E4%B8%80%E8%A6%A7"
+            },
+            {
+              "label": {
+                "zhCN": "3.0 第三期官方阵容公告"
+              },
+              "url": "https://weibo.com/ttarticle/p/show?id=2309405310690738176159"
+            }
+          ],
+          "hidden": false
+        }
+      ],
+      "hidden": false
+    }
+  ]
+}

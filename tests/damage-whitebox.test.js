@@ -11,6 +11,7 @@ import {
     damageSkillRowsWithGeneratedTotals,
     skillRowValue,
 } from "../core/skillMultiplierCandidates.js"
+import { expandCalculationConfigSkillGroups } from "../core/calculationSkillGroups.js"
 import { resolveDefaultCalculationConfig } from "../core/defaultCalculationConfig.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
@@ -31,7 +32,7 @@ assert.ok(yixuan, "Meta should expose Yixuan")
 assert.equal(yixuan.attribute, "xuanmo", "Yixuan should use Xuanmo as the display attribute")
 assert.equal(yixuan.damageElement, "ether", "Yixuan Xuanmo damage should settle as ether")
 assert.equal(yixuan.specialty, "rupture", "Yixuan should use rupture specialty")
-assert.equal(yixuan.defaultCalculationConfig?.mode, "sheer", "Yixuan should default to sheer damage calculation")
+assert.equal(yixuan.defaultCalculationConfig?.mode, "custom", "Yixuan should use the maintained custom default calculation")
 const yixuanSkillCatalog = meta.agentSkills.find(item => item.id === "yixuan")
 assert.ok(yixuanSkillCatalog, "Meta should expose Yixuan skill catalog")
 assert.ok(
@@ -98,17 +99,17 @@ function calculateStunEvent(event, { targetOverrides = {}, inputOverrides = {} }
 }
 
 function assertStunMultiplierScales({ label, event, inputOverrides = {} }) {
-    const base = calculateStunEvent(event, {
-        inputOverrides,
-        targetOverrides: {
-            stunned: false,
-            stunMultiplierPercent: 150,
-        },
-    })
-    const stunned = calculateStunEvent(event, {
+    const base = calculateStunEvent({ ...event, stunned: false }, {
         inputOverrides,
         targetOverrides: {
             stunned: true,
+            stunMultiplierPercent: 150,
+        },
+    })
+    const stunned = calculateStunEvent({ ...event, stunned: true }, {
+        inputOverrides,
+        targetOverrides: {
+            stunned: false,
             stunMultiplierPercent: 150,
         },
     })
@@ -182,7 +183,9 @@ assertStunMultiplierScales({
     label: "Direct damage",
     event: directStunEvent,
 })
-const legacyUnstunnedDirect = calculateStunEvent(directStunEvent)
+const defaultStunnedDirect = calculateStunEvent(directStunEvent)
+approx(defaultStunnedDirect.damage.multipliers.stun, 1.5, "Events without an explicit stun state should default to stunned")
+const explicitUnstunnedDirect = calculateStunEvent({ ...directStunEvent, stunned: false })
 const configuredUnstunnedDirect = calculateStunEvent(directStunEvent, {
     targetOverrides: {
         stunned: false,
@@ -190,9 +193,9 @@ const configuredUnstunnedDirect = calculateStunEvent(directStunEvent, {
     },
 })
 approx(
-    legacyUnstunnedDirect.damage.finalDamage,
+    explicitUnstunnedDirect.damage.finalDamage,
     configuredUnstunnedDirect.damage.finalDamage,
-    "Unstunned direct damage should ignore configured stun multiplier",
+    "Explicit event stun state and migrated legacy target state should agree",
 )
 
 const stunMultiplierBonusCatalog = cloneCatalog(catalog)
@@ -589,7 +592,6 @@ fieldCatalog.combatBuffs.push({
     id: "test.damage.field_dmg_coverage",
     sourceType: "field",
     scope: "inCombat",
-    coverage: { default: 0.5, min: 0, max: 1, step: 0.1 },
     effects: [
         {
             id: "field_dmg",
@@ -597,6 +599,7 @@ fieldCatalog.combatBuffs.push({
             stat: "dmgBonus",
             value: 20,
             mode: "flat",
+            coverage: { default: 0.5, min: 0, max: 1, step: 0.1 },
         },
     ],
 })
@@ -607,7 +610,7 @@ const withField = calculateInCombatPanel(fieldCatalog, minimalInput({
     combatBuffs: {
         activeBuffIds: ["test.damage.field_dmg_coverage"],
         runtimeInputs: {
-            "test.damage.field_dmg_coverage": { coverage: 0.75 },
+            "test.damage.field_dmg_coverage": { effects: { field_dmg: { coverage: 0.75 } } },
         },
     },
 }))
@@ -618,12 +621,40 @@ approx(
 )
 assert.ok(withField.damage.finalDamage > withoutField.damage.finalDamage, "Field Buff should increase final damage")
 
+const independentCoverageCatalog = cloneCatalog(catalog)
+independentCoverageCatalog.combatBuffs.push({
+    id: "test.damage.independent_rule_coverage",
+    sourceType: "field",
+    scope: "inCombat",
+    effects: [
+        { id: "covered_dmg", type: "fixed", stat: "dmgBonus", value: 20, mode: "flat", coverage: { default: 1, min: 0, max: 1, step: 0.1 } },
+        { id: "fixed_crit", type: "fixed", stat: "critRate", value: 10, mode: "flat" },
+    ],
+})
+const independentCoverageBaseline = calculateInCombatPanel(independentCoverageCatalog, minimalInput({
+    combatBuffs: { activeBuffIds: [] },
+}))
+const independentCoverageResult = calculateInCombatPanel(independentCoverageCatalog, minimalInput({
+    combatBuffs: {
+        activeBuffIds: ["test.damage.independent_rule_coverage"],
+        runtimeInputs: {
+            "test.damage.independent_rule_coverage": {
+                effects: {
+                    covered_dmg: { coverage: 0.5 },
+                    fixed_crit: { coverage: 0 },
+                },
+            },
+        },
+    },
+}))
+approx(independentCoverageResult.inCombat.panel.dmgBonus - independentCoverageBaseline.inCombat.panel.dmgBonus, 0.1, "Covered child rule")
+approx(independentCoverageResult.inCombat.panel.critRate - independentCoverageBaseline.inCombat.panel.critRate, 0.1, "Unauthorized sibling coverage must be ignored")
+
 const bossRuntimeCatalog = cloneCatalog(catalog)
 bossRuntimeCatalog.combatBuffs.push({
     id: "test.damage.boss_runtime_def",
     sourceType: "boss",
     scope: "inCombat",
-    coverage: { default: 0.5, min: 0, max: 1, step: 0.1 },
     effects: [
         {
             id: "boss_def_runtime",
@@ -631,6 +662,7 @@ bossRuntimeCatalog.combatBuffs.push({
             stat: "enemyDefReduction",
             value: 20,
             mode: "flat",
+            coverage: { default: 0.5, min: 0, max: 1, step: 0.1 },
         },
     ],
 })
@@ -649,7 +681,7 @@ const withBossFullCoverage = calculateInCombatPanel(bossRuntimeCatalog, minimalI
     combatBuffs: {
         activeBuffIds: ["test.damage.boss_runtime_def"],
         runtimeInputs: {
-            "test.damage.boss_runtime_def": { coverage: 1 },
+            "test.damage.boss_runtime_def": { effects: { boss_def_runtime: { coverage: 1 } } },
         },
     },
     damage: {
@@ -936,6 +968,96 @@ const withPhysicalIgnore = calculateInCombatPanel(resIgnoreCatalog, minimalInput
     },
 }))
 approx(withPhysicalIgnore.damage.multipliers.resistance, 1, "Physical RES ignore should offset physical RES")
+
+const allResIgnoreCatalog = cloneCatalog(catalog)
+allResIgnoreCatalog.combatBuffs.push({
+    id: "test.damage.all_res_ignore",
+    sourceType: "self",
+    scope: "inCombat",
+    effects: [
+        {
+            id: "all_res_ignore",
+            type: "fixed",
+            stat: "allResIgnore",
+            value: 10,
+            mode: "flat",
+        },
+        {
+            id: "physical_res_ignore_addition",
+            type: "fixed",
+            stat: "physicalResIgnore",
+            value: 5,
+            mode: "flat",
+        },
+    ],
+})
+
+function calculateAllResIgnoreEvent(damageElement) {
+    return calculateInCombatPanel(allResIgnoreCatalog, minimalInput({
+        combatBuffs: {
+            activeBuffIds: ["test.damage.all_res_ignore"],
+        },
+        damage: {
+            selectedEventId: `all-res-ignore-${damageElement}`,
+            events: [{
+                id: `all-res-ignore-${damageElement}`,
+                kind: "direct",
+                damageElement,
+                skillMultiplier: 100,
+                critMode: "nonCrit",
+            }],
+            target: {
+                defense: 953,
+                levelCoefficient: 794,
+                resistanceByElement: {
+                    [damageElement]: 20,
+                },
+            },
+        },
+    }))
+}
+
+const physicalAllResIgnore = calculateAllResIgnoreEvent("physical")
+approx(physicalAllResIgnore.inCombat.panel.allResIgnore, 0.1, "All-attribute RES ignore should use stored-percent conversion")
+approx(physicalAllResIgnore.damage.targetBreakdown.resIgnore, 0.15, "All and physical RES ignore should stack")
+approx(physicalAllResIgnore.damage.multipliers.resistance, 0.95, "Stacked physical RES ignore should lower effective resistance")
+
+const etherAllResIgnore = calculateAllResIgnoreEvent("ether")
+approx(etherAllResIgnore.damage.targetBreakdown.resIgnore, 0.1, "All-attribute RES ignore should apply to ether damage")
+approx(etherAllResIgnore.damage.multipliers.resistance, 0.9, "All-attribute RES ignore should affect a second damage element")
+
+function calculateGlobalCurrentAttributeResistance(stats) {
+    return calculateInCombatPanel(catalog, minimalInput({
+        agentId: "hoshimi_miyabi",
+        wEngineId: "hailfall_star_palace",
+        coreSkillLevel: "F",
+        combatBuffs: {
+            manualStats: stats.map((stat, index) => ({ id: `current-res-${index}`, value: 10, mode: "flat", stat })),
+        },
+        damage: {
+            selectedEventId: "current-attribute-resistance",
+            events: [{
+                id: "current-attribute-resistance",
+                kind: "direct",
+                damageElement: "ice",
+                skillMultiplier: 100,
+                critMode: "nonCrit",
+            }],
+            target: {
+                defense: 953,
+                levelCoefficient: 794,
+                resistanceByElement: { ice: 30 },
+            },
+        },
+    }))
+}
+
+const currentAttributeResistanceAliases = calculateGlobalCurrentAttributeResistance(["enemyResReduction", "iceResIgnore"])
+const explicitIceResistanceStats = calculateGlobalCurrentAttributeResistance(["enemyIceResReduction", "iceResIgnore"])
+approx(currentAttributeResistanceAliases.damage.targetBreakdown.enemyResReduction, 0.1, "Current-attribute reduction alias should reduce matching resistance")
+approx(currentAttributeResistanceAliases.damage.targetBreakdown.resIgnore, 0.1, "Resolved current-attribute resistance ignore should affect matching resistance")
+approx(currentAttributeResistanceAliases.damage.multipliers.resistance, explicitIceResistanceStats.damage.multipliers.resistance, "Current-attribute aliases should preserve the explicit-element resistance multiplier")
+approx(currentAttributeResistanceAliases.damage.finalDamage, explicitIceResistanceStats.damage.finalDamage, "Current-attribute aliases should preserve explicit-element final damage")
 
 const highResistanceClamp = calculateInCombatPanel(catalog, minimalInput({
     damage: {
@@ -1362,7 +1484,7 @@ assert.match(
 )
 assert.match(
     miyabiCharge3.damage.whiteBoxRows.find(row => row.label === "增伤乘区")?.formula ?? "",
-    /技能专属增伤 80%/,
+    /技能目标增伤 80%/,
 )
 
 const miyabiCharge2 = calculateInCombatPanel(skillTargetCatalog, {
@@ -1443,7 +1565,45 @@ const juhufuChain = calculateInCombatPanel(catalog, {
 approx(juhufuChain.damage.multipliers.directDamageBonus, 0.2, "Juhufu core passive should boost all chain skills")
 assert.match(
     juhufuChain.damage.whiteBoxRows.find(row => row.label === "增伤乘区")?.formula ?? "",
-    /技能专属增伤 20%/,
+    /技能目标增伤 20%/,
+)
+
+const janeFlinchDisorderWhiteBox = calculateInCombatPanel(catalog, minimalInput({
+    combatBuffs: {
+        activeBuffIds: ["jane_doe.core_insight"],
+    },
+    damage: {
+        selectedEventId: "jane-flinch-disorder",
+        events: [
+            {
+                id: "jane-flinch-disorder",
+                kind: "disorder",
+                previousAnomalyEffect: "flinch",
+                elapsedSeconds: 0,
+            },
+        ],
+    },
+}))
+assert.equal(
+    janeFlinchDisorderWhiteBox.damage.whiteBoxRows.find(row => row.label === "紊乱倍率")?.formula,
+    "畏缩紊乱（基础 10 秒 + 延长 5 秒 = 15 秒；已流逝 0 秒，剩余 15 秒）：450% + 15 × 7.5%",
+    "Jane core whitebox should expose effective Flinch duration and the recomputed multiplier",
+)
+approx(janeFlinchDisorderWhiteBox.damage.multipliers.anomaly, 5.625, "Jane core whitebox effective Flinch multiplier")
+
+const janeAssaultWhiteBox = calculateInCombatPanel(catalog, minimalInput({
+    combatBuffs: {
+        activeBuffIds: ["jane_doe.core_insight", "jane_doe.cinema_2_assault_crit"],
+    },
+    damage: {
+        selectedEventId: "jane-assault",
+        events: [{ id: "jane-assault", kind: "anomaly", anomalyEffect: "assault" }],
+    },
+}))
+assert.match(
+    janeAssaultWhiteBox.damage.whiteBoxRows.find(row => row.label === "异常暴击区")?.formula ?? "",
+    /1 \+ 100% × 100%/,
+    "Jane core plus cinema 2 whitebox should expose 100% anomaly crit rate and damage",
 )
 
 const juhufuUltimate = calculateInCombatPanel(catalog, {
@@ -1465,7 +1625,7 @@ const juhufuUltimate = calculateInCombatPanel(catalog, {
 approx(juhufuUltimate.damage.multipliers.directDamageBonus, 0.4, "Juhufu core passive should boost all ultimate skills")
 assert.match(
     juhufuUltimate.damage.whiteBoxRows.find(row => row.label === "增伤乘区")?.formula ?? "",
-    /技能专属增伤 40%/,
+    /技能目标增伤 40%/,
 )
 
 const juhufuBasic = calculateInCombatPanel(catalog, {
@@ -1508,7 +1668,7 @@ skillObjectTargetCatalog.combatBuffs.push({
             id: "frost_moon_damage_bonus",
             type: "fixed",
             stat: "dmgBonus",
-            value: 50,
+            value: 20,
             mode: "flat",
             target: {
                 kind: "skill",
@@ -1525,7 +1685,7 @@ skillObjectTargetCatalog.combatBuffs.push({
             id: "frost_moon_charge_3_multiplier_bonus",
             type: "fixed",
             stat: "skillMultiplierBonus",
-            value: 1500,
+            value: 20,
             mode: "flat",
             target: {
                 kind: "skill",
@@ -1619,15 +1779,15 @@ const skillObjectCharge3 = calculateInCombatPanel(skillObjectTargetCatalog, {
         },
     },
 })
-approx(skillObjectCharge3.damage.multipliers.directDamageBonus, 0.5, "Skill target dmgBonus should only enter the matched event damage zone")
-approx(skillObjectCharge3.damage.multipliers.skillMultiplierBonus, 15, "Skill target multiplier bonus should convert 1500% to +15")
-approx(skillObjectCharge3.damage.multipliers.skill, skillObjectCharge3.damage.multipliers.baseSkill + 15, "Skill target multiplier bonus should add to the selected skill multiplier")
+approx(skillObjectCharge3.damage.multipliers.directDamageBonus, 0.2, "20% skill target damage bonus should enter the additive damage zone")
+approx(skillObjectCharge3.damage.multipliers.skillMultiplierBonus, 0.2, "20% skill multiplier bonus should convert to +0.2")
+approx(skillObjectCharge3.damage.multipliers.skill, skillObjectCharge3.damage.multipliers.baseSkill + 0.2, "Skill multiplier bonus should add to the selected skill multiplier instead of the damage zone")
 approx(skillObjectCharge3.damage.targetBreakdown.enemyDefReduction, 0.2, "Skill target defense reduction should affect the matched event")
 approx(skillObjectCharge3.damage.targetBreakdown.enemyResReduction, 0.1, "Skill target resistance reduction should affect the matched event")
 approx(skillObjectCharge3.damage.targetBreakdown.resIgnore, 0.1, "Skill target resistance ignore should affect the matched event")
 assert.match(
     skillObjectCharge3.damage.whiteBoxRows.find(row => row.label === "增伤乘区")?.formula ?? "",
-    /技能专属增伤 50%/,
+    /技能目标增伤 20%/,
 )
 
 const skillObjectCharge2 = calculateInCombatPanel(skillObjectTargetCatalog, {
@@ -1649,7 +1809,7 @@ const skillObjectCharge2 = calculateInCombatPanel(skillObjectTargetCatalog, {
         },
     },
 })
-approx(skillObjectCharge2.damage.multipliers.directDamageBonus, 0.5, "Move-scoped skill target dmgBonus should affect sibling rows")
+approx(skillObjectCharge2.damage.multipliers.directDamageBonus, 0.2, "Move-scoped skill target dmgBonus should affect sibling rows")
 approx(skillObjectCharge2.damage.multipliers.skillMultiplierBonus, 0, "Row-scoped skill target multiplier should not affect sibling rows")
 approx(skillObjectCharge2.damage.targetBreakdown.enemyDefReduction, 0.2, "Move-scoped skill target defense reduction should affect sibling rows")
 approx(skillObjectCharge2.damage.targetBreakdown.enemyResReduction, 0.1, "Move-scoped skill target resistance reduction should affect sibling rows")
@@ -1679,6 +1839,63 @@ approx(skillObjectOtherMove.damage.multipliers.skillMultiplierBonus, 0, "Skill t
 approx(skillObjectOtherMove.damage.targetBreakdown.enemyDefReduction, 0, "Skill target defense reduction should not affect other moves")
 approx(skillObjectOtherMove.damage.targetBreakdown.enemyResReduction, 0, "Skill target resistance reduction should not affect other moves")
 approx(skillObjectOtherMove.damage.targetBreakdown.resIgnore, 0, "Skill target resistance ignore should not affect other moves")
+
+function calculateSkillTargetCurrentAttributeResistance(resReductionStat, skillRef) {
+    const target = {
+        kind: "skill",
+        skillTargets: [{
+            kind: "specific",
+            agentSkillId: "hoshimi_miyabi",
+            categoryId: "basic",
+            moveId: "frost_moon",
+        }],
+    }
+    return calculateInCombatPanel(catalog, {
+        ...skillObjectBaseInput,
+        combatBuffs: {
+            manualEffects: [{
+                id: `skill-current-res-${resReductionStat}`,
+                label: resReductionStat,
+                effects: [
+                    { id: "skill-current-res-reduction", type: "fixed", stat: resReductionStat, value: 10, mode: "flat", target },
+                    { id: "skill-current-res-ignore", type: "fixed", stat: "iceResIgnore", value: 10, mode: "flat", target },
+                ],
+            }],
+        },
+        damage: {
+            skillRef,
+            target: {
+                defense: 953,
+                levelCoefficient: 794,
+                resistanceByElement: { ice: 20 },
+            },
+        },
+    })
+}
+
+const currentAttributeSkillRef = {
+    agentSkillId: "hoshimi_miyabi",
+    categoryId: "basic",
+    moveId: "frost_moon",
+    rowId: "charge_3",
+    level: 12,
+}
+const skillCurrentAttributeAliases = calculateSkillTargetCurrentAttributeResistance("enemyResReduction", currentAttributeSkillRef)
+const skillExplicitIceResistance = calculateSkillTargetCurrentAttributeResistance("enemyIceResReduction", currentAttributeSkillRef)
+approx(skillCurrentAttributeAliases.damage.targetBreakdown.enemyResReduction, 0.1, "Skill-targeted current-attribute reduction should affect the matching move")
+approx(skillCurrentAttributeAliases.damage.targetBreakdown.resIgnore, 0.1, "Skill-targeted resolved resistance ignore should affect the matching move")
+approx(skillCurrentAttributeAliases.damage.multipliers.resistance, skillExplicitIceResistance.damage.multipliers.resistance, "Skill-targeted current-attribute aliases should preserve the explicit-element resistance multiplier")
+approx(skillCurrentAttributeAliases.damage.finalDamage, skillExplicitIceResistance.damage.finalDamage, "Skill-targeted current-attribute aliases should preserve explicit-element final damage")
+
+const skillCurrentAttributeOtherMove = calculateSkillTargetCurrentAttributeResistance("enemyResReduction", {
+    agentSkillId: "hoshimi_miyabi",
+    categoryId: "special",
+    moveId: "ex_flying_snow",
+    rowId: "slash",
+    level: 12,
+})
+approx(skillCurrentAttributeOtherMove.damage.targetBreakdown.enemyResReduction, 0, "Skill-targeted current-attribute reduction should not affect another move")
+approx(skillCurrentAttributeOtherMove.damage.targetBreakdown.resIgnore, 0, "Skill-targeted current-attribute resistance ignore should not affect another move")
 
 const skillObjectManualMultiplier = calculateInCombatPanel(skillObjectTargetCatalog, {
     ...skillObjectBaseInput,
@@ -1778,6 +1995,7 @@ const sheerBaseInput = {
                 damageElement: "physical",
                 skillMultiplier: 100,
                 critMode: "nonCrit",
+                stunned: false,
             },
         ],
         target: {
@@ -1821,6 +2039,7 @@ const sheerStunned = calculateInCombatPanel(catalog, minimalInput({
     ...sheerBaseInput,
     damage: {
         ...sheerBaseInput.damage,
+        events: sheerBaseInput.damage.events.map(event => ({ ...event, stunned: true })),
         target: {
             ...sheerBaseInput.damage.target,
             stunned: true,
@@ -2382,5 +2601,183 @@ const yixuanCinemaTwoChain = calculateYixuanCinemaTwoEvent({
 approx(yixuanCinemaTwoUltimate.damage.targetBreakdown.resIgnore, 0.15, "Yixuan cinema 2 should ignore ether RES for ultimates")
 approx(yixuanCinemaTwoUltimate.damage.multipliers.resistance, 0.95, "Yixuan cinema 2 ultimate RES multiplier should reflect 15% RES ignore")
 approx(yixuanCinemaTwoChain.damage.targetBreakdown.resIgnore, 0, "Yixuan cinema 2 should not ignore ether RES for non-ultimate chain skills")
+
+function calculateElementScopedModifier({ agentId = exampleInput.agentId, kind = "direct", element, stat, value, critMode = "crit" }) {
+    return calculateInCombatPanel(catalog, minimalInput({
+        agentId,
+        combatBuffs: {
+            manualEffects: stat ? [{
+                id: `manual-${stat}`,
+                label: stat,
+                effects: [{ id: `effect-${stat}`, type: "fixed", target: { kind: "default" }, stat, mode: "flat", value }],
+            }] : [],
+        },
+        damage: {
+            selectedEventId: `${kind}-${element}`,
+            events: [{
+                id: `${kind}-${element}`,
+                kind,
+                damageElement: element,
+                skillMultiplier: 100,
+                critMode,
+                ...(kind === "anomaly" ? { anomalyEffect: "burn", settlementType: "attribute", procCount: 1 } : {}),
+            }],
+            target: zeroResistanceTarget(),
+        },
+    }))
+}
+
+const fireCritBaseline = calculateElementScopedModifier({ element: "fire" })
+const fireCritScoped = calculateElementScopedModifier({ element: "fire", stat: "fireCritDmg", value: 30 })
+const physicalCritScoped = calculateElementScopedModifier({ element: "physical", stat: "fireCritDmg", value: 30 })
+approx(fireCritScoped.damage.multipliers.critDmg, fireCritBaseline.damage.multipliers.critDmg + 0.3, "Fire CRIT DMG should affect fire direct damage")
+approx(physicalCritScoped.damage.multipliers.critDmg, fireCritBaseline.damage.multipliers.critDmg, "Fire CRIT DMG should not affect physical direct damage")
+assert.ok(fireCritScoped.damage.finalDamage > fireCritBaseline.damage.finalDamage, "Matching element CRIT DMG should increase damage")
+assert.ok(fireCritScoped.damage.whiteBoxRows.some(row => row.label === "暴击乘区" && row.formula.includes("属性伤害暴击伤害")))
+
+const fireSheerCritScoped = calculateElementScopedModifier({ agentId: "yixuan", kind: "sheer", element: "fire", stat: "fireCritDmg", value: 30 })
+const physicalSheerCritScoped = calculateElementScopedModifier({ agentId: "yixuan", kind: "sheer", element: "physical", stat: "fireCritDmg", value: 30 })
+approx(fireSheerCritScoped.damage.multipliers.critDmg, physicalSheerCritScoped.damage.multipliers.critDmg + 0.3, "Element CRIT DMG should affect matching sheer damage")
+
+const fireAnomalyBaseline = calculateElementScopedModifier({ kind: "anomaly", element: "fire", critMode: "nonCrit" })
+const fireAnomalyCritScoped = calculateElementScopedModifier({ kind: "anomaly", element: "fire", stat: "fireCritDmg", value: 30, critMode: "nonCrit" })
+approx(fireAnomalyCritScoped.damage.finalDamage, fireAnomalyBaseline.damage.finalDamage, "Element direct CRIT DMG should not affect anomaly damage")
+
+const electricDefIgnore = calculateElementScopedModifier({ element: "electric", stat: "electricDefIgnore", value: 25, critMode: "nonCrit" })
+const physicalDefIgnore = calculateElementScopedModifier({ element: "physical", stat: "electricDefIgnore", value: 25, critMode: "nonCrit" })
+approx(electricDefIgnore.damage.targetBreakdown.enemyDefReduction, 0.25, "Electric DEF ignore should affect electric damage")
+approx(physicalDefIgnore.damage.targetBreakdown.enemyDefReduction, 0, "Electric DEF ignore should not affect physical damage")
+assert.ok(electricDefIgnore.damage.multipliers.defense > physicalDefIgnore.damage.multipliers.defense)
+
+const yeShunguang = meta.agents.find(item => item.id === "ye_shunguang")
+assert.ok(yeShunguang, "Meta should expose Ye Shunguang")
+
+function calculateYeShunguangSkill({
+    categoryId = "special",
+    moveId = "ex_clarity_return_dust",
+    rowId = "damage",
+    activeBuffIds = [],
+    stunMultiplierPercent = 150,
+    stunned = false,
+} = {}) {
+    const id = `ye-${categoryId}-${moveId}-${rowId}`
+    return calculateInCombatPanel(catalog, minimalInput({
+        agentId: "ye_shunguang",
+        coreSkillLevel: "F",
+        combatBuffs: { activeBuffIds },
+        damage: {
+            selectedEventId: id,
+            events: [{
+                id,
+                kind: "direct",
+                critMode: "nonCrit",
+                stunned,
+                skillRef: {
+                    agentSkillId: "ye_shunguang",
+                    categoryId,
+                    moveId,
+                    rowId,
+                    level: 12,
+                },
+            }],
+            target: zeroResistanceTarget({ stunMultiplierPercent }),
+        },
+    }))
+}
+
+const yeCoreBuffId = "agent:ye_shunguang.corePassive"
+const yeCinemaFourBuffId = "agent:ye_shunguang.cinema.4"
+for (const [stunMultiplierPercent, expectedBase, expectedCinemaFour] of [
+    [150, 1.5, 1.5],
+    [250, 2.1, 2.5],
+    [350, 2.1, 3],
+]) {
+    const baseCurtain = calculateYeShunguangSkill({
+        activeBuffIds: [yeCoreBuffId],
+        stunMultiplierPercent,
+        stunned: false,
+    })
+    const cinemaFourCurtain = calculateYeShunguangSkill({
+        activeBuffIds: [yeCoreBuffId, yeCinemaFourBuffId],
+        stunMultiplierPercent,
+        stunned: false,
+    })
+    approx(baseCurtain.damage.multipliers.stun, expectedBase, `Ye Shunguang curtain cap at ${stunMultiplierPercent}%`)
+    approx(cinemaFourCurtain.damage.multipliers.stun, expectedCinemaFour, `Ye Shunguang cinema 4 curtain cap at ${stunMultiplierPercent}%`)
+}
+
+const yeCurtainWhiteBox = calculateYeShunguangSkill({
+    activeBuffIds: [yeCoreBuffId],
+    stunMultiplierPercent: 350,
+    stunned: false,
+})
+approx(yeCurtainWhiteBox.damage.targetBreakdown.stunDmgMultiplierBonusCapAlways, 1.1, "Ye Shunguang core passive should store a 110% curtain vulnerability cap")
+assert.match(
+    yeCurtainWhiteBox.damage.whiteBoxRows.find(row => row.label === "失衡乘区")?.formula ?? "",
+    /帷幕易伤加成上限 110%/,
+)
+
+const yeOutsideCurtain = calculateYeShunguangSkill({
+    categoryId: "basic",
+    moveId: "quick_sword",
+    rowId: "hit_1",
+    activeBuffIds: [yeCoreBuffId],
+    stunMultiplierPercent: 350,
+    stunned: false,
+})
+approx(yeOutsideCurtain.damage.multipliers.stun, 1, "Ye Shunguang non-Clarity skills should not use curtain vulnerability")
+
+const yeCinemaFourWithoutCore = calculateYeShunguangSkill({
+    activeBuffIds: [yeCinemaFourBuffId],
+    stunMultiplierPercent: 350,
+    stunned: false,
+})
+approx(yeCinemaFourWithoutCore.damage.multipliers.stun, 1, "Ye Shunguang cinema 4 should not create curtain vulnerability without the core passive")
+
+const yeReturnDustBase = calculateYeShunguangSkill()
+const yeReturnDustCinemaSix = calculateYeShunguangSkill({
+    activeBuffIds: ["agent:ye_shunguang.cinema.6"],
+})
+approx(yeReturnDustCinemaSix.damage.multipliers.skillMultiplierBonus, 15, "Ye Shunguang cinema 6 should add 1500% to Return to Dust")
+approx(
+    yeReturnDustCinemaSix.damage.multipliers.skill,
+    yeReturnDustBase.damage.multipliers.skill + 15,
+    "Ye Shunguang cinema 6 should add the final-hit multiplier to Return to Dust",
+)
+
+const yeCutDelusionCinemaSix = calculateYeShunguangSkill({
+    categoryId: "chain",
+    moveId: "ultimate_cut_delusion_open_heaven",
+    activeBuffIds: ["agent:ye_shunguang.cinema.2", "agent:ye_shunguang.cinema.6"],
+})
+approx(yeCutDelusionCinemaSix.damage.multipliers.skillMultiplierBonus, 15, "Ye Shunguang cinema 6 should add 1500% to Cut Delusion, Open Heaven")
+approx(yeCutDelusionCinemaSix.damage.targetBreakdown.enemyDefReduction, 0.4, "Ye Shunguang cinema 6 final-hit damage should inherit cinema 2 DEF ignore")
+
+const yeFlyingLightCinemaSix = calculateYeShunguangSkill({
+    moveId: "ex_clarity_flying_light",
+    rowId: "consume_1_sword_force",
+    activeBuffIds: ["agent:ye_shunguang.cinema.6"],
+})
+approx(yeFlyingLightCinemaSix.damage.multipliers.skillMultiplierBonus, 0, "Ye Shunguang cinema 6 should not add its final-hit multiplier to other skills")
+
+assert.equal(resolveDefaultCalculationConfig(yeShunguang.defaultCalculationConfig, 5).name.zhCN, "2影12变2大")
+const yeCinemaSixAxis = resolveDefaultCalculationConfig(yeShunguang.defaultCalculationConfig, 6)
+assert.equal(yeCinemaSixAxis.name.zhCN, "6影叶12变6大")
+assert.deepEqual(
+    yeCinemaSixAxis.events.map(event => [event.kind, event.skillGroupId ?? event.skillRef?.moveId, Number(event.count ?? 1)]),
+    [
+        ["skillGroup", "skill_group_2", 12],
+        ["direct", "ultimate_cut_delusion_open_heaven", 6],
+        ["direct", "ultimate_chase_cloud_thunder", 2],
+        ["direct", "ex_clarity_return_dust", 6],
+    ],
+)
+const expandedYeCinemaSixAxis = expandCalculationConfigSkillGroups(yeCinemaSixAxis, yeShunguang, { strict: true })
+assert.equal(expandedYeCinemaSixAxis.events.some(event => event.kind === "skillGroup"), false, "Ye Shunguang cinema 6 axis should fully expand its short-axis group")
+assert.equal(
+    expandedYeCinemaSixAxis.events.find(event => event.skillRef?.moveId === "ex_clarity_flying_light")?.count,
+    96,
+    "Ye Shunguang cinema 6 axis should expand twelve cinema 2 short axes without losing their eight Flying Light uses",
+)
 
 console.log("damage whitebox tests passed")

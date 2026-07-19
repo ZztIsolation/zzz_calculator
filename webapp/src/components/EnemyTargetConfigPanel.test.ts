@@ -28,12 +28,17 @@ const naiveStubs = {
   },
 }
 
-function mountPanel(targetConfig: any = {}) {
+function mountPanel(targetConfig: any = {}, metaOverrides: any = {}) {
   return mount(EnemyTargetConfigPanel, {
     props: {
       damageElement: "ice",
       meta: {
-        damageTargetPresets: [{ id: "normal-boss", name: { zhCN: "普通 Boss" }, defense: 953 }],
+        damageTargetPresets: [
+          { id: "wandering-hunter", name: { zhCN: "彷徨猎手" }, defense: 1588 },
+          { id: "taichu-nightmare", name: { zhCN: "低防怪如太初梦魇" }, defense: 476 },
+          { id: "normal-boss", name: { zhCN: "正常boss" }, defense: 953 },
+        ],
+        ...metaOverrides,
       },
       targetConfig: {
         ...defaultTargetConfig(),
@@ -66,6 +71,21 @@ describe("EnemyTargetConfigPanel", () => {
     expect(emitted.resistanceByElement.ice).toBe(13)
   })
 
+  it("keeps only the stun multiplier in target configuration", async () => {
+    const wrapper = mountPanel({ stunned: false, stunMultiplierPercent: 150 })
+
+    expect(wrapper.text()).toContain("初始失衡倍率")
+    expect(wrapper.text()).not.toContain("启用")
+    expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false)
+
+    const multiplier = wrapper.findComponent("[data-testid='target-stun-multiplier-input']")
+    expect(multiplier.props("step")).toBe(5)
+    await multiplier.vm.$emit("update:value", 175)
+    const emitted = wrapper.emitted("update:targetConfig")?.at(-1)?.[0] as any
+    expect(emitted.stunMultiplierPercent).toBe(175)
+    expect(emitted).not.toHaveProperty("stunned")
+  })
+
   it("locks preset defense values and only edits custom defense", async () => {
     const presetWrapper = mountPanel({ presetId: "normal-boss", defense: 953 })
 
@@ -76,6 +96,7 @@ describe("EnemyTargetConfigPanel", () => {
 
     const defenseInput = customWrapper.findComponent("[data-testid='target-defense-input']")
     expect(defenseInput.exists()).toBe(true)
+    expect(defenseInput.props("step")).toBe(50)
     await defenseInput.vm.$emit("update:value", 1000)
 
     const emitted = customWrapper.emitted("update:targetConfig")?.at(-1)?.[0] as any
@@ -83,7 +104,7 @@ describe("EnemyTargetConfigPanel", () => {
   })
 
   it("copies preset defense when selecting a normal preset", async () => {
-    const wrapper = mountPanel({ presetId: "custom", defense: 1200 })
+    const wrapper = mountPanel({ presetId: "normal-boss", defense: 1200 })
     const select = wrapper.findComponent("[data-testid='target-preset-select']")
 
     await select.vm.$emit("update:value", "normal-boss")
@@ -91,5 +112,20 @@ describe("EnemyTargetConfigPanel", () => {
     const emitted = wrapper.emitted("update:targetConfig")?.at(-1)?.[0] as any
     expect(emitted.presetId).toBe("normal-boss")
     expect(emitted.defense).toBe(953)
+  })
+
+  it("keeps the original preset order and has no concrete Boss controls", () => {
+    const wrapper = mountPanel()
+    const select = wrapper.findComponent("[data-testid='target-preset-select']")
+
+    expect(select.props("options").map((option: any) => option.label)).toEqual([
+      "1588（彷徨猎手）",
+      "476（低防怪如太初梦魇）",
+      "953（正常boss）",
+      "自定义",
+    ])
+    expect(wrapper.text()).not.toContain("具体 Boss")
+    expect(wrapper.find("[data-testid='boss-profile-select']").exists()).toBe(false)
+    expect(wrapper.find("[data-testid='boss-encounter-select']").exists()).toBe(false)
   })
 })

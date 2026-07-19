@@ -43,4 +43,21 @@ describe("PanelStatTable", () => {
     const labels = wrapper.findAll("th").map(item => item.text())
     expect(labels).not.toContain("贯穿力")
   })
+
+  it("truncates anomaly mastery like the in-game panel without changing the input", () => {
+    const precisePanel = {
+      ...panel,
+      anomalyMastery: 195.96,
+    }
+    const wrapper = mount(PanelStatTable, {
+      props: {
+        panel: precisePanel,
+      },
+    })
+
+    const masteryRow = wrapper.findAll("tr").find(row => row.text().includes("异常掌控"))
+    expect(masteryRow?.text()).toContain("195")
+    expect(masteryRow?.text()).not.toContain("196")
+    expect(precisePanel.anomalyMastery).toBe(195.96)
+  })
 })

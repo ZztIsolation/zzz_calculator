@@ -22,6 +22,7 @@ const agent = {
                     id: "slash",
                     kind: "direct",
                     count: 2,
+                    stunned: true,
                     critMode: "expected",
                     skillRef: {
                         agentSkillId: "test_agent_skill",
@@ -73,6 +74,7 @@ const config = {
             kind: "skillGroup",
             skillGroupId: "loop",
             count: 10,
+            stunned: false,
         },
         {
             id: "ult-ref",
@@ -85,6 +87,7 @@ const config = {
             kind: "skillGroup",
             skillGroupId: "loop",
             count: 3,
+            stunned: true,
         },
     ],
 }
@@ -106,6 +109,9 @@ assert.equal(expandedConfig.events[0].count, 1)
 assert.equal(expandedConfig.events[1].count, 20)
 assert.equal(expandedConfig.events[2].count, 2)
 assert.equal(expandedConfig.events[3].count, 6)
+assert.equal(expandedConfig.events[1].stunned, false)
+assert.equal(expandedConfig.events[2].stunned, true)
+assert.equal(expandedConfig.events[3].stunned, true)
 assert.equal(JSON.stringify({ agent, config }), before)
 
 const expandedEvents = expandCalculationEvents(config.events, agent, { selectedEventId: "ult-ref" })
@@ -118,6 +124,7 @@ assert.deepEqual(defaultRef, {
     kind: "skillGroup",
     skillGroupId: "loop",
     count: 10,
+    stunned: true,
 })
 
 const clamped = normalizeSkillGroupCounts(agent, { loop: 999, ultimate: -5 })
