@@ -2,6 +2,15 @@
 
 # Changelog
 
+## 2026-07-19 - Fixed Direct Settings Route On GitHub Pages
+
+Removed the generated `settings.html` self-redirect. GitHub Pages resolves the
+extensionless `/settings` URL to `settings.html` when that file exists, so the
+redirect back to `/settings` could loop before Vue Router loaded. The Pages
+artifact now deliberately omits `settings.html`; direct visits fall through to
+the deployed SPA `404.html` while in-app navigation continues to use the normal
+history route. The artifact verifier rejects any future `settings.html` output.
+
 ## 2026-07-19 - Fixed Legacy Helper Upgrade Dead End
 
 Fixed the legacy Helper dead end in the Drive Disc scanner. The page now records
