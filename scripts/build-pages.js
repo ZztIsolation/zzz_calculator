@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process"
 import { createHash } from "node:crypto"
 import { createReadStream, createWriteStream, existsSync } from "node:fs"
-import { copyFile, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { Readable } from "node:stream"
 import { pipeline } from "node:stream/promises"
@@ -163,7 +163,6 @@ async function verifyPagesArtifact(maintenanceEnabled) {
         "calculate.html",
         "drive-discs.html",
         "accounts.html",
-        "settings.html",
         "static/catalog.json",
         "static/app-config.json",
         "downloads/zzz-scanner/manifest.json",
@@ -198,6 +197,7 @@ async function verifyPagesArtifact(maintenanceEnabled) {
     const helperManifest = JSON.parse(await readFile(path.join(outDir, "downloads", "zzz-scanner", "helper-manifest.json"), "utf8"))
     assertArtifact(helperManifest.version === helperManifestSource.version, "Helper manifest version mismatch")
     assertArtifact(helperManifest.sha256 === helperManifestSource.sha256, "Helper manifest SHA-256 mismatch")
+    assertArtifact(!paths.has("settings.html"), "settings.html would intercept the /settings SPA route")
 
     for (const [fileName, target] of [
         ["calculate.html", "/"],
@@ -277,7 +277,7 @@ await copyFile(path.join(outDir, "index.html"), path.join(outDir, "404.html"))
 await writeFile(path.join(outDir, "calculate.html"), legacyRedirect("返回计算工作台", "/"), "utf8")
 await writeFile(path.join(outDir, "drive-discs.html"), legacyRedirect("前往驱动盘仓库", "/discs"), "utf8")
 await writeFile(path.join(outDir, "accounts.html"), legacyRedirect("前往账号页", "/accounts"), "utf8")
-await writeFile(path.join(outDir, "settings.html"), legacyRedirect("前往设置页", "/settings"), "utf8")
+await rm(path.join(outDir, "settings.html"), { force: true })
 
 if (maintenanceEnabled) {
     await writeFile(path.join(outDir, "maintenance.html"), legacyRedirect("前往维护页", "/maintenance"), "utf8")
