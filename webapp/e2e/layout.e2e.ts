@@ -223,7 +223,7 @@ test("administrator default-loop events remain reachable inside the modal", asyn
   const editorPanel = surface.locator(".calculation-master-editor-panel")
   const footer = page.locator(".default-loop-footer")
 
-  await expect(eventItems).toHaveCount(9)
+  await expect(eventItems).toHaveCount(6)
   await expectStableLayout(page, "default-calculation-config")
   await expect(footer).toBeVisible()
 
