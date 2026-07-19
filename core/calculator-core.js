@@ -492,6 +492,14 @@ function calculateAnomalyMastery(baseAnomalyMastery, anomalyMasteryPct = 0, anom
         + Number(anomalyMasteryFlat ?? 0)
 }
 
+const ANOMALY_MASTERY_PROFICIENCY_THRESHOLD = 140
+
+function calculateMasteryConvertedProficiency(anomalyMastery, proficiencyPerPoint = 0) {
+    const wholeMastery = Math.floor(Math.max(0, Number(anomalyMastery ?? 0)))
+    const masteryAboveThreshold = Math.max(0, wholeMastery - ANOMALY_MASTERY_PROFICIENCY_THRESHOLD)
+    return Math.floor(masteryAboveThreshold * Math.max(0, Number(proficiencyPerPoint ?? 0)))
+}
+
 function isStoredPercentStat(stat, mode) {
     return mode === "pct" || STORED_PERCENT_STATS.has(stat)
 }
@@ -2117,8 +2125,10 @@ function calculateCombatPanelFromTotals(agent, outOfCombat, bonusTotals) {
     )
     panel.anomalyProficiency = outOfCombat.panel.anomalyProficiency
         + bonusTotals.anomalyProficiencyFlat
-        + Math.max(0, panel.anomalyMastery - 140)
-            * Math.max(0, Number(bonusTotals.anomalyProficiencyPerMasteryAbove140 ?? 0))
+        + calculateMasteryConvertedProficiency(
+            panel.anomalyMastery,
+            bonusTotals.anomalyProficiencyPerMasteryAbove140,
+        )
     panel.energyRegen = outOfCombat.panel.energyRegen * (1 + bonusTotals.energyRegenPct)
     panel.penFlat = outOfCombat.panel.penFlat + bonusTotals.penFlat
     panel.penRatio = outOfCombat.panel.penRatio + bonusTotals.penRatio
@@ -5734,8 +5744,10 @@ export function createInCombatPanelCalculator(catalog, input) {
                 )
                 panelValues[PANEL_KEY_LOOKUP.anomalyProficiency] = densePanelValue(outPanelValues, "anomalyProficiency")
                     + denseCombatValue(combatValues, "anomalyProficiencyFlat")
-                    + Math.max(0, panelValues[PANEL_KEY_LOOKUP.anomalyMastery] - 140)
-                        * Math.max(0, denseCombatValue(combatValues, "anomalyProficiencyPerMasteryAbove140"))
+                    + calculateMasteryConvertedProficiency(
+                        panelValues[PANEL_KEY_LOOKUP.anomalyMastery],
+                        denseCombatValue(combatValues, "anomalyProficiencyPerMasteryAbove140"),
+                    )
                 panelValues[PANEL_KEY_LOOKUP.energyRegen] = densePanelValue(outPanelValues, "energyRegen")
                     * (1 + denseCombatValue(combatValues, "energyRegenPct"))
                 panelValues[PANEL_KEY_LOOKUP.penFlat] = densePanelValue(outPanelValues, "penFlat")
@@ -5943,8 +5955,10 @@ export function createInCombatPanelCalculator(catalog, input) {
                     )
                     panelValues[PANEL_KEY_LOOKUP.anomalyProficiency] = outPanelValues[PANEL_KEY_LOOKUP.anomalyProficiency]
                         + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.anomalyProficiencyFlat]
-                        + Math.max(0, panelValues[PANEL_KEY_LOOKUP.anomalyMastery] - 140)
-                            * Math.max(0, fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.anomalyProficiencyPerMasteryAbove140])
+                        + calculateMasteryConvertedProficiency(
+                            panelValues[PANEL_KEY_LOOKUP.anomalyMastery],
+                            fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.anomalyProficiencyPerMasteryAbove140],
+                        )
                     panelValues[PANEL_KEY_LOOKUP.energyRegen] = outPanelValues[PANEL_KEY_LOOKUP.energyRegen]
                         * (1 + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.energyRegenPct])
                     panelValues[PANEL_KEY_LOOKUP.penFlat] = outPanelValues[PANEL_KEY_LOOKUP.penFlat]
@@ -6146,8 +6160,10 @@ export function createInCombatPanelCalculator(catalog, input) {
                 const anomalyProficiency = needsAnomaly
                     ? outPanelValue("anomalyProficiency")
                         + denseCombatValue(fixedCombatValues, "anomalyProficiencyFlat")
-                        + Math.max(0, anomalyMastery - 140)
-                            * Math.max(0, denseCombatValue(fixedCombatValues, "anomalyProficiencyPerMasteryAbove140"))
+                        + calculateMasteryConvertedProficiency(
+                            anomalyMastery,
+                            denseCombatValue(fixedCombatValues, "anomalyProficiencyPerMasteryAbove140"),
+                        )
                     : 0
                 let sheerForce = 0
                 if (needsSheer && compiledDamageTarget.isRuptureAgent) {

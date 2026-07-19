@@ -45,6 +45,48 @@ textarea {
   font: inherit;
 }
 
+.n-select .n-base-suffix {
+  right: 2px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: calc(var(--n-height) - 4px);
+  box-sizing: border-box;
+  border-left: 1px solid #94a3b8;
+  border-radius: 0 4px 4px 0;
+  background: #eef2f7;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.n-select .n-base-selection:not(.n-base-selection--disabled):hover .n-base-suffix,
+.n-select .n-base-selection--focus .n-base-suffix,
+.n-select .n-base-selection--active .n-base-suffix {
+  border-left-color: #93c5fd;
+  background: #eaf2ff;
+}
+
+.n-select .n-base-selection:not(.n-base-selection--disabled):hover .n-base-suffix__arrow,
+.n-select .n-base-selection--focus .n-base-suffix__arrow,
+.n-select .n-base-selection--active .n-base-suffix__arrow {
+  color: var(--app-blue);
+}
+
+.n-select .n-base-selection--disabled .n-base-suffix {
+  border-left-color: #cbd5e1;
+  background: #e9eef4;
+  cursor: not-allowed;
+}
+
+.n-select .n-base-selection--disabled :where(.n-base-selection-input, .n-base-selection-placeholder) {
+  color: #64748b;
+}
+
+.n-select .n-base-selection--disabled .n-base-suffix__arrow {
+  color: #94a3b8;
+}
+
 .num {
   font-variant-numeric: tabular-nums;
 }

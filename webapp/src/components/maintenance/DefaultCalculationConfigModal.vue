@@ -173,7 +173,7 @@ function apply() {
     :content-style="{ minHeight: '0', overflow: 'hidden' }"
     @update:show="close"
   >
-    <div v-if="draft" class="ui-layout-scope" data-layout-surface="default-calculation-config">
+    <div v-if="draft" class="default-loop-modal-content ui-layout-scope" data-layout-surface="default-calculation-config">
     <div class="default-loop-modal-body">
       <div class="default-loop-variant-bar">
         <NTabs :value="activeLevel" type="segment" class="default-loop-tabs" @update:value="activeLevel = Number($event)">
@@ -229,6 +229,7 @@ function apply() {
 </template>
 
 <style scoped>
+.default-loop-modal-content { height: 100%; min-height: 0; overflow: auto; }
 .default-loop-modal-body { display: grid; height: 100%; min-height: 0; grid-template-rows: auto minmax(0, 1fr); gap: 14px; }
 .default-loop-variant-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; }
 .default-loop-tabs { min-width: 0; }
@@ -239,7 +240,6 @@ function apply() {
 .default-loop-footer > div { display: flex; gap: 8px; }
 @container ui-layout (max-width: 860px) {
   .default-loop-modal-body { height: auto; min-height: 100%; }
-  :global(.default-loop-modal .n-card-content) { overflow: auto !important; }
 }
 @container ui-layout (max-width: 600px) {
   .default-loop-variant-bar { align-items: stretch; }

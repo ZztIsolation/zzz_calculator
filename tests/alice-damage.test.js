@@ -71,6 +71,15 @@ function driveDisc(partition, setId, mainStat) {
     }
 }
 
+function driveDiscWithProficiency(partition, setId, mainStat, anomalyProficiency = 0) {
+    return {
+        ...driveDisc(partition, setId, mainStat),
+        subStats: anomalyProficiency > 0
+            ? [{ stat: "anomalyProficiency", value: anomalyProficiency, mode: "flat" }]
+            : [],
+    }
+}
+
 const emptyMainStats = {
     1: { stat: "hpFlat", value: 0, mode: "flat" },
     2: { stat: "atkFlat", value: 0, mode: "flat" },
@@ -89,6 +98,15 @@ const phaethonMasteryDiscs = [
     driveDisc(1, "phaethons_melody", emptyMainStats[1]),
     driveDisc(2, "phaethons_melody", emptyMainStats[2]),
     ...masteryMainStatDiscs.slice(2),
+]
+
+const screenshotDiscs = [
+    driveDiscWithProficiency(1, "phaethons_melody", { stat: "hpFlat", value: 2200, mode: "flat" }, 36),
+    driveDiscWithProficiency(2, "fanged_metal", { stat: "atkFlat", value: 316, mode: "flat" }, 18),
+    driveDiscWithProficiency(3, "phaethons_melody", { stat: "defFlat", value: 184, mode: "flat" }, 27),
+    driveDiscWithProficiency(4, "fanged_metal", { stat: "anomalyProficiency", value: 92, mode: "flat" }),
+    driveDiscWithProficiency(5, "fanged_metal", { stat: "physicalDmg", value: 30, mode: "pct" }, 27),
+    driveDiscWithProficiency(6, "fanged_metal", { stat: "anomalyMastery", value: 30, mode: "pct" }, 18),
 ]
 
 assert.equal(agent.hidden, false, "Alice should be available after her mechanics are modeled")
@@ -116,22 +134,66 @@ assert.deepEqual(cinemaSixRow?.values, [3300])
 
 const defaultResult = calculate(configForCinema(0).events)
 approx(defaultResult.inCombat.panel.anomalyMastery, 142, "Alice in-combat anomaly mastery")
-approx(defaultResult.inCombat.panel.anomalyProficiency, 121.2, "Mastery above 140 should convert to proficiency")
+approx(defaultResult.inCombat.panel.anomalyProficiency, 121, "Converted proficiency should floor the decimal result")
 
 const masteryMainStatResult = calculate(configForCinema(0).events, { driveDiscs: masteryMainStatDiscs })
 approx(masteryMainStatResult.outOfCombat.panel.anomalyMastery, 184.6, "Alice slot 6 mastery should scale the 142 white stat by 30%")
+approx(masteryMainStatResult.inCombat.panel.anomalyProficiency, 188, "184.6 mastery should convert 70 proficiency after game rounding")
 approx(masteryMainStatResult.outOfCombat.bonusTotals.anomalyMasteryPct, 0.3, "Slot 6 mastery should use the percentage bucket")
 approx(masteryMainStatResult.outOfCombat.bonusTotals.anomalyMasteryFlat, 0, "Core skill mastery should remain part of the white stat")
 
 const phaethonMasteryResult = calculate(configForCinema(0).events, { driveDiscs: phaethonMasteryDiscs })
 approx(phaethonMasteryResult.outOfCombat.panel.anomalyMastery, 195.96, "Alice slot 6 and Phaethon 2-piece mastery")
 approx(phaethonMasteryResult.inCombat.panel.anomalyMastery, 195.96, "Alice in-combat mastery without an additional mastery Buff")
-approx(phaethonMasteryResult.inCombat.panel.anomalyProficiency, 207.536, "Corrected mastery should convert 89.536 proficiency")
+approx(phaethonMasteryResult.inCombat.panel.anomalyProficiency, 206, "Corrected mastery should convert 88 proficiency after game rounding")
 approx(phaethonMasteryResult.outOfCombat.bonusTotals.anomalyMasteryPct, 0.38, "Slot 6 and Phaethon percentages should add")
 assert.ok(
     phaethonMasteryResult.outOfCombat.appliedEffects.some(effect => effect.key === "phaethons_melody.twoPiece"),
     "Phaethon 2-piece should be applied to the out-of-combat panel",
 )
+
+const screenshotResult = calculateInCombatPanel(catalog, {
+    agentId: agent.id,
+    coreSkillLevel: "F",
+    wEngineId: "tenfold_starforge",
+    wEngineModificationLevel: 1,
+    driveDiscs: screenshotDiscs,
+    combatBuffs: {
+        activeBuffIds: [...activeBuffIds(0), "wEngine:tenfold_starforge.self"],
+    },
+})
+approx(screenshotResult.outOfCombat.panel.anomalyProficiency, 336, "Screenshot out-of-combat proficiency")
+approx(screenshotResult.outOfCombat.panel.anomalyMastery, 195.96, "Screenshot out-of-combat mastery retains exact precision")
+approx(screenshotResult.inCombat.panel.anomalyMastery, 255.96, "Screenshot in-combat mastery retains exact precision")
+approx(
+    screenshotResult.inCombat.panel.anomalyProficiency - screenshotResult.outOfCombat.panel.anomalyProficiency,
+    184,
+    "Screenshot converted proficiency",
+)
+approx(screenshotResult.inCombat.panel.anomalyProficiency, 520, "Screenshot in-combat proficiency")
+
+function calculateThresholdCase(anomalyMasteryFlat) {
+    return calculateInCombatPanel(catalog, {
+        agentId: agent.id,
+        coreSkillLevel: "none",
+        wEngineId: "tenfold_starforge",
+        wEngineModificationLevel: 1,
+        driveDiscs: [driveDisc(6, "fanged_metal", {
+            stat: "anomalyMasteryFlat",
+            value: anomalyMasteryFlat,
+            mode: "flat",
+        })],
+        combatBuffs: { activeBuffIds: ["agent:alice_thymefield.additionalAbility"] },
+    })
+}
+
+const belowThreshold = calculateThresholdCase(34.99)
+approx(belowThreshold.inCombat.panel.anomalyMastery, 140.99, "Fractional mastery below the next whole point")
+approx(belowThreshold.inCombat.panel.anomalyProficiency, 118, "140.99 mastery should not cross the 140-point threshold")
+
+const firstWholePoint = calculateThresholdCase(35)
+approx(firstWholePoint.inCombat.panel.anomalyMastery, 141, "First whole mastery point above the threshold")
+approx(firstWholePoint.inCombat.panel.anomalyProficiency, 119, "1.6 converted proficiency should floor to 1")
 
 const polarizedAssault = defaultResult.damage.events.find(event => event.id === "alice_polarized_assault")
 const physicalFollowup = defaultResult.damage.events.find(event => event.id === "alice_physical_anomaly_followup")
@@ -226,7 +288,7 @@ const indexedMastery = compiledCalculator.scoreOnlyFromIndexedSummary(
 )
 for (const [label, result] of [["compiled", compiledMastery], ["legacy", legacyMastery], ["indexed", indexedMastery]]) {
     approx(result.panel.anomalyMastery, 195.96, `Alice ${label} mastery summary`)
-    approx(result.panel.anomalyProficiency, 207.536, `Alice ${label} proficiency summary`)
+    approx(result.panel.anomalyProficiency, 206, `Alice ${label} proficiency summary`)
 }
 approx(compiledMastery.finalDamage, legacyMastery.finalDamage, "Corrected mastery compiled and legacy damage", 1e-6)
 

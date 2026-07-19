@@ -2,6 +2,105 @@
 
 # Changelog
 
+## 2026-07-19 - Matched Alice's In-Game Mastery Conversion Rounding
+
+Corrected Alice's Additional Ability to use the game's two-stage downward
+rounding. Current in-combat Anomaly Mastery is floored before applying the
+140-point threshold, and the resulting `1.6`-per-point Anomaly Proficiency
+conversion is floored again. The underlying Anomaly Mastery panel retains full
+precision for every other consumer.
+
+Unified the rule across ordinary panel calculation, dense optimization,
+fixed-event scoring, mixed-event scoring, and browser-local execution. With
+Core Skill F, a 30% slot-6 main stat, Phaethon's Melody, and Modification Level
+1 Tenfold Starforge, `255.96` Mastery now converts to `184` Proficiency and the
+reported in-combat total matches the observed `336 + 184 = 520` game panel.
+Added regression coverage for threshold boundaries, decimal conversion,
+compiled parity, browser parity, and the reported Drive Disc configuration.
+
+## 2026-07-19 - Added The Complete Official Attack W-Engine Catalog
+
+Imported all 24 W-Engines currently classified as `Attack` by the official
+Zenless Zone Zero wiki: 3 B-rank, 8 A-rank, and 13 S-rank entries. Added 23
+previously missing catalog records and retained the stable
+`cloudcleave_radiance` ID for Cloudcleave Radiance so saved builds continue to
+resolve without migration. Every entry now carries its official Chinese name,
+rarity, level-60 Base ATK and advanced stat, exact Modification Level 1-5
+values, full Chinese effect text, official detail-page sources, and a locally
+served official PNG icon.
+
+Structured all effects that the current maintenance model can represent using
+fixed rules, shared or independent stack groups, element-scoped bonuses,
+skill-type and skill-tag targets, conditions, durations, cooldown metadata,
+and exact per-rank value arrays. Corrected Cloudcleave Radiance so its Physical
+RES Ignore remains unconditional while its damage and CRIT DMG bonuses are
+separately marked as Ether Veil effects lasting 40 seconds. Only Cloudcleave
+Radiance links to a `relatedAgentId`, because Ye Shunguang is currently the
+only maintained Attack agent; no dangling IDs were invented for unavailable
+agents.
+
+Kept unsupported mechanics conservative instead of translating them into
+incorrect generic Buffs. Fixed Energy restoration, flat off-field Energy per
+second, independent proc damage, charge consumption, dynamic duration
+extension or pausing, and the Pelerine-only activation restriction remain in
+the authoritative effect text with explicit partial-model verification states.
+The supported numerical portions still participate in calculation, while the
+unsupported portions cannot silently inflate optimizer scores.
+
+Added a dedicated Attack W-Engine regression suite covering the complete
+official inventory and rarity distribution, level-60 panels, effect names,
+official sources and PNG assets, exact Modification materialization, safe
+partial-model boundaries, Cloudcleave condition separation, skill targeting,
+Brimstone's eight rank-5 ATK stacks, and Deep Sea Visitor's independent CRIT
+Rate effects. The new suite is part of the repository-wide `npm test` chain.
+
+## 2026-07-19 - Added Administrator-Controlled Teammate Buff Ordering
+
+Fixed teammate Buff ordering at its actual source of truth. The player Buff
+picker already preserved the order of each teammate's `buffs[]` array while
+flattening role groups, but the structured maintenance page could only edit and
+save one active Buff. It had no operation for reordering the secondary list and
+its `{ teammate, buff }` save request could not persist a reordered group. This
+made later-added entries appear after Cinema Buffs even when their gameplay
+source belonged earlier in the list.
+
+The teammate maintenance editor now adds a dedicated drag handle to every Buff
+row, visual before/after drop indicators, and compact up/down controls. Dragging
+is optimized for pointer use, while the explicit buttons provide precise and
+touch/keyboard-compatible ordering. The first Buff cannot move upward and the
+last cannot move downward. Reordering mutates only the selected teammate's
+draft array, keeps the currently edited Buff selected, enters the existing
+unsaved-draft state, and uses the normal page-level Save action instead of an
+independent or automatic write path.
+
+Extended `POST /api/maintenance/teammate-buffs` with the optional request-only
+field `buffOrder: string[]`. Existing `{ teammate, buff }` clients remain fully
+compatible when they omit it. When present, the backend materializes and
+validates the selected Buff, upserts it, then requires the order to contain
+every current Buff ID exactly once. Missing, duplicate, empty, or unknown IDs
+produce a `400` response asking the administrator to refresh. The upsert and
+reorder run inside the existing serialized `combat_buffs.json` mutation, so an
+invalid or stale order cannot partially save the current Buff or overwrite a
+concurrently added entry.
+
+Kept array order as the only persisted ordering contract. No numeric priority,
+semantic source-name sorting, or parallel schema field was added. Catalog
+loading, visibility filtering, metadata building, Vue candidate flattening,
+text search, and attribute/specialty filters all preserve the authored role and
+Buff sequence. After the canonical file is saved and the catalog is refreshed,
+the player-facing picker therefore receives the same ordering without a second
+frontend synchronization rule or a forced browser-storage migration.
+
+Reordered Qianxia's canonical teammate entries to Core Passive, Additional
+Ability, EX Special, Cinema 1, Cinema 2, and Cinema 4. Added Vue maintenance
+regressions for button moves, drag/drop, boundary disabling, selected-row
+stability, unsaved state, request serialization, and save/reload persistence.
+Added temporary-data maintenance API coverage for backward-compatible saves,
+valid atomic reorders, incomplete/duplicate/unknown order rejection, and
+unchanged files after rejection. Added shared candidate, picker filtering, and
+real Qianxia metadata assertions so future catalog changes cannot silently
+reintroduce the player-facing ordering regression.
+
 ## 2026-07-19 - Migrated Production Delivery To Server-Origin CDN Architecture
 
 Changed the primary production model from an automatically published GitHub

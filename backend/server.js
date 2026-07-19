@@ -1295,6 +1295,29 @@ function upsertById(items, item) {
     return next
 }
 
+function reorderByExactIds(items, requestedOrder, label = "条目") {
+    if (requestedOrder === undefined) {
+        return items
+    }
+    if (!Array.isArray(requestedOrder)) {
+        throw new Error(`${label}顺序必须是完整的 ID 数组。`)
+    }
+
+    const order = requestedOrder.map(id => String(id ?? "").trim())
+    const itemEntries = items.map(item => [requireId(item), item])
+    const itemIds = itemEntries.map(([id]) => id)
+    const uniqueOrder = new Set(order)
+    const itemById = new Map(itemEntries)
+    const isExactOrder = order.length === itemIds.length
+        && uniqueOrder.size === order.length
+        && order.every(id => id && itemById.has(id))
+
+    if (!isExactOrder) {
+        throw new Error(`${label}顺序已过期或不完整，请刷新维护页后重试。`)
+    }
+    return order.map(id => itemById.get(id))
+}
+
 function ensureMaintenanceId(item, prefix) {
     if (item && typeof item === "object" && !Array.isArray(item) && !String(item.id ?? "").trim()) {
         item.id = randomId(prefix)
@@ -1585,11 +1608,12 @@ async function saveTeammateBuff(input) {
 
         const teammates = [...(payload.teammates ?? [])]
         const index = teammates.findIndex(item => item.id === teammateId)
+        const savedBuffs = upsertById(index >= 0 ? teammates[index].buffs ?? [] : [], buff)
         const nextTeammate = {
             ...(index >= 0 ? teammates[index] : {}),
             ...teammate,
             id: teammateId,
-            buffs: upsertById(index >= 0 ? teammates[index].buffs ?? [] : [], buff),
+            buffs: reorderByExactIds(savedBuffs, input.buffOrder, "Buff "),
         }
 
         if (index >= 0) {

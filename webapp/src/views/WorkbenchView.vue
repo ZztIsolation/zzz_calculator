@@ -1232,7 +1232,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
                 <template #icon><Save :size="16" /></template>
                 存为套装
               </NButton>
-              <NButton size="small" data-testid="open-drive-disc-analysis" :disabled="!selectedDriveDiscs.length" @click="showDriveDiscAnalysis = true">
+              <NButton type="primary" size="small" data-testid="open-drive-disc-analysis" :disabled="!selectedDriveDiscs.length" @click="showDriveDiscAnalysis = true">
                 <template #icon><LineChart :size="16" /></template>
                 词条分析
               </NButton>

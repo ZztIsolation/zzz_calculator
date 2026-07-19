@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue"
-import { NButton, NCheckbox, NDrawer, NDrawerContent, NInput, NInputNumber, NModal, NProgress, NSelect, NSpin, NTab, NTabs, NTag, useMessage } from "naive-ui"
+import { NAlert, NButton, NCheckbox, NDrawer, NDrawerContent, NInput, NInputNumber, NModal, NProgress, NSelect, NSpin, NTab, NTabs, NTag, useMessage } from "naive-ui"
 import { Download, FileText, Plus, Radar, RefreshCw, Upload } from "lucide-vue-next"
 import ConfirmDialog from "@/components/ConfirmDialog.vue"
 import ImageAvatar from "@/components/ImageAvatar.vue"
@@ -945,6 +945,17 @@ function confirmDangerImport() {
               开始扫描
             </NButton>
           </div>
+          <NAlert class="scan-prerequisite-alert" type="warning" title="扫描前请确认">
+            <div class="scan-prerequisite-content">
+              <p>请先打开《绝区零》背包中的“驱动盘”界面，并将游戏切换为以下任一显示模式：</p>
+              <ul>
+                <li>1920 × 1080 全屏</li>
+                <li>1600 × 900 窗口</li>
+                <li>1280 × 720 窗口</li>
+              </ul>
+              <p>使用其他分辨率或显示模式会影响识别速度和准确率。</p>
+            </div>
+          </NAlert>
         </div>
 
         <div v-else-if="inventoryStore.scanPhase === 'd'" class="section-band">
@@ -1240,6 +1251,25 @@ function confirmDangerImport() {
   background: #fef3c7;
   color: #92400e;
   font-size: 12px;
+}
+
+.scan-prerequisite-alert {
+  margin-top: 2px;
+}
+
+.scan-prerequisite-content {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.scan-prerequisite-content p {
+  margin: 0;
+}
+
+.scan-prerequisite-content ul {
+  margin: 6px 0;
+  padding-left: 20px;
+  font-weight: 600;
 }
 
 .scan-empty-state {

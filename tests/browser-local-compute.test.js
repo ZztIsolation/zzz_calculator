@@ -131,7 +131,7 @@ const browserAlice = browserCalculateInCombatPanel(catalog, alicePayload)
 const backendAlice = backendCalculateInCombatPanel(catalog, alicePayload)
 assert.deepEqual(browserAlice, backendAlice, "Browser Alice mastery calculation should match backend.")
 assert.equal(browserAlice.outOfCombat.panel.anomalyMastery, 195.96)
-assert.equal(browserAlice.inCombat.panel.anomalyProficiency, 207.536)
+assert.equal(browserAlice.inCombat.panel.anomalyProficiency, 206)
 
 assert.deepEqual(
     browserAnalyzeDriveDiscSubstats(catalog, payload),

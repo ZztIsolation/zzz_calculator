@@ -587,12 +587,14 @@
             "id": "skill_group_1-ref-1",
             "kind": "skillGroup",
             "skillGroupId": "skill_group_1",
-            "count": 12
+            "count": 12,
+            "stunned": true
           },
           {
             "id": "direct-2",
             "kind": "direct",
             "count": 2,
+            "stunned": true,
             "critMode": "expected",
             "skillRef": {
               "agentSkillId": "ye_shunguang",
@@ -605,6 +607,7 @@
             "id": "direct-3",
             "kind": "direct",
             "count": 2,
+            "stunned": true,
             "critMode": "expected",
             "skillRef": {
               "agentSkillId": "ye_shunguang",
@@ -617,6 +620,7 @@
             "id": "direct-7",
             "kind": "direct",
             "count": 10,
+            "stunned": true,
             "critMode": "expected",
             "skillRef": {
               "agentSkillId": "ye_shunguang",
@@ -639,12 +643,14 @@
                 "id": "direct-1",
                 "kind": "skillGroup",
                 "skillGroupId": "skill_group_2",
-                "count": 12
+                "count": 12,
+                "stunned": true
               },
               {
                 "id": "direct-2",
                 "kind": "direct",
                 "count": 2,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "ye_shunguang",
@@ -657,6 +663,7 @@
                 "id": "direct-3",
                 "kind": "direct",
                 "count": 2,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "ye_shunguang",
@@ -669,6 +676,7 @@
                 "id": "direct-4",
                 "kind": "direct",
                 "count": 10,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "ye_shunguang",
@@ -691,12 +699,14 @@
                 "id": "direct-1",
                 "kind": "skillGroup",
                 "skillGroupId": "skill_group_2",
-                "count": 12
+                "count": 12,
+                "stunned": true
               },
               {
                 "id": "direct-2",
                 "kind": "direct",
                 "count": 6,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "ye_shunguang",
@@ -709,6 +719,7 @@
                 "id": "direct-3",
                 "kind": "direct",
                 "count": 2,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "ye_shunguang",
@@ -721,6 +732,7 @@
                 "id": "direct-4",
                 "kind": "direct",
                 "count": 6,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "ye_shunguang",
@@ -749,6 +761,7 @@
               "id": "direct-1",
               "kind": "direct",
               "count": 2,
+              "stunned": true,
               "critMode": "expected",
               "skillRef": {
                 "agentSkillId": "ye_shunguang",
@@ -761,6 +774,7 @@
               "id": "direct-2",
               "kind": "direct",
               "count": 2,
+              "stunned": true,
               "critMode": "expected",
               "skillRef": {
                 "agentSkillId": "ye_shunguang",
@@ -773,6 +787,7 @@
               "id": "direct-3",
               "kind": "direct",
               "count": 2,
+              "stunned": true,
               "critMode": "expected",
               "skillRef": {
                 "agentSkillId": "ye_shunguang",
@@ -785,6 +800,7 @@
               "id": "direct-4",
               "kind": "direct",
               "count": 1,
+              "stunned": true,
               "critMode": "expected",
               "skillRef": {
                 "agentSkillId": "ye_shunguang",
@@ -797,6 +813,7 @@
               "id": "direct-6",
               "kind": "direct",
               "count": 2,
+              "stunned": true,
               "critMode": "expected",
               "skillRef": {
                 "agentSkillId": "ye_shunguang",
@@ -821,6 +838,7 @@
               "id": "direct-1",
               "kind": "direct",
               "count": 2,
+              "stunned": true,
               "critMode": "expected",
               "skillRef": {
                 "agentSkillId": "ye_shunguang",
@@ -833,6 +851,7 @@
               "id": "direct-2",
               "kind": "direct",
               "count": 2,
+              "stunned": true,
               "critMode": "expected",
               "skillRef": {
                 "agentSkillId": "ye_shunguang",
@@ -845,6 +864,7 @@
               "id": "direct-3",
               "kind": "direct",
               "count": 1,
+              "stunned": true,
               "critMode": "expected",
               "skillRef": {
                 "agentSkillId": "ye_shunguang",
@@ -857,6 +877,7 @@
               "id": "direct-5",
               "kind": "direct",
               "count": 1,
+              "stunned": true,
               "critMode": "expected",
               "skillRef": {
                 "agentSkillId": "ye_shunguang",
@@ -869,6 +890,7 @@
               "id": "direct-6",
               "kind": "direct",
               "count": 8,
+              "stunned": true,
               "critMode": "expected",
               "skillRef": {
                 "agentSkillId": "ye_shunguang",
@@ -1414,6 +1436,7 @@
             "id": "miyabi_frost_moon_charge_3",
             "kind": "direct",
             "count": 4,
+            "stunned": true,
             "critMode": "expected",
             "skillRef": {
               "agentSkillId": "hoshimi_miyabi",
@@ -1426,6 +1449,7 @@
             "id": "miyabi_chain_spring_arrival",
             "kind": "direct",
             "count": 1,
+            "stunned": true,
             "critMode": "expected",
             "skillRef": {
               "agentSkillId": "hoshimi_miyabi",
@@ -1438,6 +1462,7 @@
             "id": "miyabi_ultimate_lingering_snow",
             "kind": "direct",
             "count": 1,
+            "stunned": true,
             "critMode": "expected",
             "skillRef": {
               "agentSkillId": "hoshimi_miyabi",
@@ -1450,6 +1475,7 @@
             "id": "miyabi_ex_flying_snow_slash",
             "kind": "direct",
             "count": 2,
+            "stunned": true,
             "critMode": "expected",
             "skillRef": {
               "agentSkillId": "hoshimi_miyabi",
@@ -1462,22 +1488,27 @@
             "id": "miyabi_frozen_disorder",
             "kind": "anomaly",
             "count": 2,
+            "stunned": true,
             "settlementType": "disorder",
             "anomalyEffect": "frost_frozen",
-            "elapsedSeconds": 6
+            "disorderType": "normal",
+            "elapsedSeconds": 4
           },
           {
             "id": "miyabi_shatter",
             "kind": "anomaly",
             "count": 2,
+            "stunned": true,
             "settlementType": "attribute",
             "anomalyEffect": "shatter",
+            "anomalyVariant": "normal",
             "procCount": 1
           },
           {
             "id": "direct-7",
             "kind": "direct",
             "count": 1,
+            "stunned": true,
             "critMode": "expected",
             "skillRef": {
               "agentSkillId": "hoshimi_miyabi",
@@ -1490,6 +1521,7 @@
             "id": "direct-8",
             "kind": "direct",
             "count": 2,
+            "stunned": true,
             "critMode": "expected",
             "skillRef": {
               "agentSkillId": "hoshimi_miyabi",
@@ -1499,7 +1531,7 @@
             }
           }
         ],
-        "selectedEventId": "miyabi_frost_moon_charge_3",
+        "selectedEventId": "miyabi_frozen_disorder",
         "variants": [
           {
             "mode": "custom",
@@ -1512,12 +1544,14 @@
                 "id": "direct-1",
                 "kind": "skillGroup",
                 "skillGroupId": "skill_group_1",
-                "count": 4
+                "count": 4,
+                "stunned": true
               },
               {
                 "id": "direct-2",
                 "kind": "direct",
                 "count": 1,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "hoshimi_miyabi",
@@ -1530,14 +1564,17 @@
                 "id": "direct-3",
                 "kind": "anomaly",
                 "count": 2,
+                "stunned": true,
                 "settlementType": "attribute",
                 "anomalyEffect": "shatter",
+                "anomalyVariant": "normal",
                 "procCount": 1
               },
               {
                 "id": "direct-4",
                 "kind": "direct",
                 "count": 1,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "hoshimi_miyabi",
@@ -1550,14 +1587,17 @@
                 "id": "direct-5",
                 "kind": "anomaly",
                 "count": 2,
+                "stunned": true,
                 "settlementType": "disorder",
                 "anomalyEffect": "frost_frozen",
+                "disorderType": "normal",
                 "elapsedSeconds": 6
               },
               {
                 "id": "direct-6",
                 "kind": "direct",
                 "count": 2,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "hoshimi_miyabi",
@@ -1570,6 +1610,7 @@
                 "id": "direct-7",
                 "kind": "direct",
                 "count": 1,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "hoshimi_miyabi",
@@ -1582,6 +1623,7 @@
                 "id": "direct-8",
                 "kind": "direct",
                 "count": 2,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "hoshimi_miyabi",
@@ -1619,6 +1661,7 @@
               "id": "direct-1",
               "kind": "direct",
               "count": 1,
+              "stunned": true,
               "critMode": "expected",
               "skillRef": {
                 "agentSkillId": "hoshimi_miyabi",
@@ -1631,6 +1674,7 @@
               "id": "direct-2",
               "kind": "direct",
               "count": 1,
+              "stunned": true,
               "critMode": "expected",
               "skillRef": {
                 "agentSkillId": "hoshimi_miyabi",
@@ -1643,6 +1687,7 @@
               "id": "direct-3",
               "kind": "direct",
               "count": 1,
+              "stunned": true,
               "critMode": "expected",
               "skillRef": {
                 "agentSkillId": "hoshimi_miyabi",
@@ -2170,6 +2215,7 @@
             "id": "yixuan_chain_xuanmo_swift_strike",
             "kind": "sheer",
             "count": 2,
+            "stunned": true,
             "critMode": "expected",
             "skillRef": {
               "agentSkillId": "yixuan",
@@ -2182,6 +2228,7 @@
             "id": "yixuan_ultimate_thousand_talismans",
             "kind": "sheer",
             "count": 1,
+            "stunned": true,
             "critMode": "expected",
             "skillRef": {
               "agentSkillId": "yixuan",
@@ -2194,6 +2241,7 @@
             "id": "yixuan_ultimate_qingming_cloud_shadow",
             "kind": "sheer",
             "count": 1,
+            "stunned": true,
             "critMode": "expected",
             "skillRef": {
               "agentSkillId": "yixuan",
@@ -2206,6 +2254,7 @@
             "id": "yixuan_ex_cloud_condensing_art",
             "kind": "sheer",
             "count": 2,
+            "stunned": true,
             "critMode": "expected",
             "skillRef": {
               "agentSkillId": "yixuan",
@@ -2217,7 +2266,8 @@
           {
             "id": "yixuan_ex_ink_ember_shadow_dispel",
             "kind": "sheer",
-            "count": 1,
+            "count": 2,
+            "stunned": true,
             "critMode": "expected",
             "skillRef": {
               "agentSkillId": "yixuan",
@@ -2225,33 +2275,9 @@
               "moveId": "ink_ember_shadow_dispel",
               "rowId": "orb_total_damage"
             }
-          },
-          {
-            "id": "yixuan_ex_ink_trace_transform",
-            "kind": "sheer",
-            "count": 1,
-            "critMode": "expected",
-            "skillRef": {
-              "agentSkillId": "yixuan",
-              "categoryId": "special",
-              "moveId": "ink_trace_transform",
-              "rowId": "damage"
-            }
-          },
-          {
-            "id": "yixuan_ex_ink_trace_transform_follow_up",
-            "kind": "sheer",
-            "count": 1,
-            "critMode": "expected",
-            "skillRef": {
-              "agentSkillId": "yixuan",
-              "categoryId": "special",
-              "moveId": "ink_trace_transform",
-              "rowId": "charged_follow_up"
-            }
           }
         ],
-        "selectedEventId": "yixuan_chain_xuanmo_swift_strike",
+        "selectedEventId": "yixuan_ex_ink_ember_shadow_dispel",
         "variants": [
           {
             "mode": "custom",
@@ -2264,6 +2290,7 @@
                 "id": "yixuan_chain_xuanmo_swift_strike",
                 "kind": "sheer",
                 "count": 2,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "yixuan",
@@ -2276,6 +2303,7 @@
                 "id": "yixuan_ultimate_thousand_talismans",
                 "kind": "sheer",
                 "count": 1,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "yixuan",
@@ -2288,6 +2316,7 @@
                 "id": "yixuan_ultimate_qingming_cloud_shadow",
                 "kind": "sheer",
                 "count": 1,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "yixuan",
@@ -2300,6 +2329,7 @@
                 "id": "yixuan_ex_cloud_condensing_art_1",
                 "kind": "sheer",
                 "count": 2,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "yixuan",
@@ -2312,6 +2342,7 @@
                 "id": "yixuan_cinema_2_thousand_talismans_break",
                 "kind": "sheer",
                 "count": 1,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "yixuan",
@@ -2323,7 +2354,8 @@
               {
                 "id": "yixuan_ex_ink_ember_shadow_dispel",
                 "kind": "sheer",
-                "count": 1,
+                "count": 2,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "yixuan",
@@ -2331,33 +2363,9 @@
                   "moveId": "ink_ember_shadow_dispel",
                   "rowId": "orb_total_damage"
                 }
-              },
-              {
-                "id": "yixuan_ex_ink_trace_transform",
-                "kind": "sheer",
-                "count": 1,
-                "critMode": "expected",
-                "skillRef": {
-                  "agentSkillId": "yixuan",
-                  "categoryId": "special",
-                  "moveId": "ink_trace_transform",
-                  "rowId": "damage"
-                }
-              },
-              {
-                "id": "yixuan_ex_ink_trace_transform_follow_up",
-                "kind": "sheer",
-                "count": 1,
-                "critMode": "expected",
-                "skillRef": {
-                  "agentSkillId": "yixuan",
-                  "categoryId": "special",
-                  "moveId": "ink_trace_transform",
-                  "rowId": "charged_follow_up"
-                }
               }
             ],
-            "selectedEventId": "yixuan_chain_xuanmo_swift_strike"
+            "selectedEventId": "yixuan_ex_ink_ember_shadow_dispel"
           },
           {
             "mode": "sheer",
@@ -2370,6 +2378,7 @@
                 "id": "yixuan_chain_xuanmo_swift_strike",
                 "kind": "sheer",
                 "count": 2,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "yixuan",
@@ -2381,7 +2390,8 @@
               {
                 "id": "yixuan_ultimate_thousand_talismans",
                 "kind": "sheer",
-                "count": 1,
+                "count": 2,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "yixuan",
@@ -2394,6 +2404,7 @@
                 "id": "yixuan_ultimate_qingming_cloud_shadow",
                 "kind": "sheer",
                 "count": 1,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "yixuan",
@@ -2403,21 +2414,10 @@
                 }
               },
               {
-                "id": "yixuan_ultimate_thousand_talismans_free",
-                "kind": "sheer",
-                "count": 1,
-                "critMode": "expected",
-                "skillRef": {
-                  "agentSkillId": "yixuan",
-                  "categoryId": "chain",
-                  "moveId": "ultimate_thousand_talismans",
-                  "rowId": "damage"
-                }
-              },
-              {
                 "id": "yixuan_ex_cloud_condensing_art_1",
                 "kind": "sheer",
                 "count": 2,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "yixuan",
@@ -2429,7 +2429,8 @@
               {
                 "id": "yixuan_cinema_2_thousand_talismans_break_1",
                 "kind": "sheer",
-                "count": 2,
+                "count": 1,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "yixuan",
@@ -2441,7 +2442,8 @@
               {
                 "id": "yixuan_ex_ink_ember_shadow_dispel",
                 "kind": "sheer",
-                "count": 1,
+                "count": 2,
+                "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "yixuan",
@@ -2449,33 +2451,9 @@
                   "moveId": "ink_ember_shadow_dispel",
                   "rowId": "orb_total_damage"
                 }
-              },
-              {
-                "id": "yixuan_ex_ink_trace_transform",
-                "kind": "sheer",
-                "count": 1,
-                "critMode": "expected",
-                "skillRef": {
-                  "agentSkillId": "yixuan",
-                  "categoryId": "special",
-                  "moveId": "ink_trace_transform",
-                  "rowId": "damage"
-                }
-              },
-              {
-                "id": "yixuan_ex_ink_trace_transform_follow_up",
-                "kind": "sheer",
-                "count": 1,
-                "critMode": "expected",
-                "skillRef": {
-                  "agentSkillId": "yixuan",
-                  "categoryId": "special",
-                  "moveId": "ink_trace_transform",
-                  "rowId": "charged_follow_up"
-                }
               }
             ],
-            "selectedEventId": "yixuan_chain_xuanmo_swift_strike"
+            "selectedEventId": "yixuan_ultimate_thousand_talismans"
           }
         ]
       },
@@ -2886,129 +2864,21 @@
         "mode": "custom",
         "cinemaLevel": 0,
         "name": {
-          "zhCN": "0影爱丽丝：极性强击、满时长物理紊乱与10跳追伤"
+          "zhCN": "最大化强击伤害（默认）"
         },
         "events": [
           {
-            "id": "alice_polarized_assault",
+            "id": "event_34ce2be12f",
             "kind": "anomaly",
             "count": 1,
+            "stunned": true,
             "settlementType": "attribute",
             "anomalyEffect": "assault",
-            "anomalyVariant": "polarizedAssault",
+            "anomalyVariant": "normal",
             "procCount": 1
-          },
-          {
-            "id": "alice_physical_anomaly_followup",
-            "kind": "anomaly",
-            "label": "核心被动：物理异常追伤",
-            "count": 10,
-            "damageRatioPct": 2.5,
-            "settlementType": "attribute",
-            "anomalyEffect": "assault",
-            "procCount": 1
-          },
-          {
-            "id": "alice_full_duration_physical_disorder",
-            "kind": "anomaly",
-            "count": 1,
-            "settlementType": "disorder",
-            "anomalyEffect": "flinch",
-            "disorderType": "normal",
-            "elapsedSeconds": 0
           }
         ],
-        "selectedEventId": "alice_polarized_assault",
-        "variants": [
-          {
-            "mode": "custom",
-            "cinemaLevel": 2,
-            "name": {
-              "zhCN": "2影爱丽丝：两次极性强击、满时长物理紊乱与10跳追伤"
-            },
-            "events": [
-              {
-                "id": "alice_polarized_assault",
-                "kind": "anomaly",
-                "count": 2,
-                "settlementType": "attribute",
-                "anomalyEffect": "assault",
-                "anomalyVariant": "polarizedAssault",
-                "procCount": 1
-              },
-              {
-                "id": "alice_physical_anomaly_followup",
-                "kind": "anomaly",
-                "label": "核心被动：物理异常追伤",
-                "count": 10,
-                "damageRatioPct": 2.5,
-                "settlementType": "attribute",
-                "anomalyEffect": "assault",
-                "procCount": 1
-              },
-              {
-                "id": "alice_full_duration_physical_disorder",
-                "kind": "anomaly",
-                "count": 1,
-                "settlementType": "disorder",
-                "anomalyEffect": "flinch",
-                "disorderType": "normal",
-                "elapsedSeconds": 0
-              }
-            ],
-            "selectedEventId": "alice_polarized_assault"
-          },
-          {
-            "mode": "custom",
-            "cinemaLevel": 6,
-            "name": {
-              "zhCN": "6影爱丽丝：两次极性强击、物理紊乱、10跳追伤与6次决胜追击"
-            },
-            "events": [
-              {
-                "id": "alice_polarized_assault",
-                "kind": "anomaly",
-                "count": 2,
-                "settlementType": "attribute",
-                "anomalyEffect": "assault",
-                "anomalyVariant": "polarizedAssault",
-                "procCount": 1
-              },
-              {
-                "id": "alice_physical_anomaly_followup",
-                "kind": "anomaly",
-                "label": "核心被动：物理异常追伤",
-                "count": 10,
-                "damageRatioPct": 2.5,
-                "settlementType": "attribute",
-                "anomalyEffect": "assault",
-                "procCount": 1
-              },
-              {
-                "id": "alice_full_duration_physical_disorder",
-                "kind": "anomaly",
-                "count": 1,
-                "settlementType": "disorder",
-                "anomalyEffect": "flinch",
-                "disorderType": "normal",
-                "elapsedSeconds": 0
-              },
-              {
-                "id": "alice_winning_state_followup",
-                "kind": "direct",
-                "count": 6,
-                "critMode": "crit",
-                "skillRef": {
-                  "agentSkillId": "alice_thymefield",
-                  "categoryId": "cinema",
-                  "moveId": "winning_state_followup",
-                  "rowId": "damage"
-                }
-              }
-            ],
-            "selectedEventId": "alice_winning_state_followup"
-          }
-        ]
+        "selectedEventId": "event_34ce2be12f"
       },
       "sources": [
         "https://baike.mihoyo.com/zzz/wiki/content/1385/detail?mhy_presentation_style=fullscreen"

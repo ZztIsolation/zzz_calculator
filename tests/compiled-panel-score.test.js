@@ -244,7 +244,7 @@ const aliceMapSummary = aliceCalculator.scoreOnlyFromSummary(
 )
 for (const result of [aliceDenseSummary, aliceMapSummary]) {
     approx(result.panel.anomalyMastery, 195.96, "Alice compiled mastery should preserve exact percentage scaling")
-    approx(result.panel.anomalyProficiency, 207.536, "Alice compiled proficiency should use corrected mastery")
+    approx(result.panel.anomalyProficiency, 206, "Alice compiled proficiency should use game-rounded mastery conversion")
 }
 
 compareDense("buff-modifier-source", {

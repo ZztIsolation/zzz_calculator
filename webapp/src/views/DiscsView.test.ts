@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import DiscsView from "@/views/DiscsView.vue"
+import { useInventoryStore } from "@/stores/inventory"
 
 const catalogFixture = vi.hoisted(() => ({
   catalog: {
@@ -74,6 +75,10 @@ vi.mock("@runtime/catalog-loader.js", () => ({
 }))
 
 vi.mock("naive-ui", () => ({
+  NAlert: {
+    props: ["title"],
+    template: "<aside role=\"alert\"><strong>{{ title }}</strong><slot /></aside>",
+  },
   NButton: {
     props: ["disabled", "type"],
     emits: ["click"],
@@ -256,6 +261,25 @@ describe("DiscsView", () => {
     expect(toolbarButtons
       .filter(item => item.attributes("data-button-type") === "primary")
       .map(item => item.text().trim())).toEqual(["扫描"])
+  })
+
+  it("shows the required game display modes and inventory page before scanning", async () => {
+    const wrapper = await mountView()
+    const inventoryStore = useInventoryStore()
+    inventoryStore.scanConnected = true
+    inventoryStore.scanStatus = "ready"
+
+    await button(wrapper, "扫描").trigger("click")
+    await flushPromises()
+
+    const reminder = wrapper.find(".scan-prerequisite-alert")
+    expect(reminder.exists()).toBe(true)
+    expect(reminder.text()).toContain("扫描前请确认")
+    expect(reminder.text()).toContain("背包中的“驱动盘”界面")
+    expect(reminder.text()).toContain("1920 × 1080 全屏")
+    expect(reminder.text()).toContain("1600 × 900 窗口")
+    expect(reminder.text()).toContain("1280 × 720 窗口")
+    expect(reminder.text()).toContain("影响识别速度和准确率")
   })
 
   it("downloads the current account export and disables export for an empty inventory", async () => {

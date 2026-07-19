@@ -524,6 +524,176 @@ describe("BuffPickerModal", () => {
     expect(wrapper.text()).toContain("旧版未标注队友")
   })
 
+  it("keeps the maintenance-authored teammate and Buff order after filtering", async () => {
+    const orderedMeta = {
+      ...meta,
+      teammateCombatBuffGroups: [
+        {
+          id: "ordered_a",
+          name: { zhCN: "顺序角色甲" },
+          attribute: "physical",
+          specialty: "support",
+          buffs: [
+            { id: "ordered_a.additional", source: { zhCN: "额外能力" }, description: { zhCN: "顺序测试" }, effects: [] },
+            { id: "ordered_a.core", source: { zhCN: "核心被动" }, description: { zhCN: "顺序测试" }, effects: [] },
+          ],
+        },
+        {
+          id: "ordered_b",
+          name: { zhCN: "顺序角色乙" },
+          attribute: "fire",
+          specialty: "attack",
+          buffs: [{ id: "ordered_b.cinema", source: { zhCN: "影画一" }, description: { zhCN: "顺序测试" }, effects: [] }],
+        },
+      ],
+    }
+    const wrapper = mountModal({ meta: orderedMeta })
+    const labels = () => wrapper.findAll(".buff-row .buff-copy strong").map(item => item.text())
+
+    await openTeammateTab(wrapper)
+    expect(labels()).toEqual([
+      "顺序角色甲 | 额外能力",
+      "顺序角色甲 | 核心被动",
+      "顺序角色乙 | 影画一",
+    ])
+
+    await selectByLabel(wrapper, "属性").setValue(["physical"])
+    await nextTick()
+    expect(labels()).toEqual([
+      "顺序角色甲 | 额外能力",
+      "顺序角色甲 | 核心被动",
+    ])
+
+    await wrapper.find("input[placeholder='搜索来源、名称、效果']").setValue("顺序测试")
+    await nextTick()
+    expect(labels()).toEqual([
+      "顺序角色甲 | 额外能力",
+      "顺序角色甲 | 核心被动",
+    ])
+  })
+
+  it("prioritizes every Buff from all selected teammates while preserving authored order and filters", async () => {
+    const priorityMeta = {
+      ...meta,
+      teammateCombatBuffGroups: [
+        {
+          id: "priority_a",
+          name: { zhCN: "置顶角色甲" },
+          attribute: "physical",
+          specialty: "support",
+          buffs: [
+            { id: "priority_a.core", source: { zhCN: "核心被动" }, description: { zhCN: "共同排序描述" }, effects: [] },
+            { id: "priority_a.additional", source: { zhCN: "额外能力" }, description: { zhCN: "共同排序描述" }, effects: [] },
+          ],
+        },
+        {
+          id: "priority_b",
+          name: { zhCN: "置顶角色乙" },
+          attribute: "fire",
+          specialty: "attack",
+          buffs: [
+            { id: "priority_b.core", source: { zhCN: "核心被动" }, description: { zhCN: "共同排序描述" }, effects: [] },
+            { id: "priority_b.cinema", source: { zhCN: "影画一" }, description: { zhCN: "共同排序描述" }, effects: [] },
+          ],
+        },
+        {
+          id: "priority_c",
+          name: { zhCN: "置顶角色丙" },
+          attribute: "ice",
+          specialty: "anomaly",
+          buffs: [
+            { id: "priority_c.additional", source: { zhCN: "额外能力" }, description: { zhCN: "共同排序描述" }, effects: [] },
+            { id: "priority_c.cinema", source: { zhCN: "影画二" }, description: { zhCN: "共同排序描述" }, effects: [] },
+          ],
+        },
+      ],
+    }
+    const wrapper = mountModal({
+      meta: priorityMeta,
+      selectedIds: ["priority_b.cinema", "priority_c.additional"],
+    })
+    const labels = () => wrapper.findAll(".buff-row .buff-copy strong").map(item => item.text())
+
+    await openTeammateTab(wrapper)
+    expect(labels()).toEqual([
+      "置顶角色乙 | 核心被动",
+      "置顶角色乙 | 影画一",
+      "置顶角色丙 | 额外能力",
+      "置顶角色丙 | 影画二",
+      "置顶角色甲 | 核心被动",
+      "置顶角色甲 | 额外能力",
+    ])
+
+    await selectByLabel(wrapper, "属性").setValue(["physical", "fire"])
+    await wrapper.find("input[placeholder='搜索来源、名称、效果']").setValue("共同排序描述")
+    await nextTick()
+    expect(labels()).toEqual([
+      "置顶角色乙 | 核心被动",
+      "置顶角色乙 | 影画一",
+      "置顶角色甲 | 核心被动",
+      "置顶角色甲 | 额外能力",
+    ])
+  })
+
+  it("updates teammate priority only after the modal is reopened with the applied selection", async () => {
+    const priorityMeta = {
+      ...meta,
+      teammateCombatBuffGroups: [
+        {
+          id: "snapshot_a",
+          name: { zhCN: "快照角色甲" },
+          attribute: "physical",
+          specialty: "support",
+          buffs: [
+            { id: "snapshot_a.core", source: { zhCN: "核心被动" }, effects: [] },
+            { id: "snapshot_a.additional", source: { zhCN: "额外能力" }, effects: [] },
+          ],
+        },
+        {
+          id: "snapshot_b",
+          name: { zhCN: "快照角色乙" },
+          attribute: "fire",
+          specialty: "attack",
+          buffs: [
+            { id: "snapshot_b.core", source: { zhCN: "核心被动" }, effects: [] },
+            { id: "snapshot_b.cinema", source: { zhCN: "影画一" }, effects: [] },
+          ],
+        },
+      ],
+    }
+    const wrapper = mountModal({ meta: priorityMeta })
+    const labels = () => wrapper.findAll(".buff-row .buff-copy strong").map(item => item.text())
+    const originalOrder = [
+      "快照角色甲 | 核心被动",
+      "快照角色甲 | 额外能力",
+      "快照角色乙 | 核心被动",
+      "快照角色乙 | 影画一",
+    ]
+    const prioritizedOrder = [
+      "快照角色乙 | 核心被动",
+      "快照角色乙 | 影画一",
+      "快照角色甲 | 核心被动",
+      "快照角色甲 | 额外能力",
+    ]
+
+    await openTeammateTab(wrapper)
+    expect(labels()).toEqual(originalOrder)
+    await buffRowByText(wrapper, "快照角色乙 | 影画一").find(".buff-row-toggle").trigger("click")
+    await nextTick()
+    expect(labels()).toEqual(originalOrder)
+
+    await wrapper.setProps({ show: false, selectedIds: ["snapshot_b.cinema"] })
+    await openTeammateTab(wrapper)
+    expect(labels()).toEqual(prioritizedOrder)
+    await buffRowByText(wrapper, "快照角色乙 | 影画一").find(".buff-row-toggle").trigger("click")
+    await nextTick()
+    expect(labels()).toEqual(prioritizedOrder)
+
+    await wrapper.setProps({ show: false, selectedIds: [] })
+    await openTeammateTab(wrapper)
+    expect(labels()).toEqual(originalOrder)
+  })
+
   it("filters Boss Buffs by every appearance, phase, and Boss name", async () => {
     const wrapper = mountModal()
 

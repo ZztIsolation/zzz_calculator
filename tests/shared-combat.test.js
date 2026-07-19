@@ -255,6 +255,15 @@ assert.equal(
     "Boss Buff cards should display bossName when no name is present",
 )
 
+const qianxiaBuffs = meta.teammateCombatBuffGroups
+    .find(group => group.id === "qianxia")
+    ?.buffs ?? []
+assert.deepEqual(
+    qianxiaBuffs.map(buff => combatBuffDisplayName(buff)),
+    ["千夏 | 核心被动", "千夏 | 额外能力", "千夏 | 强化特殊技", "千夏 | 影画一", "千夏 | 影画二", "千夏 | 影画四"],
+    "Qianxia Buffs should reach player-facing metadata in the administrator-authored order",
+)
+
 const youyeBuffs = meta.teammateCombatBuffGroups
     .find(group => group.id === "youye")
     ?.buffs ?? []

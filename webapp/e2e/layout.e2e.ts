@@ -203,3 +203,72 @@ test("maintenance forms reflow within the editor container", async ({ page }) =>
   await expect(page.locator(".maintenance-field").first()).toBeVisible()
   await expectStableLayout(page, "maintenance-editor")
 })
+
+test("administrator default-loop events remain reachable inside the modal", async ({ page }) => {
+  const browserErrors: string[] = []
+  page.on("console", message => {
+    if (message.type() === "error") browserErrors.push(message.text())
+  })
+  page.on("pageerror", error => browserErrors.push(error.message))
+
+  await openApp(page, "/maintenance")
+  await page.locator(".record-option").filter({ hasText: "仪玄" }).click()
+  await page.getByRole("button", { name: "管理默认循环" }).click()
+  await page.locator(".default-loop-tabs .n-tabs-tab").filter({ hasText: /^6 影$/ }).click()
+
+  const surface = page.locator('[data-layout-surface="default-calculation-config"]')
+  const eventList = surface.locator(".calculation-event-list")
+  const eventItems = eventList.locator(".calculation-event-list-item")
+  const lastEvent = eventItems.last()
+  const editorPanel = surface.locator(".calculation-master-editor-panel")
+  const footer = page.locator(".default-loop-footer")
+
+  await expect(eventItems).toHaveCount(9)
+  await expectStableLayout(page, "default-calculation-config")
+  await expect(footer).toBeVisible()
+
+  const listMetrics = await eventList.evaluate(element => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }))
+  expect(listMetrics.scrollHeight).toBeGreaterThan(listMetrics.clientHeight)
+
+  await eventList.evaluate(element => { element.scrollTop = element.scrollHeight })
+  const lastEventIsVisible = await lastEvent.evaluate(element => {
+    const list = element.closest(".calculation-event-list")!
+    const listRect = list.getBoundingClientRect()
+    const eventRect = element.getBoundingClientRect()
+    return eventRect.top >= listRect.top - 1 && eventRect.bottom <= listRect.bottom + 1
+  })
+  expect(lastEventIsVisible).toBe(true)
+
+  const expectedTitle = (await lastEvent.locator("strong").innerText()).trim()
+  await lastEvent.locator(".calculation-event-select").click()
+  await expect(lastEvent).toHaveClass(/active/)
+  await expect(editorPanel.locator("h4")).toHaveText(expectedTitle)
+
+  const viewportWidth = page.viewportSize()?.width ?? 0
+  const surfaceMetrics = await surface.evaluate(element => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    scrollTop: element.scrollTop,
+  }))
+
+  if (viewportWidth <= 600) {
+    expect(surfaceMetrics.scrollHeight).toBeGreaterThan(surfaceMetrics.clientHeight)
+    await surface.evaluate(element => { element.scrollTop = element.scrollHeight })
+    const detailIsReachable = await editorPanel.evaluate(element => {
+      const surface = element.closest<HTMLElement>('[data-layout-surface="default-calculation-config"]')!
+      const surfaceRect = surface.getBoundingClientRect()
+      const detailRect = element.getBoundingClientRect()
+      return detailRect.bottom > surfaceRect.top && detailRect.top < surfaceRect.bottom
+    })
+    expect(detailIsReachable).toBe(true)
+  } else {
+    expect(surfaceMetrics.scrollHeight).toBeLessThanOrEqual(surfaceMetrics.clientHeight + 1)
+    expect(surfaceMetrics.scrollTop).toBe(0)
+    await expect(footer).toBeVisible()
+  }
+
+  expect(browserErrors).toEqual([])
+})

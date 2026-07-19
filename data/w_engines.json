@@ -128,8 +128,8 @@
       "specialty": "attack",
       "relatedAgentId": "ye_shunguang",
       "images": {
-        "icon": "/assets/w-engines/cloudcleave_radiance.webp",
-        "source": "https://wiki.biligame.com/zzz/%E4%BA%91%E9%9C%93%E5%AD%A4%E5%85%89"
+        "icon": "/assets/w-engines/zzz_wiki_1751.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/12/25/233874762/9291b80daf543dcd16a843649599552e_1948334603126921922.png"
       },
       "level60": {
         "atkBase": 743,
@@ -176,6 +176,9 @@
                   26,
                   28
                 ]
+              },
+              "target": {
+                "kind": "default"
               }
             },
             {
@@ -192,7 +195,12 @@
                   36.2,
                   40
                 ]
-              }
+              },
+              "target": {
+                "kind": "default"
+              },
+              "condition": "开启以太帷幕",
+              "durationSeconds": 40
             },
             {
               "id": "effect_b3x7d4la",
@@ -208,20 +216,27 @@
                   36.2,
                   40
                 ]
-              }
+              },
+              "target": {
+                "kind": "default"
+              },
+              "condition": "开启以太帷幕",
+              "durationSeconds": 40
             }
           ],
-          "appliesToOutOfCombatPanel": false
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
         },
         "teamBuff": null
       },
       "sources": [
-        "https://wiki.biligame.com/zzz/%E4%BA%91%E9%9C%93%E5%AD%A4%E5%85%89"
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1751/detail?mhy_presentation_style=fullscreen"
       ],
       "verification": {
         "level60Stats": "source-checked",
-        "effectText": "from-provided-screenshot",
-        "phase1EffectBuff": "source-checked"
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
       }
     },
     {
@@ -3908,6 +3923,2246 @@
         "level60Stats": "source-checked",
         "effectText": "source-checked",
         "effectBuff": "source-checked-team-buff-only"
+      }
+    },
+    {
+      "id": "zzz_wiki_114",
+      "name": {
+        "zhCN": "「月相」-晦"
+      },
+      "rarity": "B",
+      "specialty": "attack",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_114.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/22/82500917/941a1dbc1f0f5ea154f89a977688f56f_7644642860191957526.png"
+      },
+      "level60": {
+        "atkBase": 475,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 20,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "残月"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "发动[连携技]或[终结技]时，装备者造成的伤害提升15%/17.5%/20%/22.5%/25%，持续6秒。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_114_self_chain_ultimate_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "chain"
+                  },
+                  {
+                    "kind": "skillType",
+                    "skillType": "ultimate"
+                  }
+                ]
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 15,
+              "modificationValues": {
+                "value": [
+                  15,
+                  17.5,
+                  20,
+                  22.5,
+                  25
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "chainOrUltimate",
+          "durationSeconds": 6
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/114/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_117",
+      "name": {
+        "zhCN": "「月相」-朔"
+      },
+      "rarity": "B",
+      "specialty": "attack",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_117.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/22/82500917/02ec27514360d65720b1b8fb011fdd65_563337634939069981.png"
+      },
+      "level60": {
+        "atkBase": 475,
+        "advancedStat": {
+          "stat": "critRate",
+          "value": 15.9,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "新月"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "发动[强化特殊技]时，装备者回复3/3.5/4/4.5/5点能量，12秒内最多触发一次。",
+          "en": ""
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/117/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "not-modeled-energy-restore"
+      }
+    },
+    {
+      "id": "zzz_wiki_118",
+      "name": {
+        "zhCN": "「月相」-望"
+      },
+      "rarity": "B",
+      "specialty": "attack",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_118.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/22/82500917/62251019ac4ef58fd4c279f83524cd84_4183639709296529508.png"
+      },
+      "level60": {
+        "atkBase": 475,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 20,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "满月"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "[普通攻击]、[冲刺攻击]、[闪避反击]造成的伤害提升12%/14%/16%/18%/20%。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_118_self_basic_dodge_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "basic"
+                  },
+                  {
+                    "kind": "skillType",
+                    "skillType": "dodge"
+                  }
+                ]
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 12,
+              "modificationValues": {
+                "value": [
+                  12,
+                  14,
+                  16,
+                  18,
+                  20
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/118/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_156",
+      "name": {
+        "zhCN": "星徽引擎"
+      },
+      "rarity": "A",
+      "specialty": "attack",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_156.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/23/11536806/4c71730c100ac556417529a8e4598d36_2327866382544117474.png"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 25,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "骑士连打"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "发动[闪避反击]或[快速支援]时，装备者的攻击力提升12%/13.8%/15.6%/17.4%/19.2%，持续12秒。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_156_self_atk",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkPct",
+              "mode": "pct",
+              "value": 12,
+              "modificationValues": {
+                "value": [
+                  12,
+                  13.8,
+                  15.6,
+                  17.4,
+                  19.2
+                ]
+              },
+              "basis": "outOfCombatAtk"
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "闪避反击或快速支援",
+          "durationSeconds": 12
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/156/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_211",
+      "name": {
+        "zhCN": "防暴者Ⅵ型"
+      },
+      "rarity": "S",
+      "specialty": "attack",
+      "attribute": "ether",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_211.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/26/11536806/786a88680bf755b1c37354f661515b3f_1539116925377315728.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "critDmg",
+          "value": 48,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "安全巡查"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "暴击率提升15%/18.8%/22.6%/26.4%/30%；发动[强化特殊技]时，为装备者提供8层充能效果，最多叠加8层；[普通攻击]或[冲刺攻击]造成以太伤害时，消耗1层充能，使当前招式造成的伤害提升35%/43.5%/52%/60.5%/70%。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_211_self_crit_rate",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 15,
+              "modificationValues": {
+                "value": [
+                  15,
+                  18.8,
+                  22.6,
+                  26.4,
+                  30
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_211_self_charged_ether_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "basic"
+                  },
+                  {
+                    "kind": "skillTag",
+                    "skillTag": "dashAttack"
+                  }
+                ]
+              },
+              "stat": "etherDmg",
+              "mode": "flat",
+              "value": 35,
+              "modificationValues": {
+                "value": [
+                  35,
+                  43.5,
+                  52,
+                  60.5,
+                  70
+                ]
+              },
+              "condition": "拥有充能效果"
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/211/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "partially-modeled-charge-consumption"
+      }
+    },
+    {
+      "id": "zzz_wiki_221",
+      "name": {
+        "zhCN": "加农转子"
+      },
+      "rarity": "A",
+      "specialty": "attack",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_221.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/26/11536806/af4b2e547d6735da28ae46769b9a832e_5920935504776128925.png"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "critRate",
+          "value": 20,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "口径超规"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "攻击力提升7.5%/8.6%/9.7%/10.8%/12%；攻击命中敌人并触发暴击时，额外造成200%攻击力的伤害，8/7.5/7/6.5/6秒内最多触发一次。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_221_self_atk",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkPct",
+              "mode": "pct",
+              "value": 7.5,
+              "modificationValues": {
+                "value": [
+                  7.5,
+                  8.6,
+                  9.7,
+                  10.8,
+                  12
+                ]
+              },
+              "basis": "outOfCombatAtk"
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/221/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "partially-modeled-proc-damage"
+      }
+    },
+    {
+      "id": "zzz_wiki_222",
+      "name": {
+        "zhCN": "街头巨星"
+      },
+      "rarity": "A",
+      "specialty": "attack",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_222.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/26/11536806/01d76f16b402716d76700acc35626517_3728798524435924794.png"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 25,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "火热腔调"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "队伍中任意角色发动[连携技]时，为装备者提供1层充能效果，最多叠加3层；发动[终结技]时，消耗所有充能，每层充能效果使招式造成的伤害提升15%/17.2%/19.5%/21.7%/24%。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_222_self_ultimate_dmg",
+              "type": "stacked",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "ultimate"
+                  }
+                ]
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "valuePerStack": 15,
+              "maxStacks": 3,
+              "defaultStacks": 3,
+              "modificationValues": {
+                "valuePerStack": [
+                  15,
+                  17.2,
+                  19.5,
+                  21.7,
+                  24
+                ]
+              },
+              "stackGroup": "street_superstar_charge",
+              "stackLabel": {
+                "zhCN": "充能层数"
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/222/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_223",
+      "name": {
+        "zhCN": "硫磺石"
+      },
+      "rarity": "S",
+      "specialty": "attack",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_223.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/26/11536806/2cd3aa09c2f818eadf4ce632c5f421fd_1967602675265095788.png"
+      },
+      "level60": {
+        "atkBase": 684,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 30,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "炽烈吐息"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "[普通攻击]、[冲刺攻击]或[闪避反击]命中敌人时，装备者的攻击力提升3.5%/4.4%/5.2%/6%/7%，最多叠加8层，持续8秒，0.5秒内最多触发一次，每层效果单独结算持续时间。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_223_self_atk",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkPct",
+              "mode": "pct",
+              "valuePerStack": 3.5,
+              "maxStacks": 8,
+              "defaultStacks": 8,
+              "modificationValues": {
+                "valuePerStack": [
+                  3.5,
+                  4.4,
+                  5.2,
+                  6,
+                  7
+                ]
+              },
+              "basis": "outOfCombatAtk",
+              "stackGroup": "brimstone_breath",
+              "stackLabel": {
+                "zhCN": "炽烈吐息层数"
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "普通攻击、冲刺攻击或闪避反击命中",
+          "durationSeconds": 8
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/223/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_224",
+      "name": {
+        "zhCN": "钢铁肉垫"
+      },
+      "rarity": "S",
+      "specialty": "attack",
+      "attribute": "physical",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_224.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/26/11536806/fbf66943a7dea171bbe1876abec75ab3_2359632281717116695.png"
+      },
+      "level60": {
+        "atkBase": 684,
+        "advancedStat": {
+          "stat": "critRate",
+          "value": 24,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "合金猫爪"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "物理伤害提升20%/25%/30%/35%/40%；从背后攻击命中敌人时，装备者造成的伤害提升25%/31.5%/38%/44%/50%。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_224_self_physical_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "physicalDmg",
+              "mode": "flat",
+              "value": 20,
+              "modificationValues": {
+                "value": [
+                  20,
+                  25,
+                  30,
+                  35,
+                  40
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_224_self_back_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 25,
+              "modificationValues": {
+                "value": [
+                  25,
+                  31.5,
+                  38,
+                  44,
+                  50
+                ]
+              },
+              "condition": "从背后攻击命中"
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/224/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_225",
+      "name": {
+        "zhCN": "深海访客"
+      },
+      "rarity": "S",
+      "specialty": "attack",
+      "attribute": "ice",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_225.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/26/11536806/b029d3bf8295e848bf4bb3cee7bee635_4869761072423699492.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "critRate",
+          "value": 24,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "诸洋之王"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "冰属性伤害提升25%/31.5%/38%/44.5%/50%；[普通攻击]命中敌人时，装备者的暴击率提升10%/12.5%/15%/17.5%/20%，持续8秒；[冲刺攻击]造成冰属性伤害时，装备者的暴击率额外提升10%/12.5%/15%/17.5%/20%，持续15秒，每种增益效果单独结算持续时间。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_225_self_ice_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "iceDmg",
+              "mode": "flat",
+              "value": 25,
+              "modificationValues": {
+                "value": [
+                  25,
+                  31.5,
+                  38,
+                  44.5,
+                  50
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_225_self_basic_crit_rate",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 10,
+              "modificationValues": {
+                "value": [
+                  10,
+                  12.5,
+                  15,
+                  17.5,
+                  20
+                ]
+              },
+              "condition": "普通攻击命中",
+              "durationSeconds": 8
+            },
+            {
+              "id": "effect_wiki_225_self_dash_crit_rate",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 10,
+              "modificationValues": {
+                "value": [
+                  10,
+                  12.5,
+                  15,
+                  17.5,
+                  20
+                ]
+              },
+              "condition": "冲刺攻击造成冰属性伤害",
+              "durationSeconds": 15
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/225/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_263",
+      "name": {
+        "zhCN": "仿制星徽引擎"
+      },
+      "rarity": "A",
+      "specialty": "attack",
+      "attribute": "physical",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_263.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/28/11536806/7a2092bf3e5d51bd8f0d425f21b4a5a2_1442414769992276141.png"
+      },
+      "level60": {
+        "atkBase": 624,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 25,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "骑士光波：改"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "[普通攻击]或[冲刺攻击]命中6米外的敌人时，装备者对目标造成的物理伤害提升36%/41%/46.5%/52%/57.5%，持续8秒。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_263_self_physical_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "physicalDmg",
+              "mode": "flat",
+              "value": 36,
+              "modificationValues": {
+                "value": [
+                  36,
+                  41,
+                  46.5,
+                  52,
+                  57.5
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "命中6米外的敌人",
+          "durationSeconds": 8
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/263/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_264",
+      "name": {
+        "zhCN": "家政员"
+      },
+      "rarity": "A",
+      "specialty": "attack",
+      "attribute": "physical",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_264.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/28/11536806/c5e3277e051b5ad10ec568c8ed62e472_4200654280788559697.png"
+      },
+      "level60": {
+        "atkBase": 624,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 25,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "安心家用轮锯"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "位于后场时，装备者的能量自动回复提升0.45/0.52/0.58/0.65/0.72点/秒；[强化特殊技]命中敌人时，装备者造成的物理伤害提升3%/3.5%/4%/4.4%/4.8%，最多叠加15层，持续1秒，重复触发时刷新持续时间。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_264_self_physical_dmg",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "physicalDmg",
+              "mode": "flat",
+              "valuePerStack": 3,
+              "maxStacks": 15,
+              "defaultStacks": 15,
+              "modificationValues": {
+                "valuePerStack": [
+                  3,
+                  3.5,
+                  4,
+                  4.4,
+                  4.8
+                ]
+              },
+              "stackGroup": "housekeeper_saw",
+              "stackLabel": {
+                "zhCN": "家用轮锯层数"
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "exSpecialHit",
+          "durationSeconds": 1
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/264/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "partially-modeled-flat-energy-regen"
+      }
+    },
+    {
+      "id": "zzz_wiki_265",
+      "name": {
+        "zhCN": "旋钻机-赤轴"
+      },
+      "rarity": "A",
+      "specialty": "attack",
+      "attribute": "electric",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_265.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/28/11536806/51cfdbcf65d8bca2826acec5ba5bd34c_3722412418301406226.png"
+      },
+      "level60": {
+        "atkBase": 624,
+        "advancedStat": {
+          "stat": "energyRegen",
+          "value": 50,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "红莲电机"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "发动[强化特殊技]或[连携技]时，[普通攻击]和[冲刺攻击]造成的电属性伤害提升50%/57.5%/65%/72.5%/80%，持续10秒，15秒内最多触发一次。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_265_self_basic_dash_electric_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "basic"
+                  },
+                  {
+                    "kind": "skillTag",
+                    "skillTag": "dashAttack"
+                  }
+                ]
+              },
+              "stat": "electricDmg",
+              "mode": "flat",
+              "value": 50,
+              "modificationValues": {
+                "value": [
+                  50,
+                  57.5,
+                  65,
+                  72.5,
+                  80
+                ]
+              },
+              "cooldownSeconds": 15
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "exSpecialOrChain",
+          "durationSeconds": 10
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/265/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_744",
+      "name": {
+        "zhCN": "鎏金花信"
+      },
+      "rarity": "A",
+      "specialty": "attack",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_744.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/08/01/15559334/5b63bca946b316faea7131615d2fcb6c_1822227116513416053.png"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 25,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "超规防盗措施"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "攻击力提升6%/6.9%/7.8%/8.7%/9.6%，[强化特殊技]造成的伤害提升15%/17.2%/19.5%/21.8%/24%。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_744_self_atk",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkPct",
+              "mode": "pct",
+              "value": 6,
+              "modificationValues": {
+                "value": [
+                  6,
+                  6.9,
+                  7.8,
+                  8.7,
+                  9.6
+                ]
+              },
+              "basis": "outOfCombatAtk"
+            },
+            {
+              "id": "effect_wiki_744_self_ex_special_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillTag",
+                    "skillTag": "exSpecial"
+                  }
+                ]
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 15,
+              "modificationValues": {
+                "value": [
+                  15,
+                  17.2,
+                  19.5,
+                  21.8,
+                  24
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/744/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_991",
+      "name": {
+        "zhCN": "残心青囊"
+      },
+      "rarity": "S",
+      "specialty": "attack",
+      "attribute": "electric",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_991.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/12/09/160824341/9861761e3b5e1ff05158695f68ce6320_8061199014439521772.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "critDmg",
+          "value": 48,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "啖若逆修"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "暴击率提升10%/11.5%/13%/14.5%/16%；[冲刺攻击]造成的电属性伤害提升40%/46%/52%/58%/64%；队伍中任意角色对敌人施加属性异常效果或造成失衡时，装备者的暴击率额外提升10%/11.5%/13%/14.5%/16%，持续15秒。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_991_self_crit_rate",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 10,
+              "modificationValues": {
+                "value": [
+                  10,
+                  11.5,
+                  13,
+                  14.5,
+                  16
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_991_self_dash_electric_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillTag",
+                    "skillTag": "dashAttack"
+                  }
+                ]
+              },
+              "stat": "electricDmg",
+              "mode": "flat",
+              "value": 40,
+              "modificationValues": {
+                "value": [
+                  40,
+                  46,
+                  52,
+                  58,
+                  64
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_991_self_triggered_crit_rate",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 10,
+              "modificationValues": {
+                "value": [
+                  10,
+                  11.5,
+                  13,
+                  14.5,
+                  16
+                ]
+              },
+              "condition": "队伍任意角色施加属性异常或造成失衡",
+              "durationSeconds": 15
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/991/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_995",
+      "name": {
+        "zhCN": "强音热望"
+      },
+      "rarity": "A",
+      "specialty": "attack",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_995.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/12/14/34600917/a10b80da6d507c0432c9c1ce613a122e_1635217964961395708.png"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "critRate",
+          "value": 20,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "躁动全场"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "[强化特殊技]或[连携技]命中敌人时，装备者的攻击力提升6%/6.9%/7.8%/8.7%/9.6%，持续8秒；目标处于属性异常状态下时，该增益效果额外提升6%/6.9%/7.8%/8.7%/9.6%。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_995_self_atk",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkPct",
+              "mode": "pct",
+              "value": 6,
+              "modificationValues": {
+                "value": [
+                  6,
+                  6.9,
+                  7.8,
+                  8.7,
+                  9.6
+                ]
+              },
+              "basis": "outOfCombatAtk",
+              "condition": "强化特殊技或连携技命中",
+              "durationSeconds": 8
+            },
+            {
+              "id": "effect_wiki_995_self_anomaly_atk",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkPct",
+              "mode": "pct",
+              "value": 6,
+              "modificationValues": {
+                "value": [
+                  6,
+                  6.9,
+                  7.8,
+                  8.7,
+                  9.6
+                ]
+              },
+              "basis": "outOfCombatAtk",
+              "condition": "enemyHasAnomaly",
+              "durationSeconds": 8
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/995/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1159",
+      "name": {
+        "zhCN": "心弦夜响"
+      },
+      "rarity": "S",
+      "specialty": "attack",
+      "attribute": "fire",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1159.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/01/24/82500917/c7671f1500f7729fa88bb1cb6d25f2f7_8612178468921610871.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "critRate",
+          "value": 24,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "弦音相随"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "暴击伤害提升50%/57.5%/65%/72.5%/80%；装备者进入接战状态、发动[连携技]、[终结技]时，获得1层[心弦]，每层[心弦]会使装备者的[连携技]和[终结技]无视目标12.5%/14.5%/16.5%/18.5%/20%火属性伤害抗性，最多叠加2层，持续30秒，重复触发时刷新持续时间。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1159_self_crit_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critDmg",
+              "mode": "flat",
+              "value": 50,
+              "modificationValues": {
+                "value": [
+                  50,
+                  57.5,
+                  65,
+                  72.5,
+                  80
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_1159_self_chain_ultimate_fire_res_ignore",
+              "type": "stacked",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "chain"
+                  },
+                  {
+                    "kind": "skillType",
+                    "skillType": "ultimate"
+                  }
+                ]
+              },
+              "stat": "fireResIgnore",
+              "mode": "flat",
+              "valuePerStack": 12.5,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "modificationValues": {
+                "valuePerStack": [
+                  12.5,
+                  14.5,
+                  16.5,
+                  18.5,
+                  20
+                ]
+              },
+              "stackGroup": "heartstring",
+              "stackLabel": {
+                "zhCN": "心弦层数"
+              },
+              "durationSeconds": 30
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1159/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1197",
+      "name": {
+        "zhCN": "牺牲洁纯"
+      },
+      "rarity": "S",
+      "specialty": "attack",
+      "attribute": "electric",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1197.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/03/05/15559334/5c73e5899881b6061fc638c78aa2db96_5805603744248007992.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "critDmg",
+          "value": 48,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "光静花冷"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "暴击伤害提升30%/34.5%/39%/43.5%/48%；装备者发动[普通攻击]、[特殊技]或[追加攻击]命中敌人时，可分别获得1层增益效果，每层增益效果使装备者的暴击伤害额外提升10%/11.5%/13%/14.5%/16%，最多叠加3层，持续30秒，每层效果单独结算持续时间，同一招式内最多触发一次；拥有3层增益效果时，装备者造成的电属性伤害提升20%/23%/26%/29%/32%。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1197_self_crit_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critDmg",
+              "mode": "flat",
+              "value": 30,
+              "modificationValues": {
+                "value": [
+                  30,
+                  34.5,
+                  39,
+                  43.5,
+                  48
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_1197_self_stacked_crit_dmg",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critDmg",
+              "mode": "flat",
+              "valuePerStack": 10,
+              "maxStacks": 3,
+              "defaultStacks": 3,
+              "modificationValues": {
+                "valuePerStack": [
+                  10,
+                  11.5,
+                  13,
+                  14.5,
+                  16
+                ]
+              },
+              "stackGroup": "sacrificial_purity",
+              "stackLabel": {
+                "zhCN": "光静花冷层数"
+              },
+              "condition": "普通攻击、特殊技或追加攻击命中",
+              "durationSeconds": 30
+            },
+            {
+              "id": "effect_wiki_1197_self_electric_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "electricDmg",
+              "mode": "flat",
+              "value": 20,
+              "modificationValues": {
+                "value": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
+              },
+              "condition": "拥有3层增益效果"
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1197/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1305",
+      "name": {
+        "zhCN": "千面日陨"
+      },
+      "rarity": "S",
+      "specialty": "attack",
+      "attribute": "ice",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1305.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/04/25/82500917/98909cbf623056db523606d4e69665ba_2675475914646128119.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "critRate",
+          "value": 24,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "万千非我"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "暴击伤害提升45%/51.75%/58.5%/65.25%/72%；[强化特殊技]、[连携技]、[终结技]造成冰属性伤害时，角色获得[零度处刑宣言]效果，持续3秒；[零度处刑宣言]效果期间，角色命中敌人时无视25%/28.75%/32.5%/36.25%/40%防御力。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1305_self_crit_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critDmg",
+              "mode": "flat",
+              "value": 45,
+              "modificationValues": {
+                "value": [
+                  45,
+                  51.75,
+                  58.5,
+                  65.25,
+                  72
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_1305_self_def_ignore",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "enemyDefIgnore",
+              "mode": "flat",
+              "value": 25,
+              "modificationValues": {
+                "value": [
+                  25,
+                  28.75,
+                  32.5,
+                  36.25,
+                  40
+                ]
+              },
+              "condition": "强化特殊技、连携技或终结技造成冰属性伤害",
+              "durationSeconds": 3
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1305/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1553",
+      "name": {
+        "zhCN": "机巧心种"
+      },
+      "rarity": "S",
+      "specialty": "attack",
+      "attribute": "electric",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1553.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/08/29/160824341/7726b5451243df3ac53dff3c0c208e68_892983507083775956.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "critRate",
+          "value": 24,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "芽生炉心"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "暴击率提升15%/17%/19%/21%/23%；装备者的[普通攻击]、[强化特殊技]造成伤害时，可分别获得1层增益效果，每层增益效果使装备者造成的电属性伤害提升12.5%/14.5%/16.5%/18.5%/20%，最多叠加2层，持续40秒，每层效果单独结算持续时间，同一招式内最多触发一次；拥有2层增益效果时，装备者的[普通攻击]和[终结技]对敌人造成的伤害无视20%/23%/26%/29%/32%防御力。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1553_self_crit_rate",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 15,
+              "modificationValues": {
+                "value": [
+                  15,
+                  17,
+                  19,
+                  21,
+                  23
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_1553_self_electric_dmg",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "electricDmg",
+              "mode": "flat",
+              "valuePerStack": 12.5,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "modificationValues": {
+                "valuePerStack": [
+                  12.5,
+                  14.5,
+                  16.5,
+                  18.5,
+                  20
+                ]
+              },
+              "stackGroup": "cordis_germina",
+              "stackLabel": {
+                "zhCN": "芽生炉心层数"
+              },
+              "condition": "普通攻击或强化特殊技造成伤害",
+              "durationSeconds": 40
+            },
+            {
+              "id": "effect_wiki_1553_self_basic_ultimate_def_ignore",
+              "type": "fixed",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "basic"
+                  },
+                  {
+                    "kind": "skillType",
+                    "skillType": "ultimate"
+                  }
+                ]
+              },
+              "stat": "enemyDefIgnore",
+              "mode": "flat",
+              "value": 20,
+              "modificationValues": {
+                "value": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
+              },
+              "condition": "拥有2层增益效果"
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1553/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1586",
+      "name": {
+        "zhCN": "嚣枪喧焰"
+      },
+      "rarity": "S",
+      "specialty": "attack",
+      "attribute": "fire",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1586.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/09/19/160824341/40400cfd8242c79f8d32bf6b9f4ec4e8_5895623562993689019.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "energyRegen",
+          "value": 60,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "喋声吞炎"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "暴击率提升20%/23%/26%/29%/32%；装备者发动[追加攻击]造成火属性伤害时，装备者的攻击对敌人造成的伤害无视15%/17.2%/19.5%/21.7%/24%防御力，持续8秒，3秒内最多获得1层，最多叠加2层，重复触发时刷新持续时间。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1586_self_crit_rate",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 20,
+              "modificationValues": {
+                "value": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_1586_self_def_ignore",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "enemyDefIgnore",
+              "mode": "flat",
+              "valuePerStack": 15,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "modificationValues": {
+                "valuePerStack": [
+                  15,
+                  17.2,
+                  19.5,
+                  21.7,
+                  24
+                ]
+              },
+              "stackGroup": "roaring_furor",
+              "stackLabel": {
+                "zhCN": "喋声吞炎层数"
+              },
+              "condition": "追加攻击造成火属性伤害",
+              "durationSeconds": 8,
+              "cooldownSeconds": 3
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1586/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1941",
+      "name": {
+        "zhCN": "鳞齿寻踪"
+      },
+      "rarity": "S",
+      "specialty": "attack",
+      "attribute": "electric",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1941.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/04/10/233874762/dbd75eea6f1a3953d522060b18ab249b_4267719502761331493.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "energyRegen",
+          "value": 60,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "仿生毒素"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "暴击率提升25%/28.8%/32.5%/36.3%/40%；装备者单次消耗的能量达到20点时，每消耗20点能量，获得3秒增益效果：造成电属性伤害时无视目标28%/31.5%/35%/38.5%/42%防御力；重复获得时，延长持续时间，至多延长至30秒；进入接战状态时，获得10秒该增益；装备者为非当前操作中角色时，持续时间不再减少。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1941_self_crit_rate",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 25,
+              "modificationValues": {
+                "value": [
+                  25,
+                  28.8,
+                  32.5,
+                  36.3,
+                  40
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_1941_self_electric_def_ignore",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "electricDefIgnore",
+              "mode": "flat",
+              "value": 28,
+              "modificationValues": {
+                "value": [
+                  28,
+                  31.5,
+                  35,
+                  38.5,
+                  42
+                ]
+              },
+              "condition": "仿生毒素增益生效"
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1941/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "partially-modeled-duration-extension"
+      }
+    },
+    {
+      "id": "zzz_wiki_2031",
+      "name": {
+        "zhCN": "日冕遗蜕"
+      },
+      "rarity": "S",
+      "specialty": "attack",
+      "attribute": "ether",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_2031.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/06/11/15559334/cd295c7495bda6f3569e4123edb0b3ca_1083990934940345828.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 30,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "日蚀效应"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "暴击率提升20%；装备者为佩洛伊斯时，发动[终结技]获得[日蚀]效果，[日蚀]效果下，装备者造成的伤害无视16%/17.5%/19%/20.5%/22%以太伤害抗性，持续45秒，重复触发时刷新持续时间，进入接战状态时，获得[日蚀]效果。",
+          "en": ""
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_2031_self_crit_rate",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 20
+            },
+            {
+              "id": "effect_wiki_2031_self_ether_res_ignore",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "etherResIgnore",
+              "mode": "flat",
+              "value": 16,
+              "modificationValues": {
+                "value": [
+                  16,
+                  17.5,
+                  19,
+                  20.5,
+                  22
+                ]
+              },
+              "condition": "装备者为佩洛伊斯且处于日蚀效果",
+              "durationSeconds": 45
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/2031/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "partially-modeled-agent-restriction"
       }
     }
   ]

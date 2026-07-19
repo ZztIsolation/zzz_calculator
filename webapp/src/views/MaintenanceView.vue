@@ -558,7 +558,11 @@ function normalizeForSave(item: any) {
 
 function teammateRequest(group: any) {
   const { buffs: _buffs, ...teammate } = group
-  return { teammate, buff: deepClone(currentBuff.value) }
+  return {
+    teammate,
+    buff: deepClone(currentBuff.value),
+    buffOrder: (group.buffs ?? []).map((buff: any) => String(buff.id ?? "")).filter(Boolean),
+  }
 }
 
 function bossRequest(group: any) {
@@ -1067,10 +1071,22 @@ details.maintenance-subcard > summary span { color: var(--app-muted); font-size:
 .core-bonus-row { grid-template-columns: minmax(140px, 1fr) minmax(110px, 1fr) auto; }
 .teammate-profile-layout { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 15px; }
 .teammate-profile-layout .maintenance-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.teammate-buff-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 16px; }
+.teammate-buff-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 16px; }
 .teammate-buff-list { display: grid; align-content: start; gap: 6px; }
-.teammate-buff-list button { display: grid; gap: 3px; width: 100%; padding: 9px 10px; border: 1px solid var(--app-border); border-radius: var(--app-radius-sm); background: #fff; text-align: left; cursor: pointer; }
-.teammate-buff-list button.active { border-color: var(--app-blue); background: #f5f9ff; }
+.teammate-buff-item { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 5px; min-width: 0; border: 1px solid var(--app-border); border-radius: var(--app-radius-sm); background: #fff; transition: border-color .15s ease, box-shadow .15s ease, opacity .15s ease; }
+.teammate-buff-item.active { border-color: var(--app-blue); background: #f5f9ff; }
+.teammate-buff-item.is-dragging { opacity: .45; }
+.teammate-buff-item.drop-before { box-shadow: inset 0 3px 0 var(--app-blue); }
+.teammate-buff-item.drop-after { box-shadow: inset 0 -3px 0 var(--app-blue); }
+.teammate-buff-drag-handle { display: inline-flex; align-items: center; align-self: stretch; padding: 0 2px 0 7px; color: var(--app-muted); cursor: grab; touch-action: none; }
+.teammate-buff-drag-handle:active { cursor: grabbing; }
+.teammate-buff-drag-handle.disabled { cursor: not-allowed; opacity: .45; }
+.teammate-buff-select { display: grid; min-width: 0; gap: 3px; padding: 9px 4px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.teammate-buff-select strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.teammate-buff-order-actions { display: grid; gap: 2px; padding-right: 5px; }
+.teammate-buff-order-actions button { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 24px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--app-muted); cursor: pointer; }
+.teammate-buff-order-actions button:hover:not(:disabled) { background: var(--app-panel-muted); color: var(--app-blue); }
+.teammate-buff-order-actions button:disabled { cursor: not-allowed; opacity: .3; }
 .teammate-buff-list small { display: -webkit-box; overflow: hidden; color: var(--app-muted); font-size: 11px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .teammate-current-buff { min-width: 0; padding-left: 16px; border-left: 1px solid var(--app-border); }
 .buff-body-editor { display: grid; gap: 0; border: 1px solid var(--app-border); border-radius: var(--app-radius-sm); }

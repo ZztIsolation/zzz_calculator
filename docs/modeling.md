@@ -1324,13 +1324,24 @@ The public calculation breakdown exposes these accumulators as
 `anomalyMasteryPct` and `anomalyMasteryFlat`. Stored inventory and maintenance
 inputs keep using `stat: "anomalyMastery", mode: "pct"` for percentage sources,
 so existing user data does not require migration. Damage and optimizer paths
-retain full precision. The Vue panel truncates only the displayed Anomaly
-Mastery integer to match the game.
+retain full Anomaly Mastery precision. The Vue panel truncates the displayed
+Anomaly Mastery integer to match the game.
 
 Phaethon's Melody contributes 8% Anomaly Mastery through its unconditional
 2-piece effect. Alice at Core Skill F therefore has a white stat of `142`; a
 30% slot-6 main stat plus Phaethon's Melody produces `195.96` internally and
-`195` in the displayed panel.
+`195` in the displayed panel. Her Additional Ability is the one exception that
+consumes a game-rounded integer instead of the raw Mastery value:
+
+```text
+convertedProficiency = floor(
+  max(floor(inCombatAnomalyMastery) - 140, 0)
+  * proficiencyPerMasteryPoint
+)
+```
+
+The rounding applies only to this conversion. Anomaly Mastery remains exact
+for the panel, buildup-related mechanics, and every other consumer.
 
 ## Effect Scope Rules
 

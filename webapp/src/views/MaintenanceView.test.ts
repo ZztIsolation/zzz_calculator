@@ -124,7 +124,11 @@ function makeCatalog() {
       buffs: [{ id: "generic_hidden", sourceType: "manual", name: { zhCN: "不应显示的通用 Buff" } }],
       teammates: [{
         id: "teammate_a", name: { zhCN: "队友甲" }, attribute: "ice", specialty: "stun", images: { icon: "/assets/agents/a.png", source: "https://example.com/a" },
-        buffs: [{ id: "buff_a", source: { zhCN: "核心被动" }, description: { zhCN: "测试" }, scope: "inCombat", effects: [effect("teammate_effect")], coverage: { default: 1, min: 0, max: 1, step: 0.1 }, buffModifiers: [] }],
+        buffs: [
+          { id: "buff_a", source: { zhCN: "核心被动" }, description: { zhCN: "测试核心" }, scope: "inCombat", effects: [effect("teammate_effect_a")], coverage: { default: 1, min: 0, max: 1, step: 0.1 }, buffModifiers: [] },
+          { id: "buff_b", source: { zhCN: "额外能力" }, description: { zhCN: "测试额外" }, scope: "inCombat", effects: [effect("teammate_effect_b")], coverage: { default: 1, min: 0, max: 1, step: 0.1 }, buffModifiers: [] },
+          { id: "buff_c", source: { zhCN: "影画一" }, description: { zhCN: "测试影画" }, scope: "inCombat", effects: [effect("teammate_effect_c")], coverage: { default: 1, min: 0, max: 1, step: 0.1 }, buffModifiers: [] },
+        ],
       }],
       fieldBuffs: [{
         id: "field.defense_v5.v3_0.p1.original", sourceType: "field", scope: "inCombat", name: { zhCN: "原场地 Buff" }, source: { zhCN: "防卫战 v5" },
@@ -184,7 +188,17 @@ async function mountView(options: { failCatalogAfterSave?: boolean, delayFieldSa
       const body = JSON.parse(String(init.body ?? "{}"))
       const teammateId = body.teammate.id || "generated_teammate"
       const buff = { ...body.buff, id: body.buff.id || "generated_buff" }
-      currentCatalog.combatBuffs.teammates = [{ ...body.teammate, id: teammateId, buffs: [buff] }]
+      const existing = currentCatalog.combatBuffs.teammates.find((item: any) => item.id === teammateId)
+      const buffs = [...(existing?.buffs ?? [])]
+      const existingBuffIndex = buffs.findIndex((item: any) => item.id === buff.id)
+      if (existingBuffIndex >= 0) buffs[existingBuffIndex] = buff
+      else buffs.push(buff)
+      const buffById = new Map(buffs.map((item: any) => [item.id, item]))
+      const orderedBuffs = Array.isArray(body.buffOrder) ? body.buffOrder.map((id: string) => buffById.get(id)) : buffs
+      const nextTeammate = { ...existing, ...body.teammate, id: teammateId, buffs: orderedBuffs }
+      const teammateIndex = currentCatalog.combatBuffs.teammates.findIndex((item: any) => item.id === teammateId)
+      if (teammateIndex >= 0) currentCatalog.combatBuffs.teammates[teammateIndex] = nextTeammate
+      else currentCatalog.combatBuffs.teammates.push(nextTeammate)
       successfulSaveCount += 1
       return jsonResponse({ ok: true, savedItem: { ...buff, teammateId, teammateName: body.teammate.name, maintenanceType: "teammate" } })
     }
@@ -329,11 +343,55 @@ describe("MaintenanceView structured editor", () => {
     expect(body).toMatchObject({
       teammate: { id: "teammate_a", name: { zhCN: "队友甲改" }, attribute: "fire", specialty: "support" },
       buff: { id: "buff_a", source: { zhCN: "额外能力" } },
+      buffOrder: ["buff_a", "buff_b", "buff_c"],
     })
     expect(body.teammate.effects).toBeUndefined()
     expect(body.teammate.buffModifiers).toBeUndefined()
     expect(wrapper.text()).not.toContain("teammate_a")
     expect(wrapper.text()).not.toContain("buff_a")
+  })
+
+  it("reorders teammate buffs with buttons and drag while preserving selection and saving the complete order", async () => {
+    const { wrapper, fetchMock } = await mountView()
+    await switchResource(wrapper, "teammate-buffs")
+
+    const listLabels = () => wrapper.findAll(".teammate-buff-item").map((item: any) => item.find("strong").text())
+    expect(listLabels()).toEqual(["核心被动", "额外能力", "影画一"])
+    expect(wrapper.find('[aria-label="上移 核心被动"]').attributes("disabled")).toBeDefined()
+    expect(wrapper.find('[aria-label="下移 影画一"]').attributes("disabled")).toBeDefined()
+
+    await wrapper.find('[aria-label="下移 核心被动"]').trigger("click")
+    expect(listLabels()).toEqual(["额外能力", "核心被动", "影画一"])
+    await wrapper.find('[aria-label="上移 影画一"]').trigger("click")
+    expect(listLabels()).toEqual(["额外能力", "影画一", "核心被动"])
+    expect(wrapper.find(".teammate-buff-item.active strong").text()).toBe("核心被动")
+    expect(wrapper.text()).toContain("有未保存修改")
+
+    const dataTransfer = {
+      value: "",
+      effectAllowed: "",
+      dropEffect: "",
+      setData(_type: string, value: string) { this.value = value },
+      getData() { return this.value },
+    }
+    const cinemaHandle = wrapper.find('[aria-label="拖拽调整 影画一 顺序"]')
+    await cinemaHandle.trigger("dragstart", { dataTransfer })
+    const additionalItem = wrapper.findAll(".teammate-buff-item").find((item: any) => item.text().includes("额外能力"))!
+    Object.defineProperty(additionalItem.element, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({ top: 0, height: 40, bottom: 40, left: 0, right: 240, width: 240, x: 0, y: 0, toJSON: () => ({}) }),
+    })
+    await additionalItem.trigger("dragover", { dataTransfer, clientY: 1 })
+    await additionalItem.trigger("drop", { dataTransfer, clientY: 1 })
+    expect(listLabels()).toEqual(["影画一", "额外能力", "核心被动"])
+    expect(wrapper.find(".teammate-buff-item.active strong").text()).toBe("核心被动")
+
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("完整目录已刷新"))
+    const calls = fetchMock.mock.calls.filter(([url, init]) => url === "/api/maintenance/teammate-buffs" && init?.method === "POST")
+    const body = JSON.parse(String(calls.at(-1)?.[1]?.body ?? "{}"))
+    expect(body.buffOrder).toEqual(["buff_c", "buff_b", "buff_a"])
+    expect(listLabels()).toEqual(["影画一", "额外能力", "核心被动"])
   })
 
   it("supports deleting a selected teammate buff and the whole teammate group", async () => {
@@ -347,7 +405,7 @@ describe("MaintenanceView structured editor", () => {
     const second = await mountView()
     await switchResource(second.wrapper, "teammate-buffs")
     await button(second.wrapper, "删除角色").trigger("click")
-    expect(second.wrapper.find(".modal").text()).toContain("全部 1 个 Buff")
+    expect(second.wrapper.find(".modal").text()).toContain("全部 3 个 Buff")
     await button(second.wrapper.find(".modal"), "删除").trigger("click")
     await vi.waitFor(() => expect(second.fetchMock).toHaveBeenCalledWith("/api/maintenance/teammate-buffs/teammate_a", { method: "DELETE" }))
   })

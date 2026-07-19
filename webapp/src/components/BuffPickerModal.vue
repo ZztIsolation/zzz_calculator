@@ -69,6 +69,7 @@ const query = ref("")
 const draft = ref<Set<string>>(new Set())
 const draftAddedBuffs = ref<any[]>([])
 const draftRuntimeInputs = ref<Record<string, any>>({})
+const prioritizedTeammateOwnerIds = ref<Set<string>>(new Set())
 const fieldVersion = ref("")
 const fieldPeriod = ref("")
 const fieldName = ref("")
@@ -97,6 +98,10 @@ watch(() => props.show, value => {
       }
     }
     draft.value = selected
+    prioritizedTeammateOwnerIds.value = selectedTeammateOwnerIds(
+      groupedBuffs.value.teammate ?? [],
+      selected,
+    )
     syncSelectedTeamWEngineReferences(teamWEngineCandidates)
     draftRuntimeInputs.value = JSON.parse(JSON.stringify(props.runtimeInputs ?? {}))
     query.value = ""
@@ -586,6 +591,37 @@ function teammateBuffMatchesFilters(buff: any) {
     && (!teammateSpecialties.value.length || teammateSpecialties.value.includes(buff?.teammateSpecialty))
 }
 
+function teammateOwnerId(buff: any) {
+  return String(buff?.ownerId ?? buff?.teammateId ?? "").trim()
+}
+
+function selectedTeammateOwnerIds(buffs: any[], selectedIds: Set<string>) {
+  const ownerIds = new Set<string>()
+  for (const buff of buffs) {
+    const ownerId = teammateOwnerId(buff)
+    if (ownerId && selectedIds.has(buff?.id)) {
+      ownerIds.add(ownerId)
+    }
+  }
+  return ownerIds
+}
+
+function prioritizeSelectedTeammateBuffs(buffs: any[]) {
+  if (!prioritizedTeammateOwnerIds.value.size) {
+    return buffs
+  }
+  const prioritized: any[] = []
+  const remaining: any[] = []
+  for (const buff of buffs) {
+    const ownerId = teammateOwnerId(buff)
+    const destination = ownerId && prioritizedTeammateOwnerIds.value.has(ownerId)
+      ? prioritized
+      : remaining
+    destination.push(buff)
+  }
+  return [...prioritized, ...remaining]
+}
+
 const categoryBuffs = computed(() => {
   const needle = query.value.trim().toLowerCase()
   const source = activeTab.value === "field"
@@ -606,7 +642,14 @@ const customBuffs = computed(() => {
     .filter(buff => !needle || buffText(buff).includes(needle))
 })
 
-const visibleBuffs = computed(() => activeTab.value === "custom" ? customBuffs.value : categoryBuffs.value)
+const visibleBuffs = computed(() => {
+  if (activeTab.value === "custom") {
+    return customBuffs.value
+  }
+  return activeTab.value === "teammate"
+    ? prioritizeSelectedTeammateBuffs(categoryBuffs.value)
+    : categoryBuffs.value
+})
 const selectedCount = computed(() => draft.value.size
   + draftAddedBuffs.value.filter(buff => buff?.sourceKind === "custom").length)
 const canBulkAddVisible = computed(() => !["custom", "field", "boss"].includes(activeTab.value))

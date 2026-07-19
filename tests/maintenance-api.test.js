@@ -452,6 +452,48 @@ try {
     assert.ok(reloadedTeammateBuff)
     assert.equal(reloadedTeammateBuff.effects.find(rule => rule.id === "all_res_ignore")?.stat, "allResIgnore")
     assert.deepEqual(reloadedTeammateBuff.effects.find(rule => rule.id === "flinch_duration")?.target, savedFlinchDuration.target)
+
+    const orderSecondBuff = cloneWithId(reloadedTeammateBuff, "order_second")
+    const orderThirdBuff = cloneWithId(reloadedTeammateBuff, "order_third")
+    await save("teammate-buffs", {
+        teammate: { ...teammateBase, id: teammateId },
+        buff: orderSecondBuff,
+    })
+    assert.deepEqual(
+        (await catalog()).combatBuffs.teammates.find(item => item.id === teammateId)?.buffs.map(item => item.id),
+        [buff.id, orderSecondBuff.id],
+        "legacy teammate saves without buffOrder should preserve the existing order and append new Buffs",
+    )
+
+    const requestedBuffOrder = [orderThirdBuff.id, buff.id, orderSecondBuff.id]
+    await save("teammate-buffs", {
+        teammate: { ...teammateBase, id: teammateId },
+        buff: orderThirdBuff,
+        buffOrder: requestedBuffOrder,
+    })
+    assert.deepEqual(
+        (await catalog()).combatBuffs.teammates.find(item => item.id === teammateId)?.buffs.map(item => item.id),
+        requestedBuffOrder,
+        "teammate maintenance should persist the complete requested Buff order atomically",
+    )
+
+    for (const invalidOrder of [
+        requestedBuffOrder.slice(0, 2),
+        [orderThirdBuff.id, buff.id, buff.id],
+        [orderThirdBuff.id, buff.id, "unknown_buff"],
+    ]) {
+        await saveRejected("teammate-buffs", {
+            teammate: { ...teammateBase, id: teammateId },
+            buff: structuredClone(reloadedTeammateBuff),
+            buffOrder: invalidOrder,
+        }, "Buff 顺序")
+        assert.deepEqual(
+            (await catalog()).combatBuffs.teammates.find(item => item.id === teammateId)?.buffs.map(item => item.id),
+            requestedBuffOrder,
+            "invalid or stale Buff orders must not partially update the catalog",
+        )
+    }
+
     await remove(`/api/maintenance/teammate-buffs/${encodeURIComponent(teammateId)}/${encodeURIComponent(buff.id)}`)
     assert.equal((await catalog()).combatBuffs.teammates
         .find(item => item.id === teammateId)?.buffs.some(item => item.id === buff.id), false)

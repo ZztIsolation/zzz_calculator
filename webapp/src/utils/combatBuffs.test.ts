@@ -157,6 +157,33 @@ describe("combat buff display helpers", () => {
     expect(teammateDriveDiscSetIdsFromBuffIds(["teammateDriveDisc4pc:set_a"])).toEqual(["set_a"])
   })
 
+  it("preserves teammate group order and each group's authored Buff order", () => {
+    const orderedMeta = {
+      teammateCombatBuffGroups: [
+        {
+          id: "teammate_first",
+          name: { zhCN: "第一位队友" },
+          buffs: [
+            { id: "first.additional", source: { zhCN: "额外能力" }, effects: [] },
+            { id: "first.core", source: { zhCN: "核心被动" }, effects: [] },
+          ],
+        },
+        {
+          id: "teammate_second",
+          name: { zhCN: "第二位队友" },
+          buffs: [{ id: "second.cinema", source: { zhCN: "影画一" }, effects: [] }],
+        },
+      ],
+      combatBuffs: [],
+    }
+
+    expect(buildCombatBuffGroups({ meta: orderedMeta }).teammate.map(item => item.id)).toEqual([
+      "first.additional",
+      "first.core",
+      "second.cinema",
+    ])
+  })
+
   it("materializes teammate w-engine candidates at their independent refinement level", () => {
     const candidateAt = (level?: number) => teamWEngineBuffCandidates(
       meta,

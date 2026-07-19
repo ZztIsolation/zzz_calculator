@@ -48,6 +48,7 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("driveDiscAnalysisInput")
     expect(source).toContain("driveDiscAnalysisSourceLabel")
     expect(source).toContain("词条分析")
+    expect(source).toContain('<NButton type="primary" size="small" data-testid="open-drive-disc-analysis"')
   })
 
   it("shows every active combat buff badge instead of truncating the list", () => {

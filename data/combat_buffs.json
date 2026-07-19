@@ -47,6 +47,30 @@
           "buffModifiers": []
         },
         {
+          "id": "buff_23620b7000",
+          "source": {
+            "zhCN": "额外能力"
+          },
+          "description": {
+            "zhCN": "处于「以太帷幕·妄想重奏」内的角色攻击命中敌人时，目标的失衡易伤倍率提升30%，持续40秒"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_3e2511fe0a",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "stunDmgMultiplierBonus",
+              "mode": "flat",
+              "value": 30
+            }
+          ],
+          "buffModifiers": [],
+          "hidden": false
+        },
+        {
           "id": "buff_v6p3n8x2la",
           "source": {
             "zhCN": "强化特殊技"
@@ -140,30 +164,6 @@
             }
           ],
           "buffModifiers": []
-        },
-        {
-          "id": "buff_23620b7000",
-          "source": {
-            "zhCN": "额外能力"
-          },
-          "description": {
-            "zhCN": "处于「以太帷幕·妄想重奏」内的角色攻击命中敌人时，目标的失衡易伤倍率提升30%，持续40秒"
-          },
-          "scope": "inCombat",
-          "effects": [
-            {
-              "id": "effect_3e2511fe0a",
-              "type": "fixed",
-              "target": {
-                "kind": "default"
-              },
-              "stat": "stunDmgMultiplierBonus",
-              "mode": "flat",
-              "value": 30
-            }
-          ],
-          "buffModifiers": [],
-          "hidden": false
         }
       ],
       "images": {
