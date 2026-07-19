@@ -6,11 +6,14 @@ import {
     accountSummary,
     createAccount,
     deleteAccount,
+    deleteUserDriveDisc,
     importScannerExportToStore,
     loadCurrentUserDriveDiscStore,
     loadUserDriveDiscStore,
     switchAccount,
     updateAccount,
+    upsertDriveDiscLoadout,
+    upsertUserDriveDisc,
 } from "../backend/driveDiscInventory.js"
 
 function scannerDisc(sequence, setName = "流光咏叹") {
@@ -71,14 +74,52 @@ try {
     assert.equal(store.driveDiscs.filter(item => item.ownerId === "default").length, 1)
     assert.equal(store.driveDiscs.filter(item => item.ownerId === "alt").length, 1)
 
+    const sharedIdDisc = {
+        id: "shared-manual-id",
+        setName: "账号隔离测试",
+        partition: 3,
+        rarity: "S",
+        level: 15,
+        mainStat: { stat: "defFlat", mode: "flat", value: 183 },
+        subStats: [],
+    }
+    await upsertUserDriveDisc(tempDir, { ...sharedIdDisc, ownerId: "default" })
+    await upsertUserDriveDisc(tempDir, { ...sharedIdDisc, ownerId: "alt", setName: "二号账号隔离测试" })
+    await upsertDriveDiscLoadout(tempDir, {
+        id: "shared-loadout",
+        agentId: "ye_shunguang",
+        ownerId: "default",
+        driveDiscIdsBySlot: { 3: sharedIdDisc.id },
+    })
+    await upsertDriveDiscLoadout(tempDir, {
+        id: "shared-loadout",
+        agentId: "ye_shunguang",
+        ownerId: "alt",
+        driveDiscIdsBySlot: { 3: sharedIdDisc.id },
+    })
+    store = await loadUserDriveDiscStore(tempDir)
+    assert.equal(store.driveDiscs.filter(item => item.id === sharedIdDisc.id).length, 2)
+
     await assert.rejects(() => deleteAccount(tempDir, "alt"), /current account/i)
     await switchAccount(tempDir, "default")
+    const deletedSharedDisc = await deleteUserDriveDisc(tempDir, sharedIdDisc.id)
+    assert.equal(deletedSharedDisc.deleted, true)
+    store = await loadUserDriveDiscStore(tempDir)
+    const defaultSharedLoadout = store.driveDiscLoadouts.find(item => item.id === "shared-loadout" && item.ownerId === "default")
+    const altSharedLoadout = store.driveDiscLoadouts.find(item => item.id === "shared-loadout" && item.ownerId === "alt")
+    assert.equal(defaultSharedLoadout.driveDiscIdsBySlot["3"], undefined)
+    assert.ok(defaultSharedLoadout.missingSlots.includes(3))
+    assert.ok(defaultSharedLoadout.missingDriveDiscIds.includes(sharedIdDisc.id))
+    assert.equal(altSharedLoadout.driveDiscIdsBySlot["3"], sharedIdDisc.id)
+    assert.equal(store.driveDiscs.some(item => item.id === sharedIdDisc.id && item.ownerId === "alt"), true)
+
     const deleted = await deleteAccount(tempDir, "alt")
     assert.equal(deleted.deleted, true)
     const summary = await accountSummary(tempDir)
     assert.equal(summary.owners.some(owner => owner.id === "alt"), false)
     store = await loadUserDriveDiscStore(tempDir)
     assert.equal(store.driveDiscs.some(item => item.ownerId === "alt"), false)
+    assert.equal(store.driveDiscs.some(item => item.id === sharedIdDisc.id), false)
 } finally {
     await rm(tempDir, { recursive: true, force: true })
 }

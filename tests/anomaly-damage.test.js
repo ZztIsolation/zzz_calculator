@@ -6,6 +6,13 @@ import {
     calculateInCombatPanel,
     loadCalculatorContext,
 } from "../backend/calculator.js"
+import {
+    disorderBaseMultiplier,
+    disorderDurationSeconds,
+    disorderElapsedStepSeconds,
+    normalizeElapsedSeconds,
+    resolveDamageEventMultiplier,
+} from "../core/damageEventMultipliers.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
@@ -102,16 +109,20 @@ approx(burnSingleTick.damage.multipliers.anomaly, 0.5, "Burn one proc multiplier
 for (const [effect, elapsedSeconds, durationSeconds, expectedMultiplier] of [
     ["burn", 0, 10, 14.5],
     ["burn", 0, 99, 14.5],
-    ["burn", 3.2, 10, 11],
+    ["burn", 3.2, 10, 11.5],
     ["burn", 10, 10, 4.5],
     ["burn", 20, 10, 4.5],
     ["shock", 0, 13, 17],
+    ["shock", 4.5, 10, 10.75],
     ["corruption", 0, 10, 17],
     ["frozen", 0, 10, 5.25],
+    ["frozen", 4.5, 10, 4.875],
     ["frost_frozen", 0, undefined, 21],
     ["frost_frozen", 0, 10, 21],
     ["frost_frozen", 3, 20, 18.75],
+    ["frost_frozen", 4.5, 20, 17.25],
     ["flinch", 0, 10, 5.25],
+    ["flinch", 4.5, 10, 4.875],
 ]) {
     const result = calculateEvent({
         id: `disorder-${effect}-${elapsedSeconds}`,
@@ -122,6 +133,59 @@ for (const [effect, elapsedSeconds, durationSeconds, expectedMultiplier] of [
     })
     approx(result.damage.multipliers.anomaly, expectedMultiplier, `${effect} disorder multiplier`)
 }
+
+assert.equal(normalizeElapsedSeconds(3.2, 10), 3, "Elapsed seconds should round to the nearest half second")
+assert.equal(normalizeElapsedSeconds(3.3, 10), 3.5, "Elapsed seconds should round upward past the half-step midpoint")
+assert.equal(normalizeElapsedSeconds(20, 10), 10, "Elapsed seconds should clamp to the catalog duration")
+assert.equal(normalizeElapsedSeconds(3.4, 10, 1), 3, "Whole-second Disorder should round down below the midpoint")
+assert.equal(normalizeElapsedSeconds(3.5, 10, 1), 4, "Whole-second Disorder should round up at the midpoint")
+assert.equal(normalizeElapsedSeconds(20, 10, 1), 10, "Whole-second Disorder should clamp to the catalog duration")
+assert.equal(disorderDurationSeconds({ anomalyEffect: "burn" }, catalog), 10, "Disorder duration should resolve from the catalog")
+for (const [effect, expectedStep] of [
+    ["burn", 0.5],
+    ["corruption", 0.5],
+    ["shock", 1],
+    ["frozen", 1],
+    ["frost_frozen", 1],
+    ["flinch", 1],
+]) {
+    assert.equal(disorderElapsedStepSeconds({ anomalyEffect: effect }, catalog), expectedStep, `${effect} elapsed step should resolve from the catalog`)
+}
+assert.equal(disorderElapsedStepSeconds({ anomalyEffect: "unknown" }, catalog), 0.5, "Unknown Disorder should retain the half-second compatibility fallback")
+const frostBreakdown = disorderBaseMultiplier(meta.disorderEffects.find(effect => effect.id === "frost_frozen"), 4.5)
+assert.deepEqual(
+    {
+        elapsed: frostBreakdown.elapsed,
+        remaining: frostBreakdown.remaining,
+        tickIntervalSeconds: frostBreakdown.tickIntervalSeconds,
+        tickCount: frostBreakdown.tickCount,
+        baseMultiplier: frostBreakdown.baseMultiplier,
+    },
+    { elapsed: 5, remaining: 15, tickIntervalSeconds: 1, tickCount: 15, baseMultiplier: 17.25 },
+    "Frost Disorder should use whole-second normalization and keep the 1725% result",
+)
+approx(resolveDamageEventMultiplier({
+    kind: "anomaly",
+    settlementType: "attribute",
+    anomalyEffect: "assault",
+    procCount: 1,
+    count: 99,
+    damageRatioPct: 2.5,
+}, catalog), 0.17825, "Displayed anomaly multiplier should include hidden event scale but exclude event count")
+approx(resolveDamageEventMultiplier({
+    kind: "anomaly",
+    settlementType: "disorder",
+    anomalyEffect: "burn",
+    disorderType: "polarized",
+    elapsedSeconds: 0.6,
+    damageRatioPct: 50,
+}, catalog), 1.75, "Displayed disorder multiplier should include half-second time, polarized scale, and hidden event scale")
+approx(resolveDamageEventMultiplier({
+    kind: "direct",
+    skillMultiplier: 3300,
+    damageRatioPct: 2.5,
+    count: 6,
+}, catalog), 0.825, "Displayed direct multiplier should include hidden event scale but exclude event count")
 
 const ignoredDurationDisorder = calculateEvent({
     id: "ignored-duration",
@@ -678,5 +742,127 @@ const directWithModifiers = calculateEvent({
     },
 }, modifierCatalog)
 approx(directWithModifiers.damage.finalDamage, directWithoutModifiers.damage.finalDamage, "Anomaly modifiers should not affect direct damage")
+
+const janeCoreBuffId = "jane_doe.core_insight"
+const janeCinemaTwoBuffId = "jane_doe.cinema_2_assault_crit"
+const janeCinemaFourBuffId = "jane_doe.cinema_4_anomaly_damage"
+const janeCoreCritRateEffectId = "jane_doe_core_assault_crit_rate"
+
+const flinchWithoutJane = calculateEvent({
+    id: "flinch-without-jane",
+    kind: "disorder",
+    previousAnomalyEffect: "flinch",
+    elapsedSeconds: 0,
+})
+approx(flinchWithoutJane.damage.multipliers.anomaly, 5.25, "Flinch Disorder should retain its 525% base multiplier")
+
+for (const [elapsedSeconds, expectedMultiplier] of [[0, 5.625], [0.5, 5.55], [12, 4.725]]) {
+    const result = calculateEvent({
+        id: `flinch-jane-${elapsedSeconds}`,
+        kind: "disorder",
+        previousAnomalyEffect: "flinch",
+        elapsedSeconds,
+    }, {
+        combatBuffs: { activeBuffIds: [janeCoreBuffId] },
+    })
+    approx(result.damage.multipliers.anomaly, expectedMultiplier, `Jane core Flinch Disorder at ${elapsedSeconds}s`)
+    assert.equal(result.damage.multipliers.baseDurationSeconds, 10, "Jane core should retain the catalog base duration")
+    assert.equal(result.damage.multipliers.durationBonusSeconds, 5, "Jane core should add five raw seconds")
+    assert.equal(result.damage.multipliers.durationSeconds, 15, "Jane core should extend the effective duration to fifteen seconds")
+}
+
+const burnWithJane = calculateEvent({
+    id: "burn-with-jane",
+    kind: "disorder",
+    previousAnomalyEffect: "burn",
+    elapsedSeconds: 0,
+}, {
+    combatBuffs: { activeBuffIds: [janeCoreBuffId] },
+})
+approx(burnWithJane.damage.multipliers.anomaly, 14.5, "Jane core duration should not affect Burn Disorder")
+assert.equal(burnWithJane.damage.multipliers.durationBonusSeconds, 0, "Jane core duration target should only match Flinch Disorder")
+
+const assaultWithJaneCore = calculateEvent({
+    id: "assault-with-jane-core",
+    kind: "anomaly",
+    anomalyEffect: "assault",
+}, {
+    combatBuffs: { activeBuffIds: [janeCoreBuffId] },
+})
+approx(assaultWithJaneCore.damage.multipliers.anomaly, 7.13, "Jane core should not change the Assault base multiplier")
+approx(assaultWithJaneCore.damage.multipliers.anomalyCritRate, 1, "Jane core should reach 100% anomaly crit rate at 375 AP")
+approx(assaultWithJaneCore.damage.multipliers.anomalyCritDmg, 0.5, "Jane core should grant 50% anomaly crit damage")
+approx(assaultWithJaneCore.damage.multipliers.anomalyCrit, 1.5, "Jane core default anomaly crit multiplier")
+
+const assaultWithJaneAt200 = calculateEvent({
+    id: "assault-with-jane-at-200",
+    kind: "anomaly",
+    anomalyEffect: "assault",
+}, {
+    combatBuffs: {
+        activeBuffIds: [janeCoreBuffId],
+        runtimeInputs: {
+            [janeCoreBuffId]: {
+                effects: {
+                    [janeCoreCritRateEffectId]: { sourceValue: 200 },
+                },
+            },
+        },
+    },
+})
+approx(assaultWithJaneAt200.damage.multipliers.anomalyCritRate, 0.72, "Jane core anomaly crit formula should use the runtime AP input")
+approx(assaultWithJaneAt200.damage.multipliers.anomalyCrit, 1.36, "Jane core 200 AP expected anomaly crit multiplier")
+
+const shockWithJaneCore = calculateEvent({
+    id: "shock-with-jane-core",
+    kind: "anomaly",
+    anomalyEffect: "shock",
+}, {
+    combatBuffs: { activeBuffIds: [janeCoreBuffId] },
+})
+approx(shockWithJaneCore.damage.multipliers.anomalyCrit, 1, "Jane core anomaly crit should only affect Assault")
+
+const assaultWithJaneCinemaTwo = calculateEvent({
+    id: "assault-with-jane-cinema-two",
+    kind: "anomaly",
+    anomalyEffect: "assault",
+}, {
+    combatBuffs: { activeBuffIds: [janeCoreBuffId, janeCinemaTwoBuffId] },
+})
+approx(assaultWithJaneCinemaTwo.damage.multipliers.anomalyCritRate, 1, "Jane core plus cinema 2 should retain 100% anomaly crit rate")
+approx(assaultWithJaneCinemaTwo.damage.multipliers.anomalyCritDmg, 1, "Jane core plus cinema 2 should reach 100% anomaly crit damage")
+approx(assaultWithJaneCinemaTwo.damage.multipliers.anomalyCrit, 2, "Jane core plus cinema 2 anomaly crit multiplier")
+approx(assaultWithJaneCinemaTwo.damage.targetBreakdown.enemyDefReduction, 0.15, "Jane cinema 2 should ignore 15% defense for Assault")
+
+const shockWithJaneCinemaTwo = calculateEvent({
+    id: "shock-with-jane-cinema-two",
+    kind: "anomaly",
+    anomalyEffect: "shock",
+}, {
+    combatBuffs: { activeBuffIds: [janeCinemaTwoBuffId] },
+})
+approx(shockWithJaneCinemaTwo.damage.targetBreakdown.enemyDefReduction, 0, "Jane cinema 2 defense ignore should not affect other anomalies")
+approx(shockWithJaneCinemaTwo.damage.multipliers.anomalyCritDmg, 0, "Jane cinema 2 crit damage should not affect other anomalies")
+
+const assaultWithJaneCinemaFour = calculateEvent({
+    id: "assault-with-jane-cinema-four",
+    kind: "anomaly",
+    anomalyEffect: "assault",
+}, {
+    combatBuffs: { activeBuffIds: [janeCinemaFourBuffId] },
+})
+approx(assaultWithJaneCinemaFour.damage.multipliers.attributeAnomalyDamage, 1.18, "Jane cinema 4 should enter the attribute anomaly damage bucket")
+approx(assaultWithJaneCinemaFour.damage.multipliers.disorderDamage, 1, "Jane cinema 4 should not enter the Disorder bucket")
+
+const flinchWithJaneCinemaFour = calculateEvent({
+    id: "flinch-with-jane-cinema-four",
+    kind: "disorder",
+    previousAnomalyEffect: "flinch",
+    elapsedSeconds: 0,
+}, {
+    combatBuffs: { activeBuffIds: [janeCinemaFourBuffId] },
+})
+approx(flinchWithJaneCinemaFour.damage.multipliers.attributeAnomalyDamage, 1, "Jane cinema 4 attribute anomaly bonus should not affect Disorder")
+approx(flinchWithJaneCinemaFour.damage.multipliers.disorderDamage, 1, "Jane cinema 4 should leave the Disorder damage bucket neutral")
 
 console.log("anomaly damage tests passed")

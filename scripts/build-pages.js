@@ -1,6 +1,7 @@
+import { spawn } from "node:child_process"
 import { createHash } from "node:crypto"
 import { createReadStream, createWriteStream, existsSync } from "node:fs"
-import { cp, mkdir, rm, stat, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { Readable } from "node:stream"
 import { pipeline } from "node:stream/promises"
@@ -10,16 +11,72 @@ import { loadCalculatorContext } from "../backend/calculator.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, "..")
+const webappDir = path.join(rootDir, "webapp")
 const outDir = path.join(rootDir, "dist", "pages")
 
-const scannerReleaseTag = "scanner-1.0.36"
-const scannerReleaseBase = `https://github.com/ZztIsolation/zzz_calculator/releases/download/${scannerReleaseTag}`
-const scannerVersion = "1.0.36"
-const scannerZipName = "ZZZ-Scanner.Next-win-x64.zip"
-const scannerGitHubPackageUrl = `${scannerReleaseBase}/${scannerZipName}`
-const scannerPagesPackageUrl = `./${scannerVersion}/${scannerZipName}`
-const scannerPackageSha256 = "d885c0aef6da61cfcbf994ad2b4e712a31efe8bd87631260fe4f87ea8711c63d"
-const scannerPackageSize = 47231570
+const scannerManifestSource = JSON.parse(await readFile(
+    path.join(rootDir, "config", "scanner-manifest.json"),
+    "utf8",
+))
+const helperManifestSource = JSON.parse(await readFile(
+    path.join(rootDir, "config", "helper-manifest.json"),
+    "utf8",
+))
+const scannerVersion = String(scannerManifestSource.scannerVersion)
+const scannerPackages = (scannerManifestSource.packages ?? []).map(packageInfo => {
+    const packageUrls = Array.isArray(packageInfo.packageUrls) ? packageInfo.packageUrls : []
+    const pagesUrl = packageUrls.find(url => String(url).startsWith("./"))
+    const githubUrl = packageUrls.find(url => /^https:\/\//i.test(url))
+    if (!pagesUrl || !githubUrl) {
+        throw new Error(`Scanner package ${packageInfo.id} must define local and HTTPS package URLs.`)
+    }
+    return {
+        ...packageInfo,
+        id: String(packageInfo.id),
+        pagesUrl: String(pagesUrl),
+        githubUrl: String(githubUrl),
+        zipName: path.posix.basename(new URL(githubUrl).pathname),
+        sha256: String(packageInfo.sha256),
+        size: Number(packageInfo.size),
+    }
+})
+if (scannerManifestSource.schemaVersion !== 3 || scannerPackages.length !== 2) {
+    throw new Error("Scanner manifest must use schema 3 and contain exactly two packages.")
+}
+for (const packageInfo of scannerPackages) {
+    if (!Array.isArray(packageInfo.files) || packageInfo.files.length === 0) {
+        throw new Error(`Scanner package ${packageInfo.id} must contain a file manifest.`)
+    }
+    const fileBytes = packageInfo.files.reduce((sum, file) => sum + Number(file.size), 0)
+    if (fileBytes !== Number(packageInfo.expandedSize)) {
+        throw new Error(`Scanner package ${packageInfo.id} file manifest size mismatch.`)
+    }
+}
+if (helperManifestSource.schemaVersion !== 1 || helperManifestSource.version !== "1.2.1") {
+    throw new Error("Helper manifest must use schema 1 and publish Helper 1.2.1.")
+}
+
+function run(command, args, cwd, extraEnv = {}) {
+    return new Promise((resolve, reject) => {
+        const child = spawn(command, args, {
+            cwd,
+            env: {
+                ...process.env,
+                ...extraEnv,
+            },
+            stdio: "inherit",
+            shell: process.platform === "win32",
+        })
+        child.on("exit", code => {
+            if (code === 0) {
+                resolve()
+                return
+            }
+            reject(new Error(`${command} ${args.join(" ")} failed with exit code ${code}`))
+        })
+        child.on("error", reject)
+    })
+}
 
 async function writeJson(filePath, value) {
     await mkdir(path.dirname(filePath), { recursive: true })
@@ -46,70 +103,185 @@ async function downloadFile(url, destination) {
     await pipeline(Readable.fromWeb(response.body), createWriteStream(destination))
 }
 
-async function verifyScannerPackage(filePath) {
+async function verifyScannerPackage(filePath, packageInfo) {
     const packageStat = await stat(filePath)
-    if (packageStat.size !== scannerPackageSize) {
-        throw new Error(`Scanner package size mismatch. Expected ${scannerPackageSize}, got ${packageStat.size}.`)
+    if (packageStat.size !== packageInfo.size) {
+        throw new Error(`Scanner package ${packageInfo.id} size mismatch. Expected ${packageInfo.size}, got ${packageStat.size}.`)
     }
 
     const actualHash = await sha256File(filePath)
-    if (actualHash !== scannerPackageSha256) {
-        throw new Error(`Scanner package sha256 mismatch. Expected ${scannerPackageSha256}, got ${actualHash}.`)
+    if (actualHash !== packageInfo.sha256) {
+        throw new Error(`Scanner package ${packageInfo.id} sha256 mismatch. Expected ${packageInfo.sha256}, got ${actualHash}.`)
     }
 }
 
-async function ensurePagesScannerPackage() {
-    const localPackagePath = path.join(rootDir, "downloads", "zzz-scanner", scannerVersion, scannerZipName)
-    const pagesPackagePath = path.join(outDir, "downloads", "zzz-scanner", scannerVersion, scannerZipName)
-    await mkdir(path.dirname(pagesPackagePath), { recursive: true })
+async function ensurePagesScannerPackages() {
+    for (const packageInfo of scannerPackages) {
+        const localPackagePath = path.join(rootDir, "downloads", "zzz-scanner", scannerVersion, packageInfo.zipName)
+        const pagesPackagePath = path.join(outDir, "downloads", "zzz-scanner", scannerVersion, packageInfo.zipName)
+        await mkdir(path.dirname(pagesPackagePath), { recursive: true })
 
-    if (existsSync(localPackagePath)) {
-        await cp(localPackagePath, pagesPackagePath)
+        if (existsSync(localPackagePath)) {
+            await copyFile(localPackagePath, pagesPackagePath)
+        } else {
+            await downloadFile(packageInfo.githubUrl, pagesPackagePath)
+        }
+
+        await verifyScannerPackage(pagesPackagePath, packageInfo)
+    }
+}
+
+function assertArtifact(condition, message) {
+    if (!condition) {
+        throw new Error(`Pages artifact verification failed: ${message}`)
+    }
+}
+
+async function artifactFiles(directory, base = directory) {
+    const result = []
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+        const absolutePath = path.join(directory, entry.name)
+        if (entry.isDirectory()) {
+            result.push(...await artifactFiles(absolutePath, base))
+        } else if (entry.isFile()) {
+            result.push({
+                absolutePath,
+                relativePath: path.relative(base, absolutePath).replace(/\\/g, "/"),
+                size: (await stat(absolutePath)).size,
+            })
+        }
+    }
+    return result
+}
+
+async function verifyPagesArtifact(maintenanceEnabled) {
+    const files = (await artifactFiles(outDir)).sort((left, right) => left.relativePath.localeCompare(right.relativePath))
+    const paths = new Set(files.map(file => file.relativePath))
+    for (const requiredPath of [
+        "index.html",
+        "404.html",
+        "calculate.html",
+        "drive-discs.html",
+        "accounts.html",
+        "settings.html",
+        "static/catalog.json",
+        "static/app-config.json",
+        "downloads/zzz-scanner/manifest.json",
+        "downloads/zzz-scanner/helper-manifest.json",
+    ]) {
+        assertArtifact(paths.has(requiredPath), `missing ${requiredPath}`)
+    }
+    for (const packageInfo of scannerPackages) {
+        assertArtifact(
+            paths.has(`downloads/zzz-scanner/${scannerVersion}/${packageInfo.zipName}`),
+            `missing scanner package ${packageInfo.id}`,
+        )
+    }
+
+    const appConfig = JSON.parse(await readFile(path.join(outDir, "static", "app-config.json"), "utf8"))
+    const manifest = JSON.parse(await readFile(path.join(outDir, "downloads", "zzz-scanner", "manifest.json"), "utf8"))
+    assertArtifact(appConfig.maintenanceEnabled === maintenanceEnabled, "app-config maintenance flag mismatch")
+    assertArtifact(manifest.schemaVersion === 3, "scanner manifest schema mismatch")
+    assertArtifact(manifest.scannerVersion === scannerVersion, "scanner version mismatch")
+    assertArtifact(Array.isArray(manifest.packages) && manifest.packages.length === scannerPackages.length, "scanner package count mismatch")
+    for (const packageInfo of scannerPackages) {
+        const emitted = manifest.packages.find(candidate => candidate.id === packageInfo.id)
+        assertArtifact(Boolean(emitted), `scanner package ${packageInfo.id} missing from manifest`)
+        assertArtifact(emitted.sha256 === packageInfo.sha256, `scanner package ${packageInfo.id} SHA-256 mismatch`)
+        assertArtifact(emitted.size === packageInfo.size, `scanner package ${packageInfo.id} size mismatch`)
+        assertArtifact(Array.isArray(emitted.files) && emitted.files.length === packageInfo.files.length, `scanner package ${packageInfo.id} file manifest mismatch`)
+        await verifyScannerPackage(
+            path.join(outDir, "downloads", "zzz-scanner", scannerVersion, packageInfo.zipName),
+            packageInfo,
+        )
+    }
+    const helperManifest = JSON.parse(await readFile(path.join(outDir, "downloads", "zzz-scanner", "helper-manifest.json"), "utf8"))
+    assertArtifact(helperManifest.version === helperManifestSource.version, "Helper manifest version mismatch")
+    assertArtifact(helperManifest.sha256 === helperManifestSource.sha256, "Helper manifest SHA-256 mismatch")
+
+    for (const [fileName, target] of [
+        ["calculate.html", "/"],
+        ["drive-discs.html", "/discs"],
+        ["accounts.html", "/accounts"],
+    ]) {
+        assertArtifact((await readFile(path.join(outDir, fileName), "utf8")).includes(`url=${target}`), `${fileName} redirect mismatch`)
+    }
+
+    if (maintenanceEnabled) {
+        assertArtifact(paths.has("maintenance.html"), "maintenance redirect missing when enabled")
     } else {
-        await downloadFile(scannerGitHubPackageUrl, pagesPackagePath)
+        assertArtifact(!paths.has("maintenance.html"), "maintenance redirect must be absent by default")
+        assertArtifact(!files.some(file => /(^|\/)MaintenanceView-|maintenance(?:Stats|Validation)?\.js$/i.test(file.relativePath)), "maintenance code leaked into the default Pages artifact")
     }
 
-    await verifyScannerPackage(pagesPackagePath)
+    const artifactHash = createHash("sha256")
+    for (const file of files) {
+        artifactHash.update(file.relativePath)
+        artifactHash.update(await readFile(file.absolutePath))
+    }
+    const totalSize = files.reduce((sum, file) => sum + file.size, 0)
+    console.log(`Pages artifact verified: ${files.length} files, ${totalSize} bytes, SHA-256 ${artifactHash.digest("hex")}`)
 }
 
-await rm(outDir, { recursive: true, force: true })
-await mkdir(outDir, { recursive: true })
-await cp(path.join(rootDir, "frontend"), outDir, { recursive: true })
+function legacyRedirect(title, target) {
+    return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="refresh" content="0; url=${target}">
+  <title>${title}</title>
+  <script>location.replace(${JSON.stringify(target)})</script>
+</head>
+<body>
+  <a href="${target}">${title}</a>
+</body>
+</html>
+`
+}
+
+function envFlag(name) {
+    const value = process.env[name]
+    if (value === undefined) {
+        return null
+    }
+    if (["1", "true", "yes", "on"].includes(String(value).toLowerCase())) {
+        return true
+    }
+    if (["0", "false", "no", "off"].includes(String(value).toLowerCase())) {
+        return false
+    }
+    return null
+}
+
+const maintenanceEnabled = envFlag("MAINTENANCE_ENABLED") === true
+const skipWebappBuild = envFlag("SKIP_WEBAPP_BUILD") === true
+if (!skipWebappBuild) {
+    const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm"
+    await run(npmCommand, ["run", "build"], webappDir, {
+        VITE_INCLUDE_MAINTENANCE: String(maintenanceEnabled),
+    })
+}
 
 const catalog = await loadCalculatorContext(rootDir)
 await writeJson(path.join(outDir, "static", "catalog.json"), catalog)
 await writeJson(path.join(outDir, "static", "app-config.json"), {
-    maintenanceEnabled: false,
+    maintenanceEnabled,
 })
-await ensurePagesScannerPackage()
+await ensurePagesScannerPackages()
 
-await writeJson(path.join(outDir, "downloads", "zzz-scanner", "manifest.json"), {
-    schemaVersion: 1,
-    launcherMinVersion: "1.0.0",
-    scannerVersion,
-    packageUrl: scannerPagesPackageUrl,
-    packageUrls: [
-        scannerPagesPackageUrl,
-        scannerGitHubPackageUrl,
-    ],
-    sha256: scannerPackageSha256,
-    size: scannerPackageSize,
-    entry: "ZZZ-Scanner.Next.exe",
-})
+await writeJson(path.join(outDir, "downloads", "zzz-scanner", "manifest.json"), scannerManifestSource)
+await writeJson(path.join(outDir, "downloads", "zzz-scanner", "helper-manifest.json"), helperManifestSource)
 
 await writeFile(path.join(outDir, "CNAME"), "zzzcaculator.top\n", "utf8")
-await writeFile(path.join(outDir, "calculate.html"), `<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0; url=/">
-  <title>正在跳转</title>
-  <script>location.replace("/")</script>
-</head>
-<body>
-  <a href="/">返回首页</a>
-</body>
-</html>
-`, "utf8")
+await copyFile(path.join(outDir, "index.html"), path.join(outDir, "404.html"))
+await writeFile(path.join(outDir, "calculate.html"), legacyRedirect("返回计算工作台", "/"), "utf8")
+await writeFile(path.join(outDir, "drive-discs.html"), legacyRedirect("前往驱动盘仓库", "/discs"), "utf8")
+await writeFile(path.join(outDir, "accounts.html"), legacyRedirect("前往账号页", "/accounts"), "utf8")
+await writeFile(path.join(outDir, "settings.html"), legacyRedirect("前往设置页", "/settings"), "utf8")
 
+if (maintenanceEnabled) {
+    await writeFile(path.join(outDir, "maintenance.html"), legacyRedirect("前往维护页", "/maintenance"), "utf8")
+}
+
+await verifyPagesArtifact(maintenanceEnabled)
 console.log(`GitHub Pages artifact written to ${outDir}`)

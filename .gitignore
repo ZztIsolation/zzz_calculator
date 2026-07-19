@@ -14,6 +14,10 @@ pnpm-debug.log*
 dist/
 build/
 coverage/
+output/
+.sandbox-home/
+test-results/
+.claude/
 .playwright-cli/
 
 # user-local runtime data

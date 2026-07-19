@@ -7,6 +7,11 @@ import {
     loadUserDriveDiscStore,
     saveUserDriveDiscStore,
 } from "../backend/driveDiscInventory.js"
+import {
+    createDriveDiscExport,
+    DRIVE_DISC_EXPORT_FORMAT,
+    DRIVE_DISC_EXPORT_VERSION,
+} from "../core/inventory-model.js"
 
 function scannerDisc(sequence, overrides = {}) {
     return {
@@ -130,6 +135,30 @@ try {
                 subStats: [],
                 source: { type: "manual" },
             },
+            {
+                id: "cross-owner-shared",
+                ownerId: "default",
+                setId: "manual-default-shared",
+                setName: "默认账号同 ID",
+                partition: 5,
+                rarity: "S",
+                level: 15,
+                mainStat: { stat: "electricDmg", value: 30, mode: "pct" },
+                subStats: [],
+                source: { type: "manual" },
+            },
+            {
+                id: "cross-owner-shared",
+                ownerId: "alt",
+                setId: "manual-alt-shared",
+                setName: "其他账号同 ID",
+                partition: 5,
+                rarity: "S",
+                level: 15,
+                mainStat: { stat: "fireDmg", value: 30, mode: "pct" },
+                subStats: [],
+                source: { type: "manual" },
+            },
         ],
         driveDiscLoadouts: [
             {
@@ -143,6 +172,22 @@ try {
                 },
                 source: { type: "manual" },
             },
+            {
+                id: "cross-owner-loadout",
+                agentId: "ye_shunguang",
+                ownerId: "default",
+                name: "默认账号同 ID 引用",
+                driveDiscIdsBySlot: { 5: "cross-owner-shared" },
+                source: { type: "manual" },
+            },
+            {
+                id: "cross-owner-loadout",
+                agentId: "ye_shunguang",
+                ownerId: "alt",
+                name: "其他账号同 ID 引用",
+                driveDiscIdsBySlot: { 5: "cross-owner-shared" },
+                source: { type: "manual" },
+            },
         ],
     })
 
@@ -151,11 +196,19 @@ try {
     ], { ownerId: "default", sourcePath: "remove.json", removeMissing: true })
     assert.equal(removed.driveDiscs.some(item => item.id === "manual-delete-me"), false)
     assert.equal(removed.driveDiscs.some(item => item.id === "alt-keep-me"), true)
+    assert.equal(removed.driveDiscs.some(item => item.id === "cross-owner-shared" && item.ownerId === "default"), false)
+    assert.equal(removed.driveDiscs.some(item => item.id === "cross-owner-shared" && item.ownerId === "alt"), true)
     assert.ok(removed.lastImportSummary.removed >= 1)
     const loadout = removed.driveDiscLoadouts.find(item => item.id === "loadout-1")
     assert.ok(loadout)
     assert.equal(loadout.driveDiscIdsBySlot["6"], undefined)
     assert.equal(loadout.status, "incomplete")
+    assert.ok(loadout.missingSlots.includes(6))
+    const defaultSharedLoadout = removed.driveDiscLoadouts.find(item => item.id === "cross-owner-loadout" && item.ownerId === "default")
+    const altSharedLoadout = removed.driveDiscLoadouts.find(item => item.id === "cross-owner-loadout" && item.ownerId === "alt")
+    assert.equal(defaultSharedLoadout.driveDiscIdsBySlot["5"], undefined)
+    assert.ok(defaultSharedLoadout.missingSlots.includes(5))
+    assert.equal(altSharedLoadout.driveDiscIdsBySlot["5"], "cross-owner-shared")
 
     await writeFile(path.join(tempDir, "user_drive_discs.json"), JSON.stringify({
         version: 1,
@@ -236,6 +289,133 @@ try {
     const aliasLoadout = cleanedAliases.driveDiscLoadouts.find(item => item.id === "alias-loadout")
     assert.ok(aliasLoadout)
     assert.equal(aliasLoadout.driveDiscIdsBySlot["1"], "legacy-alias-disc")
+
+    const exportedAt = "2026-07-18T12:00:00.000Z"
+    const exportSource = {
+        version: 1,
+        currentOwnerId: "default",
+        owners: [
+            { id: "default", label: "主账号" },
+            { id: "alt", label: "其他账号" },
+        ],
+        imports: [],
+        driveDiscs: [
+            {
+                ...legacyAliasDisc,
+                id: "native-disc-a",
+                ownerId: "default",
+                createdAt: "2026-07-01T00:00:00.000Z",
+                updatedAt: "2026-07-02T00:00:00.000Z",
+                contentFingerprint: "stale-content",
+                identityFingerprint: "stale-identity",
+            },
+            {
+                ...legacyAliasDisc,
+                id: "native-disc-b",
+                ownerId: "default",
+            },
+            {
+                ...legacyAliasDisc,
+                id: "other-owner-disc",
+                ownerId: "alt",
+            },
+        ],
+        driveDiscLoadouts: [{ id: "not-exported", ownerId: "default" }],
+    }
+    const nativeExport = createDriveDiscExport(exportSource, { exportedAt })
+    assert.equal(nativeExport.format, DRIVE_DISC_EXPORT_FORMAT)
+    assert.equal(nativeExport.version, DRIVE_DISC_EXPORT_VERSION)
+    assert.equal(nativeExport.exportedAt, exportedAt)
+    assert.deepEqual(nativeExport.sourceAccount, { label: "主账号" })
+    assert.deepEqual(nativeExport.driveDiscs.map(item => item.id), ["native-disc-a", "native-disc-b"])
+    assert.equal(Object.hasOwn(nativeExport, "driveDiscLoadouts"), false)
+    assert.equal(Object.hasOwn(nativeExport.driveDiscs[0], "ownerId"), false)
+    assert.equal(Object.hasOwn(nativeExport.driveDiscs[0], "contentFingerprint"), false)
+    assert.equal(Object.hasOwn(nativeExport.driveDiscs[0], "identityFingerprint"), false)
+
+    await saveUserDriveDiscStore(tempDir, {
+        version: 1,
+        currentOwnerId: "alt",
+        owners: [
+            { id: "default", label: "主账号" },
+            { id: "alt", label: "导入目标" },
+        ],
+        imports: [],
+        driveDiscs: [{
+            ...legacyAliasDisc,
+            id: "keep-other-account",
+            ownerId: "default",
+        }],
+        driveDiscLoadouts: [],
+    })
+    const roundTrip = await importScannerExportToStore(tempDir, nativeExport, { sourcePath: "native-export.json" })
+    assert.equal(roundTrip.lastImportSummary.added, 2)
+    assert.equal(roundTrip.lastImportSummary.duplicateInImport, 0)
+    assert.equal(roundTrip.driveDiscs.filter(item => item.ownerId === "alt").length, 2)
+    assert.equal(roundTrip.driveDiscs.find(item => item.id === "native-disc-a").ownerId, "alt")
+    assert.equal(roundTrip.driveDiscs.find(item => item.id === "native-disc-a").locked, true)
+    assert.equal(roundTrip.driveDiscs.find(item => item.id === "native-disc-a").equippedBy, "agent-a")
+    assert.ok(roundTrip.driveDiscs.some(item => item.id === "keep-other-account" && item.ownerId === "default"))
+
+    const repeatedRoundTrip = await importScannerExportToStore(tempDir, nativeExport, { sourcePath: "native-export.json" })
+    assert.equal(repeatedRoundTrip.lastImportSummary.added, 0)
+    assert.equal(repeatedRoundTrip.lastImportSummary.skipped, 2)
+    assert.equal(repeatedRoundTrip.driveDiscs.filter(item => item.ownerId === "alt").length, 2)
+
+    const changedNativeExport = JSON.parse(JSON.stringify(nativeExport))
+    changedNativeExport.driveDiscs[0].level = 14
+    changedNativeExport.driveDiscs[0].locked = false
+    const updatedRoundTrip = await importScannerExportToStore(tempDir, changedNativeExport, { sourcePath: "native-export.json" })
+    assert.equal(updatedRoundTrip.lastImportSummary.updated, 1)
+    assert.equal(updatedRoundTrip.lastImportSummary.added, 0)
+    assert.equal(updatedRoundTrip.driveDiscs.find(item => item.id === "native-disc-a").level, 14)
+    assert.equal(updatedRoundTrip.driveDiscs.find(item => item.id === "native-disc-a").locked, false)
+
+    const beforeNativeRemove = await loadUserDriveDiscStore(tempDir)
+    await saveUserDriveDiscStore(tempDir, {
+        ...beforeNativeRemove,
+        driveDiscLoadouts: [{
+            id: "native-loadout",
+            ownerId: "alt",
+            agentId: "agent-a",
+            name: "待同步清理",
+            driveDiscIdsBySlot: { 1: "native-disc-b" },
+        }],
+    })
+    const prunedNativeExport = {
+        ...changedNativeExport,
+        driveDiscs: [changedNativeExport.driveDiscs[0]],
+    }
+    const nativeRemoved = await importScannerExportToStore(tempDir, prunedNativeExport, {
+        sourcePath: "native-export.json",
+        removeMissing: true,
+    })
+    assert.equal(nativeRemoved.lastImportSummary.removed, 1)
+    assert.equal(nativeRemoved.driveDiscs.some(item => item.id === "native-disc-b" && item.ownerId === "alt"), false)
+    assert.ok(nativeRemoved.driveDiscs.some(item => item.id === "keep-other-account" && item.ownerId === "default"))
+    const nativeLoadout = nativeRemoved.driveDiscLoadouts.find(item => item.id === "native-loadout")
+    assert.equal(nativeLoadout.driveDiscIdsBySlot["1"], undefined)
+    assert.equal(nativeLoadout.status, "incomplete")
+
+    await assert.rejects(
+        () => importScannerExportToStore(tempDir, { ...nativeExport, version: 2 }),
+        /Unsupported Drive Disc export version/,
+    )
+    await assert.rejects(
+        () => importScannerExportToStore(tempDir, { ...nativeExport, format: "unknown-drive-disc-export" }),
+        /Unsupported Drive Disc import format/,
+    )
+    await assert.rejects(
+        () => importScannerExportToStore(tempDir, {
+            ...nativeExport,
+            driveDiscs: [nativeExport.driveDiscs[0], nativeExport.driveDiscs[0]],
+        }),
+        /contains duplicate id/,
+    )
+    await assert.rejects(
+        () => importScannerExportToStore(tempDir, { ...nativeExport, driveDiscs: [{ id: "broken" }] }),
+        /must include setId or setName/,
+    )
 } finally {
     await rm(tempDir, { recursive: true, force: true })
 }

@@ -2,7 +2,7 @@
   "$schema": "./schemas/drive_disc_sets.schema.json",
   "version": 1,
   "notes": [
-    "Two-piece effects always apply directly to the out-of-combat panel.",
+    "Ordinary two-piece stats apply directly to the out-of-combat panel; skill-targeted two-piece rules are injected into damage events after the two-piece threshold is met.",
     "Four-piece effects are stored as fourPiece.selfBuff and fourPiece.teamBuff; they are applied only by the in-combat panel.",
     "Image-only entries are kept so imported inventory can show set art before full set-effect modeling is added."
   ],
@@ -38,12 +38,6 @@
         "selfBuff": {
           "condition": "发动[强化特殊技]并触发[风化]效果后，默认按2层计算",
           "durationSeconds": 40,
-          "coverage": {
-            "default": 1,
-            "min": 0,
-            "max": 1,
-            "step": 0.1
-          },
           "effects": [
             {
               "id": "effect_wiki_2038_4pc_anomaly_proficiency",
@@ -52,14 +46,26 @@
               "valuePerStack": 25,
               "maxStacks": 2,
               "defaultStacks": 2,
-              "mode": "flat"
+              "mode": "flat",
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "effect_wiki_2038_4pc_dmg_bonus",
               "type": "fixed",
               "stat": "dmgBonus",
               "value": 18,
-              "mode": "flat"
+              "mode": "flat",
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ]
         },
@@ -109,7 +115,13 @@
               },
               "stat": "critDmg",
               "mode": "flat",
-              "value": 30
+              "value": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "effect_wiki_2029_4pc_atk_pct",
@@ -120,15 +132,15 @@
               "stat": "atkPct",
               "mode": "pct",
               "basis": "outOfCombatAtk",
-              "value": 10
+              "value": 10,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
-          "coverage": {
-            "default": 1,
-            "min": 0,
-            "max": 1,
-            "step": 0.1
-          },
           "durationSeconds": 30,
           "buffModifiers": []
         },
@@ -154,9 +166,13 @@
             "type": "fixed",
             "stat": "hpPct",
             "value": 10,
-            "mode": "pct"
+            "mode": "pct",
+            "target": {
+              "kind": "default"
+            }
           }
-        ]
+        ],
+        "buffModifiers": []
       },
       "fourPiece": {
         "effectText": {
@@ -174,9 +190,19 @@
               "valuePerStack": 6,
               "maxStacks": 3,
               "defaultStacks": 3,
-              "id": "effect_8f320d1674"
+              "id": "effect_8f320d1674",
+              "target": {
+                "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
-          ]
+          ],
+          "buffModifiers": []
         }
       }
     },
@@ -257,7 +283,7 @@
         "zhCN": "沧浪行歌"
       },
       "images": {
-        "icon": "/assets/drive-discs/scanner-set-fcf8ae93d798.png",
+        "icon": "/assets/drive-discs/white_water_ballad.webp",
         "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
       },
       "twoPiece": {
@@ -308,7 +334,7 @@
         "zhCN": "流光咏叹"
       },
       "images": {
-        "icon": "/assets/drive-discs/astral_voice.png",
+        "icon": "/assets/drive-discs/astral_voice.webp",
         "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/12/26/76099754/5be5aff4902913ddee95a39c2abcb8e6_5215505302189329329.png"
       },
       "sources": [
@@ -330,7 +356,42 @@
         "effectText": {
           "zhCN": "装备者发动[普通攻击]命中敌人时，自身异常精通提升36点，持续8秒，重复触发时刷新持续时间；当场上有敌人进入失衡状态时，装备者造成的伤害提升25%；持续18秒，重复触发时刷新持续时间。"
         },
-        "selfBuff": null,
+        "selfBuff": {
+          "condition": null,
+          "effects": [
+            {
+              "id": "effect_astral_voice_4pc_anomaly_proficiency",
+              "type": "fixed",
+              "stat": "anomalyProficiency",
+              "value": 36,
+              "mode": "flat",
+              "condition": "普通攻击命中敌人",
+              "durationSeconds": 8,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "effect_astral_voice_4pc_dmg_bonus",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 25,
+              "mode": "flat",
+              "condition": "场上有敌人进入失衡状态",
+              "durationSeconds": 18,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
         "teamBuff": null
       }
     },
@@ -346,11 +407,80 @@
       "sources": [
         "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
       ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_wiki_1552_2pc_basic_dmg",
+            "type": "fixed",
+            "stat": "dmgBonus",
+            "value": 15,
+            "mode": "flat",
+            "target": {
+              "kind": "skill",
+              "skillTargets": [
+                {
+                  "kind": "skillType",
+                  "skillType": "basic"
+                }
+              ]
+            }
+          }
+        ],
+        "buffModifiers": []
+      },
       "fourPiece": {
         "effectText": {
           "zhCN": "[普通攻击]造成的伤害提升20%，装备者为[强攻]角色时，发动[强化特殊技]或[终结技]会使[普通攻击]造成的伤害额外提升20%，持续25秒，重复触发时刷新持续时间。"
         },
-        "selfBuff": null,
+        "selfBuff": {
+          "condition": null,
+          "effects": [
+            {
+              "id": "effect_wiki_1552_4pc_basic_dmg",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 20,
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "basic"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_1552_4pc_triggered_basic_dmg",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 20,
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "basic"
+                  }
+                ]
+              },
+              "condition": "强攻角色发动强化特殊技或终结技",
+              "durationSeconds": 25,
+              "requirement": {
+                "specialty": "attack"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
         "teamBuff": null
       }
     },
@@ -360,7 +490,7 @@
         "zhCN": "月光骑士颂"
       },
       "images": {
-        "icon": "/assets/drive-discs/moonlight_lullaby.png",
+        "icon": "/assets/drive-discs/moonlight_lullaby.webp",
         "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
       },
       "sources": [
@@ -373,9 +503,13 @@
             "type": "fixed",
             "stat": "energyRegen",
             "value": 20,
-            "mode": "flat"
+            "mode": "flat",
+            "target": {
+              "kind": "default"
+            }
           }
-        ]
+        ],
+        "buffModifiers": []
       },
       "fourPiece": {
         "effectText": {
@@ -391,9 +525,19 @@
               "stat": "dmgBonus",
               "mode": "flat",
               "value": 18,
-              "id": "effect_91d604d37e"
+              "id": "effect_91d604d37e",
+              "target": {
+                "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
-          ]
+          ],
+          "buffModifiers": []
         }
       }
     },
@@ -403,7 +547,7 @@
         "zhCN": "云岿如我"
       },
       "images": {
-        "icon": "/assets/drive-discs/yunkui_tales.png",
+        "icon": "/assets/drive-discs/yunkui_tales.webp",
         "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
       },
       "sources": [
@@ -467,7 +611,7 @@
         "zhCN": "山大王"
       },
       "images": {
-        "icon": "/assets/drive-discs/king_of_the_summit.png",
+        "icon": "/assets/drive-discs/king_of_the_summit.webp",
         "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
       },
       "sources": [
@@ -489,11 +633,22 @@
               "valuePerStack": 15,
               "maxStacks": 2,
               "defaultStacks": 2,
-              "id": "effect_e044f6f6b8"
+              "id": "effect_e044f6f6b8",
+              "target": {
+                "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
-          ]
+          ],
+          "buffModifiers": []
         }
-      }
+      },
+      "twoPiece": null
     },
     {
       "id": "phaethons_melody",
@@ -501,19 +656,59 @@
         "zhCN": "法厄同之歌"
       },
       "images": {
-        "icon": "/assets/drive-discs/phaethons_melody.png",
+        "icon": "/assets/drive-discs/phaethons_melody.webp",
         "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/03/03/82500917/b815a9e4150ea81e31de93ac69733ed6_4775101255671251088.png"
       },
       "sources": [
         "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46",
         "https://zenless-zone-zero.fandom.com/wiki/Phaethon's_Melody"
       ],
+      "verification": {
+        "twoPiece": "source-checked; Anomaly Mastery +8%"
+      },
       "fourPiece": {
         "effectText": {
           "zhCN": "队伍中任意角色发动[强化特殊技]时，装备者的异常精通提升45点，持续8秒；如果发动[强化特殊技]的角色不是装备者本人时，装备者造成的以太伤害提升25%。"
         },
-        "selfBuff": null,
+        "selfBuff": {
+          "condition": "",
+          "durationSeconds": null,
+          "effects": [
+            {
+              "id": "effect_2f51e29af9",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "value": 45
+            },
+            {
+              "id": "effect_a9aec22d52",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "etherDmg",
+              "mode": "flat",
+              "value": 25
+            }
+          ],
+          "buffModifiers": []
+        },
         "teamBuff": null
+      },
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_phaethons_melody_2pc",
+            "type": "fixed",
+            "stat": "anomalyMastery",
+            "value": 8,
+            "mode": "pct"
+          }
+        ]
       }
     },
     {
@@ -522,7 +717,7 @@
         "zhCN": "如影相随"
       },
       "images": {
-        "icon": "/assets/drive-discs/shadow_harmony.png",
+        "icon": "/assets/drive-discs/shadow_harmony.webp",
         "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/03/03/82500917/1bc3f90e3407b55603f6051242444270_7586763932234819462.png"
       },
       "sources": [
@@ -533,7 +728,56 @@
         "effectText": {
           "zhCN": "[追加攻击]或[冲刺攻击]命中敌人时，若造成的伤害与装备者的属性一致，则获得1层增益效果，同一招式内最多触发一次；每拥有1层增益效果，装备者的攻击力提升4%，暴击率提升4%，最多叠加3层，持续15秒，重复触发时刷新持续时间。"
         },
-        "selfBuff": null,
+        "selfBuff": {
+          "condition": "追加攻击或同属性冲刺攻击命中敌人",
+          "durationSeconds": 15,
+          "effects": [
+            {
+              "id": "effect_shadow_harmony_4pc_atk_pct",
+              "type": "stacked",
+              "stat": "atkPct",
+              "valuePerStack": 4,
+              "maxStacks": 3,
+              "defaultStacks": 3,
+              "stackGroup": "shadow_harmony_stacks",
+              "stackLabel": {
+                "zhCN": "如影相随层数"
+              },
+              "mode": "pct",
+              "basis": "baseAtk",
+              "condition": "追加攻击或同属性冲刺攻击命中敌人",
+              "durationSeconds": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "effect_shadow_harmony_4pc_crit_rate",
+              "type": "stacked",
+              "stat": "critRate",
+              "valuePerStack": 4,
+              "maxStacks": 3,
+              "defaultStacks": 3,
+              "stackGroup": "shadow_harmony_stacks",
+              "stackLabel": {
+                "zhCN": "如影相随层数"
+              },
+              "mode": "flat",
+              "condition": "追加攻击或同属性冲刺攻击命中敌人",
+              "durationSeconds": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
         "teamBuff": null
       }
     },
@@ -543,7 +787,7 @@
         "zhCN": "折枝剑歌"
       },
       "images": {
-        "icon": "/assets/drive-discs/scanner-set-48ee0a14625f.png",
+        "icon": "/assets/drive-discs/branch_blade_song.webp",
         "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
       },
       "twoPiece": {
@@ -577,7 +821,13 @@
               },
               "stat": "critDmg",
               "mode": "flat",
-              "value": 30
+              "value": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "effect_l5c9r2qa",
@@ -587,15 +837,15 @@
               },
               "stat": "critRate",
               "mode": "flat",
-              "value": 12
+              "value": 12,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
-          "coverage": {
-            "default": 1,
-            "min": 0,
-            "max": 1,
-            "step": 0.1
-          },
           "buffModifiers": []
         },
         "teamBuff": null
@@ -623,9 +873,13 @@
             "type": "fixed",
             "stat": "atkPct",
             "value": 10,
-            "mode": "pct"
+            "mode": "pct",
+            "target": {
+              "kind": "default"
+            }
           }
-        ]
+        ],
+        "buffModifiers": []
       },
       "fourPiece": {
         "effectText": {
@@ -643,9 +897,19 @@
               "mode": "flat",
               "valuePerStack": 8,
               "maxStacks": 3,
-              "defaultStacks": 3
+              "defaultStacks": 3,
+              "target": {
+                "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
-          ]
+          ],
+          "buffModifiers": []
         }
       }
     },
@@ -676,7 +940,55 @@
         "effectText": {
           "zhCN": "火属性伤害和电属性伤害提升15%；位于后场时，[强化特殊技]和[支援攻击]造成的伤害提升20%，换入前场后，该增益效果仍然保留，持续5秒，保留效果7.5秒内最多触发一次"
         },
-        "selfBuff": null,
+        "selfBuff": {
+          "condition": null,
+          "effects": [
+            {
+              "id": "effect_chaos_jazz_4pc_fire_dmg",
+              "type": "fixed",
+              "stat": "fireDmg",
+              "value": 15,
+              "mode": "flat"
+            },
+            {
+              "id": "effect_chaos_jazz_4pc_electric_dmg",
+              "type": "fixed",
+              "stat": "electricDmg",
+              "value": 15,
+              "mode": "flat"
+            },
+            {
+              "id": "effect_chaos_jazz_4pc_skill_dmg",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 20,
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillTag",
+                    "skillTag": "exSpecial"
+                  },
+                  {
+                    "kind": "skillTag",
+                    "skillTag": "assistAttack"
+                  }
+                ]
+              },
+              "condition": "位于后场，或换入前场后的保留时间内",
+              "durationSeconds": 5,
+              "cooldownSeconds": 7.5,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
         "teamBuff": null
       }
     },
@@ -697,7 +1009,29 @@
           "zhCN": "队伍中任意角色发动[招架支援]和[回避支援]时，全队角色造成的伤害提升15%，持续10秒，同名被动效果之间不可叠加。"
         },
         "selfBuff": null,
-        "teamBuff": null
+        "teamBuff": {
+          "condition": "队伍中任意角色发动招架支援或回避支援",
+          "durationSeconds": 10,
+          "exclusiveGroup": "proto_punk_4pc_team_dmg",
+          "effects": [
+            {
+              "id": "effect_proto_punk_4pc_team_dmg",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 15,
+              "mode": "flat",
+              "condition": "队伍中任意角色发动招架支援或回避支援",
+              "durationSeconds": 10,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        }
       }
     },
     {
@@ -727,7 +1061,40 @@
         "effectText": {
           "zhCN": "装备者的暴击伤害提升20%，队伍中任意角色触发[侵蚀]效果的额外伤害时，该增益效果额外提升5.5%，最多叠加6层，持续8秒，重复触发时刷新持续时间。"
         },
-        "selfBuff": null,
+        "selfBuff": {
+          "condition": null,
+          "effects": [
+            {
+              "id": "effect_chaotic_metal_4pc_crit_dmg",
+              "type": "fixed",
+              "stat": "critDmg",
+              "value": 20,
+              "mode": "flat"
+            },
+            {
+              "id": "effect_chaotic_metal_4pc_corruption_crit_dmg",
+              "type": "stacked",
+              "stat": "critDmg",
+              "valuePerStack": 5.5,
+              "maxStacks": 6,
+              "defaultStacks": 6,
+              "stackGroup": "chaotic_metal_corruption_stacks",
+              "stackLabel": {
+                "zhCN": "侵蚀触发层数"
+              },
+              "mode": "flat",
+              "condition": "队伍中任意角色触发侵蚀额外伤害",
+              "durationSeconds": 8,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
         "teamBuff": null
       }
     },
@@ -768,7 +1135,7 @@
         "zhCN": "啄木鸟电音"
       },
       "images": {
-        "icon": "/assets/drive-discs/woodpecker_electro.png",
+        "icon": "/assets/drive-discs/woodpecker_electro.webp",
         "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/29/15559334/0d4dd047370168a3b992d9884ca926c6_3624385829818904793.png"
       },
       "twoPiece": {
@@ -814,7 +1181,7 @@
         "zhCN": "摇摆爵士"
       },
       "images": {
-        "icon": "/assets/drive-discs/swing_jazz.png",
+        "icon": "/assets/drive-discs/swing_jazz.webp",
         "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/29/15559334/4f85a6c7c3f2a3bbde23b282b477f8dd_6011861012357025109.png"
       },
       "twoPiece": {
@@ -880,7 +1247,44 @@
         "effectText": {
           "zhCN": " [终结技]造成的伤害提升20%；发动[终结技]时，装备者的攻击力提升15%，持续12秒。"
         },
-        "selfBuff": null,
+        "selfBuff": {
+          "condition": null,
+          "effects": [
+            {
+              "id": "effect_puffer_electro_4pc_ultimate_dmg",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 20,
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "ultimate"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "effect_puffer_electro_4pc_atk_pct",
+              "type": "fixed",
+              "stat": "atkPct",
+              "value": 15,
+              "mode": "pct",
+              "basis": "baseAtk",
+              "condition": "发动终结技",
+              "durationSeconds": 12,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
         "teamBuff": null
       }
     },
@@ -911,7 +1315,28 @@
         "effectText": {
           "zhCN": "攻击命中处于[灼烧]状态下的敌人时，装备者的暴击率提升28%，持续8秒。"
         },
-        "selfBuff": null,
+        "selfBuff": {
+          "condition": "攻击命中处于灼烧状态下的敌人",
+          "durationSeconds": 8,
+          "effects": [
+            {
+              "id": "effect_inferno_metal_4pc_crit_rate",
+              "type": "fixed",
+              "stat": "critRate",
+              "value": 28,
+              "mode": "flat",
+              "condition": "攻击命中处于灼烧状态下的敌人",
+              "durationSeconds": 8,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
         "teamBuff": null
       }
     },
@@ -1004,7 +1429,27 @@
         "effectText": {
           "zhCN": "当场上存在处于[感电]状态下的敌人时，装备者的攻击力提升28%。"
         },
-        "selfBuff": null,
+        "selfBuff": {
+          "condition": "场上存在处于感电状态下的敌人",
+          "effects": [
+            {
+              "id": "effect_thunder_metal_4pc_atk_pct",
+              "type": "fixed",
+              "stat": "atkPct",
+              "value": 28,
+              "mode": "pct",
+              "basis": "baseAtk",
+              "condition": "场上存在处于感电状态下的敌人",
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
         "teamBuff": null
       }
     },
@@ -1045,7 +1490,7 @@
         "zhCN": "激素朋克"
       },
       "images": {
-        "icon": "/assets/drive-discs/hormone_punk.png",
+        "icon": "/assets/drive-discs/hormone_punk.webp",
         "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46"
       },
       "twoPiece": {
@@ -1067,12 +1512,6 @@
         "selfBuff": {
           "condition": "enterCombatOrSwitchIn",
           "durationSeconds": 10,
-          "coverage": {
-            "default": 0.7,
-            "min": 0,
-            "max": 1,
-            "step": 0.1
-          },
           "effects": [
             {
               "id": "effect_w8d5k2lm",
@@ -1080,7 +1519,13 @@
               "stat": "atkPct",
               "mode": "pct",
               "basis": "outOfCombatAtk",
-              "value": 25
+              "value": 25,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ]
         },
@@ -1120,19 +1565,19 @@
         },
         "selfBuff": {
           "condition": null,
-          "coverage": {
-            "default": 1,
-            "min": 0,
-            "max": 1,
-            "step": 0.1
-          },
           "effects": [
             {
               "type": "fixed",
               "stat": "dmgBonus",
               "mode": "flat",
               "value": 35,
-              "id": "effect_03c221a712"
+              "id": "effect_03c221a712",
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ]
         },

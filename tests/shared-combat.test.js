@@ -18,6 +18,7 @@ import {
     ENUM_LABELS,
     nameOf,
     normalizeCustomBuffEffect,
+    normalizeRuntimeForBuff,
     runtimeForBuff,
     runtimeSourceGroups,
     runtimeSourceRuleIdsForGroup,
@@ -29,7 +30,7 @@ import {
     storedBuffModifierTexts,
     storedEffectRuleText,
     storedEffectRulesText,
-} from "../frontend/shared-combat.js"
+} from "../core/shared-combat.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
@@ -165,7 +166,6 @@ const fieldRuntimeBuff = {
     id: "field-runtime",
     sourceType: "field",
     name: { zhCN: "危局场地效果" },
-    coverage: { default: 0.6, min: 0, max: 1, step: 0.1 },
     effects: [
         {
             id: "field-dmg",
@@ -173,22 +173,81 @@ const fieldRuntimeBuff = {
             stat: "dmgBonus",
             value: 30,
             mode: "flat",
+            coverage: { default: 0.6, min: 0, max: 1, step: 0.1 },
         },
     ],
 }
-assert.equal(defaultRuntimeForBuff(fieldRuntimeBuff).coverage, 0.6, "Field Buff runtime should use coverage default")
+assert.equal(defaultRuntimeForBuff(fieldRuntimeBuff).effects["field-dmg"].coverage, 0.6, "Field Buff rule runtime should use coverage default")
 assert.equal(
     storedEffectRulesText(fieldRuntimeBuff, defaultRuntimeForBuff(fieldRuntimeBuff)),
     "通用伤害加成% +18%（覆盖率 0.6）",
     "Field Buff runtime text should include effective coverage",
 )
+
+const independentCoverageBuff = {
+    id: "independent-coverage",
+    effects: [
+        { id: "covered-dmg", type: "fixed", stat: "dmgBonus", value: 20, mode: "flat", coverage: { default: 0.5, min: 0, max: 1, step: 0.1 } },
+        { id: "fixed-crit", type: "fixed", stat: "critRate", value: 10, mode: "flat" },
+    ],
+}
+const independentRuntime = normalizeRuntimeForBuff(independentCoverageBuff, {
+    coverage: 0.2,
+    effects: {
+        "covered-dmg": { coverage: 0.25 },
+        "fixed-crit": { coverage: 0 },
+    },
+})
+assert.equal(independentRuntime.coverage, undefined, "Normalized runtime should remove legacy parent coverage")
+assert.equal(independentRuntime.effects["covered-dmg"].coverage, 0.25, "Authorized rules should retain independent runtime coverage")
+assert.equal(independentRuntime.effects["fixed-crit"].coverage, undefined, "Unauthorized rules should discard injected runtime coverage")
+assert.equal(
+    storedEffectRulesText(independentCoverageBuff, independentRuntime),
+    "通用伤害加成% +5%（覆盖率 0.25），暴击率% +10%",
+    "One rule coverage should not scale sibling rules",
+)
+
+const legacyCoverageBuff = {
+    id: "legacy-parent-coverage",
+    coverage: { default: 0.6, min: 0, max: 1, step: 0.1 },
+    effects: [
+        { id: "legacy-a", type: "fixed", stat: "dmgBonus", value: 10, mode: "flat" },
+        { id: "legacy-b", type: "fixed", stat: "critRate", value: 10, mode: "flat" },
+    ],
+}
+const migratedLegacyRuntime = normalizeRuntimeForBuff(legacyCoverageBuff, { coverage: 0.4 })
+assert.equal(migratedLegacyRuntime.effects["legacy-a"].coverage, 0.4)
+assert.equal(migratedLegacyRuntime.effects["legacy-b"].coverage, 0.4, "Legacy parent runtime should migrate to every child rule")
 assert.equal(
     skillTargetLabel({
         categoryId: "chain",
         moveIdPrefixes: ["ultimate_"],
     }, meta),
-    "全部角色/chain/ultimate_*",
-    "Generic skill targets should display without pretending to target a specific agent",
+    "终结技",
+    "Generic skill targets should display player-facing skill names without raw id paths",
+)
+assert.equal(
+    storedEffectRuleText({
+        type: "fixed",
+        stat: "dmgBonus",
+        value: 40,
+        mode: "flat",
+        target: {
+            kind: "skill",
+            skillTargets: [
+                {
+                    categoryId: "chain",
+                    moveIdPrefixes: ["chain_"],
+                },
+                {
+                    categoryId: "chain",
+                    moveIdPrefixes: ["ultimate_"],
+                },
+            ],
+        },
+    }, {}, {}, meta),
+    "技能目标伤害加成% +40%（技能：连携技；终结技）",
+    "Generic chain and ultimate targets should display as compact skill names in player-facing order",
 )
 assert.equal(
     nameOf({ bossName: { zhCN: "测试 BOSS" } }),
@@ -313,7 +372,7 @@ assert.equal(
 const groupedFormulaSummary = storedEffectRulesText(groupedFormulaRuntimeBuff, groupedFormulaRuntime)
 assert.equal(
     groupedFormulaSummary,
-    "属性异常增伤% +171%，紊乱增伤% +342%，通用伤害加成% +10%（1/3 层，覆盖率 1）",
+    "属性异常增伤% +171%，紊乱增伤% +342%，通用伤害加成% +10%（1/3 层）",
     "Formula summaries should show final values without source or expression internals",
 )
 assert.equal(
@@ -375,7 +434,7 @@ assert.equal(
 )
 assert.equal(
     storedEffectRulesText(sharedStackRuntimeBuff, sharedStackRuntime),
-    "以太伤害加成% +8%（1/2 层，覆盖率 1），以太贯穿增伤% +10%（1/2 层，覆盖率 1）",
+    "以太伤害加成% +8%（1/2 层），以太贯穿增伤% +10%（1/2 层）",
     "Grouped stacked rules should still summarize each stat effect separately with the shared stack count",
 )
 
@@ -549,6 +608,13 @@ const disorderBaseMultiplierBonusOption = CUSTOM_BUFF_STAT_OPTIONS.find(option =
 assert.ok(disorderBaseMultiplierBonusOption, "Custom Buff stat options should include disorder multiplier bonus")
 assert.equal(disorderBaseMultiplierBonusOption[0], "disorderBaseMultiplierBonus", "Disorder multiplier bonus should be a fixed event stat")
 assert.equal(disorderBaseMultiplierBonusOption[2], "eventModifier", "Disorder multiplier bonus option should use the default event modifier bucket")
+for (const removedStat of ["physicalDisorderMultiplierBonusPerRemainingSecond", "physicalDisorderMultiplierBonusCap"]) {
+    assert.equal(
+        CUSTOM_BUFF_STAT_OPTIONS.some(option => option[0] === removedStat),
+        false,
+        `Custom Buff stat options should not expose obsolete physical-only Disorder stat ${removedStat}`,
+    )
+}
 assert.equal(DAMAGE_KIND_LABELS.sheer, "贯穿", "Damage kind labels should include sheer")
 assert.equal(ENUM_LABELS.attribute.xuanmo, "玄墨", "Attribute labels should include Yixuan's Xuanmo display attribute")
 const sheerForceFlatOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[0] === "sheerForceFlat")
@@ -561,6 +627,77 @@ assert.equal(sheerDamageBonusOption[2], "eventModifier", "Sheer damage bonus opt
 const defenseIgnoreOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[1] === "无视防御率%")
 assert.ok(defenseIgnoreOption, "Custom Buff stat options should include defense ignore alias")
 assert.equal(defenseIgnoreOption[0], "enemyDefIgnore", "Defense ignore should be exposed as a defense reduction alias")
+assert.deepEqual(
+    CUSTOM_BUFF_STAT_OPTIONS.find(option => option[0] === "allResIgnore"),
+    ["allResIgnore", "全属性抗性无视%", "flat", null],
+    "Default Custom Buff stat options should expose all-attribute resistance ignore",
+)
+assert.deepEqual(
+    CUSTOM_BUFF_STAT_OPTIONS.find(option => option[0] === "currentResIgnore"),
+    ["currentResIgnore", "当前属性抗性无视%", "flat", null],
+    "Default Custom Buff stat options should expose the current-attribute resistance-ignore alias",
+)
+const customBuffElements = ["physical", "fire", "ice", "electric", "ether", "wind"]
+const customBuffElementNames = ["Physical", "Fire", "Ice", "Electric", "Ether", "Wind"]
+const hiddenElementScopedCustomStats = [
+    ...customBuffElements.flatMap(element => [
+        `${element}SheerDmg`,
+        `${element}CritDmg`,
+        `${element}DefIgnore`,
+        `${element}ResIgnore`,
+    ]),
+    ...customBuffElementNames.map(element => `enemy${element}ResReduction`),
+]
+for (const optionList of [CUSTOM_BUFF_STAT_OPTIONS, CUSTOM_BUFF_SKILL_STAT_OPTIONS]) {
+    for (const stat of hiddenElementScopedCustomStats) {
+        assert.equal(
+            optionList.some(option => option[0] === stat),
+            false,
+            `User Custom Buff options should not expose element-scoped stat ${stat}`,
+        )
+    }
+    for (const element of customBuffElements) {
+        assert.ok(
+            optionList.some(option => option[0] === `${element}Dmg`),
+            `User Custom Buff options should retain ${element} damage bonus`,
+        )
+    }
+    for (const stat of ["sheerDmgBonus", "enemyDefIgnore", "enemyResReduction", "allResIgnore", "currentResIgnore"]) {
+        assert.ok(
+            optionList.some(option => option[0] === stat),
+            `User Custom Buff options should retain generic stat ${stat}`,
+        )
+    }
+}
+assert.equal(
+    CUSTOM_BUFF_STAT_OPTIONS.some(option => option[0] === "anomalyProficiencyPerMasteryAbove140"),
+    false,
+    "Default Custom Buff options should not expose the Anomaly Mastery threshold conversion",
+)
+assert.ok(CUSTOM_BUFF_STAT_OPTIONS.some(option => option[0] === "critDmg"), "Default Custom Buff options should retain global Crit DMG")
+assert.equal(CUSTOM_BUFF_SKILL_STAT_OPTIONS.some(option => option[0] === "critDmg"), false, "Skill-targeted Custom Buffs should not add generic Crit DMG semantics")
+for (const stat of [
+    "anomalyDamageBonus",
+    "disorderDamageBonus",
+    "baseMultiplierBonus",
+    "disorderBaseMultiplierBonus",
+    "anomalyCritRate",
+    "anomalyCritDmg",
+    "stunDmgMultiplierBonus",
+    "stunDmgMultiplierBonusAlways",
+]) {
+    assert.ok(
+        CUSTOM_BUFF_STAT_OPTIONS.some(option => option[0] === stat),
+        `Default Custom Buff options should retain independent advanced stat ${stat}`,
+    )
+}
+for (const optionList of [CUSTOM_BUFF_STAT_OPTIONS, CUSTOM_BUFF_SKILL_STAT_OPTIONS]) {
+    assert.equal(
+        optionList.some(option => option[0] === "stunDmgMultiplierBonusCapAlways"),
+        false,
+        "Player Custom Buff options should not expose captured stun-vulnerability caps",
+    )
+}
 assert.equal(
     CUSTOM_BUFF_STAT_OPTIONS.some(option => option[1] === "指定技能伤害增伤%"),
     false,
@@ -573,7 +710,7 @@ assert.equal(
 )
 const directSkillDamageOption = CUSTOM_BUFF_SKILL_STAT_OPTIONS.find(option => option[0] === "dmgBonus")
 assert.ok(directSkillDamageOption, "Skill Custom Buff stat options should include skill-targeted damage bonus")
-assert.equal(directSkillDamageOption[1], "通用伤害加成%")
+assert.equal(directSkillDamageOption[1], "技能目标伤害加成%")
 assert.equal(directSkillDamageOption[2], "skill", "Skill-targeted damage bonus option should be selected by target kind")
 const skillAnomalyDamageOption = CUSTOM_BUFF_SKILL_STAT_OPTIONS.find(option => option[0] === "anomalyDamageBonus")
 assert.ok(skillAnomalyDamageOption, "Skill Custom Buff stat options should include anomaly damage bonus")
@@ -597,6 +734,16 @@ const skillDefenseIgnoreOption = CUSTOM_BUFF_SKILL_STAT_OPTIONS.find(option => o
 assert.ok(skillDefenseIgnoreOption, "Skill Custom Buff stat options should include defense ignore alias")
 assert.equal(skillDefenseIgnoreOption[1], "无视防御率%")
 assert.equal(skillDefenseIgnoreOption[2], "skill")
+assert.deepEqual(
+    CUSTOM_BUFF_SKILL_STAT_OPTIONS.find(option => option[0] === "allResIgnore"),
+    ["allResIgnore", "全属性抗性无视%", "skill", null],
+    "Skill Custom Buff stat options should expose all-attribute resistance ignore",
+)
+assert.deepEqual(
+    CUSTOM_BUFF_SKILL_STAT_OPTIONS.find(option => option[0] === "currentResIgnore"),
+    ["currentResIgnore", "当前属性抗性无视%", "skill", null],
+    "Skill Custom Buff stat options should expose the current-attribute resistance-ignore alias",
+)
 assert.equal(
     CUSTOM_BUFF_SKILL_STAT_OPTIONS.some(option => option[0] === "atkFlat" || option[0] === "critRate"),
     false,
@@ -692,13 +839,17 @@ assert.deepEqual(
             kind: "skill",
             skillTargets: [
                 {
+                    kind: "specific",
                     agentSkillId: "hoshimi_miyabi",
                     categoryId: "basic",
+                    skillType: "basic",
                     moveId: "frost_moon",
                 },
                 {
+                    kind: "specific",
                     agentSkillId: "ye_shunguang",
                     categoryId: "special",
+                    skillType: "special",
                     moveId: "ex_clarity_return_dust",
                     rowId: "damage",
                 },
@@ -753,13 +904,17 @@ assert.deepEqual(
             damageKinds: ["direct"],
             skillTargets: [
                 {
+                    kind: "specific",
                     agentSkillId: "hoshimi_miyabi",
                     categoryId: "basic",
+                    skillType: "basic",
                     moveId: "frost_moon",
                 },
                 {
+                    kind: "specific",
                     agentSkillId: "ye_shunguang",
                     categoryId: "special",
+                    skillType: "special",
                     moveId: "ex_clarity_return_dust",
                     rowId: "damage",
                 },

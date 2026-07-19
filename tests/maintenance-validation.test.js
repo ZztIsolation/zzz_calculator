@@ -3,9 +3,31 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { cleanMaintenanceItem } from "../backend/server.js"
 import { loadCalculatorContext } from "../backend/calculator.js"
-import { validateMaintenanceItem } from "../frontend/maintenanceValidation.js"
+import {
+    applySystemManagedMaintenanceFields,
+    validateMaintenanceItem,
+} from "../core/maintenanceValidation.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
+
+const systemManagedFixture = applySystemManagedMaintenanceFields({
+    skillGroups: [{ defaultCount: 9, minCount: 2, maxCount: 3, step: 0.5 }],
+    nested: { coverage: { default: 1.5, min: 0.4, max: 0.6, step: 0.2 } },
+})
+assert.deepEqual(systemManagedFixture.skillGroups[0], { defaultCount: 1, minCount: 0, maxCount: 100, step: 1 })
+assert.deepEqual(systemManagedFixture.nested.coverage, { default: 1.5, min: 0, max: 1, step: 0.1 })
+const migratedCoverageFixture = applySystemManagedMaintenanceFields({
+    coverage: { default: 0.4, min: 0.2, max: 0.8, step: 0.2 },
+    effects: [
+        { id: "coverage-a", type: "fixed", stat: "dmgBonus", value: 10 },
+        { id: "coverage-b", type: "fixed", stat: "critRate", value: 10 },
+    ],
+})
+assert.equal(migratedCoverageFixture.coverage, undefined)
+assert.deepEqual(migratedCoverageFixture.effects.map(rule => rule.coverage), [
+    { default: 0.4, min: 0, max: 1, step: 0.1 },
+    { default: 0.4, min: 0, max: 1, step: 0.1 },
+])
 
 const validAgent = {
     id: "test_agent",
@@ -79,6 +101,7 @@ const validAgentSkill = {
                 {
                     id: "normal",
                     name: { zhCN: "普通攻击：测试" },
+                    skillType: "basic",
                     damageElement: "physical",
                     rows: [
                         {
@@ -148,15 +171,21 @@ const validFieldBuff = {
     scope: "inCombat",
     name: { zhCN: "测试场地 Buff" },
     source: { zhCN: "危局强袭战" },
-    sourcePeriod: { zhCN: "2.8版本第三期" },
+    period: {
+        modeId: "critical_assault",
+        gameVersion: "3.0",
+        phaseNo: 3,
+        phaseName: { zhCN: "第三期" },
+    },
+    sourcePeriod: { zhCN: "3.0版本第三期" },
     description: { zhCN: "场地使代理人造成的伤害提升。" },
-    coverage: { default: 0.5, min: 0, max: 1, step: 0.1 },
     effects: [
         {
             type: "fixed",
             stat: "dmgBonus",
             value: 20,
             mode: "flat",
+            coverage: { default: 0.5, min: 0, max: 1, step: 0.1 },
         },
     ],
 }
@@ -169,13 +198,13 @@ const validBossBuff = {
     bossSource: { zhCN: "防卫战" },
     sourcePeriod: { zhCN: "2.8版本第三期" },
     description: { zhCN: "BOSS 受到的物理伤害提高。" },
-    coverage: { default: 1, min: 0, max: 1, step: 0.1 },
     effects: [
         {
             type: "fixed",
             stat: "enemyPhysicalResReduction",
             value: 20,
             mode: "flat",
+            coverage: { default: 1, min: 0, max: 1, step: 0.1 },
         },
     ],
 }
@@ -268,6 +297,28 @@ assertValid("agents", {
     },
 })
 assertValid("agent-skills", validAgentSkill)
+const agentSkillWithTags = clone(validAgentSkill)
+agentSkillWithTags.categories[0].moves[0].skillTags = ["dashAttack", "assistAttack"]
+assertValid("agent-skills", agentSkillWithTags)
+const agentSkillWithUnknownTag = clone(validAgentSkill)
+agentSkillWithUnknownTag.categories[0].moves[0].skillTags = ["futureAttack"]
+assertInvalid("agent-skills", agentSkillWithUnknownTag, "不是支持的选项")
+const agentSkillWithDuplicateTag = clone(validAgentSkill)
+agentSkillWithDuplicateTag.categories[0].moves[0].skillTags = ["dashAttack", "dashAttack"]
+assertInvalid("agent-skills", agentSkillWithDuplicateTag, "同一招式不能重复标签")
+const agentSkillWithoutType = clone(validAgentSkill)
+delete agentSkillWithoutType.categories[0].moves[0].skillType
+assertInvalid("agent-skills", agentSkillWithoutType, "skillType")
+const agentSkillWithSplitType = clone(validAgentSkill)
+agentSkillWithSplitType.categories.push({
+    ...clone(validAgentSkill.categories[0]),
+    id: "second_basic_category",
+    moves: [{
+        ...clone(validAgentSkill.categories[0].moves[0]),
+        id: "second_basic_move",
+    }],
+})
+assertInvalid("agent-skills", agentSkillWithSplitType, "不能拆到多个技能目录")
 const agentSkillWithLegacyCategoryIcon = clone(validAgentSkill)
 agentSkillWithLegacyCategoryIcon.categories[0].icon = "not-a-maintained-field"
 assertValid(
@@ -381,6 +432,43 @@ wEngineWithLegacyModificationScaling.effect.selfBuff.effects[0].modificationScal
 assertInvalid("wEngines", wEngineWithLegacyModificationScaling, "旧的改装等级缩放格式已废弃")
 assertValid("driveDiscSets", validDriveDiscSet)
 assertValid("driveDiscSets", validDriveDiscSetWithSplitFourPiece)
+const driveDiscWithImplicitInCombatFourPiece = clone(validDriveDiscSetWithSplitFourPiece)
+driveDiscWithImplicitInCombatFourPiece.fourPiece.selfBuff.effects = [
+    {
+        id: "drive_disc_self_skill_target",
+        type: "fixed",
+        target: {
+            kind: "skill",
+            skillTargets: [{ kind: "skillType", skillType: "ultimate" }],
+        },
+        stat: "dmgBonus",
+        value: 20,
+        mode: "flat",
+    },
+]
+driveDiscWithImplicitInCombatFourPiece.fourPiece.teamBuff.effects = [
+    {
+        id: "drive_disc_team_skill_target",
+        type: "fixed",
+        target: {
+            kind: "skill",
+            skillTargets: [{ kind: "skillType", skillType: "chain" }],
+        },
+        stat: "skillMultiplierBonus",
+        value: 10,
+        mode: "flat",
+    },
+]
+driveDiscWithImplicitInCombatFourPiece.fourPiece.teamBuff.buffModifiers = [
+    {
+        id: "drive_disc_team_modifier",
+        operation: "multiplyResolvedValue",
+        factor: 1.2,
+        targetBuffIds: ["teammate.buff"],
+        targetEffectIds: ["teammate.effect"],
+    },
+]
+assertValid("driveDiscSets", driveDiscWithImplicitInCombatFourPiece)
 assertValid("buffs", validBuff)
 assertValid("field-buffs", validFieldBuff)
 assertValid("boss-buffs", validBossBuff)
@@ -417,6 +505,69 @@ assert.equal(
     "enemyDefIgnore",
     "Maintenance save cleanup should preserve defense ignore as a display-distinct stat",
 )
+const curtainCapBuff = {
+    ...validBuff,
+    effects: [{
+        id: "curtain-cap",
+        type: "fixed",
+        stat: "stunDmgMultiplierBonusCapAlways",
+        value: 110,
+        mode: "flat",
+        target: { kind: "default" },
+    }],
+    buffModifiers: [{
+        id: "curtain-cap-amplify",
+        operation: "multiplyResolvedValue",
+        factor: 20 / 11,
+        targetBuffIds: [validBuff.id],
+        targetEffectIds: ["curtain-cap"],
+    }],
+}
+assertValid("combat-buffs", curtainCapBuff)
+const cleanedCurtainCapBuff = cleanMaintenanceItem("combat-buffs", curtainCapBuff)
+assert.equal(cleanedCurtainCapBuff.effects[0].stat, "stunDmgMultiplierBonusCapAlways")
+assert.equal(cleanedCurtainCapBuff.effects[0].value, 110)
+assert.equal(cleanedCurtainCapBuff.buffModifiers[0].factor, 20 / 11)
+assert.deepEqual(cleanedCurtainCapBuff.buffModifiers[0].targetEffectIds, ["curtain-cap"])
+const cleanedElementScopedBuff = cleanMaintenanceItem("combat-buffs", {
+    ...validBuff,
+    effects: [
+        { id: "multi-dmg", type: "fixed", stat: "dmgBonus", value: 20, mode: "flat", appliesTo: { elements: ["physical", "fire"] } },
+        { id: "electric-ignore", type: "fixed", stat: "enemyDefIgnore", value: 15, mode: "flat", appliesTo: { elements: ["electric"] } },
+    ],
+    buffModifiers: [{
+        id: "modifier",
+        operation: "multiplyResolvedValue",
+        factor: 2,
+        targetBuffIds: [validBuff.id],
+        targetEffectIds: ["multi-dmg"],
+    }],
+})
+assert.deepEqual(cleanedElementScopedBuff.effects.map(rule => rule.stat), ["physicalDmg", "fireDmg", "electricDefIgnore"])
+assert.ok(cleanedElementScopedBuff.effects.every(rule => rule.appliesTo === undefined))
+assert.deepEqual(cleanedElementScopedBuff.buffModifiers[0].targetEffectIds, ["multi-dmg_physicalDmg", "multi-dmg_fireDmg"])
+assertValid("combat-buffs", cleanedElementScopedBuff)
+const cleanedLegacySkillModifier = cleanMaintenanceItem("combat-buffs", {
+    ...validBuff,
+    effects: [{
+        id: "legacy-skill-modifier",
+        type: "damageModifier",
+        kind: "directDamageBonus",
+        value: 0.2,
+        valueUnit: "decimal",
+        appliesTo: {
+            skillTargets: [{ kind: "skillType", skillType: "ultimate" }],
+        },
+    }],
+})
+assert.equal(cleanedLegacySkillModifier.effects[0].type, "fixed")
+assert.equal(cleanedLegacySkillModifier.effects[0].stat, "dmgBonus")
+assert.equal(cleanedLegacySkillModifier.effects[0].value, 20)
+assert.deepEqual(cleanedLegacySkillModifier.effects[0].target, {
+    kind: "skill",
+    skillTargets: [{ kind: "skillType", skillType: "ultimate" }],
+})
+assertValid("combat-buffs", cleanedLegacySkillModifier)
 assert.equal(
     cleanMaintenanceItem("combat-buffs", {
         ...defenseIgnoreBuff,
@@ -456,10 +607,100 @@ assertValid("buffs", {
         },
     ],
 })
+assert.equal(
+    cleanMaintenanceItem("field-buffs", {
+        ...validFieldBuff,
+        sourcePeriod: undefined,
+    }).sourcePeriod.zhCN,
+    "3.0版本第三期",
+)
+assert.equal(
+    cleanMaintenanceItem("field-buffs", {
+        ...validFieldBuff,
+        id: "existing_field_id",
+    }).id,
+    "existing_field_id",
+    "Existing Field Buff ids should be preserved on save",
+)
+{
+    const cleanedFieldBuff = cleanMaintenanceItem("field-buffs", {
+        ...validFieldBuff,
+        id: "hand_edited_wrong_id",
+        _maintenanceOriginalId: "existing_field_id",
+    }, { originalId: "existing_field_id" })
+    assert.equal(cleanedFieldBuff.id, "existing_field_id")
+    assert.equal(
+        Object.hasOwn(cleanedFieldBuff, "_maintenanceOriginalId"),
+        false,
+        "Internal maintenance id hints should not be persisted",
+    )
+}
+assert.equal(
+    cleanMaintenanceItem("field-buffs", {
+        ...validFieldBuff,
+        id: undefined,
+        name: { zhCN: "stage buff" },
+    }).id,
+    "field.critical_assault.v3_0.p3.stage_buff",
+    "Missing Field Buff ids should be generated from period and name",
+)
+{
+    const cleanedFieldBuff = cleanMaintenanceItem("field-buffs", {
+        ...validFieldBuff,
+        source: { zhCN: "管理员乱填" },
+        sourcePeriod: { zhCN: "管理员乱填" },
+        period: {
+            ...validFieldBuff.period,
+            phaseName: { zhCN: "管理员乱填" },
+        },
+    })
+    assert.equal(cleanedFieldBuff.source.zhCN, "危局强袭战")
+    assert.equal(cleanedFieldBuff.period.phaseName.zhCN, "第三期")
+    assert.equal(cleanedFieldBuff.sourcePeriod.zhCN, "3.0版本第三期")
+}
 assertInvalid("field-buffs", {
     ...validFieldBuff,
-    sourcePeriod: { zhCN: "" },
-}, "中文名必填")
+    period: {
+        ...validFieldBuff.period,
+        modeId: "free_text_mode",
+    },
+}, "period.modeId")
+assertInvalid("field-buffs", {
+    ...validFieldBuff,
+    period: {
+        ...validFieldBuff.period,
+        gameVersion: "",
+    },
+}, "period.gameVersion")
+assertInvalid("field-buffs", {
+    ...validFieldBuff,
+    period: {
+        ...validFieldBuff.period,
+        gameVersion: "3.4",
+    },
+}, "period.gameVersion")
+assertInvalid("field-buffs", {
+    ...validFieldBuff,
+    period: {
+        ...validFieldBuff.period,
+        phaseNo: "",
+    },
+}, "period.phaseNo")
+assertInvalid("field-buffs", {
+    ...validFieldBuff,
+    period: {
+        ...validFieldBuff.period,
+        phaseNo: 5,
+        phaseName: { zhCN: "第五期" },
+    },
+}, "period.phaseNo")
+assertInvalid("field-buffs", {
+    ...validFieldBuff,
+    period: {
+        ...validFieldBuff.period,
+        phaseName: { zhCN: "" },
+    },
+}, "period.phaseName.zhCN")
 assertInvalid("field-buffs", {
     ...validFieldBuff,
     scope: "outOfCombat",
@@ -628,14 +869,14 @@ assertInvalid("driveDiscSets", missingDriveDiscSelfBasis, "必须填写基准")
 
 const badCoverage = {
     ...validBuff,
-    coverage: {
-        default: 1.5,
-        min: 0,
-        max: 1,
-        step: 0.1,
-    },
+    effects: [{ ...validBuff.effects[0], coverage: { default: 1.5, min: 0, max: 1, step: 0.1 } }],
 }
 assertInvalid("buffs", badCoverage, "覆盖率必须在 0 到 1")
+assertInvalid("buffs", {
+    ...validBuff,
+    scope: "outOfCombat",
+    effects: [{ ...validBuff.effects[0], coverage: { default: 0.5, min: 0, max: 1, step: 0.1 } }],
+}, "只有局内 Buff 增幅可以配置覆盖率")
 
 const emptyBuffRules = {
     ...validBuff,
@@ -784,6 +1025,8 @@ const validTeammateBuff = {
     teammate: {
         id: "test_teammate",
         name: { zhCN: "测试队友" },
+        attribute: "physical",
+        specialty: "support",
     },
     buff: {
         id: "test_teammate_buff",
@@ -800,6 +1043,14 @@ const validTeammateBuff = {
     },
 }
 assertValid("teammate-buffs", validTeammateBuff)
+assertInvalid("teammate-buffs", {
+    ...validTeammateBuff,
+    teammate: { ...validTeammateBuff.teammate, attribute: "" },
+}, "teammate.attribute")
+assertInvalid("teammate-buffs", {
+    ...validTeammateBuff,
+    teammate: { ...validTeammateBuff.teammate, specialty: "healer" },
+}, "teammate.specialty")
 assertValid("teammate-buffs", {
     ...validTeammateBuff,
     teammate: {
@@ -904,6 +1155,7 @@ const validDefaultCalculationConfig = {
             id: "direct-1",
             kind: "direct",
             count: 2,
+            stunned: true,
             critMode: "expected",
             skillRef: {
                 agentSkillId: "test_agent_skill",
@@ -919,6 +1171,7 @@ const validDefaultCalculationConfig = {
             anomalyEffect: "test_assault",
             procCount: 1,
             count: 1,
+            stunned: false,
         },
         {
             id: "disorder-1",
@@ -928,6 +1181,7 @@ const validDefaultCalculationConfig = {
             elapsedSeconds: 0,
             durationSeconds: 10,
             count: 1,
+            stunned: true,
         },
     ],
 }
@@ -935,6 +1189,267 @@ assertValid("agents", {
     ...validAgent,
     defaultCalculationConfig: validDefaultCalculationConfig,
 }, validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: {
+        ...validDefaultCalculationConfig,
+        events: [{ ...validDefaultCalculationConfig.events[0], stunned: "false" }],
+    },
+}, "是否失衡必须是布尔值", validCalculationContext)
+const validCinemaVariantCalculationConfig = {
+    ...validDefaultCalculationConfig,
+    cinemaLevel: 0,
+    name: { zhCN: "默认循环（0影）" },
+    variants: [
+        {
+            cinemaLevel: 2,
+            mode: "custom",
+            name: { zhCN: "默认循环（2影）" },
+            selectedEventId: "direct-2",
+            events: [
+                {
+                    ...validDefaultCalculationConfig.events[0],
+                    id: "direct-2",
+                    count: 4,
+                },
+            ],
+        },
+        {
+            cinemaLevel: 6,
+            mode: "custom",
+            selectedEventId: "direct-6",
+            events: [
+                {
+                    ...validDefaultCalculationConfig.events[0],
+                    id: "direct-6",
+                    count: 6,
+                },
+            ],
+        },
+    ],
+}
+assertValid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: validCinemaVariantCalculationConfig,
+}, validCalculationContext)
+const cleanedCinemaVariantAgent = cleanMaintenanceItem("agents", {
+    ...validAgent,
+    defaultCalculationConfig: validCinemaVariantCalculationConfig,
+})
+assert.equal(cleanedCinemaVariantAgent.defaultCalculationConfig.cinemaLevel, 0)
+assert.equal(cleanedCinemaVariantAgent.defaultCalculationConfig.variants[0].cinemaLevel, 2)
+assert.equal(cleanedCinemaVariantAgent.defaultCalculationConfig.variants[0].selectedEventId, "direct-2")
+assert.equal(cleanedCinemaVariantAgent.defaultCalculationConfig.variants[1].name.zhCN, "默认循环（6影）")
+assertInvalid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: {
+        ...validCinemaVariantCalculationConfig,
+        variants: [
+            {
+                ...validCinemaVariantCalculationConfig.variants[0],
+                cinemaLevel: 0,
+            },
+        ],
+    },
+}, "默认循环影画等级不能重复", validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: {
+        ...validCinemaVariantCalculationConfig,
+        variants: [
+            {
+                ...validCinemaVariantCalculationConfig.variants[0],
+                cinemaLevel: 7,
+            },
+        ],
+    },
+}, "影画等级必须是 0 到 6", validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: {
+        ...validCinemaVariantCalculationConfig,
+        variants: [
+            {
+                ...validCinemaVariantCalculationConfig.variants[0],
+                events: [],
+            },
+        ],
+    },
+}, "至少需要一个事件或技能组", validCalculationContext)
+const validSkillGroups = [
+    {
+        id: "loop",
+        name: { zhCN: "一变" },
+        description: { zhCN: "一轮技能循环" },
+        defaultCount: 10,
+        minCount: 0,
+        maxCount: 30,
+        step: 1,
+        events: [
+            {
+                ...validDefaultCalculationConfig.events[0],
+                id: "loop-direct",
+                count: 2,
+            },
+        ],
+    },
+    {
+        id: "ultimate",
+        name: { zhCN: "一大" },
+        defaultCount: 2,
+        minCount: 0,
+        maxCount: 10,
+        step: 1,
+        events: [
+            {
+                ...validDefaultCalculationConfig.events[0],
+                id: "ultimate-direct",
+                count: 1,
+            },
+        ],
+    },
+]
+const validSkillGroupCalculationConfig = {
+    ...validDefaultCalculationConfig,
+    selectedEventId: "loop-ref",
+    events: [
+        {
+            id: "loop-ref",
+            kind: "skillGroup",
+            skillGroupId: "loop",
+            count: 10,
+            stunned: false,
+        },
+        {
+            id: "ultimate-ref",
+            kind: "skillGroup",
+            skillGroupId: "ultimate",
+            count: 2,
+            stunned: true,
+        },
+    ],
+}
+assertValid("agents", {
+    ...validAgent,
+    skillGroups: validSkillGroups,
+    defaultCalculationConfig: validSkillGroupCalculationConfig,
+}, validCalculationContext)
+const cleanedSkillGroupAgent = cleanMaintenanceItem("agents", {
+    ...validAgent,
+    skillGroups: validSkillGroups,
+    defaultCalculationConfig: validSkillGroupCalculationConfig,
+})
+assert.equal(cleanedSkillGroupAgent.skillGroups[0].id, "loop")
+assert.equal(cleanedSkillGroupAgent.skillGroups[0].events[0].id, "loop-direct")
+assert.equal(cleanedSkillGroupAgent.skillGroups[0].events[0].stunned, true)
+assert.equal(cleanedSkillGroupAgent.defaultCalculationConfig.events[0].kind, "skillGroup")
+assert.equal(cleanedSkillGroupAgent.defaultCalculationConfig.events[0].skillGroupId, "loop")
+assert.equal(cleanedSkillGroupAgent.defaultCalculationConfig.events[0].stunned, false)
+assert.equal(cleanedSkillGroupAgent.defaultCalculationConfig.skillGroups, undefined)
+assert.equal(cleanedSkillGroupAgent.defaultCalculationConfig.skillGroupPresets, undefined)
+const legacySkillGroupOnlyCalculationConfig = {
+    ...validSkillGroupCalculationConfig,
+    selectedEventId: null,
+    events: [],
+    skillGroups: validSkillGroups,
+    skillGroupPresets: [
+        {
+            id: "10_loop_2_ult",
+            name: { zhCN: "10变2大" },
+            counts: {
+                loop: 10,
+                ultimate: 2,
+            },
+        },
+    ],
+    defaultSkillGroupPresetId: "10_loop_2_ult",
+}
+assertValid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: legacySkillGroupOnlyCalculationConfig,
+}, validCalculationContext)
+const cleanedLegacySkillGroupOnlyAgent = cleanMaintenanceItem("agents", {
+    ...validAgent,
+    defaultCalculationConfig: legacySkillGroupOnlyCalculationConfig,
+})
+assert.equal(cleanedLegacySkillGroupOnlyAgent.skillGroups[0].id, "loop")
+assert.equal(cleanedLegacySkillGroupOnlyAgent.defaultCalculationConfig.events[0].kind, "skillGroup")
+assert.equal(cleanedLegacySkillGroupOnlyAgent.defaultCalculationConfig.events[0].count, 10)
+assert.equal(cleanedLegacySkillGroupOnlyAgent.defaultCalculationConfig.events[1].skillGroupId, "ultimate")
+assert.equal(cleanedLegacySkillGroupOnlyAgent.defaultCalculationConfig.skillGroups, undefined)
+assert.equal(cleanedLegacySkillGroupOnlyAgent.defaultCalculationConfig.skillGroupPresets, undefined)
+assertInvalid("agents", {
+    ...validAgent,
+    skillGroups: validSkillGroups.map(group => ({ ...group, id: "loop" })),
+    defaultCalculationConfig: validSkillGroupCalculationConfig,
+}, "技能组 ID 不能重复", validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    skillGroups: [
+        {
+            ...validSkillGroups[0],
+            id: "",
+        },
+    ],
+    defaultCalculationConfig: validSkillGroupCalculationConfig,
+}, "必填", validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    skillGroups: [
+        {
+            ...validSkillGroups[0],
+            events: [
+                {
+                    ...validSkillGroups[0].events[0],
+                    skillRef: {
+                        ...validSkillGroups[0].events[0].skillRef,
+                        rowId: "missing",
+                    },
+                },
+            ],
+        },
+    ],
+    defaultCalculationConfig: validSkillGroupCalculationConfig,
+}, "技能倍率行不存在", validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    skillGroups: validSkillGroups,
+    defaultCalculationConfig: {
+        ...validSkillGroupCalculationConfig,
+        events: [
+            {
+                ...validSkillGroupCalculationConfig.events[0],
+                skillGroupId: "missing",
+            },
+        ],
+    },
+}, "技能组不存在", validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    skillGroups: validSkillGroups,
+    defaultCalculationConfig: {
+        ...validSkillGroupCalculationConfig,
+        events: [
+            {
+                ...validSkillGroupCalculationConfig.events[0],
+                count: -1,
+            },
+        ],
+    },
+}, "次数不能小于 0", validCalculationContext)
+assertInvalid("agents", {
+    ...validAgent,
+    skillGroups: validSkillGroups,
+    defaultCalculationConfig: {
+        ...validSkillGroupCalculationConfig,
+        events: [
+            {
+                ...validSkillGroupCalculationConfig.events[1],
+                count: 99,
+            },
+        ],
+    },
+}, "次数不能大于技能组最大次数", validCalculationContext)
 assertValid("agents", {
     ...validAgent,
     defaultCalculationConfig: {
@@ -965,9 +1480,10 @@ assertInvalid("agents", {
     ...validAgent,
     defaultCalculationConfig: {
         ...validDefaultCalculationConfig,
+        selectedEventId: null,
         events: [],
     },
-}, "至少需要一个事件", validCalculationContext)
+}, "至少需要一个事件或技能组", validCalculationContext)
 assertInvalid("agents", {
     ...validAgent,
     defaultCalculationConfig: {
@@ -1041,6 +1557,33 @@ assertValid("agents", {
         ],
     },
 }, validCalculationContext)
+const manualSheerCalculationConfig = {
+    ...validDefaultCalculationConfig,
+    mode: "sheer",
+    selectedEventId: "manual-sheer",
+    events: [
+        {
+            id: "manual-sheer",
+            kind: "sheer",
+            label: "额外能力：落雷",
+            skillMultiplier: 225,
+            damageElement: "ether",
+            count: 1,
+            critMode: "expected",
+        },
+    ],
+}
+assertValid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: manualSheerCalculationConfig,
+}, validCalculationContext)
+const cleanedManualSheerAgent = cleanMaintenanceItem("agents", {
+    ...validAgent,
+    defaultCalculationConfig: manualSheerCalculationConfig,
+})
+assert.equal(cleanedManualSheerAgent.defaultCalculationConfig.events[0].label, "额外能力：落雷")
+assert.equal(cleanedManualSheerAgent.defaultCalculationConfig.events[0].skillMultiplier, 225)
+assert.equal(cleanedManualSheerAgent.defaultCalculationConfig.events[0].damageElement, "ether")
 assertValid("agents", {
     ...validAgent,
     defaultCalculationConfig: {
@@ -1085,7 +1628,7 @@ const buffWithDamageModifier = {
         },
     ],
 }
-assertValid("combat-buffs", buffWithDamageModifier)
+assertInvalid("combat-buffs", buffWithDamageModifier, "旧适用范围不能继续保存")
 assertValid("combat-buffs", {
     ...buffWithDamageModifier,
     effects: [
@@ -1124,7 +1667,7 @@ assertValid("combat-buffs", {
         },
     ],
 })
-assertValid("combat-buffs", {
+assertInvalid("combat-buffs", {
     ...buffWithDamageModifier,
     effects: [
         {
@@ -1137,8 +1680,8 @@ assertValid("combat-buffs", {
             },
         },
     ],
-})
-assertValid("combat-buffs", {
+}, "旧适用范围不能继续保存")
+assertInvalid("combat-buffs", {
     ...buffWithDamageModifier,
     effects: [
         {
@@ -1175,7 +1718,7 @@ assertValid("combat-buffs", {
             },
         },
     ],
-})
+}, "旧适用范围不能继续保存")
 const buffWithSkillTargetRules = {
     ...validBuff,
     id: "test_skill_target_rules",
@@ -1233,6 +1776,22 @@ const buffWithSkillTargetRules = {
                 ],
             },
         },
+        {
+            id: "effect-skill-all-res-ignore",
+            type: "fixed",
+            stat: "allResIgnore",
+            value: 15,
+            mode: "flat",
+            target: {
+                kind: "skill",
+                skillTargets: [
+                    {
+                        kind: "skillType",
+                        skillType: "ultimate",
+                    },
+                ],
+            },
+        },
     ],
 }
 assertValid("combat-buffs", buffWithSkillTargetRules)
@@ -1259,6 +1818,137 @@ assertValid("combat-buffs", {
         },
     ],
 })
+assert.deepEqual(
+    cleanMaintenanceItem("combat-buffs", {
+        ...validBuff,
+        effects: [{
+            id: "legacy-chain",
+            type: "fixed",
+            stat: "dmgBonus",
+            value: 20,
+            mode: "flat",
+            target: { kind: "skill", skillTargets: [{ categoryId: "chain", moveIdPrefixes: ["chain_"] }] },
+        }],
+    }).effects[0].target.skillTargets,
+    [{ kind: "skillType", skillType: "chain" }],
+)
+assertValid("combat-buffs", {
+    ...validBuff,
+    id: "test_canonical_skill_types",
+    effects: [{
+        id: "canonical-types",
+        type: "fixed",
+        stat: "dmgBonus",
+        value: 40,
+        mode: "flat",
+        target: {
+            kind: "skill",
+            skillTargets: [
+                { kind: "skillType", skillType: "chain" },
+                { kind: "skillType", skillType: "ultimate" },
+            ],
+        },
+    }],
+})
+assertValid("combat-buffs", {
+    ...validBuff,
+    id: "test_canonical_skill_tags",
+    effects: [{
+        id: "canonical-tags",
+        type: "fixed",
+        stat: "dmgBonus",
+        value: 20,
+        mode: "flat",
+        target: {
+            kind: "skill",
+            skillTargets: [
+                { kind: "skillTag", skillTag: "exSpecial" },
+                { kind: "skillTag", skillTag: "assistAttack" },
+            ],
+        },
+    }],
+})
+assertInvalid("combat-buffs", {
+    ...validBuff,
+    effects: [{
+        id: "mixed-skill-target-modes",
+        type: "fixed",
+        stat: "dmgBonus",
+        value: 20,
+        mode: "flat",
+        target: {
+            kind: "skill",
+            skillTargets: [
+                { kind: "skillTag", skillTag: "dashAttack" },
+                { kind: "skillType", skillType: "dodge" },
+            ],
+        },
+    }],
+}, "不能混合指定角色招式、通用技能大类和通用招式标签")
+assertInvalid("combat-buffs", {
+    ...validBuff,
+    effects: [{
+        id: "unknown-skill-tag",
+        type: "fixed",
+        stat: "dmgBonus",
+        value: 20,
+        mode: "flat",
+        target: {
+            kind: "skill",
+            skillTargets: [{ kind: "skillTag", skillTag: "futureAttack" }],
+        },
+    }],
+}, "不是支持的选项")
+assertValid("combat-buffs", {
+    ...validBuff,
+    id: "test_canonical_specific_type",
+    effects: [{
+        id: "canonical-specific",
+        type: "fixed",
+        stat: "dmgBonus",
+        value: 20,
+        mode: "flat",
+        target: {
+            kind: "skill",
+            skillTargets: [{
+                kind: "specific",
+                agentSkillId: "test_agent_skill",
+                categoryId: "basic",
+                skillType: "basic",
+            }],
+        },
+    }],
+}, { agentSkills: [validAgentSkill] })
+assertInvalid("combat-buffs", {
+    ...validBuff,
+    effects: [{
+        id: "unknown-prefix",
+        type: "fixed",
+        stat: "dmgBonus",
+        value: 20,
+        mode: "flat",
+        target: { kind: "skill", skillTargets: [{ categoryId: "chain", moveIdPrefixes: ["future_"] }] },
+    }],
+}, "旧版招式前缀无法转换")
+assertInvalid("combat-buffs", {
+    ...validBuff,
+    effects: [{
+        id: "mismatched-specific",
+        type: "fixed",
+        stat: "dmgBonus",
+        value: 20,
+        mode: "flat",
+        target: {
+            kind: "skill",
+            skillTargets: [{
+                kind: "specific",
+                agentSkillId: "test_agent_skill",
+                categoryId: "basic",
+                skillType: "ultimate",
+            }],
+        },
+    }],
+}, "没有对应招式", { agentSkills: [validAgentSkill] })
 assertValid("combat-buffs", juhufuCoreBuff)
 assertValid("agents", {
     ...validAgent,
@@ -1380,7 +2070,7 @@ assertInvalid("combat-buffs", {
         },
     ],
 }, "不是支持的选项")
-assertValid("combat-buffs", {
+assertInvalid("combat-buffs", {
     ...buffWithDamageModifier,
     effects: [
         {
@@ -1397,8 +2087,8 @@ assertValid("combat-buffs", {
             },
         },
     ],
-})
-assertValid("agents", {
+}, "旧适用范围不能继续保存")
+assertInvalid("agents", {
     ...validAgent,
     combatBuffs: {
         ...validAgent.combatBuffs,
@@ -1417,8 +2107,8 @@ assertValid("agents", {
             ],
         },
     },
-})
-assertValid("agents", {
+}, "旧适用范围不能继续保存")
+assertInvalid("agents", {
     ...validAgent,
     combatBuffs: {
         ...validAgent.combatBuffs,
@@ -1445,7 +2135,7 @@ assertValid("agents", {
             ],
         },
     },
-})
+}, "旧适用范围不能继续保存")
 assertInvalid("agents", {
     ...validAgent,
     combatBuffs: {
@@ -1472,6 +2162,46 @@ assertInvalid("combat-buffs", {
     scope: "outOfCombat",
 }, "伤害修正只能用于局内 Buff")
 
+const anomalyTargetBuff = {
+    ...validBuff,
+    scope: "inCombat",
+    effects: [
+        {
+            id: "flinch-duration",
+            type: "fixed",
+            target: { kind: "anomaly", settlementType: "disorder", anomalyEffects: ["flinch"] },
+            stat: "anomalyDurationBonusSeconds",
+            mode: "flat",
+            value: 5,
+        },
+        {
+            id: "assault-crit",
+            type: "fixed",
+            target: { kind: "anomaly", settlementType: "attribute", anomalyEffects: ["assault"] },
+            stat: "anomalyCritRate",
+            mode: "flat",
+            value: 100,
+        },
+    ],
+}
+assertValid("combat-buffs", anomalyTargetBuff)
+assert.deepEqual(cleanMaintenanceItem("combat-buffs", anomalyTargetBuff).effects[0].target, {
+    kind: "anomaly",
+    settlementType: "disorder",
+    anomalyEffects: ["flinch"],
+})
+assertInvalid("combat-buffs", {
+    ...anomalyTargetBuff,
+    effects: [{
+        ...anomalyTargetBuff.effects[0],
+        target: { kind: "anomaly", settlementType: "attribute", anomalyEffects: ["assault"] },
+    }],
+}, "异常持续时间延长必须指定一个紊乱原异常")
+assertInvalid("combat-buffs", {
+    ...anomalyTargetBuff,
+    effects: [{ ...anomalyTargetBuff.effects[0], target: { kind: "anomaly", settlementType: "disorder", anomalyEffects: [] } }],
+}, "异常增幅必须至少选择一个异常效果")
+
 const buffWithModifierOnly = {
     ...validBuff,
     id: "youye.cinema_1.amplify_additional_ability",
@@ -1492,6 +2222,8 @@ assertValid("teammate-buffs", {
     teammate: {
         id: "youye",
         name: { zhCN: "浮波柚叶" },
+        attribute: "physical",
+        specialty: "support",
     },
     buff: {
         id: "youye.cinema_1.amplify_additional_ability",
@@ -1550,7 +2282,7 @@ wEngineWithDamageModifier.effect.selfBuff.effects = [
         },
     },
 ]
-assertValid("wEngines", wEngineWithDamageModifier)
+assertInvalid("wEngines", wEngineWithDamageModifier, "旧适用范围不能继续保存")
 
 const driveDiscWithDamageModifier = {
     ...validDriveDiscSet,
@@ -1572,8 +2304,8 @@ const driveDiscWithDamageModifier = {
         },
     },
 }
-assertValid("drive-disc-sets", driveDiscWithDamageModifier)
-assertValid("drive-disc-sets", {
+assertInvalid("drive-disc-sets", driveDiscWithDamageModifier, "旧适用范围不能继续保存")
+assertInvalid("drive-disc-sets", {
     ...validDriveDiscSet,
     twoPiece: {
         scope: "inCombat",
@@ -1589,6 +2321,81 @@ assertValid("drive-disc-sets", {
             },
         ],
     },
+}, "旧适用范围不能继续保存")
+
+assertValid("driveDiscSets", {
+    ...validDriveDiscSet,
+    twoPiece: {
+        effects: [
+            {
+                id: "drive_disc_two_piece_skill_target",
+                type: "fixed",
+                target: {
+                    kind: "skill",
+                    skillTargets: [{ kind: "skillType", skillType: "ultimate" }],
+                },
+                stat: "dmgBonus",
+                value: 20,
+                mode: "flat",
+                condition: { zhCN: "冲刺攻击命中" },
+                durationSeconds: 8,
+                cooldownSeconds: 1,
+                requirement: { specialty: "attack" },
+                coverage: { default: 1, min: 0, max: 1, step: 0.1 },
+            },
+        ],
+    },
 })
+assertInvalid("driveDiscSets", {
+    ...validDriveDiscSet,
+    twoPiece: {
+        effects: [{
+            id: "drive_disc_two_piece_invalid_requirement",
+            type: "fixed",
+            target: {
+                kind: "skill",
+                skillTargets: [{ kind: "skillTag", skillTag: "dashAttack" }],
+            },
+            stat: "dmgBonus",
+            value: 20,
+            mode: "flat",
+            durationSeconds: 0,
+            requirement: { specialty: "future" },
+        }],
+    },
+}, "持续时间必须大于 0")
+assertInvalid("driveDiscSets", {
+    ...validDriveDiscSet,
+    twoPiece: {
+        effects: [{
+            id: "drive_disc_two_piece_invalid_requirement",
+            type: "fixed",
+            target: {
+                kind: "skill",
+                skillTargets: [{ kind: "skillTag", skillTag: "dashAttack" }],
+            },
+            stat: "dmgBonus",
+            value: 20,
+            mode: "flat",
+            requirement: { specialty: "future" },
+        }],
+    },
+}, "不是支持的选项")
+assertInvalid("driveDiscSets", {
+    ...validDriveDiscSet,
+    twoPiece: {
+        scope: "inCombat",
+        effects: [
+            {
+                id: "drive_disc_two_piece_event_stat",
+                type: "fixed",
+                target: { kind: "default" },
+                stat: "anomalyDamageBonus",
+                value: 20,
+                mode: "flat",
+            },
+        ],
+    },
+}, "事件增幅只能用于局内 Buff")
 
 console.log("maintenance validation tests passed")

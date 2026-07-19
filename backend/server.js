@@ -1,11 +1,11 @@
 import { createServer } from "node:http"
-import { randomUUID } from "node:crypto"
-import { readFile, writeFile } from "node:fs/promises"
-import { createReadStream, existsSync } from "node:fs"
+import { createHash, randomUUID } from "node:crypto"
+import { readFile, rename, rm, writeFile } from "node:fs/promises"
+import { createReadStream, existsSync, statSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { buildMeta, calculateInCombatPanel, calculateOutOfCombatPanel, loadCalculatorContext } from "./calculator.js"
-import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "./driveDiscAnalysis.js"
+import { buildMeta, calculateInCombatPanel, calculateOutOfCombatPanel, loadCatalog } from "./calculator.js"
+import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "../core/driveDiscAnalysis-core.js"
 import { OptimizerCancelledError, optimizeDriveDiscs, optimizeDriveDiscsAsync, previewDriveDiscOptimization } from "./driveDiscOptimizer.js"
 import {
     accountSummary,
@@ -23,14 +23,47 @@ import {
     upsertDriveDiscLoadout,
     upsertUserDriveDisc,
 } from "./driveDiscInventory.js"
-import { assertValidMaintenanceItem } from "../frontend/maintenanceValidation.js"
+import {
+    applySystemManagedMaintenanceFields,
+    assertValidMaintenanceItem,
+    fieldBuffModeOption,
+    fieldBuffPhaseName,
+    SYSTEM_MANAGED_SKILL_GROUP_COUNTS,
+} from "../core/maintenanceValidation.js"
+import {
+    defaultCalculationVariantName,
+    isDefaultCalculationCinemaLevel,
+    normalizeDefaultCalculationCinemaLevel,
+} from "../core/defaultCalculationConfig.js"
+import { normalizeSkillTargetsInValue } from "../core/skillTargets.js"
+import { normalizeLegacyEffectAppliesToInValue } from "../core/effectRuleTargets.js"
+import { disorderElapsedStepSeconds, normalizeElapsedSeconds } from "../core/damageEventMultipliers.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, "..")
-const dataDir = path.join(rootDir, "data")
-const frontendDir = path.join(rootDir, "frontend")
+const dataDir = process.env.ZZZ_CALCULATOR_DATA_DIR
+    ? path.resolve(process.env.ZZZ_CALCULATOR_DATA_DIR)
+    : path.join(rootDir, "data")
+const exampleDir = path.join(rootDir, "examples")
+const pagesDir = path.join(rootDir, "dist", "pages")
 const port = Number(process.env.PORT || 8787)
+const host = String(process.env.HOST || "127.0.0.1").trim() || "127.0.0.1"
 const nodeEnv = String(process.env.NODE_ENV ?? "development").toLowerCase()
+const DAMAGE_ELEMENTS = new Set(["physical", "fire", "ice", "electric", "ether", "wind"])
+const maintenanceAllowedOrigins = new Set(
+    String(process.env.MAINTENANCE_ALLOWED_ORIGINS ?? "")
+        .split(",")
+        .map(value => value.trim())
+        .filter(Boolean)
+        .map(value => {
+            try {
+                return new URL(value).origin
+            } catch {
+                return ""
+            }
+        })
+        .filter(Boolean),
+)
 
 function envFlag(name) {
     const value = process.env[name]
@@ -50,8 +83,56 @@ function isMaintenanceEnabled() {
     return envFlag("MAINTENANCE_ENABLED") ?? nodeEnv !== "production"
 }
 
-function isMaintenanceStaticPath(pathname) {
-    return pathname === "/maintenance.html" || pathname === "/maintenance.js"
+function maintenanceRequestMethod(req) {
+    if (req.method === "OPTIONS") {
+        return String(req.headers["access-control-request-method"] ?? "").toUpperCase()
+    }
+    return String(req.method ?? "GET").toUpperCase()
+}
+
+function isMaintenanceWriteRequest(req, pathname) {
+    return pathname.startsWith("/api/maintenance/")
+        && ["POST", "PUT", "PATCH", "DELETE"].includes(maintenanceRequestMethod(req))
+}
+
+function isLoopbackHostname(hostname) {
+    const normalized = String(hostname ?? "").toLowerCase().replace(/^\[|\]$/g, "")
+    return normalized === "localhost"
+        || normalized.endsWith(".localhost")
+        || normalized === "::1"
+        || /^127(?:\.\d{1,3}){3}$/.test(normalized)
+}
+
+function isAllowedMaintenanceOrigin(req) {
+    const origin = String(req.headers.origin ?? "").trim()
+    if (!origin) {
+        return true
+    }
+    let parsedOrigin
+    try {
+        parsedOrigin = new URL(origin)
+    } catch {
+        return false
+    }
+    return maintenanceAllowedOrigins.has(parsedOrigin.origin)
+        || isLoopbackHostname(parsedOrigin.hostname)
+}
+
+function applyMaintenanceCors(req, res) {
+    const origin = String(req.headers.origin ?? "").trim()
+    if (!origin) {
+        return
+    }
+    res.setHeader("Access-Control-Allow-Origin", origin)
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type")
+    res.setHeader("Vary", "Origin")
+}
+
+function isLegacyMaintenanceStaticPath(pathname) {
+    return pathname === "/maintenance.js"
+        || pathname === "/maintenanceValidation.js"
+        || pathname === "/maintenanceStats.js"
 }
 
 function isRetiredUserDataPath(pathname) {
@@ -95,7 +176,7 @@ function createRequestStore(input = {}) {
     }
 }
 
-let catalog = await loadCalculatorContext(rootDir)
+let catalog = await loadCatalog(dataDir, exampleDir)
 const optimizerJobs = new Map()
 const OPTIMIZER_JOB_TTL_MS = 10 * 60 * 1000
 
@@ -116,10 +197,6 @@ const maintenanceResources = {
         fileName: "drive_disc_sets.json",
         collectionKey: "sets",
     },
-    "combat-buffs": {
-        fileName: "combat_buffs.json",
-        collectionKey: "buffs",
-    },
     "field-buffs": {
         fileName: "combat_buffs.json",
         collectionKey: "fieldBuffs",
@@ -133,33 +210,156 @@ const maintenanceResources = {
     },
 }
 
+function materializeBossMaintenanceInput(input = {}) {
+    const next = applySystemManagedMaintenanceFields(structuredClone(input ?? {}))
+    ensureMaintenanceId(next.boss ??= {}, "boss")
+    ensureMaintenanceId(next.encounter ??= {}, "boss_encounter")
+    for (const group of [next.encounter.playerBuffs ??= [], next.encounter.playerDebuffs ??= []]) {
+        for (const entry of group) {
+            ensureMaintenanceId(entry, "boss_effect")
+            materializeEffectSetIds(entry)
+        }
+    }
+    return next
+}
+
+function cleanBossProfile(boss = {}) {
+    const next = structuredClone(boss)
+    delete next.encounters
+    next.name = zhOnly(boss.name)
+    next.aliases = [...new Set((boss.aliases ?? []).map(value => String(value).trim()).filter(Boolean))]
+    next.images = {
+        icon: String(boss.images?.icon ?? "").trim(),
+        source: String(boss.images?.source ?? "").trim(),
+    }
+    next.target = {
+        defense: Number(boss.target?.defense),
+        weaknessElements: [...new Set(boss.target?.weaknessElements ?? [])],
+        resistanceElements: [...new Set(boss.target?.resistanceElements ?? [])],
+        resistanceOverrides: Object.fromEntries(Object.entries(boss.target?.resistanceOverrides ?? {}).map(([key, value]) => [key, Number(value)])),
+    }
+    next.hidden = boss.hidden === true
+    return next
+}
+
+function cleanBossEncounter(encounter = {}) {
+    const next = {
+        id: String(encounter.id ?? "").trim(),
+        appearances: (encounter.appearances ?? []).map(appearance => ({
+            modeId: String(appearance.modeId ?? "").trim(),
+            gameVersion: String(appearance.gameVersion ?? "").trim(),
+            phaseNo: Number(appearance.phaseNo),
+            ...(appearance.startDate ? { startDate: String(appearance.startDate) } : {}),
+            ...(appearance.endDate ? { endDate: String(appearance.endDate) } : {}),
+        })),
+        enemyIntel: zhOnly(encounter.enemyIntel),
+        recommendedSpecialties: [...new Set(encounter.recommendedSpecialties ?? [])],
+        playerBuffs: [],
+        playerDebuffs: [],
+        sources: (encounter.sources ?? []).map(item => ({ label: zhOnly(item.label), url: String(item.url ?? "").trim() })),
+        hidden: encounter.hidden === true,
+    }
+    for (const key of ["playerBuffs", "playerDebuffs"]) {
+        next[key] = (encounter[key] ?? []).map(entry => ({
+            ...entry,
+            name: zhOnly(entry.name),
+            description: zhOnly(entry.description),
+            ...(entry.unmodeledReason ? { unmodeledReason: zhOnly(entry.unmodeledReason) } : {}),
+            effects: entry.calculationStatus === "modeled" ? (entry.effects ?? []).map(cleanEffectRule) : [],
+        }))
+    }
+    return next
+}
+
+async function saveBossEncounter(input) {
+    const materialized = normalizeSkillTargetsInValue(materializeBossMaintenanceInput(input))
+    return mutateDataFile("bosses.json", payload => {
+        const boss = cleanBossProfile(materialized.boss)
+        const encounter = cleanBossEncounter(materialized.encounter)
+        const existingBoss = (payload.bosses ?? []).find(item => item.id === boss.id)
+        const validationInput = { boss, encounter }
+        assertValidMaintenanceItem("boss-buffs", validationInput, {
+            bosses: payload.bosses ?? [],
+            currentBossId: existingBoss?.id ?? "",
+            currentEncounterId: encounter.id,
+        })
+        const savedBoss = {
+            ...(existingBoss ?? {}),
+            ...boss,
+            encounters: upsertById(existingBoss?.encounters ?? [], encounter),
+        }
+        const nextPayload = {
+            ...payload,
+            version: 2,
+            bosses: upsertById(payload.bosses ?? [], savedBoss),
+        }
+        const savedItem = {
+            ...encounter,
+            bossId: savedBoss.id,
+            bossName: savedBoss.name,
+            images: savedBoss.images,
+            target: savedBoss.target,
+        }
+        return { payload: nextPayload, value: { payload: nextPayload, savedItem, savedBoss, savedEncounter: encounter } }
+    })
+}
+
+async function deleteBossMaintenanceItem(bossOrEncounterId, encounterId = "") {
+    let deleted = false
+    await mutateDataFile("bosses.json", payload => {
+        let bosses = payload.bosses ?? []
+        if (encounterId) {
+            bosses = bosses.map(boss => boss.id === bossOrEncounterId
+                ? { ...boss, encounters: deleteById(boss.encounters ?? [], encounterId) }
+                : boss)
+            deleted = true
+        } else if (bosses.some(boss => boss.id === bossOrEncounterId)) {
+            bosses = deleteById(bosses, bossOrEncounterId)
+            deleted = true
+        } else if (bosses.some(boss => (boss.encounters ?? []).some(item => item.id === bossOrEncounterId))) {
+            bosses = bosses.map(boss => ({ ...boss, encounters: deleteById(boss.encounters ?? [], bossOrEncounterId) }))
+            deleted = true
+        }
+        return { payload: { ...payload, bosses }, value: payload }
+    })
+    if (!deleted) {
+        await deleteMaintenanceItem("boss-buffs", bossOrEncounterId)
+    }
+}
+
+function applyDefaultCors(res) {
+    if (!res.hasHeader("Access-Control-Allow-Origin")) {
+        res.setHeader("Access-Control-Allow-Origin", "*")
+    }
+    if (!res.hasHeader("Access-Control-Allow-Methods")) {
+        res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
+    }
+    if (!res.hasHeader("Access-Control-Allow-Headers")) {
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type")
+    }
+}
+
 function sendJson(res, statusCode, payload) {
     const text = JSON.stringify(payload, null, 2)
+    applyDefaultCors(res)
     res.writeHead(statusCode, {
         "Content-Type": "application/json; charset=utf-8",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
     })
     res.end(text)
 }
 
 function sendText(res, statusCode, text, contentType) {
+    applyDefaultCors(res)
     res.writeHead(statusCode, {
         "Content-Type": contentType,
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
     })
     res.end(text)
 }
 
 function sendRedirect(res, location, statusCode = 308) {
+    applyDefaultCors(res)
     res.writeHead(statusCode, {
         "Location": location,
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
     })
     res.end()
 }
@@ -177,8 +377,28 @@ async function readDataFile(fileName) {
 }
 
 async function writeDataFile(fileName, payload) {
-    await writeFile(path.join(dataDir, fileName), `${JSON.stringify(payload, null, 2)}\n`, "utf8")
-    catalog = await loadCalculatorContext(rootDir)
+    const targetPath = path.join(dataDir, fileName)
+    const tempPath = path.join(dataDir, `.${fileName}.${process.pid}.${randomUUID()}.tmp`)
+    try {
+        await writeFile(tempPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8")
+        await rename(tempPath, targetPath)
+    } finally {
+        await rm(tempPath, { force: true }).catch(() => {})
+    }
+    catalog = await loadCatalog(dataDir, exampleDir)
+}
+
+let maintenanceMutationQueue = Promise.resolve()
+
+function mutateDataFile(fileName, mutation) {
+    const run = maintenanceMutationQueue.then(async () => {
+        const payload = await readDataFile(fileName)
+        const result = await mutation(payload)
+        await writeDataFile(fileName, result.payload)
+        return result.value
+    })
+    maintenanceMutationQueue = run.then(() => undefined, () => undefined)
+    return run
 }
 
 function optimizerPercent(metrics = {}, status = "running") {
@@ -290,6 +510,19 @@ function randomId(prefix) {
     return `${prefix}_${randomUUID().replaceAll("-", "").slice(0, 10)}`
 }
 
+function stableSlug(value, fallback = "item") {
+    const raw = String(value ?? "").trim()
+    const slug = raw
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "")
+    if (slug) {
+        return slug
+    }
+    const hashSource = raw || fallback
+    return `${fallback}_${createHash("sha1").update(hashSource, "utf8").digest("hex").slice(0, 8)}`
+}
+
 function zhOnly(value) {
     if (typeof value === "string") {
         return { zhCN: value }
@@ -384,17 +617,63 @@ function cleanBuff(buff = {}) {
     return next
 }
 
-function cleanFieldBuff(buff = {}) {
+function cleanFieldPeriod(period = {}) {
+    const modeId = String(period.modeId ?? "").trim()
+    const gameVersion = String(period.gameVersion ?? "").trim()
+    const phaseNo = Number(period.phaseNo)
+    const canonicalPhaseName = fieldBuffPhaseName(phaseNo)
+    return {
+        modeId,
+        gameVersion,
+        phaseNo: Number.isFinite(phaseNo) ? phaseNo : period.phaseNo,
+        phaseName: canonicalPhaseName ?? zhOnly(period.phaseName),
+    }
+}
+
+function fieldSourcePeriod(period = {}) {
+    const version = String(period.gameVersion ?? "").trim()
+    const phase = String(period.phaseName?.zhCN ?? period.phaseName ?? "").trim()
+    if (!version || !phase) {
+        return null
+    }
+    return { zhCN: `${version}版本${phase}` }
+}
+
+function cleanFieldBuff(buff = {}, options = {}) {
+    const originalId = String(options.originalId ?? buff.id ?? "").trim()
     const next = cleanBuff({
         ...buff,
+        ...(originalId ? { id: originalId } : {}),
         sourceType: "field",
         scope: "inCombat",
     })
+    delete next._maintenanceOriginalId
+    next.period = cleanFieldPeriod(buff.period)
+    const mode = fieldBuffModeOption(next.period.modeId)
+    if (mode?.source) {
+        next.source = zhOnly(mode.source)
+        delete next.sourceLabel
+    }
 
-    if (buff.sourcePeriod) {
-        next.sourcePeriod = zhOnly(buff.sourcePeriod)
+    const generatedSourcePeriod = fieldSourcePeriod(next.period)
+    if (generatedSourcePeriod) {
+        next.sourcePeriod = generatedSourcePeriod
     } else {
         delete next.sourcePeriod
+    }
+
+    if (!originalId) {
+        const versionSlug = String(next.period.gameVersion ?? "").replace(/\./g, "_")
+        const nameSlug = stableSlug(next.name?.en ?? next.name?.zhCN ?? next.name, "buff")
+        next.id = [
+            "field",
+            next.period.modeId || "unknown",
+            versionSlug ? `v${versionSlug}` : "vunknown",
+            next.period.phaseNo ? `p${next.period.phaseNo}` : "punknown",
+            nameSlug,
+        ].join(".")
+    } else {
+        next.id = originalId
     }
 
     return next
@@ -563,13 +842,31 @@ function cleanCalculationSkillRef(skillRef = null) {
     return Object.values(result).every(Boolean) ? result : null
 }
 
-function cleanCalculationEvent(event = {}, index = 0) {
+function cleanCalculationEvent(event = {}, index = 0, options = {}) {
     if (!event || typeof event !== "object" || Array.isArray(event)) {
         return null
     }
-    const inputKind = ["direct", "sheer", "anomaly", "disorder"].includes(event.kind)
+    if (event.kind === "skillGroup" && !options.allowSkillGroup) {
+        return null
+    }
+    const inputKind = ["direct", "sheer", "anomaly", "disorder", ...(options.allowSkillGroup ? ["skillGroup"] : [])].includes(event.kind)
         ? event.kind
         : "direct"
+    if (inputKind === "skillGroup") {
+        const id = String(event.id ?? `skill-group-${index + 1}`).trim() || `skill-group-${index + 1}`
+        const skillGroupId = String(event.skillGroupId ?? event.groupId ?? "").trim()
+        const count = Number(event.count ?? 1)
+        if (!skillGroupId || (options.skillGroupIds instanceof Set && !options.skillGroupIds.has(skillGroupId))) {
+            return null
+        }
+        return {
+            id,
+            kind: "skillGroup",
+            skillGroupId,
+            count: Number.isFinite(count) ? Math.max(0, count) : 1,
+            stunned: event.stunned === undefined ? true : Boolean(event.stunned),
+        }
+    }
     const settlementType = inputKind === "disorder" || event.settlementType === "disorder" ? "disorder" : "attribute"
     const kind = inputKind === "direct" || inputKind === "sheer" ? inputKind : "anomaly"
     const id = String(event.id ?? `${kind}-${index + 1}`).trim() || `${kind}-${index + 1}`
@@ -578,23 +875,49 @@ function cleanCalculationEvent(event = {}, index = 0) {
         id,
         kind,
         count: Number.isFinite(count) ? Math.max(0, count) : 1,
+        stunned: event.stunned === undefined ? true : Boolean(event.stunned),
+    }
+    const damageRatioPct = Number(event.damageRatioPct)
+    if (event.damageRatioPct !== undefined && Number.isFinite(damageRatioPct)) {
+        base.damageRatioPct = Math.max(0, damageRatioPct)
+    }
+    const eventLabel = String(event.label ?? "").trim()
+    if (eventLabel) {
+        base.label = eventLabel
     }
     if (kind === "direct" || kind === "sheer") {
         const skillRef = cleanCalculationSkillRef(event.skillRef)
-        return {
+        const result = {
             ...base,
             critMode: ["expected", "crit", "nonCrit"].includes(event.critMode) ? event.critMode : "expected",
-            ...(skillRef ? { skillRef } : {}),
         }
+        if (["atk", "anomalyProficiency"].includes(event.damageBasis)) {
+            result.damageBasis = event.damageBasis
+        }
+        if (skillRef) {
+            result.skillRef = skillRef
+            return result
+        }
+        const skillMultiplier = Number(event.skillMultiplier ?? 100)
+        result.skillMultiplier = Number.isFinite(skillMultiplier) ? Math.max(0, skillMultiplier) : 100
+        const damageElement = String(event.damageElement ?? "").trim()
+        if (DAMAGE_ELEMENTS.has(damageElement)) {
+            result.damageElement = damageElement
+        }
+        return result
     }
     if (kind === "anomaly") {
         if (settlementType === "disorder") {
-            const elapsedSeconds = Number(event.elapsedSeconds ?? 0)
             return {
                 ...base,
                 settlementType: "disorder",
                 anomalyEffect: String(event.anomalyEffect ?? event.previousAnomalyEffect ?? "").trim(),
-                elapsedSeconds: Number.isFinite(elapsedSeconds) ? Math.max(0, elapsedSeconds) : 0,
+                disorderType: ["normal", "polarized"].includes(event.disorderType) ? event.disorderType : "normal",
+                elapsedSeconds: normalizeElapsedSeconds(
+                    event.elapsedSeconds,
+                    Number.POSITIVE_INFINITY,
+                    disorderElapsedStepSeconds(event, options),
+                ),
             }
         }
         const procCount = Number(event.procCount ?? 1)
@@ -602,35 +925,165 @@ function cleanCalculationEvent(event = {}, index = 0) {
             ...base,
             settlementType: "attribute",
             anomalyEffect: String(event.anomalyEffect ?? "").trim(),
+            anomalyVariant: event.anomalyVariant === "polarizedAssault" ? "polarizedAssault" : "normal",
             procCount: Number.isFinite(procCount) ? Math.max(0, procCount) : 1,
         }
     }
     return null
 }
 
-function cleanDefaultCalculationConfig(config = null) {
+function legacySkillGroupCount(config = {}, group = {}) {
+    const presets = Array.isArray(config.skillGroupPresets)
+        ? config.skillGroupPresets.filter(preset => preset && typeof preset === "object" && !Array.isArray(preset))
+        : []
+    const selectedPresetId = String(config.defaultSkillGroupPresetId ?? "").trim()
+    const preset = presets.find(item => String(item.id ?? "").trim() === selectedPresetId) ?? presets[0] ?? null
+    const presetCount = preset?.counts && typeof preset.counts === "object" && !Array.isArray(preset.counts)
+        ? Number(preset.counts[group.id])
+        : Number.NaN
+    return Number.isFinite(presetCount) ? Math.max(0, presetCount) : Number(group.defaultCount ?? 0)
+}
+
+function legacySkillGroupReferenceEvents(config = {}, skillGroups = []) {
+    return skillGroups.map((group, index) => ({
+        id: `${group.id}-ref-${index + 1}`,
+        kind: "skillGroup",
+        skillGroupId: group.id,
+        count: legacySkillGroupCount(config, group),
+    }))
+}
+
+function cleanDefaultCalculationConfigEntry(config = null, skillGroups = [], options = {}) {
     if (!config || typeof config !== "object" || Array.isArray(config)) {
         return null
     }
-    const events = Array.isArray(config.events)
-        ? config.events.map(cleanCalculationEvent).filter(Boolean)
+    const skillGroupIds = new Set(skillGroups.map(group => group.id).filter(Boolean))
+    let events = Array.isArray(config.events)
+        ? config.events.map((event, index) => cleanCalculationEvent(event, index, {
+            ...options,
+            allowSkillGroup: true,
+            skillGroupIds,
+        })).filter(Boolean)
         : []
+    if (!events.length && skillGroups.length) {
+        events = legacySkillGroupReferenceEvents(config, skillGroups)
+            .map((event, index) => cleanCalculationEvent(event, index, {
+                ...options,
+                allowSkillGroup: true,
+                skillGroupIds,
+            }))
+            .filter(Boolean)
+    }
     if (!events.length) {
         return null
     }
     const mode = ["single", "sheer", "anomaly", "custom"].includes(config.mode) ? config.mode : "custom"
     const selectedEventId = String(config.selectedEventId ?? events[0]?.id ?? "").trim()
-    return {
+    const cinemaLevel = normalizeDefaultCalculationCinemaLevel(config.cinemaLevel, options.defaultCinemaLevel ?? 0)
+    const name = config.name ? zhOnly(config.name) : defaultCalculationVariantName(cinemaLevel)
+    const result = {
         mode,
-        ...(config.name ? { name: zhOnly(config.name) } : {}),
-        selectedEventId: events.some(event => event.id === selectedEventId) ? selectedEventId : events[0].id,
+        ...(options.includeCinemaLevel ? { cinemaLevel } : {}),
+        ...(name ? { name } : {}),
         events,
     }
+    if (events.length) {
+        result.selectedEventId = events.some(event => event.id === selectedEventId) ? selectedEventId : events[0].id
+    }
+    return result
 }
 
-function cleanAgent(item = {}) {
+function cleanDefaultCalculationConfig(config = null, skillGroups = [], options = {}) {
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+        return null
+    }
+    const rawVariants = Array.isArray(config.variants) ? config.variants : []
+    const baseConfig = cleanDefaultCalculationConfigEntry(config, skillGroups, {
+        ...options,
+        defaultCinemaLevel: 0,
+        includeCinemaLevel: config.cinemaLevel !== undefined || rawVariants.length > 0,
+    })
+    if (!baseConfig) {
+        return null
+    }
+    const seenLevels = new Set([Number(baseConfig.cinemaLevel ?? 0)])
+    const variants = rawVariants
+        .map(variant => {
+            if (!variant || typeof variant !== "object" || Array.isArray(variant) || !isDefaultCalculationCinemaLevel(variant.cinemaLevel)) {
+                return null
+            }
+            const cinemaLevel = Number(variant.cinemaLevel)
+            if (seenLevels.has(cinemaLevel)) {
+                return null
+            }
+            const cleanVariant = cleanDefaultCalculationConfigEntry(variant, skillGroups, {
+                ...options,
+                defaultCinemaLevel: cinemaLevel,
+                includeCinemaLevel: true,
+            })
+            if (cleanVariant) {
+                seenLevels.add(cinemaLevel)
+            }
+            return cleanVariant
+        })
+        .filter(Boolean)
+        .sort((left, right) => Number(left.cinemaLevel ?? 0) - Number(right.cinemaLevel ?? 0))
+    if (variants.length) {
+        baseConfig.variants = variants
+    }
+    return baseConfig
+}
+
+function cleanCalculationSkillGroups(groups = [], options = {}) {
+    if (!Array.isArray(groups)) {
+        return []
+    }
+    return groups
+        .map((group, index) => {
+            if (!group || typeof group !== "object" || Array.isArray(group)) {
+                return null
+            }
+            const id = String(group.id ?? "").trim()
+            const events = Array.isArray(group.events)
+                ? group.events.map((event, eventIndex) => cleanCalculationEvent(event, eventIndex, {
+                    ...options,
+                    allowSkillGroup: false,
+                })).filter(Boolean)
+                : []
+            if (!id || !events.length) {
+                return null
+            }
+            return {
+                id,
+                ...(group.name ? { name: zhOnly(group.name) } : {}),
+                ...(cleanOptionalZh(group.description) ? { description: cleanOptionalZh(group.description) } : {}),
+                ...SYSTEM_MANAGED_SKILL_GROUP_COUNTS,
+                events,
+            }
+        })
+        .filter(Boolean)
+}
+
+function mergeCalculationSkillGroups(primaryGroups = [], legacyGroups = []) {
+    const groups = []
+    const seen = new Set()
+    for (const group of [...primaryGroups, ...legacyGroups]) {
+        if (!group?.id || seen.has(group.id)) {
+            continue
+        }
+        seen.add(group.id)
+        groups.push(group)
+    }
+    return groups
+}
+
+function cleanAgent(item = {}, options = {}) {
     const preferredDriveDiscs = cleanPreferredDriveDiscs(item.preferredDriveDiscs)
-    const defaultCalculationConfig = cleanDefaultCalculationConfig(item.defaultCalculationConfig)
+    const skillGroups = mergeCalculationSkillGroups(
+        cleanCalculationSkillGroups(item.skillGroups, options),
+        cleanCalculationSkillGroups(item.defaultCalculationConfig?.skillGroups, options),
+    )
+    const defaultCalculationConfig = cleanDefaultCalculationConfig(item.defaultCalculationConfig, skillGroups, options)
     const next = {
         ...item,
         name: zhOnly(item.name),
@@ -649,6 +1102,11 @@ function cleanAgent(item = {}) {
         next.preferredDriveDiscs = preferredDriveDiscs
     } else {
         delete next.preferredDriveDiscs
+    }
+    if (skillGroups.length) {
+        next.skillGroups = skillGroups
+    } else {
+        delete next.skillGroups
     }
     if (defaultCalculationConfig) {
         next.defaultCalculationConfig = defaultCalculationConfig
@@ -780,12 +1238,15 @@ function deleteAnomalyEffectByType(items, type, id) {
     return items.filter(item => !(item.id === id && anomalyMaintenanceType(item) === settlementType))
 }
 
-export function cleanMaintenanceItem(resource, item) {
+export function cleanMaintenanceItem(resource, item, options = {}) {
+    item = normalizeLegacyEffectAppliesToInValue(
+        normalizeSkillTargetsInValue(applySystemManagedMaintenanceFields(structuredClone(item ?? {}))),
+    )
     if (resource === "combat-buffs") {
         return cleanBuff(item)
     }
     if (resource === "field-buffs") {
-        return cleanFieldBuff(item)
+        return cleanFieldBuff(item, options)
     }
     if (resource === "boss-buffs") {
         return cleanBossBuff(item)
@@ -800,7 +1261,7 @@ export function cleanMaintenanceItem(resource, item) {
         return cleanDriveDiscSet(item)
     }
     if (resource === "agents") {
-        return cleanAgent(item)
+        return cleanAgent(item, options)
     }
     return item
 }
@@ -810,6 +1271,8 @@ function cleanTeammate(teammate = {}) {
     const next = {
         ...teammate,
         name: zhOnly(teammate.name),
+        attribute: String(teammate.attribute ?? "").trim(),
+        specialty: String(teammate.specialty ?? "").trim(),
     }
     if (Object.keys(images).length) {
         next.images = images
@@ -830,6 +1293,147 @@ function upsertById(items, item) {
     }
 
     return next
+}
+
+function ensureMaintenanceId(item, prefix) {
+    if (item && typeof item === "object" && !Array.isArray(item) && !String(item.id ?? "").trim()) {
+        item.id = randomId(prefix)
+    }
+    return item
+}
+
+function materializeEffectSetIds(effect) {
+    if (!effect || typeof effect !== "object" || Array.isArray(effect)) {
+        return effect
+    }
+    if (Array.isArray(effect.effects)) {
+        effect.effects = effect.effects.map(rule => ensureMaintenanceId(rule, "effect"))
+    }
+    if (Array.isArray(effect.buffModifiers)) {
+        effect.buffModifiers = effect.buffModifiers.map(modifier => ensureMaintenanceId(modifier, "modifier"))
+    }
+    return effect
+}
+
+function materializeCalculationEventIds(events = []) {
+    return Array.isArray(events)
+        ? events.map(event => ensureMaintenanceId(event, "event"))
+        : events
+}
+
+function materializeCalculationConfigIds(config) {
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+        return config
+    }
+    config.events = materializeCalculationEventIds(config.events)
+    if (Array.isArray(config.variants)) {
+        config.variants = config.variants.map(variant => materializeCalculationConfigIds(variant))
+    }
+    return config
+}
+
+function materializeAgentIds(item) {
+    ensureMaintenanceId(item, "agent")
+    const combatBuffs = item.combatBuffs ?? {}
+    materializeEffectSetIds(combatBuffs.corePassive)
+    materializeEffectSetIds(combatBuffs.additionalAbility)
+    if (Array.isArray(combatBuffs.cinemaBuffs)) {
+        combatBuffs.cinemaBuffs.forEach(materializeEffectSetIds)
+    }
+    if (Array.isArray(item.skillGroups)) {
+        item.skillGroups = item.skillGroups.map(group => {
+            ensureMaintenanceId(group, "skill_group")
+            group.events = materializeCalculationEventIds(group.events)
+            return group
+        })
+    }
+    materializeCalculationConfigIds(item.defaultCalculationConfig)
+    return item
+}
+
+function materializeAgentSkillIds(item) {
+    ensureMaintenanceId(item, "agent_skill")
+    if (!Array.isArray(item.categories)) {
+        return item
+    }
+    item.categories = item.categories.map(category => {
+        ensureMaintenanceId(category, "skill_category")
+        if (Array.isArray(category.moves)) {
+            category.moves = category.moves.map(move => {
+                ensureMaintenanceId(move, "skill_move")
+                if (Array.isArray(move.rows)) {
+                    move.rows = move.rows.map(row => ensureMaintenanceId(row, "skill_row"))
+                }
+                return move
+            })
+        }
+        return category
+    })
+    return item
+}
+
+function materializeWEngineIds(item) {
+    ensureMaintenanceId(item, "w_engine")
+    materializeEffectSetIds(item.effect?.selfBuff ?? item.effect?.buff)
+    materializeEffectSetIds(item.effect?.teamBuff)
+    return item
+}
+
+function materializeDriveDiscSetIds(item) {
+    ensureMaintenanceId(item, "drive_disc_set")
+    materializeEffectSetIds(item.twoPiece)
+    materializeEffectSetIds(item.fourPiece)
+    materializeEffectSetIds(item.fourPiece?.selfBuff)
+    materializeEffectSetIds(item.fourPiece?.teamBuff)
+    return item
+}
+
+function materializeBuffIds(item, prefix = "buff") {
+    ensureMaintenanceId(item, prefix)
+    materializeEffectSetIds(item)
+    return item
+}
+
+function materializeMaintenanceItem(resource, input = {}) {
+    const item = applySystemManagedMaintenanceFields(structuredClone(input ?? {}))
+    if (resource === "agents") {
+        return materializeAgentIds(item)
+    }
+    if (resource === "agent-skills") {
+        return materializeAgentSkillIds(item)
+    }
+    if (resource === "w-engines") {
+        return materializeWEngineIds(item)
+    }
+    if (resource === "drive-disc-sets") {
+        return materializeDriveDiscSetIds(item)
+    }
+    if (resource === "anomaly-effects") {
+        const prefix = item.settlementType === "disorder" || item.maintenanceType === "disorder"
+            ? "disorder"
+            : "anomaly"
+        return ensureMaintenanceId(item, prefix)
+    }
+    if (resource === "field-buffs") {
+        materializeEffectSetIds(item)
+        return item
+    }
+    if (resource === "boss-buffs") {
+        return materializeBuffIds(item, "boss_buff")
+    }
+    return item
+}
+
+function materializeTeammateBuffInput(input = {}) {
+    const next = applySystemManagedMaintenanceFields(structuredClone(input ?? {}))
+    ensureMaintenanceId(next.teammate ??= {}, "teammate")
+    materializeBuffIds(next.buff ??= {}, "buff")
+    return next
+}
+
+function existingMaintenanceOriginalId(item = {}, items = []) {
+    const originalId = String(item?._maintenanceOriginalId ?? "").trim()
+    return originalId && items.some(entry => entry?.id === originalId) ? originalId : ""
 }
 
 function deleteById(items, id) {
@@ -857,33 +1461,37 @@ function cleanAnomalyMaintenanceItem(item = {}) {
     }
 }
 
-async function saveAnomalyMaintenanceItem(item) {
-    const payload = await readDataFile("anomaly_effects.json")
-    const settlementType = anomalyMaintenanceType(item)
-    assertValidMaintenanceItem("anomaly-effects", item, {
-        items: anomalyEffectsForType(payload, settlementType),
-        currentId: item?.id,
+async function saveAnomalyMaintenanceItem(input) {
+    const item = materializeMaintenanceItem("anomaly-effects", input)
+    return mutateDataFile("anomaly_effects.json", payload => {
+        const settlementType = anomalyMaintenanceType(item)
+        assertValidMaintenanceItem("anomaly-effects", item, {
+            items: anomalyEffectsForType(payload, settlementType),
+            currentId: item?.id,
+        })
+        const { cleaned, savedItem } = cleanAnomalyMaintenanceItem(item)
+        const nextPayload = anomalyPayloadWithEffects(
+            payload,
+            upsertAnomalyEffect(rawAnomalyEffectsFromPayload(payload), cleaned),
+        )
+        return {
+            payload: nextPayload,
+            value: {
+                payload: nextPayload,
+                savedItem,
+            },
+        }
     })
-    const { cleaned, savedItem } = cleanAnomalyMaintenanceItem(item)
-    const nextPayload = anomalyPayloadWithEffects(
-        payload,
-        upsertAnomalyEffect(rawAnomalyEffectsFromPayload(payload), cleaned),
-    )
-    await writeDataFile("anomaly_effects.json", nextPayload)
-    return {
-        payload: nextPayload,
-        savedItem,
-    }
 }
 
 async function deleteAnomalyMaintenanceItem(maintenanceType, id) {
-    const payload = await readDataFile("anomaly_effects.json")
-    const nextPayload = anomalyPayloadWithEffects(
-        payload,
-        deleteAnomalyEffectByType(rawAnomalyEffectsFromPayload(payload), maintenanceType, id),
-    )
-    await writeDataFile("anomaly_effects.json", nextPayload)
-    return nextPayload
+    return mutateDataFile("anomaly_effects.json", payload => {
+        const nextPayload = anomalyPayloadWithEffects(
+            payload,
+            deleteAnomalyEffectByType(rawAnomalyEffectsFromPayload(payload), maintenanceType, id),
+        )
+        return { payload: nextPayload, value: nextPayload }
+    })
 }
 
 async function saveMaintenanceItem(resource, item) {
@@ -891,35 +1499,53 @@ async function saveMaintenanceItem(resource, item) {
         return saveAnomalyMaintenanceItem(item)
     }
 
+    item = materializeMaintenanceItem(resource, item)
     const config = maintenanceResources[resource]
     if (!config) {
         throw new Error(`Unsupported maintenance resource: ${resource}`)
     }
 
-    const payload = await readDataFile(config.fileName)
-    const validationContext = {
-        items: payload[config.collectionKey] ?? [],
-        currentId: item?.id,
-    }
-    if (resource === "agents") {
-        const [agentSkillsPayload, anomalyEffectsPayload, driveDiscSetsPayload] = await Promise.all([
-            readDataFile("agent_skills.json"),
-            readDataFile("anomaly_effects.json"),
-            readDataFile("drive_disc_sets.json"),
-        ])
-        validationContext.agentSkills = agentSkillsPayload.agentSkills ?? []
-        validationContext.anomalyEffects = anomalyEffectsForType(anomalyEffectsPayload, "attribute")
-        validationContext.disorderEffects = anomalyEffectsForType(anomalyEffectsPayload, "disorder")
-        validationContext.driveDiscSets = driveDiscSetsPayload.sets ?? []
-    }
-    assertValidMaintenanceItem(resource, item, validationContext)
-    const savedItem = cleanMaintenanceItem(resource, item)
-    payload[config.collectionKey] = upsertById(payload[config.collectionKey] ?? [], savedItem)
-    await writeDataFile(config.fileName, payload)
-    return {
-        payload,
-        savedItem,
-    }
+    return mutateDataFile(config.fileName, async payload => {
+        const collection = payload[config.collectionKey] ?? []
+        const fieldBuffOriginalId = resource === "field-buffs"
+            ? existingMaintenanceOriginalId(item, collection)
+            : ""
+        const cleanOptions = fieldBuffOriginalId ? { originalId: fieldBuffOriginalId } : {}
+        const validationContext = {
+            items: collection,
+            currentId: fieldBuffOriginalId || item?.id,
+        }
+        const normalizedItem = normalizeSkillTargetsInValue(item)
+        if (resource !== "agent-skills") {
+            const agentSkillsPayload = await readDataFile("agent_skills.json")
+            validationContext.agentSkills = agentSkillsPayload.agentSkills ?? []
+        }
+        if (resource === "agents") {
+            const [anomalyEffectsPayload, driveDiscSetsPayload] = await Promise.all([
+                readDataFile("anomaly_effects.json"),
+                readDataFile("drive_disc_sets.json"),
+            ])
+            validationContext.anomalyEffects = anomalyEffectsForType(anomalyEffectsPayload, "attribute")
+            validationContext.disorderEffects = anomalyEffectsForType(anomalyEffectsPayload, "disorder")
+            validationContext.driveDiscSets = driveDiscSetsPayload.sets ?? []
+            cleanOptions.anomalyEffects = validationContext.anomalyEffects
+            cleanOptions.disorderEffects = validationContext.disorderEffects
+        }
+        const itemForValidation = cleanMaintenanceItem(resource, normalizedItem, cleanOptions)
+        assertValidMaintenanceItem(resource, itemForValidation, validationContext)
+        const savedItem = itemForValidation
+        const nextPayload = {
+            ...payload,
+            [config.collectionKey]: upsertById(collection, savedItem),
+        }
+        return {
+            payload: nextPayload,
+            value: {
+                payload: nextPayload,
+                savedItem,
+            },
+        }
+    })
 }
 
 async function deleteMaintenanceItem(resource, id) {
@@ -932,66 +1558,89 @@ async function deleteMaintenanceItem(resource, id) {
         throw new Error(`Unsupported maintenance resource: ${resource}`)
     }
 
-    const payload = await readDataFile(config.fileName)
-    payload[config.collectionKey] = deleteById(payload[config.collectionKey] ?? [], id)
-    await writeDataFile(config.fileName, payload)
-    return payload
+    return mutateDataFile(config.fileName, payload => {
+        const nextPayload = {
+            ...payload,
+            [config.collectionKey]: deleteById(payload[config.collectionKey] ?? [], id),
+        }
+        return { payload: nextPayload, value: nextPayload }
+    })
 }
 
 async function saveTeammateBuff(input) {
-    const payload = await readDataFile("combat_buffs.json")
-    assertValidMaintenanceItem("teammate-buffs", input, {
-        teammates: payload.teammates ?? [],
-        currentBuffId: input?.buff?.id,
+    input = normalizeSkillTargetsInValue(materializeTeammateBuffInput(input))
+    const agentSkillsPayload = await readDataFile("agent_skills.json")
+    return mutateDataFile("combat_buffs.json", payload => {
+        const teammate = cleanTeammate(input?.teammate ?? {})
+        const buff = cleanMaintenanceItem("combat-buffs", input?.buff ?? {})
+        const cleanedInput = { ...input, teammate, buff }
+        assertValidMaintenanceItem("teammate-buffs", cleanedInput, {
+            teammates: payload.teammates ?? [],
+            currentBuffId: buff.id,
+            agentSkills: agentSkillsPayload.agentSkills ?? [],
+        })
+        delete buff.sourceLabel
+        const teammateId = requireId(teammate, "teammate")
+        requireId(buff, "buff")
+
+        const teammates = [...(payload.teammates ?? [])]
+        const index = teammates.findIndex(item => item.id === teammateId)
+        const nextTeammate = {
+            ...(index >= 0 ? teammates[index] : {}),
+            ...teammate,
+            id: teammateId,
+            buffs: upsertById(index >= 0 ? teammates[index].buffs ?? [] : [], buff),
+        }
+
+        if (index >= 0) {
+            teammates[index] = nextTeammate
+        } else {
+            teammates.push(nextTeammate)
+        }
+
+        const nextPayload = { ...payload, teammates }
+        return {
+            payload: nextPayload,
+            value: {
+                payload: nextPayload,
+                savedItem: {
+                    ...buff,
+                    maintenanceType: "teammate",
+                    teammateId,
+                    teammateName: teammate.name,
+                },
+            },
+        }
     })
-    const teammate = cleanTeammate(input?.teammate ?? {})
-    const buff = cleanBuff(input?.buff ?? {})
-    delete buff.sourceLabel
-    const teammateId = requireId(teammate, "teammate")
-    requireId(buff, "buff")
-
-    const teammates = [...(payload.teammates ?? [])]
-    const index = teammates.findIndex(item => item.id === teammateId)
-    const nextTeammate = {
-        ...(index >= 0 ? teammates[index] : {}),
-        ...teammate,
-        id: teammateId,
-        buffs: upsertById(index >= 0 ? teammates[index].buffs ?? [] : [], buff),
-    }
-
-    if (index >= 0) {
-        teammates[index] = nextTeammate
-    } else {
-        teammates.push(nextTeammate)
-    }
-
-    payload.teammates = teammates
-    await writeDataFile("combat_buffs.json", payload)
-    return {
-        payload,
-        savedItem: {
-            ...buff,
-            maintenanceType: "teammate",
-            teammateId,
-            teammateName: teammate.name,
-        },
-    }
 }
 
 async function deleteTeammateBuff(teammateId, buffId) {
-    const payload = await readDataFile("combat_buffs.json")
-    payload.teammates = (payload.teammates ?? []).map(teammate => {
-        if (teammate.id !== teammateId) {
-            return teammate
-        }
+    return mutateDataFile("combat_buffs.json", payload => {
+        const nextPayload = {
+            ...payload,
+            teammates: (payload.teammates ?? []).map(teammate => {
+                if (teammate.id !== teammateId) {
+                    return teammate
+                }
 
-        return {
-            ...teammate,
-            buffs: deleteById(teammate.buffs ?? [], buffId),
+                return {
+                    ...teammate,
+                    buffs: deleteById(teammate.buffs ?? [], buffId),
+                }
+            }),
         }
+        return { payload: nextPayload, value: nextPayload }
     })
-    await writeDataFile("combat_buffs.json", payload)
-    return payload
+}
+
+async function deleteTeammate(teammateId) {
+    return mutateDataFile("combat_buffs.json", payload => {
+        const nextPayload = {
+            ...payload,
+            teammates: (payload.teammates ?? []).filter(teammate => teammate.id !== teammateId),
+        }
+        return { payload: nextPayload, value: nextPayload }
+    })
 }
 
 function contentType(filePath) {
@@ -1019,61 +1668,178 @@ function contentType(filePath) {
     }
 }
 
-async function serveStatic(res, pathname) {
-    if (!isMaintenanceEnabled() && isMaintenanceStaticPath(pathname)) {
-        sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
-        return
-    }
+function isSafeStaticPath(root, absPath) {
+    const relativePath = path.relative(root, absPath)
+    return !(relativePath.startsWith("..") || path.isAbsolute(relativePath))
+}
 
+function streamFileResponse(res, absPath, headers = {}) {
+    return new Promise(resolve => {
+        const stream = createReadStream(absPath)
+        let settled = false
+        const finish = () => {
+            if (settled) return
+            settled = true
+            resolve()
+        }
+        stream.once("open", () => {
+            applyDefaultCors(res)
+            res.writeHead(200, headers)
+            stream.pipe(res)
+        })
+        stream.once("error", error => {
+            if (!res.headersSent) {
+                sendText(res, error?.code === "ENOENT" ? 404 : 500, error?.code === "ENOENT" ? "Not Found" : "File read failed", "text/plain; charset=utf-8")
+            } else {
+                res.destroy(error)
+            }
+            finish()
+        })
+        stream.once("end", finish)
+        res.once("close", finish)
+    })
+}
+
+function staticCacheControl(absPath) {
+    const relativePath = path.relative(pagesDir, absPath).split(path.sep).join("/")
+    if (path.extname(absPath).toLowerCase() === ".html") {
+        return "no-store"
+    }
+    if (relativePath.startsWith("static/app/") && /\.(?:js|css)$/i.test(relativePath)) {
+        return "public, max-age=31536000, immutable"
+    }
+    return "no-cache"
+}
+
+function streamStaticFile(res, absPath) {
+    return streamFileResponse(res, absPath, {
+        "Content-Type": contentType(absPath),
+        "Cache-Control": staticCacheControl(absPath),
+    })
+}
+
+function resolveStaticCandidate(root, fileName) {
+    const absPath = path.resolve(root, fileName)
+    if (!isSafeStaticPath(root, absPath)) {
+        return { forbidden: true, absPath }
+    }
+    try {
+        const fileStat = statSync(absPath)
+        return {
+            forbidden: false,
+            absPath,
+            exists: fileStat.isFile(),
+            isDirectory: fileStat.isDirectory(),
+        }
+    } catch {
+        return { forbidden: false, absPath, exists: false, isDirectory: false }
+    }
+}
+
+async function serveStatic(res, pathname) {
+    if (pathname === "/maintenance" || pathname === "/maintenance/" || pathname === "/maintenance.html") {
+        if (!isMaintenanceEnabled()) {
+            sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
+            return
+        }
+        if (pathname !== "/maintenance") {
+            sendRedirect(res, "/maintenance")
+            return
+        }
+    }
     if (pathname === "/calculate.html") {
         sendRedirect(res, "/")
         return
     }
-
-    const fileName = pathname === "/" ? "index.html" : pathname.replace(/^\//, "")
-    const absPath = path.resolve(frontendDir, fileName)
-    const relativePath = path.relative(frontendDir, absPath)
-    if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
-        sendText(res, 403, "Forbidden", "text/plain; charset=utf-8")
+    if (pathname === "/drive-discs.html") {
+        sendRedirect(res, "/discs")
+        return
+    }
+    if (pathname === "/accounts.html") {
+        sendRedirect(res, "/accounts")
         return
     }
 
-    if (!existsSync(absPath)) {
+    if (isLegacyMaintenanceStaticPath(pathname)) {
         sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
         return
     }
 
-    res.writeHead(200, {
-        "Content-Type": contentType(absPath),
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-    })
-    createReadStream(absPath).pipe(res)
+    const fileName = pathname === "/" ? "index.html" : pathname.replace(/^\//, "")
+
+    const candidate = resolveStaticCandidate(pagesDir, fileName)
+    if (candidate.forbidden) {
+        sendText(res, 403, "Forbidden", "text/plain; charset=utf-8")
+        return
+    }
+    if (candidate.isDirectory) {
+        sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
+        return
+    }
+    if (candidate.exists) {
+        await streamStaticFile(res, candidate.absPath)
+        return
+    }
+
+    const spaIndex = path.join(pagesDir, "index.html")
+    if (!path.extname(pathname) && existsSync(spaIndex)) {
+        await streamStaticFile(res, spaIndex)
+        return
+    }
+
+    if (!existsSync(spaIndex) && !path.extname(pathname)) {
+        sendText(res, 503, "Vue build not found. Run `npm run build:webapp` before `npm run serve`.", "text/plain; charset=utf-8")
+        return
+    }
+
+    sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
 }
 
 async function serveDownload(res, pathname) {
     const fileName = pathname.replace(/^\/downloads\//, "")
-    const absPath = path.resolve(downloadsDir, fileName)
-    const relativePath = path.relative(downloadsDir, absPath)
-    if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
-        sendText(res, 403, "Forbidden", "text/plain; charset=utf-8")
+    for (const root of [path.join(pagesDir, "downloads"), downloadsDir]) {
+        const absPath = path.resolve(root, fileName)
+        if (!isSafeStaticPath(root, absPath)) {
+            sendText(res, 403, "Forbidden", "text/plain; charset=utf-8")
+            return
+        }
+        if (!existsSync(absPath)) {
+            continue
+        }
+        const stat = await import("node:fs/promises").then(m => m.stat(absPath))
+        if (!stat.isFile()) {
+            continue
+        }
+        await streamFileResponse(res, absPath, {
+            "Content-Type": contentType(absPath),
+            "Content-Disposition": `attachment; filename="${encodeURIComponent(path.basename(absPath))}"`,
+            "Content-Length": stat.size,
+        })
         return
     }
-    if (!existsSync(absPath)) {
-        sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
-        return
-    }
-    const stat = await import("node:fs/promises").then(m => m.stat(absPath))
-    res.writeHead(200, {
-        "Content-Type": "application/octet-stream",
-        "Content-Disposition": `attachment; filename="${encodeURIComponent(path.basename(absPath))}"`,
-        "Content-Length": stat.size,
-    })
-    createReadStream(absPath).pipe(res)
+    sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
 }
 
 async function routeApi(req, res, pathname) {
+    if (!isMaintenanceEnabled() && pathname.startsWith("/api/maintenance/")) {
+        sendJson(res, 403, {
+            ok: false,
+            error: "Maintenance is disabled in production.",
+        })
+        return
+    }
+
+    if (isMaintenanceWriteRequest(req, pathname)) {
+        if (!isAllowedMaintenanceOrigin(req)) {
+            sendJson(res, 403, {
+                ok: false,
+                error: "Cross-origin maintenance writes are not allowed.",
+            })
+            return
+        }
+        applyMaintenanceCors(req, res)
+    }
+
     if (req.method === "OPTIONS") {
         sendText(res, 204, "", "text/plain; charset=utf-8")
         return
@@ -1101,14 +1867,6 @@ async function routeApi(req, res, pathname) {
 
     if (req.method === "GET" && pathname === "/api/catalog") {
         sendJson(res, 200, catalog)
-        return
-    }
-
-    if (!isMaintenanceEnabled() && pathname.startsWith("/api/maintenance/")) {
-        sendJson(res, 403, {
-            ok: false,
-            error: "Maintenance is disabled in production.",
-        })
         return
     }
 
@@ -1175,7 +1933,7 @@ async function routeApi(req, res, pathname) {
     }
 
     if (pathname.startsWith("/api/accounts/")) {
-        const id = decodeURIComponent(pathname.slice("/api/accounts/".length))
+        const id = pathname.slice("/api/accounts/".length)
         if (!id) {
             sendJson(res, 400, {
                 ok: false,
@@ -1221,12 +1979,13 @@ async function routeApi(req, res, pathname) {
     }
 
     if (req.method === "GET" && pathname === "/api/maintenance/catalog") {
-        const [agents, agentSkills, wEngines, driveDiscSets, combatBuffs, anomalyEffects] = await Promise.all([
+        const [agents, agentSkills, wEngines, driveDiscSets, combatBuffs, bosses, anomalyEffects] = await Promise.all([
             readDataFile("agents.json"),
             readDataFile("agent_skills.json"),
             readDataFile("w_engines.json"),
             readDataFile("drive_disc_sets.json"),
             readDataFile("combat_buffs.json"),
+            readDataFile("bosses.json"),
             readDataFile("anomaly_effects.json"),
         ])
         sendJson(res, 200, {
@@ -1237,6 +1996,7 @@ async function routeApi(req, res, pathname) {
                 wEngines,
                 driveDiscSets,
                 combatBuffs,
+                bosses,
                 anomalyEffects,
                 meta: buildMeta(catalog),
             },
@@ -1253,11 +2013,15 @@ async function routeApi(req, res, pathname) {
                 const body = JSON.parse(await readBody(req) || "{}")
                 const result = resource === "teammate-buffs"
                     ? await saveTeammateBuff(body)
-                    : await saveMaintenanceItem(resource, body)
+                    : resource === "boss-buffs" && body?.boss && body?.encounter
+                        ? await saveBossEncounter(body)
+                        : await saveMaintenanceItem(resource, body)
                 sendJson(res, 200, {
                     ok: true,
                     data: result.payload,
                     savedItem: result.savedItem,
+                    ...(result.savedBoss ? { savedBoss: result.savedBoss } : {}),
+                    ...(result.savedEncounter ? { savedEncounter: result.savedEncounter } : {}),
                     meta: buildMeta(catalog),
                 })
                 return
@@ -1265,11 +2029,17 @@ async function routeApi(req, res, pathname) {
 
             if (req.method === "DELETE") {
                 if (resource === "teammate-buffs") {
-                    await deleteTeammateBuff(decodeURIComponent(parts[1] ?? ""), decodeURIComponent(parts[2] ?? ""))
+                    if (parts[2]) {
+                        await deleteTeammateBuff(parts[1] ?? "", parts[2])
+                    } else {
+                        await deleteTeammate(parts[1] ?? "")
+                    }
+                } else if (resource === "boss-buffs") {
+                    await deleteBossMaintenanceItem(parts[1] ?? "", parts[2] ?? "")
                 } else if (resource === "anomaly-effects") {
-                    await deleteAnomalyMaintenanceItem(decodeURIComponent(parts[1] ?? "anomaly"), decodeURIComponent(parts[2] ?? ""))
+                    await deleteAnomalyMaintenanceItem(parts[1] ?? "anomaly", parts[2] ?? "")
                 } else {
-                    await deleteMaintenanceItem(resource, decodeURIComponent(parts[1] ?? ""))
+                    await deleteMaintenanceItem(resource, parts[1] ?? "")
                 }
                 sendJson(res, 200, {
                     ok: true,
@@ -1436,7 +2206,7 @@ async function routeApi(req, res, pathname) {
     }
 
     if (pathname.startsWith("/api/optimize/drive-discs/jobs/")) {
-        const id = decodeURIComponent(pathname.slice("/api/optimize/drive-discs/jobs/".length))
+        const id = pathname.slice("/api/optimize/drive-discs/jobs/".length)
         const job = optimizerJobs.get(id)
         if (!id || !job) {
             sendJson(res, 404, {
@@ -1539,7 +2309,7 @@ async function routeApi(req, res, pathname) {
     }
 
     if (pathname.startsWith("/api/user-drive-disc-loadouts/")) {
-        const id = decodeURIComponent(pathname.slice("/api/user-drive-disc-loadouts/".length))
+        const id = pathname.slice("/api/user-drive-disc-loadouts/".length)
         if (!id) {
             sendJson(res, 400, {
                 ok: false,
@@ -1630,7 +2400,7 @@ async function routeApi(req, res, pathname) {
     }
 
     if (pathname.startsWith("/api/user-drive-discs/")) {
-        const id = decodeURIComponent(pathname.slice("/api/user-drive-discs/".length))
+        const id = pathname.slice("/api/user-drive-discs/".length)
         if (!id) {
             sendJson(res, 400, {
                 ok: false,
@@ -1680,10 +2450,22 @@ async function routeApi(req, res, pathname) {
 const downloadsDir = path.join(rootDir, "downloads")
 
 const server = createServer(async (req, res) => {
-    const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`)
-    const pathname = decodeURIComponent(url.pathname)
-
     try {
+        const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`)
+        let pathname
+        try {
+            pathname = decodeURIComponent(url.pathname)
+        } catch (error) {
+            if (error instanceof URIError) {
+                sendJson(res, 400, {
+                    ok: false,
+                    error: "Malformed URL encoding.",
+                })
+                return
+            }
+            throw error
+        }
+
         if (pathname.startsWith("/api/")) {
             await routeApi(req, res, pathname)
             return
@@ -1704,7 +2486,10 @@ const server = createServer(async (req, res) => {
 })
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-    server.listen(port, () => {
-        console.log(`ZZZ calculator running at http://localhost:${port}`)
+    if (!existsSync(path.join(pagesDir, "index.html"))) {
+        console.warn("Vue build not found. Run `npm run build:webapp` before `npm run serve`.")
+    }
+    server.listen(port, host, () => {
+        console.log(`ZZZ calculator running at http://${host}:${port}`)
     })
 }

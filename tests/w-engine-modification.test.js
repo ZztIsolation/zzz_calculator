@@ -14,7 +14,7 @@ import {
     materializeWEngineForModificationLevel as materializeFrontendWEngine,
     runtimeStackGroups,
     storedEffectRulesText,
-} from "../frontend/shared-combat.js"
+} from "../core/shared-combat.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
@@ -72,6 +72,8 @@ const expectedModificationValues = {
     "zzz_wiki_1753:teamBuff:effect_wiki_1753_team_crit_dmg:value": [30, 34.5, 39, 43.5, 48],
     "zzz_wiki_1689:selfBuff:effect_wiki_1689_self_daze:valuePerStack": [9, 10.3, 11.7, 13, 14.5],
     "zzz_wiki_1689:teamBuff:effect_wiki_1689_team_crit_dmg:value": [30, 34.5, 39, 43.5, 48],
+    "zzz_wiki_951:teamBuff:effect_wiki_951_team_crit_dmg_iceCritDmg:valuePerStack": [1.5, 1.72, 1.95, 2.17, 2.4],
+    "zzz_wiki_951:teamBuff:effect_wiki_951_team_crit_dmg_fireCritDmg:valuePerStack": [1.5, 1.72, 1.95, 2.17, 2.4],
     "zzz_wiki_486:teamBuff:effect_wiki_486_team_atk:valuePerStack": [2.5, 2.8, 3.2, 3.6, 4],
     "neon_fantasies:selfBuff:effect_8a81aef020:value": [90, 103, 117, 130, 145],
     "neon_fantasies:selfBuff:effect_neon_fantasies_self_ap_bonus:value": [60, 69, 78, 87, 96],
@@ -233,7 +235,38 @@ const tenfoldRank4 = createInCombatPanelCalculator(catalog, {
     },
 }).calculate([], { round: false })
 approx(tenfoldRank4.inCombat.buffTotals.anomalyMasteryFlat, 87, "Tenfold rank 4 anomaly mastery should scale")
+approx(tenfoldRank4.inCombat.buffTotals.anomalyMasteryPct, 0, "Tenfold fixed mastery should not enter the percentage bucket")
+approx(tenfoldRank4.outOfCombat.panel.anomalyMastery, 106, "Alice core skill none should retain the agent mastery base")
+approx(tenfoldRank4.inCombat.panel.anomalyMastery, 193, "Tenfold fixed mastery should add after percentage scaling")
 approx(tenfoldRank4.inCombat.buffTotals.physicalDmg, 0.58, "Tenfold rank 4 physical damage should scale per stack")
+
+const neonMastery = calculateOutOfCombatPanel(catalog, {
+    agentId: "anby_demara",
+    coreSkillLevel: "none",
+    wEngineId: "neon_fantasies",
+    driveDiscs: [],
+})
+approx(neonMastery.bonusTotals.anomalyMasteryPct, 0.3, "W-Engine advanced mastery should use the percentage bucket")
+approx(neonMastery.bonusTotals.anomalyMasteryFlat, 0, "W-Engine advanced mastery should not enter the flat bucket")
+approx(
+    neonMastery.panel.anomalyMastery,
+    Number(catalog.agentsMap.get("anby_demara").level60.anomalyMastery) * 1.3,
+    "W-Engine advanced mastery should scale the agent base",
+)
+
+const roaringRideMastery = createInCombatPanelCalculator(catalog, {
+    agentId: "alice_thymefield",
+    coreSkillLevel: "F",
+    wEngineId: "zzz_wiki_494",
+    wEngineModificationLevel: 1,
+    combatBuffs: {
+        activeBuffIds: ["wEngine:zzz_wiki_494.self"],
+    },
+}).calculate([], { round: false })
+approx(roaringRideMastery.outOfCombat.panel.anomalyMastery, 142, "Alice core mastery should form the out-of-combat white stat")
+approx(roaringRideMastery.inCombat.buffTotals.anomalyMasteryPct, 0.25, "Roaring Ride mastery should use the combat percentage bucket")
+approx(roaringRideMastery.inCombat.buffTotals.anomalyMasteryFlat, 0, "Roaring Ride mastery should not enter the combat flat bucket")
+approx(roaringRideMastery.inCombat.panel.anomalyMastery, 177.5, "Combat mastery percentage should scale the out-of-combat panel")
 
 const stunRank5 = createInCombatPanelCalculator(catalog, {
     agentId: "anby_demara",
@@ -256,7 +289,7 @@ assert.deepEqual(
 )
 assert.equal(
     storedEffectRulesText(qingmingRank5Engine.effect.selfBuff, defaultRuntimeForBuff(qingmingRank5Engine.effect.selfBuff), meta),
-    "暴击率% +32%，以太伤害加成% +25.6%（2/2 层，覆盖率 1），以太贯穿增伤% +32%（2/2 层，覆盖率 1）",
+    "暴击率% +32%，以太伤害加成% +25.6%（2/2 层），以太贯穿增伤% +32%（技能：特殊技；终结技）（2/2 层）",
     "Yunliu rank 5 default preview should apply both shared-stack effects at two stacks",
 )
 const qingmingOneStackRuntime = defaultRuntimeForBuff(qingmingRank5Engine.effect.selfBuff)
@@ -264,7 +297,7 @@ qingmingOneStackRuntime.effects.effect_wiki_1342_self_ether_dmg.stacks = 1
 qingmingOneStackRuntime.effects.effect_wiki_1342_self_ether_sheer.stacks = 1
 assert.equal(
     storedEffectRulesText(qingmingRank5Engine.effect.selfBuff, qingmingOneStackRuntime, meta),
-    "暴击率% +32%，以太伤害加成% +12.8%（1/2 层，覆盖率 1），以太贯穿增伤% +16%（1/2 层，覆盖率 1）",
+    "暴击率% +32%，以太伤害加成% +12.8%（1/2 层），以太贯穿增伤% +16%（技能：特殊技；终结技）（1/2 层）",
     "Yunliu rank 5 one-stack preview should apply the same selected stack count to both effects",
 )
 const qingmingRank5 = calculateInCombatPanel(catalog, {
@@ -485,5 +518,75 @@ const defenseRank5 = createInCombatPanelCalculator(defenseCatalog, {
 approx(defenseRank5.inCombat.buffTotals.atkPctOutOfCombat, 0.16, "Sweet Snow Bunny rank 5 team ATK should scale")
 approx(defenseRank5.inCombat.buffTotals.hpPctOutOfCombat, 0.16, "Sweet Snow Bunny rank 5 team HP should scale")
 approx(defenseRank5.inCombat.buffTotals.critDmg, 0.48, "Sweet Snow Bunny rank 5 team CRIT DMG should scale")
+
+function externalSweetSnowBunnyAtRank(level) {
+    const calculator = createInCombatPanelCalculator(defenseCatalog, {
+        agentId: "ye_shunguang",
+        coreSkillLevel: "none",
+        wEngineId: "cloudcleave_radiance",
+        wEngineModificationLevel: 1,
+        combatBuffs: {
+            activeBuffIds: ["wEngine:zzz_wiki_1753.team"],
+            wEngineTeamModificationLevels: {
+                "wEngine:zzz_wiki_1753.team": level,
+            },
+        },
+        damage: {
+            skillMultiplier: 100,
+            critMode: "crit",
+            target: {
+                defense: 953,
+                levelCoefficient: 794,
+            },
+        },
+    })
+    return {
+        result: calculator.calculate([], { round: false }),
+        score: calculator.scoreOnlyFromSummary(new Map(), new Map()),
+    }
+}
+
+const externalSweetSnowRanks = [1, 3, 5].map(externalSweetSnowBunnyAtRank)
+for (const [index, expected] of [
+    { atk: 0.1, hp: 0.1, critDmg: 0.3 },
+    { atk: 0.13, hp: 0.13, critDmg: 0.39 },
+    { atk: 0.16, hp: 0.16, critDmg: 0.48 },
+].entries()) {
+    const totals = externalSweetSnowRanks[index].result.inCombat.buffTotals
+    approx(totals.atkPctOutOfCombat, expected.atk, `External Sweet Snow Bunny rank ${index * 2 + 1} ATK should scale`)
+    approx(totals.hpPctOutOfCombat, expected.hp, `External Sweet Snow Bunny rank ${index * 2 + 1} HP should scale`)
+    approx(totals.critDmg, expected.critDmg, `External Sweet Snow Bunny rank ${index * 2 + 1} CRIT DMG should scale`)
+}
+assert.ok(
+    externalSweetSnowRanks[1].score.finalDamage > externalSweetSnowRanks[0].score.finalDamage
+        && externalSweetSnowRanks[2].score.finalDamage > externalSweetSnowRanks[1].score.finalDamage,
+    "Optimizer score path should use the selected external Sweet Snow Bunny refinement",
+)
+
+const languishEngine = materializeFrontendWEngine(wEngine("zzz_wiki_951"), 1)
+const languishGroups = runtimeStackGroups(languishEngine.effect.teamBuff)
+assert.deepEqual(
+    languishGroups.map(group => group.ruleIds),
+    [["effect_wiki_951_team_crit_dmg_iceCritDmg", "effect_wiki_951_team_crit_dmg_fireCritDmg"]],
+    "Ice and fire CRIT DMG rules should share Languish stacks",
+)
+const languishDamage = createInCombatPanelCalculator(catalog, {
+    agentId: "anby_demara",
+    coreSkillLevel: "none",
+    wEngineId: "zzz_wiki_951",
+    wEngineModificationLevel: 1,
+    combatBuffs: { activeBuffIds: ["wEngine:zzz_wiki_951.team"] },
+    damage: {
+        selectedEventId: "ice",
+        events: [
+            { id: "ice", kind: "direct", damageElement: "ice", skillMultiplier: 1, critMode: "crit" },
+            { id: "fire", kind: "direct", damageElement: "fire", skillMultiplier: 1, critMode: "crit" },
+            { id: "electric", kind: "direct", damageElement: "electric", skillMultiplier: 1, critMode: "crit" },
+        ],
+    },
+}).calculate([], { round: false })
+const languishEvents = Object.fromEntries(languishDamage.damage.events.map(event => [event.id, event]))
+approx(languishEvents.ice.multipliers.critDmg, languishEvents.electric.multipliers.critDmg + 0.3, "Languish should boost ice CRIT DMG")
+approx(languishEvents.fire.multipliers.critDmg, languishEvents.electric.multipliers.critDmg + 0.3, "Languish should boost fire CRIT DMG")
 
 console.log("w-engine modification tests passed")

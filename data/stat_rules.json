@@ -66,6 +66,10 @@
       "label": "PEN Ratio%",
       "display": "percent"
     },
+    "allResIgnore": {
+      "label": "All-Attribute RES Ignore%",
+      "display": "percent"
+    },
     "physicalResIgnore": {
       "label": "Physical RES Ignore%",
       "display": "percent"
@@ -152,6 +156,54 @@
     },
     "windSheerDmg": {
       "label": "Wind Sheer DMG Bonus%",
+      "display": "percent"
+    },
+    "physicalCritDmg": {
+      "label": "Physical DMG CRIT DMG%",
+      "display": "percent"
+    },
+    "fireCritDmg": {
+      "label": "Fire DMG CRIT DMG%",
+      "display": "percent"
+    },
+    "iceCritDmg": {
+      "label": "Ice DMG CRIT DMG%",
+      "display": "percent"
+    },
+    "electricCritDmg": {
+      "label": "Electric DMG CRIT DMG%",
+      "display": "percent"
+    },
+    "etherCritDmg": {
+      "label": "Ether DMG CRIT DMG%",
+      "display": "percent"
+    },
+    "windCritDmg": {
+      "label": "Wind DMG CRIT DMG%",
+      "display": "percent"
+    },
+    "physicalDefIgnore": {
+      "label": "Physical DMG DEF Ignore%",
+      "display": "percent"
+    },
+    "fireDefIgnore": {
+      "label": "Fire DMG DEF Ignore%",
+      "display": "percent"
+    },
+    "iceDefIgnore": {
+      "label": "Ice DMG DEF Ignore%",
+      "display": "percent"
+    },
+    "electricDefIgnore": {
+      "label": "Electric DMG DEF Ignore%",
+      "display": "percent"
+    },
+    "etherDefIgnore": {
+      "label": "Ether DMG DEF Ignore%",
+      "display": "percent"
+    },
+    "windDefIgnore": {
+      "label": "Wind DMG DEF Ignore%",
       "display": "percent"
     },
     "dmgBonus": {

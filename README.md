@@ -1,83 +1,95 @@
 # ZZZ Calculator
 
-Zenless Zone Zero Drive Disc, panel, damage, and optimizer workspace. The app is
-a small dependency-free Node.js backend with static browser pages for account
-management, inventory maintenance, out-of-combat and in-combat panel
-calculation, damage inspection, and Drive Disc optimization.
+ZZZ Calculator is a Vue 3 application for Zenless Zone Zero character panels, damage modeling, Drive Disc inventory, local optimization, accounts, and scanner imports. Shared game logic lives in a platform-neutral core and is reused by the browser and the Node.js service.
 
-Chinese documentation is available in [README.zh-CN.md](README.zh-CN.md).
+中文说明见 [README.zh-CN.md](README.zh-CN.md).
 
 ## Upload Update Summaries
 
-### 2026-07-09 Scanner 1.0.36 Release
+The entries below summarize each development day. Implementation details,
+modeling decisions, and verification evidence remain in the
+[detailed changelog](docs/changelog.md).
 
-This upload replaces the web-launched OCR runtime with ZZZ Scanner Next
-`1.0.36`:
+### 2026-07-19 Daily Update
 
-- Repacked the OCR runtime from local `publish 1.0.36`, excluding generated
-  `Scans` output while keeping the bundled `Data/ocr_fast_templates.json`.
-- Updated the Pages scanner manifest, local package manifest, and scanner
-  helper download links to `scannerVersion=1.0.36`.
-- Published the OCR zip under GitHub Release tag `scanner-1.0.36` with SHA-256
-  `d885c0aef6da61cfcbf994ad2b4e712a31efe8bd87631260fe4f87ea8711c63d` and size
-  `47231570` bytes.
-- The Pages artifact now also carries the same OCR zip at
-  `/downloads/zzz-scanner/1.0.36/ZZZ-Scanner.Next-win-x64.zip`; the scanner
-  manifest prefers that same-origin file and keeps GitHub Releases as fallback,
-  avoiding local stalls when the user's network resets GitHub release downloads.
-- Verified the local `1.0.36` scanner with a 120-item benchmark:
-  `Completed=120`, `Failed=0`, duplicate exports 0, `IncompleteRoi=0`,
-  `slot_safety=pass`, and `profile_route=exact:7`.
+- Added explicit Dash Attack, EX Special, and Assist Attack move tags, including
+  targeted two-piece Drive Disc effects across calculation and optimization.
+- Modeled Dawn Blossom's two-piece bonus and nine requested four-piece sets,
+  with independent uptime/stacks, specialty requirements, and team-effect
+  exclusivity.
+- Removed the optimizer's automatic ATK, Anomaly Proficiency, CRIT Rate, and
+  CRIT DMG minimums. Existing untouched defaults migrate to unrestricted
+  searches, while deliberate user-entered limits remain available.
+- Added `/settings` with separate controls for browser-owned calculator data
+  and storage used by the hosted scan integration.
+- Clarified the Drive Disc toolbar as single-item add, batch import/export,
+  refresh, and Scan, with Scan as the only primary action.
 
-### 2026-07-02 Scanner 1.0.35 Cloud Client Selection
+### 2026-07-18 Daily Update
 
-This upload adds an explicit Drive Disc scanner client switch. The default
-remains local Zenless Zone Zero, while Cloud Zenless Zone Zero sends
-`processName="Zenless Zone Zero Cloud"` and `visualProfileClient="cloud"` so
-the scanner can use the bundled cloud visual profiles.
+- Added teammate attribute/specialty filtering and completed team-applicable
+  Jane Doe Buffs plus Ye Shunguang Cinema 4/6 rules and the Cinema-6 loop.
+- Made Anomaly and Disorder timing effect-specific, moved stun state to each
+  event, and exposed live skill, Anomaly, and Disorder event multipliers.
+- Unified Alice's Disorder stack model and fixed the systemic loss of Anomaly
+  Mastery percentages across panels, damage calculation, and optimization.
+- Added account-scoped Drive Disc JSON export and reimport without exposing
+  account ownership or derived fingerprints.
+- Simplified player custom-Buff choices while retaining full maintenance
+  controls, and added container-aware layout regression protection.
 
-- Repacked the OCR runtime from local `publish 1.0.35`, excluding generated
-  `Scans` output while keeping the bundled `Data/ocr_fast_templates.json`.
-- Updated the Pages scanner manifest and local package manifest to
-  `scannerVersion=1.0.35`.
-- Published the OCR zip under GitHub Release tag `scanner-1.0.35` with SHA-256
-  `2a10aa3dc92e50c7ea930d75eda82fef741eff16e8c39f2839240b6fc36b0255` and size
-  `47228425` bytes.
-- The web scan payload still uses the stable strict DXGI route, now with an
-  explicit local/cloud target so cloud scans no longer search for the local
-  `ZenlessZoneZero` process.
+### 2026-07-17 Daily Update
 
-### 2026-07-02 Scanner 1.0.34 Release
+- Completed Alice Thymefield's damage, Buff, Cinema, default-loop, panel, and
+  optimizer modeling, including Anomaly Mastery slot-6 support.
+- Added first-class all-attribute RES ignore as a stat distinct from resistance
+  reduction and compatible with existing element-specific RES ignore.
 
-This upload replaces the web-launched OCR runtime with ZZZ Scanner Next
-`1.0.34`:
+### 2026-07-16 Daily Update
 
-- Repacked the OCR runtime from local `publish 1.0.34`, excluding generated
-  `Scans` output while keeping the bundled `Data/ocr_fast_templates.json`.
-- Updated the Pages scanner manifest and local package manifest to
-  `scannerVersion=1.0.34`.
-- Published the OCR zip under GitHub Release tag `scanner-1.0.34` with SHA-256
-  `d87a993e15a0f9103942b0284d8d5fc552bed348147180682ef42f7b0fc51c30` and size
-  `47228531` bytes.
-- Kept the web scan payload on the stable strict DXGI route and refreshed
-  Helper `1.0.2`, which accepts a fully downloaded temporary package before
-  retrying Range requests and still shows bytes, percentage, speed, and retries.
+- Added versioned Boss archives and moved Boss encounter Buff selection into
+  the unified picker without coupling it to target defense or resistance.
+- Added the 3.0 Critical Assault phase-3 field Buffs and independent refinement
+  selection for teammate-carried W-Engines.
+- Replaced shared Buff coverage with independent per-effect `0-1` overrides
+  while preserving administrator-authored defaults.
+- Fixed maintenance saves for four-piece Drive Disc skill targets and retained
+  backward-compatible cleanup of legacy coverage and Boss payloads.
 
-### 2026-07-02 Scanner 1.0.33 and Modal Workflow Update
+### 2026-07-15 Daily Update
 
-This upload publishes the web-launched scanner as ZZZ Scanner Next `1.0.33`
-and commits the pending optimizer/inventory UI updates:
+- Removed generic effect `appliesTo` filters in favor of explicit global,
+  Anomaly, move, and skill-type targets.
+- Hardened canonical skill types and clarified the separate damage-bonus and
+  skill-multiplier zones across maintenance, calculation, and optimization.
 
-- Repacked the OCR runtime from the local `publish 1.0.33` output. The package
-  includes the built-in `Data/ocr_fast_templates.json`, so the web page does not
-  pass any `ocrFastIndex` override.
-- The Drive Disc scan request now uses the stable `1.0.33` payload:
-  `fastMode=true`, `captureMode=dxgi`, `profileRouting=strict`,
-  `overlapConflictMode=recover`, `panelAcceptMode=adaptive-early-full-roi`,
-  `scrollAcceptMode=early-one-row`, `postScrollPanelAcceptMode=safe`, and
-  `panelMinAcceptFloorMs=120`.
-- Non-level-15 full-inventory scanning remains disabled by default through
-  `stopAtNonLevel15=true`.
+### 2026-07-14 Daily Update
+
+- Rebuilt administrator default loops as a cinema-tabbed master-detail modal
+  and replaced skill-ID prefix targeting with structured skill targets.
+- Expanded the strict optimizer contract from Top 5 to fixed Top 10 and replaced
+  the result dropdown with an immediate rank selector.
+- Restored maintenance visibility controls in the Vue workbench while keeping
+  hidden records compatible with existing saved builds.
+
+### 2026-07-13 Daily Update
+
+- Accelerated strict-exact Drive Disc optimization with result-preserving
+  pruning, specialized scoring paths, benchmarks, and parity checks.
+- Rebuilt Vue maintenance as a structured administrator workspace with
+  resource-specific forms, generated IDs, readable references, and save previews.
+
+### 2026-07-12 Daily Update
+
+- Archived the Vue rewrite before cleanup, then retired the legacy frontend and
+  consolidated browser and Node execution around the shared core and Vue app.
+- Removed obsolete duplicate runtime code and generated artifacts while
+  preserving public catalogs, source assets, storage compatibility, and tests.
+
+### 2026-07-02 Drive Disc Modal Workflow Update
+
+This update improves the calculator's optimizer and Drive Disc workflows:
+
 - The Drive Disc analysis modal now starts from the role-aware difference view,
   while keeping the current substat and gain-curve views available.
 - Combat Buff, two-piece/four-piece optimizer filters, calculation config,
@@ -87,22 +99,6 @@ and commits the pending optimizer/inventory UI updates:
 - Stacked W-Engine effects can share one runtime stack control through
   `stackGroup`; Qingming Cage now keeps its two "Qingming Companion" effects in
   sync.
-
-### 2026-07-02 Scanner Helper Download Progress
-
-This upload refreshes `ZZZ-Scanner-Helper.exe` for the existing
-`scanner-1.0.33` release:
-
-- Helper download now reports downloaded bytes, total bytes, percentage, speed,
-  and retry attempt while preparing the OCR runtime.
-- The Drive Disc page renders that progress instead of staying on a fixed
-  "downloading" message.
-- If the connected Helper is older than `1.0.1`, the page asks the user to
-  download the refreshed Helper because older helpers cannot emit byte-level
-  download progress.
-- Local diagnostics showed the GitHub Release asset exists, but full downloads
-  from the current network can reset or fail to connect, so the symptom is a
-  flaky/blocked download path rather than a pure UI freeze.
 
 ### 2026-07-01 Role-Aware Drive Disc Stat Difference Analysis
 
@@ -119,61 +115,16 @@ analysis" view:
 - Browser-local analysis, backend analysis, and regression tests are kept in
   parity.
 
-### 2026-07-01 Slim Scanner Packages
+### 2026-06-30 GitHub Pages Deployment
 
-This upload reduces the web-launched scanner download footprint without changing
-the browser workflow:
-
-- Rebuilt `ZZZ-Scanner-Helper.exe` as a NativeAOT helper, reducing the local
-  helper download from about 67.6MB to 7.4MB.
-- Repacked the `1.0.28` OCR scanner zip without unused video/diagnostic
-  payloads, reducing the package from about 129.9MB to 115.2MB.
-- Updated the scanner manifest hash/size and kept the same helper protocol,
-  scanner version, entry point, and OCR model.
-- The public Pages manifest now serves the verified GitHub Release package
-  first so the stale ECS mirror cannot return the old larger scanner package.
-
-### 2026-07-01 02:55 +08:00
-
-This upload fixes first-run OCR scanner preparation on the public Pages site:
-
-- Uploaded the `1.0.28` OCR zip to the ECS mirror and made the generated
-  scanner manifest try that mirror before GitHub Releases.
-- Extended the browser-side scanner preparation timeout to cover the current
-  130MB package download time on the low-bandwidth mirror.
-- If the helper probe already reports the scanner as installed, the Drive Disc
-  page now enables scanning without waiting for another launcher progress cycle.
-
-### 2026-06-30 22:20 +08:00
-
-This upload moves the public site toward the no-ICP GitHub Pages + GitHub
-Releases deployment path:
+This update moves the public calculator to GitHub Pages deployment:
 
 - Added `npm run build:pages` to generate a `dist/pages` static site with
-  `static/catalog.json`, `static/app-config.json`,
-  `downloads/zzz-scanner/manifest.json`, and `CNAME`.
+  `static/catalog.json`, `static/app-config.json`, and `CNAME`.
 - Frontend catalog/config loading now prefers static JSON while keeping the
   local Node server APIs as development fallbacks.
-- The Drive Disc helper download now points to GitHub Releases; the OCR
-  manifest supports `packageUrls` so the helper can try multiple package
-  sources when an up-to-date mirror is available.
 - Added a GitHub Actions Pages workflow that publishes the Pages artifact
   without committing `dist/pages` or large `downloads/` files.
-
-### 2026-07-01 01:00 +08:00
-
-This upload updates the web-launched OCR scanner integration for the 1.0.28
-stability release:
-
-- Updated `/downloads/zzz-scanner/manifest.json` to serve ZZZ Scanner Next
-  `1.0.28` from `/downloads/zzz-scanner/1.0.28/ZZZ-Scanner.Next-win-x64.zip`.
-- The web scanner request now sends the stable fast DXGI route:
-  `overlapConflictMode=recover`, `panelMinAcceptFloorMs=120`, and
-  `postScrollPanelAcceptMode=safe`, with non-15 scanning still opt-in only.
-- Scanner error dialogs now include the scanner version and runtime directory,
-  making it clear which local OCR package actually handled the request.
-- Added scanner package and `scan_req` payload validation to
-  `npm run test:scanner-bridge`.
 
 ### 2026-06-24 01:31 +08:00
 
@@ -372,281 +323,153 @@ This upload added or expanded these major areas:
   modification scaling, shared combat helpers, anomaly damage, damage
   white-box output, maintenance validation, and optimizer behavior.
 
-## Features
-
-- Agent, W-Engine, Drive Disc set, skill multiplier, stat rule, anomaly effect,
-  and combat buff catalogs.
-- Out-of-combat panel calculation from agent stats, Core Skill level, W-Engine
-  stats, Drive Discs, and unconditional set effects.
-- In-combat panel calculation from selected self, teammate, W-Engine, Drive Disc
-  4-piece, field, boss, and manual buffs.
-- Combat buff selection with teammate, W-Engine team, Drive Disc team, and
-  custom sources grouped for review and removal.
-- Damage preview for direct, sheer, anomaly, and disorder events, with
-  inspectable white-box formula rows, target resistance/defense/stun controls,
-  and separate damage modifier zones.
-- ZZZ Scanner Drive Disc import, one-click local helper scanning, manual
-  inventory editing, duplicate handling, account-scoped storage, and optional
-  remove-missing synchronization.
-- Saved Drive Disc loadouts that can be applied on the homepage or created from
-  optimizer results.
-- Drive Disc optimizer with calculation target presets, preview, background job
-  progress, cancelation, set-shape constraints, multiple optional 2-piece set
-  choices, recommended/default 4-piece set helpers, automatic or manual 4-piece
-  buff handling, main-stat constraints, minimum stat filters, exact/fast/parallel
-  algorithm choices, and damage scoring.
-- Drive Disc analysis tools for current substat effective rolls and projected
-  damage gains from extra substat rolls.
-- Browser maintenance pages for static game data and validation-oriented JSON
-  editing.
-
-## Directory Layout
+## Architecture
 
 ```text
-zzz_calculator/
-  README.md
-  README.zh-CN.md
-  package.json
-  backend/
-    server.js
-    calculator.js
-    driveDiscAnalysis.js
-    driveDiscInventory.js
-    driveDiscOptimizer.js
-    driveDiscOptimizerWorker.js
-  data/
-    agents.json
-    agent_skills.json
-    anomaly_effects.json
-    w_engines.json
-    drive_disc_sets.json
-    stat_rules.json
-    combat_buffs.json
-    user_drive_discs.example.json
-  docs/
-    changelog.md
-    frontend-usability-audit.md
-    goal.md
-    modeling.md
-  examples/
-    out_of_combat_panel.example.json
-    ye_shunguang_panel.example.json
-  frontend/
-    index.html
-    drive-discs.html
-    accounts.html
-    maintenance.html
-    app.js
-    calculate.js
-    drive-disc-analysis.js
-    drive-discs.js
-    dialogs.js
-    entity-select.js
-    feedback.js
-    accounts.js
-    accounts-page.js
-    maintenance.js
-    maintenanceStats.js
-    shared-combat.js
-    skillMultiplierCandidates.js
-    assets/
-  tests/
+core/                    shared calculations, validation, inventory rules, and optimizer engine
+webapp/                  Vue 3 + Pinia + Vite application
+  src/runtime/           browser catalog, storage, scanner, and optimizer adapters
+  public/assets/         application images and other public assets
+backend/                 Node.js APIs, file adapters, and built-app hosting
+data/                    game catalogs and public configuration
+examples/                stable calculation fixtures
+scripts/                 Pages and release build helpers
+tests/                   Node and cross-runtime regression tests
+benchmarks/              opt-in performance benchmarks
+docs/                    modeling notes, regression contract, and changelog
 ```
 
-## Run
+The browser owns user accounts, Drive Discs, import history, and loadouts through the existing IndexedDB/localStorage schema. Heavy optimization runs in one dedicated browser Worker on the public site, keeping the page responsive without creating a nested Worker pool. The Node adapter keeps worker-thread support for local and self-hosted use.
 
-Requires Node.js with ES module support. No third-party package install is
-currently required.
+When no extra two-piece set is selected, the optimizer automatically searches complete 4+2 combinations across every available non-four-piece set plus six pieces of the selected four-piece set. Incomplete 4+1+1 and 5+1 layouts are not considered.
+
+The optimizer can optionally enforce minimum ATK, Anomaly Proficiency, CRIT Rate, and CRIT DMG. All four constraints use the out-of-combat character panel and exclude in-combat Buffs. They are unrestricted by default, with step buttons of 50, 10, 10, and 10 respectively. Inputs may be any non-negative integer and do not need to be multiples of the step.
+
+## Requirements And Installation
+
+- Node.js 20
+- npm
+
+Install the Vue workspace exactly from its lock file:
 
 ```bash
-cd zzz_calculator
+npm run install:webapp
+```
+
+The root project intentionally has no third-party runtime dependencies.
+
+## Run Locally
+
+Build the Vue application and start the Node service:
+
+```bash
 npm start
 ```
 
-Open the printed local URL, usually `http://localhost:8787`. You can override
-the port with `PORT=8791 npm start`.
+The default address is `http://127.0.0.1:8787`. To serve an existing Vue build without rebuilding it, use:
 
-The Drive Disc page can launch a small local scanner helper. Public builds link
-the helper download to GitHub Releases; local Node server development can still
-serve it from `/downloads/ZZZ-Scanner-Helper.exe`. The OCR package manifest
-currently uses the verified GitHub Release package. The helper registers
-`zzz-scanner://`, connects back to the page on
-`127.0.0.1:22355`, and downloads the OCR scanner package declared by
-`/downloads/zzz-scanner/manifest.json` when needed. The current scanner package
-is ZZZ Scanner Next `1.0.36`.
+```bash
+npm run serve
+```
 
-Main pages:
+For frontend-only development with hot reload:
 
-- `/` - Drive Disc optimizer homepage with manual, loadout, and optimized scheme previews
-- `/drive-discs.html` - Drive Disc inventory and loadout management
-- `/calculate.html` - legacy optimizer compatibility entry that redirects to `/`
-- `/accounts.html` - account creation, switching, rename, and deletion
-- `/maintenance.html` - static catalog maintenance. Enabled by default during
-  local development and disabled by default when `NODE_ENV=production`.
+```bash
+npm run dev:webapp
+```
 
-## Local Runtime Data
+Set `PORT` to change the Node port. The service binds to `127.0.0.1` by default; container or network exposure requires an explicit `HOST` such as `0.0.0.0`. Maintenance is disabled in production unless `MAINTENANCE_ENABLED=true` is set explicitly. Maintenance writes accept loopback browser origins by default; every non-loopback origin must be listed explicitly in the comma-separated `MAINTENANCE_ALLOWED_ORIGINS` setting.
 
-User-owned data is stored in browser-local IndexedDB: accounts, current account,
-Drive Disc inventory, import history, and loadouts. In production, one user's
-uploads, edits, deletes, and account switches stay in that user's browser and do
-not write to a shared server inventory.
+## Routes
 
-The legacy `data/user_drive_discs.json` file remains ignored by Git for backend
-history tests and local migration reference. Public pages no longer read or
-write it through server user-data APIs.
+| Route | Purpose |
+| --- | --- |
+| `/` | Workbench: character setup, damage configuration, Buffs, Drive Disc schemes, and optimizer |
+| `/discs` | Drive Disc inventory, account-scoped JSON import/export, loadouts, and scanner flow |
+| `/accounts` | Local account creation, switching, rename, and deletion |
+| `/maintenance` | Structured Vue editor for all eight maintenance resources, available only when maintenance is enabled |
 
-Use `data/user_drive_discs.example.json` as the documented empty-store shape.
-Scanner exports copied into `imports/` or `data/imports/` are also ignored.
+`/calculate.html`, `/drive-discs.html`, and `/accounts.html` remain compatibility redirects. When maintenance is enabled, `/maintenance.html` redirects to `/maintenance`; when disabled, both maintenance page routes return 404 and maintenance APIs return 403.
 
-The public static data under `data/`, frontend assets, examples, docs, and tests
-should stay committed so other users can clone the repository and run it
-normally.
+The workbench event manager shows each skill, Anomaly, and Disorder event's current multiplier in both the target list and the active-event details. Skill values follow the selected current skill level; Anomaly values include proc count; and Disorder values update immediately from the source effect, Disorder type, and elapsed time. The displayed value includes any stored event scale but does not multiply the separate event count or fold in CRIT, damage bonus, defense, and other final-damage zones. The player-facing event-scale input is hidden to avoid confusing it with a skill multiplier, while structured maintenance and existing saved events retain the field and its calculation behavior. Disorder elapsed time is snapped to the source effect's tick interval and is no longer pre-clamped to the catalog base duration when saved. The catalog preview still shows the base-duration multiplier; final damage clamps elapsed time to the base duration plus active Buff extensions, then recomputes remaining time, ticks, and multiplier.
 
-## Production
+In the workbench Buff picker, every selected teammate-carried W-Engine has its own refinement selector using that W-Engine's supported range. Changing the level refreshes the Buff preview immediately, while only Apply commits the draft and Cancel leaves the saved build unchanged. The chosen refinement appears in the enabled-Buff summary and feeds the same calculation input used by both the workbench and the Drive Disc optimizer.
 
-The public site is intended to run on GitHub Pages so `zzzcaculator.top` no
-longer needs to point at a mainland China ECS instance and does not require ICP
-filing.
+All-attribute resistance ignore is modeled as the first-class `allResIgnore` effect instead of six duplicated element rules or a resistance-reduction alias. It remains semantically distinct from enemy resistance reduction, stacks with the matching element-specific resistance-ignore stat, and is available in both maintenance forms and workbench custom Buffs for global or skill-targeted effects. Existing element-specific resistance-ignore fields remain supported.
 
-Build the static Pages artifact with:
+Ye Shunguang now includes her official Cinema 4 and Cinema 6 mechanics. Ether Veil: Judgment captures the configured stun multiplier even for events authored as not stunned, caps the vulnerability bonus at 110% normally, and raises that cap to 200% at Cinema 4 without treating the difference as a flat damage bonus. Cinema 6 adds the stated 1500% ATK final-hit multiplier only to Return to Dust and Cut Delusion, Open Heaven. Its administrator default keeps the existing twelve-transformation window and resolves to twelve Cinema-2 short axes, two paid Chase Cloud Ultimates, six Cut Delusion finishers, and six Return to Dust finishers.
+
+Jane Doe is available as a teammate Buff group containing only team-applicable Core Passive F, Cinema 2, and Cinema 4 effects. Her Core extends Flinch by five seconds, raising full-duration Flinch Disorder from `525%` to `450% + 15 x 7.5% = 562.5%`; Assault Anomaly CRIT Rate is `clamp(40 + Jane AP x 0.16, 0, 100)%`, with a default 375 AP input that can be lowered, and Anomaly CRIT DMG is 50%. Cinema 2 applies 15% DEF ignore and another 50% Anomaly CRIT DMG to Assault only. Cinema 4 adds 18% Attribute Anomaly DMG without entering the Disorder bonus zone. Selecting a Buff means its trigger condition is satisfied; no uptime timeline is simulated.
+
+The workbench custom Buff editor uses a simplified player-facing whitelist. It keeps the six element damage bonuses separate, but replaces element-specific Sheer DMG, CRIT DMG, DEF ignore, resistance reduction, and resistance ignore choices with their generic or current-attribute forms; the Anomaly Mastery-above-140 conversion is maintenance-only. The structured maintenance forms still expose every explicit element field, and existing custom Buff records using hidden choices remain readable and fully calculated.
+
+Alice Thymefield is fully available with her official core passive, additional ability, and Cinema 1/2/4/6 rules. Her in-combat Anomaly Mastery above 140 converts to Anomaly Proficiency at 1.6 per point; physical Disorder receives 18% multiplier per remaining second up to 180%; Polarized Assault uses 100% of normal Assault; the recurring core follow-up uses an explicit 2.5% event scale; and Cinema 6 uses 3300% Anomaly Proficiency as its damage basis with forced CRIT. Her administrator defaults cover a full-duration physical-anomaly window at Cinema 0, the additional Ultimate-triggered Polarized Assault at Cinema 2, and six winning-state follow-ups at Cinema 6. Slot 6 optimization compares both Anomaly Mastery and ATK%.
+
+Anomaly Mastery percentage and flat-point bonuses use separate calculation buckets. The agent base and Core Skill white-stat additions are combined before out-of-combat percentages from Drive Discs, 2-piece sets, and W-Engine advanced stats are applied; in-combat percentages scale the current out-of-combat panel, and in-combat flat points are added last. Phaethon's Melody now contributes its 8% Anomaly Mastery 2-piece effect. With Core Skill F, a 30% Anomaly Mastery slot 6, and that 2-piece effect, Alice retains the exact internal value `142 * 1.38 = 195.96`; damage and optimization use the full value while the UI truncates it to the in-game display `195`.
+
+The maintenance UI keeps the legacy top-tab, record-list, and resource-specific form workflow while using Vue and Naive UI controls. It never asks administrators to enter internal IDs. Effect targets distinguish global effects, structured Anomaly targets, specific moves, and general skill types. An Anomaly target selects Attribute Anomaly or Disorder plus concrete effects; new data never stores legacy `appliesTo`, and the player custom-Buff editor does not expose raw duration extension without this target selector. New records and their nested skill rows, effects, modifiers, and calculation events receive generated identifiers; cross-record references use searchable labels and skill-target effects provide a complete catalog/category/move/row cascade. Skill targets use a stable two-row layout with full readable move-series ranges, while long tables and the editor scroll independently. Image provenance and multiple data sources remain separate. Shared stack arrays, default-calculation target events, W-Engine modification previews, and W-Engine/Drive Disc conditions, durations, effect text, coverage, and modifiers are all edited through readable controls. Administrator default loops appear as a compact role-form summary and open in a dedicated cinema-tabbed modal with a target-event list on the left and one active event editor on the right. Cancelling the modal leaves the role draft untouched; a new cinema variant copies the active loop with regenerated event IDs, and cinema zero remains the required base. Every damage or skill-group event has an administrator-authored stunned state; administrator defaults are read-only in the workbench, while non-administrator modes can switch each event independently. Skill-group counts are system-managed as `1 / 0 / 100 / 1` (default/min/max/step). Each in-combat effect rule has its own administrator coverage switch and editable default percentage; enabled rules keep system-managed `0 / 1 / 0.1` min/max/step metadata, and only those rules expose a `0-1` decimal player override in the Buff picker and optimizer. Teammate Buffs are edited as role groups with a secondary Buff list and a single active Buff editor. The read-only save preview masks internal identities and technical condition values while showing coverage defaults as percentages.
+
+Teammate Buff groups carry required role-level attribute and specialty metadata. The picker exposes dynamic multi-select filters for both dimensions: values within one filter use OR, the two dimensions use AND, and both combine with text search. Maintenance shows and searches the localized role labels, while bulk add/remove affects only the filtered visible Buffs.
+
+Boss data uses a separate `data/bosses.json` archive. Stable profile fields (name, aliases, local image, defense, weaknesses, and resistances) own multiple versioned encounters containing enemy intel, player buffs/debuffs, appearances, and sources. An unchanged returning encounter adds an appearance; changed rules create a new encounter. Modeled entries reuse normal effect rules, while unsupported effects remain visible as `descriptiveOnly` and never enter calculation. The unified Buff picker filters Boss Buffs by version, phase, and Boss name, allows at most one Boss Buff globally, and keeps field Buffs independent. The enemy-target panel only owns the 1588, 476, 953, and Custom defense presets plus the current damage-element resistance and initial stun multiplier; whether damage occurs during stun is configured per calculation event. Selecting a Boss Buff never changes target defense or resistance. Legacy Specific Boss saves migrate their encounter into Buff selection and reset the target to 953 defense with zero resistance.
+
+## Local Data
+
+User data stays in the browser and remains scoped to the current account. Existing installations keep the same IndexedDB and localStorage keys; no destructive migration is required.
+
+The manual Drive Disc editor is limited to S-rank discs and generates internal IDs automatically. Its four fixed substat rows use the ten legal in-game choices, distinguish flat and percentage HP/ATK/DEF, and accept one to six rolls; the UI converts those rolls back into the existing `{ stat, value }` storage shape. Imported non-S discs and hidden equipped-agent metadata remain unchanged.
+
+The Drive Disc inventory can export every disc in the current account to a versioned `zzz-calculator-drive-disc-export` JSON file. Export runs entirely in the browser, ignores active table filters, excludes other accounts and loadouts, and removes account ownership plus derived fingerprints from each record. The same import preview accepts this native format alongside ZZZ Scanner JSON, recomputes fingerprints, and assigns every imported disc to the account that is current at import time. Imports merge by default; the existing explicit “remove missing” option is required for mirror-style deletion.
+
+The local file `data/user_drive_discs.json`, scanner exports under `imports/` or `data/imports/`, build output, logs, downloads, and Playwright artifacts are ignored by Git. Public catalogs, including `data/bosses.json` and local Boss WebP assets, examples, source assets, and tests remain versioned.
+
+## Tests And Builds
+
+Run the complete regression suite after installing webapp dependencies:
+
+```bash
+npm test
+```
+
+Useful focused commands:
+
+```bash
+npm run test:webapp
+npm run test:layout
+npm --prefix webapp run build
+npm run build:pages
+npm run benchmark:optimizer
+```
+
+`npm test` covers the Node calculation model, optimizer fixtures/progress/API/fuzz behavior, storage compatibility, scanner bridge, production server behavior, and the Vue test suite. `npm run test:layout` builds the app and uses Chromium to reject clipped labels, overflowing controls, and unintended horizontal scrolling across desktop, scaled-desktop, and mobile layouts. CI uses Node 20 and runs both suites for every branch and pull request.
+
+## GitHub Pages
+
+Build the static deployment artifact with:
 
 ```bash
 npm run build:pages
 ```
 
-The artifact is written to `dist/pages` and includes the app pages, static JSON
-catalog/config files, `CNAME`, and the OCR manifest. GitHub Actions runs the
-same command from `main` and deploys the Pages artifact; do not commit
-`dist/pages`.
+The output is written to `dist/pages` and is never committed. It contains the SPA, static catalog/config payloads, `CNAME`, scanner manifest, and both verified scanner packages when available. `.github/workflows/pages.yml` deploys only when `main` is updated; maintenance pages are excluded from the default Pages artifact.
 
-Publish Helper and OCR packages through GitHub Releases instead of Git:
+## Scanner Integration
 
-- tag: `scanner-1.0.36`
-- `ZZZ-Scanner-Helper.exe`
-- `ZZZ-Scanner.Next-win-x64.zip`
+The Drive Disc scanner flow uses a small local Helper registered for the `zzz-scanner://` protocol. The Helper communicates with the page at `127.0.0.1:22355`, reads `/downloads/zzz-scanner/manifest.json`, and prepares ZZZ Scanner Next.
 
-After DNS is switched, GitHub Pages should serve `zzzcaculator.top`, with
-`www.zzzcaculator.top` as a compatibility entry. DNS records should point to
-GitHub Pages rather than the old ECS public IP.
+The current supported OCR runtime is ZZZ Scanner Next `1.0.38`, with Helper `1.2.1` or newer. Supported systems are Windows 10 1809 (Build 17763) or newer x64 and Windows 11 x64, including N and LTSC editions. x86, ARM64, and Windows 7 are outside the current support commitment.
 
-The Node server deployment path remains available for local or self-hosted
-production use.
+The schema v3 manifest locks the size, package SHA-256, and every installed file for both framework-dependent and self-contained packages. The Helper selects the smaller package when .NET 8 Desktop Runtime is present; otherwise it automatically uses the self-contained compatibility package without installing .NET or modifying the system. After a verified Scanner handshake, the Helper deletes the package ZIP and every inactive runtime, while retaining the active runtime and the newest successful and failed scan outputs. Structured errors identify environment, disk, download, integrity, extraction, native dependency, port, game-process, elevation, and UAC-cancellation failures and expose appropriate retry, repair, log, or elevation actions.
 
-Set production services with:
+The public `/settings` page separates browser data from Scanner storage. Browser cleanup deletes the calculator's IndexedDB and local settings only. Scanner cleanup is executed by Helper and removes inactive runtimes, transient packages, stale downloads, and excess outputs without uninstalling the active Scanner. Helper `1.2.1` installs into `%LOCALAPPDATA%\ZZZScannerNext\helper` and supports verified in-place self-updates. Users upgrading from Helper `1.1.x` click **Download and update Helper**, run the downloaded file, and confirm the one-time takeover; the installer safely closes the uniquely verified old Helper, installs the managed copy, and restarts it. Helper `1.2.0` and later update automatically through protocol v3.
 
-```bash
-NODE_ENV=production
-```
+The current binaries are unsigned, so SmartScreen, antivirus, or enterprise policy can block the Helper before it starts; software that has not started cannot display its own diagnostics. The manifest prefers same-site Pages packages and retains GitHub Release assets as fallbacks. Local and Cloud Zenless Zone Zero targets are both supported. Scanner packages and generated scans are release artifacts or local caches, not normal source-control content.
 
-The server then reports `maintenanceEnabled: false` and blocks
-`/maintenance.html`, `/maintenance.js`, and `/api/maintenance/*`. Set
-`MAINTENANCE_ENABLED=true|false` only when you intentionally need an explicit
-override.
+## Documentation
 
-## Tests
+- [Modeling notes](docs/modeling.md)
+- [Long-term regression contract](docs/regression-contract.md)
+- [Frontend layout contract](docs/frontend-layout-contract.md)
+- [Detailed changelog](docs/changelog.md)
 
-Run focused Node test scripts with npm:
-
-```bash
-npm run test:atk-basis
-npm run test:percent-sanity
-npm run test:maintenance-validation
-npm run test:formula
-npm run test:damage-whitebox
-npm run test:shared-combat
-npm run test:w-engine-modification
-npm run test:anomaly-damage
-npm run test:maintenance-stats
-npm run test:compiled-score
-npm run test:compiled-panel-score
-npm run test:optimizer
-npm run test:optimizer-progress
-npm run test:optimizer-api
-npm run test:optimizer-ui
-npm run test:optimizer-fuzz
-npm run test:drive-disc-analysis
-npm run test:drive-disc-import
-npm run test:accounts
-```
-
-Run the optimizer benchmark helper when comparing exact optimizer strategies:
-
-```bash
-npm run benchmark:optimizer
-```
-
-Useful syntax checks:
-
-```bash
-node --check backend/calculator.js
-node --check backend/driveDiscAnalysis.js
-node --check backend/driveDiscOptimizer.js
-node --check backend/server.js
-node --check frontend/app.js
-node --check frontend/calculate.js
-node --check frontend/dialogs.js
-node --check frontend/drive-disc-analysis.js
-node --check frontend/drive-discs.js
-node --check frontend/entity-select.js
-node --check frontend/maintenance.js
-node --check frontend/accounts-page.js
-```
-
-## API Overview
-
-- `GET /api/health`
-- `GET /api/app-config`
-- `GET /api/meta`
-- `GET /api/maintenance/catalog` (defaults to `403` in production)
-- `POST|PUT|DELETE /api/maintenance/:resource` (defaults to `403` in production)
-- `DELETE /api/maintenance/anomaly-effects/:type/:id` (defaults to `403` in production)
-- `GET /api/example/out-of-combat`
-- `GET /api/example/ye-shunguang`
-- `POST /api/calculate/out-of-combat`
-- `POST /api/calculate/in-combat`
-- `POST /api/optimize/drive-discs/preview`
-- `POST /api/optimize/drive-discs/jobs`
-- `GET|DELETE /api/optimize/drive-discs/jobs/:id`
-- `POST /api/optimize/drive-discs`
-- `POST /api/analysis/drive-disc-substats`
-- `POST /api/analysis/drive-disc-stat-gains`
-
-The legacy user-data APIs now return `410 Gone` because user data is stored in
-the browser:
-
-- `/api/accounts*`
-- `/api/user-drive-discs*`
-- `/api/user-drive-disc-loadouts*`
-
-## Modeling Notes
-
-- Base ATK is `agent Base ATK + W-Engine Base ATK + Core Skill Base ATK`.
-- Out-of-combat stats are the stable base for later conditional in-combat
-  buffs.
-- In-combat buffs can contribute plain stats, runtime-scaled effects, damage
-  modifiers, W-Engine team buffs, and skill-targeted effects.
-- Target configuration supports defense, level coefficient, per-element
-  resistance, and an optional stun multiplier.
-- Optimizer damage targets can use one direct, sheer, anomaly, or disorder event
-  or a custom list of weighted damage events.
-- Special display attributes can declare a real `damageElement`; for example,
-  Ye Shunguang is displayed as Honed Edge but calculates physical damage.
-- Rupture/Xuanmo damage is modeled as sheer damage: sheer force derives from
-  in-combat HP, in-combat ATK, and flat sheer force, then uses sheer-specific
-  damage bonuses and skips defense/PEN multipliers.
-- Anomaly and disorder damage use catalog-backed multipliers from the unified
-  `data/anomaly_effects.json` `effects` list, split by `settlementType`.
-- Attribute anomaly and disorder damage use separate bonus zones:
-  `anomalyDamageBonus` applies to attribute anomaly, while
-  `disorderDamageBonus` applies to disorder.
-- W-Engine modification ranks materialize explicit per-rank buff values without
-  changing level 60 Base ATK or advanced stats.
-
-For deeper implementation detail, see [docs/modeling.md](docs/modeling.md) and
-[docs/changelog.md](docs/changelog.md).
-
-## Maintenance Rule
-
-All Zenless Zone Zero calculator data models, examples, frontend code, backend
-code, and future calculator implementation should live inside this repository
-unless a later integration step explicitly moves them elsewhere.
+All calculator models, public data, frontend code, backend code, examples, tests, and release scripts are maintained in this repository.

@@ -1,31 +1,88 @@
 import assert from "node:assert/strict"
 import { spawn } from "node:child_process"
+import { request as httpRequest } from "node:http"
+import { createServer as createNetServer } from "node:net"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
-const port = 20000 + Math.floor(Math.random() * 1000)
-const baseUrl = `http://127.0.0.1:${port}`
-const server = spawn(process.execPath, ["backend/server.js"], {
-    cwd: rootDir,
-    env: {
-        ...process.env,
-        NODE_ENV: "production",
-        PORT: String(port),
-    },
-    stdio: ["ignore", "pipe", "pipe"],
-})
-
+let port = 0
+let baseUrl = `http://127.0.0.1:${port}`
 let serverOutput = ""
-server.stdout.on("data", chunk => {
-    serverOutput += chunk.toString()
-})
-server.stderr.on("data", chunk => {
-    serverOutput += chunk.toString()
-})
+let server = null
+
+function availablePort() {
+    return new Promise((resolve, reject) => {
+        const probe = createNetServer()
+        probe.unref()
+        probe.once("error", reject)
+        probe.listen(0, "127.0.0.1", () => {
+            const address = probe.address()
+            const selectedPort = typeof address === "object" && address ? address.port : 0
+            probe.close(error => error ? reject(error) : resolve(selectedPort))
+        })
+    })
+}
+
+async function startServer(extraEnv = {}) {
+    port = await availablePort()
+    baseUrl = `http://127.0.0.1:${port}`
+    serverOutput = ""
+    server = spawn(process.execPath, ["backend/server.js"], {
+        cwd: rootDir,
+        env: {
+            ...process.env,
+            NODE_ENV: "production",
+            PORT: String(port),
+            ...extraEnv,
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+    })
+    server.stdout.on("data", chunk => {
+        serverOutput += chunk.toString()
+    })
+    server.stderr.on("data", chunk => {
+        serverOutput += chunk.toString()
+    })
+    return server
+}
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function runNodeTool(entry, args = [], cwd = rootDir) {
+    return new Promise((resolve, reject) => {
+        let output = ""
+        const child = spawn(process.execPath, [entry, ...args], {
+            cwd,
+            env: {
+                ...process.env,
+                VITE_INCLUDE_MAINTENANCE: "true",
+            },
+            stdio: ["ignore", "pipe", "pipe"],
+        })
+        child.stdout.on("data", chunk => {
+            output += chunk.toString()
+        })
+        child.stderr.on("data", chunk => {
+            output += chunk.toString()
+        })
+        child.on("error", reject)
+        child.on("exit", code => {
+            if (code === 0) {
+                resolve()
+                return
+            }
+            reject(new Error(`${path.basename(entry)} failed with exit code ${code}.\n${output}`))
+        })
+    })
+}
+
+async function buildVueApp() {
+    const webappDir = path.join(rootDir, "webapp")
+    await runNodeTool(path.join(webappDir, "node_modules", "vue-tsc", "bin", "vue-tsc.js"), ["--noEmit"], webappDir)
+    await runNodeTool(path.join(webappDir, "node_modules", "vite", "bin", "vite.js"), ["build"], webappDir)
 }
 
 async function waitForServer() {
@@ -46,6 +103,7 @@ async function getText(pathname) {
     const response = await fetch(`${baseUrl}${pathname}`)
     return {
         status: response.status,
+        headers: response.headers,
         body: await response.text(),
     }
 }
@@ -61,15 +119,46 @@ async function getRedirect(pathname) {
     }
 }
 
+function getRaw(pathname) {
+    return new Promise((resolve, reject) => {
+        const request = httpRequest({
+            hostname: "127.0.0.1",
+            port,
+            method: "GET",
+            path: pathname,
+        }, response => {
+            let body = ""
+            response.setEncoding("utf8")
+            response.on("data", chunk => { body += chunk })
+            response.on("end", () => resolve({ status: response.statusCode, body }))
+        })
+        request.on("error", reject)
+        request.end()
+    })
+}
+
 try {
+    await buildVueApp()
+    await startServer()
     await waitForServer()
 
     const appConfig = await getText("/api/app-config")
     assert.equal(appConfig.status, 200)
     assert.equal(JSON.parse(appConfig.body).maintenanceEnabled, false)
 
+    const malformedUrl = await getRaw("/%")
+    assert.equal(malformedUrl.status, 400)
+    assert.match(JSON.parse(malformedUrl.body).error, /malformed url/i)
+    assert.equal((await getText("/api/health")).status, 200, "server must remain healthy after malformed URL")
+
+    const maintenanceRedirect = await getRedirect("/maintenance")
+    assert.equal(maintenanceRedirect.status, 404)
+    assert.equal(maintenanceRedirect.location, null)
+    assert.equal((await getText("/maintenance/")).status, 404)
     assert.equal((await getText("/maintenance.html")).status, 404)
     assert.equal((await getText("/maintenance.js")).status, 404)
+    assert.equal((await getText("/maintenanceValidation.js")).status, 404)
+    assert.equal((await getText("/maintenanceStats.js")).status, 404)
 
     const maintenanceCatalog = await getText("/api/maintenance/catalog")
     assert.equal(maintenanceCatalog.status, 403)
@@ -112,17 +201,64 @@ try {
         assert.match(JSON.parse(response.body).error, /browser locally/i)
     }
 
-    const optimizerPage = await getText("/")
-    assert.equal(optimizerPage.status, 200)
-    assert.match(optimizerPage.body, /驱动盘最优计算/)
-
-    const legacyOptimizerPage = await getRedirect("/calculate.html")
-    assert.equal(legacyOptimizerPage.status, 308)
-    assert.equal(legacyOptimizerPage.location, "/")
+    const appPage = await getText("/")
+    assert.equal(appPage.status, 200)
+    assert.equal(appPage.headers.get("cache-control"), "no-store")
+    assert.match(appPage.body, /<div id="app"><\/div>/)
+    assert.match(appPage.body, /ZZZ Calculator/)
+    const appAssetPath = appPage.body.match(/src="(\/static\/app\/[^"]+\.js)"/)?.[1]
+    assert.ok(appAssetPath, "built page should reference a hashed JavaScript asset")
+    const appAsset = await getText(appAssetPath)
+    assert.equal(appAsset.status, 200)
+    assert.equal(appAsset.headers.get("cache-control"), "public, max-age=31536000, immutable")
+    const stableAsset = await getText("/zzz-mark.svg")
+    assert.equal(stableAsset.status, 200)
+    assert.equal(stableAsset.headers.get("cache-control"), "no-cache")
+    assert.equal((await getText("/discs")).status, 200)
+    assert.equal((await getText("/accounts")).status, 200)
+    assert.equal((await getText("/static")).status, 404)
+    assert.equal((await getText("/assets")).status, 404)
+    assert.equal((await getText("/downloads/zzz-scanner")).status, 404)
+    assert.equal((await getText("/api/health")).status, 200, "server must remain healthy after directory requests")
+    assert.equal((await getText("/maintenance")).status, 404)
+    assert.deepEqual(await getRedirect("/calculate.html"), { status: 308, location: "/", body: "" })
+    assert.deepEqual(await getRedirect("/drive-discs.html"), { status: 308, location: "/discs", body: "" })
+    assert.deepEqual(await getRedirect("/accounts.html"), { status: 308, location: "/accounts", body: "" })
+    assert.equal((await getText("/maintenance.html")).status, 404)
+    assert.equal((await getText("/downloads/zzz-scanner/manifest.json")).status, 200)
+    const missingRoute = await getText("/missing-route")
+    assert.equal(missingRoute.status, 200)
+    assert.equal(missingRoute.headers.get("cache-control"), "no-store")
 
     assert.equal((await getText("/missing.html")).status, 404)
-    assert.equal((await getText("/drive-discs.html")).status, 200)
-    assert.equal((await getText("/accounts.html")).status, 200)
-} finally {
+
     server.kill()
+    await sleep(100)
+    await startServer({ MAINTENANCE_ENABLED: "true" })
+    await waitForServer()
+
+    const enabledConfig = await getText("/api/app-config")
+    assert.equal(enabledConfig.status, 200)
+    assert.equal(JSON.parse(enabledConfig.body).maintenanceEnabled, true)
+    const enabledMaintenancePage = await getText("/maintenance")
+    assert.equal(enabledMaintenancePage.status, 200)
+    assert.match(enabledMaintenancePage.body, /<div id="app"><\/div>/)
+    assert.deepEqual(await getRedirect("/maintenance.html"), { status: 308, location: "/maintenance", body: "" })
+    assert.deepEqual(await getRedirect("/maintenance/"), { status: 308, location: "/maintenance", body: "" })
+    assert.equal((await getText("/maintenance.js")).status, 404)
+    assert.equal((await getText("/maintenanceValidation.js")).status, 404)
+    assert.equal((await getText("/maintenanceStats.js")).status, 404)
+    const enabledMaintenanceCatalog = await getText("/api/maintenance/catalog")
+    assert.equal(enabledMaintenanceCatalog.status, 200)
+    const maintenanceData = JSON.parse(enabledMaintenanceCatalog.body).data
+    assert.ok(Array.isArray(maintenanceData.agents.agents))
+    assert.ok(Array.isArray(maintenanceData.agentSkills.agentSkills))
+    assert.ok(Array.isArray(maintenanceData.wEngines.wEngines))
+    assert.ok(Array.isArray(maintenanceData.driveDiscSets.sets))
+    assert.ok(Array.isArray(maintenanceData.anomalyEffects.effects))
+    assert.ok(Array.isArray(maintenanceData.combatBuffs.teammates))
+    assert.ok(Array.isArray(maintenanceData.combatBuffs.fieldBuffs))
+    assert.ok(Array.isArray(maintenanceData.combatBuffs.bossBuffs))
+} finally {
+    server?.kill()
 }

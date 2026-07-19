@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -23,7 +22,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: webapp/package-lock.json
       - uses: actions/configure-pages@v5
+      - name: Install webapp dependencies
+        run: npm --prefix webapp ci
       - run: npm run build:pages
       - uses: actions/upload-pages-artifact@v3
         with:

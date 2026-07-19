@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 
-import { normalizeCatalogPayload } from "../frontend/calculator-core.js"
+import { normalizeCatalogPayload } from "../core/calculator-core.js"
 
 export {
     buildMeta,
@@ -12,7 +12,7 @@ export {
     materializeWEngineForModificationLevel,
     normalizeCatalog,
     normalizeCatalogPayload,
-} from "../frontend/calculator-core.js"
+} from "../core/calculator-core.js"
 
 async function readJson(filePath) {
     const text = await readFile(filePath, "utf8")
@@ -26,6 +26,7 @@ export async function loadCatalog(dataDir, exampleDir) {
         wEnginesRaw,
         driveDiscSetsRaw,
         combatBuffsRaw,
+        bossesRaw,
         anomalyEffectsRaw,
         statRulesRaw,
         exampleRaw,
@@ -36,6 +37,7 @@ export async function loadCatalog(dataDir, exampleDir) {
         readJson(path.join(dataDir, "w_engines.json")),
         readJson(path.join(dataDir, "drive_disc_sets.json")),
         readJson(path.join(dataDir, "combat_buffs.json")),
+        readJson(path.join(dataDir, "bosses.json")),
         readJson(path.join(dataDir, "anomaly_effects.json")),
         readJson(path.join(dataDir, "stat_rules.json")),
         readJson(path.join(exampleDir, "out_of_combat_panel.example.json")),
@@ -48,6 +50,7 @@ export async function loadCatalog(dataDir, exampleDir) {
         wEnginesRaw,
         driveDiscSetsRaw,
         combatBuffsRaw,
+        bossesRaw,
         anomalyEffectsRaw,
         statRulesRaw,
         exampleRaw,

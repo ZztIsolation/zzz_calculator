@@ -53,12 +53,6 @@
         },
         "selfBuff": {
           "scope": "inCombat",
-          "coverage": {
-            "default": 1,
-            "min": 0,
-            "max": 1,
-            "step": 0.1
-          },
           "effects": [
             {
               "id": "effect_q4n8v2k1",
@@ -77,6 +71,12 @@
                   22,
                   24
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             },
             {
@@ -96,6 +96,12 @@
                   25,
                   27.5
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -1198,12 +1204,6 @@
         },
         "teamBuff": {
           "scope": "inCombat",
-          "coverage": {
-            "default": 1,
-            "min": 0,
-            "max": 1,
-            "step": 0.1
-          },
           "effects": [
             {
               "id": "effect_wiki_217_target_dmg",
@@ -1222,6 +1222,12 @@
                   22,
                   24
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -2215,8 +2221,8 @@
         }
       },
       "images": {
-        "icon": "",
-        "source": ""
+        "icon": "/assets/w-engines/zzz_wiki_1908.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
       },
       "sources": [],
       "modification": {
@@ -2622,7 +2628,17 @@
               "id": "effect_wiki_1342_self_ether_sheer",
               "type": "stacked",
               "target": {
-                "kind": "default"
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "special"
+                  },
+                  {
+                    "kind": "skillType",
+                    "skillType": "ultimate"
+                  }
+                ]
               },
               "stat": "etherSheerDmg",
               "mode": "flat",
@@ -3036,6 +3052,862 @@
         "level60Stats": "source-checked",
         "effectText": "source-checked",
         "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_2088",
+      "name": {
+        "zhCN": "首席跟班"
+      },
+      "rarity": "S",
+      "specialty": "stun",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_2088.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/07/02/233874762/b2d14a6d726de1b081746fcd86cb6895_6980674744530952538.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "critRate",
+          "value": 24,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "天才的扈从"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者的冲击力提升30/33/36/39/42点，造成的伤害无视目标15%/17.2%/19.5%/21.7%/24%火属性伤害抗性；装备者为非操作中角色时，能量自动回复提升0.4/0.46/0.52/0.58/0.64点/秒；装备者发动[强化特殊技]造成火属性伤害时，使全队代理人造成的伤害提升12.5%/14.4%/16.3%/18.1%/20%，持续30秒，最多叠加2层，重复触发时刷新持续时间，同一招式内最多触发1次，该效果全队唯一。",
+          "en": ""
+        },
+        "selfBuff": null,
+        "teamBuff": {
+          "scope": "inCombat",
+          "condition": "fireExSpecialDamage",
+          "durationSeconds": 30,
+          "effects": [
+            {
+              "id": "effect_wiki_2088_team_dmg",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "valuePerStack": 12.5,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "modificationValues": {
+                "valuePerStack": [
+                  12.5,
+                  14.4,
+                  16.3,
+                  18.1,
+                  20
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/2088/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked-team-buff-only"
+      }
+    },
+    {
+      "id": "zzz_wiki_2030",
+      "name": {
+        "zhCN": "琳琅鎏心"
+      },
+      "rarity": "S",
+      "specialty": "anomaly",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_2030.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/06/07/233874762/46300e97a90161a412f9e1fcd9dded33_6025154583521829054.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "energyRegen",
+          "value": 60,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "无懈之礼"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者的异常精通提升70/80/90/100/110点；装备者发动[强化特殊技]造成风属性伤害时，自身造成的[乱流]和[风化]伤害提升7%/8%/9%/10%/11%。持续40秒，最多叠加2层，重复触发时刷新持续时间，同一招式内最多触发一次，拥有2层该效果时，全队代理人的异常精通提升60/69/78/87/96点，该效果全队唯一。",
+          "en": ""
+        },
+        "selfBuff": null,
+        "teamBuff": {
+          "scope": "inCombat",
+          "condition": "twoStacksAfterWindExSpecialDamage",
+          "durationSeconds": 40,
+          "effects": [
+            {
+              "id": "effect_wiki_2030_team_ap",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "value": 60,
+              "modificationValues": {
+                "value": [
+                  60,
+                  69,
+                  78,
+                  87,
+                  96
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/2030/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked-team-buff-only"
+      }
+    },
+    {
+      "id": "zzz_wiki_1427",
+      "name": {
+        "zhCN": "福虓炉炉"
+      },
+      "rarity": "S",
+      "specialty": "stun",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1427.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/06/09/233874762/5415b465efead7ad98e51da2b8db12ce_8073204425776204154.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 30,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "虎气融融"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者的[强化特殊技]、[连携技]和[终结技]造成的失衡值提升28%/32.2%/36.4%/40.6%/44.8%；发动[连携技]或[终结技]并造成火属性伤害时，全队造成的角色伤害提升10%/11.5%/13%/14.5%/16%，最多叠加2层，持续30秒，每层效果单独结算持续时间，同一招式内最多触发一次，该效果全队唯一。",
+          "en": ""
+        },
+        "selfBuff": null,
+        "teamBuff": {
+          "scope": "inCombat",
+          "condition": "fireChainOrUltimateDamage",
+          "durationSeconds": 30,
+          "effects": [
+            {
+              "id": "effect_wiki_1427_team_dmg",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "valuePerStack": 10,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "modificationValues": {
+                "valuePerStack": [
+                  10,
+                  11.5,
+                  13,
+                  14.5,
+                  16
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1427/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked-team-buff-only"
+      }
+    },
+    {
+      "id": "zzz_wiki_951",
+      "name": {
+        "zhCN": "焰心桂冠"
+      },
+      "rarity": "S",
+      "specialty": "stun",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_951.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/11/29/76099754/a26c633d050e4360280942594764204c_4616316956671018004.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "impact",
+          "value": 18,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "流动之火"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "发动[快速支援]或[极限支援]时，装备者的冲击力提升25%/28.75%/32.5%/36.25%/40%，持续8秒；装备者的[普通攻击]命中敌人时，对目标施加一层[萎靡]，最多叠加20层，持续30秒，重复触发时刷新持续时间；队伍中任意角色攻击命中敌人时，目标每拥有一层[萎靡]，本次攻击中冰属性伤害和火属性伤害的暴击伤害提升1.5%/1.72%/1.95%/2.17%/2.4%，该效果全队唯一。",
+          "en": ""
+        },
+        "selfBuff": null,
+        "teamBuff": {
+          "scope": "inCombat",
+          "condition": "languishStacks",
+          "durationSeconds": 30,
+          "effects": [
+            {
+              "id": "effect_wiki_951_team_crit_dmg_iceCritDmg",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "iceCritDmg",
+              "mode": "flat",
+              "valuePerStack": 1.5,
+              "maxStacks": 20,
+              "defaultStacks": 20,
+              "stackGroup": "effect_wiki_951_team_crit_dmg_element_values",
+              "stackLabel": {
+                "zhCN": "萎靡"
+              },
+              "modificationValues": {
+                "valuePerStack": [
+                  1.5,
+                  1.72,
+                  1.95,
+                  2.17,
+                  2.4
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_951_team_crit_dmg_fireCritDmg",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "fireCritDmg",
+              "mode": "flat",
+              "valuePerStack": 1.5,
+              "maxStacks": 20,
+              "defaultStacks": 20,
+              "stackGroup": "effect_wiki_951_team_crit_dmg_element_values",
+              "stackLabel": {
+                "zhCN": "萎靡"
+              },
+              "modificationValues": {
+                "valuePerStack": [
+                  1.5,
+                  1.72,
+                  1.95,
+                  2.17,
+                  2.4
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/951/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked-team-buff-only"
+      }
+    },
+    {
+      "id": "zzz_wiki_799",
+      "name": {
+        "zhCN": "奔袭獠牙"
+      },
+      "rarity": "S",
+      "specialty": "defense",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_799.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/09/12/141353238/31b6008c9ea5f6a1f195c64bba5440a0_1820903942251897760.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "impact",
+          "value": 18,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "不破铁骑"
+        },
+        "requirement": {
+          "specialty": "defense",
+          "label": {
+            "zhCN": "对于【防护】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者施加的护盾值提升30%/38%/46%/52%/60%；队伍中任意角色触发[破招]或[极限闪避]时，全队角色造成的伤害提升18%/22.5%/27%/31.5%/36%，造成的失衡值提升12%/15%/18%/21%/24%，持续20秒，同名被动效果之间不可叠加。",
+          "en": ""
+        },
+        "selfBuff": null,
+        "teamBuff": {
+          "scope": "inCombat",
+          "condition": "counterOrPerfectDodge",
+          "durationSeconds": 20,
+          "effects": [
+            {
+              "id": "effect_wiki_799_team_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 18,
+              "modificationValues": {
+                "value": [
+                  18,
+                  22.5,
+                  27,
+                  31.5,
+                  36
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/799/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked-team-dmg-only"
+      }
+    },
+    {
+      "id": "zzz_wiki_678",
+      "name": {
+        "zhCN": "玉壶青冰"
+      },
+      "rarity": "S",
+      "specialty": "stun",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_678.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/07/31/82500917/6758b3dad33fa7e9f42bd512ee306199_4330887744653690767.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "impact",
+          "value": 18,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "泠泠连奏"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "[普通攻击]命中敌人时，获得1层[茶劲]，每层[茶劲]使装备者的冲击力提升0.7%/0.88%/1.05%/1.22%/1.4%，最多叠加30层，持续8秒，每层效果单独结算持续时间；获得[茶劲]时，若装备者拥有的[茶劲]层数大于等于15层，全队角色造成的伤害提升20%/23%/26%/29%/32%，持续10秒，同名被动效果之间不可叠加。",
+          "en": ""
+        },
+        "selfBuff": null,
+        "teamBuff": {
+          "scope": "inCombat",
+          "condition": "teaStacksAtLeast15",
+          "durationSeconds": 10,
+          "effects": [
+            {
+              "id": "effect_wiki_678_team_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 20,
+              "modificationValues": {
+                "value": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/678/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked-team-buff-only"
+      }
+    },
+    {
+      "id": "zzz_wiki_218",
+      "name": {
+        "zhCN": "啜泣摇篮"
+      },
+      "rarity": "S",
+      "specialty": "support",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_218.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/27/11536806/ef3bdba96582ab932e00f488d9d84241_1480526923675603443.png"
+      },
+      "level60": {
+        "atkBase": 684,
+        "advancedStat": {
+          "stat": "penRatio",
+          "value": 24,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "惩·罚"
+        },
+        "requirement": {
+          "specialty": "support",
+          "label": {
+            "zhCN": "对于【支援】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "位于后场时，能量自动回复提升0.6/0.75/0.9/1.05/1.2点/秒；装备者命中敌人时，所有单位对目标造成的伤害提升10%/12.5%/15%/17.5%/20%，持续3秒；效果持续期间，每0.5秒该增益效果额外提升1.7%/2%/2.5%/3%/3.3%，最多额外提升10.2%/12%/15%/18%/19.8%，重复触发时仅刷新持续时间，不刷新伤害提升效果，同名被动效果之间不可叠加。",
+          "en": ""
+        },
+        "selfBuff": null,
+        "teamBuff": {
+          "scope": "inCombat",
+          "condition": "wearerHitEnemy",
+          "durationSeconds": 3,
+          "effects": [
+            {
+              "id": "effect_wiki_218_team_target_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 10,
+              "modificationValues": {
+                "value": [
+                  10,
+                  12.5,
+                  15,
+                  17.5,
+                  20
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_218_team_target_dmg_growth",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "valuePerStack": 1.7,
+              "maxStacks": 6,
+              "defaultStacks": 6,
+              "modificationValues": {
+                "valuePerStack": [
+                  1.7,
+                  2,
+                  2.5,
+                  3,
+                  3.3
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/218/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked-team-buff-only"
+      }
+    },
+    {
+      "id": "zzz_wiki_128",
+      "name": {
+        "zhCN": "「残响」-Ⅰ型"
+      },
+      "rarity": "B",
+      "specialty": "support",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_128.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/23/34600917/253bf13e8132045687243a7d28afa23f_2427862443496393199.png"
+      },
+      "level60": {
+        "atkBase": 475,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 20,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "潮汐"
+        },
+        "requirement": {
+          "specialty": "support",
+          "label": {
+            "zhCN": "对于【支援】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "发动[特殊强化技]时，全队角色冲击力提升8%/9%/10%/11%/12%，持续10秒，20秒内最多触发一次，同名被动效果之间不可叠。",
+          "en": ""
+        },
+        "selfBuff": null,
+        "teamBuff": {
+          "scope": "inCombat",
+          "condition": "exSpecial",
+          "durationSeconds": 10,
+          "effects": [
+            {
+              "id": "effect_wiki_128_team_impact",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "impactPct",
+              "mode": "flat",
+              "value": 8,
+              "modificationValues": {
+                "value": [
+                  8,
+                  9,
+                  10,
+                  11,
+                  12
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/128/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked-team-buff-only"
+      }
+    },
+    {
+      "id": "zzz_wiki_129",
+      "name": {
+        "zhCN": "「残响」-Ⅱ型"
+      },
+      "rarity": "B",
+      "specialty": "support",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_129.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/23/34600917/a7cf76336e9afdd9d38f9d652d516d94_4327705131427584663.png"
+      },
+      "level60": {
+        "atkBase": 475,
+        "advancedStat": {
+          "stat": "energyRegen",
+          "value": 40,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "音浪"
+        },
+        "requirement": {
+          "specialty": "support",
+          "label": {
+            "zhCN": "对于【支援】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "发动[强化特殊技]或[连携技]时，全队角色异常掌控和异常精通提升10/12/13/15/16点，持续10秒，20秒内最多触发一次，同名被动效果之间不可叠加。",
+          "en": ""
+        },
+        "selfBuff": null,
+        "teamBuff": {
+          "scope": "inCombat",
+          "condition": "exSpecialOrChain",
+          "durationSeconds": 10,
+          "effects": [
+            {
+              "id": "effect_wiki_129_team_anomaly_mastery",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyMasteryFlat",
+              "mode": "flat",
+              "value": 10,
+              "modificationValues": {
+                "value": [
+                  10,
+                  12,
+                  13,
+                  15,
+                  16
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_129_team_anomaly_proficiency",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "value": 10,
+              "modificationValues": {
+                "value": [
+                  10,
+                  12,
+                  13,
+                  15,
+                  16
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/129/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked-team-buff-only"
+      }
+    },
+    {
+      "id": "zzz_wiki_93",
+      "name": {
+        "zhCN": "「残响」-Ⅲ型"
+      },
+      "rarity": "B",
+      "specialty": "support",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_93.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/21/34600917/059a75f3681deb2e9c78cc9835dc82b8_8996856758612183619.png"
+      },
+      "level60": {
+        "atkBase": 475,
+        "advancedStat": {
+          "stat": "hpPct",
+          "value": 20,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "强音"
+        },
+        "requirement": {
+          "specialty": "support",
+          "label": {
+            "zhCN": "对于【支援】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "发动[连携技]或[终结技]时，全队角色攻击力提升8%/9%/10%/11%/12%，持续10秒，20秒内最多触发一次，同名被动效果之间不可叠加。",
+          "en": ""
+        },
+        "selfBuff": null,
+        "teamBuff": {
+          "scope": "inCombat",
+          "condition": "chainOrUltimate",
+          "durationSeconds": 10,
+          "effects": [
+            {
+              "id": "effect_wiki_93_team_atk",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkPct",
+              "mode": "pct",
+              "basis": "outOfCombatAtk",
+              "value": 8,
+              "modificationValues": {
+                "value": [
+                  8,
+                  9,
+                  10,
+                  11,
+                  12
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/93/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effectText": "source-checked",
+        "effectBuff": "source-checked-team-buff-only"
       }
     }
   ]

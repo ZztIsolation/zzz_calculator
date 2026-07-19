@@ -1,60 +1,70 @@
 # ZZZ 计算器
 
-这是一个绝区零驱动盘、面板、伤害与优化器工作区。项目由一个无第三方依赖的 Node.js 后端和静态前端页面组成，用于账号管理、仓库维护、局外/局内面板计算、伤害白盒查看，以及驱动盘最优组合搜索。
+ZZZ 计算器是一个基于 Vue 3 的绝区零计算工具，覆盖角色面板、伤害建模、驱动盘仓库、本地优化、账号管理和扫描器导入。跨平台游戏逻辑集中在共享核心中，由浏览器与 Node.js 服务复用。
 
-英文文档见 [README.md](README.md)。
+英文说明见 [README.md](README.md)。
 
 ## 上传更新摘要
 
-### 2026-07-09 扫描器 1.0.36 发布
+以下内容按实际开发日期汇总。完整实现细节、建模决策和验证证据继续保留在
+[详细变更日志](docs/changelog.md) 中。
 
-本次上传将网页唤起的 OCR 运行时替换为 ZZZ Scanner Next `1.0.36`：
+### 2026-07-19 每日更新
 
-- OCR 运行时重新来自本机 `publish 1.0.36`，压包时排除生成的 `Scans` 输出，并保留包内 `Data/ocr_fast_templates.json`。
-- Pages scanner manifest、本地 package manifest 和扫描助手下载链接已更新为 `scannerVersion=1.0.36`。
-- OCR zip 已发布到 GitHub Release tag `scanner-1.0.36`，SHA-256 为 `d885c0aef6da61cfcbf994ad2b4e712a31efe8bd87631260fe4f87ea8711c63d`，大小 `47231570` bytes。
-- Pages 构建产物现在也会携带同一份 OCR zip，路径为 `/downloads/zzz-scanner/1.0.36/ZZZ-Scanner.Next-win-x64.zip`；manifest 会优先让 Helper 下载同站静态文件，GitHub Release 仅作为兜底，避免用户本机网络在拉 GitHub 大文件时 0B 断连。
-- 已用本地 `1.0.36` 扫描器完成 120 件 benchmark：`Completed=120`、`Failed=0`、重复导出 0、`IncompleteRoi=0`、`slot_safety=pass`、`profile_route=exact:7`。
+- 新增冲刺攻击、强化特殊技和支援攻击的显式招式标签，并让定向 2 件套贯通计算与优化器链路。
+- 完成拂晓生花 2 件套与指定九套 4 件套建模，支持逐规则覆盖率/层数、特性要求和团队同名唯一效果。
+- 取消优化器自动附加的攻击力、异常精通、暴击率和暴击伤害下限；未改动过的旧默认值会迁移为不限制，用户主动填写的限制继续保留。
+- 新增 `/settings`，分别管理浏览器内的计算器数据与本项目所搭载扫描功能占用的存储空间。
+- 明确驱动盘工具栏的“新增单个、批量导入、批量导出、刷新、扫描”职责，并将“扫描”设为唯一主操作。
 
-### 2026-07-02 扫描器 1.0.35 与云绝区零客户端选择
+### 2026-07-18 每日更新
 
-本次上传为驱动盘扫描弹窗增加明确的客户端选择。默认仍为本地绝区零；选择云绝区零时，网页会发送
-`processName="Zenless Zone Zero Cloud"` 和 `visualProfileClient="cloud"`，
-让扫描器使用包内已验证的云端视觉 profile。
+- 新增队友属性/特性筛选，补齐能作用于队友的简 Buff，以及叶瞬光 4/6 影机制与 6 影默认循环。
+- 将异常与紊乱时间粒度改为效果专属，把失衡状态下放到每个事件，并实时展示技能、异常和紊乱事件倍率。
+- 统一爱丽丝的紊乱层数模型，修复面板、伤害计算和优化器中异常掌控百分比被系统性丢失的问题。
+- 新增当前账号驱动盘 JSON 批量导出与回导，不导出账号归属和可重新计算的指纹。
+- 精简玩家自定义 Buff 选项但保留完整维护能力，并新增容器感知的布局回归保护。
 
-- OCR 运行时重新来自本机 `publish 1.0.35`，压包时排除生成的 `Scans` 输出，并保留包内 `Data/ocr_fast_templates.json`。
-- Pages scanner manifest 和本地 package manifest 已更新为 `scannerVersion=1.0.35`。
-- OCR zip 已发布到 GitHub Release tag `scanner-1.0.35`，SHA-256 为 `2a10aa3dc92e50c7ea930d75eda82fef741eff16e8c39f2839240b6fc36b0255`，大小 `47228425` bytes。
-- 网页扫描 payload 继续保持稳定 strict DXGI 路线，但会显式区分本地/云端目标，云端扫描不再误找本地 `ZenlessZoneZero` 进程。
+### 2026-07-17 每日更新
 
-### 2026-07-02 扫描器 1.0.34 发布
+- 完成爱丽丝的伤害、Buff、影画、默认循环、面板与优化器建模，并支持异常掌控 6 号位优化。
+- 新增正式的全属性抗性无视统计区，与减抗保持独立，并兼容既有单属性抗性无视。
 
-本次上传将网页唤起的 OCR 运行时替换为 ZZZ Scanner Next `1.0.34`：
+### 2026-07-16 每日更新
 
-- OCR 运行时重新来自本机 `publish 1.0.34`，压包时排除生成的 `Scans` 输出，并保留包内 `Data/ocr_fast_templates.json`。
-- Pages scanner manifest 和本地 package manifest 已更新为 `scannerVersion=1.0.34`。
-- OCR zip 已发布到 GitHub Release tag `scanner-1.0.34`，SHA-256 为 `d87a993e15a0f9103942b0284d8d5fc552bed348147180682ef42f7b0fc51c30`，大小 `47228531` bytes。
-- 网页扫描 payload 继续保持稳定 strict DXGI 路线，并刷新 Helper `1.0.2`：完整下载后的临时包会先进入校验流程，不会继续发 Range 重试；首次下载仍会显示字节数、百分比、速度和重试次数。
+- 新增版本化 Boss 档案，并将 Boss 敌情 Buff 移入统一选择器，不再与目标防御或抗性联动。
+- 新增 3.0 危局强袭第三期场地 Buff，并为队友携带的音擎提供独立精修选择。
+- 将共享 Buff 覆盖率改为逐效果独立的 `0-1` 覆盖率，同时保留管理员默认值。
+- 修复驱动盘四件套技能目标的维护保存，并继续兼容清理旧覆盖率和 Boss 数据。
 
-### 2026-07-02 扫描器 1.0.33 与弹窗流程更新
+### 2026-07-15 每日更新
 
-本次上传发布网页唤起的 ZZZ Scanner Next `1.0.33`，并一并提交当前优化器/仓库页的待提交 UI 更新：
+- 移除通用效果 `appliesTo` 筛选，改用明确的全局、异常、角色招式和技能大类目标。
+- 强化标准技能类型，并在维护、计算和优化器中明确区分伤害增伤区与技能倍率区。
 
-- OCR 运行时重新来自本机 `publish 1.0.33` 输出包，包内包含 `Data/ocr_fast_templates.json`，网页不会再传 `ocrFastIndex` 覆盖参数。
-- 驱动盘扫描请求改用 `1.0.33` 稳定 payload：`fastMode=true`、`captureMode=dxgi`、`profileRouting=strict`、`overlapConflictMode=recover`、`panelAcceptMode=adaptive-early-full-roi`、`scrollAcceptMode=early-one-row`、`postScrollPanelAcceptMode=safe`、`panelMinAcceptFloorMs=120`。
-- 非 15 级全仓读取仍不作为默认能力开放，网页默认保持 `stopAtNonLevel15=true`。
+### 2026-07-14 每日更新
+
+- 将管理员默认循环重构为按影画分栏的主从弹窗，并以结构化技能目标替代技能 ID 前缀匹配。
+- 将严格优化器固定产品契约从 Top 5 扩展为 Top 10，并用即时排名选择器替换结果下拉框。
+- 恢复 Vue 工作台的维护可见性控制，同时保证隐藏资料与既有存档兼容。
+
+### 2026-07-13 每日更新
+
+- 通过保持结果一致的剪枝、专用评分路径、性能基准和对齐测试，大幅加速严格精确驱动盘优化。
+- 将 Vue 维护页重建为结构化管理员工作区，提供资料专用表单、自动 ID、可读引用和保存预览。
+
+### 2026-07-12 每日更新
+
+- 清理前先归档 Vue 重写版本，随后移除旧前端，并围绕共享核心与 Vue 应用统一浏览器和 Node 运行路径。
+- 删除过时的重复运行时代码和生成产物，同时保留公开资料、源素材、存储兼容性与测试。
+
+### 2026-07-02 驱动盘弹窗流程更新
+
+本次更新改进计算器侧的优化器与驱动盘工作流：
+
 - 驱动盘分析弹窗现在默认展示角色感知的“差异计算”，并保留“当前副词条”和“收益曲线”视图。
 - 战斗 Buff、优化器 2 件套/4 件套限制、计算配置、驱动盘编辑和套装预设编辑弹窗改为明确的取消/应用或取消/保存页脚，临时选择不会立刻改动当前方案。
 - 堆叠型音擎效果支持通过 `stackGroup` 共用一个层数输入；「青溟笼舍」的两个“青溟同行”效果会同步同一层数。
-
-### 2026-07-02 扫描助手下载进度
-
-本次上传刷新现有 `scanner-1.0.33` Release 中的 `ZZZ-Scanner-Helper.exe`：
-
-- Helper 下载 OCR 运行时时会回传已下载字节、总字节、百分比、下载速度和重试次数。
-- 驱动盘页会直接显示这些进度，不再只停在固定的“正在下载”文案。
-- 如果当前连接的是低于 `1.0.1` 的旧 Helper，页面会提示重新下载新版 Helper，因为旧 Helper 无法回传字节级下载进度。
-- 本机诊断确认 GitHub Release 资产存在，但完整下载会出现连接重置或连接 GitHub 超时，因此当前现象更像下载链路不稳定/被阻断，不是单纯的页面假死。
 
 ### 2026-07-01 角色感知词条差异分析
 
@@ -65,40 +75,13 @@
 - 当前已经装备的主词条不会生成无意义的反向扣除行，例如物伤盘不会再出现 `-30 physicalDmg`。
 - 前端本地计算、后端分析 API 和回归测试已保持一致。
 
-### 2026-07-01 扫描器包体瘦身
+### 2026-06-30 GitHub Pages 部署
 
-本次上传在不改变网页唤起流程的前提下降低扫描器下载体积：
+本次更新将公开计算器迁移到 GitHub Pages 部署：
 
-- `ZZZ-Scanner-Helper.exe` 改为 NativeAOT 小助手，下载体积从约 67.6MB 降到 7.4MB。
-- `1.0.28` OCR 扫描器 zip 去掉未使用的视频/诊断负载，包体从约 129.9MB 降到 115.2MB。
-- 已同步扫描器 manifest 的 hash/size；Helper 协议、扫描器版本、入口程序和 OCR 模型保持不变。
-- 公开 Pages manifest 现在优先使用已验证的 GitHub Release 新包，避免旧 ECS 镜像返回瘦身前的大包。
-
-### 2026-07-01 02:55 +08:00
-
-本次上传修复公开 Pages 站点首次准备 OCR 扫描器容易卡住的问题：
-
-- 已将 `1.0.28` OCR zip 上传到 ECS 备用镜像，并让生成的扫描器 manifest 优先尝试该镜像，再尝试 GitHub Releases。
-- 前端准备 OCR 扫描器的超时时间已放宽，覆盖当前 130MB 包在低带宽镜像上的实际下载耗时。
-- 如果 Helper 探测接口已经报告扫描器已安装，驱动盘页会直接启用扫描按钮，不再等待额外的 launcher progress 流程。
-
-### 2026-06-30 22:20 +08:00
-
-本次上传迁移到不备案的 GitHub Pages + GitHub Releases 发布方式：
-
-- 新增 `npm run build:pages`，生成 `dist/pages` 静态站点，导出 `static/catalog.json`、`static/app-config.json`、`downloads/zzz-scanner/manifest.json` 和 `CNAME`。
+- 新增 `npm run build:pages`，生成 `dist/pages` 静态站点，导出 `static/catalog.json`、`static/app-config.json` 和 `CNAME`。
 - 前端优先读取静态 JSON，保留本地 Node server 的 `/api/catalog`、`/api/meta`、`/api/app-config` 作为开发兜底。
-- 驱动盘页的小助手下载改为 GitHub Releases 下载；OCR manifest 增加 `packageUrls`，便于小助手在镜像更新后尝试多个 OCR 包来源。
 - 新增 GitHub Actions Pages 工作流，只上传 Pages artifact，不提交 `dist/pages` 或 `downloads/` 大文件。
-
-### 2026-07-01 01:00 +08:00
-
-本次上传更新网页唤起 OCR 扫描器的 1.0.28 稳定版集成：
-
-- `/downloads/zzz-scanner/manifest.json` 已改为提供 ZZZ Scanner Next `1.0.28`，下载路径为 `/downloads/zzz-scanner/1.0.28/ZZZ-Scanner.Next-win-x64.zip`。
-- 网页扫描请求现在会发送更稳的 fast DXGI 路线：`overlapConflictMode=recover`、`panelMinAcceptFloorMs=120`、`postScrollPanelAcceptMode=safe`，非 15 级全仓库扫描仍不作为默认能力开放。
-- 扫描失败弹窗会显示 scanner 版本和本地运行目录，便于确认实际运行的是哪个 OCR 包。
-- `npm run test:scanner-bridge` 新增扫描器 manifest、包大小、SHA-256 和 `scan_req` payload 校验。
 
 ### 2026-06-24 01:31 +08:00
 
@@ -202,222 +185,153 @@
 - 维护页支持技能倍率、音擎改装缩放、异常/紊乱效果、自身/团队拆分效果，并强化数据校验。
 - 新增账号、扫描器导入、音擎改装、共享战斗工具、异常伤害、伤害白盒、维护校验和优化器等回归测试。
 
-## 功能
-
-- 维护角色、音擎、驱动盘套装、技能倍率、属性规则、异常效果和战斗 Buff 数据。
-- 根据角色属性、核心技等级、音擎、驱动盘和无条件套装效果计算局外面板。
-- 在局外面板基础上叠加自身、队友、音擎、驱动盘 4 件套、场地、Boss 和手动 Buff，计算局内面板。
-- 战斗 Buff 支持队友、音擎团队、驱动盘团队和自定义来源分组，便于查看与移除。
-- 支持直伤、贯穿、异常和紊乱事件的伤害预览，并输出可检查的公式拆解；目标防御、抗性与失衡乘区可配置，不同伤害类型使用独立的事件修正区。
-- 支持 ZZZ Scanner 驱动盘导入、一键唤起本地扫描助手、手动编辑、重复识别、账号隔离存储和可选的“移除缺失”同步。
-- 支持保存驱动盘套装预设，首页可套用，优化器结果也可保存。
-- 驱动盘优化器支持计算目标预设、预览、后台任务进度、取消、套装结构限制、多选额外 2 件套、推荐/默认 4 件套辅助、4 件套 Buff 自动或手动处理、主词条限制、最低属性限制、精确/快速/并行算法选择和伤害评分。
-- 驱动盘分析工具支持查看当前副词条有效词条数，以及额外副词条带来的预测伤害收益。
-- 提供静态资料维护页，用于录入和校验游戏数据 JSON。
-
-## 目录结构
+## 架构
 
 ```text
-zzz_calculator/
-  README.md
-  README.zh-CN.md
-  package.json
-  backend/
-    server.js
-    calculator.js
-    driveDiscAnalysis.js
-    driveDiscInventory.js
-    driveDiscOptimizer.js
-    driveDiscOptimizerWorker.js
-  data/
-    agents.json
-    agent_skills.json
-    anomaly_effects.json
-    w_engines.json
-    drive_disc_sets.json
-    stat_rules.json
-    combat_buffs.json
-    user_drive_discs.example.json
-  docs/
-    changelog.md
-    frontend-usability-audit.md
-    goal.md
-    modeling.md
-  examples/
-    out_of_combat_panel.example.json
-    ye_shunguang_panel.example.json
-  frontend/
-    index.html
-    drive-discs.html
-    accounts.html
-    maintenance.html
-    app.js
-    calculate.js
-    drive-disc-analysis.js
-    drive-discs.js
-    dialogs.js
-    entity-select.js
-    feedback.js
-    accounts.js
-    accounts-page.js
-    maintenance.js
-    maintenanceStats.js
-    shared-combat.js
-    skillMultiplierCandidates.js
-    assets/
-  tests/
+core/                    共享计算、校验、仓库规则和优化搜索引擎
+webapp/                  Vue 3 + Pinia + Vite 应用
+  src/runtime/           浏览器 catalog、存储、扫描器和优化器适配器
+  public/assets/         应用图片与其他公开资源
+backend/                 Node.js API、文件适配器和构建产物服务
+data/                    游戏资料与公开配置
+examples/                稳定计算 fixture
+scripts/                 Pages 与发布构建脚本
+tests/                   Node 及跨运行时回归测试
+benchmarks/              按需运行的性能基准
+docs/                    建模说明、回归契约和详细变更日志
 ```
 
-## 运行
+账号、驱动盘、导入记录和套装预设继续由浏览器通过既有 IndexedDB/localStorage schema 保存。公开站点的重优化始终在一个独立浏览器 Worker 中运行，在保持页面响应的同时不再创建嵌套 Worker 池。Node 适配器继续为本地和自托管环境保留 worker thread 并行能力。
 
-需要支持 ES module 的 Node.js。当前不需要安装第三方 npm 依赖。
+未选择额外 2 件套时，优化器会自动搜索所有可组成的完整 4+2，以及限定四件套的 6 件同套；不再考虑 4+1+1 和 5+1 散件组合。
+
+优化器可按需限制攻击力、异常精通、暴击率和暴击伤害的最低值。这四项均按局外角色面板判断，不计入局内 Buff；默认全部不限定，加减步长依次为 50、10、10 和 10。输入仅要求为非负整数，不需要是步长的整数倍。
+
+## 环境与安装
+
+- Node.js 20
+- npm
+
+按锁文件安装 Vue 工作区依赖：
 
 ```bash
-cd zzz_calculator
+npm run install:webapp
+```
+
+根项目本身不引入第三方运行时依赖。
+
+## 本地运行
+
+构建 Vue 应用并启动 Node 服务：
+
+```bash
 npm start
 ```
 
-启动后打开终端打印的本地地址，通常是 `http://localhost:8787`。如需指定端口，可以使用 `PORT=8791 npm start`。
+默认地址是 `http://127.0.0.1:8787`。已有 Vue 构建产物时，可以跳过重新构建：
 
-驱动盘页的「扫描」会优先连接本地小助手。公开站点上的小助手下载按钮指向 GitHub Releases；本地 Node server 开发模式仍可从 `/downloads/ZZZ-Scanner-Helper.exe` 提供文件。OCR 包 manifest 当前使用已验证的 GitHub Release 新包。小助手会注册 `zzz-scanner://` 协议，在 `127.0.0.1:22355` 与网页通信，并按 `/downloads/zzz-scanner/manifest.json` 自动下载/更新真正的 OCR 扫描器大包。当前网页发布的大包版本是 ZZZ Scanner Next `1.0.36`。
+```bash
+npm run serve
+```
 
-主要页面：
+只开发前端并启用热更新时运行：
 
-- `/`：驱动盘优化器首页，支持自选、套装和优化结果方案预览
-- `/drive-discs.html`：驱动盘仓库和套装预设
-- `/calculate.html`：旧优化器兼容入口，自动跳转到 `/`
-- `/accounts.html`：账号新增、切换、改名和删除
-- `/maintenance.html`：静态资料维护。本地开发默认可用；`NODE_ENV=production` 时默认禁用。
+```bash
+npm run dev:webapp
+```
 
-## 本地运行数据
+可通过 `PORT` 修改 Node 端口。服务默认只监听 `127.0.0.1`；容器或局域网公开监听必须显式设置 `HOST`（例如 `0.0.0.0`）。生产环境默认关闭维护功能，只有显式设置 `MAINTENANCE_ENABLED=true` 才会开放。维护写入默认只接受回环地址的浏览器 Origin；非回环来源必须逐项加入逗号分隔的 `MAINTENANCE_ALLOWED_ORIGINS`。
 
-用户态数据保存在浏览器本地 IndexedDB 中，包括账号、当前账号、驱动盘仓库、导入记录和套装预设。线上部署后，A 用户在自己浏览器里的上传、编辑、删除和账号切换不会写入服务器公共仓库，也不会影响 B 用户。
+## 路由
 
-旧版的 `data/user_drive_discs.json` 仍被 Git 忽略，只用于后端历史测试和本地迁移参考；公开页面不再通过服务器用户数据 API 读写它。
+| 路由 | 用途 |
+| --- | --- |
+| `/` | 工作台：角色配置、伤害配置、Buff、驱动盘方案与优化器 |
+| `/discs` | 驱动盘仓库、当前账号 JSON 导入导出、套装预设与扫描流程 |
+| `/accounts` | 本地账号新增、切换、改名和删除 |
+| `/maintenance` | Vue 结构化资料维护页，覆盖八类资源，仅在维护功能开启时可用 |
 
-`data/user_drive_discs.example.json` 是空仓库结构示例。复制到 `imports/` 或 `data/imports/` 的扫描器导出文件也会被忽略。
+`/calculate.html`、`/drive-discs.html` 和 `/accounts.html` 保留为兼容跳转。维护开启时，`/maintenance.html` 跳转到 `/maintenance`；维护关闭时两个维护页面路由返回 404，维护 API 返回 403。
 
-`data/` 下的公开静态数据、前端素材、示例、文档和测试应保持提交状态，这样其他用户克隆后可以直接运行。
+工作台事件管理会在左侧目标列表和右侧当前事件详情中同时显示每个技能、属性异常和紊乱事件的“当前倍率”。技能倍率跟随当前技能等级，属性异常计入触发次数，紊乱则根据原异常、紊乱类型和已流逝秒数实时更新；读数会折算存量事件比例，但不会再乘独立的事件次数，也不会混入暴击、增伤、防御等最终伤害乘区。普通用户不再看到容易与技能倍率混淆的“伤害比例”输入，结构化维护端和已有存档仍保留该字段及其计算语义。紊乱已流逝秒数按异常目录的跳数间隔归一化（灼烧、侵蚀为 `0.5` 秒，其余现有紊乱为 `1` 秒），保存时不按基础持续时间提前截断；目录预览只显示基础时长倍率，最终伤害会按“基础持续时间 + 当前 Buff 延长”截断并重算剩余时间、跳数和倍率。
 
-## 生产环境
+工作台 Buff 选择器会为每个已勾选的队友音擎独立显示精修选择，并按该音擎支持的等级范围提供选项。切换等级会立即刷新 Buff 效果预览，但只有“应用选择”才写入当前方案，“取消”不会改变已保存配置。所选精修等级会显示在已启用 Buff 摘要中，并通过同一计算输入同时影响工作台计算和驱动盘优化器。
 
-当前公开站点推荐部署到 GitHub Pages，不再把 `zzzcaculator.top` 解析到中国内地 ECS，因此不走 ICP 备案。
+全属性抗性无视使用正式的 `allResIgnore` 效果建模，不再拆成六条重复属性规则，也不再借用减抗字段。它与敌方抗性降低保持独立语义，并和当前伤害属性对应的单属性抗性无视正常叠加；维护表单与工作台自定义 Buff 均可为全局效果或技能目标效果直接选择“全属性抗性无视%”。原有六个单属性抗性无视字段继续兼容。
 
-静态站构建命令：
+叶瞬光现已补齐官方4影与6影机制。[以太帷幕·决裁]即使作用于管理员标记为“未失衡”的事件，也会捕获目标配置的失衡倍率；基础帷幕易伤加成上限为110%，4影提高到200%，不会把两者差值错误当作固定增伤。6影的末击1500%攻击力倍率只加到[强化特殊技：明心境·归尘]和[终结技：斩妄开天]。6影管理员默认循环沿用现有12次变身窗口，固定包含2影短轴12次、付费[终结技：逐云惊霆]2次、[终结技：斩妄开天]6次和[强化特殊技：明心境·归尘]6次。
+
+简现已作为队友 Buff 组接入，仅包含能作用于队友的 F 级核心被动、2 影和 4 影。核心使畏缩持续时间增加 5 秒，因此满时长畏缩紊乱由 `525%` 提高到 `450% + 15 × 7.5% = 562.5%`；强击异常暴击率为 `clamp(40 + 简异常精通 × 0.16, 0, 100)%`，输入默认 375 且允许向下调整，异常暴击伤害为 50%。2 影只让强击无视 15% 防御并再增加 50% 异常暴击伤害；4 影只进入属性异常增伤区 `+18%`，不进入紊乱增伤区。选中这些 Buff 即表示对应触发条件已经满足，系统不模拟覆盖时间轴。
+
+工作台自定义 Buff 使用面向普通用户的精简白名单：物理、火、冰、电、以太、风六种属性伤害加成仍分别保留；六属性版贯穿增伤、暴击伤害、无视防御、减抗和抗性无视改由通用或“当前属性”选项表达，“异常掌控超过 140 时每点转异常精通”仅在维护端提供。结构化维护表单继续开放全部明确属性字段，使用已隐藏类型的旧自定义 Buff 也仍可读取并完整参与计算。
+
+爱丽丝现已按官方资料开放，并完整接入核心被动、额外能力和 1/2/4/6 影机制：局内异常掌控超过 140 后，每点换算 1.6 异常精通；物理异常剩余时间每秒为紊乱倍率加算 18%，上限 180%；极性强击按普通强击 100% 结算；核心追伤通过 2.5% 事件伤害比例结算；6 影追加攻击使用 3300% 异常精通作为伤害基础值并固定暴击。管理员默认循环分别覆盖 0 影满时长物理异常窗口、2 影终结技带来的额外极性强击，以及 6 影的 6 次决胜追击；6 号位优化会同时比较异常掌控和攻击力%。
+
+异常掌控百分比与固定点数使用独立计算桶：角色基础值和核心技白值加成先合并，再乘以驱动盘、两件套和音擎高级属性的局外百分比；局内百分比继续乘当前局外面板，局内固定点数最后相加。法厄同之歌两件套提供 8% 异常掌控。满核心技爱丽丝佩戴 30% 异常掌控 6 号位和法厄同两件套时，内部面板为 `142 × 1.38 = 195.96`，伤害和优化器保留完整精度，界面按游戏规则显示为 `195`。
+
+维护页保留旧版“顶部资源页签 → 左侧资料列表 → 右侧专用表单”的工作方式，并使用 Vue 与 Naive UI 控件重写；管理员不需要填写或识别内部 ID，角色技能页仅在默认折叠的“技术信息”中提供只读 ID 审计。新增条目及其技能行、效果规则、修饰器和计算事件会自动生成标识；跨资料关联通过名称、来源和属性等可读选项完成。增幅对象明确区分“常规属性 / 全局效果”“异常目标”“指定角色招式”和“通用技能大类”：异常目标选择属性异常或紊乱及具体异常，角色模式提供角色、大类、招式和倍率行级联并允许选择整类招式，通用模式可多选普通攻击、闪避、支援技、特殊技、连携技、终结技等大类；维护页和工作台自定义 Buff 均不再显示或保存招式 ID 前缀。“技能目标伤害加成%”进入增伤乘区，“技能倍率加算%”直接加到招式倍率。效果规则不再提供旧“适用范围”筛选；属性限制改用明确类型，异常限制只使用结构化异常目标，多属性效果拆成多条共享层数规则，技能限制只通过增幅对象设置。工作台自定义 Buff 不开放缺少异常目标选择的裸持续时间属性。旧浏览器数据仍可计算，可转换的旧筛选会在草稿和维护 API 中自动升级，无法无损转换的旧筛选会明确阻止保存。长表格与编辑区可独立滚动。图片来源与多条资料来源分开维护，共享层数组、默认循环目标事件、音擎 1–5 级改装预览，以及音擎/驱动盘的条件、持续时间、分段文案和修饰规则均使用可读控件。管理员默认循环在角色表单中显示为紧凑摘要，通过独立弹窗按影画页签切换方案，并采用“左侧目标事件列表、右侧当前事件编辑”的主从布局；弹窗取消不修改角色草稿，新增影画方案复制当前循环并重建事件标识，`0 影`始终保留为基础方案。每个技能、异常、紊乱或技能组事件都可由管理员配置“是否失衡”；管理员默认模式在工作台保持只读，其他计算方式允许用户逐事件切换。技能组次数由系统固定为“默认 1、最小 0、最大 100、步长 1”。每条局内增幅规则独立提供“允许用户调整覆盖率”开关和管理员默认百分比；开启后仅由系统固定最小 0、最大 1、步长 0.1，并且只有已开启的规则才会在首页 Buff 选择和优化器中提供 `0-1` 小数覆盖率输入。队友 Buff 按“角色 → Buff 列表 → 当前 Buff”分层维护，保存预览隐藏内部标识和技术条件值，并以百分比显示规则默认覆盖率。
+
+队友 Buff 角色分组必须维护角色级属性与特性。选择弹窗会按当前数据动态提供两个可清空多选筛选：同一维度内取并集，属性与特性之间取交集，并与文本搜索继续叠加；批量添加或移除只作用于筛选后可见的 Buff。维护页会显示并搜索属性、特性的中文名称。
+
+Boss 资料使用独立的 `data/bosses.json` 档案。稳定的名称、别名、本地图片、防御、弱点和抗性归 Boss 档案所有；每个档案下可以维护多个敌情版本，分别保存敌情原文、玩家增益/减益、返场期数和资料来源。机制未变的返场只追加期数，机制或数值变化时新增版本。可计算条目复用普通效果规则；当前模型不支持的效果以 `descriptiveOnly` 完整展示，并且不会进入伤害计算。Boss Buff 在统一 Buff 弹窗中按版本、期数和 Boss 名称筛选，全局最多启用一个，并与场地 Buff 独立组合。敌方目标面板只维护 1588、476、953 与自定义防御预设、当前伤害属性抗性和初始失衡倍率；伤害发生时是否处于失衡状态改由每个计算事件配置。选择 Boss Buff 不会自动修改目标防御或抗性。旧“具体 Boss”存档会将敌情迁移到 Buff 选择，并把目标恢复为 953 防御、全抗性 0。
+
+## 本地数据
+
+用户数据只保存在浏览器中，并按当前账号隔离。已有安装继续使用相同 IndexedDB 和 localStorage 键，不需要破坏性迁移。
+
+手动驱动盘编辑器仅面向 S 级驱动盘，并自动生成内部 ID。四个固定副词条行只提供游戏内合法的十种选项，明确区分固定值与百分比生命、攻击、防御；用户选择 1～6 个词条后，界面会自动换算回既有 `{ stat, value }` 存储格式。导入的非 S 级驱动盘及隐藏的装备角色信息保持原样。
+
+驱动盘仓库可以把当前账号的全部驱动盘导出为带版本号的 `zzz-calculator-drive-disc-export` JSON 文件。导出完全在浏览器本地完成，不受当前表格筛选影响，不包含其他账号或套装预设，并会从每条记录中移除账号归属和可重新计算的指纹。原有导入预览同时支持该原生格式与 ZZZ Scanner JSON；回导时重新计算指纹，并把所有驱动盘归入导入时的当前账号。导入默认合并，只有显式勾选既有的“同步删除缺失盘”才会执行镜像式删除。
+
+本地 `data/user_drive_discs.json`、`imports/` 或 `data/imports/` 下的扫描器导出、构建产物、日志、下载文件和 Playwright 产物均被 Git 忽略。包括 `data/bosses.json` 与本地 Boss WebP 在内的公开 catalog、示例、源资源和测试继续纳入版本控制。
+
+## 测试与构建
+
+安装 webapp 依赖后运行完整回归：
+
+```bash
+npm test
+```
+
+常用聚焦命令：
+
+```bash
+npm run test:webapp
+npm run test:layout
+npm --prefix webapp run build
+npm run build:pages
+npm run benchmark:optimizer
+```
+
+`npm test` 覆盖 Node 计算模型、优化器 fixture/进度/API/fuzz、存储兼容、扫描器桥接、生产服务行为和 Vue 测试。`npm run test:layout` 会先构建应用，再用 Chromium 在桌面、缩放桌面和移动端拒绝标签裁切、控件越界及意外横向滚动。CI 使用 Node 20，在每个分支和 Pull Request 上运行两套门禁。
+
+## GitHub Pages
+
+生成静态部署产物：
 
 ```bash
 npm run build:pages
 ```
 
-构建产物在 `dist/pages`，包含首页、驱动盘页、账号页、静态资料 JSON、`CNAME` 和 OCR manifest。GitHub Actions 会在 `main` 分支更新后运行同一命令，并用 Pages artifact 发布；不要提交 `dist/pages`。
+产物写入 `dist/pages`，不会提交到 Git。内容包括 SPA、静态 catalog/config、`CNAME`、扫描器 manifest，以及可用时经过校验的当前扫描器双包。`.github/workflows/pages.yml` 只在 `main` 更新时部署；默认 Pages 产物不包含维护页面。
 
-Helper 和 OCR 大包通过 GitHub Releases 发布，不进入 Git 仓库：
+## 扫描器集成
 
-- tag：`scanner-1.0.36`
-- `ZZZ-Scanner-Helper.exe`
-- `ZZZ-Scanner.Next-win-x64.zip`
+驱动盘扫描流程依赖一个注册 `zzz-scanner://` 协议的本地小助手。小助手在 `127.0.0.1:22355` 与网页通信，读取 `/downloads/zzz-scanner/manifest.json` 并准备 ZZZ Scanner Next。
 
-域名设置完成后，GitHub Pages 自定义域名为 `zzzcaculator.top`，`www.zzzcaculator.top` 作为兼容入口。DNS 记录应指向 GitHub Pages，而不是旧 ECS 公网 IP。
+当前支持的 OCR 运行时为 ZZZ Scanner Next `1.0.38`，Helper 最低版本为 `1.2.1`。正式支持 Windows 10 1809（Build 17763）及以上 x64和 Windows 11 x64，包括 N 版与 LTSC；x86、ARM64 和 Windows 7 不在当前承诺范围。
 
-本地或自托管 Node 服务仍可使用原生产模式。
+schema v3 manifest 同时发布 framework-dependent 与 self-contained 包，并固定包大小、包 SHA-256 及每个安装文件的大小和哈希。Helper 检测到 .NET 8 Desktop Runtime 时选择较小包；未检测到或结果不确定时自动使用自包含兼容包，不安装 .NET、不修改系统。新 Scanner 完成本地握手后，Helper 会删除安装 ZIP 和所有非活动 runtime，只保留当前 runtime、最近一次成功扫描产物和最近一次失败诊断。网页按结构化错误码显示磁盘不足、下载/校验/解压失败、原生 DLL 缺失、端口占用、游戏未启动、权限不匹配和 UAC 取消等具体原因，并提供重试、修复、打开日志或按需提权动作。
 
-生产部署建议设置：
+公开 `/settings` 设置页把网页数据与扫描器文件分开管理。“清除网页数据”只删除计算器 IndexedDB 和本地配置；“释放扫描器空间”由 Helper 删除旧 runtime、临时安装包、残留下载和多余产物，不卸载当前可用 Scanner。Helper `1.2.1` 固定安装到 `%LOCALAPPDATA%\ZZZScannerNext\helper` 并支持校验后的原位自更新。从 Helper `1.1.x` 升级时，在网页点击“下载并更新 Helper”，运行下载文件并确认一次接管即可；安装器会在唯一验证旧进程后自动关闭旧 Helper、安装托管副本并重启。Helper `1.2.0` 及以后版本由协议 v3 自动更新。
 
-```bash
-NODE_ENV=production
-```
+当前 Helper 和扫描器未做代码签名，因此 SmartScreen、杀毒软件或企业策略可能在 Helper 启动前直接拦截；程序尚未启动时无法自行显示诊断。manifest 优先使用 Pages 同站包，并保留 GitHub Release 资产作为兜底；本地绝区零与云绝区零目标均受支持。扫描器包和扫描结果属于 Release 资产或本地缓存，不作为普通源码提交。
 
-此时服务端会返回 `maintenanceEnabled: false`，并硬拦截 `/maintenance.html`、`/maintenance.js` 和 `/api/maintenance/*`。如确需显式覆盖，可设置 `MAINTENANCE_ENABLED=true|false`。
+## 文档
 
-## 测试
+- [建模说明](docs/modeling.md)
+- [长期回归契约](docs/regression-contract.md)
+- [前端布局契约](docs/frontend-layout-contract.md)
+- [详细变更日志](docs/changelog.md)
 
-可以用 npm 运行这些聚焦测试：
-
-```bash
-npm run test:atk-basis
-npm run test:percent-sanity
-npm run test:maintenance-validation
-npm run test:formula
-npm run test:damage-whitebox
-npm run test:shared-combat
-npm run test:w-engine-modification
-npm run test:anomaly-damage
-npm run test:maintenance-stats
-npm run test:compiled-score
-npm run test:compiled-panel-score
-npm run test:optimizer
-npm run test:optimizer-progress
-npm run test:optimizer-api
-npm run test:optimizer-ui
-npm run test:optimizer-fuzz
-npm run test:drive-disc-analysis
-npm run test:drive-disc-import
-npm run test:accounts
-```
-
-对比精确优化器策略时，可以运行 benchmark 脚本：
-
-```bash
-npm run benchmark:optimizer
-```
-
-常用语法检查：
-
-```bash
-node --check backend/calculator.js
-node --check backend/driveDiscAnalysis.js
-node --check backend/driveDiscOptimizer.js
-node --check backend/server.js
-node --check frontend/app.js
-node --check frontend/calculate.js
-node --check frontend/dialogs.js
-node --check frontend/drive-disc-analysis.js
-node --check frontend/drive-discs.js
-node --check frontend/entity-select.js
-node --check frontend/maintenance.js
-node --check frontend/accounts-page.js
-```
-
-## API 概览
-
-- `GET /api/health`
-- `GET /api/app-config`
-- `GET /api/meta`
-- `GET /api/maintenance/catalog`（生产环境默认 `403`）
-- `POST|PUT|DELETE /api/maintenance/:resource`（生产环境默认 `403`）
-- `DELETE /api/maintenance/anomaly-effects/:type/:id`（生产环境默认 `403`）
-- `GET /api/example/out-of-combat`
-- `GET /api/example/ye-shunguang`
-- `POST /api/calculate/out-of-combat`
-- `POST /api/calculate/in-combat`
-- `POST /api/optimize/drive-discs/preview`
-- `POST /api/optimize/drive-discs/jobs`
-- `GET|DELETE /api/optimize/drive-discs/jobs/:id`
-- `POST /api/optimize/drive-discs`
-- `POST /api/analysis/drive-disc-substats`
-- `POST /api/analysis/drive-disc-stat-gains`
-
-以下旧用户数据接口已退役并返回 `410 Gone`，用户数据改由浏览器本地保存：
-
-- `/api/accounts*`
-- `/api/user-drive-discs*`
-- `/api/user-drive-disc-loadouts*`
-
-## 建模说明
-
-- 基础攻击力等于 `角色基础攻击力 + 音擎基础攻击力 + 核心技基础攻击力`。
-- 局外面板是后续条件性局内 Buff 的稳定基准。
-- 局内 Buff 可以贡献普通属性、运行时缩放效果、伤害修正、音擎团队 Buff 和指定技能效果。
-- 目标配置支持防御力、等级基数、分元素抗性，以及可选的失衡倍率。
-- 优化器伤害目标可以使用单个直伤、贯穿、异常或紊乱事件，也可以使用自定义的多事件列表。
-- 特殊显示属性可以声明真实结算属性；例如叶瞬光显示为贯穿，但伤害按物理结算。
-- 命破/玄墨伤害按贯穿伤害建模：贯穿力由局内生命值、局内攻击力和固定贯穿力派生，再进入贯穿增伤区，并跳过防御/穿透乘区。
-- 异常和紊乱伤害使用 `data/anomaly_effects.json` 中统一 `effects` 列表的数据倍率，并通过 `settlementType` 区分结算类型。
-- 属性异常和紊乱伤害使用不同的增伤区：`anomalyDamageBonus` 只作用于属性异常，`disorderDamageBonus` 只作用于紊乱。
-- 音擎改装等级只物化每阶明确的 Buff 数值，不改变 60 级基础攻击力或高级属性。
-
-更多细节见 [docs/modeling.md](docs/modeling.md) 和 [docs/changelog.md](docs/changelog.md)。
-
-## 维护规则
-
-所有绝区零计算器的数据模型、示例、前端代码、后端代码和后续计算器实现都应保留在本仓库内，除非之后的集成步骤明确要求迁移到其他位置。
+计算器模型、公开数据、前端、后端、示例、测试和发布脚本统一在本仓库维护。
