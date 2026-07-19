@@ -9,6 +9,18 @@ ZZZ 计算器是一个基于 Vue 3 的绝区零计算工具，覆盖角色面板
 以下内容按实际开发日期汇总。完整实现细节、建模决策和验证证据继续保留在
 [详细变更日志](docs/changelog.md) 中。
 
+### 2026-07-19 服务器与 CDN 源站迁移
+
+- 将 `121.199.21.10` 记录为正式生产主机，继续使用已经验证过的
+  `/opt/zzz_calculator/releases/<release>` 与 `current` 原子切换结构。
+- 将 Helper 和 Scanner 发布文件移出应用版本目录，固定保存在
+  `/srv/zzz-download-origin`；Nginx 直接提供支持 HTTP Range 的版本化大文件，
+  manifest 则使用独立的短缓存策略。
+- Helper 与 Scanner 下载优先级改为 `download.zzzcaculator.top`，主站服务器作为
+  第二下载源，GitHub Release 只保留为灾难恢复兜底。
+- 新增可复现的服务器发布包命令，并纳入 Nginx、systemd 生产模板。GitHub Pages
+  改为手动备用设施，不再占用生产自定义域名。
+
 ### 2026-07-19 每日更新
 
 - 新增冲刺攻击、强化特殊技和支援攻击的显式招式标签，并让定向 2 件套贯通计算与优化器链路。
@@ -195,7 +207,8 @@ webapp/                  Vue 3 + Pinia + Vite 应用
 backend/                 Node.js API、文件适配器和构建产物服务
 data/                    游戏资料与公开配置
 examples/                稳定计算 fixture
-scripts/                 Pages 与发布构建脚本
+scripts/                 服务器、Pages 备用与发布构建脚本
+deploy/                  纳入版本控制的 Nginx 与 systemd 生产模板
 tests/                   Node 及跨运行时回归测试
 benchmarks/              按需运行的性能基准
 docs/                    建模说明、回归契约和详细变更日志
@@ -299,13 +312,52 @@ npm test
 npm run test:webapp
 npm run test:layout
 npm --prefix webapp run build
+npm run build:server
 npm run build:pages
 npm run benchmark:optimizer
 ```
 
 `npm test` 覆盖 Node 计算模型、优化器 fixture/进度/API/fuzz、存储兼容、扫描器桥接、生产服务行为和 Vue 测试。`npm run test:layout` 会先构建应用，再用 Chromium 在桌面、缩放桌面和移动端拒绝标签裁切、控件越界及意外横向滚动。CI 使用 Node 20，在每个分支和 Pull Request 上运行两套门禁。
 
-## GitHub Pages
+## 生产服务器部署
+
+生产应用运行在 `121.199.21.10`。应用版本与下载资源使用相互独立的生命周期：
+
+```text
+/opt/zzz_calculator/
+  releases/<release>/             不可变应用版本
+  current -> releases/<release>/  当前原子软链接
+
+/srv/zzz-download-origin/
+  downloads/
+    zzz-scanner/
+      manifest.json
+      helper-manifest.json
+      helper/1.2.1/ZZZ-Scanner-Helper.exe
+      1.0.38/ZZZ-Scanner.Next-win-x64-fdd.zip
+      1.0.38/ZZZ-Scanner.Next-win-x64-self-contained.zip
+```
+
+生成包含当前 Git 跟踪源码与 Vue 构建产物的服务器发布包：
+
+```bash
+npm run build:server
+```
+
+发布包写入 `output/zzz-calculator-server-<commit>.tar.gz`，不会包含被 Git 忽略的
+工作区 `downloads/`。Nginx 从 `/srv/zzz-download-origin` 直接提供
+`/downloads/`，因此大文件不会经过 Node，并可响应 CDN 的 Range 回源请求。
+两个 manifest 使用 `no-cache`，带版本目录的 `.exe` 与 `.zip` 使用一年不可变缓存。
+生产配置模板位于 `deploy/nginx/zzz-calculator.conf` 和
+`deploy/systemd/zzz-calculator.service`。
+
+公开站点继续使用 `https://zzzcaculator.top`，以保持浏览器 Origin 及既有
+IndexedDB/localStorage 数据不变。公开下载入口为
+`https://download.zzzcaculator.top`；腾讯云 CDN 应以
+`https://zzzcaculator.top` 作为 HTTPS 源站，并使用相同的回源 Host。CDN 加速域名
+不能与源站域名相同。
+
+## GitHub Pages 手动备用
 
 生成静态部署产物：
 
@@ -313,7 +365,10 @@ npm run benchmark:optimizer
 npm run build:pages
 ```
 
-产物写入 `dist/pages`，不会提交到 Git。内容包括 SPA、静态 catalog/config、`CNAME`、扫描器 manifest，以及可用时经过校验的当前扫描器双包。`.github/workflows/pages.yml` 只在 `main` 更新时部署；默认 Pages 产物不包含维护页面。
+产物写入 `dist/pages`，不会提交到 Git。内容包括 SPA、静态 catalog/config、扫描器
+manifest，以及可用时经过校验的当前扫描器双包。产物明确不再生成 `CNAME`，避免备用
+部署重新占用生产域名。`.github/workflows/pages.yml` 只允许手动触发；推送 `main`
+不会再自动部署 Pages。默认 Pages 产物不包含维护页面。
 
 ## 扫描器集成
 
@@ -325,7 +380,10 @@ schema v3 manifest 同时发布 framework-dependent 与 self-contained 包，并
 
 公开 `/settings` 设置页把网页数据与扫描器文件分开管理。“清除网页数据”只删除计算器 IndexedDB 和本地配置；“释放扫描器空间”由 Helper 删除旧 runtime、临时安装包、残留下载和多余产物，不卸载当前可用 Scanner。Helper `1.2.1` 固定安装到 `%LOCALAPPDATA%\ZZZScannerNext\helper` 并支持校验后的原位自更新。从 Helper `1.1.x` 升级时，在网页点击“下载并更新 Helper”，运行下载文件并确认一次接管即可；安装器会在唯一验证旧进程后自动关闭旧 Helper、安装托管副本并重启。Helper `1.2.0` 及以后版本由协议 v3 自动更新。
 
-当前 Helper 和扫描器未做代码签名，因此 SmartScreen、杀毒软件或企业策略可能在 Helper 启动前直接拦截；程序尚未启动时无法自行显示诊断。manifest 优先使用 Pages 同站包，并保留 GitHub Release 资产作为兜底；本地绝区零与云绝区零目标均受支持。扫描器包和扫描结果属于 Release 资产或本地缓存，不作为普通源码提交。
+当前 Helper 和扫描器未做代码签名，因此 SmartScreen、杀毒软件或企业策略可能在
+Helper 启动前直接拦截；程序尚未启动时无法自行显示诊断。manifest 首选腾讯云 CDN
+下载域名，失败后重试主站服务器，GitHub Release 仅作为最后兜底；本地绝区零与云绝区零
+目标均受支持。扫描器包和扫描结果属于发布资源或本地缓存，不作为普通源码提交。
 
 ## 文档
 

@@ -14,6 +14,8 @@
       "id": "win-x64-fdd",
       "mode": "framework-dependent",
       "packageUrls": [
+        "https://download.zzzcaculator.top/downloads/zzz-scanner/1.0.38/ZZZ-Scanner.Next-win-x64-fdd.zip",
+        "https://zzzcaculator.top/downloads/zzz-scanner/1.0.38/ZZZ-Scanner.Next-win-x64-fdd.zip",
         "./1.0.38/ZZZ-Scanner.Next-win-x64-fdd.zip",
         "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.38/ZZZ-Scanner.Next-win-x64-fdd.zip"
       ],
@@ -198,6 +200,8 @@
       "id": "win-x64-self-contained",
       "mode": "self-contained",
       "packageUrls": [
+        "https://download.zzzcaculator.top/downloads/zzz-scanner/1.0.38/ZZZ-Scanner.Next-win-x64-self-contained.zip",
+        "https://zzzcaculator.top/downloads/zzz-scanner/1.0.38/ZZZ-Scanner.Next-win-x64-self-contained.zip",
         "./1.0.38/ZZZ-Scanner.Next-win-x64-self-contained.zip",
         "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.38/ZZZ-Scanner.Next-win-x64-self-contained.zip"
       ],

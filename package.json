@@ -8,6 +8,7 @@
     "start": "npm run build:webapp && npm run serve",
     "dev:webapp": "npm --prefix webapp run dev",
     "build:webapp": "npm --prefix webapp run build",
+    "build:server": "npm run build:webapp && node scripts/package-server-release.js",
     "install:webapp": "npm --prefix webapp ci",
     "test:webapp": "npm --prefix webapp run test",
     "test:layout": "npm run build:webapp && npm --prefix webapp run test:layout",

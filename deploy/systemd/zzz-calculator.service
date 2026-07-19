@@ -1,0 +1,17 @@
+[Unit]
+Description=ZZZ Calculator
+After=network.target
+
+[Service]
+Type=simple
+User=zzzcalc
+Group=zzzcalc
+WorkingDirectory=/opt/zzz_calculator/current
+Environment=NODE_ENV=production
+Environment=PORT=8787
+ExecStart=/usr/bin/node backend/server.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

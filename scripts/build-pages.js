@@ -26,14 +26,16 @@ const scannerVersion = String(scannerManifestSource.scannerVersion)
 const scannerPackages = (scannerManifestSource.packages ?? []).map(packageInfo => {
     const packageUrls = Array.isArray(packageInfo.packageUrls) ? packageInfo.packageUrls : []
     const pagesUrl = packageUrls.find(url => String(url).startsWith("./"))
-    const githubUrl = packageUrls.find(url => /^https:\/\//i.test(url))
-    if (!pagesUrl || !githubUrl) {
-        throw new Error(`Scanner package ${packageInfo.id} must define local and HTTPS package URLs.`)
+    const cdnUrl = packageUrls.find(url => String(url).startsWith("https://download.zzzcaculator.top/"))
+    const githubUrl = packageUrls.find(url => /^https:\/\/github\.com\//i.test(url))
+    if (!pagesUrl || !cdnUrl || !githubUrl) {
+        throw new Error(`Scanner package ${packageInfo.id} must define Pages, CDN, and GitHub package URLs.`)
     }
     return {
         ...packageInfo,
         id: String(packageInfo.id),
         pagesUrl: String(pagesUrl),
+        cdnUrl: String(cdnUrl),
         githubUrl: String(githubUrl),
         zipName: path.posix.basename(new URL(githubUrl).pathname),
         sha256: String(packageInfo.sha256),
@@ -272,7 +274,7 @@ await ensurePagesScannerPackages()
 await writeJson(path.join(outDir, "downloads", "zzz-scanner", "manifest.json"), scannerManifestSource)
 await writeJson(path.join(outDir, "downloads", "zzz-scanner", "helper-manifest.json"), helperManifestSource)
 
-await writeFile(path.join(outDir, "CNAME"), "zzzcaculator.top\n", "utf8")
+await rm(path.join(outDir, "CNAME"), { force: true })
 await copyFile(path.join(outDir, "index.html"), path.join(outDir, "404.html"))
 await writeFile(path.join(outDir, "calculate.html"), legacyRedirect("返回计算工作台", "/"), "utf8")
 await writeFile(path.join(outDir, "drive-discs.html"), legacyRedirect("前往驱动盘仓库", "/discs"), "utf8")

@@ -271,7 +271,7 @@ describe("inventory store", () => {
     expect(helper.launchCalls).toBe(1)
     expect(store.scanStatus).toBe("waiting-helper")
     expect(store.scanPolling).toBe(true)
-    expect(store.scanHelperDownloadUrl).toContain("helper-1.2.1")
+    expect(store.scanHelperDownloadUrl).toBe("https://download.zzzcaculator.top/downloads/zzz-scanner/helper/1.2.1/ZZZ-Scanner-Helper.exe")
 
     scannerMockState.connectResults.push({ version: "1.2.1", protocolVersion: 3 })
     await vi.advanceTimersByTimeAsync(3000)

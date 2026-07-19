@@ -14,7 +14,7 @@ import { toCalculatorDriveDisc } from "@core/drive-disc-core.js"
 import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "@core/driveDiscAnalysis-core.js"
 import { ScannerBridge } from "@runtime/scanner-bridge.js"
 
-const HELPER_DOWNLOAD_URL = "https://github.com/ZztIsolation/zzz_calculator/releases/download/helper-1.2.1/ZZZ-Scanner-Helper.exe?v=1.2.1"
+const HELPER_DOWNLOAD_URL = "https://download.zzzcaculator.top/downloads/zzz-scanner/helper/1.2.1/ZZZ-Scanner-Helper.exe"
 const HELPER_POLL_INTERVAL_MS = 3000
 export const REQUIRED_HELPER_VERSION = "1.2.1"
 const SCAN_CLIENTS = {

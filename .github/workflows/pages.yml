@@ -1,9 +1,7 @@
-name: Deploy GitHub Pages
+name: Deploy legacy GitHub Pages fallback
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   contents: read

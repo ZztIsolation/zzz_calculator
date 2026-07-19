@@ -2,6 +2,91 @@
 
 # Changelog
 
+## 2026-07-19 - Migrated Production Delivery To Server-Origin CDN Architecture
+
+Changed the primary production model from an automatically published GitHub
+Pages site to the existing Linux host at `121.199.21.10`. The application keeps
+the established immutable release layout under
+`/opt/zzz_calculator/releases/<release>` and switches
+`/opt/zzz_calculator/current` atomically only after a new archive has been
+uploaded and extracted. `zzz-calculator.service` continues to run as the
+unprivileged `zzzcalc` user with `NODE_ENV=production`, listens on local port
+`8787`, and is restarted only after the release and production configuration
+have passed their preflight checks.
+
+Separated application releases from downloadable Helper and OCR payloads.
+Versioned binaries and their two manifests now live under the persistent root
+`/srv/zzz-download-origin/downloads/zzz-scanner`. The active layout contains
+`manifest.json`, `helper-manifest.json`, Helper
+`1.2.1/ZZZ-Scanner-Helper.exe`, and both Scanner 1.0.38 packages. This directory
+is intentionally outside `/opt/zzz_calculator/current`: an application rollback
+or a new atomic release can no longer remove a working Scanner package, and
+uploading a Scanner release no longer changes application source ownership.
+The local repository `downloads/` directory remains ignored and is still a
+release staging area rather than tracked source.
+
+Added `deploy/nginx/zzz-calculator.conf` as the canonical edge configuration.
+Nginx serves `/downloads/` directly from `/srv/zzz-download-origin` instead of
+proxying large files through `backend/server.js`. This matters because the Node
+fallback streams a complete file response and does not implement byte-range
+selection, while CDN segmented origin fetches depend on valid Range behavior.
+Nginx supplies Range-capable static responses, `sendfile`, an explicit
+attachment disposition, and one-year immutable caching for versioned `.exe`
+and `.zip` payloads. `manifest.json` and `helper-manifest.json` use
+`no-cache, no-store, must-revalidate`, so a new release selection is never held
+for the lifetime of a binary package. Generated Vite chunks under
+`/static/app/` retain one-year immutable caching, while stable catalog assets
+use a shorter seven-day cache and HTML continues through Node with `no-store`.
+
+Changed the public package priority without removing disaster recovery.
+Scanner 1.0.38 package lists now try the versioned Tencent CDN URL at
+`https://download.zzzcaculator.top` first, retry the same persistent server
+files through `https://zzzcaculator.top`, then use the relative same-origin
+path for compatible self-hosted/Pages builds, and retain the matching GitHub
+Release asset as the last fallback. Helper 1.2.1 follows the same CDN, main
+server, GitHub order. The Vue download action now opens the versioned CDN Helper
+URL rather than a GitHub Release URL. Package size and SHA-256 remain unchanged:
+Helper `8137728` bytes / `d3c88f1f7556e9bab15f7129e253d2c5527b0f5009a84d52a7a0acd354f326ae`,
+FDD Scanner `21785760` bytes /
+`d63b89fbe07fba77fe641daa33b2aa8f5427f4b93fc95003fefe8c9750f7b78d`,
+and self-contained Scanner `84835665` bytes /
+`39be4d44d2b756db66f36b8308b055495e59ce4174cdb615399ceba293613bf4`.
+
+Kept the main site and download endpoint deliberately separate. The browser
+application remains on `https://zzzcaculator.top`, preserving the existing
+origin-bound IndexedDB and localStorage data. The future CDN entry is
+`https://download.zzzcaculator.top`; Tencent CDN can use
+`https://zzzcaculator.top` as the HTTPS origin because the acceleration domain
+is different from the source domain. This avoids a CNAME/origin loop while
+reusing the production certificate and Nginx download route. The package
+manifests keep the main host as an immediate fallback, so Helper-driven Scanner
+installation can still complete if the CDN is unavailable.
+
+Added `npm run build:server` and `scripts/package-server-release.js`. The command
+builds the Vue application, copies only Git-tracked source into an isolated
+staging directory, adds `dist/pages`, writes the full commit to
+`.deployed-commit`, and emits
+`output/zzz-calculator-server-<commit>.tar.gz`. The packager verifies that its
+recursive cleanup target stays under the ignored `output/` root and verifies
+both the embedded commit and non-empty archive before reporting success. The
+server package never captures local downloads, logs, test artifacts, user data,
+or untracked working files.
+
+Converted `.github/workflows/pages.yml` to a manual legacy fallback. A push to
+`main` no longer deploys GitHub Pages, and `scripts/build-pages.js` removes
+`CNAME` from the fallback artifact so it cannot reclaim the production custom
+domain. The Pages builder still verifies its generated SPA, static catalog,
+configuration, manifests, and Scanner packages when an operator deliberately
+invokes the fallback workflow. Its package source selection now identifies the
+GitHub URL explicitly rather than mistaking the new first HTTPS CDN URL for the
+release build source.
+
+Extended repository, Scanner bridge, and Vue store tests to lock the new
+contracts: CDN must be the first public package URL, the production server and
+GitHub must remain fallbacks, the Nginx template must use the persistent
+download root and current Vite release root, the Pages workflow must be
+manual-only, and the Helper button must target the versioned CDN object.
+
 ## 2026-07-19 - Fixed Direct Settings Route On GitHub Pages
 
 Removed the generated `settings.html` self-redirect. GitHub Pages resolves the

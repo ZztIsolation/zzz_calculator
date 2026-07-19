@@ -10,6 +10,21 @@ The entries below summarize each development day. Implementation details,
 modeling decisions, and verification evidence remain in the
 [detailed changelog](docs/changelog.md).
 
+### 2026-07-19 Server And CDN Origin Migration
+
+- Made `121.199.21.10` the documented production host and retained the existing
+  atomic `/opt/zzz_calculator/releases/<release>` plus `current` deployment
+  layout.
+- Moved Helper and Scanner release payloads outside application releases into
+  `/srv/zzz-download-origin`, where Nginx serves immutable versioned binaries
+  with HTTP Range support and short-lived manifests separately.
+- Changed Helper and Scanner download priority to
+  `download.zzzcaculator.top`, followed by the main server and finally GitHub
+  Release as a disaster-recovery fallback.
+- Added a reproducible server release package command and checked-in Nginx and
+  systemd production templates. GitHub Pages deployment is now manual fallback
+  infrastructure and no longer claims the production custom domain.
+
 ### 2026-07-19 Daily Update
 
 - Added explicit Dash Attack, EX Special, and Assist Attack move tags, including
@@ -333,7 +348,8 @@ webapp/                  Vue 3 + Pinia + Vite application
 backend/                 Node.js APIs, file adapters, and built-app hosting
 data/                    game catalogs and public configuration
 examples/                stable calculation fixtures
-scripts/                 Pages and release build helpers
+scripts/                 server, Pages fallback, and release build helpers
+deploy/                  checked-in Nginx and systemd production templates
 tests/                   Node and cross-runtime regression tests
 benchmarks/              opt-in performance benchmarks
 docs/                    modeling notes, regression contract, and changelog
@@ -437,13 +453,56 @@ Useful focused commands:
 npm run test:webapp
 npm run test:layout
 npm --prefix webapp run build
+npm run build:server
 npm run build:pages
 npm run benchmark:optimizer
 ```
 
 `npm test` covers the Node calculation model, optimizer fixtures/progress/API/fuzz behavior, storage compatibility, scanner bridge, production server behavior, and the Vue test suite. `npm run test:layout` builds the app and uses Chromium to reject clipped labels, overflowing controls, and unintended horizontal scrolling across desktop, scaled-desktop, and mobile layouts. CI uses Node 20 and runs both suites for every branch and pull request.
 
-## GitHub Pages
+## Production Server Deployment
+
+The production application runs on `121.199.21.10`. Application releases and
+download payloads deliberately use separate lifecycles:
+
+```text
+/opt/zzz_calculator/
+  releases/<release>/             immutable application release
+  current -> releases/<release>/  active atomic symlink
+
+/srv/zzz-download-origin/
+  downloads/
+    zzz-scanner/
+      manifest.json
+      helper-manifest.json
+      helper/1.2.1/ZZZ-Scanner-Helper.exe
+      1.0.38/ZZZ-Scanner.Next-win-x64-fdd.zip
+      1.0.38/ZZZ-Scanner.Next-win-x64-self-contained.zip
+```
+
+Build a deployable archive containing the tracked source and the generated Vue
+application with:
+
+```bash
+npm run build:server
+```
+
+The archive is written to `output/zzz-calculator-server-<commit>.tar.gz`. It
+does not contain the ignored `downloads/` workspace. Nginx serves
+`/downloads/` directly from `/srv/zzz-download-origin`, so large downloads do
+not pass through Node and support CDN Range requests. The two manifest files
+use `no-cache`; versioned `.exe` and `.zip` files use one-year immutable cache
+headers. The reference production files are
+`deploy/nginx/zzz-calculator.conf` and
+`deploy/systemd/zzz-calculator.service`.
+
+The public site remains `https://zzzcaculator.top`, preserving the browser
+origin and existing IndexedDB/localStorage data. The public download endpoint
+is `https://download.zzzcaculator.top`; Tencent CDN should use
+`https://zzzcaculator.top` as its HTTPS origin and send the same origin Host.
+The CDN origin and acceleration domain must remain different.
+
+## Legacy GitHub Pages Fallback
 
 Build the static deployment artifact with:
 
@@ -451,7 +510,11 @@ Build the static deployment artifact with:
 npm run build:pages
 ```
 
-The output is written to `dist/pages` and is never committed. It contains the SPA, static catalog/config payloads, `CNAME`, scanner manifest, and both verified scanner packages when available. `.github/workflows/pages.yml` deploys only when `main` is updated; maintenance pages are excluded from the default Pages artifact.
+The output is written to `dist/pages` and is never committed. It contains the
+SPA, static catalog/config payloads, Scanner manifests, and both verified
+Scanner packages when available. It deliberately omits `CNAME` so a fallback
+deployment cannot reclaim the production domain. `.github/workflows/pages.yml`
+is manual-only; a push to `main` no longer deploys Pages automatically.
 
 ## Scanner Integration
 
@@ -463,7 +526,13 @@ The schema v3 manifest locks the size, package SHA-256, and every installed file
 
 The public `/settings` page separates browser data from Scanner storage. Browser cleanup deletes the calculator's IndexedDB and local settings only. Scanner cleanup is executed by Helper and removes inactive runtimes, transient packages, stale downloads, and excess outputs without uninstalling the active Scanner. Helper `1.2.1` installs into `%LOCALAPPDATA%\ZZZScannerNext\helper` and supports verified in-place self-updates. Users upgrading from Helper `1.1.x` click **Download and update Helper**, run the downloaded file, and confirm the one-time takeover; the installer safely closes the uniquely verified old Helper, installs the managed copy, and restarts it. Helper `1.2.0` and later update automatically through protocol v3.
 
-The current binaries are unsigned, so SmartScreen, antivirus, or enterprise policy can block the Helper before it starts; software that has not started cannot display its own diagnostics. The manifest prefers same-site Pages packages and retains GitHub Release assets as fallbacks. Local and Cloud Zenless Zone Zero targets are both supported. Scanner packages and generated scans are release artifacts or local caches, not normal source-control content.
+The current binaries are unsigned, so SmartScreen, antivirus, or enterprise
+policy can block the Helper before it starts; software that has not started
+cannot display its own diagnostics. Manifests prefer the Tencent CDN download
+domain, retry the main production server, and retain GitHub Release as the final
+fallback. Local and Cloud Zenless Zone Zero targets are both supported. Scanner
+packages and generated scans are release artifacts or local caches, not normal
+source-control content.
 
 ## Documentation
 
