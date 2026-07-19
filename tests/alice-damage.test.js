@@ -27,16 +27,6 @@ function activeBuffIds(cinemaLevel = 0) {
     ]
 }
 
-function configForCinema(cinemaLevel = 0) {
-    if (cinemaLevel >= 6) {
-        return agent.defaultCalculationConfig.variants.find(item => item.cinemaLevel === 6)
-    }
-    if (cinemaLevel >= 2) {
-        return agent.defaultCalculationConfig.variants.find(item => item.cinemaLevel === 2)
-    }
-    return agent.defaultCalculationConfig
-}
-
 function calculate(events, { cinemaLevel = 0, driveDiscs = [], runtimeInputs = {} } = {}) {
     return calculateInCombatPanel(catalog, {
         agentId: agent.id,
@@ -100,6 +90,53 @@ const phaethonMasteryDiscs = [
     ...masteryMainStatDiscs.slice(2),
 ]
 
+const aliceMechanicsEvents = [
+    {
+        id: "alice_polarized_assault",
+        kind: "anomaly",
+        count: 1,
+        settlementType: "attribute",
+        anomalyEffect: "assault",
+        anomalyVariant: "polarizedAssault",
+        procCount: 1,
+    },
+    {
+        id: "alice_physical_anomaly_followup",
+        kind: "anomaly",
+        label: "核心被动：物理异常追伤",
+        count: 10,
+        damageRatioPct: 2.5,
+        settlementType: "attribute",
+        anomalyEffect: "assault",
+        procCount: 1,
+    },
+    {
+        id: "alice_full_duration_physical_disorder",
+        kind: "anomaly",
+        count: 1,
+        settlementType: "disorder",
+        anomalyEffect: "flinch",
+        disorderType: "normal",
+        elapsedSeconds: 0,
+    },
+]
+
+const aliceCinemaSixEvents = [
+    ...aliceMechanicsEvents,
+    {
+        id: "alice_winning_state_followup",
+        kind: "direct",
+        count: 6,
+        critMode: "crit",
+        skillRef: {
+            agentSkillId: "alice_thymefield",
+            categoryId: "cinema",
+            moveId: "winning_state_followup",
+            rowId: "damage",
+        },
+    },
+]
+
 const screenshotDiscs = [
     driveDiscWithProficiency(1, "phaethons_melody", { stat: "hpFlat", value: 2200, mode: "flat" }, 36),
     driveDiscWithProficiency(2, "fanged_metal", { stat: "atkFlat", value: 316, mode: "flat" }, 18),
@@ -132,17 +169,17 @@ const cinemaSixRow = skillCatalog.categories
 assert.equal(cinemaSixRow?.damageBasis, "anomalyProficiency")
 assert.deepEqual(cinemaSixRow?.values, [3300])
 
-const defaultResult = calculate(configForCinema(0).events)
+const defaultResult = calculate(agent.defaultCalculationConfig.events)
 approx(defaultResult.inCombat.panel.anomalyMastery, 142, "Alice in-combat anomaly mastery")
 approx(defaultResult.inCombat.panel.anomalyProficiency, 121, "Converted proficiency should floor the decimal result")
 
-const masteryMainStatResult = calculate(configForCinema(0).events, { driveDiscs: masteryMainStatDiscs })
+const masteryMainStatResult = calculate(agent.defaultCalculationConfig.events, { driveDiscs: masteryMainStatDiscs })
 approx(masteryMainStatResult.outOfCombat.panel.anomalyMastery, 184.6, "Alice slot 6 mastery should scale the 142 white stat by 30%")
 approx(masteryMainStatResult.inCombat.panel.anomalyProficiency, 188, "184.6 mastery should convert 70 proficiency after game rounding")
 approx(masteryMainStatResult.outOfCombat.bonusTotals.anomalyMasteryPct, 0.3, "Slot 6 mastery should use the percentage bucket")
 approx(masteryMainStatResult.outOfCombat.bonusTotals.anomalyMasteryFlat, 0, "Core skill mastery should remain part of the white stat")
 
-const phaethonMasteryResult = calculate(configForCinema(0).events, { driveDiscs: phaethonMasteryDiscs })
+const phaethonMasteryResult = calculate(agent.defaultCalculationConfig.events, { driveDiscs: phaethonMasteryDiscs })
 approx(phaethonMasteryResult.outOfCombat.panel.anomalyMastery, 195.96, "Alice slot 6 and Phaethon 2-piece mastery")
 approx(phaethonMasteryResult.inCombat.panel.anomalyMastery, 195.96, "Alice in-combat mastery without an additional mastery Buff")
 approx(phaethonMasteryResult.inCombat.panel.anomalyProficiency, 206, "Corrected mastery should convert 88 proficiency after game rounding")
@@ -195,9 +232,10 @@ const firstWholePoint = calculateThresholdCase(35)
 approx(firstWholePoint.inCombat.panel.anomalyMastery, 141, "First whole mastery point above the threshold")
 approx(firstWholePoint.inCombat.panel.anomalyProficiency, 119, "1.6 converted proficiency should floor to 1")
 
-const polarizedAssault = defaultResult.damage.events.find(event => event.id === "alice_polarized_assault")
-const physicalFollowup = defaultResult.damage.events.find(event => event.id === "alice_physical_anomaly_followup")
-const physicalDisorder = defaultResult.damage.events.find(event => event.id === "alice_full_duration_physical_disorder")
+const mechanicsResult = calculate(aliceMechanicsEvents)
+const polarizedAssault = mechanicsResult.damage.events.find(event => event.id === "alice_polarized_assault")
+const physicalFollowup = mechanicsResult.damage.events.find(event => event.id === "alice_physical_anomaly_followup")
+const physicalDisorder = mechanicsResult.damage.events.find(event => event.id === "alice_full_duration_physical_disorder")
 assert.equal(polarizedAssault.label, "极性强击")
 approx(physicalFollowup.finalDamage / polarizedAssault.finalDamage, 0.25, "Ten 2.5% follow-ups should equal 25% of one Assault")
 approx(physicalDisorder.multipliers.disorderBaseMultiplierBonus, 1.8, "Default ten stacks should add 180% Disorder multiplier")
@@ -247,7 +285,12 @@ approx(cinemaTwoAssault.finalDamage / cinemaOneAssault.finalDamage, 1.15, "Cinem
 approx(cinemaFourAssault.targetBreakdown.resIgnore, 0.1, "Cinema 4 physical resistance ignore")
 assert.ok(cinemaOneAssault.finalDamage > baseAssault.finalDamage)
 
-const cinemaSixConfig = configForCinema(6)
+const cinemaSixConfig = {
+    mode: "custom",
+    cinemaLevel: 6,
+    events: aliceCinemaSixEvents,
+    selectedEventId: "alice_winning_state_followup",
+}
 const cinemaSixResult = calculate(cinemaSixConfig.events, { cinemaLevel: 6 })
 const winningStateFollowup = cinemaSixResult.damage.events.find(event => event.id === "alice_winning_state_followup")
 assert.equal(winningStateFollowup.count, 6)

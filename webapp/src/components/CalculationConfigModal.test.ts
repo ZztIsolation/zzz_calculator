@@ -472,7 +472,7 @@ describe("CalculationConfigModal", () => {
     const expectedMultiplier = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 3 }).format(skillRow.values[11])
     expect(items[0].querySelector("small")?.textContent).toContain(`当前倍率 ${expectedMultiplier}%`)
     expect(listTitle).not.toContain("直伤 ·")
-    expect(document.body.querySelectorAll(".panel-title")[1].textContent).toContain("直伤 ·")
+    expect(document.body.querySelectorAll(".panel-title")[1].textContent).toContain("紊乱 · 烈霜霜寒紊乱（星见雅）")
     expect(document.body.textContent).not.toContain("miyabi_frost_moon_charge_3")
     expect(document.body.textContent).not.toMatch(/\bcharge_3\b/)
   })
@@ -776,6 +776,9 @@ describe("CalculationConfigModal", () => {
       .filter(button => ["添加技能", "添加贯穿", "添加异常事件", "添加技能组", "紊乱"].includes(button.textContent?.trim() ?? ""))
     expect(addButtons).toHaveLength(0)
     expect(document.body.querySelector(".calculation-readonly-tag")?.textContent).toContain("管理员配置 · 只读")
+    document.body.querySelectorAll(".calculation-event-select")[0]
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }))
+    await nextTick()
     expect(readonlyDetailText()).toEqual(expect.arrayContaining([
       "4",
       "普通攻击",
@@ -800,14 +803,14 @@ describe("CalculationConfigModal", () => {
       "紊乱结算",
       "烈霜霜寒紊乱（星见雅）",
       "普通紊乱",
-      "6 秒",
+      "4 秒",
     ]))
     const readonlySettlement = document.body.querySelector('[data-testid="anomaly-settlement-selector"]')
     expect(readonlySettlement?.textContent).toContain("结算类型")
     expect(readonlySettlement?.textContent).toContain("紊乱结算")
     expect(readonlySettlement?.querySelector('[role="radiogroup"]')).toBeNull()
     expect(document.body.querySelector(".disorder-explanation")?.textContent).toContain("紊乱倍率说明")
-    expect(document.body.querySelector(".disorder-explanation")?.textContent).toContain("20.0 - 6.0 = 14.0 秒")
+    expect(document.body.querySelector(".disorder-explanation")?.textContent).toContain("20.0 - 4.0 = 16.0 秒")
     expect(document.body.textContent).not.toContain("frost_frozen")
 
     document.body.querySelectorAll(".calculation-event-select")[5]
@@ -840,9 +843,11 @@ describe("CalculationConfigModal", () => {
     expect(document.body.querySelector(".calculation-readonly-tag")?.textContent).toContain("管理员配置 · 只读")
     expect(readonlyDetailText()).toEqual(expect.arrayContaining([
       "2",
-      "连携技",
-      "连携技：玄墨迅击",
-      "伤害倍率",
+      "是",
+      "468.6%",
+      "特殊技",
+      "强化特殊技：墨烬影消",
+      "总伤害倍率",
       "期望",
     ]))
     expect(document.body.querySelectorAll(".panel-title")[1].textContent).toContain("贯穿 ·")

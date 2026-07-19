@@ -2379,7 +2379,7 @@ const yixuanDefault = calculateInCombatPanel(catalog, minimalInput({
 }))
 assert.equal(yixuanDefault.damage.input.kind, "sheer", "Yixuan default calculation should produce a sheer event")
 assert.equal(yixuanDefault.damage.events[0]?.kind, "sheer", "Yixuan default event list should keep sheer kind")
-assert.equal(yixuanDefault.damage.events.length, 7, "Yixuan default calculation should model the 0-cinema stun burst axis")
+assert.equal(yixuanDefault.damage.events.length, 5, "Yixuan default calculation should model the maintained 0-cinema stun burst axis")
 function axisEntry(event) {
     return `${event.skillRef?.categoryId}/${event.skillRef?.moveId}/${event.skillRef?.rowId} x${event.count ?? 1}`
 }
@@ -2388,14 +2388,12 @@ const yixuanBaseAxis = [
     "chain/ultimate_thousand_talismans/damage x1",
     "chain/ultimate_qingming_cloud_shadow/damage x1",
     "special/cloud_condensing_art/charged_total_damage x2",
-    "special/ink_ember_shadow_dispel/orb_total_damage x1",
-    "special/ink_trace_transform/damage x1",
-    "special/ink_trace_transform/charged_follow_up x1",
+    "special/ink_ember_shadow_dispel/orb_total_damage x2",
 ]
 assert.deepEqual(
     resolveDefaultCalculationConfig(yixuan.defaultCalculationConfig, 0).events.map(axisEntry),
     yixuanBaseAxis,
-    "Yixuan 0-cinema default axis should use double chain, double ultimate, and EX specials",
+    "Yixuan 0-cinema default axis should use double chain, double ultimate, Cloud Condensing, and double Ink Ember",
 )
 assert.deepEqual(
     resolveDefaultCalculationConfig(yixuan.defaultCalculationConfig, 1).events.map(axisEntry),
@@ -2502,7 +2500,9 @@ assert.equal(
 const yixuanCinemaSixAxis = resolveDefaultCalculationConfig(yixuan.defaultCalculationConfig, 6)
 assert.equal(yixuanCinemaSixAxis.name.zhCN, "6影失衡双连携爆发", "Yixuan cinema 6 should select the cinema 6 default axis")
 assert.equal(
-    yixuanCinemaSixAxis.events.filter(event => event.skillRef?.moveId === "ultimate_thousand_talismans").length,
+    yixuanCinemaSixAxis.events
+        .filter(event => event.skillRef?.moveId === "ultimate_thousand_talismans")
+        .reduce((total, event) => total + Number(event.count ?? 1), 0),
     2,
     "Yixuan cinema 6 axis should include the paid and free Thousand Talismans ultimates",
 )
@@ -2510,8 +2510,8 @@ assert.equal(
     yixuanCinemaSixAxis.events
         .filter(event => event.skillRef?.moveId === "thousand_talismans_break")
         .reduce((total, event) => total + Number(event.count ?? 1), 0),
-    2,
-    "Yixuan cinema 6 axis should include two Thousand Talismans Break events",
+    1,
+    "Yixuan cinema 6 axis should include one Thousand Talismans Break event",
 )
 
 const yixuanCloudCondensing = {
