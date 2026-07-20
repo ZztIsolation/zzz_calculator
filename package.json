@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "npm run test:repository-integrity && npm run test:atk-basis && npm run test:percent-sanity && npm run test:skill-targets && npm run test:drive-disc-set-effects && npm run test:field-buffs && npm run test:boss-catalog && npm run test:effect-rule-targets && npm run test:maintenance-validation && npm run test:maintenance-api && npm run test:calculation-skill-groups && npm run test:default-calculation-config && npm run test:catalog-loader && npm run test:formula && npm run test:damage-whitebox && npm run test:shared-combat && npm run test:w-engine-modification && npm run test:attack-w-engines && npm run test:anomaly-damage && npm run test:alice-damage && npm run test:compiled-score && npm run test:compiled-panel-score && npm run test:optimizer && npm run test:optimizer-progress && npm run test:optimizer-api && npm run test:browser-local-compute && npm run test:optimizer-fuzz && npm run test:server-production && npm run test:drive-disc-analysis && npm run test:drive-disc-import && npm run test:scanner-bridge && npm run test:accounts && npm run test:webapp",
+    "test": "npm run test:repository-integrity && npm run test:atk-basis && npm run test:percent-sanity && npm run test:skill-targets && npm run test:drive-disc-set-effects && npm run test:field-buffs && npm run test:boss-catalog && npm run test:effect-rule-targets && npm run test:maintenance-validation && npm run test:maintenance-api && npm run test:calculation-skill-groups && npm run test:default-calculation-config && npm run test:catalog-loader && npm run test:formula && npm run test:damage-whitebox && npm run test:shared-combat && npm run test:w-engine-modification && npm run test:attack-w-engines && npm run test:anomaly-damage && npm run test:alice-damage && npm run test:compiled-score && npm run test:compiled-panel-score && npm run test:optimizer && npm run test:optimizer-progress && npm run test:optimizer-api && npm run test:browser-local-compute && npm run test:optimizer-fuzz && npm run test:scan-telemetry && npm run test:server-production && npm run test:drive-disc-analysis && npm run test:drive-disc-import && npm run test:scanner-bridge && npm run test:accounts && npm run test:webapp",
     "serve": "node backend/server.js",
     "start": "npm run build:webapp && npm run serve",
     "dev:webapp": "npm --prefix webapp run dev",
@@ -41,7 +41,9 @@
     "test:browser-local-compute": "node tests/browser-local-compute.test.js",
     "test:optimizer-fuzz": "node tests/optimizer-fuzz.test.js",
     "test:server-production": "node tests/server-production.test.js",
+    "test:scan-telemetry": "node tests/scan-telemetry.test.js",
     "benchmark:optimizer": "node benchmarks/optimizer-benchmark.js",
+    "benchmark:scan-telemetry": "node benchmarks/scan-telemetry-load.js",
     "test:drive-disc-analysis": "node tests/drive-disc-analysis.test.js",
     "test:drive-disc-import": "node tests/drive-disc-import.test.js",
     "test:scanner-bridge": "node tests/scanner-bridge.test.js",

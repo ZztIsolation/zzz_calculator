@@ -9,6 +9,7 @@ import { statLabel, labelOf } from "@/utils/format"
 import { imageForDriveDiscSet } from "@/utils/assets"
 import { useCatalogStore } from "@/stores/catalog"
 import { useInventoryStore } from "@/stores/inventory"
+import { scanTelemetryPreferenceEnabled } from "@runtime/scan-telemetry"
 
 const catalogStore = useCatalogStore()
 const inventoryStore = useInventoryStore()
@@ -485,6 +486,7 @@ const scanPreviewSections = computed(() => {
   ].filter(section => section.count > 0)
 })
 const scanControlsDisabled = computed(() => inventoryStore.scanStatus === "scanning" || inventoryStore.scanPreparing)
+const scanTelemetryEnabled = computed(() => scanTelemetryPreferenceEnabled())
 const scanProgressPercentage = computed(() => Math.min(100, Math.max(0, Math.round(inventoryStore.scanProgressPercent ?? 0))))
 
 const scanPhaseTitle = computed(() => ({
@@ -945,6 +947,10 @@ function confirmDangerImport() {
               开始扫描
             </NButton>
           </div>
+          <NAlert class="scan-telemetry-alert" type="info" title="匿名扫描诊断" :show-icon="false">
+            {{ scanTelemetryEnabled ? "已开启脱敏扫描摘要，记录保留 30 天。" : "当前已关闭，不会上传扫描摘要。" }}
+            <RouterLink to="/settings">前往设置</RouterLink>
+          </NAlert>
           <NAlert class="scan-prerequisite-alert" type="warning" title="扫描前请确认">
             <div class="scan-prerequisite-content">
               <p>请先打开《绝区零》背包中的“驱动盘”界面，并将游戏切换为以下任一显示模式：</p>

@@ -182,6 +182,8 @@ async function verifyPagesArtifact(maintenanceEnabled) {
     const appConfig = JSON.parse(await readFile(path.join(outDir, "static", "app-config.json"), "utf8"))
     const manifest = JSON.parse(await readFile(path.join(outDir, "downloads", "zzz-scanner", "manifest.json"), "utf8"))
     assertArtifact(appConfig.maintenanceEnabled === maintenanceEnabled, "app-config maintenance flag mismatch")
+    assertArtifact(appConfig.scanTelemetryEnabled === false, "Pages must keep scan telemetry disabled")
+    assertArtifact(appConfig.scanTelemetryRetentionDays === 30, "Pages telemetry retention metadata mismatch")
     assertArtifact(manifest.schemaVersion === 3, "scanner manifest schema mismatch")
     assertArtifact(manifest.scannerVersion === scannerVersion, "scanner version mismatch")
     assertArtifact(Array.isArray(manifest.packages) && manifest.packages.length === scannerPackages.length, "scanner package count mismatch")
@@ -268,6 +270,8 @@ const catalog = await loadCalculatorContext(rootDir)
 await writeJson(path.join(outDir, "static", "catalog.json"), catalog)
 await writeJson(path.join(outDir, "static", "app-config.json"), {
     maintenanceEnabled,
+    scanTelemetryEnabled: false,
+    scanTelemetryRetentionDays: 30,
 })
 await ensurePagesScannerPackages()
 

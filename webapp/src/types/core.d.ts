@@ -219,6 +219,8 @@ declare module "@runtime/scanner-bridge.js" {
     readonly mode: string
     readonly helperVersion: string
     readonly protocolVersion: number
+    readonly scannerInfo: any
+    readonly scannerVersion: string
     connect(): Promise<any>
     launchHelper(): void
     getStorageInfo(): Promise<any>

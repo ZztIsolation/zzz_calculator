@@ -59,6 +59,14 @@ export class ScannerBridge {
         return this._mode === "helper" ? Number(this._helloData?.protocolVersion ?? 0) : 0
     }
 
+    get scannerInfo() {
+        return this._helloData?.scanner ?? {}
+    }
+
+    get scannerVersion() {
+        return String(this.scannerInfo?.version ?? this.scannerInfo?.appVersion ?? "")
+    }
+
     async connect() {
         if (this.connected) {
             return this._helloData
@@ -371,6 +379,10 @@ export class ScannerBridge {
                 break
             case "scanner_ready":
                 this._scannerReady = true
+                this._helloData = {
+                    ...(this._helloData ?? {}),
+                    scanner: data ?? this._helloData?.scanner ?? {},
+                }
                 if (this._ensureResolver?.timer) clearTimeout(this._ensureResolver.timer)
                 this._ensureResolver?.resolve(data)
                 this._ensureResolver = null
