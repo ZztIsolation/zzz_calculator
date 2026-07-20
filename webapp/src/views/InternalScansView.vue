@@ -31,6 +31,7 @@ const status = ref("")
 const client = ref("")
 const scannerVersion = ref("")
 const errorCode = ref("")
+const visualTransformClass = ref("")
 const page = ref(1)
 const loading = ref(false)
 const summary = ref<any>(null)
@@ -68,6 +69,10 @@ const versionOptions = computed(() => [
 const errorOptions = computed(() => [
   { label: "全部错误", value: "" },
   ...(summary.value?.errors ?? []).map((item: any) => ({ label: `${item.key}（${item.count}）`, value: item.key })),
+])
+const visualTransformOptions = computed(() => [
+  { label: "全部显示环境", value: "" },
+  ...(summary.value?.visualTransforms ?? []).map((item: any) => ({ label: `${item.key}（${item.count}）`, value: item.key })),
 ])
 
 function formatDateTime(value: unknown) {
@@ -109,6 +114,7 @@ const columns = [
   },
   { title: "Scanner", key: "version", width: 105, render: (row: any) => row.versions?.scannerVersion || "--" },
   { title: "客户端", key: "client", width: 105, render: (row: any) => row.client === "cloud" ? "云端" : "本地" },
+  { title: "显示环境", key: "visualTransform", width: 138, render: (row: any) => row.diagnostics?.visualTransformClass || "--" },
   { title: "耗时", key: "durationMs", width: 100, render: (row: any) => formatDuration(row.durationMs) },
   { title: "完成", key: "completed", width: 76, render: (row: any) => row.counters?.completed ?? 0 },
   { title: "错误码", key: "error", ellipsis: { tooltip: true }, render: (row: any) => row.failure?.code || "--" },
@@ -124,6 +130,7 @@ async function refresh(resetPage = false) {
       client: client.value,
       scannerVersion: scannerVersion.value,
       errorCode: errorCode.value,
+      visualTransformClass: visualTransformClass.value,
       cursor: (page.value - 1) * PAGE_SIZE,
       limit: PAGE_SIZE,
     }
@@ -182,6 +189,7 @@ onMounted(() => void refresh(true))
       <NSelect v-model:value="client" :options="clientOptions" aria-label="客户端" @update:value="refresh(true)" />
       <NSelect v-model:value="scannerVersion" :options="versionOptions" aria-label="Scanner 版本" @update:value="refresh(true)" />
       <NSelect v-model:value="errorCode" :options="errorOptions" aria-label="错误码" @update:value="refresh(true)" />
+      <NSelect v-model:value="visualTransformClass" :options="visualTransformOptions" aria-label="显示环境" @update:value="refresh(true)" />
     </section>
 
     <section class="table-band">
@@ -192,7 +200,7 @@ onMounted(() => void refresh(true))
           :bordered="false"
           :single-line="false"
           :row-props="row => ({ class: 'telemetry-row', onClick: () => openSession(row) })"
-          :scroll-x="820"
+          :scroll-x="960"
         />
       </NSpin>
       <NPagination v-if="total > PAGE_SIZE" v-model:page="page" :page-size="PAGE_SIZE" :item-count="total" @update:page="refresh(false)" />
@@ -283,7 +291,7 @@ onMounted(() => void refresh(true))
 
 .filter-band {
   display: grid;
-  grid-template-columns: minmax(260px, 1.4fr) repeat(4, minmax(130px, 1fr));
+  grid-template-columns: minmax(260px, 1.4fr) repeat(5, minmax(130px, 1fr));
   gap: 10px;
 }
 

@@ -127,6 +127,8 @@ function cleanDiagnostics(value) {
         "logicalRow", "visualRow", "column", "maxColumns", "visibleRois", "totalRois", "acceptGateReason",
         "sawPanelChange", "selectionChanged", "stableFrames", "requiredStableFrames", "attempts", "frameCount",
         "clientWidth", "clientHeight", "dpi", "captureMode", "visualProfileId",
+        "preflightState", "visualTransformClass", "anchorScore", "gridScore", "inventoryCountDetected",
+        "hueDelta", "saturationDeltaPct", "valueDeltaPct",
     ])
     const input = optionalObject(value, "diagnostics", allowed)
     return {
@@ -148,6 +150,14 @@ function cleanDiagnostics(value) {
         dpi: numberValue(input.dpi, "diagnostics.dpi", { optional: true, max: 1000 }),
         captureMode: stringValue(input.captureMode, "diagnostics.captureMode", 32, { optional: true }),
         visualProfileId: stringValue(input.visualProfileId, "diagnostics.visualProfileId", 100, { optional: true }),
+        preflightState: stringValue(input.preflightState, "diagnostics.preflightState", 64, { optional: true }),
+        visualTransformClass: stringValue(input.visualTransformClass, "diagnostics.visualTransformClass", 64, { optional: true }),
+        anchorScore: numberValue(input.anchorScore, "diagnostics.anchorScore", { optional: true, max: 100 }),
+        gridScore: numberValue(input.gridScore, "diagnostics.gridScore", { optional: true, max: 100 }),
+        inventoryCountDetected: booleanValue(input.inventoryCountDetected, "diagnostics.inventoryCountDetected", { optional: true }),
+        hueDelta: numberValue(input.hueDelta, "diagnostics.hueDelta", { optional: true, max: 180 }),
+        saturationDeltaPct: numberValue(input.saturationDeltaPct, "diagnostics.saturationDeltaPct", { optional: true, max: 100 }),
+        valueDeltaPct: numberValue(input.valueDeltaPct, "diagnostics.valueDeltaPct", { optional: true, max: 100 }),
     }
 }
 
@@ -278,6 +288,7 @@ function matchesSessionFilters(session, filters = {}) {
         && (!filters.client || session.client === filters.client)
         && (!filters.scannerVersion || session.versions?.scannerVersion === filters.scannerVersion)
         && (!filters.errorCode || session.failure?.code === filters.errorCode)
+        && (!filters.visualTransformClass || session.diagnostics?.visualTransformClass === filters.visualTransformClass)
 }
 
 function sessionOrder(left, right) {
@@ -460,6 +471,8 @@ export class ScanTelemetryStore {
         const versions = new Map()
         const errors = new Map()
         const clients = new Map()
+        const visualTransforms = new Map()
+        const preflightStates = new Map()
         let total = 0
         let startedOnly = 0
         let completed = 0
@@ -478,6 +491,8 @@ export class ScanTelemetryStore {
             incrementCount(versions, session.versions?.scannerVersion)
             if (session.failure?.code) incrementCount(errors, session.failure.code)
             incrementCount(clients, session.client)
+            incrementCount(visualTransforms, session.diagnostics?.visualTransformClass)
+            incrementCount(preflightStates, session.diagnostics?.preflightState)
         })
         return {
             range,
@@ -494,6 +509,8 @@ export class ScanTelemetryStore {
             versions: countEntries(versions),
             errors: countEntries(errors),
             clients: countEntries(clients),
+            visualTransforms: countEntries(visualTransforms),
+            preflightStates: countEntries(preflightStates),
         }
     }
 

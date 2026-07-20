@@ -54,9 +54,27 @@ describe("scan telemetry runtime", () => {
     await finishScanTelemetryEvent(session, "failed", {
       counters: { visited: 1 },
       failure: {
-        code: "scan_failed",
+        code: "visual_preflight_failed",
         phase: "scan",
         message: "C:\\Users\\Someone\\secret.log token=abc logicalRow=1, visualRow=1, col=1/9",
+      },
+      diagnostics: {
+        preflightState: "color_unsupported",
+        visualTransformClass: "highlight_clipped",
+        anchorScore: 84,
+        gridScore: 67,
+        inventoryCountDetected: true,
+        hueDelta: 16,
+        saturationDeltaPct: 0,
+        valueDeltaPct: 0,
+        clientWidth: 1920,
+        clientHeight: 1080,
+        dpi: 192,
+        captureMode: "dxgi",
+        visualProfileId: "local-1920x1080-current",
+        observedColor: "#00FFFF",
+        screenshot: "private.png",
+        inventoryCount: 2875,
       },
     })
     expect(fetchMock).toHaveBeenCalledTimes(2)
@@ -64,7 +82,20 @@ describe("scan telemetry runtime", () => {
     expect(terminal.eventType).toBe("failed")
     expect(terminal.failure.message).not.toContain("Someone")
     expect(terminal.failure.message).not.toContain("abc")
-    expect(terminal.diagnostics).toMatchObject({ logicalRow: 1, visualRow: 1, column: 1, maxColumns: 9 })
+    expect(terminal.diagnostics).toMatchObject({
+      preflightState: "color_unsupported",
+      visualTransformClass: "highlight_clipped",
+      anchorScore: 84,
+      gridScore: 67,
+      inventoryCountDetected: true,
+      hueDelta: 16,
+      clientWidth: 1920,
+      dpi: 192,
+      captureMode: "dxgi",
+    })
+    expect(terminal.diagnostics).not.toHaveProperty("observedColor")
+    expect(terminal.diagnostics).not.toHaveProperty("screenshot")
+    expect(terminal.diagnostics).not.toHaveProperty("inventoryCount")
     expect(terminal).not.toHaveProperty("driveDiscs")
   })
 

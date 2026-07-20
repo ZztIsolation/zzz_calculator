@@ -51,7 +51,7 @@ type ScanFailure = {
   retryable: boolean
   actions: Array<{ kind: string; label: string }>
   diagnosticId: string
-  details: Record<string, string>
+  details: Record<string, string | number | boolean>
 }
 
 const GAME_NOT_FOUND_PATTERNS = [

@@ -1972,6 +1972,7 @@ async function routeScanTelemetry(req, res, pathname, searchParams) {
                 client: String(searchParams.get("client") ?? ""),
                 scannerVersion: String(searchParams.get("scannerVersion") ?? ""),
                 errorCode: String(searchParams.get("errorCode") ?? ""),
+                visualTransformClass: String(searchParams.get("visualTransformClass") ?? ""),
             }, {
                 cursor,
                 limit,
