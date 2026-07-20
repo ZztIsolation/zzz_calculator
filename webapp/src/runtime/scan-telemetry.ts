@@ -120,9 +120,12 @@ export function scanTelemetryVersions(value: any = {}) {
 const DIAGNOSTIC_NUMBER_FIELDS = [
   "logicalRow", "visualRow", "column", "maxColumns", "visibleRois", "totalRois", "stableFrames",
   "requiredStableFrames", "attempts", "frameCount", "clientWidth", "clientHeight", "dpi",
+  "anchorScore", "gridScore", "hueDelta", "saturationDeltaPct", "valueDeltaPct",
 ] as const
-const DIAGNOSTIC_BOOLEAN_FIELDS = ["sawPanelChange", "selectionChanged"] as const
-const DIAGNOSTIC_STRING_FIELDS = ["acceptGateReason", "captureMode", "visualProfileId"] as const
+const DIAGNOSTIC_BOOLEAN_FIELDS = ["sawPanelChange", "selectionChanged", "inventoryCountDetected"] as const
+const DIAGNOSTIC_STRING_FIELDS = [
+  "acceptGateReason", "captureMode", "visualProfileId", "preflightState", "visualTransformClass",
+] as const
 
 export function scanTelemetryDiagnostics(value: any = {}) {
   const source = value?.diagnostics ?? value?.details ?? value ?? {}

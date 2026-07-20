@@ -503,6 +503,39 @@ describe("inventory store", () => {
     expect(store.scanStatus).toBe("ready")
   })
 
+  it("preserves visual preflight diagnostics and recovery copy", async () => {
+    const store = useInventoryStore()
+    scannerMockState.connectResults.push({ version: "1.2.1", protocolVersion: 3 })
+    await store.openScannerPanel()
+    const helper = scannerMockState.instances[0]
+
+    helper.onError?.({
+      code: "visual_preflight_failed",
+      phase: "scan",
+      title: "当前显示色彩无法安全识别",
+      message: "未能安全确认驱动盘仓库界面。",
+      remedy: "请关闭过强的反色、单色或自定义 LUT 后重试。",
+      retryable: true,
+      actions: [{ kind: "retry_scan", label: "重新扫描" }],
+      details: {
+        preflightState: "color_unsupported",
+        visualTransformClass: "unknown",
+        anchorScore: 35,
+        gridScore: 67,
+        inventoryCountDetected: true,
+      },
+    })
+
+    expect(store.scanErrorVariant).toBe("diagnostic-failure")
+    expect(store.scanFailure?.code).toBe("visual_preflight_failed")
+    expect(store.scanFailure?.title).toBe("当前显示色彩无法安全识别")
+    expect(store.scanFailure?.details).toMatchObject({
+      preflightState: "color_unsupported",
+      anchorScore: 35,
+      inventoryCountDetected: true,
+    })
+  })
+
   it("disables start-scan when no rarity is selected", () => {
     const store = useInventoryStore()
     store.$patch({ scanConnected: true, scanStatus: "ready", scanRarityS: false, scanRarityA: false })

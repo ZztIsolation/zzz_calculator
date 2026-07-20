@@ -22,7 +22,33 @@ function event(eventType, sessionId = "11111111-1111-4111-8111-111111111111") {
         durationMs: eventType === "started" ? undefined : 2500,
         counters: { visited: 10, queued: 10, completed: eventType === "completed" ? 10 : 0, failed: 0 },
         failure: eventType === "failed" ? { code: "scan_failed", phase: "scan", message: "timeout" } : {},
-        diagnostics: eventType === "failed" ? { visibleRois: 10, totalRois: 12, acceptGateReason: "waiting_for_full_roi" } : {},
+        diagnostics: eventType === "failed" ? {
+            visibleRois: 10,
+            totalRois: 12,
+            acceptGateReason: "waiting_for_full_roi",
+            preflightState: "accepted",
+            visualTransformClass: "highlight_clipped",
+            anchorScore: 84,
+            gridScore: 67,
+            inventoryCountDetected: true,
+            hueDelta: 16,
+            saturationDeltaPct: 0,
+            valueDeltaPct: 0,
+            clientWidth: 1920,
+            clientHeight: 1080,
+            dpi: 192,
+            captureMode: "dxgi",
+            visualProfileId: "local-1920x1080-current",
+        } : eventType === "completed" ? {
+            preflightState: "accepted",
+            visualTransformClass: "neutral",
+            anchorScore: 100,
+            gridScore: 100,
+            inventoryCountDetected: true,
+            hueDelta: 0,
+            saturationDeltaPct: 0,
+            valueDeltaPct: 0,
+        } : {},
     }
 }
 
@@ -35,6 +61,13 @@ assert.throws(
 )
 assert.throws(
     () => validateScanTelemetryEvent({ ...event("completed"), clientId: "not-a-uuid" }),
+    ScanTelemetryValidationError,
+)
+assert.throws(
+    () => validateScanTelemetryEvent({
+        ...event("failed"),
+        diagnostics: { ...event("failed").diagnostics, observedColor: "#00FFFF" },
+    }),
     ScanTelemetryValidationError,
 )
 assert.throws(
@@ -74,11 +107,21 @@ try {
     assert.equal(summary.failed, 1)
     assert.equal(summary.durationMs.p95, 2500)
     assert.equal(summary.versions[0].key, "1.0.39")
+    assert.deepEqual(summary.visualTransforms, [
+        { key: "highlight_clipped", count: 1 },
+        { key: "neutral", count: 1 },
+    ])
 
     const failed = await store.sessions(range, { status: "failed" })
     assert.equal(failed.length, 1)
     assert.equal(failed[0].diagnostics.visibleRois, 10)
+    assert.equal(failed[0].diagnostics.visualTransformClass, "highlight_clipped")
+    assert.equal(failed[0].diagnostics.inventoryCountDetected, true)
+    assert.equal(failed[0].diagnostics.anchorScore, 84)
     assert.equal((await store.session(range, failed[0].sessionId)).failure.code, "scan_failed")
+    const shifted = await store.sessions(range, { visualTransformClass: "highlight_clipped" })
+    assert.equal(shifted.length, 1)
+    assert.equal(shifted[0].status, "failed")
 
     const firstPage = await store.sessionPage(range, {}, { cursor: 0, limit: 1 })
     assert.equal(firstPage.total, 2)

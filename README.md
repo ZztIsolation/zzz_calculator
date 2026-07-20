@@ -480,8 +480,8 @@ download payloads deliberately use separate lifecycles:
       manifest.json
       helper-manifest.json
       helper/1.2.1/ZZZ-Scanner-Helper.exe
-      1.0.39/ZZZ-Scanner.Next-win-x64-fdd.zip
-      1.0.39/ZZZ-Scanner.Next-win-x64-self-contained.zip
+      1.0.40/ZZZ-Scanner.Next-win-x64-fdd.zip
+      1.0.40/ZZZ-Scanner.Next-win-x64-self-contained.zip
 ```
 
 Build a deployable archive containing the tracked source and the generated Vue
@@ -534,7 +534,7 @@ is manual-only; a push to `main` no longer deploys Pages automatically.
 
 The Drive Disc scanner flow uses a small local Helper registered for the `zzz-scanner://` protocol. The Helper communicates with the page at `127.0.0.1:22355`, reads `/downloads/zzz-scanner/manifest.json`, and prepares ZZZ Scanner Next.
 
-The current supported OCR runtime is ZZZ Scanner Next `1.0.39`, with Helper `1.2.1` or newer. Supported systems are Windows 10 1809 (Build 17763) or newer x64 and Windows 11 x64, including N and LTSC editions. x86, ARM64, and Windows 7 are outside the current support commitment. Version 1.0.39 reports structured timeout diagnostics including ROI completeness, the final acceptance gate, stable frames, window size, DPI, capture backend, and visual profile. These fields may enter the privacy-limited summary above; screenshots and OCR text remain local.
+The current supported OCR runtime is ZZZ Scanner Next `1.0.40`, with Helper `1.2.1` or newer. Supported systems are Windows 10 1809 (Build 17763) or newer x64 and Windows 11 x64, including N and LTSC editions. x86, ARM64, and Windows 7 are outside the current support commitment. Version 1.0.40 automatically handles common HDR highlight clipping, Night light, and moderate GPU color adjustments; non-neutral captures use PP-OCR, while uncertain visual evidence stops before any click or scroll. The privacy-limited summary may include preflight state, transform class, bounded scores, window size, DPI, capture backend, and visual profile. Screenshots, OCR text, inventory counts, raw RGB values, and local paths remain local.
 
 The schema v3 manifest locks the size, package SHA-256, and every installed file for both framework-dependent and self-contained packages. The Helper selects the smaller package when .NET 8 Desktop Runtime is present; otherwise it automatically uses the self-contained compatibility package without installing .NET or modifying the system. After a verified Scanner handshake, the Helper deletes the package ZIP and every inactive runtime, while retaining the active runtime and the newest successful and failed scan outputs. Structured errors identify environment, disk, download, integrity, extraction, native dependency, port, game-process, elevation, and UAC-cancellation failures and expose appropriate retry, repair, log, or elevation actions.
 

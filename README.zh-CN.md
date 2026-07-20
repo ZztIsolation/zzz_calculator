@@ -335,8 +335,8 @@ npm run benchmark:optimizer
       manifest.json
       helper-manifest.json
       helper/1.2.1/ZZZ-Scanner-Helper.exe
-      1.0.39/ZZZ-Scanner.Next-win-x64-fdd.zip
-      1.0.39/ZZZ-Scanner.Next-win-x64-self-contained.zip
+      1.0.40/ZZZ-Scanner.Next-win-x64-fdd.zip
+      1.0.40/ZZZ-Scanner.Next-win-x64-self-contained.zip
 ```
 
 生成包含当前 Git 跟踪源码与 Vue 构建产物的服务器发布包：
@@ -385,7 +385,7 @@ manifest，以及可用时经过校验的当前扫描器双包。产物明确不
 
 驱动盘扫描流程依赖一个注册 `zzz-scanner://` 协议的本地小助手。小助手在 `127.0.0.1:22355` 与网页通信，读取 `/downloads/zzz-scanner/manifest.json` 并准备 ZZZ Scanner Next。
 
-当前支持的 OCR 运行时为 ZZZ Scanner Next `1.0.39`，Helper 最低版本为 `1.2.1`。正式支持 Windows 10 1809（Build 17763）及以上 x64和 Windows 11 x64，包括 N 版与 LTSC；x86、ARM64 和 Windows 7 不在当前承诺范围。1.0.39 会在详情面板超时时返回 ROI 完整度、最后接受门槛、稳定帧、窗口尺寸、DPI、捕获后端和视觉配置等结构化诊断；这些字段可以进入上述脱敏摘要，截图与 OCR 文本仍留在本机。
+当前支持的 OCR 运行时为 ZZZ Scanner Next `1.0.40`，Helper 最低版本为 `1.2.1`。正式支持 Windows 10 1809（Build 17763）及以上 x64和 Windows 11 x64，包括 N 版与 LTSC；x86、ARM64 和 Windows 7 不在当前承诺范围。1.0.40 会自动兼容常见 HDR 高光裁切、夜间模式和温和显卡色彩调整；非中性色彩环境自动使用 PP-OCR，视觉证据不足时在点击或滚动前安全停止。预检状态、色彩分类、脱敏分数、窗口尺寸、DPI、捕获后端和视觉配置可以进入上述摘要，截图、OCR 文本、仓库数量、原始 RGB 和本机路径仍留在本机。
 
 schema v3 manifest 同时发布 framework-dependent 与 self-contained 包，并固定包大小、包 SHA-256 及每个安装文件的大小和哈希。Helper 检测到 .NET 8 Desktop Runtime 时选择较小包；未检测到或结果不确定时自动使用自包含兼容包，不安装 .NET、不修改系统。新 Scanner 完成本地握手后，Helper 会删除安装 ZIP 和所有非活动 runtime，只保留当前 runtime、最近一次成功扫描产物和最近一次失败诊断。网页按结构化错误码显示磁盘不足、下载/校验/解压失败、原生 DLL 缺失、端口占用、游戏未启动、权限不匹配和 UAC 取消等具体原因，并提供重试、修复、打开日志或按需提权动作。
 

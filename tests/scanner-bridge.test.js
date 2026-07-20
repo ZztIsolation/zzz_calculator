@@ -51,7 +51,7 @@ function assertScannerPackageManifest() {
     const helperManifest = JSON.parse(readFileSync(join(repoRoot, "config", "helper-manifest.json"), "utf8"))
     assert.equal(manifest.schemaVersion, 3)
     assert.equal(manifest.launcherMinVersion, "1.2.1")
-    assert.equal(manifest.scannerVersion, "1.0.39")
+    assert.equal(manifest.scannerVersion, "1.0.40")
     assert.equal(helperManifest.schemaVersion, 1)
     assert.equal(helperManifest.version, "1.2.1")
     assert.equal(manifest.support.minWindowsBuild, 17763)
@@ -64,9 +64,9 @@ function assertScannerPackageManifest() {
         assert.ok(packageInfo.size > 0)
         assert.ok(packageInfo.expandedSize >= packageInfo.size)
         assert.equal(packageInfo.entry, "ZZZ-Scanner.Next.exe")
-        assert.ok(packageInfo.packageUrls[0].startsWith("https://download.zzzcaculator.top/downloads/zzz-scanner/1.0.39/"))
-        assert.ok(packageInfo.packageUrls.some(url => url.startsWith("./1.0.39/")))
-        assert.ok(packageInfo.packageUrls.some(url => url.startsWith("https://zzzcaculator.top/downloads/zzz-scanner/1.0.39/")))
+        assert.ok(packageInfo.packageUrls[0].startsWith("https://download.zzzcaculator.top/downloads/zzz-scanner/1.0.40/"))
+        assert.ok(packageInfo.packageUrls.some(url => url.startsWith("./1.0.40/")))
+        assert.ok(packageInfo.packageUrls.some(url => url.startsWith("https://zzzcaculator.top/downloads/zzz-scanner/1.0.40/")))
         assert.ok(packageInfo.packageUrls.some(url => url.startsWith("https://github.com/")))
         assert.equal(packageInfo.packageUrls.some(url => url.startsWith("http://121.199.21.10")), false)
         assert.ok(packageInfo.files.length > 0)
@@ -134,10 +134,24 @@ try {
     HelperSocket.last.onmessage({
         data: JSON.stringify({
             cmd: "scan_error",
-            data: { code: "disk_insufficient", phase: "preflight", message: "磁盘空间不足" },
+            data: {
+                code: "visual_preflight_failed",
+                phase: "scan",
+                title: "当前显示色彩无法安全识别",
+                message: "未能安全确认驱动盘仓库界面。",
+                details: {
+                    preflightState: "color_unsupported",
+                    visualTransformClass: "unknown",
+                    anchorScore: 35,
+                    gridScore: 67,
+                    inventoryCountDetected: true,
+                },
+            },
         }),
     })
-    assert.equal(structuredError.code, "disk_insufficient")
+    assert.equal(structuredError.code, "visual_preflight_failed")
+    assert.equal(structuredError.details.anchorScore, 35)
+    assert.equal(structuredError.details.inventoryCountDetected, true)
     bridge.startScan({ maxItems: 12, rarities: ["S", "A"] })
     assert.deepEqual(HelperSocket.last.sent, {
         cmd: "scan_req",

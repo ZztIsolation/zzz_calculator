@@ -2,6 +2,31 @@
 
 # Changelog
 
+## 2026-07-20 - Added Scanner 1.0.40 Display-Color Diagnostics
+
+Integrated Scanner 1.0.40 visual preflight and display-color summaries across
+the Helper bridge, browser lifecycle telemetry, server validation, and internal
+diagnostics. Successful and failed scans can report the preflight state,
+capture-space transform class, bounded anchor/grid scores, inventory-count
+detection boolean, hue/saturation/value deltas, client dimensions, DPI,
+capture backend, and visual profile. The telemetry allowlist still rejects raw
+RGB values, screenshots, OCR text, inventory counts, local paths, complete
+logs, and exception stacks.
+
+The internal scan diagnostics page can group and filter sessions by visual
+transform class. Structured `visual_preflight_failed` responses retain the
+Scanner-provided title, recovery guidance, and retry action without adding a
+manual compatibility switch.
+
+Prepared the Windows CI release payload from the controlled VC++ Redistributable
+layout. The framework-dependent package is `21775584` bytes with SHA-256
+`d6bd86ebc37c457c3fd8c2cb263c4db0f63cdbecd468bf500904e10fba273f89`;
+the self-contained x64 package is `84794392` bytes with SHA-256
+`efb8317ece48bc38b18a101e1fa9d3e9f961e5166fc20cf470aade124cbc4288`.
+Helper remains at `1.2.1`. The manifest is prepared on the release branch but
+must not be made public until the required 4K HDR/Auto HDR hardware matrix and
+SDR-to-HDR full-scan equivalence gate pass.
+
 ## 2026-07-20 - Added Privacy-Limited Scanner Telemetry And Internal Diagnostics
 
 Added a two-event scanner telemetry lifecycle to the Vue application. Each scan now emits one `started` record and exactly one terminal `completed`, `failed`, `cancelled`, or `import_failed` record after the import outcome is known. The payload is strictly limited to a random browser-local UUID, scan settings, Helper and Scanner versions, duration, aggregate counters, a sanitized error summary, and allowlisted structured diagnostics. Drive Disc arrays, account labels, screenshots, OCR text, local executable/output paths, complete logs, and exception stacks are never included. Collection is enabled by default on the production server, can be disabled or assigned a new anonymous identifier from `/settings`, and silently fails without affecting the scan workflow.

@@ -5,6 +5,7 @@ export type ScanTelemetryFilters = {
   client?: string
   scannerVersion?: string
   errorCode?: string
+  visualTransformClass?: string
   cursor?: number
   limit?: number
 }
