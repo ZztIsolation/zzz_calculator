@@ -2,6 +2,20 @@
 
 # Changelog
 
+## 2026-07-20 - Added Privacy-Limited Scanner Telemetry And Internal Diagnostics
+
+Added a two-event scanner telemetry lifecycle to the Vue application. Each scan now emits one `started` record and exactly one terminal `completed`, `failed`, `cancelled`, or `import_failed` record after the import outcome is known. The payload is strictly limited to a random browser-local UUID, scan settings, Helper and Scanner versions, duration, aggregate counters, a sanitized error summary, and allowlisted structured diagnostics. Drive Disc arrays, account labels, screenshots, OCR text, local executable/output paths, complete logs, and exception stacks are never included. Collection is enabled by default on the production server, can be disabled or assigned a new anonymous identifier from `/settings`, and silently fails without affecting the scan workflow.
+
+Added `POST /api/scan-telemetry/events` with a 16 KiB body limit, same-origin and content-type enforcement, strict nested field validation, UUID and enum validation, an in-memory per-IP rate limit, and server-owned record IDs, receive timestamps, and deployed commit values. IP addresses are used only for transient rate limiting and are not persisted. Accepted records are serialized through one append queue into UTC-dated NDJSON files outside immutable application releases; closed dates are gzip-compressed and files older than 30 days are deleted on startup and daily maintenance.
+
+Internal aggregation now streams the selected daily files instead of retaining all raw events in memory. Summary counters are updated incrementally, paginated session queries retain only the newest rows needed for the requested page, and the management UI runs summary and list reads sequentially to avoid duplicate 30-day memory peaks. Same-origin validation ignores client-supplied forwarded-host values, and rate limiting keys only the trusted Nginx `X-Real-IP` value or the direct socket address.
+
+Added the Basic-Auth-protected `/internal/scans` operational view and internal summary, paginated session-list, and session-detail APIs. The view exposes success rate, failures, duration percentiles, version/error distributions, date/version/client/error filters, and sanitized per-session diagnostics without linking from public navigation. Nginx injects the internal authorization marker only after Basic Auth succeeds, while the loopback Node service rejects direct unauthenticated production queries. The systemd template now owns `/var/lib/zzz-calculator` through `StateDirectory` and configures the telemetry directory and retention period.
+
+Added Scanner 1.0.39 integration fields for panel-timeout ROI completeness, final acceptance gate, panel/selection change state, stable-frame counts, retry attempts, captured frame count, client dimensions, DPI, active capture backend, and visual profile. Static GitHub Pages output explicitly disables telemetry. Added storage, validation, retention, rate-limit, browser privacy, lifecycle, endpoint-failure, production routing, and load-test coverage; the load harness targets 20 requests per second while checking ingestion/health P95 and process memory growth.
+
+Published the Scanner packages from the required Windows CI VC++ Redistributable layout. The framework-dependent package is `21756850` bytes with SHA-256 `6488a032b22c9cf907ea3637927b3c8df3b9bd7a04162818c3244cec80d57ea0`; the self-contained package is `84775658` bytes with SHA-256 `cc1552a38536b764373c24821af003b7e85adb097f3611653a86783c2a06b037`. Helper remains on the existing 1.2.1 release and was not replaced by the pipeline's same-version rebuild.
+
 ## 2026-07-19 - Matched Alice's In-Game Mastery Conversion Rounding
 
 Corrected Alice's Additional Ability to use the game's two-stage downward

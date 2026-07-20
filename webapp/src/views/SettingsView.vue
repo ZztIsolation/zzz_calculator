@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue"
-import { NAlert, NButton, NProgress, NTag, useMessage } from "naive-ui"
-import { Download, HardDrive, Play, RefreshCw, Trash2 } from "lucide-vue-next"
+import { NAlert, NButton, NProgress, NSwitch, NTag, useMessage } from "naive-ui"
+import { Download, HardDrive, Play, RefreshCw, RotateCcw, ShieldCheck, Trash2 } from "lucide-vue-next"
 import ConfirmDialog from "@/components/ConfirmDialog.vue"
 import { clearAllBrowserData } from "@runtime/local-store.js"
+import { loadAppConfig } from "@/runtime/app-config"
+import {
+  resetScanTelemetryClientId,
+  scanTelemetryPreferenceEnabled,
+  setScanTelemetryPreference,
+} from "@runtime/scan-telemetry"
 import { helperVersionAtLeast, REQUIRED_HELPER_VERSION, useInventoryStore } from "@/stores/inventory"
 
 const inventoryStore = useInventoryStore()
@@ -18,6 +24,9 @@ const helperBusy = ref(false)
 const helperProgress = ref<any>(null)
 const showBrowserClear = ref(false)
 const showScannerCleanup = ref(false)
+const telemetryEnabled = ref(scanTelemetryPreferenceEnabled())
+const telemetryAvailable = ref(false)
+const telemetryRetentionDays = ref(30)
 
 const bridge = computed(() => inventoryStore.ensureScannerBridge())
 const helperSupportsStorage = computed(() => helperConnected.value && helperProtocolVersion.value >= 3)
@@ -143,9 +152,24 @@ async function updateHelper() {
   }
 }
 
+function updateTelemetryPreference(value: boolean) {
+  telemetryEnabled.value = value
+  setScanTelemetryPreference(value)
+  message.success(value ? "匿名扫描诊断已开启" : "匿名扫描诊断已关闭")
+}
+
+function resetTelemetryIdentity() {
+  resetScanTelemetryClientId()
+  message.success("匿名标识已重置")
+}
+
 onMounted(() => {
   void refreshBrowserUsage()
   void refreshHelper()
+  void loadAppConfig().then(config => {
+    telemetryAvailable.value = config.scanTelemetryEnabled
+    telemetryRetentionDays.value = config.scanTelemetryRetentionDays
+  })
 })
 </script>
 
@@ -160,6 +184,36 @@ onMounted(() => {
         <NButton quaternary circle title="刷新" :loading="helperBusy" @click="refreshBrowserUsage(); refreshHelper()">
           <template #icon><RefreshCw :size="17" /></template>
         </NButton>
+      </div>
+    </section>
+
+    <section class="settings-band">
+      <div class="settings-heading">
+        <div>
+          <div class="heading-line">
+            <h2>匿名扫描诊断</h2>
+            <NTag :type="telemetryEnabled && telemetryAvailable ? 'success' : 'default'" size="small">
+              {{ telemetryEnabled && telemetryAvailable ? "已开启" : "已关闭" }}
+            </NTag>
+          </div>
+          <p>上传扫描版本、耗时、数量和脱敏错误信息，不包含驱动盘内容、账号、截图、本机路径或完整日志。</p>
+        </div>
+        <NSwitch
+          :value="telemetryEnabled && telemetryAvailable"
+          :disabled="!telemetryAvailable"
+          aria-label="匿名扫描诊断"
+          @update:value="updateTelemetryPreference"
+        />
+      </div>
+      <NAlert type="info" :show-icon="false">
+        诊断记录使用随机匿名标识关联重复故障，并在 {{ telemetryRetentionDays }} 天后自动删除。关闭后不再上传新的扫描记录。
+      </NAlert>
+      <div class="settings-actions">
+        <NButton :disabled="!telemetryAvailable" @click="resetTelemetryIdentity">
+          <template #icon><RotateCcw :size="16" /></template>
+          重置匿名标识
+        </NButton>
+        <span class="privacy-note"><ShieldCheck :size="15" /> 本地驱动盘仓库仍只保存在当前浏览器</span>
       </div>
     </section>
 
@@ -355,6 +409,18 @@ onMounted(() => {
   justify-content: flex-end;
   margin-top: 16px;
   flex-wrap: wrap;
+}
+
+.privacy-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.settings-band :deep(.n-alert) {
+  margin-top: 14px;
 }
 
 .update-progress {

@@ -2,6 +2,21 @@ import { mount } from "@vue/test-utils"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import SettingsView from "@/views/SettingsView.vue"
 
+const telemetryMocks = vi.hoisted(() => ({
+  setPreference: vi.fn(),
+  resetClientId: vi.fn(),
+}))
+
+vi.mock("@/runtime/app-config", () => ({
+  loadAppConfig: vi.fn(async () => ({ scanTelemetryEnabled: true, scanTelemetryRetentionDays: 30 })),
+}))
+
+vi.mock("@runtime/scan-telemetry", () => ({
+  scanTelemetryPreferenceEnabled: () => true,
+  setScanTelemetryPreference: telemetryMocks.setPreference,
+  resetScanTelemetryClientId: telemetryMocks.resetClientId,
+}))
+
 const scanner = {
   mode: "helper",
   helperVersion: "1.2.1",
@@ -57,6 +72,11 @@ vi.mock("naive-ui", () => ({
   NProgress: { template: "<div />" },
   NTag: { template: "<span><slot /></span>" },
   NModal: { template: "<div v-if='$attrs.show'><slot /><slot name='action' /></div>" },
+  NSwitch: {
+    props: ["value", "disabled"],
+    emits: ["update:value"],
+    template: "<button role='switch' :aria-checked='value' :disabled='disabled' @click='$emit(\"update:value\", !value)'>toggle</button>",
+  },
   useMessage: () => ({ success, warning: vi.fn(), error: vi.fn() }),
 }))
 
@@ -99,5 +119,15 @@ describe("SettingsView", () => {
     expect(wrapper.text()).toContain("下载并更新 Helper")
     expect(scanner.getStorageInfo).not.toHaveBeenCalled()
     expect(scanner.updateHelper).not.toHaveBeenCalled()
+  })
+
+  it("persists the anonymous diagnostics preference from the settings switch", async () => {
+    const wrapper = mount(SettingsView)
+    await vi.waitFor(() => expect(wrapper.get("[role='switch']").attributes("disabled")).toBeUndefined())
+
+    await wrapper.get("[role='switch']").trigger("click")
+
+    expect(telemetryMocks.setPreference).toHaveBeenCalledWith(false)
+    expect(success).toHaveBeenCalledWith("匿名扫描诊断已关闭")
   })
 })

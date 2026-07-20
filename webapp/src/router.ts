@@ -10,6 +10,7 @@ export const router = createRouter({
     { path: "/discs", name: "discs", component: () => import("@/views/DiscsView.vue") },
     { path: "/accounts", name: "accounts", component: () => import("@/views/AccountsView.vue") },
     { path: "/settings", name: "settings", component: () => import("@/views/SettingsView.vue") },
+    { path: "/internal/scans", name: "internal-scans", component: () => import("@/views/InternalScansView.vue") },
     ...(includeMaintenance
       ? [{ path: "/maintenance", name: "maintenance", component: () => import("@/views/MaintenanceView.vue") }]
       : []),

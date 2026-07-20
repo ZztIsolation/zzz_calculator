@@ -4,6 +4,14 @@ import { readFile, rename, rm, writeFile } from "node:fs/promises"
 import { createReadStream, existsSync, statSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import {
+    createScanTelemetryRateLimiter,
+    readDeploymentVersion,
+    resolveTelemetryRange,
+    ScanTelemetryStore,
+    ScanTelemetryValidationError,
+    validateScanTelemetryEvent,
+} from "./scanTelemetry.js"
 import { buildMeta, calculateInCombatPanel, calculateOutOfCombatPanel, loadCatalog } from "./calculator.js"
 import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "../core/driveDiscAnalysis-core.js"
 import { OptimizerCancelledError, optimizeDriveDiscs, optimizeDriveDiscsAsync, previewDriveDiscOptimization } from "./driveDiscOptimizer.js"
@@ -78,6 +86,20 @@ function envFlag(name) {
     }
     return null
 }
+
+const scanTelemetryEnabled = envFlag("SCAN_TELEMETRY_ENABLED") === true
+const scanTelemetryRetentionDays = Math.max(1, Math.min(365, Number(process.env.SCAN_TELEMETRY_RETENTION_DAYS) || 30))
+const scanTelemetryDirectory = path.resolve(process.env.SCAN_TELEMETRY_DIR || path.join(dataDir, "scan-telemetry"))
+const scanTelemetryStore = scanTelemetryEnabled
+    ? new ScanTelemetryStore({
+        directory: scanTelemetryDirectory,
+        retentionDays: scanTelemetryRetentionDays,
+        deploymentVersion: await readDeploymentVersion(rootDir),
+    })
+    : null
+const scanTelemetryRateLimitMax = Math.max(1, Math.min(1_000_000, Number(process.env.SCAN_TELEMETRY_RATE_LIMIT_MAX) || 60))
+const allowScanTelemetryRequest = createScanTelemetryRateLimiter({ max: scanTelemetryRateLimitMax, windowMs: 60_000 })
+await scanTelemetryStore?.init()
 
 function isMaintenanceEnabled() {
     return envFlag("MAINTENANCE_ENABLED") ?? nodeEnv !== "production"
@@ -364,12 +386,43 @@ function sendRedirect(res, location, statusCode = 308) {
     res.end()
 }
 
-async function readBody(req) {
+class RequestBodyTooLargeError extends Error {}
+
+async function readBody(req, maxBytes = Number.POSITIVE_INFINITY) {
     const chunks = []
+    let total = 0
     for await (const chunk of req) {
+        total += chunk.length
+        if (total > maxBytes) {
+            throw new RequestBodyTooLargeError(`Request body exceeds ${maxBytes} bytes.`)
+        }
         chunks.push(chunk)
     }
     return Buffer.concat(chunks).toString("utf8")
+}
+
+function requestClientIp(req) {
+    return String(req.headers["x-real-ip"] ?? req.socket.remoteAddress ?? "unknown").trim()
+}
+
+function isSameOriginRequest(req) {
+    const origin = String(req.headers.origin ?? "").trim()
+    if (!origin) return false
+    try {
+        const parsed = new URL(origin)
+        const expectedHost = String(req.headers.host ?? "").trim().toLowerCase()
+        const expectedProtocol = String(req.headers["x-forwarded-proto"] ?? (req.socket.encrypted ? "https" : "http"))
+            .split(",")[0]
+            .trim()
+            .toLowerCase()
+        return parsed.host.toLowerCase() === expectedHost && parsed.protocol === `${expectedProtocol}:`
+    } catch {
+        return false
+    }
+}
+
+function isTelemetryAdminRequest(req) {
+    return nodeEnv !== "production" || req.headers["x-scan-telemetry-admin"] === "1"
 }
 
 async function readDataFile(fileName) {
@@ -1844,7 +1897,122 @@ async function serveDownload(res, pathname) {
     sendText(res, 404, "Not Found", "text/plain; charset=utf-8")
 }
 
-async function routeApi(req, res, pathname) {
+async function routeScanTelemetry(req, res, pathname, searchParams) {
+    if (pathname === "/api/scan-telemetry/events") {
+        if (!scanTelemetryStore) {
+            sendJson(res, 404, { ok: false, error: "Scan telemetry is disabled." })
+            return true
+        }
+        if (req.method !== "POST") {
+            sendJson(res, 405, { ok: false, error: "Method not allowed." })
+            return true
+        }
+        if (!isSameOriginRequest(req)) {
+            sendJson(res, 403, { ok: false, error: "Same-origin request required." })
+            return true
+        }
+        if (!String(req.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) {
+            sendJson(res, 415, { ok: false, error: "Content-Type must be application/json." })
+            return true
+        }
+        if (!allowScanTelemetryRequest(requestClientIp(req))) {
+            res.setHeader("Retry-After", "60")
+            sendJson(res, 429, { ok: false, error: "Too many telemetry requests." })
+            return true
+        }
+        try {
+            const body = await readBody(req, 16 * 1024)
+            const event = validateScanTelemetryEvent(JSON.parse(body || "{}"))
+            const record = await scanTelemetryStore.append(event)
+            sendJson(res, 202, { ok: true, recordId: record.recordId, receivedAt: record.receivedAt })
+        } catch (error) {
+            if (error instanceof RequestBodyTooLargeError) {
+                sendJson(res, 413, { ok: false, error: error.message })
+            } else if (error instanceof ScanTelemetryValidationError || error instanceof SyntaxError) {
+                sendJson(res, 400, { ok: false, error: error.message })
+            } else {
+                console.error("Scan telemetry write failed:", error)
+                sendJson(res, 503, { ok: false, error: "Scan telemetry is temporarily unavailable." })
+            }
+        }
+        return true
+    }
+
+    if (!pathname.startsWith("/api/internal/scan-telemetry")) {
+        return false
+    }
+    if (!scanTelemetryStore) {
+        sendJson(res, 404, { ok: false, error: "Scan telemetry is disabled." })
+        return true
+    }
+    if (!isTelemetryAdminRequest(req)) {
+        res.setHeader("WWW-Authenticate", "Basic realm=\"ZZZ Scanner Diagnostics\"")
+        sendJson(res, 401, { ok: false, error: "Authentication required." })
+        return true
+    }
+    if (req.method !== "GET") {
+        sendJson(res, 405, { ok: false, error: "Method not allowed." })
+        return true
+    }
+
+    try {
+        const range = resolveTelemetryRange({
+            from: searchParams.get("from") ?? "",
+            to: searchParams.get("to") ?? "",
+        })
+        if (pathname === "/api/internal/scan-telemetry/summary") {
+            sendJson(res, 200, { ok: true, summary: await scanTelemetryStore.summary(range) })
+            return true
+        }
+        if (pathname === "/api/internal/scan-telemetry/sessions") {
+            const limit = Math.max(1, Math.min(100, Number(searchParams.get("limit")) || 50))
+            const cursor = Math.max(0, Number(searchParams.get("cursor")) || 0)
+            const result = await scanTelemetryStore.sessionPage(range, {
+                status: String(searchParams.get("status") ?? ""),
+                client: String(searchParams.get("client") ?? ""),
+                scannerVersion: String(searchParams.get("scannerVersion") ?? ""),
+                errorCode: String(searchParams.get("errorCode") ?? ""),
+            }, {
+                cursor,
+                limit,
+            })
+            sendJson(res, 200, {
+                ok: true,
+                range,
+                ...result,
+            })
+            return true
+        }
+        const prefix = "/api/internal/scan-telemetry/sessions/"
+        if (pathname.startsWith(prefix)) {
+            const sessionId = pathname.slice(prefix.length)
+            if (!/^[0-9a-f-]{36}$/i.test(sessionId)) {
+                throw new ScanTelemetryValidationError("Session ID is invalid.")
+            }
+            const session = await scanTelemetryStore.session(range, sessionId)
+            if (!session) {
+                sendJson(res, 404, { ok: false, error: "Session not found." })
+            } else {
+                sendJson(res, 200, { ok: true, range, session })
+            }
+            return true
+        }
+        sendJson(res, 404, { ok: false, error: "Not found." })
+    } catch (error) {
+        if (error instanceof ScanTelemetryValidationError) {
+            sendJson(res, 400, { ok: false, error: error.message })
+        } else {
+            console.error("Scan telemetry query failed:", error)
+            sendJson(res, 500, { ok: false, error: "Unable to query scan telemetry." })
+        }
+    }
+    return true
+}
+
+async function routeApi(req, res, pathname, searchParams) {
+    if (await routeScanTelemetry(req, res, pathname, searchParams)) {
+        return
+    }
     if (!isMaintenanceEnabled() && pathname.startsWith("/api/maintenance/")) {
         sendJson(res, 403, {
             ok: false,
@@ -1880,6 +2048,8 @@ async function routeApi(req, res, pathname) {
     if (req.method === "GET" && pathname === "/api/app-config") {
         sendJson(res, 200, {
             maintenanceEnabled: isMaintenanceEnabled(),
+            scanTelemetryEnabled,
+            scanTelemetryRetentionDays,
         })
         return
     }
@@ -2491,7 +2661,7 @@ const server = createServer(async (req, res) => {
         }
 
         if (pathname.startsWith("/api/")) {
-            await routeApi(req, res, pathname)
+            await routeApi(req, res, pathname, url.searchParams)
             return
         }
 

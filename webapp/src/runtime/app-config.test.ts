@@ -14,9 +14,9 @@ afterEach(() => {
 
 describe("loadAppConfig", () => {
   it("prefers the Node API config", async () => {
-    const fetchMock = vi.fn(async () => response({ maintenanceEnabled: true }))
+    const fetchMock = vi.fn(async () => response({ maintenanceEnabled: true, scanTelemetryEnabled: true, scanTelemetryRetentionDays: 30 }))
     vi.stubGlobal("fetch", fetchMock)
-    await expect(loadAppConfig()).resolves.toEqual({ maintenanceEnabled: true })
+    await expect(loadAppConfig()).resolves.toEqual({ maintenanceEnabled: true, scanTelemetryEnabled: true, scanTelemetryRetentionDays: 30 })
     expect(fetchMock).toHaveBeenCalledOnce()
   })
 
@@ -27,7 +27,7 @@ describe("loadAppConfig", () => {
         : response({ maintenanceEnabled: true })
     ))
     vi.stubGlobal("fetch", fetchMock)
-    await expect(loadAppConfig()).resolves.toEqual({ maintenanceEnabled: true })
+    await expect(loadAppConfig()).resolves.toEqual({ maintenanceEnabled: true, scanTelemetryEnabled: false, scanTelemetryRetentionDays: 30 })
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       "/api/app-config",
       "/static/app-config.json",
@@ -38,6 +38,6 @@ describe("loadAppConfig", () => {
     vi.stubGlobal("fetch", vi.fn(async () => {
       throw new Error("offline")
     }))
-    await expect(loadAppConfig()).resolves.toEqual({ maintenanceEnabled: false })
+    await expect(loadAppConfig()).resolves.toEqual({ maintenanceEnabled: false, scanTelemetryEnabled: false, scanTelemetryRetentionDays: 30 })
   })
 })

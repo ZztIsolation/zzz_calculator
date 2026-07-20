@@ -13,6 +13,13 @@ import {
 import { toCalculatorDriveDisc } from "@core/drive-disc-core.js"
 import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "@core/driveDiscAnalysis-core.js"
 import { ScannerBridge } from "@runtime/scanner-bridge.js"
+import {
+  createScanTelemetrySession,
+  finishScanTelemetryEvent,
+  scanTelemetryVersions,
+  startedScanTelemetryEvent,
+  type ActiveScanTelemetrySession,
+} from "@runtime/scan-telemetry"
 
 const HELPER_DOWNLOAD_URL = "https://download.zzzcaculator.top/downloads/zzz-scanner/helper/1.2.1/ZZZ-Scanner-Helper.exe"
 const HELPER_POLL_INTERVAL_MS = 3000
@@ -163,6 +170,24 @@ function normalizeLoadoutDraft(input: any = {}, fallback: any = {}) {
 
 let scanner: ScannerBridge | null = null
 let scanPollTimer: ReturnType<typeof setInterval> | null = null
+let activeScanTelemetry: ActiveScanTelemetrySession | null = null
+
+function currentScannerVersions(activeScanner: ScannerBridge | null, helperVersion = "", helperProtocolVersion = 0, payload: any = {}) {
+  return scanTelemetryVersions({
+    helperVersion,
+    helperProtocolVersion,
+    scannerVersion: activeScanner?.scannerVersion,
+    scannerPackageId: activeScanner?.scannerInfo?.packageId,
+    scannerPackageMode: activeScanner?.scannerInfo?.packageMode,
+    scanner: payload?.scanner,
+  })
+}
+
+function finishActiveScanTelemetry(eventType: "completed" | "failed" | "cancelled" | "import_failed", input: any = {}) {
+  const session = activeScanTelemetry
+  activeScanTelemetry = null
+  void finishScanTelemetryEvent(session, eventType, input)
+}
 
 function numericProgressValue(value: unknown) {
   const number = Number(value)
@@ -602,6 +627,11 @@ export const useInventoryStore = defineStore("inventory", {
         if (!scanItems.length) {
           this.scanMessage = "扫描完成，未扫描到驱动盘"
           this.scanProgressText = "扫描完成"
+          finishActiveScanTelemetry("completed", {
+            counters: payload,
+            versions: currentScannerVersions(activeScanner, this.scanHelperVersion, this.scanHelperProtocolVersion, payload),
+            diagnostics: payload?.diagnostics,
+          })
           return
         }
         try {
@@ -617,6 +647,11 @@ export const useInventoryStore = defineStore("inventory", {
           this.scanMessage = `扫描导入完成：新增 ${summary?.added ?? 0}，更新 ${summary?.updated ?? 0}，未变 ${summary?.skipped ?? 0}`
           this.scanProgressText = "扫描完成，已导入"
           this.scanRemoveMissing = false
+          finishActiveScanTelemetry("completed", {
+            counters: payload,
+            versions: currentScannerVersions(activeScanner, this.scanHelperVersion, this.scanHelperProtocolVersion, payload),
+            diagnostics: payload?.diagnostics,
+          })
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
           this.scanStatus = "error"
@@ -627,6 +662,12 @@ export const useInventoryStore = defineStore("inventory", {
           }
           this.scanMessage = `扫描完成，但导入失败：${message}`
           this.scanProgressText = "导入失败"
+          finishActiveScanTelemetry("import_failed", {
+            counters: payload,
+            failure: { code: "import_failed", phase: "import", message },
+            versions: currentScannerVersions(activeScanner, this.scanHelperVersion, this.scanHelperProtocolVersion, payload),
+            diagnostics: payload?.diagnostics,
+          })
         }
       }
       activeScanner.onError = (error: any) => {
@@ -634,6 +675,12 @@ export const useInventoryStore = defineStore("inventory", {
         this.scanStatus = "error"
         this.scanConnected = Boolean(scanner?.connected)
         const message = error?.message ?? String(error ?? "扫描失败")
+        finishActiveScanTelemetry(error?.code === "scan_cancelled" ? "cancelled" : "failed", {
+          counters: this.scanProgress,
+          failure: error,
+          diagnostics: error,
+          versions: currentScannerVersions(activeScanner, this.scanHelperVersion, this.scanHelperProtocolVersion, error),
+        })
         if (this.scanHelperOutdated) {
           this.scanFailure = null
           this.scanErrorContext = "helper-outdated"
@@ -660,6 +707,11 @@ export const useInventoryStore = defineStore("inventory", {
           return
         }
         if (this.scanStatus === "scanning") {
+          finishActiveScanTelemetry("failed", {
+            counters: this.scanProgress,
+            failure: { code: "scanner_disconnected", phase: "scan", message: "扫描助手连接已断开。" },
+            versions: currentScannerVersions(activeScanner, this.scanHelperVersion, this.scanHelperProtocolVersion),
+          })
           this.scanStatus = "idle"
           this.scanMessage = "扫描助手已断开"
         }
@@ -899,6 +951,15 @@ export const useInventoryStore = defineStore("inventory", {
         this.scanProgress = null
         this.scanProgressText = "准备中..."
         this.scanProgressPercent = 0
+        activeScanTelemetry = createScanTelemetrySession({
+          client: this.scanClient,
+          settings: {
+            rarities,
+            maxItems: Number(this.scanMaxItems) || 0,
+            stopAtNonLevel15: this.scanStopAtNonLevel15,
+          },
+          versions: currentScannerVersions(scanner, this.scanHelperVersion, this.scanHelperProtocolVersion),
+        })
         scanner.startScan({
           maxItems: Number(this.scanMaxItems) || 0,
           rarities,
@@ -915,8 +976,14 @@ export const useInventoryStore = defineStore("inventory", {
           postScrollPanelAcceptMode: "safe",
           panelMinAcceptFloorMs: 120,
         })
+        void startedScanTelemetryEvent(activeScanTelemetry)
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
+        finishActiveScanTelemetry("failed", {
+          counters: this.scanProgress,
+          failure: { code: "scan_start_failed", phase: "prepare", message },
+          versions: currentScannerVersions(scanner, this.scanHelperVersion, this.scanHelperProtocolVersion),
+        })
         this.scanFailure = normalizeScanFailure(error)
         this.scanStatus = "error"
         this.scanErrorContext = detectGameNotFound(message) ? "game-not-found" : "prepare"

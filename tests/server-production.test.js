@@ -2,6 +2,8 @@ import assert from "node:assert/strict"
 import { spawn } from "node:child_process"
 import { request as httpRequest } from "node:http"
 import { createServer as createNetServer } from "node:net"
+import { mkdtemp, rm } from "node:fs/promises"
+import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -10,6 +12,7 @@ let port = 0
 let baseUrl = `http://127.0.0.1:${port}`
 let serverOutput = ""
 let server = null
+let telemetryDirectory = null
 
 function availablePort() {
     return new Promise((resolve, reject) => {
@@ -19,7 +22,11 @@ function availablePort() {
         probe.listen(0, "127.0.0.1", () => {
             const address = probe.address()
             const selectedPort = typeof address === "object" && address ? address.port : 0
-            probe.close(error => error ? reject(error) : resolve(selectedPort))
+            probe.close(error => {
+                if (error) reject(error)
+                else if (selectedPort < 12_000) resolve(availablePort())
+                else resolve(selectedPort)
+            })
         })
     })
 }
@@ -108,6 +115,19 @@ async function getText(pathname) {
     }
 }
 
+async function postTelemetry(payload, options = {}) {
+    const response = await fetch(`${baseUrl}/api/scan-telemetry/events`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            ...(options.origin === false ? {} : { Origin: baseUrl }),
+            ...(options.headers ?? {}),
+        },
+        body: typeof payload === "string" ? payload : JSON.stringify(payload),
+    })
+    return { status: response.status, body: await response.json().catch(() => ({})) }
+}
+
 async function getRedirect(pathname) {
     const response = await fetch(`${baseUrl}${pathname}`, {
         redirect: "manual",
@@ -145,6 +165,7 @@ try {
     const appConfig = await getText("/api/app-config")
     assert.equal(appConfig.status, 200)
     assert.equal(JSON.parse(appConfig.body).maintenanceEnabled, false)
+    assert.equal(JSON.parse(appConfig.body).scanTelemetryEnabled, false)
 
     const malformedUrl = await getRaw("/%")
     assert.equal(malformedUrl.status, 400)
@@ -259,6 +280,46 @@ try {
     assert.ok(Array.isArray(maintenanceData.combatBuffs.teammates))
     assert.ok(Array.isArray(maintenanceData.combatBuffs.fieldBuffs))
     assert.ok(Array.isArray(maintenanceData.combatBuffs.bossBuffs))
+
+    server.kill()
+    await sleep(100)
+    telemetryDirectory = await mkdtemp(path.join(os.tmpdir(), "zzz-server-telemetry-"))
+    await startServer({
+        SCAN_TELEMETRY_ENABLED: "true",
+        SCAN_TELEMETRY_DIR: telemetryDirectory,
+        SCAN_TELEMETRY_RETENTION_DAYS: "30",
+    })
+    await waitForServer()
+
+    const telemetryConfig = JSON.parse((await getText("/api/app-config")).body)
+    assert.equal(telemetryConfig.scanTelemetryEnabled, true)
+    assert.equal(telemetryConfig.scanTelemetryRetentionDays, 30)
+
+    const telemetryEvent = {
+        schemaVersion: 1,
+        eventType: "started",
+        clientId: "11111111-1111-4111-8111-111111111111",
+        sessionId: "22222222-2222-4222-8222-222222222222",
+        client: "local",
+        settings: { rarities: ["S"], maxItems: 30, stopAtNonLevel15: true },
+        versions: { helperVersion: "1.2.1", scannerVersion: "1.0.39" },
+        counters: { visited: 0, queued: 0, completed: 0, failed: 0 },
+    }
+    assert.equal((await postTelemetry(telemetryEvent, { origin: false })).status, 403)
+    assert.equal((await postTelemetry(telemetryEvent, {
+        headers: { Origin: "https://attacker.invalid", "X-Forwarded-Host": "attacker.invalid" },
+    })).status, 403)
+    assert.equal((await postTelemetry({ ...telemetryEvent, driveDiscs: [] })).status, 400)
+    assert.equal((await postTelemetry("x".repeat(17 * 1024))).status, 413)
+    assert.equal((await postTelemetry(telemetryEvent)).status, 202)
+    assert.equal((await getText("/api/internal/scan-telemetry/summary")).status, 401)
+
+    const summaryResponse = await fetch(`${baseUrl}/api/internal/scan-telemetry/summary?from=2026-07-01&to=2026-07-30`, {
+        headers: { "X-Scan-Telemetry-Admin": "1" },
+    })
+    assert.equal(summaryResponse.status, 200)
+    assert.equal((await summaryResponse.json()).summary.startedOnly, 1)
 } finally {
     server?.kill()
+    if (telemetryDirectory) await rm(telemetryDirectory, { recursive: true, force: true })
 }

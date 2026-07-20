@@ -9,6 +9,11 @@ Group=zzzcalc
 WorkingDirectory=/opt/zzz_calculator/current
 Environment=NODE_ENV=production
 Environment=PORT=8787
+Environment=SCAN_TELEMETRY_ENABLED=true
+Environment=SCAN_TELEMETRY_DIR=/var/lib/zzz-calculator/telemetry
+Environment=SCAN_TELEMETRY_RETENTION_DAYS=30
+StateDirectory=zzz-calculator
+StateDirectoryMode=0750
 ExecStart=/usr/bin/node backend/server.js
 Restart=always
 RestartSec=3
