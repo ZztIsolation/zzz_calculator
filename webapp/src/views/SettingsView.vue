@@ -196,7 +196,7 @@ onMounted(() => {
               {{ telemetryEnabled && telemetryAvailable ? "已开启" : "已关闭" }}
             </NTag>
           </div>
-          <p>上传浏览器类型与主版本、连接阶段、扫描版本、耗时、数量和脱敏错误信息，不包含完整 User-Agent、驱动盘内容、账号、截图、本机路径或完整日志。</p>
+          <p>上传扫描版本、耗时、数量和脱敏错误信息，不包含驱动盘内容、账号、截图、本机路径或完整日志。</p>
         </div>
         <NSwitch
           :value="telemetryEnabled && telemetryAvailable"

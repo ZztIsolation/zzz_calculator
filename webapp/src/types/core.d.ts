@@ -216,9 +216,7 @@ declare module "@runtime/scanner-bridge.js" {
     onComplete: ((payload: any) => void) | null
     onError: ((payload: any) => void) | null
     onDiagnostics: ((payload: any) => void) | null
-    onHeartbeat: ((payload: any) => void) | null
-    onStopAck: ((payload: any) => void) | null
-    onDisconnect: ((failure?: any) => void) | null
+    onDisconnect: (() => void) | null
     readonly connected: boolean
     readonly scanning: boolean
     readonly mode: string

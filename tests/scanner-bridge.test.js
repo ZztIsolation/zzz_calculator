@@ -144,7 +144,6 @@ try {
         data: {
             maxItems: 12,
             rarities: ["S", "A"],
-            resultDelivery: "stream-items-v1",
             stopAtNonLevel15: true,
             profileName: "",
             processName: "ZenlessZoneZero",

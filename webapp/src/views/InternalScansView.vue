@@ -83,14 +83,6 @@ function formatDuration(value: unknown) {
   return `${(milliseconds / 1000).toFixed(milliseconds >= 10_000 ? 1 : 2)} s`
 }
 
-function formatCountList(value: unknown) {
-  if (!Array.isArray(value) || value.length === 0) return "--"
-  return value
-    .slice(0, 4)
-    .map(item => `${item.key} ${item.count}`)
-    .join(" · ")
-}
-
 function statusLabel(value: string) {
   return ({
     completed: "成功",
@@ -184,12 +176,6 @@ onMounted(() => void refresh(true))
       <div><span>P95 耗时</span><strong>{{ formatDuration(summary?.durationMs?.p95) }}</strong></div>
     </section>
 
-    <section class="diagnostic-band" aria-label="扫描失败诊断分布">
-      <div><span>接收门控</span><strong>{{ formatCountList(summary?.acceptGateReasons) }}</strong></div>
-      <div><span>视觉变换</span><strong>{{ formatCountList(summary?.visualTransformClasses) }}</strong></div>
-      <div><span>首个缺失 ROI</span><strong>{{ formatCountList(summary?.firstMissingRois) }}</strong></div>
-    </section>
-
     <section class="filter-band">
       <NDatePicker v-model:value="dateRange" type="daterange" :clearable="false" :is-date-disabled="(timestamp: number) => timestamp > endDate || timestamp < endDate - 29 * DAY_MS" @update:value="refresh(true)" />
       <NSelect v-model:value="status" :options="statusOptions" aria-label="状态" @update:value="refresh(true)" />
@@ -250,33 +236,8 @@ onMounted(() => void refresh(true))
 .telemetry-header,
 .filter-band,
 .metric-band,
-.diagnostic-band,
 .table-band {
   min-width: 0;
-}
-
-.diagnostic-band {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  padding: 0 2px;
-}
-
-.diagnostic-band > div {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.diagnostic-band span {
-  color: var(--app-muted);
-  font-size: 12px;
-}
-
-.diagnostic-band strong {
-  overflow-wrap: anywhere;
-  font-size: 13px;
-  font-weight: 600;
 }
 
 .telemetry-header {
@@ -398,10 +359,6 @@ onMounted(() => void refresh(true))
 
   .filter-band {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .diagnostic-band {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .filter-band :deep(.n-date-picker) {

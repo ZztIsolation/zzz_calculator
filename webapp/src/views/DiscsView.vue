@@ -74,23 +74,12 @@ watch(showScan, visible => {
   if (visible) {
     inventoryStore.openScannerPanel()
   } else {
-    const wasScanning = ["scanning", "stopping"].includes(inventoryStore.scanStatus)
+    const wasScanning = inventoryStore.scanStatus === "scanning"
     inventoryStore.closeScannerPanel()
     if (wasScanning) {
       message.warning("扫描仍在后台运行，可从驱动盘工具栏 › 扫描 回来查看进度")
     }
   }
-})
-
-watch(showImport, visible => {
-  if (visible) {
-    inventoryStore.importPreview = null
-    importError.value = ""
-  }
-})
-
-watch([importText, removeMissing], () => {
-  inventoryStore.importPreview = null
 })
 
 function requestStartScan() {
@@ -118,10 +107,6 @@ async function handleScannerError() {
     return
   }
   if (variant === "helper-missing") {
-    window.open(inventoryStore.scanHelperDownloadUrl, "_blank")
-    return
-  }
-  if (variant === "helper-rejected") {
     window.open(inventoryStore.scanHelperDownloadUrl, "_blank")
     return
   }
@@ -681,14 +666,9 @@ const scanPreviewSections = computed(() => {
     { key: "removed", label: "将删除", count: preview.summary.removed ?? 0, rows: preview.removed ?? [] },
   ].filter(section => section.count > 0)
 })
-const scanControlsDisabled = computed(() => ["scanning", "stopping"].includes(inventoryStore.scanStatus) || inventoryStore.scanPreparing)
+const scanControlsDisabled = computed(() => inventoryStore.scanStatus === "scanning" || inventoryStore.scanPreparing)
 const scanTelemetryEnabled = computed(() => scanTelemetryPreferenceEnabled())
 const scanProgressPercentage = computed(() => Math.min(100, Math.max(0, Math.round(inventoryStore.scanProgressPercent ?? 0))))
-const scanRuntimeStatus = computed(() => {
-  if (!['c', 'd'].includes(inventoryStore.scanPhase)) return ""
-  if (!inventoryStore.scanHelperVersion || !inventoryStore.scanScannerVersion) return ""
-  return `Helper ${inventoryStore.scanHelperVersion} · Scanner ${inventoryStore.scanScannerVersion} · 后台运行`
-})
 
 const scanPhaseTitle = computed(() => ({
   a: "连接扫描助手",
@@ -1229,9 +1209,6 @@ function confirmDangerImport() {
           </li>
         </ol>
         <p class="muted scan-phase-title">{{ scanPhaseTitle }}</p>
-        <p v-if="scanRuntimeStatus" class="scan-runtime-status" role="status" aria-live="polite">
-          {{ scanRuntimeStatus }}
-        </p>
 
         <ScannerErrorState
           v-if="inventoryStore.scanErrorVariant"
@@ -1268,7 +1245,10 @@ function confirmDangerImport() {
           <div class="metric-grid ui-field-grid">
             <div class="metric" role="group" aria-label="扫描品质" data-layout-field>
               <span class="metric-title">品质</span>
-              <div class="metric-value"><NTag type="warning">S</NTag></div>
+              <div class="metric-value chip-row">
+                <NCheckbox v-model:checked="inventoryStore.scanRarityS" :disabled="scanControlsDisabled">S</NCheckbox>
+                <NCheckbox v-model:checked="inventoryStore.scanRarityA" :disabled="scanControlsDisabled">A</NCheckbox>
+              </div>
             </div>
             <div class="metric" data-layout-field>
               <span class="metric-title">上限</span>
@@ -1279,6 +1259,7 @@ function confirmDangerImport() {
             <NCheckbox v-model:checked="inventoryStore.scanStopAtNonLevel15" :disabled="scanControlsDisabled">遇到非 15 级时停止</NCheckbox>
             <NCheckbox v-model:checked="inventoryStore.scanRemoveMissing" :disabled="scanControlsDisabled">同步删除缺失</NCheckbox>
           </div>
+          <p v-if="!inventoryStore.scanRaritySelected" class="scan-inline-warning">请至少选择一个品质</p>
           <div class="toolbar">
             <NButton type="primary" size="large" :disabled="!inventoryStore.scanCanStart" @click="requestStartScan">
               开始扫描
@@ -1313,9 +1294,6 @@ function confirmDangerImport() {
               停止扫描
             </NButton>
           </div>
-          <div v-else-if="inventoryStore.scanStatus === 'stopping'" class="toolbar">
-            <NButton type="error" loading disabled>正在停止</NButton>
-          </div>
 
           <div v-if="inventoryStore.scanSession?.preview" class="section-band">
             <div class="toolbar">
@@ -1323,9 +1301,7 @@ function confirmDangerImport() {
               <NTag type="info" round>更新 {{ inventoryStore.scanSession.preview.summary.updated }}</NTag>
               <NTag round>未变 {{ inventoryStore.scanSession.preview.summary.skipped }}</NTag>
               <NTag v-if="inventoryStore.scanSession.preview.summary.removed" type="error" round>删除 {{ inventoryStore.scanSession.preview.summary.removed }}</NTag>
-              <NTag v-if="inventoryStore.scanSession.imported" type="success" round>
-                {{ inventoryStore.scanSession.partial ? "已安全导入" : "已自动导入" }}
-              </NTag>
+              <NTag v-if="inventoryStore.scanSession.imported" type="success" round>已自动导入</NTag>
             </div>
             <div v-if="scanPreviewSections.length" class="panel" style="max-height: 260px; overflow: auto;">
               <table class="data-table">
@@ -1689,13 +1665,6 @@ function confirmDangerImport() {
 .scan-phase-title {
   margin: 0;
   font-size: 13px;
-  text-align: center;
-}
-
-.scan-runtime-status {
-  margin: -2px 0 0;
-  color: var(--app-muted);
-  font-size: 12px;
   text-align: center;
 }
 

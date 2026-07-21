@@ -55,15 +55,3 @@ describe("App maintenance navigation", () => {
     await vi.waitFor(() => expect(wrapper.text()).toContain("维护"))
   })
 })
-
-describe("App filing information", () => {
-  it("links the ICP filing number to the MIIT filing system", () => {
-    vi.stubGlobal("fetch", vi.fn(async () => response({ maintenanceEnabled: false })))
-    const wrapper = mountApp()
-    const filingLink = wrapper.get('a[href="https://beian.miit.gov.cn/"]')
-
-    expect(filingLink.text()).toBe("浙ICP备2026054969号-1")
-    expect(filingLink.attributes("target")).toBe("_blank")
-    expect(filingLink.attributes("rel")).toBe("noopener noreferrer")
-  })
-})

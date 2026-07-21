@@ -294,23 +294,6 @@ describe("DiscsView", () => {
       .map(item => item.text().trim())).toEqual(["扫描"])
   })
 
-  it("invalidates stale import previews when the dialog opens or its payload changes", async () => {
-    const wrapper = await mountView()
-    const inventoryStore = useInventoryStore()
-    inventoryStore.importPreview = { summary: { added: 1 } }
-
-    await button(wrapper, "批量导入").trigger("click")
-    await flushPromises()
-    expect(inventoryStore.importPreview).toBeNull()
-    expect(button(wrapper, "确认导入").attributes("disabled")).toBeDefined()
-
-    inventoryStore.importPreview = { summary: { added: 1 } }
-    await wrapper.find(".test-modal input").setValue("[]")
-    await flushPromises()
-    expect(inventoryStore.importPreview).toBeNull()
-    expect(button(wrapper, "确认导入").attributes("disabled")).toBeDefined()
-  })
-
   it("assigns, blocks, and explicitly transfers a single Drive Disc reservation", async () => {
     seedInventory([{
       id: "disc-reserved",
@@ -584,13 +567,10 @@ describe("DiscsView", () => {
     const inventoryStore = useInventoryStore()
     inventoryStore.scanConnected = true
     inventoryStore.scanStatus = "ready"
-    inventoryStore.scanHelperVersion = "1.3.1"
-    inventoryStore.scanScannerVersion = "1.0.43"
 
     await button(wrapper, "扫描").trigger("click")
     await flushPromises()
 
-    expect(wrapper.find(".scan-runtime-status").text()).toBe("Helper 1.3.1 · Scanner 1.0.43 · 后台运行")
     const reminder = wrapper.find(".scan-prerequisite-alert")
     expect(reminder.exists()).toBe(true)
     expect(reminder.text()).toContain("扫描前请确认")

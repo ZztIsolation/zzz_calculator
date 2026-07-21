@@ -19,8 +19,8 @@ vi.mock("@runtime/scan-telemetry", () => ({
 
 const scanner = {
   mode: "helper",
-  helperVersion: "1.3.1",
-  protocolVersion: 4,
+  helperVersion: "1.2.1",
+  protocolVersion: 3,
   onHelperUpdateProgress: null as any,
   connect: vi.fn(async () => ({ version: scanner.helperVersion, protocolVersion: scanner.protocolVersion })),
   getStorageInfo: vi.fn(async () => ({
@@ -48,8 +48,8 @@ const scanner = {
 }
 
 vi.mock("@/stores/inventory", () => ({
-  REQUIRED_HELPER_VERSION: "1.3.1",
-  helperVersionAtLeast: (actual = "", required = "1.3.1") => {
+  REQUIRED_HELPER_VERSION: "1.2.1",
+  helperVersionAtLeast: (actual = "", required = "1.2.1") => {
     const current = actual.split(".").map(Number)
     const target = required.split(".").map(Number)
     for (let index = 0; index < Math.max(current.length, target.length); index += 1) {
@@ -83,8 +83,8 @@ vi.mock("naive-ui", () => ({
 describe("SettingsView", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    scanner.helperVersion = "1.3.1"
-    scanner.protocolVersion = 4
+    scanner.helperVersion = "1.2.1"
+    scanner.protocolVersion = 3
     vi.stubGlobal("navigator", {
       storage: { estimate: vi.fn(async () => ({ usage: 5 * 1024 * 1024 })) },
     })
@@ -92,7 +92,7 @@ describe("SettingsView", () => {
 
   it("keeps browser and scanner cleanup separate and reports reclaimable storage", async () => {
     const wrapper = mount(SettingsView)
-    await vi.waitFor(() => expect(wrapper.text()).toContain("Helper 1.3.1"))
+    await vi.waitFor(() => expect(wrapper.text()).toContain("Helper 1.2.1"))
     expect(wrapper.text()).toContain("网页数据")
     expect(wrapper.text()).toContain("扫描器存储")
     expect(wrapper.text()).toContain("70.00 MiB")
@@ -115,7 +115,7 @@ describe("SettingsView", () => {
     const wrapper = mount(SettingsView)
     await vi.waitFor(() => expect(wrapper.text()).toContain("Helper 1.1.0"))
 
-    expect(wrapper.text()).toContain("需要更新到 1.3.1")
+    expect(wrapper.text()).toContain("需要更新到 1.2.1")
     expect(wrapper.text()).toContain("下载并更新 Helper")
     expect(scanner.getStorageInfo).not.toHaveBeenCalled()
     expect(scanner.updateHelper).not.toHaveBeenCalled()

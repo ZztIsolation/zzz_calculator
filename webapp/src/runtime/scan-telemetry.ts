@@ -117,106 +117,25 @@ export function scanTelemetryVersions(value: any = {}) {
   return result
 }
 
-const DIAGNOSTIC_NUMBER_LIMITS = {
-  logicalRow: 100_000,
-  visualRow: 100,
-  column: 100,
-  maxColumns: 100,
-  visibleRois: 100,
-  totalRois: 100,
-  stableFrames: 10_000,
-  requiredStableFrames: 100,
-  attempts: 20,
-  frameCount: 100_000,
-  clientWidth: 20_000,
-  clientHeight: 20_000,
-  dpi: 1_000,
-  anchorScore: 100,
-  gridScore: 100,
-  headerScore: 100,
-  gridStructureScore: 100,
-  layoutScore: 100,
-  countConsensusFrames: 5,
-  hueDelta: 180,
-  saturationDeltaPct: 100,
-  valueDeltaPct: 100,
-  referenceLuma: 255,
-  candidateLuma: 255,
-  lumaDelta: 255,
-  allowedLumaDelta: 255,
-  edgeDensityPermille: 1_000,
-  minimumEdgeDensityPermille: 1_000,
-  lastHeartbeatAt: 10_000_000_000_000,
-  lastProgressAt: 10_000_000_000_000,
-} as const
-const DIAGNOSTIC_BOOLEAN_FIELDS = [
-  "sawPanelChange", "selectionChanged", "warehouseHeaderDetected", "inventoryCountDetected", "secureContext",
+const DIAGNOSTIC_NUMBER_FIELDS = [
+  "logicalRow", "visualRow", "column", "maxColumns", "visibleRois", "totalRois", "stableFrames",
+  "requiredStableFrames", "attempts", "frameCount", "clientWidth", "clientHeight", "dpi",
 ] as const
-const DIAGNOSTIC_STRING_LIMITS = {
-  acceptGateReason: 100,
-  captureMode: 32,
-  visualProfileId: 100,
-  connectionStage: 32,
-  permissionName: 40,
-  permissionState: 20,
-  browserName: 40,
-  browserMajor: 8,
-  bridgeMode: 20,
-  causeName: 40,
-  preflightState: 32,
-  visualTransformClass: 32,
-  firstMissingRoi: 32,
-  exitCode: 32,
-} as const
-
-export function scanTelemetryBrowserContext() {
-  if (typeof navigator === "undefined") {
-    return { browserName: "unknown", browserMajor: "", secureContext: false }
-  }
-  const navigatorWithHints = navigator as Navigator & {
-    userAgentData?: { brands?: Array<{ brand?: string; version?: string }> }
-  }
-  const brands = navigatorWithHints.userAgentData?.brands ?? []
-  const preferred = brands.find(item => /Google Chrome|Microsoft Edge/i.test(String(item.brand ?? "")))
-    ?? brands.find(item => !/Not.?A.?Brand|Chromium/i.test(String(item.brand ?? "")))
-    ?? brands.find(item => /Chromium/i.test(String(item.brand ?? "")))
-  if (preferred?.brand) {
-    return {
-      browserName: safeString(preferred.brand, 40),
-      browserMajor: safeString(String(preferred.version ?? "").split(".")[0], 8),
-      secureContext: typeof isSecureContext === "boolean" ? isSecureContext : false,
-    }
-  }
-
-  const userAgent = String(navigator.userAgent ?? "")
-  const match = userAgent.match(/Edg\/(\d+)/)
-    ?? userAgent.match(/Chrome\/(\d+)/)
-    ?? userAgent.match(/Firefox\/(\d+)/)
-    ?? userAgent.match(/Version\/(\d+).+Safari\//)
-  const browserName = /Edg\//.test(userAgent) ? "Microsoft Edge"
-    : /Chrome\//.test(userAgent) ? "Google Chrome"
-      : /Firefox\//.test(userAgent) ? "Firefox"
-        : /Safari\//.test(userAgent) ? "Safari"
-          : "unknown"
-  return {
-    browserName,
-    browserMajor: safeString(match?.[1], 8),
-    secureContext: typeof isSecureContext === "boolean" ? isSecureContext : false,
-  }
-}
+const DIAGNOSTIC_BOOLEAN_FIELDS = ["sawPanelChange", "selectionChanged"] as const
+const DIAGNOSTIC_STRING_FIELDS = ["acceptGateReason", "captureMode", "visualProfileId"] as const
 
 export function scanTelemetryDiagnostics(value: any = {}) {
   const source = value?.diagnostics ?? value?.details ?? value ?? {}
   const result: Record<string, string | number | boolean> = {}
-  for (const [key, maximum] of Object.entries(DIAGNOSTIC_NUMBER_LIMITS)) {
+  for (const key of DIAGNOSTIC_NUMBER_FIELDS) {
     const number = Number(source?.[key])
-    if (Number.isFinite(number) && number >= 0 && number <= maximum) result[key] = Math.round(number)
+    if (Number.isFinite(number) && number >= 0) result[key] = Math.round(number)
   }
   for (const key of DIAGNOSTIC_BOOLEAN_FIELDS) {
     if (typeof source?.[key] === "boolean") result[key] = source[key]
   }
-  for (const [key, maximumLength] of Object.entries(DIAGNOSTIC_STRING_LIMITS)) {
-    if (source?.[key]) result[key] = safeString(source[key], maximumLength)
+  for (const key of DIAGNOSTIC_STRING_FIELDS) {
+    if (source?.[key]) result[key] = safeString(source[key], 100)
   }
 
   const message = String(value?.message ?? "")

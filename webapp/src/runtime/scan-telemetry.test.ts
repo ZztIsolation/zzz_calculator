@@ -14,7 +14,6 @@ import {
   resetScanTelemetryClientId,
   resetScanTelemetryRuntimeForTests,
   sanitizeTelemetryMessage,
-  scanTelemetryBrowserContext,
   scanTelemetryClientId,
   scanTelemetryDiagnostics,
   scanTelemetryPreferenceEnabled,
@@ -101,100 +100,5 @@ describe("scan telemetry runtime", () => {
       versions: {},
       counters: { visited: 0, queued: 0, completed: 0, failed: 0 },
     })).toBe(false)
-  })
-
-  it("collects only coarse browser and loopback connection diagnostics", () => {
-    vi.stubGlobal("navigator", {
-      userAgent: "Mozilla/5.0 Chrome/150.0.7871.127 Safari/537.36",
-      userAgentData: { brands: [{ brand: "Google Chrome", version: "150" }] },
-    })
-    expect(scanTelemetryBrowserContext()).toMatchObject({
-      browserName: "Google Chrome",
-      browserMajor: "150",
-    })
-    expect(scanTelemetryDiagnostics({
-      connectionStage: "websocket",
-      permissionName: "loopback-network",
-      permissionState: "denied",
-      browserName: "Google Chrome",
-      browserMajor: "150",
-      secureContext: true,
-      lastHeartbeatAt: 1_753_000_000_000,
-      lastProgressAt: 1_753_000_001_000,
-      exitCode: "0xC0000005",
-      userAgent: "must-not-be-collected",
-    })).toEqual({
-      connectionStage: "websocket",
-      permissionName: "loopback-network",
-      permissionState: "denied",
-      browserName: "Google Chrome",
-      browserMajor: "150",
-      secureContext: true,
-      lastHeartbeatAt: 1_753_000_000_000,
-      lastProgressAt: 1_753_000_001_000,
-      exitCode: "0xC0000005",
-    })
-  })
-
-  it("keeps bounded visual diagnostics without collecting pixels or OCR text", () => {
-    expect(scanTelemetryDiagnostics({
-      details: {
-        preflightState: "accepted",
-        visualTransformClass: "contrast_shifted",
-        anchorScore: 82,
-        gridScore: 67,
-        warehouseHeaderDetected: true,
-        headerScore: 91,
-        gridStructureScore: 84,
-        layoutScore: 79,
-        inventoryCountDetected: true,
-        countConsensusFrames: 2,
-        hueDelta: 4,
-        saturationDeltaPct: 12,
-        valueDeltaPct: 18,
-        visibleRois: 10,
-        totalRois: 12,
-        firstMissingRoi: "subStat4",
-        referenceLuma: 22,
-        candidateLuma: 31,
-        lumaDelta: 9,
-        allowedLumaDelta: 18,
-        edgeDensityPermille: 0,
-        minimumEdgeDensityPermille: 3,
-        sampledColor: "#1f1f1f",
-        ocrText: "must-not-be-collected",
-      },
-    })).toEqual({
-      visibleRois: 10,
-      totalRois: 12,
-      anchorScore: 82,
-      gridScore: 67,
-      headerScore: 91,
-      gridStructureScore: 84,
-      layoutScore: 79,
-      countConsensusFrames: 2,
-      hueDelta: 4,
-      saturationDeltaPct: 12,
-      valueDeltaPct: 18,
-      referenceLuma: 22,
-      candidateLuma: 31,
-      lumaDelta: 9,
-      allowedLumaDelta: 18,
-      edgeDensityPermille: 0,
-      minimumEdgeDensityPermille: 3,
-      warehouseHeaderDetected: true,
-      inventoryCountDetected: true,
-      preflightState: "accepted",
-      visualTransformClass: "contrast_shifted",
-      firstMissingRoi: "subStat4",
-    })
-
-    expect(scanTelemetryDiagnostics({
-      details: {
-        referenceLuma: 256,
-        edgeDensityPermille: 1001,
-        hueDelta: -1,
-      },
-    })).toEqual({})
   })
 })

@@ -631,9 +631,6 @@ export function buildScannerImportPlan(currentStore, input, options = {}) {
         deduplicated: 0,
         warnings: normalized.importRecord.warnings ?? [],
     }
-    const removeMissingRarities = Array.isArray(options.removeMissingRarities)
-        ? new Set(options.removeMissingRarities.map(value => String(value).trim().toUpperCase()).filter(Boolean))
-        : null
 
     for (const imported of normalized.driveDiscs) {
         if (nativeImport) {
@@ -700,9 +697,6 @@ export function buildScannerImportPlan(currentStore, input, options = {}) {
 
     if (options.removeMissing) {
         for (const disc of existingSameOwner) {
-            if (removeMissingRarities?.size && !removeMissingRarities.has(String(disc.rarity ?? "").toUpperCase())) {
-                continue
-            }
             if (!matchedExistingIds.has(disc.id) && nextSameOwner.has(disc.id)) {
                 nextSameOwner.delete(disc.id)
                 deletedIds.add(disc.id)
@@ -734,7 +728,6 @@ export function buildScannerImportPlan(currentStore, input, options = {}) {
             ownerId,
             sourcePath: normalized.importRecord.sourcePath,
             removeMissing: Boolean(options.removeMissing),
-            removeMissingRarities: removeMissingRarities ? [...removeMissingRarities] : null,
             currentCount: existingSameOwner.length,
             nextCount: nextSameOwner.size,
             normalizedDiscs: normalized.driveDiscs,
