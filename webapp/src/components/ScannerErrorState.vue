@@ -1,17 +1,22 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { NButton } from "naive-ui"
-import { AlertCircle, Download, Gamepad2, RefreshCcw, WifiOff } from "lucide-vue-next"
+import { AlertCircle, Cable, Download, Gamepad2, RefreshCcw, ShieldAlert, WifiOff } from "lucide-vue-next"
 
 type Variant =
   | "helper-missing"
   | "helper-outdated"
+  | "helper-rejected"
+  | "browser-permission"
+  | "browser-websocket"
   | "prepare-failed"
   | "scan-failed"
   | "game-not-found"
   | "diagnostic-failure"
 
 type Failure = {
+  code?: string
+  severity?: "error" | "warning"
   title?: string
   message?: string
   remedy?: string
@@ -56,6 +61,33 @@ const preset = computed(() => {
         primary: "下载并更新 Helper",
         secondary: "重新检测",
       }
+    case "helper-rejected":
+      return {
+        Icon: RefreshCcw,
+        tone: "warning" as const,
+        title: "扫描助手拒绝了当前网页",
+        subtext: props.message || "当前 Helper 无法授权此网页。请下载并运行最新版 Helper，然后重新检测。",
+        primary: "下载最新版 Helper",
+        secondary: "重新检测",
+      }
+    case "browser-permission":
+      return {
+        Icon: ShieldAlert,
+        tone: "warning" as const,
+        title: "浏览器已阻止连接本机扫描助手",
+        subtext: "请在地址栏左侧的网站设置中，允许本机应用或本地网络访问，然后重新连接。",
+        primary: "我已允许，重新连接",
+        secondary: "",
+      }
+    case "browser-websocket":
+      return {
+        Icon: Cable,
+        tone: "error" as const,
+        title: "浏览器未能建立扫描连接",
+        subtext: props.message || "Helper 已响应，但 WebSocket 连接失败。请检查浏览器扩展、安全软件或企业策略后重试。",
+        primary: "重新连接",
+        secondary: "",
+      }
     case "prepare-failed":
       return {
         Icon: WifiOff,
@@ -97,22 +129,28 @@ const preset = computed(() => {
 
 const primaryLabel = computed(() => props.primaryLabel || preset.value.primary)
 const secondaryLabel = computed(() => props.secondaryLabel ?? preset.value.secondary)
+const displayTone = computed(() => props.failure?.severity === "warning" ? "warning" : preset.value.tone)
+const displayTitle = computed(() => props.failure?.title || preset.value.title)
+const displayMessage = computed(() => props.failure?.message || preset.value.subtext)
 </script>
 
 <template>
-  <div class="scanner-error-state" :class="`tone-${preset.tone}`" role="alert">
+  <div class="scanner-error-state" :class="`tone-${displayTone}`" role="alert">
     <div class="scanner-error-icon">
       <component :is="preset.Icon" :size="40" :stroke-width="1.6" aria-hidden="true" />
     </div>
-    <h3 class="scanner-error-title">{{ preset.title }}</h3>
-    <p class="scanner-error-subtext">{{ preset.subtext }}</p>
-    <p v-if="variant === 'diagnostic-failure' && failure?.remedy" class="scanner-error-remedy">
-      {{ failure.remedy }}
+    <h3 class="scanner-error-title">{{ displayTitle }}</h3>
+    <p v-if="failure?.code" class="scanner-error-code">错误代码：{{ failure.code }}</p>
+    <p class="scanner-error-subtext">
+      <strong v-if="failure">原因：</strong>{{ displayMessage }}
     </p>
-    <p v-if="variant === 'diagnostic-failure' && failure?.diagnosticId" class="scanner-error-diagnostic">
+    <p v-if="failure?.remedy" class="scanner-error-remedy">
+      <strong>解决方案：</strong>{{ failure.remedy }}
+    </p>
+    <p v-if="failure?.diagnosticId" class="scanner-error-diagnostic">
       诊断编号：{{ failure.diagnosticId }}
     </p>
-    <div v-if="variant === 'diagnostic-failure'" class="scanner-error-actions">
+    <div v-if="failure" class="scanner-error-actions">
       <NButton
         v-for="(action, index) in failure?.actions ?? []"
         :key="action.kind"
@@ -184,6 +222,18 @@ const secondaryLabel = computed(() => props.secondaryLabel ?? preset.value.secon
   color: var(--app-muted);
   font-size: 13px;
   line-height: 1.6;
+}
+
+.scanner-error-code {
+  margin: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--app-border);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--app-text);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .scanner-error-remedy {

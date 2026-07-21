@@ -10,6 +10,26 @@ The entries below summarize each development day. Implementation details,
 modeling decisions, and verification evidence remain in the
 [detailed changelog](docs/changelog.md).
 
+### 2026-07-20 Daily Update
+
+- Rebuilt saved Drive Disc loadouts as responsive visual six-slot previews with
+  complete stats, scan sequence, score, and per-disc reservation ownership.
+  The editor now reuses the Workbench slot card and filtered visual picker while
+  keeping every selection draft-only until save.
+- Refined account-scoped Drive Disc reservations into an exclusively per-disc
+  workflow. Workbench schemes and saved-loadout previews expose a prominent
+  lock control on every disc, cross-agent transfers require confirmation, and
+  the inventory can filter every reserved disc, including unknown agent IDs.
+  The optimizer exclusion rule and the compatible batch API remain unchanged.
+- Scanner connection recovery now distinguishes denied browser loopback access,
+  an unavailable Helper, a rejected page origin, and a failed WebSocket
+  handshake. Chrome permission failures receive targeted recovery guidance
+  instead of another Helper download and feed privacy-limited diagnostics.
+- Scanner warehouse readiness now requires the semantic warehouse title plus
+  grayscale grid or panel structure instead of dismantle-button or rarity
+  colors. The UI distinguishes a missing page, an unreadable title, count OCR
+  failure, and warehouse context loss during a scan.
+
 ### 2026-07-19 Server And CDN Origin Migration
 
 - Made `121.199.21.10` the documented production host and retained the existing
@@ -537,6 +557,8 @@ The Drive Disc scanner flow uses a small local Helper registered for the `zzz-sc
 The current supported OCR runtime is ZZZ Scanner Next `1.0.39`, with Helper `1.2.1` or newer. Supported systems are Windows 10 1809 (Build 17763) or newer x64 and Windows 11 x64, including N and LTSC editions. x86, ARM64, and Windows 7 are outside the current support commitment. Version 1.0.39 reports structured timeout diagnostics including ROI completeness, the final acceptance gate, stable frames, window size, DPI, capture backend, and visual profile. These fields may enter the privacy-limited summary above; screenshots and OCR text remain local.
 
 The schema v3 manifest locks the size, package SHA-256, and every installed file for both framework-dependent and self-contained packages. The Helper selects the smaller package when .NET 8 Desktop Runtime is present; otherwise it automatically uses the self-contained compatibility package without installing .NET or modifying the system. After a verified Scanner handshake, the Helper deletes the package ZIP and every inactive runtime, while retaining the active runtime and the newest successful and failed scan outputs. Structured errors identify environment, disk, download, integrity, extraction, native dependency, port, game-process, elevation, and UAC-cancellation failures and expose appropriate retry, repair, log, or elevation actions.
+
+The development branch stages Helper `1.3.1` / protocol v4 and Scanner `1.0.42` for lifecycle-complete diagnostics and official S-rank scanning at every level with zero to four contiguous substats. The browser buffers each `scan_item`; completed scans, partial OCR failures, cancellation, Scanner exits, and transport disconnects automatically safe-import any valid buffered results, while partial results can never remove missing inventory. Complete S-rank synchronization is also scoped to S rank so existing A/B records survive. These artifacts and manifests remain local-only until they are separately published and verified for a matching web release.
 
 The public `/settings` page separates browser data from Scanner storage. Browser cleanup deletes the calculator's IndexedDB and local settings only. Scanner cleanup is executed by Helper and removes inactive runtimes, transient packages, stale downloads, and excess outputs without uninstalling the active Scanner. Helper `1.2.1` installs into `%LOCALAPPDATA%\ZZZScannerNext\helper` and supports verified in-place self-updates. Users upgrading from Helper `1.1.x` click **Download and update Helper**, run the downloaded file, and confirm the one-time takeover; the installer safely closes the uniquely verified old Helper, installs the managed copy, and restarts it. Helper `1.2.0` and later update automatically through protocol v3.
 

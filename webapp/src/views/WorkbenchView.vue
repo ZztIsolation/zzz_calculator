@@ -1,18 +1,20 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref, watch } from "vue"
-import { NButton, NInput, NInputNumber, NModal, NSelect, NTag } from "naive-ui"
+import { NAlert, NButton, NInput, NInputNumber, NModal, NSelect, NTag, useMessage } from "naive-ui"
 import { LineChart, RefreshCcw, Save, SlidersHorizontal, Sparkles, X } from "lucide-vue-next"
 import BuffPickerModal from "@/components/BuffPickerModal.vue"
 import CalculationConfigModal from "@/components/CalculationConfigModal.vue"
 import DamageSummaryBar from "@/components/DamageSummaryBar.vue"
 import DamageWhiteBox from "@/components/DamageWhiteBox.vue"
 import DriveDiscAnalysisModal from "@/components/DriveDiscAnalysisModal.vue"
+import DriveDiscPickerModal from "@/components/DriveDiscPickerModal.vue"
+import DriveDiscSlotCard from "@/components/DriveDiscSlotCard.vue"
 import EnemyTargetConfigPanel from "@/components/EnemyTargetConfigPanel.vue"
 import ImageAvatar from "@/components/ImageAvatar.vue"
 import OptimizerConfigModal from "@/components/OptimizerConfigModal.vue"
 import OptimizerResultSelector from "@/components/OptimizerResultSelector.vue"
 import PanelStatTable from "@/components/PanelStatTable.vue"
-import { fallbackIcon, imageForAgent, imageForDriveDiscSet, imageForWEngine } from "@/utils/assets"
+import { imageForAgent, imageForDriveDiscSet, imageForWEngine } from "@/utils/assets"
 import { buffLabelForId } from "@/utils/combatBuffs"
 import {
   attributeLabel,
@@ -49,6 +51,7 @@ const accountStore = useAccountStore()
 const inventoryStore = useInventoryStore()
 const buildStore = useBuildStore()
 const optimizerStore = useOptimizerStore()
+const message = useMessage()
 
 const showBuffPicker = ref(false)
 const showCalculationConfig = ref(false)
@@ -58,12 +61,14 @@ const showFourPieceSetModal = ref(false)
 const showTwoPieceSetModal = ref(false)
 const showManualDiscPicker = ref(false)
 const showSaveLoadoutModal = ref(false)
+const saveLoadoutBusy = ref(false)
+const showSchemeReservationConflict = ref(false)
+const schemeReservationConflicts = ref<any[]>([])
+const pendingSchemeReservation = ref<any | null>(null)
+const schemeReservationBusy = ref(false)
 const draftFourPieceSetId = ref("")
 const draftTwoPieceSetIds = ref<string[]>([])
 const activeManualDiscSlot = ref(0)
-const manualDiscSetFilterIds = ref<string[]>([])
-const manualDiscMainStatFilter = ref("")
-const manualDiscSearch = ref("")
 const loadoutNameDraft = ref("")
 const saveLoadoutMode = ref<"manual" | "optimized">("manual")
 const OPTIMIZED_RESULT_LIMIT = 10
@@ -228,8 +233,17 @@ const draftTwoPieceSetSummary = computed(() => {
 const twoPieceDraftUnchanged = computed(() => [...draftTwoPieceSetIds.value].sort().join("|") === [...optimizerStore.twoPieceSetIds].sort().join("|"))
 const topOptimizedResultSchemes = computed(() => optimizerStore.resultSchemes.slice(0, OPTIMIZED_RESULT_LIMIT))
 const selectedDriveDiscRows = computed<Array<{ slot: number, disc: any | null }>>(() => {
+  const inventoryById = new Map<string, any>(
+    inventoryStore.driveDiscs.map((disc: any) => [String(disc.id), disc] as [string, any]),
+  )
   const bySlot = new Map<number, any>(
-    selectedDriveDiscs.value.map((disc: any) => [Number(disc.partition), disc] as [number, any]),
+    selectedDriveDiscs.value.map((disc: any) => {
+      const inventoryDisc = inventoryById.get(String(disc.id))
+      const displayDisc = inventoryDisc
+        ? { ...disc, reservedForAgentId: inventoryDisc.reservedForAgentId ?? null }
+        : disc
+      return [Number(disc.partition), displayDisc] as [number, any]
+    }),
   )
   return OPTIMIZER_RESULT_SLOTS.map(slot => ({
     slot,
@@ -258,82 +272,6 @@ const calculationModeLabel = computed(() => {
     return "默认循环"
   }
   return /^默认循环[（(]/u.test(name) ? name : `默认循环（${name}）`
-})
-const activeManualDiscSlotDiscs = computed(() => inventoryStore.discOptionsForSlot(activeManualDiscSlot.value))
-const manualDiscPickerTitle = computed(() => activeManualDiscSlot.value ? `选择 ${activeManualDiscSlot.value} 号位驱动盘` : "选择驱动盘")
-const manualDiscSetFilterOptions = computed(() => {
-  const sets = new Map<string, { label: string, value: string, set: any, searchText: string }>()
-  for (const disc of inventoryStore.driveDiscs) {
-    const set = driveDiscSetForDisc(disc)
-    const id = String(set?.id || disc?.setId || "")
-    if (id) {
-      const label = driveDiscSetName(disc)
-      sets.set(id, {
-        label,
-        value: id,
-        set,
-        searchText: `${label} ${id}`,
-      })
-    }
-  }
-  return [...sets.values()]
-    .sort((left, right) => left.label.localeCompare(right.label, "zh-CN"))
-})
-watch(manualDiscSetFilterOptions, options => {
-  const availableSetIds = new Set(options.map(option => option.value))
-  const validSetIds = manualDiscSetFilterIds.value.filter(id => availableSetIds.has(id))
-  if (validSetIds.length !== manualDiscSetFilterIds.value.length) {
-    manualDiscSetFilterIds.value = validSetIds
-  }
-})
-const manualDiscMainStatFilterOptions = computed(() => {
-  const stats = Array.from(new Set<string>(activeManualDiscSlotDiscs.value
-    .map((disc: any) => String(disc.mainStat?.stat ?? ""))
-    .filter(Boolean)))
-    .sort((left: string, right: string) => statLabel(left, catalogStore.meta).localeCompare(statLabel(right, catalogStore.meta), "zh-CN"))
-  return [
-    { label: "全部主词条", value: "" },
-    ...stats.map((stat: string) => ({ label: statLabel(stat, catalogStore.meta), value: stat })),
-  ]
-})
-const filteredManualDiscOptions = computed(() => {
-  const slot = Number(activeManualDiscSlot.value)
-  const setIds = manualDiscSetFilterIds.value
-  const mainStat = manualDiscMainStatFilter.value
-  const search = manualDiscSearch.value.trim().toLowerCase()
-  const selectedId = buildStore.manualDriveDiscIdsBySlot[String(slot)] ?? ""
-  return inventoryStore.driveDiscs
-    .filter((disc: any) => {
-      const set = driveDiscSetForDisc(disc)
-      const discSetId = String(set?.id || disc?.setId || "")
-      const haystack = [
-        disc.id,
-        disc.setId,
-        disc.setName,
-        driveDiscSetName(disc),
-        disc.source?.sequence,
-        storedStatLabel(disc.mainStat?.stat, disc.mainStat?.mode, catalogStore.meta),
-        disc.mainStat?.label,
-        ...(disc.subStats ?? []).flatMap((stat: any) => [
-          storedStatLabel(stat.stat, stat.mode, catalogStore.meta),
-          stat.label,
-        ]),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-      return Number(disc.partition) === slot
-        && (!setIds.length || setIds.includes(discSetId))
-        && (!mainStat || disc.mainStat?.stat === mainStat)
-        && (!search || haystack.includes(search))
-    })
-    .sort((left: any, right: any) => {
-      const leftSelected = left.id === selectedId ? 0 : 1
-      const rightSelected = right.id === selectedId ? 0 : 1
-      return leftSelected - rightSelected
-        || driveDiscSetName(left).localeCompare(driveDiscSetName(right), "zh-CN")
-        || Number(left.source?.sequence ?? 999999) - Number(right.source?.sequence ?? 999999)
-    })
 })
 const saveLoadoutDiscs = computed(() => saveLoadoutMode.value === "optimized"
   ? selectedOptimizedScheme.value?.driveDiscs ?? []
@@ -531,6 +469,8 @@ const optimizerDetailChips = computed(() => [
   Number(optimizerMetrics.value?.scoredCombinationCount ?? optimizerMetrics.value?.evaluated ?? 0) > 0
     ? `真实评分 ${formatNumber(optimizerMetrics.value.scoredCombinationCount ?? optimizerMetrics.value.evaluated)}` : "",
   Number(optimizerMetrics.value?.prunedBySuperBound ?? 0) > 0 ? `剪枝 ${formatNumber(optimizerMetrics.value.prunedBySuperBound)}` : "",
+  Number(optimizerMetrics.value?.excludedByReservation ?? 0) > 0
+    ? `排除其他角色专属盘 ${formatNumber(optimizerMetrics.value.excludedByReservation)}` : "",
   Number(optimizerMetrics.value?.boundChecksPerSecond ?? 0) > 0 ? `上界 ${formatRate(optimizerMetrics.value.boundChecksPerSecond)}` : "",
   optimizerHasFreeTwoPieceMetrics.value ? `自动套装 ${formatNumber(optimizerMetrics.value.freeTwoPieceAutoSetCount ?? 0)}` : "",
   optimizerHasFreeTwoPieceMetrics.value ? `4+2 计划 ${formatNumber(optimizerMetrics.value.freeFourTwoPlanCount ?? 0)}` : "",
@@ -593,23 +533,6 @@ function renderWEngineSelectLabel(option: any) {
       h("span", { class: "w-engine-select-meta", title: entityMetaText(wEngine) }, entityMetaText(wEngine)),
     ]),
   ])
-}
-
-function renderManualDiscSetLabel(option: any) {
-  const set = option?.set ?? catalogStore.driveDiscSets.find((item: any) => item.id === option?.value)
-  const label = labelOf(set) || String(option?.label ?? option?.value ?? "未知套装")
-  return h("span", { class: "manual-disc-set-select-label" }, [
-    h(ImageAvatar, {
-      src: imageForDriveDiscSet(set),
-      name: label,
-      size: 20,
-    }),
-    h("span", { class: "manual-disc-set-select-name", title: label }, label),
-  ])
-}
-
-function updateManualDiscSetFilter(value: Array<string | number> | null) {
-  manualDiscSetFilterIds.value = Array.isArray(value) ? value.map(String) : []
 }
 
 function applyBuffs(payload: any) {
@@ -719,7 +642,7 @@ async function saveLoadoutFromModal() {
   }
   const mode = saveLoadoutMode.value
   const scheme = selectedOptimizedScheme.value
-  const loadout = await inventoryStore.saveLoadout({
+  const draft = {
     name: loadoutNameDraft.value.trim() || defaultLoadoutName(mode),
     agentId: buildStore.agentId,
     driveDiscIdsBySlot,
@@ -731,11 +654,70 @@ async function saveLoadoutFromModal() {
       : {
           source: { type: "manual", scope: "workbench" },
         }),
-  })
-  showSaveLoadoutModal.value = false
-  if (mode === "optimized") {
-    buildStore.selectLoadout(loadout.id)
   }
+  saveLoadoutBusy.value = true
+  try {
+    const result = await inventoryStore.saveLoadout(draft)
+    const loadout = result.loadout
+    showSaveLoadoutModal.value = false
+    message.success("套装已保存")
+    if (mode === "optimized") {
+      buildStore.selectLoadout(loadout.id)
+    }
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : String(error))
+  } finally {
+    saveLoadoutBusy.value = false
+  }
+}
+
+function schemeConflictDisc(conflict: any) {
+  return inventoryStore.driveDiscs.find((disc: any) => disc.id === conflict?.discId)
+}
+
+function agentNameForId(agentId: string | null | undefined) {
+  const agent = catalogStore.agents.find((item: any) => item.id === agentId)
+  return agent ? labelOf(agent) : `未知角色（${agentId}）`
+}
+
+async function applySchemeDiscReservation(action: any, allowTransfer = false) {
+  schemeReservationBusy.value = true
+  try {
+    const result = await inventoryStore.reserveDiscs([action.discId], action.agentId, allowTransfer)
+    if (!result.applied) {
+      pendingSchemeReservation.value = action
+      schemeReservationConflicts.value = result.conflicts ?? []
+      showSchemeReservationConflict.value = true
+      return false
+    }
+    message.success(action.agentId
+      ? `已锁定给${agentNameForId(action.agentId)}`
+      : "已解除角色专属")
+    showSchemeReservationConflict.value = false
+    schemeReservationConflicts.value = []
+    pendingSchemeReservation.value = null
+    return true
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : String(error))
+    return false
+  } finally {
+    schemeReservationBusy.value = false
+  }
+}
+
+async function toggleSchemeDiscReservation(disc: any) {
+  const inventoryDisc = inventoryStore.driveDiscs.find((item: any) => item.id === disc?.id)
+  if (!inventoryDisc?.id || !buildStore.agentId) return
+  const currentAgentId = String(inventoryDisc.reservedForAgentId ?? "").trim()
+  await applySchemeDiscReservation({
+    discId: inventoryDisc.id,
+    agentId: currentAgentId === buildStore.agentId ? null : buildStore.agentId,
+  })
+}
+
+async function confirmSchemeReservationTransfer() {
+  if (!pendingSchemeReservation.value) return
+  await applySchemeDiscReservation(pendingSchemeReservation.value, true)
 }
 
 function openManualDiscPicker(slot: number) {
@@ -743,8 +725,6 @@ function openManualDiscPicker(slot: number) {
     return
   }
   activeManualDiscSlot.value = Number(slot)
-  manualDiscMainStatFilter.value = ""
-  manualDiscSearch.value = ""
   showManualDiscPicker.value = true
 }
 
@@ -787,28 +767,12 @@ function driveDiscSetName(disc: any) {
   return disc?.setName || labelOf(driveDiscSetForDisc(disc)) || disc?.setId || "未知套装"
 }
 
-function driveDiscSetIcon(disc: any) {
-  return imageForDriveDiscSet(driveDiscSetForDisc(disc))
-}
-
 function driveDiscStatText(stat: any) {
   if (!stat?.stat) {
     return "-"
   }
   const mode = String(stat.mode ?? "")
   return `${storedStatLabel(String(stat.stat), mode, catalogStore.meta)} ${formatStoredStatValue(String(stat.stat), stat.value, mode)}`
-}
-
-function driveDiscSubStatText(disc: any) {
-  return (disc?.subStats ?? [])
-    .map((stat: any) => driveDiscStatText(stat))
-    .join(" / ") || "-"
-}
-
-function driveDiscRarityLevelText(disc: any) {
-  const rarity = disc?.rarity ? String(disc.rarity) : "-"
-  const level = Number(disc?.level)
-  return `${rarity}${Number.isFinite(level) ? ` +${level}` : ""}`
 }
 
 function twoPieceSetEffectText(set: any) {
@@ -1264,30 +1228,22 @@ function complexityText(metrics: any = {}, settings: any = {}) {
           />
 
           <div class="drive-disc-slot-grid">
-            <article
+            <DriveDiscSlotCard
               v-for="row in selectedDriveDiscRows"
               :key="row.slot"
-              class="disc-slot-card"
-              :class="{ 'disc-slot-card-empty': !row.disc, 'disc-slot-card-manual': buildStore.discMode === 'manual' }"
-              @click="openManualDiscPicker(row.slot)"
-            >
-              <img :src="row.disc ? driveDiscSetIcon(row.disc) : fallbackIcon" alt="" loading="lazy">
-              <div class="disc-slot-card-copy">
-                <strong>{{ row.disc ? `${row.slot}号位 · ${driveDiscSetName(row.disc)}` : `${row.slot}号位 · 未选择` }}</strong>
-                <span>{{ row.disc ? driveDiscStatText(row.disc.mainStat) : "空槽位" }}</span>
-                <small>{{ row.disc ? driveDiscSubStatText(row.disc) : "可在自选模式选择已有驱动盘" }}</small>
-              </div>
-              <div class="disc-slot-card-meta">
-                <NTag v-if="row.disc" round>{{ driveDiscRarityLevelText(row.disc) }}</NTag>
-                <NButton
-                  v-if="buildStore.discMode === 'manual'"
-                  size="tiny"
-                  @click.stop="openManualDiscPicker(row.slot)"
-                >
-                  {{ row.disc ? "更换" : "选择" }}
-                </NButton>
-              </div>
-            </article>
+              :slot="row.slot"
+              :disc="row.disc"
+              :drive-disc-sets="catalogStore.displayDriveDiscSets"
+              :meta="catalogStore.meta"
+              :agents="catalogStore.agents"
+              :target-agent-id="buildStore.agentId"
+              :interactive="buildStore.discMode === 'manual'"
+              :reservation-busy="schemeReservationBusy"
+              show-reservation
+              reservation-action
+              @select="openManualDiscPicker"
+              @toggle-reservation="toggleSchemeDiscReservation"
+            />
           </div>
         </div>
       </div>
@@ -1348,90 +1304,16 @@ function complexityText(metrics: any = {}, settings: any = {}) {
     </aside>
   </section>
 
-  <NModal v-model:show="showManualDiscPicker" preset="card" :title="manualDiscPickerTitle" style="width: min(980px, calc(100vw - 16px)); max-width: 980px">
-    <div class="section-band manual-disc-picker ui-layout-scope" data-layout-surface="manual-drive-disc-picker">
-      <div class="manual-disc-picker-head">
-        <span>只显示当前号位的已有驱动盘</span>
-        <NTag round>{{ filteredManualDiscOptions.length }} 件可选</NTag>
-      </div>
-      <div class="manual-disc-filter-row ui-field-grid ui-field-grid--comfortable" data-layout-surface="manual-drive-disc-filters">
-        <div class="metric" data-layout-field>
-          <dt>套装</dt>
-          <dd>
-            <NSelect
-              class="manual-disc-set-select"
-              :value="manualDiscSetFilterIds"
-              :options="manualDiscSetFilterOptions"
-              :filter="filterSelectOption"
-              :render-label="renderManualDiscSetLabel"
-              max-tag-count="responsive"
-              multiple
-              filterable
-              clearable
-              placeholder="全部套装"
-              @update:value="updateManualDiscSetFilter"
-            />
-          </dd>
-        </div>
-        <div class="metric" data-layout-field>
-          <dt>主词条</dt>
-          <dd>
-            <NSelect
-              :value="manualDiscMainStatFilter"
-              :options="manualDiscMainStatFilterOptions"
-              clearable
-              @update:value="manualDiscMainStatFilter = String($event ?? '')"
-            />
-          </dd>
-        </div>
-        <div class="metric" data-layout-field>
-          <dt>搜索</dt>
-          <dd><NInput v-model:value="manualDiscSearch" clearable placeholder="套装、属性、序号" /></dd>
-        </div>
-      </div>
-
-      <div v-if="filteredManualDiscOptions.length" class="manual-disc-option-list">
-        <button
-          v-for="disc in filteredManualDiscOptions"
-          :key="disc.id"
-          type="button"
-          class="manual-disc-option"
-          :class="{ active: buildStore.manualDriveDiscIdsBySlot[String(activeManualDiscSlot)] === disc.id }"
-          @click="selectManualDriveDisc(disc)"
-        >
-          <img :src="driveDiscSetIcon(disc)" alt="" loading="lazy">
-          <span class="manual-disc-option-main">
-            <strong>{{ driveDiscSetName(disc) }}</strong>
-            <span>{{ disc.partition }}号位 · {{ driveDiscRarityLevelText(disc) }}{{ disc.source?.sequence ? ` · #${disc.source.sequence}` : "" }}</span>
-          </span>
-          <span class="manual-disc-option-stat">
-            <strong>{{ driveDiscStatText(disc.mainStat) }}</strong>
-            <span>{{ driveDiscSubStatText(disc) }}</span>
-          </span>
-        </button>
-      </div>
-      <div v-else class="empty-state manual-disc-empty">
-        <img :src="fallbackIcon" alt="">
-        <strong>暂无驱动盘</strong>
-        <span>暂无符合筛选条件的驱动盘</span>
-      </div>
-    </div>
-    <template #footer>
-      <div class="drawer-footer">
-        <span class="modal-summary">{{ activeManualDiscSlot ? `${activeManualDiscSlot} 号位` : "未选择槽位" }}</span>
-        <span class="toolbar">
-          <NButton
-            type="error"
-            :disabled="!buildStore.manualDriveDiscIdsBySlot[String(activeManualDiscSlot)]"
-            @click="clearManualDriveDiscSlot"
-          >
-            卸下此槽位
-          </NButton>
-          <NButton @click="showManualDiscPicker = false">关闭</NButton>
-        </span>
-      </div>
-    </template>
-  </NModal>
+  <DriveDiscPickerModal
+    v-model:show="showManualDiscPicker"
+    :slot="activeManualDiscSlot"
+    :discs="inventoryStore.driveDiscs"
+    :selected-id="buildStore.manualDriveDiscIdsBySlot[String(activeManualDiscSlot)] ?? ''"
+    :drive-disc-sets="catalogStore.displayDriveDiscSets"
+    :meta="catalogStore.meta"
+    @select="selectManualDriveDisc"
+    @clear="clearManualDriveDiscSlot"
+  />
 
   <NModal v-model:show="showSaveLoadoutModal" preset="card" :title="saveLoadoutTitle" style="width: min(640px, calc(100vw - 16px)); max-width: 640px">
     <div class="section-band ui-layout-scope" data-layout-surface="save-loadout">
@@ -1451,9 +1333,32 @@ function complexityText(metrics: any = {}, settings: any = {}) {
       <div class="drawer-footer">
         <span class="modal-summary">保存后会更新驱动盘页中的套装预设</span>
         <span class="toolbar">
-          <NButton @click="showSaveLoadoutModal = false">取消</NButton>
-          <NButton type="primary" :disabled="!saveLoadoutDiscs.length" @click="saveLoadoutFromModal">保存套装</NButton>
+          <NButton :disabled="saveLoadoutBusy" @click="showSaveLoadoutModal = false">取消</NButton>
+          <NButton type="primary" :loading="saveLoadoutBusy" :disabled="!saveLoadoutDiscs.length" @click="saveLoadoutFromModal">保存</NButton>
         </span>
+      </div>
+    </template>
+  </NModal>
+
+  <NModal v-model:show="showSchemeReservationConflict" preset="card" title="专属角色冲突" style="width: min(720px, calc(100vw - 16px)); max-width: 720px">
+    <div class="section-band">
+      <NAlert type="warning" :show-icon="false">
+        该驱动盘已专属其他角色。确认后只转移这一块盘，未确认前不会修改专属关系。
+      </NAlert>
+      <div class="scheme-reservation-conflict-list">
+        <div v-for="conflict in schemeReservationConflicts" :key="conflict.discId" class="scheme-reservation-conflict-row">
+          <div>
+            <strong>{{ driveDiscSetName(schemeConflictDisc(conflict)) }} · {{ schemeConflictDisc(conflict)?.partition }}号位</strong>
+            <span>{{ driveDiscStatText(schemeConflictDisc(conflict)?.mainStat) }}</span>
+          </div>
+          <span>{{ agentNameForId(conflict.currentAgentId) }} → {{ agentNameForId(conflict.requestedAgentId) }}</span>
+        </div>
+      </div>
+    </div>
+    <template #footer>
+      <div class="drawer-footer">
+        <NButton :disabled="schemeReservationBusy" @click="showSchemeReservationConflict = false">取消</NButton>
+        <NButton type="primary" :loading="schemeReservationBusy" @click="confirmSchemeReservationTransfer">转移并锁定</NButton>
       </div>
     </template>
   </NModal>
@@ -1757,202 +1662,37 @@ function complexityText(metrics: any = {}, settings: any = {}) {
   gap: 10px;
 }
 
-.disc-slot-card {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  min-height: 112px;
-  padding: 10px;
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
-  background: #fff;
-}
-
-.disc-slot-card-empty {
-  background: var(--app-panel-muted);
-}
-
-.disc-slot-card-manual {
-  cursor: pointer;
-}
-
-.disc-slot-card-manual:hover {
-  border-color: #93c5fd;
-  background: #f8fbff;
-}
-
-.disc-slot-card img {
-  width: 48px;
-  height: 48px;
-  object-fit: contain;
-  border-radius: var(--app-radius-sm);
-  background: var(--app-panel-muted);
-}
-
-.disc-slot-card-copy {
-  display: grid;
-  min-width: 0;
-  gap: 3px;
-}
-
-.disc-slot-card-copy strong {
-  color: var(--app-text);
-  font-size: 13px;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
-}
-
-.disc-slot-card-copy span,
-.disc-slot-card-copy small {
-  color: var(--app-muted);
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
-.disc-slot-card-copy span {
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.disc-slot-card-copy small {
-  font-size: 11px;
-}
-
-.disc-slot-card-meta {
-  display: grid;
-  justify-items: end;
-  gap: 6px;
-}
-
-.manual-disc-picker {
-  gap: 12px;
-}
-
-.manual-disc-picker-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  color: var(--app-muted);
-  font-size: 12px;
-}
-
-.manual-disc-filter-row {
-  --ui-field-min: 180px;
-  gap: 10px;
-}
-
-.manual-disc-set-select-label {
-  display: inline-flex;
-  align-items: center;
-  max-width: 100%;
-  min-width: 0;
-  gap: 6px;
-  vertical-align: middle;
-}
-
-.manual-disc-set-select-label :deep(.avatar) {
-  flex: 0 0 auto;
-}
-
-.manual-disc-set-select-label :deep(.avatar img) {
-  object-fit: contain;
-}
-
-.manual-disc-set-select-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.manual-disc-set-select :deep(.n-base-selection-tags) {
-  min-width: 0;
-}
-
-.manual-disc-set-select :deep(.n-tag__content) {
-  min-width: 0;
-  max-width: 100%;
-}
-
-.manual-disc-option-list {
-  display: grid;
-  gap: 8px;
-  max-height: min(560px, calc(100vh - 300px));
-  overflow: auto;
-}
-
-.manual-disc-option {
-  display: grid;
-  grid-template-columns: 54px minmax(160px, 0.78fr) minmax(220px, 1.22fr);
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-height: 72px;
-  padding: 10px;
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-sm);
-  background: #fff;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.manual-disc-option:hover,
-.manual-disc-option.active {
-  border-color: #2563eb;
-  background: #f8fbff;
-}
-
-.manual-disc-option.active {
-  box-shadow: inset 4px 0 0 #facc15;
-}
-
-.manual-disc-option img {
-  width: 48px;
-  height: 48px;
-  object-fit: contain;
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-sm);
-  background: var(--app-panel-muted);
-}
-
-.manual-disc-option-main,
-.manual-disc-option-stat {
-  display: grid;
-  min-width: 0;
-  gap: 4px;
-}
-
-.manual-disc-option-main strong,
-.manual-disc-option-stat strong,
-.manual-disc-option-main span,
-.manual-disc-option-stat span {
-  min-width: 0;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
-.manual-disc-option-main strong,
-.manual-disc-option-stat strong {
-  color: var(--app-text);
-  font-size: 13px;
-}
-
-.manual-disc-option-main span,
-.manual-disc-option-stat span {
-  color: var(--app-muted);
-  font-size: 12px;
-}
-
-.manual-disc-empty {
-  min-height: 260px;
-}
-
 .save-loadout-summary {
   margin-top: 10px;
+}
+
+.scheme-reservation-conflict-list {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+}
+
+.scheme-reservation-conflict-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, auto);
+  gap: 16px;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--app-surface);
+}
+
+.scheme-reservation-conflict-row > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.scheme-reservation-conflict-row span {
+  color: var(--app-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .damage-panel-grid {
@@ -2531,8 +2271,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
   }
 
   .optimizer-run-row,
-  .drive-disc-slot-grid,
-  .manual-disc-filter-row {
+  .drive-disc-slot-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2544,6 +2283,11 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 }
 
 @media (max-width: 680px) {
+  .scheme-reservation-conflict-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
   .damage-panel-grid {
     grid-template-columns: 1fr;
   }
@@ -2573,19 +2317,6 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 
   .set-choice-list {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .manual-disc-option {
-    grid-template-columns: 48px minmax(0, 1fr);
-  }
-
-  .manual-disc-option-stat {
-    grid-column: 2;
-  }
-
-  .manual-disc-option img {
-    width: 42px;
-    height: 42px;
   }
 
   .set-modal-footer {

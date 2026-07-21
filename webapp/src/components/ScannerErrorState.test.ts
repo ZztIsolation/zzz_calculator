@@ -12,9 +12,11 @@ vi.mock("naive-ui", () => ({
 
 vi.mock("lucide-vue-next", () => ({
   AlertCircle: { template: "<i data-lucide=\"alert-circle\" />" },
+  Cable: { template: "<i data-lucide=\"cable\" />" },
   Download: { template: "<i data-lucide=\"download\" />" },
   Gamepad2: { template: "<i data-lucide=\"gamepad2\" />" },
   RefreshCcw: { template: "<i data-lucide=\"refresh-ccw\" />" },
+  ShieldAlert: { template: "<i data-lucide=\"shield-alert\" />" },
   WifiOff: { template: "<i data-lucide=\"wifi-off\" />" },
 }))
 
@@ -46,6 +48,30 @@ describe("ScannerErrorState", () => {
     expect(wrapper.text()).toContain("v1.0.1")
     expect(wrapper.text()).toContain("下载并更新 Helper")
     expect(wrapper.text()).toContain("重新检测")
+  })
+
+  it("renders a dedicated browser permission recovery instead of a Helper download", () => {
+    const wrapper = mount(ScannerErrorState, {
+      props: { variant: "browser-permission" },
+    })
+
+    expect(wrapper.text()).toContain("浏览器已阻止连接本机扫描助手")
+    expect(wrapper.text()).toContain("本机应用或本地网络访问")
+    expect(wrapper.text()).not.toContain("下载扫描助手")
+    expect(wrapper.findAll("button")).toHaveLength(1)
+    expect(wrapper.find("button").text()).toContain("我已允许，重新连接")
+  })
+
+  it("renders separate Helper-origin and WebSocket failures", () => {
+    const rejected = mount(ScannerErrorState, { props: { variant: "helper-rejected" } })
+    expect(rejected.text()).toContain("扫描助手拒绝了当前网页")
+    expect(rejected.text()).toContain("下载最新版 Helper")
+
+    const blocked = mount(ScannerErrorState, {
+      props: { variant: "browser-websocket", message: "WebSocket 被浏览器策略阻止" },
+    })
+    expect(blocked.text()).toContain("浏览器未能建立扫描连接")
+    expect(blocked.text()).toContain("WebSocket 被浏览器策略阻止")
   })
 
   it("renders prepare-failed with a custom message and only a primary action", async () => {
@@ -107,6 +133,8 @@ describe("ScannerErrorState", () => {
       props: {
         variant: "diagnostic-failure",
         failure: {
+          code: "disk_insufficient",
+          severity: "error",
           title: "磁盘空间不足",
           message: "至少需要 300 MB，当前只有 100 MB。",
           remedy: "请释放系统盘空间后重试。",
@@ -120,6 +148,9 @@ describe("ScannerErrorState", () => {
     })
 
     expect(wrapper.text()).toContain("磁盘空间不足")
+    expect(wrapper.text()).toContain("错误代码：disk_insufficient")
+    expect(wrapper.text()).toContain("原因：")
+    expect(wrapper.text()).toContain("解决方案：")
     expect(wrapper.text()).toContain("请释放系统盘空间")
     expect(wrapper.text()).toContain("abc123")
     const buttons = wrapper.findAll("button")

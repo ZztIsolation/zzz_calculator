@@ -5,6 +5,9 @@ import { describe, expect, it } from "vitest"
 
 const viewPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "WorkbenchView.vue")
 const source = readFileSync(viewPath, "utf8")
+const componentDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../components")
+const slotCardSource = readFileSync(path.join(componentDir, "DriveDiscSlotCard.vue"), "utf8")
+const pickerSource = readFileSync(path.join(componentDir, "DriveDiscPickerModal.vue"), "utf8")
 
 describe("WorkbenchView optimizer progress", () => {
   it("uses the start button as the only optimizer entrypoint", () => {
@@ -191,19 +194,21 @@ describe("WorkbenchView optimizer result details", () => {
   it("renders every optimizer result slot with full drive disc attributes", () => {
     expect(source).toContain("OPTIMIZER_RESULT_SLOTS = [1, 2, 3, 4, 5, 6]")
     expect(source).toContain("selectedDriveDiscRows")
-    expect(source).toContain("disc-slot-card")
-    expect(source).toContain("driveDiscSetIcon")
-    expect(source).toContain("driveDiscStatText(row.disc.mainStat)")
-    expect(source).toContain("driveDiscSubStatText(row.disc)")
-    expect(source).toContain("driveDiscRarityLevelText(row.disc)")
+    expect(source).toContain("DriveDiscSlotCard")
+    expect(source).toContain(':disc="row.disc"')
+    expect(slotCardSource).toContain('class="disc-slot-card"')
+    expect(slotCardSource).toContain("statText(props.disc.mainStat)")
+    expect(slotCardSource).toContain("props.disc.subStats")
+    expect(slotCardSource).toContain("rarityLevel")
   })
 
   it("uses a modal picker and current-scheme save for manual drive discs", () => {
     expect(source).toContain("showManualDiscPicker")
-    expect(source).toContain("manual-disc-option-list")
-    expect(source).toContain("manualDiscSetFilterOptions")
-    expect(source).toContain("manualDiscMainStatFilterOptions")
-    expect(source).toContain("manualDiscSearch")
+    expect(source).toContain("DriveDiscPickerModal")
+    expect(pickerSource).toContain("manual-disc-option-list")
+    expect(pickerSource).toContain("setFilterOptions")
+    expect(pickerSource).toContain("mainStatOptions")
+    expect(pickerSource).toContain('const search = ref("")')
     expect(source).toContain("clearManualDriveDiscSlot")
     expect(source).toContain("showSaveLoadoutModal")
     expect(source).toContain("openSaveCurrentLoadout")
@@ -212,22 +217,40 @@ describe("WorkbenchView optimizer result details", () => {
     expect(source).not.toContain("discOptions(row.slot)")
   })
 
+  it("offers one-disc reservation controls without batch reservation actions", () => {
+    expect(source).toContain("toggleSchemeDiscReservation")
+    expect(source).toContain("applySchemeDiscReservation")
+    expect(source).toContain("schemeReservationConflicts")
+    expect(source).toContain('target-agent-id="buildStore.agentId"')
+    expect(source).toContain("reservation-action")
+    expect(source).toContain('@toggle-reservation="toggleSchemeDiscReservation"')
+    expect(source).toContain("转移并锁定")
+    expect(source).toContain("inventoryById.get(String(disc.id))")
+    expect(slotCardSource).toContain("disc-reservation-button")
+    expect(slotCardSource).toContain("toggleReservation")
+    expect(source).not.toContain("保存并锁定")
+    expect(source).not.toContain("转移并锁定整套")
+    expect(source).not.toContain("showSaveReservationConflict")
+    expect(source).not.toContain("canSaveAndReserveLoadout")
+    expect(source).toContain("排除其他角色专属盘")
+  })
+
   it("uses an icon-rich multi-select for manual drive disc sets", () => {
-    expect(source).toContain("const manualDiscSetFilterIds = ref<string[]>([])")
-    expect(source).toContain("for (const disc of inventoryStore.driveDiscs)")
-    expect(source).toContain(':render-label="renderManualDiscSetLabel"')
-    expect(source).toContain('max-tag-count="responsive"')
-    expect(source).toContain("multiple")
-    expect(source).toContain('placeholder="全部套装"')
-    expect(source).toContain("imageForDriveDiscSet(set)")
-    expect(source).not.toContain('{ label: "全部套装", value: "" }')
+    expect(pickerSource).toContain("const setFilterIds = ref<string[]>([])")
+    expect(pickerSource).toContain("for (const disc of props.discs)")
+    expect(pickerSource).toContain(':render-label="renderSetLabel"')
+    expect(pickerSource).toContain('max-tag-count="responsive"')
+    expect(pickerSource).toContain("multiple")
+    expect(pickerSource).toContain('placeholder="全部套装"')
+    expect(pickerSource).toContain("imageForDriveDiscSet(set)")
+    expect(pickerSource).not.toContain('{ label: "全部套装", value: "" }')
   })
 
   it("shares set filters across slots while resetting slot-specific filters", () => {
-    expect(source).toContain("!setIds.length || setIds.includes(discSetId)")
-    expect(source).toContain("manualDiscSetFilterIds.value.filter(id => availableSetIds.has(id))")
-    expect(source).not.toMatch(/manualDiscSetFilterIds\.value = \[\]\s+manualDiscMainStatFilter\.value = ""/)
-    expect(source).toMatch(/activeManualDiscSlot\.value = Number\(slot\)\s+manualDiscMainStatFilter\.value = ""\s+manualDiscSearch\.value = ""/)
+    expect(pickerSource).toContain("!setFilterIds.value.length || setFilterIds.value.includes(discSetId)")
+    expect(pickerSource).toContain("setFilterIds.value.filter(id => validIds.has(id))")
+    expect(pickerSource).not.toMatch(/setFilterIds\.value = \[\]\s+mainStatFilter\.value = ""/)
+    expect(pickerSource).toMatch(/if \(!visible\) return\s+mainStatFilter\.value = ""\s+search\.value = ""/)
   })
 
   it("formats stored drive disc stats through the shared combat formatter", () => {

@@ -234,6 +234,8 @@ interface DriveDiscInventoryItem {
   maxLevel: number;
   locked: boolean;
   equippedBy: string | null;
+  // Calculator-owned optimizer reservation; independent from imported item/equipment state.
+  reservedForAgentId: string | null;
   mainStat: {
     stat: ZzzStat | "unknown";
     value: number;
@@ -274,6 +276,21 @@ interface DriveDiscInventoryStore {
   }>;
   driveDiscs: DriveDiscInventoryItem[];
 }
+
+`reservedForAgentId` is an account-scoped optimizer eligibility rule. `null`
+means that every agent may use the disc. A non-null agent ID keeps the disc in
+that agent's candidate pool and removes it before candidate dominance,
+combination estimation, and enumeration for every other agent. It does not fix
+the disc into the owning agent's results, and it does not restrict manual disc
+selection or loading a saved loadout.
+
+Whole-loadout reservation is derived rather than stored separately. A complete
+loadout is fully reserved when all six referenced discs exist in the same
+account and each `reservedForAgentId` equals the loadout's `agentId`. Batch
+reservation and save-plus-reserve update the store once; conflicting existing
+agent IDs produce an unchanged store until the caller explicitly allows the
+transfer. Existing `locked` and `equippedBy` values are not migrated into this
+field.
 
 type SkillType =
   | "basic" | "dodge" | "assist" | "special" | "chain" | "ultimate"

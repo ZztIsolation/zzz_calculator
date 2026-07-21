@@ -18,12 +18,14 @@ vi.mock("@runtime/scanner-bridge.js", () => {
     onError: ((payload: any) => void) | null = null
     onDiagnostics: ((payload: any) => void) | null = null
     onHelperUpdateProgress: ((payload: any) => void) | null = null
-    onDisconnect: (() => void) | null = null
+    onHeartbeat: ((payload: any) => void) | null = null
+    onStopAck: ((payload: any) => void) | null = null
+    onDisconnect: ((failure?: any) => void) | null = null
     connected = false
     scanning = false
     mode = "helper"
-    helperVersion = "1.2.1"
-    protocolVersion = 3
+    helperVersion = "1.3.1"
+    protocolVersion = 4
     connectCalls = 0
     ensureCalls = 0
     updateCalls = 0
@@ -70,7 +72,7 @@ vi.mock("@runtime/scanner-bridge.js", () => {
       this.updateCalls += 1
       const result = scannerMockState.updateResults.shift()
       if (result instanceof Error) throw result
-      return await (result ?? { updateAvailable: true, availableVersion: "1.2.1", restarting: true })
+      return await (result ?? { updateAvailable: true, availableVersion: "1.3.1", restarting: true })
     }
 
     async repairScanner() {
@@ -186,6 +188,62 @@ describe("inventory store", () => {
     expect(store.loadouts[0].status).toBe("incomplete")
   })
 
+  it("keeps reservation conflicts atomic and filters all known and unknown reservations", async () => {
+    const store = useInventoryStore()
+    await store.load()
+    await store.saveDisc({
+      id: "reserved-disc",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 1,
+      mainStat: { stat: "hpFlat", value: 2200 },
+      subStats: [],
+      level: 15,
+    })
+
+    const assigned = await store.reserveDiscs(["reserved-disc"], "agent-a")
+    expect(assigned.applied).toBe(true)
+    expect(store.driveDiscs[0].reservedForAgentId).toBe("agent-a")
+
+    const blocked = await store.reserveDiscs(["reserved-disc"], "agent-b")
+    expect(blocked.applied).toBe(false)
+    expect(store.driveDiscs[0].reservedForAgentId).toBe("agent-a")
+
+    await store.saveDisc({
+      id: "unknown-reserved-disc",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 2,
+      mainStat: { stat: "atkFlat", value: 316 },
+      subStats: [],
+      level: 15,
+    })
+    await store.reserveDiscs(["unknown-reserved-disc"], "retired-agent")
+    await store.saveDisc({
+      id: "public-disc",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 1,
+      mainStat: { stat: "hpFlat", value: 2200 },
+      subStats: [],
+      level: 15,
+    })
+
+    store.reservationFilter = "reserved"
+    expect(store.filteredDriveDiscs.map((disc: any) => disc.id)).toEqual([
+      "reserved-disc",
+      "unknown-reserved-disc",
+    ])
+    store.slotFilter = 2
+    expect(store.filteredDriveDiscs.map((disc: any) => disc.id)).toEqual(["unknown-reserved-disc"])
+    store.slotFilter = 0
+
+    store.reservationFilter = "agent-a"
+    expect(store.filteredDriveDiscs.map((disc: any) => disc.id)).toEqual(["reserved-disc"])
+    store.reservationFilter = "public"
+    expect(store.filteredDriveDiscs.map((disc: any) => disc.id)).toEqual(["public-disc"])
+  })
+
   it("does not auto-fill explicit manual or loadout selections", async () => {
     const store = useInventoryStore()
     await store.load()
@@ -243,7 +301,7 @@ describe("inventory store", () => {
   it("automatically imports a completed scan session", async () => {
     const store = useInventoryStore()
     await store.load()
-    scannerMockState.connectResults.push({ version: "1.2.1", protocolVersion: 3 })
+    scannerMockState.connectResults.push({ version: "1.3.1", protocolVersion: 4 })
     await store.openScannerPanel()
     await store.startScan()
 
@@ -271,15 +329,40 @@ describe("inventory store", () => {
     expect(helper.launchCalls).toBe(1)
     expect(store.scanStatus).toBe("waiting-helper")
     expect(store.scanPolling).toBe(true)
-    expect(store.scanHelperDownloadUrl).toBe("https://download.zzzcaculator.top/downloads/zzz-scanner/helper/1.2.1/ZZZ-Scanner-Helper.exe")
+    expect(store.scanHelperDownloadUrl).toBe("https://download.zzzcaculator.top/downloads/zzz-scanner/helper/1.3.1/ZZZ-Scanner-Helper.exe")
 
-    scannerMockState.connectResults.push({ version: "1.2.1", protocolVersion: 3 })
+    scannerMockState.connectResults.push({ version: "1.3.1", protocolVersion: 4 })
     await vi.advanceTimersByTimeAsync(3000)
 
     expect(helper.connectCalls).toBe(2)
     expect(helper.ensureCalls).toBe(1)
     expect(store.scanPolling).toBe(false)
     expect(store.scanStatus).toBe("ready")
+  })
+
+  it.each([
+    ["loopback_permission_denied", "browser-permission"],
+    ["helper_websocket_blocked", "browser-websocket"],
+    ["helper_connection_timeout", "browser-websocket"],
+    ["helper_origin_rejected", "helper-rejected"],
+  ])("surfaces terminal connection error %s without launching or polling", async (code, variant) => {
+    const store = useInventoryStore()
+    scannerMockState.connectResults.push(Object.assign(new Error(`connection failed: ${code}`), {
+      code,
+      phase: "connect",
+      stage: code === "helper_origin_rejected" ? "token" : "websocket",
+      permissionName: code === "loopback_permission_denied" ? "loopback-network" : "",
+      permissionState: code === "loopback_permission_denied" ? "denied" : "granted",
+      details: { connectionStage: "websocket" },
+    }))
+
+    await store.openScannerPanel()
+
+    const helper = scannerMockState.instances[0]
+    expect(store.scanStatus).toBe("error")
+    expect(store.scanErrorVariant).toBe(variant)
+    expect(store.scanPolling).toBe(false)
+    expect(helper.launchCalls).toBe(0)
   })
 
   it("formats launcher download progress for the scanner drawer", () => {
@@ -301,7 +384,7 @@ describe("inventory store", () => {
 
   it("sends the stable local and cloud scanner payloads", async () => {
     const store = useInventoryStore()
-    scannerMockState.connectResults.push({ version: "1.2.1", protocolVersion: 3 })
+    scannerMockState.connectResults.push({ version: "1.3.1", protocolVersion: 4 })
     await store.openScannerPanel()
     const helper = scannerMockState.instances[0]
 
@@ -332,7 +415,7 @@ describe("inventory store", () => {
 
     expect(helper.startScanPayloads[1]).toMatchObject({
       maxItems: 12,
-      rarities: ["S", "A"],
+      rarities: ["S"],
       stopAtNonLevel15: false,
       processName: "Zenless Zone Zero Cloud",
       visualProfileClient: "cloud",
@@ -390,7 +473,7 @@ describe("inventory store", () => {
     })
     expect(store.scanErrorVariant).toBe("helper-outdated")
 
-    store.$patch({ scanHelperVersion: "1.2.1" })
+    store.$patch({ scanHelperVersion: "1.3.1" })
     expect(store.scanErrorVariant).toBe("prepare-failed")
   })
 
@@ -407,7 +490,7 @@ describe("inventory store", () => {
     expect(store.scanHelperProtocolVersion).toBe(2)
     expect(store.scanHelperUpgradeMode).toBe("legacy-manual")
     expect(store.scanErrorVariant).toBe("helper-outdated")
-    expect(store.scanFailure).toBeNull()
+    expect(store.scanFailure?.code).toBe("helper_outdated")
 
     helper.onError?.({
       code: "manifest_invalid",
@@ -418,13 +501,13 @@ describe("inventory store", () => {
     })
 
     expect(store.scanErrorVariant).toBe("helper-outdated")
-    expect(store.scanFailure).toBeNull()
+    expect(store.scanFailure?.code).toBe("helper_outdated")
   })
 
   it("automatically self-updates a protocol v3 Helper before preparing Scanner", async () => {
     const store = useInventoryStore()
     scannerMockState.connectResults.push({ version: "1.2.0", protocolVersion: 3 })
-    scannerMockState.updateResults.push({ updateAvailable: true, availableVersion: "1.2.1", restarting: true })
+    scannerMockState.updateResults.push({ updateAvailable: true, availableVersion: "1.3.1", restarting: true })
 
     await store.openScannerPanel()
     const helper = scannerMockState.instances[0]
@@ -442,9 +525,9 @@ describe("inventory store", () => {
     const store = useInventoryStore()
     scannerMockState.connectResults.push(
       { version: "1.2.0", protocolVersion: 3 },
-      { version: "1.2.1", protocolVersion: 3 },
+      { version: "1.3.1", protocolVersion: 4 },
     )
-    scannerMockState.updateResults.push({ updateAvailable: true, availableVersion: "1.2.1", restarting: true })
+    scannerMockState.updateResults.push({ updateAvailable: true, availableVersion: "1.3.1", restarting: true })
 
     await store.openScannerPanel()
     await vi.advanceTimersByTimeAsync(3000)
@@ -452,7 +535,7 @@ describe("inventory store", () => {
     const helper = scannerMockState.instances[0]
     expect(helper.updateCalls).toBe(1)
     expect(helper.ensureCalls).toBe(1)
-    expect(store.scanHelperVersion).toBe("1.2.1")
+    expect(store.scanHelperVersion).toBe("1.3.1")
     expect(store.scanHelperUpgradeMode).toBe("")
     expect(store.scanStatus).toBe("ready")
   })
@@ -470,16 +553,16 @@ describe("inventory store", () => {
     expect(store.scanPolling).toBe(false)
   })
 
-  it("surfaces helper-missing while waiting for helper", () => {
+  it("keeps Helper startup as a pending state until its deadline", () => {
     const store = useInventoryStore()
     store.$patch({ scanStatus: "waiting-helper" })
     expect(store.scanPhase).toBe("a")
-    expect(store.scanErrorVariant).toBe("helper-missing")
+    expect(store.scanErrorVariant).toBe("")
   })
 
   it("preserves structured helper failures and executes repair actions", async () => {
     const store = useInventoryStore()
-    scannerMockState.connectResults.push({ version: "1.2.1", protocolVersion: 3 })
+    scannerMockState.connectResults.push({ version: "1.3.1", protocolVersion: 4 })
     await store.openScannerPanel()
     const helper = scannerMockState.instances[0]
 
@@ -503,26 +586,25 @@ describe("inventory store", () => {
     expect(store.scanStatus).toBe("ready")
   })
 
-  it("disables start-scan when no rarity is selected", () => {
+  it("keeps official S-rank scanning enabled regardless of legacy rarity flags", () => {
     const store = useInventoryStore()
     store.$patch({ scanConnected: true, scanStatus: "ready", scanRarityS: false, scanRarityA: false })
-    expect(store.scanRaritySelected).toBe(false)
-    expect(store.scanCanStart).toBe(false)
+    expect(store.scanRaritySelected).toBe(true)
+    expect(store.scanCanStart).toBe(true)
 
     store.$patch({ scanRarityA: true })
     expect(store.scanCanStart).toBe(true)
   })
 
-  it("does not switch to error status for the rarity validation", async () => {
+  it("always sends S-rank even when persisted legacy rarity flags are disabled", async () => {
     const store = useInventoryStore()
-    scannerMockState.connectResults.push({ version: "1.2.1", protocolVersion: 3 })
+    scannerMockState.connectResults.push({ version: "1.3.1", protocolVersion: 4 })
     await store.openScannerPanel()
     store.$patch({ scanRarityS: false, scanRarityA: false })
     await store.startScan()
 
-    expect(store.scanStatus).not.toBe("error")
-    expect(store.scanMessage).toContain("请至少选择一个品质")
-    expect(scannerMockState.instances[0].startScanPayloads).toHaveLength(0)
+    expect(store.scanStatus).toBe("scanning")
+    expect(scannerMockState.instances[0].startScanPayloads[0].rarities).toEqual(["S"])
   })
 
   it("reports hasDriveDiscs off when the local store is empty", async () => {
@@ -600,10 +682,251 @@ describe("inventory store", () => {
     expect(JSON.parse(exported.text)).toEqual(exported.payload)
   })
 
-  it("records helper version at prepare time", async () => {
+  it("records helper and Scanner versions at prepare time", async () => {
     const store = useInventoryStore()
-    scannerMockState.connectResults.push({ version: "1.2.1", protocolVersion: 3 })
+    scannerMockState.connectResults.push({ version: "1.3.1", protocolVersion: 4 })
+    scannerMockState.ensureResults.push({ version: "1.0.43" })
     await store.openScannerPanel()
-    expect(store.scanHelperVersion).toBe("1.2.1")
+    expect(store.scanHelperVersion).toBe("1.3.1")
+    expect(store.scanScannerVersion).toBe("1.0.43")
+  })
+
+  it("turns a Helper launch that never connects into a coded terminal error", async () => {
+    vi.useFakeTimers()
+    const store = useInventoryStore()
+    scannerMockState.connectResults.push(...Array.from({ length: 25 }, () => new Error("helper down")))
+
+    await store.openScannerPanel()
+    expect(store.scanStatus).toBe("waiting-helper")
+
+    await vi.advanceTimersByTimeAsync(60_000)
+
+    expect(store.scanStatus).toBe("error")
+    expect(store.scanFailure?.code).toBe("helper_launch_timeout")
+    expect(store.scanFailure?.message).toMatch(/[\u3400-\u9fff]/)
+    expect(store.scanFailure?.remedy).toMatch(/[\u3400-\u9fff]/)
+    expect(store.scanPolling).toBe(false)
+  })
+
+  it("automatically imports partial OCR results without deleting missing discs", async () => {
+    const store = useInventoryStore()
+    await store.load()
+    await store.saveDisc({
+      id: "preserved-disc",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 2,
+      rarity: "S",
+      level: 15,
+      maxLevel: 15,
+      mainStat: { stat: "atkFlat", value: 316 },
+      subStats: [],
+    })
+    scannerMockState.connectResults.push({ version: "1.3.1", protocolVersion: 4 })
+    await store.openScannerPanel()
+    store.scanRemoveMissing = true
+    await store.startScan()
+    const helper = scannerMockState.instances[0]
+
+    await helper.onComplete?.({
+      items: [scannerDisc(1)],
+      visited: 2,
+      queued: 2,
+      completed: 1,
+      failed: 1,
+    })
+
+    expect(store.scanStatus).toBe("warning")
+    expect(store.scanFailure?.code).toBe("scan_partial_failure")
+    expect(store.scanSession.imported).toBe(true)
+    expect(store.scanRemoveMissing).toBe(false)
+    expect(store.driveDiscs.map((disc: any) => disc.id)).toContain("preserved-disc")
+    expect(store.driveDiscs).toHaveLength(2)
+    expect(store.driveDiscs.map((disc: any) => disc.id)).toContain("preserved-disc")
+    expect(store.scanMessage).toContain("未删除缺失")
+  })
+
+  it("rejects malformed completion payloads and retains disconnect failures", async () => {
+    const store = useInventoryStore()
+    scannerMockState.connectResults.push({ version: "1.3.1", protocolVersion: 4 })
+    await store.openScannerPanel()
+    await store.startScan()
+    const helper = scannerMockState.instances[0]
+
+    await helper.onComplete?.({ completed: 1 })
+    expect(store.scanFailure?.code).toBe("scan_result_invalid")
+
+    helper.scanning = false
+    await store.startScan()
+    await helper.onDisconnect?.({ code: "helper_disconnected", phase: "scan" })
+    expect(store.scanStatus).toBe("error")
+    expect(store.scanFailure?.code).toBe("helper_disconnected")
+    expect(store.scanErrorVariant).toBe("diagnostic-failure")
+  })
+
+  it("waits for Scanner cancellation instead of immediately returning to ready", async () => {
+    const store = useInventoryStore()
+    scannerMockState.connectResults.push({ version: "1.3.1", protocolVersion: 4 })
+    await store.openScannerPanel()
+    await store.startScan()
+    const helper = scannerMockState.instances[0]
+
+    store.stopScan()
+    expect(store.scanStatus).toBe("stopping")
+
+    await helper.onError?.({ code: "scan_cancelled", phase: "scan", severity: "warning" })
+    expect(store.scanStatus).toBe("warning")
+    expect(store.scanFailure?.code).toBe("scan_cancelled")
+  })
+
+  it("safely imports 549 retained items when the final item fails and ignores duplicate terminals", async () => {
+    const store = useInventoryStore()
+    await store.load()
+    scannerMockState.connectResults.push({ version: "1.3.1", protocolVersion: 4 })
+    await store.openScannerPanel()
+    store.scanRemoveMissing = true
+    await store.startScan()
+    const helper = scannerMockState.instances[0]
+    const retainedItems = Array.from({ length: 549 }, (_, index) => scannerDisc(index + 1, {
+      partition: (index % 6) + 1,
+      mainStat: { "生命值": 2201 + index },
+    }))
+
+    await helper.onError?.({
+      code: "panel_read_timeout",
+      phase: "scan",
+      message: "最后一个驱动盘面板读取超时。",
+      retainedItems,
+      completed: 549,
+      failed: 1,
+    })
+
+    expect(store.scanStatus).toBe("warning")
+    expect(store.scanSession.imported).toBe(true)
+    expect(store.driveDiscs).toHaveLength(549)
+    expect(store.scanMessage).toContain("已安全导入 549 件")
+    expect(store.scanMessage).toContain("未删除缺失")
+
+    await helper.onDisconnect?.({
+      code: "helper_disconnected",
+      phase: "scan",
+      retainedItems,
+    })
+    expect(store.driveDiscs).toHaveLength(549)
+    expect(store.scanSession.summary.added).toBe(549)
+  })
+
+  it.each(["scanner_process_exited", "helper_disconnected"])(
+    "auto-imports retained items exactly once for %s",
+    async (code) => {
+      const store = useInventoryStore()
+      await store.load()
+      scannerMockState.connectResults.push({ version: "1.3.1", protocolVersion: 4 })
+      await store.openScannerPanel()
+      await store.startScan()
+      const helper = scannerMockState.instances[0]
+      const retainedItems = [scannerDisc(1)]
+
+      if (code === "helper_disconnected") {
+        await helper.onDisconnect?.({ code, phase: "scan", retainedItems })
+      } else {
+        await helper.onError?.({ code, phase: "scan", retainedItems })
+      }
+      await helper.onError?.({ code: "scan_stop_timeout", phase: "scan", retainedItems })
+
+      expect(store.scanStatus).toBe("warning")
+      expect(store.driveDiscs).toHaveLength(1)
+      expect(store.scanSession.imported).toBe(true)
+      expect(store.scanFailure?.code).toBe(code)
+    },
+  )
+
+  it("treats a stream count mismatch as partial and imports without deletion", async () => {
+    const store = useInventoryStore()
+    await store.load()
+    await store.saveDisc({
+      id: "keep-on-mismatch",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 6,
+      rarity: "S",
+      level: 15,
+      maxLevel: 15,
+      mainStat: { stat: "critRate", value: 24 },
+      subStats: [],
+    })
+    scannerMockState.connectResults.push({ version: "1.3.1", protocolVersion: 4 })
+    await store.openScannerPanel()
+    store.scanRemoveMissing = true
+    await store.startScan()
+    const helper = scannerMockState.instances[0]
+
+    await helper.onComplete?.({
+      items: [scannerDisc(1)],
+      itemCount: 2,
+      completed: 2,
+      streamIncomplete: true,
+    })
+
+    expect(store.scanStatus).toBe("warning")
+    expect(store.scanFailure?.code).toBe("scan_result_stream_incomplete")
+    expect(store.driveDiscs.map((disc: any) => disc.id)).toContain("keep-on-mismatch")
+    expect(store.driveDiscs).toHaveLength(2)
+  })
+
+  it("limits complete-scan deletion to S rank and preserves existing A/B discs", async () => {
+    const store = useInventoryStore()
+    await store.load()
+    for (const rarity of ["S", "A", "B"]) {
+      await store.saveDisc({
+        id: `existing-${rarity}`,
+        setId: "woodpecker_electro",
+        setName: "啄木鸟电音",
+        partition: rarity === "S" ? 1 : rarity === "A" ? 2 : 3,
+        rarity,
+        level: rarity === "S" ? 15 : 12,
+        maxLevel: rarity === "S" ? 15 : 12,
+        mainStat: { stat: "hpFlat", value: 2200 },
+        subStats: [],
+      })
+    }
+    scannerMockState.connectResults.push({ version: "1.3.1", protocolVersion: 4 })
+    await store.openScannerPanel()
+    store.scanRemoveMissing = true
+    await store.startScan()
+    const helper = scannerMockState.instances[0]
+
+    await helper.onComplete?.({ items: [scannerDisc(1)], itemCount: 1, completed: 1 })
+
+    expect(store.scanStatus).toBe("complete")
+    expect(store.driveDiscs.map((disc: any) => disc.id)).not.toContain("existing-S")
+    expect(store.driveDiscs.map((disc: any) => disc.id)).toContain("existing-A")
+    expect(store.driveDiscs.map((disc: any) => disc.id)).toContain("existing-B")
+  })
+
+  it("retains scan results when automatic import fails and retries them", async () => {
+    const store = useInventoryStore()
+    await store.load()
+    scannerMockState.connectResults.push({ version: "1.3.1", protocolVersion: 4 })
+    await store.openScannerPanel()
+    await store.startScan()
+    const helper = scannerMockState.instances[0]
+    const originalImport = store.importScannerPayload.bind(store)
+    const importSpy = vi.spyOn(store, "importScannerPayload")
+      .mockRejectedValueOnce(new Error("temporary storage failure"))
+      .mockImplementation(originalImport)
+
+    await helper.onComplete?.({ items: [scannerDisc(1)], itemCount: 1, completed: 1 })
+
+    expect(store.scanFailure?.code).toBe("import_failed")
+    expect(store.scanSession.payload).toHaveLength(1)
+    expect(store.scanSession.imported).toBe(false)
+
+    await store.handleScannerFailureAction("retry_import")
+
+    expect(importSpy).toHaveBeenCalledTimes(2)
+    expect(store.scanStatus).toBe("complete")
+    expect(store.scanSession.imported).toBe(true)
+    expect(store.driveDiscs).toHaveLength(1)
   })
 })

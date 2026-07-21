@@ -46,9 +46,10 @@ test("Helper 1.1.x is offered a takeover upgrade without receiving scanner comma
   await page.getByRole("button", { name: "扫描", exact: true }).click()
 
   await expect(page.getByText("扫描助手版本过低")).toBeVisible()
-  await expect(page.getByText("Helper 1.1.0 需要更新到 1.2.1。下载后运行安装器，它会自动接管当前旧 Helper。")).toBeVisible()
-  await expect(page.getByRole("button", { name: "下载并更新 Helper", exact: true })).toBeVisible()
-  await expect(page.getByRole("button", { name: "重新检测", exact: true })).toBeVisible()
+  await expect(page.getByText("Helper 1.1.0 需要更新到 1.3.1。下载后运行安装器，它会自动接管当前旧 Helper。")).toBeVisible()
+  await expect(page.getByText("错误代码：helper_outdated")).toBeVisible()
+  await expect(page.getByRole("button", { name: "更新 Helper", exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "手动下载", exact: true })).toBeVisible()
   await expect(page.getByText(/Unsupported scanner manifest schema/)).toHaveCount(0)
 
   await page.waitForTimeout(500)
@@ -77,15 +78,15 @@ test("Helper 1.2.0 self-updates, reconnects, and resumes scanner preparation", a
       contentType: "application/json",
       body: JSON.stringify({
         service: "zzz-scanner-helper",
-        version: updated ? "1.2.1" : "1.2.0",
-        protocolVersion: 3,
+        version: updated ? "1.3.1" : "1.2.0",
+        protocolVersion: updated ? 4 : 3,
         scanner: { installed: false },
       }),
     })
   })
 
   await page.routeWebSocket("ws://127.0.0.1:22355/**", socket => {
-    const helloVersion = updated ? "1.2.1" : "1.2.0"
+    const helloVersion = updated ? "1.3.1" : "1.2.0"
     socket.onMessage(message => {
       const envelope = JSON.parse(String(message))
       const command = String(envelope.cmd ?? envelope.command ?? "")
@@ -94,12 +95,12 @@ test("Helper 1.2.0 self-updates, reconnects, and resumes scanner preparation", a
         const requestId = String(envelope.data?.requestId ?? "")
         socket.send(JSON.stringify({
           cmd: "helper_update_progress",
-          data: { requestId, stage: "download", percent: 64, message: "正在下载 Helper 1.2.1..." },
+          data: { requestId, stage: "download", percent: 64, message: "正在下载 Helper 1.3.1..." },
         }))
         updated = true
         socket.send(JSON.stringify({
           cmd: "helper_update_result",
-          data: { requestId, restarting: true, availableVersion: "1.2.1" },
+          data: { requestId, restarting: true, availableVersion: "1.3.1" },
         }))
       } else if (command === "ensure_scanner") {
         socket.send(JSON.stringify({
@@ -114,7 +115,7 @@ test("Helper 1.2.0 self-updates, reconnects, and resumes scanner preparation", a
         data: {
           service: "zzz-scanner-helper",
           version: helloVersion,
-          protocolVersion: 3,
+          protocolVersion: updated ? 4 : 3,
         },
       }))
     }, 0)

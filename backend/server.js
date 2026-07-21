@@ -26,6 +26,7 @@ import {
     loadCurrentUserDriveDiscStore,
     loadUserDriveDiscStore,
     ownerScopedStore,
+    setDriveDiscReservations,
     switchAccount,
     updateAccount,
     upsertDriveDiscLoadout,
@@ -163,6 +164,13 @@ function isRetiredUserDataPath(pathname) {
         || pathname.startsWith("/api/accounts/")
         || pathname === "/api/user-drive-discs"
         || pathname.startsWith("/api/user-drive-discs/")
+        || pathname === "/api/user-drive-disc-reservations"
+        || pathname === "/api/user-drive-disc-loadouts"
+        || pathname.startsWith("/api/user-drive-disc-loadouts/")
+}
+
+function isDevelopmentDriveDiscReservationPath(pathname) {
+    return pathname === "/api/user-drive-disc-reservations"
         || pathname === "/api/user-drive-disc-loadouts"
         || pathname.startsWith("/api/user-drive-disc-loadouts/")
 }
@@ -2072,7 +2080,8 @@ async function routeApi(req, res, pathname, searchParams) {
         return
     }
 
-    if (isRetiredUserDataPath(pathname)) {
+    if (isRetiredUserDataPath(pathname)
+        && (nodeEnv === "production" || !isDevelopmentDriveDiscReservationPath(pathname))) {
         sendJson(res, 410, {
             ok: false,
             error: "User data is stored in the browser locally. This server endpoint is retired.",
@@ -2472,6 +2481,34 @@ async function routeApi(req, res, pathname, searchParams) {
         return
     }
 
+    if (pathname === "/api/user-drive-disc-reservations" && req.method === "POST") {
+        try {
+            const body = await readBody(req)
+            const result = await setDriveDiscReservations(dataDir, JSON.parse(body || "{}"))
+            if (!result.applied) {
+                sendJson(res, 409, {
+                    ok: false,
+                    code: "drive_disc_reservation_conflict",
+                    conflicts: result.conflicts,
+                })
+                return
+            }
+            sendJson(res, 200, {
+                ok: true,
+                applied: true,
+                changedIds: result.changedIds,
+                conflicts: result.conflicts,
+                store: ownerScopedStore(result.store, result.ownerId),
+            })
+        } catch (error) {
+            sendJson(res, 400, {
+                ok: false,
+                error: error instanceof Error ? error.message : String(error),
+            })
+        }
+        return
+    }
+
     if (pathname === "/api/user-drive-disc-loadouts") {
         if (req.method === "GET") {
             const store = await loadCurrentUserDriveDiscStore(dataDir)
@@ -2486,7 +2523,20 @@ async function routeApi(req, res, pathname, searchParams) {
         if (req.method === "POST") {
             try {
                 const body = await readBody(req)
-                const result = await upsertDriveDiscLoadout(dataDir, JSON.parse(body || "{}"))
+                const input = JSON.parse(body || "{}")
+                const loadout = input?.loadout && typeof input.loadout === "object" ? input.loadout : input
+                const result = await upsertDriveDiscLoadout(dataDir, loadout, {
+                    reserveDiscs: input?.reservation?.enabled === true,
+                    allowTransfer: input?.reservation?.allowTransfer === true,
+                })
+                if (!result.applied) {
+                    sendJson(res, 409, {
+                        ok: false,
+                        code: "drive_disc_reservation_conflict",
+                        conflicts: result.conflicts,
+                    })
+                    return
+                }
                 sendJson(res, 200, {
                     ok: true,
                     loadout: result.loadout,
@@ -2515,10 +2565,23 @@ async function routeApi(req, res, pathname, searchParams) {
         if (req.method === "PUT") {
             try {
                 const body = await readBody(req)
+                const input = JSON.parse(body || "{}")
+                const loadout = input?.loadout && typeof input.loadout === "object" ? input.loadout : input
                 const result = await upsertDriveDiscLoadout(dataDir, {
-                    ...JSON.parse(body || "{}"),
+                    ...loadout,
                     id,
+                }, {
+                    reserveDiscs: input?.reservation?.enabled === true,
+                    allowTransfer: input?.reservation?.allowTransfer === true,
                 })
+                if (!result.applied) {
+                    sendJson(res, 409, {
+                        ok: false,
+                        code: "drive_disc_reservation_conflict",
+                        conflicts: result.conflicts,
+                    })
+                    return
+                }
                 sendJson(res, 200, {
                     ok: true,
                     loadout: result.loadout,

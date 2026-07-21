@@ -112,6 +112,13 @@ const themeOverrides: GlobalThemeOverrides = {
         <main class="app-main">
           <RouterView />
         </main>
+        <footer class="site-footer">
+          <a
+            href="https://beian.miit.gov.cn/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >浙ICP备2026054969号-1</a>
+        </footer>
       </div>
     </NMessageProvider>
   </NConfigProvider>
