@@ -19,9 +19,9 @@
         "./1.0.43/ZZZ-Scanner.Next-win-x64-fdd.zip",
         "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.43/ZZZ-Scanner.Next-win-x64-fdd.zip"
       ],
-      "sha256": "d2f6ebe3138c763fb5895955a39099cf9a74e92833f489ee56b95e2563d1f038",
-      "size": 21801889,
-      "expandedSize": 41214139,
+      "sha256": "a8ad3c7f914e843b2763de92c40ba981e6e29431ca6c483ad7177ab9d93b5633",
+      "size": 21804074,
+      "expandedSize": 41224379,
       "entry": "ZZZ-Scanner.Next.exe",
       "files": [
         {
@@ -176,13 +176,13 @@
         },
         {
           "path": "ZZZ-Scanner.Next.dll",
-          "size": 819712,
-          "sha256": "6885a9c6330b0f2d35f6757d25f4d44bb0fbb396c2f45ebd7eadaa6ab69bbd5d"
+          "size": 829952,
+          "sha256": "efc924b4055018d956712600305098fd8670ee47fba97ae83feba96524e82ccd"
         },
         {
           "path": "ZZZ-Scanner.Next.exe",
           "size": 152064,
-          "sha256": "06dd364de22cc9aa0164ee74ecadcfc026cb7597d3753cbf0a0ca6e079b5a770"
+          "sha256": "50e815e68dfb5625951204b55256bda834c04153c94cda6fcbb2f2bffa0af396"
         },
         {
           "path": "ZZZ-Scanner.Next.runtimeconfig.json",
@@ -205,9 +205,9 @@
         "./1.0.43/ZZZ-Scanner.Next-win-x64-self-contained.zip",
         "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.43/ZZZ-Scanner.Next-win-x64-self-contained.zip"
       ],
-      "sha256": "f7918eae3c934af94d0a5bcf14605e8d0b83300ae7a879fa3d25a20122cd2244",
-      "size": 84820697,
-      "expandedSize": 185560367,
+      "sha256": "03270b1e14c55980a37ee9ad2aad0f4b84a65f0ec5c59e22706c8be3ae18c531",
+      "size": 84822882,
+      "expandedSize": 185570607,
       "entry": "ZZZ-Scanner.Next.exe",
       "files": [
         {
@@ -1602,13 +1602,13 @@
         },
         {
           "path": "ZZZ-Scanner.Next.dll",
-          "size": 819712,
-          "sha256": "6885a9c6330b0f2d35f6757d25f4d44bb0fbb396c2f45ebd7eadaa6ab69bbd5d"
+          "size": 829952,
+          "sha256": "efc924b4055018d956712600305098fd8670ee47fba97ae83feba96524e82ccd"
         },
         {
           "path": "ZZZ-Scanner.Next.exe",
           "size": 152064,
-          "sha256": "06dd364de22cc9aa0164ee74ecadcfc026cb7597d3753cbf0a0ca6e079b5a770"
+          "sha256": "50e815e68dfb5625951204b55256bda834c04153c94cda6fcbb2f2bffa0af396"
         },
         {
           "path": "ZZZ-Scanner.Next.runtimeconfig.json",
