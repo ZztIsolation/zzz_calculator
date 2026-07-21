@@ -54,8 +54,31 @@ for (const packageInfo of scannerPackages) {
         throw new Error(`Scanner package ${packageInfo.id} file manifest size mismatch.`)
     }
 }
-if (helperManifestSource.schemaVersion !== 1 || helperManifestSource.version !== "1.2.1") {
-    throw new Error("Helper manifest must use schema 1 and publish Helper 1.2.1.")
+function parseReleaseVersion(value, label) {
+    const text = String(value ?? "").trim()
+    if (!/^\d+\.\d+\.\d+(?:\.\d+)?$/.test(text)) {
+        throw new Error(`${label} must be a numeric release version.`)
+    }
+    return text.split(".").map(part => Number(part))
+}
+
+function versionAtLeast(actual, required) {
+    const left = parseReleaseVersion(actual, "Helper manifest version")
+    const right = parseReleaseVersion(required, "Scanner launcherMinVersion")
+    for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+        const delta = (left[index] ?? 0) - (right[index] ?? 0)
+        if (delta !== 0) return delta > 0
+    }
+    return true
+}
+
+if (helperManifestSource.schemaVersion !== 1) {
+    throw new Error("Helper manifest must use schema 1.")
+}
+if (!versionAtLeast(helperManifestSource.version, scannerManifestSource.launcherMinVersion)) {
+    throw new Error(
+        `Helper ${helperManifestSource.version} does not satisfy Scanner launcherMinVersion ${scannerManifestSource.launcherMinVersion}.`,
+    )
 }
 
 function run(command, args, cwd, extraEnv = {}) {

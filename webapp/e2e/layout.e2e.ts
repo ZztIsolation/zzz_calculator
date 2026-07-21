@@ -157,25 +157,6 @@ test("optimizer and buff configuration use protected field layouts", async ({ pa
 
 test("drive-disc editor and analysis stay inside their modal surfaces", async ({ page }) => {
   test.slow()
-  const layoutDiscs = [1, 2, 3, 4, 5, 6].map(slot => ({
-    id: `layout-disc-${slot}`,
-    ownerId: "default",
-    setId: "woodpecker_electro",
-    setName: "啄木鸟电音",
-    partition: slot,
-    rarity: "S",
-    level: 15,
-    maxLevel: 15,
-    mainStat: { stat: slot === 1 ? "hpFlat" : "atkPct", value: slot === 1 ? 2200 : 30 },
-    subStats: [
-      { stat: "critRate", value: 9.6 },
-      { stat: "critDmg", value: 19.2 },
-      { stat: "atkPct", value: 9 },
-      { stat: "atkFlat", value: 57 },
-    ],
-    source: { sequence: slot },
-    reservedForAgentId: slot === 1 ? "anby_demara" : slot === 2 ? "hoshimi_miyabi" : null,
-  }))
   await page.addInitScript(store => {
     Object.defineProperty(window, "indexedDB", { configurable: true, value: undefined })
     localStorage.setItem("zzz-calculator.userStore.v1", JSON.stringify(store))
@@ -184,82 +165,35 @@ test("drive-disc editor and analysis stay inside their modal surfaces", async ({
     currentOwnerId: "default",
     owners: [{ id: "default", label: "默认用户" }],
     imports: [],
-    driveDiscLoadouts: [{
-      id: "layout-loadout",
+    driveDiscLoadouts: [],
+    driveDiscs: [{
+      id: "layout-disc-1",
       ownerId: "default",
-      name: "响应式完整套装预设",
-      agentId: "anby_demara",
-      driveDiscIdsBySlot: Object.fromEntries(layoutDiscs.map(disc => [String(disc.partition), disc.id])),
-      score: 197608702,
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 1,
+      rarity: "S",
+      level: 15,
+      maxLevel: 15,
+      mainStat: { stat: "hpFlat", value: 2200 },
+      subStats: [
+        { stat: "critRate", value: 9.6 },
+        { stat: "critDmg", value: 19.2 },
+        { stat: "atkPct", value: 9 },
+        { stat: "atkFlat", value: 57 },
+      ],
     }],
-    driveDiscs: layoutDiscs,
   })
 
   await openApp(page, "/discs")
-  await expectStableLayout(page, "loadout-presets")
-  const preset = page.locator(".loadout-visual-card").first()
-  await expect(preset.locator(".disc-slot-card")).toHaveCount(6)
-  await expect(preset).toContainText("评分 197,608,702")
-  await expect(preset).toContainText("扫描 #1")
-  await expect(preset.locator('[data-reservation-state="current"]')).toHaveCount(1)
-  await expect(preset.locator('[data-reservation-state="other"]')).toHaveCount(1)
-  await expect(preset.locator(".disc-reservation-button")).toHaveCount(6)
-  const presetLockSize = await preset.locator(".disc-reservation-button").first().evaluate(element => {
-    const rect = element.getBoundingClientRect()
-    return { width: rect.width, height: rect.height }
-  })
-  expect(presetLockSize).toEqual({ width: 32, height: 32 })
-  await expect(preset).toContainText(/专属\s*1\s*\/\s*6/)
-  await expect(preset.getByRole("button", { name: /整套/ })).toHaveCount(0)
-
-  const publicPresetDisc = preset.locator('.disc-slot-card[data-slot="3"]')
-  await publicPresetDisc.locator(".disc-reservation-button").click()
-  await expect(publicPresetDisc).toHaveAttribute("data-reservation-state", "current")
-  await expect(preset).toContainText(/专属\s*2\s*\/\s*6/)
-
-  const conflictingPresetDisc = preset.locator('.disc-slot-card[data-slot="2"]')
-  await conflictingPresetDisc.locator(".disc-reservation-button").click()
-  const transferModal = page.locator('[data-layout-surface="reservation-conflict"]')
-  await expect(transferModal).toBeVisible()
-  await expectStableLayout(page, "reservation-conflict")
-  await expect(transferModal).toContainText("2号位")
-  await expect(transferModal).toContainText("星见雅")
-  await expect(transferModal).toContainText("安比")
-  await page.getByRole("button", { name: "确认转移", exact: true }).click()
-  await expect(conflictingPresetDisc).toHaveAttribute("data-reservation-state", "current")
-  await expect(preset).toContainText(/专属\s*3\s*\/\s*6/)
-
-  const expectedColumns = (page.viewportSize()?.width ?? 0) > 1100 ? 2 : 1
-  expect(await page.locator(".loadout-visual-grid").evaluate(element => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(expectedColumns)
-  expect(await preset.locator(".loadout-slot-grid").evaluate(element => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe((page.viewportSize()?.width ?? 0) > 680 ? 2 : 1)
-
-  await preset.getByRole("button", { name: "编辑", exact: true }).click()
-  await expectStableLayout(page, "loadout-editor")
-  await page.locator('.loadout-editor-slot-grid .disc-slot-card[data-slot="1"]').click()
-  await expectStableLayout(page, "loadout-drive-disc-picker")
-  await page.getByRole("button", { name: "关闭", exact: true }).click()
-  await page.getByRole("button", { name: "取消", exact: true }).click()
-
   await page.getByTestId("open-drive-disc-editor").click()
   await expectStableLayout(page, "drive-disc-editor")
   await page.getByRole("button", { name: "取消", exact: true }).click()
 
   await openApp(page)
-  await page.locator(".disc-slot-card").filter({ hasText: "3号位" }).first().click()
+  await page.locator(".disc-slot-card").filter({ hasText: "1号位" }).first().click()
   await expectStableLayout(page, "manual-drive-disc-picker")
   await page.locator(".manual-disc-option").first().click()
-  const manualSlot = page.locator('.drive-disc-slot-grid .disc-slot-card[data-slot="3"]')
-  const manualLock = manualSlot.locator(".disc-reservation-button")
-  await expect(manualLock).toBeVisible()
-  expect(await manualLock.evaluate(element => {
-    const rect = element.getBoundingClientRect()
-    return { width: rect.width, height: rect.height }
-  })).toEqual({ width: 32, height: 32 })
-  await manualLock.click()
-  await expect(page.locator('[data-layout-surface="manual-drive-disc-picker"]')).toHaveCount(0)
-  await expect(manualSlot).toHaveAttribute("data-reservation-state", "current")
-  await manualLock.click()
-  await expect(manualSlot).toHaveAttribute("data-reservation-state", "public")
   await page.getByTestId("open-drive-disc-analysis").click()
   await expectStableLayout(page, "drive-disc-analysis")
 })

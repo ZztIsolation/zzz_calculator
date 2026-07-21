@@ -6,6 +6,8 @@ const scannerMockState = vi.hoisted(() => ({
   connectResults: [] as any[],
   ensureResults: [] as any[],
   updateResults: [] as any[],
+  diagnosticsResults: [] as any[],
+  confirmResults: [] as any[],
 }))
 
 vi.mock("@runtime/scanner-bridge.js", () => {
@@ -26,6 +28,7 @@ vi.mock("@runtime/scanner-bridge.js", () => {
     mode = "helper"
     helperVersion = "1.3.1"
     protocolVersion = 4
+    helperUpdate: any = null
     connectCalls = 0
     ensureCalls = 0
     updateCalls = 0
@@ -33,6 +36,7 @@ vi.mock("@runtime/scanner-bridge.js", () => {
     elevatedCalls = 0
     openLogCalls = 0
     diagnosticsCalls = 0
+    confirmCalls = 0
     launchCalls = 0
     disconnectCalls = 0
     stopCalls = 0
@@ -51,6 +55,7 @@ vi.mock("@runtime/scanner-bridge.js", () => {
       const hello = await (result ?? { version: this.helperVersion })
       this.helperVersion = String(hello?.version ?? this.helperVersion)
       this.protocolVersion = Number(hello?.protocolVersion ?? this.protocolVersion)
+      this.helperUpdate = hello?.helperUpdate ?? null
       this.connected = true
       return hello
     }
@@ -90,6 +95,20 @@ vi.mock("@runtime/scanner-bridge.js", () => {
     requestDiagnostics() {
       this.diagnosticsCalls += 1
       this.onDiagnostics?.({ helperVersion: this.helperVersion })
+    }
+
+    async getDiagnostics() {
+      this.diagnosticsCalls += 1
+      const result = scannerMockState.diagnosticsResults.shift()
+      if (result instanceof Error) throw result
+      return await (result ?? { helperVersion: this.helperVersion, protocolVersion: this.protocolVersion })
+    }
+
+    async confirmHelperUpdate(transactionId: string) {
+      this.confirmCalls += 1
+      const result = scannerMockState.confirmResults.shift()
+      if (result instanceof Error) throw result
+      return await (result ?? { committed: true, transactionId })
     }
 
     disconnect() {
@@ -142,6 +161,8 @@ describe("inventory store", () => {
     scannerMockState.connectResults.length = 0
     scannerMockState.ensureResults.length = 0
     scannerMockState.updateResults.length = 0
+    scannerMockState.diagnosticsResults.length = 0
+    scannerMockState.confirmResults.length = 0
     localStorage.clear()
     localStorage.setItem("zzz-calculator.userStore.v1", JSON.stringify({
       version: 1,
@@ -186,62 +207,6 @@ describe("inventory store", () => {
     await store.removeDisc("disc-a")
     expect(store.driveDiscs).toHaveLength(0)
     expect(store.loadouts[0].status).toBe("incomplete")
-  })
-
-  it("keeps reservation conflicts atomic and filters all known and unknown reservations", async () => {
-    const store = useInventoryStore()
-    await store.load()
-    await store.saveDisc({
-      id: "reserved-disc",
-      setId: "woodpecker_electro",
-      setName: "啄木鸟电音",
-      partition: 1,
-      mainStat: { stat: "hpFlat", value: 2200 },
-      subStats: [],
-      level: 15,
-    })
-
-    const assigned = await store.reserveDiscs(["reserved-disc"], "agent-a")
-    expect(assigned.applied).toBe(true)
-    expect(store.driveDiscs[0].reservedForAgentId).toBe("agent-a")
-
-    const blocked = await store.reserveDiscs(["reserved-disc"], "agent-b")
-    expect(blocked.applied).toBe(false)
-    expect(store.driveDiscs[0].reservedForAgentId).toBe("agent-a")
-
-    await store.saveDisc({
-      id: "unknown-reserved-disc",
-      setId: "woodpecker_electro",
-      setName: "啄木鸟电音",
-      partition: 2,
-      mainStat: { stat: "atkFlat", value: 316 },
-      subStats: [],
-      level: 15,
-    })
-    await store.reserveDiscs(["unknown-reserved-disc"], "retired-agent")
-    await store.saveDisc({
-      id: "public-disc",
-      setId: "woodpecker_electro",
-      setName: "啄木鸟电音",
-      partition: 1,
-      mainStat: { stat: "hpFlat", value: 2200 },
-      subStats: [],
-      level: 15,
-    })
-
-    store.reservationFilter = "reserved"
-    expect(store.filteredDriveDiscs.map((disc: any) => disc.id)).toEqual([
-      "reserved-disc",
-      "unknown-reserved-disc",
-    ])
-    store.slotFilter = 2
-    expect(store.filteredDriveDiscs.map((disc: any) => disc.id)).toEqual(["unknown-reserved-disc"])
-    store.slotFilter = 0
-
-    store.reservationFilter = "agent-a"
-    expect(store.filteredDriveDiscs.map((disc: any) => disc.id)).toEqual(["reserved-disc"])
-    store.reservationFilter = "public"
-    expect(store.filteredDriveDiscs.map((disc: any) => disc.id)).toEqual(["public-disc"])
   })
 
   it("does not auto-fill explicit manual or loadout selections", async () => {
@@ -525,7 +490,15 @@ describe("inventory store", () => {
     const store = useInventoryStore()
     scannerMockState.connectResults.push(
       { version: "1.2.0", protocolVersion: 3 },
-      { version: "1.3.1", protocolVersion: 4 },
+      {
+        version: "1.3.1",
+        protocolVersion: 4,
+        helperUpdate: {
+          state: "pending_confirmation",
+          transactionId: "tx-upgrade-1",
+          previousVersion: "1.2.1",
+        },
+      },
     )
     scannerMockState.updateResults.push({ updateAvailable: true, availableVersion: "1.3.1", restarting: true })
 
@@ -534,10 +507,41 @@ describe("inventory store", () => {
 
     const helper = scannerMockState.instances[0]
     expect(helper.updateCalls).toBe(1)
+    expect(helper.diagnosticsCalls).toBe(1)
+    expect(helper.confirmCalls).toBe(1)
     expect(helper.ensureCalls).toBe(1)
     expect(store.scanHelperVersion).toBe("1.3.1")
     expect(store.scanHelperUpgradeMode).toBe("")
     expect(store.scanStatus).toBe("ready")
+  })
+
+  it("does not prepare Scanner when the new Helper transaction cannot be confirmed", async () => {
+    vi.useFakeTimers()
+    const store = useInventoryStore()
+    scannerMockState.connectResults.push(
+      { version: "1.2.1", protocolVersion: 3 },
+      {
+        version: "1.3.1",
+        protocolVersion: 4,
+        helperUpdate: {
+          state: "pending_confirmation",
+          transactionId: "tx-upgrade-failed",
+          previousVersion: "1.2.1",
+        },
+      },
+    )
+    scannerMockState.confirmResults.push(new Error("confirmation rejected"))
+
+    await store.openScannerPanel()
+    await vi.advanceTimersByTimeAsync(3000)
+
+    const helper = scannerMockState.instances[0]
+    expect(helper.updateCalls).toBe(1)
+    expect(helper.diagnosticsCalls).toBe(1)
+    expect(helper.confirmCalls).toBe(1)
+    expect(helper.ensureCalls).toBe(0)
+    expect(store.scanHelperUpgradeMode).toBe("self-update-failed")
+    expect(store.scanFailure?.code).toBe("helper_update_confirmation_failed")
   })
 
   it("offers retry and manual download when protocol v3 self-update fails", async () => {

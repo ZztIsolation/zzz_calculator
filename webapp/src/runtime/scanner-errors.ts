@@ -77,6 +77,10 @@ export const SCANNER_ERROR_CATALOG: Record<string, FailureCatalogEntry> = {
     { kind: "update_helper", label: "重试自动更新" },
     { kind: "download_helper", label: "手动下载" },
   ]),
+  helper_update_confirmation_failed: failure("helper", "扫描助手更新确认失败", "新版 Helper 未通过网页连接确认。", "旧版 Helper 会自动恢复；请等待片刻后重试自动更新。", [
+    { kind: "update_helper", label: "重试自动更新" },
+    { kind: "download_helper", label: "手动下载" },
+  ]),
   protocol_registration_failed: failure("helper", "无法注册自动启动协议", "Windows 不允许 Helper 注册网页自动启动协议。", "可以手动运行 Helper；如需自动唤起，请检查当前用户的注册表策略。", retryConnect),
   unsupported_os: failure("prepare", "Windows 版本不受支持", "当前 Windows 版本低于扫描器要求。", "请升级到 Windows 10 1809 或更高版本。", [{ kind: "open_logs", label: "打开日志" }], { retryable: false }),
   unsupported_arch: failure("prepare", "系统架构不受支持", "当前系统不是受支持的 Windows x64。", "请在 x64 Windows 10 或 Windows 11 上使用扫描器。", [{ kind: "open_logs", label: "打开日志" }], { retryable: false }),

@@ -10,17 +10,10 @@ const catalogFixture = vi.hoisted(() => ({
       id: "woodpecker_electro",
       name: { zhCN: "啄木鸟电音" },
       images: { icon: "/assets/drive-discs/woodpecker_electro.webp" },
-    }, {
-      id: "swing_jazz",
-      name: { zhCN: "摇摆爵士" },
-      images: { icon: "/assets/drive-discs/swing_jazz.webp" },
     }],
   },
   meta: {
-    agents: [
-      { id: "agent-a", name: { zhCN: "角色甲" } },
-      { id: "agent-b", name: { zhCN: "角色乙" } },
-    ],
+    agents: [{ id: "agent-a", name: { zhCN: "测试代理人" } }],
     wEngines: [],
     combatBuffs: [],
     statRules: {
@@ -121,14 +114,10 @@ vi.mock("naive-ui", () => ({
     template: "<div class=\"progress\"></div>",
   },
   NSelect: {
-    props: ["value", "options", "multiple"],
+    props: ["value", "options"],
     emits: ["update:value"],
     template: `
-      <select
-        :value="value"
-        :multiple="multiple !== undefined && multiple !== false"
-        @change="$emit('update:value', multiple !== undefined && multiple !== false ? Array.from($event.target.selectedOptions).map(option => option.value) : $event.target.value)"
-      >
+      <select :value="value" @change="$emit('update:value', $event.target.value)">
         <option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option>
       </select>
     `,
@@ -154,14 +143,14 @@ vi.mock("naive-ui", () => ({
   }),
 }))
 
-function seedInventory(driveDiscs: any[], driveDiscLoadouts: any[] = []) {
+function seedInventory(driveDiscs: any[]) {
   localStorage.setItem("zzz-calculator.userStore.v1", JSON.stringify({
     version: 1,
     currentOwnerId: "default",
     owners: [{ id: "default", label: "默认用户" }],
     imports: [],
     driveDiscs,
-    driveDiscLoadouts,
+    driveDiscLoadouts: [],
   }))
 }
 
@@ -196,26 +185,6 @@ async function setSubStat(wrapper: any, index: number, stat: string, rolls: numb
   await selects[0].setValue(stat)
   await selects[1].setValue(String(rolls))
   return row
-}
-
-function driveDisc(slot: number, overrides: any = {}) {
-  return {
-    id: `preset-disc-${slot}`,
-    ownerId: "default",
-    setId: "woodpecker_electro",
-    setName: "啄木鸟电音",
-    partition: slot,
-    rarity: "S",
-    level: 15,
-    maxLevel: 15,
-    mainStat: { stat: slot === 1 ? "hpFlat" : "atkPct", value: slot === 1 ? 2200 : 30 },
-    subStats: [
-      { stat: "critRate", value: 4.8 },
-      { stat: "critDmg", value: 9.6 },
-    ],
-    source: { sequence: slot + 20 },
-    ...overrides,
-  }
 }
 
 describe("DiscsView", () => {
@@ -292,291 +261,6 @@ describe("DiscsView", () => {
     expect(toolbarButtons
       .filter(item => item.attributes("data-button-type") === "primary")
       .map(item => item.text().trim())).toEqual(["扫描"])
-  })
-
-  it("invalidates stale import previews when the dialog opens or its payload changes", async () => {
-    const wrapper = await mountView()
-    const inventoryStore = useInventoryStore()
-    inventoryStore.importPreview = { summary: { added: 1 } }
-
-    await button(wrapper, "批量导入").trigger("click")
-    await flushPromises()
-    expect(inventoryStore.importPreview).toBeNull()
-    expect(button(wrapper, "确认导入").attributes("disabled")).toBeDefined()
-
-    inventoryStore.importPreview = { summary: { added: 1 } }
-    await wrapper.find(".test-modal input").setValue("[]")
-    await flushPromises()
-    expect(inventoryStore.importPreview).toBeNull()
-    expect(button(wrapper, "确认导入").attributes("disabled")).toBeDefined()
-  })
-
-  it("assigns, blocks, and explicitly transfers a single Drive Disc reservation", async () => {
-    seedInventory([{
-      id: "disc-reserved",
-      ownerId: "default",
-      setId: "woodpecker_electro",
-      setName: "啄木鸟电音",
-      partition: 1,
-      rarity: "S",
-      level: 15,
-      maxLevel: 15,
-      mainStat: { stat: "hpFlat", value: 2200 },
-      subStats: [],
-    }])
-    const wrapper = await mountView()
-
-    await wrapper.find('[aria-label="锁定给角色"]').trigger("click")
-    await wrapper.find('[aria-label="专属角色"]').setValue("agent-a")
-    await button(wrapper, "应用专属").trigger("click")
-    await flushPromises()
-    let store = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
-    expect(store.driveDiscs[0].reservedForAgentId).toBe("agent-a")
-    expect(wrapper.text()).toContain("角色甲")
-
-    await wrapper.find('[aria-label="调整专属角色"]').trigger("click")
-    await wrapper.find('[aria-label="专属角色"]').setValue("agent-b")
-    await button(wrapper, "应用专属").trigger("click")
-    await flushPromises()
-    store = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
-    expect(store.driveDiscs[0].reservedForAgentId).toBe("agent-a")
-    expect(wrapper.text()).toContain("专属角色冲突")
-    expect(wrapper.text()).toContain("角色甲 → 角色乙")
-
-    await button(wrapper, "确认转移").trigger("click")
-    await flushPromises()
-    store = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
-    expect(store.driveDiscs[0].reservedForAgentId).toBe("agent-b")
-  })
-
-  it("locks, releases, and transfers saved-loadout discs only one at a time", async () => {
-    const discs = [1, 2, 3, 4, 5, 6].map(slot => ({
-      id: `loadout-disc-${slot}`,
-      ownerId: "default",
-      setId: "woodpecker_electro",
-      setName: "啄木鸟电音",
-      partition: slot,
-      rarity: "S",
-      level: 15,
-      maxLevel: 15,
-      mainStat: { stat: slot === 1 ? "hpFlat" : "atkPct", value: slot === 1 ? 2200 : 30 },
-      subStats: [],
-      reservedForAgentId: slot === 2 ? "agent-b" : null,
-    }))
-    seedInventory(discs, [{
-      id: "loadout-a",
-      ownerId: "default",
-      name: "角色甲最终套装",
-      agentId: "agent-a",
-      driveDiscIdsBySlot: Object.fromEntries(discs.map(disc => [String(disc.partition), disc.id])),
-      status: "complete",
-      missingSlots: [],
-    }])
-    const wrapper = await mountView()
-    const card = wrapper.get(".loadout-visual-card")
-
-    expect(wrapper.text()).toContain("专属 0 / 6")
-    expect(wrapper.text()).not.toContain("锁定整套")
-    expect(wrapper.text()).not.toContain("补全锁定")
-    expect(wrapper.text()).not.toContain("解除整套")
-
-    await card.get('.disc-slot-card[data-slot="1"] .disc-reservation-button').trigger("click")
-    await flushPromises()
-    let store = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
-    expect(store.driveDiscs.find((disc: any) => disc.partition === 1).reservedForAgentId).toBe("agent-a")
-    expect(store.driveDiscs.find((disc: any) => disc.partition === 2).reservedForAgentId).toBe("agent-b")
-    expect(wrapper.text()).toContain("专属 1 / 6")
-
-    await card.get('.disc-slot-card[data-slot="1"] .disc-reservation-button').trigger("click")
-    await flushPromises()
-    store = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
-    expect(store.driveDiscs.find((disc: any) => disc.partition === 1).reservedForAgentId).toBeNull()
-    expect(wrapper.text()).toContain("专属 0 / 6")
-
-    await card.get('.disc-slot-card[data-slot="2"] .disc-reservation-button').trigger("click")
-    await flushPromises()
-    store = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
-    expect(store.driveDiscs.find((disc: any) => disc.partition === 2).reservedForAgentId).toBe("agent-b")
-    expect(wrapper.text()).toContain("专属角色冲突")
-    expect(wrapper.text()).toContain("角色乙 → 角色甲")
-
-    await button(wrapper, "确认转移").trigger("click")
-    await flushPromises()
-    store = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
-    expect(store.driveDiscs.find((disc: any) => disc.partition === 2).reservedForAgentId).toBe("agent-a")
-    expect(store.driveDiscs.filter((disc: any) => disc.reservedForAgentId).length).toBe(1)
-    expect(wrapper.text()).toContain("专属 1 / 6")
-  })
-
-  it("renders all six preset slots with full details, missing references, score, and reservation ownership", async () => {
-    const discs = [
-      driveDisc(1),
-      driveDisc(2, { reservedForAgentId: "agent-a" }),
-      driveDisc(3, { reservedForAgentId: "agent-b" }),
-      driveDisc(4, { reservedForAgentId: "agent-unknown" }),
-    ]
-    seedInventory(discs, [{
-      id: "visual-loadout",
-      ownerId: "default",
-      name: "角色甲可视套装",
-      agentId: "agent-a",
-      driveDiscIdsBySlot: {
-        1: "preset-disc-1",
-        2: "preset-disc-2",
-        3: "preset-disc-3",
-        4: "preset-disc-4",
-        5: "deleted-disc-5",
-      },
-      score: 197608702,
-    }])
-
-    const wrapper = await mountView()
-    const card = wrapper.get(".loadout-visual-card")
-    const slots = card.findAll(".disc-slot-card")
-
-    expect(slots).toHaveLength(6)
-    expect(card.text()).toContain("评分 197,608,702")
-    expect(slots[0].text()).toContain("1号位 · 啄木鸟电音")
-    expect(slots[0].text()).toContain("生命值 2200")
-    expect(slots[0].text()).toContain("暴击率% 4.8%")
-    expect(slots[0].text()).toContain("S +15")
-    expect(slots[0].text()).toContain("扫描 #21")
-    expect(slots[0].attributes("data-reservation-state")).toBe("public")
-    expect(slots[1].attributes("data-reservation-state")).toBe("current")
-    expect(slots[2].attributes("data-reservation-state")).toBe("other")
-    expect(slots[3].attributes("data-reservation-state")).toBe("unknown")
-    expect(slots[4].text()).toContain("驱动盘已缺失")
-    expect(slots[5].text()).toContain("未选择")
-    expect(card.text()).toContain("当前预设角色 · 角色甲")
-    expect(card.text()).toContain("其他角色 · 角色乙")
-    expect(card.text()).toContain("未知角色（agent-unknown）")
-  })
-
-  it("filters all role-reserved discs including unknown owners", async () => {
-    seedInventory([
-      driveDisc(1, { id: "public-filter-disc", setName: "公共筛选盘" }),
-      driveDisc(2, { id: "known-filter-disc", setName: "已知角色筛选盘", reservedForAgentId: "agent-a" }),
-      driveDisc(3, { id: "unknown-filter-disc", setName: "未知角色筛选盘", reservedForAgentId: "retired-agent" }),
-    ])
-    const wrapper = await mountView()
-    const filter = wrapper.get('[aria-label="专属角色筛选"]')
-
-    expect(filter.findAll("option").map(option => option.text())).toContain("所有角色专属盘")
-    expect(wrapper.text()).toContain("未知角色（retired-agent）")
-
-    await filter.setValue("reserved")
-    expect(wrapper.findAll("tbody tr")).toHaveLength(2)
-    expect(wrapper.text()).toContain("已知角色筛选盘")
-    expect(wrapper.text()).toContain("未知角色筛选盘")
-
-    await filter.setValue("public")
-    expect(wrapper.findAll("tbody tr")).toHaveLength(1)
-    expect(wrapper.text()).toContain("公共筛选盘")
-  })
-
-  it("creates a new preset through six empty visual slots", async () => {
-    const candidate = driveDisc(1)
-    seedInventory([candidate])
-    const wrapper = await mountView()
-
-    await button(wrapper, "新增预设").trigger("click")
-    const editor = wrapper.get('[data-layout-surface="loadout-editor"]')
-    expect(editor.findAll(".disc-slot-card")).toHaveLength(6)
-    expect(editor.text()).toContain("缺失 1、2、3、4、5、6 号位")
-    expect(wrapper.findAll("button").some(item => item.text().trim() === "删除")).toBe(false)
-
-    await editor.get('.disc-slot-card[data-slot="1"]').trigger("click")
-    await wrapper.get(".manual-disc-option").trigger("click")
-    await wrapper.get('[aria-label="套装预设名称"]').setValue("新建可视套装")
-    await button(wrapper, "保存").trigger("click")
-    await flushPromises()
-
-    const store = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
-    expect(store.driveDiscLoadouts).toHaveLength(1)
-    expect(store.driveDiscLoadouts[0].name).toBe("新建可视套装")
-    expect(store.driveDiscLoadouts[0].driveDiscIdsBySlot["1"]).toBe(candidate.id)
-  })
-
-  it("edits a preset through the visual picker while keeping changes in the draft until save", async () => {
-    const original = driveDisc(1)
-    const candidate = driveDisc(1, {
-      id: "candidate-disc-1",
-      setId: "swing_jazz",
-      setName: "摇摆爵士",
-      mainStat: { stat: "hpFlat", value: 2400 },
-      source: { sequence: 88 },
-      reservedForAgentId: "agent-b",
-    })
-    seedInventory([original, candidate], [{
-      id: "editable-loadout",
-      ownerId: "default",
-      name: "待编辑套装",
-      agentId: "agent-a",
-      driveDiscIdsBySlot: { 1: original.id },
-    }])
-    const wrapper = await mountView()
-
-    await button(wrapper, "编辑").trigger("click")
-    await wrapper.get('.loadout-editor-slot-grid .disc-slot-card[data-slot="1"]').trigger("click")
-    expect(wrapper.get('[data-layout-surface="loadout-drive-disc-picker"]').exists()).toBe(true)
-    expect(wrapper.findAll(".manual-disc-option")).toHaveLength(2)
-    expect(wrapper.text()).toContain("其他角色 · 角色乙")
-
-    await wrapper.get('[aria-label="搜索驱动盘"]').setValue("#88")
-    expect(wrapper.findAll(".manual-disc-option")).toHaveLength(1)
-    await wrapper.get('[aria-label*="摇摆爵士"]').trigger("click")
-    await flushPromises()
-    expect(wrapper.find('[data-layout-surface="loadout-drive-disc-picker"]').exists()).toBe(false)
-    expect(wrapper.get('.loadout-editor-slot-grid .disc-slot-card[data-slot="1"]').text()).toContain("摇摆爵士")
-
-    let store = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
-    expect(store.driveDiscLoadouts[0].driveDiscIdsBySlot["1"]).toBe(original.id)
-    expect(store.driveDiscs.find((disc: any) => disc.id === candidate.id).reservedForAgentId).toBe("agent-b")
-
-    await button(wrapper, "取消").trigger("click")
-    await button(wrapper, "编辑").trigger("click")
-    expect(wrapper.get('.loadout-editor-slot-grid .disc-slot-card[data-slot="1"]').text()).toContain("啄木鸟电音")
-
-    await wrapper.get('.loadout-editor-slot-grid .disc-slot-card[data-slot="1"]').trigger("click")
-    await wrapper.get('[aria-label*="摇摆爵士"]').trigger("click")
-    await button(wrapper, "保存").trigger("click")
-    await flushPromises()
-    store = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
-    expect(store.driveDiscLoadouts[0].driveDiscIdsBySlot["1"]).toBe(candidate.id)
-    expect(store.driveDiscs.find((disc: any) => disc.id === candidate.id).reservedForAgentId).toBe("agent-b")
-  })
-
-  it("filters picker candidates by set, main stat, and search and can clear a slot", async () => {
-    const first = driveDisc(4, { id: "filter-first", mainStat: { stat: "critRate", value: 24 } })
-    const second = driveDisc(4, {
-      id: "filter-second",
-      setId: "swing_jazz",
-      setName: "摇摆爵士",
-      mainStat: { stat: "anomalyProficiency", value: 92 },
-      source: { sequence: 99 },
-    })
-    seedInventory([first, second], [{
-      id: "filter-loadout",
-      ownerId: "default",
-      name: "筛选套装",
-      agentId: "agent-a",
-      driveDiscIdsBySlot: { 4: first.id },
-    }])
-    const wrapper = await mountView()
-
-    await button(wrapper, "编辑").trigger("click")
-    await wrapper.get('.loadout-editor-slot-grid .disc-slot-card[data-slot="4"]').trigger("click")
-    await wrapper.get('[aria-label="驱动盘套装筛选"]').setValue(["swing_jazz"])
-    expect(wrapper.findAll(".manual-disc-option")).toHaveLength(1)
-    expect(wrapper.get(".manual-disc-option").text()).toContain("摇摆爵士")
-
-    await wrapper.get('[aria-label="驱动盘套装筛选"]').setValue([])
-    await wrapper.get('[aria-label="驱动盘主词条筛选"]').setValue("critRate")
-    expect(wrapper.findAll(".manual-disc-option")).toHaveLength(1)
-    expect(wrapper.get(".manual-disc-option").text()).toContain("暴击率")
-
-    await button(wrapper, "清空此槽位").trigger("click")
-    expect(wrapper.get('.loadout-editor-slot-grid .disc-slot-card[data-slot="4"]').text()).toContain("未选择")
   })
 
   it("shows the required game display modes and inventory page before scanning", async () => {

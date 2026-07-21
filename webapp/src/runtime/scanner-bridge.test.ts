@@ -75,6 +75,49 @@ describe("ScannerBridge protocol v3 requests", () => {
     bridge._handleMessage({ cmd: "scanner_ready", data: { version: "1.0.43" } })
     await expect(pending).resolves.toMatchObject({ version: "1.0.43" })
   })
+
+  it("verifies diagnostics before confirming a protocol-v4 Helper update transaction", async () => {
+    const { bridge, send } = connectedBridge()
+    bridge._helloData = {
+      version: "1.3.1",
+      protocolVersion: 4,
+      helperUpdate: {
+        state: "pending_confirmation",
+        transactionId: "tx-confirm-1",
+        previousVersion: "1.2.1",
+      },
+    }
+    expect(bridge.helperUpdate).toMatchObject({ transactionId: "tx-confirm-1" })
+
+    const diagnosticsPending = bridge.getDiagnostics()
+    const diagnosticsRequest = JSON.parse(send.mock.calls[0][0])
+    expect(diagnosticsRequest.cmd).toBe("get_diagnostics")
+    bridge._handleMessage({
+      cmd: "helper_diagnostics",
+      data: {
+        requestId: diagnosticsRequest.data.requestId,
+        helperVersion: "1.3.1",
+        protocolVersion: 4,
+      },
+    })
+    await expect(diagnosticsPending).resolves.toMatchObject({ helperVersion: "1.3.1" })
+
+    const confirmPending = bridge.confirmHelperUpdate("tx-confirm-1")
+    const confirmRequest = JSON.parse(send.mock.calls[1][0])
+    expect(confirmRequest).toMatchObject({
+      cmd: "confirm_helper_update",
+      data: { transactionId: "tx-confirm-1" },
+    })
+    bridge._handleMessage({
+      cmd: "helper_update_commit_result",
+      data: {
+        requestId: confirmRequest.data.requestId,
+        transactionId: "tx-confirm-1",
+        committed: true,
+      },
+    })
+    await expect(confirmPending).resolves.toMatchObject({ committed: true, transactionId: "tx-confirm-1" })
+  })
 })
 
 describe("ScannerBridge terminal watchdogs", () => {

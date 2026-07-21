@@ -7,7 +7,6 @@ import {
   importScannerExportToStore,
   loadCurrentUserDriveDiscStore,
   previewScannerExportImport,
-  setDriveDiscReservations,
   upsertDriveDiscLoadout,
   upsertUserDriveDisc,
 } from "@runtime/local-store.js"
@@ -48,7 +47,7 @@ type ScanClient = keyof typeof SCAN_CLIENTS
 type ScanPhase = "a" | "b" | "c" | "d"
 type ScanErrorContext = "" | "prepare" | "scan" | "helper-missing" | "helper-outdated" | "helper-rejected" | "browser-permission" | "browser-websocket" | "game-not-found"
 type ScanErrorVariant = "helper-missing" | "helper-outdated" | "helper-rejected" | "browser-permission" | "browser-websocket" | "prepare-failed" | "scan-failed" | "game-not-found" | "diagnostic-failure"
-type ScanHelperUpgradeMode = "" | "legacy-manual" | "manual-download" | "self-updating" | "awaiting-restart" | "self-update-failed"
+type ScanHelperUpgradeMode = "" | "legacy-manual" | "manual-download" | "self-updating" | "awaiting-restart" | "confirming" | "self-update-failed"
 
 const GAME_NOT_FOUND_PATTERNS = [
   /未找到/,
@@ -241,7 +240,6 @@ export const useInventoryStore = defineStore("inventory", {
     error: "",
     slotFilter: 0,
     mainStatFilter: "",
-    reservationFilter: "",
     search: "",
     importPreview: null as any,
     importSummary: null as any,
@@ -298,16 +296,6 @@ export const useInventoryStore = defineStore("inventory", {
           return false
         }
         if (this.mainStatFilter && disc.mainStat?.stat !== this.mainStatFilter) {
-          return false
-        }
-        if (this.reservationFilter === "public" && disc.reservedForAgentId) {
-          return false
-        }
-        if (this.reservationFilter === "reserved" && !disc.reservedForAgentId) {
-          return false
-        }
-        if (this.reservationFilter && !["public", "reserved"].includes(this.reservationFilter)
-          && disc.reservedForAgentId !== this.reservationFilter) {
           return false
         }
         if (!needle) {
@@ -477,26 +465,11 @@ export const useInventoryStore = defineStore("inventory", {
         mimeType: "application/json;charset=utf-8",
       }
     },
-    async reserveDiscs(discIds: string[], reservedForAgentId: string | null, allowTransfer = false) {
-      const result = await setDriveDiscReservations({
-        ownerId: this.store?.currentOwnerId,
-        discIds,
-        reservedForAgentId,
-        allowTransfer,
-      })
+    async saveLoadout(loadout: any) {
+      const result = await upsertDriveDiscLoadout(normalizeLoadoutDraft(loadout))
       this.store = result.store
-      if (result.applied) {
-        await this.load()
-      }
-      return result
-    },
-    async saveLoadout(loadout: any, options: { reserveDiscs?: boolean; allowTransfer?: boolean } = {}) {
-      const result = await upsertDriveDiscLoadout(normalizeLoadoutDraft(loadout), options)
-      this.store = result.store
-      if (result.applied) {
-        await this.load()
-      }
-      return result
+      await this.load()
+      return result.loadout
     },
     async removeLoadout(id: string) {
       const result = await deleteDriveDiscLoadout(id)
@@ -923,6 +896,45 @@ export const useInventoryStore = defineStore("inventory", {
         }, { phase: "helper", context: "helper-outdated" })
       }
     },
+    async confirmPendingHelperUpdate(hello: any = {}) {
+      const activeScanner = this.ensureScannerBridge()
+      const helperUpdate = hello?.helperUpdate ?? activeScanner.helperUpdate
+      if (helperUpdate?.state !== "pending_confirmation" || !helperUpdate?.transactionId) {
+        return true
+      }
+
+      this.scanHelperUpgradeMode = "confirming"
+      this.scanStatus = "preparing"
+      this.scanProgressPercent = 100
+      this.scanProgressText = "新版 Helper 已启动，正在确认更新..."
+      this.scanMessage = this.scanProgressText
+      try {
+        const diagnostics = await activeScanner.getDiagnostics()
+        const diagnosticVersion = String(diagnostics?.helperVersion ?? "")
+        const diagnosticProtocol = Number(diagnostics?.protocolVersion ?? 0)
+        if (!helperVersionAtLeast(diagnosticVersion) || diagnosticProtocol < 4) {
+          throw new Error(`新版 Helper 自检返回异常版本 ${diagnosticVersion || "unknown"} / 协议 ${diagnosticProtocol || "unknown"}。`)
+        }
+        const result = await activeScanner.confirmHelperUpdate(String(helperUpdate.transactionId))
+        if (!result?.committed || result?.transactionId !== helperUpdate.transactionId) {
+          throw new Error("Helper 更新事务未被确认。")
+        }
+        this.scanProgressText = "Helper 更新已确认，正在准备 OCR 扫描器..."
+        this.scanMessage = this.scanProgressText
+        return true
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        this.scanHelperUpgradeMode = "self-update-failed"
+        this.applyScannerFailure({
+          ...(error && typeof error === "object" ? error : {}),
+          code: "helper_update_confirmation_failed",
+          phase: "helper",
+          message: `Helper 更新确认失败：${message}`,
+          remedy: "旧版 Helper 会自动恢复；请等待片刻后重试自动更新。",
+        }, { phase: "helper", context: "helper-outdated" })
+        return false
+      }
+    },
     async prepareConnectedScanner(hello: any = {}) {
       const activeScanner = this.ensureScannerBridge()
       this.scanConnected = true
@@ -967,6 +979,14 @@ export const useInventoryStore = defineStore("inventory", {
           }, { phase: "helper", context: "helper-outdated" })
           return
         }
+        if (this.scanHelperUpgradeMode === "self-update-failed") {
+          this.applyScannerFailure({
+            code: "helper_update_failed",
+            phase: "helper",
+            message: "Helper 自动更新未完成，旧版 Helper 已恢复或正在恢复。",
+          }, { phase: "helper", context: "helper-outdated" })
+          return
+        }
         if (this.scanHelperCanSelfUpdate) {
           await this.updateOutdatedHelper()
           return
@@ -978,6 +998,10 @@ export const useInventoryStore = defineStore("inventory", {
           message: `Helper ${helperVersion || "旧版"} 需要更新到 ${REQUIRED_HELPER_VERSION}。下载后运行安装器，它会自动接管当前旧 Helper。`,
         }, { phase: "helper", context: "helper-outdated" })
         if (!this.scanPolling) this.startScannerPolling()
+        return
+      }
+
+      if (!await this.confirmPendingHelperUpdate(hello)) {
         return
       }
 

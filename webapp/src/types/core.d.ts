@@ -76,8 +76,7 @@ declare module "@runtime/local-store.js" {
   export function importScannerExportToStore(input: any, options?: any): Promise<any>
   export function upsertUserDriveDisc(driveDisc: any): Promise<any>
   export function deleteUserDriveDisc(id: string): Promise<any>
-  export function setDriveDiscReservations(input: { ownerId?: string; discIds: string[]; reservedForAgentId: string | null; allowTransfer?: boolean }): Promise<any>
-  export function upsertDriveDiscLoadout(loadout: any, options?: { reserveDiscs?: boolean; allowTransfer?: boolean }): Promise<any>
+  export function upsertDriveDiscLoadout(loadout: any): Promise<any>
   export function deleteDriveDiscLoadout(id: string): Promise<any>
 }
 
@@ -188,10 +187,8 @@ declare module "@core/inventory-model.js" {
   export function buildScannerImportPlan(store: any, input: any, options?: any): any
   export function clearOwnerInventory(store: any, ownerId?: string | null): any
   export function upsertDriveDisc(store: any, driveDisc: any, options?: any): any
-  export function setDriveDiscReservations(store: any, input: { ownerId?: string; discIds: string[]; reservedForAgentId: string | null; allowTransfer?: boolean }): any
-  export function driveDiscReservationStateForLoadout(store: any, loadout: any): any
   export function deleteDriveDisc(store: any, id: string): any
-  export function upsertDriveDiscLoadout(store: any, loadout: any, options?: { reserveDiscs?: boolean; allowTransfer?: boolean }): any
+  export function upsertDriveDiscLoadout(store: any, loadout: any): any
   export function deleteDriveDiscLoadout(store: any, id: string): any
   export function accountSummary(store: any): any
   export function createAccount(store: any, account?: any): any
@@ -226,11 +223,14 @@ declare module "@runtime/scanner-bridge.js" {
     readonly protocolVersion: number
     readonly scannerInfo: any
     readonly scannerVersion: string
+    readonly helperUpdate: any
     connect(): Promise<any>
     launchHelper(): void
     getStorageInfo(): Promise<any>
     cleanupStorage(): Promise<any>
     updateHelper(): Promise<any>
+    getDiagnostics(): Promise<any>
+    confirmHelperUpdate(transactionId: string): Promise<any>
     ensureScanner(): Promise<any>
     repairScanner(): Promise<any>
     restartScannerElevated(): Promise<any>

@@ -214,7 +214,6 @@ try {
         "/api/user-drive-discs",
         "/api/user-drive-discs/import/zzz-scanner",
         "/api/user-drive-discs/example",
-        "/api/user-drive-disc-reservations",
         "/api/user-drive-disc-loadouts",
         "/api/user-drive-disc-loadouts/example",
     ]) {

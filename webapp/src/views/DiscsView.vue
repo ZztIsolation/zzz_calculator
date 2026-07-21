@@ -1,17 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue"
 import { NAlert, NButton, NCheckbox, NDrawer, NDrawerContent, NInput, NInputNumber, NModal, NProgress, NSelect, NSpin, NTab, NTabs, NTag, useMessage } from "naive-ui"
-import { Download, FileText, LockKeyhole, Plus, Radar, RefreshCw, Upload } from "lucide-vue-next"
+import { Download, FileText, Plus, Radar, RefreshCw, Upload } from "lucide-vue-next"
 import ConfirmDialog from "@/components/ConfirmDialog.vue"
-import DriveDiscPickerModal from "@/components/DriveDiscPickerModal.vue"
-import DriveDiscSlotCard from "@/components/DriveDiscSlotCard.vue"
 import ImageAvatar from "@/components/ImageAvatar.vue"
 import ScannerErrorState from "@/components/ScannerErrorState.vue"
-import { formatNumber, statLabel, labelOf } from "@/utils/format"
-import { imageForAgent, imageForDriveDiscSet } from "@/utils/assets"
+import { statLabel, labelOf } from "@/utils/format"
+import { imageForDriveDiscSet } from "@/utils/assets"
 import { useCatalogStore } from "@/stores/catalog"
 import { useInventoryStore } from "@/stores/inventory"
-import { driveDiscReservationStateForLoadout } from "@core/inventory-model.js"
 import { scanTelemetryPreferenceEnabled } from "@runtime/scan-telemetry"
 
 const catalogStore = useCatalogStore()
@@ -41,20 +38,10 @@ const selectedDisc = ref<any | null>(null)
 const showDiscEditor = ref(false)
 const discDraft = ref<any>({ mainStat: {}, subStats: [] })
 const confirmDelete = ref(false)
-const showDiscReservation = ref(false)
-const reservationDisc = ref<any | null>(null)
-const reservationAgentId = ref("")
-const reservationSaving = ref(false)
-const showReservationConflict = ref(false)
-const reservationConflicts = ref<any[]>([])
-const pendingReservationAction = ref<any | null>(null)
 
 const showLoadoutEditor = ref(false)
 const loadoutDraft = ref<any>({ driveDiscIdsBySlot: {} })
-const loadoutIsNew = ref(false)
 const deleteLoadoutId = ref("")
-const showLoadoutDiscPicker = ref(false)
-const activeLoadoutDiscSlot = ref(0)
 
 const showImport = ref(false)
 const importText = ref("")
@@ -117,11 +104,11 @@ async function handleScannerError() {
     inventoryStore.waitForManualHelperUpgrade()
     return
   }
-  if (variant === "helper-missing") {
+  if (variant === "helper-rejected") {
     window.open(inventoryStore.scanHelperDownloadUrl, "_blank")
     return
   }
-  if (variant === "helper-rejected") {
+  if (variant === "helper-missing") {
     window.open(inventoryStore.scanHelperDownloadUrl, "_blank")
     return
   }
@@ -166,28 +153,6 @@ const slotTabs = computed(() => [
 
 const setOptions = computed(() => catalogStore.driveDiscSets.map((set: any) => ({ label: labelOf(set), value: set.id })))
 const agentOptions = computed(() => catalogStore.agents.map((agent: any) => ({ label: labelOf(agent), value: agent.id })))
-const reservationFilterOptions = computed(() => {
-  const options = [
-    { label: "全部专属状态", value: "" },
-    { label: "所有角色专属盘", value: "reserved" },
-    { label: "公共驱动盘", value: "public" },
-  ]
-  const ids: string[] = [...new Set<string>(inventoryStore.driveDiscs
-    .map((disc: any) => String(disc.reservedForAgentId ?? "").trim())
-    .filter(Boolean))]
-  for (const id of ids) {
-    options.push({ label: agentName(id), value: id })
-  }
-  return options
-})
-const reservationAgentOptions = computed(() => {
-  const options = [...agentOptions.value]
-  const current = String(reservationDisc.value?.reservedForAgentId ?? "").trim()
-  if (current && !options.some(option => option.value === current)) {
-    options.push({ label: `未知角色（${current}）`, value: current })
-  }
-  return options
-})
 const statOptions = computed(() => Object.entries(catalogStore.meta?.statRules?.statDisplay ?? {})
   .map(([value]) => ({ label: statLabel(value, catalogStore.meta), value }))
   .sort((left, right) => left.label.localeCompare(right.label, "zh-CN")))
@@ -204,7 +169,6 @@ const mainStatOptions = computed(() => {
 const loadoutDeleteTarget = computed(() => inventoryStore.loadouts.find((item: any) => item.id === deleteLoadoutId.value))
 const loadoutMissingSlots = computed(() => [1, 2, 3, 4, 5, 6]
   .filter(slot => !loadoutDraft.value.driveDiscIdsBySlot?.[String(slot)]))
-const loadoutEditorRows = computed(() => loadoutDiscRows(loadoutDraft.value))
 const discEditorValidationMessage = computed(() => validateDiscDraft())
 const discDraftStoragePreview = computed(() => ({
   ...discDraft.value,
@@ -245,133 +209,23 @@ function driveDiscSetName(disc: any) {
   return disc?.setName || labelOf(driveDiscSetForDisc(disc)) || disc?.setId || "未知套装"
 }
 
-function agentForId(agentId: string | null | undefined) {
-  return catalogStore.agents.find((agent: any) => agent.id === agentId)
-}
-
-function agentName(agentId: string | null | undefined) {
-  if (!agentId) return "公共"
-  const agent = agentForId(agentId)
-  return agent ? labelOf(agent) : `未知角色（${agentId}）`
-}
-
-function loadoutAgent(loadout: any) {
-  return agentForId(loadout?.agentId)
-}
-
-function loadoutReservationState(loadout: any) {
-  return driveDiscReservationStateForLoadout(inventoryStore.store, loadout)
-}
-
-function loadoutDiscRows(loadout: any) {
-  const idsBySlot = loadout?.driveDiscIdsBySlot ?? loadout?.idsBySlot ?? {}
-  const ownerId = String(loadout?.ownerId ?? inventoryStore.store?.currentOwnerId ?? "default")
-  return [1, 2, 3, 4, 5, 6].map(slot => {
-    const id = String(idsBySlot[String(slot)] ?? "").trim()
-    const disc = id
-      ? inventoryStore.driveDiscs.find((item: any) =>
-          String(item.id) === id
-          && String(item.ownerId ?? "default") === ownerId
-          && Number(item.partition) === slot)
-      : null
-    return {
-      slot,
-      id,
-      disc: disc ?? null,
-      missingReference: Boolean(id && !disc),
-    }
-  })
-}
-
-function loadoutPresentCount(loadout: any) {
-  return loadoutReservationState(loadout).presentCount
-}
-
-function loadoutScoreText(loadout: any) {
-  if (loadout?.score === null || loadout?.score === undefined || !Number.isFinite(Number(loadout.score))) {
-    return ""
-  }
-  return `评分 ${formatNumber(Number(loadout.score), 0)}`
-}
-
-function openDiscReservation(disc: any) {
-  reservationDisc.value = disc
-  reservationAgentId.value = String(disc?.reservedForAgentId ?? "")
-  showDiscReservation.value = true
-}
-
-function conflictDisc(conflict: any) {
-  return inventoryStore.driveDiscs.find((disc: any) => disc.id === conflict?.discId)
-}
-
-async function commitReservation(action: any, allowTransfer = false) {
-  reservationSaving.value = true
-  try {
-    const result = await inventoryStore.reserveDiscs(action.discIds, action.agentId || null, allowTransfer)
-    if (!result.applied) {
-      pendingReservationAction.value = action
-      reservationConflicts.value = result.conflicts ?? []
-      showReservationConflict.value = true
-      return false
-    }
-    message.success(action.successMessage)
-    showDiscReservation.value = false
-    reservationDisc.value = null
-    return true
-  } catch (error) {
-    message.error(error instanceof Error ? error.message : String(error))
-    return false
-  } finally {
-    reservationSaving.value = false
-  }
-}
-
-async function applyDiscReservation() {
-  if (!reservationDisc.value) return
-  const targetAgentId = reservationAgentId.value || null
-  await commitReservation({
-    kind: "disc",
-    discIds: [reservationDisc.value.id],
-    agentId: targetAgentId,
-    successMessage: targetAgentId
-      ? `已锁定给${agentName(targetAgentId)}`
-      : "已解除角色专属",
-  })
-}
-
-async function togglePresetDiscReservation(disc: any, loadout: any) {
-  const inventoryDisc = inventoryStore.driveDiscs.find((item: any) => item.id === disc?.id)
-  const targetAgentId = String(loadout?.agentId ?? "").trim()
-  if (!inventoryDisc?.id || !targetAgentId) return
-  const currentAgentId = String(inventoryDisc.reservedForAgentId ?? "").trim()
-  const nextAgentId = currentAgentId === targetAgentId ? null : targetAgentId
-  await commitReservation({
-    kind: "disc",
-    discIds: [inventoryDisc.id],
-    agentId: nextAgentId,
-    successMessage: nextAgentId
-      ? `已锁定给${agentName(nextAgentId)}`
-      : "已解除角色专属",
-  })
-}
-
-async function confirmReservationTransfer() {
-  const action = pendingReservationAction.value
-  if (!action) return
-  const applied = await commitReservation(action, true)
-  if (applied) {
-    showReservationConflict.value = false
-    reservationConflicts.value = []
-    pendingReservationAction.value = null
-  }
-}
-
 function driveDiscSetIcon(disc: any) {
   return imageForDriveDiscSet(driveDiscSetForDisc(disc))
 }
 
 function driveDiscIdentityMeta(disc: any) {
   return disc?.source?.sequence ? `#${disc.source.sequence}` : disc?.id
+}
+
+function discOptionLabel(disc: any) {
+  return `${disc.setName || disc.setId} · ${disc.partition}号位 · ${mainStatText(disc)}${disc.source?.sequence ? ` · #${disc.source.sequence}` : ""}`
+}
+
+function discOptionsForSlot(slot: number) {
+  return [
+    { label: "空槽位", value: "" },
+    ...inventoryStore.discOptionsForSlot(slot).map((disc: any) => ({ label: discOptionLabel(disc), value: disc.id })),
+  ]
 }
 
 function defaultMainStatForSlot(slot: number | string) {
@@ -592,61 +446,26 @@ async function deleteSelectedDisc() {
 }
 
 function openNewLoadout() {
-  loadoutIsNew.value = true
   loadoutDraft.value = {
     id: `loadout-${Date.now()}`,
     name: "未命名套装",
     agentId: catalogStore.agents[0]?.id || "",
     driveDiscIdsBySlot: {},
   }
-  activeLoadoutDiscSlot.value = 0
-  showLoadoutDiscPicker.value = false
   showLoadoutEditor.value = true
 }
 
 function openEditLoadout(loadout: any) {
-  loadoutIsNew.value = false
   loadoutDraft.value = JSON.parse(JSON.stringify(loadout))
   loadoutDraft.value.driveDiscIdsBySlot = {
     ...(loadout.idsBySlot ?? {}),
     ...(loadout.driveDiscIdsBySlot ?? {}),
   }
-  activeLoadoutDiscSlot.value = 0
-  showLoadoutDiscPicker.value = false
   showLoadoutEditor.value = true
-}
-
-function openLoadoutDiscPicker(slot: number) {
-  activeLoadoutDiscSlot.value = Number(slot)
-  showLoadoutDiscPicker.value = true
-}
-
-function selectLoadoutDisc(disc: any) {
-  if (!activeLoadoutDiscSlot.value || !disc?.id) return
-  loadoutDraft.value.driveDiscIdsBySlot = {
-    ...(loadoutDraft.value.driveDiscIdsBySlot ?? {}),
-    [String(activeLoadoutDiscSlot.value)]: String(disc.id),
-  }
-  showLoadoutDiscPicker.value = false
-}
-
-function clearLoadoutDiscSlot() {
-  if (!activeLoadoutDiscSlot.value) return
-  const next = { ...(loadoutDraft.value.driveDiscIdsBySlot ?? {}) }
-  delete next[String(activeLoadoutDiscSlot.value)]
-  loadoutDraft.value.driveDiscIdsBySlot = next
-  showLoadoutDiscPicker.value = false
-}
-
-function cancelLoadoutEditor() {
-  showLoadoutDiscPicker.value = false
-  showLoadoutEditor.value = false
 }
 
 async function saveLoadout() {
   await inventoryStore.saveLoadout(loadoutDraft.value)
-  loadoutIsNew.value = false
-  showLoadoutDiscPicker.value = false
   showLoadoutEditor.value = false
 }
 
@@ -685,7 +504,7 @@ const scanControlsDisabled = computed(() => ["scanning", "stopping"].includes(in
 const scanTelemetryEnabled = computed(() => scanTelemetryPreferenceEnabled())
 const scanProgressPercentage = computed(() => Math.min(100, Math.max(0, Math.round(inventoryStore.scanProgressPercent ?? 0))))
 const scanRuntimeStatus = computed(() => {
-  if (!['c', 'd'].includes(inventoryStore.scanPhase)) return ""
+  if (!["c", "d"].includes(inventoryStore.scanPhase)) return ""
   if (!inventoryStore.scanHelperVersion || !inventoryStore.scanScannerVersion) return ""
   return `Helper ${inventoryStore.scanHelperVersion} · Scanner ${inventoryStore.scanScannerVersion} · 后台运行`
 })
@@ -825,7 +644,6 @@ function confirmDangerImport() {
         <div class="toolbar">
           <NInput v-model:value="inventoryStore.search" clearable placeholder="搜索套装、主词条或 ID" style="max-width: 320px" />
           <NSelect v-model:value="inventoryStore.mainStatFilter" clearable :options="inventoryStore.mainStatOptions.map(stat => ({ label: statLabel(stat, catalogStore.meta), value: stat }))" placeholder="主词条" style="max-width: 200px" />
-          <NSelect v-model:value="inventoryStore.reservationFilter" :options="reservationFilterOptions" style="max-width: 220px" aria-label="专属角色筛选" />
           <NTag round>{{ inventoryStore.driveDiscs.length }} 件</NTag>
           <NTag round>{{ inventoryStore.loadouts.length }} 个套装预设</NTag>
         </div>
@@ -860,8 +678,6 @@ function confirmDangerImport() {
                 <th>等级</th>
                 <th>主词条</th>
                 <th>副词条</th>
-                <th>专属角色</th>
-                <th aria-label="操作"></th>
               </tr>
             </thead>
             <tbody>
@@ -879,29 +695,6 @@ function confirmDangerImport() {
                 <td><span class="rarity-pill">{{ disc.rarity || "S" }} +{{ Number(disc.level ?? 0) }}</span></td>
                 <td>{{ mainStatText(disc) }}</td>
                 <td class="muted">{{ subStatText(disc) }}</td>
-                <td>
-                  <div v-if="disc.reservedForAgentId" class="reservation-agent">
-                    <ImageAvatar
-                      :src="imageForAgent(agentForId(disc.reservedForAgentId))"
-                      :name="agentName(disc.reservedForAgentId)"
-                      :size="26"
-                    />
-                    <span>{{ agentName(disc.reservedForAgentId) }}</span>
-                  </div>
-                  <NTag v-else round>公共</NTag>
-                </td>
-                <td>
-                  <NButton
-                    circle
-                    quaternary
-                    size="small"
-                    :title="disc.reservedForAgentId ? '调整专属角色' : '锁定给角色'"
-                    :aria-label="disc.reservedForAgentId ? '调整专属角色' : '锁定给角色'"
-                    @click.stop="openDiscReservation(disc)"
-                  >
-                    <template #icon><LockKeyhole :size="16" /></template>
-                  </NButton>
-                </td>
               </tr>
             </tbody>
           </table>
@@ -916,48 +709,16 @@ function confirmDangerImport() {
         <NButton size="small" @click="openNewLoadout">新增预设</NButton>
       </div>
       <div class="panel-body">
-        <div v-if="inventoryStore.loadouts.length" class="loadout-visual-grid" data-layout-surface="loadout-presets">
-          <article v-for="loadout in inventoryStore.loadouts" :key="loadout.id" class="loadout-visual-card">
+        <div v-if="inventoryStore.loadouts.length" class="entity-grid">
+          <article v-for="loadout in inventoryStore.loadouts" :key="loadout.id" class="panel">
             <div class="panel-header">
-              <div class="loadout-heading-copy">
-                <h3 class="panel-title">{{ loadout.name || loadout.id }}</h3>
-                <div class="reservation-agent loadout-agent">
-                  <ImageAvatar :src="imageForAgent(loadoutAgent(loadout))" :name="agentName(loadout.agentId)" :size="24" />
-                  <span>{{ agentName(loadout.agentId) }}</span>
-                </div>
-              </div>
+              <h3 class="panel-title">{{ loadout.name || loadout.id }}</h3>
+              <NTag :type="loadout.status === 'complete' ? 'success' : 'warning'" round>{{ Object.keys(loadout.driveDiscIdsBySlot ?? loadout.idsBySlot ?? {}).length }} / 6</NTag>
+            </div>
+            <div class="panel-body section-band">
               <div class="chip-row">
-                <NTag :type="loadoutPresentCount(loadout) === 6 ? 'success' : 'warning'" round>{{ loadoutPresentCount(loadout) }} / 6</NTag>
-                <NTag
-                  :type="loadoutReservationState(loadout).reservedCount === 6 ? 'success' : loadoutReservationState(loadout).conflictingCount ? 'error' : 'default'"
-                  round
-                >
-                  专属 {{ loadoutReservationState(loadout).reservedCount }} / 6
-                </NTag>
-                <NTag v-if="loadoutScoreText(loadout)" type="info" round>{{ loadoutScoreText(loadout) }}</NTag>
+                <NTag v-for="slot in [1,2,3,4,5,6]" :key="slot" round>{{ slot }}号位 {{ (loadout.driveDiscIdsBySlot ?? {})[String(slot)] ? '已选' : '空' }}</NTag>
               </div>
-            </div>
-            <div class="loadout-slot-grid">
-              <DriveDiscSlotCard
-                v-for="row in loadoutDiscRows(loadout)"
-                :key="row.slot"
-                class="loadout-slot-card"
-                :slot="row.slot"
-                :disc="row.disc"
-                :drive-disc-sets="catalogStore.driveDiscSets"
-                :meta="catalogStore.meta"
-                :agents="catalogStore.agents"
-                :target-agent-id="loadout.agentId"
-                :missing-reference="row.missingReference"
-                :reservation-busy="reservationSaving"
-                current-reservation-prefix="当前预设角色"
-                show-sequence
-                show-reservation
-                reservation-action
-                @toggle-reservation="togglePresetDiscReservation($event, loadout)"
-              />
-            </div>
-            <div class="loadout-card-footer">
               <NButton size="small" @click="openEditLoadout(loadout)">编辑</NButton>
             </div>
           </article>
@@ -997,7 +758,7 @@ function confirmDangerImport() {
           <div class="metric-value"><NInputNumber v-model:value="discDraft.mainStat.value" :step="0.1" aria-label="驱动盘主词条数值" /></div>
         </div>
         <div class="metric" data-layout-field>
-          <span class="metric-title">物品锁定</span>
+          <span class="metric-title">锁定</span>
           <div class="metric-value"><NCheckbox v-model:checked="discDraft.locked">锁定</NCheckbox></div>
         </div>
       </div>
@@ -1047,58 +808,7 @@ function confirmDangerImport() {
     </template>
   </NModal>
 
-  <NModal v-model:show="showDiscReservation" preset="card" title="设置专属角色" style="width: min(520px, calc(100vw - 16px)); max-width: 520px">
-    <div v-if="reservationDisc" class="section-band">
-      <div class="disc-row-identity">
-        <ImageAvatar :src="driveDiscSetIcon(reservationDisc)" :name="driveDiscSetName(reservationDisc)" :size="44" />
-        <div class="disc-row-meta">
-          <strong>{{ driveDiscSetName(reservationDisc) }} · {{ reservationDisc.partition }}号位</strong>
-          <span>{{ mainStatText(reservationDisc) }}</span>
-        </div>
-      </div>
-      <div class="metric">
-        <span class="metric-title">专属角色</span>
-        <div class="metric-value">
-          <NSelect v-model:value="reservationAgentId" clearable filterable :options="reservationAgentOptions" placeholder="公共驱动盘" aria-label="专属角色" />
-        </div>
-      </div>
-    </div>
-    <template #footer>
-      <div class="drawer-footer">
-        <NButton @click="showDiscReservation = false">取消</NButton>
-        <NButton type="primary" :loading="reservationSaving" @click="applyDiscReservation">
-          {{ reservationAgentId ? '应用专属' : '解除专属' }}
-        </NButton>
-      </div>
-    </template>
-  </NModal>
-
-  <NModal v-model:show="showReservationConflict" preset="card" title="专属角色冲突" style="width: min(720px, calc(100vw - 16px)); max-width: 720px">
-    <div class="section-band ui-layout-scope" data-layout-surface="reservation-conflict">
-      <NAlert type="warning" :show-icon="false">
-        该驱动盘已专属其他角色。确认后将其转移给目标角色，未确认前不会修改任何数据。
-      </NAlert>
-      <div class="reservation-conflict-list">
-        <div v-for="conflict in reservationConflicts" :key="conflict.discId" class="reservation-conflict-row">
-          <div>
-            <strong>{{ driveDiscSetName(conflictDisc(conflict)) }} · {{ conflictDisc(conflict)?.partition }}号位</strong>
-            <span>{{ mainStatText(conflictDisc(conflict)) }}</span>
-          </div>
-          <span>{{ agentName(conflict.currentAgentId) }} → {{ agentName(conflict.requestedAgentId) }}</span>
-        </div>
-      </div>
-    </div>
-    <template #footer>
-      <div class="drawer-footer">
-        <NButton @click="showReservationConflict = false">取消</NButton>
-        <NButton type="primary" :loading="reservationSaving" @click="confirmReservationTransfer">
-          确认转移
-        </NButton>
-      </div>
-    </template>
-  </NModal>
-
-  <NModal v-model:show="showLoadoutEditor" preset="card" title="编辑套装预设" style="width: min(1120px, calc(100vw - 16px)); max-width: 1120px">
+  <NModal v-model:show="showLoadoutEditor" preset="card" title="编辑套装预设" style="width: min(880px, calc(100vw - 16px)); max-width: 880px">
     <div class="section-band ui-layout-scope" data-layout-surface="loadout-editor">
       <div class="metric-grid ui-field-grid">
         <div class="metric" data-layout-field>
@@ -1110,23 +820,11 @@ function confirmDangerImport() {
           <div class="metric-value"><NSelect v-model:value="loadoutDraft.agentId" :options="agentOptions" aria-label="套装预设角色" filterable /></div>
         </div>
       </div>
-      <div class="loadout-editor-slot-grid">
-        <DriveDiscSlotCard
-          v-for="row in loadoutEditorRows"
-          :key="row.slot"
-          :slot="row.slot"
-          :disc="row.disc"
-          :drive-disc-sets="catalogStore.driveDiscSets"
-          :meta="catalogStore.meta"
-          :agents="catalogStore.agents"
-          :target-agent-id="loadoutDraft.agentId"
-          :missing-reference="row.missingReference"
-          :empty-hint="'点击选择当前号位驱动盘'"
-          interactive
-          show-sequence
-          show-reservation
-          @select="openLoadoutDiscPicker"
-        />
+      <div class="metric-grid ui-field-grid">
+        <div v-for="slot in [1,2,3,4,5,6]" :key="slot" class="metric" data-layout-field>
+          <span class="metric-title">{{ slot }}号位</span>
+          <div class="metric-value"><NSelect v-model:value="loadoutDraft.driveDiscIdsBySlot[String(slot)]" clearable filterable :options="discOptionsForSlot(slot)" :aria-label="`${slot}号位驱动盘`" /></div>
+        </div>
       </div>
       <div class="chip-row">
         <NTag :type="loadoutMissingSlots.length ? 'warning' : 'success'" round>
@@ -1136,28 +834,12 @@ function confirmDangerImport() {
     </div>
     <template #footer>
       <div class="drawer-footer">
-        <NButton @click="cancelLoadoutEditor">取消</NButton>
-        <NButton v-if="loadoutDraft.id && !loadoutIsNew" type="error" @click="deleteLoadoutId = loadoutDraft.id">删除</NButton>
+        <NButton @click="showLoadoutEditor = false">取消</NButton>
+        <NButton v-if="loadoutDraft.id" type="error" @click="deleteLoadoutId = loadoutDraft.id">删除</NButton>
         <NButton type="primary" @click="saveLoadout">保存</NButton>
       </div>
     </template>
   </NModal>
-
-  <DriveDiscPickerModal
-    v-model:show="showLoadoutDiscPicker"
-    :slot="activeLoadoutDiscSlot"
-    :discs="inventoryStore.driveDiscs"
-    :selected-id="loadoutDraft.driveDiscIdsBySlot?.[String(activeLoadoutDiscSlot)] ?? ''"
-    :drive-disc-sets="catalogStore.driveDiscSets"
-    :meta="catalogStore.meta"
-    :agents="catalogStore.agents"
-    :target-agent-id="loadoutDraft.agentId"
-    surface="loadout-drive-disc-picker"
-    clear-label="清空此槽位"
-    show-reservation
-    @select="selectLoadoutDisc"
-    @clear="clearLoadoutDiscSlot"
-  />
 
   <NModal v-model:show="showImport" preset="card" title="导入驱动盘 JSON" style="max-width: 760px">
     <div class="section-band">
@@ -1484,126 +1166,6 @@ function confirmDangerImport() {
   font-size: 12px;
 }
 
-.reservation-agent {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.reservation-agent span {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.loadout-agent {
-  margin-top: 6px;
-  color: var(--app-muted);
-  font-size: 12px;
-}
-
-.loadout-visual-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
-  gap: 12px;
-}
-
-.loadout-visual-card {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  min-width: 0;
-  overflow: hidden;
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius);
-  background: var(--app-surface);
-}
-
-.loadout-visual-card > .panel-header {
-  align-items: flex-start;
-}
-
-.loadout-heading-copy {
-  min-width: 0;
-}
-
-.loadout-heading-copy .panel-title {
-  overflow-wrap: anywhere;
-}
-
-.loadout-visual-card > .panel-header > .chip-row {
-  flex: 0 1 auto;
-  justify-content: flex-end;
-}
-
-.loadout-slot-grid,
-.loadout-editor-slot-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  min-width: 0;
-  gap: 10px;
-}
-
-.loadout-slot-grid {
-  padding: 14px 16px;
-}
-
-.loadout-slot-grid :deep(.loadout-slot-card) {
-  grid-template-columns: 44px minmax(0, 1fr);
-}
-
-.loadout-slot-grid :deep(.loadout-slot-card img) {
-  width: 42px;
-  height: 42px;
-}
-
-.loadout-slot-grid :deep(.loadout-slot-card .disc-slot-card-meta) {
-  grid-column: 2;
-  grid-auto-flow: column;
-  justify-content: start;
-  justify-items: start;
-  max-width: 100%;
-}
-
-.loadout-card-footer {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--app-border);
-  background: var(--app-panel-muted);
-}
-
-.reservation-conflict-list {
-  display: grid;
-  gap: 1px;
-  overflow: hidden;
-  border: 1px solid var(--app-border);
-  border-radius: 6px;
-}
-
-.reservation-conflict-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, auto);
-  gap: 16px;
-  align-items: center;
-  padding: 10px 12px;
-  background: var(--app-surface);
-}
-
-.reservation-conflict-row > div {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.reservation-conflict-row span {
-  color: var(--app-muted);
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
-
 .rarity-pill {
   display: inline-flex;
   min-height: 26px;
@@ -1795,11 +1357,6 @@ function confirmDangerImport() {
 }
 
 @media (max-width: 720px) {
-  .reservation-conflict-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
-  }
-
   .inventory-toolbar-header {
     align-items: stretch;
     flex-direction: column;
@@ -1811,36 +1368,6 @@ function confirmDangerImport() {
 
   .inventory-toolbar-actions {
     width: 100%;
-  }
-}
-
-@media (max-width: 1100px) {
-  .loadout-visual-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 680px) {
-  .loadout-slot-grid,
-  .loadout-editor-slot-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .loadout-visual-card > .panel-header {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .loadout-visual-card > .panel-header > .chip-row {
-    justify-content: flex-start;
-  }
-
-  .loadout-card-footer {
-    justify-content: stretch;
-  }
-
-  .loadout-card-footer :deep(.n-button) {
-    flex: 1 1 150px;
   }
 }
 

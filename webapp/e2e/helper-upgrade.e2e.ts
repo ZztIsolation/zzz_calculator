@@ -62,6 +62,7 @@ test("Helper 1.1.x is offered a takeover upgrade without receiving scanner comma
 test("Helper 1.2.0 self-updates, reconnects, and resumes scanner preparation", async ({ page }) => {
   const commands: string[] = []
   let updated = false
+  let updateConfirmed = false
 
   await page.route("http://127.0.0.1:22355/**", async route => {
     const url = new URL(route.request().url())
@@ -81,6 +82,9 @@ test("Helper 1.2.0 self-updates, reconnects, and resumes scanner preparation", a
         version: updated ? "1.3.1" : "1.2.0",
         protocolVersion: updated ? 4 : 3,
         scanner: { installed: false },
+        helperUpdate: updated && !updateConfirmed
+          ? { state: "pending_confirmation", transactionId: "tx-e2e-upgrade", previousVersion: "1.2.0" }
+          : null,
       }),
     })
   })
@@ -102,6 +106,22 @@ test("Helper 1.2.0 self-updates, reconnects, and resumes scanner preparation", a
           cmd: "helper_update_result",
           data: { requestId, restarting: true, availableVersion: "1.3.1" },
         }))
+      } else if (command === "get_diagnostics") {
+        socket.send(JSON.stringify({
+          cmd: "helper_diagnostics",
+          data: { requestId: envelope.data?.requestId, helperVersion: "1.3.1", protocolVersion: 4 },
+        }))
+      } else if (command === "confirm_helper_update") {
+        updateConfirmed = true
+        socket.send(JSON.stringify({
+          cmd: "helper_update_commit_result",
+          data: {
+            requestId: envelope.data?.requestId,
+            transactionId: envelope.data?.transactionId,
+            committed: true,
+            previousVersion: "1.2.0",
+          },
+        }))
       } else if (command === "ensure_scanner") {
         socket.send(JSON.stringify({
           cmd: "scanner_ready",
@@ -116,6 +136,9 @@ test("Helper 1.2.0 self-updates, reconnects, and resumes scanner preparation", a
           service: "zzz-scanner-helper",
           version: helloVersion,
           protocolVersion: updated ? 4 : 3,
+          helperUpdate: updated && !updateConfirmed
+            ? { state: "pending_confirmation", transactionId: "tx-e2e-upgrade", previousVersion: "1.2.0" }
+            : null,
         },
       }))
     }, 0)
@@ -126,6 +149,9 @@ test("Helper 1.2.0 self-updates, reconnects, and resumes scanner preparation", a
 
   await expect(page.getByRole("button", { name: "开始扫描", exact: true })).toBeVisible({ timeout: 15_000 })
   expect(commands.filter(command => command === "update_helper")).toHaveLength(1)
+  expect(commands.filter(command => command === "get_diagnostics")).toHaveLength(1)
+  expect(commands.filter(command => command === "confirm_helper_update")).toHaveLength(1)
   expect(commands.filter(command => command === "ensure_scanner")).toHaveLength(1)
   expect(commands.indexOf("update_helper")).toBeLessThan(commands.indexOf("ensure_scanner"))
+  expect(commands.indexOf("confirm_helper_update")).toBeLessThan(commands.indexOf("ensure_scanner"))
 })

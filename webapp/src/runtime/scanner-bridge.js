@@ -126,6 +126,10 @@ export class ScannerBridge {
         return this._helloData?.scanner ?? {}
     }
 
+    get helperUpdate() {
+        return this._helloData?.helperUpdate ?? null
+    }
+
     get scannerVersion() {
         return String(this.scannerInfo?.version ?? this.scannerInfo?.appVersion ?? "")
     }
@@ -196,6 +200,13 @@ export class ScannerBridge {
         this._send("get_diagnostics", {})
     }
 
+    async getDiagnostics() {
+        if (!this.connected) {
+            await this.connect()
+        }
+        return this._request("get_diagnostics", "helper_diagnostics")
+    }
+
     async getStorageInfo() {
         if (!this.connected) {
             await this.connect()
@@ -220,6 +231,21 @@ export class ScannerBridge {
         return this._request("update_helper", "helper_update_result", {}, 10 * 60 * 1000)
     }
 
+    async confirmHelperUpdate(transactionId) {
+        if (!this.connected) {
+            await this.connect()
+        }
+        if (this._mode !== "helper" || this.protocolVersion < 4) {
+            throw new Error("当前 Helper 不支持更新事务确认。")
+        }
+        return this._request(
+            "confirm_helper_update",
+            "helper_update_commit_result",
+            { transactionId },
+            15_000,
+        )
+    }
+
     _requireProtocolV3() {
         if (this._mode !== "helper" || this.protocolVersion < 3) {
             throw new Error("当前 Helper 不支持存储管理，请先安装 1.2.0 或更高版本。")
@@ -231,10 +257,11 @@ export class ScannerBridge {
         return new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
                 this._requestResolvers.delete(requestId)
-                const code = command === "update_helper" ? "helper_update_failed" : "prepare_failed"
+                const helperUpdateCommand = ["update_helper", "confirm_helper_update"].includes(command)
+                const code = helperUpdateCommand ? "helper_update_failed" : "prepare_failed"
                 reject(Object.assign(new Error("扫描助手响应超时，请重试。"), {
                     code,
-                    phase: command === "update_helper" ? "helper" : "prepare",
+                    phase: helperUpdateCommand ? "helper" : "prepare",
                 }))
             }, timeoutMs)
             this._requestResolvers.set(requestId, { responseCommand, resolve, reject, timer })
