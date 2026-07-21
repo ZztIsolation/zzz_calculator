@@ -2,6 +2,229 @@
 
 # Changelog
 
+## 2026-07-21 - Made Scanner Results Recoverable Across Every Terminal Path
+
+Staged Scanner 1.0.42 and Helper 1.3.1 locally. Official scan requests are now
+fixed to S rank, while imported A/B records remain valid inventory data. The
+Scanner accepts S-rank panels with zero to four contiguous substat pairs; the
+four-substat case retains its existing one-frame fast path, shorter valid tails
+require stability, and incomplete pairs or gaps remain hard failures. A
+non-level-15 stop is evaluated before the triggering item is committed.
+
+The browser requests `stream-items-v1`, buffers every `scan_item` by sequence,
+and treats `scan_complete` as a compact summary. Any error, cancellation,
+process exit, disconnect, or stream-count mismatch automatically imports the
+buffered items without remove-missing synchronization. Terminal processing is
+idempotent, failed imports retain their payload for retry, and complete
+remove-missing scans are scoped to S rank so historical A/B records survive.
+
+Scanner terminal cleanup writes readable `export.json` for complete scans and
+uses an uncancelled `export.partial.json` write for partial or stopped scans.
+Helper raises the legacy message ceiling to 8 MiB for old Scanner compatibility
+and maps message overflow and other transport failures to distinct single
+terminal codes. These versions, packages, and manifests remain local until a
+separate release is explicitly authorized.
+
+## 2026-07-20 - Made Warehouse Detection Independent Of Rarity Colors
+
+Replaced the Scanner readiness contract with semantic warehouse-title evidence
+plus grayscale grid or detail-layout structure. The cyan dismantle button and
+S/A/B rarity colors no longer vote on whether the warehouse is open. Inventory
+counts must reach two-frame consensus before any click or wheel input, while a
+normalized edge baseline blocks later input if the warehouse is closed or
+covered.
+
+Added bounded, privacy-safe diagnostics for warehouse title, grid structure,
+layout structure, and count consensus. The browser now distinguishes a missing
+warehouse page, an unreadable warehouse title, count OCR failure, and warehouse
+context loss. Existing color-profile errors and legacy diagnostic fields remain
+accepted for older Scanner versions; screenshots, OCR text, and actual inventory
+counts remain excluded from telemetry.
+
+## 2026-07-20 - Made Scanner Failures User-Visible And Terminal
+
+Added a single browser-side Scanner failure catalog covering connection, Helper,
+runtime preparation, game preflight, capture, OCR, navigation, process,
+cancellation, completion, and import phases. Every terminal failure is normalized
+to a stable snake-case code plus a Chinese title, reason, remedy, retryability,
+and allowlisted recovery actions. The Scanner error card now displays the public
+error code, labelled reason and solution, optional diagnostic ID, and the exact
+actions supplied by the normalized failure. English-only or legacy errors retain
+their raw text only inside sanitized diagnostics and receive Chinese fallback
+copy for display.
+
+Added bounded terminal behavior for previously indefinite states. Helper launch
+waits at most 60 seconds, Scanner preparation reports a 90-second stall and a
+15-minute hard timeout, protocol-v4 scans send five-second heartbeats, visible
+pages report a 30-second heartbeat loss, Scanner cancels after 180 seconds with
+no progress, and stop requests wait up to 15 seconds for a real terminal event.
+Helper protocol v4 supervises the Scanner child and reports
+`scanner_process_exited` with its exit code and a Helper diagnostic ID. Rejected
+origins now receive a CORS-readable 403 without exposing Helper state, so the
+browser can distinguish `helper_origin_rejected` from a missing Helper.
+
+Classified display layout, inventory-screen preflight, color profile, capture,
+inventory-count OCR, navigation, panel capture, and OCR-worker failures instead
+of collapsing them into `scan_failed`. A completion with failed OCR items now
+becomes `scan_partial_failure`: it is never auto-imported, remove-missing is
+disabled, and the only import action is explicitly non-destructive. Malformed
+completion payloads use `scan_result_invalid`; failed imports retain the Scanner
+payload and expose `retry_import` without requiring another scan. Added
+table-driven catalog tests, fake-clock timeout tests, partial-import tests,
+browser protocol simulations, and Helper/Scanner regression coverage. Source
+versions are staged as Helper 1.3.0 and Scanner 1.0.41; production manifests and
+downloads remain a separate release step.
+
+## 2026-07-20 - Refined Reservations Into Per-Disc Product Controls
+
+Replaced every user-facing whole-loadout reservation action with a prominent
+32-pixel per-disc lock control. Workbench manual schemes, loaded presets, and
+optimizer results reserve against the active Workbench agent, while saved
+loadout previews reserve against the preset agent. Public discs lock directly,
+discs already reserved for the target agent release directly, and reservations
+owned by another or unknown agent require a single-disc transfer confirmation
+that identifies the set, slot, main stat, previous owner, and target owner.
+Lock-button interaction is isolated from the surrounding slot-card selection.
+
+Saved-loadout cards retain `专属 N/6` only as live passive progress. Removed
+lock-complete, complete-lock, release-complete, and save-and-reserve commands
+from product UI, including their batch conflict dialogs. Editors and visual
+pickers continue to display reservation ownership without mutating it. The core,
+browser store, and development API retain their atomic batch operations for
+backward compatibility.
+
+Added `所有角色专属盘` to inventory filters. It matches every non-empty
+`reservedForAgentId`, including IDs absent from the current agent catalog, and
+continues to compose with slot, main-stat, and text filters. Unknown owners now
+use the consistent `未知角色（ID）` fallback. Added shared-card, Workbench,
+preset, inventory-filter, responsive-layout, and accessibility regressions for
+the per-disc-only workflow.
+
+## 2026-07-20 - Prepared Scanner 1.0.40 Visual Failure Diagnostics
+
+Extended the existing schema-v1 scanner telemetry allowlist with optional
+Scanner 1.0.40 preflight and panel-row diagnostics. Accepted values now include
+the preflight state, visual transform class, bounded confidence/delta metrics,
+the first missing ROI key, reference and candidate luminance, the allowed
+luminance difference, and observed/minimum edge density in permille. Browser
+sanitization and server validation enforce matching per-field limits. Raw RGB,
+screenshots, OCR text, inventory contents, and unknown diagnostic keys remain
+excluded, and older Scanner events remain valid without any migration.
+
+Internal scan summaries now aggregate final panel acceptance gates, visual
+transform classes, and first-missing-ROI keys. The operations view presents the
+top values for all three distributions while preserving the existing sanitized
+JSON session detail. Payload coverage verifies the terminal event remains below
+the existing 16 KiB request limit.
+
+Added browser and backend regression coverage for allowed values, out-of-range
+rejection, unknown pixel-field rejection, aggregation, and backward-compatible
+empty diagnostics. This source change does not publish Scanner 1.0.40, change
+Helper 1.2.1, or update the production Scanner manifest from 1.0.39.
+
+## 2026-07-20 - Visualized Saved Drive Disc Loadouts
+
+Replaced the compact saved-loadout slot tags with fully expanded six-slot
+previews. Each slot now shows the Drive Disc set image and name, main and sub
+stats, rarity and level, scan sequence, and whether the physical disc is public,
+reserved for the preset agent, reserved for another known agent, or reserved for
+an unknown agent ID. Missing references and intentionally empty slots use
+different states. Preset headers retain the associated agent, valid-disc count,
+derived reservation count, and any stored historical score. Presets use two
+columns on wide desktops, one column below 1100 pixels, and one-column slot rows
+below 680 pixels.
+
+Rebuilt the loadout editor around the same shared slot card and visual picker
+used by the Workbench manual scheme. Clicking a slot opens a slot-scoped list
+with set, main-stat, and text filters, complete attributes, current-selection
+highlighting, and an explicit clear action. Selections update only the editor
+draft; cancel discards them and save preserves the existing loadout write path.
+Changing the associated agent or manually choosing a disc reserved for another
+agent does not reserve, release, or transfer any disc.
+
+Added component, page-flow, and responsive layout regressions for full and
+partial presets, missing references, reservation labels, filtering, selection,
+clearing, cancel/save behavior, and the Workbench shared-component wiring. This
+change does not modify inventory or loadout schemas, reservation APIs, optimizer
+filtering, historical Top 10 records, or score calculation.
+
+## 2026-07-20 - Distinguished Browser Loopback Permission And Helper Connection Failures
+
+Changed the browser-to-Helper bridge from unstructured connection exceptions to
+stage-aware failures for the loopback permission check, Helper health probe,
+token request, and WebSocket handshake. Chromium browsers are queried for the
+current `loopback-network` permission with the legacy
+`local-network-access` name as a compatibility fallback. Only an explicit
+`denied` result is presented as a permission failure; unsupported permission
+queries and a genuinely unavailable Helper retain the existing launch, legacy,
+and polling behavior.
+
+Added dedicated recovery states for browser permission denial, Helper origin
+rejection, and WebSocket failure. Permission and WebSocket failures no longer
+open the Helper protocol, start an ineffective three-second poll, or suggest
+downloading another Helper. The permission recovery tells the user to allow
+local-device access in the browser's site settings and provides an explicit
+reconnect action. The existing missing/outdated Helper flows remain unchanged.
+
+Extended privacy-limited scanner telemetry with allowlisted connection stage,
+permission name/state, browser product and major version, bridge mode, secure
+context, and coarse exception name fields. Full User-Agent strings remain
+excluded. Connection failures are now recorded even when native scanning never
+starts, and internal summaries aggregate browser/version and connection-stage
+distributions.
+
+Added bridge, store, error-state, telemetry, server-validation, and Playwright
+regressions. Browser simulations cover a permission changing from `prompt` to
+`denied` during the Helper request, an HTTP-successful Helper rejecting the
+token request, and an HTTP-successful Helper whose WebSocket is closed by
+policy. All three cases must render their dedicated recovery state and must not
+fall back to the misleading missing-Helper card.
+
+## 2026-07-20 - Added Agent-Exclusive Drive Disc Reservations
+
+Added a calculator-owned `reservedForAgentId` field to Drive Disc inventory
+records without repurposing the existing imported `locked` or `equippedBy`
+metadata. Legacy browser and server stores normalize missing values to `null`.
+Scanner refreshes preserve an existing local reservation, while native
+`zzz-calculator-drive-disc-export` files retain and restore the field across
+accounts without exporting `ownerId` or derived fingerprints.
+
+Added one atomic shared reservation operation for individual and batch changes.
+It validates every requested disc against the current account, reports the
+original and requested agent for each conflict, and leaves the entire store
+unchanged unless transfer is explicitly allowed. Saving a complete loadout can
+now reserve its six unique, slot-correct discs in the same store write; a
+conflict cannot leave behind a saved-but-unreserved loadout. Production user
+data APIs remain retired because the hosted application stores inventory in the
+browser. The reservation and loadout endpoints are available only outside
+production for self-hosted development and integration verification.
+
+Extended the Drive Disc inventory with a reservation filter, a dedicated
+agent column, single-disc lock controls, and readable public/current/unknown
+agent states. Saved loadout cards now show their associated agent and derived
+reserved count, and complete presets support lock, complete-lock, and release
+actions. The save-current-scheme dialog now separates `仅保存` from
+`保存并锁定`; both single-disc and whole-loadout conflicts show the affected set,
+slot, main stat, previous agent, and target agent before an explicit transfer.
+Incomplete presets cannot be batch reserved, and editing or deleting a preset
+does not silently release its physical discs.
+
+Applied reservations only to automatic optimization, matching the selected
+product scope. A disc remains eligible but not mandatory for its owning agent;
+every other agent removes it before dominance filtering, candidate counts,
+combination estimates, exact enumeration, and Top 10 ranking. Manual selection
+and cross-agent saved-loadout loading remain unchanged. Progress metrics expose
+`excludedByReservation` plus per-slot counts, and an emptied slot reports that
+matching discs are reserved for other agents instead of using the generic
+complete-set shortage message.
+
+Added shared-model, browser-store, component, development-API, import/export,
+scanner-refresh, owner-isolation, optimizer, and Worker-payload regressions.
+Strict optimizer coverage compares the complete ordered Top 10 IDs and scores
+against an explicitly prefiltered inventory, confirms current-agent
+reservations preserve the baseline, and verifies other-agent IDs never leak
+into a result.
+
 ## 2026-07-20 - Added Privacy-Limited Scanner Telemetry And Internal Diagnostics
 
 Added a two-event scanner telemetry lifecycle to the Vue application. Each scan now emits one `started` record and exactly one terminal `completed`, `failed`, `cancelled`, or `import_failed` record after the import outcome is known. The payload is strictly limited to a random browser-local UUID, scan settings, Helper and Scanner versions, duration, aggregate counters, a sanitized error summary, and allowlisted structured diagnostics. Drive Disc arrays, account labels, screenshots, OCR text, local executable/output paths, complete logs, and exception stacks are never included. Collection is enabled by default on the production server, can be disabled or assigned a new anonymous identifier from `/settings`, and silently fails without affecting the scan workflow.

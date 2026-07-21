@@ -266,6 +266,7 @@ function normalizeSettings(input = {}, agent = null) {
     const minimums = settings.minimums ?? settings.minPanel ?? {}
 
     return {
+        agentId: String(input.agentId ?? ""),
         ownerId: String(settings.ownerId ?? input.ownerId ?? "default"),
         objective: settings.objective ?? input.objective ?? "damage",
         algorithm: normalizeAlgorithm(settings.algorithm ?? input.algorithm ?? "exact-super-bound"),
@@ -889,9 +890,9 @@ function applyPreferredMainStatLimits(settings, agent) {
     }
 }
 
-function groupCandidatesBySlot(store, settings, relevantStatIds = null) {
+function groupCandidatesBySlot(store, settings, relevantStatIds = null, reservationMetrics = null) {
     const mainStatLimits = normalizeMainStatLimits(settings.mainStatLimits)
-    const filtered = (store.driveDiscs ?? [])
+    const eligibleBeforeReservation = (store.driveDiscs ?? [])
         .filter(disc => (disc.ownerId ?? "default") === settings.ownerId)
         .filter(disc => Number(disc.partition) >= 1 && Number(disc.partition) <= 6)
         .filter(disc => disc.setId && disc.mainStat?.stat && disc.mainStat?.stat !== "unknown")
@@ -906,6 +907,21 @@ function groupCandidatesBySlot(store, settings, relevantStatIds = null) {
             return disc.setId === settings.fourPieceSetId || twoPieceSetIds.includes(disc.setId)
         })
         .filter(disc => passesMainStatLimit(disc, mainStatLimits))
+    const excludedByReservation = eligibleBeforeReservation.filter(disc => {
+        const reservedForAgentId = String(disc.reservedForAgentId ?? "").trim()
+        return reservedForAgentId && reservedForAgentId !== settings.agentId
+    })
+    if (reservationMetrics) {
+        reservationMetrics.excludedByReservation = excludedByReservation.length
+        reservationMetrics.excludedByReservationBySlot = Object.fromEntries(SLOT_NUMBERS.map(slot => [
+            slot,
+            excludedByReservation.filter(disc => Number(disc.partition) === slot).length,
+        ]))
+    }
+    const filtered = eligibleBeforeReservation.filter(disc => {
+        const reservedForAgentId = String(disc.reservedForAgentId ?? "").trim()
+        return !reservedForAgentId || reservedForAgentId === settings.agentId
+    })
 
     return Object.fromEntries(SLOT_NUMBERS.map(slot => {
         const slotDiscs = filtered
@@ -1249,13 +1265,14 @@ function appliedPreferredSlots(settings = {}) {
         .map(([slot]) => slot)
 }
 
-function createEmptySlotResult(settings, candidatesBySlot, emptySlots, reason = null) {
+function createEmptySlotResult(settings, candidatesBySlot, emptySlots, reason = null, extraMetrics = {}) {
     const estimatedCombinationCount = 0
     return {
         results: [],
         settings,
         metrics: {
             ...algorithmMetricFields(settings.algorithm),
+            ...extraMetrics,
             emptySlots,
             candidateCountsBySlot: candidateCountsBySlot(candidatesBySlot),
             estimatedCombinationCount,
@@ -2887,9 +2904,14 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
         ? new Set(optimizerStatMetadata.relevantStatIds ?? [])
         : null
 
-    let candidatesBySlot = groupCandidatesBySlot(store, settings, relevantStatIds)
+    const reservationMetrics = {
+        excludedByReservation: 0,
+        excludedByReservationBySlot: Object.fromEntries(SLOT_NUMBERS.map(slot => [slot, 0])),
+    }
+    let candidatesBySlot = groupCandidatesBySlot(store, settings, relevantStatIds, reservationMetrics)
     const emptySlots = SLOT_NUMBERS.filter(slot => !candidatesBySlot[String(slot)]?.length)
     reportPrepare("candidates", "正在筛选候选驱动盘", settings, {
+        ...reservationMetrics,
         emptySlots,
         candidateCountsBySlot: candidateCountsBySlot(candidatesBySlot),
         estimatedCombinationCount: 0,
@@ -2897,10 +2919,13 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
         processedCombinationCount: 0,
     })
     if (emptySlots.length) {
-        const reason = hasTwoPieceLimit(settings) ? null : FREE_TWO_PIECE_INSUFFICIENT_REASON
+        const reservationEmptySlots = emptySlots.filter(slot => Number(reservationMetrics.excludedByReservationBySlot[slot] ?? 0) > 0)
+        const reason = reservationEmptySlots.length
+            ? `${reservationEmptySlots.join("、")} 号位符合当前约束的驱动盘均已专属其他角色。`
+            : hasTwoPieceLimit(settings) ? null : FREE_TWO_PIECE_INSUFFICIENT_REASON
         return {
             isEmpty: true,
-            result: createEmptySlotResult(settings, candidatesBySlot, emptySlots, reason),
+            result: createEmptySlotResult(settings, candidatesBySlot, emptySlots, reason, reservationMetrics),
             settings,
         }
     }
@@ -2945,6 +2970,7 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
             candidatesBySlot,
             [],
             FREE_TWO_PIECE_INSUFFICIENT_REASON,
+            reservationMetrics,
         )
         Object.assign(result.metrics, freePlanMetrics, { planBuildMs })
         return {
@@ -3074,6 +3100,7 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
         specializedScoreKernelCache: new Map(),
         metrics: {
             ...algorithmMetricFields(settings.algorithm),
+            ...reservationMetrics,
             emptySlots: [],
             candidateCountsBySlot: candidateCountsBySlot(candidatesBySlot),
             estimatedCombinationCount,
@@ -3211,6 +3238,8 @@ function createTaskOptimizerStateFromBase(baseState, task = {}, input = {}) {
     const estimatedCombinationCount = Number(task.estimatedLeafCount ?? restrictedPlan?.combinationCount ?? 0)
     const metrics = {
         ...algorithmMetricFields("exact-super-bound"),
+        excludedByReservation: Number(baseState.metrics?.excludedByReservation ?? 0),
+        excludedByReservationBySlot: baseState.metrics?.excludedByReservationBySlot ?? {},
         emptySlots: [],
         candidateCountsBySlot: baseState.metrics?.candidateCountsBySlot ?? candidateCountsBySlot(baseState.candidatesBySlot),
         estimatedCombinationCount,

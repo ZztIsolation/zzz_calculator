@@ -132,6 +132,18 @@ export function withDriveDiscFingerprints(disc, options = {}) {
     return next
 }
 
+function cleanReservedForAgentId(value) {
+    const agentId = String(value ?? "").trim()
+    return agentId || null
+}
+
+function normalizeDriveDiscReservation(disc) {
+    return {
+        ...(disc ?? {}),
+        reservedForAgentId: cleanReservedForAgentId(disc?.reservedForAgentId),
+    }
+}
+
 export function createEmptyInventoryStore() {
     return {
         version: 1,
@@ -174,7 +186,7 @@ export function normalizeInventoryStore(store, options = {}) {
         owners: safeOwners,
         imports: Array.isArray(store?.imports) ? store.imports : [],
         driveDiscs: Array.isArray(store?.driveDiscs)
-            ? store.driveDiscs.map(disc => withDriveDiscFingerprints(disc, options))
+            ? store.driveDiscs.map(disc => withDriveDiscFingerprints(normalizeDriveDiscReservation(disc), options))
             : [],
         driveDiscLoadouts: Array.isArray(store?.driveDiscLoadouts) ? store.driveDiscLoadouts : [],
     }
@@ -301,6 +313,7 @@ function normalizeScannerItem(rawItem, index, options, warnings) {
         maxLevel,
         locked: false,
         equippedBy: null,
+        reservedForAgentId: null,
         mainStat: normalizeStat(rawItem["主属性"], warnings, `disc ${sourceSequence} mainStat`),
         subStats: (rawItem["副属性"] ?? []).map((item, subIndex) =>
             normalizeStat(item, warnings, `disc ${sourceSequence} subStat ${subIndex + 1}`)
@@ -498,6 +511,7 @@ function mergeImportedDriveDisc(existing, imported, options) {
         ownerId: existing.ownerId ?? imported.ownerId,
         locked: existing.locked ?? imported.locked ?? false,
         equippedBy: existing.equippedBy ?? imported.equippedBy ?? null,
+        reservedForAgentId: existing.reservedForAgentId ?? imported.reservedForAgentId ?? null,
         ...createdAt,
         updatedAt: nowIso(),
         source: matchedImportSource({
@@ -617,6 +631,9 @@ export function buildScannerImportPlan(currentStore, input, options = {}) {
         deduplicated: 0,
         warnings: normalized.importRecord.warnings ?? [],
     }
+    const removeMissingRarities = Array.isArray(options.removeMissingRarities)
+        ? new Set(options.removeMissingRarities.map(value => String(value).trim().toUpperCase()).filter(Boolean))
+        : null
 
     for (const imported of normalized.driveDiscs) {
         if (nativeImport) {
@@ -683,6 +700,9 @@ export function buildScannerImportPlan(currentStore, input, options = {}) {
 
     if (options.removeMissing) {
         for (const disc of existingSameOwner) {
+            if (removeMissingRarities?.size && !removeMissingRarities.has(String(disc.rarity ?? "").toUpperCase())) {
+                continue
+            }
             if (!matchedExistingIds.has(disc.id) && nextSameOwner.has(disc.id)) {
                 nextSameOwner.delete(disc.id)
                 deletedIds.add(disc.id)
@@ -714,6 +734,7 @@ export function buildScannerImportPlan(currentStore, input, options = {}) {
             ownerId,
             sourcePath: normalized.importRecord.sourcePath,
             removeMissing: Boolean(options.removeMissing),
+            removeMissingRarities: removeMissingRarities ? [...removeMissingRarities] : null,
             currentCount: existingSameOwner.length,
             nextCount: nextSameOwner.size,
             normalizedDiscs: normalized.driveDiscs,
@@ -754,13 +775,82 @@ export function upsertDriveDisc(store, driveDisc, options = {}) {
     const existing = store.driveDiscs ?? []
     const matches = item => item.id === driveDisc.id && (item.ownerId ?? "default") === ownerId
     const index = existing.findIndex(matches)
-    const nextDriveDisc = withDriveDiscFingerprints({ ...driveDisc, ownerId, updatedAt: nowIso() }, options)
+    const currentDriveDisc = index >= 0 ? existing[index] : null
+    const reservedForAgentId = Object.hasOwn(driveDisc, "reservedForAgentId")
+        ? cleanReservedForAgentId(driveDisc.reservedForAgentId)
+        : cleanReservedForAgentId(currentDriveDisc?.reservedForAgentId)
+    const nextDriveDisc = withDriveDiscFingerprints({
+        ...driveDisc,
+        ownerId,
+        reservedForAgentId,
+        updatedAt: nowIso(),
+    }, options)
     return {
         ownerId,
         driveDisc: nextDriveDisc,
         nextStore: {
             ...store,
             driveDiscs: index >= 0 ? existing.map(item => matches(item) ? nextDriveDisc : item) : [...existing, nextDriveDisc],
+        },
+    }
+}
+
+export function setDriveDiscReservations(store, input = {}) {
+    const ownerId = String(input.ownerId ?? store.currentOwnerId ?? "default")
+    const discIds = [...new Set((input.discIds ?? [])
+        .map(id => String(id ?? "").trim())
+        .filter(Boolean))]
+    if (!discIds.length) {
+        throw new Error("At least one Drive Disc id is required.")
+    }
+
+    const targetAgentId = cleanReservedForAgentId(input.reservedForAgentId)
+    const requestedIds = new Set(discIds)
+    const ownerDiscs = (store.driveDiscs ?? [])
+        .filter(disc => (disc.ownerId ?? "default") === ownerId && requestedIds.has(String(disc.id)))
+    const foundIds = new Set(ownerDiscs.map(disc => String(disc.id)))
+    const missingIds = discIds.filter(id => !foundIds.has(id))
+    if (missingIds.length) {
+        throw new Error(`Drive Disc reservation references missing ids: ${missingIds.join(", ")}.`)
+    }
+
+    const conflicts = targetAgentId
+        ? ownerDiscs
+            .filter(disc => cleanReservedForAgentId(disc.reservedForAgentId)
+                && cleanReservedForAgentId(disc.reservedForAgentId) !== targetAgentId)
+            .map(disc => ({
+                discId: String(disc.id),
+                currentAgentId: cleanReservedForAgentId(disc.reservedForAgentId),
+                requestedAgentId: targetAgentId,
+            }))
+        : []
+    if (conflicts.length && input.allowTransfer !== true) {
+        return {
+            ownerId,
+            applied: false,
+            changedIds: [],
+            conflicts,
+            nextStore: store,
+        }
+    }
+
+    const changedIds = ownerDiscs
+        .filter(disc => cleanReservedForAgentId(disc.reservedForAgentId) !== targetAgentId)
+        .map(disc => String(disc.id))
+    const changedIdSet = new Set(changedIds)
+    const updatedAt = nowIso()
+    return {
+        ownerId,
+        applied: true,
+        changedIds,
+        conflicts,
+        nextStore: {
+            ...store,
+            driveDiscs: (store.driveDiscs ?? []).map(disc =>
+                (disc.ownerId ?? "default") === ownerId && changedIdSet.has(String(disc.id))
+                    ? { ...disc, reservedForAgentId: targetAgentId, updatedAt }
+                    : disc
+            ),
         },
     }
 }
@@ -820,22 +910,100 @@ export function normalizeDriveDiscLoadout(loadout, existing = null) {
     }
 }
 
-export function upsertDriveDiscLoadout(store, loadout) {
+function completeLoadoutDiscIds(store, loadout, ownerId) {
+    const entries = [1, 2, 3, 4, 5, 6].map(slot => [slot, loadout.driveDiscIdsBySlot?.[String(slot)]])
+    const missingSlots = entries.filter(([, id]) => !id).map(([slot]) => slot)
+    if (missingSlots.length) {
+        throw new Error(`Cannot reserve an incomplete Drive Disc loadout. Missing slots: ${missingSlots.join(", ")}.`)
+    }
+    const discIds = entries.map(([, id]) => String(id))
+    if (new Set(discIds).size !== discIds.length) {
+        throw new Error("Cannot reserve a Drive Disc loadout that reuses the same disc in multiple slots.")
+    }
+    const ownerDiscs = new Map((store.driveDiscs ?? [])
+        .filter(disc => (disc.ownerId ?? "default") === ownerId)
+        .map(disc => [String(disc.id), disc]))
+    for (const [slot, id] of entries) {
+        const disc = ownerDiscs.get(String(id))
+        if (!disc) {
+            throw new Error(`Cannot reserve Drive Disc loadout: slot ${slot} references missing disc "${id}".`)
+        }
+        if (Number(disc.partition) !== slot) {
+            throw new Error(`Cannot reserve Drive Disc loadout: disc "${id}" does not belong to slot ${slot}.`)
+        }
+    }
+    return discIds
+}
+
+export function driveDiscReservationStateForLoadout(store, loadout) {
+    const ownerId = String(loadout?.ownerId ?? store?.currentOwnerId ?? "default")
+    const idsBySlot = loadout?.driveDiscIdsBySlot ?? loadout?.idsBySlot ?? {}
+    const ownerDiscs = new Map((store?.driveDiscs ?? [])
+        .filter(disc => (disc.ownerId ?? "default") === ownerId)
+        .map(disc => [String(disc.id), disc]))
+    let presentCount = 0
+    let reservedCount = 0
+    let conflictingCount = 0
+    const missingSlots = []
+    for (const slot of [1, 2, 3, 4, 5, 6]) {
+        const id = String(idsBySlot[String(slot)] ?? "").trim()
+        const disc = id ? ownerDiscs.get(id) : null
+        if (!disc || Number(disc.partition) !== slot) {
+            missingSlots.push(slot)
+            continue
+        }
+        presentCount += 1
+        const reservedForAgentId = cleanReservedForAgentId(disc.reservedForAgentId)
+        if (reservedForAgentId === loadout?.agentId) reservedCount += 1
+        else if (reservedForAgentId) conflictingCount += 1
+    }
+    const complete = missingSlots.length === 0
+    return {
+        ownerId,
+        complete,
+        presentCount,
+        reservedCount,
+        conflictingCount,
+        missingSlots,
+        fullyReserved: complete && reservedCount === 6,
+    }
+}
+
+export function upsertDriveDiscLoadout(store, loadout, options = {}) {
     const ownerId = loadout.ownerId ?? store.currentOwnerId
     const existing = store.driveDiscLoadouts ?? []
     const id = String(loadout?.id ?? "").trim() || `loadout-${Date.now()}`
     const matches = item => item.id === id && (item.ownerId ?? "default") === ownerId
     const index = existing.findIndex(matches)
     const nextLoadout = normalizeDriveDiscLoadout({ ...loadout, id, ownerId }, index >= 0 ? existing[index] : null)
+    const storeWithLoadout = {
+        ...store,
+        driveDiscLoadouts: index >= 0
+            ? existing.map(item => matches(item) ? nextLoadout : item)
+            : [...existing, nextLoadout],
+    }
+    if (options.reserveDiscs === true) {
+        const discIds = completeLoadoutDiscIds(store, nextLoadout, ownerId)
+        const reservation = setDriveDiscReservations(storeWithLoadout, {
+            ownerId,
+            discIds,
+            reservedForAgentId: nextLoadout.agentId,
+            allowTransfer: options.allowTransfer === true,
+        })
+        return {
+            ...reservation,
+            ownerId,
+            loadout: nextLoadout,
+            nextStore: reservation.applied ? reservation.nextStore : store,
+        }
+    }
     return {
         ownerId,
+        applied: true,
+        changedIds: [],
+        conflicts: [],
         loadout: nextLoadout,
-        nextStore: {
-            ...store,
-            driveDiscLoadouts: index >= 0
-                ? existing.map(item => matches(item) ? nextLoadout : item)
-                : [...existing, nextLoadout],
-        },
+        nextStore: storeWithLoadout,
     }
 }
 

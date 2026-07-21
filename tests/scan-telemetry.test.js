@@ -22,7 +22,40 @@ function event(eventType, sessionId = "11111111-1111-4111-8111-111111111111") {
         durationMs: eventType === "started" ? undefined : 2500,
         counters: { visited: 10, queued: 10, completed: eventType === "completed" ? 10 : 0, failed: 0 },
         failure: eventType === "failed" ? { code: "scan_failed", phase: "scan", message: "timeout" } : {},
-        diagnostics: eventType === "failed" ? { visibleRois: 10, totalRois: 12, acceptGateReason: "waiting_for_full_roi" } : {},
+        diagnostics: eventType === "failed" ? {
+            visibleRois: 10,
+            totalRois: 12,
+            acceptGateReason: "waiting_for_full_roi",
+            preflightState: "accepted",
+            visualTransformClass: "contrast_shifted",
+            anchorScore: 82,
+            gridScore: 67,
+            warehouseHeaderDetected: true,
+            headerScore: 91,
+            gridStructureScore: 84,
+            layoutScore: 79,
+            inventoryCountDetected: true,
+            countConsensusFrames: 2,
+            hueDelta: 4,
+            saturationDeltaPct: 12,
+            valueDeltaPct: 18,
+            firstMissingRoi: "subStat4",
+            referenceLuma: 22,
+            candidateLuma: 31,
+            lumaDelta: 9,
+            allowedLumaDelta: 18,
+            edgeDensityPermille: 0,
+            minimumEdgeDensityPermille: 3,
+            connectionStage: "websocket",
+            permissionName: "loopback-network",
+            permissionState: "denied",
+            browserName: "Google Chrome",
+            browserMajor: "150",
+            secureContext: true,
+            lastHeartbeatAt: 1753000000000,
+            lastProgressAt: 1753000001000,
+            exitCode: "0xC0000005",
+        } : {},
     }
 }
 
@@ -39,6 +72,20 @@ assert.throws(
 )
 assert.throws(
     () => resolveTelemetryRange({ from: "2026-01-01", to: "2026-02-15" }),
+    ScanTelemetryValidationError,
+)
+assert.throws(
+    () => validateScanTelemetryEvent({
+        ...event("failed"),
+        diagnostics: { ...event("failed").diagnostics, referenceLuma: 256 },
+    }),
+    ScanTelemetryValidationError,
+)
+assert.throws(
+    () => validateScanTelemetryEvent({
+        ...event("failed"),
+        diagnostics: { ...event("failed").diagnostics, sampledColor: "#1f1f1f" },
+    }),
     ScanTelemetryValidationError,
 )
 
@@ -74,10 +121,24 @@ try {
     assert.equal(summary.failed, 1)
     assert.equal(summary.durationMs.p95, 2500)
     assert.equal(summary.versions[0].key, "1.0.39")
+    assert.equal(summary.browsers[0].key, "Google Chrome 150")
+    assert.equal(summary.connectionStages[0].key, "websocket")
+    assert.equal(summary.acceptGateReasons[0].key, "waiting_for_full_roi")
+    assert.equal(summary.visualTransformClasses[0].key, "contrast_shifted")
+    assert.equal(summary.firstMissingRois[0].key, "subStat4")
 
     const failed = await store.sessions(range, { status: "failed" })
     assert.equal(failed.length, 1)
     assert.equal(failed[0].diagnostics.visibleRois, 10)
+    assert.equal(failed[0].diagnostics.firstMissingRoi, "subStat4")
+    assert.equal(failed[0].diagnostics.warehouseHeaderDetected, true)
+    assert.equal(failed[0].diagnostics.headerScore, 91)
+    assert.equal(failed[0].diagnostics.layoutScore, 79)
+    assert.equal(failed[0].diagnostics.countConsensusFrames, 2)
+    assert.equal(failed[0].diagnostics.candidateLuma, 31)
+    assert.equal(failed[0].diagnostics.lastHeartbeatAt, 1753000000000)
+    assert.equal(failed[0].diagnostics.exitCode, "0xC0000005")
+    assert.ok(JSON.stringify(failed[0]).length < 16 * 1024)
     assert.equal((await store.session(range, failed[0].sessionId)).failure.code, "scan_failed")
 
     const firstPage = await store.sessionPage(range, {}, { cursor: 0, limit: 1 })

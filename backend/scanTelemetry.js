@@ -126,7 +126,13 @@ function cleanDiagnostics(value) {
     const allowed = new Set([
         "logicalRow", "visualRow", "column", "maxColumns", "visibleRois", "totalRois", "acceptGateReason",
         "sawPanelChange", "selectionChanged", "stableFrames", "requiredStableFrames", "attempts", "frameCount",
-        "clientWidth", "clientHeight", "dpi", "captureMode", "visualProfileId",
+        "clientWidth", "clientHeight", "dpi", "captureMode", "visualProfileId", "connectionStage", "permissionName",
+        "permissionState", "browserName", "browserMajor", "bridgeMode", "causeName", "secureContext",
+        "preflightState", "visualTransformClass", "anchorScore", "gridScore", "warehouseHeaderDetected",
+        "headerScore", "gridStructureScore", "layoutScore", "inventoryCountDetected", "countConsensusFrames",
+        "hueDelta", "saturationDeltaPct", "valueDeltaPct", "firstMissingRoi", "referenceLuma", "candidateLuma",
+        "lumaDelta", "allowedLumaDelta", "edgeDensityPermille", "minimumEdgeDensityPermille",
+        "lastHeartbeatAt", "lastProgressAt", "exitCode",
     ])
     const input = optionalObject(value, "diagnostics", allowed)
     return {
@@ -148,6 +154,37 @@ function cleanDiagnostics(value) {
         dpi: numberValue(input.dpi, "diagnostics.dpi", { optional: true, max: 1000 }),
         captureMode: stringValue(input.captureMode, "diagnostics.captureMode", 32, { optional: true }),
         visualProfileId: stringValue(input.visualProfileId, "diagnostics.visualProfileId", 100, { optional: true }),
+        preflightState: stringValue(input.preflightState, "diagnostics.preflightState", 32, { optional: true }),
+        visualTransformClass: stringValue(input.visualTransformClass, "diagnostics.visualTransformClass", 32, { optional: true }),
+        anchorScore: numberValue(input.anchorScore, "diagnostics.anchorScore", { optional: true, max: 100 }),
+        gridScore: numberValue(input.gridScore, "diagnostics.gridScore", { optional: true, max: 100 }),
+        warehouseHeaderDetected: booleanValue(input.warehouseHeaderDetected, "diagnostics.warehouseHeaderDetected", { optional: true }),
+        headerScore: numberValue(input.headerScore, "diagnostics.headerScore", { optional: true, max: 100 }),
+        gridStructureScore: numberValue(input.gridStructureScore, "diagnostics.gridStructureScore", { optional: true, max: 100 }),
+        layoutScore: numberValue(input.layoutScore, "diagnostics.layoutScore", { optional: true, max: 100 }),
+        inventoryCountDetected: booleanValue(input.inventoryCountDetected, "diagnostics.inventoryCountDetected", { optional: true }),
+        countConsensusFrames: numberValue(input.countConsensusFrames, "diagnostics.countConsensusFrames", { optional: true, max: 5 }),
+        hueDelta: numberValue(input.hueDelta, "diagnostics.hueDelta", { optional: true, max: 180 }),
+        saturationDeltaPct: numberValue(input.saturationDeltaPct, "diagnostics.saturationDeltaPct", { optional: true, max: 100 }),
+        valueDeltaPct: numberValue(input.valueDeltaPct, "diagnostics.valueDeltaPct", { optional: true, max: 100 }),
+        firstMissingRoi: stringValue(input.firstMissingRoi, "diagnostics.firstMissingRoi", 32, { optional: true }),
+        referenceLuma: numberValue(input.referenceLuma, "diagnostics.referenceLuma", { optional: true, max: 255 }),
+        candidateLuma: numberValue(input.candidateLuma, "diagnostics.candidateLuma", { optional: true, max: 255 }),
+        lumaDelta: numberValue(input.lumaDelta, "diagnostics.lumaDelta", { optional: true, max: 255 }),
+        allowedLumaDelta: numberValue(input.allowedLumaDelta, "diagnostics.allowedLumaDelta", { optional: true, max: 255 }),
+        edgeDensityPermille: numberValue(input.edgeDensityPermille, "diagnostics.edgeDensityPermille", { optional: true, max: 1000 }),
+        minimumEdgeDensityPermille: numberValue(input.minimumEdgeDensityPermille, "diagnostics.minimumEdgeDensityPermille", { optional: true, max: 1000 }),
+        lastHeartbeatAt: numberValue(input.lastHeartbeatAt, "diagnostics.lastHeartbeatAt", { optional: true, max: 10000000000000 }),
+        lastProgressAt: numberValue(input.lastProgressAt, "diagnostics.lastProgressAt", { optional: true, max: 10000000000000 }),
+        exitCode: stringValue(input.exitCode, "diagnostics.exitCode", 32, { optional: true }),
+        connectionStage: stringValue(input.connectionStage, "diagnostics.connectionStage", 32, { optional: true }),
+        permissionName: stringValue(input.permissionName, "diagnostics.permissionName", 40, { optional: true }),
+        permissionState: stringValue(input.permissionState, "diagnostics.permissionState", 20, { optional: true }),
+        browserName: stringValue(input.browserName, "diagnostics.browserName", 40, { optional: true }),
+        browserMajor: stringValue(input.browserMajor, "diagnostics.browserMajor", 8, { optional: true }),
+        bridgeMode: stringValue(input.bridgeMode, "diagnostics.bridgeMode", 20, { optional: true }),
+        causeName: stringValue(input.causeName, "diagnostics.causeName", 40, { optional: true }),
+        secureContext: booleanValue(input.secureContext, "diagnostics.secureContext", { optional: true }),
     }
 }
 
@@ -460,6 +497,11 @@ export class ScanTelemetryStore {
         const versions = new Map()
         const errors = new Map()
         const clients = new Map()
+        const browsers = new Map()
+        const connectionStages = new Map()
+        const acceptGateReasons = new Map()
+        const visualTransformClasses = new Map()
+        const firstMissingRois = new Map()
         let total = 0
         let startedOnly = 0
         let completed = 0
@@ -478,6 +520,22 @@ export class ScanTelemetryStore {
             incrementCount(versions, session.versions?.scannerVersion)
             if (session.failure?.code) incrementCount(errors, session.failure.code)
             incrementCount(clients, session.client)
+            incrementCount(
+                browsers,
+                [session.diagnostics?.browserName, session.diagnostics?.browserMajor].filter(Boolean).join(" "),
+            )
+            if (session.diagnostics?.connectionStage) {
+                incrementCount(connectionStages, session.diagnostics.connectionStage)
+            }
+            if (session.diagnostics?.acceptGateReason) {
+                incrementCount(acceptGateReasons, session.diagnostics.acceptGateReason)
+            }
+            if (session.diagnostics?.visualTransformClass) {
+                incrementCount(visualTransformClasses, session.diagnostics.visualTransformClass)
+            }
+            if (session.diagnostics?.firstMissingRoi) {
+                incrementCount(firstMissingRois, session.diagnostics.firstMissingRoi)
+            }
         })
         return {
             range,
@@ -494,6 +552,11 @@ export class ScanTelemetryStore {
             versions: countEntries(versions),
             errors: countEntries(errors),
             clients: countEntries(clients),
+            browsers: countEntries(browsers),
+            connectionStages: countEntries(connectionStages),
+            acceptGateReasons: countEntries(acceptGateReasons),
+            visualTransformClasses: countEntries(visualTransformClasses),
+            firstMissingRois: countEntries(firstMissingRois),
         }
     }
 

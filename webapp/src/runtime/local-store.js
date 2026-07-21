@@ -11,6 +11,7 @@ import {
     createDriveDiscExport,
     normalizeInventoryStore,
     ownerScopedStore,
+    setDriveDiscReservations as setInventoryDriveDiscReservations,
     switchAccount as switchInventoryAccount,
     updateAccount as updateInventoryAccount,
     upsertDriveDisc,
@@ -209,11 +210,34 @@ export async function deleteUserDriveDisc(id) {
     }
 }
 
-export async function upsertDriveDiscLoadout(loadout) {
+export async function setDriveDiscReservations(input = {}) {
     const store = await loadUserDriveDiscStore()
-    const result = upsertInventoryLoadout(store, loadout)
+    const result = setInventoryDriveDiscReservations(store, input)
+    if (!result.applied) {
+        return {
+            ...result,
+            store: ownerScopedStore(store, result.ownerId),
+        }
+    }
     const saved = await saveUserDriveDiscStore(result.nextStore)
     return {
+        ...result,
+        store: ownerScopedStore(saved, result.ownerId),
+    }
+}
+
+export async function upsertDriveDiscLoadout(loadout, options = {}) {
+    const store = await loadUserDriveDiscStore()
+    const result = upsertInventoryLoadout(store, loadout, options)
+    if (!result.applied) {
+        return {
+            ...result,
+            store: ownerScopedStore(store, result.ownerId),
+        }
+    }
+    const saved = await saveUserDriveDiscStore(result.nextStore)
+    return {
+        ...result,
         store: ownerScopedStore(saved, result.ownerId),
         loadout: result.loadout,
     }
