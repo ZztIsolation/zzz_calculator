@@ -50,10 +50,10 @@ function assertScannerPackageManifest() {
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
     const helperManifest = JSON.parse(readFileSync(join(repoRoot, "config", "helper-manifest.json"), "utf8"))
     assert.equal(manifest.schemaVersion, 3)
-    assert.equal(manifest.launcherMinVersion, "1.2.1")
-    assert.equal(manifest.scannerVersion, "1.0.39")
+    assert.equal(manifest.launcherMinVersion, "1.3.1")
+    assert.equal(manifest.scannerVersion, "1.0.43")
     assert.equal(helperManifest.schemaVersion, 1)
-    assert.equal(helperManifest.version, "1.2.1")
+    assert.equal(helperManifest.version, "1.3.1")
     assert.equal(manifest.support.minWindowsBuild, 17763)
     assert.deepEqual(manifest.support.architectures, ["x64"])
     assert.deepEqual(manifest.packages.map(packageInfo => packageInfo.id), ["win-x64-fdd", "win-x64-self-contained"])
@@ -64,9 +64,9 @@ function assertScannerPackageManifest() {
         assert.ok(packageInfo.size > 0)
         assert.ok(packageInfo.expandedSize >= packageInfo.size)
         assert.equal(packageInfo.entry, "ZZZ-Scanner.Next.exe")
-        assert.ok(packageInfo.packageUrls[0].startsWith("https://download.zzzcaculator.top/downloads/zzz-scanner/1.0.39/"))
-        assert.ok(packageInfo.packageUrls.some(url => url.startsWith("./1.0.39/")))
-        assert.ok(packageInfo.packageUrls.some(url => url.startsWith("https://zzzcaculator.top/downloads/zzz-scanner/1.0.39/")))
+        assert.ok(packageInfo.packageUrls[0].startsWith(`https://download.zzzcaculator.top/downloads/zzz-scanner/${manifest.scannerVersion}/`))
+        assert.ok(packageInfo.packageUrls.some(url => url.startsWith(`./${manifest.scannerVersion}/`)))
+        assert.ok(packageInfo.packageUrls.some(url => url.startsWith(`https://zzzcaculator.top/downloads/zzz-scanner/${manifest.scannerVersion}/`)))
         assert.ok(packageInfo.packageUrls.some(url => url.startsWith("https://github.com/")))
         assert.equal(packageInfo.packageUrls.some(url => url.startsWith("http://121.199.21.10")), false)
         assert.ok(packageInfo.files.length > 0)
@@ -182,6 +182,7 @@ try {
 
     bridge.launchHelper()
     assert.equal(appended.at(-1).src, "zzz-scanner://launch?origin=http%3A%2F%2Flocalhost%3A8787")
+    bridge.disconnect()
 
     globalThis.fetch = async (url) => {
         fetchUrls.push(String(url))
@@ -200,7 +201,13 @@ try {
             queueMicrotask(() => this.onmessage?.({ data: JSON.stringify({ cmd: "hello", data: { ok: true } }) }))
         }
         send(raw) {
-            this.sent.push(JSON.parse(raw))
+            const envelope = JSON.parse(raw)
+            this.sent.push(envelope)
+            if (envelope.cmd === "ensure_scanner") {
+                queueMicrotask(() => this.onmessage?.({
+                    data: JSON.stringify({ cmd: "scanner_ready", data: { installed: true, version: "1.0.43" } }),
+                }))
+            }
         }
         close() {}
     }
@@ -208,7 +215,8 @@ try {
     const readyBridge = new ScannerBridge()
     await readyBridge.connect()
     await readyBridge.ensureScanner()
-    assert.deepEqual(ReadySocket.last.sent, [])
+    assert.deepEqual(ReadySocket.last.sent.map(envelope => envelope.cmd), ["ensure_scanner"])
+    readyBridge.disconnect()
 
     let legacyAttempted = false
     globalThis.fetch = async () => {
@@ -230,6 +238,7 @@ try {
     await legacyBridge.connect()
     assert.equal(legacyBridge.mode, "legacy")
     assert.equal(legacyAttempted, true)
+    legacyBridge.disconnect()
 
     assertScannerPackageManifest()
 } finally {

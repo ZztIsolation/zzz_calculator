@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "version": "1.2.1",
+  "version": "1.3.1",
   "packageUrls": [
-    "https://download.zzzcaculator.top/downloads/zzz-scanner/helper/1.2.1/ZZZ-Scanner-Helper.exe",
-    "https://zzzcaculator.top/downloads/zzz-scanner/helper/1.2.1/ZZZ-Scanner-Helper.exe",
-    "https://github.com/ZztIsolation/zzz_calculator/releases/download/helper-1.2.1/ZZZ-Scanner-Helper.exe"
+    "https://download.zzzcaculator.top/downloads/zzz-scanner/helper/1.3.1/ZZZ-Scanner-Helper.exe",
+    "https://zzzcaculator.top/downloads/zzz-scanner/helper/1.3.1/ZZZ-Scanner-Helper.exe",
+    "https://github.com/ZztIsolation/zzz_calculator/releases/download/helper-1.3.1/ZZZ-Scanner-Helper.exe"
   ],
-  "sha256": "d3c88f1f7556e9bab15f7129e253d2c5527b0f5009a84d52a7a0acd354f326ae",
-  "size": 8137728
+  "sha256": "01f1b5abbe30ecae7668d6339f82eebe8d1c6f91a6dbbbaa8bba5582948ddd0d",
+  "size": 8267264
 }

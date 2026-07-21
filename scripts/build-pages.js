@@ -14,14 +14,10 @@ const rootDir = path.resolve(__dirname, "..")
 const webappDir = path.join(rootDir, "webapp")
 const outDir = path.join(rootDir, "dist", "pages")
 
-const scannerManifestSource = JSON.parse(await readFile(
-    path.join(rootDir, "config", "scanner-manifest.json"),
-    "utf8",
-))
-const helperManifestSource = JSON.parse(await readFile(
-    path.join(rootDir, "config", "helper-manifest.json"),
-    "utf8",
-))
+const scannerManifestPath = path.join(rootDir, "config", "scanner-manifest.json")
+const helperManifestPath = path.join(rootDir, "config", "helper-manifest.json")
+const scannerManifestSource = JSON.parse(await readFile(scannerManifestPath, "utf8"))
+const helperManifestSource = JSON.parse(await readFile(helperManifestPath, "utf8"))
 const scannerVersion = String(scannerManifestSource.scannerVersion)
 const scannerPackages = (scannerManifestSource.packages ?? []).map(packageInfo => {
     const packageUrls = Array.isArray(packageInfo.packageUrls) ? packageInfo.packageUrls : []
@@ -298,8 +294,8 @@ await writeJson(path.join(outDir, "static", "app-config.json"), {
 })
 await ensurePagesScannerPackages()
 
-await writeJson(path.join(outDir, "downloads", "zzz-scanner", "manifest.json"), scannerManifestSource)
-await writeJson(path.join(outDir, "downloads", "zzz-scanner", "helper-manifest.json"), helperManifestSource)
+await copyFile(scannerManifestPath, path.join(outDir, "downloads", "zzz-scanner", "manifest.json"))
+await copyFile(helperManifestPath, path.join(outDir, "downloads", "zzz-scanner", "helper-manifest.json"))
 
 await rm(path.join(outDir, "CNAME"), { force: true })
 await copyFile(path.join(outDir, "index.html"), path.join(outDir, "404.html"))

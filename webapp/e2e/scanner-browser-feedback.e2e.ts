@@ -143,6 +143,13 @@ test("partial OCR completion automatically imports without destructive synchroni
   await page.routeWebSocket("ws://127.0.0.1:22355/**", socket => {
     socket.onMessage(message => {
       const envelope = JSON.parse(String(message))
+      if (envelope.cmd === "ensure_scanner") {
+        socket.send(JSON.stringify({
+          cmd: "scanner_ready",
+          data: { version: "1.0.43", installed: true },
+        }))
+        return
+      }
       if (envelope.cmd !== "scan_req") return
       socket.send(JSON.stringify({
         cmd: "scan_complete",
