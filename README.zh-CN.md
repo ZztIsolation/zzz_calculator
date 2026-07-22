@@ -346,8 +346,8 @@ npm run benchmark:optimizer
       manifest.json
       helper-manifest.json
       helper/1.3.1/ZZZ-Scanner-Helper.exe
-      1.0.43/ZZZ-Scanner.Next-win-x64-fdd.zip
-      1.0.43/ZZZ-Scanner.Next-win-x64-self-contained.zip
+      1.0.45/ZZZ-Scanner.Next-win-x64-fdd.zip
+      1.0.45/ZZZ-Scanner.Next-win-x64-self-contained.zip
 ```
 
 生成包含当前 Git 跟踪源码与 Vue 构建产物的服务器发布包：
@@ -396,11 +396,11 @@ manifest，以及可用时经过校验的当前扫描器双包。产物明确不
 
 驱动盘扫描流程依赖一个注册 `zzz-scanner://` 协议的本地小助手。小助手在 `127.0.0.1:22355` 与网页通信，读取 `/downloads/zzz-scanner/manifest.json` 并准备 ZZZ Scanner Next。
 
-当前支持的 OCR 运行时为 ZZZ Scanner Next `1.0.43`，Helper 为 `1.3.1`、协议为 v4。正式支持 Windows 10 1809（Build 17763）及以上 x64 和 Windows 11 x64，包括 N 版与 LTSC；x86、ARM64 和 Windows 7 不在当前承诺范围。1.0.43 会返回 ROI 完整度、最后接受门槛、稳定帧、窗口尺寸、DPI、捕获后端、视觉配置和扫描生命周期等结构化诊断；这些字段可以进入上述脱敏摘要，截图与 OCR 文本仍留在本机。
+当前支持的 OCR 运行时为 ZZZ Scanner Next `1.0.45`，Helper 为 `1.3.1`、协议为 v4。正式支持 Windows 10 1809（Build 17763）及以上 x64 和 Windows 11 x64，包括 N 版与 LTSC；x86、ARM64 和 Windows 7 不在当前承诺范围。1.0.45 会在前两件驱动盘进入 OCR 前执行事务式验证；二者详情无法区分时会在当前视口寻找不同见证盘，同时继续返回 ROI 完整度、最后接受门槛、稳定帧、窗口尺寸、DPI、捕获后端、视觉配置和扫描生命周期等结构化诊断。这些字段可以进入上述脱敏摘要，截图与 OCR 文本仍留在本机。
 
 schema v3 manifest 同时发布 framework-dependent 与 self-contained 包，并固定包大小、包 SHA-256 及每个安装文件的大小和哈希。Helper 检测到 .NET 8 Desktop Runtime 时选择较小包；未检测到或结果不确定时自动使用自包含兼容包，不安装 .NET、不修改系统。新 Scanner 完成本地握手后，Helper 会删除安装 ZIP 和所有非活动 runtime，只保留当前 runtime、最近一次成功扫描产物和最近一次失败诊断。网页按结构化错误码显示磁盘不足、下载/校验/解压失败、原生 DLL 缺失、端口占用、游戏未启动、权限不匹配和 UAC 取消等具体原因，并提供重试、修复、打开日志或按需提权动作。
 
-Helper `1.3.1` / 协议 v4 与 Scanner `1.0.43` 已是当前正式发布版本。它们把错误协议扩展到完整扫描生命周期，并把官方扫描固定为 S 级任意等级、0-4 条连续副词条。网页逐件缓存 `scan_item`；正常完成、部分 OCR 失败、主动停止、Scanner 退出或连接断开时，只要已有有效结果就会自动安全导入，且部分结果绝不执行“同步删除缺失”。完整 S 级扫描的同步删除也只作用于 S 级，仓库已有 A/B 数据不受影响。Scanner 源码、标签、构建和主 Release 由 [ZZZ-Scanner.Next 仓库](https://github.com/ZztIsolation/ZZZ-Scanner.Next)负责；本计算器消费已发布 manifest，并保留既有 Release 镜像用于兼容当前线上版本。
+Helper `1.3.1` / 协议 v4 与 Scanner `1.0.45` 已是当前正式发布版本。它们把错误协议扩展到完整扫描生命周期，并把官方扫描固定为 S 级任意等级、0-4 条连续副词条。网页逐件缓存 `scan_item`；正常完成、部分 OCR 失败、主动停止、Scanner 退出或连接断开时，只要已有有效结果就会自动安全导入，且部分结果绝不执行“同步删除缺失”。完整 S 级扫描的同步删除也只作用于 S 级，仓库已有 A/B 数据不受影响。Scanner 源码、标签、构建和主 Release 由 [ZZZ-Scanner.Next 仓库](https://github.com/ZztIsolation/ZZZ-Scanner.Next)负责；本计算器消费已发布 manifest，并保留既有 Release 镜像用于兼容当前线上版本。
 
 公开 `/settings` 设置页把网页数据与扫描器文件分开管理。“清除网页数据”只删除计算器 IndexedDB 和本地配置；“释放扫描器空间”由 Helper 删除旧 runtime、临时安装包、残留下载和多余产物，不卸载当前可用 Scanner。Helper `1.3.1` 固定安装到 `%LOCALAPPDATA%\ZZZScannerNext\helper` 并支持校验后的事务式原位自更新。从 Helper `1.1.x` 升级时，在网页点击“下载并更新 Helper”，运行下载文件并确认一次接管即可；安装器会在唯一验证旧进程后自动关闭旧 Helper、安装托管副本并重启。Helper `1.2.0` 及以后版本由协议 v3 或 v4 自动更新。
 
