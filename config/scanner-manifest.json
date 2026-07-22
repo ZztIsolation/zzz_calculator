@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "launcherMinVersion": "1.3.1",
-  "scannerVersion": "1.0.43",
+  "scannerVersion": "1.0.45",
   "support": {
     "os": "windows",
     "architectures": [
@@ -14,14 +14,14 @@
       "id": "win-x64-fdd",
       "mode": "framework-dependent",
       "packageUrls": [
-        "https://download.zzzcaculator.top/downloads/zzz-scanner/1.0.43/ZZZ-Scanner.Next-win-x64-fdd.zip",
-        "https://zzzcaculator.top/downloads/zzz-scanner/1.0.43/ZZZ-Scanner.Next-win-x64-fdd.zip",
-        "./1.0.43/ZZZ-Scanner.Next-win-x64-fdd.zip",
-        "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.43/ZZZ-Scanner.Next-win-x64-fdd.zip"
+        "https://download.zzzcaculator.top/downloads/zzz-scanner/1.0.45/ZZZ-Scanner.Next-win-x64-fdd.zip",
+        "https://zzzcaculator.top/downloads/zzz-scanner/1.0.45/ZZZ-Scanner.Next-win-x64-fdd.zip",
+        "./1.0.45/ZZZ-Scanner.Next-win-x64-fdd.zip",
+        "https://github.com/ZztIsolation/ZZZ-Scanner.Next/releases/download/scanner-1.0.45/ZZZ-Scanner.Next-win-x64-fdd.zip"
       ],
-      "sha256": "a8ad3c7f914e843b2763de92c40ba981e6e29431ca6c483ad7177ab9d93b5633",
-      "size": 21804074,
-      "expandedSize": 41224379,
+      "sha256": "4f21b0ea0fb7ed810687684eca23b8b3cdc74413a3da941ce290e6e5efa6b729",
+      "size": 21812894,
+      "expandedSize": 41247778,
       "entry": "ZZZ-Scanner.Next.exe",
       "files": [
         {
@@ -41,8 +41,8 @@
         },
         {
           "path": "Data/stat_rules.json",
-          "size": 5637,
-          "sha256": "92c007db4867742bec2f5eb6b88d3f390246f2a520e470fcd87a3ad36fc98d00"
+          "size": 5996,
+          "sha256": "ef8a707b7d25dae89a140b2673f2236b9d40b47a0d743a3ffc52d6f2907ee48e"
         },
         {
           "path": "Microsoft.ML.OnnxRuntime.dll",
@@ -172,17 +172,17 @@
         {
           "path": "ZZZ-Scanner.Next.deps.json",
           "size": 8559,
-          "sha256": "d464cd43044015b46594ef9f2862f210b520629293d80297dbf71473763b8e68"
+          "sha256": "7d17e290234ee41dcbbf3e6cc370988bb11e91bfc6ed46984705a45cbbb9e220"
         },
         {
           "path": "ZZZ-Scanner.Next.dll",
-          "size": 829952,
-          "sha256": "efc924b4055018d956712600305098fd8670ee47fba97ae83feba96524e82ccd"
+          "size": 852992,
+          "sha256": "929763e71c1b28219047a023c85eaa7ebbd96413ae9670cea4f5ec167297d8dd"
         },
         {
           "path": "ZZZ-Scanner.Next.exe",
           "size": 152064,
-          "sha256": "50e815e68dfb5625951204b55256bda834c04153c94cda6fcbb2f2bffa0af396"
+          "sha256": "217697c954db900f5df04c82f4017084383073a506629255911ffc0a3b022083"
         },
         {
           "path": "ZZZ-Scanner.Next.runtimeconfig.json",
@@ -200,14 +200,14 @@
       "id": "win-x64-self-contained",
       "mode": "self-contained",
       "packageUrls": [
-        "https://download.zzzcaculator.top/downloads/zzz-scanner/1.0.43/ZZZ-Scanner.Next-win-x64-self-contained.zip",
-        "https://zzzcaculator.top/downloads/zzz-scanner/1.0.43/ZZZ-Scanner.Next-win-x64-self-contained.zip",
-        "./1.0.43/ZZZ-Scanner.Next-win-x64-self-contained.zip",
-        "https://github.com/ZztIsolation/zzz_calculator/releases/download/scanner-1.0.43/ZZZ-Scanner.Next-win-x64-self-contained.zip"
+        "https://download.zzzcaculator.top/downloads/zzz-scanner/1.0.45/ZZZ-Scanner.Next-win-x64-self-contained.zip",
+        "https://zzzcaculator.top/downloads/zzz-scanner/1.0.45/ZZZ-Scanner.Next-win-x64-self-contained.zip",
+        "./1.0.45/ZZZ-Scanner.Next-win-x64-self-contained.zip",
+        "https://github.com/ZztIsolation/ZZZ-Scanner.Next/releases/download/scanner-1.0.45/ZZZ-Scanner.Next-win-x64-self-contained.zip"
       ],
-      "sha256": "03270b1e14c55980a37ee9ad2aad0f4b84a65f0ec5c59e22706c8be3ae18c531",
-      "size": 84822882,
-      "expandedSize": 185570607,
+      "sha256": "af7e1058152d99bd6dcfcdc2be9fe0daf037ac2b6d73337527f00c4bd16627f8",
+      "size": 84831703,
+      "expandedSize": 185594006,
       "entry": "ZZZ-Scanner.Next.exe",
       "files": [
         {
@@ -257,8 +257,8 @@
         },
         {
           "path": "Data/stat_rules.json",
-          "size": 5637,
-          "sha256": "92c007db4867742bec2f5eb6b88d3f390246f2a520e470fcd87a3ad36fc98d00"
+          "size": 5996,
+          "sha256": "ef8a707b7d25dae89a140b2673f2236b9d40b47a0d743a3ffc52d6f2907ee48e"
         },
         {
           "path": "DirectWriteForwarder.dll",
@@ -1598,17 +1598,17 @@
         {
           "path": "ZZZ-Scanner.Next.deps.json",
           "size": 43305,
-          "sha256": "ce56ab1ab320455423536dfc8ce304e2dc5cb56cb073fd79bc6dd4eeeb96de52"
+          "sha256": "db59b5f3bfbafb901b431af58f199447e964e775b194f85aafab1bdcabd08a1e"
         },
         {
           "path": "ZZZ-Scanner.Next.dll",
-          "size": 829952,
-          "sha256": "efc924b4055018d956712600305098fd8670ee47fba97ae83feba96524e82ccd"
+          "size": 852992,
+          "sha256": "929763e71c1b28219047a023c85eaa7ebbd96413ae9670cea4f5ec167297d8dd"
         },
         {
           "path": "ZZZ-Scanner.Next.exe",
           "size": 152064,
-          "sha256": "50e815e68dfb5625951204b55256bda834c04153c94cda6fcbb2f2bffa0af396"
+          "sha256": "217697c954db900f5df04c82f4017084383073a506629255911ffc0a3b022083"
         },
         {
           "path": "ZZZ-Scanner.Next.runtimeconfig.json",

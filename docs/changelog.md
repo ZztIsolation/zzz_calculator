@@ -2,6 +2,30 @@
 
 # Changelog
 
+## 2026-07-23 - Published Scanner 1.0.45 Without Changing Helper 1.3.1
+
+Updated only the Scanner consumption line from 1.0.43 to 1.0.45. The schema-v3
+manifest still requires Helper 1.3.1 and protocol v4, but now points both Windows
+x64 package modes at the immutable Scanner 1.0.45 release owned by the Scanner
+repository. The framework-dependent ZIP is 21,812,894 bytes with SHA-256
+`4f21b0ea0fb7ed810687684eca23b8b3cdc74413a3da941ce290e6e5efa6b729`;
+the self-contained ZIP is 84,831,703 bytes with SHA-256
+`af7e1058152d99bd6dcfcdc2be9fe0daf037ac2b6d73337527f00c4bd16627f8`.
+
+Scanner 1.0.45 transactionally captures the first two Drive Discs before either
+enters the OCR queue. It uses an A-B-A round trip for distinct panels and searches
+the visible viewport for a witness when the first two panels are indistinguishable.
+If no safe witness exists, it keeps the existing `panel_capture_timeout` wire code
+and records `first_pair_witness_unavailable`; it never streams an unvalidated first
+item. The `scan_item`, `scan_complete`, export JSON, and protocol-v4 contracts remain
+unchanged.
+
+The Scanner release workflow built no Helper artifact. The checked-in Helper
+manifest remains byte-for-byte unchanged at SHA-256
+`a0d6805f799e68c4c5d8e264d1574aef59451fa40d5a87aacab3e8968c085bc9`,
+and continues to reference the frozen 8,267,264-byte Helper 1.3.1 executable with
+SHA-256 `01f1b5abbe30ecae7668d6339f82eebe8d1c6f91a6dbbbaa8bba5582948ddd0d`.
+
 ## 2026-07-22 - Reintegrated Per-Disc Agent Reservations Behind A Runtime Gate
 
 Rebuilt the Drive Disc reservation feature on top of the Scanner protocol v4
