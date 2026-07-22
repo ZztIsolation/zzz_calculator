@@ -253,6 +253,47 @@ assert.ok(exact.results.every(result => {
         || (fourPieceCount === 4 && [...counts.entries()].some(([setId, count]) => setId !== fourSet && count === 2))
 }))
 
+const currentAgentReservedStore = {
+    ...store,
+    driveDiscs: store.driveDiscs.map(item => ({ ...item, reservedForAgentId: exampleInput.agentId })),
+}
+const currentAgentReserved = optimizeDriveDiscs(catalog, currentAgentReservedStore, optimizerInput())
+assert.deepEqual(resultIds(currentAgentReserved), resultIds(exact), "Current-agent reservations must remain eligible")
+assert.deepEqual(resultScores(currentAgentReserved), resultScores(exact), "Current-agent reservations must preserve scores")
+assert.equal(currentAgentReserved.metrics.excludedByReservation, 0)
+
+const otherAgentReservedStore = {
+    ...store,
+    driveDiscs: store.driveDiscs.map(item => item.id === "f1"
+        ? { ...item, reservedForAgentId: "alice_thymefield" }
+        : item),
+}
+const manuallyFilteredStore = {
+    ...store,
+    driveDiscs: store.driveDiscs.filter(item => item.id !== "f1"),
+}
+const otherAgentReserved = optimizeDriveDiscs(catalog, otherAgentReservedStore, optimizerInput())
+const manuallyFiltered = optimizeDriveDiscs(catalog, manuallyFilteredStore, optimizerInput())
+assert.equal(otherAgentReserved.metrics.excludedByReservation, 1)
+assert.equal(otherAgentReserved.metrics.excludedByReservationBySlot[1], 1)
+assert.ok(otherAgentReserved.results.every(result => result.driveDiscs.every(item => item.id !== "f1")))
+assert.deepEqual(resultIds(otherAgentReserved), resultIds(manuallyFiltered), "Reservation filtering must preserve ordered Top 10 IDs")
+assert.deepEqual(resultScores(otherAgentReserved), resultScores(manuallyFiltered), "Reservation filtering must preserve ordered Top 10 scores")
+
+const fullyReservedOtherStore = {
+    ...store,
+    driveDiscs: [1, 2, 3, 4, 5, 6].map(slot => ({
+        ...disc(`reserved-f${slot}`, fourSet, slot, slotMain[slot]),
+        reservedForAgentId: "alice_thymefield",
+    })),
+}
+const fullyReservedOther = optimizeDriveDiscs(catalog, fullyReservedOtherStore, optimizerInput({
+    settings: { twoPieceSetId: fourSet },
+}))
+assert.equal(fullyReservedOther.results.length, 0)
+assert.equal(fullyReservedOther.metrics.excludedByReservation, 6)
+assert.match(fullyReservedOther.error.reason, /专属其他角色/)
+
 const incompleteFreeStore = {
     ...store,
     driveDiscs: [

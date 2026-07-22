@@ -62,6 +62,7 @@ describe("local-store IndexedDB compatibility", () => {
     const localStore = await import("@runtime/local-store.js?indexeddb-compat")
     const loaded = await localStore.loadCurrentUserDriveDiscStore()
     expect(loaded.driveDiscs[0].id).toBe("legacy-indexeddb-disc")
+    expect(loaded.driveDiscs[0].reservedForAgentId).toBeNull()
     expect(loaded.driveDiscs[0].contentFingerprint).toBeTruthy()
 
     await localStore.upsertUserDriveDisc({
@@ -78,6 +79,13 @@ describe("local-store IndexedDB compatibility", () => {
     expect(transactionCalls).toContainEqual(["state", "readonly"])
     expect(transactionCalls).toContainEqual(["state", "readwrite"])
     expect(records.get("userDriveDiscStore").driveDiscs).toHaveLength(2)
+
+    await localStore.setDriveDiscReservations({
+      discIds: ["legacy-indexeddb-disc"],
+      reservedForAgentId: "agent-a",
+    })
+    expect(records.get("userDriveDiscStore").driveDiscs
+      .find((disc: any) => disc.id === "legacy-indexeddb-disc").reservedForAgentId).toBe("agent-a")
   })
 
   it("closes and deletes IndexedDB while clearing calculator storage keys", async () => {

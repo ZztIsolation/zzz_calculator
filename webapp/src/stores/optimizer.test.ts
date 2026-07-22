@@ -636,6 +636,7 @@ describe("optimizer store", () => {
           partition: 1,
           rarity: "S",
           level: 15,
+          reservedForAgentId: "agent-a",
           mainStat: { stat: "hpFlat", value: 2200 },
           subStats: [{ stat: "critRate", value: 4.8 }],
           source: { type: "scanner", sequence: 1, rawIndex: 3, bulky: true },
@@ -662,6 +663,7 @@ describe("optimizer store", () => {
     expect(startMessage.store.imports).toEqual([])
     expect(startMessage.store.driveDiscLoadouts).toEqual([])
     expect(startMessage.store.driveDiscs.map((disc: any) => disc.id)).toEqual(["alice-disc"])
+    expect(startMessage.store.driveDiscs[0].reservedForAgentId).toBe("agent-a")
     expect(startMessage.store.driveDiscs[0].source).toEqual({ type: "scanner", sequence: 1, rawIndex: 3 })
 
     store.cancel()

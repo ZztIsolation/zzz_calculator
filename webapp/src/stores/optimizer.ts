@@ -284,6 +284,7 @@ function cloneOptimizerDriveDisc(disc: any = {}, ownerId = "default") {
     maxLevel: disc.maxLevel,
     locked: Boolean(disc.locked),
     equippedBy: disc.equippedBy ?? null,
+    reservedForAgentId: disc.reservedForAgentId ?? null,
     mainStat: disc.mainStat ? { ...disc.mainStat } : null,
     subStats: Array.isArray(disc.subStats) ? disc.subStats.map((stat: any) => ({ ...stat })) : [],
     source: disc.source
