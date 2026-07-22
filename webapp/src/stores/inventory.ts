@@ -347,6 +347,9 @@ export const useInventoryStore = defineStore("inventory", {
       return "a"
     },
     scanErrorVariant(state): ScanErrorVariant | "" {
+      if (state.scanStatus === "waiting-helper" && state.scanErrorContext === "helper-missing") {
+        return "helper-missing"
+      }
       if (state.scanStatus !== "error" && state.scanStatus !== "warning") {
         return ""
       }

@@ -118,8 +118,19 @@ test("Helper auto-launch has a coded terminal state after 60 seconds", async ({ 
   await page.route("http://127.0.0.1:22355/**", route => route.abort("connectionrefused"))
 
   await page.goto("/discs")
+  await page.evaluate(() => {
+    window.open = ((url?: string | URL) => {
+      ;(window as any).__openedHelperDownloadUrl = String(url ?? "")
+      return null
+    }) as typeof window.open
+  })
   await page.getByRole("button", { name: "扫描", exact: true }).click()
-  await expect(page.getByText(/正在等待连接|未检测到扫描助手/)).toBeVisible()
+  await expect(page.getByRole("heading", { name: "未检测到扫描助手", exact: true })).toBeVisible()
+  await page.getByRole("button", { name: "下载扫描助手", exact: true }).click()
+  await expect.poll(() => page.evaluate(() => (window as any).__openedHelperDownloadUrl)).toBe(
+    "https://download.zzzcaculator.top/downloads/zzz-scanner/helper/1.3.1/ZZZ-Scanner-Helper.exe",
+  )
+  await expect(page.getByRole("button", { name: "我已运行，重新连接", exact: true })).toBeVisible()
 
   await page.clock.fastForward(60_000)
 

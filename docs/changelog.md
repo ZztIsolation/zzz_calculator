@@ -2,6 +2,21 @@
 
 # Changelog
 
+## 2026-07-22 - Exposed The Helper Download During Automatic Launch
+
+When the browser cannot reach a locally installed Helper, the Scanner drawer now
+shows the Helper recovery card immediately instead of hiding its download and
+reconnect actions behind the 60-second automatic-launch deadline. The browser
+still attempts the `zzz-scanner://` protocol launch and polls the local Helper in
+the background, so existing installations keep the same automatic connection
+flow. If the Helper remains unavailable for 60 seconds, the drawer still changes
+to the structured `helper_launch_timeout` diagnostic state.
+
+Added store coverage for the pending `helper-missing` recovery state and browser
+coverage proving that the first screen exposes both recovery actions, that the
+download action targets the immutable Helper 1.3.1 CDN URL, and that the existing
+terminal timeout remains available for diagnosis.
+
 ## 2026-07-21 - Made Scanner Results Recoverable Across Every Terminal Path
 
 Staged Scanner 1.0.42 and Helper 1.3.1 locally. Official scan requests are now

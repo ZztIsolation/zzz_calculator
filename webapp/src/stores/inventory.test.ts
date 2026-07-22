@@ -294,6 +294,7 @@ describe("inventory store", () => {
     expect(helper.launchCalls).toBe(1)
     expect(store.scanStatus).toBe("waiting-helper")
     expect(store.scanPolling).toBe(true)
+    expect(store.scanErrorVariant).toBe("helper-missing")
     expect(store.scanHelperDownloadUrl).toBe("https://download.zzzcaculator.top/downloads/zzz-scanner/helper/1.3.1/ZZZ-Scanner-Helper.exe")
 
     scannerMockState.connectResults.push({ version: "1.3.1", protocolVersion: 4 })
@@ -557,11 +558,11 @@ describe("inventory store", () => {
     expect(store.scanPolling).toBe(false)
   })
 
-  it("keeps Helper startup as a pending state until its deadline", () => {
+  it("shows Helper download recovery while startup remains pending", () => {
     const store = useInventoryStore()
-    store.$patch({ scanStatus: "waiting-helper" })
+    store.$patch({ scanStatus: "waiting-helper", scanErrorContext: "helper-missing" })
     expect(store.scanPhase).toBe("a")
-    expect(store.scanErrorVariant).toBe("")
+    expect(store.scanErrorVariant).toBe("helper-missing")
   })
 
   it("preserves structured helper failures and executes repair actions", async () => {
