@@ -10,6 +10,18 @@ The entries below summarize each development day. Implementation details,
 modeling decisions, and verification evidence remain in the
 [detailed changelog](docs/changelog.md).
 
+### 2026-07-22 Daily Update
+
+- Added account-scoped, per-disc agent reservations while preserving the existing
+  browser storage schema and Drive Disc identities. The optimizer always excludes
+  another agent's reserved discs; records without reservations retain identical
+  Top 10 behavior.
+- Added a runtime-gated six-slot loadout preview and shared visual picker. The UI
+  remains disabled by default and can be enabled independently after compatibility
+  validation; reservation data and optimizer constraints do not depend on the UI.
+- Added a production deployment runbook and stricter server-package evidence for
+  reproducible website, Helper/Scanner, manifest, CDN, monitoring, and rollback work.
+
 ### 2026-07-20 Daily Update
 
 - Scanner connection recovery now distinguishes denied browser loopback access,
@@ -490,9 +502,9 @@ download payloads deliberately use separate lifecycles:
     zzz-scanner/
       manifest.json
       helper-manifest.json
-      helper/1.2.1/ZZZ-Scanner-Helper.exe
-      1.0.39/ZZZ-Scanner.Next-win-x64-fdd.zip
-      1.0.39/ZZZ-Scanner.Next-win-x64-self-contained.zip
+      helper/1.3.1/ZZZ-Scanner-Helper.exe
+      1.0.43/ZZZ-Scanner.Next-win-x64-fdd.zip
+      1.0.43/ZZZ-Scanner.Next-win-x64-self-contained.zip
 ```
 
 Build a deployable archive containing the tracked source and the generated Vue
@@ -566,6 +578,7 @@ source-control content.
 - [Modeling notes](docs/modeling.md)
 - [Long-term regression contract](docs/regression-contract.md)
 - [Frontend layout contract](docs/frontend-layout-contract.md)
+- [Production deployment runbook](docs/production-deployment-runbook.md)
 - [Detailed changelog](docs/changelog.md)
 
 All calculator models, public data, frontend code, backend code, examples, tests, and release scripts are maintained in this repository.

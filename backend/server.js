@@ -89,6 +89,7 @@ function envFlag(name) {
 }
 
 const scanTelemetryEnabled = envFlag("SCAN_TELEMETRY_ENABLED") === true
+const driveDiscReservationsUiEnabled = envFlag("DRIVE_DISC_RESERVATIONS_UI_ENABLED") === true
 const scanTelemetryRetentionDays = Math.max(1, Math.min(365, Number(process.env.SCAN_TELEMETRY_RETENTION_DAYS) || 30))
 const scanTelemetryDirectory = path.resolve(process.env.SCAN_TELEMETRY_DIR || path.join(dataDir, "scan-telemetry"))
 const scanTelemetryStore = scanTelemetryEnabled
@@ -2058,6 +2059,7 @@ async function routeApi(req, res, pathname, searchParams) {
             maintenanceEnabled: isMaintenanceEnabled(),
             scanTelemetryEnabled,
             scanTelemetryRetentionDays,
+            driveDiscReservationsUiEnabled,
         })
         return
     }

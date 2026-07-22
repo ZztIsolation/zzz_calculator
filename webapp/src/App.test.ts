@@ -1,5 +1,5 @@
 import { mount } from "@vue/test-utils"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import App from "@/App.vue"
 
 vi.mock("naive-ui", () => ({
@@ -15,12 +15,18 @@ vi.mock("@/stores/account", () => ({
   }),
 }))
 
-function response(body: any, status = 200) {
-  return {
-    ok: status >= 200 && status < 300,
-    json: async () => body,
-  } as Response
-}
+const appConfigFixture = vi.hoisted(() => ({
+  config: {
+    maintenanceEnabled: false,
+    scanTelemetryEnabled: false,
+    scanTelemetryRetentionDays: 30,
+    driveDiscReservationsUiEnabled: false,
+  },
+}))
+
+vi.mock("@/stores/app-config", () => ({
+  useAppConfigStore: () => appConfigFixture,
+}))
 
 function mountApp() {
   return mount(App, {
@@ -33,24 +39,19 @@ function mountApp() {
   })
 }
 
-afterEach(() => {
-  vi.unstubAllGlobals()
+beforeEach(() => {
+  appConfigFixture.config.maintenanceEnabled = false
 })
 
 describe("App maintenance navigation", () => {
   it("hides maintenance when the API disables it", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => response({ maintenanceEnabled: false })))
     const wrapper = mountApp()
     await vi.waitFor(() => expect(wrapper.text()).toContain("账号 / default"))
     expect(wrapper.text()).not.toContain("维护")
   })
 
-  it("shows maintenance when the static fallback enables it", async () => {
-    vi.stubGlobal("fetch", vi.fn(async (url: string) => (
-      url === "/api/app-config"
-        ? response({}, 404)
-        : response({ maintenanceEnabled: true })
-    )))
+  it("shows maintenance when the preloaded runtime config enables it", async () => {
+    appConfigFixture.config.maintenanceEnabled = true
     const wrapper = mountApp()
     await vi.waitFor(() => expect(wrapper.text()).toContain("维护"))
   })
@@ -58,7 +59,6 @@ describe("App maintenance navigation", () => {
 
 describe("App filing information", () => {
   it("links the ICP filing number to the MIIT filing system", () => {
-    vi.stubGlobal("fetch", vi.fn(async () => response({ maintenanceEnabled: false })))
     const wrapper = mountApp()
     const filingLink = wrapper.get('a[href="https://beian.miit.gov.cn/"]')
 

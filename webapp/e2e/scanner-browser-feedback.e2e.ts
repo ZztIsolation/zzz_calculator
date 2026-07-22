@@ -23,21 +23,23 @@ async function mockLoopbackPermission(page: Page, states: string[]) {
   }, states)
 }
 
-const helperCorsHeaders = {
-  "Access-Control-Allow-Origin": "http://127.0.0.1:8787",
-  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Allow-Private-Network": "true",
+function helperCorsHeaders(route: any) {
+  return {
+    "Access-Control-Allow-Origin": route.request().headers().origin ?? "http://127.0.0.1:8787",
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Private-Network": "true",
+  }
 }
 
 async function fulfillHelperRoute(route: any, status: number, body: unknown) {
   if (route.request().method() === "OPTIONS") {
-    await route.fulfill({ status: 204, headers: helperCorsHeaders })
+    await route.fulfill({ status: 204, headers: helperCorsHeaders(route) })
     return
   }
   await route.fulfill({
     status,
-    headers: helperCorsHeaders,
+    headers: helperCorsHeaders(route),
     contentType: "application/json",
     body: JSON.stringify(body),
   })

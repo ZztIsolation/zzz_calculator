@@ -2,6 +2,38 @@
 
 # Changelog
 
+## 2026-07-22 - Reintegrated Per-Disc Agent Reservations Behind A Runtime Gate
+
+Rebuilt the Drive Disc reservation feature on top of the Scanner protocol v4
+production baseline instead of merging the stale feature branch. Added the optional
+`reservedForAgentId` field without changing IndexedDB version 1, the `state` object
+store, the `userDriveDiscStore` key, the localStorage fallback key, Drive Disc IDs,
+content fingerprints, identity fingerprints, or export format version. Legacy records
+normalize the new field to `null`; scan merges, manual edits, account switches,
+partial imports, complete imports, native export and re-import preserve reservations.
+
+The optimizer now excludes Drive Discs reserved for another agent before search and
+reports both total and per-slot exclusion metrics. An unreserved inventory follows the
+same input order and scoring path as before. The development-only reservation endpoint
+remains available for integration tests, while production continues to reject server-side
+user-data writes.
+
+Added a fail-closed runtime flag, `DRIVE_DISC_RESERVATIONS_UI_ENABLED`, which defaults
+to false in Node, Pages, and the checked-in systemd template. Runtime configuration loads
+before Vue mounts so the optional surfaces cannot flash before being hidden. When enabled,
+the inventory exposes public, reserved, known-agent, and unknown-agent filters; saved
+loadouts render responsive six-slot previews; the Workbench and loadout editor share a
+visual picker; and every reservation action affects one Drive Disc only. Cross-agent
+transfers require explicit confirmation. No whole-loadout lock, save-and-lock action, or
+implicit unlock-on-delete behavior was restored.
+
+Hardened server packaging to reject modified and unignored untracked release inputs and
+to emit artifact SHA-256, release file count, release tree hash, Pages file count, and
+Pages tree hash in a machine-readable evidence file. Added the Chinese production
+deployment runbook covering web-only, binary-only, and combined releases, including
+CDN handling, two-way chunk compatibility, monitoring, rollback, and previously observed
+operational pitfalls.
+
 ## 2026-07-22 - Exposed The Helper Download During Automatic Launch
 
 When the browser cannot reach a locally installed Helper, the Scanner drawer now

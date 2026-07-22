@@ -9,6 +9,12 @@ ZZZ 计算器是一个基于 Vue 3 的绝区零计算工具，覆盖角色面板
 以下内容按实际开发日期汇总。完整实现细节、建模决策和验证证据继续保留在
 [详细变更日志](docs/changelog.md) 中。
 
+### 2026-07-22 每日更新
+
+- 新增按账号隔离的逐盘角色专属关系，同时保持原有浏览器存储版本、驱动盘 ID 和指纹不变。优化器始终排除其他角色的专属盘；没有专属关系时，Top 10 结果、顺序和分数保持一致。
+- 新增运行时开关控制的六槽套装预览和统一可视化选择器。UI 默认关闭，可在兼容性验收后独立启用；专属数据和优化器约束不依赖 UI 开关。
+- 新增生产部署全链路手册，并强化服务器打包证据，统一网站、Helper/Scanner、manifest、CDN、监控和回档流程。
+
 ### 2026-07-20 每日更新
 
 - 扫描连接现可区分浏览器拒绝本机访问、Helper 未运行、网页来源被拒绝和 WebSocket 握手失败；Chrome 权限问题会显示针对性的恢复步骤，不再误导用户重复下载 Helper，并纳入脱敏诊断聚合。
@@ -339,9 +345,9 @@ npm run benchmark:optimizer
     zzz-scanner/
       manifest.json
       helper-manifest.json
-      helper/1.2.1/ZZZ-Scanner-Helper.exe
-      1.0.39/ZZZ-Scanner.Next-win-x64-fdd.zip
-      1.0.39/ZZZ-Scanner.Next-win-x64-self-contained.zip
+      helper/1.3.1/ZZZ-Scanner-Helper.exe
+      1.0.43/ZZZ-Scanner.Next-win-x64-fdd.zip
+      1.0.43/ZZZ-Scanner.Next-win-x64-self-contained.zip
 ```
 
 生成包含当前 Git 跟踪源码与 Vue 构建产物的服务器发布包：
@@ -408,6 +414,7 @@ Helper 启动前直接拦截；程序尚未启动时无法自行显示诊断。m
 - [建模说明](docs/modeling.md)
 - [长期回归契约](docs/regression-contract.md)
 - [前端布局契约](docs/frontend-layout-contract.md)
+- [生产部署全链路手册](docs/production-deployment-runbook.md)
 - [详细变更日志](docs/changelog.md)
 
 计算器模型、公开数据、前端、后端、示例、测试和发布脚本统一在本仓库维护。

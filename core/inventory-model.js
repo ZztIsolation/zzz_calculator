@@ -333,7 +333,7 @@ function normalizeScannerItem(rawItem, index, options, warnings) {
 }
 
 export function normalizeScannerExport(input, options = {}) {
-    const ownerId = options.ownerId ?? "default"
+    const ownerId = String(options.ownerId ?? "").trim() || "default"
     const importedAt = options.importedAt ?? nowIso()
     const sourcePath = options.sourcePath ?? null
     const importId = options.importId ?? `zzz-scanner-${hashWith(options, `${ownerId}:${sourcePath ?? ""}:${importedAt}`)}`
@@ -439,7 +439,7 @@ function normalizeNativeDriveDiscExport(input, options = {}) {
     if (!Array.isArray(input.driveDiscs)) {
         throw new Error("Drive Disc export driveDiscs must be an array.")
     }
-    const ownerId = options.ownerId ?? "default"
+    const ownerId = String(options.ownerId ?? "").trim() || "default"
     const importedAt = options.importedAt ?? nowIso()
     const sourcePath = options.sourcePath ?? null
     const importId = options.importId ?? `zzz-calculator-export-${hashWith(options, `${ownerId}:${sourcePath ?? ""}:${importedAt}`)}`

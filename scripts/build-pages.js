@@ -203,6 +203,7 @@ async function verifyPagesArtifact(maintenanceEnabled) {
     assertArtifact(appConfig.maintenanceEnabled === maintenanceEnabled, "app-config maintenance flag mismatch")
     assertArtifact(appConfig.scanTelemetryEnabled === false, "Pages must keep scan telemetry disabled")
     assertArtifact(appConfig.scanTelemetryRetentionDays === 30, "Pages telemetry retention metadata mismatch")
+    assertArtifact(appConfig.driveDiscReservationsUiEnabled === driveDiscReservationsUiEnabled, "app-config reservation UI flag mismatch")
     assertArtifact(manifest.schemaVersion === 3, "scanner manifest schema mismatch")
     assertArtifact(manifest.scannerVersion === scannerVersion, "scanner version mismatch")
     assertArtifact(Array.isArray(manifest.packages) && manifest.packages.length === scannerPackages.length, "scanner package count mismatch")
@@ -277,6 +278,7 @@ function envFlag(name) {
 }
 
 const maintenanceEnabled = envFlag("MAINTENANCE_ENABLED") === true
+const driveDiscReservationsUiEnabled = envFlag("DRIVE_DISC_RESERVATIONS_UI_ENABLED") === true
 const skipWebappBuild = envFlag("SKIP_WEBAPP_BUILD") === true
 if (!skipWebappBuild) {
     const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm"
@@ -291,6 +293,7 @@ await writeJson(path.join(outDir, "static", "app-config.json"), {
     maintenanceEnabled,
     scanTelemetryEnabled: false,
     scanTelemetryRetentionDays: 30,
+    driveDiscReservationsUiEnabled,
 })
 await ensurePagesScannerPackages()
 

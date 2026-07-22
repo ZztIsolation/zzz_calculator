@@ -139,6 +139,15 @@ const imported = normalizeDriveDiscImport(exported, {
 })
 assert.ok(imported.driveDiscs.every(item => item.ownerId === "alt" && item.reservedForAgentId === "agent-a"))
 
+const unknownReservationStore = setDriveDiscReservations(baseStore, {
+    discIds: ["d1"],
+    reservedForAgentId: "retired-agent",
+}).nextStore
+const unknownReservationExport = createDriveDiscExport(unknownReservationStore, { ownerId: "default" })
+const emptyAccountImport = normalizeDriveDiscImport(unknownReservationExport, { ownerId: "" })
+assert.equal(emptyAccountImport.driveDiscs.find(item => item.id === "d1").ownerId, "default")
+assert.equal(emptyAccountImport.driveDiscs.find(item => item.id === "d1").reservedForAgentId, "retired-agent")
+
 const scannerPayload = [{
     "序号": 1,
     "名称": "啄木鸟电音",
@@ -166,5 +175,53 @@ for (const removeMissing of [false, true]) {
     })
     assert.equal(refreshed.nextStore.driveDiscs[0].reservedForAgentId, "agent-a")
 }
+
+const mainStatBySlot = {
+    1: { "生命值": 2200 },
+    2: { "攻击力": 316 },
+    3: { "防御力": 184 },
+    4: { "暴击率": "24%" },
+    5: { "物理属性伤害加成": "30%" },
+    6: { "攻击力%": "30%" },
+}
+const thirtyItemPayload = Array.from({ length: 30 }, (_, index) => {
+    const slot = index % 6 + 1
+    return {
+        "序号": index + 1,
+        "名称": `兼容测试套装-${Math.floor(index / 6) + 1}`,
+        "槽位": slot,
+        "品质": "S",
+        "等级": 15,
+        "最大等级": 15,
+        "主属性": mainStatBySlot[slot],
+        "副属性": [{ "暴击率": `${2.4 + (index % 5) * 2.4}%` }],
+    }
+})
+const thirtyItemImport = buildScannerImportPlan(normalizeInventoryStore(null), thirtyItemPayload, {
+    ownerId: "default",
+    importedAt: "2026-07-20T00:05:00.000Z",
+})
+assert.equal(thirtyItemImport.nextStore.driveDiscs.length, 30)
+const reservedThirtyStore = setDriveDiscReservations(thirtyItemImport.nextStore, {
+    discIds: thirtyItemImport.nextStore.driveDiscs.filter((_, index) => index % 5 === 0).map(item => item.id),
+    reservedForAgentId: "agent-a",
+}).nextStore
+const refreshedThirty = buildScannerImportPlan(reservedThirtyStore, thirtyItemPayload, {
+    ownerId: "default",
+    importedAt: "2026-07-20T00:06:00.000Z",
+    removeMissing: true,
+    removeMissingRarities: ["S"],
+})
+assert.equal(refreshedThirty.nextStore.driveDiscs.length, 30)
+assert.equal(refreshedThirty.nextStore.driveDiscs.filter(item => item.reservedForAgentId === "agent-a").length, 6)
+
+const partialTen = buildScannerImportPlan(refreshedThirty.nextStore, thirtyItemPayload.slice(0, 10), {
+    ownerId: "default",
+    importedAt: "2026-07-20T00:07:00.000Z",
+    removeMissing: false,
+})
+assert.equal(partialTen.nextStore.driveDiscs.length, 30)
+assert.equal(partialTen.summary.removed, 0)
+assert.equal(partialTen.nextStore.driveDiscs.filter(item => item.reservedForAgentId === "agent-a").length, 6)
 
 console.log("Drive Disc reservation tests passed.")
