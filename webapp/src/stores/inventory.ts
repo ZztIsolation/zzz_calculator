@@ -7,6 +7,7 @@ import {
   importScannerExportToStore,
   loadCurrentUserDriveDiscStore,
   previewScannerExportImport,
+  setDriveDiscReservations,
   upsertDriveDiscLoadout,
   upsertUserDriveDisc,
 } from "@runtime/local-store.js"
@@ -240,6 +241,7 @@ export const useInventoryStore = defineStore("inventory", {
     error: "",
     slotFilter: 0,
     mainStatFilter: "",
+    reservationFilter: "",
     search: "",
     importPreview: null as any,
     importSummary: null as any,
@@ -296,6 +298,16 @@ export const useInventoryStore = defineStore("inventory", {
           return false
         }
         if (this.mainStatFilter && disc.mainStat?.stat !== this.mainStatFilter) {
+          return false
+        }
+        if (this.reservationFilter === "public" && disc.reservedForAgentId) {
+          return false
+        }
+        if (this.reservationFilter === "reserved" && !disc.reservedForAgentId) {
+          return false
+        }
+        if (this.reservationFilter && !["public", "reserved"].includes(this.reservationFilter)
+          && disc.reservedForAgentId !== this.reservationFilter) {
           return false
         }
         if (!needle) {
@@ -473,6 +485,19 @@ export const useInventoryStore = defineStore("inventory", {
       this.store = result.store
       await this.load()
       return result.loadout
+    },
+    async reserveDiscs(discIds: string[], reservedForAgentId: string | null, allowTransfer = false) {
+      const result = await setDriveDiscReservations({
+        ownerId: this.store?.currentOwnerId,
+        discIds,
+        reservedForAgentId,
+        allowTransfer,
+      })
+      this.store = result.store
+      if (result.applied) {
+        await this.load()
+      }
+      return result
     },
     async removeLoadout(id: string) {
       const result = await deleteDriveDiscLoadout(id)

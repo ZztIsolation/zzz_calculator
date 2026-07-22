@@ -3,6 +3,7 @@ import {
   createAccount,
   loadCurrentUserDriveDiscStore,
   loadUserDriveDiscStore,
+  setDriveDiscReservations,
   switchAccount,
   upsertUserDriveDisc,
 } from "@runtime/local-store.js"
@@ -27,6 +28,7 @@ describe("local-store compatibility", () => {
 
     const store = await loadCurrentUserDriveDiscStore()
     expect(store.driveDiscs).toHaveLength(1)
+    expect(store.driveDiscs[0].reservedForAgentId).toBeNull()
     expect(store.driveDiscLoadouts).toHaveLength(1)
     expect(store.imports).toHaveLength(1)
   })
@@ -70,5 +72,31 @@ describe("local-store compatibility", () => {
     const fullStore = await loadUserDriveDiscStore()
     expect(fullStore.driveDiscs).toHaveLength(2)
     expect(localStorage.getItem("zzz-calculator.userStore.v1")).not.toBeNull()
+  })
+
+  it("round-trips reservations through the existing fallback key", async () => {
+    localStorage.clear()
+    localStorage.setItem("zzz-calculator.userStore.v1", JSON.stringify({
+      version: 1,
+      currentOwnerId: "default",
+      owners: [{ id: "default", label: "默认用户" }],
+      imports: [],
+      driveDiscs: [{
+        id: "fallback-reserved",
+        ownerId: "default",
+        setName: "旧数据盘",
+        partition: 1,
+        rarity: "S",
+        level: 15,
+        mainStat: { stat: "hpFlat", mode: "flat", value: 2200 },
+        subStats: [],
+      }],
+      driveDiscLoadouts: [],
+    }))
+
+    await setDriveDiscReservations({ discIds: ["fallback-reserved"], reservedForAgentId: "agent-a" })
+    const raw = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
+    expect(raw.driveDiscs[0].reservedForAgentId).toBe("agent-a")
+    expect((await loadCurrentUserDriveDiscStore()).driveDiscs[0].reservedForAgentId).toBe("agent-a")
   })
 })

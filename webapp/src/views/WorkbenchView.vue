@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref, watch } from "vue"
-import { NButton, NInput, NInputNumber, NModal, NSelect, NTag } from "naive-ui"
+import { NAlert, NButton, NInput, NInputNumber, NModal, NSelect, NTag, useMessage } from "naive-ui"
 import { LineChart, RefreshCcw, Save, SlidersHorizontal, Sparkles, X } from "lucide-vue-next"
 import BuffPickerModal from "@/components/BuffPickerModal.vue"
 import CalculationConfigModal from "@/components/CalculationConfigModal.vue"
 import DamageSummaryBar from "@/components/DamageSummaryBar.vue"
 import DamageWhiteBox from "@/components/DamageWhiteBox.vue"
 import DriveDiscAnalysisModal from "@/components/DriveDiscAnalysisModal.vue"
+import DriveDiscPickerModal from "@/components/DriveDiscPickerModal.vue"
+import DriveDiscSlotCard from "@/components/DriveDiscSlotCard.vue"
 import EnemyTargetConfigPanel from "@/components/EnemyTargetConfigPanel.vue"
 import ImageAvatar from "@/components/ImageAvatar.vue"
 import OptimizerConfigModal from "@/components/OptimizerConfigModal.vue"
@@ -32,6 +34,7 @@ import {
 } from "@/utils/format"
 import { SKILL_CATEGORIES, activeDriveDisc4pcBuffIds, useBuildStore } from "@/stores/build"
 import { useAccountStore } from "@/stores/account"
+import { useAppConfigStore } from "@/stores/app-config"
 import { useCatalogStore } from "@/stores/catalog"
 import { useInventoryStore } from "@/stores/inventory"
 import { useOptimizerStore } from "@/stores/optimizer"
@@ -46,9 +49,12 @@ import { resolveDefaultCalculationConfig } from "@core/defaultCalculationConfig.
 
 const catalogStore = useCatalogStore()
 const accountStore = useAccountStore()
+const appConfigStore = useAppConfigStore()
 const inventoryStore = useInventoryStore()
 const buildStore = useBuildStore()
 const optimizerStore = useOptimizerStore()
+const message = useMessage()
+const reservationUiEnabled = computed(() => appConfigStore.driveDiscReservationsUiEnabled)
 
 const showBuffPicker = ref(false)
 const showCalculationConfig = ref(false)
@@ -58,6 +64,10 @@ const showFourPieceSetModal = ref(false)
 const showTwoPieceSetModal = ref(false)
 const showManualDiscPicker = ref(false)
 const showSaveLoadoutModal = ref(false)
+const showSchemeReservationConflict = ref(false)
+const schemeReservationConflicts = ref<any[]>([])
+const pendingSchemeReservation = ref<any | null>(null)
+const schemeReservationBusy = ref(false)
 const draftFourPieceSetId = ref("")
 const draftTwoPieceSetIds = ref<string[]>([])
 const activeManualDiscSlot = ref(0)
@@ -228,8 +238,17 @@ const draftTwoPieceSetSummary = computed(() => {
 const twoPieceDraftUnchanged = computed(() => [...draftTwoPieceSetIds.value].sort().join("|") === [...optimizerStore.twoPieceSetIds].sort().join("|"))
 const topOptimizedResultSchemes = computed(() => optimizerStore.resultSchemes.slice(0, OPTIMIZED_RESULT_LIMIT))
 const selectedDriveDiscRows = computed<Array<{ slot: number, disc: any | null }>>(() => {
+  const inventoryById = new Map<string, any>(
+    inventoryStore.driveDiscs.map((disc: any) => [String(disc.id), disc] as [string, any]),
+  )
   const bySlot = new Map<number, any>(
-    selectedDriveDiscs.value.map((disc: any) => [Number(disc.partition), disc] as [number, any]),
+    selectedDriveDiscs.value.map((disc: any) => {
+      const inventoryDisc = inventoryById.get(String(disc.id))
+      const displayDisc = inventoryDisc
+        ? { ...disc, reservedForAgentId: inventoryDisc.reservedForAgentId ?? null }
+        : disc
+      return [Number(disc.partition), displayDisc] as [number, any]
+    }),
   )
   return OPTIMIZER_RESULT_SLOTS.map(slot => ({
     slot,
@@ -531,6 +550,8 @@ const optimizerDetailChips = computed(() => [
   Number(optimizerMetrics.value?.scoredCombinationCount ?? optimizerMetrics.value?.evaluated ?? 0) > 0
     ? `真实评分 ${formatNumber(optimizerMetrics.value.scoredCombinationCount ?? optimizerMetrics.value.evaluated)}` : "",
   Number(optimizerMetrics.value?.prunedBySuperBound ?? 0) > 0 ? `剪枝 ${formatNumber(optimizerMetrics.value.prunedBySuperBound)}` : "",
+  Number(optimizerMetrics.value?.excludedByReservation ?? 0) > 0
+    ? `排除其他角色专属盘 ${formatNumber(optimizerMetrics.value.excludedByReservation)}` : "",
   Number(optimizerMetrics.value?.boundChecksPerSecond ?? 0) > 0 ? `上界 ${formatRate(optimizerMetrics.value.boundChecksPerSecond)}` : "",
   optimizerHasFreeTwoPieceMetrics.value ? `自动套装 ${formatNumber(optimizerMetrics.value.freeTwoPieceAutoSetCount ?? 0)}` : "",
   optimizerHasFreeTwoPieceMetrics.value ? `4+2 计划 ${formatNumber(optimizerMetrics.value.freeFourTwoPlanCount ?? 0)}` : "",
@@ -736,6 +757,55 @@ async function saveLoadoutFromModal() {
   if (mode === "optimized") {
     buildStore.selectLoadout(loadout.id)
   }
+}
+
+function schemeConflictDisc(conflict: any) {
+  return inventoryStore.driveDiscs.find((disc: any) => disc.id === conflict?.discId)
+}
+
+function agentNameForId(agentId: string | null | undefined) {
+  const agent = catalogStore.displayAgents.find((item: any) => item.id === agentId)
+  return agent ? labelOf(agent) : `未知角色（${agentId}）`
+}
+
+async function applySchemeDiscReservation(action: any, allowTransfer = false) {
+  schemeReservationBusy.value = true
+  try {
+    const result = await inventoryStore.reserveDiscs([action.discId], action.agentId, allowTransfer)
+    if (!result.applied) {
+      pendingSchemeReservation.value = action
+      schemeReservationConflicts.value = result.conflicts ?? []
+      showSchemeReservationConflict.value = true
+      return false
+    }
+    message.success(action.agentId
+      ? `已锁定给${agentNameForId(action.agentId)}`
+      : "已解除角色专属")
+    showSchemeReservationConflict.value = false
+    schemeReservationConflicts.value = []
+    pendingSchemeReservation.value = null
+    return true
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : String(error))
+    return false
+  } finally {
+    schemeReservationBusy.value = false
+  }
+}
+
+async function toggleSchemeDiscReservation(disc: any) {
+  const inventoryDisc = inventoryStore.driveDiscs.find((item: any) => item.id === disc?.id)
+  if (!inventoryDisc?.id || !buildStore.agentId) return
+  const currentAgentId = String(inventoryDisc.reservedForAgentId ?? "").trim()
+  await applySchemeDiscReservation({
+    discId: inventoryDisc.id,
+    agentId: currentAgentId === buildStore.agentId ? null : buildStore.agentId,
+  })
+}
+
+async function confirmSchemeReservationTransfer() {
+  if (!pendingSchemeReservation.value) return
+  await applySchemeDiscReservation(pendingSchemeReservation.value, true)
 }
 
 function openManualDiscPicker(slot: number) {
@@ -1264,30 +1334,50 @@ function complexityText(metrics: any = {}, settings: any = {}) {
           />
 
           <div class="drive-disc-slot-grid">
-            <article
-              v-for="row in selectedDriveDiscRows"
-              :key="row.slot"
-              class="disc-slot-card"
-              :class="{ 'disc-slot-card-empty': !row.disc, 'disc-slot-card-manual': buildStore.discMode === 'manual' }"
-              @click="openManualDiscPicker(row.slot)"
-            >
-              <img :src="row.disc ? driveDiscSetIcon(row.disc) : fallbackIcon" alt="" loading="lazy">
-              <div class="disc-slot-card-copy">
-                <strong>{{ row.disc ? `${row.slot}号位 · ${driveDiscSetName(row.disc)}` : `${row.slot}号位 · 未选择` }}</strong>
-                <span>{{ row.disc ? driveDiscStatText(row.disc.mainStat) : "空槽位" }}</span>
-                <small>{{ row.disc ? driveDiscSubStatText(row.disc) : "可在自选模式选择已有驱动盘" }}</small>
-              </div>
-              <div class="disc-slot-card-meta">
-                <NTag v-if="row.disc" round>{{ driveDiscRarityLevelText(row.disc) }}</NTag>
-                <NButton
-                  v-if="buildStore.discMode === 'manual'"
-                  size="tiny"
-                  @click.stop="openManualDiscPicker(row.slot)"
-                >
-                  {{ row.disc ? "更换" : "选择" }}
-                </NButton>
-              </div>
-            </article>
+            <template v-if="reservationUiEnabled">
+              <DriveDiscSlotCard
+                v-for="row in selectedDriveDiscRows"
+                :key="row.slot"
+                :slot="row.slot"
+                :disc="row.disc"
+                :drive-disc-sets="catalogStore.displayDriveDiscSets"
+                :meta="catalogStore.meta"
+                :agents="catalogStore.displayAgents"
+                :target-agent-id="buildStore.agentId"
+                :interactive="buildStore.discMode === 'manual'"
+                :reservation-busy="schemeReservationBusy"
+                show-reservation
+                reservation-action
+                @select="openManualDiscPicker"
+                @toggle-reservation="toggleSchemeDiscReservation"
+              />
+            </template>
+            <template v-else>
+              <article
+                v-for="row in selectedDriveDiscRows"
+                :key="row.slot"
+                class="disc-slot-card"
+                :class="{ 'disc-slot-card-empty': !row.disc, 'disc-slot-card-manual': buildStore.discMode === 'manual' }"
+                @click="openManualDiscPicker(row.slot)"
+              >
+                <img :src="row.disc ? driveDiscSetIcon(row.disc) : fallbackIcon" alt="" loading="lazy">
+                <div class="disc-slot-card-copy">
+                  <strong>{{ row.disc ? `${row.slot}号位 · ${driveDiscSetName(row.disc)}` : `${row.slot}号位 · 未选择` }}</strong>
+                  <span>{{ row.disc ? driveDiscStatText(row.disc.mainStat) : "空槽位" }}</span>
+                  <small>{{ row.disc ? driveDiscSubStatText(row.disc) : "可在自选模式选择已有驱动盘" }}</small>
+                </div>
+                <div class="disc-slot-card-meta">
+                  <NTag v-if="row.disc" round>{{ driveDiscRarityLevelText(row.disc) }}</NTag>
+                  <NButton
+                    v-if="buildStore.discMode === 'manual'"
+                    size="tiny"
+                    @click.stop="openManualDiscPicker(row.slot)"
+                  >
+                    {{ row.disc ? "更换" : "选择" }}
+                  </NButton>
+                </div>
+              </article>
+            </template>
           </div>
         </div>
       </div>
@@ -1348,7 +1438,21 @@ function complexityText(metrics: any = {}, settings: any = {}) {
     </aside>
   </section>
 
-  <NModal v-model:show="showManualDiscPicker" preset="card" :title="manualDiscPickerTitle" style="width: min(980px, calc(100vw - 16px)); max-width: 980px">
+  <DriveDiscPickerModal
+    v-if="reservationUiEnabled"
+    v-model:show="showManualDiscPicker"
+    :slot="activeManualDiscSlot"
+    :discs="inventoryStore.driveDiscs"
+    :selected-id="buildStore.manualDriveDiscIdsBySlot[String(activeManualDiscSlot)] ?? ''"
+    :drive-disc-sets="catalogStore.displayDriveDiscSets"
+    :meta="catalogStore.meta"
+    :agents="catalogStore.displayAgents"
+    :target-agent-id="buildStore.agentId"
+    show-reservation
+    @select="selectManualDriveDisc"
+    @clear="clearManualDriveDiscSlot"
+  />
+  <NModal v-else v-model:show="showManualDiscPicker" preset="card" :title="manualDiscPickerTitle" style="width: min(980px, calc(100vw - 16px)); max-width: 980px">
     <div class="section-band manual-disc-picker ui-layout-scope" data-layout-surface="manual-drive-disc-picker">
       <div class="manual-disc-picker-head">
         <span>只显示当前号位的已有驱动盘</span>
@@ -1429,6 +1533,35 @@ function complexityText(metrics: any = {}, settings: any = {}) {
           </NButton>
           <NButton @click="showManualDiscPicker = false">关闭</NButton>
         </span>
+      </div>
+    </template>
+  </NModal>
+
+  <NModal
+    v-if="reservationUiEnabled"
+    v-model:show="showSchemeReservationConflict"
+    preset="card"
+    title="专属角色冲突"
+    style="width: min(720px, calc(100vw - 16px)); max-width: 720px"
+  >
+    <div class="section-band">
+      <NAlert type="warning" :show-icon="false">
+        该驱动盘已专属其他角色。确认后只转移这一块盘，未确认前不会修改专属关系。
+      </NAlert>
+      <div class="scheme-reservation-conflict-list">
+        <div v-for="conflict in schemeReservationConflicts" :key="conflict.discId" class="scheme-reservation-conflict-row">
+          <div>
+            <strong>{{ driveDiscSetName(schemeConflictDisc(conflict)) }} · {{ schemeConflictDisc(conflict)?.partition }}号位</strong>
+            <span>{{ driveDiscStatText(schemeConflictDisc(conflict)?.mainStat) }}</span>
+          </div>
+          <span>{{ agentNameForId(conflict.currentAgentId) }} → {{ agentNameForId(conflict.requestedAgentId) }}</span>
+        </div>
+      </div>
+    </div>
+    <template #footer>
+      <div class="drawer-footer">
+        <NButton :disabled="schemeReservationBusy" @click="showSchemeReservationConflict = false">取消</NButton>
+        <NButton type="primary" :loading="schemeReservationBusy" @click="confirmSchemeReservationTransfer">转移并锁定</NButton>
       </div>
     </template>
   </NModal>
@@ -1953,6 +2086,35 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 
 .save-loadout-summary {
   margin-top: 10px;
+}
+
+.scheme-reservation-conflict-list {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+}
+
+.scheme-reservation-conflict-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, auto);
+  gap: 16px;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--app-surface);
+}
+
+.scheme-reservation-conflict-row > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.scheme-reservation-conflict-row span {
+  color: var(--app-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .damage-panel-grid {
@@ -2544,6 +2706,11 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 }
 
 @media (max-width: 680px) {
+  .scheme-reservation-conflict-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
   .damage-panel-grid {
     grid-template-columns: 1fr;
   }

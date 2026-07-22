@@ -103,6 +103,7 @@ function disc(seed, id, setId, partition, rng) {
         maxLevel: 15,
         locked: false,
         equippedBy: null,
+        reservedForAgentId: null,
         mainStat: {
             ...mainStat,
             mode: mainStat.mode ?? "flat",
@@ -125,6 +126,11 @@ function fuzzStore(seed) {
                 driveDiscs.push(disc(seed, `${setId}-${slot}-${variant}`, setId, slot, rng))
             }
         }
+    }
+    for (const item of driveDiscs) {
+        const reservationRoll = rng()
+        if (reservationRoll < 0.12) item.reservedForAgentId = "alice_thymefield"
+        else if (reservationRoll < 0.24) item.reservedForAgentId = exampleInput.agentId
     }
     return {
         version: 1,
@@ -318,6 +324,7 @@ function assertSameTop(seed, scenarioIndex, legacy, superBound) {
 const FUZZ_SEEDS = 160
 let suffixTopKBoundCoverage = 0
 let chunkBoundCoverage = 0
+let reservationCoverage = 0
 for (let seed = 1; seed <= FUZZ_SEEDS; seed += 1) {
     const store = fuzzStore(seed)
     const scenarioIndex = (seed - 1) % 10
@@ -325,6 +332,13 @@ for (let seed = 1; seed <= FUZZ_SEEDS; seed += 1) {
     const superBound = optimizeDriveDiscs(catalog, store, optimizerInput(seed, scenarioIndex, "exact-super-bound", store))
     assert.equal(superBound.metrics.strictExact, true)
     assertSameTop(seed, scenarioIndex, legacy, superBound)
+    const reservedForOther = new Set(store.driveDiscs
+        .filter(item => item.reservedForAgentId && item.reservedForAgentId !== exampleInput.agentId)
+        .map(item => item.id))
+    assert.ok(superBound.results.every(result => result.driveDiscs.every(item => !reservedForOther.has(item.id))))
+    if (Number(superBound.metrics.excludedByReservation ?? 0) > 0) {
+        reservationCoverage += 1
+    }
     if (Number(superBound.metrics.suffixTopKBoundChecks ?? 0) > 0) {
         suffixTopKBoundCoverage += 1
     }
@@ -367,4 +381,5 @@ assertSameTop("chunk", 0, chunkLegacy, chunkSuperBound)
 assert.ok(Number(chunkSuperBound.metrics.chunkBoundChecks ?? 0) > 0, "chunk bound fixture should exercise chunk checks")
 chunkBoundCoverage += 1
 
-console.log(`optimizer fuzz tests passed (${FUZZ_SEEDS} seeds, suffixTopK=${suffixTopKBoundCoverage}, chunk=${chunkBoundCoverage})`)
+assert.ok(reservationCoverage > 0, "reservation fuzz should exclude other-agent candidates")
+console.log(`optimizer fuzz tests passed (${FUZZ_SEEDS} seeds, reservations=${reservationCoverage}, suffixTopK=${suffixTopKBoundCoverage}, chunk=${chunkBoundCoverage})`)

@@ -209,6 +209,62 @@ describe("inventory store", () => {
     expect(store.loadouts[0].status).toBe("incomplete")
   })
 
+  it("keeps reservation conflicts atomic and filters known, unknown, and public reservations", async () => {
+    const store = useInventoryStore()
+    await store.load()
+    await store.saveDisc({
+      id: "reserved-disc",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 1,
+      mainStat: { stat: "hpFlat", value: 2200 },
+      subStats: [],
+      level: 15,
+    })
+
+    const assigned = await store.reserveDiscs(["reserved-disc"], "agent-a")
+    expect(assigned.applied).toBe(true)
+    expect(store.driveDiscs[0].reservedForAgentId).toBe("agent-a")
+
+    const blocked = await store.reserveDiscs(["reserved-disc"], "agent-b")
+    expect(blocked.applied).toBe(false)
+    expect(store.driveDiscs[0].reservedForAgentId).toBe("agent-a")
+
+    await store.saveDisc({
+      id: "unknown-reserved-disc",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 2,
+      mainStat: { stat: "atkFlat", value: 316 },
+      subStats: [],
+      level: 15,
+    })
+    await store.reserveDiscs(["unknown-reserved-disc"], "retired-agent")
+    await store.saveDisc({
+      id: "public-disc",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 1,
+      mainStat: { stat: "hpFlat", value: 2200 },
+      subStats: [],
+      level: 15,
+    })
+
+    store.reservationFilter = "reserved"
+    expect(store.filteredDriveDiscs.map((disc: any) => disc.id)).toEqual([
+      "reserved-disc",
+      "unknown-reserved-disc",
+    ])
+    store.slotFilter = 2
+    expect(store.filteredDriveDiscs.map((disc: any) => disc.id)).toEqual(["unknown-reserved-disc"])
+    store.slotFilter = 0
+
+    store.reservationFilter = "agent-a"
+    expect(store.filteredDriveDiscs.map((disc: any) => disc.id)).toEqual(["reserved-disc"])
+    store.reservationFilter = "public"
+    expect(store.filteredDriveDiscs.map((disc: any) => disc.id)).toEqual(["public-disc"])
+  })
+
   it("does not auto-fill explicit manual or loadout selections", async () => {
     const store = useInventoryStore()
     await store.load()

@@ -1,18 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue"
+import { computed, onMounted } from "vue"
 import { NConfigProvider, NMessageProvider, type GlobalThemeOverrides } from "naive-ui"
 import { Calculator, Database, HardDrive, Settings2, UserRound } from "lucide-vue-next"
-import { loadAppConfig } from "@/runtime/app-config"
 import { useAccountStore } from "@/stores/account"
+import { useAppConfigStore } from "@/stores/app-config"
 
 const accountStore = useAccountStore()
-const maintenanceEnabled = ref(false)
+const appConfigStore = useAppConfigStore()
+const maintenanceEnabled = computed(() => appConfigStore.config.maintenanceEnabled)
 
 onMounted(() => {
   void accountStore.load()
-  void loadAppConfig().then(config => {
-    maintenanceEnabled.value = config.maintenanceEnabled
-  })
 })
 
 const currentAccountLabel = computed(() => accountStore.currentOwner?.label ?? accountStore.currentOwnerId)

@@ -2,6 +2,8 @@ import { defineConfig } from "@playwright/test"
 
 const executablePath = process.env.PLAYWRIGHT_EXECUTABLE_PATH?.trim() || undefined
 const video = process.env.PLAYWRIGHT_DISABLE_VIDEO === "1" ? "off" : "retain-on-failure"
+const port = Number(process.env.PLAYWRIGHT_PORT || 8787)
+const baseURL = `http://127.0.0.1:${port}`
 
 export default defineConfig({
   testDir: "./e2e",
@@ -14,7 +16,7 @@ export default defineConfig({
     ? [["line"], ["html", { outputFolder: "../output/playwright/report", open: "never" }]]
     : "line",
   use: {
-    baseURL: "http://127.0.0.1:8787",
+    baseURL,
     launchOptions: executablePath ? { executablePath } : undefined,
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
@@ -34,7 +36,8 @@ export default defineConfig({
   ],
   webServer: {
     command: "npm --prefix .. run serve",
-    url: "http://127.0.0.1:8787/api/health",
+    url: `${baseURL}/api/health`,
+    env: { PORT: String(port) },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

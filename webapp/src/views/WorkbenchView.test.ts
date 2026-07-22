@@ -5,6 +5,9 @@ import { describe, expect, it } from "vitest"
 
 const viewPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "WorkbenchView.vue")
 const source = readFileSync(viewPath, "utf8")
+const componentDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../components")
+const slotCardSource = readFileSync(path.join(componentDir, "DriveDiscSlotCard.vue"), "utf8")
+const pickerSource = readFileSync(path.join(componentDir, "DriveDiscPickerModal.vue"), "utf8")
 
 describe("WorkbenchView optimizer progress", () => {
   it("uses the start button as the only optimizer entrypoint", () => {
@@ -196,6 +199,24 @@ describe("WorkbenchView optimizer result details", () => {
     expect(source).toContain("driveDiscStatText(row.disc.mainStat)")
     expect(source).toContain("driveDiscSubStatText(row.disc)")
     expect(source).toContain("driveDiscRarityLevelText(row.disc)")
+  })
+
+  it("gates one-disc reservation controls without exposing batch reservation actions", () => {
+    expect(source).toContain("reservationUiEnabled")
+    expect(source).toContain("toggleSchemeDiscReservation")
+    expect(source).toContain("applySchemeDiscReservation")
+    expect(source).toContain("schemeReservationConflicts")
+    expect(source).toContain('target-agent-id="buildStore.agentId"')
+    expect(source).toContain("reservation-action")
+    expect(source).toContain('@toggle-reservation="toggleSchemeDiscReservation"')
+    expect(source).toContain("转移并锁定")
+    expect(source).toContain("inventoryById.get(String(disc.id))")
+    expect(source).toContain("排除其他角色专属盘")
+    expect(slotCardSource).toContain("disc-reservation-button")
+    expect(slotCardSource).toContain("toggleReservation")
+    expect(pickerSource).toContain("showReservation")
+    expect(source).not.toContain("保存并锁定")
+    expect(source).not.toContain("转移并锁定整套")
   })
 
   it("uses a modal picker and current-scheme save for manual drive discs", () => {

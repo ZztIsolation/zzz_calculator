@@ -9,7 +9,8 @@ Group=zzzcalc
 WorkingDirectory=/opt/zzz_calculator/current
 Environment=NODE_ENV=production
 Environment=PORT=8787
-Environment=SCAN_TELEMETRY_ENABLED=true
+Environment=SCAN_TELEMETRY_ENABLED=false
+Environment=DRIVE_DISC_RESERVATIONS_UI_ENABLED=false
 Environment=SCAN_TELEMETRY_DIR=/var/lib/zzz-calculator/telemetry
 Environment=SCAN_TELEMETRY_RETENTION_DAYS=30
 StateDirectory=zzz-calculator
