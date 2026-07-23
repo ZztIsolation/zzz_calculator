@@ -149,6 +149,42 @@ compareDense("miyabi-mixed-event-stun", {
     },
 }, 24)
 
+compareDense("miyabi-targeted-crit-dmg", {
+    agentId: "hoshimi_miyabi",
+    coreSkillLevel: "F",
+    wEngineId: "hailfall_star_palace",
+    wEngineModificationLevel: 1,
+    combatBuffs: { activeBuffIds: ["field.defense_v5.v3_0.p3.lingdu_xingdong"] },
+    damage: {
+        events: [
+            {
+                id: "lingdu-basic",
+                kind: "direct",
+                critMode: "expected",
+                skillRef: {
+                    agentSkillId: "hoshimi_miyabi",
+                    categoryId: "basic",
+                    moveId: "frost_moon",
+                    rowId: "charge_3",
+                    level: 12,
+                },
+            },
+            {
+                id: "lingdu-ultimate",
+                kind: "direct",
+                critMode: "expected",
+                skillRef: {
+                    agentSkillId: "hoshimi_miyabi",
+                    categoryId: "chain",
+                    moveId: "ultimate_lingering_snow",
+                    rowId: "damage",
+                    level: 12,
+                },
+            },
+        ],
+    },
+}, 24)
+
 compareDense("ye-shunguang-curtain-cap", {
     agentId: "ye_shunguang",
     coreSkillLevel: "F",

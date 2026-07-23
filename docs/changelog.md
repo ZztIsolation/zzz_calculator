@@ -2,6 +2,61 @@
 
 # Changelog
 
+## 2026-07-24 - Added Defense Battle 3.0 Phase 3 And Removed A Duplicate W-Engine
+
+Added the three field Buffs shown for Defense Battle v5, version 3.0, phase 3,
+under stable ids in `data/combat_buffs.json`. `终幕协奏` grants 40% damage only
+to Chain Attacks and Ultimates and adds 20 percentage points to the active
+stun-vulnerability multiplier. Its complete maintained description also records
+the 15% reduction to stun recovery speed, the 15-second duration, and duration
+refresh behavior. The recovery-speed clause is intentionally descriptive-only
+because the Calculator currently models settled damage rather than enemy stun
+recovery timing.
+
+`链式回路` grants 20 Anomaly Proficiency and 15% attribute-Anomaly damage. Its
+formula runtime input is explicitly labelled `队伍内异常特性代理人数量`, accepts
+only the maintained 0-2 range, and defaults to 2. The formula maps 0, 1, and 2
+agents to 0%, 5%, and 15% all-attribute RES ignore. The RES-ignore rule targets
+only attribute settlements for Assault, Shatter, Burn, Shock, and Corruption;
+it does not leak into direct damage or Disorder. The 15% damage rule likewise
+uses the existing attribute-Anomaly multiplier and remains isolated from
+Disorder damage.
+
+`零度行动` grants global 30% Ice DMG and 30% Ether DMG, plus 20% targeted damage
+and 35% targeted CRIT DMG for Basic Attacks and Chain Attacks only. Extended the
+effect-rule contract so `target.kind = "skill"` accepts `stat = "critDmg"`.
+Targeted CRIT DMG is accumulated per matching event and enters that event's CRIT
+multiplier without changing the global in-combat panel. The same value is now
+carried through normal white-box calculation, prepared scalar calculation,
+compiled score-only calculation, dense panel scoring, fixed-set scalar scoring,
+browser-local execution, and optimizer execution. White-box output names the
+additional term as `定向暴击伤害`; the simplified player custom-Buff stat list
+does not expose a new generic CRIT DMG target option.
+
+Changed the authored Nangongyu teammate Buff order to Core Passive, Ether Veil,
+Additional Ability, Cinema 1, and Cinema 2. This is a data-only ordering change:
+all existing Buff ids, effects, values, and runtime inputs remain unchanged.
+
+Confirmed that `data/w_engines.json` contained two visible entries named
+`霓虹妄想`. Removed the less complete `neon_fantasies` duplicate and retained
+`zzz_wiki_1908`, whose source links and level-60/effect verification metadata are
+complete. Added optional `legacyIds` W-Engine metadata and registered
+`neon_fantasies` as an alias. Catalog lookup, saved current-W-Engine selection,
+current/team Buff ids, Buff runtime inputs, teammate refinement maps, and Vue
+local storage now normalize the legacy id to `zzz_wiki_1908`. Existing browser
+configurations therefore keep their equipment and active effects while the
+picker displays a single W-Engine.
+
+Added regression coverage for the three maintained source texts and period
+metadata; Nangongyu's complete authored order; unique W-Engine names and legacy
+id resolution; Chain/Ultimate/Basic targeting; the three Chained Circuit team
+counts; attribute-Anomaly, Disorder, and direct-damage isolation; targeted CRIT
+DMG white-box visibility; compiled/legacy and dense/map equivalence; browser
+core parity; optimizer parity; Vue saved-config migration; and all three field
+cards in the version/phase picker. This hotfix changes Calculator source and
+documentation only. Scanner, Helper, download manifests, release binaries, and
+CDN files are intentionally untouched.
+
 ## 2026-07-23 - Published Scanner 1.0.45 Without Changing Helper 1.3.1
 
 Updated only the Scanner consumption line from 1.0.43 to 1.0.45. The schema-v3

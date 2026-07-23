@@ -1050,6 +1050,9 @@
     },
     {
       "id": "zzz_wiki_1908",
+      "legacyIds": [
+        "neon_fantasies"
+      ],
       "name": {
         "zhCN": "霓虹妄想"
       },
@@ -2125,125 +2128,6 @@
         "level60Stats": "source-checked",
         "effectText": "source-checked",
         "effectBuff": "source-checked"
-      }
-    },
-    {
-      "id": "neon_fantasies",
-      "name": {
-        "zhCN": "霓虹妄想"
-      },
-      "rarity": "S",
-      "specialty": "stun",
-      "attribute": "ether",
-      "level60": {
-        "atkBase": 713,
-        "advancedStat": {
-          "stat": "anomalyMastery",
-          "value": 30,
-          "mode": "pct",
-          "target": {
-            "kind": "default"
-          }
-        }
-      },
-      "effect": {
-        "name": {
-          "zhCN": "迪斯科恶魔"
-        },
-        "requirement": {
-          "specialty": "stun",
-          "label": {
-            "zhCN": "对于【击破】角色，能够触发以下效果",
-            "en": "For matching specialty characters, the following effect can be triggered."
-          }
-        },
-        "description": {
-          "zhCN": "装备者的异常精通提升90/103/117/130/145点；装备者[强化特殊技]或[普通攻击]造成以太属性伤害时，全队角色造成的伤害提升15%/17%/19.5%/21%/24%，持续40秒，最多叠加2层，同一招式内最多触发一次，重复触发时刷新持续时间，拥有2层效果时，装备者的异常精通额外提升60/69/78/87/96点，该效果全队唯一。",
-          "en": ""
-        },
-        "selfBuff": {
-          "scope": "inCombat",
-          "effects": [
-            {
-              "type": "fixed",
-              "target": {
-                "kind": "default"
-              },
-              "stat": "anomalyProficiency",
-              "mode": "flat",
-              "value": 90,
-              "modificationValues": {
-                "value": [
-                  90,
-                  103,
-                  117,
-                  130,
-                  145
-                ]
-              },
-              "id": "effect_8a81aef020"
-            },
-            {
-              "type": "fixed",
-              "target": {
-                "kind": "default"
-              },
-              "stat": "anomalyProficiency",
-              "mode": "flat",
-              "value": 60,
-              "modificationValues": {
-                "value": [
-                  60,
-                  69,
-                  78,
-                  87,
-                  96
-                ]
-              },
-              "id": "effect_neon_fantasies_self_ap_bonus"
-            }
-          ],
-          "appliesToOutOfCombatPanel": false,
-          "buffModifiers": []
-        },
-        "teamBuff": {
-          "scope": "inCombat",
-          "effects": [
-            {
-              "type": "stacked",
-              "target": {
-                "kind": "default"
-              },
-              "stat": "dmgBonus",
-              "mode": "flat",
-              "valuePerStack": 15,
-              "maxStacks": 2,
-              "defaultStacks": 2,
-              "id": "effect_8256ce4483",
-              "modificationValues": {
-                "valuePerStack": [
-                  15,
-                  17,
-                  19.5,
-                  21,
-                  24
-                ]
-              }
-            }
-          ],
-          "appliesToOutOfCombatPanel": false,
-          "buffModifiers": []
-        }
-      },
-      "images": {
-        "icon": "/assets/w-engines/zzz_wiki_1908.png",
-        "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
-      },
-      "sources": [],
-      "modification": {
-        "minLevel": 1,
-        "maxLevel": 5,
-        "defaultLevel": 1
       }
     },
     {

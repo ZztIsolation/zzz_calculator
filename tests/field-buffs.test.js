@@ -12,12 +12,16 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
 
 const FIELD_BUFF_IDS = {
+    zhongmu: "field.defense_v5.v3_0.p3.zhongmu_xiezou",
+    lianshi: "field.defense_v5.v3_0.p3.lianshi_huilu",
+    lingdu: "field.defense_v5.v3_0.p3.lingdu_xingdong",
     yanwang: "field.critical_assault.v3_0.p3.yanwang",
     linxi: "field.critical_assault.v3_0.p3.linxi",
     gouxi: "field.critical_assault.v3_0.p3.gouxi",
 }
 
 const EFFECT_IDS = {
+    lianshiRes: "field_defense_v5_v3_0_p3_lianshi_anomaly_res_ignore",
     yanwangAtk: "field_critical_assault_v3_0_p3_yanwang_chain_atk",
     linxiRes: "field_critical_assault_v3_0_p3_linxi_enemy_res_reduction",
     linxiAnomaly: "field_critical_assault_v3_0_p3_linxi_anomaly_damage",
@@ -26,6 +30,9 @@ const EFFECT_IDS = {
 }
 
 const EXPECTED_NAMES = {
+    [FIELD_BUFF_IDS.zhongmu]: "终幕协奏",
+    [FIELD_BUFF_IDS.lianshi]: "链式回路",
+    [FIELD_BUFF_IDS.lingdu]: "零度行动",
     [FIELD_BUFF_IDS.yanwang]: "湮亡",
     [FIELD_BUFF_IDS.linxi]: "凛息",
     [FIELD_BUFF_IDS.gouxi]: "构析",
@@ -64,13 +71,14 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
     assert.equal(buff.name?.zhCN, EXPECTED_NAMES[id], `${id} should keep its maintained name`)
     assert.equal(buff.sourceType, "field", `${id} should be a field Buff`)
     assert.equal(buff.scope, "inCombat", `${id} should be an in-combat Buff`)
+    const isDefense = [FIELD_BUFF_IDS.zhongmu, FIELD_BUFF_IDS.lianshi, FIELD_BUFF_IDS.lingdu].includes(id)
     assert.deepEqual(buff.period, {
-        modeId: "critical_assault",
+        modeId: isDefense ? "defense_v5" : "critical_assault",
         gameVersion: "3.0",
         phaseNo: 3,
         phaseName: { zhCN: "第三期" },
     })
-    assert.equal(buff.source?.zhCN, "危局强袭战")
+    assert.equal(buff.source?.zhCN, isDefense ? "防卫战 v5" : "危局强袭战")
     assert.equal(buff.sourcePeriod?.zhCN, "3.0版本第三期")
 
     const validation = validateMaintenanceItem("field-buffs", buff, {
@@ -80,6 +88,22 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
     })
     assert.equal(validation.ok, true, `${id} should pass field Buff validation: ${JSON.stringify(validation.errors)}`)
 }
+
+assert.equal(
+    fieldBuff(FIELD_BUFF_IDS.zhongmu).description.zhCN,
+    "代理人的[终结技]、[连携技]造成的伤害提升40%。[连携技]命中敌人后，其失衡易伤倍率提升20%，失衡恢复速度降低15%，持续15秒，重复触发时刷新持续时间。",
+    "Zhongmu should preserve the complete source text, including the descriptive-only stun recovery clause",
+)
+assert.equal(
+    fieldBuff(FIELD_BUFF_IDS.lianshi).description.zhCN,
+    "代理人的异常精通提升20点，造成的属性异常伤害提升15%。若队伍内有1名/2名[异常]特性的代理人，代理人的属性异常伤害命中敌人时无视其5%/15%全属性伤害抗性。",
+    "Lianshi should preserve the complete source text",
+)
+assert.equal(
+    fieldBuff(FIELD_BUFF_IDS.lingdu).description.zhCN,
+    "代理人的冰属性伤害和以太属性伤害提升30%。代理人的[普通攻击]和[连携技]造成的伤害提升20%，造成的暴击伤害提升35%。",
+    "Lingdu should preserve the complete source text",
+)
 
 const allCatalogBuffs = [
     ...(catalog.combatBuffs ?? []),
@@ -174,6 +198,14 @@ approx(yanwangUltimate.damage.targetBreakdown.resIgnore, 0.3, "Yanwang should gr
 const yanwangBasic = calculateSkill(FIELD_BUFF_IDS.yanwang, miyabiSkillRefs.basic, yanwangOneStackRuntime)
 approx(yanwangBasic.damage.targetBreakdown.resIgnore, 0, "Yanwang should not grant Basic Attack RES ignore")
 
+const zhongmuChain = calculateSkill(FIELD_BUFF_IDS.zhongmu, miyabiSkillRefs.chain)
+approx(zhongmuChain.damage.multipliers.directDamageBonus, 0.4, "Zhongmu should grant Chain Attack 40% damage")
+approx(zhongmuChain.damage.multipliers.stun, 1.7, "Zhongmu should add 20% stun vulnerability")
+const zhongmuUltimate = calculateSkill(FIELD_BUFF_IDS.zhongmu, miyabiSkillRefs.ultimate)
+approx(zhongmuUltimate.damage.multipliers.directDamageBonus, 0.4, "Zhongmu should grant Ultimate 40% damage")
+const zhongmuBasic = calculateSkill(FIELD_BUFF_IDS.zhongmu, miyabiSkillRefs.basic)
+approx(zhongmuBasic.damage.multipliers.directDamageBonus, 0, "Zhongmu should not grant Basic Attack damage")
+
 function calculateAnomaly(fieldBuffId, event, runtime = {}) {
     return calculateInCombatPanel(catalog, {
         ...miyabiInput,
@@ -241,6 +273,58 @@ const linxiDisorder = calculateAnomaly(FIELD_BUFF_IDS.linxi, {
 }, linxiRuntime)
 approx(linxiDisorder.damage.targetBreakdown.enemyResReduction, 0.05, "Linxi RES reduction coverage should also affect Disorder damage")
 approx(linxiDisorder.damage.multipliers.disorderDamage, 1, "Linxi attribute-anomaly bonus should not affect Disorder damage")
+
+for (const [anomalyAgentCount, expectedResIgnore] of [[0, 0], [1, 0.05], [2, 0.15]]) {
+    const lianshi = calculateAnomaly(FIELD_BUFF_IDS.lianshi, {
+        id: `lianshi-burn-${anomalyAgentCount}`,
+        kind: "anomaly",
+        settlementType: "attribute",
+        anomalyEffect: "burn",
+        procCount: 1,
+    }, {
+        effects: {
+            [EFFECT_IDS.lianshiRes]: { sourceValue: anomalyAgentCount },
+        },
+    })
+    approx(
+        lianshi.inCombat.panel.anomalyProficiency - lianshi.outOfCombat.panel.anomalyProficiency,
+        20,
+        `Lianshi should grant 20 Anomaly Proficiency with ${anomalyAgentCount} Anomaly agents`,
+    )
+    approx(lianshi.damage.multipliers.attributeAnomalyDamage, 1.15, "Lianshi should grant 15% attribute-anomaly damage")
+    approx(
+        lianshi.damage.targetBreakdown.resIgnore,
+        expectedResIgnore,
+        `Lianshi should grant the correct attribute-anomaly RES ignore for ${anomalyAgentCount} Anomaly agents`,
+    )
+}
+
+const lianshiDisorder = calculateAnomaly(FIELD_BUFF_IDS.lianshi, {
+    id: "lianshi-burn-disorder",
+    kind: "disorder",
+    anomalyEffect: "burn",
+    elapsedSeconds: 0,
+})
+approx(lianshiDisorder.damage.targetBreakdown.resIgnore, 0, "Lianshi RES ignore should not affect Disorder")
+approx(lianshiDisorder.damage.multipliers.disorderDamage, 1, "Lianshi damage bonus should not affect Disorder")
+const lianshiDirect = calculateSkill(FIELD_BUFF_IDS.lianshi, miyabiSkillRefs.basic)
+approx(lianshiDirect.damage.targetBreakdown.resIgnore, 0, "Lianshi RES ignore should not affect direct damage")
+
+const lingduBasic = calculateSkill(FIELD_BUFF_IDS.lingdu, miyabiSkillRefs.basic)
+approx(lingduBasic.inCombat.panel.iceDmg - lingduBasic.outOfCombat.panel.iceDmg, 0.3, "Lingdu should grant 30% Ice damage")
+approx(lingduBasic.inCombat.panel.etherDmg - lingduBasic.outOfCombat.panel.etherDmg, 0.3, "Lingdu should grant 30% Ether damage")
+approx(lingduBasic.damage.multipliers.directDamageBonus, 0.2, "Lingdu should grant Basic Attack 20% damage")
+approx(lingduBasic.damage.multipliers.critDmg, 0.85, "Lingdu should grant Basic Attack 35% targeted CRIT DMG")
+assert.ok(
+    lingduBasic.damage.whiteBoxRows.some(row => String(row.formula ?? "").includes("定向暴击伤害 35%")),
+    "Lingdu targeted CRIT DMG should be inspectable in the white-box calculation",
+)
+const lingduChain = calculateSkill(FIELD_BUFF_IDS.lingdu, miyabiSkillRefs.chain)
+approx(lingduChain.damage.multipliers.directDamageBonus, 0.2, "Lingdu should grant Chain Attack 20% damage")
+approx(lingduChain.damage.multipliers.critDmg, 0.85, "Lingdu should grant Chain Attack 35% targeted CRIT DMG")
+const lingduUltimate = calculateSkill(FIELD_BUFF_IDS.lingdu, miyabiSkillRefs.ultimate)
+approx(lingduUltimate.damage.multipliers.directDamageBonus, 0, "Lingdu should not grant Ultimate targeted damage")
+approx(lingduUltimate.damage.multipliers.critDmg, 0.5, "Lingdu should not grant Ultimate targeted CRIT DMG")
 
 const gouxiBoth = calculateSkill(FIELD_BUFF_IDS.gouxi, miyabiSkillRefs.basic)
 approx(

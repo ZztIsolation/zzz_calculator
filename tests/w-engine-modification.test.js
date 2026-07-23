@@ -75,9 +75,9 @@ const expectedModificationValues = {
     "zzz_wiki_951:teamBuff:effect_wiki_951_team_crit_dmg_iceCritDmg:valuePerStack": [1.5, 1.72, 1.95, 2.17, 2.4],
     "zzz_wiki_951:teamBuff:effect_wiki_951_team_crit_dmg_fireCritDmg:valuePerStack": [1.5, 1.72, 1.95, 2.17, 2.4],
     "zzz_wiki_486:teamBuff:effect_wiki_486_team_atk:valuePerStack": [2.5, 2.8, 3.2, 3.6, 4],
-    "neon_fantasies:selfBuff:effect_8a81aef020:value": [90, 103, 117, 130, 145],
-    "neon_fantasies:selfBuff:effect_neon_fantasies_self_ap_bonus:value": [60, 69, 78, 87, 96],
-    "neon_fantasies:teamBuff:effect_8256ce4483:valuePerStack": [15, 17, 19.5, 21, 24],
+    "zzz_wiki_1908:selfBuff:effect_wiki_1908_self_ap:value": [90, 103, 117, 130, 145],
+    "zzz_wiki_1908:selfBuff:effect_wiki_1908_self_ap_bonus:value": [60, 69, 78, 87, 96],
+    "zzz_wiki_1908:teamBuff:effect_wiki_1908_team_dmg:valuePerStack": [15, 17, 19.5, 21, 24],
 }
 
 for (const engine of catalog.wEngines) {
@@ -124,6 +124,18 @@ for (const [key, values] of Object.entries(expectedModificationValues)) {
 }
 
 const meta = buildMeta(catalog)
+assert.equal(
+    catalog.wEngines.filter(item => item.name?.zhCN === "霓虹妄想").length,
+    1,
+    "The W-Engine catalog should display only one Neon Fantasies entry",
+)
+assert.deepEqual(wEngine("zzz_wiki_1908").legacyIds, ["neon_fantasies"], "The canonical W-Engine should retain its legacy id")
+assert.equal(catalog.wEnginesMap.get("neon_fantasies")?.id, "zzz_wiki_1908", "The legacy W-Engine id should resolve to the canonical entry")
+assert.deepEqual(
+    meta.wEngines.find(item => item.id === "zzz_wiki_1908")?.legacyIds,
+    ["neon_fantasies"],
+    "GET /api/meta data should expose legacy W-Engine ids for browser migration",
+)
 assert.deepEqual(
     meta.wEngines.find(item => item.id === "cloudcleave_radiance")?.modification,
     { minLevel: 1, maxLevel: 5, defaultLevel: 1 },
@@ -253,6 +265,24 @@ approx(
     Number(catalog.agentsMap.get("anby_demara").level60.anomalyMastery) * 1.3,
     "W-Engine advanced mastery should scale the agent base",
 )
+
+const neonLegacyBuffs = createInCombatPanelCalculator(catalog, {
+    agentId: "anby_demara",
+    coreSkillLevel: "none",
+    wEngineId: "neon_fantasies",
+    wEngineModificationLevel: 1,
+    combatBuffs: {
+        activeBuffIds: ["wEngine:neon_fantasies.self", "wEngine:neon_fantasies.team"],
+        runtimeInputs: {
+            "wEngine:neon_fantasies.team": {
+                effects: { effect_wiki_1908_team_dmg: { stacks: 2 } },
+            },
+        },
+        wEngineTeamModificationLevels: { "wEngine:neon_fantasies.team": 1 },
+    },
+}).calculate([], { round: false })
+approx(neonLegacyBuffs.inCombat.buffTotals.anomalyProficiencyFlat, 150, "Legacy self Buff ids should activate the canonical W-Engine effects")
+approx(neonLegacyBuffs.inCombat.buffTotals.dmgBonus, 0.3, "Legacy team Buff ids and runtime inputs should activate canonical stacked effects")
 
 const roaringRideMastery = createInCombatPanelCalculator(catalog, {
     agentId: "alice_thymefield",

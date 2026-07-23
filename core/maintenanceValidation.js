@@ -169,6 +169,7 @@ const SKILL_TARGET_STAT_VALUES = new Set([
     "electricDmg",
     "etherDmg",
     "windDmg",
+    "critDmg",
     "anomalyDamageBonus",
     "disorderDamageBonus",
     "stunDmgMultiplierBonus",
