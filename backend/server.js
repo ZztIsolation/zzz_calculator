@@ -47,6 +47,7 @@ import {
 import { normalizeSkillTargetsInValue } from "../core/skillTargets.js"
 import { normalizeLegacyEffectAppliesToInValue } from "../core/effectRuleTargets.js"
 import { disorderElapsedStepSeconds, normalizeElapsedSeconds } from "../core/damageEventMultipliers.js"
+import { isReleaseSettlement, normalizeAnomalySourceSnapshot } from "../core/anomalyRelease.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, "..")
@@ -871,7 +872,11 @@ function cleanPreferredDriveDiscs(preferredDriveDiscs = null) {
     if (!preferredDriveDiscs || typeof preferredDriveDiscs !== "object" || Array.isArray(preferredDriveDiscs)) {
         return null
     }
-    const defaultSetId = String(preferredDriveDiscs.defaultSetId ?? preferredDriveDiscs.defaultSet ?? "").trim()
+    const legacyDefaultSetId = String(preferredDriveDiscs.defaultSetId ?? preferredDriveDiscs.defaultSet ?? "").trim()
+    const rawDefaultSetIds = preferredDriveDiscs.defaultSetIds ?? (legacyDefaultSetId ? [legacyDefaultSetId] : [])
+    const defaultSetIds = [...new Set((Array.isArray(rawDefaultSetIds) ? rawDefaultSetIds : [rawDefaultSetIds])
+        .map(value => String(value ?? "").trim())
+        .filter(Boolean))]
     const source = preferredDriveDiscs.mainStatLimits
         ?? preferredDriveDiscs.mainStats
         ?? preferredDriveDiscs
@@ -882,11 +887,11 @@ function cleanPreferredDriveDiscs(preferredDriveDiscs = null) {
         mainStatLimits[slot] = [...new Set(values.filter(Boolean).map(String))]
     }
     const hasMainStatLimits = Object.values(mainStatLimits).some(values => values.length)
-    if (!defaultSetId && !hasMainStatLimits) {
+    if (!defaultSetIds.length && !hasMainStatLimits) {
         return null
     }
     return {
-        ...(defaultSetId ? { defaultSetId } : {}),
+        ...(defaultSetIds.length ? { defaultSetIds } : {}),
         ...(hasMainStatLimits ? { mainStatLimits } : {}),
     }
 }
@@ -929,7 +934,9 @@ function cleanCalculationEvent(event = {}, index = 0, options = {}) {
             stunned: event.stunned === undefined ? true : Boolean(event.stunned),
         }
     }
-    const settlementType = inputKind === "disorder" || event.settlementType === "disorder" ? "disorder" : "attribute"
+    const settlementType = isReleaseSettlement(event)
+        ? "release"
+        : inputKind === "disorder" || event.settlementType === "disorder" ? "disorder" : "attribute"
     const kind = inputKind === "direct" || inputKind === "sheer" ? inputKind : "anomaly"
     const id = String(event.id ?? `${kind}-${index + 1}`).trim() || `${kind}-${index + 1}`
     const count = Number(event.count ?? 1)
@@ -980,6 +987,22 @@ function cleanCalculationEvent(event = {}, index = 0, options = {}) {
                     Number.POSITIVE_INFINITY,
                     disorderElapsedStepSeconds(event, options),
                 ),
+            }
+        }
+        if (settlementType === "release") {
+            const triggerAgentId = String(event.triggerActorRef?.agentId ?? options.agentId ?? "").trim()
+            const profileId = String(event.triggerActorRef?.profileId ?? options.defaultReleaseProfileId ?? "").trim()
+            const sourceAgentId = String(event.anomalySource?.actorRef?.agentId ?? triggerAgentId).trim()
+            const snapshot = normalizeAnomalySourceSnapshot(event.anomalySource?.snapshot)
+            return {
+                ...base,
+                settlementType: "release",
+                anomalyEffect: String(event.anomalyEffect ?? "").trim(),
+                triggerActorRef: { agentId: triggerAgentId, profileId },
+                anomalySource: {
+                    actorRef: { agentId: sourceAgentId },
+                    ...(snapshot ? { snapshot } : {}),
+                },
             }
         }
         const procCount = Number(event.procCount ?? 1)
@@ -1140,12 +1163,18 @@ function mergeCalculationSkillGroups(primaryGroups = [], legacyGroups = []) {
 }
 
 function cleanAgent(item = {}, options = {}) {
+    const releaseProfiles = Array.isArray(item.anomalyReleaseProfiles) ? item.anomalyReleaseProfiles : []
+    const calculationOptions = {
+        ...options,
+        agentId: String(item.id ?? ""),
+        defaultReleaseProfileId: String(releaseProfiles.find(profile => profile?.default)?.id ?? releaseProfiles[0]?.id ?? ""),
+    }
     const preferredDriveDiscs = cleanPreferredDriveDiscs(item.preferredDriveDiscs)
     const skillGroups = mergeCalculationSkillGroups(
-        cleanCalculationSkillGroups(item.skillGroups, options),
-        cleanCalculationSkillGroups(item.defaultCalculationConfig?.skillGroups, options),
+        cleanCalculationSkillGroups(item.skillGroups, calculationOptions),
+        cleanCalculationSkillGroups(item.defaultCalculationConfig?.skillGroups, calculationOptions),
     )
-    const defaultCalculationConfig = cleanDefaultCalculationConfig(item.defaultCalculationConfig, skillGroups, options)
+    const defaultCalculationConfig = cleanDefaultCalculationConfig(item.defaultCalculationConfig, skillGroups, calculationOptions)
     const next = {
         ...item,
         name: zhOnly(item.name),

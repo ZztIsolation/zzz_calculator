@@ -22,6 +22,20 @@ import {
     ELEMENT_DEF_IGNORE_STAT_BY_ELEMENT,
     ELEMENT_DEF_IGNORE_STATS,
 } from "./effectRuleTargets.js"
+import {
+    corePassiveScalingRow,
+    materializeCorePassiveScalingEffect,
+} from "./corePassiveScaling.js"
+import {
+    anomalyReleaseProfile,
+    evaluateAnomalyReleaseProfile,
+    evaluateAnomalyReleaseProfileInterval,
+    evaluateReleaseExpression,
+    evaluateReleaseExpressionInterval,
+    isReleaseSettlement,
+    normalizeAnomalySourceSnapshot,
+    releaseFormulaStatDependencies,
+} from "./anomalyRelease.js"
 
 const BONUS_KEY_MAP = {
     hpFlat: "hpFlat",
@@ -970,10 +984,14 @@ function normalizedRuleTarget(rule = {}) {
         }
     }
     if (target.kind === "anomaly") {
+        const settlementType = ["attribute", "disorder", "release"].includes(target.settlementType)
+            ? target.settlementType
+            : "attribute"
         return {
             kind: "anomaly",
-            settlementType: target.settlementType === "disorder" ? "disorder" : "attribute",
+            settlementType,
             anomalyEffects: Array.isArray(target.anomalyEffects) ? target.anomalyEffects : [],
+            anomalyVariants: Array.isArray(target.anomalyVariants) ? target.anomalyVariants : [],
         }
     }
     return { kind: "default" }
@@ -987,7 +1005,9 @@ function hasEventAppliesToFilters(rule = {}) {
     const appliesTo = rule.appliesTo ?? null
     return Boolean(appliesTo) && [
         appliesTo.damageKinds,
+        appliesTo.settlementTypes,
         appliesTo.anomalyEffects,
+        appliesTo.anomalyVariants,
         appliesTo.elements,
         appliesTo.skillTargets,
     ].some(values => Array.isArray(values) && values.length > 0)
@@ -1023,7 +1043,9 @@ function eventModifierCalcValue(rule = {}) {
 
 function effectRuleRequirementMatches(rule = {}, modifierContext = {}) {
     const requiredSpecialty = String(rule?.requirement?.specialty ?? "").trim()
-    return !requiredSpecialty || requiredSpecialty === modifierContext.agent?.specialty
+    const requiredAttribute = String(rule?.requirement?.attribute ?? "").trim()
+    return (!requiredSpecialty || requiredSpecialty === modifierContext.agent?.specialty)
+        && (!requiredAttribute || requiredAttribute === modifierContext.agent?.attribute)
 }
 
 function resolveEffectRule(rule, effect, runtimeInput = {}, modifierContext = {}) {
@@ -1149,7 +1171,9 @@ function resolveEffectDamageModifiers(effect, runtimeInput = {}, modifierContext
                     ? {
                         ...(rule.appliesTo ?? {}),
                         damageKinds: [target.settlementType === "disorder" ? "disorder" : "anomaly"],
+                        settlementTypes: [target.settlementType],
                         anomalyEffects: target.anomalyEffects,
+                        anomalyVariants: target.anomalyVariants,
                     }
                     : rule.appliesTo ?? null
             return {
@@ -1347,6 +1371,8 @@ function normalizeAnomalyCatalogEffect(effect = {}) {
         element: DAMAGE_ELEMENTS.includes(effect.element) ? effect.element : "physical",
         baseMultiplier: Math.max(0, Number(effect.baseMultiplier ?? 0)),
         defaultProcCount: Math.max(0, Number(effect.defaultProcCount ?? 1)),
+        baseDurationSeconds: Math.max(0, Number(effect.baseDurationSeconds ?? 0)),
+        tickIntervalSeconds: Math.max(0, Number(effect.tickIntervalSeconds ?? 0)),
     }
 }
 
@@ -1652,20 +1678,25 @@ function cinemaBuffName(buff = {}) {
     return name
 }
 
-function agentCombatBuffEntries(agent) {
+function agentCombatBuffEntries(agent, coreSkillLevel) {
     const combatBuffs = agent?.combatBuffs ?? {}
     const fixedEntries = [
         ["corePassive", combatBuffs.corePassive],
         ["additionalAbility", combatBuffs.additionalAbility],
     ]
         .filter(([, buff]) => buff)
-        .map(([key, buff]) => ({
-            id: `agent:${agent.id}.${key}`,
-            key,
-            buff,
-            name: buff.name,
-            conditionLabel: buff.conditionLabel,
-        }))
+        .map(([key, buff]) => {
+            const materializedBuff = key === "corePassive"
+                ? materializeCorePassiveScalingEffect(buff, agent, coreSkillLevel)
+                : buff
+            return {
+                id: `agent:${agent.id}.${key}`,
+                key,
+                buff: materializedBuff,
+                name: materializedBuff.name,
+                conditionLabel: materializedBuff.conditionLabel,
+            }
+        })
     const cinemaEntries = (combatBuffs.cinemaBuffs ?? [])
         .filter(buff => buff)
         .map(buff => ({
@@ -2545,43 +2576,103 @@ function normalizeSheerDamageEvent(event = {}, agent = {}, catalog = {}, index =
     }
 }
 
-function normalizeAnomalyDamageEvent(event = {}, catalog = {}, index = 0) {
+function anomalyReleaseEventData(event = {}, agent = {}, damageElement = "physical", options = {}) {
+    const requestedTriggerAgentId = String(event.triggerActorRef?.agentId ?? agent.id ?? "")
+    if (requestedTriggerAgentId !== String(agent.id ?? "")) {
+        throw new Error("异放触发者必须是当前配装角色。")
+    }
+    const profile = anomalyReleaseProfile(agent, event.triggerActorRef?.profileId, damageElement)
+    if (!profile) {
+        throw new Error(`角色 ${agent.id ?? "unknown"} 暂不支持 ${damageElement} 属性异放。`)
+    }
+    const sourceAgentId = String(event.anomalySource?.actorRef?.agentId ?? agent.id ?? "")
+    const sourceSnapshot = normalizeAnomalySourceSnapshot(event.anomalySource?.snapshot)
+    if (sourceAgentId !== String(agent.id ?? "") && (!sourceSnapshot || sourceSnapshot.agentId !== sourceAgentId)) {
+        throw new Error("外部原异常施加者必须提供与角色一致的冻结快照。")
+    }
+    return {
+        profile,
+        coreScalingRow: corePassiveScalingRow(agent, options.coreSkillLevel),
+        triggerActorRef: {
+            agentId: requestedTriggerAgentId,
+            profileId: profile.id,
+        },
+        anomalySource: {
+            actorRef: { agentId: sourceAgentId },
+            ...(sourceSnapshot ? { snapshot: sourceSnapshot } : {}),
+        },
+    }
+}
+
+function normalizeAnomalyDamageEvent(event = {}, agent = {}, catalog = {}, index = 0, options = {}) {
+    const releaseSettlement = isReleaseSettlement(event)
     if (event.normalized === true) {
+        const damageElement = DAMAGE_ELEMENTS.includes(event.damageElement) ? event.damageElement : "physical"
+        const release = releaseSettlement ? anomalyReleaseEventData(event, agent, damageElement, options) : null
         return {
             ...event,
             id: String(event.id ?? `anomaly-${index + 1}`),
             kind: "anomaly",
-            settlementType: "attribute",
+            settlementType: releaseSettlement ? "release" : "attribute",
             normalized: true,
             anomalyEffect: String(event.anomalyEffect ?? ""),
-            anomalyVariant: event.anomalyVariant === "polarizedAssault" ? "polarizedAssault" : "normal",
+            anomalyVariant: releaseSettlement
+                ? undefined
+                : event.anomalyVariant === "polarizedAssault" ? "polarizedAssault" : "normal",
             label: normalizeDamageEventLabel(event),
             damageScale: normalizeDamageScale(event),
-            damageElement: DAMAGE_ELEMENTS.includes(event.damageElement) ? event.damageElement : "physical",
+            damageElement,
             baseMultiplier: Math.max(0, Number(event.baseMultiplier ?? 0)),
             baseMultiplierPerProc: Math.max(0, Number(event.baseMultiplierPerProc ?? event.baseMultiplier ?? 0)),
-            procCount: normalizeDamageCount(event.procCount, 1),
+            procCount: releaseSettlement ? 1 : normalizeDamageCount(event.procCount, 1),
+            usesDefaultProcCount: releaseSettlement ? false : event.usesDefaultProcCount === true,
+            baseDurationSeconds: Math.max(0, Number(event.baseDurationSeconds ?? 0)),
+            tickIntervalSeconds: Math.max(0, Number(event.tickIntervalSeconds ?? 0)),
+            ...(release ? {
+                releaseProfile: release.profile,
+                releaseCoreScalingRow: release.coreScalingRow,
+                triggerActorRef: release.triggerActorRef,
+                anomalySource: release.anomalySource,
+            } : {}),
             count: normalizeDamageCount(event.count, 1),
             stunned: normalizeEventStunned(event.stunned),
         }
     }
 
     const effect = anomalyEffectData(catalog, event.anomalyEffect ?? "assault")
-    const procCount = normalizeDamageCount(event.procCount, effect.defaultProcCount)
+    const anomalyVariant = releaseSettlement
+        ? undefined
+        : event.anomalyVariant === "polarizedAssault" && effect.id === "assault"
+            ? "polarizedAssault"
+            : "normal"
+    const release = releaseSettlement ? anomalyReleaseEventData(event, agent, effect.element, options) : null
+    const usesDefaultProcCount = event.procCount === undefined || event.procCount === null || event.procCount === ""
+    const procCount = releaseSettlement
+        ? 1
+        : normalizeDamageCount(event.procCount, effect.defaultProcCount)
     return {
         id: String(event.id ?? `anomaly-${index + 1}`),
         kind: "anomaly",
-        settlementType: "attribute",
+        settlementType: releaseSettlement ? "release" : "attribute",
         normalized: true,
         anomalyEffect: effect.id,
         anomalyLabel: effect.label,
-        anomalyVariant: event.anomalyVariant === "polarizedAssault" && effect.id === "assault" ? "polarizedAssault" : "normal",
+        anomalyVariant,
         label: normalizeDamageEventLabel(event),
         damageScale: normalizeDamageScale(event),
         damageElement: effect.element,
         baseMultiplier: Number(effect.baseMultiplier ?? 0) * procCount,
         baseMultiplierPerProc: Number(effect.baseMultiplier ?? 0),
         procCount,
+        usesDefaultProcCount: releaseSettlement ? false : usesDefaultProcCount,
+        baseDurationSeconds: Math.max(0, Number(effect.baseDurationSeconds ?? 0)),
+        tickIntervalSeconds: Math.max(0, Number(effect.tickIntervalSeconds ?? 0)),
+        ...(release ? {
+            releaseProfile: release.profile,
+            releaseCoreScalingRow: release.coreScalingRow,
+            triggerActorRef: release.triggerActorRef,
+            anomalySource: release.anomalySource,
+        } : {}),
         count: normalizeDamageCount(event.count, 1),
         stunned: normalizeEventStunned(event.stunned),
     }
@@ -2685,7 +2776,7 @@ function normalizeDamageEvent(event = {}, agent = {}, catalog = {}, index = 0, o
         return normalizeDisorderDamageEvent(event, catalog, index)
     }
     if (kind === "anomaly") {
-        return normalizeAnomalyDamageEvent(event, catalog, index)
+        return normalizeAnomalyDamageEvent(event, agent, catalog, index, options)
     }
     if (kind === "disorder") {
         return normalizeDisorderDamageEvent(event, catalog, index)
@@ -2968,6 +3059,18 @@ export function damageModifierAppliesTo(modifier, event) {
             return false
         }
     }
+    if (Array.isArray(appliesTo.settlementTypes) && appliesTo.settlementTypes.length) {
+        const settlementType = isReleaseSettlement(event)
+            ? "release"
+            : isDisorderDamageEvent(event) ? "disorder" : "attribute"
+        if (!appliesTo.settlementTypes.includes(settlementType)) {
+            return false
+        }
+    }
+    if (Array.isArray(appliesTo.anomalyVariants) && appliesTo.anomalyVariants.length
+        && !appliesTo.anomalyVariants.includes(event.anomalyVariant ?? "normal")) {
+        return false
+    }
     if (Array.isArray(appliesTo.elements) && appliesTo.elements.length && !appliesTo.elements.includes(event.damageElement)) {
         return false
     }
@@ -3030,7 +3133,39 @@ function eventTargetTotalsForElement(bonusTotals, event) {
     }
 }
 
-function anomalyCritMultiplier(bonusTotals, event) {
+function releaseBreakdownForEvent(event, panel = {}, outOfCombatPanel = panel) {
+    if (!isReleaseSettlement(event)) {
+        return {
+            resultMode: null,
+            originalBaseMultiplier: Number(event?.baseMultiplierPerProc ?? event?.baseMultiplier ?? 0),
+            formulaValue: 1,
+            finalBaseMultiplier: Number(event?.baseMultiplier ?? 0),
+            releaseScale: 1,
+            trace: null,
+        }
+    }
+    return evaluateAnomalyReleaseProfile(event.releaseProfile, {
+        originalBaseMultiplier: Number(event.baseMultiplierPerProc ?? event.baseMultiplier ?? 0),
+        trigger: { inCombatPanel: panel, outOfCombatPanel },
+        coreScalingRow: event.releaseCoreScalingRow,
+        event,
+        eventElement: event.damageElement,
+    })
+}
+
+function releaseCritRateBonusForEvent(event, panel = {}, outOfCombatPanel = panel) {
+    if (!isReleaseSettlement(event) || !event.releaseProfile?.critRateBonusExpression) {
+        return 0
+    }
+    return Math.max(0, evaluateReleaseExpression(event.releaseProfile.critRateBonusExpression, {
+        trigger: { inCombatPanel: panel, outOfCombatPanel },
+        coreScalingRow: event.releaseCoreScalingRow,
+        event,
+        eventElement: event.damageElement,
+    }).value)
+}
+
+function anomalyCritMultiplier(bonusTotals, event, panel = {}, outOfCombatPanel = panel) {
     if (isDisorderDamageEvent(event)) {
         return {
             critRate: 0,
@@ -3039,12 +3174,38 @@ function anomalyCritMultiplier(bonusTotals, event) {
         }
     }
 
-    const critRate = clampNumber(sumDamageModifiers(bonusTotals, event, "anomalyCritRate"), 0, 1)
+    const baseCritRate = sumDamageModifiers(bonusTotals, event, "anomalyCritRate")
+    const masteryCritRate = baseCritRate > 0 ? releaseCritRateBonusForEvent(event, panel, outOfCombatPanel) : 0
+    const critRate = clampNumber(baseCritRate + masteryCritRate, 0, 1)
     const critDmg = Math.max(0, sumDamageModifiers(bonusTotals, event, "anomalyCritDmg"))
     return {
         critRate,
         critDmg,
         multiplier: critRate > 0 && critDmg > 0 ? 1 + critRate * critDmg : 1,
+    }
+}
+
+function effectiveAttributeAnomalyDamageEvent(event, bonusTotals) {
+    if (isDisorderDamageEvent(event) || isReleaseSettlement(event) || !event.usesDefaultProcCount) {
+        return event
+    }
+    const baseDurationSeconds = Number(event.baseDurationSeconds ?? 0)
+    const tickIntervalSeconds = Number(event.tickIntervalSeconds ?? 0)
+    if (!(baseDurationSeconds > 0) || !(tickIntervalSeconds > 0)) {
+        return event
+    }
+    const durationBonusSeconds = sumDamageModifiers(bonusTotals, event, "anomalyDurationBonusSeconds")
+    if (!(durationBonusSeconds > 0)) {
+        return event
+    }
+    const extraProcCount = Math.max(0, Math.floor((durationBonusSeconds + 1e-9) / tickIntervalSeconds))
+    const procCount = Number(event.procCount ?? 0) + extraProcCount
+    return {
+        ...event,
+        durationBonusSeconds,
+        durationSeconds: baseDurationSeconds + durationBonusSeconds,
+        procCount,
+        baseMultiplier: Number(event.baseMultiplierPerProc ?? 0) * procCount,
     }
 }
 
@@ -3285,13 +3446,30 @@ function sheerDamageWhiteBoxRows({ event, hp, atk, sheerForceFlat, sheerForce, c
     return rows
 }
 
-function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBonus, dmgMultiplier, targetBreakdown, anomalyProficiencyMultiplier, levelMultiplier, anomalyDamageBonus, anomalyCrit, baseMultiplierBonus, effectiveBaseMultiplier, finalDamage, singleDamage }) {
+function releaseTraceWhiteBoxRows(trace) {
+    if (!trace) return []
+    const rows = []
+    const visit = (node, depth = 0) => {
+        for (const child of node.children ?? []) visit(child, depth + 1)
+        rows.push({
+            label: depth ? node.label : `异放公式：${node.label}`,
+            formula: node.expression,
+            value: Number(node.value ?? 0),
+            displayValue: formatDamageNumber(node.value, 6),
+        })
+    }
+    visit(trace)
+    return rows
+}
+
+function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBonus, dmgMultiplier, targetBreakdown, anomalyProficiencyMultiplier, levelMultiplier, anomalyDamageBonus, anomalyCrit, releaseBreakdown = null, baseMultiplierBonus, effectiveBaseMultiplier, finalDamage, singleDamage }) {
     const damageElementText = damageElementLabel(event.damageElement)
     const effectLabel = localizedName(event.anomalyLabel, event.anomalyEffect ?? event.previousAnomalyEffect)
     const isDisorder = isDisorderDamageEvent(event)
     const specialBonusLabel = isDisorder ? "紊乱增伤区" : "属性异常增伤区"
     const specialBonusFormulaLabel = isDisorder ? "紊乱增伤" : "属性异常增伤"
     const multiplierScale = disorderMultiplierScale(event.disorderType)
+    const isRelease = isReleaseSettlement(event)
     const rows = [
         {
             label: "局内攻击力",
@@ -3300,12 +3478,16 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
             displayValue: formatDamageNumber(atk),
         },
         {
-            label: isDisorder ? "紊乱倍率" : "异常倍率",
+            label: isDisorder ? "紊乱倍率" : isRelease ? "异放最终倍率" : "异常倍率",
             formula: isDisorder
                 ? multiplierScale === 1
                     ? `${effectLabel}${event.durationBonusSeconds ? `（基础 ${formatDamageNumber(event.baseDurationSeconds)} 秒 + 延长 ${formatDamageNumber(event.durationBonusSeconds)} 秒 = ${formatDamageNumber(event.durationSeconds)} 秒；已流逝 ${formatDamageNumber(event.elapsedSeconds)} 秒，剩余 ${formatDamageNumber(event.remainingSeconds)} 秒）` : ""}：${formatDamagePercent(event.fixedMultiplier)} + ${event.tickCount} × ${formatDamagePercent(event.tickMultiplier)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`
                     : `${effectLabel}${event.durationBonusSeconds ? `（基础 ${formatDamageNumber(event.baseDurationSeconds)} 秒 + 延长 ${formatDamageNumber(event.durationBonusSeconds)} 秒 = ${formatDamageNumber(event.durationSeconds)} 秒；已流逝 ${formatDamageNumber(event.elapsedSeconds)} 秒，剩余 ${formatDamageNumber(event.remainingSeconds)} 秒）` : ""}：(${formatDamagePercent(event.fixedMultiplier)} + ${event.tickCount} × ${formatDamagePercent(event.tickMultiplier)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}) × 极性紊乱 ${formatDamagePercent(multiplierScale)}`
-                : `${effectLabel}：${formatDamagePercent(event.baseMultiplierPerProc)} × ${formatDamageNumber(event.procCount)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`,
+                : isRelease
+                    ? releaseBreakdown?.resultMode === "fixedAnomalyMultiplier"
+                        ? `固定异放倍率 ${formatDamagePercent(releaseBreakdown.finalBaseMultiplier)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`
+                        : `${effectLabel}单次 ${formatDamagePercent(event.baseMultiplierPerProc)} × 异放比例 ${formatDamageNumber(releaseBreakdown?.releaseScale, 6)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`
+                    : `${effectLabel}：${formatDamagePercent(event.baseMultiplierPerProc)} × ${formatDamageNumber(event.procCount)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`,
             value: effectiveBaseMultiplier,
             displayValue: formatDamagePercent(effectiveBaseMultiplier),
         },
@@ -3342,6 +3524,23 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
             displayValue: formatDamageNumber(anomalyDamageBonus, 4),
         },
     ]
+    if (isRelease) {
+        rows.splice(1, 0,
+            {
+                label: "原异常单次倍率",
+                formula: `${effectLabel}仅继承单次伤害，不复制完整持续结算`,
+                value: Number(event.baseMultiplierPerProc ?? 0),
+                displayValue: formatDamagePercent(event.baseMultiplierPerProc),
+            },
+            {
+                label: "异放倍率方案",
+                formula: releaseBreakdown?.profileLabel ?? event.triggerActorRef?.profileId ?? "未配置",
+                value: Number(releaseBreakdown?.formulaValue ?? 0),
+                displayValue: formatDamageNumber(releaseBreakdown?.formulaValue, 6),
+            },
+            ...releaseTraceWhiteBoxRows(releaseBreakdown?.trace),
+        )
+    }
     if (!isDisorder) {
         rows.push({
             label: "异常暴击区",
@@ -3636,8 +3835,238 @@ function calculateSheerDamageEvent({ event, agent, panel, bonusTotals, target, i
     }
 }
 
-function calculateAnomalyDamageEvent({ event, panel, bonusTotals, target, agentLevel, includeWhiteBox }) {
+function releaseOnlyBonusTotals(bonusTotals = {}) {
+    return {
+        damageModifiers: (bonusTotals.damageModifiers ?? []).filter(modifier =>
+            Array.isArray(modifier?.appliesTo?.settlementTypes)
+            && modifier.appliesTo.settlementTypes.includes("release")),
+    }
+}
+
+function addEventTotals(...totals) {
+    const result = Object.create(null)
+    for (const source of totals) {
+        for (const [key, value] of Object.entries(source ?? {})) {
+            result[key] = Number(result[key] ?? 0) + Number(value ?? 0)
+        }
+    }
+    return result
+}
+
+function releaseSourceContext(event, panel, outOfCombatPanel, bonusTotals, agentLevel) {
+    const sourceAgentId = String(event.anomalySource?.actorRef?.agentId ?? event.triggerActorRef?.agentId ?? "")
+    const triggerAgentId = String(event.triggerActorRef?.agentId ?? "")
+    const snapshot = normalizeAnomalySourceSnapshot(event.anomalySource?.snapshot)
+    if (sourceAgentId && sourceAgentId !== triggerAgentId) {
+        if (!snapshot || snapshot.agentId !== sourceAgentId) {
+            throw new Error("外部原异常施加者缺少有效的冻结快照。")
+        }
+        return {
+            agentId: sourceAgentId,
+            panel: snapshot.panel,
+            outOfCombatPanel: snapshot.outOfCombatPanel,
+            bonusTotals: snapshot.buffTotals,
+            agentLevel: snapshot.agentLevel,
+            snapshot,
+        }
+    }
+    return {
+        agentId: triggerAgentId,
+        panel,
+        outOfCombatPanel,
+        bonusTotals,
+        agentLevel,
+        snapshot: null,
+    }
+}
+
+export function calculateAnomalyUnitDamage({
+    event,
+    panel,
+    bonusTotals,
+    target,
+    agentLevel,
+    includeCrit = false,
+    outOfCombatPanel = panel,
+} = {}) {
+    const sourceEvent = {
+        ...event,
+        settlementType: "attribute",
+        anomalyVariant: "normal",
+        baseMultiplier: Number(event.baseMultiplierPerProc ?? event.baseMultiplier ?? 0),
+        procCount: 1,
+        count: 1,
+        damageScale: 1,
+    }
+    const eventTotals = eventTargetTotalsForElement(bonusTotals, sourceEvent)
+    const selectedDmgBonus = selectedDmgBonusForElement(panel, sourceEvent.damageElement)
+    const elementDmgKey = `${sourceEvent.damageElement}Dmg`
+    const targetedDmgBonus = Number(eventTotals.dmgBonus ?? 0) + Number(eventTotals[elementDmgKey] ?? 0)
+    const dmgMultiplier = 1 + selectedDmgBonus + targetedDmgBonus
+    const baseMultiplierBonus = sumDamageModifiers(bonusTotals, sourceEvent, "baseMultiplierBonus")
+    const effectiveBaseMultiplier = Math.max(0, Number(sourceEvent.baseMultiplier ?? 0) + baseMultiplierBonus)
+    const targetBreakdown = targetBreakdownForElement(
+        panel,
+        bonusTotals,
+        target,
+        sourceEvent.damageElement,
+        eventTotals,
+        sourceEvent.stunned,
+    )
+    const anomalyProficiencyMultiplier = Math.max(0, Number(panel.anomalyProficiency ?? 0)) / 100
+    const levelMultiplier = anomalyLevelMultiplier(agentLevel)
+    const anomalyDamageBonus = 1 + Number(eventTotals.anomalyDamageBonus ?? 0)
+    const anomalyCrit = includeCrit
+        ? anomalyCritMultiplier(bonusTotals, sourceEvent, panel, outOfCombatPanel)
+        : { critRate: 0, critDmg: 0, multiplier: 1 }
+    const damage = Number(panel.atk ?? 0)
+        * effectiveBaseMultiplier
+        * dmgMultiplier
+        * targetBreakdown.defenseMultiplier
+        * targetBreakdown.resistanceMultiplier
+        * targetBreakdown.activeStunMultiplier
+        * anomalyProficiencyMultiplier
+        * levelMultiplier
+        * anomalyDamageBonus
+        * anomalyCrit.multiplier
+    return {
+        damage,
+        sourceEvent,
+        eventTotals,
+        selectedDmgBonus,
+        targetedDmgBonus,
+        dmgMultiplier,
+        baseMultiplierBonus,
+        effectiveBaseMultiplier,
+        targetBreakdown,
+        anomalyProficiencyMultiplier,
+        levelMultiplier,
+        anomalyDamageBonus,
+        anomalyCrit,
+    }
+}
+
+function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTotals, target, agentLevel, includeWhiteBox }) {
+    const source = releaseSourceContext(event, panel, outOfCombatPanel, bonusTotals, agentLevel)
+    const sourceUnit = calculateAnomalyUnitDamage({
+        event,
+        panel: source.panel,
+        outOfCombatPanel: source.outOfCombatPanel,
+        bonusTotals: source.bonusTotals,
+        target,
+        agentLevel: source.agentLevel,
+    })
+    const releaseBreakdown = releaseBreakdownForEvent(event, panel, outOfCombatPanel)
+    const triggerBonusTotals = releaseOnlyBonusTotals(bonusTotals)
+    const triggerEventTotals = eventTargetTotalsForElement(triggerBonusTotals, event)
+    const combinedEventTotals = addEventTotals(sourceUnit.eventTotals, triggerEventTotals)
+    const elementDmgKey = `${event.damageElement}Dmg`
+    const releaseTargetedDmgBonus = Number(triggerEventTotals.dmgBonus ?? 0)
+        + Number(triggerEventTotals[elementDmgKey] ?? 0)
+    const dmgMultiplier = sourceUnit.dmgMultiplier + releaseTargetedDmgBonus
+    const releaseBaseMultiplierBonus = sumDamageModifiers(triggerBonusTotals, event, "baseMultiplierBonus")
+    const effectiveBaseMultiplier = Math.max(
+        0,
+        sourceUnit.effectiveBaseMultiplier * releaseBreakdown.releaseScale + releaseBaseMultiplierBonus,
+    )
+    const targetBreakdown = targetBreakdownForElement(
+        source.panel,
+        source.bonusTotals,
+        target,
+        event.damageElement,
+        combinedEventTotals,
+        event.stunned,
+    )
+    const sourceAnomalyDamageBonus = sourceUnit.anomalyDamageBonus
+    const releaseAnomalyDamageBonus = 1 + Number(triggerEventTotals.anomalyDamageBonus ?? 0)
+    const anomalyCrit = anomalyCritMultiplier(triggerBonusTotals, event, panel, outOfCombatPanel)
+    const singleDamage = Number(source.panel.atk ?? 0)
+        * effectiveBaseMultiplier
+        * dmgMultiplier
+        * targetBreakdown.defenseMultiplier
+        * targetBreakdown.resistanceMultiplier
+        * targetBreakdown.activeStunMultiplier
+        * sourceUnit.anomalyProficiencyMultiplier
+        * sourceUnit.levelMultiplier
+        * sourceAnomalyDamageBonus
+        * releaseAnomalyDamageBonus
+        * anomalyCrit.multiplier
+        * event.damageScale
+    const finalDamage = singleDamage * event.count
+
+    return {
+        id: event.id,
+        kind: event.kind,
+        settlementType: "release",
+        label: event.label ?? "异放",
+        finalDamage,
+        singleDamage,
+        count: event.count,
+        input: { ...event, target, agentLevel: normalizeAgentLevel(agentLevel) },
+        panelSnapshot: {
+            atk: Number(source.panel.atk ?? 0),
+            anomalyProficiency: Number(source.panel.anomalyProficiency ?? 0),
+            triggerOutOfCombatPanel: outOfCombatPanel,
+            sourceAgentId: source.agentId,
+            sourceSnapshot: source.snapshot,
+        },
+        multipliers: {
+            atk: Number(source.panel.atk ?? 0),
+            anomaly: effectiveBaseMultiplier,
+            baseMultiplier: releaseBreakdown.finalBaseMultiplier,
+            originalAnomalyBaseMultiplier: releaseBreakdown.originalBaseMultiplier,
+            releaseScale: releaseBreakdown.releaseScale,
+            releaseFormulaValue: releaseBreakdown.formulaValue,
+            releaseResultMode: releaseBreakdown.resultMode,
+            releaseTrace: releaseBreakdown.trace,
+            baseMultiplierBonus: sourceUnit.baseMultiplierBonus + releaseBaseMultiplierBonus,
+            releaseBaseMultiplierBonus,
+            baseMultiplierScale: 1,
+            dmg: dmgMultiplier,
+            defense: targetBreakdown.defenseMultiplier,
+            resistance: targetBreakdown.resistanceMultiplier,
+            stun: targetBreakdown.activeStunMultiplier,
+            anomalyProficiency: sourceUnit.anomalyProficiencyMultiplier,
+            anomalyLevel: sourceUnit.levelMultiplier,
+            attributeAnomalyDamage: sourceAnomalyDamageBonus * releaseAnomalyDamageBonus,
+            disorderDamage: 1,
+            anomalyDamage: sourceAnomalyDamageBonus * releaseAnomalyDamageBonus,
+            anomalyCrit: anomalyCrit.multiplier,
+            anomalyCritRate: anomalyCrit.critRate,
+            anomalyCritDmg: anomalyCrit.critDmg,
+            damageScale: event.damageScale,
+        },
+        targetBreakdown,
+        releaseBreakdown,
+        sourceUnit,
+        whiteBoxRows: includeWhiteBox
+            ? anomalyDamageWhiteBoxRows({
+                event,
+                atk: Number(source.panel.atk ?? 0),
+                selectedDmgBonus: sourceUnit.selectedDmgBonus,
+                skillDamageBonus: sourceUnit.targetedDmgBonus + releaseTargetedDmgBonus,
+                dmgMultiplier,
+                targetBreakdown,
+                anomalyProficiencyMultiplier: sourceUnit.anomalyProficiencyMultiplier,
+                levelMultiplier: sourceUnit.levelMultiplier,
+                anomalyDamageBonus: sourceAnomalyDamageBonus * releaseAnomalyDamageBonus,
+                anomalyCrit,
+                releaseBreakdown,
+                baseMultiplierBonus: sourceUnit.baseMultiplierBonus + releaseBaseMultiplierBonus,
+                effectiveBaseMultiplier,
+                finalDamage,
+                singleDamage,
+            })
+            : [],
+    }
+}
+
+function calculateAnomalyDamageEvent({ event, panel, outOfCombatPanel = panel, bonusTotals, target, agentLevel, includeWhiteBox }) {
     event = effectiveDisorderDamageEvent(event, bonusTotals)
+    event = effectiveAttributeAnomalyDamageEvent(event, bonusTotals)
+    if (isReleaseSettlement(event)) {
+        return calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTotals, target, agentLevel, includeWhiteBox })
+    }
     const atk = Number(panel.atk ?? 0)
     const isDisorder = isDisorderDamageEvent(event)
     const selectedDmgBonus = selectedDmgBonusForElement(panel, event.damageElement)
@@ -3655,8 +4084,9 @@ function calculateAnomalyDamageEvent({ event, panel, bonusTotals, target, agentL
         ? sumDamageModifiers(bonusTotals, event, "disorderBaseMultiplierBonus")
         : sumDamageModifiers(bonusTotals, event, "baseMultiplierBonus")
     const baseMultiplierScale = isDisorder ? disorderMultiplierScale(event.disorderType) : 1
-    const effectiveBaseMultiplier = Math.max(0, Number(event.baseMultiplier ?? 0) + baseMultiplierBonus) * baseMultiplierScale
-    const anomalyCrit = anomalyCritMultiplier(bonusTotals, event)
+    const baseMultiplier = Number(event.baseMultiplier ?? 0)
+    const effectiveBaseMultiplier = Math.max(0, baseMultiplier + baseMultiplierBonus) * baseMultiplierScale
+    const anomalyCrit = anomalyCritMultiplier(bonusTotals, event, panel, outOfCombatPanel)
     const singleDamage = atk
         * effectiveBaseMultiplier
         * dmgMultiplier
@@ -3676,6 +4106,8 @@ function calculateAnomalyDamageEvent({ event, panel, bonusTotals, target, agentL
         settlementType: event.settlementType ?? (isDisorderDamageEvent(event) ? "disorder" : "attribute"),
         label: event.label ?? (event.anomalyVariant === "polarizedAssault"
             ? "极性强击"
+            : event.anomalyVariant === "release"
+                ? "异放"
             : localizedName(event.anomalyLabel, event.anomalyEffect ?? event.previousAnomalyEffect)),
         finalDamage,
         singleDamage,
@@ -3688,6 +4120,7 @@ function calculateAnomalyDamageEvent({ event, panel, bonusTotals, target, agentL
         panelSnapshot: {
             atk,
             anomalyProficiency: Number(panel.anomalyProficiency ?? 0),
+            initialAnomalyMastery: Number(outOfCombatPanel?.anomalyMastery ?? panel.anomalyMastery ?? 0),
             dmgBonus: Number(panel.dmgBonus ?? 0),
             [`${event.damageElement}Dmg`]: Number(panel[`${event.damageElement}Dmg`] ?? 0),
             penRatio: Number(panel.penRatio ?? 0),
@@ -3696,7 +4129,9 @@ function calculateAnomalyDamageEvent({ event, panel, bonusTotals, target, agentL
         multipliers: {
             atk,
             anomaly: effectiveBaseMultiplier,
-            baseMultiplier: Number(event.baseMultiplier ?? 0),
+            baseMultiplier,
+            originalAnomalyBaseMultiplier: Number(event.baseMultiplierPerProc ?? event.baseMultiplier ?? 0),
+            releaseScale: 1,
             baseMultiplierBonus,
             disorderBaseMultiplierBonus: isDisorder ? baseMultiplierBonus : 0,
             baseMultiplierScale,
@@ -3742,7 +4177,7 @@ function calculateAnomalyDamageEvent({ event, panel, bonusTotals, target, agentL
     }
 }
 
-function calculateDamageResult({ catalog, agent, panel, bonusTotals, input, includeWhiteBox = true, skillOptions = {} }) {
+function calculateDamageResult({ catalog, agent, panel, outOfCombatPanel = panel, bonusTotals, input, includeWhiteBox = true, skillOptions = {} }) {
     const damageRequest = normalizeDamageRequest(input, agent, catalog, skillOptions)
     const events = damageRequest.events.map(event => {
         if (event.kind === "direct") {
@@ -3767,6 +4202,7 @@ function calculateDamageResult({ catalog, agent, panel, bonusTotals, input, incl
         return calculateAnomalyDamageEvent({
             event,
             panel,
+            outOfCombatPanel,
             bonusTotals,
             target: damageRequest.target,
             agentLevel: damageRequest.agentLevel,
@@ -3846,8 +4282,20 @@ function calculateDirectDamageFinalValue(event, panel, bonusTotals, target) {
         * Number(event.count ?? 1)
 }
 
-function calculateAnomalyDamageFinalValue(event, panel, bonusTotals, target, agentLevel) {
+function calculateAnomalyDamageFinalValue(event, panel, bonusTotals, target, agentLevel, outOfCombatPanel = panel) {
     event = effectiveDisorderDamageEvent(event, bonusTotals)
+    event = effectiveAttributeAnomalyDamageEvent(event, bonusTotals)
+    if (isReleaseSettlement(event)) {
+        return calculateReleaseDamageEvent({
+            event,
+            panel,
+            outOfCombatPanel,
+            bonusTotals,
+            target,
+            agentLevel,
+            includeWhiteBox: false,
+        }).finalDamage
+    }
     const isDisorder = isDisorderDamageEvent(event)
     const eventTotals = eventTargetTotalsForElement(bonusTotals, event)
     const elementDmgKey = `${event.damageElement}Dmg`
@@ -3858,9 +4306,10 @@ function calculateAnomalyDamageFinalValue(event, panel, bonusTotals, target, age
         ? sumDamageModifiers(bonusTotals, event, "disorderBaseMultiplierBonus")
         : sumDamageModifiers(bonusTotals, event, "baseMultiplierBonus")
     const baseMultiplierScale = isDisorder ? disorderMultiplierScale(event.disorderType) : 1
-    const effectiveBaseMultiplier = Math.max(0, Number(event.baseMultiplier ?? 0) + baseMultiplierBonus) * baseMultiplierScale
+    const baseMultiplier = Number(event.baseMultiplier ?? 0)
+    const effectiveBaseMultiplier = Math.max(0, baseMultiplier + baseMultiplierBonus) * baseMultiplierScale
     const anomalyDamageBonus = 1 + Number(eventTotals.anomalyDamageBonus ?? 0)
-    const anomalyCritMultiplierValue = anomalyCritMultiplier(bonusTotals, event).multiplier
+    const anomalyCritMultiplierValue = anomalyCritMultiplier(bonusTotals, event, panel, outOfCombatPanel).multiplier
     return Number(panel.atk ?? 0)
         * effectiveBaseMultiplier
         * (1 + selectedDmgBonus + skillDamageBonus)
@@ -3898,7 +4347,7 @@ function calculateSheerDamageFinalValue(event, panel, bonusTotals, target, agent
         * Number(event.count ?? 1)
 }
 
-function calculateDamageTotalFinalValue({ agent, panel, bonusTotals, damageRequest }) {
+function calculateDamageTotalFinalValue({ agent, panel, outOfCombatPanel = panel, bonusTotals, damageRequest }) {
     const target = damageRequest.target
     let total = 0
     for (const event of damageRequest.events ?? []) {
@@ -3907,7 +4356,7 @@ function calculateDamageTotalFinalValue({ agent, panel, bonusTotals, damageReque
         } else if (event.kind === "sheer") {
             total += calculateSheerDamageFinalValue(event, panel, bonusTotals, target, agent)
         } else {
-            total += calculateAnomalyDamageFinalValue(event, panel, bonusTotals, target, damageRequest.agentLevel)
+            total += calculateAnomalyDamageFinalValue(event, panel, bonusTotals, target, damageRequest.agentLevel, outOfCombatPanel)
         }
     }
     return total
@@ -3918,6 +4367,8 @@ function compileDamageScoreEvent(event = {}) {
     return {
         event,
         kind: event.kind,
+        settlementType: event.settlementType ?? null,
+        isRelease: isReleaseSettlement(event),
         isDisorder: isDisorderDamageEvent(event),
         damageElement,
         elementDmgKey: `${damageElement}Dmg`,
@@ -3928,6 +4379,14 @@ function compileDamageScoreEvent(event = {}) {
         resReductionKey: RES_REDUCTION_KEY_BY_ELEMENT[damageElement],
         skillMultiplier: Number(event.skillMultiplier ?? 0),
         baseMultiplier: Number(event.baseMultiplier ?? 0),
+        baseMultiplierPerProc: Number(event.baseMultiplierPerProc ?? event.baseMultiplier ?? 0),
+        procCount: Number(event.procCount ?? 1),
+        usesDefaultProcCount: event.usesDefaultProcCount === true,
+        anomalyVariant: event.anomalyVariant ?? "normal",
+        releaseProfile: event.releaseProfile ?? null,
+        releaseCoreScalingRow: event.releaseCoreScalingRow ?? null,
+        triggerActorRef: event.triggerActorRef ?? null,
+        anomalySource: event.anomalySource ?? null,
         fixedMultiplier: Number(event.fixedMultiplier ?? 0),
         tickMultiplier: Number(event.tickMultiplier ?? 0),
         tickIntervalSeconds: Number(event.tickIntervalSeconds ?? 0.5),
@@ -3953,8 +4412,18 @@ function compileDamageScoreTarget(damageRequest = {}, agent = {}) {
     }
 }
 
-function compiledEventBaseMultiplier(compiledEvent, durationBonusSeconds = 0) {
+function compiledEventBaseMultiplier(compiledEvent, durationBonusSeconds = 0, panel = {}, outOfCombatPanel = panel) {
+    if (compiledEvent.isRelease) {
+        return releaseBreakdownForEvent(compiledEvent, panel, outOfCombatPanel).finalBaseMultiplier
+    }
     if (!compiledEvent.isDisorder) {
+        if (compiledEvent.usesDefaultProcCount
+            && compiledEvent.baseDurationSeconds > 0
+            && compiledEvent.tickIntervalSeconds > 0
+            && durationBonusSeconds > 0) {
+            const extraProcCount = Math.max(0, Math.floor((durationBonusSeconds + 1e-9) / compiledEvent.tickIntervalSeconds))
+            return compiledEvent.baseMultiplierPerProc * (compiledEvent.procCount + extraProcCount)
+        }
         return compiledEvent.baseMultiplier
     }
     return disorderBaseMultiplier({
@@ -4029,25 +4498,44 @@ function compiledCritMultiplier(panel, critMode, compiledEvent, sums) {
     return critRate * (1 + critDmg) + (1 - critRate)
 }
 
-function compiledAnomalyCritMultiplier(compiledEvent, sums) {
+function compiledAnomalyCritMultiplier(compiledEvent, sums, initialAnomalyMastery = 0) {
     if (compiledEvent.isDisorder) {
         return 1
     }
-    const critRate = clampNumber(compiledModifierSum(sums, "anomalyCritRate"), 0, 1)
+    const baseCritRate = compiledModifierSum(sums, "anomalyCritRate")
+    const masteryCritRate = compiledEvent.anomalyVariant === "release" && baseCritRate > 0
+        ? Math.max(initialAnomalyMastery - compiledEvent.releaseCritRateMasteryThreshold, 0)
+            * compiledEvent.releaseCritRatePerMasteryPoint
+        : 0
+    const critRate = clampNumber(baseCritRate + masteryCritRate, 0, 1)
     const critDmg = Math.max(0, compiledModifierSum(sums, "anomalyCritDmg"))
     return critRate > 0 && critDmg > 0 ? 1 + critRate * critDmg : 1
 }
 
-function calculateCompiledDamageScoreValue({ agent, panel, bonusTotals, compiledDamageTarget }) {
+function calculateCompiledDamageScoreValue({ agent, panel, outOfCombatPanel = panel, bonusTotals, compiledDamageTarget }) {
     const modifiers = bonusTotals.damageModifiers ?? []
     const target = compiledDamageTarget.target
     let total = 0
     for (const compiledEvent of compiledDamageTarget.events ?? []) {
         const event = compiledEvent.event
+        const initialAnomalyMastery = Number(outOfCombatPanel?.anomalyMastery ?? panel.anomalyMastery ?? 0)
         const sums = modifierSumsForCompiledEvent(modifiers, event)
         const selectedDmgBonus = selectedDmgBonusForElement(panel, compiledEvent.damageElement)
         const skillDamageBonus = compiledModifierSum(sums, "dmgBonus")
             + compiledModifierSum(sums, compiledEvent.elementDmgKey)
+
+        if (compiledEvent.isRelease) {
+            total += calculateReleaseDamageEvent({
+                event,
+                panel,
+                outOfCombatPanel,
+                bonusTotals,
+                target,
+                agentLevel: compiledDamageTarget.agentLevel,
+                includeWhiteBox: false,
+            }).finalDamage
+            continue
+        }
 
         if (compiledEvent.kind === "direct") {
             const effectiveSkillMultiplier = Math.max(
@@ -4095,6 +4583,8 @@ function calculateCompiledDamageScoreValue({ agent, panel, bonusTotals, compiled
             compiledEventBaseMultiplier(
                 compiledEvent,
                 compiledModifierSum(sums, "anomalyDurationBonusSeconds"),
+                panel,
+                outOfCombatPanel,
             ) + compiledModifierSum(
                 sums,
                 compiledEvent.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
@@ -4112,7 +4602,7 @@ function calculateCompiledDamageScoreValue({ agent, panel, bonusTotals, compiled
             * (Math.max(0, Number(panel.anomalyProficiency ?? 0)) / 100)
             * compiledDamageTarget.anomalyLevelMultiplier
             * anomalyDamageBonus
-            * compiledAnomalyCritMultiplier(compiledEvent, sums)
+            * compiledAnomalyCritMultiplier(compiledEvent, sums, initialAnomalyMastery)
             * compiledEvent.damageScale
             * compiledEvent.count
     }
@@ -4181,11 +4671,15 @@ function denseCritMultiplier(panelValues, critMode, compiledEvent, sums) {
     return critRate * (1 + critDmg) + (1 - critRate)
 }
 
-function denseAnomalyCritMultiplier(compiledEvent, sums) {
+function denseAnomalyCritMultiplier(compiledEvent, sums, panel = {}, outOfCombatPanel = panel) {
     if (compiledEvent.isDisorder) {
         return 1
     }
-    const critRate = clampNumber(denseModifierSum(sums, "anomalyCritRate"), 0, 1)
+    const baseCritRate = denseModifierSum(sums, "anomalyCritRate")
+    const masteryCritRate = baseCritRate > 0
+        ? releaseCritRateBonusForEvent(compiledEvent, panel, outOfCombatPanel)
+        : 0
+    const critRate = clampNumber(baseCritRate + masteryCritRate, 0, 1)
     const critDmg = Math.max(0, denseModifierSum(sums, "anomalyCritDmg"))
     return critRate > 0 && critDmg > 0 ? 1 + critRate * critDmg : 1
 }
@@ -4194,9 +4688,18 @@ function denseSelectedDmgBonusForElement(panelValues, damageElement) {
     return densePanelValue(panelValues, "dmgBonus") + densePanelValue(panelValues, `${damageElement}Dmg`)
 }
 
+function densePanelProxy(panelValues) {
+    return new Proxy({}, {
+        get(_target, property) {
+            return typeof property === "string" ? densePanelValue(panelValues, property) : undefined
+        },
+    })
+}
+
 function calculateCompiledDamageScoreValueDense({
     agent,
     panelValues,
+    outOfCombatPanelValues = panelValues,
     combatValues,
     compiledDamageTarget,
     eventModifierEntries,
@@ -4206,6 +4709,8 @@ function calculateCompiledDamageScoreValueDense({
     const target = compiledDamageTarget.target
     let total = 0
     const events = compiledDamageTarget.events ?? []
+    const panelProxy = densePanelProxy(panelValues)
+    const outOfCombatPanelProxy = densePanelProxy(outOfCombatPanelValues)
     for (let index = 0; index < events.length; index += 1) {
         const compiledEvent = events[index]
         fillDenseModifierSums(modifierSums, eventModifierEntries[index], activeEntryFlags)
@@ -4259,6 +4764,8 @@ function calculateCompiledDamageScoreValueDense({
             compiledEventBaseMultiplier(
                 compiledEvent,
                 denseModifierSum(modifierSums, "anomalyDurationBonusSeconds"),
+                panelProxy,
+                outOfCombatPanelProxy,
             ) + denseModifierSum(
                 modifierSums,
                 compiledEvent.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
@@ -4276,7 +4783,7 @@ function calculateCompiledDamageScoreValueDense({
             * (Math.max(0, densePanelValue(panelValues, "anomalyProficiency")) / 100)
             * compiledDamageTarget.anomalyLevelMultiplier
             * anomalyDamageBonus
-            * denseAnomalyCritMultiplier(compiledEvent, modifierSums)
+            * denseAnomalyCritMultiplier(compiledEvent, modifierSums, panelProxy, outOfCombatPanelProxy)
             * compiledEvent.damageScale
             * compiledEvent.count
     }
@@ -4295,12 +4802,13 @@ function calculateDamageFinalValue({ agent, panel, bonusTotals, damageInput }) {
     })
 }
 
-function calculateDamageWhiteBox({ catalog, agent, panel, selectedDmgBonus, bonusTotals, input, skillOptions = {} }) {
+function calculateDamageWhiteBox({ catalog, agent, panel, outOfCombatPanel = panel, selectedDmgBonus, bonusTotals, input, skillOptions = {} }) {
     void selectedDmgBonus
     return calculateDamageResult({
         catalog,
         agent,
         panel,
+        outOfCombatPanel,
         bonusTotals,
         input,
         includeWhiteBox: true,
@@ -5185,6 +5693,7 @@ export function buildMeta(catalog) {
         faction: agent.faction,
         images: agent.images,
         coreSkill: agent.coreSkill,
+        anomalyReleaseProfiles: agent.anomalyReleaseProfiles ?? [],
         combatBuffs: agent.combatBuffs ?? {},
         preferredDriveDiscs: agent.preferredDriveDiscs ?? null,
         skillGroups: agent.skillGroups ?? [],
@@ -5409,7 +5918,7 @@ export function createInCombatPanelCalculator(catalog, input) {
         coreSkillLevel: input.coreSkillLevel,
     })
     const activeCatalogBuffs = (catalog.combatBuffs ?? []).filter(buff => activeBuffIds.has(buff.id))
-    const activeAgentBuffs = agentCombatBuffEntries(agent).filter(entry => activeBuffIds.has(entry.id))
+    const activeAgentBuffs = agentCombatBuffEntries(agent, input.coreSkillLevel).filter(entry => activeBuffIds.has(entry.id))
     const currentWEngineRequirement = wEngineEffectData(wEngine)?.requirement?.specialty ?? wEngine.specialty
     const activeCurrentWEngineEntries = wEngineCombatBuffEntries(wEngine).filter(entry => activeBuffIds.has(entry.key))
     const appliedCurrentWEngineKeys = new Set(activeCurrentWEngineEntries.map(entry => entry.key))
@@ -5456,6 +5965,11 @@ export function createInCombatPanelCalculator(catalog, input) {
                 }
             } else {
                 panelStats.add("anomalyProficiency")
+                if (event.isRelease) {
+                    for (const stat of releaseFormulaStatDependencies(event.releaseProfile)) {
+                        panelStats.add(stat)
+                    }
+                }
             }
         }
         if (hasMasteryToProficiencyConversion && panelStats.has("anomalyProficiency")) {
@@ -5473,8 +5987,10 @@ export function createInCombatPanelCalculator(catalog, input) {
                 relevantStatIds.add(stat)
             }
         }
+        const hasReleaseFormula = (compiledDamageTarget.events ?? []).some(event => event.isRelease)
         return {
-            strictMonotonic: true,
+            strictMonotonic: !hasReleaseFormula,
+            requiresReleaseIntervalBound: hasReleaseFormula,
             panelStatIds: [...panelStats].sort(),
             relevantStatIds: [...relevantStatIds].sort(),
         }
@@ -5530,6 +6046,10 @@ export function createInCombatPanelCalculator(catalog, input) {
 
     function compileDensePanelScoreTarget({ statIds = [], setIds = [], setIndexById = null, candidateStatIndexes = [] } = {}) {
         if (typeof outOfCombatCalculator.compileDenseOutOfCombatTarget !== "function") {
+            return null
+        }
+        if ((compiledDamageTarget.events ?? []).some(event => event.isRelease
+            && String(event.anomalySource?.actorRef?.agentId ?? agent.id) !== String(agent.id))) {
             return null
         }
 
@@ -5832,6 +6352,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                 result.finalDamage = calculateCompiledDamageScoreValueDense({
                     agent,
                     panelValues,
+                    outOfCombatPanelValues: outPanelValues,
                     combatValues,
                     compiledDamageTarget,
                     eventModifierEntries,
@@ -6097,6 +6618,8 @@ export function createInCombatPanelCalculator(catalog, input) {
             if (!events.length
                 || events.every(event => event.kind === "direct")
                 || events.some(event => !["direct", "anomaly", "disorder", "sheer"].includes(event.kind))
+                || events.some(event => event.isRelease
+                    && String(event.anomalySource?.actorRef?.agentId ?? agent.id) !== String(agent.id))
                 || typeof fixedOutOfCombatTarget.panelValue !== "function") {
                 return null
             }
@@ -6118,7 +6641,21 @@ export function createInCombatPanelCalculator(catalog, input) {
                     + denseModifierSum(sums, event.elementDmgKey)
                 return {
                     kind: event.kind,
+                    settlementType: event.settlementType,
+                    isRelease: event.isRelease,
                     isDisorder: event.isDisorder,
+                    anomalyVariant: event.anomalyVariant,
+                    baseMultiplier: event.baseMultiplier,
+                    baseMultiplierPerProc: event.baseMultiplierPerProc,
+                    procCount: event.procCount,
+                    usesDefaultProcCount: event.usesDefaultProcCount,
+                    baseDurationSeconds: event.baseDurationSeconds,
+                    tickIntervalSeconds: event.tickIntervalSeconds,
+                    releaseProfile: event.releaseProfile,
+                    releaseCoreScalingRow: event.releaseCoreScalingRow,
+                    triggerActorRef: event.triggerActorRef,
+                    anomalySource: event.anomalySource,
+                    stunned: event.stunned,
                     count: event.count,
                     damageBasis: event.damageBasis,
                     damageScale: event.damageScale,
@@ -6142,10 +6679,18 @@ export function createInCombatPanelCalculator(catalog, input) {
                             event.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
                         ),
                     ) * event.baseMultiplierScale,
+                    baseMultiplierBonus: denseModifierSum(
+                        sums,
+                        event.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
+                    ),
+                    durationBonusSeconds: denseModifierSum(sums, "anomalyDurationBonusSeconds"),
+                    baseMultiplierScale: event.baseMultiplierScale,
                     anomalyDamageBonus: 1 + denseModifierSum(
                         sums,
                         event.isDisorder ? "disorderDamageBonus" : "anomalyDamageBonus",
                     ),
+                    anomalyCritRate: denseModifierSum(sums, "anomalyCritRate"),
+                    anomalyCritDmg: Math.max(0, denseModifierSum(sums, "anomalyCritDmg")),
                     anomalyCritMultiplier: denseAnomalyCritMultiplier(event, sums),
                     targetDefenseAfterReduction,
                     levelCoefficient: Number(target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT),
@@ -6183,6 +6728,8 @@ export function createInCombatPanelCalculator(catalog, input) {
                     branchIndexedVector,
                     optimisticIndexedVector,
                 )
+                const hasFormulaInterval = Boolean(suffixDenseVector || branchIndexedVector || optimisticIndexedVector)
+                const lowerOutPanelValue = key => fixedOutOfCombatTarget.panelValue(statValues, key)
                 const outBase = fixedOutOfCombatTarget.base
                 const outAtk = outPanelValue("atk")
                 const atk = outAtk
@@ -6220,6 +6767,31 @@ export function createInCombatPanelCalculator(catalog, input) {
                             denseCombatValue(fixedCombatValues, "anomalyProficiencyPerMasteryAbove140"),
                         )
                     : 0
+                const lowerAnomalyMastery = needsAnomaly && hasFormulaInterval
+                    ? calculateAnomalyMastery(
+                        lowerOutPanelValue("anomalyMastery"),
+                        denseCombatValue(fixedCombatValues, "anomalyMasteryPct"),
+                        denseCombatValue(fixedCombatValues, "anomalyMasteryFlat"),
+                    )
+                    : anomalyMastery
+                const lowerAnomalyProficiency = needsAnomaly && hasFormulaInterval
+                    ? lowerOutPanelValue("anomalyProficiency")
+                        + denseCombatValue(fixedCombatValues, "anomalyProficiencyFlat")
+                        + calculateMasteryConvertedProficiency(
+                            lowerAnomalyMastery,
+                            denseCombatValue(fixedCombatValues, "anomalyProficiencyPerMasteryAbove140"),
+                        )
+                    : anomalyProficiency
+                const lowerOutAtk = hasFormulaInterval ? lowerOutPanelValue("atk") : outAtk
+                const lowerAtk = hasFormulaInterval
+                    ? lowerOutAtk
+                        + denseCombatValue(fixedCombatValues, "atkFlat")
+                        + Number(outBase.atk ?? 0) * (
+                            denseCombatValue(fixedCombatValues, "atkPct")
+                            + denseCombatValue(fixedCombatValues, "atkPctBase")
+                        )
+                        + lowerOutAtk * denseCombatValue(fixedCombatValues, "atkPctOutOfCombat")
+                    : atk
                 let sheerForce = 0
                 if (needsSheer && compiledDamageTarget.isRuptureAgent) {
                     const outHp = outPanelValue("hp")
@@ -6236,6 +6808,39 @@ export function createInCombatPanelCalculator(catalog, input) {
                 }
 
                 let total = 0
+                const formulaOutOfCombatPanel = new Proxy({}, {
+                    get(_target, property) {
+                        return typeof property === "string" ? outPanelValue(property) : undefined
+                    },
+                })
+                const formulaInCombatPanel = new Proxy({}, {
+                    get(_target, property) {
+                        if (property === "anomalyMastery") return anomalyMastery
+                        if (property === "anomalyProficiency") return anomalyProficiency
+                        if (property === "atk") return atk
+                        return typeof property === "string"
+                            ? outPanelValue(property) + denseCombatValue(fixedCombatValues, property)
+                            : undefined
+                    },
+                })
+                const formulaOutOfCombatIntervalPanel = new Proxy({}, {
+                    get(_target, property) {
+                        if (typeof property !== "string") return undefined
+                        return { min: lowerOutPanelValue(property), max: outPanelValue(property) }
+                    },
+                })
+                const formulaInCombatIntervalPanel = new Proxy({}, {
+                    get(_target, property) {
+                        if (property === "anomalyMastery") return { min: lowerAnomalyMastery, max: anomalyMastery }
+                        if (property === "anomalyProficiency") return { min: lowerAnomalyProficiency, max: anomalyProficiency }
+                        if (property === "atk") return { min: lowerAtk, max: atk }
+                        if (typeof property !== "string") return undefined
+                        return {
+                            min: lowerOutPanelValue(property) + denseCombatValue(fixedCombatValues, property),
+                            max: outPanelValue(property) + denseCombatValue(fixedCombatValues, property),
+                        }
+                    },
+                })
                 for (const event of compiledEvents) {
                     const elementDmg = outPanelValue(event.damageKey) + denseCombatValue(fixedCombatValues, event.damageKey)
                     const resIgnore = outPanelValue(ALL_RES_IGNORE_KEY)
@@ -6280,8 +6885,47 @@ export function createInCombatPanelCalculator(catalog, input) {
                             * event.count
                         continue
                     }
+                    const releaseBaseMultiplier = event.isRelease && hasFormulaInterval
+                        ? evaluateAnomalyReleaseProfileInterval(event.releaseProfile, {
+                            originalBaseMultiplier: Number(event.baseMultiplierPerProc ?? event.baseMultiplier ?? 0),
+                            trigger: {
+                                inCombatPanel: formulaInCombatIntervalPanel,
+                                outOfCombatPanel: formulaOutOfCombatIntervalPanel,
+                            },
+                            coreScalingRow: event.releaseCoreScalingRow,
+                            event,
+                            eventElement: event.damageElement,
+                        }).finalBaseMultiplier.max
+                        : null
+                    const effectiveBaseMultiplier = event.isRelease
+                        ? Math.max(
+                            0,
+                            (releaseBaseMultiplier ?? compiledEventBaseMultiplier(
+                                event,
+                                event.durationBonusSeconds,
+                                formulaInCombatPanel,
+                                formulaOutOfCombatPanel,
+                            )) + event.baseMultiplierBonus,
+                        ) * event.baseMultiplierScale
+                        : event.effectiveBaseMultiplier
+                    const releaseMasteryCritRate = event.isRelease && event.anomalyCritRate > 0
+                        ? hasFormulaInterval && event.releaseProfile?.critRateBonusExpression
+                            ? Math.max(0, evaluateReleaseExpressionInterval(event.releaseProfile.critRateBonusExpression, {
+                                trigger: {
+                                    inCombatPanel: formulaInCombatIntervalPanel,
+                                    outOfCombatPanel: formulaOutOfCombatIntervalPanel,
+                                },
+                                coreScalingRow: event.releaseCoreScalingRow,
+                                event,
+                                eventElement: event.damageElement,
+                            }).max)
+                            : releaseCritRateBonusForEvent(event, formulaInCombatPanel, formulaOutOfCombatPanel)
+                        : 0
+                    const anomalyCritMultiplier = event.anomalyCritDmg > 0
+                        ? 1 + clampNumber(event.anomalyCritRate + releaseMasteryCritRate, 0, 1) * event.anomalyCritDmg
+                        : 1
                     total += atk
-                        * event.effectiveBaseMultiplier
+                        * effectiveBaseMultiplier
                         * (1 + dmgBonus + elementDmg + event.skillDamageBonus)
                         * defenseMultiplier
                         * resistanceMultiplier
@@ -6289,7 +6933,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                         * (Math.max(0, anomalyProficiency) / 100)
                         * compiledDamageTarget.anomalyLevelMultiplier
                         * event.anomalyDamageBonus
-                        * event.anomalyCritMultiplier
+                        * anomalyCritMultiplier
                         * event.damageScale
                         * event.count
                 }
@@ -6299,6 +6943,7 @@ export function createInCombatPanelCalculator(catalog, input) {
             }
 
             return {
+                releaseIntervalBound: compiledEvents.some(event => event.isRelease),
                 scoreObjectiveScalar,
                 scoreCombinedScalar(statValues = [], branchIndexedVector = null, suffixDenseVector = null, optimisticIndexedVector = null) {
                     return scoreObjectiveScalar(statValues, suffixDenseVector, branchIndexedVector, optimisticIndexedVector)
@@ -6578,12 +7223,14 @@ export function createInCombatPanelCalculator(catalog, input) {
                 ? calculateCompiledDamageScoreValue({
                     agent,
                     panel: inCombatPanel.panel,
+                    outOfCombatPanel: outOfCombat.panel,
                     bonusTotals,
                     compiledDamageTarget,
                 })
                 : calculateDamageTotalFinalValue({
                     agent,
                     panel: inCombatPanel.panel,
+                    outOfCombatPanel: outOfCombat.panel,
                     bonusTotals,
                     damageRequest: normalizedDamageInput,
                 }),
@@ -6834,6 +7481,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                 catalog,
                 agent,
                 panel: inCombatPanel.panel,
+                outOfCombatPanel: outOfCombat.panel,
                 selectedDmgBonus: inCombatPanel.selectedDmgBonus,
                 bonusTotals,
                 input: input.damage,
@@ -6922,7 +7570,7 @@ export function calculateInCombatPanel(catalog, input) {
     const ignoredEffects = []
     const exclusiveGroups = new Set()
     const activeCatalogBuffs = (catalog.combatBuffs ?? []).filter(buff => activeBuffIds.has(buff.id))
-    const activeAgentBuffs = agentCombatBuffEntries(agent).filter(entry => activeBuffIds.has(entry.id))
+    const activeAgentBuffs = agentCombatBuffEntries(agent, input.coreSkillLevel).filter(entry => activeBuffIds.has(entry.id))
     const currentWEngineRequirement = wEngineEffectData(wEngine)?.requirement?.specialty ?? wEngine.specialty
     const activeCurrentWEngineEntries = wEngineCombatBuffEntries(wEngine).filter(entry => activeBuffIds.has(entry.key))
     const appliedWEngineKeys = new Set(activeCurrentWEngineEntries.map(entry => entry.key))
@@ -7197,6 +7845,7 @@ export function calculateInCombatPanel(catalog, input) {
         catalog,
         agent,
         panel: inCombatPanel.panel,
+        outOfCombatPanel: outOfCombat.panel,
         selectedDmgBonus: inCombatPanel.selectedDmgBonus,
         bonusTotals,
         input: input.damage,

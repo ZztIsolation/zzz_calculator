@@ -6048,6 +6048,136 @@
         "effectText": "source-checked",
         "effectBuff": "partially-modeled-agent-restriction"
       }
+    },
+    {
+      "id": "zzz_wiki_1883",
+      "name": {
+        "zhCN": "壳中之灵"
+      },
+      "rarity": "S",
+      "specialty": "anomaly",
+      "attribute": "ether",
+      "relatedAgentId": "aria",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1883.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/02/24/141353238/3214160dc64637a1823af2cef51d505b_6802413686352293170.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "anomalyMastery",
+          "value": 30,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "元气一击"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者进入前场或发动特殊技、强化特殊技时，异常精通提升90/103/117/130/144点；装备者对处于属性异常状态下的敌人造成的以太伤害提升20%/23%/26%/29%/32%，触发的所有属性异常伤害和紊乱伤害提升10%/11.5%/13%/14.5%/16%，持续15秒，重复触发刷新，退场时移除。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "condition": "进入前场或发动特殊技、强化特殊技；退场时移除",
+          "durationSeconds": 15,
+          "effects": [
+            {
+              "id": "vitality-hit-anomaly-proficiency",
+              "type": "fixed",
+              "stat": "anomalyProficiencyFlat",
+              "value": 90,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "modificationValues": {
+                "value": [90, 103, 117, 130, 144]
+              },
+              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+            },
+            {
+              "id": "vitality-hit-ether-dmg",
+              "type": "fixed",
+              "stat": "etherDmg",
+              "value": 20,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "condition": "目标处于属性异常状态",
+              "requirement": {
+                "attribute": "ether"
+              },
+              "modificationValues": {
+                "value": [20, 23, 26, 29, 32]
+              },
+              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+            },
+            {
+              "id": "vitality-hit-anomaly-dmg",
+              "type": "fixed",
+              "stat": "anomalyDamageBonus",
+              "value": 10,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute",
+                "anomalyEffects": ["assault", "shatter", "burn", "shock", "corruption"]
+              },
+              "requirement": {
+                "attribute": "ether"
+              },
+              "modificationValues": {
+                "value": [10, 11.5, 13, 14.5, 16]
+              },
+              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+            },
+            {
+              "id": "vitality-hit-disorder-dmg",
+              "type": "fixed",
+              "stat": "disorderDamageBonus",
+              "value": 10,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "disorder",
+                "anomalyEffects": ["burn", "shock", "corruption", "frozen", "frost_frozen", "flinch"]
+              },
+              "requirement": {
+                "attribute": "ether"
+              },
+              "modificationValues": {
+                "value": [10, 11.5, 13, 14.5, 16]
+              },
+              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1883/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked-mihoyo-baike-2026-07-22",
+        "effectText": "source-checked-mihoyo-baike-2026-07-22",
+        "effectBuff": "five modification levels modeled; ether-only damage rules carry rule-level attribute requirements"
+      }
     }
   ]
 }

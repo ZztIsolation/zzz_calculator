@@ -210,6 +210,27 @@ describe("optimizer store", () => {
     expect(store.inputWithSettings({ agentId: "agent_a" }).settings.fourPieceSetId).toBe("fanged_metal")
   })
 
+  it("loads, persists, and submits multiple preferred four-piece sets", () => {
+    const store = useOptimizerStore()
+    store.initialize(preferredCatalog, {
+      id: "agent_a",
+      preferredDriveDiscs: { defaultSetIds: ["woodpecker_electro", "fanged_metal"] },
+    })
+
+    expect(store.fourPieceSetIds).toEqual(["woodpecker_electro", "fanged_metal"])
+    expect(store.inputWithSettings({ agentId: "agent_a" }).settings.fourPieceSetIds)
+      .toEqual(["woodpecker_electro", "fanged_metal"])
+
+    store.setFourPieceSets(["fanged_metal", "woodpecker_electro", "fanged_metal"])
+    setActivePinia(createPinia())
+    const reloaded = useOptimizerStore()
+    reloaded.initialize(preferredCatalog, {
+      id: "agent_a",
+      preferredDriveDiscs: { defaultSetIds: ["woodpecker_electro", "fanged_metal"] },
+    })
+    expect(reloaded.fourPieceSetIds).toEqual(["fanged_metal", "woodpecker_electro"])
+  })
+
   it("preserves an explicitly selected four-piece drive-disc set on reload", () => {
     const store = useOptimizerStore()
     store.initialize(preferredCatalog, preferredAgentB)
@@ -293,7 +314,7 @@ describe("optimizer store", () => {
     expect(store.minimums).toEqual({})
 
     const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer.v1") || "{}")
-    expect(saved.version).toBe(2)
+    expect(saved.version).toBe(3)
     expect(saved.currentAgentId).toBe("agent_b")
     expect(saved.byAgent.agent_a.twoPieceSetIds).toEqual(["swing_jazz"])
     expect(saved.byAgent.agent_b.twoPieceSetIds).toEqual([])

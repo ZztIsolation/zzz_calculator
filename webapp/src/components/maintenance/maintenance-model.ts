@@ -118,6 +118,7 @@ const FIELD_LABELS: Record<string, string> = {
   targetEffectIds: "目标效果",
   preferredDriveDiscs: "推荐驱动盘",
   defaultSetId: "默认套装",
+  defaultSetIds: "推荐套装",
   mainStatLimits: "主词条限制",
   skillGroups: "技能组",
   defaultCount: "默认次数",
@@ -285,7 +286,10 @@ export function prepareDraft(resource: ResourceValue, input: any): any {
     item.level60 ??= {}
     item.sources ??= []
     item.preferredDriveDiscs ??= {}
-    item.preferredDriveDiscs.defaultSetId ??= ""
+    const legacyDefaultSetId = String(item.preferredDriveDiscs.defaultSetId ?? item.preferredDriveDiscs.defaultSet ?? "").trim()
+    item.preferredDriveDiscs.defaultSetIds ??= legacyDefaultSetId ? [legacyDefaultSetId] : []
+    delete item.preferredDriveDiscs.defaultSetId
+    delete item.preferredDriveDiscs.defaultSet
     item.preferredDriveDiscs.mainStatLimits ??= {}
     for (const slot of [4, 5, 6]) item.preferredDriveDiscs.mainStatLimits[String(slot)] ??= []
     item.combatBuffs ??= { corePassive: null, additionalAbility: null, cinemaBuffs: [] }

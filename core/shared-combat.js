@@ -1104,7 +1104,7 @@ function ruleTargetText(rule = {}, meta) {
         return targets.length ? `（技能：${skillTargetLabels(targets, meta).join("；")}）` : "（技能：未选择）"
     }
     if (target.kind === "anomaly") {
-        const settlementLabel = target.settlementType === "disorder" ? "紊乱" : "属性异常"
+        const settlementLabel = target.settlementType === "disorder" ? "紊乱" : target.settlementType === "release" ? "异放" : "属性异常"
         const effects = Array.isArray(target.anomalyEffects) ? target.anomalyEffects : []
         const labels = effects.map(effect => ANOMALY_EFFECT_LABELS[effect] ?? effect)
         return `（${settlementLabel}：${labels.length ? labels.join("；") : "未选择"}）`

@@ -1,7 +1,9 @@
-import { mount } from "@vue/test-utils"
+import { enableAutoUnmount, mount } from "@vue/test-utils"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { createMemoryHistory, createRouter, RouterView } from "vue-router"
 import MaintenanceView from "@/views/MaintenanceView.vue"
+
+enableAutoUnmount(afterEach)
 
 vi.mock("naive-ui", () => ({
   NButton: {
@@ -150,8 +152,28 @@ function makeCatalog() {
   }
 }
 
-async function mountView(options: { failCatalogAfterSave?: boolean, delayFieldSave?: boolean } = {}) {
+async function mountView(options: { failCatalogAfterSave?: boolean, delayFieldSave?: boolean, dynamicCore?: boolean } = {}) {
   let currentCatalog = structuredClone(makeCatalog())
+  if (options.dynamicCore) {
+    const agent = currentCatalog.agents.agents[0]
+    agent.coreSkill = {
+      defaultLevel: "F",
+      maxLevel: "F",
+      levels: ["A", "B", "C", "D", "E", "F"].map(level => ({ level, stats: [], skillLevelBonuses: [{ skill: "corePassive", value: 1 }] })),
+      corePassiveScaling: {
+        levels: [45, 52, 60, 67, 75, 82, 90].map((value, index) => ({ level: index + 1, anomalyProficiencyFlat: value })),
+      },
+    }
+    agent.combatBuffs.corePassive.effects = [{
+      id: "core_dynamic_ap",
+      type: "fixed",
+      target: { kind: "default" },
+      stat: "anomalyProficiency",
+      mode: "flat",
+      value: 45,
+      valueSource: { kind: "corePassiveScaling", field: "anomalyProficiencyFlat" },
+    }]
+  }
   let successfulSaveCount = 0
   let releaseFieldSave = () => {}
   const fieldSaveGate = options.delayFieldSave ? new Promise<void>(resolve => { releaseFieldSave = resolve }) : null
@@ -252,6 +274,24 @@ beforeEach(() => localStorage.clear())
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear() })
 
 describe("MaintenanceView structured editor", () => {
+  it("edits and preserves core-passive scaling value sources", async () => {
+    const { wrapper, fetchMock } = await mountView({ dynamicCore: true })
+    const rule = wrapper.find(".maintenance-rule-card")
+    const sourceField = field(rule, "数值来源")
+    expect(sourceField.text()).toContain("核心被动倍率 · 异常精通")
+    expect(sourceField.find("select").element.value).toBe("anomalyProficiencyFlat")
+    expect(field(rule, "数值").find("input").attributes("disabled")).toBeDefined()
+
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("完整目录已刷新"))
+    const call = fetchMock.mock.calls.find(([url, init]) => url === "/api/maintenance/agents" && init?.method === "POST")!
+    const body = JSON.parse(String(call[1]?.body ?? "{}"))
+    expect(body.combatBuffs.corePassive.effects[0].valueSource).toEqual({
+      kind: "corePassiveScaling",
+      field: "anomalyProficiencyFlat",
+    })
+  })
+
   it("maps all eight resources without exposing editable ids, raw JSON, generic buffs, or system buffs", async () => {
     const { wrapper } = await mountView()
     expect(wrapper.findAll(".maintenance-tabs button")).toHaveLength(8)

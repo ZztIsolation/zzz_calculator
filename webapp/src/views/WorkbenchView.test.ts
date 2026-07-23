@@ -129,6 +129,10 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain(".prominent-config-button:focus-visible")
   })
 
+  it("passes the selected core skill level into the Buff picker", () => {
+    expect(source).toContain(':core-skill-level="String(buildStore.coreSkillLevel)"')
+  })
+
   it("shows the resolved admin default calculation name in the settings summary", () => {
     expect(source).toContain("const calculationModeLabel = computed")
     expect(source).toContain("resolveDefaultCalculationConfig(selectedAgent.value?.defaultCalculationConfig, buildStore.cinemaLevel)")
@@ -168,8 +172,8 @@ describe("WorkbenchView optimizer progress", () => {
   })
 
   it("keeps two-piece and four-piece limits in drafts until explicitly applied", () => {
-    expect(source).toContain("draftFourPieceSetId.value = optimizerStore.fourPieceSetId")
-    expect(source).toContain("optimizerStore.setFourPieceSet(draftFourPieceSetId.value)")
+    expect(source).toContain("draftFourPieceSetIds.value = optimizerStore.fourPieceSetIds.length")
+    expect(source).toContain("optimizerStore.setFourPieceSets(draftFourPieceSetIds.value)")
     expect(source).toContain("draftTwoPieceSetIds.value = [...optimizerStore.twoPieceSetIds]")
     expect(source).toContain("optimizerStore.setTwoPieceSetIds(draftTwoPieceSetIds.value)")
     expect(source).toContain('@click="showFourPieceSetModal = false">取消')
@@ -199,6 +203,11 @@ describe("WorkbenchView optimizer result details", () => {
     expect(source).toContain("driveDiscStatText(row.disc.mainStat)")
     expect(source).toContain("driveDiscSubStatText(row.disc)")
     expect(source).toContain("driveDiscRarityLevelText(row.disc)")
+  })
+
+  it("labels optimized results with the four-piece set that produced them", () => {
+    expect(source).toContain("selectedOptimizedScheme.value?.fourPieceSetId")
+    expect(source).toContain("实际 4 件套：{{ labelOf(selectedOptimizedFourPieceSet) }}")
   })
 
   it("gates one-disc reservation controls without exposing batch reservation actions", () => {

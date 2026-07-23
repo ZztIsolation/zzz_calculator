@@ -160,14 +160,14 @@ for (const { target, path } of storedTargets) {
         }
     }
 }
-assert.equal(moveCount, 64)
-assert.equal(rowCount, 93)
+assert.equal(moveCount, 76)
+assert.equal(rowCount, 115)
 assert.deepEqual(Object.fromEntries(skillTagCounts), {
-    dashAttack: 4,
-    assistAttack: 9,
-    exSpecial: 10,
+    dashAttack: 5,
+    assistAttack: 10,
+    exSpecial: 12,
 })
-assert.equal(storedTargets.length, 50)
+assert.equal(storedTargets.length, 64)
 const yeShunguangTargetMoveIds = new Set(storedTargets
     .map(item => item.target)
     .filter(target => target.kind === "specific" && target.agentSkillId === "ye_shunguang")

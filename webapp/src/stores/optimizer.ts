@@ -4,7 +4,7 @@ import { toRaw } from "vue"
 type OptimizerStatus = "idle" | "estimating" | "preparing" | "running" | "cancelling" | "cancelled" | "done" | "error"
 
 const SETTINGS_KEY = "zzz-calculator.webapp.optimizer.v1"
-const SETTINGS_VERSION = 2
+const SETTINGS_VERSION = 3
 const FALLBACK_AGENT_SETTINGS_ID = "__default__"
 const OPTIMIZER_WORKER_STALL_TIMEOUT_MS = 45_000
 const MINIMUM_STAT_KEYS = ["atk", "anomalyProficiency", "critRate", "critDmg"] as const
@@ -81,7 +81,7 @@ function plainObject(value: any = {}) {
 }
 
 function settingsEnvelope(value: any = null) {
-  return value?.version === SETTINGS_VERSION && value?.byAgent && typeof value.byAgent === "object" && !Array.isArray(value.byAgent)
+  return Number(value?.version ?? 0) >= 2 && value?.byAgent && typeof value.byAgent === "object" && !Array.isArray(value.byAgent)
     ? value
     : null
 }
@@ -144,21 +144,16 @@ function optimizerDriveDiscSets(catalog: any = null) {
   return catalog?.displayDriveDiscSets ?? catalog?.driveDiscSets ?? []
 }
 
-function preferredDriveDiscDefaultSetId(agent: any = null, catalog: any = null) {
-  const setId = String(
-    agent?.preferredDriveDiscs?.defaultSetId
-      ?? agent?.preferredDriveDiscs?.defaultSet
-      ?? agent?.defaultDriveDiscSetId
-      ?? "",
-  ).trim()
-  if (!setId) {
-    return ""
-  }
-  if (!catalog) {
-    return setId
-  }
+function preferredDriveDiscDefaultSetIds(agent: any = null, catalog: any = null) {
+  const legacy = agent?.preferredDriveDiscs?.defaultSetId
+    ?? agent?.preferredDriveDiscs?.defaultSet
+    ?? agent?.defaultDriveDiscSetId
+    ?? ""
+  const raw = agent?.preferredDriveDiscs?.defaultSetIds ?? (legacy ? [legacy] : [])
+  const setIds = [...new Set(normalizeArray(Array.isArray(raw) ? raw : [raw]))]
+  if (!catalog) return setIds
   const validIds = new Set(optimizerDriveDiscSets(catalog).map((set: any) => String(set?.id ?? "")).filter(Boolean))
-  return validIds.has(setId) ? setId : ""
+  return setIds.filter(setId => validIds.has(setId))
 }
 
 function firstDriveDiscSetId(catalog: any = null) {
@@ -172,16 +167,22 @@ function normalizeOptimizerSettings(value: any = {}, catalog: any = null, agent:
       .map((set: any) => String(set?.id ?? "").trim())
       .filter(Boolean),
   )
-  const preferredFourPieceSetId = preferredDriveDiscDefaultSetId(agent, catalog)
-  const savedFourPieceSetId = String(saved.fourPieceSetId ?? "").trim()
-  const savedFourPieceSetVisible = !catalog || visibleSetIds.has(savedFourPieceSetId)
-  const hasManualFourPieceSet = saved.fourPieceSetSource === "manual" && savedFourPieceSetVisible
-  const fourPieceSetId = hasManualFourPieceSet
-    ? savedFourPieceSetId
-    : preferredFourPieceSetId || (savedFourPieceSetVisible ? savedFourPieceSetId : "") || firstDriveDiscSetId(catalog)
+  const preferredFourPieceSetIds = preferredDriveDiscDefaultSetIds(agent, catalog)
+  const legacySavedSetId = String(saved.fourPieceSetId ?? "").trim()
+  const savedFourPieceSetIds = [...new Set(normalizeArray(
+    saved.fourPieceSetIds ?? (legacySavedSetId ? [legacySavedSetId] : []),
+  ))].filter(id => !catalog || visibleSetIds.has(id))
+  const hasManualFourPieceSet = saved.fourPieceSetSource === "manual" && savedFourPieceSetIds.length > 0
+  const fourPieceSetIds = hasManualFourPieceSet
+    ? savedFourPieceSetIds
+    : preferredFourPieceSetIds.length
+      ? preferredFourPieceSetIds
+      : savedFourPieceSetIds.length
+        ? savedFourPieceSetIds
+        : [firstDriveDiscSetId(catalog)].filter(Boolean)
   return {
     algorithm: normalizeBrowserOptimizerAlgorithm(saved.algorithm),
-    fourPieceSetId,
+    fourPieceSetIds,
     fourPieceSetSource: hasManualFourPieceSet ? "manual" : "preferred",
     twoPieceSetIds: normalizeArray(saved.twoPieceSetIds ?? saved.twoPieceSetId)
       .filter(id => !catalog || visibleSetIds.has(id)),
@@ -198,7 +199,7 @@ function normalizeOptimizerSettings(value: any = {}, catalog: any = null, agent:
 function optimizerSettingsPayload(state: any = {}) {
   return {
     algorithm: normalizeBrowserOptimizerAlgorithm(state.algorithm),
-    fourPieceSetId: String(state.fourPieceSetId ?? "").trim(),
+    fourPieceSetIds: [...new Set(normalizeArray(state.fourPieceSetIds))],
     fourPieceSetSource: state.fourPieceSetSource === "manual" ? "manual" : "preferred",
     twoPieceSetIds: normalizeArray(state.twoPieceSetIds),
     fourPieceBuffMode: state.fourPieceBuffMode === "manual" ? "manual" : "auto",
@@ -379,7 +380,7 @@ export const useOptimizerStore = defineStore("optimizer", {
     status: "idle" as OptimizerStatus,
     activeAgentId: "",
     algorithm: "exact-super-bound",
-    fourPieceSetId: "",
+    fourPieceSetIds: [] as string[],
     fourPieceSetSource: "preferred" as "preferred" | "manual",
     twoPieceSetIds: [] as string[],
     fourPieceBuffMode: "auto" as "auto" | "manual",
@@ -397,12 +398,14 @@ export const useOptimizerStore = defineStore("optimizer", {
   }),
   getters: {
     isBusy: state => state.status === "estimating" || state.status === "preparing" || state.status === "running" || state.status === "cancelling",
+    fourPieceSetId: state => state.fourPieceSetIds[0] ?? "",
     selectedResult: state => (rank: number) => state.resultSchemes.find((item: any) => Number(item.rank) === Number(rank)),
     settings(state) {
       return {
         objective: "damage",
         algorithm: state.algorithm,
-        fourPieceSetId: state.fourPieceSetId,
+        fourPieceSetIds: state.fourPieceSetIds,
+        fourPieceSetId: state.fourPieceSetIds[0] ?? "",
         twoPieceSetIds: state.twoPieceSetIds,
         fourPieceBuffMode: state.fourPieceBuffMode,
         fourPieceBuffRuntimeInputs: state.fourPieceBuffRuntimeInputs,
@@ -418,7 +421,7 @@ export const useOptimizerStore = defineStore("optimizer", {
     },
     applySettings(settings: any = {}) {
       this.algorithm = settings.algorithm
-      this.fourPieceSetId = settings.fourPieceSetId
+      this.fourPieceSetIds = settings.fourPieceSetIds
       this.fourPieceSetSource = settings.fourPieceSetSource
       this.twoPieceSetIds = settings.twoPieceSetIds
       this.fourPieceBuffMode = settings.fourPieceBuffMode
@@ -435,11 +438,12 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.persistSettings()
     },
     applyAgentPreferredDriveDiscSet(agent: any = null, catalog: any = null) {
-      const preferredFourPieceSetId = preferredDriveDiscDefaultSetId(agent, catalog)
-      if (!preferredFourPieceSetId || preferredFourPieceSetId === this.fourPieceSetId) {
+      const preferredFourPieceSetIds = preferredDriveDiscDefaultSetIds(agent, catalog)
+      if (!preferredFourPieceSetIds.length
+        || JSON.stringify(preferredFourPieceSetIds) === JSON.stringify(this.fourPieceSetIds)) {
         return
       }
-      this.fourPieceSetId = preferredFourPieceSetId
+      this.fourPieceSetIds = preferredFourPieceSetIds
       this.fourPieceSetSource = "preferred"
       this.persistSettings()
     },
@@ -462,7 +466,10 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.persistSettings()
     },
     setFourPieceSet(id: string) {
-      this.fourPieceSetId = id
+      this.setFourPieceSets(id ? [id] : [])
+    },
+    setFourPieceSets(ids: string[]) {
+      this.fourPieceSetIds = [...new Set(normalizeArray(ids))]
       this.fourPieceSetSource = "manual"
       this.persistSettings()
     },
@@ -759,6 +766,7 @@ export const useOptimizerStore = defineStore("optimizer", {
             this.resultSchemes = this.results.map((result: any) => ({
               rank: result.rank,
               score: result.score,
+              fourPieceSetId: result.fourPieceSetId,
               driveDiscs: result.driveDiscs ?? [],
               loadoutName: `${input?.label ?? "优化方案"}-${Math.round(Number(result.score ?? 0))}-第 ${result.rank} 名`,
             }))

@@ -38,11 +38,11 @@ export const BASIS_OPTIONS = [
 export const CRIT_MODE_OPTIONS = [option("expected", "期望"), option("crit", "暴击"), option("nonCrit", "非暴击")]
 export const EVENT_KIND_OPTIONS = [
   option("direct", "直伤"), option("sheer", "贯穿"), option("anomaly", "属性异常"),
-  option("disorder", "紊乱"), option("skillGroup", "技能组"),
+  option("disorder", "紊乱"), option("release", "异放"), option("skillGroup", "技能组"),
 ]
 export const EVENT_SOURCE_OPTIONS = [option("skill", "技能倍率"), option("manual", "手填倍率")]
 export const DISORDER_TYPE_OPTIONS = [option("normal", "（普通）紊乱"), option("polarized", "极性紊乱")]
-export const ANOMALY_SETTLEMENT_OPTIONS = [option("attribute", "属性异常"), option("disorder", "紊乱")]
+export const ANOMALY_SETTLEMENT_OPTIONS = [option("attribute", "属性异常"), option("disorder", "紊乱"), option("release", "异放")]
 export const LEVEL_SCALE_OPTIONS = [option("skill", "技能等级"), option("coreSkill", "核心技等级")]
 export const SKILL_ROW_KIND_OPTIONS = [option("damageMultiplier", "伤害倍率"), option("dazeMultiplier", "失衡倍率")]
 export const DAMAGE_BASIS_OPTIONS = [option("", "攻击力（默认）"), option("sheerForce", "贯穿力")]
@@ -261,6 +261,7 @@ export function defaultCalculationEvent(kind = "direct") {
   const base: any = { id: internalId("event"), kind, count: 1, stunned: true }
   if (kind === "anomaly") return { ...base, settlementType: "attribute", anomalyEffect: "assault", procCount: 1 }
   if (kind === "disorder") return { ...base, kind: "anomaly", settlementType: "disorder", disorderType: "normal", anomalyEffect: "burn", elapsedSeconds: 0 }
+  if (kind === "release") return { ...base, kind: "anomaly", settlementType: "release", anomalyEffect: "assault" }
   if (kind === "skillGroup") return { ...base, kind: "skillGroup", skillGroupId: "" }
   return { ...base, critMode: "expected", skillMultiplier: 100, damageElement: "physical", __source: "manual" }
 }

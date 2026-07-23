@@ -298,9 +298,44 @@ type EffectTarget =
   | { kind: "skill"; skillTargets: SkillTarget[] }
   | {
       kind: "anomaly";
-      settlementType: "attribute" | "disorder";
+      settlementType: "attribute" | "disorder" | "release";
       anomalyEffects: Array<"assault" | "shatter" | "burn" | "shock" | "corruption" | "frozen" | "frost_frozen" | "flinch">;
     };
+
+type ReleaseUnit = "raw" | "percent" | "decimal";
+type ReleaseExpression =
+  | { kind: "constant"; value: number; unit: ReleaseUnit; label?: { zhCN?: string; en?: string } }
+  | { kind: "triggerStat"; panel: "outOfCombat" | "inCombat"; stat: "atk" | "anomalyProficiency" | "anomalyMastery"; unit: ReleaseUnit; label?: { zhCN?: string; en?: string } }
+  | { kind: "coreSkillScaling"; field: string; key?: string | "eventElement"; unit: ReleaseUnit; label?: { zhCN?: string; en?: string } }
+  | { kind: "condition"; condition: "stunned"; whenTrue: number; whenFalse: number; unit: ReleaseUnit; label?: { zhCN?: string; en?: string } }
+  | { op: "add" | "subtract" | "multiply" | "divide" | "max" | "min" | "clamp" | "floor"; args: ReleaseExpression[]; label?: { zhCN?: string; en?: string } };
+
+interface AnomalyReleaseProfile {
+  id: string;
+  name: { zhCN?: string; en?: string };
+  default?: boolean;
+  supportedElements: Array<"physical" | "fire" | "ice" | "electric" | "ether" | "wind">;
+  resultMode: "originalAnomalyRatio" | "fixedAnomalyMultiplier";
+  expression: ReleaseExpression;
+  critRateBonusExpression?: ReleaseExpression;
+}
+
+interface AnomalyUnitSourceSnapshot {
+  schemaVersion: 1;
+  agentId: string;
+  agentLevel: number;
+  capturedAt: string;
+  sourceConfigHash: string;
+  panel: Record<string, number>;
+  outOfCombatPanel: Record<string, number>;
+  buffTotals: Record<string, unknown>;
+}
+
+// `percent` converts to decimal exactly once at a formula leaf; magnitude-based
+// unit guessing and string formulas are not supported. `originalAnomalyRatio`
+// multiplies one original Anomaly unit by the expression result.
+// `fixedAnomalyMultiplier` replaces the Release base multiplier and derives a
+// relative scale from the original unit instead of multiplying final damage.
 
 type BuffRuleStat =
   | ZzzStat
@@ -499,11 +534,27 @@ interface InCombatRequest {
       | { id: string; kind: "direct"; stunned?: boolean; skillMultiplier?: number; skillRef?: InCombatRequest["damage"]["skillRef"]; damageBasis?: "atk" | "anomalyProficiency"; damageRatioPct?: number; critMode?: "expected" | "crit" | "nonCrit"; count?: number }
       | { id: string; kind: "sheer"; stunned?: boolean; skillMultiplier?: number; skillRef?: InCombatRequest["damage"]["skillRef"]; damageRatioPct?: number; critMode?: "expected" | "crit" | "nonCrit"; count?: number }
       | { id: string; kind: "anomaly"; stunned?: boolean; anomalyEffect: "assault" | "shatter" | "burn" | "shock" | "corruption"; anomalyVariant?: "normal" | "polarizedAssault"; damageRatioPct?: number; procCount?: number; count?: number }
+      | { id: string; kind: "anomaly"; settlementType: "release"; stunned?: boolean; anomalyEffect: "assault" | "shatter" | "burn" | "shock" | "corruption"; triggerActorRef: { agentId: string; profileId: string }; anomalySource: { actorRef: { agentId: string }; snapshot?: AnomalyUnitSourceSnapshot }; damageRatioPct?: number; count?: number }
       | { id: string; kind: "disorder"; stunned?: boolean; previousAnomalyEffect: "burn" | "shock" | "corruption" | "frozen" | "flinch"; disorderType?: "normal" | "polarized"; damageRatioPct?: number; elapsedSeconds: number; count?: number }
       | { id: string; kind: "skillGroup"; stunned?: boolean; skillGroupId: string; count?: number }
     >;
   };
 }
+
+// For Release, `triggerActorRef.agentId` must be the equipped agent. A matching
+// current-agent source reads live panels; any other source requires a frozen
+// snapshot. The snapshot supplies one ordinary Anomaly unit and source-owned
+// modifiers. Enemy defense, resistance, and event stunned state remain live.
+// Only modifiers targeted to `settlementType: "release"` come from the trigger.
+// Trigger formula dependencies participate in optimization while an external
+// snapshot stays constant; joint source-plus-trigger Drive Disc search is out
+// of scope.
+//
+// Player-editor policy: Aria Release events are currently normalized to
+// Corruption with Aria as both trigger and live Anomaly source. The generalized
+// external-source snapshot schema remains supported for other profiles and must
+// not be removed. Reopen Aria's source selector only after cross-agent source
+// builds, snapshot refresh, and their calculation regressions are complete.
 
 interface InCombatResponse {
   outOfCombat: {

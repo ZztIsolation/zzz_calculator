@@ -230,6 +230,54 @@ function assertInvalid(kind, item, text, context = {}) {
 }
 
 assertValid("agents", validAgent)
+const dynamicCoreAgent = {
+    ...clone(validAgent),
+    combatBuffs: {
+        corePassive: {
+            scope: "inCombat",
+            effects: [{
+                id: "dynamic-core-ap",
+                type: "fixed",
+                stat: "anomalyProficiency",
+                value: 45,
+                mode: "flat",
+                valueSource: { kind: "corePassiveScaling", field: "anomalyProficiencyFlat" },
+            }],
+        },
+        additionalAbility: null,
+    },
+    coreSkill: {
+        defaultLevel: "B",
+        levels: [{ level: "A", stats: [] }, { level: "B", stats: [] }],
+        corePassiveScaling: {
+            levels: [
+                { level: 1, anomalyProficiencyFlat: 45 },
+                { level: 2, anomalyProficiencyFlat: 52 },
+                { level: 3, anomalyProficiencyFlat: 60 },
+            ],
+        },
+    },
+}
+assertValid("agents", dynamicCoreAgent)
+assert.deepEqual(
+    cleanMaintenanceItem("agents", dynamicCoreAgent).combatBuffs.corePassive.effects[0].valueSource,
+    { kind: "corePassiveScaling", field: "anomalyProficiencyFlat" },
+)
+const missingDynamicCoreField = clone(dynamicCoreAgent)
+missingDynamicCoreField.coreSkill.corePassiveScaling.levels[1] = { level: 2 }
+assertInvalid("agents", missingDynamicCoreField, "valueSource.field[1]")
+const incompleteDynamicCoreLevels = clone(dynamicCoreAgent)
+incompleteDynamicCoreLevels.coreSkill.corePassiveScaling.levels.pop()
+assertInvalid("agents", incompleteDynamicCoreLevels, "完整档位")
+const mismatchedDynamicFallback = clone(dynamicCoreAgent)
+mismatchedDynamicFallback.combatBuffs.corePassive.effects[0].value = 44
+assertInvalid("agents", mismatchedDynamicFallback, "兼容值必须与核心被动倍率第一档一致")
+const misplacedDynamicSource = clone(dynamicCoreAgent)
+misplacedDynamicSource.combatBuffs.additionalAbility = {
+    scope: "inCombat",
+    effects: [clone(misplacedDynamicSource.combatBuffs.corePassive.effects[0])],
+}
+assertInvalid("agents", misplacedDynamicSource, "只能用于角色核心被动")
 assertValid("agents", {
     ...validAgent,
     attribute: "frost",
@@ -267,6 +315,23 @@ assertValid("agents", {
 }, {
     driveDiscSets: [validDriveDiscSet],
 })
+assertValid("agents", {
+    ...validAgent,
+    preferredDriveDiscs: {
+        defaultSetIds: [validDriveDiscSet.id, "second_drive_disc"],
+        mainStatLimits: { 4: ["anomalyProficiency"] },
+    },
+}, {
+    driveDiscSets: [validDriveDiscSet, { ...validDriveDiscSet, id: "second_drive_disc" }],
+})
+const cleanedPreferredDriveDiscs = cleanMaintenanceItem("agents", {
+    ...validAgent,
+    preferredDriveDiscs: {
+        defaultSetIds: [validDriveDiscSet.id, "second_drive_disc", validDriveDiscSet.id],
+        mainStatLimits: { 4: ["anomalyProficiency"] },
+    },
+})
+assert.deepEqual(cleanedPreferredDriveDiscs.preferredDriveDiscs.defaultSetIds, [validDriveDiscSet.id, "second_drive_disc"])
 assertInvalid("agents", {
     ...validAgent,
     preferredDriveDiscs: {
@@ -1189,6 +1254,121 @@ assertValid("agents", {
     ...validAgent,
     defaultCalculationConfig: validDefaultCalculationConfig,
 }, validCalculationContext)
+
+const validReleaseProfile = {
+    id: "test-release-profile",
+    name: { zhCN: "测试异放方案" },
+    default: true,
+    supportedElements: ["physical"],
+    resultMode: "fixedAnomalyMultiplier",
+    expression: {
+        op: "multiply",
+        args: [
+            { kind: "triggerStat", panel: "outOfCombat", stat: "anomalyMastery", unit: "raw" },
+            { kind: "constant", value: 5, unit: "percent" },
+            { kind: "condition", condition: "stunned", whenTrue: 1.5, whenFalse: 1, unit: "decimal" },
+        ],
+    },
+}
+const validReleaseEvent = {
+    id: "release-1",
+    kind: "anomaly",
+    settlementType: "release",
+    anomalyEffect: "test_assault",
+    triggerActorRef: { agentId: validAgent.id, profileId: validReleaseProfile.id },
+    anomalySource: { actorRef: { agentId: validAgent.id } },
+    count: 1,
+    stunned: true,
+}
+const validReleaseAgent = {
+    ...validAgent,
+    anomalyReleaseProfiles: [validReleaseProfile],
+    defaultCalculationConfig: {
+        mode: "anomaly",
+        selectedEventId: validReleaseEvent.id,
+        events: [validReleaseEvent],
+    },
+}
+assertValid("agents", validReleaseAgent, validCalculationContext)
+const cleanedReleaseAgent = cleanMaintenanceItem("agents", validReleaseAgent)
+assert.deepEqual(cleanedReleaseAgent.defaultCalculationConfig.events[0], validReleaseEvent)
+assert.equal(cleanedReleaseAgent.defaultCalculationConfig.events[0].anomalyVariant, undefined)
+assert.equal(cleanedReleaseAgent.defaultCalculationConfig.events[0].procCount, undefined)
+const cleanedLegacyReleaseAgent = cleanMaintenanceItem("agents", {
+    ...validReleaseAgent,
+    defaultCalculationConfig: {
+        ...validReleaseAgent.defaultCalculationConfig,
+        events: [{
+            id: "legacy-release",
+            kind: "anomaly",
+            settlementType: "attribute",
+            anomalyEffect: "test_assault",
+            anomalyVariant: "release",
+            procCount: 12,
+            count: 1,
+            stunned: false,
+        }],
+        selectedEventId: "legacy-release",
+    },
+})
+assert.deepEqual(cleanedLegacyReleaseAgent.defaultCalculationConfig.events[0], {
+    id: "legacy-release",
+    kind: "anomaly",
+    count: 1,
+    stunned: false,
+    settlementType: "release",
+    anomalyEffect: "test_assault",
+    triggerActorRef: { agentId: validAgent.id, profileId: validReleaseProfile.id },
+    anomalySource: { actorRef: { agentId: validAgent.id } },
+})
+assertInvalid("agents", {
+    ...validReleaseAgent,
+    anomalyReleaseProfiles: [{
+        ...validReleaseProfile,
+        expression: { kind: "triggerStat", panel: "outOfCombat", stat: "critRate", unit: "auto" },
+    }],
+}, "unit 必须显式使用 raw、percent 或 decimal", validCalculationContext)
+assertInvalid("agents", {
+    ...validReleaseAgent,
+    defaultCalculationConfig: {
+        ...validReleaseAgent.defaultCalculationConfig,
+        events: [{ ...validReleaseEvent, triggerActorRef: { ...validReleaseEvent.triggerActorRef, agentId: "other_agent" } }],
+    },
+}, "异放触发者必须是当前角色", validCalculationContext)
+assertInvalid("agents", {
+    ...validReleaseAgent,
+    defaultCalculationConfig: {
+        ...validReleaseAgent.defaultCalculationConfig,
+        events: [{ ...validReleaseEvent, triggerActorRef: { ...validReleaseEvent.triggerActorRef, profileId: "missing" } }],
+    },
+}, "异放倍率方案不存在", validCalculationContext)
+assertInvalid("agents", {
+    ...validReleaseAgent,
+    defaultCalculationConfig: {
+        ...validReleaseAgent.defaultCalculationConfig,
+        events: [{ ...validReleaseEvent, anomalySource: { actorRef: { agentId: "other_agent" } } }],
+    },
+}, "必须提供冻结快照", validCalculationContext)
+assertInvalid("agents", {
+    ...validReleaseAgent,
+    defaultCalculationConfig: {
+        ...validReleaseAgent.defaultCalculationConfig,
+        events: [{
+            ...validReleaseEvent,
+            anomalySource: {
+                actorRef: { agentId: "other_agent" },
+                snapshot: { agentId: "wrong_agent", panel: {}, outOfCombatPanel: {}, buffTotals: {} },
+            },
+        }],
+    },
+}, "冻结快照与原异常施加者不一致", validCalculationContext)
+assertInvalid("agents", {
+    ...validReleaseAgent,
+    defaultCalculationConfig: {
+        ...validReleaseAgent.defaultCalculationConfig,
+        events: [{ ...validReleaseEvent, anomalyVariant: "release" }],
+    },
+}, "异放不能保存为异常形态", validCalculationContext)
 assertInvalid("agents", {
     ...validAgent,
     defaultCalculationConfig: {
@@ -2190,13 +2370,21 @@ assert.deepEqual(cleanMaintenanceItem("combat-buffs", anomalyTargetBuff).effects
     settlementType: "disorder",
     anomalyEffects: ["flinch"],
 })
-assertInvalid("combat-buffs", {
+assertValid("combat-buffs", {
     ...anomalyTargetBuff,
     effects: [{
         ...anomalyTargetBuff.effects[0],
-        target: { kind: "anomaly", settlementType: "attribute", anomalyEffects: ["assault"] },
+        target: { kind: "anomaly", settlementType: "attribute", anomalyEffects: ["corruption"], anomalyVariants: ["normal"] },
     }],
-}, "异常持续时间延长必须指定一个紊乱原异常")
+})
+assertValid("combat-buffs", {
+    ...anomalyTargetBuff,
+    effects: [{
+        ...anomalyTargetBuff.effects[0],
+        stat: "anomalyCritRate",
+        target: { kind: "anomaly", settlementType: "release", anomalyEffects: ["corruption"] },
+    }],
+})
 assertInvalid("combat-buffs", {
     ...anomalyTargetBuff,
     effects: [{ ...anomalyTargetBuff.effects[0], target: { kind: "anomaly", settlementType: "disorder", anomalyEffects: [] } }],

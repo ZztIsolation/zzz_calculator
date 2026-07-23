@@ -499,6 +499,49 @@ function selectByLabel(wrapper: ReturnType<typeof mountModal>, label: string) {
 }
 
 describe("BuffPickerModal", () => {
+  it("updates core-passive scaling values while the picker remains open", async () => {
+    const dynamicMeta = {
+      ...meta,
+      agents: [{
+        id: "aria",
+        name: { zhCN: "爱芮" },
+        coreSkill: {
+          defaultLevel: "F",
+          levels: ["A", "B", "C", "D", "E", "F"].map(level => ({ level })),
+          corePassiveScaling: {
+            levels: [45, 52, 60, 67, 75, 82, 90].map((value, index) => ({
+              level: index + 1,
+              anomalyProficiencyFlat: value,
+            })),
+          },
+        },
+        combatBuffs: {
+          corePassive: {
+            scope: "inCombat",
+            effects: [{
+              id: "core-ap",
+              type: "fixed",
+              stat: "anomalyProficiency",
+              value: 45,
+              valueSource: { kind: "corePassiveScaling", field: "anomalyProficiencyFlat" },
+            }],
+          },
+        },
+      }],
+    }
+    const wrapper = mountModal({ meta: dynamicMeta, agentId: "aria", coreSkillLevel: "F" })
+    await openModal(wrapper)
+    expect(wrapper.find(".buff-effect-lines").text()).toContain("异常精通 +90")
+
+    await wrapper.setProps({ coreSkillLevel: "A" })
+    await nextTick()
+    expect(wrapper.find(".buff-effect-lines").text()).toContain("异常精通 +52")
+
+    await wrapper.setProps({ coreSkillLevel: "none" })
+    await nextTick()
+    expect(wrapper.find(".buff-effect-lines").text()).toContain("异常精通 +45")
+  })
+
   it("renders the buff category tabs as a dedicated control strip", async () => {
     const wrapper = mountModal()
 

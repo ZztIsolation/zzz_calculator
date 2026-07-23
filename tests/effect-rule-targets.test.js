@@ -111,4 +111,41 @@ const unsupported = normalizeLegacyEffectAppliesToInValue(clone({
 }))
 assert.equal(hasLegacyEffectAppliesTo(unsupported), true, "Unsupported legacy filters must remain visible to validation")
 
+const releaseTargetMigration = normalizeLegacyEffectAppliesToInValue(clone({
+    effects: [{
+        id: "legacy-release-target",
+        type: "fixed",
+        stat: "critRate",
+        mode: "flat",
+        value: 10,
+        target: {
+            kind: "anomaly",
+            settlementType: "attribute",
+            anomalyEffects: ["corruption"],
+            anomalyVariants: ["release"],
+        },
+    }, {
+        id: "legacy-release-applies-to",
+        type: "fixed",
+        stat: "dmgBonus",
+        mode: "flat",
+        value: 20,
+        appliesTo: {
+            anomalyEffects: ["corruption"],
+            anomalyVariants: ["release"],
+        },
+    }],
+}))
+assert.deepEqual(releaseTargetMigration.effects[0].target, {
+    kind: "anomaly",
+    settlementType: "release",
+    anomalyEffects: ["corruption"],
+})
+assert.deepEqual(releaseTargetMigration.effects[1].target, {
+    kind: "anomaly",
+    settlementType: "release",
+    anomalyEffects: ["corruption"],
+})
+assert.equal(releaseTargetMigration.effects[1].appliesTo, undefined)
+
 console.log("effect rule target migration tests passed")

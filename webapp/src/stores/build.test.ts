@@ -115,6 +115,110 @@ describe("build store", () => {
     expect(store.damageConfig.events[0]).toMatchObject({ id: "admin-hit", stunned: true })
   })
 
+  it("upgrades legacy release variants to actor-backed release settlements", () => {
+    const store = useBuildStore()
+    const agent = {
+      id: "release_agent",
+      name: { zhCN: "异放角色" },
+      anomalyReleaseProfiles: [{
+        id: "default-release",
+        default: true,
+        supportedElements: ["ether"],
+        resultMode: "originalAnomalyRatio",
+        expression: { kind: "constant", value: 1, unit: "decimal" },
+      }],
+      defaultCalculationConfig: {
+        selectedEventId: "default-release-event",
+        events: [{ id: "default-release-event", kind: "anomaly", settlementType: "release", anomalyEffect: "corruption" }],
+      },
+    }
+    const meta = { agents: [agent], wEngines: [], combatBuffs: [] }
+
+    store.applyAgentConfig(agent.id, meta, {
+      damage: {
+        mode: "custom",
+        selectedEventId: "legacy-release",
+        events: [{
+          id: "legacy-release",
+          kind: "anomaly",
+          settlementType: "attribute",
+          anomalyEffect: "corruption",
+          anomalyVariant: "release",
+          procCount: 20,
+        }],
+      },
+    })
+
+    expect(store.damageConfig.events[0]).toMatchObject({
+      id: "legacy-release",
+      settlementType: "release",
+      triggerActorRef: { agentId: agent.id, profileId: "default-release" },
+      anomalySource: { actorRef: { agentId: agent.id } },
+    })
+    expect(store.damageConfig.events[0].anomalyVariant).toBeUndefined()
+    expect(store.damageConfig.events[0].procCount).toBeUndefined()
+  })
+
+  it("normalizes saved Aria Release events to Corruption and a live self source", () => {
+    const store = useBuildStore()
+    const aria = {
+      id: "aria",
+      name: { zhCN: "爱芮" },
+      anomalyReleaseProfiles: [{
+        id: "core_passive",
+        default: true,
+        supportedElements: ["ether"],
+        resultMode: "originalAnomalyRatio",
+        expression: { kind: "constant", value: 1, unit: "decimal" },
+      }],
+      defaultCalculationConfig: {
+        selectedEventId: "aria-default-release",
+        events: [{ id: "aria-default-release", kind: "anomaly", settlementType: "release", anomalyEffect: "corruption" }],
+      },
+    }
+    const meta = { agents: [aria], wEngines: [], combatBuffs: [] }
+
+    store.applyAgentConfig(aria.id, meta, {
+      damage: {
+        mode: "custom",
+        selectedEventId: "saved-release",
+        events: [{
+          id: "saved-release",
+          kind: "anomaly",
+          settlementType: "release",
+          anomalyEffect: "burn",
+          anomalyVariant: "release",
+          procCount: 20,
+          disorderType: "normal",
+          elapsedSeconds: 2,
+          triggerActorRef: { agentId: "other_agent", profileId: "missing" },
+          anomalySource: {
+            actorRef: { agentId: "other_agent" },
+            snapshot: {
+              agentId: "other_agent",
+              panel: { anomalyMastery: 200 },
+              outOfCombatPanel: { anomalyMastery: 200 },
+            },
+          },
+        }],
+      },
+    })
+
+    expect(store.damageConfig.events[0]).toMatchObject({
+      id: "saved-release",
+      kind: "anomaly",
+      settlementType: "release",
+      anomalyEffect: "corruption",
+      triggerActorRef: { agentId: "aria", profileId: "core_passive" },
+      anomalySource: { actorRef: { agentId: "aria" } },
+    })
+    expect(store.damageConfig.events[0].anomalySource).not.toHaveProperty("snapshot")
+    expect(store.damageConfig.events[0]).not.toHaveProperty("anomalyVariant")
+    expect(store.damageConfig.events[0]).not.toHaveProperty("procCount")
+    expect(store.damageConfig.events[0]).not.toHaveProperty("disorderType")
+    expect(store.damageConfig.events[0]).not.toHaveProperty("elapsedSeconds")
+  })
+
   it("keeps field buffs independent while allowing exactly one selected Boss Buff", () => {
     const store = useBuildStore()
     const meta = {

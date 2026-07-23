@@ -32,7 +32,7 @@ import {
   statLabel,
   storedStatLabel,
 } from "@/utils/format"
-import { SKILL_CATEGORIES, activeDriveDisc4pcBuffIds, useBuildStore } from "@/stores/build"
+import { SKILL_CATEGORIES, activeDriveDisc4pcBuffIds, savedAnomalySourceSnapshotForAgent, useBuildStore } from "@/stores/build"
 import { useAccountStore } from "@/stores/account"
 import { useAppConfigStore } from "@/stores/app-config"
 import { useCatalogStore } from "@/stores/catalog"
@@ -68,7 +68,7 @@ const showSchemeReservationConflict = ref(false)
 const schemeReservationConflicts = ref<any[]>([])
 const pendingSchemeReservation = ref<any | null>(null)
 const schemeReservationBusy = ref(false)
-const draftFourPieceSetId = ref("")
+const draftFourPieceSetIds = ref<string[]>([])
 const draftTwoPieceSetIds = ref<string[]>([])
 const activeManualDiscSlot = ref(0)
 const manualDiscSetFilterIds = ref<string[]>([])
@@ -88,8 +88,8 @@ onMounted(async () => {
       catalogStore.catalog,
       catalogStore.displayAgents.find((item: any) => item.id === buildStore.agentId),
     )
-    if (!optimizerStore.fourPieceSetId) {
-      optimizerStore.setFourPieceSet(catalogStore.displayDriveDiscSets[0]?.id ?? "")
+    if (!optimizerStore.fourPieceSetIds.length) {
+      optimizerStore.setFourPieceSets([catalogStore.displayDriveDiscSets[0]?.id ?? ""].filter(Boolean))
     }
     recalculate()
   }
@@ -126,7 +126,7 @@ const wEngineSelectOptions = computed(() => wEngineOptions.value.map((wEngine: a
 const canRunOptimization = computed(() => Boolean(
   buildStore.agentId
   && buildStore.wEngineId
-  && optimizerStore.fourPieceSetId,
+  && optimizerStore.fourPieceSetIds.length,
 ))
 const selectedOptimizedScheme = computed(() => optimizerStore.selectedResult(buildStore.selectedOptimizedRank))
 const selectedDriveDiscs = computed(() => inventoryStore.calculatorDriveDiscs({
@@ -207,8 +207,16 @@ const modificationOptions = computed(() => {
   })
 })
 const optimizerSetChoices = computed(() => [...catalogStore.displayDriveDiscSets].sort((left: any, right: any) => labelOf(left).localeCompare(labelOf(right), "zh-CN")))
-const selectedOptimizerSet = computed(() => catalogStore.displayDriveDiscSets.find((set: any) => set.id === optimizerStore.fourPieceSetId))
-const draftFourPieceSet = computed(() => catalogStore.displayDriveDiscSets.find((set: any) => set.id === draftFourPieceSetId.value))
+const selectedOptimizerSets = computed(() => optimizerStore.fourPieceSetIds
+  .map(id => catalogStore.displayDriveDiscSets.find((set: any) => set.id === id))
+  .filter(Boolean))
+const selectedOptimizedFourPieceSet = computed(() => catalogStore.displayDriveDiscSets
+  .find((set: any) => set.id === selectedOptimizedScheme.value?.fourPieceSetId))
+const draftFourPieceSets = computed(() => draftFourPieceSetIds.value
+  .map(id => catalogStore.displayDriveDiscSets.find((set: any) => set.id === id))
+  .filter(Boolean))
+const fourPieceDraftUnchanged = computed(() => [...draftFourPieceSetIds.value].sort().join("|")
+  === [...optimizerStore.fourPieceSetIds].sort().join("|"))
 const selectedTwoPieceSets = computed(() => optimizerStore.twoPieceSetIds
   .map(id => catalogStore.displayDriveDiscSets.find((set: any) => set.id === id))
   .filter(Boolean))
@@ -452,28 +460,26 @@ const selectedDamageEvent = computed(() => {
 })
 const currentDamageElement = computed(() => selectedDamageEvent.value?.damageElement ?? selectedAgent.value?.damageElement ?? selectedAgent.value?.attribute ?? "physical")
 const fourPieceRuntimeBuffs = computed(() => {
-  const set = selectedOptimizerSet.value
-  const fourPiece = set?.fourPiece
-  if (!set || !fourPiece) {
-    return []
-  }
   const buffs: any[] = []
-  const selfBuff = fourPiece.selfBuff ?? (Array.isArray(fourPiece.effects) ? fourPiece : null)
-  if (selfBuff?.effects?.length) {
-    buffs.push({
-      ...selfBuff,
-      id: `driveDisc4pc:${set.id}.self`,
-      name: { zhCN: `${labelOf(set)} 4 件套自身` },
-      sourceCategory: "driveDisc",
-    })
-  }
-  if (fourPiece.teamBuff?.effects?.length) {
-    buffs.push({
-      ...fourPiece.teamBuff,
-      id: `driveDisc4pc:${set.id}.team`,
-      name: { zhCN: `${labelOf(set)} 4 件套团队` },
-      sourceCategory: "driveDisc",
-    })
+  for (const set of selectedOptimizerSets.value) {
+    const fourPiece = set?.fourPiece
+    const selfBuff = fourPiece?.selfBuff ?? (Array.isArray(fourPiece?.effects) ? fourPiece : null)
+    if (selfBuff?.effects?.length) {
+      buffs.push({
+        ...selfBuff,
+        id: `driveDisc4pc:${set.id}.self`,
+        name: { zhCN: `${labelOf(set)} 4 件套自身` },
+        sourceCategory: "driveDisc",
+      })
+    }
+    if (fourPiece?.teamBuff?.effects?.length) {
+      buffs.push({
+        ...fourPiece.teamBuff,
+        id: `driveDisc4pc:${set.id}.team`,
+        name: { zhCN: `${labelOf(set)} 4 件套团队` },
+        sourceCategory: "driveDisc",
+      })
+    }
   }
   return buffs
 })
@@ -543,6 +549,18 @@ const optimizerHasFreeTwoPieceMetrics = computed(() => {
     && optimizerMetrics.value
     && Object.hasOwn(optimizerMetrics.value, "freeTwoPieceAutoSetCount")
 })
+const optimizerSetMetricChips = computed(() => (optimizerMetrics.value?.fourPieceSets ?? []).map((entry: any) => {
+  const set = catalogStore.displayDriveDiscSets.find((item: any) => item.id === entry.fourPieceSetId)
+  const metrics = entry.metrics ?? {}
+  const processed = processedOptimizationCount(metrics)
+  const estimated = Number(metrics.estimatedCombinationCount ?? 0)
+  return `${set ? labelOf(set) : entry.fourPieceSetId} ${formatNumber(processed)}${estimated ? ` / ${formatNumber(estimated)}` : ""}`
+}))
+
+function anomalySourceSnapshotForAgent(agentId: string) {
+  if (agentId === buildStore.agentId) return buildStore.lastAnomalySourceSnapshot
+  return savedAnomalySourceSnapshotForAgent(agentId)
+}
 const optimizerDetailChips = computed(() => [
   optimizerPrepareStageLabel.value ? `阶段：${optimizerPrepareStageLabel.value}` : "",
   optimizerMetrics.value?.algorithmLabel ? `算法：${optimizerMetrics.value.algorithmLabel}` : "",
@@ -558,6 +576,7 @@ const optimizerDetailChips = computed(() => [
   optimizerHasFreeTwoPieceMetrics.value ? `4+2 组合 ${formatNumber(optimizerMetrics.value.freeFourTwoCombinationCount ?? 0)}` : "",
   optimizerHasFreeTwoPieceMetrics.value ? `六件计划 ${formatNumber(optimizerMetrics.value.freeSixPiecePlanCount ?? 0)}` : "",
   optimizerHasFreeTwoPieceMetrics.value ? `六件组合 ${formatNumber(optimizerMetrics.value.freeSixPieceCombinationCount ?? 0)}` : "",
+  ...optimizerSetMetricChips.value,
   ...candidateChipTexts(optimizerMetrics.value),
   complexityText(optimizerMetrics.value, optimizerProgress.value?.settings ?? optimizerStore.settings),
 ].filter(Boolean))
@@ -886,13 +905,26 @@ function twoPieceSetEffectText(set: any) {
 }
 
 function openFourPieceSetModal() {
-  draftFourPieceSetId.value = optimizerStore.fourPieceSetId || optimizerSetChoices.value[0]?.id || ""
+  draftFourPieceSetIds.value = optimizerStore.fourPieceSetIds.length
+    ? [...optimizerStore.fourPieceSetIds]
+    : [optimizerSetChoices.value[0]?.id].filter(Boolean)
   showFourPieceSetModal.value = true
 }
 
 function applyFourPieceSetModalSelection() {
-  optimizerStore.setFourPieceSet(draftFourPieceSetId.value)
+  optimizerStore.setFourPieceSets(draftFourPieceSetIds.value)
   showFourPieceSetModal.value = false
+}
+
+function draftHasFourPieceSet(id: string) {
+  return draftFourPieceSetIds.value.includes(id)
+}
+
+function toggleDraftFourPieceSet(id: string) {
+  const selected = new Set(draftFourPieceSetIds.value)
+  if (selected.has(id)) selected.delete(id)
+  else selected.add(id)
+  draftFourPieceSetIds.value = [...selected]
 }
 
 function openTwoPieceSetModal() {
@@ -1213,10 +1245,12 @@ function complexityText(metrics: any = {}, settings: any = {}) {
               <dd class="set-summary-actions">
                 <NButton size="small" @click="openFourPieceSetModal">选择</NButton>
                 <div class="selected-set-summary" aria-live="polite">
-                  <span v-if="selectedOptimizerSet" class="selected-set-chip selected-set-chip-with-icon">
-                    <img :src="imageForDriveDiscSet(selectedOptimizerSet)" alt="" loading="lazy">
-                    <span>{{ labelOf(selectedOptimizerSet) }}</span>
-                  </span>
+                  <template v-if="selectedOptimizerSets.length">
+                    <span v-for="set in selectedOptimizerSets" :key="set.id" class="selected-set-chip selected-set-chip-with-icon">
+                      <img :src="imageForDriveDiscSet(set)" alt="" loading="lazy">
+                      <span>{{ labelOf(set) }}</span>
+                    </span>
+                  </template>
                   <span v-else class="selected-set-empty">未选择限定 4 件套</span>
                 </div>
               </dd>
@@ -1332,6 +1366,12 @@ function complexityText(metrics: any = {}, settings: any = {}) {
             :results="topOptimizedResultSchemes"
             @update:model-value="buildStore.selectOptimizedRank"
           />
+          <div v-if="buildStore.discMode === 'optimized' && selectedOptimizedFourPieceSet" class="selected-set-summary optimized-result-set">
+            <span class="selected-set-chip selected-set-chip-with-icon">
+              <img :src="imageForDriveDiscSet(selectedOptimizedFourPieceSet)" alt="" loading="lazy">
+              <span>实际 4 件套：{{ labelOf(selectedOptimizedFourPieceSet) }}</span>
+            </span>
+          </div>
 
           <div class="drive-disc-slot-grid">
             <template v-if="reservationUiEnabled">
@@ -1591,19 +1631,18 @@ function complexityText(metrics: any = {}, settings: any = {}) {
     </template>
   </NModal>
 
-  <NModal v-model:show="showFourPieceSetModal" preset="card" title="选择限定 4 件套" style="max-width: 920px">
+  <NModal v-model:show="showFourPieceSetModal" preset="card" title="选择限定 4 件套（可多选）" style="max-width: 920px">
     <div class="set-choice-list">
       <label
         v-for="set in optimizerSetChoices"
         :key="set.id"
         class="set-choice"
-        :class="{ active: draftFourPieceSetId === set.id }"
+        :class="{ active: draftHasFourPieceSet(set.id) }"
       >
         <input
-          type="radio"
-          name="optimizer-four-piece-set"
-          :checked="draftFourPieceSetId === set.id"
-          @change="draftFourPieceSetId = set.id"
+          type="checkbox"
+          :checked="draftHasFourPieceSet(set.id)"
+          @change="toggleDraftFourPieceSet(set.id)"
         >
         <img :src="imageForDriveDiscSet(set)" alt="" loading="lazy">
         <span class="set-choice-text">
@@ -1613,10 +1652,10 @@ function complexityText(metrics: any = {}, settings: any = {}) {
     </div>
     <template #footer>
       <div class="drawer-footer set-modal-footer">
-        <span class="modal-summary">{{ draftFourPieceSet ? `已选择 ${labelOf(draftFourPieceSet)}` : "未选择限定 4 件套" }}</span>
+        <span class="modal-summary">{{ draftFourPieceSets.length ? `已选择 ${draftFourPieceSets.length} 套` : "至少选择一套 4 件套" }}</span>
         <span class="toolbar">
           <NButton @click="showFourPieceSetModal = false">取消</NButton>
-          <NButton type="primary" :disabled="draftFourPieceSetId === optimizerStore.fourPieceSetId" @click="applyFourPieceSetModalSelection">应用限制</NButton>
+          <NButton type="primary" :disabled="!draftFourPieceSetIds.length || fourPieceDraftUnchanged" @click="applyFourPieceSetModalSelection">应用限制</NButton>
         </span>
       </div>
     </template>
@@ -1663,6 +1702,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
     :meta="catalogStore.meta"
     :drive-disc-sets="catalogStore.displayDriveDiscSets"
     :agent-id="buildStore.agentId"
+    :core-skill-level="String(buildStore.coreSkillLevel)"
     :cinema-level="buildStore.cinemaLevel"
     :w-engine-id="buildStore.wEngineId"
     :w-engine-modification-level="buildStore.wEngineModificationLevel"
@@ -1678,6 +1718,8 @@ function complexityText(metrics: any = {}, settings: any = {}) {
     :agent="selectedAgent"
     :cinema-level="buildStore.cinemaLevel"
     :combat-effects="buildStore.result?.inCombat?.activeEffects ?? []"
+    :release-context="{ inCombatPanel: buildStore.result?.inCombat?.panel, outOfCombatPanel: buildStore.result?.outOfCombat?.panel, coreSkillLevel: buildStore.coreSkillLevel }"
+    :source-snapshot-provider="anomalySourceSnapshotForAgent"
     @save="saveCalculationConfig"
   />
 

@@ -49,6 +49,7 @@ const props = defineProps<{
   meta?: any
   driveDiscSets?: any[]
   agentId?: string
+  coreSkillLevel?: string
   cinemaLevel?: number
   wEngineId?: string
   wEngineModificationLevel?: number
@@ -317,6 +318,7 @@ const groupedBuffs = computed(() => {
     catalogBuffs: props.buffs ?? [],
     driveDiscSets: props.driveDiscSets ?? [],
     agentId: props.agentId,
+    coreSkillLevel: props.coreSkillLevel,
     cinemaLevel: props.cinemaLevel,
     wEngineId: props.wEngineId,
     wEngineModificationLevel: props.wEngineModificationLevel,

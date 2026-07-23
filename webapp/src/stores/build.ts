@@ -11,6 +11,12 @@ import {
 } from "@core/calculationSkillGroups.js"
 import { resolveDefaultCalculationConfig } from "@core/defaultCalculationConfig.js"
 import { normalizeSkillTargetsInValue } from "@core/skillTargets.js"
+import {
+  createAnomalySourceSnapshot,
+  isReleaseSettlement,
+  normalizeAnomalyReleaseEventForAgent,
+  normalizeAnomalySourceSnapshot,
+} from "@core/anomalyRelease.js"
 import { teammateDriveDiscSetIdsFromBuffIds, wEngineIdFromTeamBuffId } from "@/utils/combatBuffs"
 import {
   clampWEngineModificationLevel,
@@ -54,6 +60,16 @@ function readJson(key: string) {
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value ?? null))
+}
+
+function configFingerprint(value: any) {
+  const text = JSON.stringify(value ?? {})
+  let hash = 2166136261
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return `fnv1a-${(hash >>> 0).toString(16).padStart(8, "0")}`
 }
 
 function wEngineForTeamBuffId(meta: any, id: string) {
@@ -308,7 +324,7 @@ function calculationAgentFor(metaAgent: any = null, catalog: any = null, agentId
   return metaAgent ?? catalogAgent
 }
 
-function normalizeDamageEvent(event: any, index = 0, fallbackStunned = true) {
+function normalizeDamageEvent(event: any, index = 0, fallbackStunned = true, agent: any = null) {
   const stunned = event?.stunned === undefined ? fallbackStunned : Boolean(event.stunned)
   if (event?.kind === "skillGroup") {
     const id = String(event?.id ?? `skillGroup-${index + 1}`)
@@ -322,7 +338,7 @@ function normalizeDamageEvent(event: any, index = 0, fallbackStunned = true) {
   }
   const kind = ["direct", "sheer", "anomaly", "disorder"].includes(event?.kind) ? event.kind : "direct"
   const fallback = defaultEvent(kind, `${kind}-${index + 1}`)
-  return {
+  const normalized = {
     ...fallback,
     ...clone(event ?? {}),
     id: String(event?.id ?? fallback.id),
@@ -330,6 +346,10 @@ function normalizeDamageEvent(event: any, index = 0, fallbackStunned = true) {
     count: Math.max(0, numeric(event?.count, fallback.count ?? 1)),
     stunned,
   }
+  if (kind === "anomaly" && isReleaseSettlement(normalized)) {
+    return normalizeAnomalyReleaseEventForAgent(normalized, agent)
+  }
+  return normalized
 }
 
 function legacyTargetStunned(value: any = {}) {
@@ -360,8 +380,8 @@ function normalizeDamageConfig(value: any, agent: any = null, cinemaLevel = 0) {
     ? value.events
     : eventFallback.events
   const events = Array.isArray(eventSource) && eventSource.length
-    ? eventSource.map((event: any, index: number) => normalizeDamageEvent(event, index, fallbackStunned))
-    : eventFallback.events.map((event: any, index: number) => normalizeDamageEvent(event, index, fallbackStunned))
+    ? eventSource.map((event: any, index: number) => normalizeDamageEvent(event, index, fallbackStunned, agent))
+    : eventFallback.events.map((event: any, index: number) => normalizeDamageEvent(event, index, fallbackStunned, agent))
   const selectedEventId = events.some((event: any) => event.id === value?.selectedEventId)
     ? String(value.selectedEventId)
     : events[0]?.id
@@ -431,6 +451,10 @@ function savedConfigForAgent(agentId: string) {
   const legacy = legacyOwnerSelection()
   const fallback = webappFallbackSelection()
   return saved?.byAgent?.[agentId] ?? legacy?.byAgent?.[agentId] ?? fallback?.byAgent?.[agentId] ?? {}
+}
+
+export function savedAnomalySourceSnapshotForAgent(agentId: string) {
+  return normalizeAnomalySourceSnapshot(savedConfigForAgent(agentId)?.lastAnomalySourceSnapshot)
 }
 
 function savedCurrentAgentId() {
@@ -634,6 +658,7 @@ export const useBuildStore = defineStore("build", {
     selectedOptimizedRank: 0,
     result: null as any,
     outOfCombat: null as any,
+    lastAnomalySourceSnapshot: null as any,
     error: "",
   }),
   getters: {
@@ -712,6 +737,7 @@ export const useBuildStore = defineStore("build", {
       )
       this.selectedLoadoutId = String(config.selectedLoadoutId ?? config.loadoutId ?? "")
       this.selectedOptimizedRank = numeric(config.selectedOptimizedRank, 0)
+      this.lastAnomalySourceSnapshot = normalizeAnomalySourceSnapshot(config.lastAnomalySourceSnapshot)
     },
     wEnginesForAgent(meta: any) {
       const agent = displayAgents(meta).find((item: any) => item.id === this.agentId)
@@ -911,8 +937,19 @@ export const useBuildStore = defineStore("build", {
       }
       try {
         const input = this.buildInput(catalog, meta, driveDiscs, options)
-        this.outOfCombat = calculateOutOfCombatPanel(catalog, input)
-        this.result = calculateInCombatPanel(catalog, input)
+        const outOfCombat = calculateOutOfCombatPanel(catalog, input)
+        const result = calculateInCombatPanel(catalog, input)
+        const anomalySourceSnapshot = createAnomalySourceSnapshot({
+          agentId: this.agentId,
+          agentLevel: this.agentLevel,
+          outOfCombatPanel: result?.outOfCombat?.panel,
+          inCombatPanel: result?.inCombat?.panel,
+          buffTotals: result?.inCombat?.buffTotals,
+          sourceConfigHash: configFingerprint(input),
+        })
+        this.outOfCombat = outOfCombat
+        this.result = result
+        this.lastAnomalySourceSnapshot = anomalySourceSnapshot
         this.error = ""
         this.persist()
       } catch (error) {
@@ -939,6 +976,7 @@ export const useBuildStore = defineStore("build", {
         wEngineModificationLevel: this.wEngineModificationLevel,
         selectedLoadoutId: this.selectedLoadoutId,
         selectedOptimizedRank: this.selectedOptimizedRank,
+        lastAnomalySourceSnapshot: this.lastAnomalySourceSnapshot,
         discMode: this.discMode,
         manualDriveDiscIdsBySlot: this.manualDriveDiscIdsBySlot,
         targetConfig: this.targetConfig,
