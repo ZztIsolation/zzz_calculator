@@ -264,6 +264,15 @@ assert.deepEqual(
     "Qianxia Buffs should reach player-facing metadata in the administrator-authored order",
 )
 
+const nangongyuBuffs = meta.teammateCombatBuffGroups
+    .find(group => group.id === "nangongyu")
+    ?.buffs ?? []
+assert.deepEqual(
+    nangongyuBuffs.map(buff => combatBuffDisplayName(buff)),
+    ["南宫羽 | 核心被动", "南宫羽 | 以太帷幕.妄想重奏", "南宫羽 | 额外能力", "南宫羽 | 影画一", "南宫羽 | 影画二"],
+    "Nangongyu Buffs should place Additional Ability before Cinema 1 without changing the surrounding authored order",
+)
+
 const youyeBuffs = meta.teammateCombatBuffGroups
     .find(group => group.id === "youye")
     ?.buffs ?? []

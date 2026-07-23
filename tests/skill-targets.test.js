@@ -167,7 +167,7 @@ assert.deepEqual(Object.fromEntries(skillTagCounts), {
     assistAttack: 9,
     exSpecial: 10,
 })
-assert.equal(storedTargets.length, 44)
+assert.equal(storedTargets.length, 50)
 const yeShunguangTargetMoveIds = new Set(storedTargets
     .map(item => item.target)
     .filter(target => target.kind === "specific" && target.agentSkillId === "ye_shunguang")

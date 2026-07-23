@@ -10,6 +10,20 @@ The entries below summarize each development day. Implementation details,
 modeling decisions, and verification evidence remain in the
 [detailed changelog](docs/changelog.md).
 
+### 2026-07-24 Hotfix
+
+- Added the three Defense Battle 3.0 Phase 3 field Buffs, Final Movement,
+  Chained Circuit, and Zero-Degree Operation, with explicit targeting for
+  Chain/Ultimate, attribute Anomaly, and Basic/Chain effects.
+- Moved Nangongyu's Additional Ability above Cinema 1 while preserving all
+  existing calculation ids, values, and surrounding authored order.
+- Removed the duplicate Neon Fantasies W-Engine listing, retained the
+  source-verified canonical entry, and migrated legacy `neon_fantasies`
+  loadouts and Buff selections.
+- Propagated skill-targeted CRIT DMG through white-box, compiled/dense,
+  browser Worker, and optimizer calculation paths without exposing it in the
+  player custom-Buff editor.
+
 ### 2026-07-22 Daily Update
 
 - Added account-scoped, per-disc agent reservations while preserving the existing

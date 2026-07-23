@@ -59,8 +59,21 @@ function clone<T>(value: T): T {
 function wEngineForTeamBuffId(meta: any, id: string) {
   const wEngineId = wEngineIdFromTeamBuffId(id)
   return wEngineId
-    ? (meta?.wEngines ?? []).find((item: any) => item?.id === wEngineId) ?? null
+    ? (meta?.wEngines ?? []).find((item: any) => item?.id === wEngineId
+      || (item?.legacyIds ?? []).includes(wEngineId)) ?? null
     : null
+}
+
+function canonicalWEngineId(meta: any, id: string) {
+  const wEngine = (meta?.wEngines ?? []).find((item: any) => item?.id === id
+    || (item?.legacyIds ?? []).includes(id))
+  return String(wEngine?.id ?? id)
+}
+
+function normalizeWEngineBuffId(meta: any, id: string) {
+  const match = /^wEngine:([^.]+)\.(self|team)$/.exec(String(id ?? ""))
+  if (!match) return id
+  return `wEngine:${canonicalWEngineId(meta, match[1])}.${match[2]}`
 }
 
 function normalizeAddedBuffs(value: any, meta: any = null): any[] {
@@ -75,6 +88,7 @@ function normalizeAddedBuffs(value: any, meta: any = null): any[] {
     }
     return {
       ...item,
+      id: normalizeWEngineBuffId(meta, String(item.id)),
       sourceCategory: "wEngine",
       sourceKind: "wEngineTeam",
       wEngineModificationLevel: clampWEngineModificationLevel(item.wEngineModificationLevel, wEngine),
@@ -666,6 +680,7 @@ export const useBuildStore = defineStore("build", {
       const rawTargetConfig = config.targetConfig ?? rawDamageConfig?.target ?? rawDamageConfig?.targetConfig ?? {}
       const legacyBossEncounterId = String(rawTargetConfig?.bossEncounterId ?? "")
       const rawSelectedBuffIds = stringArray(combat.activeBuffIds ?? config.selectedBuffIds)
+        .map(id => normalizeWEngineBuffId(meta, id))
       const selectedWithLegacyBoss = legacyBossEncounterId && !rawSelectedBuffIds.includes(legacyBossEncounterId)
         ? [...rawSelectedBuffIds, legacyBossEncounterId]
         : rawSelectedBuffIds

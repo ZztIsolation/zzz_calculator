@@ -669,7 +669,8 @@ export function defaultWEngineIdForAgent(wEngines = [], agentId = "", savedWEngi
     if (!Array.isArray(wEngines) || wEngines.length === 0) {
         return ""
     }
-    const saved = wEngines.find(wEngine => wEngine?.id === savedWEngineId)
+    const saved = wEngines.find(wEngine => wEngine?.id === savedWEngineId
+        || (wEngine?.legacyIds ?? []).includes(savedWEngineId))
     if (saved) {
         return saved.id
     }

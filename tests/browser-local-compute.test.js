@@ -104,10 +104,51 @@ const optimizerInput = {
     },
 }
 
+const browserPayloadResult = browserCalculateInCombatPanel(catalog, payload)
+const backendPayloadResult = backendCalculateInCombatPanel(catalog, payload)
 assert.deepEqual(
-    browserCalculateInCombatPanel(catalog, payload),
-    backendCalculateInCombatPanel(catalog, payload),
+    browserPayloadResult,
+    backendPayloadResult,
     "Browser damage core should match backend damage calculation.",
+)
+const lingduPayload = {
+    agentId: "hoshimi_miyabi",
+    coreSkillLevel: "F",
+    wEngineId: "hailfall_star_palace",
+    wEngineModificationLevel: 1,
+    driveDiscs: [],
+    combatBuffs: { activeBuffIds: ["field.defense_v5.v3_0.p3.lingdu_xingdong"] },
+    damage: {
+        selectedEventId: "lingdu-basic",
+        events: [{
+            id: "lingdu-basic",
+            kind: "direct",
+            critMode: "expected",
+            count: 1,
+            skillRef: {
+                agentSkillId: "hoshimi_miyabi",
+                categoryId: "basic",
+                moveId: "frost_moon",
+                rowId: "charge_3",
+                level: 12,
+            },
+        }],
+    },
+}
+const browserLingduResult = browserCalculateInCombatPanel(catalog, lingduPayload)
+const backendLingduResult = backendCalculateInCombatPanel(catalog, lingduPayload)
+assert.deepEqual(browserLingduResult, backendLingduResult, "Browser targeted CRIT DMG should match backend calculation.")
+const browserPayloadWithoutLingdu = browserCalculateInCombatPanel(catalog, {
+    ...lingduPayload,
+    combatBuffs: { activeBuffIds: [] },
+})
+assert.ok(
+    Math.abs(
+        browserLingduResult.damage.multipliers.critDmg
+            - browserPayloadWithoutLingdu.damage.multipliers.critDmg
+            - 0.35
+    ) < 1e-9,
+    "Browser calculation should add 35% skill-targeted CRIT DMG",
 )
 
 const aliceMasteryDiscs = [
@@ -224,6 +265,34 @@ assert.deepEqual(
     fallbackOptimized.results.slice(0, 10).map(result => result.driveDiscs.map(disc => disc.id)),
     browserOptimized.results.slice(0, 10).map(result => result.driveDiscs.map(disc => disc.id)),
     "Browser optimizer should preserve exact results when parallel workers are unavailable.",
+)
+
+const lingduOptimizerInput = {
+    ...lingduPayload,
+    driveDiscs: [],
+    settings: {
+        objective: "damage",
+        fourPieceSetId: fourSet,
+        twoPieceSetId: twoSet,
+        algorithm: "exact-super-bound",
+        enableUpperBoundPruning: true,
+    },
+}
+const backendLingduOptimized = await backendOptimizeDriveDiscsAsync(catalog, store, lingduOptimizerInput)
+const browserLingduRuntime = createDriveDiscOptimizerRuntime({
+    availableParallelism: () => 1,
+    yieldControl: async () => {},
+})
+const browserLingduOptimized = await browserLingduRuntime.optimizeDriveDiscsAsync(catalog, store, lingduOptimizerInput)
+assert.deepEqual(
+    browserLingduOptimized.results.map(result => result.driveDiscs.map(item => item.id)),
+    backendLingduOptimized.results.map(result => result.driveDiscs.map(item => item.id)),
+    "Browser and backend optimizers should rank the same discs with skill-targeted CRIT DMG.",
+)
+assert.deepEqual(
+    browserLingduOptimized.results.map(result => result.score),
+    backendLingduOptimized.results.map(result => result.score),
+    "Browser and backend optimizer scores should match with skill-targeted CRIT DMG.",
 )
 
 const aliceFourSet = "fanged_metal"

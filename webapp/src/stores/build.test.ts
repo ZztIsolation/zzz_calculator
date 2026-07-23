@@ -557,6 +557,45 @@ describe("build store", () => {
     expect(restored.buildInput({}, meta, []).combatBuffs.wEngineTeamModificationLevels[id]).toBe(5)
   })
 
+  it("normalizes legacy current and teammate w-engine ids to the canonical catalog id", () => {
+    const legacyId = "neon_fantasies"
+    const canonicalId = "zzz_wiki_1908"
+    const meta = {
+      agents: [{ id: "agent_a", name: { zhCN: "角色 A" } }],
+      wEngines: [{
+        id: canonicalId,
+        legacyIds: [legacyId],
+        name: { zhCN: "霓虹妄想" },
+        modification: { minLevel: 1, maxLevel: 5, defaultLevel: 1 },
+        effect: {
+          selfBuff: { scope: "inCombat", effects: [] },
+          teamBuff: { scope: "inCombat", effects: [] },
+        },
+      }],
+      combatBuffs: [],
+    }
+    const store = useBuildStore()
+
+    store.applyAgentConfig("agent_a", meta, {
+      wEngineId: legacyId,
+      combat: {
+        activeBuffIds: [`wEngine:${legacyId}.self`, `wEngine:${legacyId}.team`],
+        addedBuffs: [{
+          id: `wEngine:${legacyId}.team`,
+          sourceCategory: "wEngine",
+          sourceKind: "wEngineTeam",
+          wEngineModificationLevel: 3,
+        }],
+      },
+    })
+
+    expect(store.wEngineId).toBe(canonicalId)
+    expect(store.selectedBuffIds).toEqual([`wEngine:${canonicalId}.self`, `wEngine:${canonicalId}.team`])
+    expect(store.addedBuffs[0].id).toBe(`wEngine:${canonicalId}.team`)
+    expect(store.activeBuffIds(meta)).toContain(`wEngine:${canonicalId}.self`)
+    expect(store.activeBuffIds(meta)).toContain(`wEngine:${canonicalId}.team`)
+  })
+
   it("normalizes missing and non-numeric teammate w-engine ranks to refinement 1", () => {
     const meta = teammateWEngineMeta()
     const store = useBuildStore()

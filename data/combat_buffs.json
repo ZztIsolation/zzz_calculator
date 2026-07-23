@@ -458,29 +458,6 @@
           "buffModifiers": []
         },
         {
-          "id": "buff_a9ab2c0d63",
-          "source": {
-            "zhCN": "影画一"
-          },
-          "description": {
-            "zhCN": "「强化特殊技：相当沉重的爱意」或「普通攻击：可爱地雷飞天撞」命中敌人时，使敌人的全属性伤害抗性降低18%，持续40秒。"
-          },
-          "scope": "inCombat",
-          "effects": [
-            {
-              "id": "effect_884161bbba",
-              "type": "fixed",
-              "target": {
-                "kind": "default"
-              },
-              "stat": "enemyResReduction",
-              "mode": "flat",
-              "value": 18
-            }
-          ],
-          "buffModifiers": []
-        },
-        {
           "id": "buff_ce11acbda2",
           "source": {
             "zhCN": "额外能力"
@@ -503,6 +480,29 @@
           ],
           "buffModifiers": [],
           "hidden": false
+        },
+        {
+          "id": "buff_a9ab2c0d63",
+          "source": {
+            "zhCN": "影画一"
+          },
+          "description": {
+            "zhCN": "「强化特殊技：相当沉重的爱意」或「普通攻击：可爱地雷飞天撞」命中敌人时，使敌人的全属性伤害抗性降低18%，持续40秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_884161bbba",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "enemyResReduction",
+              "mode": "flat",
+              "value": 18
+            }
+          ],
+          "buffModifiers": []
         },
         {
           "id": "buff_2c59dfda5b",
@@ -3009,6 +3009,242 @@
             "max": 1,
             "step": 0.1
           }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.defense_v5.v3_0.p3.zhongmu_xiezou",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "defense_v5",
+        "gameVersion": "3.0",
+        "phaseNo": 3,
+        "phaseName": {
+          "zhCN": "第三期"
+        }
+      },
+      "name": {
+        "zhCN": "终幕协奏"
+      },
+      "source": {
+        "zhCN": "防卫战 v5"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.0版本第三期"
+      },
+      "description": {
+        "zhCN": "代理人的[终结技]、[连携技]造成的伤害提升40%。[连携技]命中敌人后，其失衡易伤倍率提升20%，失衡恢复速度降低15%，持续15秒，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_defense_v5_v3_0_p3_zhongmu_chain_ultimate_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "skill",
+            "skillTargets": [
+              {
+                "kind": "skillType",
+                "skillType": "chain"
+              },
+              {
+                "kind": "skillType",
+                "skillType": "ultimate"
+              }
+            ]
+          },
+          "stat": "dmgBonus",
+          "mode": "flat",
+          "value": 40,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_defense_v5_v3_0_p3_zhongmu_stun_vulnerable",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "stunDmgMultiplierBonus",
+          "mode": "flat",
+          "value": 20,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.defense_v5.v3_0.p3.lianshi_huilu",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "defense_v5",
+        "gameVersion": "3.0",
+        "phaseNo": 3,
+        "phaseName": {
+          "zhCN": "第三期"
+        }
+      },
+      "name": {
+        "zhCN": "链式回路"
+      },
+      "source": {
+        "zhCN": "防卫战 v5"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.0版本第三期"
+      },
+      "description": {
+        "zhCN": "代理人的异常精通提升20点，造成的属性异常伤害提升15%。若队伍内有1名/2名[异常]特性的代理人，代理人的属性异常伤害命中敌人时无视其5%/15%全属性伤害抗性。"
+      },
+      "effects": [
+        {
+          "id": "field_defense_v5_v3_0_p3_lianshi_anomaly_proficiency",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "anomalyProficiency",
+          "mode": "flat",
+          "value": 20
+        },
+        {
+          "id": "field_defense_v5_v3_0_p3_lianshi_anomaly_damage",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "anomalyDamageBonus",
+          "mode": "flat",
+          "value": 15
+        },
+        {
+          "id": "field_defense_v5_v3_0_p3_lianshi_anomaly_res_ignore",
+          "type": "formula",
+          "target": {
+            "kind": "anomaly",
+            "settlementType": "attribute",
+            "anomalyEffects": [
+              "assault",
+              "shatter",
+              "burn",
+              "shock",
+              "corruption"
+            ]
+          },
+          "stat": "allResIgnore",
+          "mode": "flat",
+          "source": {
+            "variable": "x",
+            "label": {
+              "zhCN": "队伍内异常特性代理人数量"
+            },
+            "defaultValue": 2,
+            "min": 0,
+            "max": 2
+          },
+          "formula": {
+            "expression": "5 * x + 5 * max(x - 1, 0)",
+            "valueUnit": "storedPercent"
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.defense_v5.v3_0.p3.lingdu_xingdong",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "defense_v5",
+        "gameVersion": "3.0",
+        "phaseNo": 3,
+        "phaseName": {
+          "zhCN": "第三期"
+        }
+      },
+      "name": {
+        "zhCN": "零度行动"
+      },
+      "source": {
+        "zhCN": "防卫战 v5"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.0版本第三期"
+      },
+      "description": {
+        "zhCN": "代理人的冰属性伤害和以太属性伤害提升30%。代理人的[普通攻击]和[连携技]造成的伤害提升20%，造成的暴击伤害提升35%。"
+      },
+      "effects": [
+        {
+          "id": "field_defense_v5_v3_0_p3_lingdu_ice_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "iceDmg",
+          "mode": "flat",
+          "value": 30
+        },
+        {
+          "id": "field_defense_v5_v3_0_p3_lingdu_ether_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "etherDmg",
+          "mode": "flat",
+          "value": 30
+        },
+        {
+          "id": "field_defense_v5_v3_0_p3_lingdu_basic_chain_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "skill",
+            "skillTargets": [
+              {
+                "kind": "skillType",
+                "skillType": "basic"
+              },
+              {
+                "kind": "skillType",
+                "skillType": "chain"
+              }
+            ]
+          },
+          "stat": "dmgBonus",
+          "mode": "flat",
+          "value": 20
+        },
+        {
+          "id": "field_defense_v5_v3_0_p3_lingdu_basic_chain_crit_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "skill",
+            "skillTargets": [
+              {
+                "kind": "skillType",
+                "skillType": "basic"
+              },
+              {
+                "kind": "skillType",
+                "skillType": "chain"
+              }
+            ]
+          },
+          "stat": "critDmg",
+          "mode": "flat",
+          "value": 35
         }
       ],
       "buffModifiers": []

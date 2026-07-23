@@ -127,6 +127,42 @@ const fieldBuffs = [
     effects: [{ id: "field-atk", type: "fixed", stat: "atkPct", value: 30, mode: "pct", basis: "outOfCombatAtk" }],
   },
   {
+    id: "field.defense_v5.v3_0.p3.zhongmu_xiezou",
+    sourceType: "field",
+    sourceCategory: "field",
+    sourceKind: "field",
+    source: { zhCN: "防卫战 v5" },
+    sourcePeriod: { zhCN: "3.0版本第三期" },
+    period: { modeId: "defense_v5", gameVersion: "3.0", phaseNo: 3, phaseName: { zhCN: "第三期" } },
+    name: { zhCN: "终幕协奏" },
+    description: { zhCN: "终结技与连携技伤害提升" },
+    effects: [{ id: "field-defense-zhongmu", type: "fixed", stat: "dmgBonus", value: 40 }],
+  },
+  {
+    id: "field.defense_v5.v3_0.p3.lianshi_huilu",
+    sourceType: "field",
+    sourceCategory: "field",
+    sourceKind: "field",
+    source: { zhCN: "防卫战 v5" },
+    sourcePeriod: { zhCN: "3.0版本第三期" },
+    period: { modeId: "defense_v5", gameVersion: "3.0", phaseNo: 3, phaseName: { zhCN: "第三期" } },
+    name: { zhCN: "链式回路" },
+    description: { zhCN: "异常精通与属性异常伤害提升" },
+    effects: [{ id: "field-defense-lianshi", type: "fixed", stat: "anomalyProficiency", value: 20 }],
+  },
+  {
+    id: "field.defense_v5.v3_0.p3.lingdu_xingdong",
+    sourceType: "field",
+    sourceCategory: "field",
+    sourceKind: "field",
+    source: { zhCN: "防卫战 v5" },
+    sourcePeriod: { zhCN: "3.0版本第三期" },
+    period: { modeId: "defense_v5", gameVersion: "3.0", phaseNo: 3, phaseName: { zhCN: "第三期" } },
+    name: { zhCN: "零度行动" },
+    description: { zhCN: "冰属性、以太属性、普通攻击与连携技提升" },
+    effects: [{ id: "field-defense-lingdu", type: "fixed", stat: "iceDmg", value: 30 }],
+  },
+  {
     id: "field.critical_assault.v3_0.p3.yanwang",
     sourceType: "field",
     sourceCategory: "field",
@@ -783,6 +819,23 @@ describe("BuffPickerModal", () => {
 
     const payload = wrapper.emitted("apply")?.[0]?.[0] as any
     expect(payload.selectedBuffIds).toEqual(["field.defense_v5.v3_0.p2.mingse_yinguang"])
+  })
+
+  it("shows all three Defense Battle 3.0 phase 3 buffs in authored order", async () => {
+    const wrapper = mountModal()
+
+    await openFieldTab(wrapper)
+    const selects = wrapper.findAll(".field-buff-filter-row select")
+    await selects[0].setValue("3.0")
+    await nextTick()
+    await selects[1].setValue("defense_v5|3.0|3")
+    await nextTick()
+
+    const rows = wrapper.findAll(".buff-row").map(row => row.text())
+    expect(rows).toHaveLength(3)
+    expect(rows[0]).toContain("终幕协奏")
+    expect(rows[1]).toContain("链式回路")
+    expect(rows[2]).toContain("零度行动")
   })
 
   it("defaults 3.0 field buffs to critical assault phase 3 and keeps one selection", async () => {
