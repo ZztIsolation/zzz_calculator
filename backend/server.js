@@ -26,6 +26,7 @@ import {
     loadCurrentUserDriveDiscStore,
     loadUserDriveDiscStore,
     ownerScopedStore,
+    setDriveDiscExclusions,
     setDriveDiscReservations,
     switchAccount,
     updateAccount,
@@ -167,12 +168,14 @@ function isRetiredUserDataPath(pathname) {
         || pathname === "/api/user-drive-discs"
         || pathname.startsWith("/api/user-drive-discs/")
         || pathname === "/api/user-drive-disc-reservations"
+        || pathname === "/api/user-drive-disc-exclusions"
         || pathname === "/api/user-drive-disc-loadouts"
         || pathname.startsWith("/api/user-drive-disc-loadouts/")
 }
 
 function isDevelopmentDriveDiscReservationPath(pathname) {
     return pathname === "/api/user-drive-disc-reservations"
+        || pathname === "/api/user-drive-disc-exclusions"
         || pathname === "/api/user-drive-disc-loadouts"
         || pathname.startsWith("/api/user-drive-disc-loadouts/")
 }
@@ -2527,6 +2530,34 @@ async function routeApi(req, res, pathname, searchParams) {
                 sendJson(res, 409, {
                     ok: false,
                     code: "drive_disc_reservation_conflict",
+                    conflicts: result.conflicts,
+                })
+                return
+            }
+            sendJson(res, 200, {
+                ok: true,
+                applied: true,
+                changedIds: result.changedIds,
+                conflicts: result.conflicts,
+                store: ownerScopedStore(result.store, result.ownerId),
+            })
+        } catch (error) {
+            sendJson(res, 400, {
+                ok: false,
+                error: error instanceof Error ? error.message : String(error),
+            })
+        }
+        return
+    }
+
+    if (pathname === "/api/user-drive-disc-exclusions" && req.method === "POST") {
+        try {
+            const body = await readBody(req)
+            const result = await setDriveDiscExclusions(dataDir, JSON.parse(body || "{}"))
+            if (!result.applied) {
+                sendJson(res, 409, {
+                    ok: false,
+                    code: "drive_disc_exclusion_conflict",
                     conflicts: result.conflicts,
                 })
                 return

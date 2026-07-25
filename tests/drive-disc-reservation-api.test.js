@@ -98,6 +98,47 @@ try {
     const afterConflict = JSON.parse(await readFile(path.join(tempDataDir, "user_drive_discs.json"), "utf8"))
     assert.equal(afterConflict.driveDiscs.find(item => item.id === "api-disc-2").reservedForAgentId, null)
 
+    const excluded = await post(baseUrl, "/api/user-drive-disc-exclusions", {
+        discIds: ["api-disc-3"],
+        excludedForAgentId: "agent-a",
+        excluded: true,
+    })
+    assert.equal(excluded.response.status, 200)
+    assert.deepEqual(excluded.body.store.driveDiscs.find(item => item.id === "api-disc-3").excludedForAgentIds, ["agent-a"])
+
+    const excludedLockConflict = await post(baseUrl, "/api/user-drive-disc-reservations", {
+        discIds: ["api-disc-3"],
+        reservedForAgentId: "agent-a",
+    })
+    assert.equal(excludedLockConflict.response.status, 409)
+    assert.equal(excludedLockConflict.body.conflicts[0].kind, "excluded-current")
+
+    const convertedToLock = await post(baseUrl, "/api/user-drive-disc-reservations", {
+        discIds: ["api-disc-3"],
+        reservedForAgentId: "agent-a",
+        allowExclusionOverride: true,
+    })
+    assert.equal(convertedToLock.response.status, 200)
+    assert.deepEqual(convertedToLock.body.store.driveDiscs.find(item => item.id === "api-disc-3").excludedForAgentIds, [])
+
+    const lockExclusionConflict = await post(baseUrl, "/api/user-drive-disc-exclusions", {
+        discIds: ["api-disc-3"],
+        excludedForAgentId: "agent-a",
+        excluded: true,
+    })
+    assert.equal(lockExclusionConflict.response.status, 409)
+    assert.equal(lockExclusionConflict.body.conflicts[0].kind, "reserved-current")
+
+    const convertedToExclusion = await post(baseUrl, "/api/user-drive-disc-exclusions", {
+        discIds: ["api-disc-3"],
+        excludedForAgentId: "agent-a",
+        excluded: true,
+        allowReservationRelease: true,
+    })
+    assert.equal(convertedToExclusion.response.status, 200)
+    assert.equal(convertedToExclusion.body.store.driveDiscs.find(item => item.id === "api-disc-3").reservedForAgentId, null)
+    assert.deepEqual(convertedToExclusion.body.store.driveDiscs.find(item => item.id === "api-disc-3").excludedForAgentIds, ["agent-a"])
+
     const loadout = {
         name: "API 原子套装",
         agentId: "agent-b",
@@ -114,6 +155,7 @@ try {
     })
     assert.equal(transferred.response.status, 200)
     assert.ok(transferred.body.store.driveDiscs.every(item => item.reservedForAgentId === "agent-b"))
+    assert.deepEqual(transferred.body.store.driveDiscs.find(item => item.id === "api-disc-3").excludedForAgentIds, ["agent-a"])
     console.log("Drive Disc reservation API tests passed.")
 } finally {
     server?.kill("SIGTERM")

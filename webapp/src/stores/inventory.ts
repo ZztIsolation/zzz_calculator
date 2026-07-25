@@ -7,6 +7,7 @@ import {
   importScannerExportToStore,
   loadCurrentUserDriveDiscStore,
   previewScannerExportImport,
+  setDriveDiscExclusions,
   setDriveDiscReservations,
   upsertDriveDiscLoadout,
   upsertUserDriveDisc,
@@ -486,12 +487,37 @@ export const useInventoryStore = defineStore("inventory", {
       await this.load()
       return result.loadout
     },
-    async reserveDiscs(discIds: string[], reservedForAgentId: string | null, allowTransfer = false) {
+    async reserveDiscs(
+      discIds: string[],
+      reservedForAgentId: string | null,
+      allowTransfer = false,
+      allowExclusionOverride = false,
+    ) {
       const result = await setDriveDiscReservations({
         ownerId: this.store?.currentOwnerId,
         discIds,
         reservedForAgentId,
         allowTransfer,
+        allowExclusionOverride,
+      })
+      this.store = result.store
+      if (result.applied) {
+        await this.load()
+      }
+      return result
+    },
+    async excludeDiscs(
+      discIds: string[],
+      excludedForAgentId: string,
+      excluded: boolean,
+      allowReservationRelease = false,
+    ) {
+      const result = await setDriveDiscExclusions({
+        ownerId: this.store?.currentOwnerId,
+        discIds,
+        excludedForAgentId,
+        excluded,
+        allowReservationRelease,
       })
       this.store = result.store
       if (result.applied) {

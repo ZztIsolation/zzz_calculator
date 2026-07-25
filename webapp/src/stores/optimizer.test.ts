@@ -565,6 +565,21 @@ describe("optimizer store", () => {
       minimums: {},
     })
     expect(store.resultsAreStale).toBe(false)
+    expect(store.completedInventoryFingerprint).toBeTruthy()
+    expect(store.inventoryRestrictionsChanged(inventoryStore(), "default", "agent_a")).toBe(false)
+    expect(store.inventoryRestrictionsChanged(inventoryStore({
+      driveDiscs: [{
+        id: "new-restricted-disc",
+        ownerId: "default",
+        setId: "woodpecker_electro",
+        partition: 1,
+        rarity: "S",
+        level: 15,
+        mainStat: { stat: "hpFlat", value: 2200 },
+        subStats: [],
+        excludedForAgentIds: ["agent_a"],
+      }],
+    }), "default", "agent_a")).toBe(true)
     expect(worker.terminated).toBe(false)
   })
 
@@ -755,6 +770,7 @@ describe("optimizer store", () => {
           rarity: "S",
           level: 15,
           reservedForAgentId: "agent-a",
+          excludedForAgentIds: ["retired-agent"],
           mainStat: { stat: "hpFlat", value: 2200 },
           subStats: [{ stat: "critRate", value: 4.8 }],
           source: { type: "scanner", sequence: 1, rawIndex: 3, bulky: true },
@@ -782,6 +798,7 @@ describe("optimizer store", () => {
     expect(startMessage.store.driveDiscLoadouts).toEqual([])
     expect(startMessage.store.driveDiscs.map((disc: any) => disc.id)).toEqual(["alice-disc"])
     expect(startMessage.store.driveDiscs[0].reservedForAgentId).toBe("agent-a")
+    expect(startMessage.store.driveDiscs[0].excludedForAgentIds).toEqual(["retired-agent"])
     expect(startMessage.store.driveDiscs[0].source).toEqual({ type: "scanner", sequence: 1, rawIndex: 3 })
 
     store.cancel()

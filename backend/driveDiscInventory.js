@@ -17,6 +17,7 @@ import {
     normalizeInventoryStore,
     normalizeScannerExport as normalizeInventoryScannerExport,
     ownerScopedStore as scopeInventoryStore,
+    setDriveDiscExclusions as setInventoryDriveDiscExclusions,
     setDriveDiscReservations as setInventoryDriveDiscReservations,
     switchAccount as switchInventoryAccount,
     updateAccount as updateInventoryAccount,
@@ -125,6 +126,22 @@ export async function deleteUserDriveDisc(dataDir, id) {
 export async function setDriveDiscReservations(dataDir, input = {}) {
     const store = await loadUserDriveDiscStore(dataDir)
     const result = setInventoryDriveDiscReservations(store, input)
+    if (!result.applied) {
+        return {
+            ...result,
+            store,
+        }
+    }
+    const saved = await saveUserDriveDiscStore(dataDir, result.nextStore)
+    return {
+        ...result,
+        store: saved,
+    }
+}
+
+export async function setDriveDiscExclusions(dataDir, input = {}) {
+    const store = await loadUserDriveDiscStore(dataDir)
+    const result = setInventoryDriveDiscExclusions(store, input)
     if (!result.applied) {
         return {
             ...result,

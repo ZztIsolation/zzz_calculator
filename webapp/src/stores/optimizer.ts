@@ -1,5 +1,6 @@
 import { defineStore } from "pinia"
 import { toRaw } from "vue"
+import { driveDiscOptimizationInventoryFingerprint } from "@core/inventory-model.js"
 
 type OptimizerStatus = "idle" | "estimating" | "preparing" | "running" | "cancelling" | "cancelled" | "done" | "error"
 
@@ -344,6 +345,7 @@ function cloneOptimizerDriveDisc(disc: any = {}, ownerId = "default") {
     locked: Boolean(disc.locked),
     equippedBy: disc.equippedBy ?? null,
     reservedForAgentId: disc.reservedForAgentId ?? null,
+    excludedForAgentIds: Array.isArray(disc.excludedForAgentIds) ? [...disc.excludedForAgentIds] : [],
     mainStat: disc.mainStat ? { ...disc.mainStat } : null,
     subStats: Array.isArray(disc.subStats) ? disc.subStats.map((stat: any) => ({ ...stat })) : [],
     source: disc.source
@@ -452,6 +454,7 @@ export const useOptimizerStore = defineStore("optimizer", {
     resultSchemes: [] as any[],
     completedSettings: null as any,
     completedSettingsFingerprint: "",
+    completedInventoryFingerprint: "",
     error: "",
     cancelRequested: false,
   }),
@@ -464,6 +467,11 @@ export const useOptimizerStore = defineStore("optimizer", {
       state.resultSchemes.length
       && state.completedSettingsFingerprint
       && state.completedSettingsFingerprint !== optimizerSettingsFingerprint(settingsFromState(state)),
+    ),
+    inventoryRestrictionsChanged: state => (store: any, ownerId: string, agentId: string) => Boolean(
+      state.completedInventoryFingerprint
+      && state.resultSchemes.length
+      && state.completedInventoryFingerprint !== driveDiscOptimizationInventoryFingerprint(store, { ownerId, agentId }),
     ),
   },
   actions: {
@@ -602,6 +610,7 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.resultSchemes = []
       this.completedSettings = null
       this.completedSettingsFingerprint = ""
+      this.completedInventoryFingerprint = ""
       this.error = ""
       this.cancelRequested = false
     },
@@ -616,6 +625,7 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.resultSchemes = []
       this.completedSettings = null
       this.completedSettingsFingerprint = ""
+      this.completedInventoryFingerprint = ""
       this.cancelRequested = false
       this.progress = null
       this.applyProgress({
@@ -716,6 +726,7 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.resultSchemes = []
       this.completedSettings = null
       this.completedSettingsFingerprint = ""
+      this.completedInventoryFingerprint = ""
       this.cancelRequested = false
       this.progress = null
       this.applyProgress({
@@ -731,6 +742,10 @@ export const useOptimizerStore = defineStore("optimizer", {
       const worker = reusableWorker()
       const workerInput = this.inputWithSettings(input, store)
       const submittedSettingsFingerprint = optimizerSettingsFingerprint(workerInput.settings)
+      const inventoryFingerprint = driveDiscOptimizationInventoryFingerprint(store, {
+        ownerId: workerInput.ownerId,
+        agentId: workerInput.agentId,
+      })
       const workerStore = optimizerStorePayload(store, workerInput.ownerId)
       const workerCatalog = catalogForWorker(catalog)
       const workerRequestInput = cloneWorkerPayload(workerInput)
@@ -822,6 +837,7 @@ export const useOptimizerStore = defineStore("optimizer", {
             this.results = results
             this.completedSettings = hasResults ? cloneWorkerPayload(completedSettings) : null
             this.completedSettingsFingerprint = hasResults ? submittedSettingsFingerprint : ""
+            this.completedInventoryFingerprint = hasResults ? inventoryFingerprint : ""
             this.resultSchemes = this.results.map((result: any) => ({
               rank: result.rank,
               score: result.score,
