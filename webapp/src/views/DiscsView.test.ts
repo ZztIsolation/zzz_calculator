@@ -166,7 +166,7 @@ function seedInventory(driveDiscs: any[], driveDiscLoadouts: any[] = []) {
   }))
 }
 
-async function mountView(reservationUiEnabled = false) {
+async function mountView(reservationUiEnabled = false, exclusionUiEnabled = false) {
   const pinia = createPinia()
   setActivePinia(pinia)
   const appConfigStore = useAppConfigStore(pinia)
@@ -177,6 +177,7 @@ async function mountView(reservationUiEnabled = false) {
       scanTelemetryEnabled: false,
       scanTelemetryRetentionDays: 30,
       driveDiscReservationsUiEnabled: reservationUiEnabled,
+      driveDiscExclusionsUiEnabled: exclusionUiEnabled,
     },
   })
   const wrapper = mount(DiscsView, {
@@ -337,10 +338,43 @@ describe("DiscsView", () => {
     expect(persisted.driveDiscs.find((disc: any) => disc.id === "known-filter-disc").reservedForAgentId).toBe("agent-a")
     expect(wrapper.text()).toContain("角色甲 → 角色乙")
 
-    await button(wrapper, "确认转移").trigger("click")
+    await button(wrapper, "转移并锁定").trigger("click")
     await flushPromises()
     persisted = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
     expect(persisted.driveDiscs.find((disc: any) => disc.id === "known-filter-disc").reservedForAgentId).toBe("agent-b")
+  })
+
+  it("filters effective exclusions by role and manages explicit unknown-role exclusions", async () => {
+    seedInventory([
+      driveDisc(1, { id: "available-disc", setName: "可用盘" }),
+      driveDisc(2, { id: "explicit-disc", setName: "主动排除盘", excludedForAgentIds: ["agent-a"] }),
+      driveDisc(3, { id: "locked-other-disc", setName: "其他角色锁定盘", reservedForAgentId: "agent-b" }),
+      driveDisc(4, { id: "unknown-exclusion-disc", setName: "未知角色排除盘", excludedForAgentIds: ["retired-agent"] }),
+    ])
+    const wrapper = await mountView(true, true)
+
+    expect(wrapper.text()).toContain("使用限制")
+    expect(wrapper.find('[aria-label="专属角色筛选"]').exists()).toBe(false)
+    expect(wrapper.get('[aria-label="限制角色筛选"]').findAll("option").map(option => option.text())).toContain("未知角色（retired-agent）")
+
+    await wrapper.get('[aria-label="限制状态筛选"]').setValue("excluded")
+    await wrapper.get('[aria-label="限制角色筛选"]').setValue("agent-a")
+    const filteredText = wrapper.find("tbody").text()
+    expect(filteredText).toContain("主动排除盘")
+    expect(filteredText).toContain("其他角色锁定盘")
+    expect(filteredText).not.toContain("可用盘")
+
+    await wrapper.get('[aria-label="限制状态筛选"]').setValue("")
+    await wrapper.get('[aria-label="限制角色筛选"]').setValue("")
+    const availableRow = wrapper.findAll("tbody tr").find(row => row.text().includes("可用盘"))
+    await availableRow?.get('[aria-label="管理排除角色"]').trigger("click")
+    await wrapper.get('[aria-label="主动排除角色"]').setValue(["agent-a", "retired-agent"])
+    await button(wrapper, "保存排除设置").trigger("click")
+    await flushPromises()
+
+    const persisted = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
+    expect(persisted.driveDiscs.find((disc: any) => disc.id === "available-disc").excludedForAgentIds)
+      .toEqual(["agent-a", "retired-agent"])
   })
 
   it("renders six visual preset slots and keeps picker edits as drafts until save", async () => {

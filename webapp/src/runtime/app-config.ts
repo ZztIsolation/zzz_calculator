@@ -3,6 +3,7 @@ export interface AppConfig {
   scanTelemetryEnabled: boolean
   scanTelemetryRetentionDays: number
   driveDiscReservationsUiEnabled: boolean
+  driveDiscExclusionsUiEnabled: boolean
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -10,6 +11,7 @@ const DEFAULT_CONFIG: AppConfig = {
   scanTelemetryEnabled: false,
   scanTelemetryRetentionDays: 30,
   driveDiscReservationsUiEnabled: import.meta.env.DEV,
+  driveDiscExclusionsUiEnabled: import.meta.env.DEV,
 }
 
 async function readConfig(pathname: string): Promise<AppConfig | null> {
@@ -24,6 +26,7 @@ async function readConfig(pathname: string): Promise<AppConfig | null> {
       scanTelemetryEnabled: payload?.scanTelemetryEnabled === true,
       scanTelemetryRetentionDays: Math.max(1, Math.min(365, Number(payload?.scanTelemetryRetentionDays) || 30)),
       driveDiscReservationsUiEnabled: payload?.driveDiscReservationsUiEnabled === true,
+      driveDiscExclusionsUiEnabled: payload?.driveDiscExclusionsUiEnabled === true,
     }
   } catch {
     return null

@@ -115,6 +115,8 @@ previous_dir="$(readlink -f /opt/zzz_calculator/current)"
 - [ ] 开启功能开关时，候选功能完整且没有先显示后隐藏。
 - [ ] 无专属数据时优化器 Top 10 的 ID、顺序和分数与基线逐项一致。
 - [ ] 有专属数据时，只排除其他角色专属盘；自己的专属盘仍可选。
+- [ ] 有主动排除数据时，优化器结果与从库存手工删除相同盘的 Top 10 ID、顺序和分数完全一致。
+- [ ] 专属与主动排除重叠时只计入专属排除一次，纯专属、纯排除和混合耗尽原因准确。
 
 ### 4.3 浏览器旧数据兼容
 
@@ -131,6 +133,7 @@ previous_dir="$(readlink -f /opt/zzz_calculator/current)"
 - [ ] 首次加载不丢字段、不改驱动盘 ID、不改内容/身份指纹。
 - [ ] 当前账号不变，套装槽位不清空，优化器配置不覆盖。
 - [ ] 缺失的可选新字段只归一化为安全默认值。
+- [ ] `excludedForAgentIds` 缺失、非法、重复和未知角色 ID 的归一化符合预期；不改变库存 `version: 1`。
 - [ ] 刷新、浏览器重启、账号切换后数据仍在。
 - [ ] 30 件扫描、partial 导入和完整扫描保留本地增量字段。
 - [ ] partial 导入保持 `removeMissing=false`，不会删除未返回记录。
@@ -270,6 +273,7 @@ sudo -u zzzcalc env \
   PORT=8788 \
   SCAN_TELEMETRY_ENABLED=false \
   DRIVE_DISC_RESERVATIONS_UI_ENABLED=false \
+  DRIVE_DISC_EXCLUSIONS_UI_ENABLED=false \
   /usr/bin/node "$candidate_dir/backend/server.js"
 ```
 
@@ -282,16 +286,20 @@ sudo -u zzzcalc env \
 - [ ] SPA 直接刷新正常。
 - [ ] catalog 和 `/api/app-config` 正常。
 - [ ] `driveDiscReservationsUiEnabled=false`。
+- [ ] `driveDiscExclusionsUiEnabled=false`，旧服务器缺字段时前端也保持关闭。
 - [ ] 旧数据哨兵完整，现有 UI 未出现预约控件。
 - [ ] Helper/Scanner manifest 哈希与基线一致。
 
 开启开关预检：
 
-- [ ] 使用相同 release、相同旧数据哨兵，仅把开关设为 `true`。
+- [ ] 使用相同 release、相同旧数据哨兵，先保持排除开关关闭验证兼容基础，再在锁定开关已开启的前提下仅开启排除开关。
 - [ ] 页面首次渲染直接出现功能，不发生先显示后隐藏或反向闪烁。
 - [ ] 逐盘锁定、解除、跨角色确认、未知角色筛选通过。
 - [ ] 六槽预览、缺失引用、统一选择器、取消草稿不落库通过。
 - [ ] 优化器排除其他角色专属盘，自己的专属盘仍可选。
+- [ ] 普通新增/取消排除即时保存；锁定转排除、排除转锁定分别出现准确确认；其他角色锁定盘的排除按钮为橙色禁用态。
+- [ ] “已排除 + 角色”筛选同时返回主动排除该角色的盘及锁给其他角色的盘，并标明原因。
+- [ ] 手动选择和已有套装仍显示排除盘；使用限制变化后旧 Top 10 仍可查看计算并明确提示重新优化。
 - [ ] 切回关闭状态后数据仍在，UI 隐藏但约束仍生效。
 
 预检结束后停止候选并确认 8788 已释放。
@@ -387,7 +395,7 @@ Helper 成功确认更新后通常不支持自动降级。Helper 严重故障时
 
 可选 UI 必须先部署代码、后启用：
 
-1. [ ] 最终代码以 `DRIVE_DISC_RESERVATIONS_UI_ENABLED=false` 上线。
+1. [ ] 最终代码以 `DRIVE_DISC_RESERVATIONS_UI_ENABLED=false`、`DRIVE_DISC_EXCLUSIONS_UI_ENABLED=false` 上线。
 2. [ ] 健康、路由、旧数据哨兵、扫描和 manifest 哈希通过。
 3. [ ] 创建 systemd drop-in，而不是覆盖完整 unit：
 
@@ -397,13 +405,21 @@ Helper 成功确认更新后通常不支持自动降级。Helper 严重故障时
 Environment=DRIVE_DISC_RESERVATIONS_UI_ENABLED=true
 ```
 
+排除 UI 使用独立 drop-in；只有锁定 UI 已开启时才启用：
+
+```ini
+# /etc/systemd/system/zzz-calculator.service.d/30-drive-disc-exclusions.conf
+[Service]
+Environment=DRIVE_DISC_EXCLUSIONS_UI_ENABLED=true
+```
+
 4. [ ] `systemctl daemon-reload`。
 5. [ ] `systemctl restart zzz-calculator.service`。
 6. [ ] 15 秒健康门禁通过。
-7. [ ] `/api/app-config` 明确为 true。
+7. [ ] `/api/app-config` 中两个 Drive Disc UI 开关均为 true。
 8. [ ] 不强制刷新正在扫描、优化或编辑的旧标签页。
 
-关闭 UI 的首选回档：把 drop-in 中值改为 false（或移除该单一 drop-in），daemon-reload 后重启。数据和优化器语义仍由兼容基础代码保留。
+关闭排除 UI 的首选回档：只把 `DRIVE_DISC_EXCLUSIONS_UI_ENABLED` 设为 false（或移除其单一 drop-in），daemon-reload 后重启。不要同时关闭锁定 UI，除非其自身也需要回退。数据和优化器语义仍由兼容基础代码保留。
 
 ## 14. 公网验收
 
@@ -446,14 +462,14 @@ journalctl -u zzz-calculator.service --since '10 minutes ago' --no-pager
 
 ### 16.1 UI 级故障
 
-1. 把 UI feature flag 设为 false。
+1. 只把发生故障的 UI feature flag 设为 false；排除故障优先关闭 `DRIVE_DISC_EXCLUSIONS_UI_ENABLED`。
 2. daemon-reload 并重启。
 3. 执行 15 秒健康门禁。
 4. 保留最终代码和兼容数据语义，修复前进。
 
 ### 16.2 最终代码故障
 
-1. 切回同一功能的兼容基础 release。
+1. 切回同一功能的兼容基础 release（必须包含 `excludedForAgentIds` 归一化和优化器过滤，不能退到完全不理解排除语义的版本）。
 2. 重启并验证健康。
 3. 保留用户已写入的可选字段和优化器排除语义。
 4. 不回到不理解新语义的旧版本作为常规回档。

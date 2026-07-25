@@ -46,6 +46,7 @@ import {
   skillLevelValues,
 } from "@core/skillMultiplierCandidates.js"
 import { resolveDefaultCalculationConfig } from "@core/defaultCalculationConfig.js"
+import { driveDiscUsageStateForAgent } from "@core/inventory-model.js"
 
 const catalogStore = useCatalogStore()
 const accountStore = useAccountStore()
@@ -55,6 +56,7 @@ const buildStore = useBuildStore()
 const optimizerStore = useOptimizerStore()
 const message = useMessage()
 const reservationUiEnabled = computed(() => appConfigStore.driveDiscReservationsUiEnabled)
+const exclusionUiEnabled = computed(() => reservationUiEnabled.value && appConfigStore.driveDiscExclusionsUiEnabled)
 
 const showBuffPicker = ref(false)
 const showCalculationConfig = ref(false)
@@ -240,7 +242,11 @@ const selectedDriveDiscRows = computed<Array<{ slot: number, disc: any | null }>
     selectedDriveDiscs.value.map((disc: any) => {
       const inventoryDisc = inventoryById.get(String(disc.id))
       const displayDisc = inventoryDisc
-        ? { ...disc, reservedForAgentId: inventoryDisc.reservedForAgentId ?? null }
+        ? {
+            ...disc,
+            reservedForAgentId: inventoryDisc.reservedForAgentId ?? null,
+            excludedForAgentIds: inventoryDisc.excludedForAgentIds ?? [],
+          }
         : disc
       return [Number(disc.partition), displayDisc] as [number, any]
     }),
@@ -561,6 +567,8 @@ const optimizerDetailChips = computed(() => [
   Number(optimizerMetrics.value?.prunedBySuperBound ?? 0) > 0 ? `剪枝 ${formatNumber(optimizerMetrics.value.prunedBySuperBound)}` : "",
   Number(optimizerMetrics.value?.excludedByReservation ?? 0) > 0
     ? `排除其他角色专属盘 ${formatNumber(optimizerMetrics.value.excludedByReservation)}` : "",
+  Number(optimizerMetrics.value?.excludedByExclusion ?? 0) > 0
+    ? `主动排除盘 ${formatNumber(optimizerMetrics.value.excludedByExclusion)}` : "",
   Number(optimizerMetrics.value?.boundChecksPerSecond ?? 0) > 0 ? `上界 ${formatRate(optimizerMetrics.value.boundChecksPerSecond)}` : "",
   optimizerHasFreeTwoPieceMetrics.value ? `自动套装 ${formatNumber(optimizerMetrics.value.freeTwoPieceAutoSetCount ?? 0)}` : "",
   optimizerHasFreeTwoPieceMetrics.value ? `4+2 计划 ${formatNumber(optimizerMetrics.value.freeFourTwoPlanCount ?? 0)}` : "",
@@ -571,6 +579,12 @@ const optimizerDetailChips = computed(() => [
   ...candidateChipTexts(optimizerMetrics.value),
   complexityText(optimizerMetrics.value, optimizerProgress.value?.settings ?? optimizerStore.settings),
 ].filter(Boolean))
+
+const optimizerInventoryStale = computed(() => optimizerStore.inventoryRestrictionsChanged(
+  inventoryStore.store,
+  inventoryStore.store?.currentOwnerId ?? "default",
+  buildStore.agentId,
+))
 
 const buildSignature = computed(() => JSON.stringify({
   agentId: buildStore.agentId,
@@ -778,10 +792,15 @@ function agentNameForId(agentId: string | null | undefined) {
   return agent ? labelOf(agent) : `未知角色（${agentId}）`
 }
 
-async function applySchemeDiscReservation(action: any, allowTransfer = false) {
+async function applySchemeDiscReservation(action: any, options: any = {}) {
   schemeReservationBusy.value = true
   try {
-    const result = await inventoryStore.reserveDiscs([action.discId], action.agentId, allowTransfer)
+    const result = await inventoryStore.reserveDiscs(
+      [action.discId],
+      action.agentId,
+      options.allowTransfer === true,
+      options.allowExclusionOverride === true,
+    )
     if (!result.applied) {
       pendingSchemeReservation.value = action
       schemeReservationConflicts.value = result.conflicts ?? []
@@ -803,19 +822,92 @@ async function applySchemeDiscReservation(action: any, allowTransfer = false) {
   }
 }
 
+async function applySchemeDiscExclusion(action: any, allowReservationRelease = false) {
+  schemeReservationBusy.value = true
+  try {
+    const result = await inventoryStore.excludeDiscs(
+      [action.discId],
+      action.agentId,
+      action.excluded,
+      allowReservationRelease,
+    )
+    if (!result.applied) {
+      pendingSchemeReservation.value = { ...action, kind: "exclusion" }
+      schemeReservationConflicts.value = result.conflicts ?? []
+      showSchemeReservationConflict.value = true
+      return false
+    }
+    message.success(action.excluded ? "已排除，下次自动优化将跳过此盘" : "已取消排除")
+    showSchemeReservationConflict.value = false
+    schemeReservationConflicts.value = []
+    pendingSchemeReservation.value = null
+    return true
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : String(error))
+    return false
+  } finally {
+    schemeReservationBusy.value = false
+  }
+}
+
 async function toggleSchemeDiscReservation(disc: any) {
   const inventoryDisc = inventoryStore.driveDiscs.find((item: any) => item.id === disc?.id)
   if (!inventoryDisc?.id || !buildStore.agentId) return
   const currentAgentId = String(inventoryDisc.reservedForAgentId ?? "").trim()
   await applySchemeDiscReservation({
+    kind: "reservation",
     discId: inventoryDisc.id,
     agentId: currentAgentId === buildStore.agentId ? null : buildStore.agentId,
   })
 }
 
+async function toggleSchemeDiscExclusion(disc: any) {
+  const inventoryDisc = inventoryStore.driveDiscs.find((item: any) => item.id === disc?.id)
+  if (!inventoryDisc?.id || !buildStore.agentId) return
+  const state = driveDiscUsageStateForAgent(inventoryDisc, buildStore.agentId).state
+  if (state === "excluded-by-reservation") return
+  await applySchemeDiscExclusion({
+    kind: "exclusion",
+    discId: inventoryDisc.id,
+    agentId: buildStore.agentId,
+    excluded: state !== "excluded-explicit",
+  })
+}
+
+const schemeRestrictionConfirmMode = computed(() => {
+  const kind = schemeReservationConflicts.value[0]?.kind
+  if (pendingSchemeReservation.value?.kind === "exclusion" || kind === "reserved-current") {
+    return {
+      title: "解除锁定并排除",
+      copy: "此盘当前锁定给该角色。确认后会解除锁定并加入该角色的主动排除列表，其他角色不受影响。",
+      action: "解除锁定并排除",
+    }
+  }
+  if (kind === "excluded-current") {
+    return {
+      title: "取消排除并锁定",
+      copy: "此盘已被该角色主动排除。确认后会取消该角色的排除记录并锁定给该角色。",
+      action: "取消排除并锁定",
+    }
+  }
+  return {
+    title: "专属角色冲突",
+    copy: "该驱动盘已专属其他角色。确认后只转移这一块盘，未确认前不会修改专属关系。",
+    action: "转移并锁定",
+  }
+})
+
 async function confirmSchemeReservationTransfer() {
   if (!pendingSchemeReservation.value) return
-  await applySchemeDiscReservation(pendingSchemeReservation.value, true)
+  if (pendingSchemeReservation.value.kind === "exclusion") {
+    await applySchemeDiscExclusion(pendingSchemeReservation.value, true)
+    return
+  }
+  const conflicts = schemeReservationConflicts.value
+  await applySchemeDiscReservation(pendingSchemeReservation.value, {
+    allowTransfer: conflicts.some(conflict => conflict.kind !== "excluded-current"),
+    allowExclusionOverride: conflicts.some(conflict => conflict.kind === "excluded-current"),
+  })
 }
 
 function openManualDiscPicker(slot: number) {
@@ -1365,6 +1457,9 @@ function complexityText(metrics: any = {}, settings: any = {}) {
               <span>实际 4 件套：{{ labelOf(selectedOptimizedFourPieceSet) }}</span>
             </span>
           </div>
+          <NAlert v-if="optimizerInventoryStale" type="warning" :show-icon="false" class="optimizer-stale-alert">
+            驱动盘使用限制已更新，需重新优化。当前结果仍可查看和计算。
+          </NAlert>
 
           <div class="drive-disc-slot-grid">
             <template v-if="reservationUiEnabled">
@@ -1379,10 +1474,14 @@ function complexityText(metrics: any = {}, settings: any = {}) {
                 :target-agent-id="buildStore.agentId"
                 :interactive="buildStore.discMode === 'manual'"
                 :reservation-busy="schemeReservationBusy"
+                :show-exclusion="exclusionUiEnabled"
+                :exclusion-action="exclusionUiEnabled"
+                :exclusion-busy="schemeReservationBusy"
                 show-reservation
                 reservation-action
                 @select="openManualDiscPicker"
                 @toggle-reservation="toggleSchemeDiscReservation"
+                @toggle-exclusion="toggleSchemeDiscExclusion"
               />
             </template>
             <template v-else>
@@ -1411,6 +1510,10 @@ function complexityText(metrics: any = {}, settings: any = {}) {
                 </div>
               </article>
             </template>
+          </div>
+          <div v-if="exclusionUiEnabled" class="drive-disc-restriction-hints" aria-label="驱动盘使用限制说明">
+            <span><strong>锁定：</strong>自动优化时只供当前角色使用，其他角色会自动排除。</span>
+            <span><strong>排除：</strong>当前角色下次优化跳过此盘，不影响其他角色、手动方案或已有套装。</span>
           </div>
         </div>
       </div>
@@ -1482,6 +1585,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
     :agents="catalogStore.displayAgents"
     :target-agent-id="buildStore.agentId"
     show-reservation
+    :show-exclusion="exclusionUiEnabled"
     @select="selectManualDriveDisc"
     @clear="clearManualDriveDiscSlot"
   />
@@ -1574,12 +1678,12 @@ function complexityText(metrics: any = {}, settings: any = {}) {
     v-if="reservationUiEnabled"
     v-model:show="showSchemeReservationConflict"
     preset="card"
-    title="专属角色冲突"
+    :title="schemeRestrictionConfirmMode.title"
     style="width: min(720px, calc(100vw - 16px)); max-width: 720px"
   >
     <div class="section-band">
       <NAlert type="warning" :show-icon="false">
-        该驱动盘已专属其他角色。确认后只转移这一块盘，未确认前不会修改专属关系。
+        {{ schemeRestrictionConfirmMode.copy }}
       </NAlert>
       <div class="scheme-reservation-conflict-list">
         <div v-for="conflict in schemeReservationConflicts" :key="conflict.discId" class="scheme-reservation-conflict-row">
@@ -1594,7 +1698,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
     <template #footer>
       <div class="drawer-footer">
         <NButton :disabled="schemeReservationBusy" @click="showSchemeReservationConflict = false">取消</NButton>
-        <NButton type="primary" :loading="schemeReservationBusy" @click="confirmSchemeReservationTransfer">转移并锁定</NButton>
+        <NButton type="primary" :loading="schemeReservationBusy" @click="confirmSchemeReservationTransfer">{{ schemeRestrictionConfirmMode.action }}</NButton>
       </div>
     </template>
   </NModal>
@@ -1923,6 +2027,31 @@ function complexityText(metrics: any = {}, settings: any = {}) {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.drive-disc-restriction-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 9px 10px;
+  border-left: 3px solid #3b82f6;
+  background: #f8fbff;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.drive-disc-restriction-hints span {
+  min-width: min(100%, 280px);
+  flex: 1 1 320px;
+}
+
+.drive-disc-restriction-hints strong {
+  color: var(--app-text);
+}
+
+.optimizer-stale-alert {
+  margin-top: 2px;
 }
 
 .disc-slot-card {

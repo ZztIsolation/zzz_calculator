@@ -237,6 +237,20 @@ describe("WorkbenchView optimizer result details", () => {
     expect(source).not.toContain("转移并锁定整套")
   })
 
+  it("gates role exclusions separately and keeps results visible when restrictions change", () => {
+    expect(source).toContain("driveDiscExclusionsUiEnabled")
+    expect(source).toContain("toggleSchemeDiscExclusion")
+    expect(source).toContain('@toggle-exclusion="toggleSchemeDiscExclusion"')
+    expect(source).toContain("解除锁定并排除")
+    expect(source).toContain("取消排除并锁定")
+    expect(source).toContain("驱动盘使用限制已更新，需重新优化")
+    expect(source).toContain("当前结果仍可查看和计算")
+    expect(source).toContain("锁定：")
+    expect(source).toContain("排除：")
+    expect(slotCardSource).toContain("disc-exclusion-button")
+    expect(pickerSource).toContain("excluded-explicit")
+  })
+
   it("uses a modal picker and current-scheme save for manual drive discs", () => {
     expect(source).toContain("showManualDiscPicker")
     expect(source).toContain("manual-disc-option-list")

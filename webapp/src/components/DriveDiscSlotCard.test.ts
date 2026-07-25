@@ -35,17 +35,19 @@ const agents = [
 ]
 const driveDiscSets = [{ id: "woodpecker_electro", name: { zhCN: "啄木鸟电音" } }]
 
-function mountCard(reservedForAgentId: string | null = null) {
+function mountCard(reservedForAgentId: string | null = null, excludedForAgentIds: string[] = []) {
   return mount(DriveDiscSlotCard, {
     props: {
       slot: 1,
-      disc: { ...disc, reservedForAgentId },
+      disc: { ...disc, reservedForAgentId, excludedForAgentIds },
       agents,
       driveDiscSets,
       targetAgentId: "agent-a",
       interactive: true,
       showReservation: true,
       reservationAction: true,
+      showExclusion: true,
+      exclusionAction: true,
     },
   })
 }
@@ -69,7 +71,7 @@ describe("DriveDiscSlotCard reservation action", () => {
     expect(wrapper.text()).toContain("未知角色（retired-agent）")
   })
 
-  it("emits only the reservation action when the overlaid lock is clicked", async () => {
+  it("emits only the reservation action when the lock is clicked", async () => {
     const wrapper = mountCard()
     await wrapper.get(".disc-reservation-button").trigger("click")
 
@@ -80,9 +82,22 @@ describe("DriveDiscSlotCard reservation action", () => {
     expect(wrapper.emitted("select")?.[0]).toEqual([1])
   })
 
-  it("keeps the overlaid lock at the prominent 32px size", () => {
+  it("renders explicit and derived exclusion states with a disabled derived action", async () => {
+    const wrapper = mountCard(null, ["agent-a"])
+    expect(wrapper.get(".disc-exclusion-button").classes()).toContain("disc-exclusion-button-excluded-explicit")
+    expect(wrapper.get(".disc-exclusion-button").attributes("aria-label")).toBe("取消角色甲排除")
+    await wrapper.get(".disc-exclusion-button").trigger("click")
+    expect(wrapper.emitted("toggleExclusion")?.[0]).toEqual([expect.objectContaining({ id: "disc-1" })])
+
+    await wrapper.setProps({ disc: { ...disc, reservedForAgentId: "agent-b", excludedForAgentIds: [] } })
+    expect(wrapper.get(".disc-exclusion-button").classes()).toContain("disc-exclusion-button-excluded-by-reservation")
+    expect(wrapper.get(".disc-exclusion-button").attributes("disabled")).toBeDefined()
+    expect(wrapper.text()).toContain("已排除")
+  })
+
+  it("keeps both right-side restriction actions at a stable 32px size", () => {
     const source = readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "DriveDiscSlotCard.vue"), "utf8")
-    expect(source).toMatch(/\.disc-reservation-button\s*\{[\s\S]*width: 32px;[\s\S]*height: 32px;/)
-    expect(source).toContain('class="disc-slot-card-icon"')
+    expect(source).toMatch(/\.disc-restriction-button\s*\{[\s\S]*width: 32px;[\s\S]*height: 32px;/)
+    expect(source).toContain('class="disc-slot-card-actions"')
   })
 })

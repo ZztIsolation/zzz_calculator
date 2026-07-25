@@ -4,6 +4,7 @@ import { NButton, NInput, NModal, NSelect, NTag } from "naive-ui"
 import ImageAvatar from "@/components/ImageAvatar.vue"
 import { fallbackIcon, imageForDriveDiscSet } from "@/utils/assets"
 import { formatStoredStatValue, labelOf, storedStatLabel } from "@/utils/format"
+import { driveDiscUsageStateForAgent } from "@core/inventory-model.js"
 
 const props = withDefaults(defineProps<{
   show: boolean
@@ -15,6 +16,7 @@ const props = withDefaults(defineProps<{
   agents?: any[]
   targetAgentId?: string
   showReservation?: boolean
+  showExclusion?: boolean
   surface?: string
   clearLabel?: string
 }>(), {
@@ -24,6 +26,7 @@ const props = withDefaults(defineProps<{
   agents: () => [],
   targetAgentId: "",
   showReservation: false,
+  showExclusion: false,
   surface: "manual-drive-disc-picker",
   clearLabel: "卸下此槽位",
 })
@@ -148,6 +151,19 @@ function reservationFor(disc: any) {
     : { label: `其他角色 · ${ownerName}`, type: "error" as const, state: "other" }
 }
 
+function restrictionFor(disc: any) {
+  const reservation = reservationFor(disc)
+  if (!props.showExclusion) return reservation
+  const usage = driveDiscUsageStateForAgent(disc, props.targetAgentId)
+  if (usage.state === "excluded-explicit") {
+    return { label: "当前角色已排除", type: "error" as const, state: usage.state }
+  }
+  if (usage.state === "excluded-by-reservation") {
+    return { label: `自动排除 · ${reservation.label}`, type: "warning" as const, state: usage.state }
+  }
+  return { ...reservation, state: usage.state }
+}
+
 function filterSelectOption(pattern: string, option: any) {
   const needle = pattern.trim().toLowerCase()
   return !needle || String(option?.searchText ?? option?.label ?? option?.value ?? "").toLowerCase().includes(needle)
@@ -228,7 +244,7 @@ function clearSlot() {
           class="manual-disc-option"
           :class="{
             active: selectedId === disc.id,
-            conflict: showReservation && ['other', 'unknown'].includes(reservationFor(disc).state),
+            conflict: showReservation && ['other', 'unknown', 'excluded-by-reservation'].includes(restrictionFor(disc).state),
           }"
           :aria-label="`选择 ${slot}号位 ${setName(disc)}${disc.source?.sequence ? ` 扫描序号 ${disc.source.sequence}` : ''}`"
           @click="choose(disc)"
@@ -237,8 +253,8 @@ function clearSlot() {
           <span class="manual-disc-option-main">
             <strong>{{ setName(disc) }}</strong>
             <span>{{ disc.partition }}号位 · {{ rarityLevelText(disc) }}{{ disc.source?.sequence ? ` · 扫描 #${disc.source.sequence}` : "" }}</span>
-            <NTag v-if="showReservation" :type="reservationFor(disc).type" size="small" round>
-              {{ reservationFor(disc).label }}
+            <NTag v-if="showReservation" :type="restrictionFor(disc).type" size="small" round>
+              {{ restrictionFor(disc).label }}
             </NTag>
           </span>
           <span class="manual-disc-option-stat">
