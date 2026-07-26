@@ -83,6 +83,34 @@ async function openDiscs(page: Page) {
   await page.waitForLoadState("networkidle")
 }
 
+async function expectNoHorizontalOverflow(page: Page) {
+  const metrics = await page.evaluate(() => {
+    const viewportWidth = window.innerWidth
+    const offenders = Array.from(document.querySelectorAll<HTMLElement>("*"))
+      .map((element) => {
+        const rect = element.getBoundingClientRect()
+        return {
+          element: `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ""}${typeof element.className === "string" && element.className ? `.${element.className.trim().replace(/\s+/g, ".")}` : ""}`,
+          left: Math.round(rect.left * 100) / 100,
+          right: Math.round(rect.right * 100) / 100,
+          width: Math.round(rect.width * 100) / 100,
+        }
+      })
+      .filter(candidate => candidate.right > viewportWidth + 2)
+      .sort((left, right) => right.right - left.right)
+      .slice(0, 10)
+
+    return {
+      pixels: document.documentElement.scrollWidth - viewportWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      viewportWidth,
+      offenders,
+    }
+  })
+
+  expect(metrics.pixels, JSON.stringify(metrics, null, 2)).toBeLessThanOrEqual(2)
+}
+
 test("reservation UI stays absent when the runtime flag is disabled", async ({ page }) => {
   await seedLegacyLocalStorage(page)
   await mockRestrictionUi(page, false)
@@ -146,8 +174,7 @@ test("reservation UI preserves legacy data and supports per-disc visual workflow
   expect(await page.evaluate(() => localStorage.getItem("zzz-calculator.webapp.optimizer.v1"))).toContain("exact-super-bound")
   expect(await page.evaluate(() => localStorage.getItem("zzz_maintenance_vue_draft_v3"))).toContain("legacy-draft")
 
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
-  expect(overflow).toBeLessThanOrEqual(2)
+  await expectNoHorizontalOverflow(page)
 })
 
 test("exclusion UI supports effective states and both confirmed conversions", async ({ page }) => {
@@ -191,7 +218,6 @@ test("exclusion UI supports effective states and both confirmed conversions", as
   for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(viewport)
     await expect(preset).toBeVisible()
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
-    expect(overflow).toBeLessThanOrEqual(2)
+    await expectNoHorizontalOverflow(page)
   }
 })
