@@ -33,6 +33,7 @@ export const DAMAGE_MODIFIER_KIND_LABELS = {
     disorderBaseMultiplierBonus: "紊乱倍率加算",
     anomalyCritRate: "异常暴击率",
     anomalyCritDmg: "异常暴击伤害",
+    anomalyCritRatePerInitialMasteryAbove100: "初始异常掌控转异常暴击率",
     anomalyDurationBonusSeconds: "异常持续时间延长",
     stunDmgMultiplierBonus: "失衡易伤倍率加算",
     stunDmgMultiplierBonusAlways: "失衡易伤倍率加算（未失衡生效）",
@@ -226,6 +227,7 @@ export const FALLBACK_LABELS = {
     disorderBaseMultiplierBonus: "紊乱倍率加算",
     anomalyCritRate: "异常暴击率",
     anomalyCritDmg: "异常暴击伤害",
+    anomalyCritRatePerInitialMasteryAbove100: "初始异常掌控转异常暴击率",
     anomalyDurationBonusSeconds: "异常持续时间延长（秒）",
     stunDmgMultiplierBonus: "失衡易伤倍率加算",
     stunDmgMultiplierBonusAlways: "失衡易伤倍率加算（未失衡生效）",
@@ -320,6 +322,7 @@ export const PERCENT_KEYS = new Set([
     "disorderBaseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
+    "anomalyCritRatePerInitialMasteryAbove100",
     "stunDmgMultiplierBonus",
     "stunDmgMultiplierBonusAlways",
     "stunDmgMultiplierBonusCapAlways",
@@ -382,6 +385,7 @@ export const STORED_PERCENT_STATS = new Set([
     "disorderBaseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
+    "anomalyCritRatePerInitialMasteryAbove100",
     "stunDmgMultiplierBonus",
     "stunDmgMultiplierBonusAlways",
     "stunDmgMultiplierBonusCapAlways",
@@ -447,6 +451,7 @@ export const STORED_STAT_LABELS = {
     disorderBaseMultiplierBonus: "紊乱倍率加算%",
     anomalyCritRate: "异常暴击率%",
     anomalyCritDmg: "异常暴击伤害%",
+    anomalyCritRatePerInitialMasteryAbove100: "初始异常掌控超过100时每点转异常暴击率%",
     anomalyDurationBonusSeconds: "异常持续时间延长（秒）",
     stunDmgMultiplierBonus: "失衡易伤倍率加算%",
     stunDmgMultiplierBonusAlways: "失衡易伤倍率加算（未失衡生效）%",
@@ -1104,10 +1109,12 @@ function ruleTargetText(rule = {}, meta) {
         return targets.length ? `（技能：${skillTargetLabels(targets, meta).join("；")}）` : "（技能：未选择）"
     }
     if (target.kind === "anomaly") {
-        const settlementLabel = target.settlementType === "disorder" ? "紊乱" : "属性异常"
+        const settlementLabel = target.settlementType === "disorder" ? "紊乱" : target.settlementType === "release" ? "异放" : "属性异常"
         const effects = Array.isArray(target.anomalyEffects) ? target.anomalyEffects : []
         const labels = effects.map(effect => ANOMALY_EFFECT_LABELS[effect] ?? effect)
-        return `（${settlementLabel}：${labels.length ? labels.join("；") : "未选择"}）`
+        return labels.length
+            ? `（${settlementLabel}：${labels.join("；")}）`
+            : `（${settlementLabel}）`
     }
     return ""
 }

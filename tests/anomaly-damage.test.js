@@ -13,6 +13,7 @@ import {
     normalizeElapsedSeconds,
     resolveDamageEventMultiplier,
 } from "../core/damageEventMultipliers.js"
+import { damageModifierAppliesTo } from "../core/calculator-core.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
@@ -333,6 +334,108 @@ const shockWithModifiers = calculateEvent({
     },
 }, modifierCatalog)
 approx(shockWithModifiers.damage.multipliers.attributeAnomalyDamage, 1.5, "Shock-specific attribute anomaly damage bonus")
+
+const structuredWildcardCatalog = cloneCatalog(catalog)
+structuredWildcardCatalog.combatBuffs.push({
+    id: "test.structured-anomaly-wildcards",
+    sourceType: "manual",
+    scope: "inCombat",
+    effects: [
+        {
+            id: "all-attribute-anomalies",
+            type: "fixed",
+            stat: "anomalyDamageBonus",
+            mode: "flat",
+            value: 10,
+            target: { kind: "anomaly", settlementType: "attribute" },
+        },
+        {
+            id: "all-disorders",
+            type: "fixed",
+            stat: "disorderDamageBonus",
+            mode: "flat",
+            value: 20,
+            target: { kind: "anomaly", settlementType: "disorder" },
+        },
+    ],
+})
+const wildcardCombatBuffs = { activeBuffIds: ["test.structured-anomaly-wildcards"] }
+const wildcardAssault = calculateEvent({
+    id: "wildcard-assault",
+    kind: "anomaly",
+    settlementType: "attribute",
+    anomalyEffect: "assault",
+}, { combatBuffs: wildcardCombatBuffs }, structuredWildcardCatalog)
+approx(wildcardAssault.damage.multipliers.attributeAnomalyDamage, 1.1,
+    "Attribute wildcard should match Assault")
+approx(wildcardAssault.damage.multipliers.disorderDamage, 1,
+    "Disorder wildcard should not leak into Attribute Anomaly")
+const wildcardDisorder = calculateEvent({
+    id: "wildcard-disorder",
+    kind: "anomaly",
+    settlementType: "disorder",
+    anomalyEffect: "burn",
+    elapsedSeconds: 0,
+}, { combatBuffs: wildcardCombatBuffs }, structuredWildcardCatalog)
+approx(wildcardDisorder.damage.multipliers.attributeAnomalyDamage, 1,
+    "Attribute wildcard should not leak into Disorder")
+approx(wildcardDisorder.damage.multipliers.disorderDamage, 1.2,
+    "Disorder wildcard should match Burn Disorder")
+
+const releaseWildcardModifier = {
+    appliesTo: { damageKinds: ["anomaly"], settlementTypes: ["release"] },
+}
+assert.equal(damageModifierAppliesTo(releaseWildcardModifier, {
+    kind: "anomaly",
+    settlementType: "release",
+    anomalyEffect: "corruption",
+}), true)
+assert.equal(damageModifierAppliesTo(releaseWildcardModifier, {
+    kind: "anomaly",
+    settlementType: "release",
+    anomalyEffect: "assault",
+}), true, "Release wildcard should match a different original Anomaly")
+assert.equal(damageModifierAppliesTo(releaseWildcardModifier, {
+    kind: "anomaly",
+    settlementType: "attribute",
+    anomalyEffect: "corruption",
+}), false, "Release wildcard should not match an ordinary Attribute Anomaly")
+const corruptionReleaseModifier = {
+    appliesTo: {
+        damageKinds: ["anomaly"],
+        settlementTypes: ["release"],
+        anomalyEffects: ["corruption"],
+    },
+}
+assert.equal(damageModifierAppliesTo(corruptionReleaseModifier, {
+    kind: "anomaly",
+    settlementType: "release",
+    anomalyEffect: "corruption",
+}), true)
+assert.equal(damageModifierAppliesTo(corruptionReleaseModifier, {
+    kind: "anomaly",
+    settlementType: "release",
+    anomalyEffect: "assault",
+}), false, "Non-empty Release lists should remain exact original-Anomaly filters")
+const polarizedAttributeWildcard = {
+    appliesTo: {
+        damageKinds: ["anomaly"],
+        settlementTypes: ["attribute"],
+        anomalyVariants: ["polarizedAssault"],
+    },
+}
+assert.equal(damageModifierAppliesTo(polarizedAttributeWildcard, {
+    kind: "anomaly",
+    settlementType: "attribute",
+    anomalyEffect: "assault",
+    anomalyVariant: "polarizedAssault",
+}), true)
+assert.equal(damageModifierAppliesTo(polarizedAttributeWildcard, {
+    kind: "anomaly",
+    settlementType: "attribute",
+    anomalyEffect: "assault",
+    anomalyVariant: "normal",
+}), false, "Attribute variant filters should remain independent from the concrete-Anomaly wildcard")
 
 const manualEffectModifier = calculateEvent({
     id: "manual-effect",

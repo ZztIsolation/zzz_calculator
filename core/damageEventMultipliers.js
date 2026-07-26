@@ -1,3 +1,6 @@
+import { anomalyReleaseProfile, evaluateAnomalyReleaseProfile, isReleaseSettlement } from "./anomalyRelease.js"
+import { corePassiveScalingRow } from "./corePassiveScaling.js"
+
 const DEFAULT_ELAPSED_STEP_SECONDS = 0.5
 
 function finiteNonNegative(value, fallback = 0) {
@@ -101,7 +104,7 @@ export function disorderMultiplierScale(type) {
     return type === "polarized" ? 0.25 : 1
 }
 
-export function resolveDamageEventMultiplier(event = {}, catalog = {}) {
+export function resolveDamageEventMultiplier(event = {}, catalog = {}, releaseContext = {}) {
     if (!event || event.kind === "skillGroup") {
         return null
     }
@@ -124,6 +127,24 @@ export function resolveDamageEventMultiplier(event = {}, catalog = {}) {
     if (isDisorder) {
         const disorder = disorderBaseMultiplier(effect, event.elapsedSeconds)
         return disorder.baseMultiplier * disorderMultiplierScale(event.disorderType) * damageScale
+    }
+
+    if (isReleaseSettlement(event)) {
+        const agent = releaseContext.agent
+            ?? (catalog?.agents ?? []).find(item => item?.id === event.triggerActorRef?.agentId)
+        const profile = event.releaseProfile
+            ?? anomalyReleaseProfile(agent, event.triggerActorRef?.profileId, effect.element)
+        if (!profile) return null
+        return evaluateAnomalyReleaseProfile(profile, {
+            originalBaseMultiplier: finiteNonNegative(effect.baseMultiplier, 0),
+            trigger: {
+                inCombatPanel: releaseContext.inCombatPanel ?? {},
+                outOfCombatPanel: releaseContext.outOfCombatPanel ?? {},
+            },
+            coreScalingRow: event.releaseCoreScalingRow ?? corePassiveScalingRow(agent, releaseContext.coreSkillLevel),
+            event,
+            eventElement: effect.element,
+        }).finalBaseMultiplier * damageScale
     }
 
     const procCountValue = Number(event.procCount ?? effect.defaultProcCount ?? 1)

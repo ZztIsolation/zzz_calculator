@@ -227,6 +227,7 @@ describe("OptimizerConfigModal", () => {
     const buff = {
       id: "independent-coverage-runtime",
       name: { zhCN: "独立覆盖率" },
+      description: { zhCN: "命中敌人后获得伤害加成，持续 8 秒。" },
       effects: [
         { id: "covered-dmg", type: "fixed", stat: "dmgBonus", mode: "flat", value: 20, coverage: { default: 0.6, min: 0, max: 1, step: 0.1 } },
         { id: "fixed-crit", type: "fixed", stat: "critRate", mode: "flat", value: 10 },
@@ -243,17 +244,39 @@ describe("OptimizerConfigModal", () => {
       fourPieceRuntimeBuffs: [buff],
     })
     await openModal(wrapper)
-    const inputs = document.body.querySelectorAll(".optimizer-coverage-metric input")
+    expect(document.body.textContent).toContain("命中敌人后获得伤害加成，持续 8 秒。")
+    expect(document.body.querySelector(".optimizer-effect-value")?.textContent).toBe("通用伤害加成% +20%")
+    expect(document.body.textContent).not.toContain("通用伤害加成% +8%")
+    expect(document.body.querySelector(".optimizer-rule-coverage-control")?.textContent).toContain("覆盖率")
+
+    const enabledControls = wrapper.findAllComponents({ name: "Checkbox" })
+      .filter(checkbox => checkbox.text().trim() === "启用")
+    expect(enabledControls).toHaveLength(2)
+    expect(enabledControls.every(checkbox => checkbox.props("checked") === true)).toBe(true)
+
+    const inputs = document.body.querySelectorAll(".optimizer-rule-coverage-control input")
     expect(inputs).toHaveLength(1)
     expect((inputs[0] as HTMLInputElement).value).toBe("0.4")
     ;(inputs[0] as HTMLInputElement).value = "0.3"
     inputs[0].dispatchEvent(new Event("input", { bubbles: true }))
     await nextTick()
 
+    await enabledControls[0].vm.$emit("update:checked", false)
+    await nextTick()
+    expect((document.body.querySelector(".optimizer-rule-coverage-control input") as HTMLInputElement).disabled).toBe(true)
+
     const saved = await saveModal(wrapper)
     const runtime = saved.fourPieceBuffRuntimeInputs["independent-coverage-runtime"]
     expect(runtime.coverage).toBeUndefined()
-    expect(runtime.effects["covered-dmg"].coverage).toBe(0.3)
+    expect(runtime.effects["covered-dmg"]).toMatchObject({ enabled: false, coverage: 0.3 })
+    expect(runtime.effects["fixed-crit"].enabled).toBe(true)
     expect(runtime.effects["fixed-crit"].coverage).toBeUndefined()
+
+    await wrapper.setProps({ show: false, optimizerConfig: saved })
+    await openModal(wrapper)
+    const reopenedEnabledControls = wrapper.findAllComponents({ name: "Checkbox" })
+      .filter(checkbox => checkbox.text().trim() === "启用")
+    expect(reopenedEnabledControls.map(checkbox => checkbox.props("checked"))).toEqual([false, true])
+    expect((document.body.querySelector(".optimizer-rule-coverage-control input") as HTMLInputElement).disabled).toBe(true)
   })
 })

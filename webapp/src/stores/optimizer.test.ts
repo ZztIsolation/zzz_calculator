@@ -108,12 +108,14 @@ describe("optimizer store", () => {
     store.error = "boom"
     store.results = [{ rank: 1 }]
     store.completedSettings = { ownerId: "default" }
+    store.completedSettingsFingerprint = "saved"
     store.progress = { percent: 50 }
     store.reset()
     expect(store.status).toBe("idle")
     expect(store.error).toBe("")
     expect(store.results).toEqual([])
     expect(store.completedSettings).toBe(null)
+    expect(store.completedSettingsFingerprint).toBe("")
     expect(store.progress).toBe(null)
   })
 
@@ -210,6 +212,27 @@ describe("optimizer store", () => {
     expect(store.inputWithSettings({ agentId: "agent_a" }).settings.fourPieceSetId).toBe("fanged_metal")
   })
 
+  it("loads, persists, and submits multiple preferred four-piece sets", () => {
+    const store = useOptimizerStore()
+    store.initialize(preferredCatalog, {
+      id: "agent_a",
+      preferredDriveDiscs: { defaultSetIds: ["woodpecker_electro", "fanged_metal"] },
+    })
+
+    expect(store.fourPieceSetIds).toEqual(["woodpecker_electro", "fanged_metal"])
+    expect(store.inputWithSettings({ agentId: "agent_a" }).settings.fourPieceSetIds)
+      .toEqual(["woodpecker_electro", "fanged_metal"])
+
+    store.setFourPieceSets(["fanged_metal", "woodpecker_electro", "fanged_metal"])
+    setActivePinia(createPinia())
+    const reloaded = useOptimizerStore()
+    reloaded.initialize(preferredCatalog, {
+      id: "agent_a",
+      preferredDriveDiscs: { defaultSetIds: ["woodpecker_electro", "fanged_metal"] },
+    })
+    expect(reloaded.fourPieceSetIds).toEqual(["fanged_metal", "woodpecker_electro"])
+  })
+
   it("preserves an explicitly selected four-piece drive-disc set on reload", () => {
     const store = useOptimizerStore()
     store.initialize(preferredCatalog, preferredAgentB)
@@ -221,12 +244,41 @@ describe("optimizer store", () => {
 
     expect(reloaded.fourPieceSetId).toBe("woodpecker_electro")
     const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer.v1") || "{}")
-    expect(saved.version).toBe(2)
+    expect(saved.version).toBe(3)
     expect(saved.byAgent.agent_b.fourPieceSetId).toBe("woodpecker_electro")
     expect(saved.byAgent.agent_b.fourPieceSetIds).toEqual(["woodpecker_electro"])
   })
 
-  it("round-trips version 3 multi-set settings and unknown fields through the compatibility store", () => {
+  it("upgrades version 2 settings to version 3 without losing the legacy choice or unknown fields", () => {
+    localStorage.setItem("zzz-calculator.webapp.optimizer.v1", JSON.stringify({
+      version: 2,
+      currentAgentId: "agent_a",
+      rolloutSentinel: "keep-envelope",
+      byAgent: {
+        agent_a: {
+          algorithm: "exact-super-bound",
+          fourPieceSetId: "fanged_metal",
+          fourPieceSetSource: "manual",
+          futureConstraint: { releaseProfileId: "aria-release" },
+        },
+        agent_b: { untouched: true },
+      },
+    }))
+    const store = useOptimizerStore()
+
+    store.initialize(preferredCatalog, preferredAgentA)
+
+    expect(store.fourPieceSetIds).toEqual(["fanged_metal"])
+    const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer.v1") || "{}")
+    expect(saved.version).toBe(3)
+    expect(saved.rolloutSentinel).toBe("keep-envelope")
+    expect(saved.byAgent.agent_a.fourPieceSetId).toBe("fanged_metal")
+    expect(saved.byAgent.agent_a.fourPieceSetIds).toEqual(["fanged_metal"])
+    expect(saved.byAgent.agent_a.futureConstraint).toEqual({ releaseProfileId: "aria-release" })
+    expect(saved.byAgent.agent_b).toEqual({ untouched: true })
+  })
+
+  it("round-trips version 3 multi-set settings and unknown fields through the final store", () => {
     localStorage.setItem("zzz-calculator.webapp.optimizer.v1", JSON.stringify({
       version: 3,
       currentAgentId: "agent_a",
@@ -258,7 +310,7 @@ describe("optimizer store", () => {
     expect(saved.byAgent.agent_a.futureConstraint).toEqual({ releaseProfileId: "aria-release" })
     expect(saved.byAgent.agent_b).toMatchObject({ untouched: true, fourPieceSetIds: ["fanged_metal"] })
 
-    store.setFourPieceSet("fanged_metal")
+    store.setFourPieceSets(["fanged_metal", "woodpecker_electro"])
     saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer.v1") || "{}")
     expect(saved.byAgent.agent_a.fourPieceSetId).toBe("fanged_metal")
     expect(saved.byAgent.agent_a.fourPieceSetIds).toEqual(["fanged_metal", "woodpecker_electro"])
@@ -336,7 +388,7 @@ describe("optimizer store", () => {
     expect(store.minimums).toEqual({})
 
     const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer.v1") || "{}")
-    expect(saved.version).toBe(2)
+    expect(saved.version).toBe(3)
     expect(saved.currentAgentId).toBe("agent_b")
     expect(saved.byAgent.agent_a.twoPieceSetIds).toEqual(["swing_jazz"])
     expect(saved.byAgent.agent_b.twoPieceSetIds).toEqual([])
@@ -490,6 +542,29 @@ describe("optimizer store", () => {
         "driveDisc4pc:woodpecker_electro.self": { coverage: 0.5 },
       },
     })
+    expect(store.resultsAreStale).toBe(false)
+
+    store.applyAdvancedSettings({
+      algorithm: "exact-super-bound",
+      fourPieceBuffMode: "manual",
+      fourPieceBuffRuntimeInputs: {
+        "driveDisc4pc:woodpecker_electro.self": {
+          effects: { crit: { enabled: false, coverage: 0.5 } },
+        },
+      },
+      mainStatLimits: { "4": [], "5": [], "6": [] },
+      minimums: {},
+    })
+    expect(store.resultsAreStale).toBe(true)
+
+    store.applyAdvancedSettings({
+      algorithm: "exact-super-bound",
+      fourPieceBuffMode: "auto",
+      fourPieceBuffRuntimeInputs: {},
+      mainStatLimits: { "4": [], "5": [], "6": [] },
+      minimums: {},
+    })
+    expect(store.resultsAreStale).toBe(false)
     expect(worker.terminated).toBe(false)
   })
 

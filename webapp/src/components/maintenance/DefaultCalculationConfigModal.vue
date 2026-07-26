@@ -7,6 +7,7 @@ import CalculationEventsEditor from "./CalculationEventsEditor.vue"
 import { defaultCalculationEvent, option } from "./maintenance-options"
 import { internalId, textOf } from "./maintenance-model"
 import { disorderElapsedStepSeconds, normalizeElapsedSeconds } from "@core/damageEventMultipliers.js"
+import { anomalyReleaseProfile, isReleaseSettlement } from "@core/anomalyRelease.js"
 
 const props = withDefaults(defineProps<{
   show: boolean
@@ -67,6 +68,18 @@ function normalizeEntry(entry: any) {
   entry.events = Array.isArray(entry.events) ? entry.events : []
   for (const event of entry.events) {
     event.id ||= internalId("event")
+    if (isReleaseSettlement(event)) {
+      const profile = anomalyReleaseProfile(props.agent, event.triggerActorRef?.profileId)
+      event.kind = "anomaly"
+      event.settlementType = "release"
+      event.triggerActorRef = {
+        agentId: String(props.agent?.id ?? event.triggerActorRef?.agentId ?? ""),
+        profileId: String(profile?.id ?? event.triggerActorRef?.profileId ?? ""),
+      }
+      event.anomalySource ??= { actorRef: { agentId: event.triggerActorRef.agentId } }
+      delete event.anomalyVariant
+      delete event.procCount
+    }
     if (event.kind === "disorder" || event.settlementType === "disorder") {
       event.elapsedSeconds = normalizeElapsedSeconds(
         event.elapsedSeconds,

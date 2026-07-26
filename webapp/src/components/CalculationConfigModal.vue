@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
 import { NButton, NInputNumber, NModal, NRadioButton, NRadioGroup, NSelect, NSwitch, NTag } from "naive-ui"
-import { Copy, Info, Lock, Trash2 } from "lucide-vue-next"
+import { Copy, Info, Lock, RefreshCcw, Trash2 } from "lucide-vue-next"
 import SkillPickerModal from "@/components/SkillPickerModal.vue"
 import {
   defaultDamageConfig,
@@ -47,6 +47,15 @@ import {
   resolveDamageEventMultiplier,
 } from "@core/damageEventMultipliers.js"
 import { damageElementForAgent } from "@core/shared-combat.js"
+import { corePassiveScalingRow } from "@core/corePassiveScaling.js"
+import {
+  anomalyReleaseProfile,
+  anomalyReleaseProfiles,
+  evaluateAnomalyReleaseProfile,
+  isAriaReleaseSourceLocked,
+  isReleaseSettlement,
+  normalizeAnomalyReleaseEventForAgent,
+} from "@core/anomalyRelease.js"
 
 const props = defineProps<{
   show: boolean
@@ -57,6 +66,8 @@ const props = defineProps<{
   agent?: any
   cinemaLevel?: number
   combatEffects?: any[]
+  releaseContext?: { inCombatPanel?: any, outOfCombatPanel?: any, coreSkillLevel?: string | number }
+  sourceSnapshotProvider?: (agentId: string) => any
 }>()
 
 const emit = defineEmits<{
@@ -66,6 +77,7 @@ const emit = defineEmits<{
 
 const draft = ref<any>(defaultDamageConfig())
 const showSkillPicker = ref(false)
+const releaseSnapshotError = ref("")
 const isAdminDefaultMode = computed(() => draft.value.mode === "adminDefault")
 const canEditEventStructure = computed(() => draft.value.mode === "custom")
 const canUseSheerDamage = computed(() => isRuptureAgent(props.agent))
@@ -89,16 +101,20 @@ const critModeOptions = [
   { label: "暴击", value: "crit" },
   { label: "不暴击", value: "nonCrit" },
 ]
-const anomalySettlementOptions = [
+const releaseProfiles = computed(() => anomalyReleaseProfiles(props.agent))
+const supportsRelease = computed(() => releaseProfiles.value.length > 0)
+const releaseSourceLocked = computed(() => isAriaReleaseSourceLocked(props.agent))
+const anomalySettlementOptions = computed(() => [
   { label: "属性异常", value: "attribute" },
   { label: "紊乱结算", value: "disorder" },
-]
+  { label: "异放", value: "release", disabled: !supportsRelease.value, title: supportsRelease.value ? "" : "暂不支持" },
+])
 const disorderTypeOptions = [
   { label: "普通紊乱", value: "normal" },
   { label: "极性紊乱", value: "polarized" },
 ]
 const anomalyVariantOptions = [
-  { label: "普通强击", value: "normal" },
+  { label: "普通异常", value: "normal" },
   { label: "极性强击", value: "polarizedAssault" },
 ]
 
@@ -122,6 +138,7 @@ function normalizeDraftForAgent(config: any) {
 
 watch(() => props.show, value => {
   if (value) {
+    releaseSnapshotError.value = ""
     const { target: _target, targetConfig: _targetConfig, ...damageConfig } = props.damageConfig ?? {}
     const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0)
     const shouldUseFallbackEvents = damageConfig?.mode === "adminDefault"
@@ -158,6 +175,15 @@ const disorderOptions = computed(() => (props.meta?.disorderEffects ?? []).map((
   value: effect.id,
 })))
 
+function agentLabel(agentId: string) {
+  return labelOf((props.meta?.agents ?? []).find((agent: any) => agent?.id === agentId)) || agentId || "未配置"
+}
+
+const releaseSourceOptions = computed(() => (props.meta?.agents ?? []).map((agent: any) => ({
+  label: labelOf(agent) || agent.id,
+  value: agent.id,
+})))
+
 const selectedEvent = computed(() => (draft.value.events ?? []).find((event: any) => event.id === draft.value.selectedEventId) ?? draft.value.events?.[0])
 const skillCategories = computed(() => props.skillCatalog?.categories ?? [])
 const skillCategoryOptions = computed(() => skillCategories.value.map((category: any) => ({
@@ -185,7 +211,65 @@ function eventListTitle(event: any) {
   return eventTitle(event)
 }
 
+function releaseEffect(event: any) {
+  const effectId = String(event?.anomalyEffect ?? "")
+  return (props.meta?.anomalyEffects ?? []).find((effect: any) => effect?.id === effectId) ?? null
+}
+
+function releaseBreakdown(event: any) {
+  if (!isReleaseSettlement(event)) return null
+  const effect = releaseEffect(event)
+  const profile = anomalyReleaseProfile(props.agent, event?.triggerActorRef?.profileId, effect?.element)
+  if (!effect || !profile) return null
+  try {
+    const evaluated = evaluateAnomalyReleaseProfile(profile, {
+      originalBaseMultiplier: Number(effect.baseMultiplier ?? 0),
+      trigger: {
+        inCombatPanel: props.releaseContext?.inCombatPanel ?? {},
+        outOfCombatPanel: props.releaseContext?.outOfCombatPanel ?? {},
+      },
+      coreScalingRow: corePassiveScalingRow(props.agent, props.releaseContext?.coreSkillLevel),
+      event,
+      eventElement: effect.element,
+    })
+    return {
+      ...evaluated,
+      currentMultiplier: evaluated.finalBaseMultiplier * normalizeDamageScale(event),
+      effectLabel: anomalyEffectLabel(effect.id, props.meta),
+      triggerLabel: labelOf(props.agent),
+      sourceLabel: agentLabel(event?.anomalySource?.actorRef?.agentId),
+      snapshot: event?.anomalySource?.snapshot ?? null,
+      outOfCombatAnomalyMastery: Number(props.releaseContext?.outOfCombatPanel?.anomalyMastery ?? 0),
+      stunnedRatio: releaseTraceValue(evaluated.trace, "异放失衡倍率修正") ?? 1,
+    }
+  } catch {
+    return null
+  }
+}
+
+function releaseTraceValue(trace: any, label: string): number | null {
+  if (!trace) return null
+  if (trace.label === label && Number.isFinite(Number(trace.value))) return Number(trace.value)
+  for (const child of trace.children ?? []) {
+    const value = releaseTraceValue(child, label)
+    if (value !== null) return value
+  }
+  return null
+}
+
+function formatReleaseValue(value: unknown) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return "-"
+  return numeric.toLocaleString("zh-CN", { maximumFractionDigits: 6, useGrouping: false })
+}
+
+const ARIA_RELEASE_CORE_DESCRIPTION = "爱芮的第三段[普通攻击：绝对音准]重击命中处于以太异常状态、电属性异常状态、火属性异常状态、物理属性异常状态、冰属性异常状态的目标时，触发一次[异放]：额外结算一次属性异常伤害，相对于原属性异常伤害的比例为每10点初始异常掌控27.5%/14.3%/35.7%/2.5%/3.6%，当目标处于失衡状态下时，该伤害比例额外提升50%。"
+
+const selectedReleaseBreakdown = computed(() => releaseBreakdown(selectedEvent.value))
+
 function eventMultiplier(event: any) {
+  const release = releaseBreakdown(event)
+  if (release) return release.currentMultiplier
   const disorder = disorderBreakdown(event)
   if (disorder) {
     return disorder.currentMultiplier
@@ -600,16 +684,18 @@ function normalizeDraftAnomalyEffects() {
     if (event?.kind !== "anomaly" && event?.kind !== "disorder") {
       return event
     }
-    const settlementType = event.kind === "disorder" || event.settlementType === "disorder" ? "disorder" : "attribute"
+    const release = isReleaseSettlement(event)
+    const settlementType = release ? "release" : event.kind === "disorder" || event.settlementType === "disorder" ? "disorder" : "attribute"
     const effectId = settlementType === "disorder" ? selectedDisorderEffectId(event) : selectedAnomalyEffectId(event)
-    if (effectId && isKnownEffect(settlementType, effectId)) {
-      return event
-    }
-    const normalized = {
+    const normalized: any = {
       ...event,
-      anomalyEffect: defaultAgentEffectId(settlementType),
+      settlementType,
+      anomalyEffect: effectId && isKnownEffect(settlementType, effectId) ? effectId : defaultAgentEffectId(settlementType),
     }
     delete normalized.previousAnomalyEffect
+    if (release) {
+      return normalizeAnomalyReleaseEventForAgent(normalized, props.agent)
+    }
     return normalized
   })
 }
@@ -797,6 +883,13 @@ const eventWarnings = computed(() => {
   if (damageEventNeedsSkillMultiplier(event, props.meta, props.skillCatalog)) {
     warnings.push("直伤/贯穿事件需要技能倍率")
   }
+  if (isReleaseSettlement(event)) {
+    if (!supportsRelease.value) warnings.push("当前角色暂不支持异放")
+    if (event.triggerActorRef?.agentId !== props.agent?.id) warnings.push("异放触发者必须是当前角色")
+    if (!event.triggerActorRef?.profileId) warnings.push("异放倍率方案未配置")
+    if (!event.anomalySource?.actorRef?.agentId) warnings.push("原异常施加者未配置")
+    if (releaseSnapshotError.value) warnings.push(releaseSnapshotError.value)
+  }
   if (event.kind === "anomaly" && event.settlementType !== "disorder") {
     if (!event.anomalyEffect) {
       warnings.push("属性异常事件需要选择异常类型")
@@ -844,6 +937,7 @@ function updateSkillRow(rowId: string) {
 }
 
 function updateAnomalySettlementType(value: string) {
+  releaseSnapshotError.value = ""
   if (value === "disorder") {
     const effectId = defaultAgentEffectId("disorder")
     const nextEvent = { ...selectedEvent.value, anomalyEffect: effectId, settlementType: "disorder" }
@@ -857,6 +951,19 @@ function updateAnomalySettlementType(value: string) {
     }, { clearLabel: true })
     return
   }
+  if (value === "release") {
+    if (!supportsRelease.value) return
+    const profile = anomalyReleaseProfile(props.agent, "", damageElementForAgent(props.agent)) ?? releaseProfiles.value[0]
+    const releaseEvent = normalizeAnomalyReleaseEventForAgent({
+      ...selectedEvent.value,
+      settlementType: "release",
+      anomalyEffect: defaultAgentEffectId("release"),
+      triggerActorRef: { agentId: String(props.agent?.id ?? ""), profileId: String(profile?.id ?? "") },
+      anomalySource: { actorRef: { agentId: String(props.agent?.id ?? "") } },
+    }, props.agent)
+    updateSelectedEvent(releaseEvent, { clearLabel: true })
+    return
+  }
   updateSelectedEvent({
     settlementType: "attribute",
     anomalyEffect: defaultAgentEffectId("attribute"),
@@ -864,7 +971,38 @@ function updateAnomalySettlementType(value: string) {
     disorderType: undefined,
     elapsedSeconds: undefined,
     procCount: selectedEvent.value?.procCount ?? 1,
+    anomalyVariant: selectedEvent.value?.anomalyVariant === "polarizedAssault" ? "polarizedAssault" : "normal",
+    triggerActorRef: undefined,
+    anomalySource: undefined,
   }, { clearLabel: true })
+}
+
+function updateReleaseSourceAgent(agentId: string) {
+  if (releaseSourceLocked.value) return
+  const currentAgentId = String(props.agent?.id ?? "")
+  if (agentId === currentAgentId) {
+    releaseSnapshotError.value = ""
+    updateSelectedEvent({ anomalySource: { actorRef: { agentId } } })
+    return
+  }
+  const snapshot = props.sourceSnapshotProvider?.(agentId)
+  if (!snapshot || snapshot.agentId !== agentId) {
+    releaseSnapshotError.value = "该角色暂无已保存的异常快照，请先使用该角色完成一次计算。"
+    return
+  }
+  releaseSnapshotError.value = ""
+  updateSelectedEvent({ anomalySource: { actorRef: { agentId }, snapshot: JSON.parse(JSON.stringify(snapshot)) } })
+}
+
+function refreshReleaseSourceSnapshot() {
+  const agentId = String(selectedEvent.value?.anomalySource?.actorRef?.agentId ?? "")
+  if (agentId) updateReleaseSourceAgent(agentId)
+}
+
+function releaseSnapshotTime(snapshot: any) {
+  if (!snapshot?.capturedAt) return "当前面板实时读取"
+  const date = new Date(snapshot.capturedAt)
+  return Number.isNaN(date.getTime()) ? "已冻结" : date.toLocaleString("zh-CN", { hour12: false })
 }
 
 function updateDisorderEffect(effectId: string) {
@@ -904,6 +1042,7 @@ function save() {
   normalizeDraftSkillSelections()
   normalizeDraftElapsedSeconds()
   normalizeDraftStunned()
+  normalizeDraftAnomalyEffects()
   const normalizedDraft = isDamageModeAllowedForAgent(draft.value.mode, props.agent, props.cinemaLevel ?? 0)
     ? draft.value
     : normalizeDraftForAgent(draft.value)
@@ -1003,11 +1142,17 @@ function save() {
                   :key="option.value"
                   :value="option.value"
                   :label="option.label"
+                  :disabled="option.disabled"
+                  :title="option.title"
                   @click="updateAnomalySettlementType(option.value)"
                 />
               </NRadioGroup>
             </div>
-            <div class="metric-grid calculation-editor-grid ui-field-grid" data-layout-surface="calculation-fields">
+            <div
+              class="metric-grid calculation-editor-grid ui-field-grid"
+              :class="{ 'calculation-editor-grid--release': isReleaseSettlement(selectedEvent) }"
+              data-layout-surface="calculation-fields"
+            >
               <div
                 class="metric calculation-editor-field calculation-editor-field-short ui-field"
                 :class="{ 'calculation-skill-group-count-field': selectedEvent?.kind === 'skillGroup' }"
@@ -1108,24 +1253,47 @@ function save() {
                 </div>
               </div>
               <div v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType !== 'disorder'" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field>
-                <span class="metric-title">异常类型</span>
+                <span class="metric-title">{{ isReleaseSettlement(selectedEvent) ? '原异常' : '异常类型' }}</span>
                 <div class="metric-value">
-                  <span v-if="isAdminDefaultMode" class="calculation-readonly-value">{{ selectedAnomalyEffectLabel(selectedEvent) }}</span>
-                  <NSelect v-else :value="selectedAnomalyEffectValue(selectedEvent)" :options="anomalyOptionsFor(selectedEvent)" aria-label="异常类型" @update:value="updateSelectedEvent({ anomalyEffect: $event, anomalyVariant: $event === 'assault' ? (selectedEvent?.anomalyVariant ?? 'normal') : undefined }, { clearLabel: true })" />
+                  <span v-if="isAdminDefaultMode || (isReleaseSettlement(selectedEvent) && releaseSourceLocked)" class="calculation-readonly-value">{{ selectedAnomalyEffectLabel(selectedEvent) }}</span>
+                  <NSelect v-else :value="selectedAnomalyEffectValue(selectedEvent)" :options="anomalyOptionsFor(selectedEvent)" :aria-label="isReleaseSettlement(selectedEvent) ? '异放原异常' : '异常类型'" @update:value="updateSelectedEvent({ anomalyEffect: $event, anomalyVariant: !isReleaseSettlement(selectedEvent) && $event === 'assault' ? (selectedEvent?.anomalyVariant ?? 'normal') : undefined }, { clearLabel: true })" />
                 </div>
               </div>
-              <div v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType !== 'disorder'" class="metric calculation-editor-field calculation-editor-field-short ui-field" data-layout-field>
+              <div v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType === 'attribute'" class="metric calculation-editor-field calculation-editor-field-short ui-field" data-layout-field>
                 <span class="metric-title">触发次数</span>
                 <div class="metric-value">
                   <span v-if="isAdminDefaultMode" class="calculation-readonly-value">{{ Number(selectedEvent?.procCount ?? 1) }}</span>
                   <NInputNumber v-else :value="selectedEvent?.procCount ?? 1" :min="0" :step="1" aria-label="异常触发次数" @update:value="updateSelectedEvent({ procCount: Number($event ?? 1) })" />
                 </div>
               </div>
-              <div v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType !== 'disorder' && selectedAnomalyEffectId(selectedEvent) === 'assault'" class="metric calculation-editor-field calculation-editor-field-medium ui-field" data-layout-field>
-                <span class="metric-title">强击形态</span>
+              <div v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType === 'attribute'" class="metric calculation-editor-field calculation-editor-field-medium ui-field" data-layout-field>
+                <span class="metric-title">异常形态</span>
                 <div class="metric-value">
                   <span v-if="isAdminDefaultMode" class="calculation-readonly-value">{{ optionLabel(anomalyVariantOptions, selectedEvent?.anomalyVariant ?? 'normal') }}</span>
-                  <NSelect v-else :value="selectedEvent?.anomalyVariant ?? 'normal'" :options="anomalyVariantOptions" aria-label="强击形态" @update:value="updateSelectedEvent({ anomalyVariant: $event })" />
+                  <NSelect v-else :value="selectedEvent?.anomalyVariant ?? 'normal'" :options="anomalyVariantOptions" aria-label="异常形态" @update:value="updateSelectedEvent({ anomalyVariant: $event, procCount: selectedEvent?.procCount ?? 1 })" />
+                </div>
+              </div>
+              <div v-if="isReleaseSettlement(selectedEvent)" class="metric calculation-editor-field calculation-editor-field-medium ui-field" data-layout-field="release-trigger">
+                <span class="metric-title">异放触发者</span>
+                <div class="metric-value"><span class="calculation-readonly-value">{{ labelOf(agent) }}</span></div>
+              </div>
+              <div v-if="isReleaseSettlement(selectedEvent)" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field="release-source">
+                <span class="metric-title">原异常施加者</span>
+                <div class="metric-value">
+                  <span v-if="isAdminDefaultMode || releaseSourceLocked" class="calculation-readonly-value release-source-readonly">
+                    <strong>{{ agentLabel(selectedEvent?.anomalySource?.actorRef?.agentId) }}</strong>
+                    <small v-if="releaseSourceLocked">当前面板实时读取</small>
+                  </span>
+                  <NSelect v-else :value="selectedEvent?.anomalySource?.actorRef?.agentId" :options="releaseSourceOptions" filterable aria-label="原异常施加者" @update:value="updateReleaseSourceAgent(String($event))" />
+                </div>
+              </div>
+              <div v-if="isReleaseSettlement(selectedEvent) && !releaseSourceLocked" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field="release-snapshot">
+                <span class="metric-title">来源快照</span>
+                <div class="metric-value release-snapshot-value">
+                  <span class="calculation-readonly-value">{{ releaseSnapshotTime(selectedEvent?.anomalySource?.snapshot) }}</span>
+                  <NButton v-if="!isAdminDefaultMode && selectedEvent?.anomalySource?.snapshot" quaternary circle title="刷新来源快照" aria-label="刷新来源快照" @click="refreshReleaseSourceSnapshot">
+                    <template #icon><RefreshCcw :size="16" /></template>
+                  </NButton>
                 </div>
               </div>
               <div v-if="selectedEvent?.kind === 'disorder' || selectedEvent?.settlementType === 'disorder'" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field>
@@ -1213,6 +1381,25 @@ function save() {
                 <p>结算间隔：灼烧、侵蚀每0.5秒一段；感电、畏缩、霜寒、烈霜霜寒每1秒一段。</p>
                 <p v-for="note in selectedDisorderBreakdown.modifierNotes" :key="note">{{ note }}</p>
               </div>
+            </section>
+            <section
+              v-if="selectedReleaseBreakdown"
+              class="disorder-explanation release-explanation"
+              aria-labelledby="release-explanation-title"
+            >
+              <div class="disorder-explanation-head">
+                <Info :size="19" aria-hidden="true" />
+                <div>
+                  <strong id="release-explanation-title">异放倍率说明</strong>
+                  <p>{{ selectedReleaseBreakdown.sourceLabel }}提供原异常单次倍率与伤害快照，{{ selectedReleaseBreakdown.triggerLabel }}提供角色专属异放倍率。</p>
+                  <p v-if="releaseSourceLocked">{{ ARIA_RELEASE_CORE_DESCRIPTION }}</p>
+                </div>
+              </div>
+              <dl class="disorder-explanation-metrics release-explanation-metrics">
+                <div><dt>局外异常掌控</dt><dd>{{ formatReleaseValue(selectedReleaseBreakdown.outOfCombatAnomalyMastery) }}</dd></div>
+                <div><dt>异放失衡倍率修正</dt><dd>× {{ formatReleaseValue(selectedReleaseBreakdown.stunnedRatio) }}</dd></div>
+                <div><dt>异放最终倍率</dt><dd>{{ formatDisorderMultiplier(selectedReleaseBreakdown.currentMultiplier) }}</dd></div>
+              </dl>
             </section>
             <div v-if="['direct', 'sheer'].includes(selectedEvent?.kind)" class="toolbar" :class="{ 'calculation-readonly-summary': isAdminDefaultMode }">
               <template v-if="isAdminDefaultMode">
@@ -1421,6 +1608,42 @@ function save() {
   min-width: 0;
 }
 
+.calculation-editor-grid--release {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.calculation-editor-grid--release .ui-field--wide {
+  grid-column: span 1;
+}
+
+.release-snapshot-value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.release-snapshot-value .calculation-readonly-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.release-source-readonly {
+  display: grid;
+  align-content: center;
+  gap: 1px;
+}
+
+.release-source-readonly strong {
+  font-size: 14px;
+}
+
+.release-source-readonly small {
+  color: var(--app-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
 .calculation-readonly-summary {
   align-items: flex-start;
   gap: 8px;
@@ -1452,6 +1675,19 @@ function save() {
   padding: 16px 18px;
   border-left: 3px solid var(--app-blue);
   background: #f8fafc;
+}
+
+.release-explanation {
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.release-explanation .disorder-explanation-head p {
+  line-height: 1.45;
+}
+
+.release-explanation-metrics dd {
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
 }
 
 .disorder-explanation-head {
@@ -1825,6 +2061,10 @@ function save() {
   .calculation-settlement-selector {
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;
+  }
+
+  .calculation-editor-grid--release {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .disorder-explanation {

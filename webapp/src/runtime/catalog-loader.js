@@ -3,6 +3,11 @@ import { buildMeta, normalizeCatalog } from "../../../core/calculator-core.js"
 let catalogPromise = null
 let metaPromise = null
 
+export function invalidateCatalogCache() {
+    catalogPromise = null
+    metaPromise = null
+}
+
 function cloneJson(value) {
     if (typeof structuredClone === "function") {
         return structuredClone(value)

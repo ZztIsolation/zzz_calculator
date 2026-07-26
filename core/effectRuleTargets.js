@@ -71,7 +71,7 @@ function normalizedAppliesTo(rule) {
         return null
     }
     const appliesTo = { ...rule.appliesTo }
-    for (const key of ["damageKinds", "anomalyEffects", "elements", "skillTargets"]) {
+    for (const key of ["damageKinds", "settlementTypes", "anomalyEffects", "anomalyVariants", "elements", "skillTargets"]) {
         if (Array.isArray(appliesTo[key]) && !appliesTo[key].length) {
             delete appliesTo[key]
         }
@@ -95,8 +95,37 @@ function moveLegacySkillTargets(rule, appliesTo) {
     }
 }
 
+function migrateLegacyReleaseTarget(rule) {
+    const target = rule?.target
+    const targetVariants = nonEmptyArray(target?.anomalyVariants)
+    if (target?.kind === "anomaly" && targetVariants.length && targetVariants.every(value => value === "release")) {
+        target.settlementType = "release"
+        delete target.anomalyVariants
+    }
+
+    const appliesTo = rule?.appliesTo
+    const appliesToVariants = nonEmptyArray(appliesTo?.anomalyVariants)
+    if (!appliesToVariants.length || !appliesToVariants.every(value => value === "release")) return
+
+    if (!rule.target || rule.target.kind === "default") {
+        rule.target = {
+            kind: "anomaly",
+            settlementType: "release",
+            ...(nonEmptyArray(appliesTo.anomalyEffects).length
+                ? { anomalyEffects: nonEmptyArray(appliesTo.anomalyEffects) }
+                : {}),
+        }
+        delete appliesTo.anomalyEffects
+    } else if (rule.target.kind === "anomaly") {
+        rule.target.settlementType = "release"
+        delete rule.target.anomalyVariants
+    }
+    delete appliesTo.anomalyVariants
+}
+
 function migrateRule(rule = {}) {
     const next = clone(rule)
+    migrateLegacyReleaseTarget(next)
     const legacySkillTargets = Array.isArray(next.appliesTo?.skillTargets) ? next.appliesTo.skillTargets : []
     if (next.type === "damageModifier"
         && (legacySkillTargets.length || !["directDamageBonus", "skillMultiplierBonus"].includes(next.kind))) {

@@ -221,13 +221,24 @@ function compareTopResult(left, right) {
     return compareStable(left, right)
 }
 
-function preferredDriveDiscDefaultSetId(agent = {}) {
-    return String(
-        agent?.preferredDriveDiscs?.defaultSetId
-            ?? agent?.preferredDriveDiscs?.defaultSet
-            ?? agent?.defaultDriveDiscSetId
-            ?? "",
-    ).trim()
+function preferredDriveDiscDefaultSetIds(agent = {}) {
+    const preferred = agent?.preferredDriveDiscs ?? {}
+    const legacy = preferred.defaultSetId ?? preferred.defaultSet ?? agent?.defaultDriveDiscSetId ?? ""
+    const raw = preferred.defaultSetIds ?? (legacy ? [legacy] : [])
+    return [...new Set((Array.isArray(raw) ? raw : [raw])
+        .map(value => String(value ?? "").trim())
+        .filter(Boolean))]
+}
+
+function requestedFourPieceSetIds(input = {}, agent = null) {
+    const settings = input.settings ?? input.optimization ?? {}
+    const legacy = settings.fourPieceSetId ?? input.fourPieceSetId ?? ""
+    const raw = input._optimizerFourPieceBranch
+        ? [legacy]
+        : settings.fourPieceSetIds ?? input.fourPieceSetIds ?? (legacy ? [legacy] : preferredDriveDiscDefaultSetIds(agent))
+    return [...new Set((Array.isArray(raw) ? raw : [raw])
+        .map(value => String(value ?? "").trim())
+        .filter(Boolean))]
 }
 
 function normalizeFourPieceBuffMode(value) {
@@ -251,9 +262,9 @@ function normalizeFourPieceBuffRuntimeInputs(value = {}) {
 
 function normalizeSettings(input = {}, agent = null) {
     const settings = input.settings ?? input.optimization ?? {}
-    const requestedFourPieceSetId = String(settings.fourPieceSetId ?? input.fourPieceSetId ?? "").trim()
-    const fourPieceSetId = requestedFourPieceSetId || preferredDriveDiscDefaultSetId(agent)
-    if (!fourPieceSetId) {
+    const fourPieceSetIds = requestedFourPieceSetIds(input, agent)
+    const fourPieceSetId = fourPieceSetIds[0] ?? ""
+    if (!fourPieceSetIds.length) {
         throw new Error("必须选择限定 4 件套。")
     }
 
@@ -271,6 +282,7 @@ function normalizeSettings(input = {}, agent = null) {
         objective: settings.objective ?? input.objective ?? "damage",
         algorithm: normalizeAlgorithm(settings.algorithm ?? input.algorithm ?? "exact-super-bound"),
         fourPieceSetId,
+        fourPieceSetIds,
         twoPieceSetId,
         twoPieceSetIds,
         fourPieceBuffMode: normalizeFourPieceBuffMode(settings.fourPieceBuffMode ?? input.fourPieceBuffMode),
@@ -2420,6 +2432,10 @@ function superBoundScoreDense(state, superPlan, nextOrderIndex, branchIndexedSup
     if (superPlan.needsOptimisticFreeTwoPiece && !superPlan.freeTwoPieceOptimisticEntries) {
         return Number.POSITIVE_INFINITY
     }
+    if (state.optimizerStatMetadata?.requiresReleaseIntervalBound
+        && superPlan.specializedScoreKernel?.releaseIntervalBound !== true) {
+        return Number.POSITIVE_INFINITY
+    }
 
     const boundCallCount = Number(state.metrics.superBoundChecks ?? 0) + 1
     const sample = hotMetricSample(state.metrics, "boundCheckMs", boundCallCount)
@@ -3737,7 +3753,7 @@ function optimizeDriveDiscsSuperBoundExact(catalog, store, input = {}) {
     return finalizeOptimizerResult(state)
 }
 
-export function optimizeDriveDiscs(catalog, store, input = {}) {
+function optimizeDriveDiscsSingle(catalog, store, input = {}) {
     const algorithm = normalizeAlgorithm(input.settings?.algorithm ?? input.algorithm ?? "exact-super-bound")
     if (algorithm === "exact-legacy") {
         return optimizeDriveDiscsLegacyExact(catalog, store, {
@@ -3755,6 +3771,117 @@ export function optimizeDriveDiscs(catalog, store, input = {}) {
             algorithm,
         },
     })
+}
+
+function optimizerAgentForInput(catalog, input = {}) {
+    return catalog.agentsMap?.get(input.agentId)
+        ?? catalog.agents?.find(item => item.id === input.agentId)
+        ?? null
+}
+
+function fourPieceBranchInput(input = {}, fourPieceSetId, fourPieceSetIds, globalCutoffScore = null) {
+    return {
+        ...input,
+        _optimizerFourPieceBranch: true,
+        ...(Number.isFinite(globalCutoffScore) ? { _globalCutoffScore: globalCutoffScore } : {}),
+        settings: {
+            ...(input.settings ?? {}),
+            fourPieceSetId,
+            fourPieceSetIds,
+        },
+    }
+}
+
+const MULTI_SET_SUM_METRIC_KEYS = [
+    "estimatedCombinationCount",
+    "evaluated",
+    "scoredCombinationCount",
+    "processedCombinationCount",
+    "rejectedByMinimums",
+    "prunedBySetFeasibility",
+    "prunedByUpperBound",
+    "prunedBySuperBound",
+    "prunedByChunkBound",
+    "prunedBySuffixTopKBound",
+    "prunedByGlobalCutoff",
+    "upperBoundChecks",
+    "superBoundChecks",
+]
+
+function combineFourPieceSetResults(branches = [], fourPieceSetIds = [], startedAtMs = Date.now(), status = "complete") {
+    const results = []
+    const metrics = {
+        ...(branches[0]?.result?.metrics ?? {}),
+        fourPieceSetCount: fourPieceSetIds.length,
+        completedFourPieceSetCount: branches.length,
+        fourPieceSets: [],
+    }
+    for (const key of MULTI_SET_SUM_METRIC_KEYS) metrics[key] = 0
+    for (const branch of branches) {
+        const branchMetrics = branch.result?.metrics ?? {}
+        for (const key of MULTI_SET_SUM_METRIC_KEYS) {
+            metrics[key] += Number(branchMetrics[key] ?? 0)
+        }
+        const taggedResults = (branch.result?.results ?? []).map(item => ({
+            ...item,
+            fourPieceSetId: branch.fourPieceSetId,
+        }))
+        for (const item of taggedResults) insertTopResult(results, item)
+        metrics.fourPieceSets.push({
+            fourPieceSetId: branch.fourPieceSetId,
+            resultCount: taggedResults.length,
+            error: branch.result?.error ?? null,
+            metrics: branchMetrics,
+        })
+    }
+    results.forEach((result, index) => { result.rank = index + 1 })
+    metrics.elapsedMs = Math.max(0, Date.now() - startedAtMs)
+    metrics.percent = status === "complete"
+        ? 100
+        : metrics.estimatedCombinationCount > 0
+            ? Math.max(0, Math.min(100, metrics.processedCombinationCount / metrics.estimatedCombinationCount * 100))
+            : 0
+    const firstSettings = branches.find(branch => branch.result?.settings)?.result.settings ?? {}
+    const noResultReason = branches.length === 1
+        ? branches[0]?.result?.error?.reason ?? "没有符合限定条件和最小面板要求的驱动盘套装。"
+        : "所有限定 4 件套分支均没有符合条件的驱动盘套装。"
+    return {
+        results,
+        settings: {
+            ...firstSettings,
+            fourPieceSetId: fourPieceSetIds[0] ?? "",
+            fourPieceSetIds,
+        },
+        metrics,
+        error: {
+            isError: results.length === 0,
+            reason: results.length === 0 ? noResultReason : null,
+        },
+    }
+}
+
+export function optimizeDriveDiscs(catalog, store, input = {}) {
+    const agent = optimizerAgentForInput(catalog, input)
+    const fourPieceSetIds = requestedFourPieceSetIds(input, agent)
+    if (!fourPieceSetIds.length) {
+        throw new Error("必须选择限定 4 件套。")
+    }
+    const startedAtMs = Date.now()
+    const branches = []
+    const merged = []
+    for (const fourPieceSetId of fourPieceSetIds) {
+        const globalCutoffScore = merged.length >= RESULT_LIMIT ? Number(merged.at(-1)?.score) : null
+        const result = optimizeDriveDiscsSingle(
+            catalog,
+            store,
+            fourPieceBranchInput(input, fourPieceSetId, fourPieceSetIds, globalCutoffScore),
+        )
+        for (const item of result.results ?? []) {
+            insertTopResult(merged, { ...item, fourPieceSetId })
+        }
+        branches.push({ fourPieceSetId, result })
+    }
+    return combineFourPieceSetResults(branches, fourPieceSetIds, startedAtMs)
 }
 
 export function createDriveDiscOptimizerWorkerSession(catalog, store, input = {}) {
@@ -4314,7 +4441,7 @@ function normalizedOptimizationInput(input = {}) {
     }
 }
 
-function createDriveDiscOptimizationJobWithRuntime(runtime, catalog, store, input = {}, options = {}) {
+function createDriveDiscOptimizationJobWithRuntimeSingle(runtime, catalog, store, input = {}, options = {}) {
     const runtimeOptions = {
         ...options,
         yieldControl: options.yieldControl ?? runtime.yieldControl,
@@ -4366,6 +4493,155 @@ function createDriveDiscOptimizationJobWithRuntime(runtime, catalog, store, inpu
     }
 }
 
+function decorateSingleFourPieceSetResult(result, fourPieceSetId) {
+    if (!result) return result
+    result.results = (result.results ?? []).map((item, index) => ({
+        ...item,
+        rank: index + 1,
+        fourPieceSetId,
+    }))
+    result.settings = {
+        ...(result.settings ?? {}),
+        fourPieceSetId,
+        fourPieceSetIds: [fourPieceSetId],
+    }
+    const metrics = result.metrics ?? {}
+    metrics.fourPieceSetCount = 1
+    metrics.completedFourPieceSetCount = result.results.length || result.error?.isError ? 1 : 0
+    metrics.fourPieceSets = [{
+        fourPieceSetId,
+        resultCount: result.results.length,
+        error: result.error ?? null,
+        metrics: {
+            estimatedCombinationCount: Number(metrics.estimatedCombinationCount ?? 0),
+            processedCombinationCount: Number(metrics.processedCombinationCount ?? 0),
+            evaluated: Number(metrics.evaluated ?? 0),
+            elapsedMs: Number(metrics.elapsedMs ?? 0),
+        },
+    }]
+    result.metrics = metrics
+    return result
+}
+
+function createDriveDiscOptimizationJobWithRuntime(runtime, catalog, store, input = {}, options = {}) {
+    const agent = optimizerAgentForInput(catalog, input)
+    const fourPieceSetIds = requestedFourPieceSetIds(input, agent)
+    if (!fourPieceSetIds.length) {
+        throw new Error("必须选择限定 4 件套。")
+    }
+    if (fourPieceSetIds.length === 1) {
+        const fourPieceSetId = fourPieceSetIds[0]
+        const childJob = createDriveDiscOptimizationJobWithRuntimeSingle(
+            runtime,
+            catalog,
+            store,
+            fourPieceBranchInput(input, fourPieceSetId, fourPieceSetIds),
+            options,
+        )
+        return {
+            preview() {
+                return decorateSingleFourPieceSetResult(childJob.preview(), fourPieceSetId)
+            },
+            async run(runOptions = {}) {
+                return decorateSingleFourPieceSetResult(await childJob.run(runOptions), fourPieceSetId)
+            },
+        }
+    }
+    const startedAtMs = Date.now()
+    const previewBranches = fourPieceSetIds.map(fourPieceSetId => {
+        const branchInput = fourPieceBranchInput(input, fourPieceSetId, fourPieceSetIds)
+        const preview = createDriveDiscOptimizationJobWithRuntimeSingle(runtime, catalog, store, branchInput, {
+            ...options,
+            onProgress: undefined,
+        }).preview()
+        return { fourPieceSetId, result: preview }
+    })
+    const totalEstimatedCombinationCount = previewBranches.reduce(
+        (total, branch) => total + Number(branch.result?.metrics?.estimatedCombinationCount ?? 0),
+        0,
+    )
+    let runStarted = false
+
+    return {
+        preview() {
+            const combined = combineFourPieceSetResults(previewBranches, fourPieceSetIds, startedAtMs, "preparing")
+            combined.metrics.estimatedCombinationCount = totalEstimatedCombinationCount
+            combined.metrics.percent = 0
+            combined.results = []
+            combined.error = { isError: false, reason: null }
+            return combined
+        },
+        async run(runOptions = {}) {
+            if (runStarted) {
+                throw new Error("Optimization job can only be run once.")
+            }
+            runStarted = true
+            const combinedOptions = { ...options, ...runOptions }
+            const completedBranches = []
+            const merged = []
+            for (const fourPieceSetId of fourPieceSetIds) {
+                if (combinedOptions.shouldCancel?.()) {
+                    throw new OptimizerCancelledError()
+                }
+                const globalCutoffScore = merged.length >= RESULT_LIMIT ? Number(merged.at(-1)?.score) : null
+                const branchInput = fourPieceBranchInput(input, fourPieceSetId, fourPieceSetIds, globalCutoffScore)
+                const childJob = createDriveDiscOptimizationJobWithRuntimeSingle(runtime, catalog, store, branchInput, {
+                    ...combinedOptions,
+                    onProgress: progress => {
+                        const progressBranch = {
+                            fourPieceSetId,
+                            result: {
+                                results: [],
+                                settings: progress.settings,
+                                metrics: progress.metrics,
+                                error: { isError: false, reason: null },
+                            },
+                        }
+                        const snapshot = combineFourPieceSetResults(
+                            [...completedBranches, progressBranch],
+                            fourPieceSetIds,
+                            startedAtMs,
+                            "running",
+                        )
+                        snapshot.metrics.estimatedCombinationCount = totalEstimatedCombinationCount
+                        snapshot.metrics.percent = totalEstimatedCombinationCount > 0
+                            ? Math.max(0, Math.min(100,
+                                Number(snapshot.metrics.processedCombinationCount ?? 0) / totalEstimatedCombinationCount * 100,
+                            ))
+                            : 0
+                        combinedOptions.onProgress?.({
+                            status: progress.status === "preparing" ? "preparing" : "running",
+                            settings: snapshot.settings,
+                            metrics: snapshot.metrics,
+                            evaluated: snapshot.metrics.processedCombinationCount,
+                            estimatedCombinationCount: totalEstimatedCombinationCount,
+                            percent: snapshot.metrics.percent,
+                            elapsedMs: snapshot.metrics.elapsedMs,
+                            fourPieceSetId,
+                        })
+                    },
+                })
+                const result = await childJob.run()
+                for (const item of result.results ?? []) {
+                    insertTopResult(merged, { ...item, fourPieceSetId })
+                }
+                completedBranches.push({ fourPieceSetId, result })
+            }
+            const combined = combineFourPieceSetResults(completedBranches, fourPieceSetIds, startedAtMs)
+            combinedOptions.onProgress?.({
+                status: "complete",
+                settings: combined.settings,
+                metrics: combined.metrics,
+                evaluated: combined.metrics.processedCombinationCount,
+                estimatedCombinationCount: combined.metrics.estimatedCombinationCount,
+                percent: 100,
+                elapsedMs: combined.metrics.elapsedMs,
+            })
+            return combined
+        },
+    }
+}
+
 async function optimizeDriveDiscsAsyncWithRuntime(runtime, catalog, store, input = {}, options = {}) {
     return createDriveDiscOptimizationJobWithRuntime(runtime, catalog, store, input, options).run()
 }
@@ -4386,11 +4662,7 @@ export function createDriveDiscOptimizerRuntime(runtime = {}) {
 }
 
 export function previewDriveDiscOptimization(catalog, store, input = {}, options = {}) {
-    const prepareStartedAt = nowMs()
-    const state = createOptimizerState(catalog, store, input, { onPrepareProgress: options.onProgress })
-    const metrics = state.result?.metrics ?? state.metrics
-    metrics.preparationMs = elapsedMsSince(prepareStartedAt)
-    return previewFromOptimizerState(state)
+    return createDriveDiscOptimizationJobWithRuntime(DEFAULT_OPTIMIZER_RUNTIME, catalog, store, input, options).preview()
 }
 
 export async function optimizeDriveDiscsAsync(catalog, store, input = {}, options = {}) {

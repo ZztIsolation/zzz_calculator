@@ -550,7 +550,9 @@
         }
       },
       "preferredDriveDiscs": {
-        "defaultSetId": "scanner-set-fcf8ae93d798",
+        "defaultSetIds": [
+          "scanner-set-fcf8ae93d798"
+        ],
         "mainStatLimits": {
           "4": [
             "atkPct",
@@ -1408,7 +1410,9 @@
         }
       },
       "preferredDriveDiscs": {
-        "defaultSetId": "scanner-set-48ee0a14625f",
+        "defaultSetIds": [
+          "scanner-set-48ee0a14625f"
+        ],
         "mainStatLimits": {
           "4": [
             "atkPct",
@@ -2188,7 +2192,9 @@
         }
       },
       "preferredDriveDiscs": {
-        "defaultSetId": "yunkui_tales",
+        "defaultSetIds": [
+          "yunkui_tales"
+        ],
         "mainStatLimits": {
           "4": [
             "hpPct",
@@ -2843,7 +2849,9 @@
         }
       },
       "preferredDriveDiscs": {
-        "defaultSetId": "fanged_metal",
+        "defaultSetIds": [
+          "fanged_metal"
+        ],
         "mainStatLimits": {
           "4": [
             "anomalyProficiency",
@@ -2887,6 +2895,571 @@
         "level60Stats": "source-checked-mihoyo-baike-2026-07-17",
         "panelDefaults": "source-checked-mihoyo-baike-2026-07-17",
         "combatMechanics": "source-checked-mihoyo-baike-2026-07-17; default rotation assumes one full 10-second physical anomaly window, 10 core-passive ticks, and cinema-triggered extra actions"
+      },
+      "hidden": false
+    },
+    {
+      "id": "aria",
+      "name": {
+        "zhCN": "爱芮"
+      },
+      "rarity": "S",
+      "attribute": "ether",
+      "specialty": "anomaly",
+      "attackTypes": [
+        "slash"
+      ],
+      "faction": "妄想天使",
+      "images": {
+        "portrait": "/assets/agents/aria.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/1793/detail?mhy_presentation_style=fullscreen"
+      },
+      "level60": {
+        "hpBase": 7749,
+        "atkBase": 788,
+        "defBase": 619,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 87,
+        "anomalyProficiency": 116,
+        "anomalyMastery": 115,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动：控场核心"
+          },
+          "description": {
+            "zhCN": "异常精通随核心技等级提升45/52/60/67/75/82/90点。第三段「普通攻击：绝对音准」重击命中处于属性异常状态的目标时触发一次异放；异放继承该异常的单次伤害，并按局外初始异常掌控与属性系数重写倍率，目标失衡时异放比例额外乘1.5。"
+          },
+          "effects": [
+            {
+              "id": "core-anomaly-proficiency",
+              "type": "fixed",
+              "stat": "anomalyProficiency",
+              "value": 45,
+              "mode": "flat",
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "anomalyProficiencyFlat"
+              },
+              "target": {
+                "kind": "default"
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "additionalAbility": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "额外能力：合作舞台"
+          },
+          "description": {
+            "zhCN": "队伍中存在击破、支援或同阵营角色时：以太帷幕开启会生成4个应援能量，1秒内最多触发1次；队伍施加的侵蚀持续时间提升3秒。资源生成仅保留说明，侵蚀持续时间按完整侵蚀和侵蚀紊乱精确结算，异放不受持续时间放大。"
+          },
+          "effects": [
+            {
+              "id": "corruption-duration-attribute",
+              "type": "fixed",
+              "stat": "anomalyDurationBonusSeconds",
+              "value": 3,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute",
+                "anomalyEffects": [
+                  "corruption"
+                ],
+                "anomalyVariants": [
+                  "normal"
+                ]
+              }
+            },
+            {
+              "id": "effect_92256acea3",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "disorder",
+                "anomalyEffects": [
+                  "corruption"
+                ]
+              },
+              "stat": "anomalyDurationBonusSeconds",
+              "mode": "flat",
+              "value": 3
+            }
+          ],
+          "buffModifiers": []
+        },
+        "cinemaBuffs": [
+          {
+            "cinemaLevel": 1,
+            "cinemaName": {
+              "zhCN": "元气声浪"
+            },
+            "description": {
+              "zhCN": "普通攻击、特殊技和强化特殊技无视10%以太异常积蓄抗性；自身异放可暴击，基础暴击率25%、暴击伤害25%，局外初始异常掌控超过100后每点增加0.5%异放暴击率，最高100%。积蓄抗性不换算为伤害。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "release-crit-rate",
+                "type": "fixed",
+                "stat": "anomalyCritRate",
+                "value": 25,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "release"
+                }
+              },
+              {
+                "id": "release-crit-dmg",
+                "type": "fixed",
+                "stat": "anomalyCritDmg",
+                "value": 25,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "release"
+                }
+              },
+              {
+                "id": "release-crit-rate-from-initial-mastery",
+                "type": "fixed",
+                "stat": "anomalyCritRatePerInitialMasteryAbove100",
+                "value": 0.5,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "release"
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 2,
+            "cinemaName": {
+              "zhCN": "梦幻节拍"
+            },
+            "description": {
+              "zhCN": "攻击和异放无视目标16%防御力；妄想时刻期间额外无视8%防御力。额外8%作为独立覆盖率输入。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "attack-def-ignore-16",
+                "type": "fixed",
+                "stat": "enemyDefIgnore",
+                "value": 16,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "release"
+                }
+              },
+              {
+                "id": "release-delusion-def-ignore-8",
+                "type": "fixed",
+                "stat": "enemyDefIgnore",
+                "value": 8,
+                "mode": "flat",
+                "condition": "妄想时刻期间",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "release"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 6,
+            "cinemaName": {
+              "zhCN": "永不落幕"
+            },
+            "description": {
+              "zhCN": "进入战斗获得1200点喧响值并永久处于妄想时刻；强化蓄力普通攻击和终结技造成的以太伤害提升40%。获得全场应援及应援能量转换机制。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "enhanced-charge-and-ultimate-ether-dmg",
+                "type": "fixed",
+                "stat": "etherDmg",
+                "value": 40,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          }
+        ]
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "控场核心"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "核心被动：控场核心"
+          },
+          "levels": [
+            {
+              "level": 1,
+              "anomalyProficiencyFlat": 45,
+              "releaseCoefficientPctByElement": {
+                "ether": 13.8,
+                "electric": 7.2,
+                "fire": 17.9,
+                "physical": 1.25,
+                "ice": 1.8,
+                "wind": 0.7
+              }
+            },
+            {
+              "level": 2,
+              "anomalyProficiencyFlat": 52,
+              "releaseCoefficientPctByElement": {
+                "ether": 16,
+                "electric": 8.3,
+                "fire": 20.8,
+                "physical": 1.46,
+                "ice": 2.1,
+                "wind": 0.8
+              }
+            },
+            {
+              "level": 3,
+              "anomalyProficiencyFlat": 60,
+              "releaseCoefficientPctByElement": {
+                "ether": 18.3,
+                "electric": 9.5,
+                "fire": 23.8,
+                "physical": 1.67,
+                "ice": 2.4,
+                "wind": 0.9
+              }
+            },
+            {
+              "level": 4,
+              "anomalyProficiencyFlat": 67,
+              "releaseCoefficientPctByElement": {
+                "ether": 20.6,
+                "electric": 10.7,
+                "fire": 26.8,
+                "physical": 1.88,
+                "ice": 2.7,
+                "wind": 1.1
+              }
+            },
+            {
+              "level": 5,
+              "anomalyProficiencyFlat": 75,
+              "releaseCoefficientPctByElement": {
+                "ether": 22.9,
+                "electric": 11.9,
+                "fire": 29.8,
+                "physical": 2.08,
+                "ice": 3,
+                "wind": 1.2
+              }
+            },
+            {
+              "level": 6,
+              "anomalyProficiencyFlat": 82,
+              "releaseCoefficientPctByElement": {
+                "ether": 25.2,
+                "electric": 13.1,
+                "fire": 32.7,
+                "physical": 2.29,
+                "ice": 3.3,
+                "wind": 1.3
+              }
+            },
+            {
+              "level": 7,
+              "anomalyProficiencyFlat": 90,
+              "releaseCoefficientPctByElement": {
+                "ether": 27.5,
+                "electric": 14.3,
+                "fire": 35.7,
+                "physical": 2.5,
+                "ice": 3.6,
+                "wind": 1.4
+              }
+            }
+          ],
+          "defaultLevelAtCoreSkill": "F"
+        },
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/1793/detail?mhy_presentation_style=fullscreen"
+        ],
+        "verification": {
+          "stats": "source-checked-mihoyo-baike-2026-07-22",
+          "releaseTable": "official seven-level table preserved for ether, electric, fire, physical, ice, and wind",
+          "releaseSemantics": "one original anomaly proc; release stun ratio and normal stun vulnerability are separate multipliers"
+        }
+      },
+      "anomalyReleaseProfiles": [
+        {
+          "id": "core_passive",
+          "name": {
+            "zhCN": "核心被动：控场核心"
+          },
+          "default": true,
+          "supportedElements": [
+            "ether",
+            "electric",
+            "fire",
+            "physical",
+            "ice",
+            "wind"
+          ],
+          "resultMode": "originalAnomalyRatio",
+          "expression": {
+            "op": "multiply",
+            "label": {
+              "zhCN": "异放倍率"
+            },
+            "args": [
+              {
+                "op": "divide",
+                "label": {
+                  "zhCN": "局外异常掌控换算"
+                },
+                "args": [
+                  {
+                    "kind": "triggerStat",
+                    "panel": "outOfCombat",
+                    "stat": "anomalyMastery",
+                    "unit": "raw",
+                    "whiteBoxRole": "conversionSource",
+                    "label": {
+                      "zhCN": "局外异常掌控"
+                    }
+                  },
+                  {
+                    "kind": "constant",
+                    "value": 10,
+                    "unit": "raw",
+                    "label": {
+                      "zhCN": "异常掌控除数"
+                    }
+                  }
+                ]
+              },
+              {
+                "kind": "coreSkillScaling",
+                "field": "releaseCoefficientPctByElement",
+                "key": "eventElement",
+                "unit": "percent",
+                "label": {
+                  "zhCN": "核心属性系数"
+                }
+              },
+              {
+                "kind": "condition",
+                "condition": "stunned",
+                "whenTrue": 1.5,
+                "whenFalse": 1,
+                "unit": "decimal",
+                "label": {
+                  "zhCN": "异放失衡倍率修正"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "phaethons_melody"
+        ],
+        "mainStatLimits": {
+          "4": [
+            "anomalyProficiency"
+          ],
+          "5": [
+            "etherDmg",
+            "atkPct",
+            "penRatio"
+          ],
+          "6": [
+            "anomalyMastery"
+          ]
+        }
+      },
+      "defaultCalculationConfig": {
+        "mode": "anomaly",
+        "cinemaLevel": 0,
+        "name": {
+          "zhCN": "失衡期侵蚀异放"
+        },
+        "events": [
+          {
+            "id": "aria_stunned_corruption_release",
+            "kind": "anomaly",
+            "count": 1,
+            "stunned": true,
+            "settlementType": "release",
+            "anomalyEffect": "corruption",
+            "triggerActorRef": {
+              "agentId": "aria",
+              "profileId": "core_passive"
+            },
+            "anomalySource": {
+              "actorRef": {
+                "agentId": "aria"
+              }
+            }
+          }
+        ],
+        "selectedEventId": "aria_stunned_corruption_release"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1793/detail?mhy_presentation_style=fullscreen",
+        "https://www.miyoushe.com/zzz/article/74046051"
+      ],
+      "verification": {
+        "level60Stats": "source-checked-mihoyo-baike-2026-07-22",
+        "combatMechanics": "official wording plus mechanism guide cross-check; official 25% cinema-1 release crit value takes precedence",
+        "unsupportedMechanics": "anomaly buildup resistance, energy, decibel, cheer energy, and resource conversion remain descriptive"
       },
       "hidden": false
     }

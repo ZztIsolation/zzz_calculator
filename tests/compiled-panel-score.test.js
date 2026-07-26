@@ -257,6 +257,41 @@ compareDense("attribute-anomaly", {
     },
 })
 
+compareDense("attribute-anomaly-settlement-wildcard", {
+    agentId: "hoshimi_miyabi",
+    coreSkillLevel: "F",
+    wEngineId: "hailfall_star_palace",
+    wEngineModificationLevel: 1,
+    combatBuffs: { activeBuffIds: ["jane_doe.cinema_4_anomaly_damage"] },
+    damage: {
+        events: [
+            {
+                id: "shatter",
+                kind: "anomaly",
+                settlementType: "attribute",
+                anomalyEffect: "shatter",
+                count: 2,
+            },
+        ],
+        target: {
+            stunned: true,
+            stunMultiplierPercent: 150,
+        },
+    },
+}, 24)
+
+const aria = catalog.agentsMap.get("aria")
+compareDense("release-settlement-wildcard", {
+    agentId: "aria",
+    coreSkillLevel: "F",
+    wEngineId: "zzz_wiki_1883",
+    wEngineModificationLevel: 1,
+    combatBuffs: {
+        activeBuffIds: ["agent:aria.corePassive", "agent:aria.cinema.1"],
+    },
+    damage: aria.defaultCalculationConfig,
+}, 24)
+
 const alice = catalog.agentsMap.get("alice_thymefield")
 const aliceInput = {
     agentId: "alice_thymefield",

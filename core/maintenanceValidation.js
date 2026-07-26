@@ -9,6 +9,7 @@ import {
     unknownLegacySkillTargetPrefixes,
 } from "./skillTargets.js"
 import { ELEMENT_CRIT_DMG_STATS, ELEMENT_DEF_IGNORE_STATS } from "./effectRuleTargets.js"
+import { validateAnomalyReleaseProfile } from "./anomalyRelease.js"
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9_.-]*$/
 const PLACEHOLDER_NAMES = new Set(["未命名"])
@@ -127,6 +128,7 @@ const IMPLICIT_EFFECT_SCOPE_BY_SOURCE_TYPE = new Map([
     ["driveDisc4pcTeam", "inCombat"],
 ])
 const EFFECT_TYPE_VALUES = new Set(["fixed", "derived", "formula", "stacked", "damageModifier"])
+const EFFECT_VALUE_SOURCE_KIND_VALUES = new Set(["corePassiveScaling"])
 const BUFF_MODIFIER_OPERATION_VALUES = new Set(["multiplyResolvedValue"])
 const FORMULA_VALUE_UNIT_VALUES = new Set(["storedValue", "storedPercent"])
 const SKILL_ROW_KIND_VALUES = new Set(["damageMultiplier", "dazeMultiplier", "energyCost", "statBonus"])
@@ -135,16 +137,16 @@ const SKILL_LEVEL_SCALE_VALUES = new Set(["skill", "coreSkill"])
 const CORE_SKILL_LEVEL_VALUES = new Set(["0", "A", "B", "C", "D", "E", "F"])
 const DAMAGE_EVENT_KIND_VALUES = new Set(["direct", "anomaly", "disorder", "sheer"])
 const CALCULATION_EVENT_KIND_VALUES = new Set([...DAMAGE_EVENT_KIND_VALUES, "skillGroup"])
-const ANOMALY_SETTLEMENT_TYPE_VALUES = new Set(["attribute", "disorder"])
+const ANOMALY_SETTLEMENT_TYPE_VALUES = new Set(["attribute", "disorder", "release"])
 const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
 const ANOMALY_VARIANT_VALUES = new Set(["normal", "polarizedAssault"])
 const CALCULATION_MODE_VALUES = new Set(["single", "sheer", "anomaly", "custom"])
 const SHEER_DAMAGE_MODIFIER_KIND_VALUES = ["sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg"]
-const DAMAGE_MODIFIER_KIND_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "skillMultiplierBonus", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
+const DAMAGE_MODIFIER_KIND_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "skillMultiplierBonus", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
 const SKILL_TARGET_DAMAGE_MODIFIER_KIND_VALUES = new Set(["directDamageBonus", "skillMultiplierBonus"])
 const DAMAGE_MODIFIER_VALUE_UNIT_VALUES = new Set(["decimal"])
 const RULE_TARGET_KIND_VALUES = new Set(["default", "skill", "anomaly"])
-const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyDurationBonusSeconds", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
+const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
 const SKILL_TARGET_STAT_VALUES = new Set([
     "allResIgnore",
     "physicalResIgnore",
@@ -210,6 +212,7 @@ const ANOMALY_TARGET_STAT_VALUES = new Set([
     "disorderBaseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
+    "anomalyCritRatePerInitialMasteryAbove100",
     "anomalyDurationBonusSeconds",
     "stunDmgMultiplierBonus",
     "stunDmgMultiplierBonusAlways",
@@ -464,8 +467,38 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     if (rule.requirement?.specialty) {
         requireEnum(errors, rule.requirement.specialty, SPECIALTY_VALUES, `${path}.requirement.specialty`)
     }
+    if (rule.requirement?.attribute) {
+        requireEnum(errors, rule.requirement.attribute, ATTRIBUTE_VALUES, `${path}.requirement.attribute`)
+    }
     if (rule.modificationScaling) {
         add(errors, `${path}.modificationScaling`, "旧的改装等级缩放格式已废弃，请使用 modificationValues。")
+    }
+    if (rule.valueSource !== undefined) {
+        const source = rule.valueSource ?? {}
+        if (type !== "fixed") {
+            add(errors, `${path}.valueSource`, "动态数值来源只支持固定值规则。")
+        }
+        if (!context.allowCorePassiveScalingSource) {
+            add(errors, `${path}.valueSource`, "核心被动倍率来源只能用于角色核心被动。")
+        }
+        requireEnum(errors, source.kind, EFFECT_VALUE_SOURCE_KIND_VALUES, `${path}.valueSource.kind`)
+        const field = String(source.field ?? "").trim()
+        if (!/^[A-Za-z][A-Za-z0-9]*$/.test(field)) {
+            add(errors, `${path}.valueSource.field`, "倍率字段必须是有效的字段名。")
+        } else if (source.kind === "corePassiveScaling" && context.allowCorePassiveScalingSource) {
+            const scalingLevels = context.agent?.coreSkill?.corePassiveScaling?.levels
+            const coreSkillLevels = context.agent?.coreSkill?.levels ?? []
+            if (!Array.isArray(scalingLevels) || scalingLevels.length !== coreSkillLevels.length + 1) {
+                add(errors, `${path}.valueSource.field`, "核心被动倍率必须包含基础1级和每个核心技等级对应的完整档位。")
+            } else {
+                scalingLevels.forEach((level, index) => requireFinite(errors, level?.[field], `${path}.valueSource.field[${index}]`))
+                const firstValue = Number(scalingLevels[0]?.[field])
+                const fallbackValue = Number(rule.value)
+                if (Number.isFinite(firstValue) && Number.isFinite(fallbackValue) && Math.abs(firstValue - fallbackValue) > 1e-9) {
+                    add(errors, `${path}.value`, "兼容值必须与核心被动倍率第一档一致。")
+                }
+            }
+        }
     }
 
     if (type === "damageModifier") {
@@ -512,15 +545,26 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     } else if (targetKind === "anomaly") {
         const settlementType = target.settlementType
         requireEnum(errors, settlementType, ANOMALY_SETTLEMENT_TYPE_VALUES, `${path}.target.settlementType`)
-        if (!Array.isArray(target.anomalyEffects) || !target.anomalyEffects.length) {
-            add(errors, `${path}.target.anomalyEffects`, "异常增幅必须至少选择一个异常效果。")
-        } else {
+        if (target.anomalyEffects !== undefined && !Array.isArray(target.anomalyEffects)) {
+            add(errors, `${path}.target.anomalyEffects`, "具体异常必须是数组。")
+        } else if (Array.isArray(target.anomalyEffects)) {
             const validEffects = calculationAnomalyIds(context, settlementType === "disorder" ? "disorder" : "anomaly")
             target.anomalyEffects.forEach((effectId, index) => {
                 if (!validEffects.has(effectId)) {
                     add(errors, `${path}.target.anomalyEffects[${index}]`, "异常效果不存在或不属于所选结算类型。")
                 }
             })
+        }
+        if (target.anomalyVariants !== undefined && settlementType !== "attribute") {
+            add(errors, `${path}.target.anomalyVariants`, "只有属性异常结算可以配置异常形态。")
+        } else if (target.anomalyVariants !== undefined) {
+            if (!Array.isArray(target.anomalyVariants) || !target.anomalyVariants.length) {
+                add(errors, `${path}.target.anomalyVariants`, "异常形态至少需要选择一个。")
+            } else {
+                target.anomalyVariants.forEach((variant, index) =>
+                    requireEnum(errors, variant, ANOMALY_VARIANT_VALUES, `${path}.target.anomalyVariants[${index}]`)
+                )
+            }
         }
         if (!ANOMALY_TARGET_STAT_VALUES.has(rule.stat)) {
             add(errors, `${path}.stat`, "异常增幅对象不支持该增幅类型。")
@@ -531,9 +575,12 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     } else if (!STAT_VALUES.has(rule.stat) && !DEFAULT_EVENT_MODIFIER_STAT_VALUES.has(rule.stat)) {
         add(errors, `${path}.stat`, "不是支持的选项。")
     }
-    if (rule.stat === "anomalyDurationBonusSeconds"
-        && (targetKind !== "anomaly" || target.settlementType !== "disorder")) {
-        add(errors, `${path}.stat`, "异常持续时间延长必须指定一个紊乱原异常。")
+    if (rule.stat === "anomalyDurationBonusSeconds" && targetKind !== "anomaly") {
+        add(errors, `${path}.stat`, "异常持续时间延长必须指定异常效果。")
+    }
+    if (rule.stat === "anomalyCritRatePerInitialMasteryAbove100"
+        && (targetKind !== "anomaly" || target.settlementType !== "release")) {
+        add(errors, `${path}.stat`, "初始异常掌控转异常暴击率只能用于异放结算。")
     }
     if (DEFAULT_EVENT_MODIFIER_STAT_VALUES.has(rule.stat) && effectiveScope !== "inCombat") {
         add(errors, `${path}.stat`, "事件增幅只能用于局内 Buff。")
@@ -903,6 +950,19 @@ function validatePreferredDriveDiscs(errors, preferredDriveDiscs, context = {}) 
             add(errors, "preferredDriveDiscs.defaultSetId", "驱动盘套装不存在。")
         }
     }
+    if (preferredDriveDiscs.defaultSetIds !== undefined) {
+        if (!Array.isArray(preferredDriveDiscs.defaultSetIds)) {
+            add(errors, "preferredDriveDiscs.defaultSetIds", "推荐驱动盘套装必须是数组。")
+        } else {
+            const driveDiscSets = Array.isArray(context.driveDiscSets) ? context.driveDiscSets : []
+            preferredDriveDiscs.defaultSetIds.forEach((setId, index) => {
+                validateOptionalId(errors, { id: setId }, `preferredDriveDiscs.defaultSetIds[${index}]`)
+                if (driveDiscSets.length && !driveDiscSets.some(set => set?.id === setId)) {
+                    add(errors, `preferredDriveDiscs.defaultSetIds[${index}]`, "驱动盘套装不存在。")
+                }
+            })
+        }
+    }
 
     const mainStatLimits = preferredDriveDiscs.mainStatLimits ?? preferredDriveDiscs
     if (typeof mainStatLimits !== "object" || Array.isArray(mainStatLimits)) {
@@ -1069,7 +1129,7 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
     }
     const settlementType = event.kind === "disorder"
         ? "disorder"
-        : (event.settlementType === "disorder" ? "disorder" : "attribute")
+        : (["attribute", "disorder", "release"].includes(event.settlementType) ? event.settlementType : "attribute")
     if (event.settlementType !== undefined) {
         requireEnum(errors, event.settlementType, ANOMALY_SETTLEMENT_TYPE_VALUES, `${path}.settlementType`)
     }
@@ -1082,6 +1142,44 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
             requireEnum(errors, event.anomalyVariant, ANOMALY_VARIANT_VALUES, `${path}.anomalyVariant`)
             if (event.anomalyVariant === "polarizedAssault" && event.anomalyEffect !== "assault") {
                 add(errors, `${path}.anomalyVariant`, "极性强击只能用于强击结算。")
+            }
+        }
+        return
+    }
+    if (settlementType === "release") {
+        if (!calculationAnomalyIds(context, "anomaly").has(event.anomalyEffect)) {
+            add(errors, `${path}.anomalyEffect`, "原异常不存在。")
+        }
+        if (event.procCount !== undefined) {
+            add(errors, `${path}.procCount`, "异放不保存普通异常触发次数。")
+        }
+        if (event.anomalyVariant !== undefined) {
+            add(errors, `${path}.anomalyVariant`, "异放不能保存为异常形态。")
+        }
+        const triggerAgentId = String(event.triggerActorRef?.agentId ?? "")
+        const profileId = String(event.triggerActorRef?.profileId ?? "")
+        if (!triggerAgentId || triggerAgentId !== String(agentId ?? "")) {
+            add(errors, `${path}.triggerActorRef.agentId`, "异放触发者必须是当前角色。")
+        }
+        if (!profileId) {
+            add(errors, `${path}.triggerActorRef.profileId`, "必须选择异放倍率方案。")
+        } else {
+            const triggerAgent = context.currentAgent?.id === triggerAgentId
+                ? context.currentAgent
+                : (context.agents ?? []).find(item => item?.id === triggerAgentId)
+            if (!triggerAgent?.anomalyReleaseProfiles?.some(profile => profile?.id === profileId)) {
+                add(errors, `${path}.triggerActorRef.profileId`, "异放倍率方案不存在。")
+            }
+        }
+        const sourceAgentId = String(event.anomalySource?.actorRef?.agentId ?? "")
+        if (!sourceAgentId) {
+            add(errors, `${path}.anomalySource.actorRef.agentId`, "必须选择原异常施加者。")
+        } else if (sourceAgentId !== triggerAgentId) {
+            const snapshot = event.anomalySource?.snapshot
+            if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+                add(errors, `${path}.anomalySource.snapshot`, "外部原异常施加者必须提供冻结快照。")
+            } else if (String(snapshot.agentId ?? "") !== sourceAgentId) {
+                add(errors, `${path}.anomalySource.snapshot.agentId`, "冻结快照与原异常施加者不一致。")
             }
         }
         return
@@ -1502,6 +1600,29 @@ function validateCinemaBuffs(errors, cinemaBuffs, context = {}) {
     })
 }
 
+function validateAnomalyReleaseProfiles(errors, profiles) {
+    if (profiles === undefined || profiles === null) return
+    if (!Array.isArray(profiles)) {
+        add(errors, "anomalyReleaseProfiles", "必须是数组。")
+        return
+    }
+    const ids = new Set()
+    let defaultCount = 0
+    profiles.forEach((profile, index) => {
+        const path = `anomalyReleaseProfiles[${index}]`
+        const id = String(profile?.id ?? "")
+        if (ids.has(id)) add(errors, `${path}.id`, "同一角色的异放倍率方案 ID 不能重复。")
+        ids.add(id)
+        if (profile?.default === true) defaultCount += 1
+        for (const message of validateAnomalyReleaseProfile(profile)) {
+            add(errors, path, message)
+        }
+    })
+    if (defaultCount > 1) {
+        add(errors, "anomalyReleaseProfiles", "最多只能有一个默认异放倍率方案。")
+    }
+}
+
 function validateAgent(item, context) {
     const errors = []
     requireId(errors, item)
@@ -1527,12 +1648,16 @@ function validateAgent(item, context) {
         }
     }
 
-    validateEffectSet(errors, item?.combatBuffs?.corePassive, "combatBuffs.corePassive", { sourceType: "self", context })
+    validateEffectSet(errors, item?.combatBuffs?.corePassive, "combatBuffs.corePassive", {
+        sourceType: "self",
+        context: { ...context, agent: item, allowCorePassiveScalingSource: true },
+    })
     validateEffectSet(errors, item?.combatBuffs?.additionalAbility, "combatBuffs.additionalAbility", { sourceType: "self", context })
     validateCinemaBuffs(errors, item?.combatBuffs?.cinemaBuffs, context)
+    validateAnomalyReleaseProfiles(errors, item?.anomalyReleaseProfiles)
     validatePreferredDriveDiscs(errors, item?.preferredDriveDiscs, context)
     const roleSkillGroupById = validateCalculationSkillGroups(errors, item?.skillGroups, "skillGroups", context, item?.id)
-    validateDefaultCalculationConfig(errors, item?.defaultCalculationConfig, context, item?.id, roleSkillGroupById)
+    validateDefaultCalculationConfig(errors, item?.defaultCalculationConfig, { ...context, currentAgent: item }, item?.id, roleSkillGroupById)
 
     if (item?.coreSkill) {
         if (typeof item.coreSkill !== "object" || Array.isArray(item.coreSkill)) {
@@ -1560,6 +1685,9 @@ function validateWEngine(item, context) {
         if (item?.specialty && item.effect.requirement.specialty !== item.specialty) {
             add(errors, "effect.requirement.specialty", "必须与音擎适配特性一致；跨职业佩戴只提供基础攻击力和高级属性，不触发音擎被动。")
         }
+    }
+    if (item?.effect?.requirement?.attribute) {
+        requireEnum(errors, item.effect.requirement.attribute, ATTRIBUTE_VALUES, "effect.requirement.attribute")
     }
     validateOptionalSources(errors, item, item?.images?.icon ?? item?.images?.portrait)
 

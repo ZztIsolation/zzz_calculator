@@ -49,6 +49,7 @@ async function withFetch(responses, callback) {
     }
 }
 
+let currentAgentId = "stale-agent"
 await withFetch({
     "/api/catalog": response({
         ...baseCatalog,
@@ -176,6 +177,27 @@ await withFetch({
     assert.deepEqual(meta.teammateCombatBuffGroups[0].buffs.map(item => item.id), ["visible-teammate-buff"])
     assert.deepEqual(meta.fieldCombatBuffs.map(item => item.id), ["visible-field"])
     assert.deepEqual(meta.bossCombatBuffs.map(item => item.id), ["visible-boss"])
+})
+
+await withFetch({
+    "/api/catalog": () => response({
+        ...baseCatalog,
+        agents: [{ id: currentAgentId }],
+    }),
+}, async calls => {
+    const { invalidateCatalogCache, loadCatalog, loadMeta } = await import(loaderUrl("cache-invalidation"))
+    let catalog = await loadCatalog()
+    let meta = await loadMeta()
+    assert.equal(catalog.agents[0].id, "stale-agent")
+    assert.equal(meta.agents[0].id, "stale-agent")
+
+    currentAgentId = "fresh-agent"
+    invalidateCatalogCache()
+    catalog = await loadCatalog()
+    meta = await loadMeta()
+    assert.equal(catalog.agents[0].id, "fresh-agent")
+    assert.equal(meta.agents[0].id, "fresh-agent")
+    assert.equal(calls.length, 2)
 })
 
 console.log("catalog loader tests passed")
