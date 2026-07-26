@@ -2,9 +2,10 @@
 import { NAlert, NButton, NInput, NInputNumber, NRadioButton, NRadioGroup, NSelect, NSwitch } from "naive-ui"
 import { Plus, Trash2 } from "lucide-vue-next"
 import { createSystemManagedCoverage } from "@core/maintenanceValidation.js"
+import { statLabel } from "@/utils/format"
 import SkillTargetEditor from "./SkillTargetEditor.vue"
 import {
-  ANOMALY_SETTLEMENT_OPTIONS, BASIS_OPTIONS, EFFECT_MODE_OPTIONS, EFFECT_TYPE_OPTIONS, EVENT_STAT_KEYS, FORMULA_VALUE_UNIT_OPTIONS,
+  ANOMALY_SETTLEMENT_OPTIONS, ANOMALY_VARIANT_OPTIONS, ATTRIBUTE_OPTIONS, BASIS_OPTIONS, EFFECT_MODE_OPTIONS, EFFECT_TYPE_OPTIONS, EVENT_STAT_KEYS, FORMULA_VALUE_UNIT_OPTIONS,
   SPECIALTY_OPTIONS, TARGET_KIND_OPTIONS, anomalyOptions, defaultEffectRule, defaultGeneralSkillTargets, defaultModeForStat, defaultSkillTarget, option, statOptions,
 } from "./maintenance-options"
 import { internalId, textOf } from "./maintenance-model"
@@ -17,7 +18,8 @@ const props = withDefaults(defineProps<{
   allowCoverage?: boolean
   allowModificationValues?: boolean
   preferredSkillId?: string
-}>(), { simple: false, allowCoverage: false, allowModificationValues: false, preferredSkillId: "" })
+  corePassiveScaling?: any
+}>(), { simple: false, allowCoverage: false, allowModificationValues: false, preferredSkillId: "", corePassiveScaling: null })
 const emit = defineEmits<{ change: [] }>()
 
 function rules() {
@@ -52,6 +54,7 @@ function setCoveragePercent(rule: any, value: number | null) {
 
 function changeType(rule: any, type: string) {
   rule.type = type
+  if (type !== "fixed") delete rule.valueSource
   if (type === "derived") {
     rule.sourceLabel ??= { zhCN: "来源数值" }
     rule.defaultSourceValue ??= 0
@@ -81,16 +84,18 @@ function changeTarget(rule: any, kind: string) {
     const existing = (rule.target?.skillTargets ?? []).filter((target: any) => target?.kind === "skillTag")
     rule.target = { kind: "skill", skillTargets: existing.length ? existing : [{ kind: "skillTag", skillTag: "dashAttack" }] }
   } else if (kind === "anomaly") {
-    const effects = anomalyOptions(props.catalog, false)
     rule.target = {
       kind: "anomaly",
       settlementType: "attribute",
-      anomalyEffects: [String(effects[0]?.value ?? "assault")],
     }
   } else {
     rule.target = { kind: "default" }
   }
-  const options = statOptions(props.catalog, kind === "default" ? "default" : kind === "anomaly" ? "anomaly" : "skill")
+  const options = statOptions(
+    props.catalog,
+    kind === "default" ? "default" : kind === "anomaly" ? "anomaly" : "skill",
+    rule.target?.settlementType,
+  )
   if (!options.some(item => item.value === rule.stat)) rule.stat = String(options[0]?.value ?? "atkFlat")
   syncMode(rule)
   emit("change")
@@ -105,6 +110,7 @@ function targetMode(rule: any): "default" | "anomaly" | "specific" | "skillType"
 
 function changeStat(rule: any, stat: string) {
   rule.stat = stat
+  delete rule.valueSource
   delete rule.appliesTo
   syncMode(rule)
   emit("change")
@@ -124,17 +130,60 @@ function anomalyTargetOptions(rule: any) {
 }
 
 function changeAnomalySettlement(rule: any, settlementType: string) {
-  const normalizedType = settlementType === "disorder" ? "disorder" : "attribute"
-  const options = anomalyOptions(props.catalog, normalizedType === "disorder")
-  const valid = new Set(options.map((item: any) => String(item.value)))
-  const existing = (rule.target?.anomalyEffects ?? []).map(String).filter((value: string) => valid.has(value))
+  const normalizedType = ["attribute", "disorder", "release"].includes(settlementType) ? settlementType : "attribute"
   rule.target.settlementType = normalizedType
-  rule.target.anomalyEffects = existing.length ? existing : [String(options[0]?.value ?? (normalizedType === "disorder" ? "burn" : "assault"))]
+  delete rule.target.anomalyEffects
+  if (normalizedType !== "attribute") delete rule.target.anomalyVariants
+  const allowedStats = statOptions(props.catalog, "anomaly", normalizedType)
+  if (!allowedStats.some(item => item.value === rule.stat)) {
+    rule.stat = String(allowedStats[0]?.value ?? "anomalyDamageBonus")
+    syncMode(rule)
+  }
   emit("change")
 }
 
 function changeAnomalyEffects(rule: any, values: unknown) {
-  rule.target.anomalyEffects = Array.isArray(values) ? values.map(String) : []
+  const effects = Array.isArray(values) ? values.map(String) : []
+  if (effects.length) rule.target.anomalyEffects = effects
+  else delete rule.target.anomalyEffects
+  emit("change")
+}
+
+function anomalyTargetPlaceholder(rule: any) {
+  if (rule.target?.settlementType === "release") return "全部原异常"
+  if (rule.target?.settlementType === "disorder") return "全部紊乱"
+  return "全部属性异常"
+}
+
+function corePassiveScalingFieldOptions() {
+  const levels = props.corePassiveScaling?.levels ?? []
+  if (!levels.length) return [option("", "固定值")]
+  const fields = Object.keys(levels[0] ?? {}).filter(key => key !== "level"
+    && levels.every((level: any) => Number.isFinite(Number(level?.[key]))))
+  return [
+    option("", "固定值"),
+    ...fields.map(field => {
+      return option(field, `核心被动倍率 · ${statLabel(field, props.catalog?.meta)}`)
+    }),
+  ]
+}
+
+function setValueSourceField(rule: any, field: string | null) {
+  const normalized = String(field ?? "").trim()
+  if (!normalized) {
+    delete rule.valueSource
+  } else {
+    rule.valueSource = { kind: "corePassiveScaling", field: normalized }
+    const firstValue = Number(props.corePassiveScaling?.levels?.[0]?.[normalized])
+    if (Number.isFinite(firstValue)) rule.value = firstValue
+  }
+  emit("change")
+}
+
+function changeAnomalyVariants(rule: any, values: unknown) {
+  const variants = Array.isArray(values) ? values.map(String) : []
+  if (variants.length) rule.target.anomalyVariants = variants
+  else delete rule.target.anomalyVariants
   emit("change")
 }
 
@@ -170,7 +219,19 @@ function setStackLabel(rule: any, value: string) {
 
 function setRuleSpecialty(rule: any, value: string | null) {
   if (value) rule.requirement = { ...(rule.requirement ?? {}), specialty: value }
-  else delete rule.requirement
+  else if (rule.requirement) {
+    delete rule.requirement.specialty
+    if (!Object.keys(rule.requirement).length) delete rule.requirement
+  }
+  emit("change")
+}
+
+function setRuleAttribute(rule: any, value: string | null) {
+  if (value) rule.requirement = { ...(rule.requirement ?? {}), attribute: value }
+  else if (rule.requirement) {
+    delete rule.requirement.attribute
+    if (!Object.keys(rule.requirement).length) delete rule.requirement
+  }
   emit("change")
 }
 
@@ -208,8 +269,9 @@ function selectStackGroup(rule: any, value: string) {
       <div class="effect-rule-grid">
         <label v-if="!simple" class="maintenance-field"><span>计算类型</span><NSelect :value="rule.type ?? 'fixed'" :options="EFFECT_TYPE_OPTIONS" :disabled="disabled" @update:value="changeType(rule, String($event))" /></label>
         <label v-if="!simple" class="maintenance-field maintenance-field-wide"><span>增幅对象</span><NRadioGroup class="maintenance-target-mode" :value="targetMode(rule)" :disabled="disabled" size="small"><NRadioButton v-for="item in TARGET_KIND_OPTIONS" :key="item.value" :value="item.value" :label="item.label" @click="changeTarget(rule, String(item.value))" /></NRadioGroup></label>
-        <label class="maintenance-field" data-field-key="stat"><span>增幅类型</span><NSelect filterable :consistent-menu-width="false" :value="rule.stat" :options="statOptions(catalog, rule.target?.kind)" :disabled="disabled" @update:value="changeStat(rule, String($event))" /></label>
-        <label v-if="!['derived', 'formula'].includes(rule.type)" class="maintenance-field"><span>{{ rule.type === 'stacked' ? '每层数值' : '数值' }}</span><NInputNumber :value="rule.type === 'stacked' ? rule.valuePerStack : rule.value" :disabled="disabled" :step="0.01" @update:value="rule[rule.type === 'stacked' ? 'valuePerStack' : 'value'] = $event; emit('change')" /></label>
+        <label class="maintenance-field" data-field-key="stat"><span>增幅类型</span><NSelect filterable :consistent-menu-width="false" :value="rule.stat" :options="statOptions(catalog, rule.target?.kind, rule.target?.settlementType)" :disabled="disabled" @update:value="changeStat(rule, String($event))" /></label>
+        <label v-if="corePassiveScaling && (rule.type ?? 'fixed') === 'fixed'" class="maintenance-field"><span>数值来源</span><NSelect :value="rule.valueSource?.field ?? ''" :options="corePassiveScalingFieldOptions()" :disabled="disabled" @update:value="setValueSourceField(rule, $event ? String($event) : null)" /></label>
+        <label v-if="!['derived', 'formula'].includes(rule.type)" class="maintenance-field"><span>{{ rule.type === 'stacked' ? '每层数值' : '数值' }}</span><NInputNumber :value="rule.type === 'stacked' ? rule.valuePerStack : rule.value" :disabled="disabled || Boolean(rule.valueSource)" :step="0.01" @update:value="rule[rule.type === 'stacked' ? 'valuePerStack' : 'value'] = $event; emit('change')" /></label>
         <label v-if="rule.target?.kind !== 'skill' && !EVENT_STAT_KEYS.has(rule.stat)" class="maintenance-field"><span>计算方式</span><NSelect v-model:value="rule.mode" :options="EFFECT_MODE_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
         <label v-if="rule.target?.kind !== 'skill' && !EVENT_STAT_KEYS.has(rule.stat)" class="maintenance-field"><span>基准</span><NSelect v-model:value="rule.basis" :options="BASIS_OPTIONS" :disabled="disabled" clearable @update:value="emit('change')" /></label>
       </div>
@@ -221,7 +283,8 @@ function selectStackGroup(rule: any, value: string) {
 
       <div v-if="rule.target?.kind === 'anomaly'" class="maintenance-nested-panel maintenance-grid">
         <label class="maintenance-field"><span>结算类型</span><NSelect :value="rule.target.settlementType" :options="ANOMALY_SETTLEMENT_OPTIONS" :disabled="disabled" @update:value="changeAnomalySettlement(rule, String($event))" /></label>
-        <label class="maintenance-field maintenance-field-wide"><span>具体异常</span><NSelect multiple filterable :value="rule.target.anomalyEffects ?? []" :options="anomalyTargetOptions(rule)" :disabled="disabled" @update:value="changeAnomalyEffects(rule, $event)" /></label>
+        <label class="maintenance-field maintenance-field-wide"><span>具体异常（留空为全部）</span><NSelect multiple filterable clearable :value="rule.target.anomalyEffects ?? []" :options="anomalyTargetOptions(rule)" :placeholder="anomalyTargetPlaceholder(rule)" :disabled="disabled" @update:value="changeAnomalyEffects(rule, $event)" /></label>
+        <label v-if="rule.target.settlementType === 'attribute'" class="maintenance-field maintenance-field-wide"><span>异常形态（留空为全部）</span><NSelect multiple clearable :value="rule.target.anomalyVariants ?? []" :options="ANOMALY_VARIANT_OPTIONS" :disabled="disabled" @update:value="changeAnomalyVariants(rule, $event)" /></label>
       </div>
 
       <NAlert v-if="rule.appliesTo" type="error" title="旧筛选无法保存">
@@ -261,6 +324,7 @@ function selectStackGroup(rule: any, value: string) {
         <label class="maintenance-field"><span>持续时间（秒）</span><NInputNumber v-model:value="rule.durationSeconds" :disabled="disabled" :min="0" clearable @update:value="emit('change')" /></label>
         <label class="maintenance-field"><span>冷却时间（秒）</span><NInputNumber v-model:value="rule.cooldownSeconds" :disabled="disabled" :min="0" clearable @update:value="emit('change')" /></label>
         <label class="maintenance-field"><span>装备者特性要求</span><NSelect :value="rule.requirement?.specialty ?? null" :options="SPECIALTY_OPTIONS" :disabled="disabled" clearable @update:value="setRuleSpecialty(rule, $event ? String($event) : null)" /></label>
+        <label class="maintenance-field"><span>装备者属性要求</span><NSelect :value="rule.requirement?.attribute ?? null" :options="ATTRIBUTE_OPTIONS" :disabled="disabled" clearable @update:value="setRuleAttribute(rule, $event ? String($event) : null)" /></label>
       </div>
 
       <div v-if="allowModificationValues && ['fixed', 'stacked'].includes(rule.type)" class="maintenance-grid rule-detail-grid">

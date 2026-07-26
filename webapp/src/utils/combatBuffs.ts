@@ -5,6 +5,7 @@ import {
   materializeWEngineForModificationLevel,
   nameOf,
 } from "@core/shared-combat.js"
+import { materializeCorePassiveScalingEffect } from "@core/corePassiveScaling.js"
 import { buffDisplayName } from "@/utils/format"
 
 export type BuffCategory = "self" | "selfWEngine" | "teammate" | "teammateWEngine" | "teammateDriveDisc" | "field" | "boss" | "custom"
@@ -25,6 +26,7 @@ type CombatBuffContext = {
   catalogBuffs?: any[]
   driveDiscSets?: any[]
   agentId?: string
+  coreSkillLevel?: string
   cinemaLevel?: number
   wEngineId?: string
   wEngineModificationLevel?: number
@@ -70,7 +72,7 @@ function cinemaBuffName(buff: any = {}) {
   }
 }
 
-export function currentAgentBuffCandidates(meta: any, agentId = "", cinemaLevel = 0): any[] {
+export function currentAgentBuffCandidates(meta: any, agentId = "", cinemaLevel = 0, coreSkillLevel?: string): any[] {
   const agent = (meta?.agents ?? []).find((item: any) => item.id === agentId)
   if (!agent) {
     return []
@@ -82,9 +84,12 @@ export function currentAgentBuffCandidates(meta: any, agentId = "", cinemaLevel 
   ]
     .filter(([, buff]) => inCombatEffect(buff))
     .map(([key, buff]) => {
-      const source = agentBuffSourceLabel(String(key), buff)
+      const materializedBuff = key === "corePassive"
+        ? materializeCorePassiveScalingEffect(buff, agent, coreSkillLevel)
+        : buff
+      const source = agentBuffSourceLabel(String(key), materializedBuff)
       return {
-        ...buff,
+        ...materializedBuff,
         id: `agent:${agent.id}.${key}`,
         sourceType: "self",
         sourceCategory: "agent",
@@ -96,9 +101,9 @@ export function currentAgentBuffCandidates(meta: any, agentId = "", cinemaLevel 
         agentImages: agent.images ?? null,
         source,
         sourceLabel: source,
-        name: buff.name ?? source,
-        description: buff.description ?? null,
-        conditionLabel: buff.conditionLabel ?? buff.condition ?? null,
+        name: materializedBuff.name ?? source,
+        description: materializedBuff.description ?? null,
+        conditionLabel: materializedBuff.conditionLabel ?? materializedBuff.condition ?? null,
       }
     })
 
@@ -335,7 +340,7 @@ export function buildCombatBuffGroups(context: CombatBuffContext): Record<BuffCa
   const catalogBuffs = combatBuffsFromContext(context)
   return {
     self: dedupeById([
-      ...currentAgentBuffCandidates(context.meta, context.agentId, context.cinemaLevel),
+      ...currentAgentBuffCandidates(context.meta, context.agentId, context.cinemaLevel, context.coreSkillLevel),
       ...catalogBuffs.filter((buff: any) => buff?.sourceType === "self"),
     ]),
     selfWEngine: currentWEngineBuffCandidates(context.meta, context.wEngineId, context.wEngineModificationLevel),

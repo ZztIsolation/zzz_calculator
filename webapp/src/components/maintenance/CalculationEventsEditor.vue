@@ -80,7 +80,9 @@ function groupOptions() {
 function visibleKind(event: any) {
   if (event.kind === "skillGroup") return "skillGroup"
   if (event.kind === "direct" || event.kind === "sheer") return event.kind
-  return event.kind === "disorder" || event.settlementType === "disorder" ? "disorder" : "anomaly"
+  return event.kind === "disorder" || event.settlementType === "disorder"
+    ? "disorder"
+    : event.settlementType === "release" ? "release" : "anomaly"
 }
 
 function eventTitle(event: any, index: number) {
@@ -111,6 +113,7 @@ function eventIndex(event: any) {
       <NButton size="small" :disabled="disabled" @click="add('sheer')">添加贯穿</NButton>
       <NButton size="small" :disabled="disabled" @click="add('anomaly')">添加属性异常</NButton>
       <NButton size="small" :disabled="disabled" @click="add('disorder')">添加紊乱</NButton>
+      <NButton size="small" :disabled="disabled || !(agent?.anomalyReleaseProfiles?.length)" :title="agent?.anomalyReleaseProfiles?.length ? '' : '暂不支持'" @click="add('release')">添加异放</NButton>
       <NButton v-if="allowSkillGroup" size="small" :disabled="disabled || !skillGroups.length" @click="add('skillGroup')">添加技能组</NButton>
     </div>
     <article v-for="(event, index) in events" :key="event.id ?? index" class="maintenance-subcard calculation-event-card">
@@ -142,6 +145,7 @@ function eventIndex(event: any) {
           <NButton size="small" :disabled="disabled" @click="add('sheer')">添加贯穿</NButton>
           <NButton size="small" :disabled="disabled" @click="add('anomaly')">添加异常</NButton>
           <NButton size="small" :disabled="disabled" @click="add('disorder')">添加紊乱</NButton>
+          <NButton size="small" :disabled="disabled || !(agent?.anomalyReleaseProfiles?.length)" :title="agent?.anomalyReleaseProfiles?.length ? '' : '暂不支持'" @click="add('release')">添加异放</NButton>
           <NButton v-if="allowSkillGroup" size="small" :disabled="disabled || !skillGroups.length" @click="add('skillGroup')">添加技能组</NButton>
         </div>
       </section>

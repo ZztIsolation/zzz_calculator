@@ -9,7 +9,7 @@ const DEFAULT_CONFIG: AppConfig = {
   maintenanceEnabled: false,
   scanTelemetryEnabled: false,
   scanTelemetryRetentionDays: 30,
-  driveDiscReservationsUiEnabled: false,
+  driveDiscReservationsUiEnabled: import.meta.env.DEV,
 }
 
 async function readConfig(pathname: string): Promise<AppConfig | null> {

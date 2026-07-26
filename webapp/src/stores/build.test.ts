@@ -1,6 +1,6 @@
 import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it } from "vitest"
-import { defaultDamageConfig, normalizeDamageModeForAgent, useBuildStore } from "@/stores/build"
+import { activeDriveDisc4pcRuntimeInputs, defaultDamageConfig, normalizeDamageModeForAgent, useBuildStore } from "@/stores/build"
 
 function teammateWEngineMeta() {
   const teamWEngine = (id: string) => ({
@@ -113,6 +113,110 @@ describe("build store", () => {
 
     expect(store.damageConfig.mode).toBe("adminDefault")
     expect(store.damageConfig.events[0]).toMatchObject({ id: "admin-hit", stunned: true })
+  })
+
+  it("upgrades legacy release variants to actor-backed release settlements", () => {
+    const store = useBuildStore()
+    const agent = {
+      id: "release_agent",
+      name: { zhCN: "异放角色" },
+      anomalyReleaseProfiles: [{
+        id: "default-release",
+        default: true,
+        supportedElements: ["ether"],
+        resultMode: "originalAnomalyRatio",
+        expression: { kind: "constant", value: 1, unit: "decimal" },
+      }],
+      defaultCalculationConfig: {
+        selectedEventId: "default-release-event",
+        events: [{ id: "default-release-event", kind: "anomaly", settlementType: "release", anomalyEffect: "corruption" }],
+      },
+    }
+    const meta = { agents: [agent], wEngines: [], combatBuffs: [] }
+
+    store.applyAgentConfig(agent.id, meta, {
+      damage: {
+        mode: "custom",
+        selectedEventId: "legacy-release",
+        events: [{
+          id: "legacy-release",
+          kind: "anomaly",
+          settlementType: "attribute",
+          anomalyEffect: "corruption",
+          anomalyVariant: "release",
+          procCount: 20,
+        }],
+      },
+    })
+
+    expect(store.damageConfig.events[0]).toMatchObject({
+      id: "legacy-release",
+      settlementType: "release",
+      triggerActorRef: { agentId: agent.id, profileId: "default-release" },
+      anomalySource: { actorRef: { agentId: agent.id } },
+    })
+    expect(store.damageConfig.events[0].anomalyVariant).toBeUndefined()
+    expect(store.damageConfig.events[0].procCount).toBeUndefined()
+  })
+
+  it("normalizes saved Aria Release events to Corruption and a live self source", () => {
+    const store = useBuildStore()
+    const aria = {
+      id: "aria",
+      name: { zhCN: "爱芮" },
+      anomalyReleaseProfiles: [{
+        id: "core_passive",
+        default: true,
+        supportedElements: ["ether"],
+        resultMode: "originalAnomalyRatio",
+        expression: { kind: "constant", value: 1, unit: "decimal" },
+      }],
+      defaultCalculationConfig: {
+        selectedEventId: "aria-default-release",
+        events: [{ id: "aria-default-release", kind: "anomaly", settlementType: "release", anomalyEffect: "corruption" }],
+      },
+    }
+    const meta = { agents: [aria], wEngines: [], combatBuffs: [] }
+
+    store.applyAgentConfig(aria.id, meta, {
+      damage: {
+        mode: "custom",
+        selectedEventId: "saved-release",
+        events: [{
+          id: "saved-release",
+          kind: "anomaly",
+          settlementType: "release",
+          anomalyEffect: "burn",
+          anomalyVariant: "release",
+          procCount: 20,
+          disorderType: "normal",
+          elapsedSeconds: 2,
+          triggerActorRef: { agentId: "other_agent", profileId: "missing" },
+          anomalySource: {
+            actorRef: { agentId: "other_agent" },
+            snapshot: {
+              agentId: "other_agent",
+              panel: { anomalyMastery: 200 },
+              outOfCombatPanel: { anomalyMastery: 200 },
+            },
+          },
+        }],
+      },
+    })
+
+    expect(store.damageConfig.events[0]).toMatchObject({
+      id: "saved-release",
+      kind: "anomaly",
+      settlementType: "release",
+      anomalyEffect: "corruption",
+      triggerActorRef: { agentId: "aria", profileId: "core_passive" },
+      anomalySource: { actorRef: { agentId: "aria" } },
+    })
+    expect(store.damageConfig.events[0].anomalySource).not.toHaveProperty("snapshot")
+    expect(store.damageConfig.events[0]).not.toHaveProperty("anomalyVariant")
+    expect(store.damageConfig.events[0]).not.toHaveProperty("procCount")
+    expect(store.damageConfig.events[0]).not.toHaveProperty("disorderType")
+    expect(store.damageConfig.events[0]).not.toHaveProperty("elapsedSeconds")
   })
 
   it("keeps field buffs independent while allowing exactly one selected Boss Buff", () => {
@@ -416,6 +520,43 @@ describe("build store", () => {
     expect(input.combatBuffs.activeBuffIds).toContain("driveDisc4pc:set_a.self")
     expect(input.combatBuffs.activeBuffIds).toContain("driveDisc4pc:set_a.team")
     expect(input.combatBuffs.activeBuffIds).not.toContain("driveDisc4pc:set_b.self")
+  })
+
+  it("applies saved manual runtime only to matching active 4-piece sets", () => {
+    const catalog = {
+      driveDiscSets: [{
+        id: "set_a",
+        fourPiece: {
+          selfBuff: {
+            effects: [{ id: "self", type: "fixed", stat: "dmgBonus", value: 10 }],
+          },
+        },
+      }],
+    }
+    const matchingDiscs = [1, 2, 3, 4, 5, 6].map(slot => ({
+      id: `disc-${slot}`,
+      partition: slot,
+      setId: slot <= 4 ? "set_a" : "set_b",
+    }))
+    const runtime = {
+      effects: { self: { enabled: false, coverage: 0.5 } },
+    }
+    const manualSettings = {
+      fourPieceBuffMode: "manual",
+      fourPieceBuffRuntimeInputs: {
+        "driveDisc4pc:set_a.self": runtime,
+        "driveDisc4pc:set_b.self": { effects: { other: { enabled: true } } },
+      },
+    }
+
+    expect(activeDriveDisc4pcRuntimeInputs(catalog, matchingDiscs, manualSettings)).toEqual({
+      "driveDisc4pc:set_a.self": runtime,
+    })
+    expect(activeDriveDisc4pcRuntimeInputs(catalog, matchingDiscs.slice(0, 3), manualSettings)).toEqual({})
+    expect(activeDriveDisc4pcRuntimeInputs(catalog, matchingDiscs, {
+      ...manualSettings,
+      fourPieceBuffMode: "auto",
+    })).toEqual({})
   })
 
   it("merges selected optimized 4-piece runtime overrides into the calculation input", () => {

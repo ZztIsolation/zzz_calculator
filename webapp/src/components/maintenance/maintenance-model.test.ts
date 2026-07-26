@@ -1,12 +1,26 @@
 import { describe, expect, it } from "vitest"
 import { cloneForCreate, maskedPreview, prepareDraft } from "./maintenance-model"
-import { agentOptions, EVENT_STATS, PANEL_STATS } from "./maintenance-options"
+import { agentOptions, effectSummary, EVENT_STATS, PANEL_STATS, statOptions } from "./maintenance-options"
 
 describe("maintenance structured model", () => {
   it("uses the unified Disorder multiplier stat instead of physical-only variants", () => {
     const removedStats = ["physicalDisorderMultiplierBonusPerRemainingSecond", "physicalDisorderMultiplierBonusCap"]
     expect(PANEL_STATS.some(([stat]) => removedStats.includes(stat))).toBe(false)
     expect(EVENT_STATS.some(([stat]) => stat === "disorderBaseMultiplierBonus")).toBe(true)
+  })
+
+  it("offers initial-Mastery anomaly Crit conversion only for Release maintenance targets", () => {
+    const stat = "anomalyCritRatePerInitialMasteryAbove100"
+    expect(statOptions({}, "anomaly", "release").some(option => option.value === stat)).toBe(true)
+    expect(statOptions({}, "anomaly", "attribute").some(option => option.value === stat)).toBe(false)
+    expect(statOptions({}, "anomaly", "disorder").some(option => option.value === stat)).toBe(false)
+    expect(statOptions({}, "default").some(option => option.value === stat)).toBe(false)
+    expect(statOptions({}, "skill").some(option => option.value === stat)).toBe(false)
+    expect(effectSummary({
+      stat,
+      value: 0.5,
+      target: { kind: "anomaly", settlementType: "release", anomalyEffects: ["corruption"] },
+    }, {})).toBe("初始异常掌控超过 100 时每点转异常暴击率% +0.5")
   })
 
   it("materializes nested ids without inventing a top-level id", () => {

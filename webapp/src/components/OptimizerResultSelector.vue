@@ -11,6 +11,7 @@ interface OptimizerResultOption {
 const props = defineProps<{
   modelValue: number
   results: OptimizerResultOption[]
+  stale?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -129,15 +130,16 @@ function rankTooltip(value: number) {
 
     <div
       class="optimizer-result-ratio"
+      :class="{ 'is-stale': props.stale }"
       :style="ratioStyle"
       role="progressbar"
-      aria-label="当前优化结果相对第一套的评分比例"
+      :aria-label="props.stale ? '当前优化结果相对第一套的上次评分比例' : '当前优化结果相对第一套的评分比例'"
       aria-valuemin="0"
       aria-valuemax="100"
       :aria-valuenow="scorePercentage ?? undefined"
     >
       <span class="optimizer-result-ratio-fill"></span>
-      <strong>第 {{ currentRank }} 套 · {{ percentageText }} · 评分 {{ scoreText }}</strong>
+      <strong>第 {{ currentRank }} 套 · {{ percentageText }} · {{ props.stale ? "上次评分" : "评分" }} {{ scoreText }}</strong>
     </div>
   </div>
 </template>
@@ -188,6 +190,15 @@ function rankTooltip(value: number) {
   width: var(--optimizer-result-ratio);
   background: #dbeafe;
   transition: width 160ms ease;
+}
+
+.optimizer-result-ratio.is-stale {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.optimizer-result-ratio.is-stale .optimizer-result-ratio-fill {
+  background: #fef3c7;
 }
 
 .optimizer-result-ratio strong {

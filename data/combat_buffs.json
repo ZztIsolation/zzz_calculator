@@ -41,7 +41,13 @@
               },
               "defaultSourceValue": 3500,
               "ratio": 30,
-              "cap": 1050
+              "cap": 1050,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -64,7 +70,13 @@
               },
               "stat": "stunDmgMultiplierBonus",
               "mode": "flat",
-              "value": 30
+              "value": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": [],
@@ -88,7 +100,13 @@
               },
               "stat": "atkFlat",
               "mode": "flat",
-              "value": 50
+              "value": 50,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -113,7 +131,13 @@
               "mode": "flat",
               "valuePerStack": 7,
               "maxStacks": 3,
-              "defaultStacks": 3
+              "defaultStacks": 3,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -137,7 +161,13 @@
               "stat": "atkPct",
               "mode": "pct",
               "basis": "outOfCombatAtk",
-              "value": 10
+              "value": 10,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -160,7 +190,13 @@
               },
               "stat": "dmgBonus",
               "mode": "flat",
-              "value": 18
+              "value": 18,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -197,7 +233,13 @@
               },
               "stat": "dmgBonus",
               "mode": "flat",
-              "value": 40
+              "value": 40,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "effect_8615efa7f4",
@@ -207,53 +249,13 @@
               },
               "stat": "stunDmgMultiplierBonus",
               "mode": "flat",
-              "value": 30
-            }
-          ],
-          "buffModifiers": []
-        },
-        {
-          "id": "liuyin.cinema_1.good_review_res_ignore",
-          "source": {
-            "zhCN": "影画一"
-          },
-          "description": {
-            "zhCN": "「好评如潮」状态下的角色无视敌人15%全属性伤害抗性。"
-          },
-          "scope": "inCombat",
-          "effects": [
-            {
-              "id": "liuyin_cinema_1_all_res_ignore",
-              "type": "fixed",
-              "target": {
-                "kind": "default"
-              },
-              "stat": "allResIgnore",
-              "mode": "flat",
-              "value": 15
-            }
-          ],
-          "buffModifiers": []
-        },
-        {
-          "id": "liuyin.cinema_2.complaint_damage_bonus",
-          "source": {
-            "zhCN": "影画二"
-          },
-          "description": {
-            "zhCN": "「恶意投诉」效果下敌人进入失衡状态后的失衡易伤倍率额外提升20%，所有单位对「恶意投诉」效果下的敌人造成的伤害提升15%。"
-          },
-          "scope": "inCombat",
-          "effects": [
-            {
-              "id": "liuyin_cinema_2_damage_bonus",
-              "type": "fixed",
-              "target": {
-                "kind": "default"
-              },
-              "stat": "dmgBonus",
-              "mode": "flat",
-              "value": 15
+              "value": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -276,11 +278,91 @@
               },
               "stat": "stunDmgMultiplierBonus",
               "mode": "flat",
-              "value": 30
+              "value": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": [],
           "hidden": false
+        },
+        {
+          "id": "liuyin.cinema_1.good_review_res_ignore",
+          "source": {
+            "zhCN": "影画一"
+          },
+          "description": {
+            "zhCN": "「好评如潮」状态下的角色无视敌人15%全属性伤害抗性。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "liuyin_cinema_1_all_res_ignore",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "allResIgnore",
+              "mode": "flat",
+              "value": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "liuyin.cinema_2.complaint_damage_bonus",
+          "source": {
+            "zhCN": "影画二"
+          },
+          "description": {
+            "zhCN": "「恶意投诉」效果下敌人进入失衡状态后的失衡易伤倍率额外提升20%，所有单位对「恶意投诉」效果下的敌人造成的伤害提升15%。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "liuyin_cinema_2_damage_bonus",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "effect_f0feb08e96",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "stunDmgMultiplierBonus",
+              "mode": "flat",
+              "value": 20,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
         }
       ],
       "images": {
@@ -315,7 +397,13 @@
               "stat": "hpPct",
               "mode": "pct",
               "basis": "outOfCombatHp",
-              "value": 5
+              "value": 5,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "effect_0400b55f89",
@@ -325,7 +413,13 @@
               },
               "stat": "atkFlat",
               "mode": "flat",
-              "value": 1000
+              "value": 1000,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "effect_zhao_hp_to_dmg",
@@ -347,6 +441,12 @@
               "formula": {
                 "expression": "clamp(floor((x - 15000) / 400) + 10, 10, 40)",
                 "valueUnit": "storedPercent"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -370,9 +470,16 @@
               },
               "stat": "enemyResReduction",
               "mode": "flat",
-              "value": 15
+              "value": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
-          ]
+          ],
+          "buffModifiers": []
         },
         {
           "id": "zhao.cinema_2.heal_team_atk_pct",
@@ -393,9 +500,16 @@
               "stat": "atkPct",
               "mode": "pct",
               "basis": "outOfCombatAtk",
-              "value": 15
+              "value": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
-          ]
+          ],
+          "buffModifiers": []
         }
       ],
       "images": {
@@ -429,7 +543,13 @@
               },
               "stat": "dmgBonus",
               "mode": "flat",
-              "value": 25
+              "value": 25,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -452,7 +572,13 @@
               },
               "stat": "atkFlat",
               "mode": "flat",
-              "value": 50
+              "value": 50,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -475,7 +601,13 @@
               },
               "stat": "stunDmgMultiplierBonus",
               "mode": "flat",
-              "value": 30
+              "value": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": [],
@@ -499,7 +631,13 @@
               },
               "stat": "enemyResReduction",
               "mode": "flat",
-              "value": 18
+              "value": 18,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -522,7 +660,13 @@
               },
               "stat": "stunDmgMultiplierBonus",
               "mode": "flat",
-              "value": 30
+              "value": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": [],
@@ -565,7 +709,13 @@
               },
               "defaultSourceValue": 3000,
               "ratio": 40,
-              "cap": 1200
+              "cap": 1200,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "effect_68de5894c8",
@@ -575,7 +725,13 @@
               },
               "stat": "dmgBonus",
               "mode": "flat",
-              "value": 15.04
+              "value": 15.04,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -610,6 +766,12 @@
               "formula": {
                 "expression": "clamp((x - 100) * 0.2, 0, 20)",
                 "valueUnit": "storedPercent"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             },
             {
@@ -632,6 +794,12 @@
               "formula": {
                 "expression": "clamp((x - 100) * 0.2, 0, 20)",
                 "valueUnit": "storedPercent"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -655,7 +823,13 @@
               },
               "stat": "enemyResReduction",
               "mode": "flat",
-              "value": 10
+              "value": 10,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": [
@@ -707,7 +881,13 @@
               },
               "stat": "dmgBonus",
               "mode": "flat",
-              "value": 15
+              "value": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -732,7 +912,13 @@
               "mode": "flat",
               "valuePerStack": 105,
               "maxStacks": 3,
-              "defaultStacks": 3
+              "defaultStacks": 3,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -774,7 +960,13 @@
               },
               "defaultSourceValue": 3429,
               "ratio": 35,
-              "cap": 1200
+              "cap": 1200,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -809,6 +1001,12 @@
               "formula": {
                 "expression": "clamp(x + 8, 9, 24)",
                 "valueUnit": "storedPercent"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             },
             {
@@ -831,6 +1029,12 @@
               "formula": {
                 "expression": "clamp(x * 1.5 + 7, 8.5, 31)",
                 "valueUnit": "storedPercent"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ]
@@ -855,7 +1059,13 @@
               "mode": "flat",
               "valuePerStack": 6,
               "maxStacks": 3,
-              "defaultStacks": 3
+              "defaultStacks": 3,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -890,6 +1100,12 @@
               "formula": {
                 "expression": "clamp(x * 0.54, 0, 1600) - clamp(x * 0.35, 0, 1200)",
                 "valueUnit": "storedValue"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -939,6 +1155,12 @@
               "formula": {
                 "expression": "clamp(x * 0.25 + 12, 0, 30)",
                 "valueUnit": "storedPercent"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ]
@@ -961,7 +1183,13 @@
               },
               "stat": "electricDmg",
               "mode": "flat",
-              "value": 10
+              "value": 10,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ]
         },
@@ -1010,7 +1238,13 @@
               },
               "stat": "electricDmg",
               "mode": "flat",
-              "value": 15
+              "value": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ]
         }
@@ -1046,7 +1280,13 @@
               },
               "stat": "atkFlat",
               "mode": "flat",
-              "value": 600
+              "value": 600,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1069,7 +1309,13 @@
               },
               "stat": "critDmg",
               "mode": "flat",
-              "value": 10
+              "value": 10,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ]
         }
@@ -1105,7 +1351,13 @@
               },
               "stat": "enemyDefReduction",
               "mode": "flat",
-              "value": 40
+              "value": 40,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1128,7 +1380,13 @@
               },
               "stat": "etherDmg",
               "mode": "flat",
-              "value": 25
+              "value": 25,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ]
         },
@@ -1152,7 +1410,13 @@
               "mode": "flat",
               "valuePerStack": 1.5,
               "maxStacks": 10,
-              "defaultStacks": 10
+              "defaultStacks": 10,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1194,7 +1458,13 @@
               },
               "defaultSourceValue": 2500,
               "ratio": 40,
-              "cap": 1000
+              "cap": 1000,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1217,7 +1487,13 @@
               },
               "stat": "iceDmg",
               "mode": "flat",
-              "value": 20
+              "value": 20,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ]
         },
@@ -1239,7 +1515,13 @@
               },
               "stat": "enemyIceResReduction",
               "mode": "flat",
-              "value": 10
+              "value": 10,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ]
         }
@@ -1275,7 +1557,13 @@
               },
               "stat": "disorderBaseMultiplierBonus",
               "mode": "flat",
-              "value": 250
+              "value": 250,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1298,7 +1586,13 @@
               },
               "stat": "penRatio",
               "mode": "flat",
-              "value": 16
+              "value": 16,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1338,7 +1632,13 @@
               "mode": "flat",
               "valuePerStack": 4,
               "maxStacks": 5,
-              "defaultStacks": 5
+              "defaultStacks": 5,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1376,7 +1676,13 @@
               },
               "stat": "enemyIceResReduction",
               "mode": "flat",
-              "value": 15
+              "value": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "lighter_core_enemy_fire_res_reduction",
@@ -1386,7 +1692,13 @@
               },
               "stat": "enemyFireResReduction",
               "mode": "flat",
-              "value": 15
+              "value": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1414,7 +1726,13 @@
               },
               "defaultSourceValue": 75,
               "ratio": 100,
-              "cap": 75
+              "cap": 75,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "lighter_additional_fire_dmg",
@@ -1429,7 +1747,13 @@
               },
               "defaultSourceValue": 75,
               "ratio": 100,
-              "cap": 75
+              "cap": 75,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1452,7 +1776,13 @@
               },
               "stat": "enemyIceResReduction",
               "mode": "flat",
-              "value": 10
+              "value": 10,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "lighter_cinema_1_enemy_fire_res_reduction",
@@ -1462,7 +1792,13 @@
               },
               "stat": "enemyFireResReduction",
               "mode": "flat",
-              "value": 10
+              "value": 10,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1485,7 +1821,13 @@
               },
               "stat": "stunDmgMultiplierBonus",
               "mode": "flat",
-              "value": 25
+              "value": 25,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": [
@@ -1537,7 +1879,13 @@
               },
               "stat": "energyRegen",
               "mode": "flat",
-              "value": 10
+              "value": 10,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": [],
@@ -1575,7 +1923,13 @@
               },
               "stat": "enemyIceResReduction",
               "mode": "flat",
-              "value": 25
+              "value": 25,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "lycaon_core_other_attribute_physical_dmg",
@@ -1585,7 +1939,13 @@
               },
               "stat": "physicalDmg",
               "mode": "flat",
-              "value": 30
+              "value": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "lycaon_core_other_attribute_fire_dmg",
@@ -1595,7 +1955,13 @@
               },
               "stat": "fireDmg",
               "mode": "flat",
-              "value": 30
+              "value": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "lycaon_core_other_attribute_electric_dmg",
@@ -1605,7 +1971,13 @@
               },
               "stat": "electricDmg",
               "mode": "flat",
-              "value": 30
+              "value": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "lycaon_core_other_attribute_ether_dmg",
@@ -1615,7 +1987,13 @@
               },
               "stat": "etherDmg",
               "mode": "flat",
-              "value": 30
+              "value": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "lycaon_core_other_attribute_wind_dmg",
@@ -1625,7 +2003,13 @@
               },
               "stat": "windDmg",
               "mode": "flat",
-              "value": 30
+              "value": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1648,7 +2032,13 @@
               },
               "stat": "stunDmgMultiplierBonus",
               "mode": "flat",
-              "value": 35
+              "value": 35,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1688,7 +2078,13 @@
               "mode": "flat",
               "valuePerStack": 4,
               "maxStacks": 20,
-              "defaultStacks": 20
+              "defaultStacks": 20,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1711,7 +2107,13 @@
               },
               "stat": "enemyDefReduction",
               "mode": "flat",
-              "value": 15
+              "value": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1761,7 +2163,13 @@
               },
               "stat": "enemyResReduction",
               "mode": "flat",
-              "value": 20
+              "value": 20,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1799,7 +2207,13 @@
               },
               "stat": "stunDmgMultiplierBonusAlways",
               "mode": "flat",
-              "value": 35
+              "value": 35,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1822,7 +2236,13 @@
               },
               "stat": "stunDmgMultiplierBonusAlways",
               "mode": "flat",
-              "value": 20
+              "value": 20,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1847,7 +2267,13 @@
               "mode": "flat",
               "valuePerStack": 6,
               "maxStacks": 4,
-              "defaultStacks": 4
+              "defaultStacks": 4,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1884,7 +2310,13 @@
               },
               "stat": "critDmg",
               "mode": "flat",
-              "value": 50
+              "value": 50,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "juhufu_core_tiger_roar_chain_dmg",
@@ -1900,7 +2332,13 @@
               },
               "stat": "dmgBonus",
               "mode": "flat",
-              "value": 20
+              "value": 20,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "juhufu_core_tiger_roar_ultimate_dmg",
@@ -1916,7 +2354,13 @@
               },
               "stat": "dmgBonus",
               "mode": "flat",
-              "value": 40
+              "value": 40,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1939,7 +2383,13 @@
               },
               "stat": "stunDmgMultiplierBonus",
               "mode": "flat",
-              "value": 35
+              "value": 35,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1962,7 +2412,13 @@
               },
               "stat": "critDmg",
               "mode": "flat",
-              "value": 22
+              "value": 22,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -1999,7 +2455,13 @@
               },
               "stat": "atkFlat",
               "mode": "flat",
-              "value": 1000
+              "value": 1000,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -2022,7 +2484,13 @@
               },
               "stat": "dmgBonus",
               "mode": "flat",
-              "value": 25
+              "value": 25,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -2045,7 +2513,13 @@
               },
               "stat": "enemyResReduction",
               "mode": "flat",
-              "value": 15
+              "value": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -2122,6 +2596,12 @@
               "formula": {
                 "expression": "clamp(floor((x - 1.4) / 0.12) + 6, 6, 25)",
                 "valueUnit": "storedPercent"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -2145,7 +2625,13 @@
               },
               "stat": "critDmg",
               "mode": "flat",
-              "value": 40
+              "value": 40,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -2168,7 +2654,13 @@
               },
               "stat": "electricResIgnore",
               "mode": "flat",
-              "value": 5
+              "value": 5,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": [
@@ -2233,6 +2725,12 @@
               "formula": {
                 "expression": "clamp(floor((x - 1.6) / 0.1) * 20 + 280, 280, 700)",
                 "valueUnit": "storedValue"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -2256,7 +2754,13 @@
               },
               "stat": "dmgBonus",
               "mode": "flat",
-              "value": 20
+              "value": 20,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -2294,7 +2798,13 @@
               },
               "stat": "atkFlat",
               "mode": "flat",
-              "value": 1000
+              "value": 1000,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "seed_core_bright_attack_crit_dmg",
@@ -2304,7 +2814,13 @@
               },
               "stat": "critDmg",
               "mode": "flat",
-              "value": 30
+              "value": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "seed_core_encirclement_dmg",
@@ -2314,7 +2830,13 @@
               },
               "stat": "dmgBonus",
               "mode": "flat",
-              "value": 25
+              "value": 25,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -2337,7 +2859,13 @@
               },
               "stat": "enemyDefIgnore",
               "mode": "flat",
-              "value": 20
+              "value": 20,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -2376,7 +2904,13 @@
               "stat": "hpPct",
               "mode": "pct",
               "basis": "outOfCombatHp",
-              "value": 5
+              "value": 5,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "lucia_elowen_core_dream_song_dmg",
@@ -2386,7 +2920,13 @@
               },
               "stat": "dmgBonus",
               "mode": "flat",
-              "value": 20
+              "value": 20,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -2421,6 +2961,12 @@
               "formula": {
                 "expression": "clamp(12 + floor(x / 200) * 7.4, 12, 900)",
                 "valueUnit": "storedValue"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -2444,7 +2990,13 @@
               },
               "stat": "critDmg",
               "mode": "flat",
-              "value": 30
+              "value": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -2467,7 +3019,13 @@
               },
               "stat": "allResIgnore",
               "mode": "flat",
-              "value": 18
+              "value": 18,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -2490,7 +3048,13 @@
               },
               "stat": "sheerDmgBonus",
               "mode": "flat",
-              "value": 15
+              "value": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -2533,7 +3097,13 @@
               },
               "defaultSourceValue": 3000,
               "ratio": 18,
-              "cap": 540
+              "cap": 540,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -2556,7 +3126,13 @@
               },
               "stat": "dmgBonus",
               "mode": "flat",
-              "value": 20
+              "value": 20,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -2579,7 +3155,13 @@
               },
               "stat": "dmgBonus",
               "mode": "flat",
-              "value": 10
+              "value": 10,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -2648,7 +3230,13 @@
               },
               "stat": "anomalyDurationBonusSeconds",
               "mode": "flat",
-              "value": 5
+              "value": 5,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "jane_doe_core_assault_crit_rate",
@@ -2674,6 +3262,12 @@
               "formula": {
                 "expression": "clamp(40 + x * 0.16, 0, 100)",
                 "valueUnit": "storedPercent"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             },
             {
@@ -2688,7 +3282,13 @@
               },
               "stat": "anomalyCritDmg",
               "mode": "flat",
-              "value": 50
+              "value": 50,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -2715,7 +3315,13 @@
               },
               "stat": "enemyDefIgnore",
               "mode": "flat",
-              "value": 15
+              "value": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "jane_doe_cinema_2_assault_crit_dmg",
@@ -2729,7 +3335,13 @@
               },
               "stat": "anomalyCritDmg",
               "mode": "flat",
-              "value": 50
+              "value": 50,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -2749,18 +3361,17 @@
               "type": "fixed",
               "target": {
                 "kind": "anomaly",
-                "settlementType": "attribute",
-                "anomalyEffects": [
-                  "assault",
-                  "shatter",
-                  "burn",
-                  "shock",
-                  "corruption"
-                ]
+                "settlementType": "attribute"
               },
               "stat": "anomalyDamageBonus",
               "mode": "flat",
-              "value": 18
+              "value": 18,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []
@@ -2770,6 +3381,137 @@
         "icon": "/assets/agents/jane_doe.png",
         "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/08/16/15559334/671b9f8d9227c19355e2eceb9f23ef28_7055750575833971395.png",
         "officialPage": "https://baike.mihoyo.com/zzz/wiki/content/759/detail?mhy_presentation_style=fullscreen"
+      }
+    },
+    {
+      "id": "norma_hollowell",
+      "name": {
+        "zhCN": "诺姆·霍洛维尔"
+      },
+      "attribute": "fire",
+      "specialty": "stun",
+      "buffs": [
+        {
+          "id": "norma_hollowell.additional_technical_gap",
+          "source": {
+            "zhCN": "额外能力（技术鸿沟）"
+          },
+          "description": {
+            "zhCN": "队伍中存在[强攻]、[命破]角色或与诺姆阵营相同的角色时触发：诺姆及其造物、战斗邦布攻击命中敌人时，对敌人施加1层[技术鸿沟]，每层使目标的失衡易伤倍率提升3%，最多叠加10层，每0.5秒最多叠加1层；持有任意层数[技术鸿沟]的敌人进入失衡状态后，失衡持续时间提升2秒，同类效果不可叠加；敌人失衡结束时[技术鸿沟]结束。当前计算规则按默认10层结算失衡易伤；失衡持续时间提升保留为说明，不计入伤害结算。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "norma_hollowell_additional_technical_gap_stun_multiplier",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "stunDmgMultiplierBonus",
+              "mode": "flat",
+              "valuePerStack": 3,
+              "maxStacks": 10,
+              "defaultStacks": 10,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "norma_hollowell.additional_bangboo_barrage",
+          "source": {
+            "zhCN": "额外能力（嗯呢弹幕）"
+          },
+          "description": {
+            "zhCN": "[嗯呢弹幕]期间，全队代理人造成的伤害提升20%。[嗯呢弹幕]基础持续32秒，发动[强化特殊技：嗯呢弹幕]时可通过持续消耗能量额外延长最多32秒，即最长持续64秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "norma_hollowell_additional_bangboo_barrage_team_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 20,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "norma_hollowell.cinema_1_aggressive_foresight",
+          "source": {
+            "zhCN": "影画一"
+          },
+          "description": {
+            "zhCN": "任意招式中的[破甲弹头]或[高爆弹头]命中敌人时，使敌人的全属性伤害抗性降低15%，持续15秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "norma_hollowell_cinema_1_enemy_res_reduction",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "enemyResReduction",
+              "mode": "flat",
+              "value": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "norma_hollowell.cinema_2_technical_gap_amplify",
+          "source": {
+            "zhCN": "影画二"
+          },
+          "description": {
+            "zhCN": "[额外能力：集群优势]中，每层[技术鸿沟]提供的失衡易伤倍率由3%提升至6%；选中本 Buff 时，必须同时选中[额外能力（技术鸿沟）]才会生效。"
+          },
+          "scope": "inCombat",
+          "effects": [],
+          "buffModifiers": [
+            {
+              "id": "norma_hollowell_cinema_2_amplify_technical_gap",
+              "operation": "multiplyResolvedValue",
+              "factor": 2,
+              "targetBuffIds": [
+                "norma_hollowell.additional_technical_gap"
+              ],
+              "targetEffectIds": [
+                "norma_hollowell_additional_technical_gap_stun_multiplier"
+              ],
+              "label": {
+                "zhCN": "每层[技术鸿沟]提供的失衡易伤倍率由3%提升至6%。"
+              }
+            }
+          ]
+        }
+      ],
+      "images": {
+        "icon": "/assets/agents/norma_hollowell.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/06/20/82500917/88ab6fa91dc0e69c0d22780cb86b4db0_3734734092895620952.png",
+        "officialPage": "https://baike.mihoyo.com/zzz/wiki/content/1962/detail?mhy_presentation_style=fullscreen"
       }
     }
   ],
@@ -3133,14 +3875,7 @@
           "type": "formula",
           "target": {
             "kind": "anomaly",
-            "settlementType": "attribute",
-            "anomalyEffects": [
-              "assault",
-              "shatter",
-              "burn",
-              "shock",
-              "corruption"
-            ]
+            "settlementType": "attribute"
           },
           "stat": "allResIgnore",
           "mode": "flat",

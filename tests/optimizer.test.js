@@ -245,7 +245,11 @@ assert.ok(exact.metrics.freeFourTwoPlanCount > 0)
 assert.equal(exact.metrics.freeSixPiecePlanCount, 1)
 assert.ok(exact.metrics.freeFourTwoCombinationCount > 0)
 assert.ok(exact.metrics.freeSixPieceCombinationCount > 0)
-assert.ok(exact.metrics.freeSpecializedScorePlanCount > 0)
+if (exact.metrics.scoreKernel === "compiled-dense") {
+    assert.ok(exact.metrics.freeSpecializedScorePlanCount > 0)
+} else {
+    assert.equal(exact.metrics.freeSpecializedScorePlanCount, 0)
+}
 assert.ok(exact.results.every(result => {
     const counts = result.driveDiscs.reduce((map, item) => map.set(item.setId, (map.get(item.setId) ?? 0) + 1), new Map())
     const fourPieceCount = counts.get(fourSet) ?? 0
@@ -688,8 +692,13 @@ const set22Brute = bruteForce(set22Input)
 assert.equal(set22.results[0].driveDiscs.map(item => item.id).join("|"), set22Brute[0].ids)
 assert.deepEqual(resultIds(set22), resultIds(set22GenericKernel))
 assert.deepEqual(resultScores(set22), resultScores(set22GenericKernel))
-assert.ok(Number(set22.metrics.specializedScorePlanCount ?? 0) > 0)
-assert.ok(Number(set22.metrics.specializedScoreCalls ?? 0) > 0)
+if (set22.metrics.scoreKernel === "compiled-dense") {
+    assert.ok(Number(set22.metrics.specializedScorePlanCount ?? 0) > 0)
+    assert.ok(Number(set22.metrics.specializedScoreCalls ?? 0) > 0)
+} else {
+    assert.equal(Number(set22.metrics.specializedScorePlanCount ?? 0), 0)
+    assert.equal(Number(set22.metrics.specializedScoreCalls ?? 0), 0)
+}
 assert.ok(Number(set22.metrics.suffixFrontierRawCount ?? 0) >= Number(set22.metrics.suffixFrontierCompressedCount ?? 0))
 assert.equal(
     set22.results[0].data.outOfCombat.appliedEffects.filter(item => item.key.endsWith(".twoPiece")).length,

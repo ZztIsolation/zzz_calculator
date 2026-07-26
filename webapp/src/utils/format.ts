@@ -279,7 +279,7 @@ export function damageEventKindLabel(event: any): string {
     return "贯穿"
   }
   if (kind === "anomaly") {
-    return event?.settlementType === "disorder" ? "紊乱" : "属性异常"
+    return event?.settlementType === "disorder" ? "紊乱" : event?.settlementType === "release" ? "异放" : "属性异常"
   }
   if (kind === "disorder") {
     return "紊乱"
@@ -346,6 +346,9 @@ export function damageEventSubjectLabel(event: any, meta?: any, fallbackSkillCat
     }
     if (event.anomalyVariant === "polarizedAssault") {
       return "极性强击"
+    }
+    if (event.settlementType === "release") {
+      return `${anomalyEffectLabel(event.anomalyEffect, meta) || "属性异常"}异放`
     }
     return anomalyEffectLabel(event.anomalyEffect, meta) || "属性异常"
   }

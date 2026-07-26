@@ -250,6 +250,28 @@ assert.equal(
     "Generic chain and ultimate targets should display as compact skill names in player-facing order",
 )
 assert.equal(
+    storedEffectRuleText({
+        type: "fixed",
+        stat: "anomalyDamageBonus",
+        value: 18,
+        mode: "flat",
+        target: { kind: "anomaly", settlementType: "attribute" },
+    }, {}, {}, meta),
+    "属性异常增伤% +18%（属性异常）",
+    "Settlement-wide Attribute Anomaly targets should display only their settlement type",
+)
+assert.equal(
+    storedEffectRuleText({
+        type: "fixed",
+        stat: "enemyDefIgnore",
+        value: 16,
+        mode: "flat",
+        target: { kind: "anomaly", settlementType: "release" },
+    }, {}, {}, meta),
+    "无视防御率% +16%（异放）",
+    "Settlement-wide Release targets should display only their settlement type",
+)
+assert.equal(
     nameOf({ bossName: { zhCN: "测试 BOSS" } }),
     "测试 BOSS",
     "Boss Buff cards should display bossName when no name is present",
@@ -262,6 +284,29 @@ assert.deepEqual(
     qianxiaBuffs.map(buff => combatBuffDisplayName(buff)),
     ["千夏 | 核心被动", "千夏 | 额外能力", "千夏 | 强化特殊技", "千夏 | 影画一", "千夏 | 影画二", "千夏 | 影画四"],
     "Qianxia Buffs should reach player-facing metadata in the administrator-authored order",
+)
+
+const liuyinBuffs = meta.teammateCombatBuffGroups
+    .find(group => group.id === "liuyin")
+    ?.buffs ?? []
+assert.deepEqual(
+    liuyinBuffs.map(buff => buff.id),
+    [
+        "buff_6646686e01",
+        "buff_81803b7f10",
+        "liuyin.cinema_1.good_review_res_ignore",
+        "liuyin.cinema_2.complaint_damage_bonus",
+    ],
+    "Liuyin Buffs should preserve the administrator-authored order",
+)
+const liuyinCinemaTwo = liuyinBuffs.find(buff => buff.id === "liuyin.cinema_2.complaint_damage_bonus")
+assert.deepEqual(
+    liuyinCinemaTwo?.effects.map(effect => ({ stat: effect.stat, value: effect.value })),
+    [
+        { stat: "dmgBonus", value: 15 },
+        { stat: "stunDmgMultiplierBonus", value: 20 },
+    ],
+    "Liuyin Cinema 2 should keep its team damage bonus and added stun multiplier bonus",
 )
 
 const nangongyuBuffs = meta.teammateCombatBuffGroups
@@ -692,6 +737,13 @@ assert.equal(
     false,
     "Default Custom Buff options should not expose the Anomaly Mastery threshold conversion",
 )
+for (const optionList of [CUSTOM_BUFF_STAT_OPTIONS, CUSTOM_BUFF_SKILL_STAT_OPTIONS]) {
+    assert.equal(
+        optionList.some(option => option[0] === "anomalyCritRatePerInitialMasteryAbove100"),
+        false,
+        "Player Custom Buff options should not expose initial-Mastery anomaly Crit conversion",
+    )
+}
 assert.ok(CUSTOM_BUFF_STAT_OPTIONS.some(option => option[0] === "critDmg"), "Default Custom Buff options should retain global Crit DMG")
 assert.equal(CUSTOM_BUFF_SKILL_STAT_OPTIONS.some(option => option[0] === "critDmg"), false, "Skill-targeted Custom Buffs should not add generic Crit DMG semantics")
 for (const stat of [

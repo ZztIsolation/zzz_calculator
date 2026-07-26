@@ -6,6 +6,7 @@ import {
 } from "./maintenance-options"
 import { textOf } from "./maintenance-model"
 import { disorderElapsedStepSeconds, normalizeElapsedSeconds } from "@core/damageEventMultipliers.js"
+import { anomalyReleaseProfiles } from "@core/anomalyRelease.js"
 
 const props = withDefaults(defineProps<{
   event: any
@@ -24,7 +25,9 @@ function agentSkill() {
 function visibleKind() {
   if (props.event.kind === "skillGroup") return "skillGroup"
   if (props.event.kind === "direct" || props.event.kind === "sheer") return props.event.kind
-  return props.event.kind === "disorder" || props.event.settlementType === "disorder" ? "disorder" : "anomaly"
+  return props.event.kind === "disorder" || props.event.settlementType === "disorder"
+    ? "disorder"
+    : props.event.settlementType === "release" ? "release" : "anomaly"
 }
 
 function sourceOf() {
@@ -44,6 +47,11 @@ function changeKind(kind: string) {
   const next = defaultCalculationEvent(kind)
   Object.keys(props.event).forEach(key => delete props.event[key])
   Object.assign(props.event, next, { id })
+  if (kind === "release") {
+    const profile = anomalyReleaseProfiles(props.agent)[0]
+    props.event.triggerActorRef = { agentId: props.agent?.id ?? "", profileId: profile?.id ?? "" }
+    props.event.anomalySource = { actorRef: { agentId: props.agent?.id ?? "" } }
+  }
   if (["direct", "sheer"].includes(kind) && agentSkill()) {
     delete props.event.__source
     delete props.event.skillMultiplier
@@ -84,6 +92,18 @@ function groupOptions() {
   return props.skillGroups.map(group => option(group.id, textOf(group.name) || "未命名技能组"))
 }
 
+function releaseProfileOptions() {
+  return anomalyReleaseProfiles(props.agent).map((profile: any) => option(profile.id, textOf(profile.name) || profile.id))
+}
+
+function eventKindOptions() {
+  return EVENT_KIND_OPTIONS
+    .filter(item => props.allowSkillGroup || item.value !== "skillGroup")
+    .map(item => item.value === "release" && !anomalyReleaseProfiles(props.agent).length
+      ? { ...item, disabled: true, label: "异放（暂不支持）" }
+      : item)
+}
+
 function elapsedStep() {
   return disorderElapsedStepSeconds(props.event, props.catalog)
 }
@@ -112,7 +132,7 @@ function updateStunned(value: boolean) {
 
 <template>
   <div class="calculation-event-grid">
-    <label class="maintenance-field"><span>类型</span><NSelect :value="visibleKind()" :options="allowSkillGroup ? EVENT_KIND_OPTIONS : EVENT_KIND_OPTIONS.filter(item => item.value !== 'skillGroup')" :disabled="disabled" @update:value="changeKind(String($event))" /></label>
+    <label class="maintenance-field"><span>类型</span><NSelect :value="visibleKind()" :options="eventKindOptions()" :disabled="disabled" @update:value="changeKind(String($event))" /></label>
     <label class="maintenance-field"><span>次数</span><NInputNumber v-model:value="event.count" :disabled="disabled" :min="0" :step="1" @update:value="emit('change')" /></label>
     <label class="maintenance-switch-field"><span>是否失衡</span><NSwitch :value="event.stunned !== false" :disabled="disabled" @update:value="updateStunned(Boolean($event))"><template #checked>是</template><template #unchecked>否</template></NSwitch></label>
     <label v-if="visibleKind() !== 'skillGroup'" class="maintenance-field"><span>伤害比例%</span><NInputNumber v-model:value="event.damageRatioPct" :disabled="disabled" :min="0" :step="0.1" placeholder="100" @update:value="emit('change')" /></label>
@@ -136,8 +156,14 @@ function updateStunned(value: boolean) {
 
     <template v-if="visibleKind() === 'anomaly'">
       <label class="maintenance-field"><span>异常类型</span><NSelect filterable v-model:value="event.anomalyEffect" :options="anomalyOptions(catalog)" :disabled="disabled" @update:value="emit('change')" /></label>
-      <label v-if="event.anomalyEffect === 'assault'" class="maintenance-field"><span>强击形态</span><NSelect v-model:value="event.anomalyVariant" :options="ANOMALY_VARIANT_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
+      <label class="maintenance-field"><span>异常形态</span><NSelect v-model:value="event.anomalyVariant" :options="ANOMALY_VARIANT_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
       <label class="maintenance-field"><span>结算次数</span><NInputNumber v-model:value="event.procCount" :disabled="disabled" :min="0" :step="1" @update:value="emit('change')" /></label>
+    </template>
+    <template v-if="visibleKind() === 'release'">
+      <label class="maintenance-field"><span>原异常</span><NSelect filterable v-model:value="event.anomalyEffect" :options="anomalyOptions(catalog)" :disabled="disabled" @update:value="emit('change')" /></label>
+      <label class="maintenance-field"><span>倍率方案</span><NSelect v-model:value="event.triggerActorRef.profileId" :options="releaseProfileOptions()" :disabled="disabled" @update:value="emit('change')" /></label>
+      <label class="maintenance-field"><span>异放触发者</span><NInput :value="textOf(agent?.name)" disabled /></label>
+      <label class="maintenance-field"><span>原异常施加者</span><NInput :value="textOf(agent?.name)" disabled /></label>
     </template>
     <template v-if="visibleKind() === 'disorder'">
       <label class="maintenance-field"><span>紊乱类型</span><NSelect v-model:value="event.disorderType" :options="DISORDER_TYPE_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>

@@ -35,11 +35,12 @@ const topTenResults = Array.from({ length: 10 }, (_, index) => ({
   score: 1000 - index * 10,
 }))
 
-function mountSelector(modelValue = 1, resultOptions = results) {
+function mountSelector(modelValue = 1, resultOptions = results, stale = false) {
   return mount(OptimizerResultSelector, {
     props: {
       modelValue,
       results: resultOptions,
+      stale,
     },
   })
 }
@@ -113,5 +114,13 @@ describe("OptimizerResultSelector", () => {
     expect(wrapper.find(".optimizer-result-selector").exists()).toBe(false)
     expect(wrapper.text()).not.toContain("NaN")
     expect(wrapper.text()).not.toContain("Infinity")
+  })
+
+  it("labels retained result scores as stale after constraints change", () => {
+    const wrapper = mountSelector(2, results, true)
+
+    expect(wrapper.text()).toContain("第 2 套 · 97.8% · 上次评分 978")
+    expect(wrapper.get("[role='progressbar']").classes()).toContain("is-stale")
+    expect(wrapper.get("[role='progressbar']").attributes("aria-label")).toContain("上次评分")
   })
 })

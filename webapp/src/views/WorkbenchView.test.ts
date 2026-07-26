@@ -129,6 +129,10 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain(".prominent-config-button:focus-visible")
   })
 
+  it("passes the selected core skill level into the Buff picker", () => {
+    expect(source).toContain(':core-skill-level="String(buildStore.coreSkillLevel)"')
+  })
+
   it("shows the resolved admin default calculation name in the settings summary", () => {
     expect(source).toContain("const calculationModeLabel = computed")
     expect(source).toContain("resolveDefaultCalculationConfig(selectedAgent.value?.defaultCalculationConfig, buildStore.cinemaLevel)")
@@ -160,16 +164,25 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("当前没有可用于优化的可见角色、音擎或驱动盘套装")
   })
 
-  it("reuses completed optimized four-piece runtime for calculation and analysis", () => {
-    expect(source).toContain("selectedOptimizedRuntimeInputs")
-    expect(source).toContain("optimizerStore.completedSettings")
-    expect(source).toContain("activeDriveDisc4pcBuffIds")
+  it("applies the currently saved matching four-piece runtime to every drive-disc mode", () => {
+    expect(source).toContain("selectedDriveDiscRuntimeInputs")
+    expect(source).toContain("activeDriveDisc4pcRuntimeInputs")
+    expect(source).toContain("optimizerStore.settings")
+    expect(source).not.toContain("selectedOptimizedRuntimeInputs")
     expect(source).toContain("selectedBuildOptions.value")
+    expect(source).toContain("driveDiscRuntimeInputs: selectedDriveDiscRuntimeInputs.value")
+  })
+
+  it("marks retained optimizer rankings as stale after constraints change", () => {
+    expect(source).toContain("optimizerStore.resultsAreStale")
+    expect(source).toContain("约束已更新，需重新优化")
+    expect(source).toContain(':stale="optimizerStore.resultsAreStale"')
+    expect(source).toContain("上次评分")
   })
 
   it("keeps two-piece and four-piece limits in drafts until explicitly applied", () => {
-    expect(source).toContain("draftFourPieceSetId.value = optimizerStore.fourPieceSetId")
-    expect(source).toContain("optimizerStore.setFourPieceSet(draftFourPieceSetId.value)")
+    expect(source).toContain("draftFourPieceSetIds.value = optimizerStore.fourPieceSetIds.length")
+    expect(source).toContain("optimizerStore.setFourPieceSets(draftFourPieceSetIds.value)")
     expect(source).toContain("draftTwoPieceSetIds.value = [...optimizerStore.twoPieceSetIds]")
     expect(source).toContain("optimizerStore.setTwoPieceSetIds(draftTwoPieceSetIds.value)")
     expect(source).toContain('@click="showFourPieceSetModal = false">取消')
@@ -199,6 +212,11 @@ describe("WorkbenchView optimizer result details", () => {
     expect(source).toContain("driveDiscStatText(row.disc.mainStat)")
     expect(source).toContain("driveDiscSubStatText(row.disc)")
     expect(source).toContain("driveDiscRarityLevelText(row.disc)")
+  })
+
+  it("labels optimized results with the four-piece set that produced them", () => {
+    expect(source).toContain("selectedOptimizedScheme.value?.fourPieceSetId")
+    expect(source).toContain("实际 4 件套：{{ labelOf(selectedOptimizedFourPieceSet) }}")
   })
 
   it("gates one-disc reservation controls without exposing batch reservation actions", () => {

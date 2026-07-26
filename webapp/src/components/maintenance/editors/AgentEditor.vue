@@ -8,6 +8,7 @@ import EffectRulesEditor from "../EffectRulesEditor.vue"
 import CalculationEventsEditor from "../CalculationEventsEditor.vue"
 import DefaultCalculationConfigModal from "../DefaultCalculationConfigModal.vue"
 import CoreSkillEditor from "../CoreSkillEditor.vue"
+import AnomalyReleaseProfilesEditor from "../AnomalyReleaseProfilesEditor.vue"
 import BuffModifiersEditor from "../BuffModifiersEditor.vue"
 import SourceListEditor from "../SourceListEditor.vue"
 import {
@@ -141,7 +142,7 @@ function enableCoreSkill(enabled: boolean) {
 
     <MaintenanceSection title="优先驱动盘">
       <div class="maintenance-grid">
-        <label class="maintenance-field"><span>默认驱动盘套装</span><NSelect filterable clearable v-model:value="model.preferredDriveDiscs.defaultSetId" :options="driveDiscOptions()" :disabled="disabled" @update:value="changed" /></label>
+        <label class="maintenance-field"><span>推荐驱动盘套装</span><NSelect multiple filterable clearable v-model:value="model.preferredDriveDiscs.defaultSetIds" :options="driveDiscOptions()" :disabled="disabled" @update:value="changed" /></label>
         <label v-for="slot in [4, 5, 6]" :key="slot" class="maintenance-field"><span>{{ slot }} 号位主属性</span><NSelect multiple clearable v-model:value="model.preferredDriveDiscs.mainStatLimits[String(slot)]" :options="MAIN_STAT_OPTIONS[slot]" :disabled="disabled" @update:value="changed" /></label>
       </div>
     </MaintenanceSection>
@@ -185,7 +186,7 @@ function enableCoreSkill(enabled: boolean) {
           <label class="maintenance-field"><span>生效范围</span><NSelect :value="model.combatBuffs[entry.key].scope" :options="SCOPE_OPTIONS" :disabled="disabled" @update:value="setBuffScope(model.combatBuffs[entry.key], String($event))" /></label>
           <label class="maintenance-field maintenance-field-wide"><span>Buff 描述</span><NInput type="textarea" :value="textOf(model.combatBuffs[entry.key].description)" :disabled="disabled" @update:value="model.combatBuffs[entry.key].description = { zhCN: String($event) }; changed()" /></label>
         </div>
-        <EffectRulesEditor :model="model.combatBuffs[entry.key]" :catalog="catalog" :disabled="disabled" :allow-coverage="model.combatBuffs[entry.key].scope === 'inCombat'" :preferred-skill-id="catalog?.agentSkills?.agentSkills?.find((skill: any) => skill.agentId === model.id)?.id" @change="changed" />
+        <EffectRulesEditor :model="model.combatBuffs[entry.key]" :catalog="catalog" :disabled="disabled" :allow-coverage="model.combatBuffs[entry.key].scope === 'inCombat'" :preferred-skill-id="catalog?.agentSkills?.agentSkills?.find((skill: any) => skill.agentId === model.id)?.id" :core-passive-scaling="entry.key === 'corePassive' ? model.coreSkill?.corePassiveScaling : null" @change="changed" />
         <div class="buff-modifier-block"><div class="maintenance-row-head"><strong>Buff 修饰</strong></div><BuffModifiersEditor :model="model.combatBuffs[entry.key]" :catalog="catalog" :disabled="disabled" @change="changed" /></div>
       </template>
     </MaintenanceSection>
@@ -209,6 +210,7 @@ function enableCoreSkill(enabled: boolean) {
     <MaintenanceSection title="核心技">
       <template #actions><NSwitch :value="Boolean(model.coreSkill)" :disabled="disabled" @update:value="enableCoreSkill" /></template>
       <CoreSkillEditor v-if="model.coreSkill" :model="model.coreSkill" :disabled="disabled" @change="changed" />
+      <AnomalyReleaseProfilesEditor :model="model" :disabled="disabled" @change="changed" />
     </MaintenanceSection>
   </div>
 

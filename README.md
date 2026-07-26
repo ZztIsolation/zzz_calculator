@@ -10,8 +10,16 @@ The entries below summarize each development day. Implementation details,
 modeling decisions, and verification evidence remain in the
 [detailed changelog](docs/changelog.md).
 
+### 2026-07-25 Hotfix
+
+- Added Aria Cinema 1's initial-Anomaly-Mastery conversion as an explicit Buff rule. It floors the final out-of-combat panel value, converts each whole point above 100 into 0.5% Anomaly CRIT Rate, adds the existing 25% base rate, and caps the result at 100%. It applies only to Corruption Release; in-combat Anomaly Mastery does not affect it.
+- Exposed the new conversion type only to administrator maintenance under Anomaly target plus Release. It is absent from every player custom-Buff mode. Legacy Release-profile CRIT formulas remain a read-time fallback and never stack with the explicit rule.
+
 ### 2026-07-24 Hotfix
 
+- Added Norma Hollowell to teammate Buff maintenance with separate Technical
+  Gap and Bangboo Barrage controls, Cinema 1 all-attribute RES reduction,
+  Cinema 2 Technical Gap amplification, and her official local avatar.
 - Added the three Defense Battle 3.0 Phase 3 field Buffs, Final Movement,
   Chained Circuit, and Zero-Degree Operation, with explicit targeting for
   Chain/Ultimate, attribute Anomaly, and Basic/Chain effects.
@@ -24,8 +32,28 @@ modeling decisions, and verification evidence remain in the
   browser Worker, and optimizer calculation paths without exposing it in the
   player custom-Buff editor.
 
+### 2026-07-23 Daily Update
+
+- Promoted Release from an Anomaly variant to a third settlement type. The event manager now presents Attribute Anomaly, Disorder, and Release together; agents without a Release profile keep a disabled entry labeled as unsupported.
+- Added dual-source Release events. The equipped agent is always the Release trigger, while the generalized model supports either the current agent or another saved agent as the original Anomaly source. External sources use frozen panel/Buff snapshots with agent, configuration hash, and capture-time metadata. Aria's player-facing editor is temporarily locked to Corruption and Aria as the live source; existing external-source Aria events are normalized on load while the generalized model remains available for later reopening.
+- Added a restricted structured formula tree with explicit `raw`, `percent`, and `decimal` units. The shared evaluation trace drives multiplier explanations, white-box output, and optimizer dependencies. Fixed-multiplier profiles replace the Release base multiplier before converting it relative to one original Anomaly unit; they do not multiply final damage directly.
+- Migrated Aria's existing coefficient, Core Skill scaling, stunned factor, and Cinema 1 CRIT rules to profiles and Release-scoped modifiers. Full, compiled, dense, fixed-score, browser Worker, server, and strict optimizer paths remain equivalent. The first version optimizes only the trigger's build and does not jointly search the external source build.
+- Compacted Aria's Release editor into two field rows and reduced the visible multiplier explanation to out-of-combat Anomaly Mastery, the Release stunned adjustment, and the final Release multiplier. The description displays the five maximum-Core coefficients while calculations continue to use the selected Core tier.
+
 ### 2026-07-22 Daily Update
 
+- Added complete Aria character, skill, Core Skill, Cinema, and signature
+  W-Engine data. Her default target is one stunned Corruption Release, calculated
+  from unrounded out-of-combat Anomaly Mastery and one Corruption proc.
+- Made Aria's in-combat Anomaly Proficiency Core Passive resolve from the selected
+  Core Skill tier: none and A-F grant `45/52/60/67/75/82/90`. The picker,
+  calculation, white-box output, and optimizer now share that resolved value.
+- Added multi-select four-piece optimization. Each candidate set uses the existing
+  strict exact kernel, then all branches merge into one stable global Top 10 with
+  per-set metrics and the actual set attached to every result.
+- Added Release white-box rows, scoped Cinema effects, Corruption duration support,
+  corrected Phaethon's Melody triggers, and rule-level attribute requirements across
+  browser workers, the server, and optimizer scoring paths.
 - Added account-scoped, per-disc agent reservations while preserving the existing
   browser storage schema and Drive Disc identities. The optimizer always excludes
   another agent's reserved discs; records without reservations retain identical
@@ -435,7 +463,7 @@ For frontend-only development with hot reload:
 npm run dev:webapp
 ```
 
-Set `PORT` to change the Node port. The service binds to `127.0.0.1` by default; container or network exposure requires an explicit `HOST` such as `0.0.0.0`. Maintenance is disabled in production unless `MAINTENANCE_ENABLED=true` is set explicitly. Maintenance writes accept loopback browser origins by default; every non-loopback origin must be listed explicitly in the comma-separated `MAINTENANCE_ALLOWED_ORIGINS` setting.
+Set `PORT` to change the Node port. The service binds to `127.0.0.1` by default; container or network exposure requires an explicit `HOST` such as `0.0.0.0`. Per-disc agent reservations and their visual loadout controls are enabled by default in local development, including the Vite fallback when no runtime config endpoint is available. Production and Pages builds remain disabled by default; set `DRIVE_DISC_RESERVATIONS_UI_ENABLED=true` or `false` to override the Node default explicitly. Maintenance is disabled in production unless `MAINTENANCE_ENABLED=true` is set explicitly. Maintenance writes accept loopback browser origins by default; every non-loopback origin must be listed explicitly in the comma-separated `MAINTENANCE_ALLOWED_ORIGINS` setting.
 
 ## Routes
 
@@ -448,7 +476,7 @@ Set `PORT` to change the Node port. The service binds to `127.0.0.1` by default;
 
 `/calculate.html`, `/drive-discs.html`, and `/accounts.html` remain compatibility redirects. When maintenance is enabled, `/maintenance.html` redirects to `/maintenance`; when disabled, both maintenance page routes return 404 and maintenance APIs return 403.
 
-The workbench event manager shows each skill, Anomaly, and Disorder event's current multiplier in both the target list and the active-event details. Skill values follow the selected current skill level; Anomaly values include proc count; and Disorder values update immediately from the source effect, Disorder type, and elapsed time. The displayed value includes any stored event scale but does not multiply the separate event count or fold in CRIT, damage bonus, defense, and other final-damage zones. The player-facing event-scale input is hidden to avoid confusing it with a skill multiplier, while structured maintenance and existing saved events retain the field and its calculation behavior. Disorder elapsed time is snapped to the source effect's tick interval and is no longer pre-clamped to the catalog base duration when saved. The catalog preview still shows the base-duration multiplier; final damage clamps elapsed time to the base duration plus active Buff extensions, then recomputes remaining time, ticks, and multiplier.
+The workbench event manager shows every skill, Attribute Anomaly, Disorder, and Release event's current multiplier in both the target list and active-event details. Skill values follow the selected level, Attribute Anomaly values include proc count, and Disorder values update from source effect/type/elapsed time. The compact Release explanation exposes only out-of-combat Anomaly Mastery, the Release stunned adjustment, and the final Release multiplier; the structured formula trace remains shared by white-box output, tests, and optimizer dependencies. The displayed value never multiplies event count or folds in CRIT, damage bonus, defense, resistance, or the ordinary stunned-damage zone. The generalized model retains frozen external sources, but Aria's player editor currently normalizes every Release to Corruption with Aria as the live source. Her cross-agent source selector will reopen only after source-build selection, snapshot refresh, and regression coverage are complete. The player-facing event-scale input remains hidden, while structured maintenance and existing saved events retain its semantics. Disorder elapsed time is snapped to the source effect's tick interval and is no longer pre-clamped to catalog base duration when saved; final damage applies active duration extensions before recomputing remaining ticks.
 
 In the workbench Buff picker, every selected teammate-carried W-Engine has its own refinement selector using that W-Engine's supported range. Changing the level refreshes the Buff preview immediately, while only Apply commits the draft and Cancel leaves the saved build unchanged. The chosen refinement appears in the enabled-Buff summary and feeds the same calculation input used by both the workbench and the Drive Disc optimizer.
 
@@ -458,7 +486,7 @@ Ye Shunguang now includes her official Cinema 4 and Cinema 6 mechanics. Ether Ve
 
 Jane Doe is available as a teammate Buff group containing only team-applicable Core Passive F, Cinema 2, and Cinema 4 effects. Her Core extends Flinch by five seconds, raising full-duration Flinch Disorder from `525%` to `450% + 15 x 7.5% = 562.5%`; Assault Anomaly CRIT Rate is `clamp(40 + Jane AP x 0.16, 0, 100)%`, with a default 375 AP input that can be lowered, and Anomaly CRIT DMG is 50%. Cinema 2 applies 15% DEF ignore and another 50% Anomaly CRIT DMG to Assault only. Cinema 4 adds 18% Attribute Anomaly DMG without entering the Disorder bonus zone. Selecting a Buff means its trigger condition is satisfied; no uptime timeline is simulated.
 
-The workbench custom Buff editor uses a simplified player-facing whitelist. It keeps the six element damage bonuses separate, but replaces element-specific Sheer DMG, CRIT DMG, DEF ignore, resistance reduction, and resistance ignore choices with their generic or current-attribute forms; the Anomaly Mastery-above-140 conversion is maintenance-only. The structured maintenance forms still expose every explicit element field, and existing custom Buff records using hidden choices remain readable and fully calculated.
+The workbench custom Buff editor uses a simplified player-facing whitelist. It keeps the six element damage bonuses separate, but replaces element-specific Sheer DMG, CRIT DMG, DEF ignore, resistance reduction, and resistance ignore choices with their generic or current-attribute forms. Both the Anomaly-Mastery-above-140 proficiency conversion and the initial-Anomaly-Mastery-above-100 CRIT conversion are maintenance-only; the latter is additionally restricted to Release anomaly targets. The structured maintenance forms still expose every explicit element field, and existing custom Buff records using hidden choices remain readable and fully calculated.
 
 Alice Thymefield is fully available with her official core passive, additional ability, and Cinema 1/2/4/6 rules. Her in-combat Anomaly Mastery above 140 converts to Anomaly Proficiency at 1.6 per point; physical Disorder receives 18% multiplier per remaining second up to 180%; Polarized Assault uses 100% of normal Assault; the recurring core follow-up uses an explicit 2.5% event scale; and Cinema 6 uses 3300% Anomaly Proficiency as its damage basis with forced CRIT. Her administrator defaults cover a full-duration physical-anomaly window at Cinema 0, the additional Ultimate-triggered Polarized Assault at Cinema 2, and six winning-state follow-ups at Cinema 6. Slot 6 optimization compares both Anomaly Mastery and ATK%.
 

@@ -31,7 +31,7 @@ function availablePort() {
     })
 }
 
-async function startServer(extraEnv = {}) {
+async function startServer(extraEnv = {}, environment = "production") {
     port = await availablePort()
     baseUrl = `http://127.0.0.1:${port}`
     serverOutput = ""
@@ -39,7 +39,8 @@ async function startServer(extraEnv = {}) {
         cwd: rootDir,
         env: {
             ...process.env,
-            NODE_ENV: "production",
+            NODE_ENV: environment,
+            DRIVE_DISC_RESERVATIONS_UI_ENABLED: "",
             PORT: String(port),
             ...extraEnv,
         },
@@ -322,6 +323,20 @@ try {
     })
     assert.equal(summaryResponse.status, 200)
     assert.equal((await summaryResponse.json()).summary.startedOnly, 1)
+
+    server.kill()
+    await sleep(100)
+    await startServer({}, "development")
+    await waitForServer()
+    const localDefaultConfig = JSON.parse((await getText("/api/app-config")).body)
+    assert.equal(localDefaultConfig.driveDiscReservationsUiEnabled, true)
+
+    server.kill()
+    await sleep(100)
+    await startServer({ DRIVE_DISC_RESERVATIONS_UI_ENABLED: "false" }, "development")
+    await waitForServer()
+    const localDisabledConfig = JSON.parse((await getText("/api/app-config")).body)
+    assert.equal(localDisabledConfig.driveDiscReservationsUiEnabled, false)
 } finally {
     server?.kill()
     if (telemetryDirectory) await rm(telemetryDirectory, { recursive: true, force: true })

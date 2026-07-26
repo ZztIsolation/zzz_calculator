@@ -2,6 +2,31 @@
 
 # Changelog
 
+## 2026-07-27 - Released Aria, Multi-Set Optimization, Norma, And Two W-Engines
+
+Released the Calculator-only second stage on top of the storage compatibility
+foundation. The visible feature set includes Aria's attributed Release
+settlement model, global Top 10 optimization across multiple selected
+four-piece sets, Norma Hollowell's teammate Buff group, and the official
+`索魂影眸` and `淬锋钳刺` W-Engine entries and effects. The related maintenance
+editors, catalog validation, compiled/dense/Worker calculation paths, strict
+optimizer paths, result provenance, and stale-result warnings are included in
+the same release.
+
+Optimizer settings now write version 3. Every saved selection keeps the complete
+ordered `fourPieceSetIds` array and also writes its first item to the legacy
+`fourPieceSetId` field. Loading a version 2 single-set configuration upgrades it
+without changing the selected set, while unknown per-agent fields, other agent
+records, and unknown top-level metadata continue to round-trip. The IndexedDB
+database name and version, all browser storage keys, account and inventory
+records, build-store version, anomaly source snapshots, and maintenance drafts
+remain unchanged; the release performs no automatic cleanup or bulk rewrite.
+
+This release changes only the Calculator website. Helper, Scanner, their public
+manifests, native packages, the download origin, GitHub Pages, CDN contents, and
+GitHub Releases are outside the release. In particular, the deployed Scanner
+remains version 1.0.43 and no Scanner artifact or manifest is rebuilt or pushed.
+
 ## 2026-07-27 - Added The Storage Compatibility Foundation
 
 Added a no-UI compatibility foundation for the staged Aria and multi-set
@@ -20,6 +45,128 @@ trigger/source references, and unrelated future build metadata survive a load
 and compatibility save. This foundation does not change IndexedDB, localStorage
 keys, inventory records, account pointers, visible features, Calculator APIs,
 Helper/Scanner manifests, or native download artifacts.
+
+## 2026-07-25 - Added Settlement-Wide Anomaly Effect Targets
+
+Changed structured Anomaly effect targets so a missing `anomalyEffects` field
+is the canonical settlement-wide wildcard. Attribute Anomaly, Disorder, and
+Release rules still require an explicit `settlementType`; a non-empty
+`anomalyEffects` array remains an exact whitelist within that settlement.
+Release lists continue to identify the original Anomaly used by the Release,
+not the trigger actor or multiplier profile. Calculation events themselves
+still require a concrete Anomaly and were not widened by this change.
+
+Maintenance validation now accepts both a missing field and an empty input
+array as the wildcard. Cleaning removes only an exactly empty array before
+storage and API responses, while malformed or non-empty invalid values remain
+visible to validation and cannot silently broaden into a wildcard. Runtime rule
+resolution always emits the settlement filter and emits concrete-effect and
+Attribute-Anomaly variant filters only when they are non-empty. Existing exact
+targets therefore retain their behavior, while settlement-wide targets include
+new catalog effects automatically.
+
+The maintenance editor now creates Anomaly targets in the all-Attribute-
+Anomaly state, labels the concrete-effect control as optional, and displays
+settlement-specific empty placeholders. Clearing the control removes the field.
+Changing between Attribute Anomaly, Disorder, and Release resets the concrete
+selection to all; leaving Attribute Anomaly also removes its independent
+variant filter. Maintenance summaries say `全部` or `全部原异常` instead of
+treating the wildcard as incomplete. Player Buff rows keep the shorter target
+label, such as `异常暴击率% +25%（异放）`; an exact whitelist still displays its
+concrete type, such as `（异放：侵蚀）`.
+
+Migrated the semantically settlement-wide Jane Cinema 4 and Defense Battle
+rules, both settlement-wide Vitality Hit W-Engine rules, and Aria Cinema 1 and
+Cinema 2 Release rules.
+Corruption duration, Flinch duration, Assault CRIT, and other mechanics tied to
+a named Anomaly keep their exact whitelists. Regression
+coverage locks cleaning, validation, API round trips, settlement isolation,
+Release original-Anomaly matching, compiled/dense/fixed scoring, maintenance
+editing, and readable summaries.
+
+Successful maintenance saves and deletes now invalidate the workbench's cached
+catalog and its module-level loading promises. Returning to calculation reloads
+the server catalog instead of retaining a pre-save character snapshot, so a
+newly widened Aria rule cannot continue to appear as `异放：侵蚀` until a full
+browser refresh.
+
+Aria Cinema 1 now stores its 25% Anomaly CRIT Rate, 25% Anomaly CRIT DMG, and
+0.5%-per-point initial-Mastery conversion as three separate settlement-wide
+Release effects under the existing `agent:aria.cinema.1` Buff id. The conversion uses
+`max(floor(final out-of-combat Anomaly Mastery) - 100, 0)`, then clamps the
+combined CRIT Rate to 100%. In-combat Anomaly Mastery never enters this
+conversion, while Anomaly Mastery remains an optimizer-relevant stat.
+The Release damage white-box keeps this calculation implicit and displays only
+the combined Anomaly CRIT zone instead of a separate conversion row.
+
+Removed the authored `critRateBonusExpression` from Aria's Release profile.
+Runtime keeps it only as a fallback for older catalogs, and a matching explicit
+Buff conversion always takes precedence so mixed-version data cannot
+double-count. Full, prepared, map, indexed, dense, fixed-objective, and strict
+optimizer tests now share the same conversion result and Top 10 scoring path.
+
+Administrator maintenance exposes the new stat only for Anomaly targets whose
+settlement type is Release. Validation rejects Attribute Anomaly, Disorder,
+skill, and ordinary panel targets. Neither the normal nor skill-targeted player
+custom-Buff whitelist exposes the type; maintenance save/reload and player
+option isolation have dedicated regression coverage.
+
+## 2026-07-24 - Added Norma Hollowell Teammate Buffs
+
+Added `norma_hollowell` to the role-grouped teammate Buff catalog from the
+official Mihoyo Wiki page. The group is identified as Fire and Stun and exposes
+four independently selectable maintenance entries in authored order: Technical
+Gap, Bangboo Barrage, Cinema 1, and Cinema 2. Self-only Core Passive, Cinema,
+Energy, turret-duration, and extra-attack effects remain outside the teammate
+catalog.
+
+Technical Gap uses the existing stacked stun-vulnerability rule with 3
+percentage points per stack, 10 maximum stacks, and 10 default stacks. The
+official two-second stun-duration extension remains in the maintained source
+description but does not enter settled-damage calculation because the current
+model does not resolve enemy stun timing. Bangboo Barrage is kept separate from
+Technical Gap because its uptime is independent; it grants 20% team damage for
+the maintained 32-second base window, extendable to 64 seconds by the source
+skill.
+
+Cinema 1 maps the enemy's 15% all-attribute RES reduction to
+`enemyResReduction`, preserving its 15-second duration in the description.
+Cinema 2 is a modifier-only Buff: when both it and Technical Gap are active, it
+multiplies the targeted stack rule by two, changing each stack from 3% to 6%
+and the ten-stack total from 30% to 60%. Selecting Cinema 2 alone creates no
+stun-vulnerability effect.
+
+Downloaded the official 300x300 PNG avatar to
+`webapp/public/assets/agents/norma_hollowell.png` and linked its Wiki source and
+detail page in the catalog. Formula regressions now cover the complete teammate
+profile roster, Buff ordering, maintenance validation, default stacks,
+modifier-only behavior, the 60% Cinema 2 result, 20% team damage, and 15% RES
+reduction.
+
+## 2026-07-24 - Corrected Yesterday's Call And Added Two Official W-Engines
+
+Corrected `昨夜来电` (`zzz_wiki_1689`) against the current official ZZZ Wiki
+entry. Removed its previous `impactPct` self-Buff rule because the source effect
+increases Daze dealt by attacks rather than the wearer's Impact stat. The
+Calculator does not currently settle skill Daze, so the Daze and flat off-field
+Energy regeneration clauses now remain authoritative text instead of producing
+an inaccurate panel change. The exact five-rank squad CRIT DMG rule remains
+calculable, and the maintained description now includes the per-move trigger
+limit, duration refresh, and squad-unique clauses.
+
+Added `索魂影眸` (`zzz_wiki_1243`) as an S-rank Stun W-Engine with 713 Base ATK
+and 24% CRIT Rate. Its five-rank model applies three independently selectable
+`魂锁` Impact stacks plus the full-stack Impact bonus, and applies the triggered
+25%/28.75%/32.5%/36.25%/40% enemy DEF reduction as the W-Engine's squad-facing
+effect. Added `淬锋钳刺` (`zzz_wiki_760`) as an S-rank Anomaly W-Engine with 713
+Base ATK and 90 Anomaly Proficiency. Its five-rank model applies up to three
+`猎意` Physical DMG stacks. The full-stack Anomaly Buildup Rate clause remains
+text-only because the Calculator does not simulate anomaly accumulation.
+
+Downloaded both official PNG icons and added regression coverage for all new
+five-rank values, default full-stack totals, exact DEF reduction, the removed
+Yesterday's Call Impact approximation, full official source text, and the
+partial-modeling boundary.
 
 ## 2026-07-24 - Added Defense Battle 3.0 Phase 3 And Removed A Duplicate W-Engine
 

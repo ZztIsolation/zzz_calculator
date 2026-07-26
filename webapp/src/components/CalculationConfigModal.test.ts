@@ -13,6 +13,7 @@ const disorderEffects = (anomalyEffectsData as any).effects.filter((effect: any)
 const yixuan = (agentsData as any).agents.find((agent: any) => agent.id === "yixuan")
 const yixuanSkillCatalog = (agentSkillsData as any).agentSkills.find((skill: any) => skill.id === "yixuan")
 const alice = (agentsData as any).agents.find((agent: any) => agent.id === "alice_thymefield")
+const aria = (agentsData as any).agents.find((agent: any) => agent.id === "aria")
 
 const miyabiWithSkillGroups = {
   ...JSON.parse(JSON.stringify(miyabi)),
@@ -150,7 +151,7 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value))
 }
 
-function mountModal(overrides: { agent?: any, damageConfig?: any, meta?: any, skillCatalog?: any, cinemaLevel?: number, combatEffects?: any[] } = {}) {
+function mountModal(overrides: { agent?: any, damageConfig?: any, meta?: any, skillCatalog?: any, cinemaLevel?: number, combatEffects?: any[], releaseContext?: any, sourceSnapshotProvider?: (agentId: string) => any } = {}) {
   const agent = overrides.agent ?? miyabi
   const skillCatalog = overrides.skillCatalog
     ?? (agentSkillsData as any).agentSkills.find((skill: any) => skill.id === agent?.id)
@@ -167,6 +168,7 @@ function mountModal(overrides: { agent?: any, damageConfig?: any, meta?: any, sk
       meta: {
         anomalyEffects,
         disorderEffects,
+        agents: (agentsData as any).agents,
         agentSkills: [skillCatalog],
         ...(overrides.meta ?? {}),
       },
@@ -174,6 +176,8 @@ function mountModal(overrides: { agent?: any, damageConfig?: any, meta?: any, sk
       skillLevels: { basic: 12, dodge: 12, assist: 12, special: 12, chain: 12, core_skill: "F" },
       cinemaLevel: overrides.cinemaLevel ?? 0,
       combatEffects: overrides.combatEffects ?? [],
+      releaseContext: overrides.releaseContext,
+      sourceSnapshotProvider: overrides.sourceSnapshotProvider,
     },
     global: {
       stubs: naiveStubs,
@@ -347,7 +351,9 @@ describe("CalculationConfigModal", () => {
     const settlementButtons = wrapper.findAllComponents({ name: "RadioButton" })
     expect(settlementSelector?.nextElementSibling?.classList.contains("calculation-editor-grid")).toBe(true)
     expect(settlementSelector?.textContent).toContain("结算类型")
-    expect(settlementButtons.map(button => button.props("label"))).toEqual(["属性异常", "紊乱结算"])
+    expect(settlementButtons.map(button => button.props("label"))).toEqual(["属性异常", "紊乱结算", "异放"])
+    expect(settlementButtons[2].props("disabled")).toBe(true)
+    expect(settlementButtons[2].attributes("title")).toBe("暂不支持")
     expect(wrapper.findComponent({ name: "RadioGroup" }).props("value")).toBe("attribute")
     expect(selectComponentWithOption(wrapper, "disorder")).toBeUndefined()
 
@@ -409,6 +415,170 @@ describe("CalculationConfigModal", () => {
     })
     expect(saved.events[0]).not.toHaveProperty("disorderType")
     expect(saved.events[0]).not.toHaveProperty("elapsedSeconds")
+  })
+
+  it("normalizes Aria Release to Corruption and self source with a compact explanation", async () => {
+    const sourceSnapshot = {
+      schemaVersion: 1,
+      agentId: alice.id,
+      agentLevel: 60,
+      capturedAt: "2026-07-23T00:00:00.000Z",
+      sourceConfigHash: "test-source",
+      panel: { atk: 3000, anomalyProficiency: 500, anomalyMastery: 200 },
+      outOfCombatPanel: { atk: 2800, anomalyProficiency: 400, anomalyMastery: 195.96 },
+      buffTotals: { damageModifiers: [] },
+    }
+    const wrapper = mountModal({
+      agent: aria,
+      damageConfig: {
+        mode: "custom",
+        selectedEventId: "aria-release",
+        events: [{
+          ...clone(aria.defaultCalculationConfig.events[0]),
+          id: "aria-release",
+          anomalyEffect: "burn",
+          anomalyVariant: "release",
+          procCount: 20,
+          triggerActorRef: { agentId: alice.id, profileId: "missing-profile" },
+          anomalySource: { actorRef: { agentId: alice.id }, snapshot: sourceSnapshot },
+        }],
+      },
+      releaseContext: {
+        inCombatPanel: { anomalyMastery: 353.68, anomalyProficiency: 296 },
+        outOfCombatPanel: { anomalyMastery: 253.68, anomalyProficiency: 116 },
+        coreSkillLevel: "F",
+      },
+      sourceSnapshotProvider: agentId => agentId === alice.id ? sourceSnapshot : null,
+    })
+    await openModal(wrapper)
+
+    const settlementButtons = wrapper.findAllComponents({ name: "RadioButton" })
+    expect(settlementButtons.map(button => button.props("label"))).toEqual(["属性异常", "紊乱结算", "异放"])
+    expect(settlementButtons[2].props("disabled")).toBe(false)
+    expect(document.body.querySelector('[data-layout-field="release-source"]')?.textContent).toContain("爱芮")
+    expect(document.body.querySelector('[data-layout-field="release-source"]')?.textContent).toContain("当前面板实时读取")
+    expect(document.body.querySelector('[data-layout-field="release-snapshot"]')).toBeNull()
+    expect(selectComponentWithOption(wrapper, alice.id)).toBeUndefined()
+    expect(document.body.querySelector('[data-layout-field="event-multiplier"]')?.textContent).toContain("654.019%")
+    expect(document.body.textContent).not.toContain("异常形态")
+
+    const explanation = document.body.querySelector(".release-explanation")?.textContent ?? ""
+    expect(explanation).toContain("异放倍率说明")
+    expect(explanation).toContain("局外异常掌控")
+    expect(explanation).toContain("异放失衡倍率修正")
+    expect(explanation).toContain("异放最终倍率")
+    expect(explanation).toContain("每10点初始异常掌控27.5%/14.3%/35.7%/2.5%/3.6%")
+    expect(explanation).not.toContain("局外未取整异常掌控")
+    expect(explanation).not.toContain("异常掌控除数")
+    expect(explanation).not.toContain("局外异常掌控换算")
+    expect(explanation).not.toContain("核心属性系数")
+    expect(explanation).not.toContain("事件比例折算")
+    expect(explanation).not.toContain("事件次数和防御、抗性")
+
+    const saved = await saveModal(wrapper)
+    expect(saved.events[0]).toMatchObject({
+      settlementType: "release",
+      anomalyEffect: "corruption",
+      triggerActorRef: { agentId: "aria", profileId: "core_passive" },
+      anomalySource: { actorRef: { agentId: "aria" } },
+    })
+    expect(saved.events[0].anomalySource).not.toHaveProperty("snapshot")
+    expect(saved.events[0].anomalyVariant).toBeUndefined()
+    expect(saved.events[0].procCount).toBeUndefined()
+  })
+
+  it("locks Aria Release when switching from Attribute Anomaly", async () => {
+    const wrapper = mountModal({
+      agent: aria,
+      damageConfig: {
+        mode: "custom",
+        selectedEventId: "aria-anomaly",
+        events: [{
+          id: "aria-anomaly",
+          kind: "anomaly",
+          settlementType: "attribute",
+          anomalyEffect: "burn",
+          anomalyVariant: "normal",
+          procCount: 3,
+          count: 1,
+          stunned: true,
+        }],
+      },
+      releaseContext: {
+        inCombatPanel: { anomalyMastery: 253.68 },
+        outOfCombatPanel: { anomalyMastery: 253.68 },
+        coreSkillLevel: "F",
+      },
+    })
+    await openModal(wrapper)
+
+    const settlementButtons = wrapper.findAllComponents({ name: "RadioButton" })
+    await settlementButtons[2].vm.$emit("click")
+    await nextTick()
+
+    expect(document.body.querySelector('[data-layout-field="release-source"]')?.textContent).toContain("爱芮")
+    const saved = await saveModal(wrapper)
+    expect(saved.events[0]).toMatchObject({
+      kind: "anomaly",
+      settlementType: "release",
+      anomalyEffect: "corruption",
+      triggerActorRef: { agentId: "aria", profileId: "core_passive" },
+      anomalySource: { actorRef: { agentId: "aria" } },
+    })
+    expect(saved.events[0]).not.toHaveProperty("procCount")
+    expect(saved.events[0]).not.toHaveProperty("anomalyVariant")
+  })
+
+  it("keeps the generalized source snapshot controls for non-Aria Release profiles", async () => {
+    const sourceSnapshot = {
+      schemaVersion: 1,
+      agentId: alice.id,
+      agentLevel: 60,
+      capturedAt: "2026-07-23T00:00:00.000Z",
+      sourceConfigHash: "test-source",
+      panel: { atk: 3000, anomalyProficiency: 500, anomalyMastery: 200 },
+      outOfCombatPanel: { atk: 2800, anomalyProficiency: 400, anomalyMastery: 195.96 },
+      buffTotals: { damageModifiers: [] },
+    }
+    const genericReleaseAgent = {
+      ...clone(aria),
+      id: "generic_release_agent",
+      name: { zhCN: "通用异放角色" },
+    }
+    const wrapper = mountModal({
+      agent: genericReleaseAgent,
+      skillCatalog: (agentSkillsData as any).agentSkills.find((skill: any) => skill.id === "aria"),
+      meta: { agents: [...(agentsData as any).agents, genericReleaseAgent] },
+      damageConfig: {
+        mode: "custom",
+        selectedEventId: "generic-release",
+        events: [{
+          id: "generic-release",
+          kind: "anomaly",
+          settlementType: "release",
+          anomalyEffect: "corruption",
+          count: 1,
+          stunned: true,
+          triggerActorRef: { agentId: genericReleaseAgent.id, profileId: "core_passive" },
+          anomalySource: { actorRef: { agentId: alice.id }, snapshot: sourceSnapshot },
+        }],
+      },
+      releaseContext: {
+        inCombatPanel: { anomalyMastery: 253.68 },
+        outOfCombatPanel: { anomalyMastery: 253.68 },
+        coreSkillLevel: "F",
+      },
+    })
+    await openModal(wrapper)
+
+    expect(selectComponentWithOption(wrapper, alice.id)).toBeTruthy()
+    expect(document.body.querySelector('[data-layout-field="release-snapshot"]')?.textContent).toContain("2026")
+
+    const saved = await saveModal(wrapper)
+    expect(saved.events[0].anomalySource).toMatchObject({
+      actorRef: { agentId: alice.id },
+      snapshot: { agentId: alice.id, sourceConfigHash: "test-source" },
+    })
   })
 
   it("uses Alice defaults in both settlement directions and never leaks Flinch into attribute anomaly", async () => {

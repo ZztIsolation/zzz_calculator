@@ -670,9 +670,8 @@
         "effectText": {
           "zhCN": "队伍中任意角色发动[强化特殊技]时，装备者的异常精通提升45点，持续8秒；如果发动[强化特殊技]的角色不是装备者本人时，装备者造成的以太伤害提升25%。"
         },
-        "selfBuff": {
-          "condition": "",
-          "durationSeconds": null,
+      "selfBuff": {
+        "condition": null,
           "effects": [
             {
               "id": "effect_2f51e29af9",
@@ -680,9 +679,17 @@
               "target": {
                 "kind": "default"
               },
-              "stat": "anomalyProficiency",
-              "mode": "flat",
-              "value": 45
+            "stat": "anomalyProficiency",
+            "mode": "flat",
+            "value": 45,
+            "condition": "队伍中任意角色发动强化特殊技",
+            "durationSeconds": 8,
+            "coverage": {
+              "default": 1,
+              "min": 0,
+              "max": 1,
+              "step": 0.1
+            }
             },
             {
               "id": "effect_a9aec22d52",
@@ -690,9 +697,17 @@
               "target": {
                 "kind": "default"
               },
-              "stat": "etherDmg",
-              "mode": "flat",
-              "value": 25
+            "stat": "etherDmg",
+            "mode": "flat",
+            "value": 25,
+            "condition": "队友（非装备者）发动强化特殊技",
+            "durationSeconds": 8,
+            "coverage": {
+              "default": 1,
+              "min": 0,
+              "max": 1,
+              "step": 0.1
+            }
             }
           ],
           "buffModifiers": []

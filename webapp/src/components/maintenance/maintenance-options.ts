@@ -38,11 +38,11 @@ export const BASIS_OPTIONS = [
 export const CRIT_MODE_OPTIONS = [option("expected", "期望"), option("crit", "暴击"), option("nonCrit", "非暴击")]
 export const EVENT_KIND_OPTIONS = [
   option("direct", "直伤"), option("sheer", "贯穿"), option("anomaly", "属性异常"),
-  option("disorder", "紊乱"), option("skillGroup", "技能组"),
+  option("disorder", "紊乱"), option("release", "异放"), option("skillGroup", "技能组"),
 ]
 export const EVENT_SOURCE_OPTIONS = [option("skill", "技能倍率"), option("manual", "手填倍率")]
 export const DISORDER_TYPE_OPTIONS = [option("normal", "（普通）紊乱"), option("polarized", "极性紊乱")]
-export const ANOMALY_SETTLEMENT_OPTIONS = [option("attribute", "属性异常"), option("disorder", "紊乱")]
+export const ANOMALY_SETTLEMENT_OPTIONS = [option("attribute", "属性异常"), option("disorder", "紊乱"), option("release", "异放")]
 export const LEVEL_SCALE_OPTIONS = [option("skill", "技能等级"), option("coreSkill", "核心技等级")]
 export const SKILL_ROW_KIND_OPTIONS = [option("damageMultiplier", "伤害倍率"), option("dazeMultiplier", "失衡倍率")]
 export const DAMAGE_BASIS_OPTIONS = [option("", "攻击力（默认）"), option("sheerForce", "贯穿力")]
@@ -150,6 +150,7 @@ export const ANOMALY_TARGET_STATS: Array<[string, string, "flat"]> = [
   ["anomalyDamageBonus", "属性异常增伤%", "flat"], ["disorderDamageBonus", "紊乱增伤%", "flat"],
   ["baseMultiplierBonus", "异常倍率修正%", "flat"], ["disorderBaseMultiplierBonus", "紊乱倍率加算%", "flat"],
   ["anomalyCritRate", "异常暴击率%", "flat"], ["anomalyCritDmg", "异常暴击伤害%", "flat"],
+  ["anomalyCritRatePerInitialMasteryAbove100", "初始异常掌控超过 100 时每点转异常暴击率%", "flat"],
   ["anomalyDurationBonusSeconds", "异常持续时间延长（秒）", "flat"],
   ["enemyDefReduction", "敌方防御力降低%", "flat"], ["enemyDefIgnore", "无视防御率%", "flat"],
   ["enemyResReduction", "敌方全属性抗性降低%", "flat"], ["allResIgnore", "全属性抗性无视%", "flat"],
@@ -160,19 +161,16 @@ export const ANOMALY_TARGET_STATS: Array<[string, string, "flat"]> = [
 
 export const EVENT_STAT_KEYS = new Set([...EVENT_STATS, ...ANOMALY_TARGET_STATS].map(([value]) => value))
 
-export function statOptions(catalog: any, targetKind = "default"): SelectOption[] {
+export function statOptions(catalog: any, targetKind = "default", settlementType = ""): SelectOption[] {
   const base = targetKind === "skill"
     ? SKILL_TARGET_STATS
     : targetKind === "anomaly"
-      ? ANOMALY_TARGET_STATS
+      ? ANOMALY_TARGET_STATS.filter(([value]) =>
+          value !== "anomalyCritRatePerInitialMasteryAbove100" || settlementType === "release")
       : [...PANEL_STATS, ...EVENT_STATS]
   const labels = new Map(base.map(([value, label]) => [value, label]))
   for (const value of Object.keys(catalog?.meta?.statRules?.statDisplay ?? {})) {
-    const allowed = targetKind === "skill"
-      ? SKILL_TARGET_STATS.some(([key]) => key === value)
-      : targetKind === "anomaly"
-        ? ANOMALY_TARGET_STATS.some(([key]) => key === value)
-        : true
+    const allowed = targetKind === "default" || base.some(([key]) => key === value)
     if (allowed) labels.set(value, labels.get(value) || statLabel(value, catalog?.meta))
   }
   return [...labels].map(([value, label]) => option(value, label))
@@ -261,6 +259,7 @@ export function defaultCalculationEvent(kind = "direct") {
   const base: any = { id: internalId("event"), kind, count: 1, stunned: true }
   if (kind === "anomaly") return { ...base, settlementType: "attribute", anomalyEffect: "assault", procCount: 1 }
   if (kind === "disorder") return { ...base, kind: "anomaly", settlementType: "disorder", disorderType: "normal", anomalyEffect: "burn", elapsedSeconds: 0 }
+  if (kind === "release") return { ...base, kind: "anomaly", settlementType: "release", anomalyEffect: "assault" }
   if (kind === "skillGroup") return { ...base, kind: "skillGroup", skillGroupId: "" }
   return { ...base, critMode: "expected", skillMultiplier: 100, damageElement: "physical", __source: "manual" }
 }
@@ -285,6 +284,8 @@ export function buffCandidates(catalog: any) {
 }
 
 export function effectSummary(effect: any, catalog: any) {
-  const stat = effect.stat ? statOptions(catalog, effect.target?.kind).find(item => item.value === effect.stat)?.label : ""
+  const stat = effect.stat
+    ? statOptions(catalog, effect.target?.kind, effect.target?.settlementType).find(item => item.value === effect.stat)?.label
+    : ""
   return [stat || effect.kind || "效果", Number.isFinite(Number(effect.value ?? effect.valuePerStack)) ? String(effect.value ?? effect.valuePerStack) : ""].filter(Boolean).join(" +")
 }

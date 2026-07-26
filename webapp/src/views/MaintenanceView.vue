@@ -24,6 +24,7 @@ import {
 } from "@/components/maintenance/maintenance-model"
 import { conditionLabel } from "@/components/maintenance/maintenance-options"
 import { loadAppConfig } from "@/runtime/app-config"
+import { useCatalogStore } from "@/stores/catalog"
 import { imageForAgent, imageForBuff, imageForDriveDiscSet, imageForWEngine } from "@/utils/assets"
 import {
   applySystemManagedMaintenanceFields,
@@ -76,6 +77,7 @@ const resources = [
 ]
 
 const router = useRouter()
+const catalogStore = useCatalogStore()
 const loading = ref(false)
 const busy = ref(false)
 const error = ref("")
@@ -739,6 +741,7 @@ async function saveDraft() {
     const payload = await response.json().catch(() => ({}))
     if (!response.ok || payload.ok === false || !payload.savedItem) throw new Error(payload.error ?? `保存失败：${response.status}`)
     applySavedItem(payload.savedItem, payload)
+    catalogStore.invalidate()
     const pending = { key: selectedKey.value, ...(["teammate-buffs", "boss-buffs"].includes(resource.value) ? { buffId: selectedBuffId.value } : {}) }
     pendingCatalogRefresh.value = pending
     saveState.value = "已保存"
@@ -796,6 +799,7 @@ async function deleteDraft() {
     const response = await fetch(pathname, { method: "DELETE" })
     const payload = await response.json().catch(() => ({}))
     if (!response.ok || payload.ok === false) throw new Error(payload.error ?? `删除失败：${response.status}`)
+    catalogStore.invalidate()
     clearStoredDraft()
     await fetchCatalog()
     selectFirstRecord()

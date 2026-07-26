@@ -1,6 +1,7 @@
 declare module "@runtime/catalog-loader.js" {
   export function loadCatalog(): Promise<any>
   export function loadMeta(): Promise<any>
+  export function invalidateCatalogCache(): void
 }
 
 declare module "@core/calculator-core.js" {
@@ -17,8 +18,32 @@ declare module "@core/damageEventMultipliers.js" {
   export function normalizeDamageScale(event?: any): number
   export function disorderBaseMultiplier(effect?: any, elapsedSeconds?: unknown, durationBonusSeconds?: unknown): { baseDuration: number, durationBonus: number, duration: number, elapsed: number, remaining: number, tickIntervalSeconds: number, tickCount: number, baseMultiplier: number }
   export function disorderMultiplierScale(type?: unknown): number
-  export function resolveDamageEventMultiplier(event?: any, catalog?: any): number | null
+  export function resolveDamageEventMultiplier(event?: any, catalog?: any, releaseContext?: any): number | null
   export function disorderDurationSeconds(event?: any, catalog?: any, durationBonusSeconds?: unknown): number
+}
+
+declare module "@core/anomalyRelease.js" {
+  export function isReleaseSettlement(event?: any): boolean
+  export function anomalyReleaseProfiles(agent?: any): any[]
+  export function defaultAnomalyReleaseProfile(agent?: any, damageElement?: string): any
+  export function anomalyReleaseProfile(agent?: any, profileId?: string, damageElement?: string): any
+  export function isAriaReleaseSourceLocked(agent?: any): boolean
+  export function normalizeAnomalyReleaseEventForAgent(event?: any, agent?: any): any
+  export function evaluateReleaseExpression(node?: any, context?: any): any
+  export function evaluateReleaseExpressionInterval(node?: any, context?: any): { min: number, max: number }
+  export function evaluateAnomalyReleaseProfile(profile?: any, context?: any): any
+  export function evaluateAnomalyReleaseProfileInterval(profile?: any, context?: any): any
+  export function releaseFormulaStatDependencies(profile?: any): string[]
+  export function validateAnomalyReleaseProfile(profile?: any): string[]
+  export function normalizeAnomalySourceSnapshot(snapshot?: any): any
+  export function createAnomalySourceSnapshot(input?: any): any
+}
+
+declare module "@core/corePassiveScaling.js" {
+  export function activeCoreSkillLevelCount(agent?: any, requestedLevel?: any): number
+  export function corePassiveScalingRow(agent?: any, requestedLevel?: any): any
+  export function materializeCorePassiveScalingRule(rule?: any, agent?: any, requestedLevel?: any): any
+  export function materializeCorePassiveScalingEffect(effect?: any, agent?: any, requestedLevel?: any): any
 }
 
 declare module "@core/calculationSkillGroups.js" {
