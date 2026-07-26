@@ -8,6 +8,7 @@ import {
   effectRuleCoverage,
   effectRuleId,
   effectRules,
+  localizedText,
   normalizeRuntimeForBuff,
   runtimeCoverageForEffectRule,
   runtimeSourceGroups,
@@ -148,8 +149,22 @@ function fourPieceRuntimePartLabel(buff: any) {
   return String(buff?.id ?? "").endsWith(".team") ? "团队效果" : "装备者效果"
 }
 
+function normalizeOptimizerRuntimeForBuff(buff: any, runtime: any) {
+  const input = runtime && typeof runtime === "object" ? runtime : {}
+  const normalized = normalizeRuntimeForBuff(buff, input)
+  for (const rule of effectRules(buff)) {
+    const id = effectRuleId(rule)
+    const configured = input.effects?.[id] ?? input[id]
+    normalized.effects[id] = {
+      ...(normalized.effects?.[id] ?? {}),
+      enabled: configured?.enabled !== false,
+    }
+  }
+  return normalized
+}
+
 function optimizerRuntimeFor(buff: any) {
-  return normalizeRuntimeForBuff(buff, optimizerDraft.value.fourPieceBuffRuntimeInputs?.[buff.id] ?? defaultRuntimeForBuff(buff))
+  return normalizeOptimizerRuntimeForBuff(buff, optimizerDraft.value.fourPieceBuffRuntimeInputs?.[buff.id] ?? defaultRuntimeForBuff(buff))
 }
 
 function updateOptimizerRuntime(buff: any, runtime: any) {
@@ -157,13 +172,47 @@ function updateOptimizerRuntime(buff: any, runtime: any) {
     ...optimizerDraft.value,
     fourPieceBuffRuntimeInputs: {
       ...(optimizerDraft.value.fourPieceBuffRuntimeInputs ?? {}),
-      [buff.id]: normalizeRuntimeForBuff(buff, runtime),
+      [buff.id]: normalizeOptimizerRuntimeForBuff(buff, runtime),
     },
   }
 }
 
-function coverageRules(buff: any) {
-  return effectRules(buff).filter((rule: any) => effectRuleCoverage(rule, buff))
+function optimizerBuffDescription(buff: any) {
+  return localizedText(buff?.description) || localizedText(buff?.condition)
+}
+
+function optimizerEffectRows(buff: any) {
+  const runtime = optimizerRuntimeFor(buff)
+  return effectRules(buff).map((rule: any) => {
+    const displayRule = { ...rule, coverage: undefined }
+    const displayBuff = {
+      ...buff,
+      coverage: undefined,
+      effects: [displayRule],
+    }
+    return {
+      id: effectRuleId(rule),
+      rule,
+      text: storedEffectRuleText(displayRule, runtime, displayBuff),
+      coverage: effectRuleCoverage(rule, buff),
+      enabled: runtime.effects?.[effectRuleId(rule)]?.enabled !== false,
+    }
+  }).filter((row: any) => row.text)
+}
+
+function setOptimizerRuleEnabled(buff: any, rule: any, enabled: boolean) {
+  const runtime = optimizerRuntimeFor(buff)
+  const id = effectRuleId(rule)
+  updateOptimizerRuntime(buff, {
+    ...runtime,
+    effects: {
+      ...(runtime.effects ?? {}),
+      [id]: {
+        ...(runtime.effects?.[id] ?? {}),
+        enabled,
+      },
+    },
+  })
 }
 
 function setOptimizerRuleCoverage(buff: any, rule: any, value: number | null) {
@@ -214,7 +263,7 @@ function save() {
   const buffById = new Map((props.fourPieceRuntimeBuffs ?? []).map((buff: any) => [buff.id, buff]))
   payload.fourPieceBuffRuntimeInputs = Object.fromEntries(Object.entries(payload.fourPieceBuffRuntimeInputs).flatMap(([id, runtime]) => {
     const buff = buffById.get(id)
-    return buff ? [[id, normalizeRuntimeForBuff(buff, runtime)]] : []
+    return buff ? [[id, normalizeOptimizerRuntimeForBuff(buff, runtime)]] : []
   }))
   emit("save", payload)
   close()
@@ -266,22 +315,39 @@ function save() {
             class="optimizer-runtime-card"
           >
             <div class="optimizer-runtime-head">
-              <strong>{{ buffDisplayName(buff) }}</strong>
+              <div class="optimizer-runtime-copy">
+                <strong>{{ buffDisplayName(buff) }}</strong>
+                <p v-if="optimizerBuffDescription(buff)">{{ optimizerBuffDescription(buff) }}</p>
+              </div>
               <NTag round>{{ fourPieceRuntimePartLabel(buff) }}</NTag>
             </div>
-            <div class="optimizer-runtime-grid">
-              <div v-for="rule in coverageRules(buff)" :key="`coverage-${effectRuleId(rule)}`" class="metric optimizer-runtime-metric optimizer-coverage-metric ui-field" data-layout-field>
-                <dt>{{ storedEffectRuleText(rule, optimizerRuntimeFor(buff), buff) }}</dt>
-                <dd>
-                  <NInputNumber
-                    :value="runtimeCoverageForEffectRule(rule, buff, optimizerRuntimeFor(buff))"
-                    :min="0"
-                    :max="1"
-                    :step="0.1"
-                    @update:value="setOptimizerRuleCoverage(buff, rule, $event)"
-                  />
-                </dd>
+            <div class="optimizer-effect-list">
+              <div v-for="row in optimizerEffectRows(buff)" :key="row.id" class="optimizer-effect-row" :class="{ 'is-disabled': !row.enabled }">
+                <span class="optimizer-effect-value">{{ row.text }}</span>
+                <div class="optimizer-effect-controls">
+                  <NCheckbox
+                    class="optimizer-rule-enabled-control"
+                    :checked="row.enabled"
+                    @update:checked="setOptimizerRuleEnabled(buff, row.rule, Boolean($event))"
+                  >
+                    启用
+                  </NCheckbox>
+                  <label v-if="row.coverage" class="optimizer-rule-coverage-control">
+                    <span>覆盖率</span>
+                    <NInputNumber
+                      :value="runtimeCoverageForEffectRule(row.rule, buff, optimizerRuntimeFor(buff))"
+                      :min="Number.isFinite(Number(row.coverage.min)) ? Number(row.coverage.min) : 0"
+                      :max="Number.isFinite(Number(row.coverage.max)) ? Number(row.coverage.max) : 1"
+                      :step="Number.isFinite(Number(row.coverage.step)) ? Number(row.coverage.step) : 0.1"
+                      :disabled="!row.enabled"
+                      size="small"
+                      @update:value="setOptimizerRuleCoverage(buff, row.rule, $event)"
+                    />
+                  </label>
+                </div>
               </div>
+            </div>
+            <div v-if="runtimeSourceGroups(buff).length || runtimeStackGroups(buff).length" class="optimizer-runtime-grid">
               <div v-for="group in runtimeSourceGroups(buff)" :key="group.key" class="metric optimizer-runtime-metric ui-field" data-layout-field>
                 <dt>{{ group.label || "来源数值" }}</dt>
                 <dd>
@@ -439,15 +505,91 @@ function save() {
 .optimizer-runtime-head,
 .optimizer-field-title-row {
   display: flex;
-  align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.optimizer-runtime-head strong {
+.optimizer-runtime-head {
+  align-items: flex-start;
+}
+
+.optimizer-field-title-row {
+  align-items: center;
+}
+
+.optimizer-runtime-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.optimizer-runtime-copy strong {
   min-width: 0;
   overflow-wrap: anywhere;
   font-size: 13px;
+}
+
+.optimizer-runtime-copy p {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.optimizer-effect-list {
+  display: grid;
+  border-top: 1px solid var(--app-border);
+}
+
+.optimizer-effect-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.optimizer-effect-value {
+  min-width: 0;
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.optimizer-effect-row.is-disabled .optimizer-effect-value {
+  color: var(--app-muted);
+  font-weight: 650;
+}
+
+.optimizer-effect-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px 14px;
+}
+
+.optimizer-rule-enabled-control {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.optimizer-rule-coverage-control {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.optimizer-rule-coverage-control :deep(.n-input-number) {
+  width: 104px;
 }
 
 .optimizer-runtime-grid {
@@ -464,16 +606,6 @@ function save() {
 
 .optimizer-runtime-metric :deep(.n-input-number) {
   width: 112px;
-}
-
-.optimizer-coverage-metric {
-  flex: 1 1 280px;
-}
-
-.optimizer-coverage-metric dd {
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .optimizer-runtime-layer {
@@ -563,6 +695,16 @@ function save() {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .optimizer-effect-row {
+    grid-template-columns: 1fr;
+  }
+
+  .optimizer-effect-controls {
+    justify-content: space-between;
+  }
 }
 
 </style>

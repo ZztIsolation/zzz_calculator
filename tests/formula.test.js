@@ -5,6 +5,7 @@ import {
     calculateInCombatPanel,
     loadCalculatorContext,
 } from "../backend/calculator.js"
+import { validateMaintenanceItem } from "../core/maintenanceValidation.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
@@ -22,6 +23,7 @@ const expectedTeammateProfiles = {
     lycaon: ["ice", "stun"],
     nangongyu: ["ether", "stun"],
     nicole: ["ether", "support"],
+    norma_hollowell: ["fire", "stun"],
     orphie_magusa: ["fire", "attack"],
     pan_yinhu: ["physical", "defense"],
     qianxia: ["physical", "support"],
@@ -50,8 +52,8 @@ function countTeammateProfile(index) {
     }, {})
 }
 
-assert.deepEqual(countTeammateProfile(0), { electric: 6, ether: 4, fire: 5, ice: 3, physical: 6 })
-assert.deepEqual(countTeammateProfile(1), { anomaly: 3, attack: 3, defense: 3, stun: 7, support: 8 })
+assert.deepEqual(countTeammateProfile(0), { electric: 6, ether: 4, fire: 6, ice: 3, physical: 6 })
+assert.deepEqual(countTeammateProfile(1), { anomaly: 3, attack: 3, defense: 3, stun: 8, support: 8 })
 
 function clone(value) {
     return JSON.parse(JSON.stringify(value))
@@ -261,5 +263,78 @@ approx(
     0.3,
     "Pan Yinhu Stupefaction should be a 20% + 10% general damage bonus",
 )
+
+const normaGroup = catalog.teammateCombatBuffGroups.find(group => group.id === "norma_hollowell")
+assert.ok(normaGroup, "Norma teammate Buff group should exist")
+assert.equal(normaGroup.attribute, "fire")
+assert.equal(normaGroup.specialty, "stun")
+assert.equal(normaGroup.images?.icon, "/assets/agents/norma_hollowell.png")
+assert.deepEqual(
+    normaGroup.buffs.map(buff => buff.id),
+    [
+        "norma_hollowell.additional_technical_gap",
+        "norma_hollowell.additional_bangboo_barrage",
+        "norma_hollowell.cinema_1_aggressive_foresight",
+        "norma_hollowell.cinema_2_technical_gap_amplify",
+    ],
+    "Norma teammate Buffs should stay split by trigger window and authored order",
+)
+const normaTeammate = { ...normaGroup }
+delete normaTeammate.buffs
+for (const buff of normaGroup.buffs) {
+    const validation = validateMaintenanceItem("teammate-buffs", {
+        teammate: normaTeammate,
+        buff,
+    }, {
+        teammates: catalog.teammateCombatBuffGroups,
+        currentBuffId: buff.id,
+        agentSkills: catalog.agentSkills ?? [],
+    })
+    assert.deepEqual(validation.errors, [], `${buff.id} should be accepted by teammate Buff maintenance`)
+}
+
+const normaEvent = {
+    id: "norma-buff-test",
+    kind: "direct",
+    damageElement: "fire",
+    skillMultiplier: 100,
+    critMode: "nonCrit",
+    stunned: true,
+}
+
+function calculateNormaBuffs(activeBuffIds) {
+    return calculateInCombatPanel(catalog, {
+        ...input,
+        combatBuffs: { activeBuffIds },
+        damage: {
+            agentLevel: 60,
+            selectedEventId: normaEvent.id,
+            events: [normaEvent],
+            target: {
+                defense: 953,
+                levelCoefficient: 794,
+                stunMultiplierPercent: 150,
+                resistanceByElement: {
+                    physical: 0,
+                    fire: 0,
+                    ice: 0,
+                    electric: 0,
+                    ether: 0,
+                },
+            },
+        },
+    })
+}
+
+const normaTechnicalGap = calculateNormaBuffs(["norma_hollowell.additional_technical_gap"])
+approx(normaTechnicalGap.damage.multipliers.stun, 1.8, "Norma Technical Gap should default to 10 stacks for 30% stun vulnerability")
+
+const normaCinemaTwoOnly = calculateNormaBuffs(["norma_hollowell.cinema_2_technical_gap_amplify"])
+approx(normaCinemaTwoOnly.damage.multipliers.stun, 1.5, "Norma cinema 2 should not create Technical Gap by itself")
+
+const normaAllBuffs = calculateNormaBuffs(normaGroup.buffs.map(buff => buff.id))
+approx(normaAllBuffs.damage.multipliers.stun, 2.1, "Norma cinema 2 should raise Technical Gap from 3% to 6% per stack")
+approx(normaAllBuffs.damage.multipliers.dmg, 1.2, "Norma Bangboo Barrage should grant 20% team damage")
+approx(normaAllBuffs.damage.multipliers.resistance, 1.15, "Norma cinema 1 should reduce all-attribute resistance by 15%")
 
 console.log("formula tests passed")

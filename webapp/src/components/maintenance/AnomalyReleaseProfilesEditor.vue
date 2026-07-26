@@ -30,7 +30,7 @@ function addProfile() {
     default: items.length === 0,
     supportedElements: [props.model.damageElement || props.model.attribute || "physical"],
     resultMode: "originalAnomalyRatio",
-    expression: { kind: "constant", value: 1, unit: "decimal", label: { zhCN: "异放倍率" } },
+    expression: { kind: "constant", value: 1, unit: "decimal", whiteBoxRole: "conversionSource", label: { zhCN: "固定倍率" } },
   })
   emit("change")
 }
@@ -40,11 +40,6 @@ function setDefault(index: number, value: boolean) {
   emit("change")
 }
 
-function toggleCritExpression(profile: any, enabled: boolean) {
-  if (enabled) profile.critRateBonusExpression = { kind: "constant", value: 0, unit: "decimal" }
-  else delete profile.critRateBonusExpression
-  emit("change")
-}
 </script>
 
 <template>
@@ -64,10 +59,9 @@ function toggleCritExpression(profile: any, enabled: boolean) {
       </div>
       <ReleaseExpressionEditor :node="profile.expression" :core-scaling="model.coreSkill?.corePassiveScaling" :disabled="disabled" @change="emit('change')" />
       <div class="maintenance-row-head">
-        <label class="maintenance-switch-field"><span>暴击率附加公式</span><NSwitch :value="Boolean(profile.critRateBonusExpression)" :disabled="disabled" @update:value="toggleCritExpression(profile, Boolean($event))" /></label>
+        <strong>方案操作</strong>
         <NButton quaternary type="error" :disabled="disabled" title="删除异放倍率方案" @click="profiles().splice(index, 1); emit('change')"><template #icon><Trash2 :size="15" /></template></NButton>
       </div>
-      <ReleaseExpressionEditor v-if="profile.critRateBonusExpression" :node="profile.critRateBonusExpression" :core-scaling="model.coreSkill?.corePassiveScaling" :disabled="disabled" @change="emit('change')" />
     </details>
   </article>
 </template>

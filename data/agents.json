@@ -550,7 +550,9 @@
         }
       },
       "preferredDriveDiscs": {
-        "defaultSetIds": ["scanner-set-fcf8ae93d798"],
+        "defaultSetIds": [
+          "scanner-set-fcf8ae93d798"
+        ],
         "mainStatLimits": {
           "4": [
             "atkPct",
@@ -1408,7 +1410,9 @@
         }
       },
       "preferredDriveDiscs": {
-        "defaultSetIds": ["scanner-set-48ee0a14625f"],
+        "defaultSetIds": [
+          "scanner-set-48ee0a14625f"
+        ],
         "mainStatLimits": {
           "4": [
             "atkPct",
@@ -2188,7 +2192,9 @@
         }
       },
       "preferredDriveDiscs": {
-        "defaultSetIds": ["yunkui_tales"],
+        "defaultSetIds": [
+          "yunkui_tales"
+        ],
         "mainStatLimits": {
           "4": [
             "hpPct",
@@ -2843,7 +2849,9 @@
         }
       },
       "preferredDriveDiscs": {
-        "defaultSetIds": ["fanged_metal"],
+        "defaultSetIds": [
+          "fanged_metal"
+        ],
         "mainStatLimits": {
           "4": [
             "anomalyProficiency",
@@ -2972,18 +2980,18 @@
               }
             },
             {
-              "id": "corruption-duration-disorder",
+              "id": "effect_92256acea3",
               "type": "fixed",
-              "stat": "anomalyDurationBonusSeconds",
-              "value": 3,
-              "mode": "flat",
               "target": {
                 "kind": "anomaly",
                 "settlementType": "disorder",
                 "anomalyEffects": [
                   "corruption"
                 ]
-              }
+              },
+              "stat": "anomalyDurationBonusSeconds",
+              "mode": "flat",
+              "value": 3
             }
           ],
           "buffModifiers": []
@@ -3008,10 +3016,7 @@
                 "mode": "flat",
                 "target": {
                   "kind": "anomaly",
-                  "settlementType": "release",
-                  "anomalyEffects": [
-                    "corruption"
-                  ]
+                  "settlementType": "release"
                 }
               },
               {
@@ -3022,10 +3027,18 @@
                 "mode": "flat",
                 "target": {
                   "kind": "anomaly",
-                  "settlementType": "release",
-                  "anomalyEffects": [
-                    "corruption"
-                  ]
+                  "settlementType": "release"
+                }
+              },
+              {
+                "id": "release-crit-rate-from-initial-mastery",
+                "type": "fixed",
+                "stat": "anomalyCritRatePerInitialMasteryAbove100",
+                "value": 0.5,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "release"
                 }
               }
             ],
@@ -3045,81 +3058,33 @@
               {
                 "id": "attack-def-ignore-16",
                 "type": "fixed",
-                "stat": "etherDefIgnore",
-                "value": 16,
-                "mode": "flat",
-                "target": {
-                  "kind": "skill",
-                  "skillTargets": [
-                    { "kind": "skillType", "skillType": "basic" },
-                    { "kind": "skillType", "skillType": "dodge" },
-                    { "kind": "skillType", "skillType": "assist" },
-                    { "kind": "skillType", "skillType": "special" },
-                    { "kind": "skillType", "skillType": "chain" },
-                    { "kind": "skillType", "skillType": "ultimate" }
-                  ]
-                }
-              },
-              {
-                "id": "release-def-ignore-16",
-                "type": "fixed",
-                "stat": "etherDefIgnore",
+                "stat": "enemyDefIgnore",
                 "value": 16,
                 "mode": "flat",
                 "target": {
                   "kind": "anomaly",
-                  "settlementType": "release",
-                  "anomalyEffects": ["corruption"]
+                  "settlementType": "release"
                 }
-              },
-              {
-                "id": "attack-delusion-def-ignore-8",
-                "type": "fixed",
-                "stat": "etherDefIgnore",
-                "value": 8,
-                "mode": "flat",
-                "condition": "妄想时刻期间",
-                "target": {
-                  "kind": "skill",
-                  "skillTargets": [
-                    { "kind": "skillType", "skillType": "basic" },
-                    { "kind": "skillType", "skillType": "dodge" },
-                    { "kind": "skillType", "skillType": "assist" },
-                    { "kind": "skillType", "skillType": "special" },
-                    { "kind": "skillType", "skillType": "chain" },
-                    { "kind": "skillType", "skillType": "ultimate" }
-                  ]
-                },
-                "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
               },
               {
                 "id": "release-delusion-def-ignore-8",
                 "type": "fixed",
-                "stat": "etherDefIgnore",
+                "stat": "enemyDefIgnore",
                 "value": 8,
                 "mode": "flat",
                 "condition": "妄想时刻期间",
                 "target": {
                   "kind": "anomaly",
-                  "settlementType": "release",
-                  "anomalyEffects": ["corruption"]
+                  "settlementType": "release"
                 },
-                "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
               }
             ],
-            "buffModifiers": []
-          },
-          {
-            "cinemaLevel": 4,
-            "cinemaName": {
-              "zhCN": "机械天使"
-            },
-            "description": {
-              "zhCN": "触发异放时获得4点能量和70点喧响值，10秒内最多触发一次。资源回复保留官方说明，不换算为伤害或额外事件。"
-            },
-            "scope": "inCombat",
-            "defaultChecked": false,
-            "effects": [],
             "buffModifiers": []
           },
           {
@@ -3128,7 +3093,7 @@
               "zhCN": "永不落幕"
             },
             "description": {
-              "zhCN": "进入战斗获得1200点喧响值并永久处于妄想时刻；强化蓄力普通攻击和终结技造成的以太伤害提升40%。全场应援及应援能量转换机制保留说明，不伪造额外攻击次数。"
+              "zhCN": "进入战斗获得1200点喧响值并永久处于妄想时刻；强化蓄力普通攻击和终结技造成的以太伤害提升40%。获得全场应援及应援能量转换机制。"
             },
             "scope": "inCombat",
             "defaultChecked": false,
@@ -3140,25 +3105,13 @@
                 "value": 40,
                 "mode": "flat",
                 "target": {
-                  "kind": "skill",
-                  "skillTargets": [
-                    {
-                      "kind": "specific",
-                      "agentSkillId": "aria",
-                      "categoryId": "basic",
-                      "skillType": "basic",
-                      "moveId": "absolute_pitch",
-                      "rowId": "enhanced_charge_damage"
-                    },
-                    {
-                      "kind": "specific",
-                      "agentSkillId": "aria",
-                      "categoryId": "chain",
-                      "skillType": "ultimate",
-                      "moveId": "ultimate_full_vitality",
-                      "rowId": "damage"
-                    }
-                  ]
+                  "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
                 }
               }
             ],
@@ -3176,38 +3129,110 @@
           {
             "level": "A",
             "label": "强化A",
-            "stats": [{ "stat": "anomalyMasteryFlat", "value": 12, "mode": "flat", "target": "panel" }],
-            "skillLevelBonuses": [{ "skill": "corePassive", "value": 1 }]
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
           },
           {
             "level": "B",
             "label": "强化B",
-            "stats": [{ "stat": "atkBase", "value": 25, "mode": "flat", "target": "base" }],
-            "skillLevelBonuses": [{ "skill": "corePassive", "value": 1 }]
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
           },
           {
             "level": "C",
             "label": "强化C",
-            "stats": [{ "stat": "anomalyMasteryFlat", "value": 12, "mode": "flat", "target": "panel" }],
-            "skillLevelBonuses": [{ "skill": "corePassive", "value": 1 }]
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
           },
           {
             "level": "D",
             "label": "强化D",
-            "stats": [{ "stat": "atkBase", "value": 25, "mode": "flat", "target": "base" }],
-            "skillLevelBonuses": [{ "skill": "corePassive", "value": 1 }]
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
           },
           {
             "level": "E",
             "label": "强化E",
-            "stats": [{ "stat": "anomalyMasteryFlat", "value": 12, "mode": "flat", "target": "panel" }],
-            "skillLevelBonuses": [{ "skill": "corePassive", "value": 1 }]
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
           },
           {
             "level": "F",
             "label": "强化F",
-            "stats": [{ "stat": "atkBase", "value": 25, "mode": "flat", "target": "base" }],
-            "skillLevelBonuses": [{ "skill": "corePassive", "value": 1 }]
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
           }
         ],
         "corePassiveScaling": {
@@ -3215,13 +3240,90 @@
             "zhCN": "核心被动：控场核心"
           },
           "levels": [
-            { "level": 1, "anomalyProficiencyFlat": 45, "releaseCoefficientPctByElement": { "ether": 13.8, "electric": 7.2, "fire": 17.9, "physical": 1.25, "ice": 1.8, "wind": 0.7 } },
-            { "level": 2, "anomalyProficiencyFlat": 52, "releaseCoefficientPctByElement": { "ether": 16, "electric": 8.3, "fire": 20.8, "physical": 1.46, "ice": 2.1, "wind": 0.8 } },
-            { "level": 3, "anomalyProficiencyFlat": 60, "releaseCoefficientPctByElement": { "ether": 18.3, "electric": 9.5, "fire": 23.8, "physical": 1.67, "ice": 2.4, "wind": 0.9 } },
-            { "level": 4, "anomalyProficiencyFlat": 67, "releaseCoefficientPctByElement": { "ether": 20.6, "electric": 10.7, "fire": 26.8, "physical": 1.88, "ice": 2.7, "wind": 1.1 } },
-            { "level": 5, "anomalyProficiencyFlat": 75, "releaseCoefficientPctByElement": { "ether": 22.9, "electric": 11.9, "fire": 29.8, "physical": 2.08, "ice": 3, "wind": 1.2 } },
-            { "level": 6, "anomalyProficiencyFlat": 82, "releaseCoefficientPctByElement": { "ether": 25.2, "electric": 13.1, "fire": 32.7, "physical": 2.29, "ice": 3.3, "wind": 1.3 } },
-            { "level": 7, "anomalyProficiencyFlat": 90, "releaseCoefficientPctByElement": { "ether": 27.5, "electric": 14.3, "fire": 35.7, "physical": 2.5, "ice": 3.6, "wind": 1.4 } }
+            {
+              "level": 1,
+              "anomalyProficiencyFlat": 45,
+              "releaseCoefficientPctByElement": {
+                "ether": 13.8,
+                "electric": 7.2,
+                "fire": 17.9,
+                "physical": 1.25,
+                "ice": 1.8,
+                "wind": 0.7
+              }
+            },
+            {
+              "level": 2,
+              "anomalyProficiencyFlat": 52,
+              "releaseCoefficientPctByElement": {
+                "ether": 16,
+                "electric": 8.3,
+                "fire": 20.8,
+                "physical": 1.46,
+                "ice": 2.1,
+                "wind": 0.8
+              }
+            },
+            {
+              "level": 3,
+              "anomalyProficiencyFlat": 60,
+              "releaseCoefficientPctByElement": {
+                "ether": 18.3,
+                "electric": 9.5,
+                "fire": 23.8,
+                "physical": 1.67,
+                "ice": 2.4,
+                "wind": 0.9
+              }
+            },
+            {
+              "level": 4,
+              "anomalyProficiencyFlat": 67,
+              "releaseCoefficientPctByElement": {
+                "ether": 20.6,
+                "electric": 10.7,
+                "fire": 26.8,
+                "physical": 1.88,
+                "ice": 2.7,
+                "wind": 1.1
+              }
+            },
+            {
+              "level": 5,
+              "anomalyProficiencyFlat": 75,
+              "releaseCoefficientPctByElement": {
+                "ether": 22.9,
+                "electric": 11.9,
+                "fire": 29.8,
+                "physical": 2.08,
+                "ice": 3,
+                "wind": 1.2
+              }
+            },
+            {
+              "level": 6,
+              "anomalyProficiencyFlat": 82,
+              "releaseCoefficientPctByElement": {
+                "ether": 25.2,
+                "electric": 13.1,
+                "fire": 32.7,
+                "physical": 2.29,
+                "ice": 3.3,
+                "wind": 1.3
+              }
+            },
+            {
+              "level": 7,
+              "anomalyProficiencyFlat": 90,
+              "releaseCoefficientPctByElement": {
+                "ether": 27.5,
+                "electric": 14.3,
+                "fire": 35.7,
+                "physical": 2.5,
+                "ice": 3.6,
+                "wind": 1.4
+              }
+            }
           ],
           "defaultLevelAtCoreSkill": "F"
         },
@@ -3241,54 +3343,86 @@
             "zhCN": "核心被动：控场核心"
           },
           "default": true,
-          "supportedElements": ["ether", "electric", "fire", "physical", "ice", "wind"],
+          "supportedElements": [
+            "ether",
+            "electric",
+            "fire",
+            "physical",
+            "ice",
+            "wind"
+          ],
           "resultMode": "originalAnomalyRatio",
           "expression": {
             "op": "multiply",
-            "label": { "zhCN": "异放倍率" },
+            "label": {
+              "zhCN": "异放倍率"
+            },
             "args": [
               {
                 "op": "divide",
-                "label": { "zhCN": "局外异常掌控换算" },
-                "args": [
-                  { "kind": "triggerStat", "panel": "outOfCombat", "stat": "anomalyMastery", "unit": "raw", "label": { "zhCN": "局外未取整异常掌控" } },
-                  { "kind": "constant", "value": 10, "unit": "raw", "label": { "zhCN": "异常掌控除数" } }
-                ]
-              },
-              { "kind": "coreSkillScaling", "field": "releaseCoefficientPctByElement", "key": "eventElement", "unit": "percent", "label": { "zhCN": "核心属性系数" } },
-              { "kind": "condition", "condition": "stunned", "whenTrue": 1.5, "whenFalse": 1, "unit": "decimal", "label": { "zhCN": "异放失衡倍率修正" } }
-            ]
-          },
-          "critRateBonusExpression": {
-            "op": "multiply",
-            "args": [
-              {
-                "op": "max",
+                "label": {
+                  "zhCN": "局外异常掌控换算"
+                },
                 "args": [
                   {
-                    "op": "subtract",
-                    "args": [
-                      { "kind": "triggerStat", "panel": "outOfCombat", "stat": "anomalyMastery", "unit": "raw" },
-                      { "kind": "constant", "value": 100, "unit": "raw" }
-                    ]
+                    "kind": "triggerStat",
+                    "panel": "outOfCombat",
+                    "stat": "anomalyMastery",
+                    "unit": "raw",
+                    "whiteBoxRole": "conversionSource",
+                    "label": {
+                      "zhCN": "局外异常掌控"
+                    }
                   },
-                  { "kind": "constant", "value": 0, "unit": "raw" }
+                  {
+                    "kind": "constant",
+                    "value": 10,
+                    "unit": "raw",
+                    "label": {
+                      "zhCN": "异常掌控除数"
+                    }
+                  }
                 ]
               },
-              { "kind": "constant", "value": 0.5, "unit": "percent" }
+              {
+                "kind": "coreSkillScaling",
+                "field": "releaseCoefficientPctByElement",
+                "key": "eventElement",
+                "unit": "percent",
+                "label": {
+                  "zhCN": "核心属性系数"
+                }
+              },
+              {
+                "kind": "condition",
+                "condition": "stunned",
+                "whenTrue": 1.5,
+                "whenFalse": 1,
+                "unit": "decimal",
+                "label": {
+                  "zhCN": "异放失衡倍率修正"
+                }
+              }
             ]
           }
         }
       ],
       "preferredDriveDiscs": {
         "defaultSetIds": [
-          "astral_voice",
           "phaethons_melody"
         ],
         "mainStatLimits": {
-          "4": ["anomalyProficiency"],
-          "5": ["etherDmg", "atkPct", "penRatio"],
-          "6": ["anomalyMastery"]
+          "4": [
+            "anomalyProficiency"
+          ],
+          "5": [
+            "etherDmg",
+            "atkPct",
+            "penRatio"
+          ],
+          "6": [
+            "anomalyMastery"
+          ]
         }
       },
       "defaultCalculationConfig": {

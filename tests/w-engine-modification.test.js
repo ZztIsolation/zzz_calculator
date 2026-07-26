@@ -70,8 +70,11 @@ const expectedModificationValues = {
     "zzz_wiki_1753:teamBuff:effect_wiki_1753_team_atk:value": [10, 11.5, 13, 14.5, 16],
     "zzz_wiki_1753:teamBuff:effect_wiki_1753_team_hp:value": [10, 11.5, 13, 14.5, 16],
     "zzz_wiki_1753:teamBuff:effect_wiki_1753_team_crit_dmg:value": [30, 34.5, 39, 43.5, 48],
-    "zzz_wiki_1689:selfBuff:effect_wiki_1689_self_daze:valuePerStack": [9, 10.3, 11.7, 13, 14.5],
     "zzz_wiki_1689:teamBuff:effect_wiki_1689_team_crit_dmg:value": [30, 34.5, 39, 43.5, 48],
+    "zzz_wiki_1243:selfBuff:effect_wiki_1243_self_impact_stack:valuePerStack": [4, 4.6, 5.2, 5.8, 6.4],
+    "zzz_wiki_1243:selfBuff:effect_wiki_1243_self_impact_full:value": [8, 9.2, 10.4, 11.6, 12.8],
+    "zzz_wiki_1243:teamBuff:effect_wiki_1243_team_def_reduction:value": [25, 28.75, 32.5, 36.25, 40],
+    "zzz_wiki_760:selfBuff:effect_wiki_760_self_physical_dmg:valuePerStack": [12, 15, 18, 21, 24],
     "zzz_wiki_951:teamBuff:effect_wiki_951_team_crit_dmg_iceCritDmg:valuePerStack": [1.5, 1.72, 1.95, 2.17, 2.4],
     "zzz_wiki_951:teamBuff:effect_wiki_951_team_crit_dmg_fireCritDmg:valuePerStack": [1.5, 1.72, 1.95, 2.17, 2.4],
     "zzz_wiki_486:teamBuff:effect_wiki_486_team_atk:valuePerStack": [2.5, 2.8, 3.2, 3.6, 4],
@@ -124,6 +127,25 @@ for (const [key, values] of Object.entries(expectedModificationValues)) {
 }
 
 const meta = buildMeta(catalog)
+assert.deepEqual(
+    ["zzz_wiki_1243", "zzz_wiki_760"].map(id => {
+        const item = wEngine(id)
+        return [item.id, item.name.zhCN, item.rarity, item.specialty, item.level60.atkBase, item.level60.advancedStat.stat, item.level60.advancedStat.value]
+    }),
+    [
+        ["zzz_wiki_1243", "索魂影眸", "S", "stun", 713, "critRate", 24],
+        ["zzz_wiki_760", "淬锋钳刺", "S", "anomaly", 713, "anomalyProficiency", 90],
+    ],
+    "The two requested official W-Engines should keep their exact level-60 catalog data",
+)
+assert.match(wEngine("zzz_wiki_1243").effect.description.zhCN, /防御力降低25%\/28\.75%\/32\.5%\/36\.25%\/40%.*魂锁.*额外给装备者的冲击力提升8%\/9\.2%\/10\.4%\/11\.6%\/12\.8%/)
+assert.match(wEngine("zzz_wiki_760").effect.description.zhCN, /物理伤害提升12%\/15%\/18%\/21%\/24%.*属性异常积蓄效率提升40%\/50%\/60%\/70%\/80%/)
+for (const id of ["zzz_wiki_1689", "zzz_wiki_1243", "zzz_wiki_760"]) {
+    assert.ok(
+        wEngine(id).sources.includes(`https://baike.mihoyo.com/zzz/wiki/content/${id.replace("zzz_wiki_", "")}/detail?mhy_presentation_style=fullscreen`),
+        `${id} should cite its official detail page`,
+    )
+}
 assert.equal(
     catalog.wEngines.filter(item => item.name?.zhCN === "霓虹妄想").length,
     1,
@@ -298,17 +320,52 @@ approx(roaringRideMastery.inCombat.buffTotals.anomalyMasteryPct, 0.25, "Roaring 
 approx(roaringRideMastery.inCombat.buffTotals.anomalyMasteryFlat, 0, "Roaring Ride mastery should not enter the combat flat bucket")
 approx(roaringRideMastery.inCombat.panel.anomalyMastery, 177.5, "Combat mastery percentage should scale the out-of-combat panel")
 
-const stunRank5 = createInCombatPanelCalculator(catalog, {
+assert.equal(wEngine("zzz_wiki_1689").effect.selfBuff, null, "Yesterday's Call Daze should remain text-only instead of changing Impact")
+assert.match(
+    wEngine("zzz_wiki_1689").effect.description.zhCN,
+    /同一招式内最多触发一次.*暴击伤害提升效果全队唯一/,
+    "Yesterday's Call should preserve the complete official trigger and uniqueness text",
+)
+
+const yesterdayCallRank5 = createInCombatPanelCalculator(catalog, {
     agentId: "anby_demara",
     coreSkillLevel: "none",
     wEngineId: "zzz_wiki_1689",
     wEngineModificationLevel: 5,
     combatBuffs: {
-        activeBuffIds: ["wEngine:zzz_wiki_1689.self", "wEngine:zzz_wiki_1689.team"],
+        activeBuffIds: ["wEngine:zzz_wiki_1689.team"],
     },
 }).calculate([], { round: false })
-approx(stunRank5.inCombat.buffTotals.impactPct, 0.435, "Yesterday's Call rank 5 Daze should scale per stack")
-approx(stunRank5.inCombat.buffTotals.critDmg, 0.48, "Yesterday's Call rank 5 team CRIT DMG should scale")
+approx(yesterdayCallRank5.inCombat.buffTotals.impactPct, 0, "Yesterday's Call Daze should not be approximated as Impact")
+approx(yesterdayCallRank5.inCombat.buffTotals.critDmg, 0.48, "Yesterday's Call rank 5 team CRIT DMG should scale")
+
+const spectralGazeRank5 = createInCombatPanelCalculator(catalog, {
+    agentId: "anby_demara",
+    coreSkillLevel: "none",
+    wEngineId: "zzz_wiki_1243",
+    wEngineModificationLevel: 5,
+    combatBuffs: {
+        activeBuffIds: ["wEngine:zzz_wiki_1243.self", "wEngine:zzz_wiki_1243.team"],
+    },
+}).calculate([], { round: false })
+approx(spectralGazeRank5.inCombat.buffTotals.impactPct, 0.32, "Spectral Gaze rank 5 should apply three Soul Lock stacks and the full-stack bonus")
+approx(spectralGazeRank5.inCombat.buffTotals.enemyDefReduction, 0.4, "Spectral Gaze rank 5 should apply exact target DEF reduction")
+
+const sharpenedStingerRank5 = createInCombatPanelCalculator(catalog, {
+    agentId: "alice_thymefield",
+    coreSkillLevel: "F",
+    wEngineId: "zzz_wiki_760",
+    wEngineModificationLevel: 5,
+    combatBuffs: {
+        activeBuffIds: ["wEngine:zzz_wiki_760.self"],
+    },
+}).calculate([], { round: false })
+approx(sharpenedStingerRank5.inCombat.buffTotals.physicalDmg, 0.72, "Sharpened Stinger rank 5 should apply three exact Hunting Intent stacks")
+assert.match(
+    wEngine("zzz_wiki_760").verification.effectBuff,
+    /anomaly-buildup-text-only/,
+    "Sharpened Stinger should mark anomaly buildup efficiency as text-only",
+)
 
 const qingmingRank5Engine = materializeFrontendWEngine(wEngine("zzz_wiki_1342"), 5)
 const qingmingStackGroups = runtimeStackGroups(qingmingRank5Engine.effect.selfBuff)
@@ -383,7 +440,7 @@ const crossSpecialtyCurrentWEngineInput = {
     wEngineId: "zzz_wiki_1689",
     wEngineModificationLevel: 5,
     combatBuffs: {
-        activeBuffIds: ["wEngine:zzz_wiki_1689.self", "wEngine:zzz_wiki_1689.team"],
+        activeBuffIds: ["wEngine:zzz_wiki_1689.team"],
     },
     damage: {
         skillMultiplier: 100,
@@ -399,19 +456,13 @@ assert.deepEqual(
     crossSpecialtyCurrentWEngine.inCombat.ignoredEffects.filter(effect => effect.reason === "specialtyMismatch"),
     [
         {
-            key: "wEngine:zzz_wiki_1689.self",
-            sourceType: "wEngine",
-            reason: "specialtyMismatch",
-        },
-        {
             key: "wEngine:zzz_wiki_1689.team",
             sourceType: "wEngineTeam",
             reason: "specialtyMismatch",
         },
     ],
-    "Current equipped cross-specialty W-Engine self and team Buffs should be ignored",
+    "Current equipped cross-specialty W-Engine team Buff should be ignored",
 )
-approx(crossSpecialtyCurrentWEngine.inCombat.buffTotals.impactPct, 0, "Cross-specialty current W-Engine self Buff should not apply")
 approx(crossSpecialtyCurrentWEngine.inCombat.buffTotals.critDmg, 0, "Cross-specialty current W-Engine team Buff should not apply")
 
 const crossSpecialtyPreparedCalculator = createInCombatPanelCalculator(catalog, crossSpecialtyCurrentWEngineInput)
@@ -421,7 +472,6 @@ assert.deepEqual(
     crossSpecialtyCurrentWEngine.inCombat.ignoredEffects.filter(effect => effect.reason === "specialtyMismatch"),
     "Prepared calculator should report the same current W-Engine specialty mismatches",
 )
-approx(crossSpecialtyPrepared.inCombat.buffTotals.impactPct, 0, "Prepared current W-Engine self Buff should respect specialty mismatch")
 approx(crossSpecialtyPrepared.inCombat.buffTotals.critDmg, 0, "Prepared current W-Engine team Buff should respect specialty mismatch")
 const crossSpecialtyNoBuffScore = createInCombatPanelCalculator(catalog, {
     ...crossSpecialtyCurrentWEngineInput,
@@ -548,6 +598,28 @@ const defenseRank5 = createInCombatPanelCalculator(defenseCatalog, {
 approx(defenseRank5.inCombat.buffTotals.atkPctOutOfCombat, 0.16, "Sweet Snow Bunny rank 5 team ATK should scale")
 approx(defenseRank5.inCombat.buffTotals.hpPctOutOfCombat, 0.16, "Sweet Snow Bunny rank 5 team HP should scale")
 approx(defenseRank5.inCombat.buffTotals.critDmg, 0.48, "Sweet Snow Bunny rank 5 team CRIT DMG should scale")
+
+const defenseRank5PartialCoverage = createInCombatPanelCalculator(defenseCatalog, {
+    agentId: "ye_shunguang",
+    coreSkillLevel: "none",
+    wEngineId: "zzz_wiki_1753",
+    wEngineModificationLevel: 5,
+    combatBuffs: {
+        activeBuffIds: ["wEngine:zzz_wiki_1753.team"],
+        runtimeInputs: {
+            "wEngine:zzz_wiki_1753.team": {
+                effects: {
+                    effect_wiki_1753_team_atk: { coverage: 0.5 },
+                    effect_wiki_1753_team_hp: { coverage: 0.25 },
+                    effect_wiki_1753_team_crit_dmg: { coverage: 0 },
+                },
+            },
+        },
+    },
+}).calculate([], { round: false })
+approx(defenseRank5PartialCoverage.inCombat.buffTotals.atkPctOutOfCombat, 0.08, "Sweet Snow Bunny team ATK should use independent coverage")
+approx(defenseRank5PartialCoverage.inCombat.buffTotals.hpPctOutOfCombat, 0.04, "Sweet Snow Bunny team HP should use independent coverage")
+approx(defenseRank5PartialCoverage.inCombat.buffTotals.critDmg, 0, "Sweet Snow Bunny team CRIT DMG should allow zero coverage")
 
 function externalSweetSnowBunnyAtRank(level) {
     const calculator = createInCombatPanelCalculator(defenseCatalog, {

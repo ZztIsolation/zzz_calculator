@@ -32,7 +32,7 @@ import {
   statLabel,
   storedStatLabel,
 } from "@/utils/format"
-import { SKILL_CATEGORIES, activeDriveDisc4pcBuffIds, savedAnomalySourceSnapshotForAgent, useBuildStore } from "@/stores/build"
+import { SKILL_CATEGORIES, activeDriveDisc4pcRuntimeInputs, savedAnomalySourceSnapshotForAgent, useBuildStore } from "@/stores/build"
 import { useAccountStore } from "@/stores/account"
 import { useAppConfigStore } from "@/stores/app-config"
 import { useCatalogStore } from "@/stores/catalog"
@@ -135,27 +135,14 @@ const selectedDriveDiscs = computed(() => inventoryStore.calculatorDriveDiscs({
   loadoutId: buildStore.selectedLoadoutId,
   optimizedDriveDiscs: selectedOptimizedScheme.value?.driveDiscs ?? [],
 }))
-const selectedOptimizedRuntimeInputs = computed(() => {
-  if (buildStore.discMode !== "optimized" || !catalogStore.catalog || !selectedOptimizedScheme.value) {
+const selectedDriveDiscRuntimeInputs = computed(() => {
+  if (!catalogStore.catalog) {
     return {}
   }
-  const settings = optimizerStore.completedSettings ?? optimizerStore.progress?.settings ?? null
-  if (settings?.fourPieceBuffMode !== "manual") {
-    return {}
-  }
-  const source = settings.fourPieceBuffRuntimeInputs
-  if (!source || typeof source !== "object" || Array.isArray(source)) {
-    return {}
-  }
-  return Object.fromEntries(
-    activeDriveDisc4pcBuffIds(catalogStore.catalog, selectedDriveDiscs.value)
-      .map(id => [id, source[id]] as [string, any])
-      .filter(([, runtime]) => runtime && typeof runtime === "object" && !Array.isArray(runtime))
-      .map(([id, runtime]) => [id, JSON.parse(JSON.stringify(runtime))]),
-  )
+  return activeDriveDisc4pcRuntimeInputs(catalogStore.catalog, selectedDriveDiscs.value, optimizerStore.settings)
 })
 const selectedBuildOptions = computed(() => ({
-  runtimeInputs: selectedOptimizedRuntimeInputs.value,
+  runtimeInputs: selectedDriveDiscRuntimeInputs.value,
 }))
 const selectedLoadout = computed(() => inventoryStore.loadouts.find((item: any) => item.id === buildStore.selectedLoadoutId))
 const loadoutOptions = computed(() => [
@@ -265,7 +252,9 @@ const selectedDriveDiscRows = computed<Array<{ slot: number, disc: any | null }>
 })
 const currentSchemeScoreLabel = computed(() => {
   if (buildStore.discMode === "optimized" && selectedOptimizedScheme.value) {
-    return `第 ${selectedOptimizedScheme.value.rank} 名 · ${formatNumber(selectedOptimizedScheme.value.score, 0)}`
+    return optimizerStore.resultsAreStale
+      ? `第 ${selectedOptimizedScheme.value.rank} 名 · 上次评分 ${formatNumber(selectedOptimizedScheme.value.score, 0)}`
+      : `第 ${selectedOptimizedScheme.value.rank} 名 · ${formatNumber(selectedOptimizedScheme.value.score, 0)}`
   }
   if (buildStore.discMode === "loadout" && selectedLoadout.value?.score !== undefined) {
     return `评分 ${formatNumber(selectedLoadout.value.score, 0)}`
@@ -469,6 +458,7 @@ const fourPieceRuntimeBuffs = computed(() => {
         ...selfBuff,
         id: `driveDisc4pc:${set.id}.self`,
         name: { zhCN: `${labelOf(set)} 4 件套自身` },
+        description: fourPiece.effectText,
         sourceCategory: "driveDisc",
       })
     }
@@ -477,6 +467,7 @@ const fourPieceRuntimeBuffs = computed(() => {
         ...fourPiece.teamBuff,
         id: `driveDisc4pc:${set.id}.team`,
         name: { zhCN: `${labelOf(set)} 4 件套团队` },
+        description: fourPiece.effectText,
         sourceCategory: "driveDisc",
       })
     }
@@ -601,7 +592,7 @@ const buildSignature = computed(() => JSON.stringify({
   loadoutId: buildStore.selectedLoadoutId,
   optimizedRank: buildStore.selectedOptimizedRank,
   discs: selectedDriveDiscs.value.map((disc: any) => disc.id),
-  optimizedRuntimeInputs: selectedOptimizedRuntimeInputs.value,
+  driveDiscRuntimeInputs: selectedDriveDiscRuntimeInputs.value,
 }))
 
 watch(buildSignature, () => recalculate())
@@ -1235,6 +1226,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
               <template #icon><SlidersHorizontal :size="18" /></template>
               计算配置
             </NButton>
+            <NTag v-if="optimizerStore.resultsAreStale" type="warning" round>约束已更新，需重新优化</NTag>
             <NTag :type="optimizerStore.status === 'error' ? 'error' : optimizerStore.status === 'done' ? 'success' : 'info'" round>{{ optimizerStatusLabel(optimizerStore.status) }}</NTag>
           </div>
         </div>
@@ -1364,6 +1356,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
             class="drive-disc-mode-control"
             :model-value="buildStore.selectedOptimizedRank"
             :results="topOptimizedResultSchemes"
+            :stale="optimizerStore.resultsAreStale"
             @update:model-value="buildStore.selectOptimizedRank"
           />
           <div v-if="buildStore.discMode === 'optimized' && selectedOptimizedFourPieceSet" class="selected-set-summary optimized-result-set">

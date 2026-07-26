@@ -140,6 +140,57 @@ function cleanMainStatLimits(value: any = {}) {
   }
 }
 
+function canonicalValue(value: any): any {
+  if (Array.isArray(value)) {
+    return value.map(canonicalValue)
+  }
+  if (!value || typeof value !== "object") {
+    return value
+  }
+  return Object.fromEntries(
+    Object.keys(value)
+      .sort()
+      .map(key => [key, canonicalValue(value[key])]),
+  )
+}
+
+function normalizedSetIds(value: any, fallback: any = "") {
+  const values = normalizeArray(value)
+  if (!values.length && fallback) {
+    values.push(String(fallback))
+  }
+  return [...new Set(values)].sort()
+}
+
+function optimizerSettingsFingerprint(settings: any = {}) {
+  const mainStatLimits = cleanMainStatLimits(settings.explicitMainStatLimits ?? settings.mainStatLimits)
+  return JSON.stringify(canonicalValue({
+    algorithm: normalizeBrowserOptimizerAlgorithm(settings.algorithm),
+    fourPieceSetIds: normalizedSetIds(settings.fourPieceSetIds, settings.fourPieceSetId),
+    twoPieceSetIds: normalizedSetIds(settings.twoPieceSetIds, settings.twoPieceSetId),
+    fourPieceBuffMode: settings.fourPieceBuffMode === "manual" ? "manual" : "auto",
+    fourPieceBuffRuntimeInputs: plainObject(settings.fourPieceBuffRuntimeInputs),
+    mainStatLimits: Object.fromEntries(Object.entries(mainStatLimits)
+      .map(([slot, values]) => [slot, [...new Set(normalizeArray(values))].sort()])),
+    minimums: cleanMinimums(settings.minimums),
+  }))
+}
+
+function settingsFromState(state: any) {
+  return {
+    objective: "damage",
+    algorithm: state.algorithm,
+    fourPieceSetIds: state.fourPieceSetIds,
+    fourPieceSetId: state.fourPieceSetIds[0] ?? "",
+    twoPieceSetIds: state.twoPieceSetIds,
+    fourPieceBuffMode: state.fourPieceBuffMode,
+    fourPieceBuffRuntimeInputs: state.fourPieceBuffRuntimeInputs,
+    mainStatLimits: state.mainStatLimits,
+    minimums: cleanMinimums(state.minimums),
+    enableUpperBoundPruning: true,
+  }
+}
+
 function optimizerDriveDiscSets(catalog: any = null) {
   return catalog?.displayDriveDiscSets ?? catalog?.driveDiscSets ?? []
 }
@@ -393,6 +444,7 @@ export const useOptimizerStore = defineStore("optimizer", {
     results: [] as any[],
     resultSchemes: [] as any[],
     completedSettings: null as any,
+    completedSettingsFingerprint: "",
     error: "",
     cancelRequested: false,
   }),
@@ -400,20 +452,12 @@ export const useOptimizerStore = defineStore("optimizer", {
     isBusy: state => state.status === "estimating" || state.status === "preparing" || state.status === "running" || state.status === "cancelling",
     fourPieceSetId: state => state.fourPieceSetIds[0] ?? "",
     selectedResult: state => (rank: number) => state.resultSchemes.find((item: any) => Number(item.rank) === Number(rank)),
-    settings(state) {
-      return {
-        objective: "damage",
-        algorithm: state.algorithm,
-        fourPieceSetIds: state.fourPieceSetIds,
-        fourPieceSetId: state.fourPieceSetIds[0] ?? "",
-        twoPieceSetIds: state.twoPieceSetIds,
-        fourPieceBuffMode: state.fourPieceBuffMode,
-        fourPieceBuffRuntimeInputs: state.fourPieceBuffRuntimeInputs,
-        mainStatLimits: state.mainStatLimits,
-        minimums: cleanMinimums(state.minimums),
-        enableUpperBoundPruning: true,
-      }
-    },
+    settings: state => settingsFromState(state),
+    resultsAreStale: state => Boolean(
+      state.resultSchemes.length
+      && state.completedSettingsFingerprint
+      && state.completedSettingsFingerprint !== optimizerSettingsFingerprint(settingsFromState(state)),
+    ),
   },
   actions: {
     initialize(catalog: any = null, agent: any = null) {
@@ -547,6 +591,7 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.results = []
       this.resultSchemes = []
       this.completedSettings = null
+      this.completedSettingsFingerprint = ""
       this.error = ""
       this.cancelRequested = false
     },
@@ -560,6 +605,7 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.results = []
       this.resultSchemes = []
       this.completedSettings = null
+      this.completedSettingsFingerprint = ""
       this.cancelRequested = false
       this.progress = null
       this.applyProgress({
@@ -659,6 +705,7 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.results = []
       this.resultSchemes = []
       this.completedSettings = null
+      this.completedSettingsFingerprint = ""
       this.cancelRequested = false
       this.progress = null
       this.applyProgress({
@@ -673,6 +720,7 @@ export const useOptimizerStore = defineStore("optimizer", {
       lastWorkerMessageAt = Date.now()
       const worker = reusableWorker()
       const workerInput = this.inputWithSettings(input, store)
+      const submittedSettingsFingerprint = optimizerSettingsFingerprint(workerInput.settings)
       const workerStore = optimizerStorePayload(store, workerInput.ownerId)
       const workerCatalog = catalogForWorker(catalog)
       const workerRequestInput = cloneWorkerPayload(workerInput)
@@ -763,6 +811,7 @@ export const useOptimizerStore = defineStore("optimizer", {
             })
             this.results = results
             this.completedSettings = hasResults ? cloneWorkerPayload(completedSettings) : null
+            this.completedSettingsFingerprint = hasResults ? submittedSettingsFingerprint : ""
             this.resultSchemes = this.results.map((result: any) => ({
               rank: result.rank,
               score: result.score,

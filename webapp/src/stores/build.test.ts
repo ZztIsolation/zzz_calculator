@@ -1,6 +1,6 @@
 import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it } from "vitest"
-import { defaultDamageConfig, normalizeDamageModeForAgent, useBuildStore } from "@/stores/build"
+import { activeDriveDisc4pcRuntimeInputs, defaultDamageConfig, normalizeDamageModeForAgent, useBuildStore } from "@/stores/build"
 
 function teammateWEngineMeta() {
   const teamWEngine = (id: string) => ({
@@ -520,6 +520,43 @@ describe("build store", () => {
     expect(input.combatBuffs.activeBuffIds).toContain("driveDisc4pc:set_a.self")
     expect(input.combatBuffs.activeBuffIds).toContain("driveDisc4pc:set_a.team")
     expect(input.combatBuffs.activeBuffIds).not.toContain("driveDisc4pc:set_b.self")
+  })
+
+  it("applies saved manual runtime only to matching active 4-piece sets", () => {
+    const catalog = {
+      driveDiscSets: [{
+        id: "set_a",
+        fourPiece: {
+          selfBuff: {
+            effects: [{ id: "self", type: "fixed", stat: "dmgBonus", value: 10 }],
+          },
+        },
+      }],
+    }
+    const matchingDiscs = [1, 2, 3, 4, 5, 6].map(slot => ({
+      id: `disc-${slot}`,
+      partition: slot,
+      setId: slot <= 4 ? "set_a" : "set_b",
+    }))
+    const runtime = {
+      effects: { self: { enabled: false, coverage: 0.5 } },
+    }
+    const manualSettings = {
+      fourPieceBuffMode: "manual",
+      fourPieceBuffRuntimeInputs: {
+        "driveDisc4pc:set_a.self": runtime,
+        "driveDisc4pc:set_b.self": { effects: { other: { enabled: true } } },
+      },
+    }
+
+    expect(activeDriveDisc4pcRuntimeInputs(catalog, matchingDiscs, manualSettings)).toEqual({
+      "driveDisc4pc:set_a.self": runtime,
+    })
+    expect(activeDriveDisc4pcRuntimeInputs(catalog, matchingDiscs.slice(0, 3), manualSettings)).toEqual({})
+    expect(activeDriveDisc4pcRuntimeInputs(catalog, matchingDiscs, {
+      ...manualSettings,
+      fourPieceBuffMode: "auto",
+    })).toEqual({})
   })
 
   it("merges selected optimized 4-piece runtime overrides into the calculation input", () => {

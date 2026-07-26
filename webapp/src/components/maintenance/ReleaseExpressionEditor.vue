@@ -13,6 +13,7 @@ const nodeTypeOptions = [
   option("max", "取最大值"), option("min", "取最小值"), option("clamp", "限制范围"), option("floor", "向下取整"),
 ]
 const unitOptions = [option("raw", "原始数值"), option("percent", "百分数"), option("decimal", "小数倍率")]
+const whiteBoxRoleOptions = [option("", "不单独展示"), option("conversionSource", "转换数据来源")]
 const panelOptions = [option("outOfCombat", "局外面板"), option("inCombat", "局内面板")]
 const statOptions = [option("anomalyMastery", "异常掌控"), option("anomalyProficiency", "异常精通"), option("atk", "攻击力")]
 const coreFieldLabels: Record<string, string> = {
@@ -73,6 +74,7 @@ function addArgument() {
       <label v-if="node.kind === 'condition'" class="maintenance-field"><span>满足时</span><NInputNumber v-model:value="node.whenTrue" :disabled="disabled" :step="0.01" @update:value="emit('change')" /></label>
       <label v-if="node.kind === 'condition'" class="maintenance-field"><span>不满足时</span><NInputNumber v-model:value="node.whenFalse" :disabled="disabled" :step="0.01" @update:value="emit('change')" /></label>
       <label class="maintenance-field"><span>数值单位</span><NSelect v-model:value="node.unit" :options="unitOptions" :disabled="disabled" @update:value="emit('change')" /></label>
+      <label class="maintenance-field"><span>白盒展示</span><NSelect :value="node.whiteBoxRole ?? ''" :options="whiteBoxRoleOptions" :disabled="disabled" @update:value="node.whiteBoxRole = $event || undefined; emit('change')" /></label>
     </div>
 
     <div v-if="node.op" class="release-expression-args">

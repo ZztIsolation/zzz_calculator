@@ -636,6 +636,22 @@ export function activeDriveDisc4pcBuffIds(catalog: any, driveDiscs: any[] = []) 
   return ids
 }
 
+export function activeDriveDisc4pcRuntimeInputs(catalog: any, driveDiscs: any[] = [], settings: any = {}) {
+  if (settings?.fourPieceBuffMode !== "manual") {
+    return {}
+  }
+  const source = settings?.fourPieceBuffRuntimeInputs
+  if (!source || typeof source !== "object" || Array.isArray(source)) {
+    return {}
+  }
+  return Object.fromEntries(
+    activeDriveDisc4pcBuffIds(catalog, driveDiscs)
+      .map(id => [id, source[id]] as [string, any])
+      .filter(([, runtime]) => runtime && typeof runtime === "object" && !Array.isArray(runtime))
+      .map(([id, runtime]) => [id, JSON.parse(JSON.stringify(runtime))]),
+  )
+}
+
 export const useBuildStore = defineStore("build", {
   state: () => ({
     agentId: "",

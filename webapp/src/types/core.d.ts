@@ -1,6 +1,7 @@
 declare module "@runtime/catalog-loader.js" {
   export function loadCatalog(): Promise<any>
   export function loadMeta(): Promise<any>
+  export function invalidateCatalogCache(): void
 }
 
 declare module "@core/calculator-core.js" {

@@ -451,8 +451,8 @@ const fieldPeriodOptions = computed(() => {
     .sort((left, right) => {
       const leftPeriod = fieldBuffPeriod(left)
       const rightPeriod = fieldBuffPeriod(right)
+      // Modes in the same phase keep catalog order, which defines the authored default.
       return rightPeriod.phaseNo - leftPeriod.phaseNo
-        || String(localizedText(right.source)).localeCompare(String(localizedText(left.source)), "zh-CN")
     })
     .map(buff => {
       const key = fieldBuffPeriodKey(buff)

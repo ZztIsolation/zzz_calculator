@@ -148,4 +148,22 @@ assert.deepEqual(releaseTargetMigration.effects[1].target, {
 })
 assert.equal(releaseTargetMigration.effects[1].appliesTo, undefined)
 
+const releaseWildcardMigration = normalizeLegacyEffectAppliesToInValue(clone({
+    effects: [{
+        id: "legacy-release-wildcard",
+        type: "fixed",
+        stat: "dmgBonus",
+        mode: "flat",
+        value: 20,
+        appliesTo: {
+            anomalyVariants: ["release"],
+        },
+    }],
+}))
+assert.deepEqual(releaseWildcardMigration.effects[0].target, {
+    kind: "anomaly",
+    settlementType: "release",
+})
+assert.equal(releaseWildcardMigration.effects[0].appliesTo, undefined)
+
 console.log("effect rule target migration tests passed")

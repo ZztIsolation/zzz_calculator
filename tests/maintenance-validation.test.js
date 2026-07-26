@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { cleanMaintenanceItem } from "../backend/server.js"
@@ -9,6 +10,50 @@ import {
 } from "../core/maintenanceValidation.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
+const combatBuffData = JSON.parse(readFileSync(path.join(rootDir, "data", "combat_buffs.json"), "utf8"))
+const wEngineData = JSON.parse(readFileSync(path.join(rootDir, "data", "w_engines.json"), "utf8"))
+
+const teammateEffectsWithoutCoverage = combatBuffData.teammates.flatMap(teammate =>
+    teammate.buffs.flatMap(buff => buff.effects
+        .filter(effect => !effect.coverage)
+        .map(effect => `${teammate.id}/${buff.id}/${effect.id}`)),
+)
+assert.deepEqual(
+    teammateEffectsWithoutCoverage,
+    [],
+    "Every teammate Buff effect must allow users to adjust its coverage",
+)
+for (const teammate of combatBuffData.teammates) {
+    for (const buff of teammate.buffs) {
+        for (const effect of buff.effects) {
+            assert.deepEqual(
+                effect.coverage,
+                { default: 1, min: 0, max: 1, step: 0.1 },
+                `Unexpected coverage metadata for ${teammate.id}/${buff.id}/${effect.id}`,
+            )
+        }
+    }
+}
+
+const teamWEngineEffectsWithoutCoverage = wEngineData.wEngines.flatMap(engine =>
+    (engine.effect?.teamBuff?.effects ?? [])
+        .filter(effect => !effect.coverage)
+        .map(effect => `${engine.id}/${effect.id}`),
+)
+assert.deepEqual(
+    teamWEngineEffectsWithoutCoverage,
+    [],
+    "Every team W-Engine Buff effect must allow users to adjust its coverage",
+)
+for (const engine of wEngineData.wEngines) {
+    for (const effect of engine.effect?.teamBuff?.effects ?? []) {
+        assert.deepEqual(
+            effect.coverage,
+            { default: 1, min: 0, max: 1, step: 0.1 },
+            `Unexpected team W-Engine coverage metadata for ${engine.id}/${effect.id}`,
+        )
+    }
+}
 
 const systemManagedFixture = applySystemManagedMaintenanceFields({
     skillGroups: [{ defaultCount: 9, minCount: 2, maxCount: 3, step: 0.5 }],
@@ -1264,7 +1309,7 @@ const validReleaseProfile = {
     expression: {
         op: "multiply",
         args: [
-            { kind: "triggerStat", panel: "outOfCombat", stat: "anomalyMastery", unit: "raw" },
+            { kind: "triggerStat", panel: "outOfCombat", stat: "anomalyMastery", unit: "raw", whiteBoxRole: "conversionSource" },
             { kind: "constant", value: 5, unit: "percent" },
             { kind: "condition", condition: "stunned", whenTrue: 1.5, whenFalse: 1, unit: "decimal" },
         ],
@@ -1292,6 +1337,7 @@ const validReleaseAgent = {
 assertValid("agents", validReleaseAgent, validCalculationContext)
 const cleanedReleaseAgent = cleanMaintenanceItem("agents", validReleaseAgent)
 assert.deepEqual(cleanedReleaseAgent.defaultCalculationConfig.events[0], validReleaseEvent)
+assert.equal(cleanedReleaseAgent.anomalyReleaseProfiles[0].expression.args[0].whiteBoxRole, "conversionSource")
 assert.equal(cleanedReleaseAgent.defaultCalculationConfig.events[0].anomalyVariant, undefined)
 assert.equal(cleanedReleaseAgent.defaultCalculationConfig.events[0].procCount, undefined)
 const cleanedLegacyReleaseAgent = cleanMaintenanceItem("agents", {
@@ -1321,6 +1367,13 @@ assert.deepEqual(cleanedLegacyReleaseAgent.defaultCalculationConfig.events[0], {
     triggerActorRef: { agentId: validAgent.id, profileId: validReleaseProfile.id },
     anomalySource: { actorRef: { agentId: validAgent.id } },
 })
+assertInvalid("agents", {
+    ...validReleaseAgent,
+    anomalyReleaseProfiles: [{
+        ...validReleaseProfile,
+        expression: { kind: "constant", value: 5, unit: "decimal" },
+    }],
+}, "必须且只能标记一个转换数据来源", validCalculationContext)
 assertInvalid("agents", {
     ...validReleaseAgent,
     anomalyReleaseProfiles: [{
@@ -2385,11 +2438,63 @@ assertValid("combat-buffs", {
         target: { kind: "anomaly", settlementType: "release", anomalyEffects: ["corruption"] },
     }],
 })
+const wildcardAnomalyTargetBuff = {
+    ...anomalyTargetBuff,
+    effects: [{
+        ...anomalyTargetBuff.effects[0],
+        target: { kind: "anomaly", settlementType: "disorder" },
+    }],
+}
+assertValid("combat-buffs", wildcardAnomalyTargetBuff)
+assert.deepEqual(
+    cleanMaintenanceItem("combat-buffs", wildcardAnomalyTargetBuff).effects[0].target,
+    { kind: "anomaly", settlementType: "disorder" },
+)
+const emptyWildcardAnomalyTargetBuff = {
+    ...anomalyTargetBuff,
+    effects: [{
+        ...anomalyTargetBuff.effects[0],
+        target: { kind: "anomaly", settlementType: "disorder", anomalyEffects: [] },
+    }],
+}
+assertValid("combat-buffs", emptyWildcardAnomalyTargetBuff)
+assert.deepEqual(
+    cleanMaintenanceItem("combat-buffs", emptyWildcardAnomalyTargetBuff).effects[0].target,
+    { kind: "anomaly", settlementType: "disorder" },
+    "Empty concrete-Anomaly input should clean to the canonical settlement wildcard",
+)
 assertInvalid("combat-buffs", {
     ...anomalyTargetBuff,
-    effects: [{ ...anomalyTargetBuff.effects[0], target: { kind: "anomaly", settlementType: "disorder", anomalyEffects: [] } }],
-}, "异常增幅必须至少选择一个异常效果")
-
+    effects: [{
+        ...anomalyTargetBuff.effects[0],
+        target: { kind: "anomaly", settlementType: "disorder", anomalyEffects: "flinch" },
+    }],
+}, "具体异常必须是数组")
+const initialMasteryCritConversion = {
+    ...anomalyTargetBuff.effects[0],
+    id: "initial-mastery-to-anomaly-crit",
+    stat: "anomalyCritRatePerInitialMasteryAbove100",
+    value: 0.5,
+    target: { kind: "anomaly", settlementType: "release", anomalyEffects: ["corruption"] },
+}
+assertValid("combat-buffs", {
+    ...anomalyTargetBuff,
+    effects: [initialMasteryCritConversion],
+})
+assertInvalid("combat-buffs", {
+    ...anomalyTargetBuff,
+    effects: [{
+        ...initialMasteryCritConversion,
+        target: { kind: "anomaly", settlementType: "attribute", anomalyEffects: ["corruption"] },
+    }],
+}, "初始异常掌控转异常暴击率只能用于异放结算")
+assertInvalid("combat-buffs", {
+    ...anomalyTargetBuff,
+    effects: [{
+        ...initialMasteryCritConversion,
+        target: { kind: "default" },
+    }],
+}, "初始异常掌控转异常暴击率只能用于异放结算")
 const buffWithModifierOnly = {
     ...validBuff,
     id: "youye.cinema_1.amplify_additional_ability",

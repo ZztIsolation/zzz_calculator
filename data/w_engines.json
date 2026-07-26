@@ -482,6 +482,12 @@
                   14.5,
                   16
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             },
             {
@@ -499,6 +505,12 @@
                   14.5,
                   16
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             },
             {
@@ -515,6 +527,12 @@
                   43.5,
                   48
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -567,38 +585,10 @@
           }
         },
         "description": {
-          "zhCN": "位于后台时，装备者的能量自动回复提升1.5/1.7/1.9/2.1/2.3点/秒；装备者发动[强化特殊技]造成物理属性伤害时，装备者攻击造成的失衡值提升9%/10.3%/11.7%/13%/14.5%，最多叠加3层，持续10秒；叠加到3层时，全队角色暴击伤害额外提升30%/34.5%/39%/43.5%/48%，持续40秒。",
+          "zhCN": "位于后台时，装备者的能量自动回复提升1.5/1.7/1.9/2.1/2.3点/秒；装备者发动[强化特殊技]造成物理属性伤害时，装备者攻击造成的失衡值提升9%/10.3%/11.7%/13%/14.5%，最多叠加3层，持续10秒，同一招式内最多触发一次，重复触发时刷新持续时间；叠加到3层时，全队角色暴击伤害额外提升30%/34.5%/39%/43.5%/48%，持续40秒，重复触发时刷新持续时间，暴击伤害提升效果全队唯一。",
           "en": "When off-field, the equipper gains Energy Regen. Physical EX Special Attack damage increases the Daze dealt by the equipper's attacks, stacking up to 3 times. At 3 stacks, squad CRIT DMG increases."
         },
-        "selfBuff": {
-          "scope": "inCombat",
-          "condition": "enhancedSpecialPhysicalDamage",
-          "durationSeconds": 10,
-          "appliesToOutOfCombatPanel": false,
-          "effects": [
-            {
-              "id": "effect_wiki_1689_self_daze",
-              "type": "stacked",
-              "stat": "impactPct",
-              "mode": "flat",
-              "valuePerStack": 9,
-              "maxStacks": 3,
-              "defaultStacks": 3,
-              "modificationValues": {
-                "valuePerStack": [
-                  9,
-                  10.3,
-                  11.7,
-                  13,
-                  14.5
-                ]
-              }
-            }
-          ],
-          "effectText": {
-            "zhCN": "装备者发动[强化特殊技]造成物理属性伤害时，装备者攻击造成的失衡值提升9%/10.3%/11.7%/13%/14.5%，最多叠加3层，持续10秒。"
-          }
-        },
+        "selfBuff": null,
         "teamBuff": {
           "scope": "inCombat",
           "condition": "threeStacks",
@@ -618,21 +608,28 @@
                   43.5,
                   48
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
           "effectText": {
-            "zhCN": "叠加到3层时，全队角色暴击伤害额外提升30%/34.5%/39%/43.5%/48%，持续40秒。"
+            "zhCN": "叠加到3层时，全队角色暴击伤害额外提升30%/34.5%/39%/43.5%/48%，持续40秒，重复触发时刷新持续时间，暴击伤害提升效果全队唯一。"
           }
         }
       },
       "sources": [
-        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1689/detail?mhy_presentation_style=fullscreen"
       ],
       "verification": {
         "level60Stats": "source-checked",
         "effectText": "source-checked",
-        "effectBuff": "partially-modeled"
+        "effectBuff": "partially-modeled-energy-and-daze-text-only"
       }
     },
     {
@@ -716,6 +713,12 @@
                   17.9,
                   20
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             },
             {
@@ -733,6 +736,12 @@
                   14.5,
                   16
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -828,6 +837,12 @@
                   36.3,
                   40
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             },
             {
@@ -845,6 +860,12 @@
                   21.8,
                   24
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -952,6 +973,12 @@
                   87,
                   96
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -1032,6 +1059,12 @@
                   14.5,
                   16
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -1161,6 +1194,12 @@
                   21,
                   24
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -1321,6 +1360,12 @@
                   3.6,
                   4
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -1420,6 +1465,12 @@
                   2.9,
                   3.2
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -1547,6 +1598,12 @@
                   17.5,
                   20
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -3017,6 +3074,12 @@
                   18.1,
                   20
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -3095,6 +3158,12 @@
                   87,
                   96
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -3175,6 +3244,12 @@
                   14.5,
                   16
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -3259,6 +3334,12 @@
                   2.17,
                   2.4
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             },
             {
@@ -3284,6 +3365,12 @@
                   2.17,
                   2.4
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -3362,6 +3449,12 @@
                   31.5,
                   36
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -3440,6 +3533,12 @@
                   29,
                   32
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -3518,6 +3617,12 @@
                   17.5,
                   20
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             },
             {
@@ -3539,6 +3644,12 @@
                   3,
                   3.3
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -3617,6 +3728,12 @@
                   11,
                   12
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -3695,6 +3812,12 @@
                   15,
                   16
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             },
             {
@@ -3714,6 +3837,12 @@
                   15,
                   16
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -3793,6 +3922,12 @@
                   11,
                   12
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -6134,8 +6269,7 @@
               "mode": "flat",
               "target": {
                 "kind": "anomaly",
-                "settlementType": "attribute",
-                "anomalyEffects": ["assault", "shatter", "burn", "shock", "corruption"]
+                "settlementType": "attribute"
               },
               "requirement": {
                 "attribute": "ether"
@@ -6153,8 +6287,7 @@
               "mode": "flat",
               "target": {
                 "kind": "anomaly",
-                "settlementType": "disorder",
-                "anomalyEffects": ["burn", "shock", "corruption", "frozen", "frost_frozen", "flinch"]
+                "settlementType": "disorder"
               },
               "requirement": {
                 "attribute": "ether"
@@ -6177,6 +6310,238 @@
         "level60Stats": "source-checked-mihoyo-baike-2026-07-22",
         "effectText": "source-checked-mihoyo-baike-2026-07-22",
         "effectBuff": "five modification levels modeled; ether-only damage rules carry rule-level attribute requirements"
+      }
+    },
+    {
+      "id": "zzz_wiki_1243",
+      "name": {
+        "zhCN": "索魂影眸"
+      },
+      "rarity": "S",
+      "specialty": "stun",
+      "attribute": "electric",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1243.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/03/24/158441880/8af13876cf5d0dac56d68bcf217ea58c_5903588353920177925.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "critRate",
+          "value": 24,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "捕风寻踪"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者的[追加攻击]命中敌人并造成电属性伤害时，目标的防御力降低25%/28.75%/32.5%/36.25%/40%，持续5秒，同名被动效果之间不可叠加；该效果触发时，如果自身不是当前操作中的角色，则装备者获得1层[魂锁]，最多叠加3层，同一招式内最多触发一次；每层[魂锁]，可使装备者的冲击力提升4%/4.6%/5.2%/5.8%/6.4%，持续12秒，每层效果单独结算持续时间，[魂锁]层数叠满时，额外给装备者的冲击力提升8%/9.2%/10.4%/11.6%/12.8%。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "condition": "追加攻击造成电属性伤害且装备者位于后台",
+          "durationSeconds": 12,
+          "effects": [
+            {
+              "id": "effect_wiki_1243_self_impact_stack",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "impactPct",
+              "mode": "flat",
+              "valuePerStack": 4,
+              "maxStacks": 3,
+              "defaultStacks": 3,
+              "modificationValues": {
+                "valuePerStack": [
+                  4,
+                  4.6,
+                  5.2,
+                  5.8,
+                  6.4
+                ]
+              },
+              "stackGroup": "soul_lock",
+              "stackLabel": {
+                "zhCN": "魂锁"
+              }
+            },
+            {
+              "id": "effect_wiki_1243_self_impact_full",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "impactPct",
+              "mode": "flat",
+              "value": 8,
+              "modificationValues": {
+                "value": [
+                  8,
+                  9.2,
+                  10.4,
+                  11.6,
+                  12.8
+                ]
+              },
+              "condition": "魂锁达到3层"
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "effectText": {
+            "zhCN": "每层[魂锁]使装备者的冲击力提升4%/4.6%/5.2%/5.8%/6.4%，最多3层，持续12秒；叠满时额外提升8%/9.2%/10.4%/11.6%/12.8%。"
+          }
+        },
+        "teamBuff": {
+          "scope": "inCombat",
+          "condition": "追加攻击命中并造成电属性伤害",
+          "durationSeconds": 5,
+          "effects": [
+            {
+              "id": "effect_wiki_1243_team_def_reduction",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "enemyDefReduction",
+              "mode": "flat",
+              "value": 25,
+              "modificationValues": {
+                "value": [
+                  25,
+                  28.75,
+                  32.5,
+                  36.25,
+                  40
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "effectText": {
+            "zhCN": "追加攻击命中敌人并造成电属性伤害时，目标防御力降低25%/28.75%/32.5%/36.25%/40%，持续5秒，同名被动效果之间不可叠加。"
+          }
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1243/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked-mihoyo-baike-2026-07-24",
+        "effectText": "source-checked-mihoyo-baike-2026-07-24",
+        "effectBuff": "source-checked-full-stack-default"
+      }
+    },
+    {
+      "id": "zzz_wiki_760",
+      "name": {
+        "zhCN": "淬锋钳刺"
+      },
+      "rarity": "S",
+      "specialty": "anomaly",
+      "attribute": "physical",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_760.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/08/27/160824341/15a02c67d9bcb3ba4b5727280adfb8fe_8180946295167199111.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "anomalyProficiency",
+          "value": 90,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "恣横猎心"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "发动[冲刺攻击]时，获得1层[猎意]，每层[猎意]使装备者造成的物理伤害提升12%/15%/18%/21%/24%，最多叠加3层，持续10秒，0.5秒内最多触发一次，重复触发时刷新持续时间；进入接战状态或触发[极限闪避]时，直接获得3层[猎意]；[猎意]叠加至层数上限后，装备者的属性异常积蓄效率提升40%/50%/60%/70%/80%。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "condition": "冲刺攻击、进入接战状态或触发极限闪避获得猎意",
+          "durationSeconds": 10,
+          "effects": [
+            {
+              "id": "effect_wiki_760_self_physical_dmg",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "physicalDmg",
+              "mode": "flat",
+              "valuePerStack": 12,
+              "maxStacks": 3,
+              "defaultStacks": 3,
+              "modificationValues": {
+                "valuePerStack": [
+                  12,
+                  15,
+                  18,
+                  21,
+                  24
+                ]
+              },
+              "stackGroup": "hunting_intent",
+              "stackLabel": {
+                "zhCN": "猎意"
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "effectText": {
+            "zhCN": "每层[猎意]使装备者造成的物理伤害提升12%/15%/18%/21%/24%，最多3层；满层时属性异常积蓄效率提升40%/50%/60%/70%/80%。"
+          }
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/760/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "level60Stats": "source-checked-mihoyo-baike-2026-07-24",
+        "effectText": "source-checked-mihoyo-baike-2026-07-24",
+        "effectBuff": "partially-modeled-anomaly-buildup-text-only"
       }
     }
   ]

@@ -1,6 +1,6 @@
 import { defineStore } from "pinia"
 import { markRaw } from "vue"
-import { loadCatalog, loadMeta } from "@runtime/catalog-loader.js"
+import { invalidateCatalogCache, loadCatalog, loadMeta } from "@runtime/catalog-loader.js"
 import { auditIconCoverage } from "@/utils/assets"
 
 export const useCatalogStore = defineStore("catalog", {
@@ -22,6 +22,12 @@ export const useCatalogStore = defineStore("catalog", {
     iconAudit: state => auditIconCoverage(state.meta),
   },
   actions: {
+    invalidate() {
+      invalidateCatalogCache()
+      this.catalog = null
+      this.meta = null
+      this.error = ""
+    },
     async load() {
       if (this.catalog && this.meta) {
         return

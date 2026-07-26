@@ -34,10 +34,10 @@ describe("loadAppConfig", () => {
     ])
   })
 
-  it("defaults to maintenance disabled when neither source is available", async () => {
+  it("defaults local development reservation UI on when neither source is available", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => {
       throw new Error("offline")
     }))
-    await expect(loadAppConfig()).resolves.toEqual({ maintenanceEnabled: false, scanTelemetryEnabled: false, scanTelemetryRetentionDays: 30, driveDiscReservationsUiEnabled: false })
+    await expect(loadAppConfig()).resolves.toEqual({ maintenanceEnabled: false, scanTelemetryEnabled: false, scanTelemetryRetentionDays: 30, driveDiscReservationsUiEnabled: true })
   })
 })

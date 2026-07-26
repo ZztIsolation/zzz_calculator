@@ -10,8 +10,16 @@ The entries below summarize each development day. Implementation details,
 modeling decisions, and verification evidence remain in the
 [detailed changelog](docs/changelog.md).
 
+### 2026-07-25 Hotfix
+
+- Added Aria Cinema 1's initial-Anomaly-Mastery conversion as an explicit Buff rule. It floors the final out-of-combat panel value, converts each whole point above 100 into 0.5% Anomaly CRIT Rate, adds the existing 25% base rate, and caps the result at 100%. It applies only to Corruption Release; in-combat Anomaly Mastery does not affect it.
+- Exposed the new conversion type only to administrator maintenance under Anomaly target plus Release. It is absent from every player custom-Buff mode. Legacy Release-profile CRIT formulas remain a read-time fallback and never stack with the explicit rule.
+
 ### 2026-07-24 Hotfix
 
+- Added Norma Hollowell to teammate Buff maintenance with separate Technical
+  Gap and Bangboo Barrage controls, Cinema 1 all-attribute RES reduction,
+  Cinema 2 Technical Gap amplification, and her official local avatar.
 - Added the three Defense Battle 3.0 Phase 3 field Buffs, Final Movement,
   Chained Circuit, and Zero-Degree Operation, with explicit targeting for
   Chain/Ultimate, attribute Anomaly, and Basic/Chain effects.
@@ -455,7 +463,7 @@ For frontend-only development with hot reload:
 npm run dev:webapp
 ```
 
-Set `PORT` to change the Node port. The service binds to `127.0.0.1` by default; container or network exposure requires an explicit `HOST` such as `0.0.0.0`. Maintenance is disabled in production unless `MAINTENANCE_ENABLED=true` is set explicitly. Maintenance writes accept loopback browser origins by default; every non-loopback origin must be listed explicitly in the comma-separated `MAINTENANCE_ALLOWED_ORIGINS` setting.
+Set `PORT` to change the Node port. The service binds to `127.0.0.1` by default; container or network exposure requires an explicit `HOST` such as `0.0.0.0`. Per-disc agent reservations and their visual loadout controls are enabled by default in local development, including the Vite fallback when no runtime config endpoint is available. Production and Pages builds remain disabled by default; set `DRIVE_DISC_RESERVATIONS_UI_ENABLED=true` or `false` to override the Node default explicitly. Maintenance is disabled in production unless `MAINTENANCE_ENABLED=true` is set explicitly. Maintenance writes accept loopback browser origins by default; every non-loopback origin must be listed explicitly in the comma-separated `MAINTENANCE_ALLOWED_ORIGINS` setting.
 
 ## Routes
 
@@ -478,7 +486,7 @@ Ye Shunguang now includes her official Cinema 4 and Cinema 6 mechanics. Ether Ve
 
 Jane Doe is available as a teammate Buff group containing only team-applicable Core Passive F, Cinema 2, and Cinema 4 effects. Her Core extends Flinch by five seconds, raising full-duration Flinch Disorder from `525%` to `450% + 15 x 7.5% = 562.5%`; Assault Anomaly CRIT Rate is `clamp(40 + Jane AP x 0.16, 0, 100)%`, with a default 375 AP input that can be lowered, and Anomaly CRIT DMG is 50%. Cinema 2 applies 15% DEF ignore and another 50% Anomaly CRIT DMG to Assault only. Cinema 4 adds 18% Attribute Anomaly DMG without entering the Disorder bonus zone. Selecting a Buff means its trigger condition is satisfied; no uptime timeline is simulated.
 
-The workbench custom Buff editor uses a simplified player-facing whitelist. It keeps the six element damage bonuses separate, but replaces element-specific Sheer DMG, CRIT DMG, DEF ignore, resistance reduction, and resistance ignore choices with their generic or current-attribute forms; the Anomaly Mastery-above-140 conversion is maintenance-only. The structured maintenance forms still expose every explicit element field, and existing custom Buff records using hidden choices remain readable and fully calculated.
+The workbench custom Buff editor uses a simplified player-facing whitelist. It keeps the six element damage bonuses separate, but replaces element-specific Sheer DMG, CRIT DMG, DEF ignore, resistance reduction, and resistance ignore choices with their generic or current-attribute forms. Both the Anomaly-Mastery-above-140 proficiency conversion and the initial-Anomaly-Mastery-above-100 CRIT conversion are maintenance-only; the latter is additionally restricted to Release anomaly targets. The structured maintenance forms still expose every explicit element field, and existing custom Buff records using hidden choices remain readable and fully calculated.
 
 Alice Thymefield is fully available with her official core passive, additional ability, and Cinema 1/2/4/6 rules. Her in-combat Anomaly Mastery above 140 converts to Anomaly Proficiency at 1.6 per point; physical Disorder receives 18% multiplier per remaining second up to 180%; Polarized Assault uses 100% of normal Assault; the recurring core follow-up uses an explicit 2.5% event scale; and Cinema 6 uses 3300% Anomaly Proficiency as its damage basis with forced CRIT. Her administrator defaults cover a full-duration physical-anomaly window at Cinema 0, the additional Ultimate-triggered Polarized Assault at Cinema 2, and six winning-state follow-ups at Cinema 6. Slot 6 optimization compares both Anomaly Mastery and ATK%.
 

@@ -542,6 +542,50 @@ describe("BuffPickerModal", () => {
     expect(wrapper.find(".buff-effect-lines").text()).toContain("异常精通 +45")
   })
 
+  it("shows a settlement-wide Aria Release target without inventing a concrete Anomaly", async () => {
+    const ariaMeta = {
+      ...meta,
+      agents: [{
+        id: "aria",
+        name: { zhCN: "爱芮" },
+        combatBuffs: {
+          cinemaBuffs: [{
+            cinemaLevel: 1,
+            cinemaName: { zhCN: "元气声浪" },
+            scope: "inCombat",
+            effects: [
+              {
+                id: "release-crit-rate",
+                type: "fixed",
+                stat: "anomalyCritRate",
+                value: 25,
+                mode: "flat",
+                target: { kind: "anomaly", settlementType: "release" },
+              },
+              {
+                id: "corruption-release-crit-dmg",
+                type: "fixed",
+                stat: "anomalyCritDmg",
+                value: 25,
+                mode: "flat",
+                target: { kind: "anomaly", settlementType: "release", anomalyEffects: ["corruption"] },
+              },
+            ],
+          }],
+        },
+      }],
+    }
+    const wrapper = mountModal({ meta: ariaMeta, agentId: "aria", cinemaLevel: 1 })
+
+    await openModal(wrapper)
+
+    const text = wrapper.find(".buff-effect-lines").text()
+    expect(text).toContain("异常暴击率% +25%（异放）")
+    expect(text).not.toContain("异常暴击率% +25%（异放：侵蚀）")
+    expect(text).not.toContain("异放：全部原异常")
+    expect(text).toContain("异常暴击伤害% +25%（异放：侵蚀）")
+  })
+
   it("renders the buff category tabs as a dedicated control strip", async () => {
     const wrapper = mountModal()
 
@@ -881,17 +925,34 @@ describe("BuffPickerModal", () => {
     expect(rows[2]).toContain("零度行动")
   })
 
-  it("defaults 3.0 field buffs to critical assault phase 3 and keeps one selection", async () => {
+  it("defaults the latest field buffs to the first authored period", async () => {
+    const latestFieldBuffs = fieldBuffs.filter(buff => buff.period.gameVersion === "3.0")
+    const wrapper = mountModal({ buffs: latestFieldBuffs })
+
+    await openFieldTab(wrapper)
+    const selects = wrapper.findAll(".field-buff-filter-row select")
+
+    expect((selects[0].element as HTMLSelectElement).value).toBe("3.0")
+    const selectedPeriod = selects[1].findAll("option")
+      .find(option => (option.element as HTMLOptionElement).selected)
+    expect(selectedPeriod?.text()).toBe("防卫战 v5 · 3.0版本 · 第三期")
+    const visibleRows = wrapper.findAll(".buff-row").map(row => row.text())
+    expect(visibleRows.some(text => text.includes("终幕协奏"))).toBe(true)
+    expect(visibleRows.some(text => text.includes("链式回路"))).toBe(true)
+    expect(visibleRows.some(text => text.includes("零度行动"))).toBe(true)
+    expect(visibleRows.some(text => text.includes("湮亡"))).toBe(false)
+  })
+
+  it("shows critical assault phase 3 and keeps one selection when requested", async () => {
     const wrapper = mountModal()
 
     await openFieldTab(wrapper)
     const selects = wrapper.findAll(".field-buff-filter-row select")
     await selects[0].setValue("3.0")
     await nextTick()
+    await selects[1].setValue("critical_assault|3.0|3")
+    await nextTick()
 
-    const selectedPeriod = selects[1].findAll("option")
-      .find(option => (option.element as HTMLOptionElement).selected)
-    expect(selectedPeriod?.text()).toBe("危局强袭战 · 3.0版本 · 第三期")
     const visibleRows = wrapper.findAll(".buff-row").map(row => row.text())
     expect(visibleRows.some(text => text.includes("湮亡"))).toBe(true)
     expect(visibleRows.some(text => text.includes("凛息"))).toBe(true)
@@ -1011,6 +1072,7 @@ describe("BuffPickerModal", () => {
     }
     for (const label of [
       "异常掌控超过 140 时每点转异常精通",
+      "初始异常掌控超过 100 时每点转异常暴击率%",
       "火贯穿增伤%",
       "火属性伤害暴击伤害%",
       "电属性伤害无视防御率%",
@@ -1036,6 +1098,7 @@ describe("BuffPickerModal", () => {
       expect(skillLabels).toContain("全属性抗性无视%")
       expect(skillLabels).toContain("火属性伤害加成%")
       expect(skillLabels).not.toContain("暴击伤害%")
+      expect(skillLabels).not.toContain("初始异常掌控超过 100 时每点转异常暴击率%")
       expect(skillLabels).not.toContain("火贯穿增伤%")
       expect(skillLabels).not.toContain("火属性伤害暴击伤害%")
       expect(skillLabels).not.toContain("电属性伤害无视防御率%")

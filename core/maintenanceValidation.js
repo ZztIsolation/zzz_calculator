@@ -142,11 +142,11 @@ const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
 const ANOMALY_VARIANT_VALUES = new Set(["normal", "polarizedAssault"])
 const CALCULATION_MODE_VALUES = new Set(["single", "sheer", "anomaly", "custom"])
 const SHEER_DAMAGE_MODIFIER_KIND_VALUES = ["sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg"]
-const DAMAGE_MODIFIER_KIND_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "skillMultiplierBonus", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
+const DAMAGE_MODIFIER_KIND_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "skillMultiplierBonus", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
 const SKILL_TARGET_DAMAGE_MODIFIER_KIND_VALUES = new Set(["directDamageBonus", "skillMultiplierBonus"])
 const DAMAGE_MODIFIER_VALUE_UNIT_VALUES = new Set(["decimal"])
 const RULE_TARGET_KIND_VALUES = new Set(["default", "skill", "anomaly"])
-const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyDurationBonusSeconds", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
+const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
 const SKILL_TARGET_STAT_VALUES = new Set([
     "allResIgnore",
     "physicalResIgnore",
@@ -212,6 +212,7 @@ const ANOMALY_TARGET_STAT_VALUES = new Set([
     "disorderBaseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
+    "anomalyCritRatePerInitialMasteryAbove100",
     "anomalyDurationBonusSeconds",
     "stunDmgMultiplierBonus",
     "stunDmgMultiplierBonusAlways",
@@ -544,9 +545,9 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     } else if (targetKind === "anomaly") {
         const settlementType = target.settlementType
         requireEnum(errors, settlementType, ANOMALY_SETTLEMENT_TYPE_VALUES, `${path}.target.settlementType`)
-        if (!Array.isArray(target.anomalyEffects) || !target.anomalyEffects.length) {
-            add(errors, `${path}.target.anomalyEffects`, "异常增幅必须至少选择一个异常效果。")
-        } else {
+        if (target.anomalyEffects !== undefined && !Array.isArray(target.anomalyEffects)) {
+            add(errors, `${path}.target.anomalyEffects`, "具体异常必须是数组。")
+        } else if (Array.isArray(target.anomalyEffects)) {
             const validEffects = calculationAnomalyIds(context, settlementType === "disorder" ? "disorder" : "anomaly")
             target.anomalyEffects.forEach((effectId, index) => {
                 if (!validEffects.has(effectId)) {
@@ -576,6 +577,10 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     }
     if (rule.stat === "anomalyDurationBonusSeconds" && targetKind !== "anomaly") {
         add(errors, `${path}.stat`, "异常持续时间延长必须指定异常效果。")
+    }
+    if (rule.stat === "anomalyCritRatePerInitialMasteryAbove100"
+        && (targetKind !== "anomaly" || target.settlementType !== "release")) {
+        add(errors, `${path}.stat`, "初始异常掌控转异常暴击率只能用于异放结算。")
     }
     if (DEFAULT_EVENT_MODIFIER_STAT_VALUES.has(rule.stat) && effectiveScope !== "inCombat") {
         add(errors, `${path}.stat`, "事件增幅只能用于局内 Buff。")

@@ -90,7 +90,7 @@ function envFlag(name) {
 }
 
 const scanTelemetryEnabled = envFlag("SCAN_TELEMETRY_ENABLED") === true
-const driveDiscReservationsUiEnabled = envFlag("DRIVE_DISC_RESERVATIONS_UI_ENABLED") === true
+const driveDiscReservationsUiEnabled = envFlag("DRIVE_DISC_RESERVATIONS_UI_ENABLED") ?? nodeEnv !== "production"
 const scanTelemetryRetentionDays = Math.max(1, Math.min(365, Number(process.env.SCAN_TELEMETRY_RETENTION_DAYS) || 30))
 const scanTelemetryDirectory = path.resolve(process.env.SCAN_TELEMETRY_DIR || path.join(dataDir, "scan-telemetry"))
 const scanTelemetryStore = scanTelemetryEnabled
@@ -615,6 +615,13 @@ function cleanEffectRule(effect = {}) {
     const next = {
         ...rest,
         id: rest.id || randomId("effect"),
+    }
+
+    if (rest.target?.kind === "anomaly") {
+        next.target = { ...rest.target }
+        if (Array.isArray(next.target.anomalyEffects) && next.target.anomalyEffects.length === 0) {
+            delete next.target.anomalyEffects
+        }
     }
 
     if (rest.sourceLabel) {

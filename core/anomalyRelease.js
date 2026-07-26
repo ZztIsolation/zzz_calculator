@@ -3,6 +3,13 @@ const RELEASE_UNITS = new Set(["raw", "percent", "decimal"])
 const RELEASE_OPERATIONS = new Set(["add", "subtract", "multiply", "divide", "max", "min", "clamp", "floor"])
 const RELEASE_LEAF_KINDS = new Set(["constant", "triggerStat", "coreSkillScaling", "condition"])
 const RELEASE_TRIGGER_STATS = new Set(["atk", "anomalyProficiency", "anomalyMastery"])
+const RELEASE_WHITE_BOX_ROLES = new Set(["conversionSource"])
+const RELEASE_OPERATION_PRECEDENCE = {
+    add: 1,
+    subtract: 1,
+    multiply: 2,
+    divide: 2,
+}
 
 function finiteNumber(value, label) {
     const numeric = Number(value)
@@ -84,6 +91,16 @@ function expressionLabel(node, fallback) {
     return localizedText(node?.label, fallback)
 }
 
+function operationFormulaTerm(trace, parentOperation, index) {
+    const formula = trace.formula ?? trace.expression
+    if (trace.kind !== "operation") return formula
+    const parentPrecedence = RELEASE_OPERATION_PRECEDENCE[parentOperation] ?? 3
+    const childPrecedence = RELEASE_OPERATION_PRECEDENCE[trace.operation] ?? 3
+    const requiresGrouping = childPrecedence < parentPrecedence
+        || (index > 0 && ["subtract", "divide"].includes(parentOperation) && childPrecedence <= parentPrecedence)
+    return requiresGrouping ? `(${formula})` : formula
+}
+
 function evaluateLeaf(node, context) {
     const unit = node.unit ?? "raw"
     let rawValue
@@ -134,7 +151,10 @@ function evaluateLeaf(node, context) {
             unit,
             rawValue,
             value,
-            expression: unit === "percent" ? `${rawDisplay} = ${displayNumber(value)}` : rawDisplay,
+            rawDisplay,
+            whiteBoxRole: node.whiteBoxRole,
+            formula: rawDisplay,
+            expression: rawDisplay,
             children: [],
         },
     }
@@ -177,9 +197,9 @@ function evaluateOperation(node, context) {
         multiply: " × ",
         divide: " / ",
     }
-    const expression = symbols[operation]
-        ? evaluated.map(item => item.trace.expression).join(symbols[operation])
-        : `${operation}(${evaluated.map(item => item.trace.expression).join(", ")})`
+    const formula = symbols[operation]
+        ? evaluated.map((item, index) => operationFormulaTerm(item.trace, operation, index)).join(symbols[operation])
+        : `${operation}(${evaluated.map(item => item.trace.formula ?? item.trace.expression).join(", ")})`
     return {
         value,
         trace: {
@@ -189,7 +209,10 @@ function evaluateOperation(node, context) {
             unit: "decimal",
             rawValue: value,
             value,
-            expression: `${expression} = ${displayNumber(value)}`,
+            rawDisplay: displayNumber(value),
+            whiteBoxRole: node.whiteBoxRole,
+            formula,
+            expression: `${formula} = ${displayNumber(value)}`,
             children: evaluated.map(item => item.trace),
         },
     }
@@ -420,19 +443,31 @@ export function releaseFormulaStatDependencies(profile = {}) {
 
 export function validateAnomalyReleaseProfile(profile = {}) {
     const errors = []
+    let conversionSourceCount = 0
     if (!String(profile.id ?? "").trim()) errors.push("异放倍率方案 ID 不能为空。")
     if (!RELEASE_RESULT_MODES.has(profile.resultMode)) errors.push("异放倍率方案的结果模式无效。")
     if (!Array.isArray(profile.supportedElements) || !profile.supportedElements.length) {
         errors.push("异放倍率方案必须至少支持一个伤害属性。")
     }
-    const validateNode = (node, path) => {
+    const validateNode = (node, path, allowWhiteBoxRole = true) => {
         if (!node || typeof node !== "object" || Array.isArray(node)) {
             errors.push(`${path} 必须是结构化公式节点。`)
             return
         }
+        if (node.whiteBoxRole !== undefined) {
+            if (!allowWhiteBoxRole) {
+                errors.push(`${path}.whiteBoxRole 不能标记附加公式。`)
+            } else if (!RELEASE_WHITE_BOX_ROLES.has(node.whiteBoxRole)) {
+                errors.push(`${path}.whiteBoxRole 不是允许的白盒展示角色。`)
+            } else if (node.op) {
+                errors.push(`${path}.whiteBoxRole 只能标记公式叶节点。`)
+            } else if (node.whiteBoxRole === "conversionSource") {
+                conversionSourceCount += 1
+            }
+        }
         if (node.op) {
             if (!RELEASE_OPERATIONS.has(node.op)) errors.push(`${path} 使用了不支持的运算。`)
-            for (const [index, arg] of (node.args ?? []).entries()) validateNode(arg, `${path}.args[${index}]`)
+            for (const [index, arg] of (node.args ?? []).entries()) validateNode(arg, `${path}.args[${index}]`, allowWhiteBoxRole)
             return
         }
         if (!RELEASE_LEAF_KINDS.has(node.kind)) errors.push(`${path} 使用了不支持的节点。`)
@@ -449,7 +484,8 @@ export function validateAnomalyReleaseProfile(profile = {}) {
         }
     }
     validateNode(profile.expression, "expression")
-    if (profile.critRateBonusExpression) validateNode(profile.critRateBonusExpression, "critRateBonusExpression")
+    if (profile.critRateBonusExpression) validateNode(profile.critRateBonusExpression, "critRateBonusExpression", false)
+    if (conversionSourceCount !== 1) errors.push("异放倍率方案必须且只能标记一个转换数据来源。")
     try {
         evaluateReleaseExpression(profile.expression, {
             trigger: { outOfCombatPanel: new Proxy({}, { get: () => 100 }), inCombatPanel: new Proxy({}, { get: () => 100 }) },

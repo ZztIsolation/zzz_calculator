@@ -419,6 +419,14 @@ try {
             value: 5,
             target: { kind: "anomaly", settlementType: "disorder", anomalyEffects: ["flinch"] },
         },
+        {
+            id: "all_release_def_ignore",
+            type: "fixed",
+            stat: "enemyDefIgnore",
+            mode: "flat",
+            value: 8,
+            target: { kind: "anomaly", settlementType: "release", anomalyEffects: [] },
+        },
     ]
     const teammateResult = await save("teammate-buffs", {
         teammate: { ...teammateBase, id: teammateId },
@@ -443,6 +451,12 @@ try {
         settlementType: "disorder",
         anomalyEffects: ["flinch"],
     })
+    const savedAllRelease = teammateResult.savedItem.effects[5]
+    assert.equal(savedAllRelease.stat, "enemyDefIgnore")
+    assert.deepEqual(savedAllRelease.target, {
+        kind: "anomaly",
+        settlementType: "release",
+    })
     assert.equal(JSON.stringify(teammateResult.savedItem).includes("moveIdPrefixes"), false)
     assert.equal(JSON.stringify(teammateResult.savedItem).includes("appliesTo"), false)
     const reloadedTeammate = (await catalog()).combatBuffs.teammates.find(item => item.id === teammateId)
@@ -452,6 +466,7 @@ try {
     assert.ok(reloadedTeammateBuff)
     assert.equal(reloadedTeammateBuff.effects.find(rule => rule.id === "all_res_ignore")?.stat, "allResIgnore")
     assert.deepEqual(reloadedTeammateBuff.effects.find(rule => rule.id === "flinch_duration")?.target, savedFlinchDuration.target)
+    assert.deepEqual(reloadedTeammateBuff.effects.find(rule => rule.id === "all_release_def_ignore")?.target, savedAllRelease.target)
 
     const orderSecondBuff = cloneWithId(reloadedTeammateBuff, "order_second")
     const orderThirdBuff = cloneWithId(reloadedTeammateBuff, "order_third")

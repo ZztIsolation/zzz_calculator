@@ -108,12 +108,14 @@ describe("optimizer store", () => {
     store.error = "boom"
     store.results = [{ rank: 1 }]
     store.completedSettings = { ownerId: "default" }
+    store.completedSettingsFingerprint = "saved"
     store.progress = { percent: 50 }
     store.reset()
     expect(store.status).toBe("idle")
     expect(store.error).toBe("")
     expect(store.results).toEqual([])
     expect(store.completedSettings).toBe(null)
+    expect(store.completedSettingsFingerprint).toBe("")
     expect(store.progress).toBe(null)
   })
 
@@ -468,6 +470,29 @@ describe("optimizer store", () => {
         "driveDisc4pc:woodpecker_electro.self": { coverage: 0.5 },
       },
     })
+    expect(store.resultsAreStale).toBe(false)
+
+    store.applyAdvancedSettings({
+      algorithm: "exact-super-bound",
+      fourPieceBuffMode: "manual",
+      fourPieceBuffRuntimeInputs: {
+        "driveDisc4pc:woodpecker_electro.self": {
+          effects: { crit: { enabled: false, coverage: 0.5 } },
+        },
+      },
+      mainStatLimits: { "4": [], "5": [], "6": [] },
+      minimums: {},
+    })
+    expect(store.resultsAreStale).toBe(true)
+
+    store.applyAdvancedSettings({
+      algorithm: "exact-super-bound",
+      fourPieceBuffMode: "auto",
+      fourPieceBuffRuntimeInputs: {},
+      mainStatLimits: { "4": [], "5": [], "6": [] },
+      minimums: {},
+    })
+    expect(store.resultsAreStale).toBe(false)
     expect(worker.terminated).toBe(false)
   })
 

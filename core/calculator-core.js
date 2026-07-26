@@ -278,7 +278,7 @@ const DEF_IGNORE_KEY_BY_ELEMENT = ELEMENT_DEF_IGNORE_STAT_BY_ELEMENT
 
 const DAMAGE_EVENT_KINDS = ["direct", "anomaly", "disorder", "sheer"]
 const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
-const DAMAGE_MODIFIER_KINDS = ["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyDurationBonusSeconds", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg", "skillMultiplierBonus", ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS]
+const DAMAGE_MODIFIER_KINDS = ["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg", "skillMultiplierBonus", ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS]
 const EVENT_MODIFIER_STAT_KEYS = new Set([
     "anomalyDamageBonus",
     "disorderDamageBonus",
@@ -286,6 +286,7 @@ const EVENT_MODIFIER_STAT_KEYS = new Set([
     "disorderBaseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
+    "anomalyCritRatePerInitialMasteryAbove100",
     "anomalyDurationBonusSeconds",
     "stunDmgMultiplierBonus",
     "stunDmgMultiplierBonusAlways",
@@ -508,6 +509,7 @@ function calculateAnomalyMastery(baseAnomalyMastery, anomalyMasteryPct = 0, anom
 }
 
 const ANOMALY_MASTERY_PROFICIENCY_THRESHOLD = 140
+const INITIAL_ANOMALY_MASTERY_CRIT_THRESHOLD = 100
 
 function calculateMasteryConvertedProficiency(anomalyMastery, proficiencyPerPoint = 0) {
     const wholeMastery = Math.floor(Math.max(0, Number(anomalyMastery ?? 0)))
@@ -1172,8 +1174,8 @@ function resolveEffectDamageModifiers(effect, runtimeInput = {}, modifierContext
                         ...(rule.appliesTo ?? {}),
                         damageKinds: [target.settlementType === "disorder" ? "disorder" : "anomaly"],
                         settlementTypes: [target.settlementType],
-                        anomalyEffects: target.anomalyEffects,
-                        anomalyVariants: target.anomalyVariants,
+                        ...(target.anomalyEffects.length ? { anomalyEffects: target.anomalyEffects } : {}),
+                        ...(target.anomalyVariants.length ? { anomalyVariants: target.anomalyVariants } : {}),
                     }
                     : rule.appliesTo ?? null
             return {
@@ -3089,9 +3091,13 @@ function skillTargetsApplyTo(skillTargets, event) {
     return skillTargets.some(target => skillTargetMatches(target, source))
 }
 
-function sumDamageModifiers(bonusTotals, event, kind) {
+function matchingDamageModifiers(bonusTotals, event, kind) {
     return (bonusTotals.damageModifiers ?? [])
         .filter(modifier => modifier.kind === kind && damageModifierAppliesTo(modifier, event))
+}
+
+function sumDamageModifiers(bonusTotals, event, kind) {
+    return matchingDamageModifiers(bonusTotals, event, kind)
         .reduce((total, modifier) => total + Number(modifier.value ?? 0), 0)
 }
 
@@ -3168,6 +3174,8 @@ function releaseCritRateBonusForEvent(event, panel = {}, outOfCombatPanel = pane
 function anomalyCritMultiplier(bonusTotals, event, panel = {}, outOfCombatPanel = panel) {
     if (isDisorderDamageEvent(event)) {
         return {
+            baseCritRate: 0,
+            convertedCritRate: 0,
             critRate: 0,
             critDmg: 0,
             multiplier: 1,
@@ -3175,10 +3183,29 @@ function anomalyCritMultiplier(bonusTotals, event, panel = {}, outOfCombatPanel 
     }
 
     const baseCritRate = sumDamageModifiers(bonusTotals, event, "anomalyCritRate")
-    const masteryCritRate = baseCritRate > 0 ? releaseCritRateBonusForEvent(event, panel, outOfCombatPanel) : 0
-    const critRate = clampNumber(baseCritRate + masteryCritRate, 0, 1)
+    const conversionModifiers = matchingDamageModifiers(
+        bonusTotals,
+        event,
+        "anomalyCritRatePerInitialMasteryAbove100",
+    )
+    const critRatePerInitialMasteryPoint = conversionModifiers
+        .reduce((total, modifier) => total + Number(modifier.value ?? 0), 0)
+    const initialAnomalyMastery = Number(outOfCombatPanel?.anomalyMastery ?? panel?.anomalyMastery ?? 0)
+    const convertedCritRate = conversionModifiers.length
+        ? calculateInitialMasteryConvertedAnomalyCritRate(
+            initialAnomalyMastery,
+            critRatePerInitialMasteryPoint,
+        )
+        : baseCritRate > 0
+            ? releaseCritRateBonusForEvent(event, panel, outOfCombatPanel)
+            : 0
+    const critRate = clampNumber(baseCritRate + convertedCritRate, 0, 1)
     const critDmg = Math.max(0, sumDamageModifiers(bonusTotals, event, "anomalyCritDmg"))
     return {
+        baseCritRate,
+        convertedCritRate,
+        critRatePerInitialMasteryPoint,
+        initialAnomalyMastery,
         critRate,
         critDmg,
         multiplier: critRate > 0 && critDmg > 0 ? 1 + critRate * critDmg : 1,
@@ -3448,18 +3475,42 @@ function sheerDamageWhiteBoxRows({ event, hp, atk, sheerForceFlat, sheerForce, c
 
 function releaseTraceWhiteBoxRows(trace) {
     if (!trace) return []
-    const rows = []
-    const visit = (node, depth = 0) => {
-        for (const child of node.children ?? []) visit(child, depth + 1)
-        rows.push({
-            label: depth ? node.label : `异放公式：${node.label}`,
+    const nodes = []
+    const visit = node => {
+        nodes.push(node)
+        for (const child of node.children ?? []) visit(child)
+    }
+    visit(trace)
+    const conversionSource = nodes.find(node => node.whiteBoxRole === "conversionSource")
+    const conditionRows = nodes
+        .filter(node => node.kind === "condition" && node !== conversionSource)
+        .map(node => ({
+            label: node.label,
             formula: node.expression,
             value: Number(node.value ?? 0),
             displayValue: formatDamageNumber(node.value, 6),
-        })
-    }
-    visit(trace)
-    return rows
+        }))
+    return [
+        conversionSource ? {
+            label: "转换数据来源",
+            formula: conversionSource.label,
+            value: Number(conversionSource.rawValue ?? conversionSource.value ?? 0),
+            displayValue: conversionSource.rawDisplay ?? formatDamageNumber(conversionSource.rawValue ?? conversionSource.value, 6),
+        } : null,
+        ...conditionRows,
+        {
+            label: `异放公式：${trace.label}`,
+            formula: trace.expression,
+            value: Number(trace.value ?? 0),
+            displayValue: formatDamageNumber(trace.value, 6),
+        },
+    ].filter(Boolean)
+}
+
+function calculateInitialMasteryConvertedAnomalyCritRate(initialAnomalyMastery, critRatePerPoint = 0) {
+    const wholeMastery = Math.floor(Math.max(0, Number(initialAnomalyMastery ?? 0)))
+    const masteryAboveThreshold = Math.max(0, wholeMastery - INITIAL_ANOMALY_MASTERY_CRIT_THRESHOLD)
+    return masteryAboveThreshold * Math.max(0, Number(critRatePerPoint ?? 0))
 }
 
 function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBonus, dmgMultiplier, targetBreakdown, anomalyProficiencyMultiplier, levelMultiplier, anomalyDamageBonus, anomalyCrit, releaseBreakdown = null, baseMultiplierBonus, effectiveBaseMultiplier, finalDamage, singleDamage }) {
@@ -3528,15 +3579,9 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
         rows.splice(1, 0,
             {
                 label: "原异常单次倍率",
-                formula: `${effectLabel}仅继承单次伤害，不复制完整持续结算`,
+                formula: effectLabel,
                 value: Number(event.baseMultiplierPerProc ?? 0),
                 displayValue: formatDamagePercent(event.baseMultiplierPerProc),
-            },
-            {
-                label: "异放倍率方案",
-                formula: releaseBreakdown?.profileLabel ?? event.triggerActorRef?.profileId ?? "未配置",
-                value: Number(releaseBreakdown?.formulaValue ?? 0),
-                displayValue: formatDamageNumber(releaseBreakdown?.formulaValue, 6),
             },
             ...releaseTraceWhiteBoxRows(releaseBreakdown?.trace),
         )
@@ -4032,6 +4077,8 @@ function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTota
             disorderDamage: 1,
             anomalyDamage: sourceAnomalyDamageBonus * releaseAnomalyDamageBonus,
             anomalyCrit: anomalyCrit.multiplier,
+            anomalyCritBaseRate: anomalyCrit.baseCritRate,
+            anomalyCritConvertedRate: anomalyCrit.convertedCritRate,
             anomalyCritRate: anomalyCrit.critRate,
             anomalyCritDmg: anomalyCrit.critDmg,
             damageScale: event.damageScale,
@@ -4145,6 +4192,8 @@ function calculateAnomalyDamageEvent({ event, panel, outOfCombatPanel = panel, b
             disorderDamage: disorderDamageBonus,
             anomalyDamage: anomalyDamageBonus,
             anomalyCrit: anomalyCrit.multiplier,
+            anomalyCritBaseRate: anomalyCrit.baseCritRate,
+            anomalyCritConvertedRate: anomalyCrit.convertedCritRate,
             anomalyCritRate: anomalyCrit.critRate,
             anomalyCritDmg: anomalyCrit.critDmg,
             baseDurationSeconds: Number(event.baseDurationSeconds ?? 0),
@@ -4676,10 +4725,19 @@ function denseAnomalyCritMultiplier(compiledEvent, sums, panel = {}, outOfCombat
         return 1
     }
     const baseCritRate = denseModifierSum(sums, "anomalyCritRate")
-    const masteryCritRate = baseCritRate > 0
-        ? releaseCritRateBonusForEvent(compiledEvent, panel, outOfCombatPanel)
-        : 0
-    const critRate = clampNumber(baseCritRate + masteryCritRate, 0, 1)
+    const critRatePerInitialMasteryPoint = denseModifierSum(
+        sums,
+        "anomalyCritRatePerInitialMasteryAbove100",
+    )
+    const convertedCritRate = critRatePerInitialMasteryPoint !== 0
+        ? calculateInitialMasteryConvertedAnomalyCritRate(
+            outOfCombatPanel?.anomalyMastery ?? panel?.anomalyMastery,
+            critRatePerInitialMasteryPoint,
+        )
+        : baseCritRate > 0
+            ? releaseCritRateBonusForEvent(compiledEvent, panel, outOfCombatPanel)
+            : 0
+    const critRate = clampNumber(baseCritRate + convertedCritRate, 0, 1)
     const critDmg = Math.max(0, denseModifierSum(sums, "anomalyCritDmg"))
     return critRate > 0 && critDmg > 0 ? 1 + critRate * critDmg : 1
 }
@@ -5932,6 +5990,9 @@ export function createInCombatPanelCalculator(catalog, input) {
     const hasMasteryToProficiencyConversion = activeAgentBuffs.some(entry =>
         effectRules(entry.buff).some(rule => rule?.stat === "anomalyProficiencyPerMasteryAbove140")
     )
+    const hasInitialMasteryToAnomalyCritConversion = activeAgentBuffs.some(entry =>
+        effectRules(entry.buff).some(rule => rule?.stat === "anomalyCritRatePerInitialMasteryAbove100")
+    )
 
     function optimizerStatMetadata({ minimums = {} } = {}) {
         const panelStats = new Set()
@@ -5973,6 +6034,10 @@ export function createInCombatPanelCalculator(catalog, input) {
             }
         }
         if (hasMasteryToProficiencyConversion && panelStats.has("anomalyProficiency")) {
+            panelStats.add("anomalyMastery")
+        }
+        if (hasInitialMasteryToAnomalyCritConversion
+            && (compiledDamageTarget.events ?? []).some(event => event.isRelease)) {
             panelStats.add("anomalyMastery")
         }
         for (const [stat, value] of Object.entries(minimums ?? {})) {
@@ -6657,6 +6722,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     anomalySource: event.anomalySource,
                     stunned: event.stunned,
                     count: event.count,
+                    damageElement: event.damageElement,
                     damageBasis: event.damageBasis,
                     damageScale: event.damageScale,
                     critMode: event.critMode,
@@ -6669,16 +6735,18 @@ export function createInCombatPanelCalculator(catalog, input) {
                         + denseModifierSum(sums, event.elementCritDmgKey),
                     sheerDmgBonus: denseModifierSum(sums, "sheerDmgBonus")
                         + denseModifierSum(sums, event.elementSheerDmgKey),
-                    effectiveBaseMultiplier: Math.max(
-                        0,
-                        compiledEventBaseMultiplier(
-                            event,
-                            denseModifierSum(sums, "anomalyDurationBonusSeconds"),
-                        ) + denseModifierSum(
-                            sums,
-                            event.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
-                        ),
-                    ) * event.baseMultiplierScale,
+                    effectiveBaseMultiplier: event.isRelease
+                        ? 0
+                        : Math.max(
+                            0,
+                            compiledEventBaseMultiplier(
+                                event,
+                                denseModifierSum(sums, "anomalyDurationBonusSeconds"),
+                            ) + denseModifierSum(
+                                sums,
+                                event.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
+                            ),
+                        ) * event.baseMultiplierScale,
                     baseMultiplierBonus: denseModifierSum(
                         sums,
                         event.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
@@ -6691,6 +6759,10 @@ export function createInCombatPanelCalculator(catalog, input) {
                     ),
                     anomalyCritRate: denseModifierSum(sums, "anomalyCritRate"),
                     anomalyCritDmg: Math.max(0, denseModifierSum(sums, "anomalyCritDmg")),
+                    anomalyCritRatePerInitialMasteryAbove100: denseModifierSum(
+                        sums,
+                        "anomalyCritRatePerInitialMasteryAbove100",
+                    ),
                     anomalyCritMultiplier: denseAnomalyCritMultiplier(event, sums),
                     targetDefenseAfterReduction,
                     levelCoefficient: Number(target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT),
@@ -6908,19 +6980,27 @@ export function createInCombatPanelCalculator(catalog, input) {
                             )) + event.baseMultiplierBonus,
                         ) * event.baseMultiplierScale
                         : event.effectiveBaseMultiplier
-                    const releaseMasteryCritRate = event.isRelease && event.anomalyCritRate > 0
-                        ? hasFormulaInterval && event.releaseProfile?.critRateBonusExpression
-                            ? Math.max(0, evaluateReleaseExpressionInterval(event.releaseProfile.critRateBonusExpression, {
-                                trigger: {
-                                    inCombatPanel: formulaInCombatIntervalPanel,
-                                    outOfCombatPanel: formulaOutOfCombatIntervalPanel,
-                                },
-                                coreScalingRow: event.releaseCoreScalingRow,
-                                event,
-                                eventElement: event.damageElement,
-                            }).max)
-                            : releaseCritRateBonusForEvent(event, formulaInCombatPanel, formulaOutOfCombatPanel)
-                        : 0
+                    const explicitCritConversion = Number(event.anomalyCritRatePerInitialMasteryAbove100 ?? 0)
+                    const releaseMasteryCritRate = event.isRelease && explicitCritConversion !== 0
+                        ? calculateInitialMasteryConvertedAnomalyCritRate(
+                            hasFormulaInterval
+                                ? formulaOutOfCombatIntervalPanel.anomalyMastery.max
+                                : formulaOutOfCombatPanel.anomalyMastery,
+                            explicitCritConversion,
+                        )
+                        : event.isRelease && event.anomalyCritRate > 0
+                            ? hasFormulaInterval && event.releaseProfile?.critRateBonusExpression
+                                ? Math.max(0, evaluateReleaseExpressionInterval(event.releaseProfile.critRateBonusExpression, {
+                                    trigger: {
+                                        inCombatPanel: formulaInCombatIntervalPanel,
+                                        outOfCombatPanel: formulaOutOfCombatIntervalPanel,
+                                    },
+                                    coreScalingRow: event.releaseCoreScalingRow,
+                                    event,
+                                    eventElement: event.damageElement,
+                                }).max)
+                                : releaseCritRateBonusForEvent(event, formulaInCombatPanel, formulaOutOfCombatPanel)
+                            : 0
                     const anomalyCritMultiplier = event.anomalyCritDmg > 0
                         ? 1 + clampNumber(event.anomalyCritRate + releaseMasteryCritRate, 0, 1) * event.anomalyCritDmg
                         : 1

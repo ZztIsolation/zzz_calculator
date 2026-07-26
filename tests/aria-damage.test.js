@@ -79,6 +79,16 @@ function releaseInput(overrides = {}) {
     }
 }
 
+function catalogWithAria(testAgent) {
+    const agentsMap = new Map(catalog.agentsMap)
+    agentsMap.set(testAgent.id, testAgent)
+    return {
+        ...catalog,
+        agents: catalog.agents.map(item => item.id === testAgent.id ? testAgent : item),
+        agentsMap,
+    }
+}
+
 assert.ok(agent, "Aria should be present in the agent catalog")
 assert.deepEqual(agent.level60, {
     hpBase: 7749,
@@ -93,7 +103,74 @@ assert.deepEqual(agent.level60, {
     penRatio: 0,
 })
 assert.equal(agent.images.portrait, "/assets/agents/aria.png")
-assert.deepEqual(agent.preferredDriveDiscs.defaultSetIds, ["astral_voice", "phaethons_melody"])
+assert.deepEqual(agent.preferredDriveDiscs.defaultSetIds, ["phaethons_melody"])
+const cinemaOneBuff = agent.combatBuffs.cinemaBuffs.find(buff => buff.cinemaLevel === 1)
+assert.deepEqual(
+    agent.combatBuffs.cinemaBuffs.map(buff => buff.cinemaLevel),
+    [1, 2, 6],
+    "Aria should expose only the modeled Cinema Buffs",
+)
+assert.deepEqual(
+    cinemaOneBuff.effects.map(effect => ({
+        stat: effect.stat,
+        value: effect.value,
+        target: effect.target,
+    })),
+    [
+        {
+            stat: "anomalyCritRate",
+            value: 25,
+            target: { kind: "anomaly", settlementType: "release" },
+        },
+        {
+            stat: "anomalyCritDmg",
+            value: 25,
+            target: { kind: "anomaly", settlementType: "release" },
+        },
+        {
+            stat: "anomalyCritRatePerInitialMasteryAbove100",
+            value: 0.5,
+            target: { kind: "anomaly", settlementType: "release" },
+        },
+    ],
+    "Aria Cinema 1 should store base Crit, Crit DMG, and initial-Mastery conversion as separate effects",
+)
+assert.equal(agent.anomalyReleaseProfiles[0].critRateBonusExpression, undefined)
+assert.deepEqual(
+    agent.combatBuffs.additionalAbility.effects.map(effect => ({
+        type: effect.type,
+        stat: effect.stat,
+        value: effect.value,
+        mode: effect.mode,
+        target: effect.target,
+    })),
+    [
+        {
+            type: "fixed",
+            stat: "anomalyDurationBonusSeconds",
+            value: 3,
+            mode: "flat",
+            target: {
+                kind: "anomaly",
+                settlementType: "attribute",
+                anomalyEffects: ["corruption"],
+                anomalyVariants: ["normal"],
+            },
+        },
+        {
+            type: "fixed",
+            stat: "anomalyDurationBonusSeconds",
+            value: 3,
+            mode: "flat",
+            target: {
+                kind: "anomaly",
+                settlementType: "disorder",
+                anomalyEffects: ["corruption"],
+            },
+        },
+    ],
+    "Aria additional ability should extend both Corruption and Corruption Disorder without relying on generated effect ids",
+)
 assert.equal(agent.coreSkill.corePassiveScaling.levels.length, 7)
 assert.deepEqual(
     agent.coreSkill.corePassiveScaling.levels.map(level => level.anomalyProficiencyFlat),
@@ -126,6 +203,7 @@ const percentLeaf = evaluateReleaseExpression({
 approx(percentLeaf.value, 0.625, "percent values convert exactly once at the formula boundary")
 assert.equal(percentLeaf.trace.rawValue, 62.5)
 assert.equal(percentLeaf.trace.unit, "percent")
+assert.equal(percentLeaf.trace.expression, "62.5%")
 const dividedInterval = evaluateReleaseExpressionInterval({
     op: "divide",
     args: [
@@ -151,6 +229,14 @@ const fixedRelease = evaluateAnomalyReleaseProfile({
 approx(fixedRelease.formulaValue, 5, "fixed profile formula value")
 approx(fixedRelease.finalBaseMultiplier, 5, "fixed profile replaces the anomaly base multiplier")
 approx(fixedRelease.releaseScale, 8, "fixed profile converts relative to the original anomaly unit")
+const screenshotRelease = evaluateAnomalyReleaseProfile(agent.anomalyReleaseProfiles[0], {
+    originalBaseMultiplier: 0.625,
+    trigger: { outOfCombatPanel: { anomalyMastery: 196.3 } },
+    coreScalingRow: { releaseCoefficientPctByElement: { ether: 27.5 } },
+    event: { stunned: true },
+    eventElement: "ether",
+})
+assert.equal(screenshotRelease.trace.expression, "196.3 / 10 × 27.5% × 1.5 = 8.097375")
 assert.throws(() => evaluateReleaseExpression({
     op: "divide",
     args: [
@@ -162,7 +248,7 @@ assert.ok(validateAnomalyReleaseProfile({
     id: "illegal-stat",
     supportedElements: ["ether"],
     resultMode: "originalAnomalyRatio",
-    expression: { kind: "triggerStat", panel: "outOfCombat", stat: "critRate", unit: "raw" },
+    expression: { kind: "triggerStat", panel: "outOfCombat", stat: "critRate", unit: "raw", whiteBoxRole: "conversionSource" },
 }).some(message => message.includes("不是允许的触发者属性")))
 
 const skills = catalog.agentSkillsMap.get("aria")
@@ -225,6 +311,24 @@ approx(release.outOfCombat.panel.anomalyMastery, 253.68, "unrounded out-of-comba
 approx(release.damage.multipliers.releaseScale, 10.4643, "stunned F-level ether release ratio")
 approx(release.damage.multipliers.originalAnomalyBaseMultiplier, 0.625, "release should inherit one corruption proc")
 approx(release.damage.multipliers.anomaly, 0.625 * 10.4643, "release effective anomaly multiplier")
+const releaseWhiteBoxRows = release.damage.whiteBoxRows
+assert.equal(releaseWhiteBoxRows.find(row => row.label === "原异常单次倍率")?.formula, "侵蚀")
+assert.deepEqual(
+    releaseWhiteBoxRows.find(row => row.label === "转换数据来源"),
+    {
+        label: "转换数据来源",
+        formula: "局外异常掌控",
+        value: 253.68,
+        displayValue: "253.68",
+    },
+)
+assert.equal(
+    releaseWhiteBoxRows.find(row => row.label === "异放公式：异放倍率")?.formula,
+    "253.68 / 10 × 27.5% × 1.5 = 10.4643",
+)
+for (const hiddenLabel of ["异放倍率方案", "异常掌控除数", "局外异常掌控换算", "核心属性系数"]) {
+    assert.equal(releaseWhiteBoxRows.some(row => row.label === hiddenLabel), false, `${hiddenLabel} should not occupy its own white-box row`)
+}
 assert.ok(release.damage.whiteBoxRows.some(row => row.label === "异放失衡倍率修正" && row.value === 1.5))
 assert.ok(release.damage.whiteBoxRows.some(row => row.label === "失衡乘区" && row.value === 1.5))
 
@@ -265,8 +369,127 @@ const cinemaOneLowMastery = calculateInCombatPanel(catalog, releaseInput({
     },
 }))
 approx(cinemaOneLowMastery.outOfCombat.panel.anomalyMastery, 115, "low-mastery cinema test panel")
+approx(cinemaOneLowMastery.damage.multipliers.anomalyCritBaseRate, 0.25, "cinema 1 base release crit rate")
+approx(cinemaOneLowMastery.damage.multipliers.anomalyCritConvertedRate, 0.075, "cinema 1 converted release crit rate")
 approx(cinemaOneLowMastery.damage.multipliers.anomalyCritRate, 0.325, "cinema 1 release crit formula below cap")
 approx(cinemaOneLowMastery.damage.multipliers.anomalyCritDmg, 0.25, "cinema 1 release crit damage")
+
+const fractionalMasteryDisc = disc(
+    "aria-fractional-mastery",
+    "astral_voice",
+    6,
+    { stat: "anomalyMastery", value: 70.69565217391305, mode: "pct" },
+)
+const coreFInitialMasteryDisc = disc(
+    "aria-core-f-initial-mastery",
+    "astral_voice",
+    6,
+    { stat: "anomalyMastery", value: 30, mode: "pct" },
+)
+const cinemaOneFractionalMastery = calculateInCombatPanel(catalog, releaseInput({
+    activeBuffIds: ["agent:aria.corePassive", "agent:aria.cinema.1"],
+    input: {
+        coreSkillLevel: "none",
+        wEngineId: "zzz_wiki_212",
+        driveDiscs: [fractionalMasteryDisc],
+    },
+}))
+approx(cinemaOneFractionalMastery.outOfCombat.panel.anomalyMastery, 196.3, "fractional out-of-combat mastery")
+approx(cinemaOneFractionalMastery.damage.multipliers.anomalyCritConvertedRate, 0.48,
+    "conversion should floor the final out-of-combat panel mastery before applying the coefficient")
+approx(cinemaOneFractionalMastery.damage.multipliers.anomalyCritRate, 0.73,
+    "196 displayed initial mastery should produce 73% total anomaly Crit Rate")
+assert.equal(
+    cinemaOneFractionalMastery.damage.whiteBoxRows.some(row => row.label === "异常暴击率转换"),
+    false,
+    "Release whitebox should not expose a separate anomaly Crit conversion row",
+)
+assert.equal(
+    cinemaOneFractionalMastery.damage.whiteBoxRows.find(row => row.label === "异常暴击区")?.formula,
+    "1 + 73% × 25%",
+    "Release whitebox should show only the combined anomaly Crit zone",
+)
+
+const legacyCritRateBonusExpression = {
+    op: "multiply",
+    args: [
+        {
+            op: "max",
+            args: [
+                {
+                    op: "subtract",
+                    args: [
+                        { kind: "triggerStat", panel: "outOfCombat", stat: "anomalyMastery", unit: "raw" },
+                        { kind: "constant", value: 100, unit: "raw" },
+                    ],
+                },
+                { kind: "constant", value: 0, unit: "raw" },
+            ],
+        },
+        { kind: "constant", value: 0.5, unit: "percent" },
+    ],
+}
+const ariaWithBothCritSources = structuredClone(agent)
+ariaWithBothCritSources.anomalyReleaseProfiles[0].critRateBonusExpression = legacyCritRateBonusExpression
+const dualEncodedCinemaOne = calculateInCombatPanel(catalogWithAria(ariaWithBothCritSources), releaseInput({
+    activeBuffIds: ["agent:aria.corePassive", "agent:aria.cinema.1"],
+    input: {
+        coreSkillLevel: "F",
+        wEngineId: "zzz_wiki_212",
+        driveDiscs: [coreFInitialMasteryDisc],
+    },
+}))
+approx(dualEncodedCinemaOne.damage.multipliers.anomalyCritRate, 0.73,
+    "the explicit Cinema Buff conversion must replace, not stack with, a legacy profile expression")
+
+const legacyAria = structuredClone(ariaWithBothCritSources)
+legacyAria.combatBuffs.cinemaBuffs.find(buff => buff.cinemaLevel === 1).effects =
+    legacyAria.combatBuffs.cinemaBuffs.find(buff => buff.cinemaLevel === 1).effects
+        .filter(effect => effect.stat !== "anomalyCritRatePerInitialMasteryAbove100")
+const legacyCinemaOne = calculateInCombatPanel(catalogWithAria(legacyAria), releaseInput({
+    activeBuffIds: ["agent:aria.corePassive", "agent:aria.cinema.1"],
+    input: {
+        coreSkillLevel: "F",
+        wEngineId: "zzz_wiki_212",
+        driveDiscs: [coreFInitialMasteryDisc],
+    },
+}))
+approx(legacyCinemaOne.damage.multipliers.anomalyCritRate, 0.7315,
+    "legacy catalogs without the explicit conversion Buff should retain the profile fallback")
+
+const cinemaOneWithInCombatMastery = calculateInCombatPanel(catalog, releaseInput({
+    activeBuffIds: ["agent:aria.corePassive", "agent:aria.cinema.1"],
+    manualStats: [{ id: "combat-am", stat: "anomalyMasteryFlat", value: 100, mode: "flat" }],
+    input: {
+        coreSkillLevel: "none",
+        wEngineId: "zzz_wiki_212",
+        driveDiscs: [],
+    },
+}))
+approx(cinemaOneWithInCombatMastery.outOfCombat.panel.anomalyMastery, 115, "in-combat Buff must not alter initial mastery")
+approx(cinemaOneWithInCombatMastery.inCombat.panel.anomalyMastery, 215, "in-combat mastery fixture")
+approx(cinemaOneWithInCombatMastery.damage.multipliers.anomalyCritRate, 0.325,
+    "in-combat mastery must not change the Cinema 1 conversion")
+
+const ordinaryCorruption = calculateInCombatPanel(catalog, releaseInput({
+    activeBuffIds: ["agent:aria.corePassive", "agent:aria.cinema.1"],
+    damage: {
+        mode: "anomaly",
+        selectedEventId: "ordinary-corruption",
+        events: [{
+            id: "ordinary-corruption",
+            kind: "anomaly",
+            count: 1,
+            stunned: true,
+            settlementType: "attribute",
+            anomalyEffect: "corruption",
+            anomalyVariant: "normal",
+            procCount: 1,
+        }],
+    },
+}))
+approx(ordinaryCorruption.damage.multipliers.anomalyCritRate, 0,
+    "Cinema 1 anomaly Crit effects must not apply to ordinary Corruption")
 
 const cinemaOneCapped = calculateInCombatPanel(catalog, releaseInput({
     activeBuffIds: ["agent:aria.corePassive", "agent:aria.cinema.1"],
@@ -315,7 +538,73 @@ const cinemaSix = calculateInCombatPanel(catalog, releaseInput({
 const cinemaSixById = new Map(cinemaSix.damage.events.map(event => [event.id, event]))
 approx(cinemaSixById.get("enhanced").multipliers.dmg, 1.4, "cinema 6 enhanced charged basic bonus")
 approx(cinemaSixById.get("ultimate").multipliers.dmg, 1.4, "cinema 6 ultimate bonus")
-approx(cinemaSixById.get("charge").multipliers.dmg, 1, "cinema 6 should not buff normal charged basic")
+approx(cinemaSixById.get("charge").multipliers.dmg, 1.4, "cinema 6 current Ether damage bonus target")
+
+function teammateRelease(activeBuffIds) {
+    return calculateInCombatPanel(catalog, releaseInput({
+        activeBuffIds: ["agent:aria.corePassive", ...activeBuffIds],
+        input: {
+            wEngineId: "zzz_wiki_212",
+            driveDiscs: [],
+        },
+    }))
+}
+
+const teammateReleaseBaseline = teammateRelease([])
+for (const buff of catalog.teammateCombatBuffs) {
+    const result = teammateRelease([buff.id])
+    assert.ok(
+        Number.isFinite(result.damage.totalFinalDamage) && result.damage.totalFinalDamage > 0,
+        `${buff.id} should produce a finite positive Aria Release result`,
+    )
+}
+
+for (const buffId of [
+    "buff_j8kf2r9m4q",
+    "qianxia.cinema_1.cat_gaze_def_reduction",
+    "qianxia.cinema_2.aether_curtain_atk_pct",
+    "qianxia.cinema_4.ultimate_team_dmg_bonus",
+    "buff_23620b7000",
+    "youye.additional_ability.anomaly_damage_bonus",
+    "rina.core_pen_ratio",
+    "nicole.additional_ether_damage",
+    "liuyin.cinema_1.good_review_res_ignore",
+    "yaojiayin.cinema_1.enemy_res_reduction",
+]) {
+    assert.ok(
+        teammateRelease([buffId]).damage.totalFinalDamage > teammateReleaseBaseline.damage.totalFinalDamage,
+        `${buffId} should increase Aria Corruption Release damage`,
+    )
+}
+
+for (const buffId of [
+    "rina.additional_electric_damage",
+    "soukaku.additional_ice_damage",
+    "lucia_elowen.ex_special_darkbreaker_sheer_force",
+    "jane_doe.core_insight",
+]) {
+    approx(
+        teammateRelease([buffId]).damage.totalFinalDamage,
+        teammateReleaseBaseline.damage.totalFinalDamage,
+        `${buffId} should not affect Aria Corruption Release damage`,
+    )
+}
+
+const qingyiCoreRelease = teammateRelease(["qingyi.core_subjugation_stun_multiplier"])
+const qingyiCinemaTwoOnlyRelease = teammateRelease(["qingyi.cinema_2_subjugation_amplify"])
+const qingyiCombinedRelease = teammateRelease([
+    "qingyi.core_subjugation_stun_multiplier",
+    "qingyi.cinema_2_subjugation_amplify",
+])
+approx(
+    qingyiCinemaTwoOnlyRelease.damage.totalFinalDamage,
+    teammateReleaseBaseline.damage.totalFinalDamage,
+    "Qingyi Cinema 2 modifier should not create a standalone Aria damage Buff",
+)
+assert.ok(
+    qingyiCombinedRelease.damage.totalFinalDamage > qingyiCoreRelease.damage.totalFinalDamage,
+    "Qingyi Cinema 2 should amplify the selected core stun multiplier for Aria Release",
+)
 
 const alienAttribute = calculateInCombatPanel(catalog, {
     ...releaseInput(),
@@ -427,6 +716,60 @@ const externalMapPrepared = externalPrepared.scoreOnlyFromSummaryLegacy(summaryS
 approx(externalCompiledPrepared.finalDamage, externalFullPrepared.damage.totalFinalDamage, "compiled external-source release score")
 approx(externalMapPrepared.finalDamage, externalFullPrepared.damage.totalFinalDamage, "map external-source release score")
 
+const cinemaOnePrepared = createInCombatPanelCalculator(catalog, releaseInput({
+    activeBuffIds: ["agent:aria.corePassive", "agent:aria.cinema.1"],
+    input: {
+        coreSkillLevel: "F",
+        wEngineId: "zzz_wiki_212",
+        driveDiscs: [],
+    },
+}))
+const fractionalSummaryStats = new Map([["anomalyMastery", 30]])
+const fractionalSummarySets = new Map([["astral_voice", 1]])
+const cinemaOnePreparedFull = cinemaOnePrepared.calculate([coreFInitialMasteryDisc], { round: false })
+const cinemaOneCompiled = cinemaOnePrepared.scoreOnlyFromSummary(fractionalSummaryStats, fractionalSummarySets)
+const cinemaOneMap = cinemaOnePrepared.scoreOnlyFromSummaryLegacy(fractionalSummaryStats, fractionalSummarySets)
+const cinemaOneIndexed = cinemaOnePrepared.scoreOnlyFromIndexedSummary(
+    [30],
+    ["anomalyMastery"],
+    [1],
+    ["astral_voice"],
+    new Map([["astral_voice", 0]]),
+)
+for (const [label, result] of [
+    ["compiled", cinemaOneCompiled],
+    ["map", cinemaOneMap],
+    ["indexed", cinemaOneIndexed],
+]) {
+    approx(result.finalDamage, cinemaOnePreparedFull.damage.totalFinalDamage,
+        `Cinema 1 ${label} score should use displayed initial Anomaly Mastery`)
+}
+assert.ok(cinemaOnePrepared.optimizerStatMetadata().relevantStatIds.includes("anomalyMastery"),
+    "Cinema 1 conversion must keep Anomaly Mastery relevant to optimization")
+
+const cinemaOneDenseTarget = cinemaOnePrepared.compileDensePanelScoreTarget({
+    statIds: ["anomalyMastery"],
+    setIds: ["astral_voice"],
+    setIndexById: new Map([["astral_voice", 0]]),
+})
+assert.ok(cinemaOneDenseTarget, "Cinema 1 should compile a dense Release target")
+const cinemaOneDense = cinemaOneDenseTarget.scoreDense(
+    Float64Array.of(30),
+    Int16Array.of(1),
+)
+approx(cinemaOneDense.finalDamage, cinemaOnePreparedFull.damage.totalFinalDamage,
+    "Cinema 1 dense score should equal the full calculation")
+const cinemaOneFixedTarget = cinemaOneDenseTarget.compileForSetCounts(Int16Array.of(1))
+const cinemaOneFixed = cinemaOneFixedTarget.scoreScalar(Float64Array.of(30))
+approx(cinemaOneFixed.finalDamage, cinemaOnePreparedFull.damage.totalFinalDamage,
+    "Cinema 1 fixed score should equal the full calculation")
+assert.equal(typeof cinemaOneFixedTarget.scoreObjectiveScalar, "function")
+approx(
+    cinemaOneFixedTarget.scoreObjectiveScalar(Float64Array.of(30)).finalDamage,
+    cinemaOnePreparedFull.damage.totalFinalDamage,
+    "Cinema 1 fixed objective score should equal the full calculation",
+)
+
 const optimizerSets = ["astral_voice", "phaethons_melody", "freedom_blues"]
 const mainBySlot = {
     1: { stat: "hpFlat", value: 2200, mode: "flat" },
@@ -449,7 +792,14 @@ const optimizerDiscs = optimizerSets.flatMap((setId, setIndex) => Array.from({ l
 const optimizerStore = { currentOwnerId: "default", driveDiscs: optimizerDiscs }
 function optimizationInput(fourPieceSetIds) {
     return {
-        ...releaseInput(),
+        ...releaseInput({
+            activeBuffIds: [
+                "agent:aria.corePassive",
+                "agent:aria.additionalAbility",
+                "agent:aria.cinema.1",
+                "wEngine:zzz_wiki_1883.self",
+            ],
+        }),
         settings: {
             objective: "damage",
             algorithm: "exact-super-bound",
@@ -477,6 +827,20 @@ assert.equal(dual.results.length, 10)
 assert.equal(dual.metrics.fourPieceSets.length, 2)
 assert.equal(dual.metrics.estimatedCombinationCount,
     astralOnly.metrics.estimatedCombinationCount + phaethonOnly.metrics.estimatedCombinationCount)
+const dualTopInput = optimizationInput(["astral_voice", "phaethons_melody"])
+const dualTopFull = calculateInCombatPanel(catalog, {
+    ...dualTopInput,
+    combatBuffs: {
+        ...dualTopInput.combatBuffs,
+        activeBuffIds: [
+            ...dualTopInput.combatBuffs.activeBuffIds,
+            `driveDisc4pc:${dual.results[0].fourPieceSetId}.self`,
+        ],
+    },
+    driveDiscs: dual.results[0].driveDiscs,
+})
+approx(dual.results[0].score, dualTopFull.damage.totalFinalDamage,
+    "Cinema 1 strict optimizer score must equal the full calculation")
 
 const externalOptimizationInput = {
     ...optimizationInput(["astral_voice"]),

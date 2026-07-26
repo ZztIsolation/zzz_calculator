@@ -164,11 +164,20 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("当前没有可用于优化的可见角色、音擎或驱动盘套装")
   })
 
-  it("reuses completed optimized four-piece runtime for calculation and analysis", () => {
-    expect(source).toContain("selectedOptimizedRuntimeInputs")
-    expect(source).toContain("optimizerStore.completedSettings")
-    expect(source).toContain("activeDriveDisc4pcBuffIds")
+  it("applies the currently saved matching four-piece runtime to every drive-disc mode", () => {
+    expect(source).toContain("selectedDriveDiscRuntimeInputs")
+    expect(source).toContain("activeDriveDisc4pcRuntimeInputs")
+    expect(source).toContain("optimizerStore.settings")
+    expect(source).not.toContain("selectedOptimizedRuntimeInputs")
     expect(source).toContain("selectedBuildOptions.value")
+    expect(source).toContain("driveDiscRuntimeInputs: selectedDriveDiscRuntimeInputs.value")
+  })
+
+  it("marks retained optimizer rankings as stale after constraints change", () => {
+    expect(source).toContain("optimizerStore.resultsAreStale")
+    expect(source).toContain("约束已更新，需重新优化")
+    expect(source).toContain(':stale="optimizerStore.resultsAreStale"')
+    expect(source).toContain("上次评分")
   })
 
   it("keeps two-piece and four-piece limits in drafts until explicitly applied", () => {

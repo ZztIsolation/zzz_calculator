@@ -259,6 +259,27 @@ const directUnstunnedWithBonus = calculateInCombatPanel(stunMultiplierBonusCatal
 }))
 approx(directUnstunnedWithBonus.damage.multipliers.stun, 1, "Stun multiplier bonus should stay inactive while target is unstunned")
 
+const directStunnedWithLiuyinCinemaTwo = calculateInCombatPanel(catalog, minimalInput({
+    combatBuffs: {
+        activeBuffIds: ["liuyin.cinema_2.complaint_damage_bonus"],
+    },
+    damage: {
+        agentLevel: 60,
+        selectedEventId: directStunEvent.id,
+        events: [{ ...directStunEvent, stunned: true }],
+        target: zeroResistanceTarget({
+            stunMultiplierPercent: 150,
+        }),
+    },
+}))
+approx(directStunnedWithLiuyinCinemaTwo.damage.multipliers.dmg, 1.15, "Liuyin Cinema 2 team damage multiplier")
+approx(directStunnedWithLiuyinCinemaTwo.damage.multipliers.stun, 1.7, "Liuyin Cinema 2 stun multiplier")
+approx(
+    directStunnedWithLiuyinCinemaTwo.damage.finalDamage,
+    directStunnedNoBonus.damage.finalDamage * 1.15 * (1.7 / 1.5),
+    "Liuyin Cinema 2 should apply team damage and stun multiplier bonuses together",
+)
+
 stunMultiplierBonusCatalog.combatBuffs.push({
     id: "test.damage.stun_multiplier_bonus_always",
     sourceType: "manual",

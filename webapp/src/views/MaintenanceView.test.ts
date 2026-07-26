@@ -1,6 +1,8 @@
 import { enableAutoUnmount, mount } from "@vue/test-utils"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { createPinia } from "pinia"
 import { createMemoryHistory, createRouter, RouterView } from "vue-router"
+import { useCatalogStore } from "@/stores/catalog"
 import MaintenanceView from "@/views/MaintenanceView.vue"
 
 enableAutoUnmount(afterEach)
@@ -31,10 +33,10 @@ vi.mock("naive-ui", () => ({
     template: "<div><slot /><button v-for=\"option in options\" :key=\"option.key\" type=\"button\" :disabled=\"disabled\" @click=\"$emit('select', option.key)\">{{ option.label }}</button></div>",
   },
   NSelect: {
-    props: ["value", "options", "disabled", "multiple", "id"],
+    props: ["value", "options", "disabled", "multiple", "id", "placeholder", "clearable"],
     emits: ["update:value"],
     template: `
-      <select :id="id" :value="value" :disabled="disabled" :multiple="multiple" @change="update($event)">
+      <select :id="id" :value="value" :disabled="disabled" :multiple="multiple" :data-placeholder="placeholder" :data-clearable="clearable !== undefined ? 'true' : undefined" @change="update($event)">
         <option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option>
       </select>
     `,
@@ -120,6 +122,7 @@ function makeCatalog() {
     driveDiscSets: { sets: [{ id: "disc_set_a", name: { zhCN: "套装甲" }, images: { icon: "", source: "https://example.com/disc-image" }, sources: ["https://example.com/disc-primary", "https://example.com/disc-secondary"], twoPiece: { effects: [effect("disc_effect")] }, fourPiece: { effectText: { zhCN: "四件套说明" }, selfBuff: { condition: "launchChainAttackOrUltimate", durationSeconds: 12, effects: [effect("disc_four_effect")], buffModifiers: [] }, teamBuff: null } }] },
     anomalyEffects: { effects: [
       { id: "assault", settlementType: "attribute", label: { zhCN: "强击" }, element: "physical", baseMultiplier: 7.13, defaultProcCount: 1 },
+      { id: "corruption", settlementType: "attribute", label: { zhCN: "侵蚀" }, element: "ether", baseMultiplier: 0.625, defaultProcCount: 20 },
       { id: "burn_disorder", settlementType: "disorder", label: { zhCN: "灼烧紊乱" }, element: "fire", fixedMultiplier: 4.5, tickMultiplier: 0.5, tickIntervalSeconds: 1, defaultDurationSeconds: 10 },
     ] },
     combatBuffs: {
@@ -186,7 +189,9 @@ async function mountView(options: { failCatalogAfterSave?: boolean, delayFieldSa
     if (url === "/api/maintenance/agents" && init?.method === "POST") {
       const body = JSON.parse(String(init.body ?? "{}"))
       const savedItem = { ...body, id: body.id || "generated_agent" }
-      currentCatalog.agents.agents.push(savedItem)
+      const existingIndex = currentCatalog.agents.agents.findIndex((item: any) => item.id === savedItem.id)
+      if (existingIndex >= 0) currentCatalog.agents.agents[existingIndex] = savedItem
+      else currentCatalog.agents.agents.push(savedItem)
       successfulSaveCount += 1
       return jsonResponse({ ok: true, savedItem })
     }
@@ -242,9 +247,11 @@ async function mountView(options: { failCatalogAfterSave?: boolean, delayFieldSa
   })
   await router.push("/maintenance")
   await router.isReady()
-  const wrapper = mount(RouterView, { global: { plugins: [router] } })
+  const pinia = createPinia()
+  const catalogStore = useCatalogStore(pinia)
+  const wrapper = mount(RouterView, { global: { plugins: [pinia, router] } })
   await vi.waitFor(() => expect(wrapper.text()).toContain("角色甲"))
-  return { wrapper, fetchMock, router, releaseFieldSave }
+  return { wrapper, fetchMock, router, releaseFieldSave, catalogStore }
 }
 
 const resourceLabels: Record<string, string> = {
@@ -461,6 +468,20 @@ describe("MaintenanceView structured editor", () => {
     expect(fetchMock.mock.calls.filter(([url, init]) => url === "/api/maintenance/field-buffs" && init?.method === "POST")).toHaveLength(1)
   })
 
+  it("invalidates the loaded workbench catalog after a successful maintenance save", async () => {
+    const { wrapper, catalogStore } = await mountView()
+    catalogStore.$patch({
+      catalog: { agents: [{ id: "stale_agent" }] },
+      meta: { agents: [{ id: "stale_agent" }] },
+    })
+
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("完整目录已刷新"))
+
+    expect(catalogStore.catalog).toBeNull()
+    expect(catalogStore.meta).toBeNull()
+  })
+
   it("locks navigation and fields while a save is in flight", async () => {
     const { wrapper, releaseFieldSave } = await mountView({ delayFieldSave: true })
     await switchResource(wrapper, "field-buffs")
@@ -581,11 +602,11 @@ describe("MaintenanceView structured editor", () => {
     const rule = wrapper.find(".maintenance-rule-card")
     await button(rule, "异常目标").trigger("click")
     expect(field(rule, "结算类型").text()).toContain("属性异常")
-    expect(field(rule, "具体异常").text()).toContain("强击")
+    expect(field(rule, "具体异常（留空为全部）").text()).toContain("强击")
     expect(field(rule, "增幅类型").text()).toContain("异常持续时间延长（秒）")
 
     await field(rule, "结算类型").find("select").setValue("disorder")
-    await field(rule, "具体异常").find("select").setValue(["burn_disorder"])
+    await field(rule, "具体异常（留空为全部）").find("select").setValue(["burn_disorder"])
     await field(rule, "增幅类型").find("select").setValue("anomalyDurationBonusSeconds")
     await field(rule, "数值").find("input").setValue(5)
     await button(wrapper, "保存").trigger("click")
@@ -599,6 +620,56 @@ describe("MaintenanceView structured editor", () => {
       target: { kind: "anomaly", settlementType: "disorder", anomalyEffects: ["burn_disorder"] },
     })
     expect(body.combatBuffs.corePassive.effects[0].appliesTo).toBeUndefined()
+  })
+
+  it("selects, saves, and reloads the maintenance-only initial-Mastery Release conversion", async () => {
+    const { wrapper, fetchMock } = await mountView()
+    const rule = wrapper.find(".maintenance-rule-card")
+    await button(rule, "异常目标").trigger("click")
+    expect(field(rule, "增幅类型").text()).not.toContain("初始异常掌控超过 100 时每点转异常暴击率%")
+
+    await field(rule, "结算类型").find("select").setValue("release")
+    expect(field(rule, "增幅类型").text()).toContain("初始异常掌控超过 100 时每点转异常暴击率%")
+    await field(rule, "具体异常（留空为全部）").find("select").setValue(["corruption"])
+    await field(rule, "增幅类型").find("select").setValue("anomalyCritRatePerInitialMasteryAbove100")
+    await field(rule, "数值").find("input").setValue(0.5)
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("完整目录已刷新"))
+
+    const call = fetchMock.mock.calls.find(([url, init]) => url === "/api/maintenance/agents" && init?.method === "POST")!
+    const body = JSON.parse(String(call[1]?.body ?? "{}"))
+    expect(body.combatBuffs.corePassive.effects[0]).toMatchObject({
+      stat: "anomalyCritRatePerInitialMasteryAbove100",
+      value: 0.5,
+      target: { kind: "anomaly", settlementType: "release", anomalyEffects: ["corruption"] },
+    })
+    await vi.waitFor(() => expect(wrapper.text()).toContain("初始异常掌控超过 100 时每点转异常暴击率%"))
+  })
+
+  it("saves an empty concrete-Anomaly selection as a settlement wildcard and resets it when switching", async () => {
+    const { wrapper, fetchMock } = await mountView()
+    const rule = wrapper.find(".maintenance-rule-card")
+    await button(rule, "异常目标").trigger("click")
+
+    const concreteEffects = field(rule, "具体异常（留空为全部）").find("select")
+    expect(concreteEffects.attributes("data-clearable")).toBe("true")
+    expect(concreteEffects.attributes("data-placeholder")).toBe("全部属性异常")
+    await concreteEffects.setValue(["assault"])
+    await field(rule, "异常形态（留空为全部）").find("select").setValue(["normal"])
+
+    await field(rule, "结算类型").find("select").setValue("release")
+    expect(rule.text()).not.toContain("异常形态（留空为全部）")
+    expect(field(rule, "具体异常（留空为全部）").find("select").attributes("data-placeholder")).toBe("全部原异常")
+
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("完整目录已刷新"))
+
+    const call = fetchMock.mock.calls.find(([url, init]) => url === "/api/maintenance/agents" && init?.method === "POST")!
+    const body = JSON.parse(String(call[1]?.body ?? "{}"))
+    expect(body.combatBuffs.corePassive.effects[0].target).toEqual({
+      kind: "anomaly",
+      settlementType: "release",
+    })
   })
 
   it("uses a readable multi-select for general skill types", async () => {

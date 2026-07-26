@@ -299,7 +299,8 @@ type EffectTarget =
   | {
       kind: "anomaly";
       settlementType: "attribute" | "disorder" | "release";
-      anomalyEffects: Array<"assault" | "shatter" | "burn" | "shock" | "corruption" | "frozen" | "frost_frozen" | "flinch">;
+      anomalyEffects?: Array<"assault" | "shatter" | "burn" | "shock" | "corruption" | "frozen" | "frost_frozen" | "flinch">;
+      anomalyVariants?: Array<"normal" | "polarizedAssault">;
     };
 
 type ReleaseUnit = "raw" | "percent" | "decimal";
@@ -317,6 +318,7 @@ interface AnomalyReleaseProfile {
   supportedElements: Array<"physical" | "fire" | "ice" | "electric" | "ether" | "wind">;
   resultMode: "originalAnomalyRatio" | "fixedAnomalyMultiplier";
   expression: ReleaseExpression;
+  /** @deprecated Compatibility fallback for catalogs authored before explicit Buff conversion rules. */
   critRateBonusExpression?: ReleaseExpression;
 }
 
@@ -336,6 +338,13 @@ interface AnomalyUnitSourceSnapshot {
 // multiplies one original Anomaly unit by the expression result.
 // `fixedAnomalyMultiplier` replaces the Release base multiplier and derives a
 // relative scale from the original unit instead of multiplying final damage.
+// New stat-dependent CRIT conversions belong to targeted Buff rules. Aria
+// Cinema 1 uses `anomalyCritRatePerInitialMasteryAbove100` on Corruption
+// Release only. Its stored value is decimal CRIT Rate per whole point above
+// 100 after flooring the final out-of-combat Anomaly Mastery panel value.
+// A legacy `critRateBonusExpression` is evaluated only when no matching
+// explicit conversion rule exists, so old catalogs remain compatible without
+// double-counting catalogs that contain both representations.
 
 type BuffRuleStat =
   | ZzzStat
@@ -345,6 +354,7 @@ type BuffRuleStat =
   | "disorderBaseMultiplierBonus"
   | "anomalyCritRate"
   | "anomalyCritDmg"
+  | "anomalyCritRatePerInitialMasteryAbove100"
   | "anomalyDurationBonusSeconds"
   | "stunDmgMultiplierBonus" | "stunDmgMultiplierBonusAlways" | "stunDmgMultiplierBonusCapAlways"
   | "sheerDmgBonus" | "physicalSheerDmg" | "fireSheerDmg" | "iceSheerDmg" | "electricSheerDmg" | "etherSheerDmg" | "windSheerDmg"
@@ -672,13 +682,19 @@ the player-facing Buff picker and optimizer edit the same values directly on a
 New catalog and maintenance data must not store `appliesTo`. Element-specific
 critical damage and defense ignore use the explicit stat keys above, while
 multi-element effects are represented as multiple rules. Skill restrictions use
-`target.kind: "skill"` only. Attribute-Anomaly and Disorder restrictions use
-`target.kind: "anomaly"`, with a settlement type and one or more concrete
-effects. `anomalyDurationBonusSeconds` is stored in raw seconds, is valid only
-for a Disorder Anomaly target, and is not a stored percentage. The runtime still reads legacy `damageModifier` and
-`appliesTo` payloads for old browser state. Maintenance loading converts known
-element and skill filters; an unconvertible legacy `damageKinds` or
-`anomalyEffects` filter blocks saving instead of persisting hidden behavior.
+`target.kind: "skill"` only. Attribute-Anomaly, Disorder, and Release
+restrictions use `target.kind: "anomaly"` with a required settlement type.
+`anomalyEffects` is an optional exact whitelist: when it is absent, the rule
+matches every concrete effect in that settlement type, including effects added
+to the catalog later. Maintenance accepts an empty input array as the same
+wildcard but omits the field when saving. For Release targets, a non-empty list
+filters the original Anomaly used by the Release, not its trigger actor or
+profile. Attribute `anomalyVariants` remains an independent optional filter.
+`anomalyDurationBonusSeconds` is stored in raw seconds and is not a stored
+percentage. The runtime still reads legacy `damageModifier` and `appliesTo`
+payloads for old browser state. Maintenance loading converts known element and
+skill filters; an unconvertible legacy `damageKinds` or `anomalyEffects` filter
+blocks saving instead of persisting hidden behavior.
 
 Disorder events keep `elapsedSeconds` after snapping it to the selected source
 effect's tick interval, even when it exceeds the catalog base duration. The
@@ -694,8 +710,9 @@ Flinch Disorder with `+5` seconds and targets Assault with Anomaly CRIT Rate
 `clamp(40 + x * 0.16, 0, 100)%` plus 50% Anomaly CRIT DMG. Its runtime source
 `x` is Jane's AP, defaulting to and capped at 375 while allowing lower values.
 Cinema 2 adds 15% DEF ignore and another 50% Anomaly CRIT DMG to Assault only.
-Cinema 4 targets all catalog Attribute Anomalies with 18% Anomaly DMG and does
-not enter the Disorder bonus bucket. Selecting these Buffs means their stated
+Cinema 4 uses the settlement-wide Attribute Anomaly wildcard with 18% Anomaly
+DMG, automatically includes future Attribute Anomalies, and does not enter the
+Disorder bonus bucket. Selecting these Buffs means their stated
 trigger conditions are already satisfied; uptime is not simulated.
 
 ## In-Combat Panel Rules
