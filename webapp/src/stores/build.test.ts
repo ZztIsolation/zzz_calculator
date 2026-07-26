@@ -717,6 +717,62 @@ describe("build store", () => {
     expect(saved.byOwner.default.byAgent.agent_a.damage.target).toBeUndefined()
   })
 
+  it("preserves future snapshots and Release event fields through a compatibility save", () => {
+    const releaseEvent = {
+      id: "release-1",
+      kind: "anomaly",
+      settlementType: "release",
+      anomalyEffect: "corruption",
+      triggerActorRef: { agentId: "agent_a", profileId: "aria-release" },
+      anomalySource: {
+        actorRef: { agentId: "source_agent" },
+        snapshot: { agentId: "source_agent", sourceConfigHash: "future-hash" },
+      },
+      count: 1,
+    }
+    const sourceSnapshot = {
+      agentId: "source_agent",
+      sourceConfigHash: "future-hash",
+      capturedAt: "2026-07-27T00:00:00.000Z",
+    }
+    localStorage.setItem("zzz-calculator.webapp.build.v1", JSON.stringify({
+      version: 2,
+      currentOwnerId: "default",
+      byOwner: {
+        default: {
+          currentAgentId: "agent_a",
+          byAgent: {
+            agent_a: {
+              wEngineId: "engine_a",
+              lastAnomalySourceSnapshot: sourceSnapshot,
+              futureBuildField: { keep: true },
+              damage: {
+                mode: "custom",
+                selectedEventId: "release-1",
+                events: [releaseEvent],
+              },
+            },
+          },
+        },
+      },
+    }))
+    const meta = {
+      agents: [{ id: "agent_a", name: { zhCN: "角色 A" } }],
+      wEngines: [{ id: "engine_a", name: { zhCN: "音擎 A" } }],
+      combatBuffs: [],
+    }
+    const store = useBuildStore()
+
+    store.initialize({}, meta)
+    store.persist()
+
+    const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "{}")
+    const config = saved.byOwner.default.byAgent.agent_a
+    expect(config.lastAnomalySourceSnapshot).toEqual(sourceSnapshot)
+    expect(config.futureBuildField).toEqual({ keep: true })
+    expect(config.damage.events[0]).toMatchObject(releaseEvent)
+  })
+
   it("persists calculation config in an owner-scoped and main-compatible shape", () => {
     localStorage.setItem("zzz-calculator.currentAccount.v1", "alice")
     const store = useBuildStore()

@@ -2,6 +2,25 @@
 
 # Changelog
 
+## 2026-07-27 - Added The Storage Compatibility Foundation
+
+Added a no-UI compatibility foundation for the staged Aria and multi-set
+optimizer rollout. The existing optimizer store now accepts both version 2 and
+version 3 envelopes. Version 2 continues to represent one selected four-piece
+set and dual-writes that choice as both `fourPieceSetId` and a one-item
+`fourPieceSetIds` array. When a version 3 envelope is loaded after a rollback,
+the compatibility UI uses the first set while preserving the complete ordered
+array, unknown per-agent settings, other agents, top-level rollout metadata,
+and the original version number.
+
+The existing build-store normalizer already round-trips unknown per-agent
+fields and unknown fields inside custom damage events. Added regression
+coverage proving that a future `lastAnomalySourceSnapshot`, a Release event's
+trigger/source references, and unrelated future build metadata survive a load
+and compatibility save. This foundation does not change IndexedDB, localStorage
+keys, inventory records, account pointers, visible features, Calculator APIs,
+Helper/Scanner manifests, or native download artifacts.
+
 ## 2026-07-24 - Added Defense Battle 3.0 Phase 3 And Removed A Duplicate W-Engine
 
 Added the three field Buffs shown for Defense Battle v5, version 3.0, phase 3,
