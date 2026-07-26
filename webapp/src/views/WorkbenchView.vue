@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref, watch } from "vue"
 import { NAlert, NButton, NInput, NInputNumber, NModal, NSelect, NTag, useMessage } from "naive-ui"
-import { LineChart, RefreshCcw, Save, SlidersHorizontal, Sparkles, X } from "lucide-vue-next"
+import { Ban, LineChart, LockKeyhole, RefreshCcw, Save, SlidersHorizontal, Sparkles, X } from "lucide-vue-next"
 import BuffPickerModal from "@/components/BuffPickerModal.vue"
 import CalculationConfigModal from "@/components/CalculationConfigModal.vue"
 import DamageSummaryBar from "@/components/DamageSummaryBar.vue"
@@ -1512,8 +1512,18 @@ function complexityText(metrics: any = {}, settings: any = {}) {
             </template>
           </div>
           <div v-if="exclusionUiEnabled" class="drive-disc-restriction-hints" aria-label="驱动盘使用限制说明">
-            <span><strong>锁定：</strong>自动优化时只供当前角色使用，其他角色会自动排除。</span>
-            <span><strong>排除：</strong>当前角色下次优化跳过此盘，不影响其他角色、手动方案或已有套装。</span>
+            <div class="drive-disc-restriction-hint">
+              <span class="restriction-hint-button restriction-hint-button-lock" title="锁定按钮" aria-hidden="true">
+                <LockKeyhole :size="16" />
+              </span>
+              <span><strong>锁定：</strong>自动优化时只供当前角色使用，其他角色会自动排除。</span>
+            </div>
+            <div class="drive-disc-restriction-hint">
+              <span class="restriction-hint-button restriction-hint-button-exclusion" title="排除按钮" aria-hidden="true">
+                <Ban :size="16" />
+              </span>
+              <span><strong>排除：</strong>当前角色下次优化跳过此盘，不影响其他角色、手动方案或已有套装。</span>
+            </div>
           </div>
         </div>
       </div>
@@ -2032,8 +2042,8 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 .drive-disc-restriction-hints {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 18px;
-  padding: 9px 10px;
+  gap: 8px 18px;
+  padding: 10px;
   border-left: 3px solid #3b82f6;
   background: #f8fbff;
   color: var(--app-muted);
@@ -2041,13 +2051,40 @@ function complexityText(metrics: any = {}, settings: any = {}) {
   line-height: 1.5;
 }
 
-.drive-disc-restriction-hints span {
-  min-width: min(100%, 280px);
-  flex: 1 1 320px;
+.drive-disc-restriction-hint {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: min(100%, 220px);
+  flex: 1 1 230px;
 }
 
 .drive-disc-restriction-hints strong {
   color: var(--app-text);
+}
+
+.restriction-hint-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.restriction-hint-button-lock {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #2f7df6;
+}
+
+.restriction-hint-button-exclusion {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #d14343;
 }
 
 .optimizer-stale-alert {
