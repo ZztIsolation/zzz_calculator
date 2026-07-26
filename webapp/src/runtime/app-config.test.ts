@@ -34,7 +34,7 @@ describe("loadAppConfig", () => {
     ])
   })
 
-  it("defaults local development reservation UI on when neither source is available", async () => {
+  it("defaults local development restriction controls on when neither source is available", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => {
       throw new Error("offline")
     }))

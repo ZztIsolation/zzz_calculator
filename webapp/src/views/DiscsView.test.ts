@@ -331,7 +331,7 @@ describe("DiscsView", () => {
     expect(wrapper.findAll("tbody tr")).toHaveLength(1)
 
     await wrapper.get('[aria-label="调整专属角色"]').trigger("click")
-    await wrapper.get('[aria-label="专属角色"]').setValue("agent-b")
+    await wrapper.get('select[aria-label="专属角色"]').setValue("agent-b")
     await button(wrapper, "应用专属").trigger("click")
     await flushPromises()
     let persisted = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")

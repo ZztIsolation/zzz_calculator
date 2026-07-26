@@ -40,6 +40,7 @@ export default defineConfig({
     env: {
       PORT: String(port),
       DRIVE_DISC_RESERVATIONS_UI_ENABLED: "false",
+      DRIVE_DISC_EXCLUSIONS_UI_ENABLED: "false",
     },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

@@ -63,7 +63,7 @@ async function seedLegacyLocalStorage(page: Page) {
   }, legacyStore)
 }
 
-async function enableReservationUi(page: Page, exclusions = false) {
+async function mockRestrictionUi(page: Page, reservations: boolean, exclusions = false) {
   await page.route("**/api/app-config", route => route.fulfill({
     status: 200,
     contentType: "application/json",
@@ -71,7 +71,7 @@ async function enableReservationUi(page: Page, exclusions = false) {
       maintenanceEnabled: false,
       scanTelemetryEnabled: false,
       scanTelemetryRetentionDays: 30,
-      driveDiscReservationsUiEnabled: true,
+      driveDiscReservationsUiEnabled: reservations,
       driveDiscExclusionsUiEnabled: exclusions,
     }),
   }))
@@ -85,6 +85,7 @@ async function openDiscs(page: Page) {
 
 test("reservation UI stays absent when the runtime flag is disabled", async ({ page }) => {
   await seedLegacyLocalStorage(page)
+  await mockRestrictionUi(page, false)
   await openDiscs(page)
 
   await expect(page.getByLabel("专属角色筛选")).toHaveCount(0)
@@ -97,7 +98,7 @@ test("reservation UI stays absent when the runtime flag is disabled", async ({ p
 test("reservation UI preserves legacy data and supports per-disc visual workflows", async ({ page }) => {
   test.slow()
   await seedLegacyLocalStorage(page)
-  await enableReservationUi(page)
+  await mockRestrictionUi(page, true)
   await openDiscs(page)
 
   const preset = page.locator(".loadout-visual-card").filter({ hasText: "旧数据六槽预设" })
@@ -152,7 +153,7 @@ test("reservation UI preserves legacy data and supports per-disc visual workflow
 test("exclusion UI supports effective states and both confirmed conversions", async ({ page }) => {
   test.slow()
   await seedLegacyLocalStorage(page)
-  await enableReservationUi(page, true)
+  await mockRestrictionUi(page, true, true)
   await openDiscs(page)
 
   await expect(page.getByLabel("限制状态筛选")).toBeVisible()

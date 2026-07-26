@@ -41,6 +41,7 @@ async function startServer(extraEnv = {}, environment = "production") {
             ...process.env,
             NODE_ENV: environment,
             DRIVE_DISC_RESERVATIONS_UI_ENABLED: "",
+            DRIVE_DISC_EXCLUSIONS_UI_ENABLED: "",
             PORT: String(port),
             ...extraEnv,
         },
@@ -337,13 +338,18 @@ try {
     await waitForServer()
     const localDefaultConfig = JSON.parse((await getText("/api/app-config")).body)
     assert.equal(localDefaultConfig.driveDiscReservationsUiEnabled, true)
+    assert.equal(localDefaultConfig.driveDiscExclusionsUiEnabled, true)
 
     server.kill()
     await sleep(100)
-    await startServer({ DRIVE_DISC_RESERVATIONS_UI_ENABLED: "false" }, "development")
+    await startServer({
+        DRIVE_DISC_RESERVATIONS_UI_ENABLED: "false",
+        DRIVE_DISC_EXCLUSIONS_UI_ENABLED: "false",
+    }, "development")
     await waitForServer()
     const localDisabledConfig = JSON.parse((await getText("/api/app-config")).body)
     assert.equal(localDisabledConfig.driveDiscReservationsUiEnabled, false)
+    assert.equal(localDisabledConfig.driveDiscExclusionsUiEnabled, false)
 } finally {
     server?.kill()
     if (telemetryDirectory) await rm(telemetryDirectory, { recursive: true, force: true })
