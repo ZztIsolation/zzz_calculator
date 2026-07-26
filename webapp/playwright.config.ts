@@ -37,7 +37,10 @@ export default defineConfig({
   webServer: {
     command: "npm --prefix .. run serve",
     url: `${baseURL}/api/health`,
-    env: { PORT: String(port) },
+    env: {
+      PORT: String(port),
+      DRIVE_DISC_RESERVATIONS_UI_ENABLED: "false",
+    },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

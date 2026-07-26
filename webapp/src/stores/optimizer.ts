@@ -5,6 +5,7 @@ type OptimizerStatus = "idle" | "estimating" | "preparing" | "running" | "cancel
 
 const SETTINGS_KEY = "zzz-calculator.webapp.optimizer.v1"
 const SETTINGS_VERSION = 2
+const SUPPORTED_SETTINGS_VERSIONS = new Set([2, 3])
 const FALLBACK_AGENT_SETTINGS_ID = "__default__"
 const OPTIMIZER_WORKER_STALL_TIMEOUT_MS = 45_000
 const MINIMUM_STAT_KEYS = ["atk", "anomalyProficiency", "critRate", "critDmg"] as const
@@ -81,7 +82,10 @@ function plainObject(value: any = {}) {
 }
 
 function settingsEnvelope(value: any = null) {
-  return value?.version === SETTINGS_VERSION && value?.byAgent && typeof value.byAgent === "object" && !Array.isArray(value.byAgent)
+  return SUPPORTED_SETTINGS_VERSIONS.has(Number(value?.version))
+    && value?.byAgent
+    && typeof value.byAgent === "object"
+    && !Array.isArray(value.byAgent)
     ? value
     : null
 }
@@ -173,7 +177,7 @@ function normalizeOptimizerSettings(value: any = {}, catalog: any = null, agent:
       .filter(Boolean),
   )
   const preferredFourPieceSetId = preferredDriveDiscDefaultSetId(agent, catalog)
-  const savedFourPieceSetId = String(saved.fourPieceSetId ?? "").trim()
+  const savedFourPieceSetId = String(saved.fourPieceSetId ?? normalizeArray(saved.fourPieceSetIds)[0] ?? "").trim()
   const savedFourPieceSetVisible = !catalog || visibleSetIds.has(savedFourPieceSetId)
   const hasManualFourPieceSet = saved.fourPieceSetSource === "manual" && savedFourPieceSetVisible
   const fourPieceSetId = hasManualFourPieceSet
@@ -195,10 +199,24 @@ function normalizeOptimizerSettings(value: any = {}, catalog: any = null, agent:
   }
 }
 
-function optimizerSettingsPayload(state: any = {}) {
+function compatibleFourPieceSetIds(state: any = {}, previous: any = {}, preserveMultiple = false) {
+  const selectedSetId = String(state.fourPieceSetId ?? "").trim()
+  const previousSetIds = normalizeArray(previous.fourPieceSetIds)
+  if (!selectedSetId) {
+    return preserveMultiple ? previousSetIds : []
+  }
+  return preserveMultiple
+    ? [selectedSetId, ...previousSetIds.filter(id => id !== selectedSetId)]
+    : [selectedSetId]
+}
+
+function optimizerSettingsPayload(state: any = {}, previous: any = {}, preserveMultiple = false) {
+  const fourPieceSetId = String(state.fourPieceSetId ?? "").trim()
   return {
+    ...plainObject(previous),
     algorithm: normalizeBrowserOptimizerAlgorithm(state.algorithm),
-    fourPieceSetId: String(state.fourPieceSetId ?? "").trim(),
+    fourPieceSetId,
+    fourPieceSetIds: compatibleFourPieceSetIds(state, previous, preserveMultiple),
     fourPieceSetSource: state.fourPieceSetSource === "manual" ? "manual" : "preferred",
     twoPieceSetIds: normalizeArray(state.twoPieceSetIds),
     fourPieceBuffMode: state.fourPieceBuffMode === "manual" ? "manual" : "auto",
@@ -447,12 +465,15 @@ export const useOptimizerStore = defineStore("optimizer", {
       const saved = readSettings()
       const envelope = settingsEnvelope(saved)
       const currentAgentId = this.activeAgentId || agentSettingsId(null, saved)
+      const previousAgentSettings = envelope?.byAgent?.[currentAgentId]
+        ?? storedOptimizerSettingsForAgent(saved, currentAgentId)
       const byAgent = {
         ...(envelope?.byAgent ?? {}),
-        [currentAgentId]: optimizerSettingsPayload(this),
+        [currentAgentId]: optimizerSettingsPayload(this, previousAgentSettings, Number(envelope?.version) >= 3),
       }
       writeSettings({
-        version: SETTINGS_VERSION,
+        ...plainObject(envelope),
+        version: envelope?.version ?? SETTINGS_VERSION,
         currentAgentId,
         byAgent,
       })

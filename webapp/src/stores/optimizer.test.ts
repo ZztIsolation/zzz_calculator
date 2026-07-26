@@ -220,6 +220,49 @@ describe("optimizer store", () => {
     reloaded.initialize(preferredCatalog, preferredAgentB)
 
     expect(reloaded.fourPieceSetId).toBe("woodpecker_electro")
+    const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer.v1") || "{}")
+    expect(saved.version).toBe(2)
+    expect(saved.byAgent.agent_b.fourPieceSetId).toBe("woodpecker_electro")
+    expect(saved.byAgent.agent_b.fourPieceSetIds).toEqual(["woodpecker_electro"])
+  })
+
+  it("round-trips version 3 multi-set settings and unknown fields through the compatibility store", () => {
+    localStorage.setItem("zzz-calculator.webapp.optimizer.v1", JSON.stringify({
+      version: 3,
+      currentAgentId: "agent_a",
+      rolloutSentinel: "keep-envelope",
+      byAgent: {
+        agent_a: {
+          algorithm: "exact-super-bound",
+          fourPieceSetIds: ["woodpecker_electro", "fanged_metal"],
+          fourPieceSetSource: "manual",
+          twoPieceSetIds: ["swing_jazz"],
+          futureConstraint: { releaseProfileId: "aria-release" },
+        },
+        agent_b: {
+          fourPieceSetId: "fanged_metal",
+          fourPieceSetIds: ["fanged_metal"],
+          untouched: true,
+        },
+      },
+    }))
+    const store = useOptimizerStore()
+
+    store.initialize(preferredCatalog, preferredAgentA)
+
+    expect(store.fourPieceSetId).toBe("woodpecker_electro")
+    let saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer.v1") || "{}")
+    expect(saved.version).toBe(3)
+    expect(saved.rolloutSentinel).toBe("keep-envelope")
+    expect(saved.byAgent.agent_a.fourPieceSetIds).toEqual(["woodpecker_electro", "fanged_metal"])
+    expect(saved.byAgent.agent_a.futureConstraint).toEqual({ releaseProfileId: "aria-release" })
+    expect(saved.byAgent.agent_b).toMatchObject({ untouched: true, fourPieceSetIds: ["fanged_metal"] })
+
+    store.setFourPieceSet("fanged_metal")
+    saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer.v1") || "{}")
+    expect(saved.byAgent.agent_a.fourPieceSetId).toBe("fanged_metal")
+    expect(saved.byAgent.agent_a.fourPieceSetIds).toEqual(["fanged_metal", "woodpecker_electro"])
+    expect(saved.byAgent.agent_a.futureConstraint).toEqual({ releaseProfileId: "aria-release" })
   })
 
   it("keeps optimizer constraints scoped to each active agent", () => {
