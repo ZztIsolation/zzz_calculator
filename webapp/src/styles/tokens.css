@@ -166,6 +166,7 @@ textarea {
 }
 
 .panel {
+  min-width: 0;
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius);
   background: var(--app-panel);
