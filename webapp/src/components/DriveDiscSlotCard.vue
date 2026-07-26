@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue"
 import { NButton, NTag } from "naive-ui"
-import { LockKeyhole } from "lucide-vue-next"
+import { Ban, LockKeyhole } from "lucide-vue-next"
+import { driveDiscUsageStateForAgent } from "@core/inventory-model.js"
 import { fallbackIcon, imageForDriveDiscSet } from "@/utils/assets"
 import { formatStoredStatValue, labelOf, storedStatLabel } from "@/utils/format"
 
@@ -18,6 +19,9 @@ const props = withDefaults(defineProps<{
   showReservation?: boolean
   reservationAction?: boolean
   reservationBusy?: boolean
+  showExclusion?: boolean
+  exclusionAction?: boolean
+  exclusionBusy?: boolean
   currentReservationPrefix?: string
   emptyHint?: string
 }>(), {
@@ -31,6 +35,9 @@ const props = withDefaults(defineProps<{
   showReservation: false,
   reservationAction: false,
   reservationBusy: false,
+  showExclusion: false,
+  exclusionAction: false,
+  exclusionBusy: false,
   currentReservationPrefix: "当前角色",
   emptyHint: "可在自选模式选择已有驱动盘",
 })
@@ -38,6 +45,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   select: [slot: number]
   toggleReservation: [disc: any]
+  toggleExclusion: [disc: any]
 }>()
 
 const driveDiscSet = computed(() => {
@@ -95,6 +103,24 @@ const reservationActionLabel = computed(() => {
   if (reservation.value.state === "public") return `锁定给${targetAgentName.value}`
   return `转移给${targetAgentName.value}`
 })
+const usage = computed(() => driveDiscUsageStateForAgent(props.disc, props.targetAgentId))
+const usageTag = computed(() => {
+  if (!props.showExclusion) return reservation.value
+  if (usage.value.state === "excluded-explicit") {
+    return { label: `${targetAgentName.value}已排除`, type: "error" as const, state: usage.value.state }
+  }
+  if (usage.value.state === "excluded-by-reservation") {
+    return { label: `已排除 · ${reservation.value.label}`, type: "warning" as const, state: usage.value.state }
+  }
+  return { ...reservation.value, state: usage.value.state }
+})
+const exclusionActionLabel = computed(() => {
+  if (usage.value.state === "excluded-explicit") return `取消${targetAgentName.value}排除`
+  if (usage.value.state === "excluded-by-reservation") return `${reservation.value.label}，已自动排除`
+  if (usage.value.state === "reserved-current") return `解除锁定并为${targetAgentName.value}排除`
+  return `为${targetAgentName.value}排除此盘`
+})
+const exclusionDisabled = computed(() => props.exclusionBusy || usage.value.state === "excluded-by-reservation")
 
 function statText(stat: any) {
   if (!stat?.stat) return "-"
@@ -109,6 +135,12 @@ function choose() {
 function toggleReservation() {
   if (props.disc && props.reservationAction && props.targetAgentId && !props.reservationBusy) {
     emit("toggleReservation", props.disc)
+  }
+}
+
+function toggleExclusion() {
+  if (props.disc && props.exclusionAction && props.targetAgentId && !exclusionDisabled.value) {
+    emit("toggleExclusion", props.disc)
   }
 }
 </script>
@@ -126,28 +158,13 @@ function toggleReservation() {
     :tabindex="interactive ? 0 : undefined"
     :data-slot="slot"
     :data-reservation-state="showReservation && disc ? reservation.state : undefined"
+    :data-usage-state="showExclusion && disc ? usage.state : undefined"
     @click="choose"
     @keydown.enter.prevent="choose"
     @keydown.space.prevent="choose"
   >
     <span class="disc-slot-card-icon">
       <img :src="disc ? imageForDriveDiscSet(driveDiscSet) : fallbackIcon" alt="" loading="lazy">
-      <NButton
-        v-if="disc && reservationAction && targetAgentId"
-        class="disc-reservation-button"
-        :class="`disc-reservation-button-${reservation.state}`"
-        circle
-        secondary
-        :type="reservation.state === 'current' ? 'primary' : ['other', 'unknown'].includes(reservation.state) ? 'warning' : 'default'"
-        :loading="reservationBusy"
-        :disabled="reservationBusy"
-        :title="reservationActionLabel"
-        :aria-label="reservationActionLabel"
-        @click.stop="toggleReservation"
-        @keydown.stop
-      >
-        <template #icon><LockKeyhole :size="18" /></template>
-      </NButton>
     </span>
     <div class="disc-slot-card-copy">
       <strong>{{ title }}</strong>
@@ -155,9 +172,43 @@ function toggleReservation() {
       <small>{{ secondary }}</small>
     </div>
     <div class="disc-slot-card-meta">
+      <div v-if="disc && targetAgentId && (reservationAction || exclusionAction)" class="disc-slot-card-actions">
+        <NButton
+          v-if="reservationAction"
+          class="disc-restriction-button disc-reservation-button"
+          :class="`disc-reservation-button-${reservation.state}`"
+          circle
+          secondary
+          :type="reservation.state === 'current' ? 'primary' : ['other', 'unknown'].includes(reservation.state) ? 'warning' : 'default'"
+          :loading="reservationBusy"
+          :disabled="reservationBusy || exclusionBusy"
+          :title="reservationActionLabel"
+          :aria-label="reservationActionLabel"
+          @click.stop="toggleReservation"
+          @keydown.stop
+        >
+          <template #icon><LockKeyhole :size="17" /></template>
+        </NButton>
+        <NButton
+          v-if="showExclusion && exclusionAction"
+          class="disc-restriction-button disc-exclusion-button"
+          :class="`disc-exclusion-button-${usage.state}`"
+          circle
+          secondary
+          :type="usage.state === 'excluded-explicit' ? 'error' : usage.state === 'excluded-by-reservation' ? 'warning' : 'default'"
+          :loading="exclusionBusy"
+          :disabled="exclusionDisabled || reservationBusy"
+          :title="exclusionActionLabel"
+          :aria-label="exclusionActionLabel"
+          @click.stop="toggleExclusion"
+          @keydown.stop
+        >
+          <template #icon><Ban :size="17" /></template>
+        </NButton>
+      </div>
       <NTag v-if="disc" round>{{ rarityLevel }}</NTag>
-      <NTag v-if="showReservation && disc" :type="reservation.type" size="small" round>
-        {{ reservation.label }}
+      <NTag v-if="showReservation && disc" :type="usageTag.type" size="small" round>
+        {{ usageTag.label }}
       </NTag>
       <NButton v-if="interactive" size="tiny" @click.stop="choose">
         {{ disc ? "更换" : "选择" }}
@@ -216,16 +267,20 @@ function toggleReservation() {
   background: var(--app-panel-muted);
 }
 
-.disc-reservation-button {
-  position: absolute;
-  top: -9px;
-  right: -9px;
-  z-index: 1;
+.disc-slot-card-actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 32px;
+  gap: 6px;
+  min-width: 70px;
+  justify-content: end;
+}
+
+.disc-restriction-button {
   width: 32px;
   height: 32px;
   min-width: 32px;
-  border: 2px solid #fff;
-  box-shadow: 0 2px 7px rgba(15, 23, 42, 0.2);
+  border: 1px solid var(--app-border);
 }
 
 .disc-reservation-button-public {
@@ -239,6 +294,16 @@ function toggleReservation() {
 
 .disc-reservation-button-other,
 .disc-reservation-button-unknown {
+  background: #fff7e6;
+}
+
+.disc-exclusion-button-excluded-explicit {
+  color: #fff;
+  background: #d03050;
+}
+
+.disc-exclusion-button-excluded-by-reservation {
+  color: #d97706;
   background: #fff7e6;
 }
 
@@ -280,9 +345,15 @@ function toggleReservation() {
 
 .disc-slot-card-meta :deep(.n-tag__content) {
   max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.disc-slot-card-meta :deep(.n-tag) {
+  max-width: 100%;
+  height: auto;
+  min-height: 24px;
 }
 
 @media (max-width: 480px) {
@@ -302,10 +373,19 @@ function toggleReservation() {
 
   .disc-slot-card-meta {
     grid-column: 2;
-    grid-auto-flow: column;
+    grid-template-columns: auto auto;
     justify-content: start;
     justify-items: start;
     max-width: 100%;
+  }
+
+  .disc-slot-card-actions {
+    grid-column: 1 / -1;
+    justify-content: start;
+  }
+
+  .disc-slot-card-meta :deep(.n-tag__content) {
+    text-align: left;
   }
 }
 </style>

@@ -284,6 +284,29 @@ assert.ok(otherAgentReserved.results.every(result => result.driveDiscs.every(ite
 assert.deepEqual(resultIds(otherAgentReserved), resultIds(manuallyFiltered), "Reservation filtering must preserve ordered Top 10 IDs")
 assert.deepEqual(resultScores(otherAgentReserved), resultScores(manuallyFiltered), "Reservation filtering must preserve ordered Top 10 scores")
 
+const explicitlyExcludedStore = {
+    ...store,
+    driveDiscs: store.driveDiscs.map(item => item.id === "f1"
+        ? { ...item, excludedForAgentIds: [exampleInput.agentId] }
+        : item),
+}
+const explicitlyExcluded = optimizeDriveDiscs(catalog, explicitlyExcludedStore, optimizerInput())
+assert.equal(explicitlyExcluded.metrics.excludedByReservation, 0)
+assert.equal(explicitlyExcluded.metrics.excludedByExclusion, 1)
+assert.equal(explicitlyExcluded.metrics.excludedByExclusionBySlot[1], 1)
+assert.deepEqual(resultIds(explicitlyExcluded), resultIds(manuallyFiltered), "Exclusion filtering must preserve ordered Top 10 IDs")
+assert.deepEqual(resultScores(explicitlyExcluded), resultScores(manuallyFiltered), "Exclusion filtering must preserve ordered Top 10 scores")
+
+const overlappingRestrictionStore = {
+    ...store,
+    driveDiscs: store.driveDiscs.map(item => item.id === "f1"
+        ? { ...item, reservedForAgentId: "alice_thymefield", excludedForAgentIds: [exampleInput.agentId] }
+        : item),
+}
+const overlappingRestriction = optimizeDriveDiscs(catalog, overlappingRestrictionStore, optimizerInput())
+assert.equal(overlappingRestriction.metrics.excludedByReservation, 1)
+assert.equal(overlappingRestriction.metrics.excludedByExclusion, 0, "Reservation must own the effective exclusion count")
+
 const fullyReservedOtherStore = {
     ...store,
     driveDiscs: [1, 2, 3, 4, 5, 6].map(slot => ({
@@ -297,6 +320,33 @@ const fullyReservedOther = optimizeDriveDiscs(catalog, fullyReservedOtherStore, 
 assert.equal(fullyReservedOther.results.length, 0)
 assert.equal(fullyReservedOther.metrics.excludedByReservation, 6)
 assert.match(fullyReservedOther.error.reason, /专属其他角色/)
+
+const fullyExcludedStore = {
+    ...store,
+    driveDiscs: [1, 2, 3, 4, 5, 6].map(slot => ({
+        ...disc(`excluded-f${slot}`, fourSet, slot, slotMain[slot]),
+        excludedForAgentIds: [exampleInput.agentId],
+    })),
+}
+const fullyExcluded = optimizeDriveDiscs(catalog, fullyExcludedStore, optimizerInput({
+    settings: { twoPieceSetId: fourSet },
+}))
+assert.equal(fullyExcluded.results.length, 0)
+assert.equal(fullyExcluded.metrics.excludedByExclusion, 6)
+assert.match(fullyExcluded.error.reason, /当前角色排除/)
+
+const mixedRestrictedStore = {
+    ...fullyExcludedStore,
+    driveDiscs: fullyExcludedStore.driveDiscs.map((item, index) => index % 2 === 0
+        ? { ...item, reservedForAgentId: "alice_thymefield", excludedForAgentIds: [exampleInput.agentId] }
+        : item),
+}
+const mixedRestricted = optimizeDriveDiscs(catalog, mixedRestrictedStore, optimizerInput({
+    settings: { twoPieceSetId: fourSet },
+}))
+assert.equal(mixedRestricted.metrics.excludedByReservation, 3)
+assert.equal(mixedRestricted.metrics.excludedByExclusion, 3)
+assert.match(mixedRestricted.error.reason, /专属或当前角色主动排除/)
 
 const incompleteFreeStore = {
     ...store,

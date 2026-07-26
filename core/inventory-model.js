@@ -137,11 +137,73 @@ function cleanReservedForAgentId(value) {
     return agentId || null
 }
 
-function normalizeDriveDiscReservation(disc) {
+export function normalizeExcludedForAgentIds(value, reservedForAgentId = null) {
+    const reservedAgentId = cleanReservedForAgentId(reservedForAgentId)
+    const seen = new Set()
+    return (Array.isArray(value) ? value : [])
+        .map(agentId => String(agentId ?? "").trim())
+        .filter(agentId => agentId && agentId !== reservedAgentId && !seen.has(agentId) && seen.add(agentId))
+}
+
+function normalizeDriveDiscUsageRestrictions(disc) {
+    const reservedForAgentId = cleanReservedForAgentId(disc?.reservedForAgentId)
     return {
         ...(disc ?? {}),
-        reservedForAgentId: cleanReservedForAgentId(disc?.reservedForAgentId),
+        reservedForAgentId,
+        excludedForAgentIds: normalizeExcludedForAgentIds(disc?.excludedForAgentIds, reservedForAgentId),
     }
+}
+
+export function driveDiscUsageStateForAgent(disc, agentId) {
+    const targetAgentId = String(agentId ?? "").trim()
+    const reservedForAgentId = cleanReservedForAgentId(disc?.reservedForAgentId)
+    const excludedForAgentIds = normalizeExcludedForAgentIds(disc?.excludedForAgentIds, reservedForAgentId)
+    if (reservedForAgentId) {
+        if (targetAgentId && reservedForAgentId === targetAgentId) {
+            return {
+                state: "reserved-current",
+                available: true,
+                reservedForAgentId,
+                excludedForAgentIds,
+            }
+        }
+        return {
+            state: "excluded-by-reservation",
+            available: false,
+            reservedForAgentId,
+            excludedForAgentIds,
+        }
+    }
+    if (targetAgentId && excludedForAgentIds.includes(targetAgentId)) {
+        return {
+            state: "excluded-explicit",
+            available: false,
+            reservedForAgentId: null,
+            excludedForAgentIds,
+        }
+    }
+    return {
+        state: "available",
+        available: true,
+        reservedForAgentId: null,
+        excludedForAgentIds,
+    }
+}
+
+export function driveDiscOptimizationInventoryFingerprint(store, input = {}, options = {}) {
+    const normalized = normalizeInventoryStore(store, options)
+    const ownerId = String(input.ownerId ?? normalized.currentOwnerId ?? "default")
+    const agentId = String(input.agentId ?? "").trim()
+    const driveDiscs = normalized.driveDiscs
+        .filter(disc => (disc.ownerId ?? "default") === ownerId)
+        .map(disc => ({
+            id: String(disc.id ?? ""),
+            contentFingerprint: disc.contentFingerprint ?? driveDiscContentFingerprint(disc, options),
+            reservedForAgentId: cleanReservedForAgentId(disc.reservedForAgentId),
+            excludedForAgentIds: normalizeExcludedForAgentIds(disc.excludedForAgentIds, disc.reservedForAgentId).sort(),
+        }))
+        .sort((left, right) => left.id.localeCompare(right.id))
+    return hashWith(options, stableStringify({ ownerId, agentId, driveDiscs }))
 }
 
 export function createEmptyInventoryStore() {
@@ -186,7 +248,7 @@ export function normalizeInventoryStore(store, options = {}) {
         owners: safeOwners,
         imports: Array.isArray(store?.imports) ? store.imports : [],
         driveDiscs: Array.isArray(store?.driveDiscs)
-            ? store.driveDiscs.map(disc => withDriveDiscFingerprints(normalizeDriveDiscReservation(disc), options))
+            ? store.driveDiscs.map(disc => withDriveDiscFingerprints(normalizeDriveDiscUsageRestrictions(disc), options))
             : [],
         driveDiscLoadouts: Array.isArray(store?.driveDiscLoadouts) ? store.driveDiscLoadouts : [],
     }
@@ -407,7 +469,7 @@ function normalizeNativeDriveDisc(rawItem, index, options) {
         identityFingerprint: _identityFingerprint,
         ...record
     } = cloneJsonValue(rawItem)
-    return withDriveDiscFingerprints({
+    return withDriveDiscFingerprints(normalizeDriveDiscUsageRestrictions({
         ...record,
         id,
         ownerId: options.ownerId,
@@ -421,7 +483,7 @@ function normalizeNativeDriveDisc(rawItem, index, options) {
         subStats: rawItem.subStats.map((stat, statIndex) =>
             normalizeNativeStat(stat, `${context}.subStats[${statIndex}]`)
         ),
-    }, options)
+    }), options)
 }
 
 function normalizeNativeDriveDiscExport(input, options = {}) {
@@ -512,6 +574,10 @@ function mergeImportedDriveDisc(existing, imported, options) {
         locked: existing.locked ?? imported.locked ?? false,
         equippedBy: existing.equippedBy ?? imported.equippedBy ?? null,
         reservedForAgentId: existing.reservedForAgentId ?? imported.reservedForAgentId ?? null,
+        excludedForAgentIds: normalizeExcludedForAgentIds(
+            existing.excludedForAgentIds ?? imported.excludedForAgentIds,
+            existing.reservedForAgentId ?? imported.reservedForAgentId,
+        ),
         ...createdAt,
         updatedAt: nowIso(),
         source: matchedImportSource({
@@ -779,10 +845,14 @@ export function upsertDriveDisc(store, driveDisc, options = {}) {
     const reservedForAgentId = Object.hasOwn(driveDisc, "reservedForAgentId")
         ? cleanReservedForAgentId(driveDisc.reservedForAgentId)
         : cleanReservedForAgentId(currentDriveDisc?.reservedForAgentId)
+    const excludedForAgentIds = Object.hasOwn(driveDisc, "excludedForAgentIds")
+        ? normalizeExcludedForAgentIds(driveDisc.excludedForAgentIds, reservedForAgentId)
+        : normalizeExcludedForAgentIds(currentDriveDisc?.excludedForAgentIds, reservedForAgentId)
     const nextDriveDisc = withDriveDiscFingerprints({
         ...driveDisc,
         ownerId,
         reservedForAgentId,
+        excludedForAgentIds,
         updatedAt: nowIso(),
     }, options)
     return {
@@ -814,7 +884,7 @@ export function setDriveDiscReservations(store, input = {}) {
         throw new Error(`Drive Disc reservation references missing ids: ${missingIds.join(", ")}.`)
     }
 
-    const conflicts = targetAgentId
+    const reservationConflicts = targetAgentId
         ? ownerDiscs
             .filter(disc => cleanReservedForAgentId(disc.reservedForAgentId)
                 && cleanReservedForAgentId(disc.reservedForAgentId) !== targetAgentId)
@@ -824,7 +894,19 @@ export function setDriveDiscReservations(store, input = {}) {
                 requestedAgentId: targetAgentId,
             }))
         : []
-    if (conflicts.length && input.allowTransfer !== true) {
+    const exclusionConflicts = targetAgentId
+        ? ownerDiscs
+            .filter(disc => normalizeExcludedForAgentIds(disc.excludedForAgentIds, disc.reservedForAgentId).includes(targetAgentId))
+            .map(disc => ({
+                kind: "excluded-current",
+                discId: String(disc.id),
+                currentAgentId: targetAgentId,
+                requestedAgentId: targetAgentId,
+            }))
+        : []
+    const conflicts = [...reservationConflicts, ...exclusionConflicts]
+    if ((reservationConflicts.length && input.allowTransfer !== true)
+        || (exclusionConflicts.length && input.allowExclusionOverride !== true)) {
         return {
             ownerId,
             applied: false,
@@ -835,7 +917,8 @@ export function setDriveDiscReservations(store, input = {}) {
     }
 
     const changedIds = ownerDiscs
-        .filter(disc => cleanReservedForAgentId(disc.reservedForAgentId) !== targetAgentId)
+        .filter(disc => cleanReservedForAgentId(disc.reservedForAgentId) !== targetAgentId
+            || (targetAgentId && normalizeExcludedForAgentIds(disc.excludedForAgentIds, disc.reservedForAgentId).includes(targetAgentId)))
         .map(disc => String(disc.id))
     const changedIdSet = new Set(changedIds)
     const updatedAt = nowIso()
@@ -848,9 +931,109 @@ export function setDriveDiscReservations(store, input = {}) {
             ...store,
             driveDiscs: (store.driveDiscs ?? []).map(disc =>
                 (disc.ownerId ?? "default") === ownerId && changedIdSet.has(String(disc.id))
-                    ? { ...disc, reservedForAgentId: targetAgentId, updatedAt }
+                    ? {
+                        ...disc,
+                        reservedForAgentId: targetAgentId,
+                        excludedForAgentIds: normalizeExcludedForAgentIds(disc.excludedForAgentIds, targetAgentId),
+                        updatedAt,
+                    }
                     : disc
             ),
+        },
+    }
+}
+
+export function setDriveDiscExclusions(store, input = {}) {
+    const ownerId = String(input.ownerId ?? store.currentOwnerId ?? "default")
+    const discIds = [...new Set((input.discIds ?? [])
+        .map(id => String(id ?? "").trim())
+        .filter(Boolean))]
+    if (!discIds.length) {
+        throw new Error("At least one Drive Disc id is required.")
+    }
+    const excludedForAgentId = String(input.excludedForAgentId ?? "").trim()
+    if (!excludedForAgentId) {
+        throw new Error("Drive Disc exclusion agent id is required.")
+    }
+
+    const requestedIds = new Set(discIds)
+    const ownerDiscs = (store.driveDiscs ?? [])
+        .filter(disc => (disc.ownerId ?? "default") === ownerId && requestedIds.has(String(disc.id)))
+    const foundIds = new Set(ownerDiscs.map(disc => String(disc.id)))
+    const missingIds = discIds.filter(id => !foundIds.has(id))
+    if (missingIds.length) {
+        throw new Error(`Drive Disc exclusion references missing ids: ${missingIds.join(", ")}.`)
+    }
+
+    const excluded = input.excluded !== false
+    const conflicts = ownerDiscs.flatMap(disc => {
+        const reservedForAgentId = cleanReservedForAgentId(disc.reservedForAgentId)
+        if (!reservedForAgentId) return []
+        if (reservedForAgentId === excludedForAgentId && excluded && input.allowReservationRelease !== true) {
+            return [{
+                kind: "reserved-current",
+                discId: String(disc.id),
+                currentAgentId: reservedForAgentId,
+                requestedAgentId: excludedForAgentId,
+            }]
+        }
+        if (reservedForAgentId !== excludedForAgentId) {
+            return [{
+                kind: "excluded-by-reservation",
+                discId: String(disc.id),
+                currentAgentId: reservedForAgentId,
+                requestedAgentId: excludedForAgentId,
+            }]
+        }
+        return []
+    })
+    if (conflicts.length) {
+        return {
+            ownerId,
+            applied: false,
+            changedIds: [],
+            conflicts,
+            nextStore: store,
+        }
+    }
+
+    const changedIds = ownerDiscs
+        .filter(disc => {
+            const reservedForAgentId = cleanReservedForAgentId(disc.reservedForAgentId)
+            const exclusions = normalizeExcludedForAgentIds(disc.excludedForAgentIds, reservedForAgentId)
+            return (excluded && !exclusions.includes(excludedForAgentId))
+                || (!excluded && exclusions.includes(excludedForAgentId))
+                || (excluded && reservedForAgentId === excludedForAgentId)
+        })
+        .map(disc => String(disc.id))
+    const changedIdSet = new Set(changedIds)
+    const updatedAt = nowIso()
+    return {
+        ownerId,
+        applied: true,
+        changedIds,
+        conflicts: [],
+        nextStore: {
+            ...store,
+            driveDiscs: (store.driveDiscs ?? []).map(disc => {
+                if ((disc.ownerId ?? "default") !== ownerId || !changedIdSet.has(String(disc.id))) {
+                    return disc
+                }
+                const reservedForAgentId = cleanReservedForAgentId(disc.reservedForAgentId)
+                const nextReservedForAgentId = excluded && reservedForAgentId === excludedForAgentId
+                    ? null
+                    : reservedForAgentId
+                const exclusions = normalizeExcludedForAgentIds(disc.excludedForAgentIds, nextReservedForAgentId)
+                const nextExclusions = excluded
+                    ? [...new Set([...exclusions, excludedForAgentId])]
+                    : exclusions.filter(agentId => agentId !== excludedForAgentId)
+                return {
+                    ...disc,
+                    reservedForAgentId: nextReservedForAgentId,
+                    excludedForAgentIds: nextExclusions,
+                    updatedAt,
+                }
+            }),
         },
     }
 }

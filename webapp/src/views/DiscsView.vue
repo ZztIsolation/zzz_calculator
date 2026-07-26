@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue"
 import { NAlert, NButton, NCheckbox, NDrawer, NDrawerContent, NInput, NInputNumber, NModal, NProgress, NSelect, NSpin, NTab, NTabs, NTag, useMessage } from "naive-ui"
-import { Download, FileText, LockKeyhole, Plus, Radar, RefreshCw, Upload } from "lucide-vue-next"
+import { Ban, Download, FileText, LockKeyhole, Plus, Radar, RefreshCw, Upload } from "lucide-vue-next"
 import ConfirmDialog from "@/components/ConfirmDialog.vue"
 import DriveDiscPickerModal from "@/components/DriveDiscPickerModal.vue"
 import DriveDiscSlotCard from "@/components/DriveDiscSlotCard.vue"
@@ -12,7 +12,7 @@ import { imageForAgent, imageForDriveDiscSet } from "@/utils/assets"
 import { useAppConfigStore } from "@/stores/app-config"
 import { useCatalogStore } from "@/stores/catalog"
 import { useInventoryStore } from "@/stores/inventory"
-import { driveDiscReservationStateForLoadout } from "@core/inventory-model.js"
+import { driveDiscReservationStateForLoadout, driveDiscUsageStateForAgent } from "@core/inventory-model.js"
 import { scanTelemetryPreferenceEnabled } from "@runtime/scan-telemetry"
 
 const catalogStore = useCatalogStore()
@@ -20,6 +20,7 @@ const appConfigStore = useAppConfigStore()
 const inventoryStore = useInventoryStore()
 const message = useMessage()
 const reservationUiEnabled = computed(() => appConfigStore.driveDiscReservationsUiEnabled)
+const exclusionUiEnabled = computed(() => reservationUiEnabled.value && appConfigStore.driveDiscExclusionsUiEnabled)
 
 const SUB_STAT_LABELS: Record<string, string> = {
   hpFlat: "小生命（固定生命值）",
@@ -51,6 +52,9 @@ const reservationSaving = ref(false)
 const showReservationConflict = ref(false)
 const reservationConflicts = ref<any[]>([])
 const pendingReservationAction = ref<any | null>(null)
+const showDiscExclusions = ref(false)
+const exclusionDisc = ref<any | null>(null)
+const exclusionAgentIds = ref<string[]>([])
 
 const showLoadoutEditor = ref(false)
 const loadoutDraft = ref<any>({ driveDiscIdsBySlot: {} })
@@ -169,6 +173,29 @@ const slotTabs = computed(() => [
 
 const setOptions = computed(() => catalogStore.driveDiscSets.map((set: any) => ({ label: labelOf(set), value: set.id })))
 const agentOptions = computed(() => catalogStore.agents.map((agent: any) => ({ label: labelOf(agent), value: agent.id })))
+const restrictionStatusOptions = [
+  { label: "全部限制状态", value: "" },
+  { label: "可用", value: "available" },
+  { label: "已锁定", value: "reserved" },
+  { label: "已排除", value: "excluded" },
+]
+const restrictionAgentOptions = computed(() => {
+  const ids = new Set<string>(catalogStore.agents.map((agent: any) => String(agent.id)).filter(Boolean))
+  for (const disc of inventoryStore.driveDiscs) {
+    const reservedForAgentId = String(disc.reservedForAgentId ?? "").trim()
+    if (reservedForAgentId) ids.add(reservedForAgentId)
+    for (const agentId of Array.isArray(disc.excludedForAgentIds) ? disc.excludedForAgentIds : []) {
+      const cleaned = String(agentId ?? "").trim()
+      if (cleaned) ids.add(cleaned)
+    }
+  }
+  return [
+    { label: "全部角色", value: "" },
+    ...[...ids]
+      .map(id => ({ label: agentName(id), value: id }))
+      .sort((left, right) => left.label.localeCompare(right.label, "zh-CN")),
+  ]
+})
 const reservationFilterOptions = computed(() => {
   const options = [
     { label: "全部专属状态", value: "" },
@@ -188,6 +215,15 @@ const reservationAgentOptions = computed(() => {
   const current = String(reservationDisc.value?.reservedForAgentId ?? "").trim()
   if (current && !options.some(option => option.value === current)) {
     options.push({ label: `未知角色（${current}）`, value: current })
+  }
+  return options
+})
+const exclusionAgentOptions = computed(() => {
+  const options = restrictionAgentOptions.value.filter(option => option.value)
+  for (const id of exclusionAgentIds.value) {
+    if (!options.some(option => option.value === id)) {
+      options.push({ label: agentName(id), value: id })
+    }
   }
   return options
 })
@@ -258,6 +294,33 @@ function agentName(agentId: string | null | undefined) {
   return agent ? labelOf(agent) : `未知角色（${agentId}）`
 }
 
+function explicitExclusionIds(disc: any): string[] {
+  return Array.isArray(disc?.excludedForAgentIds)
+    ? disc.excludedForAgentIds.map((id: any) => String(id ?? "").trim()).filter(Boolean)
+    : []
+}
+
+function restrictionSummary(disc: any) {
+  const lines: string[] = []
+  const reservedForAgentId = String(disc?.reservedForAgentId ?? "").trim()
+  const exclusions = explicitExclusionIds(disc)
+  if (reservedForAgentId) lines.push(`锁定：${agentName(reservedForAgentId)}`)
+  if (exclusions.length) {
+    lines.push(`${reservedForAgentId ? "解除锁定后恢复" : "主动排除"}：${exclusions.map(agentName).join("、")}`)
+  }
+  if (!lines.length) lines.push("可用")
+  const filteredAgentId = inventoryStore.restrictionAgentFilter
+  if (filteredAgentId) {
+    const usage = driveDiscUsageStateForAgent(disc, filteredAgentId)
+    if (usage.state === "excluded-by-reservation") {
+      lines.push(`对${agentName(filteredAgentId)}：被其他角色锁定而自动排除`)
+    } else if (usage.state === "excluded-explicit") {
+      lines.push(`对${agentName(filteredAgentId)}：主动排除`)
+    }
+  }
+  return lines
+}
+
 function loadoutAgent(loadout: any) {
   return agentForId(loadout?.agentId)
 }
@@ -298,14 +361,25 @@ function openDiscReservation(disc: any) {
   showDiscReservation.value = true
 }
 
+function openDiscExclusions(disc: any) {
+  exclusionDisc.value = disc
+  exclusionAgentIds.value = explicitExclusionIds(disc)
+  showDiscExclusions.value = true
+}
+
 function conflictDisc(conflict: any) {
   return inventoryStore.driveDiscs.find((disc: any) => disc.id === conflict?.discId)
 }
 
-async function commitReservation(action: any, allowTransfer = false) {
+async function commitReservation(action: any, options: any = {}) {
   reservationSaving.value = true
   try {
-    const result = await inventoryStore.reserveDiscs(action.discIds, action.agentId || null, allowTransfer)
+    const result = await inventoryStore.reserveDiscs(
+      action.discIds,
+      action.agentId || null,
+      options.allowTransfer === true,
+      options.allowExclusionOverride === true,
+    )
     if (!result.applied) {
       pendingReservationAction.value = action
       reservationConflicts.value = result.conflicts ?? []
@@ -324,10 +398,67 @@ async function commitReservation(action: any, allowTransfer = false) {
   }
 }
 
+async function commitExclusion(action: any, allowReservationRelease = false) {
+  reservationSaving.value = true
+  try {
+    const result = await inventoryStore.excludeDiscs(
+      action.discIds,
+      action.agentId,
+      action.excluded,
+      allowReservationRelease,
+    )
+    if (!result.applied) {
+      pendingReservationAction.value = { ...action, kind: "exclusion" }
+      reservationConflicts.value = result.conflicts ?? []
+      showReservationConflict.value = true
+      return false
+    }
+    if (action.successMessage) message.success(action.successMessage)
+    return true
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : String(error))
+    return false
+  } finally {
+    reservationSaving.value = false
+  }
+}
+
+async function applyDiscExclusions() {
+  const disc = exclusionDisc.value
+  if (!disc?.id || disc.reservedForAgentId) return
+  const current = new Set(explicitExclusionIds(disc))
+  const next = new Set(exclusionAgentIds.value.map(String).filter(Boolean))
+  const removals = [...current].filter(id => !next.has(id))
+  const additions = [...next].filter(id => !current.has(id))
+  for (const agentId of removals) {
+    if (!await commitExclusion({ discIds: [disc.id], agentId, excluded: false })) return
+  }
+  for (const agentId of additions) {
+    if (!await commitExclusion({ discIds: [disc.id], agentId, excluded: true })) return
+  }
+  showDiscExclusions.value = false
+  exclusionDisc.value = null
+  message.success("已更新主动排除角色")
+}
+
+async function convertLockedDiscToExclusion() {
+  const disc = exclusionDisc.value
+  const agentId = String(disc?.reservedForAgentId ?? "").trim()
+  if (!disc?.id || !agentId) return
+  await commitExclusion({
+    kind: "exclusion",
+    discIds: [disc.id],
+    agentId,
+    excluded: true,
+    successMessage: "已解除锁定并排除",
+  })
+}
+
 async function applyDiscReservation() {
   if (!reservationDisc.value) return
   const targetAgentId = reservationAgentId.value || null
   await commitReservation({
+    kind: "reservation",
     discIds: [reservationDisc.value.id],
     agentId: targetAgentId,
     successMessage: targetAgentId ? `已锁定给${agentName(targetAgentId)}` : "已解除角色专属",
@@ -341,20 +472,66 @@ async function togglePresetDiscReservation(disc: any, loadout: any) {
   const currentAgentId = String(inventoryDisc.reservedForAgentId ?? "").trim()
   const nextAgentId = currentAgentId === targetAgentId ? null : targetAgentId
   await commitReservation({
+    kind: "reservation",
     discIds: [inventoryDisc.id],
     agentId: nextAgentId,
     successMessage: nextAgentId ? `已锁定给${agentName(nextAgentId)}` : "已解除角色专属",
   })
 }
 
+async function togglePresetDiscExclusion(disc: any, loadout: any) {
+  const inventoryDisc = inventoryStore.driveDiscs.find((item: any) => item.id === disc?.id)
+  const targetAgentId = String(loadout?.agentId ?? "").trim()
+  if (!inventoryDisc?.id || !targetAgentId) return
+  const usage = driveDiscUsageStateForAgent(inventoryDisc, targetAgentId)
+  if (usage.state === "excluded-by-reservation") return
+  await commitExclusion({
+    kind: "exclusion",
+    discIds: [inventoryDisc.id],
+    agentId: targetAgentId,
+    excluded: usage.state !== "excluded-explicit",
+    successMessage: usage.state === "excluded-explicit" ? "已取消排除" : "已排除，下次自动优化将跳过此盘",
+  })
+}
+
+const restrictionConflictMode = computed(() => {
+  const kind = reservationConflicts.value[0]?.kind
+  if (pendingReservationAction.value?.kind === "exclusion" || kind === "reserved-current") {
+    return {
+      title: "解除锁定并排除",
+      copy: "确认后会解除当前锁定，并将该盘加入锁定角色的主动排除列表。",
+      action: "解除锁定并排除",
+    }
+  }
+  if (kind === "excluded-current") {
+    return {
+      title: "取消排除并锁定",
+      copy: "确认后会取消目标角色的主动排除记录，并将该盘锁定给该角色。",
+      action: "取消排除并锁定",
+    }
+  }
+  return {
+    title: "专属角色冲突",
+    copy: "该驱动盘已专属其他角色。确认后将其转移给目标角色，未确认前不会修改任何数据。",
+    action: "转移并锁定",
+  }
+})
+
 async function confirmReservationTransfer() {
   const action = pendingReservationAction.value
   if (!action) return
-  const applied = await commitReservation(action, true)
+  const applied = action.kind === "exclusion"
+    ? await commitExclusion(action, true)
+    : await commitReservation(action, {
+        allowTransfer: reservationConflicts.value.some(conflict => conflict.kind !== "excluded-current"),
+        allowExclusionOverride: reservationConflicts.value.some(conflict => conflict.kind === "excluded-current"),
+      })
   if (applied) {
     showReservationConflict.value = false
     reservationConflicts.value = []
     pendingReservationAction.value = null
+    showDiscExclusions.value = false
+    exclusionDisc.value = null
   }
 }
 
@@ -829,11 +1006,26 @@ function confirmDangerImport() {
           <NInput v-model:value="inventoryStore.search" clearable placeholder="搜索套装、主词条或 ID" style="max-width: 320px" />
           <NSelect v-model:value="inventoryStore.mainStatFilter" clearable :options="inventoryStore.mainStatOptions.map(stat => ({ label: statLabel(stat, catalogStore.meta), value: stat }))" placeholder="主词条" style="max-width: 200px" />
           <NSelect
-            v-if="reservationUiEnabled"
+            v-if="reservationUiEnabled && !exclusionUiEnabled"
             v-model:value="inventoryStore.reservationFilter"
             :options="reservationFilterOptions"
             style="max-width: 220px"
             aria-label="专属角色筛选"
+          />
+          <NSelect
+            v-if="exclusionUiEnabled"
+            v-model:value="inventoryStore.restrictionStatusFilter"
+            :options="restrictionStatusOptions"
+            style="max-width: 180px"
+            aria-label="限制状态筛选"
+          />
+          <NSelect
+            v-if="exclusionUiEnabled"
+            v-model:value="inventoryStore.restrictionAgentFilter"
+            :options="restrictionAgentOptions"
+            filterable
+            style="max-width: 220px"
+            aria-label="限制角色筛选"
           />
           <NTag round>{{ inventoryStore.driveDiscs.length }} 件</NTag>
           <NTag round>{{ inventoryStore.loadouts.length }} 个套装预设</NTag>
@@ -860,8 +1052,8 @@ function confirmDangerImport() {
             </NButton>
           </div>
         </div>
-        <div v-else class="panel" style="max-height: 620px; overflow: auto;">
-          <table class="data-table">
+        <div v-else class="panel inventory-table-panel" style="max-height: 620px; overflow: auto;">
+          <table class="data-table inventory-table">
             <thead>
               <tr>
                 <th>驱动盘</th>
@@ -869,7 +1061,7 @@ function confirmDangerImport() {
                 <th>等级</th>
                 <th>主词条</th>
                 <th>副词条</th>
-                <th v-if="reservationUiEnabled">专属角色</th>
+                <th v-if="reservationUiEnabled">{{ exclusionUiEnabled ? "使用限制" : "专属角色" }}</th>
                 <th v-if="reservationUiEnabled" aria-label="操作"></th>
               </tr>
             </thead>
@@ -889,28 +1081,49 @@ function confirmDangerImport() {
                 <td>{{ mainStatText(disc) }}</td>
                 <td class="muted">{{ subStatText(disc) }}</td>
                 <template v-if="reservationUiEnabled">
-                  <td>
-                    <div v-if="disc.reservedForAgentId" class="reservation-agent">
-                      <ImageAvatar
-                        :src="imageForAgent(agentForId(disc.reservedForAgentId))"
-                        :name="agentName(disc.reservedForAgentId)"
-                        :size="26"
-                      />
-                      <span>{{ agentName(disc.reservedForAgentId) }}</span>
+                  <td
+                    data-field="usage-restriction"
+                    :aria-label="exclusionUiEnabled ? '使用限制' : '专属角色'"
+                  >
+                    <div v-if="exclusionUiEnabled" class="restriction-summary">
+                      <span v-for="line in restrictionSummary(disc)" :key="line">{{ line }}</span>
                     </div>
-                    <NTag v-else round>公共</NTag>
+                    <template v-else>
+                      <div v-if="disc.reservedForAgentId" class="reservation-agent">
+                        <ImageAvatar
+                          :src="imageForAgent(agentForId(disc.reservedForAgentId))"
+                          :name="agentName(disc.reservedForAgentId)"
+                          :size="26"
+                        />
+                        <span>{{ agentName(disc.reservedForAgentId) }}</span>
+                      </div>
+                      <NTag v-else round>公共</NTag>
+                    </template>
                   </td>
                   <td>
-                    <NButton
-                      circle
-                      quaternary
-                      size="small"
-                      :title="disc.reservedForAgentId ? '调整专属角色' : '锁定给角色'"
-                      :aria-label="disc.reservedForAgentId ? '调整专属角色' : '锁定给角色'"
-                      @click.stop="openDiscReservation(disc)"
-                    >
-                      <template #icon><LockKeyhole :size="16" /></template>
-                    </NButton>
+                    <div class="restriction-actions">
+                      <NButton
+                        circle
+                        quaternary
+                        size="small"
+                        :title="disc.reservedForAgentId ? '调整专属角色' : '锁定给角色'"
+                        :aria-label="disc.reservedForAgentId ? '调整专属角色' : '锁定给角色'"
+                        @click.stop="openDiscReservation(disc)"
+                      >
+                        <template #icon><LockKeyhole :size="16" /></template>
+                      </NButton>
+                      <NButton
+                        v-if="exclusionUiEnabled"
+                        circle
+                        quaternary
+                        size="small"
+                        title="管理排除角色"
+                        aria-label="管理排除角色"
+                        @click.stop="openDiscExclusions(disc)"
+                      >
+                        <template #icon><Ban :size="16" /></template>
+                      </NButton>
+                    </div>
                   </td>
                 </template>
               </tr>
@@ -962,11 +1175,15 @@ function confirmDangerImport() {
                   :target-agent-id="loadout.agentId"
                   :missing-reference="row.missingReference"
                   :reservation-busy="reservationSaving"
+                  :show-exclusion="exclusionUiEnabled"
+                  :exclusion-action="exclusionUiEnabled"
+                  :exclusion-busy="reservationSaving"
                   current-reservation-prefix="当前预设角色"
                   show-sequence
                   show-reservation
                   reservation-action
                   @toggle-reservation="togglePresetDiscReservation($event, loadout)"
+                  @toggle-exclusion="togglePresetDiscExclusion($event, loadout)"
                 />
               </div>
               <div class="loadout-card-footer">
@@ -1075,6 +1292,60 @@ function confirmDangerImport() {
   </NModal>
 
   <NModal
+    v-if="exclusionUiEnabled"
+    v-model:show="showDiscExclusions"
+    preset="card"
+    title="管理排除角色"
+    style="width: min(600px, calc(100vw - 16px)); max-width: 600px"
+  >
+    <div v-if="exclusionDisc" class="section-band">
+      <div class="disc-row-identity">
+        <ImageAvatar :src="driveDiscSetIcon(exclusionDisc)" :name="driveDiscSetName(exclusionDisc)" :size="44" />
+        <div class="disc-row-meta">
+          <strong>{{ driveDiscSetName(exclusionDisc) }} · {{ exclusionDisc.partition }}号位</strong>
+          <span>{{ mainStatText(exclusionDisc) }}</span>
+        </div>
+      </div>
+      <NAlert v-if="exclusionDisc.reservedForAgentId" type="warning" :show-icon="false">
+        此盘锁定给{{ agentName(exclusionDisc.reservedForAgentId) }}，对其他角色会自动排除，无需重复添加。已有主动排除记录会在解除锁定后恢复。
+      </NAlert>
+      <div v-if="!exclusionDisc.reservedForAgentId" class="metric">
+        <span class="metric-title">主动排除角色</span>
+        <div class="metric-value">
+          <NSelect
+            v-model:value="exclusionAgentIds"
+            multiple
+            filterable
+            clearable
+            max-tag-count="responsive"
+            :options="exclusionAgentOptions"
+            placeholder="选择下次优化要跳过此盘的角色"
+            aria-label="主动排除角色"
+          />
+        </div>
+      </div>
+      <div v-else-if="explicitExclusionIds(exclusionDisc).length" class="restriction-summary restriction-summary-dormant">
+        <strong>解除锁定后恢复</strong>
+        <span>{{ explicitExclusionIds(exclusionDisc).map(agentName).join('、') }}</span>
+      </div>
+    </div>
+    <template #footer>
+      <div class="drawer-footer">
+        <NButton @click="showDiscExclusions = false">取消</NButton>
+        <NButton
+          v-if="exclusionDisc?.reservedForAgentId"
+          type="error"
+          :loading="reservationSaving"
+          @click="convertLockedDiscToExclusion"
+        >
+          解除锁定并排除
+        </NButton>
+        <NButton v-else type="primary" :loading="reservationSaving" @click="applyDiscExclusions">保存排除设置</NButton>
+      </div>
+    </template>
+  </NModal>
+
+  <NModal
     v-if="reservationUiEnabled"
     v-model:show="showDiscReservation"
     preset="card"
@@ -1110,12 +1381,12 @@ function confirmDangerImport() {
     v-if="reservationUiEnabled"
     v-model:show="showReservationConflict"
     preset="card"
-    title="专属角色冲突"
+    :title="restrictionConflictMode.title"
     style="width: min(720px, calc(100vw - 16px)); max-width: 720px"
   >
     <div class="section-band ui-layout-scope" data-layout-surface="reservation-conflict">
       <NAlert type="warning" :show-icon="false">
-        该驱动盘已专属其他角色。确认后将其转移给目标角色，未确认前不会修改任何数据。
+        {{ restrictionConflictMode.copy }}
       </NAlert>
       <div class="reservation-conflict-list">
         <div v-for="conflict in reservationConflicts" :key="conflict.discId" class="reservation-conflict-row">
@@ -1130,7 +1401,7 @@ function confirmDangerImport() {
     <template #footer>
       <div class="drawer-footer">
         <NButton @click="showReservationConflict = false">取消</NButton>
-        <NButton type="primary" :loading="reservationSaving" @click="confirmReservationTransfer">确认转移</NButton>
+        <NButton type="primary" :loading="reservationSaving" @click="confirmReservationTransfer">{{ restrictionConflictMode.action }}</NButton>
       </div>
     </template>
   </NModal>
@@ -1157,6 +1428,7 @@ function confirmDangerImport() {
           interactive
           show-sequence
           show-reservation
+          :show-exclusion="exclusionUiEnabled"
           @select="openLoadoutDiscPicker"
         />
       </div>
@@ -1204,6 +1476,7 @@ function confirmDangerImport() {
     surface="loadout-drive-disc-picker"
     clear-label="清空此槽位"
     show-reservation
+    :show-exclusion="exclusionUiEnabled"
     @select="selectLoadoutDisc"
     @clear="clearLoadoutDiscSlot"
   />
@@ -1543,6 +1816,89 @@ function confirmDangerImport() {
 .reservation-agent span {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.restriction-summary {
+  display: grid;
+  min-width: 190px;
+  gap: 3px;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.restriction-summary span {
+  overflow-wrap: anywhere;
+}
+
+.restriction-summary-dormant {
+  padding: 10px;
+  border-left: 3px solid #f0a020;
+  background: #fffaf0;
+}
+
+.restriction-actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 32px;
+  gap: 4px;
+  justify-content: end;
+}
+
+@media (max-width: 680px) {
+  .inventory-table-panel {
+    max-height: none !important;
+    overflow: visible !important;
+    border: 0;
+    background: transparent;
+  }
+
+  .inventory-table,
+  .inventory-table tbody,
+  .inventory-table tr,
+  .inventory-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .inventory-table thead {
+    display: none;
+  }
+
+  .inventory-table tbody {
+    display: grid;
+    gap: 8px;
+  }
+
+  .inventory-table tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px 12px;
+    padding: 10px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius-sm);
+    background: var(--app-surface);
+  }
+
+  .inventory-table td {
+    padding: 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .inventory-table td:first-child,
+  .inventory-table td:nth-child(5),
+  .inventory-table td:nth-last-child(2) {
+    grid-column: 1 / -1;
+  }
+
+  .inventory-table td:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .restriction-actions {
+    justify-content: start;
+  }
 }
 
 .loadout-agent {

@@ -41,6 +41,7 @@ async function startServer(extraEnv = {}, environment = "production") {
             ...process.env,
             NODE_ENV: environment,
             DRIVE_DISC_RESERVATIONS_UI_ENABLED: "",
+            DRIVE_DISC_EXCLUSIONS_UI_ENABLED: "",
             PORT: String(port),
             ...extraEnv,
         },
@@ -168,6 +169,7 @@ try {
     assert.equal(JSON.parse(appConfig.body).maintenanceEnabled, false)
     assert.equal(JSON.parse(appConfig.body).scanTelemetryEnabled, false)
     assert.equal(JSON.parse(appConfig.body).driveDiscReservationsUiEnabled, false)
+    assert.equal(JSON.parse(appConfig.body).driveDiscExclusionsUiEnabled, false)
 
     const malformedUrl = await getRaw("/%")
     assert.equal(malformedUrl.status, 400)
@@ -217,6 +219,7 @@ try {
         "/api/user-drive-discs/import/zzz-scanner",
         "/api/user-drive-discs/example",
         "/api/user-drive-disc-reservations",
+        "/api/user-drive-disc-exclusions",
         "/api/user-drive-disc-loadouts",
         "/api/user-drive-disc-loadouts/example",
     ]) {
@@ -258,13 +261,18 @@ try {
 
     server.kill()
     await sleep(100)
-    await startServer({ MAINTENANCE_ENABLED: "true", DRIVE_DISC_RESERVATIONS_UI_ENABLED: "true" })
+    await startServer({
+        MAINTENANCE_ENABLED: "true",
+        DRIVE_DISC_RESERVATIONS_UI_ENABLED: "true",
+        DRIVE_DISC_EXCLUSIONS_UI_ENABLED: "true",
+    })
     await waitForServer()
 
     const enabledConfig = await getText("/api/app-config")
     assert.equal(enabledConfig.status, 200)
     assert.equal(JSON.parse(enabledConfig.body).maintenanceEnabled, true)
     assert.equal(JSON.parse(enabledConfig.body).driveDiscReservationsUiEnabled, true)
+    assert.equal(JSON.parse(enabledConfig.body).driveDiscExclusionsUiEnabled, true)
     const enabledMaintenancePage = await getText("/maintenance")
     assert.equal(enabledMaintenancePage.status, 200)
     assert.match(enabledMaintenancePage.body, /<div id="app"><\/div>/)
@@ -330,13 +338,18 @@ try {
     await waitForServer()
     const localDefaultConfig = JSON.parse((await getText("/api/app-config")).body)
     assert.equal(localDefaultConfig.driveDiscReservationsUiEnabled, true)
+    assert.equal(localDefaultConfig.driveDiscExclusionsUiEnabled, true)
 
     server.kill()
     await sleep(100)
-    await startServer({ DRIVE_DISC_RESERVATIONS_UI_ENABLED: "false" }, "development")
+    await startServer({
+        DRIVE_DISC_RESERVATIONS_UI_ENABLED: "false",
+        DRIVE_DISC_EXCLUSIONS_UI_ENABLED: "false",
+    }, "development")
     await waitForServer()
     const localDisabledConfig = JSON.parse((await getText("/api/app-config")).body)
     assert.equal(localDisabledConfig.driveDiscReservationsUiEnabled, false)
+    assert.equal(localDisabledConfig.driveDiscExclusionsUiEnabled, false)
 } finally {
     server?.kill()
     if (telemetryDirectory) await rm(telemetryDirectory, { recursive: true, force: true })

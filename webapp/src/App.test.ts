@@ -21,6 +21,7 @@ const appConfigFixture = vi.hoisted(() => ({
     scanTelemetryEnabled: false,
     scanTelemetryRetentionDays: 30,
     driveDiscReservationsUiEnabled: false,
+    driveDiscExclusionsUiEnabled: false,
   },
 }))
 

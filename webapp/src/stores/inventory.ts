@@ -7,11 +7,13 @@ import {
   importScannerExportToStore,
   loadCurrentUserDriveDiscStore,
   previewScannerExportImport,
+  setDriveDiscExclusions,
   setDriveDiscReservations,
   upsertDriveDiscLoadout,
   upsertUserDriveDisc,
 } from "@runtime/local-store.js"
 import { toCalculatorDriveDisc } from "@core/drive-disc-core.js"
+import { driveDiscUsageStateForAgent } from "@core/inventory-model.js"
 import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "@core/driveDiscAnalysis-core.js"
 import { ScannerBridge } from "@runtime/scanner-bridge.js"
 import {
@@ -242,6 +244,8 @@ export const useInventoryStore = defineStore("inventory", {
     slotFilter: 0,
     mainStatFilter: "",
     reservationFilter: "",
+    restrictionStatusFilter: "",
+    restrictionAgentFilter: "",
     search: "",
     importPreview: null as any,
     importSummary: null as any,
@@ -300,15 +304,29 @@ export const useInventoryStore = defineStore("inventory", {
         if (this.mainStatFilter && disc.mainStat?.stat !== this.mainStatFilter) {
           return false
         }
-        if (this.reservationFilter === "public" && disc.reservedForAgentId) {
-          return false
-        }
-        if (this.reservationFilter === "reserved" && !disc.reservedForAgentId) {
-          return false
-        }
-        if (this.reservationFilter && !["public", "reserved"].includes(this.reservationFilter)
-          && disc.reservedForAgentId !== this.reservationFilter) {
-          return false
+        const restrictionStatus = this.restrictionStatusFilter
+        const restrictionAgentId = this.restrictionAgentFilter
+        const explicitExclusions = Array.isArray(disc.excludedForAgentIds) ? disc.excludedForAgentIds : []
+        if (restrictionStatus || restrictionAgentId) {
+          const usage = restrictionAgentId ? driveDiscUsageStateForAgent(disc, restrictionAgentId) : null
+          if (restrictionStatus === "available" && (restrictionAgentId
+            ? usage?.state !== "available"
+            : Boolean(disc.reservedForAgentId) || explicitExclusions.length > 0)) return false
+          if (restrictionStatus === "reserved" && (restrictionAgentId
+            ? disc.reservedForAgentId !== restrictionAgentId
+            : !disc.reservedForAgentId)) return false
+          if (restrictionStatus === "excluded" && (restrictionAgentId
+            ? !["excluded-explicit", "excluded-by-reservation"].includes(String(usage?.state))
+            : !explicitExclusions.length)) return false
+          if (!restrictionStatus && restrictionAgentId
+            && disc.reservedForAgentId !== restrictionAgentId
+            && !explicitExclusions.includes(restrictionAgentId)
+            && usage?.state !== "excluded-by-reservation") return false
+        } else {
+          if (this.reservationFilter === "public" && disc.reservedForAgentId) return false
+          if (this.reservationFilter === "reserved" && !disc.reservedForAgentId) return false
+          if (this.reservationFilter && !["public", "reserved"].includes(this.reservationFilter)
+            && disc.reservedForAgentId !== this.reservationFilter) return false
         }
         if (!needle) {
           return true
@@ -319,6 +337,8 @@ export const useInventoryStore = defineStore("inventory", {
           disc.setId,
           disc.mainStat?.label,
           disc.mainStat?.stat,
+          disc.reservedForAgentId,
+          ...explicitExclusions,
           ...(disc.subStats ?? []).flatMap((stat: any) => [stat.stat, stat.label]),
         ]
           .filter(Boolean)
@@ -486,12 +506,37 @@ export const useInventoryStore = defineStore("inventory", {
       await this.load()
       return result.loadout
     },
-    async reserveDiscs(discIds: string[], reservedForAgentId: string | null, allowTransfer = false) {
+    async reserveDiscs(
+      discIds: string[],
+      reservedForAgentId: string | null,
+      allowTransfer = false,
+      allowExclusionOverride = false,
+    ) {
       const result = await setDriveDiscReservations({
         ownerId: this.store?.currentOwnerId,
         discIds,
         reservedForAgentId,
         allowTransfer,
+        allowExclusionOverride,
+      })
+      this.store = result.store
+      if (result.applied) {
+        await this.load()
+      }
+      return result
+    },
+    async excludeDiscs(
+      discIds: string[],
+      excludedForAgentId: string,
+      excluded: boolean,
+      allowReservationRelease = false,
+    ) {
+      const result = await setDriveDiscExclusions({
+        ownerId: this.store?.currentOwnerId,
+        discIds,
+        excludedForAgentId,
+        excluded,
+        allowReservationRelease,
       })
       this.store = result.store
       if (result.applied) {

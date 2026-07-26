@@ -230,6 +230,16 @@ describe("inventory store", () => {
     expect(blocked.applied).toBe(false)
     expect(store.driveDiscs[0].reservedForAgentId).toBe("agent-a")
 
+    const converted = await store.excludeDiscs(["reserved-disc"], "agent-a", true, true)
+    expect(converted.applied).toBe(true)
+    expect(store.driveDiscs[0].reservedForAgentId).toBeNull()
+    expect(store.driveDiscs[0].excludedForAgentIds).toEqual(["agent-a"])
+
+    const restored = await store.reserveDiscs(["reserved-disc"], "agent-a", false, true)
+    expect(restored.applied).toBe(true)
+    expect(store.driveDiscs[0].reservedForAgentId).toBe("agent-a")
+    expect(store.driveDiscs[0].excludedForAgentIds).toEqual([])
+
     await store.saveDisc({
       id: "unknown-reserved-disc",
       setId: "woodpecker_electro",

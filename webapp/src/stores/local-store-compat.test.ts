@@ -3,6 +3,7 @@ import {
   createAccount,
   loadCurrentUserDriveDiscStore,
   loadUserDriveDiscStore,
+  setDriveDiscExclusions,
   setDriveDiscReservations,
   switchAccount,
   upsertUserDriveDisc,
@@ -29,6 +30,7 @@ describe("local-store compatibility", () => {
     const store = await loadCurrentUserDriveDiscStore()
     expect(store.driveDiscs).toHaveLength(1)
     expect(store.driveDiscs[0].reservedForAgentId).toBeNull()
+    expect(store.driveDiscs[0].excludedForAgentIds).toEqual([])
     expect(store.driveDiscLoadouts).toHaveLength(1)
     expect(store.imports).toHaveLength(1)
   })
@@ -98,5 +100,36 @@ describe("local-store compatibility", () => {
     const raw = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
     expect(raw.driveDiscs[0].reservedForAgentId).toBe("agent-a")
     expect((await loadCurrentUserDriveDiscStore()).driveDiscs[0].reservedForAgentId).toBe("agent-a")
+  })
+
+  it("round-trips exclusions through the existing fallback key", async () => {
+    localStorage.clear()
+    localStorage.setItem("zzz-calculator.userStore.v1", JSON.stringify({
+      version: 1,
+      currentOwnerId: "default",
+      owners: [{ id: "default", label: "默认用户" }],
+      imports: [],
+      driveDiscs: [{
+        id: "fallback-excluded",
+        ownerId: "default",
+        setName: "旧数据盘",
+        partition: 1,
+        rarity: "S",
+        level: 15,
+        mainStat: { stat: "hpFlat", mode: "flat", value: 2200 },
+        subStats: [],
+      }],
+      driveDiscLoadouts: [],
+    }))
+
+    await setDriveDiscExclusions({
+      discIds: ["fallback-excluded"],
+      excludedForAgentId: "retired-agent",
+      excluded: true,
+    })
+    const raw = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
+    expect(raw.version).toBe(1)
+    expect(raw.driveDiscs[0].excludedForAgentIds).toEqual(["retired-agent"])
+    expect((await loadCurrentUserDriveDiscStore()).driveDiscs[0].excludedForAgentIds).toEqual(["retired-agent"])
   })
 })

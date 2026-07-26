@@ -6,6 +6,7 @@ const DEFAULT_CONFIG: AppConfig = {
   scanTelemetryEnabled: false,
   scanTelemetryRetentionDays: 30,
   driveDiscReservationsUiEnabled: false,
+  driveDiscExclusionsUiEnabled: false,
 }
 
 let configPromise: ReturnType<typeof loadAppConfig> | null = null
@@ -17,6 +18,7 @@ export const useAppConfigStore = defineStore("app-config", {
   }),
   getters: {
     driveDiscReservationsUiEnabled: state => state.config.driveDiscReservationsUiEnabled,
+    driveDiscExclusionsUiEnabled: state => state.config.driveDiscExclusionsUiEnabled,
   },
   actions: {
     async load() {

@@ -18,11 +18,13 @@ describe("app config store", () => {
       scanTelemetryEnabled: false,
       scanTelemetryRetentionDays: 30,
       driveDiscReservationsUiEnabled: true,
+      driveDiscExclusionsUiEnabled: true,
     })
     const store = useAppConfigStore()
     await Promise.all([store.load(), store.load()])
     expect(store.loaded).toBe(true)
     expect(store.driveDiscReservationsUiEnabled).toBe(true)
+    expect(store.driveDiscExclusionsUiEnabled).toBe(true)
     expect(loadAppConfig).toHaveBeenCalledOnce()
   })
 
@@ -33,5 +35,6 @@ describe("app config store", () => {
     await expect(store.load()).rejects.toThrow("offline")
     expect(store.loaded).toBe(false)
     expect(store.driveDiscReservationsUiEnabled).toBe(false)
+    expect(store.driveDiscExclusionsUiEnabled).toBe(false)
   })
 })

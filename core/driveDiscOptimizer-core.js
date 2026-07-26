@@ -1,5 +1,6 @@
 import { createInCombatPanelCalculator } from "./calculator-core.js"
 import { toCalculatorDriveDisc } from "./drive-disc-core.js"
+import { driveDiscUsageStateForAgent } from "./inventory-model.js"
 
 function browserAvailableParallelism() {
     return Math.max(1, Number(globalThis.navigator?.hardwareConcurrency ?? 1))
@@ -902,7 +903,7 @@ function applyPreferredMainStatLimits(settings, agent) {
     }
 }
 
-function groupCandidatesBySlot(store, settings, relevantStatIds = null, reservationMetrics = null) {
+function groupCandidatesBySlot(store, settings, relevantStatIds = null, restrictionMetrics = null) {
     const mainStatLimits = normalizeMainStatLimits(settings.mainStatLimits)
     const eligibleBeforeReservation = (store.driveDiscs ?? [])
         .filter(disc => (disc.ownerId ?? "default") === settings.ownerId)
@@ -919,21 +920,29 @@ function groupCandidatesBySlot(store, settings, relevantStatIds = null, reservat
             return disc.setId === settings.fourPieceSetId || twoPieceSetIds.includes(disc.setId)
         })
         .filter(disc => passesMainStatLimit(disc, mainStatLimits))
-    const excludedByReservation = eligibleBeforeReservation.filter(disc => {
-        const reservedForAgentId = String(disc.reservedForAgentId ?? "").trim()
-        return reservedForAgentId && reservedForAgentId !== settings.agentId
-    })
-    if (reservationMetrics) {
-        reservationMetrics.excludedByReservation = excludedByReservation.length
-        reservationMetrics.excludedByReservationBySlot = Object.fromEntries(SLOT_NUMBERS.map(slot => [
+    const usageStates = eligibleBeforeReservation.map(disc => ({
+        disc,
+        usage: driveDiscUsageStateForAgent(disc, settings.agentId),
+    }))
+    const excludedByReservation = usageStates
+        .filter(item => item.usage.state === "excluded-by-reservation")
+        .map(item => item.disc)
+    const excludedByExclusion = usageStates
+        .filter(item => item.usage.state === "excluded-explicit")
+        .map(item => item.disc)
+    if (restrictionMetrics) {
+        restrictionMetrics.excludedByReservation = excludedByReservation.length
+        restrictionMetrics.excludedByReservationBySlot = Object.fromEntries(SLOT_NUMBERS.map(slot => [
             slot,
             excludedByReservation.filter(disc => Number(disc.partition) === slot).length,
         ]))
+        restrictionMetrics.excludedByExclusion = excludedByExclusion.length
+        restrictionMetrics.excludedByExclusionBySlot = Object.fromEntries(SLOT_NUMBERS.map(slot => [
+            slot,
+            excludedByExclusion.filter(disc => Number(disc.partition) === slot).length,
+        ]))
     }
-    const filtered = eligibleBeforeReservation.filter(disc => {
-        const reservedForAgentId = String(disc.reservedForAgentId ?? "").trim()
-        return !reservedForAgentId || reservedForAgentId === settings.agentId
-    })
+    const filtered = usageStates.filter(item => item.usage.available).map(item => item.disc)
 
     return Object.fromEntries(SLOT_NUMBERS.map(slot => {
         const slotDiscs = filtered
@@ -2923,6 +2932,8 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
     const reservationMetrics = {
         excludedByReservation: 0,
         excludedByReservationBySlot: Object.fromEntries(SLOT_NUMBERS.map(slot => [slot, 0])),
+        excludedByExclusion: 0,
+        excludedByExclusionBySlot: Object.fromEntries(SLOT_NUMBERS.map(slot => [slot, 0])),
     }
     let candidatesBySlot = groupCandidatesBySlot(store, settings, relevantStatIds, reservationMetrics)
     const emptySlots = SLOT_NUMBERS.filter(slot => !candidatesBySlot[String(slot)]?.length)
@@ -2936,8 +2947,14 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
     })
     if (emptySlots.length) {
         const reservationEmptySlots = emptySlots.filter(slot => Number(reservationMetrics.excludedByReservationBySlot[slot] ?? 0) > 0)
-        const reason = reservationEmptySlots.length
-            ? `${reservationEmptySlots.join("、")} 号位符合当前约束的驱动盘均已专属其他角色。`
+        const exclusionEmptySlots = emptySlots.filter(slot => Number(reservationMetrics.excludedByExclusionBySlot[slot] ?? 0) > 0)
+        const restrictionEmptySlots = [...new Set([...reservationEmptySlots, ...exclusionEmptySlots])].sort((a, b) => a - b)
+        const reason = reservationEmptySlots.length && exclusionEmptySlots.length
+            ? `${restrictionEmptySlots.join("、")} 号位符合当前约束的驱动盘均因其他角色专属或当前角色主动排除而不可用。`
+            : reservationEmptySlots.length
+                ? `${reservationEmptySlots.join("、")} 号位符合当前约束的驱动盘均已专属其他角色。`
+                : exclusionEmptySlots.length
+                    ? `${exclusionEmptySlots.join("、")} 号位符合当前约束的驱动盘均已被当前角色排除。`
             : hasTwoPieceLimit(settings) ? null : FREE_TWO_PIECE_INSUFFICIENT_REASON
         return {
             isEmpty: true,
@@ -3256,6 +3273,8 @@ function createTaskOptimizerStateFromBase(baseState, task = {}, input = {}) {
         ...algorithmMetricFields("exact-super-bound"),
         excludedByReservation: Number(baseState.metrics?.excludedByReservation ?? 0),
         excludedByReservationBySlot: baseState.metrics?.excludedByReservationBySlot ?? {},
+        excludedByExclusion: Number(baseState.metrics?.excludedByExclusion ?? 0),
+        excludedByExclusionBySlot: baseState.metrics?.excludedByExclusionBySlot ?? {},
         emptySlots: [],
         candidateCountsBySlot: baseState.metrics?.candidateCountsBySlot ?? candidateCountsBySlot(baseState.candidatesBySlot),
         estimatedCombinationCount,

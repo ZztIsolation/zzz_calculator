@@ -63,7 +63,7 @@ async function seedLegacyLocalStorage(page: Page) {
   }, legacyStore)
 }
 
-async function enableReservationUi(page: Page) {
+async function mockRestrictionUi(page: Page, reservations: boolean, exclusions = false) {
   await page.route("**/api/app-config", route => route.fulfill({
     status: 200,
     contentType: "application/json",
@@ -71,7 +71,8 @@ async function enableReservationUi(page: Page) {
       maintenanceEnabled: false,
       scanTelemetryEnabled: false,
       scanTelemetryRetentionDays: 30,
-      driveDiscReservationsUiEnabled: true,
+      driveDiscReservationsUiEnabled: reservations,
+      driveDiscExclusionsUiEnabled: exclusions,
     }),
   }))
 }
@@ -82,8 +83,37 @@ async function openDiscs(page: Page) {
   await page.waitForLoadState("networkidle")
 }
 
+async function expectNoHorizontalOverflow(page: Page) {
+  const metrics = await page.evaluate(() => {
+    const viewportWidth = window.innerWidth
+    const offenders = Array.from(document.querySelectorAll<HTMLElement>("*"))
+      .map((element) => {
+        const rect = element.getBoundingClientRect()
+        return {
+          element: `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ""}${typeof element.className === "string" && element.className ? `.${element.className.trim().replace(/\s+/g, ".")}` : ""}`,
+          left: Math.round(rect.left * 100) / 100,
+          right: Math.round(rect.right * 100) / 100,
+          width: Math.round(rect.width * 100) / 100,
+        }
+      })
+      .filter(candidate => candidate.right > viewportWidth + 2)
+      .sort((left, right) => right.right - left.right)
+      .slice(0, 10)
+
+    return {
+      pixels: document.documentElement.scrollWidth - viewportWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      viewportWidth,
+      offenders,
+    }
+  })
+
+  expect(metrics.pixels, JSON.stringify(metrics, null, 2)).toBeLessThanOrEqual(2)
+}
+
 test("reservation UI stays absent when the runtime flag is disabled", async ({ page }) => {
   await seedLegacyLocalStorage(page)
+  await mockRestrictionUi(page, false)
   await openDiscs(page)
 
   await expect(page.getByLabel("专属角色筛选")).toHaveCount(0)
@@ -96,7 +126,7 @@ test("reservation UI stays absent when the runtime flag is disabled", async ({ p
 test("reservation UI preserves legacy data and supports per-disc visual workflows", async ({ page }) => {
   test.slow()
   await seedLegacyLocalStorage(page)
-  await enableReservationUi(page)
+  await mockRestrictionUi(page, true)
   await openDiscs(page)
 
   const preset = page.locator(".loadout-visual-card").filter({ hasText: "旧数据六槽预设" })
@@ -120,7 +150,7 @@ test("reservation UI preserves legacy data and supports per-disc visual workflow
   const conflictModal = page.locator('[data-layout-surface="reservation-conflict"]')
   await expect(conflictModal).toContainText("星见雅")
   await expect(conflictModal).toContainText("安比")
-  await page.getByRole("button", { name: "确认转移", exact: true }).click()
+  await page.getByRole("button", { name: "转移并锁定", exact: true }).click()
   await expect(conflictingDisc).toHaveAttribute("data-reservation-state", "current")
   await expect(preset).toContainText("专属 2 / 6")
 
@@ -144,6 +174,50 @@ test("reservation UI preserves legacy data and supports per-disc visual workflow
   expect(await page.evaluate(() => localStorage.getItem("zzz-calculator.webapp.optimizer.v1"))).toContain("exact-super-bound")
   expect(await page.evaluate(() => localStorage.getItem("zzz_maintenance_vue_draft_v3"))).toContain("legacy-draft")
 
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
-  expect(overflow).toBeLessThanOrEqual(2)
+  await expectNoHorizontalOverflow(page)
+})
+
+test("exclusion UI supports effective states and both confirmed conversions", async ({ page }) => {
+  test.slow()
+  await seedLegacyLocalStorage(page)
+  await mockRestrictionUi(page, true, true)
+  await openDiscs(page)
+
+  await expect(page.getByLabel("限制状态筛选")).toBeVisible()
+  await expect(page.getByLabel("限制角色筛选")).toBeVisible()
+  await expect(page.locator('[data-field="usage-restriction"]').first()).toBeVisible()
+
+  const preset = page.locator(".loadout-visual-card").filter({ hasText: "旧数据六槽预设" })
+  const publicDisc = preset.locator('.disc-slot-card[data-slot="3"]')
+  const autoExcludedDisc = preset.locator('.disc-slot-card[data-slot="2"]')
+
+  await expect(autoExcludedDisc).toHaveAttribute("data-usage-state", "excluded-by-reservation")
+  await expect(autoExcludedDisc.locator(".disc-exclusion-button")).toBeDisabled()
+
+  await publicDisc.locator(".disc-exclusion-button").click()
+  await expect(publicDisc).toHaveAttribute("data-usage-state", "excluded-explicit")
+  await expect(publicDisc).toContainText("已排除")
+
+  await publicDisc.locator(".disc-reservation-button").click()
+  await expect(page.getByRole("heading", { name: "取消排除并锁定", exact: true })).toBeVisible()
+  await page.getByRole("button", { name: "取消排除并锁定", exact: true }).click()
+  await expect(publicDisc).toHaveAttribute("data-usage-state", "reserved-current")
+
+  await publicDisc.locator(".disc-exclusion-button").click()
+  await expect(page.getByRole("heading", { name: "解除锁定并排除", exact: true })).toBeVisible()
+  await page.getByRole("button", { name: "解除锁定并排除", exact: true }).click()
+  await expect(publicDisc).toHaveAttribute("data-usage-state", "excluded-explicit")
+
+  const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}"))
+  const converted = persisted.driveDiscs.find((disc: any) => disc.id === "reservation-e2e-disc-3")
+  expect(converted.reservedForAgentId).toBeNull()
+  expect(converted.excludedForAgentIds).toEqual(["anby_demara"])
+  expect(persisted.version).toBe(1)
+  expect(await page.evaluate(() => localStorage.getItem("zzz-calculator.reservation-e2e-sentinel"))).toBe("preserve-me")
+
+  for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport)
+    await expect(preset).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+  }
 })
