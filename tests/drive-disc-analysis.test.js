@@ -91,6 +91,38 @@ approx(gains.baseline.finalDamage, finalDamage(baseline), "Gain baseline should 
 
 const diffs = analyzeDriveDiscStatDiffs(catalog, payload)
 approx(diffs.baseline.finalDamage, finalDamage(baseline), "Diff baseline should match full whitebox damage")
+
+const skillLevelPayload = {
+    ...payload,
+    damage: {
+        skillLevelsByCategory: { basic: 1 },
+        selectedEventId: "skill-hit",
+        events: [{
+            id: "skill-hit",
+            kind: "direct",
+            critMode: "expected",
+            count: 1,
+            skillRef: {
+                agentSkillId: "ye_shunguang",
+                categoryId: "basic",
+                moveId: "quick_sword",
+                rowId: "hit_1",
+                level: 12,
+            },
+        }],
+    },
+}
+const skillLevelOneBaseline = calculateInCombatPanel(catalog, skillLevelPayload)
+const skillLevelOneGains = analyzeDriveDiscStatGains(catalog, skillLevelPayload)
+approx(skillLevelOneGains.baseline.finalDamage, finalDamage(skillLevelOneBaseline), "Drive Disc analysis should use the current LV1 skill multiplier")
+const skillLevelTwelveBaseline = calculateInCombatPanel(catalog, {
+    ...skillLevelPayload,
+    damage: {
+        ...skillLevelPayload.damage,
+        skillLevelsByCategory: { basic: 12 },
+    },
+})
+assert.ok(finalDamage(skillLevelTwelveBaseline) > finalDamage(skillLevelOneBaseline), "Drive Disc analysis fixture should distinguish current LV1 and LV12 damage")
 assert.deepEqual(
     diffs.substatDiffs.map(item => item.stat),
     [...diffs.substatDiffs].sort((left, right) =>

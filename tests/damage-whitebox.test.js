@@ -423,6 +423,87 @@ for (const [level, expectedPercent] of [
     )
 }
 
+const currentLevelSkillRef = {
+    agentSkillId: "ye_shunguang",
+    categoryId: "basic",
+    moveId: "quick_sword",
+    rowId: "hit_1",
+    level: 12,
+}
+const currentLevelOne = calculateInCombatPanel(catalog, minimalInput({
+    damage: {
+        skillLevelsByCategory: { basic: 1 },
+        skillRef: currentLevelSkillRef,
+    },
+}))
+const currentLevelTwelve = calculateInCombatPanel(catalog, minimalInput({
+    damage: {
+        skillLevelsByCategory: { basic: 12 },
+        skillRef: { ...currentLevelSkillRef, level: 1 },
+    },
+}))
+approx(currentLevelOne.damage.input.skillMultiplier, 0.794, "Current Basic Attack LV1 should override the stored LV12 snapshot")
+approx(currentLevelTwelve.damage.input.skillMultiplier, 1.597, "Current Basic Attack LV12 should override the stored LV1 snapshot")
+assert.match(currentLevelOne.damage.whiteBoxRows.find(row => row.label === "技能倍率")?.formula ?? "", /LV1$/)
+assert.match(currentLevelTwelve.damage.whiteBoxRows.find(row => row.label === "技能倍率")?.formula ?? "", /LV12$/)
+assert.ok(currentLevelTwelve.damage.finalDamage > currentLevelOne.damage.finalDamage, "Changing the current skill level should change white-box damage")
+
+const explicitLegacyLevel = calculateInCombatPanel(catalog, minimalInput({
+    damage: {
+        skillRef: { ...currentLevelSkillRef, level: 1 },
+    },
+}))
+const defaultCatalogLevel = calculateInCombatPanel(catalog, minimalInput({
+    damage: {
+        skillRef: { ...currentLevelSkillRef, level: undefined },
+    },
+}))
+approx(explicitLegacyLevel.damage.input.skillMultiplier, 0.794, "Legacy explicit skill level should remain supported without a current-level map")
+approx(defaultCatalogLevel.damage.input.skillMultiplier, 1.597, "Missing current and explicit levels should use the catalog default")
+
+assert.throws(
+    () => calculateInCombatPanel(catalog, minimalInput({
+        damage: {
+            skillLevelsByCategory: { basic: 99 },
+            skillRef: currentLevelSkillRef,
+        },
+    })),
+    /Skill level out of range.*: 99/,
+)
+
+for (const event of [
+    { id: "manual", kind: "direct", skillMultiplier: 100, critMode: "expected" },
+    { id: "anomaly", kind: "anomaly", anomalyEffect: "assault", procCount: 1 },
+]) {
+    const atLevelOne = calculateInCombatPanel(catalog, minimalInput({
+        damage: { skillLevelsByCategory: { basic: 1 }, selectedEventId: event.id, events: [event] },
+    }))
+    const atLevelTwelve = calculateInCombatPanel(catalog, minimalInput({
+        damage: { skillLevelsByCategory: { basic: 12 }, selectedEventId: event.id, events: [event] },
+    }))
+    approx(atLevelOne.damage.finalDamage, atLevelTwelve.damage.finalDamage, `${event.kind} damage without a skill ref should ignore ordinary skill levels`)
+}
+
+for (const coreSkillLevel of ["none", "A", "F"]) {
+    const expectedMultiplier = { none: 7.5, A: 8.75, F: 15 }[coreSkillLevel]
+    const coreSkillResult = calculateInCombatPanel(catalog, minimalInput({
+        agentId: "hoshimi_miyabi",
+        wEngineId: "hailfall_star_palace",
+        coreSkillLevel,
+        damage: {
+            skillLevelsByCategory: { core_skill: "A" },
+            skillRef: {
+                agentSkillId: "hoshimi_miyabi",
+                categoryId: "core_skill",
+                moveId: "frostburn_break",
+                rowId: "damage",
+                level: coreSkillLevel === "F" ? "A" : "F",
+            },
+        },
+    }))
+    approx(coreSkillResult.damage.input.skillMultiplier, expectedMultiplier, `Current Core Skill ${coreSkillLevel} should override event snapshots and category maps`)
+}
+
 assert.throws(
     () => calculateInCombatPanel(catalog, minimalInput({
         damage: {
@@ -2672,6 +2753,23 @@ assert.ok(electricDefIgnore.damage.multipliers.defense > physicalDefIgnore.damag
 
 const yeShunguang = meta.agents.find(item => item.id === "ye_shunguang")
 assert.ok(yeShunguang, "Meta should expose Ye Shunguang")
+
+const yeDefaultAxis = resolveDefaultCalculationConfig(yeShunguang.defaultCalculationConfig, 0)
+function calculateYeDefaultAtLevel(level) {
+    return calculateInCombatPanel(catalog, minimalInput({
+        agentId: "ye_shunguang",
+        coreSkillLevel: "F",
+        damage: {
+            ...yeDefaultAxis,
+            skillLevelsByCategory: { basic: level, dodge: level, assist: level, special: level, chain: level },
+        },
+    }))
+}
+const yeDefaultLevelOne = calculateYeDefaultAtLevel(1)
+const yeDefaultLevelTwelve = calculateYeDefaultAtLevel(12)
+assert.ok(yeDefaultLevelOne.damage.events.length > yeDefaultAxis.events.length, "Ye Shunguang default axis should expand its skill-group reference")
+assert.ok(yeDefaultLevelOne.damage.events.every(event => event.input?.skillSource?.level === 1), "Every expanded default-axis skill should use its current category level")
+assert.ok(yeDefaultLevelTwelve.damage.totalFinalDamage > yeDefaultLevelOne.damage.totalFinalDamage, "Skill-group total damage should change with current skill levels")
 
 function calculateYeShunguangSkill({
     categoryId = "special",

@@ -138,6 +138,18 @@ const lingduPayload = {
 const browserLingduResult = browserCalculateInCombatPanel(catalog, lingduPayload)
 const backendLingduResult = backendCalculateInCombatPanel(catalog, lingduPayload)
 assert.deepEqual(browserLingduResult, backendLingduResult, "Browser targeted CRIT DMG should match backend calculation.")
+const currentSkillLevelPayload = {
+    ...lingduPayload,
+    damage: {
+        ...lingduPayload.damage,
+        skillLevelsByCategory: { basic: 1 },
+    },
+}
+const browserCurrentSkillLevel = browserCalculateInCombatPanel(catalog, currentSkillLevelPayload)
+const backendCurrentSkillLevel = backendCalculateInCombatPanel(catalog, currentSkillLevelPayload)
+assert.deepEqual(browserCurrentSkillLevel, backendCurrentSkillLevel, "Browser current skill levels should match backend calculation.")
+assert.equal(browserCurrentSkillLevel.damage.input.skillSource?.level, 1, "Browser calculation should override the stored skill level snapshot.")
+assert.ok(browserLingduResult.damage.finalDamage > browserCurrentSkillLevel.damage.finalDamage, "A higher current skill level should produce higher browser-local damage.")
 const browserPayloadWithoutLingdu = browserCalculateInCombatPanel(catalog, {
     ...lingduPayload,
     combatBuffs: { activeBuffIds: [] },

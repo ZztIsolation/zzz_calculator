@@ -82,6 +82,29 @@ compareCalculator("miyabi-custom", {
     damage: miyabi.defaultCalculationConfig,
 })
 
+compareCalculator("miyabi-current-skill-level", {
+    agentId: "hoshimi_miyabi",
+    coreSkillLevel: "F",
+    wEngineId: "hailfall_star_palace",
+    wEngineModificationLevel: 1,
+    combatBuffs: { activeBuffIds: [] },
+    damage: {
+        skillLevelsByCategory: { basic: 1 },
+        events: [{
+            id: "current-basic",
+            kind: "direct",
+            critMode: "expected",
+            skillRef: {
+                agentSkillId: "hoshimi_miyabi",
+                categoryId: "basic",
+                moveId: "frost_moon",
+                rowId: "charge_3",
+                level: 12,
+            },
+        }],
+    },
+})
+
 compareCalculator("miyabi-mixed-event-stun", {
     agentId: "hoshimi_miyabi",
     coreSkillLevel: "F",

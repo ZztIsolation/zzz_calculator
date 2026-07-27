@@ -2,6 +2,23 @@
 
 # Changelog
 
+## 2026-07-28 - Fixed Current Skill Levels In Damage Calculation
+
+Fixed a cross-layer defect where the workbench skill-level selectors triggered
+a recalculation but the damage core continued using an event's stored
+`skillRef.level` snapshot or the catalog default. The request-level
+`damage.skillLevelsByCategory` map is now authoritative for ordinary skills,
+while the selected `coreSkillLevel` is authoritative for Core Skill-scaled
+damage rows. Historical event-level values remain supported only when the
+current build does not provide the corresponding level.
+
+The same resolution now feeds normal white-box damage, prepared and compiled
+scores, dense and fixed scoring, skill-group expansion, Drive Disc analysis,
+browser-local computation, and exact optimization. Workbench input and
+compatibility persistence also merge current skill levels last, so conflicting
+legacy copies cannot silently overwrite the values shown by the selectors. No
+catalog data, storage key, user event, or saved build is migrated or deleted.
+
 ## 2026-07-27 - Released Aria, Multi-Set Optimization, Norma, And Two W-Engines
 
 Released the Calculator-only second stage on top of the storage compatibility

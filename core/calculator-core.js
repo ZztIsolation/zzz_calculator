@@ -2304,14 +2304,17 @@ function resolveDamageSkillRef(catalog, agent, skillRef = null, options = {}) {
 
     const isCoreSkillLevel = isCoreSkillLevelScale(category)
     const defaultLevel = defaultLevelForSkill(category, move, row)
-    const rawRequestedLevel = skillRef.level
-        ?? (isCoreSkillLevel ? options.coreSkillLevel : undefined)
+    const currentLevel = isCoreSkillLevel
+        ? options.coreSkillLevel
+        : options.skillLevelsByCategory?.[categoryId]
+    const rawRequestedLevel = currentLevel
+        ?? skillRef.level
         ?? defaultLevel
     const requestedLevel = isCoreSkillLevel
         ? (String(rawRequestedLevel ?? "").trim() === "" || rawRequestedLevel === "none" ? "0" : String(rawRequestedLevel).trim())
         : Number(rawRequestedLevel)
     if (!isValidSkillLevel(category, move, row, requestedLevel)) {
-        throw new Error(`Skill level out of range for ${skillSet.id}.${categoryId}.${moveId}.${rowId}: ${skillRef.level}`)
+        throw new Error(`Skill level out of range for ${skillSet.id}.${categoryId}.${moveId}.${rowId}: ${rawRequestedLevel}`)
     }
 
     const value = skillRowValue(category, move, row, requestedLevel)
@@ -2812,6 +2815,10 @@ function normalizeDamageRequest(input = {}, agent = {}, catalog = {}, options = 
         strict: true,
         defaultStunned: legacyStunnedFallback,
     })
+    const skillOptions = {
+        ...options,
+        skillLevelsByCategory: expandedInput.skillLevelsByCategory ?? options.skillLevelsByCategory,
+    }
     const hasConfiguredEvents = Array.isArray(input.events) && input.events.length > 0
     if (hasConfiguredEvents && (!Array.isArray(expandedInput.events) || !expandedInput.events.length)) {
         throw new Error("技能组引用无法展开：没有可用于计算的普通事件。")
@@ -2822,7 +2829,7 @@ function normalizeDamageRequest(input = {}, agent = {}, catalog = {}, options = 
     const events = rawEvents.map((event, index) => normalizeDamageEvent({
         ...event,
         stunned: normalizeEventStunned(event?.stunned, legacyStunnedFallback),
-    }, agent, catalog, index, options))
+    }, agent, catalog, index, skillOptions))
     const firstElement = events[0]?.damageElement ?? resolveDamageElement(agent)
     return {
         agentLevel: normalizeAgentLevel(expandedInput.agentLevel),

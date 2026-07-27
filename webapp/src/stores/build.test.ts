@@ -73,6 +73,35 @@ describe("build store", () => {
     expect(input.combatBuffs.activeBuffIds).toContain("teammate_buff")
   })
 
+  it("keeps current skill levels authoritative over stale damage snapshots", () => {
+    const store = useBuildStore()
+    const meta = {
+      agents: [{ id: "agent_a", name: { zhCN: "角色 A" } }],
+      wEngines: [{ id: "engine_a", name: { zhCN: "音擎 A" } }],
+      combatBuffs: [],
+    }
+    store.applyAgentConfig("agent_a", meta, {
+      wEngineId: "engine_a",
+      skillLevels: { basic: 4, special: 8 },
+      damage: {
+        mode: "custom",
+        skillLevelsByCategory: { basic: 12, special: 12 },
+        selectedEventId: "legacy-hit",
+        events: [{ id: "legacy-hit", kind: "direct", skillMultiplier: 100, count: 1 }],
+      },
+    })
+
+    expect(store.skillLevels).toMatchObject({ basic: 4, special: 8 })
+    expect(store.buildInput({}, meta, []).damage.skillLevelsByCategory).toMatchObject({ basic: 4, special: 8 })
+
+    store.updateSkillLevel("basic", 7)
+    store.persist()
+
+    const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "{}")
+    expect(saved.byOwner.default.byAgent.agent_a.skillLevels).toMatchObject({ basic: 7, special: 8 })
+    expect(saved.byOwner.default.byAgent.agent_a.damage.skillLevelsByCategory).toMatchObject({ basic: 7, special: 8 })
+  })
+
   it("migrates legacy target stun state only into non-admin events", () => {
     const store = useBuildStore()
     const agent = {

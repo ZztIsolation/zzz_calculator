@@ -532,12 +532,13 @@ interface InCombatRequest {
       stunMultiplierPercent?: number; // default 150; activation is decided by each event.
     };
     skillMultiplier?: number;
+    skillLevelsByCategory?: Partial<Record<"basic" | "dodge" | "assist" | "special" | "chain", number>>;
     skillRef?: {
       agentSkillId: string;
       categoryId: string;
       moveId: string;
       rowId: string;
-      level: number;
+      level?: number | string; // compatibility fallback when the current level is absent.
     };
     selectedEventId?: string;
     events?: Array<
