@@ -373,7 +373,7 @@
                   "target": {
                     "kind": "default"
                   },
-                  "stat": "enemyDamageTakenBonus",
+                  "stat": "dmgBonus",
                   "mode": "flat",
                   "valuePerStack": 8,
                   "maxStacks": 2,
