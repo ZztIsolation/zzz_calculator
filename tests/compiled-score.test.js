@@ -57,6 +57,14 @@ compareCalculator("direct", {
     damage: exampleInput.damage,
 })
 
+compareCalculator("direct-enemy-damage-taken", {
+    agentId: exampleInput.agentId,
+    coreSkillLevel: exampleInput.coreSkillLevel,
+    wEngineId: exampleInput.wEngineId,
+    combatBuffs: { activeBuffIds: ["boss_encounter.girtablullu_stagnant_aberrant.v3_1.p1"] },
+    damage: exampleInput.damage,
+})
+
 compareCalculator("direct-stunned", {
     agentId: exampleInput.agentId,
     coreSkillLevel: exampleInput.coreSkillLevel,
@@ -79,6 +87,15 @@ compareCalculator("miyabi-custom", {
     wEngineId: "hailfall_star_palace",
     wEngineModificationLevel: 1,
     combatBuffs: { activeBuffIds: [] },
+    damage: miyabi.defaultCalculationConfig,
+})
+
+compareCalculator("miyabi-custom-enemy-damage-taken", {
+    agentId: "hoshimi_miyabi",
+    coreSkillLevel: "F",
+    wEngineId: "hailfall_star_palace",
+    wEngineModificationLevel: 1,
+    combatBuffs: { activeBuffIds: ["boss_encounter.girtablullu_stagnant_aberrant.v3_1.p1"] },
     damage: miyabi.defaultCalculationConfig,
 })
 
@@ -173,6 +190,15 @@ compareCalculator("sheer", {
             stunMultiplierPercent: 150,
         },
     },
+})
+
+compareCalculator("sheer-enemy-damage-taken", {
+    agentId: "yixuan",
+    coreSkillLevel: "F",
+    wEngineId: "zzz_wiki_1342",
+    wEngineModificationLevel: 1,
+    combatBuffs: { activeBuffIds: ["boss_encounter.girtablullu_stagnant_aberrant.v3_1.p1"] },
+    damage: yixuan.defaultCalculationConfig,
 })
 
 compareCalculator("jane-extended-flinch-disorder", {

@@ -183,6 +183,25 @@ assert.equal(
     "通用伤害加成% +18%（覆盖率 0.6）",
     "Field Buff runtime text should include effective coverage",
 )
+const disabledFieldRuntime = normalizeRuntimeForBuff(fieldRuntimeBuff, {
+    effects: {
+        "field-dmg": { enabled: false, coverage: 0.35 },
+    },
+})
+assert.equal(disabledFieldRuntime.effects["field-dmg"].enabled, false, "Field Buff rules should preserve explicit disabled state")
+assert.equal(disabledFieldRuntime.effects["field-dmg"].coverage, 0.35, "Disabled Field Buff rules should retain coverage")
+const bossRuntimeBuff = {
+    ...fieldRuntimeBuff,
+    id: "boss-runtime",
+    sourceType: "boss",
+}
+const disabledBossRuntime = normalizeRuntimeForBuff(bossRuntimeBuff, {
+    effects: {
+        "field-dmg": { enabled: false, coverage: 0.45 },
+    },
+})
+assert.equal(disabledBossRuntime.effects["field-dmg"].enabled, false, "Boss Buff rules should preserve explicit disabled state")
+assert.equal(disabledBossRuntime.effects["field-dmg"].coverage, 0.45, "Disabled Boss Buff rules should retain coverage")
 
 const independentCoverageBuff = {
     id: "independent-coverage",
@@ -663,6 +682,12 @@ const anomalyDamageBonusOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[
 assert.ok(anomalyDamageBonusOption, "Custom Buff stat options should include anomaly damage bonus")
 assert.equal(anomalyDamageBonusOption[0], "anomalyDamageBonus", "Anomaly damage bonus should be a fixed event stat")
 assert.equal(anomalyDamageBonusOption[2], "eventModifier", "Anomaly damage bonus option should use the default event modifier bucket")
+const enemyDamageTakenOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[0] === "enemyDamageTakenBonus")
+assert.deepEqual(
+    enemyDamageTakenOption,
+    ["enemyDamageTakenBonus", "敌方承伤提升%", "eventModifier", null],
+    "Custom Buff stat options should expose enemy damage taken as an independent event multiplier",
+)
 const disorderDamageBonusOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[1] === "紊乱增伤%")
 assert.ok(disorderDamageBonusOption, "Custom Buff stat options should include disorder damage bonus")
 assert.equal(disorderDamageBonusOption[0], "disorderDamageBonus", "Disorder damage bonus should be a fixed event stat")
@@ -747,6 +772,7 @@ for (const optionList of [CUSTOM_BUFF_STAT_OPTIONS, CUSTOM_BUFF_SKILL_STAT_OPTIO
 assert.ok(CUSTOM_BUFF_STAT_OPTIONS.some(option => option[0] === "critDmg"), "Default Custom Buff options should retain global Crit DMG")
 assert.equal(CUSTOM_BUFF_SKILL_STAT_OPTIONS.some(option => option[0] === "critDmg"), false, "Skill-targeted Custom Buffs should not add generic Crit DMG semantics")
 for (const stat of [
+    "enemyDamageTakenBonus",
     "anomalyDamageBonus",
     "disorderDamageBonus",
     "baseMultiplierBonus",

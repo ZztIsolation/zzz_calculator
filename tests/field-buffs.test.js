@@ -12,6 +12,9 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
 
 const FIELD_BUFF_IDS = {
+    cuixin: "field.critical_assault.v3_1.p1.cuixin",
+    luli: "field.critical_assault.v3_1.p1.luli",
+    guixi: "field.critical_assault.v3_1.p1.guixi",
     zhongmu: "field.defense_v5.v3_0.p3.zhongmu_xiezou",
     lianshi: "field.defense_v5.v3_0.p3.lianshi_huilu",
     lingdu: "field.defense_v5.v3_0.p3.lingdu_xingdong",
@@ -21,6 +24,12 @@ const FIELD_BUFF_IDS = {
 }
 
 const EFFECT_IDS = {
+    cuixinCrit: "field_critical_assault_v3_1_p1_cuixin_crit_dmg",
+    cuixinAtk: "field_critical_assault_v3_1_p1_cuixin_attack_atk",
+    luliProficiency: "field_critical_assault_v3_1_p1_luli_anomaly_proficiency",
+    luliAnomaly: "field_critical_assault_v3_1_p1_luli_anomaly_damage",
+    luliRes: "field_critical_assault_v3_1_p1_luli_enemy_res_reduction",
+    guixiDef: "field_critical_assault_v3_1_p1_guixi_enemy_def_reduction",
     lianshiRes: "field_defense_v5_v3_0_p3_lianshi_anomaly_res_ignore",
     yanwangAtk: "field_critical_assault_v3_0_p3_yanwang_chain_atk",
     linxiRes: "field_critical_assault_v3_0_p3_linxi_enemy_res_reduction",
@@ -30,6 +39,9 @@ const EFFECT_IDS = {
 }
 
 const EXPECTED_NAMES = {
+    [FIELD_BUFF_IDS.cuixin]: "摧心",
+    [FIELD_BUFF_IDS.luli]: "勠力",
+    [FIELD_BUFF_IDS.guixi]: "诡袭",
     [FIELD_BUFF_IDS.zhongmu]: "终幕协奏",
     [FIELD_BUFF_IDS.lianshi]: "链式回路",
     [FIELD_BUFF_IDS.lingdu]: "零度行动",
@@ -37,6 +49,9 @@ const EXPECTED_NAMES = {
     [FIELD_BUFF_IDS.linxi]: "凛息",
     [FIELD_BUFF_IDS.gouxi]: "构析",
 }
+
+const DEFENSE_3_0_IDS = [FIELD_BUFF_IDS.zhongmu, FIELD_BUFF_IDS.lianshi, FIELD_BUFF_IDS.lingdu]
+const CRITICAL_ASSAULT_3_1_IDS = [FIELD_BUFF_IDS.cuixin, FIELD_BUFF_IDS.luli, FIELD_BUFF_IDS.guixi]
 
 const ALL_RES_IGNORE_BUFF_IDS = [
     "liuyin.cinema_1.good_review_res_ignore",
@@ -71,15 +86,16 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
     assert.equal(buff.name?.zhCN, EXPECTED_NAMES[id], `${id} should keep its maintained name`)
     assert.equal(buff.sourceType, "field", `${id} should be a field Buff`)
     assert.equal(buff.scope, "inCombat", `${id} should be an in-combat Buff`)
-    const isDefense = [FIELD_BUFF_IDS.zhongmu, FIELD_BUFF_IDS.lianshi, FIELD_BUFF_IDS.lingdu].includes(id)
+    const isDefense = DEFENSE_3_0_IDS.includes(id)
+    const isCriticalAssault31 = CRITICAL_ASSAULT_3_1_IDS.includes(id)
     assert.deepEqual(buff.period, {
         modeId: isDefense ? "defense_v5" : "critical_assault",
-        gameVersion: "3.0",
-        phaseNo: 3,
-        phaseName: { zhCN: "第三期" },
+        gameVersion: isCriticalAssault31 ? "3.1" : "3.0",
+        phaseNo: isCriticalAssault31 ? 1 : 3,
+        phaseName: { zhCN: isCriticalAssault31 ? "第一期" : "第三期" },
     })
     assert.equal(buff.source?.zhCN, isDefense ? "防卫战 v5" : "危局强袭战")
-    assert.equal(buff.sourcePeriod?.zhCN, "3.0版本第三期")
+    assert.equal(buff.sourcePeriod?.zhCN, isCriticalAssault31 ? "3.1版本第一期" : "3.0版本第三期")
 
     const validation = validateMaintenanceItem("field-buffs", buff, {
         items: catalog.combatBuffs,
@@ -88,6 +104,35 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
     })
     assert.equal(validation.ok, true, `${id} should pass field Buff validation: ${JSON.stringify(validation.errors)}`)
 }
+
+const allFieldBuffs = catalog.combatBuffs.filter(buff => buff.sourceType === "field")
+assert.equal(allFieldBuffs.length, 12, "Field Buff catalog should keep all maintained entries")
+for (const buff of allFieldBuffs) {
+    assert.ok(buff.effects.length > 0, `${buff.id} should expose structured effects`)
+    for (const effect of buff.effects) {
+        assert.deepEqual(
+            effect.coverage,
+            { default: 1, min: 0, max: 1, step: 0.1 },
+            `${buff.id}.${effect.id} should expose standard independent coverage`,
+        )
+    }
+}
+
+assert.equal(
+    fieldBuff(FIELD_BUFF_IDS.cuixin).description.zhCN,
+    "代理人的暴击伤害提升30%。[强攻]特性的代理人攻击力提升10%，[普通攻击]命中时造成的伤害提升30%，并无视敌人15%的防御。",
+    "Cuixin should preserve the complete source text",
+)
+assert.equal(
+    fieldBuff(FIELD_BUFF_IDS.luli).description.zhCN,
+    "队伍内存在2/3名[异常]特性代理人时，全队的异常精通分别提升30点/70点，造成的属性异常伤害分别提升10%/25%。对敌人施加属性异常效果后，敌人的全属性伤害抗性降低15%，持续10秒，重复触发时刷新持续时间。",
+    "Luli should preserve the complete source text",
+)
+assert.equal(
+    fieldBuff(FIELD_BUFF_IDS.guixi).description.zhCN,
+    "代理人的攻击力提升10%，异常精通提升30点，暴击伤害提升40%。代理人对敌人施加属性异常效果后，其防御力降低10%，持续10秒，重复触发时刷新持续时间。",
+    "Guixi should preserve the complete source text",
+)
 
 assert.equal(
     fieldBuff(FIELD_BUFF_IDS.zhongmu).description.zhCN,
@@ -174,6 +219,79 @@ function calculateSkill(fieldBuffId, skillRef, runtime = {}) {
     })
 }
 
+function calculateAttackBasic(fieldBuffId, runtime = {}) {
+    return calculateInCombatPanel(catalog, {
+        ...catalog.examples.yeShunguang.input,
+        driveDiscs: [],
+        combatBuffs: {
+            activeBuffIds: [fieldBuffId],
+            runtimeInputs: { [fieldBuffId]: runtime },
+        },
+        damage: {
+            skillRef: {
+                agentSkillId: "ye_shunguang",
+                categoryId: "basic",
+                moveId: "quick_sword",
+                rowId: "hit_1",
+                level: 12,
+            },
+            target: { defense: 953, levelCoefficient: 794 },
+        },
+    })
+}
+
+const cuixinAttack = calculateAttackBasic(FIELD_BUFF_IDS.cuixin)
+approx(
+    cuixinAttack.inCombat.panel.atk - cuixinAttack.outOfCombat.panel.atk,
+    cuixinAttack.outOfCombat.panel.atk * 0.1,
+    "Cuixin should grant Attack agents 10% of out-of-combat ATK",
+)
+approx(
+    cuixinAttack.inCombat.panel.critDmg - cuixinAttack.outOfCombat.panel.critDmg,
+    0.3,
+    "Cuixin should grant every agent 30% CRIT DMG",
+)
+approx(cuixinAttack.damage.multipliers.directDamageBonus, 0.3, "Cuixin should grant Attack agents 30% Basic Attack damage")
+approx(cuixinAttack.damage.targetBreakdown.enemyDefReduction, 0.15, "Cuixin should grant Attack agents 15% Basic Attack DEF ignore")
+
+const configuredCuixinAttack = calculateAttackBasic(FIELD_BUFF_IDS.cuixin, {
+    effects: {
+        [EFFECT_IDS.cuixinCrit]: { enabled: false, coverage: 0.3 },
+        [EFFECT_IDS.cuixinAtk]: { coverage: 0.5 },
+    },
+})
+approx(
+    configuredCuixinAttack.inCombat.panel.atk - configuredCuixinAttack.outOfCombat.panel.atk,
+    configuredCuixinAttack.outOfCombat.panel.atk * 0.05,
+    "Cuixin ATK coverage should scale only the ATK effect",
+)
+approx(
+    configuredCuixinAttack.inCombat.panel.critDmg - configuredCuixinAttack.outOfCombat.panel.critDmg,
+    0,
+    "Cuixin disabled CRIT DMG should not affect sibling effects",
+)
+
+const reenabledCuixinAttack = calculateAttackBasic(FIELD_BUFF_IDS.cuixin, {
+    effects: {
+        [EFFECT_IDS.cuixinCrit]: { enabled: true, coverage: 0.3 },
+    },
+})
+approx(
+    reenabledCuixinAttack.inCombat.panel.critDmg - reenabledCuixinAttack.outOfCombat.panel.critDmg,
+    0.09,
+    "Cuixin re-enabled CRIT DMG should reuse its retained coverage",
+)
+
+const cuixinAnomaly = calculateSkill(FIELD_BUFF_IDS.cuixin, miyabiSkillRefs.basic)
+approx(cuixinAnomaly.inCombat.panel.atk - cuixinAnomaly.outOfCombat.panel.atk, 0, "Cuixin should not grant non-Attack agents ATK")
+approx(cuixinAnomaly.damage.multipliers.directDamageBonus, 0, "Cuixin should not grant non-Attack agents Basic Attack damage")
+approx(cuixinAnomaly.damage.targetBreakdown.enemyDefReduction, 0, "Cuixin should not grant non-Attack agents DEF ignore")
+approx(
+    cuixinAnomaly.inCombat.panel.critDmg - cuixinAnomaly.outOfCombat.panel.critDmg,
+    0.3,
+    "Cuixin's unconditional CRIT DMG should still apply to non-Attack agents",
+)
+
 const yanwangOneStackRuntime = {
     effects: {
         [EFFECT_IDS.yanwangAtk]: { stacks: 1 },
@@ -226,6 +344,74 @@ function calculateAnomaly(fieldBuffId, event, runtime = {}) {
         },
     })
 }
+
+for (const [anomalyAgentCount, expectedProficiency, expectedAnomalyDamage] of [
+    [0, 0, 0],
+    [1, 0, 0],
+    [2, 30, 0.1],
+    [3, 70, 0.25],
+]) {
+    const luli = calculateAnomaly(FIELD_BUFF_IDS.luli, {
+        id: `luli-burn-${anomalyAgentCount}`,
+        kind: "anomaly",
+        settlementType: "attribute",
+        anomalyEffect: "burn",
+        procCount: 1,
+    }, {
+        effects: {
+            [EFFECT_IDS.luliProficiency]: { sourceValue: anomalyAgentCount },
+            [EFFECT_IDS.luliAnomaly]: { sourceValue: anomalyAgentCount },
+        },
+    })
+    approx(
+        luli.inCombat.panel.anomalyProficiency - luli.outOfCombat.panel.anomalyProficiency,
+        expectedProficiency,
+        `Luli should grant the correct Anomaly Proficiency for ${anomalyAgentCount} Anomaly agents`,
+    )
+    approx(
+        luli.damage.multipliers.attributeAnomalyDamage,
+        1 + expectedAnomalyDamage,
+        `Luli should grant the correct attribute-anomaly damage for ${anomalyAgentCount} Anomaly agents`,
+    )
+    approx(luli.damage.targetBreakdown.enemyResReduction, 0.15, "Luli should reduce all-attribute RES after applying an Anomaly")
+}
+
+const luliHalfResCoverage = calculateAnomaly(FIELD_BUFF_IDS.luli, {
+    id: "luli-half-res-coverage",
+    kind: "anomaly",
+    settlementType: "attribute",
+    anomalyEffect: "burn",
+    procCount: 1,
+}, {
+    effects: {
+        [EFFECT_IDS.luliRes]: { coverage: 0.5 },
+    },
+})
+approx(luliHalfResCoverage.damage.targetBreakdown.enemyResReduction, 0.075, "Luli RES reduction should honor coverage")
+
+const guixi = calculateAnomaly(FIELD_BUFF_IDS.guixi, {
+    id: "guixi-burn",
+    kind: "anomaly",
+    settlementType: "attribute",
+    anomalyEffect: "burn",
+    procCount: 1,
+}, {
+    effects: {
+        [EFFECT_IDS.guixiDef]: { coverage: 0.5 },
+    },
+})
+approx(
+    guixi.inCombat.panel.atk - guixi.outOfCombat.panel.atk,
+    guixi.outOfCombat.panel.atk * 0.1,
+    "Guixi should grant 10% of out-of-combat ATK",
+)
+approx(
+    guixi.inCombat.panel.anomalyProficiency - guixi.outOfCombat.panel.anomalyProficiency,
+    30,
+    "Guixi should grant 30 Anomaly Proficiency",
+)
+approx(guixi.inCombat.panel.critDmg - guixi.outOfCombat.panel.critDmg, 0.4, "Guixi should grant 40% CRIT DMG")
+approx(guixi.damage.targetBreakdown.enemyDefReduction, 0.05, "Guixi DEF reduction should honor coverage")
 
 const jijingFireAnomaly = calculateAnomaly("field.defense_v5.v3_0.p2.jijing_chefeng", {
     id: "jijing-fire-burn",

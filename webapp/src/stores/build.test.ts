@@ -272,6 +272,72 @@ describe("build store", () => {
     expect(store.runtimeInputs).not.toHaveProperty("boss.encounter.b")
   })
 
+  it("preserves disabled Field Buff effects in the final calculation input", () => {
+    const store = useBuildStore()
+    const fieldBuff = {
+      id: "field.v3.p1",
+      sourceType: "field",
+      scope: "inCombat",
+      effects: [{
+        id: "field-atk",
+        type: "fixed",
+        stat: "atkFlat",
+        value: 100,
+        coverage: { default: 1, min: 0, max: 1, step: 0.1 },
+      }],
+    }
+    const meta = {
+      agents: [{ id: "agent_a", name: { zhCN: "角色 A" } }],
+      wEngines: [{ id: "engine_a", name: { zhCN: "音擎 A" } }],
+      combatBuffs: [fieldBuff],
+    }
+    store.agentId = "agent_a"
+    store.wEngineId = "engine_a"
+    store.selectedBuffIds = [fieldBuff.id]
+    store.runtimeInputs = {
+      [fieldBuff.id]: { effects: { "field-atk": { enabled: false, coverage: 0.4 } } },
+    }
+
+    const input = store.buildInput({}, meta, [])
+    expect(input.combatBuffs.runtimeInputs[fieldBuff.id].effects["field-atk"]).toMatchObject({
+      enabled: false,
+      coverage: 0.4,
+    })
+  })
+
+  it("preserves disabled Boss Buff effects in the final calculation input", () => {
+    const store = useBuildStore()
+    const bossBuff = {
+      id: "boss.encounter.a",
+      sourceType: "boss",
+      scope: "inCombat",
+      effects: [{
+        id: "boss-dmg",
+        type: "fixed",
+        stat: "dmgBonus",
+        value: 20,
+        coverage: { default: 1, min: 0, max: 1, step: 0.1 },
+      }],
+    }
+    const meta = {
+      agents: [{ id: "agent_a", name: { zhCN: "角色 A" } }],
+      wEngines: [{ id: "engine_a", name: { zhCN: "音擎 A" } }],
+      combatBuffs: [bossBuff],
+    }
+    store.agentId = "agent_a"
+    store.wEngineId = "engine_a"
+    store.selectedBuffIds = [bossBuff.id]
+    store.runtimeInputs = {
+      [bossBuff.id]: { effects: { "boss-dmg": { enabled: false, coverage: 0.6 } } },
+    }
+
+    const input = store.buildInput({}, meta, [])
+    expect(input.combatBuffs.runtimeInputs[bossBuff.id].effects["boss-dmg"]).toMatchObject({
+      enabled: false,
+      coverage: 0.6,
+    })
+  })
+
   it("migrates a legacy concrete Boss target into Buff selection and resets target values", () => {
     const store = useBuildStore()
     const meta = {

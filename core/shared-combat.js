@@ -27,6 +27,7 @@ export const DAMAGE_KIND_LABELS = {
     sheer: "贯穿",
 }
 export const DAMAGE_MODIFIER_KIND_LABELS = {
+    enemyDamageTakenBonus: "敌方承伤提升",
     anomalyDamageBonus: "属性异常增伤",
     disorderDamageBonus: "紊乱增伤",
     baseMultiplierBonus: "伤害倍率修正",
@@ -100,6 +101,7 @@ export const CUSTOM_BUFF_STAT_OPTIONS = [
     ["penRatio", "穿透率%", "flat", null],
     ["sheerForceFlat", "固定贯穿力", "flat", null],
     ["dmgBonus", "通用伤害%", "flat", null],
+    ["enemyDamageTakenBonus", "敌方承伤提升%", "eventModifier", null],
     ["anomalyDamageBonus", "属性异常增伤%", "eventModifier", null],
     ["disorderDamageBonus", "紊乱增伤%", "eventModifier", null],
     ["sheerDmgBonus", "贯穿增伤%", "eventModifier", null],
@@ -192,6 +194,7 @@ export const FALLBACK_LABELS = {
     etherDmg: "以太伤害加成",
     windDmg: "风属性伤害加成",
     dmgBonus: "通用伤害加成",
+    enemyDamageTakenBonus: "敌方承伤提升",
     enemyDefReduction: "敌方减防率",
     enemyDefIgnore: "无视防御率",
     enemyDefFlatReduction: "敌方固定减防",
@@ -298,6 +301,7 @@ export const PERCENT_KEYS = new Set([
     "etherDmg",
     "windDmg",
     "dmgBonus",
+    "enemyDamageTakenBonus",
     "enemyDefReduction",
     "enemyDefIgnore",
     "enemyResReduction",
@@ -361,6 +365,7 @@ export const STORED_PERCENT_STATS = new Set([
     "etherDmg",
     "windDmg",
     "dmgBonus",
+    "enemyDamageTakenBonus",
     "enemyDefReduction",
     "enemyDefIgnore",
     "enemyResReduction",
@@ -417,6 +422,7 @@ export const STORED_STAT_LABELS = {
     etherDmg: "以太伤害加成%",
     windDmg: "风属性伤害加成%",
     dmgBonus: "通用伤害加成%",
+    enemyDamageTakenBonus: "敌方承伤提升%",
     enemyDefReduction: "敌方减防率%",
     enemyDefIgnore: "无视防御率%",
     enemyResReduction: "敌方当前属性减抗%",
@@ -1034,6 +1040,7 @@ export function defaultRuntimeForBuff(buff = {}) {
 export function normalizeRuntimeForBuff(buff = {}, runtime = {}) {
     const defaults = defaultRuntimeForBuff(buff)
     const input = runtime && typeof runtime === "object" ? runtime : {}
+    const preservesRuleEnabled = ["field", "boss"].includes(buff?.sourceType)
     const { coverage: legacyCoverage, ...inputWithoutLegacyCoverage } = input
     const next = {
         ...defaults,
@@ -1046,11 +1053,12 @@ export function normalizeRuntimeForBuff(buff = {}, runtime = {}) {
     for (const rule of effectRules(buff)) {
         const id = effectRuleId(rule)
         const legacyRuleRuntime = input[id] && typeof input[id] === "object" ? input[id] : {}
+        const configuredEnabled = input.effects?.[id]?.enabled ?? legacyRuleRuntime.enabled
         next.effects[id] = {
             ...(defaults.effects[id] ?? { enabled: true }),
             ...legacyRuleRuntime,
             ...(next.effects[id] ?? {}),
-            enabled: true,
+            enabled: preservesRuleEnabled ? configuredEnabled !== false : true,
         }
         const coverage = effectRuleCoverage(rule, buff)
         if (coverage) {

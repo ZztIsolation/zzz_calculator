@@ -142,11 +142,11 @@ const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
 const ANOMALY_VARIANT_VALUES = new Set(["normal", "polarizedAssault"])
 const CALCULATION_MODE_VALUES = new Set(["single", "sheer", "anomaly", "custom"])
 const SHEER_DAMAGE_MODIFIER_KIND_VALUES = ["sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg"]
-const DAMAGE_MODIFIER_KIND_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "skillMultiplierBonus", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
+const DAMAGE_MODIFIER_KIND_VALUES = new Set(["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "skillMultiplierBonus", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
 const SKILL_TARGET_DAMAGE_MODIFIER_KIND_VALUES = new Set(["directDamageBonus", "skillMultiplierBonus"])
 const DAMAGE_MODIFIER_VALUE_UNIT_VALUES = new Set(["decimal"])
 const RULE_TARGET_KIND_VALUES = new Set(["default", "skill", "anomaly"])
-const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
+const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
 const SKILL_TARGET_STAT_VALUES = new Set([
     "allResIgnore",
     "physicalResIgnore",
