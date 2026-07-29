@@ -1045,11 +1045,51 @@ function eventModifierCalcValue(rule = {}) {
     return toCalcValue(stat, value, rule.mode)
 }
 
+function outOfCombatStatRequirement(requirement = {}) {
+    const config = requirement?.outOfCombatStat
+    const stat = String(config?.stat ?? "").trim()
+    if (!stat) {
+        return null
+    }
+    const optionalFinite = value => {
+        if (value === undefined || value === null || value === "") return null
+        return Number.isFinite(Number(value)) ? Number(value) : null
+    }
+    return {
+        stat,
+        min: optionalFinite(config.min),
+        max: optionalFinite(config.max),
+    }
+}
+
+function outOfCombatStatRequirementMatches(requirement = {}, panel = null) {
+    const config = outOfCombatStatRequirement(requirement)
+    if (!config) {
+        return true
+    }
+    if (!panel) {
+        return false
+    }
+    const value = Number(panel[config.stat])
+    return Number.isFinite(value)
+        && (config.min === null || value >= config.min)
+        && (config.max === null || value <= config.max)
+}
+
+function hasOutOfCombatStatRequirement(rule = {}) {
+    return Boolean(outOfCombatStatRequirement(rule?.requirement))
+}
+
 function effectRuleRequirementMatches(rule = {}, modifierContext = {}) {
     const requiredSpecialty = String(rule?.requirement?.specialty ?? "").trim()
     const requiredAttribute = String(rule?.requirement?.attribute ?? "").trim()
     return (!requiredSpecialty || requiredSpecialty === modifierContext.agent?.specialty)
         && (!requiredAttribute || requiredAttribute === modifierContext.agent?.attribute)
+        && (
+            !hasOutOfCombatStatRequirement(rule)
+            || outOfCombatStatRequirementMatches(rule.requirement, modifierContext.outOfCombat?.panel)
+            || modifierContext.deferOutOfCombatStatRequirements === true
+        )
 }
 
 function resolveEffectRule(rule, effect, runtimeInput = {}, modifierContext = {}) {
@@ -1315,7 +1355,12 @@ function compileDenseCombatEffectEntry({
     minSetCount = 0,
     agent = null,
 } = {}) {
-    const normalized = normalizeEffect(effect, runtimeInput, { sourceKey: key, buffModifiers, agent })
+    const normalized = normalizeEffect(effect, runtimeInput, {
+        sourceKey: key,
+        buffModifiers,
+        agent,
+        deferOutOfCombatStatRequirements: true,
+    })
     if (!normalized || normalized.scope !== "inCombat") {
         return null
     }
@@ -1330,6 +1375,8 @@ function compileDenseCombatEffectEntry({
         exclusiveGroup: String(effect.exclusiveGroup ?? "").trim() || null,
         stats: normalized.stats,
         damageModifiers: normalized.damageModifiers,
+        hasOutOfCombatStatRequirements: [...normalized.stats, ...normalized.damageModifiers]
+            .some(hasOutOfCombatStatRequirement),
     }
 }
 
@@ -1347,6 +1394,7 @@ function compileDenseDamageModifierEntries(effectEntries = [], compiledEvents = 
                         entryIndex,
                         kindIndex,
                         value: Number(modifier.value ?? 0),
+                        requirement: modifier.requirement ?? null,
                     })
                 }
             }
@@ -1880,6 +1928,7 @@ function applyCombatEffect({ bonusTotals, effect, key, name, sourceType, conditi
         sourceKey: key,
         buffModifiers,
         agent,
+        outOfCombat,
     })
     if (!normalized) {
         ignoredEffects?.push({
@@ -4707,10 +4756,25 @@ function denseModifierSum(sums, kind) {
     return index === undefined ? 0 : Number(sums[index] ?? 0)
 }
 
-function fillDenseModifierSums(sums, eventModifierEntries = [], activeEntryFlags = []) {
+function denseOutOfCombatStatRequirementMatches(requirement = {}, panelValues = null) {
+    const config = outOfCombatStatRequirement(requirement)
+    if (!config) {
+        return true
+    }
+    if (!panelValues) {
+        return false
+    }
+    const value = densePanelValue(panelValues, config.stat)
+    return Number.isFinite(value)
+        && (config.min === null || value >= config.min)
+        && (config.max === null || value <= config.max)
+}
+
+function fillDenseModifierSums(sums, eventModifierEntries = [], activeEntryFlags = [], outOfCombatPanelValues = null) {
     sums.fill(0)
     for (const modifier of eventModifierEntries ?? []) {
-        if (activeEntryFlags[modifier.entryIndex]) {
+        if (activeEntryFlags[modifier.entryIndex]
+            && denseOutOfCombatStatRequirementMatches(modifier.requirement, outOfCombatPanelValues)) {
             sums[modifier.kindIndex] += modifier.value
         }
     }
@@ -4816,7 +4880,12 @@ function calculateCompiledDamageScoreValueDense({
     const outOfCombatPanelProxy = densePanelProxy(outOfCombatPanelValues)
     for (let index = 0; index < events.length; index += 1) {
         const compiledEvent = events[index]
-        fillDenseModifierSums(modifierSums, eventModifierEntries[index], activeEntryFlags)
+        fillDenseModifierSums(
+            modifierSums,
+            eventModifierEntries[index],
+            activeEntryFlags,
+            outOfCombatPanelValues,
+        )
         const selectedDmgBonus = denseSelectedDmgBonusForElement(panelValues, compiledEvent.damageElement)
         const skillDamageBonus = denseModifierSum(modifierSums, "dmgBonus")
             + denseModifierSum(modifierSums, compiledEvent.elementDmgKey)
@@ -6039,6 +6108,26 @@ export function createInCombatPanelCalculator(catalog, input) {
     const hasInitialMasteryToAnomalyCritConversion = activeAgentBuffs.some(entry =>
         effectRules(entry.buff).some(rule => rule?.stat === "anomalyCritRatePerInitialMasteryAbove100")
     )
+    const activeOutOfCombatRequirementStats = new Set()
+    const collectOutOfCombatRequirementStats = effect => {
+        for (const rule of effectRules(effect)) {
+            const requirement = outOfCombatStatRequirement(rule?.requirement)
+            if (requirement) activeOutOfCombatRequirementStats.add(requirement.stat)
+        }
+    }
+    for (const buff of activeCatalogBuffs) collectOutOfCombatRequirementStats(buff)
+    for (const entry of activeAgentBuffs) collectOutOfCombatRequirementStats(entry.buff)
+    for (const entry of activeCurrentWEngineEntries) collectOutOfCombatRequirementStats(entry.effect)
+    for (const entry of activeTeamWEngineEntries) collectOutOfCombatRequirementStats(entry.teamBuff)
+    for (const activeId of activeDriveDisc4pcIds) {
+        const rawKey = String(activeId).slice("driveDisc4pc:".length)
+        const [setId, part = "self"] = rawKey.split(".")
+        const set = driveDiscSets.get(setId)
+        const effect = part === "team"
+            ? driveDiscFourPieceTeamBuff(set)
+            : driveDiscFourPieceSelfBuff(set)
+        collectOutOfCombatRequirementStats(effect)
+    }
 
     function optimizerStatMetadata({ minimums = {} } = {}) {
         const panelStats = new Set()
@@ -6086,6 +6175,9 @@ export function createInCombatPanelCalculator(catalog, input) {
             && (compiledDamageTarget.events ?? []).some(event => event.isRelease)) {
             panelStats.add("anomalyMastery")
         }
+        for (const stat of activeOutOfCombatRequirementStats) {
+            panelStats.add(stat)
+        }
         for (const [stat, value] of Object.entries(minimums ?? {})) {
             if (value !== null && value !== undefined && Number.isFinite(Number(value))) {
                 panelStats.add(stat)
@@ -6100,7 +6192,7 @@ export function createInCombatPanelCalculator(catalog, input) {
         }
         const hasReleaseFormula = (compiledDamageTarget.events ?? []).some(event => event.isRelease)
         return {
-            strictMonotonic: !hasReleaseFormula,
+            strictMonotonic: !hasReleaseFormula && activeOutOfCombatRequirementStats.size === 0,
             requiresReleaseIntervalBound: hasReleaseFormula,
             panelStatIds: [...panelStats].sort(),
             relevantStatIds: [...relevantStatIds].sort(),
@@ -6394,6 +6486,9 @@ export function createInCombatPanelCalculator(catalog, input) {
                         if (entry.exclusiveGroup) activeExclusiveGroups.add(entry.exclusiveGroup)
                         activeEntryFlags[entryIndex] = 1
                         for (const stat of entry.stats ?? []) {
+                            if (!denseOutOfCombatStatRequirementMatches(stat.requirement, outPanelValues)) {
+                                continue
+                            }
                             addDenseCombatStat(combatValues, stat, entry.sourceType, outBase, outPanelValues)
                         }
                     }
@@ -7111,19 +7206,23 @@ export function createInCombatPanelCalculator(catalog, input) {
                         return true
                     })
                     .map(({ index }) => index)
+                const hasDynamicOutOfCombatRequirements = fixedActiveEntryIndexes
+                    .some(index => entries[index]?.hasOutOfCombatStatRequirements)
                 const fixedCombatValues = new Float64Array(COMBAT_BONUS_KEYS.length)
                 const fixedEntryFlags = new Uint8Array(entries.length)
-                for (const entryIndex of fixedActiveEntryIndexes) {
-                    const entry = entries[entryIndex]
-                    fixedEntryFlags[entryIndex] = 1
-                    for (const stat of entry.stats ?? []) {
-                        addDenseCombatStat(fixedCombatValues, stat, entry.sourceType, null, null)
+                if (!hasDynamicOutOfCombatRequirements) {
+                    for (const entryIndex of fixedActiveEntryIndexes) {
+                        const entry = entries[entryIndex]
+                        fixedEntryFlags[entryIndex] = 1
+                        for (const stat of entry.stats ?? []) {
+                            addDenseCombatStat(fixedCombatValues, stat, entry.sourceType, null, null)
+                        }
                     }
                 }
-                const fixedDirectKernel = fixedOutOfCombatTarget
+                const fixedDirectKernel = fixedOutOfCombatTarget && !hasDynamicOutOfCombatRequirements
                     ? compileFixedDirectScoreKernel(fixedOutOfCombatTarget, fixedCombatValues, fixedEntryFlags)
                     : null
-                const fixedObjectiveKernel = fixedDirectKernel ?? (fixedOutOfCombatTarget
+                const fixedObjectiveKernel = fixedDirectKernel ?? (fixedOutOfCombatTarget && !hasDynamicOutOfCombatRequirements
                     ? compileFixedNonDirectObjectiveKernel(fixedOutOfCombatTarget, fixedCombatValues, fixedEntryFlags)
                     : null)
                 return {
@@ -7140,8 +7239,8 @@ export function createInCombatPanelCalculator(catalog, input) {
                             false,
                             fixedOutOfCombatTarget,
                             fixedActiveEntryIndexes,
-                            fixedCombatValues,
-                            fixedEntryFlags,
+                            hasDynamicOutOfCombatRequirements ? null : fixedCombatValues,
+                            hasDynamicOutOfCombatRequirements ? null : fixedEntryFlags,
                         )
                         scalarResult.outOfCombatPanelValues = summary.outOfCombatPanelValues
                         scalarResult.selectedDmgBonus = summary.selectedDmgBonus

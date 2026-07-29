@@ -210,6 +210,19 @@ const independentCoverageBuff = {
         { id: "fixed-crit", type: "fixed", stat: "critRate", value: 10, mode: "flat" },
     ],
 }
+
+assert.equal(
+    storedEffectRuleText({
+        id: "initial-defense-threshold",
+        type: "fixed",
+        stat: "critRate",
+        value: 8,
+        mode: "flat",
+        requirement: { outOfCombatStat: { stat: "def", min: 1000 } },
+    }, {}, {}),
+    "暴击率% +8%（初始防御力 >= 1000）",
+    "Effect rule text should expose out-of-combat stat thresholds",
+)
 const independentRuntime = normalizeRuntimeForBuff(independentCoverageBuff, {
     coverage: 0.2,
     effects: {

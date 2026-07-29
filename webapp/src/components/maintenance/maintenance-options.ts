@@ -14,6 +14,12 @@ export const SPECIALTY_OPTIONS = [
   option("attack", "强攻"), option("stun", "击破"), option("anomaly", "异常"),
   option("support", "支援"), option("defense", "防护"), option("rupture", "命破"),
 ]
+export const OUT_OF_COMBAT_REQUIREMENT_STAT_OPTIONS = [
+  option("hp", "初始生命值"), option("atk", "初始攻击力"), option("def", "初始防御力"),
+  option("critRate", "初始暴击率"), option("critDmg", "初始暴击伤害"), option("impact", "初始冲击力"),
+  option("anomalyMastery", "初始异常掌控"), option("anomalyProficiency", "初始异常精通"),
+  option("energyRegen", "初始能量自动回复"), option("penFlat", "初始穿透值"), option("penRatio", "初始穿透率"),
+]
 export const SCOPE_OPTIONS = [option("outOfCombat", "局外"), option("inCombat", "局内")]
 export const ATTACK_TYPE_OPTIONS = [option("slash", "斩击"), option("pierce", "穿刺"), option("strike", "打击")]
 export const TARGET_KIND_OPTIONS = [

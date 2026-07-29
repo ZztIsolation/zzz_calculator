@@ -10,6 +10,12 @@ The entries below summarize each development day. Implementation details,
 modeling decisions, and verification evidence remain in the
 [detailed changelog](docs/changelog.md).
 
+### 2026-07-29 Drive Disc Update
+
+- Added official catalog data and local artwork for Thorned Rose and Vow of the Prophetic Feather.
+- Thorned Rose now applies its 16% DEF two-piece bonus, permanent 15% damage bonus, and automatic 8%/16% CRIT Rate thresholds at 1,000/1,800 final out-of-combat DEF across calculation and optimizer paths.
+- Vow of the Prophetic Feather applies 30 Anomaly Proficiency at two pieces and 50 more at four pieces. Its official 15% Luminous Attribute Anomaly damage text is preserved but intentionally excluded from calculation because it belongs to an independent multiplier area that is not modeled yet.
+
 ### 2026-07-25 Hotfix
 
 - Added Aria Cinema 1's initial-Anomaly-Mastery conversion as an explicit Buff rule. It floors the final out-of-combat panel value, converts each whole point above 100 into 0.5% Anomaly CRIT Rate, adds the existing 25% base rate, and caps the result at 100%. It applies only to Corruption Release; in-combat Anomaly Mastery does not affect it.
