@@ -8,6 +8,124 @@
   ],
   "sets": [
     {
+      "id": "zzz_wiki_2121",
+      "name": {
+        "zhCN": "棘刺玫瑰"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/zzz_wiki_2121.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/07/29/428571341/2e9a9ef78d5ec63830363565a9ed81c2_1442063704478650622.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46",
+        "https://baike.mihoyo.com/zzz/wiki/content/2121/detail?mhy_presentation_style=fullscreen"
+      ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_wiki_2121_2pc_def_pct",
+            "type": "fixed",
+            "stat": "defPct",
+            "value": 16,
+            "mode": "pct"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "装备者造成的伤害提升15%，装备者初始防御力大于等于1000/1800点时，暴击率提升8/16%。",
+          "en": ""
+        },
+        "selfBuff": {
+          "condition": "伤害提升始终生效；暴击率按装备者最终局外防御力自动判定",
+          "effects": [
+            {
+              "id": "effect_wiki_2121_4pc_dmg_bonus",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 15,
+              "mode": "flat"
+            },
+            {
+              "id": "effect_wiki_2121_4pc_crit_rate_1000",
+              "type": "fixed",
+              "stat": "critRate",
+              "value": 8,
+              "mode": "flat",
+              "requirement": {
+                "outOfCombatStat": {
+                  "stat": "def",
+                  "min": 1000
+                }
+              }
+            },
+            {
+              "id": "effect_wiki_2121_4pc_crit_rate_1800",
+              "type": "fixed",
+              "stat": "critRate",
+              "value": 8,
+              "mode": "flat",
+              "requirement": {
+                "outOfCombatStat": {
+                  "stat": "def",
+                  "min": 1800
+                }
+              }
+            }
+          ]
+        },
+        "teamBuff": null
+      }
+    },
+    {
+      "id": "zzz_wiki_2116",
+      "name": {
+        "zhCN": "谶羽之誓"
+      },
+      "images": {
+        "icon": "/assets/drive-discs/zzz_wiki_2116.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/07/22/141353238/c147d9fccba49a1f4176f795883d03be_5279715334283037319.png"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/46",
+        "https://baike.mihoyo.com/zzz/wiki/content/2116/detail?mhy_presentation_style=fullscreen"
+      ],
+      "twoPiece": {
+        "effects": [
+          {
+            "id": "effect_wiki_2116_2pc_anomaly_proficiency",
+            "type": "fixed",
+            "stat": "anomalyProficiency",
+            "value": 30,
+            "mode": "flat"
+          }
+        ]
+      },
+      "fourPiece": {
+        "effectText": {
+          "zhCN": "装备者进入战场时，或被切换为当前操作中角色时，获得增益效果：异常精通提升50点，若装备者为流明属性，造成的属性异常伤害提升15%，持续15秒；当装备者为非操作中角色时，则始终持有该增益效果。",
+          "en": ""
+        },
+        "modelingNotes": {
+          "zhCN": "15%流明属性异常增伤属于独立乘区，本次仅保留官方说明，不参与计算。"
+        },
+        "selfBuff": {
+          "condition": "进入战场或切换为当前操作中角色后；位于后台时始终持有",
+          "durationSeconds": 15,
+          "effects": [
+            {
+              "id": "effect_wiki_2116_4pc_anomaly_proficiency",
+              "type": "fixed",
+              "stat": "anomalyProficiency",
+              "value": 50,
+              "mode": "flat"
+            }
+          ]
+        },
+        "teamBuff": null
+      }
+    },
+    {
       "id": "zzz_wiki_2038",
       "name": {
         "zhCN": "呼啸沙龙"

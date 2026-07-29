@@ -2691,4 +2691,50 @@ assertInvalid("driveDiscSets", {
     },
 }, "事件增幅只能用于局内 Buff")
 
+assertValid("driveDiscSets", {
+    ...validDriveDiscSet,
+    fourPiece: {
+        selfBuff: {
+            effects: [{
+                id: "drive_disc_initial_def_requirement",
+                type: "fixed",
+                stat: "critRate",
+                value: 8,
+                mode: "flat",
+                requirement: { outOfCombatStat: { stat: "def", min: 1000 } },
+            }],
+        },
+    },
+})
+assertInvalid("driveDiscSets", {
+    ...validDriveDiscSet,
+    fourPiece: {
+        selfBuff: {
+            effects: [{
+                id: "drive_disc_invalid_initial_stat_requirement",
+                type: "fixed",
+                stat: "critRate",
+                value: 8,
+                mode: "flat",
+                requirement: { outOfCombatStat: { stat: "futureStat", min: 1000 } },
+            }],
+        },
+    },
+}, "不是支持的选项")
+assertInvalid("driveDiscSets", {
+    ...validDriveDiscSet,
+    fourPiece: {
+        selfBuff: {
+            effects: [{
+                id: "drive_disc_inverted_initial_stat_requirement",
+                type: "fixed",
+                stat: "critRate",
+                value: 8,
+                mode: "flat",
+                requirement: { outOfCombatStat: { stat: "def", min: 1800, max: 1000 } },
+            }],
+        },
+    },
+}, "最小值不能大于最大值")
+
 console.log("maintenance validation tests passed")

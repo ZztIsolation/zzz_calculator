@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { existsSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import {
@@ -321,5 +322,95 @@ for (const setId of Object.keys(expectedFourPieceRules)) {
         assert.ok(String(rule.condition).trim(), `${setId}.${rule.id} should preserve its trigger condition`)
     }
 }
+
+const thornSet = catalog.driveDiscSetsMap.get("zzz_wiki_2121")
+assert.equal(thornSet.name.zhCN, "棘刺玫瑰")
+assert.ok(existsSync(path.join(rootDir, "webapp", "public", thornSet.images.icon)), "Thorned Rose local icon should exist")
+assert.deepEqual(thornSet.twoPiece.effects.map(rule => [rule.stat, rule.value, rule.mode]), [["defPct", 16, "pct"]])
+assert.deepEqual(thornSet.fourPiece.selfBuff.effects.map(rule => [
+    rule.stat,
+    rule.value,
+    rule.requirement?.outOfCombatStat?.min ?? null,
+]), [
+    ["dmgBonus", 15, null],
+    ["critRate", 8, 1000],
+    ["critRate", 8, 1800],
+])
+
+const thornBuffId = `driveDisc4pc:${thornSet.id}.self`
+const thornCalculator = createInCombatPanelCalculator(catalog, {
+    agentId: "ye_shunguang",
+    wEngineId,
+    driveDiscs: [],
+    combatBuffs: { activeBuffIds: [thornBuffId] },
+    damage: basicDamage,
+})
+const thornSetCounts = new Map([[thornSet.id, 4]])
+const thornBase = thornCalculator.scoreOnlyFromSummary(new Map(), thornSetCounts)
+assert.ok(thornCalculator.optimizerStatMetadata().relevantStatIds.includes("defFlat"), "Thorned Rose threshold should keep flat DEF relevant")
+assert.ok(thornCalculator.optimizerStatMetadata().relevantStatIds.includes("defPct"), "Thorned Rose threshold should keep percent DEF relevant")
+assert.equal(thornCalculator.optimizerStatMetadata().strictMonotonic, false, "Thorned Rose threshold should disable monotonic dominance pruning")
+const thornDense = thornCalculator.compileDensePanelScoreTarget({
+    statIds: ["defFlat"],
+    setIds: [thornSet.id],
+    setIndexById: new Map([[thornSet.id, 0]]),
+})
+assert.ok(thornDense, "Thorned Rose should compile a dense score target")
+
+for (const [targetDef, expectedCritRate] of [[999, 0], [1000, 0.08], [1799, 0.08], [1800, 0.16]]) {
+    const defFlat = targetDef - thornBase.outOfCombatPanel.def
+    const statTotals = new Map([["defFlat", defFlat]])
+    const summary = thornCalculator.scoreOnlyFromSummary(statTotals, thornSetCounts)
+    approx(summary.outOfCombatPanel.def, targetDef, `Thorned Rose ${targetDef} out-of-combat DEF`)
+    approx(summary.panel.critRate - summary.outOfCombatPanel.critRate, expectedCritRate, `Thorned Rose ${targetDef} CRIT threshold`)
+
+    const fullDiscs = discs(thornSet.id, 4)
+    fullDiscs[0].mainStat = { stat: "defFlat", value: defFlat, mode: "flat" }
+    const full = calculateInCombatPanel(catalog, {
+        agentId: "ye_shunguang",
+        wEngineId,
+        driveDiscs: fullDiscs,
+        combatBuffs: { activeBuffIds: [thornBuffId] },
+        damage: basicDamage,
+    }, { round: false })
+    approx(full.outOfCombat.panel.def, targetDef, `Thorned Rose ${targetDef} full out-of-combat DEF`)
+    approx(full.inCombat.panel.critRate - full.outOfCombat.panel.critRate, expectedCritRate, `Thorned Rose ${targetDef} full CRIT threshold`)
+    approx(full.inCombat.buffTotals.dmgBonus, 0.15, `Thorned Rose ${targetDef} permanent damage bonus`)
+    approx(summary.finalDamage, full.damage.finalDamage, `Thorned Rose ${targetDef} prepared score`)
+
+    const denseSummary = thornDense.scoreDense(Float64Array.of(defFlat), Int16Array.of(4))
+    approx(denseSummary.panel.critRate - summary.outOfCombatPanel.critRate, expectedCritRate, `Thorned Rose ${targetDef} dense CRIT threshold`)
+    approx(denseSummary.finalDamage, full.damage.finalDamage, `Thorned Rose ${targetDef} dense score`)
+    const fixedSummary = thornDense.compileForSetCounts(Int16Array.of(4)).scoreScalar(Float64Array.of(defFlat))
+    approx(fixedSummary.finalDamage, full.damage.finalDamage, `Thorned Rose ${targetDef} fixed-set score`)
+}
+
+const vowSet = catalog.driveDiscSetsMap.get("zzz_wiki_2116")
+assert.equal(vowSet.name.zhCN, "谶羽之誓")
+assert.ok(existsSync(path.join(rootDir, "webapp", "public", vowSet.images.icon)), "Vow of the Prophetic Feather local icon should exist")
+assert.deepEqual(vowSet.twoPiece.effects.map(rule => [rule.stat, rule.value]), [["anomalyProficiency", 30]])
+assert.deepEqual(vowSet.fourPiece.selfBuff.effects.map(rule => [rule.stat, rule.value]), [["anomalyProficiency", 50]])
+assert.equal(
+    vowSet.fourPiece.selfBuff.effects.some(rule => rule.stat === "anomalyDamageBonus" || rule.kind === "anomalyDamageBonus"),
+    false,
+    "Vow's independent 15% Luminous Anomaly multiplier must remain unmodeled",
+)
+assert.match(vowSet.fourPiece.effectText.zhCN, /属性异常伤害提升15%/)
+assert.match(vowSet.fourPiece.modelingNotes.zhCN, /独立乘区.*不参与计算/)
+const vowTwoPiece = calculate({ setId: vowSet.id, count: 2 })
+const vowFourPiece = calculate({
+    setId: vowSet.id,
+    count: 4,
+    activeBuffIds: [`driveDisc4pc:${vowSet.id}.self`],
+    damage: {
+        selectedEventId: "vow-assault",
+        events: [{ id: "vow-assault", kind: "anomaly", settlementType: "attribute", anomalyEffect: "assault" }],
+        target: { defense: 953, levelCoefficient: 794 },
+    },
+})
+const vowNoSet = calculate({ setId: vowSet.id, count: 0 })
+approx(vowTwoPiece.outOfCombat.panel.anomalyProficiency - vowNoSet.outOfCombat.panel.anomalyProficiency, 30, "Vow two-piece Anomaly Proficiency")
+approx(vowFourPiece.inCombat.panel.anomalyProficiency - vowFourPiece.outOfCombat.panel.anomalyProficiency, 50, "Vow four-piece Anomaly Proficiency")
+approx(vowFourPiece.damage.multipliers.attributeAnomalyDamage, 1, "Vow independent Luminous Anomaly multiplier exclusion")
 
 console.log("drive disc set effect tests passed")

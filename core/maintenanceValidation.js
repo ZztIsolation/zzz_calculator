@@ -118,6 +118,19 @@ export function fieldBuffPhaseName(phaseNo) {
 
 const ATTRIBUTE_VALUES = new Set(["physical", "fire", "ice", "electric", "ether", "wind", "honed_edge", "frost", "xuanmo"])
 const DAMAGE_ELEMENT_VALUES = new Set(["physical", "fire", "ice", "electric", "ether", "wind"])
+const OUT_OF_COMBAT_REQUIREMENT_STAT_VALUES = new Set([
+    "hp",
+    "atk",
+    "def",
+    "critRate",
+    "critDmg",
+    "impact",
+    "anomalyMastery",
+    "anomalyProficiency",
+    "energyRegen",
+    "penFlat",
+    "penRatio",
+])
 const SPECIALTY_VALUES = new Set(["attack", "stun", "anomaly", "support", "defense", "rupture"])
 const RARITY_VALUES = new Set(["B", "A", "S"])
 const SOURCE_TYPE_VALUES = new Set(["teammate", "self", "boss", "field", "manual"])
@@ -469,6 +482,24 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     }
     if (rule.requirement?.attribute) {
         requireEnum(errors, rule.requirement.attribute, ATTRIBUTE_VALUES, `${path}.requirement.attribute`)
+    }
+    if (rule.requirement?.outOfCombatStat !== undefined) {
+        const requirement = rule.requirement.outOfCombatStat
+        if (!requirement || typeof requirement !== "object" || Array.isArray(requirement)) {
+            add(errors, `${path}.requirement.outOfCombatStat`, "局外属性门槛必须是对象。")
+        } else {
+            requireEnum(errors, requirement.stat, OUT_OF_COMBAT_REQUIREMENT_STAT_VALUES, `${path}.requirement.outOfCombatStat.stat`)
+            const hasMin = requirement.min !== undefined && requirement.min !== null && requirement.min !== ""
+            const hasMax = requirement.max !== undefined && requirement.max !== null && requirement.max !== ""
+            if (!hasMin && !hasMax) {
+                add(errors, `${path}.requirement.outOfCombatStat`, "局外属性门槛至少需要填写最小值或最大值。")
+            }
+            const min = hasMin ? requireFinite(errors, requirement.min, `${path}.requirement.outOfCombatStat.min`) : null
+            const max = hasMax ? requireFinite(errors, requirement.max, `${path}.requirement.outOfCombatStat.max`) : null
+            if (Number.isFinite(min) && Number.isFinite(max) && min > max) {
+                add(errors, `${path}.requirement.outOfCombatStat`, "局外属性门槛的最小值不能大于最大值。")
+            }
+        }
     }
     if (rule.modificationScaling) {
         add(errors, `${path}.modificationScaling`, "旧的改装等级缩放格式已废弃，请使用 modificationValues。")

@@ -1134,6 +1134,35 @@ function storedRuleStatLabel(rule = {}, meta) {
     return storedStatLabel(rule.stat, rule.mode, meta)
 }
 
+const OUT_OF_COMBAT_REQUIREMENT_STAT_LABELS = {
+    hp: "初始生命值",
+    atk: "初始攻击力",
+    def: "初始防御力",
+    critRate: "初始暴击率",
+    critDmg: "初始暴击伤害",
+    impact: "初始冲击力",
+    anomalyMastery: "初始异常掌控",
+    anomalyProficiency: "初始异常精通",
+    energyRegen: "初始能量自动回复",
+    penFlat: "初始穿透值",
+    penRatio: "初始穿透率",
+}
+
+function storedRuleRequirementText(rule = {}) {
+    const requirement = rule.requirement?.outOfCombatStat
+    const stat = String(requirement?.stat ?? "").trim()
+    if (!stat) return ""
+    const label = OUT_OF_COMBAT_REQUIREMENT_STAT_LABELS[stat] ?? stat
+    const min = Number(requirement.min)
+    const max = Number(requirement.max)
+    const hasMin = requirement.min !== undefined && requirement.min !== null && requirement.min !== "" && Number.isFinite(min)
+    const hasMax = requirement.max !== undefined && requirement.max !== null && requirement.max !== "" && Number.isFinite(max)
+    if (hasMin && hasMax) return `（${label} ${min} - ${max}）`
+    if (hasMin) return `（${label} >= ${min}）`
+    if (hasMax) return `（${label} <= ${max}）`
+    return ""
+}
+
 export function storedEffectRuleText(rule, runtime, effect, meta) {
     const id = effectRuleId(rule)
     const ruleRuntime = runtime?.effects?.[id] ?? {}
@@ -1141,6 +1170,7 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
     const coverage = runtimeCoverageForEffectRule(rule, effect, runtime)
     const coverageValue = Number(coverage.toFixed(4))
     const coverageText = coverageConfig && coverage !== 1 ? `（覆盖率 ${coverageValue}）` : ""
+    const requirementText = storedRuleRequirementText(rule)
     if (rule.type === "damageModifier") {
         const rawValue = Number(rule.value ?? 0)
         const value = (rule.valueUnit === "decimal" ? rawValue * 100 : Math.abs(rawValue) > 1 ? rawValue : rawValue * 100) * coverage
@@ -1151,7 +1181,7 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
             ...(appliesTo.elements ?? []).map(item => DAMAGE_ELEMENT_SHORT_LABELS[item] ?? item),
             ...skillTargetLabels(appliesTo.skillTargets ?? [], meta),
         ]
-        return `${DAMAGE_MODIFIER_KIND_LABELS[rule.kind] ?? rule.kind} +${formatStoredStatValue("dmgBonus", value)}${scopes.length ? `（${scopes.join(" / ")}）` : ""}${coverageText}`
+        return `${DAMAGE_MODIFIER_KIND_LABELS[rule.kind] ?? rule.kind} +${formatStoredStatValue("dmgBonus", value)}${scopes.length ? `（${scopes.join(" / ")}）` : ""}${requirementText}${coverageText}`
     }
     if (rule.type === "derived") {
         const sourceValue = Number(ruleRuntime.sourceValue ?? rule.defaultSourceValue ?? 0)
@@ -1159,7 +1189,7 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
         const uncapped = sourceValue * ratio / 100
         const capped = Number.isFinite(Number(rule.cap)) ? Math.min(uncapped, Number(rule.cap)) : uncapped
         const finalValue = capped * coverage
-        return `${storedRuleStatLabel(rule, meta)} +${formatStoredStatValue(rule.stat, finalValue, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${coverageText}`
+        return `${storedRuleStatLabel(rule, meta)} +${formatStoredStatValue(rule.stat, finalValue, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${requirementText}${coverageText}`
     }
     if (rule.type === "formula") {
         const source = rule.source ?? {}
@@ -1171,7 +1201,7 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
         const expression = rule.formula?.expression ?? ""
         try {
             const finalValue = evaluateFormulaExpression(expression, { [source.variable ?? "x"]: sourceValue }) * coverage
-            return `${storedRuleStatLabel(rule, meta)} +${formatStoredStatValue(rule.stat, finalValue, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${coverageText}`
+            return `${storedRuleStatLabel(rule, meta)} +${formatStoredStatValue(rule.stat, finalValue, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${requirementText}${coverageText}`
         } catch {
             return `${storedRuleStatLabel(rule, meta)}：公式无效`
         }
@@ -1186,11 +1216,11 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
         const runtimeText = coverageConfig
             ? `${stacks}/${rule.maxStacks ?? stacks} 层，覆盖率 ${coverageValue}`
             : `${stacks}/${rule.maxStacks ?? stacks} 层`
-        return `${storedRuleStatLabel(rule, meta)} +${formatStoredStatValue(rule.stat, value, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}（${runtimeText}）`
+        return `${storedRuleStatLabel(rule, meta)} +${formatStoredStatValue(rule.stat, value, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${requirementText}（${runtimeText}）`
     }
     const displayValue = Number(rule.displayValue ?? rule.value ?? 0)
     const value = (Number.isFinite(displayValue) ? displayValue : Number(rule.value ?? 0)) * coverage
-    return `${storedRuleStatLabel(rule, meta)} +${formatStoredStatValue(rule.stat, value, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${coverageText}`
+    return `${storedRuleStatLabel(rule, meta)} +${formatStoredStatValue(rule.stat, value, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${requirementText}${coverageText}`
 }
 
 export function storedBuffModifierText(modifier = {}) {
