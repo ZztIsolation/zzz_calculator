@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { createHash } from "node:crypto"
 import { execFileSync } from "node:child_process"
 import { existsSync } from "node:fs"
 import { readFile } from "node:fs/promises"
@@ -55,7 +56,8 @@ for (const prefix of ["frontend/", "dist/", "output/", "downloads/", ".claude/"]
 }
 
 const webappPackage = JSON.parse(await readFile(path.join(rootDir, "webapp", "package.json"), "utf8"))
-const scannerManifest = JSON.parse(await readFile(path.join(rootDir, "config", "scanner-manifest.json"), "utf8"))
+const scannerManifestBytes = await readFile(path.join(rootDir, "config", "scanner-manifest.json"))
+const scannerManifest = JSON.parse(scannerManifestBytes.toString("utf8"))
 const helperManifest = JSON.parse(await readFile(path.join(rootDir, "config", "helper-manifest.json"), "utf8"))
 const nginxConfig = await readFile(path.join(rootDir, "deploy", "nginx", "zzz-calculator.conf"), "utf8")
 const pagesWorkflow = await readFile(path.join(rootDir, ".github", "workflows", "pages.yml"), "utf8")
@@ -67,7 +69,11 @@ assert.equal("tailwindcss" in directDependencies, false)
 assert.equal("katex" in directDependencies, false)
 assert.equal(scannerManifest.schemaVersion, 3)
 assert.equal(scannerManifest.launcherMinVersion, "1.3.1")
-assert.equal(scannerManifest.scannerVersion, "1.0.45")
+assert.equal(scannerManifest.scannerVersion, "1.0.47")
+assert.equal(
+    createHash("sha256").update(scannerManifestBytes).digest("hex"),
+    "a1c64ac9902508172bd78afbc16481fe5761dfc7b805e737ad95d284d6f702a4",
+)
 assert.equal(helperManifest.schemaVersion, 1)
 assert.equal(helperManifest.version, "1.3.1")
 assert.equal(helperManifest.packageUrls[0], "https://download.zzzcaculator.top/downloads/zzz-scanner/helper/1.3.1/ZZZ-Scanner-Helper.exe")
@@ -79,7 +85,7 @@ assert.equal(scannerManifest.support.minWindowsBuild, 17763)
 assert.deepEqual(scannerManifest.support.architectures, ["x64"])
 assert.deepEqual(scannerManifest.packages.map(packageInfo => packageInfo.id), ["win-x64-fdd", "win-x64-self-contained"])
 for (const packageInfo of scannerManifest.packages) {
-    assert.match(packageInfo.packageUrls[0], /^https:\/\/download\.zzzcaculator\.top\/downloads\/zzz-scanner\/1\.0\.45\//)
+    assert.match(packageInfo.packageUrls[0], /^https:\/\/download\.zzzcaculator\.top\/downloads\/zzz-scanner\/1\.0\.47\//)
     assert.equal(packageInfo.packageUrls.some(url => /^https:\/\//.test(url)), true)
     assert.match(packageInfo.sha256, /^[a-f0-9]{64}$/)
     assert.ok(packageInfo.size > 0)
