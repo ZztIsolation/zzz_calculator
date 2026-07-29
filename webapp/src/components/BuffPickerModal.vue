@@ -760,18 +760,26 @@ function hasRuntimeControls(buff: any) {
   return Boolean(runtimeSourceGroups(buff).length || runtimeStackGroups(buff).length)
 }
 
+function hasIndependentRuleControls(buff: any) {
+  return ["field", "boss"].includes(buff?.sourceType)
+}
+
 function runtimeFor(buff: any) {
   return normalizeRuntimeForBuff(buff, draftRuntimeInputs.value[buff.id] ?? defaultRuntimeForBuff(buff))
 }
 
 function effectRowsFor(buff: any) {
   const runtime = runtimeFor(buff)
-  return effectRules(buff).map((rule: any) => ({
-    id: effectRuleId(rule),
-    rule,
-    text: storedEffectRuleText(rule, runtime, buff, props.meta),
-    coverage: effectRuleCoverage(rule, buff),
-  })).filter((row: any) => row.text)
+  return effectRules(buff).map((rule: any) => {
+    const id = effectRuleId(rule)
+    return {
+      id,
+      rule,
+      text: storedEffectRuleText(rule, runtime, buff, props.meta),
+      coverage: effectRuleCoverage(rule, buff),
+      enabled: runtime.effects?.[id]?.enabled !== false,
+    }
+  }).filter((row: any) => row.text)
 }
 
 function modifierLinesFor(buff: any) {
@@ -783,6 +791,21 @@ function updateRuntime(buff: any, runtime: any) {
     ...draftRuntimeInputs.value,
     [buff.id]: normalizeRuntimeForBuff(buff, runtime),
   }
+}
+
+function setRuleEnabled(buff: any, rule: any, enabled: boolean) {
+  const runtime = runtimeFor(buff)
+  const id = effectRuleId(rule)
+  updateRuntime(buff, {
+    ...runtime,
+    effects: {
+      ...(runtime.effects ?? {}),
+      [id]: {
+        ...(runtime.effects?.[id] ?? {}),
+        enabled,
+      },
+    },
+  })
 }
 
 function setRuleCoverage(buff: any, rule: any, value: number | null) {
@@ -1217,9 +1240,36 @@ function apply() {
               </label>
             </div>
             <div v-if="effectRowsFor(buff).length || modifierLinesFor(buff).length" class="buff-effect-lines">
-              <div v-for="row in effectRowsFor(buff)" :key="row.id" class="buff-effect-row">
+              <div
+                v-for="row in effectRowsFor(buff)"
+                :key="row.id"
+                class="buff-effect-row"
+                :class="{ 'is-disabled': hasIndependentRuleControls(buff) && !row.enabled }"
+              >
                 <span>{{ row.text }}</span>
-                <label v-if="row.coverage" class="rule-coverage-control">
+                <div v-if="hasIndependentRuleControls(buff)" class="rule-runtime-controls">
+                  <NCheckbox
+                    class="rule-enabled-control"
+                    :checked="row.enabled"
+                    :disabled="!draft.has(buff.id)"
+                    @update:checked="setRuleEnabled(buff, row.rule, Boolean($event))"
+                  >
+                    启用
+                  </NCheckbox>
+                  <label v-if="row.coverage" class="rule-coverage-control">
+                    <span>覆盖率</span>
+                    <NInputNumber
+                      :value="runtimeCoverageForEffectRule(row.rule, buff, runtimeFor(buff))"
+                      :min="Number.isFinite(Number(row.coverage.min)) ? Number(row.coverage.min) : 0"
+                      :max="Number.isFinite(Number(row.coverage.max)) ? Number(row.coverage.max) : 1"
+                      :step="Number.isFinite(Number(row.coverage.step)) ? Number(row.coverage.step) : 0.1"
+                      :disabled="!draft.has(buff.id) || !row.enabled"
+                      size="small"
+                      @update:value="setRuleCoverage(buff, row.rule, $event)"
+                    />
+                  </label>
+                </div>
+                <label v-else-if="row.coverage" class="rule-coverage-control">
                   <span>覆盖率</span>
                   <NInputNumber
                     :value="runtimeCoverageForEffectRule(row.rule, buff, runtimeFor(buff))"
@@ -1581,6 +1631,24 @@ button.buff-row-toggle:focus-visible {
   border-bottom: 1px solid var(--app-border);
 }
 
+.buff-effect-row.is-disabled > span {
+  color: var(--app-muted);
+  font-weight: 650;
+}
+
+.rule-runtime-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px 14px;
+}
+
+.rule-enabled-control {
+  font-size: 12px;
+  font-weight: 650;
+}
+
 .rule-coverage-control {
   display: flex;
   align-items: center;
@@ -1692,6 +1760,10 @@ button.buff-row-toggle:focus-visible {
   }
 
   .rule-coverage-control {
+    justify-content: flex-start;
+  }
+
+  .rule-runtime-controls {
     justify-content: flex-start;
   }
 }

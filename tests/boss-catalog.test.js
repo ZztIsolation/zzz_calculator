@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url"
 
 import { buildMeta, calculateInCombatPanel, loadCalculatorContext } from "../backend/calculator.js"
 import { validateMaintenanceItem } from "../core/maintenanceValidation.js"
+import { storedEffectRuleText } from "../core/shared-combat.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
@@ -12,13 +13,15 @@ const meta = buildMeta(catalog)
 const source = JSON.parse(await readFile(path.join(rootDir, "data", "bosses.json"), "utf8"))
 
 assert.equal(source.version, 2)
-assert.equal(source.bosses.length, 3)
-assert.equal(meta.bosses.length, 3)
-assert.equal(meta.bossCombatBuffs.length, 3)
+assert.equal(source.bosses.length, 7)
+assert.equal(meta.bosses.length, 7)
+assert.equal(meta.bossCombatBuffs.length, 7)
 
 for (const boss of source.bosses) {
     assert.ok(boss.images.icon.startsWith("/assets/bosses/"))
     assert.match(boss.images.source, /^https:\/\//)
+    const image = await readFile(path.join(rootDir, "webapp", "public", ...boss.images.icon.split("/").filter(Boolean)))
+    assert.ok(image.length > 0, `${boss.id} should have a non-empty local image`)
     for (const encounter of boss.encounters) {
         assert.deepEqual(Object.keys(encounter), [
             "id",
@@ -37,6 +40,22 @@ for (const boss of source.bosses) {
         })
         assert.deepEqual(validation.errors, [], `${boss.id} should satisfy the Boss maintenance contract`)
     }
+}
+
+const bossEntries = source.bosses.flatMap(boss =>
+    boss.encounters.flatMap(encounter => [
+        ...(encounter.playerBuffs ?? []),
+        ...(encounter.playerDebuffs ?? []),
+    ]))
+const bossEffects = bossEntries.flatMap(entry => entry.effects ?? [])
+assert.equal(bossEntries.length, 9)
+assert.equal(bossEffects.length, 10)
+for (const effect of bossEffects) {
+    assert.deepEqual(
+        effect.coverage,
+        { default: 1, min: 0, max: 1, step: 0.1 },
+        `${effect.id} should expose standard independent coverage`,
+    )
 }
 
 const exampleInput = catalog.examples.yeShunguang.input
@@ -60,6 +79,100 @@ const miasmaModifier = miasma.inCombat.activeEffects
     .flatMap(effect => effect.resolvedDamageModifiers ?? [])
     .find(effect => effect.stat === "anomalyDamageBonus")
 assert.equal(miasmaModifier?.value, 0.48)
+
+const stagnantId = "boss_encounter.girtablullu_stagnant_aberrant.v3_1.p1"
+const stagnantMarkBuff = source.bosses
+    .find(boss => boss.id === "boss.girtablullu_stagnant_aberrant")
+    ?.encounters.find(encounter => encounter.id === stagnantId)
+    ?.playerBuffs.find(buff => buff.id === "girtablullu_blight_marks")
+const stagnantAnomalyRule = stagnantMarkBuff?.effects
+    .find(effect => effect.id === "girtablullu_blight_anomaly_damage")
+assert.equal(stagnantAnomalyRule?.stat, "anomalyDamageBonus")
+assert.equal(
+    storedEffectRuleText(stagnantAnomalyRule, {}, {}, meta),
+    "属性异常增伤% +16%（2/2 层，覆盖率 1）",
+)
+assert.equal(stagnantMarkBuff?.effects.some(effect => effect.id === "girtablullu_blight_damage_taken"), false)
+assert.equal(stagnantMarkBuff?.description?.zhCN.includes("所有伤害"), false)
+const withoutBoss = (() => {
+    const input = structuredClone(exampleInput)
+    input.combatBuffs = { activeBuffIds: [], runtimeInputs: {} }
+    return calculateInCombatPanel(catalog, input)
+})()
+const stagnant = resultFor(stagnantId)
+const stagnantModifiers = stagnant.inCombat.activeEffects.flatMap(effect => effect.resolvedDamageModifiers ?? [])
+assert.equal(stagnant.inCombat.buffTotals.anomalyProficiencyFlat, 60)
+assert.equal(stagnantModifiers.find(effect => effect.stat === "anomalyDamageBonus")?.value, 0.16)
+assert.equal(stagnantModifiers.some(effect => effect.stat === "enemyDamageTakenBonus"), false)
+assert.equal(stagnant.inCombat.buffTotals.dmgBonus, withoutBoss.inCombat.buffTotals.dmgBonus)
+assert.equal(stagnant.damage.multipliers.dmg, withoutBoss.damage.multipliers.dmg)
+assert.equal(stagnant.damage.multipliers.enemyDamageTaken, withoutBoss.damage.multipliers.enemyDamageTaken)
+assert.equal(
+    stagnant.damage.whiteBoxRows.find(row => row.label === "增伤乘区")?.value,
+    stagnant.damage.multipliers.dmg,
+)
+assert.equal(
+    stagnant.damage.whiteBoxRows.find(row => row.label === "敌方承伤乘区")?.value,
+    withoutBoss.damage.multipliers.enemyDamageTaken,
+)
+assert.equal(stagnant.damage.finalDamage, withoutBoss.damage.finalDamage)
+
+const stagnantOneStack = resultFor(stagnantId, {
+    [stagnantId]: {
+        effects: {
+            girtablullu_blight_anomaly_damage: { stacks: 1 },
+            girtablullu_blight_damage_taken: { stacks: 1 },
+        },
+    },
+})
+const stagnantOneStackModifiers = stagnantOneStack.inCombat.activeEffects
+    .flatMap(effect => effect.resolvedDamageModifiers ?? [])
+assert.equal(stagnantOneStackModifiers.find(effect => effect.stat === "anomalyDamageBonus")?.value, 0.08)
+assert.equal(stagnantOneStackModifiers.some(effect => effect.stat === "enemyDamageTakenBonus"), false)
+assert.equal(stagnantOneStack.inCombat.buffTotals.dmgBonus, withoutBoss.inCombat.buffTotals.dmgBonus)
+assert.equal(stagnantOneStack.damage.multipliers.dmg, withoutBoss.damage.multipliers.dmg)
+assert.equal(stagnantOneStack.damage.multipliers.enemyDamageTaken, withoutBoss.damage.multipliers.enemyDamageTaken)
+
+const configuredStagnant = resultFor(stagnantId, {
+    [stagnantId]: {
+        effects: {
+            girtablullu_blight_anomaly_damage: { enabled: false, coverage: 0.25, stacks: 2 },
+            girtablullu_blight_damage_taken: { coverage: 0.5, stacks: 2 },
+        },
+    },
+})
+const configuredStagnantModifiers = configuredStagnant.inCombat.activeEffects
+    .flatMap(effect => effect.resolvedDamageModifiers ?? [])
+assert.equal(configuredStagnantModifiers.some(effect => effect.stat === "anomalyDamageBonus"), false)
+assert.equal(configuredStagnantModifiers.some(effect => effect.stat === "enemyDamageTakenBonus"), false)
+assert.equal(configuredStagnant.inCombat.buffTotals.anomalyProficiencyFlat, 60)
+assert.equal(configuredStagnant.inCombat.buffTotals.dmgBonus, withoutBoss.inCombat.buffTotals.dmgBonus)
+assert.equal(configuredStagnant.damage.multipliers.dmg, withoutBoss.damage.multipliers.dmg)
+assert.equal(configuredStagnant.damage.multipliers.enemyDamageTaken, withoutBoss.damage.multipliers.enemyDamageTaken)
+
+const deadEndId = "boss_encounter.notorious_dead_end_butcher.v3_1.p1"
+const deadEndBoss = source.bosses.find(boss => boss.id === "boss.notorious_dead_end_butcher")
+const deadEnd = resultFor(deadEndId)
+const deadEndModifiers = deadEnd.inCombat.activeEffects.flatMap(effect => effect.resolvedDamageModifiers ?? [])
+assert.equal(deadEndModifiers.find(effect => effect.stat === "anomalyDamageBonus")?.value, 0.5)
+assert.equal(deadEndModifiers.some(effect => effect.stat === "enemyDamageTakenBonus"), false)
+assert.equal(JSON.stringify(deadEndBoss).includes("以太强化"), false)
+assert.deepEqual(deadEndBoss.target.weaknessElements, ["ice", "ether"])
+
+const unknown = resultFor("boss_encounter.unknown_corruption_complex.v3_1.p1")
+assert.equal(unknown.inCombat.buffTotals.critDmg, 1)
+
+const integrated = resultFor("boss_encounter.integrated_girtablullu.v3_1.p1")
+const integratedModifiers = integrated.inCombat.activeEffects.flatMap(effect => effect.resolvedDamageModifiers ?? [])
+assert.equal(integrated.inCombat.buffTotals.dmgBonus, 0.15)
+assert.equal(integrated.inCombat.buffTotals.anomalyProficiencyFlat, 20)
+assert.equal(integratedModifiers.find(effect => effect.stat === "anomalyDamageBonus")?.value, 0.4)
+
+const currentBosses = source.bosses.slice(-4)
+assert.ok(currentBosses.every(boss => boss.target.defense === 953))
+assert.deepEqual(currentBosses[0].target.weaknessElements, [])
+assert.deepEqual(currentBosses[2].target.weaknessElements, ["electric", "ether"])
+assert.deepEqual(currentBosses[3].target.weaknessElements, [])
 
 for (const buff of meta.bossCombatBuffs) {
     assert.equal("mechanics" in buff, false)

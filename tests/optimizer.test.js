@@ -218,6 +218,31 @@ const exactAlias = optimizeDriveDiscs(catalog, store, optimizerInput({ settings:
 const exactLegacy = optimizeDriveDiscs(catalog, store, optimizerInput({ settings: { algorithm: "exact-legacy" } }))
 const exactNoPrune = optimizeDriveDiscs(catalog, store, optimizerInput({ settings: { enableUpperBoundPruning: false } }))
 const brute = bruteForce(optimizerInput())
+
+const currentSkillDamage = level => ({
+    skillLevelsByCategory: { basic: level },
+    selectedEventId: "current-basic",
+    events: [{
+        id: "current-basic",
+        kind: "direct",
+        critMode: "expected",
+        count: 1,
+        skillRef: {
+            agentSkillId: "ye_shunguang",
+            categoryId: "basic",
+            moveId: "quick_sword",
+            rowId: "hit_1",
+            level: level === 1 ? 12 : 1,
+        },
+    }],
+})
+const currentSkillLevelOneInput = optimizerInput({ damage: currentSkillDamage(1) })
+const currentSkillLevelTwelveInput = optimizerInput({ damage: currentSkillDamage(12) })
+const currentSkillLevelOne = optimizeDriveDiscs(catalog, store, currentSkillLevelOneInput)
+const currentSkillLevelTwelve = optimizeDriveDiscs(catalog, store, currentSkillLevelTwelveInput)
+assert.deepEqual(resultScores(currentSkillLevelOne), bruteForce(currentSkillLevelOneInput).map(item => Number(item.score.toFixed(6))), "Optimizer LV1 scores should match full recalculation")
+assert.deepEqual(resultScores(currentSkillLevelTwelve), bruteForce(currentSkillLevelTwelveInput).map(item => Number(item.score.toFixed(6))), "Optimizer LV12 scores should match full recalculation")
+assert.ok(currentSkillLevelTwelve.results[0].score > currentSkillLevelOne.results[0].score, "Optimizer scores should change with the current skill level")
 assert.equal(exact.metrics.algorithmId, "exact-super-bound")
 assert.equal(exact.metrics.algorithmLabel, "精准 · 推荐")
 assert.equal(exact.metrics.strictExact, true)

@@ -2,6 +2,49 @@
 
 # Changelog
 
+## 2026-07-29 - Added Version 3.1 Phase 1 Boss Models
+
+Added the four Critical Assault version 3.1 phase 1 Boss profiles and their
+local catalog images: Girtablullu: Stagnant Aberrant, Notorious: Dead End
+Butcher, Unknown Corruption Complex, and Integrated: Girtablullu. Their stored
+profiles include the screenshot-confirmed defense, weakness, and resistance
+metadata, while their combat rules include only effects that change player
+damage. Score rules, Decibel restoration, enemy outgoing damage, and the Dead
+End Butcher's Ether Enhanced behavior are deliberately not stored.
+
+Stagnant Aberrant's marks independently grant `8%` Attribute Anomaly damage and
+`8%` enemy damage taken per stack, up to two stacks, and its part-break or
+Perfect Counter trigger grants `60` Anomaly Proficiency. Dead End Butcher grants
+`50%` Attribute Anomaly damage. Unknown Corruption Complex grants `25%` CRIT DMG
+per Disintegration stack, up to four. Integrated Girtablullu's Dissonant state
+grants `40%` Attribute Anomaly damage, while Transmutation grants `15%` damage
+and `20` Anomaly Proficiency.
+
+Introduced `enemyDamageTakenBonus` as a dedicated event modifier rather than
+folding enemy vulnerability into the player's generic damage bonus. The new
+multiplier is visible as its own white-box row and is wired through direct,
+Sheer, Attribute Anomaly, Disorder, Release, compiled, dense, and fixed-set
+optimizer calculations. Catalog validation, percentage normalization, Boss
+image presence, runtime stacks, and compiled-versus-legacy score equivalence
+are covered by regression tests.
+
+## 2026-07-28 - Fixed Current Skill Levels In Damage Calculation
+
+Fixed a cross-layer defect where the workbench skill-level selectors triggered
+a recalculation but the damage core continued using an event's stored
+`skillRef.level` snapshot or the catalog default. The request-level
+`damage.skillLevelsByCategory` map is now authoritative for ordinary skills,
+while the selected `coreSkillLevel` is authoritative for Core Skill-scaled
+damage rows. Historical event-level values remain supported only when the
+current build does not provide the corresponding level.
+
+The same resolution now feeds normal white-box damage, prepared and compiled
+scores, dense and fixed scoring, skill-group expansion, Drive Disc analysis,
+browser-local computation, and exact optimization. Workbench input and
+compatibility persistence also merge current skill levels last, so conflicting
+legacy copies cannot silently overwrite the values shown by the selectors. No
+catalog data, storage key, user event, or saved build is migrated or deleted.
+
 ## 2026-07-27 - Released Aria, Multi-Set Optimization, Norma, And Two W-Engines
 
 Released the Calculator-only second stage on top of the storage compatibility

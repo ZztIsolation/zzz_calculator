@@ -1381,4 +1381,40 @@ describe("CalculationConfigModal", () => {
     })
     expect(saved.events[0].skillMultiplier).toBe(expectedRow.values[11])
   })
+
+  it("refreshes a stored skill snapshot when the current category level changes", async () => {
+    const wrapper = mountModal({
+      damageConfig: {
+        mode: "custom",
+        selectedEventId: "stored-direct",
+        events: [{
+          id: "stored-direct",
+          kind: "direct",
+          count: 1,
+          critMode: "expected",
+          skillRef: {
+            agentSkillId: "hoshimi_miyabi",
+            categoryId: "basic",
+            moveId: "windflower_opening",
+            rowId: "hit_1",
+            level: 12,
+          },
+        }],
+      },
+    })
+    const expectedRow = miyabiSkillCatalog.categories[0].moves[0].rows.find((row: any) => row.id === "hit_1")
+
+    await openModal(wrapper)
+    expect(document.body.querySelector(".calculation-current-multiplier")?.textContent).toBe(`${expectedRow.values[11]}%`)
+
+    await wrapper.setProps({
+      skillLevels: { basic: 1, dodge: 12, assist: 12, special: 12, chain: 12, core_skill: "F" },
+    })
+    await nextTick()
+
+    expect(document.body.querySelector(".calculation-current-multiplier")?.textContent).toBe(`${expectedRow.values[0]}%`)
+    const saved = await saveModal(wrapper)
+    expect(saved.events[0].skillRef.level).toBe(1)
+    expect(saved.events[0].skillMultiplier).toBe(expectedRow.values[0])
+  })
 })

@@ -73,6 +73,35 @@ describe("build store", () => {
     expect(input.combatBuffs.activeBuffIds).toContain("teammate_buff")
   })
 
+  it("keeps current skill levels authoritative over stale damage snapshots", () => {
+    const store = useBuildStore()
+    const meta = {
+      agents: [{ id: "agent_a", name: { zhCN: "角色 A" } }],
+      wEngines: [{ id: "engine_a", name: { zhCN: "音擎 A" } }],
+      combatBuffs: [],
+    }
+    store.applyAgentConfig("agent_a", meta, {
+      wEngineId: "engine_a",
+      skillLevels: { basic: 4, special: 8 },
+      damage: {
+        mode: "custom",
+        skillLevelsByCategory: { basic: 12, special: 12 },
+        selectedEventId: "legacy-hit",
+        events: [{ id: "legacy-hit", kind: "direct", skillMultiplier: 100, count: 1 }],
+      },
+    })
+
+    expect(store.skillLevels).toMatchObject({ basic: 4, special: 8 })
+    expect(store.buildInput({}, meta, []).damage.skillLevelsByCategory).toMatchObject({ basic: 4, special: 8 })
+
+    store.updateSkillLevel("basic", 7)
+    store.persist()
+
+    const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "{}")
+    expect(saved.byOwner.default.byAgent.agent_a.skillLevels).toMatchObject({ basic: 7, special: 8 })
+    expect(saved.byOwner.default.byAgent.agent_a.damage.skillLevelsByCategory).toMatchObject({ basic: 7, special: 8 })
+  })
+
   it("migrates legacy target stun state only into non-admin events", () => {
     const store = useBuildStore()
     const agent = {
@@ -241,6 +270,72 @@ describe("build store", () => {
     expect(store.activeBuffIds(meta)).toEqual(["field.v3.p1", "boss.encounter.a"])
     expect(store.runtimeInputs).toHaveProperty("boss.encounter.a")
     expect(store.runtimeInputs).not.toHaveProperty("boss.encounter.b")
+  })
+
+  it("preserves disabled Field Buff effects in the final calculation input", () => {
+    const store = useBuildStore()
+    const fieldBuff = {
+      id: "field.v3.p1",
+      sourceType: "field",
+      scope: "inCombat",
+      effects: [{
+        id: "field-atk",
+        type: "fixed",
+        stat: "atkFlat",
+        value: 100,
+        coverage: { default: 1, min: 0, max: 1, step: 0.1 },
+      }],
+    }
+    const meta = {
+      agents: [{ id: "agent_a", name: { zhCN: "角色 A" } }],
+      wEngines: [{ id: "engine_a", name: { zhCN: "音擎 A" } }],
+      combatBuffs: [fieldBuff],
+    }
+    store.agentId = "agent_a"
+    store.wEngineId = "engine_a"
+    store.selectedBuffIds = [fieldBuff.id]
+    store.runtimeInputs = {
+      [fieldBuff.id]: { effects: { "field-atk": { enabled: false, coverage: 0.4 } } },
+    }
+
+    const input = store.buildInput({}, meta, [])
+    expect(input.combatBuffs.runtimeInputs[fieldBuff.id].effects["field-atk"]).toMatchObject({
+      enabled: false,
+      coverage: 0.4,
+    })
+  })
+
+  it("preserves disabled Boss Buff effects in the final calculation input", () => {
+    const store = useBuildStore()
+    const bossBuff = {
+      id: "boss.encounter.a",
+      sourceType: "boss",
+      scope: "inCombat",
+      effects: [{
+        id: "boss-dmg",
+        type: "fixed",
+        stat: "dmgBonus",
+        value: 20,
+        coverage: { default: 1, min: 0, max: 1, step: 0.1 },
+      }],
+    }
+    const meta = {
+      agents: [{ id: "agent_a", name: { zhCN: "角色 A" } }],
+      wEngines: [{ id: "engine_a", name: { zhCN: "音擎 A" } }],
+      combatBuffs: [bossBuff],
+    }
+    store.agentId = "agent_a"
+    store.wEngineId = "engine_a"
+    store.selectedBuffIds = [bossBuff.id]
+    store.runtimeInputs = {
+      [bossBuff.id]: { effects: { "boss-dmg": { enabled: false, coverage: 0.6 } } },
+    }
+
+    const input = store.buildInput({}, meta, [])
+    expect(input.combatBuffs.runtimeInputs[bossBuff.id].effects["boss-dmg"]).toMatchObject({
+      enabled: false,
+      coverage: 0.6,
+    })
   })
 
   it("migrates a legacy concrete Boss target into Buff selection and resets target values", () => {

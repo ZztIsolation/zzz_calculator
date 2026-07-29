@@ -70,6 +70,12 @@
                   "stackGroup": "scorched_departing_flame_stacks",
                   "stackLabel": {
                     "zhCN": "赴火层数"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
                   }
                 }
               ],
@@ -161,6 +167,12 @@
                   "stackGroup": "pompey_disadvantage_stacks",
                   "stackLabel": {
                     "zhCN": "不利层数"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
                   }
                 }
               ]
@@ -252,6 +264,12 @@
                   "stackGroup": "miasma_anomaly_damage_stack_group",
                   "stackLabel": {
                     "zhCN": "异常伤害提升层数"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
                   }
                 }
               ],
@@ -271,6 +289,444 @@
                 "zhCN": "3.0 第三期官方阵容公告"
               },
               "url": "https://weibo.com/ttarticle/p/show?id=2309405310690738176159"
+            }
+          ],
+          "hidden": false
+        }
+      ],
+      "hidden": false
+    },
+    {
+      "id": "boss.girtablullu_stagnant_aberrant",
+      "name": {
+        "zhCN": "基塔布鲁·滞变畸兽"
+      },
+      "aliases": [
+        "滞变畸兽",
+        "Girtablullu: Stagnant Aberrant"
+      ],
+      "images": {
+        "icon": "/assets/bosses/girtablullu-stagnant-aberrant.webp",
+        "source": "https://www.buhflipexplode.org/assets/zzz/enemies/girtablullu%2B.webp"
+      },
+      "target": {
+        "defense": 953,
+        "weaknessElements": [],
+        "resistanceElements": [],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.girtablullu_stagnant_aberrant.v3_1.p1",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.1",
+              "phaseNo": 1,
+              "startDate": "2026-07-29",
+              "endDate": "2026-08-12"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "对敌人施加属性异常状态时，目标获得 1 层对应属性的蚀蚀印记，持续 30 秒，最多叠加 2 层；重复施加同属性印记时刷新持续时间。敌人每持有 1 层印记，受到的属性异常伤害提升 8%。对敌人造成部位破坏或完美反制时，全队异常精通提升 60 点，持续 30 秒。"
+          },
+          "recommendedSpecialties": [
+            "anomaly"
+          ],
+          "playerBuffs": [
+            {
+              "id": "girtablullu_blight_marks",
+              "name": {
+                "zhCN": "蚀蚀印记"
+              },
+              "description": {
+                "zhCN": "每层使敌人受到的属性异常伤害提升 8%；持续 30 秒，最多 2 层。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "girtablullu_blight_anomaly_damage",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyDamageBonus",
+                  "mode": "flat",
+                  "valuePerStack": 8,
+                  "maxStacks": 2,
+                  "defaultStacks": 2,
+                  "durationSeconds": 30,
+                  "stackGroup": "girtablullu_blight_mark_stacks",
+                  "stackLabel": {
+                    "zhCN": "蚀蚀印记层数"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            },
+            {
+              "id": "girtablullu_counter_proficiency",
+              "name": {
+                "zhCN": "反制精通提升"
+              },
+              "description": {
+                "zhCN": "造成部位破坏或完美反制时，全队异常精通提升 60 点，持续 30 秒；重复触发刷新持续时间。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "girtablullu_counter_proficiency_value",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyProficiency",
+                  "mode": "flat",
+                  "value": 60,
+                  "durationSeconds": 30,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "3.1 第一期敌人数据与效果"
+              },
+              "url": "https://www.buhflipexplode.org/zzz/da/"
+            }
+          ],
+          "hidden": false
+        }
+      ],
+      "hidden": false
+    },
+    {
+      "id": "boss.notorious_dead_end_butcher",
+      "name": {
+        "zhCN": "恶名·死路屠夫"
+      },
+      "aliases": [
+        "死路屠夫",
+        "Notorious: Dead End Butcher"
+      ],
+      "images": {
+        "icon": "/assets/bosses/notorious-dead-end-butcher.webp",
+        "source": "https://www.buhflipexplode.org/assets/zzz/enemies/dead-end-butcher-not.webp"
+      },
+      "target": {
+        "defense": 953,
+        "weaknessElements": [
+          "ice",
+          "ether"
+        ],
+        "resistanceElements": [],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.notorious_dead_end_butcher.v3_1.p1",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.1",
+              "phaseNo": 1,
+              "startDate": "2026-07-29",
+              "endDate": "2026-08-12"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "代理人对恶名·死路屠夫造成的属性异常伤害提升 50%。"
+          },
+          "recommendedSpecialties": [
+            "anomaly"
+          ],
+          "playerBuffs": [
+            {
+              "id": "dead_end_butcher_anomaly_damage",
+              "name": {
+                "zhCN": "属性异常伤害提升"
+              },
+              "description": {
+                "zhCN": "代理人对恶名·死路屠夫造成的属性异常伤害提升 50%。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "dead_end_butcher_anomaly_damage_value",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyDamageBonus",
+                  "mode": "flat",
+                  "value": 50,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "危局强袭战敌人一览"
+              },
+              "url": "https://wikiwiki.jp/zenless/%E5%8D%B1%E5%B1%80%E5%BC%B7%E8%A5%B2%E6%88%A6/%E6%95%B5%E4%B8%80%E8%A6%A7"
+            },
+            {
+              "label": {
+                "zhCN": "3.1 第一期敌人数据"
+              },
+              "url": "https://www.buhflipexplode.org/zzz/da/"
+            }
+          ],
+          "hidden": false
+        }
+      ],
+      "hidden": false
+    },
+    {
+      "id": "boss.unknown_corruption_complex",
+      "name": {
+        "zhCN": "未知复合侵蚀体"
+      },
+      "aliases": [
+        "复合侵蚀体",
+        "Unknown Corruption Complex"
+      ],
+      "images": {
+        "icon": "/assets/bosses/unknown-corruption-complex.webp",
+        "source": "https://www.buhflipexplode.org/assets/zzz/enemies/unknown-corruption-complex.webp"
+      },
+      "target": {
+        "defense": 953,
+        "weaknessElements": [
+          "electric",
+          "ether"
+        ],
+        "resistanceElements": [],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.unknown_corruption_complex.v3_1.p1",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.1",
+              "phaseNo": 1,
+              "startDate": "2026-07-29",
+              "endDate": "2026-08-12"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "破坏未知复合侵蚀体的腿部时，为其施加 1 层崩解，持续 20 秒，最多叠加 4 层；每层使代理人对其造成的暴击伤害提升 25%。"
+          },
+          "recommendedSpecialties": [
+            "attack"
+          ],
+          "playerBuffs": [
+            {
+              "id": "unknown_complex_disintegration",
+              "name": {
+                "zhCN": "崩解"
+              },
+              "description": {
+                "zhCN": "破坏腿部时施加 1 层崩解，持续 20 秒；每层使暴击伤害提升 25%，最多 4 层。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "unknown_complex_disintegration_crit_dmg",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "critDmg",
+                  "mode": "flat",
+                  "valuePerStack": 25,
+                  "maxStacks": 4,
+                  "defaultStacks": 4,
+                  "durationSeconds": 20,
+                  "stackGroup": "unknown_complex_disintegration_stacks",
+                  "stackLabel": {
+                    "zhCN": "崩解层数"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "危局强袭战敌人一览"
+              },
+              "url": "https://wikiwiki.jp/zenless/%E5%8D%B1%E5%B1%80%E5%BC%B7%E8%A5%B2%E6%88%A6/%E6%95%B5%E4%B8%80%E8%A6%A7"
+            },
+            {
+              "label": {
+                "zhCN": "3.1 第一期敌人数据"
+              },
+              "url": "https://www.buhflipexplode.org/zzz/da/"
+            }
+          ],
+          "hidden": false
+        }
+      ],
+      "hidden": false
+    },
+    {
+      "id": "boss.integrated_girtablullu",
+      "name": {
+        "zhCN": "异构·基塔布鲁"
+      },
+      "aliases": [
+        "异构基塔布鲁",
+        "Integrated: Girtablullu"
+      ],
+      "images": {
+        "icon": "/assets/bosses/integrated-girtablullu.webp",
+        "source": "https://www.buhflipexplode.org/assets/zzz/enemies/girtablullu-r.webp"
+      },
+      "target": {
+        "defense": 953,
+        "weaknessElements": [],
+        "resistanceElements": [],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.integrated_girtablullu.v3_1.p1",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.1",
+              "phaseNo": 1,
+              "startDate": "2026-07-29",
+              "endDate": "2026-08-12"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "异构·基塔布鲁进入失谐状态后，受到的属性异常伤害提升 40%，持续 10 秒。对其施加属性异常状态时，全队获得转化：造成的伤害提升 15%，异常精通提升 20 点，持续 10 秒；重复触发刷新持续时间。"
+          },
+          "recommendedSpecialties": [
+            "anomaly"
+          ],
+          "playerBuffs": [
+            {
+              "id": "integrated_girtablullu_dissonant",
+              "name": {
+                "zhCN": "失谐"
+              },
+              "description": {
+                "zhCN": "异构·基塔布鲁进入失谐状态后，受到的属性异常伤害提升 40%，持续 10 秒。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "integrated_girtablullu_dissonant_anomaly_damage",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyDamageBonus",
+                  "mode": "flat",
+                  "value": 40,
+                  "durationSeconds": 10,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            },
+            {
+              "id": "integrated_girtablullu_transmutation",
+              "name": {
+                "zhCN": "转化"
+              },
+              "description": {
+                "zhCN": "对异构·基塔布鲁施加属性异常状态时，全队造成的伤害提升 15%，异常精通提升 20 点，持续 10 秒；重复触发刷新持续时间。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "integrated_girtablullu_transmutation_damage",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "dmgBonus",
+                  "mode": "flat",
+                  "value": 15,
+                  "durationSeconds": 10,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                },
+                {
+                  "id": "integrated_girtablullu_transmutation_proficiency",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyProficiency",
+                  "mode": "flat",
+                  "value": 20,
+                  "durationSeconds": 10,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "3.1 第一期敌人数据与效果"
+              },
+              "url": "https://www.buhflipexplode.org/zzz/da/"
             }
           ],
           "hidden": false

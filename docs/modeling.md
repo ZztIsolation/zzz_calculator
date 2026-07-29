@@ -532,12 +532,13 @@ interface InCombatRequest {
       stunMultiplierPercent?: number; // default 150; activation is decided by each event.
     };
     skillMultiplier?: number;
+    skillLevelsByCategory?: Partial<Record<"basic" | "dodge" | "assist" | "special" | "chain", number>>;
     skillRef?: {
       agentSkillId: string;
       categoryId: string;
       moveId: string;
       rowId: string;
-      level: number;
+      level?: number | string; // compatibility fallback when the current level is absent.
     };
     selectedEventId?: string;
     events?: Array<
@@ -907,8 +908,17 @@ Direct damage normally uses:
 
 ```text
 atk * skillMultiplier * critMultiplier * (1 + generic/element dmg bonus)
-  * defenseMultiplier * resistanceMultiplier * stunMultiplier * damageScale
+  * defenseMultiplier * resistanceMultiplier * enemyDamageTakenMultiplier
+  * stunMultiplier * damageScale
 ```
+
+`enemyDamageTakenBonus` is an event-level enemy vulnerability bucket. It is
+stored as a percentage and resolves to `max(0, 1 + enemyDamageTakenBonus)`.
+This multiplier is independent from generic/element damage bonus, resistance,
+defense, and stun vulnerability, and applies consistently to direct, Sheer,
+attribute Anomaly, Disorder, and Release damage. It is used for enemy rules
+whose wording says the enemy "takes increased damage"; player-side "damage
+dealt increases" effects continue to use `dmgBonus`.
 
 `damageRatioPct` is stored as a schema percentage and becomes `damageScale`
 during normalization. The player-facing event manager no longer exposes this
@@ -970,7 +980,8 @@ Attribute anomaly damage uses:
 
 ```text
 atk * anomalyMultiplier * (1 + generic/element dmg bonus)
-  * defenseMultiplier * resistanceMultiplier * stunMultiplier
+  * defenseMultiplier * resistanceMultiplier * enemyDamageTakenMultiplier
+  * stunMultiplier
   * anomalyProficiency / 100
   * anomalyLevel
   * (1 + anomalyDamageBonus)

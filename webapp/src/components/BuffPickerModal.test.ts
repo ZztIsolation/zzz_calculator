@@ -14,9 +14,9 @@ vi.mock("naive-ui", async () => {
       template: "<button :disabled=\"disabled\" @click=\"$emit('click', $event)\"><slot /></button>",
     },
     NCheckbox: {
-      props: ["checked"],
+      props: ["checked", "disabled"],
       emits: ["update:checked"],
-      template: "<label><input type=\"checkbox\" :checked=\"checked\" @change=\"$emit('update:checked', $event.target.checked)\"><slot /></label>",
+      template: "<label><input type=\"checkbox\" :checked=\"checked\" :disabled=\"disabled\" @change=\"$emit('update:checked', $event.target.checked)\"><slot /></label>",
     },
     NInput: {
       props: ["value", "placeholder"],
@@ -227,21 +227,45 @@ const fieldBuffs = [
     effects: [{ id: "field-critical-gouxi", type: "fixed", stat: "anomalyProficiency", value: 45, mode: "flat" }],
   },
   {
-    id: "field.defense_v5.v3_1.p1.future",
+    id: "field.critical_assault.v3_1.p1.cuixin",
     sourceType: "field",
     sourceCategory: "field",
     sourceKind: "field",
-    source: { zhCN: "防卫战 v5" },
+    source: { zhCN: "危局强袭战" },
     sourcePeriod: { zhCN: "3.1版本第一期" },
     period: {
-      modeId: "defense_v5",
+      modeId: "critical_assault",
       gameVersion: "3.1",
       phaseNo: 1,
       phaseName: { zhCN: "第一期" },
     },
-    name: { zhCN: "新版本场地" },
-    description: { zhCN: "最新版本默认显示" },
-    effects: [{ id: "field-new", type: "fixed", stat: "dmgBonus", value: 5 }],
+    name: { zhCN: "摧心" },
+    description: { zhCN: "暴击伤害与强攻代理人的普通攻击提升" },
+    effects: [{ id: "field-critical-cuixin", type: "fixed", stat: "critDmg", value: 30, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
+  {
+    id: "field.critical_assault.v3_1.p1.luli",
+    sourceType: "field",
+    sourceCategory: "field",
+    sourceKind: "field",
+    source: { zhCN: "危局强袭战" },
+    sourcePeriod: { zhCN: "3.1版本第一期" },
+    period: { modeId: "critical_assault", gameVersion: "3.1", phaseNo: 1, phaseName: { zhCN: "第一期" } },
+    name: { zhCN: "勠力" },
+    description: { zhCN: "异常代理人数量提升异常精通与属性异常伤害" },
+    effects: [{ id: "field-critical-luli", type: "fixed", stat: "anomalyProficiency", value: 70, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
+  {
+    id: "field.critical_assault.v3_1.p1.guixi",
+    sourceType: "field",
+    sourceCategory: "field",
+    sourceKind: "field",
+    source: { zhCN: "危局强袭战" },
+    sourcePeriod: { zhCN: "3.1版本第一期" },
+    period: { modeId: "critical_assault", gameVersion: "3.1", phaseNo: 1, phaseName: { zhCN: "第一期" } },
+    name: { zhCN: "诡袭" },
+    description: { zhCN: "攻击力、异常精通、暴击伤害与敌方防御力降低" },
+    effects: [{ id: "field-critical-guixi", type: "fixed", stat: "atkPct", value: 10, mode: "pct", basis: "outOfCombatAtk", coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
   },
 ]
 
@@ -262,7 +286,7 @@ const bossBuffs = [
     enemyIntel: { zhCN: "Boss 甲完整敌情" },
     playerBuffs: [{ id: "a-modeled", name: { zhCN: "甲增益" }, description: { zhCN: "每层异常伤害提升" }, calculationStatus: "modeled" }],
     playerDebuffs: [{ id: "a-info", name: { zhCN: "甲说明" }, description: { zhCN: "仅记录的敌方效果" }, calculationStatus: "descriptiveOnly", unmodeledReason: { zhCN: "当前模型不支持" } }],
-    effects: [{ id: "a-stack", type: "stacked", stat: "anomalyDamageBonus", valuePerStack: 8, maxStacks: 6, defaultStacks: 6, stackGroup: "a-stacks", stackLabel: { zhCN: "甲层数" } }],
+    effects: [{ id: "a-stack", type: "stacked", stat: "anomalyDamageBonus", valuePerStack: 8, maxStacks: 6, defaultStacks: 6, stackGroup: "a-stacks", stackLabel: { zhCN: "甲层数" }, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
   },
   {
     id: "boss.encounter.b",
@@ -276,7 +300,7 @@ const bossBuffs = [
     enemyIntel: { zhCN: "Boss 乙完整敌情" },
     playerBuffs: [],
     playerDebuffs: [],
-    effects: [{ id: "b-crit", type: "fixed", stat: "critDmg", value: 15 }],
+    effects: [{ id: "b-crit", type: "fixed", stat: "critDmg", value: 15, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
   },
   {
     id: "boss.encounter.c",
@@ -290,7 +314,7 @@ const bossBuffs = [
     enemyIntel: { zhCN: "Boss 丙完整敌情" },
     playerBuffs: [],
     playerDebuffs: [],
-    effects: [{ id: "c-dmg", type: "fixed", stat: "dmgBonus", value: 10 }],
+    effects: [{ id: "c-dmg", type: "fixed", stat: "dmgBonus", value: 10, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
   },
 ]
 
@@ -847,6 +871,56 @@ describe("BuffPickerModal", () => {
     expect(rows[0]).toContain("Boss 丙")
   })
 
+  it("configures Boss Buff effects independently and restores retained coverage", async () => {
+    const buffId = "boss.encounter.a"
+    const wrapper = mountModal({ selectedIds: [buffId] })
+
+    await openBossTab(wrapper)
+    expect(wrapper.findAll(".rule-enabled-control")).toHaveLength(2)
+    expect(wrapper.findAll(".rule-coverage-control")).toHaveLength(2)
+
+    const unselectedRow = buffRowByText(wrapper, "Boss 乙")
+    expect((unselectedRow.find(".rule-enabled-control input").element as HTMLInputElement).disabled).toBe(true)
+    expect((unselectedRow.find(".rule-coverage-control input").element as HTMLInputElement).disabled).toBe(true)
+
+    const row = buffRowByText(wrapper, "Boss 甲")
+    const enabledInput = row.find(".rule-enabled-control input")
+    const coverageInput = row.find(".rule-coverage-control input")
+    expect((enabledInput.element as HTMLInputElement).checked).toBe(true)
+    expect((coverageInput.element as HTMLInputElement).value).toBe("1")
+
+    await coverageInput.setValue(0.4)
+    await enabledInput.setValue(false)
+    await nextTick()
+    expect(row.find(".buff-effect-row").classes()).toContain("is-disabled")
+    expect((coverageInput.element as HTMLInputElement).disabled).toBe(true)
+    expect((coverageInput.element as HTMLInputElement).value).toBe("0.4")
+    await buttonByText(wrapper, "应用选择").trigger("click")
+
+    const payload = wrapper.emitted("apply")?.[0]?.[0] as any
+    expect(payload.runtimeInputs[buffId].effects["a-stack"]).toMatchObject({
+      enabled: false,
+      coverage: 0.4,
+    })
+
+    const reopened = mountModal({
+      selectedIds: [buffId],
+      runtimeInputs: payload.runtimeInputs,
+    })
+    await openBossTab(reopened)
+    const reopenedRow = buffRowByText(reopened, "Boss 甲")
+    const reopenedEnabled = reopenedRow.find(".rule-enabled-control input")
+    const reopenedCoverage = reopenedRow.find(".rule-coverage-control input")
+    expect((reopenedEnabled.element as HTMLInputElement).checked).toBe(false)
+    expect((reopenedCoverage.element as HTMLInputElement).disabled).toBe(true)
+    expect((reopenedCoverage.element as HTMLInputElement).value).toBe("0.4")
+
+    await reopenedEnabled.setValue(true)
+    await nextTick()
+    expect((reopenedCoverage.element as HTMLInputElement).disabled).toBe(false)
+    expect((reopenedCoverage.element as HTMLInputElement).value).toBe("0.4")
+  })
+
   it("selects at most one Boss Buff without clearing a selected field Buff", async () => {
     const fieldId = "field.defense_v5.v3_0.p2.jijing_chefeng"
     const wrapper = mountModal({
@@ -875,7 +949,7 @@ describe("BuffPickerModal", () => {
 
     await openFieldTab(wrapper)
 
-    expect(wrapper.text()).toContain("新版本场地")
+    expect(wrapper.text()).toContain("摧心")
     expect(wrapper.text()).not.toContain("极境彻风")
 
     const selects = wrapper.findAll(".field-buff-filter-row select")
@@ -906,6 +980,57 @@ describe("BuffPickerModal", () => {
 
     const payload = wrapper.emitted("apply")?.[0]?.[0] as any
     expect(payload.selectedBuffIds).toEqual(["field.defense_v5.v3_0.p2.mingse_yinguang"])
+  })
+
+  it("configures Field Buff effects independently and restores retained coverage", async () => {
+    const buffId = "field.critical_assault.v3_1.p1.cuixin"
+    const wrapper = mountModal({ selectedIds: [buffId] })
+
+    await openFieldTab(wrapper)
+    expect(wrapper.findAll(".rule-enabled-control")).toHaveLength(3)
+    expect(wrapper.findAll(".rule-coverage-control")).toHaveLength(3)
+
+    const unselectedRow = buffRowByText(wrapper, "勠力")
+    expect((unselectedRow.find(".rule-enabled-control input").element as HTMLInputElement).disabled).toBe(true)
+    expect((unselectedRow.find(".rule-coverage-control input").element as HTMLInputElement).disabled).toBe(true)
+
+    const row = buffRowByText(wrapper, "摧心")
+    const enabledInput = row.find(".rule-enabled-control input")
+    const coverageInput = row.find(".rule-coverage-control input")
+    expect((enabledInput.element as HTMLInputElement).disabled).toBe(false)
+    expect((enabledInput.element as HTMLInputElement).checked).toBe(true)
+    expect((coverageInput.element as HTMLInputElement).value).toBe("1")
+
+    await coverageInput.setValue(0.35)
+    await enabledInput.setValue(false)
+    await nextTick()
+    expect(row.find(".buff-effect-row").classes()).toContain("is-disabled")
+    expect((coverageInput.element as HTMLInputElement).disabled).toBe(true)
+    expect((coverageInput.element as HTMLInputElement).value).toBe("0.35")
+    await buttonByText(wrapper, "应用选择").trigger("click")
+
+    const payload = wrapper.emitted("apply")?.[0]?.[0] as any
+    expect(payload.runtimeInputs[buffId].effects["field-critical-cuixin"]).toMatchObject({
+      enabled: false,
+      coverage: 0.35,
+    })
+
+    const reopened = mountModal({
+      selectedIds: [buffId],
+      runtimeInputs: payload.runtimeInputs,
+    })
+    await openFieldTab(reopened)
+    const reopenedRow = buffRowByText(reopened, "摧心")
+    const reopenedEnabled = reopenedRow.find(".rule-enabled-control input")
+    const reopenedCoverage = reopenedRow.find(".rule-coverage-control input")
+    expect((reopenedEnabled.element as HTMLInputElement).checked).toBe(false)
+    expect((reopenedCoverage.element as HTMLInputElement).disabled).toBe(true)
+    expect((reopenedCoverage.element as HTMLInputElement).value).toBe("0.35")
+
+    await reopenedEnabled.setValue(true)
+    await nextTick()
+    expect((reopenedCoverage.element as HTMLInputElement).disabled).toBe(false)
+    expect((reopenedCoverage.element as HTMLInputElement).value).toBe("0.35")
   })
 
   it("shows all three Defense Battle 3.0 phase 3 buffs in authored order", async () => {
@@ -941,6 +1066,25 @@ describe("BuffPickerModal", () => {
     expect(visibleRows.some(text => text.includes("链式回路"))).toBe(true)
     expect(visibleRows.some(text => text.includes("零度行动"))).toBe(true)
     expect(visibleRows.some(text => text.includes("湮亡"))).toBe(false)
+  })
+
+  it("defaults the field tab to Critical Assault 3.1 phase 1", async () => {
+    const wrapper = mountModal()
+
+    await openFieldTab(wrapper)
+    const selects = wrapper.findAll(".field-buff-filter-row select")
+
+    expect((selects[0].element as HTMLSelectElement).value).toBe("3.1")
+    expect((selects[1].element as HTMLSelectElement).value).toBe("critical_assault|3.1|1")
+    const selectedPeriod = selects[1].findAll("option")
+      .find(option => (option.element as HTMLOptionElement).selected)
+    expect(selectedPeriod?.text()).toBe("危局强袭战 · 3.1版本 · 第一期")
+    const visibleRows = wrapper.findAll(".buff-row").map(row => row.text())
+    expect(visibleRows).toHaveLength(3)
+    expect(visibleRows[0]).toContain("摧心")
+    expect(visibleRows[1]).toContain("勠力")
+    expect(visibleRows[2]).toContain("诡袭")
+    expect(visibleRows.some(text => text.includes("3.0版本"))).toBe(false)
   })
 
   it("shows critical assault phase 3 and keeps one selection when requested", async () => {

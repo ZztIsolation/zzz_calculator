@@ -3517,6 +3517,317 @@
   ],
   "fieldBuffs": [
     {
+      "id": "field.critical_assault.v3_1.p1.cuixin",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "critical_assault",
+        "gameVersion": "3.1",
+        "phaseNo": 1,
+        "phaseName": {
+          "zhCN": "第一期"
+        }
+      },
+      "name": {
+        "zhCN": "摧心"
+      },
+      "source": {
+        "zhCN": "危局强袭战"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.1版本第一期"
+      },
+      "description": {
+        "zhCN": "代理人的暴击伤害提升30%。[强攻]特性的代理人攻击力提升10%，[普通攻击]命中时造成的伤害提升30%，并无视敌人15%的防御。"
+      },
+      "effects": [
+        {
+          "id": "field_critical_assault_v3_1_p1_cuixin_crit_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "critDmg",
+          "mode": "flat",
+          "value": 30,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_1_p1_cuixin_attack_atk",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "atkPct",
+          "mode": "pct",
+          "basis": "outOfCombatAtk",
+          "value": 10,
+          "requirement": {
+            "specialty": "attack"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_1_p1_cuixin_attack_basic_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "skill",
+            "skillTargets": [
+              {
+                "kind": "skillType",
+                "skillType": "basic"
+              }
+            ]
+          },
+          "stat": "dmgBonus",
+          "mode": "flat",
+          "value": 30,
+          "requirement": {
+            "specialty": "attack"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_1_p1_cuixin_attack_basic_def_ignore",
+          "type": "fixed",
+          "target": {
+            "kind": "skill",
+            "skillTargets": [
+              {
+                "kind": "skillType",
+                "skillType": "basic"
+              }
+            ]
+          },
+          "stat": "enemyDefIgnore",
+          "mode": "flat",
+          "value": 15,
+          "requirement": {
+            "specialty": "attack"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.critical_assault.v3_1.p1.luli",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "critical_assault",
+        "gameVersion": "3.1",
+        "phaseNo": 1,
+        "phaseName": {
+          "zhCN": "第一期"
+        }
+      },
+      "name": {
+        "zhCN": "勠力"
+      },
+      "source": {
+        "zhCN": "危局强袭战"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.1版本第一期"
+      },
+      "description": {
+        "zhCN": "队伍内存在2/3名[异常]特性代理人时，全队的异常精通分别提升30点/70点，造成的属性异常伤害分别提升10%/25%。对敌人施加属性异常效果后，敌人的全属性伤害抗性降低15%，持续10秒，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_critical_assault_v3_1_p1_luli_anomaly_proficiency",
+          "type": "formula",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "anomalyProficiency",
+          "mode": "flat",
+          "source": {
+            "variable": "x",
+            "label": {
+              "zhCN": "队伍内异常特性代理人数量"
+            },
+            "defaultValue": 3,
+            "min": 0,
+            "max": 3
+          },
+          "formula": {
+            "expression": "30 * max(x - 1, 0) + 10 * max(x - 2, 0)",
+            "valueUnit": "storedValue"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_1_p1_luli_anomaly_damage",
+          "type": "formula",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "anomalyDamageBonus",
+          "mode": "flat",
+          "source": {
+            "variable": "x",
+            "label": {
+              "zhCN": "队伍内异常特性代理人数量"
+            },
+            "defaultValue": 3,
+            "min": 0,
+            "max": 3
+          },
+          "formula": {
+            "expression": "10 * max(x - 1, 0) + 5 * max(x - 2, 0)",
+            "valueUnit": "storedPercent"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_1_p1_luli_enemy_res_reduction",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "enemyResReduction",
+          "mode": "flat",
+          "value": 15,
+          "condition": "对敌人施加属性异常效果后",
+          "durationSeconds": 10,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.critical_assault.v3_1.p1.guixi",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "critical_assault",
+        "gameVersion": "3.1",
+        "phaseNo": 1,
+        "phaseName": {
+          "zhCN": "第一期"
+        }
+      },
+      "name": {
+        "zhCN": "诡袭"
+      },
+      "source": {
+        "zhCN": "危局强袭战"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.1版本第一期"
+      },
+      "description": {
+        "zhCN": "代理人的攻击力提升10%，异常精通提升30点，暴击伤害提升40%。代理人对敌人施加属性异常效果后，其防御力降低10%，持续10秒，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_critical_assault_v3_1_p1_guixi_atk",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "atkPct",
+          "mode": "pct",
+          "basis": "outOfCombatAtk",
+          "value": 10,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_1_p1_guixi_anomaly_proficiency",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "anomalyProficiency",
+          "mode": "flat",
+          "value": 30,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_1_p1_guixi_crit_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "critDmg",
+          "mode": "flat",
+          "value": 40,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_1_p1_guixi_enemy_def_reduction",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "enemyDefReduction",
+          "mode": "flat",
+          "value": 10,
+          "condition": "对敌人施加属性异常效果后",
+          "durationSeconds": 10,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
       "id": "field.defense_v5.v3_0.p2.jijing_chefeng",
       "sourceType": "field",
       "scope": "inCombat",
@@ -3858,7 +4169,13 @@
           },
           "stat": "anomalyProficiency",
           "mode": "flat",
-          "value": 20
+          "value": 20,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         },
         {
           "id": "field_defense_v5_v3_0_p3_lianshi_anomaly_damage",
@@ -3868,7 +4185,13 @@
           },
           "stat": "anomalyDamageBonus",
           "mode": "flat",
-          "value": 15
+          "value": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         },
         {
           "id": "field_defense_v5_v3_0_p3_lianshi_anomaly_res_ignore",
@@ -3891,6 +4214,12 @@
           "formula": {
             "expression": "5 * x + 5 * max(x - 1, 0)",
             "valueUnit": "storedPercent"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
           }
         }
       ],
@@ -3929,7 +4258,13 @@
           },
           "stat": "iceDmg",
           "mode": "flat",
-          "value": 30
+          "value": 30,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         },
         {
           "id": "field_defense_v5_v3_0_p3_lingdu_ether_dmg",
@@ -3939,7 +4274,13 @@
           },
           "stat": "etherDmg",
           "mode": "flat",
-          "value": 30
+          "value": 30,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         },
         {
           "id": "field_defense_v5_v3_0_p3_lingdu_basic_chain_dmg",
@@ -3959,7 +4300,13 @@
           },
           "stat": "dmgBonus",
           "mode": "flat",
-          "value": 20
+          "value": 20,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         },
         {
           "id": "field_defense_v5_v3_0_p3_lingdu_basic_chain_crit_dmg",
@@ -3979,7 +4326,13 @@
           },
           "stat": "critDmg",
           "mode": "flat",
-          "value": 35
+          "value": 35,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         }
       ],
       "buffModifiers": []
@@ -4027,7 +4380,13 @@
           },
           "stat": "allResIgnore",
           "mode": "flat",
-          "value": 30
+          "value": 30,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         },
         {
           "id": "field_critical_assault_v3_0_p3_yanwang_chain_atk",
@@ -4044,6 +4403,12 @@
           "stackGroup": "field_critical_assault_v3_0_p3_yanwang_chain_stacks",
           "stackLabel": {
             "zhCN": "连携技增益层数"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
           }
         },
         {
@@ -4060,6 +4425,12 @@
           "stackGroup": "field_critical_assault_v3_0_p3_yanwang_chain_stacks",
           "stackLabel": {
             "zhCN": "连携技增益层数"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
           }
         }
       ],
@@ -4098,7 +4469,13 @@
           },
           "stat": "windDmg",
           "mode": "flat",
-          "value": 20
+          "value": 20,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         },
         {
           "id": "field_critical_assault_v3_0_p3_linxi_ice_dmg",
@@ -4108,7 +4485,13 @@
           },
           "stat": "iceDmg",
           "mode": "flat",
-          "value": 20
+          "value": 20,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         },
         {
           "id": "field_critical_assault_v3_0_p3_linxi_anomaly_proficiency",
@@ -4118,7 +4501,13 @@
           },
           "stat": "anomalyProficiency",
           "mode": "flat",
-          "value": 20
+          "value": 20,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         },
         {
           "id": "field_critical_assault_v3_0_p3_linxi_enemy_res_reduction",
@@ -4188,7 +4577,13 @@
           },
           "stat": "anomalyProficiency",
           "mode": "flat",
-          "value": 45
+          "value": 45,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
         },
         {
           "id": "field_critical_assault_v3_0_p3_gouxi_anomaly_def_reduction",

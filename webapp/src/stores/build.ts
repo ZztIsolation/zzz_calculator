@@ -918,8 +918,8 @@ export const useBuildStore = defineStore("build", {
         ...sourceDamageConfig,
         agentLevel: this.agentLevel,
         skillLevelsByCategory: {
-          ...this.skillLevels,
           ...(sourceDamageConfig.skillLevelsByCategory ?? {}),
+          ...this.skillLevels,
         },
       }, damageAgent, this.cinemaLevel)
       const expandedDamage = expandCalculationConfigSkillGroups(damage, damageAgent, { strict: true })
@@ -1004,8 +1004,8 @@ export const useBuildStore = defineStore("build", {
         damage: {
           ...damageConfigFields(this.damageConfig),
           skillLevelsByCategory: {
-            ...this.skillLevels,
             ...(this.damageConfig.skillLevelsByCategory ?? {}),
+            ...this.skillLevels,
           },
         },
         combat: {
