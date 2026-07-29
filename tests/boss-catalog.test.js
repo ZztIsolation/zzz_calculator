@@ -49,7 +49,7 @@ const bossEntries = source.bosses.flatMap(boss =>
     ]))
 const bossEffects = bossEntries.flatMap(entry => entry.effects ?? [])
 assert.equal(bossEntries.length, 9)
-assert.equal(bossEffects.length, 11)
+assert.equal(bossEffects.length, 10)
 for (const effect of bossEffects) {
     assert.deepEqual(
         effect.coverage,
@@ -81,16 +81,19 @@ const miasmaModifier = miasma.inCombat.activeEffects
 assert.equal(miasmaModifier?.value, 0.48)
 
 const stagnantId = "boss_encounter.girtablullu_stagnant_aberrant.v3_1.p1"
-const stagnantDamageRule = source.bosses
+const stagnantMarkBuff = source.bosses
     .find(boss => boss.id === "boss.girtablullu_stagnant_aberrant")
     ?.encounters.find(encounter => encounter.id === stagnantId)
     ?.playerBuffs.find(buff => buff.id === "girtablullu_blight_marks")
-    ?.effects.find(effect => effect.id === "girtablullu_blight_damage_taken")
-assert.equal(stagnantDamageRule?.stat, "dmgBonus")
+const stagnantAnomalyRule = stagnantMarkBuff?.effects
+    .find(effect => effect.id === "girtablullu_blight_anomaly_damage")
+assert.equal(stagnantAnomalyRule?.stat, "anomalyDamageBonus")
 assert.equal(
-    storedEffectRuleText(stagnantDamageRule, {}, {}, meta),
-    "通用伤害加成% +16%（2/2 层，覆盖率 1）",
+    storedEffectRuleText(stagnantAnomalyRule, {}, {}, meta),
+    "属性异常增伤% +16%（2/2 层，覆盖率 1）",
 )
+assert.equal(stagnantMarkBuff?.effects.some(effect => effect.id === "girtablullu_blight_damage_taken"), false)
+assert.equal(stagnantMarkBuff?.description?.zhCN.includes("所有伤害"), false)
 const withoutBoss = (() => {
     const input = structuredClone(exampleInput)
     input.combatBuffs = { activeBuffIds: [], runtimeInputs: {} }
@@ -101,8 +104,8 @@ const stagnantModifiers = stagnant.inCombat.activeEffects.flatMap(effect => effe
 assert.equal(stagnant.inCombat.buffTotals.anomalyProficiencyFlat, 60)
 assert.equal(stagnantModifiers.find(effect => effect.stat === "anomalyDamageBonus")?.value, 0.16)
 assert.equal(stagnantModifiers.some(effect => effect.stat === "enemyDamageTakenBonus"), false)
-assert.ok(Math.abs(stagnant.inCombat.buffTotals.dmgBonus - withoutBoss.inCombat.buffTotals.dmgBonus - 0.16) < 1e-9)
-assert.ok(Math.abs(stagnant.damage.multipliers.dmg - withoutBoss.damage.multipliers.dmg - 0.16) < 1e-9)
+assert.equal(stagnant.inCombat.buffTotals.dmgBonus, withoutBoss.inCombat.buffTotals.dmgBonus)
+assert.equal(stagnant.damage.multipliers.dmg, withoutBoss.damage.multipliers.dmg)
 assert.equal(stagnant.damage.multipliers.enemyDamageTaken, withoutBoss.damage.multipliers.enemyDamageTaken)
 assert.equal(
     stagnant.damage.whiteBoxRows.find(row => row.label === "增伤乘区")?.value,
@@ -112,13 +115,7 @@ assert.equal(
     stagnant.damage.whiteBoxRows.find(row => row.label === "敌方承伤乘区")?.value,
     withoutBoss.damage.multipliers.enemyDamageTaken,
 )
-assert.ok(
-    Math.abs(
-        stagnant.damage.finalDamage / withoutBoss.damage.finalDamage
-        - stagnant.damage.multipliers.dmg / withoutBoss.damage.multipliers.dmg,
-    ) < 1e-9,
-    "Stagnant Aberrant marks should add 16% to the general damage multiplier for direct damage",
-)
+assert.equal(stagnant.damage.finalDamage, withoutBoss.damage.finalDamage)
 
 const stagnantOneStack = resultFor(stagnantId, {
     [stagnantId]: {
@@ -132,8 +129,8 @@ const stagnantOneStackModifiers = stagnantOneStack.inCombat.activeEffects
     .flatMap(effect => effect.resolvedDamageModifiers ?? [])
 assert.equal(stagnantOneStackModifiers.find(effect => effect.stat === "anomalyDamageBonus")?.value, 0.08)
 assert.equal(stagnantOneStackModifiers.some(effect => effect.stat === "enemyDamageTakenBonus"), false)
-assert.ok(Math.abs(stagnantOneStack.inCombat.buffTotals.dmgBonus - withoutBoss.inCombat.buffTotals.dmgBonus - 0.08) < 1e-9)
-assert.ok(Math.abs(stagnantOneStack.damage.multipliers.dmg - withoutBoss.damage.multipliers.dmg - 0.08) < 1e-9)
+assert.equal(stagnantOneStack.inCombat.buffTotals.dmgBonus, withoutBoss.inCombat.buffTotals.dmgBonus)
+assert.equal(stagnantOneStack.damage.multipliers.dmg, withoutBoss.damage.multipliers.dmg)
 assert.equal(stagnantOneStack.damage.multipliers.enemyDamageTaken, withoutBoss.damage.multipliers.enemyDamageTaken)
 
 const configuredStagnant = resultFor(stagnantId, {
@@ -149,8 +146,8 @@ const configuredStagnantModifiers = configuredStagnant.inCombat.activeEffects
 assert.equal(configuredStagnantModifiers.some(effect => effect.stat === "anomalyDamageBonus"), false)
 assert.equal(configuredStagnantModifiers.some(effect => effect.stat === "enemyDamageTakenBonus"), false)
 assert.equal(configuredStagnant.inCombat.buffTotals.anomalyProficiencyFlat, 60)
-assert.ok(Math.abs(configuredStagnant.inCombat.buffTotals.dmgBonus - withoutBoss.inCombat.buffTotals.dmgBonus - 0.08) < 1e-9)
-assert.ok(Math.abs(configuredStagnant.damage.multipliers.dmg - withoutBoss.damage.multipliers.dmg - 0.08) < 1e-9)
+assert.equal(configuredStagnant.inCombat.buffTotals.dmgBonus, withoutBoss.inCombat.buffTotals.dmgBonus)
+assert.equal(configuredStagnant.damage.multipliers.dmg, withoutBoss.damage.multipliers.dmg)
 assert.equal(configuredStagnant.damage.multipliers.enemyDamageTaken, withoutBoss.damage.multipliers.enemyDamageTaken)
 
 const deadEndId = "boss_encounter.notorious_dead_end_butcher.v3_1.p1"

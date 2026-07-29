@@ -328,7 +328,7 @@
             }
           ],
           "enemyIntel": {
-            "zhCN": "对敌人施加属性异常状态时，目标获得 1 层对应属性的蚀蚀印记，持续 30 秒，最多叠加 2 层；重复施加同属性印记时刷新持续时间。敌人每持有 1 层印记，受到的属性异常伤害和所有伤害分别提升 8%。对敌人造成部位破坏或完美反制时，全队异常精通提升 60 点，持续 30 秒。"
+            "zhCN": "对敌人施加属性异常状态时，目标获得 1 层对应属性的蚀蚀印记，持续 30 秒，最多叠加 2 层；重复施加同属性印记时刷新持续时间。敌人每持有 1 层印记，受到的属性异常伤害提升 8%。对敌人造成部位破坏或完美反制时，全队异常精通提升 60 点，持续 30 秒。"
           },
           "recommendedSpecialties": [
             "anomaly"
@@ -340,7 +340,7 @@
                 "zhCN": "蚀蚀印记"
               },
               "description": {
-                "zhCN": "每层使敌人受到的属性异常伤害提升 8%，并使其受到的所有伤害提升 8%；持续 30 秒，最多 2 层。"
+                "zhCN": "每层使敌人受到的属性异常伤害提升 8%；持续 30 秒，最多 2 层。"
               },
               "calculationStatus": "modeled",
               "effects": [
@@ -351,29 +351,6 @@
                     "kind": "default"
                   },
                   "stat": "anomalyDamageBonus",
-                  "mode": "flat",
-                  "valuePerStack": 8,
-                  "maxStacks": 2,
-                  "defaultStacks": 2,
-                  "durationSeconds": 30,
-                  "stackGroup": "girtablullu_blight_mark_stacks",
-                  "stackLabel": {
-                    "zhCN": "蚀蚀印记层数"
-                  },
-                  "coverage": {
-                    "default": 1,
-                    "min": 0,
-                    "max": 1,
-                    "step": 0.1
-                  }
-                },
-                {
-                  "id": "girtablullu_blight_damage_taken",
-                  "type": "stacked",
-                  "target": {
-                    "kind": "default"
-                  },
-                  "stat": "dmgBonus",
                   "mode": "flat",
                   "valuePerStack": 8,
                   "maxStacks": 2,
