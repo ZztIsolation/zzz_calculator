@@ -51,7 +51,7 @@ function assertScannerPackageManifest() {
     const helperManifest = JSON.parse(readFileSync(join(repoRoot, "config", "helper-manifest.json"), "utf8"))
     assert.equal(manifest.schemaVersion, 3)
     assert.equal(manifest.launcherMinVersion, "1.3.1")
-    assert.equal(manifest.scannerVersion, "1.0.45")
+    assert.equal(manifest.scannerVersion, "1.0.47")
     assert.equal(helperManifest.schemaVersion, 1)
     assert.equal(helperManifest.version, "1.3.1")
     assert.equal(manifest.support.minWindowsBuild, 17763)
@@ -154,7 +154,8 @@ try {
             captureMode: "dxgi",
             profileRouting: "strict",
             overlapConflictMode: "recover",
-            panelAcceptMode: "adaptive-early-full-roi",
+            panelAcceptMode: "safe",
+            panelStabilityMode: "text-core",
             scrollAcceptMode: "early-one-row",
             postScrollPanelAcceptMode: "safe",
             panelMinAcceptFloorMs: 120,
@@ -193,6 +194,7 @@ try {
     }
     class ReadySocket {
         static OPEN = 1
+        static scannerVersion = "1.0.47"
         constructor(url) {
             this.url = url
             this.readyState = ReadySocket.OPEN
@@ -205,7 +207,7 @@ try {
             this.sent.push(envelope)
             if (envelope.cmd === "ensure_scanner") {
                 queueMicrotask(() => this.onmessage?.({
-                    data: JSON.stringify({ cmd: "scanner_ready", data: { installed: true, version: "1.0.45" } }),
+                    data: JSON.stringify({ cmd: "scanner_ready", data: { installed: true, version: ReadySocket.scannerVersion } }),
                 }))
             }
         }
@@ -214,9 +216,18 @@ try {
     globalThis.WebSocket = ReadySocket
     const readyBridge = new ScannerBridge()
     await readyBridge.connect()
-    await readyBridge.ensureScanner()
+    const currentReady = await readyBridge.ensureScanner()
+    assert.equal(currentReady.version, "1.0.47")
     assert.deepEqual(ReadySocket.last.sent.map(envelope => envelope.cmd), ["ensure_scanner"])
     readyBridge.disconnect()
+
+    ReadySocket.scannerVersion = "1.0.43"
+    const rollbackCompatibleBridge = new ScannerBridge()
+    await rollbackCompatibleBridge.connect()
+    const rollbackReady = await rollbackCompatibleBridge.ensureScanner()
+    assert.equal(rollbackReady.version, "1.0.43")
+    assert.deepEqual(ReadySocket.last.sent.map(envelope => envelope.cmd), ["ensure_scanner"])
+    rollbackCompatibleBridge.disconnect()
 
     let legacyAttempted = false
     globalThis.fetch = async () => {
