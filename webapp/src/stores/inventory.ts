@@ -740,8 +740,21 @@ export const useInventoryStore = defineStore("inventory", {
         : Array.isArray(envelope.retainedItems) ? envelope.retainedItems : []
       const failedCount = Math.max(0, Number(envelope.failed) || 0)
       const streamIncomplete = Boolean(envelope.streamIncomplete)
-      const partial = Boolean(terminalError || envelope.partial || failedCount > 0 || streamIncomplete)
       const terminalCode = String(terminalError?.code ?? envelope.terminationCode ?? "")
+      const expectedNonLevel15Stop = Boolean(
+        !terminalError
+        && terminalCode === "non_level_15_stop"
+        && this.scanStopAtNonLevel15
+        && failedCount === 0
+        && !streamIncomplete,
+      )
+      const partial = Boolean(
+        terminalError
+        || envelope.partial
+        || failedCount > 0
+        || streamIncomplete
+        || terminalCode === "non_level_15_stop",
+      )
       const requestedRemoveMissing = this.scanRemoveMissing
 
       this.scanProgress = envelope
@@ -761,6 +774,19 @@ export const useInventoryStore = defineStore("inventory", {
 
       if (!retainedItems.length) {
         this.scanRemoveMissing = false
+        if (expectedNonLevel15Stop) {
+          this.scanStatus = "complete"
+          this.scanFailure = null
+          this.scanErrorContext = ""
+          this.scanMessage = "检测到非 15 级驱动盘，扫描已按设置停止；未扫描到可导入的 15 级驱动盘"
+          this.scanProgressText = this.scanMessage
+          finishActiveScanTelemetry("completed", {
+            counters: envelope,
+            versions: currentScannerVersions(scanner, this.scanHelperVersion, this.scanHelperProtocolVersion, envelope),
+            diagnostics: envelope?.diagnostics,
+          })
+          return
+        }
         if (partial) {
           const failure = terminalError ?? {
             code: streamIncomplete ? "scan_result_stream_incomplete" : "scan_partial_failure",
@@ -785,10 +811,12 @@ export const useInventoryStore = defineStore("inventory", {
         return
       }
 
-      this.scanStatus = partial ? "warning" : "complete"
+      this.scanStatus = partial && !expectedNonLevel15Stop ? "warning" : "complete"
       this.scanFailure = null
       this.scanErrorContext = ""
-      this.scanMessage = partial ? "扫描未完整结束，正在安全导入已识别结果" : "扫描完成，正在导入仓库"
+      this.scanMessage = expectedNonLevel15Stop
+        ? "检测到非 15 级驱动盘，扫描已按设置停止，正在安全导入已识别结果"
+        : partial ? "扫描未完整结束，正在安全导入已识别结果" : "扫描完成，正在导入仓库"
       this.scanProgressText = this.scanMessage
       try {
         const removeMissing = partial ? false : requestedRemoveMissing
@@ -802,6 +830,20 @@ export const useInventoryStore = defineStore("inventory", {
           summary,
         }
         this.scanRemoveMissing = false
+
+        if (expectedNonLevel15Stop) {
+          this.scanStatus = "complete"
+          this.scanFailure = null
+          this.scanErrorContext = ""
+          this.scanMessage = `检测到非 15 级驱动盘，已按设置停止并安全导入 ${retainedItems.length} 件，未删除缺失`
+          this.scanProgressText = this.scanMessage
+          finishActiveScanTelemetry("completed", {
+            counters: envelope,
+            versions: currentScannerVersions(scanner, this.scanHelperVersion, this.scanHelperProtocolVersion, envelope),
+            diagnostics: envelope?.diagnostics,
+          })
+          return
+        }
 
         if (partial) {
           const baseFailure = terminalError ?? {

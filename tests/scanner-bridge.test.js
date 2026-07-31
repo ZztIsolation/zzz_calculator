@@ -51,7 +51,7 @@ function assertScannerPackageManifest() {
     const helperManifest = JSON.parse(readFileSync(join(repoRoot, "config", "helper-manifest.json"), "utf8"))
     assert.equal(manifest.schemaVersion, 3)
     assert.equal(manifest.launcherMinVersion, "1.3.1")
-    assert.equal(manifest.scannerVersion, "1.0.47")
+    assert.equal(manifest.scannerVersion, "1.0.49")
     assert.equal(helperManifest.schemaVersion, 1)
     assert.equal(helperManifest.version, "1.3.1")
     assert.equal(manifest.support.minWindowsBuild, 17763)
@@ -194,7 +194,7 @@ try {
     }
     class ReadySocket {
         static OPEN = 1
-        static scannerVersion = "1.0.47"
+        static scannerVersion = "1.0.49"
         constructor(url) {
             this.url = url
             this.readyState = ReadySocket.OPEN
@@ -217,7 +217,7 @@ try {
     const readyBridge = new ScannerBridge()
     await readyBridge.connect()
     const currentReady = await readyBridge.ensureScanner()
-    assert.equal(currentReady.version, "1.0.47")
+    assert.equal(currentReady.version, "1.0.49")
     assert.deepEqual(ReadySocket.last.sent.map(envelope => envelope.cmd), ["ensure_scanner"])
     readyBridge.disconnect()
 
