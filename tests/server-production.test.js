@@ -326,7 +326,9 @@ try {
     assert.equal((await postTelemetry(telemetryEvent)).status, 202)
     assert.equal((await getText("/api/internal/scan-telemetry/summary")).status, 401)
 
-    const summaryResponse = await fetch(`${baseUrl}/api/internal/scan-telemetry/summary?from=2026-07-01&to=2026-07-30`, {
+    const summaryFrom = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const summaryTo = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const summaryResponse = await fetch(`${baseUrl}/api/internal/scan-telemetry/summary?from=${summaryFrom}&to=${summaryTo}`, {
         headers: { "X-Scan-Telemetry-Admin": "1" },
     })
     assert.equal(summaryResponse.status, 200)
