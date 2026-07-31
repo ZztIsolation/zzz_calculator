@@ -201,3 +201,67 @@ test("partial OCR completion automatically imports without destructive synchroni
   await expect(page.getByRole("button", { name: "导入已识别结果（不删除）", exact: true })).toHaveCount(0)
   await expect(page.getByRole("row", { name: /流光咏叹 流光咏叹 #1/ })).toBeVisible()
 })
+
+test("configured non-level-15 stop completes without a partial-failure card", async ({ page }) => {
+  await mockLoopbackPermission(page, ["granted"])
+  await page.route("http://127.0.0.1:22355/**", async route => {
+    const url = new URL(route.request().url())
+    await fulfillHelperRoute(
+      route,
+      200,
+      url.pathname === "/token"
+        ? { token: "level-stop-token" }
+        : { service: "zzz-scanner-helper", version: "1.3.1", protocolVersion: 4, scanner: { installed: true } },
+    )
+  })
+  await page.routeWebSocket("ws://127.0.0.1:22355/**", socket => {
+    socket.onMessage(message => {
+      const envelope = JSON.parse(String(message))
+      if (envelope.cmd === "ensure_scanner") {
+        socket.send(JSON.stringify({
+          cmd: "scanner_ready",
+          data: { version: "1.0.49", installed: true },
+        }))
+        return
+      }
+      if (envelope.cmd !== "scan_req") return
+      socket.send(JSON.stringify({
+        cmd: "scan_complete",
+        data: {
+          items: [{
+            "序号": 1,
+            "名称": "流光咏叹",
+            "槽位": 1,
+            "品质": "S",
+            "等级": 15,
+            "最大等级": 15,
+            "主属性": { "生命值": 2200 },
+            "副属性": [{ "攻击力": "6%" }],
+          }],
+          visited: 2,
+          queued: 1,
+          completed: 1,
+          failed: 0,
+          partial: true,
+          terminationCode: "non_level_15_stop",
+        },
+      }))
+    })
+    setTimeout(() => socket.send(JSON.stringify({
+      cmd: "hello",
+      data: { service: "zzz-scanner-helper", version: "1.3.1", protocolVersion: 4, scanner: { installed: true } },
+    })), 0)
+  })
+
+  await page.goto("/discs")
+  await page.getByRole("button", { name: "扫描", exact: true }).click()
+  await expect(page.getByLabel("遇到非 15 级时停止")).toBeChecked()
+  await page.getByLabel("同步删除缺失").check()
+  await page.getByRole("button", { name: "开始扫描", exact: true }).click()
+  await page.getByRole("button", { name: "继续扫描", exact: true }).click()
+
+  await expect(page.getByText(/检测到非 15 级驱动盘，已按设置停止并安全导入 1 件，未删除缺失/)).toBeVisible()
+  await expect(page.getByText("错误代码：scan_partial_failure")).toHaveCount(0)
+  await expect(page.getByText("已安全导入", { exact: true })).toBeVisible()
+  await expect(page.getByRole("row", { name: /流光咏叹 流光咏叹 #1/ })).toBeVisible()
+})

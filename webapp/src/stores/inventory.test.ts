@@ -818,6 +818,71 @@ describe("inventory store", () => {
     expect(store.scanMessage).toContain("未删除缺失")
   })
 
+  it("treats a configured non-level-15 stop as successful non-destructive completion", async () => {
+    const store = useInventoryStore()
+    await store.load()
+    await store.saveDisc({
+      id: "preserved-after-level-stop",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 2,
+      rarity: "S",
+      level: 15,
+      maxLevel: 15,
+      mainStat: { stat: "atkFlat", value: 316 },
+      subStats: [],
+    })
+    scannerMockState.connectResults.push({ version: "1.3.1", protocolVersion: 4 })
+    await store.openScannerPanel()
+    store.scanRemoveMissing = true
+    await store.startScan()
+    const helper = scannerMockState.instances[0]
+
+    await helper.onComplete?.({
+      items: [scannerDisc(1)],
+      visited: 2,
+      queued: 1,
+      completed: 1,
+      failed: 0,
+      terminationCode: "non_level_15_stop",
+    })
+
+    expect(store.scanStatus).toBe("complete")
+    expect(store.scanFailure).toBeNull()
+    expect(store.scanErrorVariant).toBe("")
+    expect(store.scanSession.partial).toBe(true)
+    expect(store.scanSession.imported).toBe(true)
+    expect(store.scanRemoveMissing).toBe(false)
+    expect(store.driveDiscs.map((disc: any) => disc.id)).toContain("preserved-after-level-stop")
+    expect(store.driveDiscs).toHaveLength(2)
+    expect(store.scanMessage).toContain("已按设置停止并安全导入 1 件")
+    expect(store.scanMessage).toContain("未删除缺失")
+  })
+
+  it("completes without an error card when the first scanned disc triggers the configured level stop", async () => {
+    const store = useInventoryStore()
+    scannerMockState.connectResults.push({ version: "1.3.1", protocolVersion: 4 })
+    await store.openScannerPanel()
+    await store.startScan()
+    const helper = scannerMockState.instances[0]
+
+    await helper.onComplete?.({
+      items: [],
+      visited: 1,
+      queued: 0,
+      completed: 0,
+      failed: 0,
+      partial: true,
+      terminationCode: "non_level_15_stop",
+    })
+
+    expect(store.scanStatus).toBe("complete")
+    expect(store.scanFailure).toBeNull()
+    expect(store.scanErrorVariant).toBe("")
+    expect(store.scanSession.partial).toBe(true)
+    expect(store.scanMessage).toContain("扫描已按设置停止")
+  })
+
   it("rejects malformed completion payloads and retains disconnect failures", async () => {
     const store = useInventoryStore()
     scannerMockState.connectResults.push({ version: "1.3.1", protocolVersion: 4 })
