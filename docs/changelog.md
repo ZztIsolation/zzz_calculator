@@ -2,6 +2,24 @@
 
 # Changelog
 
+## 2026-08-01 - Integrated Scanner 1.0.49 And Safe Configured Level Stops
+
+Integrated the immutable Scanner 1.0.49 schema-v3 manifest from the published
+`scanner-1.0.49` Release while retaining Helper 1.3.1 and protocol v4. The
+Scanner now uses the game's native fourth-row click movement by default, so
+normal row advancement no longer depends on measuring a few pixels of movement
+from a compressed scrollbar. The release also contains the structured
+`elevation_required` repair for permission mismatches and preserves an explicit
+legacy wheel fallback for diagnosis.
+
+When “stop at a non-level-15 Drive Disc” is enabled, a clean
+`non_level_15_stop` terminal is now presented as a configured completion rather
+than `scan_partial_failure`. Retained items are imported non-destructively,
+“remove missing” is disabled, and zero-item configured stops complete without
+an error card. OCR failures, incomplete result streams, and unexpected stops
+remain warnings or errors. No IndexedDB database, object store, record key, or
+localStorage key changed.
+
 ## 2026-07-29 - Added Version 3.1 Phase 1 Boss Models
 
 Added the four Critical Assault version 3.1 phase 1 Boss profiles and their
