@@ -544,7 +544,7 @@ const optimizerHasFreeTwoPieceMetrics = computed(() => {
       : []
   return twoPieceSetIds.length === 0
     && optimizerMetrics.value
-    && Object.hasOwn(optimizerMetrics.value, "freeTwoPieceAutoSetCount")
+    && Object.prototype.hasOwnProperty.call(optimizerMetrics.value, "freeTwoPieceAutoSetCount")
 })
 const optimizerSetMetricChips = computed(() => (optimizerMetrics.value?.fourPieceSets ?? []).map((entry: any) => {
   const set = catalogStore.displayDriveDiscSets.find((item: any) => item.id === entry.fourPieceSetId)

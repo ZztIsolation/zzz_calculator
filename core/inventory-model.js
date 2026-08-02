@@ -534,7 +534,7 @@ function normalizeNativeDriveDiscExport(input, options = {}) {
 }
 
 export function normalizeDriveDiscImport(input, options = {}) {
-    if (input && typeof input === "object" && !Array.isArray(input) && Object.hasOwn(input, "format")) {
+    if (input && typeof input === "object" && !Array.isArray(input) && Object.prototype.hasOwnProperty.call(input, "format")) {
         if (input.format !== DRIVE_DISC_EXPORT_FORMAT) {
             throw new Error(`Unsupported Drive Disc import format "${input.format}".`)
         }
@@ -842,10 +842,10 @@ export function upsertDriveDisc(store, driveDisc, options = {}) {
     const matches = item => item.id === driveDisc.id && (item.ownerId ?? "default") === ownerId
     const index = existing.findIndex(matches)
     const currentDriveDisc = index >= 0 ? existing[index] : null
-    const reservedForAgentId = Object.hasOwn(driveDisc, "reservedForAgentId")
+    const reservedForAgentId = Object.prototype.hasOwnProperty.call(driveDisc, "reservedForAgentId")
         ? cleanReservedForAgentId(driveDisc.reservedForAgentId)
         : cleanReservedForAgentId(currentDriveDisc?.reservedForAgentId)
-    const excludedForAgentIds = Object.hasOwn(driveDisc, "excludedForAgentIds")
+    const excludedForAgentIds = Object.prototype.hasOwnProperty.call(driveDisc, "excludedForAgentIds")
         ? normalizeExcludedForAgentIds(driveDisc.excludedForAgentIds, reservedForAgentId)
         : normalizeExcludedForAgentIds(currentDriveDisc?.excludedForAgentIds, reservedForAgentId)
     const nextDriveDisc = withDriveDiscFingerprints({

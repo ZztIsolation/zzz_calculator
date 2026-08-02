@@ -4,11 +4,32 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { defineConfig } from "vite"
 
+import {
+  assertBrowserCompatibilityBundle,
+  assertBrowserCompatibilityOutputDirectory,
+  assertBrowserCompatibilitySources,
+} from "../scripts/browser-compatibility-guard.js"
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, "..")
 const coreDir = path.join(rootDir, "core")
 const runtimeDir = path.join(__dirname, "src", "runtime")
 const pagesDir = path.join(rootDir, "dist", "pages")
+
+function browserCompatibilityPlugin() {
+  return {
+    name: "zzz-browser-compatibility",
+    buildStart() {
+      assertBrowserCompatibilitySources(rootDir)
+    },
+    generateBundle(_options: unknown, bundle: Record<string, unknown>) {
+      assertBrowserCompatibilityBundle(bundle)
+    },
+    writeBundle() {
+      assertBrowserCompatibilityOutputDirectory(path.join(pagesDir, "static", "app"))
+    },
+  }
+}
 
 function scannerManifestPlugin() {
   return {
@@ -22,7 +43,7 @@ function scannerManifestPlugin() {
 }
 
 export default defineConfig({
-  plugins: [vue(), scannerManifestPlugin()],
+  plugins: [browserCompatibilityPlugin(), vue(), scannerManifestPlugin()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),

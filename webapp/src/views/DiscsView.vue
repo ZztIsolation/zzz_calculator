@@ -1483,7 +1483,9 @@ function confirmDangerImport() {
 
   <NModal v-model:show="showImport" preset="card" title="导入驱动盘 JSON" style="max-width: 760px">
     <div class="section-band">
-      <NInput v-model:value="importText" type="textarea" placeholder="粘贴扫描器或计算器导出的 JSON" :autosize="{ minRows: 8, maxRows: 16 }" />
+      <div class="notranslate" translate="no">
+        <NInput v-model:value="importText" type="textarea" placeholder="粘贴扫描器或计算器导出的 JSON" :autosize="{ minRows: 8, maxRows: 16 }" />
+      </div>
       <div class="toolbar">
         <input type="file" accept=".json,application/json" @change="previewFileImport">
         <NCheckbox v-model:checked="removeMissing">同步删除本地存在但本次扫描缺失的驱动盘</NCheckbox>

@@ -130,7 +130,7 @@ class Parser {
             if (this.match("(")) {
                 return this.parseCall(token.value)
             }
-            if (!Object.hasOwn(this.variables, token.value)) {
+            if (!Object.prototype.hasOwnProperty.call(this.variables, token.value)) {
                 throw new Error(`Unknown variable: ${token.value}`)
             }
             return Number(this.variables[token.value])
