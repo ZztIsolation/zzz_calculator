@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue"
 import { NConfigProvider, NMessageProvider, type GlobalThemeOverrides } from "naive-ui"
-import { Calculator, Database, HardDrive, Settings2, UserRound } from "lucide-vue-next"
+import { Calculator, Database, Download, HardDrive, Settings2, UserRound } from "lucide-vue-next"
 import { useAccountStore } from "@/stores/account"
 import { useAppConfigStore } from "@/stores/app-config"
 
@@ -95,6 +95,10 @@ const themeOverrides: GlobalThemeOverrides = {
             <RouterLink to="/accounts">
               <UserRound :size="16" />
               <span>账号</span>
+            </RouterLink>
+            <RouterLink to="/import">
+              <Download :size="16" />
+              <span>导入</span>
             </RouterLink>
             <RouterLink to="/settings">
               <HardDrive :size="16" />

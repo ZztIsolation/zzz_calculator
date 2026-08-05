@@ -6,7 +6,9 @@ import {
   exportCurrentUserDriveDiscs,
   importScannerExportToStore,
   loadCurrentUserDriveDiscStore,
+  loadUserDriveDiscStore,
   previewScannerExportImport,
+  saveUserDriveDiscStore,
   setDriveDiscExclusions,
   setDriveDiscReservations,
   upsertDriveDiscLoadout,
@@ -426,6 +428,16 @@ export const useInventoryStore = defineStore("inventory", {
       } finally {
         this.loading = false
       }
+    },
+    // Full (all-owners) store + current owner id, for building an Enka drive-disc plan.
+    async fullStoreWithOwner() {
+      const store = await loadUserDriveDiscStore()
+      return { store, ownerId: String(store?.currentOwnerId ?? "default") }
+    },
+    // Persist a pre-built nextStore (e.g. from the Enka drive-disc plan) in one write.
+    async applyPlannedStore(nextStore: any) {
+      await saveUserDriveDiscStore(nextStore)
+      await this.load()
     },
     calculatorDriveDiscs(options: any = {}) {
       const selected = new Map<number, any>()
