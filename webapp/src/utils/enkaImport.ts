@@ -2,6 +2,7 @@
 // load Enka's static metadata, then parse + map into Calculator catalog ids.
 import { parseEnkaShowcase } from "@core/enka-import/parse-enka.js"
 import { mapShowcaseToCatalog } from "@core/enka-import/entity-mapping.js"
+import { buildDriveDiscSyncPlan } from "@core/enka-import/drive-disc-plan.js"
 import { ENKA_METADATA_URLS } from "@core/enka-import/constants.js"
 
 let metadataPromise: Promise<any> | null = null
@@ -65,4 +66,14 @@ export function buildConfigForAgent(mappedAgent: any): Record<string, any> {
         }
     }
     return config
+}
+
+// Plan the drive-disc import against the full (all-owners) inventory store.
+// store must be the unscoped userDriveDiscStore; ownerId scopes the writes.
+export function planDriveDiscImport(mappedAgents: any[], store: any, ownerId: string, now: Date = new Date()): any {
+    return buildDriveDiscSyncPlan({
+        mappedAgents,
+        driveDiscState: { ownerId, store },
+        now,
+    })
 }

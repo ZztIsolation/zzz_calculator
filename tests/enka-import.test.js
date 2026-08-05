@@ -87,3 +87,61 @@ assert.equal(unmapped.skippedAgents.length, 1)
 assert.match(unmapped.skippedAgents[0].reason, /未收录|缺失/)
 
 console.log("enka-import.test.js: all assertions passed")
+
+// --- drive-disc import plan (from drive-disc-plan.js) ---
+const { buildDriveDiscSyncPlan } = await import("../core/enka-import/drive-disc-plan.js")
+
+const discPreset = {
+    agentId: "hoshimi_miyabi",
+    agentName: "星见雅",
+    driveDiscs: [
+        {
+            id: "enka-3001", setId: "scanner-set", setName: "折枝剑歌", partition: 1,
+            rarity: "S", level: 15, maxLevel: 15, locked: true, equippedBy: "hoshimi_miyabi",
+            mainStat: { stat: "hpFlat", value: 2200, mode: "flat", label: "生命值" },
+            subStats: [{ stat: "critRate", value: 0.072, mode: "pct", label: "暴击率" }],
+            source: { type: "enka-showcase", agentId: "hoshimi_miyabi" },
+        },
+    ],
+}
+const emptyStore = { currentOwnerId: "default", driveDiscs: [], driveDiscLoadouts: [] }
+const plan = buildDriveDiscSyncPlan({
+    mappedAgents: [{ agentId: "hoshimi_miyabi", agentName: "星见雅", driveDiscPreset: discPreset }],
+    driveDiscState: { ownerId: "default", store: emptyStore },
+    now: new Date("2026-08-05T10:00:00"),
+})
+assert.equal(plan.changed, true)
+assert.equal(plan.addedDiscs, 1)
+assert.equal(plan.nextStore.driveDiscs.length, 1)
+assert.equal(plan.nextStore.driveDiscs[0].id, "enka-3001")
+assert.equal(plan.nextStore.driveDiscs[0].ownerId, "default")
+assert.equal(plan.nextStore.driveDiscLoadouts.length, 1)
+const loadout = plan.nextStore.driveDiscLoadouts[0]
+assert.equal(loadout.id, "enka-showcase-hoshimi_miyabi")
+assert.equal(loadout.driveDiscIdsBySlot["1"], "enka-3001")
+assert.equal(loadout.status, "incomplete") // only 1 of 6 slots
+assert.equal(loadout.source.type, "enka-showcase")
+
+// re-running the same plan is a no-op (idempotent, stable id)
+const plan2 = buildDriveDiscSyncPlan({
+    mappedAgents: [{ agentId: "hoshimi_miyabi", agentName: "星见雅", driveDiscPreset: discPreset }],
+    driveDiscState: { ownerId: "default", store: plan.nextStore },
+    now: new Date("2026-08-05T11:00:00"),
+})
+assert.equal(plan2.changed, false)
+assert.equal(plan2.addedDiscs, 0)
+
+// manual (non-enka) disc with a colliding id is preserved + warns
+const manualStore = {
+    currentOwnerId: "default",
+    driveDiscs: [{ ...discPreset.driveDiscs[0], source: { type: "manual" } }],
+    driveDiscLoadouts: [],
+}
+const plan3 = buildDriveDiscSyncPlan({
+    mappedAgents: [{ agentId: "hoshimi_miyabi", agentName: "星见雅", driveDiscPreset: discPreset }],
+    driveDiscState: { ownerId: "default", store: manualStore },
+})
+assert.equal(plan3.addedDiscs, 0)
+assert.ok(plan3.warnings.some(w => /冲突/.test(w)))
+
+console.log("enka-import.test.js drive-disc plan: all assertions passed")
