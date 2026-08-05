@@ -187,9 +187,9 @@ const ENUM_OPTIONS: Record<string, SelectOption[]> = {
   rarity: options(["S", "S"], ["A", "A"], ["B", "B"]),
   attribute: options(
     ["physical", "物理"], ["fire", "火"], ["ice", "冰"], ["electric", "电"], ["ether", "以太"],
-    ["wind", "风"], ["honed_edge", "凛刃"], ["frost", "烈霜"], ["xuanmo", "玄墨"],
+    ["wind", "风"], ["honed_edge", "凛刃"], ["frost", "烈霜"], ["xuanmo", "玄墨"], ["lumiflux", "流明"],
   ),
-  damageElement: options(["physical", "物理"], ["fire", "火"], ["ice", "冰"], ["electric", "电"], ["ether", "以太"], ["wind", "风"]),
+  damageElement: options(["physical", "物理"], ["fire", "火"], ["ice", "冰"], ["electric", "电"], ["ether", "以太"], ["wind", "风"], ["lumiflux", "流明"]),
   element: options(["physical", "物理"], ["fire", "火"], ["ice", "冰"], ["electric", "电"], ["ether", "以太"], ["wind", "风"]),
   specialty: options(["attack", "强攻"], ["stun", "击破"], ["anomaly", "异常"], ["support", "支援"], ["defense", "防护"], ["rupture", "命破"]),
   scope: options(["outOfCombat", "局外面板"], ["inCombat", "局内战斗"]),
@@ -271,7 +271,28 @@ function ensureCalculationConfigIds(config: any) {
   if (!config || typeof config !== "object") return
   if (Array.isArray(config.events)) config.events.forEach((event: any) => {
     ensureId(event, "event")
-    event.stunned ??= true
+    if (event?.settlementType === "luminescence") {
+      const id = event.id
+      const legacyRecord = Array.isArray(event.records)
+        ? event.records.find((record: any) => ["normal", "ordinary", undefined].includes(record?.kind))
+        : null
+      const teammateAttack = event.teammateAttack ?? legacyRecord?.T ?? legacyRecord?.teammateAttack ?? 2800
+      const luminescenceDamageSharePct = Object.prototype.hasOwnProperty.call(event, "luminescenceDamageSharePct")
+        ? event.luminescenceDamageSharePct
+        : 50
+      const triggerActorRef = { agentId: String(event.triggerActorRef?.agentId ?? "") }
+      Object.keys(event).forEach(key => delete event[key])
+      Object.assign(event, {
+        id,
+        kind: "anomaly",
+        settlementType: "luminescence",
+        triggerActorRef,
+        teammateAttack,
+        luminescenceDamageSharePct,
+      })
+    } else {
+      event.stunned ??= true
+    }
   })
   if (Array.isArray(config.variants)) config.variants.forEach(ensureCalculationConfigIds)
 }

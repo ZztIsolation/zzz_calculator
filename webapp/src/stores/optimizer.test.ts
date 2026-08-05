@@ -109,6 +109,7 @@ describe("optimizer store", () => {
     store.results = [{ rank: 1 }]
     store.completedSettings = { ownerId: "default" }
     store.completedSettingsFingerprint = "saved"
+    store.completedCalculationInputFingerprint = "saved"
     store.progress = { percent: 50 }
     store.reset()
     expect(store.status).toBe("idle")
@@ -116,11 +117,13 @@ describe("optimizer store", () => {
     expect(store.results).toEqual([])
     expect(store.completedSettings).toBe(null)
     expect(store.completedSettingsFingerprint).toBe("")
+    expect(store.completedCalculationInputFingerprint).toBe("")
     expect(store.progress).toBe(null)
   })
 
   it("can fail before starting a worker when the active account has no discs", () => {
     const store = useOptimizerStore()
+    store.completedCalculationInputFingerprint = "saved"
 
     store.failBeforeRun("当前账号没有可用于优化的驱动盘。", { ownerId: "default" })
 
@@ -129,6 +132,7 @@ describe("optimizer store", () => {
     expect(store.error).toContain("当前账号")
     expect(store.progress.status).toBe("error")
     expect(store.progress.metrics.candidateCountsBySlot).toEqual({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 })
+    expect(store.completedCalculationInputFingerprint).toBe("")
     expect(store.isBusy).toBe(false)
   })
 
@@ -581,6 +585,92 @@ describe("optimizer store", () => {
       }],
     }), "default", "agent_a")).toBe(true)
     expect(worker.terminated).toBe(false)
+  })
+
+  it("tracks calculation input changes from the last successful run", async () => {
+    const store = useOptimizerStore()
+    store.initialize(catalog)
+    const completedInput = optimizerInput({
+      agentLevel: 60,
+      coreSkillLevel: "F",
+      cinemaLevel: 2,
+      wEngineId: "engine_a",
+      wEngineLevel: 60,
+      wEngineModificationLevel: 1,
+      driveDiscs: [{ id: "equipped-disc" }],
+      combatBuffs: {
+        activeBuffIds: ["field_buff", "teammate_buff"],
+        runtimeInputs: {
+          field_buff: { enabled: true, stacks: 2 },
+        },
+      },
+      damage: {
+        mode: "adminDefault",
+        events: [{
+          id: "damage-event",
+          kind: "anomaly",
+          settlementType: "luminescence",
+          teammateAttack: 2800,
+          luminescenceDamageSharePct: 50,
+        }],
+        target: {
+          defense: 953,
+          resistanceByElement: { physical: 0, fire: 0.1 },
+        },
+      },
+    })
+
+    const runPromise = store.run(catalog, inventoryStore(), completedInput)
+    const worker = MockWorker.instances[0]
+    const startMessage = worker.messages[0]
+    worker.emit({
+      type: "complete",
+      runId: startMessage.runId,
+      result: {
+        settings: startMessage.input.settings,
+        metrics: { estimatedCombinationCount: 1, processedCombinationCount: 1 },
+        results: [{ rank: 1, score: 12345, driveDiscs: [] }],
+      },
+    })
+    await runPromise
+
+    expect(store.completedCalculationInputFingerprint).toBeTruthy()
+    expect(store.calculationInputChanged(completedInput)).toBe(false)
+    expect(store.calculationInputChanged({
+      ...structuredClone(completedInput),
+      ownerId: "another-owner",
+      label: "重命名方案",
+      settings: { algorithm: "ignored" },
+      driveDiscs: [{ id: "another-equipped-disc" }],
+    })).toBe(false)
+
+    const changedLuminescenceInput = structuredClone(completedInput)
+    changedLuminescenceInput.damage.events[0].luminescenceDamageSharePct = 62.5
+    expect(store.calculationInputChanged(changedLuminescenceInput)).toBe(true)
+    changedLuminescenceInput.damage.events[0].luminescenceDamageSharePct = 50
+    expect(store.calculationInputChanged(changedLuminescenceInput)).toBe(false)
+
+    const changedInput = structuredClone(completedInput)
+    changedInput.damage.target.defense = 1000
+    expect(store.calculationInputChanged(changedInput)).toBe(true)
+    expect(store.calculationInputChanged(completedInput)).toBe(false)
+
+    const reverseObjectKeys = (value: any): any => {
+      if (Array.isArray(value)) return value.map(reverseObjectKeys)
+      if (!value || typeof value !== "object") return value
+      return Object.fromEntries(
+        Object.entries(value)
+          .reverse()
+          .map(([key, item]) => [key, reverseObjectKeys(item)]),
+      )
+    }
+    expect(store.calculationInputChanged(reverseObjectKeys(completedInput))).toBe(false)
+
+    const nextRun = store.run(catalog, inventoryStore(), changedInput)
+    expect(store.completedCalculationInputFingerprint).toBe("")
+    expect(store.calculationInputChanged(completedInput)).toBe(false)
+    store.cancel()
+    await nextRun
   })
 
   it("reuses one worker and transfers an unchanged catalog only once", async () => {

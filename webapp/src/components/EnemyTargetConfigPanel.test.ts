@@ -28,10 +28,10 @@ const naiveStubs = {
   },
 }
 
-function mountPanel(targetConfig: any = {}, metaOverrides: any = {}) {
+function mountPanel(targetConfig: any = {}, metaOverrides: any = {}, damageElement = "ice") {
   return mount(EnemyTargetConfigPanel, {
     props: {
-      damageElement: "ice",
+      damageElement,
       meta: {
         damageTargetPresets: [
           { id: "wandering-hunter", name: { zhCN: "彷徨猎手" }, defense: 1588 },
@@ -69,6 +69,18 @@ describe("EnemyTargetConfigPanel", () => {
 
     const emitted = wrapper.emitted("update:targetConfig")?.at(-1)?.[0] as any
     expect(emitted.resistanceByElement.ice).toBe(13)
+  })
+
+  it("shows a fixed resistance multiplier for Lumiflux without falling back to physical resistance", () => {
+    const wrapper = mountPanel({}, {}, "lumiflux")
+
+    expect(wrapper.text()).toContain("抗性配置")
+    expect(wrapper.text()).toContain("不单独配置")
+    expect(wrapper.text()).not.toContain("抗性乘区")
+    expect(wrapper.text()).not.toContain("物理抗性")
+    expect(wrapper.text()).not.toContain("流明抗性")
+    expect(wrapper.find("[data-testid='target-resistance-input']").exists()).toBe(false)
+    expect(wrapper.findAll("button").map(button => button.text())).not.toEqual(expect.arrayContaining(["0%", "20%", "-20%"] as string[]))
   })
 
   it("keeps only the stun multiplier in target configuration", async () => {

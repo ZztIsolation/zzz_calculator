@@ -102,6 +102,169 @@ describe("build store", () => {
     expect(saved.byOwner.default.byAgent.agent_a.damage.skillLevelsByCategory).toMatchObject({ basic: 7, special: 8 })
   })
 
+  it("migrates and persists legacy Luminescence events with the minimal score structure", () => {
+    const store = useBuildStore()
+    const meta = {
+      agents: [{ id: "remielle_dan", name: { zhCN: "蕾米埃尔·丹" } }],
+      wEngines: [],
+      combatBuffs: [],
+    }
+    store.applyAgentConfig("remielle_dan", meta, {
+      damage: {
+        mode: "custom",
+        selectedEventId: "legacy-luminescence",
+        events: [{
+          id: "legacy-luminescence",
+          kind: "anomaly",
+          settlementType: "luminescence",
+          count: 3,
+          stunned: true,
+          triggerActorRef: { agentId: "remielle_dan" },
+          records: [{ kind: "normal", T: 3150, k: 1.25, B: 7.13, sourceElement: "physical" }],
+          resistanceMode: "sourceElement",
+        }],
+      },
+    })
+
+    const expected = {
+      id: "legacy-luminescence",
+      kind: "anomaly",
+      settlementType: "luminescence",
+      triggerActorRef: { agentId: "remielle_dan" },
+      teammateAttack: 3150,
+      luminescenceDamageSharePct: 50,
+    }
+    expect(store.damageConfig.events[0]).toEqual(expected)
+
+    store.persist()
+    const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "{}")
+    expect(saved.byOwner.default.byAgent.remielle_dan.damage.events[0]).toEqual(expected)
+  })
+
+  it("preserves the editable teammate attack inside Dan's fixed admin score model", () => {
+    const event = {
+      id: "dan-luminescence",
+      kind: "anomaly",
+      settlementType: "luminescence",
+      triggerActorRef: { agentId: "remielle_dan" },
+      teammateAttack: 2800,
+      luminescenceDamageSharePct: 50,
+    }
+    const agent = {
+      id: "remielle_dan",
+      name: { zhCN: "蕾米埃尔·丹" },
+      defaultCalculationConfig: {
+        mode: "anomaly",
+        selectedEventId: event.id,
+        events: [event],
+      },
+    }
+    const meta = { agents: [agent], wEngines: [], combatBuffs: [] }
+    const store = useBuildStore()
+    store.agentId = agent.id
+
+    store.setDamageConfig({
+      mode: "adminDefault",
+      selectedEventId: event.id,
+      events: [{ ...event, teammateAttack: 3200, luminescenceDamageSharePct: 62.5 }],
+    }, agent)
+
+    expect(store.damageConfig.events).toEqual([{ ...event, teammateAttack: 3200, luminescenceDamageSharePct: 62.5 }])
+    expect(store.buildInput({}, meta, []).damage.events).toEqual([{ ...event, teammateAttack: 3200, luminescenceDamageSharePct: 62.5 }])
+    store.setCinemaLevel(2, meta)
+    expect(store.damageConfig.events).toEqual([{ ...event, teammateAttack: 3200, luminescenceDamageSharePct: 62.5 }])
+    expect(store.buildInput({}, meta, []).cinemaLevel).toBe(2)
+
+    store.persist()
+    const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "{}")
+    expect(saved.byOwner.default.byAgent.remielle_dan.damage.events).toEqual([{ ...event, teammateAttack: 3200, luminescenceDamageSharePct: 62.5 }])
+  })
+
+  it("drops legacy measured-reference fields from Dan's build inputs and persistence", () => {
+    const event = {
+      id: "dan-luminescence",
+      kind: "anomaly",
+      settlementType: "luminescence",
+      triggerActorRef: { agentId: "remielle_dan" },
+      teammateAttack: 2800,
+      luminescenceDamageSharePct: 50,
+      referenceAnomalyProficiency: 642,
+      referenceLuminescenceDamageMultiplier: 1.51,
+    }
+    const agent = {
+      id: "remielle_dan",
+      defaultCalculationConfig: { mode: "anomaly", selectedEventId: event.id, events: [event] },
+    }
+    const meta = { agents: [agent], wEngines: [], combatBuffs: [] }
+    const store = useBuildStore()
+    store.agentId = agent.id
+    store.setDamageConfig({ mode: "adminDefault", selectedEventId: event.id, events: [event] }, agent)
+
+    const expected = {
+      id: "dan-luminescence",
+      kind: "anomaly",
+      settlementType: "luminescence",
+      triggerActorRef: { agentId: "remielle_dan" },
+      teammateAttack: 2800,
+      luminescenceDamageSharePct: 50,
+    }
+    expect(store.damageConfig.events[0]).toEqual(expected)
+    expect(store.buildInput({}, meta, []).damage.events[0]).toEqual(expected)
+    store.setCinemaLevel(2, meta)
+    expect(store.damageConfig.events[0]).toEqual(expected)
+    store.persist()
+    const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "{}")
+    expect(saved.byOwner.default.byAgent.remielle_dan.damage.events[0]).toEqual(expected)
+  })
+
+  it("does not silently replace an invalid Luminescence teammate attack", () => {
+    const event = {
+      id: "dan-luminescence",
+      kind: "anomaly",
+      settlementType: "luminescence",
+      triggerActorRef: { agentId: "remielle_dan" },
+      teammateAttack: 2800,
+      luminescenceDamageSharePct: 50,
+    }
+    const agent = {
+      id: "remielle_dan",
+      defaultCalculationConfig: { mode: "anomaly", selectedEventId: event.id, events: [event] },
+    }
+    const store = useBuildStore()
+
+    store.setDamageConfig({
+      mode: "adminDefault",
+      selectedEventId: event.id,
+      events: [{ ...event, teammateAttack: null }],
+    }, agent)
+
+    expect(store.damageConfig.events[0].teammateAttack).toBeNull()
+  })
+
+  it("does not silently replace an invalid Luminescence damage share", () => {
+    const event = {
+      id: "dan-luminescence",
+      kind: "anomaly",
+      settlementType: "luminescence",
+      triggerActorRef: { agentId: "remielle_dan" },
+      teammateAttack: 2800,
+      luminescenceDamageSharePct: 50,
+    }
+    const agent = {
+      id: "remielle_dan",
+      defaultCalculationConfig: { mode: "anomaly", selectedEventId: event.id, events: [event] },
+    }
+    const store = useBuildStore()
+
+    store.setDamageConfig({
+      mode: "adminDefault",
+      selectedEventId: event.id,
+      events: [{ ...event, luminescenceDamageSharePct: null }],
+    }, agent)
+
+    expect(store.damageConfig.events[0].luminescenceDamageSharePct).toBeNull()
+  })
+
   it("migrates legacy target stun state only into non-admin events", () => {
     const store = useBuildStore()
     const agent = {

@@ -1251,6 +1251,30 @@ describe("BuffPickerModal", () => {
     }
   })
 
+  it("does not offer resistance aliases for Lumiflux damage", async () => {
+    const lumifluxMeta = {
+      ...meta,
+      agents: meta.agents.map(agent => agent.id === "agent_a"
+        ? { ...agent, attribute: "lumiflux", damageElement: "lumiflux" }
+        : agent),
+    }
+    const wrapper = mountModal({ meta: lumifluxMeta })
+
+    await openCustomTab(wrapper)
+    for (const targetLabel of [null, "指定角色招式"] as const) {
+      if (targetLabel) {
+        await buttonByText(wrapper, targetLabel).trigger("click")
+        await nextTick()
+      }
+      const labels = selectByLabel(wrapper, "增幅类型").findAll("option").map(option => option.text())
+      expect(labels).not.toContain("当前属性减抗%")
+      expect(labels).not.toContain("当前属性抗性无视%")
+      expect(labels).not.toContain("全属性抗性无视%")
+    }
+    expect(wrapper.text()).not.toContain("流明减抗")
+    expect(wrapper.text()).not.toContain("流明抗性无视")
+  })
+
   it("adds default custom panel buffs as stats instead of skill effects", async () => {
     const wrapper = mountModal()
 

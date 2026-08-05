@@ -666,6 +666,41 @@ describe("MaintenanceView structured editor", () => {
     expect(localStorage.getItem("zzz_maintenance_vue_draft_v2")).toBe(storedV2)
   })
 
+  it("separates broad anomaly damage from precise anomaly targeting", async () => {
+    const { wrapper, fetchMock } = await mountView()
+    const rule = wrapper.find(".maintenance-rule-card")
+
+    await button(rule, "指定角色招式").trigger("click")
+    const skillStatValues = [...field(rule, "增幅类型").find("select").element.options].map(item => item.value)
+    expect(skillStatValues).not.toContain("anomalyDamageBonus")
+
+    await button(rule, "异常目标").trigger("click")
+    const preciseStat = field(rule, "增幅类型").find("select")
+    expect(preciseStat.element.value).toBe("anomalyDamageBonus")
+    expect(preciseStat.element.selectedOptions[0]?.textContent).toBe("指定异常增伤%")
+    await field(rule, "结算类型").find("select").setValue("release")
+    await field(rule, "具体异常（留空为全部）").find("select").setValue(["corruption"])
+
+    await button(rule, "常规属性 / 全局效果").trigger("click")
+    const broadStat = field(rule, "增幅类型").find("select")
+    expect(broadStat.element.value).toBe("anomalyDamageBonus")
+    expect(broadStat.element.selectedOptions[0]?.textContent).toBe("属性异常增伤%")
+    expect(rule.text()).not.toContain("结算类型")
+    expect(rule.text()).not.toContain("具体异常（留空为全部）")
+    expect(rule.text()).not.toContain("异常形态（留空为全部）")
+
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("完整目录已刷新"))
+
+    const call = fetchMock.mock.calls.find(([url, init]) => url === "/api/maintenance/agents" && init?.method === "POST")!
+    const body = JSON.parse(String(call[1]?.body ?? "{}"))
+    expect(body.combatBuffs.corePassive.effects[0]).toMatchObject({
+      stat: "anomalyDamageBonus",
+      target: { kind: "default" },
+    })
+    expect(body.combatBuffs.corePassive.effects[0].target).toEqual({ kind: "default" })
+  })
+
   it("edits and saves a structured anomaly target", async () => {
     const { wrapper, fetchMock } = await mountView()
     const rule = wrapper.find(".maintenance-rule-card")

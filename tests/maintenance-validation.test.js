@@ -334,6 +334,12 @@ assertValid("agents", {
     damageElement: "ether",
     specialty: "rupture",
 })
+assertValid("agents", {
+    ...validAgent,
+    attribute: "lumiflux",
+    damageElement: "lumiflux",
+    specialty: "anomaly",
+})
 assertInvalid("agents", {
     ...validAgent,
     attribute: "frost",
@@ -407,6 +413,9 @@ assertValid("agents", {
     },
 })
 assertValid("agent-skills", validAgentSkill)
+const lumifluxAgentSkill = clone(validAgentSkill)
+lumifluxAgentSkill.categories[0].moves[0].damageElement = "lumiflux"
+assertValid("agent-skills", lumifluxAgentSkill)
 const agentSkillWithTags = clone(validAgentSkill)
 agentSkillWithTags.categories[0].moves[0].skillTags = ["dashAttack", "assistAttack"]
 assertValid("agent-skills", agentSkillWithTags)
@@ -1227,6 +1236,10 @@ assertInvalid("anomaly-effects", {
 }, "element")
 assertInvalid("anomaly-effects", {
     ...validAnomalyEffect,
+    element: "lumiflux",
+}, "element")
+assertInvalid("anomaly-effects", {
+    ...validAnomalyEffect,
     baseMultiplier: -1,
 }, "不能小于 0")
 assertInvalid("anomaly-effects", validAnomalyEffect, "重复", {
@@ -1299,6 +1312,40 @@ assertValid("agents", {
     ...validAgent,
     defaultCalculationConfig: validDefaultCalculationConfig,
 }, validCalculationContext)
+
+const lumifluxManualDirectEvent = {
+    id: "lumiflux-direct",
+    kind: "direct",
+    count: 1,
+    stunned: true,
+    critMode: "expected",
+    skillMultiplier: 100,
+    damageElement: "lumiflux",
+}
+const lumifluxManualDirectAgent = {
+    ...validAgent,
+    attribute: "lumiflux",
+    damageElement: "lumiflux",
+    specialty: "anomaly",
+    defaultCalculationConfig: {
+        mode: "custom",
+        name: { zhCN: "流明直伤" },
+        selectedEventId: lumifluxManualDirectEvent.id,
+        events: [lumifluxManualDirectEvent],
+    },
+}
+assertValid("agents", lumifluxManualDirectAgent, validCalculationContext)
+assert.equal(
+    cleanMaintenanceItem("agents", lumifluxManualDirectAgent).defaultCalculationConfig.events[0].damageElement,
+    "lumiflux",
+)
+assertInvalid("agents", {
+    ...lumifluxManualDirectAgent,
+    defaultCalculationConfig: {
+        ...lumifluxManualDirectAgent.defaultCalculationConfig,
+        events: [{ ...lumifluxManualDirectEvent, kind: "sheer" }],
+    },
+}, "不是支持的选项", validCalculationContext)
 
 const validReleaseProfile = {
     id: "test-release-profile",
@@ -1422,6 +1469,134 @@ assertInvalid("agents", {
         events: [{ ...validReleaseEvent, anomalyVariant: "release" }],
     },
 }, "异放不能保存为异常形态", validCalculationContext)
+
+const validLuminescenceEvent = {
+    id: "luminescence-1",
+    kind: "anomaly",
+    settlementType: "luminescence",
+    triggerActorRef: { agentId: validAgent.id },
+    teammateAttack: 2800,
+    luminescenceDamageSharePct: 50,
+}
+function luminescenceAgentWithEvent(event) {
+    return {
+        ...validAgent,
+        defaultCalculationConfig: {
+            mode: "anomaly",
+            selectedEventId: event.id,
+            events: [event],
+        },
+    }
+}
+assertValid("agents", luminescenceAgentWithEvent(validLuminescenceEvent), validCalculationContext)
+const cleanedLegacyLuminescenceAgent = cleanMaintenanceItem("agents", luminescenceAgentWithEvent({
+    ...validLuminescenceEvent,
+    count: 3,
+    stunned: true,
+    moveRef: { moveId: "basic_vertical_rainbow" },
+    records: [{ kind: "normal", T: 3150, k: 1.25, B: 7.13, sourceElement: "physical" }],
+    resistanceMode: "sourceElement",
+    referenceAnomalyProficiency: 642,
+    referenceLuminescenceDamageMultiplier: 1.51,
+}))
+assert.deepEqual(cleanedLegacyLuminescenceAgent.defaultCalculationConfig.events[0], {
+    id: validLuminescenceEvent.id,
+    kind: "anomaly",
+    settlementType: "luminescence",
+    triggerActorRef: { agentId: validAgent.id },
+    teammateAttack: 2800,
+    luminescenceDamageSharePct: 50,
+})
+const legacyLuminescenceWithoutNewField = {
+    ...validLuminescenceEvent,
+    teammateAttack: undefined,
+    records: [{ kind: "normal", T: 3150, k: 1.25, B: 7.13 }],
+}
+delete legacyLuminescenceWithoutNewField.luminescenceDamageSharePct
+const cleanedLegacyLuminescenceWithoutNewField = cleanMaintenanceItem(
+    "agents",
+    luminescenceAgentWithEvent(legacyLuminescenceWithoutNewField),
+)
+assert.equal(cleanedLegacyLuminescenceWithoutNewField.defaultCalculationConfig.events[0].teammateAttack, 3150)
+assert.equal(cleanedLegacyLuminescenceWithoutNewField.defaultCalculationConfig.events[0].luminescenceDamageSharePct, 50)
+assert.equal("referenceAnomalyProficiency" in cleanedLegacyLuminescenceWithoutNewField.defaultCalculationConfig.events[0], false)
+assert.equal("referenceLuminescenceDamageMultiplier" in cleanedLegacyLuminescenceWithoutNewField.defaultCalculationConfig.events[0], false)
+assertValid("agents", luminescenceAgentWithEvent({
+    ...validLuminescenceEvent,
+    referenceAnomalyProficiency: -1,
+    referenceLuminescenceDamageMultiplier: 0,
+}), validCalculationContext)
+assertValid("agents", luminescenceAgentWithEvent({
+    ...validLuminescenceEvent,
+    luminescenceDamageSharePct: 0,
+}), validCalculationContext)
+assertValid("agents", luminescenceAgentWithEvent({
+    ...validLuminescenceEvent,
+    luminescenceDamageSharePct: 62.5,
+}), validCalculationContext)
+assertValid("agents", luminescenceAgentWithEvent({
+    ...validLuminescenceEvent,
+    luminescenceDamageSharePct: 100,
+}), validCalculationContext)
+assertInvalid("agents", luminescenceAgentWithEvent({
+    ...validLuminescenceEvent,
+    triggerActorRef: { agentId: "other_agent" },
+}), "耀变触发者必须是当前角色", validCalculationContext)
+assertInvalid("agents", luminescenceAgentWithEvent({
+    ...validLuminescenceEvent,
+    teammateAttack: -1,
+}), "队友初始攻击力不能小于 0", validCalculationContext)
+assertInvalid("agents", luminescenceAgentWithEvent({
+    ...validLuminescenceEvent,
+    teammateAttack: "invalid",
+}), "teammateAttack", validCalculationContext)
+for (const teammateAttack of [null, "", "   ", false, true]) {
+    const invalidAgent = luminescenceAgentWithEvent({
+        ...validLuminescenceEvent,
+        teammateAttack,
+    })
+    assertInvalid("agents", invalidAgent, "teammateAttack", validCalculationContext)
+    assert.equal(
+        cleanMaintenanceItem("agents", invalidAgent).defaultCalculationConfig.events[0].teammateAttack,
+        teammateAttack,
+    )
+}
+assertInvalid("agents", luminescenceAgentWithEvent({
+    ...validLuminescenceEvent,
+    luminescenceDamageSharePct: -0.01,
+}), "耀变伤害占比不能小于 0", validCalculationContext)
+assertInvalid("agents", luminescenceAgentWithEvent({
+    ...validLuminescenceEvent,
+    luminescenceDamageSharePct: 100.01,
+}), "耀变伤害占比不能大于 100", validCalculationContext)
+assertInvalid("agents", luminescenceAgentWithEvent({
+    ...validLuminescenceEvent,
+    luminescenceDamageSharePct: "invalid",
+}), "luminescenceDamageSharePct", validCalculationContext)
+assertInvalid("agents", luminescenceAgentWithEvent({
+    ...validLuminescenceEvent,
+    luminescenceDamageSharePct: null,
+}), "luminescenceDamageSharePct", validCalculationContext)
+for (const luminescenceDamageSharePct of ["", "   ", false, true]) {
+    const invalidAgent = luminescenceAgentWithEvent({
+        ...validLuminescenceEvent,
+        luminescenceDamageSharePct,
+    })
+    assertInvalid("agents", invalidAgent, "luminescenceDamageSharePct", validCalculationContext)
+    assert.equal(
+        cleanMaintenanceItem("agents", invalidAgent).defaultCalculationConfig.events[0].luminescenceDamageSharePct,
+        luminescenceDamageSharePct,
+    )
+}
+assertInvalid("agents", {
+    ...validAgent,
+    defaultCalculationConfig: {
+        mode: "custom",
+        selectedEventId: validLuminescenceEvent.id,
+        events: [validLuminescenceEvent, validDefaultCalculationConfig.events[0]],
+    },
+}, "队伍异常评分必须作为单独事件使用", validCalculationContext)
+
 assertInvalid("agents", {
     ...validAgent,
     defaultCalculationConfig: {
@@ -2423,6 +2598,65 @@ assert.deepEqual(cleanMaintenanceItem("combat-buffs", anomalyTargetBuff).effects
     settlementType: "disorder",
     anomalyEffects: ["flinch"],
 })
+const broadAnomalyDamageBuff = {
+    ...anomalyTargetBuff,
+    effects: [{
+        id: "broad-anomaly-damage",
+        type: "fixed",
+        stat: "anomalyDamageBonus",
+        mode: "flat",
+        value: 15,
+        target: { kind: "default" },
+    }],
+}
+assertValid("combat-buffs", broadAnomalyDamageBuff)
+assert.deepEqual(
+    cleanMaintenanceItem("combat-buffs", {
+        ...broadAnomalyDamageBuff,
+        effects: [{
+            ...broadAnomalyDamageBuff.effects[0],
+            target: {
+                kind: "default",
+                settlementType: "attribute",
+                anomalyEffects: ["assault"],
+                anomalyVariants: ["normal"],
+            },
+        }],
+    }).effects[0].target,
+    { kind: "default" },
+    "Broad Anomaly Damage should save without stale precise-target fields",
+)
+assert.deepEqual(
+    cleanMaintenanceItem("combat-buffs", {
+        ...broadAnomalyDamageBuff,
+        effects: [{ ...broadAnomalyDamageBuff.effects[0], target: undefined }],
+    }).effects[0].target,
+    { kind: "default" },
+    "Broad Anomaly Damage should save with an explicit default target",
+)
+assertValid("combat-buffs", {
+    ...broadAnomalyDamageBuff,
+    effects: [{
+        ...broadAnomalyDamageBuff.effects[0],
+        id: "precise-assault-damage",
+        target: {
+            kind: "anomaly",
+            settlementType: "attribute",
+            anomalyEffects: ["assault"],
+        },
+    }],
+})
+assertInvalid("combat-buffs", {
+    ...broadAnomalyDamageBuff,
+    effects: [{
+        ...broadAnomalyDamageBuff.effects[0],
+        id: "unsupported-skill-anomaly-damage",
+        target: {
+            kind: "skill",
+            skillTargets: [{ kind: "skillType", skillType: "ultimate" }],
+        },
+    }],
+}, "技能增幅对象不支持该增幅类型")
 assertValid("combat-buffs", {
     ...anomalyTargetBuff,
     effects: [{
@@ -2438,6 +2672,45 @@ assertValid("combat-buffs", {
         target: { kind: "anomaly", settlementType: "release", anomalyEffects: ["corruption"] },
     }],
 })
+const luminescenceTargetBuff = {
+    ...anomalyTargetBuff,
+    effects: [{
+        ...anomalyTargetBuff.effects[0],
+        id: "luminescence-target",
+        target: { kind: "anomaly", settlementType: "luminescence" },
+    }],
+}
+assertValid("combat-buffs", luminescenceTargetBuff)
+assert.deepEqual(
+    cleanMaintenanceItem("combat-buffs", {
+        ...luminescenceTargetBuff,
+        effects: [{
+            ...luminescenceTargetBuff.effects[0],
+            target: {
+                kind: "anomaly",
+                settlementType: "luminescence",
+                anomalyEffects: [],
+                anomalyVariants: [],
+            },
+        }],
+    }).effects[0].target,
+    { kind: "anomaly", settlementType: "luminescence" },
+    "Empty Luminescence filters should save as a settlement-wide target",
+)
+assertInvalid("combat-buffs", {
+    ...luminescenceTargetBuff,
+    effects: [{
+        ...luminescenceTargetBuff.effects[0],
+        target: { kind: "anomaly", settlementType: "luminescence", anomalyEffects: ["corruption"] },
+    }],
+}, "耀变结算只能配置为整类目标，不能指定具体异常")
+assertInvalid("combat-buffs", {
+    ...luminescenceTargetBuff,
+    effects: [{
+        ...luminescenceTargetBuff.effects[0],
+        target: { kind: "anomaly", settlementType: "luminescence", anomalyVariants: ["normal"] },
+    }],
+}, "耀变结算只能配置为整类目标，不能指定异常形态")
 const wildcardAnomalyTargetBuff = {
     ...anomalyTargetBuff,
     effects: [{

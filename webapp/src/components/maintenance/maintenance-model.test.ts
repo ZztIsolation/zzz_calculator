@@ -1,8 +1,82 @@
 import { describe, expect, it } from "vitest"
 import { cloneForCreate, maskedPreview, prepareDraft } from "./maintenance-model"
-import { agentOptions, effectSummary, EVENT_STATS, PANEL_STATS, statOptions } from "./maintenance-options"
+import {
+  agentOptions, DAMAGE_ELEMENT_OPTIONS, DIRECT_DAMAGE_ELEMENT_OPTIONS, effectSummary, EVENT_STATS, PANEL_STATS, statOptions,
+} from "./maintenance-options"
 
 describe("maintenance structured model", () => {
+  it("migrates Luminescence drafts to the minimal team-score event structure", () => {
+    const draft = prepareDraft("agents", {
+      defaultCalculationConfig: {
+        events: [{
+          id: "luminescence-event",
+          kind: "anomaly",
+          settlementType: "luminescence",
+          triggerActorRef: { agentId: "remielle_dan" },
+          records: [{ kind: "normal", T: 3150, k: 1.2, B: 7.13 }],
+          resistanceMode: "sourceElement",
+        }],
+      },
+    })
+
+    expect(draft.defaultCalculationConfig.events[0]).toEqual({
+      id: "luminescence-event",
+      kind: "anomaly",
+      settlementType: "luminescence",
+      triggerActorRef: { agentId: "remielle_dan" },
+      teammateAttack: 3150,
+      luminescenceDamageSharePct: 50,
+    })
+  })
+
+  it("preserves explicit Luminescence share values for maintenance validation", () => {
+    const draft = prepareDraft("agents", {
+      defaultCalculationConfig: {
+        events: [{
+          id: "luminescence-event",
+          kind: "anomaly",
+          settlementType: "luminescence",
+          triggerActorRef: { agentId: "remielle_dan" },
+          teammateAttack: 2800,
+          luminescenceDamageSharePct: null,
+        }],
+      },
+    })
+
+    expect(draft.defaultCalculationConfig.events[0].luminescenceDamageSharePct).toBeNull()
+  })
+
+  it("drops legacy Luminescence measured-reference fields", () => {
+    const draft = prepareDraft("agents", {
+      defaultCalculationConfig: {
+        events: [{
+          id: "luminescence-event",
+          kind: "anomaly",
+          settlementType: "luminescence",
+          triggerActorRef: { agentId: "remielle_dan" },
+          teammateAttack: 2800,
+          luminescenceDamageSharePct: 50,
+          referenceAnomalyProficiency: 642,
+          referenceLuminescenceDamageMultiplier: 1.51,
+        }],
+      },
+    })
+
+    expect(draft.defaultCalculationConfig.events[0]).toEqual({
+      id: "luminescence-event",
+      kind: "anomaly",
+      settlementType: "luminescence",
+      triggerActorRef: { agentId: "remielle_dan" },
+      teammateAttack: 2800,
+      luminescenceDamageSharePct: 50,
+    })
+  })
+
+  it("keeps Lumiflux in direct-damage choices without exposing it as a resistance element", () => {
+    expect(DIRECT_DAMAGE_ELEMENT_OPTIONS.some(option => option.value === "lumiflux")).toBe(true)
+    expect(DAMAGE_ELEMENT_OPTIONS.some(option => option.value === "lumiflux")).toBe(false)
+  })
+
   it("uses the unified Disorder multiplier stat instead of physical-only variants", () => {
     const removedStats = ["physicalDisorderMultiplierBonusPerRemainingSecond", "physicalDisorderMultiplierBonusCap"]
     expect(PANEL_STATS.some(([stat]) => removedStats.includes(stat))).toBe(false)

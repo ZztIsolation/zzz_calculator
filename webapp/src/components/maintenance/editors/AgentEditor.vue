@@ -12,7 +12,7 @@ import AnomalyReleaseProfilesEditor from "../AnomalyReleaseProfilesEditor.vue"
 import BuffModifiersEditor from "../BuffModifiersEditor.vue"
 import SourceListEditor from "../SourceListEditor.vue"
 import {
-  ATTACK_TYPE_OPTIONS, ATTRIBUTE_OPTIONS, CORE_SKILL_LEVELS, DAMAGE_ELEMENT_OPTIONS, RARITY_OPTIONS, SCOPE_OPTIONS, SPECIALTY_OPTIONS,
+  ATTACK_TYPE_OPTIONS, ATTRIBUTE_OPTIONS, CORE_SKILL_LEVELS, DIRECT_DAMAGE_ELEMENT_OPTIONS, RARITY_OPTIONS, SCOPE_OPTIONS, SPECIALTY_OPTIONS,
   defaultCalculationEvent, option,
 } from "../maintenance-options"
 import { internalId, textOf } from "../maintenance-model"
@@ -123,7 +123,7 @@ function enableCoreSkill(enabled: boolean) {
         <label class="maintenance-field"><span>中文名称</span><NInput :value="textOf(model.name)" :disabled="disabled" @update:value="model.name = { ...model.name, zhCN: String($event) }; changed()" /></label>
         <label class="maintenance-field"><span>稀有度</span><NSelect v-model:value="model.rarity" :options="RARITY_OPTIONS" :disabled="disabled" @update:value="changed" /></label>
         <label class="maintenance-field"><span>属性</span><NSelect v-model:value="model.attribute" :options="ATTRIBUTE_OPTIONS" :disabled="disabled" @update:value="changed" /></label>
-        <label class="maintenance-field"><span>伤害结算属性</span><NSelect v-model:value="model.damageElement" :options="[{ label: '同角色属性', value: '' }, ...DAMAGE_ELEMENT_OPTIONS]" :disabled="disabled" @update:value="changed" /></label>
+        <label class="maintenance-field"><span>伤害结算属性</span><NSelect v-model:value="model.damageElement" :options="[{ label: '同角色属性', value: '' }, ...DIRECT_DAMAGE_ELEMENT_OPTIONS]" :disabled="disabled" @update:value="changed" /></label>
         <label class="maintenance-field"><span>特性</span><NSelect :value="model.specialty" :options="SPECIALTY_OPTIONS" :disabled="disabled" @update:value="changeSpecialty(String($event))" /></label>
         <label class="maintenance-field"><span>阵营</span><NInput v-model:value="model.faction" :disabled="disabled" @update:value="changed" /></label>
         <label class="maintenance-field"><span>攻击类型</span><NSelect multiple clearable v-model:value="model.attackTypes" :options="ATTACK_TYPE_OPTIONS" :disabled="disabled" @update:value="changed" /></label>

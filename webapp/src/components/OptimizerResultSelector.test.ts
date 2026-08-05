@@ -123,4 +123,19 @@ describe("OptimizerResultSelector", () => {
     expect(wrapper.get("[role='progressbar']").classes()).toContain("is-stale")
     expect(wrapper.get("[role='progressbar']").attributes("aria-label")).toContain("上次评分")
   })
+
+  it("formats Luminescence team optimization results as a three-decimal score with k", () => {
+    const wrapper = mount(OptimizerResultSelector, {
+      props: {
+        modelValue: 1,
+        results: [{ rank: 1, score: 5134.289 }],
+        scoreLabel: "队伍异常评分",
+        scoreSuffix: "× k",
+        scoreDigits: 3,
+      },
+    })
+
+    expect(wrapper.text()).toContain("第 1 套 · 100% · 队伍异常评分 5,134.289 × k")
+    expect(wrapper.get("[role='progressbar']").attributes("aria-label")).toContain("队伍异常评分比例")
+  })
 })

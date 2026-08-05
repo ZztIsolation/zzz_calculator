@@ -2916,6 +2916,7 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
     const scoreInputBase = {
         agentId: input.agentId,
         coreSkillLevel: input.coreSkillLevel,
+        cinemaLevel: input.cinemaLevel,
         wEngineId: input.wEngineId,
         wEngineModificationLevel: input.wEngineModificationLevel,
         combatBuffs,

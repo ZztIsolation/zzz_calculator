@@ -10,6 +10,7 @@ declare module "@core/calculator-core.js" {
   export function calculateOutOfCombatPanel(catalog: any, input: any): any
   export function calculateInCombatPanel(catalog: any, input: any): any
   export function damageModifierAppliesTo(modifier?: any, event?: any): boolean
+  export function isTeamAnomalyDamageModifier(modifier?: any): boolean
 }
 
 declare module "@core/damageEventMultipliers.js" {
@@ -37,6 +38,250 @@ declare module "@core/anomalyRelease.js" {
   export function validateAnomalyReleaseProfile(profile?: any): string[]
   export function normalizeAnomalySourceSnapshot(snapshot?: any): any
   export function createAnomalySourceSnapshot(input?: any): any
+}
+
+declare module "@core/luminescence.js" {
+  export type LuminescenceCoreLevel = "initial" | "A" | "B" | "C" | "D" | "E" | "F"
+  export type LuminescenceObjectiveKind = "luminescenceTeamScore"
+  export type LuminescenceDisplayObjectiveKind = LuminescenceObjectiveKind | "luminescenceScore"
+
+  export interface LuminescenceEvent {
+    id?: string
+    kind: "anomaly"
+    count?: number
+    settlementType: "luminescence"
+    triggerActorRef?: { agentId: string }
+    teammateAttack: number
+    luminescenceDamageSharePct: number
+  }
+
+  export interface LuminescenceEvaluationInput {
+    id?: string
+    label?: string
+    kind?: "anomaly"
+    settlementType?: "luminescence"
+    triggerActorRef?: { agentId: string }
+    teammateAttack?: number
+    luminescenceDamageSharePct?: number
+    danInitialAtk?: number
+    danAnomalyProficiency?: number
+    coreSkillLevel?: LuminescenceCoreLevel
+    cinemaLevel?: number
+    teamAnomalyDamageMultiplier?: number
+    luminescenceDamageMultiplier?: number
+  }
+
+  export interface NormalizedLuminescenceEvent {
+    id?: string
+    label?: string
+    kind: "anomaly"
+    settlementType: "luminescence"
+    triggerActorRef?: { agentId: string }
+    teammateAttack: number
+    luminescenceDamageSharePct: number
+    danInitialAtk: number
+    danAnomalyProficiency: number
+    coreSkillLevel: LuminescenceCoreLevel
+    cinemaLevel: number
+    teamAnomalyDamageMultiplier: number
+    luminescenceDamageMultiplier: number
+    anomalyAgentCount: 3
+    additionalAbilityActive: true
+    objectiveKind: LuminescenceObjectiveKind
+    scoreSuffix: "× k"
+  }
+
+  export interface LuminescenceScoreStatus {
+    scalarReady: true
+    objectiveKind: LuminescenceObjectiveKind
+    scoreSuffix: "× k"
+    dependencies: string[]
+    reasons: string[]
+    warnings: unknown[]
+    teammateAttack: number
+  }
+
+  export interface LuminescenceFormulaValues {
+    teammateAttack: number
+    danInitialAtk: number
+    danAnomalyProficiency: number
+    shareRate: number
+    sharedAttack: number
+    sharedAttackCap: number
+    attackPool: number
+    baseConversionCoefficient: number
+    cinemaTwoBonus: number
+    proficiencyConversionRate: number
+    proficiencyConversionBonus: number
+    conversionCoefficient: number
+    coreAlpha: number
+    proficiencyMultiplier: number
+    teamAnomalyDamageMultiplier: number
+    teamAnomalyDamageBonus: number
+    luminescenceDamageMultiplier: number
+    luminescenceDamageBonus: number
+    luminescenceExclusiveDamageBonus: number
+    luminescenceDamageSharePct: number
+    luminescenceDamageShare: number
+    commonDamageFactor: number
+    otherAnomalyFactor: number
+    luminescenceFactor: number
+    exclusiveLuminescenceFactor: number
+    luminescenceRelativeDamageMultiplier: number
+    luminescenceRelativeFactor: number
+    weightedOtherAnomalyMultiplier?: number
+    weightedExclusiveMultiplier?: number
+    weightedTeamScoreMultiplier?: number
+    referenceAnomalyProficiency?: number
+    referenceProficiencyMultiplier?: number
+    referenceLuminescenceDamageMultiplier?: number
+    referenceLuminescenceFactor?: number
+    referenceOtherAnomalyFactor?: number
+    referenceFactorsExplicit?: boolean
+    usesImplicitReference?: boolean
+    referenceSource?: "frozenBuild" | "currentBuildFallback"
+    otherAnomalyContribution?: number
+    luminescenceContribution?: number
+    weightedReferenceRatio?: number
+    baseTeamFactor: number
+    luminescenceExclusiveFactor: number
+  }
+
+  export interface LuminescenceFactors {
+    event: NormalizedLuminescenceEvent
+    formulaValues: LuminescenceFormulaValues
+    teammateAttack: number
+    danInitialAtk: number
+    danAnomalyProficiency: number
+    shareRate: number
+    sharedAttack: number
+    attackPool: number
+    baseConversionCoefficient: number
+    cinemaTwoBonus: number
+    proficiencyConversionBonus: number
+    conversionCoefficient: number
+    alpha: number
+    proficiencyMultiplier: number
+    teamAnomalyDamageMultiplier: number
+    teamAnomalyDamageBonus: number
+    luminescenceDamageMultiplier: number
+    luminescenceDamageBonus: number
+    luminescenceExclusiveDamageBonus: number
+    luminescenceDamageSharePct: number
+    luminescenceDamageShare: number
+    commonDamageFactor: number
+    otherAnomalyFactor: number
+    luminescenceFactor: number
+    exclusiveLuminescenceFactor: number
+    luminescenceRelativeDamageMultiplier: number
+    luminescenceRelativeFactor: number
+    baseTeamFactor: number
+    luminescenceExclusiveFactor: number
+  }
+
+  export interface LuminescenceScoreResult extends LuminescenceScoreStatus, LuminescenceFactors {
+    score: number
+    damage: number
+    finalDamage: number
+    complete: true
+    modelKind: "referenceCalibrated" | "geometricShare"
+    weightedOtherAnomalyMultiplier: number
+    weightedExclusiveMultiplier: number
+    weightedTeamScoreMultiplier: number
+    scoreBeforeLuminescenceDamageMultiplier: number
+    referenceLuminescenceFactor?: number
+    referenceOtherAnomalyFactor?: number
+    referenceFactors?: LuminescenceReferenceFactors
+    otherAnomalyRatio?: number
+    luminescenceRatio?: number
+    weightedReferenceRatio?: number
+    weightedLuminescenceFactor?: number
+    referenceAnomalyProficiency?: number
+    referenceProficiencyMultiplier?: number
+    referenceLuminescenceDamageMultiplier?: number
+    referenceFactorsExplicit?: boolean
+    usesImplicitReference?: boolean
+    referenceSource?: "frozenBuild" | "currentBuildFallback"
+    otherAnomalyContribution?: number
+    luminescenceContribution?: number
+  }
+
+  export interface LuminescenceReferenceFactors {
+    otherAnomalyFactor: number
+    luminescenceFactor: number
+  }
+
+  export interface LuminescenceModelComparison {
+    candidateId?: string
+    constantShareRelativeScore: number
+    referenceCalibratedRelativeScore: number
+    relativeDifference: number
+    differencePercent: number
+    baseRatio: number
+    otherAnomalyRatio: number
+    luminescenceRatio: number
+    luminescenceDamageSharePct: number
+  }
+
+  export interface LuminescenceModelRankingEntry {
+    candidateIndex: number
+    candidateId?: string
+    relativeScore: number
+    rank: number
+  }
+
+  export interface LuminescenceModelRankDifference {
+    candidateIndex: number
+    candidateId?: string
+    constantShareRank: number
+    referenceCalibratedRank: number
+    rankDifference: number
+  }
+
+  export interface LuminescenceRankedModelComparison extends LuminescenceModelComparison, LuminescenceModelRankDifference {}
+
+  export interface LuminescenceModelComparisonSet {
+    candidates: LuminescenceRankedModelComparison[]
+    constantShareRanking: LuminescenceModelRankingEntry[]
+    referenceCalibratedRanking: LuminescenceModelRankingEntry[]
+    rankingDifferences: LuminescenceModelRankDifference[]
+    hasRankingDifference: boolean
+  }
+
+  export const LUMINESCENCE_SETTLEMENT_TYPE: "luminescence"
+  export const LUMINESCENCE_OBJECTIVE_KIND: LuminescenceObjectiveKind
+  export const LUMINESCENCE_SCORE_SUFFIX: "× k"
+  export const LUMINESCENCE_DEFAULT_TEAMMATE_ATTACK: number
+  export const LUMINESCENCE_DEFAULT_DAMAGE_SHARE_PCT: number
+  export const LUMINESCENCE_SHARE_RATE: number
+  export const LUMINESCENCE_SHARED_ATK_CAP: number
+  export const LUMINESCENCE_CORE_ALPHA_BY_LEVEL: Readonly<Record<LuminescenceCoreLevel, number>>
+  export const LUMINESCENCE_MOVE_IDS: Readonly<Record<string, string>>
+  export const LUMINESCENCE_MOVE_REFS: Readonly<Record<string, string>>
+  export const LUMINESCENCE_MOVE_MULTIPLIERS_PERCENT: Readonly<Record<string, readonly number[]>>
+  export const LUMINESCENCE_MOVE_MULTIPLIER_METADATA: Readonly<Record<string, any>>
+  export function isLuminescenceSettlement(event?: any): boolean
+  export function parseLuminescenceCoreLevel(value?: any): LuminescenceCoreLevel | null
+  export function resolveLuminescenceAlpha(coreSkillLevel?: LuminescenceCoreLevel): number
+  export function parseLuminescenceMoveId(value?: any): string | null
+  export function parseLuminescenceSkillLevel(value?: any): number | null
+  export function resolveLuminescenceMoveMultiplierPercent(move?: any, level?: any): number
+  export function resolveLuminescenceMoveMultiplier(move?: any, level?: any): number
+  export function luminescenceMoveMultiplierSourceWarnings(move?: any, level?: any): any[]
+  export function luminescenceShareRate(): number
+  export function normalizeLuminescenceEvent(event?: LuminescenceEvaluationInput): NormalizedLuminescenceEvent
+  export function luminescenceStatDependencies(event?: LuminescenceEvaluationInput): string[]
+  export function luminescenceScoreStatus(event?: LuminescenceEvaluationInput): LuminescenceScoreStatus
+  export function luminescenceScalarOptimizationStatus(event?: LuminescenceEvaluationInput): LuminescenceScoreStatus
+  export function isLuminescenceScalarReady(event?: LuminescenceEvaluationInput): boolean
+  export function evaluateLuminescenceFactors(event?: LuminescenceEvaluationInput): LuminescenceFactors
+  export function evaluateGeometricShareTeamScore(event?: LuminescenceEvaluationInput): LuminescenceScoreResult
+  export function evaluateConstantShareTeamScore(event?: LuminescenceEvaluationInput): LuminescenceScoreResult
+  export function evaluateReferenceCalibratedTeamScore(event: LuminescenceEvaluationInput | undefined, referenceLuminescenceFactor: number | LuminescenceReferenceFactors): LuminescenceScoreResult
+  export function compareLuminescenceTeamScoreModels(candidateEvent?: LuminescenceEvaluationInput, referenceEvent?: LuminescenceEvaluationInput): LuminescenceModelComparison
+  export function compareLuminescenceTeamScoreModels(candidateEvents: LuminescenceEvaluationInput[], referenceEvent?: LuminescenceEvaluationInput): LuminescenceModelComparisonSet
+  export function evaluateLuminescenceScore(event?: LuminescenceEvaluationInput): LuminescenceScoreResult
+  export function evaluateLuminescence(event?: LuminescenceEvaluationInput): LuminescenceScoreResult
 }
 
 declare module "@core/corePassiveScaling.js" {
@@ -209,6 +454,7 @@ declare module "@core/drive-disc-core.js" {
 declare module "@core/inventory-model.js" {
   export function driveDiscContentFingerprint(disc: any, options?: any): string
   export function driveDiscIdentityFingerprint(disc: any, options?: any): string
+  export function migrateDriveDiscSetAliases(store?: any, options?: any): any
   export function normalizeInventoryStore(store?: any, options?: any): any
   export function ownerScopedStore(store: any, ownerId?: string, options?: any): any
   export function buildScannerImportPlan(store: any, input: any, options?: any): any

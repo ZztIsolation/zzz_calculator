@@ -10,6 +10,7 @@ import {
     materializeWEngineForModificationLevel,
 } from "../backend/calculator.js"
 import {
+    defaultWEngineIdForAgent,
     defaultRuntimeForBuff,
     materializeWEngineForModificationLevel as materializeFrontendWEngine,
     runtimeStackGroups,
@@ -81,6 +82,9 @@ const expectedModificationValues = {
     "zzz_wiki_1908:selfBuff:effect_wiki_1908_self_ap:value": [90, 103, 117, 130, 145],
     "zzz_wiki_1908:selfBuff:effect_wiki_1908_self_ap_bonus:value": [60, 69, 78, 87, 96],
     "zzz_wiki_1908:teamBuff:effect_wiki_1908_team_dmg:valuePerStack": [15, 17, 19.5, 21, 24],
+    "zzz_wiki_2109:selfBuff:effect_wiki_2109_self_anomaly_proficiency:value": [96, 105, 115, 125, 135],
+    "zzz_wiki_2109:selfBuff:effect_wiki_2109_self_anomaly_damage:value": [20, 23, 26, 29, 32],
+    "zzz_wiki_2109:teamBuff:effect_wiki_2109_team_damage:value": [30, 34.5, 39, 43.5, 48],
 }
 
 for (const engine of catalog.wEngines) {
@@ -167,6 +171,161 @@ assert.match(
     wEngine("cloudcleave_radiance").effect.description.zhCN,
     /20%\/22%\/24%\/26%\/28%/,
     "Chinese descriptions should use fixed slash-delimited rank values",
+)
+
+const remielleSignature = wEngine("zzz_wiki_2109")
+assert.deepEqual(
+    [
+        remielleSignature.name.zhCN,
+        remielleSignature.rarity,
+        remielleSignature.specialty,
+        remielleSignature.relatedAgentId,
+        remielleSignature.level60.atkBase,
+        remielleSignature.level60.advancedStat.stat,
+        remielleSignature.level60.advancedStat.value,
+        remielleSignature.level60.advancedStat.mode,
+    ],
+    ["空羽复归之诗", "S", "anomaly", "remielle_dan", 743, "atkPct", 36, "pct"],
+    "Remielle's signature W-Engine should keep its exact official level-60 catalog data",
+)
+assert.equal(remielleSignature.attribute, undefined, "The official entry should not invent a Lumiflux damage bucket for the W-Engine")
+assert.equal(remielleSignature.effect.name.zhCN, "失乐园")
+assert.equal(remielleSignature.effect.requirement.specialty, "anomaly")
+assert.match(remielleSignature.effect.description.zhCN, /异常精通提升96\/105\/115\/125\/135点.*属性异常伤害提升20%\/23%\/26%\/29%\/32%.*伤害提升30%\/34\.5%\/39%\/43\.5%\/48%/)
+assert.ok(
+    remielleSignature.sources.includes("https://baike.mihoyo.com/zzz/wiki/content/2109/detail?mhy_presentation_style=fullscreen"),
+    "Remielle's signature W-Engine should cite its official detail page",
+)
+assert.equal(
+    defaultWEngineIdForAgent(catalog.wEngines, "remielle_dan", ""),
+    "zzz_wiki_2109",
+    "Remielle should default to her signature W-Engine when no valid saved choice exists",
+)
+
+const remielleSignatureAnomalyRule = rule(
+    "zzz_wiki_2109",
+    "selfBuff",
+    "effect_wiki_2109_self_anomaly_damage",
+)
+assert.deepEqual(
+    remielleSignatureAnomalyRule.target,
+    { kind: "default" },
+    "Default anomalyDamageBonus should keep its settlement-wide scope",
+)
+assert.equal(remielleSignatureAnomalyRule.condition, "装备者触发[异化]反应")
+assert.equal(remielleSignatureAnomalyRule.durationSeconds, 30)
+assert.deepEqual(remielleSignatureAnomalyRule.coverage, { default: 1, min: 0, max: 1, step: 0.1 })
+assert.equal(remielleSignature.effect.teamBuff.condition, "装备者触发[异化]反应")
+assert.equal(remielleSignature.effect.teamBuff.durationSeconds, 30)
+
+function signatureAriaInput(damage) {
+    return {
+        agentId: "aria",
+        coreSkillLevel: "F",
+        cinemaLevel: 0,
+        wEngineId: "zzz_wiki_2109",
+        wEngineModificationLevel: 1,
+        combatBuffs: { activeBuffIds: ["wEngine:zzz_wiki_2109.self"] },
+        damage,
+    }
+}
+
+function signatureAriaResult(damage) {
+    return calculateInCombatPanel(catalog, signatureAriaInput(damage))
+}
+
+const signatureAttributeAnomaly = signatureAriaResult({
+    selectedEventId: "signature-attribute",
+    events: [{
+        id: "signature-attribute",
+        kind: "anomaly",
+        settlementType: "attribute",
+        anomalyEffect: "corruption",
+        count: 1,
+        stunned: true,
+    }],
+}).damage.events[0]
+const signatureDisorder = signatureAriaResult({
+    selectedEventId: "signature-disorder",
+    events: [{
+        id: "signature-disorder",
+        kind: "anomaly",
+        settlementType: "disorder",
+        anomalyEffect: "corruption",
+        disorderType: "normal",
+        elapsedSeconds: 0,
+        count: 1,
+        stunned: true,
+    }],
+}).damage.events[0]
+const signatureRelease = signatureAriaResult(clone(catalog.agentsMap.get("aria").defaultCalculationConfig)).damage.events[0]
+approx(signatureAttributeAnomaly.multipliers.anomalyDamage, 1.2, "Default anomalyDamageBonus should affect Attribute Anomaly")
+approx(signatureDisorder.multipliers.anomalyDamage, 1, "Default anomalyDamageBonus should not affect Disorder")
+approx(signatureRelease.multipliers.anomalyDamage, 1.2, "Default anomalyDamageBonus should affect Release")
+
+function signatureRemielleInput(level, activeBuffIds) {
+    return {
+        agentId: "remielle_dan",
+        coreSkillLevel: "F",
+        cinemaLevel: 0,
+        wEngineId: "zzz_wiki_2109",
+        wEngineModificationLevel: level,
+        combatBuffs: { activeBuffIds },
+        damage: clone(catalog.agentsMap.get("remielle_dan").defaultCalculationConfig),
+    }
+}
+
+function signatureRemielleResult(level, activeBuffIds) {
+    return calculateInCombatPanel(catalog, signatureRemielleInput(level, activeBuffIds))
+}
+
+const signatureRank1Self = signatureRemielleResult(1, ["wEngine:zzz_wiki_2109.self"])
+const signatureRank1Full = signatureRemielleResult(1, ["wEngine:zzz_wiki_2109.self", "wEngine:zzz_wiki_2109.team"])
+const signatureRank5Full = signatureRemielleResult(5, ["wEngine:zzz_wiki_2109.self", "wEngine:zzz_wiki_2109.team"])
+approx(signatureRank1Full.outOfCombat.bonusTotals.atkPct, 0.36, "Signature advanced ATK should be active outside combat")
+approx(signatureRank1Full.inCombat.buffTotals.anomalyProficiencyFlat, 96, "Signature rank 1 should grant 96 Anomaly Proficiency")
+approx(signatureRank5Full.inCombat.buffTotals.anomalyProficiencyFlat, 135, "Signature rank 5 should grant 135 Anomaly Proficiency")
+approx(signatureRank1Full.inCombat.buffTotals.dmgBonus, 0.3, "Signature rank 1 should grant 30% squad damage")
+approx(signatureRank5Full.inCombat.buffTotals.dmgBonus, 0.48, "Signature rank 5 should grant 48% squad damage")
+approx(signatureRank1Full.damage.events[0].multipliers.luminescenceDamage, 1.2, "Default anomalyDamageBonus should affect Luminescence")
+approx(signatureRank5Full.damage.events[0].multipliers.luminescenceDamage, 1.32, "Signature rank 5 should scale Luminescence damage bonus")
+approx(
+    signatureRank1Full.damage.finalDamage,
+    signatureRank1Self.damage.finalDamage,
+    "Generic squad damage should remain separate from the Luminescence Attribute Anomaly multiplier",
+)
+
+function assertSignatureScorePathParity(label, input) {
+    const calculator = createInCombatPanelCalculator(catalog, input)
+    const full = calculator.calculate([], { round: false })
+    const expected = full.damage.totalFinalDamage ?? full.damage.finalDamage
+    const compiled = calculator.scoreOnlyFromSummary(new Map(), new Map())
+    const legacy = calculator.scoreOnlyFromSummaryLegacy(new Map(), new Map())
+    const dense = calculator.compileDensePanelScoreTarget({
+        statIds: [],
+        setIds: [],
+        setIndexById: new Map(),
+    })
+    assert.ok(dense, `${label} should compile a dense signature W-Engine target`)
+    const denseSummary = dense.scoreDense(new Float64Array(), new Int16Array())
+    const fixedSummary = dense.compileForSetCounts(new Int16Array()).scoreScalar(new Float64Array())
+    for (const [pathLabel, result] of [
+        ["compiled", compiled],
+        ["legacy summary", legacy],
+        ["dense", denseSummary],
+        ["fixed", fixedSummary],
+    ]) {
+        approx(result.finalDamage, expected, `${label} ${pathLabel} score should equal the full calculation`)
+    }
+}
+
+assertSignatureScorePathParity(
+    "Release",
+    signatureAriaInput(clone(catalog.agentsMap.get("aria").defaultCalculationConfig)),
+)
+assertSignatureScorePathParity(
+    "Luminescence",
+    signatureRemielleInput(1, ["wEngine:zzz_wiki_2109.self"]),
 )
 
 const cloudcleaveRank2 = materializeFrontendWEngine(wEngine("cloudcleave_radiance"), 2)

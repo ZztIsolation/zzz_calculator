@@ -130,7 +130,7 @@ function anomalyTargetOptions(rule: any) {
 }
 
 function changeAnomalySettlement(rule: any, settlementType: string) {
-  const normalizedType = ["attribute", "disorder", "release"].includes(settlementType) ? settlementType : "attribute"
+  const normalizedType = ["attribute", "disorder", "release", "luminescence"].includes(settlementType) ? settlementType : "attribute"
   rule.target.settlementType = normalizedType
   delete rule.target.anomalyEffects
   if (normalizedType !== "attribute") delete rule.target.anomalyVariants
@@ -152,6 +152,7 @@ function changeAnomalyEffects(rule: any, values: unknown) {
 function anomalyTargetPlaceholder(rule: any) {
   if (rule.target?.settlementType === "release") return "全部原异常"
   if (rule.target?.settlementType === "disorder") return "全部紊乱"
+  if (rule.target?.settlementType === "luminescence") return "全部耀变"
   return "全部属性异常"
 }
 
@@ -300,7 +301,7 @@ function selectStackGroup(rule: any, value: string) {
 
       <div v-if="rule.target?.kind === 'anomaly'" class="maintenance-nested-panel maintenance-grid">
         <label class="maintenance-field"><span>结算类型</span><NSelect :value="rule.target.settlementType" :options="ANOMALY_SETTLEMENT_OPTIONS" :disabled="disabled" @update:value="changeAnomalySettlement(rule, String($event))" /></label>
-        <label class="maintenance-field maintenance-field-wide"><span>具体异常（留空为全部）</span><NSelect multiple filterable clearable :value="rule.target.anomalyEffects ?? []" :options="anomalyTargetOptions(rule)" :placeholder="anomalyTargetPlaceholder(rule)" :disabled="disabled" @update:value="changeAnomalyEffects(rule, $event)" /></label>
+        <label v-if="rule.target.settlementType !== 'luminescence'" class="maintenance-field maintenance-field-wide"><span>具体异常（留空为全部）</span><NSelect multiple filterable clearable :value="rule.target.anomalyEffects ?? []" :options="anomalyTargetOptions(rule)" :placeholder="anomalyTargetPlaceholder(rule)" :disabled="disabled" @update:value="changeAnomalyEffects(rule, $event)" /></label>
         <label v-if="rule.target.settlementType === 'attribute'" class="maintenance-field maintenance-field-wide"><span>异常形态（留空为全部）</span><NSelect multiple clearable :value="rule.target.anomalyVariants ?? []" :options="ANOMALY_VARIANT_OPTIONS" :disabled="disabled" @update:value="changeAnomalyVariants(rule, $event)" /></label>
       </div>
 

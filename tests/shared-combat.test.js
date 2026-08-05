@@ -13,6 +13,7 @@ import {
     CUSTOM_BUFF_STAT_OPTIONS,
     DAMAGE_KIND_LABELS,
     damageElementForAgent,
+    damageElementShortLabel,
     defaultWEngineIdForAgent,
     defaultRuntimeForBuff,
     ENUM_LABELS,
@@ -43,6 +44,10 @@ assert.equal(agentAttributeText(miyabiMeta), "烈霜（冰属性结算）")
 assert.equal(damageElementForAgent(miyabiMeta), "ice")
 assert.equal(agentAttributeText(yixuanMeta), "玄墨（以太属性结算）")
 assert.equal(damageElementForAgent(yixuanMeta), "ether")
+const lumifluxMeta = { attribute: "lumiflux", damageElement: "lumiflux" }
+assert.equal(agentAttributeText(lumifluxMeta), "流明")
+assert.equal(damageElementForAgent(lumifluxMeta), "lumiflux")
+assert.equal(damageElementShortLabel("lumiflux"), "流明")
 
 const defaultWEngines = [
     { id: "catalog-first", rarity: "B" },
@@ -289,8 +294,8 @@ assert.equal(
         mode: "flat",
         target: { kind: "anomaly", settlementType: "attribute" },
     }, {}, {}, meta),
-    "属性异常增伤% +18%（属性异常）",
-    "Settlement-wide Attribute Anomaly targets should display only their settlement type",
+    "指定异常增伤% +18%（属性异常）",
+    "Scoped Attribute Anomaly targets should use the precise anomaly label",
 )
 assert.equal(
     storedEffectRuleText({
@@ -302,6 +307,28 @@ assert.equal(
     }, {}, {}, meta),
     "无视防御率% +16%（异放）",
     "Settlement-wide Release targets should display only their settlement type",
+)
+assert.equal(
+    storedEffectRuleText({
+        type: "fixed",
+        stat: "anomalyDamageBonus",
+        value: 12,
+        mode: "flat",
+        target: { kind: "anomaly", settlementType: "luminescence" },
+    }, {}, {}, meta),
+    "指定异常增伤% +12%（耀变）",
+    "Settlement-wide Luminescence targets should use the precise anomaly label",
+)
+assert.equal(
+    storedEffectRuleText({
+        type: "fixed",
+        stat: "anomalyDamageBonus",
+        value: 12,
+        mode: "flat",
+        target: { kind: "default" },
+    }, {}, {}, meta),
+    "属性异常增伤% +12%",
+    "Default anomaly damage bonus should keep the broad stat label without a settlement suffix",
 )
 assert.equal(
     nameOf({ bossName: { zhCN: "测试 BOSS" } }),
@@ -821,9 +848,11 @@ const directSkillDamageOption = CUSTOM_BUFF_SKILL_STAT_OPTIONS.find(option => op
 assert.ok(directSkillDamageOption, "Skill Custom Buff stat options should include skill-targeted damage bonus")
 assert.equal(directSkillDamageOption[1], "技能目标伤害加成%")
 assert.equal(directSkillDamageOption[2], "skill", "Skill-targeted damage bonus option should be selected by target kind")
-const skillAnomalyDamageOption = CUSTOM_BUFF_SKILL_STAT_OPTIONS.find(option => option[0] === "anomalyDamageBonus")
-assert.ok(skillAnomalyDamageOption, "Skill Custom Buff stat options should include anomaly damage bonus")
-assert.equal(skillAnomalyDamageOption[2], "skill")
+assert.equal(
+    CUSTOM_BUFF_SKILL_STAT_OPTIONS.some(option => option[0] === "anomalyDamageBonus"),
+    false,
+    "Skill Custom Buff stat options should not expose anomaly damage bonus",
+)
 const skillDisorderDamageOption = CUSTOM_BUFF_SKILL_STAT_OPTIONS.find(option => option[0] === "disorderDamageBonus")
 assert.ok(skillDisorderDamageOption, "Skill Custom Buff stat options should include disorder damage bonus")
 assert.equal(skillDisorderDamageOption[2], "skill")

@@ -850,6 +850,10 @@ const janeCoreBuffId = "jane_doe.core_insight"
 const janeCinemaTwoBuffId = "jane_doe.cinema_2_assault_crit"
 const janeCinemaFourBuffId = "jane_doe.cinema_4_anomaly_damage"
 const janeCoreCritRateEffectId = "jane_doe_core_assault_crit_rate"
+const janeCinemaFourRule = catalog.combatBuffsMap
+    .get(janeCinemaFourBuffId)
+    ?.effects.find(effect => effect.id === "jane_doe_cinema_4_attribute_anomaly_damage")
+assert.deepEqual(janeCinemaFourRule?.target, { kind: "default" })
 
 const flinchWithoutJane = calculateEvent({
     id: "flinch-without-jane",

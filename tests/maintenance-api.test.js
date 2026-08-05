@@ -233,6 +233,30 @@ try {
         { default: 0.65, min: 0, max: 1, step: 0.1 },
     )
 
+    const danAgent = structuredClone(
+        managedAgentCatalog.agents.agents.find(item => item.id === "remielle_dan"),
+    )
+    assert.ok(danAgent?.defaultCalculationConfig?.events?.[0], "Dan maintenance fixture must exist")
+    for (const [field, invalidValue] of [
+        ["teammateAttack", null],
+        ["teammateAttack", ""],
+        ["teammateAttack", false],
+        ["luminescenceDamageSharePct", null],
+        ["luminescenceDamageSharePct", ""],
+        ["luminescenceDamageSharePct", true],
+    ]) {
+        const invalidDanAgent = structuredClone(danAgent)
+        invalidDanAgent.defaultCalculationConfig.events[0][field] = invalidValue
+        await saveRejected("agents", invalidDanAgent, field)
+    }
+    const legacyReferenceDanAgent = structuredClone(danAgent)
+    legacyReferenceDanAgent.defaultCalculationConfig.events[0].referenceAnomalyProficiency = -1
+    legacyReferenceDanAgent.defaultCalculationConfig.events[0].referenceLuminescenceDamageMultiplier = 0
+    const cleanedDanResult = await save("agents", legacyReferenceDanAgent)
+    const cleanedDanEvent = cleanedDanResult.savedItem.defaultCalculationConfig.events[0]
+    assert.equal("referenceAnomalyProficiency" in cleanedDanEvent, false)
+    assert.equal("referenceLuminescenceDamageMultiplier" in cleanedDanEvent, false)
+
     const timedAgent = structuredClone(managedAgentResult.savedItem)
     const disorderEffects = (await catalog()).anomalyEffects.effects.filter(item => item.settlementType === "disorder")
     const halfSecondDisorderEffect = disorderEffects.find(item => item.tickIntervalSeconds === 0.5)
@@ -427,6 +451,19 @@ try {
             value: 8,
             target: { kind: "anomaly", settlementType: "release", anomalyEffects: [] },
         },
+        {
+            id: "broad_anomaly_damage",
+            type: "fixed",
+            stat: "anomalyDamageBonus",
+            mode: "flat",
+            value: 15,
+            target: {
+                kind: "default",
+                settlementType: "attribute",
+                anomalyEffects: ["assault"],
+                anomalyVariants: ["normal"],
+            },
+        },
     ]
     const teammateResult = await save("teammate-buffs", {
         teammate: { ...teammateBase, id: teammateId },
@@ -457,6 +494,10 @@ try {
         kind: "anomaly",
         settlementType: "release",
     })
+    const savedBroadAnomalyDamage = teammateResult.savedItem.effects.find(rule => rule.id === "broad_anomaly_damage")
+    assert.ok(savedBroadAnomalyDamage)
+    assert.equal(savedBroadAnomalyDamage.stat, "anomalyDamageBonus")
+    assert.deepEqual(savedBroadAnomalyDamage.target, { kind: "default" })
     assert.equal(JSON.stringify(teammateResult.savedItem).includes("moveIdPrefixes"), false)
     assert.equal(JSON.stringify(teammateResult.savedItem).includes("appliesTo"), false)
     const reloadedTeammate = (await catalog()).combatBuffs.teammates.find(item => item.id === teammateId)
@@ -467,6 +508,7 @@ try {
     assert.equal(reloadedTeammateBuff.effects.find(rule => rule.id === "all_res_ignore")?.stat, "allResIgnore")
     assert.deepEqual(reloadedTeammateBuff.effects.find(rule => rule.id === "flinch_duration")?.target, savedFlinchDuration.target)
     assert.deepEqual(reloadedTeammateBuff.effects.find(rule => rule.id === "all_release_def_ignore")?.target, savedAllRelease.target)
+    assert.deepEqual(reloadedTeammateBuff.effects.find(rule => rule.id === "broad_anomaly_damage")?.target, { kind: "default" })
 
     const orderSecondBuff = cloneWithId(reloadedTeammateBuff, "order_second")
     const orderThirdBuff = cloneWithId(reloadedTeammateBuff, "order_third")
@@ -527,6 +569,24 @@ try {
         teammate: { ...teammateBase, id: `${teammateId}__unsupported` },
         buff: unsupportedLegacyBuff,
     }, "旧适用范围")
+
+    const unsupportedSkillAnomalyBuff = cloneWithId(teammateSource.buffs[0], "unsupported_skill_anomaly_damage")
+    unsupportedSkillAnomalyBuff.scope = "inCombat"
+    unsupportedSkillAnomalyBuff.effects = [{
+        id: "skill_anomaly_damage",
+        type: "fixed",
+        stat: "anomalyDamageBonus",
+        mode: "flat",
+        value: 20,
+        target: {
+            kind: "skill",
+            skillTargets: [{ kind: "skillType", skillType: "ultimate" }],
+        },
+    }]
+    await saveRejected("teammate-buffs", {
+        teammate: { ...teammateBase, id: `${teammateId}__unsupported_skill` },
+        buff: unsupportedSkillAnomalyBuff,
+    }, "技能增幅对象不支持该增幅类型")
 
     await saveRejected("teammate-buffs", {
         teammate: { name: { zhCN: "缺少属性队友" }, specialty: "support" },

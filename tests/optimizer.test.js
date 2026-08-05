@@ -12,6 +12,7 @@ import {
     toCalculatorDriveDisc,
     upsertDriveDiscLoadout,
 } from "../backend/driveDiscInventory.js"
+import { migrateDriveDiscSetAliases } from "../core/inventory-model.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
@@ -402,6 +403,39 @@ const tooSmallFreeStore = {
 const tooSmallFree = optimizeDriveDiscs(catalog, tooSmallFreeStore, optimizerInput())
 assert.equal(tooSmallFree.results.length, 0)
 assert.equal(tooSmallFree.error.reason, "已有驱动盘太少，无法组成 4+2 或 6 件同套。")
+
+const legacyVowSetId = "scanner-set-62cbf3b10eb2"
+const officialVowSetId = "zzz_wiki_2116"
+const legacyVowStore = {
+    ...store,
+    driveDiscs: [1, 2, 3, 4, 5, 6].map(slot => ({
+        ...disc(`legacy-vow-${slot}`, legacyVowSetId, slot, slotMain[slot]),
+        setName: "谶羽之誓",
+    })),
+}
+const legacyVowInput = optimizerInput({
+    settings: { fourPieceSetId: officialVowSetId },
+})
+const beforeVowMigration = optimizeDriveDiscs(catalog, legacyVowStore, legacyVowInput)
+assert.equal(beforeVowMigration.results.length, 0)
+assert.equal(beforeVowMigration.error.reason, "已有驱动盘太少，无法组成 4+2 或 6 件同套。")
+
+const migratedVowStore = migrateDriveDiscSetAliases(legacyVowStore)
+assert.notStrictEqual(migratedVowStore, legacyVowStore)
+assert.deepEqual(
+    migratedVowStore.driveDiscs.map(item => item.id),
+    legacyVowStore.driveDiscs.map(item => item.id),
+    "Set alias migration must preserve Drive Disc ids",
+)
+assert.ok(migratedVowStore.driveDiscs.every(item => item.setId === officialVowSetId))
+assert.strictEqual(migrateDriveDiscSetAliases(migratedVowStore), migratedVowStore)
+
+const afterVowMigration = optimizeDriveDiscs(catalog, migratedVowStore, legacyVowInput)
+assert.deepEqual(afterVowMigration.error, { isError: false, reason: null })
+assert.equal(afterVowMigration.results.length, 1)
+assert.equal(afterVowMigration.metrics.freeFourTwoPlanCount, 0)
+assert.equal(afterVowMigration.metrics.freeSixPiecePlanCount, 1)
+assert.ok(afterVowMigration.results[0].driveDiscs.every(item => item.setId === officialVowSetId))
 
 const impossibleMinimum = optimizeDriveDiscs(catalog, store, optimizerInput({
     settings: { minimums: { critRate: 999 } },

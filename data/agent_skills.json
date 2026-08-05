@@ -3517,6 +3517,197 @@
         "coordinatedCharge": "official additive components are stored as base charge and cooperative extra rows",
         "energyCosts": "both EX special attacks cost 40 energy at all levels"
       }
+    },
+    {
+      "id": "remielle_dan",
+      "agentId": "remielle_dan",
+      "name": {
+        "zhCN": "蕾米埃尔·丹技能倍率"
+      },
+      "categories": [
+        {
+          "id": "basic",
+          "name": {
+            "zhCN": "普通攻击"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "basic_vertical_rainbow",
+              "name": {
+                "zhCN": "普通攻击：垂虹"
+              },
+              "displayAttribute": "lumiflux",
+              "damageElement": "lumiflux",
+              "description": {
+                "zhCN": "储存有虚曜时可发动；命中目标后触发耀变，发动后清空全部虚曜。"
+              },
+              "rows": [
+                {
+                  "id": "direct_damage",
+                  "label": {
+                    "zhCN": "流明直伤倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [195,212.8,230.6,248.4,266.2,284,301.8,319.6,337.4,355.2,373,390.8,408.8,426.4,444.2,462],
+                  "includedInDefaultTargets": false
+                },
+                {
+                  "id": "luminescence_multiplier",
+                  "label": {
+                    "zhCN": "耀变倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [105,110,115,120,125,130,135,140,145,150,155,160,165,170,175,180],
+                  "settlementType": "luminescence",
+                  "strengthBasis": "allStoredVoidflareAnomalyEffectStrength"
+                }
+              ],
+              "skillType": "basic"
+            },
+            {
+              "id": "basic_startled_swan",
+              "name": {
+                "zhCN": "普通攻击：惊鸿"
+              },
+              "displayAttribute": "lumiflux",
+              "damageElement": "lumiflux",
+              "description": {
+                "zhCN": "储存有虚曜且处于映曜状态时可发动；命中目标后触发耀变，发动后清空全部虚曜。"
+              },
+              "rows": [
+                {
+                  "id": "direct_damage",
+                  "label": {
+                    "zhCN": "流明直伤倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [597.2,651.5,705.8,760.1,814.4,868.7,923,977.3,1031.6,1085.9,1140.2,1194.5,1248.8,1303.1,1357.4,1411.7],
+                  "includedInDefaultTargets": false
+                },
+                {
+                  "id": "luminescence_multiplier",
+                  "label": {
+                    "zhCN": "耀变倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [210,220,230,230,250,260,270,280,290,300,310,320,330,340,350,360],
+                  "settlementType": "luminescence",
+                  "strengthBasis": "allStoredVoidflareAnomalyEffectStrength",
+                  "officialDataNote": "官方 2076 API 中 Lv4 耀变倍率为 230%，与 Lv3 相同，按原值保留。"
+                }
+              ],
+              "skillType": "basic"
+            }
+          ]
+        },
+        {
+          "id": "assist",
+          "name": {
+            "zhCN": "支援技"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "assist_flower_feather_round_dance",
+              "name": {
+                "zhCN": "支援技：花羽轮舞"
+              },
+              "displayAttribute": "lumiflux",
+              "damageElement": "lumiflux",
+              "description": {
+                "zhCN": "入场发动大范围攻击；命中目标后触发耀变。官方核心技未将本招列为虚曜清空事件。"
+              },
+              "rows": [
+                {
+                  "id": "direct_damage",
+                  "label": {
+                    "zhCN": "流明直伤倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [453.5,494.8,536.1,577.4,618.7,660,701.3,742.6,783.9,825.2,866.5,907.8,949.1,990.4,1031.7,1073],
+                  "includedInDefaultTargets": false
+                },
+                {
+                  "id": "luminescence_multiplier",
+                  "label": {
+                    "zhCN": "耀变倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [210,220,230,240,250,260,270,280,290,300,310,320,330,340,350,360],
+                  "settlementType": "luminescence",
+                  "strengthBasis": "allStoredVoidflareAnomalyEffectStrength"
+                }
+              ],
+              "skillType": "assist"
+            }
+          ]
+        },
+        {
+          "id": "chain",
+          "name": {
+            "zhCN": "连携技与终结技"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "ultimate_chaotic_finale",
+              "name": {
+                "zhCN": "终结技：缭乱终幕"
+              },
+              "displayAttribute": "lumiflux",
+              "damageElement": "lumiflux",
+              "description": {
+                "zhCN": "命中目标后触发耀变。官方核心技未将本招列为虚曜清空事件。"
+              },
+              "rows": [
+                {
+                  "id": "direct_damage",
+                  "label": {
+                    "zhCN": "流明直伤倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [2009.7,2192.4,2375.1,2557.8,2740.5,2923.2,3105.9,3288.6,3471.3,3654,3836.7,4019.4,4202.1,4384.8,4567.5,4750.2],
+                  "includedInDefaultTargets": false
+                },
+                {
+                  "id": "luminescence_multiplier",
+                  "label": {
+                    "zhCN": "耀变倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [220.5,231,241.5,252,262.5,273,283.5,294,304.5,315,325.5,336,346.5,357,367.5,378],
+                  "settlementType": "luminescence",
+                  "strengthBasis": "allStoredVoidflareAnomalyEffectStrength"
+                }
+              ],
+              "skillType": "ultimate"
+            }
+          ]
+        }
+      ],
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/2076/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "officialEntryPageId": 2076,
+        "officialEntryVersion": 1785592903,
+        "skillMultipliers": "four luminescence-triggering moves and both direct/luminescence Lv1-16 rows source-checked-mihoyo-baike-entry-2076-2026-08-03",
+        "startledSwanLevel4": "official API value 230 preserved without interpolation",
+        "damageElement": "all four direct rows explicitly use Lumiflux damage; their resistance multiplier is fixed at 1, and they remain excluded from the Luminescence default score target"
+      }
     }
   ]
 }

@@ -17,6 +17,7 @@ import {
     normalizeElapsedSeconds,
 } from "./damageEventMultipliers.js"
 import {
+    ANOMALY_SETTLEMENT_TYPE_VALUES,
     ELEMENT_CRIT_DMG_STAT_BY_ELEMENT,
     ELEMENT_CRIT_DMG_STATS,
     ELEMENT_DEF_IGNORE_STAT_BY_ELEMENT,
@@ -36,6 +37,11 @@ import {
     normalizeAnomalySourceSnapshot,
     releaseFormulaStatDependencies,
 } from "./anomalyRelease.js"
+import {
+    evaluateLuminescence,
+    isLuminescenceSettlement,
+    normalizeLuminescenceEvent,
+} from "./luminescence.js"
 
 const BONUS_KEY_MAP = {
     hpFlat: "hpFlat",
@@ -237,6 +243,8 @@ const COMBAT_BONUS_KEY_LOOKUP = Object.freeze(Object.fromEntries(COMBAT_BONUS_KE
 const PANEL_KEY_LOOKUP = Object.freeze(Object.fromEntries(PANEL_KEY_INDEX))
 
 const DAMAGE_ELEMENTS = ["physical", "fire", "ice", "electric", "ether", "wind"]
+const LUMIFLUX_DAMAGE_ELEMENT = "lumiflux"
+const DIRECT_DAMAGE_ELEMENTS = new Set([...DAMAGE_ELEMENTS, LUMIFLUX_DAMAGE_ELEMENT])
 const DAMAGE_ELEMENT_LABELS = {
     physical: "物理",
     fire: "火",
@@ -244,6 +252,7 @@ const DAMAGE_ELEMENT_LABELS = {
     electric: "电",
     ether: "以太",
     wind: "风",
+    lumiflux: "流明",
 }
 const RES_IGNORE_KEY_BY_ELEMENT = {
     physical: "physicalResIgnore",
@@ -348,7 +357,8 @@ const EVENT_MODIFIER_KIND_VALUES = new Set([
     ...EVENT_MODIFIER_STAT_KEYS,
     ...SKILL_TARGET_STAT_KEYS,
 ])
-const DAMAGE_MODIFIER_SUM_KEYS = [...EVENT_MODIFIER_KIND_VALUES]
+const TEAM_ANOMALY_DAMAGE_MODIFIER_SUM_KEY = "teamAnomalyDamageBonus"
+const DAMAGE_MODIFIER_SUM_KEYS = [...EVENT_MODIFIER_KIND_VALUES, TEAM_ANOMALY_DAMAGE_MODIFIER_SUM_KEY]
 const DAMAGE_MODIFIER_SUM_KEY_INDEX = new Map(DAMAGE_MODIFIER_SUM_KEYS.map((key, index) => [key, index]))
 const DAMAGE_MODIFIER_SUM_KEY_LOOKUP = Object.freeze(Object.fromEntries(DAMAGE_MODIFIER_SUM_KEY_INDEX))
 
@@ -988,7 +998,7 @@ function normalizedRuleTarget(rule = {}) {
         }
     }
     if (target.kind === "anomaly") {
-        const settlementType = ["attribute", "disorder", "release"].includes(target.settlementType)
+        const settlementType = ANOMALY_SETTLEMENT_TYPE_VALUES.has(target.settlementType)
             ? target.settlementType
             : "attribute"
         return {
@@ -1367,6 +1377,11 @@ function compileDenseCombatEffectEntry({
     if (missingRequiredCombatBasis(normalized.stats, sourceType)) {
         return null
     }
+    const damageModifiers = normalized.damageModifiers.map(modifier => ({
+        ...modifier,
+        sourceKey: key,
+        sourceType,
+    }))
     return {
         key,
         sourceType,
@@ -1374,8 +1389,8 @@ function compileDenseCombatEffectEntry({
         minSetCount,
         exclusiveGroup: String(effect.exclusiveGroup ?? "").trim() || null,
         stats: normalized.stats,
-        damageModifiers: normalized.damageModifiers,
-        hasOutOfCombatStatRequirements: [...normalized.stats, ...normalized.damageModifiers]
+        damageModifiers,
+        hasOutOfCombatStatRequirements: [...normalized.stats, ...damageModifiers]
             .some(hasOutOfCombatStatRequirement),
     }
 }
@@ -1393,6 +1408,14 @@ function compileDenseDamageModifierEntries(effectEntries = [], compiledEvents = 
                     result.push({
                         entryIndex,
                         kindIndex,
+                        value: Number(modifier.value ?? 0),
+                        requirement: modifier.requirement ?? null,
+                    })
+                }
+                if (isTeamAnomalyDamageModifier(modifier)) {
+                    result.push({
+                        entryIndex,
+                        kindIndex: DAMAGE_MODIFIER_SUM_KEY_INDEX.get(TEAM_ANOMALY_DAMAGE_MODIFIER_SUM_KEY),
                         value: Number(modifier.value ?? 0),
                         requirement: modifier.requirement ?? null,
                     })
@@ -1964,13 +1987,11 @@ function applyCombatEffect({ bonusTotals, effect, key, name, sourceType, conditi
     for (const stat of normalized.stats) {
         addCombatStat(bonusTotals, stat, sourceType, outOfCombat, resolvedStats)
     }
-    const resolvedDamageModifiers = activeEffects
-        ? normalized.damageModifiers.map(modifier => ({
-            ...modifier,
-            sourceKey: key,
-            sourceType,
-        }))
-        : normalized.damageModifiers
+    const resolvedDamageModifiers = normalized.damageModifiers.map(modifier => ({
+        ...modifier,
+        sourceKey: key,
+        sourceType,
+    }))
     bonusTotals.damageModifiers.push(...resolvedDamageModifiers)
     if (exclusiveGroup) {
         exclusiveGroups?.add(exclusiveGroup)
@@ -2283,7 +2304,7 @@ function normalizeResistanceByElement(targetInput, damageElement) {
         }
     }
 
-    if (resistanceByElement[damageElement] === undefined) {
+    if (DAMAGE_ELEMENTS.includes(damageElement) && resistanceByElement[damageElement] === undefined) {
         resistanceByElement[damageElement] = fallbackResistance
     }
 
@@ -2398,7 +2419,7 @@ function resolveDamageSkillRef(catalog, agent, skillRef = null, options = {}) {
             levelScale: skillLevelScale(category),
             levelLabel: skillLevelLabel(category, requestedLevel),
             damageBasis: row.damageBasis ?? "atk",
-            damageElement: DAMAGE_ELEMENTS.includes(move.damageElement) ? move.damageElement : null,
+            damageElement: DIRECT_DAMAGE_ELEMENTS.has(move.damageElement) ? move.damageElement : null,
             categoryName: category.name,
             moveName: move.name,
             rowLabel: row.label,
@@ -2536,9 +2557,11 @@ function directDamageBasisValue(panel = {}, event = {}) {
 
 function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index = 0, options = {}) {
     if (event.normalized === true) {
-        const damageElement = DAMAGE_ELEMENTS.includes(event.damageElement)
+        const damageElement = DIRECT_DAMAGE_ELEMENTS.has(event.damageElement)
             ? event.damageElement
-            : resolveDamageElement(agent)
+            : DIRECT_DAMAGE_ELEMENTS.has(event.skillSource?.damageElement)
+                ? event.skillSource.damageElement
+                : resolveDirectDamageElement(agent)
         return {
             ...event,
             id: String(event.id ?? `direct-${index + 1}`),
@@ -2564,9 +2587,9 @@ function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index 
     const critMode = ["expected", "crit", "nonCrit"].includes(event.critMode)
         ? event.critMode
         : "expected"
-    const damageElement = DAMAGE_ELEMENTS.includes(event.damageElement)
+    const damageElement = DIRECT_DAMAGE_ELEMENTS.has(event.damageElement)
         ? event.damageElement
-        : skillRefResult?.skillSource?.damageElement ?? resolveDamageElement(agent)
+        : skillRefResult?.skillSource?.damageElement ?? resolveDirectDamageElement(agent)
 
     return {
         id: String(event.id ?? `direct-${index + 1}`),
@@ -2613,9 +2636,10 @@ function normalizeSheerDamageEvent(event = {}, agent = {}, catalog = {}, index =
     const critMode = ["expected", "crit", "nonCrit"].includes(event.critMode)
         ? event.critMode
         : "expected"
+    const skillDamageElement = skillRefResult?.skillSource?.damageElement
     const damageElement = DAMAGE_ELEMENTS.includes(event.damageElement)
         ? event.damageElement
-        : skillRefResult?.skillSource?.damageElement ?? resolveDamageElement(agent)
+        : DAMAGE_ELEMENTS.includes(skillDamageElement) ? skillDamageElement : resolveDamageElement(agent)
 
     return {
         id: String(event.id ?? `sheer-${index + 1}`),
@@ -2657,6 +2681,26 @@ function anomalyReleaseEventData(event = {}, agent = {}, damageElement = "physic
             actorRef: { agentId: sourceAgentId },
             ...(sourceSnapshot ? { snapshot: sourceSnapshot } : {}),
         },
+    }
+}
+
+function normalizeLuminescenceDamageEvent(event = {}, agent = {}, index = 0, options = {}) {
+    const triggerAgentId = String(event.triggerActorRef?.agentId ?? agent.id ?? "")
+    if (!triggerAgentId || triggerAgentId !== String(agent.id ?? "")) {
+        throw new Error("耀变触发者必须是当前配装角色。")
+    }
+    const cinemaLevel = clampNumber(Math.trunc(Number(options.cinemaLevel ?? event.cinemaLevel ?? 0)), 0, 6)
+    return {
+        ...normalizeLuminescenceEvent({
+            ...event,
+            id: String(event.id ?? `luminescence-${index + 1}`),
+            triggerActorRef: { agentId: triggerAgentId },
+            coreSkillLevel: options.coreSkillLevel ?? event.coreSkillLevel ?? "F",
+            cinemaLevel,
+        }),
+        id: String(event.id ?? `luminescence-${index + 1}`),
+        label: normalizeDamageEventLabel(event) ?? "队伍异常评分",
+        damageElement: LUMIFLUX_DAMAGE_ELEMENT,
     }
 }
 
@@ -2831,6 +2875,9 @@ function normalizeDamageEvent(event = {}, agent = {}, catalog = {}, index = 0, o
     if (kind === "anomaly" && event.settlementType === "disorder") {
         return normalizeDisorderDamageEvent(event, catalog, index)
     }
+    if (kind === "anomaly" && isLuminescenceSettlement(event)) {
+        return normalizeLuminescenceDamageEvent(event, agent, index, options)
+    }
     if (kind === "anomaly") {
         return normalizeAnomalyDamageEvent(event, agent, catalog, index, options)
     }
@@ -2881,6 +2928,9 @@ function normalizeDamageRequest(input = {}, agent = {}, catalog = {}, options = 
         ...event,
         stunned: normalizeEventStunned(event?.stunned, legacyStunnedFallback),
     }, agent, catalog, index, skillOptions))
+    if (events.some(isLuminescenceSettlement) && events.length !== 1) {
+        throw new Error("队伍异常评分必须作为单独事件使用，不能与实际伤害事件合计。")
+    }
     const firstElement = events[0]?.damageElement ?? resolveDamageElement(agent)
     return {
         agentLevel: normalizeAgentLevel(expandedInput.agentLevel),
@@ -3036,20 +3086,25 @@ function targetBreakdownForElement(panel, bonusTotals, target, damageElement, ev
     const targetDefenseAfterReduction = Math.max(0, targetDefense * (1 - enemyDefReduction) - enemyDefFlatReduction)
     const effectiveDefense = Math.max(0, targetDefenseAfterReduction * (1 - penRatio) - penFlat)
     const defenseMultiplier = Math.min(1, levelCoefficient / (levelCoefficient + effectiveDefense))
-    const targetResistance = Number(target.resistanceByElement?.[damageElement] ?? 0)
+    const resistanceFixedOne = damageElement === LUMIFLUX_DAMAGE_ELEMENT
+    const targetResistance = resistanceFixedOne ? 0 : Number(target.resistanceByElement?.[damageElement] ?? 0)
     const enemyResReductionKey = RES_REDUCTION_KEY_BY_ELEMENT[damageElement]
-    const enemyResReduction = Number(bonusTotals.enemyResReduction ?? 0)
-        + Number(bonusTotals[enemyResReductionKey] ?? 0)
-        + Number(eventTotals.enemyResReduction ?? 0)
-        + Number(eventTotals[enemyResReductionKey] ?? 0)
+    const enemyResReduction = resistanceFixedOne
+        ? 0
+        : Number(bonusTotals.enemyResReduction ?? 0)
+            + Number(bonusTotals[enemyResReductionKey] ?? 0)
+            + Number(eventTotals.enemyResReduction ?? 0)
+            + Number(eventTotals[enemyResReductionKey] ?? 0)
     const resIgnoreKey = RES_IGNORE_KEY_BY_ELEMENT[damageElement]
-    const resIgnore = Number(panel[ALL_RES_IGNORE_KEY] ?? 0)
-        + Number(panel[resIgnoreKey] ?? 0)
-        + Number(eventTotals[ALL_RES_IGNORE_KEY] ?? 0)
-        + Number(eventTotals[resIgnoreKey] ?? 0)
+    const resIgnore = resistanceFixedOne
+        ? 0
+        : Number(panel[ALL_RES_IGNORE_KEY] ?? 0)
+            + Number(panel[resIgnoreKey] ?? 0)
+            + Number(eventTotals[ALL_RES_IGNORE_KEY] ?? 0)
+            + Number(eventTotals[resIgnoreKey] ?? 0)
     const effectiveResistance = targetResistance - enemyResReduction - resIgnore
     const rawResistanceMultiplier = 1 - effectiveResistance
-    const resistanceMultiplier = clampNumber(rawResistanceMultiplier, 0.01, 2)
+    const resistanceMultiplier = resistanceFixedOne ? 1 : clampNumber(rawResistanceMultiplier, 0.01, 2)
     const enemyDamageTakenBonus = Number(eventTotals.enemyDamageTakenBonus ?? 0)
     const enemyDamageTaken = enemyDamageTakenMultiplier(eventTotals)
     const stunDmgMultiplierBonus = Number(eventTotals.stunDmgMultiplierBonus ?? 0)
@@ -3080,6 +3135,7 @@ function targetBreakdownForElement(panel, bonusTotals, target, damageElement, ev
         effectiveResistance,
         rawResistanceMultiplier,
         resistanceMultiplier,
+        resistanceFixedOne,
         enemyDamageTakenBonus,
         enemyDamageTakenMultiplier: enemyDamageTaken,
         stunned: normalizedStunned,
@@ -3128,7 +3184,9 @@ export function damageModifierAppliesTo(modifier, event) {
         }
     }
     if (Array.isArray(appliesTo.settlementTypes) && appliesTo.settlementTypes.length) {
-        const settlementType = isReleaseSettlement(event)
+        const settlementType = isLuminescenceSettlement(event)
+            ? "luminescence"
+            : isReleaseSettlement(event)
             ? "release"
             : isDisorderDamageEvent(event) ? "disorder" : "attribute"
         if (!appliesTo.settlementTypes.includes(settlementType)) {
@@ -3148,6 +3206,36 @@ export function damageModifierAppliesTo(modifier, event) {
     return true
 }
 
+const TEAM_ANOMALY_DAMAGE_SOURCE_TYPES = new Set(["field", "boss"])
+const DAMAGE_MODIFIER_FILTER_KEYS = [
+    "damageKinds",
+    "settlementTypes",
+    "anomalyEffects",
+    "anomalyVariants",
+    "elements",
+    "skillTargets",
+]
+
+export function isTeamAnomalyDamageModifier(modifier = {}) {
+    const requirement = modifier.requirement
+    const hasRequirement = requirement !== undefined
+        && requirement !== null
+        && (
+            typeof requirement !== "object"
+            || Array.isArray(requirement)
+            || Object.keys(requirement).length > 0
+        )
+    if (modifier.kind !== "anomalyDamageBonus"
+        || !TEAM_ANOMALY_DAMAGE_SOURCE_TYPES.has(modifier.sourceType)
+        || (modifier.target?.kind ?? "default") !== "default"
+        || hasRequirement) {
+        return false
+    }
+    const appliesTo = modifier.appliesTo ?? {}
+    return !DAMAGE_MODIFIER_FILTER_KEYS.some(key =>
+        Array.isArray(appliesTo[key]) && appliesTo[key].length > 0)
+}
+
 function skillTargetsApplyTo(skillTargets, event) {
     const source = event.skillSource
     if (!source) {
@@ -3165,6 +3253,25 @@ function matchingDamageModifiers(bonusTotals, event, kind) {
 function sumDamageModifiers(bonusTotals, event, kind) {
     return matchingDamageModifiers(bonusTotals, event, kind)
         .reduce((total, modifier) => total + Number(modifier.value ?? 0), 0)
+}
+
+function luminescenceDamageMultipliersFromModifiers(modifiers = [], event = {}) {
+    let luminescenceDamageBonus = 0
+    let teamAnomalyDamageBonus = 0
+    for (const modifier of modifiers) {
+        if (modifier?.kind !== "anomalyDamageBonus" || !damageModifierAppliesTo(modifier, event)) {
+            continue
+        }
+        const value = Number(modifier.value ?? 0)
+        luminescenceDamageBonus += value
+        if (isTeamAnomalyDamageModifier(modifier)) {
+            teamAnomalyDamageBonus += value
+        }
+    }
+    return {
+        luminescenceDamageMultiplier: Math.max(0, 1 + luminescenceDamageBonus),
+        teamAnomalyDamageMultiplier: Math.max(0, 1 + teamAnomalyDamageBonus),
+    }
 }
 
 function eventTargetTotalsForElement(bonusTotals, event) {
@@ -3420,9 +3527,13 @@ function directDamageWhiteBoxRows({ event, damageBasisValue, critMultiplier, cri
         defenseWhiteBoxRow(targetBreakdown),
         {
             label: "抗性乘区",
-            formula: `clamp(1 - (${damageElementText}抗性 ${formatDamagePercent(targetBreakdown.targetResistance)} - 减抗 ${formatDamagePercent(targetBreakdown.enemyResReduction)} - 抗性无视 ${formatDamagePercent(targetBreakdown.resIgnore)}), 0.01, 2)`,
+            formula: targetBreakdown.resistanceFixedOne
+                ? "流明直伤不使用抗性，抗性乘区固定为 1"
+                : `clamp(1 - (${damageElementText}抗性 ${formatDamagePercent(targetBreakdown.targetResistance)} - 减抗 ${formatDamagePercent(targetBreakdown.enemyResReduction)} - 抗性无视 ${formatDamagePercent(targetBreakdown.resIgnore)}), 0.01, 2)`,
             value: targetBreakdown.resistanceMultiplier,
-            displayValue: formatDamageNumber(targetBreakdown.resistanceMultiplier, 4),
+            displayValue: targetBreakdown.resistanceFixedOne
+                ? "1"
+                : formatDamageNumber(targetBreakdown.resistanceMultiplier, 4),
         },
         enemyDamageTakenWhiteBoxRow(targetBreakdown),
         stunWhiteBoxRow(targetBreakdown),
@@ -3787,7 +3898,9 @@ function calculateDirectDamageEvent({ event, panel, bonusTotals, target, include
             elementCritDmgBonus,
             targetedCritDmgBonus,
             dmgBonus: Number(panel.dmgBonus ?? 0),
-            [elementDmgKey]: Number(panel[elementDmgKey] ?? 0),
+            ...(DAMAGE_ELEMENTS.includes(event.damageElement)
+                ? { [elementDmgKey]: Number(panel[elementDmgKey] ?? 0) }
+                : {}),
             penRatio: Number(panel.penRatio ?? 0),
             penFlat: Number(panel.penFlat ?? 0),
         },
@@ -3972,6 +4085,16 @@ function releaseOnlyBonusTotals(bonusTotals = {}) {
     }
 }
 
+function releaseSourceBonusTotals(bonusTotals = {}) {
+    return {
+        ...bonusTotals,
+        damageModifiers: (bonusTotals.damageModifiers ?? []).filter(modifier =>
+            modifier?.kind !== "anomalyDamageBonus"
+            || !Array.isArray(modifier?.appliesTo?.settlementTypes)
+            || modifier.appliesTo.settlementTypes.length === 0),
+    }
+}
+
 function addEventTotals(...totals) {
     const result = Object.create(null)
     for (const source of totals) {
@@ -4082,7 +4205,7 @@ function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTota
         event,
         panel: source.panel,
         outOfCombatPanel: source.outOfCombatPanel,
-        bonusTotals: source.bonusTotals,
+        bonusTotals: releaseSourceBonusTotals(source.bonusTotals),
         target,
         agentLevel: source.agentLevel,
     })
@@ -4108,7 +4231,8 @@ function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTota
         event.stunned,
     )
     const sourceAnomalyDamageBonus = sourceUnit.anomalyDamageBonus
-    const releaseAnomalyDamageBonus = 1 + Number(triggerEventTotals.anomalyDamageBonus ?? 0)
+    const releaseAnomalyDamageBonus = Number(triggerEventTotals.anomalyDamageBonus ?? 0)
+    const anomalyDamageBonus = sourceAnomalyDamageBonus + releaseAnomalyDamageBonus
     const anomalyCrit = anomalyCritMultiplier(triggerBonusTotals, event, panel, outOfCombatPanel)
     const singleDamage = Number(source.panel.atk ?? 0)
         * effectiveBaseMultiplier
@@ -4119,8 +4243,7 @@ function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTota
         * targetBreakdown.activeStunMultiplier
         * sourceUnit.anomalyProficiencyMultiplier
         * sourceUnit.levelMultiplier
-        * sourceAnomalyDamageBonus
-        * releaseAnomalyDamageBonus
+        * anomalyDamageBonus
         * anomalyCrit.multiplier
         * event.damageScale
     const finalDamage = singleDamage * event.count
@@ -4160,9 +4283,9 @@ function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTota
             stun: targetBreakdown.activeStunMultiplier,
             anomalyProficiency: sourceUnit.anomalyProficiencyMultiplier,
             anomalyLevel: sourceUnit.levelMultiplier,
-            attributeAnomalyDamage: sourceAnomalyDamageBonus * releaseAnomalyDamageBonus,
+            attributeAnomalyDamage: anomalyDamageBonus,
             disorderDamage: 1,
-            anomalyDamage: sourceAnomalyDamageBonus * releaseAnomalyDamageBonus,
+            anomalyDamage: anomalyDamageBonus,
             anomalyCrit: anomalyCrit.multiplier,
             anomalyCritBaseRate: anomalyCrit.baseCritRate,
             anomalyCritConvertedRate: anomalyCrit.convertedCritRate,
@@ -4183,7 +4306,7 @@ function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTota
                 targetBreakdown,
                 anomalyProficiencyMultiplier: sourceUnit.anomalyProficiencyMultiplier,
                 levelMultiplier: sourceUnit.levelMultiplier,
-                anomalyDamageBonus: sourceAnomalyDamageBonus * releaseAnomalyDamageBonus,
+                anomalyDamageBonus,
                 anomalyCrit,
                 releaseBreakdown,
                 baseMultiplierBonus: sourceUnit.baseMultiplierBonus + releaseBaseMultiplierBonus,
@@ -4195,7 +4318,171 @@ function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTota
     }
 }
 
+function luminescenceRuntimeInput(event, panel = {}, outOfCombatPanel = panel, overrides = {}) {
+    const danInitialAtk = Math.max(0, Number(overrides.danInitialAtk ?? outOfCombatPanel?.atk ?? panel?.atk ?? 0))
+    const danAnomalyProficiency = Math.max(0, Number(overrides.danAnomalyProficiency ?? panel?.anomalyProficiency ?? 0))
+    return {
+        ...event,
+        A: danInitialAtk,
+        danInitialAtk,
+        P: danAnomalyProficiency,
+        danAnomalyProficiency,
+    }
+}
+
+function evaluateLuminescenceForPanels(event, panel, outOfCombatPanel, bonusTotals, overrides = {}) {
+    const modifierMultipliers = luminescenceDamageMultipliersFromModifiers(
+        bonusTotals.damageModifiers ?? [],
+        event,
+    )
+    const luminescenceDamageMultiplier = Number.isFinite(Number(overrides.luminescenceDamageMultiplier))
+        ? Number(overrides.luminescenceDamageMultiplier)
+        : modifierMultipliers.luminescenceDamageMultiplier
+    const teamAnomalyDamageMultiplier = Number.isFinite(Number(overrides.teamAnomalyDamageMultiplier))
+        ? Number(overrides.teamAnomalyDamageMultiplier)
+        : modifierMultipliers.teamAnomalyDamageMultiplier
+    return evaluateLuminescence({
+        ...luminescenceRuntimeInput(event, panel, outOfCombatPanel, overrides),
+        teamAnomalyDamageMultiplier,
+        luminescenceDamageMultiplier,
+    })
+}
+
+function luminescenceScoreWhiteBoxRows(evaluated) {
+    const T = Number(evaluated.teammateAttack ?? 0)
+    const A = Number(evaluated.danInitialAtk ?? 0)
+    const P = Number(evaluated.danAnomalyProficiency ?? 0)
+    const sharePct = Number(evaluated.luminescenceDamageSharePct ?? 50)
+    const share = Number(evaluated.luminescenceDamageShare ?? sharePct / 100)
+    const m2Term = Number(evaluated.cinemaTwoBonus ?? 0) > 0 ? " + 0.20" : ""
+    const conversionCoefficient = Number(evaluated.conversionCoefficient ?? 1)
+    const coreCoefficient = Number(evaluated.alpha ?? 0)
+    const teamAnomalyMultiplier = Number(evaluated.teamAnomalyDamageMultiplier ?? 1)
+    const luminescenceMultiplier = Number(evaluated.luminescenceDamageMultiplier ?? 1)
+    const proficiencyMultiplier = Number(evaluated.proficiencyMultiplier ?? 1)
+    const relativeDamageMultiplier = Number(
+        evaluated.luminescenceRelativeDamageMultiplier
+            ?? luminescenceMultiplier / teamAnomalyMultiplier,
+    )
+    const candidateCoreExpression = `[1 + ${formatDamageNumber(coreCoefficient, 6)} × ${formatDamageNumber(P)}]`
+    const relativeDamageExpression = `[${formatDamageNumber(luminescenceMultiplier, 6)}`
+        + ` / ${formatDamageNumber(teamAnomalyMultiplier, 6)}]`
+    const formula = `[${formatDamageNumber(T)} + min(0.40 × ${formatDamageNumber(A)}, 1600)]`
+        + ` × [1 + 0.10${m2Term} + 0.0002 × ${formatDamageNumber(P)}]`
+        + ` × ${formatDamageNumber(teamAnomalyMultiplier, 6)}`
+        + ` × (${candidateCoreExpression} × ${relativeDamageExpression})`
+        + `^${formatDamageNumber(share, 6)} × k`
+    const numericWeightedExpression = `(${formatDamageNumber(proficiencyMultiplier, 6)}`
+        + ` × ${formatDamageNumber(relativeDamageMultiplier, 6)})`
+        + `^${formatDamageNumber(share, 6)}`
+    return [
+        {
+            label: "队友初始攻击力",
+            value: T,
+        },
+        {
+            label: "丹局外攻击力",
+            value: A,
+        },
+        {
+            label: "丹局内异常精通",
+            value: P,
+        },
+        {
+            label: "耀变在队伍总伤害中的占比",
+            value: sharePct,
+            displayValue: `${formatDamageNumber(sharePct, 3)}%`,
+        },
+        {
+            label: "异化倍率",
+            value: conversionCoefficient,
+            displayValue: formatDamageNumber(conversionCoefficient, 6),
+            formula: `1 + 0.10${m2Term} + 0.0002 × ${formatDamageNumber(P)}`
+                + ` = ${formatDamageNumber(conversionCoefficient, 6)}`,
+        },
+        {
+            label: "队伍异常评分",
+            value: evaluated.score,
+            displayValue: `${formatDamageNumber(evaluated.score)} × k`,
+            formulaLines: [
+                formula,
+                `= ${formatDamageNumber(evaluated.commonDamageFactor)}`
+                    + ` × ${formatDamageNumber(teamAnomalyMultiplier, 6)}`
+                    + ` × ${numericWeightedExpression} × k`,
+                `= ${formatDamageNumber(evaluated.score)} × k`,
+                "丹所在队伍伤害的最大化，主要取决于队友攻击力、队友其他属性（如异常精通、穿透等）、耀变伤害占比、丹初始攻击力、丹局内精通。为了简化计算，我们将队友攻击力、耀变伤害占比设置为变量，队友其他属性设置为恒变量k，从而得到关于丹攻击力以及异常精通配置的最优解。",
+                "该结果用于比较丹的驱动盘方案，不是实际伤害。",
+            ],
+        },
+    ]
+}
+
+function calculateLuminescenceDamageEvent({ event, panel, outOfCombatPanel = panel, bonusTotals, includeWhiteBox }) {
+    const evaluated = evaluateLuminescenceForPanels(event, panel, outOfCombatPanel, bonusTotals)
+    const finalDamage = Number(evaluated.score)
+    return {
+        id: event.id,
+        kind: "anomaly",
+        settlementType: "luminescence",
+        label: event.label ?? "队伍异常评分",
+        objectiveKind: evaluated.objectiveKind,
+        scoreSuffix: evaluated.scoreSuffix,
+        score: finalDamage,
+        finalDamage,
+        singleDamage: finalDamage,
+        count: 1,
+        scalarReady: true,
+        scalarBlockReasons: [],
+        input: evaluated.event,
+        panelSnapshot: {
+            atk: Number(outOfCombatPanel?.atk ?? panel?.atk ?? 0),
+            anomalyProficiency: Number(panel?.anomalyProficiency ?? 0),
+        },
+        multipliers: {
+            alienation: evaluated.conversionCoefficient,
+            proficiency: evaluated.proficiencyMultiplier,
+            teamAnomalyDamage: evaluated.teamAnomalyDamageMultiplier,
+            luminescenceDamage: evaluated.luminescenceDamageMultiplier,
+            luminescenceShare: evaluated.luminescenceDamageShare,
+            otherAnomaly: evaluated.otherAnomalyFactor,
+            luminescenceFactor: evaluated.luminescenceFactor,
+            weightedOtherAnomaly: evaluated.weightedOtherAnomalyMultiplier,
+            weightedLuminescence: evaluated.weightedExclusiveMultiplier,
+            weightedTeamScore: evaluated.weightedTeamScoreMultiplier,
+        },
+        targetBreakdown: {},
+        luminescence: {
+            teammateAttack: evaluated.teammateAttack,
+            sharedAttack: evaluated.sharedAttack,
+            attackPool: evaluated.attackPool,
+            conversionCoefficient: evaluated.conversionCoefficient,
+            proficiencyMultiplier: evaluated.proficiencyMultiplier,
+            teamAnomalyDamageMultiplier: evaluated.teamAnomalyDamageMultiplier,
+            teamAnomalyDamageBonus: evaluated.teamAnomalyDamageBonus,
+            luminescenceDamageMultiplier: evaluated.luminescenceDamageMultiplier,
+            luminescenceDamageBonus: evaluated.luminescenceDamageBonus,
+            luminescenceExclusiveDamageBonus: evaluated.luminescenceExclusiveDamageBonus,
+            luminescenceRelativeDamageMultiplier: evaluated.luminescenceRelativeDamageMultiplier,
+            luminescenceDamageSharePct: evaluated.luminescenceDamageSharePct,
+            luminescenceDamageShare: evaluated.luminescenceDamageShare,
+            commonDamageFactor: evaluated.commonDamageFactor,
+            otherAnomalyFactor: evaluated.otherAnomalyFactor,
+            luminescenceFactor: evaluated.luminescenceFactor,
+            luminescenceRelativeFactor: evaluated.luminescenceRelativeFactor,
+            exclusiveLuminescenceFactor: evaluated.exclusiveLuminescenceFactor,
+            weightedOtherAnomalyMultiplier: evaluated.weightedOtherAnomalyMultiplier,
+            weightedExclusiveMultiplier: evaluated.weightedExclusiveMultiplier,
+            weightedTeamScoreMultiplier: evaluated.weightedTeamScoreMultiplier,
+            score: finalDamage,
+        },
+        whiteBoxRows: includeWhiteBox ? luminescenceScoreWhiteBoxRows(evaluated) : [],
+    }
+}
+
 function calculateAnomalyDamageEvent({ event, panel, outOfCombatPanel = panel, bonusTotals, target, agentLevel, includeWhiteBox }) {
+    if (isLuminescenceSettlement(event)) {
+        return calculateLuminescenceDamageEvent({ event, panel, outOfCombatPanel, bonusTotals, includeWhiteBox })
+    }
     event = effectiveDisorderDamageEvent(event, bonusTotals)
     event = effectiveAttributeAnomalyDamageEvent(event, bonusTotals)
     if (isReleaseSettlement(event)) {
@@ -4353,6 +4640,10 @@ function calculateDamageResult({ catalog, agent, panel, outOfCombatPanel = panel
     return {
         finalDamage: Number(selectedEvent?.finalDamage ?? 0),
         totalFinalDamage,
+        scalarReady: selectedEvent?.scalarReady ?? true,
+        scalarBlockReasons: selectedEvent?.scalarBlockReasons ?? [],
+        objectiveKind: selectedEvent?.objectiveKind ?? null,
+        scoreSuffix: selectedEvent?.scoreSuffix ?? null,
         selectedEventId: selectedEvent?.id ?? null,
         input: selectedEvent?.input ?? normalizeDamageInput(input, agent, catalog, skillOptions),
         multipliers: selectedEvent?.multipliers ?? {},
@@ -4384,6 +4675,7 @@ function targetDamageMultiplierForElement(panel, bonusTotals, target, damageElem
 }
 
 function targetResistanceMultiplierForElement(panel, bonusTotals, target, damageElement, eventTotals = {}) {
+    if (damageElement === LUMIFLUX_DAMAGE_ELEMENT) return 1
     const targetResistance = Number(target.resistanceByElement?.[damageElement] ?? 0)
     const enemyResReductionKey = RES_REDUCTION_KEY_BY_ELEMENT[damageElement]
     const enemyResReduction = Number(bonusTotals.enemyResReduction ?? 0)
@@ -4422,6 +4714,9 @@ function calculateDirectDamageFinalValue(event, panel, bonusTotals, target) {
 }
 
 function calculateAnomalyDamageFinalValue(event, panel, bonusTotals, target, agentLevel, outOfCombatPanel = panel) {
+    if (isLuminescenceSettlement(event)) {
+        return evaluateLuminescenceForPanels(event, panel, outOfCombatPanel, bonusTotals).score
+    }
     event = effectiveDisorderDamageEvent(event, bonusTotals)
     event = effectiveAttributeAnomalyDamageEvent(event, bonusTotals)
     if (isReleaseSettlement(event)) {
@@ -4508,9 +4803,11 @@ function compileDamageScoreEvent(event = {}) {
         event,
         kind: event.kind,
         settlementType: event.settlementType ?? null,
+        isLuminescence: isLuminescenceSettlement(event),
         isRelease: isReleaseSettlement(event),
         isDisorder: isDisorderDamageEvent(event),
         damageElement,
+        resistanceFixedOne: damageElement === LUMIFLUX_DAMAGE_ELEMENT,
         elementDmgKey: `${damageElement}Dmg`,
         elementSheerDmgKey: SHEER_DMG_KEY_BY_ELEMENT[damageElement],
         elementCritDmgKey: CRIT_DMG_KEY_BY_ELEMENT[damageElement],
@@ -4582,6 +4879,11 @@ function modifierSumsForCompiledEvent(modifiers = [], event = {}) {
         }
         sums ??= Object.create(null)
         sums[modifier.kind] = Number(sums[modifier.kind] ?? 0) + Number(modifier.value ?? 0)
+        if (isTeamAnomalyDamageModifier(modifier)) {
+            sums[TEAM_ANOMALY_DAMAGE_MODIFIER_SUM_KEY] = Number(
+                sums[TEAM_ANOMALY_DAMAGE_MODIFIER_SUM_KEY] ?? 0,
+            ) + Number(modifier.value ?? 0)
+        }
     }
     return sums
 }
@@ -4591,6 +4893,7 @@ function compiledModifierSum(sums, kind) {
 }
 
 function compiledResistanceMultiplier(panel, bonusTotals, target, compiledEvent, sums) {
+    if (compiledEvent.resistanceFixedOne) return 1
     const targetResistance = Number(target.resistanceByElement?.[compiledEvent.damageElement] ?? 0)
     const enemyResReduction = Number(bonusTotals.enemyResReduction ?? 0)
         + Number(bonusTotals[compiledEvent.resReductionKey] ?? 0)
@@ -4664,6 +4967,20 @@ function calculateCompiledDamageScoreValue({ agent, panel, outOfCombatPanel = pa
         const selectedDmgBonus = selectedDmgBonusForElement(panel, compiledEvent.damageElement)
         const skillDamageBonus = compiledModifierSum(sums, "dmgBonus")
             + compiledModifierSum(sums, compiledEvent.elementDmgKey)
+
+        if (compiledEvent.isLuminescence) {
+            total += evaluateLuminescenceForPanels(event, panel, outOfCombatPanel, bonusTotals, {
+                luminescenceDamageMultiplier: Math.max(
+                    0,
+                    1 + compiledModifierSum(sums, "anomalyDamageBonus"),
+                ),
+                teamAnomalyDamageMultiplier: Math.max(
+                    0,
+                    1 + compiledModifierSum(sums, TEAM_ANOMALY_DAMAGE_MODIFIER_SUM_KEY),
+                ),
+            }).score
+            continue
+        }
 
         if (compiledEvent.isRelease) {
             total += calculateReleaseDamageEvent({
@@ -4781,6 +5098,7 @@ function fillDenseModifierSums(sums, eventModifierEntries = [], activeEntryFlags
 }
 
 function denseResistanceMultiplier(panelValues, combatValues, target, compiledEvent, sums) {
+    if (compiledEvent.resistanceFixedOne) return 1
     const targetResistance = Number(target.resistanceByElement?.[compiledEvent.damageElement] ?? 0)
     const enemyResReduction = denseCombatValue(combatValues, "enemyResReduction")
         + denseCombatValue(combatValues, compiledEvent.resReductionKey)
@@ -4886,6 +5204,25 @@ function calculateCompiledDamageScoreValueDense({
             activeEntryFlags,
             outOfCombatPanelValues,
         )
+        if (compiledEvent.isLuminescence) {
+            const evaluated = evaluateLuminescence({
+                ...luminescenceRuntimeInput(
+                    compiledEvent.event,
+                    panelProxy,
+                    outOfCombatPanelProxy,
+                ),
+                luminescenceDamageMultiplier: Math.max(
+                    0,
+                    1 + denseModifierSum(modifierSums, "anomalyDamageBonus"),
+                ),
+                teamAnomalyDamageMultiplier: Math.max(
+                    0,
+                    1 + denseModifierSum(modifierSums, TEAM_ANOMALY_DAMAGE_MODIFIER_SUM_KEY),
+                ),
+            })
+            total += evaluated.score
+            continue
+        }
         const selectedDmgBonus = denseSelectedDmgBonusForElement(panelValues, compiledEvent.damageElement)
         const skillDamageBonus = denseModifierSum(modifierSums, "dmgBonus")
             + denseModifierSum(modifierSums, compiledEvent.elementDmgKey)
@@ -5029,9 +5366,14 @@ function resolveDamageElement(agent = {}) {
     return DAMAGE_ELEMENTS.includes(damageElement) ? damageElement : "physical"
 }
 
+function resolveDirectDamageElement(agent = {}) {
+    const damageElement = agent.damageElement ?? agent.attribute
+    return DIRECT_DAMAGE_ELEMENTS.has(damageElement) ? damageElement : resolveDamageElement(agent)
+}
+
 function resolveAttributeBonusKey(agent) {
-    const damageElement = resolveDamageElement(agent)
-    return `${damageElement}Dmg`
+    const damageElement = resolveDirectDamageElement(agent)
+    return DAMAGE_ELEMENTS.includes(damageElement) ? `${damageElement}Dmg` : null
 }
 
 function defaultCoreSkillLevel(agent) {
@@ -6100,7 +6442,10 @@ export function createInCombatPanelCalculator(catalog, input) {
         .map(sourceWEngine => materializedTeamWEngineEntry(sourceWEngine, wEngineTeamModificationLevels))
         .filter(entry => activeBuffIds.has(entry.key) && !appliedCurrentWEngineKeys.has(entry.key))
     const activeDriveDisc4pcIds = [...activeBuffIds].filter(activeId => String(activeId).startsWith("driveDisc4pc:"))
-    const normalizedDamageInput = normalizeDamageRequest(input.damage, agent, catalog, { coreSkillLevel: input.coreSkillLevel })
+    const normalizedDamageInput = normalizeDamageRequest(input.damage, agent, catalog, {
+        coreSkillLevel: input.coreSkillLevel,
+        cinemaLevel: input.cinemaLevel,
+    })
     const compiledDamageTarget = compileDamageScoreTarget(normalizedDamageInput, agent)
     const hasMasteryToProficiencyConversion = activeAgentBuffs.some(entry =>
         effectRules(entry.buff).some(rule => rule?.stat === "anomalyProficiencyPerMasteryAbove140")
@@ -6132,10 +6477,17 @@ export function createInCombatPanelCalculator(catalog, input) {
     function optimizerStatMetadata({ minimums = {} } = {}) {
         const panelStats = new Set()
         for (const event of compiledDamageTarget.events ?? []) {
+            if (event.isLuminescence) {
+                panelStats.add("atk")
+                panelStats.add("anomalyProficiency")
+                continue
+            }
             const damageElement = String(event.damageElement ?? "physical")
             panelStats.add("dmgBonus")
-            panelStats.add(`${damageElement}Dmg`)
-            panelStats.add(`${damageElement}ResIgnore`)
+            if (DAMAGE_ELEMENTS.includes(damageElement)) {
+                panelStats.add(`${damageElement}Dmg`)
+                panelStats.add(`${damageElement}ResIgnore`)
+            }
 
             const usesAnomalyFormula = event.kind !== "direct" && event.kind !== "sheer"
             if (event.kind === "sheer") {
@@ -6593,6 +6945,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     count: event.count,
                     damageScale: event.damageScale,
                     critMode: event.critMode,
+                    resistanceFixedOne: event.resistanceFixedOne,
                     damageIndex: PANEL_KEY_LOOKUP[`${event.damageElement}Dmg`],
                     resIgnoreIndex: PANEL_KEY_LOOKUP[event.resIgnoreKey],
                     effectiveSkillMultiplier: Math.max(0, event.skillMultiplier + denseModifierSum(sums, "skillMultiplierBonus")),
@@ -6603,13 +6956,19 @@ export function createInCombatPanelCalculator(catalog, input) {
                         + denseModifierSum(sums, event.elementCritDmgKey),
                     targetDefenseAfterReduction,
                     levelCoefficient: Number(target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT),
-                    targetResistance: Number(target.resistanceByElement?.[event.damageElement] ?? 0),
-                    enemyResReduction: fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP.enemyResReduction]
-                        + fixedCombatValues[COMBAT_BONUS_KEY_LOOKUP[event.resReductionKey]]
-                        + denseModifierSum(sums, "enemyResReduction")
-                        + denseModifierSum(sums, event.resReductionKey),
-                    modifierResIgnore: denseModifierSum(sums, ALL_RES_IGNORE_KEY)
-                        + denseModifierSum(sums, event.resIgnoreKey),
+                    targetResistance: event.resistanceFixedOne
+                        ? 0
+                        : Number(target.resistanceByElement?.[event.damageElement] ?? 0),
+                    enemyResReduction: event.resistanceFixedOne
+                        ? 0
+                        : denseCombatValue(fixedCombatValues, "enemyResReduction")
+                            + denseCombatValue(fixedCombatValues, event.resReductionKey)
+                            + denseModifierSum(sums, "enemyResReduction")
+                            + denseModifierSum(sums, event.resReductionKey),
+                    modifierResIgnore: event.resistanceFixedOne
+                        ? 0
+                        : denseModifierSum(sums, ALL_RES_IGNORE_KEY)
+                            + denseModifierSum(sums, event.resIgnoreKey),
                     enemyDamageTakenMultiplier: Math.max(
                         0,
                         1 + denseModifierSum(sums, "enemyDamageTakenBonus"),
@@ -6658,18 +7017,24 @@ export function createInCombatPanelCalculator(catalog, input) {
                 for (const event of compiledEvents) {
                     const resIgnoreKey = OUTPUT_PANEL_KEYS[event.resIgnoreIndex]
                     const damageKey = OUTPUT_PANEL_KEYS[event.damageIndex]
-                    const resIgnore = outPanelValue(ALL_RES_IGNORE_KEY)
-                        + denseCombatValue(fixedCombatValues, ALL_RES_IGNORE_KEY)
-                        + outPanelValue(resIgnoreKey)
-                        + denseCombatValue(fixedCombatValues, resIgnoreKey)
-                    const elementDmg = outPanelValue(damageKey) + denseCombatValue(fixedCombatValues, damageKey)
+                    const resIgnore = event.resistanceFixedOne
+                        ? 0
+                        : outPanelValue(ALL_RES_IGNORE_KEY)
+                            + denseCombatValue(fixedCombatValues, ALL_RES_IGNORE_KEY)
+                            + outPanelValue(resIgnoreKey)
+                            + denseCombatValue(fixedCombatValues, resIgnoreKey)
+                    const elementDmg = damageKey
+                        ? outPanelValue(damageKey) + denseCombatValue(fixedCombatValues, damageKey)
+                        : 0
                     const effectiveDefense = Math.max(0, event.targetDefenseAfterReduction * (1 - penRatio) - penFlat)
                     const defenseMultiplier = Math.min(1, event.levelCoefficient / (event.levelCoefficient + effectiveDefense))
-                    const resistanceMultiplier = clampNumber(
-                        1 - (event.targetResistance - event.enemyResReduction - (resIgnore + event.modifierResIgnore)),
-                        0.01,
-                        2,
-                    )
+                    const resistanceMultiplier = event.resistanceFixedOne
+                        ? 1
+                        : clampNumber(
+                            1 - (event.targetResistance - event.enemyResReduction - (resIgnore + event.modifierResIgnore)),
+                            0.01,
+                            2,
+                        )
                     const effectiveCritDmg = critDmg + event.targetedCritDmgBonus
                     const critMultiplier = event.critMode === "crit"
                         ? 1 + effectiveCritDmg
@@ -6786,19 +7151,21 @@ export function createInCombatPanelCalculator(catalog, input) {
                             1,
                             event.levelCoefficient / (event.levelCoefficient + effectiveDefense),
                         )
-                        const resistanceMultiplier = clampNumber(
-                            1 - (
-                                event.targetResistance
-                                - event.enemyResReduction
-                                - (
-                                    panelValues[PANEL_KEY_LOOKUP[ALL_RES_IGNORE_KEY]]
-                                    + panelValues[event.resIgnoreIndex]
-                                    + event.modifierResIgnore
-                                )
-                            ),
-                            0.01,
-                            2,
-                        )
+                        const resistanceMultiplier = event.resistanceFixedOne
+                            ? 1
+                            : clampNumber(
+                                1 - (
+                                    event.targetResistance
+                                    - event.enemyResReduction
+                                    - (
+                                        panelValues[PANEL_KEY_LOOKUP[ALL_RES_IGNORE_KEY]]
+                                        + panelValues[event.resIgnoreIndex]
+                                        + event.modifierResIgnore
+                                    )
+                                ),
+                                0.01,
+                                2,
+                            )
                         const critRate = clampNumber(panelValues[PANEL_KEY_LOOKUP.critRate], 0, 1)
                         const critDmg = panelValues[PANEL_KEY_LOOKUP.critDmg]
                         const effectiveCritDmg = critDmg + event.targetedCritDmgBonus
@@ -6813,14 +7180,14 @@ export function createInCombatPanelCalculator(catalog, input) {
                             * event.stunMultiplier
                         total += atk
                             * event.effectiveSkillMultiplier
-                            * (1 + panelValues[PANEL_KEY_LOOKUP.dmgBonus] + panelValues[event.damageIndex] + event.directDamageBonus)
+                            * (1 + panelValues[PANEL_KEY_LOOKUP.dmgBonus] + densePanelValue(panelValues, OUTPUT_PANEL_KEYS[event.damageIndex]) + event.directDamageBonus)
                             * targetMultiplier
                             * critMultiplier
                             * event.damageScale
                             * event.count
                     }
                     scalarResult.selectedDmgBonus = panelValues[PANEL_KEY_LOOKUP.dmgBonus]
-                        + panelValues[PANEL_KEY_LOOKUP[selectedAttributeBonusKey]]
+                        + densePanelValue(panelValues, selectedAttributeBonusKey)
                     scalarResult.finalDamage = total
                     return scalarResult
                 },
@@ -6832,6 +7199,7 @@ export function createInCombatPanelCalculator(catalog, input) {
             if (!events.length
                 || events.every(event => event.kind === "direct")
                 || events.some(event => !["direct", "anomaly", "disorder", "sheer"].includes(event.kind))
+                || events.some(event => event.isLuminescence)
                 || events.some(event => event.isRelease
                     && String(event.anomalySource?.actorRef?.agentId ?? agent.id) !== String(agent.id))
                 || typeof fixedOutOfCombatTarget.panelValue !== "function") {
@@ -6872,6 +7240,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     stunned: event.stunned,
                     count: event.count,
                     damageElement: event.damageElement,
+                    resistanceFixedOne: event.resistanceFixedOne,
                     damageBasis: event.damageBasis,
                     damageScale: event.damageScale,
                     critMode: event.critMode,
@@ -6915,13 +7284,19 @@ export function createInCombatPanelCalculator(catalog, input) {
                     anomalyCritMultiplier: denseAnomalyCritMultiplier(event, sums),
                     targetDefenseAfterReduction,
                     levelCoefficient: Number(target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT),
-                    targetResistance: Number(target.resistanceByElement?.[event.damageElement] ?? 0),
-                    enemyResReduction: denseCombatValue(fixedCombatValues, "enemyResReduction")
-                        + denseCombatValue(fixedCombatValues, event.resReductionKey)
-                        + denseModifierSum(sums, "enemyResReduction")
-                        + denseModifierSum(sums, event.resReductionKey),
-                    modifierResIgnore: denseModifierSum(sums, ALL_RES_IGNORE_KEY)
-                        + denseModifierSum(sums, event.resIgnoreKey),
+                    targetResistance: event.resistanceFixedOne
+                        ? 0
+                        : Number(target.resistanceByElement?.[event.damageElement] ?? 0),
+                    enemyResReduction: event.resistanceFixedOne
+                        ? 0
+                        : denseCombatValue(fixedCombatValues, "enemyResReduction")
+                            + denseCombatValue(fixedCombatValues, event.resReductionKey)
+                            + denseModifierSum(sums, "enemyResReduction")
+                            + denseModifierSum(sums, event.resReductionKey),
+                    modifierResIgnore: event.resistanceFixedOne
+                        ? 0
+                        : denseModifierSum(sums, ALL_RES_IGNORE_KEY)
+                            + denseModifierSum(sums, event.resIgnoreKey),
                     enemyDamageTakenMultiplier: Math.max(
                         0,
                         1 + denseModifierSum(sums, "enemyDamageTakenBonus"),
@@ -7068,16 +7443,20 @@ export function createInCombatPanelCalculator(catalog, input) {
                 })
                 for (const event of compiledEvents) {
                     const elementDmg = outPanelValue(event.damageKey) + denseCombatValue(fixedCombatValues, event.damageKey)
-                    const resIgnore = outPanelValue(ALL_RES_IGNORE_KEY)
-                        + denseCombatValue(fixedCombatValues, ALL_RES_IGNORE_KEY)
-                        + outPanelValue(event.resIgnoreKey)
-                        + denseCombatValue(fixedCombatValues, event.resIgnoreKey)
-                        + event.modifierResIgnore
-                    const resistanceMultiplier = clampNumber(
-                        1 - (event.targetResistance - event.enemyResReduction - resIgnore),
-                        0.01,
-                        2,
-                    )
+                    const resIgnore = event.resistanceFixedOne
+                        ? 0
+                        : outPanelValue(ALL_RES_IGNORE_KEY)
+                            + denseCombatValue(fixedCombatValues, ALL_RES_IGNORE_KEY)
+                            + outPanelValue(event.resIgnoreKey)
+                            + denseCombatValue(fixedCombatValues, event.resIgnoreKey)
+                            + event.modifierResIgnore
+                    const resistanceMultiplier = event.resistanceFixedOne
+                        ? 1
+                        : clampNumber(
+                            1 - (event.targetResistance - event.enemyResReduction - resIgnore),
+                            0.01,
+                            2,
+                        )
                     const effectiveCritDmg = critDmg + event.targetedCritDmgBonus
                     const critMultiplier = event.critMode === "crit"
                         ? 1 + effectiveCritDmg
@@ -7725,7 +8104,11 @@ export function createInCombatPanelCalculator(catalog, input) {
                 selectedDmgBonus: inCombatPanel.selectedDmgBonus,
                 bonusTotals,
                 input: input.damage,
-                skillOptions: { coreSkillLevel: input.coreSkillLevel },
+                skillOptions: {
+                    coreSkillLevel: input.coreSkillLevel,
+                    cinemaLevel: input.cinemaLevel,
+                    outOfCombatBaseAtk: outOfCombat.base?.atk,
+                },
             })
 
             const result = {
@@ -8089,7 +8472,11 @@ export function calculateInCombatPanel(catalog, input) {
         selectedDmgBonus: inCombatPanel.selectedDmgBonus,
         bonusTotals,
         input: input.damage,
-        skillOptions: { coreSkillLevel: input.coreSkillLevel },
+        skillOptions: {
+            coreSkillLevel: input.coreSkillLevel,
+            cinemaLevel: input.cinemaLevel,
+            outOfCombatBaseAtk: outOfCombat.base?.atk,
+        },
     })
 
     return roundNumbers({

@@ -389,14 +389,15 @@ const vowSet = catalog.driveDiscSetsMap.get("zzz_wiki_2116")
 assert.equal(vowSet.name.zhCN, "谶羽之誓")
 assert.ok(existsSync(path.join(rootDir, "webapp", "public", vowSet.images.icon)), "Vow of the Prophetic Feather local icon should exist")
 assert.deepEqual(vowSet.twoPiece.effects.map(rule => [rule.stat, rule.value]), [["anomalyProficiency", 30]])
-assert.deepEqual(vowSet.fourPiece.selfBuff.effects.map(rule => [rule.stat, rule.value]), [["anomalyProficiency", 50]])
-assert.equal(
-    vowSet.fourPiece.selfBuff.effects.some(rule => rule.stat === "anomalyDamageBonus" || rule.kind === "anomalyDamageBonus"),
-    false,
-    "Vow's independent 15% Luminous Anomaly multiplier must remain unmodeled",
-)
+assert.deepEqual(vowSet.fourPiece.selfBuff.effects.map(rule => [rule.stat, rule.value]), [
+    ["anomalyProficiency", 50],
+    ["anomalyDamageBonus", 15],
+])
+const vowAnomalyBonus = vowSet.fourPiece.selfBuff.effects.find(rule => rule.stat === "anomalyDamageBonus")
+assert.deepEqual(vowAnomalyBonus.target, { kind: "default" })
+assert.deepEqual(vowAnomalyBonus.requirement, { attribute: "lumiflux" })
 assert.match(vowSet.fourPiece.effectText.zhCN, /属性异常伤害提升15%/)
-assert.match(vowSet.fourPiece.modelingNotes.zhCN, /独立乘区.*不参与计算/)
+assert.match(vowSet.fourPiece.modelingNotes.zhCN, /默认属性异常增伤作用域.*属性异常、异放和耀变.*队伍异常评分/)
 const vowTwoPiece = calculate({ setId: vowSet.id, count: 2 })
 const vowFourPiece = calculate({
     setId: vowSet.id,
@@ -411,6 +412,6 @@ const vowFourPiece = calculate({
 const vowNoSet = calculate({ setId: vowSet.id, count: 0 })
 approx(vowTwoPiece.outOfCombat.panel.anomalyProficiency - vowNoSet.outOfCombat.panel.anomalyProficiency, 30, "Vow two-piece Anomaly Proficiency")
 approx(vowFourPiece.inCombat.panel.anomalyProficiency - vowFourPiece.outOfCombat.panel.anomalyProficiency, 50, "Vow four-piece Anomaly Proficiency")
-approx(vowFourPiece.damage.multipliers.attributeAnomalyDamage, 1, "Vow independent Luminous Anomaly multiplier exclusion")
+approx(vowFourPiece.damage.multipliers.attributeAnomalyDamage, 1, "Vow anomaly bonus must reject non-Lumiflux wearers")
 
 console.log("drive disc set effect tests passed")

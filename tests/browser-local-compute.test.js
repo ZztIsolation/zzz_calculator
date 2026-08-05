@@ -8,6 +8,13 @@ import { optimizeDriveDiscsAsync as backendOptimizeDriveDiscsAsync, previewDrive
 import { calculateInCombatPanel as browserCalculateInCombatPanel } from "../core/calculator-core.js"
 import { analyzeDriveDiscStatDiffs as browserAnalyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains as browserAnalyzeDriveDiscStatGains, analyzeDriveDiscSubstats as browserAnalyzeDriveDiscSubstats } from "../core/driveDiscAnalysis-core.js"
 import { createDriveDiscOptimizerRuntime, previewDriveDiscOptimization as browserPreviewDriveDiscOptimization } from "../core/driveDiscOptimizer-core.js"
+import { evaluateLuminescence } from "../core/luminescence.js"
+import {
+    FROZEN_DAN_LUMINESCENCE_DAMAGE_SHARE_PCT,
+    FROZEN_DAN_LUMINESCENCE_EVENT,
+    FROZEN_DAN_TEAMMATE_ATTACK,
+    fixedDanLuminescenceInput,
+} from "./luminescence-cross-path-fixture.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
@@ -185,6 +192,89 @@ const backendAlice = backendCalculateInCombatPanel(catalog, alicePayload)
 assert.deepEqual(browserAlice, backendAlice, "Browser Alice mastery calculation should match backend.")
 assert.equal(browserAlice.outOfCombat.panel.anomalyMastery, 195.96)
 assert.equal(browserAlice.inCombat.panel.anomalyProficiency, 206)
+
+const fixedDanInput = fixedDanLuminescenceInput()
+const browserFixedDan = browserCalculateInCombatPanel(catalog, fixedDanInput)
+const backendFixedDan = backendCalculateInCombatPanel(catalog, fixedDanInput)
+assert.deepEqual(browserFixedDan, backendFixedDan, "Browser-local Dan Luminescence should match the backend core wrapper.")
+const browserFixedDanEvent = browserFixedDan.damage.events[0]
+const fixedDanCoreEvaluation = evaluateLuminescence(browserFixedDanEvent.input)
+assert.ok(
+    Math.abs(browserFixedDanEvent.finalDamage - fixedDanCoreEvaluation.score) <= 1e-9,
+    "Browser-local Dan Luminescence should equal the shared formula core within floating-point tolerance.",
+)
+assert.equal(browserFixedDanEvent.objectiveKind, "luminescenceTeamScore")
+assert.equal(browserFixedDanEvent.scoreSuffix, "× k")
+assert.equal(browserFixedDan.damage.objectiveKind, "luminescenceTeamScore")
+assert.equal(browserFixedDan.damage.scoreSuffix, "× k")
+assert.equal(browserFixedDanEvent.input.teammateAttack, FROZEN_DAN_TEAMMATE_ATTACK)
+assert.equal(browserFixedDanEvent.input.luminescenceDamageSharePct, FROZEN_DAN_LUMINESCENCE_DAMAGE_SHARE_PCT)
+for (const legacyKey of [
+    "records",
+    "T",
+    "B",
+    "k",
+    "moveRef",
+    "resistanceMode",
+    "referenceAnomalyProficiency",
+    "referenceLuminescenceDamageMultiplier",
+]) {
+    assert.equal(
+        legacyKey in browserFixedDanEvent.input,
+        false,
+        `Browser-local score input must not retain ${legacyKey}.`,
+    )
+}
+assert.deepEqual(FROZEN_DAN_LUMINESCENCE_EVENT, {
+    id: "remielle-fixed-cross-path-luminescence",
+    kind: "anomaly",
+    settlementType: "luminescence",
+    triggerActorRef: { agentId: "remielle_dan" },
+    teammateAttack: 2345,
+    luminescenceDamageSharePct: 50,
+})
+
+const danWorkerRuntime = createDriveDiscOptimizerRuntime({
+    availableParallelism: () => 1,
+    yieldControl: async () => {},
+})
+const danWorkerInput = structuredClone({
+    ...fixedDanInput,
+    settings: {
+        objective: "damage",
+        fourPieceSetId: fourSet,
+        twoPieceSetId: twoSet,
+        algorithm: "exact-super-bound",
+        enableUpperBoundPruning: true,
+        mainStatLimits: {
+            4: ["critRate"],
+            5: ["physicalDmg"],
+            6: ["atkPct"],
+        },
+    },
+})
+const danWorkerResult = await danWorkerRuntime.optimizeDriveDiscsAsync(catalog, store, danWorkerInput)
+assert.ok(danWorkerResult.results.length > 0, "Browser Worker runtime should produce a Dan Luminescence result.")
+const danWorkerWinner = danWorkerResult.results[0]
+const danWorkerCoreResult = browserCalculateInCombatPanel(catalog, {
+    ...fixedDanInput,
+    driveDiscs: danWorkerWinner.driveDiscs,
+})
+assert.equal(
+    danWorkerWinner.data.damage.finalDamage,
+    danWorkerCoreResult.damage.finalDamage,
+    "Browser Worker Dan Luminescence score should equal direct shared-core calculation exactly.",
+)
+assert.equal(danWorkerWinner.data.damage.objectiveKind, "luminescenceTeamScore")
+assert.equal(danWorkerWinner.data.damage.scoreSuffix, "× k")
+const danWorkerEventInput = danWorkerWinner.data.damage.events[0].input
+assert.equal(danWorkerEventInput.teammateAttack, FROZEN_DAN_TEAMMATE_ATTACK)
+assert.equal(danWorkerEventInput.luminescenceDamageSharePct, FROZEN_DAN_LUMINESCENCE_DAMAGE_SHARE_PCT)
+assert.equal("records" in danWorkerEventInput, false)
+assert.equal("B" in danWorkerEventInput, false)
+assert.equal("k" in danWorkerEventInput, false)
+assert.equal("referenceAnomalyProficiency" in danWorkerEventInput, false)
+assert.equal("referenceLuminescenceDamageMultiplier" in danWorkerEventInput, false)
 
 assert.deepEqual(
     browserAnalyzeDriveDiscSubstats(catalog, payload),

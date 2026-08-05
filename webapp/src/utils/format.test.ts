@@ -145,6 +145,17 @@ describe("format helpers", () => {
     )).toContain("属性异常 · 碎冰 ×2")
   })
 
+  it("labels luminescence as a team score without an event count", () => {
+    const event = {
+      kind: "anomaly",
+      settlementType: "luminescence",
+      teammateAttack: 2800,
+    }
+
+    expect(damageEventTitle(event)).toBe("队伍异常评分")
+    expect(damageEventSummaryTitle(event)).toBe("队伍异常评分")
+  })
+
   it("does not require a manual multiplier when a skill ref resolves", () => {
     const miyabi = (agentsData as any).agents.find((agent: any) => agent.id === "hoshimi_miyabi")
     const skillCatalog = (agentSkillsData as any).agentSkills.find((skill: any) => skill.id === "hoshimi_miyabi")

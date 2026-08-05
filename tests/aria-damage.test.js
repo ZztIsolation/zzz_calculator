@@ -281,6 +281,13 @@ assert.equal(signature.images.icon, "/assets/w-engines/zzz_wiki_1883.png")
 assert.deepEqual(signature.effect.selfBuff.effects[0].modificationValues.value, [90, 103, 117, 130, 144])
 assert.deepEqual(signature.effect.selfBuff.effects[1].modificationValues.value, [20, 23, 26, 29, 32])
 assert.deepEqual(signature.effect.selfBuff.effects[2].modificationValues.value, [10, 11.5, 13, 14.5, 16])
+const vitalityEtherBonus = signature.effect.selfBuff.effects.find(effect => effect.id === "vitality-hit-ether-dmg")
+const vitalityAnomalyBonus = signature.effect.selfBuff.effects.find(effect => effect.id === "vitality-hit-anomaly-dmg")
+const vitalityDisorderBonus = signature.effect.selfBuff.effects.find(effect => effect.id === "vitality-hit-disorder-dmg")
+assert.deepEqual(vitalityEtherBonus.requirement, { attribute: "ether" })
+assert.deepEqual(vitalityAnomalyBonus.target, { kind: "default" })
+assert.equal(vitalityAnomalyBonus.requirement, undefined)
+assert.equal(vitalityDisorderBonus.requirement, undefined)
 
 const coreProficiencyByLevel = new Map([
     ["none", 45],
@@ -533,6 +540,7 @@ const normalCorruption = calculateInCombatPanel(catalog, releaseInput({
 assert.equal(normalCorruption.damage.input.procCount, 26, "additional ability should extend a full corruption to 26 procs")
 const releaseWithDurationBuff = calculateInCombatPanel(catalog, releaseInput())
 assert.equal(releaseWithDurationBuff.damage.input.procCount, 1, "corruption duration must not multiply release")
+approx(releaseWithDurationBuff.damage.multipliers.anomalyDamage, 1.1, "default-scoped Vitality anomaly bonus should affect Release")
 
 function directEventsInput() {
     return {
@@ -631,14 +639,51 @@ const alienAttribute = calculateInCombatPanel(catalog, {
     },
 })
 approx(alienAttribute.inCombat.panel.etherDmg, 0, "ether-only signature damage rule must not apply to physical anomaly agents")
-approx(alienAttribute.damage.multipliers.anomalyDamage, 1, "ether-only signature anomaly bonus must not apply to physical anomaly agents")
+approx(alienAttribute.damage.multipliers.anomalyDamage, 1.1, "signature anomaly bonus should apply to physical Attribute Anomaly")
+
+const aliceCinemaTwoAttribute = calculateInCombatPanel(catalog, {
+    ...releaseInput(),
+    agentId: "alice_thymefield",
+    coreSkillLevel: "F",
+    combatBuffs: {
+        activeBuffIds: ["agent:alice_thymefield.cinema.2", "wEngine:zzz_wiki_1883.self"],
+    },
+    damage: {
+        selectedEventId: "assault",
+        events: [{ id: "assault", kind: "anomaly", anomalyEffect: "assault", stunned: false }],
+        target: { defense: 953, levelCoefficient: 794, resistanceByElement: { physical: 0 } },
+    },
+})
+approx(aliceCinemaTwoAttribute.damage.multipliers.anomalyDamage, 1.25,
+    "Alice Cinema 2 Assault bonus should share the Attribute Anomaly bonus zone")
+
+const alienDisorder = calculateInCombatPanel(catalog, {
+    ...releaseInput(),
+    agentId: "alice_thymefield",
+    coreSkillLevel: "F",
+    combatBuffs: { activeBuffIds: ["wEngine:zzz_wiki_1883.self"] },
+    damage: {
+        selectedEventId: "physical-disorder",
+        events: [{
+            id: "physical-disorder",
+            kind: "anomaly",
+            settlementType: "disorder",
+            anomalyEffect: "flinch",
+            disorderType: "normal",
+            elapsedSeconds: 0,
+            stunned: false,
+        }],
+        target: { defense: 953, levelCoefficient: 794, resistanceByElement: { physical: 0 } },
+    },
+})
+approx(alienDisorder.damage.multipliers.disorderDamage, 1.1, "signature Disorder bonus should apply to physical Disorder")
 
 const aliceSnapshot = createAnomalySourceSnapshot({
     agentId: "alice_thymefield",
     agentLevel: 60,
-    outOfCombatPanel: alienAttribute.outOfCombat.panel,
-    inCombatPanel: alienAttribute.inCombat.panel,
-    buffTotals: alienAttribute.inCombat.buffTotals,
+    outOfCombatPanel: aliceCinemaTwoAttribute.outOfCombat.panel,
+    inCombatPanel: aliceCinemaTwoAttribute.inCombat.panel,
+    buffTotals: aliceCinemaTwoAttribute.inCombat.buffTotals,
     capturedAt: "2026-07-23T00:00:00.000Z",
     sourceConfigHash: "alice-source-v1",
 })
@@ -656,6 +701,8 @@ const externalRelease = calculateInCombatPanel(catalog, releaseInput({ damage: e
 const externalReleaseEvent = externalRelease.damage.events[0]
 assert.equal(externalReleaseEvent.panelSnapshot.sourceAgentId, "alice_thymefield")
 assert.equal(externalReleaseEvent.panelSnapshot.sourceSnapshot.sourceConfigHash, "alice-source-v1")
+approx(externalReleaseEvent.multipliers.anomalyDamage, 1.1,
+    "Alice Cinema 2 precise Assault bonus should not leak into Release")
 approx(externalReleaseEvent.panelSnapshot.atk, aliceSnapshot.panel.atk, "external release uses frozen source ATK")
 approx(externalRelease.damage.multipliers.anomalyProficiency, aliceSnapshot.panel.anomalyProficiency / 100,
     "external release uses frozen source anomaly proficiency")
@@ -721,6 +768,78 @@ const compiledPrepared = prepared.scoreOnlyFromSummary(summaryStats, summarySets
 const mapPrepared = prepared.scoreOnlyFromSummaryLegacy(summaryStats, summarySets)
 approx(compiledPrepared.finalDamage, fullPrepared.damage.totalFinalDamage, "compiled release score")
 approx(mapPrepared.finalDamage, fullPrepared.damage.totalFinalDamage, "map release score")
+
+const scopedBonusAgent = structuredClone(agent)
+scopedBonusAgent.combatBuffs.cinemaBuffs.push({
+    cinemaLevel: 5,
+    cinemaName: { zhCN: "测试：异放增伤乘区" },
+    description: { zhCN: "仅用于锁定广域、属性异常精确和异放精确增伤边界。" },
+    scope: "inCombat",
+    defaultChecked: false,
+    effects: [
+        {
+            id: "test-release-anomaly-damage",
+            type: "fixed",
+            stat: "anomalyDamageBonus",
+            value: 20,
+            mode: "flat",
+            target: { kind: "anomaly", settlementType: "release" },
+        },
+        {
+            id: "test-attribute-corruption-damage",
+            type: "fixed",
+            stat: "anomalyDamageBonus",
+            value: 30,
+            mode: "flat",
+            target: {
+                kind: "anomaly",
+                settlementType: "attribute",
+                anomalyEffects: ["corruption"],
+            },
+        },
+    ],
+    buffModifiers: [],
+})
+const scopedBonusCatalog = catalogWithAria(scopedBonusAgent)
+const scopedBonusInput = releaseInput({
+    activeBuffIds: [
+        "agent:aria.corePassive",
+        "agent:aria.additionalAbility",
+        "agent:aria.cinema.5",
+        "wEngine:zzz_wiki_1883.self",
+    ],
+})
+const scopedBonusPrepared = createInCombatPanelCalculator(scopedBonusCatalog, scopedBonusInput)
+const scopedBonusFull = scopedBonusPrepared.calculate(masteryDiscs, { round: false })
+approx(
+    scopedBonusFull.damage.events[0].multipliers.anomalyDamage,
+    1.3,
+    "Release should add broad and precise Release bonuses while excluding precise Attribute Anomaly bonuses",
+)
+const scopedBonusCompiled = scopedBonusPrepared.scoreOnlyFromSummary(summaryStats, summarySets)
+const scopedBonusLegacy = scopedBonusPrepared.scoreOnlyFromSummaryLegacy(summaryStats, summarySets)
+const scopedStatIds = [...summaryStats.keys()]
+const scopedSetIds = [...summarySets.keys()]
+const scopedSetIndexById = new Map(scopedSetIds.map((setId, index) => [setId, index]))
+const scopedStatValues = Float64Array.from(scopedStatIds, statId => summaryStats.get(statId) ?? 0)
+const scopedSetCounts = Int16Array.from(scopedSetIds, setId => summarySets.get(setId) ?? 0)
+const scopedBonusDenseTarget = scopedBonusPrepared.compileDensePanelScoreTarget({
+    statIds: scopedStatIds,
+    setIds: scopedSetIds,
+    setIndexById: scopedSetIndexById,
+})
+assert.ok(scopedBonusDenseTarget, "Scoped Release anomaly bonuses should compile a dense target")
+const scopedBonusDense = scopedBonusDenseTarget.scoreDense(scopedStatValues, scopedSetCounts)
+const scopedBonusFixed = scopedBonusDenseTarget.compileForSetCounts(scopedSetCounts).scoreScalar(scopedStatValues)
+for (const [label, result] of [
+    ["compiled", scopedBonusCompiled],
+    ["legacy", scopedBonusLegacy],
+    ["dense", scopedBonusDense],
+    ["fixed", scopedBonusFixed],
+]) {
+    approx(result.finalDamage, scopedBonusFull.damage.totalFinalDamage,
+        `${label} Release score should preserve the shared anomaly-damage bonus zone`)
+}
 
 const externalPrepared = createInCombatPanelCalculator(catalog, releaseInput({ damage: externalReleaseDamage }))
 const externalFullPrepared = externalPrepared.calculate(masteryDiscs, { round: false })

@@ -12,6 +12,9 @@ const props = defineProps<{
   modelValue: number
   results: OptimizerResultOption[]
   stale?: boolean
+  scoreLabel?: string
+  scoreSuffix?: string
+  scoreDigits?: number
 }>()
 
 const emit = defineEmits<{
@@ -53,8 +56,11 @@ const percentageText = computed(() => {
 })
 const scoreText = computed(() => {
   const score = Number(selectedResult.value?.score)
-  return Number.isFinite(score) ? formatNumber(score, 0) : "-"
+  if (!Number.isFinite(score)) return "-"
+  const suffix = String(props.scoreSuffix ?? "").trim()
+  return `${formatNumber(score, props.scoreDigits ?? 0)}${suffix ? ` ${suffix}` : ""}`
 })
+const displayedScoreLabel = computed(() => `${props.stale ? "上次" : ""}${props.scoreLabel ?? "评分"}`)
 const ratioStyle = computed(() => ({
   "--optimizer-result-ratio": `${scorePercentage.value ?? 0}%`,
 }))
@@ -133,13 +139,13 @@ function rankTooltip(value: number) {
       :class="{ 'is-stale': props.stale }"
       :style="ratioStyle"
       role="progressbar"
-      :aria-label="props.stale ? '当前优化结果相对第一套的上次评分比例' : '当前优化结果相对第一套的评分比例'"
+      :aria-label="`当前优化结果相对第一套的${displayedScoreLabel}比例`"
       aria-valuemin="0"
       aria-valuemax="100"
       :aria-valuenow="scorePercentage ?? undefined"
     >
       <span class="optimizer-result-ratio-fill"></span>
-      <strong>第 {{ currentRank }} 套 · {{ percentageText }} · {{ props.stale ? "上次评分" : "评分" }} {{ scoreText }}</strong>
+      <strong>第 {{ currentRank }} 套 · {{ percentageText }} · {{ displayedScoreLabel }} {{ scoreText }}</strong>
     </div>
   </div>
 </template>

@@ -11,6 +11,7 @@ import DriveDiscPickerModal from "@/components/DriveDiscPickerModal.vue"
 import DriveDiscSlotCard from "@/components/DriveDiscSlotCard.vue"
 import EnemyTargetConfigPanel from "@/components/EnemyTargetConfigPanel.vue"
 import ImageAvatar from "@/components/ImageAvatar.vue"
+import LuminescenceParameterFields from "@/components/LuminescenceParameterFields.vue"
 import OptimizerConfigModal from "@/components/OptimizerConfigModal.vue"
 import OptimizerResultSelector from "@/components/OptimizerResultSelector.vue"
 import PanelStatTable from "@/components/PanelStatTable.vue"
@@ -47,6 +48,8 @@ import {
 } from "@core/skillMultiplierCandidates.js"
 import { resolveDefaultCalculationConfig } from "@core/defaultCalculationConfig.js"
 import { driveDiscUsageStateForAgent } from "@core/inventory-model.js"
+import { isLuminescenceSettlement } from "@core/luminescence.js"
+import { resolveLuminescenceParameters } from "@/utils/luminescenceParameters"
 
 const catalogStore = useCatalogStore()
 const accountStore = useAccountStore()
@@ -113,6 +116,11 @@ watch(() => accountStore.currentOwnerId, async () => {
 const selectedAgent = computed(() => catalogStore.displayAgents.find((item: any) => item.id === buildStore.agentId))
 const selectedWEngine = computed(() => catalogStore.displayWEngines.find((item: any) => item.id === buildStore.wEngineId))
 const selectedSkillCatalog = computed(() => catalogStore.displayAgentSkills.find((item: any) => item.id === buildStore.agentId || item.agentId === buildStore.agentId))
+const activeLuminescenceEvent = computed(() => (buildStore.damageConfig.events ?? [])
+  .find((event: any) => isLuminescenceSettlement(event)) ?? null)
+const luminescenceParametersValid = computed(() => activeLuminescenceEvent.value
+  ? resolveLuminescenceParameters(activeLuminescenceEvent.value).valid
+  : true)
 const agentSelectOptions = computed(() => catalogStore.displayAgents.map((agent: any) => ({
   label: entitySelectLabel(agent),
   value: agent.id,
@@ -128,7 +136,8 @@ const wEngineSelectOptions = computed(() => wEngineOptions.value.map((wEngine: a
 const canRunOptimization = computed(() => Boolean(
   buildStore.agentId
   && buildStore.wEngineId
-  && optimizerStore.fourPieceSetIds.length,
+  && optimizerStore.fourPieceSetIds.length
+  && luminescenceParametersValid.value,
 ))
 const selectedOptimizedScheme = computed(() => optimizerStore.selectedResult(buildStore.selectedOptimizedRank))
 const selectedDriveDiscs = computed(() => inventoryStore.calculatorDriveDiscs({
@@ -164,7 +173,7 @@ const driveDiscAnalysisInput = computed(() => {
 const driveDiscAnalysisSourceLabel = computed(() => {
   if (buildStore.discMode === "optimized") {
     return selectedOptimizedScheme.value
-      ? `优化结果：第 ${selectedOptimizedScheme.value.rank} 名 · ${formatNumber(selectedOptimizedScheme.value.score, 0)}`
+      ? `优化结果：第 ${selectedOptimizedScheme.value.rank} 名 · ${objectiveScoreText(selectedOptimizedScheme.value.score)}`
       : "优化结果"
   }
   if (buildStore.discMode === "loadout") {
@@ -234,6 +243,33 @@ const draftTwoPieceSetSummary = computed(() => {
 })
 const twoPieceDraftUnchanged = computed(() => [...draftTwoPieceSetIds.value].sort().join("|") === [...optimizerStore.twoPieceSetIds].sort().join("|"))
 const topOptimizedResultSchemes = computed(() => optimizerStore.resultSchemes.slice(0, OPTIMIZED_RESULT_LIMIT))
+const isLuminescenceScore = computed(() => ["luminescenceTeamScore", "luminescenceScore"]
+  .includes(String(buildStore.result?.damage?.objectiveKind ?? "")))
+const currentLuminescenceDamageMultiplier = computed(() => {
+  const event = (buildStore.result?.damage?.events ?? [])
+    .find((item: any) => item?.settlementType === "luminescence")
+  if (!event) return undefined
+  const value = Number(event?.luminescence?.luminescenceDamageMultiplier)
+  return Number.isFinite(value) && value >= 0 ? value : undefined
+})
+const currentTeamAnomalyDamageMultiplier = computed(() => {
+  const event = (buildStore.result?.damage?.events ?? [])
+    .find((item: any) => item?.settlementType === "luminescence")
+  if (!event) return undefined
+  const value = Number(event?.luminescence?.teamAnomalyDamageMultiplier)
+  return Number.isFinite(value) && value >= 0 ? value : undefined
+})
+
+const currentScoreSuffix = computed(() => isLuminescenceScore.value
+  ? String(buildStore.result?.damage?.scoreSuffix ?? "× k")
+  : "")
+
+function objectiveScoreText(value: unknown) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return "-"
+  const formatted = formatNumber(numeric, isLuminescenceScore.value ? 3 : 0)
+  return isLuminescenceScore.value ? `${formatted} ${currentScoreSuffix.value}` : formatted
+}
 const selectedDriveDiscRows = computed<Array<{ slot: number, disc: any | null }>>(() => {
   const inventoryById = new Map<string, any>(
     inventoryStore.driveDiscs.map((disc: any) => [String(disc.id), disc] as [string, any]),
@@ -258,12 +294,12 @@ const selectedDriveDiscRows = computed<Array<{ slot: number, disc: any | null }>
 })
 const currentSchemeScoreLabel = computed(() => {
   if (buildStore.discMode === "optimized" && selectedOptimizedScheme.value) {
-    return optimizerStore.resultsAreStale
-      ? `第 ${selectedOptimizedScheme.value.rank} 名 · 上次评分 ${formatNumber(selectedOptimizedScheme.value.score, 0)}`
-      : `第 ${selectedOptimizedScheme.value.rank} 名 · ${formatNumber(selectedOptimizedScheme.value.score, 0)}`
+    return optimizerResultsAreStale.value
+      ? `第 ${selectedOptimizedScheme.value.rank} 名 · ${isLuminescenceScore.value ? "上次队伍异常评分" : "上次评分"} ${objectiveScoreText(selectedOptimizedScheme.value.score)}`
+      : `第 ${selectedOptimizedScheme.value.rank} 名 · ${isLuminescenceScore.value ? "队伍异常评分 " : ""}${objectiveScoreText(selectedOptimizedScheme.value.score)}`
   }
   if (buildStore.discMode === "loadout" && selectedLoadout.value?.score !== undefined) {
-    return `评分 ${formatNumber(selectedLoadout.value.score, 0)}`
+    return `${isLuminescenceScore.value ? "队伍异常评分" : "评分"} ${objectiveScoreText(selectedLoadout.value.score)}`
   }
   return selectedDriveDiscs.value.length ? `${selectedDriveDiscs.value.length} / 6` : "未选择"
 })
@@ -385,8 +421,10 @@ const optimizerConstraintChips = computed(() => [
 ])
 const totalDamageLabel = computed(() => {
   const damage = buildStore.result?.damage
-  const value = damage?.totalFinalDamage ?? damage?.finalDamage
-  return value === undefined || value === null ? "-" : formatNumber(value, 0)
+  const value = isLuminescenceScore.value
+    ? damage?.score ?? damage?.finalDamage
+    : damage?.totalFinalDamage ?? damage?.finalDamage
+  return value === undefined || value === null ? "-" : objectiveScoreText(value)
 })
 const panelSummaryText = computed(() => {
   const panel = buildStore.result?.inCombat?.panel ?? buildStore.outOfCombat?.panel ?? {}
@@ -586,6 +624,18 @@ const optimizerInventoryStale = computed(() => optimizerStore.inventoryRestricti
   buildStore.agentId,
 ))
 
+const optimizerCalculationStale = computed(() => {
+  if (!catalogStore.catalog || !catalogStore.meta || !buildStore.agentId || !buildStore.wEngineId) {
+    return false
+  }
+  try {
+    return optimizerStore.calculationInputChanged(optimizerInput())
+  } catch {
+    return false
+  }
+})
+const optimizerResultsAreStale = computed(() => optimizerStore.resultsAreStale || optimizerCalculationStale.value)
+
 const buildSignature = computed(() => JSON.stringify({
   agentId: buildStore.agentId,
   agentLevel: buildStore.agentLevel,
@@ -665,6 +715,20 @@ function saveCalculationConfig(config: any) {
   buildStore.setDamageConfig(config, selectedAgent.value)
 }
 
+function updateLuminescenceParameters(patch: Record<string, unknown>) {
+  const current = activeLuminescenceEvent.value
+  if (!current || optimizerStore.isBusy) return
+  const events = [...(buildStore.damageConfig.events ?? [])]
+  const index = events.findIndex((event: any) => event === current
+    || (event?.id === current?.id && isLuminescenceSettlement(event)))
+  if (index < 0) return
+  events[index] = { ...events[index], ...patch }
+  buildStore.setDamageConfig({
+    ...buildStore.damageConfig,
+    events,
+  }, selectedAgent.value)
+}
+
 function saveOptimizerConfig(config: any) {
   optimizerStore.applyAdvancedSettings(config)
 }
@@ -692,6 +756,13 @@ async function runOptimization() {
   await inventoryStore.load()
   const ownerId = inventoryStore.store?.currentOwnerId ?? accountStore.currentOwnerId ?? "default"
   const owner = (inventoryStore.store?.owners ?? accountStore.owners ?? []).find((item: any) => item.id === ownerId)
+  if (!luminescenceParametersValid.value) {
+    optimizerStore.failBeforeRun(
+      "请先填写有效的队友初始攻击力和耀变伤害占比。",
+      optimizerStore.settings,
+    )
+    return
+  }
   if (!canRunOptimization.value) {
     optimizerStore.failBeforeRun(
       "当前没有可用于优化的可见角色、音擎或驱动盘套装。请先在维护页启用至少一项。",
@@ -1275,21 +1346,38 @@ function complexityText(metrics: any = {}, settings: any = {}) {
       <div class="panel">
         <div class="panel-header">
           <h2 class="panel-title">计算设置</h2>
-          <NButton class="prominent-config-button" type="primary" secondary size="large" data-testid="open-calculation-config" @click="showCalculationConfig = true">
+          <NButton class="prominent-config-button" type="primary" secondary size="large" data-testid="open-calculation-config" :disabled="optimizerStore.isBusy" @click="showCalculationConfig = true">
             <template #icon><SlidersHorizontal :size="18" /></template>
             配置
           </NButton>
         </div>
-        <div class="panel-body metric-grid calculation-summary-grid">
-          <dl class="metric" data-layout-field>
+        <div class="panel-body metric-grid calculation-summary-grid" data-layout-surface="calculation-summary">
+          <dl class="metric" :class="{ 'calculation-mode-summary--luminescence': activeLuminescenceEvent }" data-layout-field>
             <dt>模式</dt>
             <dd>{{ calculationModeLabel }}</dd>
           </dl>
-          <dl class="metric" data-layout-field>
+          <section v-if="activeLuminescenceEvent" class="metric calculation-luminescence-parameters" data-layout-field>
+            <div class="calculation-luminescence-heading">
+              <span>队伍评分参数</span>
+              <NTag v-if="!luminescenceParametersValid" type="error" size="small" round>参数无效</NTag>
+            </div>
+            <LuminescenceParameterFields
+              :event="activeLuminescenceEvent"
+              :disabled="optimizerStore.isBusy"
+              variant="compact"
+              @update="updateLuminescenceParameters"
+            />
+          </section>
+          <div v-if="activeLuminescenceEvent" class="calculation-luminescence-summary" data-layout-field>
+            <strong>事件 {{ buildStore.damageConfig.events?.length ?? 1 }} 项</strong>
+            <span aria-hidden="true">·</span>
+            <NTag v-for="event in damageEventSummary" :key="event.id" round>{{ event.label }}</NTag>
+          </div>
+          <dl v-if="!activeLuminescenceEvent" class="metric" data-layout-field>
             <dt>事件</dt>
             <dd>{{ buildStore.damageConfig.events?.length ?? 1 }} 项</dd>
           </dl>
-          <div class="metric calculation-event-summary" data-layout-field>
+          <div v-if="!activeLuminescenceEvent" class="metric calculation-event-summary" data-layout-field>
             <dt>事件摘要</dt>
             <dd class="chip-row calculation-event-summary-tags">
               <NTag v-for="event in damageEventSummary" :key="event.id" round>{{ event.label }}</NTag>
@@ -1318,7 +1406,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
               <template #icon><SlidersHorizontal :size="18" /></template>
               计算配置
             </NButton>
-            <NTag v-if="optimizerStore.resultsAreStale" type="warning" round>约束已更新，需重新优化</NTag>
+            <NTag v-if="optimizerResultsAreStale" type="warning" round>配置已更新，需重新优化</NTag>
             <NTag :type="optimizerStore.status === 'error' ? 'error' : optimizerStore.status === 'done' ? 'success' : 'info'" round>{{ optimizerStatusLabel(optimizerStore.status) }}</NTag>
           </div>
         </div>
@@ -1430,9 +1518,9 @@ function complexityText(metrics: any = {}, settings: any = {}) {
           <div class="drive-disc-analysis-strip">
             <div>
               <strong>{{ driveDiscAnalysisSourceLabel }}</strong>
-              <span>{{ selectedDriveDiscs.length ? `${selectedDriveDiscs.length} 件驱动盘参与当前伤害计算` : "选择驱动盘后可查看词条分析" }}</span>
+              <span>{{ selectedDriveDiscs.length ? `${selectedDriveDiscs.length} 件驱动盘参与当前${isLuminescenceScore ? "评分" : "伤害"}计算` : "选择驱动盘后可查看词条分析" }}</span>
             </div>
-            <NTag round>{{ panelSummaryText }}</NTag>
+            <NTag v-if="buildStore.discMode !== 'optimized'" round>{{ panelSummaryText }}</NTag>
           </div>
 
           <div v-if="buildStore.discMode === 'loadout'" class="drive-disc-mode-control">
@@ -1448,7 +1536,10 @@ function complexityText(metrics: any = {}, settings: any = {}) {
             class="drive-disc-mode-control"
             :model-value="buildStore.selectedOptimizedRank"
             :results="topOptimizedResultSchemes"
-            :stale="optimizerStore.resultsAreStale"
+            :stale="optimizerResultsAreStale"
+            :score-label="isLuminescenceScore ? '队伍异常评分' : '评分'"
+            :score-suffix="currentScoreSuffix"
+            :score-digits="isLuminescenceScore ? 3 : 0"
             @update:model-value="buildStore.selectOptimizedRank"
           />
           <div v-if="buildStore.discMode === 'optimized' && selectedOptimizedFourPieceSet" class="selected-set-summary optimized-result-set">
@@ -1535,7 +1626,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
         <div class="panel">
           <div class="panel-header">
             <div>
-              <h2 class="panel-title">伤害白盒</h2>
+              <h2 class="panel-title">{{ isLuminescenceScore ? "队伍异常评分白盒" : "伤害白盒" }}</h2>
               <p class="panel-subtitle">随当前驱动盘方案实时刷新</p>
             </div>
             <NButton size="small" @click="recalculate">
@@ -1825,7 +1916,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
     :agent="selectedAgent"
     :cinema-level="buildStore.cinemaLevel"
     :combat-effects="buildStore.result?.inCombat?.activeEffects ?? []"
-    :release-context="{ inCombatPanel: buildStore.result?.inCombat?.panel, outOfCombatPanel: buildStore.result?.outOfCombat?.panel, coreSkillLevel: buildStore.coreSkillLevel }"
+    :release-context="{ inCombatPanel: buildStore.result?.inCombat?.panel, outOfCombatPanel: buildStore.result?.outOfCombat?.panel, outOfCombatBaseAtk: buildStore.result?.outOfCombat?.base?.atk, coreSkillLevel: buildStore.coreSkillLevel, luminescenceDamageMultiplier: currentLuminescenceDamageMultiplier, teamAnomalyDamageMultiplier: currentTeamAnomalyDamageMultiplier }"
     :source-snapshot-provider="anomalySourceSnapshotForAgent"
     @save="saveCalculationConfig"
   />
@@ -1899,6 +1990,44 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 
 .calculation-event-summary {
   grid-column: 1 / -1;
+}
+
+.calculation-mode-summary--luminescence,
+.calculation-luminescence-parameters,
+.calculation-luminescence-summary {
+  grid-column: 1 / -1;
+}
+
+.calculation-luminescence-parameters {
+  display: grid;
+  gap: 10px;
+}
+
+.calculation-luminescence-heading,
+.calculation-luminescence-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.calculation-luminescence-heading > span {
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.calculation-luminescence-summary {
+  min-height: 30px;
+  padding: 2px 2px 0;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.calculation-luminescence-summary strong {
+  color: var(--app-text);
+  font-size: 13px;
 }
 
 .calculation-event-summary-tags :deep(.n-tag) {

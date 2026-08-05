@@ -6239,9 +6239,20 @@
                 "kind": "default"
               },
               "modificationValues": {
-                "value": [90, 103, 117, 130, 144]
+                "value": [
+                  90,
+                  103,
+                  117,
+                  130,
+                  144
+                ]
               },
-              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "vitality-hit-ether-dmg",
@@ -6257,9 +6268,20 @@
                 "attribute": "ether"
               },
               "modificationValues": {
-                "value": [20, 23, 26, 29, 32]
+                "value": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
               },
-              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "vitality-hit-anomaly-dmg",
@@ -6268,16 +6290,23 @@
               "value": 10,
               "mode": "flat",
               "target": {
-                "kind": "anomaly",
-                "settlementType": "attribute"
-              },
-              "requirement": {
-                "attribute": "ether"
+                "kind": "default"
               },
               "modificationValues": {
-                "value": [10, 11.5, 13, 14.5, 16]
+                "value": [
+                  10,
+                  11.5,
+                  13,
+                  14.5,
+                  16
+                ]
               },
-              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "vitality-hit-disorder-dmg",
@@ -6289,13 +6318,21 @@
                 "kind": "anomaly",
                 "settlementType": "disorder"
               },
-              "requirement": {
-                "attribute": "ether"
-              },
               "modificationValues": {
-                "value": [10, 11.5, 13, 14.5, 16]
+                "value": [
+                  10,
+                  11.5,
+                  13,
+                  14.5,
+                  16
+                ]
               },
-              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "appliesToOutOfCombatPanel": false,
@@ -6309,7 +6346,7 @@
       "verification": {
         "level60Stats": "source-checked-mihoyo-baike-2026-07-22",
         "effectText": "source-checked-mihoyo-baike-2026-07-22",
-        "effectBuff": "five modification levels modeled; ether-only damage rules carry rule-level attribute requirements"
+        "effectBuff": "five modification levels modeled; only etherDmg carries an ether attribute requirement, while anomalyDamageBonus and disorderDamageBonus apply to all matching Anomaly wearers"
       }
     },
     {
@@ -6542,6 +6579,143 @@
         "level60Stats": "source-checked-mihoyo-baike-2026-07-24",
         "effectText": "source-checked-mihoyo-baike-2026-07-24",
         "effectBuff": "partially-modeled-anomaly-buildup-text-only"
+      }
+    },
+    {
+      "id": "zzz_wiki_2109",
+      "name": {
+        "zhCN": "空羽复归之诗"
+      },
+      "rarity": "S",
+      "specialty": "anomaly",
+      "relatedAgentId": "remielle_dan",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_2109.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/07/22/15559334/72de3df7aa987a554de6a9ca97b72789_1235753090233911834.png"
+      },
+      "level60": {
+        "atkBase": 743,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 36,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "失乐园"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "异常精通提升96/105/115/125/135点；装备者触发[异化]反应时，自身获得属性异常伤害提升20%/23%/26%/29%/32%的效果，并为全队角色施加造成的伤害提升30%/34.5%/39%/43.5%/48%效果，效果均持续30秒，重复触发时刷新持续时间。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_2109_self_anomaly_proficiency",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "value": 96,
+              "modificationValues": {
+                "value": [
+                  96,
+                  105,
+                  115,
+                  125,
+                  135
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_2109_self_anomaly_damage",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyDamageBonus",
+              "mode": "flat",
+              "value": 20,
+              "modificationValues": {
+                "value": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
+              },
+              "condition": "装备者触发[异化]反应",
+              "durationSeconds": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": {
+          "scope": "inCombat",
+          "condition": "装备者触发[异化]反应",
+          "durationSeconds": 30,
+          "effects": [
+            {
+              "id": "effect_wiki_2109_team_damage",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 30,
+              "modificationValues": {
+                "value": [
+                  30,
+                  34.5,
+                  39,
+                  43.5,
+                  48
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/2109/detail?mhy_presentation_style=fullscreen",
+        "https://act-api-takumi-static.mihoyo.com/hoyowiki/zzz/wapi/entry_page?entry_page_id=2109&lang=zh-cn&app_sn=zzz_wiki"
+      ],
+      "verification": {
+        "level60Stats": "source-checked-mihoyo-baike-entry-2109-version-1785290498-2026-08-04",
+        "effectText": "source-checked-mihoyo-baike-entry-2109-version-1785290498-2026-08-04",
+        "effectBuff": "source-checked; default anomalyDamageBonus applies to Attribute Anomaly, Release, and Luminescence while Disorder uses its separate bonus"
       }
     }
   ]

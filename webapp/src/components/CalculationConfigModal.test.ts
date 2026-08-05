@@ -1,7 +1,9 @@
 import { mount } from "@vue/test-utils"
 import { afterEach, describe, expect, it } from "vitest"
 import { nextTick } from "vue"
+import { NInputNumber } from "naive-ui"
 import CalculationConfigModal from "@/components/CalculationConfigModal.vue"
+import LuminescenceEventEditor from "@/components/LuminescenceEventEditor.vue"
 import agentsData from "../../../data/agents.json"
 import agentSkillsData from "../../../data/agent_skills.json"
 import anomalyEffectsData from "../../../data/anomaly_effects.json"
@@ -14,6 +16,7 @@ const yixuan = (agentsData as any).agents.find((agent: any) => agent.id === "yix
 const yixuanSkillCatalog = (agentSkillsData as any).agentSkills.find((skill: any) => skill.id === "yixuan")
 const alice = (agentsData as any).agents.find((agent: any) => agent.id === "alice_thymefield")
 const aria = (agentsData as any).agents.find((agent: any) => agent.id === "aria")
+const dan = (agentsData as any).agents.find((agent: any) => agent.id === "remielle_dan")
 
 const miyabiWithSkillGroups = {
   ...JSON.parse(JSON.stringify(miyabi)),
@@ -1416,5 +1419,249 @@ describe("CalculationConfigModal", () => {
     const saved = await saveModal(wrapper)
     expect(saved.events[0].skillRef.level).toBe(1)
     expect(saved.events[0].skillMultiplier).toBe(expectedRow.values[0])
+  })
+
+  it("edits and preserves Dan's minimal Luminescence team-score event", async () => {
+    const wrapper = mountModal({
+      agent: dan,
+      cinemaLevel: 0,
+      damageConfig: {
+        ...clone(dan.defaultCalculationConfig),
+        mode: "custom",
+      },
+      releaseContext: {
+        inCombatPanel: { atk: 1800, anomalyProficiency: 170 },
+        outOfCombatPanel: { atk: 1447, anomalyProficiency: 170 },
+        coreSkillLevel: "F",
+        luminescenceDamageMultiplier: 1.2,
+        teamAnomalyDamageMultiplier: 1.1,
+      },
+    })
+
+    await openModal(wrapper)
+    expect(document.body.textContent).toContain("结算类型")
+    expect(document.body.textContent).toContain("耀变")
+    const editor = wrapper.getComponent(LuminescenceEventEditor)
+    expect(editor.text()).toContain("队友初始攻击力")
+    expect(editor.text()).toContain("耀变在队伍总伤害中的占比")
+    expect(editor.text()).toContain("可以参考危局、防卫战结束时蕾米埃尔的伤害占比，约等于耀变伤害占比。普遍而言，丹的影画越高，耀变伤害占比越高。")
+    expect(document.body.querySelector(".calculation-event-list-item small")?.textContent)
+      .toContain("耀变在队伍总伤害中的占比 50%")
+    expect(editor.text()).toContain("队伍异常评分")
+    expect(editor.text()).toContain("× k")
+    expect(editor.props("teamAnomalyDamageMultiplier")).toBe(1.1)
+    expect(editor.text()).toContain("5,095.83 × k")
+    expect(editor.text()).toContain("队友其他属性设置为恒变量k，从而得到关于丹攻击力以及异常精通配置的最优解")
+    for (const forbidden of ["归一化", "本次虚曜", "1 / 3", "原异常倍率 B", "固定系数 k", "来源属性", "抗性口径", "特殊虚曜", "共享封顶", "实测参考构筑", "更新参考", "旧模型"]) {
+      expect(editor.text()).not.toContain(forbidden)
+      expect(document.body.textContent).not.toContain(forbidden)
+    }
+    const inputs = editor.findAllComponents(NInputNumber)
+    expect(inputs).toHaveLength(2)
+    expect(inputs[0].props("value")).toBe(2800)
+    expect(inputs[1].props("value")).toBe(50)
+    expect(inputs[1].props("min")).toBe(0)
+    expect(inputs[1].props("max")).toBe(100)
+    await inputs[0].vm.$emit("update:value", null)
+    await nextTick()
+    expect(editor.text()).toContain("参数无效")
+    expect(document.body.textContent).toContain("队友初始攻击力需要是非负数")
+    await inputs[0].vm.$emit("update:value", 3200)
+    await inputs[1].vm.$emit("update:value", null)
+    await nextTick()
+    expect(editor.text()).toContain("参数无效")
+    expect(document.body.textContent).toContain("耀变在队伍总伤害中的占比需要在 0% 至 100% 之间")
+    await inputs[1].vm.$emit("update:value", 62.5)
+    await nextTick()
+    const saved = await saveModal(wrapper)
+    expect(saved.events[0]).toMatchObject({
+      kind: "anomaly",
+      settlementType: "luminescence",
+      teammateAttack: 3200,
+      luminescenceDamageSharePct: 62.5,
+      triggerActorRef: { agentId: "remielle_dan" },
+    })
+    expect(saved.events[0].anomalyEffect).toBeUndefined()
+    for (const removed of ["records", "moveRef", "anomalyAgentCount", "additionalAbilityActive", "m4MultiplierMode", "resistanceMode", "specialRecordBaseStrength", "stunned", "teamAnomalyDamageMultiplier", "luminescenceDamageMultiplier"]) {
+      expect(saved.events[0][removed]).toBeUndefined()
+    }
+  })
+
+  it("derives separate Luminescence and broad team anomaly multipliers from active effects", async () => {
+    const wrapper = mountModal({
+      agent: dan,
+      cinemaLevel: 0,
+      damageConfig: {
+        ...clone(dan.defaultCalculationConfig),
+        mode: "custom",
+      },
+      releaseContext: {
+        inCombatPanel: { atk: 1800, anomalyProficiency: 170 },
+        outOfCombatPanel: { atk: 1447, anomalyProficiency: 170 },
+        coreSkillLevel: "F",
+      },
+      combatEffects: [
+        {
+          key: "field-broad-anomaly",
+          sourceType: "field",
+          resolvedDamageModifiers: [
+            {
+              kind: "anomalyDamageBonus",
+              value: 0.5,
+              sourceType: "field",
+            },
+            {
+              kind: "anomalyDamageBonus",
+              value: 0.1,
+              sourceType: "field",
+              appliesTo: { settlementTypes: ["luminescence"] },
+            },
+            {
+              kind: "anomalyDamageBonus",
+              value: 0.1,
+              sourceType: "field",
+              requirement: { attribute: "lumiflux" },
+            },
+          ],
+        },
+        {
+          key: "personal-luminescence-effects",
+          sourceType: "wEngine",
+          resolvedDamageModifiers: [
+            {
+              kind: "anomalyDamageBonus",
+              value: 0.15,
+              sourceType: "wEngine",
+              appliesTo: { settlementTypes: ["luminescence"] },
+            },
+            {
+              kind: "anomalyDamageBonus",
+              value: 0.5,
+              sourceType: "wEngine",
+              appliesTo: { settlementTypes: ["release"] },
+            },
+          ],
+        },
+      ],
+    })
+
+    await openModal(wrapper)
+    const editor = wrapper.getComponent(LuminescenceEventEditor)
+    expect(editor.props("luminescenceDamageMultiplier")).toBeCloseTo(1.85)
+    expect(editor.props("teamAnomalyDamageMultiplier")).toBeCloseTo(1.5)
+    expect(editor.text()).not.toContain("实测参考构筑")
+    expect(editor.text()).toContain("丹所在队伍伤害的最大化，主要取决于队友攻击力")
+    expect(editor.text()).toContain("队友其他属性设置为恒变量k")
+  })
+
+  it("drops legacy measured-reference fields instead of persisting them", async () => {
+    const wrapper = mountModal({
+      agent: dan,
+      damageConfig: {
+        ...clone(dan.defaultCalculationConfig),
+        mode: "custom",
+        events: [{
+          ...clone(dan.defaultCalculationConfig.events[0]),
+          referenceAnomalyProficiency: 170,
+          referenceLuminescenceDamageMultiplier: 1.2,
+        }],
+      },
+      releaseContext: {
+        inCombatPanel: { atk: 1800, anomalyProficiency: 222 },
+        outOfCombatPanel: { atk: 1447, anomalyProficiency: 170 },
+        coreSkillLevel: "F",
+        luminescenceDamageMultiplier: 1.4,
+      },
+    })
+
+    await openModal(wrapper)
+    const editor = wrapper.getComponent(LuminescenceEventEditor)
+    expect(editor.text()).not.toContain("实测参考构筑")
+    expect(editor.find('button[title="将当前显示构筑设为实测参考"]').exists()).toBe(false)
+
+    const saved = await saveModal(wrapper)
+    expect(saved.events[0].referenceAnomalyProficiency).toBeUndefined()
+    expect(saved.events[0].referenceLuminescenceDamageMultiplier).toBeUndefined()
+  })
+
+  it("keeps Dan's admin score model fixed while preserving the editable score inputs", async () => {
+    const baseEvent = clone(dan.defaultCalculationConfig.events[0])
+    const wrapper = mountModal({
+      agent: dan,
+      damageConfig: {
+        ...clone(dan.defaultCalculationConfig),
+        mode: "adminDefault",
+        events: [{ ...baseEvent, teammateAttack: 3100 }],
+      },
+      releaseContext: {
+        inCombatPanel: { atk: 1800, anomalyProficiency: 170 },
+        outOfCombatPanel: { atk: 1447, anomalyProficiency: 170 },
+        coreSkillLevel: "F",
+      },
+    })
+
+    await openModal(wrapper)
+    expect(document.body.querySelector(".calculation-readonly-tag")?.textContent).toContain("固定评分模型")
+    const editor = wrapper.getComponent(LuminescenceEventEditor)
+    const [teammateAttackInput, damageShareInput] = editor.findAllComponents(NInputNumber)
+    expect(teammateAttackInput.props("disabled")).not.toBe(true)
+    expect(teammateAttackInput.props("value")).toBe(3100)
+    expect(damageShareInput.props("disabled")).not.toBe(true)
+    expect(damageShareInput.props("value")).toBe(50)
+
+    await teammateAttackInput.vm.$emit("update:value", 3200)
+    await damageShareInput.vm.$emit("update:value", 45)
+    await nextTick()
+    const saved = await saveModal(wrapper)
+    expect(saved.mode).toBe("adminDefault")
+    expect(saved.events).toEqual([{
+      id: baseEvent.id,
+      kind: "anomaly",
+      settlementType: "luminescence",
+      triggerActorRef: { agentId: "remielle_dan" },
+      teammateAttack: 3200,
+      luminescenceDamageSharePct: 45,
+    }])
+  })
+
+  it("migrates a legacy Luminescence record to teammateAttack on save", async () => {
+    const legacyEvent = {
+      id: "legacy-luminescence",
+      kind: "anomaly",
+      settlementType: "luminescence",
+      count: 3,
+      stunned: true,
+      triggerActorRef: { agentId: "remielle_dan" },
+      moveRef: { moveId: "basic_vertical_rainbow" },
+      records: [{ kind: "normal", T: 3150, k: 1.25, B: 7.13, sourceElement: "physical" }],
+      anomalyAgentCount: 2,
+      additionalAbilityActive: true,
+      m4MultiplierMode: "multiplicative",
+      resistanceMode: "sourceElement",
+    }
+    const wrapper = mountModal({
+      agent: dan,
+      damageConfig: {
+        mode: "custom",
+        selectedEventId: legacyEvent.id,
+        events: [legacyEvent],
+      },
+      releaseContext: {
+        inCombatPanel: { atk: 1800, anomalyProficiency: 200 },
+        outOfCombatPanel: { atk: 1600, anomalyProficiency: 180 },
+        coreSkillLevel: "F",
+      },
+    })
+
+    await openModal(wrapper)
+    const saved = await saveModal(wrapper)
+    expect(saved.events[0]).toEqual({
+      id: "legacy-luminescence",
+      kind: "anomaly",
+      settlementType: "luminescence",
+      triggerActorRef: { agentId: "remielle_dan" },
+      teammateAttack: 3150,
+      luminescenceDamageSharePct: 50,
+    })
   })
 })

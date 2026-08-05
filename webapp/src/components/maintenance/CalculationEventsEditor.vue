@@ -21,6 +21,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ change: [], "update:selectedEventId": [value: string | null] }>()
 
 const selectedEvent = computed(() => props.events.find(event => event.id === props.selectedEventId) ?? props.events[0] ?? null)
+const hasLuminescenceEvent = computed(() => props.events.some(event => event?.settlementType === "luminescence"))
 
 function agentSkill() {
   return (props.catalog?.agentSkills?.agentSkills ?? []).find((skill: any) => skill.agentId === props.agent?.id)
@@ -39,6 +40,7 @@ function newSkillRef() {
 }
 
 function add(kind: string) {
+  if (kind !== "luminescence" && hasLuminescenceEvent.value) return
   const event = defaultCalculationEvent(kind)
   if (["direct", "sheer"].includes(kind) && preferredSkillId()) {
     delete event.__source
@@ -46,7 +48,14 @@ function add(kind: string) {
     delete event.damageElement
     event.skillRef = newSkillRef()
   }
-  props.events.push(event)
+  if (kind === "luminescence") {
+    event.triggerActorRef = { agentId: props.agent?.id ?? "" }
+  }
+  if (kind === "luminescence") {
+    props.events.splice(0, props.events.length, event)
+  } else {
+    props.events.push(event)
+  }
   emit("update:selectedEventId", event.id)
   emit("change")
 }
@@ -54,10 +63,19 @@ function add(kind: string) {
 function duplicate(eventId: string) {
   const index = props.events.findIndex(event => event.id === eventId)
   if (index < 0) return
+  if (props.events[index]?.settlementType === "luminescence") return
   const copy = JSON.parse(JSON.stringify(props.events[index]))
   copy.id = internalId("event")
   props.events.splice(index + 1, 0, copy)
   emit("update:selectedEventId", copy.id)
+  emit("change")
+}
+
+function handleEventChange(event: any) {
+  if (event?.settlementType === "luminescence" && props.events.length > 1) {
+    props.events.splice(0, props.events.length, event)
+    emit("update:selectedEventId", event.id ?? null)
+  }
   emit("change")
 }
 
@@ -82,7 +100,9 @@ function visibleKind(event: any) {
   if (event.kind === "direct" || event.kind === "sheer") return event.kind
   return event.kind === "disorder" || event.settlementType === "disorder"
     ? "disorder"
-    : event.settlementType === "release" ? "release" : "anomaly"
+    : event.settlementType === "release"
+      ? "release"
+      : event.settlementType === "luminescence" ? "luminescence" : "anomaly"
 }
 
 function eventTitle(event: any, index: number) {
@@ -104,21 +124,29 @@ function eventTitle(event: any, index: number) {
 function eventIndex(event: any) {
   return props.events.findIndex(item => item.id === event?.id)
 }
+
+function eventSummary(event: any) {
+  if (event?.settlementType !== "luminescence") return `次数 ×${event?.count ?? 1}`
+  const teammateAttack = Number(event.teammateAttack ?? 2800).toLocaleString("zh-CN")
+  const share = Number(event.luminescenceDamageSharePct ?? 50).toLocaleString("zh-CN", { maximumFractionDigits: 6 })
+  return `队友初始攻击力 ${teammateAttack} · 耀变伤害占比 ${share}%`
+}
 </script>
 
 <template>
   <div v-if="layout === 'cards'" class="calculation-events-editor">
     <div class="maintenance-action-row">
-      <NButton size="small" :disabled="disabled" @click="add('direct')"><template #icon><Plus :size="14" /></template>添加直伤</NButton>
-      <NButton size="small" :disabled="disabled" @click="add('sheer')">添加贯穿</NButton>
-      <NButton size="small" :disabled="disabled" @click="add('anomaly')">添加属性异常</NButton>
-      <NButton size="small" :disabled="disabled" @click="add('disorder')">添加紊乱</NButton>
-      <NButton size="small" :disabled="disabled || !(agent?.anomalyReleaseProfiles?.length)" :title="agent?.anomalyReleaseProfiles?.length ? '' : '暂不支持'" @click="add('release')">添加异放</NButton>
-      <NButton v-if="allowSkillGroup" size="small" :disabled="disabled || !skillGroups.length" @click="add('skillGroup')">添加技能组</NButton>
+      <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('direct')"><template #icon><Plus :size="14" /></template>添加直伤</NButton>
+      <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('sheer')">添加贯穿</NButton>
+      <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('anomaly')">添加属性异常</NButton>
+      <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('disorder')">添加紊乱</NButton>
+      <NButton size="small" :disabled="disabled || hasLuminescenceEvent || !(agent?.anomalyReleaseProfiles?.length)" :title="agent?.anomalyReleaseProfiles?.length ? '' : '暂不支持'" @click="add('release')">添加异放</NButton>
+      <NButton v-if="allowSkillGroup" size="small" :disabled="disabled || hasLuminescenceEvent || agent?.id !== 'remielle_dan'" :title="agent?.id === 'remielle_dan' ? '' : '仅蕾米埃尔·丹支持'" @click="add('luminescence')">添加耀变</NButton>
+      <NButton v-if="allowSkillGroup" size="small" :disabled="disabled || hasLuminescenceEvent || !skillGroups.length" @click="add('skillGroup')">添加技能组</NButton>
     </div>
     <article v-for="(event, index) in events" :key="event.id ?? index" class="maintenance-subcard calculation-event-card">
       <header class="maintenance-row-head calculation-event-head"><strong>{{ eventTitle(event, index) }}</strong><NButton quaternary type="error" :disabled="disabled" title="删除计算事件" @click="events.splice(index, 1); emit('change')"><template #icon><Trash2 :size="16" /></template></NButton></header>
-      <CalculationEventFields :event="event" :catalog="catalog" :agent="agent" :skill-groups="skillGroups" :disabled="disabled" :allow-skill-group="allowSkillGroup" @change="emit('change')" />
+      <CalculationEventFields :event="event" :catalog="catalog" :agent="agent" :skill-groups="skillGroups" :disabled="disabled" :allow-skill-group="allowSkillGroup" @change="handleEventChange(event)" />
     </article>
   </div>
 
@@ -131,22 +159,23 @@ function eventIndex(event: any) {
           <article v-for="(event, index) in events" :key="event.id ?? index" class="calculation-event-list-item" :class="{ active: selectedEvent?.id === event.id }">
             <button type="button" class="calculation-event-select" @click="emit('update:selectedEventId', event.id)">
               <span class="calculation-event-order">#{{ index + 1 }}</span>
-              <span class="calculation-event-copy"><strong>{{ eventTitle(event, index) }}</strong><small>次数 ×{{ event.count ?? 1 }}</small></span>
+              <span class="calculation-event-copy"><strong>{{ eventTitle(event, index) }}</strong><small>{{ eventSummary(event) }}</small></span>
             </button>
             <div class="calculation-event-inline-actions">
-              <NButton circle quaternary size="tiny" :disabled="disabled" title="复制目标事件" aria-label="复制目标事件" @click="duplicate(event.id)"><template #icon><Copy :size="14" /></template></NButton>
+              <NButton v-if="event.settlementType !== 'luminescence'" circle quaternary size="tiny" :disabled="disabled" title="复制目标事件" aria-label="复制目标事件" @click="duplicate(event.id)"><template #icon><Copy :size="14" /></template></NButton>
               <NButton circle quaternary size="tiny" type="error" :disabled="disabled || events.length <= 1" title="删除目标事件" aria-label="删除目标事件" @click="remove(index)"><template #icon><Trash2 :size="14" /></template></NButton>
             </div>
           </article>
         </div>
         <div v-else class="calculation-event-empty">还没有目标事件</div>
         <div class="calculation-add-toolbar">
-          <NButton size="small" :disabled="disabled" @click="add('direct')">添加技能</NButton>
-          <NButton size="small" :disabled="disabled" @click="add('sheer')">添加贯穿</NButton>
-          <NButton size="small" :disabled="disabled" @click="add('anomaly')">添加异常</NButton>
-          <NButton size="small" :disabled="disabled" @click="add('disorder')">添加紊乱</NButton>
-          <NButton size="small" :disabled="disabled || !(agent?.anomalyReleaseProfiles?.length)" :title="agent?.anomalyReleaseProfiles?.length ? '' : '暂不支持'" @click="add('release')">添加异放</NButton>
-          <NButton v-if="allowSkillGroup" size="small" :disabled="disabled || !skillGroups.length" @click="add('skillGroup')">添加技能组</NButton>
+          <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('direct')">添加技能</NButton>
+          <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('sheer')">添加贯穿</NButton>
+          <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('anomaly')">添加异常</NButton>
+          <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('disorder')">添加紊乱</NButton>
+          <NButton size="small" :disabled="disabled || hasLuminescenceEvent || !(agent?.anomalyReleaseProfiles?.length)" :title="agent?.anomalyReleaseProfiles?.length ? '' : '暂不支持'" @click="add('release')">添加异放</NButton>
+          <NButton v-if="allowSkillGroup" size="small" :disabled="disabled || hasLuminescenceEvent || agent?.id !== 'remielle_dan'" :title="agent?.id === 'remielle_dan' ? '' : '仅蕾米埃尔·丹支持'" @click="add('luminescence')">添加耀变</NButton>
+          <NButton v-if="allowSkillGroup" size="small" :disabled="disabled || hasLuminescenceEvent || !skillGroups.length" @click="add('skillGroup')">添加技能组</NButton>
         </div>
       </section>
     </aside>
@@ -157,7 +186,7 @@ function eventIndex(event: any) {
         <NTag v-if="selectedEvent" round>{{ EVENT_KIND_OPTIONS.find(item => item.value === visibleKind(selectedEvent))?.label }}</NTag>
       </header>
       <div v-if="selectedEvent" class="calculation-master-editor-body">
-        <CalculationEventFields :event="selectedEvent" :catalog="catalog" :agent="agent" :skill-groups="skillGroups" :disabled="disabled" :allow-skill-group="allowSkillGroup" @change="emit('change')" />
+        <CalculationEventFields :event="selectedEvent" :catalog="catalog" :agent="agent" :skill-groups="skillGroups" :disabled="disabled" :allow-skill-group="allowSkillGroup" @change="handleEventChange(selectedEvent)" />
       </div>
       <div v-else class="calculation-event-empty">从左侧添加一个事件开始配置</div>
     </section>

@@ -1,5 +1,14 @@
 export const DAMAGE_ELEMENTS = Object.freeze(["physical", "fire", "ice", "electric", "ether", "wind"])
 
+export const ANOMALY_SETTLEMENT_TYPES = Object.freeze([
+    "attribute",
+    "disorder",
+    "release",
+    "luminescence",
+])
+
+export const ANOMALY_SETTLEMENT_TYPE_VALUES = new Set(ANOMALY_SETTLEMENT_TYPES)
+
 export const ELEMENT_DAMAGE_STAT_BY_ELEMENT = Object.freeze(Object.fromEntries(
     DAMAGE_ELEMENTS.map(element => [element, `${element}Dmg`]),
 ))
@@ -123,9 +132,37 @@ function migrateLegacyReleaseTarget(rule) {
     delete appliesTo.anomalyVariants
 }
 
+export function normalizeEffectRuleTarget(rule = {}) {
+    const target = rule?.target
+    if (target?.kind === "default") {
+        rule.target = { kind: "default" }
+        return rule
+    }
+
+    if (target?.kind !== "anomaly") {
+        if ((target === undefined || target === null) && rule?.stat === "anomalyDamageBonus") {
+            rule.target = { kind: "default" }
+        }
+        return rule
+    }
+
+    rule.target = { ...target }
+    if (Array.isArray(rule.target.anomalyEffects) && rule.target.anomalyEffects.length === 0) {
+        delete rule.target.anomalyEffects
+    }
+
+    if (rule.target.settlementType === "luminescence"
+        && Array.isArray(rule.target.anomalyVariants)
+        && rule.target.anomalyVariants.length === 0) {
+        delete rule.target.anomalyVariants
+    }
+    return rule
+}
+
 function migrateRule(rule = {}) {
     const next = clone(rule)
     migrateLegacyReleaseTarget(next)
+    normalizeEffectRuleTarget(next)
     const legacySkillTargets = Array.isArray(next.appliesTo?.skillTargets) ? next.appliesTo.skillTargets : []
     if (next.type === "damageModifier"
         && (legacySkillTargets.length || !["directDamageBonus", "skillMultiplierBonus"].includes(next.kind))) {

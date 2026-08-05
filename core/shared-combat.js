@@ -12,6 +12,7 @@ import { ELEMENT_CRIT_DMG_STATS, ELEMENT_DEF_IGNORE_STATS } from "./effectRuleTa
 export const DEFAULT_DAMAGE_TARGET_PRESET_ID = "normal-boss"
 export const DEFAULT_DAMAGE_LEVEL_COEFFICIENT = 794
 export const DAMAGE_ELEMENTS = ["physical", "fire", "ice", "electric", "ether", "wind"]
+export const DIRECT_DAMAGE_ELEMENTS = [...DAMAGE_ELEMENTS, "lumiflux"]
 export const DAMAGE_ELEMENT_SHORT_LABELS = {
     physical: "物理",
     fire: "火",
@@ -19,6 +20,7 @@ export const DAMAGE_ELEMENT_SHORT_LABELS = {
     electric: "电",
     ether: "以太",
     wind: "风",
+    lumiflux: "流明",
 }
 export const DAMAGE_KIND_LABELS = {
     direct: "直伤",
@@ -132,7 +134,6 @@ export const CUSTOM_BUFF_SKILL_STAT_OPTIONS = [
     ["electricDmg", "电属性伤害加成%", "skill", null],
     ["etherDmg", "以太伤害加成%", "skill", null],
     ["windDmg", "风属性伤害加成%", "skill", null],
-    ["anomalyDamageBonus", "属性异常增伤%", "skill", null],
     ["disorderDamageBonus", "紊乱增伤%", "skill", null],
     ["stunDmgMultiplierBonus", "失衡易伤倍率加算%", "skill", null],
     ["stunDmgMultiplierBonusAlways", "失衡易伤倍率加算（未失衡生效）%", "skill", null],
@@ -244,6 +245,7 @@ export const ENUM_LABELS = {
         honed_edge: "凛刃",
         frost: "烈霜",
         xuanmo: "玄墨",
+        lumiflux: "流明",
         fire: "火属性",
         ice: "冰属性",
         electric: "电属性",
@@ -800,7 +802,7 @@ export function agentAttributeText(agent) {
 
 export function damageElementForAgent(agent = {}) {
     const damageElement = agent.damageElement ?? agent.attribute
-    return DAMAGE_ELEMENTS.includes(damageElement) ? damageElement : "physical"
+    return DIRECT_DAMAGE_ELEMENTS.includes(damageElement) ? damageElement : "physical"
 }
 
 export function damageElementShortLabel(element) {
@@ -1117,7 +1119,13 @@ function ruleTargetText(rule = {}, meta) {
         return targets.length ? `（技能：${skillTargetLabels(targets, meta).join("；")}）` : "（技能：未选择）"
     }
     if (target.kind === "anomaly") {
-        const settlementLabel = target.settlementType === "disorder" ? "紊乱" : target.settlementType === "release" ? "异放" : "属性异常"
+        const settlementLabel = target.settlementType === "disorder"
+            ? "紊乱"
+            : target.settlementType === "release"
+                ? "异放"
+                : target.settlementType === "luminescence"
+                    ? "耀变"
+                    : "属性异常"
         const effects = Array.isArray(target.anomalyEffects) ? target.anomalyEffects : []
         const labels = effects.map(effect => ANOMALY_EFFECT_LABELS[effect] ?? effect)
         return labels.length
@@ -1130,6 +1138,9 @@ function ruleTargetText(rule = {}, meta) {
 function storedRuleStatLabel(rule = {}, meta) {
     if (rule.target?.kind === "skill" && rule.stat === "dmgBonus") {
         return "技能目标伤害加成%"
+    }
+    if (rule.target?.kind === "anomaly" && rule.stat === "anomalyDamageBonus") {
+        return "指定异常增伤%"
     }
     return storedStatLabel(rule.stat, rule.mode, meta)
 }
