@@ -2,6 +2,227 @@
 
 # Changelog
 
+## 2026-08-05 - Clarified Dan's Luminescence Score Presentation
+
+Renamed the empirical weight throughout the event editor and white box to
+"耀变在队伍总伤害中的占比" and added a practical note that players can use
+Remielle's end-of-Deadly-Assault damage share as an approximation in most
+teams. Replaced the previous multiplier-focused explanatory copy with the
+explicit modeling boundary: teammate ATK and Luminescence share are user
+variables, teammate non-ATK properties are frozen into `k`, and the optimizer
+solves for Dan's ATK and Anomaly Proficiency allocation.
+
+The Luminescence white box no longer repeats helper descriptions beneath the
+three panel values or the empirical share. It now inserts a flattened
+"异化倍率" row before the final score, including the active M2 term and the
+current AP substitution. The drive-disc workbench also hides the ATK/CRIT/CRIT
+DMG summary pill beside optimized results for every agent while retaining the
+underlying panel and analysis data.
+
+## 2026-08-05 - Restored Dan's Reference-Free Weighted Score
+
+Replaced the production reference-build additive formula with the reference-free
+constant-weight score `B(d) * E * [H(d) * M(d) / E]^w * k`. The empirical
+Luminescence percentage is now an explicit ranking weight rather than a claim
+that every candidate preserves an exact damage split. Players no longer need a
+measured-build snapshot, and the UI, browser persistence, maintenance payloads,
+Worker, server, and strict optimizer no longer require or save reference
+Anomaly Proficiency or a reference Luminescence multiplier.
+
+Broad field/Boss Attribute Anomaly damage bonuses are displayed as the full
+team multiplier `E`. Luminescence compares its complete same-bucket multiplier
+`M(d)=1+e+s(d)` against that public baseline through `M(d)/E`. For a 16% public
+environment bonus and 35% personal bonus, the white box therefore shows
+`* 1.16 * ([1+alpha*P] * 1.51/1.16)^w`, not `1+1.51/1.16` and not
+`1.16*1.35`. This factoring is algebraically identical to
+`E^(1-w) * [H(d)*M(d)]^w`, but makes it explicit that selecting a positive
+public Buff increases the displayed score while diluting only the relative
+advantage of personal anomaly damage bonuses.
+
+The superseded reference-calibrated additive evaluator remains a named,
+unit-tested internal comparison function only. It has no production entrypoint
+or persisted reference fields.
+
+## 2026-08-04 - Calibrated Dan's Score To The Measured Reference Build
+
+Replaced the production geometric-share approximation with the additive team
+damage model `B(d) * [(1-w) + w * L(d)/L0] * k`. The percentage entered by the
+player is now explicitly the Luminescence share observed with one measured
+reference build. That build's in-combat Anomaly Proficiency and complete
+Luminescence anomaly-damage multiplier are frozen in the event, while every
+drive-disc candidate is compared against the same `L0`.
+
+The event editor shows the frozen reference values and provides one explicit
+"update reference" command. Older browser saves acquire the snapshot once from
+the currently displayed build, after which normal persistence, Worker, server,
+and optimizer inputs preserve it. The white box expands the additive branches
+and makes the reference ratio visible; the reference build itself therefore has
+`(1-w) + w * 1 = 1`.
+
+The formal model intentionally does not estimate whether abstract teammate
+damage receives a field/Boss anomaly bonus. When the empirical share was
+measured in that environment, its teammate-side effect is already represented
+by the observed split and the constant `k`. The prior `B * O^(1-w) * L^w * k`
+model is retained only as a deprecated internal geometric comparison endpoint.
+
+## 2026-08-04 - Split Broad Environment Bonuses Across Dan's Team Branches
+
+Superseded later the same day by the reference-calibrated additive model above;
+the geometric formula described in this historical entry is no longer used by
+the production UI or optimizer.
+
+Corrected Remielle Dan's constant-share team anomaly score so broad Attribute
+Anomaly damage bonuses from field and Boss sources affect both modeled damage
+branches. The production scalar is now `B * O^(1-w) * L^w * k`: `O` contains
+the broad environment bonus received by the abstract teammate-anomaly branch,
+while `L` contains Dan's core-Proficiency multiplier and the complete additive
+Luminescence anomaly-damage bucket. A 50% environment bonus plus 35% personal
+bonus therefore produces `O = 1.50` and a Luminescence bonus bucket of `1.85`,
+not `1.50 * 1.35`.
+
+Damage-modifier provenance is preserved through full, compiled, dense, fixed,
+Worker, server, and strict-optimizer paths so the two buckets are aggregated
+directly rather than reconstructed from a merged multiplier. Only unrestricted
+field/Boss `anomalyDamageBonus` rules enter the abstract teammate branch;
+element-, anomaly-, settlement-, skill-, or beneficiary-restricted rules remain
+Luminescence-only when they match Dan. Runtime multipliers remain derived from
+selected Buffs and add no UI input or persisted event field.
+
+## 2026-08-04 - Canonicalized Broad And Precise Anomaly Damage Rules
+
+Aligned the maintained catalogs with the confirmed `anomalyDamageBonus`
+contract. Broad Attribute Anomaly damage bonuses now store
+`target: { kind: "default" }`, which covers Attribute Anomaly, Release, and
+Luminescence in the dedicated anomaly bonus zone while excluding Disorder.
+Precise bonuses continue to use the same stat with an explicit anomaly target;
+the maintenance surface distinguishes that form as “指定异常增伤%”. New
+skill-targeted anomaly-damage rules are no longer authored, while legacy
+payloads remain readable.
+
+The maintenance draft cache is now version 4. Incompatible version 3 drafts are
+not restored, but their original localStorage bytes remain untouched; their
+presence also prevents an older v2/v1 draft from being restored in their place.
+Saving or explicitly discarding a v4 draft writes a resolved v4 marker rather
+than deleting any versioned predecessor key.
+
+Release source snapshots now exclude explicitly Attribute-Anomaly-targeted
+`anomalyDamageBonus` rules. Broad source bonuses and explicit Release bonuses
+are added inside one anomaly-damage zone instead of being multiplied, keeping
+full, compiled, legacy-summary, dense, and fixed-set scoring identical and
+preventing Alice's precise Assault bonus from leaking into Release.
+
+Migrated Jane Doe's Cinema 4 and Aria's `壳中之灵` hit-triggered anomaly bonus
+from Attribute-Anomaly-only targets to the broad default scope. For
+`壳中之灵`, only the Ether damage rule retains an Ether-attribute requirement;
+its separately worded Attribute Anomaly and Disorder bonuses now apply to all
+matching Anomaly wearers. Migrated
+`谶羽之誓`'s 15% bonus to the same default scope and expressed its actual
+equipment restriction as `requirement.attribute: "lumiflux"`; the rule is no
+longer described as Luminescence-only. Conversely, Alice's Cinema 2 15% Assault
+bonus is now an explicit Attribute Anomaly target with
+`anomalyEffects: ["assault"]`, so it cannot leak into other anomalies, Release,
+or Luminescence. Alice's separate Disorder rule remains unchanged.
+
+## 2026-08-04 - Rebalanced Dan Optimization Around Team Anomaly Damage
+
+Superseded later the same day by the reference-calibrated additive model at the
+top of this changelog. `B * G^w * k` remains only as a deprecated internal
+comparison formula.
+
+Replaced Remielle Dan's formal Luminescence-only objective with a constant
+empirical-share team anomaly score. Players now provide the observed share of
+team anomaly damage contributed by Luminescence, defaulting to 50%. Dan's ATK
+sharing and `0.02%`-per-Proficiency alienation conversion affect the full score,
+while the core passive's `0.2%`-per-Proficiency multiplier and candidate-specific
+Luminescence damage bonuses are weighted by that share. The production scalar is
+`B * G^w * k`, so 0% recovers the teammate anomaly branch and 100% recovers the
+former Luminescence-only objective.
+
+The previous reference-calibrated formula remains as a named, unit-tested core
+function for later numerical comparison, but has no UI, persistence, Worker,
+server, or optimizer entry point. Cross-model diagnostics compare normalized
+relative gains from one explicit reference build instead of subtracting raw
+scores with different arbitrary scales. Browser and maintenance persistence now
+store only teammate ATK and the empirical percentage; the white box and all
+formal result surfaces identify the production value as a team anomaly score.
+
+## 2026-08-04 - Repaired Existing New-Set Scanner IDs on Browser Load
+
+Added the missing Calculator import aliases for `谶羽之誓` (`zzz_wiki_2116`)
+and `棘刺玫瑰` (`zzz_wiki_2121`). Earlier Scanner exports contained the correct
+Chinese set names, but the Calculator did not yet know those names and therefore
+stored them as the fallback IDs `scanner-set-62cbf3b10eb2` and
+`scanner-set-7645cfcb962e`. The inventory page could still display the correct
+name, while the optimizer's exact `setId` matching saw zero pieces in the
+selected official set and incorrectly reported that the existing inventory was
+too small for a legal 4+2 or six-piece plan.
+
+One idempotent canonicalizer now covers ordinary inventory loading, Scanner
+imports, Calculator-native backup imports, direct upserts, and all store saves.
+An exact known `setName` is repaired only when its current ID is empty or uses a
+`scanner-set-*` fallback; an already-correct official ID also acquires a missing
+`canonicalSetName`. Unknown names and custom non-Scanner IDs remain untouched.
+The first affected load writes the repaired raw store back to the same location,
+while subsequent loads do not rewrite it. IndexedDB reads the newest record,
+transforms it, writes it, and awaits completion inside one `readwrite`
+transaction, serializing concurrent tabs. The localStorage fallback performs
+the same transformation synchronously against its latest value. A failed write
+does not prevent the current page from using the repaired in-memory inventory
+and does not replace the original persisted value.
+
+The repair changes only `setId` and adds the matching `canonicalSetName` on the
+affected Drive Discs. It preserves the store version and timestamp, account and
+import records, Drive Disc order and count, item IDs and fingerprints, stats,
+locks, equipped agents, reservation and exclusion rules, source/raw payloads,
+loadout references, and unknown extension fields. The IndexedDB database remains
+`zzz-calculator-user-store` version 1 with object store `state` and record key
+`userDriveDiscStore`; the fallback remains `zzz-calculator.userStore.v1`. No
+re-import is required, and no Helper, Scanner, manifest, protocol, native
+artifact, or database-schema change was made. Regression coverage reproduces
+the pre-repair optimizer failure, confirms the repaired six-piece plan, locks
+new imports to the official IDs, and verifies one-time localStorage and
+IndexedDB writeback.
+
+## 2026-08-04 - Defined Lumiflux Direct-Damage Resistance Semantics
+
+Clarified Remielle Dan's previously deferred element boundary. Her display
+attribute and the direct-damage element of all four cataloged moves are now
+explicitly `lumiflux`. Lumiflux direct damage remains Lumiflux damage and uses
+a fixed resistance multiplier of `1`; it is not mapped to any of the six legacy
+elements. The data model removes the corresponding `unresolved` and `deferred`
+markers without introducing `lumifluxDmg`, a Lumiflux resistance stat, a
+Lumiflux resistance-ignore stat, or a user-editable resistance input.
+
+The Luminescence optimization formula is unchanged. A teammate's recorded
+anomaly still uses that teammate's own element for resistance settlement, but
+the resulting resistance multiplier is constant across Remielle's candidate
+Drive Disc builds and is therefore included in the score's existing `k`.
+Lumiflux direct-damage rows remain separate actual-damage events and cannot be
+added to, or alter, the single-Luminescence optimization score. Regression and
+modeling documentation now preserve both boundaries explicitly.
+
+## 2026-08-04 - Added Remielle Dan's Signature W-Engine
+
+Added the official `空羽复归之诗` S-rank Anomaly W-Engine catalog entry for
+Remielle Dan from HoYoLAB Wiki entry 2109. The stored level-60 panel is `743`
+Base ATK with `36%` ATK. Its `失乐园` effect stores all five refinement values:
+`96/105/115/125/135` Anomaly Proficiency, `20%/23%/26%/29%/32%` self Attribute
+Anomaly damage, and `30%/34.5%/39%/43.5%/48%` squad damage. The two triggered
+effects use the official 30-second duration and refresh wording, while the
+always-on Anomaly Proficiency remains unconditional. The official artwork is
+stored locally and the catalog retains both the detail page and structured API
+source, including source version `1785290498`.
+
+Modeled the self Attribute Anomaly damage as one default-scoped
+`anomalyDamageBonus`. Under the confirmed settlement contract it affects
+Attribute Anomaly, Release, and Luminescence, but not Disorder. It remains in
+the dedicated anomaly bonus zone rather than generic damage, while the squad
+damage effect remains the existing generic `dmgBonus`. The W-Engine model itself
+introduced no `releaseDamageBonus`, new schema field, or UI-only special case.
+Regression coverage locks the refinement values, metadata, default W-Engine
+selection, four-settlement multiplier matrix, and full/compiled/legacy-summary/
+dense/fixed score parity.
+
 ## 2026-08-01 - Integrated Scanner 1.0.49 And Safe Configured Level Stops
 
 Integrated the immutable Scanner 1.0.49 schema-v3 manifest from the published
