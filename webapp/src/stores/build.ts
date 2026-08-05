@@ -346,6 +346,28 @@ function normalizeDamageEvent(event: any, index = 0, fallbackStunned = true, age
     count: Math.max(0, numeric(event?.count, fallback.count ?? 1)),
     stunned,
   }
+  if (kind === "anomaly" && normalized.settlementType === "luminescence") {
+    const legacyRecord = Array.isArray(normalized.records)
+      ? normalized.records.find((record: any) => record?.kind === "normal")
+      : null
+    const hasTeammateAttack = Object.prototype.hasOwnProperty.call(normalized, "teammateAttack")
+    const hasLegacyAttack = legacyRecord && Object.prototype.hasOwnProperty.call(legacyRecord, "T")
+    const hasLuminescenceDamageShare = Object.prototype.hasOwnProperty.call(normalized, "luminescenceDamageSharePct")
+    return {
+      id: normalized.id,
+      kind: "anomaly",
+      settlementType: "luminescence",
+      triggerActorRef: {
+        agentId: String(normalized.triggerActorRef?.agentId ?? agent?.id ?? ""),
+      },
+      teammateAttack: hasTeammateAttack
+        ? normalized.teammateAttack
+        : hasLegacyAttack ? legacyRecord.T : 2800,
+      luminescenceDamageSharePct: hasLuminescenceDamageShare
+        ? normalized.luminescenceDamageSharePct
+        : 50,
+    }
+  }
   if (kind === "anomaly" && isReleaseSettlement(normalized)) {
     return normalizeAnomalyReleaseEventForAgent(normalized, agent)
   }
@@ -376,9 +398,30 @@ function normalizeDamageConfig(value: any, agent: any = null, cinemaLevel = 0) {
   const eventFallback = modeAllowed ? fallback : primaryDamageConfigForAgent(agent)
   const usesAdminDefault = mode === "adminDefault"
   const fallbackStunned = usesAdminDefault ? true : (legacyTargetStunned(value) ?? true)
-  const eventSource = !usesAdminDefault && modeAllowed && Array.isArray(value?.events) && value.events.length
-    ? value.events
-    : eventFallback.events
+  const savedEvents = Array.isArray(value?.events) ? value.events : []
+  const savedLuminescenceEvents = savedEvents
+    .filter((event: any) => event?.kind === "anomaly" && event?.settlementType === "luminescence")
+  const eventSource = usesAdminDefault
+    ? eventFallback.events.map((event: any) => {
+        if (event?.kind !== "anomaly" || event?.settlementType !== "luminescence") return event
+        const saved = savedLuminescenceEvents.find((item: any) => item?.id === event?.id)
+          ?? savedLuminescenceEvents[0]
+        if (!saved) return event
+        const legacyRecord = Array.isArray(saved.records)
+          ? saved.records.find((record: any) => record?.kind === "normal")
+          : null
+        const merged = { ...event }
+        if (Object.prototype.hasOwnProperty.call(saved, "teammateAttack")) {
+          merged.teammateAttack = saved.teammateAttack
+        } else if (legacyRecord && Object.prototype.hasOwnProperty.call(legacyRecord, "T")) {
+          merged.teammateAttack = legacyRecord.T
+        }
+        if (Object.prototype.hasOwnProperty.call(saved, "luminescenceDamageSharePct")) {
+          merged.luminescenceDamageSharePct = saved.luminescenceDamageSharePct
+        }
+        return merged
+      })
+    : modeAllowed && savedEvents.length ? savedEvents : eventFallback.events
   const events = Array.isArray(eventSource) && eventSource.length
     ? eventSource.map((event: any, index: number) => normalizeDamageEvent(event, index, fallbackStunned, agent))
     : eventFallback.events.map((event: any, index: number) => normalizeDamageEvent(event, index, fallbackStunned, agent))
@@ -768,7 +811,7 @@ export const useBuildStore = defineStore("build", {
       this.cinemaLevel = nextLevel
       if (this.damageConfig?.mode === "adminDefault") {
         const agent = meta?.agents?.find((item: any) => item.id === this.agentId)
-        this.damageConfig = normalizeDamageConfig({ mode: "adminDefault" }, agent, this.cinemaLevel)
+        this.damageConfig = normalizeDamageConfig(this.damageConfig, agent, this.cinemaLevel)
       }
       this.persist()
     },
@@ -911,7 +954,7 @@ export const useBuildStore = defineStore("build", {
         && this.damageConfig?.events?.length === 1
         && this.damageConfig?.events?.[0]?.id === "direct-1"
         && hasAdminDefaultCalculation(damageAgent, this.cinemaLevel)
-      const sourceDamageConfig = this.damageConfig?.mode === "adminDefault" || untouchedFallbackDamage
+      const sourceDamageConfig = untouchedFallbackDamage
         ? defaultDamageConfig(damageAgent, this.cinemaLevel)
         : this.damageConfig
       const damage = normalizeDamageConfig({
@@ -928,6 +971,7 @@ export const useBuildStore = defineStore("build", {
         agentId: this.agentId,
         agentLevel: this.agentLevel,
         coreSkillLevel: this.coreSkillLevel,
+        cinemaLevel: this.cinemaLevel,
         wEngineId: this.wEngineId,
         wEngineLevel: this.wEngineLevel,
         wEngineModificationLevel: this.wEngineModificationLevel,

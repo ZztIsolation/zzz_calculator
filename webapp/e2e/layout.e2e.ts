@@ -73,6 +73,13 @@ async function chooseNaiveOption(page: Page, label: string, option: string) {
   await page.locator(".n-base-select-option").filter({ hasText: option }).last().click()
 }
 
+async function chooseWorkbenchAgent(page: Page, option: string) {
+  const select = page.locator(".workbench-left .n-select").first()
+  await select.click()
+  await select.locator("input").fill(option)
+  await page.locator(".n-base-select-option").filter({ hasText: option }).last().click()
+}
+
 async function expectProminentConfigButton(page: Page, testId: string, label: string) {
   const button = page.getByTestId(testId)
   await expect(button).toBeVisible()
@@ -131,6 +138,64 @@ test("event management keeps disorder labels and controls visible", async ({ pag
     element.textContent = "用于验证完整显示的超长中文字段名称"
   })
   await expectStableLayout(page, "calculation-config")
+})
+
+test("Dan team score parameters stay synchronized inside and outside calculation settings", async ({ page }) => {
+  test.slow()
+  await openApp(page)
+  await chooseWorkbenchAgent(page, "蕾米埃尔·丹")
+
+  const summary = page.locator('[data-layout-surface="calculation-summary"]')
+  const teammateAttack = summary.getByTestId("luminescence-teammate-attack").locator("input")
+  const damageShare = summary.getByTestId("luminescence-damage-share").locator("input")
+  const currentScore = page.locator(".summary-value").first()
+
+  await expect(summary).toContainText("队伍评分参数")
+  await expect(summary).toContainText("事件 1 项")
+  await expect(summary).toContainText("队伍异常评分")
+  await expect(summary.locator("dt")).toHaveText(["模式"])
+  await expect(teammateAttack).toHaveValue("2800")
+  await expect(damageShare).toHaveValue("50")
+  await expectStableLayout(page, "calculation-summary")
+
+  const initialScore = await currentScore.innerText()
+  await teammateAttack.fill("3200")
+  await teammateAttack.press("Tab")
+  await expect(teammateAttack).toHaveValue("3200")
+  await expect.poll(() => currentScore.innerText()).not.toBe(initialScore)
+
+  await damageShare.fill("62.5")
+  await damageShare.press("Tab")
+  await expect(damageShare).toHaveValue("62.5")
+
+  await page.getByTestId("open-calculation-config").click()
+  const dialog = page.getByRole("dialog")
+  await expect(dialog.getByTestId("luminescence-teammate-attack").locator("input")).toHaveValue("3200")
+  await expect(dialog.getByTestId("luminescence-damage-share").locator("input")).toHaveValue("62.5")
+  await dialog.getByTestId("luminescence-damage-share").locator("input").fill("45")
+  await dialog.getByRole("button", { name: "保存配置", exact: true }).click()
+  await expect(damageShare).toHaveValue("45")
+
+  await page.getByTestId("open-calculation-config").click()
+  await page.getByRole("dialog").getByTestId("luminescence-damage-share").locator("input").fill("70")
+  await page.getByRole("dialog").getByRole("button", { name: "取消", exact: true }).click()
+  await expect(damageShare).toHaveValue("45")
+
+  await chooseWorkbenchAgent(page, "叶瞬光")
+  await expect(page.locator('[data-layout-surface="calculation-summary"]')).not.toContainText("队伍评分参数")
+  await chooseWorkbenchAgent(page, "蕾米埃尔·丹")
+  await expect(summary.getByTestId("luminescence-teammate-attack").locator("input")).toHaveValue("3200")
+  await expect(summary.getByTestId("luminescence-damage-share").locator("input")).toHaveValue("45")
+
+  await page.reload()
+  await expect(summary.getByTestId("luminescence-teammate-attack").locator("input")).toHaveValue("3200")
+  await expect(summary.getByTestId("luminescence-damage-share").locator("input")).toHaveValue("45")
+
+  await summary.getByTestId("luminescence-teammate-attack").locator("input").fill("")
+  await summary.getByTestId("luminescence-teammate-attack").locator("input").press("Tab")
+  await expect(summary).toContainText("参数无效")
+  await expect(page.getByRole("button", { name: "开始优化", exact: true })).toBeDisabled()
+  await expectStableLayout(page, "calculation-summary")
 })
 
 test("optimizer and buff configuration use protected field layouts", async ({ page }) => {

@@ -23,8 +23,13 @@ const selectedEvent = computed(() => {
 const selectedRows = computed<any[]>(() => selectedEvent.value?.whiteBoxRows ?? props.damage?.whiteBoxRows ?? [])
 const totalDamage = computed(() => props.damage?.totalFinalDamage ?? props.damage?.finalDamage)
 const hasMultipleEvents = computed(() => events.value.length > 1)
+function isLuminescenceScoreKind(value: unknown): boolean {
+  return ["luminescenceTeamScore", "luminescenceScore"].includes(String(value ?? ""))
+}
+
+const isLuminescenceScore = computed(() => isLuminescenceScoreKind(selectedEvent.value?.objectiveKind ?? props.damage?.objectiveKind))
 const eventOptions = computed(() => events.value.map(event => ({
-  label: `${eventLabel(event)} | ${damageNumber(event.finalDamage ?? 0)}`,
+  label: `${eventLabel(event)} | ${eventValue(event.finalDamage ?? 0, event)}`,
   value: String(event?.id ?? ""),
 })))
 const selectedVariantItems = computed(() => eventVariantItems(selectedEvent.value))
@@ -36,6 +41,12 @@ watch(() => props.damage, () => {
 
 function damageNumber(value: unknown, digits = 3): string {
   return formatNumber(value, digits)
+}
+
+function eventValue(value: unknown, event: any = selectedEvent.value): string {
+  const luminescence = isLuminescenceScoreKind(event?.objectiveKind ?? props.damage?.objectiveKind)
+  const formatted = damageNumber(value, 3)
+  return luminescence ? `${formatted} ${String(event?.scoreSuffix ?? props.damage?.scoreSuffix ?? "× k")}` : formatted
 }
 
 function rowValue(row: any): string {
@@ -69,6 +80,9 @@ function eventSkillLabel(event: any): string {
 }
 
 function eventLabel(event: any): string {
+  if (isLuminescenceScoreKind(event?.objectiveKind ?? props.damage?.objectiveKind)) {
+    return "队伍异常评分"
+  }
   const skillLabel = eventSkillLabel(event)
   if (skillLabel) {
     return `${skillLabel} ×${event?.count ?? 1}`
@@ -107,7 +121,7 @@ function selectEventId(value: string | number | null) {
         </small>
       </div>
       <div class="damage-whitebox-current-values">
-        <span v-if="selectedEvent">本事件 <b class="num">{{ damageNumber(selectedEvent.finalDamage) }}</b></span>
+        <span v-if="selectedEvent">{{ isLuminescenceScore ? "本评分" : "本事件" }} <b class="num">{{ eventValue(selectedEvent.finalDamage) }}</b></span>
         <span v-if="hasMultipleEvents">总计 <b class="num">{{ damageNumber(totalDamage) }}</b></span>
       </div>
     </div>

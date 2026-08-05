@@ -3360,8 +3360,7 @@
               "id": "jane_doe_cinema_4_attribute_anomaly_damage",
               "type": "fixed",
               "target": {
-                "kind": "anomaly",
-                "settlementType": "attribute"
+                "kind": "default"
               },
               "stat": "anomalyDamageBonus",
               "mode": "flat",

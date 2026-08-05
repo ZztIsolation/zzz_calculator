@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { NInput, NInputNumber, NSelect, NSwitch } from "naive-ui"
 import {
-  ANOMALY_VARIANT_OPTIONS, CALCULATION_DAMAGE_BASIS_OPTIONS, CRIT_MODE_OPTIONS, DAMAGE_ELEMENT_OPTIONS, DISORDER_TYPE_OPTIONS, EVENT_KIND_OPTIONS, EVENT_SOURCE_OPTIONS,
+  ANOMALY_VARIANT_OPTIONS, CALCULATION_DAMAGE_BASIS_OPTIONS, CRIT_MODE_OPTIONS, DAMAGE_ELEMENT_OPTIONS, DIRECT_DAMAGE_ELEMENT_OPTIONS, DISORDER_TYPE_OPTIONS, EVENT_KIND_OPTIONS, EVENT_SOURCE_OPTIONS,
   anomalyOptions, categoryOptions, defaultCalculationEvent, moveOptions, option, rowOptions,
 } from "./maintenance-options"
 import { textOf } from "./maintenance-model"
 import { disorderElapsedStepSeconds, normalizeElapsedSeconds } from "@core/damageEventMultipliers.js"
 import { anomalyReleaseProfiles } from "@core/anomalyRelease.js"
+import LuminescenceEventEditor from "@/components/LuminescenceEventEditor.vue"
 
 const props = withDefaults(defineProps<{
   event: any
@@ -27,11 +28,22 @@ function visibleKind() {
   if (props.event.kind === "direct" || props.event.kind === "sheer") return props.event.kind
   return props.event.kind === "disorder" || props.event.settlementType === "disorder"
     ? "disorder"
-    : props.event.settlementType === "release" ? "release" : "anomaly"
+    : props.event.settlementType === "release"
+      ? "release"
+      : props.event.settlementType === "luminescence" ? "luminescence" : "anomaly"
 }
 
 function sourceOf() {
   return props.event.skillRef ? "skill" : "manual"
+}
+
+function manualDamageElementOptions() {
+  return visibleKind() === "direct" ? DIRECT_DAMAGE_ELEMENT_OPTIONS : DAMAGE_ELEMENT_OPTIONS
+}
+
+function defaultManualDamageElement() {
+  const preferred = String(props.agent?.damageElement || props.agent?.attribute || "physical")
+  return manualDamageElementOptions().some(option => option.value === preferred) ? preferred : "physical"
 }
 
 function newSkillRef() {
@@ -52,6 +64,9 @@ function changeKind(kind: string) {
     props.event.triggerActorRef = { agentId: props.agent?.id ?? "", profileId: profile?.id ?? "" }
     props.event.anomalySource = { actorRef: { agentId: props.agent?.id ?? "" } }
   }
+  if (kind === "luminescence") {
+    props.event.triggerActorRef = { agentId: props.agent?.id ?? "" }
+  }
   if (["direct", "sheer"].includes(kind) && agentSkill()) {
     delete props.event.__source
     delete props.event.skillMultiplier
@@ -70,7 +85,7 @@ function changeSource(source: string) {
   } else {
     delete props.event.skillRef
     props.event.skillMultiplier ??= 100
-    props.event.damageElement ??= props.agent?.damageElement || props.agent?.attribute || "physical"
+    props.event.damageElement ??= defaultManualDamageElement()
   }
   emit("change")
 }
@@ -98,10 +113,16 @@ function releaseProfileOptions() {
 
 function eventKindOptions() {
   return EVENT_KIND_OPTIONS
-    .filter(item => props.allowSkillGroup || item.value !== "skillGroup")
-    .map(item => item.value === "release" && !anomalyReleaseProfiles(props.agent).length
-      ? { ...item, disabled: true, label: "异放（暂不支持）" }
-      : item)
+    .filter(item => props.allowSkillGroup || !["skillGroup", "luminescence"].includes(String(item.value)))
+    .map(item => {
+      if (item.value === "release" && !anomalyReleaseProfiles(props.agent).length) {
+        return { ...item, disabled: true, label: "异放（暂不支持）" }
+      }
+      if (item.value === "luminescence" && props.agent?.id !== "remielle_dan") {
+        return { ...item, disabled: true, label: "耀变（仅丹）" }
+      }
+      return item
+    })
 }
 
 function elapsedStep() {
@@ -133,9 +154,9 @@ function updateStunned(value: boolean) {
 <template>
   <div class="calculation-event-grid">
     <label class="maintenance-field"><span>类型</span><NSelect :value="visibleKind()" :options="eventKindOptions()" :disabled="disabled" @update:value="changeKind(String($event))" /></label>
-    <label class="maintenance-field"><span>次数</span><NInputNumber v-model:value="event.count" :disabled="disabled" :min="0" :step="1" @update:value="emit('change')" /></label>
-    <label class="maintenance-switch-field"><span>是否失衡</span><NSwitch :value="event.stunned !== false" :disabled="disabled" @update:value="updateStunned(Boolean($event))"><template #checked>是</template><template #unchecked>否</template></NSwitch></label>
-    <label v-if="visibleKind() !== 'skillGroup'" class="maintenance-field"><span>伤害比例%</span><NInputNumber v-model:value="event.damageRatioPct" :disabled="disabled" :min="0" :step="0.1" placeholder="100" @update:value="emit('change')" /></label>
+    <label v-if="visibleKind() !== 'luminescence'" class="maintenance-field"><span>次数</span><NInputNumber v-model:value="event.count" :disabled="disabled" :min="0" :step="1" @update:value="emit('change')" /></label>
+    <label v-if="visibleKind() !== 'luminescence'" class="maintenance-switch-field"><span>是否失衡</span><NSwitch :value="event.stunned !== false" :disabled="disabled" @update:value="updateStunned(Boolean($event))"><template #checked>是</template><template #unchecked>否</template></NSwitch></label>
+    <label v-if="!['skillGroup', 'luminescence'].includes(visibleKind())" class="maintenance-field"><span>伤害比例%</span><NInputNumber v-model:value="event.damageRatioPct" :disabled="disabled" :min="0" :step="0.1" placeholder="100" @update:value="emit('change')" /></label>
     <label v-if="visibleKind() === 'skillGroup'" class="maintenance-field"><span>技能组</span><NSelect v-model:value="event.skillGroupId" :options="groupOptions()" :disabled="disabled" @update:value="emit('change')" /></label>
 
     <template v-if="['direct', 'sheer'].includes(visibleKind())">
@@ -148,7 +169,7 @@ function updateStunned(value: boolean) {
       <template v-else>
         <label class="maintenance-field"><span>事件名称</span><NInput v-model:value="event.label" :disabled="disabled" placeholder="额外能力：落雷" @update:value="emit('change')" /></label>
         <label class="maintenance-field"><span>手填倍率%</span><NInputNumber v-model:value="event.skillMultiplier" :disabled="disabled" :min="0" :step="0.1" @update:value="emit('change')" /></label>
-        <label class="maintenance-field"><span>伤害属性</span><NSelect v-model:value="event.damageElement" :options="DAMAGE_ELEMENT_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
+        <label class="maintenance-field"><span>伤害属性</span><NSelect v-model:value="event.damageElement" :options="manualDamageElementOptions()" :disabled="disabled" @update:value="emit('change')" /></label>
       </template>
       <label class="maintenance-field"><span>暴击模式</span><NSelect v-model:value="event.critMode" :options="CRIT_MODE_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
       <label v-if="!event.skillRef && visibleKind() === 'direct'" class="maintenance-field"><span>伤害基础值</span><NSelect v-model:value="event.damageBasis" :options="CALCULATION_DAMAGE_BASIS_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
@@ -165,6 +186,16 @@ function updateStunned(value: boolean) {
       <label class="maintenance-field"><span>异放触发者</span><NInput :value="textOf(agent?.name)" disabled /></label>
       <label class="maintenance-field"><span>原异常施加者</span><NInput :value="textOf(agent?.name)" disabled /></label>
     </template>
+    <LuminescenceEventEditor
+      v-if="visibleKind() === 'luminescence'"
+      class="maintenance-luminescence-editor"
+      :event="event"
+      :agent="agent"
+      :cinema-level="Number(event.cinemaLevel ?? 0)"
+      :core-skill-level="event.coreSkillLevel ?? 'F'"
+      :disabled="disabled"
+      @update="Object.assign(event, $event); emit('change')"
+    />
     <template v-if="visibleKind() === 'disorder'">
       <label class="maintenance-field"><span>紊乱类型</span><NSelect v-model:value="event.disorderType" :options="DISORDER_TYPE_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
       <label class="maintenance-field"><span>原异常</span><NSelect filterable :value="event.anomalyEffect" :options="anomalyOptions(catalog, true)" :disabled="disabled" @update:value="updateDisorderEffect(String($event))" /></label>
@@ -172,3 +203,7 @@ function updateStunned(value: boolean) {
     </template>
   </div>
 </template>
+
+<style scoped>
+.maintenance-luminescence-editor { grid-column: 1 / -1; }
+</style>

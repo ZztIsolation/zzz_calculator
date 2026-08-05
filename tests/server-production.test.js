@@ -6,8 +6,16 @@ import { mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import { calculateInCombatPanel, loadCalculatorContext } from "../backend/calculator.js"
+import {
+    FROZEN_DAN_LUMINESCENCE_DAMAGE_SHARE_PCT,
+    FROZEN_DAN_LUMINESCENCE_EVENT,
+    FROZEN_DAN_TEAMMATE_ATTACK,
+    fixedDanLuminescenceInput,
+} from "./luminescence-cross-path-fixture.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
+const directCatalog = await loadCalculatorContext(rootDir)
 let port = 0
 let baseUrl = `http://127.0.0.1:${port}`
 let serverOutput = ""
@@ -128,6 +136,15 @@ async function postTelemetry(payload, options = {}) {
         body: typeof payload === "string" ? payload : JSON.stringify(payload),
     })
     return { status: response.status, body: await response.json().catch(() => ({})) }
+}
+
+async function postJson(pathname, payload) {
+    const response = await fetch(`${baseUrl}${pathname}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    })
+    return { status: response.status, body: await response.json() }
 }
 
 async function getRedirect(pathname) {
@@ -341,6 +358,47 @@ try {
     const localDefaultConfig = JSON.parse((await getText("/api/app-config")).body)
     assert.equal(localDefaultConfig.driveDiscReservationsUiEnabled, true)
     assert.equal(localDefaultConfig.driveDiscExclusionsUiEnabled, true)
+
+    const fixedDanInput = fixedDanLuminescenceInput()
+    const directDanResult = calculateInCombatPanel(directCatalog, fixedDanInput)
+    const serverDanResponse = await postJson("/api/calculate/in-combat", fixedDanInput)
+    assert.equal(serverDanResponse.status, 200)
+    assert.deepEqual(
+        serverDanResponse.body.data,
+        JSON.parse(JSON.stringify(directDanResult)),
+        "Development server Dan Luminescence response should equal the shared core exactly.",
+    )
+    const serverDanDamage = serverDanResponse.body.data.damage
+    assert.equal(serverDanDamage.objectiveKind, "luminescenceTeamScore")
+    assert.equal(serverDanDamage.scoreSuffix, "× k")
+    assert.equal(serverDanDamage.events[0].objectiveKind, "luminescenceTeamScore")
+    assert.equal(serverDanDamage.events[0].scoreSuffix, "× k")
+    assert.equal(serverDanDamage.events[0].input.teammateAttack, FROZEN_DAN_TEAMMATE_ATTACK)
+    assert.equal(serverDanDamage.events[0].input.luminescenceDamageSharePct, FROZEN_DAN_LUMINESCENCE_DAMAGE_SHARE_PCT)
+    for (const legacyKey of [
+        "records",
+        "T",
+        "B",
+        "k",
+        "moveRef",
+        "resistanceMode",
+        "referenceAnomalyProficiency",
+        "referenceLuminescenceDamageMultiplier",
+    ]) {
+        assert.equal(
+            legacyKey in serverDanDamage.events[0].input,
+            false,
+            `Server score input must not retain ${legacyKey}.`,
+        )
+    }
+    assert.deepEqual(FROZEN_DAN_LUMINESCENCE_EVENT, {
+        id: "remielle-fixed-cross-path-luminescence",
+        kind: "anomaly",
+        settlementType: "luminescence",
+        triggerActorRef: { agentId: "remielle_dan" },
+        teammateAttack: 2345,
+        luminescenceDamageSharePct: 50,
+    })
 
     server.kill()
     await sleep(100)

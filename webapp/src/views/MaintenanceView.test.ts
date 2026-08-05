@@ -494,21 +494,50 @@ describe("MaintenanceView structured editor", () => {
   })
 
   it("migrates the v1 JSON draft and keeps route-leave protection", async () => {
-    localStorage.setItem("zzz_maintenance_vue_draft_v1", JSON.stringify({
+    const storedV1 = JSON.stringify({
       resource: "agents", selectedKey: "agent_a", draftText: JSON.stringify({ id: "agent_a", name: { zhCN: "本地草稿角色" } }),
       baselineText: JSON.stringify({ id: "agent_a", name: { zhCN: "角色甲" } }), draftIsNew: false,
       originalIdentity: { id: "agent_a", teammateId: "", maintenanceType: "" },
-    }))
+    })
+    localStorage.setItem("zzz_maintenance_vue_draft_v1", storedV1)
     const { wrapper, router } = await mountView()
     expect(wrapper.text()).toContain("已迁移旧草稿")
     expect(wrapper.text()).toContain("本地草稿角色")
-    expect(localStorage.getItem("zzz_maintenance_vue_draft_v3")).not.toBeNull()
+    expect(localStorage.getItem("zzz_maintenance_vue_draft_v4")).not.toBeNull()
+    expect(localStorage.getItem("zzz_maintenance_vue_draft_v1")).toBe(storedV1)
 
     await router.push("/")
     await vi.waitFor(() => expect(wrapper.find(".modal").text()).toContain("离开维护页"))
     expect(router.currentRoute.value.path).toBe("/maintenance")
     await button(wrapper.find(".modal"), "离开").trigger("click")
     await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/"))
+    expect(localStorage.getItem("zzz_maintenance_vue_draft_v1")).toBe(storedV1)
+    expect(JSON.parse(localStorage.getItem("zzz_maintenance_vue_draft_v4")!)).toMatchObject({
+      version: 4,
+      resource: "agents",
+      draft: { id: "agent_a", name: { zhCN: "本地草稿角色" } },
+    })
+  })
+
+  it("migrates v2 drafts without deleting their original localStorage value", async () => {
+    const storedV2 = JSON.stringify({
+      version: 2,
+      resource: "agents",
+      selectedKey: "agent_a",
+      selectedBuffId: "",
+      draft: { id: "agent_a", name: { zhCN: "v2 本地草稿角色" } },
+      baselineText: JSON.stringify({ id: "agent_a", name: { zhCN: "角色甲" } }),
+      draftIsNew: false,
+      originalIdentity: { id: "agent_a", teammateId: "", maintenanceType: "" },
+    })
+    localStorage.setItem("zzz_maintenance_vue_draft_v2", storedV2)
+
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).toContain("已迁移旧草稿")
+    expect(wrapper.text()).toContain("v2 本地草稿角色")
+    expect(localStorage.getItem("zzz_maintenance_vue_draft_v4")).not.toBeNull()
+    expect(localStorage.getItem("zzz_maintenance_vue_draft_v2")).toBe(storedV2)
   })
 
   it("shows readable validation errors and does not send invalid data", async () => {
@@ -595,6 +624,81 @@ describe("MaintenanceView structured editor", () => {
     expect(rule.text()).not.toContain("适用范围")
     expect(rule.text()).not.toContain("伤害类型")
     expect(rule.text()).not.toContain("技能限定")
+  })
+
+  it("ignores incompatible v3 drafts without mutating their stored bytes", async () => {
+    const storedV3 = JSON.stringify({
+      version: 3,
+      resource: "agents",
+      selectedKey: "agent_a",
+      selectedBuffId: "",
+      draft: { id: "agent_a", name: { zhCN: "旧缓存角色" } },
+      baselineText: "",
+      draftIsNew: false,
+      originalIdentity: { id: "agent_a", teammateId: "", maintenanceType: "" },
+      preservedUnknownField: { source: "pre-update", values: [1, 2, 3] },
+    })
+    const storedV2 = JSON.stringify({
+      version: 2,
+      resource: "agents",
+      selectedKey: "agent_a",
+      selectedBuffId: "",
+      draft: { id: "agent_a", name: { zhCN: "不应恢复的旧 v2 草稿" } },
+      baselineText: "",
+      draftIsNew: false,
+      originalIdentity: { id: "agent_a", teammateId: "", maintenanceType: "" },
+    })
+    localStorage.setItem("zzz_maintenance_vue_draft_v3", storedV3)
+    localStorage.setItem("zzz_maintenance_vue_draft_v2", storedV2)
+
+    const { wrapper } = await mountView()
+
+    expect(wrapper.text()).not.toContain("旧缓存角色")
+    expect(wrapper.text()).not.toContain("不应恢复的旧 v2 草稿")
+    expect(wrapper.text()).not.toContain("已恢复草稿")
+    expect(localStorage.getItem("zzz_maintenance_vue_draft_v3")).toBe(storedV3)
+    expect(localStorage.getItem("zzz_maintenance_vue_draft_v2")).toBe(storedV2)
+
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("完整目录已刷新"))
+    expect(JSON.parse(localStorage.getItem("zzz_maintenance_vue_draft_v4")!)).toEqual({ version: 4, resolved: true })
+    expect(localStorage.getItem("zzz_maintenance_vue_draft_v3")).toBe(storedV3)
+    expect(localStorage.getItem("zzz_maintenance_vue_draft_v2")).toBe(storedV2)
+  })
+
+  it("separates broad anomaly damage from precise anomaly targeting", async () => {
+    const { wrapper, fetchMock } = await mountView()
+    const rule = wrapper.find(".maintenance-rule-card")
+
+    await button(rule, "指定角色招式").trigger("click")
+    const skillStatValues = [...field(rule, "增幅类型").find("select").element.options].map(item => item.value)
+    expect(skillStatValues).not.toContain("anomalyDamageBonus")
+
+    await button(rule, "异常目标").trigger("click")
+    const preciseStat = field(rule, "增幅类型").find("select")
+    expect(preciseStat.element.value).toBe("anomalyDamageBonus")
+    expect(preciseStat.element.selectedOptions[0]?.textContent).toBe("指定异常增伤%")
+    await field(rule, "结算类型").find("select").setValue("release")
+    await field(rule, "具体异常（留空为全部）").find("select").setValue(["corruption"])
+
+    await button(rule, "常规属性 / 全局效果").trigger("click")
+    const broadStat = field(rule, "增幅类型").find("select")
+    expect(broadStat.element.value).toBe("anomalyDamageBonus")
+    expect(broadStat.element.selectedOptions[0]?.textContent).toBe("属性异常增伤%")
+    expect(rule.text()).not.toContain("结算类型")
+    expect(rule.text()).not.toContain("具体异常（留空为全部）")
+    expect(rule.text()).not.toContain("异常形态（留空为全部）")
+
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("完整目录已刷新"))
+
+    const call = fetchMock.mock.calls.find(([url, init]) => url === "/api/maintenance/agents" && init?.method === "POST")!
+    const body = JSON.parse(String(call[1]?.body ?? "{}"))
+    expect(body.combatBuffs.corePassive.effects[0]).toMatchObject({
+      stat: "anomalyDamageBonus",
+      target: { kind: "default" },
+    })
+    expect(body.combatBuffs.corePassive.effects[0].target).toEqual({ kind: "default" })
   })
 
   it("edits and saves a structured anomaly target", async () => {

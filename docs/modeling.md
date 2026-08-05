@@ -298,7 +298,7 @@ type EffectTarget =
   | { kind: "skill"; skillTargets: SkillTarget[] }
   | {
       kind: "anomaly";
-      settlementType: "attribute" | "disorder" | "release";
+      settlementType: "attribute" | "disorder" | "release" | "luminescence";
       anomalyEffects?: Array<"assault" | "shatter" | "burn" | "shock" | "corruption" | "frozen" | "frost_frozen" | "flinch">;
       anomalyVariants?: Array<"normal" | "polarizedAssault">;
     };
@@ -451,7 +451,7 @@ interface AgentSkillCatalog {
       name: { zhCN?: string; en?: string };
       skillType: SkillType;
       skillTags?: SkillTag[];
-      damageElement?: "physical" | "fire" | "ice" | "electric" | "ether";
+      damageElement?: "physical" | "fire" | "ice" | "electric" | "ether" | "wind" | "lumiflux";
       rows: Array<{
         id: string;
         label: { zhCN?: string; en?: string };
@@ -818,13 +818,17 @@ Rule-level `condition`, `durationSeconds`, and `cooldownSeconds` are descriptive
 trigger metadata and do not automatically derive uptime. A rule with
 `coverage` remains independently adjustable and defaults to its catalog value;
 an omitted coverage is treated as 100%. Stacked rules likewise use their
-configured default/max stacks. `requirement.specialty` is enforced against the
-current agent before the rule is resolved.
+configured default/max stacks. `requirement.specialty` and
+`requirement.attribute` are enforced against the current agent before the rule
+is resolved.
 
 Skill-targeted rules may use only the event-safe stats: elemental resistance
 ignore, current/element resistance reduction, `enemyDefReduction`, generic and
-elemental damage bonuses, `anomalyDamageBonus`, `disorderDamageBonus`, captured
-stun-vulnerability caps, and `skillMultiplierBonus`.
+elemental damage bonuses, `disorderDamageBonus`, captured stun-vulnerability
+caps, and `skillMultiplierBonus`. New `anomalyDamageBonus` rules must use either
+the default scope or an explicit anomaly target; legacy skill-targeted payloads
+remain readable for runtime compatibility but cannot be authored or saved by
+maintenance.
 Targeted `dmgBonus` is displayed as “技能目标伤害加成%”. It enters the same
 additive damage-bonus zone as generic and elemental damage bonuses:
 `1 + genericBonus + elementBonus + targetedSkillBonus`. It does not change the
@@ -988,11 +992,35 @@ atk * anomalyMultiplier * (1 + generic/element dmg bonus)
   * anomalyCritMultiplier
 ```
 
-`anomalyDamageBonus` is the attribute anomaly damage bonus bucket. It is
-independent from the existing generic/elemental damage bonus bucket and does not
-affect disorder. `disorderDamageBonus` is the separate disorder-only bonus
-bucket. Their stat keys carry the event scope directly; new data does not add a
-separate event-kind filter.
+`anomalyDamageBonus` is the dedicated Attribute Anomaly-family damage bonus
+bucket. With `target.kind: "default"`, it applies to Attribute Anomaly, Release,
+and Luminescence, but not Disorder. Maintenance presents this broad form as
+“属性异常增伤%” and always stores `{ kind: "default" }`, without settlement or
+concrete-anomaly fields. An explicit anomaly target is the separate
+“指定异常增伤%” authoring form: its `settlementType`, `anomalyEffects`, and
+`anomalyVariants` narrow the same underlying stat to a precise target. This
+bucket remains independent from generic/elemental damage bonus.
+`disorderDamageBonus` is the separate Disorder-only bonus bucket; no
+Release-specific bonus stat is introduced by this contract.
+
+Remielle Dan's displayed and direct-damage element is `lumiflux`. Lumiflux
+direct damage remains Lumiflux damage instead of being mapped to one of the six
+legacy elements, but its resistance multiplier is fixed at `1`. This does not
+introduce a `lumifluxDmg` stat, a Lumiflux resistance stat, or a new resistance
+input. Luminescence remains a separate optimization score: the resistance
+multiplier selected from the teammate's own anomaly element is constant across
+Dan's candidate Drive Disc builds and is included in the score's existing `k`.
+Direct Lumiflux events must not enter or alter that Luminescence score.
+
+Dan's production team-anomaly score uses the reference-free constant-weight
+form `B * E * [H * M / E]^w * k`. `E` is the broad field/Boss Attribute
+Anomaly multiplier received by the abstract team branch, while `M` is Dan's
+complete same-bucket Luminescence multiplier. For example, a 16% broad
+environment bonus plus 35% personal bonus produces `E=1.16`, `M=1.51`, and the
+relative Luminescence advantage `M/E=1.51/1.16`. The full `E` remains in the
+displayed score; `M/E` must not receive another additive `1`. The empirical
+share `w` is a constant ranking weight, not an exact damage split reconstructed
+from a measured reference build.
 
 The anomaly and disorder catalogs live in `data/anomaly_effects.json` and are
 editable from the maintenance UI. v1 ships these default anomaly multipliers:

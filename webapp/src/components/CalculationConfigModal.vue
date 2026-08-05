@@ -3,6 +3,8 @@ import { computed, ref, watch } from "vue"
 import { NButton, NInputNumber, NModal, NRadioButton, NRadioGroup, NSelect, NSwitch, NTag } from "naive-ui"
 import { Copy, Info, Lock, RefreshCcw, Trash2 } from "lucide-vue-next"
 import SkillPickerModal from "@/components/SkillPickerModal.vue"
+import LuminescenceEventEditor from "@/components/LuminescenceEventEditor.vue"
+import { resolveLuminescenceParameters } from "@/utils/luminescenceParameters"
 import {
   defaultDamageConfig,
   hasAdminDefaultCalculation,
@@ -28,7 +30,7 @@ import {
   normalizeSkillLevel,
   skillRowValue,
 } from "@core/skillMultiplierCandidates.js"
-import { damageModifierAppliesTo } from "@core/calculator-core.js"
+import { damageModifierAppliesTo, isTeamAnomalyDamageModifier } from "@core/calculator-core.js"
 import {
   calculationSkillGroups,
   defaultSkillGroupReferenceEvent,
@@ -56,6 +58,7 @@ import {
   isReleaseSettlement,
   normalizeAnomalyReleaseEventForAgent,
 } from "@core/anomalyRelease.js"
+import { isLuminescenceSettlement } from "@core/luminescence.js"
 
 const props = defineProps<{
   show: boolean
@@ -66,7 +69,14 @@ const props = defineProps<{
   agent?: any
   cinemaLevel?: number
   combatEffects?: any[]
-  releaseContext?: { inCombatPanel?: any, outOfCombatPanel?: any, coreSkillLevel?: string | number }
+  releaseContext?: {
+    inCombatPanel?: any
+    outOfCombatPanel?: any
+    outOfCombatBaseAtk?: number
+    coreSkillLevel?: string | number
+    luminescenceDamageMultiplier?: number
+    teamAnomalyDamageMultiplier?: number
+  }
   sourceSnapshotProvider?: (agentId: string) => any
 }>()
 
@@ -103,11 +113,13 @@ const critModeOptions = [
 ]
 const releaseProfiles = computed(() => anomalyReleaseProfiles(props.agent))
 const supportsRelease = computed(() => releaseProfiles.value.length > 0)
+const supportsLuminescence = computed(() => props.agent?.id === "remielle_dan" || props.agent?.luminescenceModel?.status === "implemented")
 const releaseSourceLocked = computed(() => isAriaReleaseSourceLocked(props.agent))
 const anomalySettlementOptions = computed(() => [
   { label: "属性异常", value: "attribute" },
   { label: "紊乱结算", value: "disorder" },
   { label: "异放", value: "release", disabled: !supportsRelease.value, title: supportsRelease.value ? "" : "暂不支持" },
+  ...(supportsLuminescence.value ? [{ label: "耀变", value: "luminescence" }] : []),
 ])
 const disorderTypeOptions = [
   { label: "普通紊乱", value: "normal" },
@@ -144,12 +156,28 @@ watch(() => props.show, value => {
     const shouldUseFallbackEvents = damageConfig?.mode === "adminDefault"
       && Array.isArray(fallback.events)
       && fallback.events.length > 0
+    const savedLuminescenceEvents = (damageConfig?.events ?? [])
+      .filter((event: any) => isLuminescenceSettlement(event))
+    const fallbackEvents = shouldUseFallbackEvents
+      ? fallback.events.map((event: any) => {
+          if (!isLuminescenceSettlement(event)) return event
+          const saved = savedLuminescenceEvents.find((item: any) => item?.id === event?.id)
+            ?? savedLuminescenceEvents[0]
+          if (!saved) return event
+          const parameters = resolveLuminescenceParameters(saved)
+          return {
+            ...event,
+            teammateAttack: parameters.teammateAttack,
+            luminescenceDamageSharePct: parameters.luminescenceDamageSharePct,
+          }
+        })
+      : fallback.events
     draft.value = JSON.parse(JSON.stringify(normalizeDraftForAgent({
       ...fallback,
       ...damageConfig,
       ...(shouldUseFallbackEvents ? {
         selectedEventId: fallback.selectedEventId ?? fallback.events[0]?.id,
-        events: fallback.events,
+        events: fallbackEvents,
       } : {}),
     })))
     normalizeDraftAnomalyEffects()
@@ -191,7 +219,62 @@ const skillCategoryOptions = computed(() => skillCategories.value.map((category:
   value: category.id,
 })))
 
+function luminescencePreviewEvent(event: any) {
+  return {
+    ...event,
+    kind: "anomaly",
+    settlementType: "luminescence",
+    triggerActorRef: { agentId: String(props.agent?.id ?? event?.triggerActorRef?.agentId ?? "") },
+    damageElement: props.agent?.damageElement ?? props.agent?.attribute,
+    anomalyVariant: "normal",
+  }
+}
+
+function luminescenceDamageMultipliersFromEffects(event: any) {
+  const previewEvent = luminescencePreviewEvent(event)
+  let luminescenceDamageBonus = 0
+  let teamAnomalyDamageBonus = 0
+  for (const combatEffect of props.combatEffects ?? []) {
+    for (const modifier of combatEffect?.resolvedDamageModifiers ?? []) {
+      if (modifier?.kind !== "anomalyDamageBonus" || !damageModifierAppliesTo(modifier, previewEvent)) continue
+      const value = Number(modifier?.value ?? 0)
+      if (!Number.isFinite(value)) continue
+      luminescenceDamageBonus += value
+      if (isTeamAnomalyDamageModifier(modifier)) {
+        teamAnomalyDamageBonus += value
+      }
+    }
+  }
+  return {
+    luminescenceDamageMultiplier: Math.max(0, 1 + luminescenceDamageBonus),
+    teamAnomalyDamageMultiplier: Math.max(0, 1 + teamAnomalyDamageBonus),
+  }
+}
+
+function explicitNonNegativeMultiplier(raw: unknown) {
+  if (raw !== undefined && raw !== null && raw !== "") {
+    const explicit = Number(raw)
+    if (Number.isFinite(explicit) && explicit >= 0) {
+      return explicit
+    }
+  }
+  return null
+}
+
+const luminescencePreviewMultipliers = computed(() => {
+  const derived = luminescenceDamageMultipliersFromEffects(selectedEvent.value)
+  return {
+    luminescenceDamageMultiplier: explicitNonNegativeMultiplier(props.releaseContext?.luminescenceDamageMultiplier)
+      ?? derived.luminescenceDamageMultiplier,
+    teamAnomalyDamageMultiplier: explicitNonNegativeMultiplier(props.releaseContext?.teamAnomalyDamageMultiplier)
+      ?? derived.teamAnomalyDamageMultiplier,
+  }
+})
+
 function eventTitle(event: any) {
+  if (isLuminescenceSettlement(event)) {
+    return "队伍异常评分"
+  }
   if (event?.kind === "skillGroup") {
     return `技能组 · ${skillGroupLabel(selectedSkillGroup(event))}`
   }
@@ -679,10 +762,46 @@ function defaultAgentEffectId(settlementType: string) {
     : options[0]?.value ?? fallback
 }
 
+function luminescenceFieldsToClear() {
+  return {
+    teammateAttack: undefined,
+    luminescenceDamageSharePct: undefined,
+    referenceAnomalyProficiency: undefined,
+    referenceLuminescenceDamageMultiplier: undefined,
+    moveRef: undefined,
+    anomalyAgentCount: undefined,
+    additionalAbilityActive: undefined,
+    records: undefined,
+    specialRecordBaseStrength: undefined,
+    m4MultiplierMode: undefined,
+    resistanceMode: undefined,
+    skillLevel: undefined,
+    coreSkillLevel: undefined,
+    cinemaLevel: undefined,
+    danInitialAtk: undefined,
+    danAnomalyProficiency: undefined,
+  }
+}
+
+function normalizeLuminescenceDraftEvent(event: any) {
+  const parameters = resolveLuminescenceParameters(event)
+  return {
+    id: event?.id,
+    kind: "anomaly",
+    settlementType: "luminescence",
+    triggerActorRef: { agentId: String(props.agent?.id ?? event?.triggerActorRef?.agentId ?? "") },
+    teammateAttack: parameters.teammateAttack,
+    luminescenceDamageSharePct: parameters.luminescenceDamageSharePct,
+  }
+}
+
 function normalizeDraftAnomalyEffects() {
   draft.value.events = (draft.value.events ?? []).map((event: any) => {
     if (event?.kind !== "anomaly" && event?.kind !== "disorder") {
       return event
+    }
+    if (isLuminescenceSettlement(event)) {
+      return normalizeLuminescenceDraftEvent(event)
     }
     const release = isReleaseSettlement(event)
     const settlementType = release ? "release" : event.kind === "disorder" || event.settlementType === "disorder" ? "disorder" : "attribute"
@@ -744,11 +863,11 @@ function isKnownDisorderEffect(effectId: string) {
 }
 
 function updateSelectedEvent(patch: any, options: { clearLabel?: boolean } = {}) {
-  if (isAdminDefaultMode.value) {
-    return
-  }
   const current = selectedEvent.value
   if (!current) {
+    return
+  }
+  if (isAdminDefaultMode.value && !isLuminescenceSettlement(current)) {
     return
   }
   draft.value.events = draft.value.events.map((event: any) => {
@@ -869,7 +988,7 @@ const eventWarnings = computed(() => {
     return ["请选择一个事件"]
   }
   const warnings: string[] = []
-  if (!Number.isFinite(Number(event.count)) || Number(event.count) <= 0) {
+  if (!isLuminescenceSettlement(event) && (!Number.isFinite(Number(event.count)) || Number(event.count) <= 0)) {
     warnings.push("次数需要大于 0")
   }
   if (event.kind === "skillGroup") {
@@ -890,7 +1009,11 @@ const eventWarnings = computed(() => {
     if (!event.anomalySource?.actorRef?.agentId) warnings.push("原异常施加者未配置")
     if (releaseSnapshotError.value) warnings.push(releaseSnapshotError.value)
   }
-  if (event.kind === "anomaly" && event.settlementType !== "disorder") {
+  if (isLuminescenceSettlement(event)) {
+    if (event.triggerActorRef?.agentId !== props.agent?.id) warnings.push("耀变触发者必须是当前角色")
+    warnings.push(...resolveLuminescenceParameters(event).errors)
+  }
+  if (event.kind === "anomaly" && event.settlementType !== "disorder" && !isLuminescenceSettlement(event)) {
     if (!event.anomalyEffect) {
       warnings.push("属性异常事件需要选择异常类型")
     } else if (!isKnownEffect("attribute", selectedAnomalyEffectId(event))) {
@@ -942,12 +1065,15 @@ function updateAnomalySettlementType(value: string) {
     const effectId = defaultAgentEffectId("disorder")
     const nextEvent = { ...selectedEvent.value, anomalyEffect: effectId, settlementType: "disorder" }
     updateSelectedEvent({
+      ...luminescenceFieldsToClear(),
       settlementType: "disorder",
       anomalyEffect: effectId,
       previousAnomalyEffect: undefined,
       disorderType: selectedEvent.value?.disorderType ?? "normal",
       elapsedSeconds: normalizeElapsedSeconds(selectedEvent.value?.elapsedSeconds, Number.POSITIVE_INFINITY, disorderElapsedStep(nextEvent)),
       procCount: undefined,
+      triggerActorRef: undefined,
+      anomalySource: undefined,
     }, { clearLabel: true })
     return
   }
@@ -961,10 +1087,31 @@ function updateAnomalySettlementType(value: string) {
       triggerActorRef: { agentId: String(props.agent?.id ?? ""), profileId: String(profile?.id ?? "") },
       anomalySource: { actorRef: { agentId: String(props.agent?.id ?? "") } },
     }, props.agent)
-    updateSelectedEvent(releaseEvent, { clearLabel: true })
+    updateSelectedEvent({ ...releaseEvent, ...luminescenceFieldsToClear() }, { clearLabel: true })
+    return
+  }
+  if (value === "luminescence") {
+    if (!supportsLuminescence.value) return
+    updateSelectedEvent({
+      ...luminescenceFieldsToClear(),
+      kind: "anomaly",
+      settlementType: "luminescence",
+      triggerActorRef: { agentId: String(props.agent?.id ?? "") },
+      teammateAttack: 2800,
+      luminescenceDamageSharePct: 50,
+      anomalyEffect: undefined,
+      anomalyVariant: undefined,
+      previousAnomalyEffect: undefined,
+      disorderType: undefined,
+      elapsedSeconds: undefined,
+      procCount: undefined,
+      anomalySource: undefined,
+    }, { clearLabel: true })
+    draft.value.events = (draft.value.events ?? []).filter((event: any) => event.id === selectedEvent.value?.id)
     return
   }
   updateSelectedEvent({
+    ...luminescenceFieldsToClear(),
     settlementType: "attribute",
     anomalyEffect: defaultAgentEffectId("attribute"),
     previousAnomalyEffect: undefined,
@@ -1027,14 +1174,24 @@ function close() {
 function save() {
   if (draft.value.mode === "adminDefault") {
     const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0)
+    const draftLuminescenceEvents = (draft.value.events ?? [])
+      .filter((event: any) => isLuminescenceSettlement(event))
     emit("save", {
       ...fallback,
       mode: "adminDefault",
       selectedEventId: fallback.selectedEventId ?? fallback.events?.[0]?.id,
-      events: JSON.parse(JSON.stringify(fallback.events ?? [])).map((event: any) => ({
-        ...event,
-        stunned: eventStunValue(event),
-      })),
+      events: JSON.parse(JSON.stringify(fallback.events ?? [])).map((event: any) => {
+        if (isLuminescenceSettlement(event)) {
+          const draftEvent = draftLuminescenceEvents.find((item: any) => item?.id === event?.id)
+            ?? draftLuminescenceEvents[0]
+            ?? event
+          return normalizeLuminescenceDraftEvent(draftEvent)
+        }
+        return {
+          ...event,
+          stunned: eventStunValue(event),
+        }
+      }),
     })
     close()
     return
@@ -1085,12 +1242,13 @@ function save() {
                   <span class="calculation-event-order">#{{ index + 1 }}</span>
                   <span class="calculation-event-copy">
                     <strong>{{ eventListTitle(event) }}</strong>
-                    <small v-if="event.kind === 'skillGroup'">次数 ×{{ event.count ?? 1 }} · {{ eventStunLabel(event) }}</small>
+                    <small v-if="isLuminescenceSettlement(event)">队友初始攻击力 {{ Number(event.teammateAttack ?? 2800).toLocaleString('zh-CN') }} · 耀变在队伍总伤害中的占比 {{ Number(event.luminescenceDamageSharePct ?? 50).toLocaleString('zh-CN') }}%</small>
+                    <small v-else-if="event.kind === 'skillGroup'">次数 ×{{ event.count ?? 1 }} · {{ eventStunLabel(event) }}</small>
                     <small v-else>当前倍率 {{ eventMultiplierText(event) }} · 次数 ×{{ event.count ?? 1 }} · {{ eventStunLabel(event) }}</small>
                   </span>
                 </button>
                 <div v-if="canEditEventStructure" class="calculation-event-inline-actions">
-                  <NButton circle quaternary size="tiny" title="复制目标事件" aria-label="复制目标事件" @click="duplicateEvent(event.id)">
+                  <NButton v-if="!isLuminescenceSettlement(event)" circle quaternary size="tiny" title="复制目标事件" aria-label="复制目标事件" @click="duplicateEvent(event.id)">
                     <template #icon><Copy :size="14" /></template>
                   </NButton>
                   <NButton circle quaternary size="tiny" type="error" title="删除目标事件" aria-label="删除目标事件" @click="removeEvent(event.id)">
@@ -1100,7 +1258,7 @@ function save() {
               </article>
             </div>
             <div v-else class="calculation-event-empty">还没有目标事件</div>
-            <div v-if="canEditEventStructure" class="toolbar calculation-add-toolbar">
+            <div v-if="canEditEventStructure && !(draft.events ?? []).some(isLuminescenceSettlement)" class="toolbar calculation-add-toolbar">
               <NButton class="calculation-add-button" size="medium" @click="addEvent('direct')">添加技能</NButton>
               <NButton v-if="canUseSheerDamage" class="calculation-add-button" size="medium" @click="addEvent('sheer')">添加贯穿</NButton>
               <NButton class="calculation-add-button" size="medium" @click="addEvent('anomaly')">添加异常事件</NButton>
@@ -1117,7 +1275,7 @@ function save() {
             <div class="calculation-editor-status">
               <NTag round>{{ damageEventKindLabel(selectedEvent) }}</NTag>
               <NTag v-if="isAdminDefaultMode" type="info" round>
-                <span class="calculation-readonly-tag"><Lock :size="13" />管理员配置 · 只读</span>
+                <span class="calculation-readonly-tag"><Lock :size="13" />{{ isLuminescenceSettlement(selectedEvent) ? '固定评分模型' : '管理员配置 · 只读' }}</span>
               </NTag>
             </div>
           </div>
@@ -1149,6 +1307,7 @@ function save() {
               </NRadioGroup>
             </div>
             <div
+              v-if="!isLuminescenceSettlement(selectedEvent)"
               class="metric-grid calculation-editor-grid ui-field-grid"
               :class="{ 'calculation-editor-grid--release': isReleaseSettlement(selectedEvent) }"
               data-layout-surface="calculation-fields"
@@ -1252,7 +1411,7 @@ function save() {
                   />
                 </div>
               </div>
-              <div v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType !== 'disorder'" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field>
+              <div v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType !== 'disorder' && !isLuminescenceSettlement(selectedEvent)" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field>
                 <span class="metric-title">{{ isReleaseSettlement(selectedEvent) ? '原异常' : '异常类型' }}</span>
                 <div class="metric-value">
                   <span v-if="isAdminDefaultMode || (isReleaseSettlement(selectedEvent) && releaseSourceLocked)" class="calculation-readonly-value">{{ selectedAnomalyEffectLabel(selectedEvent) }}</span>
@@ -1318,6 +1477,18 @@ function save() {
                 </div>
               </div>
             </div>
+            <LuminescenceEventEditor
+              v-if="isLuminescenceSettlement(selectedEvent)"
+              :event="selectedEvent"
+              :agent="agent"
+              :cinema-level="cinemaLevel ?? 0"
+              :core-skill-level="releaseContext?.coreSkillLevel ?? 'F'"
+              :in-combat-panel="releaseContext?.inCombatPanel"
+              :out-of-combat-panel="releaseContext?.outOfCombatPanel"
+              :luminescence-damage-multiplier="luminescencePreviewMultipliers.luminescenceDamageMultiplier"
+              :team-anomaly-damage-multiplier="luminescencePreviewMultipliers.teamAnomalyDamageMultiplier"
+              @update="updateSelectedEvent"
+            />
             <div v-if="eventWarnings.length" class="chip-row">
               <NTag v-for="warning in eventWarnings" :key="warning" type="warning" round>{{ warning }}</NTag>
             </div>
@@ -1446,7 +1617,7 @@ function save() {
       <div class="drawer-footer">
         <span class="muted">事件 {{ draft.events?.length ?? 0 }} 项</span>
         <NButton @click="close">取消</NButton>
-        <NButton type="primary" @click="save">保存配置</NButton>
+        <NButton type="primary" :disabled="isLuminescenceSettlement(selectedEvent) && eventWarnings.length > 0" @click="save">保存配置</NButton>
       </div>
     </template>
   </NModal>

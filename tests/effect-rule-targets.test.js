@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import {
+    ANOMALY_SETTLEMENT_TYPES,
     hasLegacyEffectAppliesTo,
     normalizeLegacyEffectAppliesToInValue,
 } from "../core/effectRuleTargets.js"
@@ -7,6 +8,8 @@ import {
 function clone(value) {
     return structuredClone(value)
 }
+
+assert.deepEqual(ANOMALY_SETTLEMENT_TYPES, ["attribute", "disorder", "release", "luminescence"])
 
 const migrated = normalizeLegacyEffectAppliesToInValue(clone({
     effects: [
@@ -165,5 +168,99 @@ assert.deepEqual(releaseWildcardMigration.effects[0].target, {
     settlementType: "release",
 })
 assert.equal(releaseWildcardMigration.effects[0].appliesTo, undefined)
+
+const luminescenceTargetNormalization = normalizeLegacyEffectAppliesToInValue(clone({
+    effects: [{
+        id: "luminescence-wildcard",
+        type: "fixed",
+        stat: "anomalyDamageBonus",
+        mode: "flat",
+        value: 20,
+        target: {
+            kind: "anomaly",
+            settlementType: "luminescence",
+            anomalyEffects: [],
+            anomalyVariants: [],
+        },
+    }, {
+        id: "invalid-luminescence-specific-target",
+        type: "fixed",
+        stat: "anomalyDamageBonus",
+        mode: "flat",
+        value: 20,
+        target: {
+            kind: "anomaly",
+            settlementType: "luminescence",
+            anomalyEffects: ["corruption"],
+            anomalyVariants: ["normal"],
+        },
+    }],
+}))
+assert.deepEqual(luminescenceTargetNormalization.effects[0].target, {
+    kind: "anomaly",
+    settlementType: "luminescence",
+}, "Empty Luminescence filters should normalize to the settlement-wide target")
+assert.deepEqual(luminescenceTargetNormalization.effects[1].target, {
+    kind: "anomaly",
+    settlementType: "luminescence",
+    anomalyEffects: ["corruption"],
+    anomalyVariants: ["normal"],
+}, "Non-empty Luminescence filters must survive normalization so validation can reject them")
+
+const anomalyDamageTargetNormalization = normalizeLegacyEffectAppliesToInValue(clone({
+    effects: [{
+        id: "broad-anomaly-damage-with-stale-filters",
+        type: "fixed",
+        stat: "anomalyDamageBonus",
+        mode: "flat",
+        value: 20,
+        target: {
+            kind: "default",
+            settlementType: "attribute",
+            anomalyEffects: ["assault"],
+            anomalyVariants: ["normal"],
+        },
+    }, {
+        id: "implicit-broad-anomaly-damage",
+        type: "fixed",
+        stat: "anomalyDamageBonus",
+        mode: "flat",
+        value: 20,
+    }, {
+        id: "precise-anomaly-damage",
+        type: "fixed",
+        stat: "anomalyDamageBonus",
+        mode: "flat",
+        value: 20,
+        target: {
+            kind: "anomaly",
+            settlementType: "attribute",
+            anomalyEffects: ["assault"],
+            anomalyVariants: ["normal"],
+        },
+    }, {
+        id: "legacy-skill-anomaly-damage",
+        type: "fixed",
+        stat: "anomalyDamageBonus",
+        mode: "flat",
+        value: 20,
+        target: {
+            kind: "skill",
+            skillTargets: [{ kind: "skillType", skillType: "ultimate" }],
+        },
+    }],
+}))
+assert.deepEqual(anomalyDamageTargetNormalization.effects[0].target, { kind: "default" })
+assert.deepEqual(anomalyDamageTargetNormalization.effects[1].target, { kind: "default" })
+assert.deepEqual(anomalyDamageTargetNormalization.effects[2].target, {
+    kind: "anomaly",
+    settlementType: "attribute",
+    anomalyEffects: ["assault"],
+    anomalyVariants: ["normal"],
+}, "Precise Anomaly Damage targets must not be widened during normalization")
+assert.deepEqual(anomalyDamageTargetNormalization.effects[3].target, {
+    kind: "skill",
+    skillTargets: [{ kind: "skillType", skillType: "ultimate" }],
+}, "Legacy skill-targeted payloads must remain readable instead of being widened")
 
 console.log("effect rule target migration tests passed")

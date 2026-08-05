@@ -8,7 +8,11 @@ import {
     skillTypeForMove,
     unknownLegacySkillTargetPrefixes,
 } from "./skillTargets.js"
-import { ELEMENT_CRIT_DMG_STATS, ELEMENT_DEF_IGNORE_STATS } from "./effectRuleTargets.js"
+import {
+    ANOMALY_SETTLEMENT_TYPE_VALUES,
+    ELEMENT_CRIT_DMG_STATS,
+    ELEMENT_DEF_IGNORE_STATS,
+} from "./effectRuleTargets.js"
 import { validateAnomalyReleaseProfile } from "./anomalyRelease.js"
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9_.-]*$/
@@ -116,8 +120,9 @@ export function fieldBuffPhaseName(phaseNo) {
     return fieldBuffPhaseOption(phaseNo)?.phaseName ?? null
 }
 
-const ATTRIBUTE_VALUES = new Set(["physical", "fire", "ice", "electric", "ether", "wind", "honed_edge", "frost", "xuanmo"])
+const ATTRIBUTE_VALUES = new Set(["physical", "fire", "ice", "electric", "ether", "wind", "honed_edge", "frost", "xuanmo", "lumiflux"])
 const DAMAGE_ELEMENT_VALUES = new Set(["physical", "fire", "ice", "electric", "ether", "wind"])
+const DIRECT_DAMAGE_ELEMENT_VALUES = new Set([...DAMAGE_ELEMENT_VALUES, "lumiflux"])
 const OUT_OF_COMBAT_REQUIREMENT_STAT_VALUES = new Set([
     "hp",
     "atk",
@@ -150,7 +155,6 @@ const SKILL_LEVEL_SCALE_VALUES = new Set(["skill", "coreSkill"])
 const CORE_SKILL_LEVEL_VALUES = new Set(["0", "A", "B", "C", "D", "E", "F"])
 const DAMAGE_EVENT_KIND_VALUES = new Set(["direct", "anomaly", "disorder", "sheer"])
 const CALCULATION_EVENT_KIND_VALUES = new Set([...DAMAGE_EVENT_KIND_VALUES, "skillGroup"])
-const ANOMALY_SETTLEMENT_TYPE_VALUES = new Set(["attribute", "disorder", "release"])
 const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
 const ANOMALY_VARIANT_VALUES = new Set(["normal", "polarizedAssault"])
 const CALCULATION_MODE_VALUES = new Set(["single", "sheer", "anomaly", "custom"])
@@ -185,7 +189,6 @@ const SKILL_TARGET_STAT_VALUES = new Set([
     "etherDmg",
     "windDmg",
     "critDmg",
-    "anomalyDamageBonus",
     "disorderDamageBonus",
     "stunDmgMultiplierBonus",
     "stunDmgMultiplierBonusAlways",
@@ -578,6 +581,8 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
         requireEnum(errors, settlementType, ANOMALY_SETTLEMENT_TYPE_VALUES, `${path}.target.settlementType`)
         if (target.anomalyEffects !== undefined && !Array.isArray(target.anomalyEffects)) {
             add(errors, `${path}.target.anomalyEffects`, "具体异常必须是数组。")
+        } else if (settlementType === "luminescence" && target.anomalyEffects?.length) {
+            add(errors, `${path}.target.anomalyEffects`, "耀变结算只能配置为整类目标，不能指定具体异常。")
         } else if (Array.isArray(target.anomalyEffects)) {
             const validEffects = calculationAnomalyIds(context, settlementType === "disorder" ? "disorder" : "anomaly")
             target.anomalyEffects.forEach((effectId, index) => {
@@ -586,7 +591,9 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
                 }
             })
         }
-        if (target.anomalyVariants !== undefined && settlementType !== "attribute") {
+        if (settlementType === "luminescence" && Array.isArray(target.anomalyVariants) && target.anomalyVariants.length) {
+            add(errors, `${path}.target.anomalyVariants`, "耀变结算只能配置为整类目标，不能指定异常形态。")
+        } else if (target.anomalyVariants !== undefined && settlementType !== "attribute") {
             add(errors, `${path}.target.anomalyVariants`, "只有属性异常结算可以配置异常形态。")
         } else if (target.anomalyVariants !== undefined) {
             if (!Array.isArray(target.anomalyVariants) || !target.anomalyVariants.length) {
@@ -1145,7 +1152,12 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
         } else if (hasManualSkillMultiplier) {
             validatePositiveNumber(errors, event.skillMultiplier, `${path}.skillMultiplier`, "手填倍率")
             if (event.damageElement !== undefined && event.damageElement !== "") {
-                requireEnum(errors, event.damageElement, DAMAGE_ELEMENT_VALUES, `${path}.damageElement`)
+                requireEnum(
+                    errors,
+                    event.damageElement,
+                    event.kind === "direct" ? DIRECT_DAMAGE_ELEMENT_VALUES : DAMAGE_ELEMENT_VALUES,
+                    `${path}.damageElement`,
+                )
             }
         } else {
             add(errors, `${path}.skillRef`, "必须选择技能倍率或填写手填倍率。")
@@ -1160,7 +1172,7 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
     }
     const settlementType = event.kind === "disorder"
         ? "disorder"
-        : (["attribute", "disorder", "release"].includes(event.settlementType) ? event.settlementType : "attribute")
+        : (ANOMALY_SETTLEMENT_TYPE_VALUES.has(event.settlementType) ? event.settlementType : "attribute")
     if (event.settlementType !== undefined) {
         requireEnum(errors, event.settlementType, ANOMALY_SETTLEMENT_TYPE_VALUES, `${path}.settlementType`)
     }
@@ -1215,6 +1227,40 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
         }
         return
     }
+    if (settlementType === "luminescence") {
+        const triggerAgentId = String(event.triggerActorRef?.agentId ?? "")
+        if (!triggerAgentId || triggerAgentId !== String(agentId ?? "")) {
+            add(errors, `${path}.triggerActorRef.agentId`, "耀变触发者必须是当前角色。")
+        }
+        const teammateAttackPath = `${path}.teammateAttack`
+        const rawTeammateAttack = event.teammateAttack
+        const missingTeammateAttack = rawTeammateAttack == null
+            || typeof rawTeammateAttack === "boolean"
+            || (typeof rawTeammateAttack === "string" && !rawTeammateAttack.trim())
+        if (missingTeammateAttack) {
+            add(errors, teammateAttackPath, "必须是有效数字。")
+        } else {
+            validateNonNegativeNumber(errors, rawTeammateAttack, teammateAttackPath, "队友初始攻击力")
+        }
+        const sharePath = `${path}.luminescenceDamageSharePct`
+        const rawLuminescenceDamageSharePct = event.luminescenceDamageSharePct
+        const missingLuminescenceDamageSharePct = rawLuminescenceDamageSharePct === null
+            || typeof rawLuminescenceDamageSharePct === "boolean"
+            || (typeof rawLuminescenceDamageSharePct === "string" && !rawLuminescenceDamageSharePct.trim())
+        const luminescenceDamageSharePct = missingLuminescenceDamageSharePct
+            ? NaN
+            : requireFinite(errors, rawLuminescenceDamageSharePct, sharePath)
+        if (missingLuminescenceDamageSharePct) {
+            add(errors, sharePath, "必须是有效数字。")
+        }
+        if (Number.isFinite(luminescenceDamageSharePct) && luminescenceDamageSharePct < 0) {
+            add(errors, sharePath, "耀变伤害占比不能小于 0。")
+        }
+        if (Number.isFinite(luminescenceDamageSharePct) && luminescenceDamageSharePct > 100) {
+            add(errors, sharePath, "耀变伤害占比不能大于 100。")
+        }
+        return
+    }
     const disorderEffectId = event.anomalyEffect ?? event.previousAnomalyEffect
     if (!calculationAnomalyIds(context, "disorder").has(disorderEffectId)) {
         add(errors, event.anomalyEffect === undefined ? `${path}.previousAnomalyEffect` : `${path}.anomalyEffect`, "紊乱类型不存在。")
@@ -1246,6 +1292,9 @@ function validateCalculationEventList(errors, events, path, context = {}, agentI
             ids.add(event.id)
         }
     })
+    if (events.some(event => event?.settlementType === "luminescence") && events.length !== 1) {
+        add(errors, path, "队伍异常评分必须作为单独事件使用，不能与实际伤害事件合计。")
+    }
     return ids
 }
 
@@ -1560,7 +1609,7 @@ function validateAgentSkill(item, context) {
                     }
                 }
                 if (move?.damageElement) {
-                    requireEnum(errors, move.damageElement, DAMAGE_ELEMENT_VALUES, `${movePath}.damageElement`)
+                    requireEnum(errors, move.damageElement, DIRECT_DAMAGE_ELEMENT_VALUES, `${movePath}.damageElement`)
                 }
                 const moveRange = move?.levelRange
                     ? validateSkillLevelRange(errors, move.levelRange, `${movePath}.levelRange`, categoryRange, levelScale)
@@ -1662,7 +1711,7 @@ function validateAgent(item, context) {
     requireEnum(errors, item?.attribute, ATTRIBUTE_VALUES, "attribute")
     requireEnum(errors, item?.specialty, SPECIALTY_VALUES, "specialty")
     if (item?.damageElement) {
-        requireEnum(errors, item.damageElement, DAMAGE_ELEMENT_VALUES, "damageElement")
+        requireEnum(errors, item.damageElement, DIRECT_DAMAGE_ELEMENT_VALUES, "damageElement")
     } else if (item?.attribute && !DAMAGE_ELEMENT_VALUES.has(item.attribute)) {
         add(errors, "damageElement", "特殊显示属性必须填写真实伤害结算属性。")
     }

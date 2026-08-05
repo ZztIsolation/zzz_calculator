@@ -11,6 +11,7 @@
 - [ ] HTML、`app-config` 和 manifest 不依赖长期缓存；带哈希的 JS/CSS 使用 immutable 缓存。
 - [ ] 网站、Helper、Scanner 是三个可独立回档的生命周期；联合发布也必须分阶段切换。
 - [ ] 浏览器用户数据只存储在用户本机。部署不得修改 IndexedDB 名称、版本、对象仓库、记录键、localStorage key 或生产域名。
+- [ ] Calculator 全量热更新只做一次生产代码切换；数据补全随最终代码幂等执行，不设置迁移 feature flag，也不先部署兼容基础版本。
 - [ ] 任何健康、哈希、Range、浏览器流程或数据保留门禁失败，立即停止扩大变更范围。
 - [ ] 不得把密码、Token、Cookie、私钥、Basic Auth 内容写入本文档、仓库、命令脚本、CI 日志或发布记录。
 - [ ] 生产现场 Nginx/systemd 配置不得被仓库模板直接覆盖。先保存现场副本，再做逐行 diff，只应用本次获批项。
@@ -23,7 +24,7 @@
 
 - Calculator 源码和构建产物。
 - 新网站 release 目录、兼容回滚目录、`current` 软链接。
-- 经批准的 Calculator systemd feature-flag drop-in。
+- 现有 Calculator systemd 配置的只读核验；本次不新增迁移开关或 drop-in。
 
 禁止修改：
 
@@ -111,8 +112,8 @@ previous_dir="$(readlink -f /opt/zzz_calculator/current)"
 - [ ] `npm run build:pages` 通过；静态 `app-config` 使用预期的安全默认值。
 - [ ] `npm run test:layout` 覆盖桌面、125% 缩放和移动端。
 - [ ] Chrome 和 Edge 的关键 E2E 通过。
-- [ ] 无功能开关时，生产界面与当前版本对照一致。
-- [ ] 开启功能开关时，候选功能完整且没有先显示后隐藏。
+- [ ] 8788 候选以最终生产行为一次性通过全部功能和数据迁移验证，不依赖上线后再开启 feature flag。
+- [ ] 候选首次渲染即为最终行为，没有先显示后隐藏或反向闪烁。
 - [ ] 无专属数据时优化器 Top 10 的 ID、顺序和分数与基线逐项一致。
 - [ ] 有专属数据时，只排除其他角色专属盘；自己的专属盘仍可选。
 - [ ] 有主动排除数据时，优化器结果与从库存手工删除相同盘的 Top 10 ID、顺序和分数完全一致。
@@ -139,6 +140,8 @@ previous_dir="$(readlink -f /opt/zzz_calculator/current)"
 - [ ] partial 导入保持 `removeMissing=false`，不会删除未返回记录。
 - [ ] 原生导出再回导保留已支持的可选字段。
 - [ ] 空账号、多账号同 ID、未知角色 ID 均通过。
+- [ ] 套装精确名称补全只允许修改目标记录的 `setId`、`canonicalSetName`；`谶羽之誓` 补为 `zzz_wiki_2116`，`棘刺玫瑰` 补为 `zzz_wiki_2121`，未知或自定义非 Scanner ID 原样保留。
+- [ ] `zzz_maintenance_vue_draft_v*` 不因版本升级被自动删除；不兼容的 v3 草稿可以忽略恢复，但 localStorage 中原始字节必须保持不变。
 
 ### 4.4 Helper/Scanner 门禁（仅二进制或联合发布）
 
@@ -158,6 +161,12 @@ previous_dir="$(readlink -f /opt/zzz_calculator/current)"
 npm test
 npm run build:server
 ```
+
+本次 Calculator 全量单次热更新必须在两个互相独立的干净 worktree 中分别重复以上命令：
+
+- 候选包来自 PR 合入后的精确 `origin/main` merge SHA。
+- 兼容回滚包来自精确提交 `4a8c9529b699285ce60df966da65c8a206b1bf54`，不得用当前生产目录或普通旧版本代替。
+- 两套包各自保留独立 artifact、evidence 和构建日志；任一包的提交、测试或哈希无法确认都停止发布。
 
 `scripts/package-server-release.js` 必须：
 
@@ -181,6 +190,8 @@ pages_total_bytes=
 pages_tree_sha256=
 deployed_commit=
 ```
+
+候选包的 `.deployed-commit` 必须是合入后的完整 main SHA，兼容回滚包必须是完整 `4a8c9529b699285ce60df966da65c8a206b1bf54`。该文件表示可执行代码来源；后续只补入兼容静态资源时不得改写它，补齐后目录的实际字节状态由新的树哈希单独记录。
 
 ## 6. 服务器只读基线
 
@@ -211,9 +222,9 @@ find /opt/zzz_calculator/releases -maxdepth 1 -mindepth 1 -type d -printf '%f\n'
 - [ ] 磁盘足以同时保存新目录、兼容回滚目录和上传包。
 - [ ] app-config 的维护、遥测和产品功能开关符合预期。
 - [ ] 两个 manifest 哈希已保存。
-- [ ] 回滚目标目录真实存在且可读。
+- [ ] 精确 `4a8c9529b699285ce60df966da65c8a206b1bf54` 兼容回滚包及 evidence 已准备且可读，计划中的最终回滚目录尚不存在。
 
-## 7. 安全上传和不可变解压
+## 7. 安全上传和暂存解压
 
 上传到临时目录，不直接写最终 release：
 
@@ -221,47 +232,116 @@ find /opt/zzz_calculator/releases -maxdepth 1 -mindepth 1 -type d -printf '%f\n'
 install -d -m 0750 /opt/zzz_calculator/staging
 ```
 
-- [ ] 本机上传到 `/opt/zzz_calculator/staging/<artifact>.part`。
-- [ ] 服务器运行 `sha256sum`，结果必须与本机一致。
-- [ ] 最终目录不存在；若已存在，停止并调查，不覆盖。
-- [ ] 解压到同文件系统的临时目录 `<release>.staging`。
-- [ ] 核对 `.deployed-commit`、文件数和 Pages 树哈希。
-- [ ] 设置正确 owner/group 和只读权限。
-- [ ] 原子重命名为 `/opt/zzz_calculator/releases/<release>`。
+- [ ] 候选包和 `4a8c952` 兼容回滚包分别上传到 `/opt/zzz_calculator/staging/<artifact>.part`。
+- [ ] 服务器分别运行 `sha256sum`，结果必须与各自本机 evidence 一致。
+- [ ] 两个最终目录和两个 `.staging` 目录都不存在；任一已存在即停止并调查，不覆盖、不递归清理。
+- [ ] 解压前分别核对 artifact SHA/字节数，并检查归档清单不存在绝对路径、`..`、符号链接或设备节点。
+- [ ] 两套包分别解压到 `/opt/zzz_calculator/releases/<release>.staging`，确保与最终 release 位于同一文件系统。
+- [ ] 在未补入任何静态资源的原始暂存树上，分别核对 `.deployed-commit`、release 文件数/树哈希和 Pages 文件数/字节数/树哈希。
+- [ ] 原始 evidence 全部匹配前，不得执行资源补齐、权限调整或最终目录改名。
+- [ ] 资源补齐、复核和权限收紧完成后，才按第 8 节原子重命名两个目录。
 
 示例：
 
 ```bash
+candidate_commit='<merged-main-40-char-sha>'
+compat_commit='4a8c9529b699285ce60df966da65c8a206b1bf54'
+candidate_dir='/opt/zzz_calculator/releases/<candidate-release>'
+rollback_dir='/opt/zzz_calculator/releases/<compat-rollback-release>'
+candidate_staging_dir="${candidate_dir}.staging"
+rollback_staging_dir="${rollback_dir}.staging"
+
+for target in "$candidate_dir" "$rollback_dir" "$candidate_staging_dir" "$rollback_staging_dir"; do
+  test ! -e "$target"
+done
+
+install -d -m 0750 "$candidate_staging_dir" "$rollback_staging_dir"
+tar --no-same-owner --no-same-permissions \
+  -xzf "/opt/zzz_calculator/staging/<candidate-artifact>.part" \
+  -C "$candidate_staging_dir"
+tar --no-same-owner --no-same-permissions \
+  -xzf "/opt/zzz_calculator/staging/<compat-artifact>.part" \
+  -C "$rollback_staging_dir"
+
+test "$(cat "$candidate_staging_dir/.deployed-commit")" = "$candidate_commit"
+test "$(cat "$rollback_staging_dir/.deployed-commit")" = "$compat_commit"
+# 此处按两个 evidence 分别复算并核对未经补齐的 releaseTree 和 pagesTree。
+```
+
+兼容回滚目录必须来自上述独立干净包。不得用 `cp -a "$previous_dir" "$rollback_dir"` 把当前生产代码伪装成兼容回滚代码，也不得把候选的 `.deployed-commit` 写入回滚目录。
+
+## 8. 新旧静态资源双向兼容
+
+部署前已打开的旧标签页可能在切换后继续请求旧哈希 chunk 或旧资源；回档后已加载新 HTML 的标签页也可能请求新 chunk、图片等非哈希资源。因此 `dist/pages/static/app` 与 `dist/pages/assets` 必须一起双向保留：
+
+- [ ] 当前生产目录、候选暂存目录和 `4a8c952` 兼容回滚暂存目录的 `dist/pages/static/app`、`dist/pages/assets` 都真实存在。
+- [ ] 在复制前逐对比较三方同相对路径文件；任一同路径内容不同都立即停止，不能依赖 `cp -an` 静默跳过冲突。
+- [ ] 将当前生产的两棵资源树补入候选和兼容回滚，再将候选与兼容回滚双向补齐，使两个暂存目录都包含三方资源并保持原有同名文件不变。
+- [ ] 所有资源补齐都使用 `cp -an`，只创建缺失文件，绝不覆盖候选或回滚暂存目录中的同名文件。
+- [ ] 旧版独有 URL 在候选中返回 200；新版独有 URL，包括新增的非哈希图片或 JSON，在回滚目录中也返回 200。
+- [ ] 同一路径在新旧版本中内容不同但未使用版本化文件名时停止发布；`cp -an` 无法同时保存一个 URL 的两份内容，必须先改成兼容内容或版本化 URL。
+- [ ] 候选和兼容回滚目录分别记录两棵目录的文件数、字节数与树哈希。
+- [ ] 新 release、上一生产 release 和兼容回滚目录至少保留 7 天。
+
+示例：
+
+```bash
+assert_no_resource_conflicts() {
+  local left="$1"
+  local right="$2"
+  local relative_path
+  local failed=0
+  while IFS= read -r -d '' relative_path; do
+    relative_path="${relative_path#./}"
+    if [ -f "$right/$relative_path" ] && \
+       ! cmp -s -- "$left/$relative_path" "$right/$relative_path"; then
+      printf 'static resource conflict: %s\n' "$relative_path" >&2
+      failed=1
+    fi
+  done < <(cd "$left" && find . -type f -print0)
+  test "$failed" -eq 0
+}
+
+for resource_tree in dist/pages/static/app dist/pages/assets; do
+  for root in "$previous_dir" "$candidate_staging_dir" "$rollback_staging_dir"; do
+    test -d "$root/$resource_tree"
+  done
+
+  assert_no_resource_conflicts "$previous_dir/$resource_tree" "$candidate_staging_dir/$resource_tree"
+  assert_no_resource_conflicts "$previous_dir/$resource_tree" "$rollback_staging_dir/$resource_tree"
+  assert_no_resource_conflicts "$candidate_staging_dir/$resource_tree" "$rollback_staging_dir/$resource_tree"
+
+  cp -an -- "$previous_dir/$resource_tree/." "$candidate_staging_dir/$resource_tree/"
+  cp -an -- "$previous_dir/$resource_tree/." "$rollback_staging_dir/$resource_tree/"
+  cp -an -- "$candidate_staging_dir/$resource_tree/." "$rollback_staging_dir/$resource_tree/"
+  cp -an -- "$rollback_staging_dir/$resource_tree/." "$candidate_staging_dir/$resource_tree/"
+
+  diff -u \
+    <(cd "$candidate_staging_dir/$resource_tree" && find . -type f -printf '%P\n' | LC_ALL=C sort) \
+    <(cd "$rollback_staging_dir/$resource_tree" && find . -type f -printf '%P\n' | LC_ALL=C sort)
+done
+
+test "$(cat "$candidate_staging_dir/.deployed-commit")" = "$candidate_commit"
+test "$(cat "$rollback_staging_dir/.deployed-commit")" = "$compat_commit"
+
+# 记录补齐后的新树哈希；它们不再等于原始包 evidence 中的树哈希。
+chown -R zzzcalc:zzzcalc "$candidate_staging_dir" "$rollback_staging_dir"
+find "$candidate_staging_dir" "$rollback_staging_dir" -type d -exec chmod 0755 {} +
+find "$candidate_staging_dir" "$rollback_staging_dir" -type f -exec chmod 0644 {} +
+
 test ! -e "$candidate_dir"
-staging_dir="${candidate_dir}.staging"
-rm -rf -- "$staging_dir"
-install -d -o zzzcalc -g zzzcalc -m 0750 "$staging_dir"
-tar -xzf "/opt/zzz_calculator/staging/<artifact>.part" -C "$staging_dir"
-test "$(cat "$staging_dir/.deployed-commit")" = '<40-char-sha>'
-chown -R zzzcalc:zzzcalc "$staging_dir"
-mv "$staging_dir" "$candidate_dir"
+test ! -e "$rollback_dir"
+mv -T -- "$rollback_staging_dir" "$rollback_dir"
+mv -T -- "$candidate_staging_dir" "$candidate_dir"
 ```
 
-不得把 `rm -rf` 用于计算后未核验的路径；删除前必须打印并确认绝对路径位于 `/opt/zzz_calculator/releases/` 或 staging 内。
+补齐后先做静态资源与回滚验证：
 
-## 8. 新旧静态 chunk 双向兼容
-
-部署前已打开的旧标签页可能在切换后继续请求旧哈希 chunk；回档后已加载新 HTML 的标签页也可能请求新 chunk。因此：
-
-- [ ] 将当前生产 `dist/pages/static/app` 中旧哈希文件补入新 release。
-- [ ] 建立“旧代码 + 新哈希 chunk”的独立兼容回滚目录。
-- [ ] 只补充不存在的哈希文件，不覆盖同名文件。
-- [ ] 新 release 和兼容回滚目录分别记录 chunk 文件数与树哈希。
-- [ ] 保留两套目录至少 7 天。
-
-示例：
-
-```bash
-cp -an "$previous_dir/dist/pages/static/app/." "$candidate_dir/dist/pages/static/app/"
-rollback_dir="/opt/zzz_calculator/releases/<rollback-name>"
-cp -a "$previous_dir" "$rollback_dir"
-cp -an "$candidate_dir/dist/pages/static/app/." "$rollback_dir/dist/pages/static/app/"
-```
+- [ ] 分别从候选和回滚目录生成 `static/app`、`assets` 的相对路径清单与 SHA-256 清单；两个目录的资源清单一致，且补齐操作没有改变三方原有同名文件。
+- [ ] 用候选目录启动 8788，逐项请求旧版与新版清单中的 URL，状态均为 200，缓存头符合 HTML/no-store 与哈希资源/immutable 约定。
+- [ ] 停止候选后用兼容回滚目录启动同一 8788，再请求同一份旧/新 URL 清单；新增非哈希资源也必须为 200。
+- [ ] 回滚目录的 `.deployed-commit` 仍指向真实回滚代码提交；额外静态文件不得被误记为代码升级。
+- [ ] 任一路径缺失、被覆盖或哈希异常，停止切换并重建候选与回滚目录。
 
 ## 9. 8788 候选预检
 
@@ -272,27 +352,22 @@ sudo -u zzzcalc env \
   NODE_ENV=production \
   PORT=8788 \
   SCAN_TELEMETRY_ENABLED=false \
-  DRIVE_DISC_RESERVATIONS_UI_ENABLED=false \
-  DRIVE_DISC_EXCLUSIONS_UI_ENABLED=false \
   /usr/bin/node "$candidate_dir/backend/server.js"
 ```
 
 如使用 `systemd-run`，先查询服务器版本支持的参数。旧版本可能不支持较新的 `--working-directory`；改用兼容的 `-p WorkingDirectory=<dir>`，并在失败后确认候选进程实际未启动。
 
-关闭开关预检：
+最终候选预检：
+
+生产 Helper/Scanner manifest 的权威文件分别是 Nginx download origin 上的 `/srv/zzz-download-origin/downloads/zzz-scanner/helper-manifest.json` 和 `/srv/zzz-download-origin/downloads/zzz-scanner/manifest.json`。`build:server` 的 8788 Node 候选不一定包含 Helper manifest，因此其 404 不能作为 manifest 改变或发布失败的证据；即使包内存在 Scanner manifest，也必须核对 `/srv` 文件 SHA，并通过当前生产 Nginx/公网 manifest URL 验证。纯网站发布不得向 `/srv/zzz-download-origin` 复制任何文件。
 
 - [ ] `/api/health` 200。
 - [ ] `/`、`/discs`、`/settings` 200。
 - [ ] SPA 直接刷新正常。
 - [ ] catalog 和 `/api/app-config` 正常。
-- [ ] `driveDiscReservationsUiEnabled=false`。
-- [ ] `driveDiscExclusionsUiEnabled=false`，旧服务器缺字段时前端也保持关闭。
-- [ ] 旧数据哨兵完整，现有 UI 未出现预约控件。
-- [ ] Helper/Scanner manifest 哈希与基线一致。
-
-开启开关预检：
-
-- [ ] 使用相同 release、相同旧数据哨兵，先保持排除开关关闭验证兼容基础，再在锁定开关已开启的前提下仅开启排除开关。
+- [ ] app-config 与计划中的最终生产值一致；候选验证后不再通过迁移 feature flag 改变代码路径。
+- [ ] 旧数据哨兵完整，数据补全只修改获准的 `setId`、`canonicalSetName`。
+- [ ] `/srv/zzz-download-origin` 中 Helper/Scanner manifest 哈希与基线一致；8788 只用于候选应用行为，不替代 Nginx download origin 验证。
 - [ ] 页面首次渲染直接出现功能，不发生先显示后隐藏或反向闪烁。
 - [ ] 逐盘锁定、解除、跨角色确认、未知角色筛选通过。
 - [ ] 六槽预览、缺失引用、统一选择器、取消草稿不落库通过。
@@ -300,13 +375,21 @@ sudo -u zzzcalc env \
 - [ ] 普通新增/取消排除即时保存；锁定转排除、排除转锁定分别出现准确确认；其他角色锁定盘的排除按钮为橙色禁用态。
 - [ ] “已排除 + 角色”筛选同时返回主动排除该角色的盘及锁给其他角色的盘，并标明原因。
 - [ ] 手动选择和已有套装仍显示排除盘；使用限制变化后旧 Top 10 仍可查看计算并明确提示重新优化。
-- [ ] 切回关闭状态后数据仍在，UI 隐藏但约束仍生效。
+- [ ] `settlementType: "luminescence"`、`teammateAttack`、`luminescenceDamageSharePct` 在保存、降级读取和再次升级后仍完整。
 
-预检结束后停止候选并确认 8788 已释放。
+同源降级演练使用隔离浏览器资料，并始终保持 `http://127.0.0.1:8788` origin：
 
-## 10. 纯网站生产切换
+1. [ ] 当前生产代码种入旧版多账号、库存、优化器与维护草稿哨兵。
+2. [ ] 候选代码加载并完成套装身份补全，再写入新的流明配置。
+3. [ ] 兼容回滚代码读取同一浏览器资料；除获准补全字段外，全部哨兵和新字段保持。
+4. [ ] 再次启动候选代码并读取同一资料；补全幂等，驱动盘能正确显示图标/效果并参与套装优化。
+5. [ ] v3 维护草稿可以不恢复到编辑器，但 localStorage 原始值必须逐字节不变。
 
-切换前再次确认两个 manifest 哈希不变。然后：
+每次更换 8788 代码目录前停止前一个候选进程并确认端口已释放。降级演练任一步失败都禁止生产切换；不得用上线后再开迁移 flag 代替这项验证。
+
+## 10. 纯网站单次生产切换
+
+切换前再次确认两个 manifest 哈希不变、候选与兼容回滚演练均已通过。以下代码切换只执行一次：
 
 ```bash
 ln -sfn "$candidate_dir" /opt/zzz_calculator/current.next
@@ -391,35 +474,15 @@ https://download.zzzcaculator.top/downloads/zzz-scanner/manifest.json
 
 Helper 成功确认更新后通常不支持自动降级。Helper 严重故障时先回退网站和 Scanner manifest 止损，再发布更高版本 fix-forward；不能把恢复旧 Helper manifest 当作已升级客户端的降级方案。
 
-## 13. Feature Flag 两阶段启用
+## 13. 单次切换约束
 
-可选 UI 必须先部署代码、后启用：
+本次全量 Calculator 热更新不采用“兼容基础代码 + feature flag”两阶段启用：
 
-1. [ ] 最终代码以 `DRIVE_DISC_RESERVATIONS_UI_ENABLED=false`、`DRIVE_DISC_EXCLUSIONS_UI_ENABLED=false` 上线。
-2. [ ] 健康、路由、旧数据哨兵、扫描和 manifest 哈希通过。
-3. [ ] 创建 systemd drop-in，而不是覆盖完整 unit：
-
-```ini
-# /etc/systemd/system/zzz-calculator.service.d/20-drive-disc-reservations.conf
-[Service]
-Environment=DRIVE_DISC_RESERVATIONS_UI_ENABLED=true
-```
-
-排除 UI 使用独立 drop-in；只有锁定 UI 已开启时才启用：
-
-```ini
-# /etc/systemd/system/zzz-calculator.service.d/30-drive-disc-exclusions.conf
-[Service]
-Environment=DRIVE_DISC_EXCLUSIONS_UI_ENABLED=true
-```
-
-4. [ ] `systemctl daemon-reload`。
-5. [ ] `systemctl restart zzz-calculator.service`。
-6. [ ] 15 秒健康门禁通过。
-7. [ ] `/api/app-config` 中两个 Drive Disc UI 开关均为 true。
-8. [ ] 不强制刷新正在扫描、优化或编辑的旧标签页。
-
-关闭排除 UI 的首选回档：只把 `DRIVE_DISC_EXCLUSIONS_UI_ENABLED` 设为 false（或移除其单一 drop-in），daemon-reload 后重启。不要同时关闭锁定 UI，除非其自身也需要回退。数据和优化器语义仍由兼容基础代码保留。
+1. [ ] 数据补全、最终 UI、计算输入和回滚兼容均已在 8788 候选/回滚/再升级演练中通过。
+2. [ ] 不创建迁移专用环境变量、systemd drop-in 或第二阶段重启步骤。
+3. [ ] 生产只执行第 10 节的一次 `current` 原子切换与一次服务重启。
+4. [ ] 15 秒健康门禁失败时直接切到已演练的兼容回滚目录，不尝试临时改变数据或开关。
+5. [ ] 不强制刷新正在扫描、优化或编辑的旧标签页；新旧静态资源由第 8 节的双向保留承接。
 
 ## 14. 公网验收
 
@@ -432,7 +495,7 @@ Environment=DRIVE_DISC_EXCLUSIONS_UI_ENABLED=true
 - [ ] Helper 未安装首屏立即显示下载和重连入口。
 - [ ] 已安装 Helper 能连接，版本/协议/Scanner 状态正确。
 - [ ] 若本次涉及扫描，至少完成一次受控 30 件扫描或记录无法完成的外部条件。
-- [ ] 功能开关显示值与页面实际一致。
+- [ ] `/api/app-config` 与切换前记录的最终期望一致，生产验收期间未发生第二次配置启用或代码切换。
 - [ ] 浏览器控制脚本遇到后台轮询重渲染时重新定位按钮，不复用失效 DOM 引用。
 
 ## 15. 监控时间点
@@ -460,23 +523,23 @@ journalctl -u zzz-calculator.service --since '10 minutes ago' --no-pager
 
 ## 16. 回档决策
 
-### 16.1 UI 级故障
+### 16.1 UI 或数据兼容故障
 
-1. 只把发生故障的 UI feature flag 设为 false；排除故障优先关闭 `DRIVE_DISC_EXCLUSIONS_UI_ENABLED`。
-2. daemon-reload 并重启。
-3. 执行 15 秒健康门禁。
-4. 保留最终代码和兼容数据语义，修复前进。
+1. 停止扩大变更，不写入或清理任何浏览器存储。
+2. 将 `current` 原子切回已演练的兼容回滚目录并重启，不新增临时 feature flag。
+3. 执行 15 秒健康门禁，并用同源隔离资料复核旧数据、新字段、v3 维护草稿和静态资源 URL。
+4. 保留候选及回滚目录，基于证据修复前进。
 
 ### 16.2 最终代码故障
 
-1. 切回同一功能的兼容基础 release（必须包含 `excludedForAgentIds` 归一化和优化器过滤，不能退到完全不理解排除语义的版本）。
+1. 切回已通过“候选写入 -> 回滚读取”演练的兼容回滚 release；不能退到无法保留新增字段或新驱动盘身份的版本。
 2. 重启并验证健康。
-3. 保留用户已写入的可选字段和优化器排除语义。
+3. 保留用户已写入的可选字段、优化器语义和全部非目标字段。
 4. 不回到不理解新语义的旧版本作为常规回档。
 
-### 16.3 兼容基础启动失败
+### 16.3 兼容回滚失败
 
-只有 UI 从未开放、用户尚未产生新语义数据时，才允许暂时退回更旧生产版本。否则关闭 UI 并 fix-forward。
+兼容回滚目录启动、静态 URL 或同源降级读取任一验证失败时，生产切换门禁不成立，禁止上线。若生产切换后才发现该问题，优先保持服务健康和用户数据原样，停止新的写入路径并 fix-forward；不得删除浏览器字段或维护草稿来迁就旧代码。
 
 ### 16.4 Scanner 故障
 
@@ -566,9 +629,11 @@ journalctl -u zzz-calculator.service --since '10 minutes ago' --no-pager
 - rollback directory：
 
 ## 候选预检
-- 8788 flag off：
-- 8788 flag on：
+- 8788 最终候选：
+- current -> candidate -> rollback -> candidate：
 - routes：
+- static/app old/new URL：
+- assets old/new/non-hashed URL：
 - browser：
 - old-data sentinel：
 
@@ -577,6 +642,7 @@ journalctl -u zzz-calculator.service --since '10 minutes ago' --no-pager
 - health recovery ms：
 - PID / NRestarts：
 - app-config：
+- production code switches（应为 1）：
 - manifest hash unchanged：
 - CDN action（纯网站应为 none）：
 

@@ -46,9 +46,13 @@ import {
     normalizeDefaultCalculationCinemaLevel,
 } from "../core/defaultCalculationConfig.js"
 import { normalizeSkillTargetsInValue } from "../core/skillTargets.js"
-import { normalizeLegacyEffectAppliesToInValue } from "../core/effectRuleTargets.js"
+import {
+    normalizeEffectRuleTarget,
+    normalizeLegacyEffectAppliesToInValue,
+} from "../core/effectRuleTargets.js"
 import { disorderElapsedStepSeconds, normalizeElapsedSeconds } from "../core/damageEventMultipliers.js"
 import { isReleaseSettlement, normalizeAnomalySourceSnapshot } from "../core/anomalyRelease.js"
+import { isLuminescenceSettlement } from "../core/luminescence.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, "..")
@@ -61,6 +65,7 @@ const port = Number(process.env.PORT || 8787)
 const host = String(process.env.HOST || "127.0.0.1").trim() || "127.0.0.1"
 const nodeEnv = String(process.env.NODE_ENV ?? "development").toLowerCase()
 const DAMAGE_ELEMENTS = new Set(["physical", "fire", "ice", "electric", "ether", "wind"])
+const DIRECT_DAMAGE_ELEMENTS = new Set([...DAMAGE_ELEMENTS, "lumiflux"])
 const maintenanceAllowedOrigins = new Set(
     String(process.env.MAINTENANCE_ALLOWED_ORIGINS ?? "")
         .split(",")
@@ -616,17 +621,10 @@ function cleanImages(images = {}, key = "icon") {
 
 function cleanEffectRule(effect = {}) {
     const { sourceStat, ...rest } = effect
-    const next = {
+    const next = normalizeEffectRuleTarget({
         ...rest,
         id: rest.id || randomId("effect"),
-    }
-
-    if (rest.target?.kind === "anomaly") {
-        next.target = { ...rest.target }
-        if (Array.isArray(next.target.anomalyEffects) && next.target.anomalyEffects.length === 0) {
-            delete next.target.anomalyEffects
-        }
-    }
+    })
 
     if (rest.sourceLabel) {
         next.sourceLabel = zhOnly(rest.sourceLabel)
@@ -920,6 +918,16 @@ function cleanCalculationSkillRef(skillRef = null) {
     return Object.values(result).every(Boolean) ? result : null
 }
 
+function cleanFiniteNumberInput(value) {
+    if (value === null
+        || typeof value === "boolean"
+        || (typeof value === "string" && !value.trim())) {
+        return value
+    }
+    const numericValue = Number(value)
+    return Number.isFinite(numericValue) ? numericValue : value
+}
+
 function cleanCalculationEvent(event = {}, index = 0, options = {}) {
     if (!event || typeof event !== "object" || Array.isArray(event)) {
         return null
@@ -945,11 +953,37 @@ function cleanCalculationEvent(event = {}, index = 0, options = {}) {
             stunned: event.stunned === undefined ? true : Boolean(event.stunned),
         }
     }
-    const settlementType = isReleaseSettlement(event)
-        ? "release"
+    const settlementType = isLuminescenceSettlement(event)
+        ? "luminescence"
+        : isReleaseSettlement(event)
+            ? "release"
         : inputKind === "disorder" || event.settlementType === "disorder" ? "disorder" : "attribute"
     const kind = inputKind === "direct" || inputKind === "sheer" ? inputKind : "anomaly"
     const id = String(event.id ?? `${kind}-${index + 1}`).trim() || `${kind}-${index + 1}`
+    if (kind === "anomaly" && settlementType === "luminescence") {
+        const legacyRecord = Array.isArray(event.records)
+            ? event.records.find(record => ["normal", "ordinary", undefined].includes(record?.kind))
+            : null
+        const explicitTeammateAttack = Object.prototype.hasOwnProperty.call(event, "teammateAttack")
+            && event.teammateAttack !== undefined
+        const teammateAttack = explicitTeammateAttack
+            ? event.teammateAttack
+            : legacyRecord?.T ?? legacyRecord?.teammateAttack ?? legacyRecord?.teammateAtk ?? 2800
+        const hasLuminescenceDamageShare = Object.prototype.hasOwnProperty.call(event, "luminescenceDamageSharePct")
+        const luminescenceDamageSharePct = hasLuminescenceDamageShare
+            ? event.luminescenceDamageSharePct
+            : 50
+        return {
+            id,
+            kind: "anomaly",
+            settlementType: "luminescence",
+            triggerActorRef: {
+                agentId: String(event.triggerActorRef?.agentId ?? options.agentId ?? "").trim(),
+            },
+            teammateAttack: cleanFiniteNumberInput(teammateAttack),
+            luminescenceDamageSharePct: cleanFiniteNumberInput(luminescenceDamageSharePct),
+        }
+    }
     const count = Number(event.count ?? 1)
     const base = {
         id,
@@ -981,7 +1015,8 @@ function cleanCalculationEvent(event = {}, index = 0, options = {}) {
         const skillMultiplier = Number(event.skillMultiplier ?? 100)
         result.skillMultiplier = Number.isFinite(skillMultiplier) ? Math.max(0, skillMultiplier) : 100
         const damageElement = String(event.damageElement ?? "").trim()
-        if (DAMAGE_ELEMENTS.has(damageElement)) {
+        const supportedElements = kind === "direct" ? DIRECT_DAMAGE_ELEMENTS : DAMAGE_ELEMENTS
+        if (supportedElements.has(damageElement)) {
             result.damageElement = damageElement
         }
         return result

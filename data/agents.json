@@ -2605,7 +2605,11 @@
                 "value": 15,
                 "mode": "flat",
                 "target": {
-                  "kind": "default"
+                  "kind": "anomaly",
+                  "settlementType": "attribute",
+                  "anomalyEffects": [
+                    "assault"
+                  ]
                 },
                 "coverage": {
                   "default": 1,
@@ -3462,6 +3466,419 @@
         "unsupportedMechanics": "anomaly buildup resistance, energy, decibel, cheer energy, and resource conversion remain descriptive"
       },
       "hidden": false
+    },
+    {
+      "id": "remielle_dan",
+      "name": {
+        "zhCN": "蕾米埃尔·丹"
+      },
+      "rarity": "S",
+      "attribute": "lumiflux",
+      "damageElement": "lumiflux",
+      "damageElementModelingNote": "流明直伤按流明伤害结算，当前模型不读取或新增流明抗性桶，抗性乘区固定为1。",
+      "specialty": "anomaly",
+      "faction": "达识结社",
+      "images": {
+        "portrait": "https://act-upload.mihoyo.com/nap-obc-indep/2026/07/22/15559334/13b7b06627a8a99ffdf1f397b1daf7d1_5495460923605178593.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/2076/detail?mhy_presentation_style=fullscreen"
+      },
+      "level60": {
+        "hpBase": 7482,
+        "atkBase": 748,
+        "defBase": 600,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 83,
+        "anomalyProficiency": 116,
+        "anomalyMastery": 115,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动：时序=万色滞行"
+          },
+          "description": {
+            "zhCN": "异化系数为自身异常精通的0.02%，三名异常角色时额外提升10%。队友触发异化后，按异化加强后的异常效果强度生成虚曜，最多储存最新3个。花羽轮舞、缭乱终幕、垂虹或惊鸿命中后可基于全部已储存虚曜触发耀变；进入相变时流或发动垂虹、惊鸿后清空全部虚曜。F核心按自身异常精通的0.2%提升耀变伤害倍率。"
+          },
+          "effects": [],
+          "buffModifiers": [],
+          "mechanics": {
+            "alienationCoefficientPctPerAnomalyProficiency": 0.02,
+            "threeAnomalyAgentsBonusPct": 10,
+            "voidflare": {
+              "normalGenerationTrigger": "teammateTriggersAlienation",
+              "strengthBasis": "alienationEnhancedAnomalyEffectStrength",
+              "storageLimit": 3,
+              "retention": "latestGenerated",
+              "luminescenceUses": "allStored",
+              "clearEvents": [
+                "enterPhaseShiftTimeflow",
+                "basicVerticalRainbow",
+                "basicStartledSwan"
+              ]
+            },
+            "luminescenceTriggerMoves": [
+              "basic_vertical_rainbow",
+              "basic_startled_swan",
+              "assist_flower_feather_round_dance",
+              "ultimate_chaotic_finale"
+            ]
+          }
+        },
+        "additionalAbility": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "额外能力：芳菲之邀"
+          },
+          "description": {
+            "zhCN": "队伍中存在其他异常角色或同阵营角色时触发。异常角色数量为1/2/3时，进入战场为全队提升蕾米埃尔初始攻击力6%/12%/40%的攻击力，上限1600；相变时流期间自身造成的失衡值提升6%/12%/35%。施加流明积蓄点时附加幻色，使全队攻击该敌人时异常积蓄效率提升15%；幻色消失后该效果额外持续8秒。"
+          },
+          "effects": [],
+          "buffModifiers": [],
+          "mechanics": {
+            "activation": "otherAnomalyAgentOrSameFactionAgent",
+            "attackShare": {
+              "basis": "initialAtk",
+              "pctByAnomalyAgentCount": {
+                "1": 6,
+                "2": 12,
+                "3": 40
+              },
+              "cap": 1600
+            },
+            "phaseShiftDazeBonusPctByAnomalyAgentCount": {
+              "1": 6,
+              "2": 12,
+              "3": 35
+            },
+            "illusion": {
+              "appliedWithLumifluxBuildupPoint": true,
+              "teamAnomalyBuildupEfficiencyPct": 15,
+              "lingerSecondsAfterEffectEnds": 8
+            }
+          }
+        },
+        "cinemaBuffs": [
+          {
+            "cinemaLevel": 1,
+            "cinemaName": {
+              "zhCN": "青涩誓言"
+            },
+            "description": {
+              "zhCN": "进入战场时获得3个特殊虚曜，勘域模式中180秒内最多触发一次；耀变伤害无视目标50%的全属性伤害抗性；花羽轮舞获得200点喧响值，18秒内最多触发一次；相变时流期间队伍中其他角色造成的属性异常伤害提升10%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [],
+            "buffModifiers": [],
+            "mechanics": {
+              "entrySpecialVoidflareCount": 3,
+              "hollowModeCooldownSeconds": 180,
+              "luminescenceAllAttributeResistanceIgnorePct": 50,
+              "assistDecibelGain": 200,
+              "assistDecibelCooldownSeconds": 18,
+              "otherAgentAnomalyDamageBonusDuringPhaseShiftPct": 10,
+              "specialVoidflareAbsoluteStrengthStatus": "unconfirmed"
+            }
+          },
+          {
+            "cinemaLevel": 2,
+            "cinemaName": {
+              "zhCN": "倾落喧囂"
+            },
+            "description": {
+              "zhCN": "异化系数提升20%；异常角色对幻色敌人造成属性异常伤害时无视目标15%防御力，幻色消失后额外持续8秒；相变时流期间自主攻击施加流明积蓄点的频率提升。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [],
+            "buffModifiers": [],
+            "mechanics": {
+              "alienationCoefficientBonusPct": 20,
+              "illusionAnomalyDefIgnorePct": 15,
+              "illusionDefIgnoreLingerSeconds": 8,
+              "phaseShiftBuildupApplicationFrequency": "increased-unquantified"
+            }
+          },
+          {
+            "cinemaLevel": 4,
+            "cinemaName": {
+              "zhCN": "漫长的告别"
+            },
+            "description": {
+              "zhCN": "触发耀变时伤害倍率额外提升12%；入场获得的3个特殊虚曜全部消耗后，可再获得一次最大数量特殊虚曜。再次获得效果生效一次后或进入相变时流时消失。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [],
+            "buffModifiers": [],
+            "mechanics": {
+              "luminescenceMultiplierBonusPct": 12,
+              "luminescenceMultiplierOperationStatus": "unconfirmed",
+              "specialVoidflareRefillCount": 1,
+              "refillAmount": "maximum",
+              "refillExpiresOnEnterPhaseShift": true
+            }
+          },
+          {
+            "cinemaLevel": 6,
+            "cinemaName": {
+              "zhCN": "千度振翅的子羽"
+            },
+            "description": {
+              "zhCN": "发动垂虹和惊鸿时触发2次耀变；第四段普通攻击命中后获得3个特殊虚曜，其可造成的伤害为入场特殊虚曜的25%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [],
+            "buffModifiers": [],
+            "mechanics": {
+              "luminescenceTriggerCountByMove": {
+                "basic_vertical_rainbow": 2,
+                "basic_startled_swan": 2
+              },
+              "fourthBasicHitSpecialVoidflareCount": 3,
+              "specialVoidflareStrengthRatioToEntry": 0.25
+            }
+          }
+        ]
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "时序=万色滞行"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "luminescenceAlphaPctPerAnomalyProficiency": 0.12,
+            "stats": [
+              {
+                "stat": "anomalyProficiency",
+                "value": 18,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "luminescenceAlphaPctPerAnomalyProficiency": 0.14,
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "luminescenceAlphaPctPerAnomalyProficiency": 0.15,
+            "stats": [
+              {
+                "stat": "anomalyProficiency",
+                "value": 18,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "luminescenceAlphaPctPerAnomalyProficiency": 0.16,
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "luminescenceAlphaPctPerAnomalyProficiency": 0.18,
+            "stats": [
+              {
+                "stat": "anomalyProficiency",
+                "value": 18,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "luminescenceAlphaPctPerAnomalyProficiency": 0.2,
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "核心被动：时序=万色滞行"
+          },
+          "levels": [
+            {
+              "level": 1,
+              "alienationCoefficientPctPerAnomalyProficiency": 0.02,
+              "luminescenceAlphaPctPerAnomalyProficiency": 0.1
+            },
+            {
+              "level": 2,
+              "alienationCoefficientPctPerAnomalyProficiency": 0.02,
+              "luminescenceAlphaPctPerAnomalyProficiency": 0.12
+            },
+            {
+              "level": 3,
+              "alienationCoefficientPctPerAnomalyProficiency": 0.02,
+              "luminescenceAlphaPctPerAnomalyProficiency": 0.14
+            },
+            {
+              "level": 4,
+              "alienationCoefficientPctPerAnomalyProficiency": 0.02,
+              "luminescenceAlphaPctPerAnomalyProficiency": 0.15
+            },
+            {
+              "level": 5,
+              "alienationCoefficientPctPerAnomalyProficiency": 0.02,
+              "luminescenceAlphaPctPerAnomalyProficiency": 0.16
+            },
+            {
+              "level": 6,
+              "alienationCoefficientPctPerAnomalyProficiency": 0.02,
+              "luminescenceAlphaPctPerAnomalyProficiency": 0.18
+            },
+            {
+              "level": 7,
+              "alienationCoefficientPctPerAnomalyProficiency": 0.02,
+              "luminescenceAlphaPctPerAnomalyProficiency": 0.2
+            }
+          ],
+          "defaultLevelAtCoreSkill": "F"
+        },
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/2076/detail?mhy_presentation_style=fullscreen"
+        ],
+        "verification": {
+          "stats": "source-checked-mihoyo-baike-entry-2076-2026-08-03",
+          "skillLevelBonuses": "A/C/E each add Anomaly Proficiency +18 and Core Passive level +1; B/D/F each add Base ATK +25 and Core Passive level +1",
+          "luminescenceAlpha": "official initial/A/B/C/D/E/F values preserved as 0.10/0.12/0.14/0.15/0.16/0.18/0.20 percent per anomaly proficiency"
+        }
+      },
+      "luminescenceModel": {
+        "status": "implemented",
+        "objectiveKind": "luminescenceTeamScore",
+        "scoreSuffix": "× k",
+        "fixedAnomalyAgentCount": 3,
+        "additionalAbilityAssumedActive": true,
+        "resistanceModelingNote": "耀变沿用现有常数k；队友原异常按队友属性结算的抗性乘区包含在该常数中，不单独进入丹的驱动盘评分。",
+        "defaultCalculationConfigIntegration": true
+      },
+      "defaultCalculationConfig": {
+        "mode": "anomaly",
+        "cinemaLevel": 0,
+        "name": {
+          "zhCN": "队伍异常评分"
+        },
+        "events": [
+          {
+            "id": "remielle_normal_voidflare_vertical_rainbow",
+            "kind": "anomaly",
+            "settlementType": "luminescence",
+            "triggerActorRef": {
+              "agentId": "remielle_dan"
+            },
+            "teammateAttack": 2800,
+            "luminescenceDamageSharePct": 50
+          }
+        ],
+        "selectedEventId": "remielle_normal_voidflare_vertical_rainbow"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/2076/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "officialEntryPageId": 2076,
+        "officialEntryVersion": 1785592903,
+        "level60Stats": "source-checked-mihoyo-baike-entry-2076-2026-08-03; base ATK 748 and base AP 116 exclude core A-F node gains",
+        "combatMechanics": "source-checked-mihoyo-baike-entry-2076-2026-08-03",
+        "damageElement": "modeling contract: direct damage is Lumiflux damage and uses a fixed resistance multiplier of 1 without adding a Lumiflux resistance or damage-bonus stat",
+        "luminescenceTeamScore": "teammateAttack=2800 and luminescenceDamageSharePct=50 are the editable defaults; the formal reference-calibrated additive score is B(d)*[(1-w)+w*L(d)/L0]*k, with the measured build's in-combat AP and Luminescence anomaly-damage multiplier frozen for every candidate; three anomaly agents and the additional ability are fixed active, while teammate, environment, and trigger factors that are not modeled per candidate remain in k"
+      },
+      "hidden": false,
+      "attackTypes": [],
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "zzz_wiki_2116"
+        ],
+        "mainStatLimits": {
+          "4": [
+            "anomalyProficiency",
+            "atkPct"
+          ],
+          "5": [
+            "atkPct"
+          ],
+          "6": [
+            "atkPct"
+          ]
+        }
+      }
     }
   ]
 }

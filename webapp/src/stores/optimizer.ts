@@ -11,6 +11,12 @@ const FALLBACK_AGENT_SETTINGS_ID = "__default__"
 const OPTIMIZER_WORKER_STALL_TIMEOUT_MS = 45_000
 const MINIMUM_STAT_KEYS = ["atk", "anomalyProficiency", "critRate", "critDmg"] as const
 const MINIMUM_DEFAULTS_VERSION = 2
+const CALCULATION_INPUT_FINGERPRINT_EXCLUDED_KEYS = new Set([
+  "label",
+  "settings",
+  "ownerId",
+  "driveDiscs",
+])
 const LEGACY_MINIMUM_DEFAULTS: Record<typeof MINIMUM_STAT_KEYS[number], number> = {
   atk: 2500,
   anomalyProficiency: 250,
@@ -179,6 +185,18 @@ function optimizerSettingsFingerprint(settings: any = {}) {
       .map(([slot, values]) => [slot, [...new Set(normalizeArray(values))].sort()])),
     minimums: cleanMinimums(settings.minimums),
   }))
+}
+
+function optimizerCalculationInputFingerprint(input: any = {}) {
+  const rawInput = toRaw(input)
+  if (!rawInput || typeof rawInput !== "object" || Array.isArray(rawInput)) {
+    return JSON.stringify({})
+  }
+  const calculationInput = Object.fromEntries(
+    Object.entries(rawInput)
+      .filter(([key]) => !CALCULATION_INPUT_FINGERPRINT_EXCLUDED_KEYS.has(key)),
+  )
+  return JSON.stringify(canonicalValue(calculationInput))
 }
 
 function settingsFromState(state: any) {
@@ -455,6 +473,7 @@ export const useOptimizerStore = defineStore("optimizer", {
     completedSettings: null as any,
     completedSettingsFingerprint: "",
     completedInventoryFingerprint: "",
+    completedCalculationInputFingerprint: "",
     error: "",
     cancelRequested: false,
   }),
@@ -472,6 +491,11 @@ export const useOptimizerStore = defineStore("optimizer", {
       state.completedInventoryFingerprint
       && state.resultSchemes.length
       && state.completedInventoryFingerprint !== driveDiscOptimizationInventoryFingerprint(store, { ownerId, agentId }),
+    ),
+    calculationInputChanged: state => (input: any) => Boolean(
+      state.resultSchemes.length
+      && state.completedCalculationInputFingerprint
+      && state.completedCalculationInputFingerprint !== optimizerCalculationInputFingerprint(input),
     ),
   },
   actions: {
@@ -611,6 +635,7 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.completedSettings = null
       this.completedSettingsFingerprint = ""
       this.completedInventoryFingerprint = ""
+      this.completedCalculationInputFingerprint = ""
       this.error = ""
       this.cancelRequested = false
     },
@@ -626,6 +651,7 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.completedSettings = null
       this.completedSettingsFingerprint = ""
       this.completedInventoryFingerprint = ""
+      this.completedCalculationInputFingerprint = ""
       this.cancelRequested = false
       this.progress = null
       this.applyProgress({
@@ -727,6 +753,7 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.completedSettings = null
       this.completedSettingsFingerprint = ""
       this.completedInventoryFingerprint = ""
+      this.completedCalculationInputFingerprint = ""
       this.cancelRequested = false
       this.progress = null
       this.applyProgress({
@@ -742,6 +769,7 @@ export const useOptimizerStore = defineStore("optimizer", {
       const worker = reusableWorker()
       const workerInput = this.inputWithSettings(input, store)
       const submittedSettingsFingerprint = optimizerSettingsFingerprint(workerInput.settings)
+      const submittedCalculationInputFingerprint = optimizerCalculationInputFingerprint(workerInput)
       const inventoryFingerprint = driveDiscOptimizationInventoryFingerprint(store, {
         ownerId: workerInput.ownerId,
         agentId: workerInput.agentId,
@@ -838,6 +866,7 @@ export const useOptimizerStore = defineStore("optimizer", {
             this.completedSettings = hasResults ? cloneWorkerPayload(completedSettings) : null
             this.completedSettingsFingerprint = hasResults ? submittedSettingsFingerprint : ""
             this.completedInventoryFingerprint = hasResults ? inventoryFingerprint : ""
+            this.completedCalculationInputFingerprint = hasResults ? submittedCalculationInputFingerprint : ""
             this.resultSchemes = this.results.map((result: any) => ({
               rank: result.rank,
               score: result.score,

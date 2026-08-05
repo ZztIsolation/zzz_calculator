@@ -129,18 +129,21 @@ const customSkillTypeOptions = SKILL_TYPES.map((value: string) => ({ label: SKIL
 
 type CustomBuffOption = [string, string, string, string | null]
 
-const customOptionList = computed<CustomBuffOption[]>(() =>
-  customRow.value.targetKind !== "default" ? CUSTOM_BUFF_SKILL_STAT_OPTIONS : CUSTOM_BUFF_STAT_OPTIONS)
+const selectedAgent = computed(() => (props.meta?.agents ?? [])
+  .find((agent: any) => agent?.id === props.agentId) ?? null)
+
+const currentDamageElement = computed(() => damageElementForAgent(selectedAgent.value ?? {}))
+
+const customOptionList = computed<CustomBuffOption[]>(() => {
+  const options = customRow.value.targetKind !== "default" ? CUSTOM_BUFF_SKILL_STAT_OPTIONS : CUSTOM_BUFF_STAT_OPTIONS
+  if (currentDamageElement.value !== "lumiflux") return options
+  return options.filter(([stat]) => !["enemyResReduction", "allResIgnore", "currentResIgnore"].includes(stat))
+})
 
 const customStatOptions = computed(() => customOptionList.value.map((option, index) => ({
   label: option[1],
   value: index,
 })))
-
-const selectedAgent = computed(() => (props.meta?.agents ?? [])
-  .find((agent: any) => agent?.id === props.agentId) ?? null)
-
-const currentDamageElement = computed(() => damageElementForAgent(selectedAgent.value ?? {}))
 
 const displayAgents = computed(() => props.meta?.displayAgents ?? props.meta?.agents ?? [])
 const displayAgentSkills = computed(() => props.meta?.displayAgentSkills ?? props.meta?.agentSkills ?? [])
@@ -334,7 +337,7 @@ const groupedBuffs = computed(() => {
   return groups
 })
 
-const teammateAttributeOrder = ["physical", "fire", "ice", "electric", "ether", "wind", "honed_edge", "frost", "xuanmo"]
+const teammateAttributeOrder = ["physical", "fire", "ice", "electric", "ether", "wind", "honed_edge", "frost", "xuanmo", "lumiflux"]
 const teammateSpecialtyOrder = ["attack", "stun", "anomaly", "support", "defense", "rupture"]
 
 function currentTeammateOptions(values: unknown[], order: string[], label: (value: string) => string) {
@@ -981,7 +984,7 @@ function resolveCustomBuffStatOption(stat: string) {
     return "enemyDefReduction"
   }
   if (stat === "currentResIgnore") {
-    return RES_IGNORE_STAT_BY_ELEMENT[currentDamageElement.value] ?? "physicalResIgnore"
+    return RES_IGNORE_STAT_BY_ELEMENT[currentDamageElement.value] ?? ""
   }
   return stat
 }

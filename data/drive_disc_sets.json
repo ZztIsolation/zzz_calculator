@@ -97,9 +97,13 @@
             "type": "fixed",
             "stat": "anomalyProficiency",
             "value": 30,
-            "mode": "flat"
+            "mode": "flat",
+            "target": {
+              "kind": "default"
+            }
           }
-        ]
+        ],
+        "buffModifiers": []
       },
       "fourPiece": {
         "effectText": {
@@ -107,7 +111,7 @@
           "en": ""
         },
         "modelingNotes": {
-          "zhCN": "15%流明属性异常增伤属于独立乘区，本次仅保留官方说明，不参与计算。"
+          "zhCN": "15%属性异常增伤仅要求装备者为流明属性；采用默认属性异常增伤作用域，可作用于属性异常、异放和耀变，不作用于紊乱。在当前蕾米埃尔队伍异常评分中，该增伤作为装备者侧收益进入耀变分支。"
         },
         "selfBuff": {
           "condition": "进入战场或切换为当前操作中角色后；位于后台时始终持有",
@@ -118,9 +122,26 @@
               "type": "fixed",
               "stat": "anomalyProficiency",
               "value": 50,
-              "mode": "flat"
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              }
+            },
+            {
+              "id": "effect_wiki_2116_4pc_luminescence_anomaly_damage",
+              "type": "fixed",
+              "stat": "anomalyDamageBonus",
+              "value": 15,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "requirement": {
+                "attribute": "lumiflux"
+              }
             }
-          ]
+          ],
+          "buffModifiers": []
         },
         "teamBuff": null
       }
@@ -788,8 +809,8 @@
         "effectText": {
           "zhCN": "队伍中任意角色发动[强化特殊技]时，装备者的异常精通提升45点，持续8秒；如果发动[强化特殊技]的角色不是装备者本人时，装备者造成的以太伤害提升25%。"
         },
-      "selfBuff": {
-        "condition": null,
+        "selfBuff": {
+          "condition": null,
           "effects": [
             {
               "id": "effect_2f51e29af9",
@@ -797,17 +818,17 @@
               "target": {
                 "kind": "default"
               },
-            "stat": "anomalyProficiency",
-            "mode": "flat",
-            "value": 45,
-            "condition": "队伍中任意角色发动强化特殊技",
-            "durationSeconds": 8,
-            "coverage": {
-              "default": 1,
-              "min": 0,
-              "max": 1,
-              "step": 0.1
-            }
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "value": 45,
+              "condition": "队伍中任意角色发动强化特殊技",
+              "durationSeconds": 8,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "effect_a9aec22d52",
@@ -815,17 +836,17 @@
               "target": {
                 "kind": "default"
               },
-            "stat": "etherDmg",
-            "mode": "flat",
-            "value": 25,
-            "condition": "队友（非装备者）发动强化特殊技",
-            "durationSeconds": 8,
-            "coverage": {
-              "default": 1,
-              "min": 0,
-              "max": 1,
-              "step": 0.1
-            }
+              "stat": "etherDmg",
+              "mode": "flat",
+              "value": 25,
+              "condition": "队友（非装备者）发动强化特殊技",
+              "durationSeconds": 8,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ],
           "buffModifiers": []

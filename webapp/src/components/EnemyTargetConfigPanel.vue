@@ -56,8 +56,10 @@ const displayDefense = computed(() => isCustomTargetPreset.value
 
 const selectedElement = computed(() => {
   const element = String(props.damageElement ?? "")
-  return ELEMENTS.includes(element) ? element : "physical"
+  return ELEMENTS.includes(element) ? element : ""
 })
+
+const hasResistanceElement = computed(() => Boolean(selectedElement.value))
 
 const resistanceLabel = computed(() => `${resistanceElementLabels[selectedElement.value] ?? selectedElement.value}抗性`)
 
@@ -95,6 +97,7 @@ function applyPreset(id: string) {
 }
 
 function setResistance(value: number | null) {
+  if (!selectedElement.value) return
   updateTarget({
     resistanceByElement: {
       [selectedElement.value]: normalizeResistanceValue(value),
@@ -142,7 +145,7 @@ function setResistance(value: number | null) {
             <span>%</span>
           </dd>
         </div>
-        <div class="metric" data-layout-field>
+        <div v-if="hasResistanceElement" class="metric" data-layout-field>
           <dt>{{ resistanceLabel }}</dt>
           <dd>
             <NInputNumber
@@ -155,8 +158,12 @@ function setResistance(value: number | null) {
             />
           </dd>
         </div>
+          <div v-else class="metric" data-layout-field>
+            <dt>抗性配置</dt>
+            <dd><span class="target-defense-value">不单独配置</span></dd>
+        </div>
       </div>
-      <div class="toolbar">
+      <div v-if="hasResistanceElement" class="toolbar">
         <NButton size="small" @click="setResistance(0)">0%</NButton>
         <NButton size="small" @click="setResistance(20)">20%</NButton>
         <NButton size="small" @click="setResistance(-20)">-20%</NButton>

@@ -161,6 +161,15 @@ assert.deepEqual(agent.combatBuffs.corePassive.effects, [{
     mode: "flat",
     target: { kind: "default" },
 }])
+const aliceCinemaTwo = agent.combatBuffs.cinemaBuffs.find(buff => buff.cinemaLevel === 2)
+const aliceAssaultBonus = aliceCinemaTwo.effects.find(effect => effect.id === "assault-damage-bonus")
+const aliceDisorderBonus = aliceCinemaTwo.effects.find(effect => effect.id === "physical-disorder-damage-bonus")
+assert.deepEqual(aliceAssaultBonus.target, {
+    kind: "anomaly",
+    settlementType: "attribute",
+    anomalyEffects: ["assault"],
+})
+assert.deepEqual(aliceDisorderBonus.target, { kind: "default" }, "Alice's existing Disorder rule should remain unchanged")
 
 const cinemaSixRow = skillCatalog.categories
     .find(category => category.id === "cinema")
@@ -284,6 +293,17 @@ approx(cinemaOneAssault.targetBreakdown.enemyDefReduction, 0.2, "Cinema 1 defens
 approx(cinemaTwoAssault.finalDamage / cinemaOneAssault.finalDamage, 1.15, "Cinema 2 Assault damage bonus")
 approx(cinemaFourAssault.targetBreakdown.resIgnore, 0.1, "Cinema 4 physical resistance ignore")
 assert.ok(cinemaOneAssault.finalDamage > baseAssault.finalDamage)
+
+const shockEvent = [{
+    id: "shock",
+    kind: "anomaly",
+    settlementType: "attribute",
+    anomalyEffect: "shock",
+    procCount: 1,
+}]
+const cinemaOneShock = calculate(shockEvent, { cinemaLevel: 1 }).damage
+const cinemaTwoShock = calculate(shockEvent, { cinemaLevel: 2 }).damage
+approx(cinemaTwoShock.finalDamage, cinemaOneShock.finalDamage, "Cinema 2 Assault bonus should not affect other Attribute Anomalies")
 
 const cinemaSixConfig = {
     mode: "custom",

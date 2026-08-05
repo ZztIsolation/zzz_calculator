@@ -4,7 +4,7 @@ import { Plus, Trash2 } from "lucide-vue-next"
 import MaintenanceSection from "../MaintenanceSection.vue"
 import SourceListEditor from "../SourceListEditor.vue"
 import {
-  CORE_SKILL_LEVELS, DAMAGE_BASIS_OPTIONS, DAMAGE_ELEMENT_OPTIONS, LEVEL_SCALE_OPTIONS, SKILL_ROW_KIND_OPTIONS, SKILL_TAG_OPTIONS, SKILL_TYPE_OPTIONS,
+  CORE_SKILL_LEVELS, DAMAGE_BASIS_OPTIONS, DIRECT_DAMAGE_ELEMENT_OPTIONS, LEVEL_SCALE_OPTIONS, SKILL_ROW_KIND_OPTIONS, SKILL_TAG_OPTIONS, SKILL_TYPE_OPTIONS,
   agentOptions, option,
 } from "../maintenance-options"
 import { internalId, textOf } from "../maintenance-model"
@@ -109,7 +109,7 @@ function addRow(category: any, move: any) {
             <label class="maintenance-field"><span>招式名</span><NInput :value="textOf(move.name)" :disabled="disabled" @update:value="move.name = { zhCN: String($event) }; changed()" /></label>
             <label class="maintenance-field"><span>招式大类</span><NSelect v-model:value="move.skillType" :options="SKILL_TYPE_OPTIONS" :disabled="disabled" @update:value="changed" /></label>
             <label class="maintenance-field"><span>通用招式标签</span><NSelect multiple clearable v-model:value="move.skillTags" :options="SKILL_TAG_OPTIONS" :disabled="disabled" @update:value="changed" /></label>
-            <label class="maintenance-field"><span>伤害属性</span><NSelect v-model:value="move.damageElement" :options="DAMAGE_ELEMENT_OPTIONS" :disabled="disabled" @update:value="changed" /></label>
+            <label class="maintenance-field"><span>伤害属性</span><NSelect v-model:value="move.damageElement" :options="DIRECT_DAMAGE_ELEMENT_OPTIONS" :disabled="disabled" @update:value="changed" /></label>
           </div>
           <div class="skill-table-wrap">
             <table class="skill-multiplier-table">

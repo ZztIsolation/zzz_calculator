@@ -52,6 +52,54 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("driveDiscAnalysisSourceLabel")
     expect(source).toContain("词条分析")
     expect(source).toContain('<NButton type="primary" size="small" data-testid="open-drive-disc-analysis"')
+    expect(source).toContain('${objectiveScoreText(selectedOptimizedScheme.value.score)}')
+  })
+
+  it("uses the team anomaly score label while accepting legacy Luminescence results", () => {
+    expect(source).toContain('["luminescenceTeamScore", "luminescenceScore"]')
+    expect(source).toContain("队伍异常评分")
+    expect(source).not.toContain("耀变评分白盒")
+    expect(source).toContain("currentLuminescenceDamageMultiplier")
+    expect(source).toContain("currentTeamAnomalyDamageMultiplier")
+    expect(source).toContain("luminescenceDamageMultiplier: currentLuminescenceDamageMultiplier")
+    expect(source).toContain("teamAnomalyDamageMultiplier: currentTeamAnomalyDamageMultiplier")
+  })
+
+  it("edits Luminescence team parameters inside the calculation summary", () => {
+    expect(source).toContain('import LuminescenceParameterFields from "@/components/LuminescenceParameterFields.vue"')
+    expect(source).toContain('import { resolveLuminescenceParameters } from "@/utils/luminescenceParameters"')
+    expect(source).toContain("const activeLuminescenceEvent = computed")
+    expect(source).toContain("resolveLuminescenceParameters(activeLuminescenceEvent.value).valid")
+    expect(source).toContain('data-layout-surface="calculation-summary"')
+    expect(source).toContain("队伍评分参数")
+    expect(source).toContain('variant="compact"')
+    expect(source).toContain('@update="updateLuminescenceParameters"')
+    expect(source).toContain("事件 {{ buildStore.damageConfig.events?.length ?? 1 }} 项")
+    const updater = source.slice(
+      source.indexOf("function updateLuminescenceParameters"),
+      source.indexOf("function saveOptimizerConfig"),
+    )
+    expect(updater).toContain("if (!current || optimizerStore.isBusy) return")
+    expect(updater).toContain("events[index] = { ...events[index], ...patch }")
+    expect(updater).toContain("buildStore.setDamageConfig({")
+    expect(updater).toContain("}, selectedAgent.value)")
+    expect(updater).not.toContain("buildStore.upsertDamageEvent")
+  })
+
+  it("keeps non-Luminescence summaries unchanged and locks calculation inputs while optimizing", () => {
+    expect(source).toContain('v-if="!activeLuminescenceEvent" class="metric"')
+    expect(source).toContain('v-if="!activeLuminescenceEvent" class="metric calculation-event-summary"')
+    expect(source).toContain(':disabled="optimizerStore.isBusy" @click="showCalculationConfig = true"')
+    expect(source).toContain(':disabled="optimizerStore.isBusy"')
+    expect(source).toContain("&& luminescenceParametersValid.value")
+    expect(source).toContain("请先填写有效的队友初始攻击力和耀变伤害占比。")
+  })
+
+  it("does not invent or persist a measured-reference build", () => {
+    expect(source).not.toContain('"referenceAnomalyProficiency"')
+    expect(source).not.toContain('"referenceLuminescenceDamageMultiplier"')
+    expect(source).not.toContain("patch.referenceAnomalyProficiency")
+    expect(source).not.toContain("patch.referenceLuminescenceDamageMultiplier")
   })
 
   it("shows every active combat buff badge instead of truncating the list", () => {
@@ -173,10 +221,12 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("driveDiscRuntimeInputs: selectedDriveDiscRuntimeInputs.value")
   })
 
-  it("marks retained optimizer rankings as stale after constraints change", () => {
+  it("marks retained optimizer rankings as stale after constraints or calculation inputs change", () => {
     expect(source).toContain("optimizerStore.resultsAreStale")
-    expect(source).toContain("约束已更新，需重新优化")
-    expect(source).toContain(':stale="optimizerStore.resultsAreStale"')
+    expect(source).toContain("optimizerStore.calculationInputChanged(optimizerInput())")
+    expect(source).toContain("optimizerResultsAreStale")
+    expect(source).toContain("配置已更新，需重新优化")
+    expect(source).toContain(':stale="optimizerResultsAreStale"')
     expect(source).toContain("上次评分")
   })
 
@@ -212,6 +262,11 @@ describe("WorkbenchView optimizer result details", () => {
     expect(source).toContain("driveDiscStatText(row.disc.mainStat)")
     expect(source).toContain("driveDiscSubStatText(row.disc)")
     expect(source).toContain("driveDiscRarityLevelText(row.disc)")
+  })
+
+  it("hides the panel stat summary only while viewing optimizer results", () => {
+    expect(source).toContain('<NTag v-if="buildStore.discMode !== \'optimized\'" round>{{ panelSummaryText }}</NTag>')
+    expect(source).not.toContain('<NTag round>{{ panelSummaryText }}</NTag>')
   })
 
   it("labels optimized results with the four-piece set that produced them", () => {

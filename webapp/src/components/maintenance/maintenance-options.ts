@@ -7,9 +7,10 @@ export const option = (value: string | number, label: string): SelectOption => (
 export const RARITY_OPTIONS = [option("S", "S"), option("A", "A"), option("B", "B")]
 export const ATTRIBUTE_OPTIONS = [
   option("physical", "物理"), option("fire", "火"), option("ice", "冰"), option("electric", "电"),
-  option("ether", "以太"), option("wind", "风"), option("honed_edge", "凛刃"), option("frost", "烈霜"), option("xuanmo", "玄墨"),
+  option("ether", "以太"), option("wind", "风"), option("honed_edge", "凛刃"), option("frost", "烈霜"), option("xuanmo", "玄墨"), option("lumiflux", "流明"),
 ]
-export const DAMAGE_ELEMENT_OPTIONS = ATTRIBUTE_OPTIONS.filter(item => !["honed_edge", "frost", "xuanmo"].includes(String(item.value)))
+export const DAMAGE_ELEMENT_OPTIONS = ATTRIBUTE_OPTIONS.filter(item => !["honed_edge", "frost", "xuanmo", "lumiflux"].includes(String(item.value)))
+export const DIRECT_DAMAGE_ELEMENT_OPTIONS = [...DAMAGE_ELEMENT_OPTIONS, option("lumiflux", "流明")]
 export const SPECIALTY_OPTIONS = [
   option("attack", "强攻"), option("stun", "击破"), option("anomaly", "异常"),
   option("support", "支援"), option("defense", "防护"), option("rupture", "命破"),
@@ -44,11 +45,11 @@ export const BASIS_OPTIONS = [
 export const CRIT_MODE_OPTIONS = [option("expected", "期望"), option("crit", "暴击"), option("nonCrit", "非暴击")]
 export const EVENT_KIND_OPTIONS = [
   option("direct", "直伤"), option("sheer", "贯穿"), option("anomaly", "属性异常"),
-  option("disorder", "紊乱"), option("release", "异放"), option("skillGroup", "技能组"),
+  option("disorder", "紊乱"), option("release", "异放"), option("luminescence", "耀变"), option("skillGroup", "技能组"),
 ]
 export const EVENT_SOURCE_OPTIONS = [option("skill", "技能倍率"), option("manual", "手填倍率")]
 export const DISORDER_TYPE_OPTIONS = [option("normal", "（普通）紊乱"), option("polarized", "极性紊乱")]
-export const ANOMALY_SETTLEMENT_OPTIONS = [option("attribute", "属性异常"), option("disorder", "紊乱"), option("release", "异放")]
+export const ANOMALY_SETTLEMENT_OPTIONS = [option("attribute", "属性异常"), option("disorder", "紊乱"), option("release", "异放"), option("luminescence", "耀变")]
 export const LEVEL_SCALE_OPTIONS = [option("skill", "技能等级"), option("coreSkill", "核心技等级")]
 export const SKILL_ROW_KIND_OPTIONS = [option("damageMultiplier", "伤害倍率"), option("dazeMultiplier", "失衡倍率")]
 export const DAMAGE_BASIS_OPTIONS = [option("", "攻击力（默认）"), option("sheerForce", "贯穿力")]
@@ -143,7 +144,7 @@ export const SKILL_TARGET_STATS: Array<[string, string, "flat"]> = [
   ["dmgBonus", "技能目标伤害加成%", "flat"], ["physicalDmg", "物理伤害加成%", "flat"],
   ["fireDmg", "火属性伤害加成%", "flat"], ["iceDmg", "冰属性伤害加成%", "flat"],
   ["electricDmg", "电属性伤害加成%", "flat"], ["etherDmg", "以太伤害加成%", "flat"], ["windDmg", "风属性伤害加成%", "flat"],
-  ...EVENT_STATS, ["skillMultiplierBonus", "技能倍率加算%", "flat"],
+  ...EVENT_STATS.filter(([value]) => value !== "anomalyDamageBonus"), ["skillMultiplierBonus", "技能倍率加算%", "flat"],
   ["enemyDefReduction", "敌方防御力降低%", "flat"], ["enemyDefIgnore", "无视防御率%", "flat"],
   ["enemyResReduction", "敌方全属性抗性降低%", "flat"],
   ["allResIgnore", "全属性抗性无视%", "flat"],
@@ -153,7 +154,7 @@ export const SKILL_TARGET_STATS: Array<[string, string, "flat"]> = [
 ]
 
 export const ANOMALY_TARGET_STATS: Array<[string, string, "flat"]> = [
-  ["anomalyDamageBonus", "属性异常增伤%", "flat"], ["disorderDamageBonus", "紊乱增伤%", "flat"],
+  ["anomalyDamageBonus", "指定异常增伤%", "flat"], ["disorderDamageBonus", "紊乱增伤%", "flat"],
   ["baseMultiplierBonus", "异常倍率修正%", "flat"], ["disorderBaseMultiplierBonus", "紊乱倍率加算%", "flat"],
   ["anomalyCritRate", "异常暴击率%", "flat"], ["anomalyCritDmg", "异常暴击伤害%", "flat"],
   ["anomalyCritRatePerInitialMasteryAbove100", "初始异常掌控超过 100 时每点转异常暴击率%", "flat"],
@@ -266,6 +267,14 @@ export function defaultCalculationEvent(kind = "direct") {
   if (kind === "anomaly") return { ...base, settlementType: "attribute", anomalyEffect: "assault", procCount: 1 }
   if (kind === "disorder") return { ...base, kind: "anomaly", settlementType: "disorder", disorderType: "normal", anomalyEffect: "burn", elapsedSeconds: 0 }
   if (kind === "release") return { ...base, kind: "anomaly", settlementType: "release", anomalyEffect: "assault" }
+  if (kind === "luminescence") return {
+    id: base.id,
+    kind: "anomaly",
+    settlementType: "luminescence",
+    triggerActorRef: { agentId: "" },
+    teammateAttack: 2800,
+    luminescenceDamageSharePct: 50,
+  }
   if (kind === "skillGroup") return { ...base, kind: "skillGroup", skillGroupId: "" }
   return { ...base, critMode: "expected", skillMultiplier: 100, damageElement: "physical", __source: "manual" }
 }

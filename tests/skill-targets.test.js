@@ -160,8 +160,8 @@ for (const { target, path } of storedTargets) {
         }
     }
 }
-assert.equal(moveCount, 76)
-assert.equal(rowCount, 115)
+assert.equal(moveCount, 80)
+assert.equal(rowCount, 123)
 assert.deepEqual(Object.fromEntries(skillTagCounts), {
     dashAttack: 5,
     assistAttack: 10,

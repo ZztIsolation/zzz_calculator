@@ -457,7 +457,11 @@ Build the Vue application and start the Node service:
 npm start
 ```
 
-The default address is `http://127.0.0.1:8787`. To serve an existing Vue build without rebuilding it, use:
+The default address is `http://127.0.0.1:8787`.
+
+Manual local Calculator starts and browser verification must always use `127.0.0.1:8787`; do not switch to a fallback such as `8790` to bypass a port conflict. Before starting, inspect the listener on `8787`. If the port is occupied, identify and terminate that exact listener, then restart the Calculator on `8787`. Do not broadly terminate every Node process. Ephemeral test ports, production candidate preflight ports, the Vite development server, and the Scanner Helper are outside this local Calculator service rule.
+
+To serve an existing Vue build without rebuilding it, use:
 
 ```bash
 npm run serve
@@ -469,7 +473,7 @@ For frontend-only development with hot reload:
 npm run dev:webapp
 ```
 
-Set `PORT` to change the Node port. The service binds to `127.0.0.1` by default; container or network exposure requires an explicit `HOST` such as `0.0.0.0`. Per-disc agent reservations and their visual loadout controls are enabled by default in local development, including the Vite fallback when no runtime config endpoint is available. Production and Pages builds remain disabled by default; set `DRIVE_DISC_RESERVATIONS_UI_ENABLED=true` or `false` to override the Node default explicitly. Maintenance is disabled in production unless `MAINTENANCE_ENABLED=true` is set explicitly. Maintenance writes accept loopback browser origins by default; every non-loopback origin must be listed explicitly in the comma-separated `MAINTENANCE_ALLOWED_ORIGINS` setting.
+The Node service still supports `PORT`, but that override is reserved for automated tests, deployment candidates, or an explicitly requested external environment; it is not used for routine manual local starts or browser verification. The service binds to `127.0.0.1` by default; container or network exposure requires an explicit `HOST` such as `0.0.0.0`. Per-disc agent reservations and their visual loadout controls are enabled by default in local development, including the Vite fallback when no runtime config endpoint is available. Production and Pages builds remain disabled by default; set `DRIVE_DISC_RESERVATIONS_UI_ENABLED=true` or `false` to override the Node default explicitly. Maintenance is disabled in production unless `MAINTENANCE_ENABLED=true` is set explicitly. Maintenance writes accept loopback browser origins by default; every non-loopback origin must be listed explicitly in the comma-separated `MAINTENANCE_ALLOWED_ORIGINS` setting.
 
 ## Routes
 

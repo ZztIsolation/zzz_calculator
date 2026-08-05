@@ -279,7 +279,11 @@ export function damageEventKindLabel(event: any): string {
     return "贯穿"
   }
   if (kind === "anomaly") {
-    return event?.settlementType === "disorder" ? "紊乱" : event?.settlementType === "release" ? "异放" : "属性异常"
+    return event?.settlementType === "disorder"
+      ? "紊乱"
+      : event?.settlementType === "release"
+        ? "异放"
+        : event?.settlementType === "luminescence" ? "耀变" : "属性异常"
   }
   if (kind === "disorder") {
     return "紊乱"
@@ -350,6 +354,9 @@ export function damageEventSubjectLabel(event: any, meta?: any, fallbackSkillCat
     if (event.settlementType === "release") {
       return `${anomalyEffectLabel(event.anomalyEffect, meta) || "属性异常"}异放`
     }
+    if (event.settlementType === "luminescence") {
+      return "队伍异常评分"
+    }
     return anomalyEffectLabel(event.anomalyEffect, meta) || "属性异常"
   }
   if (event.kind === "disorder" || event.settlementType === "disorder") {
@@ -363,5 +370,8 @@ export function damageEventSubjectLabel(event: any, meta?: any, fallbackSkillCat
 }
 
 export function damageEventTitle(event: any, meta?: any, fallbackSkillCatalog?: any): string {
+  if (event?.settlementType === "luminescence") {
+    return "队伍异常评分"
+  }
   return `${damageEventKindLabel(event)} · ${damageEventSubjectLabel(event, meta, fallbackSkillCatalog)} ×${event?.count ?? 1}`
 }

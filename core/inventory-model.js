@@ -27,6 +27,8 @@ const DRIVE_DISC_SET_ALIASES = {
     "山大王": { id: "king_of_the_summit", name: { zhCN: "山大王" } },
     "呼啸沙龙": { id: "zzz_wiki_2038", name: { zhCN: "呼啸沙龙" } },
     "拂晓行纪": { id: "zzz_wiki_2029", name: { zhCN: "拂晓行纪" } },
+    "棘刺玫瑰": { id: "zzz_wiki_2121", name: { zhCN: "棘刺玫瑰" } },
+    "谶羽之誓": { id: "zzz_wiki_2116", name: { zhCN: "谶羽之誓" } },
 }
 
 export const DRIVE_DISC_EXPORT_FORMAT = "zzz-calculator-drive-disc-export"
@@ -226,6 +228,50 @@ function defaultOwner() {
     return { id: "default", label: "默认用户" }
 }
 
+function isMissingCanonicalSetName(value) {
+    if (value === null || value === undefined) return true
+    if (typeof value === "string") return !value.trim()
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+        return Object.keys(value).length === 0
+    }
+    return false
+}
+
+export function normalizeDriveDiscSetAlias(disc, options = {}) {
+    if (!disc || typeof disc !== "object") return disc
+
+    const setName = String(disc.setName ?? "").trim()
+    const setMatch = options.setAliases?.[setName] ?? DRIVE_DISC_SET_ALIASES[setName]
+    if (!setMatch?.id) return disc
+
+    const currentSetId = String(disc.setId ?? "").trim()
+    const replaceSetId = !currentSetId || currentSetId.startsWith("scanner-set-")
+    const fillCanonicalSetName = (replaceSetId || currentSetId === setMatch.id)
+        && isMissingCanonicalSetName(disc.canonicalSetName)
+    if (!replaceSetId && !fillCanonicalSetName) return disc
+
+    return {
+        ...disc,
+        ...(replaceSetId ? { setId: setMatch.id } : {}),
+        ...(fillCanonicalSetName ? { canonicalSetName: cloneJsonValue(setMatch.name) } : {}),
+    }
+}
+
+export function migrateDriveDiscSetAliases(store, options = {}) {
+    if (!store || typeof store !== "object" || !Array.isArray(store.driveDiscs)) {
+        return store
+    }
+
+    let changed = false
+    const driveDiscs = store.driveDiscs.map(disc => {
+        const normalized = normalizeDriveDiscSetAlias(disc, options)
+        if (normalized !== disc) changed = true
+        return normalized
+    })
+
+    return changed ? { ...store, driveDiscs } : store
+}
+
 export function normalizeInventoryStore(store, options = {}) {
     const fallback = createEmptyInventoryStore()
     const owners = Array.isArray(store?.owners) && store.owners.length
@@ -248,7 +294,10 @@ export function normalizeInventoryStore(store, options = {}) {
         owners: safeOwners,
         imports: Array.isArray(store?.imports) ? store.imports : [],
         driveDiscs: Array.isArray(store?.driveDiscs)
-            ? store.driveDiscs.map(disc => withDriveDiscFingerprints(normalizeDriveDiscUsageRestrictions(disc), options))
+            ? store.driveDiscs.map(disc => withDriveDiscFingerprints(
+                normalizeDriveDiscUsageRestrictions(normalizeDriveDiscSetAlias(disc, options)),
+                options,
+            ))
             : [],
         driveDiscLoadouts: Array.isArray(store?.driveDiscLoadouts) ? store.driveDiscLoadouts : [],
     }
@@ -358,17 +407,16 @@ function normalizeStat(rawStat, warnings, context) {
 function normalizeScannerItem(rawItem, index, options, warnings) {
     const sourceSequence = Number(rawItem["序号"] ?? index + 1)
     const setName = String(rawItem["名称"] ?? "未知套装")
-    const setMatch = options.setAliases?.[setName] ?? DRIVE_DISC_SET_ALIASES[setName]
     const partition = Number(rawItem["槽位"] ?? 0)
     const rarity = String(rawItem["品质"] ?? "S")
     const level = Number(rawItem["等级"] ?? 0)
     const maxLevel = Number(rawItem["最大等级"] ?? level)
-    const normalized = {
+    const normalized = normalizeDriveDiscSetAlias({
         id: `scanner-${sourceSequence}-${hashWith(options, `${options.ownerId}:${setName}:${partition}:${rarity}:${stableStringify(rawItem["主属性"])}:${stableStringify(rawItem["副属性"])}`)}`,
         ownerId: options.ownerId,
-        setId: setMatch?.id ?? `scanner-set-${hashWith(options, setName)}`,
+        setId: `scanner-set-${hashWith(options, setName)}`,
         setName,
-        canonicalSetName: setMatch?.name ?? null,
+        canonicalSetName: null,
         partition,
         rarity,
         level,
@@ -389,7 +437,7 @@ function normalizeScannerItem(rawItem, index, options, warnings) {
             rawIndex: index,
         },
         raw: rawItem,
-    }
+    }, options)
     const withFingerprints = withDriveDiscFingerprints(normalized, options)
     return { ...withFingerprints, id: `scanner-${withFingerprints.contentFingerprint}` }
 }
@@ -469,7 +517,7 @@ function normalizeNativeDriveDisc(rawItem, index, options) {
         identityFingerprint: _identityFingerprint,
         ...record
     } = cloneJsonValue(rawItem)
-    return withDriveDiscFingerprints(normalizeDriveDiscUsageRestrictions({
+    return withDriveDiscFingerprints(normalizeDriveDiscUsageRestrictions(normalizeDriveDiscSetAlias({
         ...record,
         id,
         ownerId: options.ownerId,
@@ -483,7 +531,7 @@ function normalizeNativeDriveDisc(rawItem, index, options) {
         subStats: rawItem.subStats.map((stat, statIndex) =>
             normalizeNativeStat(stat, `${context}.subStats[${statIndex}]`)
         ),
-    }), options)
+    }, options)), options)
 }
 
 function normalizeNativeDriveDiscExport(input, options = {}) {
@@ -837,19 +885,20 @@ export function upsertDriveDisc(store, driveDisc, options = {}) {
     if (!driveDisc?.id) {
         throw new Error("Drive disc id is required.")
     }
-    const ownerId = driveDisc.ownerId ?? store.currentOwnerId
+    const normalizedDriveDisc = normalizeDriveDiscSetAlias(driveDisc, options)
+    const ownerId = normalizedDriveDisc.ownerId ?? store.currentOwnerId
     const existing = store.driveDiscs ?? []
-    const matches = item => item.id === driveDisc.id && (item.ownerId ?? "default") === ownerId
+    const matches = item => item.id === normalizedDriveDisc.id && (item.ownerId ?? "default") === ownerId
     const index = existing.findIndex(matches)
     const currentDriveDisc = index >= 0 ? existing[index] : null
-    const reservedForAgentId = Object.prototype.hasOwnProperty.call(driveDisc, "reservedForAgentId")
-        ? cleanReservedForAgentId(driveDisc.reservedForAgentId)
+    const reservedForAgentId = Object.prototype.hasOwnProperty.call(normalizedDriveDisc, "reservedForAgentId")
+        ? cleanReservedForAgentId(normalizedDriveDisc.reservedForAgentId)
         : cleanReservedForAgentId(currentDriveDisc?.reservedForAgentId)
-    const excludedForAgentIds = Object.prototype.hasOwnProperty.call(driveDisc, "excludedForAgentIds")
-        ? normalizeExcludedForAgentIds(driveDisc.excludedForAgentIds, reservedForAgentId)
+    const excludedForAgentIds = Object.prototype.hasOwnProperty.call(normalizedDriveDisc, "excludedForAgentIds")
+        ? normalizeExcludedForAgentIds(normalizedDriveDisc.excludedForAgentIds, reservedForAgentId)
         : normalizeExcludedForAgentIds(currentDriveDisc?.excludedForAgentIds, reservedForAgentId)
     const nextDriveDisc = withDriveDiscFingerprints({
-        ...driveDisc,
+        ...normalizedDriveDisc,
         ownerId,
         reservedForAgentId,
         excludedForAgentIds,
