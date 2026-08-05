@@ -1,0 +1,284 @@
+name: Deploy production
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Read-only audit or isolated dry-run (real deploys only come from CI)
+        required: true
+        default: dry-run
+        type: choice
+        options:
+          - audit
+          - dry-run
+      run_id:
+        description: Optional successful CI run ID; blank uses the newest successful main CI run
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: validate candidate
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       vars.PRODUCTION_CD_ENABLED == 'true') ||
+      (github.event_name == 'workflow_dispatch' &&
+       github.ref == 'refs/heads/main' &&
+       vars.PRODUCTION_CD_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      mode: ${{ steps.candidate.outputs.mode }}
+      run_id: ${{ steps.candidate.outputs.run_id }}
+      sha: ${{ steps.candidate.outputs.sha }}
+      artifact_name: ${{ steps.candidate.outputs.artifact_name }}
+    steps:
+      - name: Validate successful CI run and current main
+        id: candidate
+        uses: actions/github-script@v7
+        env:
+          REQUESTED_MODE: ${{ inputs.mode || '' }}
+          REQUESTED_RUN_ID: ${{ inputs.run_id || '' }}
+        with:
+          script: |
+            const requestedMode = process.env.REQUESTED_MODE;
+            let mode = "deploy";
+            let runId = process.env.REQUESTED_RUN_ID;
+
+            if (context.eventName === "workflow_run") {
+              mode = "deploy";
+              runId = String(context.payload.workflow_run.id);
+              if (context.payload.workflow_run.conclusion !== "success"
+                || context.payload.workflow_run.head_branch !== "main") {
+                core.setFailed("The triggering CI run is not a successful main run.");
+                return;
+              }
+            } else {
+              if (context.ref !== "refs/heads/main") {
+                core.setFailed("Manual production audit/dry-run must run from main.");
+                return;
+              }
+              mode = requestedMode;
+              if (!["audit", "dry-run"].includes(mode)) {
+                core.setFailed("Manual mode must be audit or dry-run; deploy is CI-only.");
+                return;
+              }
+            }
+
+            if (!runId) {
+              const runs = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: "ci.yml",
+                branch: "main",
+                status: "success",
+                per_page: 1,
+              });
+              if (runs.data.workflow_runs.length === 0) {
+                core.setFailed("No successful main CI run is available for this audit/dry-run.");
+                return;
+              }
+              runId = String(runs.data.workflow_runs[0].id);
+            }
+
+            const run = (await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: Number(runId),
+            })).data;
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            if (run.name !== "CI"
+              || !["push", "workflow_dispatch"].includes(run.event)
+              || run.head_branch !== "main"
+              || run.conclusion !== "success"
+              || run.head_repository?.full_name !== repository) {
+              core.setFailed("The selected run is not a successful Calculator CI run on main.");
+              return;
+            }
+
+            const branch = (await github.rest.repos.getBranch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: "main",
+            })).data;
+            if (mode === "deploy" && branch.commit.sha !== run.head_sha) {
+              core.setFailed(`main advanced from ${run.head_sha} to ${branch.commit.sha}; refusing a stale deployment.`);
+              return;
+            }
+
+            const sha = run.head_sha;
+            core.setOutput("mode", mode);
+            core.setOutput("run_id", String(run.id));
+            core.setOutput("sha", sha);
+            core.setOutput("artifact_name", `server-release-${sha}`);
+
+      - name: Record preflight summary
+        run: |
+          {
+            echo "mode=${{ steps.candidate.outputs.mode }}"
+            echo "run_id=${{ steps.candidate.outputs.run_id }}"
+            echo "sha=${{ steps.candidate.outputs.sha }}"
+            echo "artifact=server-release-${{ steps.candidate.outputs.sha }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  remote:
+    name: ${{ needs.preflight.outputs.mode }} production candidate
+    needs: preflight
+    if: needs.preflight.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ vars.PROD_URL }}
+    steps:
+      - name: Re-check main before reading production credentials
+        uses: actions/github-script@v7
+        env:
+          CANDIDATE_SHA: ${{ needs.preflight.outputs.sha }}
+          CANDIDATE_RUN_ID: ${{ needs.preflight.outputs.run_id }}
+          CANDIDATE_MODE: ${{ needs.preflight.outputs.mode }}
+        with:
+          script: |
+            const run = (await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: Number(process.env.CANDIDATE_RUN_ID),
+            })).data;
+            if (run.head_sha !== process.env.CANDIDATE_SHA || run.conclusion !== "success") {
+              core.setFailed("The CI candidate changed or is no longer successful.");
+              return;
+            }
+            if (process.env.CANDIDATE_MODE === "deploy") {
+              const branch = (await github.rest.repos.getBranch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: "main",
+              })).data;
+              if (branch.commit.sha !== process.env.CANDIDATE_SHA) {
+                core.setFailed(`main advanced to ${branch.commit.sha}; refusing a stale deployment.`);
+              }
+            }
+
+      - name: Download exact CI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.preflight.outputs.artifact_name }}
+          run-id: ${{ needs.preflight.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/calculator-release
+
+      - name: Validate artifact and evidence hashes
+        id: artifact
+        env:
+          CANDIDATE_SHA: ${{ needs.preflight.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_dir="$RUNNER_TEMP/calculator-release"
+          expected_base="zzz-calculator-server-${CANDIDATE_SHA:0:12}"
+          archive="$release_dir/${expected_base}.tar.gz"
+          evidence="$release_dir/${expected_base}.evidence.json"
+          test -f "$archive"
+          test -f "$evidence"
+          actual_sha="$(sha256sum "$archive" | awk '{print $1}')"
+          expected_sha="$(jq -er '.artifact.sha256' "$evidence")"
+          test "$actual_sha" = "$expected_sha"
+          jq -e --arg commit "$CANDIDATE_SHA" --arg archive "$(basename "$archive")" --arg actual "$actual_sha" '
+            .commit == $commit and
+            .deployedCommit == $commit and
+            .artifact.sha256 == $actual and
+            (.artifact.path | endswith($archive)) and
+            (.releaseTree.fileCount > 0) and
+            (.pagesTree.fileCount > 0)
+          ' "$evidence" > /dev/null
+          printf 'archive=%s\nevidence=%s\nsha256=%s\n' "$archive" "$evidence" "$actual_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Configure restricted SSH client
+        env:
+          PROD_KNOWN_HOSTS: ${{ secrets.PROD_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$PROD_KNOWN_HOSTS"
+          install -m 700 -d "$RUNNER_TEMP/ssh"
+          printf '%s\n' "$PROD_KNOWN_HOSTS" > "$RUNNER_TEMP/ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/ssh/known_hosts"
+
+      - name: Upload candidate and invoke server gate
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_USER: ${{ secrets.PROD_USER }}
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          CANDIDATE_SHA: ${{ needs.preflight.outputs.sha }}
+          CANDIDATE_MODE: ${{ needs.preflight.outputs.mode }}
+          ARCHIVE: ${{ steps.artifact.outputs.archive }}
+          EVIDENCE: ${{ steps.artifact.outputs.evidence }}
+          ARTIFACT_SHA256: ${{ steps.artifact.outputs.sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PROD_HOST"
+          test -n "$PROD_USER"
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          key_file="$RUNNER_TEMP/ssh/deploy_key"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$key_file"
+          chmod 600 "$key_file"
+          ssh_opts=(-i "$key_file" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" -o RequestTTY=no -o ForwardAgent=no -o ClearAllForwardings=yes)
+          if [[ "$CANDIDATE_MODE" == "audit" ]]; then
+            ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
+              sudo -n /usr/local/sbin/zzz-calculator-deploy audit \
+              | tee "$RUNNER_TEMP/deploy-output.txt"
+            exit 0
+          fi
+          archive_name="$(basename "$ARCHIVE")"
+          evidence_name="$(basename "$EVIDENCE")"
+          remote_archive="/var/lib/zzz-calculator-deploy/incoming/${archive_name}.part"
+          remote_evidence="/var/lib/zzz-calculator-deploy/incoming/${evidence_name}.part"
+          scp "${ssh_opts[@]}" "$ARCHIVE" "$PROD_USER@$PROD_HOST:$remote_archive"
+          scp "${ssh_opts[@]}" "$EVIDENCE" "$PROD_USER@$PROD_HOST:$remote_evidence"
+          ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
+            sudo -n /usr/local/sbin/zzz-calculator-deploy "$CANDIDATE_MODE" \
+              --artifact "$remote_archive" --evidence "$remote_evidence" \
+              --expected-sha "$ARTIFACT_SHA256" --expected-commit "$CANDIDATE_SHA" \
+            | tee "$RUNNER_TEMP/deploy-output.txt"
+
+      - name: Verify public production routes
+        if: needs.preflight.outputs.mode == 'deploy'
+        env:
+          PROD_URL: ${{ vars.PROD_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PROD_URL"
+          base="${PROD_URL%/}"
+          for path in / /discs /settings /api/health /api/catalog /api/app-config \
+            /downloads/zzz-scanner/manifest.json /downloads/zzz-scanner/helper-manifest.json; do
+            curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 "$base$path" > /dev/null
+          done
+          curl --fail --silent --show-error --max-time 15 -D "$RUNNER_TEMP/home-headers.txt" -o /dev/null "$base/"
+          grep -Eiq '^cache-control:[[:space:]]*no-store' "$RUNNER_TEMP/home-headers.txt"
+
+      - name: Upload deployment evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-${{ needs.preflight.outputs.mode }}-${{ needs.preflight.outputs.sha }}
+          path: ${{ runner.temp }}/deploy-output.txt
+          if-no-files-found: ignore
+          retention-days: 14

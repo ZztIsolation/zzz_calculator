@@ -673,3 +673,18 @@ journalctl -u zzz-calculator.service --since '10 minutes ago' --no-pager
 - [ ] 轮换发布过程中暴露过的密码，改用 SSH key 和最小权限账号。
 - [ ] 把证据记录提交到批准的位置，但不包含任何凭据。
 - [ ] 对证书到期、遥测基础设施、密码轮换等非本次范围事项单独建任务，不在上线窗口临时混入。
+
+## 20. Calculator CI/CD 门禁
+
+Calculator 的自动化入口是 `.github/workflows/ci.yml`、
+`.github/workflows/deploy-production.yml` 和
+`.github/workflows/rollback-production.yml`。CI 的 required check 固定为
+`CI / verify`，只在 `main` 的成功 CI run 上上传绑定完整 SHA 的服务器产物和
+evidence；CD 只能下载触发它的同一次 run 的产物，禁止在部署任务中重新构建。
+
+- [ ] GitHub `main` 已启用 PR、`CI / verify`、分支最新、conversation resolution、禁止 force push/删除；管理员应急绕过保留审计记录。
+- [ ] `production` Environment 只允许 protected `main`，审批人和 `PROD_HOST`、`PROD_USER`、`PROD_SSH_PRIVATE_KEY`、`PROD_KNOWN_HOSTS` 已配置；`PRODUCTION_CD_ENABLED` 未明确设置为 `true` 时所有 CD 任务跳过。
+- [ ] 服务器已运行 `deploy/production/bootstrap-zzz-calculator-deploy.sh`，`zzzdeploy` 仅使用锁定密码的专用 key，sudo 只允许 root-owned 部署程序；初始化不得触碰 `current`、systemd、Nginx 或下载源。
+- [ ] 审批后仍复核 `main` SHA、产物 SHA-256、`.deployed-commit`、安全 tar 路径和静态资源冲突；`.part` 上传只在服务器复算通过后转为最终文件。
+- [ ] `audit` 只读；`dry-run` 只写 `validation`；`deploy` 使用不可变 `git-<short-sha>` release、兼容回滚目录、原子 current 切换、15 秒健康门禁；失败自动切回并重启一次。
+- [ ] 首次启用前使用隔离浏览器完成当前版 -> 候选版 -> 回滚版 -> 候选版的本地存储哨兵演练；真实生产切换必须另获明确批准。
