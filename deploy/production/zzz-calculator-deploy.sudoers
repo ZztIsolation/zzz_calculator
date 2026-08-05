@@ -1,0 +1,7 @@
+# Installed by bootstrap-zzz-calculator-deploy.sh.
+Defaults!ZZZ_CALCULATOR_DEPLOY !setenv
+Cmnd_Alias ZZZ_CALCULATOR_DEPLOY = /usr/local/sbin/zzz-calculator-deploy audit, \
+    /usr/local/sbin/zzz-calculator-deploy dry-run *, \
+    /usr/local/sbin/zzz-calculator-deploy deploy *, \
+    /usr/local/sbin/zzz-calculator-deploy rollback *
+zzzdeploy ALL=(root) NOPASSWD: ZZZ_CALCULATOR_DEPLOY

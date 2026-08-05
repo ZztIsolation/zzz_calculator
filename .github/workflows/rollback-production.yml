@@ -1,0 +1,80 @@
+name: Rollback production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Confirm rollback to the server-recorded previous release
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    name: rollback to previous release
+    if: inputs.confirm == true && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ vars.PROD_URL }}
+    steps:
+      - name: Configure restricted SSH client
+        env:
+          PROD_KNOWN_HOSTS: ${{ secrets.PROD_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$PROD_KNOWN_HOSTS"
+          install -m 700 -d "$RUNNER_TEMP/ssh"
+          printf '%s\n' "$PROD_KNOWN_HOSTS" > "$RUNNER_TEMP/ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/ssh/known_hosts"
+
+      - name: Request server-recorded previous release rollback
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_USER: ${{ secrets.PROD_USER }}
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PROD_HOST"
+          test -n "$PROD_USER"
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          key_file="$RUNNER_TEMP/ssh/deploy_key"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$key_file"
+          chmod 600 "$key_file"
+          ssh_opts=(-i "$key_file" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" -o RequestTTY=no -o ForwardAgent=no -o ClearAllForwardings=yes)
+          ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
+            sudo -n /usr/local/sbin/zzz-calculator-deploy rollback --previous \
+            | tee "$RUNNER_TEMP/rollback-output.txt"
+
+      - name: Verify health after rollback
+        env:
+          PROD_URL: ${{ vars.PROD_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PROD_URL"
+          base="${PROD_URL%/}"
+          for path in /api/health / /discs /settings /api/catalog /api/app-config \
+            /downloads/zzz-scanner/manifest.json /downloads/zzz-scanner/helper-manifest.json; do
+            curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 "$base$path" > /dev/null
+          done
+          curl --fail --silent --show-error --max-time 15 -D "$RUNNER_TEMP/home-headers.txt" -o /dev/null "$base/"
+          grep -Eiq '^cache-control:[[:space:]]*no-store' "$RUNNER_TEMP/home-headers.txt"
+
+      - name: Upload rollback evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-rollback-${{ github.run_id }}
+          path: ${{ runner.temp }}/rollback-output.txt
+          if-no-files-found: ignore
+          retention-days: 14
