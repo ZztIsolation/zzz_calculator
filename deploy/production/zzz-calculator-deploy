@@ -455,6 +455,21 @@ merge_compatible_resources() {
     done
 }
 
+merge_existing_release_resources() {
+    local source_root="$1"
+    local destination_root="$2"
+    local relative_tree
+
+    for relative_tree in "dist/pages/static/app" "dist/pages/assets"; do
+        if [[ ! -d "$source_root/$relative_tree" && ! -d "$destination_root/$relative_tree" ]]; then
+            continue
+        fi
+        [[ -d "$source_root/$relative_tree" ]] || die "existing release is missing ${relative_tree}"
+        install -d -m 0755 -- "$destination_root/$relative_tree"
+        merge_missing_files "$source_root/$relative_tree" "$destination_root/$relative_tree"
+    done
+}
+
 prepare_permissions() {
     local root="$1"
     id "$APP_USER" >/dev/null 2>&1 || die "application user ${APP_USER} does not exist"
@@ -562,6 +577,7 @@ run_deploy() {
 
     if [[ -e "$candidate_target" || -L "$candidate_target" ]]; then
         if [[ "$CURRENT_BEFORE" == "$candidate_target" && -d "$candidate_target" ]]; then
+            merge_existing_release_resources "$candidate_target" "$candidate_staging"
             if same_release_tree "$candidate_staging" "$candidate_target"; then
                 log "release ${RELEASE_BASENAME} is already current and identical"
                 return 0

@@ -37,6 +37,7 @@ for (const contract of [
     "--expected-commit",
     "same_release_tree",
     "merge_compatible_resources",
+    "merge_existing_release_resources",
     "atomic_switch",
     "health_gate",
     "write_state_file",
