@@ -43,8 +43,9 @@ interface OriginalIdentity {
   bossId?: string
 }
 
-interface StoredDraftV3 {
-  version: 3
+interface StoredDraftV4 {
+  version: 4
+  resolved?: false
   resource: ResourceValue
   selectedKey: string
   selectedBuffId: string
@@ -54,6 +55,11 @@ interface StoredDraftV3 {
   originalIdentity: OriginalIdentity
 }
 
+interface ResolvedDraftV4 {
+  version: 4
+  resolved: true
+}
+
 interface PendingCatalogRefresh {
   key: string
   buffId?: string
@@ -61,7 +67,8 @@ interface PendingCatalogRefresh {
 
 type DeleteMode = "record" | "buff" | "teammate" | "encounter" | "boss"
 
-const DRAFT_STORAGE_KEY = "zzz_maintenance_vue_draft_v3"
+const DRAFT_STORAGE_KEY = "zzz_maintenance_vue_draft_v4"
+const INCOMPATIBLE_DRAFT_STORAGE_KEY = "zzz_maintenance_vue_draft_v3"
 const PREVIOUS_DRAFT_STORAGE_KEY = "zzz_maintenance_vue_draft_v2"
 const LEGACY_DRAFT_STORAGE_KEY = "zzz_maintenance_vue_draft_v1"
 
@@ -215,11 +222,11 @@ function recordIcon(item: any) {
   return ""
 }
 
-function clearStoredDraft() {
+function resolveStoredDraft() {
   try {
-    localStorage.removeItem(DRAFT_STORAGE_KEY)
-    localStorage.removeItem(PREVIOUS_DRAFT_STORAGE_KEY)
-    localStorage.removeItem(LEGACY_DRAFT_STORAGE_KEY)
+    // Versioned draft keys are retained across upgrades. A resolved v4 marker
+    // prevents a saved or discarded draft from being restored as unsaved.
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ version: 4, resolved: true }))
   } catch {
     // Editing remains available without browser storage.
   }
@@ -227,11 +234,11 @@ function clearStoredDraft() {
 
 function persistDraft() {
   if (!hasUnsavedChanges.value || !draft.value) {
-    clearStoredDraft()
+    resolveStoredDraft()
     return
   }
-  const stored: StoredDraftV3 = {
-    version: 3,
+  const stored: StoredDraftV4 = {
+    version: 4,
     resource: resource.value,
     selectedKey: selectedKey.value,
     selectedBuffId: selectedBuffId.value,
@@ -255,8 +262,12 @@ function legacyTeammateGroup(item: any) {
 
 function restoreStoredDraft() {
   try {
-    const current = JSON.parse(localStorage.getItem(DRAFT_STORAGE_KEY) || "null") as StoredDraftV3 | null
-    if (current?.version === 3 && resources.some(item => item.value === current.resource) && current.draft) {
+    const current = JSON.parse(localStorage.getItem(DRAFT_STORAGE_KEY) || "null") as StoredDraftV4 | ResolvedDraftV4 | null
+    if (current?.version === 4 && current.resolved === true) return false
+    if (current?.version === 4
+      && current.resolved !== true
+      && resources.some(item => item.value === current.resource)
+      && current.draft) {
       resource.value = current.resource
       selectedKey.value = current.selectedKey
       selectedBuffId.value = current.selectedBuffId
@@ -268,6 +279,9 @@ function restoreStoredDraft() {
       saveHint.value = "上次未保存的结构化修改已从本机恢复"
       return true
     }
+    // v3 is intentionally skipped: it may contain the retired broad-anomaly
+    // target shape. Its presence also blocks recovery of an even older draft.
+    if (localStorage.getItem(INCOMPATIBLE_DRAFT_STORAGE_KEY) !== null) return false
     const previous = JSON.parse(localStorage.getItem(PREVIOUS_DRAFT_STORAGE_KEY) || "null")
     if (previous?.version === 2 && resources.some(item => item.value === previous.resource) && previous.draft) {
       resource.value = previous.resource
@@ -278,7 +292,6 @@ function restoreStoredDraft() {
       draftIsNew.value = previous.draftIsNew === true
       originalIdentity.value = previous.originalIdentity ?? { id: "", teammateId: "", maintenanceType: "" }
       persistDraft()
-      localStorage.removeItem(PREVIOUS_DRAFT_STORAGE_KEY)
       saveState.value = "已迁移旧草稿"
       saveHint.value = "旧版技能目标已转为明确的角色招式或技能大类"
       return true
@@ -296,13 +309,12 @@ function restoreStoredDraft() {
       draftIsNew.value = legacy.draftIsNew === true
       originalIdentity.value = legacy.originalIdentity ?? identityFor(draft.value, selectedBuffId.value)
       persistDraft()
-      localStorage.removeItem(LEGACY_DRAFT_STORAGE_KEY)
       saveState.value = "已迁移旧草稿"
       saveHint.value = "旧版 JSON 草稿已转为结构化表单"
       return true
     }
   } catch {
-    clearStoredDraft()
+    // Invalid or unavailable browser storage must remain untouched.
   }
   return false
 }
@@ -321,7 +333,6 @@ function setEditor(item: any, options: { isNew?: boolean, key?: string, buffId?:
   saveState.value = options.state ?? (options.isNew ? "未保存" : "已加载")
   saveHint.value = options.hint ?? (options.isNew ? "完成必填项后保存" : "所有修改会先在本机保留")
   if (options.isNew) persistDraft()
-  else clearStoredDraft()
 }
 
 function selectFirstRecord() {
@@ -385,7 +396,7 @@ function confirmDiscard() {
   const action = pendingDiscardAction
   pendingDiscardAction = null
   showDiscardConfirm.value = false
-  clearStoredDraft()
+  resolveStoredDraft()
   action?.()
 }
 
@@ -702,7 +713,7 @@ function applySavedItem(savedItem: any, responsePayload: any = {}) {
   }
   draftIsNew.value = false
   baselineText.value = JSON.stringify(draft.value)
-  clearStoredDraft()
+  resolveStoredDraft()
 }
 
 async function refreshCatalogAndSelect(pending: PendingCatalogRefresh) {
@@ -772,7 +783,7 @@ async function deleteDraft() {
   if (busy.value || !draft.value) return
   showDeleteConfirm.value = false
   if (draftIsNew.value && !originalIdentity.value.id && deleteMode.value !== "teammate") {
-    clearStoredDraft()
+    resolveStoredDraft()
     const source = records.value.find(item => recordKey(item) === selectedKey.value)
     if (source) setEditor(source)
     else selectFirstRecord()
@@ -800,7 +811,7 @@ async function deleteDraft() {
     const payload = await response.json().catch(() => ({}))
     if (!response.ok || payload.ok === false) throw new Error(payload.error ?? `删除失败：${response.status}`)
     catalogStore.invalidate()
-    clearStoredDraft()
+    resolveStoredDraft()
     await fetchCatalog()
     selectFirstRecord()
     saveState.value = "已删除"
@@ -965,7 +976,7 @@ onBeforeUnmount(() => window.removeEventListener("beforeunload", warnBeforeUnloa
   </NModal>
 
   <ConfirmDialog v-model:show="showDeleteConfirm" title="删除维护资料" :message="deleteMessage()" confirm-text="删除" danger @confirm="deleteDraft" />
-  <ConfirmDialog v-model:show="showDiscardConfirm" title="放弃未保存修改" message="当前修改已保存在本机草稿中。继续切换会删除这份草稿。" confirm-text="放弃并继续" danger @confirm="confirmDiscard" />
+  <ConfirmDialog v-model:show="showDiscardConfirm" title="放弃未保存修改" message="当前修改已保存在本机草稿中。继续切换会将它标记为已放弃，旧版草稿记录仍保留在本机。" confirm-text="放弃并继续" danger @confirm="confirmDiscard" />
   <ConfirmDialog v-model:show="showLeaveConfirm" title="离开维护页" message="当前内容尚未保存到数据文件。本地草稿会保留，下次进入维护页时可恢复。" confirm-text="离开" danger @confirm="confirmRouteLeave" />
 </template>
 

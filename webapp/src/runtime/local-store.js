@@ -9,6 +9,7 @@ import {
     driveDiscContentFingerprint,
     driveDiscIdentityFingerprint,
     createDriveDiscExport,
+    migrateDriveDiscSetAliases,
     normalizeInventoryStore,
     ownerScopedStore,
     setDriveDiscExclusions as setInventoryDriveDiscExclusions,
@@ -34,7 +35,16 @@ function requestToPromise(request) {
     })
 }
 
+function transactionToPromise(transaction) {
+    return new Promise((resolve, reject) => {
+        transaction.oncomplete = () => resolve()
+        transaction.onerror = () => reject(transaction.error ?? new Error("浏览器数据库事务失败。"))
+        transaction.onabort = () => reject(transaction.error ?? new Error("浏览器数据库事务已中止。"))
+    })
+}
+
 let dbPromise = null
+let pendingStoreLoad = null
 
 function openDb() {
     if (typeof indexedDB === "undefined") {
@@ -69,32 +79,79 @@ function deleteDatabase() {
     })
 }
 
-async function readPersistedStore() {
-    const db = await openDb()
-    if (!db) {
-        try {
-            return JSON.parse(localStorage.getItem(FALLBACK_STORAGE_KEY) || "null")
-        } catch {
-            return null
-        }
+function readFallbackStore() {
+    try {
+        return JSON.parse(localStorage.getItem(FALLBACK_STORAGE_KEY) || "null")
+    } catch {
+        return null
     }
-    const tx = db.transaction(STATE_STORE, "readonly")
-    return requestToPromise(tx.objectStore(STATE_STORE).get(STORE_KEY))
 }
 
 async function writePersistedStore(store) {
-    const db = await openDb()
-    if (!db) {
+    const pendingDb = openDb()
+    if (!pendingDb) {
         localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(store))
         return store
     }
+    const db = await pendingDb
     const tx = db.transaction(STATE_STORE, "readwrite")
-    await requestToPromise(tx.objectStore(STATE_STORE).put(store, STORE_KEY))
+    const completed = transactionToPromise(tx)
+    tx.objectStore(STATE_STORE).put(store, STORE_KEY)
+    await completed
     return store
 }
 
-export async function loadUserDriveDiscStore() {
-    return normalizeInventoryStore(await readPersistedStore())
+function readAndMigrateFallbackStore() {
+    const persisted = readFallbackStore()
+    const migrated = migrateDriveDiscSetAliases(persisted)
+    if (migrated !== persisted) {
+        try {
+            localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(migrated))
+        } catch (error) {
+            console.warn("自动修正驱动盘套装 ID 后回写浏览器存储失败。", error)
+        }
+    }
+    return normalizeInventoryStore(migrated)
+}
+
+async function readAndMigratePersistedStore() {
+    const pendingDb = openDb()
+    if (!pendingDb) {
+        return readAndMigrateFallbackStore()
+    }
+
+    const db = await pendingDb
+    const tx = db.transaction(STATE_STORE, "readwrite")
+    const completed = transactionToPromise(tx)
+    const objectStore = tx.objectStore(STATE_STORE)
+    let persisted
+    try {
+        persisted = await requestToPromise(objectStore.get(STORE_KEY))
+    } catch (error) {
+        await completed.catch(() => {})
+        throw error
+    }
+
+    const migrated = migrateDriveDiscSetAliases(persisted)
+    if (migrated !== persisted) {
+        try {
+            objectStore.put(migrated, STORE_KEY)
+            await completed
+        } catch (error) {
+            await completed.catch(() => {})
+            console.warn("自动修正驱动盘套装 ID 后回写浏览器存储失败。", error)
+        }
+    } else {
+        await completed
+    }
+    return normalizeInventoryStore(migrated)
+}
+
+export function loadUserDriveDiscStore() {
+    pendingStoreLoad ??= readAndMigratePersistedStore().finally(() => {
+        pendingStoreLoad = null
+    })
+    return pendingStoreLoad
 }
 
 export async function clearAllBrowserData() {
@@ -130,7 +187,7 @@ export async function exportCurrentUserDriveDiscs(options = {}) {
 
 export async function saveUserDriveDiscStore(store) {
     const nextStore = {
-        ...normalizeInventoryStore(store),
+        ...normalizeInventoryStore(migrateDriveDiscSetAliases(store)),
         updatedAt: new Date().toISOString(),
     }
     await writePersistedStore(nextStore)

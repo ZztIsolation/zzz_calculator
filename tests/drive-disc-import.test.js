@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import {
@@ -11,6 +11,9 @@ import {
     createDriveDiscExport,
     DRIVE_DISC_EXPORT_FORMAT,
     DRIVE_DISC_EXPORT_VERSION,
+    migrateDriveDiscSetAliases,
+    normalizeDriveDiscImport,
+    normalizeScannerExport,
 } from "../core/inventory-model.js"
 
 function scannerDisc(sequence, overrides = {}) {
@@ -30,6 +33,124 @@ function scannerDisc(sequence, overrides = {}) {
         ],
     }
 }
+
+const currentSetAliases = normalizeScannerExport([
+    scannerDisc(1, { setName: "谶羽之誓" }),
+    scannerDisc(2, { setName: "棘刺玫瑰", partition: 2 }),
+], {
+    ownerId: "default",
+    sourcePath: "current-set-aliases.json",
+    importedAt: "2026-08-04T00:00:00.000Z",
+})
+assert.deepEqual(
+    currentSetAliases.driveDiscs.map(item => [item.setName, item.setId, item.canonicalSetName]),
+    [
+        ["谶羽之誓", "zzz_wiki_2116", { zhCN: "谶羽之誓" }],
+        ["棘刺玫瑰", "zzz_wiki_2121", { zhCN: "棘刺玫瑰" }],
+    ],
+)
+
+const driveDiscCatalog = JSON.parse(await readFile(new URL("../data/drive_disc_sets.json", import.meta.url), "utf8"))
+const catalogAliases = normalizeScannerExport(
+    driveDiscCatalog.sets.map((set, index) => scannerDisc(index + 1, {
+        setName: set.name.zhCN,
+        partition: (index % 6) + 1,
+    })),
+    {
+        ownerId: "default",
+        sourcePath: "catalog-set-aliases.json",
+        importedAt: "2026-08-04T00:00:00.000Z",
+    },
+)
+assert.deepEqual(
+    catalogAliases.driveDiscs.map(item => [item.setName, item.setId, item.canonicalSetName]),
+    driveDiscCatalog.sets.map(set => [set.name.zhCN, set.id, set.name]),
+    "every catalog name must resolve to the same official id and canonical name during Scanner import",
+)
+
+const aliasMigrationInput = {
+    version: 1,
+    currentOwnerId: "default",
+    owners: [
+        { id: "default", label: "默认用户" },
+        { id: "alt", label: "二号账号" },
+    ],
+    imports: [{ id: "alias-import", ownerId: "default" }],
+    driveDiscs: [
+        { id: "blank-id", ownerId: "default", setId: "", setName: "谶羽之誓", sentinel: { keep: true } },
+        { id: "scanner-id", ownerId: "alt", setId: "scanner-set-old", setName: "棘刺玫瑰", locked: true },
+        { id: "official-without-name", ownerId: "default", setId: "zzz_wiki_2116", setName: "谶羽之誓" },
+        { id: "unknown", ownerId: "default", setId: "scanner-set-future", setName: "未来未知套装" },
+        { id: "custom", ownerId: "alt", setId: "custom-user-set", setName: "谶羽之誓", canonicalSetName: null },
+    ],
+    driveDiscLoadouts: [{ id: "alias-loadout", ownerId: "alt", driveDiscIdsBySlot: { 2: "scanner-id" } }],
+    futureStoreField: { preserve: true },
+}
+const migratedAliases = migrateDriveDiscSetAliases(aliasMigrationInput)
+assert.notEqual(migratedAliases, aliasMigrationInput)
+assert.deepEqual(migratedAliases.owners, aliasMigrationInput.owners)
+assert.deepEqual(migratedAliases.imports, aliasMigrationInput.imports)
+assert.deepEqual(migratedAliases.driveDiscLoadouts, aliasMigrationInput.driveDiscLoadouts)
+assert.deepEqual(migratedAliases.futureStoreField, aliasMigrationInput.futureStoreField)
+assert.deepEqual(
+    migratedAliases.driveDiscs.map(({ setId, canonicalSetName }) => [setId, canonicalSetName]),
+    [
+        ["zzz_wiki_2116", { zhCN: "谶羽之誓" }],
+        ["zzz_wiki_2121", { zhCN: "棘刺玫瑰" }],
+        ["zzz_wiki_2116", { zhCN: "谶羽之誓" }],
+        ["scanner-set-future", undefined],
+        ["custom-user-set", null],
+    ],
+)
+for (let index = 0; index < aliasMigrationInput.driveDiscs.length; index += 1) {
+    const { setId: _beforeSetId, canonicalSetName: _beforeCanonicalName, ...before } = aliasMigrationInput.driveDiscs[index]
+    const { setId: _afterSetId, canonicalSetName: _afterCanonicalName, ...after } = migratedAliases.driveDiscs[index]
+    assert.deepEqual(after, before, `alias migration must preserve non-identity fields for disc ${index}`)
+}
+assert.equal(migratedAliases.driveDiscs[3], aliasMigrationInput.driveDiscs[3])
+assert.equal(migratedAliases.driveDiscs[4], aliasMigrationInput.driveDiscs[4])
+assert.equal(migrateDriveDiscSetAliases(migratedAliases), migratedAliases, "alias migration must be idempotent")
+
+const nativeAliasImport = normalizeDriveDiscImport({
+    format: DRIVE_DISC_EXPORT_FORMAT,
+    version: DRIVE_DISC_EXPORT_VERSION,
+    exportedAt: "2026-08-04T00:00:00.000Z",
+    sourceAccount: { label: "原生备份" },
+    driveDiscs: [
+        {
+            id: "native-blank-set-id",
+            setId: "",
+            setName: "谶羽之誓",
+            partition: 1,
+            rarity: "S",
+            level: 15,
+            maxLevel: 15,
+            mainStat: { stat: "hpFlat", mode: "flat", value: 2200 },
+            subStats: [],
+        },
+        {
+            id: "native-official-missing-canonical",
+            setId: "zzz_wiki_2121",
+            setName: "棘刺玫瑰",
+            partition: 2,
+            rarity: "S",
+            level: 15,
+            maxLevel: 15,
+            mainStat: { stat: "atkFlat", mode: "flat", value: 316 },
+            subStats: [],
+        },
+    ],
+}, {
+    ownerId: "alt",
+    importedAt: "2026-08-04T00:01:00.000Z",
+})
+assert.deepEqual(
+    nativeAliasImport.driveDiscs.map(item => [item.ownerId, item.setId, item.canonicalSetName]),
+    [
+        ["alt", "zzz_wiki_2116", { zhCN: "谶羽之誓" }],
+        ["alt", "zzz_wiki_2121", { zhCN: "棘刺玫瑰" }],
+    ],
+)
 
 const tempDir = await mkdtemp(path.join(os.tmpdir(), "zzz-disc-import-"))
 

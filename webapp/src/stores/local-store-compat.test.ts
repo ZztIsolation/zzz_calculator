@@ -52,6 +52,182 @@ describe("local-store compatibility", () => {
     expect(store.imports).toHaveLength(1)
   })
 
+  it("repairs legacy scanner set ids on load without reimporting or rewriting unrelated data", async () => {
+    localStorage.clear()
+    const vowDisc = persistedDisc({
+      id: "legacy-vow-disc",
+      ownerId: "default",
+      setId: "scanner-set-62cbf3b10eb2",
+      setName: "谶羽之誓",
+      partition: 1,
+      rarity: "S",
+      level: 15,
+      maxLevel: 15,
+      locked: true,
+      equippedBy: "agent-a",
+      reservedForAgentId: "agent-b",
+      excludedForAgentIds: ["agent-c"],
+      mainStat: { stat: "hpFlat", mode: "flat", value: 2200 },
+      subStats: [{ stat: "anomalyProficiency", mode: "flat", value: 27 }],
+      source: { type: "zzz-scanner", importId: "legacy-import", sequence: 1 },
+      raw: { "名称": "谶羽之誓", "序号": 1 },
+      createdAt: "2026-08-01T00:00:00.000Z",
+      updatedAt: "2026-08-02T00:00:00.000Z",
+      futureDiscField: { preserve: true },
+    })
+    const thornDisc = persistedDisc({
+      id: "legacy-thorn-disc",
+      ownerId: "alt",
+      setId: "scanner-set-7645cfcb962e",
+      setName: "棘刺玫瑰",
+      partition: 2,
+      rarity: "S",
+      level: 15,
+      maxLevel: 15,
+      locked: false,
+      equippedBy: null,
+      mainStat: { stat: "atkFlat", mode: "flat", value: 316 },
+      subStats: [],
+    })
+    const unknownDisc = persistedDisc({
+      id: "unknown-scanner-disc",
+      ownerId: "default",
+      setId: "scanner-set-unknown",
+      setName: "未来未知套装",
+      partition: 3,
+      rarity: "S",
+      level: 15,
+      mainStat: { stat: "defFlat", mode: "flat", value: 184 },
+      subStats: [],
+    })
+    const customIdDisc = persistedDisc({
+      id: "custom-id-disc",
+      ownerId: "default",
+      setId: "custom-user-set",
+      setName: "谶羽之誓",
+      partition: 4,
+      rarity: "S",
+      level: 15,
+      mainStat: { stat: "critRate", mode: "pct", value: 24 },
+      subStats: [],
+    })
+    const persisted = {
+      version: 1,
+      updatedAt: "2026-08-03T00:00:00.000Z",
+      currentOwnerId: "default",
+      owners: [
+        { id: "default", label: "默认用户" },
+        { id: "alt", label: "二号账号" },
+      ],
+      imports: [{ id: "legacy-import", ownerId: "default", itemCount: 4 }],
+      driveDiscs: [vowDisc, thornDisc, unknownDisc, customIdDisc],
+      driveDiscLoadouts: [{
+        id: "legacy-loadout",
+        ownerId: "default",
+        driveDiscIdsBySlot: { 1: "legacy-vow-disc", 2: "legacy-thorn-disc" },
+      }],
+      futureStoreField: { preserve: true },
+    }
+    localStorage.setItem("zzz-calculator.userStore.v1", JSON.stringify(persisted))
+    localStorage.setItem("zzz-calculator.migration-sentinel", "preserve-me")
+
+    const storagePrototype = Object.getPrototypeOf(localStorage)
+    const setItem = vi.spyOn(storagePrototype, "setItem")
+    const removeItem = vi.spyOn(storagePrototype, "removeItem")
+    const clear = vi.spyOn(storagePrototype, "clear")
+    try {
+      const [first, concurrent] = await Promise.all([
+        loadUserDriveDiscStore(),
+        loadUserDriveDiscStore(),
+      ])
+      expect(first.driveDiscs).toHaveLength(4)
+      expect(concurrent.driveDiscs).toEqual(first.driveDiscs)
+      expect(first.driveDiscs.find((disc: any) => disc.id === "legacy-vow-disc")?.setId).toBe("zzz_wiki_2116")
+      expect(first.driveDiscs.find((disc: any) => disc.id === "legacy-thorn-disc")?.setId).toBe("zzz_wiki_2121")
+      expect(first.driveDiscs.find((disc: any) => disc.id === "unknown-scanner-disc")?.setId).toBe("scanner-set-unknown")
+      expect(first.driveDiscs.find((disc: any) => disc.id === "custom-id-disc")?.setId).toBe("custom-user-set")
+      expect(setItem).toHaveBeenCalledTimes(1)
+      expect(setItem).toHaveBeenCalledWith("zzz-calculator.userStore.v1", expect.any(String))
+      expect(removeItem).not.toHaveBeenCalled()
+      expect(clear).not.toHaveBeenCalled()
+
+      const migrated = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
+      const migratedVow = migrated.driveDiscs.find((disc: any) => disc.id === "legacy-vow-disc")
+      const migratedThorn = migrated.driveDiscs.find((disc: any) => disc.id === "legacy-thorn-disc")
+      const { setId: _oldVowId, ...vowWithoutSetId } = vowDisc
+      const { setId: _newVowId, canonicalSetName: _vowCanonicalName, ...migratedVowWithoutIdentity } = migratedVow
+      expect(migratedVowWithoutIdentity).toEqual(vowWithoutSetId)
+      expect(migratedVow.setId).toBe("zzz_wiki_2116")
+      expect(migratedVow.canonicalSetName).toEqual({ zhCN: "谶羽之誓" })
+      expect(migratedThorn.setId).toBe("zzz_wiki_2121")
+      expect(migratedThorn.canonicalSetName).toEqual({ zhCN: "棘刺玫瑰" })
+      expect(migrated.version).toBe(1)
+      expect(migrated.updatedAt).toBe(persisted.updatedAt)
+      expect(migrated.owners).toEqual(persisted.owners)
+      expect(migrated.imports).toEqual(persisted.imports)
+      expect(migrated.driveDiscLoadouts).toEqual(persisted.driveDiscLoadouts)
+      expect(migrated.futureStoreField).toEqual({ preserve: true })
+      expect(localStorage.getItem("zzz-calculator.migration-sentinel")).toBe("preserve-me")
+
+      await loadUserDriveDiscStore()
+      expect(setItem).toHaveBeenCalledTimes(1)
+      expect(removeItem).not.toHaveBeenCalled()
+      expect(clear).not.toHaveBeenCalled()
+    } finally {
+      setItem.mockRestore()
+      removeItem.mockRestore()
+      clear.mockRestore()
+    }
+  })
+
+  it("returns the repaired fallback store when the migration write fails", async () => {
+    localStorage.clear()
+    const persisted = {
+      version: 1,
+      currentOwnerId: "default",
+      owners: [{ id: "default", label: "默认用户" }],
+      imports: [],
+      driveDiscs: [{
+        id: "write-failure-vow-disc",
+        ownerId: "default",
+        setId: "scanner-set-62cbf3b10eb2",
+        setName: "谶羽之誓",
+        partition: 1,
+        rarity: "S",
+        level: 15,
+        mainStat: { stat: "hpFlat", mode: "flat", value: 2200 },
+        subStats: [],
+        futureDiscField: { preserve: true },
+      }],
+      driveDiscLoadouts: [],
+      futureStoreField: { preserve: true },
+    }
+    const persistedSnapshot = structuredClone(persisted)
+    localStorage.setItem("zzz-calculator.userStore.v1", JSON.stringify(persisted))
+
+    const storagePrototype = Object.getPrototypeOf(localStorage)
+    const originalSetItem = storagePrototype.setItem
+    const setItem = vi.spyOn(storagePrototype, "setItem").mockImplementation(function (key: string, value: string) {
+      if (key === "zzz-calculator.userStore.v1") {
+        throw new DOMException("quota exceeded", "QuotaExceededError")
+      }
+      return originalSetItem.call(this, key, value)
+    })
+    try {
+      const loaded = await loadUserDriveDiscStore()
+      expect(loaded.driveDiscs[0]).toMatchObject({
+        setId: "zzz_wiki_2116",
+        canonicalSetName: { zhCN: "谶羽之誓" },
+        futureDiscField: { preserve: true },
+      })
+      expect(JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")).toEqual(persistedSnapshot)
+      expect(persisted).toEqual(persistedSnapshot)
+      expect(setItem).toHaveBeenCalledTimes(1)
+    } finally {
+      setItem.mockRestore()
+    }
+  })
+
   it("keeps the storage key and isolates duplicate ids by account", async () => {
     localStorage.clear()
     localStorage.setItem("zzz-calculator.userStore.v1", JSON.stringify({

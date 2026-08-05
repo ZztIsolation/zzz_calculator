@@ -6,6 +6,18 @@ function asyncRequest(result: unknown = undefined) {
   return request
 }
 
+function asyncTransaction(createStore: (scheduleComplete: () => void) => any) {
+  const transaction: any = {}
+  let completionScheduled = false
+  const scheduleComplete = () => {
+    if (completionScheduled) return
+    completionScheduled = true
+    setTimeout(() => transaction.oncomplete?.(), 0)
+  }
+  transaction.objectStore = () => createStore(scheduleComplete)
+  return transaction
+}
+
 describe("local-store IndexedDB compatibility", () => {
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -36,20 +48,17 @@ describe("local-store IndexedDB compatibility", () => {
       createObjectStore: vi.fn(),
       transaction(name: string, mode: string) {
         transactionCalls.push([name, mode])
-        return {
-          objectStore(storeName: string) {
-            expect(storeName).toBe("state")
-            return {
-              get(key: string) {
-                return asyncRequest(records.get(key))
-              },
-              put(value: any, key: string) {
-                records.set(key, value)
-                return asyncRequest(key)
-              },
-            }
+        return asyncTransaction(scheduleComplete => ({
+          get(key: string) {
+            scheduleComplete()
+            return asyncRequest(records.get(key))
           },
-        }
+          put(value: any, key: string) {
+            records.set(key, value)
+            scheduleComplete()
+            return asyncRequest(key)
+          },
+        }))
       },
     }
     vi.stubGlobal("indexedDB", {
@@ -77,7 +86,6 @@ describe("local-store IndexedDB compatibility", () => {
     })
 
     expect(openCalls).toEqual([["zzz-calculator-user-store", 1]])
-    expect(transactionCalls).toContainEqual(["state", "readonly"])
     expect(transactionCalls).toContainEqual(["state", "readwrite"])
     expect(records.get("userDriveDiscStore").driveDiscs).toHaveLength(2)
 
@@ -96,6 +104,137 @@ describe("local-store IndexedDB compatibility", () => {
     expect(records.get("userDriveDiscStore").version).toBe(1)
     expect(records.get("userDriveDiscStore").driveDiscs
       .find((disc: any) => disc.id === "new-indexeddb-disc").excludedForAgentIds).toEqual(["retired-agent"])
+  })
+
+  it("migrates legacy scanner set ids in place once while preserving the IndexedDB contract", async () => {
+    const vowDisc = {
+      id: "indexeddb-vow-disc",
+      ownerId: "default",
+      setId: "scanner-set-62cbf3b10eb2",
+      setName: "谶羽之誓",
+      partition: 1,
+      rarity: "S",
+      level: 15,
+      maxLevel: 15,
+      locked: true,
+      equippedBy: "agent-a",
+      reservedForAgentId: "agent-b",
+      excludedForAgentIds: ["agent-c"],
+      mainStat: { stat: "hpFlat", mode: "flat", value: 2200 },
+      subStats: [{ stat: "anomalyProficiency", mode: "flat", value: 27 }],
+      contentFingerprint: "content-fingerprint-sentinel",
+      identityFingerprint: "identity-fingerprint-sentinel",
+      source: { type: "zzz-scanner", importId: "indexeddb-import" },
+      raw: { "名称": "谶羽之誓" },
+      futureDiscField: { preserve: true },
+    }
+    const thornDisc = {
+      ...vowDisc,
+      id: "indexeddb-thorn-disc",
+      ownerId: "alt",
+      setId: "scanner-set-7645cfcb962e",
+      setName: "棘刺玫瑰",
+      partition: 2,
+      locked: false,
+      equippedBy: null,
+      reservedForAgentId: null,
+      excludedForAgentIds: [],
+      raw: { "名称": "棘刺玫瑰" },
+    }
+    const unknownDisc = {
+      ...vowDisc,
+      id: "indexeddb-unknown-disc",
+      setId: "scanner-set-future",
+      setName: "未来未知套装",
+      partition: 3,
+    }
+    const persisted = {
+      version: 1,
+      updatedAt: "2026-08-03T00:00:00.000Z",
+      currentOwnerId: "default",
+      owners: [
+        { id: "default", label: "默认用户" },
+        { id: "alt", label: "二号账号" },
+      ],
+      imports: [{ id: "indexeddb-import", ownerId: "default" }],
+      driveDiscs: [vowDisc, thornDisc, unknownDisc],
+      driveDiscLoadouts: [{
+        id: "indexeddb-loadout",
+        ownerId: "default",
+        driveDiscIdsBySlot: { 1: "indexeddb-vow-disc", 2: "indexeddb-thorn-disc" },
+      }],
+      futureStoreField: { preserve: true },
+    }
+    const records = new Map<string, any>([["userDriveDiscStore", persisted]])
+    const openCalls: Array<[string, number]> = []
+    const transactionCalls: Array<[string, string]> = []
+    const put = vi.fn((value: any, key: string) => {
+      records.set(key, value)
+      return asyncRequest(key)
+    })
+    const database = {
+      objectStoreNames: { contains: (name: string) => name === "state" },
+      createObjectStore: vi.fn(),
+      transaction(name: string, mode: string) {
+        transactionCalls.push([name, mode])
+        return asyncTransaction(scheduleComplete => ({
+          get(key: string) {
+            scheduleComplete()
+            return asyncRequest(records.get(key))
+          },
+          put(value: any, key: string) {
+            scheduleComplete()
+            return put(value, key)
+          },
+        }))
+      },
+    }
+    vi.stubGlobal("indexedDB", {
+      open(name: string, version: number) {
+        openCalls.push([name, version])
+        return asyncRequest(database)
+      },
+    })
+
+    const localStore = await import("@runtime/local-store.js?indexeddb-set-alias-migration")
+    const [first, concurrent] = await Promise.all([
+      localStore.loadUserDriveDiscStore(),
+      localStore.loadUserDriveDiscStore(),
+    ])
+    expect(concurrent.driveDiscs).toEqual(first.driveDiscs)
+    expect(first.driveDiscs.find((disc: any) => disc.id === "indexeddb-vow-disc")?.setId).toBe("zzz_wiki_2116")
+    expect(first.driveDiscs.find((disc: any) => disc.id === "indexeddb-thorn-disc")?.setId).toBe("zzz_wiki_2121")
+    expect(first.driveDiscs.find((disc: any) => disc.id === "indexeddb-unknown-disc")?.setId).toBe("scanner-set-future")
+    expect(openCalls).toEqual([["zzz-calculator-user-store", 1]])
+    expect(transactionCalls).toEqual([
+      ["state", "readwrite"],
+    ])
+    expect(put).toHaveBeenCalledTimes(1)
+    expect(put).toHaveBeenCalledWith(expect.any(Object), "userDriveDiscStore")
+    expect(database.createObjectStore).not.toHaveBeenCalled()
+
+    const migrated = records.get("userDriveDiscStore")
+    const migratedVow = migrated.driveDiscs.find((disc: any) => disc.id === "indexeddb-vow-disc")
+    const { setId: _oldVowId, ...vowWithoutSetId } = vowDisc
+    const { setId: _newVowId, canonicalSetName: _vowCanonicalName, ...migratedVowWithoutIdentity } = migratedVow
+    expect(migratedVowWithoutIdentity).toEqual(vowWithoutSetId)
+    expect(migratedVow.setId).toBe("zzz_wiki_2116")
+    expect(migratedVow.canonicalSetName).toEqual({ zhCN: "谶羽之誓" })
+    expect(migrated.driveDiscs.find((disc: any) => disc.id === "indexeddb-thorn-disc")?.canonicalSetName)
+      .toEqual({ zhCN: "棘刺玫瑰" })
+    expect(migrated.version).toBe(1)
+    expect(migrated.updatedAt).toBe(persisted.updatedAt)
+    expect(migrated.owners).toEqual(persisted.owners)
+    expect(migrated.imports).toEqual(persisted.imports)
+    expect(migrated.driveDiscLoadouts).toEqual(persisted.driveDiscLoadouts)
+    expect(migrated.futureStoreField).toEqual({ preserve: true })
+
+    await localStore.loadUserDriveDiscStore()
+    expect(transactionCalls).toEqual([
+      ["state", "readwrite"],
+      ["state", "readwrite"],
+    ])
+    expect(put).toHaveBeenCalledTimes(1)
   })
 
   it("previews native imports through a readonly IndexedDB transaction without writing", async () => {
@@ -146,17 +285,16 @@ describe("local-store IndexedDB compatibility", () => {
       createObjectStore: vi.fn(),
       transaction(name: string, mode: string) {
         transactionCalls.push([name, mode])
-        return {
-          objectStore(storeName: string) {
-            expect(storeName).toBe("state")
-            return {
-              get(key: string) {
-                return asyncRequest(records.get(key))
-              },
-              put,
-            }
+        return asyncTransaction(scheduleComplete => ({
+          get(key: string) {
+            scheduleComplete()
+            return asyncRequest(records.get(key))
           },
-        }
+          put(value: any, key: string) {
+            scheduleComplete()
+            return put(value, key)
+          },
+        }))
       },
     }
     vi.stubGlobal("indexedDB", {
@@ -188,7 +326,7 @@ describe("local-store IndexedDB compatibility", () => {
     expect(preview.summary.added).toBe(1)
     expect(preview.summary.removed).toBe(1)
     expect(openCalls).toEqual([["zzz-calculator-user-store", 1]])
-    expect(transactionCalls).toEqual([["state", "readonly"]])
+    expect(transactionCalls).toEqual([["state", "readwrite"]])
     expect(put).not.toHaveBeenCalled()
     expect(deleteDatabase).not.toHaveBeenCalled()
     expect(database.createObjectStore).not.toHaveBeenCalled()
@@ -202,7 +340,12 @@ describe("local-store IndexedDB compatibility", () => {
       close,
       objectStoreNames: { contains: () => true },
       transaction() {
-        return { objectStore: () => ({ get: () => asyncRequest(null) }) }
+        return asyncTransaction(scheduleComplete => ({
+          get: () => {
+            scheduleComplete()
+            return asyncRequest(null)
+          },
+        }))
       },
     }
     const deleteCalls: string[] = []
