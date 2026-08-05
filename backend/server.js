@@ -13,6 +13,7 @@ import {
     validateScanTelemetryEvent,
 } from "./scanTelemetry.js"
 import { buildMeta, calculateInCombatPanel, calculateOutOfCombatPanel, loadCatalog } from "./calculator.js"
+import { EnkaProxyError, fetchEnkaShowcase } from "./enkaProxy.js"
 import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "../core/driveDiscAnalysis-core.js"
 import { OptimizerCancelledError, optimizeDriveDiscs, optimizeDriveDiscsAsync, previewDriveDiscOptimization } from "./driveDiscOptimizer.js"
 import {
@@ -2147,6 +2148,22 @@ async function routeApi(req, res, pathname, searchParams) {
 
     if (req.method === "GET" && pathname === "/api/catalog") {
         sendJson(res, 200, catalog)
+        return
+    }
+
+    if (req.method === "GET" && pathname.startsWith("/api/enka/")) {
+        const uid = decodeURIComponent(pathname.slice("/api/enka/".length))
+        try {
+            const showcase = await fetchEnkaShowcase(uid)
+            sendJson(res, 200, { ok: true, showcase })
+        } catch (error) {
+            if (error instanceof EnkaProxyError) {
+                sendJson(res, error.status, { ok: false, error: error.message })
+            } else {
+                console.error("Enka proxy failed:", error)
+                sendJson(res, 502, { ok: false, error: "Enka 代理请求失败，请稍后重试。" })
+            }
+        }
         return
     }
 
