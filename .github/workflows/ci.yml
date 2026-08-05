@@ -51,12 +51,13 @@ jobs:
       - name: Build server release
         run: npm run build:server
 
-      # build:server invokes Vite and therefore clears dist/pages. Rebuild the
-      # Pages metadata on the same app output, then emit final evidence from the
-      # exact tree that will be uploaded to production CD.
+      # build:server invokes Vite with its normal build flags. Rebuild Pages
+      # with its own maintenance flag so stale maintenance chunks cannot leak
+      # into the default production tree, then emit final evidence from the
+      # exact tree uploaded to production CD.
       - name: Finalize Pages tree and release evidence
         run: |
-          SKIP_WEBAPP_BUILD=1 npm run build:pages
+          npm run build:pages
           node scripts/package-server-release.js
 
       - name: Validate deployment configuration
