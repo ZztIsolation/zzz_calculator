@@ -324,7 +324,8 @@ try {
     await remove(`/api/maintenance/anomaly-effects/${encodeURIComponent(generatedAnomaly.maintenanceType)}/${encodeURIComponent(generatedAnomaly.id)}`)
 
     const bossData = await catalog()
-    const fieldTemplate = bossData.combatBuffs.fieldBuffs[0]
+    const fieldTemplate = bossData.combatBuffs.fieldBuffs.find(item => item.effects?.length > 1)
+    assert.ok(fieldTemplate, "Boss Buff integration requires a multi-effect Field Buff template")
     const bossTemplate = {
         sourceType: "boss",
         scope: "inCombat",

@@ -227,6 +227,42 @@ const fieldBuffs = [
     effects: [{ id: "field-critical-gouxi", type: "fixed", stat: "anomalyProficiency", value: 45, mode: "flat" }],
   },
   {
+    id: "field.defense_v5.v3_1.p1.wenyin_gongzhen",
+    sourceType: "field",
+    sourceCategory: "field",
+    sourceKind: "field",
+    source: { zhCN: "防卫战 v5" },
+    sourcePeriod: { zhCN: "3.1版本第一期" },
+    period: { modeId: "defense_v5", gameVersion: "3.1", phaseNo: 1, phaseName: { zhCN: "第一期" } },
+    name: { zhCN: "紊音共振" },
+    description: { zhCN: "异常代理人数量提升属性异常伤害与初始喧响值" },
+    effects: [{ id: "field-defense-wenyin", type: "fixed", stat: "anomalyDamageBonus", value: 60, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
+  {
+    id: "field.defense_v5.v3_1.p1.zhongmu_xiezou",
+    sourceType: "field",
+    sourceCategory: "field",
+    sourceKind: "field",
+    source: { zhCN: "防卫战 v5" },
+    sourcePeriod: { zhCN: "3.1版本第一期" },
+    period: { modeId: "defense_v5", gameVersion: "3.1", phaseNo: 1, phaseName: { zhCN: "第一期" } },
+    name: { zhCN: "终幕协奏" },
+    description: { zhCN: "终结技、连携技伤害与失衡易伤倍率提升" },
+    effects: [{ id: "field-defense-zhongmu-31", type: "fixed", stat: "dmgBonus", value: 40, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
+  {
+    id: "field.defense_v5.v3_1.p1.shuanglei_pofeng",
+    sourceType: "field",
+    sourceCategory: "field",
+    sourceKind: "field",
+    source: { zhCN: "防卫战 v5" },
+    sourcePeriod: { zhCN: "3.1版本第一期" },
+    period: { modeId: "defense_v5", gameVersion: "3.1", phaseNo: 1, phaseName: { zhCN: "第一期" } },
+    name: { zhCN: "霜雷破锋" },
+    description: { zhCN: "冰、电属性伤害与强攻代理人暴击伤害提升" },
+    effects: [{ id: "field-defense-shuanglei", type: "fixed", stat: "iceDmg", value: 30, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
+  {
     id: "field.critical_assault.v3_1.p1.cuixin",
     sourceType: "field",
     sourceCategory: "field",
@@ -949,7 +985,8 @@ describe("BuffPickerModal", () => {
 
     await openFieldTab(wrapper)
 
-    expect(wrapper.text()).toContain("摧心")
+    expect(wrapper.text()).toContain("紊音共振")
+    expect(wrapper.text()).not.toContain("摧心")
     expect(wrapper.text()).not.toContain("极境彻风")
 
     const selects = wrapper.findAll(".field-buff-filter-row select")
@@ -984,7 +1021,8 @@ describe("BuffPickerModal", () => {
 
   it("configures Field Buff effects independently and restores retained coverage", async () => {
     const buffId = "field.critical_assault.v3_1.p1.cuixin"
-    const wrapper = mountModal({ selectedIds: [buffId] })
+    const criticalAssault31Buffs = fieldBuffs.filter(buff => buff.period.modeId === "critical_assault" && buff.period.gameVersion === "3.1")
+    const wrapper = mountModal({ selectedIds: [buffId], buffs: criticalAssault31Buffs })
 
     await openFieldTab(wrapper)
     expect(wrapper.findAll(".rule-enabled-control")).toHaveLength(3)
@@ -1018,6 +1056,7 @@ describe("BuffPickerModal", () => {
     const reopened = mountModal({
       selectedIds: [buffId],
       runtimeInputs: payload.runtimeInputs,
+      buffs: criticalAssault31Buffs,
     })
     await openFieldTab(reopened)
     const reopenedRow = buffRowByText(reopened, "摧心")
@@ -1068,23 +1107,39 @@ describe("BuffPickerModal", () => {
     expect(visibleRows.some(text => text.includes("湮亡"))).toBe(false)
   })
 
-  it("defaults the field tab to Critical Assault 3.1 phase 1", async () => {
+  it("defaults the field tab to Defense Battle 3.1 phase 1", async () => {
     const wrapper = mountModal()
 
     await openFieldTab(wrapper)
     const selects = wrapper.findAll(".field-buff-filter-row select")
 
     expect((selects[0].element as HTMLSelectElement).value).toBe("3.1")
-    expect((selects[1].element as HTMLSelectElement).value).toBe("critical_assault|3.1|1")
+    expect((selects[1].element as HTMLSelectElement).value).toBe("defense_v5|3.1|1")
     const selectedPeriod = selects[1].findAll("option")
       .find(option => (option.element as HTMLOptionElement).selected)
-    expect(selectedPeriod?.text()).toBe("危局强袭战 · 3.1版本 · 第一期")
+    expect(selectedPeriod?.text()).toBe("防卫战 v5 · 3.1版本 · 第一期")
+    const visibleRows = wrapper.findAll(".buff-row").map(row => row.text())
+    expect(visibleRows).toHaveLength(3)
+    expect(visibleRows[0]).toContain("紊音共振")
+    expect(visibleRows[1]).toContain("终幕协奏")
+    expect(visibleRows[2]).toContain("霜雷破锋")
+    expect(visibleRows.some(text => text.includes("3.0版本"))).toBe(false)
+  })
+
+  it("shows Critical Assault 3.1 phase 1 when requested", async () => {
+    const wrapper = mountModal()
+
+    await openFieldTab(wrapper)
+    const selects = wrapper.findAll(".field-buff-filter-row select")
+    await selects[1].setValue("critical_assault|3.1|1")
+    await nextTick()
+
     const visibleRows = wrapper.findAll(".buff-row").map(row => row.text())
     expect(visibleRows).toHaveLength(3)
     expect(visibleRows[0]).toContain("摧心")
     expect(visibleRows[1]).toContain("勠力")
     expect(visibleRows[2]).toContain("诡袭")
-    expect(visibleRows.some(text => text.includes("3.0版本"))).toBe(false)
+    expect(visibleRows.some(text => text.includes("紊音共振"))).toBe(false)
   })
 
   it("shows critical assault phase 3 and keeps one selection when requested", async () => {
