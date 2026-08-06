@@ -29,10 +29,15 @@ const assertions = [
     [files.deploy.includes("CANDIDATE_MODE"), "CD must distinguish audit, dry-run, and CI deploy."],
     [files.rollback.includes("--previous"), "Rollback must use the server-recorded previous release."],
     [files.deployScript.includes("flock"), "Server deploy must serialize callers with flock."],
+    [files.deployScript.includes('PROCESSING_DIR="${DEPLOY_ROOT}/processing"'), "Server deploy must isolate claimed uploads."],
+    [files.deployScript.includes("claim_incoming_inputs"), "Server deploy must claim uploads before validation."],
     [files.deployScript.includes(".part"), "Server deploy must receive atomically named uploads."],
     [files.deployScript.includes(".deployed-commit"), "Server deploy must verify the committed artifact."],
     [files.deployScript.includes('FINALIZE_UPLOAD="1"'), "Only deploy may finalize a .part upload."],
     [files.bootstrap.includes("no-port-forwarding"), "Bootstrap must restrict port forwarding."],
+    [files.bootstrap.includes('chown root:"$DEPLOY_USER" "$authorized_keys_tmp"'), "Bootstrap must keep SSH authorization root-owned."],
+    [files.bootstrap.includes('ssh-keygen -l -f "$key_validation_tmp"'), "Bootstrap must validate the real OpenSSH public key."],
+    [files.bootstrap.includes('mv -Tf -- "$authorized_keys_tmp" "$authorized_keys"'), "Bootstrap must replace legacy SSH authorization atomically."],
     [files.bootstrap.includes("zzzdeploy"), "Bootstrap must create the dedicated deployment user."],
 ]
 

@@ -7,8 +7,8 @@ download origin, and the `current` symlink.
 
 ## One-time initialization
 
-Run the bootstrap as `root` on the production host. The first run needs the
-public half of the dedicated CI deploy key in `ZZZDEPLOY_PUBLIC_KEY`; the key
+Run the bootstrap as `root` on the production host. Every run needs the public
+half of the dedicated CI deploy key in `ZZZDEPLOY_PUBLIC_KEY`; the key
 is written only to the server's `zzzdeploy` account and is never part of the
 repository:
 
@@ -21,7 +21,9 @@ unset ZZZDEPLOY_PUBLIC_KEY
 The initializer creates a password-locked `zzzdeploy` account, disables PTY,
 agent/X11/port forwarding for its dedicated key, and grants access to the
 fixed `incoming` upload directory plus only the root deployment command. It
-creates the root-owned history/validation folders,
+replaces `authorized_keys` with a new root-owned inode, pre-validates the SSH
+key and sudo policy,
+and creates root-only processing/history/validation folders,
 the fixed sudo rule, and `/usr/local/sbin/zzz-calculator-deploy`. It does not
 read or change `current`, release contents, Nginx, or systemd, and it never
 restarts the application.
@@ -47,7 +49,11 @@ sudo -n /usr/local/sbin/zzz-calculator-deploy rollback
 `audit` is read-only apart from its evidence file. `dry-run` validates the
 archive, `.deployed-commit`, SHA-256, safe tar paths and static-resource
 compatibility in `validation`; it does not switch `current` or restart the
-service. `deploy` creates a new immutable `git-<12-char-sha>` release and a
+service. Before either artifact operation, the root manager atomically moves
+the uploaded artifact and evidence into a root-only processing directory and
+seals each into a new root-owned inode. The unprivileged upload account cannot
+replace or keep modifying the objects used during validation. `deploy`
+creates a new immutable `git-<12-char-sha>` release and a
 rollback release containing the union of old/new `dist/pages/static/app` and
 `dist/pages/assets`. Same-path byte conflicts stop the operation. The current
 symlink is switched atomically and the service is restarted at most once; a
@@ -57,5 +63,6 @@ health gate.
 
 The program uses `/run/lock/zzz-calculator-deploy.lock`, so audit, dry-run,
 deploy and rollback cannot overlap. Release directories are never overwritten
-or deleted, and `.part` uploads remain available for post-deploy evidence
-cleanup.
+or deleted. Claimed `.part` uploads are removed from root-only processing when
+the operation finishes; a cleanup failure fails the operation and is recorded.
+The immutable CI artifact and JSON history remain the deployment evidence.

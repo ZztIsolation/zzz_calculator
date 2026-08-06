@@ -5,6 +5,7 @@ umask 027
 
 readonly DEPLOY_ROOT="/var/lib/zzz-calculator-deploy"
 readonly INCOMING_DIR="${DEPLOY_ROOT}/incoming"
+readonly PROCESSING_DIR="${DEPLOY_ROOT}/processing"
 readonly HISTORY_DIR="${DEPLOY_ROOT}/history"
 readonly VALIDATION_DIR="${DEPLOY_ROOT}/validation"
 readonly RELEASE_ROOT="/opt/zzz_calculator/releases"
@@ -50,6 +51,8 @@ EVIDENCE_PATH=""
 DISK_STATUS=""
 MEMORY_STATUS=""
 FINALIZE_UPLOAD="0"
+PROCESSING_JOB_DIR=""
+CLAIMED_PATH=""
 STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 usage() {
@@ -194,6 +197,10 @@ write_evidence() {
 on_exit() {
     local exit_code="$1"
     trap - EXIT
+    if ! cleanup_processing_job; then
+        [[ -n "$ERROR_MESSAGE" ]] || ERROR_MESSAGE="failed to remove root-only processing data"
+        exit_code=1
+    fi
     if [[ "$exit_code" -eq 0 ]]; then
         STATUS="success"
     else
@@ -202,15 +209,28 @@ on_exit() {
     capture_after || true
     write_evidence || true
     if [[ -n "$EVIDENCE_PATH" && -f "$EVIDENCE_PATH" ]]; then
-        cat -- "$EVIDENCE_PATH"
+        cat -- "$EVIDENCE_PATH" || true
     fi
     exit "$exit_code"
+}
+
+cleanup_processing_job() {
+    [[ -n "$PROCESSING_JOB_DIR" ]] || return 0
+    [[ "$PROCESSING_JOB_DIR" == "$PROCESSING_DIR/job."* ]] || return 1
+    [[ -d "$PROCESSING_JOB_DIR" && ! -L "$PROCESSING_JOB_DIR" ]] || return 0
+    if ! rm -rf --one-file-system -- "$PROCESSING_JOB_DIR"; then
+        log "ERROR: failed to remove processing directory ${PROCESSING_JOB_DIR}"
+        return 1
+    fi
+    PROCESSING_JOB_DIR=""
 }
 
 require_root_and_layout() {
     [[ "$(id -u)" -eq 0 ]] || die "this program must run as root through the restricted sudo rule"
     [[ -d "$DEPLOY_ROOT" ]] || die "deployment root is not initialized"
     [[ -d "$INCOMING_DIR" ]] || die "incoming directory is not initialized"
+    [[ -d "$PROCESSING_DIR" && ! -L "$PROCESSING_DIR" ]] || die "processing directory is not initialized"
+    [[ "$(stat -c '%U:%G:%a' -- "$PROCESSING_DIR")" == "root:root:700" ]] || die "processing directory must be root-owned mode 0700"
     [[ -d "$HISTORY_DIR" ]] || die "history directory is not initialized"
     [[ -d "$VALIDATION_DIR" ]] || die "validation directory is not initialized"
     [[ -d "$RELEASE_ROOT" ]] || die "release root is missing"
@@ -309,6 +329,51 @@ parse_artifact_options() {
         [[ -f "$EVIDENCE_PATH_INPUT" && ! -L "$EVIDENCE_PATH_INPUT" ]] || die "evidence is not a regular file in incoming"
         command -v jq >/dev/null || die "jq is required when evidence is supplied"
     fi
+}
+
+claim_incoming_file() {
+    local source="$1"
+    local basename untrusted sealed_tmp target
+
+    [[ "$source" == "$INCOMING_DIR/"* ]] || die "upload source is outside incoming"
+    basename="${source##*/}"
+    [[ "$basename" != "." && "$basename" != ".." && "$basename" != */* ]] || die "upload basename is invalid"
+    untrusted="${PROCESSING_JOB_DIR}/.untrusted-${basename}"
+    sealed_tmp="${PROCESSING_JOB_DIR}/.sealed-${basename}.tmp"
+    target="${PROCESSING_JOB_DIR}/${basename}"
+    [[ ! -e "$untrusted" && ! -L "$untrusted" && ! -e "$sealed_tmp" && ! -L "$sealed_tmp" && ! -e "$target" && ! -L "$target" ]] || die "claimed upload target already exists"
+    [[ "$(stat -c '%d' -- "$source")" == "$(stat -c '%d' -- "$PROCESSING_JOB_DIR")" ]] || die "incoming and processing must share a filesystem"
+    mv -T -- "$source" "$untrusted" || die "failed to claim uploaded file"
+    [[ -f "$untrusted" && ! -L "$untrusted" ]] || die "claimed upload is not a regular file"
+    [[ "$(stat -c '%h' -- "$untrusted")" == "1" ]] || die "claimed upload must not be hard-linked"
+
+    # Renaming and chowning do not revoke a writer's already-open descriptor.
+    # Copy to a new inode, then validate and extract only that sealed copy.
+    cp --reflink=never -- "$untrusted" "$sealed_tmp" || die "failed to seal uploaded file"
+    [[ -f "$sealed_tmp" && ! -L "$sealed_tmp" && "$(stat -c '%h' -- "$sealed_tmp")" == "1" ]] || die "sealed upload is not a private regular file"
+    chown root:root "$sealed_tmp"
+    chmod 0640 "$sealed_tmp"
+    mv -T -- "$sealed_tmp" "$target"
+    rm -f -- "$untrusted"
+    CLAIMED_PATH="$target"
+}
+
+claim_incoming_inputs() {
+    local source
+
+    PROCESSING_JOB_DIR="$(mktemp -d "${PROCESSING_DIR}/job.XXXXXXXX")"
+    chown root:root "$PROCESSING_JOB_DIR"
+    chmod 0700 "$PROCESSING_JOB_DIR"
+
+    source="$ARTIFACT_PATH"
+    claim_incoming_file "$source"
+    ARTIFACT_PATH="$CLAIMED_PATH"
+    if [[ -n "$EVIDENCE_PATH_INPUT" ]]; then
+        source="$EVIDENCE_PATH_INPUT"
+        claim_incoming_file "$source"
+        EVIDENCE_PATH_INPUT="$CLAIMED_PATH"
+    fi
+    CLAIMED_PATH=""
 }
 
 validate_archive_listing() {
@@ -533,8 +598,10 @@ run_audit() {
 run_dry_run() {
     local validation_dir
     parse_artifact_options "$@"
+    claim_incoming_inputs
     validation_dir="$(mktemp -d "${VALIDATION_DIR}/release.XXXXXXXX")"
     extract_and_validate "$validation_dir"
+    cleanup_processing_job || die "failed to clean claimed uploads after dry-run extraction"
 
     if [[ -n "$CURRENT_BEFORE" ]]; then
         local relative_tree
@@ -567,10 +634,12 @@ run_deploy() {
     [[ -n "$rollback_commit" ]] || die "current release has no valid .deployed-commit"
     PREVIOUS_BASENAME="$(basename -- "$CURRENT_BEFORE")"
     [[ "$(current_target)" == "$CURRENT_BEFORE" ]] || die "current release changed during preflight"
+    claim_incoming_inputs
 
     candidate_staging="$(mktemp -d "${RELEASE_ROOT}/.candidate.XXXXXXXX")"
     FINALIZE_UPLOAD="1"
     extract_and_validate "$candidate_staging"
+    cleanup_processing_job || die "failed to clean claimed uploads before production preflight"
     candidate_target="${RELEASE_ROOT}/${RELEASE_BASENAME}"
     ROLLBACK_BASENAME="rollback-${DEPLOYED_COMMIT:0:12}"
     rollback_target="${RELEASE_ROOT}/${ROLLBACK_BASENAME}"

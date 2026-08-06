@@ -33,6 +33,20 @@ jobs:
       - name: Install webapp dependencies
         run: npm --prefix webapp ci
 
+      - name: Validate deployment shell policy
+        run: |
+          bash -n deploy/production/bootstrap-zzz-calculator-deploy.sh
+          bash -n deploy/production/zzz-calculator-deploy
+          bash -n tests/production-bootstrap.integration.sh
+          bash -n tests/production-deploy-manager.integration.sh
+          sudo visudo -cf deploy/production/zzz-calculator-deploy.sudoers
+
+      - name: Run deployment bootstrap integration tests
+        run: bash tests/production-bootstrap.integration.sh
+
+      - name: Run deployment manager integration tests
+        run: bash tests/production-deploy-manager.integration.sh
+
       - name: Run regression suite
         run: npm test
 
