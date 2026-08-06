@@ -25,6 +25,14 @@ command -v ssh-keygen >/dev/null || fail "ssh-keygen is required"
 ! getent passwd zzzdeploy >/dev/null 2>&1 || fail "zzzdeploy unexpectedly exists on the clean runner"
 [[ ! -e "$DEPLOY_ROOT" ]] || fail "deployment root unexpectedly exists on the clean runner"
 
+# GitHub's hosted runner currently provisions this generated sudoers file with
+# a permissive mode even though sudo accepts it for runner bootstrap. Normalize
+# the disposable VM before testing the production script's strict baseline.
+if sudo test -f /etc/sudoers.d/runner; then
+    sudo chmod 0440 /etc/sudoers.d/runner
+fi
+sudo visudo --check >/dev/null || fail "runner sudoers baseline is invalid"
+
 if sudo env ZZZDEPLOY_PUBLIC_KEY='ssh-ed25519 not-base64' bash "$BOOTSTRAP"; then
     fail "bootstrap accepted an invalid public key"
 fi
