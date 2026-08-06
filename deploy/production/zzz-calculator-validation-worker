@@ -1,0 +1,127 @@
+#!/bin/bash
+
+set -Eeuo pipefail
+umask 077
+export PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+unset BASH_ENV ENV CDPATH GLOBIGNORE NODE_OPTIONS NODE_PATH NPM_CONFIG_PREFIX \
+    LD_PRELOAD LD_LIBRARY_PATH CURL_HOME || true
+while read -r _ _ inherited_function; do
+    unset -f "$inherited_function"
+done < <(declare -F)
+unalias -a 2>/dev/null || true
+hash -r
+IFS=$' \t\n'
+
+readonly VALIDATION_USER="zzzvalidate"
+readonly VALIDATION_TMPFS_BYTES="$((128 * 1024 * 1024))"
+readonly VALIDATION_RUN_TMPFS_BYTES="$((4 * 1024 * 1024))"
+readonly PRODUCTION_STATE_DIR="/var/lib/zzz-calculator"
+readonly PRODUCTION_RELEASE_ROOT="/opt/zzz_calculator"
+readonly PRODUCTION_DEPLOY_ROOT="/var/lib/zzz-calculator-deploy"
+readonly PRODUCTION_CURRENT_DATA="/opt/zzz_calculator/current/data"
+readonly HOST_RUNTIME_DIR="/run"
+readonly HOST_TMP_DIR="/tmp"
+readonly HOST_VAR_TMP_DIR="/var/tmp"
+readonly HOST_SHM_DIR="/dev/shm"
+readonly PRODUCTION_HEALTH_URL="http://127.0.0.1:8787/api/health"
+readonly VALIDATION_BASE_URL="http://127.0.0.1:8788"
+readonly -a VALIDATION_CATALOG_FILES=(
+    agents.json
+    agent_skills.json
+    anomaly_effects.json
+    bosses.json
+    combat_buffs.json
+    drive_disc_sets.json
+    stat_rules.json
+    w_engines.json
+)
+
+release_dir="${1:-}"
+probe_root="${2:-}"
+server_pid=""
+
+cleanup() {
+    local attempt
+    [[ -n "$server_pid" ]] || return 0
+    kill -TERM "$server_pid" 2>/dev/null || true
+    for attempt in $(seq 1 20); do
+        kill -0 "$server_pid" 2>/dev/null || break
+        sleep 0.1
+    done
+    kill -KILL "$server_pid" 2>/dev/null || true
+    wait "$server_pid" 2>/dev/null || true
+}
+
+on_signal() {
+    trap '' HUP INT TERM
+    exit 128
+}
+
+trap cleanup EXIT
+trap on_signal HUP INT TERM
+
+[[ "$(id -un)" == "$VALIDATION_USER" && "$(id -G)" == "$(id -g)" ]] || exit 30
+[[ -n "$release_dir" && -n "$probe_root" ]] || exit 31
+[[ "$HOME" == "$probe_root/home" && "${ZZZ_CALCULATOR_DATA_DIR:-}" == "$probe_root/data" ]] || exit 32
+[[ -d "$release_dir" && ! -L "$release_dir" && -r "$release_dir/backend/server.js" ]] || exit 33
+[[ -d "$probe_root" && ! -L "$probe_root" && -w "$probe_root" ]] || exit 34
+[[ "$(/usr/bin/stat -f -c %T -- "$probe_root")" == "tmpfs" ]] || exit 35
+tmpfs_bytes="$(/usr/bin/df --output=size -B1 "$probe_root" | /usr/bin/tail -n 1 | /usr/bin/tr -d '[:space:]')"
+[[ "$tmpfs_bytes" =~ ^[1-9][0-9]*$ && "$tmpfs_bytes" -le "$VALIDATION_TMPFS_BYTES" ]] || exit 36
+[[ "$(/usr/bin/stat -c '%U:%G:%a' -- "$probe_root")" == "$VALIDATION_USER:$VALIDATION_USER:700" ]] || exit 37
+[[ "$(/usr/bin/stat -f -c %T -- "$HOST_RUNTIME_DIR")" == "tmpfs" ]] || exit 38
+run_tmpfs_bytes="$(/usr/bin/df --output=size -B1 "$HOST_RUNTIME_DIR" | /usr/bin/tail -n 1 | /usr/bin/tr -d '[:space:]')"
+[[ "$run_tmpfs_bytes" =~ ^[1-9][0-9]*$ && "$run_tmpfs_bytes" -le "$VALIDATION_RUN_TMPFS_BYTES" ]] || exit 39
+[[ ! -r "$PRODUCTION_STATE_DIR" && ! -w "$PRODUCTION_STATE_DIR" && ! -x "$PRODUCTION_STATE_DIR" ]] || exit 40
+[[ ! -r "$PRODUCTION_RELEASE_ROOT" && ! -w "$PRODUCTION_RELEASE_ROOT" && ! -x "$PRODUCTION_RELEASE_ROOT" ]] || exit 41
+[[ ! -r "$PRODUCTION_DEPLOY_ROOT" && ! -w "$PRODUCTION_DEPLOY_ROOT" && ! -x "$PRODUCTION_DEPLOY_ROOT" ]] || exit 42
+[[ ! -r "$PRODUCTION_CURRENT_DATA" && ! -w "$PRODUCTION_CURRENT_DATA" && ! -x "$PRODUCTION_CURRENT_DATA" ]] || exit 43
+for hidden_writable_path in "$HOST_TMP_DIR" "$HOST_VAR_TMP_DIR" "$HOST_SHM_DIR"; do
+    [[ ! -r "$hidden_writable_path" && ! -w "$hidden_writable_path" && ! -x "$hidden_writable_path" ]] || exit 44
+done
+
+# PrivateNetwork must produce a namespace distinct from PID 1 with only loopback.
+[[ "$(readlink /proc/self/ns/net)" != "$(readlink /proc/1/ns/net)" ]] || exit 45
+interfaces=(/sys/class/net/*)
+[[ "${#interfaces[@]}" -eq 1 && "${interfaces[0]##*/}" == "lo" ]] || exit 46
+if curl --disable --fail --silent --max-time 1 "$PRODUCTION_HEALTH_URL" >/dev/null 2>&1; then
+    exit 47
+fi
+
+for path in home data tmp run xdg-cache xdg-config xdg-data; do
+    /usr/bin/mkdir -m 0700 -- "$probe_root/$path" || exit 48
+done
+[[ -d "$release_dir/data" && ! -L "$release_dir/data" ]] || exit 49
+for catalog_name in "${VALIDATION_CATALOG_FILES[@]}" user_drive_discs.example.json; do
+    catalog_path="$release_dir/data/$catalog_name"
+    [[ -f "$catalog_path" && ! -L "$catalog_path" ]] || exit 50
+    /usr/bin/cp -- "$catalog_path" "$probe_root/data/$catalog_name" || exit 51
+done
+/usr/bin/cp -- "$release_dir/data/user_drive_discs.example.json" \
+    "$probe_root/data/user_drive_discs.json" || exit 52
+/usr/bin/cmp -- "$probe_root/data/user_drive_discs.example.json" \
+    "$probe_root/data/user_drive_discs.json" || exit 53
+
+/usr/bin/node "$release_dir/backend/server.js" >/dev/null 2>&1 &
+server_pid="$!"
+ready="0"
+for attempt in $(seq 1 15); do
+    kill -0 "$server_pid" 2>/dev/null || exit 54
+    if curl --disable --fail --silent --show-error --max-time 1 \
+        "$VALIDATION_BASE_URL/api/health" >"$probe_root/run/response.json" 2>/dev/null \
+        && jq -e '.ok == true' "$probe_root/run/response.json" >/dev/null 2>&1; then
+        ready="1"
+        break
+    fi
+    sleep 1
+done
+[[ "$ready" == "1" ]] || exit 55
+
+kill -0 "$server_pid" 2>/dev/null || exit 56
+curl --disable --fail --silent --show-error --max-time 3 \
+    "$VALIDATION_BASE_URL/api/catalog" >"$probe_root/run/response.json"
+jq -e '(.agents | type) == "array"' "$probe_root/run/response.json" >/dev/null
+curl --disable --fail --silent --show-error --max-time 3 \
+    "$VALIDATION_BASE_URL/api/app-config" >"$probe_root/run/response.json"
+jq -e '.maintenanceEnabled == false' "$probe_root/run/response.json" >/dev/null
+kill -0 "$server_pid" 2>/dev/null || exit 57

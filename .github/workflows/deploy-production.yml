@@ -40,30 +40,38 @@ jobs:
        github.event.workflow_run.head_branch == 'main' &&
        vars.PRODUCTION_CD_ENABLED == 'true') ||
       (github.event_name == 'workflow_dispatch' &&
-       github.ref == 'refs/heads/main' &&
-       vars.PRODUCTION_CD_ENABLED == 'true')
+       github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
       mode: ${{ steps.candidate.outputs.mode }}
       run_id: ${{ steps.candidate.outputs.run_id }}
       sha: ${{ steps.candidate.outputs.sha }}
+      main_sha: ${{ steps.candidate.outputs.main_sha }}
       artifact_name: ${{ steps.candidate.outputs.artifact_name }}
+      production_url: ${{ steps.candidate.outputs.production_url }}
     steps:
       - name: Validate successful CI run and current main
         id: candidate
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           REQUESTED_MODE: ${{ inputs.mode || '' }}
           REQUESTED_RUN_ID: ${{ inputs.run_id || '' }}
+          PROD_URL: ${{ vars.PROD_URL }}
         with:
           script: |
             const requestedMode = process.env.REQUESTED_MODE;
+            const productionUrl = process.env.PROD_URL;
             let mode = "deploy";
             let runId = process.env.REQUESTED_RUN_ID;
 
+            if (!productionUrl || !productionUrl.startsWith("https://")) {
+              core.setFailed("Repository variable PROD_URL must be a non-empty HTTPS URL.");
+              return;
+            }
+            core.setOutput("production_url", productionUrl.replace(/\/$/, ""));
+
             if (context.eventName === "workflow_run") {
-              mode = "deploy";
               runId = String(context.payload.workflow_run.id);
               if (context.payload.workflow_run.conclusion !== "success"
                 || context.payload.workflow_run.head_branch !== "main") {
@@ -82,8 +90,27 @@ jobs:
               }
             }
 
+            const branch = (await github.rest.repos.getBranch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: "main",
+            })).data;
+            if (context.eventName === "workflow_dispatch" && context.sha !== branch.commit.sha) {
+              core.setFailed(`Manual workflow SHA ${context.sha} is not current main ${branch.commit.sha}.`);
+              return;
+            }
+
+            if (mode === "audit") {
+              core.setOutput("mode", mode);
+              core.setOutput("run_id", "");
+              core.setOutput("sha", branch.commit.sha);
+              core.setOutput("main_sha", branch.commit.sha);
+              core.setOutput("artifact_name", "");
+              return;
+            }
+
             if (!runId) {
-              const runs = await github.rest.actions.listWorkflowRunsForRepo({
+              const runs = await github.rest.actions.listWorkflowRuns({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 workflow_id: "ci.yml",
@@ -112,12 +139,6 @@ jobs:
               core.setFailed("The selected run is not a successful Calculator CI run on main.");
               return;
             }
-
-            const branch = (await github.rest.repos.getBranch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              branch: "main",
-            })).data;
             if (mode === "deploy" && branch.commit.sha !== run.head_sha) {
               core.setFailed(`main advanced from ${run.head_sha} to ${branch.commit.sha}; refusing a stale deployment.`);
               return;
@@ -127,6 +148,7 @@ jobs:
             core.setOutput("mode", mode);
             core.setOutput("run_id", String(run.id));
             core.setOutput("sha", sha);
+            core.setOutput("main_sha", branch.commit.sha);
             core.setOutput("artifact_name", `server-release-${sha}`);
 
       - name: Record preflight summary
@@ -135,24 +157,39 @@ jobs:
             echo "mode=${{ steps.candidate.outputs.mode }}"
             echo "run_id=${{ steps.candidate.outputs.run_id }}"
             echo "sha=${{ steps.candidate.outputs.sha }}"
-            echo "artifact=server-release-${{ steps.candidate.outputs.sha }}"
+            echo "main_sha=${{ steps.candidate.outputs.main_sha }}"
+            echo "artifact=${{ steps.candidate.outputs.artifact_name }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  remote:
-    name: ${{ needs.preflight.outputs.mode }} production candidate
+  validation:
+    name: validate ${{ needs.preflight.outputs.mode }} artifact and browser
     needs: preflight
-    if: needs.preflight.result == 'success'
+    if: >-
+      needs.preflight.result == 'success' &&
+      needs.preflight.outputs.mode != 'audit'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment:
-      name: production
-      url: ${{ vars.PROD_URL }}
+    timeout-minutes: 25
+    outputs:
+      artifact_sha256: ${{ steps.artifact.outputs.sha256 }}
+      candidate_index_sha256: ${{ steps.artifact.outputs.candidate_index_sha256 }}
+      metadata_sha256: ${{ steps.metadata.outputs.sha256 }}
     steps:
-      - name: Re-check main before reading production credentials
-        uses: actions/github-script@v7
+      - name: Initialize validation evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'workflow_run_id=%s\nmode=%s\ncandidate_sha=%s\n' \
+            "$GITHUB_RUN_ID" \
+            "${{ needs.preflight.outputs.mode }}" \
+            "${{ needs.preflight.outputs.sha }}" \
+            > "$RUNNER_TEMP/validation-output.txt"
+
+      - name: Re-check candidate before artifact access
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           CANDIDATE_SHA: ${{ needs.preflight.outputs.sha }}
           CANDIDATE_RUN_ID: ${{ needs.preflight.outputs.run_id }}
+          EXPECTED_MAIN_SHA: ${{ needs.preflight.outputs.main_sha }}
           CANDIDATE_MODE: ${{ needs.preflight.outputs.mode }}
         with:
           script: |
@@ -165,26 +202,29 @@ jobs:
               core.setFailed("The CI candidate changed or is no longer successful.");
               return;
             }
-            if (process.env.CANDIDATE_MODE === "deploy") {
-              const branch = (await github.rest.repos.getBranch({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                branch: "main",
-              })).data;
-              if (branch.commit.sha !== process.env.CANDIDATE_SHA) {
-                core.setFailed(`main advanced to ${branch.commit.sha}; refusing a stale deployment.`);
-              }
+            const branch = (await github.rest.repos.getBranch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: "main",
+            })).data;
+            if (branch.commit.sha !== process.env.EXPECTED_MAIN_SHA) {
+              core.setFailed(`main advanced to ${branch.commit.sha}; restart this production operation.`);
+              return;
+            }
+            if (process.env.CANDIDATE_MODE === "deploy"
+              && branch.commit.sha !== process.env.CANDIDATE_SHA) {
+              core.setFailed(`main is ${branch.commit.sha}, not candidate ${process.env.CANDIDATE_SHA}.`);
             }
 
       - name: Download exact CI artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: ${{ needs.preflight.outputs.artifact_name }}
           run-id: ${{ needs.preflight.outputs.run_id }}
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/calculator-release
 
-      - name: Validate artifact and evidence hashes
+      - name: Validate artifact, evidence, and browser samples
         id: artifact
         env:
           CANDIDATE_SHA: ${{ needs.preflight.outputs.sha }}
@@ -195,6 +235,9 @@ jobs:
           expected_base="zzz-calculator-server-${CANDIDATE_SHA:0:12}"
           archive="$release_dir/${expected_base}.tar.gz"
           evidence="$release_dir/${expected_base}.evidence.json"
+          candidate_index="$release_dir/candidate-index.html"
+          candidate_refs="$release_dir/candidate-index-chunks.txt"
+          candidate_assets="$release_dir/candidate-assets.txt"
           test -f "$archive"
           test -f "$evidence"
           actual_sha="$(sha256sum "$archive" | awk '{print $1}')"
@@ -208,11 +251,258 @@ jobs:
             (.releaseTree.fileCount > 0) and
             (.pagesTree.fileCount > 0)
           ' "$evidence" > /dev/null
-          printf 'archive=%s\nevidence=%s\nsha256=%s\n' "$archive" "$evidence" "$actual_sha" >> "$GITHUB_OUTPUT"
+          tar -xOf "$archive" ./dist/pages/index.html > "$candidate_index"
+          grep -Eo '(src|href)="[^"]+"' "$candidate_index" \
+            | sed -E 's/^(src|href)="([^"]+)"$/\2/' \
+            | grep -E '^/static/app/[A-Za-z0-9._/-]+-[A-Za-z0-9_-]{8,}\.(js|css)$' \
+            | sort -u > "$candidate_refs"
+          test -s "$candidate_refs"
+          tar -tzf "$archive" \
+            | grep -E '^\./dist/pages/assets/[A-Za-z0-9._/-]+\.(avif|gif|jpe?g|png|svg|webp)$' \
+            | sed 's#^\./dist/pages##' \
+            | awk 'NR <= 3 { print }' > "$candidate_assets"
+          test -s "$candidate_assets"
+          candidate_index_sha256="$(sha256sum "$candidate_index" | awk '{print $1}')"
+          printf 'archive=%s\nevidence=%s\nsha256=%s\ncandidate_index_sha256=%s\ncandidate_refs=%s\ncandidate_assets=%s\n' \
+            "$archive" "$evidence" "$actual_sha" "$candidate_index_sha256" \
+            "$candidate_refs" "$candidate_assets" >> "$GITHUB_OUTPUT"
 
-      - name: Configure restricted SSH client
+      - name: Set up Node for isolated storage roundtrip
+        if: needs.preflight.outputs.mode != 'audit'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+
+      - name: Run isolated same-origin storage roundtrip
+        if: needs.preflight.outputs.mode != 'audit'
+        env:
+          ARCHIVE: ${{ steps.artifact.outputs.archive }}
+          PROD_URL: ${{ needs.preflight.outputs.production_url }}
+          CANDIDATE_SHA: ${{ needs.preflight.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate_dir="$RUNNER_TEMP/browser-candidate"
+          rm -rf "$candidate_dir"
+          mkdir -p "$candidate_dir"
+          tar -xzf "$ARCHIVE" -C "$candidate_dir"
+          npm --prefix "$candidate_dir/webapp" ci --ignore-scripts
+          npm --prefix "$candidate_dir/webapp" exec -- playwright install --with-deps chromium
+          node "$candidate_dir/scripts/production-storage-roundtrip.mjs" \
+            --candidate-dir "$candidate_dir" \
+            --current-url "$PROD_URL" \
+            --expected-commit "$CANDIDATE_SHA" \
+            --evidence "$RUNNER_TEMP/storage-roundtrip.json" \
+            --screenshot "$RUNNER_TEMP/storage-roundtrip.png" \
+            2>&1 | tee -a "$RUNNER_TEMP/validation-output.txt"
+          test -s "$RUNNER_TEMP/storage-roundtrip.json"
+          test -s "$RUNNER_TEMP/storage-roundtrip.png"
+
+          test -s "$RUNNER_TEMP/storage-roundtrip-trace.zip"
+
+      - name: Record exact validated metadata
+        id: metadata
+        env:
+          CANDIDATE_MODE: ${{ needs.preflight.outputs.mode }}
+          CANDIDATE_RUN_ID: ${{ needs.preflight.outputs.run_id }}
+          CANDIDATE_SHA: ${{ needs.preflight.outputs.sha }}
+          ARTIFACT_SHA256: ${{ steps.artifact.outputs.sha256 }}
+          CANDIDATE_INDEX_SHA256: ${{ steps.artifact.outputs.candidate_index_sha256 }}
+          CANDIDATE_REFS: ${{ steps.artifact.outputs.candidate_refs }}
+          CANDIDATE_ASSETS: ${{ steps.artifact.outputs.candidate_assets }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$CANDIDATE_INDEX_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          test -s "$CANDIDATE_REFS"
+          test -s "$CANDIDATE_ASSETS"
+          refs_sha256="$(sha256sum "$CANDIDATE_REFS" | awk '{print $1}')"
+          assets_sha256="$(sha256sum "$CANDIDATE_ASSETS" | awk '{print $1}')"
+          storage_sha256=""
+          screenshot_sha256=""
+          trace_sha256=""
+          storage_status="not-run"
+          if [[ "$CANDIDATE_MODE" != "audit" ]]; then
+            test -s "$RUNNER_TEMP/storage-roundtrip.json"
+            test -s "$RUNNER_TEMP/storage-roundtrip.png"
+            test -s "$RUNNER_TEMP/storage-roundtrip-trace.zip"
+            jq -e '.status == "success"' "$RUNNER_TEMP/storage-roundtrip.json" > /dev/null
+            storage_sha256="$(sha256sum "$RUNNER_TEMP/storage-roundtrip.json" | awk '{print $1}')"
+            screenshot_sha256="$(sha256sum "$RUNNER_TEMP/storage-roundtrip.png" | awk '{print $1}')"
+            trace_sha256="$(sha256sum "$RUNNER_TEMP/storage-roundtrip-trace.zip" | awk '{print $1}')"
+            storage_status="success"
+          fi
+          jq -n \
+            --arg mode "$CANDIDATE_MODE" \
+            --arg runId "$CANDIDATE_RUN_ID" \
+            --arg commit "$CANDIDATE_SHA" \
+            --arg artifactSha256 "$ARTIFACT_SHA256" \
+            --arg candidateIndexSha256 "$CANDIDATE_INDEX_SHA256" \
+            --arg candidateRefsSha256 "$refs_sha256" \
+            --arg candidateAssetsSha256 "$assets_sha256" \
+            --arg storageStatus "$storage_status" \
+            --arg storageSha256 "$storage_sha256" \
+            --arg screenshotSha256 "$screenshot_sha256" \
+            --arg traceSha256 "$trace_sha256" \
+            '{
+              status: "success",
+              mode: $mode,
+              ciRunId: $runId,
+              commit: $commit,
+              artifactSha256: $artifactSha256,
+              candidateIndexSha256: $candidateIndexSha256,
+              candidateRefsSha256: $candidateRefsSha256,
+              candidateAssetsSha256: $candidateAssetsSha256,
+              storageRoundtrip: {
+                status: $storageStatus,
+                evidenceSha256: $storageSha256,
+                screenshotSha256: $screenshotSha256,
+                traceSha256: $traceSha256
+              }
+            }' > "$RUNNER_TEMP/validated-metadata.json"
+          metadata_sha256="$(sha256sum "$RUNNER_TEMP/validated-metadata.json" | awk '{print $1}')"
+          printf 'validated_metadata_sha256=%s\n' "$metadata_sha256" | tee -a "$RUNNER_TEMP/validation-output.txt"
+          printf 'sha256=%s\n' "$metadata_sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: production-validation-${{ needs.preflight.outputs.sha }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/validation-output.txt
+            ${{ runner.temp }}/validated-metadata.json
+            ${{ runner.temp }}/storage-roundtrip.json
+            ${{ runner.temp }}/storage-roundtrip.png
+            ${{ runner.temp }}/storage-roundtrip-trace.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  remote:
+    name: ${{ needs.preflight.outputs.mode }} production candidate
+    needs:
+      - preflight
+      - validation
+    if: >-
+      always() &&
+      needs.preflight.result == 'success' &&
+      ((needs.preflight.outputs.mode == 'audit' && needs.validation.result == 'skipped') ||
+       (needs.preflight.outputs.mode != 'audit' && needs.validation.result == 'success'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ needs.preflight.outputs.production_url }}
+    steps:
+      - name: Initialize deployment evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'workflow_run_id=%s\nmode=%s\ncandidate_sha=%s\nvalidated_metadata_sha256=%s\n' \
+            "$GITHUB_RUN_ID" \
+            "${{ needs.preflight.outputs.mode }}" \
+            "${{ needs.preflight.outputs.sha }}" \
+            "${{ needs.validation.outputs.metadata_sha256 }}" \
+            > "$RUNNER_TEMP/deploy-output.txt"
+
+      - name: Re-check candidate before artifact access
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          CANDIDATE_SHA: ${{ needs.preflight.outputs.sha }}
+          CANDIDATE_RUN_ID: ${{ needs.preflight.outputs.run_id }}
+          EXPECTED_MAIN_SHA: ${{ needs.preflight.outputs.main_sha }}
+          CANDIDATE_MODE: ${{ needs.preflight.outputs.mode }}
+        with:
+          script: |
+            const branch = (await github.rest.repos.getBranch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: "main",
+            })).data;
+            if (branch.commit.sha !== process.env.EXPECTED_MAIN_SHA) {
+              core.setFailed(`main advanced to ${branch.commit.sha}; restart this production operation.`);
+              return;
+            }
+            if (process.env.CANDIDATE_MODE === "audit") {
+              if (branch.commit.sha !== process.env.CANDIDATE_SHA) {
+                core.setFailed(`Audit workflow SHA ${process.env.CANDIDATE_SHA} is not current main.`);
+              }
+              return;
+            }
+            const run = (await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: Number(process.env.CANDIDATE_RUN_ID),
+            })).data;
+            if (run.head_sha !== process.env.CANDIDATE_SHA || run.conclusion !== "success") {
+              core.setFailed("The CI candidate changed or is no longer successful.");
+              return;
+            }
+            if (process.env.CANDIDATE_MODE === "deploy"
+              && branch.commit.sha !== process.env.CANDIDATE_SHA) {
+              core.setFailed(`main is ${branch.commit.sha}, not candidate ${process.env.CANDIDATE_SHA}.`);
+            }
+
+      - name: Re-download exact CI artifact on fresh runner
+        if: needs.preflight.outputs.mode != 'audit'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ needs.preflight.outputs.artifact_name }}
+          run-id: ${{ needs.preflight.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/calculator-release
+
+      - name: Re-verify artifact without executing candidate code
+        if: needs.preflight.outputs.mode != 'audit'
+        id: artifact
+        env:
+          CANDIDATE_SHA: ${{ needs.preflight.outputs.sha }}
+          VALIDATED_ARTIFACT_SHA256: ${{ needs.validation.outputs.artifact_sha256 }}
+          VALIDATED_INDEX_SHA256: ${{ needs.validation.outputs.candidate_index_sha256 }}
+          VALIDATED_METADATA_SHA256: ${{ needs.validation.outputs.metadata_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$VALIDATED_ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$VALIDATED_INDEX_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$VALIDATED_METADATA_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          release_dir="$RUNNER_TEMP/calculator-release"
+          expected_base="zzz-calculator-server-${CANDIDATE_SHA:0:12}"
+          archive="$release_dir/${expected_base}.tar.gz"
+          evidence="$release_dir/${expected_base}.evidence.json"
+          candidate_index="$release_dir/candidate-index.html"
+          candidate_assets="$release_dir/candidate-assets.txt"
+          test -f "$archive"
+          test -f "$evidence"
+          actual_sha="$(sha256sum "$archive" | awk '{print $1}')"
+          expected_sha="$(jq -er '.artifact.sha256' "$evidence")"
+          test "$actual_sha" = "$expected_sha"
+          test "$actual_sha" = "$VALIDATED_ARTIFACT_SHA256"
+          jq -e --arg commit "$CANDIDATE_SHA" --arg archive "$(basename "$archive")" --arg actual "$actual_sha" '
+            .commit == $commit and
+            .deployedCommit == $commit and
+            .artifact.sha256 == $actual and
+            (.artifact.path | endswith($archive)) and
+            (.releaseTree.fileCount > 0) and
+            (.pagesTree.fileCount > 0)
+          ' "$evidence" > /dev/null
+          tar -xOf "$archive" ./dist/pages/index.html > "$candidate_index"
+          candidate_index_sha256="$(sha256sum "$candidate_index" | awk '{print $1}')"
+          test "$candidate_index_sha256" = "$VALIDATED_INDEX_SHA256"
+          tar -tzf "$archive" \
+            | grep -E '^\./dist/pages/assets/[A-Za-z0-9._/-]+\.(avif|gif|jpe?g|png|svg|webp)$' \
+            | sed 's#^\./dist/pages##' \
+            | awk 'NR <= 3 { print }' > "$candidate_assets"
+          test -s "$candidate_assets"
+          printf 'archive=%s\nevidence=%s\nsha256=%s\ncandidate_index_sha256=%s\ncandidate_assets=%s\n' \
+            "$archive" "$evidence" "$actual_sha" "$candidate_index_sha256" \
+            "$candidate_assets" >> "$GITHUB_OUTPUT"
+
+      - name: Configure restricted SSH host verification
         env:
           PROD_KNOWN_HOSTS: ${{ secrets.PROD_KNOWN_HOSTS }}
+        shell: bash
         run: |
           set -euo pipefail
           test -n "$PROD_KNOWN_HOSTS"
@@ -220,65 +510,219 @@ jobs:
           printf '%s\n' "$PROD_KNOWN_HOSTS" > "$RUNNER_TEMP/ssh/known_hosts"
           chmod 600 "$RUNNER_TEMP/ssh/known_hosts"
 
-      - name: Upload candidate and invoke server gate
+      - name: Run remote gate and verify production transaction
         env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ needs.preflight.outputs.main_sha }}
           PROD_HOST: ${{ secrets.PROD_HOST }}
           PROD_USER: ${{ secrets.PROD_USER }}
           PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          PROD_URL: ${{ needs.preflight.outputs.production_url }}
           CANDIDATE_SHA: ${{ needs.preflight.outputs.sha }}
           CANDIDATE_MODE: ${{ needs.preflight.outputs.mode }}
           ARCHIVE: ${{ steps.artifact.outputs.archive }}
           EVIDENCE: ${{ steps.artifact.outputs.evidence }}
           ARTIFACT_SHA256: ${{ steps.artifact.outputs.sha256 }}
+          CANDIDATE_INDEX_SHA256: ${{ steps.artifact.outputs.candidate_index_sha256 }}
+          CANDIDATE_ASSETS: ${{ steps.artifact.outputs.candidate_assets }}
         shell: bash
         run: |
           set -euo pipefail
+          evidence_file="$RUNNER_TEMP/deploy-output.txt"
+          key_file=""
+          cleanup() {
+            local exit_code="$?"
+            trap - EXIT
+            if [[ -n "$key_file" && -f "$key_file" ]]; then
+              shred -u -- "$key_file" 2>/dev/null || rm -f -- "$key_file"
+            fi
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+          exec > >(tee -a "$evidence_file") 2>&1
+
+          test -n "$GH_TOKEN"
+          test -n "$EXPECTED_MAIN_SHA"
           test -n "$PROD_HOST"
           test -n "$PROD_USER"
           test -n "$PROD_SSH_PRIVATE_KEY"
-          key_file="$RUNNER_TEMP/ssh/deploy_key"
-          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$key_file"
+          test -n "$PROD_URL"
+          [[ "$PROD_URL" == https://* ]]
+          base="${PROD_URL%/}"
+
+          assert_main_current() {
+            local gate="$1"
+            local live_main
+            live_main="$(curl --fail --silent --show-error --max-time 15 \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/branches/main" \
+              | jq -er '.commit.sha')"
+            if [[ "$live_main" != "$EXPECTED_MAIN_SHA" ]]; then
+              echo "main advanced to $live_main at gate: $gate"
+              return 1
+            fi
+            if [[ "$CANDIDATE_MODE" == "deploy" && "$live_main" != "$CANDIDATE_SHA" ]]; then
+              echo "deploy candidate $CANDIDATE_SHA is not live main $live_main"
+              return 1
+            fi
+          }
+
+          extract_hashed_refs() {
+            local index_file="$1"
+            local output_file="$2"
+            grep -Eo '(src|href)="[^"]+"' "$index_file" \
+              | sed -E 's/^(src|href)="([^"]+)"$/\2/' \
+              | grep -E '^/static/app/[A-Za-z0-9._/-]+-[A-Za-z0-9_-]{8,}\.(js|css)$' \
+              | sort -u > "$output_file" || return 1
+            [[ -s "$output_file" ]]
+          }
+
+          verify_cached_chunks() {
+            local list_file="$1"
+            local label="$2"
+            local path headers counter=0
+            while IFS= read -r path; do
+              [[ "$path" =~ ^/static/app/[A-Za-z0-9._/-]+-[A-Za-z0-9_-]{8,}\.(js|css)$ ]] || return 1
+              counter=$((counter + 1))
+              headers="$RUNNER_TEMP/${label}-chunk-${counter}.headers"
+              curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+                -D "$headers" -o /dev/null "$base$path" || return 1
+              grep -Eiq '^cache-control:.*public' "$headers" || return 1
+              grep -Eiq '^cache-control:.*immutable' "$headers" || return 1
+            done < "$list_file"
+            [[ "$counter" -gt 0 ]]
+          }
+
+          verify_candidate_assets() {
+            local path headers counter=0
+            while IFS= read -r path; do
+              [[ "$path" =~ ^/assets/[A-Za-z0-9._/-]+$ ]] || return 1
+              counter=$((counter + 1))
+              headers="$RUNNER_TEMP/candidate-asset-${counter}.headers"
+              curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+                -D "$headers" -o /dev/null "$base$path" || return 1
+              grep -Eiq '^cache-control:.*public' "$headers" || return 1
+              grep -Eiq '^cache-control:.*max-age=[1-9][0-9]*' "$headers" || return 1
+            done < "$CANDIDATE_ASSETS"
+            [[ "$counter" -gt 0 ]]
+          }
+
+          verify_public_candidate() {
+            local path
+            curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+              -D "$RUNNER_TEMP/after-home.headers" -o "$RUNNER_TEMP/after-index.html" "$base/" || return 1
+            grep -Eiq '^cache-control:[[:space:]]*no-store' "$RUNNER_TEMP/after-home.headers" || return 1
+            for path in /discs /settings /api/health /api/catalog /api/app-config; do
+              curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+                "$base$path" > /dev/null || return 1
+            done
+            curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+              "$base/downloads/zzz-scanner/manifest.json" > "$RUNNER_TEMP/after-scanner-manifest.json" || return 1
+            curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+              "$base/downloads/zzz-scanner/helper-manifest.json" > "$RUNNER_TEMP/after-helper-manifest.json" || return 1
+            [[ "$(sha256sum "$RUNNER_TEMP/after-scanner-manifest.json" | awk '{print $1}')" == "$scanner_manifest_before" ]] || return 1
+            [[ "$(sha256sum "$RUNNER_TEMP/after-helper-manifest.json" | awk '{print $1}')" == "$helper_manifest_before" ]] || return 1
+            [[ "$(sha256sum "$RUNNER_TEMP/after-index.html" | awk '{print $1}')" == "$CANDIDATE_INDEX_SHA256" ]] || return 1
+            extract_hashed_refs "$RUNNER_TEMP/after-index.html" "$RUNNER_TEMP/after-index-chunks.txt" || return 1
+            verify_cached_chunks "$RUNNER_TEMP/before-index-chunks.txt" old || return 1
+            verify_cached_chunks "$RUNNER_TEMP/after-index-chunks.txt" new || return 1
+            verify_candidate_assets || return 1
+          }
+
+          verify_restored_public() {
+            local path
+            curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+              -D "$RUNNER_TEMP/restored-home.headers" -o "$RUNNER_TEMP/restored-index.html" "$base/" || return 1
+            grep -Eiq '^cache-control:[[:space:]]*no-store' "$RUNNER_TEMP/restored-home.headers" || return 1
+            for path in /discs /settings /api/health /api/catalog /api/app-config; do
+              curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+                "$base$path" > /dev/null || return 1
+            done
+            [[ "$(sha256sum "$RUNNER_TEMP/restored-index.html" | awk '{print $1}')" == "$index_before" ]] || return 1
+            curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+              "$base/downloads/zzz-scanner/manifest.json" > "$RUNNER_TEMP/restored-scanner-manifest.json" || return 1
+            curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+              "$base/downloads/zzz-scanner/helper-manifest.json" > "$RUNNER_TEMP/restored-helper-manifest.json" || return 1
+            [[ "$(sha256sum "$RUNNER_TEMP/restored-scanner-manifest.json" | awk '{print $1}')" == "$scanner_manifest_before" ]] || return 1
+            [[ "$(sha256sum "$RUNNER_TEMP/restored-helper-manifest.json" | awk '{print $1}')" == "$helper_manifest_before" ]] || return 1
+            verify_cached_chunks "$RUNNER_TEMP/before-index-chunks.txt" restored || return 1
+          }
+
+          if [[ "$CANDIDATE_MODE" == "deploy" ]]; then
+            curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+              "$base/" > "$RUNNER_TEMP/before-index.html"
+            curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+              "$base/downloads/zzz-scanner/manifest.json" > "$RUNNER_TEMP/before-scanner-manifest.json"
+            curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+              "$base/downloads/zzz-scanner/helper-manifest.json" > "$RUNNER_TEMP/before-helper-manifest.json"
+            index_before="$(sha256sum "$RUNNER_TEMP/before-index.html" | awk '{print $1}')"
+            scanner_manifest_before="$(sha256sum "$RUNNER_TEMP/before-scanner-manifest.json" | awk '{print $1}')"
+            helper_manifest_before="$(sha256sum "$RUNNER_TEMP/before-helper-manifest.json" | awk '{print $1}')"
+            extract_hashed_refs "$RUNNER_TEMP/before-index.html" "$RUNNER_TEMP/before-index-chunks.txt"
+          fi
+
+          key_file="$(mktemp "$RUNNER_TEMP/ssh/deploy_key.XXXXXX")"
+          (umask 077; printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$key_file")
           chmod 600 "$key_file"
+          ssh-keygen -y -f "$key_file" > /dev/null
           ssh_opts=(-i "$key_file" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" -o RequestTTY=no -o ForwardAgent=no -o ClearAllForwardings=yes)
+
+          assert_main_current "before first SSH/SCP"
           if [[ "$CANDIDATE_MODE" == "audit" ]]; then
             ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
-              sudo -n /usr/local/sbin/zzz-calculator-deploy audit \
-              | tee "$RUNNER_TEMP/deploy-output.txt"
+              sudo -n /usr/local/sbin/zzz-calculator-deploy audit
             exit 0
           fi
+
           archive_name="$(basename "$ARCHIVE")"
           evidence_name="$(basename "$EVIDENCE")"
-          remote_archive="/var/lib/zzz-calculator-deploy/incoming/${archive_name}.part"
-          remote_evidence="/var/lib/zzz-calculator-deploy/incoming/${evidence_name}.part"
-          scp "${ssh_opts[@]}" "$ARCHIVE" "$PROD_USER@$PROD_HOST:$remote_archive"
-          scp "${ssh_opts[@]}" "$EVIDENCE" "$PROD_USER@$PROD_HOST:$remote_evidence"
-          ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
-            sudo -n /usr/local/sbin/zzz-calculator-deploy "$CANDIDATE_MODE" \
-              --artifact "$remote_archive" --evidence "$remote_evidence" \
-              --expected-sha "$ARTIFACT_SHA256" --expected-commit "$CANDIDATE_SHA" \
-            | tee "$RUNNER_TEMP/deploy-output.txt"
+          remote_archive_name="${archive_name}.part"
+          remote_evidence_name="${evidence_name}.part"
+          remote_archive="/var/lib/zzz-calculator-deploy/incoming/${remote_archive_name}"
+          remote_evidence="/var/lib/zzz-calculator-deploy/incoming/${remote_evidence_name}"
+          scp -O "${ssh_opts[@]}" "$ARCHIVE" "$PROD_USER@$PROD_HOST:$remote_archive"
+          scp -O "${ssh_opts[@]}" "$EVIDENCE" "$PROD_USER@$PROD_HOST:$remote_evidence"
 
-      - name: Verify public production routes
-        if: needs.preflight.outputs.mode == 'deploy'
-        env:
-          PROD_URL: ${{ vars.PROD_URL }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$PROD_URL"
-          base="${PROD_URL%/}"
-          for path in / /discs /settings /api/health /api/catalog /api/app-config \
-            /downloads/zzz-scanner/manifest.json /downloads/zzz-scanner/helper-manifest.json; do
-            curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 "$base$path" > /dev/null
-          done
-          curl --fail --silent --show-error --max-time 15 -D "$RUNNER_TEMP/home-headers.txt" -o /dev/null "$base/"
-          grep -Eiq '^cache-control:[[:space:]]*no-store' "$RUNNER_TEMP/home-headers.txt"
+          if [[ "$CANDIDATE_MODE" == "dry-run" ]]; then
+            ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
+              sudo -n /usr/local/sbin/zzz-calculator-deploy dry-run \
+                --artifact "$remote_archive_name" --evidence "$remote_evidence_name" \
+                --expected-sha "$ARTIFACT_SHA256" --expected-commit "$CANDIDATE_SHA"
+            exit 0
+          fi
+
+          assert_main_current "immediately before deploy invocation"
+          ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
+            sudo -n /usr/local/sbin/zzz-calculator-deploy deploy \
+              --artifact "$remote_archive_name" --evidence "$remote_evidence_name" \
+              --expected-sha "$ARTIFACT_SHA256" --expected-commit "$CANDIDATE_SHA"
+
+          if ! verify_public_candidate; then
+            echo "Public verification failed; rolling back to the server-recorded previous release."
+            rollback_status=0
+            ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
+              sudo -n /usr/local/sbin/zzz-calculator-deploy rollback --previous \
+              || rollback_status="$?"
+            if [[ "$rollback_status" -ne 0 ]]; then
+              echo "Automatic rollback command failed with exit code $rollback_status."
+              exit 1
+            fi
+            if ! verify_restored_public; then
+              echo "Automatic rollback completed, but restored public health verification failed."
+              exit 1
+            fi
+            echo "Automatic rollback restored the pre-deploy public release."
+            exit 1
+          fi
+          echo "Production deployment and public verification succeeded."
 
       - name: Upload deployment evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: production-${{ needs.preflight.outputs.mode }}-${{ needs.preflight.outputs.sha }}
           path: ${{ runner.temp }}/deploy-output.txt
-          if-no-files-found: ignore
+          if-no-files-found: error
           retention-days: 14

@@ -1,7 +1,17 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 set -Eeuo pipefail
 umask 027
+export PATH="/usr/sbin:/usr/bin:/sbin:/bin"
+unset BASH_ENV ENV CDPATH GLOBIGNORE NODE_OPTIONS NODE_PATH NPM_CONFIG_PREFIX \
+    LD_PRELOAD LD_LIBRARY_PATH TAR_OPTIONS GZIP BZIP BZIP2 XZ_OPT \
+    AWKPATH AWKLIBPATH POSIXLY_CORRECT CURL_HOME || true
+while read -r _ _ inherited_function; do
+    unset -f "$inherited_function"
+done < <(declare -F)
+unalias -a 2>/dev/null || true
+hash -r
+IFS=$' \t\n'
 
 readonly DEPLOY_ROOT="/var/lib/zzz-calculator-deploy"
 readonly INCOMING_DIR="${DEPLOY_ROOT}/incoming"
@@ -17,6 +27,34 @@ readonly HELPER_MANIFEST="/srv/zzz-download-origin/downloads/zzz-scanner/helper-
 readonly SCANNER_MANIFEST="/srv/zzz-download-origin/downloads/zzz-scanner/manifest.json"
 readonly APP_USER="zzzcalc"
 readonly APP_GROUP="zzzcalc"
+readonly VALIDATION_USER="zzzvalidate"
+readonly VALIDATION_GROUP="zzzvalidate"
+readonly VALIDATION_ACCOUNT_HOME="/nonexistent"
+readonly VALIDATION_WORKER="/usr/local/libexec/zzz-calculator-validation-worker"
+readonly VALIDATION_PORT="8788"
+readonly VALIDATION_UNIT_PREFIX="zzz-calculator-validation"
+readonly VALIDATION_TMPFS_BYTES="$((128 * 1024 * 1024))"
+readonly VALIDATION_TMPFS_INODES="16384"
+readonly VALIDATION_RUN_TMPFS_BYTES="$((4 * 1024 * 1024))"
+readonly VALIDATION_RUN_TMPFS_INODES="1024"
+readonly MAX_VALIDATION_SEED_BYTES="$((64 * 1024 * 1024))"
+readonly MAX_VALIDATION_SEED_ENTRIES="8192"
+readonly MAX_VALIDATION_SEED_FILE_BYTES="$((1024 * 1024))"
+readonly -a VALIDATION_CATALOG_FILES=(
+    agents.json
+    agent_skills.json
+    anomaly_effects.json
+    bosses.json
+    combat_buffs.json
+    drive_disc_sets.json
+    stat_rules.json
+    w_engines.json
+)
+readonly MAX_COMPRESSED_BYTES="$((256 * 1024 * 1024))"
+readonly MAX_EXPANDED_BYTES="$((1024 * 1024 * 1024))"
+readonly MAX_ARCHIVE_ENTRIES="20000"
+readonly MAX_EVIDENCE_BYTES="$((1024 * 1024))"
+readonly MIN_DISK_HEADROOM_BYTES="$((512 * 1024 * 1024))"
 
 ACTION="${1:-}"
 STATUS="started"
@@ -43,16 +81,46 @@ PID_AFTER=""
 RESTARTS_BEFORE=""
 RESTARTS_AFTER=""
 NGINX_STATUS="not-checked"
-HELPER_MANIFEST_SHA256=""
-SCANNER_MANIFEST_SHA256=""
+NGINX_STATUS_AFTER="not-checked"
+HELPER_MANIFEST_SHA256_BEFORE=""
+HELPER_MANIFEST_SHA256_AFTER=""
+SCANNER_MANIFEST_SHA256_BEFORE=""
+SCANNER_MANIFEST_SHA256_AFTER=""
 RELEASE_TREE_SHA256=""
 PAGES_TREE_SHA256=""
 EVIDENCE_PATH=""
 DISK_STATUS=""
+DISK_STATUS_AFTER=""
 MEMORY_STATUS=""
+MEMORY_STATUS_AFTER=""
+ARCHIVE_ENTRY_COUNT=""
+ARCHIVE_EXPANDED_BYTES=""
+DISK_REQUIRED_BYTES=""
+DISK_AVAILABLE_BYTES=""
+VALIDATION_SEQUENCE=""
 FINALIZE_UPLOAD="0"
 PROCESSING_JOB_DIR=""
 CLAIMED_PATH=""
+VALIDATION_JOB_DIR=""
+CANDIDATE_STAGING=""
+ROLLBACK_STAGING=""
+VALIDATION_UNIT=""
+VALIDATION_ACTIVE_LABEL=""
+VALIDATION_PROBE_ROOT=""
+VALIDATION_PROBE_INDEX="0"
+VALIDATION_DIR_EXPOSED="0"
+VALIDATION_UNIT_RESULTS=""
+VALIDATION_UID=""
+VALIDATION_GID=""
+SWITCH_STATE="not-switched"
+SWITCH_ROLLBACK_TARGET=""
+SWITCH_TARGET=""
+SWITCH_ORIGINAL_TARGET=""
+NEXT_LINK_PATH=""
+STATE_PREVIOUS_EXISTED="0"
+STATE_LAST_EXISTED="0"
+STATE_PREVIOUS_BEFORE=""
+STATE_LAST_BEFORE=""
 STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 usage() {
@@ -61,7 +129,7 @@ Usage:
   zzz-calculator-deploy audit
   zzz-calculator-deploy dry-run [--artifact <basename-or-incoming-part>] [--evidence <basename-or-incoming-part>] [--expected-sha <sha256>] [--expected-commit <40-char-sha>]
   zzz-calculator-deploy deploy  [--artifact <basename-or-incoming-part>] [--evidence <basename-or-incoming-part>] --expected-sha <sha256> --expected-commit <40-char-sha>
-  zzz-calculator-deploy rollback [--previous|--release <release-basename>]
+  zzz-calculator-deploy rollback --previous
 
 Artifacts are resolved only below /var/lib/zzz-calculator-deploy/incoming.
 Omitting --artifact is allowed only when that directory contains exactly one server artifact.
@@ -78,21 +146,109 @@ die() {
     exit 1
 }
 
-json_escape() {
-    local value="${1-}"
-    value=${value//\\/\\\\}
-    value=${value//\"/\\\"}
-    value=${value//$'\r'/\\r}
-    value=${value//$'\n'/\\n}
-    value=${value//$'\t'/\\t}
-    printf '%s' "$value"
-}
-
 json_field() {
     local name="$1"
     local value="${2-}"
     local separator="${3:-,}"
-    printf '"%s":"%s"%s' "$(json_escape "$name")" "$(json_escape "$value")" "$separator"
+    local encoded_name encoded_value
+    encoded_name="$(printf '%s' "$name" | jq -Rs .)" || return 1
+    encoded_value="$(printf '%s' "$value" | jq -Rs .)" || return 1
+    printf '%s:%s%s' "$encoded_name" "$encoded_value" "$separator"
+}
+
+emit_evidence_json() {
+    local reported_switch_state="$1"
+    local completed_at="$2"
+    local index separator
+    local -a fields=(
+        action "$ACTION"
+        status "$STATUS"
+        startedAt "$STARTED_AT"
+        completedAt "$completed_at"
+        error "$ERROR_MESSAGE"
+        artifact "$ARTIFACT_BASENAME"
+        artifactSizeBytes "$ARTIFACT_SIZE_BYTES"
+        artifactSha256 "$ARTIFACT_SHA256"
+        deployedCommit "$DEPLOYED_COMMIT"
+        release "$RELEASE_BASENAME"
+        rollbackRelease "$ROLLBACK_BASENAME"
+        previousRelease "$PREVIOUS_BASENAME"
+        currentBefore "$CURRENT_BEFORE"
+        currentAfter "$CURRENT_AFTER"
+        currentCommitBefore "$CURRENT_COMMIT_BEFORE"
+        currentCommitAfter "$CURRENT_COMMIT_AFTER"
+        serviceBefore "$SERVICE_BEFORE"
+        serviceAfter "$SERVICE_AFTER"
+        pidBefore "$PID_BEFORE"
+        pidAfter "$PID_AFTER"
+        nRestartsBefore "$RESTARTS_BEFORE"
+        nRestartsAfter "$RESTARTS_AFTER"
+        nginx "$NGINX_STATUS"
+        nginxBefore "$NGINX_STATUS"
+        nginxAfter "$NGINX_STATUS_AFTER"
+        disk "$DISK_STATUS"
+        diskBefore "$DISK_STATUS"
+        diskAfter "$DISK_STATUS_AFTER"
+        memory "$MEMORY_STATUS"
+        memoryBefore "$MEMORY_STATUS"
+        memoryAfter "$MEMORY_STATUS_AFTER"
+        helperManifestSha256 "$HELPER_MANIFEST_SHA256_BEFORE"
+        scannerManifestSha256 "$SCANNER_MANIFEST_SHA256_BEFORE"
+        helperManifestSha256Before "$HELPER_MANIFEST_SHA256_BEFORE"
+        helperManifestSha256After "$HELPER_MANIFEST_SHA256_AFTER"
+        scannerManifestSha256Before "$SCANNER_MANIFEST_SHA256_BEFORE"
+        scannerManifestSha256After "$SCANNER_MANIFEST_SHA256_AFTER"
+        archiveEntryCount "$ARCHIVE_ENTRY_COUNT"
+        archiveExpandedBytes "$ARCHIVE_EXPANDED_BYTES"
+        diskRequiredBytes "$DISK_REQUIRED_BYTES"
+        diskAvailableBytes "$DISK_AVAILABLE_BYTES"
+        validationSequence "$VALIDATION_SEQUENCE"
+        validationUnitResults "$VALIDATION_UNIT_RESULTS"
+        switchState "$reported_switch_state"
+        releaseTreeSha256 "$RELEASE_TREE_SHA256"
+        pagesTreeSha256 "$PAGES_TREE_SHA256"
+    )
+
+    printf '{' || return 1
+    for ((index = 0; index < ${#fields[@]}; index += 2)); do
+        separator=','
+        if (( index + 2 == ${#fields[@]} )); then separator=''; fi
+        json_field "${fields[index]}" "${fields[index + 1]}" "$separator" || return 1
+    done
+    printf '}\n' || return 1
+}
+
+validate_evidence_json() {
+    local evidence_file="$1"
+    jq -e '
+        def required_keys: [
+            "action", "status", "startedAt", "completedAt", "error",
+            "artifact", "artifactSizeBytes", "artifactSha256", "deployedCommit",
+            "release", "rollbackRelease", "previousRelease", "currentBefore",
+            "currentAfter", "currentCommitBefore", "currentCommitAfter",
+            "serviceBefore", "serviceAfter", "pidBefore", "pidAfter",
+            "nRestartsBefore", "nRestartsAfter", "nginx", "nginxBefore",
+            "nginxAfter", "disk", "diskBefore", "diskAfter", "memory",
+            "memoryBefore", "memoryAfter", "helperManifestSha256",
+            "scannerManifestSha256", "helperManifestSha256Before",
+            "helperManifestSha256After", "scannerManifestSha256Before",
+            "scannerManifestSha256After", "archiveEntryCount",
+            "archiveExpandedBytes", "diskRequiredBytes", "diskAvailableBytes",
+            "validationSequence", "validationUnitResults", "switchState", "releaseTreeSha256",
+            "pagesTreeSha256"
+        ] | sort;
+        type == "object"
+        and (keys == required_keys)
+        and (all(.[]; type == "string"))
+        and (.action as $action | (["audit", "dry-run", "deploy", "rollback"] | index($action)) != null)
+        and (.status as $status | (["success", "failed"] | index($status)) != null)
+        and (.switchState as $state | (["not-switched", "rolled-back", "committed", "armed", "switched"] | index($state)) != null)
+        and (.startedAt | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"))
+        and (.completedAt | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"))
+        and ((.status == "success" and .error == "") or (.status == "failed" and (.error | length) > 0))
+        and (.artifactSha256 == "" or (.artifactSha256 | test("^[0-9a-f]{64}$")))
+        and (.deployedCommit == "" or (.deployedCommit | test("^[0-9a-f]{40}$")))
+    ' -- "$evidence_file" >/dev/null
 }
 
 read_commit() {
@@ -128,8 +284,8 @@ capture_before() {
     SERVICE_BEFORE="$(systemctl is-active "$SERVICE_NAME" 2>/dev/null || true)"
     PID_BEFORE="$(service_property MainPID)"
     RESTARTS_BEFORE="$(service_property NRestarts)"
-    HELPER_MANIFEST_SHA256="$(manifest_sha256 "$HELPER_MANIFEST")"
-    SCANNER_MANIFEST_SHA256="$(manifest_sha256 "$SCANNER_MANIFEST")"
+    HELPER_MANIFEST_SHA256_BEFORE="$(manifest_sha256 "$HELPER_MANIFEST")"
+    SCANNER_MANIFEST_SHA256_BEFORE="$(manifest_sha256 "$SCANNER_MANIFEST")"
     DISK_STATUS="$(df -P /opt /srv 2>/dev/null | tr '\n' ' ' || true)"
     MEMORY_STATUS="$(free -h 2>/dev/null | tr '\n' ' ' || true)"
     if command -v nginx >/dev/null 2>&1 && nginx -t >/dev/null 2>&1; then
@@ -145,73 +301,35 @@ capture_after() {
     SERVICE_AFTER="$(systemctl is-active "$SERVICE_NAME" 2>/dev/null || true)"
     PID_AFTER="$(service_property MainPID)"
     RESTARTS_AFTER="$(service_property NRestarts)"
+    HELPER_MANIFEST_SHA256_AFTER="$(manifest_sha256 "$HELPER_MANIFEST")"
+    SCANNER_MANIFEST_SHA256_AFTER="$(manifest_sha256 "$SCANNER_MANIFEST")"
+    DISK_STATUS_AFTER="$(df -P /opt /srv 2>/dev/null | tr '\n' ' ' || true)"
+    MEMORY_STATUS_AFTER="$(free -h 2>/dev/null | tr '\n' ' ' || true)"
+    if command -v nginx >/dev/null 2>&1 && nginx -t >/dev/null 2>&1; then
+        NGINX_STATUS_AFTER="valid"
+    else
+        NGINX_STATUS_AFTER="invalid"
+    fi
 }
 
 write_evidence() {
-    local completed_at
+    local completed_at evidence_tmp reported_switch_state
     local suffix="${DEPLOYED_COMMIT:0:12}"
     completed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     [[ -n "$suffix" ]] || suffix="none"
-
-    if [[ ! -d "$HISTORY_DIR" || ! -w "$HISTORY_DIR" ]]; then
-        return 0
+    reported_switch_state="$SWITCH_STATE"
+    if [[ "$STATUS" == "success" && "$SWITCH_STATE" == "switched" ]]; then
+        reported_switch_state="committed"
     fi
 
     EVIDENCE_PATH="${HISTORY_DIR}/$(date -u +%Y%m%dT%H%M%SZ)-${ACTION:-unknown}-${suffix}-$$.json"
-    {
-        printf '{'
-        json_field action "$ACTION"
-        json_field status "$STATUS"
-        json_field startedAt "$STARTED_AT"
-        json_field completedAt "$completed_at"
-        json_field error "$ERROR_MESSAGE"
-        json_field artifact "$ARTIFACT_BASENAME"
-        json_field artifactSizeBytes "$ARTIFACT_SIZE_BYTES"
-        json_field artifactSha256 "$ARTIFACT_SHA256"
-        json_field deployedCommit "$DEPLOYED_COMMIT"
-        json_field release "$RELEASE_BASENAME"
-        json_field rollbackRelease "$ROLLBACK_BASENAME"
-        json_field previousRelease "$PREVIOUS_BASENAME"
-        json_field currentBefore "$CURRENT_BEFORE"
-        json_field currentAfter "$CURRENT_AFTER"
-        json_field currentCommitBefore "$CURRENT_COMMIT_BEFORE"
-        json_field currentCommitAfter "$CURRENT_COMMIT_AFTER"
-        json_field serviceBefore "$SERVICE_BEFORE"
-        json_field serviceAfter "$SERVICE_AFTER"
-        json_field pidBefore "$PID_BEFORE"
-        json_field pidAfter "$PID_AFTER"
-        json_field nRestartsBefore "$RESTARTS_BEFORE"
-        json_field nRestartsAfter "$RESTARTS_AFTER"
-        json_field nginx "$NGINX_STATUS"
-        json_field disk "$DISK_STATUS"
-        json_field memory "$MEMORY_STATUS"
-        json_field helperManifestSha256 "$HELPER_MANIFEST_SHA256"
-        json_field scannerManifestSha256 "$SCANNER_MANIFEST_SHA256"
-        json_field releaseTreeSha256 "$RELEASE_TREE_SHA256"
-        json_field pagesTreeSha256 "$PAGES_TREE_SHA256" ''
-        printf '}\n'
-    } >"$EVIDENCE_PATH"
-    chmod 0640 "$EVIDENCE_PATH"
-}
-
-on_exit() {
-    local exit_code="$1"
-    trap - EXIT
-    if ! cleanup_processing_job; then
-        [[ -n "$ERROR_MESSAGE" ]] || ERROR_MESSAGE="failed to remove root-only processing data"
-        exit_code=1
-    fi
-    if [[ "$exit_code" -eq 0 ]]; then
-        STATUS="success"
-    else
-        STATUS="failed"
-    fi
-    capture_after || true
-    write_evidence || true
-    if [[ -n "$EVIDENCE_PATH" && -f "$EVIDENCE_PATH" ]]; then
-        cat -- "$EVIDENCE_PATH" || true
-    fi
-    exit "$exit_code"
+    [[ ! -e "$EVIDENCE_PATH" && ! -L "$EVIDENCE_PATH" ]] || return 1
+    evidence_tmp="$(mktemp "${HISTORY_DIR}/.evidence.XXXXXXXX")" || return 1
+    emit_evidence_json "$reported_switch_state" "$completed_at" >"$evidence_tmp" \
+        || { rm -f -- "$evidence_tmp"; return 1; }
+    validate_evidence_json "$evidence_tmp" || { rm -f -- "$evidence_tmp"; return 1; }
+    chmod 0640 "$evidence_tmp" || { rm -f -- "$evidence_tmp"; return 1; }
+    mv -T -- "$evidence_tmp" "$EVIDENCE_PATH" || { rm -f -- "$evidence_tmp"; return 1; }
 }
 
 cleanup_processing_job() {
@@ -225,26 +343,320 @@ cleanup_processing_job() {
     PROCESSING_JOB_DIR=""
 }
 
-require_root_and_layout() {
-    [[ "$(id -u)" -eq 0 ]] || die "this program must run as root through the restricted sudo rule"
-    [[ -d "$DEPLOY_ROOT" ]] || die "deployment root is not initialized"
-    [[ -d "$INCOMING_DIR" ]] || die "incoming directory is not initialized"
-    [[ -d "$PROCESSING_DIR" && ! -L "$PROCESSING_DIR" ]] || die "processing directory is not initialized"
-    [[ "$(stat -c '%U:%G:%a' -- "$PROCESSING_DIR")" == "root:root:700" ]] || die "processing directory must be root-owned mode 0700"
-    [[ -d "$HISTORY_DIR" ]] || die "history directory is not initialized"
-    [[ -d "$VALIDATION_DIR" ]] || die "validation directory is not initialized"
-    [[ -d "$RELEASE_ROOT" ]] || die "release root is missing"
-    command -v flock >/dev/null || die "flock is required"
-    command -v sha256sum >/dev/null || die "sha256sum is required"
-    command -v tar >/dev/null || die "tar is required"
-    command -v cmp >/dev/null || die "cmp is required"
-    if [[ -n "$EVIDENCE_PATH_INPUT" ]]; then
-        command -v jq >/dev/null || die "jq is required when evidence is supplied"
+stop_validation_probe() {
+    local unit load_state active_state control_group cgroup_procs
+    [[ -n "$VALIDATION_UNIT" ]] || return 0
+    unit="$VALIDATION_UNIT"
+    load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null || true)"
+    if [[ -n "$load_state" && "$load_state" != "not-found" ]]; then
+        systemctl stop "$unit" >/dev/null 2>&1 || return 1
+        active_state="$(systemctl show "$unit" --property ActiveState --value 2>/dev/null || true)"
+        [[ "$active_state" == "inactive" || "$active_state" == "failed" ]] || return 1
+        control_group="$(systemctl show "$unit" --property ControlGroup --value 2>/dev/null || true)"
+        if [[ "$control_group" == /* ]]; then
+            cgroup_procs="/sys/fs/cgroup${control_group}/cgroup.procs"
+            if [[ -r "$cgroup_procs" ]] && grep -Eq '[0-9]' -- "$cgroup_procs"; then
+                return 1
+            fi
+        fi
+        systemctl reset-failed "$unit" >/dev/null 2>&1 || true
+    fi
+    VALIDATION_UNIT=""
+}
+
+safe_remove_transient_dir() {
+    local target="${1:-}"
+    local allowed="0"
+    [[ -n "$target" ]] || return 0
+    case "$target" in
+        "$VALIDATION_DIR"/job.*|"$RELEASE_ROOT"/.candidate.*|"$RELEASE_ROOT"/.rollback.*) allowed="1" ;;
+    esac
+    [[ "$allowed" == "1" ]] || return 1
+    [[ ! -L "$target" ]] || return 1
+    [[ -e "$target" ]] || return 0
+    rm -rf --one-file-system -- "$target"
+}
+
+cleanup_transient_trees() {
+    local failed="0"
+    local active_state sub_state result exec_status
+    if [[ -n "$VALIDATION_ACTIVE_LABEL" && -n "$VALIDATION_PROBE_ROOT" ]]; then
+        active_state="$(systemctl show "$VALIDATION_UNIT" --property ActiveState --value 2>/dev/null || true)"
+        sub_state="$(systemctl show "$VALIDATION_UNIT" --property SubState --value 2>/dev/null || true)"
+        result="$(systemctl show "$VALIDATION_UNIT" --property Result --value 2>/dev/null || true)"
+        exec_status="$(systemctl show "$VALIDATION_UNIT" --property ExecMainStatus --value 2>/dev/null || true)"
+        stop_validation_probe || failed="1"
+        record_validation_unit_result "$VALIDATION_ACTIVE_LABEL" "$active_state" "$sub_state" "$result" "$exec_status"
+        VALIDATION_ACTIVE_LABEL=""
+    else
+        stop_validation_probe || failed="1"
+    fi
+    safe_remove_transient_dir "$CANDIDATE_STAGING" || failed="1"
+    safe_remove_transient_dir "$ROLLBACK_STAGING" || failed="1"
+    safe_remove_transient_dir "$VALIDATION_JOB_DIR" || failed="1"
+    CANDIDATE_STAGING=""
+    ROLLBACK_STAGING=""
+    VALIDATION_JOB_DIR=""
+    VALIDATION_ACTIVE_LABEL=""
+    VALIDATION_PROBE_ROOT=""
+    if [[ "$VALIDATION_DIR_EXPOSED" == "1" ]]; then
+        chown root:root "$VALIDATION_DIR" 2>/dev/null || failed="1"
+        chmod 0750 "$VALIDATION_DIR" 2>/dev/null || failed="1"
+        VALIDATION_DIR_EXPOSED="0"
+    fi
+    if [[ -n "$NEXT_LINK_PATH" ]]; then
+        if [[ "$NEXT_LINK_PATH" != "${CURRENT_LINK}.next.$$" || ( -e "$NEXT_LINK_PATH" && ! -L "$NEXT_LINK_PATH" ) ]]; then
+            failed="1"
+        else
+            rm -f -- "$NEXT_LINK_PATH" 2>/dev/null || failed="1"
+            NEXT_LINK_PATH=""
+        fi
+    fi
+    [[ "$failed" == "0" ]]
+}
+
+read_state_snapshot() {
+    if [[ -f "$DEPLOY_ROOT/previous-release" && ! -L "$DEPLOY_ROOT/previous-release" ]]; then
+        STATE_PREVIOUS_EXISTED="1"
+        STATE_PREVIOUS_BEFORE="$(<"$DEPLOY_ROOT/previous-release")"
+    fi
+    if [[ -f "$DEPLOY_ROOT/last-release" && ! -L "$DEPLOY_ROOT/last-release" ]]; then
+        STATE_LAST_EXISTED="1"
+        STATE_LAST_BEFORE="$(<"$DEPLOY_ROOT/last-release")"
     fi
 }
 
+restore_state_snapshot() {
+    if [[ "$STATE_PREVIOUS_EXISTED" == "1" ]]; then
+        write_state_file previous-release "$STATE_PREVIOUS_BEFORE" || return 1
+    else
+        rm -f -- "$DEPLOY_ROOT/previous-release" || return 1
+    fi
+    if [[ "$STATE_LAST_EXISTED" == "1" ]]; then
+        write_state_file last-release "$STATE_LAST_BEFORE" || return 1
+    else
+        rm -f -- "$DEPLOY_ROOT/last-release" || return 1
+    fi
+}
+
+rollback_uncommitted_switch() {
+    if [[ "$SWITCH_STATE" == "armed" ]]; then
+        case "$(current_target)" in
+            "$SWITCH_TARGET") SWITCH_STATE="switched" ;;
+            "$SWITCH_ORIGINAL_TARGET") SWITCH_STATE="not-switched"; return 0 ;;
+            *) return 1 ;;
+        esac
+    fi
+    [[ "$SWITCH_STATE" == "switched" ]] || return 0
+    [[ -n "$SWITCH_ROLLBACK_TARGET" && -d "$SWITCH_ROLLBACK_TARGET" && ! -L "$SWITCH_ROLLBACK_TARGET" ]] || return 1
+    log "restoring uncommitted production switch to $(basename -- "$SWITCH_ROLLBACK_TARGET")"
+    if [[ "$(current_target)" != "$SWITCH_ROLLBACK_TARGET" ]]; then
+        atomic_switch "$SWITCH_ROLLBACK_TARGET" || return 1
+    fi
+    systemctl restart "$SERVICE_NAME" || return 1
+    health_gate || return 1
+    restore_state_snapshot || return 1
+    SWITCH_STATE="rolled-back"
+}
+
+on_signal() {
+    local signal_name="$1"
+    ERROR_MESSAGE="deployment interrupted by ${signal_name}"
+    log "ERROR: ${ERROR_MESSAGE}"
+    exit 128
+}
+
+on_exit() {
+    local exit_code="$1"
+    local evidence_ok="0"
+    trap - EXIT
+    trap '' HUP INT TERM
+    set +e
+
+    if [[ "$exit_code" -ne 0 && -z "$ERROR_MESSAGE" ]]; then
+        ERROR_MESSAGE="operation failed with exit code ${exit_code}"
+    fi
+
+    if [[ "$SWITCH_STATE" == "armed" ]]; then
+        exit_code=1
+        [[ -n "$ERROR_MESSAGE" ]] || ERROR_MESSAGE="operation exited while the atomic switch was armed"
+        if ! rollback_uncommitted_switch; then
+            ERROR_MESSAGE="cannot determine or restore the interrupted atomic switch"
+            log "ERROR: ${ERROR_MESSAGE}"
+        fi
+    fi
+
+    if [[ "$exit_code" -ne 0 && "$SWITCH_STATE" == "switched" ]]; then
+        if ! rollback_uncommitted_switch; then
+            [[ -n "$ERROR_MESSAGE" ]] || ERROR_MESSAGE="operation failed and automatic rollback also failed"
+            log "ERROR: automatic rollback failed"
+        fi
+    fi
+    if ! cleanup_processing_job; then
+        [[ -n "$ERROR_MESSAGE" ]] || ERROR_MESSAGE="failed to remove root-only processing data"
+        exit_code=1
+    fi
+    if ! cleanup_transient_trees; then
+        [[ -n "$ERROR_MESSAGE" ]] || ERROR_MESSAGE="failed to remove transient validation or staging data"
+        exit_code=1
+    fi
+    if [[ "$exit_code" -ne 0 && "$SWITCH_STATE" == "switched" ]]; then
+        rollback_uncommitted_switch || true
+    fi
+
+    capture_after
+    if [[ "$exit_code" -eq 0 ]]; then
+        if [[ "$NGINX_STATUS_AFTER" != "valid" ]]; then
+            ERROR_MESSAGE="nginx configuration changed before evidence commit"
+            log "ERROR: ${ERROR_MESSAGE}"
+            exit_code=1
+        elif [[ -z "$HELPER_MANIFEST_SHA256_AFTER" || "$HELPER_MANIFEST_SHA256_AFTER" != "$HELPER_MANIFEST_SHA256_BEFORE" \
+            || -z "$SCANNER_MANIFEST_SHA256_AFTER" || "$SCANNER_MANIFEST_SHA256_AFTER" != "$SCANNER_MANIFEST_SHA256_BEFORE" ]]; then
+            ERROR_MESSAGE="download manifest changed before evidence commit"
+            log "ERROR: ${ERROR_MESSAGE}"
+            exit_code=1
+        elif [[ "$SWITCH_STATE" == "switched" \
+            && ( "$CURRENT_AFTER" != "$SWITCH_TARGET" || "$SERVICE_AFTER" != "active" || ! "$PID_AFTER" =~ ^[1-9][0-9]*$ ) ]]; then
+            ERROR_MESSAGE="candidate runtime changed before evidence commit"
+            log "ERROR: ${ERROR_MESSAGE}"
+            exit_code=1
+        fi
+    fi
+    if [[ "$exit_code" -ne 0 && "$SWITCH_STATE" == "switched" ]]; then
+        rollback_uncommitted_switch || true
+        capture_after
+    fi
+    if [[ "$exit_code" -eq 0 ]]; then STATUS="success"; else STATUS="failed"; fi
+    if write_evidence; then
+        evidence_ok="1"
+    else
+        log "ERROR: failed to persist deployment evidence"
+        ERROR_MESSAGE="failed to persist deployment evidence"
+        STATUS="failed"
+        exit_code=1
+    fi
+
+    if [[ "$evidence_ok" != "1" && "$SWITCH_STATE" == "switched" ]]; then
+        rollback_uncommitted_switch || true
+        capture_after
+        write_evidence || true
+    elif [[ "$evidence_ok" == "1" && "$exit_code" -eq 0 && "$SWITCH_STATE" == "switched" ]]; then
+        SWITCH_STATE="committed"
+    fi
+
+    if [[ -n "$EVIDENCE_PATH" && -f "$EVIDENCE_PATH" ]]; then
+        cat -- "$EVIDENCE_PATH" || true
+    fi
+    exit "$exit_code"
+}
+
+assert_validation_principal() {
+    local expected_gid passwd_record account_name account_password account_uid account_gid
+    local account_gecos account_home account_shell password_status
+
+    expected_gid="$(getent group "$VALIDATION_GROUP" | awk -F: 'NR == 1 { print $3 }')"
+    [[ "$expected_gid" =~ ^[1-9][0-9]*$ ]] || die "validation group ${VALIDATION_GROUP} is missing or invalid"
+    passwd_record="$(getent passwd "$VALIDATION_USER")" || die "validation account ${VALIDATION_USER} is missing"
+    IFS=: read -r account_name account_password account_uid account_gid account_gecos account_home account_shell <<<"$passwd_record"
+    [[ "$account_name" == "$VALIDATION_USER" && "$account_uid" =~ ^[1-9][0-9]*$ ]] \
+        || die "validation account identity is invalid"
+    [[ "$account_gid" == "$expected_gid" && "$(id -G "$VALIDATION_USER")" == "$expected_gid" ]] \
+        || die "validation account must have only its dedicated primary group"
+    [[ "$account_home" == "$VALIDATION_ACCOUNT_HOME" && "$account_shell" == "/usr/sbin/nologin" ]] \
+        || die "validation account must use /nonexistent and /usr/sbin/nologin"
+    password_status="$(passwd --status "$VALIDATION_USER" 2>/dev/null | awk 'NR == 1 { print $2 }')"
+    [[ "$password_status" == "L" ]] || die "validation account password is not locked"
+    [[ ! -e "$VALIDATION_ACCOUNT_HOME" && ! -L "$VALIDATION_ACCOUNT_HOME" ]] \
+        || die "validation account home path must not exist"
+    if [[ -e /var/lib/zzz-calculator || -L /var/lib/zzz-calculator ]]; then
+        runuser -u "$VALIDATION_USER" -- test ! -r /var/lib/zzz-calculator \
+            || die "validation account can read the production StateDirectory"
+        runuser -u "$VALIDATION_USER" -- test ! -w /var/lib/zzz-calculator \
+            || die "validation account can write the production StateDirectory"
+        runuser -u "$VALIDATION_USER" -- test ! -x /var/lib/zzz-calculator \
+            || die "validation account can traverse the production StateDirectory"
+    fi
+    VALIDATION_UID="$account_uid"
+    VALIDATION_GID="$expected_gid"
+}
+
+require_root_and_layout() {
+    local tar_version required_absolute_command
+    [[ "$(id -u)" -eq 0 ]] || die "this program must run as root through the restricted sudo rule"
+    [[ -d "$DEPLOY_ROOT" && ! -L "$DEPLOY_ROOT" ]] || die "deployment root is not initialized"
+    [[ -d "$INCOMING_DIR" && ! -L "$INCOMING_DIR" ]] || die "incoming directory is not initialized"
+    [[ -d "$PROCESSING_DIR" && ! -L "$PROCESSING_DIR" ]] || die "processing directory is not initialized"
+    [[ "$(stat -c '%U:%G:%a' -- "$PROCESSING_DIR")" == "root:root:700" ]] || die "processing directory must be root-owned mode 0700"
+    [[ -d "$HISTORY_DIR" && ! -L "$HISTORY_DIR" && -w "$HISTORY_DIR" ]] || die "history directory is not initialized or writable"
+    [[ -d "$VALIDATION_DIR" && ! -L "$VALIDATION_DIR" ]] || die "validation directory is not initialized"
+    [[ "$(stat -c '%U:%G:%a' -- "$VALIDATION_DIR")" == "root:root:750" ]] || die "validation directory must be root-owned mode 0750"
+    [[ -d "$RELEASE_ROOT" && ! -L "$RELEASE_ROOT" ]] || die "release root is missing"
+    [[ "$(stat -c '%U:%G:%a' -- "$RELEASE_ROOT")" == "root:root:755" ]] || die "release root must be root-owned mode 0755"
+    command -v flock >/dev/null || die "flock is required"
+    command -v find >/dev/null || die "find is required"
+    command -v head >/dev/null || die "head is required"
+    command -v sha256sum >/dev/null || die "sha256sum is required"
+    command -v tar >/dev/null || die "tar is required"
+    tar_version="$(tar --version 2>/dev/null)" || die "cannot inspect tar version"
+    [[ "$tar_version" == tar\ \(GNU\ tar\)* ]] || die "GNU tar is required"
+    command -v base64 >/dev/null || die "base64 is required"
+    command -v cmp >/dev/null || die "cmp is required"
+    command -v curl >/dev/null || die "curl is required"
+    command -v jq >/dev/null || die "jq is required"
+    command -v nginx >/dev/null || die "nginx is required"
+    command -v journalctl >/dev/null || die "journalctl is required"
+    command -v mkdir >/dev/null || die "mkdir is required"
+    command -v runuser >/dev/null || die "runuser is required"
+    command -v sort >/dev/null || die "sort is required"
+    command -v realpath >/dev/null || die "realpath is required"
+    command -v systemd-run >/dev/null || die "systemd-run is required"
+    for required_absolute_command in \
+        /bin/bash /usr/bin/base64 /usr/bin/cmp /usr/bin/cp /usr/bin/df \
+        /usr/bin/env /usr/bin/journalctl /usr/bin/mkdir /usr/bin/node \
+        /usr/bin/stat /usr/bin/systemd-run /usr/bin/tail /usr/bin/timeout \
+        /usr/bin/tr; do
+        [[ -x "$required_absolute_command" ]] \
+            || die "${required_absolute_command} is required"
+    done
+    [[ -f "$VALIDATION_WORKER" && ! -L "$VALIDATION_WORKER" \
+        && "$(stat -c '%U:%G:%a' -- "$VALIDATION_WORKER")" == "root:root:555" ]] \
+        || die "validation worker must be root-owned mode 0555"
+    assert_validation_principal
+    runuser -u "$VALIDATION_USER" -- test -x "$VALIDATION_WORKER" \
+        || die "validation account cannot execute the validation worker"
+    runuser -u "$VALIDATION_USER" -- test ! -w "$VALIDATION_WORKER" \
+        || die "validation account can write the validation worker"
+}
+
+preflight_evidence_storage() {
+    local probe previous_status previous_error
+    probe="$(mktemp "${HISTORY_DIR}/.write-probe.XXXXXXXX")" || die "history directory cannot create evidence"
+    previous_status="$STATUS"
+    previous_error="$ERROR_MESSAGE"
+    STATUS="failed"
+    ERROR_MESSAGE="evidence preflight probe"
+    if ! emit_evidence_json "not-switched" "$STARTED_AT" >"$probe" \
+        || ! validate_evidence_json "$probe"; then
+        STATUS="$previous_status"
+        ERROR_MESSAGE="$previous_error"
+        rm -f -- "$probe"
+        die "history directory cannot render and validate evidence"
+    fi
+    STATUS="$previous_status"
+    ERROR_MESSAGE="$previous_error"
+    chmod 0600 "$probe" || { rm -f -- "$probe"; die "history evidence permissions cannot be set"; }
+    rm -f -- "$probe" || die "history evidence probe cannot be removed"
+}
+
 acquire_lock() {
+    if [[ -e "$LOCK_FILE" || -L "$LOCK_FILE" ]]; then
+        [[ -f "$LOCK_FILE" && ! -L "$LOCK_FILE" \
+            && "$(stat -c '%U:%G:%h' -- "$LOCK_FILE")" == "root:root:1" ]] \
+            || die "deployment lock is not a safe root-owned regular file"
+    fi
     exec 9>"$LOCK_FILE"
+    [[ "$(stat -Lc '%U:%G:%h' -- "/proc/$$/fd/9")" == "root:root:1" ]] \
+        || die "deployment lock descriptor is not a safe root-owned regular file"
     flock -n 9 || die "another deployment operation is running"
 }
 
@@ -333,11 +745,19 @@ parse_artifact_options() {
 
 claim_incoming_file() {
     local source="$1"
-    local basename untrusted sealed_tmp target
+    local basename untrusted sealed_tmp target max_bytes source_size sealed_size
 
     [[ "$source" == "$INCOMING_DIR/"* ]] || die "upload source is outside incoming"
     basename="${source##*/}"
     [[ "$basename" != "." && "$basename" != ".." && "$basename" != */* ]] || die "upload basename is invalid"
+    case "$basename" in
+        zzz-calculator-server-*.tar.gz|zzz-calculator-server-*.tar.gz.part) max_bytes="$MAX_COMPRESSED_BYTES" ;;
+        zzz-calculator-server-*.evidence.json|zzz-calculator-server-*.evidence.json.part) max_bytes="$MAX_EVIDENCE_BYTES" ;;
+        *) die "uploaded file type is not allowed" ;;
+    esac
+    source_size="$(stat -c '%s' -- "$source")"
+    [[ "$source_size" =~ ^[1-9][0-9]*$ ]] || die "uploaded file is empty or has an invalid size"
+    (( source_size <= max_bytes )) || die "uploaded file exceeds its size limit"
     untrusted="${PROCESSING_JOB_DIR}/.untrusted-${basename}"
     sealed_tmp="${PROCESSING_JOB_DIR}/.sealed-${basename}.tmp"
     target="${PROCESSING_JOB_DIR}/${basename}"
@@ -346,11 +766,18 @@ claim_incoming_file() {
     mv -T -- "$source" "$untrusted" || die "failed to claim uploaded file"
     [[ -f "$untrusted" && ! -L "$untrusted" ]] || die "claimed upload is not a regular file"
     [[ "$(stat -c '%h' -- "$untrusted")" == "1" ]] || die "claimed upload must not be hard-linked"
+    source_size="$(stat -c '%s' -- "$untrusted")"
+    (( source_size > 0 && source_size <= max_bytes )) || die "claimed upload exceeds its size limit"
 
     # Renaming and chowning do not revoke a writer's already-open descriptor.
-    # Copy to a new inode, then validate and extract only that sealed copy.
-    cp --reflink=never -- "$untrusted" "$sealed_tmp" || die "failed to seal uploaded file"
+    # Copy to a new inode under a kernel file-size limit, then validate and
+    # extract only that sealed copy.
+    ( ulimit -f "$((max_bytes / 1024))"; cp --reflink=never -- "$untrusted" "$sealed_tmp" ) \
+        || die "failed to seal uploaded file within its size limit"
     [[ -f "$sealed_tmp" && ! -L "$sealed_tmp" && "$(stat -c '%h' -- "$sealed_tmp")" == "1" ]] || die "sealed upload is not a private regular file"
+    sealed_size="$(stat -c '%s' -- "$sealed_tmp")"
+    [[ "$sealed_size" == "$source_size" ]] || die "uploaded file changed while it was being sealed"
+    (( sealed_size <= max_bytes )) || die "sealed upload exceeds its size limit"
     chown root:root "$sealed_tmp"
     chmod 0640 "$sealed_tmp"
     mv -T -- "$sealed_tmp" "$target"
@@ -377,24 +804,39 @@ claim_incoming_inputs() {
 }
 
 validate_archive_listing() {
-    local listing entry normalized verbose_listing type normalized_listing duplicates
-    listing="$(tar -tzf "$ARTIFACT_PATH" 2>/dev/null)" || die "artifact is not a readable gzip tar archive"
-    [[ -n "$listing" ]] || die "artifact archive is empty"
+    local listing_file verbose_file entry normalized type normalized_file duplicates expanded
+    listing_file="$(mktemp "${PROCESSING_JOB_DIR}/.archive-list.XXXXXXXX")"
+    verbose_file="$(mktemp "${PROCESSING_JOB_DIR}/.archive-verbose.XXXXXXXX")"
+    normalized_file="$(mktemp "${PROCESSING_JOB_DIR}/.archive-normalized.XXXXXXXX")"
+    LC_ALL=C tar --quoting-style=escape -tzf "$ARTIFACT_PATH" >"$listing_file" 2>/dev/null \
+        || die "artifact is not a readable gzip tar archive"
+    [[ -s "$listing_file" ]] || die "artifact archive is empty"
+    ARCHIVE_ENTRY_COUNT="$(wc -l <"$listing_file" | tr -d '[:space:]')"
+    [[ "$ARCHIVE_ENTRY_COUNT" =~ ^[0-9]+$ ]] || die "cannot count archive entries"
+    (( ARCHIVE_ENTRY_COUNT <= MAX_ARCHIVE_ENTRIES )) || die "artifact exceeds ${MAX_ARCHIVE_ENTRIES} entries"
 
-    normalized_listing=""
     while IFS= read -r entry; do
         [[ -n "$entry" ]] || continue
-        normalized="${entry#./}"
+        normalized="$entry"
+        while [[ "$normalized" == ./* ]]; do
+            normalized="${normalized#./}"
+        done
+        while [[ "$normalized" == */ ]]; do
+            normalized="${normalized%/}"
+        done
         [[ -n "$normalized" ]] || continue
-        if [[ "$normalized" == /* || "$normalized" == ".." || "$normalized" == ../* || "$normalized" == */../* || "$normalized" == */.. ]]; then
+        if [[ "$normalized" == /* || "$normalized" == *//* \
+            || "$normalized" == "." || "$normalized" == */./* || "$normalized" == */. \
+            || "$normalized" == ".." || "$normalized" == ../* || "$normalized" == */../* || "$normalized" == */.. ]]; then
             die "unsafe archive path: ${entry}"
         fi
-        normalized_listing+="${normalized}"$'\n'
-    done <<<"$listing"
-    duplicates="$(printf '%s' "$normalized_listing" | LC_ALL=C sort | uniq -d)"
+        printf '%s\n' "$normalized" >>"$normalized_file"
+    done <"$listing_file"
+    duplicates="$(LC_ALL=C sort "$normalized_file" | uniq -d)"
     [[ -z "$duplicates" ]] || die "archive contains duplicate paths"
 
-    verbose_listing="$(tar -tvzf "$ARTIFACT_PATH" 2>/dev/null)" || die "cannot inspect archive entry types"
+    LC_ALL=C tar --numeric-owner --quoting-style=escape -tvzf "$ARTIFACT_PATH" >"$verbose_file" 2>/dev/null \
+        || die "cannot inspect archive entry types"
     while IFS= read -r entry; do
         [[ -n "$entry" ]] || continue
         type="${entry:0:1}"
@@ -402,7 +844,34 @@ validate_archive_listing() {
             -|d) ;;
             *) die "archive contains a link or special entry" ;;
         esac
-    done <<<"$verbose_listing"
+    done <"$verbose_file"
+    expanded="$(awk '
+        $3 !~ /^[0-9]+$/ { exit 2 }
+        { total += $3; if (total > 1073741824) exit 3 }
+        END { if (total <= 1073741824) printf "%.0f", total }
+    ' "$verbose_file")" || die "artifact expanded size is invalid or exceeds 1 GiB"
+    [[ "$expanded" =~ ^[0-9]+$ ]] || die "artifact expanded size is invalid"
+    ARCHIVE_EXPANDED_BYTES="$expanded"
+    (( ARCHIVE_EXPANDED_BYTES <= MAX_EXPANDED_BYTES )) || die "artifact expanded size exceeds 1 GiB"
+}
+
+tree_size_bytes() {
+    local root="$1"
+    find "$root" -type f -printf '%s\n' | awk '{ total += $1 } END { printf "%.0f", total + 0 }'
+}
+
+check_disk_headroom() {
+    local destination="$1"
+    local current_size="0"
+    [[ -z "$CURRENT_BEFORE" || ! -d "$CURRENT_BEFORE" ]] || current_size="$(tree_size_bytes "$CURRENT_BEFORE")"
+    [[ "$current_size" =~ ^[0-9]+$ ]] || die "cannot calculate current release size"
+    # Candidate/rollback unions plus an immutable current validation copy and
+    # one sequential job-local data copy can coexist at the high-water mark.
+    DISK_REQUIRED_BYTES="$((3 * (ARCHIVE_EXPANDED_BYTES + current_size) + MIN_DISK_HEADROOM_BYTES))"
+    DISK_AVAILABLE_BYTES="$(df -PB1 -- "$destination" | awk 'NR == 2 { print $4 }')"
+    [[ "$DISK_AVAILABLE_BYTES" =~ ^[0-9]+$ ]] || die "cannot calculate deployment disk headroom"
+    (( DISK_AVAILABLE_BYTES >= DISK_REQUIRED_BYTES )) \
+        || die "insufficient disk headroom for candidate and rollback trees"
 }
 
 tree_sha256() {
@@ -421,22 +890,30 @@ tree_sha256() {
 
 extract_and_validate() {
     local destination="$1"
+    local artifact_commit_prefix evidence_basename
 
     ARTIFACT_SIZE_BYTES="$(stat -c '%s' -- "$ARTIFACT_PATH")"
     [[ "$ARTIFACT_SIZE_BYTES" =~ ^[1-9][0-9]*$ ]] || die "artifact is empty"
+    (( ARTIFACT_SIZE_BYTES <= MAX_COMPRESSED_BYTES )) || die "artifact compressed size exceeds 256 MiB"
     ARTIFACT_SHA256="$(sha256sum -- "$ARTIFACT_PATH" | awk '{print $1}')"
     if [[ -n "$EVIDENCE_PATH_INPUT" ]]; then
         local evidence_size evidence_sha evidence_commit evidence_archive
         evidence_size="$(jq -er '.artifact.size' -- "$EVIDENCE_PATH_INPUT")" || die "evidence has no artifact size"
         evidence_sha="$(jq -er '.artifact.sha256' -- "$EVIDENCE_PATH_INPUT")" || die "evidence has no artifact SHA-256"
         evidence_commit="$(jq -er '.commit' -- "$EVIDENCE_PATH_INPUT")" || die "evidence has no commit"
+        jq -e '.artifact.path as $path | ($path | type == "string") and ($path | explode | all(. >= 32 and . != 127))' \
+            -- "$EVIDENCE_PATH_INPUT" >/dev/null || die "evidence artifact path contains control characters"
         evidence_archive="$(jq -er '.artifact.path' -- "$EVIDENCE_PATH_INPUT")" || die "evidence has no artifact path"
         [[ "$evidence_size" =~ ^[0-9]+$ ]] || die "evidence artifact size is invalid"
         validate_sha256 "$evidence_sha"
         validate_commit "$evidence_commit"
         [[ "$evidence_size" == "$ARTIFACT_SIZE_BYTES" ]] || die "artifact size does not match evidence"
         [[ "$evidence_sha" == "$ARTIFACT_SHA256" ]] || die "artifact SHA-256 does not match evidence"
-        [[ "$evidence_archive" == *"$ARTIFACT_BASENAME" ]] || die "artifact basename does not match evidence"
+        [[ "${evidence_archive##*/}" == "$ARTIFACT_BASENAME" ]] || die "artifact basename does not match evidence"
+        evidence_basename="${EVIDENCE_PATH_INPUT##*/}"
+        evidence_basename="${evidence_basename%.part}"
+        [[ "${evidence_basename%.evidence.json}" == "${ARTIFACT_BASENAME%.tar.gz}" ]] \
+            || die "evidence filename does not match the artifact filename"
         if [[ -z "$EXPECTED_SHA256" ]]; then EXPECTED_SHA256="$evidence_sha"; fi
         if [[ -z "$EXPECTED_COMMIT" ]]; then EXPECTED_COMMIT="$evidence_commit"; fi
     fi
@@ -445,10 +922,16 @@ extract_and_validate() {
     fi
 
     validate_archive_listing
+    check_disk_headroom "$destination"
     tar --no-same-owner --no-same-permissions --no-acls --no-xattrs -xzf "$ARTIFACT_PATH" -C "$destination"
+    [[ "$(tree_size_bytes "$destination")" -le "$MAX_EXPANDED_BYTES" ]] || die "extracted artifact exceeds 1 GiB"
     [[ -f "$destination/.deployed-commit" && ! -L "$destination/.deployed-commit" ]] || die "artifact is missing .deployed-commit"
     DEPLOYED_COMMIT="$(<"$destination/.deployed-commit")"
     validate_commit "$DEPLOYED_COMMIT"
+    artifact_commit_prefix="${ARTIFACT_BASENAME#zzz-calculator-server-}"
+    artifact_commit_prefix="${artifact_commit_prefix%.tar.gz}"
+    [[ "$DEPLOYED_COMMIT" == "$artifact_commit_prefix"* ]] \
+        || die "artifact filename commit prefix does not match .deployed-commit"
     if [[ -n "$EXPECTED_COMMIT" && "$DEPLOYED_COMMIT" != "$EXPECTED_COMMIT" ]]; then
         die ".deployed-commit does not match the approved commit"
     fi
@@ -468,6 +951,7 @@ extract_and_validate() {
     RELEASE_TREE_SHA256="$(tree_sha256 "$destination")"
     [[ -d "$destination/dist/pages" ]] || die "artifact is missing dist/pages"
     [[ -f "$destination/backend/server.js" ]] || die "artifact is missing backend/server.js"
+    [[ -f "$destination/dist/pages/index.html" ]] || die "artifact is missing dist/pages/index.html"
     PAGES_TREE_SHA256="$(tree_sha256 "$destination/dist/pages")"
 }
 
@@ -483,6 +967,12 @@ merge_missing_files() {
     local destination_root="$2"
     local source relative destination
 
+    if [[ ! -e "$source_root" && ! -L "$source_root" ]]; then
+        return 0
+    fi
+    [[ -d "$source_root" && ! -L "$source_root" ]] || die "static resource tree is not a directory: ${source_root}"
+    install -d -m 0755 -- "$destination_root"
+    [[ -d "$destination_root" && ! -L "$destination_root" ]] || die "static resource destination is not a directory: ${destination_root}"
     assert_no_symlinks "$source_root"
     assert_no_symlinks "$destination_root"
     while IFS= read -r -d '' source; do
@@ -506,15 +996,15 @@ merge_compatible_resources() {
     local -a resource_trees=("dist/pages/static/app" "dist/pages/assets")
 
     for relative_tree in "${resource_trees[@]}"; do
-        # Older Calculator releases use static/app; newer layouts may also
-        # expose an assets directory. A missing optional tree is fine, but a
-        # tree present on either side must be reconciled byte-for-byte.
-        if [[ ! -d "$previous/$relative_tree" && ! -d "$candidate/$relative_tree" ]]; then
+        if [[ ! -e "$previous/$relative_tree" && ! -L "$previous/$relative_tree" \
+            && ! -e "$candidate/$relative_tree" && ! -L "$candidate/$relative_tree" ]]; then
             continue
         fi
-        [[ -d "$previous/$relative_tree" ]] || die "previous release is missing ${relative_tree}"
-        [[ -d "$candidate/$relative_tree" ]] || die "candidate release is missing ${relative_tree}"
-        [[ -d "$rollback/$relative_tree" ]] || die "rollback release is missing ${relative_tree}"
+        [[ ! -e "$previous/$relative_tree" || -d "$previous/$relative_tree" ]] || die "previous release has invalid ${relative_tree}"
+        [[ ! -L "$previous/$relative_tree" ]] || die "previous release has symbolic-link ${relative_tree}"
+        [[ ! -e "$candidate/$relative_tree" || -d "$candidate/$relative_tree" ]] || die "candidate release has invalid ${relative_tree}"
+        [[ ! -L "$candidate/$relative_tree" ]] || die "candidate release has symbolic-link ${relative_tree}"
+        install -d -m 0755 -- "$candidate/$relative_tree" "$rollback/$relative_tree"
         merge_missing_files "$previous/$relative_tree" "$candidate/$relative_tree"
         merge_missing_files "$candidate/$relative_tree" "$rollback/$relative_tree"
     done
@@ -526,22 +1016,54 @@ merge_existing_release_resources() {
     local relative_tree
 
     for relative_tree in "dist/pages/static/app" "dist/pages/assets"; do
-        if [[ ! -d "$source_root/$relative_tree" && ! -d "$destination_root/$relative_tree" ]]; then
+        if [[ ! -e "$source_root/$relative_tree" && ! -L "$source_root/$relative_tree" \
+            && ! -e "$destination_root/$relative_tree" && ! -L "$destination_root/$relative_tree" ]]; then
             continue
         fi
-        [[ -d "$source_root/$relative_tree" ]] || die "existing release is missing ${relative_tree}"
+        [[ ! -e "$source_root/$relative_tree" || -d "$source_root/$relative_tree" ]] || die "existing release has invalid ${relative_tree}"
+        [[ ! -L "$source_root/$relative_tree" ]] || die "existing release has symbolic-link ${relative_tree}"
         install -d -m 0755 -- "$destination_root/$relative_tree"
         merge_missing_files "$source_root/$relative_tree" "$destination_root/$relative_tree"
     done
 }
 
-prepare_permissions() {
+prepare_immutable_release() {
     local root="$1"
     id "$APP_USER" >/dev/null 2>&1 || die "application user ${APP_USER} does not exist"
     getent group "$APP_GROUP" >/dev/null 2>&1 || die "application group ${APP_GROUP} does not exist"
-    chown -R "$APP_USER:$APP_GROUP" "$root"
+    assert_no_symlinks "$root"
+    chown -R root:root "$root"
     find "$root" -type d -exec chmod 0755 {} +
     find "$root" -type f -exec chmod 0644 {} +
+    assert_immutable_release "$root"
+}
+
+assert_immutable_release() {
+    local root="$1"
+    [[ -d "$root" && ! -L "$root" ]] || die "release is not a real directory"
+    [[ "$(stat -c '%U:%G:%a' -- "$root")" == "root:root:755" ]] || die "release root must be root-owned mode 0755"
+    if find "$root" \( ! -user root -o ! -group root \) -print -quit | grep -q .; then
+        die "release contains a non-root-owned path"
+    fi
+    if find "$root" ! -type d ! -type f -print -quit | grep -q .; then
+        die "release contains a link or special path"
+    fi
+    if find "$root" -type d ! -perm 0755 -print -quit | grep -q .; then
+        die "release contains a directory that is not mode 0755"
+    fi
+    if find "$root" -type f ! -perm 0644 -print -quit | grep -q .; then
+        die "release contains a file that is not mode 0644"
+    fi
+    for key_file in .deployed-commit backend/server.js dist/pages/index.html; do
+        runuser -u "$APP_USER" -- test -r "$root/$key_file" || die "${APP_USER} cannot read release key file ${key_file}"
+        runuser -u "$VALIDATION_USER" -- test -r "$root/$key_file" \
+            || die "${VALIDATION_USER} cannot read release key file ${key_file}"
+    done
+    runuser -u "$APP_USER" -- test ! -w "$root" || die "${APP_USER} can write the release root"
+    runuser -u "$APP_USER" -- test ! -w "$root/.deployed-commit" || die "${APP_USER} can write release metadata"
+    runuser -u "$VALIDATION_USER" -- test ! -w "$root" || die "${VALIDATION_USER} can write the release root"
+    runuser -u "$VALIDATION_USER" -- test ! -w "$root/.deployed-commit" \
+        || die "${VALIDATION_USER} can write release metadata"
 }
 
 same_release_tree() {
@@ -556,19 +1078,119 @@ atomic_switch() {
     [[ -d "$target" ]] || die "switch target does not exist"
     [[ -L "$CURRENT_LINK" ]] || die "current must be a symbolic link"
     [[ ! -e "$next_link" && ! -L "$next_link" ]] || die "temporary current link already exists"
+    NEXT_LINK_PATH="$next_link"
     ln -s -- "$target" "$next_link"
     mv -Tf -- "$next_link" "$CURRENT_LINK"
+    NEXT_LINK_PATH=""
+}
+
+process_environment_value() {
+    local pid="$1"
+    local name="$2"
+    local entry
+    [[ -r "/proc/${pid}/environ" ]] || return 1
+    while IFS= read -r entry; do
+        if [[ "${entry%%=*}" == "$name" ]]; then
+            printf '%s' "${entry#*=}"
+            return 0
+        fi
+    done < <(tr '\0' '\n' <"/proc/${pid}/environ")
+    return 1
+}
+
+assert_manifest_invariants() {
+    [[ -n "$HELPER_MANIFEST_SHA256_BEFORE" && -n "$HELPER_MANIFEST_SHA256_AFTER" ]] \
+        || die "Helper manifest is missing before or after the operation"
+    [[ -n "$SCANNER_MANIFEST_SHA256_BEFORE" && -n "$SCANNER_MANIFEST_SHA256_AFTER" ]] \
+        || die "Scanner manifest is missing before or after the operation"
+    [[ "$HELPER_MANIFEST_SHA256_AFTER" == "$HELPER_MANIFEST_SHA256_BEFORE" ]] \
+        || die "Helper manifest changed during the operation"
+    [[ "$SCANNER_MANIFEST_SHA256_AFTER" == "$SCANNER_MANIFEST_SHA256_BEFORE" ]] \
+        || die "Scanner manifest changed during the operation"
+}
+
+assert_effective_runtime_environment() {
+    local pid="$1"
+    local expected_release="$2"
+    local node_env maintenance_enabled data_dir process_cwd configured_working_dir lexical_data
+    [[ "$pid" =~ ^[1-9][0-9]*$ && -d "/proc/${pid}" ]] || die "production service has no live PID"
+    process_cwd="$(readlink -f -- "/proc/${pid}/cwd" 2>/dev/null || true)"
+    [[ "$process_cwd" == "$expected_release" ]] || die "production process working directory does not match current"
+
+    node_env="$(process_environment_value "$pid" NODE_ENV || true)"
+    [[ "${node_env,,}" == "production" ]] || die "effective production process NODE_ENV is not production"
+    maintenance_enabled="$(process_environment_value "$pid" MAINTENANCE_ENABLED || true)"
+    case "${maintenance_enabled,,}" in
+        1|true|yes|on) die "effective production process has maintenance enabled" ;;
+    esac
+
+    data_dir="$(process_environment_value "$pid" ZZZ_CALCULATOR_DATA_DIR || true)"
+    if [[ -n "$data_dir" ]]; then
+        configured_working_dir="$(service_property WorkingDirectory)"
+        [[ -n "$configured_working_dir" ]] || die "cannot read the service WorkingDirectory"
+        if [[ "$data_dir" == /* ]]; then
+            lexical_data="$(realpath -ms -- "$data_dir")"
+        else
+            [[ "$(realpath -ms -- "$configured_working_dir")" == "$CURRENT_LINK" ]] \
+                || die "relative ZZZ_CALCULATOR_DATA_DIR requires WorkingDirectory=current"
+            lexical_data="$(realpath -ms -- "$configured_working_dir/$data_dir")"
+        fi
+        [[ "$lexical_data" == "$CURRENT_LINK/data" ]] \
+            || die "ZZZ_CALCULATOR_DATA_DIR must be unset or lexically resolve to /opt/zzz_calculator/current/data"
+    fi
+}
+
+assert_runtime_endpoints() {
+    local app_config
+    curl --disable --fail --silent --show-error --max-time 3 "$HEALTH_URL" | jq -e '.ok == true' >/dev/null \
+        || die "production health check failed"
+    app_config="$(curl --disable --fail --silent --show-error --max-time 3 "http://127.0.0.1:8787/api/app-config")" \
+        || die "production app-config check failed"
+    printf '%s' "$app_config" | jq -e '.maintenanceEnabled == false' >/dev/null \
+        || die "production app-config reports maintenance enabled"
+}
+
+assert_production_preflight() {
+    [[ -n "$CURRENT_BEFORE" && "$CURRENT_BEFORE" == "$RELEASE_ROOT/"* ]] || die "current release cannot be resolved inside the fixed release root"
+    [[ -d "$CURRENT_BEFORE" && ! -L "$CURRENT_BEFORE" ]] || die "current release is not a real directory"
+    [[ -n "$CURRENT_COMMIT_BEFORE" ]] || die "current release has no valid .deployed-commit"
+    [[ "$SERVICE_BEFORE" == "active" ]] || die "production service is not active"
+    [[ "$PID_BEFORE" =~ ^[1-9][0-9]*$ && -d "/proc/${PID_BEFORE}" ]] || die "production service has no live PID"
+    [[ "$RESTARTS_BEFORE" =~ ^[0-9]+$ ]] || die "production service has no numeric NRestarts baseline"
+    [[ "$NGINX_STATUS" == "valid" ]] || die "nginx configuration check failed"
+    [[ -f "$HELPER_MANIFEST" && "$HELPER_MANIFEST_SHA256_BEFORE" =~ ^[0-9a-f]{64}$ ]] || die "Helper manifest is missing or unreadable"
+    [[ -f "$SCANNER_MANIFEST" && "$SCANNER_MANIFEST_SHA256_BEFORE" =~ ^[0-9a-f]{64}$ ]] || die "Scanner manifest is missing or unreadable"
+
+    assert_effective_runtime_environment "$PID_BEFORE" "$CURRENT_BEFORE"
+    assert_runtime_endpoints
 }
 
 health_gate() {
-    local attempt
+    local attempt observed_pid=""
     for attempt in $(seq 1 15); do
-        if curl --fail --silent --show-error --max-time 1 "$HEALTH_URL" >/dev/null 2>&1; then
-            return 0
-        fi
+        [[ "$(systemctl is-active "$SERVICE_NAME" 2>/dev/null || true)" == "active" ]] || return 1
+        local current_pid
+        current_pid="$(service_property MainPID)"
+        [[ "$current_pid" =~ ^[1-9][0-9]*$ && -d "/proc/${current_pid}" ]] || return 1
+        if [[ -z "$observed_pid" ]]; then observed_pid="$current_pid"; fi
+        [[ "$current_pid" == "$observed_pid" ]] || return 1
+        curl --disable --fail --silent --show-error --max-time 1 "$HEALTH_URL" | jq -e '.ok == true' >/dev/null 2>&1 || return 1
         sleep 1
     done
-    return 1
+    return 0
+}
+
+assert_production_unchanged() {
+    capture_after
+    [[ "$CURRENT_AFTER" == "$CURRENT_BEFORE" ]] || die "current release changed during isolated validation"
+    [[ "$CURRENT_COMMIT_AFTER" == "$CURRENT_COMMIT_BEFORE" ]] || die "current commit changed during isolated validation"
+    [[ "$SERVICE_AFTER" == "active" ]] || die "production service became inactive during isolated validation"
+    [[ "$PID_AFTER" == "$PID_BEFORE" ]] || die "production PID changed during isolated validation"
+    [[ "$RESTARTS_AFTER" == "$RESTARTS_BEFORE" ]] || die "production NRestarts changed during isolated validation"
+    [[ "$NGINX_STATUS_AFTER" == "valid" ]] || die "nginx configuration changed during isolated validation"
+    assert_manifest_invariants
+    curl --disable --fail --silent --show-error --max-time 3 "$HEALTH_URL" | jq -e '.ok == true' >/dev/null \
+        || die "production health changed during isolated validation"
 }
 
 write_state_file() {
@@ -582,106 +1204,379 @@ write_state_file() {
 
 run_audit() {
     [[ "$#" -eq 0 ]] || die "audit does not accept arguments"
-    if nginx -t >/dev/null 2>&1; then
-        NGINX_STATUS="valid"
-    else
-        NGINX_STATUS="invalid"
-        die "nginx configuration check failed"
+    assert_production_preflight
+    assert_production_unchanged
+}
+
+prepare_validation_job() {
+    [[ -z "$VALIDATION_JOB_DIR" ]] || die "validation job is already initialized"
+    VALIDATION_JOB_DIR="$(mktemp -d "${VALIDATION_DIR}/job.XXXXXXXX")"
+    VALIDATION_DIR_EXPOSED="1"
+    chown root:"$VALIDATION_GROUP" "$VALIDATION_DIR" "$VALIDATION_JOB_DIR"
+    chmod 0750 "$VALIDATION_DIR" "$VALIDATION_JOB_DIR"
+}
+
+prepare_validation_probe_root() {
+    local label="$1"
+
+    VALIDATION_PROBE_INDEX="$((VALIDATION_PROBE_INDEX + 1))"
+    VALIDATION_PROBE_ROOT="${VALIDATION_JOB_DIR}/probe.${VALIDATION_PROBE_INDEX}.${label}"
+    [[ ! -e "$VALIDATION_PROBE_ROOT" && ! -L "$VALIDATION_PROBE_ROOT" ]] \
+        || die "validation probe path is already occupied"
+    install -d -o root -g root -m 0700 -- "$VALIDATION_PROBE_ROOT"
+}
+
+remove_validation_probe_root() {
+    [[ -n "$VALIDATION_PROBE_ROOT" ]] || return 0
+    [[ -n "$VALIDATION_JOB_DIR" && "$VALIDATION_PROBE_ROOT" == "$VALIDATION_JOB_DIR/probe."* ]] || return 1
+    [[ ! -L "$VALIDATION_PROBE_ROOT" ]] || return 1
+    if [[ -e "$VALIDATION_PROBE_ROOT" ]]; then
+        rm -rf --one-file-system -- "$VALIDATION_PROBE_ROOT" || return 1
     fi
-    [[ -n "$CURRENT_BEFORE" ]] || die "current release cannot be resolved"
-    [[ -n "$CURRENT_COMMIT_BEFORE" ]] || die "current release has no valid .deployed-commit"
-    [[ "$NGINX_STATUS" == "valid" ]] || die "nginx configuration check failed"
-    [[ "$SERVICE_BEFORE" == "active" ]] || die "production service is not active"
-    curl --fail --silent --show-error --max-time 3 "$HEALTH_URL" >/dev/null || die "production health check failed"
+    VALIDATION_PROBE_ROOT=""
+}
+
+record_validation_unit_result() {
+    local label="$1"
+    local active_state="$2"
+    local sub_state="$3"
+    local result="$4"
+    local exec_status="$5"
+    VALIDATION_UNIT_RESULTS+="${label}:${active_state}/${sub_state}/${result}/${exec_status}"$'\n'
+}
+
+assert_sanitized_validation_data() {
+    local label="$1"
+    local release_dir="$2"
+    local catalog_name catalog_path actual_count expected_count
+
+    [[ -d "$release_dir/data" && ! -L "$release_dir/data" ]] \
+        || die "${label} validation release has no sanitized data directory"
+    if find "$release_dir/data" -mindepth 1 -maxdepth 1 ! -type f -print -quit | grep -q .; then
+        die "${label} validation data contains a nested or special path"
+    fi
+    expected_count="$((${#VALIDATION_CATALOG_FILES[@]} + 2))"
+    actual_count="$(find "$release_dir/data" -mindepth 1 -maxdepth 1 -type f -printf '.' | wc -c | tr -d '[:space:]')"
+    [[ "$actual_count" =~ ^[0-9]+$ && "$actual_count" -eq "$expected_count" ]] \
+        || die "${label} validation data does not match the catalog allowlist"
+    for catalog_name in "${VALIDATION_CATALOG_FILES[@]}" \
+        user_drive_discs.example.json user_drive_discs.json; do
+        catalog_path="$release_dir/data/$catalog_name"
+        [[ -f "$catalog_path" && ! -L "$catalog_path" \
+            && "$(stat -c '%U:%G:%a:%h' -- "$catalog_path")" == "root:root:644:1" ]] \
+            || die "${label} sanitized validation file ${catalog_name} is unsafe"
+    done
+    cmp -- "$release_dir/data/user_drive_discs.example.json" "$release_dir/data/user_drive_discs.json" \
+        || die "${label} validation inventory differs from the empty example"
+}
+
+run_validation_probe() {
+    local label="$1"
+    local release_dir="$2"
+    local unit_base active_state sub_state result exec_status attempt success="0"
+    local seed_size seed_entries largest_seed_file
+
+    [[ -d "$release_dir" && ! -L "$release_dir" ]] || die "${label} validation release is invalid"
+    for key_file in .deployed-commit backend/server.js dist/pages/index.html; do
+        runuser -u "$VALIDATION_USER" -- test -r "$release_dir/$key_file" \
+            || die "${VALIDATION_USER} cannot read ${label} validation file ${key_file}"
+    done
+    assert_sanitized_validation_data "$label" "$release_dir"
+    seed_size="$(tree_size_bytes "$release_dir/data")"
+    seed_entries="$(find "$release_dir/data" -mindepth 1 -printf '.' | wc -c | tr -d '[:space:]')"
+    largest_seed_file="$(find "$release_dir/data" -type f -printf '%s\n' \
+        | awk 'BEGIN { max = 0 } $1 > max { max = $1 } END { print max }')"
+    largest_seed_file="${largest_seed_file:-0}"
+    [[ "$seed_size" =~ ^[0-9]+$ && "$seed_entries" =~ ^[0-9]+$ && "$largest_seed_file" =~ ^[0-9]+$ ]] \
+        || die "${label} validation seed limits could not be measured"
+    (( seed_size <= MAX_VALIDATION_SEED_BYTES )) \
+        || die "${label} validation seed exceeds 64 MiB"
+    (( seed_entries <= MAX_VALIDATION_SEED_ENTRIES )) \
+        || die "${label} validation seed exceeds 8192 entries"
+    (( largest_seed_file <= MAX_VALIDATION_SEED_FILE_BYTES )) \
+        || die "${label} validation seed contains a file larger than 1 MiB"
+    prepare_validation_probe_root "$label"
+    unit_base="${VALIDATION_UNIT_PREFIX}-${$}-${VALIDATION_PROBE_INDEX}"
+    [[ "$unit_base" =~ ^zzz-calculator-validation-[0-9]+-[1-9][0-9]*$ ]] \
+        || die "generated validation unit name is invalid"
+    VALIDATION_UNIT="${unit_base}.service"
+    VALIDATION_ACTIVE_LABEL="$label"
+
+    /usr/bin/systemd-run --quiet --unit "$unit_base" \
+        --property Type=oneshot \
+        --property RemainAfterExit=yes \
+        --property "User=$VALIDATION_USER" \
+        --property "Group=$VALIDATION_GROUP" \
+        --property SupplementaryGroups= \
+        --property WorkingDirectory=/zzz-validation/app \
+        --property PrivateNetwork=yes \
+        --property PrivateMounts=yes \
+        --property PrivateTmp=no \
+        --property PrivateIPC=yes \
+        --property PrivateDevices=yes \
+        --property ProtectSystem=strict \
+        --property ProtectHome=yes \
+        --property "InaccessiblePaths=-/opt/zzz_calculator -/var/lib/zzz-calculator -/srv/zzz-download-origin" \
+        --property "TemporaryFileSystem=/zzz-validation:rw,nosuid,nodev,noexec,size=${VALIDATION_TMPFS_BYTES},nr_inodes=${VALIDATION_TMPFS_INODES},mode=0700,uid=${VALIDATION_UID},gid=${VALIDATION_GID} /run:rw,nosuid,nodev,noexec,size=${VALIDATION_RUN_TMPFS_BYTES},nr_inodes=${VALIDATION_RUN_TMPFS_INODES},mode=0755 /var/lib/zzz-calculator-deploy:ro,nosuid,nodev,noexec,size=4k,nr_inodes=16,mode=000 /tmp:ro,nosuid,nodev,noexec,size=4k,nr_inodes=16,mode=000 /var/tmp:ro,nosuid,nodev,noexec,size=4k,nr_inodes=16,mode=000 /dev/shm:ro,nosuid,nodev,noexec,size=4k,nr_inodes=16,mode=000" \
+        --property "BindReadOnlyPaths=$release_dir:/zzz-validation/app" \
+        --property NoNewPrivileges=yes \
+        --property CapabilityBoundingSet= \
+        --property "RestrictAddressFamilies=AF_INET AF_INET6" \
+        --property LockPersonality=yes \
+        --property RestrictRealtime=yes \
+        --property RestrictSUIDSGID=yes \
+        --property KillMode=control-group \
+        --property SendSIGKILL=yes \
+        --property Restart=no \
+        --property TimeoutStartSec=55s \
+        --property TimeoutStopSec=5s \
+        --property MemoryLimit=768M \
+        --property CPUQuota=200% \
+        --property TasksMax=64 \
+        --property LimitNPROC=64 \
+        --property LimitNOFILE=4096 \
+        --property LimitCORE=0 \
+        --property LimitFSIZE=1M \
+        --property UMask=0077 \
+        --property StandardOutput=null \
+        --property StandardError=null \
+        -- /usr/bin/timeout --signal=TERM --kill-after=5s 45s \
+        /usr/bin/env -i \
+        PATH="/usr/sbin:/usr/bin:/sbin:/bin" \
+        HOME=/zzz-validation/home \
+        TMPDIR=/zzz-validation/tmp \
+        XDG_CACHE_HOME=/zzz-validation/xdg-cache \
+        XDG_CONFIG_HOME=/zzz-validation/xdg-config \
+        XDG_DATA_HOME=/zzz-validation/xdg-data \
+        NODE_ENV=production HOST=127.0.0.1 PORT="$VALIDATION_PORT" \
+        ZZZ_CALCULATOR_DATA_DIR=/zzz-validation/data \
+        SCAN_TELEMETRY_DIR=/zzz-validation/data/scan-telemetry \
+        MAINTENANCE_ENABLED=false SCAN_TELEMETRY_ENABLED=false \
+        DRIVE_DISC_RESERVATIONS_UI_ENABLED=false DRIVE_DISC_EXCLUSIONS_UI_ENABLED=false \
+        /bin/bash "$VALIDATION_WORKER" /zzz-validation/app /zzz-validation \
+        || die "${label} validation transient unit could not be started"
+
+    for attempt in $(seq 1 550); do
+        active_state="$(systemctl show "$VALIDATION_UNIT" --property ActiveState --value 2>/dev/null || true)"
+        sub_state="$(systemctl show "$VALIDATION_UNIT" --property SubState --value 2>/dev/null || true)"
+        result="$(systemctl show "$VALIDATION_UNIT" --property Result --value 2>/dev/null || true)"
+        exec_status="$(systemctl show "$VALIDATION_UNIT" --property ExecMainStatus --value 2>/dev/null || true)"
+        if [[ "$active_state" == "active" && "$sub_state" == "exited" && "$result" == "success" && "$exec_status" == "0" ]]; then
+            success="1"
+            break
+        fi
+        if [[ "$active_state" == "failed" || "$active_state" == "inactive" || "$result" == "failed" ]]; then
+            break
+        fi
+        sleep 0.1
+    done
+    if [[ "$success" != "1" ]]; then
+        stop_validation_probe || true
+        record_validation_unit_result "$label" "$active_state" "$sub_state" "$result" "$exec_status"
+        VALIDATION_ACTIVE_LABEL=""
+        die "${label} validation failed inside its private systemd sandbox"
+    fi
+    stop_validation_probe || die "${label} validation cgroup could not be stopped"
+    record_validation_unit_result "$label" "$active_state" "$sub_state" "$result" "$exec_status"
+    VALIDATION_ACTIVE_LABEL=""
+    remove_validation_probe_root || die "${label} validation data could not be removed"
+    if [[ -z "$VALIDATION_SEQUENCE" ]]; then
+        VALIDATION_SEQUENCE="$label"
+    else
+        VALIDATION_SEQUENCE="${VALIDATION_SEQUENCE},${label}"
+    fi
+}
+
+copy_release_for_validation() {
+    local label="$1"
+    local source="$2"
+    local destination="$3"
+    local source_tree_before source_tree_after source_commit catalog_name catalog_path catalog_size
+    local sanitized_data_size="0"
+
+    [[ -d "$source" && ! -L "$source" ]] || die "${label} validation source is invalid"
+    [[ ! -e "$destination" && ! -L "$destination" ]] || die "${label} validation copy path is occupied"
+    source_tree_before="$(tree_sha256 "$source")"
+    [[ "$source_tree_before" =~ ^[0-9a-f]{64}$ ]] || die "${label} validation source cannot be hashed"
+    source_commit="$(read_commit "$source")"
+    [[ -n "$source_commit" ]] || die "${label} validation source has no valid commit"
+    assert_immutable_release "$source"
+    install -d -m 0755 -- "$destination"
+    (cd -- "$source" && tar --no-acls --no-xattrs --exclude='./data' -cf - .) \
+        | (cd -- "$destination" && tar --no-same-owner --no-same-permissions --no-acls --no-xattrs -xf -)
+    install -d -o root -g root -m 0755 -- "$destination/data"
+    for catalog_name in "${VALIDATION_CATALOG_FILES[@]}" user_drive_discs.example.json; do
+        catalog_path="$source/data/$catalog_name"
+        [[ -f "$catalog_path" && ! -L "$catalog_path" \
+            && "$(stat -c '%U:%G:%a:%h' -- "$catalog_path")" == "root:root:644:1" ]] \
+            || die "${label} validation catalog ${catalog_name} is not a safe immutable file"
+        catalog_size="$(stat -c '%s' -- "$catalog_path")"
+        [[ "$catalog_size" =~ ^[1-9][0-9]*$ ]] \
+            || die "${label} validation catalog ${catalog_name} is empty or invalid"
+        (( catalog_size <= MAX_VALIDATION_SEED_FILE_BYTES )) \
+            || die "${label} validation catalog ${catalog_name} exceeds 1 MiB"
+        sanitized_data_size="$((sanitized_data_size + catalog_size))"
+        install -o root -g root -m 0644 -- "$catalog_path" "$destination/data/$catalog_name"
+    done
+    install -o root -g root -m 0644 -- "$source/data/user_drive_discs.example.json" \
+        "$destination/data/user_drive_discs.json"
+    sanitized_data_size="$((sanitized_data_size + $(stat -c '%s' -- "$source/data/user_drive_discs.example.json")))"
+    (( sanitized_data_size <= MAX_VALIDATION_SEED_BYTES )) \
+        || die "${label} sanitized validation data exceeds 64 MiB"
+    cmp -- "$destination/data/user_drive_discs.example.json" "$destination/data/user_drive_discs.json" \
+        || die "${label} validation inventory is not the empty example"
+    source_tree_after="$(tree_sha256 "$source")"
+    [[ "$source_tree_after" == "$source_tree_before" ]] \
+        || die "${label} validation source changed while creating its private copy"
+    [[ "$(read_commit "$destination")" == "$source_commit" ]] \
+        || die "${label} validation copy commit is invalid"
+    prepare_immutable_release "$destination"
+    assert_sanitized_validation_data "$label" "$destination"
+}
+
+run_four_stage_validation() {
+    local current_release="$1"
+    local candidate_release="$2"
+    local rollback_release="$3"
+    local copies_root="${VALIDATION_JOB_DIR}/copies"
+    local current_copy="${copies_root}/current"
+    local candidate_copy="${copies_root}/candidate"
+    local rollback_copy="${copies_root}/rollback"
+
+    [[ ! -e "$copies_root" && ! -L "$copies_root" ]] || die "validation copies path is occupied"
+    install -d -m 0755 -- "$copies_root"
+    copy_release_for_validation current "$current_release" "$current_copy"
+    copy_release_for_validation candidate "$candidate_release" "$candidate_copy"
+    copy_release_for_validation rollback "$rollback_release" "$rollback_copy"
+
+    VALIDATION_SEQUENCE=""
+    run_validation_probe current "$current_copy"
+    run_validation_probe candidate "$candidate_copy"
+    run_validation_probe rollback "$rollback_copy"
+    run_validation_probe candidate "$candidate_copy"
+    [[ "$VALIDATION_SEQUENCE" == "current,candidate,rollback,candidate" ]] \
+        || die "isolated validation sequence was incomplete"
 }
 
 run_dry_run() {
-    local validation_dir
+    local candidate_dir rollback_dir rollback_commit
+
     parse_artifact_options "$@"
+    assert_production_preflight
     claim_incoming_inputs
-    validation_dir="$(mktemp -d "${VALIDATION_DIR}/release.XXXXXXXX")"
-    extract_and_validate "$validation_dir"
+    prepare_validation_job
+    candidate_dir="${VALIDATION_JOB_DIR}/candidate"
+    rollback_dir="${VALIDATION_JOB_DIR}/rollback"
+    install -d -m 0755 -- "$candidate_dir" "$rollback_dir"
+    extract_and_validate "$candidate_dir"
     cleanup_processing_job || die "failed to clean claimed uploads after dry-run extraction"
 
-    if [[ -n "$CURRENT_BEFORE" ]]; then
-        local relative_tree
-        for relative_tree in "dist/pages/static/app" "dist/pages/assets"; do
-            if [[ ! -d "$CURRENT_BEFORE/$relative_tree" && ! -d "$validation_dir/$relative_tree" ]]; then
-                continue
-            fi
-            [[ -d "$CURRENT_BEFORE/$relative_tree" ]] || die "current release is missing ${relative_tree}"
-            [[ -d "$validation_dir/$relative_tree" ]] || die "candidate release is missing ${relative_tree}"
-            merge_missing_files "$CURRENT_BEFORE/$relative_tree" "$validation_dir/$relative_tree"
-        done
-    fi
+    rollback_commit="$(read_commit "$CURRENT_BEFORE")"
+    [[ -n "$rollback_commit" ]] || die "current release has no valid .deployed-commit"
+    cp -a --reflink=never -- "$CURRENT_BEFORE/." "$rollback_dir/"
+    merge_compatible_resources "$CURRENT_BEFORE" "$candidate_dir" "$rollback_dir"
+    [[ "$(read_commit "$candidate_dir")" == "$DEPLOYED_COMMIT" ]] || die "candidate commit changed during validation merge"
+    [[ "$(read_commit "$rollback_dir")" == "$rollback_commit" ]] || die "rollback commit changed during validation merge"
+    prepare_immutable_release "$candidate_dir"
+    prepare_immutable_release "$rollback_dir"
+    RELEASE_TREE_SHA256="$(tree_sha256 "$candidate_dir")"
+    PAGES_TREE_SHA256="$(tree_sha256 "$candidate_dir/dist/pages")"
+    ROLLBACK_BASENAME="validation-rollback-${rollback_commit:0:12}"
 
-    RELEASE_TREE_SHA256="$(tree_sha256 "$validation_dir")"
-    PAGES_TREE_SHA256="$(tree_sha256 "$validation_dir/dist/pages")"
-    log "dry-run validated ${ARTIFACT_BASENAME} in ${validation_dir}"
+    run_four_stage_validation "$CURRENT_BEFORE" "$candidate_dir" "$rollback_dir"
+    assert_production_unchanged
+    log "dry-run validated ${ARTIFACT_BASENAME} through current/candidate/rollback/candidate"
 }
 
 run_deploy() {
-    local candidate_staging rollback_staging candidate_target rollback_target rollback_commit
+    local candidate_target rollback_target rollback_commit candidate_exists="0" rollback_exists="0"
 
     parse_artifact_options "$@"
     [[ -n "$EXPECTED_SHA256" ]] || die "deploy requires --expected-sha"
     [[ -n "$EXPECTED_COMMIT" ]] || die "deploy requires --expected-commit"
-    [[ -n "$CURRENT_BEFORE" ]] || die "current release cannot be resolved"
-    [[ "$NGINX_STATUS" == "valid" ]] || die "nginx configuration check failed"
-    [[ "$CURRENT_BEFORE" == "$RELEASE_ROOT/"* ]] || die "current release is outside the fixed release root"
-    [[ -d "$CURRENT_BEFORE" ]] || die "current release is not a directory"
+    assert_production_preflight
     rollback_commit="$(read_commit "$CURRENT_BEFORE")"
-    [[ -n "$rollback_commit" ]] || die "current release has no valid .deployed-commit"
     PREVIOUS_BASENAME="$(basename -- "$CURRENT_BEFORE")"
     [[ "$(current_target)" == "$CURRENT_BEFORE" ]] || die "current release changed during preflight"
     claim_incoming_inputs
 
-    candidate_staging="$(mktemp -d "${RELEASE_ROOT}/.candidate.XXXXXXXX")"
+    CANDIDATE_STAGING="$(mktemp -d "${RELEASE_ROOT}/.candidate.XXXXXXXX")"
     FINALIZE_UPLOAD="1"
-    extract_and_validate "$candidate_staging"
+    extract_and_validate "$CANDIDATE_STAGING"
     cleanup_processing_job || die "failed to clean claimed uploads before production preflight"
     candidate_target="${RELEASE_ROOT}/${RELEASE_BASENAME}"
     ROLLBACK_BASENAME="rollback-${DEPLOYED_COMMIT:0:12}"
     rollback_target="${RELEASE_ROOT}/${ROLLBACK_BASENAME}"
 
     if [[ -e "$candidate_target" || -L "$candidate_target" ]]; then
+        [[ -d "$candidate_target" && ! -L "$candidate_target" ]] || die "target release path is occupied"
+        assert_immutable_release "$candidate_target"
+        merge_existing_release_resources "$candidate_target" "$CANDIDATE_STAGING"
+        prepare_immutable_release "$CANDIDATE_STAGING"
         if [[ "$CURRENT_BEFORE" == "$candidate_target" && -d "$candidate_target" ]]; then
-            merge_existing_release_resources "$candidate_target" "$candidate_staging"
-            if same_release_tree "$candidate_staging" "$candidate_target"; then
+            if same_release_tree "$CANDIDATE_STAGING" "$candidate_target"; then
+                RELEASE_TREE_SHA256="$(tree_sha256 "$candidate_target")"
+                PAGES_TREE_SHA256="$(tree_sha256 "$candidate_target/dist/pages")"
+                assert_production_unchanged
                 log "release ${RELEASE_BASENAME} is already current and identical"
                 return 0
             fi
         fi
-        die "target release already exists and will not be overwritten"
+        candidate_exists="1"
     fi
-    [[ ! -e "$rollback_target" && ! -L "$rollback_target" ]] || die "rollback release already exists and will not be overwritten"
+    if [[ -e "$rollback_target" || -L "$rollback_target" ]]; then
+        [[ -d "$rollback_target" && ! -L "$rollback_target" ]] || die "rollback release path is occupied"
+        assert_immutable_release "$rollback_target"
+        rollback_exists="1"
+    fi
 
-    rollback_staging="$(mktemp -d "${RELEASE_ROOT}/.rollback.XXXXXXXX")"
-    cp -a -- "$CURRENT_BEFORE/." "$rollback_staging/"
-    merge_compatible_resources "$CURRENT_BEFORE" "$candidate_staging" "$rollback_staging"
-    [[ "$(read_commit "$candidate_staging")" == "$DEPLOYED_COMMIT" ]] || die "candidate commit changed during resource merge"
-    [[ "$(read_commit "$rollback_staging")" == "$rollback_commit" ]] || die "rollback commit changed during resource merge"
+    ROLLBACK_STAGING="$(mktemp -d "${RELEASE_ROOT}/.rollback.XXXXXXXX")"
+    cp -a --reflink=never -- "$CURRENT_BEFORE/." "$ROLLBACK_STAGING/"
+    merge_compatible_resources "$CURRENT_BEFORE" "$CANDIDATE_STAGING" "$ROLLBACK_STAGING"
+    [[ "$(read_commit "$CANDIDATE_STAGING")" == "$DEPLOYED_COMMIT" ]] || die "candidate commit changed during resource merge"
+    [[ "$(read_commit "$ROLLBACK_STAGING")" == "$rollback_commit" ]] || die "rollback commit changed during resource merge"
 
-    prepare_permissions "$candidate_staging"
-    prepare_permissions "$rollback_staging"
-    RELEASE_TREE_SHA256="$(tree_sha256 "$candidate_staging")"
-    PAGES_TREE_SHA256="$(tree_sha256 "$candidate_staging/dist/pages")"
+    prepare_immutable_release "$CANDIDATE_STAGING"
+    prepare_immutable_release "$ROLLBACK_STAGING"
+    RELEASE_TREE_SHA256="$(tree_sha256 "$CANDIDATE_STAGING")"
+    PAGES_TREE_SHA256="$(tree_sha256 "$CANDIDATE_STAGING/dist/pages")"
 
-    mv -T -- "$rollback_staging" "$rollback_target"
-    mv -T -- "$candidate_staging" "$candidate_target"
+    prepare_validation_job
+    run_four_stage_validation "$CURRENT_BEFORE" "$CANDIDATE_STAGING" "$ROLLBACK_STAGING"
+    assert_production_unchanged
+
+    if [[ "$rollback_exists" == "1" ]]; then
+        same_release_tree "$ROLLBACK_STAGING" "$rollback_target" \
+            || die "existing rollback release differs and will not be overwritten"
+    else
+        mv -T -- "$ROLLBACK_STAGING" "$rollback_target"
+        ROLLBACK_STAGING=""
+    fi
+    if [[ "$candidate_exists" == "1" ]]; then
+        same_release_tree "$CANDIDATE_STAGING" "$candidate_target" \
+            || die "existing target release differs and will not be overwritten"
+    else
+        mv -T -- "$CANDIDATE_STAGING" "$candidate_target"
+        CANDIDATE_STAGING=""
+    fi
+    assert_immutable_release "$rollback_target"
+    assert_immutable_release "$candidate_target"
     [[ "$(current_target)" == "$CURRENT_BEFORE" ]] || die "current release changed before atomic switch"
+    SWITCH_ROLLBACK_TARGET="$rollback_target"
+    SWITCH_TARGET="$candidate_target"
+    SWITCH_ORIGINAL_TARGET="$CURRENT_BEFORE"
+    SWITCH_STATE="armed"
     atomic_switch "$candidate_target"
-    if ! systemctl restart "$SERVICE_NAME"; then
-        atomic_switch "$rollback_target"
-        systemctl restart "$SERVICE_NAME" || true
-        die "production service restart failed; current was restored to rollback"
-    fi
-    if ! health_gate; then
-        atomic_switch "$rollback_target"
-        systemctl restart "$SERVICE_NAME" || true
-        health_gate || true
-        die "candidate health did not recover in 15 seconds; current was restored to rollback"
-    fi
+    SWITCH_STATE="switched"
+    systemctl restart "$SERVICE_NAME" || die "production service restart failed"
+    health_gate || die "candidate failed the 15-consecutive-second stable health gate"
+    capture_after
+    [[ "$CURRENT_AFTER" == "$candidate_target" ]] || die "current does not resolve to the candidate after restart"
+    [[ "$CURRENT_COMMIT_AFTER" == "$DEPLOYED_COMMIT" ]] || die "running candidate commit does not match the approved commit"
+    assert_effective_runtime_environment "$PID_AFTER" "$candidate_target"
+    assert_runtime_endpoints
+    nginx -t >/dev/null 2>&1 || die "nginx configuration became invalid after candidate restart"
+    assert_manifest_invariants
 
     write_state_file previous-release "$ROLLBACK_BASENAME"
     write_state_file last-release "$RELEASE_BASENAME"
@@ -693,31 +1588,18 @@ validate_release_basename() {
 }
 
 run_rollback() {
-    local requested=""
+    local requested
     local target old_current old_basename target_commit
 
-    while [[ "$#" -gt 0 ]]; do
-        case "$1" in
-            --previous)
-                [[ -z "$requested" ]] || die "--previous cannot be combined with --release"
-                shift
-                ;;
-            --release)
-                [[ "$#" -ge 2 ]] || die "--release requires a value"
-                requested="$2"
-                shift 2
-                ;;
-            *) die "unsupported option: $1" ;;
-        esac
-    done
-
-    if [[ -z "$requested" ]]; then
-        [[ -f "$DEPLOY_ROOT/previous-release" ]] || die "no previous successful release is recorded"
-        requested="$(<"$DEPLOY_ROOT/previous-release")"
-    fi
+    [[ "$#" -eq 1 && "$1" == "--previous" ]] || die "rollback accepts only --previous"
+    assert_production_preflight
+    [[ -f "$DEPLOY_ROOT/previous-release" && ! -L "$DEPLOY_ROOT/previous-release" ]] \
+        || die "no previous successful release is recorded"
+    requested="$(<"$DEPLOY_ROOT/previous-release")"
     validate_release_basename "$requested"
     target="${RELEASE_ROOT}/${requested}"
     [[ -d "$target" && ! -L "$target" ]] || die "recorded rollback release does not exist"
+    assert_immutable_release "$target"
     target_commit="$(read_commit "$target")"
     [[ -n "$target_commit" ]] || die "rollback release has no valid .deployed-commit"
 
@@ -734,13 +1616,21 @@ run_rollback() {
         return 0
     fi
 
+    SWITCH_ROLLBACK_TARGET="$old_current"
+    SWITCH_TARGET="$target"
+    SWITCH_ORIGINAL_TARGET="$old_current"
+    SWITCH_STATE="armed"
     atomic_switch "$target"
-    if ! systemctl restart "$SERVICE_NAME" || ! health_gate; then
-        atomic_switch "$old_current"
-        systemctl restart "$SERVICE_NAME" || true
-        health_gate || true
-        die "rollback target failed health; original current was restored"
-    fi
+    SWITCH_STATE="switched"
+    systemctl restart "$SERVICE_NAME" || die "rollback target service restart failed"
+    health_gate || die "rollback target failed the 15-consecutive-second stable health gate"
+    capture_after
+    [[ "$CURRENT_AFTER" == "$target" && "$CURRENT_COMMIT_AFTER" == "$target_commit" ]] \
+        || die "running rollback target does not match the recorded release"
+    assert_effective_runtime_environment "$PID_AFTER" "$target"
+    assert_runtime_endpoints
+    nginx -t >/dev/null 2>&1 || die "nginx configuration became invalid after rollback"
+    assert_manifest_invariants
 
     write_state_file previous-release "$old_basename"
     write_state_file last-release "$requested"
@@ -752,8 +1642,13 @@ main() {
     shift
     require_root_and_layout
     trap 'on_exit $?' EXIT
+    trap 'on_signal HUP' HUP
+    trap 'on_signal INT' INT
+    trap 'on_signal TERM' TERM
     acquire_lock
+    preflight_evidence_storage
     capture_before
+    read_state_snapshot
 
     case "$ACTION" in
         audit) run_audit "$@" ;;
