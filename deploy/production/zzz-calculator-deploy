@@ -149,7 +149,7 @@ die() {
 json_field() {
     local name="$1"
     local value="${2-}"
-    local separator="${3:-,}"
+    local separator="${3-,}"
     local encoded_name encoded_value
     encoded_name="$(printf '%s' "$name" | jq -Rs .)" || return 1
     encoded_value="$(printf '%s' "$value" | jq -Rs .)" || return 1

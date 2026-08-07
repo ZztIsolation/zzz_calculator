@@ -111,6 +111,8 @@ assert.match(
 includes(manager, '[[ "$(tree_size_bytes "$destination")" -le "$MAX_EXPANDED_BYTES" ]]')
 
 // Evidence is coupled to the exact archive and must be persisted atomically.
+includes(manager, 'local separator="${3-,}"')
+assert.doesNotMatch(manager, /local separator="\$\{3:-,\}"/)
 includes(manager, "evidence artifact path contains control characters")
 includes(manager, '[[ "$evidence_size" == "$ARTIFACT_SIZE_BYTES" ]]')
 includes(manager, '[[ "$evidence_sha" == "$ARTIFACT_SHA256" ]]')
