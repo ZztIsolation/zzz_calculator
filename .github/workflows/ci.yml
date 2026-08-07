@@ -50,7 +50,13 @@ jobs:
           bash tests/production-ssh-gateway.integration.sh
 
       - name: Run deployment bootstrap integration tests
-        run: bash tests/production-bootstrap.integration.sh
+        run: |
+          # setup-node installs Node in the hosted tool cache, while the
+          # production bootstrap intentionally requires this fixed system path.
+          if [[ ! -x /usr/bin/node ]]; then
+            sudo ln -s -- "$(command -v node)" /usr/bin/node
+          fi
+          bash tests/production-bootstrap.integration.sh
 
       - name: Run deployment manager integration tests
         run: bash tests/production-deploy-manager.integration.sh
