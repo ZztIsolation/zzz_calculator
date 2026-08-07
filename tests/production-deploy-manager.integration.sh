@@ -85,8 +85,13 @@ run_manager_failure() {
     set -e
 
     [[ "$exit_code" -ne 0 ]] || fail "${label} unexpectedly succeeded"
-    grep -F -- "$expected_error" "$stderr_path" >/dev/null \
-        || fail "${label} did not report the expected rejection"
+    if ! grep -F -- "$expected_error" "$stderr_path" >/dev/null; then
+        printf '%s\n' "--- ${label} stderr ---" >&2
+        cat -- "$stderr_path" >&2
+        printf '%s\n' "--- ${label} stdout ---" >&2
+        cat -- "$stdout_path" >&2
+        fail "${label} did not report the expected rejection"
+    fi
     jq -e --arg action "$action" --arg error "$expected_error" '
         .status == "failed"
         and .action == $action
