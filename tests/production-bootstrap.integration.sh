@@ -207,8 +207,10 @@ late_clean_output="$(sudo env ZZZDEPLOY_PUBLIC_KEY="$public_key" \
 late_clean_status="$?"
 set -e
 [[ "$late_clean_status" -ne 0 ]] || fail "injected clean-host failure unexpectedly succeeded"
-grep -Fq -- 'injected failure after managed file installation' <<<"$late_clean_output" \
-    || fail "clean-host failpoint did not reach the late installation boundary"
+if ! grep -Fq -- 'injected failure after managed file installation' <<<"$late_clean_output"; then
+    printf '%s\n' "$late_clean_output" >&2
+    fail "clean-host failpoint did not reach the late installation boundary"
+fi
 ! getent passwd zzzdeploy >/dev/null 2>&1 || fail "failed transaction retained zzzdeploy"
 ! getent group zzzdeploy >/dev/null 2>&1 || fail "failed transaction retained zzzdeploy group"
 ! getent passwd zzzvalidate >/dev/null 2>&1 || fail "failed transaction retained zzzvalidate"
