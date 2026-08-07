@@ -56,6 +56,9 @@ jobs:
           if [[ ! -x /usr/bin/node ]]; then
             sudo ln -s -- "$(command -v node)" /usr/bin/node
           fi
+          # The hosted runner uses a disposable world-writable /run/lock.
+          # Production keeps the stricter bootstrap check unchanged.
+          sudo chmod o-w /run/lock
           bash tests/production-bootstrap.integration.sh
 
       - name: Run deployment manager integration tests
