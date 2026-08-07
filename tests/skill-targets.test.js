@@ -167,7 +167,7 @@ assert.deepEqual(Object.fromEntries(skillTagCounts), {
     assistAttack: 10,
     exSpecial: 12,
 })
-assert.equal(storedTargets.length, 54)
+assert.equal(storedTargets.length, 56)
 const yeShunguangTargetMoveIds = new Set(storedTargets
     .map(item => item.target)
     .filter(target => target.kind === "specific" && target.agentSkillId === "ye_shunguang")
@@ -180,5 +180,81 @@ for (const moveId of [
 ]) {
     assert.ok(yeShunguangTargetMoveIds.has(moveId), `Ye Shunguang should retain the modeled target ${moveId}`)
 }
+
+const agentsById = new Map(dataRoots[0].agents.map(agent => [agent.id, agent]))
+const officialAgents = {
+    zhao: {
+        name: "照",
+        faction: "坎卜斯黑枝",
+        entryPageId: 1686,
+        entryVersion: 1779875044,
+        level60: { hpBase: 9117, atkBase: 690, defBase: 701, impact: 93, anomalyProficiency: 96, anomalyMastery: 93 },
+    },
+    juhufu: {
+        name: "橘福福",
+        faction: "云岿山",
+        entryPageId: 1301,
+        entryVersion: 1776254279,
+        level60: { hpBase: 8250, atkBase: 690, defBase: 597, impact: 118, anomalyProficiency: 96, anomalyMastery: 93 },
+    },
+    vivian: {
+        name: "薇薇安·班希",
+        faction: "反舌鸟",
+        entryPageId: 1276,
+        entryVersion: 1781774238,
+        level60: { hpBase: 7673, atkBase: 805, defBase: 606, impact: 86, anomalyProficiency: 118, anomalyMastery: 108 },
+    },
+    lucia_elowen: {
+        name: "卢西娅·艾洛温",
+        faction: "怪啖屋",
+        entryPageId: 1533,
+        entryVersion: 1779875116,
+        level60: { hpBase: 8477, atkBase: 683, defBase: 594, impact: 83, anomalyProficiency: 95, anomalyMastery: 96 },
+    },
+    velina_airgid: {
+        name: "维琳娜·艾嘉德",
+        faction: "外务筹策局",
+        entryPageId: 1960,
+        entryVersion: 1785895376,
+        level60: { hpBase: 7788, atkBase: 797, defBase: 612, impact: 86, anomalyProficiency: 111, anomalyMastery: 112 },
+    },
+}
+
+for (const [agentId, expected] of Object.entries(officialAgents)) {
+    const agent = agentsById.get(agentId)
+    assert.ok(agent, `${agentId} must exist in the catalog`)
+    assert.equal(agent.name.zhCN, expected.name)
+    assert.equal(agent.faction, expected.faction)
+    assert.equal(agent.sources[0], `https://baike.mihoyo.com/zzz/wiki/content/${expected.entryPageId}/detail`)
+    assert.equal(agent.verification.officialEntryPageId, expected.entryPageId)
+    assert.equal(agent.verification.officialEntryVersion, expected.entryVersion)
+    assert.deepEqual(
+        Object.fromEntries(Object.keys(expected.level60).map(key => [key, agent.level60[key]])),
+        expected.level60,
+    )
+    assert.equal(
+        agent.coreSkill.levels
+            .flatMap(level => level.stats ?? [])
+            .filter(stat => stat.stat === "atkBase")
+            .reduce((sum, stat) => sum + Number(stat.value), 0),
+        75,
+        `${agentId} should add three 25-point ATK core nodes instead of preloading them into level60.atkBase`,
+    )
+}
+
+assert.deepEqual(
+    agentsById.get("vivian").coreSkill.levels
+        .flatMap(level => level.stats ?? [])
+        .filter(stat => stat.stat === "anomalyMasteryFlat")
+        .map(stat => stat.value),
+    [12, 12, 12],
+)
+assert.deepEqual(
+    agentsById.get("lucia_elowen").coreSkill.levels
+        .flatMap(level => level.stats ?? [])
+        .filter(stat => stat.stat === "energyRegenPct")
+        .map(stat => stat.value),
+    [10, 10, 10],
+)
 
 console.log("skill target tests passed")

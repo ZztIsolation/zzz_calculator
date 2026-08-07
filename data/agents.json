@@ -3879,6 +3879,1412 @@
           ]
         }
       }
+    },
+    {
+      "id": "zhao",
+      "name": {
+        "zhCN": "照"
+      },
+      "rarity": "S",
+      "attribute": "ice",
+      "specialty": "defense",
+      "attackTypes": [],
+      "faction": "坎卜斯黑枝",
+      "images": {
+        "portrait": "/assets/agents/zhao.png"
+      },
+      "level60": {
+        "hpBase": 9117,
+        "atkBase": 690,
+        "defBase": 701,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 93,
+        "anomalyProficiency": 96,
+        "anomalyMastery": 93,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动：最佳同事"
+          },
+          "description": {
+            "zhCN": "照会额外根据初始最大生命值提高暴击率，每1000点初始最大生命值提高0.8%暴击率。"
+          },
+          "effects": [
+            {
+              "id": "zhao_agent_core_hp_to_crit_rate",
+              "type": "formula",
+              "stat": "critRate",
+              "mode": "flat",
+              "source": {
+                "variable": "x",
+                "label": {
+                  "zhCN": "照初始最大生命值"
+                },
+                "defaultValue": 27000,
+                "min": 0,
+                "max": 27000
+              },
+              "formula": {
+                "expression": "x / 1000 * 0.8",
+                "valueUnit": "storedPercent"
+              },
+              "target": {
+                "kind": "default"
+              }
+            }
+          ],
+          "buffModifiers": []
+        }
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "最佳同事"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "hpPct",
+                "value": 6,
+                "mode": "pct",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "hpPct",
+                "value": 6,
+                "mode": "pct",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "hpPct",
+                "value": 6,
+                "mode": "pct",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/1686/detail"
+        ],
+        "verification": {
+          "stats": "source-checked-official-entry-1686-role_talent-2026-08-07; A/C/E each add HP +6% and Core Passive level +1; B/D/F each add Base ATK +25 and Core Passive level +1",
+          "corePassive": "fixed-value core passive (no A-F scaling): 0.8% crit rate per 1000 initial HP, source-backed from official entry 1686 role_talent"
+        }
+      },
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "swing_jazz"
+        ],
+        "mainStatLimits": {
+          "4": [
+            "hpPct",
+            "critRate"
+          ],
+          "5": [
+            "hpPct",
+            "iceDmg"
+          ],
+          "6": [
+            "hpPct",
+            "energyRegen"
+          ]
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1686/detail",
+        "https://wiki.biligame.com/zzz/%E7%85%A7",
+        "https://ol.3dmgame.com/gl/328535_5.html"
+      ],
+      "verification": {
+        "officialEntryPageId": 1686,
+        "officialEntryVersion": 1779875044,
+        "level60Stats": "source-checked-mihoyo-official-entry-1686-version-1779875044; level-60 HP/ATK/DEF 9117/690/701 and initial Impact/AP/AM 93/96/93 exclude Core Skill A-F node gains",
+        "combatMechanics": "core passive converts initial max HP into crit rate (critRate = initialMaxHp / 1000 * 0.8, fixed across Core Passive levels), modeled as a formula combat buff",
+        "driveDiscSet": "source-checked-2026-08-01; BWiki records the HP%/HP%/ER priority and 3DM's Zhao-specific build guide explicitly names 4pc Swing Jazz. Astral Voice 4pc is a comparable alternative, not a fabricated hard requirement.",
+        "unsupportedMechanics": "personal damage events remain unmodeled"
+      },
+      "hidden": false
+    },
+    {
+      "id": "juhufu",
+      "name": {
+        "zhCN": "橘福福"
+      },
+      "rarity": "S",
+      "attribute": "fire",
+      "specialty": "stun",
+      "attackTypes": [],
+      "faction": "云岿山",
+      "images": {
+        "portrait": "/assets/agents/juhufu.png"
+      },
+      "level60": {
+        "hpBase": 8250,
+        "atkBase": 690,
+        "defBase": 597,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 118,
+        "anomalyProficiency": 96,
+        "anomalyMastery": 93,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动：虎虎生威"
+          },
+          "description": {
+            "zhCN": "拥有[威风]时，橘福福可为全队施加[虎啸]，使全队暴击伤害按核心被动等级提升（初始/A-F基础10/11.7/13.3/15/16.7/18.3/20%，随初始攻击力额外提升合计最高40/41.7/43.3/45/46.7/48.3/50%）；[虎啸]状态下，角色的[连携技]造成的伤害提升（初始/A-F:10/11.7/13.3/15/16.7/18.3/20%），[终结技]造成的伤害提升（初始/A-F:20/23.3/26.7/30/33.3/36.7/40%）。"
+          },
+          "effects": [
+            {
+              "id": "juhufu.core_tiger_roar_crit_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critDmg",
+              "mode": "flat",
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "tigerRoarCritDmgBasePct"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              },
+              "value": 10
+            },
+            {
+              "id": "juhufu.core_tiger_roar_chain_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "chain"
+                  }
+                ]
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "tigerRoarChainDmgPct"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              },
+              "value": 10
+            },
+            {
+              "id": "juhufu.core_tiger_roar_ultimate_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "ultimate"
+                  }
+                ]
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "tigerRoarUltimateDmgPct"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              },
+              "value": 20
+            }
+          ],
+          "buffModifiers": []
+        },
+        "additionalAbility": null,
+        "cinemaBuffs": []
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "虎虎生威"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "pct",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "pct",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "pct",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "核心被动：虎虎生威"
+          },
+          "levels": [
+            {
+              "level": 1,
+              "coreSkillLevel": "initial",
+              "tigerRoarCritDmgBasePct": 10,
+              "tigerRoarChainDmgPct": 10,
+              "tigerRoarUltimateDmgPct": 20,
+              "tigerRoarSelfImpactBonus": 25
+            },
+            {
+              "level": 2,
+              "coreSkillLevel": "A",
+              "tigerRoarCritDmgBasePct": 11.7,
+              "tigerRoarChainDmgPct": 11.7,
+              "tigerRoarUltimateDmgPct": 23.3,
+              "tigerRoarSelfImpactBonus": 29.2
+            },
+            {
+              "level": 3,
+              "coreSkillLevel": "B",
+              "tigerRoarCritDmgBasePct": 13.3,
+              "tigerRoarChainDmgPct": 13.3,
+              "tigerRoarUltimateDmgPct": 26.7,
+              "tigerRoarSelfImpactBonus": 33.3
+            },
+            {
+              "level": 4,
+              "coreSkillLevel": "C",
+              "tigerRoarCritDmgBasePct": 15,
+              "tigerRoarChainDmgPct": 15,
+              "tigerRoarUltimateDmgPct": 30,
+              "tigerRoarSelfImpactBonus": 37.5
+            },
+            {
+              "level": 5,
+              "coreSkillLevel": "D",
+              "tigerRoarCritDmgBasePct": 16.7,
+              "tigerRoarChainDmgPct": 16.7,
+              "tigerRoarUltimateDmgPct": 33.3,
+              "tigerRoarSelfImpactBonus": 41.7
+            },
+            {
+              "level": 6,
+              "coreSkillLevel": "E",
+              "tigerRoarCritDmgBasePct": 18.3,
+              "tigerRoarChainDmgPct": 18.3,
+              "tigerRoarUltimateDmgPct": 36.7,
+              "tigerRoarSelfImpactBonus": 45.8
+            },
+            {
+              "level": 7,
+              "coreSkillLevel": "F",
+              "tigerRoarCritDmgBasePct": 20,
+              "tigerRoarChainDmgPct": 20,
+              "tigerRoarUltimateDmgPct": 40,
+              "tigerRoarSelfImpactBonus": 50
+            }
+          ],
+          "defaultLevelAtCoreSkill": "F"
+        },
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/1301/detail"
+        ],
+        "verification": {
+          "skillLevelBonuses": "A/C/E each add Crit Rate +4.8% and Core Passive level +1; B/D/F each add Base ATK +25 and Core Passive level +1",
+          "corePassiveScaling": "source-checked official entry 1301; initial/A-F [虎啸] crit-dmg base and chain bonus are 10/11.7/13.3/15/16.7/18.3/20%, ultimate bonus is 20/23.3/26.7/30/33.3/36.7/40%, self Impact bonus is 25/29.2/33.3/37.5/41.7/45.8/50"
+        }
+      },
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "king_of_the_summit"
+        ],
+        "mainStatLimits": {
+          "4": [
+            "critRate",
+            "atkPct"
+          ],
+          "5": [
+            "atkPct",
+            "fireDmg"
+          ],
+          "6": [
+            "impact",
+            "energyRegen",
+            "atkPct"
+          ]
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1301/detail",
+        "https://www.hoyolab.com/article/39661788"
+      ],
+      "verification": {
+        "officialEntryPageId": 1301,
+        "officialEntryVersion": 1776254279,
+        "level60Stats": "source-checked-mihoyo-official-entry-1301-version-1776254279; level-60 HP/ATK/DEF 8250/690/597 and initial Impact/AP/AM 118/96/93 exclude Core Skill A-F node gains",
+        "coreSkill": "source-checked-official-entry-1301-role_talent-2026-08-07; A/C/E each add Crit Rate +4.8% and Core Passive level +1; B/D/F each add Base ATK +25 and Core Passive level +1",
+        "corePassiveScaling": "source-checked-official-entry-1301-role_talent; [虎啸] tiger-roar crit-dmg base 11.7/13.3/15/16.7/18.3/20, chain dmg 11.7/13.3/15/16.7/18.3/20, ultimate dmg 23.3/26.7/30/33.3/36.7/40, self impact bonus 29.2/33.3/37.5/41.7/45.8/50 across A-F",
+        "combatMechanics": "[虎啸] team buff inlined as three corePassiveScaling-keyed combat buffs (whole-team crit-dmg, chain-skill dmg, ultimate-skill dmg) matching the shared F-level values 50/20/40 at Core Passive level 7",
+        "unsupportedMechanics": "personal damage events and exact stun-cycle multipliers remain unmodeled"
+      },
+      "hidden": false
+    },
+    {
+      "id": "vivian",
+      "name": {
+        "zhCN": "薇薇安·班希"
+      },
+      "rarity": "S",
+      "attribute": "ether",
+      "specialty": "anomaly",
+      "attackTypes": [],
+      "faction": "反舌鸟",
+      "level60": {
+        "hpBase": 7673,
+        "atkBase": 805,
+        "defBase": 606,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 86,
+        "anomalyProficiency": 118,
+        "anomalyMastery": 108,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "combatBuffs": {
+        "corePassive": null,
+        "additionalAbility": null,
+        "cinemaBuffs": []
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "命运悲歌"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "核心被动：命运悲歌"
+          },
+          "levels": [
+            {
+              "level": 1,
+              "coreSkillLevel": "initial",
+              "releaseCoefficientPctByElement": {
+                "ether": 3.07,
+                "electric": 1.6,
+                "fire": 4,
+                "physical": 0.37,
+                "ice": 0.54,
+                "wind": 0.16
+              }
+            },
+            {
+              "level": 2,
+              "coreSkillLevel": "A",
+              "releaseCoefficientPctByElement": {
+                "ether": 3.59,
+                "electric": 1.86,
+                "fire": 4.66,
+                "physical": 0.44,
+                "ice": 0.63,
+                "wind": 0.18
+              }
+            },
+            {
+              "level": 3,
+              "coreSkillLevel": "B",
+              "releaseCoefficientPctByElement": {
+                "ether": 4.11,
+                "electric": 2.12,
+                "fire": 5.32,
+                "physical": 0.51,
+                "ice": 0.72,
+                "wind": 0.21
+              }
+            },
+            {
+              "level": 4,
+              "coreSkillLevel": "C",
+              "releaseCoefficientPctByElement": {
+                "ether": 4.63,
+                "electric": 2.38,
+                "fire": 5.98,
+                "physical": 0.58,
+                "ice": 0.81,
+                "wind": 0.24
+              }
+            },
+            {
+              "level": 5,
+              "coreSkillLevel": "D",
+              "releaseCoefficientPctByElement": {
+                "ether": 5.15,
+                "electric": 2.64,
+                "fire": 6.64,
+                "physical": 0.65,
+                "ice": 0.9,
+                "wind": 0.26
+              }
+            },
+            {
+              "level": 6,
+              "coreSkillLevel": "E",
+              "releaseCoefficientPctByElement": {
+                "ether": 5.65,
+                "electric": 2.9,
+                "fire": 7.3,
+                "physical": 0.7,
+                "ice": 0.99,
+                "wind": 0.29
+              }
+            },
+            {
+              "level": 7,
+              "coreSkillLevel": "F",
+              "releaseCoefficientPctByElement": {
+                "ether": 6.15,
+                "electric": 3.2,
+                "fire": 8,
+                "physical": 0.75,
+                "ice": 1.08,
+                "wind": 0.32
+              }
+            }
+          ],
+          "defaultLevelAtCoreSkill": "F"
+        },
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/1276/detail"
+        ],
+        "verification": {
+          "skillLevelBonuses": "A/C/E each add Anomaly Mastery +12 and Core Passive level +1; B/D/F each add Base ATK +25 and Core Passive level +1",
+          "corePassiveScaling": "source-checked official entry 1276; initial/A-F [异放] per-10-AP coefficients are recorded for ether/electric/fire/physical/ice/wind, beginning at 3.07/1.6/4/0.37/0.54/0.16 and ending at 6.15/3.2/8/0.75/1.08/0.32"
+        }
+      },
+      "anomalyReleaseProfiles": [
+        {
+          "id": "core_passive",
+          "name": {
+            "zhCN": "核心被动：命运悲歌"
+          },
+          "default": true,
+          "supportedElements": [
+            "ether",
+            "electric",
+            "fire",
+            "physical",
+            "ice",
+            "wind"
+          ],
+          "resultMode": "originalAnomalyRatio",
+          "expression": {
+            "op": "multiply",
+            "label": {
+              "zhCN": "异放倍率"
+            },
+            "args": [
+              {
+                "op": "divide",
+                "label": {
+                  "zhCN": "局外异常精通换算"
+                },
+                "args": [
+                  {
+                    "kind": "triggerStat",
+                    "panel": "outOfCombat",
+                    "stat": "anomalyProficiency",
+                    "unit": "raw",
+                    "whiteBoxRole": "conversionSource",
+                    "label": {
+                      "zhCN": "局外异常精通"
+                    }
+                  },
+                  {
+                    "kind": "constant",
+                    "value": 10,
+                    "unit": "raw",
+                    "label": {
+                      "zhCN": "异常精通除数"
+                    }
+                  }
+                ]
+              },
+              {
+                "kind": "coreSkillScaling",
+                "field": "releaseCoefficientPctByElement",
+                "key": "eventElement",
+                "unit": "percent",
+                "label": {
+                  "zhCN": "核心属性系数"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "phaethons_melody"
+        ],
+        "mainStatLimits": {
+          "4": [
+            "anomalyProficiency",
+            "atkPct"
+          ],
+          "5": [
+            "etherDmg",
+            "atkPct",
+            "penRatio"
+          ],
+          "6": [
+            "anomalyMastery",
+            "atkPct"
+          ]
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1276/detail",
+        "https://www.hoyolab.com/article/38413036"
+      ],
+      "verification": {
+        "officialEntryPageId": 1276,
+        "officialEntryVersion": 1781774238,
+        "level60Stats": "source-checked-mihoyo-official-entry-1276-version-1781774238; level-60 HP/ATK/DEF 7673/805/606 and initial Impact/AP/AM 86/118/108 exclude Core Skill A-F node gains",
+        "combatMechanics": "core passive [异放] anomaly-release coefficient by element is modeled through anomalyReleaseProfiles keyed to coreSkillScaling (releaseCoefficientPctByElement), not as a team combat buff",
+        "unsupportedMechanics": "full off-field damage and anomaly event multipliers require a separately verified skill dataset before exact damage scoring"
+      },
+      "hidden": false
+    },
+    {
+      "id": "lucia_elowen",
+      "name": {
+        "zhCN": "卢西娅·艾洛温"
+      },
+      "rarity": "S",
+      "attribute": "ether",
+      "specialty": "support",
+      "attackTypes": [],
+      "faction": "怪啖屋",
+      "images": {
+        "portrait": "/assets/agents/lucia_elowen.png"
+      },
+      "level60": {
+        "hpBase": 8477,
+        "atkBase": 683,
+        "defBase": 594,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 83,
+        "anomalyProficiency": 95,
+        "anomalyMastery": 96,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动：迷途夜颂"
+          },
+          "description": {
+            "zhCN": "进入[梦境]状态时开启[以太帷幕·涌泉]，使全队角色最大生命值提升5%，持续40秒；卢西娅发动招式升级或[追加攻击]时，为全队施加[巡梦童谣]，使角色造成的伤害按核心被动等级提升（初始/A-F:10/11.7/13.3/15/16.7/18.3/20%），持续12秒。"
+          },
+          "effects": [
+            {
+              "id": "lucia_elowen.core_dream_song_team_hp",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "hpPct",
+              "mode": "pct",
+              "basis": "outOfCombatHp",
+              "value": 5,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "lucia_elowen.core_dream_song_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "dreamSongDmgPct"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              },
+              "value": 10
+            }
+          ],
+          "buffModifiers": []
+        },
+        "additionalAbility": null,
+        "cinemaBuffs": []
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "迷途夜颂"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "energyRegenPct",
+                "value": 10,
+                "mode": "pct",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "energyRegenPct",
+                "value": 10,
+                "mode": "pct",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "energyRegenPct",
+                "value": 10,
+                "mode": "pct",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "核心被动：迷途夜颂"
+          },
+          "levels": [
+            {
+              "level": 1,
+              "coreSkillLevel": "initial",
+              "dreamSongDmgPct": 10
+            },
+            {
+              "level": 2,
+              "coreSkillLevel": "A",
+              "dreamSongDmgPct": 11.7
+            },
+            {
+              "level": 3,
+              "coreSkillLevel": "B",
+              "dreamSongDmgPct": 13.3
+            },
+            {
+              "level": 4,
+              "coreSkillLevel": "C",
+              "dreamSongDmgPct": 15
+            },
+            {
+              "level": 5,
+              "coreSkillLevel": "D",
+              "dreamSongDmgPct": 16.7
+            },
+            {
+              "level": 6,
+              "coreSkillLevel": "E",
+              "dreamSongDmgPct": 18.3
+            },
+            {
+              "level": 7,
+              "coreSkillLevel": "F",
+              "dreamSongDmgPct": 20
+            }
+          ],
+          "defaultLevelAtCoreSkill": "F"
+        },
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/1533/detail"
+        ],
+        "verification": {
+          "skillLevelBonuses": "A/C/E each add Base Energy Regen +0.12/s and Core Passive level +1; B/D/F each add Base ATK +25 and Core Passive level +1",
+          "corePassiveScaling": "source-checked official entry 1533; initial/A-F [巡梦童谣] team damage bonus is 10/11.7/13.3/15/16.7/18.3/20%"
+        }
+      },
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "astral_voice"
+        ],
+        "mainStatLimits": {
+          "4": [
+            "hpPct"
+          ],
+          "5": [
+            "hpPct",
+            "etherDmg"
+          ],
+          "6": [
+            "energyRegen",
+            "hpPct"
+          ]
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1533/detail",
+        "https://www.hoyolab.com/article/41763426"
+      ],
+      "verification": {
+        "officialEntryPageId": 1533,
+        "officialEntryVersion": 1779875116,
+        "level60Stats": "source-checked-mihoyo-official-entry-1533-version-1779875116; level-60 HP/ATK/DEF 8477/683/594 and initial Impact/AP/AM 83/95/96 exclude Core Skill A-F node gains",
+        "coreSkill": "source-checked-official-entry-1533-role_talent-2026-08-07; A/C/E each add Base Energy Regen +0.12/s and Core Passive level +1; B/D/F each add Base ATK +25 and Core Passive level +1",
+        "corePassiveScaling": "source-checked-official-entry-1533-role_talent; [巡梦童谣] team damage bonus scales A-F 11.7/13.3/15/16.7/18.3/20%",
+        "combatMechanics": "[巡梦童谣] team buff inlined as two combat buffs (whole-team dmg-bonus keyed to corePassiveScaling dreamSongDmgPct, and team max-HP +5% fixed) matching the shared F-level values 20% and 5% at Core Passive level 7",
+        "unsupportedMechanics": "personal damage events remain unmodeled"
+      },
+      "hidden": false
+    },
+    {
+      "id": "velina_airgid",
+      "name": {
+        "zhCN": "维琳娜·艾嘉德"
+      },
+      "rarity": "S",
+      "attribute": "wind",
+      "specialty": "anomaly",
+      "attackTypes": [],
+      "faction": "外务筹策局",
+      "level60": {
+        "hpBase": 7788,
+        "atkBase": 797,
+        "defBase": 612,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 86,
+        "anomalyProficiency": 111,
+        "anomalyMastery": 112,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动：风华盈袖"
+          },
+          "description": {
+            "zhCN": "维琳娜初始能量自动回复大于1.2时，超过部分每超过0.01，造成的伤害提升0.21%（最多提升35%），异常掌控提升0.5点（最多提升84点）。"
+          },
+          "effects": [
+            {
+              "id": "velina_agent_core_er_to_dmg",
+              "type": "formula",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "source": {
+                "variable": "x",
+                "label": {
+                  "zhCN": "维琳娜初始能量自动回复"
+                },
+                "defaultValue": 288,
+                "min": 120,
+                "max": 288
+              },
+              "formula": {
+                "expression": "clamp((x - 120) * 0.21, 0, 35)",
+                "valueUnit": "storedPercent"
+              },
+              "target": {
+                "kind": "default"
+              }
+            },
+            {
+              "id": "velina_agent_core_er_to_anomaly_mastery",
+              "type": "formula",
+              "stat": "anomalyMasteryFlat",
+              "mode": "flat",
+              "source": {
+                "variable": "x",
+                "label": {
+                  "zhCN": "维琳娜初始能量自动回复"
+                },
+                "defaultValue": 288,
+                "min": 120,
+                "max": 288
+              },
+              "formula": {
+                "expression": "clamp((x - 120) * 0.5, 0, 84)",
+                "valueUnit": "storedValue"
+              },
+              "target": {
+                "kind": "default"
+              }
+            }
+          ],
+          "buffModifiers": []
+        }
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "风华盈袖"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "anomalyProficiency",
+                "value": 18,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "anomalyProficiency",
+                "value": 18,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "anomalyProficiency",
+                "value": 18,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/1960/detail"
+        ],
+        "verification": {
+          "stats": "source-checked-official-entry-1960-role_talent-2026-08-08; A/C/E each add Anomaly Proficiency +18 and Core Passive level +1; B/D/F each add Base ATK +25 and Core Passive level +1",
+          "corePassive": "fixed-value core passive (no A-F scaling): energy-regen conversion, source-backed from official entry 1960 role_talent"
+        }
+      },
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "zzz_wiki_2038",
+          "moonlight_lullaby"
+        ],
+        "mainStatLimits": {
+          "4": [
+            "anomalyProficiency"
+          ],
+          "5": [
+            "windDmg",
+            "penRatio"
+          ],
+          "6": [
+            "energyRegen"
+          ]
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1960/detail",
+        "https://wiki.biligame.com/zzz/%E7%BB%B4%E7%90%B3%E5%A8%9C",
+        "https://zzz.mihoyo.com/news/164823"
+      ],
+      "verification": {
+        "officialEntryPageId": 1960,
+        "officialEntryVersion": 1785895376,
+        "level60Stats": "source-checked-mihoyo-official-entry-1960-version-1785895376; level-60 HP/ATK/DEF 7788/797/612 and initial Impact/AP/AM 86/111/112 exclude Core Skill A-F node gains",
+        "combatMechanics": "core passive converts energy regen into dmg bonus and anomaly mastery (fixed across Core Passive levels), modeled as two formula combat buffs",
+        "unsupportedMechanics": "exact skill multipliers, Winded/Disordered damage sequence, resistance reduction timing, and a full off-field DPS rotation remain unmodeled"
+      },
+      "hidden": false
     }
   ]
 }
