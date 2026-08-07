@@ -874,6 +874,9 @@ export function runtimeSourceConfigForRule(rule = {}) {
         return null
     }
     const source = rule.source ?? {}
+    if (rule.type === "formula" && source.kind === "panelStat") {
+        return null
+    }
     return {
         label: localizedText(source.label ?? rule.sourceLabel) || "来源数值",
         defaultValue: finiteSourceNumber(source.defaultValue ?? rule.defaultSourceValue, 0),
@@ -1017,7 +1020,11 @@ export function defaultRuntimeForBuff(buff = {}) {
     for (const rule of effectRules(buff)) {
         const id = effectRuleId(rule)
         const coverage = effectRuleCoverage(rule, buff)
-        if (rule.type === "derived" || rule.type === "formula") {
+        if (rule.type === "formula" && rule.source?.kind === "panelStat") {
+            runtime.effects[id] = {
+                enabled: true,
+            }
+        } else if (rule.type === "derived" || rule.type === "formula") {
             runtime.effects[id] = {
                 enabled: true,
                 sourceValue: Number(rule.source?.defaultValue ?? rule.defaultSourceValue ?? 0),
@@ -1204,6 +1211,13 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
     }
     if (rule.type === "formula") {
         const source = rule.source ?? {}
+        if (source.kind === "panelStat") {
+            const sourceLabel = localizedText(source.label)
+                || OUT_OF_COMBAT_REQUIREMENT_STAT_LABELS[source.stat]
+                || source.stat
+                || "局外面板"
+            return `${storedRuleStatLabel(rule, meta)}：按${sourceLabel}自动计算${ruleTargetText(rule, meta)}${requirementText}${coverageText}`
+        }
         const rawSourceValue = Number(ruleRuntime.sourceValue ?? source.defaultValue ?? 0)
         const sourceValue = Math.max(
             Number.isFinite(Number(source.min)) ? Number(source.min) : rawSourceValue,

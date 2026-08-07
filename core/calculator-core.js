@@ -1090,6 +1090,33 @@ function hasOutOfCombatStatRequirement(rule = {}) {
     return Boolean(outOfCombatStatRequirement(rule?.requirement))
 }
 
+function panelFormulaSourceStat(rule = {}) {
+    const source = rule?.source
+    if (rule?.type !== "formula" || source?.kind !== "panelStat") {
+        return ""
+    }
+    if ((source.panel ?? "outOfCombat") !== "outOfCombat") {
+        return ""
+    }
+    return String(source.stat ?? "").trim()
+}
+
+function hasPanelFormulaSource(effect = {}) {
+    return effectRules(effect).some(rule => Boolean(panelFormulaSourceStat(rule)))
+}
+
+function panelFormulaSourceValue(rule = {}, modifierContext = {}) {
+    const stat = panelFormulaSourceStat(rule)
+    if (!stat) {
+        return null
+    }
+    const value = Number(modifierContext.outOfCombat?.panel?.[stat])
+    if (!Number.isFinite(value)) {
+        return null
+    }
+    return rule.source?.valueUnit === "storedPercent" ? value * 100 : value
+}
+
 function effectRuleRequirementMatches(rule = {}, modifierContext = {}) {
     const requiredSpecialty = String(rule?.requirement?.specialty ?? "").trim()
     const requiredAttribute = String(rule?.requirement?.attribute ?? "").trim()
@@ -1153,7 +1180,14 @@ function resolveEffectRule(rule, effect, runtimeInput = {}, modifierContext = {}
     if (type === "formula") {
         const source = rule.source ?? {}
         const variable = source.variable ?? "x"
-        const rawSourceValue = Number(runtime.sourceValue ?? source.defaultValue ?? rule.defaultSourceValue ?? 0)
+        const automaticSourceValue = panelFormulaSourceValue(rule, modifierContext)
+        const rawSourceValue = Number(
+            automaticSourceValue
+                ?? runtime.sourceValue
+                ?? source.defaultValue
+                ?? rule.defaultSourceValue
+                ?? 0,
+        )
         const min = Number(source.min)
         const max = Number(source.max)
         const sourceValue = clampNumber(
@@ -6454,16 +6488,19 @@ export function createInCombatPanelCalculator(catalog, input) {
         effectRules(entry.buff).some(rule => rule?.stat === "anomalyCritRatePerInitialMasteryAbove100")
     )
     const activeOutOfCombatRequirementStats = new Set()
-    const collectOutOfCombatRequirementStats = effect => {
+    const activePanelFormulaSourceStats = new Set()
+    const collectOutOfCombatDependencies = effect => {
         for (const rule of effectRules(effect)) {
             const requirement = outOfCombatStatRequirement(rule?.requirement)
             if (requirement) activeOutOfCombatRequirementStats.add(requirement.stat)
+            const formulaSourceStat = panelFormulaSourceStat(rule)
+            if (formulaSourceStat) activePanelFormulaSourceStats.add(formulaSourceStat)
         }
     }
-    for (const buff of activeCatalogBuffs) collectOutOfCombatRequirementStats(buff)
-    for (const entry of activeAgentBuffs) collectOutOfCombatRequirementStats(entry.buff)
-    for (const entry of activeCurrentWEngineEntries) collectOutOfCombatRequirementStats(entry.effect)
-    for (const entry of activeTeamWEngineEntries) collectOutOfCombatRequirementStats(entry.teamBuff)
+    for (const buff of activeCatalogBuffs) collectOutOfCombatDependencies(buff)
+    for (const entry of activeAgentBuffs) collectOutOfCombatDependencies(entry.buff)
+    for (const entry of activeCurrentWEngineEntries) collectOutOfCombatDependencies(entry.effect)
+    for (const entry of activeTeamWEngineEntries) collectOutOfCombatDependencies(entry.teamBuff)
     for (const activeId of activeDriveDisc4pcIds) {
         const rawKey = String(activeId).slice("driveDisc4pc:".length)
         const [setId, part = "self"] = rawKey.split(".")
@@ -6471,7 +6508,7 @@ export function createInCombatPanelCalculator(catalog, input) {
         const effect = part === "team"
             ? driveDiscFourPieceTeamBuff(set)
             : driveDiscFourPieceSelfBuff(set)
-        collectOutOfCombatRequirementStats(effect)
+        collectOutOfCombatDependencies(effect)
     }
 
     function optimizerStatMetadata({ minimums = {} } = {}) {
@@ -6530,6 +6567,9 @@ export function createInCombatPanelCalculator(catalog, input) {
         for (const stat of activeOutOfCombatRequirementStats) {
             panelStats.add(stat)
         }
+        for (const stat of activePanelFormulaSourceStats) {
+            panelStats.add(stat)
+        }
         for (const [stat, value] of Object.entries(minimums ?? {})) {
             if (value !== null && value !== undefined && Number.isFinite(Number(value))) {
                 panelStats.add(stat)
@@ -6544,7 +6584,9 @@ export function createInCombatPanelCalculator(catalog, input) {
         }
         const hasReleaseFormula = (compiledDamageTarget.events ?? []).some(event => event.isRelease)
         return {
-            strictMonotonic: !hasReleaseFormula && activeOutOfCombatRequirementStats.size === 0,
+            strictMonotonic: !hasReleaseFormula
+                && activeOutOfCombatRequirementStats.size === 0
+                && activePanelFormulaSourceStats.size === 0,
             requiresReleaseIntervalBound: hasReleaseFormula,
             panelStatIds: [...panelStats].sort(),
             relevantStatIds: [...relevantStatIds].sort(),
@@ -6636,6 +6678,12 @@ export function createInCombatPanelCalculator(catalog, input) {
             const effect = options?.effect
             if (!effect) {
                 return true
+            }
+            // A panel-backed formula must be evaluated for every candidate's
+            // out-of-combat panel. The dense path freezes effect values during
+            // compilation, so fall back to the exact prepared calculator.
+            if (hasPanelFormulaSource(effect)) {
+                return false
             }
             const entry = compileDenseCombatEffectEntry({
                 ...options,

@@ -21,6 +21,14 @@ const props = withDefaults(defineProps<{
   corePassiveScaling?: any
 }>(), { simple: false, allowCoverage: false, allowModificationValues: false, preferredSkillId: "", corePassiveScaling: null })
 const emit = defineEmits<{ change: [] }>()
+const FORMULA_SOURCE_KIND_OPTIONS = [
+  option("manual", "手动来源数值"),
+  option("panelStat", "自动读取局外面板"),
+]
+const FORMULA_SOURCE_VALUE_UNIT_OPTIONS = [
+  option("storedValue", "按面板原值"),
+  option("storedPercent", "按百分数（0.5 → 50）"),
+]
 
 function rules() {
   return Array.isArray(props.model.effects) ? props.model.effects as any[] : []
@@ -68,6 +76,26 @@ function changeType(rule: any, type: string) {
     rule.defaultStacks ??= rule.maxStacks
   } else {
     rule.value ??= Number(rule.valuePerStack ?? 0)
+  }
+  emit("change")
+}
+
+function formulaSourceKind(rule: any) {
+  return rule.source?.kind === "panelStat" ? "panelStat" : "manual"
+}
+
+function changeFormulaSourceKind(rule: any, kind: string) {
+  rule.source ??= { variable: "x", label: { zhCN: "来源数值" }, defaultValue: 0 }
+  if (kind === "panelStat") {
+    rule.source.kind = "panelStat"
+    rule.source.panel = "outOfCombat"
+    rule.source.stat ??= "atk"
+    rule.source.valueUnit ??= "storedValue"
+  } else {
+    delete rule.source.kind
+    delete rule.source.panel
+    delete rule.source.stat
+    delete rule.source.valueUnit
   }
   emit("change")
 }
@@ -181,6 +209,16 @@ function setValueSourceField(rule: any, field: string | null) {
   emit("change")
 }
 
+function setValueSourceFields(rule: any, value: unknown) {
+  const fields = Array.isArray(value) ? [...new Set(value.map(String).filter(Boolean))] : []
+  if (!fields.length) {
+    delete rule.valueSource
+  } else {
+    rule.valueSource = { kind: "corePassiveScaling", fields }
+  }
+  emit("change")
+}
+
 function changeAnomalyVariants(rule: any, values: unknown) {
   const variants = Array.isArray(values) ? values.map(String) : []
   if (variants.length) rule.target.anomalyVariants = variants
@@ -289,6 +327,7 @@ function selectStackGroup(rule: any, value: string) {
         <label v-if="!simple" class="maintenance-field maintenance-field-wide"><span>增幅对象</span><NRadioGroup class="maintenance-target-mode" :value="targetMode(rule)" :disabled="disabled" size="small"><NRadioButton v-for="item in TARGET_KIND_OPTIONS" :key="item.value" :value="item.value" :label="item.label" @click="changeTarget(rule, String(item.value))" /></NRadioGroup></label>
         <label class="maintenance-field" data-field-key="stat"><span>增幅类型</span><NSelect filterable :consistent-menu-width="false" :value="rule.stat" :options="statOptions(catalog, rule.target?.kind, rule.target?.settlementType)" :disabled="disabled" @update:value="changeStat(rule, String($event))" /></label>
         <label v-if="corePassiveScaling && (rule.type ?? 'fixed') === 'fixed'" class="maintenance-field"><span>数值来源</span><NSelect :value="rule.valueSource?.field ?? ''" :options="corePassiveScalingFieldOptions()" :disabled="disabled" @update:value="setValueSourceField(rule, $event ? String($event) : null)" /></label>
+        <label v-if="corePassiveScaling && rule.type === 'formula'" class="maintenance-field maintenance-field-wide"><span>公式核心被动倍率</span><NSelect multiple clearable :value="rule.valueSource?.fields ?? []" :options="corePassiveScalingFieldOptions().filter(item => item.value)" :disabled="disabled" @update:value="setValueSourceFields(rule, $event)" /></label>
         <label v-if="!['derived', 'formula'].includes(rule.type)" class="maintenance-field"><span>{{ rule.type === 'stacked' ? '每层数值' : '数值' }}</span><NInputNumber :value="rule.type === 'stacked' ? rule.valuePerStack : rule.value" :disabled="disabled || Boolean(rule.valueSource)" :step="0.01" @update:value="rule[rule.type === 'stacked' ? 'valuePerStack' : 'value'] = $event; emit('change')" /></label>
         <label v-if="rule.target?.kind !== 'skill' && !EVENT_STAT_KEYS.has(rule.stat)" class="maintenance-field"><span>计算方式</span><NSelect v-model:value="rule.mode" :options="EFFECT_MODE_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
         <label v-if="rule.target?.kind !== 'skill' && !EVENT_STAT_KEYS.has(rule.stat)" class="maintenance-field"><span>基准</span><NSelect v-model:value="rule.basis" :options="BASIS_OPTIONS" :disabled="disabled" clearable @update:value="emit('change')" /></label>
@@ -317,8 +356,11 @@ function selectStackGroup(rule: any, value: string) {
       </div>
 
       <div v-if="rule.type === 'formula'" class="maintenance-grid rule-detail-grid">
+        <label class="maintenance-field"><span>来源方式</span><NSelect :value="formulaSourceKind(rule)" :options="FORMULA_SOURCE_KIND_OPTIONS" :disabled="disabled" @update:value="changeFormulaSourceKind(rule, String($event))" /></label>
+        <label v-if="formulaSourceKind(rule) === 'panelStat'" class="maintenance-field"><span>局外面板字段</span><NSelect v-model:value="rule.source.stat" :options="OUT_OF_COMBAT_REQUIREMENT_STAT_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
+        <label v-if="formulaSourceKind(rule) === 'panelStat'" class="maintenance-field"><span>面板来源单位</span><NSelect v-model:value="rule.source.valueUnit" :options="FORMULA_SOURCE_VALUE_UNIT_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
         <label class="maintenance-field"><span>来源数值名称</span><NInput :value="textOf(rule.source?.label)" :disabled="disabled" @update:value="rule.source.label = { zhCN: String($event) }; emit('change')" /></label>
-        <label class="maintenance-field"><span>默认来源数值</span><NInputNumber v-model:value="rule.source.defaultValue" :disabled="disabled" @update:value="emit('change')" /></label>
+        <label class="maintenance-field"><span>{{ formulaSourceKind(rule) === 'panelStat' ? '缺失面板时回退值' : '默认来源数值' }}</span><NInputNumber v-model:value="rule.source.defaultValue" :disabled="disabled" @update:value="emit('change')" /></label>
         <label class="maintenance-field"><span>来源下限</span><NInputNumber v-model:value="rule.source.min" :disabled="disabled" clearable @update:value="emit('change')" /></label>
         <label class="maintenance-field"><span>来源上限</span><NInputNumber v-model:value="rule.source.max" :disabled="disabled" clearable @update:value="emit('change')" /></label>
         <label class="maintenance-field"><span>公式结果单位</span><NSelect v-model:value="rule.formula.valueUnit" :options="FORMULA_VALUE_UNIT_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>

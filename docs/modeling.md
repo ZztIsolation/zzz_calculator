@@ -372,7 +372,7 @@ interface EffectCoverage {
 type EffectRule = (
   | { type: "fixed"; stat: BuffRuleStat; value: number; mode: "flat" | "pct"; basis?: Effect["stats"][number]["basis"]; target?: EffectTarget }
   | { type: "derived"; stat: BuffRuleStat; mode: "flat" | "pct"; sourceLabel?: { zhCN?: string }; defaultSourceValue: number; ratio: number; cap?: number; target?: EffectTarget }
-  | { type: "formula"; stat: BuffRuleStat; mode: "flat" | "pct"; source: { variable: "x"; label?: { zhCN?: string }; defaultValue: number; min?: number; max?: number }; formula: { expression: string; valueUnit?: "storedValue" | "storedPercent" }; target?: EffectTarget }
+  | { type: "formula"; stat: BuffRuleStat; mode: "flat" | "pct"; source: { kind?: "manual"; variable: "x"; label?: { zhCN?: string }; defaultValue: number; min?: number; max?: number } | { kind: "panelStat"; panel: "outOfCombat"; stat: "hp" | "atk" | "def" | "critRate" | "critDmg" | "impact" | "anomalyMastery" | "anomalyProficiency" | "energyRegen" | "penFlat" | "penRatio"; valueUnit?: "storedValue" | "storedPercent"; variable: "x"; label?: { zhCN?: string }; defaultValue: number; min?: number; max?: number }; formula: { expression: string; valueUnit?: "storedValue" | "storedPercent" }; target?: EffectTarget }
   | { type: "stacked"; stat: BuffRuleStat; mode: "flat" | "pct"; valuePerStack: number; maxStacks: number; defaultStacks?: number; stackGroup?: string; stackLabel?: { zhCN?: string; en?: string }; basis?: Effect["stats"][number]["basis"]; target?: EffectTarget }
 ) & {
   id: string;
@@ -753,9 +753,19 @@ Structured Buffs can use these calculation rules:
 - `fixed`: directly adds one stored stat value.
 - `derived`: converts a runtime source number by `sourceValue * ratio / 100`,
   then applies optional `cap`.
-- `formula`: evaluates a safe single-variable expression from source `x` into
-  the stored stat value. It only permits numbers, `x`, arithmetic, parentheses,
-  and `floor/ceil/round/min/max/clamp`.
+- `formula`: evaluates a safe expression from source `x` into the stored stat
+  value. A manual source keeps the editable `sourceValue` behavior. A
+  `source.kind: "panelStat"` source reads the selected out-of-combat panel stat
+  for every candidate, hides the manual source control, registers that stat as
+  an optimizer dependency, and disables dense precomputation that would freeze
+  the value. `source.valueUnit: "storedPercent"` converts decimal panel values
+  such as Crit Rate `0.5` or Energy Regen `1.2` into stored percent values `50`
+  or `120` before evaluating the expression; the default `storedValue` keeps HP,
+  ATK, DEF, Impact, Mastery, and Proficiency unchanged. Formula rules inside a character core passive may also bind
+  multiple A-F values through `valueSource: { kind: "corePassiveScaling",
+  fields: [...] }`; those field names are substituted before evaluating `x`.
+  Expressions only permit declared variables, numbers, arithmetic,
+  parentheses, and `floor/ceil/round/min/max/clamp`.
 - `stacked`: multiplies `valuePerStack` by runtime stack count. Multiple
   stacked rules can share one runtime stack input by using the same
   `stackGroup`, for cases where one in-game stack state drives several stat

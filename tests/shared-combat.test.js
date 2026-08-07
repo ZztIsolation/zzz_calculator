@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url"
 import {
     buildMeta,
     calculateInCombatPanel,
+    createInCombatPanelCalculator,
     loadCalculatorContext,
 } from "../backend/calculator.js"
 import {
@@ -1089,4 +1090,106 @@ approx(
     withManual.inCombat.panel.dmgBonus - withoutManual.inCombat.panel.dmgBonus,
     0.4,
     "Custom manual stat Buff should still affect in-combat results",
+)
+
+const panelFormulaAgent = structuredClone(catalog.agentsMap.get("anby_demara"))
+panelFormulaAgent.id = "panel_formula_test"
+panelFormulaAgent.combatBuffs = {
+    corePassive: {
+        scope: "inCombat",
+        name: { zhCN: "面板公式测试" },
+        effects: [{
+            id: "panel_formula_test.hp_to_crit",
+            type: "formula",
+            stat: "critRate",
+            mode: "flat",
+            source: {
+                kind: "panelStat",
+                panel: "outOfCombat",
+                stat: "hp",
+                variable: "x",
+                label: { zhCN: "初始生命值" },
+                defaultValue: 10000,
+                min: 0,
+            },
+            formula: {
+                expression: "x / 1000 * 0.8",
+                valueUnit: "storedPercent",
+            },
+            target: { kind: "default" },
+        }, {
+            id: "panel_formula_test.crit_to_impact",
+            type: "formula",
+            stat: "impactFlat",
+            mode: "flat",
+            source: {
+                kind: "panelStat",
+                panel: "outOfCombat",
+                stat: "critRate",
+                valueUnit: "storedPercent",
+                variable: "x",
+                label: { zhCN: "初始暴击率" },
+                defaultValue: 5,
+                min: 0,
+            },
+            formula: {
+                expression: "x * 2",
+                valueUnit: "storedValue",
+            },
+            target: { kind: "default" },
+        }],
+    },
+}
+const panelFormulaCatalog = {
+    ...catalog,
+    agents: [...catalog.agents, panelFormulaAgent],
+    agentsMap: new Map(catalog.agentsMap).set(panelFormulaAgent.id, panelFormulaAgent),
+}
+const panelFormulaInput = {
+    ...exampleInput,
+    agentId: panelFormulaAgent.id,
+    coreSkillLevel: "none",
+    combatBuffs: {
+        activeBuffIds: [`agent:${panelFormulaAgent.id}.corePassive`],
+    },
+}
+const panelFormulaCalculator = createInCombatPanelCalculator(panelFormulaCatalog, panelFormulaInput)
+const panelFormulaWithoutDisc = panelFormulaCalculator.calculate([], { round: false })
+const panelFormulaWithHpDisc = panelFormulaCalculator.calculate([{
+    id: "panel-formula-hp-disc",
+    partition: 1,
+    mainStat: { stat: "hpFlat", value: 2200, mode: "flat" },
+    subStats: [],
+}], { round: false })
+approx(
+    panelFormulaWithHpDisc.inCombat.panel.critRate - panelFormulaWithoutDisc.inCombat.panel.critRate,
+    0.0176,
+    "Panel-backed formulas should be re-evaluated from each candidate's out-of-combat panel",
+)
+approx(
+    panelFormulaWithoutDisc.inCombat.panel.impact - panelFormulaWithoutDisc.outOfCombat.panel.impact,
+    panelFormulaWithoutDisc.outOfCombat.panel.critRate * 100 * 2,
+    "Panel-backed percentage sources should convert decimal panel values into stored percent units",
+)
+const panelFormulaMetadata = panelFormulaCalculator.optimizerStatMetadata()
+assert.equal(panelFormulaMetadata.strictMonotonic, false)
+assert.ok(panelFormulaMetadata.relevantStatIds.includes("hpFlat"))
+assert.ok(panelFormulaMetadata.relevantStatIds.includes("hpPct"))
+assert.equal(panelFormulaCalculator.compileDensePanelScoreTarget(), null)
+assert.equal(runtimeSourceGroups(panelFormulaAgent.combatBuffs.corePassive).length, 0)
+assert.equal(
+    Object.hasOwn(
+        defaultRuntimeForBuff(panelFormulaAgent.combatBuffs.corePassive).effects["panel_formula_test.hp_to_crit"],
+        "sourceValue",
+    ),
+    false,
+)
+assert.match(
+    storedEffectRuleText(
+        panelFormulaAgent.combatBuffs.corePassive.effects[0],
+        {},
+        panelFormulaAgent.combatBuffs.corePassive,
+        meta,
+    ),
+    /自动计算/,
 )
