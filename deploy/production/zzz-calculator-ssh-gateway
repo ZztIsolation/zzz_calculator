@@ -1,0 +1,244 @@
+#!/bin/bash
+
+set -Eeuo pipefail
+umask 027
+export PATH='/usr/sbin:/usr/bin:/sbin:/bin'
+unset BASH_ENV ENV CDPATH GLOBIGNORE NODE_OPTIONS NODE_PATH NPM_CONFIG_PREFIX \
+    LD_PRELOAD LD_LIBRARY_PATH TAR_OPTIONS GZIP BZIP BZIP2 XZ_OPT \
+    AWKPATH AWKLIBPATH POSIXLY_CORRECT || true
+while read -r _ _ inherited_function; do
+    unset -f "$inherited_function"
+done < <(declare -F)
+unalias -a 2>/dev/null || true
+hash -r
+IFS=$' \t\n'
+
+readonly MANAGER_PATH="/usr/local/sbin/zzz-calculator-deploy"
+readonly INCOMING_DIR="/var/lib/zzz-calculator-deploy/incoming"
+readonly MAX_ARCHIVE_BYTES="$((256 * 1024 * 1024))"
+readonly MAX_EVIDENCE_BYTES="$((1024 * 1024))"
+readonly MAX_INCOMING_BYTES="$((320 * 1024 * 1024))"
+
+COMMAND_KIND=""
+MANAGER_ACTION=""
+UPLOAD_KIND=""
+UPLOAD_PATH=""
+UPLOAD_BASENAME=""
+UPLOAD_MAX_BYTES=""
+declare -a MANAGER_ARGS=()
+
+reject() {
+    printf 'ssh gateway error: %s\n' "$*" >&2
+    exit 126
+}
+
+fail() {
+    printf 'ssh gateway error: %s\n' "$*" >&2
+    exit 1
+}
+
+classify_command() {
+    local original_command="$1"
+    local manager_regex archive_upload_regex evidence_upload_regex
+    local control_character_regex manager_action artifact_basename artifact_prefix
+    local evidence_basename evidence_prefix expected_sha expected_commit
+
+    COMMAND_KIND=""
+    MANAGER_ACTION=""
+    UPLOAD_KIND=""
+    UPLOAD_PATH=""
+    UPLOAD_BASENAME=""
+    UPLOAD_MAX_BYTES=""
+    MANAGER_ARGS=()
+
+    control_character_regex=$'[\x01-\x1f\x7f]'
+    [[ ! "$original_command" =~ $control_character_regex ]] || return 1
+
+    if [[ "$original_command" == "sudo -n ${MANAGER_PATH} audit" ]]; then
+        COMMAND_KIND="manager"
+        MANAGER_ACTION="audit"
+        MANAGER_ARGS=(audit)
+        return 0
+    fi
+
+    if [[ "$original_command" == "sudo -n ${MANAGER_PATH} rollback --previous" ]]; then
+        COMMAND_KIND="manager"
+        MANAGER_ACTION="rollback"
+        MANAGER_ARGS=(rollback --previous)
+        return 0
+    fi
+
+    manager_regex='^sudo -n /usr/local/sbin/zzz-calculator-deploy (dry-run|deploy) --artifact (zzz-calculator-server-([0-9a-f]{12})\.tar\.gz\.part) --evidence (zzz-calculator-server-([0-9a-f]{12})\.evidence\.json\.part) --expected-sha ([0-9a-f]{64}) --expected-commit ([0-9a-f]{40})$'
+    if [[ "$original_command" =~ $manager_regex ]]; then
+        manager_action="${BASH_REMATCH[1]}"
+        artifact_basename="${BASH_REMATCH[2]}"
+        artifact_prefix="${BASH_REMATCH[3]}"
+        evidence_basename="${BASH_REMATCH[4]}"
+        evidence_prefix="${BASH_REMATCH[5]}"
+        expected_sha="${BASH_REMATCH[6]}"
+        expected_commit="${BASH_REMATCH[7]}"
+        [[ "$artifact_prefix" == "$evidence_prefix" ]] || return 1
+        [[ "${expected_commit:0:12}" == "$artifact_prefix" ]] || return 1
+        COMMAND_KIND="manager"
+        MANAGER_ACTION="$manager_action"
+        MANAGER_ARGS=(
+            "$MANAGER_ACTION"
+            --artifact "$artifact_basename"
+            --evidence "$evidence_basename"
+            --expected-sha "$expected_sha"
+            --expected-commit "$expected_commit"
+        )
+        return 0
+    fi
+
+    archive_upload_regex='^scp -t (/var/lib/zzz-calculator-deploy/incoming/(zzz-calculator-server-[0-9a-f]{12}\.tar\.gz\.part))$'
+    if [[ "$original_command" =~ $archive_upload_regex ]]; then
+        COMMAND_KIND="upload"
+        UPLOAD_KIND="archive"
+        UPLOAD_PATH="${BASH_REMATCH[1]}"
+        UPLOAD_BASENAME="${BASH_REMATCH[2]}"
+        UPLOAD_MAX_BYTES="$MAX_ARCHIVE_BYTES"
+        return 0
+    fi
+
+    evidence_upload_regex='^scp -t (/var/lib/zzz-calculator-deploy/incoming/(zzz-calculator-server-[0-9a-f]{12}\.evidence\.json\.part))$'
+    if [[ "$original_command" =~ $evidence_upload_regex ]]; then
+        COMMAND_KIND="upload"
+        UPLOAD_KIND="evidence"
+        UPLOAD_PATH="${BASH_REMATCH[1]}"
+        UPLOAD_BASENAME="${BASH_REMATCH[2]}"
+        UPLOAD_MAX_BYTES="$MAX_EVIDENCE_BYTES"
+        return 0
+    fi
+
+    return 1
+}
+
+print_classification() {
+    case "$COMMAND_KIND" in
+        manager)
+            printf 'manager\t%s' "$MANAGER_ACTION"
+            printf '\t%s' "${MANAGER_ARGS[@]}"
+            printf '\n'
+            ;;
+        upload)
+            printf 'upload\t%s\t%s\t%s\n' \
+                "$UPLOAD_KIND" "$UPLOAD_PATH" "$UPLOAD_MAX_BYTES"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+require_incoming_directory() {
+    local metadata
+    [[ -d "$INCOMING_DIR" && ! -L "$INCOMING_DIR" ]] \
+        || fail "incoming directory is unavailable"
+    metadata="$(/usr/bin/stat -c '%U:%G:%a' -- "$INCOMING_DIR")" \
+        || fail "cannot inspect incoming directory"
+    [[ "$metadata" == "root:zzzdeploy:770" ]] \
+        || fail "incoming directory ownership or mode is invalid"
+}
+
+lock_incoming_directory() {
+    exec 9<"$INCOMING_DIR" || fail "cannot open incoming directory lock"
+    /usr/bin/flock -n 9 || fail "another upload or deployment command is active"
+}
+
+incoming_size_bytes() {
+    local unexpected total
+    unexpected="$(/usr/bin/find "$INCOMING_DIR" -xdev -mindepth 1 ! -type f -print -quit)" \
+        || fail "cannot inspect incoming directory entries"
+    [[ -z "$unexpected" ]] || fail "incoming directory contains an unexpected entry"
+    total="$(/usr/bin/find "$INCOMING_DIR" -xdev -mindepth 1 -maxdepth 1 -type f -printf '%s\n' \
+        | /usr/bin/awk '{ total += $1 } END { printf "%.0f\n", total + 0 }')" \
+        || fail "cannot calculate incoming directory size"
+    [[ "$total" =~ ^[0-9]+$ ]] || fail "incoming directory size is invalid"
+    printf '%s\n' "$total"
+}
+
+run_upload() {
+    local current_size file_size file_links scp_status limit_blocks
+    local cleanup_target="$UPLOAD_PATH"
+
+    require_incoming_directory
+    lock_incoming_directory
+    [[ ! -e "$UPLOAD_PATH" && ! -L "$UPLOAD_PATH" ]] \
+        || fail "upload target already exists"
+    current_size="$(incoming_size_bytes)"
+    (( current_size + UPLOAD_MAX_BYTES <= MAX_INCOMING_BYTES )) \
+        || fail "incoming upload capacity would be exceeded"
+
+    cleanup_failed_upload() {
+        local exit_code="$?"
+        trap - EXIT HUP INT TERM
+        if [[ -n "$cleanup_target" ]]; then
+            /usr/bin/rm -f -- "$cleanup_target" 2>/dev/null || true
+        fi
+        exit "$exit_code"
+    }
+    trap cleanup_failed_upload EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+
+    limit_blocks="$(((UPLOAD_MAX_BYTES + 1023) / 1024))"
+    ulimit -f "$limit_blocks" || fail "cannot apply upload file-size limit"
+    set +e
+    /usr/bin/env -i \
+        PATH='/usr/sbin:/usr/bin:/sbin:/bin' \
+        HOME='/var/lib/zzz-calculator-deploy' \
+        USER='zzzdeploy' LOGNAME='zzzdeploy' \
+        /usr/bin/scp -t "$UPLOAD_PATH"
+    scp_status="$?"
+    set -e
+    [[ "$scp_status" -eq 0 ]] || fail "legacy SCP upload failed"
+
+    [[ -f "$UPLOAD_PATH" && ! -L "$UPLOAD_PATH" ]] \
+        || fail "upload did not create a regular file"
+    file_links="$(/usr/bin/stat -c '%h' -- "$UPLOAD_PATH")" \
+        || fail "cannot inspect uploaded file links"
+    [[ "$file_links" == "1" ]] || fail "uploaded file must not be hard-linked"
+    file_size="$(/usr/bin/stat -c '%s' -- "$UPLOAD_PATH")" \
+        || fail "cannot inspect uploaded file size"
+    [[ "$file_size" =~ ^[1-9][0-9]*$ ]] || fail "uploaded file is empty"
+    (( file_size <= UPLOAD_MAX_BYTES )) || fail "uploaded file exceeds its size limit"
+    (( $(incoming_size_bytes) <= MAX_INCOMING_BYTES )) \
+        || fail "incoming directory exceeds its total size limit"
+    /usr/bin/chmod 0640 -- "$UPLOAD_PATH" || fail "cannot secure uploaded file"
+
+    cleanup_target=""
+    trap - EXIT HUP INT TERM
+}
+
+run_manager() {
+    require_incoming_directory
+    lock_incoming_directory
+    /usr/bin/sudo -n "$MANAGER_PATH" "${MANAGER_ARGS[@]}"
+}
+
+main() {
+    local original_command
+
+    if [[ "$#" -eq 2 && "$1" == "--classify" ]]; then
+        original_command="$2"
+        classify_command "$original_command" || reject "command rejected"
+        print_classification || reject "command rejected"
+        return 0
+    fi
+
+    [[ "$#" -eq 0 ]] || reject "gateway arguments are not accepted"
+    original_command="${SSH_ORIGINAL_COMMAND:-}"
+    unset SSH_ORIGINAL_COMMAND SSH_CONNECTION SSH_CLIENT SSH_TTY || true
+    [[ -n "$original_command" ]] || reject "interactive sessions are disabled"
+    classify_command "$original_command" || reject "command rejected"
+
+    case "$COMMAND_KIND" in
+        manager) run_manager ;;
+        upload) run_upload ;;
+        *) reject "command rejected" ;;
+    esac
+}
+
+main "$@"

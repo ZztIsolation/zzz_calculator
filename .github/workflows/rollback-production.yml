@@ -26,9 +26,17 @@ jobs:
       name: production
       url: ${{ vars.PROD_URL }}
     steps:
-      - name: Configure restricted SSH client
+      - name: Initialize rollback evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'workflow_run_id=%s\nworkflow_sha=%s\n' \
+            "$GITHUB_RUN_ID" "$GITHUB_SHA" > "$RUNNER_TEMP/rollback-output.txt"
+
+      - name: Configure restricted SSH host verification
         env:
           PROD_KNOWN_HOSTS: ${{ secrets.PROD_KNOWN_HOSTS }}
+        shell: bash
         run: |
           set -euo pipefail
           test -n "$PROD_KNOWN_HOSTS"
@@ -36,45 +44,155 @@ jobs:
           printf '%s\n' "$PROD_KNOWN_HOSTS" > "$RUNNER_TEMP/ssh/known_hosts"
           chmod 600 "$RUNNER_TEMP/ssh/known_hosts"
 
-      - name: Request server-recorded previous release rollback
+      - name: Roll back, verify, and restore original on failure
         env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN_SHA: ${{ github.sha }}
           PROD_HOST: ${{ secrets.PROD_HOST }}
           PROD_USER: ${{ secrets.PROD_USER }}
           PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$PROD_HOST"
-          test -n "$PROD_USER"
-          test -n "$PROD_SSH_PRIVATE_KEY"
-          key_file="$RUNNER_TEMP/ssh/deploy_key"
-          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$key_file"
-          chmod 600 "$key_file"
-          ssh_opts=(-i "$key_file" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" -o RequestTTY=no -o ForwardAgent=no -o ClearAllForwardings=yes)
-          ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
-            sudo -n /usr/local/sbin/zzz-calculator-deploy rollback --previous \
-            | tee "$RUNNER_TEMP/rollback-output.txt"
-
-      - name: Verify health after rollback
-        env:
           PROD_URL: ${{ vars.PROD_URL }}
         shell: bash
         run: |
           set -euo pipefail
+          evidence_file="$RUNNER_TEMP/rollback-output.txt"
+          key_file=""
+          cleanup() {
+            local exit_code="$?"
+            trap - EXIT
+            if [[ -n "$key_file" && -f "$key_file" ]]; then
+              shred -u -- "$key_file" 2>/dev/null || rm -f -- "$key_file"
+            fi
+            exit "$exit_code"
+          }
+          trap cleanup EXIT
+          exec > >(tee -a "$evidence_file") 2>&1
+
+          test -n "$GH_TOKEN"
+          test -n "$EXPECTED_MAIN_SHA"
+          test -n "$PROD_HOST"
+          test -n "$PROD_USER"
+          test -n "$PROD_SSH_PRIVATE_KEY"
           test -n "$PROD_URL"
+          [[ "$PROD_URL" == https://* ]]
           base="${PROD_URL%/}"
-          for path in /api/health / /discs /settings /api/catalog /api/app-config \
-            /downloads/zzz-scanner/manifest.json /downloads/zzz-scanner/helper-manifest.json; do
-            curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 "$base$path" > /dev/null
-          done
-          curl --fail --silent --show-error --max-time 15 -D "$RUNNER_TEMP/home-headers.txt" -o /dev/null "$base/"
-          grep -Eiq '^cache-control:[[:space:]]*no-store' "$RUNNER_TEMP/home-headers.txt"
+
+          assert_main_current() {
+            local live_main
+            live_main="$(curl --fail --silent --show-error --max-time 15 \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/branches/main" \
+              | jq -er '.commit.sha')"
+            if [[ "$live_main" != "$EXPECTED_MAIN_SHA" ]]; then
+              echo "main advanced to $live_main; restart this rollback operation."
+              return 1
+            fi
+          }
+
+          extract_hashed_refs() {
+            local index_file="$1"
+            local output_file="$2"
+            grep -Eo '(src|href)="[^"]+"' "$index_file" \
+              | sed -E 's/^(src|href)="([^"]+)"$/\2/' \
+              | grep -E '^/static/app/[A-Za-z0-9._/-]+-[A-Za-z0-9_-]{8,}\.(js|css)$' \
+              | sort -u > "$output_file" || return 1
+            [[ -s "$output_file" ]]
+          }
+
+          verify_cached_chunks() {
+            local list_file="$1"
+            local label="$2"
+            local path headers counter=0
+            while IFS= read -r path; do
+              [[ "$path" =~ ^/static/app/[A-Za-z0-9._/-]+-[A-Za-z0-9_-]{8,}\.(js|css)$ ]] || return 1
+              counter=$((counter + 1))
+              headers="$RUNNER_TEMP/${label}-chunk-${counter}.headers"
+              curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+                -D "$headers" -o /dev/null "$base$path" || return 1
+              grep -Eiq '^cache-control:.*public' "$headers" || return 1
+              grep -Eiq '^cache-control:.*immutable' "$headers" || return 1
+            done < "$list_file"
+            [[ "$counter" -gt 0 ]]
+          }
+
+          fetch_public_snapshot() {
+            local prefix="$1"
+            local path
+            curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+              -D "$RUNNER_TEMP/${prefix}-home.headers" -o "$RUNNER_TEMP/${prefix}-index.html" "$base/" || return 1
+            grep -Eiq '^cache-control:[[:space:]]*no-store' "$RUNNER_TEMP/${prefix}-home.headers" || return 1
+            for path in /discs /settings /api/health /api/catalog /api/app-config; do
+              curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+                "$base$path" > /dev/null || return 1
+            done
+            curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+              "$base/downloads/zzz-scanner/manifest.json" > "$RUNNER_TEMP/${prefix}-scanner-manifest.json" || return 1
+            curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+              "$base/downloads/zzz-scanner/helper-manifest.json" > "$RUNNER_TEMP/${prefix}-helper-manifest.json" || return 1
+            extract_hashed_refs "$RUNNER_TEMP/${prefix}-index.html" "$RUNNER_TEMP/${prefix}-index-chunks.txt" || return 1
+          }
+
+          verify_rollback_public() {
+            fetch_public_snapshot rollback || return 1
+            [[ "$(sha256sum "$RUNNER_TEMP/rollback-scanner-manifest.json" | awk '{print $1}')" == "$scanner_manifest_before" ]] || return 1
+            [[ "$(sha256sum "$RUNNER_TEMP/rollback-helper-manifest.json" | awk '{print $1}')" == "$helper_manifest_before" ]] || return 1
+            verify_cached_chunks "$RUNNER_TEMP/before-index-chunks.txt" original || return 1
+            verify_cached_chunks "$RUNNER_TEMP/rollback-index-chunks.txt" rollback || return 1
+          }
+
+          verify_original_restored() {
+            fetch_public_snapshot restored || return 1
+            [[ "$(sha256sum "$RUNNER_TEMP/restored-index.html" | awk '{print $1}')" == "$index_before" ]] || return 1
+            [[ "$(sha256sum "$RUNNER_TEMP/restored-scanner-manifest.json" | awk '{print $1}')" == "$scanner_manifest_before" ]] || return 1
+            [[ "$(sha256sum "$RUNNER_TEMP/restored-helper-manifest.json" | awk '{print $1}')" == "$helper_manifest_before" ]] || return 1
+            verify_cached_chunks "$RUNNER_TEMP/before-index-chunks.txt" restored || return 1
+          }
+
+          fetch_public_snapshot before
+          index_before="$(sha256sum "$RUNNER_TEMP/before-index.html" | awk '{print $1}')"
+          scanner_manifest_before="$(sha256sum "$RUNNER_TEMP/before-scanner-manifest.json" | awk '{print $1}')"
+          helper_manifest_before="$(sha256sum "$RUNNER_TEMP/before-helper-manifest.json" | awk '{print $1}')"
+
+          key_file="$(mktemp "$RUNNER_TEMP/ssh/rollback_key.XXXXXX")"
+          (umask 077; printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$key_file")
+          chmod 600 "$key_file"
+          ssh-keygen -y -f "$key_file" > /dev/null
+          ssh_opts=(-i "$key_file" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" -o RequestTTY=no -o ForwardAgent=no -o ClearAllForwardings=yes)
+
+          assert_main_current
+          if ! ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
+            sudo -n /usr/local/sbin/zzz-calculator-deploy rollback --previous; then
+            echo "Rollback command failed; verifying that the original release remains healthy."
+            verify_original_restored || true
+            exit 1
+          fi
+
+          if ! verify_rollback_public; then
+            echo "Rollback target failed public verification; restoring the now-recorded previous release."
+            restore_status=0
+            ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
+              sudo -n /usr/local/sbin/zzz-calculator-deploy rollback --previous \
+              || restore_status="$?"
+            if [[ "$restore_status" -ne 0 ]]; then
+              echo "Original release restore command failed with exit code $restore_status."
+              exit 1
+            fi
+            if ! verify_original_restored; then
+              echo "Original release was selected, but public restoration verification failed."
+              exit 1
+            fi
+            echo "Original release was restored after rollback verification failure."
+            exit 1
+          fi
+          echo "Rollback and public verification succeeded."
 
       - name: Upload rollback evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: production-rollback-${{ github.run_id }}
           path: ${{ runner.temp }}/rollback-output.txt
-          if-no-files-found: ignore
+          if-no-files-found: error
           retention-days: 14
