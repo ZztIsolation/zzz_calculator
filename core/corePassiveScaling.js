@@ -26,14 +26,48 @@ export function corePassiveScalingRow(agent = {}, requestedLevel) {
     return levels[index] ?? null
 }
 
+function bindScalingFields(expression, scaling, fields) {
+    const fieldSet = new Set(fields)
+    return String(expression ?? "").replace(/[A-Za-z_][A-Za-z0-9_]*/g, (name) => {
+        if (!fieldSet.has(name)) {
+            return name
+        }
+        return String(Number(scaling?.[name]))
+    })
+}
+
 export function materializeCorePassiveScalingRule(rule = {}, agent = {}, requestedLevel) {
     const source = rule?.valueSource
     if (source?.kind !== "corePassiveScaling") {
         return rule
     }
 
-    const field = String(source.field ?? "").trim()
     const scaling = corePassiveScalingRow(agent, requestedLevel)
+    if (!scaling) {
+        throw new Error(`No core passive scaling row for ${agent?.id ?? "unknown"} at level ${requestedLevel ?? "default"}`)
+    }
+
+    // Formula path: bind one or more scaling fields as numeric literals in the
+    // expression, leaving the external input variable (e.g. `x`) to be supplied
+    // at evaluation time. This is how a core passive that composes a base value
+    // plus a per-panel coefficient stays keyed to the source-backed A-F table.
+    if (rule.type === "formula" && Array.isArray(source.fields) && source.fields.length) {
+        for (const field of source.fields) {
+            if (!field || !Number.isFinite(Number(scaling?.[field]))) {
+                throw new Error(`Invalid core passive scaling field for ${agent?.id ?? "unknown"}: ${field || "missing field"}`)
+            }
+        }
+        return {
+            ...rule,
+            formula: {
+                ...rule.formula,
+                expression: bindScalingFields(rule.formula?.expression, scaling, source.fields),
+            },
+        }
+    }
+
+    // Legacy single-field path: materialize a flat value keyed to the selected level.
+    const field = String(source.field ?? "").trim()
     const value = Number(scaling?.[field])
     if (!field || !Number.isFinite(value)) {
         throw new Error(`Invalid core passive scaling source for ${agent?.id ?? "unknown"}: ${field || "missing field"}`)

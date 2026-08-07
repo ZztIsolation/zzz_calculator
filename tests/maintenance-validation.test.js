@@ -323,6 +323,62 @@ misplacedDynamicSource.combatBuffs.additionalAbility = {
     effects: [clone(misplacedDynamicSource.combatBuffs.corePassive.effects[0])],
 }
 assertInvalid("agents", misplacedDynamicSource, "只能用于角色核心被动")
+
+// A core passive that needs a formula-plus-multiple-fields source (e.g. a
+// percentage of the agent's base attack with a hard cap) must validate and
+// materialize correctly against the source-backed A-F table.
+const formulaScalingAgent = {
+    ...clone(validAgent),
+    combatBuffs: {
+        corePassive: {
+            scope: "inCombat",
+            effects: [{
+                id: "formula-scaling-atk",
+                type: "formula",
+                stat: "atkFlat",
+                mode: "flat",
+                source: {
+                    variable: "x",
+                    label: { zhCN: "测试角色初始攻击力" },
+                    defaultValue: 3000,
+                    min: 0,
+                    max: 3000,
+                },
+                formula: {
+                    expression: "clamp(x * attackPercentage / 100, 0, maxAttackBonus)",
+                    valueUnit: "storedValue",
+                },
+                valueSource: {
+                    kind: "corePassiveScaling",
+                    fields: ["attackPercentage", "maxAttackBonus"],
+                },
+                target: { kind: "default" },
+            }],
+        },
+        additionalAbility: null,
+    },
+    coreSkill: {
+        defaultLevel: "F",
+        levels: [{ level: "A", stats: [] }],
+        corePassiveScaling: {
+            levels: [
+                { level: 1, attackPercentage: 40, maxAttackBonus: 600 },
+                { level: 2, attackPercentage: 40, maxAttackBonus: 700 },
+            ],
+        },
+    },
+}
+assertValid("agents", formulaScalingAgent)
+assert.deepEqual(
+    cleanMaintenanceItem("agents", formulaScalingAgent).combatBuffs.corePassive.effects[0].valueSource,
+    { kind: "corePassiveScaling", fields: ["attackPercentage", "maxAttackBonus"] },
+)
+const missingFormulaField = clone(formulaScalingAgent)
+missingFormulaField.coreSkill.corePassiveScaling.levels[1] = { level: 2, attackPercentage: 40 }
+assertInvalid("agents", missingFormulaField, "valueSource.field[1][1]")
+const invalidFormulaVariable = clone(formulaScalingAgent)
+invalidFormulaVariable.combatBuffs.corePassive.effects[0].formula.expression = "clamp(x + unknownField, 0, maxAttackBonus)"
+assertInvalid("agents", invalidFormulaVariable, "公式无效")
 assertValid("agents", {
     ...validAgent,
     attribute: "frost",
