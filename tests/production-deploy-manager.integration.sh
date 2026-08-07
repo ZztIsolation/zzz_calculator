@@ -117,6 +117,9 @@ getent passwd zzzdeploy >/dev/null || fail "bootstrap integration test did not c
     || fail "refusing to run rejection tests when a current release exists"
 
 test_root="$(mktemp -d)"
+# The fixture files are copied by the restricted deployment user below. Keep
+# the disposable parent traversable while all generated files remain read-only.
+chmod 0755 "$test_root"
 lock_launcher_pid=""
 lock_holder_pid=""
 remote_archive="${INCOMING_DIR}/${ARCHIVE_NAME}.part"
