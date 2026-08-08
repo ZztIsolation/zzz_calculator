@@ -174,6 +174,11 @@ requireText(validation, "needs.preflight.outputs.mode != 'audit'", "Audit must b
 requireText(validation, "production-storage-roundtrip.mjs", "CD must run the isolated browser storage roundtrip.")
 requireText(validation, '--current-url "$PROD_URL"', "Storage roundtrip must exercise the live origin through its switching proxy.")
 requireText(validation, '--expected-commit "$CANDIDATE_SHA"', "Storage roundtrip must bind the candidate to the approved commit.")
+assert.match(
+    remote,
+    /needs:\s*[\s\S]*?-\s+preflight\s*[\s\S]*?-\s+validation\s*[\s\S]*?needs\.validation\.result\s*==\s*'success'/,
+    "Every non-audit remote operation must require the isolated browser validation job to succeed.",
+)
 requireText(files.deploy, 'if [[ "$CANDIDATE_MODE" == "audit" ]]', "Audit must invoke only the read-only server action.")
 requireText(files.deploy, "zzz-calculator-deploy audit", "Audit mode must call the restricted deployment manager.")
 requireText(files.deploy, 'if [[ "$CANDIDATE_MODE" == "dry-run" ]]', "Dry-run must have a non-deploying server path.")
