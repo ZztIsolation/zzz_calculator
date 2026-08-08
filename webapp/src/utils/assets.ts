@@ -1,4 +1,4 @@
-export const fallbackIcon = "/assets/drive-discs/empty.svg"
+export const fallbackIcon = "/assets/drive-discs/empty-5ad1cbe3.svg"
 
 export function imageForAgent(agent: any): string {
   return String(agent?.images?.portrait || agent?.images?.icon || fallbackIcon)

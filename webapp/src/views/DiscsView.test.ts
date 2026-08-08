@@ -278,7 +278,7 @@ describe("DiscsView", () => {
     const wrapper = await mountView()
     const identity = wrapper.find(".disc-row-identity")
 
-    expect(identity.find("img").attributes("src")).toBe("/assets/drive-discs/empty.svg")
+    expect(identity.find("img").attributes("src")).toBe("/assets/drive-discs/empty-5ad1cbe3.svg")
     expect(identity.text()).toContain("未知套装")
     expect(identity.text()).toContain("disc-unknown")
   })
