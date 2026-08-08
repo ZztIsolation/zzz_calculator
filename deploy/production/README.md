@@ -44,8 +44,13 @@ every other external command used by the manager or worker. It replaces
 `authorized_keys` with a new root-owned inode and installs the root-owned
 manager, validation worker and forced-command gateway. Existing shared `/run/lock`,
 `/opt/zzz_calculator/releases` and `/usr/local/libexec` metadata is verified
-and left unchanged. The initializer does not read or change `current`, release
-contents, Nginx, the production service, or its restart counter.
+and left unchanged. A legacy `/opt/zzz_calculator` parent owned by
+`zzzcalc:zzzcalc` with mode `0755` is hardened to `root:root` inside the same
+rollback transaction; a later failure restores its original owner and mode.
+The deployment account's Bash startup files are replaced with empty root-owned
+files in that transaction so no account-controlled command can run before the
+forced SSH gateway. The directory inode, `current`, release contents, Nginx,
+the production service and its restart counter are not changed.
 
 `PROD_URL` is a repository-level GitHub Actions variable. Production host,
 user, private key and pinned `known_hosts` remain secrets in the protected

@@ -15,6 +15,8 @@ IFS=$' \t\n'
 
 readonly DEPLOY_USER="zzzdeploy"
 readonly DEPLOY_GROUP="zzzdeploy"
+readonly APP_USER="zzzcalc"
+readonly APP_GROUP="zzzcalc"
 readonly VALIDATION_USER="zzzvalidate"
 readonly VALIDATION_GROUP="zzzvalidate"
 readonly VALIDATION_HOME="/nonexistent"
@@ -34,6 +36,13 @@ readonly LOCK_FILE="${LOCK_DIR}/zzz-calculator-deploy.lock"
 readonly RELEASE_PARENT="/opt/zzz_calculator"
 readonly RELEASE_ROOT="${RELEASE_PARENT}/releases"
 readonly AUTHORIZED_KEY_PREFIX='command="/usr/local/libexec/zzz-calculator-ssh-gateway",restrict,no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty,no-user-rc '
+readonly -a SHELL_STARTUP_FILES=(
+    "${DEPLOY_ROOT}/.bashrc"
+    "${DEPLOY_ROOT}/.bash_profile"
+    "${DEPLOY_ROOT}/.bash_login"
+    "${DEPLOY_ROOT}/.profile"
+    "${DEPLOY_ROOT}/.bash_logout"
+)
 
 source_dir="$(cd -- "${BASH_SOURCE[0]%/*}" && pwd -P)"
 readonly SOURCE_PATH="${source_dir}/zzz-calculator-deploy"
@@ -59,6 +68,12 @@ lock_file_created="0"
 lock_file_inode=""
 lock_fd_open="0"
 lock_acquired="0"
+release_parent_metadata_changed="0"
+release_parent_original_device=""
+release_parent_original_inode=""
+release_parent_original_uid=""
+release_parent_original_gid=""
+release_parent_original_mode=""
 declare -a replaced_targets=()
 declare -a replaced_backups=()
 declare -a replaced_had_original=()
@@ -126,6 +141,18 @@ require_exact_directory_if_present() {
     if path_exists "$path"; then
         [[ "$(stat -c '%U:%G:%a' -- "$path")" == "${expected_owner}:${expected_group}:${expected_mode}" ]] \
             || fail "existing directory has unexpected ownership or mode: ${path}"
+    fi
+}
+
+require_release_parent_if_present() {
+    local metadata
+    require_plain_directory_if_present "$RELEASE_PARENT"
+    if path_exists "$RELEASE_PARENT"; then
+        metadata="$(stat -c '%U:%G:%a' -- "$RELEASE_PARENT")"
+        case "$metadata" in
+            root:root:755|"${APP_USER}:${APP_GROUP}:755") ;;
+            *) fail "existing release parent has unsupported ownership or mode: ${RELEASE_PARENT}" ;;
+        esac
     fi
 }
 
@@ -207,6 +234,38 @@ create_exact_directory() {
     fi
     created_directories+=("$path")
     install -d -o "$owner" -g "$group" -m "$mode" "$path"
+}
+
+prepare_release_parent() {
+    local metadata
+    if ! path_exists "$RELEASE_PARENT"; then
+        create_exact_directory "$RELEASE_PARENT" root root 755
+        return 0
+    fi
+
+    require_release_parent_if_present
+    metadata="$(stat -c '%U:%G:%a' -- "$RELEASE_PARENT")"
+    [[ "$metadata" == "${APP_USER}:${APP_GROUP}:755" ]] || return 0
+
+    release_parent_original_device="$(stat -c '%d' -- "$RELEASE_PARENT")"
+    release_parent_original_inode="$(stat -c '%i' -- "$RELEASE_PARENT")"
+    release_parent_original_uid="$(stat -c '%u' -- "$RELEASE_PARENT")"
+    release_parent_original_gid="$(stat -c '%g' -- "$RELEASE_PARENT")"
+    release_parent_original_mode="$(stat -c '%a' -- "$RELEASE_PARENT")"
+
+    ignore_termination_signals
+    if chown --no-dereference root:root -- "$RELEASE_PARENT"; then
+        release_parent_metadata_changed="1"
+        restore_termination_signals
+    else
+        restore_termination_signals
+        fail "failed to harden release parent ownership: ${RELEASE_PARENT}"
+    fi
+
+    [[ -d "$RELEASE_PARENT" && ! -L "$RELEASE_PARENT" \
+        && "$(stat -c '%d:%i:%U:%G:%a' -- "$RELEASE_PARENT")" \
+            == "${release_parent_original_device}:${release_parent_original_inode}:root:root:755" ]] \
+        || fail "release parent changed unexpectedly while hardening ownership: ${RELEASE_PARENT}"
 }
 
 file_matches_contract() {
@@ -375,6 +434,24 @@ remove_created_directories() {
     created_directories=()
 }
 
+rollback_release_parent_metadata() {
+    [[ "$release_parent_metadata_changed" == "1" ]] || return 0
+    if [[ -d "$RELEASE_PARENT" && ! -L "$RELEASE_PARENT" \
+        && "$(stat -c '%d:%i' -- "$RELEASE_PARENT" 2>/dev/null)" \
+            == "${release_parent_original_device}:${release_parent_original_inode}" ]]; then
+        chown --no-dereference "${release_parent_original_uid}:${release_parent_original_gid}" -- "$RELEASE_PARENT" \
+            || rollback_notice "could not restore release parent ownership"
+        chmod "$release_parent_original_mode" -- "$RELEASE_PARENT" \
+            || rollback_notice "could not restore release parent mode"
+        [[ "$(stat -c '%u:%g:%a' -- "$RELEASE_PARENT" 2>/dev/null)" \
+            == "${release_parent_original_uid}:${release_parent_original_gid}:${release_parent_original_mode}" ]] \
+            || rollback_notice "release parent metadata did not return to its original state"
+    else
+        rollback_notice "release parent inode changed; refusing to restore metadata on a different path"
+    fi
+    release_parent_metadata_changed="0"
+}
+
 remove_created_accounts() {
     if [[ "$validation_user_created" == "1" ]] && account_is_present "$VALIDATION_USER"; then
         userdel "$VALIDATION_USER" >/dev/null 2>&1 \
@@ -433,16 +510,21 @@ on_exit() {
     trap - EXIT HUP INT TERM
     set +e
     if [[ "$transaction_started" == "1" && "$transaction_committed" == "0" ]]; then
-        rollback_managed_files
+        rollback_ssh_directory
+        if [[ "$rollback_failed" == "0" ]]; then
+            rollback_managed_files
+        else
+            rollback_notice "managed files retained because the previous SSH directory could not be restored safely"
+        fi
         visudo --check >/dev/null 2>&1 \
             || rollback_notice "aggregate sudoers validation failed after rollback"
         if [[ "$ssh_replacement_started" == "0" && -n "$ssh_backup_root" ]]; then
             remove_temporary_tree "$ssh_backup_root" >/dev/null 2>&1 || true
             ssh_backup_root=""
         fi
-        rollback_ssh_directory
         remove_temporary_tree "$ssh_staged" >/dev/null 2>&1 || true
         remove_created_directories
+        rollback_release_parent_metadata
         remove_created_accounts
     fi
     [[ -n "$key_validation_tmp" ]] && rm -f -- "$key_validation_tmp" >/dev/null 2>&1
@@ -534,6 +616,10 @@ if account_is_present "$DEPLOY_USER"; then
     require_exact_directory_if_present "$VALIDATION_DIR" root root 750
     require_exact_directory_if_present "$PROCESSING_DIR" root root 700
     require_plain_directory_if_present "$SSH_DIR"
+    for shell_startup_path in "${SHELL_STARTUP_FILES[@]}"; do
+        require_regular_file_if_present "$shell_startup_path"
+    done
+    unset shell_startup_path
 else
     for unexpected_path in "$DEPLOY_ROOT" "$INSTALL_PATH" "$VALIDATION_WORKER_PATH" "$SSH_GATEWAY_PATH" "$SUDOERS_PATH"; do
         ! path_exists "$unexpected_path" \
@@ -542,7 +628,7 @@ else
     unset unexpected_path
 fi
 
-require_exact_directory_if_present "$RELEASE_PARENT" root root 755
+require_release_parent_if_present
 require_exact_directory_if_present "$RELEASE_ROOT" root root 755
 require_exact_directory_if_present "$VALIDATION_WORKER_DIR" root root 755
 
@@ -561,10 +647,12 @@ manager_snapshot="${transaction_root}/zzz-calculator-deploy"
 worker_snapshot="${transaction_root}/zzz-calculator-validation-worker"
 gateway_snapshot="${transaction_root}/zzz-calculator-ssh-gateway"
 sudoers_snapshot="${transaction_root}/zzz-calculator-deploy.sudoers"
+empty_shell_startup_snapshot="${transaction_root}/empty-shell-startup"
 install -o root -g root -m 0600 "$SOURCE_PATH" "$manager_snapshot"
 install -o root -g root -m 0600 "$VALIDATION_WORKER_SOURCE" "$worker_snapshot"
 install -o root -g root -m 0600 "$SSH_GATEWAY_SOURCE" "$gateway_snapshot"
 install -o root -g root -m 0600 "$SUDOERS_SOURCE" "$sudoers_snapshot"
+install -o root -g root -m 0600 /dev/null "$empty_shell_startup_snapshot"
 /bin/bash -n "$manager_snapshot" || fail "deployment program has invalid shell syntax"
 /bin/bash -n "$worker_snapshot" || fail "validation worker has invalid shell syntax"
 /bin/bash -n "$gateway_snapshot" || fail "SSH gateway has invalid shell syntax"
@@ -675,18 +763,23 @@ create_exact_directory "$INCOMING_DIR" root "$DEPLOY_GROUP" 770
 create_exact_directory "$HISTORY_DIR" root root 750
 create_exact_directory "$VALIDATION_DIR" root root 750
 create_exact_directory "$PROCESSING_DIR" root root 700
-create_exact_directory "$RELEASE_PARENT" root root 755
+prepare_release_parent
 create_exact_directory "$RELEASE_ROOT" root root 755
 create_exact_directory "$VALIDATION_WORKER_DIR" root root 755
 
-expected_authorized_key="${AUTHORIZED_KEY_PREFIX}${public_key}"
-install_ssh_directory "$expected_authorized_key"
-unset public_key ZZZDEPLOY_PUBLIC_KEY
+for shell_startup_path in "${SHELL_STARTUP_FILES[@]}"; do
+    replace_managed_file "$empty_shell_startup_snapshot" "$shell_startup_path" 644
+done
+unset shell_startup_path
 
 replace_managed_file "$manager_snapshot" "$INSTALL_PATH" 755
 replace_managed_file "$worker_snapshot" "$VALIDATION_WORKER_PATH" 555
 replace_managed_file "$gateway_snapshot" "$SSH_GATEWAY_PATH" 555
 replace_managed_file "$sudoers_snapshot" "$SUDOERS_PATH" 440
+
+expected_authorized_key="${AUTHORIZED_KEY_PREFIX}${public_key}"
+install_ssh_directory "$expected_authorized_key"
+unset public_key ZZZDEPLOY_PUBLIC_KEY
 
 if [[ "$failpoint" == "after-install" ]]; then
     fail "injected failure after managed file installation"
@@ -694,8 +787,14 @@ fi
 
 verify_account_contract "$DEPLOY_USER" "$DEPLOY_GROUP" "$DEPLOY_ROOT" /bin/bash
 verify_account_contract "$VALIDATION_USER" "$VALIDATION_GROUP" "$VALIDATION_HOME" /usr/sbin/nologin
+require_exact_directory_if_present "$RELEASE_PARENT" root root 755
 ssh_state_matches_contract "$expected_authorized_key" \
     || fail "final SSH directory verification failed"
+for shell_startup_path in "${SHELL_STARTUP_FILES[@]}"; do
+    file_matches_contract "$empty_shell_startup_snapshot" "$shell_startup_path" 644 \
+        || fail "final shell startup file verification failed: ${shell_startup_path}"
+done
+unset shell_startup_path
 file_matches_contract "$manager_snapshot" "$INSTALL_PATH" 755 \
     || fail "final deployment program verification failed"
 file_matches_contract "$worker_snapshot" "$VALIDATION_WORKER_PATH" 555 \

@@ -28,6 +28,13 @@ readonly RELEASE_ROOT="${RELEASE_PARENT}/releases"
 readonly LOCK_DIR="/run/lock"
 readonly LOCK_FILE="${LOCK_DIR}/zzz-calculator-deploy.lock"
 readonly VALIDATION_HOME="/nonexistent"
+readonly -a SHELL_STARTUP_FILES=(
+    "${DEPLOY_ROOT}/.bashrc"
+    "${DEPLOY_ROOT}/.bash_profile"
+    "${DEPLOY_ROOT}/.bash_login"
+    "${DEPLOY_ROOT}/.profile"
+    "${DEPLOY_ROOT}/.bash_logout"
+)
 readonly KEY_PREFIX='command="/usr/local/libexec/zzz-calculator-ssh-gateway",restrict,no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty,no-user-rc '
 readonly EXTRA_GROUP="zzzdeploy-bootstrap-extra"
 readonly SAFE_PATH="/usr/sbin:/usr/bin:/sbin:/bin"
@@ -152,6 +159,8 @@ command -v ssh-keygen >/dev/null || fail "ssh-keygen is required"
 ! getent group zzzdeploy >/dev/null 2>&1 || fail "zzzdeploy group unexpectedly exists on the clean runner"
 ! getent passwd zzzvalidate >/dev/null 2>&1 || fail "zzzvalidate unexpectedly exists on the clean runner"
 ! getent group zzzvalidate >/dev/null 2>&1 || fail "zzzvalidate group unexpectedly exists on the clean runner"
+! getent passwd zzzcalc >/dev/null 2>&1 || fail "zzzcalc unexpectedly exists on the clean runner"
+! getent group zzzcalc >/dev/null 2>&1 || fail "zzzcalc group unexpectedly exists on the clean runner"
 [[ ! -e "$DEPLOY_ROOT" && ! -L "$DEPLOY_ROOT" ]] \
     || fail "deployment root unexpectedly exists on the clean runner"
 for unexpected_path in "$INSTALLED_MANAGER" "$INSTALLED_VALIDATION_WORKER" \
@@ -168,8 +177,16 @@ if sudo test -f /etc/sudoers.d/runner; then
 fi
 sudo visudo --check >/dev/null || fail "runner sudoers baseline is invalid"
 
+# Reproduce the legacy production layout. The bootstrap must harden only this
+# parent directory's ownership, without replacing its inode or touching current.
+sudo groupadd --system zzzcalc
+sudo useradd --system --gid zzzcalc --home-dir /nonexistent \
+    --no-create-home --shell /usr/sbin/nologin zzzcalc
+sudo install -d -o zzzcalc -g zzzcalc -m 0755 "$RELEASE_PARENT"
+
 lock_dir_state_before="$(path_state "$LOCK_DIR")"
 release_parent_state_before="$(path_state "$RELEASE_PARENT")"
+release_parent_device_inode_before="$(sudo stat -c '%d:%i' -- "$RELEASE_PARENT")"
 release_root_state_before="$(path_state "$RELEASE_ROOT")"
 libexec_state_before="$(path_state /usr/local/libexec)"
 
@@ -243,6 +260,10 @@ sudo visudo --check >/dev/null || fail "sudoers was damaged by the clean-host ro
 sudo env ZZZDEPLOY_PUBLIC_KEY="$public_key" \
     ZZZDEPLOY_BOOTSTRAP_FAILPOINT=signal-during-account-setup \
     /bin/bash "$BOOTSTRAP"
+[[ "$(sudo stat -c '%d:%i' -- "$RELEASE_PARENT")" == "$release_parent_device_inode_before" ]] \
+    || fail "bootstrap replaced the legacy release parent inode"
+[[ "$(sudo stat -c '%U:%G:%a' -- "$RELEASE_PARENT")" == "root:root:755" ]] \
+    || fail "bootstrap did not harden the legacy release parent"
 [[ "$(sudo stat -c '%U:%G:%a' -- "$SSH_DIR")" == "root:zzzdeploy:750" ]] \
     || fail "unexpected .ssh ownership or mode"
 [[ "$(sudo stat -c '%U:%G:%a:%h' -- "$AUTHORIZED_KEYS")" == "root:zzzdeploy:640:1" ]] \
@@ -263,6 +284,11 @@ sudo env ZZZDEPLOY_PUBLIC_KEY="$public_key" \
     || fail "installed SSH gateway has unsafe ownership or mode"
 [[ "$(sudo stat -c '%U:%G:%a' -- "$SUDOERS_PATH")" == "root:root:440" ]] \
     || fail "installed sudoers has unsafe ownership or mode"
+for shell_startup_path in "${SHELL_STARTUP_FILES[@]}"; do
+    [[ "$(sudo stat -c '%U:%G:%a:%h:%s' -- "$shell_startup_path")" == "root:root:644:1:0" ]] \
+        || fail "shell startup file is not empty and root-owned: ${shell_startup_path}"
+done
+unset shell_startup_path
 sudo -u zzzdeploy test -r "$AUTHORIZED_KEYS" || fail "zzzdeploy cannot read authorized_keys"
 if sudo -u zzzdeploy test -w "$AUTHORIZED_KEYS"; then
     fail "zzzdeploy can write authorized_keys"
@@ -321,6 +347,88 @@ assert_state_equal "sudoers idempotent rerun" "$sudoers_state_before_idempotent"
 assert_state_equal "release root idempotent rerun" "$release_root_state_after_create" "$(path_state "$RELEASE_ROOT")"
 assert_state_equal "/run/lock idempotent rerun" "$lock_dir_state_after_create" "$(path_state "$LOCK_DIR")"
 assert_state_equal "lock file idempotent rerun" "$lock_file_state_after_create" "$(file_state "$LOCK_FILE")"
+
+# Legacy home files are account-writable and Bash may read .bashrc before an
+# SSH forced command. A failed migration must restore them byte-for-byte; a
+# successful rerun replaces every startup file with an empty root-owned inode.
+for shell_startup_path in "${SHELL_STARTUP_FILES[@]}"; do
+    printf 'exit 97\n' >"${test_root}/legacy-startup"
+    sudo install -o zzzdeploy -g zzzdeploy -m 0644 \
+        "${test_root}/legacy-startup" "$shell_startup_path"
+done
+unset shell_startup_path
+declare -a legacy_startup_states=()
+for shell_startup_path in "${SHELL_STARTUP_FILES[@]}"; do
+    legacy_startup_states+=("$(file_state "$shell_startup_path")")
+done
+unset shell_startup_path
+
+set +e
+legacy_startup_failure_output="$(sudo env ZZZDEPLOY_PUBLIC_KEY="$public_key" \
+    ZZZDEPLOY_BOOTSTRAP_FAILPOINT=after-install /bin/bash "$BOOTSTRAP" 2>&1)"
+legacy_startup_failure_status="$?"
+set -e
+[[ "$legacy_startup_failure_status" -ne 0 ]] \
+    || fail "legacy startup failpoint unexpectedly succeeded"
+grep -Fq -- 'injected failure after managed file installation' <<<"$legacy_startup_failure_output" \
+    || fail "legacy startup failpoint did not reach the managed-file boundary"
+for index in "${!SHELL_STARTUP_FILES[@]}"; do
+    assert_state_equal "legacy startup rollback ${SHELL_STARTUP_FILES[$index]}" \
+        "${legacy_startup_states[$index]}" "$(file_state "${SHELL_STARTUP_FILES[$index]}")"
+done
+unset index legacy_startup_states
+
+sudo env ZZZDEPLOY_PUBLIC_KEY="$public_key" /bin/bash "$BOOTSTRAP"
+for shell_startup_path in "${SHELL_STARTUP_FILES[@]}"; do
+    [[ "$(sudo stat -c '%U:%G:%a:%h:%s' -- "$shell_startup_path")" == "root:root:644:1:0" ]] \
+        || fail "bootstrap did not neutralize shell startup file: ${shell_startup_path}"
+done
+unset shell_startup_path
+
+# Unsupported ownership and unsafe modes must fail before any managed inode is
+# touched. The bootstrap must never normalize an unrecognized parent contract.
+parent_reject_ssh_state="$(path_state "$SSH_DIR")"
+parent_reject_key_state="$(file_state "$AUTHORIZED_KEYS")"
+parent_reject_manager_state="$(file_state "$INSTALLED_MANAGER")"
+parent_reject_worker_state="$(file_state "$INSTALLED_VALIDATION_WORKER")"
+parent_reject_gateway_state="$(file_state "$INSTALLED_SSH_GATEWAY")"
+parent_reject_sudoers_state="$(file_state "$SUDOERS_PATH")"
+
+sudo chown "$(id -u):$(id -g)" "$RELEASE_PARENT"
+untrusted_parent_state="$(path_state "$RELEASE_PARENT")"
+set +e
+untrusted_parent_output="$(sudo env ZZZDEPLOY_PUBLIC_KEY="$public_key" /bin/bash "$BOOTSTRAP" 2>&1)"
+untrusted_parent_status="$?"
+set -e
+[[ "$untrusted_parent_status" -ne 0 ]] || fail "bootstrap accepted an unrecognized release parent owner"
+grep -Fq -- 'existing release parent has unsupported ownership or mode' <<<"$untrusted_parent_output" \
+    || fail "bootstrap did not report the unrecognized release parent contract"
+assert_state_equal "unrecognized release parent rejection" "$untrusted_parent_state" "$(path_state "$RELEASE_PARENT")"
+
+sudo chown root:root "$RELEASE_PARENT"
+sudo chmod 0777 "$RELEASE_PARENT"
+unsafe_parent_state="$(path_state "$RELEASE_PARENT")"
+set +e
+unsafe_parent_output="$(sudo env ZZZDEPLOY_PUBLIC_KEY="$public_key" /bin/bash "$BOOTSTRAP" 2>&1)"
+unsafe_parent_status="$?"
+set -e
+[[ "$unsafe_parent_status" -ne 0 ]] || fail "bootstrap accepted a writable release parent"
+grep -Fq -- 'existing release parent has unsupported ownership or mode' <<<"$unsafe_parent_output" \
+    || fail "bootstrap did not report the unsafe release parent mode"
+assert_state_equal "unsafe release parent rejection" "$unsafe_parent_state" "$(path_state "$RELEASE_PARENT")"
+sudo chmod 0755 "$RELEASE_PARENT"
+
+assert_state_equal ".ssh release parent rejection" "$parent_reject_ssh_state" "$(path_state "$SSH_DIR")"
+assert_state_equal "authorized_keys release parent rejection" "$parent_reject_key_state" "$(file_state "$AUTHORIZED_KEYS")"
+assert_state_equal "manager release parent rejection" "$parent_reject_manager_state" "$(file_state "$INSTALLED_MANAGER")"
+assert_state_equal "worker release parent rejection" "$parent_reject_worker_state" "$(file_state "$INSTALLED_VALIDATION_WORKER")"
+assert_state_equal "gateway release parent rejection" "$parent_reject_gateway_state" "$(file_state "$INSTALLED_SSH_GATEWAY")"
+assert_state_equal "sudoers release parent rejection" "$parent_reject_sudoers_state" "$(file_state "$SUDOERS_PATH")"
+assert_state_equal "release root release parent rejection" "$release_root_state_after_create" "$(path_state "$RELEASE_ROOT")"
+assert_state_equal "/run/lock release parent rejection" "$lock_dir_state_after_create" "$(path_state "$LOCK_DIR")"
+assert_state_equal "lock file release parent rejection" "$lock_file_state_after_create" "$(file_state "$LOCK_FILE")"
+[[ ! -e /opt/zzz_calculator/current && ! -L /opt/zzz_calculator/current ]] \
+    || fail "release parent rejection created or changed current"
 
 # Force TERM after the SSH backup state is prepared but before the original
 # directory is moved. The original directory and key inodes must survive.
