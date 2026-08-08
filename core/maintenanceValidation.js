@@ -509,15 +509,19 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     }
     if (rule.valueSource !== undefined) {
         const source = rule.valueSource ?? {}
-        if (type !== "fixed") {
-            add(errors, `${path}.valueSource`, "动态数值来源只支持固定值规则。")
+        const isFixedWithSource = type === "fixed"
+        const isFormulaWithFields = type === "formula" && Array.isArray(source.fields) && source.fields.length > 0
+        if (!isFixedWithSource && !isFormulaWithFields) {
+            add(errors, `${path}.valueSource`, "动态数值来源只支持固定值规则或带倍率字段的公式规则。")
         }
         if (!context.allowCorePassiveScalingSource) {
             add(errors, `${path}.valueSource`, "核心被动倍率来源只能用于角色核心被动。")
         }
         requireEnum(errors, source.kind, EFFECT_VALUE_SOURCE_KIND_VALUES, `${path}.valueSource.kind`)
-        const field = String(source.field ?? "").trim()
-        if (!/^[A-Za-z][A-Za-z0-9]*$/.test(field)) {
+
+        const fields = isFormulaWithFields ? source.fields : [String(source.field ?? "").trim()]
+        const validFieldNames = fields.filter(field => /^[A-Za-z][A-Za-z0-9]*$/.test(field))
+        if (!fields.length || validFieldNames.length !== fields.length) {
             add(errors, `${path}.valueSource.field`, "倍率字段必须是有效的字段名。")
         } else if (source.kind === "corePassiveScaling" && context.allowCorePassiveScalingSource) {
             const scalingLevels = context.agent?.coreSkill?.corePassiveScaling?.levels
@@ -525,11 +529,20 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
             if (!Array.isArray(scalingLevels) || scalingLevels.length !== coreSkillLevels.length + 1) {
                 add(errors, `${path}.valueSource.field`, "核心被动倍率必须包含基础1级和每个核心技等级对应的完整档位。")
             } else {
-                scalingLevels.forEach((level, index) => requireFinite(errors, level?.[field], `${path}.valueSource.field[${index}]`))
-                const firstValue = Number(scalingLevels[0]?.[field])
-                const fallbackValue = Number(rule.value)
-                if (Number.isFinite(firstValue) && Number.isFinite(fallbackValue) && Math.abs(firstValue - fallbackValue) > 1e-9) {
-                    add(errors, `${path}.value`, "兼容值必须与核心被动倍率第一档一致。")
+                fields.forEach((field, fieldIndex) => {
+                    scalingLevels.forEach((level, index) => {
+                        const sourcePath = fields.length === 1
+                            ? `${path}.valueSource.field[${index}]`
+                            : `${path}.valueSource.field[${fieldIndex}][${index}]`
+                        requireFinite(errors, level?.[field], sourcePath)
+                    })
+                })
+                if (type === "fixed") {
+                    const firstValue = Number(scalingLevels[0]?.[fields[0]])
+                    const fallbackValue = Number(rule.value)
+                    if (Number.isFinite(firstValue) && Number.isFinite(fallbackValue) && Math.abs(firstValue - fallbackValue) > 1e-9) {
+                        add(errors, `${path}.value`, "兼容值必须与核心被动倍率第一档一致。")
+                    }
                 }
             }
         }
@@ -698,12 +711,20 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
             add(errors, `${path}.formula.expression`, "公式必填。")
         } else {
             try {
-                validateFormulaExpression(expression, new Set(["x"]))
+                const allowedVariables = new Set(["x"])
+                const scalingFields = Array.isArray(rule.valueSource?.fields) ? rule.valueSource.fields : []
+                scalingFields.forEach(field => allowedVariables.add(field))
+                validateFormulaExpression(expression, allowedVariables)
                 const x = Math.max(
                     Number.isFinite(min) ? min : defaultValue,
                     Math.min(Number.isFinite(max) ? max : defaultValue, defaultValue),
                 )
-                evaluateFormulaExpression(expression, { x })
+                const variables = { x }
+                const scalingLevels = context.agent?.coreSkill?.corePassiveScaling?.levels ?? []
+                scalingFields.forEach(field => {
+                    variables[field] = Number(scalingLevels[0]?.[field])
+                })
+                evaluateFormulaExpression(expression, variables)
             } catch (error) {
                 add(errors, `${path}.formula.expression`, `公式无效：${error.message}`)
             }
