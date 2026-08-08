@@ -1046,6 +1046,49 @@ prepare_immutable_release() {
     assert_immutable_release "$root"
 }
 
+prepare_production_release() {
+    local root="$1"
+    prepare_immutable_release "$root"
+    assert_release_path_access_for_user "$root" "$APP_USER"
+    assert_release_path_access_for_user "$root" "$VALIDATION_USER"
+}
+
+prepare_private_validation_release() {
+    local root="$1"
+    prepare_immutable_release "$root"
+    assert_private_validation_release_access "$root"
+}
+
+assert_release_tree_access_for_user() {
+    local root="$1"
+    local runtime_user="$2"
+    local key_file
+
+    for key_file in .deployed-commit backend/server.js dist/pages/index.html; do
+        (cd -- "$root" && runuser -u "$runtime_user" -- test -r "./$key_file") \
+            || die "${runtime_user} cannot read release key file ${key_file}"
+    done
+    (cd -- "$root" && runuser -u "$runtime_user" -- test ! -w .) \
+        || die "${runtime_user} can write the release root"
+    (cd -- "$root" && runuser -u "$runtime_user" -- test ! -w ./.deployed-commit) \
+        || die "${runtime_user} can write release metadata"
+}
+
+assert_release_path_access_for_user() {
+    local root="$1"
+    local runtime_user="$2"
+    local key_file
+
+    for key_file in .deployed-commit backend/server.js dist/pages/index.html; do
+        runuser -u "$runtime_user" -- test -r "$root/$key_file" \
+            || die "${runtime_user} cannot reach release key file ${key_file}"
+    done
+    runuser -u "$runtime_user" -- test ! -w "$root" \
+        || die "${runtime_user} can write the release root through its absolute path"
+    runuser -u "$runtime_user" -- test ! -w "$root/.deployed-commit" \
+        || die "${runtime_user} can write release metadata through its absolute path"
+}
+
 assert_immutable_release() {
     local root="$1"
     [[ -d "$root" && ! -L "$root" ]] || die "release is not a real directory"
@@ -1062,16 +1105,30 @@ assert_immutable_release() {
     if find "$root" -type f ! -perm 0644 -print -quit | grep -q .; then
         die "release contains a file that is not mode 0644"
     fi
-    for key_file in .deployed-commit backend/server.js dist/pages/index.html; do
-        runuser -u "$APP_USER" -- test -r "$root/$key_file" || die "${APP_USER} cannot read release key file ${key_file}"
-        runuser -u "$VALIDATION_USER" -- test -r "$root/$key_file" \
-            || die "${VALIDATION_USER} cannot read release key file ${key_file}"
+    assert_release_tree_access_for_user "$root" "$APP_USER"
+    assert_release_tree_access_for_user "$root" "$VALIDATION_USER"
+}
+
+assert_private_validation_release_access() {
+    local root="$1"
+    local denied_mode key_file
+
+    assert_release_path_access_for_user "$root" "$VALIDATION_USER"
+    for denied_mode in -r -w -x; do
+        runuser -u "$APP_USER" -- test ! "$denied_mode" "$root" \
+            || die "application account can access a private validation release"
     done
-    runuser -u "$APP_USER" -- test ! -w "$root" || die "${APP_USER} can write the release root"
-    runuser -u "$APP_USER" -- test ! -w "$root/.deployed-commit" || die "${APP_USER} can write release metadata"
-    runuser -u "$VALIDATION_USER" -- test ! -w "$root" || die "${VALIDATION_USER} can write the release root"
-    runuser -u "$VALIDATION_USER" -- test ! -w "$root/.deployed-commit" \
-        || die "${VALIDATION_USER} can write release metadata"
+    for key_file in .deployed-commit backend/server.js dist/pages/index.html; do
+        runuser -u "$APP_USER" -- test ! -r "$root/$key_file" \
+            || die "application account can read private validation file ${key_file}"
+    done
+}
+
+assert_production_release() {
+    local root="$1"
+    assert_immutable_release "$root"
+    assert_release_path_access_for_user "$root" "$APP_USER"
+    assert_release_path_access_for_user "$root" "$VALIDATION_USER"
 }
 
 same_release_tree() {
@@ -1162,6 +1219,8 @@ assert_production_preflight() {
     [[ -n "$CURRENT_BEFORE" && "$CURRENT_BEFORE" == "$RELEASE_ROOT/"* ]] || die "current release cannot be resolved inside the fixed release root"
     [[ -d "$CURRENT_BEFORE" && ! -L "$CURRENT_BEFORE" ]] || die "current release is not a real directory"
     [[ -n "$CURRENT_COMMIT_BEFORE" ]] || die "current release has no valid .deployed-commit"
+    assert_release_path_access_for_user "$CURRENT_BEFORE" "$APP_USER"
+    assert_release_path_access_for_user "$CURRENT_BEFORE" "$VALIDATION_USER"
     [[ "$SERVICE_BEFORE" == "active" ]] || die "production service is not active"
     [[ "$PID_BEFORE" =~ ^[1-9][0-9]*$ && -d "/proc/${PID_BEFORE}" ]] || die "production service has no live PID"
     [[ "$RESTARTS_BEFORE" =~ ^[0-9]+$ ]] || die "production service has no numeric NRestarts baseline"
@@ -1217,11 +1276,22 @@ run_audit() {
 }
 
 prepare_validation_job() {
+    local denied_mode
     [[ -z "$VALIDATION_JOB_DIR" ]] || die "validation job is already initialized"
     VALIDATION_JOB_DIR="$(mktemp -d "${VALIDATION_DIR}/job.XXXXXXXX")"
     VALIDATION_DIR_EXPOSED="1"
     chown root:"$VALIDATION_GROUP" "$VALIDATION_DIR" "$VALIDATION_JOB_DIR"
     chmod 0750 "$VALIDATION_DIR" "$VALIDATION_JOB_DIR"
+    runuser -u "$VALIDATION_USER" -- test -r "$VALIDATION_JOB_DIR" \
+        || die "validation account cannot read the private validation job"
+    runuser -u "$VALIDATION_USER" -- test -x "$VALIDATION_JOB_DIR" \
+        || die "validation account cannot traverse the private validation job"
+    runuser -u "$VALIDATION_USER" -- test ! -w "$VALIDATION_JOB_DIR" \
+        || die "validation account can write the private validation job"
+    for denied_mode in -r -w -x; do
+        runuser -u "$APP_USER" -- test ! "$denied_mode" "$VALIDATION_JOB_DIR" \
+            || die "application account can access the private validation job"
+    done
 }
 
 prepare_validation_probe_root() {
@@ -1438,7 +1508,7 @@ copy_release_for_validation() {
         || die "${label} validation source changed while creating its private copy"
     [[ "$(read_commit "$destination")" == "$source_commit" ]] \
         || die "${label} validation copy commit is invalid"
-    prepare_immutable_release "$destination"
+    prepare_private_validation_release "$destination"
     assert_sanitized_validation_data "$label" "$destination"
 }
 
@@ -1485,8 +1555,8 @@ run_dry_run() {
     merge_compatible_resources "$CURRENT_BEFORE" "$candidate_dir" "$rollback_dir"
     [[ "$(read_commit "$candidate_dir")" == "$DEPLOYED_COMMIT" ]] || die "candidate commit changed during validation merge"
     [[ "$(read_commit "$rollback_dir")" == "$rollback_commit" ]] || die "rollback commit changed during validation merge"
-    prepare_immutable_release "$candidate_dir"
-    prepare_immutable_release "$rollback_dir"
+    prepare_private_validation_release "$candidate_dir"
+    prepare_private_validation_release "$rollback_dir"
     RELEASE_TREE_SHA256="$(tree_sha256 "$candidate_dir")"
     PAGES_TREE_SHA256="$(tree_sha256 "$candidate_dir/dist/pages")"
     ROLLBACK_BASENAME="validation-rollback-${rollback_commit:0:12}"
@@ -1518,9 +1588,9 @@ run_deploy() {
 
     if [[ -e "$candidate_target" || -L "$candidate_target" ]]; then
         [[ -d "$candidate_target" && ! -L "$candidate_target" ]] || die "target release path is occupied"
-        assert_immutable_release "$candidate_target"
+        assert_production_release "$candidate_target"
         merge_existing_release_resources "$candidate_target" "$CANDIDATE_STAGING"
-        prepare_immutable_release "$CANDIDATE_STAGING"
+        prepare_production_release "$CANDIDATE_STAGING"
         if [[ "$CURRENT_BEFORE" == "$candidate_target" && -d "$candidate_target" ]]; then
             if same_release_tree "$CANDIDATE_STAGING" "$candidate_target"; then
                 RELEASE_TREE_SHA256="$(tree_sha256 "$candidate_target")"
@@ -1534,7 +1604,7 @@ run_deploy() {
     fi
     if [[ -e "$rollback_target" || -L "$rollback_target" ]]; then
         [[ -d "$rollback_target" && ! -L "$rollback_target" ]] || die "rollback release path is occupied"
-        assert_immutable_release "$rollback_target"
+        assert_production_release "$rollback_target"
         rollback_exists="1"
     fi
 
@@ -1544,8 +1614,8 @@ run_deploy() {
     [[ "$(read_commit "$CANDIDATE_STAGING")" == "$DEPLOYED_COMMIT" ]] || die "candidate commit changed during resource merge"
     [[ "$(read_commit "$ROLLBACK_STAGING")" == "$rollback_commit" ]] || die "rollback commit changed during resource merge"
 
-    prepare_immutable_release "$CANDIDATE_STAGING"
-    prepare_immutable_release "$ROLLBACK_STAGING"
+    prepare_production_release "$CANDIDATE_STAGING"
+    prepare_production_release "$ROLLBACK_STAGING"
     RELEASE_TREE_SHA256="$(tree_sha256 "$CANDIDATE_STAGING")"
     PAGES_TREE_SHA256="$(tree_sha256 "$CANDIDATE_STAGING/dist/pages")"
 
@@ -1567,8 +1637,8 @@ run_deploy() {
         mv -T -- "$CANDIDATE_STAGING" "$candidate_target"
         CANDIDATE_STAGING=""
     fi
-    assert_immutable_release "$rollback_target"
-    assert_immutable_release "$candidate_target"
+    assert_production_release "$rollback_target"
+    assert_production_release "$candidate_target"
     [[ "$(current_target)" == "$CURRENT_BEFORE" ]] || die "current release changed before atomic switch"
     SWITCH_ROLLBACK_TARGET="$rollback_target"
     SWITCH_TARGET="$candidate_target"
@@ -1607,7 +1677,7 @@ run_rollback() {
     validate_release_basename "$requested"
     target="${RELEASE_ROOT}/${requested}"
     [[ -d "$target" && ! -L "$target" ]] || die "recorded rollback release does not exist"
-    assert_immutable_release "$target"
+    assert_production_release "$target"
     target_commit="$(read_commit "$target")"
     [[ -n "$target_commit" ]] || die "rollback release has no valid .deployed-commit"
 
