@@ -153,14 +153,52 @@ assert.match(
     "A switched deployment with missing evidence must be rolled back",
 )
 
-// Candidate and rollback trees are immutable and readable, but not writable,
-// by the application account.
+// Production trees are readable but not writable by both runtime principals.
+// Private validation trees remain unreadable to the production application
+// account while retaining the same root-owned immutable tree contract.
 includes(manager, 'chown -R root:root "$root"')
 includes(manager, 'find "$root" -type d -exec chmod 0755 {} +')
 includes(manager, 'find "$root" -type f -exec chmod 0644 {} +')
 includes(manager, "release contains a non-root-owned path")
-includes(manager, 'runuser -u "$APP_USER" -- test ! -w "$root"')
-includes(manager, 'runuser -u "$APP_USER" -- test ! -w "$root/.deployed-commit"')
+includes(manager, 'assert_release_tree_access_for_user "$root" "$APP_USER"')
+includes(manager, 'assert_release_tree_access_for_user "$root" "$VALIDATION_USER"')
+const releaseAccess = manager.match(/assert_release_tree_access_for_user\(\)[\s\S]*?^}/m)?.[0] ?? ""
+includes(releaseAccess, 'cd -- "$root"')
+includes(releaseAccess, 'runuser -u "$runtime_user" -- test -r "./$key_file"')
+includes(releaseAccess, 'runuser -u "$runtime_user" -- test ! -w .')
+includes(releaseAccess, 'runuser -u "$runtime_user" -- test ! -w ./.deployed-commit')
+assert.doesNotMatch(releaseAccess, /test -[rw] "\$root\//)
+const releasePathAccess = manager.match(/assert_release_path_access_for_user\(\)[\s\S]*?^}/m)?.[0] ?? ""
+includes(releasePathAccess, 'runuser -u "$runtime_user" -- test -r "$root/$key_file"')
+includes(releasePathAccess, 'runuser -u "$runtime_user" -- test ! -w "$root"')
+includes(releasePathAccess, 'runuser -u "$runtime_user" -- test ! -w "$root/.deployed-commit"')
+includes(manager, 'assert_release_path_access_for_user "$CURRENT_BEFORE" "$APP_USER"')
+includes(manager, 'assert_release_path_access_for_user "$CURRENT_BEFORE" "$VALIDATION_USER"')
+includes(manager, 'prepare_private_validation_release "$candidate_dir"')
+includes(manager, 'prepare_private_validation_release "$rollback_dir"')
+includes(manager, 'prepare_private_validation_release "$destination"')
+includes(manager, 'prepare_production_release "$CANDIDATE_STAGING"')
+includes(manager, 'prepare_production_release "$ROLLBACK_STAGING"')
+includes(manager, 'assert_production_release "$candidate_target"')
+includes(manager, 'assert_production_release "$rollback_target"')
+const privateValidationAccess = manager.match(/assert_private_validation_release_access\(\)[\s\S]*?^}/m)?.[0] ?? ""
+includes(privateValidationAccess, 'assert_release_path_access_for_user "$root" "$VALIDATION_USER"')
+includes(privateValidationAccess, 'runuser -u "$APP_USER" -- test ! "$denied_mode" "$root"')
+includes(privateValidationAccess, 'runuser -u "$APP_USER" -- test ! -r "$root/$key_file"')
+for (const productionFunction of ["prepare_production_release", "assert_production_release"]) {
+    const body = manager.match(new RegExp(`${productionFunction}\\(\\)[\\s\\S]*?^}`, "m"))?.[0] ?? ""
+    includes(body, 'assert_release_path_access_for_user "$root" "$APP_USER"')
+    includes(body, 'assert_release_path_access_for_user "$root" "$VALIDATION_USER"')
+}
+assert.equal((releaseAccess.match(/\|\| die /g) ?? []).length, 3)
+assert.doesNotMatch(releaseAccess, /\(cd[^)]*\bdie\b/)
+const validationJob = manager.match(/prepare_validation_job\(\)[\s\S]*?^}/m)?.[0] ?? ""
+includes(validationJob, "local denied_mode")
+includes(validationJob, 'chown root:"$VALIDATION_GROUP" "$VALIDATION_DIR" "$VALIDATION_JOB_DIR"')
+includes(validationJob, 'chmod 0750 "$VALIDATION_DIR" "$VALIDATION_JOB_DIR"')
+includes(validationJob, 'runuser -u "$VALIDATION_USER" -- test -x "$VALIDATION_JOB_DIR"')
+includes(validationJob, 'runuser -u "$APP_USER" -- test ! "$denied_mode" "$VALIDATION_JOB_DIR"')
+assert.doesNotMatch(validationJob, /chmod 0755|chown[^\n]*APP_(?:USER|GROUP)/)
 includes(bootstrap, 'replace_managed_file "$manager_snapshot" "$INSTALL_PATH" 755')
 includes(bootstrap, 'create_exact_directory "$PROCESSING_DIR" root root 700')
 includes(bootstrap, 'create_exact_directory "$HISTORY_DIR" root root 750')
@@ -331,7 +369,7 @@ assert.match(
 )
 assert.match(
     manager,
-    /copy_release_for_validation\(\)[\s\S]*source_tree_before[\s\S]*--exclude='\.\/data'[\s\S]*user_drive_discs\.example\.json[\s\S]*source_tree_after[\s\S]*prepare_immutable_release "\$destination"[\s\S]*assert_sanitized_validation_data/,
+    /copy_release_for_validation\(\)[\s\S]*source_tree_before[\s\S]*--exclude='\.\/data'[\s\S]*user_drive_discs\.example\.json[\s\S]*source_tree_after[\s\S]*prepare_private_validation_release "\$destination"[\s\S]*assert_sanitized_validation_data/,
     "Validation must make a hash-verified immutable private copy of every source release",
 )
 const privateReleaseCopy = manager.match(/copy_release_for_validation\(\)[\s\S]*?^}/m)?.[0] ?? ""

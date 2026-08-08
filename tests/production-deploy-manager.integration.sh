@@ -18,6 +18,7 @@ readonly MANAGER="/usr/local/sbin/zzz-calculator-deploy"
 readonly SERVICE_NAME="zzz-calculator.service"
 readonly HELPER_MANIFEST="/srv/zzz-download-origin/downloads/zzz-scanner/helper-manifest.json"
 readonly SCANNER_MANIFEST="/srv/zzz-download-origin/downloads/zzz-scanner/manifest.json"
+readonly REPO_MANAGER="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/deploy/production/zzz-calculator-deploy"
 readonly COMMIT="$(printf '%s\n' "$$-$(date -u +%s%N)" | sha256sum | cut -c1-40)"
 readonly ARCHIVE_NAME="zzz-calculator-server-${COMMIT:0:12}.tar.gz"
 readonly EVIDENCE_NAME="zzz-calculator-server-${COMMIT:0:12}.evidence.json"
@@ -106,11 +107,13 @@ run_manager_failure() {
 }
 
 [[ "$(id -u)" -ne 0 ]] || fail "run this integration test as the regular CI user"
-for dependency in jq sudo tar sha256sum stat find flock systemctl; do
+for dependency in cmp jq sudo tar sha256sum stat find flock systemctl; do
     command -v "$dependency" >/dev/null || fail "${dependency} is required"
 done
 getent passwd zzzdeploy >/dev/null || fail "bootstrap integration test did not create zzzdeploy"
 [[ -x "$MANAGER" ]] || fail "deployment manager is not installed"
+cmp -s -- "$REPO_MANAGER" "$MANAGER" \
+    || fail "installed deployment manager differs from the checked-out source"
 [[ -d "$INCOMING_DIR" && -d "$PROCESSING_DIR" && -d "$HISTORY_DIR" && -d "$VALIDATION_DIR" ]] \
     || fail "deployment control directories are not initialized"
 [[ -d "$RELEASE_ROOT" && ! -L "$RELEASE_ROOT" ]] || fail "release root is not initialized"
@@ -125,6 +128,9 @@ test_root="$(mktemp -d)"
 # The fixture files are copied by the restricted deployment user below. Keep
 # the disposable parent traversable while all generated files remain read-only.
 chmod 0755 "$test_root"
+validation_access_root="${test_root}/validation-access"
+production_access_root="${test_root}/production-access"
+release_assert_driver="${test_root}/assert-immutable-release.sh"
 lock_launcher_pid=""
 lock_holder_pid=""
 remote_archive="${INCOMING_DIR}/${ARCHIVE_NAME}.part"
@@ -137,11 +143,124 @@ cleanup() {
         wait "$lock_launcher_pid" >/dev/null 2>&1 || true
     fi
     sudo rm -f -- "$remote_archive" "$remote_evidence" >/dev/null 2>&1 || true
+    if [[ -n "${validation_access_root:-}" && "$validation_access_root" == "$test_root/"* ]]; then
+        sudo rm -rf --one-file-system -- "$validation_access_root" >/dev/null 2>&1 || true
+    fi
+    if [[ -n "${production_access_root:-}" && "$production_access_root" == "$test_root/"* ]]; then
+        sudo rm -rf --one-file-system -- "$production_access_root" >/dev/null 2>&1 || true
+    fi
     if [[ -n "$test_root" && "$test_root" == /tmp/* ]]; then
         rm -rf -- "$test_root"
     fi
 }
 trap cleanup EXIT
+
+# A private validation parent deliberately blocks the production application
+# account. Root-owned 0755/0644 release contents remain readable by the
+# dedicated validator without making the parent world-traversable.
+sudo install -d -o root -g zzzvalidate -m 0750 -- "$validation_access_root"
+sudo install -d -o root -g root -m 0755 -- \
+    "$validation_access_root/release" \
+    "$validation_access_root/release/backend" \
+    "$validation_access_root/release/dist" \
+    "$validation_access_root/release/dist/pages"
+printf '%s\n' "$COMMIT" | sudo tee "$validation_access_root/release/.deployed-commit" >/dev/null
+printf 'console.log("validation access fixture")\n' \
+    | sudo tee "$validation_access_root/release/backend/server.js" >/dev/null
+printf '<!doctype html><title>validation access fixture</title>\n' \
+    | sudo tee "$validation_access_root/release/dist/pages/index.html" >/dev/null
+sudo chown -R root:root "$validation_access_root/release"
+sudo find "$validation_access_root/release" -type d -exec chmod 0755 {} +
+sudo find "$validation_access_root/release" -type f -exec chmod 0644 {} +
+sudo -u zzzvalidate test -r "$validation_access_root/release/.deployed-commit" \
+    || fail "validation account cannot read an immutable private release"
+if sudo -u zzzcalc test -r "$validation_access_root/release/.deployed-commit"; then
+    fail "application account can read an isolated validation release"
+fi
+
+# Execute the exact installed manager functions so this test covers both the
+# root-opened working-directory behavior and every immutable-tree rejection.
+{
+    printf '%s\n' '#!/bin/bash' 'set -Eeuo pipefail' \
+        'readonly APP_USER="zzzcalc"' 'readonly VALIDATION_USER="zzzvalidate"'
+    printf '%s\n' 'die() { printf "fixture error: %s\\n" "$*" >&2; exit 1; }'
+    sed -n '/^assert_release_tree_access_for_user() {$/,/^}$/p' "$MANAGER"
+    sed -n '/^assert_release_path_access_for_user() {$/,/^}$/p' "$MANAGER"
+    sed -n '/^assert_immutable_release() {$/,/^}$/p' "$MANAGER"
+    sed -n '/^assert_private_validation_release_access() {$/,/^}$/p' "$MANAGER"
+    sed -n '/^assert_production_release() {$/,/^}$/p' "$MANAGER"
+    printf '%s\n' \
+        'case "$1" in' \
+        '  private) assert_immutable_release "$2"; assert_private_validation_release_access "$2" ;;' \
+        '  production) assert_production_release "$2" ;;' \
+        '  *) exit 64 ;;' \
+        'esac'
+} >"$release_assert_driver"
+grep -Fq 'assert_release_tree_access_for_user()' "$release_assert_driver" \
+    || fail "could not extract installed release access helper"
+grep -Fq 'assert_immutable_release()' "$release_assert_driver" \
+    || fail "could not extract installed immutable release assertion"
+grep -Fq 'assert_private_validation_release_access()' "$release_assert_driver" \
+    || fail "could not extract installed private validation assertion"
+grep -Fq 'assert_production_release()' "$release_assert_driver" \
+    || fail "could not extract installed production release assertion"
+bash -n "$release_assert_driver" || fail "extracted release assertion is not valid Bash"
+
+assert_private_release() {
+    sudo /bin/bash --noprofile --norc "$release_assert_driver" private "$validation_access_root/release" \
+        >/dev/null 2>&1
+}
+
+assert_private_release_rejected() {
+    local label="$1"
+    if assert_private_release; then
+        fail "immutable release assertion accepted ${label}"
+    fi
+}
+
+assert_private_release || fail "immutable private release failed the installed manager assertion"
+sudo chmod 0600 "$validation_access_root/release/.deployed-commit"
+assert_private_release_rejected "mode 0600 release metadata"
+sudo chmod 0666 "$validation_access_root/release/.deployed-commit"
+assert_private_release_rejected "mode 0666 release metadata"
+sudo chmod 0644 "$validation_access_root/release/.deployed-commit"
+sudo chmod 0777 "$validation_access_root/release"
+assert_private_release_rejected "mode 0777 release root"
+sudo chmod 0755 "$validation_access_root/release"
+sudo chown zzzcalc:zzzcalc "$validation_access_root/release/backend/server.js"
+assert_private_release_rejected "non-root-owned release file"
+sudo chown root:root "$validation_access_root/release/backend/server.js"
+sudo ln -s -- .deployed-commit "$validation_access_root/release/unsafe-link"
+assert_private_release_rejected "symbolic link"
+sudo rm -f -- "$validation_access_root/release/unsafe-link"
+assert_private_release || fail "restored immutable private release failed its assertion"
+sudo chmod 0755 "$validation_access_root"
+assert_private_release_rejected "world-traversable validation parent"
+sudo chmod 0750 "$validation_access_root"
+assert_private_release || fail "restored private validation scope failed its assertion"
+
+# The production scope separately proves that the application can reach a
+# future release through its real ancestors; the tree-internal check alone
+# must not hide a broken /opt-style parent path.
+sudo install -d -o root -g root -m 0755 -- "$production_access_root"
+sudo cp -a -- "$validation_access_root/release" "$production_access_root/release"
+sudo chown -R root:root "$production_access_root/release"
+sudo /bin/bash --noprofile --norc "$release_assert_driver" production "$production_access_root/release" \
+    >/dev/null 2>&1 || fail "production release failed its absolute application access assertion"
+sudo chmod 0700 "$production_access_root"
+if sudo /bin/bash --noprofile --norc "$release_assert_driver" production "$production_access_root/release" \
+    >/dev/null 2>&1; then
+    fail "production release assertion accepted an application-inaccessible parent"
+fi
+sudo chmod 0755 "$production_access_root"
+sudo chown root:zzzcalc "$production_access_root"
+sudo chmod 0750 "$production_access_root"
+if sudo /bin/bash --noprofile --norc "$release_assert_driver" production "$production_access_root/release" \
+    >/dev/null 2>&1; then
+    fail "production release assertion accepted a validator-inaccessible parent"
+fi
+sudo chown root:root "$production_access_root"
+sudo chmod 0755 "$production_access_root"
 
 release_tree="${test_root}/release"
 mkdir -p "$release_tree/backend" "$release_tree/dist/pages"

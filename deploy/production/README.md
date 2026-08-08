@@ -18,6 +18,13 @@ export ZZZDEPLOY_PUBLIC_KEY='ssh-ed25519 AAAA...'
 unset ZZZDEPLOY_PUBLIC_KEY
 ```
 
+The bootstrap is also the control-plane upgrade path. Whenever the manager,
+validation worker, SSH gateway or sudoers policy changes, rerun the bootstrap
+from the same pinned `main` commit before approving its first `dry-run`. Verify
+the installed file hashes afterward. The transaction may update only these
+dedicated deployment files and accounts; it must still leave `current`, the
+production service, Nginx and download manifests unchanged.
+
 The initializer creates a password-locked `zzzdeploy` account and installs a
 root-owned forced-command SSH gateway. The dedicated key disables PTY,
 agent/X11/port forwarding and cannot open a shell or invoke arbitrary SCP:
@@ -111,6 +118,10 @@ scan telemetry and unknown files never enter the sandbox. Seed data is capped
 at 64 MiB, 8,192 entries and 1 MiB per file before candidate code starts. The real release
 root, deployment state, production state and download origin are inaccessible;
 the one private release copy is exposed read-only at `/zzz-validation/app`.
+The private validation parent remains `root:zzzvalidate` mode `0750`: the
+validator can read immutable release files, while the production `zzzcalc`
+account cannot traverse the job directory. Production release trees separately
+require read access for both principals and write access for neither.
 Only private loopback port 8788 exists. The worker itself checks these mounts
 and isolation before starting candidate code, traps HUP/INT/TERM, terminates
 and reaps its server child, and is backed by systemd control-group cleanup for

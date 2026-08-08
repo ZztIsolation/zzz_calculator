@@ -685,7 +685,7 @@ evidence；CD 只能下载触发它的同一次 run 的产物，禁止在部署�
 
 - [ ] GitHub `main` 已启用 PR、`CI / verify`、分支最新、conversation resolution、禁止 force push/删除；管理员应急绕过保留审计记录。
 - [ ] `production` Environment 只允许 protected `main`，审批人和 `PROD_HOST`、`PROD_USER`、`PROD_SSH_PRIVATE_KEY`、`PROD_KNOWN_HOSTS` 已配置；`PRODUCTION_CD_ENABLED` 未明确设置为 `true` 时所有 CD 任务跳过。
-- [ ] 服务器已运行 `deploy/production/bootstrap-zzz-calculator-deploy.sh`，`zzzdeploy` 仅使用锁定密码的专用 key，sudo 只允许 root-owned 部署程序；初始化不得触碰 `current`、systemd、Nginx 或下载源。
+- [ ] 服务器已从候选 `main` 的同一固定 SHA 运行 `deploy/production/bootstrap-zzz-calculator-deploy.sh`，已安装 manager/worker/gateway/sudoers 哈希与该 SHA 一致；`zzzdeploy` 仅使用锁定密码的专用 key，sudo 只允许 root-owned 部署程序。控制面有变化时必须先事务性重跑 bootstrap，且初始化不得触碰 `current`、生产 systemd 服务、Nginx 或下载源。
 - [ ] 审批后仍复核 `main` SHA、产物 SHA-256、`.deployed-commit`、安全 tar 路径和静态资源冲突；`.part` 上传只在服务器复算通过后转为最终文件。
 - [ ] `audit` 只读；`dry-run` 只写 `validation`；`deploy` 使用不可变 `git-<short-sha>` release、兼容回滚目录、原子 current 切换、15 秒健康门禁；失败自动切回并重启一次。
 - [ ] 首次启用前使用隔离浏览器完成当前版 -> 候选版 -> 回滚版 -> 候选版的本地存储哨兵演练；真实生产切换必须另获明确批准。
