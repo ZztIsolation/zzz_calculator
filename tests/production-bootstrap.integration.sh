@@ -64,6 +64,16 @@ assert_state_equal() {
         || fail "${label} changed unexpectedly (before=${expected}, after=${actual})"
 }
 
+assert_locked_password_status() {
+    local user="$1"
+    local password_status
+    password_status="$(sudo passwd --status "$user" | awk '{print $2}')"
+    case "$password_status" in
+        L|LK) ;;
+        *) fail "passwd does not report ${user} as locked: ${password_status}" ;;
+    esac
+}
+
 assert_exact_deploy_user() {
     local expected_gid passwd_record account_name account_password account_uid account_gid
     local account_gecos account_home account_shell locked_password
@@ -83,8 +93,7 @@ assert_exact_deploy_user() {
     locked_password="$(sudo getent shadow zzzdeploy | cut -d: -f2)"
     [[ "$locked_password" == '!'* || "$locked_password" == '*'* ]] \
         || fail "zzzdeploy password is not locked"
-    [[ "$(sudo passwd --status zzzdeploy | awk '{print $2}')" == "L" ]] \
-        || fail "passwd does not report zzzdeploy as locked"
+    assert_locked_password_status zzzdeploy
 }
 
 assert_exact_validation_user() {
@@ -107,8 +116,7 @@ assert_exact_validation_user() {
     locked_password="$(sudo getent shadow zzzvalidate | cut -d: -f2)"
     [[ "$locked_password" == '!'* || "$locked_password" == '*'* ]] \
         || fail "zzzvalidate password is not locked"
-    [[ "$(sudo passwd --status zzzvalidate | awk '{print $2}')" == "L" ]] \
-        || fail "passwd does not report zzzvalidate as locked"
+    assert_locked_password_status zzzvalidate
 }
 
 assert_sudo_allowed() {

@@ -167,6 +167,13 @@ includes(bootstrap, 'verify_account_contract "$VALIDATION_USER" "$VALIDATION_GRO
 includes(bootstrap, "failed to lock the validation account password")
 includes(bootstrap, '"$(id -G "$user")" == "$expected_gid"')
 includes(bootstrap, "existing account has an unexpected primary or supplementary group")
+for (const contents of [bootstrap, manager]) {
+    includes(contents, "password_status_is_locked()")
+    includes(contents, "L|LK) return 0")
+    includes(contents, "*) return 1")
+}
+assert.doesNotMatch(bootstrap, /\[\[ "\$lock_status" == "L" \]\]/)
+assert.doesNotMatch(manager, /\[\[ "\$password_status" == "L" \]\]/)
 includes(bootstrap, '[[ ! -e "$VALIDATION_HOME" && ! -L "$VALIDATION_HOME" ]]')
 includes(bootstrap, 'replace_managed_file "$worker_snapshot" "$VALIDATION_WORKER_PATH" 555')
 for (const dependency of ["base64", "journalctl", "sudo", "systemd-run", "timeout"]) {

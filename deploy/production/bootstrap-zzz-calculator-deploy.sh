@@ -69,6 +69,13 @@ fail() {
     exit 1
 }
 
+password_status_is_locked() {
+    case "${1:-}" in
+        L|LK) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 rollback_notice() {
     printf 'bootstrap rollback error: %s\n' "$*" >&2
     rollback_failed="1"
@@ -178,7 +185,8 @@ verify_existing_account_or_absence() {
     [[ -z "$group_members" ]] \
         || fail "dedicated group contains explicit members and will not be taken over: ${group}"
     lock_status="$(passwd --status "$user" | awk 'NR == 1 { print $2 }')"
-    [[ "$lock_status" == "L" ]] || fail "existing account password is not locked: ${user}"
+    password_status_is_locked "$lock_status" \
+        || fail "existing account password is not locked: ${user}"
 }
 
 verify_account_contract() {
