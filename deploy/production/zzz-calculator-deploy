@@ -146,6 +146,13 @@ die() {
     exit 1
 }
 
+password_status_is_locked() {
+    case "${1:-}" in
+        L|LK) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 json_field() {
     local name="$1"
     local value="${2-}"
@@ -565,7 +572,8 @@ assert_validation_principal() {
     [[ "$account_home" == "$VALIDATION_ACCOUNT_HOME" && "$account_shell" == "/usr/sbin/nologin" ]] \
         || die "validation account must use /nonexistent and /usr/sbin/nologin"
     password_status="$(passwd --status "$VALIDATION_USER" 2>/dev/null | awk 'NR == 1 { print $2 }')"
-    [[ "$password_status" == "L" ]] || die "validation account password is not locked"
+    password_status_is_locked "$password_status" \
+        || die "validation account password is not locked"
     [[ ! -e "$VALIDATION_ACCOUNT_HOME" && ! -L "$VALIDATION_ACCOUNT_HOME" ]] \
         || die "validation account home path must not exist"
     if [[ -e /var/lib/zzz-calculator || -L /var/lib/zzz-calculator ]]; then
