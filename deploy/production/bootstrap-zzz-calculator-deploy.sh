@@ -77,6 +77,7 @@ release_parent_original_mode=""
 declare -a replaced_targets=()
 declare -a replaced_backups=()
 declare -a replaced_had_original=()
+declare -a replaced_phases=()
 declare -a created_directories=()
 
 fail() {
@@ -284,6 +285,7 @@ replace_managed_file() {
     local mode="$3"
     local backup=""
     local had_original="0"
+    local replacement_index
 
     if file_matches_contract "$source" "$target" "$mode"; then
         return 0
@@ -291,19 +293,36 @@ replace_managed_file() {
     if path_exists "$target"; then
         [[ -f "$target" && ! -L "$target" ]] \
             || fail "refusing to replace a non-regular managed file: ${target}"
-        backup="$(mktemp "${target}.backup.XXXXXXXX")"
-        rm -f -- "$backup"
+        ignore_termination_signals
+        backup="$(mktemp "${target}.backup.XXXXXXXX")" \
+            || fail "could not reserve a recovery path for managed file: ${target}"
         had_original="1"
+    else
+        ignore_termination_signals
     fi
     replaced_targets+=("$target")
     replaced_backups+=("$backup")
     replaced_had_original+=("$had_original")
+    replaced_phases+=("registered")
     if [[ "$had_original" == "1" ]]; then
-        mv -T -- "$target" "$backup"
+        rm -f -- "$backup" \
+            || fail "could not prepare the recovery path for managed file: ${target}"
     fi
-    install -o root -g root -m "$mode" "$source" "$target"
+    restore_termination_signals
+    replacement_index="$((${#replaced_targets[@]} - 1))"
+    if [[ "$had_original" == "1" ]]; then
+        replaced_phases[$replacement_index]="original-move-armed"
+        mv -T -- "$target" "$backup" \
+            || fail "could not move the previous managed file to its recovery path: ${target}"
+        replaced_phases[$replacement_index]="original-moved"
+    fi
+    replaced_phases[$replacement_index]="install-armed"
+    install -o root -g root -m "$mode" "$source" "$target" \
+        || fail "could not install managed file: ${target}"
+    replaced_phases[$replacement_index]="candidate-installed"
     file_matches_contract "$source" "$target" "$mode" \
         || fail "installed file failed its ownership, mode or content check: ${target}"
+    replaced_phases[$replacement_index]="verified"
 }
 
 ssh_state_matches_contract() {
@@ -334,11 +353,17 @@ install_ssh_directory() {
     chmod 0640 "${ssh_staged}/authorized_keys"
 
     if path_exists "$SSH_DIR"; then
-        ssh_backup_root="$(mktemp -d "${DEPLOY_ROOT}/.ssh.backup.XXXXXXXX")"
-        chmod 0700 "$ssh_backup_root"
+        ignore_termination_signals
+        ssh_backup_root="$(mktemp -d "${DEPLOY_ROOT}/.ssh.backup.XXXXXXXX")" \
+            || fail "could not create the SSH recovery directory"
         ssh_had_original="1"
+        ssh_replacement_started="1"
+        chmod 0700 "$ssh_backup_root" \
+            || fail "could not secure the SSH recovery directory"
+        restore_termination_signals
+    else
+        ssh_replacement_started="1"
     fi
-    ssh_replacement_started="1"
     if [[ "$failpoint" == "signal-before-ssh-move" ]]; then
         kill -TERM "$$"
         fail "TERM did not interrupt the SSH replacement failpoint"
@@ -387,39 +412,151 @@ rollback_ssh_directory() {
         rm -rf --one-file-system -- "$SSH_DIR" \
             || { rollback_notice "could not remove candidate SSH directory"; restore_failed="1"; }
     fi
-    ssh_replacement_started="0"
     if [[ "$restore_failed" == "0" && -n "$ssh_backup_root" ]]; then
-        remove_temporary_tree "$ssh_backup_root" >/dev/null 2>&1 || true
-        ssh_backup_root=""
+        if remove_temporary_tree "$ssh_backup_root" >/dev/null 2>&1; then
+            ssh_backup_root=""
+            ssh_replacement_started="0"
+        else
+            rollback_notice "could not remove restored SSH backup directory ${ssh_backup_root}"
+            restore_failed="1"
+        fi
+    elif [[ "$restore_failed" == "0" ]]; then
+        ssh_replacement_started="0"
     elif [[ "$restore_failed" == "1" && -n "$ssh_backup_root" ]]; then
         printf 'bootstrap rollback error: SSH backup retained at %s\n' "$ssh_backup_root" >&2
     fi
+    [[ "$restore_failed" == "0" ]]
+}
+
+managed_replacement_records_are_aligned() {
+    local count="${#replaced_targets[@]}"
+    [[ "${#replaced_backups[@]}" -eq "$count" \
+        && "${#replaced_had_original[@]}" -eq "$count" \
+        && "${#replaced_phases[@]}" -eq "$count" ]]
+}
+
+managed_replacement_records_are_verified() {
+    local phase
+    managed_replacement_records_are_aligned || return 1
+    for phase in "${replaced_phases[@]}"; do
+        [[ "$phase" == "verified" ]] || return 1
+    done
 }
 
 rollback_managed_files() {
-    local index target backup had_original
+    local index target backup had_original phase restore_failed="0"
+    if ! managed_replacement_records_are_aligned; then
+        rollback_notice "managed-file recovery records have inconsistent lengths"
+        return 1
+    fi
     for ((index=${#replaced_targets[@]} - 1; index >= 0; index--)); do
         target="${replaced_targets[$index]}"
         backup="${replaced_backups[$index]}"
         had_original="${replaced_had_original[$index]}"
+        phase="${replaced_phases[$index]}"
         if [[ "$had_original" == "1" ]]; then
-            if [[ -f "$backup" && ! -L "$backup" ]]; then
-                rm -f -- "$target" || rollback_notice "could not remove candidate file ${target}"
-                mv -T -- "$backup" "$target" \
-                    || rollback_notice "could not restore previous file ${target} from ${backup}"
-            elif [[ -f "$target" && ! -L "$target" ]]; then
-                # The failure happened before the original target was moved.
-                :
-            else
-                rollback_notice "previous file backup is missing for ${target}"
-            fi
+            case "$phase" in
+                registered)
+                    if [[ -n "$backup" && ! -e "$backup" && ! -L "$backup" \
+                        && -f "$target" && ! -L "$target" ]]; then
+                        replaced_phases[$index]="rolled-back"
+                    else
+                        rollback_notice "registered original cannot be proven untouched for ${target}"
+                        restore_failed="1"
+                    fi
+                    ;;
+                original-move-armed|original-moved|install-armed|candidate-installed|verified)
+                    if [[ ! -f "$backup" || -L "$backup" ]]; then
+                        rollback_notice "previous file backup is missing for ${target} at phase ${phase}"
+                        restore_failed="1"
+                        continue
+                    fi
+                    if path_exists "$target" && [[ ! -f "$target" || -L "$target" ]]; then
+                        rollback_notice "candidate managed path has an unsafe type: ${target}"
+                        restore_failed="1"
+                        continue
+                    fi
+                    if ! rm -f -- "$target"; then
+                        rollback_notice "could not remove candidate file ${target}"
+                        restore_failed="1"
+                        continue
+                    fi
+                    if mv -T -- "$backup" "$target"; then
+                        replaced_phases[$index]="rolled-back"
+                    else
+                        rollback_notice "could not restore previous file ${target} from ${backup}"
+                        restore_failed="1"
+                    fi
+                    ;;
+                rolled-back)
+                    if [[ ! -e "$backup" && ! -L "$backup" \
+                        && -f "$target" && ! -L "$target" ]]; then
+                        :
+                    else
+                        rollback_notice "managed file is not in its recorded rolled-back state: ${target}"
+                        restore_failed="1"
+                    fi
+                    ;;
+                *)
+                    rollback_notice "unknown managed-file recovery phase ${phase} for ${target}"
+                    restore_failed="1"
+                    ;;
+            esac
+        elif [[ "$had_original" == "0" ]]; then
+            case "$phase" in
+                registered)
+                    if [[ -z "$backup" && ! -e "$target" && ! -L "$target" ]]; then
+                        replaced_phases[$index]="rolled-back"
+                    else
+                        rollback_notice "new managed path changed before installation was armed: ${target}"
+                        restore_failed="1"
+                    fi
+                    ;;
+                install-armed|candidate-installed|verified)
+                    if [[ -n "$backup" ]]; then
+                        rollback_notice "new managed path unexpectedly has a backup: ${target}"
+                        restore_failed="1"
+                        continue
+                    fi
+                    if path_exists "$target" && [[ ! -f "$target" || -L "$target" ]]; then
+                        rollback_notice "new managed path has an unsafe type: ${target}"
+                        restore_failed="1"
+                        continue
+                    fi
+                    if rm -f -- "$target"; then
+                        replaced_phases[$index]="rolled-back"
+                    else
+                        rollback_notice "could not remove candidate file ${target}"
+                        restore_failed="1"
+                    fi
+                    ;;
+                rolled-back)
+                    if [[ -z "$backup" && ! -e "$target" && ! -L "$target" ]]; then
+                        :
+                    else
+                        rollback_notice "new managed path is not in its recorded rolled-back state: ${target}"
+                        restore_failed="1"
+                    fi
+                    ;;
+                *)
+                    rollback_notice "invalid phase ${phase} for a newly created managed file ${target}"
+                    restore_failed="1"
+                    ;;
+            esac
         else
-            rm -f -- "$target" || rollback_notice "could not remove candidate file ${target}"
+            rollback_notice "invalid original-file flag for ${target}"
+            restore_failed="1"
         fi
     done
-    replaced_targets=()
-    replaced_backups=()
-    replaced_had_original=()
+    if [[ "$restore_failed" == "0" ]]; then
+        replaced_targets=()
+        replaced_backups=()
+        replaced_had_original=()
+        replaced_phases=()
+    else
+        printf 'bootstrap rollback error: managed-file recovery backups were retained\n' >&2
+    fi
+    [[ "$restore_failed" == "0" ]]
 }
 
 remove_created_directories() {
@@ -503,32 +640,56 @@ discard_transaction_backups() {
     replaced_targets=()
     replaced_backups=()
     replaced_had_original=()
+    replaced_phases=()
 }
 
 on_exit() {
     local status="$1"
-    trap - EXIT HUP INT TERM
+    trap - EXIT
+    ignore_termination_signals
     set +e
     if [[ "$transaction_started" == "1" && "$transaction_committed" == "0" ]]; then
-        rollback_ssh_directory
+        if ! rollback_ssh_directory; then
+            rollback_failed="1"
+        fi
         if [[ "$rollback_failed" == "0" ]]; then
-            rollback_managed_files
+            if ! rollback_managed_files; then
+                rollback_failed="1"
+            fi
         else
             rollback_notice "managed files retained because the previous SSH directory could not be restored safely"
         fi
         visudo --check >/dev/null 2>&1 \
             || rollback_notice "aggregate sudoers validation failed after rollback"
-        if [[ "$ssh_replacement_started" == "0" && -n "$ssh_backup_root" ]]; then
-            remove_temporary_tree "$ssh_backup_root" >/dev/null 2>&1 || true
-            ssh_backup_root=""
+        if [[ "$rollback_failed" == "0" ]]; then
+            if [[ -n "$ssh_staged" ]]; then
+                if remove_temporary_tree "$ssh_staged" >/dev/null 2>&1; then
+                    ssh_staged=""
+                else
+                    rollback_notice "could not remove staged SSH directory ${ssh_staged}"
+                fi
+            fi
         fi
-        remove_temporary_tree "$ssh_staged" >/dev/null 2>&1 || true
-        remove_created_directories
-        rollback_release_parent_metadata
-        remove_created_accounts
+        if [[ "$rollback_failed" == "0" ]]; then
+            remove_created_directories
+        fi
+        if [[ "$rollback_failed" == "0" ]]; then
+            rollback_release_parent_metadata
+        fi
+        if [[ "$rollback_failed" == "0" ]]; then
+            remove_created_accounts
+        fi
+        if [[ "$rollback_failed" == "1" ]]; then
+            [[ -n "$ssh_backup_root" ]] \
+                && printf 'bootstrap rollback recovery: retained SSH backup %s\n' "$ssh_backup_root" >&2
+            [[ -n "$transaction_root" ]] \
+                && printf 'bootstrap rollback recovery: retained transaction directory %s\n' "$transaction_root" >&2
+        fi
     fi
     [[ -n "$key_validation_tmp" ]] && rm -f -- "$key_validation_tmp" >/dev/null 2>&1
-    [[ -n "$transaction_root" ]] && remove_temporary_tree "$transaction_root" >/dev/null 2>&1
+    if [[ "$rollback_failed" == "0" && -n "$transaction_root" ]]; then
+        remove_temporary_tree "$transaction_root" >/dev/null 2>&1
+    fi
     release_transaction_lock
     if [[ "$rollback_failed" == "1" ]]; then
         printf 'bootstrap error: rollback was incomplete; inspect the errors above before retrying\n' >&2
@@ -811,6 +972,8 @@ runuser -u "$VALIDATION_USER" -- test -x "$VALIDATION_WORKER_PATH" \
 runuser -u "$VALIDATION_USER" -- test ! -w "$VALIDATION_WORKER_PATH" \
     || fail "validation account can write the validation worker"
 
+managed_replacement_records_are_verified \
+    || fail "managed-file transaction records are incomplete before commit"
 trap '' HUP INT TERM
 transaction_committed="1"
 discard_transaction_backups

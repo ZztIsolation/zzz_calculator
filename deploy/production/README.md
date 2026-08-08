@@ -84,13 +84,45 @@ sudo -n /usr/local/sbin/zzz-calculator-deploy rollback --previous
 
 Every command first requires an active and healthy production service, valid
 Nginx configuration, both download manifests, effective `NODE_ENV=production`,
-maintenance disabled, and `ZZZ_CALCULATOR_DATA_DIR` either unset or resolving
-lexically through `/opt/zzz_calculator/current/data`. An absolute path naming a
-specific release is rejected even when it happens to point at the current
-release, because it would become stale after a switch. The effective process
+maintenance and scan telemetry disabled, empty `ZZZ_CALCULATOR_DATA_DIR` and
+`SCAN_TELEMETRY_DIR`, no production StateDirectory, no server inventory or
+telemetry files, and a retired `/api/user-drive-discs` endpoint (`410`). These
+temporary no-persistence gates prevent an immutable release from hiding a
+server-side write requirement. Future server persistence requires a separately
+approved external StateDirectory and migration. The effective process
 environment is checked again after every restart. `audit` is read-only apart
 from its evidence file and verifies that the release, PID, restart counter,
 service and manifest hashes stay unchanged.
+
+The first managed migration has one explicit legacy-current compatibility
+contract. It accepts only the audited tuple `last-release=git-2e7f874bc034`,
+`previous-release=rollback-2e7f874bc034`, an absent migration marker, and
+current commit `2e7f874bc034871f03b5738f48d7d05685b36ea9`. The current tree
+must match the pinned full-content and static portable digests, its complete
+historical `zzzcalc:zzzcalc` ownership and directory/file `0755/0644` modes,
+and the audited empty server-persistence state. It may contain no links, hard
+links, special paths or nested mounts. The manager never changes its owner or
+permissions. The legacy `previous-release` is preserved as history but is not
+a valid rollback target. Manual rollback remains disabled until the first
+managed deployment creates a new strict compatibility rollback.
+
+Before an artifact is claimed, the legacy tree is copied with a canonical tar
+stream into a `root:root` mode `0700` processing job and normalized there to
+the root-owned immutable contract. Neither `zzzcalc` nor `zzzvalidate` can
+reach this complete source snapshot. Only allow-listed catalog files and the
+empty example inventory are copied into the `root:zzzvalidate` validation job;
+real inventory, telemetry and unknown data files never enter validator scope.
+All rollback construction and resource merging use the sealed root-only
+snapshot, not the writable live tree. Full content, portable/static and
+metadata digests are checked again after sealing, after validation and
+immediately before a production switch.
+
+A first successful deploy records the newly created strict compatibility
+rollback, the candidate and a root-owned `legacy-current-migrated` marker. If
+an uncommitted first deploy is automatically restored to that compatibility
+rollback, both state entries are anchored to the actual immutable rollback.
+Later managed rollback failures preserve the prior `previous-release`. The
+marker permanently disables replay of the legacy exception.
 
 Before either artifact operation, the root manager atomically moves the
 uploaded artifact and evidence into a root-only processing directory and seals
@@ -109,7 +141,8 @@ copy, rollback copy and candidate copy in that order. Each stage gets a fresh
 separate 4 MiB private `/run`, and runs as `zzzvalidate` in a transient systemd
 service with `PrivateNetwork`, AF_UNIX disabled, an empty capability set, no
 new privileges, a read-only host filesystem, explicit memory/CPU/task/file
-limits and `KillMode=control-group`. The source `data` tree is never copied:
+limits and `KillMode=control-group`. The source `data` tree is never copied into
+the validation scope:
 only `agents.json`, `agent_skills.json`, `anomaly_effects.json`, `bosses.json`,
 `combat_buffs.json`, `drive_disc_sets.json`, `stat_rules.json` and
 `w_engines.json` are allow-listed. `user_drive_discs.example.json` is copied
@@ -121,7 +154,10 @@ the one private release copy is exposed read-only at `/zzz-validation/app`.
 The private validation parent remains `root:zzzvalidate` mode `0750`: the
 validator can read immutable release files, while the production `zzzcalc`
 account cannot traverse the job directory. Production release trees separately
-require read access for both principals and write access for neither.
+require read access for both principals and write access for neither. The
+one-time legacy source is not a production target under this rule: only its
+sanitized copies participate in validation, and every newly created candidate
+or rollback remains strictly immutable.
 Only private loopback port 8788 exists. The worker itself checks these mounts
 and isolation before starting candidate code, traps HUP/INT/TERM, terminates
 and reaps its server child, and is backed by systemd control-group cleanup for
@@ -141,15 +177,19 @@ The rollback and candidate each contain the union of old/new
 side is treated as empty, while same-path byte conflicts stop the operation.
 Public assets whose bytes may differ between releases must therefore use a
 content-versioned URL and deterministic line endings.
-After an atomic `current` switch, health must pass for 15 consecutive one-second
-checks with an active service and stable PID. Any failed or interrupted
-uncommitted switch restores the validated rollback release. The switch is not
-committed until before/after evidence has been written atomically.
+After an atomic `current` switch, the first healthy response must arrive within
+15 seconds. Health must then pass for 15 consecutive one-second checks with an
+active service and stable PID. Any failed or catchably interrupted uncommitted
+switch restores the validated rollback release. The switch is not committed
+until before/after evidence has been written atomically.
 
 `rollback` accepts exactly `--previous`; arbitrary release names and paths are
 not accepted. It uses the same production preflight, atomic switch, stable
 health, manifest and evidence gates. HUP, INT and TERM use the same uncommitted
-switch recovery path.
+switch recovery path. SIGKILL and host power loss cannot execute a shell trap;
+the next manager invocation therefore fails closed if `current`, the state pair
+and the migration marker do not describe one complete managed state, and an
+operator must audit that state before recovery.
 
 The program uses an absolute `/bin/bash`, a fixed system `PATH`, clears shell,
 loader, archive, Node and curl injection variables, and holds
@@ -158,7 +198,12 @@ cannot overlap. Release directories are never overwritten or deleted. Claimed
 uploads and allow-listed staging paths are removed on exit; a cleanup failure
 fails the operation. Evidence records before/after release, commit, service,
 PID, restart counter and manifest hashes plus archive limits, tree hashes,
-validation sequence, transient-unit results and switch state. JSON is rendered
+the current-release policy, full/portable/static live digests, metadata digest,
+tree usage, byte/inode headroom, validation sequence, transient-unit results
+and switch state. It also records `previous-release`, `last-release` and the
+migration marker before and after the action. Successful audit/dry-run evidence
+requires those values to be identical; committed deploy/rollback evidence must
+map them to the exact final release. JSON is rendered
 to a temporary inode, checked against a complete key/type/state schema with
 `jq`, permissioned, and atomically renamed. An invalid or unwritable evidence
 record fails the operation; after a production switch it also forces rollback.

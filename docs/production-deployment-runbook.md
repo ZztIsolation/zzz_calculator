@@ -155,6 +155,8 @@ previous_dir="$(readlink -f /opt/zzz_calculator/current)"
 
 ## 5. 生成 Calculator 发布产物
 
+> 适用范围：第 5-8 节保留的是 2026-08-05 全量热更新的历史手工双产物流程；固定提交 `4a8c9529b699285ce60df966da65c8a206b1bf54` 的兼容回滚包仅属于该流程。第 20 节的自动 CI/CD manager 不执行这些手工 staging 命令，也不接收或使用该固定 rollback artifact；它从审计后密封的当前 release 构建严格不可变 rollback，并在生产切换前完成浏览器存储往返与服务器四阶段验证，任一失败即停止。
+
 仅允许从干净提交打包：
 
 ```powershell
@@ -686,6 +688,12 @@ evidence；CD 只能下载触发它的同一次 run 的产物，禁止在部署�
 - [ ] GitHub `main` 已启用 PR、`CI / verify`、分支最新、conversation resolution、禁止 force push/删除；管理员应急绕过保留审计记录。
 - [ ] `production` Environment 只允许 protected `main`，审批人和 `PROD_HOST`、`PROD_USER`、`PROD_SSH_PRIVATE_KEY`、`PROD_KNOWN_HOSTS` 已配置；`PRODUCTION_CD_ENABLED` 未明确设置为 `true` 时所有 CD 任务跳过。
 - [ ] 服务器已从候选 `main` 的同一固定 SHA 运行 `deploy/production/bootstrap-zzz-calculator-deploy.sh`，已安装 manager/worker/gateway/sudoers 哈希与该 SHA 一致；`zzzdeploy` 仅使用锁定密码的专用 key，sudo 只允许 root-owned 部署程序。控制面有变化时必须先事务性重跑 bootstrap，且初始化不得触碰 `current`、生产 systemd 服务、Nginx 或下载源。
+- [ ] 第一次旧版迁移只允许审计确认的精确 tuple：`current=git-2e7f874bc034`、commit `2e7f874bc034871f03b5738f48d7d05685b36ea9`、`last-release=git-2e7f874bc034`、`previous-release=rollback-2e7f874bc034`、migration marker 不存在。current 必须匹配固定的完整内容/静态摘要、`zzzcalc:zzzcalc`、目录 `0755`、文件 `0644`，无链接、硬链接、特殊文件或嵌套挂载；不得现场 `chown/chmod`。旧 `previous-release` 仅保留为历史对象，首次 managed deploy 前禁止手动 rollback。
+- [ ] 完整 current 只能密封到 `processing/job.*` 的 `root:root 0700` 区域，`zzzcalc` 与 `zzzvalidate` 均不可读取；`validation/job.*` 只能接收白名单目录和空示例库存生成的脱敏副本。真实库存、telemetry 和未知 data 文件不得进入验证账户范围。candidate、rollback staging、最终 release 和手动 rollback target 仍须同时对两个 runtime principal 可读且不可写。
+- [ ] legacy current 的 full/portable/static/metadata 摘要、state tuple、服务 PID、`NRestarts`、Nginx 与两个 manifest 在 seal、四阶段验证、切换前和 evidence 前保持不变。evidence 必须记录 state pair 与 marker 的前后值：audit/dry-run 逐字一致，committed deploy/rollback 与最终 release 映射一致。第一次成功 deploy 写入新 rollback/candidate state 和 root-owned marker；首次切换后失败则 `previous=last=实际严格回滚副本`，后续 managed 失败保留原 previous。marker 写入后 legacy 例外永久失效。
+- [ ] 当前服务端持久化基线继续为：`StateDirectory`、`ZZZ_CALCULATOR_DATA_DIR`、`SCAN_TELEMETRY_DIR` 为空，`data/user_drive_discs.json`、`data/scan-telemetry` 不存在，maintenance/scan telemetry 均关闭且 `/api/user-drive-discs` 返回 `410`。任一项变化均停止部署；未来启用服务端写入必须单独建设外部 StateDirectory 和迁移流程。
 - [ ] 审批后仍复核 `main` SHA、产物 SHA-256、`.deployed-commit`、安全 tar 路径和静态资源冲突；`.part` 上传只在服务器复算通过后转为最终文件。
-- [ ] `audit` 只读；`dry-run` 只写 `validation`；`deploy` 使用不可变 `git-<short-sha>` release、兼容回滚目录、原子 current 切换、15 秒健康门禁；失败自动切回并重启一次。
-- [ ] 首次启用前使用隔离浏览器完成当前版 -> 候选版 -> 回滚版 -> 候选版的本地存储哨兵演练；真实生产切换必须另获明确批准。
+- [ ] `audit` 除持久化 history evidence 外不改变生产；`dry-run` 只临时写 root-only `processing`、脱敏 `validation`、消费本次 incoming 上传并持久化 history evidence，不切换 `current`、不重启生产服务。`deploy` 才会使用不可变 `git-<short-sha>` release、兼容回滚目录和原子 current 切换；切换后必须在 15 秒内首次恢复健康，再以同一 PID 连续稳定 15 秒，任一门禁失败即回滚。
+- [ ] 首次启用前，隔离浏览器必须在同一 origin 完成“种入并只读核对旧数据 -> 候选迁移并写入新字段 -> 当前生产读取/往返写入 -> 候选再次升级”的存储门禁；服务器 manager 另行完成 current -> candidate -> rollback -> candidate 四阶段应用验证。真实生产切换必须另获明确批准。
+- [ ] 自动回滚覆盖脚本错误及可捕获的 HUP/INT/TERM；SIGKILL 或宿主机断电无法运行 shell trap。下次 manager 调用必须对 `current`、state pair 与 marker 不一致 fail closed，并在人工只读审计后恢复，不得宣称不可捕获中断会自动回滚。
+- [ ] 本次 foundation 只允许 bootstrap、audit 和 dry-run；不得调用 deploy/rollback。`PRODUCTION_CD_ENABLED` 在 audit 与 dry-run 都成功并完成零影响复核前保持 `false`；之后仅启用未来待审批能力，变量变更本身不得触发部署。

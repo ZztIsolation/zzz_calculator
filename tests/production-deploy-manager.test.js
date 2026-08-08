@@ -66,6 +66,14 @@ for (const contract of [
     'readonly VALIDATION_DIR="${DEPLOY_ROOT}/validation"',
     'readonly RELEASE_ROOT="/opt/zzz_calculator/releases"',
     'readonly CURRENT_LINK="/opt/zzz_calculator/current"',
+    'readonly LEGACY_CURRENT_BASENAME="git-2e7f874bc034"',
+    'readonly LEGACY_CURRENT_COMMIT="2e7f874bc034871f03b5738f48d7d05685b36ea9"',
+    'readonly LEGACY_CURRENT_TREE_SHA256="d5d9e7a43f20a899c3638e0a675a774e80930ca0f878d5fd188f04e85fc16f8e"',
+    'readonly LEGACY_CURRENT_PORTABLE_SHA256="c77a6bfed6417cf8c27a90c0515f70e26127d08a6edff447e89e1c9bbc37cb51"',
+    'readonly LEGACY_CURRENT_STATIC_SHA256="c77a6bfed6417cf8c27a90c0515f70e26127d08a6edff447e89e1c9bbc37cb51"',
+    'readonly LEGACY_STATE_LAST="git-2e7f874bc034"',
+    'readonly LEGACY_STATE_PREVIOUS="rollback-2e7f874bc034"',
+    'readonly LEGACY_MIGRATION_MARKER="${DEPLOY_ROOT}/legacy-current-migrated"',
     'readonly LOCK_FILE="/run/lock/zzz-calculator-deploy.lock"',
     'readonly VALIDATION_PORT="8788"',
     'readonly VALIDATION_USER="zzzvalidate"',
@@ -89,6 +97,7 @@ for (const cap of [
     'readonly MAX_ARCHIVE_ENTRIES="20000"',
     'readonly MAX_EVIDENCE_BYTES="$((1024 * 1024))"',
     'readonly MIN_DISK_HEADROOM_BYTES="$((512 * 1024 * 1024))"',
+    'readonly MIN_DISK_HEADROOM_INODES="32768"',
 ]) {
     includes(manager, cap)
 }
@@ -106,6 +115,8 @@ includes(manager, 'chmod 0640 "$sealed_tmp"')
 includes(manager, "claimed upload must not be hard-linked")
 includes(manager, "incoming and processing must share a filesystem")
 includes(manager, '(( ARCHIVE_ENTRY_COUNT <= MAX_ARCHIVE_ENTRIES ))')
+includes(manager, 'DISK_REQUIRED_INODES="$((4 * ARCHIVE_ENTRY_COUNT + 6 * CURRENT_TREE_ENTRY_COUNT + MIN_DISK_HEADROOM_INODES))"')
+includes(manager, 'DISK_AVAILABLE_INODES="$(df -Pi -- "$destination" | awk')
 includes(manager, "archive contains duplicate paths")
 includes(manager, "archive contains a link or special entry")
 includes(manager, "artifact expanded size is invalid or exceeds 1 GiB")
@@ -131,6 +142,57 @@ includes(manager, "validate_evidence_json")
 includes(manager, "def required_keys:")
 includes(manager, "and (keys == required_keys)")
 includes(manager, 'and (all(.[]; type == "string"))')
+for (const evidenceField of [
+    "currentReleasePolicy",
+    "currentTreeSha256Before",
+    "currentTreeSha256After",
+    "currentPortableSha256Before",
+    "currentPortableSha256After",
+    "currentStaticSha256Before",
+    "currentStaticSha256After",
+    "currentTreeMetadataSha256Before",
+    "currentTreeMetadataSha256After",
+    "currentTreeEntryCount",
+    "currentTreeFileCount",
+    "currentTreeBytes",
+    "statePreviousExistedBefore",
+    "statePreviousBefore",
+    "statePreviousExistedAfter",
+    "statePreviousAfter",
+    "stateLastExistedBefore",
+    "stateLastBefore",
+    "stateLastExistedAfter",
+    "stateLastAfter",
+    "migrationMarkerExistedBefore",
+    "migrationMarkerValueBefore",
+    "migrationMarkerExistedAfter",
+    "migrationMarkerValueAfter",
+    "artifactSizeBytes",
+    "archiveEntryCount",
+    "archiveExpandedBytes",
+    "diskRequiredBytes",
+    "diskAvailableBytes",
+    "nRestartsBefore",
+    "nRestartsAfter",
+    "diskRequiredInodes",
+    "diskAvailableInodes",
+]) {
+    includes(manager, evidenceField)
+}
+includes(manager, "def state_snapshot_unchanged:")
+includes(manager, "def artifact_metadata_complete:")
+includes(manager, "def validation_complete:")
+includes(manager, "def managed_state_after:")
+includes(manager, 'if .status == "success" and .action == "audit"')
+includes(manager, 'if .status == "success" and .action == "dry-run"')
+includes(manager, 'if .status == "success" and .action == "deploy"')
+includes(manager, 'if .status == "success" and .action == "rollback"')
+includes(manager, 'capture_state_after_for_evidence')
+assert.match(
+    manager,
+    /write_evidence\(\)[\s\S]*capture_state_after_for_evidence[\s\S]*emit_evidence_json/,
+    "Evidence must capture the final state tuple immediately before rendering",
+)
 includes(manager, 'preflight_evidence_storage')
 assert.match(
     manager,
@@ -144,22 +206,55 @@ assert.match(
 )
 assert.match(
     manager,
-    /if write_evidence; then[\s\S]*else[\s\S]*ERROR_MESSAGE="failed to persist deployment evidence"[\s\S]*STATUS="failed"[\s\S]*exit_code=1/,
+    /if write_evidence; then[\s\S]*else[\s\S]*ERROR_MESSAGE="\$\{ERROR_MESSAGE\}; \$\{evidence_failure_detail\}"[\s\S]*STATUS="failed"[\s\S]*exit_code=1/,
     "Evidence persistence failure must turn a nominal deployment into a failure",
 )
 assert.match(
     manager,
-    /if \[\[ "\$evidence_ok" != "1" && "\$SWITCH_STATE" == "switched" \]\]; then[\s\S]*rollback_uncommitted_switch/,
+    /if \[\[ "\$evidence_ok" != "1" \]\]; then[\s\S]*attempt_automatic_rollback "evidence persistence failure"/,
     "A switched deployment with missing evidence must be rolled back",
+)
+includes(manager, 'attempt_automatic_rollback "post-cleanup failure"')
+includes(manager, 'attempt_automatic_rollback "final invariant failure"')
+includes(manager, 'attempt_automatic_rollback "evidence persistence failure"')
+includes(manager, "automatic rollback attempts exhausted")
+includes(manager, "CRITICAL operation ended with an uncommitted production switch")
+assert.doesNotMatch(manager, /rollback_uncommitted_switch\s*\|\|\s*true/)
+assert.doesNotMatch(manager, /attempt_automatic_rollback[^\r\n]*\|\|\s*true/)
+assert.match(
+    manager,
+    /rollback_uncommitted_switch\(\)[\s\S]*actual_current="\$\(current_target\)"[\s\S]*\[\[ "\$actual_current" == "\$SWITCH_TARGET" \]\] \|\| return 1[\s\S]*atomic_switch "\$SWITCH_ROLLBACK_TARGET" \|\| return 1/,
+    "Automatic rollback must not overwrite an unrelated current target",
+)
+assert.match(
+    manager,
+    /rollback_uncommitted_switch\(\)[\s\S]*health_gate \|\| return 1[\s\S]*verify_rollback_runtime "\$SWITCH_ROLLBACK_TARGET" \|\| return 1[\s\S]*record_managed_current/,
+    "Automatic rollback must verify the exact running rollback release before recording state",
+)
+assert.match(
+    manager,
+    /verify_rollback_runtime\(\) \([\s\S]*current_target[\s\S]*assert_production_release[\s\S]*assert_effective_runtime_environment[\s\S]*assert_runtime_endpoints[\s\S]*nginx -t[\s\S]*manifest_sha256/,
+    "Recovered runtime verification must bind current, process, endpoints, Nginx, and manifests",
+)
+assert.match(
+    manager,
+    /rollback_uncommitted_switch\(\)[\s\S]*SWITCH_ROLLBACK_TARGET.*SWITCH_ORIGINAL_TARGET[\s\S]*record_managed_current "\$rollback_previous" "\$rollback_basename"/,
+    "Automatic compatibility rollback must record the actual restored immutable release",
 )
 
 // Production trees are readable but not writable by both runtime principals.
 // Private validation trees remain unreadable to the production application
 // account while retaining the same root-owned immutable tree contract.
 includes(manager, 'chown -R root:root "$root"')
-includes(manager, 'find "$root" -type d -exec chmod 0755 {} +')
-includes(manager, 'find "$root" -type f -exec chmod 0644 {} +')
+includes(manager, 'find "$root" -xdev -type d -exec chmod 0755 {} +')
+includes(manager, 'find "$root" -xdev -type f -exec chmod 0644 {} +')
 includes(manager, "release contains a non-root-owned path")
+includes(manager, "release contains a symbolic link")
+includes(manager, "release contains a special path")
+includes(manager, "release contains a hard-linked file")
+includes(manager, '"root:root:755" ]] || die "deployment root must be root-owned mode 0755"')
+includes(manager, '"root:zzzdeploy:770" ]] || die "incoming directory must be root:zzzdeploy mode 0770"')
+includes(manager, '"root:root:750" ]] || die "history directory must be root-owned mode 0750"')
 includes(manager, 'assert_release_tree_access_for_user "$root" "$APP_USER"')
 includes(manager, 'assert_release_tree_access_for_user "$root" "$VALIDATION_USER"')
 const releaseAccess = manager.match(/assert_release_tree_access_for_user\(\)[\s\S]*?^}/m)?.[0] ?? ""
@@ -169,18 +264,48 @@ includes(releaseAccess, 'runuser -u "$runtime_user" -- test ! -w .')
 includes(releaseAccess, 'runuser -u "$runtime_user" -- test ! -w ./.deployed-commit')
 assert.doesNotMatch(releaseAccess, /test -[rw] "\$root\//)
 const releasePathAccess = manager.match(/assert_release_path_access_for_user\(\)[\s\S]*?^}/m)?.[0] ?? ""
-includes(releasePathAccess, 'runuser -u "$runtime_user" -- test -r "$root/$key_file"')
-includes(releasePathAccess, 'runuser -u "$runtime_user" -- test ! -w "$root"')
-includes(releasePathAccess, 'runuser -u "$runtime_user" -- test ! -w "$root/.deployed-commit"')
-includes(manager, 'assert_release_path_access_for_user "$CURRENT_BEFORE" "$APP_USER"')
-includes(manager, 'assert_release_path_access_for_user "$CURRENT_BEFORE" "$VALIDATION_USER"')
-includes(manager, 'prepare_private_validation_release "$candidate_dir"')
-includes(manager, 'prepare_private_validation_release "$rollback_dir"')
-includes(manager, 'prepare_private_validation_release "$destination"')
+includes(releasePathAccess, 'assert_release_path_readable_for_user "$root" "$runtime_user"')
+includes(releasePathAccess, 'assert_release_path_not_writable_for_user "$root" "$runtime_user"')
+const releasePathReadable = manager.match(/assert_release_path_readable_for_user\(\)[\s\S]*?^}/m)?.[0] ?? ""
+includes(releasePathReadable, 'runuser -u "$runtime_user" -- test -r "$root/$key_file"')
+const releasePathNotWritable = manager.match(/assert_release_path_not_writable_for_user\(\)[\s\S]*?^}/m)?.[0] ?? ""
+includes(releasePathNotWritable, 'runuser -u "$runtime_user" -- test ! -w "$root"')
+includes(releasePathNotWritable, 'runuser -u "$runtime_user" -- test ! -w "$root/.deployed-commit"')
+const currentCompatibility = manager.match(/assert_current_release_compatible\(\)[\s\S]*?^}/m)?.[0] ?? ""
+includes(currentCompatibility, 'CURRENT_RELEASE_POLICY="managed-immutable"')
+includes(currentCompatibility, 'CURRENT_RELEASE_POLICY="legacy-writable"')
+includes(currentCompatibility, 'assert_legacy_current_release "$CURRENT_BEFORE"')
+includes(currentCompatibility, 'assert_exact_legacy_state_tuple')
+includes(currentCompatibility, 'assert_managed_state_tuple "$current_basename"')
+const exactLegacyState = manager.match(/assert_exact_legacy_state_tuple\(\)[\s\S]*?^}/m)?.[0] ?? ""
+includes(exactLegacyState, 'STATE_LAST_BEFORE" == "$LEGACY_STATE_LAST')
+includes(exactLegacyState, 'STATE_PREVIOUS_BEFORE" == "$LEGACY_STATE_PREVIOUS')
+includes(exactLegacyState, 'LEGACY_MIGRATION_MARKER_EXISTED" == "0')
+const stateReader = manager.match(/read_state_file_snapshot\(\)[\s\S]*?^}/m)?.[0] ?? ""
+includes(stateReader, 'root:root:640:1')
+includes(stateReader, 'must contain exactly one newline-terminated basename')
+assert.doesNotMatch(stateReader, /\[\[ -f "\$path"[^\n]*\]\] \|\| return 0/)
+const legacyCurrent = manager.match(/assert_legacy_current_release\(\)[\s\S]*?^}/m)?.[0] ?? ""
+includes(legacyCurrent, 'release_matches_exact_contract "$root" "$APP_USER" "$APP_GROUP" 755 644')
+includes(legacyCurrent, 'assert_release_path_not_writable_for_user "$root" "$VALIDATION_USER"')
+includes(legacyCurrent, 'CURRENT_TREE_SHA256_BEFORE')
+includes(legacyCurrent, 'CURRENT_STATIC_SHA256_BEFORE')
+includes(legacyCurrent, 'server-side inventory data')
+assert.doesNotMatch(legacyCurrent, /chown|chmod|prepare_/)
+assert.doesNotMatch(manager, /assert_release_path_access_for_user "\$CURRENT_BEFORE"/)
+includes(manager, 'prepare_immutable_release "$candidate_dir"')
+includes(manager, 'prepare_immutable_release "$rollback_dir"')
+includes(manager, 'assert_root_private_release_access "$destination"')
 includes(manager, 'prepare_production_release "$CANDIDATE_STAGING"')
 includes(manager, 'prepare_production_release "$ROLLBACK_STAGING"')
 includes(manager, 'assert_production_release "$candidate_target"')
 includes(manager, 'assert_production_release "$rollback_target"')
+assert.match(
+    manager,
+    /atomic_switch\(\)[\s\S]*ln -s -- "\$target" "\$next_link" \|\| return 1[\s\S]*mv -Tf -- "\$next_link" "\$CURRENT_LINK" \|\| return 1[\s\S]*\[\[ "\$\(current_target\)" == "\$target" \]\]/,
+    "Atomic switch must check every filesystem mutation and verify the resolved target",
+)
+includes(manager, 'assert_live_current_matches_baseline "immediately before the atomic switch"')
 const privateValidationAccess = manager.match(/assert_private_validation_release_access\(\)[\s\S]*?^}/m)?.[0] ?? ""
 includes(privateValidationAccess, 'assert_release_path_access_for_user "$root" "$VALIDATION_USER"')
 includes(privateValidationAccess, 'runuser -u "$APP_USER" -- test ! "$denied_mode" "$root"')
@@ -199,6 +324,52 @@ includes(validationJob, 'chmod 0750 "$VALIDATION_DIR" "$VALIDATION_JOB_DIR"')
 includes(validationJob, 'runuser -u "$VALIDATION_USER" -- test -x "$VALIDATION_JOB_DIR"')
 includes(validationJob, 'runuser -u "$APP_USER" -- test ! "$denied_mode" "$VALIDATION_JOB_DIR"')
 assert.doesNotMatch(validationJob, /chmod 0755|chown[^\n]*APP_(?:USER|GROUP)/)
+
+const currentSealing = manager.match(/seal_current_release\(\)[\s\S]*?^}/m)?.[0] ?? ""
+includes(currentSealing, 'assert_live_current_matches_baseline "before sealing the current release"')
+includes(currentSealing, 'tar --one-file-system --no-acls --no-xattrs -cf - .')
+includes(currentSealing, 'assert_live_current_matches_baseline "after sealing the current release"')
+includes(currentSealing, 'prepare_immutable_release "$destination"')
+includes(currentSealing, 'assert_root_private_release_access "$destination"')
+includes(currentSealing, 'assert_snapshot_capacity "$PROCESSING_JOB_DIR"')
+includes(currentSealing, '"$destination" == "$PROCESSING_JOB_DIR/"*')
+assert.doesNotMatch(currentSealing, /VALIDATION_JOB_DIR|prepare_private_validation_release/)
+const processingJob = manager.match(/prepare_processing_job\(\)[\s\S]*?^}/m)?.[0] ?? ""
+includes(processingJob, 'mktemp -d "${PROCESSING_DIR}/job.XXXXXXXX"')
+includes(processingJob, 'chmod 0700 "$PROCESSING_JOB_DIR"')
+const managedStateCommit = manager.match(/record_managed_current\(\)[\s\S]*?^}/m)?.[0] ?? ""
+ordered(
+    managedStateCommit,
+    'write_state_file previous-release "$previous"',
+    'write_state_file last-release "$last"',
+    "previous-release must be committed before last-release",
+)
+ordered(
+    managedStateCommit,
+    'write_state_file last-release "$last"',
+    'write_migration_marker',
+    "The monotonic migration marker must be written last",
+)
+const dryRun = manager.match(/run_dry_run\(\)[\s\S]*?^}/m)?.[0] ?? ""
+includes(dryRun, 'seal_current_release "$CURRENT_BEFORE" "$current_snapshot"')
+includes(dryRun, 'current_snapshot="${PROCESSING_JOB_DIR}/sources/current"')
+includes(dryRun, 'cp -a --reflink=never -- "$current_snapshot/." "$rollback_dir/"')
+includes(dryRun, 'merge_compatible_resources "$current_snapshot" "$candidate_dir" "$rollback_dir"')
+includes(dryRun, 'run_four_stage_validation "$current_snapshot" "$candidate_dir" "$rollback_dir"')
+assert.doesNotMatch(dryRun, /cp -a[^\n]*CURRENT_BEFORE|merge_compatible_resources "\$CURRENT_BEFORE"|run_four_stage_validation "\$CURRENT_BEFORE"/)
+const deploy = manager.match(/run_deploy\(\)[\s\S]*?^}/m)?.[0] ?? ""
+includes(deploy, 'seal_current_release "$CURRENT_BEFORE" "$current_snapshot"')
+includes(deploy, 'current_snapshot="${PROCESSING_JOB_DIR}/sources/current"')
+includes(deploy, 'cp -a --reflink=never -- "$current_snapshot/." "$ROLLBACK_STAGING/"')
+includes(deploy, 'merge_compatible_resources "$current_snapshot" "$CANDIDATE_STAGING" "$ROLLBACK_STAGING"')
+includes(deploy, 'run_four_stage_validation "$current_snapshot" "$CANDIDATE_STAGING" "$ROLLBACK_STAGING"')
+assert.doesNotMatch(deploy, /cp -a[^\n]*CURRENT_BEFORE|merge_compatible_resources "\$CURRENT_BEFORE"|run_four_stage_validation "\$CURRENT_BEFORE"/)
+includes(manager, 'CURRENT_TREE_SHA256_BEFORE="$(tree_sha256 "$CURRENT_BEFORE")"')
+includes(manager, 'CURRENT_PORTABLE_SHA256_BEFORE="$(portable_tree_sha256 "$CURRENT_BEFORE" full)"')
+includes(manager, 'CURRENT_STATIC_SHA256_BEFORE="$(portable_tree_sha256 "$CURRENT_BEFORE" static)"')
+includes(manager, 'CURRENT_TREE_METADATA_SHA256_BEFORE="$(tree_metadata_sha256 "$CURRENT_BEFORE")"')
+includes(manager, 'current release content changed during isolated validation')
+includes(manager, 'current release metadata changed during isolated validation')
 includes(bootstrap, 'replace_managed_file "$manager_snapshot" "$INSTALL_PATH" 755')
 includes(bootstrap, 'create_exact_directory "$PROCESSING_DIR" root root 700')
 includes(bootstrap, 'create_exact_directory "$HISTORY_DIR" root root 750')
@@ -317,11 +488,15 @@ await assert.rejects(
     "The conflicting unversioned fallback URL must not remain in the candidate source tree",
 )
 
-// A persisted data directory may only resolve to current/data; validation runs
-// in an empty environment and never receives a production data path.
+// Server-side persistence remains disabled until a separately approved data
+// migration exists; validation uses only its isolated temporary data path.
 includes(manager, 'data_dir="$(process_environment_value "$pid" ZZZ_CALCULATOR_DATA_DIR || true)"')
-includes(manager, '[[ "$lexical_data" == "$CURRENT_LINK/data" ]]')
-includes(manager, "ZZZ_CALCULATOR_DATA_DIR must be unset or lexically resolve to /opt/zzz_calculator/current/data")
+includes(manager, '[[ -z "$data_dir" ]] || die "effective production process has ZZZ_CALCULATOR_DATA_DIR configured"')
+includes(manager, 'telemetry_dir="$(process_environment_value "$pid" SCAN_TELEMETRY_DIR || true)"')
+includes(manager, '[[ -z "$telemetry_dir" ]] || die "effective production process has SCAN_TELEMETRY_DIR configured"')
+includes(manager, '.maintenanceEnabled == false and .scanTelemetryEnabled == false')
+includes(manager, '"http://127.0.0.1:8787/api/user-drive-discs"')
+includes(manager, '[[ "$retired_inventory_status" == "410" ]]')
 const validationProbe = manager.match(/run_validation_probe\(\)[\s\S]*?^}/m)?.[0] ?? ""
 includes(validationProbe, '/usr/bin/systemd-run --quiet --unit "$unit_base"')
 includes(validationProbe, '--property "User=$VALIDATION_USER"')
@@ -429,11 +604,22 @@ assert.doesNotMatch(validationWorker, /cp -R|scan-telemetry\//)
 includes(validationWorker, '/usr/bin/node "$release_dir/backend/server.js" >/dev/null 2>&1 &')
 assert.doesNotMatch(validationWorker, /server\.log/)
 
-// Deployment and rollback require 15 consecutive healthy seconds with one PID,
-// then re-check runtime identity, Nginx, and both untouched download manifests.
-assert.match(manager, /health_gate\(\)[\s\S]*for attempt in \$\(seq 1 15\)[\s\S]*\[\[ "\$current_pid" == "\$observed_pid" \]\][\s\S]*sleep 1/)
+// Deployment and rollback allow at most 15 seconds for the first healthy
+// response, then require 15 stable seconds with one PID before committing.
+includes(manager, 'readonly HEALTH_STARTUP_GRACE_SECONDS="15"')
+includes(manager, 'readonly HEALTH_STABILITY_SECONDS="15"')
+assert.match(
+    manager,
+    /healthy_runtime_pid\(\)[\s\S]*systemctl is-active[\s\S]*service_property MainPID[\s\S]*curl[\s\S]*jq/,
+)
+assert.match(
+    manager,
+    /health_gate\(\)[\s\S]*HEALTH_GATE_PID=""[\s\S]*startup_deadline="\$\(\(SECONDS \+ HEALTH_STARTUP_GRACE_SECONDS\)\)"[\s\S]*while \(\(SECONDS < startup_deadline\)\)[\s\S]*current_pid="\$\(healthy_runtime_pid\)"[\s\S]*attempt <= HEALTH_STABILITY_SECONDS[\s\S]*"\$current_pid" == "\$observed_pid"[\s\S]*HEALTH_GATE_PID="\$observed_pid"/,
+)
 includes(manager, "candidate failed the 15-consecutive-second stable health gate")
 includes(manager, "rollback target failed the 15-consecutive-second stable health gate")
+includes(manager, "candidate PID changed after the stable health gate")
+includes(manager, "rollback target PID changed after the stable health gate")
 for (const token of [
     "HELPER_MANIFEST_SHA256_BEFORE",
     "HELPER_MANIFEST_SHA256_AFTER",
@@ -455,7 +641,8 @@ assert.match(
 // a caller-controlled release path.
 includes(manager, "zzz-calculator-deploy rollback --previous")
 includes(manager, '[[ "$#" -eq 1 && "$1" == "--previous" ]] || die "rollback accepts only --previous"')
-includes(manager, 'requested="$(<"$DEPLOY_ROOT/previous-release")"')
+includes(manager, 'requested="$STATE_PREVIOUS_BEFORE"')
+includes(manager, 'manual rollback is disabled until the legacy current has completed its first managed deployment')
 assert.match(sudoers, /\/usr\/local\/sbin\/zzz-calculator-deploy rollback --previous(?:\r?$|\s)/m)
 assert.doesNotMatch(sudoers, /zzz-calculator-deploy rollback \*/)
 assert.doesNotMatch(sudoers, /systemctl|nginx|\/bin\/(?:ba)?sh(?:\s|,|$)/i)
@@ -474,9 +661,41 @@ includes(bootstrap, 'mv -T -- "$ssh_staged" "$SSH_DIR"')
 includes(bootstrap, 'chown root:"$DEPLOY_GROUP" "${ssh_staged}/authorized_keys"')
 assert.doesNotMatch(bootstrap, /chown "\$DEPLOY_USER:\$DEPLOY_USER" "\$DEPLOY_ROOT\/\.ssh"/)
 includes(bootstrap, 'backup="$(mktemp "${target}.backup.XXXXXXXX")"')
+includes(bootstrap, "declare -a replaced_phases=()")
+for (const replacementPhase of [
+    '"registered"',
+    '"original-move-armed"',
+    '"original-moved"',
+    '"install-armed"',
+    '"candidate-installed"',
+    '"verified"',
+]) {
+    includes(bootstrap, replacementPhase)
+}
+assert.match(
+    bootstrap,
+    /if \[\[ "\$had_original" == "1" \]\]; then[\s\S]*?registered\)[\s\S]*?! -e "\$backup"[\s\S]*?-f "\$target"[\s\S]*?original-move-armed\|/,
+    "A missing managed-file backup may be treated as untouched only before replacement was armed",
+)
+includes(bootstrap, 'previous file backup is missing for ${target} at phase ${phase}')
 includes(bootstrap, "candidate sudoers policy conflicts with the aggregate configuration")
 includes(bootstrap, "rollback_managed_files")
 includes(bootstrap, "rollback_ssh_directory")
+assert.match(
+    bootstrap,
+    /rollback_ssh_directory\(\)[\s\S]*if \[\[ "\$restore_failed" == "0"[\s\S]*ssh_replacement_started="0"[\s\S]*\[\[ "\$restore_failed" == "0" \]\]/,
+    "SSH rollback may discard its recovery marker only after a successful restore",
+)
+assert.match(
+    bootstrap,
+    /if \[\[ "\$rollback_failed" == "0" && -n "\$transaction_root" \]\]; then[\s\S]*remove_temporary_tree "\$transaction_root"/,
+    "Failed bootstrap rollback must retain its transaction recovery directory",
+)
+assert.doesNotMatch(
+    bootstrap,
+    /if \[\[ "\$ssh_replacement_started" == "0" && -n "\$ssh_backup_root" \]\]; then[\s\S]*remove_temporary_tree "\$ssh_backup_root"/,
+)
+assert.doesNotMatch(bootstrap, /rollback_(?:ssh_directory|managed_files)\s*\|\|\s*true/)
 ordered(
     bootstrap,
     'visudo --check --file "$sudoers_snapshot"',
