@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { createHash } from "node:crypto"
 import { access, readFile } from "node:fs/promises"
 import { constants } from "node:fs"
 import path from "node:path"
@@ -11,6 +12,8 @@ const bootstrapPath = path.join(productionDir, "bootstrap-zzz-calculator-deploy.
 const validationWorkerPath = path.join(productionDir, "zzz-calculator-validation-worker")
 const sudoersPath = path.join(productionDir, "zzz-calculator-deploy.sudoers")
 const readmePath = path.join(productionDir, "README.md")
+const gitAttributesPath = path.join(root, ".gitattributes")
+const fallbackSourcePath = path.join(root, "webapp", "src", "utils", "assets.ts")
 
 for (const filePath of [managerPath, bootstrapPath, validationWorkerPath, sudoersPath, readmePath]) {
     await access(filePath, constants.F_OK)
@@ -20,6 +23,8 @@ const manager = await readFile(managerPath, "utf8")
 const bootstrap = await readFile(bootstrapPath, "utf8")
 const validationWorker = await readFile(validationWorkerPath, "utf8")
 const sudoers = await readFile(sudoersPath, "utf8")
+const gitAttributes = await readFile(gitAttributesPath, "utf8")
+const fallbackSource = await readFile(fallbackSourcePath, "utf8")
 
 function includes(contents, token, message = `Missing deployment contract: ${token}`) {
     assert.ok(contents.includes(token), message)
@@ -249,6 +254,29 @@ assert.match(
     bootstrap,
     /create_exact_directory\(\)[\s\S]*if path_exists "\$path"[\s\S]*return 0[\s\S]*install -d/,
     "Existing managed directories must be verified without metadata normalization",
+)
+
+// Non-hashed public assets must use content-versioned URLs. This allows old
+// and new releases to retain both byte variants without weakening conflict
+// detection for a shared URL.
+const mergeMissingFiles = manager.match(/merge_missing_files\(\)[\s\S]*?^}/m)?.[0] ?? ""
+includes(mergeMissingFiles, 'cmp -s -- "$source" "$destination"')
+includes(mergeMissingFiles, "static resource content conflict")
+includes(manager, 'local -a resource_trees=("dist/pages/static/app" "dist/pages/assets")')
+includes(gitAttributes, "webapp/public/assets/drive-discs/*.svg text eol=lf")
+const fallbackMatch = fallbackSource.match(/fallbackIcon = "([^"]+)"/)
+assert.ok(fallbackMatch, "The shared fallback icon URL must be explicit")
+const fallbackUrl = fallbackMatch[1]
+assert.match(fallbackUrl, /^\/assets\/drive-discs\/empty-[0-9a-f]{8}\.svg$/)
+const fallbackAssetPath = path.join(root, "webapp", "public", ...fallbackUrl.slice(1).split("/"))
+const fallbackAsset = await readFile(fallbackAssetPath)
+assert.equal(fallbackAsset.includes(0x0d), false, "The versioned fallback SVG must use LF line endings")
+const fallbackSha = createHash("sha256").update(fallbackAsset).digest("hex")
+assert.equal(path.basename(fallbackAssetPath), `empty-${fallbackSha.slice(0, 8)}.svg`)
+await assert.rejects(
+    access(path.join(root, "webapp", "public", "assets", "drive-discs", "empty.svg"), constants.F_OK),
+    (error) => error?.code === "ENOENT",
+    "The conflicting unversioned fallback URL must not remain in the candidate source tree",
 )
 
 // A persisted data directory may only resolve to current/data; validation runs

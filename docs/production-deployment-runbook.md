@@ -560,6 +560,7 @@ journalctl -u zzz-calculator.service --since '10 minutes ago' --no-pager
 - 旧 `systemd-run` 可能不支持新参数。先查询版本，使用 `-p WorkingDirectory=` 兼容写法。
 - `journalctl --since` 可能不接受带时区 ISO 时间。用相对时间并把日志命令状态与应用健康分开判断。
 - Playwright 的 `reuseExistingServer` 可能复用旧构建。发布测试前确认端口 PID、`.deployed-commit` 和 bundle 哈希。
+- 非哈希 public 文本资源必须固定行尾并使用内容版本化 URL；Windows CRLF 与 Linux LF 会被静态资源同路径冲突门禁正确拦截。
 - GitHub 大文件上传超时不代表服务端未接收。先列资产，只补缺失项。
 - CDN 会缓存版本 URL 的 404。新对象发布后必须精确刷新再预热。
 - 动态按钮会因轮询重渲染而失效。浏览器自动化点击前重新定位元素。

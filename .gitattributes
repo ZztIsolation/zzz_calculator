@@ -1,1 +1,2 @@
 config/scanner-manifest.json -text -diff
+webapp/public/assets/drive-discs/*.svg text eol=lf

@@ -128,6 +128,8 @@ checks that `zzzcalc` can read the runtime files but cannot write the release.
 The rollback and candidate each contain the union of old/new
 `dist/pages/static/app` and `dist/pages/assets`; an absent directory on either
 side is treated as empty, while same-path byte conflicts stop the operation.
+Public assets whose bytes may differ between releases must therefore use a
+content-versioned URL and deterministic line endings.
 After an atomic `current` switch, health must pass for 15 consecutive one-second
 checks with an active service and stable PID. Any failed or interrupted
 uncommitted switch restores the validated rollback release. The switch is not
