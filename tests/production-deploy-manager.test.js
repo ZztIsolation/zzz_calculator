@@ -202,6 +202,49 @@ for (const absoluteExecutable of [
 }
 assert.doesNotMatch(bootstrap, /install -d[^\n]*"?\$LOCK_DIR"?/, "Bootstrap must not normalize the shared lock directory")
 includes(bootstrap, 'create_exact_directory "$RELEASE_ROOT" root root 755')
+includes(bootstrap, 'readonly APP_USER="zzzcalc"')
+includes(bootstrap, 'readonly APP_GROUP="zzzcalc"')
+includes(bootstrap, 'root:root:755|"${APP_USER}:${APP_GROUP}:755"')
+includes(bootstrap, 'prepare_release_parent')
+includes(bootstrap, 'chown --no-dereference root:root -- "$RELEASE_PARENT"')
+includes(bootstrap, 'rollback_release_parent_metadata')
+includes(bootstrap, 'require_exact_directory_if_present "$RELEASE_PARENT" root root 755')
+for (const startupFile of [".bashrc", ".bash_profile", ".bash_login", ".profile", ".bash_logout"]) {
+    includes(bootstrap, `"\${DEPLOY_ROOT}/${startupFile}"`)
+}
+includes(bootstrap, 'install -o root -g root -m 0600 /dev/null "$empty_shell_startup_snapshot"')
+includes(bootstrap, 'replace_managed_file "$empty_shell_startup_snapshot" "$shell_startup_path" 644')
+includes(bootstrap, 'file_matches_contract "$empty_shell_startup_snapshot" "$shell_startup_path" 644')
+assert.match(
+    bootstrap,
+    /replace_managed_file "\$empty_shell_startup_snapshot" "\$shell_startup_path" 644[\s\S]*replace_managed_file "\$gateway_snapshot" "\$SSH_GATEWAY_PATH" 555[\s\S]*install_ssh_directory "\$expected_authorized_key"/,
+    "Account startup files and the forced gateway must be secured before the restricted SSH key is activated",
+)
+assert.match(
+    bootstrap,
+    /on_exit\(\)[\s\S]*rollback_ssh_directory[\s\S]*rollback_managed_files/,
+    "Rollback must restore the previous SSH directory before account startup files",
+)
+assert.equal(
+    (bootstrap.match(/^require_exact_directory_if_present "\$RELEASE_PARENT" root root 755\r?$/gm) ?? []).length,
+    1,
+    "The release parent should require its final root-owned contract exactly once",
+)
+assert.equal(
+    (bootstrap.match(/^[ \t]*create_exact_directory "\$RELEASE_PARENT" root root 755\r?$/gm) ?? []).length,
+    1,
+    "Only the dedicated release-parent helper may create a missing parent",
+)
+assert.match(
+    bootstrap,
+    /require_release_parent_if_present\r?\nrequire_exact_directory_if_present "\$RELEASE_ROOT" root root 755/,
+    "Legacy release-parent compatibility must be checked before the transaction",
+)
+assert.match(
+    bootstrap,
+    /prepare_release_parent\r?\ncreate_exact_directory "\$RELEASE_ROOT" root root 755/,
+    "The transaction must harden the release parent before managing the release root",
+)
 assert.match(
     bootstrap,
     /create_exact_directory\(\)[\s\S]*if path_exists "\$path"[\s\S]*return 0[\s\S]*install -d/,
