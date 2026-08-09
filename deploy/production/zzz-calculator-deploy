@@ -2737,7 +2737,7 @@ run_validation_transient_unit() {
         stop_validation_probe || true
         record_validation_unit_result "$label" "$active_state" "$sub_state" "$result" "$exec_status"
         VALIDATION_ACTIVE_LABEL=""
-        die "${label} validation transient unit was rejected before execution; systemd=${SYSTEMD_EFFECTIVE_VERSION} profile=${VALIDATION_SANDBOX_PROFILE}"
+        die "${label} validation transient unit did not start successfully; systemd=${SYSTEMD_EFFECTIVE_VERSION} profile=${VALIDATION_SANDBOX_PROFILE} activeState=${active_state:-unknown} subState=${sub_state:-unknown} result=${result:-unknown} execStatus=${exec_status:-unknown}"
     fi
 
     for attempt in $(seq 1 550); do
