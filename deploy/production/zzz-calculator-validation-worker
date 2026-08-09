@@ -290,7 +290,7 @@ assert_personality_denied() {
 }
 
 assert_sandbox_contract() {
-    local status_value="" capability_field hidden_writable_path hidden_ipc_path
+    local status_value="" capability_field hidden_writable_path hidden_ipc_path interface counters
     local -a interfaces=()
 
     read_process_status_field NoNewPrivs status_value
@@ -340,8 +340,16 @@ assert_sandbox_contract() {
     # PrivateNetwork must produce a namespace distinct from PID 1 with only loopback.
     [[ "$(readlink /proc/self/ns/net)" != "$(readlink /proc/1/ns/net)" ]] \
         || fail_worker "$EXIT_NETWORK_NAMESPACE_CONTRACT" "network namespace is shared with PID 1"
-    interfaces=(/sys/class/net/*)
-    [[ "${#interfaces[@]}" -eq 1 && "${interfaces[0]##*/}" == "lo" ]] \
+    [[ -r /proc/net/dev ]] \
+        || fail_worker "$EXIT_NETWORK_INTERFACE_CONTRACT" "network namespace interface table is unreadable"
+    while IFS=: read -r interface counters; do
+        [[ -n "$counters" ]] || continue
+        interface="${interface//[[:space:]]/}"
+        [[ "$interface" =~ ^[A-Za-z0-9_.-]+$ ]] \
+            || fail_worker "$EXIT_NETWORK_INTERFACE_CONTRACT" "network namespace contains an invalid interface name"
+        interfaces+=("$interface")
+    done </proc/net/dev
+    [[ "${#interfaces[@]}" -eq 1 && "${interfaces[0]}" == "lo" ]] \
         || fail_worker "$EXIT_NETWORK_INTERFACE_CONTRACT" "network namespace contains a non-loopback interface"
     if curl --disable --fail --silent --max-time 1 "$PRODUCTION_HEALTH_URL" >/dev/null 2>&1; then
         fail_worker "$EXIT_PRODUCTION_NETWORK_REACHABLE" "production health endpoint is reachable"

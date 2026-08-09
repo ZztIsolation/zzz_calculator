@@ -664,7 +664,10 @@ for (const token of [
     '[[ ! -r "$PRODUCTION_CURRENT_DATA" && ! -w "$PRODUCTION_CURRENT_DATA" && ! -x "$PRODUCTION_CURRENT_DATA" ]]',
     '[[ ! -r "$PRODUCTION_DOWNLOAD_ROOT" && ! -w "$PRODUCTION_DOWNLOAD_ROOT" && ! -x "$PRODUCTION_DOWNLOAD_ROOT" ]]',
     '[[ "$(readlink /proc/self/ns/net)" != "$(readlink /proc/1/ns/net)" ]]',
-    '[[ "${#interfaces[@]}" -eq 1 && "${interfaces[0]##*/}" == "lo" ]]',
+    '[[ -r /proc/net/dev ]]',
+    'while IFS=: read -r interface counters',
+    '[[ "$interface" =~ ^[A-Za-z0-9_.-]+$ ]]',
+    '[[ "${#interfaces[@]}" -eq 1 && "${interfaces[0]}" == "lo" ]]',
 ]) {
     includes(validationWorker, token)
 }
@@ -677,6 +680,11 @@ const validationWorkerIpc = validationWorker.match(/assert_sysv_ipc_denied\(\)[\
 const validationWorkerPersonality = validationWorker.match(/assert_personality_denied\(\)[\s\S]*?^}/m)?.[0] ?? ""
 const validationWorkerMountSelection = validationWorker.match(/select_effective_mount_record\(\)[\s\S]*?^}/m)?.[0] ?? ""
 const validationWorkerMain = validationWorker.slice(validationWorker.indexOf('[[ "$(id -un)"'))
+assert.doesNotMatch(
+    validationWorkerSandbox,
+    /\/sys\/class\/net/,
+    "Network namespace interfaces must be read from namespaced procfs rather than host-mounted sysfs",
+)
 includes(validationWorker, 'readonly CAPABILITY_PROBE_MODE="--capability-probe"')
 for (const processContract of ["NoNewPrivs", "Seccomp", "CapInh", "CapPrm", "CapEff", "CapBnd", "CapAmb"]) {
     includes(validationWorkerSandbox, processContract)

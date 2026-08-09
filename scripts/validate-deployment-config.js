@@ -321,6 +321,8 @@ for (const token of [
     "Seccomp",
     "CapBnd",
     "/proc/self/mountinfo",
+    "/proc/net/dev",
+    "while IFS=: read -r interface counters",
     "/usr/bin/ipcmk",
     "/usr/bin/ipcrm",
     "Operation not permitted",
