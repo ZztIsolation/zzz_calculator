@@ -992,8 +992,10 @@ validation_unit_name_has_members() {
 
 stop_validation_probe() {
     local unit load_state active_state control_group cgroup_procs attempt
+    local control_group_was_realized="0"
     [[ -n "$VALIDATION_UNIT" ]] || return 0
     unit="$VALIDATION_UNIT"
+    [[ "$unit" =~ ^zzz-calculator-validation-[0-9]+-[1-9][0-9]*\.service$ ]] || return 1
     load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null)" || return 1
     if [[ "$load_state" == "not-found" ]]; then
         validation_unit_name_has_members "$unit" && return 1
@@ -1003,13 +1005,21 @@ stop_validation_probe() {
     [[ "$load_state" == "loaded" ]] || return 1
 
     control_group="$(systemctl show "$unit" --property ControlGroup --value 2>/dev/null)" || return 1
-    [[ "$control_group" == /*/"$unit" ]] || return 1
-    systemctl stop "$unit" >/dev/null 2>&1 || return 1
-    cgroup_procs="/sys/fs/cgroup${control_group}/cgroup.procs"
-    if [[ -r "$cgroup_procs" ]] && grep -Eq '[0-9]' -- "$cgroup_procs"; then
-        return 1
+    if [[ -n "$control_group" ]]; then
+        [[ "$control_group" == /*/"$unit" ]] || return 1
+        control_group_was_realized="1"
+    else
+        validation_unit_name_has_members "$unit" && return 1
     fi
-    validation_cgroup_has_members "$control_group" && return 1
+    systemctl stop "$unit" >/dev/null 2>&1 || return 1
+    if [[ "$control_group_was_realized" == "1" ]]; then
+        cgroup_procs="/sys/fs/cgroup${control_group}/cgroup.procs"
+        if [[ -r "$cgroup_procs" ]] && grep -Eq '[0-9]' -- "$cgroup_procs"; then
+            return 1
+        fi
+        validation_cgroup_has_members "$control_group" && return 1
+    fi
+    validation_unit_name_has_members "$unit" && return 1
 
     load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null)" || return 1
     if [[ "$load_state" == "not-found" ]]; then

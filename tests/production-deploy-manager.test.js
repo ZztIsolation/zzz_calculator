@@ -598,6 +598,21 @@ assert.match(
     "Transient validation must stop and verify its complete cgroup",
 )
 const validationStop = manager.match(/stop_validation_probe\(\)[\s\S]*?^}/m)?.[0] ?? ""
+assert.match(
+    validationStop,
+    /\[\[ "\$unit" =~ \^zzz-calculator-validation-\[0-9\]\+\-\[1-9\]\[0-9\]\*\\\.service\$ \]\] \|\| return 1/,
+    "Validation cleanup must reject untrusted transient-unit names",
+)
+assert.match(
+    validationStop,
+    /if \[\[ -n "\$control_group" \]\]; then[\s\S]*?else\s+validation_unit_name_has_members "\$unit" && return 1\s+fi[\s\S]*?systemctl stop/,
+    "A pruned systemd 239 cgroup must be accepted only when no unit-named members remain",
+)
+assert.match(
+    validationStop,
+    /systemctl stop[\s\S]*?validation_unit_name_has_members "\$unit" && return 1/,
+    "Validation cleanup must recheck unit-named members after stopping the service",
+)
 assert.doesNotMatch(
     validationStop,
     /LoadState --value 2>\/dev\/null \|\| true/,

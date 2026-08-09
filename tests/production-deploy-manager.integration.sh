@@ -415,7 +415,11 @@ TEST_COUNTER_FILE="${test_root}/health-pid-change.count" TEST_FAILURE_COUNT="0" 
         '        elif [[ ! -e "$STATE_ROOT/stopped" ]]; then printf "loaded\n"' \
         '        elif [[ "$MODE" == "gc-after-stop" || -e "$STATE_ROOT/reset" ]]; then printf "not-found\n"' \
         '        else printf "loaded\n"; fi ;;' \
-        '      ControlGroup) printf "/system.slice/%s\n" "$UNIT_NAME" ;;' \
+        '      ControlGroup)' \
+        '        [[ "$MODE" != "control-query-error" ]] || return 1' \
+        '        if [[ "$MODE" == "blank-control-group" || "$MODE" == "blank-control-group-member" ]]; then printf "\n"' \
+        '        elif [[ "$MODE" == "invalid-control-group" ]]; then printf "/system.slice/other.service\n"' \
+        '        else printf "/system.slice/%s\n" "$UNIT_NAME"; fi ;;' \
         '      ActiveState) printf "inactive\n" ;;' \
         '      *) return 1 ;;' \
         '    esac' \
@@ -428,19 +432,30 @@ TEST_COUNTER_FILE="${test_root}/health-pid-change.count" TEST_FAILURE_COUNT="0" 
     sed -n '/^validation_unit_name_has_members() {$/,/^}$/p' "$MANAGER"
     sed -n '/^stop_validation_probe() {$/,/^}$/p' "$MANAGER"
     printf '%s\n' \
+        'if [[ "$MODE" == "blank-control-group-member" ]]; then' \
+        '  validation_unit_name_has_members() { return 0; }' \
+        'elif [[ "$MODE" == "member-after-stop" ]]; then' \
+        '  validation_unit_name_has_members() { [[ -e "$STATE_ROOT/stopped" ]]; }' \
+        'fi' \
         'status=0; stop_validation_probe || status="$?"' \
         'printf "%s|%s|%s|%s\n" "$status" "${VALIDATION_UNIT:-}" "$([[ -e "$STATE_ROOT/stopped" ]] && printf 1 || printf 0)" "$([[ -e "$STATE_ROOT/reset" ]] && printf 1 || printf 0)"'
 } >"$validation_stop_driver"
 bash -n "$validation_stop_driver" || fail "extracted validation stop driver is not valid Bash"
-for stop_fixture in query-error absent gc-after-stop reset-race clean; do
+for stop_fixture in \
+    query-error control-query-error invalid-control-group blank-control-group-member member-after-stop absent blank-control-group \
+    gc-after-stop reset-race clean; do
     stop_state="${test_root}/validation-stop-${stop_fixture}"
     mkdir -p -- "$stop_state"
     stop_result="$(TEST_STATE_ROOT="$stop_state" /bin/bash --noprofile --norc \
         "$validation_stop_driver" "$stop_fixture")"
     case "$stop_fixture" in
-        query-error)
+        query-error|control-query-error|invalid-control-group|blank-control-group-member)
             [[ "$stop_result" == "1|zzz-calculator-validation-999999-1.service|0|0" ]] \
-                || fail "a failed systemd query was treated as a clean validation stop"
+                || fail "an invalid systemd cleanup state was treated as a clean validation stop"
+            ;;
+        member-after-stop)
+            [[ "$stop_result" == "1|zzz-calculator-validation-999999-1.service|1|0" ]] \
+                || fail "a post-stop validation cgroup member was treated as clean"
             ;;
         absent)
             [[ "$stop_result" == "0||0|0" ]] \
@@ -450,7 +465,7 @@ for stop_fixture in query-error absent gc-after-stop reset-race clean; do
             [[ "$stop_result" == "0||1|0" ]] \
                 || fail "post-stop transient-unit garbage collection was misclassified"
             ;;
-        reset-race|clean)
+        blank-control-group|reset-race|clean)
             [[ "$stop_result" == "0||1|1" ]] \
                 || fail "validation cleanup did not handle ${stop_fixture} safely"
             ;;
