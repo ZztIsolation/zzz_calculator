@@ -392,10 +392,10 @@ assert.doesNotMatch(bootstrap, /\[\[ "\$lock_status" == "L" \]\]/)
 assert.doesNotMatch(manager, /\[\[ "\$password_status" == "L" \]\]/)
 includes(bootstrap, '[[ ! -e "$VALIDATION_HOME" && ! -L "$VALIDATION_HOME" ]]')
 includes(bootstrap, 'replace_managed_file "$worker_snapshot" "$VALIDATION_WORKER_PATH" 555')
-for (const dependency of ["base64", "ipcmk", "ipcrm", "journalctl", "sudo", "systemctl", "systemd-run", "timeout"]) {
+for (const dependency of ["base64", "ipcmk", "ipcrm", "journalctl", "setarch", "sudo", "systemctl", "systemd-run", "timeout", "uname"]) {
     assert.match(bootstrap, new RegExp(`(?:^|\\s)${dependency}(?:\\s|\\\\$)`), `Bootstrap does not preflight ${dependency}`)
 }
-for (const absoluteDependency of ["base64", "ipcmk", "ipcrm", "journalctl", "sudo", "systemctl", "systemd-run", "timeout"]) {
+for (const absoluteDependency of ["base64", "ipcmk", "ipcrm", "journalctl", "setarch", "sudo", "systemctl", "systemd-run", "timeout", "true", "uname"]) {
     includes(bootstrap, `/usr/bin/${absoluteDependency}`)
 }
 for (const absoluteExecutable of [
@@ -410,12 +410,15 @@ for (const absoluteExecutable of [
     "/usr/bin/journalctl",
     "/usr/bin/mkdir",
     "/usr/bin/node",
+    "/usr/bin/setarch",
     "/usr/bin/stat",
     "/usr/bin/systemctl",
     "/usr/bin/systemd-run",
     "/usr/bin/tail",
     "/usr/bin/timeout",
     "/usr/bin/tr",
+    "/usr/bin/true",
+    "/usr/bin/uname",
 ]) {
     includes(manager, absoluteExecutable)
 }
@@ -522,15 +525,16 @@ includes(validationProperties, "--property PrivateTmp=no")
 includes(validationProperties, "--property ProtectSystem=strict")
 includes(validationProperties, "--property RemoveIPC=yes")
 includes(validationProperties, "--property SystemCallErrorNumber=EPERM")
-includes(validationProperties, '--property "SystemCallFilter=~${denied_ipc_syscalls}"')
+includes(validationProperties, '--property "SystemCallFilter=~${denied_syscalls}"')
 includes(validationProperties, "--property SystemCallArchitectures=native")
+assert.doesNotMatch(validationProperties, /LockPersonality=yes/)
 assert.doesNotMatch(validationProperties, /SystemCallFilter=~@ipc/)
-for (const deniedIpcSyscall of [
+for (const deniedSyscall of [
     "ipc", "mq_getsetattr", "mq_notify", "mq_open", "mq_timedreceive", "mq_timedsend", "mq_unlink",
     "msgctl", "msgget", "msgrcv", "msgsnd", "semctl", "semget", "semop", "semtimedop",
-    "shmat", "shmctl", "shmdt", "shmget",
+    "shmat", "shmctl", "shmdt", "shmget", "personality",
 ]) {
-    includes(manager, `    ${deniedIpcSyscall}`)
+    includes(manager, `    ${deniedSyscall}`)
 }
 includes(
     validationProperties,
@@ -560,6 +564,8 @@ includes(validationTransientUnit, "ZZZ_CALCULATOR_DATA_DIR=/zzz-validation/data"
 includes(validationTransientUnit, '/bin/bash "$VALIDATION_WORKER" "${worker_args[@]}"')
 assert.doesNotMatch(validationTransientUnit, /\beval\b/)
 includes(validationCapabilityProbe, "run_validation_transient_unit sandbox-capability")
+includes(validationCapabilityProbe, 'printf \'%s\\n\' "$VALIDATION_CAPABILITY_SENTINEL_CONTENT"')
+includes(validationCapabilityProbe, 'rm -f -- "$capability_sentinel"')
 includes(validationCapabilityProbe, 'VALIDATION_SANDBOX_PROBE_RESULT" == "active/exited/success/0')
 for (const limitCheck of [
     "seed_size <= MAX_VALIDATION_SEED_BYTES",
@@ -639,6 +645,7 @@ for (const hiddenWritablePath of ["HOST_TMP_DIR", "HOST_VAR_TMP_DIR", "HOST_SHM_
 const validationWorkerSandbox = validationWorker.match(/assert_sandbox_contract\(\)[\s\S]*?^}/m)?.[0] ?? ""
 const validationWorkerTmpfs = validationWorker.match(/assert_tmpfs_mount_contract\(\)[\s\S]*?^}/m)?.[0] ?? ""
 const validationWorkerIpc = validationWorker.match(/assert_sysv_ipc_denied\(\)[\s\S]*?^}/m)?.[0] ?? ""
+const validationWorkerPersonality = validationWorker.match(/assert_personality_denied\(\)[\s\S]*?^}/m)?.[0] ?? ""
 const validationWorkerMountSelection = validationWorker.match(/select_effective_mount_record\(\)[\s\S]*?^}/m)?.[0] ?? ""
 const validationWorkerMain = validationWorker.slice(validationWorker.indexOf('[[ "$(id -un)"'))
 includes(validationWorker, 'readonly CAPABILITY_PROBE_MODE="--capability-probe"')
@@ -668,6 +675,16 @@ includes(validationWorkerSandbox, '[[ -x /usr/bin/ipcmk && -x /usr/bin/ipcrm ]]'
 for (const ipcProbe of ["queue", "semaphore", "shared-memory"]) {
     includes(validationWorkerSandbox, `assert_sysv_ipc_denied ${ipcProbe}`)
 }
+includes(validationWorkerSandbox, "assert_personality_denied")
+includes(validationWorkerPersonality, '/usr/bin/setarch "$architecture" -R /usr/bin/true')
+includes(validationWorkerPersonality, "/usr/bin/uname -m")
+includes(validationWorkerPersonality, "Operation not permitted")
+ordered(
+    validationWorkerSandbox,
+    "assert_sysv_ipc_denied shared-memory",
+    "assert_personality_denied",
+    "The personality denial must be proven before the sandbox contract succeeds",
+)
 for (const ipcFlag of ['create_flag="-Q"', 'create_flag="-S"', 'create_flag="-M"']) {
     includes(validationWorkerIpc, ipcFlag)
 }
@@ -692,12 +709,16 @@ for (const workerExit of [
     "EXIT_IPC_SYSCALL_ALLOWED=69",
     "EXIT_IPC_CLEANUP_FAILED=70",
     "EXIT_PRODUCTION_DOWNLOAD_EXPOSED=71",
+    "EXIT_PERSONALITY_DEPENDENCY_MISSING=72",
+    "EXIT_PERSONALITY_DENIAL_UNPROVEN=73",
+    "EXIT_PERSONALITY_SYSCALL_ALLOWED=74",
+    "EXIT_CAPABILITY_SOURCE_CONTRACT=75",
 ]) {
     includes(validationWorker, workerExit)
 }
 assert.match(
     validationWorkerMain,
-    /assert_sandbox_contract\r?\nif \[\[ "\$worker_mode" == "capability-probe" \]\]; then\r?\n\s+exit 0\r?\nfi\r?\n\r?\n\[\[ -d "\$release_dir"[^\n]*backend\/server\.js/,
+    /assert_sandbox_contract\r?\nif \[\[ "\$worker_mode" == "capability-probe" \]\]; then[\s\S]*?capability bind source sentinel is missing or invalid[\s\S]*?\n\s+exit 0\r?\nfi\r?\n\r?\n\[\[ -d "\$release_dir"[^\n]*backend\/server\.js/,
     "The fixed capability probe must exit before reading or executing candidate files",
 )
 ordered(

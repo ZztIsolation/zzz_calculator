@@ -708,18 +708,18 @@ trap 'exit 143' TERM
 for required_command in \
     awk base64 basename cat chmod chown cmp cp curl cut date df diff env find \
     flock free getent grep groupadd groupdel head id install ipcmk ipcrm journalctl jq ln \
-    dirname mkdir mktemp mv nginx passwd readlink realpath rm rmdir runuser scp sed seq \
+    dirname mkdir mktemp mv nginx passwd readlink realpath rm rmdir runuser scp sed seq setarch \
     sha256sum sleep sort ssh-keygen stat sudo systemctl systemd-run tail tar \
-    timeout tr uniq useradd userdel usermod visudo wc; do
+    timeout tr uname uniq useradd userdel usermod visudo wc; do
     command -v "$required_command" >/dev/null || fail "${required_command} is required"
 done
 for required_absolute_command in \
     /bin/bash /usr/bin/awk /usr/bin/base64 /usr/bin/chmod /usr/bin/cmp \
     /usr/bin/cp /usr/bin/df /usr/bin/env /usr/bin/find /usr/bin/flock \
     /usr/bin/ipcmk /usr/bin/ipcrm /usr/bin/journalctl /usr/bin/mkdir /usr/bin/node \
-    /usr/bin/rm /usr/bin/scp /usr/bin/stat /usr/bin/sudo /usr/bin/systemctl \
+    /usr/bin/rm /usr/bin/scp /usr/bin/setarch /usr/bin/stat /usr/bin/sudo /usr/bin/systemctl \
     /usr/bin/systemd-run /usr/bin/tail /usr/bin/test \
-    /usr/bin/timeout /usr/bin/tr /usr/sbin/nologin; do
+    /usr/bin/timeout /usr/bin/tr /usr/bin/true /usr/bin/uname /usr/sbin/nologin; do
     [[ -x "$required_absolute_command" ]] || fail "${required_absolute_command} is required"
 done
 unset required_command required_absolute_command

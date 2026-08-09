@@ -4,7 +4,16 @@ RUN dnf -y install \
         bash coreutils-single curl findutils gawk grep iproute procps-ng shadow-utils \
         systemd systemd-libs util-linux \
     && dnf clean all \
-    && rm -rf /var/cache/dnf
+    && rm -rf /var/cache/dnf \
+    && test -x /usr/bin/env \
+    && test -x /usr/bin/ipcmk \
+    && test -x /usr/bin/ipcrm \
+    && test -x /usr/bin/setarch \
+    && test -x /usr/bin/systemctl \
+    && test -x /usr/bin/systemd-run \
+    && test -x /usr/bin/timeout \
+    && test -x /usr/bin/true \
+    && test -x /usr/bin/uname
 
 COPY deploy/production/zzz-calculator-deploy /opt/zzz-cicd-source/zzz-calculator-deploy
 COPY deploy/production/zzz-calculator-validation-worker /opt/zzz-cicd-source/zzz-calculator-validation-worker

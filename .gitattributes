@@ -3,3 +3,4 @@ webapp/public/assets/drive-discs/*.svg text eol=lf
 deploy/production/bootstrap-zzz-calculator-deploy.sh text eol=lf
 deploy/production/zzz-calculator-* text eol=lf
 tests/production-*.integration.sh text eol=lf
+tests/systemd239-sandbox.Dockerfile text eol=lf

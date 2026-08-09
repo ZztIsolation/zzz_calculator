@@ -15,6 +15,8 @@ IFS=$' \t\n'
 
 readonly VALIDATION_USER="zzzvalidate"
 readonly CAPABILITY_PROBE_MODE="--capability-probe"
+readonly VALIDATION_CAPABILITY_SENTINEL=".zzz-sandbox-capability-v1"
+readonly VALIDATION_CAPABILITY_SENTINEL_CONTENT="zzz-sandbox-capability-v1"
 readonly VALIDATION_TMPFS_BYTES="$((128 * 1024 * 1024))"
 readonly VALIDATION_TMPFS_INODES="16384"
 readonly VALIDATION_RUN_TMPFS_BYTES="$((4 * 1024 * 1024))"
@@ -72,6 +74,10 @@ readonly EXIT_IPC_DENIAL_UNPROVEN=68
 readonly EXIT_IPC_SYSCALL_ALLOWED=69
 readonly EXIT_IPC_CLEANUP_FAILED=70
 readonly EXIT_PRODUCTION_DOWNLOAD_EXPOSED=71
+readonly EXIT_PERSONALITY_DEPENDENCY_MISSING=72
+readonly EXIT_PERSONALITY_DENIAL_UNPROVEN=73
+readonly EXIT_PERSONALITY_SYSCALL_ALLOWED=74
+readonly EXIT_CAPABILITY_SOURCE_CONTRACT=75
 readonly -a VALIDATION_CATALOG_FILES=(
     agents.json
     agent_skills.json
@@ -266,6 +272,23 @@ assert_sysv_ipc_denied() {
     fail_worker "$EXIT_IPC_SYSCALL_ALLOWED" "${ipc_kind} creation syscall was not blocked"
 }
 
+assert_personality_denied() {
+    local architecture output
+
+    [[ -x /usr/bin/setarch && -x /usr/bin/uname && -x /usr/bin/true ]] \
+        || fail_worker "$EXIT_PERSONALITY_DEPENDENCY_MISSING" "setarch, uname and true are required"
+    architecture="$(/usr/bin/uname -m)" \
+        || fail_worker "$EXIT_PERSONALITY_DENIAL_UNPROVEN" "native architecture could not be read"
+    [[ "$architecture" =~ ^[A-Za-z0-9._-]+$ ]] \
+        || fail_worker "$EXIT_PERSONALITY_DENIAL_UNPROVEN" "native architecture is invalid"
+
+    if output="$(/usr/bin/setarch "$architecture" -R /usr/bin/true 2>&1)"; then
+        fail_worker "$EXIT_PERSONALITY_SYSCALL_ALLOWED" "personality syscall was not blocked"
+    fi
+    [[ "$output" == *"Operation not permitted"* ]] \
+        || fail_worker "$EXIT_PERSONALITY_DENIAL_UNPROVEN" "personality denial did not return EPERM"
+}
+
 assert_sandbox_contract() {
     local status_value="" capability_field hidden_writable_path hidden_ipc_path
     local -a interfaces=()
@@ -329,6 +352,7 @@ assert_sandbox_contract() {
     assert_sysv_ipc_denied queue
     assert_sysv_ipc_denied semaphore
     assert_sysv_ipc_denied shared-memory
+    assert_personality_denied
 }
 
 [[ "$(id -un)" == "$VALIDATION_USER" && "$(id -G)" == "$(id -g)" ]] \
@@ -340,6 +364,11 @@ assert_sandbox_contract() {
 
 assert_sandbox_contract
 if [[ "$worker_mode" == "capability-probe" ]]; then
+    capability_sentinel="${release_dir}/${VALIDATION_CAPABILITY_SENTINEL}"
+    [[ -f "$capability_sentinel" && ! -L "$capability_sentinel" \
+        && -r "$capability_sentinel" \
+        && "$(<"$capability_sentinel")" == "$VALIDATION_CAPABILITY_SENTINEL_CONTENT" ]] \
+        || fail_worker "$EXIT_CAPABILITY_SOURCE_CONTRACT" "capability bind source sentinel is missing or invalid"
     exit 0
 fi
 

@@ -48,6 +48,8 @@ readonly MIN_SYSTEMD_VERSION="239"
 readonly RESTRICT_SUID_SGID_SYSTEMD_VERSION="242"
 readonly PRIVATE_IPC_SYSTEMD_VERSION="248"
 readonly VALIDATION_SANDBOX_PROFILE_BASE="systemd-v239-seccomp"
+readonly VALIDATION_CAPABILITY_SENTINEL=".zzz-sandbox-capability-v1"
+readonly VALIDATION_CAPABILITY_SENTINEL_CONTENT="zzz-sandbox-capability-v1"
 readonly VALIDATION_TMPFS_BYTES="$((128 * 1024 * 1024))"
 readonly VALIDATION_TMPFS_INODES="16384"
 readonly VALIDATION_RUN_TMPFS_BYTES="$((4 * 1024 * 1024))"
@@ -65,7 +67,7 @@ readonly -a VALIDATION_CATALOG_FILES=(
     stat_rules.json
     w_engines.json
 )
-readonly -a VALIDATION_DENIED_IPC_SYSCALLS=(
+readonly -a VALIDATION_DENIED_SYSCALLS=(
     ipc
     mq_getsetattr
     mq_notify
@@ -85,6 +87,7 @@ readonly -a VALIDATION_DENIED_IPC_SYSCALLS=(
     shmctl
     shmdt
     shmget
+    personality
 )
 readonly MAX_COMPRESSED_BYTES="$((256 * 1024 * 1024))"
 readonly MAX_EXPANDED_BYTES="$((1024 * 1024 * 1024))"
@@ -307,7 +310,7 @@ detect_validation_systemd_profile() {
 
 build_validation_systemd_properties() {
     local release_dir="$1"
-    local denied_ipc_syscalls
+    local denied_syscalls
 
     [[ "$SYSTEMD_EFFECTIVE_VERSION" =~ ^[1-9][0-9]*$ \
         && "$SYSTEMD_EFFECTIVE_VERSION" -ge "$MIN_SYSTEMD_VERSION" ]] \
@@ -316,7 +319,7 @@ build_validation_systemd_properties() {
         && -d "$release_dir" && ! -L "$release_dir" ]] \
         || die "validation bind source is outside the private validation job"
 
-    denied_ipc_syscalls="${VALIDATION_DENIED_IPC_SYSCALLS[*]}"
+    denied_syscalls="${VALIDATION_DENIED_SYSCALLS[*]}"
     VALIDATION_SYSTEMD_PROPERTIES=(
         --property Type=oneshot
         --property RemainAfterExit=yes
@@ -335,12 +338,11 @@ build_validation_systemd_properties() {
         --property "BindReadOnlyPaths=$release_dir:/zzz-validation/app"
         --property NoNewPrivileges=yes
         --property CapabilityBoundingSet=
-        --property "SystemCallFilter=~${denied_ipc_syscalls}"
+        --property "SystemCallFilter=~${denied_syscalls}"
         --property SystemCallArchitectures=native
         --property SystemCallErrorNumber=EPERM
         --property RemoveIPC=yes
         --property "RestrictAddressFamilies=AF_INET AF_INET6"
-        --property LockPersonality=yes
         --property RestrictRealtime=yes
         --property KillMode=control-group
         --property SendSIGKILL=yes
@@ -1535,15 +1537,17 @@ require_root_and_layout() {
     command -v mkdir >/dev/null || die "mkdir is required"
     command -v mountpoint >/dev/null || die "mountpoint is required"
     command -v runuser >/dev/null || die "runuser is required"
+    command -v setarch >/dev/null || die "setarch is required"
     command -v sort >/dev/null || die "sort is required"
+    command -v uname >/dev/null || die "uname is required"
     command -v realpath >/dev/null || die "realpath is required"
     command -v systemd-run >/dev/null || die "systemd-run is required"
     for required_absolute_command in \
         /bin/bash /usr/bin/base64 /usr/bin/cmp /usr/bin/cp /usr/bin/df \
         /usr/bin/env /usr/bin/ipcmk /usr/bin/ipcrm /usr/bin/journalctl \
-        /usr/bin/mkdir /usr/bin/node /usr/bin/stat /usr/bin/systemctl \
+        /usr/bin/mkdir /usr/bin/node /usr/bin/setarch /usr/bin/stat /usr/bin/systemctl \
         /usr/bin/systemd-run /usr/bin/tail /usr/bin/timeout \
-        /usr/bin/tr; do
+        /usr/bin/tr /usr/bin/true /usr/bin/uname; do
         [[ -x "$required_absolute_command" ]] \
             || die "${required_absolute_command} is required"
     done
@@ -2731,15 +2735,21 @@ run_validation_transient_unit() {
 
 run_validation_sandbox_capability_probe() {
     local capability_source="${VALIDATION_JOB_DIR}/capability-source"
+    local capability_sentinel="${capability_source}/${VALIDATION_CAPABILITY_SENTINEL}"
 
     [[ "$VALIDATION_SANDBOX_PROBE_RESULT" == "not-run" ]] \
         || die "validation sandbox capability probe was already attempted"
     [[ ! -e "$capability_source" && ! -L "$capability_source" ]] \
         || die "validation sandbox capability source is occupied"
     install -d -o root -g root -m 0755 -- "$capability_source"
+    printf '%s\n' "$VALIDATION_CAPABILITY_SENTINEL_CONTENT" >"$capability_sentinel"
+    chown root:root -- "$capability_sentinel"
+    chmod 0644 -- "$capability_sentinel"
     run_validation_transient_unit sandbox-capability "$capability_source" capability
     [[ "$VALIDATION_SANDBOX_PROBE_RESULT" == "active/exited/success/0" ]] \
         || die "validation sandbox capability probe did not complete successfully"
+    rm -f -- "$capability_sentinel" \
+        || die "validation sandbox capability sentinel could not be removed"
     rmdir -- "$capability_source" \
         || die "validation sandbox capability source could not be removed"
     log "validation sandbox capability probe passed profile=${VALIDATION_SANDBOX_PROFILE}"

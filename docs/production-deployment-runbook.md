@@ -371,12 +371,13 @@ probe 在服务器实际 native 架构上证明 deny 生效。per-unit
 logind 同名配置。worker 必须在自身启动 Node 前核验 seccomp、
 `NoNewPrivs`、全部 capability mask、tmpfs mount flags、生产目录不可达、
 网络仅有 `lo` 和两个 IPC 路径不可访问；`ipcmk -Q/-S/-M` 必须以 `EPERM`
+失败，固定 `setarch` 探针也必须证明 `personality` syscall 以 `EPERM`
 失败。若意外创建 IPC 对象，先用 `ipcrm` 清理，再令整次操作失败。
 
 在 claim incoming artifact 和 current、candidate、rollback、candidate
 四阶段之前，manager 先以同一套完整参数运行一次固定、root-owned 的 inert
 capability probe。探针只验证
-沙箱能力，不读取 release 的 backend/data、不启动 Node，也不执行任何候选
+沙箱能力和固定、manager-owned 的 bind-source 哨兵，不读取 release 的 backend/data、不启动 Node，也不执行任何候选
 字节。探针任一属性、mount、seccomp 或隔离断言失败时只失败一次，清理
 transient unit、完整 cgroup 和临时可写目录后停止；不得自动重试或降低沙箱
 强度。探针成功后才允许进入四阶段应用验证。
@@ -712,7 +713,7 @@ evidence；CD 只能下载触发它的同一次 run 的产物，禁止在部署�
 - [ ] `production` Environment 只允许 protected `main`，审批人和 `PROD_HOST`、`PROD_USER`、`PROD_SSH_PRIVATE_KEY`、`PROD_KNOWN_HOSTS` 已配置；`PRODUCTION_CD_ENABLED` 未明确设置为 `true` 时所有 CD 任务跳过。
 - [ ] 服务器已从候选 `main` 的同一固定 SHA 运行 `deploy/production/bootstrap-zzz-calculator-deploy.sh`，已安装 manager/worker/gateway/sudoers 哈希与该 SHA 一致；`zzzdeploy` 仅使用锁定密码的专用 key，sudo 只允许 root-owned 部署程序。控制面有变化时必须先事务性重跑 bootstrap，且初始化不得触碰 `current`、生产 systemd 服务、Nginx 或下载源。
 - [ ] `systemd-run` client 与 PID 1 manager 版本均可解析，取两者较低值后的 effective version 不低于 v239；使用固定 v239 baseline，只有 v242/v248 画像才分别增加 `RestrictSUIDSGID`/`PrivateIPC`。root-owned inert capability probe 已在 claim incoming artifact 和候选代码前以完整参数一次通过；没有发生未知属性重试、参数降级或候选字节提前执行。
-- [ ] v239 baseline 以 `SystemCallArchitectures=native` 禁止 compat ABI 绕过；显式窄 IPC syscall deny、per-unit `RemoveIPC=yes`、IPC 路径隐藏、AF_UNIX 禁止、空 capabilities、`NoNewPrivileges`、私有 network/mount namespace 和只读生产视图均由 worker 在服务器实际 native 架构上自证。没有使用会误伤 pipe/worker 调用的 `@ipc` syscall group；`ipcmk -Q/-S/-M` 全部以 `EPERM` 失败，且没有修改 logind `RemoveIPC` 或其他生产全局配置。
+- [ ] v239 baseline 以 `SystemCallArchitectures=native` 禁止 compat ABI 绕过；显式窄 IPC syscall deny 和 `personality` syscall deny、per-unit `RemoveIPC=yes`、IPC 路径隐藏、AF_UNIX 禁止、空 capabilities、`NoNewPrivileges`、私有 network/mount namespace 和只读生产视图均由 worker 在服务器实际 native 架构上自证。Rocky/RHEL v239 不接受 transient `LockPersonality=`，因此以同一 seccomp filter 直接拒绝该 syscall，并由固定 `setarch` 探针验证返回 `EPERM`；没有使用会误伤 pipe/worker 调用的 `@ipc` syscall group。CI-only parser 诊断必须在真实 v239 PID 1 上逐项提交完整 baseline、严格清理每个诊断 unit，并先证明两个假属性能在一次结果中同时汇总；完整 inert probe 仍是组合画像的最终门禁。`ipcmk -Q/-S/-M` 全部以 `EPERM` 失败，且没有修改 logind `RemoveIPC` 或其他生产全局配置。
 - [ ] 第一次旧版迁移只允许审计确认的精确 tuple：`current=git-2e7f874bc034`、commit `2e7f874bc034871f03b5738f48d7d05685b36ea9`、`last-release=git-2e7f874bc034`、`previous-release=rollback-2e7f874bc034`、migration marker 不存在。current 必须匹配固定的完整内容/静态摘要、`zzzcalc:zzzcalc`、目录 `0755`、文件 `0644`，无链接、硬链接、特殊文件或嵌套挂载；不得现场 `chown/chmod`。旧 `previous-release` 仅保留为历史对象，首次 managed deploy 前禁止手动 rollback。
 - [ ] 完整 current 只能密封到 `processing/job.*` 的 `root:root 0700` 区域，`zzzcalc` 与 `zzzvalidate` 均不可读取；`validation/job.*` 只能接收白名单目录和空示例库存生成的脱敏副本。真实库存、telemetry 和未知 data 文件不得进入验证账户范围。candidate、rollback staging、最终 release 和手动 rollback target 仍须同时对两个 runtime principal 可读且不可写。
 - [ ] legacy current 的 full/portable/static/metadata 摘要、state tuple、服务 PID、`NRestarts`、Nginx 与两个 manifest 在 seal、四阶段验证、切换前和 evidence 前保持不变。evidence 必须记录 state pair 与 marker 的前后值：audit/dry-run 逐字一致，committed deploy/rollback 与最终 release 映射一致。第一次成功 deploy 写入新 rollback/candidate state 和 root-owned marker；首次切换后失败则 `previous=last=实际严格回滚副本`，后续 managed 失败保留原 previous。marker 写入后 legacy 例外永久失效。

@@ -293,7 +293,7 @@ for (const token of [
     'readonly PRIVATE_IPC_SYSTEMD_VERSION="248"',
     "/usr/bin/systemd-run --version",
     "/usr/bin/systemctl show --property=Version --value",
-    "SystemCallFilter=~${denied_ipc_syscalls}",
+    "SystemCallFilter=~${denied_syscalls}",
     "SystemCallArchitectures=native",
     "SystemCallErrorNumber=EPERM",
     "RemoveIPC=yes",
@@ -323,6 +323,10 @@ for (const token of [
     "/usr/bin/ipcmk",
     "/usr/bin/ipcrm",
     "Operation not permitted",
+    "/usr/bin/setarch",
+    "/usr/bin/uname",
+    "assert_personality_denied",
+    "capability bind source sentinel is missing or invalid",
     "HOST_SYSVIPC_DIR",
     "HOST_MQUEUE_DIR",
 ]) {
@@ -334,6 +338,10 @@ for (const token of [
     "assert_profile 242 247 systemd-v239-seccomp+restrict-suidsgid 1 0",
     "assert_profile 248 252 systemd-v239-seccomp+restrict-suidsgid+private-ipc 1 1",
     "run_validation_sandbox_capability_probe",
+    "assert_transient_property_parser_support",
+    "Unknown assignment:",
+    "ZzzFirstUnsupported",
+    "ZzzSecondUnsupported",
     "ZzzDefinitelyUnsupported=yes",
 ]) {
     requireText(files.systemd239Sandbox, token, `The systemd 239 integration fixture is missing: ${token}`)

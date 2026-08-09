@@ -24,6 +24,7 @@ cleanup() {
     trap - EXIT HUP INT TERM
     systemctl stop 'zzz-calculator-validation-*' >/dev/null 2>&1 || true
     rm -f -- "$DRIVER" "$MOUNT_DRIVER" "$MOUNT_FIXTURE" "$MOUNT_AMBIGUOUS_FIXTURE"
+    rmdir /zzz-validation/app /zzz-validation 2>/dev/null || true
     rm -rf --one-file-system -- /var/lib/zzz-calculator-deploy/validation/job.* 2>/dev/null || true
     chown root:root /var/lib/zzz-calculator-deploy/validation 2>/dev/null || true
     chmod 0750 /var/lib/zzz-calculator-deploy/validation 2>/dev/null || true
@@ -53,7 +54,27 @@ passwd --lock zzzcalc >/dev/null 2>&1 || true
 
 install -d -o root -g root -m 0755 /var/lib/zzz-calculator-deploy
 install -d -o root -g root -m 0750 /var/lib/zzz-calculator-deploy/validation
+install -d -o root -g root -m 0755 \
+    /opt/zzz_calculator/current/data \
+    /var/lib/zzz-calculator \
+    /srv/zzz-download-origin
+printf 'host-only\n' >/opt/zzz_calculator/current/data/sandbox-sentinel
+printf 'host-only\n' >/var/lib/zzz-calculator/sandbox-sentinel
+printf 'host-only\n' >/srv/zzz-download-origin/sandbox-sentinel
+chmod 0644 \
+    /opt/zzz_calculator/current/data/sandbox-sentinel \
+    /var/lib/zzz-calculator/sandbox-sentinel \
+    /srv/zzz-download-origin/sandbox-sentinel
+for host_sentinel in \
+    /opt/zzz_calculator/current/data/sandbox-sentinel \
+    /var/lib/zzz-calculator/sandbox-sentinel \
+    /srv/zzz-download-origin/sandbox-sentinel; do
+    runuser -u zzzvalidate -- test -r "$host_sentinel" \
+        || fail "host sentinel is not visible before sandboxing: ${host_sentinel}"
+done
+unset host_sentinel
 install -d -o root -g root -m 0755 /usr/local/libexec
+install -d -o root -g root -m 0755 /zzz-validation/app
 install -o root -g root -m 0555 "$WORKER_SOURCE" /usr/local/libexec/zzz-calculator-validation-worker
 
 # Linux may reuse a lower numeric mount ID for the top of a stack. Exercise
@@ -120,6 +141,51 @@ array_has_value() {
     return 1
 }
 
+assert_transient_property_parser_support() {
+    local index assignment property unit_base output launch_status
+    local -a unsupported=() rejected=()
+
+    (( ${#VALIDATION_SYSTEMD_PROPERTIES[@]} % 2 == 0 )) || exit 104
+    for ((index = 0; index < ${#VALIDATION_SYSTEMD_PROPERTIES[@]}; index += 2)); do
+        [[ "${VALIDATION_SYSTEMD_PROPERTIES[index]}" == "--property" ]] || exit 104
+        assignment="${VALIDATION_SYSTEMD_PROPERTIES[index + 1]}"
+        [[ "$assignment" == *=* ]] || exit 104
+        property="${assignment%%=*}"
+        [[ "$property" =~ ^[A-Za-z][A-Za-z0-9]*$ ]] || exit 104
+        unit_base="zzz-calculator-validation-${$}-$((1000 + index / 2))"
+        VALIDATION_UNIT="${unit_base}.service"
+        launch_status="0"
+        if output="$(/usr/bin/timeout --signal=TERM --kill-after=2s 10s \
+            /usr/bin/systemd-run --quiet --unit "$unit_base" \
+            --property "$assignment" -- /usr/bin/true 2>&1)"; then
+            :
+        else
+            launch_status="$?"
+        fi
+        stop_validation_probe \
+            || die "property parser probe cleanup failed for ${property}"
+        if [[ "$launch_status" -ne 0 && "$output" == *"Unknown assignment:"* ]]; then
+            unsupported+=("$property")
+        elif [[ "$launch_status" -ne 0 ]]; then
+            rejected+=("$property")
+        fi
+    done
+
+    if ((${#unsupported[@]} > 0 || ${#rejected[@]} > 0)); then
+        if ((${#unsupported[@]} > 0)); then
+            printf 'systemd 239 unsupported transient properties:' >&2
+            printf ' %s' "${unsupported[@]}" >&2
+            printf '\n' >&2
+        fi
+        if ((${#rejected[@]} > 0)); then
+            printf 'systemd 239 rejected transient properties:' >&2
+            printf ' %s' "${rejected[@]}" >&2
+            printf '\n' >&2
+        fi
+        return 1
+    fi
+}
+
 assert_profile() {
     local client="$1"
     local manager="$2"
@@ -134,7 +200,7 @@ assert_profile() {
     array_has_value "RemoveIPC=yes" || exit 83
     array_has_value "SystemCallErrorNumber=EPERM" || exit 84
     array_has_value "InaccessiblePaths=-/opt/zzz_calculator -/var/lib/zzz-calculator -/srv/zzz-download-origin -/proc/sysvipc -/dev/mqueue" || exit 85
-    array_has_value "SystemCallFilter=~ipc mq_getsetattr mq_notify mq_open mq_timedreceive mq_timedsend mq_unlink msgctl msgget msgrcv msgsnd semctl semget semop semtimedop shmat shmctl shmdt shmget" || exit 86
+    array_has_value "SystemCallFilter=~ipc mq_getsetattr mq_notify mq_open mq_timedreceive mq_timedsend mq_unlink msgctl msgget msgrcv msgsnd semctl semget semop semtimedop shmat shmctl shmdt shmget personality" || exit 86
     array_has_value "SystemCallArchitectures=native" || exit 103
     ! array_has_value "SystemCallFilter=~@ipc" || exit 87
     if [[ "$expect_suid" == "1" ]]; then
@@ -170,6 +236,21 @@ assert_profile 248 252 systemd-v239-seccomp+restrict-suidsgid+private-ipc 1 1
 detect_validation_systemd_profile
 [[ "$SYSTEMD_RUN_VERSION" == "239" && "$SYSTEMD_MANAGER_VERSION" == "239" \
     && "$SYSTEMD_EFFECTIVE_VERSION" == "239" ]] || exit 97
+VALIDATION_SYSTEMD_PROPERTIES=(
+    --property ZzzFirstUnsupported=yes
+    --property ZzzSecondUnsupported=yes
+)
+if unsupported_output="$(assert_transient_property_parser_support 2>&1)"; then
+    die "the parser diagnostic accepted deliberately unsupported properties"
+fi
+[[ "$unsupported_output" == *"ZzzFirstUnsupported"* \
+    && "$unsupported_output" == *"ZzzSecondUnsupported"* ]] \
+    || die "the parser diagnostic did not aggregate all unsupported properties"
+build_validation_systemd_properties "$VALIDATION_JOB_DIR/matrix-source"
+assert_transient_property_parser_support \
+    || die "the v239 baseline contains unsupported transient properties"
+rmdir /zzz-validation/app /zzz-validation \
+    || die "the parser diagnostic working directory could not be removed"
 run_validation_sandbox_capability_probe
 [[ "$VALIDATION_SANDBOX_PROBE_RESULT" == "active/exited/success/0" ]] || exit 98
 [[ -z "$VALIDATION_UNIT" && -z "$VALIDATION_PROBE_ROOT" ]] || exit 99

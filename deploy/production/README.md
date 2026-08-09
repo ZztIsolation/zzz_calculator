@@ -68,12 +68,13 @@ add `RestrictSUIDSGID=yes` and `PrivateIPC=yes`, respectively, as defense in
 depth; those newer properties are never sent speculatively to an older manager.
 Profile selection is deterministic and is not a retry mechanism.
 
-The v239 baseline does not depend on `PrivateIPC`. It denies exactly `ipc`,
+The v239 baseline does not depend on `PrivateIPC`. It denies the IPC syscalls `ipc`,
 `msgctl`, `msgget`, `msgrcv`, `msgsnd`, `semctl`, `semget`, `semop`,
 `semtimedop`, `shmat`, `shmctl`, `shmdt`, `shmget`, `mq_getsetattr`,
-`mq_notify`, `mq_open`, `mq_timedreceive`, `mq_timedsend` and `mq_unlink`, sets
-the transient service's `RemoveIPC=yes`, clamps seccomp to the native syscall
-architecture, and makes `/proc/sysvipc` and
+`mq_notify`, `mq_open`, `mq_timedreceive`, `mq_timedsend` and `mq_unlink`. It
+also denies the `personality` syscall directly because the Rocky/RHEL systemd
+239 client does not accept transient `LockPersonality=`. The profile sets the
+transient service's `RemoveIPC=yes`, clamps seccomp to the native syscall architecture, and makes `/proc/sysvipc` and
 `/dev/mqueue` inaccessible. It deliberately does not use systemd's broader
 `@ipc` syscall group, which would also block ordinary pipes and worker runtime
 calls. The inert probe proves the deny rules on the server's actual native
@@ -83,17 +84,24 @@ The baseline also excludes AF_UNIX, removes all capabilities and enables
 sandbox: `NoNewPrivs` and seccomp must be active, every capability mask must be
 zero, both IPC paths must be unreadable/unwritable/untraversable, and System V
 message queue, semaphore and shared-memory creation with `ipcmk` must fail with
-`EPERM`. If an unexpected IPC object is created, the worker removes it with
-`ipcrm` and fails the operation. This per-unit `RemoveIPC` cleanup is distinct
-from the global setting with the same name: the bootstrap does not modify
-logind policy.
+`EPERM`. A fixed `setarch` probe must also prove that the `personality` syscall
+returns `EPERM`. If an unexpected IPC object is created, the worker removes it
+with `ipcrm` and fails the operation. This per-unit `RemoveIPC` cleanup is
+distinct from the global setting with the same name: the bootstrap does not
+modify logind policy.
 
 Before claiming the uploaded artifact or starting any current, candidate or
 rollback validation stage, the manager starts
 one fixed root-owned inert capability probe with the selected complete sandbox
-profile. Probe mode checks isolation only: it does not read release data, start
-Node or execute candidate-controlled bytes. Candidate code is permitted only
-after this probe succeeds. An unsupported property, mount, seccomp rule or
+profile. Probe mode checks isolation and a fixed manager-owned bind-source
+sentinel only: it does not read release data, start Node or execute
+candidate-controlled bytes. Candidate code is permitted only
+after this probe succeeds. As a CI-only diagnostic, the pinned systemd 239
+fixture first submits every baseline property separately, strictly removes each
+diagnostic unit, and reports all unsupported transient assignments in one
+failure. It also proves that two deliberately unsupported names are aggregated.
+The complete inert probe remains the authoritative combined-profile gate. An
+unsupported property, mount, seccomp rule or
 isolation assertion stops the operation after that single attempt; the manager
 does not retry with a weaker profile. Cleanup then verifies that the transient
 unit, cgroup and writable probe tree are gone.
