@@ -347,17 +347,39 @@ mv -T -- "$candidate_staging_dir" "$candidate_dir"
 
 ## 9. 8788 候选预检
 
-以 `zzzcalc` 用户、生产工作目录和明确环境变量启动候选：
+CI/CD 管理器不得用裸 `sudo -u zzzcalc` 命令启动候选，也不得只针对
+`WorkingDirectory` 参数做临时降级。它先读取 `systemd-run` client 和 PID 1
+manager 版本并取较低者作为 effective version；任一版本无法解析或 effective
+version 低于 v239 时，在任何候选代码运行前停止。v239 是固定的最低沙箱
+基线；v242、v248 画像分别额外启用 `RestrictSUIDSGID=yes`、
+`PrivateIPC=yes` 作为纵深防护。管理器必须一次性按已解析版本选择
+画像，禁止先提交新属性、失败后删除属性重试。
 
-```bash
-sudo -u zzzcalc env \
-  NODE_ENV=production \
-  PORT=8788 \
-  SCAN_TELEMETRY_ENABLED=false \
-  /usr/bin/node "$candidate_dir/backend/server.js"
-```
+v239 基线必须包含：`PrivateNetwork` 与独立 mount namespace、
+`ProtectSystem=strict`、只读候选 bind mount、受限且带
+`nosuid,nodev,noexec` 的私有 tmpfs、空 capability、
+`NoNewPrivileges`、AF_UNIX 禁止、transient service 的 `RemoveIPC=yes`，
+以及对 `ipc`、`msgctl`、`msgget`、`msgrcv`、`msgsnd`、`semctl`、`semget`、
+`semop`、`semtimedop`、`shmat`、`shmctl`、`shmdt`、`shmget`、
+`mq_getsetattr`、`mq_notify`、`mq_open`、`mq_timedreceive`、`mq_timedsend`、
+`mq_unlink` 的显式窄 syscall deny 和隐藏 `/proc/sysvipc`、
+`/dev/mqueue`。不得使用 systemd
+更宽的 `@ipc` syscall group，因为它还会阻断普通 pipe 和 worker 自身的
+运行调用。`SystemCallArchitectures=native` 禁止 compat ABI 绕过，并由 inert
+probe 在服务器实际 native 架构上证明 deny 生效。per-unit
+`RemoveIPC` 只负责该瞬态单元停止后的兜底清理，不得为兼容而修改主机全局
+logind 同名配置。worker 必须在自身启动 Node 前核验 seccomp、
+`NoNewPrivs`、全部 capability mask、tmpfs mount flags、生产目录不可达、
+网络仅有 `lo` 和两个 IPC 路径不可访问；`ipcmk -Q/-S/-M` 必须以 `EPERM`
+失败。若意外创建 IPC 对象，先用 `ipcrm` 清理，再令整次操作失败。
 
-如使用 `systemd-run`，先查询服务器版本支持的参数。旧版本可能不支持较新的 `--working-directory`；改用兼容的 `-p WorkingDirectory=<dir>`，并在失败后确认候选进程实际未启动。
+在 claim incoming artifact 和 current、candidate、rollback、candidate
+四阶段之前，manager 先以同一套完整参数运行一次固定、root-owned 的 inert
+capability probe。探针只验证
+沙箱能力，不读取 release 的 backend/data、不启动 Node，也不执行任何候选
+字节。探针任一属性、mount、seccomp 或隔离断言失败时只失败一次，清理
+transient unit、完整 cgroup 和临时可写目录后停止；不得自动重试或降低沙箱
+强度。探针成功后才允许进入四阶段应用验证。
 
 最终候选预检：
 
@@ -559,7 +581,8 @@ journalctl -u zzz-calculator.service --since '10 minutes ago' --no-pager
 
 ## 17. 已知操作陷阱
 
-- 旧 `systemd-run` 可能不支持新参数。先查询版本，使用 `-p WorkingDirectory=` 兼容写法。
+- 旧 `systemd-run` 的风险不只有 `--working-directory`。必须先通过 v239 最低版本门禁，按 v239/v242/v248 固定画像构造完整瞬态单元，并在候选代码前运行 inert capability probe；未知属性或隔离失效后禁止删参数重试。
+- `RemoveIPC=` 同时存在 per-unit 与 logind 全局语义。本流程只设置 transient service 的 `RemoveIPC=yes` 作为停止时兜底，绝不修改 logind；IPC 的首要门禁仍是显式窄 syscall deny、路径隐藏和 worker 的 `ipcmk`/`ipcrm` 自证。
 - `journalctl --since` 可能不接受带时区 ISO 时间。用相对时间并把日志命令状态与应用健康分开判断。
 - Playwright 的 `reuseExistingServer` 可能复用旧构建。发布测试前确认端口 PID、`.deployed-commit` 和 bundle 哈希。
 - 非哈希 public 文本资源必须固定行尾并使用内容版本化 URL；Windows CRLF 与 Linux LF 会被静态资源同路径冲突门禁正确拦截。
@@ -688,12 +711,14 @@ evidence；CD 只能下载触发它的同一次 run 的产物，禁止在部署�
 - [ ] GitHub `main` 已启用 PR、`CI / verify`、分支最新、conversation resolution、禁止 force push/删除；管理员应急绕过保留审计记录。
 - [ ] `production` Environment 只允许 protected `main`，审批人和 `PROD_HOST`、`PROD_USER`、`PROD_SSH_PRIVATE_KEY`、`PROD_KNOWN_HOSTS` 已配置；`PRODUCTION_CD_ENABLED` 未明确设置为 `true` 时所有 CD 任务跳过。
 - [ ] 服务器已从候选 `main` 的同一固定 SHA 运行 `deploy/production/bootstrap-zzz-calculator-deploy.sh`，已安装 manager/worker/gateway/sudoers 哈希与该 SHA 一致；`zzzdeploy` 仅使用锁定密码的专用 key，sudo 只允许 root-owned 部署程序。控制面有变化时必须先事务性重跑 bootstrap，且初始化不得触碰 `current`、生产 systemd 服务、Nginx 或下载源。
+- [ ] `systemd-run` client 与 PID 1 manager 版本均可解析，取两者较低值后的 effective version 不低于 v239；使用固定 v239 baseline，只有 v242/v248 画像才分别增加 `RestrictSUIDSGID`/`PrivateIPC`。root-owned inert capability probe 已在 claim incoming artifact 和候选代码前以完整参数一次通过；没有发生未知属性重试、参数降级或候选字节提前执行。
+- [ ] v239 baseline 以 `SystemCallArchitectures=native` 禁止 compat ABI 绕过；显式窄 IPC syscall deny、per-unit `RemoveIPC=yes`、IPC 路径隐藏、AF_UNIX 禁止、空 capabilities、`NoNewPrivileges`、私有 network/mount namespace 和只读生产视图均由 worker 在服务器实际 native 架构上自证。没有使用会误伤 pipe/worker 调用的 `@ipc` syscall group；`ipcmk -Q/-S/-M` 全部以 `EPERM` 失败，且没有修改 logind `RemoveIPC` 或其他生产全局配置。
 - [ ] 第一次旧版迁移只允许审计确认的精确 tuple：`current=git-2e7f874bc034`、commit `2e7f874bc034871f03b5738f48d7d05685b36ea9`、`last-release=git-2e7f874bc034`、`previous-release=rollback-2e7f874bc034`、migration marker 不存在。current 必须匹配固定的完整内容/静态摘要、`zzzcalc:zzzcalc`、目录 `0755`、文件 `0644`，无链接、硬链接、特殊文件或嵌套挂载；不得现场 `chown/chmod`。旧 `previous-release` 仅保留为历史对象，首次 managed deploy 前禁止手动 rollback。
 - [ ] 完整 current 只能密封到 `processing/job.*` 的 `root:root 0700` 区域，`zzzcalc` 与 `zzzvalidate` 均不可读取；`validation/job.*` 只能接收白名单目录和空示例库存生成的脱敏副本。真实库存、telemetry 和未知 data 文件不得进入验证账户范围。candidate、rollback staging、最终 release 和手动 rollback target 仍须同时对两个 runtime principal 可读且不可写。
 - [ ] legacy current 的 full/portable/static/metadata 摘要、state tuple、服务 PID、`NRestarts`、Nginx 与两个 manifest 在 seal、四阶段验证、切换前和 evidence 前保持不变。evidence 必须记录 state pair 与 marker 的前后值：audit/dry-run 逐字一致，committed deploy/rollback 与最终 release 映射一致。第一次成功 deploy 写入新 rollback/candidate state 和 root-owned marker；首次切换后失败则 `previous=last=实际严格回滚副本`，后续 managed 失败保留原 previous。marker 写入后 legacy 例外永久失效。
 - [ ] 当前服务端持久化基线继续为：`StateDirectory`、`ZZZ_CALCULATOR_DATA_DIR`、`SCAN_TELEMETRY_DIR` 为空，`data/user_drive_discs.json`、`data/scan-telemetry` 不存在，maintenance/scan telemetry 均关闭且 `/api/user-drive-discs` 返回 `410`。任一项变化均停止部署；未来启用服务端写入必须单独建设外部 StateDirectory 和迁移流程。
 - [ ] 审批后仍复核 `main` SHA、产物 SHA-256、`.deployed-commit`、安全 tar 路径和静态资源冲突；`.part` 上传只在服务器复算通过后转为最终文件。
-- [ ] `audit` 除持久化 history evidence 外不改变生产；`dry-run` 只临时写 root-only `processing`、脱敏 `validation`、消费本次 incoming 上传并持久化 history evidence，不切换 `current`、不重启生产服务。`deploy` 才会使用不可变 `git-<short-sha>` release、兼容回滚目录和原子 current 切换；切换后必须在 15 秒内首次恢复健康，再以同一 PID 连续稳定 15 秒，任一门禁失败即回滚。
+- [ ] `audit` 除持久化 history evidence 外不改变生产；`dry-run` 只临时写 root-only `processing`、脱敏 `validation`、消费本次 incoming 上传并持久化 history evidence，不切换 `current`、不重启生产服务。无论 inert probe 或四阶段验证成功还是失败，均复核 `current` target/commit、full/portable/static/metadata digest、state pair/marker、生产 PID、`NRestarts`、Nginx 和两个 manifest 前后不变，并确认无残留 transient unit/cgroup/可写验证目录。evidence 中的 `systemdRunVersion`、`systemdManagerVersion`、`systemdEffectiveVersion`、`validationSandboxProfile`、`validationSandboxProbe` 与 `validationCleanup` 必须分别绑定 client/PID 1/effective 版本、所选画像、inert probe 结果和最终清理结果；成功 dry-run/deploy 的探针必须为 `active/exited/success/0` 且清理必须为 `clean`。`deploy` 才会使用不可变 `git-<short-sha>` release、兼容回滚目录和原子 current 切换；切换后必须在 15 秒内首次恢复健康，再以同一 PID 连续稳定 15 秒，任一门禁失败即回滚。
 - [ ] 首次启用前，隔离浏览器必须在同一 origin 完成“种入并只读核对旧数据 -> 候选迁移并写入新字段 -> 当前生产读取/往返写入 -> 候选再次升级”的存储门禁；服务器 manager 另行完成 current -> candidate -> rollback -> candidate 四阶段应用验证。真实生产切换必须另获明确批准。
 - [ ] 自动回滚覆盖脚本错误及可捕获的 HUP/INT/TERM；SIGKILL 或宿主机断电无法运行 shell trap。下次 manager 调用必须对 `current`、state pair 与 marker 不一致 fail closed，并在人工只读审计后恢复，不得宣称不可捕获中断会自动回滚。
 - [ ] 本次 foundation 只允许 bootstrap、audit 和 dry-run；不得调用 deploy/rollback。`PRODUCTION_CD_ENABLED` 在 audit 与 dry-run 都成功并完成零影响复核前保持 `false`；之后仅启用未来待审批能力，变量变更本身不得触发部署。

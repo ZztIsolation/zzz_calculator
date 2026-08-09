@@ -137,6 +137,7 @@ release_assert_driver="${test_root}/assert-immutable-release.sh"
 atomic_switch_driver="${test_root}/atomic-switch.sh"
 evidence_schema_driver="${test_root}/evidence-schema.sh"
 health_gate_driver="${test_root}/health-gate.sh"
+validation_stop_driver="${test_root}/validation-stop.sh"
 driver_deploy_root="${test_root}/driver-state"
 driver_release_root="$production_access_root"
 driver_processing_root="$legacy_snapshot_root"
@@ -224,6 +225,8 @@ run_release_driver() {
         '  LEGACY_MIGRATION_MARKER_EXISTED_AFTER="0"; LEGACY_MIGRATION_MARKER_VALUE_AFTER=""' \
         '  SERVICE_BEFORE="active"; SERVICE_AFTER="active"; PID_BEFORE="101"; PID_AFTER="101"' \
         '  RESTARTS_BEFORE="0"; RESTARTS_AFTER="0"; NGINX_STATUS="valid"; NGINX_STATUS_AFTER="valid"' \
+        '  SYSTEMD_RUN_VERSION="239"; SYSTEMD_MANAGER_VERSION="239"; SYSTEMD_EFFECTIVE_VERSION="239"' \
+        '  VALIDATION_SANDBOX_PROFILE="systemd-v239-seccomp"; VALIDATION_SANDBOX_PROBE_RESULT="not-run"' \
         '  HELPER_MANIFEST_SHA256_BEFORE="$HASH_C"; HELPER_MANIFEST_SHA256_AFTER="$HASH_C"' \
         '  SCANNER_MANIFEST_SHA256_BEFORE="$HASH_D"; SCANNER_MANIFEST_SHA256_AFTER="$HASH_D"' \
         '  DISK_STATUS="fixture"; DISK_STATUS_AFTER="fixture"; MEMORY_STATUS="fixture"; MEMORY_STATUS_AFTER="fixture"' \
@@ -263,18 +266,35 @@ run_release_driver() {
         '    ACTION="audit"; mutation='"'"'.stateLastAfter = "git-deadbee"'"'"' ;;' \
         '  dry-run)' \
         '    ACTION="dry-run"; set_artifact_metadata; ROLLBACK_BASENAME="validation-rollback-2e7f874bc034"' \
-        '    VALIDATION_SEQUENCE="current,candidate,rollback,candidate"; VALIDATION_UNIT_RESULTS="$VALIDATION_RESULTS"' \
+        '    VALIDATION_SEQUENCE="current,candidate,rollback,candidate"; VALIDATION_UNIT_RESULTS="$VALIDATION_RESULTS"; VALIDATION_SANDBOX_PROBE_RESULT="active/exited/success/0"' \
+        '    VALIDATION_CLEANUP_RESULT="clean"' \
         '    mutation='"'"'.validationSequence = "candidate"'"'"' ;;' \
+        '  dry-run-effective-version)' \
+        '    ACTION="dry-run"; set_artifact_metadata; ROLLBACK_BASENAME="validation-rollback-2e7f874bc034"' \
+        '    VALIDATION_SEQUENCE="current,candidate,rollback,candidate"; VALIDATION_UNIT_RESULTS="$VALIDATION_RESULTS"; VALIDATION_SANDBOX_PROBE_RESULT="active/exited/success/0"' \
+        '    VALIDATION_CLEANUP_RESULT="clean"' \
+        '    mutation='"'"'.systemdEffectiveVersion = "240"'"'"' ;;' \
+        '  dry-run-profile)' \
+        '    ACTION="dry-run"; set_artifact_metadata; ROLLBACK_BASENAME="validation-rollback-2e7f874bc034"' \
+        '    VALIDATION_SEQUENCE="current,candidate,rollback,candidate"; VALIDATION_UNIT_RESULTS="$VALIDATION_RESULTS"; VALIDATION_SANDBOX_PROBE_RESULT="active/exited/success/0"' \
+        '    VALIDATION_CLEANUP_RESULT="clean"' \
+        '    mutation='"'"'.validationSandboxProfile = "systemd-v239-seccomp+restrict-suidsgid"'"'"' ;;' \
+        '  dry-run-probe)' \
+        '    ACTION="dry-run"; set_artifact_metadata; ROLLBACK_BASENAME="validation-rollback-2e7f874bc034"' \
+        '    VALIDATION_SEQUENCE="current,candidate,rollback,candidate"; VALIDATION_UNIT_RESULTS="$VALIDATION_RESULTS"; VALIDATION_SANDBOX_PROBE_RESULT="active/exited/success/0"' \
+        '    VALIDATION_CLEANUP_RESULT="clean"' \
+        '    mutation='"'"'.validationSandboxProbe = "failed/failed/failed/69"'"'"' ;;' \
         '  deploy)' \
         '    ACTION="deploy"; set_artifact_metadata; ROLLBACK_BASENAME="rollback-111111111111"; PREVIOUS_BASENAME="git-2e7f874bc034"' \
         '    CURRENT_AFTER="/opt/zzz_calculator/releases/git-111111111111"; CURRENT_COMMIT_AFTER="$CANDIDATE_COMMIT"' \
         '    CURRENT_TREE_SHA256_AFTER="$HASH_B"; CURRENT_PORTABLE_SHA256_AFTER="$HASH_B"; CURRENT_STATIC_SHA256_AFTER="$HASH_B"; CURRENT_TREE_METADATA_SHA256_AFTER="$HASH_C"' \
         '    STATE_PREVIOUS_AFTER="$ROLLBACK_BASENAME"; STATE_LAST_AFTER="$RELEASE_BASENAME"' \
         '    LEGACY_MIGRATION_MARKER_EXISTED_AFTER="1"; LEGACY_MIGRATION_MARKER_VALUE_AFTER="$LEGACY_COMMIT"' \
-        '    VALIDATION_SEQUENCE="current,candidate,rollback,candidate"; VALIDATION_UNIT_RESULTS="$VALIDATION_RESULTS"; reported_switch="committed"' \
+        '    VALIDATION_SEQUENCE="current,candidate,rollback,candidate"; VALIDATION_UNIT_RESULTS="$VALIDATION_RESULTS"; VALIDATION_SANDBOX_PROBE_RESULT="active/exited/success/0"; VALIDATION_CLEANUP_RESULT="clean"; reported_switch="committed"' \
         '    mutation='"'"'.statePreviousAfter = "rollback-deadbee"'"'"' ;;' \
         '  deploy-noop)' \
         '    ACTION="deploy"; set_managed_candidate_baseline; set_artifact_metadata; ROLLBACK_BASENAME="rollback-111111111111"; PREVIOUS_BASENAME="git-111111111111"' \
+        '    VALIDATION_SANDBOX_PROBE_RESULT="active/exited/success/0"; VALIDATION_CLEANUP_RESULT="clean"' \
         '    mutation='"'"'.currentAfter = "/opt/zzz_calculator/releases/git-deadbee"'"'"' ;;' \
         '  rollback)' \
         '    ACTION="rollback"; set_managed_candidate_baseline; DEPLOYED_COMMIT="$TARGET_COMMIT"' \
@@ -295,6 +315,12 @@ run_release_driver() {
         '  failed-invalid)' \
         '    ACTION="deploy"; STATUS="failed"; ERROR_MESSAGE="fixture failure"; STATE_LAST_EXISTED_AFTER="invalid"; STATE_LAST_AFTER=""; reported_switch="rolled-back"' \
         '    mutation='"'"'.error = ""'"'"' ;;' \
+        '  failed-systemd)' \
+        '    ACTION="dry-run"; STATUS="failed"; ERROR_MESSAGE="fixture systemd failure"; VALIDATION_SANDBOX_PROBE_RESULT="failed/failed/exit-code/68"; VALIDATION_CLEANUP_RESULT="clean"' \
+        '    mutation='"'"'.validationSandboxProbe = "failed/failed/exit-code\n/68"'"'"' ;;' \
+        '  failed-pending-cleanup)' \
+        '    ACTION="dry-run"; STATUS="failed"; ERROR_MESSAGE="fixture pending cleanup"; VALIDATION_SANDBOX_PROBE_RESULT="failed/failed/exit-code/68"; VALIDATION_CLEANUP_RESULT="pending"' \
+        '    mutation='"'"'.validationCleanup = "clean"'"'"' ;;' \
         '  *) die "unknown evidence fixture $fixture" ;;' \
         'esac' \
         'valid="$TEST_OUTPUT_DIR/$fixture.valid.json"; invalid="$TEST_OUTPUT_DIR/$fixture.invalid.json"' \
@@ -304,12 +330,21 @@ run_release_driver() {
         'if validate_evidence_json "$invalid"; then die "$fixture tampered evidence was accepted"; fi'
 } >"$evidence_schema_driver"
 bash -n "$evidence_schema_driver" || fail "extracted evidence schema driver is not valid Bash"
-for evidence_fixture in probe audit dry-run deploy deploy-noop rollback rollback-noop failed-invalid; do
+for evidence_fixture in \
+    probe audit dry-run dry-run-effective-version dry-run-profile dry-run-probe \
+    deploy deploy-noop rollback rollback-noop failed-invalid failed-systemd failed-pending-cleanup; do
     evidence_output="${test_root}/evidence-${evidence_fixture}"
     mkdir -p -- "$evidence_output"
-    TEST_OUTPUT_DIR="$evidence_output" /bin/bash --noprofile --norc \
-        "$evidence_schema_driver" "$evidence_fixture" \
-        || fail "${evidence_fixture} evidence schema fixture failed"
+    if [[ "$evidence_fixture" == "failed-pending-cleanup" ]]; then
+        if TEST_OUTPUT_DIR="$evidence_output" /bin/bash --noprofile --norc \
+            "$evidence_schema_driver" "$evidence_fixture"; then
+            fail "pending validation cleanup was accepted as final evidence"
+        fi
+    else
+        TEST_OUTPUT_DIR="$evidence_output" /bin/bash --noprofile --norc \
+            "$evidence_schema_driver" "$evidence_fixture" \
+            || fail "${evidence_fixture} evidence schema fixture failed"
+    fi
 done
 
 {
@@ -362,6 +397,72 @@ printf '0' >"${test_root}/health-pid-change.count"
 TEST_COUNTER_FILE="${test_root}/health-pid-change.count" TEST_FAILURE_COUNT="0" TEST_PID_CHANGE_AFTER_COUNT="1" \
     /bin/bash --noprofile --norc "$health_gate_driver" pid-change \
     || fail "health gate accepted a PID change during the stability window"
+
+# Exercise transient-unit cleanup with systemd query failures and unit garbage
+# collection races. All process-group checks still run against the real /proc;
+# the synthetic unit name is deliberately unique to this fixture.
+{
+    printf '%s\n' '#!/bin/bash' 'set -Eeuo pipefail' \
+        'readonly MODE="${1:?}"' \
+        'readonly STATE_ROOT="${TEST_STATE_ROOT:?}"' \
+        'readonly UNIT_NAME="zzz-calculator-validation-999999-1.service"' \
+        'VALIDATION_UNIT="$UNIT_NAME"' \
+        'systemctl() {' \
+        '  local command="${1:-}" property="" argument expect_property="0"' \
+        '  shift || true' \
+        '  if [[ "$command" == "show" ]]; then' \
+        '    for argument in "$@"; do' \
+        '      if [[ "$expect_property" == "1" ]]; then property="$argument"; expect_property="0"; continue; fi' \
+        '      case "$argument" in --property) expect_property="1" ;; --property=*) property="${argument#--property=}" ;; esac' \
+        '    done' \
+        '    case "$property" in' \
+        '      LoadState)' \
+        '        [[ "$MODE" != "query-error" ]] || return 1' \
+        '        if [[ "$MODE" == "absent" ]]; then printf "not-found\n"' \
+        '        elif [[ ! -e "$STATE_ROOT/stopped" ]]; then printf "loaded\n"' \
+        '        elif [[ "$MODE" == "gc-after-stop" || -e "$STATE_ROOT/reset" ]]; then printf "not-found\n"' \
+        '        else printf "loaded\n"; fi ;;' \
+        '      ControlGroup) printf "/system.slice/%s\n" "$UNIT_NAME" ;;' \
+        '      ActiveState) printf "inactive\n" ;;' \
+        '      *) return 1 ;;' \
+        '    esac' \
+        '  elif [[ "$command" == "stop" ]]; then : >"$STATE_ROOT/stopped"' \
+        '  elif [[ "$command" == "reset-failed" ]]; then' \
+        '    : >"$STATE_ROOT/reset"; [[ "$MODE" != "reset-race" ]]' \
+        '  else return 1; fi' \
+        '}'
+    sed -n '/^validation_cgroup_has_members() {$/,/^}$/p' "$MANAGER"
+    sed -n '/^validation_unit_name_has_members() {$/,/^}$/p' "$MANAGER"
+    sed -n '/^stop_validation_probe() {$/,/^}$/p' "$MANAGER"
+    printf '%s\n' \
+        'status=0; stop_validation_probe || status="$?"' \
+        'printf "%s|%s|%s|%s\n" "$status" "${VALIDATION_UNIT:-}" "$([[ -e "$STATE_ROOT/stopped" ]] && printf 1 || printf 0)" "$([[ -e "$STATE_ROOT/reset" ]] && printf 1 || printf 0)"'
+} >"$validation_stop_driver"
+bash -n "$validation_stop_driver" || fail "extracted validation stop driver is not valid Bash"
+for stop_fixture in query-error absent gc-after-stop reset-race clean; do
+    stop_state="${test_root}/validation-stop-${stop_fixture}"
+    mkdir -p -- "$stop_state"
+    stop_result="$(TEST_STATE_ROOT="$stop_state" /bin/bash --noprofile --norc \
+        "$validation_stop_driver" "$stop_fixture")"
+    case "$stop_fixture" in
+        query-error)
+            [[ "$stop_result" == "1|zzz-calculator-validation-999999-1.service|0|0" ]] \
+                || fail "a failed systemd query was treated as a clean validation stop"
+            ;;
+        absent)
+            [[ "$stop_result" == "0||0|0" ]] \
+                || fail "an already unloaded validation unit was not accepted safely"
+            ;;
+        gc-after-stop)
+            [[ "$stop_result" == "0||1|0" ]] \
+                || fail "post-stop transient-unit garbage collection was misclassified"
+            ;;
+        reset-race|clean)
+            [[ "$stop_result" == "0||1|1" ]] \
+                || fail "validation cleanup did not handle ${stop_fixture} safely"
+            ;;
+    esac
+done
 
 # A private validation parent deliberately blocks the production application
 # account. Root-owned 0755/0644 release contents remain readable by the
