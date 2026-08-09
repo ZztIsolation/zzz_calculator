@@ -81,6 +81,7 @@ for (const contract of [
     'readonly VALIDATION_TMPFS_BYTES="$((128 * 1024 * 1024))"',
     'readonly VALIDATION_TMPFS_INODES="16384"',
     'readonly VALIDATION_RUN_TMPFS_BYTES="$((4 * 1024 * 1024))"',
+    'readonly MAX_VALIDATION_RESPONSE_BYTES="$((4 * 1024 * 1024))"',
     'readonly MAX_VALIDATION_SEED_BYTES="$((64 * 1024 * 1024))"',
     'readonly MAX_VALIDATION_SEED_ENTRIES="8192"',
     'readonly MAX_VALIDATION_SEED_FILE_BYTES="$((1024 * 1024))"',
@@ -141,6 +142,8 @@ includes(manager, 'mv -T -- "$evidence_tmp" "$EVIDENCE_PATH"')
 includes(manager, "validate_evidence_json")
 includes(manager, "def required_keys:")
 includes(manager, "and (keys == required_keys)")
+includes(manager, '["not-run", "clean", "failed"] | index($cleanup)')
+assert.doesNotMatch(manager, /\["not-run", "pending", "clean", "failed"\]/)
 includes(manager, 'and (all(.[]; type == "string"))')
 for (const evidenceField of [
     "currentReleasePolicy",
@@ -390,10 +393,10 @@ assert.doesNotMatch(bootstrap, /\[\[ "\$lock_status" == "L" \]\]/)
 assert.doesNotMatch(manager, /\[\[ "\$password_status" == "L" \]\]/)
 includes(bootstrap, '[[ ! -e "$VALIDATION_HOME" && ! -L "$VALIDATION_HOME" ]]')
 includes(bootstrap, 'replace_managed_file "$worker_snapshot" "$VALIDATION_WORKER_PATH" 555')
-for (const dependency of ["base64", "journalctl", "sudo", "systemd-run", "timeout"]) {
+for (const dependency of ["base64", "ipcmk", "ipcrm", "journalctl", "setarch", "sudo", "systemctl", "systemd-run", "timeout", "uname"]) {
     assert.match(bootstrap, new RegExp(`(?:^|\\s)${dependency}(?:\\s|\\\\$)`), `Bootstrap does not preflight ${dependency}`)
 }
-for (const absoluteDependency of ["base64", "journalctl", "sudo", "systemd-run", "timeout"]) {
+for (const absoluteDependency of ["base64", "ipcmk", "ipcrm", "journalctl", "setarch", "sudo", "systemctl", "systemd-run", "timeout", "true", "uname"]) {
     includes(bootstrap, `/usr/bin/${absoluteDependency}`)
 }
 for (const absoluteExecutable of [
@@ -403,14 +406,20 @@ for (const absoluteExecutable of [
     "/usr/bin/cp",
     "/usr/bin/df",
     "/usr/bin/env",
+    "/usr/bin/ipcmk",
+    "/usr/bin/ipcrm",
     "/usr/bin/journalctl",
     "/usr/bin/mkdir",
     "/usr/bin/node",
+    "/usr/bin/setarch",
     "/usr/bin/stat",
+    "/usr/bin/systemctl",
     "/usr/bin/systemd-run",
     "/usr/bin/tail",
     "/usr/bin/timeout",
     "/usr/bin/tr",
+    "/usr/bin/true",
+    "/usr/bin/uname",
 ]) {
     includes(manager, absoluteExecutable)
 }
@@ -497,37 +506,72 @@ includes(manager, '[[ -z "$telemetry_dir" ]] || die "effective production proces
 includes(manager, '.maintenanceEnabled == false and .scanTelemetryEnabled == false')
 includes(manager, '"http://127.0.0.1:8787/api/user-drive-discs"')
 includes(manager, '[[ "$retired_inventory_status" == "410" ]]')
+const validationProfile = manager.match(/select_validation_systemd_profile\(\)[\s\S]*?^}/m)?.[0] ?? ""
+const validationProperties = manager.match(/build_validation_systemd_properties\(\)[\s\S]*?^}/m)?.[0] ?? ""
+const validationTransientUnit = manager.match(/run_validation_transient_unit\(\)[\s\S]*?^}/m)?.[0] ?? ""
+const validationCapabilityProbe = manager.match(/run_validation_sandbox_capability_probe\(\)[\s\S]*?^}/m)?.[0] ?? ""
 const validationProbe = manager.match(/run_validation_probe\(\)[\s\S]*?^}/m)?.[0] ?? ""
-includes(validationProbe, '/usr/bin/systemd-run --quiet --unit "$unit_base"')
-includes(validationProbe, '--property "User=$VALIDATION_USER"')
-includes(validationProbe, "--property SupplementaryGroups=")
-includes(validationProbe, "--property PrivateNetwork=yes")
-includes(validationProbe, "--property PrivateMounts=yes")
-includes(validationProbe, "--property PrivateTmp=no")
-includes(validationProbe, "--property PrivateIPC=yes")
-includes(validationProbe, "--property ProtectSystem=strict")
-includes(
-    validationProbe,
-    '--property "InaccessiblePaths=-/opt/zzz_calculator -/var/lib/zzz-calculator -/srv/zzz-download-origin"',
-)
-includes(validationProbe, '--property "BindReadOnlyPaths=$release_dir:/zzz-validation/app"')
-includes(validationProbe, "TemporaryFileSystem=/zzz-validation:rw,nosuid,nodev,noexec,size=${VALIDATION_TMPFS_BYTES}")
-includes(validationProbe, "/run:rw,nosuid,nodev,noexec,size=${VALIDATION_RUN_TMPFS_BYTES}")
-includes(validationProbe, "/var/lib/zzz-calculator-deploy:ro,nosuid,nodev,noexec,size=4k,nr_inodes=16,mode=000")
-for (const hiddenWritablePath of ["/tmp", "/var/tmp", "/dev/shm"]) {
-    includes(validationProbe, `${hiddenWritablePath}:ro,nosuid,nodev,noexec,size=4k,nr_inodes=16,mode=000`)
+includes(manager, 'readonly MIN_SYSTEMD_VERSION="239"')
+includes(manager, 'readonly RESTRICT_SUID_SGID_SYSTEMD_VERSION="242"')
+includes(manager, 'readonly PRIVATE_IPC_SYSTEMD_VERSION="248"')
+includes(manager, '/usr/bin/systemd-run --version')
+includes(manager, '/usr/bin/systemctl show --property=Version --value')
+includes(validationProfile, 'effective_version >= RESTRICT_SUID_SGID_SYSTEMD_VERSION')
+includes(validationProfile, 'effective_version >= PRIVATE_IPC_SYSTEMD_VERSION')
+includes(validationProperties, '--property "User=$VALIDATION_USER"')
+includes(validationProperties, "--property SupplementaryGroups=")
+includes(validationProperties, "--property PrivateNetwork=yes")
+includes(validationProperties, "--property PrivateMounts=yes")
+includes(validationProperties, "--property PrivateTmp=no")
+includes(validationProperties, "--property ProtectSystem=strict")
+includes(validationProperties, "--property RemoveIPC=yes")
+includes(validationProperties, "--property SystemCallErrorNumber=EPERM")
+includes(validationProperties, '--property "SystemCallFilter=~${denied_syscalls}"')
+includes(validationProperties, "--property SystemCallArchitectures=native")
+assert.doesNotMatch(validationProperties, /LockPersonality=yes/)
+assert.doesNotMatch(validationProperties, /SystemCallFilter=~@ipc/)
+for (const deniedSyscall of [
+    "ipc", "mq_getsetattr", "mq_notify", "mq_open", "mq_timedreceive", "mq_timedsend", "mq_unlink",
+    "msgctl", "msgget", "msgrcv", "msgsnd", "semctl", "semget", "semop", "semtimedop",
+    "shmat", "shmctl", "shmdt", "shmget", "personality",
+]) {
+    includes(manager, `    ${deniedSyscall}`)
 }
-includes(validationProbe, '--property "RestrictAddressFamilies=AF_INET AF_INET6"')
-includes(validationProbe, "--property StandardOutput=null")
-includes(validationProbe, "--property StandardError=null")
-includes(validationProbe, "--property KillMode=control-group")
-includes(validationProbe, "--property MemoryLimit=768M")
-includes(validationProbe, "--property CPUQuota=200%")
-includes(validationProbe, "--property TasksMax=64")
-includes(validationProbe, "--property LimitFSIZE=1M")
-includes(validationProbe, "HOME=/zzz-validation/home")
-includes(validationProbe, "ZZZ_CALCULATOR_DATA_DIR=/zzz-validation/data")
-includes(validationProbe, '/bin/bash "$VALIDATION_WORKER" /zzz-validation/app /zzz-validation')
+includes(
+    validationProperties,
+    '--property "InaccessiblePaths=-/opt/zzz_calculator -/var/lib/zzz-calculator -/srv/zzz-download-origin -/proc/sysvipc -/dev/mqueue"',
+)
+includes(validationProperties, '--property "BindReadOnlyPaths=$release_dir:/zzz-validation/app"')
+includes(validationProperties, "TemporaryFileSystem=/zzz-validation:rw,nosuid,nodev,noexec,size=${VALIDATION_TMPFS_BYTES}")
+includes(validationProperties, "/run:rw,nosuid,nodev,noexec,size=${VALIDATION_RUN_TMPFS_BYTES}")
+includes(validationProperties, "/var/lib/zzz-calculator-deploy:ro,nosuid,nodev,noexec,size=4k,nr_inodes=16,mode=000")
+for (const hiddenWritablePath of ["/tmp", "/var/tmp", "/dev/shm"]) {
+    includes(validationProperties, `${hiddenWritablePath}:ro,nosuid,nodev,noexec,size=4k,nr_inodes=16,mode=000`)
+}
+includes(validationProperties, '--property "RestrictAddressFamilies=AF_INET AF_INET6"')
+includes(validationProperties, "--property StandardOutput=null")
+includes(validationProperties, "--property StandardError=null")
+includes(validationProperties, "--property KillMode=control-group")
+includes(validationProperties, "--property MemoryLimit=768M")
+includes(validationProperties, "--property CPUQuota=200%")
+includes(validationProperties, "--property TasksMax=64")
+includes(validationProperties, '--property "LimitFSIZE=${MAX_VALIDATION_RESPONSE_BYTES}"')
+includes(validationProperties, "VALIDATION_SYSTEMD_PROPERTIES+=(--property RestrictSUIDSGID=yes)")
+includes(validationProperties, "VALIDATION_SYSTEMD_PROPERTIES+=(--property PrivateIPC=yes)")
+includes(validationTransientUnit, '/usr/bin/systemd-run --quiet --unit "$unit_base"')
+includes(validationTransientUnit, '"${VALIDATION_SYSTEMD_PROPERTIES[@]}"')
+includes(validationTransientUnit, "HOME=/zzz-validation/home")
+includes(validationTransientUnit, "ZZZ_CALCULATOR_DATA_DIR=/zzz-validation/data")
+includes(validationTransientUnit, '/bin/bash "$VALIDATION_WORKER" "${worker_args[@]}"')
+includes(validationTransientUnit, "activeState=${active_state:-unknown}")
+includes(validationTransientUnit, "subState=${sub_state:-unknown}")
+includes(validationTransientUnit, "result=${result:-unknown}")
+includes(validationTransientUnit, "execStatus=${exec_status:-unknown}")
+assert.doesNotMatch(validationTransientUnit, /\beval\b/)
+includes(validationCapabilityProbe, "run_validation_transient_unit sandbox-capability")
+includes(validationCapabilityProbe, 'printf \'%s\\n\' "$VALIDATION_CAPABILITY_SENTINEL_CONTENT"')
+includes(validationCapabilityProbe, 'rm -f -- "$capability_sentinel"')
+includes(validationCapabilityProbe, 'VALIDATION_SANDBOX_PROBE_RESULT" == "active/exited/success/0')
 for (const limitCheck of [
     "seed_size <= MAX_VALIDATION_SEED_BYTES",
     "seed_entries <= MAX_VALIDATION_SEED_ENTRIES",
@@ -536,12 +580,60 @@ for (const limitCheck of [
     includes(validationProbe, limitCheck)
 }
 assert.doesNotMatch(validationProbe, /runuser -u "\$APP_USER"/, "Candidate code must not run as the production account")
-assert.doesNotMatch(validationProbe, /journalctl|server\.log/, "Candidate-controlled output must not be returned from validation")
+assert.doesNotMatch(validationTransientUnit, /journalctl|server\.log/, "Candidate-controlled output must not be returned from validation")
+for (const actionName of ["run_dry_run", "run_deploy"]) {
+    const actionBody = manager.match(new RegExp(`${actionName}\\(\\) \\{[\\s\\S]*?^\\}`, "m"))?.[0] ?? ""
+    ordered(
+        actionBody,
+        "prepare_validation_job",
+        "run_validation_sandbox_capability_probe",
+        "prepare_processing_job",
+        `${actionName} must pass the inert sandbox probe before preparing or claiming candidate inputs`,
+    )
+    ordered(
+        actionBody,
+        "run_validation_sandbox_capability_probe",
+        "claim_incoming_inputs",
+        `${actionName} must not claim uploaded inputs before the sandbox capability gate`,
+    )
+}
 assert.match(
     manager,
-    /stop_validation_probe\(\)[\s\S]*systemctl stop[\s\S]*ControlGroup[\s\S]*cgroup\.procs[\s\S]*reset-failed/,
+    /stop_validation_probe\(\)[\s\S]*LoadState[\s\S]*== "loaded"[\s\S]*ControlGroup[\s\S]*systemctl stop[\s\S]*cgroup\.procs[\s\S]*validation_cgroup_has_members[\s\S]*ActiveState[\s\S]*reset-failed[\s\S]*for attempt/,
     "Transient validation must stop and verify its complete cgroup",
 )
+const validationStop = manager.match(/stop_validation_probe\(\)[\s\S]*?^}/m)?.[0] ?? ""
+const validationGone = manager.match(/finish_validation_probe_if_gone\(\)[\s\S]*?^}/m)?.[0] ?? ""
+assert.match(
+    validationGone,
+    /LoadState --value[\s\S]*?== "not-found"[\s\S]*?validation_unit_name_has_members "\$unit" && return 1[\s\S]*?VALIDATION_UNIT=""/,
+    "A transient validation unit may be finalized only after a fresh not-found and no-member proof",
+)
+assert.match(
+    validationStop,
+    /\[\[ "\$unit" =~ \^zzz-calculator-validation-\[0-9\]\+\-\[1-9\]\[0-9\]\*\\\.service\$ \]\] \|\| return 1/,
+    "Validation cleanup must reject untrusted transient-unit names",
+)
+assert.match(
+    validationStop,
+    /if \[\[ -n "\$control_group" \]\]; then[\s\S]*?else\s+validation_unit_name_has_members "\$unit" && return 1\s+fi[\s\S]*?systemctl stop/,
+    "A pruned systemd 239 cgroup must be accepted only when no unit-named members remain",
+)
+assert.match(
+    validationStop,
+    /systemctl stop[\s\S]*?validation_unit_name_has_members "\$unit" && return 1/,
+    "Validation cleanup must recheck unit-named members after stopping the service",
+)
+assert.ok(
+    (validationStop.match(/finish_validation_probe_if_gone "\$unit"/g) ?? []).length >= 7,
+    "Every transient-unit query, stop, reset, and GC race must use the same strict gone-unit proof",
+)
+assert.doesNotMatch(
+    validationStop,
+    /LoadState --value 2>\/dev\/null \|\| true/,
+    "A failed systemd LoadState query must never be treated as an unloaded validation unit",
+)
+includes(validationGone, 'VALIDATION_UNIT=""')
 assert.match(
     manager,
     /copy_release_for_validation\(\)[\s\S]*source_tree_before[\s\S]*--exclude='\.\/data'[\s\S]*user_drive_discs\.example\.json[\s\S]*source_tree_after[\s\S]*prepare_private_validation_release "\$destination"[\s\S]*assert_sanitized_validation_data/,
@@ -562,22 +654,125 @@ assert.doesNotMatch(manager, /validationLogTailBase64|VALIDATION_LOG_TAIL_BASE64
 for (const token of [
     'readonly VALIDATION_TMPFS_BYTES="$((128 * 1024 * 1024))"',
     'readonly VALIDATION_RUN_TMPFS_BYTES="$((4 * 1024 * 1024))"',
+    'readonly MAX_VALIDATION_RESPONSE_BYTES="$((4 * 1024 * 1024))"',
     'readonly PRODUCTION_RELEASE_ROOT="/opt/zzz_calculator"',
     'readonly PRODUCTION_DEPLOY_ROOT="/var/lib/zzz-calculator-deploy"',
     'readonly PRODUCTION_CURRENT_DATA="/opt/zzz_calculator/current/data"',
+    'readonly PRODUCTION_DOWNLOAD_ROOT="/srv/zzz-download-origin"',
     '[[ "$(/usr/bin/stat -f -c %T -- "$probe_root")" == "tmpfs" ]]',
     '[[ "$(/usr/bin/stat -f -c %T -- "$HOST_RUNTIME_DIR")" == "tmpfs" ]]',
     '[[ ! -r "$PRODUCTION_RELEASE_ROOT" && ! -w "$PRODUCTION_RELEASE_ROOT" && ! -x "$PRODUCTION_RELEASE_ROOT" ]]',
     '[[ ! -r "$PRODUCTION_DEPLOY_ROOT" && ! -w "$PRODUCTION_DEPLOY_ROOT" && ! -x "$PRODUCTION_DEPLOY_ROOT" ]]',
     '[[ ! -r "$PRODUCTION_CURRENT_DATA" && ! -w "$PRODUCTION_CURRENT_DATA" && ! -x "$PRODUCTION_CURRENT_DATA" ]]',
+    '[[ ! -r "$PRODUCTION_DOWNLOAD_ROOT" && ! -w "$PRODUCTION_DOWNLOAD_ROOT" && ! -x "$PRODUCTION_DOWNLOAD_ROOT" ]]',
     '[[ "$(readlink /proc/self/ns/net)" != "$(readlink /proc/1/ns/net)" ]]',
-    '[[ "${#interfaces[@]}" -eq 1 && "${interfaces[0]##*/}" == "lo" ]]',
+    '[[ -r /proc/net/dev ]]',
+    'while IFS=: read -r interface counters',
+    '[[ "$interface" =~ ^[A-Za-z0-9_.-]+$ ]]',
+    '[[ "${#interfaces[@]}" -eq 1 && "${interfaces[0]}" == "lo" ]]',
 ]) {
     includes(validationWorker, token)
 }
 for (const hiddenWritablePath of ["HOST_TMP_DIR", "HOST_VAR_TMP_DIR", "HOST_SHM_DIR"]) {
     includes(validationWorker, hiddenWritablePath)
 }
+const validationWorkerSandbox = validationWorker.match(/assert_sandbox_contract\(\)[\s\S]*?^}/m)?.[0] ?? ""
+const validationWorkerTmpfs = validationWorker.match(/assert_tmpfs_mount_contract\(\)[\s\S]*?^}/m)?.[0] ?? ""
+const validationWorkerIpc = validationWorker.match(/assert_sysv_ipc_denied\(\)[\s\S]*?^}/m)?.[0] ?? ""
+const validationWorkerPersonality = validationWorker.match(/assert_personality_denied\(\)[\s\S]*?^}/m)?.[0] ?? ""
+const validationWorkerResponseFile = validationWorker.match(/assert_endpoint_response_file\(\)[\s\S]*?^}/m)?.[0] ?? ""
+const validationWorkerMountSelection = validationWorker.match(/select_effective_mount_record\(\)[\s\S]*?^}/m)?.[0] ?? ""
+const validationWorkerMain = validationWorker.slice(validationWorker.indexOf('[[ "$(id -un)"'))
+assert.doesNotMatch(
+    validationWorkerSandbox,
+    /\/sys\/class\/net/,
+    "Network namespace interfaces must be read from namespaced procfs rather than host-mounted sysfs",
+)
+includes(validationWorker, 'readonly CAPABILITY_PROBE_MODE="--capability-probe"')
+for (const processContract of ["NoNewPrivs", "Seccomp", "CapInh", "CapPrm", "CapEff", "CapBnd", "CapAmb"]) {
+    includes(validationWorkerSandbox, processContract)
+}
+includes(validationWorkerSandbox, '[[ "$status_value" == "1" ]]')
+includes(validationWorkerSandbox, '[[ "$status_value" == "2" ]]')
+includes(validationWorkerSandbox, '[[ "$status_value" =~ ^0+$ ]]')
+for (const isolatedIpcPath of [
+    'readonly HOST_SYSVIPC_DIR="/proc/sysvipc"',
+    'readonly HOST_MQUEUE_DIR="/dev/mqueue"',
+]) {
+    includes(validationWorker, isolatedIpcPath)
+}
+includes(validationWorkerSandbox, '[[ ! -r "$hidden_ipc_path" && ! -w "$hidden_ipc_path" && ! -x "$hidden_ipc_path" ]]')
+includes(validationWorkerTmpfs, "select_effective_mount_record")
+includes(validationWorkerMountSelection, "hidden_by_child")
+includes(validationWorkerMountSelection, '[[ "$top_count" == "1" ]]')
+assert.doesNotMatch(validationWorkerMountSelection, /mount_id > selected_mount_id/)
+includes(validationWorkerTmpfs, "for required_option in rw nosuid nodev noexec")
+includes(validationWorkerTmpfs, "/usr/bin/df --output=size -B1")
+includes(validationWorkerTmpfs, "/usr/bin/df --output=itotal")
+includes(validationWorker, 'readonly VALIDATION_TMPFS_INODES="16384"')
+includes(validationWorker, 'readonly VALIDATION_RUN_TMPFS_INODES="1024"')
+includes(validationWorkerResponseFile, '[[ -f "$response_file" && ! -L "$response_file" ]]')
+includes(validationWorkerResponseFile, "/usr/bin/stat -c '%u:%g:%a:%h:%s'")
+includes(validationWorkerResponseFile, '"$mode" == "600"')
+includes(validationWorkerResponseFile, '"$links" == "1"')
+includes(validationWorkerResponseFile, '"$size" -le "$MAX_VALIDATION_RESPONSE_BYTES"')
+includes(validationWorkerSandbox, '[[ -x /usr/bin/ipcmk && -x /usr/bin/ipcrm ]]')
+for (const ipcProbe of ["queue", "semaphore", "shared-memory"]) {
+    includes(validationWorkerSandbox, `assert_sysv_ipc_denied ${ipcProbe}`)
+}
+includes(validationWorkerSandbox, "assert_personality_denied")
+includes(validationWorkerPersonality, '/usr/bin/setarch "$architecture" -R /usr/bin/true')
+includes(validationWorkerPersonality, "/usr/bin/uname -m")
+includes(validationWorkerPersonality, "Operation not permitted")
+ordered(
+    validationWorkerSandbox,
+    "assert_sysv_ipc_denied shared-memory",
+    "assert_personality_denied",
+    "The personality denial must be proven before the sandbox contract succeeds",
+)
+for (const ipcFlag of ['create_flag="-Q"', 'create_flag="-S"', 'create_flag="-M"']) {
+    includes(validationWorkerIpc, ipcFlag)
+}
+includes(validationWorkerIpc, "Operation not permitted")
+includes(validationWorkerIpc, '/usr/bin/ipcrm "$remove_flag" "$ipc_id"')
+ordered(
+    validationWorkerIpc,
+    '/usr/bin/ipcrm "$remove_flag" "$ipc_id"',
+    'fail_worker "$EXIT_IPC_SYSCALL_ALLOWED"',
+    "An unexpectedly created SysV IPC object must be removed before the worker fails",
+)
+for (const workerExit of [
+    "EXIT_PROCESS_STATUS_CONTRACT=60",
+    "EXIT_NO_NEW_PRIVILEGES_CONTRACT=61",
+    "EXIT_SECCOMP_CONTRACT=62",
+    "EXIT_CAPABILITY_CONTRACT=63",
+    "EXIT_TMPFS_MOUNT_OPTIONS=64",
+    "EXIT_TMPFS_INODE_LIMIT=65",
+    "EXIT_IPC_PATH_EXPOSED=66",
+    "EXIT_IPC_DEPENDENCY_MISSING=67",
+    "EXIT_IPC_DENIAL_UNPROVEN=68",
+    "EXIT_IPC_SYSCALL_ALLOWED=69",
+    "EXIT_IPC_CLEANUP_FAILED=70",
+    "EXIT_PRODUCTION_DOWNLOAD_EXPOSED=71",
+    "EXIT_PERSONALITY_DEPENDENCY_MISSING=72",
+    "EXIT_PERSONALITY_DENIAL_UNPROVEN=73",
+    "EXIT_PERSONALITY_SYSCALL_ALLOWED=74",
+    "EXIT_CAPABILITY_SOURCE_CONTRACT=75",
+    "EXIT_ENDPOINT_RESPONSE_FILE_CONTRACT=76",
+]) {
+    includes(validationWorker, workerExit)
+}
+assert.match(
+    validationWorkerMain,
+    /assert_sandbox_contract\r?\nif \[\[ "\$worker_mode" == "capability-probe" \]\]; then[\s\S]*?capability bind source sentinel is missing or invalid[\s\S]*?\n\s+exit 0\r?\nfi\r?\n\r?\n\[\[ -d "\$release_dir"[^\n]*backend\/server\.js/,
+    "The fixed capability probe must exit before reading or executing candidate files",
+)
+ordered(
+    validationWorkerMain,
+    "assert_sandbox_contract",
+    '/usr/bin/node "$release_dir/backend/server.js"',
+    "Normal validation must prove its sandbox before candidate Node starts",
+)
 const expectedValidationCatalogs = [
     "agents.json",
     "agent_skills.json",
@@ -602,6 +797,12 @@ includes(validationWorker, '"$probe_root/data/user_drive_discs.json"')
 includes(validationWorker, '/usr/bin/cmp -- "$probe_root/data/user_drive_discs.example.json"')
 assert.doesNotMatch(validationWorker, /cp -R|scan-telemetry\//)
 includes(validationWorker, '/usr/bin/node "$release_dir/backend/server.js" >/dev/null 2>&1 &')
+includes(validationWorker, '--max-filesize "$MAX_VALIDATION_RESPONSE_BYTES"')
+assert.equal(
+    validationWorker.match(/assert_endpoint_response_file "\$response_file"/g)?.length,
+    3,
+    "Health, catalog and app-config responses must all pass the bounded-file contract",
+)
 assert.doesNotMatch(validationWorker, /server\.log/)
 
 // Deployment and rollback allow at most 15 seconds for the first healthy

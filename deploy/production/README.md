@@ -59,6 +59,53 @@ files in that transaction so no account-controlled command can run before the
 forced SSH gateway. The directory inode, `current`, release contents, Nginx,
 the production service and its restart counter are not changed.
 
+The validation sandbox has an explicit host compatibility contract. The
+manager parses both the `systemd-run` client and PID 1 manager versions, uses
+the lower as the effective version, and rejects an unreadable version or
+anything older than v239 before candidate code can run. Its mandatory sandbox
+profile contains only the v239 baseline. Hosts in the v242 and v248 profiles
+add `RestrictSUIDSGID=yes` and `PrivateIPC=yes`, respectively, as defense in
+depth; those newer properties are never sent speculatively to an older manager.
+Profile selection is deterministic and is not a retry mechanism.
+
+The v239 baseline does not depend on `PrivateIPC`. It denies the IPC syscalls `ipc`,
+`msgctl`, `msgget`, `msgrcv`, `msgsnd`, `semctl`, `semget`, `semop`,
+`semtimedop`, `shmat`, `shmctl`, `shmdt`, `shmget`, `mq_getsetattr`,
+`mq_notify`, `mq_open`, `mq_timedreceive`, `mq_timedsend` and `mq_unlink`. It
+also denies the `personality` syscall directly because the Rocky/RHEL systemd
+239 client does not accept transient `LockPersonality=`. The profile sets the
+transient service's `RemoveIPC=yes`, clamps seccomp to the native syscall architecture, and makes `/proc/sysvipc` and
+`/dev/mqueue` inaccessible. It deliberately does not use systemd's broader
+`@ipc` syscall group, which would also block ordinary pipes and worker runtime
+calls. The inert probe proves the deny rules on the server's actual native
+architecture; compatibility ABIs are not permitted.
+The baseline also excludes AF_UNIX, removes all capabilities and enables
+`NoNewPrivileges`. The validation worker proves those controls from inside the
+sandbox: `NoNewPrivs` and seccomp must be active, every capability mask must be
+zero, both IPC paths must be unreadable/unwritable/untraversable, and System V
+message queue, semaphore and shared-memory creation with `ipcmk` must fail with
+`EPERM`. A fixed `setarch` probe must also prove that the `personality` syscall
+returns `EPERM`. If an unexpected IPC object is created, the worker removes it
+with `ipcrm` and fails the operation. This per-unit `RemoveIPC` cleanup is
+distinct from the global setting with the same name: the bootstrap does not
+modify logind policy.
+
+Before claiming the uploaded artifact or starting any current, candidate or
+rollback validation stage, the manager starts
+one fixed root-owned inert capability probe with the selected complete sandbox
+profile. Probe mode checks isolation and a fixed manager-owned bind-source
+sentinel only: it does not read release data, start Node or execute
+candidate-controlled bytes. Candidate code is permitted only
+after this probe succeeds. As a CI-only diagnostic, the pinned systemd 239
+fixture first submits every baseline property separately, strictly removes each
+diagnostic unit, and reports all unsupported transient assignments in one
+failure. It also proves that two deliberately unsupported names are aggregated.
+The complete inert probe remains the authoritative combined-profile gate. An
+unsupported property, mount, seccomp rule or
+isolation assertion stops the operation after that single attempt; the manager
+does not retry with a weaker profile. Cleanup then verifies that the transient
+unit, cgroup and writable probe tree are gone.
+
 `PROD_URL` is a repository-level GitHub Actions variable. Production host,
 user, private key and pinned `known_hosts` remain secrets in the protected
 `production` Environment; the secretless preflight job exports the normalized
@@ -141,14 +188,19 @@ copy, rollback copy and candidate copy in that order. Each stage gets a fresh
 separate 4 MiB private `/run`, and runs as `zzzvalidate` in a transient systemd
 service with `PrivateNetwork`, AF_UNIX disabled, an empty capability set, no
 new privileges, a read-only host filesystem, explicit memory/CPU/task/file
-limits and `KillMode=control-group`. The source `data` tree is never copied into
+limits and `KillMode=control-group`. Endpoint responses are written only to the
+private validation tmpfs under a 4 MiB `RLIMIT_FSIZE`; curl also receives that limit,
+and the worker rejects an empty, linked, multiply linked, mis-owned, permissively
+mode-set or oversized response before parsing it. The source `data` tree is never copied into
 the validation scope:
 only `agents.json`, `agent_skills.json`, `anomaly_effects.json`, `bosses.json`,
 `combat_buffs.json`, `drive_disc_sets.json`, `stat_rules.json` and
 `w_engines.json` are allow-listed. `user_drive_discs.example.json` is copied
 as both the example and isolated `user_drive_discs.json`; real inventory,
 scan telemetry and unknown files never enter the sandbox. Seed data is capped
-at 64 MiB, 8,192 entries and 1 MiB per file before candidate code starts. The real release
+at 64 MiB, 8,192 entries and 1 MiB per file before candidate code starts; this
+independent input-file cap is not widened by the 4 MiB aggregate API-response
+limit. The real release
 root, deployment state, production state and download origin are inaccessible;
 the one private release copy is exposed read-only at `/zzz-validation/app`.
 The private validation parent remains `root:zzzvalidate` mode `0750`: the
@@ -166,8 +218,11 @@ is never copied into deployment evidence. Every stage must pass `/api/health`,
 `/api/catalog` and `/api/app-config`, after which the manager stops the whole
 cgroup and removes its writable tree. `dry-run`
 never changes `current` or restarts the production service and verifies the
-original target, PID, `NRestarts`, Nginx and both manifest hashes afterward. A
-real `deploy` repeats the same four-stage gate before any production switch.
+original target, commit, full/portable/static/metadata digests, state pair and
+migration marker, PID, `NRestarts`, Nginx and both manifest hashes afterward.
+The same zero-impact comparison runs after a failed capability probe or failed
+validation stage. A real `deploy` repeats the inert probe and the same
+four-stage gate before any production switch.
 
 Successful deploys create new `git-<12-char-sha>` and rollback releases owned
 by `root:root`, with directories mode `0755` and files mode `0644`; the manager
@@ -200,10 +255,14 @@ fails the operation. Evidence records before/after release, commit, service,
 PID, restart counter and manifest hashes plus archive limits, tree hashes,
 the current-release policy, full/portable/static live digests, metadata digest,
 tree usage, byte/inode headroom, validation sequence, transient-unit results
-and switch state. It also records `previous-release`, `last-release` and the
-migration marker before and after the action. Successful audit/dry-run evidence
-requires those values to be identical; committed deploy/rollback evidence must
-map them to the exact final release. JSON is rendered
+and switch state. The `systemdRunVersion`, `systemdManagerVersion`,
+`systemdEffectiveVersion`, `validationSandboxProfile`,
+`validationSandboxProbe` and `validationCleanup` fields bind the selected host
+profile, inert probe result and final transient cleanup state to that evidence.
+It also records `previous-release`, `last-release` and the migration marker
+before and after the action. Successful audit/dry-run evidence requires those
+values to be identical; committed deploy/rollback evidence must map them to the
+exact final release. JSON is rendered
 to a temporary inode, checked against a complete key/type/state schema with
 `jq`, permissioned, and atomically renamed. An invalid or unwritable evidence
 record fails the operation; after a production switch it also forces rollback.
