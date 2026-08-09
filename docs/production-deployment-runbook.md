@@ -374,6 +374,15 @@ logind 同名配置。worker 必须在自身启动 Node 前核验 seccomp、
 失败，固定 `setarch` 探针也必须证明 `personality` syscall 以 `EPERM`
 失败。若意外创建 IPC 对象，先用 `ipcrm` 清理，再令整次操作失败。
 
+隔离服务的 `LimitFSIZE` 固定为 4 MiB，用于容纳当前约 2.3 MiB 的聚合
+`/api/catalog` 响应，但不改变每个输入 catalog 文件 1 MiB 的门禁。health、
+catalog 和 app-config 响应只能写入私有 validation tmpfs；curl 同时接收 4 MiB
+上限，写入成功后 worker 还必须核验响应为 `zzzvalidate` 自有、`0600`、
+单硬链接、非空且不超过 4 MiB 的普通文件，再交给 `jq`。Rocky/systemd 239
+CI 必须用一个无 `Content-Length` 且大于 1 MiB、小于 4 MiB 的 catalog 完整
+运行 release-mode worker，并用一个大于 4 MiB 的响应证明上限仍会拒绝且无
+transient unit/probe 目录残留；不能只运行 capability probe。
+
 在 claim incoming artifact 和 current、candidate、rollback、candidate
 四阶段之前，manager 先以同一套完整参数运行一次固定、root-owned 的 inert
 capability probe。探针只验证

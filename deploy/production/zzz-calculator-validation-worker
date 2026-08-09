@@ -21,6 +21,7 @@ readonly VALIDATION_TMPFS_BYTES="$((128 * 1024 * 1024))"
 readonly VALIDATION_TMPFS_INODES="16384"
 readonly VALIDATION_RUN_TMPFS_BYTES="$((4 * 1024 * 1024))"
 readonly VALIDATION_RUN_TMPFS_INODES="1024"
+readonly MAX_VALIDATION_RESPONSE_BYTES="$((4 * 1024 * 1024))"
 readonly PRODUCTION_STATE_DIR="/var/lib/zzz-calculator"
 readonly PRODUCTION_RELEASE_ROOT="/opt/zzz_calculator"
 readonly PRODUCTION_DEPLOY_ROOT="/var/lib/zzz-calculator-deploy"
@@ -78,6 +79,7 @@ readonly EXIT_PERSONALITY_DEPENDENCY_MISSING=72
 readonly EXIT_PERSONALITY_DENIAL_UNPROVEN=73
 readonly EXIT_PERSONALITY_SYSCALL_ALLOWED=74
 readonly EXIT_CAPABILITY_SOURCE_CONTRACT=75
+readonly EXIT_ENDPOINT_RESPONSE_FILE_CONTRACT=76
 readonly -a VALIDATION_CATALOG_FILES=(
     agents.json
     agent_skills.json
@@ -289,6 +291,24 @@ assert_personality_denied() {
         || fail_worker "$EXIT_PERSONALITY_DENIAL_UNPROVEN" "personality denial did not return EPERM"
 }
 
+assert_endpoint_response_file() {
+    local response_file="$1"
+    local owner_uid owner_gid mode links size extra=""
+
+    [[ -f "$response_file" && ! -L "$response_file" ]] \
+        || fail_worker "$EXIT_ENDPOINT_RESPONSE_FILE_CONTRACT" "endpoint response file is missing or unsafe"
+    IFS=: read -r owner_uid owner_gid mode links size extra \
+        <<<"$(/usr/bin/stat -c '%u:%g:%a:%h:%s' -- "$response_file")"
+    [[ -z "$extra" \
+        && "$owner_uid" == "$(id -u)" \
+        && "$owner_gid" == "$(id -g)" \
+        && "$mode" == "600" \
+        && "$links" == "1" \
+        && "$size" =~ ^[1-9][0-9]*$ \
+        && "$size" -le "$MAX_VALIDATION_RESPONSE_BYTES" ]] \
+        || fail_worker "$EXIT_ENDPOINT_RESPONSE_FILE_CONTRACT" "endpoint response file violates its bounded-file contract"
+}
+
 assert_sandbox_contract() {
     local status_value="" capability_field hidden_writable_path hidden_ipc_path interface counters
     local -a interfaces=()
@@ -405,13 +425,16 @@ done
 
 /usr/bin/node "$release_dir/backend/server.js" >/dev/null 2>&1 &
 server_pid="$!"
+response_file="$probe_root/run/response.json"
 ready="0"
 for attempt in $(seq 1 15); do
     kill -0 "$server_pid" 2>/dev/null \
         || fail_worker "$EXIT_SERVER_EARLY_EXIT" "candidate server exited before readiness"
     if curl --disable --fail --silent --show-error --max-time 1 \
-        "$VALIDATION_BASE_URL/api/health" >"$probe_root/run/response.json" 2>/dev/null \
-        && jq -e '.ok == true' "$probe_root/run/response.json" >/dev/null 2>&1; then
+        --max-filesize "$MAX_VALIDATION_RESPONSE_BYTES" \
+        "$VALIDATION_BASE_URL/api/health" >"$response_file" 2>/dev/null \
+        && assert_endpoint_response_file "$response_file" \
+        && jq -e '.ok == true' "$response_file" >/dev/null 2>&1; then
         ready="1"
         break
     fi
@@ -423,14 +446,18 @@ done
 kill -0 "$server_pid" 2>/dev/null \
     || fail_worker "$EXIT_SERVER_HEALTH_LOST" "candidate server stopped after readiness"
 curl --disable --fail --silent --show-error --max-time 3 \
-    "$VALIDATION_BASE_URL/api/catalog" >"$probe_root/run/response.json" \
+    --max-filesize "$MAX_VALIDATION_RESPONSE_BYTES" \
+    "$VALIDATION_BASE_URL/api/catalog" >"$response_file" \
     || fail_worker "$EXIT_SERVER_ENDPOINT_FAILURE" "candidate catalog endpoint failed"
-jq -e '(.agents | type) == "array"' "$probe_root/run/response.json" >/dev/null \
+assert_endpoint_response_file "$response_file"
+jq -e '(.agents | type) == "array"' "$response_file" >/dev/null \
     || fail_worker "$EXIT_SERVER_ENDPOINT_FAILURE" "candidate catalog response is invalid"
 curl --disable --fail --silent --show-error --max-time 3 \
-    "$VALIDATION_BASE_URL/api/app-config" >"$probe_root/run/response.json" \
+    --max-filesize "$MAX_VALIDATION_RESPONSE_BYTES" \
+    "$VALIDATION_BASE_URL/api/app-config" >"$response_file" \
     || fail_worker "$EXIT_SERVER_ENDPOINT_FAILURE" "candidate app-config endpoint failed"
-jq -e '.maintenanceEnabled == false' "$probe_root/run/response.json" >/dev/null \
+assert_endpoint_response_file "$response_file"
+jq -e '.maintenanceEnabled == false' "$response_file" >/dev/null \
     || fail_worker "$EXIT_SERVER_ENDPOINT_FAILURE" "candidate app-config response is invalid"
 kill -0 "$server_pid" 2>/dev/null \
     || fail_worker "$EXIT_SERVER_ENDPOINT_FAILURE" "candidate server stopped during endpoint checks"

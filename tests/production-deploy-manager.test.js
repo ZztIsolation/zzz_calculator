@@ -81,6 +81,7 @@ for (const contract of [
     'readonly VALIDATION_TMPFS_BYTES="$((128 * 1024 * 1024))"',
     'readonly VALIDATION_TMPFS_INODES="16384"',
     'readonly VALIDATION_RUN_TMPFS_BYTES="$((4 * 1024 * 1024))"',
+    'readonly MAX_VALIDATION_RESPONSE_BYTES="$((4 * 1024 * 1024))"',
     'readonly MAX_VALIDATION_SEED_BYTES="$((64 * 1024 * 1024))"',
     'readonly MAX_VALIDATION_SEED_ENTRIES="8192"',
     'readonly MAX_VALIDATION_SEED_FILE_BYTES="$((1024 * 1024))"',
@@ -554,7 +555,7 @@ includes(validationProperties, "--property KillMode=control-group")
 includes(validationProperties, "--property MemoryLimit=768M")
 includes(validationProperties, "--property CPUQuota=200%")
 includes(validationProperties, "--property TasksMax=64")
-includes(validationProperties, "--property LimitFSIZE=1M")
+includes(validationProperties, '--property "LimitFSIZE=${MAX_VALIDATION_RESPONSE_BYTES}"')
 includes(validationProperties, "VALIDATION_SYSTEMD_PROPERTIES+=(--property RestrictSUIDSGID=yes)")
 includes(validationProperties, "VALIDATION_SYSTEMD_PROPERTIES+=(--property PrivateIPC=yes)")
 includes(validationTransientUnit, '/usr/bin/systemd-run --quiet --unit "$unit_base"')
@@ -653,6 +654,7 @@ assert.doesNotMatch(manager, /validationLogTailBase64|VALIDATION_LOG_TAIL_BASE64
 for (const token of [
     'readonly VALIDATION_TMPFS_BYTES="$((128 * 1024 * 1024))"',
     'readonly VALIDATION_RUN_TMPFS_BYTES="$((4 * 1024 * 1024))"',
+    'readonly MAX_VALIDATION_RESPONSE_BYTES="$((4 * 1024 * 1024))"',
     'readonly PRODUCTION_RELEASE_ROOT="/opt/zzz_calculator"',
     'readonly PRODUCTION_DEPLOY_ROOT="/var/lib/zzz-calculator-deploy"',
     'readonly PRODUCTION_CURRENT_DATA="/opt/zzz_calculator/current/data"',
@@ -678,6 +680,7 @@ const validationWorkerSandbox = validationWorker.match(/assert_sandbox_contract\
 const validationWorkerTmpfs = validationWorker.match(/assert_tmpfs_mount_contract\(\)[\s\S]*?^}/m)?.[0] ?? ""
 const validationWorkerIpc = validationWorker.match(/assert_sysv_ipc_denied\(\)[\s\S]*?^}/m)?.[0] ?? ""
 const validationWorkerPersonality = validationWorker.match(/assert_personality_denied\(\)[\s\S]*?^}/m)?.[0] ?? ""
+const validationWorkerResponseFile = validationWorker.match(/assert_endpoint_response_file\(\)[\s\S]*?^}/m)?.[0] ?? ""
 const validationWorkerMountSelection = validationWorker.match(/select_effective_mount_record\(\)[\s\S]*?^}/m)?.[0] ?? ""
 const validationWorkerMain = validationWorker.slice(validationWorker.indexOf('[[ "$(id -un)"'))
 assert.doesNotMatch(
@@ -708,6 +711,11 @@ includes(validationWorkerTmpfs, "/usr/bin/df --output=size -B1")
 includes(validationWorkerTmpfs, "/usr/bin/df --output=itotal")
 includes(validationWorker, 'readonly VALIDATION_TMPFS_INODES="16384"')
 includes(validationWorker, 'readonly VALIDATION_RUN_TMPFS_INODES="1024"')
+includes(validationWorkerResponseFile, '[[ -f "$response_file" && ! -L "$response_file" ]]')
+includes(validationWorkerResponseFile, "/usr/bin/stat -c '%u:%g:%a:%h:%s'")
+includes(validationWorkerResponseFile, '"$mode" == "600"')
+includes(validationWorkerResponseFile, '"$links" == "1"')
+includes(validationWorkerResponseFile, '"$size" -le "$MAX_VALIDATION_RESPONSE_BYTES"')
 includes(validationWorkerSandbox, '[[ -x /usr/bin/ipcmk && -x /usr/bin/ipcrm ]]')
 for (const ipcProbe of ["queue", "semaphore", "shared-memory"]) {
     includes(validationWorkerSandbox, `assert_sysv_ipc_denied ${ipcProbe}`)
@@ -750,6 +758,7 @@ for (const workerExit of [
     "EXIT_PERSONALITY_DENIAL_UNPROVEN=73",
     "EXIT_PERSONALITY_SYSCALL_ALLOWED=74",
     "EXIT_CAPABILITY_SOURCE_CONTRACT=75",
+    "EXIT_ENDPOINT_RESPONSE_FILE_CONTRACT=76",
 ]) {
     includes(validationWorker, workerExit)
 }
@@ -788,6 +797,12 @@ includes(validationWorker, '"$probe_root/data/user_drive_discs.json"')
 includes(validationWorker, '/usr/bin/cmp -- "$probe_root/data/user_drive_discs.example.json"')
 assert.doesNotMatch(validationWorker, /cp -R|scan-telemetry\//)
 includes(validationWorker, '/usr/bin/node "$release_dir/backend/server.js" >/dev/null 2>&1 &')
+includes(validationWorker, '--max-filesize "$MAX_VALIDATION_RESPONSE_BYTES"')
+assert.equal(
+    validationWorker.match(/assert_endpoint_response_file "\$response_file"/g)?.length,
+    3,
+    "Health, catalog and app-config responses must all pass the bounded-file contract",
+)
 assert.doesNotMatch(validationWorker, /server\.log/)
 
 // Deployment and rollback allow at most 15 seconds for the first healthy

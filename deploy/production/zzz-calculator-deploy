@@ -54,6 +54,7 @@ readonly VALIDATION_TMPFS_BYTES="$((128 * 1024 * 1024))"
 readonly VALIDATION_TMPFS_INODES="16384"
 readonly VALIDATION_RUN_TMPFS_BYTES="$((4 * 1024 * 1024))"
 readonly VALIDATION_RUN_TMPFS_INODES="1024"
+readonly MAX_VALIDATION_RESPONSE_BYTES="$((4 * 1024 * 1024))"
 readonly MAX_VALIDATION_SEED_BYTES="$((64 * 1024 * 1024))"
 readonly MAX_VALIDATION_SEED_ENTRIES="8192"
 readonly MAX_VALIDATION_SEED_FILE_BYTES="$((1024 * 1024))"
@@ -355,7 +356,7 @@ build_validation_systemd_properties() {
         --property LimitNPROC=64
         --property LimitNOFILE=4096
         --property LimitCORE=0
-        --property LimitFSIZE=1M
+        --property "LimitFSIZE=${MAX_VALIDATION_RESPONSE_BYTES}"
         --property UMask=0077
         --property StandardOutput=null
         --property StandardError=null
