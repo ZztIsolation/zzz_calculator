@@ -319,8 +319,8 @@ run_release_driver() {
         '    ACTION="dry-run"; STATUS="failed"; ERROR_MESSAGE="fixture systemd failure"; VALIDATION_SANDBOX_PROBE_RESULT="failed/failed/exit-code/68"; VALIDATION_CLEANUP_RESULT="clean"' \
         '    mutation='"'"'.validationSandboxProbe = "failed/failed/exit-code\n/68"'"'"' ;;' \
         '  failed-pending-cleanup)' \
-        '    ACTION="dry-run"; STATUS="failed"; ERROR_MESSAGE="fixture pending cleanup"; VALIDATION_SANDBOX_PROBE_RESULT="failed/failed/exit-code/68"; VALIDATION_CLEANUP_RESULT="pending"' \
-        '    mutation='"'"'.validationCleanup = "clean"'"'"' ;;' \
+        '    ACTION="dry-run"; STATUS="failed"; ERROR_MESSAGE="fixture cleanup failure"; VALIDATION_SANDBOX_PROBE_RESULT="failed/failed/exit-code/68"; VALIDATION_CLEANUP_RESULT="failed"' \
+        '    mutation='"'"'.validationCleanup = "pending"'"'"' ;;' \
         '  *) die "unknown evidence fixture $fixture" ;;' \
         'esac' \
         'valid="$TEST_OUTPUT_DIR/$fixture.valid.json"; invalid="$TEST_OUTPUT_DIR/$fixture.invalid.json"' \
@@ -335,16 +335,9 @@ for evidence_fixture in \
     deploy deploy-noop rollback rollback-noop failed-invalid failed-systemd failed-pending-cleanup; do
     evidence_output="${test_root}/evidence-${evidence_fixture}"
     mkdir -p -- "$evidence_output"
-    if [[ "$evidence_fixture" == "failed-pending-cleanup" ]]; then
-        if TEST_OUTPUT_DIR="$evidence_output" /bin/bash --noprofile --norc \
-            "$evidence_schema_driver" "$evidence_fixture"; then
-            fail "pending validation cleanup was accepted as final evidence"
-        fi
-    else
-        TEST_OUTPUT_DIR="$evidence_output" /bin/bash --noprofile --norc \
-            "$evidence_schema_driver" "$evidence_fixture" \
-            || fail "${evidence_fixture} evidence schema fixture failed"
-    fi
+    TEST_OUTPUT_DIR="$evidence_output" /bin/bash --noprofile --norc \
+        "$evidence_schema_driver" "$evidence_fixture" \
+        || fail "${evidence_fixture} evidence schema fixture failed"
 done
 
 {

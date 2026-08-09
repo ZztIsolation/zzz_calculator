@@ -2410,7 +2410,6 @@ verify_rollback_runtime() (
 )
 
 assert_production_preflight() {
-    detect_validation_systemd_profile
     current_path_is_bounded_for_read "$CURRENT_BEFORE" \
         || die "current release cannot be resolved inside the fixed release root"
     assert_release_tree_shape "$CURRENT_BEFORE"
@@ -2441,6 +2440,7 @@ assert_production_preflight() {
 
     assert_effective_runtime_environment "$PID_BEFORE" "$CURRENT_BEFORE"
     assert_runtime_endpoints
+    detect_validation_systemd_profile
 }
 
 healthy_runtime_pid() {
