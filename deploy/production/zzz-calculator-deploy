@@ -44,6 +44,12 @@ readonly VALIDATION_PORT="8788"
 readonly HEALTH_STARTUP_GRACE_SECONDS="15"
 readonly HEALTH_STABILITY_SECONDS="15"
 readonly VALIDATION_UNIT_PREFIX="zzz-calculator-validation"
+readonly MIN_SYSTEMD_VERSION="239"
+readonly RESTRICT_SUID_SGID_SYSTEMD_VERSION="242"
+readonly PRIVATE_IPC_SYSTEMD_VERSION="248"
+readonly VALIDATION_SANDBOX_PROFILE_BASE="systemd-v239-seccomp"
+readonly VALIDATION_CAPABILITY_SENTINEL=".zzz-sandbox-capability-v1"
+readonly VALIDATION_CAPABILITY_SENTINEL_CONTENT="zzz-sandbox-capability-v1"
 readonly VALIDATION_TMPFS_BYTES="$((128 * 1024 * 1024))"
 readonly VALIDATION_TMPFS_INODES="16384"
 readonly VALIDATION_RUN_TMPFS_BYTES="$((4 * 1024 * 1024))"
@@ -60,6 +66,28 @@ readonly -a VALIDATION_CATALOG_FILES=(
     drive_disc_sets.json
     stat_rules.json
     w_engines.json
+)
+readonly -a VALIDATION_DENIED_SYSCALLS=(
+    ipc
+    mq_getsetattr
+    mq_notify
+    mq_open
+    mq_timedreceive
+    mq_timedsend
+    mq_unlink
+    msgctl
+    msgget
+    msgrcv
+    msgsnd
+    semctl
+    semget
+    semop
+    semtimedop
+    shmat
+    shmctl
+    shmdt
+    shmget
+    personality
 )
 readonly MAX_COMPRESSED_BYTES="$((256 * 1024 * 1024))"
 readonly MAX_EXPANDED_BYTES="$((1024 * 1024 * 1024))"
@@ -139,8 +167,15 @@ VALIDATION_PROBE_ROOT=""
 VALIDATION_PROBE_INDEX="0"
 VALIDATION_DIR_EXPOSED="0"
 VALIDATION_UNIT_RESULTS=""
+SYSTEMD_RUN_VERSION=""
+SYSTEMD_MANAGER_VERSION=""
+SYSTEMD_EFFECTIVE_VERSION=""
+VALIDATION_SANDBOX_PROFILE=""
+VALIDATION_SANDBOX_PROBE_RESULT="not-run"
+VALIDATION_CLEANUP_RESULT="not-run"
 VALIDATION_UID=""
 VALIDATION_GID=""
+declare -a VALIDATION_SYSTEMD_PROPERTIES=()
 SWITCH_STATE="not-switched"
 SWITCH_ROLLBACK_TARGET=""
 SWITCH_TARGET=""
@@ -186,11 +221,151 @@ die() {
     exit 1
 }
 
+append_error_detail() {
+    local detail="$*"
+    [[ -n "$detail" ]] || return 0
+    if [[ -z "$ERROR_MESSAGE" ]]; then
+        ERROR_MESSAGE="$detail"
+    elif [[ "$ERROR_MESSAGE" != *"$detail"* ]]; then
+        ERROR_MESSAGE="${ERROR_MESSAGE}; ${detail}"
+    fi
+}
+
+production_baseline_captured() {
+    [[ -n "$CURRENT_BEFORE" && -n "$CURRENT_COMMIT_BEFORE" \
+        && -n "$CURRENT_TREE_SHA256_BEFORE" && -n "$CURRENT_PORTABLE_SHA256_BEFORE" \
+        && -n "$CURRENT_STATIC_SHA256_BEFORE" && -n "$CURRENT_TREE_METADATA_SHA256_BEFORE" \
+        && "$STATE_PREVIOUS_EXISTED" =~ ^[01]$ && "$STATE_LAST_EXISTED" =~ ^[01]$ \
+        && "$LEGACY_MIGRATION_MARKER_EXISTED" =~ ^[01]$ \
+        && -n "$SERVICE_BEFORE" && -n "$PID_BEFORE" && -n "$RESTARTS_BEFORE" \
+        && -n "$HELPER_MANIFEST_SHA256_BEFORE" && -n "$SCANNER_MANIFEST_SHA256_BEFORE" ]]
+}
+
 password_status_is_locked() {
     case "${1:-}" in
         L|LK) return 0 ;;
         *) return 1 ;;
     esac
+}
+
+parse_systemd_major_version() {
+    local raw="$1"
+    local first_line
+
+    first_line="${raw%%$'\n'*}"
+    first_line="${first_line%$'\r'}"
+    if [[ "$first_line" =~ ^systemd[[:space:]]+([0-9]+)([[:space:]].*)?$ ]]; then
+        printf '%s\n' "${BASH_REMATCH[1]}"
+        return 0
+    fi
+    if [[ "$first_line" =~ ^([0-9]+)([[:space:]].*)?$ ]]; then
+        printf '%s\n' "${BASH_REMATCH[1]}"
+        return 0
+    fi
+    return 1
+}
+
+select_validation_systemd_profile() {
+    local run_version="$1"
+    local manager_version="$2"
+    local effective_version
+
+    [[ "$run_version" =~ ^[1-9][0-9]*$ && "$manager_version" =~ ^[1-9][0-9]*$ ]] \
+        || die "systemd version values are invalid"
+
+    if (( run_version < manager_version )); then
+        effective_version="$run_version"
+    else
+        effective_version="$manager_version"
+    fi
+    SYSTEMD_RUN_VERSION="$run_version"
+    SYSTEMD_MANAGER_VERSION="$manager_version"
+    SYSTEMD_EFFECTIVE_VERSION="$effective_version"
+    (( effective_version >= MIN_SYSTEMD_VERSION )) \
+        || die "systemd ${effective_version} is unsupported; validation requires systemd ${MIN_SYSTEMD_VERSION} or newer"
+
+    VALIDATION_SANDBOX_PROFILE="$VALIDATION_SANDBOX_PROFILE_BASE"
+    if (( effective_version >= RESTRICT_SUID_SGID_SYSTEMD_VERSION )); then
+        VALIDATION_SANDBOX_PROFILE+="+restrict-suidsgid"
+    fi
+    if (( effective_version >= PRIVATE_IPC_SYSTEMD_VERSION )); then
+        VALIDATION_SANDBOX_PROFILE+="+private-ipc"
+    fi
+    log "validation sandbox systemdRun=${SYSTEMD_RUN_VERSION} manager=${SYSTEMD_MANAGER_VERSION} effective=${SYSTEMD_EFFECTIVE_VERSION} profile=${VALIDATION_SANDBOX_PROFILE}"
+}
+
+detect_validation_systemd_profile() {
+    local run_output manager_output run_version manager_version
+
+    run_output="$(/usr/bin/systemd-run --version)" \
+        || die "cannot query the systemd-run client version"
+    manager_output="$(/usr/bin/systemctl show --property=Version --value)" \
+        || die "cannot query the PID 1 systemd manager version"
+    run_version="$(parse_systemd_major_version "$run_output")" \
+        || die "cannot parse the systemd-run client version"
+    manager_version="$(parse_systemd_major_version "$manager_output")" \
+        || die "cannot parse the PID 1 systemd manager version"
+    select_validation_systemd_profile "$run_version" "$manager_version"
+}
+
+build_validation_systemd_properties() {
+    local release_dir="$1"
+    local denied_syscalls
+
+    [[ "$SYSTEMD_EFFECTIVE_VERSION" =~ ^[1-9][0-9]*$ \
+        && "$SYSTEMD_EFFECTIVE_VERSION" -ge "$MIN_SYSTEMD_VERSION" ]] \
+        || die "validation systemd profile was not initialized"
+    [[ -n "$VALIDATION_JOB_DIR" && "$release_dir" == "$VALIDATION_JOB_DIR/"* \
+        && -d "$release_dir" && ! -L "$release_dir" ]] \
+        || die "validation bind source is outside the private validation job"
+
+    denied_syscalls="${VALIDATION_DENIED_SYSCALLS[*]}"
+    VALIDATION_SYSTEMD_PROPERTIES=(
+        --property Type=oneshot
+        --property RemainAfterExit=yes
+        --property "User=$VALIDATION_USER"
+        --property "Group=$VALIDATION_GROUP"
+        --property SupplementaryGroups=
+        --property WorkingDirectory=/zzz-validation/app
+        --property PrivateNetwork=yes
+        --property PrivateMounts=yes
+        --property PrivateTmp=no
+        --property PrivateDevices=yes
+        --property ProtectSystem=strict
+        --property ProtectHome=yes
+        --property "InaccessiblePaths=-/opt/zzz_calculator -/var/lib/zzz-calculator -/srv/zzz-download-origin -/proc/sysvipc -/dev/mqueue"
+        --property "TemporaryFileSystem=/zzz-validation:rw,nosuid,nodev,noexec,size=${VALIDATION_TMPFS_BYTES},nr_inodes=${VALIDATION_TMPFS_INODES},mode=0700,uid=${VALIDATION_UID},gid=${VALIDATION_GID} /run:rw,nosuid,nodev,noexec,size=${VALIDATION_RUN_TMPFS_BYTES},nr_inodes=${VALIDATION_RUN_TMPFS_INODES},mode=0755 /var/lib/zzz-calculator-deploy:ro,nosuid,nodev,noexec,size=4k,nr_inodes=16,mode=000 /tmp:ro,nosuid,nodev,noexec,size=4k,nr_inodes=16,mode=000 /var/tmp:ro,nosuid,nodev,noexec,size=4k,nr_inodes=16,mode=000 /dev/shm:ro,nosuid,nodev,noexec,size=4k,nr_inodes=16,mode=000"
+        --property "BindReadOnlyPaths=$release_dir:/zzz-validation/app"
+        --property NoNewPrivileges=yes
+        --property CapabilityBoundingSet=
+        --property "SystemCallFilter=~${denied_syscalls}"
+        --property SystemCallArchitectures=native
+        --property SystemCallErrorNumber=EPERM
+        --property RemoveIPC=yes
+        --property "RestrictAddressFamilies=AF_INET AF_INET6"
+        --property RestrictRealtime=yes
+        --property KillMode=control-group
+        --property SendSIGKILL=yes
+        --property Restart=no
+        --property TimeoutStartSec=55s
+        --property TimeoutStopSec=5s
+        --property MemoryLimit=768M
+        --property CPUQuota=200%
+        --property TasksMax=64
+        --property LimitNPROC=64
+        --property LimitNOFILE=4096
+        --property LimitCORE=0
+        --property LimitFSIZE=1M
+        --property UMask=0077
+        --property StandardOutput=null
+        --property StandardError=null
+    )
+    if (( SYSTEMD_EFFECTIVE_VERSION >= RESTRICT_SUID_SGID_SYSTEMD_VERSION )); then
+        VALIDATION_SYSTEMD_PROPERTIES+=(--property RestrictSUIDSGID=yes)
+    fi
+    if (( SYSTEMD_EFFECTIVE_VERSION >= PRIVATE_IPC_SYSTEMD_VERSION )); then
+        VALIDATION_SYSTEMD_PROPERTIES+=(--property PrivateIPC=yes)
+    fi
 }
 
 json_field() {
@@ -277,6 +452,12 @@ emit_evidence_json() {
         diskAvailableInodes "$DISK_AVAILABLE_INODES"
         validationSequence "$VALIDATION_SEQUENCE"
         validationUnitResults "$VALIDATION_UNIT_RESULTS"
+        systemdRunVersion "$SYSTEMD_RUN_VERSION"
+        systemdManagerVersion "$SYSTEMD_MANAGER_VERSION"
+        systemdEffectiveVersion "$SYSTEMD_EFFECTIVE_VERSION"
+        validationSandboxProfile "$VALIDATION_SANDBOX_PROFILE"
+        validationSandboxProbe "$VALIDATION_SANDBOX_PROBE_RESULT"
+        validationCleanup "$VALIDATION_CLEANUP_RESULT"
         switchState "$reported_switch_state"
         releaseTreeSha256 "$RELEASE_TREE_SHA256"
         pagesTreeSha256 "$PAGES_TREE_SHA256"
@@ -331,6 +512,18 @@ validate_evidence_json() {
         def validation_complete:
             .validationSequence == "current,candidate,rollback,candidate"
             and .validationUnitResults == "current:active/exited/success/0\ncandidate:active/exited/success/0\nrollback:active/exited/success/0\ncandidate:active/exited/success/0\n";
+        def sandbox_profile_valid:
+            (.systemdRunVersion | tonumber) as $client
+            | (.systemdManagerVersion | tonumber) as $manager
+            | (.systemdEffectiveVersion | tonumber) as $effective
+            | $effective == ([$client, $manager] | min)
+            and (if $effective >= 248 then
+                .validationSandboxProfile == "systemd-v239-seccomp+restrict-suidsgid+private-ipc"
+            elif $effective >= 242 then
+                .validationSandboxProfile == "systemd-v239-seccomp+restrict-suidsgid"
+            else
+                .validationSandboxProfile == "systemd-v239-seccomp"
+            end);
         def managed_state_after:
             .statePreviousExistedAfter == "1"
             and (.statePreviousAfter | managed_basename)
@@ -364,7 +557,10 @@ validate_evidence_json() {
             "scannerManifestSha256After", "archiveEntryCount",
             "archiveExpandedBytes", "diskRequiredBytes", "diskAvailableBytes",
             "diskRequiredInodes", "diskAvailableInodes",
-            "validationSequence", "validationUnitResults", "switchState", "releaseTreeSha256",
+            "validationSequence", "validationUnitResults",
+            "systemdRunVersion", "systemdManagerVersion",
+            "systemdEffectiveVersion", "validationSandboxProfile",
+            "validationSandboxProbe", "validationCleanup", "switchState", "releaseTreeSha256",
             "pagesTreeSha256"
         ] | sort;
         type == "object"
@@ -405,6 +601,16 @@ validate_evidence_json() {
             .diskRequiredInodes,
             .diskAvailableInodes
         ][]; . == "" or natural))
+        and (all([
+            .systemdRunVersion,
+            .systemdManagerVersion,
+            .systemdEffectiveVersion
+        ][]; . == "" or positive))
+        and (.validationSandboxProfile == ""
+            or (.validationSandboxProfile | test("^systemd-v239-seccomp(\\+restrict-suidsgid)?(\\+private-ipc)?$")))
+        and (.validationSandboxProbe == "not-run"
+            or (.validationSandboxProbe | test("^[a-z][a-z0-9-]{0,31}/[a-z][a-z0-9-]{0,31}/[a-z][a-z0-9-]{0,31}/([0-9]+|unknown)$")))
+        and (.validationCleanup as $cleanup | (["not-run", "clean", "failed"] | index($cleanup)) != null)
         and (if .status == "success" then
             .currentReleasePolicy != ""
             and (.currentBefore | test("^/opt/zzz_calculator/releases/(git|rollback)-[0-9a-f]{7,40}$"))
@@ -445,6 +651,12 @@ validate_evidence_json() {
             and (.nRestartsBefore | natural)
             and (.nRestartsAfter | natural)
             and .nRestartsBefore == .nRestartsAfter
+            and (.systemdRunVersion | positive)
+            and (.systemdManagerVersion | positive)
+            and (.systemdEffectiveVersion | positive)
+            and ((.systemdEffectiveVersion | tonumber) >= 239)
+            and (.validationSandboxProfile | test("^systemd-v239-seccomp(\\+restrict-suidsgid)?(\\+private-ipc)?$"))
+            and sandbox_profile_valid
             and .nginxBefore == "valid"
             and .nginxAfter == "valid"
             and (.helperManifestSha256Before | hex64)
@@ -460,6 +672,27 @@ validate_evidence_json() {
             and .currentPortableSha256Before == .currentPortableSha256After
             and .currentStaticSha256Before == .currentStaticSha256After
             and .currentTreeMetadataSha256Before == .currentTreeMetadataSha256After
+        else true end)
+        and (if .status == "failed" and .switchState == "not-switched" and .currentBefore != "" then
+            .currentBefore == .currentAfter
+            and .currentCommitBefore == .currentCommitAfter
+            and .currentTreeSha256Before == .currentTreeSha256After
+            and .currentPortableSha256Before == .currentPortableSha256After
+            and .currentStaticSha256Before == .currentStaticSha256After
+            and .currentTreeMetadataSha256Before == .currentTreeMetadataSha256After
+            and state_snapshot_unchanged
+            and .serviceBefore == "active"
+            and .serviceAfter == .serviceBefore
+            and (.pidBefore | positive)
+            and .pidAfter == .pidBefore
+            and (.nRestartsBefore | natural)
+            and .nRestartsAfter == .nRestartsBefore
+            and .nginxBefore == "valid"
+            and .nginxAfter == .nginxBefore
+            and (.helperManifestSha256Before | hex64)
+            and .helperManifestSha256After == .helperManifestSha256Before
+            and (.scannerManifestSha256Before | hex64)
+            and .scannerManifestSha256After == .scannerManifestSha256Before
         else true end)
         and (if .status == "success" and .action == "audit" then
             .switchState == "not-switched"
@@ -478,6 +711,8 @@ validate_evidence_json() {
             and .diskAvailableInodes == ""
             and .validationSequence == ""
             and .validationUnitResults == ""
+            and .validationSandboxProbe == "not-run"
+            and .validationCleanup == "not-run"
             and .releaseTreeSha256 == ""
             and .pagesTreeSha256 == ""
             and state_snapshot_unchanged
@@ -488,10 +723,14 @@ validate_evidence_json() {
             and (.rollbackRelease | test("^validation-rollback-[0-9a-f]{12}$"))
             and .previousRelease == ""
             and validation_complete
+            and .validationSandboxProbe == "active/exited/success/0"
+            and .validationCleanup == "clean"
             and state_snapshot_unchanged
         else true end)
         and (if .status == "success" and .action == "deploy" then
             artifact_metadata_complete
+            and .validationSandboxProbe == "active/exited/success/0"
+            and .validationCleanup == "clean"
             and (.rollbackRelease | test("^rollback-[0-9a-f]{12}$"))
             and .rollbackRelease == ("rollback-" + .deployedCommit[0:12])
             and .currentAfter == ("/opt/zzz_calculator/releases/" + .release)
@@ -524,6 +763,8 @@ validate_evidence_json() {
             and .currentCommitAfter == .deployedCommit
             and .validationSequence == ""
             and .validationUnitResults == ""
+            and .validationSandboxProbe == "not-run"
+            and .validationCleanup == "not-run"
             and .releaseTreeSha256 == ""
             and .pagesTreeSha256 == ""
             and (if .switchState == "committed" then
@@ -717,25 +958,122 @@ cleanup_processing_job() {
     PROCESSING_JOB_DIR=""
 }
 
+validation_cgroup_has_members() {
+    local control_group="$1"
+    local proc_cgroup hierarchy controllers member_path
+
+    [[ "$control_group" == /* ]] || return 1
+    for proc_cgroup in /proc/[0-9]*/cgroup; do
+        [[ -r "$proc_cgroup" ]] || continue
+        while IFS=: read -r hierarchy controllers member_path; do
+            if [[ "$member_path" == "$control_group" || "$member_path" == "$control_group/"* ]]; then
+                return 0
+            fi
+        done <"$proc_cgroup"
+    done
+    return 1
+}
+
+validation_unit_name_has_members() {
+    local unit="$1"
+    local proc_cgroup hierarchy controllers member_path
+
+    [[ "$unit" =~ ^zzz-calculator-validation-[0-9]+-[1-9][0-9]*\.service$ ]] || return 0
+    for proc_cgroup in /proc/[0-9]*/cgroup; do
+        [[ -r "$proc_cgroup" ]] || continue
+        while IFS=: read -r hierarchy controllers member_path; do
+            if [[ "$member_path" == */"$unit" || "$member_path" == */"$unit/"* ]]; then
+                return 0
+            fi
+        done <"$proc_cgroup"
+    done
+    return 1
+}
+
+finish_validation_probe_if_gone() {
+    local unit="$1"
+    local load_state
+
+    [[ "$unit" =~ ^zzz-calculator-validation-[0-9]+-[1-9][0-9]*\.service$ ]] || return 1
+    [[ "$VALIDATION_UNIT" == "$unit" ]] || return 1
+    load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null)" || return 1
+    [[ "$load_state" == "not-found" ]] || return 1
+    validation_unit_name_has_members "$unit" && return 1
+    VALIDATION_UNIT=""
+    return 0
+}
+
 stop_validation_probe() {
-    local unit load_state active_state control_group cgroup_procs
+    local unit load_state active_state control_group cgroup_procs attempt
+    local control_group_was_realized="0"
     [[ -n "$VALIDATION_UNIT" ]] || return 0
     unit="$VALIDATION_UNIT"
-    load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null || true)"
-    if [[ -n "$load_state" && "$load_state" != "not-found" ]]; then
-        systemctl stop "$unit" >/dev/null 2>&1 || return 1
-        active_state="$(systemctl show "$unit" --property ActiveState --value 2>/dev/null || true)"
-        [[ "$active_state" == "inactive" || "$active_state" == "failed" ]] || return 1
-        control_group="$(systemctl show "$unit" --property ControlGroup --value 2>/dev/null || true)"
-        if [[ "$control_group" == /* ]]; then
-            cgroup_procs="/sys/fs/cgroup${control_group}/cgroup.procs"
-            if [[ -r "$cgroup_procs" ]] && grep -Eq '[0-9]' -- "$cgroup_procs"; then
-                return 1
-            fi
-        fi
-        systemctl reset-failed "$unit" >/dev/null 2>&1 || true
+    [[ "$unit" =~ ^zzz-calculator-validation-[0-9]+-[1-9][0-9]*\.service$ ]] || return 1
+    if ! load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null)"; then
+        finish_validation_probe_if_gone "$unit" && return 0
+        return 1
     fi
-    VALIDATION_UNIT=""
+    if [[ "$load_state" == "not-found" ]]; then
+        finish_validation_probe_if_gone "$unit"
+        return
+    fi
+    [[ "$load_state" == "loaded" ]] || return 1
+
+    if ! control_group="$(systemctl show "$unit" --property ControlGroup --value 2>/dev/null)"; then
+        finish_validation_probe_if_gone "$unit" && return 0
+        return 1
+    fi
+    if [[ -n "$control_group" ]]; then
+        [[ "$control_group" == /*/"$unit" ]] || return 1
+        control_group_was_realized="1"
+    else
+        validation_unit_name_has_members "$unit" && return 1
+    fi
+    if ! systemctl stop "$unit" >/dev/null 2>&1; then
+        finish_validation_probe_if_gone "$unit" && return 0
+        return 1
+    fi
+    if [[ "$control_group_was_realized" == "1" ]]; then
+        cgroup_procs="/sys/fs/cgroup${control_group}/cgroup.procs"
+        if [[ -r "$cgroup_procs" ]] && grep -Eq '[0-9]' -- "$cgroup_procs"; then
+            return 1
+        fi
+        validation_cgroup_has_members "$control_group" && return 1
+    fi
+    validation_unit_name_has_members "$unit" && return 1
+
+    if ! load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null)"; then
+        finish_validation_probe_if_gone "$unit" && return 0
+        return 1
+    fi
+    if [[ "$load_state" == "not-found" ]]; then
+        finish_validation_probe_if_gone "$unit"
+        return
+    fi
+    [[ "$load_state" == "loaded" ]] || return 1
+    if ! active_state="$(systemctl show "$unit" --property ActiveState --value 2>/dev/null)"; then
+        finish_validation_probe_if_gone "$unit" && return 0
+        return 1
+    fi
+    [[ "$active_state" == "inactive" || "$active_state" == "failed" ]] || return 1
+    if ! systemctl reset-failed "$unit" >/dev/null 2>&1; then
+        finish_validation_probe_if_gone "$unit" && return 0
+        return 1
+    fi
+
+    for attempt in $(seq 1 50); do
+        if ! load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null)"; then
+            finish_validation_probe_if_gone "$unit" && return 0
+            return 1
+        fi
+        if [[ "$load_state" == "not-found" ]]; then
+            finish_validation_probe_if_gone "$unit"
+            return
+        fi
+        [[ "$load_state" == "loaded" ]] || return 1
+        sleep 0.1
+    done
+    return 1
 }
 
 safe_remove_transient_dir() {
@@ -753,30 +1091,50 @@ safe_remove_transient_dir() {
 
 cleanup_transient_trees() {
     local failed="0"
+    local validation_stopped="1"
     local active_state sub_state result exec_status
+    if [[ "$VALIDATION_CLEANUP_RESULT" == "pending" ]]; then
+        VALIDATION_CLEANUP_RESULT="failed"
+    fi
     if [[ -n "$VALIDATION_ACTIVE_LABEL" && -n "$VALIDATION_PROBE_ROOT" ]]; then
         active_state="$(systemctl show "$VALIDATION_UNIT" --property ActiveState --value 2>/dev/null || true)"
         sub_state="$(systemctl show "$VALIDATION_UNIT" --property SubState --value 2>/dev/null || true)"
         result="$(systemctl show "$VALIDATION_UNIT" --property Result --value 2>/dev/null || true)"
         exec_status="$(systemctl show "$VALIDATION_UNIT" --property ExecMainStatus --value 2>/dev/null || true)"
-        stop_validation_probe || failed="1"
+        if ! stop_validation_probe; then
+            validation_stopped="0"
+            failed="1"
+        fi
         record_validation_unit_result "$VALIDATION_ACTIVE_LABEL" "$active_state" "$sub_state" "$result" "$exec_status"
-        VALIDATION_ACTIVE_LABEL=""
+        if [[ "$validation_stopped" == "1" ]]; then
+            VALIDATION_ACTIVE_LABEL=""
+        fi
     else
-        stop_validation_probe || failed="1"
+        if ! stop_validation_probe; then
+            validation_stopped="0"
+            failed="1"
+        fi
     fi
     safe_remove_transient_dir "$CANDIDATE_STAGING" || failed="1"
     safe_remove_transient_dir "$ROLLBACK_STAGING" || failed="1"
-    safe_remove_transient_dir "$VALIDATION_JOB_DIR" || failed="1"
     CANDIDATE_STAGING=""
     ROLLBACK_STAGING=""
-    VALIDATION_JOB_DIR=""
-    VALIDATION_ACTIVE_LABEL=""
-    VALIDATION_PROBE_ROOT=""
-    if [[ "$VALIDATION_DIR_EXPOSED" == "1" ]]; then
-        chown root:root "$VALIDATION_DIR" 2>/dev/null || failed="1"
-        chmod 0750 "$VALIDATION_DIR" 2>/dev/null || failed="1"
-        VALIDATION_DIR_EXPOSED="0"
+    if [[ "$validation_stopped" == "1" ]]; then
+        if safe_remove_transient_dir "$VALIDATION_JOB_DIR"; then
+            VALIDATION_JOB_DIR=""
+            VALIDATION_ACTIVE_LABEL=""
+            VALIDATION_PROBE_ROOT=""
+            if [[ "$VALIDATION_DIR_EXPOSED" == "1" ]]; then
+                if chown root:root "$VALIDATION_DIR" 2>/dev/null \
+                    && chmod 0750 "$VALIDATION_DIR" 2>/dev/null; then
+                    VALIDATION_DIR_EXPOSED="0"
+                else
+                    failed="1"
+                fi
+            fi
+        else
+            failed="1"
+        fi
     fi
     if [[ -n "$NEXT_LINK_PATH" ]]; then
         if [[ "$NEXT_LINK_PATH" != "${CURRENT_LINK}.next.$$" || ( -e "$NEXT_LINK_PATH" && ! -L "$NEXT_LINK_PATH" ) ]]; then
@@ -785,6 +1143,11 @@ cleanup_transient_trees() {
             rm -f -- "$NEXT_LINK_PATH" 2>/dev/null || failed="1"
             NEXT_LINK_PATH=""
         fi
+    fi
+    if [[ "$failed" == "0" && "$VALIDATION_CLEANUP_RESULT" != "not-run" ]]; then
+        VALIDATION_CLEANUP_RESULT="clean"
+    elif [[ "$failed" != "0" && "$VALIDATION_CLEANUP_RESULT" != "not-run" ]]; then
+        VALIDATION_CLEANUP_RESULT="failed"
     fi
     [[ "$failed" == "0" ]]
 }
@@ -1014,11 +1377,11 @@ on_exit() {
         fi
     fi
     if ! cleanup_processing_job; then
-        [[ -n "$ERROR_MESSAGE" ]] || ERROR_MESSAGE="failed to remove root-only processing data"
+        append_error_detail "failed to remove root-only processing data"
         exit_code=1
     fi
     if ! cleanup_transient_trees; then
-        [[ -n "$ERROR_MESSAGE" ]] || ERROR_MESSAGE="failed to remove transient validation or staging data"
+        append_error_detail "failed to stop or remove transient validation or staging data"
         exit_code=1
     fi
     if [[ "$exit_code" -ne 0 && ( "$SWITCH_STATE" == "armed" || "$SWITCH_STATE" == "switched" ) ]]; then
@@ -1027,57 +1390,57 @@ on_exit() {
         fi
     fi
 
-    if [[ "$exit_code" -eq 0 && "$SWITCH_STATE" == "not-switched" ]] \
+    if [[ "$SWITCH_STATE" == "not-switched" ]] && production_baseline_captured \
         && ! (assert_state_snapshot_unchanged); then
-        ERROR_MESSAGE="deployment state changed before evidence commit"
-        log "ERROR: ${ERROR_MESSAGE}"
+        append_error_detail "deployment state changed before evidence commit"
+        log "ERROR: deployment state changed before evidence commit"
         exit_code=1
     fi
     capture_after
-    if [[ "$exit_code" -eq 0 && "$SWITCH_STATE" == "not-switched" ]]; then
+    if [[ "$SWITCH_STATE" == "not-switched" ]] && production_baseline_captured; then
         if [[ "$CURRENT_AFTER" != "$CURRENT_BEFORE" || "$CURRENT_COMMIT_AFTER" != "$CURRENT_COMMIT_BEFORE" ]]; then
-            ERROR_MESSAGE="current release changed before evidence commit"
-            log "ERROR: ${ERROR_MESSAGE}"
+            append_error_detail "current release changed before evidence commit"
+            log "ERROR: current release changed before evidence commit"
             exit_code=1
         elif [[ "$CURRENT_TREE_SHA256_AFTER" != "$CURRENT_TREE_SHA256_BEFORE" ]]; then
-            ERROR_MESSAGE="current release content changed before evidence commit"
-            log "ERROR: ${ERROR_MESSAGE}"
+            append_error_detail "current release content changed before evidence commit"
+            log "ERROR: current release content changed before evidence commit"
             exit_code=1
         elif [[ "$CURRENT_PORTABLE_SHA256_AFTER" != "$CURRENT_PORTABLE_SHA256_BEFORE" ]]; then
-            ERROR_MESSAGE="current release portable tree changed before evidence commit"
-            log "ERROR: ${ERROR_MESSAGE}"
+            append_error_detail "current release portable tree changed before evidence commit"
+            log "ERROR: current release portable tree changed before evidence commit"
             exit_code=1
         elif [[ "$CURRENT_STATIC_SHA256_AFTER" != "$CURRENT_STATIC_SHA256_BEFORE" ]]; then
-            ERROR_MESSAGE="current release static tree changed before evidence commit"
-            log "ERROR: ${ERROR_MESSAGE}"
+            append_error_detail "current release static tree changed before evidence commit"
+            log "ERROR: current release static tree changed before evidence commit"
             exit_code=1
         elif [[ "$CURRENT_TREE_METADATA_SHA256_AFTER" != "$CURRENT_TREE_METADATA_SHA256_BEFORE" ]]; then
-            ERROR_MESSAGE="current release metadata changed before evidence commit"
-            log "ERROR: ${ERROR_MESSAGE}"
+            append_error_detail "current release metadata changed before evidence commit"
+            log "ERROR: current release metadata changed before evidence commit"
             exit_code=1
         elif [[ "$SERVICE_AFTER" != "$SERVICE_BEFORE" || "$PID_AFTER" != "$PID_BEFORE" \
             || "$RESTARTS_AFTER" != "$RESTARTS_BEFORE" ]]; then
-            ERROR_MESSAGE="production service changed before evidence commit"
-            log "ERROR: ${ERROR_MESSAGE}"
+            append_error_detail "production service changed before evidence commit"
+            log "ERROR: production service changed before evidence commit"
             exit_code=1
         fi
     fi
-    if [[ "$exit_code" -eq 0 ]]; then
+    if production_baseline_captured; then
         if [[ "$NGINX_STATUS_AFTER" != "valid" ]]; then
-            ERROR_MESSAGE="nginx configuration changed before evidence commit"
-            log "ERROR: ${ERROR_MESSAGE}"
+            append_error_detail "nginx configuration changed before evidence commit"
+            log "ERROR: nginx configuration changed before evidence commit"
             exit_code=1
         elif [[ -z "$HELPER_MANIFEST_SHA256_AFTER" || "$HELPER_MANIFEST_SHA256_AFTER" != "$HELPER_MANIFEST_SHA256_BEFORE" \
             || -z "$SCANNER_MANIFEST_SHA256_AFTER" || "$SCANNER_MANIFEST_SHA256_AFTER" != "$SCANNER_MANIFEST_SHA256_BEFORE" ]]; then
-            ERROR_MESSAGE="download manifest changed before evidence commit"
-            log "ERROR: ${ERROR_MESSAGE}"
+            append_error_detail "download manifest changed before evidence commit"
+            log "ERROR: download manifest changed before evidence commit"
             exit_code=1
-        elif [[ "$SWITCH_STATE" == "switched" \
+        elif [[ "$exit_code" -eq 0 && "$SWITCH_STATE" == "switched" \
             && ( "$CURRENT_AFTER" != "$SWITCH_TARGET" || "$SERVICE_AFTER" != "active" \
                 || ! "$PID_AFTER" =~ ^[1-9][0-9]*$ || "$PID_AFTER" != "$HEALTH_GATE_PID" \
                 || "$RESTARTS_AFTER" != "$RESTARTS_BEFORE" ) ]]; then
-            ERROR_MESSAGE="candidate runtime changed before evidence commit"
-            log "ERROR: ${ERROR_MESSAGE}"
+            append_error_detail "candidate runtime changed before evidence commit"
+            log "ERROR: candidate runtime changed before evidence commit"
             exit_code=1
         fi
     fi
@@ -1202,17 +1565,22 @@ require_root_and_layout() {
     command -v jq >/dev/null || die "jq is required"
     command -v nginx >/dev/null || die "nginx is required"
     command -v journalctl >/dev/null || die "journalctl is required"
+    command -v ipcmk >/dev/null || die "ipcmk is required"
+    command -v ipcrm >/dev/null || die "ipcrm is required"
     command -v mkdir >/dev/null || die "mkdir is required"
     command -v mountpoint >/dev/null || die "mountpoint is required"
     command -v runuser >/dev/null || die "runuser is required"
+    command -v setarch >/dev/null || die "setarch is required"
     command -v sort >/dev/null || die "sort is required"
+    command -v uname >/dev/null || die "uname is required"
     command -v realpath >/dev/null || die "realpath is required"
     command -v systemd-run >/dev/null || die "systemd-run is required"
     for required_absolute_command in \
         /bin/bash /usr/bin/base64 /usr/bin/cmp /usr/bin/cp /usr/bin/df \
-        /usr/bin/env /usr/bin/journalctl /usr/bin/mkdir /usr/bin/node \
-        /usr/bin/stat /usr/bin/systemd-run /usr/bin/tail /usr/bin/timeout \
-        /usr/bin/tr; do
+        /usr/bin/env /usr/bin/ipcmk /usr/bin/ipcrm /usr/bin/journalctl \
+        /usr/bin/mkdir /usr/bin/node /usr/bin/setarch /usr/bin/stat /usr/bin/systemctl \
+        /usr/bin/systemd-run /usr/bin/tail /usr/bin/timeout \
+        /usr/bin/tr /usr/bin/true /usr/bin/uname; do
         [[ -x "$required_absolute_command" ]] \
             || die "${required_absolute_command} is required"
     done
@@ -2109,6 +2477,7 @@ assert_production_preflight() {
 
     assert_effective_runtime_environment "$PID_BEFORE" "$CURRENT_BEFORE"
     assert_runtime_endpoints
+    detect_validation_systemd_profile
 }
 
 healthy_runtime_pid() {
@@ -2241,6 +2610,7 @@ prepare_validation_job() {
     local denied_mode
     [[ -z "$VALIDATION_JOB_DIR" ]] || die "validation job is already initialized"
     VALIDATION_JOB_DIR="$(mktemp -d "${VALIDATION_DIR}/job.XXXXXXXX")"
+    VALIDATION_CLEANUP_RESULT="pending"
     VALIDATION_DIR_EXPOSED="1"
     chown root:"$VALIDATION_GROUP" "$VALIDATION_DIR" "$VALIDATION_JOB_DIR"
     chmod 0750 "$VALIDATION_DIR" "$VALIDATION_JOB_DIR"
@@ -2282,7 +2652,15 @@ record_validation_unit_result() {
     local sub_state="$3"
     local result="$4"
     local exec_status="$5"
-    VALIDATION_UNIT_RESULTS+="${label}:${active_state}/${sub_state}/${result}/${exec_status}"$'\n'
+    if [[ "$label" == "sandbox-capability" ]]; then
+        active_state="${active_state:-unknown}"
+        sub_state="${sub_state:-unknown}"
+        result="${result:-unknown}"
+        exec_status="${exec_status:-unknown}"
+        VALIDATION_SANDBOX_PROBE_RESULT="${active_state}/${sub_state}/${result}/${exec_status}"
+    else
+        VALIDATION_UNIT_RESULTS+="${label}:${active_state}/${sub_state}/${result}/${exec_status}"$'\n'
+    fi
 }
 
 assert_sanitized_validation_data() {
@@ -2310,10 +2688,109 @@ assert_sanitized_validation_data() {
         || die "${label} validation inventory differs from the empty example"
 }
 
+run_validation_transient_unit() {
+    local label="$1"
+    local release_dir="$2"
+    local mode="$3"
+    local unit_base active_state sub_state result exec_status attempt success="0"
+    local launch_status="0"
+    local -a worker_args
+
+    [[ -d "$release_dir" && ! -L "$release_dir" ]] || die "${label} validation release is invalid"
+    case "$mode" in
+        capability) worker_args=(--capability-probe /zzz-validation/app /zzz-validation) ;;
+        release) worker_args=(/zzz-validation/app /zzz-validation) ;;
+        *) die "invalid validation worker mode" ;;
+    esac
+    prepare_validation_probe_root "$label"
+    unit_base="${VALIDATION_UNIT_PREFIX}-${$}-${VALIDATION_PROBE_INDEX}"
+    [[ "$unit_base" =~ ^zzz-calculator-validation-[0-9]+-[1-9][0-9]*$ ]] \
+        || die "generated validation unit name is invalid"
+    VALIDATION_UNIT="${unit_base}.service"
+    VALIDATION_ACTIVE_LABEL="$label"
+    build_validation_systemd_properties "$release_dir"
+
+    set +e
+    /usr/bin/systemd-run --quiet --unit "$unit_base" \
+        "${VALIDATION_SYSTEMD_PROPERTIES[@]}" \
+        -- /usr/bin/timeout --signal=TERM --kill-after=5s 45s \
+        /usr/bin/env -i \
+        PATH="/usr/sbin:/usr/bin:/sbin:/bin" \
+        HOME=/zzz-validation/home \
+        TMPDIR=/zzz-validation/tmp \
+        XDG_CACHE_HOME=/zzz-validation/xdg-cache \
+        XDG_CONFIG_HOME=/zzz-validation/xdg-config \
+        XDG_DATA_HOME=/zzz-validation/xdg-data \
+        NODE_ENV=production HOST=127.0.0.1 PORT="$VALIDATION_PORT" \
+        ZZZ_CALCULATOR_DATA_DIR=/zzz-validation/data \
+        SCAN_TELEMETRY_DIR=/zzz-validation/data/scan-telemetry \
+        MAINTENANCE_ENABLED=false SCAN_TELEMETRY_ENABLED=false \
+        DRIVE_DISC_RESERVATIONS_UI_ENABLED=false DRIVE_DISC_EXCLUSIONS_UI_ENABLED=false \
+        /bin/bash "$VALIDATION_WORKER" "${worker_args[@]}"
+    launch_status="$?"
+    set -e
+    if [[ "$launch_status" -ne 0 ]]; then
+        active_state="$(systemctl show "$VALIDATION_UNIT" --property ActiveState --value 2>/dev/null || true)"
+        sub_state="$(systemctl show "$VALIDATION_UNIT" --property SubState --value 2>/dev/null || true)"
+        result="$(systemctl show "$VALIDATION_UNIT" --property Result --value 2>/dev/null || true)"
+        exec_status="$(systemctl show "$VALIDATION_UNIT" --property ExecMainStatus --value 2>/dev/null || true)"
+        stop_validation_probe || true
+        record_validation_unit_result "$label" "$active_state" "$sub_state" "$result" "$exec_status"
+        VALIDATION_ACTIVE_LABEL=""
+        die "${label} validation transient unit did not start successfully; systemd=${SYSTEMD_EFFECTIVE_VERSION} profile=${VALIDATION_SANDBOX_PROFILE} activeState=${active_state:-unknown} subState=${sub_state:-unknown} result=${result:-unknown} execStatus=${exec_status:-unknown}"
+    fi
+
+    for attempt in $(seq 1 550); do
+        active_state="$(systemctl show "$VALIDATION_UNIT" --property ActiveState --value 2>/dev/null || true)"
+        sub_state="$(systemctl show "$VALIDATION_UNIT" --property SubState --value 2>/dev/null || true)"
+        result="$(systemctl show "$VALIDATION_UNIT" --property Result --value 2>/dev/null || true)"
+        exec_status="$(systemctl show "$VALIDATION_UNIT" --property ExecMainStatus --value 2>/dev/null || true)"
+        if [[ "$active_state" == "active" && "$sub_state" == "exited" && "$result" == "success" && "$exec_status" == "0" ]]; then
+            success="1"
+            break
+        fi
+        if [[ "$active_state" == "failed" || "$active_state" == "inactive" || "$result" == "failed" ]]; then
+            break
+        fi
+        sleep 0.1
+    done
+    if [[ "$success" != "1" ]]; then
+        stop_validation_probe || true
+        record_validation_unit_result "$label" "$active_state" "$sub_state" "$result" "$exec_status"
+        VALIDATION_ACTIVE_LABEL=""
+        die "${label} validation failed inside its private systemd sandbox; execStatus=${exec_status:-unknown}"
+    fi
+    stop_validation_probe || die "${label} validation cgroup could not be stopped"
+    record_validation_unit_result "$label" "$active_state" "$sub_state" "$result" "$exec_status"
+    VALIDATION_ACTIVE_LABEL=""
+    remove_validation_probe_root || die "${label} validation data could not be removed"
+}
+
+run_validation_sandbox_capability_probe() {
+    local capability_source="${VALIDATION_JOB_DIR}/capability-source"
+    local capability_sentinel="${capability_source}/${VALIDATION_CAPABILITY_SENTINEL}"
+
+    [[ "$VALIDATION_SANDBOX_PROBE_RESULT" == "not-run" ]] \
+        || die "validation sandbox capability probe was already attempted"
+    [[ ! -e "$capability_source" && ! -L "$capability_source" ]] \
+        || die "validation sandbox capability source is occupied"
+    install -d -o root -g root -m 0755 -- "$capability_source"
+    printf '%s\n' "$VALIDATION_CAPABILITY_SENTINEL_CONTENT" >"$capability_sentinel"
+    chown root:root -- "$capability_sentinel"
+    chmod 0644 -- "$capability_sentinel"
+    run_validation_transient_unit sandbox-capability "$capability_source" capability
+    [[ "$VALIDATION_SANDBOX_PROBE_RESULT" == "active/exited/success/0" ]] \
+        || die "validation sandbox capability probe did not complete successfully"
+    rm -f -- "$capability_sentinel" \
+        || die "validation sandbox capability sentinel could not be removed"
+    rmdir -- "$capability_source" \
+        || die "validation sandbox capability source could not be removed"
+    log "validation sandbox capability probe passed profile=${VALIDATION_SANDBOX_PROFILE}"
+}
+
 run_validation_probe() {
     local label="$1"
     local release_dir="$2"
-    local unit_base active_state sub_state result exec_status attempt success="0"
     local seed_size seed_entries largest_seed_file
 
     [[ -d "$release_dir" && ! -L "$release_dir" ]] || die "${label} validation release is invalid"
@@ -2335,91 +2812,7 @@ run_validation_probe() {
         || die "${label} validation seed exceeds 8192 entries"
     (( largest_seed_file <= MAX_VALIDATION_SEED_FILE_BYTES )) \
         || die "${label} validation seed contains a file larger than 1 MiB"
-    prepare_validation_probe_root "$label"
-    unit_base="${VALIDATION_UNIT_PREFIX}-${$}-${VALIDATION_PROBE_INDEX}"
-    [[ "$unit_base" =~ ^zzz-calculator-validation-[0-9]+-[1-9][0-9]*$ ]] \
-        || die "generated validation unit name is invalid"
-    VALIDATION_UNIT="${unit_base}.service"
-    VALIDATION_ACTIVE_LABEL="$label"
-
-    /usr/bin/systemd-run --quiet --unit "$unit_base" \
-        --property Type=oneshot \
-        --property RemainAfterExit=yes \
-        --property "User=$VALIDATION_USER" \
-        --property "Group=$VALIDATION_GROUP" \
-        --property SupplementaryGroups= \
-        --property WorkingDirectory=/zzz-validation/app \
-        --property PrivateNetwork=yes \
-        --property PrivateMounts=yes \
-        --property PrivateTmp=no \
-        --property PrivateIPC=yes \
-        --property PrivateDevices=yes \
-        --property ProtectSystem=strict \
-        --property ProtectHome=yes \
-        --property "InaccessiblePaths=-/opt/zzz_calculator -/var/lib/zzz-calculator -/srv/zzz-download-origin" \
-        --property "TemporaryFileSystem=/zzz-validation:rw,nosuid,nodev,noexec,size=${VALIDATION_TMPFS_BYTES},nr_inodes=${VALIDATION_TMPFS_INODES},mode=0700,uid=${VALIDATION_UID},gid=${VALIDATION_GID} /run:rw,nosuid,nodev,noexec,size=${VALIDATION_RUN_TMPFS_BYTES},nr_inodes=${VALIDATION_RUN_TMPFS_INODES},mode=0755 /var/lib/zzz-calculator-deploy:ro,nosuid,nodev,noexec,size=4k,nr_inodes=16,mode=000 /tmp:ro,nosuid,nodev,noexec,size=4k,nr_inodes=16,mode=000 /var/tmp:ro,nosuid,nodev,noexec,size=4k,nr_inodes=16,mode=000 /dev/shm:ro,nosuid,nodev,noexec,size=4k,nr_inodes=16,mode=000" \
-        --property "BindReadOnlyPaths=$release_dir:/zzz-validation/app" \
-        --property NoNewPrivileges=yes \
-        --property CapabilityBoundingSet= \
-        --property "RestrictAddressFamilies=AF_INET AF_INET6" \
-        --property LockPersonality=yes \
-        --property RestrictRealtime=yes \
-        --property RestrictSUIDSGID=yes \
-        --property KillMode=control-group \
-        --property SendSIGKILL=yes \
-        --property Restart=no \
-        --property TimeoutStartSec=55s \
-        --property TimeoutStopSec=5s \
-        --property MemoryLimit=768M \
-        --property CPUQuota=200% \
-        --property TasksMax=64 \
-        --property LimitNPROC=64 \
-        --property LimitNOFILE=4096 \
-        --property LimitCORE=0 \
-        --property LimitFSIZE=1M \
-        --property UMask=0077 \
-        --property StandardOutput=null \
-        --property StandardError=null \
-        -- /usr/bin/timeout --signal=TERM --kill-after=5s 45s \
-        /usr/bin/env -i \
-        PATH="/usr/sbin:/usr/bin:/sbin:/bin" \
-        HOME=/zzz-validation/home \
-        TMPDIR=/zzz-validation/tmp \
-        XDG_CACHE_HOME=/zzz-validation/xdg-cache \
-        XDG_CONFIG_HOME=/zzz-validation/xdg-config \
-        XDG_DATA_HOME=/zzz-validation/xdg-data \
-        NODE_ENV=production HOST=127.0.0.1 PORT="$VALIDATION_PORT" \
-        ZZZ_CALCULATOR_DATA_DIR=/zzz-validation/data \
-        SCAN_TELEMETRY_DIR=/zzz-validation/data/scan-telemetry \
-        MAINTENANCE_ENABLED=false SCAN_TELEMETRY_ENABLED=false \
-        DRIVE_DISC_RESERVATIONS_UI_ENABLED=false DRIVE_DISC_EXCLUSIONS_UI_ENABLED=false \
-        /bin/bash "$VALIDATION_WORKER" /zzz-validation/app /zzz-validation \
-        || die "${label} validation transient unit could not be started"
-
-    for attempt in $(seq 1 550); do
-        active_state="$(systemctl show "$VALIDATION_UNIT" --property ActiveState --value 2>/dev/null || true)"
-        sub_state="$(systemctl show "$VALIDATION_UNIT" --property SubState --value 2>/dev/null || true)"
-        result="$(systemctl show "$VALIDATION_UNIT" --property Result --value 2>/dev/null || true)"
-        exec_status="$(systemctl show "$VALIDATION_UNIT" --property ExecMainStatus --value 2>/dev/null || true)"
-        if [[ "$active_state" == "active" && "$sub_state" == "exited" && "$result" == "success" && "$exec_status" == "0" ]]; then
-            success="1"
-            break
-        fi
-        if [[ "$active_state" == "failed" || "$active_state" == "inactive" || "$result" == "failed" ]]; then
-            break
-        fi
-        sleep 0.1
-    done
-    if [[ "$success" != "1" ]]; then
-        stop_validation_probe || true
-        record_validation_unit_result "$label" "$active_state" "$sub_state" "$result" "$exec_status"
-        VALIDATION_ACTIVE_LABEL=""
-        die "${label} validation failed inside its private systemd sandbox"
-    fi
-    stop_validation_probe || die "${label} validation cgroup could not be stopped"
-    record_validation_unit_result "$label" "$active_state" "$sub_state" "$result" "$exec_status"
-    VALIDATION_ACTIVE_LABEL=""
-    remove_validation_probe_root || die "${label} validation data could not be removed"
+    run_validation_transient_unit "$label" "$release_dir" release
     if [[ -z "$VALIDATION_SEQUENCE" ]]; then
         VALIDATION_SEQUENCE="$label"
     else
@@ -2539,6 +2932,8 @@ run_dry_run() {
 
     parse_artifact_options "$@"
     assert_production_preflight
+    prepare_validation_job
+    run_validation_sandbox_capability_probe
     prepare_processing_job
     current_snapshot="${PROCESSING_JOB_DIR}/sources/current"
     seal_current_release "$CURRENT_BEFORE" "$current_snapshot"
@@ -2562,7 +2957,6 @@ run_dry_run() {
     PAGES_TREE_SHA256="$(tree_sha256 "$candidate_dir/dist/pages")"
     ROLLBACK_BASENAME="validation-rollback-${rollback_commit:0:12}"
 
-    prepare_validation_job
     run_four_stage_validation "$current_snapshot" "$candidate_dir" "$rollback_dir"
     assert_production_unchanged
     cleanup_processing_job || die "failed to remove root-only dry-run sources"
@@ -2576,6 +2970,8 @@ run_deploy() {
     [[ -n "$EXPECTED_SHA256" ]] || die "deploy requires --expected-sha"
     [[ -n "$EXPECTED_COMMIT" ]] || die "deploy requires --expected-commit"
     assert_production_preflight
+    prepare_validation_job
+    run_validation_sandbox_capability_probe
     prepare_processing_job
     current_snapshot="${PROCESSING_JOB_DIR}/sources/current"
     seal_current_release "$CURRENT_BEFORE" "$current_snapshot"
@@ -2624,7 +3020,6 @@ run_deploy() {
     RELEASE_TREE_SHA256="$(tree_sha256 "$CANDIDATE_STAGING")"
     PAGES_TREE_SHA256="$(tree_sha256 "$CANDIDATE_STAGING/dist/pages")"
 
-    prepare_validation_job
     run_four_stage_validation "$current_snapshot" "$CANDIDATE_STAGING" "$ROLLBACK_STAGING"
     assert_production_unchanged
     cleanup_processing_job || die "failed to remove root-only deploy sources before switching"

@@ -17,6 +17,8 @@ const files = {
     bootstrap: await read("deploy/production/bootstrap-zzz-calculator-deploy.sh"),
     sshGateway: await read("deploy/production/zzz-calculator-ssh-gateway"),
     validationWorker: await read("deploy/production/zzz-calculator-validation-worker"),
+    systemd239Sandbox: await read("tests/production-systemd239-sandbox.integration.sh"),
+    systemd239Dockerfile: await read("tests/systemd239-sandbox.Dockerfile"),
     sshGatewayTest: await read("tests/production-ssh-gateway.test.js"),
     sshGatewayIntegration: await read("tests/production-ssh-gateway.integration.sh"),
     sudoers: await read("deploy/production/zzz-calculator-deploy.sudoers"),
@@ -83,6 +85,30 @@ requireText(
 )
 requireText(files.ci, "node tests/production-ssh-gateway.test.js", "CI must run SSH gateway contract tests.")
 requireText(files.ci, "bash tests/production-ssh-gateway.integration.sh", "CI must run SSH gateway integration tests.")
+requireText(
+    files.ci,
+    "bash -n tests/production-systemd239-sandbox.integration.sh",
+    "CI must syntax-check the systemd 239 sandbox fixture before building it.",
+)
+requireText(
+    files.ci,
+    "name: Run the validation sandbox on systemd 239",
+    "CI must exercise the production validation sandbox against systemd 239.",
+)
+requireText(
+    files.ci,
+    "tests/systemd239-sandbox.Dockerfile",
+    "CI must build the pinned systemd 239 compatibility fixture.",
+)
+requireText(files.ci, "--privileged --cgroupns=host", "The systemd 239 fixture must boot a real PID 1 and cgroup hierarchy.")
+requireText(files.ci, 'context="$(mktemp -d "$RUNNER_TEMP/zzz-systemd239-context.XXXXXX")"', "CI must use a bounded minimal Docker context.")
+requireText(files.ci, '"$context/deploy/production/"', "CI must copy only the reviewed manager and worker into the Docker context.")
+assert.doesNotMatch(files.ci, /docker build[^\n]*\s\.\s*$/m, "The systemd fixture must not send the whole checkout to Docker.")
+requireText(
+    files.ci,
+    "/usr/local/bin/production-systemd239-sandbox.integration.sh",
+    "CI must execute the systemd 239 sandbox integration test.",
+)
 requireText(files.ci, "output/zzz-calculator-server-*.evidence.json", "CI must upload release evidence with the artifact.")
 requireText(files.ci, "if-no-files-found: error", "Missing release artifacts must fail CI.")
 requireText(files.ci, "retention-days: 14", "CI artifacts must have an explicit retention period.")
@@ -262,9 +288,76 @@ for (const token of [
     "RestrictAddressFamilies=AF_INET AF_INET6",
     "StandardOutput=null",
     "StandardError=null",
+    'readonly MIN_SYSTEMD_VERSION="239"',
+    'readonly RESTRICT_SUID_SGID_SYSTEMD_VERSION="242"',
+    'readonly PRIVATE_IPC_SYSTEMD_VERSION="248"',
+    "/usr/bin/systemd-run --version",
+    "/usr/bin/systemctl show --property=Version --value",
+    "SystemCallFilter=~${denied_syscalls}",
+    "SystemCallArchitectures=native",
+    "SystemCallErrorNumber=EPERM",
+    "RemoveIPC=yes",
+    "-/proc/sysvipc -/dev/mqueue",
+    "run_validation_sandbox_capability_probe",
+    "finish_validation_probe_if_gone",
 ]) {
     requireText(files.deployScript, token, `Deployment sandbox is missing: ${token}`)
 }
+assert.doesNotMatch(files.deployScript, /SystemCallFilter=~@ipc/, "The broad systemd @ipc group would also block pipe syscalls.")
+assert.doesNotMatch(files.deployScript, /\beval\b/, "Validation systemd properties must be passed as a quoted array.")
+const dryRunBody = section(files.deployScript, "run_dry_run() {", "\nrun_deploy() {")
+const deployBody = section(files.deployScript, "run_deploy() {", "\nrun_rollback() {")
+for (const [name, body] of [["dry-run", dryRunBody], ["deploy", deployBody]]) {
+    const probeIndex = body.indexOf("run_validation_sandbox_capability_probe")
+    assert.ok(probeIndex >= 0, `${name} must run the inert sandbox capability probe.`)
+    for (const laterOperation of ["prepare_processing_job", "seal_current_release", "claim_incoming_inputs"]) {
+        const operationIndex = body.indexOf(laterOperation)
+        assert.ok(operationIndex > probeIndex, `${name} must run the inert sandbox probe before ${laterOperation}.`)
+    }
+}
+for (const token of [
+    "--capability-probe",
+    "NoNewPrivs",
+    "Seccomp",
+    "CapBnd",
+    "/proc/self/mountinfo",
+    "/proc/net/dev",
+    "while IFS=: read -r interface counters",
+    "/usr/bin/ipcmk",
+    "/usr/bin/ipcrm",
+    "Operation not permitted",
+    "/usr/bin/setarch",
+    "/usr/bin/uname",
+    "assert_personality_denied",
+    "capability bind source sentinel is missing or invalid",
+    "HOST_SYSVIPC_DIR",
+    "HOST_MQUEUE_DIR",
+]) {
+    requireText(files.validationWorker, token, `Validation worker sandbox self-check is missing: ${token}`)
+}
+for (const token of [
+    "systemd 239",
+    "assert_profile 239 239 systemd-v239-seccomp 0 0",
+    "assert_profile 242 247 systemd-v239-seccomp+restrict-suidsgid 1 0",
+    "assert_profile 248 252 systemd-v239-seccomp+restrict-suidsgid+private-ipc 1 1",
+    "run_validation_sandbox_capability_probe",
+    "assert_transient_property_parser_support",
+    "systemd-run --no-block --quiet",
+    "/usr/bin/sleep 30",
+    "UnitNameMembers=",
+    "Unknown assignment:",
+    "ZzzFirstUnsupported",
+    "ZzzSecondUnsupported",
+    "ZzzDefinitelyUnsupported=yes",
+]) {
+    requireText(files.systemd239Sandbox, token, `The systemd 239 integration fixture is missing: ${token}`)
+}
+requireText(
+    files.systemd239Dockerfile,
+    "FROM rockylinux/rockylinux:8.10@sha256:e8a49c5403b687db05d4d67333fa45808fbe74f36e683cec7abb1f7d0f2338c6",
+    "The systemd 239 fixture must pin the reviewed Rocky Linux image index.",
+)
+requireText(files.systemd239Dockerfile, 'CMD ["/sbin/init"]', "The compatibility fixture must boot systemd as PID 1.")
 assert.doesNotMatch(
     files.deployScript,
     /validationLogTailBase64|VALIDATION_LOG_TAIL_BASE64|server\.log/,

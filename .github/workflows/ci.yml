@@ -41,6 +41,7 @@ jobs:
           bash -n deploy/production/zzz-calculator-validation-worker
           bash -n tests/production-bootstrap.integration.sh
           bash -n tests/production-deploy-manager.integration.sh
+          bash -n tests/production-systemd239-sandbox.integration.sh
           bash -n tests/production-ssh-gateway.integration.sh
           sudo visudo -cf deploy/production/zzz-calculator-deploy.sudoers
 
@@ -63,6 +64,55 @@ jobs:
 
       - name: Run deployment manager integration tests
         run: bash tests/production-deploy-manager.integration.sh
+
+      - name: Run the validation sandbox on systemd 239
+        run: |
+          image="zzz-calculator-systemd239:${GITHUB_SHA}"
+          container=""
+          context=""
+          cleanup_systemd239() {
+            status="$?"
+            trap - EXIT
+            if [[ -n "$container" ]]; then
+              if [[ "$status" -ne 0 ]]; then
+                docker logs "$container" || true
+              fi
+              docker rm --force "$container" >/dev/null 2>&1 || true
+            fi
+            if [[ -n "$context" && "$context" == "$RUNNER_TEMP/zzz-systemd239-context."* ]]; then
+              rm -rf -- "$context"
+            fi
+            exit "$status"
+          }
+          trap cleanup_systemd239 EXIT
+          context="$(mktemp -d "$RUNNER_TEMP/zzz-systemd239-context.XXXXXX")"
+          install -d -- "$context/deploy/production" "$context/tests"
+          cp -- deploy/production/zzz-calculator-deploy \
+            deploy/production/zzz-calculator-validation-worker \
+            "$context/deploy/production/"
+          cp -- tests/production-systemd239-sandbox.integration.sh \
+            tests/systemd239-sandbox.Dockerfile "$context/tests/"
+          docker build --file "$context/tests/systemd239-sandbox.Dockerfile" --tag "$image" "$context"
+          container="$(docker run --detach --privileged --cgroupns=host \
+            --env container=docker \
+            --tmpfs /run --tmpfs /run/lock --tmpfs /tmp \
+            --volume /sys/fs/cgroup:/sys/fs/cgroup:rw \
+            "$image")"
+          ready="0"
+          for attempt in $(seq 1 60); do
+            state="$(docker exec "$container" systemctl is-system-running 2>/dev/null || true)"
+            if [[ "$state" == "running" || "$state" == "degraded" ]]; then
+              ready="1"
+              break
+            fi
+            sleep 1
+          done
+          [[ "$ready" == "1" ]] || {
+            docker exec "$container" systemctl --failed || true
+            exit 1
+          }
+          docker exec "$container" \
+            /usr/local/bin/production-systemd239-sandbox.integration.sh
 
       - name: Run regression suite
         run: npm test
