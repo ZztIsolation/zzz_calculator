@@ -79,7 +79,7 @@ cat >"$MOUNT_AMBIGUOUS_FIXTURE" <<'MOUNTINFO'
 43 900 0:52 / /run rw,nosuid,nodev,noexec - tmpfs tmpfs rw,nosuid,nodev,noexec
 MOUNTINFO
 chmod 0700 "$MOUNT_DRIVER"
-"$MOUNT_DRIVER" "$MOUNT_FIXTURE" "$MOUNT_AMBIGUOUS_FIXTURE" \
+/bin/bash --noprofile --norc "$MOUNT_DRIVER" "$MOUNT_FIXTURE" "$MOUNT_AMBIGUOUS_FIXTURE" \
     || fail "worker did not select the unique top-most mount by parent-ID topology"
 
 # Build a driver from the real manager functions. The production manager is
