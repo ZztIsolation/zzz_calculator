@@ -299,6 +299,7 @@ for (const token of [
     "RemoveIPC=yes",
     "-/proc/sysvipc -/dev/mqueue",
     "run_validation_sandbox_capability_probe",
+    "finish_validation_probe_if_gone",
 ]) {
     requireText(files.deployScript, token, `Deployment sandbox is missing: ${token}`)
 }
@@ -339,6 +340,9 @@ for (const token of [
     "assert_profile 248 252 systemd-v239-seccomp+restrict-suidsgid+private-ipc 1 1",
     "run_validation_sandbox_capability_probe",
     "assert_transient_property_parser_support",
+    "systemd-run --no-block --quiet",
+    "/usr/bin/sleep 30",
+    "UnitNameMembers=",
     "Unknown assignment:",
     "ZzzFirstUnsupported",
     "ZzzSecondUnsupported",

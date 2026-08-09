@@ -990,28 +990,49 @@ validation_unit_name_has_members() {
     return 1
 }
 
+finish_validation_probe_if_gone() {
+    local unit="$1"
+    local load_state
+
+    [[ "$unit" =~ ^zzz-calculator-validation-[0-9]+-[1-9][0-9]*\.service$ ]] || return 1
+    [[ "$VALIDATION_UNIT" == "$unit" ]] || return 1
+    load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null)" || return 1
+    [[ "$load_state" == "not-found" ]] || return 1
+    validation_unit_name_has_members "$unit" && return 1
+    VALIDATION_UNIT=""
+    return 0
+}
+
 stop_validation_probe() {
     local unit load_state active_state control_group cgroup_procs attempt
     local control_group_was_realized="0"
     [[ -n "$VALIDATION_UNIT" ]] || return 0
     unit="$VALIDATION_UNIT"
     [[ "$unit" =~ ^zzz-calculator-validation-[0-9]+-[1-9][0-9]*\.service$ ]] || return 1
-    load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null)" || return 1
+    if ! load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null)"; then
+        finish_validation_probe_if_gone "$unit" && return 0
+        return 1
+    fi
     if [[ "$load_state" == "not-found" ]]; then
-        validation_unit_name_has_members "$unit" && return 1
-        VALIDATION_UNIT=""
-        return 0
+        finish_validation_probe_if_gone "$unit"
+        return
     fi
     [[ "$load_state" == "loaded" ]] || return 1
 
-    control_group="$(systemctl show "$unit" --property ControlGroup --value 2>/dev/null)" || return 1
+    if ! control_group="$(systemctl show "$unit" --property ControlGroup --value 2>/dev/null)"; then
+        finish_validation_probe_if_gone "$unit" && return 0
+        return 1
+    fi
     if [[ -n "$control_group" ]]; then
         [[ "$control_group" == /*/"$unit" ]] || return 1
         control_group_was_realized="1"
     else
         validation_unit_name_has_members "$unit" && return 1
     fi
-    systemctl stop "$unit" >/dev/null 2>&1 || return 1
+    if ! systemctl stop "$unit" >/dev/null 2>&1; then
+        finish_validation_probe_if_gone "$unit" && return 0
+        return 1
+    fi
     if [[ "$control_group_was_realized" == "1" ]]; then
         cgroup_procs="/sys/fs/cgroup${control_group}/cgroup.procs"
         if [[ -r "$cgroup_procs" ]] && grep -Eq '[0-9]' -- "$cgroup_procs"; then
@@ -1021,31 +1042,33 @@ stop_validation_probe() {
     fi
     validation_unit_name_has_members "$unit" && return 1
 
-    load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null)" || return 1
+    if ! load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null)"; then
+        finish_validation_probe_if_gone "$unit" && return 0
+        return 1
+    fi
     if [[ "$load_state" == "not-found" ]]; then
-        validation_unit_name_has_members "$unit" && return 1
-        VALIDATION_UNIT=""
-        return 0
+        finish_validation_probe_if_gone "$unit"
+        return
     fi
     [[ "$load_state" == "loaded" ]] || return 1
-    active_state="$(systemctl show "$unit" --property ActiveState --value 2>/dev/null)" || return 1
+    if ! active_state="$(systemctl show "$unit" --property ActiveState --value 2>/dev/null)"; then
+        finish_validation_probe_if_gone "$unit" && return 0
+        return 1
+    fi
     [[ "$active_state" == "inactive" || "$active_state" == "failed" ]] || return 1
     if ! systemctl reset-failed "$unit" >/dev/null 2>&1; then
-        load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null)" || return 1
-        if [[ "$load_state" == "not-found" ]]; then
-            validation_unit_name_has_members "$unit" && return 1
-            VALIDATION_UNIT=""
-            return 0
-        fi
+        finish_validation_probe_if_gone "$unit" && return 0
         return 1
     fi
 
     for attempt in $(seq 1 50); do
-        load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null)" || return 1
+        if ! load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null)"; then
+            finish_validation_probe_if_gone "$unit" && return 0
+            return 1
+        fi
         if [[ "$load_state" == "not-found" ]]; then
-            validation_unit_name_has_members "$unit" && return 1
-            VALIDATION_UNIT=""
-            return 0
+            finish_validation_probe_if_gone "$unit"
+            return
         fi
         [[ "$load_state" == "loaded" ]] || return 1
         sleep 0.1

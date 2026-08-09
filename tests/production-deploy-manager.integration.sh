@@ -411,29 +411,48 @@ TEST_COUNTER_FILE="${test_root}/health-pid-change.count" TEST_FAILURE_COUNT="0" 
         '    case "$property" in' \
         '      LoadState)' \
         '        [[ "$MODE" != "query-error" ]] || return 1' \
-        '        if [[ "$MODE" == "absent" ]]; then printf "not-found\n"' \
+        '        if [[ "$MODE" == "initial-query-gc" && ! -e "$STATE_ROOT/collected" ]]; then' \
+        '          : >"$STATE_ROOT/collected"; return 1' \
+        '        elif [[ -e "$STATE_ROOT/collected" ]]; then printf "not-found\n"' \
+        '        elif [[ "$MODE" == "post-load-query-gc" && -e "$STATE_ROOT/stopped" ]]; then' \
+        '          : >"$STATE_ROOT/collected"; return 1' \
+        '        elif [[ "$MODE" == "poll-query-gc" && -e "$STATE_ROOT/reset" ]]; then' \
+        '          : >"$STATE_ROOT/collected"; return 1' \
+        '        elif [[ "$MODE" == "absent" ]]; then printf "not-found\n"' \
         '        elif [[ ! -e "$STATE_ROOT/stopped" ]]; then printf "loaded\n"' \
-        '        elif [[ "$MODE" == "gc-after-stop" || -e "$STATE_ROOT/reset" ]]; then printf "not-found\n"' \
+        '        elif [[ "$MODE" == "gc-after-stop" || ( -e "$STATE_ROOT/reset" && "$MODE" != "reset-error-loaded" ) ]]; then printf "not-found\n"' \
         '        else printf "loaded\n"; fi ;;' \
         '      ControlGroup)' \
         '        [[ "$MODE" != "control-query-error" ]] || return 1' \
-        '        if [[ "$MODE" == "blank-control-group" || "$MODE" == "blank-control-group-member" ]]; then printf "\n"' \
+        '        if [[ "$MODE" == "gc-control-query" ]]; then : >"$STATE_ROOT/collected"; return 1' \
+        '        elif [[ "$MODE" == "blank-control-group" || "$MODE" == "blank-control-group-member" || "$MODE" == "stop-gc" || "$MODE" == "stop-gc-member" ]]; then printf "\n"' \
         '        elif [[ "$MODE" == "invalid-control-group" ]]; then printf "/system.slice/other.service\n"' \
         '        else printf "/system.slice/%s\n" "$UNIT_NAME"; fi ;;' \
-        '      ActiveState) printf "inactive\n" ;;' \
+        '      ActiveState)' \
+        '        if [[ "$MODE" == "active-query-gc" ]]; then : >"$STATE_ROOT/collected"; return 1' \
+        '        elif [[ "$MODE" == "active-query-error-loaded" ]]; then return 1' \
+        '        else printf "inactive\n"; fi ;;' \
         '      *) return 1 ;;' \
         '    esac' \
-        '  elif [[ "$command" == "stop" ]]; then : >"$STATE_ROOT/stopped"' \
+        '  elif [[ "$command" == "stop" ]]; then' \
+        '    : >"$STATE_ROOT/stopped"' \
+        '    if [[ "$MODE" == "stop-gc" || "$MODE" == "stop-gc-member" ]]; then' \
+        '      : >"$STATE_ROOT/collected"; return 1' \
+        '    elif [[ "$MODE" == "stop-error-loaded" ]]; then return 1; fi' \
         '  elif [[ "$command" == "reset-failed" ]]; then' \
-        '    : >"$STATE_ROOT/reset"; [[ "$MODE" != "reset-race" ]]' \
+        '    : >"$STATE_ROOT/reset"' \
+        '    [[ "$MODE" != "reset-race" && "$MODE" != "reset-error-loaded" ]]' \
         '  else return 1; fi' \
         '}'
     sed -n '/^validation_cgroup_has_members() {$/,/^}$/p' "$MANAGER"
     sed -n '/^validation_unit_name_has_members() {$/,/^}$/p' "$MANAGER"
+    sed -n '/^finish_validation_probe_if_gone() {$/,/^}$/p' "$MANAGER"
     sed -n '/^stop_validation_probe() {$/,/^}$/p' "$MANAGER"
     printf '%s\n' \
         'if [[ "$MODE" == "blank-control-group-member" ]]; then' \
         '  validation_unit_name_has_members() { return 0; }' \
+        'elif [[ "$MODE" == "stop-gc-member" ]]; then' \
+        '  validation_unit_name_has_members() { [[ -e "$STATE_ROOT/collected" ]]; }' \
         'elif [[ "$MODE" == "member-after-stop" ]]; then' \
         '  validation_unit_name_has_members() { [[ -e "$STATE_ROOT/stopped" ]]; }' \
         'fi' \
@@ -442,8 +461,10 @@ TEST_COUNTER_FILE="${test_root}/health-pid-change.count" TEST_FAILURE_COUNT="0" 
 } >"$validation_stop_driver"
 bash -n "$validation_stop_driver" || fail "extracted validation stop driver is not valid Bash"
 for stop_fixture in \
-    query-error control-query-error invalid-control-group blank-control-group-member member-after-stop absent blank-control-group \
-    gc-after-stop reset-race clean; do
+    query-error control-query-error stop-error-loaded active-query-error-loaded reset-error-loaded \
+    invalid-control-group blank-control-group-member member-after-stop stop-gc-member \
+    initial-query-gc gc-control-query stop-gc post-load-query-gc active-query-gc poll-query-gc \
+    absent blank-control-group gc-after-stop reset-race clean; do
     stop_state="${test_root}/validation-stop-${stop_fixture}"
     mkdir -p -- "$stop_state"
     stop_result="$(TEST_STATE_ROOT="$stop_state" /bin/bash --noprofile --norc \
@@ -453,9 +474,25 @@ for stop_fixture in \
             [[ "$stop_result" == "1|zzz-calculator-validation-999999-1.service|0|0" ]] \
                 || fail "an invalid systemd cleanup state was treated as a clean validation stop"
             ;;
-        member-after-stop)
+        stop-error-loaded|active-query-error-loaded|member-after-stop|stop-gc-member)
             [[ "$stop_result" == "1|zzz-calculator-validation-999999-1.service|1|0" ]] \
-                || fail "a post-stop validation cgroup member was treated as clean"
+                || fail "a failed or occupied post-stop validation state was treated as clean"
+            ;;
+        reset-error-loaded)
+            [[ "$stop_result" == "1|zzz-calculator-validation-999999-1.service|1|1" ]] \
+                || fail "a failed reset with a loaded unit was treated as clean"
+            ;;
+        initial-query-gc|gc-control-query)
+            [[ "$stop_result" == "0||0|0" ]] \
+                || fail "a safely collected pre-stop unit was misclassified for ${stop_fixture}"
+            ;;
+        stop-gc|post-load-query-gc|active-query-gc)
+            [[ "$stop_result" == "0||1|0" ]] \
+                || fail "a safely collected post-stop unit was misclassified for ${stop_fixture}"
+            ;;
+        poll-query-gc)
+            [[ "$stop_result" == "0||1|1" ]] \
+                || fail "a safely collected unit was misclassified during GC polling"
             ;;
         absent)
             [[ "$stop_result" == "0||0|0" ]] \

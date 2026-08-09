@@ -594,10 +594,16 @@ for (const actionName of ["run_dry_run", "run_deploy"]) {
 }
 assert.match(
     manager,
-    /stop_validation_probe\(\)[\s\S]*LoadState[\s\S]*== "not-found"[\s\S]*validation_unit_name_has_members[\s\S]*== "loaded"[\s\S]*ControlGroup[\s\S]*systemctl stop[\s\S]*cgroup\.procs[\s\S]*validation_cgroup_has_members[\s\S]*reset-failed[\s\S]*== "not-found"/,
+    /stop_validation_probe\(\)[\s\S]*LoadState[\s\S]*== "loaded"[\s\S]*ControlGroup[\s\S]*systemctl stop[\s\S]*cgroup\.procs[\s\S]*validation_cgroup_has_members[\s\S]*ActiveState[\s\S]*reset-failed[\s\S]*for attempt/,
     "Transient validation must stop and verify its complete cgroup",
 )
 const validationStop = manager.match(/stop_validation_probe\(\)[\s\S]*?^}/m)?.[0] ?? ""
+const validationGone = manager.match(/finish_validation_probe_if_gone\(\)[\s\S]*?^}/m)?.[0] ?? ""
+assert.match(
+    validationGone,
+    /LoadState --value[\s\S]*?== "not-found"[\s\S]*?validation_unit_name_has_members "\$unit" && return 1[\s\S]*?VALIDATION_UNIT=""/,
+    "A transient validation unit may be finalized only after a fresh not-found and no-member proof",
+)
 assert.match(
     validationStop,
     /\[\[ "\$unit" =~ \^zzz-calculator-validation-\[0-9\]\+\-\[1-9\]\[0-9\]\*\\\.service\$ \]\] \|\| return 1/,
@@ -613,12 +619,16 @@ assert.match(
     /systemctl stop[\s\S]*?validation_unit_name_has_members "\$unit" && return 1/,
     "Validation cleanup must recheck unit-named members after stopping the service",
 )
+assert.ok(
+    (validationStop.match(/finish_validation_probe_if_gone "\$unit"/g) ?? []).length >= 7,
+    "Every transient-unit query, stop, reset, and GC race must use the same strict gone-unit proof",
+)
 assert.doesNotMatch(
     validationStop,
     /LoadState --value 2>\/dev\/null \|\| true/,
     "A failed systemd LoadState query must never be treated as an unloaded validation unit",
 )
-includes(validationStop, 'VALIDATION_UNIT=""')
+includes(validationGone, 'VALIDATION_UNIT=""')
 assert.match(
     manager,
     /copy_release_for_validation\(\)[\s\S]*source_tree_before[\s\S]*--exclude='\.\/data'[\s\S]*user_drive_discs\.example\.json[\s\S]*source_tree_after[\s\S]*prepare_private_validation_release "\$destination"[\s\S]*assert_sanitized_validation_data/,

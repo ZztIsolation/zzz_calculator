@@ -126,6 +126,7 @@ for function_name in \
     record_validation_unit_result \
     validation_cgroup_has_members \
     validation_unit_name_has_members \
+    finish_validation_probe_if_gone \
     stop_validation_probe \
     run_validation_transient_unit \
     run_validation_sandbox_capability_probe; do
@@ -142,7 +143,8 @@ array_has_value() {
 }
 
 assert_transient_property_parser_support() {
-    local index assignment property unit_base output launch_status
+    local index assignment property unit_base unit output launch_status
+    local attempt load_state control_group ready
     local -a unsupported=() rejected=()
 
     (( ${#VALIDATION_SYSTEMD_PROPERTIES[@]} % 2 == 0 )) || exit 104
@@ -153,17 +155,52 @@ assert_transient_property_parser_support() {
         property="${assignment%%=*}"
         [[ "$property" =~ ^[A-Za-z][A-Za-z0-9]*$ ]] || exit 104
         unit_base="zzz-calculator-validation-${$}-$((1000 + index / 2))"
-        VALIDATION_UNIT="${unit_base}.service"
+        unit="${unit_base}.service"
+        VALIDATION_UNIT="$unit"
         launch_status="0"
         if output="$(/usr/bin/timeout --signal=TERM --kill-after=2s 10s \
-            /usr/bin/systemd-run --quiet --unit "$unit_base" \
-            --property "$assignment" -- /usr/bin/true 2>&1)"; then
+            /usr/bin/systemd-run --no-block --quiet --unit "$unit_base" \
+            --property "$assignment" -- /usr/bin/sleep 30 2>&1)"; then
             :
         else
             launch_status="$?"
         fi
-        stop_validation_probe \
-            || die "property parser probe cleanup failed for ${property}"
+        if [[ "$launch_status" -eq 0 ]]; then
+            ready="0"
+            load_state=""
+            control_group=""
+            for attempt in $(seq 1 50); do
+                load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null || true)"
+                control_group="$(systemctl show "$unit" --property ControlGroup --value 2>/dev/null || true)"
+                if [[ "$load_state" == "loaded" && "$control_group" == /*/"$unit" ]] \
+                    && validation_unit_name_has_members "$unit"; then
+                    ready="1"
+                    break
+                fi
+                [[ "$load_state" != "not-found" ]] || break
+                sleep 0.1
+            done
+            if [[ "$ready" != "1" ]]; then
+                launch_status="125"
+                output="transient unit did not stabilize: loadState=${load_state:-unknown} controlGroup=${control_group:-unknown}"
+            fi
+        fi
+        if ! stop_validation_probe; then
+            systemctl show "$unit" --no-pager \
+                --property LoadState --property ActiveState --property SubState \
+                --property Result --property ExecMainStatus --property ControlGroup >&2 || true
+            if validation_unit_name_has_members "$unit"; then
+                printf 'UnitNameMembers=yes\n' >&2
+            else
+                printf 'UnitNameMembers=no\n' >&2
+            fi
+            die "property parser probe cleanup failed for ${property}"
+        fi
+        [[ -z "$VALIDATION_UNIT" ]] \
+            || die "property parser probe retained its unit for ${property}"
+        if validation_unit_name_has_members "$unit"; then
+            die "property parser probe retained cgroup members for ${property}"
+        fi
         if [[ "$launch_status" -ne 0 && "$output" == *"Unknown assignment:"* ]]; then
             unsupported+=("$property")
         elif [[ "$launch_status" -ne 0 ]]; then

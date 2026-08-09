@@ -9,6 +9,7 @@ RUN dnf -y install \
     && test -x /usr/bin/ipcmk \
     && test -x /usr/bin/ipcrm \
     && test -x /usr/bin/setarch \
+    && test -x /usr/bin/sleep \
     && test -x /usr/bin/systemctl \
     && test -x /usr/bin/systemd-run \
     && test -x /usr/bin/timeout \
