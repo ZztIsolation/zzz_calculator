@@ -188,14 +188,19 @@ copy, rollback copy and candidate copy in that order. Each stage gets a fresh
 separate 4 MiB private `/run`, and runs as `zzzvalidate` in a transient systemd
 service with `PrivateNetwork`, AF_UNIX disabled, an empty capability set, no
 new privileges, a read-only host filesystem, explicit memory/CPU/task/file
-limits and `KillMode=control-group`. The source `data` tree is never copied into
+limits and `KillMode=control-group`. Endpoint responses are written only to the
+private validation tmpfs under a 4 MiB `RLIMIT_FSIZE`; curl also receives that limit,
+and the worker rejects an empty, linked, multiply linked, mis-owned, permissively
+mode-set or oversized response before parsing it. The source `data` tree is never copied into
 the validation scope:
 only `agents.json`, `agent_skills.json`, `anomaly_effects.json`, `bosses.json`,
 `combat_buffs.json`, `drive_disc_sets.json`, `stat_rules.json` and
 `w_engines.json` are allow-listed. `user_drive_discs.example.json` is copied
 as both the example and isolated `user_drive_discs.json`; real inventory,
 scan telemetry and unknown files never enter the sandbox. Seed data is capped
-at 64 MiB, 8,192 entries and 1 MiB per file before candidate code starts. The real release
+at 64 MiB, 8,192 entries and 1 MiB per file before candidate code starts; this
+independent input-file cap is not widened by the 4 MiB aggregate API-response
+limit. The real release
 root, deployment state, production state and download origin are inaccessible;
 the one private release copy is exposed read-only at `/zzz-validation/app`.
 The private validation parent remains `root:zzzvalidate` mode `0750`: the

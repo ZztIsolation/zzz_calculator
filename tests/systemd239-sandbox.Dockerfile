@@ -1,13 +1,15 @@
 FROM rockylinux/rockylinux:8.10@sha256:e8a49c5403b687db05d4d67333fa45808fbe74f36e683cec7abb1f7d0f2338c6
 
 RUN dnf -y install \
-        bash coreutils-single curl findutils gawk grep iproute procps-ng shadow-utils \
+        bash coreutils-single curl findutils gawk grep iproute jq nodejs procps-ng shadow-utils \
         systemd systemd-libs util-linux \
     && dnf clean all \
     && rm -rf /var/cache/dnf \
     && test -x /usr/bin/env \
     && test -x /usr/bin/ipcmk \
     && test -x /usr/bin/ipcrm \
+    && test -x /usr/bin/jq \
+    && test -x /usr/bin/node \
     && test -x /usr/bin/setarch \
     && test -x /usr/bin/sleep \
     && test -x /usr/bin/systemctl \

@@ -330,11 +330,20 @@ for (const token of [
     "/usr/bin/uname",
     "assert_personality_denied",
     "capability bind source sentinel is missing or invalid",
+    'readonly MAX_VALIDATION_RESPONSE_BYTES="$((4 * 1024 * 1024))"',
+    "assert_endpoint_response_file",
+    '--max-filesize "$MAX_VALIDATION_RESPONSE_BYTES"',
     "HOST_SYSVIPC_DIR",
     "HOST_MQUEUE_DIR",
 ]) {
     requireText(files.validationWorker, token, `Validation worker sandbox self-check is missing: ${token}`)
 }
+requireText(
+    files.deployScript,
+    '--property "LimitFSIZE=${MAX_VALIDATION_RESPONSE_BYTES}"',
+    "The transient validation file-size limit must match the bounded endpoint response contract.",
+)
+assert.doesNotMatch(files.deployScript, /LimitFSIZE=1M/, "The validation worker must accept the current catalog response.")
 for (const token of [
     "systemd 239",
     "assert_profile 239 239 systemd-v239-seccomp 0 0",
@@ -349,6 +358,13 @@ for (const token of [
     "ZzzFirstUnsupported",
     "ZzzSecondUnsupported",
     "ZzzDefinitelyUnsupported=yes",
+    "large-catalog-source",
+    'fs.existsSync(path.resolve(__dirname, "..", ".oversize-response"))',
+    'run_validation_transient_unit large-catalog "$large_catalog_release" release',
+    "oversized chunked catalog bypassed the 4 MiB response limit",
+    "cleanup_oversize_validation",
+    "cleanup_transient_trees",
+    "oversized catalog failure retained a transient unit",
 ]) {
     requireText(files.systemd239Sandbox, token, `The systemd 239 integration fixture is missing: ${token}`)
 }
@@ -358,6 +374,8 @@ requireText(
     "The systemd 239 fixture must pin the reviewed Rocky Linux image index.",
 )
 requireText(files.systemd239Dockerfile, 'CMD ["/sbin/init"]', "The compatibility fixture must boot systemd as PID 1.")
+requireText(files.systemd239Dockerfile, "test -x /usr/bin/jq", "The release-mode sandbox fixture requires jq.")
+requireText(files.systemd239Dockerfile, "test -x /usr/bin/node", "The release-mode sandbox fixture requires Node.js.")
 assert.doesNotMatch(
     files.deployScript,
     /validationLogTailBase64|VALIDATION_LOG_TAIL_BASE64|server\.log/,

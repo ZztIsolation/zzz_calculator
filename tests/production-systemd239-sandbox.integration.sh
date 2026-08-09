@@ -120,6 +120,8 @@ for function_name in \
     select_validation_systemd_profile \
     detect_validation_systemd_profile \
     build_validation_systemd_properties \
+    safe_remove_transient_dir \
+    cleanup_transient_trees \
     prepare_validation_job \
     prepare_validation_probe_root \
     remove_validation_probe_root \
@@ -295,6 +297,76 @@ if systemctl list-units --all --no-legend 'zzz-calculator-validation-*' | grep -
     exit 100
 fi
 
+# Exercise the real release-mode worker with a chunked catalog response larger
+# than the old 1 MiB file limit. The 4 MiB RLIMIT and post-download stat gate
+# must accept this bounded response without weakening the sandbox profile.
+large_catalog_release="$VALIDATION_JOB_DIR/large-catalog-source"
+install -d -o root -g root -m 0755 \
+    "$large_catalog_release/backend" "$large_catalog_release/data"
+for catalog_name in "${VALIDATION_CATALOG_FILES[@]}" user_drive_discs.example.json; do
+    printf '{}\n' >"$large_catalog_release/data/$catalog_name"
+done
+cat >"$large_catalog_release/backend/server.js" <<'LARGE_CATALOG_SERVER'
+const fs = require("fs")
+const http = require("http")
+const path = require("path")
+
+const paddingBytes = fs.existsSync(path.resolve(__dirname, "..", ".oversize-response"))
+  ? 5242880
+  : 2621440
+const catalog = JSON.stringify({
+  agents: [],
+  padding: "x".repeat(paddingBytes),
+}, null, 2)
+
+function sendJson(response, payload) {
+  response.writeHead(200, { "content-type": "application/json; charset=utf-8" })
+  response.write(payload)
+  response.end()
+}
+
+http.createServer((request, response) => {
+  if (request.url === "/api/health") {
+    sendJson(response, JSON.stringify({ ok: true }))
+  } else if (request.url === "/api/catalog") {
+    sendJson(response, catalog)
+  } else if (request.url === "/api/app-config") {
+    sendJson(response, JSON.stringify({ maintenanceEnabled: false }))
+  } else {
+    response.writeHead(404)
+    response.end()
+  }
+}).listen(Number(process.env.PORT), process.env.HOST)
+LARGE_CATALOG_SERVER
+chown -R root:root -- "$large_catalog_release"
+find "$large_catalog_release" -type d -exec chmod 0755 {} +
+find "$large_catalog_release" -type f -exec chmod 0644 {} +
+large_catalog_bytes="$(/usr/bin/node -e \
+    'process.stdout.write(String(Buffer.byteLength(JSON.stringify({agents:[],padding:"x".repeat(2621440)}, null, 2))))')"
+[[ "$large_catalog_bytes" =~ ^[1-9][0-9]*$ \
+    && "$large_catalog_bytes" -gt $((1024 * 1024)) \
+    && "$large_catalog_bytes" -le "$MAX_VALIDATION_RESPONSE_BYTES" ]] \
+    || die "large catalog fixture does not exercise the bounded response window"
+run_validation_transient_unit large-catalog "$large_catalog_release" release
+[[ "$VALIDATION_UNIT_RESULTS" == *'large-catalog:active/exited/success/0'* ]] \
+    || die "large catalog release-mode validation did not succeed"
+[[ -z "$VALIDATION_UNIT" && -z "$VALIDATION_PROBE_ROOT" ]] \
+    || die "large catalog validation retained transient state"
+if systemctl list-units --all --no-legend 'zzz-calculator-validation-*' | grep -q .; then
+    die "large catalog validation retained a transient unit"
+fi
+
+oversize_catalog_release="$VALIDATION_JOB_DIR/oversize-catalog-source"
+cp -a -- "$large_catalog_release" "$oversize_catalog_release"
+printf 'oversize\n' >"$oversize_catalog_release/.oversize-response"
+chown root:root -- "$oversize_catalog_release/.oversize-response"
+chmod 0644 -- "$oversize_catalog_release/.oversize-response"
+oversize_catalog_bytes="$(/usr/bin/node -e \
+    'process.stdout.write(String(Buffer.byteLength(JSON.stringify({agents:[],padding:"x".repeat(5242880)}, null, 2))))')"
+[[ "$oversize_catalog_bytes" =~ ^[1-9][0-9]*$ \
+    && "$oversize_catalog_bytes" -gt "$MAX_VALIDATION_RESPONSE_BYTES" ]] \
+    || die "oversized catalog fixture does not exceed the response limit"
+
 # An unknown property must fail before the marker command can execute. There is
 # no retry with a reduced property set.
 unknown_marker="/run/zzz-systemd239-unknown-property-marker"
@@ -305,10 +377,39 @@ if /usr/bin/systemd-run --quiet --unit "zzz-systemd239-unknown-$$" \
 fi
 [[ ! -e "$unknown_marker" ]] || exit 102
 
-rm -rf --one-file-system -- "$VALIDATION_JOB_DIR"
+# Run the oversized response last: the child EXIT trap invokes the same full
+# transient-tree cleanup used by production, then the parent proves that the
+# private job and systemd unit are both gone.
+oversize_output=""
+oversize_status="0"
+oversize_output="$(
+    exec 2>&1
+    cleanup_oversize_validation() {
+        local status="$?"
+        trap - EXIT
+        cleanup_transient_trees || exit 125
+        exit "$status"
+    }
+    trap cleanup_oversize_validation EXIT
+    run_validation_transient_unit oversize-catalog "$oversize_catalog_release" release
+)" || oversize_status="$?"
+if [[ "$oversize_status" == "0" ]]; then
+    die "oversized chunked catalog bypassed the 4 MiB response limit"
+fi
+[[ "$oversize_status" == "1" ]] \
+    || die "oversized catalog cleanup failed with status ${oversize_status}"
+[[ "$oversize_output" == *'execStatus=57'* ]] \
+    || die "oversized catalog did not fail through the endpoint response gate"
+[[ ! -e "$VALIDATION_JOB_DIR" && ! -L "$VALIDATION_JOB_DIR" ]] \
+    || die "oversized catalog failure retained its validation job"
+if systemctl list-units --all --no-legend 'zzz-calculator-validation-*' | grep -q .; then
+    die "oversized catalog failure retained a transient unit"
+fi
+[[ "$(stat -c '%U:%G:%a' -- "$VALIDATION_DIR")" == "root:root:750" ]] \
+    || die "oversized catalog cleanup did not restore the validation directory"
 VALIDATION_JOB_DIR=""
-chown root:root "$VALIDATION_DIR"
-chmod 0750 "$VALIDATION_DIR"
+VALIDATION_DIR_EXPOSED="0"
+VALIDATION_CLEANUP_RESULT="clean"
 printf 'systemd 239 validation sandbox integration passed\n'
 DRIVER_TESTS
 
