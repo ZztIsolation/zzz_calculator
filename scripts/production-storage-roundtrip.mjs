@@ -482,10 +482,38 @@ function stableBuildSnapshot(store) {
     const clone = structuredClone(store)
     for (const owner of Object.values(clone?.byOwner ?? {})) {
         for (const config of Object.values(owner?.byAgent ?? {})) {
-            if (config?.lastAnomalySourceSnapshot) delete config.lastAnomalySourceSnapshot.capturedAt
+            if (config?.lastAnomalySourceSnapshot) {
+                delete config.lastAnomalySourceSnapshot.capturedAt
+                delete config.lastAnomalySourceSnapshot.sourceConfigHash
+            }
         }
     }
     return clone
+}
+
+function anomalySnapshotHashes(store) {
+    const hashes = {}
+    for (const [ownerId, owner] of Object.entries(store?.byOwner ?? {})) {
+        for (const [agentId, config] of Object.entries(owner?.byAgent ?? {})) {
+            const snapshot = config?.lastAnomalySourceSnapshot
+            if (snapshot) hashes[`${ownerId}/${agentId}`] = snapshot.sourceConfigHash
+        }
+    }
+    return hashes
+}
+
+function assertSnapshotHashesSynchronized(buildStore, compatibilityStore, phase) {
+    const buildHashes = anomalySnapshotHashes(buildStore)
+    const compatibilityHashes = anomalySnapshotHashes(compatibilityStore)
+    assert(Object.keys(buildHashes).length > 0, `${phase} did not persist an anomaly source snapshot`)
+    for (const hash of Object.values(buildHashes)) {
+        assert.match(String(hash ?? ""), /^fnv1a-[0-9a-f]{8}$/)
+    }
+    assert.deepEqual(
+        compatibilityHashes,
+        buildHashes,
+        `${phase} source config hashes diverged between the primary and compatibility stores`,
+    )
 }
 
 async function visitRelease(page, proxy, target, label, route, readyLocator, pageErrors) {
@@ -771,6 +799,11 @@ async function main() {
         assertDatabaseContract(candidateLocalAfterWrite)
         assert.equal(candidateLocalAfterWrite.localStorage["zzz-calculator.webapp.build.v1"], luminescenceValue)
         assert.equal(candidateLocalAfterWrite.localStorage["zzz_maintenance_vue_draft_v3"], initialLocalStorage["zzz_maintenance_vue_draft_v3"])
+        assertSnapshotHashesSynchronized(
+            luminescenceStore,
+            JSON.parse(candidateLocalAfterWrite.localStorage["zzz-calculator.homeSelection.v1"]),
+            "first candidate load",
+        )
         evidence.sequence.push({ release: "candidate", phase: "first", ok: true, catalogSets })
 
         await visitRelease(
@@ -788,6 +821,7 @@ async function main() {
         assert.deepEqual(rollback.store, candidateFirst.store, "rollback release changed IndexedDB data")
         const rollbackBuild = JSON.parse(rollback.localStorage["zzz-calculator.webapp.build.v1"])
         const rollbackHome = JSON.parse(rollback.localStorage["zzz-calculator.homeSelection.v1"])
+        assertSnapshotHashesSynchronized(rollbackBuild, rollbackHome, "rollback load")
         assertLuminescenceBuildCompatibility(luminescenceStore, rollbackBuild)
         assertLuminescenceBuildCompatibility(luminescenceStore, rollbackHome, { checkAltOwner: false })
         for (const [key, value] of Object.entries(initialLocalStorage)) {
@@ -810,15 +844,18 @@ async function main() {
         const candidateSecond = await readBrowserStorage(page, storageKeys)
         assertDatabaseContract(candidateSecond)
         assert.deepEqual(candidateSecond.store, candidateFirst.store, "second candidate load was not idempotent")
+        const candidateSecondBuild = JSON.parse(candidateSecond.localStorage["zzz-calculator.webapp.build.v1"])
+        const candidateSecondHome = JSON.parse(candidateSecond.localStorage["zzz-calculator.homeSelection.v1"])
         assert.deepEqual(
-            stableBuildSnapshot(JSON.parse(candidateSecond.localStorage["zzz-calculator.webapp.build.v1"])),
+            stableBuildSnapshot(candidateSecondBuild),
             stableBuildSnapshot(rollbackBuild),
         )
         assert.deepEqual(
-            stableBuildSnapshot(JSON.parse(candidateSecond.localStorage["zzz-calculator.homeSelection.v1"])),
+            stableBuildSnapshot(candidateSecondHome),
             stableBuildSnapshot(rollbackHome),
         )
-        assertLuminescenceBuildCompatibility(luminescenceStore, JSON.parse(candidateSecond.localStorage["zzz-calculator.webapp.build.v1"]))
+        assertSnapshotHashesSynchronized(candidateSecondBuild, candidateSecondHome, "second candidate load")
+        assertLuminescenceBuildCompatibility(luminescenceStore, candidateSecondBuild)
         assertCanonicalSetMigration(candidateSecond.store)
         evidence.sequence.push({ release: "candidate", phase: "second", ok: true })
         await verifyLocalStorageFallback(

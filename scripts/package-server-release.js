@@ -50,10 +50,13 @@ for (const relativePath of trackedFiles) {
     await copyFile(sourcePath, targetPath)
 }
 
-async function copyTree(sourceDir, targetDir) {
+async function copyTree(sourceDir, targetDir, excludedEntries = new Set()) {
     const entries = await readdir(sourceDir, { withFileTypes: true })
     await mkdir(targetDir, { recursive: true })
     for (const entry of entries) {
+        if (excludedEntries.has(entry.name)) {
+            continue
+        }
         const sourcePath = path.join(sourceDir, entry.name)
         const targetPath = path.join(targetDir, entry.name)
         if (entry.isDirectory()) {
@@ -96,7 +99,12 @@ async function summarizeTree(root) {
     }
 }
 
-await copyTree(pagesDir, path.join(stagingDir, "dist", "pages"))
+// Production Nginx serves downloads from the separately managed download origin.
+await copyTree(pagesDir, path.join(stagingDir, "dist", "pages"), new Set(["downloads"]))
+const packagedDownloads = await stat(path.join(stagingDir, "dist", "pages", "downloads")).catch(() => null)
+if (packagedDownloads) {
+    throw new Error("Calculator server releases must not contain separately managed download payloads.")
+}
 await writeFile(path.join(stagingDir, ".deployed-commit"), `${commit}\n`, "utf8")
 
 execFileSync("tar", ["-czf", artifactPath, "-C", stagingDir, "."], {

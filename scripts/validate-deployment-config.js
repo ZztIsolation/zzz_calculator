@@ -23,6 +23,7 @@ const files = {
     sshGatewayIntegration: await read("tests/production-ssh-gateway.integration.sh"),
     sudoers: await read("deploy/production/zzz-calculator-deploy.sudoers"),
     storageRoundtrip: await read("scripts/production-storage-roundtrip.mjs"),
+    serverPackager: await read("scripts/package-server-release.js"),
 }
 
 function requireText(contents, token, message) {
@@ -110,8 +111,12 @@ requireText(
     "CI must execute the systemd 239 sandbox integration test.",
 )
 requireText(files.ci, "output/zzz-calculator-server-*.evidence.json", "CI must upload release evidence with the artifact.")
+requireText(files.ci, "name: Verify Calculator-only server release boundary", "CI must verify that server artifacts exclude download payloads.")
+requireText(files.ci, "Calculator server artifact contains separately managed download payloads.", "CI must reject bundled download payloads.")
 requireText(files.ci, "if-no-files-found: error", "Missing release artifacts must fail CI.")
 requireText(files.ci, "retention-days: 14", "CI artifacts must have an explicit retention period.")
+requireText(files.serverPackager, 'new Set(["downloads"])', "The server packager must exclude the separately managed downloads tree.")
+requireText(files.serverPackager, "Calculator server releases must not contain separately managed download payloads.", "The server packager must fail closed if downloads enter the release tree.")
 assert.match(
     files.ci,
     /\(github\.event_name == 'push' \|\| github\.event_name == 'workflow_dispatch'\) &&\s*github\.ref == 'refs\/heads\/main'/,
@@ -192,6 +197,11 @@ assert.doesNotMatch(
 )
 
 requireText(files.deploy, "workflow_run:", "CD must be driven by the completed CI workflow.")
+assert.equal(
+    [...files.deploy.matchAll(/Calculator server artifact contains separately managed download payloads\./g)].length,
+    2,
+    "CD must reject bundled download payloads during validation and again before production access.",
+)
 requireText(files.deploy, "environment:", "CD must use the protected production environment.")
 requireText(files.deploy, "run-id: ${{ needs.preflight.outputs.run_id }}", "CD must download the triggering CI run's artifact.")
 requireText(files.deploy, "github-token: ${{ github.token }}", "Cross-run artifact download must use the scoped workflow token.")

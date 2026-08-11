@@ -240,6 +240,10 @@ jobs:
           candidate_assets="$release_dir/candidate-assets.txt"
           test -f "$archive"
           test -f "$evidence"
+          if tar -tzf "$archive" | grep -E '^\./dist/pages/downloads(/|$)' > /dev/null; then
+            echo "Calculator server artifact contains separately managed download payloads." >&2
+            exit 1
+          fi
           actual_sha="$(sha256sum "$archive" | awk '{print $1}')"
           expected_sha="$(jq -er '.artifact.sha256' "$evidence")"
           test "$actual_sha" = "$expected_sha"
@@ -475,6 +479,10 @@ jobs:
           candidate_assets="$release_dir/candidate-assets.txt"
           test -f "$archive"
           test -f "$evidence"
+          if tar -tzf "$archive" | grep -E '^\./dist/pages/downloads(/|$)' > /dev/null; then
+            echo "Calculator server artifact contains separately managed download payloads." >&2
+            exit 1
+          fi
           actual_sha="$(sha256sum "$archive" | awk '{print $1}')"
           expected_sha="$(jq -er '.artifact.sha256' "$evidence")"
           test "$actual_sha" = "$expected_sha"

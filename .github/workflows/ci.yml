@@ -141,6 +141,18 @@ jobs:
           npm run build:pages
           node scripts/package-server-release.js
 
+      - name: Verify Calculator-only server release boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          archives=(output/zzz-calculator-server-*.tar.gz)
+          [[ "${#archives[@]}" -eq 1 ]]
+          if tar -tzf "${archives[0]}" | grep -E '^\./dist/pages/downloads(/|$)' > /dev/null; then
+            echo "Calculator server artifact contains separately managed download payloads." >&2
+            exit 1
+          fi
+
       - name: Validate deployment configuration
         run: node scripts/validate-deployment-config.js
 
