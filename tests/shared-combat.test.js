@@ -20,7 +20,9 @@ import {
     nameOf,
     normalizeCustomBuffEffect,
     normalizeRuntimeForBuff,
+    runtimeEffectRules,
     runtimeForBuff,
+    runtimeParameterRequirementMatches,
     runtimeSourceGroups,
     runtimeSourceRuleIdsForGroup,
     runtimeStackGroups,
@@ -491,6 +493,55 @@ assert.equal(
     true,
     "Legacy disabled runtime flags should normalize back to enabled",
 )
+const integerSourceBuff = {
+    id: "integer-source",
+    effects: [{
+        id: "special-level",
+        type: "formula",
+        stat: "dmgBonus",
+        source: {
+            label: { zhCN: "特殊技等级" },
+            defaultValue: 12,
+            min: 1,
+            max: 16,
+            step: 1,
+            integer: true,
+        },
+        formula: { expression: "x * 1.5", valueUnit: "storedPercent" },
+    }],
+}
+const parameterizedBuff = {
+    id: "parameterized-buff",
+    runtimeParameters: [{ id: "anomalyAgentCount", kind: "enum", values: [1, 2, 3], defaultValue: 3 }],
+    effects: [
+        { id: "count-one", type: "fixed", stat: "atkFlat", value: 240, requirement: { runtimeParameter: { id: "anomalyAgentCount", oneOf: [1] } } },
+        { id: "count-three", type: "fixed", stat: "atkFlat", value: 1600, requirement: { runtimeParameter: { id: "anomalyAgentCount", oneOf: [3] } } },
+    ],
+}
+assert.equal(defaultRuntimeForBuff(parameterizedBuff).parameters.anomalyAgentCount, 3,
+    "Per-Buff runtime parameters should expose their default value")
+const countOneRuntime = normalizeRuntimeForBuff(parameterizedBuff, { parameters: { anomalyAgentCount: 1 } })
+assert.equal(countOneRuntime.parameters.anomalyAgentCount, 1)
+assert.equal(runtimeParameterRequirementMatches(parameterizedBuff.effects[0], countOneRuntime), true)
+assert.deepEqual(runtimeEffectRules(parameterizedBuff, countOneRuntime).map(rule => rule.id), ["count-one"],
+    "Runtime effect display should include only the matching conditional branch")
+assert.equal(normalizeRuntimeForBuff(parameterizedBuff, {
+    parameters: { anomalyAgentCount: 99 },
+}).parameters.anomalyAgentCount, 3, "Invalid runtime parameter values should fall back to the Buff default")
+assert.equal(
+    normalizeRuntimeForBuff(integerSourceBuff, {
+        effects: { "special-level": { sourceValue: 15.6 } },
+    }).effects["special-level"].sourceValue,
+    16,
+    "Integer formula inputs should be rounded before persistence",
+)
+assert.equal(
+    normalizeRuntimeForBuff(integerSourceBuff, {
+        effects: { "special-level": { sourceValue: 99 } },
+    }).effects["special-level"].sourceValue,
+    16,
+    "Formula inputs should be clamped to their configured bounds",
+)
 const groupedFormulaSummary = storedEffectRulesText(groupedFormulaRuntimeBuff, groupedFormulaRuntime)
 assert.equal(
     groupedFormulaSummary,
@@ -732,6 +783,12 @@ const disorderDamageBonusOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option
 assert.ok(disorderDamageBonusOption, "Custom Buff stat options should include disorder damage bonus")
 assert.equal(disorderDamageBonusOption[0], "disorderDamageBonus", "Disorder damage bonus should be a fixed event stat")
 assert.equal(disorderDamageBonusOption[2], "eventModifier", "Disorder damage bonus option should use the default event modifier bucket")
+assert.equal(
+    [...CUSTOM_BUFF_STAT_OPTIONS, ...CUSTOM_BUFF_SKILL_STAT_OPTIONS]
+        .some(option => option[0] === "alienationCoefficientBonus"),
+    false,
+    "Alienation must remain unavailable in the player custom-Buff menu",
+)
 const disorderBaseMultiplierBonusOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[1] === "紊乱倍率加算%")
 assert.ok(disorderBaseMultiplierBonusOption, "Custom Buff stat options should include disorder multiplier bonus")
 assert.equal(disorderBaseMultiplierBonusOption[0], "disorderBaseMultiplierBonus", "Disorder multiplier bonus should be a fixed event stat")

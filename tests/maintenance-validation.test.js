@@ -1212,6 +1212,53 @@ assertInvalid("teammate-buffs", {
     },
 }, "buff.source.zhCN")
 
+const runtimeParameterizedTeammateBuff = {
+    ...validTeammateBuff,
+    buff: {
+        ...validTeammateBuff.buff,
+        runtimeParameters: [{
+            id: "anomalyAgentCount",
+            kind: "enum",
+            values: [1, 2, 3],
+            defaultValue: 3,
+        }],
+        effects: [{
+            id: "runtime_parameter_effect",
+            type: "fixed",
+            target: { kind: "default" },
+            stat: "alienationCoefficientBonus",
+            value: 10,
+            mode: "flat",
+            requirement: {
+                runtimeParameter: { id: "anomalyAgentCount", oneOf: [3] },
+            },
+        }],
+    },
+}
+assertValid("teammate-buffs", runtimeParameterizedTeammateBuff)
+assertInvalid("teammate-buffs", {
+    ...runtimeParameterizedTeammateBuff,
+    buff: {
+        ...runtimeParameterizedTeammateBuff.buff,
+        runtimeParameters: [{
+            id: "anomalyAgentCount",
+            kind: "enum",
+            values: [1, 2, 3],
+            defaultValue: 4,
+        }],
+    },
+}, "默认值必须属于可选值")
+assertInvalid("teammate-buffs", {
+    ...runtimeParameterizedTeammateBuff,
+    buff: {
+        ...runtimeParameterizedTeammateBuff.buff,
+        effects: [{
+            ...runtimeParameterizedTeammateBuff.buff.effects[0],
+            requirement: { runtimeParameter: { id: "missingParameter", oneOf: [3] } },
+        }],
+    },
+}, "引用的 Buff 运行时参数不存在")
+
 const validAnomalyEffect = {
     id: "test_assault",
     maintenanceType: "anomaly",

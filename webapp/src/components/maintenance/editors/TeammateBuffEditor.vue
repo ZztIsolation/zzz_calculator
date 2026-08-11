@@ -83,6 +83,7 @@ function dropBuff(event: DragEvent, targetBuffId: string) {
   moveBuff(fromIndex, toIndex)
   clearDragState()
 }
+
 </script>
 
 <template>

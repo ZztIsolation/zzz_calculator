@@ -2,6 +2,52 @@
 
 # Changelog
 
+## 2026-08-12 - Added Remielle Teammate Buffs And The Alienation Zone
+
+Added Remielle Dan as a five-entry teammate group: Core Passive F, Special
+Skill, Additional Ability, Cinema 1, and Cinema 2. Core Passive and Additional
+Ability each own an independent `anomalyAgentCount` selector with values
+`1/2/3` and compatibility default `3`. The Core selector drives only its
+three-Anomaly 10% coefficient bonus. The Additional selector chooses exactly
+one `6%/12%/40%` initial-ATK conversion branch, capped at 1600 ATK; the picker
+shows only that branch and keeps one shared initial-ATK input across count
+changes.
+The Special Skill exposes its level as an integer `1-16` runtime source,
+defaults to level 12, and resolves `clamp(level * 1.5, 1.5, 24)%`; levels 14 and
+16 therefore represent the Cinema 3/5 skill-level increases without duplicate
+catalog Buffs. Counts now persist at each Buff's ordinary runtime key. A legacy
+`teammate:remielle_dan` count seeds both Buffs only when their own values are
+missing, and Apply migrates the state without retaining the group key. Per-Buff
+parameters, sources, coverage, and Special Skill level survive reopen, browser
+persistence, maintenance saves, Worker inputs, and Node requests, while Cancel
+remains side-effect free.
+
+Introduced the internal stored-percent modifier
+`alienationCoefficientBonus` and independent multiplier
+`1 + alienationCoefficientBonus / 100`. Attribute Anomaly, Release, and
+Disorder now multiply that zone in the ordinary, prepared, compiled, dense,
+fixed-score, and optimizer paths. Release inherits the modifier from its live
+or frozen original-Anomaly source and ignores the trigger's broad alienation
+Buff, preventing double multiplication. Remielle's Luminescence score remains
+on its dedicated conversion formula and never reads the teammate zone.
+
+The anomaly white box conditionally inserts `异化乘区` with source provenance,
+including the AP conversion, three-Anomaly bonus, and Cinema 2. A selected rule
+with zero effective value still displays the row; without any selected
+alienation rule, the result shape and flattened formula omit it entirely.
+Cinema 1 now stores one Attribute-Anomaly 10% rule; Release inherits it from the
+original Anomaly source instead of exposing a duplicate Release child row.
+Cinema 2 contributes 20% alienation and stores one Attribute-Anomaly 15% DEF
+ignore rule for Anomaly agents. Release inherits that defense modifier once,
+fixing the previous normal-path double count from 30% back to 15% (defense
+multiplier `0.4949970387` for DEF 953 and level coefficient 794). Direct damage,
+Disorder, non-Anomaly agents, and Luminescence remain excluded as specified.
+The new stat is available to maintained system catalogs but deliberately absent
+from the player custom-Buff menu. Added the official 300x300 PNG portrait and
+cross-path regressions for independent counts, one-branch display, `1.19`,
+`1.39`, ATK tiers, skill levels, source-side Release inheritance, external
+snapshots, Luminescence isolation, and picker runtime migration/round-trips.
+
 ## 2026-08-05 - Clarified Dan's Luminescence Score Presentation
 
 Renamed the empirical weight throughout the event editor and white box to

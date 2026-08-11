@@ -244,6 +244,7 @@ export function teammateBuffCandidates(meta: any): any[] {
         teammateAttribute: group.attribute ?? null,
         teammateSpecialty: group.specialty ?? null,
         teammateImages: group.images ?? buff.teammateImages ?? null,
+        runtimeParameters: buff.runtimeParameters ?? [],
         sourceLabel: buff.sourceLabel ?? buff.source,
         source: buff.source,
       }

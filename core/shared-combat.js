@@ -32,6 +32,7 @@ export const DAMAGE_MODIFIER_KIND_LABELS = {
     enemyDamageTakenBonus: "敌方承伤提升",
     anomalyDamageBonus: "属性异常增伤",
     disorderDamageBonus: "紊乱增伤",
+    alienationCoefficientBonus: "异化系数加成",
     baseMultiplierBonus: "伤害倍率修正",
     disorderBaseMultiplierBonus: "紊乱倍率加算",
     anomalyCritRate: "异常暴击率",
@@ -208,6 +209,7 @@ export const FALLBACK_LABELS = {
     enemyWindResReduction: "敌方风减抗",
     anomalyDamageBonus: "属性异常增伤",
     disorderDamageBonus: "紊乱增伤",
+    alienationCoefficientBonus: "异化系数加成",
     sheerDmgBonus: "贯穿增伤",
     physicalSheerDmg: "物理贯穿增伤",
     fireSheerDmg: "火贯穿增伤",
@@ -315,6 +317,7 @@ export const PERCENT_KEYS = new Set([
     "enemyWindResReduction",
     "anomalyDamageBonus",
     "disorderDamageBonus",
+    "alienationCoefficientBonus",
     "sheerDmgBonus",
     "physicalSheerDmg",
     "fireSheerDmg",
@@ -379,6 +382,7 @@ export const STORED_PERCENT_STATS = new Set([
     "enemyWindResReduction",
     "anomalyDamageBonus",
     "disorderDamageBonus",
+    "alienationCoefficientBonus",
     "sheerDmgBonus",
     "physicalSheerDmg",
     "fireSheerDmg",
@@ -436,6 +440,7 @@ export const STORED_STAT_LABELS = {
     enemyWindResReduction: "敌方风减抗%",
     anomalyDamageBonus: "属性异常增伤%",
     disorderDamageBonus: "紊乱增伤%",
+    alienationCoefficientBonus: "异化系数加成%",
     sheerDmgBonus: "贯穿增伤%",
     physicalSheerDmg: "物理贯穿增伤%",
     fireSheerDmg: "火贯穿增伤%",
@@ -834,6 +839,40 @@ export function effectRuleId(rule = {}) {
     return rule.id ?? rule.stat ?? "effect"
 }
 
+export function runtimeParameterDefinitions(effect = {}) {
+    return Array.isArray(effect?.runtimeParameters) ? effect.runtimeParameters : []
+}
+
+export function normalizedRuntimeParameterValue(definition = {}, value) {
+    const values = Array.isArray(definition?.values) ? definition.values : []
+    const selected = values.find(candidate => String(candidate) === String(value))
+    const fallback = values.find(candidate => String(candidate) === String(definition?.defaultValue))
+        ?? definition?.defaultValue
+        ?? values[0]
+    return selected ?? fallback
+}
+
+export function runtimeParameterDefaults(effect = {}) {
+    return Object.fromEntries(runtimeParameterDefinitions(effect).flatMap(definition => {
+        const id = String(definition?.id ?? "").trim()
+        return id ? [[id, normalizedRuntimeParameterValue(definition, definition.defaultValue)]] : []
+    }))
+}
+
+export function runtimeParameterRequirementMatches(rule = {}, runtimeInput = {}) {
+    const requirement = rule?.requirement?.runtimeParameter
+    if (!requirement) return true
+    const id = String(requirement.id ?? "").trim()
+    const oneOf = Array.isArray(requirement.oneOf) ? requirement.oneOf : []
+    if (!id || !oneOf.length) return false
+    const value = runtimeInput?.parameters?.[id]
+    return oneOf.some(candidate => String(candidate) === String(value))
+}
+
+export function runtimeEffectRules(effect = {}, runtimeInput = {}) {
+    return effectRules(effect).filter(rule => runtimeParameterRequirementMatches(rule, runtimeInput))
+}
+
 export function effectRuleCoverage(rule = {}, effect = {}) {
     return rule?.coverage ?? effect?.coverage ?? null
 }
@@ -879,13 +918,15 @@ export function runtimeSourceConfigForRule(rule = {}) {
         defaultValue: finiteSourceNumber(source.defaultValue ?? rule.defaultSourceValue, 0),
         min: finiteSourceNumber(source.min),
         max: finiteSourceNumber(source.max),
+        step: finiteSourceNumber(source.step),
+        integer: source.integer === true,
     }
 }
 
 export function runtimeSourceGroupKey(rule = {}) {
     const config = runtimeSourceConfigForRule(rule)
     return config
-        ? JSON.stringify([config.label, config.defaultValue, config.min, config.max])
+        ? JSON.stringify([config.label, config.defaultValue, config.min, config.max, config.step, config.integer])
         : ""
 }
 
@@ -1011,8 +1052,10 @@ export function runtimeStackRuleIdsForGroup(effect, key, fallbackRuleId = "") {
 
 export function defaultRuntimeForBuff(buff = {}) {
     buff = buff ?? {}
+    const parameterDefaults = runtimeParameterDefaults(buff)
     const runtime = {
         effects: {},
+        ...(Object.keys(parameterDefaults).length ? { parameters: parameterDefaults } : {}),
     }
     for (const rule of effectRules(buff)) {
         const id = effectRuleId(rule)
@@ -1052,6 +1095,16 @@ export function normalizeRuntimeForBuff(buff = {}, runtime = {}) {
             ...(input.effects ?? {}),
         },
     }
+    const parameters = Object.fromEntries(runtimeParameterDefinitions(buff).flatMap(definition => {
+        const id = String(definition?.id ?? "").trim()
+        if (!id) return []
+        return [[id, normalizedRuntimeParameterValue(
+            definition,
+            input?.parameters?.[id] ?? defaults?.parameters?.[id],
+        )]]
+    }))
+    if (Object.keys(parameters).length) next.parameters = parameters
+    else delete next.parameters
     for (const rule of effectRules(buff)) {
         const id = effectRuleId(rule)
         const legacyRuleRuntime = input[id] && typeof input[id] === "object" ? input[id] : {}
@@ -1077,7 +1130,19 @@ export function normalizeRuntimeForBuff(buff = {}, runtime = {}) {
     }
     for (const group of runtimeSourceGroups(buff)) {
         const primaryId = group.ruleIds[0]
-        const sourceValue = next.effects?.[primaryId]?.sourceValue ?? group.defaultValue ?? 0
+        let sourceValue = finiteSourceNumber(
+            next.effects?.[primaryId]?.sourceValue,
+            group.defaultValue ?? 0,
+        )
+        if (group.integer) {
+            sourceValue = Math.round(sourceValue)
+            if (group.min !== null) {
+                sourceValue = Math.max(group.min, sourceValue)
+            }
+            if (group.max !== null) {
+                sourceValue = Math.min(group.max, sourceValue)
+            }
+        }
         for (const id of group.ruleIds) {
             next.effects[id] = {
                 ...(next.effects[id] ?? {}),

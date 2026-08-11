@@ -159,11 +159,11 @@ const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
 const ANOMALY_VARIANT_VALUES = new Set(["normal", "polarizedAssault"])
 const CALCULATION_MODE_VALUES = new Set(["single", "sheer", "anomaly", "custom"])
 const SHEER_DAMAGE_MODIFIER_KIND_VALUES = ["sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg"]
-const DAMAGE_MODIFIER_KIND_VALUES = new Set(["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "skillMultiplierBonus", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
+const DAMAGE_MODIFIER_KIND_VALUES = new Set(["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "skillMultiplierBonus", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
 const SKILL_TARGET_DAMAGE_MODIFIER_KIND_VALUES = new Set(["directDamageBonus", "skillMultiplierBonus"])
 const DAMAGE_MODIFIER_VALUE_UNIT_VALUES = new Set(["decimal"])
 const RULE_TARGET_KIND_VALUES = new Set(["default", "skill", "anomaly"])
-const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
+const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
 const SKILL_TARGET_STAT_VALUES = new Set([
     "allResIgnore",
     "physicalResIgnore",
@@ -462,6 +462,40 @@ function validateModificationValues(errors, container, key, path, rankOneValue) 
     }
 }
 
+function validateRuntimeParameters(errors, parameters, path = "runtimeParameters") {
+    if (parameters === undefined) {
+        return
+    }
+    if (!Array.isArray(parameters)) {
+        add(errors, path, "必须是数组。")
+        return
+    }
+    const ids = new Set()
+    parameters.forEach((parameter, index) => {
+        const parameterPath = `${path}[${index}]`
+        const id = String(parameter?.id ?? "").trim()
+        if (!/^[A-Za-z][A-Za-z0-9]*$/.test(id)) {
+            add(errors, `${parameterPath}.id`, "必须是有效的运行时参数标识符。")
+        }
+        if (id && ids.has(id)) {
+            add(errors, `${parameterPath}.id`, "运行时参数 ID 不能重复。")
+        }
+        ids.add(id)
+        requireEnum(errors, parameter?.kind, new Set(["enum"]), `${parameterPath}.kind`)
+        if (!Array.isArray(parameter?.values) || !parameter.values.length) {
+            add(errors, `${parameterPath}.values`, "枚举参数至少需要一个可选值。")
+            return
+        }
+        const values = parameter.values.map(value => String(value))
+        if (new Set(values).size !== values.length) {
+            add(errors, `${parameterPath}.values`, "枚举参数的可选值不能重复。")
+        }
+        if (!values.includes(String(parameter.defaultValue))) {
+            add(errors, `${parameterPath}.defaultValue`, "默认值必须属于可选值。")
+        }
+    })
+}
+
 function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scope = "outOfCombat", context = {}) {
     const type = rule.type ?? "fixed"
     const targetKind = rule.target?.kind ?? "default"
@@ -485,6 +519,39 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     }
     if (rule.requirement?.attribute) {
         requireEnum(errors, rule.requirement.attribute, ATTRIBUTE_VALUES, `${path}.requirement.attribute`)
+    }
+    if (rule.requirement?.excludedAgentIds !== undefined) {
+        if (!Array.isArray(rule.requirement.excludedAgentIds)) {
+            add(errors, `${path}.requirement.excludedAgentIds`, "排除角色必须是 ID 数组。")
+        } else {
+            rule.requirement.excludedAgentIds.forEach((agentId, index) =>
+                validateOptionalId(errors, { id: agentId }, `${path}.requirement.excludedAgentIds[${index}]`))
+        }
+    }
+    if (rule.requirement?.runtimeParameter !== undefined) {
+        const requirement = rule.requirement.runtimeParameter
+        if (!requirement || typeof requirement !== "object" || Array.isArray(requirement)) {
+            add(errors, `${path}.requirement.runtimeParameter`, "运行时参数条件必须是对象。")
+        } else {
+            const id = String(requirement.id ?? "").trim()
+            if (!/^[A-Za-z][A-Za-z0-9]*$/.test(id)) {
+                add(errors, `${path}.requirement.runtimeParameter.id`, "必须是有效的运行时参数标识符。")
+            }
+            const definition = (context.runtimeParameters ?? []).find(parameter => parameter?.id === id)
+            if (!definition) {
+                add(errors, `${path}.requirement.runtimeParameter.id`, "引用的 Buff 运行时参数不存在。")
+            }
+            if (!Array.isArray(requirement.oneOf) || !requirement.oneOf.length) {
+                add(errors, `${path}.requirement.runtimeParameter.oneOf`, "至少选择一个允许值。")
+            } else if (definition) {
+                const values = new Set((definition.values ?? []).map(value => String(value)))
+                requirement.oneOf.forEach((value, index) => {
+                    if (!values.has(String(value))) {
+                        add(errors, `${path}.requirement.runtimeParameter.oneOf[${index}]`, "不属于运行时参数的可选值。")
+                    }
+                })
+            }
+        }
     }
     if (rule.requirement?.outOfCombatStat !== undefined) {
         const requirement = rule.requirement.outOfCombatStat
@@ -1897,7 +1964,15 @@ function validateTeammateBuff(item, context) {
     requireName(errors, item?.buff?.source, "buff.source.zhCN")
     requireEnum(errors, item?.buff?.scope, EFFECT_SCOPE_VALUES, "buff.scope")
     validateCoverage(errors, item?.buff?.coverage, "buff.coverage")
-    validateEffectSet(errors, item?.buff, "buff", { requireRule: true, sourceType: "teammate", context })
+    validateRuntimeParameters(errors, item?.buff?.runtimeParameters, "buff.runtimeParameters")
+    validateEffectSet(errors, item?.buff, "buff", {
+        requireRule: true,
+        sourceType: "teammate",
+        context: {
+            ...context,
+            runtimeParameters: item?.buff?.runtimeParameters ?? [],
+        },
+    })
 
     const teammate = (context?.teammates ?? []).find(entry => entry.id === item?.teammate?.id)
     validateDuplicateId(errors, item?.buff?.id, {

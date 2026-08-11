@@ -813,8 +813,8 @@ const scopedBonusPrepared = createInCombatPanelCalculator(scopedBonusCatalog, sc
 const scopedBonusFull = scopedBonusPrepared.calculate(masteryDiscs, { round: false })
 approx(
     scopedBonusFull.damage.events[0].multipliers.anomalyDamage,
-    1.3,
-    "Release should add broad and precise Release bonuses while excluding precise Attribute Anomaly bonuses",
+    1.6,
+    "Release should add broad, source-side precise Attribute Anomaly, and precise Release bonuses once",
 )
 const scopedBonusCompiled = scopedBonusPrepared.scoreOnlyFromSummary(summaryStats, summarySets)
 const scopedBonusLegacy = scopedBonusPrepared.scoreOnlyFromSummaryLegacy(summaryStats, summarySets)

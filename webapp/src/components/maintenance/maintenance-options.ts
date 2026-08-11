@@ -123,6 +123,7 @@ export const PANEL_STATS: Array<[string, string, "flat" | "pct"]> = [
 
 export const EVENT_STATS: Array<[string, string, "flat"]> = [
   ["anomalyDamageBonus", "属性异常增伤%", "flat"], ["disorderDamageBonus", "紊乱增伤%", "flat"],
+  ["alienationCoefficientBonus", "异化系数加成%", "flat"],
   ["baseMultiplierBonus", "异常倍率修正%", "flat"], ["disorderBaseMultiplierBonus", "紊乱倍率加算%", "flat"],
   ["anomalyCritRate", "异常暴击率%", "flat"], ["anomalyCritDmg", "异常暴击伤害%", "flat"],
   ["stunDmgMultiplierBonus", "失衡易伤倍率加算%", "flat"],
@@ -144,7 +145,7 @@ export const SKILL_TARGET_STATS: Array<[string, string, "flat"]> = [
   ["dmgBonus", "技能目标伤害加成%", "flat"], ["physicalDmg", "物理伤害加成%", "flat"],
   ["fireDmg", "火属性伤害加成%", "flat"], ["iceDmg", "冰属性伤害加成%", "flat"],
   ["electricDmg", "电属性伤害加成%", "flat"], ["etherDmg", "以太伤害加成%", "flat"], ["windDmg", "风属性伤害加成%", "flat"],
-  ...EVENT_STATS.filter(([value]) => value !== "anomalyDamageBonus"), ["skillMultiplierBonus", "技能倍率加算%", "flat"],
+  ...EVENT_STATS.filter(([value]) => !["anomalyDamageBonus", "alienationCoefficientBonus"].includes(value)), ["skillMultiplierBonus", "技能倍率加算%", "flat"],
   ["enemyDefReduction", "敌方防御力降低%", "flat"], ["enemyDefIgnore", "无视防御率%", "flat"],
   ["enemyResReduction", "敌方全属性抗性降低%", "flat"],
   ["allResIgnore", "全属性抗性无视%", "flat"],

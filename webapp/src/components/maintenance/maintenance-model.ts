@@ -152,6 +152,11 @@ const FIELD_LABELS: Record<string, string> = {
   maxLevel: "最高改装等级",
   defaultLevel: "默认改装等级",
   requirement: "生效要求",
+  runtimeParameters: "Buff 运行时参数",
+  runtimeParameter: "运行时参数条件",
+  defaultValue: "默认值",
+  oneOf: "允许值",
+  excludedAgentIds: "排除角色",
   appliesToOutOfCombatPanel: "应用于局外面板",
   selfBuff: "佩戴者效果",
   teamBuff: "团队效果",
@@ -409,6 +414,7 @@ export function prepareDraft(resource: ResourceValue, input: any): any {
     item.attribute ??= ""
     item.specialty ??= ""
     item.images ??= { icon: "", source: "" }
+    delete item.runtimeParameters
     item.buffs = item.buffs.map((buff: any) => prepareDraft(resource, buff))
   } else if (resource === "boss-buffs" && Array.isArray(item.encounters)) {
     item.name ??= { zhCN: "" }
@@ -424,7 +430,10 @@ export function prepareDraft(resource: ResourceValue, input: any): any {
     item.description ??= { zhCN: "" }
     item.effects ??= []
     item.buffModifiers ??= []
-    if (resource === "teammate-buffs") item.source ??= { zhCN: "" }
+    if (resource === "teammate-buffs") {
+      item.source ??= { zhCN: "" }
+      item.runtimeParameters ??= []
+    }
     if (resource === "field-buffs") {
       item.name ??= { zhCN: "" }
       item.period ??= { modeId: "defense_v5", gameVersion: "3.0", phaseNo: 1 }

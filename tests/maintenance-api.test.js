@@ -511,6 +511,27 @@ try {
     assert.deepEqual(reloadedTeammateBuff.effects.find(rule => rule.id === "all_release_def_ignore")?.target, savedAllRelease.target)
     assert.deepEqual(reloadedTeammateBuff.effects.find(rule => rule.id === "broad_anomaly_damage")?.target, { kind: "default" })
 
+    const remielleSource = teammateData.combatBuffs.teammates.find(item => item.id === "remielle_dan")
+    const { buffs: _remielleBuffs, ...remielleBase } = remielleSource
+    const remielleCopyId = "remielle_dan__maintenance_api_copy"
+    const remielleCoreCopy = cloneWithId(remielleSource.buffs.find(item => item.id === "remielle_dan.core_passive.alienation"), "maintenance_api_copy")
+    await save("teammate-buffs", {
+        teammate: { ...remielleBase, id: remielleCopyId },
+        buff: remielleCoreCopy,
+    })
+    const reloadedRemielleCopy = (await catalog()).combatBuffs.teammates.find(item => item.id === remielleCopyId)
+    assert.equal(reloadedRemielleCopy.runtimeParameters, undefined,
+        "teammate maintenance should not create group runtime parameters")
+    assert.deepEqual(reloadedRemielleCopy.buffs[0].runtimeParameters, remielleCoreCopy.runtimeParameters,
+        "teammate maintenance should retain per-Buff runtime parameters")
+    assert.deepEqual(
+        reloadedRemielleCopy.buffs[0].effects.find(rule => rule.id === "remielle_dan_core_three_anomaly_alienation")
+            .requirement.runtimeParameter,
+        { id: "anomalyAgentCount", oneOf: [3] },
+        "teammate maintenance should retain runtime-parameter requirements",
+    )
+    await remove(`/api/maintenance/teammate-buffs/${encodeURIComponent(remielleCopyId)}`)
+
     const orderSecondBuff = cloneWithId(reloadedTeammateBuff, "order_second")
     const orderThirdBuff = cloneWithId(reloadedTeammateBuff, "order_third")
     await save("teammate-buffs", {

@@ -42,6 +42,11 @@ import {
     isLuminescenceSettlement,
     normalizeLuminescenceEvent,
 } from "./luminescence.js"
+import {
+    normalizedRuntimeParameterValue,
+    runtimeParameterDefaults,
+    runtimeParameterRequirementMatches,
+} from "./shared-combat.js"
 
 const BONUS_KEY_MAP = {
     hpFlat: "hpFlat",
@@ -287,11 +292,12 @@ const DEF_IGNORE_KEY_BY_ELEMENT = ELEMENT_DEF_IGNORE_STAT_BY_ELEMENT
 
 const DAMAGE_EVENT_KINDS = ["direct", "anomaly", "disorder", "sheer"]
 const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
-const DAMAGE_MODIFIER_KINDS = ["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg", "skillMultiplierBonus", ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS]
+const DAMAGE_MODIFIER_KINDS = ["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg", "skillMultiplierBonus", ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS]
 const EVENT_MODIFIER_STAT_KEYS = new Set([
     "enemyDamageTakenBonus",
     "anomalyDamageBonus",
     "disorderDamageBonus",
+    "alienationCoefficientBonus",
     "baseMultiplierBonus",
     "disorderBaseMultiplierBonus",
     "anomalyCritRate",
@@ -431,6 +437,7 @@ const STORED_PERCENT_STATS = new Set([
     "enemyDamageTakenBonus",
     "anomalyDamageBonus",
     "disorderDamageBonus",
+    "alienationCoefficientBonus",
     "sheerDmgBonus",
     "physicalSheerDmg",
     "fireSheerDmg",
@@ -910,6 +917,7 @@ function normalizeEffectRuntimeInput(effect, runtimeInput = {}) {
 
 function effectRuleEnabled(rule, runtimeInput = {}) {
     return effectRuntimeFor(rule, runtimeInput).enabled !== false
+        && runtimeParameterRequirementMatches(rule, runtimeInput)
 }
 
 function effectBuffModifiers(effect) {
@@ -1093,8 +1101,10 @@ function hasOutOfCombatStatRequirement(rule = {}) {
 function effectRuleRequirementMatches(rule = {}, modifierContext = {}) {
     const requiredSpecialty = String(rule?.requirement?.specialty ?? "").trim()
     const requiredAttribute = String(rule?.requirement?.attribute ?? "").trim()
+    const excludedAgentIds = stringArray(rule?.requirement?.excludedAgentIds)
     return (!requiredSpecialty || requiredSpecialty === modifierContext.agent?.specialty)
         && (!requiredAttribute || requiredAttribute === modifierContext.agent?.attribute)
+        && (!excludedAgentIds.length || !excludedAgentIds.includes(String(modifierContext.agent?.id ?? "")))
         && (
             !hasOutOfCombatStatRequirement(rule)
             || outOfCombatStatRequirementMatches(rule.requirement, modifierContext.outOfCombat?.panel)
@@ -1153,7 +1163,8 @@ function resolveEffectRule(rule, effect, runtimeInput = {}, modifierContext = {}
     if (type === "formula") {
         const source = rule.source ?? {}
         const variable = source.variable ?? "x"
-        const rawSourceValue = Number(runtime.sourceValue ?? source.defaultValue ?? rule.defaultSourceValue ?? 0)
+        const inputSourceValue = Number(runtime.sourceValue ?? source.defaultValue ?? rule.defaultSourceValue ?? 0)
+        const rawSourceValue = source.integer === true ? Math.round(inputSourceValue) : inputSourceValue
         const min = Number(source.min)
         const max = Number(source.max)
         const sourceValue = clampNumber(
@@ -1400,7 +1411,7 @@ function compileDenseDamageModifierEntries(effectEntries = [], compiledEvents = 
         const result = []
         effectEntries.forEach((entry, entryIndex) => {
             for (const modifier of entry.damageModifiers ?? []) {
-                if (!damageModifierAppliesTo(modifier, compiledEvent.event)) {
+                if (!damageModifierAppliesToCompiledEvent(modifier, compiledEvent.event)) {
                     continue
                 }
                 const kindIndex = DAMAGE_MODIFIER_SUM_KEY_INDEX.get(modifier.kind)
@@ -1561,12 +1572,52 @@ function normalizeTeammateCombatBuffForGroup(teammate = {}, buff = {}) {
         teammateId: teammate.id,
         teammateName: teammate.name,
         teammateImages: teammate.images ?? null,
+        runtimeParameters: buff.runtimeParameters ?? [],
         source: buff.source ?? sourceLabel,
         sourceLabel,
         name: buff.name ?? nameWithSource(teammate.name, sourceLabel),
         description,
         conditionLabel: buff.conditionLabel ?? description,
         scope: buff.scope ?? "inCombat",
+    }
+}
+
+const RELEASE_SOURCE_INHERITED_MODIFIER_KINDS = new Set([
+    "anomalyDamageBonus",
+    "enemyDefReduction",
+    ...ELEMENT_DEF_IGNORE_STATS,
+])
+
+function damageModifierAppliesToCompiledEvent(modifier, event) {
+    if (damageModifierAppliesTo(modifier, event)) return true
+    if (!isReleaseSettlement(event) || !RELEASE_SOURCE_INHERITED_MODIFIER_KINDS.has(modifier?.kind)) {
+        return false
+    }
+    return damageModifierAppliesTo(modifier, {
+        ...event,
+        settlementType: "attribute",
+        anomalyVariant: "normal",
+    })
+}
+
+function combatBuffRuntimeInput(buff = {}, runtimeInputs = {}) {
+    const ownRuntime = runtimeInputs?.[buff.id] ?? {}
+    const legacyGroupRuntime = buff.teammateId
+        ? runtimeInputs?.[`teammate:${buff.teammateId}`] ?? {}
+        : {}
+    const rawParameters = {
+        ...runtimeParameterDefaults(buff),
+        ...(legacyGroupRuntime?.parameters ?? {}),
+        ...(ownRuntime?.parameters ?? {}),
+    }
+    const parameters = Object.fromEntries((buff.runtimeParameters ?? []).flatMap(definition => {
+        const id = String(definition?.id ?? "").trim()
+        if (!id) return []
+        return [[id, normalizedRuntimeParameterValue(definition, rawParameters[id])]]
+    }))
+    return {
+        ...ownRuntime,
+        ...(Object.keys(parameters).length ? { parameters } : {}),
     }
 }
 
@@ -3255,6 +3306,34 @@ function sumDamageModifiers(bonusTotals, event, kind) {
         .reduce((total, modifier) => total + Number(modifier.value ?? 0), 0)
 }
 
+function alienationBreakdownForEvent(bonusTotals, event) {
+    const modifiers = matchingDamageModifiers(bonusTotals, event, "alienationCoefficientBonus")
+    const coefficientBonus = modifiers.reduce((total, modifier) => total + Number(modifier.value ?? 0), 0)
+    return {
+        active: modifiers.length > 0,
+        coefficientBonus,
+        multiplier: Math.max(0, 1 + coefficientBonus),
+        modifiers,
+    }
+}
+
+function alienationModifierFormulaPart(modifier = {}) {
+    const sourceValue = Number(modifier.sourceValue)
+    const formulaValue = Number(modifier.formulaValue)
+    if (Number.isFinite(sourceValue) && sourceValue !== 0 && Number.isFinite(formulaValue)) {
+        const ratio = formulaValue / sourceValue / 100
+        const coverage = Number(modifier.coverage ?? 1)
+        return `${formatDamageNumber(sourceValue)} × ${formatDamagePercent(ratio, 4)}${coverage !== 1 ? ` × 覆盖率 ${formatDamagePercent(coverage)}` : ""}`
+    }
+    const label = localizedName(modifier.label, modifier.sourceKey ?? "异化系数")
+    return `${label} ${formatDamagePercent(Number(modifier.value ?? 0))}`
+}
+
+function alienationWhiteBoxFormula(alienation) {
+    const parts = (alienation?.modifiers ?? []).map(alienationModifierFormulaPart)
+    return `1${parts.length ? ` + ${parts.join(" + ")}` : ""} = ${formatDamageNumber(alienation?.multiplier ?? 1, 4)}`
+}
+
 function luminescenceDamageMultipliersFromModifiers(modifiers = [], event = {}) {
     let luminescenceDamageBonus = 0
     let teamAnomalyDamageBonus = 0
@@ -3702,7 +3781,7 @@ function calculateInitialMasteryConvertedAnomalyCritRate(initialAnomalyMastery, 
     return masteryAboveThreshold * Math.max(0, Number(critRatePerPoint ?? 0))
 }
 
-function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBonus, dmgMultiplier, targetBreakdown, anomalyProficiencyMultiplier, levelMultiplier, anomalyDamageBonus, anomalyCrit, releaseBreakdown = null, baseMultiplierBonus, effectiveBaseMultiplier, finalDamage, singleDamage }) {
+function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBonus, dmgMultiplier, targetBreakdown, anomalyProficiencyMultiplier, levelMultiplier, anomalyDamageBonus, alienation, anomalyCrit, releaseBreakdown = null, baseMultiplierBonus, effectiveBaseMultiplier, finalDamage, singleDamage }) {
     const damageElementText = damageElementLabel(event.damageElement)
     const effectLabel = localizedName(event.anomalyLabel, event.anomalyEffect ?? event.previousAnomalyEffect)
     const isDisorder = isDisorderDamageEvent(event)
@@ -3776,6 +3855,14 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
             ...releaseTraceWhiteBoxRows(releaseBreakdown?.trace),
         )
     }
+    if (alienation?.active) {
+        rows.push({
+            label: "异化乘区",
+            formula: alienationWhiteBoxFormula(alienation),
+            value: alienation.multiplier,
+            displayValue: formatDamageNumber(alienation.multiplier, 4),
+        })
+    }
     if (!isDisorder) {
         rows.push({
             label: "异常暴击区",
@@ -3816,6 +3903,7 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
                 formatDamageNumber(anomalyProficiencyMultiplier, 4),
                 formatDamageNumber(levelMultiplier, 4),
                 formatDamageNumber(anomalyDamageBonus, 4),
+                ...(alienation?.active ? [formatDamageNumber(alienation.multiplier, 4)] : []),
                 ...(!isDisorder ? [formatDamageNumber(anomalyCrit.multiplier, 4)] : []),
                 ...(event.damageScale !== 1 ? [formatDamagePercent(event.damageScale)] : []),
             ].join(" × ")
@@ -4091,7 +4179,8 @@ function releaseSourceBonusTotals(bonusTotals = {}) {
         damageModifiers: (bonusTotals.damageModifiers ?? []).filter(modifier =>
             modifier?.kind !== "anomalyDamageBonus"
             || !Array.isArray(modifier?.appliesTo?.settlementTypes)
-            || modifier.appliesTo.settlementTypes.length === 0),
+            || modifier.appliesTo.settlementTypes.length === 0
+            || modifier.appliesTo.settlementTypes.includes("attribute")),
     }
 }
 
@@ -4168,6 +4257,7 @@ export function calculateAnomalyUnitDamage({
     const anomalyProficiencyMultiplier = Math.max(0, Number(panel.anomalyProficiency ?? 0)) / 100
     const levelMultiplier = anomalyLevelMultiplier(agentLevel)
     const anomalyDamageBonus = 1 + Number(eventTotals.anomalyDamageBonus ?? 0)
+    const alienation = alienationBreakdownForEvent(bonusTotals, sourceEvent)
     const anomalyCrit = includeCrit
         ? anomalyCritMultiplier(bonusTotals, sourceEvent, panel, outOfCombatPanel)
         : { critRate: 0, critDmg: 0, multiplier: 1 }
@@ -4181,6 +4271,7 @@ export function calculateAnomalyUnitDamage({
         * anomalyProficiencyMultiplier
         * levelMultiplier
         * anomalyDamageBonus
+        * alienation.multiplier
         * anomalyCrit.multiplier
     return {
         damage,
@@ -4195,6 +4286,7 @@ export function calculateAnomalyUnitDamage({
         anomalyProficiencyMultiplier,
         levelMultiplier,
         anomalyDamageBonus,
+        alienation,
         anomalyCrit,
     }
 }
@@ -4233,6 +4325,7 @@ function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTota
     const sourceAnomalyDamageBonus = sourceUnit.anomalyDamageBonus
     const releaseAnomalyDamageBonus = Number(triggerEventTotals.anomalyDamageBonus ?? 0)
     const anomalyDamageBonus = sourceAnomalyDamageBonus + releaseAnomalyDamageBonus
+    const alienation = sourceUnit.alienation
     const anomalyCrit = anomalyCritMultiplier(triggerBonusTotals, event, panel, outOfCombatPanel)
     const singleDamage = Number(source.panel.atk ?? 0)
         * effectiveBaseMultiplier
@@ -4244,6 +4337,7 @@ function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTota
         * sourceUnit.anomalyProficiencyMultiplier
         * sourceUnit.levelMultiplier
         * anomalyDamageBonus
+        * alienation.multiplier
         * anomalyCrit.multiplier
         * event.damageScale
     const finalDamage = singleDamage * event.count
@@ -4286,6 +4380,10 @@ function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTota
             attributeAnomalyDamage: anomalyDamageBonus,
             disorderDamage: 1,
             anomalyDamage: anomalyDamageBonus,
+            ...(alienation.active ? {
+                alienation: alienation.multiplier,
+                alienationCoefficientBonus: alienation.coefficientBonus,
+            } : {}),
             anomalyCrit: anomalyCrit.multiplier,
             anomalyCritBaseRate: anomalyCrit.baseCritRate,
             anomalyCritConvertedRate: anomalyCrit.convertedCritRate,
@@ -4307,6 +4405,7 @@ function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTota
                 anomalyProficiencyMultiplier: sourceUnit.anomalyProficiencyMultiplier,
                 levelMultiplier: sourceUnit.levelMultiplier,
                 anomalyDamageBonus,
+                alienation,
                 anomalyCrit,
                 releaseBreakdown,
                 baseMultiplierBonus: sourceUnit.baseMultiplierBonus + releaseBaseMultiplierBonus,
@@ -4501,6 +4600,7 @@ function calculateAnomalyDamageEvent({ event, panel, outOfCombatPanel = panel, b
     const attributeAnomalyDamageBonus = isDisorder ? 1 : 1 + Number(eventTotals.attributeAnomalyDamageBonus ?? 0)
     const disorderDamageBonus = isDisorder ? 1 + Number(eventTotals.disorderDamageBonus ?? 0) : 1
     const anomalyDamageBonus = isDisorder ? disorderDamageBonus : attributeAnomalyDamageBonus
+    const alienation = alienationBreakdownForEvent(bonusTotals, event)
     const baseMultiplierBonus = isDisorder
         ? sumDamageModifiers(bonusTotals, event, "disorderBaseMultiplierBonus")
         : sumDamageModifiers(bonusTotals, event, "baseMultiplierBonus")
@@ -4518,6 +4618,7 @@ function calculateAnomalyDamageEvent({ event, panel, outOfCombatPanel = panel, b
         * anomalyProficiencyMultiplier
         * levelMultiplier
         * anomalyDamageBonus
+        * alienation.multiplier
         * anomalyCrit.multiplier
         * event.damageScale
     const finalDamage = singleDamage * event.count
@@ -4567,6 +4668,10 @@ function calculateAnomalyDamageEvent({ event, panel, outOfCombatPanel = panel, b
             attributeAnomalyDamage: attributeAnomalyDamageBonus,
             disorderDamage: disorderDamageBonus,
             anomalyDamage: anomalyDamageBonus,
+            ...(alienation.active ? {
+                alienation: alienation.multiplier,
+                alienationCoefficientBonus: alienation.coefficientBonus,
+            } : {}),
             anomalyCrit: anomalyCrit.multiplier,
             anomalyCritBaseRate: anomalyCrit.baseCritRate,
             anomalyCritConvertedRate: anomalyCrit.convertedCritRate,
@@ -4592,6 +4697,7 @@ function calculateAnomalyDamageEvent({ event, panel, outOfCombatPanel = panel, b
                 anomalyProficiencyMultiplier,
                 levelMultiplier,
                 anomalyDamageBonus,
+                alienation,
                 anomalyCrit,
                 baseMultiplierBonus,
                 effectiveBaseMultiplier,
@@ -4743,6 +4849,7 @@ function calculateAnomalyDamageFinalValue(event, panel, bonusTotals, target, age
     const baseMultiplier = Number(event.baseMultiplier ?? 0)
     const effectiveBaseMultiplier = Math.max(0, baseMultiplier + baseMultiplierBonus) * baseMultiplierScale
     const anomalyDamageBonus = 1 + Number(eventTotals.anomalyDamageBonus ?? 0)
+    const alienationMultiplier = alienationBreakdownForEvent(bonusTotals, event).multiplier
     const anomalyCritMultiplierValue = anomalyCritMultiplier(bonusTotals, event, panel, outOfCombatPanel).multiplier
     return Number(panel.atk ?? 0)
         * effectiveBaseMultiplier
@@ -4751,6 +4858,7 @@ function calculateAnomalyDamageFinalValue(event, panel, bonusTotals, target, age
         * anomalyProficiencyMultiplier
         * anomalyLevelMultiplier(agentLevel)
         * anomalyDamageBonus
+        * alienationMultiplier
         * anomalyCritMultiplierValue
         * event.damageScale
         * Number(event.count ?? 1)
@@ -5054,6 +5162,10 @@ function calculateCompiledDamageScoreValue({ agent, panel, outOfCombatPanel = pa
                 ? compiledModifierSum(sums, "disorderDamageBonus")
                 : compiledModifierSum(sums, "anomalyDamageBonus")
         )
+        const alienationMultiplier = Math.max(
+            0,
+            1 + compiledModifierSum(sums, "alienationCoefficientBonus"),
+        )
         total += Number(panel.atk ?? 0)
             * effectiveBaseMultiplier
             * (1 + selectedDmgBonus + skillDamageBonus)
@@ -5061,6 +5173,7 @@ function calculateCompiledDamageScoreValue({ agent, panel, outOfCombatPanel = pa
             * (Math.max(0, Number(panel.anomalyProficiency ?? 0)) / 100)
             * compiledDamageTarget.anomalyLevelMultiplier
             * anomalyDamageBonus
+            * alienationMultiplier
             * compiledAnomalyCritMultiplier(compiledEvent, sums, initialAnomalyMastery)
             * compiledEvent.damageScale
             * compiledEvent.count
@@ -5286,6 +5399,10 @@ function calculateCompiledDamageScoreValueDense({
                 ? denseModifierSum(modifierSums, "disorderDamageBonus")
                 : denseModifierSum(modifierSums, "anomalyDamageBonus")
         )
+        const alienationMultiplier = Math.max(
+            0,
+            1 + denseModifierSum(modifierSums, "alienationCoefficientBonus"),
+        )
         total += densePanelValue(panelValues, "atk")
             * effectiveBaseMultiplier
             * (1 + selectedDmgBonus + skillDamageBonus)
@@ -5293,6 +5410,7 @@ function calculateCompiledDamageScoreValueDense({
             * (Math.max(0, densePanelValue(panelValues, "anomalyProficiency")) / 100)
             * compiledDamageTarget.anomalyLevelMultiplier
             * anomalyDamageBonus
+            * alienationMultiplier
             * denseAnomalyCritMultiplier(compiledEvent, modifierSums, panelProxy, outOfCombatPanelProxy)
             * compiledEvent.damageScale
             * compiledEvent.count
@@ -6280,6 +6398,7 @@ export function buildMeta(catalog) {
                 teammateId: item.teammateId,
                 teammateName: item.teammateName,
                 teammateImages: item.teammateImages ?? null,
+                runtimeParameters: item.runtimeParameters ?? [],
                 source: item.source,
                 sourceLabel: item.sourceLabel,
                 sourcePeriod: item.sourcePeriod,
@@ -6312,6 +6431,7 @@ export function buildMeta(catalog) {
                     teammateId: normalizedBuff.teammateId,
                     teammateName: normalizedBuff.teammateName,
                     teammateImages: normalizedBuff.teammateImages,
+                    runtimeParameters: normalizedBuff.runtimeParameters,
                     source: normalizedBuff.source,
                     sourceLabel: normalizedBuff.sourceLabel,
                     name: normalizedBuff.name,
@@ -6653,7 +6773,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                 effect: buff,
                 key: buff.id,
                 sourceType: buff.sourceType ?? "manual",
-                runtimeInput: runtimeInputs[buff.id],
+                runtimeInput: combatBuffRuntimeInput(buff, runtimeInputs),
             })) {
                 return null
             }
@@ -7275,6 +7395,10 @@ export function createInCombatPanelCalculator(catalog, input) {
                         sums,
                         event.isDisorder ? "disorderDamageBonus" : "anomalyDamageBonus",
                     ),
+                    alienationMultiplier: Math.max(
+                        0,
+                        1 + denseModifierSum(sums, "alienationCoefficientBonus"),
+                    ),
                     anomalyCritRate: denseModifierSum(sums, "anomalyCritRate"),
                     anomalyCritDmg: Math.max(0, denseModifierSum(sums, "anomalyCritDmg")),
                     anomalyCritRatePerInitialMasteryAbove100: denseModifierSum(
@@ -7548,6 +7672,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                         * (Math.max(0, anomalyProficiency) / 100)
                         * compiledDamageTarget.anomalyLevelMultiplier
                         * event.anomalyDamageBonus
+                        * event.alienationMultiplier
                         * anomalyCritMultiplier
                         * event.damageScale
                         * event.count
@@ -7663,7 +7788,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                 sourceType: buff.sourceType ?? "manual",
                 conditionLabel: buff.conditionLabel,
                 outOfCombat,
-                runtimeInput: runtimeInputs[buff.id],
+                runtimeInput: combatBuffRuntimeInput(buff, runtimeInputs),
                 buffModifiers: activeBuffModifiers,
                 activeEffects,
                 ignoredEffects,
@@ -7898,7 +8023,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     sourceType: buff.sourceType ?? "manual",
                     conditionLabel: buff.conditionLabel,
                     outOfCombat,
-                    runtimeInput: runtimeInputs[buff.id],
+                    runtimeInput: combatBuffRuntimeInput(buff, runtimeInputs),
                     buffModifiers: activeBuffModifiers,
                     activeEffects,
                     ignoredEffects,
@@ -8233,7 +8358,7 @@ export function calculateInCombatPanel(catalog, input) {
             sourceType: buff.sourceType ?? "manual",
             conditionLabel: buff.conditionLabel,
             outOfCombat,
-            runtimeInput: runtimeInputs[buff.id],
+            runtimeInput: combatBuffRuntimeInput(buff, runtimeInputs),
             buffModifiers: activeBuffModifiers,
             activeEffects,
             ignoredEffects,

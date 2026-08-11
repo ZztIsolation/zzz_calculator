@@ -20,10 +20,8 @@ import {
   compareGameVersions,
   damageElementForAgent,
   damageElementShortLabel,
-  defaultRuntimeForBuff,
   effectRuleCoverage,
   effectRuleId,
-  effectRules,
   fieldBuffPeriod,
   fieldBuffPeriodKey,
   fieldBuffPeriodLabel,
@@ -32,6 +30,9 @@ import {
   normalizeCustomBuffEffect,
   normalizeCustomBuffStat,
   normalizeRuntimeForBuff,
+  normalizedRuntimeParameterValue,
+  runtimeEffectRules,
+  runtimeParameterDefinitions,
   runtimeSourceGroups,
   runtimeStackGroups,
   runtimeCoverageForEffectRule,
@@ -768,12 +769,44 @@ function hasIndependentRuleControls(buff: any) {
 }
 
 function runtimeFor(buff: any) {
-  return normalizeRuntimeForBuff(buff, draftRuntimeInputs.value[buff.id] ?? defaultRuntimeForBuff(buff))
+  const ownRuntime = draftRuntimeInputs.value[buff.id] ?? {}
+  const ownerId = teammateOwnerId(buff)
+  const legacyRuntime = ownerId ? draftRuntimeInputs.value[`teammate:${ownerId}`] ?? {} : {}
+  return normalizeRuntimeForBuff(buff, {
+    ...ownRuntime,
+    parameters: {
+      ...(legacyRuntime?.parameters ?? {}),
+      ...(ownRuntime?.parameters ?? {}),
+    },
+  })
+}
+
+function runtimeParameterValue(buff: any, definition: any) {
+  return normalizedRuntimeParameterValue(
+    definition,
+    runtimeFor(buff)?.parameters?.[definition.id],
+  )
+}
+
+function setRuntimeParameterValue(buff: any, definition: any, value: unknown) {
+  const runtime = runtimeFor(buff)
+  updateRuntime(buff, {
+    ...runtime,
+    parameters: {
+      ...(runtime.parameters ?? {}),
+      [definition.id]: normalizedRuntimeParameterValue(definition, value),
+    },
+  })
+}
+
+function runtimeParameterLabel(definition: any) {
+  if (definition?.id === "anomalyAgentCount") return "异常特性代理人人数"
+  return localizedText(definition?.label) || String(definition?.id ?? "队伍参数")
 }
 
 function effectRowsFor(buff: any) {
   const runtime = runtimeFor(buff)
-  return effectRules(buff).map((rule: any) => {
+  return runtimeEffectRules(buff, runtime).map((rule: any) => {
     const id = effectRuleId(rule)
     return {
       id,
@@ -1020,10 +1053,17 @@ function apply() {
     || !availableTeamWEngineIds.has(item.id)
     || draft.value.has(item.id))
   const selectedBuffIds = [...draft.value]
-  const buffById = new Map(Object.values(groupedBuffs.value).flat().map((buff: any) => [buff.id, buff]))
-  const runtimeInputs = Object.fromEntries(Object.entries(draftRuntimeInputs.value).flatMap(([id, runtime]) => {
+  const buffById = new Map<string, any>(Object.values(groupedBuffs.value).flat().map((buff: any) => [buff.id, buff]))
+  const runtimeInputDraft = { ...draftRuntimeInputs.value }
+  for (const buff of buffById.values()) {
+    if (draft.value.has(buff.id) && runtimeParameterDefinitions(buff).length) {
+      runtimeInputDraft[buff.id] = runtimeFor(buff)
+    }
+  }
+  const runtimeInputs = Object.fromEntries(Object.entries(runtimeInputDraft).flatMap(([id, runtime]) => {
     const buff = buffById.get(id)
-    return buff ? [[id, normalizeRuntimeForBuff(buff, runtime)]] : []
+    if (buff) return [[id, normalizeRuntimeForBuff(buff, runtime)]]
+    return []
   }))
   emit("apply", {
     selectedBuffIds,
@@ -1197,12 +1237,11 @@ function apply() {
 
       <NScrollbar class="buff-list-scrollbar" style="width: 100%; max-width: 100%; min-width: 0; max-height: 560px">
         <div class="section-band buff-list">
-          <article
-            v-for="buff in visibleBuffs"
-            :key="buff.id"
-            class="buff-row"
-            :class="{ 'is-selected': draft.has(buff.id), 'is-selectable': activeTab !== 'custom' }"
-          >
+          <template v-for="buff in visibleBuffs" :key="buff.id">
+            <article
+              class="buff-row"
+              :class="{ 'is-selected': draft.has(buff.id), 'is-selectable': activeTab !== 'custom' }"
+            >
             <div class="buff-row-main">
               <NCheckbox
                 v-if="activeTab !== 'custom'"
@@ -1240,6 +1279,23 @@ function apply() {
                   size="small"
                   @update:value="setTeamWEngineModificationLevel(buff, $event)"
                 />
+              </label>
+            </div>
+            <div v-if="runtimeParameterDefinitions(buff).length" class="buff-runtime-parameters">
+              <label v-for="definition in runtimeParameterDefinitions(buff)" :key="definition.id" class="buff-runtime-parameter">
+                <span>{{ runtimeParameterLabel(definition) }}</span>
+                <NRadioGroup
+                  :value="runtimeParameterValue(buff, definition)"
+                  size="small"
+                >
+                  <NRadioButton
+                    v-for="value in definition.values ?? []"
+                    :key="String(value)"
+                    :value="value"
+                    :label="String(value)"
+                    @click="setRuntimeParameterValue(buff, definition, value)"
+                  />
+                </NRadioGroup>
               </label>
             </div>
             <div v-if="effectRowsFor(buff).length || modifierLinesFor(buff).length" class="buff-effect-lines">
@@ -1313,6 +1369,7 @@ function apply() {
                     :value="runtimeFor(buff).effects?.[group.ruleIds?.[0]]?.sourceValue ?? group.defaultValue ?? 0"
                     :min="Number.isFinite(group.min) ? group.min : undefined"
                     :max="Number.isFinite(group.max) ? group.max : undefined"
+                    :step="Number.isFinite(group.step) ? group.step : undefined"
                     size="small"
                     @update:value="setSourceValue(buff, group, Number($event))"
                   />
@@ -1331,12 +1388,13 @@ function apply() {
                 </dd>
               </div>
             </div>
-            <div v-if="effectRules(buff).length" class="chip-row">
-              <NTag v-for="rule in effectRules(buff).slice(0, 4)" :key="rule.id ?? rule.stat" size="small" round>
+            <div v-if="runtimeEffectRules(buff, runtimeFor(buff)).length" class="chip-row">
+              <NTag v-for="rule in runtimeEffectRules(buff, runtimeFor(buff)).slice(0, 4)" :key="rule.id ?? rule.stat" size="small" round>
                 {{ statLabel(rule.stat, meta) || rule.kind || rule.type }}
               </NTag>
             </div>
-          </article>
+            </article>
+          </template>
           <div v-if="!visibleBuffs.length" class="empty-state">暂无可添加的 Buff</div>
         </div>
       </NScrollbar>
@@ -1473,6 +1531,31 @@ function apply() {
   color: var(--app-text);
 }
 
+.buff-runtime-parameters {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.buff-runtime-parameter {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+.buff-runtime-parameter span {
+  white-space: nowrap;
+}
+
 .buff-row {
   display: grid;
   gap: 12px;
@@ -1561,6 +1644,10 @@ function apply() {
   background: transparent;
   color: inherit;
   text-align: left;
+}
+
+.buff-row-toggle :deep(.avatar) {
+  flex: 0 0 auto;
 }
 
 button.buff-row-toggle {

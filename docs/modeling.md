@@ -350,6 +350,7 @@ type BuffRuleStat =
   | ZzzStat
   | "anomalyDamageBonus"
   | "disorderDamageBonus"
+  | "alienationCoefficientBonus"
   | "baseMultiplierBonus"
   | "disorderBaseMultiplierBonus"
   | "anomalyCritRate"
@@ -372,7 +373,7 @@ interface EffectCoverage {
 type EffectRule = (
   | { type: "fixed"; stat: BuffRuleStat; value: number; mode: "flat" | "pct"; basis?: Effect["stats"][number]["basis"]; target?: EffectTarget }
   | { type: "derived"; stat: BuffRuleStat; mode: "flat" | "pct"; sourceLabel?: { zhCN?: string }; defaultSourceValue: number; ratio: number; cap?: number; target?: EffectTarget }
-  | { type: "formula"; stat: BuffRuleStat; mode: "flat" | "pct"; source: { variable: "x"; label?: { zhCN?: string }; defaultValue: number; min?: number; max?: number }; formula: { expression: string; valueUnit?: "storedValue" | "storedPercent" }; target?: EffectTarget }
+  | { type: "formula"; stat: BuffRuleStat; mode: "flat" | "pct"; source: { variable: "x"; label?: { zhCN?: string }; defaultValue: number; min?: number; max?: number; step?: number; integer?: boolean }; formula: { expression: string; valueUnit?: "storedValue" | "storedPercent" }; target?: EffectTarget }
   | { type: "stacked"; stat: BuffRuleStat; mode: "flat" | "pct"; valuePerStack: number; maxStacks: number; defaultStacks?: number; stackGroup?: string; stackLabel?: { zhCN?: string; en?: string }; basis?: Effect["stats"][number]["basis"]; target?: EffectTarget }
 ) & {
   id: string;
@@ -380,7 +381,12 @@ type EffectRule = (
   condition?: string | { zhCN?: string; en?: string };
   durationSeconds?: number;
   cooldownSeconds?: number;
-  requirement?: { specialty?: string };
+  requirement?: {
+    specialty?: string;
+    attribute?: string;
+    excludedAgentIds?: string[];
+    runtimeParameter?: { id: string; oneOf: Array<string | number> };
+  };
 };
 
 interface Effect {
@@ -471,6 +477,12 @@ interface TeammateCombatBuffGroup {
     source: { zhCN?: string; en?: string };
     description: string | { zhCN?: string; en?: string };
     scope: "inCombat";
+    runtimeParameters?: Array<{
+      id: string;
+      kind: "enum";
+      values: Array<string | number>;
+      defaultValue: string | number;
+    }>;
     stats: Effect["stats"];
   }>;
 }
@@ -514,6 +526,7 @@ interface InCombatRequest {
       basis?: Effect["stats"][number]["basis"];
     }>;
     runtimeInputs?: Record<string, {
+      parameters?: Record<string, string | number>;
       effects?: Record<string, {
         coverage?: number;
         sourceValue?: number;
@@ -691,6 +704,12 @@ to the catalog later. Maintenance accepts an empty input array as the same
 wildcard but omits the field when saving. For Release targets, a non-empty list
 filters the original Anomaly used by the Release, not its trigger actor or
 profile. Attribute `anomalyVariants` remains an independent optional filter.
+Release evaluates source-side and trigger-side rules separately. A precise
+Attribute-Anomaly `anomalyDamageBonus` or defense modifier is inherited from
+the original Anomaly once; an explicit Release rule remains a trigger-side
+addition. Broad rules are counted once, and source-side Attribute rules do not
+need a duplicate Release catalog row. This source inheritance does not widen
+Attribute rules to Disorder or Luminescence.
 `anomalyDurationBonusSeconds` is stored in raw seconds and is not a stored
 percentage. The runtime still reads legacy `damageModifier` and `appliesTo`
 payloads for old browser state. Maintenance loading converts known element and
@@ -715,6 +734,55 @@ Cinema 4 uses the settlement-wide Attribute Anomaly wildcard with 18% Anomaly
 DMG, automatically includes future Attribute Anomalies, and does not enter the
 Disorder bonus bucket. Selecting these Buffs means their stated
 trigger conditions are already satisfied; uptime is not simulated.
+
+Remielle Dan's Core Passive and Additional Ability each define their own
+`anomalyAgentCount` enum parameter. Both accept `1/2/3` and default to `3`, but
+they are stored independently at
+`combatBuffs.runtimeInputs[buffId].parameters.anomalyAgentCount`. Rules gate on
+the local value through `requirement.runtimeParameter = { id, oneOf }`; the
+default does nothing unless that Buff ID is selected. The Core value controls
+only its three-Anomaly `+10%`, while the Additional Ability value selects
+exactly one `6%/12%/40%` initial-ATK branch. The picker displays only the
+matching branch, although all three internal branches share the same initial
+ATK input. A legacy `runtimeInputs["teammate:remielle_dan"]` count seeds both
+Buffs only when their own values are missing, and the next Apply writes only
+the per-Buff form.
+
+The Special Skill Buff is a formula rule whose runtime source is the skill
+level. It accepts integer levels `1-16`, defaults to `12`, and resolves
+`clamp(level * 1.5, 1.5, 24)%`. This explicitly exposes Cinema 3/5 skill levels
+`14/16` without creating separate Cinema Buff entries. The picker keeps the
+level in that Buff's ordinary rule runtime. Apply commits the independent Buff
+parameters and level together, while Cancel commits none of the draft changes.
+
+`alienationCoefficientBonus` is an internal stored-percent event modifier. It
+is deliberately absent from the player custom-Buff whitelist. Matching rules
+form an independent multiplier:
+
+```text
+alienationMultiplier = 1 + alienationCoefficientBonus / 100
+
+Attribute Anomaly / Release:
+  existing formula * Attribute Anomaly bonus * alienationMultiplier * Anomaly CRIT
+
+Disorder:
+  existing formula * Disorder bonus * alienationMultiplier
+```
+
+The multiplier exists in response and white-box data only when at least one
+matching alienation rule is active. A selected rule with zero effective value
+still displays `异化乘区 = 1`; without a selected rule, the row, multiplier
+property, and flattened `* 1` factor are omitted. Release reads alienation from
+the original Anomaly source. For an external source, that means the frozen
+`anomalySource.snapshot.buffTotals`; a matching trigger-side teammate Buff is
+not multiplied again. Luminescence settlement continues to use Remielle's
+dedicated score conversion and never reads this teammate multiplier.
+Cinema 1 therefore owns one precise Attribute-Anomaly `+10%` rule; Release
+inherits it from the source instead of requiring a second displayed rule.
+Cinema 2 likewise owns one Attribute-Anomaly 15% DEF-ignore rule alongside its
+20% alienation rule. Release inherits the DEF ignore once, so a target with
+DEF 953 and level coefficient 794 resolves the defense multiplier to
+`0.4949970387`, not the duplicated-30% value `0.5434261858`.
 
 ## In-Combat Panel Rules
 

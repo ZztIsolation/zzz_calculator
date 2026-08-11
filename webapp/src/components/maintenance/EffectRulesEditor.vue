@@ -19,7 +19,8 @@ const props = withDefaults(defineProps<{
   allowModificationValues?: boolean
   preferredSkillId?: string
   corePassiveScaling?: any
-}>(), { simple: false, allowCoverage: false, allowModificationValues: false, preferredSkillId: "", corePassiveScaling: null })
+  runtimeParameters?: any[]
+}>(), { simple: false, allowCoverage: false, allowModificationValues: false, preferredSkillId: "", corePassiveScaling: null, runtimeParameters: () => [] })
 const emit = defineEmits<{ change: [] }>()
 
 function rules() {
@@ -253,6 +254,43 @@ function setRuleOutOfCombatStat(rule: any, value: string | null) {
   emit("change")
 }
 
+function runtimeParameterOptions() {
+  return (props.runtimeParameters ?? []).map((parameter: any) => ({
+    label: parameter.id === "anomalyAgentCount" ? "异常特性代理人人数" : parameter.id,
+    value: parameter.id,
+  }))
+}
+
+function runtimeParameterValueOptions(rule: any) {
+  const id = rule.requirement?.runtimeParameter?.id
+  const definition = (props.runtimeParameters ?? []).find((parameter: any) => parameter.id === id)
+  return (definition?.values ?? []).map((value: unknown) => ({ label: String(value), value }))
+}
+
+function setRuleRuntimeParameter(rule: any, id: string | null) {
+  if (id) {
+    const definition = (props.runtimeParameters ?? []).find((parameter: any) => parameter.id === id)
+    rule.requirement = {
+      ...(rule.requirement ?? {}),
+      runtimeParameter: {
+        id,
+        oneOf: [definition?.defaultValue ?? definition?.values?.[0]].filter((value: unknown) => value !== undefined),
+      },
+    }
+  } else if (rule.requirement) {
+    delete rule.requirement.runtimeParameter
+    if (!Object.keys(rule.requirement).length) delete rule.requirement
+  }
+  emit("change")
+}
+
+function setRuleRuntimeParameterValues(rule: any, values: unknown) {
+  if (rule.requirement?.runtimeParameter) {
+    rule.requirement.runtimeParameter.oneOf = Array.isArray(values) ? values : []
+  }
+  emit("change")
+}
+
 function stackGroupOptions(rule: any) {
   const rows = new Map<string, string>()
   for (const candidate of rules()) {
@@ -346,6 +384,8 @@ function selectStackGroup(rule: any, value: string) {
         <label class="maintenance-field"><span>初始属性门槛</span><NSelect :value="rule.requirement?.outOfCombatStat?.stat ?? null" :options="OUT_OF_COMBAT_REQUIREMENT_STAT_OPTIONS" :disabled="disabled" clearable @update:value="setRuleOutOfCombatStat(rule, $event ? String($event) : null)" /></label>
         <label v-if="rule.requirement?.outOfCombatStat?.stat" class="maintenance-field"><span>最小值</span><NInputNumber v-model:value="rule.requirement.outOfCombatStat.min" :disabled="disabled" clearable @update:value="emit('change')" /></label>
         <label v-if="rule.requirement?.outOfCombatStat?.stat" class="maintenance-field"><span>最大值</span><NInputNumber v-model:value="rule.requirement.outOfCombatStat.max" :disabled="disabled" clearable @update:value="emit('change')" /></label>
+        <label v-if="runtimeParameterOptions().length" class="maintenance-field"><span>Buff 运行时参数条件</span><NSelect :value="rule.requirement?.runtimeParameter?.id ?? null" :options="runtimeParameterOptions()" :disabled="disabled" clearable @update:value="setRuleRuntimeParameter(rule, $event ? String($event) : null)" /></label>
+        <label v-if="rule.requirement?.runtimeParameter?.id" class="maintenance-field"><span>允许值</span><NSelect multiple :value="rule.requirement.runtimeParameter.oneOf ?? []" :options="runtimeParameterValueOptions(rule)" :disabled="disabled" @update:value="setRuleRuntimeParameterValues(rule, $event)" /></label>
       </div>
 
       <div v-if="allowModificationValues && ['fixed', 'stacked'].includes(rule.type)" class="maintenance-grid rule-detail-grid">

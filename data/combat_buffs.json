@@ -3512,6 +3512,353 @@
         "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/06/20/82500917/88ab6fa91dc0e69c0d22780cb86b4db0_3734734092895620952.png",
         "officialPage": "https://baike.mihoyo.com/zzz/wiki/content/1962/detail?mhy_presentation_style=fullscreen"
       }
+    },
+    {
+      "id": "remielle_dan",
+      "name": {
+        "zhCN": "蕾米埃尔·丹"
+      },
+      "attribute": "lumiflux",
+      "specialty": "anomaly",
+      "buffs": [
+        {
+          "id": "remielle_dan.core_passive.alienation",
+          "source": {
+            "zhCN": "核心被动：时序=万色滞行（F）"
+          },
+          "description": {
+            "zhCN": "蕾米埃尔触发异化时，异化系数基于其局内异常精通提升，每点异常精通提升0.02%；队伍中有3名异常特性代理人时，异化系数额外提升10%。异化影响属性异常、异放及由异化异常触发的紊乱。"
+          },
+          "scope": "inCombat",
+          "runtimeParameters": [
+            {
+              "id": "anomalyAgentCount",
+              "kind": "enum",
+              "values": [
+                1,
+                2,
+                3
+              ],
+              "defaultValue": 3
+            }
+          ],
+          "effects": [
+            {
+              "id": "remielle_dan_core_ap_alienation",
+              "label": {
+                "zhCN": "异常精通转异化"
+              },
+              "type": "formula",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "alienationCoefficientBonus",
+              "mode": "flat",
+              "source": {
+                "variable": "x",
+                "label": {
+                  "zhCN": "蕾米埃尔触发异化时的局内异常精通"
+                },
+                "defaultValue": 450,
+                "min": 0,
+                "max": 2000,
+                "step": 1,
+                "integer": true
+              },
+              "formula": {
+                "expression": "x * 0.02",
+                "valueUnit": "storedPercent"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "remielle_dan_core_three_anomaly_alienation",
+              "label": {
+                "zhCN": "三异常"
+              },
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "alienationCoefficientBonus",
+              "mode": "flat",
+              "value": 10,
+              "requirement": {
+                "runtimeParameter": {
+                  "id": "anomalyAgentCount",
+                  "oneOf": [
+                    3
+                  ]
+                }
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "remielle_dan.special.timeflow_hymn",
+          "source": {
+            "zhCN": "特殊技：曙色颂·转辉"
+          },
+          "description": {
+            "zhCN": "发动特殊技后，全队造成的伤害提升。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "remielle_dan_special_team_dmg",
+              "label": {
+                "zhCN": "曙色颂·转辉"
+              },
+              "type": "formula",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "source": {
+                "variable": "x",
+                "label": {
+                  "zhCN": "特殊技等级"
+                },
+                "defaultValue": 12,
+                "min": 1,
+                "max": 16,
+                "step": 1,
+                "integer": true
+              },
+              "formula": {
+                "expression": "clamp(x * 1.5, 1.5, 24)",
+                "valueUnit": "storedPercent"
+              },
+              "condition": "发动特殊技后",
+              "durationSeconds": 60,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "remielle_dan.additional.fragrant_invitation",
+          "source": {
+            "zhCN": "额外能力：芳菲之邀"
+          },
+          "description": {
+            "zhCN": "队伍中有1/2/3名异常特性代理人时，全队攻击力分别提升蕾米埃尔初始攻击力的6%/12%/40%，最多提升1600点。幻色使全队异常积蓄效率提升15%。"
+          },
+          "scope": "inCombat",
+          "runtimeParameters": [
+            {
+              "id": "anomalyAgentCount",
+              "kind": "enum",
+              "values": [
+                1,
+                2,
+                3
+              ],
+              "defaultValue": 3
+            }
+          ],
+          "effects": [
+            {
+              "id": "remielle_dan_additional_atk_one_anomaly",
+              "type": "derived",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkFlat",
+              "mode": "flat",
+              "sourceLabel": {
+                "zhCN": "蕾米埃尔初始攻击力"
+              },
+              "defaultSourceValue": 4000,
+              "ratio": 6,
+              "cap": 1600,
+              "requirement": {
+                "runtimeParameter": {
+                  "id": "anomalyAgentCount",
+                  "oneOf": [
+                    1
+                  ]
+                }
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "remielle_dan_additional_atk_two_anomaly",
+              "type": "derived",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkFlat",
+              "mode": "flat",
+              "sourceLabel": {
+                "zhCN": "蕾米埃尔初始攻击力"
+              },
+              "defaultSourceValue": 4000,
+              "ratio": 12,
+              "cap": 1600,
+              "requirement": {
+                "runtimeParameter": {
+                  "id": "anomalyAgentCount",
+                  "oneOf": [
+                    2
+                  ]
+                }
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "remielle_dan_additional_atk_three_anomaly",
+              "type": "derived",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkFlat",
+              "mode": "flat",
+              "sourceLabel": {
+                "zhCN": "蕾米埃尔初始攻击力"
+              },
+              "defaultSourceValue": 4000,
+              "ratio": 40,
+              "cap": 1600,
+              "requirement": {
+                "runtimeParameter": {
+                  "id": "anomalyAgentCount",
+                  "oneOf": [
+                    3
+                  ]
+                }
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "remielle_dan.cinema_1.green_vow",
+          "source": {
+            "zhCN": "影画一：青涩誓言"
+          },
+          "description": {
+            "zhCN": "处于幻色状态期间，队伍中其他角色造成的属性异常伤害提升10%。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "remielle_dan_cinema_1_attribute_anomaly",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute"
+              },
+              "stat": "anomalyDamageBonus",
+              "mode": "flat",
+              "value": 10,
+              "requirement": {
+                "excludedAgentIds": [
+                  "remielle_dan"
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "remielle_dan.cinema_2.falling_clamor",
+          "source": {
+            "zhCN": "影画二：倾落喧嚣"
+          },
+          "description": {
+            "zhCN": "异化系数额外提升20%。异常特性代理人对幻色状态下的目标造成属性异常伤害时，无视目标15%防御力；"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "remielle_dan_cinema_2_alienation",
+              "label": {
+                "zhCN": "影画二"
+              },
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "alienationCoefficientBonus",
+              "mode": "flat",
+              "value": 20,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "remielle_dan_cinema_2_attribute_def_ignore",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute"
+              },
+              "stat": "enemyDefIgnore",
+              "mode": "flat",
+              "value": 15,
+              "requirement": {
+                "specialty": "anomaly"
+              },
+              "condition": "目标处于幻色状态；幻色消失后延续8秒",
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        }
+      ],
+      "images": {
+        "icon": "/assets/agents/remielle_dan.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/07/22/15559334/13b7b06627a8a99ffdf1f397b1daf7d1_5495460923605178593.png"
+      }
     }
   ],
   "fieldBuffs": [

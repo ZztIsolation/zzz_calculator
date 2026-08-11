@@ -558,6 +558,67 @@ function selectByLabel(wrapper: ReturnType<typeof mountModal>, label: string) {
   return field!.find("select")
 }
 
+const remielleRuntimeParameter = [{
+  id: "anomalyAgentCount",
+  kind: "enum",
+  values: [1, 2, 3],
+  defaultValue: 3,
+}]
+
+function remielleRuntimeMeta() {
+  const countRequirement = (count: number) => ({ runtimeParameter: { id: "anomalyAgentCount", oneOf: [count] } })
+  return {
+    ...meta,
+    teammateCombatBuffGroups: [{
+      id: "remielle_dan",
+      name: { zhCN: "蕾米埃尔·丹" },
+      attribute: "lumiflux",
+      specialty: "anomaly",
+      buffs: [
+        {
+          id: "remielle.core",
+          source: { zhCN: "核心被动" },
+          description: { zhCN: "异化系数" },
+          runtimeParameters: remielleRuntimeParameter,
+          effects: [
+            {
+              id: "core-ap",
+              type: "formula",
+              stat: "alienationCoefficientBonus",
+              source: { variable: "x", label: { zhCN: "局内异常精通" }, defaultValue: 450, min: 0, max: 2000, step: 1 },
+              formula: { expression: "x * 0.02", valueUnit: "storedPercent" },
+            },
+            { id: "core-three", type: "fixed", stat: "alienationCoefficientBonus", value: 10, requirement: countRequirement(3) },
+          ],
+        },
+        {
+          id: "remielle.special",
+          source: { zhCN: "特殊技" },
+          description: { zhCN: "全队伤害提升" },
+          effects: [{
+            id: "special-level",
+            type: "formula",
+            stat: "dmgBonus",
+            source: { variable: "x", label: { zhCN: "特殊技等级" }, defaultValue: 12, min: 1, max: 16, step: 1 },
+            formula: { expression: "clamp(x * 1.5, 1.5, 24)", valueUnit: "storedPercent" },
+          }],
+        },
+        {
+          id: "remielle.additional",
+          source: { zhCN: "额外能力" },
+          description: { zhCN: "按异常特性代理人人数提升攻击力" },
+          runtimeParameters: remielleRuntimeParameter,
+          effects: [
+            { id: "atk-one", type: "derived", stat: "atkFlat", sourceLabel: { zhCN: "蕾米埃尔初始攻击力" }, defaultSourceValue: 4000, ratio: 6, cap: 1600, requirement: countRequirement(1) },
+            { id: "atk-two", type: "derived", stat: "atkFlat", sourceLabel: { zhCN: "蕾米埃尔初始攻击力" }, defaultSourceValue: 4000, ratio: 12, cap: 1600, requirement: countRequirement(2) },
+            { id: "atk-three", type: "derived", stat: "atkFlat", sourceLabel: { zhCN: "蕾米埃尔初始攻击力" }, defaultSourceValue: 4000, ratio: 40, cap: 1600, requirement: countRequirement(3) },
+          ],
+        },
+      ],
+    }],
+  }
+}
+
 describe("BuffPickerModal", () => {
   it("updates core-passive scaling values while the picker remains open", async () => {
     const dynamicMeta = {
@@ -705,6 +766,108 @@ describe("BuffPickerModal", () => {
     expect(wrapper.text()).toContain("物理支援队友")
     expect(wrapper.text()).toContain("火系强攻队友")
     expect(wrapper.text()).toContain("旧版未标注队友")
+  })
+
+  it("persists independent teammate Buff parameters and selectable Special Skill level", async () => {
+    const wrapper = mountModal({ meta: remielleRuntimeMeta() })
+    await openTeammateTab(wrapper)
+
+    expect(wrapper.findAll(".teammate-runtime-header")).toHaveLength(0)
+    expect(wrapper.findAll(".buff-runtime-parameters")).toHaveLength(2)
+
+    const coreRow = buffRowByText(wrapper, "异化系数")
+    const additionalRow = buffRowByText(wrapper, "按异常特性代理人人数提升攻击力")
+    const specialRow = buffRowByText(wrapper, "全队伤害提升")
+    expect(coreRow.findAll(".buff-runtime-parameter")).toHaveLength(1)
+    expect(additionalRow.findAll(".buff-runtime-parameter")).toHaveLength(1)
+    expect(specialRow.findAll(".buff-runtime-parameter")).toHaveLength(0)
+    expect(additionalRow.text()).toContain("攻击力 +1600")
+    expect(additionalRow.text()).not.toContain("攻击力 +240")
+    expect(additionalRow.text()).not.toContain("攻击力 +480")
+    expect(additionalRow.findAll(".chip-row > span")).toHaveLength(1)
+    expect(coreRow.findAll(".buff-effect-row")).toHaveLength(2)
+
+    await coreRow.find(".buff-runtime-parameter").findAll("button")
+      .find(button => button.text() === "2")!.trigger("click")
+    expect(coreRow.findAll(".buff-effect-row")).toHaveLength(1)
+    expect(additionalRow.text()).toContain("攻击力 +1600")
+
+    const initialAtkInput = additionalRow.find(".runtime-grid input[type='number']")
+    expect(initialAtkInput.element.getAttribute("value")).toBe("4000")
+    await initialAtkInput.setValue("3000")
+    await additionalRow.find(".buff-runtime-parameter").findAll("button")
+      .find(button => button.text() === "1")!.trigger("click")
+    expect(additionalRow.text()).toContain("攻击力 +180")
+    expect(initialAtkInput.element.getAttribute("value")).toBe("3000")
+    await initialAtkInput.setValue("4000")
+    await additionalRow.find(".buff-runtime-parameter").findAll("button")
+      .find(button => button.text() === "3")!.trigger("click")
+
+    await coreRow.find(".buff-row-toggle").trigger("click")
+    await additionalRow.find(".buff-row-toggle").trigger("click")
+    await specialRow.find(".buff-row-toggle").trigger("click")
+    const specialLevelInput = specialRow.find("input[type='number']")
+    expect(specialLevelInput.element.getAttribute("value")).toBe("12")
+    await specialLevelInput.setValue("16")
+    await buttonByText(wrapper, "应用选择").trigger("click")
+
+    const payload = wrapper.emitted("apply")?.[0]?.[0] as any
+    expect(payload.selectedBuffIds).toEqual(["remielle.core", "remielle.additional", "remielle.special"])
+    expect(payload.runtimeInputs["remielle.core"].parameters.anomalyAgentCount).toBe(2)
+    expect(payload.runtimeInputs["remielle.additional"].parameters.anomalyAgentCount).toBe(3)
+    expect(payload.runtimeInputs["teammate:remielle_dan"]).toBeUndefined()
+    expect(payload.runtimeInputs["remielle.special"].effects["special-level"].sourceValue).toBe(16)
+
+    await wrapper.setProps({
+      show: false,
+      selectedIds: payload.selectedBuffIds,
+      runtimeInputs: payload.runtimeInputs,
+    })
+    await openTeammateTab(wrapper)
+    expect(buffRowByText(wrapper, "全队伤害提升").find("input[type='number']").element.getAttribute("value")).toBe("16")
+    expect(buffRowByText(wrapper, "按异常特性代理人人数提升攻击力").text()).toContain("攻击力 +1600")
+    await buttonByText(wrapper, "应用选择").trigger("click")
+    const reopenedPayload = wrapper.emitted("apply")?.[1]?.[0] as any
+    expect(reopenedPayload.runtimeInputs["remielle.core"].parameters.anomalyAgentCount).toBe(2)
+    expect(reopenedPayload.runtimeInputs["remielle.additional"].parameters.anomalyAgentCount).toBe(3)
+  })
+
+  it("discards un-applied per-Buff counts and Special Skill runtime changes", async () => {
+    const wrapper = mountModal({ meta: remielleRuntimeMeta() })
+    await openTeammateTab(wrapper)
+    await buffRowByText(wrapper, "异化系数").find(".buff-runtime-parameter").findAll("button")
+      .find(button => button.text() === "1")!.trigger("click")
+    await buffRowByText(wrapper, "按异常特性代理人人数提升攻击力").find(".buff-runtime-parameter").findAll("button")
+      .find(button => button.text() === "2")!.trigger("click")
+    await buffRowByText(wrapper, "全队伤害提升").find("input[type='number']").setValue("16")
+    await buttonByText(wrapper, "取消").trigger("click")
+
+    await wrapper.setProps({ show: false })
+    await openTeammateTab(wrapper)
+    expect(buffRowByText(wrapper, "全队伤害提升").find("input[type='number']").element.getAttribute("value")).toBe("12")
+    expect(buffRowByText(wrapper, "按异常特性代理人人数提升攻击力").text()).toContain("攻击力 +1600")
+    await buttonByText(wrapper, "应用选择").trigger("click")
+    const payload = wrapper.emitted("apply")?.[0]?.[0] as any
+    expect(payload.runtimeInputs["teammate:remielle_dan"]).toBeUndefined()
+    expect(payload.runtimeInputs["remielle.core"]).toBeUndefined()
+    expect(payload.runtimeInputs["remielle.additional"]).toBeUndefined()
+  })
+
+  it("migrates the legacy teammate count into each selected Buff", async () => {
+    const wrapper = mountModal({
+      meta: remielleRuntimeMeta(),
+      selectedIds: ["remielle.core", "remielle.additional"],
+      runtimeInputs: {
+        "teammate:remielle_dan": { parameters: { anomalyAgentCount: 2 } },
+      },
+    })
+    await openTeammateTab(wrapper)
+    expect(buffRowByText(wrapper, "按异常特性代理人人数提升攻击力").text()).toContain("攻击力 +480")
+    await buttonByText(wrapper, "应用选择").trigger("click")
+    const payload = wrapper.emitted("apply")?.[0]?.[0] as any
+    expect(payload.runtimeInputs["remielle.core"].parameters.anomalyAgentCount).toBe(2)
+    expect(payload.runtimeInputs["remielle.additional"].parameters.anomalyAgentCount).toBe(2)
+    expect(payload.runtimeInputs["teammate:remielle_dan"]).toBeUndefined()
   })
 
   it("keeps the maintenance-authored teammate and Buff order after filtering", async () => {

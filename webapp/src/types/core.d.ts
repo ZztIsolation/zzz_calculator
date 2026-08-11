@@ -380,6 +380,11 @@ declare module "@core/shared-combat.js" {
   export function coreSkillSummary(agent: any, selectedLevel: string, meta?: any): string
   export function clampWEngineModificationLevel(value: unknown, wEngine?: any): number
   export function defaultRuntimeForBuff(buff?: any): any
+  export function runtimeParameterDefinitions(effect?: any): any[]
+  export function normalizedRuntimeParameterValue(definition?: any, value?: unknown): any
+  export function runtimeParameterDefaults(effect?: any): Record<string, any>
+  export function runtimeParameterRequirementMatches(rule?: any, runtimeInput?: any): boolean
+  export function runtimeEffectRules(effect?: any, runtimeInput?: any): any[]
   export function normalizeCustomBuffEffect(effect?: any): any
   export function normalizeCustomBuffStat(stat?: any, meta?: any): any
   export function normalizeRuntimeForBuff(buff?: any, runtime?: any): any

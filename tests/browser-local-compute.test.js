@@ -193,6 +193,29 @@ assert.deepEqual(browserAlice, backendAlice, "Browser Alice mastery calculation 
 assert.equal(browserAlice.outOfCombat.panel.anomalyMastery, 195.96)
 assert.equal(browserAlice.inCombat.panel.anomalyProficiency, 206)
 
+const remielleTeammatePayload = {
+    ...alicePayload,
+    driveDiscs: [],
+    combatBuffs: {
+        activeBuffIds: ["remielle_dan.core_passive.alienation"],
+        runtimeInputs: {
+            "remielle_dan.core_passive.alienation": {
+                parameters: { anomalyAgentCount: 2 },
+                effects: { remielle_dan_core_ap_alienation: { sourceValue: 450 } },
+            },
+        },
+    },
+    damage: {
+        selectedEventId: "remielle-assault",
+        events: [{ id: "remielle-assault", kind: "anomaly", anomalyEffect: "assault", stunned: false }],
+    },
+}
+const browserRemielleTeammate = browserCalculateInCombatPanel(catalog, remielleTeammatePayload)
+const backendRemielleTeammate = backendCalculateInCombatPanel(catalog, remielleTeammatePayload)
+assert.deepEqual(browserRemielleTeammate, backendRemielleTeammate,
+    "Browser-local Remielle teammate runtime should match the backend wrapper.")
+assert.equal(browserRemielleTeammate.damage.multipliers.alienation, 1.09)
+
 const fixedDanInput = fixedDanLuminescenceInput()
 const browserFixedDan = browserCalculateInCombatPanel(catalog, fixedDanInput)
 const backendFixedDan = backendCalculateInCombatPanel(catalog, fixedDanInput)
@@ -430,7 +453,14 @@ const aliceOptimizerInput = {
         activeBuffIds: [
             "agent:alice_thymefield.corePassive",
             "agent:alice_thymefield.additionalAbility",
+            "remielle_dan.core_passive.alienation",
         ],
+        runtimeInputs: {
+            "remielle_dan.core_passive.alienation": {
+                parameters: { anomalyAgentCount: 3 },
+                effects: { remielle_dan_core_ap_alienation: { sourceValue: 450 } },
+            },
+        },
     },
     damage: catalog.agentsMap.get("alice_thymefield").defaultCalculationConfig,
     settings: {
