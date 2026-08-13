@@ -88,9 +88,10 @@ assert.equal(skillTargetMatches({ ...wholeSpecificType, moveId: "ultimate_test",
 assert.equal(skillTargetMatches({ ...wholeSpecificType, moveId: "ultimate_test", rowId: "other" }, ultimateSource), false)
 
 const skillCatalog = JSON.parse(readFileSync(new URL("../data/agent_skills.json", import.meta.url), "utf8")).agentSkills
+const combatBuffCatalog = JSON.parse(readFileSync(new URL("../data/combat_buffs.json", import.meta.url), "utf8"))
 const dataRoots = [
     JSON.parse(readFileSync(new URL("../data/agents.json", import.meta.url), "utf8")),
-    JSON.parse(readFileSync(new URL("../data/combat_buffs.json", import.meta.url), "utf8")),
+    combatBuffCatalog,
 ]
 const skillsById = new Map(skillCatalog.map(skill => [skill.id, skill]))
 let moveCount = 0
@@ -167,7 +168,14 @@ assert.deepEqual(Object.fromEntries(skillTagCounts), {
     assistAttack: 10,
     exSpecial: 12,
 })
-assert.equal(storedTargets.length, 54)
+assert.equal(storedTargets.length, 60)
+const zhishuangTargets = combatBuffCatalog.fieldBuffs
+    .find(buff => buff.id === "field.critical_assault.v3_1.p2.zhishuang")
+    .effects.flatMap(effect => effect.target?.skillTargets ?? [])
+assert.equal(zhishuangTargets.length, 6)
+assert.equal(zhishuangTargets.filter(target => skillTargetMatches(target, chainSource)).length, 2)
+assert.equal(zhishuangTargets.filter(target => skillTargetMatches(target, exSpecialSource)).length, 2)
+assert.equal(zhishuangTargets.filter(target => skillTargetMatches(target, normalSpecialSource)).length, 2)
 const yeShunguangTargetMoveIds = new Set(storedTargets
     .map(item => item.target)
     .filter(target => target.kind === "specific" && target.agentSkillId === "ye_shunguang")
