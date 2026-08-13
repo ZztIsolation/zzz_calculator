@@ -13,9 +13,9 @@ const meta = buildMeta(catalog)
 const source = JSON.parse(await readFile(path.join(rootDir, "data", "bosses.json"), "utf8"))
 
 assert.equal(source.version, 2)
-assert.equal(source.bosses.length, 7)
-assert.equal(meta.bosses.length, 7)
-assert.equal(meta.bossCombatBuffs.length, 7)
+assert.equal(source.bosses.length, 10)
+assert.equal(meta.bosses.length, 10)
+assert.equal(meta.bossCombatBuffs.length, 11)
 
 for (const boss of source.bosses) {
     assert.ok(boss.images.icon.startsWith("/assets/bosses/"))
@@ -48,8 +48,8 @@ const bossEntries = source.bosses.flatMap(boss =>
         ...(encounter.playerDebuffs ?? []),
     ]))
 const bossEffects = bossEntries.flatMap(entry => entry.effects ?? [])
-assert.equal(bossEntries.length, 9)
-assert.equal(bossEffects.length, 10)
+assert.equal(bossEntries.length, 16)
+assert.equal(bossEffects.length, 22)
 for (const effect of bossEffects) {
     assert.deepEqual(
         effect.coverage,
@@ -117,6 +117,14 @@ assert.equal(
 )
 assert.equal(stagnant.damage.finalDamage, withoutBoss.damage.finalDamage)
 
+const stagnantPhase2Id = "boss_encounter.girtablullu_stagnant_aberrant.v3_1.p2"
+const stagnantPhase2 = resultFor(stagnantPhase2Id)
+const stagnantPhase2Modifiers = stagnantPhase2.inCombat.activeEffects
+    .flatMap(effect => effect.resolvedDamageModifiers ?? [])
+assert.equal(stagnantPhase2.inCombat.buffTotals.anomalyProficiencyFlat, 60)
+assert.equal(stagnantPhase2Modifiers.find(effect => effect.stat === "anomalyDamageBonus")?.value, 0.36)
+assert.equal(source.bosses.find(boss => boss.id === "boss.girtablullu_stagnant_aberrant")?.encounters.length, 2)
+
 const stagnantOneStack = resultFor(stagnantId, {
     [stagnantId]: {
         effects: {
@@ -168,11 +176,47 @@ assert.equal(integrated.inCombat.buffTotals.dmgBonus, 0.15)
 assert.equal(integrated.inCombat.buffTotals.anomalyProficiencyFlat, 20)
 assert.equal(integratedModifiers.find(effect => effect.stat === "anomalyDamageBonus")?.value, 0.4)
 
-const currentBosses = source.bosses.slice(-4)
-assert.ok(currentBosses.every(boss => boss.target.defense === 953))
-assert.deepEqual(currentBosses[0].target.weaknessElements, [])
-assert.deepEqual(currentBosses[2].target.weaknessElements, ["electric", "ether"])
-assert.deepEqual(currentBosses[3].target.weaknessElements, [])
+const dreamBound = resultFor("boss_encounter.dream_bound_ye_shiyuan.v3_1.p2")
+assert.equal(dreamBound.inCombat.buffTotals.critDmg, 0.5)
+assert.equal(dreamBound.damage.targetBreakdown.enemyDefReduction, 0.24)
+
+const miasmaPriest = resultFor("boss_encounter.miasma_priest.v3_1.p2")
+assert.equal(miasmaPriest.inCombat.buffTotals.critDmg, 0.6)
+
+const bloodHunter = resultFor("boss_encounter.replica_blood_hunter_janitor.v3_1.p2")
+const bloodHunterModifiers = bloodHunter.inCombat.activeEffects.flatMap(effect => effect.resolvedDamageModifiers ?? [])
+assert.ok(
+    Math.abs(
+        bloodHunter.inCombat.panel.atk - bloodHunter.outOfCombat.panel.atk
+        - bloodHunter.outOfCombat.panel.atk * 0.2,
+    ) < 1e-6,
+)
+assert.equal(bloodHunter.inCombat.panel.penRatio - bloodHunter.outOfCombat.panel.penRatio, 0.25)
+assert.equal(bloodHunter.inCombat.buffTotals.anomalyProficiencyFlat, 40)
+assert.equal(bloodHunterModifiers.find(effect => effect.stat === "anomalyDamageBonus")?.value, 0.3)
+assert.equal(bloodHunterModifiers.find(effect => effect.stat === "iceCritDmg")?.value, 0.6)
+assert.equal(bloodHunterModifiers.find(effect => effect.stat === "etherCritDmg")?.value, 0.6)
+
+const phaseOneBosses = source.bosses.filter(boss => boss.encounters.some(encounter =>
+    encounter.appearances.some(appearance => appearance.gameVersion === "3.1" && appearance.phaseNo === 1)))
+assert.ok(phaseOneBosses.every(boss => boss.target.defense === 953))
+assert.deepEqual(source.bosses.find(boss => boss.id === "boss.girtablullu_stagnant_aberrant")?.target.weaknessElements, [])
+assert.deepEqual(source.bosses.find(boss => boss.id === "boss.unknown_corruption_complex")?.target.weaknessElements, ["electric", "ether"])
+assert.deepEqual(source.bosses.find(boss => boss.id === "boss.integrated_girtablullu")?.target.weaknessElements, [])
+
+const phaseTwoBossIds = source.bosses
+    .filter(boss => boss.encounters.some(encounter => encounter.appearances.some(appearance =>
+        appearance.gameVersion === "3.1" && appearance.phaseNo === 2)))
+    .map(boss => boss.id)
+assert.deepEqual(phaseTwoBossIds, [
+    "boss.girtablullu_stagnant_aberrant",
+    "boss.dream_bound_ye_shiyuan",
+    "boss.miasma_priest",
+    "boss.replica_blood_hunter_janitor",
+])
+const phaseTwoText = JSON.stringify(source.bosses.filter(boss => phaseTwoBossIds.includes(boss.id)))
+assert.equal(phaseTwoText.includes("操作分"), false)
+assert.equal(phaseTwoText.includes("异常积蓄"), false)
 
 for (const buff of meta.bossCombatBuffs) {
     assert.equal("mechanics" in buff, false)

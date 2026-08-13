@@ -411,6 +411,102 @@
             }
           ],
           "hidden": false
+        },
+        {
+          "id": "boss_encounter.girtablullu_stagnant_aberrant.v3_1.p2",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.1",
+              "phaseNo": 2,
+              "startDate": "2026-08-12",
+              "endDate": "2026-08-26"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "对敌人施加属性异常状态时，目标获得 1 层对应属性的[蚀蚀印记]，持续 30 秒，最多叠加 2 层；重复施加同属性印记时刷新持续时间。敌人每持有 1 层[蚀蚀印记]，受到的属性异常伤害提升 18%。对敌人造成部位破坏或[完美反制]时，全队异常精通提升 60 点，持续 30 秒，重复触发刷新持续时间。"
+          },
+          "recommendedSpecialties": [
+            "anomaly"
+          ],
+          "playerBuffs": [
+            {
+              "id": "girtablullu_p2_blight_marks",
+              "name": {
+                "zhCN": "蚀蚀印记"
+              },
+              "description": {
+                "zhCN": "每层使敌人受到的属性异常伤害提升 18%；持续 30 秒，最多 2 层。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "girtablullu_p2_blight_anomaly_damage",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyDamageBonus",
+                  "mode": "flat",
+                  "valuePerStack": 18,
+                  "maxStacks": 2,
+                  "defaultStacks": 2,
+                  "durationSeconds": 30,
+                  "stackGroup": "girtablullu_p2_blight_mark_stacks",
+                  "stackLabel": {
+                    "zhCN": "蚀蚀印记层数"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            },
+            {
+              "id": "girtablullu_p2_counter_proficiency",
+              "name": {
+                "zhCN": "反制精通提升"
+              },
+              "description": {
+                "zhCN": "造成部位破坏或[完美反制]时，全队异常精通提升 60 点，持续 30 秒；重复触发刷新持续时间。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "girtablullu_p2_counter_proficiency_value",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyProficiency",
+                  "mode": "flat",
+                  "value": 60,
+                  "durationSeconds": 30,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "3.1 第二期游戏内敌情截图"
+              },
+              "url": "https://wikiwiki.jp/zenless/%E5%8D%B1%E5%B1%80%E5%BC%B7%E8%A5%B2%E6%88%A6/%E6%95%B5%E4%B8%80%E8%A6%A7"
+            }
+          ],
+          "hidden": false
         }
       ],
       "hidden": false
@@ -727,6 +823,428 @@
                 "zhCN": "3.1 第一期敌人数据与效果"
               },
               "url": "https://www.buhflipexplode.org/zzz/da/"
+            }
+          ],
+          "hidden": false
+        }
+      ],
+      "hidden": false
+    },
+    {
+      "id": "boss.dream_bound_ye_shiyuan",
+      "name": {
+        "zhCN": "魇缚者·叶释渊"
+      },
+      "aliases": [
+        "叶释渊",
+        "Ye Shiyuan the Thrall"
+      ],
+      "images": {
+        "icon": "/assets/bosses/dream-bound-ye-shiyuan.webp",
+        "source": "https://cdn.wikiwiki.jp/to/w/zenless/%E7%94%BB%E5%83%8F/%3A%3Aref/%E3%82%A8%E3%83%8D%E3%83%9F%E3%83%BC_%E6%82%AA%E5%A4%A2%E3%81%AB%E7%B8%9B%E3%82%89%E3%82%8C%E3%81%97%E8%80%85%E3%83%BB%E8%91%89%E9%87%88%E6%B7%B5.webp?rev=06c5904e7c48426a2a1847b124220231&t=20251127211739"
+      },
+      "target": {
+        "defense": 953,
+        "weaknessElements": [
+          "physical",
+          "ice",
+          "wind"
+        ],
+        "resistanceElements": [
+          "electric"
+        ],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.dream_bound_ye_shiyuan.v3_1.p2",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.1",
+              "phaseNo": 2,
+              "startDate": "2026-08-12",
+              "endDate": "2026-08-26"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "索贝克与魇缚者每次交替上场时，可使魇缚者获得 1 层[合契]与 1 层[舍身]，[合契]与[舍身]最多叠加 3 层；每层[舍身]可使魇缚者防御降低 8%。魇缚者进入失衡状态时，受到暴击伤害提升 50%。"
+          },
+          "recommendedSpecialties": [
+            "stun"
+          ],
+          "playerBuffs": [
+            {
+              "id": "dream_bound_ye_shiyuan_sacrifice",
+              "name": {
+                "zhCN": "舍身"
+              },
+              "description": {
+                "zhCN": "每层[舍身]可使魇缚者防御降低 8%，最多叠加 3 层。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "dream_bound_ye_shiyuan_sacrifice_def_reduction",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "enemyDefReduction",
+                  "mode": "flat",
+                  "valuePerStack": 8,
+                  "maxStacks": 3,
+                  "defaultStacks": 3,
+                  "stackGroup": "dream_bound_ye_shiyuan_sacrifice_stacks",
+                  "stackLabel": {
+                    "zhCN": "舍身层数"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            },
+            {
+              "id": "dream_bound_ye_shiyuan_stunned_crit_damage",
+              "name": {
+                "zhCN": "失衡暴击易伤"
+              },
+              "description": {
+                "zhCN": "魇缚者进入失衡状态时，受到暴击伤害提升 50%。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "dream_bound_ye_shiyuan_stunned_crit_damage_value",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "critDmg",
+                  "mode": "flat",
+                  "value": 50,
+                  "condition": "魇缚者进入失衡状态时",
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "危局强袭战敌人一览（Boss 图片）"
+              },
+              "url": "https://wikiwiki.jp/zenless/%E5%8D%B1%E5%B1%80%E5%BC%B7%E8%A5%B2%E6%88%A6/%E6%95%B5%E4%B8%80%E8%A6%A7"
+            }
+          ],
+          "hidden": false
+        }
+      ],
+      "hidden": false
+    },
+    {
+      "id": "boss.miasma_priest",
+      "name": {
+        "zhCN": "秽息司祭"
+      },
+      "aliases": [
+        "Miasma Priest"
+      ],
+      "images": {
+        "icon": "/assets/bosses/miasma-priest.webp",
+        "source": "https://cdn.wikiwiki.jp/to/w/zenless/%E7%94%BB%E5%83%8F/%3A%3Aref/%E3%82%A8%E3%83%8D%E3%83%9F%E3%83%BC_%E3%83%9F%E3%82%A2%E3%82%BA%E3%83%9E%E3%81%AE%E5%8F%B8%E7%A5%AD.webp?rev=75385386edb0c1b7e09622dfb20aff06&t=20250610090148"
+      },
+      "target": {
+        "defense": 953,
+        "weaknessElements": [
+          "ether"
+        ],
+        "resistanceElements": [
+          "ice"
+        ],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.miasma_priest.v3_1.p2",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.1",
+              "phaseNo": 2,
+              "startDate": "2026-08-12",
+              "endDate": "2026-08-26"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "秽息司祭每切换阶段时，会使自身受到的暴击伤害提升 30%，最多可叠加 2 层；[秽盾]被打破时，清除所有层数。"
+          },
+          "recommendedSpecialties": [
+            "rupture"
+          ],
+          "playerBuffs": [
+            {
+              "id": "miasma_priest_phase_crit_damage",
+              "name": {
+                "zhCN": "阶段暴击易伤"
+              },
+              "description": {
+                "zhCN": "每切换阶段时，受到的暴击伤害提升 30%，最多叠加 2 层；[秽盾]被打破时清除所有层数。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "miasma_priest_phase_crit_damage_value",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "critDmg",
+                  "mode": "flat",
+                  "valuePerStack": 30,
+                  "maxStacks": 2,
+                  "defaultStacks": 2,
+                  "stackGroup": "miasma_priest_phase_stacks",
+                  "stackLabel": {
+                    "zhCN": "阶段切换层数"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "危局强袭战敌人一览（Boss 图片）"
+              },
+              "url": "https://wikiwiki.jp/zenless/%E5%8D%B1%E5%B1%80%E5%BC%B7%E8%A5%B2%E6%88%A6/%E6%95%B5%E4%B8%80%E8%A6%A7"
+            }
+          ],
+          "hidden": false
+        }
+      ],
+      "hidden": false
+    },
+    {
+      "id": "boss.replica_blood_hunter_janitor",
+      "name": {
+        "zhCN": "复写体·猎血清道夫"
+      },
+      "aliases": [
+        "猎血清道夫",
+        "Blood Hunter Janitor"
+      ],
+      "images": {
+        "icon": "/assets/bosses/replica-blood-hunter-janitor.webp",
+        "source": "https://cdn.wikiwiki.jp/to/w/zenless/%E7%94%BB%E5%83%8F/%3A%3Aref/%E3%82%A8%E3%83%8D%E3%83%9F%E3%83%BC_%E8%A1%80%E7%8B%A9%E3%82%8A%E3%81%AE%E6%8E%83%E9%99%A4%E5%B1%8B.webp?rev=818a5c0e9a39023a5ae8fcad5f8798aa&t=20260324115552"
+      },
+      "target": {
+        "defense": 476,
+        "weaknessElements": [
+          "ice"
+        ],
+        "resistanceElements": [],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.replica_blood_hunter_janitor.v3_1.p2",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.1",
+              "phaseNo": 2,
+              "startDate": "2026-08-12",
+              "endDate": "2026-08-26"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "代理人对敌人造成[完美反制]后，敌人的全属性抗性降低 10%，且全队[强攻]特性的代理人攻击力提升 20%，穿透率提升 25%，造成的冰属性和以太属性伤害的暴击伤害提升 60%。触发特殊跪地时，全队异常精通提升 40 点，异常伤害提升 30%。"
+          },
+          "recommendedSpecialties": [
+            "attack",
+            "anomaly"
+          ],
+          "playerBuffs": [
+            {
+              "id": "replica_blood_hunter_perfect_counter",
+              "name": {
+                "zhCN": "完美反制增益"
+              },
+              "description": {
+                "zhCN": "造成[完美反制]后，敌人的全属性抗性降低 10%；全队[强攻]特性的代理人攻击力提升 20%、穿透率提升 25%，冰属性和以太属性伤害的暴击伤害提升 60%。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "replica_blood_hunter_perfect_counter_res_reduction",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "enemyResReduction",
+                  "mode": "flat",
+                  "value": 10,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                },
+                {
+                  "id": "replica_blood_hunter_perfect_counter_attack_atk",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "atkPct",
+                  "mode": "pct",
+                  "basis": "outOfCombatAtk",
+                  "value": 20,
+                  "requirement": {
+                    "specialty": "attack"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                },
+                {
+                  "id": "replica_blood_hunter_perfect_counter_attack_pen_ratio",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "penRatio",
+                  "mode": "flat",
+                  "value": 25,
+                  "requirement": {
+                    "specialty": "attack"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                },
+                {
+                  "id": "replica_blood_hunter_perfect_counter_attack_ice_crit_damage",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "iceCritDmg",
+                  "mode": "flat",
+                  "value": 60,
+                  "requirement": {
+                    "specialty": "attack"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                },
+                {
+                  "id": "replica_blood_hunter_perfect_counter_attack_ether_crit_damage",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "etherCritDmg",
+                  "mode": "flat",
+                  "value": 60,
+                  "requirement": {
+                    "specialty": "attack"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            },
+            {
+              "id": "replica_blood_hunter_special_kneel",
+              "name": {
+                "zhCN": "特殊跪地增益"
+              },
+              "description": {
+                "zhCN": "触发特殊跪地时，全队异常精通提升 40 点，异常伤害提升 30%。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "replica_blood_hunter_special_kneel_proficiency",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyProficiency",
+                  "mode": "flat",
+                  "value": 40,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                },
+                {
+                  "id": "replica_blood_hunter_special_kneel_anomaly_damage",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyDamageBonus",
+                  "mode": "flat",
+                  "value": 30,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "危局强袭战敌人一览（Boss 图片）"
+              },
+              "url": "https://wikiwiki.jp/zenless/%E5%8D%B1%E5%B1%80%E5%BC%B7%E8%A5%B2%E6%88%A6/%E6%95%B5%E4%B8%80%E8%A6%A7"
             }
           ],
           "hidden": false

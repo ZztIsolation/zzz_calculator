@@ -15,6 +15,9 @@ const FIELD_BUFF_IDS = {
     cuixin: "field.critical_assault.v3_1.p1.cuixin",
     luli: "field.critical_assault.v3_1.p1.luli",
     guixi: "field.critical_assault.v3_1.p1.guixi",
+    pojing: "field.critical_assault.v3_1.p2.pojing",
+    luliPhase2: "field.critical_assault.v3_1.p2.luli",
+    zhishuang: "field.critical_assault.v3_1.p2.zhishuang",
     wenyin: "field.defense_v5.v3_1.p1.wenyin_gongzhen",
     zhongmuDefense31: "field.defense_v5.v3_1.p1.zhongmu_xiezou",
     shuanglei: "field.defense_v5.v3_1.p1.shuanglei_pofeng",
@@ -33,6 +36,10 @@ const EFFECT_IDS = {
     luliAnomaly: "field_critical_assault_v3_1_p1_luli_anomaly_damage",
     luliRes: "field_critical_assault_v3_1_p1_luli_enemy_res_reduction",
     guixiDef: "field_critical_assault_v3_1_p1_guixi_enemy_def_reduction",
+    pojingSheer: "field_critical_assault_v3_1_p2_pojing_rupture_sheer_dmg",
+    luliPhase2Proficiency: "field_critical_assault_v3_1_p2_luli_anomaly_proficiency",
+    luliPhase2Anomaly: "field_critical_assault_v3_1_p2_luli_anomaly_damage",
+    luliPhase2Res: "field_critical_assault_v3_1_p2_luli_enemy_res_reduction",
     wenyinAnomaly: "field_defense_v5_v3_1_p1_wenyin_attribute_anomaly_damage",
     lianshiRes: "field_defense_v5_v3_0_p3_lianshi_anomaly_res_ignore",
     yanwangAtk: "field_critical_assault_v3_0_p3_yanwang_chain_atk",
@@ -46,6 +53,9 @@ const EXPECTED_NAMES = {
     [FIELD_BUFF_IDS.cuixin]: "摧心",
     [FIELD_BUFF_IDS.luli]: "勠力",
     [FIELD_BUFF_IDS.guixi]: "诡袭",
+    [FIELD_BUFF_IDS.pojing]: "破境",
+    [FIELD_BUFF_IDS.luliPhase2]: "勠力",
+    [FIELD_BUFF_IDS.zhishuang]: "制霜",
     [FIELD_BUFF_IDS.wenyin]: "紊音共振",
     [FIELD_BUFF_IDS.zhongmuDefense31]: "终幕协奏",
     [FIELD_BUFF_IDS.shuanglei]: "霜雷破锋",
@@ -64,7 +74,12 @@ const CRITICAL_ASSAULT_3_1_IDS = [
     FIELD_BUFF_IDS.luli,
     FIELD_BUFF_IDS.guixi,
 ]
-const VERSION_3_1_IDS = [...DEFENSE_3_1_IDS, ...CRITICAL_ASSAULT_3_1_IDS]
+const CRITICAL_ASSAULT_3_1_PHASE_2_IDS = [
+    FIELD_BUFF_IDS.pojing,
+    FIELD_BUFF_IDS.luliPhase2,
+    FIELD_BUFF_IDS.zhishuang,
+]
+const VERSION_3_1_IDS = [...DEFENSE_3_1_IDS, ...CRITICAL_ASSAULT_3_1_IDS, ...CRITICAL_ASSAULT_3_1_PHASE_2_IDS]
 
 const ALL_RES_IGNORE_BUFF_IDS = [
     "liuyin.cinema_1.good_review_res_ignore",
@@ -101,14 +116,15 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
     assert.equal(buff.scope, "inCombat", `${id} should be an in-combat Buff`)
     const isDefense = DEFENSE_3_0_IDS.includes(id) || DEFENSE_3_1_IDS.includes(id)
     const isVersion31 = VERSION_3_1_IDS.includes(id)
+    const isPhase2 = CRITICAL_ASSAULT_3_1_PHASE_2_IDS.includes(id)
     assert.deepEqual(buff.period, {
         modeId: isDefense ? "defense_v5" : "critical_assault",
         gameVersion: isVersion31 ? "3.1" : "3.0",
-        phaseNo: isVersion31 ? 1 : 3,
-        phaseName: { zhCN: isVersion31 ? "第一期" : "第三期" },
+        phaseNo: isPhase2 ? 2 : isVersion31 ? 1 : 3,
+        phaseName: { zhCN: isPhase2 ? "第二期" : isVersion31 ? "第一期" : "第三期" },
     })
     assert.equal(buff.source?.zhCN, isDefense ? "防卫战 v5" : "危局强袭战")
-    assert.equal(buff.sourcePeriod?.zhCN, isVersion31 ? "3.1版本第一期" : "3.0版本第三期")
+    assert.equal(buff.sourcePeriod?.zhCN, isPhase2 ? "3.1版本第二期" : isVersion31 ? "3.1版本第一期" : "3.0版本第三期")
 
     const validation = validateMaintenanceItem("field-buffs", buff, {
         items: catalog.combatBuffs,
@@ -119,7 +135,7 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
 }
 
 const allFieldBuffs = catalog.combatBuffs.filter(buff => buff.sourceType === "field")
-assert.equal(allFieldBuffs.length, 15, "Field Buff catalog should keep all maintained entries")
+assert.equal(allFieldBuffs.length, 18, "Field Buff catalog should keep all maintained entries")
 for (const buff of allFieldBuffs) {
     assert.ok(buff.effects.length > 0, `${buff.id} should expose structured effects`)
     for (const effect of buff.effects) {
@@ -161,6 +177,22 @@ assert.equal(
     "代理人的冰属性伤害和电属性伤害提升30%。[强攻]特性的代理人发动[强化特殊技]后，自身暴击伤害提升30%，持续20秒，重复触发时刷新持续时间。",
     "Shuanglei Pofeng should preserve the complete source text",
 )
+assert.equal(
+    fieldBuff(FIELD_BUFF_IDS.pojing).description.zhCN,
+    "[命破]特性的代理人贯穿伤害提升15%。处于[以太帷幕]中的代理人，以太属性伤害提升25%，攻击命中敌人后使其失衡易伤倍率提升25%，持续10秒，重复触发时刷新持续时间。",
+    "Pojing should retain only modeled damage-relevant source text",
+)
+assert.equal(
+    fieldBuff(FIELD_BUFF_IDS.luliPhase2).description.zhCN,
+    "队伍内存在2/3名[异常]特性代理人时，全队的异常精通分别提升30点/70点，造成的属性异常伤害分别提升10%/25%。对敌人施加属性异常效果后，敌人的全属性伤害抗性降低15%，持续10秒，重复触发时刷新持续时间。",
+    "Phase 2 Luli should preserve the complete source text",
+)
+assert.equal(
+    fieldBuff(FIELD_BUFF_IDS.zhishuang).description.zhCN,
+    "[强攻]特性的代理人攻击力提升25%，[普通攻击]、[强化特殊技]、[连携技]命中敌人时，无视其30%的冰属性伤害抗性和以太属性伤害抗性。代理人命中处于失衡状态的敌人时，其失衡易伤提升40%，持续5秒，重复触发时刷新持续时间。",
+    "Zhishuang should preserve the complete source text",
+)
+assert.equal(JSON.stringify(CRITICAL_ASSAULT_3_1_PHASE_2_IDS.map(fieldBuff)).includes("秽息盾削减值"), false)
 
 assert.equal(
     fieldBuff(FIELD_BUFF_IDS.zhongmu).description.zhCN,
@@ -274,6 +306,41 @@ approx(
     cuixinAttack.outOfCombat.panel.atk * 0.1,
     "Cuixin should grant Attack agents 10% of out-of-combat ATK",
 )
+
+const zhishuangAttack = calculateAttackBasic(FIELD_BUFF_IDS.zhishuang)
+approx(
+    zhishuangAttack.inCombat.panel.atk - zhishuangAttack.outOfCombat.panel.atk,
+    zhishuangAttack.outOfCombat.panel.atk * 0.25,
+    "Zhishuang should grant Attack agents 25% of out-of-combat ATK",
+)
+approx(zhishuangAttack.damage.multipliers.stun, 1.9, "Zhishuang should add 40% stun vulnerability")
+const zhishuangRules = fieldBuff(FIELD_BUFF_IDS.zhishuang).effects
+    .filter(effect => effect.stat === "iceResIgnore" || effect.stat === "etherResIgnore")
+assert.deepEqual(zhishuangRules.map(effect => effect.stat), ["iceResIgnore", "etherResIgnore"])
+assert.ok(zhishuangRules.every(effect => effect.requirement?.specialty === "attack"))
+assert.equal(zhishuangRules.filter(effect => effect.target?.skillTargets?.some(target => target.skillType === "special")).length, 2)
+
+const pojingSheer = calculateInCombatPanel(catalog, {
+    agentId: "yixuan",
+    wEngineId: "zzz_wiki_1342",
+    combatBuffs: {
+        activeBuffIds: [FIELD_BUFF_IDS.pojing],
+        runtimeInputs: {},
+    },
+    damage: {
+        selectedEventId: "pojing-sheer",
+        events: [{
+            id: "pojing-sheer",
+            kind: "sheer",
+            damageElement: "ether",
+            skillMultiplier: 100,
+            critMode: "nonCrit",
+            stunned: true,
+        }],
+        target: { defense: 953, levelCoefficient: 794 },
+    },
+})
+approx(pojingSheer.damage.multipliers.sheerDamage, 1.15, "Pojing should grant Rupture agents 15% sheer damage")
 approx(
     cuixinAttack.inCombat.panel.critDmg - cuixinAttack.outOfCombat.panel.critDmg,
     0.3,
