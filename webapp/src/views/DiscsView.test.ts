@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import DiscsView from "@/views/DiscsView.vue"
 import { useAppConfigStore } from "@/stores/app-config"
 import { useInventoryStore } from "@/stores/inventory"
+import { normalizeInventoryStore } from "@core/inventory-model.js"
 
 const catalogFixture = vi.hoisted(() => ({
   catalog: {
@@ -15,6 +16,10 @@ const catalogFixture = vi.hoisted(() => ({
       id: "swing_jazz",
       name: { zhCN: "摇摆爵士" },
       images: { icon: "/assets/drive-discs/swing_jazz.webp" },
+    }, {
+      id: "scanner-set-48ee0a14625f",
+      name: { zhCN: "折枝剑歌" },
+      images: { icon: "/assets/drive-discs/branch_blade_song.webp" },
     }],
   },
   meta: {
@@ -77,6 +82,13 @@ const catalogFixture = vi.hoisted(() => ({
   },
 }))
 
+const messageFixture = vi.hoisted(() => ({
+  info: vi.fn(),
+  success: vi.fn(),
+  warning: vi.fn(),
+  error: vi.fn(),
+}))
+
 vi.mock("@runtime/catalog-loader.js", () => ({
   loadCatalog: vi.fn(async () => catalogFixture.catalog),
   loadMeta: vi.fn(async () => catalogFixture.meta),
@@ -88,9 +100,9 @@ vi.mock("naive-ui", () => ({
     template: "<aside role=\"alert\"><strong>{{ title }}</strong><slot /></aside>",
   },
   NButton: {
-    props: ["disabled", "type"],
+    props: ["disabled", "type", "loading"],
     emits: ["click"],
-    template: "<button :disabled=\"disabled\" :data-button-type=\"type || undefined\" @click=\"$emit('click', $event)\"><slot name=\"icon\" /><slot /></button>",
+    template: "<button :disabled=\"disabled\" :data-button-type=\"type || undefined\" :data-loading=\"loading || undefined\" @click=\"$emit('click', $event)\"><slot name=\"icon\" /><slot /></button>",
   },
   NCheckbox: {
     props: ["checked", "disabled"],
@@ -147,12 +159,7 @@ vi.mock("naive-ui", () => ({
   NTag: {
     template: "<span><slot /></span>",
   },
-  useMessage: () => ({
-    info: vi.fn(),
-    success: vi.fn(),
-    warning: vi.fn(),
-    error: vi.fn(),
-  }),
+  useMessage: () => messageFixture,
 }))
 
 function seedInventory(driveDiscs: any[], driveDiscLoadouts: any[] = []) {
@@ -232,6 +239,7 @@ function driveDisc(slot: number, overrides: any = {}) {
 
 describe("DiscsView", () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     localStorage.clear()
   })
 
@@ -612,6 +620,233 @@ describe("DiscsView", () => {
       { stat: "anomalyProficiency", value: 9 },
       { stat: "atkFlat", value: 19 },
     ])
+  })
+
+  it("saves cloneable scanner-disc edits and leaves unrelated browser data unchanged", async () => {
+    const rawScan = {
+      序号: 1,
+      名称: "折枝剑歌",
+      槽位: 2,
+      品质: "S",
+      等级: 15,
+    }
+    const initialStore = normalizeInventoryStore({
+      version: 1,
+      updatedAt: "2026-08-01T00:00:00.000Z",
+      currentOwnerId: "default",
+      owners: [
+        { id: "default", label: "默认用户" },
+        { id: "alt", label: "二号账号" },
+      ],
+      imports: [{ id: "scanner-import-1", ownerId: "default", itemCount: 2 }],
+      driveDiscs: [{
+        id: "scanner-fold-disc",
+        ownerId: "default",
+        setId: "scanner-set-48ee0a14625f",
+        setName: "折枝剑歌",
+        canonicalSetName: { zhCN: "折枝剑歌" },
+        partition: 2,
+        rarity: "S",
+        level: 15,
+        maxLevel: 15,
+        mainStat: { stat: "atkFlat", value: 316 },
+        subStats: [
+          { stat: "hpFlat", value: 224 },
+          { stat: "anomalyProficiency", value: 9 },
+          { stat: "critRate", value: 4.8 },
+          { stat: "atkPct", value: 15 },
+        ],
+        equippedBy: "agent-a",
+        locked: false,
+        reservedForAgentId: "agent-a",
+        excludedForAgentIds: ["agent-b"],
+        source: { type: "zzz-scanner", importId: "scanner-import-1", sequence: 1 },
+        raw: rawScan,
+        futureDiscField: { preserve: true },
+      }, {
+        id: "untouched-default-disc",
+        ownerId: "default",
+        setId: "swing_jazz",
+        setName: "摇摆爵士",
+        canonicalSetName: { zhCN: "摇摆爵士" },
+        partition: 1,
+        rarity: "S",
+        level: 15,
+        maxLevel: 15,
+        mainStat: { stat: "hpFlat", value: 2200 },
+        subStats: [],
+        locked: true,
+      }, {
+        id: "untouched-alt-disc",
+        ownerId: "alt",
+        setId: "woodpecker_electro",
+        setName: "啄木鸟电音",
+        canonicalSetName: { zhCN: "啄木鸟电音" },
+        partition: 3,
+        rarity: "S",
+        level: 15,
+        maxLevel: 15,
+        mainStat: { stat: "defFlat", value: 184 },
+        subStats: [],
+        locked: false,
+      }],
+      driveDiscLoadouts: [{
+        id: "saved-loadout",
+        ownerId: "default",
+        name: "原有预设",
+        driveDiscIdsBySlot: { 1: "untouched-default-disc", 2: "scanner-fold-disc" },
+      }],
+      futureStoreField: { preserve: true },
+    })
+    localStorage.setItem("zzz-calculator.userStore.v1", JSON.stringify(initialStore))
+    localStorage.setItem("zzz-calculator.save-regression-sentinel", "preserve-me")
+
+    const wrapper = await mountView()
+    const inventoryStore = useInventoryStore()
+    const originalSaveDisc = inventoryStore.saveDisc
+    let submitted: any = null
+    const saveSpy = vi.spyOn(inventoryStore, "saveDisc").mockImplementation(async input => {
+      submitted = input
+      expect(() => structuredClone(input)).not.toThrow()
+      await originalSaveDisc(input)
+    })
+    const before = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
+    const untouchedDefaultBefore = structuredClone(before.driveDiscs.find((disc: any) => disc.id === "untouched-default-disc"))
+    const untouchedAltBefore = structuredClone(before.driveDiscs.find((disc: any) => disc.id === "untouched-alt-disc"))
+    const targetRow = wrapper.findAll("tbody tr").find(row => row.text().includes("折枝剑歌"))
+    expect(targetRow).toBeTruthy()
+
+    await targetRow!.trigger("click")
+    const modal = wrapper.find(".test-modal")
+    await modal.find('[aria-label="驱动盘套装"]').setValue("swing_jazz")
+    await modal.find('[aria-label="驱动盘位置"]').setValue("4")
+    await flushPromises()
+    await modal.find('[aria-label="驱动盘等级"]').setValue("14")
+    await modal.find('[aria-label="驱动盘主词条"]').setValue("critDmg")
+    await modal.find('[aria-label="驱动盘主词条数值"]').setValue("48")
+    await modal.find('input[type="checkbox"]').setValue(true)
+    await setSubStat(wrapper, 0, "defFlat", 3)
+    await setSubStat(wrapper, 1, "anomalyProficiency", 3)
+
+    expect(wrapper.find('[aria-label="副词条 1 换算结果"]').text()).toBe("45")
+    expect(wrapper.find('[aria-label="副词条 2 换算结果"]').text()).toBe("27")
+    await button(wrapper, "保存").trigger("click")
+    await flushPromises()
+
+    expect(saveSpy).toHaveBeenCalledTimes(1)
+    expect(wrapper.find(".test-modal").exists()).toBe(false)
+    expect(submitted).toMatchObject({
+      id: "scanner-fold-disc",
+      ownerId: "default",
+      setId: "swing_jazz",
+      setName: "摇摆爵士",
+      canonicalSetName: { zhCN: "摇摆爵士" },
+      level: 14,
+      mainStat: { stat: "critDmg", value: 48 },
+      locked: true,
+      source: { type: "zzz-scanner", importId: "scanner-import-1", sequence: 1 },
+      raw: rawScan,
+      futureDiscField: { preserve: true },
+      subStats: [
+        { stat: "defFlat", value: 45 },
+        { stat: "anomalyProficiency", value: 27 },
+        { stat: "critRate", value: 4.8 },
+        { stat: "atkPct", value: 15 },
+      ],
+    })
+
+    const after = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "{}")
+    const saved = after.driveDiscs.find((disc: any) => disc.id === "scanner-fold-disc")
+    expect(saved).toMatchObject({
+      id: "scanner-fold-disc",
+      ownerId: "default",
+      setId: "swing_jazz",
+      setName: "摇摆爵士",
+      canonicalSetName: { zhCN: "摇摆爵士" },
+      partition: 4,
+      level: 14,
+      mainStat: { stat: "critDmg", value: 48 },
+      locked: true,
+      equippedBy: "agent-a",
+      reservedForAgentId: "agent-a",
+      excludedForAgentIds: ["agent-b"],
+      source: { type: "zzz-scanner", importId: "scanner-import-1", sequence: 1 },
+      raw: rawScan,
+      futureDiscField: { preserve: true },
+    })
+    expect(saved.subStats).toEqual([
+      { stat: "defFlat", value: 45 },
+      { stat: "anomalyProficiency", value: 27 },
+      { stat: "critRate", value: 4.8 },
+      { stat: "atkPct", value: 15 },
+    ])
+    expect(after.driveDiscs.find((disc: any) => disc.id === "untouched-default-disc")).toEqual(untouchedDefaultBefore)
+    expect(after.driveDiscs.find((disc: any) => disc.id === "untouched-alt-disc")).toEqual(untouchedAltBefore)
+    expect(after.owners).toEqual(before.owners)
+    expect(after.imports).toEqual(before.imports)
+    expect(after.driveDiscLoadouts).toEqual(before.driveDiscLoadouts)
+    expect(after.futureStoreField).toEqual(before.futureStoreField)
+    expect(localStorage.getItem("zzz-calculator.save-regression-sentinel")).toBe("preserve-me")
+
+    const savedRow = wrapper.findAll("tbody tr").find(row => row.text().includes("摇摆爵士") && row.text().includes("#1"))
+    expect(savedRow).toBeTruthy()
+    await savedRow!.trigger("click")
+    expect(wrapper.find('[aria-label="驱动盘等级"]').attributes("value")).toBe("14")
+    expect(wrapper.find('[aria-label="副词条 1 词条数"]').attributes("value")).toBe("3")
+    expect(wrapper.find('[aria-label="副词条 2 词条数"]').attributes("value")).toBe("3")
+    expect(wrapper.find('.test-modal input[type="checkbox"]').attributes()).toHaveProperty("checked")
+  })
+
+  it("keeps the editor draft and reports the reason when saving fails", async () => {
+    seedInventory([{
+      id: "disc-save-failure",
+      ownerId: "default",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      canonicalSetName: { zhCN: "啄木鸟电音" },
+      partition: 5,
+      rarity: "S",
+      level: 15,
+      maxLevel: 15,
+      mainStat: { stat: "fireDmg", value: 30 },
+      subStats: [
+        { stat: "critRate", value: 7.2 },
+        { stat: "critDmg", value: 28.8 },
+        { stat: "anomalyProficiency", value: 9 },
+        { stat: "atkFlat", value: 19 },
+      ],
+    }])
+    const wrapper = await mountView()
+    const inventoryStore = useInventoryStore()
+    let rejectSave!: (reason: Error) => void
+    const pendingSave = new Promise<void>((_resolve, reject) => {
+      rejectSave = reject
+    })
+    const saveSpy = vi.spyOn(inventoryStore, "saveDisc").mockReturnValue(pendingSave)
+
+    await wrapper.find("tbody tr").trigger("click")
+    await wrapper.find('[aria-label="驱动盘等级"]').setValue("14")
+    await button(wrapper, "保存").trigger("click")
+
+    expect(saveSpy).toHaveBeenCalledTimes(1)
+    expect(button(wrapper, "保存").attributes()).toMatchObject({ disabled: "", "data-loading": "true" })
+    await button(wrapper, "保存").trigger("click")
+    expect(saveSpy).toHaveBeenCalledTimes(1)
+
+    rejectSave(new Error("浏览器数据库事务失败。"))
+    await flushPromises()
+
+    expect(messageFixture.error).toHaveBeenCalledWith("保存驱动盘失败：浏览器数据库事务失败。")
+    expect(wrapper.find(".test-modal").exists()).toBe(true)
+    expect(wrapper.find('[aria-label="驱动盘等级"]').attributes("value")).toBe("14")
+    expect(button(wrapper, "保存").attributes()).not.toHaveProperty("disabled")
+    expect(button(wrapper, "保存").attributes()).not.toHaveProperty("data-loading")
+
+    saveSpy.mockResolvedValueOnce(undefined)
+    await button(wrapper, "保存").trigger("click")
+    await flushPromises()
+    expect(saveSpy).toHaveBeenCalledTimes(2)
+    expect(wrapper.find(".test-modal").exists()).toBe(false)
   })
 
   it("blocks non-S records without changing stored data", async () => {
