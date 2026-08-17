@@ -44,6 +44,7 @@ const ROLL_EPSILON = 1e-6
 const selectedDisc = ref<any | null>(null)
 const showDiscEditor = ref(false)
 const discDraft = ref<any>({ mainStat: {}, subStats: [] })
+const discSaving = ref(false)
 const confirmDelete = ref(false)
 const showDiscReservation = ref(false)
 const reservationDisc = ref<any | null>(null)
@@ -720,21 +721,38 @@ function openEditDisc(disc: any) {
 }
 
 async function saveDisc() {
+  if (discSaving.value) {
+    return
+  }
   const validationMessage = validateDiscDraft()
   if (validationMessage) {
     message.error(validationMessage)
     return
   }
-  const set = catalogStore.driveDiscSets.find((item: any) => item.id === discDraft.value.setId)
-  await inventoryStore.saveDisc({
-    ...discDraft.value,
-    rarity: "S",
-    maxLevel: 15,
-    setName: discDraft.value.setName || labelOf(set),
-    subStats: (discDraft.value.subStats ?? []).map((item: any) => storedSubStat(item)),
-  })
-  showDiscEditor.value = false
-  selectedDisc.value = null
+  discSaving.value = true
+  try {
+    const draft = JSON.parse(JSON.stringify(discDraft.value))
+    const set = catalogStore.driveDiscSets.find((item: any) => item.id === draft.setId)
+    const setChanged = Boolean(selectedDisc.value)
+      && String(selectedDisc.value?.setId ?? "") !== String(draft.setId ?? "")
+    if (setChanged && set?.name) {
+      draft.canonicalSetName = JSON.parse(JSON.stringify(set.name))
+    }
+    await inventoryStore.saveDisc({
+      ...draft,
+      rarity: "S",
+      maxLevel: 15,
+      setName: setChanged ? labelOf(set) || draft.setName : draft.setName || labelOf(set),
+      subStats: (draft.subStats ?? []).map((item: any) => storedSubStat(item)),
+    })
+    showDiscEditor.value = false
+    selectedDisc.value = null
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error ?? "")
+    message.error(`保存驱动盘失败：${reason || "未知错误"}`)
+  } finally {
+    discSaving.value = false
+  }
 }
 
 watch(() => discDraft.value.partition, slot => {
@@ -1286,7 +1304,7 @@ function confirmDangerImport() {
       <div class="drawer-footer">
         <NButton @click="showDiscEditor = false">取消</NButton>
         <NButton v-if="selectedDisc" type="error" @click="confirmDelete = true">删除</NButton>
-        <NButton type="primary" :disabled="Boolean(discEditorValidationMessage)" @click="saveDisc">保存</NButton>
+        <NButton type="primary" :loading="discSaving" :disabled="discSaving || Boolean(discEditorValidationMessage)" @click="saveDisc">保存</NButton>
       </div>
     </template>
   </NModal>
