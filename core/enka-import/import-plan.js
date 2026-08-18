@@ -73,6 +73,23 @@ function fieldDisplay(value) {
   return String(value)
 }
 
+function configuredManualDriveDiscIdsBySlot(config) {
+  return config?.manualDriveDiscIdsBySlot
+    ?? config?.manualDriveDiscsBySlot
+    ?? config?.driveDiscIdsBySlot
+    ?? {}
+}
+
+function cleanIdsBySlot(value) {
+  return Object.fromEntries(Object.entries(value ?? {})
+    .map(([slot, id]) => [String(slot), String(id ?? "").trim()])
+    .filter(([, id]) => Boolean(id)))
+}
+
+function slotCount(value) {
+  return Object.keys(cleanIdsBySlot(value)).length
+}
+
 function mergeAgentConfig(currentConfig, agent, driveResult) {
   const current = clone(currentConfig ?? {}) ?? {}
   const next = clone(current)
@@ -151,6 +168,31 @@ function mergeAgentConfig(currentConfig, agent, driveResult) {
   if (driveResult?.hasUsableLoadout) {
     applyField("discMode", "驱动盘模式", "loadout")
     applyField("selectedLoadoutId", "驱动盘配装", driveResult.loadoutId)
+    const currentManualIds = cleanIdsBySlot(configuredManualDriveDiscIdsBySlot(current))
+    const nextManualIds = cleanIdsBySlot(driveResult.driveDiscIdsBySlot)
+    const mirrorsChanged = !sameValue(current.manualDriveDiscIdsBySlot ?? null, nextManualIds)
+      || (Object.prototype.hasOwnProperty.call(current, "manualDriveDiscsBySlot")
+        && !sameValue(current.manualDriveDiscsBySlot, nextManualIds))
+      || (Object.prototype.hasOwnProperty.call(current, "driveDiscIdsBySlot")
+        && !sameValue(current.driveDiscIdsBySlot, nextManualIds))
+    next.manualDriveDiscIdsBySlot = clone(nextManualIds)
+    if (Object.prototype.hasOwnProperty.call(current, "manualDriveDiscsBySlot")) {
+      next.manualDriveDiscsBySlot = clone(nextManualIds)
+    }
+    if (Object.prototype.hasOwnProperty.call(current, "driveDiscIdsBySlot")) {
+      next.driveDiscIdsBySlot = clone(nextManualIds)
+    }
+    if (mirrorsChanged) {
+      const clearedSlots = [1, 2, 3, 4, 5, 6]
+        .filter(slot => currentManualIds[String(slot)] && !nextManualIds[String(slot)])
+      changes.push({
+        field: "manualDriveDiscIdsBySlot",
+        label: "自选套装",
+        before: `原 ${slotCount(currentManualIds)}/6`,
+        after: `展柜 ${slotCount(nextManualIds)}/6${clearedSlots.length ? `（清空 ${clearedSlots.join("、")} 号位）` : ""}`,
+        clearedSlots,
+      })
+    }
     if (driveResult.changed) {
       changes.push({
         field: "driveDiscLoadout",
@@ -198,6 +240,27 @@ function configsSnapshot(document, ownerId, agentIds) {
         : null,
     ])),
   }
+}
+
+function configDriveDiscReferences(document, ownerId, agentIds) {
+  const selection = ownerSelection(document, ownerId)
+  const driveDiscIds = new Set()
+  const loadoutIds = new Set()
+  for (const agentId of agentIds) {
+    const config = selection.byAgent?.[agentId]
+    if (!config || typeof config !== "object") continue
+    for (const field of ["manualDriveDiscIdsBySlot", "manualDriveDiscsBySlot", "driveDiscIdsBySlot"]) {
+      for (const id of Object.values(config[field] ?? {})) {
+        const normalized = String(id ?? "").trim()
+        if (normalized) driveDiscIds.add(normalized)
+      }
+    }
+    for (const field of ["selectedLoadoutId", "loadoutId"]) {
+      const normalized = String(config[field] ?? "").trim()
+      if (normalized) loadoutIds.add(normalized)
+    }
+  }
+  return { driveDiscIds: [...driveDiscIds], loadoutIds: [...loadoutIds] }
 }
 
 function inventorySnapshot(store, ownerId, discIds, loadoutIds) {
@@ -281,8 +344,22 @@ export function buildEnkaImportPlan({
     undoJournal: null,
   }))
 
-  const discIds = changedOwnerItems(store.driveDiscs, nextStore.driveDiscs, ownerId)
-  const loadoutIds = changedOwnerItems(store.driveDiscLoadouts, nextStore.driveDiscLoadouts, ownerId)
+  const changedDriveDiscIds = changedOwnerItems(store.driveDiscs, nextStore.driveDiscs, ownerId)
+  const changedLoadoutIds = changedOwnerItems(store.driveDiscLoadouts, nextStore.driveDiscLoadouts, ownerId)
+  const referenceSets = [
+    configDriveDiscReferences(buildSelection, ownerId, selectedAgentIds),
+    configDriveDiscReferences(legacySelection, ownerId, selectedAgentIds),
+    configDriveDiscReferences(nextBuildSelection, ownerId, selectedAgentIds),
+    configDriveDiscReferences(nextLegacySelection, ownerId, selectedAgentIds),
+  ]
+  const affectedDriveDiscIds = [...new Set([
+    ...changedDriveDiscIds,
+    ...referenceSets.flatMap(item => item.driveDiscIds),
+  ])]
+  const affectedLoadoutIds = [...new Set([
+    ...changedLoadoutIds,
+    ...referenceSets.flatMap(item => item.loadoutIds),
+  ])]
   const journal = {
     version: 1,
     id: transactionId,
@@ -291,20 +368,22 @@ export function buildEnkaImportPlan({
     status: "prepared",
     createdAt: importedAt,
     affectedAgentIds: selectedAgentIds,
-    affectedDriveDiscIds: discIds,
-    affectedLoadoutIds: loadoutIds,
+    changedDriveDiscIds,
+    changedLoadoutIds,
+    affectedDriveDiscIds,
+    affectedLoadoutIds,
     baseFingerprint: {
       store: jsonFingerprint(store),
       buildSelection: jsonFingerprint(buildSelection),
       legacySelection: jsonFingerprint(legacySelection),
     },
     before: {
-      inventory: inventorySnapshot(store, ownerId, discIds, loadoutIds),
+      inventory: inventorySnapshot(store, ownerId, affectedDriveDiscIds, affectedLoadoutIds),
       buildConfigs: configsSnapshot(buildSelection, ownerId, selectedAgentIds),
       legacyConfigs: configsSnapshot(legacySelection, ownerId, selectedAgentIds),
     },
     after: {
-      inventory: inventorySnapshot(nextStore, ownerId, discIds, loadoutIds),
+      inventory: inventorySnapshot(nextStore, ownerId, affectedDriveDiscIds, affectedLoadoutIds),
       buildConfigs: configsSnapshot(nextBuildSelection, ownerId, selectedAgentIds),
       legacyConfigs: configsSnapshot(nextLegacySelection, ownerId, selectedAgentIds),
     },
@@ -328,7 +407,7 @@ export function buildEnkaImportPlan({
     nextLegacySelection,
     journal,
     changeCount: agents.reduce((sum, agent) => sum + agent.changes.length, 0)
-      + discIds.length + loadoutIds.length + (binding ? 0 : 1),
+      + changedDriveDiscIds.length + changedLoadoutIds.length + (binding ? 0 : 1),
   }
 }
 

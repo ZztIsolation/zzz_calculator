@@ -53,6 +53,17 @@ function loadoutSignature(loadout) {
   }
 }
 
+function isLegacyAutomaticLoadoutName(name) {
+  const normalized = String(name ?? "").trim()
+  return normalized === "Enka 当前装备" || /^Enka 当前装备 - .+$/.test(normalized)
+}
+
+function showcaseLoadoutName(existingName, agentName) {
+  const normalized = String(existingName ?? "").trim()
+  if (normalized && !isLegacyAutomaticLoadoutName(normalized)) return existingName
+  return `展柜佩戴套装 - ${agentName}`
+}
+
 function legacyEquipmentUid(id) {
   const match = /^enka-(?!zzz:)(.+)$/.exec(String(id ?? ""))
   return match?.[1] ?? ""
@@ -240,14 +251,19 @@ export function buildDriveDiscSyncPlan({
       migratedDiscs: migrated.migrations.driveDiscs.filter(item => item.agentId === agent.agentId),
       migratedLoadouts: migrated.migrations.loadouts.filter(item => item.agentId === agent.agentId),
     }
-    const canSynchronize = sourceCount === 0 || presetDiscs.length > 0
+    const canSynchronize = presetDiscs.length > 0
     if (!canSynchronize) {
+      const reason = sourceCount === 0
+        ? "展柜未返回驱动盘，已保留原库存和配装。"
+        : "原始驱动盘存在，但没有可安全导入的盘，已保留原库存和配装。"
       results.push({
         agentId: agent.agentId,
         agentName: agent.agentName,
+        driveDiscIdsBySlot: {},
+        hasUsableLoadout: false,
         changed: operations.migratedDiscs.length > 0 || operations.migratedLoadouts.length > 0,
         skipped: true,
-        reason: "原始驱动盘存在，但没有可安全导入的盘，已保留原配装。",
+        reason,
         operations,
       })
       continue
@@ -261,6 +277,8 @@ export function buildDriveDiscSyncPlan({
       results.push({
         agentId: agent.agentId,
         agentName: agent.agentName,
+        driveDiscIdsBySlot: {},
+        hasUsableLoadout: false,
         changed: operations.migratedDiscs.length > 0 || operations.migratedLoadouts.length > 0,
         skipped: true,
         reason: "ID 冲突",
@@ -299,11 +317,18 @@ export function buildDriveDiscSyncPlan({
     const desiredIds = new Set(presetDiscs
       .map(disc => reconciliation.resolvedIds[String(disc.id)])
       .filter(Boolean))
+    const idsBySlot = Object.fromEntries(presetDiscs.map(disc => [
+      String(disc.partition),
+      reconciliation.resolvedIds[String(disc.id)],
+    ]).filter(([, id]) => Boolean(id)))
 
     if (reconciliation.conflicts.length) {
       results.push({
         agentId: agent.agentId,
         agentName: agent.agentName,
+        loadoutId,
+        driveDiscIdsBySlot: idsBySlot,
+        hasUsableLoadout: false,
         changed: agentChanged,
         skipped: true,
         reason: "存在待确认的疑似同盘",
@@ -324,10 +349,6 @@ export function buildDriveDiscSyncPlan({
       agentChanged = true
     }
 
-    const idsBySlot = Object.fromEntries(presetDiscs.map(disc => [
-      String(disc.partition),
-      reconciliation.resolvedIds[String(disc.id)],
-    ]).filter(([, id]) => Boolean(id)))
     const missingSlots = [1, 2, 3, 4, 5, 6].filter(slot => !idsBySlot[String(slot)])
     if (presetDiscs.length || existingLoadout) {
       const desiredLoadout = {
@@ -335,7 +356,7 @@ export function buildDriveDiscSyncPlan({
         id: loadoutId,
         ownerId,
         agentId: agent.agentId,
-        name: existingLoadout?.name || `Enka 当前装备 - ${agent.agentName}`,
+        name: showcaseLoadoutName(existingLoadout?.name, agent.agentName),
         driveDiscIdsBySlot: idsBySlot,
         status: missingSlots.length ? "incomplete" : "complete",
         missingSlots,
@@ -358,6 +379,7 @@ export function buildDriveDiscSyncPlan({
       agentId: agent.agentId,
       agentName: agent.agentName,
       loadoutId,
+      driveDiscIdsBySlot: idsBySlot,
       hasUsableLoadout: presetDiscs.length > 0,
       changed: agentChanged,
       operations,

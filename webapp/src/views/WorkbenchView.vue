@@ -140,10 +140,21 @@ const canRunOptimization = computed(() => Boolean(
   && luminescenceParametersValid.value,
 ))
 const selectedOptimizedScheme = computed(() => optimizerStore.selectedResult(buildStore.selectedOptimizedRank))
+const currentAgentLoadouts = computed(() => inventoryStore.loadoutsForAgent(buildStore.agentId))
+const selectedLoadout = computed(() => currentAgentLoadouts.value
+  .find((item: any) => item.id === buildStore.selectedLoadoutId))
+const loadoutOptions = computed(() => [
+  { label: "选择套装预设", value: "" },
+  ...currentAgentLoadouts.value.map((item: any) => ({ label: item.name || item.id, value: item.id })),
+])
+const hasMismatchedLoadoutSelection = computed(() => buildStore.discMode === "loadout"
+  && Boolean(buildStore.selectedLoadoutId)
+  && !selectedLoadout.value)
 const selectedDriveDiscs = computed(() => inventoryStore.calculatorDriveDiscs({
   mode: buildStore.discMode,
   idsBySlot: buildStore.manualDriveDiscIdsBySlot,
-  loadoutId: buildStore.selectedLoadoutId,
+  loadoutId: selectedLoadout.value?.id ?? "",
+  agentId: buildStore.agentId,
   optimizedDriveDiscs: selectedOptimizedScheme.value?.driveDiscs ?? [],
 }))
 const selectedDriveDiscRuntimeInputs = computed(() => {
@@ -155,11 +166,6 @@ const selectedDriveDiscRuntimeInputs = computed(() => {
 const selectedBuildOptions = computed(() => ({
   runtimeInputs: selectedDriveDiscRuntimeInputs.value,
 }))
-const selectedLoadout = computed(() => inventoryStore.loadouts.find((item: any) => item.id === buildStore.selectedLoadoutId))
-const loadoutOptions = computed(() => [
-  { label: "选择套装预设", value: "" },
-  ...inventoryStore.loadouts.map((item: any) => ({ label: item.name || item.id, value: item.id })),
-])
 const driveDiscAnalysisInput = computed(() => {
   if (!catalogStore.catalog || !catalogStore.meta || !buildStore.agentId || !buildStore.wEngineId) {
     return null
@@ -1526,11 +1532,19 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 
           <div v-if="buildStore.discMode === 'loadout'" class="drive-disc-mode-control">
             <NSelect
-              :value="buildStore.selectedLoadoutId"
+              :value="selectedLoadout?.id ?? ''"
               :options="loadoutOptions"
               filterable
               @update:value="buildStore.selectLoadout(String($event ?? ''))"
             />
+            <NAlert
+              v-if="hasMismatchedLoadoutSelection"
+              type="warning"
+              :show-icon="false"
+              class="loadout-agent-mismatch-alert"
+            >
+              当前保存的套装不属于该角色，请重新选择该角色的套装。
+            </NAlert>
           </div>
           <OptimizerResultSelector
             v-else-if="buildStore.discMode === 'optimized'"
@@ -2161,6 +2175,10 @@ function complexityText(metrics: any = {}, settings: any = {}) {
 
 .drive-disc-mode-control {
   min-width: 0;
+}
+
+.loadout-agent-mismatch-alert {
+  margin-top: 8px;
 }
 
 .drive-disc-slot-grid {

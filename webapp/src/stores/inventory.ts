@@ -290,6 +290,14 @@ export const useInventoryStore = defineStore("inventory", {
   getters: {
     driveDiscs: state => state.store?.driveDiscs ?? [],
     loadouts: state => state.store?.driveDiscLoadouts ?? [],
+    loadoutsForAgent: state => (agentId: string) => {
+      const normalizedAgentId = String(agentId ?? "")
+      if (!normalizedAgentId) {
+        return []
+      }
+      return (state.store?.driveDiscLoadouts ?? [])
+        .filter((loadout: any) => String(loadout?.agentId ?? "") === normalizedAgentId)
+    },
     imports: state => state.store?.imports ?? [],
     slotCounts: state => {
       const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
@@ -444,6 +452,8 @@ export const useInventoryStore = defineStore("inventory", {
     calculatorDriveDiscs(options: any = {}) {
       const selected = new Map<number, any>()
       const mode = options.mode ?? "loadout"
+      const enforceAgentId = options.agentId !== undefined
+      const agentId = String(options.agentId ?? "")
       const resultDiscs = Array.isArray(options.optimizedDriveDiscs) ? options.optimizedDriveDiscs : []
       if (mode === "optimized" && resultDiscs.length) {
         return resultDiscs.map((disc: any) => toCalculatorDriveDisc(disc)).filter(Boolean)
@@ -458,7 +468,8 @@ export const useInventoryStore = defineStore("inventory", {
         }
       } else if (mode === "loadout") {
         const loadout = options.loadoutId
-          ? this.loadouts.find((item: any) => item.id === options.loadoutId)
+          ? this.loadouts.find((item: any) => item.id === options.loadoutId
+            && (!enforceAgentId || (agentId && String(item?.agentId ?? "") === agentId)))
           : null
         const idsBySlot = loadout?.driveDiscIdsBySlot ?? loadout?.idsBySlot ?? null
         if (idsBySlot) {

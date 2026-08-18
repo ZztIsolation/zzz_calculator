@@ -209,6 +209,68 @@ describe("inventory store", () => {
     expect(store.loadouts[0].status).toBe("incomplete")
   })
 
+  it("isolates loadouts and loadout calculations by their exact agent id", async () => {
+    const store = useInventoryStore()
+    await store.load()
+    await store.saveDisc({
+      id: "disc-a",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 1,
+      mainStat: { stat: "hpFlat", value: 2200 },
+      subStats: [],
+      level: 15,
+    })
+    await store.saveLoadout({
+      id: "loadout-agent-a",
+      name: "角色 A 套装",
+      agentId: "agent-a",
+      driveDiscIdsBySlot: { "1": "disc-a" },
+    })
+    await store.saveLoadout({
+      id: "loadout-agent-b",
+      name: "角色 B 套装",
+      agentId: "agent-b",
+      driveDiscIdsBySlot: { "1": "disc-a" },
+    })
+    store.store.driveDiscLoadouts.push({
+      id: "legacy-unassigned-loadout",
+      name: "缺少角色的旧套装",
+      driveDiscIdsBySlot: { "1": "disc-a" },
+    })
+
+    expect(store.loadoutsForAgent("agent-a").map((item: any) => item.id)).toEqual(["loadout-agent-a"])
+    expect(store.loadoutsForAgent("agent-b").map((item: any) => item.id)).toEqual(["loadout-agent-b"])
+    expect(store.loadoutsForAgent("agent-a ")).toEqual([])
+    expect(store.loadoutsForAgent("")).toEqual([])
+    expect(store.calculatorDriveDiscs({
+      mode: "loadout",
+      loadoutId: "loadout-agent-a",
+      agentId: "agent-a",
+    }).map((disc: any) => disc.id)).toEqual(["disc-a"])
+    expect(store.calculatorDriveDiscs({
+      mode: "loadout",
+      loadoutId: "loadout-agent-a",
+      agentId: "agent-b",
+    })).toEqual([])
+    expect(store.calculatorDriveDiscs({
+      mode: "loadout",
+      loadoutId: "loadout-agent-a",
+      agentId: "agent-a ",
+    })).toEqual([])
+    expect(store.calculatorDriveDiscs({
+      mode: "loadout",
+      loadoutId: "legacy-unassigned-loadout",
+      agentId: "agent-a",
+    })).toEqual([])
+
+    expect(store.loadouts.map((item: any) => item.id)).toEqual([
+      "loadout-agent-a",
+      "loadout-agent-b",
+      "legacy-unassigned-loadout",
+    ])
+  })
+
   it("keeps reservation conflicts atomic and filters known, unknown, and public reservations", async () => {
     const store = useInventoryStore()
     await store.load()

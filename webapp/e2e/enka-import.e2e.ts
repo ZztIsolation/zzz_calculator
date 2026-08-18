@@ -1,6 +1,12 @@
 import { expect, test, type Page } from "@playwright/test"
 
 const uid = "1302309616"
+const showcaseDiscId = `enka-zzz:${uid}:e2e-disc-1`
+const showcaseLoadoutId = `enka-zzz:${uid}:hoshimi_miyabi`
+const showcaseLoadoutName = "展柜佩戴套装 - 星见雅"
+const previousManualDiscId = "manual-before-showcase-import"
+const miyabiHistoryLoadoutName = "星见雅历史套装"
+const ariaHistoryLoadoutName = "爱芮历史套装"
 const agents: any[] = [
   ["hoshimi_miyabi", "星见雅", 6, "F"],
   ["aria", "爱芮", 2, "D"],
@@ -21,7 +27,7 @@ const agents: any[] = [
 agents[0].driveDiscSourceCount = 1
 agents[0].driveDiscPreset = {
   driveDiscs: [{
-    id: `enka-zzz:${uid}:e2e-disc-1`,
+    id: showcaseDiscId,
     setId: "woodpecker_electro",
     setName: "啄木鸟电音",
     partition: 1,
@@ -158,16 +164,64 @@ test("five-agent import requires preview, persists both configs, and can undo", 
   initialStore.owners = initialStore.owners.map((owner: any) => owner.id === initialStore.currentOwnerId
     ? { ...owner, label: "myself" }
     : owner)
+  initialStore.driveDiscs = [{
+    id: previousManualDiscId,
+    ownerId: "default",
+    setId: "swing_jazz",
+    setName: "摇摆爵士",
+    partition: 2,
+    rarity: "S",
+    level: 15,
+    maxLevel: 15,
+    locked: false,
+    equippedBy: "",
+    mainStat: { stat: "atkFlat", value: 316, mode: "flat", label: "攻击力" },
+    subStats: [],
+    source: { type: "manual" },
+  }]
+  initialStore.driveDiscLoadouts = [{
+    id: "miyabi-history-loadout",
+    ownerId: "default",
+    agentId: "hoshimi_miyabi",
+    name: miyabiHistoryLoadoutName,
+    driveDiscIdsBySlot: { 2: previousManualDiscId },
+    source: { type: "manual" },
+  }, {
+    id: "aria-history-loadout",
+    ownerId: "default",
+    agentId: "aria",
+    name: ariaHistoryLoadoutName,
+    driveDiscIdsBySlot: {},
+    source: { type: "manual" },
+  }]
   await writeInventoryStore(page, initialStore)
   await page.goto("/import")
   await expect(page.getByRole("heading", { name: "展柜数据导入" })).toBeVisible()
   await expect(page.locator(".account-chip")).toHaveText("账号 / myself")
   await expect(page.locator(".page-header p")).toContainText("当前账号：myself")
   await expect(page.locator(".page-header p")).not.toContainText("account-")
-  await page.evaluate(() => {
-    localStorage.removeItem("zzz-calculator.webapp.build.v1")
-    localStorage.removeItem("zzz-calculator.homeSelection.v1")
-  })
+  const previousMiyabiConfig = {
+    agentLevel: 40,
+    discMode: "manual",
+    selectedLoadoutId: "miyabi-history-loadout",
+    manualDriveDiscIdsBySlot: { 2: previousManualDiscId },
+    combat: { activeBuffIds: ["keep-before-showcase"] },
+  }
+  const initialBuildSelection = {
+    version: 2,
+    currentOwnerId: "default",
+    byOwner: {
+      default: {
+        currentAgentId: "hoshimi_miyabi",
+        byAgent: { hoshimi_miyabi: previousMiyabiConfig },
+      },
+    },
+  }
+  const initialLegacySelection = structuredClone(initialBuildSelection)
+  await page.evaluate(({ build, legacy }) => {
+    localStorage.setItem("zzz-calculator.webapp.build.v1", JSON.stringify(build))
+    localStorage.setItem("zzz-calculator.homeSelection.v1", JSON.stringify(legacy))
+  }, { build: initialBuildSelection, legacy: initialLegacySelection })
   await page.getByLabel("游戏 UID").fill(uid)
   await page.getByRole("button", { name: "读取展柜" }).click()
   await expect(page.getByLabel(/^选择导入 /)).toHaveCount(5)
@@ -192,8 +246,8 @@ test("five-agent import requires preview, persists both configs, and can undo", 
   await expectNoHorizontalOverflow(page)
   await page.screenshot({ path: "../output/playwright/enka-import-preview-320.png", fullPage: true })
 
-  const beforeConfirm = await page.evaluate(() => localStorage.getItem("zzz-calculator.webapp.build.v1"))
-  expect(beforeConfirm).toBeNull()
+  const beforeConfirm = await page.evaluate(() => JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "null"))
+  expect(beforeConfirm).toEqual(initialBuildSelection)
   await dialog.getByRole("button", { name: "确认导入" }).click()
   const importFeedback = page.locator(".n-message").filter({ hasText: "已导入 5 个角色，库存与配置已同步。" })
   await expect(importFeedback).toBeVisible()
@@ -207,10 +261,18 @@ test("five-agent import requires preview, persists both configs, and can undo", 
     expect(persisted.build.byOwner.default.byAgent[agent.agentId].agentLevel).toBe(60)
     expect(persisted.legacy.byOwner.default.byAgent[agent.agentId].agentLevel).toBe(60)
   }
+  for (const document of [persisted.build, persisted.legacy]) {
+    const config = document.byOwner.default.byAgent.hoshimi_miyabi
+    expect(config.discMode).toBe("loadout")
+    expect(config.selectedLoadoutId).toBe(showcaseLoadoutId)
+    expect(config.manualDriveDiscIdsBySlot).toEqual({ 1: showcaseDiscId })
+    expect(config.combat.activeBuffIds).toEqual(["keep-before-showcase"])
+  }
   let inventory = await readInventoryStore(page)
   expect(inventory.enkaImportState.byOwner.default.binding.uid).toBe(uid)
   expect(inventory.enkaImportState.byOwner.default.undoJournal.status).toBe("committed")
-  expect(inventory.driveDiscs).toHaveLength(1)
+  expect(inventory.driveDiscs).toHaveLength(2)
+  expect(inventory.driveDiscLoadouts.find((loadout: any) => loadout.id === showcaseLoadoutId)?.name).toBe(showcaseLoadoutName)
 
   await page.getByRole("button", { name: "撤销上次导入" }).click()
   const undoFeedback = page.locator(".n-message").filter({ hasText: "最近一次展柜数据导入已撤销。" })
@@ -220,14 +282,69 @@ test("five-agent import requires preview, persists both configs, and can undo", 
     build: JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "null"),
     legacy: JSON.parse(localStorage.getItem("zzz-calculator.homeSelection.v1") || "null"),
   }))
-  for (const agent of agents) {
-    expect(undone.build.byOwner.default.byAgent[agent.agentId]).toBeUndefined()
-    expect(undone.legacy.byOwner.default.byAgent[agent.agentId]).toBeUndefined()
+  for (const document of [undone.build, undone.legacy]) {
+    expect(document.byOwner.default.byAgent.hoshimi_miyabi).toEqual(previousMiyabiConfig)
+    for (const agent of agents.slice(1)) {
+      expect(document.byOwner.default.byAgent[agent.agentId]).toBeUndefined()
+    }
   }
   inventory = await readInventoryStore(page)
   expect(inventory.enkaImportState.byOwner.default.binding).toBeUndefined()
   expect(inventory.enkaImportState.byOwner.default.undoJournal).toBeNull()
-  expect(inventory.driveDiscs).toHaveLength(0)
+  expect(inventory.driveDiscs.map((disc: any) => disc.id)).toEqual([previousManualDiscId])
+  expect(inventory.driveDiscLoadouts.map((loadout: any) => loadout.name)).toEqual([
+    miyabiHistoryLoadoutName,
+    ariaHistoryLoadoutName,
+  ])
+
+  await importFiveAgents(page)
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.goto("/discs")
+  await expect(page.getByText(showcaseLoadoutName, { exact: true })).toBeVisible()
+  await expect(page.getByText(miyabiHistoryLoadoutName, { exact: true })).toBeVisible()
+  await expect(page.getByText(ariaHistoryLoadoutName, { exact: true })).toBeVisible()
+
+  await page.evaluate(loadoutId => {
+    for (const key of ["zzz-calculator.webapp.build.v1", "zzz-calculator.homeSelection.v1"]) {
+      const document = JSON.parse(localStorage.getItem(key) || "null")
+      const config = document?.byOwner?.default?.byAgent?.aria
+      if (!config) continue
+      config.discMode = "loadout"
+      config.selectedLoadoutId = loadoutId
+      localStorage.setItem(key, JSON.stringify(document))
+    }
+  }, showcaseLoadoutId)
+
+  await page.goto("/")
+  await page.getByRole("button", { name: "已有套装", exact: true }).click()
+  const loadoutSelect = page.locator(".drive-disc-mode-control .n-select")
+  await loadoutSelect.click()
+  const openLoadoutOptions = page.locator(".n-base-select-option")
+  await expect(openLoadoutOptions.filter({ hasText: showcaseLoadoutName })).toBeVisible()
+  await expect(openLoadoutOptions.filter({ hasText: miyabiHistoryLoadoutName })).toBeVisible()
+  await expect(openLoadoutOptions.filter({ hasText: ariaHistoryLoadoutName })).toHaveCount(0)
+
+  await page.keyboard.press("Escape")
+  const agentSelect = page.locator(".workbench-left .n-select").first()
+  await agentSelect.click()
+  await agentSelect.locator("input").fill("爱芮")
+  await page.locator(".n-base-select-option").filter({ hasText: "爱芮" }).last().click()
+  await expect(page.locator(".workbench-left .selection-summary-copy strong").first()).toHaveText("爱芮")
+  await page.getByRole("button", { name: "已有套装", exact: true }).click()
+  await expect(page.locator(".loadout-agent-mismatch-alert")).toContainText("当前保存的套装不属于该角色")
+  await expect(page.locator(".drive-disc-workbench-panel .panel-header .n-tag")).toHaveText("0 / 6")
+  await expect(page.getByTestId("open-drive-disc-analysis")).toBeDisabled()
+  await loadoutSelect.click()
+  await expect(openLoadoutOptions.filter({ hasText: ariaHistoryLoadoutName })).toBeVisible()
+  await expect(openLoadoutOptions.filter({ hasText: showcaseLoadoutName })).toHaveCount(0)
+  await expect(openLoadoutOptions.filter({ hasText: miyabiHistoryLoadoutName })).toHaveCount(0)
+  await page.keyboard.press("Escape")
+  const persistedMismatchedLoadoutId = await page.evaluate(() => {
+    const document = JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "null")
+    return document?.byOwner?.default?.byAgent?.aria?.selectedLoadoutId
+  })
+  expect(persistedMismatchedLoadoutId).toBe(showcaseLoadoutId)
+  await page.screenshot({ path: "../output/playwright/showcase-loadouts-by-agent-1440.png", fullPage: true })
 })
 
 test("startup recovery rolls back a prepared transaction with partial configs", async ({ page }) => {

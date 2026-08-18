@@ -49,6 +49,8 @@ import {
 
 const ownerId = "default"
 const uid = "1302309616"
+const showcaseDiscId = `enka-zzz:${uid}:equipment-showcase-1`
+const showcaseLoadoutId = `enka-zzz:${uid}:hoshimi_miyabi`
 const initialConfig = {
   agentLevel: 40,
   combat: { activeBuffIds: ["keep"] },
@@ -86,6 +88,54 @@ function createPlan(transactionId = "tx-test") {
   })
 }
 
+function showcaseDisc() {
+  return {
+    id: showcaseDiscId,
+    ownerId,
+    setId: "woodpecker_electro",
+    setName: "啄木鸟电音",
+    partition: 1,
+    rarity: "S",
+    level: 15,
+    maxLevel: 15,
+    statUnitVersion: 2,
+    locked: true,
+    equippedBy: "hoshimi_miyabi",
+    mainStat: { stat: "hpFlat", value: 2200, mode: "flat", label: "生命值" },
+    subStats: [],
+    source: {
+      type: "enka-zzz-showcase",
+      uid,
+      agentId: "hoshimi_miyabi",
+      equipmentUid: "equipment-showcase-1",
+      equipmentId: "31000",
+    },
+  }
+}
+
+function createShowcasePlan(transactionId = "tx-showcase-discs") {
+  return buildEnkaImportPlan({
+    uid,
+    ownerId,
+    store: clone(memory.store),
+    buildSelection: clone(memory.buildSelection),
+    legacySelection: clone(memory.legacySelection),
+    mappedAgents: [{
+      agentId: "hoshimi_miyabi",
+      agentName: "星见雅",
+      agentLevel: 60,
+      cinemaLevel: 6,
+      coreSkillLevel: "F",
+      skillLevels: { basic: 16 },
+      wEngine: null,
+      driveDiscSourceCount: 1,
+      driveDiscPreset: { driveDiscs: [showcaseDisc()] },
+    }],
+    transactionId,
+    now: new Date("2026-08-18T00:00:00.000Z"),
+  })
+}
+
 beforeEach(() => {
   memory.store = createEmptyInventoryStore()
   memory.buildSelection = selection()
@@ -108,6 +158,57 @@ describe("Enka import transaction", () => {
     expect(memory.buildSelection.byOwner[ownerId].byAgent.hoshimi_miyabi).toEqual(initialConfig)
     expect(memory.store.enkaImportState.byOwner[ownerId].binding).toBeUndefined()
     expect(await hasCommittedEnkaUndo(ownerId)).toBe(false)
+  })
+
+  it("writes the showcase loadout into both manual selections and restores them on undo", async () => {
+    const previousConfig = {
+      ...initialConfig,
+      discMode: "manual",
+      selectedLoadoutId: "manual-loadout-before-import",
+      manualDriveDiscIdsBySlot: { 2: "manual-disc-before-import" },
+    }
+    memory.buildSelection = selection(previousConfig)
+    memory.legacySelection = selection(previousConfig)
+    memory.store.driveDiscs.push({
+      id: "manual-disc-before-import",
+      ownerId,
+      setId: "swing_jazz",
+      setName: "摇摆爵士",
+      partition: 2,
+      rarity: "S",
+      level: 15,
+      maxLevel: 15,
+      mainStat: { stat: "atkFlat", value: 316 },
+      subStats: [],
+      source: { type: "manual" },
+    })
+
+    const plan = createShowcasePlan()
+    const plannedLoadout = plan.nextStore.driveDiscLoadouts.find((loadout: any) => loadout.id === showcaseLoadoutId)
+    expect(plannedLoadout).toMatchObject({
+      name: "展柜佩戴套装 - 星见雅",
+      driveDiscIdsBySlot: { 1: showcaseDiscId },
+    })
+    for (const document of [plan.nextBuildSelection, plan.nextLegacySelection]) {
+      expect(document.byOwner[ownerId].byAgent.hoshimi_miyabi).toMatchObject({
+        discMode: "loadout",
+        selectedLoadoutId: showcaseLoadoutId,
+        manualDriveDiscIdsBySlot: { 1: showcaseDiscId },
+      })
+    }
+
+    await commitEnkaImportPlan(plan)
+    for (const document of [memory.buildSelection, memory.legacySelection]) {
+      expect(document.byOwner[ownerId].byAgent.hoshimi_miyabi.manualDriveDiscIdsBySlot)
+        .toEqual({ 1: showcaseDiscId })
+    }
+    expect(memory.store.enkaImportState.byOwner[ownerId].undoJournal.status).toBe("committed")
+
+    await undoLastEnkaImport(ownerId)
+    expect(memory.buildSelection.byOwner[ownerId].byAgent.hoshimi_miyabi).toEqual(previousConfig)
+    expect(memory.legacySelection.byOwner[ownerId].byAgent.hoshimi_miyabi).toEqual(previousConfig)
+    expect(memory.store.driveDiscs.map((disc: any) => disc.id)).toEqual(["manual-disc-before-import"])
+    expect(memory.store.driveDiscLoadouts).toHaveLength(0)
   })
 
   it("remaps legacy Enka disc and loadout references for every owner config and undoes them", async () => {

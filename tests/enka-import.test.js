@@ -177,6 +177,31 @@ assert.equal(drivePlan.nextStore.driveDiscLoadouts[0].name, "自定义展示名"
 assert.equal(drivePlan.results[0].operations.updated.length, 1)
 assert.equal(drivePlan.results[0].operations.unequipped.length, 1)
 
+for (const preservedInventoryCase of [
+  { label: "零盘", driveDiscSourceCount: 0 },
+  { label: "全部映射失败", driveDiscSourceCount: 2 },
+]) {
+  const preservedInventoryPlan = buildDriveDiscSyncPlan({
+    uid,
+    mappedAgents: [{
+      agentId,
+      agentName: "星见雅",
+      driveDiscSourceCount: preservedInventoryCase.driveDiscSourceCount,
+      driveDiscPreset: null,
+    }],
+    driveDiscState: { ownerId: "default", store: driveStore },
+    now: new Date("2026-08-18T00:15:00.000Z"),
+  })
+  assert.equal(preservedInventoryPlan.changed, false, preservedInventoryCase.label)
+  assert.deepEqual(preservedInventoryPlan.nextStore.driveDiscs, driveStore.driveDiscs, preservedInventoryCase.label)
+  assert.deepEqual(
+    preservedInventoryPlan.nextStore.driveDiscLoadouts,
+    driveStore.driveDiscLoadouts,
+    preservedInventoryCase.label,
+  )
+  assert.equal(preservedInventoryPlan.unequippedDiscs, 0, preservedInventoryCase.label)
+}
+
 const scannerCanonicalId = "scanner-existing-canonical"
 const scannerThenEnkaPlan = buildDriveDiscSyncPlan({
   uid,
@@ -219,6 +244,32 @@ assert.equal(
   scannerThenEnkaPlan.nextStore.driveDiscLoadouts[0].driveDiscIdsBySlot[1],
   scannerCanonicalId,
 )
+assert.deepEqual(scannerThenEnkaPlan.results[0].driveDiscIdsBySlot, { 1: scannerCanonicalId })
+assert.equal(scannerThenEnkaPlan.nextStore.driveDiscLoadouts[0].name, "展柜佩戴套装 - 星见雅")
+
+for (const legacyAutomaticName of ["Enka 当前装备", "Enka 当前装备 - 旧角色名"]) {
+  const automaticNamePlan = buildDriveDiscSyncPlan({
+    uid,
+    mappedAgents: [{
+      agentId,
+      agentName: "星见雅",
+      driveDiscSourceCount: 1,
+      driveDiscPreset: { driveDiscs: [importedDisc(uid, "300", agentId)] },
+    }],
+    driveDiscState: {
+      ownerId: "default",
+      store: {
+        ...scannerThenEnkaPlan.nextStore,
+        driveDiscLoadouts: scannerThenEnkaPlan.nextStore.driveDiscLoadouts.map(loadout => ({
+          ...loadout,
+          name: legacyAutomaticName,
+        })),
+      },
+    },
+    now: new Date("2026-08-18T00:45:00.000Z"),
+  })
+  assert.equal(automaticNamePlan.nextStore.driveDiscLoadouts[0].name, "展柜佩戴套装 - 星见雅")
+}
 
 const legacyStore = {
   ...createEmptyInventoryStore(),
@@ -356,6 +407,186 @@ assert.equal(importPlan.nextBuildSelection.byOwner.default.byAgent.aria.wEngineL
 assert.equal(enkaBindingForOwner(importPlan.nextStore, "default").uid, uid)
 assert.equal(importPlan.nextStore.enkaImportState.byOwner.default.undoJournal.status, "prepared")
 assert.equal(importPlan.agents.length, 2)
+
+const dependencyStore = normalizeInventoryStore({
+  ...scannerThenEnkaPlan.nextStore,
+  driveDiscs: [
+    ...scannerThenEnkaPlan.nextStore.driveDiscs,
+    {
+      ...importedDisc(uid, "manual-old", agentId),
+      id: "manual-old",
+      ownerId: "default",
+      partition: 5,
+      setId: "manual-set-a",
+      setName: "手动套装 A",
+      source: { type: "manual" },
+    },
+    {
+      ...importedDisc(uid, "manual-clear", agentId),
+      id: "manual-clear",
+      ownerId: "default",
+      partition: 6,
+      setId: "manual-set-b",
+      setName: "手动套装 B",
+      source: { type: "manual" },
+    },
+  ],
+  driveDiscLoadouts: [
+    ...scannerThenEnkaPlan.nextStore.driveDiscLoadouts,
+    {
+      id: "previous-loadout",
+      ownerId: "default",
+      agentId,
+      name: "原套装",
+      driveDiscIdsBySlot: { 1: "manual-old", 2: "manual-clear" },
+    },
+  ],
+})
+const manualBefore = { 1: "manual-old", 2: "manual-clear" }
+const dependencySelection = {
+  version: 2,
+  currentOwnerId: "default",
+  byOwner: {
+    default: {
+      currentAgentId: agentId,
+      byAgent: {
+        [agentId]: {
+          discMode: "manual",
+          selectedLoadoutId: "previous-loadout",
+          manualDriveDiscIdsBySlot: manualBefore,
+          manualDriveDiscsBySlot: manualBefore,
+          driveDiscIdsBySlot: manualBefore,
+        },
+      },
+    },
+  },
+}
+const canonicalManualPlan = buildEnkaImportPlan({
+  uid,
+  mappedAgents: [{
+    agentId,
+    agentName: "星见雅",
+    wEngine: null,
+    driveDiscSourceCount: 6,
+    driveDiscPreset: { driveDiscs: [importedDisc(uid, "300", agentId)] },
+  }],
+  store: dependencyStore,
+  ownerId: "default",
+  buildSelection: dependencySelection,
+  legacySelection: structuredClone(dependencySelection),
+  now: new Date("2026-08-18T02:00:00.000Z"),
+  transactionId: "tx-canonical-manual",
+})
+const canonicalManualConfig = canonicalManualPlan.nextBuildSelection.byOwner.default.byAgent[agentId]
+const expectedCanonicalManual = { 1: scannerCanonicalId }
+assert.deepEqual(canonicalManualConfig.manualDriveDiscIdsBySlot, expectedCanonicalManual)
+assert.deepEqual(canonicalManualConfig.manualDriveDiscsBySlot, expectedCanonicalManual)
+assert.deepEqual(canonicalManualConfig.driveDiscIdsBySlot, expectedCanonicalManual)
+assert.equal(canonicalManualConfig.discMode, "loadout")
+assert.equal(canonicalManualConfig.selectedLoadoutId, enkaLoadoutId(uid, agentId))
+assert.deepEqual(canonicalManualPlan.drivePlan.results[0].driveDiscIdsBySlot, expectedCanonicalManual)
+const manualPreview = canonicalManualPlan.agents[0].changes.find(change => change.label === "自选套装")
+assert.equal(manualPreview.before, "原 2/6")
+assert.equal(manualPreview.after, "展柜 1/6（清空 2 号位）")
+assert.deepEqual(manualPreview.clearedSlots, [2])
+assert.deepEqual(canonicalManualPlan.journal.changedDriveDiscIds, [])
+assert.deepEqual(canonicalManualPlan.journal.changedLoadoutIds, [])
+assert.ok(canonicalManualPlan.journal.affectedDriveDiscIds.includes("manual-old"))
+assert.ok(canonicalManualPlan.journal.affectedDriveDiscIds.includes("manual-clear"))
+assert.ok(canonicalManualPlan.journal.affectedDriveDiscIds.includes(scannerCanonicalId))
+assert.ok(canonicalManualPlan.journal.affectedLoadoutIds.includes("previous-loadout"))
+assert.ok(canonicalManualPlan.journal.affectedLoadoutIds.includes(enkaLoadoutId(uid, agentId)))
+assert.equal(
+  canonicalManualPlan.changeCount,
+  canonicalManualPlan.agents[0].changes.length + 1,
+)
+assert.ok(enkaImportSnapshotMatches({
+  store: canonicalManualPlan.nextStore,
+  buildSelection: canonicalManualPlan.nextBuildSelection,
+  legacySelection: canonicalManualPlan.nextLegacySelection,
+  journal: canonicalManualPlan.journal,
+}, "after"))
+const dependencyChangedStore = structuredClone(canonicalManualPlan.nextStore)
+dependencyChangedStore.driveDiscs.find(disc => disc.id === "manual-old").locked = false
+assert.equal(enkaImportSnapshotMatches({
+  store: dependencyChangedStore,
+  buildSelection: canonicalManualPlan.nextBuildSelection,
+  legacySelection: canonicalManualPlan.nextLegacySelection,
+  journal: canonicalManualPlan.journal,
+}, "after"), false)
+const canonicalManualUndone = applyEnkaImportSnapshot({
+  store: canonicalManualPlan.nextStore,
+  buildSelection: canonicalManualPlan.nextBuildSelection,
+  legacySelection: canonicalManualPlan.nextLegacySelection,
+  journal: canonicalManualPlan.journal,
+}, "before")
+assert.deepEqual(
+  canonicalManualUndone.buildSelection.byOwner.default.byAgent[agentId],
+  dependencySelection.byOwner.default.byAgent[agentId],
+)
+
+for (const preservedDriveCase of [
+  { label: "零盘", driveDiscSourceCount: 0 },
+  { label: "全部映射失败", driveDiscSourceCount: 2 },
+]) {
+  const preservedPlan = buildEnkaImportPlan({
+    uid,
+    mappedAgents: [{
+      agentId,
+      agentName: "星见雅",
+      wEngine: null,
+      driveDiscSourceCount: preservedDriveCase.driveDiscSourceCount,
+      driveDiscPreset: null,
+    }],
+    store: createEmptyInventoryStore(),
+    ownerId: "default",
+    buildSelection: dependencySelection,
+    legacySelection: structuredClone(dependencySelection),
+    now: new Date("2026-08-18T02:10:00.000Z"),
+    transactionId: `tx-preserve-${preservedDriveCase.driveDiscSourceCount}`,
+  })
+  const config = preservedPlan.nextBuildSelection.byOwner.default.byAgent[agentId]
+  assert.deepEqual(config.manualDriveDiscIdsBySlot, manualBefore, preservedDriveCase.label)
+  assert.equal(config.discMode, "manual", preservedDriveCase.label)
+  assert.equal(config.selectedLoadoutId, "previous-loadout", preservedDriveCase.label)
+}
+
+const conflictingScannerDisc = normalizeInventoryStore({
+  ...createEmptyInventoryStore(),
+  driveDiscs: [{
+    ...importedDisc(uid, "scanner-shape", agentId),
+    id: "scanner-shape",
+    ownerId: "default",
+    level: 10,
+    maxLevel: 15,
+    statUnitVersion: 2,
+    source: { type: "zzz-scanner", sequence: 1 },
+    subStats: [{ stat: "critRate", value: 2.4, mode: "pct", label: "暴击率" }],
+  }],
+})
+const conflictPlan = buildEnkaImportPlan({
+  uid,
+  mappedAgents: [{
+    agentId,
+    agentName: "星见雅",
+    wEngine: null,
+    driveDiscSourceCount: 1,
+    driveDiscPreset: { driveDiscs: [importedDisc(uid, "conflict-enka", agentId)] },
+  }],
+  store: conflictingScannerDisc,
+  ownerId: "default",
+  buildSelection: dependencySelection,
+  legacySelection: structuredClone(dependencySelection),
+  now: new Date("2026-08-18T02:20:00.000Z"),
+  transactionId: "tx-conflict-preserve",
+})
+assert.equal(conflictPlan.hasUnresolvedConflicts, true)
+assert.equal(conflictPlan.drivePlan.results[0].hasUsableLoadout, false)
+assert.deepEqual(
+  conflictPlan.nextBuildSelection.byOwner.default.byAgent[agentId].manualDriveDiscIdsBySlot,
+  manualBefore,
+)
+assert.equal(conflictPlan.nextBuildSelection.byOwner.default.byAgent[agentId].discMode, "manual")
 const mirrorOnlySelection = {
   version: 2,
   currentOwnerId: "default",

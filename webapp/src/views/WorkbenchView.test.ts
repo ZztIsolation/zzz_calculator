@@ -240,6 +240,21 @@ describe("WorkbenchView optimizer progress", () => {
   })
 })
 
+describe("WorkbenchView drive disc loadout isolation", () => {
+  it("uses the current agent loadouts for options, selection, scoring, and calculation", () => {
+    expect(source).toContain("inventoryStore.loadoutsForAgent(buildStore.agentId)")
+    expect(source).toContain("currentAgentLoadouts.value")
+    expect(source).toContain("loadoutId: selectedLoadout.value?.id ?? \"\"")
+    expect(source).toContain("agentId: buildStore.agentId")
+    expect(source).toContain(":value=\"selectedLoadout?.id ?? ''\"")
+    expect(source).toContain("hasMismatchedLoadoutSelection")
+    expect(source).toContain('buildStore.discMode === "loadout" && selectedLoadout.value?.score')
+    expect(source).toContain("当前保存的套装不属于该角色，请重新选择该角色的套装。")
+    expect(source).not.toContain("inventoryStore.loadouts.find((item: any) => item.id === buildStore.selectedLoadoutId)")
+    expect(source).not.toContain("...inventoryStore.loadouts.map((item: any)")
+  })
+})
+
 describe("WorkbenchView optimizer result details", () => {
   it("uses an immediate top-ten slider selector instead of a rank dropdown", () => {
     expect(source).toContain("OPTIMIZED_RESULT_LIMIT = 10")
