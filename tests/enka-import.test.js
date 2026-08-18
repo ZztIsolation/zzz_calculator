@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 
-import { createEmptyInventoryStore } from "../core/inventory-model.js"
+import { createEmptyInventoryStore, normalizeInventoryStore } from "../core/inventory-model.js"
 import {
   applyEnkaImportSnapshot,
   buildEnkaImportPlan,
@@ -19,7 +19,8 @@ import { cinemaSkillBonus, parseEnkaShowcase } from "../core/enka-import/parse-e
 
 const mapping = JSON.parse(await readFile(new URL("../data/enka_zzz_mapping.json", import.meta.url), "utf8"))
 assert.equal(mapping.source.commit, "dc86b5dc06ad27d26c9a4df9f0b6ffd0417bf554")
-const mappedEquipmentEntry = Object.entries(mapping.driveDiscEquipment)[0]
+const mappedEquipmentEntry = Object.entries(mapping.driveDiscEquipment)
+  .find(([, entry]) => entry.rarity === "S" && entry.levelScale === 0.2)
 const [knownEquipmentId, knownEquipment] = mappedEquipmentEntry
 const catalog = {
   displayAgents: [
@@ -102,6 +103,11 @@ assert.equal(mapped.mappedAgents[0].wEngine.id, "hailfall_star_palace")
 assert.equal(mapped.mappedAgents[0].driveDiscPreset.driveDiscs.length, 1)
 assert.equal(mapped.mappedAgents[0].driveDiscPreset.driveDiscs[0].id, "enka-zzz:1302309616:7038")
 assert.equal(mapped.mappedAgents[0].driveDiscPreset.driveDiscs[0].mainStat.stat, "windDmg")
+assert.equal(mapped.mappedAgents[0].driveDiscPreset.driveDiscs[0].mainStat.value, 30)
+assert.deepEqual(
+  mapped.mappedAgents[0].driveDiscPreset.driveDiscs[0].subStats.map(stat => [stat.stat, stat.value]),
+  [["critRate", 4.8]],
+)
 assert.ok(mapped.warnings.some(warning => /6号位.*未导入/.test(warning)))
 assert.notEqual(enkaDriveDiscId("1302309616", "7038"), enkaDriveDiscId("1300027938", "7038"))
 
@@ -171,6 +177,49 @@ assert.equal(drivePlan.nextStore.driveDiscLoadouts[0].name, "自定义展示名"
 assert.equal(drivePlan.results[0].operations.updated.length, 1)
 assert.equal(drivePlan.results[0].operations.unequipped.length, 1)
 
+const scannerCanonicalId = "scanner-existing-canonical"
+const scannerThenEnkaPlan = buildDriveDiscSyncPlan({
+  uid,
+  mappedAgents: [{
+    agentId,
+    agentName: "星见雅",
+    driveDiscSourceCount: 1,
+    driveDiscPreset: { driveDiscs: [importedDisc(uid, "300", agentId)] },
+  }],
+  driveDiscState: {
+    ownerId: "default",
+    store: {
+      ...createEmptyInventoryStore(),
+      driveDiscs: [{
+        ...importedDisc(uid, "300", agentId),
+        id: scannerCanonicalId,
+        ownerId: "default",
+        locked: false,
+        equippedBy: null,
+        reservedForAgentId: "aria",
+        excludedForAgentIds: ["yixuan"],
+        statUnitVersion: 2,
+        subStats: [{ stat: "critRate", value: 4.8, mode: "pct", label: "暴击率" }],
+        source: { type: "zzz-scanner", sequence: 4 },
+      }],
+    },
+  },
+  now: new Date("2026-08-18T00:30:00.000Z"),
+})
+assert.equal(scannerThenEnkaPlan.addedDiscs, 0)
+assert.equal(scannerThenEnkaPlan.sourceMergedDiscs, 1)
+assert.equal(scannerThenEnkaPlan.nextStore.driveDiscs[0].id, scannerCanonicalId)
+assert.equal(scannerThenEnkaPlan.nextStore.driveDiscs[0].locked, true)
+assert.equal(scannerThenEnkaPlan.nextStore.driveDiscs[0].equippedBy, agentId)
+assert.equal(scannerThenEnkaPlan.nextStore.driveDiscs[0].reservedForAgentId, "aria")
+assert.deepEqual(scannerThenEnkaPlan.nextStore.driveDiscs[0].excludedForAgentIds, ["yixuan"])
+assert.ok(scannerThenEnkaPlan.nextStore.driveDiscs[0].provenance.enkaZzz)
+assert.ok(scannerThenEnkaPlan.nextStore.driveDiscs[0].provenance.scanner)
+assert.equal(
+  scannerThenEnkaPlan.nextStore.driveDiscLoadouts[0].driveDiscIdsBySlot[1],
+  scannerCanonicalId,
+)
+
 const legacyStore = {
   ...createEmptyInventoryStore(),
   driveDiscs: [{
@@ -189,14 +238,20 @@ const legacyStore = {
   }],
 }
 delete legacyStore.driveDiscs[0].source
+delete legacyStore.driveDiscs[0].statUnitVersion
+const normalizedLegacyStore = normalizeInventoryStore(legacyStore)
+assert.equal(normalizedLegacyStore.driveDiscs[0].subStats[0].value, 0.048)
+assert.notEqual(normalizedLegacyStore.driveDiscs[0].statUnitVersion, 2)
 const migrationPlan = buildDriveDiscSyncPlan({
   uid,
   mappedAgents: [{ agentId, agentName: "星见雅", driveDiscSourceCount: null, driveDiscPreset: null }],
-  driveDiscState: { ownerId: "default", store: legacyStore },
+  driveDiscState: { ownerId: "default", store: normalizedLegacyStore },
   now: new Date("2026-08-18T00:00:00.000Z"),
 })
 assert.equal(migrationPlan.migratedDiscs, 1)
 assert.equal(migrationPlan.nextStore.driveDiscs[0].id, enkaDriveDiscId(uid, "200"))
+assert.equal(migrationPlan.nextStore.driveDiscs[0].subStats[0].value, 4.8)
+assert.equal(migrationPlan.nextStore.driveDiscs[0].statUnitVersion, 2)
 assert.equal(migrationPlan.nextStore.driveDiscLoadouts[0].id, enkaLoadoutId(uid, agentId))
 assert.equal(migrationPlan.nextStore.driveDiscLoadouts[0].driveDiscIdsBySlot[1], enkaDriveDiscId(uid, "200"))
 assert.equal(migrationPlan.results[0].operations.migratedDiscs.length, 1)
@@ -301,6 +356,43 @@ assert.equal(importPlan.nextBuildSelection.byOwner.default.byAgent.aria.wEngineL
 assert.equal(enkaBindingForOwner(importPlan.nextStore, "default").uid, uid)
 assert.equal(importPlan.nextStore.enkaImportState.byOwner.default.undoJournal.status, "prepared")
 assert.equal(importPlan.agents.length, 2)
+const mirrorOnlySelection = {
+  version: 2,
+  currentOwnerId: "default",
+  byOwner: {
+    default: {
+      currentAgentId: agentId,
+      byAgent: {
+        [agentId]: {
+          skillLevels: { basic: 12 },
+          damage: { skillLevelsByCategory: { basic: 8 } },
+        },
+      },
+    },
+  },
+}
+const mirrorOnlyPlan = buildEnkaImportPlan({
+  uid,
+  mappedAgents: [{
+    agentId,
+    agentName: "星见雅",
+    skillLevels: { basic: 12 },
+    wEngine: null,
+    driveDiscSourceCount: 0,
+    driveDiscPreset: null,
+  }],
+  store: createEmptyInventoryStore(),
+  ownerId: "default",
+  buildSelection: mirrorOnlySelection,
+  legacySelection: structuredClone(mirrorOnlySelection),
+  now: new Date("2026-08-18T01:30:00.000Z"),
+  transactionId: "tx-mirror-preview",
+})
+assert.ok(mirrorOnlyPlan.agents[0].changes.some(change => change.label === "技能等级同步"))
+assert.deepEqual(
+  mirrorOnlyPlan.nextBuildSelection.byOwner.default.byAgent[agentId].damage.skillLevelsByCategory,
+  { basic: 12 },
+)
 assert.ok(enkaImportSnapshotMatches({
   store: importPlan.nextStore,
   buildSelection: importPlan.nextBuildSelection,

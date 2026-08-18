@@ -97,6 +97,7 @@ function mergeAgentConfig(currentConfig, agent, driveResult) {
         ?? {}),
     }
     for (const [category, level] of skillEntries) nextSkills[category] = level
+    let skillChangeRecorded = false
     if (!sameValue(current.skillLevels ?? current.skillLevelsByCategory ?? {}, nextSkills)) {
       next.skillLevels = nextSkills
       changes.push({
@@ -105,6 +106,7 @@ function mergeAgentConfig(currentConfig, agent, driveResult) {
         before: fieldDisplay(current.skillLevels ?? current.skillLevelsByCategory ?? {}),
         after: fieldDisplay(nextSkills),
       })
+      skillChangeRecorded = true
     }
     if (Object.prototype.hasOwnProperty.call(current, "skillLevelsByCategory")) {
       next.skillLevelsByCategory = clone(nextSkills)
@@ -122,6 +124,21 @@ function mergeAgentConfig(currentConfig, agent, driveResult) {
         ...clone(current.damageConfig),
         skillLevelsByCategory: clone(next.damage.skillLevelsByCategory),
       }
+    }
+    const mirrorsChanged = !sameValue(
+      currentDamage.skillLevelsByCategory ?? {},
+      next.damage.skillLevelsByCategory,
+    ) || (current.damageConfig && typeof current.damageConfig === "object" && !sameValue(
+      current.damageConfig.skillLevelsByCategory ?? {},
+      next.damageConfig.skillLevelsByCategory,
+    ))
+    if (!skillChangeRecorded && mirrorsChanged) {
+      changes.push({
+        field: "skillLevels",
+        label: "技能等级同步",
+        before: fieldDisplay(currentDamage.skillLevelsByCategory ?? {}),
+        after: fieldDisplay(next.damage.skillLevelsByCategory),
+      })
     }
   }
 
@@ -167,12 +184,20 @@ function itemsSnapshot(items, ownerId, ids) {
 
 function configsSnapshot(document, ownerId, agentIds) {
   const selection = ownerSelection(document, ownerId)
-  return Object.fromEntries(agentIds.map(agentId => [
-    agentId,
-    Object.prototype.hasOwnProperty.call(selection.byAgent ?? {}, agentId)
-      ? clone(selection.byAgent[agentId])
-      : null,
-  ]))
+  const ownerPresent = Boolean(document?.byOwner && typeof document.byOwner === "object")
+    ? Object.prototype.hasOwnProperty.call(document.byOwner, ownerId)
+    : ownerId === "default" && Boolean(document && typeof document === "object" && !Array.isArray(document))
+  return {
+    version: 1,
+    ownerPresent,
+    currentAgentId: clone(selection.currentAgentId ?? null),
+    configs: Object.fromEntries(agentIds.map(agentId => [
+      agentId,
+      Object.prototype.hasOwnProperty.call(selection.byAgent ?? {}, agentId)
+        ? clone(selection.byAgent[agentId])
+        : null,
+    ])),
+  }
 }
 
 function inventorySnapshot(store, ownerId, discIds, loadoutIds) {
@@ -194,6 +219,7 @@ export function buildEnkaImportPlan({
   ownerId,
   buildSelection,
   legacySelection,
+  driveDiscResolutions = {},
   now = new Date(),
   transactionId = `enka-${now.getTime()}`,
 }) {
@@ -209,6 +235,7 @@ export function buildEnkaImportPlan({
     uid: normalizedUid,
     mappedAgents,
     driveDiscState: { ownerId, store },
+    resolutions: driveDiscResolutions,
     now,
   })
   const driveByAgent = new Map(drivePlan.results.map(result => [result.agentId, result]))
@@ -294,6 +321,8 @@ export function buildEnkaImportPlan({
     agents,
     warnings: drivePlan.warnings,
     drivePlan,
+    conflicts: drivePlan.conflicts,
+    hasUnresolvedConflicts: drivePlan.hasUnresolvedConflicts,
     nextStore,
     nextBuildSelection,
     nextLegacySelection,
@@ -319,14 +348,20 @@ function replaceOwnerItems(items, ownerId, ids, replacements) {
   ]
 }
 
-function applyConfigSnapshot(document, ownerId, agentIds, configs) {
+function applyConfigSnapshot(document, ownerId, agentIds, snapshot) {
   const selection = ownerSelection(document, ownerId)
+  const structured = snapshot?.version === 1 && snapshot?.configs && typeof snapshot.configs === "object"
+  const configs = structured ? snapshot.configs : snapshot
   const byAgent = { ...(clone(selection.byAgent ?? {}) ?? {}) }
   for (const agentId of agentIds) {
     if (configs?.[agentId] == null) delete byAgent[agentId]
     else byAgent[agentId] = clone(configs[agentId])
   }
-  return withOwnerSelection(document, ownerId, { ...selection, byAgent })
+  return withOwnerSelection(document, ownerId, {
+    ...selection,
+    currentAgentId: structured ? clone(snapshot.currentAgentId ?? null) : selection.currentAgentId ?? null,
+    byAgent,
+  })
 }
 
 export function enkaImportSnapshotMatches({ store, buildSelection, legacySelection, journal }, phase = "after") {

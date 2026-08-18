@@ -181,7 +181,7 @@ describe("ImportView", () => {
     expect(mocks.planEnkaImport).toHaveBeenCalledWith("1302309616", expect.arrayContaining([
       expect.objectContaining({ agentId: "hoshimi_miyabi" }),
       expect.objectContaining({ agentId: "aria" }),
-    ]))
+    ]), {})
     expect(wrapper.get("[data-modal]").text()).toContain("2 个角色 / 2 项更改")
     expect(uidInput.attributes("disabled")).toBeDefined()
 

@@ -19,6 +19,7 @@ import {
     upsertDriveDisc,
     upsertDriveDiscLoadout as upsertInventoryLoadout,
 } from "@core/inventory-model.js"
+import { withDriveDiscImportOwnerLock } from "@runtime/drive-disc-import-lock"
 
 export { driveDiscContentFingerprint, driveDiscIdentityFingerprint, ownerScopedStore }
 
@@ -154,6 +155,10 @@ export function loadUserDriveDiscStore() {
     return pendingStoreLoad
 }
 
+export function loadUserDriveDiscStoreFresh() {
+    return readAndMigratePersistedStore()
+}
+
 export async function clearAllBrowserData() {
     if (dbPromise) {
         try {
@@ -185,7 +190,7 @@ export async function exportCurrentUserDriveDiscs(options = {}) {
     return createDriveDiscExport(await loadUserDriveDiscStore(), options)
 }
 
-export async function saveUserDriveDiscStore(store) {
+export async function saveUserDriveDiscStoreUnlocked(store) {
     const nextStore = {
         ...normalizeInventoryStore(migrateDriveDiscSetAliases(store)),
         updatedAt: new Date().toISOString(),
@@ -194,47 +199,78 @@ export async function saveUserDriveDiscStore(store) {
     return nextStore
 }
 
+export async function saveUserDriveDiscStore(store) {
+    const ownerId = String(store?.currentOwnerId ?? "store")
+    return withDriveDiscImportOwnerLock(ownerId, () => saveUserDriveDiscStoreUnlocked(store))
+}
+
+function mutateUserDriveDiscStore(ownerId, task) {
+    return withDriveDiscImportOwnerLock(String(ownerId ?? "store"), async () => {
+        const store = await loadUserDriveDiscStoreFresh()
+        return task(store)
+    })
+}
+
 export async function accountSummary() {
     return summarizeAccounts(await loadUserDriveDiscStore())
 }
 
 export async function createAccount(account = {}) {
-    const store = await loadUserDriveDiscStore()
-    const result = createInventoryAccount(store, account)
-    const saved = await saveUserDriveDiscStore(result.nextStore)
-    return summarizeAccounts(saved)
+    return mutateUserDriveDiscStore("accounts", async store => {
+        const result = createInventoryAccount(store, account)
+        const saved = await saveUserDriveDiscStoreUnlocked(result.nextStore)
+        return summarizeAccounts(saved)
+    })
 }
 
 export async function updateAccount(id, patch = {}) {
-    const store = await loadUserDriveDiscStore()
-    const result = updateInventoryAccount(store, id, patch)
-    const saved = await saveUserDriveDiscStore(result.nextStore)
-    return summarizeAccounts(saved)
+    return mutateUserDriveDiscStore(id, async store => {
+        const result = updateInventoryAccount(store, id, patch)
+        const saved = await saveUserDriveDiscStoreUnlocked(result.nextStore)
+        return summarizeAccounts(saved)
+    })
 }
 
 export async function switchAccount(id) {
-    const store = await loadUserDriveDiscStore()
-    const result = switchInventoryAccount(store, id)
-    const saved = await saveUserDriveDiscStore(result.nextStore)
-    return summarizeAccounts(saved)
+    return mutateUserDriveDiscStore(id, async store => {
+        const result = switchInventoryAccount(store, id)
+        const saved = await saveUserDriveDiscStoreUnlocked(result.nextStore)
+        return summarizeAccounts(saved)
+    })
 }
 
 export async function deleteAccount(id) {
-    const store = await loadUserDriveDiscStore()
-    const result = deleteInventoryAccount(store, id)
-    const saved = await saveUserDriveDiscStore(result.nextStore)
-    return summarizeAccounts(saved)
+    return mutateUserDriveDiscStore(id, async store => {
+        const result = deleteInventoryAccount(store, id)
+        const saved = await saveUserDriveDiscStoreUnlocked(result.nextStore)
+        return summarizeAccounts(saved)
+    })
 }
 
 export async function previewScannerExportImport(input, options = {}) {
+    return (await planScannerExportImport(input, options)).preview
+}
+
+export async function planScannerExportImport(input, options = {}) {
     const currentStore = await loadUserDriveDiscStore()
-    return buildScannerImportPlan(currentStore, input, options).preview
+    return buildScannerImportPlan(currentStore, input, options)
 }
 
 export async function importScannerExportToStore(input, options = {}) {
-    const currentStore = await loadUserDriveDiscStore()
-    const plan = buildScannerImportPlan(currentStore, input, options)
-    const saved = await saveUserDriveDiscStore(plan.nextStore)
+    const plan = await planScannerExportImport(input, options)
+    if (plan.hasUnresolvedConflicts) {
+        const error = new Error("驱动盘导入存在待确认的疑似同盘，请先预览并处理。")
+        error.code = "DRIVE_DISC_IMPORT_CONFLICT"
+        error.conflicts = plan.reconciliation.conflicts
+        throw error
+    }
+    const {
+        commitDriveDiscImportPlan,
+        freezeDriveDiscInventoryImportPlan,
+    } = await import("@runtime/drive-disc-import-transaction")
+    const frozenPlan = await freezeDriveDiscInventoryImportPlan(plan)
+    await commitDriveDiscImportPlan(frozenPlan)
+    const saved = await loadUserDriveDiscStoreFresh()
     return {
         ...ownerScopedStore(saved, plan.ownerId),
         lastImportSummary: plan.summary,
@@ -242,87 +278,94 @@ export async function importScannerExportToStore(input, options = {}) {
 }
 
 export async function clearUserDriveDiscStore(ownerId = null) {
-    const store = await loadUserDriveDiscStore()
-    const result = clearOwnerInventory(store, ownerId)
-    const saved = await saveUserDriveDiscStore(result.nextStore)
-    return {
-        store: ownerScopedStore(saved, result.ownerId),
-        previous: result.previous,
-    }
+    return mutateUserDriveDiscStore(ownerId, async store => {
+        const result = clearOwnerInventory(store, ownerId)
+        const saved = await saveUserDriveDiscStoreUnlocked(result.nextStore)
+        return {
+            store: ownerScopedStore(saved, result.ownerId),
+            previous: result.previous,
+        }
+    })
 }
 
 export async function upsertUserDriveDisc(driveDisc) {
-    const store = await loadUserDriveDiscStore()
-    const result = upsertDriveDisc(store, driveDisc)
-    const saved = await saveUserDriveDiscStore(result.nextStore)
-    return ownerScopedStore(saved, result.ownerId)
+    return mutateUserDriveDiscStore(driveDisc?.ownerId, async store => {
+        const result = upsertDriveDisc(store, driveDisc)
+        const saved = await saveUserDriveDiscStoreUnlocked(result.nextStore)
+        return ownerScopedStore(saved, result.ownerId)
+    })
 }
 
 export async function deleteUserDriveDisc(id) {
-    const store = await loadUserDriveDiscStore()
-    const result = deleteDriveDisc(store, id)
-    const saved = await saveUserDriveDiscStore(result.nextStore)
-    return {
-        store: ownerScopedStore(saved, result.ownerId),
-        deleted: result.deleted,
-    }
+    return mutateUserDriveDiscStore("store", async store => {
+        const result = deleteDriveDisc(store, id)
+        const saved = await saveUserDriveDiscStoreUnlocked(result.nextStore)
+        return {
+            store: ownerScopedStore(saved, result.ownerId),
+            deleted: result.deleted,
+        }
+    })
 }
 
 export async function setDriveDiscReservations(input = {}) {
-    const store = await loadUserDriveDiscStore()
-    const result = setInventoryDriveDiscReservations(store, input)
-    if (!result.applied) {
+    return mutateUserDriveDiscStore(input.ownerId, async store => {
+        const result = setInventoryDriveDiscReservations(store, input)
+        if (!result.applied) {
+            return {
+                ...result,
+                store: ownerScopedStore(store, result.ownerId),
+            }
+        }
+        const saved = await saveUserDriveDiscStoreUnlocked(result.nextStore)
         return {
             ...result,
-            store: ownerScopedStore(store, result.ownerId),
+            store: ownerScopedStore(saved, result.ownerId),
         }
-    }
-    const saved = await saveUserDriveDiscStore(result.nextStore)
-    return {
-        ...result,
-        store: ownerScopedStore(saved, result.ownerId),
-    }
+    })
 }
 
 export async function setDriveDiscExclusions(input = {}) {
-    const store = await loadUserDriveDiscStore()
-    const result = setInventoryDriveDiscExclusions(store, input)
-    if (!result.applied) {
+    return mutateUserDriveDiscStore(input.ownerId, async store => {
+        const result = setInventoryDriveDiscExclusions(store, input)
+        if (!result.applied) {
+            return {
+                ...result,
+                store: ownerScopedStore(store, result.ownerId),
+            }
+        }
+        const saved = await saveUserDriveDiscStoreUnlocked(result.nextStore)
         return {
             ...result,
-            store: ownerScopedStore(store, result.ownerId),
+            store: ownerScopedStore(saved, result.ownerId),
         }
-    }
-    const saved = await saveUserDriveDiscStore(result.nextStore)
-    return {
-        ...result,
-        store: ownerScopedStore(saved, result.ownerId),
-    }
+    })
 }
 
 export async function upsertDriveDiscLoadout(loadout, options = {}) {
-    const store = await loadUserDriveDiscStore()
-    const result = upsertInventoryLoadout(store, loadout, options)
-    if (!result.applied) {
+    return mutateUserDriveDiscStore(loadout?.ownerId ?? options.ownerId, async store => {
+        const result = upsertInventoryLoadout(store, loadout, options)
+        if (!result.applied) {
+            return {
+                ...result,
+                store: ownerScopedStore(store, result.ownerId),
+            }
+        }
+        const saved = await saveUserDriveDiscStoreUnlocked(result.nextStore)
         return {
             ...result,
-            store: ownerScopedStore(store, result.ownerId),
+            store: ownerScopedStore(saved, result.ownerId),
+            loadout: result.loadout,
         }
-    }
-    const saved = await saveUserDriveDiscStore(result.nextStore)
-    return {
-        ...result,
-        store: ownerScopedStore(saved, result.ownerId),
-        loadout: result.loadout,
-    }
+    })
 }
 
 export async function deleteDriveDiscLoadout(id) {
-    const store = await loadUserDriveDiscStore()
-    const result = deleteInventoryLoadout(store, id)
-    const saved = await saveUserDriveDiscStore(result.nextStore)
-    return {
-        store: ownerScopedStore(saved, result.ownerId),
-        deleted: result.deleted,
-    }
+    return mutateUserDriveDiscStore("store", async store => {
+        const result = deleteInventoryLoadout(store, id)
+        const saved = await saveUserDriveDiscStoreUnlocked(result.nextStore)
+        return {
+            store: ownerScopedStore(saved, result.ownerId),
+            deleted: result.deleted,
+        }
+    })
 }

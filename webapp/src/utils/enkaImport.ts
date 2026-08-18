@@ -38,7 +38,7 @@ export async function currentEnkaBinding(): Promise<{ ownerId: string, binding: 
   return { ownerId, binding: enkaBindingForOwner(store, ownerId) }
 }
 
-export async function planEnkaImport(uid: string, mappedAgents: any[]): Promise<any> {
+export async function planEnkaImport(uid: string, mappedAgents: any[], driveDiscResolutions: Record<string, any> = {}): Promise<any> {
   const store = await loadUserDriveDiscStore()
   const ownerId = String(store?.currentOwnerId ?? "default")
   return buildEnkaImportPlan({
@@ -48,6 +48,7 @@ export async function planEnkaImport(uid: string, mappedAgents: any[]): Promise<
     ownerId,
     buildSelection: readBuildSelectionDocument(),
     legacySelection: readLegacySelectionDocument(),
+    driveDiscResolutions,
     transactionId: crypto.randomUUID(),
     now: new Date(),
   })

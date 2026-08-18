@@ -164,7 +164,12 @@ try {
     assert.deepEqual(importPlan.nextStore.imports.slice(0, currentStore.imports.length), currentStore.imports)
     assert.equal(importPlan.nextStore.imports.at(-1).ownerId, "default")
     assert.equal(importPlan.nextStore.imports.at(-1).type, DRIVE_DISC_EXPORT_FORMAT)
-    assert.deepEqual(importPlan.nextStore.driveDiscs.find(item => item.id === "default-existing"), defaultExisting)
+    const normalizedDefaultExisting = importPlan.nextStore.driveDiscs.find(item => item.id === "default-existing")
+    assert.deepEqual(
+        Object.fromEntries(Object.keys(defaultExisting).map(key => [key, normalizedDefaultExisting[key]])),
+        defaultExisting,
+        "v1 readers must retain every pre-existing base field when v2 optional metadata is added",
+    )
     assert.deepEqual(importPlan.nextStore.driveDiscs.find(item => item.id === "alt-existing"), altExisting)
     assert.ok(importPlan.nextStore.driveDiscs.some(item => item.id === "native-new" && item.ownerId === "default"))
     assert.deepEqual(importPlan.nextStore.driveDiscLoadouts, currentStore.driveDiscLoadouts)

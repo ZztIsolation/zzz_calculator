@@ -325,8 +325,8 @@ describe("inventory store", () => {
     await store.importScannerJson(firstPayload, false)
     const removePreview = await store.previewImportText(firstPayload, true)
     expect(removePreview.summary.skipped).toBe(1)
-    expect(removePreview.summary.removed).toBe(1)
-    expect(removePreview.removed.map((disc: any) => disc.id)).toContain("manual-disc")
+    expect(removePreview.summary.removed).toBe(0)
+    expect(removePreview.removed.map((disc: any) => disc.id)).not.toContain("manual-disc")
   })
 
   it("automatically imports a completed scan session", async () => {
@@ -347,6 +347,45 @@ describe("inventory store", () => {
     expect(store.scanMessage).toContain("扫描导入完成")
     expect(store.driveDiscs).toHaveLength(1)
     expect(store.importPreview.summary.added).toBe(1)
+  })
+
+  it("keeps a scanner conflict review available after closing and reopening the drawer", async () => {
+    const store = useInventoryStore()
+    const reviewSession = {
+      payload: [scannerDisc(1)],
+      plan: { hasUnresolvedConflicts: true, conflicts: [{ key: "conflict-a" }] },
+      importDraft: { payload: [scannerDisc(1)], options: {}, resolutions: {} },
+      preview: { summary: { conflicts: 1 } },
+    }
+    store.scanSession = reviewSession
+    store.scanStatus = "review"
+    store.scanMessage = "请确认疑似同盘"
+
+    store.closeScannerPanel()
+    await store.openScannerPanel()
+
+    expect(store.scanStatus).toBe("review")
+    expect(store.scanSession).toEqual(reviewSession)
+    expect(store.scanMessage).toBe("请确认疑似同盘")
+  })
+
+  it("serializes conflict decisions while rebuilding a frozen import plan", async () => {
+    const store = useInventoryStore()
+    store.importDraft = { payload: [scannerDisc(1)], options: {}, resolutions: {} }
+    let releasePlan!: (plan: any) => void
+    const planPromise = new Promise<any>(resolve => { releasePlan = resolve })
+    const planSpy = vi.spyOn(store, "createFrozenImportPlan").mockReturnValue(planPromise)
+
+    const first = store.resolveImportConflict({ key: "conflict-a", action: "add" })
+    await Promise.resolve()
+    const second = store.resolveImportConflict({ key: "conflict-b", action: "add" })
+
+    expect(store.importResolving).toBe(true)
+    expect(planSpy).toHaveBeenCalledTimes(1)
+    releasePlan({ preview: { summary: {} }, hasUnresolvedConflicts: false })
+    await Promise.all([first, second])
+    expect(store.importResolutions).toEqual({ "conflict-a": { action: "add" } })
+    expect(store.importResolving).toBe(false)
   })
 
   it("launches the helper and polls when the first connection fails", async () => {
@@ -746,7 +785,7 @@ describe("inventory store", () => {
 
     expect(exported.fileName).toBe("zzz-drive-discs-主账号-测试-2026-07-18.json")
     expect(exported.mimeType).toBe("application/json;charset=utf-8")
-    expect(exported.payload.sourceAccount).toEqual({ label: "主账号/测试" })
+    expect(exported.payload.sourceAccount).toEqual({ id: "default", label: "主账号/测试" })
     expect(exported.payload.driveDiscs.map((disc: any) => disc.id)).toEqual(["default-disc"])
     expect(exported.payload.driveDiscs[0]).not.toHaveProperty("ownerId")
     expect(exported.payload.driveDiscs[0]).not.toHaveProperty("contentFingerprint")
@@ -1011,7 +1050,7 @@ describe("inventory store", () => {
     expect(store.driveDiscs).toHaveLength(2)
   })
 
-  it("limits complete-scan deletion to S rank and preserves existing A/B discs", async () => {
+  it("does not delete manual discs during complete Scanner synchronization", async () => {
     const store = useInventoryStore()
     await store.load()
     for (const rarity of ["S", "A", "B"]) {
@@ -1036,7 +1075,7 @@ describe("inventory store", () => {
     await helper.onComplete?.({ items: [scannerDisc(1)], itemCount: 1, completed: 1 })
 
     expect(store.scanStatus).toBe("complete")
-    expect(store.driveDiscs.map((disc: any) => disc.id)).not.toContain("existing-S")
+    expect(store.driveDiscs.map((disc: any) => disc.id)).toContain("existing-S")
     expect(store.driveDiscs.map((disc: any) => disc.id)).toContain("existing-A")
     expect(store.driveDiscs.map((disc: any) => disc.id)).toContain("existing-B")
   })

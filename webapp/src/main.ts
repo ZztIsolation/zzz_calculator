@@ -3,18 +3,27 @@ import { createApp } from "vue"
 import App from "@/App.vue"
 import { router } from "@/router"
 import { useAppConfigStore } from "@/stores/app-config"
+import { recoverAllPendingDriveDiscImports } from "@runtime/drive-disc-import-transaction"
 import { recoverPendingEnkaImport } from "@runtime/enka-import-transaction"
-import { loadUserDriveDiscStore } from "@runtime/local-store.js"
+import { loadUserDriveDiscStoreFresh } from "@runtime/local-store.js"
 import "@/styles/tokens.css"
 
 async function bootstrap() {
   const pinia = createPinia()
   let startupError = ""
   try {
-    const store = await loadUserDriveDiscStore()
-    await recoverPendingEnkaImport(String(store?.currentOwnerId ?? "default"))
+    await recoverAllPendingDriveDiscImports()
+    const store = await loadUserDriveDiscStoreFresh()
+    const ownerIds = new Set([
+      String(store?.currentOwnerId ?? "default"),
+      ...(store?.owners ?? []).map((owner: any) => String(owner?.id ?? "")).filter(Boolean),
+      ...Object.keys(store?.enkaImportState?.byOwner ?? {}),
+    ])
+    for (const ownerId of ownerIds) {
+      await recoverPendingEnkaImport(ownerId)
+    }
   } catch (error) {
-    startupError = `未完成的 Enka 导入自动恢复失败，请刷新页面后再修改配置：${error instanceof Error ? error.message : String(error)}`
+    startupError = `未完成的驱动盘导入自动恢复失败，请刷新页面后再修改配置：${error instanceof Error ? error.message : String(error)}`
   }
   try {
     await useAppConfigStore(pinia).load()

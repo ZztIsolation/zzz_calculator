@@ -100,4 +100,35 @@ describe("DriveDiscSlotCard reservation action", () => {
     expect(source).toMatch(/\.disc-restriction-button\s*\{[\s\S]*width: 32px;[\s\S]*height: 32px;/)
     expect(source).toContain('class="disc-slot-card-actions"')
   })
+
+  it("shows combined provenance in a stable order and reads Scanner sequence from provenance", () => {
+    const wrapper = mount(DriveDiscSlotCard, {
+      props: {
+        slot: 1,
+        disc: {
+          ...disc,
+          source: { type: "enka-zzz-showcase" },
+          provenance: {
+            version: 1,
+            manual: { lastEditedAt: "2026-08-18T00:00:00.000Z" },
+            calculatorJson: { sourceRecordId: "disc-1" },
+            scanner: { lastSequence: 42 },
+            enkaZzz: { uid: "1302309616", equipmentUid: "equipment-1" },
+          },
+        },
+        agents,
+        driveDiscSets,
+        showSequence: true,
+      },
+    })
+
+    expect(wrapper.findAll(".drive-disc-source-tag").map(tag => tag.text().trim())).toEqual([
+      "Enka",
+      "扫描器 #42",
+      "JSON",
+      "手动",
+    ])
+    expect(wrapper.get(".drive-disc-source-tags").attributes("aria-label"))
+      .toBe("来源：Enka、扫描器 #42、JSON、手动")
+  })
 })

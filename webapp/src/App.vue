@@ -119,7 +119,7 @@ const themeOverrides: GlobalThemeOverrides = {
         <main class="app-main">
           <NAlert v-if="props.startupError" type="error" :title="props.startupError" />
           <NAlert v-if="enkaImportDisabledNotice" type="warning" title="Enka UID 导入当前未启用。" />
-          <RouterView />
+          <RouterView v-if="!props.startupError" />
         </main>
         <footer class="site-footer">
           <a

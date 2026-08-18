@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { computed, h, ref, watch } from "vue"
 import { NButton, NInput, NModal, NSelect, NTag } from "naive-ui"
+import DriveDiscSourceTags from "@/components/DriveDiscSourceTags.vue"
 import ImageAvatar from "@/components/ImageAvatar.vue"
 import { fallbackIcon, imageForDriveDiscSet } from "@/utils/assets"
+import {
+  driveDiscScannerSequence,
+  driveDiscSourceDescriptors,
+  driveDiscSourceText,
+} from "@/utils/driveDiscProvenance"
 import { formatStoredStatValue, labelOf, storedStatLabel } from "@/utils/format"
 import { driveDiscUsageStateForAgent } from "@core/inventory-model.js"
 
@@ -73,13 +79,15 @@ const filteredDiscs = computed(() => {
     .filter(disc => {
       const set = setForDisc(disc)
       const discSetId = String(set?.id || disc?.setId || "")
+      const scannerSequence = driveDiscScannerSequence(disc)
       const haystack = [
         disc.id,
         disc.setId,
         disc.setName,
         setName(disc),
-        disc.source?.sequence,
-        disc.source?.sequence ? `#${disc.source.sequence}` : "",
+        scannerSequence,
+        scannerSequence !== null ? `#${scannerSequence}` : "",
+        ...driveDiscSourceDescriptors(disc).map(source => source.label),
         statText(disc.mainStat),
         ...(disc.subStats ?? []).flatMap((stat: any) => [statText(stat), stat.label]),
       ].filter(Boolean).join(" ").toLowerCase()
@@ -92,7 +100,7 @@ const filteredDiscs = computed(() => {
       const rightSelected = right.id === props.selectedId ? 0 : 1
       return leftSelected - rightSelected
         || setName(left).localeCompare(setName(right), "zh-CN")
-        || Number(left.source?.sequence ?? 999999) - Number(right.source?.sequence ?? 999999)
+        || scannerSequenceSortValue(left) - scannerSequenceSortValue(right)
     })
 })
 
@@ -138,6 +146,21 @@ function rarityLevelText(disc: any) {
   const rarity = disc?.rarity ? String(disc.rarity) : "-"
   const level = Number(disc?.level)
   return `${rarity}${Number.isFinite(level) ? ` +${level}` : ""}`
+}
+
+function scannerSequenceSortValue(disc: any) {
+  const sequence = Number(driveDiscScannerSequence(disc))
+  return Number.isFinite(sequence) ? sequence : 999999
+}
+
+function discAriaLabel(disc: any) {
+  const sequence = driveDiscScannerSequence(disc)
+  const sourceText = driveDiscSourceText(disc)
+  return [
+    `选择 ${props.slot}号位 ${setName(disc)}`,
+    sourceText ? `来源 ${sourceText}` : "",
+    sequence !== null ? `扫描序号 ${sequence}` : "",
+  ].filter(Boolean).join(" ")
 }
 
 function reservationFor(disc: any) {
@@ -246,13 +269,14 @@ function clearSlot() {
             active: selectedId === disc.id,
             conflict: showReservation && ['other', 'unknown', 'excluded-by-reservation'].includes(restrictionFor(disc).state),
           }"
-          :aria-label="`选择 ${slot}号位 ${setName(disc)}${disc.source?.sequence ? ` 扫描序号 ${disc.source.sequence}` : ''}`"
+          :aria-label="discAriaLabel(disc)"
           @click="choose(disc)"
         >
           <img :src="imageForDriveDiscSet(setForDisc(disc))" alt="" loading="lazy">
           <span class="manual-disc-option-main">
             <strong>{{ setName(disc) }}</strong>
-            <span>{{ disc.partition }}号位 · {{ rarityLevelText(disc) }}{{ disc.source?.sequence ? ` · 扫描 #${disc.source.sequence}` : "" }}</span>
+            <span>{{ disc.partition }}号位 · {{ rarityLevelText(disc) }}</span>
+            <DriveDiscSourceTags :disc="disc" show-scanner-sequence />
             <NTag v-if="showReservation" :type="restrictionFor(disc).type" size="small" round>
               {{ restrictionFor(disc).label }}
             </NTag>

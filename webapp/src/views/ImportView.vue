@@ -12,6 +12,8 @@ import {
   useMessage,
 } from "naive-ui"
 import { Eye, RefreshCw, RotateCcw, Upload } from "lucide-vue-next"
+import DriveDiscConflictResolver from "@/components/DriveDiscConflictResolver.vue"
+import DriveDiscSourceTags from "@/components/DriveDiscSourceTags.vue"
 import { useBuildStore } from "@/stores/build"
 import { useCatalogStore } from "@/stores/catalog"
 import { useInventoryStore } from "@/stores/inventory"
@@ -47,6 +49,8 @@ const skippedAgents = ref<any[]>([])
 const warnings = ref<string[]>([])
 const selectedIds = ref<string[]>([])
 const previewPlan = shallowRef<any>(null)
+const previewInput = shallowRef<any>(null)
+const driveDiscResolutions = ref<Record<string, any>>({})
 let requestController: AbortController | null = null
 
 const busy = computed(() => loading.value || planning.value || applying.value || undoing.value)
@@ -62,6 +66,8 @@ function resetResult() {
   selectedIds.value = []
   ttlSeconds.value = 0
   previewPlan.value = null
+  previewInput.value = null
+  driveDiscResolutions.value = {}
 }
 
 async function refreshBindingAndUndo() {
@@ -118,15 +124,16 @@ function agentSummary(agent: any): string {
   return parts.join(" / ")
 }
 
-function driveOperationRows(drive: any): string[] {
+function driveOperationRows(drive: any): Array<{ label: string, disc?: any }> {
   const operations = drive?.operations ?? {}
   const discLabel = (item: any) => `${item.partition ?? "?"}号位${item.setName ? ` ${item.setName}` : ""}`
   return [
-    ...(operations.added ?? []).map((item: any) => `新增：${discLabel(item)}`),
-    ...(operations.updated ?? []).map((item: any) => `更新：${discLabel(item)}`),
-    ...(operations.migratedDiscs ?? []).map((item: any) => `迁移：${discLabel(item)}（${item.beforeId} → ${item.afterId}）`),
-    ...(operations.migratedLoadouts ?? []).map((item: any) => `迁移稳定配装：${item.beforeId} → ${item.afterId}`),
-    ...(operations.unequipped ?? []).map((item: any) => `解除装备：${discLabel(item)}`),
+    ...(operations.added ?? []).map((item: any) => ({ label: `新增：${discLabel(item)}`, disc: item })),
+    ...(operations.updated ?? []).map((item: any) => ({ label: `更新：${discLabel(item)}`, disc: item })),
+    ...(operations.sourceMerged ?? []).map((item: any) => ({ label: `合并来源：${discLabel(item)}`, disc: item })),
+    ...(operations.migratedDiscs ?? []).map((item: any) => ({ label: `迁移：${discLabel(item)}（${item.beforeId} → ${item.afterId}）`, disc: item })),
+    ...(operations.migratedLoadouts ?? []).map((item: any) => ({ label: `迁移稳定配装：${item.beforeId} → ${item.afterId}` })),
+    ...(operations.unequipped ?? []).map((item: any) => ({ label: `解除装备：${discLabel(item)}`, disc: item })),
   ]
 }
 
@@ -136,12 +143,19 @@ async function openPreview() {
   error.value = ""
   const frozenUid = uid.value.trim()
   const frozenAgents = JSON.parse(JSON.stringify(selectedAgents.value))
+  previewInput.value = {
+    uid: frozenUid,
+    agents: frozenAgents,
+    skippedAgents: JSON.parse(JSON.stringify(skippedAgents.value)),
+    warnings: [...warnings.value],
+  }
+  driveDiscResolutions.value = {}
   try {
-    const plan = await planEnkaImport(frozenUid, frozenAgents)
+    const plan = await planEnkaImport(frozenUid, frozenAgents, driveDiscResolutions.value)
     previewPlan.value = {
       ...plan,
-      skippedAgents: JSON.parse(JSON.stringify(skippedAgents.value)),
-      warnings: [...new Set([...warnings.value, ...(plan.warnings ?? [])])],
+      skippedAgents: previewInput.value.skippedAgents,
+      warnings: [...new Set([...previewInput.value.warnings, ...(plan.warnings ?? [])])],
     }
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : String(caught)
@@ -151,12 +165,40 @@ async function openPreview() {
 }
 
 function closePreview() {
-  if (!applying.value) previewPlan.value = null
+  if (!applying.value) {
+    previewPlan.value = null
+    previewInput.value = null
+    driveDiscResolutions.value = {}
+  }
+}
+
+async function resolveDriveDiscConflict(resolution: any) {
+  const input = previewInput.value
+  if (!input || planning.value || applying.value) return
+  driveDiscResolutions.value = {
+    ...driveDiscResolutions.value,
+    [resolution.key]: resolution.action === "update"
+      ? { action: "update", existingId: resolution.existingId }
+      : { action: "add" },
+  }
+  planning.value = true
+  try {
+    const plan = await planEnkaImport(input.uid, input.agents, driveDiscResolutions.value)
+    previewPlan.value = {
+      ...plan,
+      skippedAgents: input.skippedAgents,
+      warnings: [...new Set([...input.warnings, ...(plan.warnings ?? [])])],
+    }
+  } catch (caught) {
+    message.error(caught instanceof Error ? caught.message : String(caught))
+  } finally {
+    planning.value = false
+  }
 }
 
 async function confirmImport() {
   const plan = previewPlan.value
-  if (!plan || applying.value) return
+  if (!plan || applying.value || planning.value || plan.hasUnresolvedConflicts) return
   applying.value = true
   try {
     await applyEnkaImportPlan(plan)
@@ -281,6 +323,17 @@ onBeforeUnmount(() => requestController?.abort())
         <NSpin :show="applying">
           <div v-if="previewPlan" class="preview-content">
             <NAlert type="info" :title="`UID ${previewPlan.uid} / ${previewPlan.agents.length} 个角色 / ${previewPlan.changeCount} 项更改`" />
+            <NAlert
+              v-if="previewPlan.hasUnresolvedConflicts"
+              type="warning"
+              :title="`还有 ${previewPlan.conflicts.length} 张疑似同盘需要确认`"
+            />
+            <DriveDiscConflictResolver
+              :conflicts="previewPlan.conflicts"
+              :resolutions="driveDiscResolutions"
+              :disabled="planning || applying"
+              @resolve="resolveDriveDiscConflict"
+            />
             <div v-for="agent in previewPlan.agents" :key="agent.agentId" class="preview-agent">
               <h3>{{ agent.agentName }}</h3>
               <p v-if="!agent.changes.length" class="meta">没有配置变化</p>
@@ -292,7 +345,8 @@ onBeforeUnmount(() => requestController?.abort())
               </dl>
               <ul v-if="driveOperationRows(agent.drive).length" class="drive-operations" aria-label="驱动盘同步变化">
                 <li v-for="(operation, index) in driveOperationRows(agent.drive)" :key="`${agent.agentId}-drive-${index}`">
-                  {{ operation }}
+                  <span>{{ operation.label }}</span>
+                  <DriveDiscSourceTags v-if="operation.disc" :disc="operation.disc" show-scanner-sequence />
                 </li>
               </ul>
               <NAlert v-if="agent.drive?.skipped" type="warning" :title="agent.drive.reason" />
@@ -309,7 +363,12 @@ onBeforeUnmount(() => requestController?.abort())
         <template #footer>
           <div class="modal-actions">
             <NButton :disabled="applying" @click="closePreview">取消</NButton>
-            <NButton type="primary" :loading="applying" @click="confirmImport">
+            <NButton
+              type="primary"
+              :loading="applying"
+              :disabled="planning || previewPlan?.hasUnresolvedConflicts"
+              @click="confirmImport"
+            >
               <template #icon><Upload :size="16" /></template>
               确认导入
             </NButton>
@@ -347,6 +406,7 @@ onBeforeUnmount(() => requestController?.abort())
 .preview-agent dd { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; overflow-wrap: anywhere; }
 .drive-operations { margin: 8px 0 0; padding-left: 20px; color: #334155; font-size: 13px; overflow-wrap: anywhere; }
 .drive-operations li + li { margin-top: 4px; }
+.drive-operations li { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .modal-actions { justify-content: flex-end; }
 @media (max-width: 480px) {
   .page-header, .list-header { align-items: flex-start; flex-direction: column; }

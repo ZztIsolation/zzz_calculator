@@ -1,3 +1,8 @@
+import {
+  migrateConfirmedLegacyEnkaStatUnits,
+  planDriveDiscReconciliation,
+} from "../inventory-model.js"
+
 const MANAGED_SOURCE = "enka-zzz-showcase"
 const LEGACY_MANAGED_SOURCE = "enka-showcase"
 
@@ -14,13 +19,16 @@ function belongsToOwner(item, ownerId) {
 }
 
 function isManaged(item) {
-  return [MANAGED_SOURCE, LEGACY_MANAGED_SOURCE].includes(item?.source?.type)
+  return Boolean(item?.provenance?.enkaZzz)
+    || [MANAGED_SOURCE, LEGACY_MANAGED_SOURCE].includes(item?.source?.type)
 }
 
 function isManagedFor(item, uid, agentId = null) {
   if (!isManaged(item)) return false
-  if (item?.source?.type === MANAGED_SOURCE && String(item?.source?.uid ?? "") !== uid) return false
-  return agentId == null || String(item?.source?.agentId ?? "") === agentId
+  const sourceUid = item?.provenance?.enkaZzz?.uid ?? item?.source?.uid
+  const sourceAgentId = item?.provenance?.enkaZzz?.lastAgentId ?? item?.source?.agentId
+  if (sourceUid != null && String(sourceUid) !== uid) return false
+  return agentId == null || String(sourceAgentId ?? "") === agentId
 }
 
 export function enkaDriveDiscId(uid, equipmentUid) {
@@ -29,26 +37,6 @@ export function enkaDriveDiscId(uid, equipmentUid) {
 
 export function enkaLoadoutId(uid, agentId) {
   return `enka-zzz:${uid}:${agentId}`
-}
-
-function discSignature(disc) {
-  return {
-    id: disc?.id,
-    ownerId: disc?.ownerId,
-    setId: disc?.setId,
-    setName: disc?.setName,
-    partition: disc?.partition,
-    rarity: disc?.rarity,
-    level: disc?.level,
-    maxLevel: disc?.maxLevel,
-    locked: disc?.locked,
-    equippedBy: disc?.equippedBy,
-    reservedForAgentId: disc?.reservedForAgentId ?? null,
-    excludedForAgentIds: disc?.excludedForAgentIds ?? [],
-    mainStat: disc?.mainStat,
-    subStats: disc?.subStats,
-    source: disc?.source,
-  }
 }
 
 function loadoutSignature(loadout) {
@@ -113,6 +101,7 @@ function migrateLegacyManagedData(store, ownerId, uid, now) {
       scopedDiscs.splice(scopedDiscs.indexOf(disc), 1)
     } else {
       byId.delete(String(disc.id))
+      Object.assign(disc, migrateConfirmedLegacyEnkaStatUnits(disc))
       disc.id = nextId
       disc.source = {
         ...disc.source,
@@ -188,18 +177,56 @@ function migrateLegacyManagedData(store, ownerId, uid, now) {
   }
 }
 
-export function buildDriveDiscSyncPlan({ uid, mappedAgents, driveDiscState, now = new Date() }) {
+function replaceOwnerDriveDiscs(allDiscs, ownerId, nextOwnerDiscs) {
+  const nextById = new Map(nextOwnerDiscs.map(disc => [String(disc.id), disc]))
+  const result = []
+  for (const disc of allDiscs ?? []) {
+    if (!belongsToOwner(disc, ownerId)) {
+      result.push(disc)
+      continue
+    }
+    const replacement = nextById.get(String(disc.id))
+    if (!replacement) continue
+    result.push(replacement)
+    nextById.delete(String(disc.id))
+  }
+  result.push(...nextById.values())
+  return result
+}
+
+function operationSummary(item) {
+  const disc = item?.after ?? item
+  return {
+    id: disc?.id,
+    partition: disc?.partition,
+    setName: disc?.setName,
+    provenance: clone(disc?.provenance),
+    source: clone(disc?.source),
+    reason: item?.reason ?? null,
+  }
+}
+
+export function buildDriveDiscSyncPlan({
+  uid,
+  mappedAgents,
+  driveDiscState,
+  resolutions = {},
+  now = new Date(),
+}) {
   const ownerId = String(driveDiscState.ownerId)
   const normalizedUid = String(uid ?? "").trim()
   const nowIso = now.toISOString()
   const migrated = migrateLegacyManagedData(driveDiscState.store, ownerId, normalizedUid, nowIso)
-  const nextDriveDiscs = [...clone(migrated.store.driveDiscs ?? [])]
+  let nextDriveDiscs = [...clone(migrated.store.driveDiscs ?? [])]
   const nextLoadouts = [...clone(migrated.store.driveDiscLoadouts ?? [])]
   const results = []
   const warnings = [...migrated.warnings]
   let addedDiscs = 0
   let updatedDiscs = 0
   let unequippedDiscs = 0
+  let sourceMergedDiscs = 0
+  let historicalDuplicates = 0
+  const conflicts = []
 
   for (const agent of mappedAgents ?? []) {
     const presetDiscs = agent.driveDiscPreset?.driveDiscs ?? []
@@ -207,7 +234,9 @@ export function buildDriveDiscSyncPlan({ uid, mappedAgents, driveDiscState, now 
     const operations = {
       added: [],
       updated: [],
+      sourceMerged: [],
       unequipped: [],
+      conflicts: [],
       migratedDiscs: migrated.migrations.driveDiscs.filter(item => item.agentId === agent.agentId),
       migratedLoadouts: migrated.migrations.loadouts.filter(item => item.agentId === agent.agentId),
     }
@@ -225,13 +254,9 @@ export function buildDriveDiscSyncPlan({ uid, mappedAgents, driveDiscState, now 
     }
 
     const loadoutId = enkaLoadoutId(normalizedUid, agent.agentId)
-    const desiredIds = new Set(presetDiscs.map(disc => disc.id))
-    const collision = nextDriveDiscs.find(item =>
-      belongsToOwner(item, ownerId) && desiredIds.has(item.id) && !isManagedFor(item, normalizedUid)
-    )
     const loadoutIndex = nextLoadouts.findIndex(item => belongsToOwner(item, ownerId) && item.id === loadoutId)
     const existingLoadout = loadoutIndex >= 0 ? nextLoadouts[loadoutIndex] : null
-    if (collision || (existingLoadout && !isManagedFor(existingLoadout, normalizedUid))) {
+    if (existingLoadout && !isManagedFor(existingLoadout, normalizedUid)) {
       warnings.push(`${agent.agentName} 的 Enka 数据与手动数据 ID 冲突，已保留原库存和配装。`)
       results.push({
         agentId: agent.agentId,
@@ -245,29 +270,46 @@ export function buildDriveDiscSyncPlan({ uid, mappedAgents, driveDiscState, now 
     }
 
     let agentChanged = operations.migratedDiscs.length > 0 || operations.migratedLoadouts.length > 0
-    for (const imported of presetDiscs) {
-      const index = nextDriveDiscs.findIndex(item => belongsToOwner(item, ownerId) && item.id === imported.id)
-      const existing = index >= 0 ? nextDriveDiscs[index] : null
-      const desired = {
-        ...clone(imported),
-        ownerId,
-        reservedForAgentId: existing?.reservedForAgentId ?? null,
-        excludedForAgentIds: clone(existing?.excludedForAgentIds ?? []),
-        createdAt: existing?.createdAt ?? nowIso,
-        updatedAt: existing?.updatedAt ?? nowIso,
-      }
-      if (!existing) {
-        nextDriveDiscs.push(desired)
-        operations.added.push({ id: desired.id, partition: desired.partition, setName: desired.setName })
-        addedDiscs += 1
-        agentChanged = true
-      } else if (!sameValue(discSignature(existing), discSignature(desired))) {
-        desired.updatedAt = nowIso
-        nextDriveDiscs[index] = desired
-        operations.updated.push({ id: desired.id, partition: desired.partition, setName: desired.setName })
-        updatedDiscs += 1
-        agentChanged = true
-      }
+    const ownerDiscs = nextDriveDiscs.filter(item => belongsToOwner(item, ownerId))
+    const reconciliation = planDriveDiscReconciliation({
+      existingDiscs: ownerDiscs,
+      importedDiscs: presetDiscs,
+      ownerId,
+      sourceKind: "enka",
+      resolutions,
+      now: nowIso,
+    })
+    nextDriveDiscs = replaceOwnerDriveDiscs(nextDriveDiscs, ownerId, reconciliation.driveDiscs)
+    operations.added.push(...reconciliation.added.map(operationSummary))
+    operations.updated.push(...reconciliation.updated.map(operationSummary))
+    operations.sourceMerged.push(...reconciliation.sourceMerged.map(operationSummary))
+    operations.conflicts.push(...reconciliation.conflicts)
+    warnings.push(...reconciliation.warnings)
+    conflicts.push(...reconciliation.conflicts.map(conflict => ({
+      ...conflict,
+      agentId: agent.agentId,
+      agentName: agent.agentName,
+    })))
+    addedDiscs += reconciliation.added.length
+    updatedDiscs += reconciliation.updated.length
+    sourceMergedDiscs += reconciliation.sourceMerged.length
+    historicalDuplicates += reconciliation.historicalDuplicates
+    agentChanged ||= reconciliation.changed
+
+    const desiredIds = new Set(presetDiscs
+      .map(disc => reconciliation.resolvedIds[String(disc.id)])
+      .filter(Boolean))
+
+    if (reconciliation.conflicts.length) {
+      results.push({
+        agentId: agent.agentId,
+        agentName: agent.agentName,
+        changed: agentChanged,
+        skipped: true,
+        reason: "存在待确认的疑似同盘",
+        operations,
+      })
+      continue
     }
 
     for (let index = 0; index < nextDriveDiscs.length; index += 1) {
@@ -277,12 +319,15 @@ export function buildDriveDiscSyncPlan({ uid, mappedAgents, driveDiscState, now 
         || desiredIds.has(String(disc.id))
         || String(disc.equippedBy ?? "") !== agent.agentId) continue
       nextDriveDiscs[index] = { ...disc, equippedBy: "", updatedAt: nowIso }
-      operations.unequipped.push({ id: disc.id, partition: disc.partition, setName: disc.setName })
+      operations.unequipped.push(operationSummary(disc))
       unequippedDiscs += 1
       agentChanged = true
     }
 
-    const idsBySlot = Object.fromEntries(presetDiscs.map(disc => [String(disc.partition), disc.id]))
+    const idsBySlot = Object.fromEntries(presetDiscs.map(disc => [
+      String(disc.partition),
+      reconciliation.resolvedIds[String(disc.id)],
+    ]).filter(([, id]) => Boolean(id)))
     const missingSlots = [1, 2, 3, 4, 5, 6].filter(slot => !idsBySlot[String(slot)])
     if (presetDiscs.length || existingLoadout) {
       const desiredLoadout = {
@@ -330,10 +375,14 @@ export function buildDriveDiscSyncPlan({ uid, mappedAgents, driveDiscState, now 
     warnings,
     addedDiscs,
     updatedDiscs,
+    sourceMergedDiscs,
+    historicalDuplicates,
     unequippedDiscs,
     migratedDiscs: migrated.migratedDiscs,
     migratedLoadouts: migrated.migratedLoadouts,
     migrations: migrated.migrations,
+    conflicts,
+    hasUnresolvedConflicts: conflicts.length > 0,
     presetCount: results.filter(result => result.changed && result.hasUsableLoadout).length,
     nextStore: changed
       ? { ...clone(migrated.store), driveDiscs: nextDriveDiscs, driveDiscLoadouts: nextLoadouts }

@@ -18,7 +18,8 @@ function clone<T>(value: T): T {
 
 vi.mock("@runtime/local-store.js", () => ({
   loadUserDriveDiscStore: vi.fn(async () => clone(memory.store)),
-  saveUserDriveDiscStore: vi.fn(async (store: any) => {
+  loadUserDriveDiscStoreFresh: vi.fn(async () => clone(memory.store)),
+  saveUserDriveDiscStoreUnlocked: vi.fn(async (store: any) => {
     memory.storeSaveCall += 1
     if (memory.failStoreSaveAt.has(memory.storeSaveCall)) throw new Error("inventory write failed")
     memory.store = clone(store)
@@ -29,7 +30,7 @@ vi.mock("@runtime/local-store.js", () => ({
 vi.mock("@runtime/build-storage", () => ({
   readBuildSelectionDocument: vi.fn(() => clone(memory.buildSelection)),
   readLegacySelectionDocument: vi.fn(() => clone(memory.legacySelection)),
-  writeEnkaSelectionDocuments: vi.fn((buildSelection: any, legacySelection: any) => {
+  writeSelectionDocuments: vi.fn((buildSelection: any, legacySelection: any) => {
     memory.buildSelection = clone(buildSelection)
     if (memory.failSelectionWriteOnce) {
       memory.failSelectionWriteOnce = false
@@ -109,13 +110,63 @@ describe("Enka import transaction", () => {
     expect(await hasCommittedEnkaUndo(ownerId)).toBe(false)
   })
 
+  it("remaps legacy Enka disc and loadout references for every owner config and undoes them", async () => {
+    memory.store.driveDiscs.push({
+      id: "enka-equipment-1",
+      ownerId,
+      partition: 1,
+      setName: "旧套装",
+      source: { type: "enka-showcase", agentId: "hoshimi_miyabi" },
+    })
+    memory.store.driveDiscLoadouts.push({
+      id: "enka-showcase-hoshimi_miyabi",
+      ownerId,
+      agentId: "hoshimi_miyabi",
+      driveDiscIdsBySlot: { 1: "enka-equipment-1" },
+      source: { type: "enka-showcase", agentId: "hoshimi_miyabi" },
+    })
+    memory.store.driveDiscLoadouts.push({
+      id: "manual-loadout-referencing-enka",
+      ownerId,
+      agentId: "agent-other",
+      driveDiscIdsBySlot: { 1: "enka-equipment-1" },
+      source: { type: "manual" },
+    })
+    const referencingConfig = {
+      manualDriveDiscIdsBySlot: { 1: "enka-equipment-1" },
+      selectedLoadoutId: "enka-showcase-hoshimi_miyabi",
+      combat: { activeBuffIds: ["other-keep"] },
+    }
+    memory.buildSelection.byOwner[ownerId].byAgent["agent-other"] = clone(referencingConfig)
+    memory.legacySelection.byOwner[ownerId].byAgent["agent-other"] = clone(referencingConfig)
+
+    const plan = createPlan("tx-legacy-reference-migration")
+    expect(plan.drivePlan.migrations.driveDiscs).toHaveLength(1)
+    expect(plan.drivePlan.migrations.loadouts).toHaveLength(1)
+    await commitEnkaImportPlan(plan)
+
+    const migratedConfig = memory.buildSelection.byOwner[ownerId].byAgent["agent-other"]
+    expect(migratedConfig.manualDriveDiscIdsBySlot[1]).toBe(`enka-zzz:${uid}:equipment-1`)
+    expect(migratedConfig.selectedLoadoutId).toBe(`enka-zzz:${uid}:hoshimi_miyabi`)
+    expect(memory.store.enkaImportState.byOwner[ownerId].undoJournal.affectedAgentIds).toContain("agent-other")
+    expect(memory.store.enkaImportState.byOwner[ownerId].undoJournal.affectedLoadoutIds).toContain("manual-loadout-referencing-enka")
+    expect(memory.store.driveDiscLoadouts.find((loadout: any) => loadout.id === "manual-loadout-referencing-enka").driveDiscIdsBySlot[1]).toBe(`enka-zzz:${uid}:equipment-1`)
+
+    await undoLastEnkaImport(ownerId)
+    expect(memory.buildSelection.byOwner[ownerId].byAgent["agent-other"]).toEqual(referencingConfig)
+    expect(memory.legacySelection.byOwner[ownerId].byAgent["agent-other"]).toEqual(referencingConfig)
+    expect(memory.store.driveDiscs.some((disc: any) => disc.id === "enka-equipment-1")).toBe(true)
+    expect(memory.store.driveDiscLoadouts.some((loadout: any) => loadout.id === "enka-showcase-hoshimi_miyabi")).toBe(true)
+    expect(memory.store.driveDiscLoadouts.find((loadout: any) => loadout.id === "manual-loadout-referencing-enka").driveDiscIdsBySlot[1]).toBe("enka-equipment-1")
+  })
+
   it("rolls back both selection documents after a partial localStorage failure", async () => {
     const plan = createPlan()
     memory.failSelectionWriteOnce = true
     await expect(commitEnkaImportPlan(plan)).rejects.toThrow("legacy write failed")
     expect(memory.buildSelection.byOwner[ownerId].byAgent.hoshimi_miyabi).toEqual(initialConfig)
     expect(memory.legacySelection.byOwner[ownerId].byAgent.hoshimi_miyabi).toEqual(initialConfig)
-    expect(memory.store.enkaImportState?.byOwner?.[ownerId]?.undoJournal).toBeNull()
+    expect(memory.store.enkaImportState?.byOwner?.[ownerId]?.undoJournal).toBeUndefined()
   })
 
   it("rolls back configs when the committed journal write fails", async () => {
@@ -124,7 +175,7 @@ describe("Enka import transaction", () => {
     await expect(commitEnkaImportPlan(plan)).rejects.toThrow("inventory write failed")
     expect(memory.buildSelection.byOwner[ownerId].byAgent.hoshimi_miyabi).toEqual(initialConfig)
     expect(memory.legacySelection.byOwner[ownerId].byAgent.hoshimi_miyabi).toEqual(initialConfig)
-    expect(memory.store.enkaImportState?.byOwner?.[ownerId]?.undoJournal).toBeNull()
+    expect(memory.store.enkaImportState?.byOwner?.[ownerId]?.undoJournal).toBeUndefined()
   })
 
   it("rejects a stale preview before writing", async () => {

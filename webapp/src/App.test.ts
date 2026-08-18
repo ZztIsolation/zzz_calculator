@@ -43,7 +43,7 @@ function mountApp(props: Record<string, unknown> = {}) {
     global: {
       stubs: {
         RouterLink: { template: "<a><slot /></a>" },
-        RouterView: { template: "<div />" },
+        RouterView: { template: '<div data-testid="router-view" />' },
       },
     },
   })
@@ -83,6 +83,7 @@ describe("App maintenance navigation", () => {
   it("surfaces a startup recovery failure", () => {
     const wrapper = mountApp({ startupError: "恢复失败" })
     expect(wrapper.get('[role="alert"]').text()).toContain("恢复失败")
+    expect(wrapper.find('[data-testid="router-view"]').exists()).toBe(false)
   })
 })
 

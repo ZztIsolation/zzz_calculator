@@ -8,7 +8,7 @@ function mapStat(rawStat, mapping, multiplier) {
   const rawValue = rawStat.propertyValue * multiplier
   return {
     stat: property.stat,
-    value: rounded(property.mode === "pct" ? rawValue / 100 : rawValue),
+    value: rounded(rawValue),
     mode: property.mode,
     label: property.label,
   }
@@ -28,6 +28,7 @@ function mapDriveDisc(rawDisc, context) {
     rarity: item.rarity,
     level: rawDisc.level,
     maxLevel: item.maxLevel,
+    statUnitVersion: 2,
     locked: rawDisc.locked,
     equippedBy: context.agentId,
     mainStat: mapStat(rawDisc.mainStat, context.mapping, mainMultiplier),
