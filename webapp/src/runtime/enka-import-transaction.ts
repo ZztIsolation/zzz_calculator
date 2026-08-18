@@ -249,7 +249,7 @@ export async function recoverPendingEnkaImport(ownerId: string): Promise<"none" 
 export async function undoLastEnkaImport(ownerId: string): Promise<void> {
   const current = await currentState()
   const journal = committedEnkaImportJournal(current.store, ownerId)
-  if (!journal) throw new Error("当前账号没有可撤销的 Enka 导入。")
+  if (!journal) throw new Error("当前账号没有可撤销的展柜数据导入。")
   if (!enkaImportSnapshotMatches({ ...current, journal }, "after")) {
     throw new Error("导入后的相关配置或库存已被修改，无法自动撤销以免覆盖新数据。")
   }

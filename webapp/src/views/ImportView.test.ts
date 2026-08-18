@@ -8,6 +8,9 @@ const mocks = vi.hoisted(() => ({
   catalogLoad: vi.fn(async () => {}),
   buildInitialize: vi.fn(),
   inventoryLoad: vi.fn(async () => {}),
+  accountEnsureLoaded: vi.fn(async () => {}),
+  accountStore: null as any,
+  currentEnkaBinding: vi.fn(),
   importEnkaShowcase: vi.fn(),
   planEnkaImport: vi.fn(),
   applyEnkaImportPlan: vi.fn(async () => {}),
@@ -26,8 +29,21 @@ vi.mock("@/stores/catalog", () => ({
 }))
 vi.mock("@/stores/build", () => ({ useBuildStore: () => ({ initialize: mocks.buildInitialize }) }))
 vi.mock("@/stores/inventory", () => ({ useInventoryStore: () => ({ load: mocks.inventoryLoad }) }))
+vi.mock("@/stores/account", async () => {
+  const { reactive } = await import("vue")
+  const store: any = reactive({
+    loadState: "ready",
+    error: "",
+    currentOwnerId: "default",
+    owners: [{ id: "default", label: "myself" }],
+    ensureLoaded: mocks.accountEnsureLoaded,
+  })
+  store.ownerLabelById = (ownerId: string) => String(store.owners.find((owner: any) => owner.id === ownerId)?.label ?? "").trim() || null
+  mocks.accountStore = store
+  return { useAccountStore: () => store }
+})
 vi.mock("@/utils/enkaImport", () => ({
-  currentEnkaBinding: vi.fn(async () => ({ ownerId: "default", binding: mocks.binding })),
+  currentEnkaBinding: mocks.currentEnkaBinding,
   importEnkaShowcase: mocks.importEnkaShowcase,
   planEnkaImport: mocks.planEnkaImport,
   applyEnkaImportPlan: mocks.applyEnkaImportPlan,
@@ -63,12 +79,13 @@ const CheckboxStub = defineComponent({
 })
 const CardStub = defineComponent({
   name: "NCard",
-  template: `<section><header><slot name="header"/></header><slot/><footer><slot name="footer"/></footer></section>`,
+  props: { title: String },
+  template: `<section><header>{{ title }}<slot name="header"/></header><slot/><footer><slot name="footer"/></footer></section>`,
 })
 const AlertStub = defineComponent({
   name: "NAlert",
   props: { title: String },
-  template: `<div role="alert">{{ title }}<slot/></div>`,
+  template: `<div role="alert">{{ title }}<slot/><slot name="action"/></div>`,
 })
 const ModalStub = defineComponent({
   name: "NModal",
@@ -139,6 +156,17 @@ beforeEach(() => {
     if (typeof value === "function" && "mockClear" in value) (value as any).mockClear()
   }
   for (const value of Object.values(mocks.message)) value.mockClear()
+  Object.assign(mocks.accountStore, {
+    loadState: "ready",
+    error: "",
+    currentOwnerId: "default",
+    owners: [{ id: "default", label: "myself" }],
+  })
+  mocks.accountEnsureLoaded.mockResolvedValue({
+    currentOwnerId: "default",
+    owners: [{ id: "default", label: "myself" }],
+  })
+  mocks.currentEnkaBinding.mockImplementation(async () => ({ ownerId: mocks.accountStore.currentOwnerId, binding: mocks.binding }))
   mocks.importEnkaShowcase.mockResolvedValue({
     mappedAgents: agents,
     skippedAgents: [],
@@ -165,6 +193,9 @@ describe("ImportView", () => {
   it("requires preview before committing a frozen multi-agent selection", async () => {
     const wrapper = mountView()
     await flushPromises()
+    expect(wrapper.get("h1").text()).toBe("展柜数据导入")
+    expect(wrapper.text()).toContain("当前账号：myself")
+    expect(wrapper.text()).not.toContain("当前账号：default")
     const uidInput = wrapper.get('input[aria-label="游戏 UID"]')
     await uidInput.setValue("1302309616")
     await button(wrapper, "读取展柜").trigger("click")
@@ -178,6 +209,7 @@ describe("ImportView", () => {
 
     await button(wrapper, "预览更改（2）").trigger("click")
     await flushPromises()
+    expect(wrapper.get("[data-modal]").text()).toContain("确认展柜数据导入")
     expect(mocks.planEnkaImport).toHaveBeenCalledWith("1302309616", expect.arrayContaining([
       expect.objectContaining({ agentId: "hoshimi_miyabi" }),
       expect.objectContaining({ agentId: "aria" }),
@@ -191,6 +223,72 @@ describe("ImportView", () => {
     expect(mocks.inventoryLoad).toHaveBeenCalled()
     expect(mocks.buildInitialize).toHaveBeenCalled()
     expect(mocks.message.success).toHaveBeenCalledWith("已导入 2 个角色，库存与配置已同步。")
+  })
+
+  it("blocks importing and offers retry when account loading fails", async () => {
+    mocks.accountStore.loadState = "error"
+    mocks.accountStore.error = "IndexedDB unavailable"
+    mocks.accountStore.currentOwnerId = null
+    mocks.accountStore.owners = []
+    mocks.accountEnsureLoaded
+      .mockRejectedValueOnce(new Error("IndexedDB unavailable"))
+      .mockImplementation(async () => {
+        Object.assign(mocks.accountStore, {
+          loadState: "ready",
+          error: "",
+          currentOwnerId: "default",
+          owners: [{ id: "default", label: "myself" }],
+        })
+        return { currentOwnerId: "default", owners: mocks.accountStore.owners }
+      })
+
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.text()).toContain("账号信息加载失败")
+    expect(wrapper.text()).toContain("IndexedDB unavailable")
+    expect(wrapper.text()).not.toContain("当前账号：default")
+    expect(wrapper.get('input[aria-label="游戏 UID"]').attributes("disabled")).toBeDefined()
+    expect(button(wrapper, "读取展柜").attributes("disabled")).toBeDefined()
+
+    await button(wrapper, "重试").trigger("click")
+    await flushPromises()
+    expect(wrapper.text()).toContain("当前账号：myself")
+    expect(wrapper.get('input[aria-label="游戏 UID"]').attributes("disabled")).toBeUndefined()
+  })
+
+  it("keeps importing locked until a failed account context recovery is retried", async () => {
+    mocks.recoverPendingEnkaImport.mockRejectedValueOnce(new Error("prepared transaction recovery failed"))
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("账号上下文初始化失败")
+    expect(wrapper.text()).toContain("prepared transaction recovery failed")
+    expect(wrapper.get('input[aria-label="游戏 UID"]').attributes("disabled")).toBeDefined()
+    expect(button(wrapper, "读取展柜").attributes("disabled")).toBeDefined()
+
+    await button(wrapper, "重试").trigger("click")
+    await flushPromises()
+    expect(wrapper.text()).not.toContain("账号上下文初始化失败")
+    expect(wrapper.get('input[aria-label="游戏 UID"]').attributes("disabled")).toBeUndefined()
+  })
+
+  it("clears a bound UID when switching to an unbound account", async () => {
+    mocks.binding = { uid: "1302309616" }
+    const wrapper = mountView()
+    await flushPromises()
+    const uidInput = wrapper.get('input[aria-label="游戏 UID"]')
+    expect((uidInput.element as HTMLInputElement).value).toBe("1302309616")
+
+    mocks.binding = null
+    mocks.accountStore.owners = [
+      { id: "default", label: "myself" },
+      { id: "alt", label: "second" },
+    ]
+    mocks.accountStore.currentOwnerId = "alt"
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("当前账号：second")
+    expect((uidInput.element as HTMLInputElement).value).toBe("")
   })
 
   it("blocks a different UID for an already bound Calculator account", async () => {

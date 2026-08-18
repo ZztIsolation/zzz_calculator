@@ -2,6 +2,7 @@ import { createPinia } from "pinia"
 import { createApp } from "vue"
 import App from "@/App.vue"
 import { router } from "@/router"
+import { useAccountStore } from "@/stores/account"
 import { useAppConfigStore } from "@/stores/app-config"
 import { recoverAllPendingDriveDiscImports } from "@runtime/drive-disc-import-transaction"
 import { recoverPendingEnkaImport } from "@runtime/enka-import-transaction"
@@ -10,6 +11,7 @@ import "@/styles/tokens.css"
 
 async function bootstrap() {
   const pinia = createPinia()
+  const accountStore = useAccountStore(pinia)
   let startupError = ""
   try {
     await recoverAllPendingDriveDiscImports()
@@ -24,6 +26,13 @@ async function bootstrap() {
     }
   } catch (error) {
     startupError = `未完成的驱动盘导入自动恢复失败，请刷新页面后再修改配置：${error instanceof Error ? error.message : String(error)}`
+  }
+  if (!startupError) {
+    try {
+      await accountStore.ensureLoaded()
+    } catch {
+      // Account-dependent views expose the shared error state and retry action.
+    }
   }
   try {
     await useAppConfigStore(pinia).load()

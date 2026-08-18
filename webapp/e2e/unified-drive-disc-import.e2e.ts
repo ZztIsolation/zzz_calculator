@@ -127,7 +127,7 @@ async function confirmJsonImport(page: Page, expectedSummary: string) {
 
 async function importEnka(page: Page, expectedDriveOperation?: string) {
   await page.goto("/import")
-  await expect(page.getByRole("heading", { name: "Enka 展柜导入" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "展柜数据导入" })).toBeVisible()
   await page.getByLabel("游戏 UID").fill(uid)
   await page.getByRole("button", { name: "读取展柜", exact: true }).click()
   await expect(page.getByLabel(`选择导入 ${agentName}`)).toBeVisible()

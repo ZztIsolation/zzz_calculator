@@ -61,6 +61,8 @@ const scannerManifest = JSON.parse(scannerManifestBytes.toString("utf8"))
 const helperManifest = JSON.parse(await readFile(path.join(rootDir, "config", "helper-manifest.json"), "utf8"))
 const nginxConfig = await readFile(path.join(rootDir, "deploy", "nginx", "zzz-calculator.conf"), "utf8")
 const pagesWorkflow = await readFile(path.join(rootDir, ".github", "workflows", "pages.yml"), "utf8")
+const readmeEn = await readFile(path.join(rootDir, "README.md"), "utf8")
+const readmeZh = await readFile(path.join(rootDir, "README.zh-CN.md"), "utf8")
 const directDependencies = {
     ...webappPackage.dependencies,
     ...webappPackage.devDependencies,
@@ -100,5 +102,15 @@ assert.match(nginxConfig, /location \^~ \/downloads\//)
 assert.match(nginxConfig, /root \/opt\/zzz_calculator\/current\/dist\/pages;/)
 assert.match(pagesWorkflow, /workflow_dispatch:/)
 assert.doesNotMatch(pagesWorkflow, /\bpush:/)
+assert.match(readmeEn, /^## Third-party services and acknowledgements$/m)
+assert.match(readmeZh, /^## 第三方服务与致谢$/m)
+for (const url of [
+    "https://enka.network/",
+    "https://github.com/EnkaNetwork/API-docs",
+    "https://github.com/EnkaNetwork/API-docs/blob/master/docs/zzz/api.md",
+]) {
+    assert.ok(readmeEn.includes(`](${url})`), `README.md must acknowledge ${url}`)
+    assert.ok(readmeZh.includes(`](${url})`), `README.zh-CN.md must acknowledge ${url}`)
+}
 
 console.log(`repository integrity: ok (${referencedAssets.size} catalog assets verified)`)

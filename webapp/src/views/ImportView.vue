@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue"
 import {
   NAlert,
   NButton,
@@ -14,6 +14,7 @@ import {
 import { Eye, RefreshCw, RotateCcw, Upload } from "lucide-vue-next"
 import DriveDiscConflictResolver from "@/components/DriveDiscConflictResolver.vue"
 import DriveDiscSourceTags from "@/components/DriveDiscSourceTags.vue"
+import { useAccountStore } from "@/stores/account"
 import { useBuildStore } from "@/stores/build"
 import { useCatalogStore } from "@/stores/catalog"
 import { useInventoryStore } from "@/stores/inventory"
@@ -32,11 +33,15 @@ import {
 const catalogStore = useCatalogStore()
 const buildStore = useBuildStore()
 const inventoryStore = useInventoryStore()
+const accountStore = useAccountStore()
 const message = useMessage()
 
 const uid = ref("")
-const ownerId = ref("default")
+const ownerId = ref("")
 const binding = ref<any>(null)
+const accountInitializing = ref(true)
+const accountContextReady = ref(false)
+const accountContextError = ref("")
 const loading = ref(false)
 const planning = ref(false)
 const applying = ref(false)
@@ -54,7 +59,13 @@ const driveDiscResolutions = ref<Record<string, any>>({})
 let requestController: AbortController | null = null
 
 const busy = computed(() => loading.value || planning.value || applying.value || undoing.value)
-const controlsLocked = computed(() => busy.value || Boolean(previewPlan.value))
+const accountLabel = computed(() => ownerId.value ? accountStore.ownerLabelById(ownerId.value) : null)
+const accountUnavailable = computed(() => accountInitializing.value
+  || !accountContextReady.value
+  || accountStore.loadState !== "ready"
+  || !ownerId.value
+  || !accountLabel.value)
+const controlsLocked = computed(() => busy.value || accountUnavailable.value || Boolean(previewPlan.value))
 const hasResult = computed(() => mappedAgents.value.length > 0 || skippedAgents.value.length > 0)
 const selectedAgents = computed(() => mappedAgents.value.filter(agent => selectedIds.value.includes(agent.agentId)))
 const bindingMismatch = computed(() => binding.value?.uid && uid.value.trim() && binding.value.uid !== uid.value.trim())
@@ -70,20 +81,85 @@ function resetResult() {
   driveDiscResolutions.value = {}
 }
 
-async function refreshBindingAndUndo() {
+async function refreshBindingAndUndo(expectedOwnerId = ownerId.value || accountStore.currentOwnerId) {
+  if (!expectedOwnerId) throw new Error("账号信息尚未加载完成。")
   const current = await currentEnkaBinding()
+  if (current.ownerId !== expectedOwnerId || accountStore.currentOwnerId !== expectedOwnerId) {
+    throw new Error("当前账号已切换，请重新加载导入数据。")
+  }
+  const nextCanUndo = await hasCommittedEnkaUndo(current.ownerId)
+  if (accountStore.currentOwnerId !== expectedOwnerId) {
+    throw new Error("当前账号已切换，请重新加载导入数据。")
+  }
   ownerId.value = current.ownerId
   binding.value = current.binding
-  canUndo.value = await hasCommittedEnkaUndo(current.ownerId)
+  canUndo.value = nextCanUndo
+}
+
+let accountContextGeneration = 0
+
+async function initializeAccountContext() {
+  const generation = ++accountContextGeneration
+  accountInitializing.value = true
+  accountContextReady.value = false
+  accountContextError.value = ""
+  requestController?.abort()
+  requestController = null
+  resetResult()
+  binding.value = null
+  canUndo.value = false
+  error.value = ""
+  try {
+    await accountStore.ensureLoaded()
+    if (generation !== accountContextGeneration) return
+    const expectedOwnerId = accountStore.currentOwnerId
+    if (!expectedOwnerId) throw new Error("账号信息尚未加载完成。")
+    ownerId.value = expectedOwnerId
+    const recovery = await recoverPendingEnkaImport(expectedOwnerId)
+    if (generation !== accountContextGeneration || accountStore.currentOwnerId !== expectedOwnerId) return
+    if (recovery === "rolled-back") message.warning("检测到未完成的展柜数据导入，已自动回滚。")
+    if (recovery === "committed") message.info("检测到已完成的展柜数据导入，事务状态已恢复。")
+    await Promise.all([refreshBindingAndUndo(expectedOwnerId), inventoryStore.load()])
+    if (generation !== accountContextGeneration) return
+    uid.value = binding.value?.uid ?? ""
+    accountContextReady.value = true
+  } catch (caught) {
+    if (generation !== accountContextGeneration) return
+    if (accountStore.loadState !== "error") {
+      accountContextError.value = caught instanceof Error ? caught.message : String(caught)
+    }
+  } finally {
+    if (generation === accountContextGeneration) accountInitializing.value = false
+  }
+}
+
+async function retryAccountContext() {
+  if (accountStore.loadState === "error") {
+    accountInitializing.value = true
+    try {
+      await accountStore.ensureLoaded({ force: true })
+    } catch {
+      accountInitializing.value = false
+      return
+    }
+  }
+  await initializeAccountContext()
 }
 
 async function loadShowcase() {
+  if (accountUnavailable.value) return
   const value = uid.value.trim()
   if (!/^\d{8,12}$/.test(value)) {
     error.value = "UID 必须是 8–12 位数字。"
     return
   }
-  await refreshBindingAndUndo()
+  const requestOwnerId = ownerId.value
+  try {
+    await refreshBindingAndUndo(requestOwnerId)
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : String(caught)
+    return
+  }
   if (binding.value && binding.value.uid !== value) {
     error.value = `当前账号已绑定 UID ${binding.value.uid}，请切换或新建 Calculator 账号。`
     return
@@ -96,7 +172,7 @@ async function loadShowcase() {
   resetResult()
   try {
     const result = await importEnkaShowcase(value, requestController.signal)
-    if (uid.value.trim() !== value) return
+    if (uid.value.trim() !== value || ownerId.value !== requestOwnerId || accountStore.currentOwnerId !== requestOwnerId) return
     mappedAgents.value = result.mappedAgents
     skippedAgents.value = result.skippedAgents
     warnings.value = result.warnings
@@ -138,7 +214,7 @@ function driveOperationRows(drive: any): Array<{ label: string, disc?: any }> {
 }
 
 async function openPreview() {
-  if (!selectedAgents.value.length) return
+  if (accountUnavailable.value || !selectedAgents.value.length) return
   planning.value = true
   error.value = ""
   const frozenUid = uid.value.trim()
@@ -174,7 +250,7 @@ function closePreview() {
 
 async function resolveDriveDiscConflict(resolution: any) {
   const input = previewInput.value
-  if (!input || planning.value || applying.value) return
+  if (!input || planning.value || applying.value || accountUnavailable.value) return
   driveDiscResolutions.value = {
     ...driveDiscResolutions.value,
     [resolution.key]: resolution.action === "update"
@@ -198,7 +274,12 @@ async function resolveDriveDiscConflict(resolution: any) {
 
 async function confirmImport() {
   const plan = previewPlan.value
-  if (!plan || applying.value || planning.value || plan.hasUnresolvedConflicts) return
+  if (!plan || applying.value || planning.value || accountUnavailable.value || plan.hasUnresolvedConflicts) return
+  if (plan.ownerId !== ownerId.value || accountStore.currentOwnerId !== ownerId.value) {
+    message.error("当前账号已切换，请重新生成预览。")
+    resetResult()
+    return
+  }
   applying.value = true
   try {
     await applyEnkaImportPlan(plan)
@@ -214,14 +295,14 @@ async function confirmImport() {
 }
 
 async function undoImport() {
-  if (undoing.value) return
+  if (undoing.value || accountUnavailable.value) return
   undoing.value = true
   try {
     await undoLastEnkaImport(ownerId.value)
     await Promise.all([inventoryStore.load(), catalogStore.load(), refreshBindingAndUndo()])
     buildStore.initialize(catalogStore.catalog, catalogStore.meta)
     resetResult()
-    message.success("最近一次 Enka 导入已撤销。")
+    message.success("最近一次展柜数据导入已撤销。")
   } catch (caught) {
     message.error(caught instanceof Error ? caught.message : String(caught))
   } finally {
@@ -229,35 +310,42 @@ async function undoImport() {
   }
 }
 
-onMounted(async () => {
-  try {
-    const current = await currentEnkaBinding()
-    ownerId.value = current.ownerId
-    const recovery = await recoverPendingEnkaImport(current.ownerId)
-    if (recovery === "rolled-back") message.warning("检测到未完成的 Enka 导入，已自动回滚。")
-    if (recovery === "committed") message.info("检测到已完成的 Enka 导入，事务状态已恢复。")
-    await Promise.all([refreshBindingAndUndo(), inventoryStore.load()])
-    if (binding.value?.uid) uid.value = binding.value.uid
-  } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : String(caught)
-  }
+onMounted(() => void initializeAccountContext())
+
+watch(() => accountStore.currentOwnerId, (nextOwnerId, previousOwnerId) => {
+  if (!nextOwnerId || nextOwnerId === previousOwnerId || accountInitializing.value && !ownerId.value) return
+  void initializeAccountContext()
 })
 
-onBeforeUnmount(() => requestController?.abort())
+onBeforeUnmount(() => {
+  accountContextGeneration += 1
+  requestController?.abort()
+})
 </script>
 
 <template>
   <section class="import-view" aria-labelledby="import-title">
     <header class="page-header">
       <div>
-        <h1 id="import-title">Enka 展柜导入</h1>
-        <p>当前账号：{{ ownerId }}<span v-if="binding"> / 已绑定 UID {{ binding.uid }}</span></p>
+        <h1 id="import-title">展柜数据导入</h1>
+        <p v-if="accountStore.loadState === 'error'">当前账号：加载失败</p>
+        <p v-else-if="accountLabel">当前账号：{{ accountLabel }}<span v-if="binding"> / 已绑定 UID {{ binding.uid }}</span></p>
+        <p v-else>当前账号：加载中…</p>
       </div>
-      <NButton v-if="canUndo" secondary :loading="undoing" :disabled="busy" @click="undoImport">
+      <NButton v-if="canUndo" secondary :loading="undoing" :disabled="controlsLocked" @click="undoImport">
         <template #icon><RotateCcw :size="16" /></template>
         撤销上次导入
       </NButton>
     </header>
+
+    <NAlert v-if="accountStore.loadState === 'error'" type="error" title="账号信息加载失败">
+      {{ accountStore.error }}
+      <NButton secondary size="small" :loading="accountInitializing" @click="retryAccountContext">重试</NButton>
+    </NAlert>
+    <NAlert v-else-if="accountContextError" type="error" title="账号上下文初始化失败">
+      {{ accountContextError }}
+      <NButton secondary size="small" :loading="accountInitializing" @click="retryAccountContext">重试</NButton>
+    </NAlert>
 
     <NCard size="small" class="import-tool">
       <label class="field-label" for="enka-uid">游戏 UID</label>
@@ -319,7 +407,7 @@ onBeforeUnmount(() => requestController?.abort())
     </section>
 
     <NModal :show="Boolean(previewPlan)" :mask-closable="!applying" @update:show="shown => { if (!shown) closePreview() }">
-      <NCard class="preview-modal" title="确认 Enka 导入" role="dialog" aria-modal="true">
+      <NCard class="preview-modal" title="确认展柜数据导入" role="dialog" aria-modal="true">
         <NSpin :show="applying">
           <div v-if="previewPlan" class="preview-content">
             <NAlert type="info" :title="`UID ${previewPlan.uid} / ${previewPlan.agents.length} 个角色 / ${previewPlan.changeCount} 项更改`" />
@@ -331,7 +419,7 @@ onBeforeUnmount(() => requestController?.abort())
             <DriveDiscConflictResolver
               :conflicts="previewPlan.conflicts"
               :resolutions="driveDiscResolutions"
-              :disabled="planning || applying"
+              :disabled="planning || applying || accountUnavailable"
               @resolve="resolveDriveDiscConflict"
             />
             <div v-for="agent in previewPlan.agents" :key="agent.agentId" class="preview-agent">
@@ -366,7 +454,7 @@ onBeforeUnmount(() => requestController?.abort())
             <NButton
               type="primary"
               :loading="applying"
-              :disabled="planning || previewPlan?.hasUnresolvedConflicts"
+              :disabled="planning || accountUnavailable || previewPlan?.hasUnresolvedConflicts"
               @click="confirmImport"
             >
               <template #icon><Upload :size="16" /></template>

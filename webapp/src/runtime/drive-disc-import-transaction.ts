@@ -220,7 +220,7 @@ export async function freezeDriveDiscInventoryImportPlan(inventoryPlan: any, opt
   })
   const preview = plainSnapshot(inventoryPlan.preview ?? null)
   const invalidationWarning = transactionPlan.enkaUndoInvalidation
-    ? "本次导入会修改上次 Enka 导入涉及的库存或配置，原撤销记录将失效。"
+    ? "本次导入会修改上次展柜数据导入涉及的库存或配置，原撤销记录将失效。"
     : ""
   if (preview && invalidationWarning) {
     preview.warnings = [...new Set([...(preview.warnings ?? []), invalidationWarning])]

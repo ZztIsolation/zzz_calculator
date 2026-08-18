@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue"
+import { computed } from "vue"
 import { NAlert, NConfigProvider, NMessageProvider, type GlobalThemeOverrides } from "naive-ui"
 import { Calculator, Database, Download, HardDrive, Settings2, UserRound } from "lucide-vue-next"
 import { useRoute } from "vue-router"
@@ -14,11 +14,12 @@ const maintenanceEnabled = computed(() => appConfigStore.config.maintenanceEnabl
 const enkaImportEnabled = computed(() => appConfigStore.config.enkaImportEnabled)
 const enkaImportDisabledNotice = computed(() => route.query.notice === "enka-import-disabled")
 
-onMounted(() => {
-  void accountStore.load()
+const currentAccountLabel = computed(() => accountStore.currentOwnerLabel)
+const accountChipText = computed(() => {
+  if (accountStore.loadState === "error") return "账号加载失败"
+  if (currentAccountLabel.value) return `账号 / ${currentAccountLabel.value}`
+  return "账号加载中"
 })
-
-const currentAccountLabel = computed(() => accountStore.currentOwner?.label ?? accountStore.currentOwnerId)
 
 const themeOverrides: GlobalThemeOverrides = {
   common: {
@@ -114,11 +115,11 @@ const themeOverrides: GlobalThemeOverrides = {
               <span>维护</span>
             </RouterLink>
           </nav>
-          <span class="account-chip">账号 / {{ currentAccountLabel }}</span>
+          <span class="account-chip" aria-live="polite">{{ accountChipText }}</span>
         </header>
         <main class="app-main">
           <NAlert v-if="props.startupError" type="error" :title="props.startupError" />
-          <NAlert v-if="enkaImportDisabledNotice" type="warning" title="Enka UID 导入当前未启用。" />
+          <NAlert v-if="enkaImportDisabledNotice" type="warning" title="展柜数据导入当前未启用。" />
           <RouterView v-if="!props.startupError" />
         </main>
         <footer class="site-footer">

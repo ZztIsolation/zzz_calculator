@@ -85,7 +85,7 @@ const OPTIMIZED_RESULT_LIMIT = 10
 const OPTIMIZER_RESULT_SLOTS = [1, 2, 3, 4, 5, 6]
 
 onMounted(async () => {
-  await Promise.all([catalogStore.load(), accountStore.load()])
+  await catalogStore.load()
   await inventoryStore.load()
   if (catalogStore.catalog && catalogStore.meta) {
     buildStore.initialize(catalogStore.catalog, catalogStore.meta)
@@ -773,8 +773,9 @@ async function runOptimization() {
   const input = optimizerInput(ownerId)
   const inputWithSettings = optimizerStore.inputWithSettings(input, inventoryStore.store)
   if (!inventoryStore.driveDiscs.length) {
+    const ownerLabel = String(owner?.label ?? "").trim()
     optimizerStore.failBeforeRun(
-      `当前账号「${owner?.label ?? ownerId}」没有可用于优化的驱动盘。请先到驱动盘页导入，或切换到包含驱动盘的账号。`,
+      `当前账号${ownerLabel ? `「${ownerLabel}」` : ""}没有可用于优化的驱动盘。请先到驱动盘页导入，或切换到包含驱动盘的账号。`,
       inputWithSettings.settings,
     )
     return

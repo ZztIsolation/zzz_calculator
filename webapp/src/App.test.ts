@@ -9,17 +9,19 @@ vi.mock("naive-ui", () => ({
 }))
 
 const routeFixture = vi.hoisted(() => ({ query: {} as Record<string, string> }))
+const accountFixture = vi.hoisted(() => ({
+  currentOwnerLabel: "myself" as string | null,
+  currentOwnerId: "internal-owner-id",
+  loadState: "ready" as "idle" | "loading" | "ready" | "error",
+  error: "",
+}))
 
 vi.mock("vue-router", () => ({
   useRoute: () => routeFixture,
 }))
 
 vi.mock("@/stores/account", () => ({
-  useAccountStore: () => ({
-    load: vi.fn(),
-    currentOwner: null,
-    currentOwnerId: "default",
-  }),
+  useAccountStore: () => accountFixture,
 }))
 
 const appConfigFixture = vi.hoisted(() => ({
@@ -53,13 +55,28 @@ beforeEach(() => {
   appConfigFixture.config.maintenanceEnabled = false
   appConfigFixture.config.enkaImportEnabled = false
   routeFixture.query = {}
+  accountFixture.currentOwnerLabel = "myself"
+  accountFixture.currentOwnerId = "internal-owner-id"
+  accountFixture.loadState = "ready"
+  accountFixture.error = ""
 })
 
 describe("App maintenance navigation", () => {
   it("hides maintenance when the API disables it", async () => {
     const wrapper = mountApp()
-    await vi.waitFor(() => expect(wrapper.text()).toContain("账号 / default"))
+    await vi.waitFor(() => expect(wrapper.text()).toContain("账号 / myself"))
+    expect(wrapper.text()).not.toContain("internal-owner-id")
     expect(wrapper.text()).not.toContain("维护")
+  })
+
+  it("does not expose the raw owner id when account loading fails", () => {
+    accountFixture.currentOwnerLabel = null
+    accountFixture.loadState = "error"
+    accountFixture.error = "IndexedDB unavailable"
+    const wrapper = mountApp()
+
+    expect(wrapper.text()).toContain("账号加载失败")
+    expect(wrapper.text()).not.toContain("internal-owner-id")
   })
 
   it("shows maintenance when the preloaded runtime config enables it", async () => {
@@ -77,7 +94,7 @@ describe("App maintenance navigation", () => {
   it("shows a notice after a disabled direct import route is redirected", () => {
     routeFixture.query = { notice: "enka-import-disabled" }
     const wrapper = mountApp()
-    expect(wrapper.get('[role="alert"]').text()).toContain("Enka UID 导入当前未启用")
+    expect(wrapper.get('[role="alert"]').text()).toContain("展柜数据导入当前未启用")
   })
 
   it("surfaces a startup recovery failure", () => {
@@ -90,7 +107,8 @@ describe("App maintenance navigation", () => {
 describe("App filing information", () => {
   it("links the ICP filing number to the MIIT filing system", () => {
     const wrapper = mountApp()
-    const filingLink = wrapper.get('a[href="https://beian.miit.gov.cn/"]')
+    const footer = wrapper.get("footer.site-footer")
+    const filingLink = footer.get('a[href="https://beian.miit.gov.cn/"]')
 
     expect(filingLink.text()).toBe("浙ICP备2026054969号-1")
     expect(filingLink.attributes("target")).toBe("_blank")

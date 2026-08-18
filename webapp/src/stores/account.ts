@@ -16,6 +16,40 @@ import { commitDriveDiscImportPlan } from "@runtime/drive-disc-import-transactio
 import { recoverPendingEnkaImport } from "@runtime/enka-import-transaction"
 import { setCurrentAccountId } from "@runtime/selection-storage.js"
 
+export type AccountLoadState = "idle" | "loading" | "ready" | "error"
+
+const pendingLoads = new WeakMap<object, Promise<any>>()
+const summaryGenerations = new WeakMap<object, number>()
+
+class AccountSummaryApplyError extends Error {}
+
+function accountErrorMessage(error: unknown) {
+  if (error && typeof error === "object" && "message" in error) {
+    const message = String((error as { message?: unknown }).message ?? "").trim()
+    if (message) return message
+  }
+  return String(error)
+}
+
+function applyAccountSummary(store: any, summary: any) {
+  const ownerId = String(summary?.currentOwnerId ?? "").trim()
+  try {
+    if (!ownerId) throw new Error("账号数据缺少当前账号。")
+    setCurrentAccountId(ownerId)
+  } catch (error) {
+    const failure = new AccountSummaryApplyError(accountErrorMessage(error))
+    summaryGenerations.set(store, (summaryGenerations.get(store) ?? 0) + 1)
+    store.loadState = "error"
+    store.error = failure.message
+    throw failure
+  }
+  summaryGenerations.set(store, (summaryGenerations.get(store) ?? 0) + 1)
+  store.summary = summary
+  store.loadState = "ready"
+  store.error = ""
+  return summary
+}
+
 function withoutOwnerSelection(document: any, ownerId: string, currentOwnerId: string): any {
   const source = document && typeof document === "object" && !Array.isArray(document)
     ? JSON.parse(JSON.stringify(document))
@@ -32,38 +66,64 @@ function withoutOwnerSelection(document: any, ownerId: string, currentOwnerId: s
 export const useAccountStore = defineStore("account", {
   state: () => ({
     summary: null as any,
-    loading: false,
+    loadState: "idle" as AccountLoadState,
     error: "",
   }),
   getters: {
     owners: state => state.summary?.owners ?? [],
-    currentOwnerId: state => state.summary?.currentOwnerId ?? "default",
-    currentOwner: state => (state.summary?.owners ?? []).find((owner: any) => owner.id === state.summary?.currentOwnerId),
+    loading: state => state.loadState === "loading",
+    currentOwnerId: state => String(state.summary?.currentOwnerId ?? "").trim() || null,
+    currentOwner: state => (state.summary?.owners ?? []).find((owner: any) => owner.id === state.summary?.currentOwnerId) ?? null,
+    currentOwnerLabel: state => {
+      const owner = (state.summary?.owners ?? []).find((item: any) => item.id === state.summary?.currentOwnerId)
+      return String(owner?.label ?? "").trim() || null
+    },
+    ownerLabelById: state => (ownerId: string) => {
+      const owner = (state.summary?.owners ?? []).find((item: any) => item.id === ownerId)
+      return String(owner?.label ?? "").trim() || null
+    },
   },
   actions: {
-    async load() {
-      this.loading = true
-      this.error = ""
-      try {
-        this.summary = await accountSummary()
-        setCurrentAccountId(this.currentOwnerId)
-      } catch (error) {
-        this.error = error instanceof Error ? error.message : String(error)
-      } finally {
-        this.loading = false
+    ensureLoaded(options: { force?: boolean } = {}) {
+      if (!options.force && this.loadState === "ready" && this.summary) {
+        return Promise.resolve(this.summary)
       }
+      const pending = pendingLoads.get(this)
+      if (pending) return pending
+
+      this.loadState = "loading"
+      this.error = ""
+      const generation = summaryGenerations.get(this) ?? 0
+      const request = accountSummary()
+        .then(summary => (summaryGenerations.get(this) ?? 0) === generation
+          ? applyAccountSummary(this, summary)
+          : this.summary)
+        .catch(error => {
+          if ((summaryGenerations.get(this) ?? 0) !== generation && !(error instanceof AccountSummaryApplyError)) {
+            return this.summary
+          }
+          this.loadState = "error"
+          this.error = accountErrorMessage(error)
+          throw error
+        })
+        .finally(() => {
+          if (pendingLoads.get(this) === request) pendingLoads.delete(this)
+        })
+      pendingLoads.set(this, request)
+      return request
+    },
+    load() {
+      return this.ensureLoaded({ force: true })
     },
     async create(label: string) {
-      this.summary = await createAccount({ label })
-      setCurrentAccountId(this.currentOwnerId)
+      applyAccountSummary(this, await createAccount({ label }))
     },
     async rename(id: string, label: string) {
-      this.summary = await updateAccount(id, { label })
+      applyAccountSummary(this, await updateAccount(id, { label }))
     },
     async switchTo(id: string) {
       await recoverPendingEnkaImport(id)
-      this.summary = await switchAccount(id)
-      setCurrentAccountId(this.currentOwnerId)
+      applyAccountSummary(this, await switchAccount(id))
     },
     async remove(id: string) {
       await recoverPendingEnkaImport(id)
@@ -86,8 +146,7 @@ export const useAccountStore = defineStore("account", {
         metadata: { deletedOwnerId: id },
       })
       await commitDriveDiscImportPlan(plan)
-      this.summary = await accountSummary()
-      setCurrentAccountId(this.currentOwnerId)
+      applyAccountSummary(this, await accountSummary())
     },
   },
 })

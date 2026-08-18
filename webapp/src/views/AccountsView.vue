@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue"
-import { NButton, NInput, NModal, NTag } from "naive-ui"
+import { computed, ref } from "vue"
+import { NAlert, NButton, NInput, NModal, NTag } from "naive-ui"
 import { Check, Pencil, Plus, Trash2 } from "lucide-vue-next"
 import ConfirmDialog from "@/components/ConfirmDialog.vue"
 import { useAccountStore } from "@/stores/account"
@@ -11,11 +11,16 @@ const editingId = ref("")
 const labelDraft = ref("")
 const deleteId = ref("")
 
-onMounted(() => {
-  void accountStore.load()
-})
-
 const deleteTarget = computed(() => accountStore.owners.find((owner: any) => owner.id === deleteId.value))
+const accountUnavailable = computed(() => accountStore.loadState !== "ready")
+
+async function retryAccountLoad() {
+  try {
+    await accountStore.ensureLoaded()
+  } catch {
+    // The shared store exposes the error to this view.
+  }
+}
 
 function createAccount() {
   editingId.value = ""
@@ -25,7 +30,7 @@ function createAccount() {
 
 function renameAccount(owner: any) {
   editingId.value = owner.id
-  labelDraft.value = owner.label || owner.name || owner.id
+  labelDraft.value = owner.label || owner.name || "账号"
   showEditor.value = true
 }
 
@@ -49,16 +54,23 @@ async function confirmDelete() {
   <section class="panel">
     <div class="panel-header">
       <h1 class="panel-title">账号</h1>
-      <NButton type="primary" @click="createAccount">
+      <NButton type="primary" :disabled="accountUnavailable" @click="createAccount">
         <template #icon><Plus :size="16" /></template>
         新建账号
       </NButton>
     </div>
     <div class="panel-body">
-      <div v-if="accountStore.owners.length" class="entity-grid">
+      <NAlert v-if="accountStore.loadState === 'error'" type="error" title="账号信息加载失败">
+        {{ accountStore.error }}
+        <NButton secondary size="small" @click="retryAccountLoad">重试</NButton>
+      </NAlert>
+      <div v-else-if="accountStore.loadState === 'loading' || accountStore.loadState === 'idle'" class="empty-state">
+        正在加载账号…
+      </div>
+      <div v-else-if="accountStore.owners.length" class="entity-grid">
         <article v-for="owner in accountStore.owners" :key="owner.id" class="panel">
           <div class="panel-header">
-            <h2 class="panel-title">{{ owner.label || owner.name || owner.id }}</h2>
+            <h2 class="panel-title">{{ owner.label }}</h2>
             <NTag v-if="owner.id === accountStore.currentOwnerId" type="success" round>
               当前
             </NTag>
@@ -83,15 +95,15 @@ async function confirmDelete() {
               </div>
             </dl>
             <div class="toolbar">
-              <NButton :disabled="owner.id === accountStore.currentOwnerId" @click="accountStore.switchTo(owner.id)">
+              <NButton :disabled="accountUnavailable || owner.id === accountStore.currentOwnerId" @click="accountStore.switchTo(owner.id)">
                 <template #icon><Check :size="16" /></template>
                 切换
               </NButton>
-              <NButton @click="renameAccount(owner)">
+              <NButton :disabled="accountUnavailable" @click="renameAccount(owner)">
                 <template #icon><Pencil :size="16" /></template>
                 改名
               </NButton>
-              <NButton type="error" :disabled="owner.id === accountStore.currentOwnerId" @click="deleteId = owner.id">
+              <NButton type="error" :disabled="accountUnavailable || owner.id === accountStore.currentOwnerId" @click="deleteId = owner.id">
                 <template #icon><Trash2 :size="16" /></template>
                 删除
               </NButton>
@@ -115,7 +127,7 @@ async function confirmDelete() {
     :show="Boolean(deleteId)"
     danger
     title="删除账号"
-    :message="`将删除「${deleteTarget?.label || deleteTarget?.id || ''}」下的 ${deleteTarget?.driveDiscCount ?? 0} 个驱动盘、${deleteTarget?.loadoutCount ?? 0} 个套装预设和 ${deleteTarget?.importCount ?? 0} 条导入记录。`"
+    :message="`将删除「${deleteTarget?.label || ''}」下的 ${deleteTarget?.driveDiscCount ?? 0} 个驱动盘、${deleteTarget?.loadoutCount ?? 0} 个套装预设和 ${deleteTarget?.importCount ?? 0} 条导入记录。`"
     confirm-text="删除账号"
     @update:show="value => { if (!value) deleteId = '' }"
     @confirm="confirmDelete"

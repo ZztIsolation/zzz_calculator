@@ -137,7 +137,7 @@ test("disabled import route redirects home with a visible notice", async ({ page
   await mockAppConfig(page, false)
   await page.goto("/import")
   await expect(page).toHaveURL(/\/?\?notice=enka-import-disabled$/)
-  await expect(page.getByRole("alert")).toContainText("Enka UID 导入当前未启用")
+  await expect(page.getByRole("alert")).toContainText("展柜数据导入当前未启用")
   await expect(page.getByRole("link", { name: "导入" })).toHaveCount(0)
 })
 
@@ -146,8 +146,28 @@ test("five-agent import requires preview, persists both configs, and can undo", 
   await mockAppConfig(page, true)
   await mockShowcase(page)
 
+  await page.goto("/")
+  const initialStore = await readInventoryStore(page) ?? {
+    version: 1,
+    currentOwnerId: "default",
+    owners: [{ id: "default", label: "默认用户" }],
+    imports: [],
+    driveDiscs: [],
+    driveDiscLoadouts: [],
+  }
+  initialStore.owners = initialStore.owners.map((owner: any) => owner.id === initialStore.currentOwnerId
+    ? { ...owner, label: "myself" }
+    : owner)
+  await writeInventoryStore(page, initialStore)
   await page.goto("/import")
-  await expect(page.getByRole("heading", { name: "Enka 展柜导入" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "展柜数据导入" })).toBeVisible()
+  await expect(page.locator(".account-chip")).toHaveText("账号 / myself")
+  await expect(page.locator(".page-header p")).toContainText("当前账号：myself")
+  await expect(page.locator(".page-header p")).not.toContainText("account-")
+  await page.evaluate(() => {
+    localStorage.removeItem("zzz-calculator.webapp.build.v1")
+    localStorage.removeItem("zzz-calculator.homeSelection.v1")
+  })
   await page.getByLabel("游戏 UID").fill(uid)
   await page.getByRole("button", { name: "读取展柜" }).click()
   await expect(page.getByLabel(/^选择导入 /)).toHaveCount(5)
@@ -193,9 +213,9 @@ test("five-agent import requires preview, persists both configs, and can undo", 
   expect(inventory.driveDiscs).toHaveLength(1)
 
   await page.getByRole("button", { name: "撤销上次导入" }).click()
-  const undoFeedback = page.locator(".n-message").filter({ hasText: "最近一次 Enka 导入已撤销。" })
+  const undoFeedback = page.locator(".n-message").filter({ hasText: "最近一次展柜数据导入已撤销。" })
   await expect(undoFeedback).toBeVisible()
-  await expect(undoFeedback).toContainText("最近一次 Enka 导入已撤销。")
+  await expect(undoFeedback).toContainText("最近一次展柜数据导入已撤销。")
   const undone = await page.evaluate(() => ({
     build: JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "null"),
     legacy: JSON.parse(localStorage.getItem("zzz-calculator.homeSelection.v1") || "null"),
@@ -227,7 +247,7 @@ test("startup recovery rolls back a prepared transaction with partial configs", 
   })
 
   await page.reload()
-  await expect(page.getByRole("heading", { name: "Enka 展柜导入" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "展柜数据导入" })).toBeVisible()
   await expect.poll(async () => (await readInventoryStore(page)).enkaImportState.byOwner.default.undoJournal).toBeNull()
   const recovered = await page.evaluate(() => ({
     build: JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "null"),
