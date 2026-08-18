@@ -137,7 +137,12 @@ async function openPreview() {
   const frozenUid = uid.value.trim()
   const frozenAgents = JSON.parse(JSON.stringify(selectedAgents.value))
   try {
-    previewPlan.value = await planEnkaImport(frozenUid, frozenAgents)
+    const plan = await planEnkaImport(frozenUid, frozenAgents)
+    previewPlan.value = {
+      ...plan,
+      skippedAgents: JSON.parse(JSON.stringify(skippedAgents.value)),
+      warnings: [...new Set([...warnings.value, ...(plan.warnings ?? [])])],
+    }
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : String(caught)
   } finally {
@@ -292,6 +297,12 @@ onBeforeUnmount(() => requestController?.abort())
               </ul>
               <NAlert v-if="agent.drive?.skipped" type="warning" :title="agent.drive.reason" />
             </div>
+            <NAlert
+              v-for="item in previewPlan.skippedAgents"
+              :key="`skipped-${item.enkaId}`"
+              type="warning"
+              :title="`${item.name}：${item.reason}`"
+            />
             <NAlert v-for="warning in previewPlan.warnings" :key="warning" type="warning" :title="warning" />
           </div>
         </NSpin>

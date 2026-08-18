@@ -121,10 +121,11 @@ await assert.rejects(
 
 let releaseQueue
 const queueProxy = createEnkaProxy({
+  globalLimit: 2,
   maxConcurrent: 1,
   maxQueue: 0,
   fetchImpl: async () => {
-    await new Promise(resolve => { releaseQueue = resolve })
+    if (!releaseQueue) await new Promise(resolve => { releaseQueue = resolve })
     return jsonResponse(fakeShowcase)
   },
 })
@@ -136,5 +137,7 @@ await assert.rejects(
 )
 releaseQueue()
 await queuedFirst
+await queueProxy.request("1308423787", { ip: "c" })
+assert.equal(queueProxy.metrics().upstreamRequests, 2)
 
 console.log("enka-proxy.test.js: all assertions passed")

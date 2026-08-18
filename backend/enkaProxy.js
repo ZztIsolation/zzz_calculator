@@ -228,20 +228,22 @@ export function createEnkaProxy(options = {}) {
   }
 
   async function upstream(uid) {
-    rateLimitGlobal()
     await acquire()
-    metrics.upstreamRequests += 1
     try {
-      const result = await fetchEnkaShowcase(uid, { ...options, fetchImpl })
-      const expiresAt = now() + result.ttlSeconds * 1000
-      cache.set(uid, { ...result, expiresAt })
-      return { ...result, cache: { hit: false, expiresAt: new Date(expiresAt).toISOString() } }
-    } catch (error) {
-      metrics.upstreamErrors += 1
-      if (error instanceof EnkaProxyError && error.status === 404) {
-        cache.set(uid, { error: cloneError(error), expiresAt: now() + notFoundTtlMs })
+      rateLimitGlobal()
+      metrics.upstreamRequests += 1
+      try {
+        const result = await fetchEnkaShowcase(uid, { ...options, fetchImpl })
+        const expiresAt = now() + result.ttlSeconds * 1000
+        cache.set(uid, { ...result, expiresAt })
+        return { ...result, cache: { hit: false, expiresAt: new Date(expiresAt).toISOString() } }
+      } catch (error) {
+        metrics.upstreamErrors += 1
+        if (error instanceof EnkaProxyError && error.status === 404) {
+          cache.set(uid, { error: cloneError(error), expiresAt: now() + notFoundTtlMs })
+        }
+        throw error
       }
-      throw error
     } finally {
       release()
     }

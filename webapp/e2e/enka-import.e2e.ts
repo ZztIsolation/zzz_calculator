@@ -117,8 +117,8 @@ async function mockShowcase(page: Page) {
       cache: { hit: false, expiresAt: "2026-08-18T12:00:00.000Z" },
       ttlSeconds: 60,
       agents,
-      skippedAgents: [],
-      warnings: [],
+      skippedAgents: [{ enkaId: "999", name: "未收录角色", reason: "目录未映射" }],
+      warnings: [{ code: "DISC_SKIPPED", message: "6号位属性无法映射，已跳过。" }],
     }),
   }))
 }
@@ -165,6 +165,8 @@ test("five-agent import requires preview, persists both configs, and can undo", 
   await expect(dialog).toContainText(`UID ${uid} / 5 个角色`)
   await expect(dialog.getByRole("heading", { level: 3 })).toHaveCount(5)
   await expect(dialog.getByRole("list", { name: "驱动盘同步变化" })).toContainText("新增：1号位 啄木鸟电音")
+  await expect(dialog).toContainText("未收录角色：目录未映射")
+  await expect(dialog).toContainText("6号位属性无法映射，已跳过。")
   await expect(page.getByLabel("游戏 UID")).toBeDisabled()
   for (const agent of agents) await expect(page.getByLabel(`选择导入 ${agent.agentName}`)).toBeDisabled()
   await expectNoHorizontalOverflow(page)

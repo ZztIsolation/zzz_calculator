@@ -188,6 +188,7 @@ const legacyStore = {
     source: { type: "enka-showcase", agentId },
   }],
 }
+delete legacyStore.driveDiscs[0].source
 const migrationPlan = buildDriveDiscSyncPlan({
   uid,
   mappedAgents: [{ agentId, agentName: "星见雅", driveDiscSourceCount: null, driveDiscPreset: null }],

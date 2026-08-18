@@ -204,4 +204,48 @@ describe("ImportView", () => {
     expect(button(wrapper, "读取展柜").attributes("disabled")).toBeDefined()
     expect(mocks.importEnkaShowcase).not.toHaveBeenCalled()
   })
+
+  it("allows a failed showcase request to be retried", async () => {
+    mocks.importEnkaShowcase
+      .mockRejectedValueOnce(new Error("temporary upstream failure"))
+      .mockResolvedValueOnce({ mappedAgents: agents, skippedAgents: [], warnings: [], ttlSeconds: 30 })
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('input[aria-label="游戏 UID"]').setValue("1302309616")
+    await button(wrapper, "读取展柜").trigger("click")
+    await flushPromises()
+    expect(wrapper.text()).toContain("temporary upstream failure")
+
+    await button(wrapper, "读取展柜").trigger("click")
+    await flushPromises()
+    expect(mocks.importEnkaShowcase).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).toContain("星见雅")
+  })
+
+  it("freezes diagnostics in preview and ignores duplicate confirmation", async () => {
+    mocks.importEnkaShowcase.mockResolvedValue({
+      mappedAgents: agents,
+      skippedAgents: [{ enkaId: "999", name: "未收录角色", reason: "目录未映射" }],
+      warnings: ["服务端映射警告"],
+      ttlSeconds: 30,
+    })
+    let resolveApply: (value: any) => void = () => {}
+    mocks.applyEnkaImportPlan.mockImplementation(() => new Promise(resolve => { resolveApply = resolve }))
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('input[aria-label="游戏 UID"]').setValue("1302309616")
+    await button(wrapper, "读取展柜").trigger("click")
+    await flushPromises()
+    await button(wrapper, "预览更改（2）").trigger("click")
+    await flushPromises()
+    expect(wrapper.get("[data-modal]").text()).toContain("未收录角色：目录未映射")
+    expect(wrapper.get("[data-modal]").text()).toContain("服务端映射警告")
+
+    const confirm = button(wrapper, "确认导入")
+    await confirm.trigger("click")
+    await confirm.trigger("click")
+    expect(mocks.applyEnkaImportPlan).toHaveBeenCalledOnce()
+    resolveApply({ transactionId: "tx" })
+    await flushPromises()
+  })
 })

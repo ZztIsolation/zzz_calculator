@@ -74,6 +74,16 @@ function migrateLegacyManagedData(store, ownerId, uid, now) {
   const warnings = []
   const idChanges = new Map()
   const migrations = { driveDiscs: [], loadouts: [] }
+  const legacyAgentByDiscId = new Map()
+  for (const loadout of store.driveDiscLoadouts ?? []) {
+    if (!belongsToOwner(loadout, ownerId)) continue
+    const explicitLegacyLoadout = loadout?.source?.type === LEGACY_MANAGED_SOURCE
+      || String(loadout?.id ?? "").startsWith("enka-showcase-")
+    if (!explicitLegacyLoadout) continue
+    for (const discId of Object.values(loadout.driveDiscIdsBySlot ?? {})) {
+      legacyAgentByDiscId.set(String(discId), String(loadout.agentId ?? ""))
+    }
+  }
   const otherDiscs = []
   const scopedDiscs = []
   for (const disc of store.driveDiscs ?? []) {
@@ -85,8 +95,9 @@ function migrateLegacyManagedData(store, ownerId, uid, now) {
   let migratedDiscs = 0
   for (const disc of [...scopedDiscs]) {
     const oldId = String(disc.id)
-    const equipmentUid = disc?.source?.type === LEGACY_MANAGED_SOURCE ? legacyEquipmentUid(disc.id) : ""
+    const equipmentUid = legacyEquipmentUid(disc.id)
     if (!equipmentUid) continue
+    const legacyAgentId = String(disc?.source?.agentId ?? legacyAgentByDiscId.get(oldId) ?? "")
     const nextId = enkaDriveDiscId(uid, equipmentUid)
     const collision = byId.get(nextId)
     if (collision && collision !== disc) {
@@ -107,6 +118,7 @@ function migrateLegacyManagedData(store, ownerId, uid, now) {
         ...disc.source,
         type: MANAGED_SOURCE,
         uid,
+        ...(legacyAgentId ? { agentId: legacyAgentId } : {}),
         equipmentUid,
       }
       disc.updatedAt = now
@@ -114,7 +126,7 @@ function migrateLegacyManagedData(store, ownerId, uid, now) {
     }
     idChanges.set(oldId, nextId)
     migrations.driveDiscs.push({
-      agentId: String(disc?.source?.agentId ?? ""),
+      agentId: legacyAgentId,
       beforeId: oldId,
       afterId: nextId,
       partition: disc.partition,
