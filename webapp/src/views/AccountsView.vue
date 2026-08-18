@@ -77,6 +77,10 @@ async function confirmDelete() {
                 <dt>导入记录</dt>
                 <dd class="num">{{ owner.importCount ?? 0 }}</dd>
               </div>
+              <div class="metric">
+                <dt>Enka UID</dt>
+                <dd>{{ owner.enkaUid || "未绑定" }}</dd>
+              </div>
             </dl>
             <div class="toolbar">
               <NButton :disabled="owner.id === accountStore.currentOwnerId" @click="accountStore.switchTo(owner.id)">

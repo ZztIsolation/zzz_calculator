@@ -71,6 +71,7 @@ async function mockRestrictionUi(page: Page, reservations: boolean, exclusions =
       maintenanceEnabled: false,
       scanTelemetryEnabled: false,
       scanTelemetryRetentionDays: 30,
+      enkaImportEnabled: false,
       driveDiscReservationsUiEnabled: reservations,
       driveDiscExclusionsUiEnabled: exclusions,
     }),

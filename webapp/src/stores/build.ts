@@ -35,8 +35,9 @@ import {
   loadCurrentOwnerSelection,
   saveCurrentOwnerSelection,
 } from "@runtime/selection-storage.js"
+import { WEBAPP_BUILD_STORAGE_KEY } from "@runtime/build-storage"
 
-export const STORAGE_KEY = "zzz-calculator.webapp.build.v1"
+export const STORAGE_KEY = WEBAPP_BUILD_STORAGE_KEY
 const OLD_HOME_SELECTION_KEY = "zzz-calculator.homeSelection.v1"
 
 export const ELEMENTS = ["physical", "fire", "ice", "electric", "ether", "wind"]

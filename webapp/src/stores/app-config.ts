@@ -5,6 +5,7 @@ const DEFAULT_CONFIG: AppConfig = {
   maintenanceEnabled: false,
   scanTelemetryEnabled: false,
   scanTelemetryRetentionDays: 30,
+  enkaImportEnabled: false,
   driveDiscReservationsUiEnabled: false,
   driveDiscExclusionsUiEnabled: false,
 }
@@ -19,6 +20,7 @@ export const useAppConfigStore = defineStore("app-config", {
   getters: {
     driveDiscReservationsUiEnabled: state => state.config.driveDiscReservationsUiEnabled,
     driveDiscExclusionsUiEnabled: state => state.config.driveDiscExclusionsUiEnabled,
+    enkaImportEnabled: state => state.config.enkaImportEnabled,
   },
   actions: {
     async load() {

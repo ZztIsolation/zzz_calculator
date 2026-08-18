@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue"
-import { NConfigProvider, NMessageProvider, type GlobalThemeOverrides } from "naive-ui"
-import { Calculator, Database, HardDrive, Settings2, UserRound } from "lucide-vue-next"
+import { NAlert, NConfigProvider, NMessageProvider, type GlobalThemeOverrides } from "naive-ui"
+import { Calculator, Database, Download, HardDrive, Settings2, UserRound } from "lucide-vue-next"
+import { useRoute } from "vue-router"
 import { useAccountStore } from "@/stores/account"
 import { useAppConfigStore } from "@/stores/app-config"
 
 const accountStore = useAccountStore()
 const appConfigStore = useAppConfigStore()
+const route = useRoute()
+const props = defineProps<{ startupError?: string }>()
 const maintenanceEnabled = computed(() => appConfigStore.config.maintenanceEnabled)
+const enkaImportEnabled = computed(() => appConfigStore.config.enkaImportEnabled)
+const enkaImportDisabledNotice = computed(() => route.query.notice === "enka-import-disabled")
 
 onMounted(() => {
   void accountStore.load()
@@ -96,6 +101,10 @@ const themeOverrides: GlobalThemeOverrides = {
               <UserRound :size="16" />
               <span>账号</span>
             </RouterLink>
+            <RouterLink v-if="enkaImportEnabled" to="/import">
+              <Download :size="16" />
+              <span>导入</span>
+            </RouterLink>
             <RouterLink to="/settings">
               <HardDrive :size="16" />
               <span>设置</span>
@@ -108,6 +117,8 @@ const themeOverrides: GlobalThemeOverrides = {
           <span class="account-chip">账号 / {{ currentAccountLabel }}</span>
         </header>
         <main class="app-main">
+          <NAlert v-if="props.startupError" type="error" :title="props.startupError" />
+          <NAlert v-if="enkaImportDisabledNotice" type="warning" title="Enka UID 导入当前未启用。" />
           <RouterView />
         </main>
         <footer class="site-footer">

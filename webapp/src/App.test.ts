@@ -3,8 +3,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import App from "@/App.vue"
 
 vi.mock("naive-ui", () => ({
+  NAlert: { props: ["title"], template: '<div role="alert">{{ title }}</div>' },
   NConfigProvider: { template: "<div><slot /></div>" },
   NMessageProvider: { template: "<div><slot /></div>" },
+}))
+
+const routeFixture = vi.hoisted(() => ({ query: {} as Record<string, string> }))
+
+vi.mock("vue-router", () => ({
+  useRoute: () => routeFixture,
 }))
 
 vi.mock("@/stores/account", () => ({
@@ -20,6 +27,7 @@ const appConfigFixture = vi.hoisted(() => ({
     maintenanceEnabled: false,
     scanTelemetryEnabled: false,
     scanTelemetryRetentionDays: 30,
+    enkaImportEnabled: false,
     driveDiscReservationsUiEnabled: false,
     driveDiscExclusionsUiEnabled: false,
   },
@@ -29,8 +37,9 @@ vi.mock("@/stores/app-config", () => ({
   useAppConfigStore: () => appConfigFixture,
 }))
 
-function mountApp() {
+function mountApp(props: Record<string, unknown> = {}) {
   return mount(App, {
+    props,
     global: {
       stubs: {
         RouterLink: { template: "<a><slot /></a>" },
@@ -42,6 +51,8 @@ function mountApp() {
 
 beforeEach(() => {
   appConfigFixture.config.maintenanceEnabled = false
+  appConfigFixture.config.enkaImportEnabled = false
+  routeFixture.query = {}
 })
 
 describe("App maintenance navigation", () => {
@@ -55,6 +66,23 @@ describe("App maintenance navigation", () => {
     appConfigFixture.config.maintenanceEnabled = true
     const wrapper = mountApp()
     await vi.waitFor(() => expect(wrapper.text()).toContain("维护"))
+  })
+
+  it("shows Enka import only when the runtime config enables it", async () => {
+    appConfigFixture.config.enkaImportEnabled = true
+    const wrapper = mountApp()
+    await vi.waitFor(() => expect(wrapper.text()).toContain("导入"))
+  })
+
+  it("shows a notice after a disabled direct import route is redirected", () => {
+    routeFixture.query = { notice: "enka-import-disabled" }
+    const wrapper = mountApp()
+    expect(wrapper.get('[role="alert"]').text()).toContain("Enka UID 导入当前未启用")
+  })
+
+  it("surfaces a startup recovery failure", () => {
+    const wrapper = mountApp({ startupError: "恢复失败" })
+    expect(wrapper.get('[role="alert"]').text()).toContain("恢复失败")
   })
 })
 

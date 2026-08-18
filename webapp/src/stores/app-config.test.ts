@@ -17,6 +17,7 @@ describe("app config store", () => {
       maintenanceEnabled: false,
       scanTelemetryEnabled: false,
       scanTelemetryRetentionDays: 30,
+      enkaImportEnabled: true,
       driveDiscReservationsUiEnabled: true,
       driveDiscExclusionsUiEnabled: true,
     })
@@ -25,6 +26,7 @@ describe("app config store", () => {
     expect(store.loaded).toBe(true)
     expect(store.driveDiscReservationsUiEnabled).toBe(true)
     expect(store.driveDiscExclusionsUiEnabled).toBe(true)
+    expect(store.enkaImportEnabled).toBe(true)
     expect(loadAppConfig).toHaveBeenCalledOnce()
   })
 
@@ -36,5 +38,6 @@ describe("app config store", () => {
     expect(store.loaded).toBe(false)
     expect(store.driveDiscReservationsUiEnabled).toBe(false)
     expect(store.driveDiscExclusionsUiEnabled).toBe(false)
+    expect(store.enkaImportEnabled).toBe(false)
   })
 })

@@ -1316,7 +1316,7 @@ function complexityText(metrics: any = {}, settings: any = {}) {
           <div class="build-compact-grid ui-field-grid" data-layout-surface="w-engine-fields">
             <label class="compact-field ui-field" data-layout-field>
               <span>等级</span>
-              <NInputNumber v-model:value="buildStore.wEngineLevel" :min="1" :max="60" size="small" />
+              <NInputNumber v-model:value="buildStore.wEngineLevel" :min="0" :max="60" size="small" />
             </label>
             <label class="compact-field ui-field" data-layout-field>
               <span>精修</span>

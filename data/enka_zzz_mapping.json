@@ -1,0 +1,4313 @@
+{
+  "version": 1,
+  "source": {
+    "repository": "EnkaNetwork/API-docs",
+    "commit": "dc86b5dc06ad27d26c9a4df9f0b6ffd0417bf554"
+  },
+  "agents": {
+    "1011": {
+      "id": "anby_demara",
+      "name": "安比"
+    },
+    "1091": {
+      "id": "hoshimi_miyabi",
+      "name": "星见雅"
+    },
+    "1371": {
+      "id": "yixuan",
+      "name": "仪玄"
+    },
+    "1401": {
+      "id": "alice_thymefield",
+      "name": "爱丽丝"
+    },
+    "1431": {
+      "id": "ye_shunguang",
+      "name": "叶瞬光"
+    },
+    "1501": {
+      "id": "aria",
+      "name": "爱芮"
+    },
+    "1581": {
+      "id": "remielle_dan",
+      "name": "蕾米埃尔·丹"
+    }
+  },
+  "wEngines": {
+    "12001": {
+      "id": "zzz_wiki_118",
+      "name": "「月相」-望"
+    },
+    "12002": {
+      "id": "zzz_wiki_114",
+      "name": "「月相」-晦"
+    },
+    "12003": {
+      "id": "zzz_wiki_117",
+      "name": "「月相」-朔"
+    },
+    "12004": {
+      "id": "zzz_wiki_128",
+      "name": "「残响」-Ⅰ型"
+    },
+    "12005": {
+      "id": "zzz_wiki_129",
+      "name": "「残响」-Ⅱ型"
+    },
+    "12006": {
+      "id": "zzz_wiki_93",
+      "name": "「残响」-Ⅲ型"
+    },
+    "13001": {
+      "id": "zzz_wiki_222",
+      "name": "街头巨星"
+    },
+    "13002": {
+      "id": "zzz_wiki_216",
+      "name": "时光切片"
+    },
+    "13004": {
+      "id": "zzz_wiki_156",
+      "name": "星徽引擎"
+    },
+    "13008": {
+      "id": "zzz_wiki_212",
+      "name": "双生泣星"
+    },
+    "13009": {
+      "id": "zzz_wiki_210",
+      "name": "触电唇彩"
+    },
+    "13012": {
+      "id": "zzz_wiki_1343",
+      "name": "幻变魔方"
+    },
+    "13013": {
+      "id": "zzz_wiki_744",
+      "name": "鎏金花信"
+    },
+    "13014": {
+      "id": "zzz_wiki_1340",
+      "name": "电波漫步"
+    },
+    "13015": {
+      "id": "zzz_wiki_995",
+      "name": "强音热望"
+    },
+    "13019": {
+      "id": "zzz_wiki_1774",
+      "name": "青漪灵鼎"
+    },
+    "13101": {
+      "id": "demara_battery_mark_ii",
+      "name": "德玛拉电池II型"
+    },
+    "13103": {
+      "id": "zzz_wiki_217",
+      "name": "聚宝箱"
+    },
+    "13106": {
+      "id": "zzz_wiki_264",
+      "name": "家政员"
+    },
+    "13108": {
+      "id": "zzz_wiki_263",
+      "name": "仿制星徽引擎"
+    },
+    "13111": {
+      "id": "zzz_wiki_265",
+      "name": "旋钻机-赤轴"
+    },
+    "13113": {
+      "id": "zzz_wiki_215",
+      "name": "含羞恶面"
+    },
+    "13115": {
+      "id": "zzz_wiki_486",
+      "name": "好斗的阿炮"
+    },
+    "13128": {
+      "id": "zzz_wiki_494",
+      "name": "轰鸣座驾"
+    },
+    "13144": {
+      "id": "zzz_wiki_1612",
+      "name": "燔火胧夜"
+    },
+    "14001": {
+      "id": "zzz_wiki_221",
+      "name": "加农转子"
+    },
+    "14002": {
+      "id": "zzz_wiki_213",
+      "name": "逍遥游球"
+    },
+    "14102": {
+      "id": "zzz_wiki_224",
+      "name": "钢铁肉垫"
+    },
+    "14104": {
+      "id": "zzz_wiki_223",
+      "name": "硫磺石"
+    },
+    "14105": {
+      "id": "zzz_wiki_1664",
+      "name": "海妖摇篮"
+    },
+    "14107": {
+      "id": "zzz_wiki_799",
+      "name": "奔袭獠牙"
+    },
+    "14109": {
+      "id": "hailfall_star_palace",
+      "name": "霰落星殿"
+    },
+    "14116": {
+      "id": "zzz_wiki_951",
+      "name": "焰心桂冠"
+    },
+    "14118": {
+      "id": "zzz_wiki_214",
+      "name": "嵌合编译器"
+    },
+    "14119": {
+      "id": "zzz_wiki_225",
+      "name": "深海访客"
+    },
+    "14120": {
+      "id": "zzz_wiki_991",
+      "name": "残心青囊"
+    },
+    "14121": {
+      "id": "zzz_wiki_218",
+      "name": "啜泣摇篮"
+    },
+    "14122": {
+      "id": "zzz_wiki_915",
+      "name": "时流贤者"
+    },
+    "14124": {
+      "id": "zzz_wiki_211",
+      "name": "防暴者Ⅵ型"
+    },
+    "14125": {
+      "id": "zzz_wiki_678",
+      "name": "玉壶青冰"
+    },
+    "14126": {
+      "id": "zzz_wiki_760",
+      "name": "淬锋钳刺"
+    },
+    "14129": {
+      "id": "zzz_wiki_1305",
+      "name": "千面日陨"
+    },
+    "14130": {
+      "id": "zzz_wiki_1586",
+      "name": "嚣枪喧焰"
+    },
+    "14131": {
+      "id": "zzz_wiki_1107",
+      "name": "玲珑妆匣"
+    },
+    "14132": {
+      "id": "zzz_wiki_1159",
+      "name": "心弦夜响"
+    },
+    "14133": {
+      "id": "zzz_wiki_1277",
+      "name": "飞鸟星梦"
+    },
+    "14134": {
+      "id": "zzz_wiki_1753",
+      "name": "半糖雪兔"
+    },
+    "14136": {
+      "id": "zzz_wiki_1243",
+      "name": "索魂影眸"
+    },
+    "14137": {
+      "id": "zzz_wiki_1342",
+      "name": "青溟笼舍"
+    },
+    "14138": {
+      "id": "zzz_wiki_1197",
+      "name": "牺牲洁纯"
+    },
+    "14139": {
+      "id": "zzz_wiki_1427",
+      "name": "福虓炉炉"
+    },
+    "14140": {
+      "id": "tenfold_starforge",
+      "name": "十方锻星"
+    },
+    "14141": {
+      "id": "zzz_wiki_1463",
+      "name": "狸法七变化"
+    },
+    "14143": {
+      "id": "cloudcleave_radiance",
+      "name": "云霓孤光"
+    },
+    "14145": {
+      "id": "zzz_wiki_1611",
+      "name": "铸梦炉歌"
+    },
+    "14146": {
+      "id": "zzz_wiki_1553",
+      "name": "机巧心种"
+    },
+    "14147": {
+      "id": "zzz_wiki_1721",
+      "name": "怒目金刚"
+    },
+    "14148": {
+      "id": "zzz_wiki_1689",
+      "name": "昨夜来电"
+    },
+    "14149": {
+      "id": "zzz_wiki_1826",
+      "name": "思络成歌"
+    },
+    "14150": {
+      "id": "zzz_wiki_1883",
+      "name": "壳中之灵"
+    },
+    "14151": {
+      "id": "zzz_wiki_1908",
+      "name": "霓虹妄想"
+    },
+    "14152": {
+      "id": "zzz_wiki_1941",
+      "name": "鳞齿寻踪"
+    },
+    "14153": {
+      "id": "zzz_wiki_2002",
+      "name": "辉骑面铠"
+    },
+    "14155": {
+      "id": "zzz_wiki_2031",
+      "name": "日冕遗蜕"
+    },
+    "14156": {
+      "id": "zzz_wiki_2030",
+      "name": "琳琅鎏心"
+    },
+    "14157": {
+      "id": "zzz_wiki_2088",
+      "name": "首席跟班"
+    },
+    "14158": {
+      "id": "zzz_wiki_2109",
+      "name": "空羽复归之诗"
+    }
+  },
+  "driveDiscSuits": {
+    "31000": {
+      "id": "woodpecker_electro",
+      "name": "啄木鸟电音"
+    },
+    "31100": {
+      "id": "puffer_electro",
+      "name": "河豚电音"
+    },
+    "31200": {
+      "id": "shockstar_disco",
+      "name": "震星迪斯科"
+    },
+    "31300": {
+      "id": "freedom_blues",
+      "name": "自由蓝调"
+    },
+    "31400": {
+      "id": "hormone_punk",
+      "name": "激素朋克"
+    },
+    "31500": {
+      "id": "soul_rock",
+      "name": "灵魂摇滚"
+    },
+    "31600": {
+      "id": "swing_jazz",
+      "name": "摇摆爵士"
+    },
+    "31800": {
+      "id": "chaos_jazz",
+      "name": "混沌爵士"
+    },
+    "31900": {
+      "id": "proto_punk",
+      "name": "原始朋克"
+    },
+    "32200": {
+      "id": "inferno_metal",
+      "name": "炎狱重金属"
+    },
+    "32300": {
+      "id": "chaotic_metal",
+      "name": "混沌重金属"
+    },
+    "32400": {
+      "id": "thunder_metal",
+      "name": "雷暴重金属"
+    },
+    "32500": {
+      "id": "polar_metal",
+      "name": "极地重金属"
+    },
+    "32600": {
+      "id": "fanged_metal",
+      "name": "獠牙重金属"
+    },
+    "32700": {
+      "id": "scanner-set-48ee0a14625f",
+      "name": "折枝剑歌"
+    },
+    "32800": {
+      "id": "zzz_wiki_1001",
+      "name": "静听嘉音"
+    },
+    "32900": {
+      "id": "shadow_harmony",
+      "name": "如影相随"
+    },
+    "33000": {
+      "id": "phaethons_melody",
+      "name": "法厄同之歌"
+    },
+    "33100": {
+      "id": "yunkui_tales",
+      "name": "云岿如我"
+    },
+    "33200": {
+      "id": "king_of_the_summit",
+      "name": "山大王"
+    },
+    "33300": {
+      "id": "zzz_wiki_1552",
+      "name": "拂晓生花"
+    },
+    "33400": {
+      "id": "moonlight_lullaby",
+      "name": "月光骑士颂"
+    },
+    "33500": {
+      "id": "scanner-set-fcf8ae93d798",
+      "name": "沧浪行歌"
+    },
+    "33600": {
+      "id": "astral_voice",
+      "name": "流光咏叹"
+    },
+    "33700": {
+      "id": "zzz_wiki_1907",
+      "name": "雪兔梦游仙境"
+    },
+    "33800": {
+      "id": "zzz_wiki_1906",
+      "name": "囚徒手记"
+    },
+    "33900": {
+      "id": "zzz_wiki_2038",
+      "name": "呼啸沙龙"
+    },
+    "34000": {
+      "id": "zzz_wiki_2029",
+      "name": "拂晓行纪"
+    },
+    "34100": {
+      "id": "zzz_wiki_2116",
+      "name": "谶羽之誓"
+    },
+    "34200": {
+      "id": "zzz_wiki_2121",
+      "name": "棘刺玫瑰"
+    }
+  },
+  "driveDiscEquipment": {
+    "31021": {
+      "setId": "woodpecker_electro",
+      "setName": "啄木鸟电音",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31022": {
+      "setId": "woodpecker_electro",
+      "setName": "啄木鸟电音",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31023": {
+      "setId": "woodpecker_electro",
+      "setName": "啄木鸟电音",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31024": {
+      "setId": "woodpecker_electro",
+      "setName": "啄木鸟电音",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31025": {
+      "setId": "woodpecker_electro",
+      "setName": "啄木鸟电音",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31026": {
+      "setId": "woodpecker_electro",
+      "setName": "啄木鸟电音",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31031": {
+      "setId": "woodpecker_electro",
+      "setName": "啄木鸟电音",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31032": {
+      "setId": "woodpecker_electro",
+      "setName": "啄木鸟电音",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31033": {
+      "setId": "woodpecker_electro",
+      "setName": "啄木鸟电音",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31034": {
+      "setId": "woodpecker_electro",
+      "setName": "啄木鸟电音",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31035": {
+      "setId": "woodpecker_electro",
+      "setName": "啄木鸟电音",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31036": {
+      "setId": "woodpecker_electro",
+      "setName": "啄木鸟电音",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31041": {
+      "setId": "woodpecker_electro",
+      "setName": "啄木鸟电音",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31042": {
+      "setId": "woodpecker_electro",
+      "setName": "啄木鸟电音",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31043": {
+      "setId": "woodpecker_electro",
+      "setName": "啄木鸟电音",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31044": {
+      "setId": "woodpecker_electro",
+      "setName": "啄木鸟电音",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31045": {
+      "setId": "woodpecker_electro",
+      "setName": "啄木鸟电音",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31046": {
+      "setId": "woodpecker_electro",
+      "setName": "啄木鸟电音",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31121": {
+      "setId": "puffer_electro",
+      "setName": "河豚电音",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31122": {
+      "setId": "puffer_electro",
+      "setName": "河豚电音",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31123": {
+      "setId": "puffer_electro",
+      "setName": "河豚电音",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31124": {
+      "setId": "puffer_electro",
+      "setName": "河豚电音",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31125": {
+      "setId": "puffer_electro",
+      "setName": "河豚电音",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31126": {
+      "setId": "puffer_electro",
+      "setName": "河豚电音",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31131": {
+      "setId": "puffer_electro",
+      "setName": "河豚电音",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31132": {
+      "setId": "puffer_electro",
+      "setName": "河豚电音",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31133": {
+      "setId": "puffer_electro",
+      "setName": "河豚电音",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31134": {
+      "setId": "puffer_electro",
+      "setName": "河豚电音",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31135": {
+      "setId": "puffer_electro",
+      "setName": "河豚电音",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31136": {
+      "setId": "puffer_electro",
+      "setName": "河豚电音",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31141": {
+      "setId": "puffer_electro",
+      "setName": "河豚电音",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31142": {
+      "setId": "puffer_electro",
+      "setName": "河豚电音",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31143": {
+      "setId": "puffer_electro",
+      "setName": "河豚电音",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31144": {
+      "setId": "puffer_electro",
+      "setName": "河豚电音",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31145": {
+      "setId": "puffer_electro",
+      "setName": "河豚电音",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31146": {
+      "setId": "puffer_electro",
+      "setName": "河豚电音",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31221": {
+      "setId": "shockstar_disco",
+      "setName": "震星迪斯科",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31222": {
+      "setId": "shockstar_disco",
+      "setName": "震星迪斯科",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31223": {
+      "setId": "shockstar_disco",
+      "setName": "震星迪斯科",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31224": {
+      "setId": "shockstar_disco",
+      "setName": "震星迪斯科",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31225": {
+      "setId": "shockstar_disco",
+      "setName": "震星迪斯科",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31226": {
+      "setId": "shockstar_disco",
+      "setName": "震星迪斯科",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31231": {
+      "setId": "shockstar_disco",
+      "setName": "震星迪斯科",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31232": {
+      "setId": "shockstar_disco",
+      "setName": "震星迪斯科",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31233": {
+      "setId": "shockstar_disco",
+      "setName": "震星迪斯科",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31234": {
+      "setId": "shockstar_disco",
+      "setName": "震星迪斯科",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31235": {
+      "setId": "shockstar_disco",
+      "setName": "震星迪斯科",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31236": {
+      "setId": "shockstar_disco",
+      "setName": "震星迪斯科",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31241": {
+      "setId": "shockstar_disco",
+      "setName": "震星迪斯科",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31242": {
+      "setId": "shockstar_disco",
+      "setName": "震星迪斯科",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31243": {
+      "setId": "shockstar_disco",
+      "setName": "震星迪斯科",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31244": {
+      "setId": "shockstar_disco",
+      "setName": "震星迪斯科",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31245": {
+      "setId": "shockstar_disco",
+      "setName": "震星迪斯科",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31246": {
+      "setId": "shockstar_disco",
+      "setName": "震星迪斯科",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31321": {
+      "setId": "freedom_blues",
+      "setName": "自由蓝调",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31322": {
+      "setId": "freedom_blues",
+      "setName": "自由蓝调",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31323": {
+      "setId": "freedom_blues",
+      "setName": "自由蓝调",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31324": {
+      "setId": "freedom_blues",
+      "setName": "自由蓝调",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31325": {
+      "setId": "freedom_blues",
+      "setName": "自由蓝调",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31326": {
+      "setId": "freedom_blues",
+      "setName": "自由蓝调",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31331": {
+      "setId": "freedom_blues",
+      "setName": "自由蓝调",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31332": {
+      "setId": "freedom_blues",
+      "setName": "自由蓝调",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31333": {
+      "setId": "freedom_blues",
+      "setName": "自由蓝调",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31334": {
+      "setId": "freedom_blues",
+      "setName": "自由蓝调",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31335": {
+      "setId": "freedom_blues",
+      "setName": "自由蓝调",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31336": {
+      "setId": "freedom_blues",
+      "setName": "自由蓝调",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31341": {
+      "setId": "freedom_blues",
+      "setName": "自由蓝调",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31342": {
+      "setId": "freedom_blues",
+      "setName": "自由蓝调",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31343": {
+      "setId": "freedom_blues",
+      "setName": "自由蓝调",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31344": {
+      "setId": "freedom_blues",
+      "setName": "自由蓝调",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31345": {
+      "setId": "freedom_blues",
+      "setName": "自由蓝调",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31346": {
+      "setId": "freedom_blues",
+      "setName": "自由蓝调",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31421": {
+      "setId": "hormone_punk",
+      "setName": "激素朋克",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31422": {
+      "setId": "hormone_punk",
+      "setName": "激素朋克",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31423": {
+      "setId": "hormone_punk",
+      "setName": "激素朋克",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31424": {
+      "setId": "hormone_punk",
+      "setName": "激素朋克",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31425": {
+      "setId": "hormone_punk",
+      "setName": "激素朋克",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31426": {
+      "setId": "hormone_punk",
+      "setName": "激素朋克",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31431": {
+      "setId": "hormone_punk",
+      "setName": "激素朋克",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31432": {
+      "setId": "hormone_punk",
+      "setName": "激素朋克",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31433": {
+      "setId": "hormone_punk",
+      "setName": "激素朋克",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31434": {
+      "setId": "hormone_punk",
+      "setName": "激素朋克",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31435": {
+      "setId": "hormone_punk",
+      "setName": "激素朋克",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31436": {
+      "setId": "hormone_punk",
+      "setName": "激素朋克",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31441": {
+      "setId": "hormone_punk",
+      "setName": "激素朋克",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31442": {
+      "setId": "hormone_punk",
+      "setName": "激素朋克",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31443": {
+      "setId": "hormone_punk",
+      "setName": "激素朋克",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31444": {
+      "setId": "hormone_punk",
+      "setName": "激素朋克",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31445": {
+      "setId": "hormone_punk",
+      "setName": "激素朋克",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31446": {
+      "setId": "hormone_punk",
+      "setName": "激素朋克",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31521": {
+      "setId": "soul_rock",
+      "setName": "灵魂摇滚",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31522": {
+      "setId": "soul_rock",
+      "setName": "灵魂摇滚",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31523": {
+      "setId": "soul_rock",
+      "setName": "灵魂摇滚",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31524": {
+      "setId": "soul_rock",
+      "setName": "灵魂摇滚",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31525": {
+      "setId": "soul_rock",
+      "setName": "灵魂摇滚",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31526": {
+      "setId": "soul_rock",
+      "setName": "灵魂摇滚",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31531": {
+      "setId": "soul_rock",
+      "setName": "灵魂摇滚",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31532": {
+      "setId": "soul_rock",
+      "setName": "灵魂摇滚",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31533": {
+      "setId": "soul_rock",
+      "setName": "灵魂摇滚",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31534": {
+      "setId": "soul_rock",
+      "setName": "灵魂摇滚",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31535": {
+      "setId": "soul_rock",
+      "setName": "灵魂摇滚",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31536": {
+      "setId": "soul_rock",
+      "setName": "灵魂摇滚",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31541": {
+      "setId": "soul_rock",
+      "setName": "灵魂摇滚",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31542": {
+      "setId": "soul_rock",
+      "setName": "灵魂摇滚",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31543": {
+      "setId": "soul_rock",
+      "setName": "灵魂摇滚",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31544": {
+      "setId": "soul_rock",
+      "setName": "灵魂摇滚",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31545": {
+      "setId": "soul_rock",
+      "setName": "灵魂摇滚",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31546": {
+      "setId": "soul_rock",
+      "setName": "灵魂摇滚",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31621": {
+      "setId": "swing_jazz",
+      "setName": "摇摆爵士",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31622": {
+      "setId": "swing_jazz",
+      "setName": "摇摆爵士",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31623": {
+      "setId": "swing_jazz",
+      "setName": "摇摆爵士",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31624": {
+      "setId": "swing_jazz",
+      "setName": "摇摆爵士",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31625": {
+      "setId": "swing_jazz",
+      "setName": "摇摆爵士",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31626": {
+      "setId": "swing_jazz",
+      "setName": "摇摆爵士",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31631": {
+      "setId": "swing_jazz",
+      "setName": "摇摆爵士",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31632": {
+      "setId": "swing_jazz",
+      "setName": "摇摆爵士",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31633": {
+      "setId": "swing_jazz",
+      "setName": "摇摆爵士",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31634": {
+      "setId": "swing_jazz",
+      "setName": "摇摆爵士",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31635": {
+      "setId": "swing_jazz",
+      "setName": "摇摆爵士",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31636": {
+      "setId": "swing_jazz",
+      "setName": "摇摆爵士",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31641": {
+      "setId": "swing_jazz",
+      "setName": "摇摆爵士",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31642": {
+      "setId": "swing_jazz",
+      "setName": "摇摆爵士",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31643": {
+      "setId": "swing_jazz",
+      "setName": "摇摆爵士",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31644": {
+      "setId": "swing_jazz",
+      "setName": "摇摆爵士",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31645": {
+      "setId": "swing_jazz",
+      "setName": "摇摆爵士",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31646": {
+      "setId": "swing_jazz",
+      "setName": "摇摆爵士",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31821": {
+      "setId": "chaos_jazz",
+      "setName": "混沌爵士",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31822": {
+      "setId": "chaos_jazz",
+      "setName": "混沌爵士",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31823": {
+      "setId": "chaos_jazz",
+      "setName": "混沌爵士",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31824": {
+      "setId": "chaos_jazz",
+      "setName": "混沌爵士",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31825": {
+      "setId": "chaos_jazz",
+      "setName": "混沌爵士",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31826": {
+      "setId": "chaos_jazz",
+      "setName": "混沌爵士",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31831": {
+      "setId": "chaos_jazz",
+      "setName": "混沌爵士",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31832": {
+      "setId": "chaos_jazz",
+      "setName": "混沌爵士",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31833": {
+      "setId": "chaos_jazz",
+      "setName": "混沌爵士",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31834": {
+      "setId": "chaos_jazz",
+      "setName": "混沌爵士",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31835": {
+      "setId": "chaos_jazz",
+      "setName": "混沌爵士",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31836": {
+      "setId": "chaos_jazz",
+      "setName": "混沌爵士",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31841": {
+      "setId": "chaos_jazz",
+      "setName": "混沌爵士",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31842": {
+      "setId": "chaos_jazz",
+      "setName": "混沌爵士",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31843": {
+      "setId": "chaos_jazz",
+      "setName": "混沌爵士",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31844": {
+      "setId": "chaos_jazz",
+      "setName": "混沌爵士",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31845": {
+      "setId": "chaos_jazz",
+      "setName": "混沌爵士",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31846": {
+      "setId": "chaos_jazz",
+      "setName": "混沌爵士",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31921": {
+      "setId": "proto_punk",
+      "setName": "原始朋克",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31922": {
+      "setId": "proto_punk",
+      "setName": "原始朋克",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31923": {
+      "setId": "proto_punk",
+      "setName": "原始朋克",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31924": {
+      "setId": "proto_punk",
+      "setName": "原始朋克",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31925": {
+      "setId": "proto_punk",
+      "setName": "原始朋克",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31926": {
+      "setId": "proto_punk",
+      "setName": "原始朋克",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "31931": {
+      "setId": "proto_punk",
+      "setName": "原始朋克",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31932": {
+      "setId": "proto_punk",
+      "setName": "原始朋克",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31933": {
+      "setId": "proto_punk",
+      "setName": "原始朋克",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31934": {
+      "setId": "proto_punk",
+      "setName": "原始朋克",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31935": {
+      "setId": "proto_punk",
+      "setName": "原始朋克",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31936": {
+      "setId": "proto_punk",
+      "setName": "原始朋克",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "31941": {
+      "setId": "proto_punk",
+      "setName": "原始朋克",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31942": {
+      "setId": "proto_punk",
+      "setName": "原始朋克",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31943": {
+      "setId": "proto_punk",
+      "setName": "原始朋克",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31944": {
+      "setId": "proto_punk",
+      "setName": "原始朋克",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31945": {
+      "setId": "proto_punk",
+      "setName": "原始朋克",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "31946": {
+      "setId": "proto_punk",
+      "setName": "原始朋克",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32221": {
+      "setId": "inferno_metal",
+      "setName": "炎狱重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32222": {
+      "setId": "inferno_metal",
+      "setName": "炎狱重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32223": {
+      "setId": "inferno_metal",
+      "setName": "炎狱重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32224": {
+      "setId": "inferno_metal",
+      "setName": "炎狱重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32225": {
+      "setId": "inferno_metal",
+      "setName": "炎狱重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32226": {
+      "setId": "inferno_metal",
+      "setName": "炎狱重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32231": {
+      "setId": "inferno_metal",
+      "setName": "炎狱重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32232": {
+      "setId": "inferno_metal",
+      "setName": "炎狱重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32233": {
+      "setId": "inferno_metal",
+      "setName": "炎狱重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32234": {
+      "setId": "inferno_metal",
+      "setName": "炎狱重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32235": {
+      "setId": "inferno_metal",
+      "setName": "炎狱重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32236": {
+      "setId": "inferno_metal",
+      "setName": "炎狱重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32241": {
+      "setId": "inferno_metal",
+      "setName": "炎狱重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32242": {
+      "setId": "inferno_metal",
+      "setName": "炎狱重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32243": {
+      "setId": "inferno_metal",
+      "setName": "炎狱重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32244": {
+      "setId": "inferno_metal",
+      "setName": "炎狱重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32245": {
+      "setId": "inferno_metal",
+      "setName": "炎狱重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32246": {
+      "setId": "inferno_metal",
+      "setName": "炎狱重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32321": {
+      "setId": "chaotic_metal",
+      "setName": "混沌重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32322": {
+      "setId": "chaotic_metal",
+      "setName": "混沌重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32323": {
+      "setId": "chaotic_metal",
+      "setName": "混沌重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32324": {
+      "setId": "chaotic_metal",
+      "setName": "混沌重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32325": {
+      "setId": "chaotic_metal",
+      "setName": "混沌重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32326": {
+      "setId": "chaotic_metal",
+      "setName": "混沌重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32331": {
+      "setId": "chaotic_metal",
+      "setName": "混沌重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32332": {
+      "setId": "chaotic_metal",
+      "setName": "混沌重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32333": {
+      "setId": "chaotic_metal",
+      "setName": "混沌重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32334": {
+      "setId": "chaotic_metal",
+      "setName": "混沌重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32335": {
+      "setId": "chaotic_metal",
+      "setName": "混沌重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32336": {
+      "setId": "chaotic_metal",
+      "setName": "混沌重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32341": {
+      "setId": "chaotic_metal",
+      "setName": "混沌重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32342": {
+      "setId": "chaotic_metal",
+      "setName": "混沌重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32343": {
+      "setId": "chaotic_metal",
+      "setName": "混沌重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32344": {
+      "setId": "chaotic_metal",
+      "setName": "混沌重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32345": {
+      "setId": "chaotic_metal",
+      "setName": "混沌重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32346": {
+      "setId": "chaotic_metal",
+      "setName": "混沌重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32421": {
+      "setId": "thunder_metal",
+      "setName": "雷暴重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32422": {
+      "setId": "thunder_metal",
+      "setName": "雷暴重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32423": {
+      "setId": "thunder_metal",
+      "setName": "雷暴重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32424": {
+      "setId": "thunder_metal",
+      "setName": "雷暴重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32425": {
+      "setId": "thunder_metal",
+      "setName": "雷暴重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32426": {
+      "setId": "thunder_metal",
+      "setName": "雷暴重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32431": {
+      "setId": "thunder_metal",
+      "setName": "雷暴重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32432": {
+      "setId": "thunder_metal",
+      "setName": "雷暴重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32433": {
+      "setId": "thunder_metal",
+      "setName": "雷暴重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32434": {
+      "setId": "thunder_metal",
+      "setName": "雷暴重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32435": {
+      "setId": "thunder_metal",
+      "setName": "雷暴重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32436": {
+      "setId": "thunder_metal",
+      "setName": "雷暴重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32441": {
+      "setId": "thunder_metal",
+      "setName": "雷暴重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32442": {
+      "setId": "thunder_metal",
+      "setName": "雷暴重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32443": {
+      "setId": "thunder_metal",
+      "setName": "雷暴重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32444": {
+      "setId": "thunder_metal",
+      "setName": "雷暴重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32445": {
+      "setId": "thunder_metal",
+      "setName": "雷暴重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32446": {
+      "setId": "thunder_metal",
+      "setName": "雷暴重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32521": {
+      "setId": "polar_metal",
+      "setName": "极地重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32522": {
+      "setId": "polar_metal",
+      "setName": "极地重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32523": {
+      "setId": "polar_metal",
+      "setName": "极地重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32524": {
+      "setId": "polar_metal",
+      "setName": "极地重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32525": {
+      "setId": "polar_metal",
+      "setName": "极地重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32526": {
+      "setId": "polar_metal",
+      "setName": "极地重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32531": {
+      "setId": "polar_metal",
+      "setName": "极地重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32532": {
+      "setId": "polar_metal",
+      "setName": "极地重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32533": {
+      "setId": "polar_metal",
+      "setName": "极地重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32534": {
+      "setId": "polar_metal",
+      "setName": "极地重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32535": {
+      "setId": "polar_metal",
+      "setName": "极地重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32536": {
+      "setId": "polar_metal",
+      "setName": "极地重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32541": {
+      "setId": "polar_metal",
+      "setName": "极地重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32542": {
+      "setId": "polar_metal",
+      "setName": "极地重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32543": {
+      "setId": "polar_metal",
+      "setName": "极地重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32544": {
+      "setId": "polar_metal",
+      "setName": "极地重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32545": {
+      "setId": "polar_metal",
+      "setName": "极地重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32546": {
+      "setId": "polar_metal",
+      "setName": "极地重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32621": {
+      "setId": "fanged_metal",
+      "setName": "獠牙重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32622": {
+      "setId": "fanged_metal",
+      "setName": "獠牙重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32623": {
+      "setId": "fanged_metal",
+      "setName": "獠牙重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32624": {
+      "setId": "fanged_metal",
+      "setName": "獠牙重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32625": {
+      "setId": "fanged_metal",
+      "setName": "獠牙重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32626": {
+      "setId": "fanged_metal",
+      "setName": "獠牙重金属",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32631": {
+      "setId": "fanged_metal",
+      "setName": "獠牙重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32632": {
+      "setId": "fanged_metal",
+      "setName": "獠牙重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32633": {
+      "setId": "fanged_metal",
+      "setName": "獠牙重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32634": {
+      "setId": "fanged_metal",
+      "setName": "獠牙重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32635": {
+      "setId": "fanged_metal",
+      "setName": "獠牙重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32636": {
+      "setId": "fanged_metal",
+      "setName": "獠牙重金属",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32641": {
+      "setId": "fanged_metal",
+      "setName": "獠牙重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32642": {
+      "setId": "fanged_metal",
+      "setName": "獠牙重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32643": {
+      "setId": "fanged_metal",
+      "setName": "獠牙重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32644": {
+      "setId": "fanged_metal",
+      "setName": "獠牙重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32645": {
+      "setId": "fanged_metal",
+      "setName": "獠牙重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32646": {
+      "setId": "fanged_metal",
+      "setName": "獠牙重金属",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32721": {
+      "setId": "scanner-set-48ee0a14625f",
+      "setName": "折枝剑歌",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32722": {
+      "setId": "scanner-set-48ee0a14625f",
+      "setName": "折枝剑歌",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32723": {
+      "setId": "scanner-set-48ee0a14625f",
+      "setName": "折枝剑歌",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32724": {
+      "setId": "scanner-set-48ee0a14625f",
+      "setName": "折枝剑歌",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32725": {
+      "setId": "scanner-set-48ee0a14625f",
+      "setName": "折枝剑歌",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32726": {
+      "setId": "scanner-set-48ee0a14625f",
+      "setName": "折枝剑歌",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32731": {
+      "setId": "scanner-set-48ee0a14625f",
+      "setName": "折枝剑歌",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32732": {
+      "setId": "scanner-set-48ee0a14625f",
+      "setName": "折枝剑歌",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32733": {
+      "setId": "scanner-set-48ee0a14625f",
+      "setName": "折枝剑歌",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32734": {
+      "setId": "scanner-set-48ee0a14625f",
+      "setName": "折枝剑歌",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32735": {
+      "setId": "scanner-set-48ee0a14625f",
+      "setName": "折枝剑歌",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32736": {
+      "setId": "scanner-set-48ee0a14625f",
+      "setName": "折枝剑歌",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32741": {
+      "setId": "scanner-set-48ee0a14625f",
+      "setName": "折枝剑歌",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32742": {
+      "setId": "scanner-set-48ee0a14625f",
+      "setName": "折枝剑歌",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32743": {
+      "setId": "scanner-set-48ee0a14625f",
+      "setName": "折枝剑歌",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32744": {
+      "setId": "scanner-set-48ee0a14625f",
+      "setName": "折枝剑歌",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32745": {
+      "setId": "scanner-set-48ee0a14625f",
+      "setName": "折枝剑歌",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32746": {
+      "setId": "scanner-set-48ee0a14625f",
+      "setName": "折枝剑歌",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32821": {
+      "setId": "zzz_wiki_1001",
+      "setName": "静听嘉音",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32822": {
+      "setId": "zzz_wiki_1001",
+      "setName": "静听嘉音",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32823": {
+      "setId": "zzz_wiki_1001",
+      "setName": "静听嘉音",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32824": {
+      "setId": "zzz_wiki_1001",
+      "setName": "静听嘉音",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32825": {
+      "setId": "zzz_wiki_1001",
+      "setName": "静听嘉音",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32826": {
+      "setId": "zzz_wiki_1001",
+      "setName": "静听嘉音",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32831": {
+      "setId": "zzz_wiki_1001",
+      "setName": "静听嘉音",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32832": {
+      "setId": "zzz_wiki_1001",
+      "setName": "静听嘉音",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32833": {
+      "setId": "zzz_wiki_1001",
+      "setName": "静听嘉音",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32834": {
+      "setId": "zzz_wiki_1001",
+      "setName": "静听嘉音",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32835": {
+      "setId": "zzz_wiki_1001",
+      "setName": "静听嘉音",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32836": {
+      "setId": "zzz_wiki_1001",
+      "setName": "静听嘉音",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32841": {
+      "setId": "zzz_wiki_1001",
+      "setName": "静听嘉音",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32842": {
+      "setId": "zzz_wiki_1001",
+      "setName": "静听嘉音",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32843": {
+      "setId": "zzz_wiki_1001",
+      "setName": "静听嘉音",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32844": {
+      "setId": "zzz_wiki_1001",
+      "setName": "静听嘉音",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32845": {
+      "setId": "zzz_wiki_1001",
+      "setName": "静听嘉音",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32846": {
+      "setId": "zzz_wiki_1001",
+      "setName": "静听嘉音",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32921": {
+      "setId": "shadow_harmony",
+      "setName": "如影相随",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32922": {
+      "setId": "shadow_harmony",
+      "setName": "如影相随",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32923": {
+      "setId": "shadow_harmony",
+      "setName": "如影相随",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32924": {
+      "setId": "shadow_harmony",
+      "setName": "如影相随",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32925": {
+      "setId": "shadow_harmony",
+      "setName": "如影相随",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32926": {
+      "setId": "shadow_harmony",
+      "setName": "如影相随",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "32931": {
+      "setId": "shadow_harmony",
+      "setName": "如影相随",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32932": {
+      "setId": "shadow_harmony",
+      "setName": "如影相随",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32933": {
+      "setId": "shadow_harmony",
+      "setName": "如影相随",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32934": {
+      "setId": "shadow_harmony",
+      "setName": "如影相随",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32935": {
+      "setId": "shadow_harmony",
+      "setName": "如影相随",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32936": {
+      "setId": "shadow_harmony",
+      "setName": "如影相随",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "32941": {
+      "setId": "shadow_harmony",
+      "setName": "如影相随",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32942": {
+      "setId": "shadow_harmony",
+      "setName": "如影相随",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32943": {
+      "setId": "shadow_harmony",
+      "setName": "如影相随",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32944": {
+      "setId": "shadow_harmony",
+      "setName": "如影相随",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32945": {
+      "setId": "shadow_harmony",
+      "setName": "如影相随",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "32946": {
+      "setId": "shadow_harmony",
+      "setName": "如影相随",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33021": {
+      "setId": "phaethons_melody",
+      "setName": "法厄同之歌",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33022": {
+      "setId": "phaethons_melody",
+      "setName": "法厄同之歌",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33023": {
+      "setId": "phaethons_melody",
+      "setName": "法厄同之歌",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33024": {
+      "setId": "phaethons_melody",
+      "setName": "法厄同之歌",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33025": {
+      "setId": "phaethons_melody",
+      "setName": "法厄同之歌",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33026": {
+      "setId": "phaethons_melody",
+      "setName": "法厄同之歌",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33031": {
+      "setId": "phaethons_melody",
+      "setName": "法厄同之歌",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33032": {
+      "setId": "phaethons_melody",
+      "setName": "法厄同之歌",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33033": {
+      "setId": "phaethons_melody",
+      "setName": "法厄同之歌",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33034": {
+      "setId": "phaethons_melody",
+      "setName": "法厄同之歌",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33035": {
+      "setId": "phaethons_melody",
+      "setName": "法厄同之歌",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33036": {
+      "setId": "phaethons_melody",
+      "setName": "法厄同之歌",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33041": {
+      "setId": "phaethons_melody",
+      "setName": "法厄同之歌",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33042": {
+      "setId": "phaethons_melody",
+      "setName": "法厄同之歌",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33043": {
+      "setId": "phaethons_melody",
+      "setName": "法厄同之歌",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33044": {
+      "setId": "phaethons_melody",
+      "setName": "法厄同之歌",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33045": {
+      "setId": "phaethons_melody",
+      "setName": "法厄同之歌",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33046": {
+      "setId": "phaethons_melody",
+      "setName": "法厄同之歌",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33121": {
+      "setId": "yunkui_tales",
+      "setName": "云岿如我",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33122": {
+      "setId": "yunkui_tales",
+      "setName": "云岿如我",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33123": {
+      "setId": "yunkui_tales",
+      "setName": "云岿如我",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33124": {
+      "setId": "yunkui_tales",
+      "setName": "云岿如我",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33125": {
+      "setId": "yunkui_tales",
+      "setName": "云岿如我",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33126": {
+      "setId": "yunkui_tales",
+      "setName": "云岿如我",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33131": {
+      "setId": "yunkui_tales",
+      "setName": "云岿如我",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33132": {
+      "setId": "yunkui_tales",
+      "setName": "云岿如我",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33133": {
+      "setId": "yunkui_tales",
+      "setName": "云岿如我",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33134": {
+      "setId": "yunkui_tales",
+      "setName": "云岿如我",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33135": {
+      "setId": "yunkui_tales",
+      "setName": "云岿如我",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33136": {
+      "setId": "yunkui_tales",
+      "setName": "云岿如我",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33141": {
+      "setId": "yunkui_tales",
+      "setName": "云岿如我",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33142": {
+      "setId": "yunkui_tales",
+      "setName": "云岿如我",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33143": {
+      "setId": "yunkui_tales",
+      "setName": "云岿如我",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33144": {
+      "setId": "yunkui_tales",
+      "setName": "云岿如我",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33145": {
+      "setId": "yunkui_tales",
+      "setName": "云岿如我",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33146": {
+      "setId": "yunkui_tales",
+      "setName": "云岿如我",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33221": {
+      "setId": "king_of_the_summit",
+      "setName": "山大王",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33222": {
+      "setId": "king_of_the_summit",
+      "setName": "山大王",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33223": {
+      "setId": "king_of_the_summit",
+      "setName": "山大王",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33224": {
+      "setId": "king_of_the_summit",
+      "setName": "山大王",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33225": {
+      "setId": "king_of_the_summit",
+      "setName": "山大王",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33226": {
+      "setId": "king_of_the_summit",
+      "setName": "山大王",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33231": {
+      "setId": "king_of_the_summit",
+      "setName": "山大王",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33232": {
+      "setId": "king_of_the_summit",
+      "setName": "山大王",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33233": {
+      "setId": "king_of_the_summit",
+      "setName": "山大王",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33234": {
+      "setId": "king_of_the_summit",
+      "setName": "山大王",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33235": {
+      "setId": "king_of_the_summit",
+      "setName": "山大王",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33236": {
+      "setId": "king_of_the_summit",
+      "setName": "山大王",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33241": {
+      "setId": "king_of_the_summit",
+      "setName": "山大王",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33242": {
+      "setId": "king_of_the_summit",
+      "setName": "山大王",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33243": {
+      "setId": "king_of_the_summit",
+      "setName": "山大王",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33244": {
+      "setId": "king_of_the_summit",
+      "setName": "山大王",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33245": {
+      "setId": "king_of_the_summit",
+      "setName": "山大王",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33246": {
+      "setId": "king_of_the_summit",
+      "setName": "山大王",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33321": {
+      "setId": "zzz_wiki_1552",
+      "setName": "拂晓生花",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33322": {
+      "setId": "zzz_wiki_1552",
+      "setName": "拂晓生花",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33323": {
+      "setId": "zzz_wiki_1552",
+      "setName": "拂晓生花",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33324": {
+      "setId": "zzz_wiki_1552",
+      "setName": "拂晓生花",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33325": {
+      "setId": "zzz_wiki_1552",
+      "setName": "拂晓生花",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33326": {
+      "setId": "zzz_wiki_1552",
+      "setName": "拂晓生花",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33331": {
+      "setId": "zzz_wiki_1552",
+      "setName": "拂晓生花",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33332": {
+      "setId": "zzz_wiki_1552",
+      "setName": "拂晓生花",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33333": {
+      "setId": "zzz_wiki_1552",
+      "setName": "拂晓生花",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33334": {
+      "setId": "zzz_wiki_1552",
+      "setName": "拂晓生花",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33335": {
+      "setId": "zzz_wiki_1552",
+      "setName": "拂晓生花",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33336": {
+      "setId": "zzz_wiki_1552",
+      "setName": "拂晓生花",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33341": {
+      "setId": "zzz_wiki_1552",
+      "setName": "拂晓生花",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33342": {
+      "setId": "zzz_wiki_1552",
+      "setName": "拂晓生花",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33343": {
+      "setId": "zzz_wiki_1552",
+      "setName": "拂晓生花",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33344": {
+      "setId": "zzz_wiki_1552",
+      "setName": "拂晓生花",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33345": {
+      "setId": "zzz_wiki_1552",
+      "setName": "拂晓生花",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33346": {
+      "setId": "zzz_wiki_1552",
+      "setName": "拂晓生花",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33421": {
+      "setId": "moonlight_lullaby",
+      "setName": "月光骑士颂",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33422": {
+      "setId": "moonlight_lullaby",
+      "setName": "月光骑士颂",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33423": {
+      "setId": "moonlight_lullaby",
+      "setName": "月光骑士颂",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33424": {
+      "setId": "moonlight_lullaby",
+      "setName": "月光骑士颂",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33425": {
+      "setId": "moonlight_lullaby",
+      "setName": "月光骑士颂",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33426": {
+      "setId": "moonlight_lullaby",
+      "setName": "月光骑士颂",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33431": {
+      "setId": "moonlight_lullaby",
+      "setName": "月光骑士颂",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33432": {
+      "setId": "moonlight_lullaby",
+      "setName": "月光骑士颂",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33433": {
+      "setId": "moonlight_lullaby",
+      "setName": "月光骑士颂",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33434": {
+      "setId": "moonlight_lullaby",
+      "setName": "月光骑士颂",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33435": {
+      "setId": "moonlight_lullaby",
+      "setName": "月光骑士颂",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33436": {
+      "setId": "moonlight_lullaby",
+      "setName": "月光骑士颂",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33441": {
+      "setId": "moonlight_lullaby",
+      "setName": "月光骑士颂",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33442": {
+      "setId": "moonlight_lullaby",
+      "setName": "月光骑士颂",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33443": {
+      "setId": "moonlight_lullaby",
+      "setName": "月光骑士颂",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33444": {
+      "setId": "moonlight_lullaby",
+      "setName": "月光骑士颂",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33445": {
+      "setId": "moonlight_lullaby",
+      "setName": "月光骑士颂",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33446": {
+      "setId": "moonlight_lullaby",
+      "setName": "月光骑士颂",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33521": {
+      "setId": "scanner-set-fcf8ae93d798",
+      "setName": "沧浪行歌",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33522": {
+      "setId": "scanner-set-fcf8ae93d798",
+      "setName": "沧浪行歌",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33523": {
+      "setId": "scanner-set-fcf8ae93d798",
+      "setName": "沧浪行歌",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33524": {
+      "setId": "scanner-set-fcf8ae93d798",
+      "setName": "沧浪行歌",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33525": {
+      "setId": "scanner-set-fcf8ae93d798",
+      "setName": "沧浪行歌",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33526": {
+      "setId": "scanner-set-fcf8ae93d798",
+      "setName": "沧浪行歌",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33531": {
+      "setId": "scanner-set-fcf8ae93d798",
+      "setName": "沧浪行歌",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33532": {
+      "setId": "scanner-set-fcf8ae93d798",
+      "setName": "沧浪行歌",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33533": {
+      "setId": "scanner-set-fcf8ae93d798",
+      "setName": "沧浪行歌",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33534": {
+      "setId": "scanner-set-fcf8ae93d798",
+      "setName": "沧浪行歌",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33535": {
+      "setId": "scanner-set-fcf8ae93d798",
+      "setName": "沧浪行歌",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33536": {
+      "setId": "scanner-set-fcf8ae93d798",
+      "setName": "沧浪行歌",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33541": {
+      "setId": "scanner-set-fcf8ae93d798",
+      "setName": "沧浪行歌",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33542": {
+      "setId": "scanner-set-fcf8ae93d798",
+      "setName": "沧浪行歌",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33543": {
+      "setId": "scanner-set-fcf8ae93d798",
+      "setName": "沧浪行歌",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33544": {
+      "setId": "scanner-set-fcf8ae93d798",
+      "setName": "沧浪行歌",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33545": {
+      "setId": "scanner-set-fcf8ae93d798",
+      "setName": "沧浪行歌",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33546": {
+      "setId": "scanner-set-fcf8ae93d798",
+      "setName": "沧浪行歌",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33621": {
+      "setId": "astral_voice",
+      "setName": "流光咏叹",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33622": {
+      "setId": "astral_voice",
+      "setName": "流光咏叹",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33623": {
+      "setId": "astral_voice",
+      "setName": "流光咏叹",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33624": {
+      "setId": "astral_voice",
+      "setName": "流光咏叹",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33625": {
+      "setId": "astral_voice",
+      "setName": "流光咏叹",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33626": {
+      "setId": "astral_voice",
+      "setName": "流光咏叹",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33631": {
+      "setId": "astral_voice",
+      "setName": "流光咏叹",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33632": {
+      "setId": "astral_voice",
+      "setName": "流光咏叹",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33633": {
+      "setId": "astral_voice",
+      "setName": "流光咏叹",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33634": {
+      "setId": "astral_voice",
+      "setName": "流光咏叹",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33635": {
+      "setId": "astral_voice",
+      "setName": "流光咏叹",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33636": {
+      "setId": "astral_voice",
+      "setName": "流光咏叹",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33641": {
+      "setId": "astral_voice",
+      "setName": "流光咏叹",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33642": {
+      "setId": "astral_voice",
+      "setName": "流光咏叹",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33643": {
+      "setId": "astral_voice",
+      "setName": "流光咏叹",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33644": {
+      "setId": "astral_voice",
+      "setName": "流光咏叹",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33645": {
+      "setId": "astral_voice",
+      "setName": "流光咏叹",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33646": {
+      "setId": "astral_voice",
+      "setName": "流光咏叹",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33721": {
+      "setId": "zzz_wiki_1907",
+      "setName": "雪兔梦游仙境",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33722": {
+      "setId": "zzz_wiki_1907",
+      "setName": "雪兔梦游仙境",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33723": {
+      "setId": "zzz_wiki_1907",
+      "setName": "雪兔梦游仙境",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33724": {
+      "setId": "zzz_wiki_1907",
+      "setName": "雪兔梦游仙境",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33725": {
+      "setId": "zzz_wiki_1907",
+      "setName": "雪兔梦游仙境",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33726": {
+      "setId": "zzz_wiki_1907",
+      "setName": "雪兔梦游仙境",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33731": {
+      "setId": "zzz_wiki_1907",
+      "setName": "雪兔梦游仙境",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33732": {
+      "setId": "zzz_wiki_1907",
+      "setName": "雪兔梦游仙境",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33733": {
+      "setId": "zzz_wiki_1907",
+      "setName": "雪兔梦游仙境",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33734": {
+      "setId": "zzz_wiki_1907",
+      "setName": "雪兔梦游仙境",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33735": {
+      "setId": "zzz_wiki_1907",
+      "setName": "雪兔梦游仙境",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33736": {
+      "setId": "zzz_wiki_1907",
+      "setName": "雪兔梦游仙境",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33741": {
+      "setId": "zzz_wiki_1907",
+      "setName": "雪兔梦游仙境",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33742": {
+      "setId": "zzz_wiki_1907",
+      "setName": "雪兔梦游仙境",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33743": {
+      "setId": "zzz_wiki_1907",
+      "setName": "雪兔梦游仙境",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33744": {
+      "setId": "zzz_wiki_1907",
+      "setName": "雪兔梦游仙境",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33745": {
+      "setId": "zzz_wiki_1907",
+      "setName": "雪兔梦游仙境",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33746": {
+      "setId": "zzz_wiki_1907",
+      "setName": "雪兔梦游仙境",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33821": {
+      "setId": "zzz_wiki_1906",
+      "setName": "囚徒手记",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33822": {
+      "setId": "zzz_wiki_1906",
+      "setName": "囚徒手记",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33823": {
+      "setId": "zzz_wiki_1906",
+      "setName": "囚徒手记",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33824": {
+      "setId": "zzz_wiki_1906",
+      "setName": "囚徒手记",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33825": {
+      "setId": "zzz_wiki_1906",
+      "setName": "囚徒手记",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33826": {
+      "setId": "zzz_wiki_1906",
+      "setName": "囚徒手记",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33831": {
+      "setId": "zzz_wiki_1906",
+      "setName": "囚徒手记",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33832": {
+      "setId": "zzz_wiki_1906",
+      "setName": "囚徒手记",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33833": {
+      "setId": "zzz_wiki_1906",
+      "setName": "囚徒手记",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33834": {
+      "setId": "zzz_wiki_1906",
+      "setName": "囚徒手记",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33835": {
+      "setId": "zzz_wiki_1906",
+      "setName": "囚徒手记",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33836": {
+      "setId": "zzz_wiki_1906",
+      "setName": "囚徒手记",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33841": {
+      "setId": "zzz_wiki_1906",
+      "setName": "囚徒手记",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33842": {
+      "setId": "zzz_wiki_1906",
+      "setName": "囚徒手记",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33843": {
+      "setId": "zzz_wiki_1906",
+      "setName": "囚徒手记",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33844": {
+      "setId": "zzz_wiki_1906",
+      "setName": "囚徒手记",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33845": {
+      "setId": "zzz_wiki_1906",
+      "setName": "囚徒手记",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33846": {
+      "setId": "zzz_wiki_1906",
+      "setName": "囚徒手记",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33921": {
+      "setId": "zzz_wiki_2038",
+      "setName": "呼啸沙龙",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33922": {
+      "setId": "zzz_wiki_2038",
+      "setName": "呼啸沙龙",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33923": {
+      "setId": "zzz_wiki_2038",
+      "setName": "呼啸沙龙",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33924": {
+      "setId": "zzz_wiki_2038",
+      "setName": "呼啸沙龙",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33925": {
+      "setId": "zzz_wiki_2038",
+      "setName": "呼啸沙龙",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33926": {
+      "setId": "zzz_wiki_2038",
+      "setName": "呼啸沙龙",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "33931": {
+      "setId": "zzz_wiki_2038",
+      "setName": "呼啸沙龙",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33932": {
+      "setId": "zzz_wiki_2038",
+      "setName": "呼啸沙龙",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33933": {
+      "setId": "zzz_wiki_2038",
+      "setName": "呼啸沙龙",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33934": {
+      "setId": "zzz_wiki_2038",
+      "setName": "呼啸沙龙",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33935": {
+      "setId": "zzz_wiki_2038",
+      "setName": "呼啸沙龙",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33936": {
+      "setId": "zzz_wiki_2038",
+      "setName": "呼啸沙龙",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "33941": {
+      "setId": "zzz_wiki_2038",
+      "setName": "呼啸沙龙",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33942": {
+      "setId": "zzz_wiki_2038",
+      "setName": "呼啸沙龙",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33943": {
+      "setId": "zzz_wiki_2038",
+      "setName": "呼啸沙龙",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33944": {
+      "setId": "zzz_wiki_2038",
+      "setName": "呼啸沙龙",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33945": {
+      "setId": "zzz_wiki_2038",
+      "setName": "呼啸沙龙",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "33946": {
+      "setId": "zzz_wiki_2038",
+      "setName": "呼啸沙龙",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "34021": {
+      "setId": "zzz_wiki_2029",
+      "setName": "拂晓行纪",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "34022": {
+      "setId": "zzz_wiki_2029",
+      "setName": "拂晓行纪",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "34023": {
+      "setId": "zzz_wiki_2029",
+      "setName": "拂晓行纪",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "34024": {
+      "setId": "zzz_wiki_2029",
+      "setName": "拂晓行纪",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "34025": {
+      "setId": "zzz_wiki_2029",
+      "setName": "拂晓行纪",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "34026": {
+      "setId": "zzz_wiki_2029",
+      "setName": "拂晓行纪",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "34031": {
+      "setId": "zzz_wiki_2029",
+      "setName": "拂晓行纪",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "34032": {
+      "setId": "zzz_wiki_2029",
+      "setName": "拂晓行纪",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "34033": {
+      "setId": "zzz_wiki_2029",
+      "setName": "拂晓行纪",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "34034": {
+      "setId": "zzz_wiki_2029",
+      "setName": "拂晓行纪",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "34035": {
+      "setId": "zzz_wiki_2029",
+      "setName": "拂晓行纪",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "34036": {
+      "setId": "zzz_wiki_2029",
+      "setName": "拂晓行纪",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "34041": {
+      "setId": "zzz_wiki_2029",
+      "setName": "拂晓行纪",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "34042": {
+      "setId": "zzz_wiki_2029",
+      "setName": "拂晓行纪",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "34043": {
+      "setId": "zzz_wiki_2029",
+      "setName": "拂晓行纪",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "34044": {
+      "setId": "zzz_wiki_2029",
+      "setName": "拂晓行纪",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "34045": {
+      "setId": "zzz_wiki_2029",
+      "setName": "拂晓行纪",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "34046": {
+      "setId": "zzz_wiki_2029",
+      "setName": "拂晓行纪",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "34121": {
+      "setId": "zzz_wiki_2116",
+      "setName": "谶羽之誓",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "34122": {
+      "setId": "zzz_wiki_2116",
+      "setName": "谶羽之誓",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "34123": {
+      "setId": "zzz_wiki_2116",
+      "setName": "谶羽之誓",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "34124": {
+      "setId": "zzz_wiki_2116",
+      "setName": "谶羽之誓",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "34125": {
+      "setId": "zzz_wiki_2116",
+      "setName": "谶羽之誓",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "34126": {
+      "setId": "zzz_wiki_2116",
+      "setName": "谶羽之誓",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "34131": {
+      "setId": "zzz_wiki_2116",
+      "setName": "谶羽之誓",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "34132": {
+      "setId": "zzz_wiki_2116",
+      "setName": "谶羽之誓",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "34133": {
+      "setId": "zzz_wiki_2116",
+      "setName": "谶羽之誓",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "34134": {
+      "setId": "zzz_wiki_2116",
+      "setName": "谶羽之誓",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "34135": {
+      "setId": "zzz_wiki_2116",
+      "setName": "谶羽之誓",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "34136": {
+      "setId": "zzz_wiki_2116",
+      "setName": "谶羽之誓",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "34141": {
+      "setId": "zzz_wiki_2116",
+      "setName": "谶羽之誓",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "34142": {
+      "setId": "zzz_wiki_2116",
+      "setName": "谶羽之誓",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "34143": {
+      "setId": "zzz_wiki_2116",
+      "setName": "谶羽之誓",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "34144": {
+      "setId": "zzz_wiki_2116",
+      "setName": "谶羽之誓",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "34145": {
+      "setId": "zzz_wiki_2116",
+      "setName": "谶羽之誓",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "34146": {
+      "setId": "zzz_wiki_2116",
+      "setName": "谶羽之誓",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "34221": {
+      "setId": "zzz_wiki_2121",
+      "setName": "棘刺玫瑰",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "34222": {
+      "setId": "zzz_wiki_2121",
+      "setName": "棘刺玫瑰",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "34223": {
+      "setId": "zzz_wiki_2121",
+      "setName": "棘刺玫瑰",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "34224": {
+      "setId": "zzz_wiki_2121",
+      "setName": "棘刺玫瑰",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "34225": {
+      "setId": "zzz_wiki_2121",
+      "setName": "棘刺玫瑰",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "34226": {
+      "setId": "zzz_wiki_2121",
+      "setName": "棘刺玫瑰",
+      "rarity": "B",
+      "maxLevel": 9,
+      "levelScale": 0.3
+    },
+    "34231": {
+      "setId": "zzz_wiki_2121",
+      "setName": "棘刺玫瑰",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "34232": {
+      "setId": "zzz_wiki_2121",
+      "setName": "棘刺玫瑰",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "34233": {
+      "setId": "zzz_wiki_2121",
+      "setName": "棘刺玫瑰",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "34234": {
+      "setId": "zzz_wiki_2121",
+      "setName": "棘刺玫瑰",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "34235": {
+      "setId": "zzz_wiki_2121",
+      "setName": "棘刺玫瑰",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "34236": {
+      "setId": "zzz_wiki_2121",
+      "setName": "棘刺玫瑰",
+      "rarity": "A",
+      "maxLevel": 12,
+      "levelScale": 0.25
+    },
+    "34241": {
+      "setId": "zzz_wiki_2121",
+      "setName": "棘刺玫瑰",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "34242": {
+      "setId": "zzz_wiki_2121",
+      "setName": "棘刺玫瑰",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "34243": {
+      "setId": "zzz_wiki_2121",
+      "setName": "棘刺玫瑰",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "34244": {
+      "setId": "zzz_wiki_2121",
+      "setName": "棘刺玫瑰",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "34245": {
+      "setId": "zzz_wiki_2121",
+      "setName": "棘刺玫瑰",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    },
+    "34246": {
+      "setId": "zzz_wiki_2121",
+      "setName": "棘刺玫瑰",
+      "rarity": "S",
+      "maxLevel": 15,
+      "levelScale": 0.2
+    }
+  },
+  "properties": {
+    "11102": {
+      "stat": "hpPct",
+      "mode": "pct",
+      "label": "生命值百分比"
+    },
+    "11103": {
+      "stat": "hpFlat",
+      "mode": "flat",
+      "label": "生命值"
+    },
+    "12102": {
+      "stat": "atkPct",
+      "mode": "pct",
+      "label": "攻击力百分比"
+    },
+    "12103": {
+      "stat": "atkFlat",
+      "mode": "flat",
+      "label": "攻击力"
+    },
+    "12202": {
+      "stat": "impact",
+      "mode": "pct",
+      "label": "冲击力"
+    },
+    "13102": {
+      "stat": "defPct",
+      "mode": "pct",
+      "label": "防御力百分比"
+    },
+    "13103": {
+      "stat": "defFlat",
+      "mode": "flat",
+      "label": "防御力"
+    },
+    "20103": {
+      "stat": "critRate",
+      "mode": "pct",
+      "label": "暴击率"
+    },
+    "21103": {
+      "stat": "critDmg",
+      "mode": "pct",
+      "label": "暴击伤害"
+    },
+    "23103": {
+      "stat": "penRatio",
+      "mode": "pct",
+      "label": "穿透率"
+    },
+    "23203": {
+      "stat": "penFlat",
+      "mode": "flat",
+      "label": "穿透值"
+    },
+    "30502": {
+      "stat": "energyRegen",
+      "mode": "pct",
+      "label": "能量自动回复"
+    },
+    "31203": {
+      "stat": "anomalyProficiency",
+      "mode": "flat",
+      "label": "异常精通"
+    },
+    "31402": {
+      "stat": "anomalyMastery",
+      "mode": "pct",
+      "label": "异常掌控"
+    },
+    "31503": {
+      "stat": "physicalDmg",
+      "mode": "pct",
+      "label": "物理伤害加成"
+    },
+    "31603": {
+      "stat": "fireDmg",
+      "mode": "pct",
+      "label": "火属性伤害加成"
+    },
+    "31703": {
+      "stat": "iceDmg",
+      "mode": "pct",
+      "label": "冰属性伤害加成"
+    },
+    "31803": {
+      "stat": "electricDmg",
+      "mode": "pct",
+      "label": "电属性伤害加成"
+    },
+    "31903": {
+      "stat": "etherDmg",
+      "mode": "pct",
+      "label": "以太伤害加成"
+    },
+    "32303": {
+      "stat": "windDmg",
+      "mode": "pct",
+      "label": "风属性伤害加成"
+    }
+  }
+}

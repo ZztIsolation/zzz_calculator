@@ -183,6 +183,7 @@ async function mountView(reservationUiEnabled = false, exclusionUiEnabled = fals
       maintenanceEnabled: false,
       scanTelemetryEnabled: false,
       scanTelemetryRetentionDays: 30,
+      enkaImportEnabled: false,
       driveDiscReservationsUiEnabled: reservationUiEnabled,
       driveDiscExclusionsUiEnabled: exclusionUiEnabled,
     },

@@ -1252,6 +1252,7 @@ export function deleteDriveDiscLoadout(store, id) {
 }
 
 export function accountSummary(store) {
+    const enkaByOwner = store?.enkaImportState?.version === 1 ? store.enkaImportState.byOwner ?? {} : {}
     return {
         currentOwnerId: store.currentOwnerId,
         owners: (store.owners ?? []).map(owner => ({
@@ -1259,6 +1260,7 @@ export function accountSummary(store) {
             driveDiscCount: (store.driveDiscs ?? []).filter(item => (item.ownerId ?? "default") === owner.id).length,
             loadoutCount: (store.driveDiscLoadouts ?? []).filter(item => (item.ownerId ?? "default") === owner.id).length,
             importCount: (store.imports ?? []).filter(item => (item.ownerId ?? "default") === owner.id).length,
+            enkaUid: enkaByOwner[owner.id]?.binding?.uid ?? null,
         })),
     }
 }
@@ -1304,6 +1306,14 @@ export function deleteAccount(store, id) {
     const ownerId = cleanOwnerId(id)
     if (ownerId === store.currentOwnerId) throw new Error("Cannot delete the current account.")
     if (!(store.owners ?? []).some(owner => owner.id === ownerId)) throw new Error("Account not found.")
+    const enkaImportState = store.enkaImportState?.version === 1
+        ? {
+            ...store.enkaImportState,
+            byOwner: Object.fromEntries(
+                Object.entries(store.enkaImportState.byOwner ?? {}).filter(([key]) => key !== ownerId),
+            ),
+        }
+        : store.enkaImportState
     return {
         ownerId,
         deleted: true,
@@ -1313,6 +1323,7 @@ export function deleteAccount(store, id) {
             imports: (store.imports ?? []).filter(item => (item.ownerId ?? "default") !== ownerId),
             driveDiscs: (store.driveDiscs ?? []).filter(item => (item.ownerId ?? "default") !== ownerId),
             driveDiscLoadouts: (store.driveDiscLoadouts ?? []).filter(item => (item.ownerId ?? "default") !== ownerId),
+            ...(enkaImportState ? { enkaImportState } : {}),
         },
     }
 }

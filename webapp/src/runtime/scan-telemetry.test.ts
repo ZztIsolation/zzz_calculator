@@ -5,6 +5,7 @@ vi.mock("@/runtime/app-config", () => ({
     maintenanceEnabled: false,
     scanTelemetryEnabled: true,
     scanTelemetryRetentionDays: 30,
+    enkaImportEnabled: false,
   })),
 }))
 

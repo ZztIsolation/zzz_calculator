@@ -432,7 +432,9 @@ declare module "@core/effectRuleTargets.js" {
 }
 
 declare module "@runtime/selection-storage.js" {
+  export const HOME_SELECTION_STORAGE_KEY: string
   export function currentAccountId(): string
+  export function loadHomeSelection(): any
   export function loadCurrentOwnerSelection(ownerId?: string): any
   export function saveCurrentOwnerSelection(selection: any, ownerId?: string): void
   export function setCurrentAccountId(ownerId: string): void
