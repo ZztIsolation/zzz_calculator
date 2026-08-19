@@ -375,6 +375,72 @@ const anomalyStunInput = {
         ],
     },
 }
+
+// Legacy saved Buffs may still contain the retired enemy-damage-taken field.
+// They must be inert in both the result and the white-box contract.
+const legacyEnemyDamageTakenCatalog = cloneCatalog(catalog)
+legacyEnemyDamageTakenCatalog.combatBuffs.push({
+    id: "test.legacy.enemy_damage_taken",
+    sourceType: "manual",
+    scope: "inCombat",
+    effects: [
+        {
+            id: "legacy_enemy_damage_taken",
+            type: "damageModifier",
+            kind: "enemyDamageTakenBonus",
+            value: 300,
+        },
+        {
+            id: "legacy_enemy_damage_taken_stat",
+            type: "fixed",
+            stat: "enemyDamageTakenBonus",
+            value: 300,
+        },
+    ],
+})
+const legacyDirectInput = minimalInput({
+    combatBuffs: { activeBuffIds: ["test.legacy.enemy_damage_taken"] },
+    damage: {
+        agentLevel: 60,
+        selectedEventId: "legacy-direct",
+        events: [{ ...directStunEvent, id: "legacy-direct" }],
+        target: zeroResistanceTarget(),
+    },
+})
+const legacyDirect = calculateInCombatPanel(legacyEnemyDamageTakenCatalog, legacyDirectInput)
+const baselineDirect = calculateInCombatPanel(catalog, legacyDirectInput)
+approx(legacyDirect.damage.finalDamage, baselineDirect.damage.finalDamage, "Legacy enemy damage taken must not change direct damage")
+assert.equal(Object.hasOwn(legacyDirect.damage.multipliers, "enemyDamageTaken"), false)
+assert.equal(Object.hasOwn(legacyDirect.damage.targetBreakdown, "enemyDamageTakenMultiplier"), false)
+assert.equal(
+    legacyDirect.damage.events.every(event => !Object.hasOwn(event.multipliers ?? {}, "enemyDamageTaken")),
+    true,
+)
+assert.equal(legacyDirect.damage.whiteBoxRows.some(row => row.label === "敌方承伤乘区"), false)
+assert.equal(
+    legacyDirect.inCombat.activeEffects
+        .flatMap(effect => effect.resolvedDamageModifiers ?? [])
+        .some(effect => effect.stat === "enemyDamageTakenBonus" || effect.kind === "enemyDamageTakenBonus"),
+    false,
+)
+
+const legacyAnomalyInput = minimalInput({
+    combatBuffs: {
+        activeBuffIds: ["test.legacy.enemy_damage_taken"],
+        manualStats: [{ id: "legacy-anomaly-proficiency", stat: "anomalyProficiency", value: 100, mode: "flat" }],
+    },
+    damage: {
+        agentLevel: 60,
+        selectedEventId: "legacy-anomaly",
+        events: [{ id: "legacy-anomaly", kind: "anomaly", anomalyEffect: "assault" }],
+        target: zeroResistanceTarget(),
+    },
+})
+const legacyAnomaly = calculateInCombatPanel(legacyEnemyDamageTakenCatalog, legacyAnomalyInput)
+const baselineAnomaly = calculateInCombatPanel(catalog, legacyAnomalyInput)
+approx(legacyAnomaly.damage.finalDamage, baselineAnomaly.damage.finalDamage, "Legacy enemy damage taken must not change anomaly damage")
+assert.equal(legacyAnomaly.damage.whiteBoxRows.some(row => row.label === "敌方承伤乘区"), false)
+
 assertStunMultiplierScales({
     label: "Attribute anomaly damage",
     event: {

@@ -774,10 +774,10 @@ assert.ok(anomalyDamageBonusOption, "Custom Buff stat options should include ano
 assert.equal(anomalyDamageBonusOption[0], "anomalyDamageBonus", "Anomaly damage bonus should be a fixed event stat")
 assert.equal(anomalyDamageBonusOption[2], "eventModifier", "Anomaly damage bonus option should use the default event modifier bucket")
 const enemyDamageTakenOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[0] === "enemyDamageTakenBonus")
-assert.deepEqual(
+assert.equal(
     enemyDamageTakenOption,
-    ["enemyDamageTakenBonus", "敌方承伤提升%", "eventModifier", null],
-    "Custom Buff stat options should expose enemy damage taken as an independent event multiplier",
+    undefined,
+    "The retired enemy damage taken zone must not be available in the custom Buff picker",
 )
 const disorderDamageBonusOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[1] === "紊乱增伤%")
 assert.ok(disorderDamageBonusOption, "Custom Buff stat options should include disorder damage bonus")
@@ -869,7 +869,6 @@ for (const optionList of [CUSTOM_BUFF_STAT_OPTIONS, CUSTOM_BUFF_SKILL_STAT_OPTIO
 assert.ok(CUSTOM_BUFF_STAT_OPTIONS.some(option => option[0] === "critDmg"), "Default Custom Buff options should retain global Crit DMG")
 assert.equal(CUSTOM_BUFF_SKILL_STAT_OPTIONS.some(option => option[0] === "critDmg"), false, "Skill-targeted Custom Buffs should not add generic Crit DMG semantics")
 for (const stat of [
-    "enemyDamageTakenBonus",
     "anomalyDamageBonus",
     "disorderDamageBonus",
     "baseMultiplierBonus",

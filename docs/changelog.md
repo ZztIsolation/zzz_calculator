@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 2026-08-19 - Retired The Enemy Damage Taken Zone
+
+Retired `enemyDamageTakenBonus` as a damage multiplier. Historical payloads
+may keep the field for storage compatibility, but every calculation path now
+ignores it and the damage white box no longer exposes an enemy-damage-taken
+row. The custom Buff picker no longer offers the retired field, while legacy
+maintenance data remains readable without changing damage results.
+
 ## 2026-08-12 - Added Remielle Teammate Buffs And The Alienation Zone
 
 Added Remielle Dan as a five-entry teammate group: Core Passive F, Special
@@ -297,21 +305,21 @@ metadata, while their combat rules include only effects that change player
 damage. Score rules, Decibel restoration, enemy outgoing damage, and the Dead
 End Butcher's Ether Enhanced behavior are deliberately not stored.
 
-Stagnant Aberrant's marks independently grant `8%` Attribute Anomaly damage and
-`8%` enemy damage taken per stack, up to two stacks, and its part-break or
-Perfect Counter trigger grants `60` Anomaly Proficiency. Dead End Butcher grants
+Stagnant Aberrant's marks independently grant `8%` Attribute Anomaly damage.
+The historical `8%` enemy-damage-taken rule per stack has been retired and no
+longer affects calculations. Its part-break or Perfect Counter trigger grants
+`60` Anomaly Proficiency. Dead End Butcher grants
 `50%` Attribute Anomaly damage. Unknown Corruption Complex grants `25%` CRIT DMG
 per Disintegration stack, up to four. Integrated Girtablullu's Dissonant state
 grants `40%` Attribute Anomaly damage, while Transmutation grants `15%` damage
 and `20` Anomaly Proficiency.
 
-Introduced `enemyDamageTakenBonus` as a dedicated event modifier rather than
-folding enemy vulnerability into the player's generic damage bonus. The new
-multiplier is visible as its own white-box row and is wired through direct,
-Sheer, Attribute Anomaly, Disorder, Release, compiled, dense, and fixed-set
-optimizer calculations. Catalog validation, percentage normalization, Boss
-image presence, runtime stacks, and compiled-versus-legacy score equivalence
-are covered by regression tests.
+The historical implementation in this release briefly introduced
+`enemyDamageTakenBonus` as a dedicated event modifier. That experiment has
+since been retired; see the 2026-08-19 entry above. The catalog validation,
+percentage normalization, Boss image presence, runtime stacks, and
+compiled-versus-legacy score equivalence tests remain applicable to the
+supported modifiers.
 
 ## 2026-07-28 - Fixed Current Skill Levels In Damage Calculation
 

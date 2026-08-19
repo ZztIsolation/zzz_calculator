@@ -292,6 +292,9 @@ const DEF_IGNORE_KEY_BY_ELEMENT = ELEMENT_DEF_IGNORE_STAT_BY_ELEMENT
 
 const DAMAGE_EVENT_KINDS = ["direct", "anomaly", "disorder", "sheer"]
 const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
+// Kept in the accepted data vocabulary for old saved effects, but this legacy
+// modifier is intentionally ignored by every calculation path.
+const IGNORED_DAMAGE_MODIFIER_KINDS = new Set(["enemyDamageTakenBonus"])
 const DAMAGE_MODIFIER_KINDS = ["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg", "skillMultiplierBonus", ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS]
 const EVENT_MODIFIER_STAT_KEYS = new Set([
     "enemyDamageTakenBonus",
@@ -1249,6 +1252,8 @@ function resolveEffectDamageModifiers(effect, runtimeInput = {}, modifierContext
                 appliesTo: targetAppliesTo,
             }
         })
+        .filter(rule => !IGNORED_DAMAGE_MODIFIER_KINDS.has(rule.kind)
+            && !IGNORED_DAMAGE_MODIFIER_KINDS.has(rule.stat))
         .filter(rule => EVENT_MODIFIER_KIND_VALUES.has(rule.kind) && Number.isFinite(Number(rule.value)))
 }
 
@@ -1411,6 +1416,9 @@ function compileDenseDamageModifierEntries(effectEntries = [], compiledEvents = 
         const result = []
         effectEntries.forEach((entry, entryIndex) => {
             for (const modifier of entry.damageModifiers ?? []) {
+                if (IGNORED_DAMAGE_MODIFIER_KINDS.has(modifier?.kind)) {
+                    continue
+                }
                 if (!damageModifierAppliesToCompiledEvent(modifier, compiledEvent.event)) {
                     continue
                 }
@@ -3123,10 +3131,6 @@ function targetActiveStunMultiplier(target = {}, stunned = true, eventTotals = {
         : Math.max(0, 1 + alwaysStunDmgMultiplierBonus)
 }
 
-function enemyDamageTakenMultiplier(eventTotals = {}) {
-    return Math.max(0, 1 + Number(eventTotals.enemyDamageTakenBonus ?? 0))
-}
-
 function targetBreakdownForElement(panel, bonusTotals, target, damageElement, eventTotals = {}, stunned = true) {
     const targetDefense = target.defense
     const levelCoefficient = target.levelCoefficient
@@ -3156,8 +3160,6 @@ function targetBreakdownForElement(panel, bonusTotals, target, damageElement, ev
     const effectiveResistance = targetResistance - enemyResReduction - resIgnore
     const rawResistanceMultiplier = 1 - effectiveResistance
     const resistanceMultiplier = resistanceFixedOne ? 1 : clampNumber(rawResistanceMultiplier, 0.01, 2)
-    const enemyDamageTakenBonus = Number(eventTotals.enemyDamageTakenBonus ?? 0)
-    const enemyDamageTaken = enemyDamageTakenMultiplier(eventTotals)
     const stunDmgMultiplierBonus = Number(eventTotals.stunDmgMultiplierBonus ?? 0)
     const stunDmgMultiplierBonusAlways = Number(eventTotals.stunDmgMultiplierBonusAlways ?? 0)
     const stunDmgMultiplierBonusCapAlways = Number(eventTotals.stunDmgMultiplierBonusCapAlways ?? 0)
@@ -3187,8 +3189,6 @@ function targetBreakdownForElement(panel, bonusTotals, target, damageElement, ev
         rawResistanceMultiplier,
         resistanceMultiplier,
         resistanceFixedOne,
-        enemyDamageTakenBonus,
-        enemyDamageTakenMultiplier: enemyDamageTaken,
         stunned: normalizedStunned,
         stunMultiplier,
         stunDmgMultiplierBonus,
@@ -3298,7 +3298,9 @@ function skillTargetsApplyTo(skillTargets, event) {
 
 function matchingDamageModifiers(bonusTotals, event, kind) {
     return (bonusTotals.damageModifiers ?? [])
-        .filter(modifier => modifier.kind === kind && damageModifierAppliesTo(modifier, event))
+        .filter(modifier => !IGNORED_DAMAGE_MODIFIER_KINDS.has(modifier?.kind)
+            && modifier.kind === kind
+            && damageModifierAppliesTo(modifier, event))
 }
 
 function sumDamageModifiers(bonusTotals, event, kind) {
@@ -3378,7 +3380,6 @@ function eventTargetTotalsForElement(bonusTotals, event) {
         [resReductionKey]: sumDamageModifiers(bonusTotals, event, resReductionKey),
         [ALL_RES_IGNORE_KEY]: sumDamageModifiers(bonusTotals, event, ALL_RES_IGNORE_KEY),
         [resIgnoreKey]: sumDamageModifiers(bonusTotals, event, resIgnoreKey),
-        enemyDamageTakenBonus: sumDamageModifiers(bonusTotals, event, "enemyDamageTakenBonus"),
         stunDmgMultiplierBonus: sumDamageModifiers(bonusTotals, event, "stunDmgMultiplierBonus"),
         stunDmgMultiplierBonusAlways: sumDamageModifiers(bonusTotals, event, "stunDmgMultiplierBonusAlways"),
         stunDmgMultiplierBonusCapAlways: sumDamageModifiers(bonusTotals, event, "stunDmgMultiplierBonusCapAlways"),
@@ -3528,15 +3529,6 @@ function defenseWhiteBoxRow(targetBreakdown) {
     }
 }
 
-function enemyDamageTakenWhiteBoxRow(targetBreakdown) {
-    return {
-        label: "敌方承伤乘区",
-        formula: `max(0, 1 + 敌方承伤提升 ${formatDamagePercent(targetBreakdown.enemyDamageTakenBonus)})`,
-        value: targetBreakdown.enemyDamageTakenMultiplier,
-        displayValue: formatDamageNumber(targetBreakdown.enemyDamageTakenMultiplier, 4),
-    }
-}
-
 function stunWhiteBoxRow(targetBreakdown) {
     const bonus = Number(targetBreakdown.stunDmgMultiplierBonus ?? 0)
     const alwaysBonus = Number(targetBreakdown.stunDmgMultiplierBonusAlways ?? 0)
@@ -3614,7 +3606,6 @@ function directDamageWhiteBoxRows({ event, damageBasisValue, critMultiplier, cri
                 ? "1"
                 : formatDamageNumber(targetBreakdown.resistanceMultiplier, 4),
         },
-        enemyDamageTakenWhiteBoxRow(targetBreakdown),
         stunWhiteBoxRow(targetBreakdown),
     ]
     if (event.damageScale !== 1) {
@@ -3636,7 +3627,7 @@ function directDamageWhiteBoxRows({ event, damageBasisValue, critMultiplier, cri
     rows.push({
         label: "最终伤害",
         formula: event.count === 1
-            ? `${formatDamageNumber(damageBasisValue)} × ${formatDamagePercent(effectiveSkillMultiplier)} × ${formatDamageNumber(critMultiplier, 4)} × ${formatDamageNumber(dmgMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.defenseMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.resistanceMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.enemyDamageTakenMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.activeStunMultiplier, 4)}${event.damageScale !== 1 ? ` × ${formatDamagePercent(event.damageScale)}` : ""}`
+            ? `${formatDamageNumber(damageBasisValue)} × ${formatDamagePercent(effectiveSkillMultiplier)} × ${formatDamageNumber(critMultiplier, 4)} × ${formatDamageNumber(dmgMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.defenseMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.resistanceMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.activeStunMultiplier, 4)}${event.damageScale !== 1 ? ` × ${formatDamagePercent(event.damageScale)}` : ""}`
             : `${formatDamageNumber(singleDamage)} × ${formatDamageNumber(event.count)}`,
         value: finalDamage,
         displayValue: formatDamageNumber(finalDamage),
@@ -3711,7 +3702,6 @@ function sheerDamageWhiteBoxRows({ event, hp, atk, sheerForceFlat, sheerForce, c
             value: targetBreakdown.resistanceMultiplier,
             displayValue: formatDamageNumber(targetBreakdown.resistanceMultiplier, 4),
         },
-        enemyDamageTakenWhiteBoxRow(targetBreakdown),
         stunWhiteBoxRow(targetBreakdown),
     ]
     if (event.damageScale !== 1) {
@@ -3733,7 +3723,7 @@ function sheerDamageWhiteBoxRows({ event, hp, atk, sheerForceFlat, sheerForce, c
     rows.push({
         label: "最终伤害",
         formula: event.count === 1
-            ? `${formatDamageNumber(sheerForce)} × ${formatDamagePercent(effectiveSkillMultiplier)} × ${formatDamageNumber(critMultiplier, 4)} × ${formatDamageNumber(dmgMultiplier, 4)} × ${formatDamageNumber(sheerDmgMultiplier, 4)} × 1 × ${formatDamageNumber(targetBreakdown.resistanceMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.enemyDamageTakenMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.activeStunMultiplier, 4)}${event.damageScale !== 1 ? ` × ${formatDamagePercent(event.damageScale)}` : ""}`
+            ? `${formatDamageNumber(sheerForce)} × ${formatDamagePercent(effectiveSkillMultiplier)} × ${formatDamageNumber(critMultiplier, 4)} × ${formatDamageNumber(dmgMultiplier, 4)} × ${formatDamageNumber(sheerDmgMultiplier, 4)} × 1 × ${formatDamageNumber(targetBreakdown.resistanceMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.activeStunMultiplier, 4)}${event.damageScale !== 1 ? ` × ${formatDamagePercent(event.damageScale)}` : ""}`
             : `${formatDamageNumber(singleDamage)} × ${formatDamageNumber(event.count)}`,
         value: finalDamage,
         displayValue: formatDamageNumber(finalDamage),
@@ -3823,7 +3813,6 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
             value: targetBreakdown.resistanceMultiplier,
             displayValue: formatDamageNumber(targetBreakdown.resistanceMultiplier, 4),
         },
-        enemyDamageTakenWhiteBoxRow(targetBreakdown),
         stunWhiteBoxRow(targetBreakdown),
         {
             label: "异常精通区",
@@ -3898,7 +3887,6 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
                 formatDamageNumber(dmgMultiplier, 4),
                 formatDamageNumber(targetBreakdown.defenseMultiplier, 4),
                 formatDamageNumber(targetBreakdown.resistanceMultiplier, 4),
-                formatDamageNumber(targetBreakdown.enemyDamageTakenMultiplier, 4),
                 formatDamageNumber(targetBreakdown.activeStunMultiplier, 4),
                 formatDamageNumber(anomalyProficiencyMultiplier, 4),
                 formatDamageNumber(levelMultiplier, 4),
@@ -3940,7 +3928,6 @@ function calculateDirectDamageEvent({ event, panel, bonusTotals, target, include
         * dmgMultiplier
         * targetBreakdown.defenseMultiplier
         * targetBreakdown.resistanceMultiplier
-        * targetBreakdown.enemyDamageTakenMultiplier
         * targetBreakdown.activeStunMultiplier
         * event.damageScale
     const damageVariant = mode => {
@@ -4008,7 +3995,6 @@ function calculateDirectDamageEvent({ event, panel, bonusTotals, target, include
             directDamageBonus,
             defense: targetBreakdown.defenseMultiplier,
             resistance: targetBreakdown.resistanceMultiplier,
-            enemyDamageTaken: targetBreakdown.enemyDamageTakenMultiplier,
             stun: targetBreakdown.activeStunMultiplier,
         },
         targetBreakdown,
@@ -4064,7 +4050,6 @@ function calculateSheerDamageEvent({ event, agent, panel, bonusTotals, target, i
         * dmgMultiplier
         * sheerDmgMultiplier
         * targetBreakdown.resistanceMultiplier
-        * targetBreakdown.enemyDamageTakenMultiplier
         * targetBreakdown.activeStunMultiplier
         * event.damageScale
     const damageVariant = mode => {
@@ -4133,7 +4118,6 @@ function calculateSheerDamageEvent({ event, agent, panel, bonusTotals, target, i
             sheerDmgBonus,
             defense: 1,
             resistance: targetBreakdown.resistanceMultiplier,
-            enemyDamageTaken: targetBreakdown.enemyDamageTakenMultiplier,
             stun: targetBreakdown.activeStunMultiplier,
         },
         targetBreakdown,
@@ -4266,7 +4250,6 @@ export function calculateAnomalyUnitDamage({
         * dmgMultiplier
         * targetBreakdown.defenseMultiplier
         * targetBreakdown.resistanceMultiplier
-        * targetBreakdown.enemyDamageTakenMultiplier
         * targetBreakdown.activeStunMultiplier
         * anomalyProficiencyMultiplier
         * levelMultiplier
@@ -4332,7 +4315,6 @@ function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTota
         * dmgMultiplier
         * targetBreakdown.defenseMultiplier
         * targetBreakdown.resistanceMultiplier
-        * targetBreakdown.enemyDamageTakenMultiplier
         * targetBreakdown.activeStunMultiplier
         * sourceUnit.anomalyProficiencyMultiplier
         * sourceUnit.levelMultiplier
@@ -4373,7 +4355,6 @@ function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTota
             dmg: dmgMultiplier,
             defense: targetBreakdown.defenseMultiplier,
             resistance: targetBreakdown.resistanceMultiplier,
-            enemyDamageTaken: targetBreakdown.enemyDamageTakenMultiplier,
             stun: targetBreakdown.activeStunMultiplier,
             anomalyProficiency: sourceUnit.anomalyProficiencyMultiplier,
             anomalyLevel: sourceUnit.levelMultiplier,
@@ -4613,7 +4594,6 @@ function calculateAnomalyDamageEvent({ event, panel, outOfCombatPanel = panel, b
         * dmgMultiplier
         * targetBreakdown.defenseMultiplier
         * targetBreakdown.resistanceMultiplier
-        * targetBreakdown.enemyDamageTakenMultiplier
         * targetBreakdown.activeStunMultiplier
         * anomalyProficiencyMultiplier
         * levelMultiplier
@@ -4661,7 +4641,6 @@ function calculateAnomalyDamageEvent({ event, panel, outOfCombatPanel = panel, b
             dmg: dmgMultiplier,
             defense: targetBreakdown.defenseMultiplier,
             resistance: targetBreakdown.resistanceMultiplier,
-            enemyDamageTaken: targetBreakdown.enemyDamageTakenMultiplier,
             stun: targetBreakdown.activeStunMultiplier,
             anomalyProficiency: anomalyProficiencyMultiplier,
             anomalyLevel: levelMultiplier,
@@ -4776,7 +4755,6 @@ function targetDamageMultiplierForElement(panel, bonusTotals, target, damageElem
     const defenseMultiplier = Math.min(1, levelCoefficient / (levelCoefficient + effectiveDefense))
     return defenseMultiplier
         * targetResistanceMultiplierForElement(panel, bonusTotals, target, damageElement, eventTotals)
-        * enemyDamageTakenMultiplier(eventTotals)
         * targetActiveStunMultiplier(target, stunned, eventTotals)
 }
 
@@ -4884,7 +4862,6 @@ function calculateSheerDamageFinalValue(event, panel, bonusTotals, target, agent
         * (1 + selectedDmgBonus + skillDamageBonus)
         * targetResistanceMultiplierForElement(panel, bonusTotals, target, event.damageElement, eventTotals)
         * (1 + sheerDmgBonus)
-        * enemyDamageTakenMultiplier(eventTotals)
         * targetActiveStunMultiplier(target, event.stunned, eventTotals)
         * event.damageScale
         * Number(event.count ?? 1)
@@ -4982,7 +4959,9 @@ function compiledEventBaseMultiplier(compiledEvent, durationBonusSeconds = 0, pa
 function modifierSumsForCompiledEvent(modifiers = [], event = {}) {
     let sums = null
     for (const modifier of modifiers) {
-        if (!modifier?.kind || !damageModifierAppliesTo(modifier, event)) {
+        if (!modifier?.kind
+            || IGNORED_DAMAGE_MODIFIER_KINDS.has(modifier.kind)
+            || !damageModifierAppliesTo(modifier, event)) {
             continue
         }
         sums ??= Object.create(null)
@@ -5028,7 +5007,6 @@ function compiledTargetDamageMultiplier(panel, bonusTotals, target, compiledEven
     const defenseMultiplier = Math.min(1, levelCoefficient / (levelCoefficient + effectiveDefense))
     return defenseMultiplier
         * compiledResistanceMultiplier(panel, bonusTotals, target, compiledEvent, sums)
-        * Math.max(0, 1 + compiledModifierSum(sums, "enemyDamageTakenBonus"))
         * targetActiveStunMultiplier(target, compiledEvent.stunned, {
             stunDmgMultiplierBonus: compiledModifierSum(sums, "stunDmgMultiplierBonus"),
             stunDmgMultiplierBonusAlways: compiledModifierSum(sums, "stunDmgMultiplierBonusAlways"),
@@ -5134,7 +5112,6 @@ function calculateCompiledDamageScoreValue({ agent, panel, outOfCombatPanel = pa
                 * (1 + selectedDmgBonus + skillDamageBonus)
                 * compiledResistanceMultiplier(panel, bonusTotals, target, compiledEvent, sums)
                 * (1 + sheerDmgBonus)
-                * Math.max(0, 1 + compiledModifierSum(sums, "enemyDamageTakenBonus"))
                 * targetActiveStunMultiplier(target, compiledEvent.stunned, {
                     stunDmgMultiplierBonus: compiledModifierSum(sums, "stunDmgMultiplierBonus"),
                     stunDmgMultiplierBonusAlways: compiledModifierSum(sums, "stunDmgMultiplierBonusAlways"),
@@ -5238,7 +5215,6 @@ function denseTargetDamageMultiplier(panelValues, combatValues, target, compiled
     const defenseMultiplier = Math.min(1, levelCoefficient / (levelCoefficient + effectiveDefense))
     return defenseMultiplier
         * denseResistanceMultiplier(panelValues, combatValues, target, compiledEvent, sums)
-        * Math.max(0, 1 + denseModifierSum(sums, "enemyDamageTakenBonus"))
         * targetActiveStunMultiplier(target, compiledEvent.stunned, {
             stunDmgMultiplierBonus: denseModifierSum(sums, "stunDmgMultiplierBonus"),
             stunDmgMultiplierBonusAlways: denseModifierSum(sums, "stunDmgMultiplierBonusAlways"),
@@ -5371,7 +5347,6 @@ function calculateCompiledDamageScoreValueDense({
                 * (1 + selectedDmgBonus + skillDamageBonus)
                 * denseResistanceMultiplier(panelValues, combatValues, target, compiledEvent, modifierSums)
                 * (1 + sheerDmgBonus)
-                * Math.max(0, 1 + denseModifierSum(modifierSums, "enemyDamageTakenBonus"))
                 * targetActiveStunMultiplier(target, compiledEvent.stunned, {
                     stunDmgMultiplierBonus: denseModifierSum(modifierSums, "stunDmgMultiplierBonus"),
                     stunDmgMultiplierBonusAlways: denseModifierSum(modifierSums, "stunDmgMultiplierBonusAlways"),
@@ -7089,10 +7064,6 @@ export function createInCombatPanelCalculator(catalog, input) {
                         ? 0
                         : denseModifierSum(sums, ALL_RES_IGNORE_KEY)
                             + denseModifierSum(sums, event.resIgnoreKey),
-                    enemyDamageTakenMultiplier: Math.max(
-                        0,
-                        1 + denseModifierSum(sums, "enemyDamageTakenBonus"),
-                    ),
                     stunMultiplier: targetActiveStunMultiplier(target, event.stunned, {
                         stunDmgMultiplierBonus: denseModifierSum(sums, "stunDmgMultiplierBonus"),
                         stunDmgMultiplierBonusAlways: denseModifierSum(sums, "stunDmgMultiplierBonusAlways"),
@@ -7166,7 +7137,6 @@ export function createInCombatPanelCalculator(catalog, input) {
                         * (1 + dmgBonus + elementDmg + event.directDamageBonus)
                         * defenseMultiplier
                         * resistanceMultiplier
-                        * event.enemyDamageTakenMultiplier
                         * event.stunMultiplier
                         * critMultiplier
                         * event.damageScale
@@ -7296,7 +7266,6 @@ export function createInCombatPanelCalculator(catalog, input) {
                                 : critRate * (1 + effectiveCritDmg) + (1 - critRate)
                         const targetMultiplier = defenseMultiplier
                             * resistanceMultiplier
-                            * event.enemyDamageTakenMultiplier
                             * event.stunMultiplier
                         total += atk
                             * event.effectiveSkillMultiplier
@@ -7421,10 +7390,6 @@ export function createInCombatPanelCalculator(catalog, input) {
                         ? 0
                         : denseModifierSum(sums, ALL_RES_IGNORE_KEY)
                             + denseModifierSum(sums, event.resIgnoreKey),
-                    enemyDamageTakenMultiplier: Math.max(
-                        0,
-                        1 + denseModifierSum(sums, "enemyDamageTakenBonus"),
-                    ),
                     stunMultiplier: targetActiveStunMultiplier(target, event.stunned, {
                         stunDmgMultiplierBonus: denseModifierSum(sums, "stunDmgMultiplierBonus"),
                         stunDmgMultiplierBonusAlways: denseModifierSum(sums, "stunDmgMultiplierBonusAlways"),
@@ -7594,7 +7559,6 @@ export function createInCombatPanelCalculator(catalog, input) {
                             * (1 + dmgBonus + elementDmg + event.skillDamageBonus)
                             * resistanceMultiplier
                             * (1 + event.sheerDmgBonus)
-                            * event.enemyDamageTakenMultiplier
                             * event.stunMultiplier
                             * event.damageScale
                             * event.count
@@ -7608,7 +7572,6 @@ export function createInCombatPanelCalculator(catalog, input) {
                             * (1 + dmgBonus + elementDmg + event.directDamageBonus)
                             * defenseMultiplier
                             * resistanceMultiplier
-                            * event.enemyDamageTakenMultiplier
                             * event.stunMultiplier
                             * critMultiplier
                             * event.damageScale
@@ -7667,7 +7630,6 @@ export function createInCombatPanelCalculator(catalog, input) {
                         * (1 + dmgBonus + elementDmg + event.skillDamageBonus)
                         * defenseMultiplier
                         * resistanceMultiplier
-                        * event.enemyDamageTakenMultiplier
                         * event.stunMultiplier
                         * (Math.max(0, anomalyProficiency) / 100)
                         * compiledDamageTarget.anomalyLevelMultiplier

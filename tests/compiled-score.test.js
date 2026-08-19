@@ -57,7 +57,7 @@ compareCalculator("direct", {
     damage: exampleInput.damage,
 })
 
-compareCalculator("direct-enemy-damage-taken", {
+compareCalculator("direct-boss-environment", {
     agentId: exampleInput.agentId,
     coreSkillLevel: exampleInput.coreSkillLevel,
     wEngineId: exampleInput.wEngineId,
@@ -90,7 +90,7 @@ compareCalculator("miyabi-custom", {
     damage: miyabi.defaultCalculationConfig,
 })
 
-compareCalculator("miyabi-custom-enemy-damage-taken", {
+compareCalculator("miyabi-custom-boss-environment", {
     agentId: "hoshimi_miyabi",
     coreSkillLevel: "F",
     wEngineId: "hailfall_star_palace",
@@ -192,7 +192,7 @@ compareCalculator("sheer", {
     },
 })
 
-compareCalculator("sheer-enemy-damage-taken", {
+compareCalculator("sheer-boss-environment", {
     agentId: "yixuan",
     coreSkillLevel: "F",
     wEngineId: "zzz_wiki_1342",

@@ -980,17 +980,15 @@ Direct damage normally uses:
 
 ```text
 atk * skillMultiplier * critMultiplier * (1 + generic/element dmg bonus)
-  * defenseMultiplier * resistanceMultiplier * enemyDamageTakenMultiplier
+  * defenseMultiplier * resistanceMultiplier
   * stunMultiplier * damageScale
 ```
 
-`enemyDamageTakenBonus` is an event-level enemy vulnerability bucket. It is
-stored as a percentage and resolves to `max(0, 1 + enemyDamageTakenBonus)`.
-This multiplier is independent from generic/element damage bonus, resistance,
-defense, and stun vulnerability, and applies consistently to direct, Sheer,
-attribute Anomaly, Disorder, and Release damage. It is used for enemy rules
-whose wording says the enemy "takes increased damage"; player-side "damage
-dealt increases" effects continue to use `dmgBonus`.
+`enemyDamageTakenBonus` is a retired legacy field. Existing payloads may still
+contain it for storage compatibility, but the calculator ignores it and does
+not expose a multiplier or white-box row for it. Enemy-side vulnerability is
+therefore not an independent damage zone; effects that intentionally increase
+player damage must use their corresponding player-side damage modifier.
 
 `damageRatioPct` is stored as a schema percentage and becomes `damageScale`
 during normalization. The player-facing event manager no longer exposes this
@@ -1052,7 +1050,7 @@ Attribute anomaly damage uses:
 
 ```text
 atk * anomalyMultiplier * (1 + generic/element dmg bonus)
-  * defenseMultiplier * resistanceMultiplier * enemyDamageTakenMultiplier
+  * defenseMultiplier * resistanceMultiplier
   * stunMultiplier
   * anomalyProficiency / 100
   * anomalyLevel

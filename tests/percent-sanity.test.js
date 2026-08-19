@@ -30,7 +30,6 @@ const STORED_PERCENT_LIMITS = {
     etherResIgnore: 100,
     windResIgnore: 100,
     dmgBonus: 300,
-    enemyDamageTakenBonus: 300,
     physicalDmg: 300,
     fireDmg: 300,
     iceDmg: 300,
