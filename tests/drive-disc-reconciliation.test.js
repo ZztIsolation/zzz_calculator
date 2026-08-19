@@ -555,60 +555,40 @@ function assertSources(disc, expected) {
     assert.equal(syncPlan.summary.removed, 0)
 }
 
-// Same-shape/different-content observations require an explicit add/update resolution.
+// Same-shape/different-content observations are distinct inventory records.
+// They must not open an update/add conflict: only an exact v2 content match is
+// strong enough for cross-source deduplication.
 {
-    const existing = normalizedScannerDiscs([scannerItem(1, {
-        level: 12,
-        subStats: [
-            { "攻击力": "3%" },
-            { "暴击率": "2.4%" },
-            { "暴击伤害": "9.6%" },
-        ],
-    })], "conflict-existing")[0]
-    const incoming = enkaDisc(UID_A, "204")
-    const unresolved = planDriveDiscReconciliation({
-        existingDiscs: [existing],
-        importedDiscs: [incoming],
-        ownerId: OWNER_ID,
-        sourceKind: "enka",
-        now: NOW,
-    })
-    assert.equal(unresolved.driveDiscs.length, 1)
-    assert.equal(unresolved.conflicts.length, 1)
-    assert.equal(unresolved.added.length, 0)
-    assert.equal(unresolved.updated.length, 0)
-    assert.equal(unresolved.conflicts[0].reason, "same-shape-different-content")
-
-    const updateResolved = planDriveDiscReconciliation({
-        existingDiscs: [existing],
-        importedDiscs: [incoming],
-        ownerId: OWNER_ID,
-        sourceKind: "enka",
-        resolutions: {
-            [unresolved.conflicts[0].key]: { action: "update", existingId: existing.id },
+    const existing = normalizedScannerDiscs([scannerItem()], "shape-existing")[0]
+    const differingObservations = [
+        { label: "level", overrides: { level: 12 } },
+        { label: "main stat", overrides: { mainStat: { stat: "hpFlat", value: 2201, mode: "flat", label: "生命值" } } },
+        {
+            label: "sub stat",
+            overrides: {
+                subStats: [
+                    { stat: "atkPct", value: 3, mode: "pct", label: "攻击力" },
+                    { stat: "critRate", value: 4.8, mode: "pct", label: "暴击率" },
+                    { stat: "critDmg", value: 14.4, mode: "pct", label: "暴击伤害" },
+                ],
+            },
         },
-        now: NOW,
-    })
-    assert.equal(updateResolved.driveDiscs.length, 1)
-    assert.equal(updateResolved.driveDiscs[0].id, existing.id)
-    assert.equal(updateResolved.driveDiscs[0].level, 15)
-    assert.equal(updateResolved.updated.length, 1)
-    assert.equal(updateResolved.conflicts.length, 0)
-    assertSources(updateResolved.driveDiscs[0], ["scanner", "enkaZzz"])
-
-    const addResolved = planDriveDiscReconciliation({
-        existingDiscs: [existing],
-        importedDiscs: [incoming],
-        ownerId: OWNER_ID,
-        sourceKind: "enka",
-        resolutions: {
-            [unresolved.conflicts[0].key]: { action: "add" },
-        },
-        now: NOW,
-    })
-    assert.equal(addResolved.driveDiscs.length, 2)
-    assert.equal(addResolved.added.length, 1)
-    assert.equal(addResolved.conflicts.length, 0)
+    ]
+    for (const [index, { label, overrides }] of differingObservations.entries()) {
+        const incoming = enkaDisc(UID_A, `204-${index}`, overrides)
+        const reconciled = planDriveDiscReconciliation({
+            existingDiscs: [existing],
+            importedDiscs: [incoming],
+            ownerId: OWNER_ID,
+            sourceKind: "enka",
+            now: NOW,
+        })
+        assert.equal(reconciled.driveDiscs.length, 2, label)
+        assert.equal(reconciled.conflicts.length, 0, label)
+        assert.equal(reconciled.added.length, 1, label)
+        assert.equal(reconciled.updated.length, 0, label)
+        assert.equal(reconciled.added[0].id, incoming.id, label)
+    }
 }
 
 // Fingerprints are only an index. A forced hash collision must still deep-compare
@@ -631,8 +611,9 @@ function assertSources(disc, expected) {
     assert.deepEqual(result.driveDiscs.map(disc => disc.partition).sort(), [1, 2, 3])
 }
 
-// Collision-resistant decision keys do not rely on the content hash, and the
-// reconciliation API rejects records from a different owner.
+// Hash collisions never make shape-only observations ambiguous: differing
+// content receives deterministic suffix IDs. The reconciliation API still
+// rejects records from a different owner.
 {
     const collisionOptions = { hashText: () => "same-hash" }
     const imported = normalizeDriveDiscImport([
@@ -658,8 +639,10 @@ function assertSources(disc, expected) {
         now: NOW,
         options: collisionOptions,
     })
-    assert.equal(unresolved.conflicts.length, 2)
-    assert.equal(new Set(unresolved.conflicts.map(conflict => conflict.key)).size, 2)
+    assert.equal(unresolved.conflicts.length, 0)
+    assert.equal(unresolved.added.length, 2)
+    assert.equal(unresolved.driveDiscs.length, 4)
+    assert.equal(new Set(unresolved.driveDiscs.map(disc => disc.id)).size, 4)
 
     assert.throws(() => planDriveDiscReconciliation({
         existingDiscs: [{ ...existing[0], ownerId: "other-owner" }],

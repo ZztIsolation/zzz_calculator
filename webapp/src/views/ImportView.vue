@@ -70,6 +70,10 @@ const hasResult = computed(() => mappedAgents.value.length > 0 || skippedAgents.
 const selectedAgents = computed(() => mappedAgents.value.filter(agent => selectedIds.value.includes(agent.agentId)))
 const bindingMismatch = computed(() => binding.value?.uid && uid.value.trim() && binding.value.uid !== uid.value.trim())
 
+function hasUnresolvedConflicts(plan: any): boolean {
+  return Boolean(plan?.hasUnresolvedConflicts || (Array.isArray(plan?.conflicts) && plan.conflicts.length > 0))
+}
+
 function resetResult() {
   mappedAgents.value = []
   skippedAgents.value = []
@@ -248,6 +252,72 @@ function closePreview() {
   }
 }
 
+function selectionMatchesSnapshot(snapshot: { uid: string, ownerId: string, agentIds: string[] }): boolean {
+  if (uid.value.trim() !== snapshot.uid) return false
+  if (ownerId.value !== snapshot.ownerId || accountStore.currentOwnerId !== snapshot.ownerId) return false
+  const currentIds = selectedIds.value
+  return currentIds.length === snapshot.agentIds.length
+    && snapshot.agentIds.every(agentId => currentIds.includes(agentId))
+}
+
+async function refreshAfterImport() {
+  await Promise.all([inventoryStore.load(), catalogStore.load(), refreshBindingAndUndo()])
+  buildStore.initialize(catalogStore.catalog, catalogStore.meta)
+}
+
+async function commitImportPlan(plan: any) {
+  applying.value = true
+  try {
+    await applyEnkaImportPlan(plan)
+    previewPlan.value = null
+    await refreshAfterImport()
+    message.success(`已导入 ${plan.agents.length} 个角色，库存与配置已同步。`)
+  } finally {
+    applying.value = false
+  }
+}
+
+/**
+ * Direct import still builds the same frozen plan as the preview flow. It only
+ * omits rendering the modal; the transaction layer remains the single writer.
+ */
+async function confirmImportDirect() {
+  if (accountUnavailable.value || !selectedAgents.value.length || busy.value || previewPlan.value) return
+  const frozenUid = uid.value.trim()
+  const frozenAgents = JSON.parse(JSON.stringify(selectedAgents.value))
+  const snapshot = {
+    uid: frozenUid,
+    ownerId: ownerId.value,
+    agentIds: frozenAgents.map((agent: any) => String(agent.agentId)),
+  }
+  planning.value = true
+  error.value = ""
+  try {
+    const plan = await planEnkaImport(frozenUid, frozenAgents, {})
+    if (!selectionMatchesSnapshot(snapshot)) {
+      message.error("UID 或角色选择已变化，请重新读取展柜后再导入。")
+      return
+    }
+    if (plan.ownerId !== ownerId.value || accountStore.currentOwnerId !== ownerId.value) {
+      message.error("当前账号已切换，请重新读取展柜后再导入。")
+      return
+    }
+    const conflicts = Array.isArray(plan.conflicts) ? plan.conflicts : []
+    if (hasUnresolvedConflicts(plan)) {
+      const conflictCount = conflicts.length || 1
+      message.warning(`检测到 ${conflictCount} 个导入冲突，请使用“预览更改”处理后再导入。`)
+      return
+    }
+    await commitImportPlan(plan)
+  } catch (caught) {
+    const reason = caught instanceof Error ? caught.message : String(caught)
+    error.value = reason
+    message.error(reason)
+  } finally {
+    planning.value = false
+  }
+}
+
 async function resolveDriveDiscConflict(resolution: any) {
   const input = previewInput.value
   if (!input || planning.value || applying.value || accountUnavailable.value) return
@@ -274,7 +344,7 @@ async function resolveDriveDiscConflict(resolution: any) {
 
 async function confirmImport() {
   const plan = previewPlan.value
-  if (!plan || applying.value || planning.value || accountUnavailable.value || plan.hasUnresolvedConflicts) return
+  if (!plan || applying.value || planning.value || accountUnavailable.value || hasUnresolvedConflicts(plan)) return
   if (plan.ownerId !== ownerId.value || accountStore.currentOwnerId !== ownerId.value) {
     message.error("当前账号已切换，请重新生成预览。")
     resetResult()
@@ -284,8 +354,7 @@ async function confirmImport() {
   try {
     await applyEnkaImportPlan(plan)
     previewPlan.value = null
-    await Promise.all([inventoryStore.load(), catalogStore.load(), refreshBindingAndUndo()])
-    buildStore.initialize(catalogStore.catalog, catalogStore.meta)
+    await refreshAfterImport()
     message.success(`已导入 ${plan.agents.length} 个角色，库存与配置已同步。`)
   } catch (caught) {
     message.error(caught instanceof Error ? caught.message : String(caught))
@@ -324,13 +393,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="import-view" aria-labelledby="import-title">
+  <section class="import-view" aria-labelledby="import-title" aria-describedby="import-description">
     <header class="page-header">
       <div>
         <h1 id="import-title">展柜数据导入</h1>
         <p v-if="accountStore.loadState === 'error'">当前账号：加载失败</p>
         <p v-else-if="accountLabel">当前账号：{{ accountLabel }}<span v-if="binding"> / 已绑定 UID {{ binding.uid }}</span></p>
         <p v-else>当前账号：加载中…</p>
+        <p id="import-description" class="import-description">输入游戏 UID，读取公开展柜中的角色、音擎和驱动盘；确认后同步到当前 Calculator 账号。每个账号绑定一个 UID，最近一次成功导入可撤销。</p>
       </div>
       <NButton v-if="canUndo" secondary :loading="undoing" :disabled="controlsLocked" @click="undoImport">
         <template #icon><RotateCcw :size="16" /></template>
@@ -374,10 +444,21 @@ onBeforeUnmount(() => {
     <section v-if="hasResult" class="results" aria-labelledby="showcase-title">
       <div class="list-header">
         <h2 id="showcase-title">展柜角色</h2>
-        <NButton type="primary" :loading="planning" :disabled="controlsLocked || !selectedIds.length" @click="openPreview">
-          <template #icon><Eye :size="16" /></template>
-          预览更改（{{ selectedIds.length }}）
-        </NButton>
+        <div class="list-actions">
+          <NButton
+            type="primary"
+            :loading="planning || applying"
+            :disabled="controlsLocked || !selectedIds.length"
+            @click="confirmImportDirect"
+          >
+            <template #icon><Upload :size="16" /></template>
+            确认导入
+          </NButton>
+          <NButton secondary :loading="planning" :disabled="controlsLocked || !selectedIds.length" @click="openPreview">
+            <template #icon><Eye :size="16" /></template>
+            预览更改（{{ selectedIds.length }}）
+          </NButton>
+        </div>
       </div>
       <div class="agent-list">
         <label v-for="agent in mappedAgents" :key="agent.agentId" class="agent-row">
@@ -412,7 +493,7 @@ onBeforeUnmount(() => {
           <div v-if="previewPlan" class="preview-content">
             <NAlert type="info" :title="`UID ${previewPlan.uid} / ${previewPlan.agents.length} 个角色 / ${previewPlan.changeCount} 项更改`" />
             <NAlert
-              v-if="previewPlan.hasUnresolvedConflicts"
+              v-if="hasUnresolvedConflicts(previewPlan)"
               type="warning"
               :title="`还有 ${previewPlan.conflicts.length} 张疑似同盘需要确认`"
             />
@@ -454,7 +535,7 @@ onBeforeUnmount(() => {
             <NButton
               type="primary"
               :loading="applying"
-              :disabled="planning || accountUnavailable || previewPlan?.hasUnresolvedConflicts"
+              :disabled="planning || accountUnavailable || hasUnresolvedConflicts(previewPlan)"
               @click="confirmImport"
             >
               <template #icon><Upload :size="16" /></template>
@@ -473,11 +554,13 @@ onBeforeUnmount(() => {
 .page-header h1, .list-header h2, .preview-agent h3 { margin: 0; }
 .page-header h1 { font-size: 24px; }
 .page-header p { margin: 4px 0 0; color: #64748b; font-size: 13px; }
+.page-header .import-description { max-width: 760px; margin-top: 10px; color: #475569; line-height: 1.6; }
 .field-label { display: block; margin-bottom: 6px; color: #334155; font-size: 13px; font-weight: 600; }
 .uid-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .block { margin-top: 12px; }
 .results { display: flex; flex-direction: column; gap: 10px; }
 .list-header h2 { font-size: 18px; }
+.list-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .agent-list { border-top: 1px solid #e2e8f0; }
 .agent-row { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 4px; border-bottom: 1px solid #e2e8f0; }
 .agent-row.skipped { opacity: 0.72; }
@@ -498,6 +581,7 @@ onBeforeUnmount(() => {
 .modal-actions { justify-content: flex-end; }
 @media (max-width: 480px) {
   .page-header, .list-header { align-items: flex-start; flex-direction: column; }
+  .list-actions { width: 100%; justify-content: flex-start; }
   .uid-row > * { width: 100%; max-width: none !important; }
   .preview-agent dl div { grid-template-columns: 1fr; }
 }

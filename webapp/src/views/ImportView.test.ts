@@ -127,6 +127,12 @@ function button(wrapper: any, text: string) {
   return match
 }
 
+function buttonWithin(wrapper: any, text: string) {
+  const match = wrapper.findAll("button").find((candidate: any) => candidate.text().includes(text))
+  if (!match) throw new Error(`Button not found: ${text}`)
+  return match
+}
+
 const agents = [
   {
     agentId: "hoshimi_miyabi",
@@ -190,7 +196,31 @@ beforeEach(() => {
 })
 
 describe("ImportView", () => {
-  it("requires preview before committing a frozen multi-agent selection", async () => {
+  it("shows import guidance and can commit directly without opening the preview", async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('input[aria-label="游戏 UID"]').setValue("1302309616")
+    await button(wrapper, "读取展柜").trigger("click")
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("输入游戏 UID，读取公开展柜中的角色、音擎和驱动盘")
+    const resultButtons = wrapper.get(".list-actions").findAll("button")
+    expect(resultButtons).toHaveLength(2)
+    expect(resultButtons[0].text()).toContain("确认导入")
+    expect(resultButtons[1].text()).toContain("预览更改（2）")
+
+    await resultButtons[0].trigger("click")
+    await flushPromises()
+    expect(mocks.planEnkaImport).toHaveBeenCalledWith("1302309616", expect.arrayContaining([
+      expect.objectContaining({ agentId: "hoshimi_miyabi" }),
+      expect.objectContaining({ agentId: "aria" }),
+    ]), {})
+    expect(mocks.applyEnkaImportPlan).toHaveBeenCalledOnce()
+    expect(wrapper.find("[data-modal]").exists()).toBe(false)
+    expect(mocks.message.success).toHaveBeenCalledWith("已导入 2 个角色，库存与配置已同步。")
+  })
+
+  it("freezes a multi-agent selection through the preview before committing", async () => {
     const wrapper = mountView()
     await flushPromises()
     expect(wrapper.get("h1").text()).toBe("展柜数据导入")
@@ -207,7 +237,7 @@ describe("ImportView", () => {
     expect(wrapper.get('input[aria-label="选择导入 星见雅"]')).toBeTruthy()
     expect(mocks.applyEnkaImportPlan).not.toHaveBeenCalled()
 
-    await button(wrapper, "预览更改（2）").trigger("click")
+    await wrapper.get(".list-actions").findAll("button")[1].trigger("click")
     await flushPromises()
     expect(wrapper.get("[data-modal]").text()).toContain("确认展柜数据导入")
     expect(mocks.planEnkaImport).toHaveBeenCalledWith("1302309616", expect.arrayContaining([
@@ -217,12 +247,54 @@ describe("ImportView", () => {
     expect(wrapper.get("[data-modal]").text()).toContain("2 个角色 / 2 项更改")
     expect(uidInput.attributes("disabled")).toBeDefined()
 
-    await button(wrapper, "确认导入").trigger("click")
+    await buttonWithin(wrapper.get("[data-modal]"), "确认导入").trigger("click")
     await flushPromises()
     expect(mocks.applyEnkaImportPlan).toHaveBeenCalledOnce()
     expect(mocks.inventoryLoad).toHaveBeenCalled()
     expect(mocks.buildInitialize).toHaveBeenCalled()
     expect(mocks.message.success).toHaveBeenCalledWith("已导入 2 个角色，库存与配置已同步。")
+  })
+
+  it("does not submit a direct import twice while the transaction is pending", async () => {
+    let resolveApply: (value: any) => void = () => {}
+    mocks.applyEnkaImportPlan.mockImplementation(() => new Promise(resolve => { resolveApply = resolve }))
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('input[aria-label="游戏 UID"]').setValue("1302309616")
+    await button(wrapper, "读取展柜").trigger("click")
+    await flushPromises()
+
+    const direct = wrapper.get(".list-actions").findAll("button")[0]
+    await direct.trigger("click")
+    await flushPromises()
+    await direct.trigger("click")
+    expect(mocks.planEnkaImport).toHaveBeenCalledOnce()
+    expect(mocks.applyEnkaImportPlan).toHaveBeenCalledOnce()
+    expect(direct.attributes("disabled")).toBeDefined()
+
+    resolveApply({ transactionId: "tx" })
+    await flushPromises()
+  })
+
+  it("blocks direct import when the generated plan has unresolved conflicts", async () => {
+    mocks.planEnkaImport.mockResolvedValueOnce({
+      uid: "1302309616",
+      ownerId: "default",
+      agents,
+      conflicts: [{ key: "disc-conflict" }],
+      hasUnresolvedConflicts: true,
+      changeCount: 1,
+    })
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('input[aria-label="游戏 UID"]').setValue("1302309616")
+    await button(wrapper, "读取展柜").trigger("click")
+    await flushPromises()
+    await wrapper.get(".list-actions").findAll("button")[0].trigger("click")
+    await flushPromises()
+
+    expect(mocks.applyEnkaImportPlan).not.toHaveBeenCalled()
+    expect(mocks.message.warning).toHaveBeenCalledWith(expect.stringContaining("请使用“预览更改”处理"))
   })
 
   it("blocks importing and offers retry when account loading fails", async () => {
@@ -334,12 +406,12 @@ describe("ImportView", () => {
     await wrapper.get('input[aria-label="游戏 UID"]').setValue("1302309616")
     await button(wrapper, "读取展柜").trigger("click")
     await flushPromises()
-    await button(wrapper, "预览更改（2）").trigger("click")
+    await wrapper.get(".list-actions").findAll("button")[1].trigger("click")
     await flushPromises()
     expect(wrapper.get("[data-modal]").text()).toContain("未收录角色：目录未映射")
     expect(wrapper.get("[data-modal]").text()).toContain("服务端映射警告")
 
-    const confirm = button(wrapper, "确认导入")
+    const confirm = buttonWithin(wrapper.get("[data-modal]"), "确认导入")
     await confirm.trigger("click")
     await confirm.trigger("click")
     expect(mocks.applyEnkaImportPlan).toHaveBeenCalledOnce()

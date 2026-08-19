@@ -564,7 +564,7 @@ const conflictingScannerDisc = normalizeInventoryStore({
     subStats: [{ stat: "critRate", value: 2.4, mode: "pct", label: "暴击率" }],
   }],
 })
-const conflictPlan = buildEnkaImportPlan({
+const distinctDiscPlan = buildEnkaImportPlan({
   uid,
   mappedAgents: [{
     agentId,
@@ -578,15 +578,17 @@ const conflictPlan = buildEnkaImportPlan({
   buildSelection: dependencySelection,
   legacySelection: structuredClone(dependencySelection),
   now: new Date("2026-08-18T02:20:00.000Z"),
-  transactionId: "tx-conflict-preserve",
+  transactionId: "tx-distinct-disc",
 })
-assert.equal(conflictPlan.hasUnresolvedConflicts, true)
-assert.equal(conflictPlan.drivePlan.results[0].hasUsableLoadout, false)
+assert.equal(distinctDiscPlan.hasUnresolvedConflicts, false)
+assert.equal(distinctDiscPlan.drivePlan.results[0].hasUsableLoadout, true)
+assert.equal(distinctDiscPlan.drivePlan.results[0].operations.added.length, 1)
+assert.equal(distinctDiscPlan.drivePlan.results[0].operations.conflicts?.length ?? 0, 0)
 assert.deepEqual(
-  conflictPlan.nextBuildSelection.byOwner.default.byAgent[agentId].manualDriveDiscIdsBySlot,
-  manualBefore,
+  distinctDiscPlan.nextBuildSelection.byOwner.default.byAgent[agentId].manualDriveDiscIdsBySlot,
+  { 1: enkaDriveDiscId(uid, "conflict-enka") },
 )
-assert.equal(conflictPlan.nextBuildSelection.byOwner.default.byAgent[agentId].discMode, "manual")
+assert.equal(distinctDiscPlan.nextBuildSelection.byOwner.default.byAgent[agentId].discMode, "loadout")
 const mirrorOnlySelection = {
   version: 2,
   currentOwnerId: "default",

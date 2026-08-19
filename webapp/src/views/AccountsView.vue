@@ -90,7 +90,7 @@ async function confirmDelete() {
                 <dd class="num">{{ owner.importCount ?? 0 }}</dd>
               </div>
               <div class="metric">
-                <dt>Enka UID</dt>
+                <dt>游戏 UID</dt>
                 <dd>{{ owner.enkaUid || "未绑定" }}</dd>
               </div>
             </dl>

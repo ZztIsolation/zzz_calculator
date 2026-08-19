@@ -1035,38 +1035,12 @@ export function planDriveDiscReconciliation({
             return
         }
 
-        const shapeCandidates = identityCandidates(currentItems, imported)
-            .filter(item => initialIds.has(String(item.id)))
-            .filter(item => !excludesDifferentStrongIdentity(item, imported))
-            .sort(candidateSort(sourceKind))
-        if (shapeCandidates.length) {
-            const key = reconciliationKey(sourceKind, imported, index)
-            const resolution = resolutions?.[key]
-            if (resolution?.action === "update") {
-                const existing = shapeCandidates.find(item => String(item.id) === String(resolution.existingId))
-                if (!existing) throw new Error(`疑似同盘处理结果已失效：${key}`)
-                const after = mergeReconciledDriveDisc(existing, imported, {
-                    sourceKind,
-                    matchReason: "resolved-identity",
-                    now,
-                    options,
-                })
-                nextById.set(String(existing.id), after)
-                matchedExistingIds.add(String(existing.id))
-                resolvedIds[String(imported.id)] = String(existing.id)
-                updated.push({ id: existing.id, before: existing, after, imported, reason: "resolved-identity" })
-                return
-            }
-            if (resolution?.action !== "add") {
-                conflicts.push({
-                    key,
-                    imported,
-                    candidates: shapeCandidates,
-                    reason: "same-shape-different-content",
-                })
-                return
-            }
-        }
+        // A shape-only match is not enough evidence that two records are the
+        // same physical disc.  In particular, a level or stat value change is
+        // a valid observation of a different disc (and two Enka equipment UIDs
+        // always represent different entities).  Exact content matches were
+        // handled above; every remaining record therefore gets a new canonical
+        // ID instead of entering the old update/add conflict flow.
 
         const baseId = String(imported.id)
         let nextId = baseId

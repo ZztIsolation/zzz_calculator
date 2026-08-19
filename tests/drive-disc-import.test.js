@@ -214,25 +214,17 @@ try {
             ],
         }),
     ]
-    let upgradeConflict = null
-    await assert.rejects(
-        () => importScannerExportToStore(tempDir, fourthPayload, { ownerId: "default", sourcePath: "fourth.json" }),
-        error => {
-            upgradeConflict = error
-            return error?.code === "DRIVE_DISC_IMPORT_CONFLICT" && error.conflicts?.length === 1
-        },
-    )
     const fourth = await importScannerExportToStore(tempDir, fourthPayload, {
         ownerId: "default",
         sourcePath: "fourth.json",
-        resolutions: {
-            [upgradeConflict.conflicts[0].key]: { action: "update", existingId: level12Id },
-        },
     })
-    const level15 = fourth.driveDiscs.find(item => Number(item.partition) === 3)
-    assert.equal(level15.id, level12Id)
+    const level15 = fourth.driveDiscs.find(item => Number(item.partition) === 3 && Number(item.level) === 15)
+    assert.ok(level15)
+    assert.notEqual(level15.id, level12Id)
     assert.equal(level15.level, 15)
-    assert.equal(fourth.lastImportSummary.updated, 1)
+    assert.equal(fourth.lastImportSummary.added, 1)
+    assert.equal(fourth.lastImportSummary.updated, 0)
+    assert.equal(fourth.lastImportSummary.conflicts, 0)
 
     const withDuplicate = await importScannerExportToStore(tempDir, [
         scannerDisc(1),

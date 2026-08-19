@@ -139,12 +139,49 @@ async function importFiveAgents(page: Page) {
   await expect(page.locator(".n-message").filter({ hasText: "已导入 5 个角色，库存与配置已同步。" })).toBeVisible()
 }
 
+async function directImportFiveAgents(page: Page) {
+  await page.goto("/import")
+  await page.getByLabel("游戏 UID").fill(uid)
+  await page.getByRole("button", { name: "读取展柜" }).click()
+  await expect(page.getByLabel(/^选择导入 /)).toHaveCount(5)
+  await expect(page.getByText("输入游戏 UID，读取公开展柜中的角色、音擎和驱动盘")).toBeVisible()
+  const directButton = page.getByRole("button", { name: "确认导入", exact: true }).first()
+  await expect(directButton).toBeVisible()
+  await directButton.click()
+  await expect(page.getByRole("dialog")).toHaveCount(0)
+  await expect(page.locator(".n-message").filter({ hasText: "已导入 5 个角色，库存与配置已同步。" })).toBeVisible()
+}
+
 test("disabled import route redirects home with a visible notice", async ({ page }) => {
   await mockAppConfig(page, false)
   await page.goto("/import")
   await expect(page).toHaveURL(/\/?\?notice=enka-import-disabled$/)
   await expect(page.getByRole("alert")).toContainText("展柜数据导入当前未启用")
   await expect(page.getByRole("link", { name: "导入" })).toHaveCount(0)
+})
+
+test("direct confirmation imports without preview and remains idempotent", async ({ page }) => {
+  test.slow()
+  await mockAppConfig(page, true)
+  await mockShowcase(page)
+
+  await directImportFiveAgents(page)
+  const first = await readInventoryStore(page)
+  expect(first.driveDiscs).toHaveLength(1)
+  expect(first.driveDiscLoadouts.find((loadout: any) => loadout.id === showcaseLoadoutId)?.name).toBe(showcaseLoadoutName)
+
+  await page.getByRole("button", { name: "读取展柜" }).click()
+  await expect(page.getByLabel(/^选择导入 /)).toHaveCount(5)
+  await page.getByRole("button", { name: "确认导入", exact: true }).first().click()
+  await expect(page.locator(".n-message").filter({ hasText: "已导入 5 个角色，库存与配置已同步。" })).toBeVisible()
+  const second = await readInventoryStore(page)
+  expect(second.driveDiscs).toHaveLength(first.driveDiscs.length)
+  expect(second.driveDiscLoadouts).toHaveLength(first.driveDiscLoadouts.length)
+
+  await page.goto("/accounts")
+  await expect(page.getByText("游戏 UID", { exact: true })).toBeVisible()
+  await expect(page.getByText("Enka UID", { exact: true })).toHaveCount(0)
+  await expectNoHorizontalOverflow(page)
 })
 
 test("five-agent import requires preview, persists both configs, and can undo", async ({ page }) => {
@@ -198,8 +235,8 @@ test("five-agent import requires preview, persists both configs, and can undo", 
   await page.goto("/import")
   await expect(page.getByRole("heading", { name: "展柜数据导入" })).toBeVisible()
   await expect(page.locator(".account-chip")).toHaveText("账号 / myself")
-  await expect(page.locator(".page-header p")).toContainText("当前账号：myself")
-  await expect(page.locator(".page-header p")).not.toContainText("account-")
+  await expect(page.locator(".page-header").getByText("当前账号：myself", { exact: false })).toBeVisible()
+  await expect(page.locator(".page-header")).not.toContainText("account-")
   const previousMiyabiConfig = {
     agentLevel: 40,
     discMode: "manual",
