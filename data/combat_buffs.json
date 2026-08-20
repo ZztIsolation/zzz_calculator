@@ -5177,6 +5177,254 @@
       "buffModifiers": []
     },
     {
+      "id": "field.defense_v5.v3_1.p2.zhuoluan_xuanwo",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "defense_v5",
+        "gameVersion": "3.1",
+        "phaseNo": 2,
+        "phaseName": {
+          "zhCN": "第二期"
+        }
+      },
+      "name": {
+        "zhCN": "灼乱漩涡"
+      },
+      "source": {
+        "zhCN": "防卫战 v5"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.1版本第二期"
+      },
+      "description": {
+        "zhCN": "代理人造成的属性异常伤害提升15%。若队伍内有2名/3名[异常]特性的代理人，代理人的异常精通提升40点/120点。"
+      },
+      "effects": [
+        {
+          "id": "field_defense_v5_v3_1_p2_zhuoluan_attribute_anomaly_damage",
+          "type": "fixed",
+          "target": {
+            "kind": "anomaly",
+            "settlementType": "attribute"
+          },
+          "stat": "anomalyDamageBonus",
+          "mode": "flat",
+          "value": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_defense_v5_v3_1_p2_zhuoluan_anomaly_proficiency",
+          "type": "formula",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "anomalyProficiency",
+          "mode": "flat",
+          "source": {
+            "variable": "x",
+            "label": {
+              "zhCN": "队伍内异常特性代理人数量"
+            },
+            "defaultValue": 3,
+            "min": 0,
+            "max": 3
+          },
+          "formula": {
+            "expression": "40 * max(x - 1, 0) + 40 * max(x - 2, 0)",
+            "valueUnit": "storedValue"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.defense_v5.v3_1.p2.guiyu_qijue",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "defense_v5",
+        "gameVersion": "3.1",
+        "phaseNo": 2,
+        "phaseName": {
+          "zhCN": "第二期"
+        }
+      },
+      "name": {
+        "zhCN": "诡域奇谲"
+      },
+      "source": {
+        "zhCN": "防卫战 v5"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.1版本第二期"
+      },
+      "description": {
+        "zhCN": "代理人的以太属性伤害提升20%。代理人使敌人进入属性异常状态后，其防御力降低15%，全属性伤害抗性降低15%，持续10秒，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_defense_v5_v3_1_p2_guiyu_ether_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "etherDmg",
+          "mode": "flat",
+          "value": 20,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_defense_v5_v3_1_p2_guiyu_enemy_def_reduction",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "enemyDefReduction",
+          "mode": "flat",
+          "value": 15,
+          "condition": "代理人使敌人进入属性异常状态后",
+          "durationSeconds": 10,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_defense_v5_v3_1_p2_guiyu_enemy_res_reduction",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "enemyResReduction",
+          "mode": "flat",
+          "value": 15,
+          "condition": "代理人使敌人进入属性异常状态后",
+          "durationSeconds": 10,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.defense_v5.v3_1.p2.guanche_shuanghan",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "defense_v5",
+        "gameVersion": "3.1",
+        "phaseNo": 2,
+        "phaseName": {
+          "zhCN": "第二期"
+        }
+      },
+      "name": {
+        "zhCN": "贯彻霜寒"
+      },
+      "source": {
+        "zhCN": "防卫战 v5"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.1版本第二期"
+      },
+      "description": {
+        "zhCN": "[强攻]特性的代理人的[普通攻击]命中敌人时，无视其30%的冰属性伤害抗性。[强攻]特性的代理人发动[连携技]和[强化特殊技]后，自身冰属性伤害提升20%，暴击伤害提升40%，持续15秒，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_defense_v5_v3_1_p2_guanche_attack_basic_ice_res_ignore",
+          "type": "fixed",
+          "target": {
+            "kind": "skill",
+            "skillTargets": [
+              {
+                "kind": "skillType",
+                "skillType": "basic"
+              }
+            ]
+          },
+          "stat": "iceResIgnore",
+          "mode": "flat",
+          "value": 30,
+          "requirement": {
+            "specialty": "attack"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_defense_v5_v3_1_p2_guanche_attack_ice_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "iceDmg",
+          "mode": "flat",
+          "value": 20,
+          "requirement": {
+            "specialty": "attack"
+          },
+          "condition": "强攻特性代理人发动连携技和强化特殊技后",
+          "durationSeconds": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_defense_v5_v3_1_p2_guanche_attack_crit_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "critDmg",
+          "mode": "flat",
+          "value": 40,
+          "requirement": {
+            "specialty": "attack"
+          },
+          "condition": "强攻特性代理人发动连携技和强化特殊技后",
+          "durationSeconds": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
       "id": "field.critical_assault.v3_1.p2.pojing",
       "sourceType": "field",
       "scope": "inCombat",
