@@ -21,6 +21,9 @@ const FIELD_BUFF_IDS = {
     wenyin: "field.defense_v5.v3_1.p1.wenyin_gongzhen",
     zhongmuDefense31: "field.defense_v5.v3_1.p1.zhongmu_xiezou",
     shuanglei: "field.defense_v5.v3_1.p1.shuanglei_pofeng",
+    zhuoluan: "field.defense_v5.v3_1.p2.zhuoluan_xuanwo",
+    guiyu: "field.defense_v5.v3_1.p2.guiyu_qijue",
+    guanche: "field.defense_v5.v3_1.p2.guanche_shuanghan",
     zhongmu: "field.defense_v5.v3_0.p3.zhongmu_xiezou",
     lianshi: "field.defense_v5.v3_0.p3.lianshi_huilu",
     lingdu: "field.defense_v5.v3_0.p3.lingdu_xingdong",
@@ -41,6 +44,7 @@ const EFFECT_IDS = {
     luliPhase2Anomaly: "field_critical_assault_v3_1_p2_luli_anomaly_damage",
     luliPhase2Res: "field_critical_assault_v3_1_p2_luli_enemy_res_reduction",
     wenyinAnomaly: "field_defense_v5_v3_1_p1_wenyin_attribute_anomaly_damage",
+    zhuoluanProficiency: "field_defense_v5_v3_1_p2_zhuoluan_anomaly_proficiency",
     lianshiRes: "field_defense_v5_v3_0_p3_lianshi_anomaly_res_ignore",
     yanwangAtk: "field_critical_assault_v3_0_p3_yanwang_chain_atk",
     linxiRes: "field_critical_assault_v3_0_p3_linxi_enemy_res_reduction",
@@ -59,6 +63,9 @@ const EXPECTED_NAMES = {
     [FIELD_BUFF_IDS.wenyin]: "紊音共振",
     [FIELD_BUFF_IDS.zhongmuDefense31]: "终幕协奏",
     [FIELD_BUFF_IDS.shuanglei]: "霜雷破锋",
+    [FIELD_BUFF_IDS.zhuoluan]: "灼乱漩涡",
+    [FIELD_BUFF_IDS.guiyu]: "诡域奇谲",
+    [FIELD_BUFF_IDS.guanche]: "贯彻霜寒",
     [FIELD_BUFF_IDS.zhongmu]: "终幕协奏",
     [FIELD_BUFF_IDS.lianshi]: "链式回路",
     [FIELD_BUFF_IDS.lingdu]: "零度行动",
@@ -68,7 +75,9 @@ const EXPECTED_NAMES = {
 }
 
 const DEFENSE_3_0_IDS = [FIELD_BUFF_IDS.zhongmu, FIELD_BUFF_IDS.lianshi, FIELD_BUFF_IDS.lingdu]
-const DEFENSE_3_1_IDS = [FIELD_BUFF_IDS.wenyin, FIELD_BUFF_IDS.zhongmuDefense31, FIELD_BUFF_IDS.shuanglei]
+const DEFENSE_3_1_PHASE_1_IDS = [FIELD_BUFF_IDS.wenyin, FIELD_BUFF_IDS.zhongmuDefense31, FIELD_BUFF_IDS.shuanglei]
+const DEFENSE_3_1_PHASE_2_IDS = [FIELD_BUFF_IDS.zhuoluan, FIELD_BUFF_IDS.guiyu, FIELD_BUFF_IDS.guanche]
+const DEFENSE_3_1_IDS = [...DEFENSE_3_1_PHASE_1_IDS, ...DEFENSE_3_1_PHASE_2_IDS]
 const CRITICAL_ASSAULT_3_1_IDS = [
     FIELD_BUFF_IDS.cuixin,
     FIELD_BUFF_IDS.luli,
@@ -79,6 +88,7 @@ const CRITICAL_ASSAULT_3_1_PHASE_2_IDS = [
     FIELD_BUFF_IDS.luliPhase2,
     FIELD_BUFF_IDS.zhishuang,
 ]
+const PHASE_2_IDS = [...DEFENSE_3_1_PHASE_2_IDS, ...CRITICAL_ASSAULT_3_1_PHASE_2_IDS]
 const VERSION_3_1_IDS = [...DEFENSE_3_1_IDS, ...CRITICAL_ASSAULT_3_1_IDS, ...CRITICAL_ASSAULT_3_1_PHASE_2_IDS]
 
 const ALL_RES_IGNORE_BUFF_IDS = [
@@ -116,7 +126,7 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
     assert.equal(buff.scope, "inCombat", `${id} should be an in-combat Buff`)
     const isDefense = DEFENSE_3_0_IDS.includes(id) || DEFENSE_3_1_IDS.includes(id)
     const isVersion31 = VERSION_3_1_IDS.includes(id)
-    const isPhase2 = CRITICAL_ASSAULT_3_1_PHASE_2_IDS.includes(id)
+    const isPhase2 = PHASE_2_IDS.includes(id)
     assert.deepEqual(buff.period, {
         modeId: isDefense ? "defense_v5" : "critical_assault",
         gameVersion: isVersion31 ? "3.1" : "3.0",
@@ -135,7 +145,15 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
 }
 
 const allFieldBuffs = catalog.combatBuffs.filter(buff => buff.sourceType === "field")
-assert.equal(allFieldBuffs.length, 18, "Field Buff catalog should keep all maintained entries")
+assert.equal(allFieldBuffs.length, 21, "Field Buff catalog should keep all maintained entries")
+assert.deepEqual(
+    allFieldBuffs
+        .filter(buff => buff.period?.gameVersion === "3.1" && buff.period?.phaseNo === 2)
+        .slice(0, DEFENSE_3_1_PHASE_2_IDS.length)
+        .map(buff => buff.id),
+    DEFENSE_3_1_PHASE_2_IDS,
+    "Defense Battle 3.1 phase 2 should lead the authored order for the latest field period",
+)
 for (const buff of allFieldBuffs) {
     assert.ok(buff.effects.length > 0, `${buff.id} should expose structured effects`)
     for (const effect of buff.effects) {
@@ -176,6 +194,21 @@ assert.equal(
     fieldBuff(FIELD_BUFF_IDS.shuanglei).description.zhCN,
     "代理人的冰属性伤害和电属性伤害提升30%。[强攻]特性的代理人发动[强化特殊技]后，自身暴击伤害提升30%，持续20秒，重复触发时刷新持续时间。",
     "Shuanglei Pofeng should preserve the complete source text",
+)
+assert.equal(
+    fieldBuff(FIELD_BUFF_IDS.zhuoluan).description.zhCN,
+    "代理人造成的属性异常伤害提升15%。若队伍内有2名/3名[异常]特性的代理人，代理人的异常精通提升40点/120点。",
+    "Zhuoluan Xuanwo should preserve the complete source text",
+)
+assert.equal(
+    fieldBuff(FIELD_BUFF_IDS.guiyu).description.zhCN,
+    "代理人的以太属性伤害提升20%。代理人使敌人进入属性异常状态后，其防御力降低15%，全属性伤害抗性降低15%，持续10秒，重复触发时刷新持续时间。",
+    "Guiyu Qijue should preserve the complete source text",
+)
+assert.equal(
+    fieldBuff(FIELD_BUFF_IDS.guanche).description.zhCN,
+    "[强攻]特性的代理人的[普通攻击]命中敌人时，无视其30%的冰属性伤害抗性。[强攻]特性的代理人发动[连携技]和[强化特殊技]后，自身冰属性伤害提升20%，暴击伤害提升40%，持续15秒，重复触发时刷新持续时间。",
+    "Guanche Shuanghan should preserve the complete source text",
 )
 assert.equal(
     fieldBuff(FIELD_BUFF_IDS.pojing).description.zhCN,
@@ -279,7 +312,7 @@ function calculateSkill(fieldBuffId, skillRef, runtime = {}) {
     })
 }
 
-function calculateAttackBasic(fieldBuffId, runtime = {}) {
+function calculateAttackBasic(fieldBuffId, runtime = {}, damageElement = "") {
     return calculateInCombatPanel(catalog, {
         ...catalog.examples.yeShunguang.input,
         driveDiscs: [],
@@ -295,7 +328,12 @@ function calculateAttackBasic(fieldBuffId, runtime = {}) {
                 rowId: "hit_1",
                 level: 12,
             },
-            target: { defense: 953, levelCoefficient: 794 },
+            ...(damageElement ? { damageElement } : {}),
+            target: {
+                defense: 953,
+                levelCoefficient: 794,
+                ...(damageElement ? { resistanceByElement: { [damageElement]: 20 } } : {}),
+            },
         },
     })
 }
@@ -436,6 +474,24 @@ approx(shuangleiAnomaly.inCombat.panel.iceDmg - shuangleiAnomaly.outOfCombat.pan
 approx(shuangleiAnomaly.inCombat.panel.electricDmg - shuangleiAnomaly.outOfCombat.panel.electricDmg, 0.3, "Shuanglei Electric damage should apply to non-Attack agents")
 approx(shuangleiAnomaly.inCombat.panel.critDmg - shuangleiAnomaly.outOfCombat.panel.critDmg, 0, "Shuanglei CRIT DMG should not apply to non-Attack agents")
 
+const guiyu = calculateSkill(FIELD_BUFF_IDS.guiyu, miyabiSkillRefs.basic)
+approx(guiyu.inCombat.panel.etherDmg - guiyu.outOfCombat.panel.etherDmg, 0.2, "Guiyu Qijue should grant 20% Ether damage")
+approx(guiyu.damage.targetBreakdown.enemyDefReduction, 0.15, "Guiyu Qijue should reduce enemy DEF by 15%")
+approx(guiyu.damage.targetBreakdown.enemyResReduction, 0.15, "Guiyu Qijue should reduce all-attribute RES by 15%")
+const guiyuTriggeredRules = fieldBuff(FIELD_BUFF_IDS.guiyu).effects
+    .filter(effect => effect.stat === "enemyDefReduction" || effect.stat === "enemyResReduction")
+assert.ok(guiyuTriggeredRules.every(effect => effect.durationSeconds === 10))
+assert.ok(guiyuTriggeredRules.every(effect => effect.condition === "代理人使敌人进入属性异常状态后"))
+
+const guancheAttack = calculateAttackBasic(FIELD_BUFF_IDS.guanche, {}, "ice")
+approx(guancheAttack.inCombat.panel.iceDmg - guancheAttack.outOfCombat.panel.iceDmg, 0.2, "Guanche Shuanghan should grant Attack agents 20% Ice damage")
+approx(guancheAttack.inCombat.panel.critDmg - guancheAttack.outOfCombat.panel.critDmg, 0.4, "Guanche Shuanghan should grant Attack agents 40% CRIT DMG")
+approx(guancheAttack.damage.targetBreakdown.resIgnore, 0.3, "Guanche Shuanghan should grant Attack Basic Attacks 30% Ice RES ignore")
+const guancheAnomaly = calculateSkill(FIELD_BUFF_IDS.guanche, miyabiSkillRefs.basic)
+approx(guancheAnomaly.inCombat.panel.iceDmg - guancheAnomaly.outOfCombat.panel.iceDmg, 0, "Guanche Shuanghan Ice damage should not apply to non-Attack agents")
+approx(guancheAnomaly.inCombat.panel.critDmg - guancheAnomaly.outOfCombat.panel.critDmg, 0, "Guanche Shuanghan CRIT DMG should not apply to non-Attack agents")
+approx(guancheAnomaly.damage.targetBreakdown.resIgnore, 0, "Guanche Shuanghan Ice RES ignore should not apply to non-Attack agents")
+
 function calculateAnomaly(fieldBuffId, event, runtime = {}) {
     return calculateInCombatPanel(catalog, {
         ...miyabiInput,
@@ -486,6 +542,37 @@ const wenyinDisorder = calculateAnomaly(FIELD_BUFF_IDS.wenyin, {
     },
 })
 approx(wenyinDisorder.damage.multipliers.disorderDamage, 1, "Wenyin Gongzhen should not increase Disorder damage")
+
+for (const [anomalyAgentCount, expectedProficiency] of [[0, 0], [1, 0], [2, 40], [3, 120]]) {
+    const zhuoluan = calculateAnomaly(FIELD_BUFF_IDS.zhuoluan, {
+        id: `zhuoluan-burn-${anomalyAgentCount}`,
+        kind: "anomaly",
+        settlementType: "attribute",
+        anomalyEffect: "burn",
+        procCount: 1,
+    }, {
+        effects: {
+            [EFFECT_IDS.zhuoluanProficiency]: { sourceValue: anomalyAgentCount },
+        },
+    })
+    approx(
+        zhuoluan.inCombat.panel.anomalyProficiency - zhuoluan.outOfCombat.panel.anomalyProficiency,
+        expectedProficiency,
+        `Zhuoluan Xuanwo should grant the correct Anomaly Proficiency for ${anomalyAgentCount} Anomaly agents`,
+    )
+    approx(
+        zhuoluan.damage.multipliers.attributeAnomalyDamage,
+        1.15,
+        "Zhuoluan Xuanwo should grant 15% attribute-anomaly damage",
+    )
+}
+const zhuoluanDisorder = calculateAnomaly(FIELD_BUFF_IDS.zhuoluan, {
+    id: "zhuoluan-burn-disorder",
+    kind: "disorder",
+    anomalyEffect: "burn",
+    elapsedSeconds: 0,
+})
+approx(zhuoluanDisorder.damage.multipliers.disorderDamage, 1, "Zhuoluan Xuanwo should not increase Disorder damage")
 
 for (const [anomalyAgentCount, expectedProficiency, expectedAnomalyDamage] of [
     [0, 0, 0],
