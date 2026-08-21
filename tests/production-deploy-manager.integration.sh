@@ -571,7 +571,7 @@ fi
         'SWITCH_TARGET=""' 'SWITCH_ORIGINAL_TARGET=""' \
         'AUTOMATIC_ROLLBACK_FAILED="0"' 'AUTOMATIC_ROLLBACK_FAILURE_DETAIL=""' \
         'ERROR_MESSAGE=""'
-    printf '%s\n' 'readonly -a VALIDATION_CATALOG_FILES=(agents.json agent_skills.json anomaly_effects.json bosses.json combat_buffs.json drive_disc_sets.json stat_rules.json w_engines.json)'
+    printf '%s\n' 'readonly -a VALIDATION_CATALOG_FILES=(agents.json agent_skills.json anomaly_effects.json bosses.json combat_buffs.json drive_disc_sets.json enka_zzz_mapping.json stat_rules.json w_engines.json)'
     printf '%s\n' 'die() { printf "fixture error: %s\\n" "$*" >&2; exit 1; }'
     printf '%s\n' 'log() { printf "fixture log: %s\\n" "$*" >&2; }'
     printf '%s\n' 'current_target() { if [[ -n "${TEST_CURRENT_STATE_FILE:-}" && -f "$TEST_CURRENT_STATE_FILE" ]]; then cat -- "$TEST_CURRENT_STATE_FILE"; else printf "%s" "$CURRENT_BEFORE"; fi; }'
@@ -908,7 +908,7 @@ sanitized_source="${legacy_snapshot_root}/sanitized-source"
 sanitized_destination="${validation_access_root}/sanitized-release"
 sudo cp -a -- "$legacy_snapshot" "$sanitized_source"
 for catalog_name in agents.json agent_skills.json anomaly_effects.json bosses.json \
-    combat_buffs.json drive_disc_sets.json stat_rules.json w_engines.json; do
+    combat_buffs.json drive_disc_sets.json enka_zzz_mapping.json stat_rules.json w_engines.json; do
     sudo install -o root -g root -m 0644 -- "$REPO_ROOT/data/$catalog_name" \
         "$sanitized_source/data/$catalog_name"
 done
