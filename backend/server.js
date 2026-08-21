@@ -113,13 +113,15 @@ const scanTelemetryStore = scanTelemetryEnabled
     : null
 const scanTelemetryRateLimitMax = Math.max(1, Math.min(1_000_000, Number(process.env.SCAN_TELEMETRY_RATE_LIMIT_MAX) || 60))
 const allowScanTelemetryRequest = createScanTelemetryRateLimiter({ max: scanTelemetryRateLimitMax, windowMs: 60_000 })
-const enkaProxy = createEnkaProxy({
-    ...(process.env.ENKA_API_BASE_URL ? { baseUrl: process.env.ENKA_API_BASE_URL } : {}),
-    perIpLimit: Math.max(1, Number(process.env.ENKA_IMPORT_IP_RATE_LIMIT) || 10),
-    globalLimit: Math.max(1, Number(process.env.ENKA_IMPORT_GLOBAL_RATE_LIMIT) || 60),
-    maxConcurrent: Math.max(1, Number(process.env.ENKA_IMPORT_MAX_CONCURRENT) || 4),
-    maxQueue: Math.max(0, process.env.ENKA_IMPORT_MAX_QUEUE === undefined ? 32 : Number(process.env.ENKA_IMPORT_MAX_QUEUE) || 0),
-})
+const enkaProxy = enkaImportEnabled
+    ? createEnkaProxy({
+        ...(process.env.ENKA_API_BASE_URL ? { baseUrl: process.env.ENKA_API_BASE_URL } : {}),
+        perIpLimit: Math.max(1, Number(process.env.ENKA_IMPORT_IP_RATE_LIMIT) || 10),
+        globalLimit: Math.max(1, Number(process.env.ENKA_IMPORT_GLOBAL_RATE_LIMIT) || 60),
+        maxConcurrent: Math.max(1, Number(process.env.ENKA_IMPORT_MAX_CONCURRENT) || 4),
+        maxQueue: Math.max(0, process.env.ENKA_IMPORT_MAX_QUEUE === undefined ? 32 : Number(process.env.ENKA_IMPORT_MAX_QUEUE) || 0),
+    })
+    : null
 await scanTelemetryStore?.init()
 
 function isMaintenanceEnabled() {
@@ -229,7 +231,9 @@ function createRequestStore(input = {}) {
 }
 
 let catalog = await loadCatalog(dataDir, exampleDir)
-const enkaMapping = JSON.parse(await readFile(path.join(dataDir, "enka_zzz_mapping.json"), "utf8"))
+const enkaMapping = enkaImportEnabled
+    ? JSON.parse(await readFile(path.join(dataDir, "enka_zzz_mapping.json"), "utf8"))
+    : null
 const optimizerJobs = new Map()
 const OPTIMIZER_JOB_TTL_MS = 10 * 60 * 1000
 

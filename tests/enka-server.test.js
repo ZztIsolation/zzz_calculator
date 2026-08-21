@@ -1,6 +1,22 @@
 import assert from "node:assert/strict"
 import { spawn } from "node:child_process"
+import { copyFile, mkdtemp, rm } from "node:fs/promises"
 import { createServer } from "node:http"
+import os from "node:os"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
+
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
+const legacyValidationCatalogs = [
+  "agents.json",
+  "agent_skills.json",
+  "anomaly_effects.json",
+  "bosses.json",
+  "combat_buffs.json",
+  "drive_disc_sets.json",
+  "stat_rules.json",
+  "w_engines.json",
+]
 
 function listen(server) {
   return new Promise((resolve, reject) => {
@@ -33,13 +49,29 @@ async function waitForServer(url, child, output) {
 function startCalculator(port, env = {}) {
   let logs = ""
   const child = spawn(process.execPath, ["backend/server.js"], {
-    cwd: new URL("..", import.meta.url),
+    cwd: rootDir,
     env: { ...process.env, NODE_ENV: "production", HOST: "127.0.0.1", PORT: String(port), ...env },
     stdio: ["ignore", "pipe", "pipe"],
   })
   child.stdout.on("data", chunk => { logs += chunk })
   child.stderr.on("data", chunk => { logs += chunk })
   return { child, output: () => logs }
+}
+
+async function createLegacyValidationDataDir() {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "zzz-enka-disabled-data-"))
+  await Promise.all(legacyValidationCatalogs.map(fileName => (
+    copyFile(path.join(rootDir, "data", fileName), path.join(directory, fileName))
+  )))
+  return directory
+}
+
+async function waitForExit(child) {
+  if (child.exitCode != null) return child.exitCode
+  return Promise.race([
+    new Promise(resolve => child.once("exit", resolve)),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("Calculator server did not exit.")), 3000)),
+  ])
 }
 
 async function stop(child) {
@@ -83,6 +115,8 @@ const upstreamPort = await listen(upstream)
 
 let enabled
 let disabled
+let enabledWithoutMapping
+let legacyValidationDataDir
 try {
   const enabledPort = await freePort()
   enabled = startCalculator(enabledPort, {
@@ -112,17 +146,32 @@ try {
   const malformed = await fetch(`${enabledBase}/api/enka/zzz/%25`)
   assert.equal(malformed.status, 400)
 
+  legacyValidationDataDir = await createLegacyValidationDataDir()
   const disabledPort = await freePort()
-  disabled = startCalculator(disabledPort, { ENKA_IMPORT_ENABLED: "false" })
+  disabled = startCalculator(disabledPort, {
+    ENKA_IMPORT_ENABLED: "",
+    ZZZ_CALCULATOR_DATA_DIR: legacyValidationDataDir,
+  })
   const disabledBase = `http://127.0.0.1:${disabledPort}`
   await waitForServer(`${disabledBase}/api/health`, disabled.child, disabled.output)
   const disabledConfig = await (await fetch(`${disabledBase}/api/app-config`)).json()
   assert.equal(disabledConfig.enkaImportEnabled, false)
   assert.equal((await fetch(`${disabledBase}/api/enka/zzz/1302309616`)).status, 404)
+
+  await stop(disabled.child)
+  const missingMappingPort = await freePort()
+  enabledWithoutMapping = startCalculator(missingMappingPort, {
+    ENKA_IMPORT_ENABLED: "true",
+    ZZZ_CALCULATOR_DATA_DIR: legacyValidationDataDir,
+  })
+  assert.notEqual(await waitForExit(enabledWithoutMapping.child), 0)
+  assert.match(enabledWithoutMapping.output(), /enka_zzz_mapping\.json/)
 } finally {
   await stop(enabled?.child)
   await stop(disabled?.child)
+  await stop(enabledWithoutMapping?.child)
   await new Promise(resolve => upstream.close(resolve))
+  if (legacyValidationDataDir) await rm(legacyValidationDataDir, { recursive: true, force: true })
 }
 
 console.log("enka-server.test.js: all assertions passed")
