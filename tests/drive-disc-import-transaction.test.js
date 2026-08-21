@@ -31,6 +31,7 @@ function selection(agentConfig, otherOwnerConfig = null) {
 
 const referencedConfig = {
   manualDriveDiscIdsBySlot: { 1: "disc-old", 2: "disc-keep" },
+  manualDriveDiscsBySlot: { 1: "disc-old", 3: "disc-delete", 4: "disc-keep" },
   driveDiscIdsBySlot: { 3: "disc-delete", 4: "disc-keep" },
   selectedLoadoutId: "loadout-old",
   loadoutId: "loadout-delete",
@@ -45,9 +46,16 @@ const referencedConfig = {
     deletedDriveDiscIds: ["disc-old", "disc-delete"],
     loadoutIdRemap: { "loadout-old": "loadout-canonical" },
     deletedLoadoutIds: ["loadout-delete"],
+    removedLoadoutDiscReferences: [{
+      loadoutId: "loadout-delete",
+      agentId: "agent-a",
+      driveDiscId: "disc-keep",
+      slots: ["2"],
+    }],
   })
   const config = result.document.byOwner[ownerId].byAgent["agent-a"]
-  assert.deepEqual(config.manualDriveDiscIdsBySlot, { 1: "disc-canonical", 2: "disc-keep" })
+  assert.deepEqual(config.manualDriveDiscIdsBySlot, { 1: "disc-canonical" })
+  assert.deepEqual(config.manualDriveDiscsBySlot, { 1: "disc-canonical", 4: "disc-keep" })
   assert.deepEqual(config.driveDiscIdsBySlot, { 4: "disc-keep" })
   assert.equal(config.selectedLoadoutId, "loadout-canonical")
   assert.equal(config.loadoutId, "")

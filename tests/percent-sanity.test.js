@@ -129,4 +129,41 @@ for (const [name, example] of Object.entries(catalog.examples ?? {})) {
     assertPanelPercentValues(`${name}.inCombat.buffTotals`, inCombat.inCombat.buffTotals)
 }
 
+const unknownStatExample = Object.values(catalog.examples ?? {})[0]
+assert.ok(unknownStatExample, "A calculator example is required for the unknown-stat regression")
+const knownDriveDiscSetId = catalog.driveDiscSets?.[0]?.id
+assert.ok(knownDriveDiscSetId, "A known Drive Disc set is required for the unknown-stat regression")
+const baselineUnknownStatInput = structuredClone(unknownStatExample.input)
+baselineUnknownStatInput.driveDiscs = []
+const baselineUnknownStatPanel = calculateOutOfCombatPanel(catalog, baselineUnknownStatInput)
+const unknownStatInput = structuredClone(baselineUnknownStatInput)
+unknownStatInput.driveDiscs = [{
+        id: "unknown-stat-regression",
+        setId: knownDriveDiscSetId,
+        partition: 1,
+        rarity: "S",
+        level: 15,
+        mainStat: {
+            stat: "unknown",
+            mode: "unknown",
+            value: 999,
+            label: "未来主词条",
+            rawValue: "999%",
+        },
+        subStats: [{
+            stat: "unknown",
+            mode: "unknown",
+            value: 888,
+            label: "未来副词条",
+            rawValue: "888%",
+        }],
+    }]
+const withUnknownStatPanel = calculateOutOfCombatPanel(catalog, unknownStatInput)
+assert.deepEqual(
+    withUnknownStatPanel.panel,
+    baselineUnknownStatPanel.panel,
+    "Unknown Drive Disc stats must not affect calculated panel values",
+)
+assert.equal(withUnknownStatPanel.bonusTotals.unknown, undefined)
+
 console.log("percent sanity tests passed")

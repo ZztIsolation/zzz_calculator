@@ -653,4 +653,220 @@ function assertSources(disc, expected) {
     }), /cannot cross owner boundary/)
 }
 
+// Unknown stats preserve their raw identity but are never eligible for weak
+// content deduplication. Each Scanner observation therefore remains distinct.
+{
+    const unknownScanner = normalizedScannerDiscs([
+        scannerItem(1, { mainStat: { "未来属性": "88%" } }),
+        scannerItem(2, { mainStat: { "未来属性": "88%" } }),
+    ], "unknown-weak")
+    assert.equal(unknownScanner[0].mainStat.stat, "unknown")
+    assert.equal(unknownScanner[0].mainStat.label, "未来属性")
+    assert.equal(unknownScanner[0].mainStat.rawValue, "88%")
+
+    const first = planDriveDiscReconciliation({
+        importedDiscs: unknownScanner,
+        ownerId: OWNER_ID,
+        sourceKind: "scanner",
+        now: NOW,
+    })
+    assert.equal(first.driveDiscs.length, 2)
+    assert.equal(first.duplicateInImport, 0)
+
+    const repeated = planDriveDiscReconciliation({
+        existingDiscs: first.driveDiscs.slice(0, 1),
+        importedDiscs: unknownScanner.slice(0, 1),
+        ownerId: OWNER_ID,
+        sourceKind: "scanner",
+        now: NOW,
+    })
+    assert.equal(repeated.driveDiscs.length, 2)
+    assert.equal(repeated.sourceMerged.length, 0)
+}
+
+// Scanner label variants that still describe known Calculator stats must not
+// enter the unknown-stat path or lose user restrictions on a full rescan.
+{
+    const aliases = normalizedScannerDiscs([
+        scannerItem(1, { mainStat: { "攻击力%": "30%" } }),
+        scannerItem(2, { mainStat: { "物理属性伤害加成": "30%" } }),
+    ], "known-aliases")
+    assert.deepEqual(aliases.map(disc => disc.mainStat.stat), ["atkPct", "physicalDmg"])
+}
+
+// Enka Equipment UID remains authoritative even when a future stat is unknown.
+// The same physical disc updates in place and keeps the canonical ID/restrictions.
+{
+    const unknownStat = {
+        stat: "unknown",
+        mode: "unknown",
+        value: 99,
+        label: "PropertyId 99999",
+        rawValue: 99,
+        raw: { propertyId: "99999", propertyLevel: 1, propertyValue: 99 },
+    }
+    const existing = enkaDisc(UID_A, "unknown-strong", {
+        level: 12,
+        mainStat: unknownStat,
+        reservedForAgentId: "aria",
+        excludedForAgentIds: ["yixuan"],
+    })
+    const incoming = enkaDisc(UID_A, "unknown-strong", {
+        level: 15,
+        mainStat: { ...unknownStat, value: 120 },
+    })
+    const reconciled = planDriveDiscReconciliation({
+        existingDiscs: [existing],
+        importedDiscs: [incoming],
+        ownerId: OWNER_ID,
+        sourceKind: "enka",
+        now: NOW,
+    })
+    assert.equal(reconciled.driveDiscs.length, 1)
+    assert.equal(reconciled.driveDiscs[0].id, existing.id)
+    assert.equal(reconciled.driveDiscs[0].level, 15)
+    assert.equal(reconciled.driveDiscs[0].mainStat.value, 120)
+    assert.equal(reconciled.driveDiscs[0].reservedForAgentId, "aria")
+    assert.deepEqual(reconciled.driveDiscs[0].excludedForAgentIds, ["yixuan"])
+}
+
+// Exact duplicate observations of one Enka entity collapse, while contradictory
+// slot/agent/template observations are structural blocking errors, not conflicts.
+{
+    const exact = enkaDisc(UID_A, "batch-identity")
+    const folded = planDriveDiscReconciliation({
+        importedDiscs: [exact, structuredClone(exact)],
+        ownerId: OWNER_ID,
+        sourceKind: "enka",
+        now: NOW,
+    })
+    assert.equal(folded.driveDiscs.length, 1)
+    assert.equal(folded.duplicateInImport, 1)
+    assert.equal(folded.hasBlockingErrors, false)
+
+    const contradictory = enkaDisc(UID_A, "batch-identity", {
+        partition: 2,
+        equippedBy: "aria",
+        source: {
+            type: "enka-zzz-showcase",
+            uid: UID_A,
+            equipmentUid: "batch-identity",
+            equipmentId: "different-template",
+            agentId: "aria",
+        },
+    })
+    const blocked = planDriveDiscReconciliation({
+        existingDiscs: [enkaDisc(UID_A, "preserved")],
+        importedDiscs: [exact, contradictory],
+        ownerId: OWNER_ID,
+        sourceKind: "enka",
+        now: NOW,
+    })
+    assert.equal(blocked.changed, false)
+    assert.equal(blocked.hasBlockingErrors, true)
+    assert.equal(blocked.blockingErrors[0].code, "ENKA_EQUIPMENT_IDENTITY_CONFLICT")
+    assert.equal(blocked.driveDiscs.length, 1)
+    assert.equal(blocked.driveDiscs[0].id, enkaDriveDiscId(UID_A, "preserved"))
+    assert.equal(blocked.conflicts.length, 0)
+}
+
+// Across imports, an Equipment UID may move between agents and change mutable
+// observations, but it may never become a different slot/set/template entity.
+{
+    const existing = enkaDisc(UID_A, "immutable-across-imports", {
+        reservedForAgentId: "aria",
+        excludedForAgentIds: ["yixuan"],
+    })
+    const incoming = enkaDisc(UID_A, "immutable-across-imports", {
+        partition: 2,
+        setId: "swing_jazz",
+        setName: "摇摆爵士",
+        source: {
+            type: "enka-zzz-showcase",
+            uid: UID_A,
+            equipmentUid: "immutable-across-imports",
+            equipmentId: "different-template",
+            agentId: "aria",
+        },
+        equippedBy: "aria",
+    })
+    const blocked = planDriveDiscReconciliation({
+        existingDiscs: [existing],
+        importedDiscs: [incoming],
+        ownerId: OWNER_ID,
+        sourceKind: "enka",
+        now: NOW,
+    })
+    assert.equal(blocked.hasBlockingErrors, true)
+    assert.equal(blocked.blockingErrors[0].code, "ENKA_EQUIPMENT_IMMUTABLE_IDENTITY_CONFLICT")
+    assert.deepEqual(
+        new Set(blocked.blockingErrors[0].details.differences.map(item => item.field)),
+        new Set(["partition", "set", "equipmentId"]),
+    )
+    assert.equal(blocked.driveDiscs[0].partition, 1)
+    assert.equal(blocked.driveDiscs[0].setId, "astral_voice")
+    assert.equal(blocked.driveDiscs[0].reservedForAgentId, "aria")
+    assert.deepEqual(blocked.driveDiscs[0].excludedForAgentIds, ["yixuan"])
+}
+
+// An Enka canonical ID is an identity assertion, so an unrelated record already
+// using that ID must block instead of falling through to the generic suffix path.
+// Scanner/JSON imports retain their existing collision suffix behavior above.
+{
+    const canonicalId = enkaDriveDiscId(UID_A, "canonical-collision")
+    const occupied = normalizedDisc(canonicalId, {
+        level: 12,
+        source: { type: "manual" },
+    })
+    const blocked = planDriveDiscReconciliation({
+        existingDiscs: [occupied],
+        importedDiscs: [enkaDisc(UID_A, "canonical-collision")],
+        ownerId: OWNER_ID,
+        sourceKind: "enka",
+        now: NOW,
+    })
+    assert.equal(blocked.hasBlockingErrors, true)
+    assert.equal(blocked.blockingErrors[0].code, "ENKA_CANONICAL_ID_COLLISION")
+    assert.equal(blocked.changed, false)
+    assert.deepEqual(blocked.driveDiscs, [occupied])
+    assert.equal(blocked.added.length, 0)
+}
+
+// Version-1 Calculator exports may omit stat.mode. Known stat keys still form a
+// usable native identity, so importing the same record twice remains idempotent.
+{
+    const withoutModes = normalizedDisc("native-without-stat-mode", {
+        source: { type: "manual" },
+        mainStat: { stat: "hpFlat", value: 2200, label: "生命值" },
+        subStats: [
+            { stat: "atkPct", value: 6, label: "攻击力" },
+            { stat: "critRate", value: 4.8, label: "暴击率" },
+        ],
+    })
+    const first = buildScannerImportPlan(storeWith(), nativeExport([
+        withoutModes,
+    ], "without-mode-first"), {
+        ownerId: OWNER_ID,
+        sourcePath: "without-mode-first.json",
+        importId: "without-mode-first",
+        importedAt: NOW,
+        now: NOW,
+    })
+    const repeated = buildScannerImportPlan(first.nextStore, nativeExport([
+        withoutModes,
+    ], "without-mode-repeated"), {
+        ownerId: OWNER_ID,
+        sourcePath: "without-mode-repeated.json",
+        importId: "without-mode-repeated",
+        importedAt: NOW,
+        now: NOW,
+    })
+    assert.equal(repeated.nextStore.driveDiscs.length, 1)
+    assert.equal(repeated.nextStore.driveDiscs[0].id, withoutModes.id)
+    assert.equal(repeated.reconciliation.changed, false)
+    assert.equal(repeated.reconciliation.unchanged.length, 1)
+    assert.equal(repeated.summary.added, 0)
+    assert.equal(repeated.summary.updated, 0)
+}
+
 console.log("drive-disc-reconciliation.test.js: all assertions passed")

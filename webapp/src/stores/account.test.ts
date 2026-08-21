@@ -56,7 +56,26 @@ describe("account store transactions", () => {
       driveDiscLoadouts: [{ id: "loadout-alt", ownerId: "alt" }],
       enkaImportState: {
         version: 1,
-        byOwner: { alt: { binding: { uid: "1300000000" } } },
+        byOwner: {
+          alt: {
+            binding: { uid: "1300000000" },
+            history: {
+              version: 1,
+              backfillVersion: 1,
+              byAgent: {
+                aria: {
+                  agentId: "aria",
+                  agentName: "爱芮",
+                  uid: "1300000000",
+                  completeness: "full",
+                  firstImportedAt: "2026-08-18T00:00:00.000Z",
+                  lastImportedAt: "2026-08-18T00:00:00.000Z",
+                  snapshot: { driveDiscCount: 0, driveDiscSourceCount: 0 },
+                },
+              },
+            },
+          },
+        },
       },
     }))
     localStorage.setItem(WEBAPP_BUILD_STORAGE_KEY, JSON.stringify(selectionDocument()))

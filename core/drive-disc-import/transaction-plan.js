@@ -96,14 +96,39 @@ function withOwnerSelection(document, ownerId, selection) {
   }
 }
 
-function rewriteAgentConfig(config, driveDiscIdRemap, deletedDriveDiscIds, loadoutIdRemap, deletedLoadoutIds) {
+function rewriteAgentConfig(
+  config,
+  driveDiscIdRemap,
+  deletedDriveDiscIds,
+  loadoutIdRemap,
+  deletedLoadoutIds,
+  removedLoadoutDiscReferences = [],
+) {
   const next = clone(config ?? {}) ?? {}
   let changed = false
-  for (const field of ["manualDriveDiscIdsBySlot", "driveDiscIdsBySlot"]) {
+  for (const field of ["manualDriveDiscIdsBySlot", "manualDriveDiscsBySlot", "driveDiscIdsBySlot"]) {
     if (!Object.prototype.hasOwnProperty.call(next, field)) continue
     const rewritten = rewriteIdsBySlot(next[field], driveDiscIdRemap, deletedDriveDiscIds)
     if (rewritten.changed) {
       next[field] = rewritten.value
+      changed = true
+    }
+  }
+  for (const reference of removedLoadoutDiscReferences) {
+    const driveDiscId = String(reference?.driveDiscId ?? "")
+    if (!driveDiscId) continue
+    for (const field of ["manualDriveDiscIdsBySlot", "manualDriveDiscsBySlot", "driveDiscIdsBySlot"]) {
+      if (!Object.prototype.hasOwnProperty.call(next, field)) continue
+      const idsBySlot = { ...(next[field] ?? {}) }
+      let fieldChanged = false
+      for (const slot of reference?.slots ?? []) {
+        const key = String(slot)
+        if (String(idsBySlot[key] ?? "") !== driveDiscId) continue
+        delete idsBySlot[key]
+        fieldChanged = true
+      }
+      if (!fieldChanged) continue
+      next[field] = idsBySlot
       changed = true
     }
   }
@@ -126,6 +151,7 @@ export function reconcileSelectionDriveDiscReferences(document, {
   deletedDriveDiscIds = [],
   loadoutIdRemap = {},
   deletedLoadoutIds = [],
+  removedLoadoutDiscReferences = [],
 } = {}) {
   const discRemap = stringMap(driveDiscIdRemap)
   const deletedDiscs = stringSet(deletedDriveDiscIds)
@@ -135,7 +161,16 @@ export function reconcileSelectionDriveDiscReferences(document, {
   const byAgent = { ...(selection.byAgent ?? {}) }
   const affectedAgentIds = []
   for (const [agentId, config] of Object.entries(byAgent)) {
-    const rewritten = rewriteAgentConfig(config, discRemap, deletedDiscs, loadoutRemap, deletedLoadouts)
+    const scopedRemovedReferences = (removedLoadoutDiscReferences ?? [])
+      .filter(reference => String(reference?.agentId ?? "") === String(agentId))
+    const rewritten = rewriteAgentConfig(
+      config,
+      discRemap,
+      deletedDiscs,
+      loadoutRemap,
+      deletedLoadouts,
+      scopedRemovedReferences,
+    )
     if (!rewritten.changed) continue
     byAgent[agentId] = rewritten.config
     affectedAgentIds.push(agentId)
@@ -342,7 +377,7 @@ function applyEnkaOwnerStateSnapshot(store, ownerId, snapshot) {
 }
 
 function invalidateEnkaUndoForAffected(store, ownerId, kind, affected, now) {
-  if (["enka", "enka-undo", "account-delete"].includes(String(kind))) {
+  if (["enka", "enka-rebind", "enka-undo", "account-delete"].includes(String(kind))) {
     return { store, invalidation: null }
   }
   const ownerState = store?.enkaImportState?.version === 1

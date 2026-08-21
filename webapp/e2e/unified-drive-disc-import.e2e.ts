@@ -152,18 +152,25 @@ async function confirmJsonImport(page: Page, expectedSummary: string, payload: a
   await expect(modal).toBeHidden()
 }
 
-async function importEnka(page: Page, expectedDriveOperation?: string) {
+async function importEnka(page: Page, expectedDriveOperation?: string, expectedOutcome: "imported" | "noop" = "imported") {
   await page.goto("/import")
   await expect(page.getByRole("heading", { name: "展柜数据导入" })).toBeVisible()
-  await page.getByLabel("游戏 UID").fill(uid)
+  const uidInput = page.getByLabel("游戏 UID")
+  await expect.poll(async () => !(await uidInput.isDisabled()) || await uidInput.inputValue() === uid).toBe(true)
+  if (await uidInput.isEnabled()) await uidInput.fill(uid)
+  else await expect(uidInput).toHaveValue(uid)
   await page.getByRole("button", { name: "读取展柜", exact: true }).click()
   await expect(page.getByLabel(`选择导入 ${agentName}`)).toBeVisible()
-  await page.getByRole("button", { name: "预览更改（1）", exact: true }).click()
+  await page.getByRole("button", { name: "预览更改（1 个角色）", exact: true }).click()
   const dialog = page.getByRole("dialog")
   await expect(dialog).toBeVisible()
   if (expectedDriveOperation) await expect(dialog).toContainText(expectedDriveOperation)
   await dialog.getByRole("button", { name: "确认导入", exact: true }).click()
-  await expect(page.locator(".n-message").filter({ hasText: "已导入 1 个角色" })).toBeVisible()
+  if (expectedOutcome === "noop") {
+    await expect(page.getByRole("alert").filter({ hasText: "当前选择已经是最新数据。" })).toBeVisible()
+  } else {
+    await expect(page.locator(".n-message").filter({ hasText: "已导入 1 个角色" })).toBeVisible()
+  }
   await expect(dialog).toBeHidden()
 }
 
@@ -233,7 +240,7 @@ test("Scanner JSON then Enka keeps the Scanner canonical id and remains idempote
   await importEnka(page, "合并来源：1号位 啄木鸟电音")
   await expectUnifiedDisc(page, scannerCanonicalId)
 
-  await importEnka(page)
+  await importEnka(page, undefined, "noop")
   await expectUnifiedDisc(page, scannerCanonicalId)
 
   await page.goto("/discs")

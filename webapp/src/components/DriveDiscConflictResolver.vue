@@ -96,7 +96,7 @@ function subStatsText(disc: any) {
 }
 
 function discAriaName(disc: any) {
-  return `${discName(disc)} ${discMeta(disc)} ID ${candidateId(disc) || "未提供"}`
+  return `${discName(disc)} ${discMeta(disc)}`
 }
 
 function conflictTitle(conflict: DriveDiscConflict, index: number) {
@@ -113,7 +113,7 @@ function resolutionLabel(conflict: DriveDiscConflict) {
   const resolution = resolutionFor(conflict)
   if (!resolution) return "待选择"
   if (resolution.action === "add") return "作为新盘"
-  return `更新 ${resolution.existingId}`
+  return "更新已选库存盘"
 }
 
 function radioName(conflictIndex: number) {
@@ -167,10 +167,6 @@ function detailsId(conflictIndex: number, candidateIndex: number | "imported" | 
               <div><dt>主词条</dt><dd>{{ statText(conflict.imported?.mainStat) }}</dd></div>
               <div><dt>副词条</dt><dd>{{ subStatsText(conflict.imported) }}</dd></div>
             </dl>
-            <code
-              :id="detailsId(conflictIndex, 'imported')"
-              class="drive-disc-conflict-id"
-            >ID {{ candidateId(conflict.imported) || "未提供" }}</code>
             <DriveDiscSourceTags :disc="conflict.imported" show-scanner-sequence />
           </div>
         </section>
@@ -203,7 +199,6 @@ function detailsId(conflictIndex: number, candidateIndex: number | "imported" | 
               </span>
               <span class="drive-disc-conflict-stat"><b>主词条</b>{{ statText(candidate?.mainStat) }}</span>
               <span class="drive-disc-conflict-stat"><b>副词条</b>{{ subStatsText(candidate) }}</span>
-              <code class="drive-disc-conflict-id">ID {{ candidateId(candidate) || "未提供" }}</code>
               <DriveDiscSourceTags :disc="candidate" show-scanner-sequence />
             </span>
             <span class="drive-disc-conflict-action">更新此盘</span>

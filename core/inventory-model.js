@@ -1,3 +1,5 @@
+import { recordNonEnkaBindingSessionChanges } from "./enka-import/binding-session.js"
+
 const DRIVE_DISC_SET_ALIASES = {
     "雪兔梦游仙境": { id: "zzz_wiki_1907", name: { zhCN: "雪兔梦游仙境" } },
     "囚徒手记": { id: "zzz_wiki_1906", name: { zhCN: "囚徒手记" } },
@@ -55,6 +57,9 @@ const STAT_LABELS = {
     "以太伤害加成": { pct: "etherDmg" },
     "风属性伤害加成": { pct: "windDmg" },
 }
+const KNOWN_DRIVE_DISC_STATS = new Set(
+    Object.values(STAT_LABELS).flatMap(modes => Object.values(modes)),
+)
 
 function stableStringify(value) {
     if (Array.isArray(value)) {
@@ -102,10 +107,27 @@ function statFingerprintEntry(stat, { includeValue = true } = {}) {
         stat: stat?.stat ?? "unknown",
         mode: stat?.mode ?? "unknown",
     }
+    if (entry.stat === "unknown" || entry.mode === "unknown") {
+        entry.rawIdentity = {
+            propertyId: String(stat?.raw?.propertyId ?? stat?.propertyId ?? "").trim(),
+            label: String(stat?.label ?? "").trim(),
+            rawValue: stat?.rawValue ?? stat?.raw?.propertyValue ?? null,
+        }
+    }
     if (includeValue) {
         entry.value = normalizedStatValue(stat?.value)
     }
     return entry
+}
+
+export function hasUnknownDriveDiscStat(disc) {
+    const stats = [disc?.mainStat, ...(disc?.subStats ?? [])]
+    return stats.some(stat => {
+        const statKey = String(stat?.stat ?? "").trim()
+        return !stat
+            || !KNOWN_DRIVE_DISC_STATS.has(statKey)
+            || (stat.mode != null && String(stat.mode).trim() === "unknown")
+    })
 }
 
 function localizedText(value) {
@@ -563,7 +585,10 @@ function parseScannerValue(rawValue) {
 }
 
 function resolveStat(label, mode) {
-    const entry = STAT_LABELS[label]
+    const normalizedLabel = String(label ?? "").trim()
+        .replace(/%$/, "")
+        .replace(/^物理属性伤害加成$/, "物理伤害加成")
+    const entry = STAT_LABELS[normalizedLabel]
     return entry ? entry[mode] ?? entry.flat ?? entry.pct ?? null : null
 }
 
@@ -807,9 +832,144 @@ export function normalizeDriveDiscImport(input, options = {}) {
 
 function enkaProvenanceKey(disc) {
     const enka = disc?.provenance?.enkaZzz
-    const uid = String(enka?.uid ?? "").trim()
-    const equipmentUid = String(enka?.equipmentUid ?? "").trim()
+    const source = disc?.source ?? {}
+    const uid = String(enka?.uid ?? source.uid ?? "").trim()
+    const equipmentUid = String(enka?.equipmentUid ?? source.equipmentUid ?? "").trim()
     return uid && equipmentUid ? `${uid}:${equipmentUid}` : ""
+}
+
+function enkaIdentityObservation(disc) {
+    const enka = disc?.provenance?.enkaZzz
+    const source = disc?.source ?? {}
+    const uid = String(enka?.uid ?? source.uid ?? "").trim()
+    const equipmentUid = String(enka?.equipmentUid ?? source.equipmentUid ?? "").trim()
+    return {
+        uid,
+        equipmentUid,
+        agentId: String(enka?.lastAgentId ?? source.agentId ?? disc?.equippedBy ?? "").trim(),
+        partition: Number(disc?.partition ?? 0),
+        set: canonicalSetKey(disc),
+        templateId: String(enka?.equipmentId ?? source.equipmentId ?? "").trim(),
+        locked: Boolean(disc?.locked),
+        content: canonicalDriveDiscContent(disc),
+    }
+}
+
+function enkaImmutableIdentity(disc) {
+    const enka = disc?.provenance?.enkaZzz
+    const source = disc?.source ?? {}
+    return {
+        partition: Number(disc?.partition ?? 0),
+        set: canonicalSetKey(disc),
+        equipmentId: String(enka?.equipmentId ?? source.equipmentId ?? "").trim(),
+        rarity: String(disc?.rarity ?? "").trim().toUpperCase(),
+        maxLevel: Number(disc?.maxLevel ?? 0),
+    }
+}
+
+function immutableEnkaIdentityDifferences(existing, imported) {
+    const before = enkaImmutableIdentity(existing)
+    const after = enkaImmutableIdentity(imported)
+    return Object.keys(before).flatMap(field => {
+        const left = before[field]
+        const right = after[field]
+        const leftKnown = typeof left === "number" ? left > 0 : Boolean(left)
+        const rightKnown = typeof right === "number" ? right > 0 : Boolean(right)
+        return leftKnown && rightKnown && left !== right ? [{ field, before: left, after: right }] : []
+    })
+}
+
+export function validateEnkaDriveDiscIdentities(discs = [], { expectedUid = null, existingDiscs = [] } = {}) {
+    const normalizedExpectedUid = expectedUid == null ? null : String(expectedUid).trim()
+    const observationsByKey = new Map()
+    const blockingErrors = []
+    const immutableErrorKeys = new Set()
+    const canonicalCollisionErrorKeys = new Set()
+
+    for (const disc of discs ?? []) {
+        const observation = enkaIdentityObservation(disc)
+        if (!observation.uid || !observation.equipmentUid) {
+            blockingErrors.push({
+                code: "ENKA_DISC_IDENTITY_MISSING",
+                message: "展柜驱动盘缺少游戏 UID 或 Equipment UID，无法建立安全身份。",
+                details: { observation },
+            })
+            continue
+        }
+        if (normalizedExpectedUid !== null && observation.uid !== normalizedExpectedUid) {
+            blockingErrors.push({
+                code: "ENKA_DISC_UID_MISMATCH",
+                message: `驱动盘 ${observation.equipmentUid} 的来源 UID 与本次展柜 UID 不一致。`,
+                details: { expectedUid: normalizedExpectedUid, observation },
+            })
+            continue
+        }
+        const key = `${observation.uid}:${observation.equipmentUid}`
+        const canonicalId = `enka-zzz:${observation.uid}:${observation.equipmentUid}`
+        const previous = observationsByKey.get(key)
+        if (!previous) {
+            observationsByKey.set(key, observation)
+        } else if (stableStringify(previous) !== stableStringify(observation)) {
+            blockingErrors.push({
+                code: "ENKA_EQUIPMENT_IDENTITY_CONFLICT",
+                message: `同一 Equipment UID ${observation.equipmentUid} 在本次展柜数据中对应了互相矛盾的角色、槽位、套装或模板。`,
+                details: {
+                    uid: observation.uid,
+                    equipmentUid: observation.equipmentUid,
+                    observations: [previous, observation],
+                },
+            })
+        }
+
+        for (const existing of existingDiscs ?? []) {
+            if (String(existing?.id ?? "") === canonicalId) {
+                const existingEnkaKey = enkaProvenanceKey(existing)
+                const sameStrongIdentity = existingEnkaKey === key
+                const safelyMatchesContent = !hasUnknownDriveDiscStat(existing)
+                    && !hasUnknownDriveDiscStat(disc)
+                    && !excludesDifferentStrongIdentity(existing, disc)
+                    && sameDriveDiscContent(existing, disc)
+                if (!sameStrongIdentity && !safelyMatchesContent) {
+                    const errorKey = stableStringify([canonicalId, existingEnkaKey])
+                    if (!canonicalCollisionErrorKeys.has(errorKey)) {
+                        canonicalCollisionErrorKeys.add(errorKey)
+                        blockingErrors.push({
+                            code: "ENKA_CANONICAL_ID_COLLISION",
+                            message: `驱动盘 ${observation.equipmentUid} 的 canonical ID 已被其他记录占用，无法安全合并。`,
+                            details: {
+                                uid: observation.uid,
+                                equipmentUid: observation.equipmentUid,
+                                canonicalId,
+                                existingId: String(existing.id),
+                                existingEnkaIdentity: existingEnkaKey || null,
+                            },
+                        })
+                    }
+                }
+            }
+            if (enkaProvenanceKey(existing) !== key) continue
+            const differences = immutableEnkaIdentityDifferences(existing, disc)
+            if (!differences.length) continue
+            const errorKey = stableStringify([key, existing?.id, differences])
+            if (immutableErrorKeys.has(errorKey)) continue
+            immutableErrorKeys.add(errorKey)
+            blockingErrors.push({
+                code: "ENKA_EQUIPMENT_IMMUTABLE_IDENTITY_CONFLICT",
+                message: `驱动盘 ${observation.equipmentUid} 与已有同一 Equipment UID 记录的槽位、套装或模板身份不一致。`,
+                details: {
+                    uid: observation.uid,
+                    equipmentUid: observation.equipmentUid,
+                    existingId: String(existing?.id ?? ""),
+                    differences,
+                },
+            })
+        }
+    }
+
+    return {
+        blockingErrors,
+        hasBlockingErrors: blockingErrors.length > 0,
+    }
 }
 
 function calculatorJsonProvenanceKey(disc) {
@@ -960,6 +1120,9 @@ export function planDriveDiscReconciliation({
         normalizeDriveDiscUsageRestrictions(normalizeDriveDiscSetAlias({ ...disc, ownerId: normalizedOwnerId }, options)),
         options,
     ))
+    const identityValidation = sourceKind === "enka"
+        ? validateEnkaDriveDiscIdentities(normalizedImported, { existingDiscs: normalizedExisting })
+        : { blockingErrors: [], hasBlockingErrors: false }
     const nextById = new Map(normalizedExisting.map(disc => [String(disc.id), disc]))
     const initialIds = new Set(nextById.keys())
     const added = []
@@ -972,14 +1135,44 @@ export function planDriveDiscReconciliation({
     const matchedExistingIds = new Set()
     const protectedHistoricalIds = new Set()
     const seenWeakContent = new Set()
+    const firstImportedIdByEnkaKey = new Map()
     let duplicateInImport = 0
     let historicalDuplicates = 0
 
+    if (identityValidation.hasBlockingErrors) {
+        return {
+            driveDiscs: existingDiscs.map(cloneJsonValue),
+            added,
+            updated,
+            unchanged,
+            sourceMerged,
+            conflicts,
+            warnings,
+            blockingErrors: identityValidation.blockingErrors,
+            hasBlockingErrors: true,
+            resolvedIds,
+            matchedExistingIds,
+            protectedHistoricalIds,
+            initialIds,
+            duplicateInImport,
+            historicalDuplicates,
+            changed: false,
+        }
+    }
+
     normalizedImported.forEach((imported, index) => {
         const incomingEnkaKey = enkaProvenanceKey(imported)
+        const firstImportedId = incomingEnkaKey ? firstImportedIdByEnkaKey.get(incomingEnkaKey) : null
+        if (firstImportedId != null) {
+            duplicateInImport += 1
+            resolvedIds[String(imported.id)] = resolvedIds[firstImportedId]
+            return
+        }
+        if (incomingEnkaKey) firstImportedIdByEnkaKey.set(incomingEnkaKey, String(imported.id))
+        const hasUnknownStats = hasUnknownDriveDiscStat(imported)
         const weakContentKey = stableStringify(canonicalDriveDiscContent(imported))
-        const isWeakDuplicate = !incomingEnkaKey && seenWeakContent.has(weakContentKey)
-        if (!incomingEnkaKey) seenWeakContent.add(weakContentKey)
+        const isWeakDuplicate = !incomingEnkaKey && !hasUnknownStats && seenWeakContent.has(weakContentKey)
+        if (!incomingEnkaKey && !hasUnknownStats) seenWeakContent.add(weakContentKey)
 
         const currentItems = [...nextById.values()]
         let candidates = incomingEnkaKey
@@ -987,7 +1180,7 @@ export function planDriveDiscReconciliation({
             : []
         let matchReason = candidates.length ? "same-enka-identity" : ""
 
-        if (!candidates.length && sourceKind === "calculatorJson") {
+        if (!candidates.length && sourceKind === "calculatorJson" && !hasUnknownStats) {
             const sourceRecordId = calculatorJsonProvenanceKey(imported)
             if (sourceRecordId) {
                 candidates = currentItems
@@ -996,14 +1189,14 @@ export function planDriveDiscReconciliation({
                 if (candidates.length) matchReason = "same-native-source"
             }
         }
-        if (!candidates.length && sourceKind === "calculatorJson") {
+        if (!candidates.length && sourceKind === "calculatorJson" && !hasUnknownStats) {
             const exactId = nextById.get(String(imported.id))
             if (exactId && !excludesDifferentStrongIdentity(exactId, imported)) {
                 candidates = [exactId]
                 matchReason = "same-native-id"
             }
         }
-        if (!candidates.length) {
+        if (!candidates.length && !hasUnknownStats) {
             candidates = contentCandidates(currentItems, imported)
                 .filter(item => !excludesDifferentStrongIdentity(item, imported))
             if (candidates.length) matchReason = "same-content"
@@ -1070,6 +1263,8 @@ export function planDriveDiscReconciliation({
         sourceMerged,
         conflicts,
         warnings,
+        blockingErrors: [],
+        hasBlockingErrors: false,
         resolvedIds,
         matchedExistingIds,
         protectedHistoricalIds,
@@ -1237,6 +1432,13 @@ export function buildScannerImportPlan(currentStore, input, options = {}) {
         ...sourceDetached.map(item => String(item.id)),
         ...removed.map(item => String(item.id)),
     ])
+    nextStore = recordNonEnkaBindingSessionChanges({
+        storeBefore: normalizedCurrentStore,
+        storeAfter: nextStore,
+        ownerId,
+        touchedDriveDiscIds: [...changedIds],
+        driveDiscIdRemap: Object.fromEntries(remappedIds),
+    })
     const ownerImportState = nextStore.enkaImportState?.version === 1
         ? nextStore.enkaImportState.byOwner?.[ownerId]
         : null
@@ -1352,13 +1554,19 @@ export function upsertDriveDisc(store, driveDisc, options = {}) {
         source: projectDriveDiscSource(provenance, normalizedDriveDisc.source),
         updatedAt: editedAt,
     }, options)
-    return {
-        ownerId,
-        driveDisc: nextDriveDisc,
-        nextStore: {
+    const nextStore = recordNonEnkaBindingSessionChanges({
+        storeBefore: store,
+        storeAfter: {
             ...store,
             driveDiscs: index >= 0 ? existing.map(item => matches(item) ? nextDriveDisc : item) : [...existing, nextDriveDisc],
         },
+        ownerId,
+        touchedDriveDiscIds: [nextDriveDisc.id],
+    })
+    return {
+        ownerId,
+        driveDisc: nextDriveDisc,
+        nextStore,
     }
 }
 

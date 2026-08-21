@@ -65,17 +65,18 @@ describe("DriveDiscConflictResolver", () => {
     expect(wrapper.attributes("aria-label")).toBe("驱动盘疑似重复处理")
     expect(wrapper.findAll("article.drive-disc-conflict")).toHaveLength(2)
     expect(wrapper.findAll("fieldset")[0].text()).toContain("库存候选（2）")
-    expect(wrapper.text()).toContain(longImportedId)
-    expect(wrapper.text()).toContain(secondCandidateId)
+    expect(wrapper.text()).not.toContain(longImportedId)
+    expect(wrapper.text()).not.toContain(secondCandidateId)
+    expect(wrapper.text()).toContain("更新已选库存盘")
     expect(wrapper.text()).toContain("安比")
     expect(wrapper.text()).toContain("扫描器 #17")
     expect(wrapper.text()).toContain("Enka")
 
     const radios = wrapper.findAll<HTMLInputElement>('input[type="radio"]')
     expect(radios).toHaveLength(5)
-    expect(radios[0].attributes("aria-label")).toContain(`更新此盘：啄木鸟电音 4号位 · S +12 ID ${firstCandidateId}`)
+    expect(radios[0].attributes("aria-label")).toBe("更新此盘：啄木鸟电音 4号位 · S +12")
     expect(radios[1].element.checked).toBe(true)
-    expect(radios[2].attributes("aria-label")).toContain(`作为新盘：啄木鸟电音 4号位 · S +15 ID ${longImportedId}`)
+    expect(radios[2].attributes("aria-label")).toBe("作为新盘：啄木鸟电音 4号位 · S +15")
     expect(radios[4].element.checked).toBe(true)
     expect(new Set(radios.slice(0, 3).map(radio => radio.attributes("name"))).size).toBe(1)
     expect(radios[3].attributes("name")).not.toBe(radios[0].attributes("name"))
@@ -96,7 +97,7 @@ describe("DriveDiscConflictResolver", () => {
     ])
   })
 
-  it("keeps long identifiers and option grids safe in a 320px container", () => {
+  it("keeps option grids safe in a 320px container without rendering internal identifiers", () => {
     const componentPath = path.resolve(
       path.dirname(fileURLToPath(import.meta.url)),
       "DriveDiscConflictResolver.vue",

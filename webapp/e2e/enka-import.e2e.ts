@@ -1,7 +1,9 @@
 import { expect, test, type Page } from "@playwright/test"
 
 const uid = "1302309616"
+const replacementUid = "1300027938"
 const showcaseDiscId = `enka-zzz:${uid}:e2e-disc-1`
+const showcaseOnlyDiscId = `enka-zzz:${uid}:e2e-disc-2`
 const showcaseLoadoutId = `enka-zzz:${uid}:hoshimi_miyabi`
 const showcaseLoadoutName = "展柜佩戴套装 - 星见雅"
 const previousManualDiscId = "manual-before-showcase-import"
@@ -36,7 +38,7 @@ agents[0].driveDiscPreset = {
     maxLevel: 15,
     locked: false,
     equippedBy: "hoshimi_miyabi",
-    mainStat: { stat: "hpFlat", value: 2200 },
+    mainStat: { stat: "hpFlat", value: 2200, mode: "flat", label: "生命值" },
     subStats: [],
     source: {
       type: "enka-zzz-showcase",
@@ -47,6 +49,22 @@ agents[0].driveDiscPreset = {
     },
   }],
 }
+const additionalAgents = [
+  ["anby_demara", "安比"],
+  ["ellen_joe", "艾莲"],
+  ["koleda_belobog", "珂蕾妲"],
+  ["von_lycaon", "莱卡恩"],
+].map(([agentId, agentName]) => ({
+  agentId,
+  agentName,
+  agentLevel: 60,
+  cinemaLevel: 0,
+  coreSkillLevel: "A",
+  skillLevels: { basic: 12, dodge: 12, assist: 12, special: 12, chain: 12 },
+  wEngine: null,
+  driveDiscSourceCount: 0,
+  driveDiscPreset: null,
+}))
 
 async function mockAppConfig(page: Page, enkaImportEnabled: boolean) {
   await page.route("**/api/app-config", route => route.fulfill({
@@ -113,20 +131,29 @@ async function writeInventoryStore(page: Page, store: any): Promise<void> {
   }), store)
 }
 
-async function mockShowcase(page: Page) {
+async function mockShowcaseAgents(
+  page: Page,
+  showcaseAgents: any[],
+  skippedAgents: any[] = [],
+  responseUid = uid,
+) {
   await page.route("**/api/enka/zzz/**", route => route.fulfill({
     status: 200,
     contentType: "application/json",
     body: JSON.stringify({
       ok: true,
-      uid,
+      uid: responseUid,
       cache: { hit: false, expiresAt: "2026-08-18T12:00:00.000Z" },
       ttlSeconds: 60,
-      agents,
-      skippedAgents: [{ enkaId: "999", name: "未收录角色", reason: "目录未映射" }],
+      agents: showcaseAgents,
+      skippedAgents,
       warnings: [{ code: "DISC_SKIPPED", message: "6号位属性无法映射，已跳过。" }],
     }),
   }))
+}
+
+async function mockShowcase(page: Page) {
+  await mockShowcaseAgents(page, agents, [{ enkaId: "999", name: "未收录角色", reason: "目录未映射" }])
 }
 
 async function importFiveAgents(page: Page) {
@@ -134,7 +161,7 @@ async function importFiveAgents(page: Page) {
   await page.getByLabel("游戏 UID").fill(uid)
   await page.getByRole("button", { name: "读取展柜" }).click()
   await expect(page.getByLabel(/^选择导入 /)).toHaveCount(5)
-  await page.getByRole("button", { name: "预览更改（5）" }).click()
+  await page.getByRole("button", { name: "预览更改（5 个角色）" }).click()
   await page.getByRole("dialog").getByRole("button", { name: "确认导入" }).click()
   await expect(page.locator(".n-message").filter({ hasText: "已导入 5 个角色，库存与配置已同步。" })).toBeVisible()
 }
@@ -166,22 +193,91 @@ test("direct confirmation imports without preview and remains idempotent", async
   await mockShowcase(page)
 
   await directImportFiveAgents(page)
+  await expect(page.getByRole("heading", { name: "已导入角色（5）" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "本次读取角色（5）" })).toBeVisible()
   const first = await readInventoryStore(page)
   expect(first.driveDiscs).toHaveLength(1)
   expect(first.driveDiscLoadouts.find((loadout: any) => loadout.id === showcaseLoadoutId)?.name).toBe(showcaseLoadoutName)
+  expect(Object.keys(first.enkaImportState.byOwner.default.history.byAgent)).toHaveLength(5)
+  const firstUndoJournal = structuredClone(first.enkaImportState.byOwner.default.undoJournal)
 
   await page.getByRole("button", { name: "读取展柜" }).click()
   await expect(page.getByLabel(/^选择导入 /)).toHaveCount(5)
   await page.getByRole("button", { name: "确认导入", exact: true }).first().click()
-  await expect(page.locator(".n-message").filter({ hasText: "已导入 5 个角色，库存与配置已同步。" })).toBeVisible()
+  await expect(page.getByRole("alert").filter({ hasText: "当前选择已经是最新数据。" })).toBeVisible()
   const second = await readInventoryStore(page)
   expect(second.driveDiscs).toHaveLength(first.driveDiscs.length)
   expect(second.driveDiscLoadouts).toHaveLength(first.driveDiscLoadouts.length)
+  expect(second.enkaImportState.byOwner.default.undoJournal).toEqual(firstUndoJournal)
+
+  await page.getByRole("button", { name: "撤销上次导入" }).click()
+  await expect(page.getByRole("alert").filter({ hasText: "最近一次展柜数据导入已撤销。" })).toBeVisible()
+  const undone = await readInventoryStore(page)
+  expect(undone.driveDiscs).toHaveLength(0)
+  expect(undone.driveDiscLoadouts).toHaveLength(0)
+  expect(undone.enkaImportState.byOwner.default.undoJournal).toBeNull()
+  expect(Object.keys(undone.enkaImportState.byOwner.default.history?.byAgent ?? {})).toHaveLength(0)
 
   await page.goto("/accounts")
   await expect(page.getByText("游戏 UID", { exact: true })).toBeVisible()
   await expect(page.getByText("Enka UID", { exact: true })).toHaveCount(0)
   await expectNoHorizontalOverflow(page)
+})
+
+test("multiple showcase imports accumulate history across reload and undo only the latest batch", async ({ page }) => {
+  test.slow()
+  await mockAppConfig(page, true)
+  await mockShowcase(page)
+  await directImportFiveAgents(page)
+  await expect(page.getByRole("heading", { name: "已导入角色（5）" })).toBeVisible()
+
+  await page.unroute("**/api/enka/zzz/**")
+  await mockShowcaseAgents(page, additionalAgents)
+  await page.getByRole("button", { name: "读取展柜" }).click()
+  await expect(page.getByRole("heading", { name: "本次读取角色（4）" })).toBeVisible()
+  await expect(page.getByLabel(/^选择导入 /)).toHaveCount(4)
+  await page.getByRole("button", { name: "确认导入", exact: true }).first().click()
+  await expect(page.locator(".n-message").filter({ hasText: "已导入 4 个角色，库存与配置已同步。" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "已导入角色（9）" })).toBeVisible()
+
+  let inventory = await readInventoryStore(page)
+  expect(Object.keys(inventory.enkaImportState.byOwner.default.history.byAgent)).toHaveLength(9)
+  await page.reload()
+  await expect(page.getByRole("heading", { name: "已导入角色（9）" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: /本次读取角色/ })).toHaveCount(0)
+  for (const agent of [...agents, ...additionalAgents]) {
+    await expect(page.locator(".imported-agent-list").getByText(agent.agentName, { exact: true })).toBeVisible()
+  }
+
+  for (const width of [320, 360, 1440]) {
+    await page.setViewportSize({ width, height: width < 500 ? 844 : 1000 })
+    await expectNoHorizontalOverflow(page)
+    await page.screenshot({ path: `../output/playwright/enka-import-history-${width}.png`, fullPage: true })
+  }
+
+  await page.getByRole("button", { name: "撤销上次导入" }).click()
+  await expect(page.getByRole("heading", { name: "已导入角色（5）" })).toBeVisible()
+  inventory = await readInventoryStore(page)
+  expect(Object.keys(inventory.enkaImportState.byOwner.default.history.byAgent)).toHaveLength(5)
+  for (const agent of additionalAgents) {
+    expect(inventory.enkaImportState.byOwner.default.history.byAgent[agent.agentId]).toBeUndefined()
+  }
+})
+
+test("changing the UID invalidates the loaded showcase before either import path can run", async ({ page }) => {
+  await mockAppConfig(page, true)
+  await mockShowcase(page)
+  await page.goto("/import")
+  await page.getByLabel("游戏 UID").fill(uid)
+  await page.getByRole("button", { name: "读取展柜" }).click()
+  await expect(page.getByLabel(/^选择导入 /)).toHaveCount(5)
+
+  await page.getByLabel("游戏 UID").fill("1300027938")
+
+  await expect(page.getByRole("alert").filter({ hasText: "UID 已变化，请重新读取展柜。" })).toBeVisible()
+  await expect(page.getByLabel(/^选择导入 /)).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "确认导入", exact: true })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: /预览更改/ })).toHaveCount(0)
 })
 
 test("five-agent import requires preview, persists both configs, and can undo", async ({ page }) => {
@@ -262,7 +358,10 @@ test("five-agent import requires preview, persists both configs, and can undo", 
   await page.getByLabel("游戏 UID").fill(uid)
   await page.getByRole("button", { name: "读取展柜" }).click()
   await expect(page.getByLabel(/^选择导入 /)).toHaveCount(5)
-  await expect(page.getByRole("button", { name: "预览更改（5）" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "本次读取角色（5）" })).toBeVisible()
+  await expect(page.getByRole("alert").filter({ hasText: "有 1 个角色暂未收录，已跳过。" })).toBeVisible()
+  await expect(page.locator('section[aria-labelledby="showcase-title"]')).not.toContainText("未收录角色")
+  await expect(page.getByRole("button", { name: "预览更改（5 个角色）" })).toBeVisible()
 
   for (const width of [320, 360, 1440]) {
     await page.setViewportSize({ width, height: width < 500 ? 844 : 1000 })
@@ -271,13 +370,16 @@ test("five-agent import requires preview, persists both configs, and can undo", 
   }
 
   await page.setViewportSize({ width: 320, height: 844 })
-  await page.getByRole("button", { name: "预览更改（5）" }).click()
+  await page.getByRole("button", { name: "预览更改（5 个角色）" }).click()
   const dialog = page.getByRole("dialog")
   await expect(dialog).toContainText(`UID ${uid} / 5 个角色`)
-  await expect(dialog.getByRole("heading", { level: 3 })).toHaveCount(5)
+  await expect(dialog.locator("details.preview-agent")).toHaveCount(5)
+  await dialog.locator("details.preview-agent summary").first().click()
   await expect(dialog.getByRole("list", { name: "驱动盘同步变化" })).toContainText("新增：1号位 啄木鸟电音")
   await expect(dialog).toContainText("未收录角色：目录未映射")
   await expect(dialog).toContainText("6号位属性无法映射，已跳过。")
+  await expect(dialog).not.toContainText("enka-zzz:")
+  await expect(dialog).not.toContainText("hoshimi_miyabi")
   await expect(page.getByLabel("游戏 UID")).toBeDisabled()
   for (const agent of agents) await expect(page.getByLabel(`选择导入 ${agent.agentName}`)).toBeDisabled()
   await expectNoHorizontalOverflow(page)
@@ -308,8 +410,14 @@ test("five-agent import requires preview, persists both configs, and can undo", 
   let inventory = await readInventoryStore(page)
   expect(inventory.enkaImportState.byOwner.default.binding.uid).toBe(uid)
   expect(inventory.enkaImportState.byOwner.default.undoJournal.status).toBe("committed")
+  expect(Object.keys(inventory.enkaImportState.byOwner.default.history.byAgent)).toHaveLength(5)
   expect(inventory.driveDiscs).toHaveLength(2)
   expect(inventory.driveDiscLoadouts.find((loadout: any) => loadout.id === showcaseLoadoutId)?.name).toBe(showcaseLoadoutName)
+
+  await page.reload()
+  await expect(page.getByRole("heading", { name: "已导入角色（5）" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: /本次读取角色/ })).toHaveCount(0)
+  for (const agent of agents) await expect(page.locator(".imported-agent-list").getByText(agent.agentName, { exact: true })).toBeVisible()
 
   await page.getByRole("button", { name: "撤销上次导入" }).click()
   const undoFeedback = page.locator(".n-message").filter({ hasText: "最近一次展柜数据导入已撤销。" })
@@ -328,6 +436,7 @@ test("five-agent import requires preview, persists both configs, and can undo", 
   inventory = await readInventoryStore(page)
   expect(inventory.enkaImportState.byOwner.default.binding).toBeUndefined()
   expect(inventory.enkaImportState.byOwner.default.undoJournal).toBeNull()
+  expect(Object.keys(inventory.enkaImportState.byOwner.default.history?.byAgent ?? {})).toHaveLength(0)
   expect(inventory.driveDiscs.map((disc: any) => disc.id)).toEqual([previousManualDiscId])
   expect(inventory.driveDiscLoadouts.map((loadout: any) => loadout.name)).toEqual([
     miyabiHistoryLoadoutName,
@@ -384,6 +493,221 @@ test("five-agent import requires preview, persists both configs, and can undo", 
   await page.screenshot({ path: "../output/playwright/showcase-loadouts-by-agent-1440.png", fullPage: true })
 })
 
+test("safe UID rebind detaches shared sources, removes old-only data, and undoes atomically", async ({ page }) => {
+  test.slow()
+  await mockAppConfig(page, true)
+  const oldAgents = structuredClone(agents)
+  oldAgents[0].driveDiscSourceCount = 2
+  oldAgents[0].driveDiscPreset.driveDiscs.push({
+    id: showcaseOnlyDiscId,
+    setId: "woodpecker_electro",
+    setName: "啄木鸟电音",
+    partition: 2,
+    rarity: "S",
+    level: 15,
+    maxLevel: 15,
+    locked: true,
+    equippedBy: "hoshimi_miyabi",
+    mainStat: { stat: "atkFlat", value: 316, mode: "flat", label: "攻击力" },
+    subStats: [],
+    source: {
+      type: "enka-zzz-showcase",
+      uid,
+      agentId: "hoshimi_miyabi",
+      equipmentUid: "e2e-disc-2",
+      equipmentId: "e2e-equipment-2",
+    },
+  })
+  await mockShowcaseAgents(page, oldAgents)
+
+  await page.goto("/")
+  const initialStore = await readInventoryStore(page) ?? {
+    version: 1,
+    currentOwnerId: "default",
+    owners: [{ id: "default", label: "默认用户" }],
+    imports: [],
+    driveDiscs: [],
+    driveDiscLoadouts: [],
+  }
+  const scannerCanonicalId = "scanner-shared-before-rebind"
+  initialStore.driveDiscs = [{
+    id: scannerCanonicalId,
+    ownerId: "default",
+    setId: "woodpecker_electro",
+    setName: "啄木鸟电音",
+    partition: 1,
+    rarity: "S",
+    level: 15,
+    maxLevel: 15,
+    statUnitVersion: 2,
+    locked: false,
+    equippedBy: null,
+    reservedForAgentId: "aria",
+    excludedForAgentIds: ["yixuan"],
+    mainStat: { stat: "hpFlat", value: 2200, mode: "flat", label: "生命值" },
+    subStats: [],
+    createdAt: "2026-08-17T00:00:00.000Z",
+    updatedAt: "2026-08-17T00:00:00.000Z",
+    source: {
+      type: "zzz-scanner",
+      importId: "scanner-before-rebind",
+      sourcePath: "scanner-before-rebind.json",
+      sequence: 1,
+      rawIndex: 0,
+    },
+    provenance: {
+      version: 1,
+      scanner: {
+        firstSeenAt: "2026-08-17T00:00:00.000Z",
+        lastSeenAt: "2026-08-17T00:00:00.000Z",
+        lastImportId: "scanner-before-rebind",
+        lastSourcePath: "scanner-before-rebind.json",
+        lastSequence: 1,
+        lastRawIndex: 0,
+      },
+    },
+  }]
+  initialStore.driveDiscLoadouts = []
+  await writeInventoryStore(page, initialStore)
+
+  await page.goto("/import")
+  await page.getByLabel("游戏 UID").fill(uid)
+  await page.getByRole("button", { name: "读取展柜" }).click()
+  await expect(page.getByLabel(/^选择导入 /)).toHaveCount(5)
+  await page.getByRole("button", { name: "确认导入", exact: true }).first().click()
+  await expect(page.locator(".n-message").filter({ hasText: "已导入 5 个角色" })).toBeVisible()
+
+  let inventory = await readInventoryStore(page)
+  expect(inventory.enkaImportState.byOwner.default.binding.uid).toBe(uid)
+  expect(inventory.enkaImportState.byOwner.default.bindingSession.complete).toBe(true)
+  expect(inventory.driveDiscs.some((disc: any) => disc.id === showcaseDiscId)).toBe(false)
+  const sharedAfterOldImport = inventory.driveDiscs.find((disc: any) => disc.id === scannerCanonicalId)
+  expect(sharedAfterOldImport.provenance.scanner).toBeTruthy()
+  expect(sharedAfterOldImport.provenance.enkaZzz).toBeTruthy()
+  expect(inventory.driveDiscs.some((disc: any) => disc.id === showcaseOnlyDiscId)).toBe(true)
+
+  await page.unroute("**/api/enka/zzz/**")
+  const malformedReplacementAgent = {
+    ...structuredClone(agents[1]),
+    driveDiscSourceCount: 1,
+    driveDiscPreset: {
+      agentId: "aria",
+      driveDiscs: [{
+        id: `enka-zzz:${replacementUid}:malformed-disc`,
+        setId: "woodpecker_electro",
+        setName: "啄木鸟电音",
+        partition: 1,
+        rarity: "S",
+        level: 15,
+        maxLevel: 15,
+        equippedBy: "aria",
+        mainStat: { stat: "hpFlat", value: 2200, mode: "flat", label: "生命值" },
+        subStats: [],
+        source: {
+          type: "enka-zzz-showcase",
+          uid,
+          agentId: "aria",
+          equipmentUid: "malformed-disc",
+          equipmentId: "malformed-equipment",
+        },
+      }],
+    },
+  }
+  await mockShowcaseAgents(page, [malformedReplacementAgent], [], replacementUid)
+  await page.getByRole("button", { name: "更换 UID" }).click()
+  await page.getByLabel("游戏 UID").fill(replacementUid)
+  await page.getByRole("button", { name: "读取新展柜" }).click()
+  await expect(page.getByRole("heading", { name: "本次读取角色（1）" })).toBeVisible()
+  const beforeBlockedPreview = await readInventoryStore(page)
+  await page.getByRole("button", { name: "预览并更换 UID" }).click()
+  let dialog = page.getByRole("dialog")
+  await expect(dialog).toContainText("部分驱动盘的来源 UID 与本次读取不一致")
+  await expect(dialog.getByRole("button", { name: "确认更换 UID" })).toBeDisabled()
+  expect(await readInventoryStore(page)).toEqual(beforeBlockedPreview)
+  await dialog.getByRole("button", { name: "取消" }).click()
+
+  await page.unroute("**/api/enka/zzz/**")
+  const replacementAgent = {
+    ...structuredClone(agents[1]),
+    driveDiscSourceCount: 0,
+    driveDiscPreset: null,
+  }
+  await mockShowcaseAgents(page, [replacementAgent], [], replacementUid)
+  await page.getByRole("button", { name: "读取新展柜" }).click()
+  await page.getByRole("button", { name: "预览并更换 UID" }).click()
+  dialog = page.getByRole("dialog")
+  await expect(dialog).toContainText(`UID ${uid} → ${replacementUid}`)
+  await expect(dialog).toContainText("删除 1 张仅属于旧 UID 的驱动盘")
+  await expect(dialog).toContainText("保留 1 张 Scanner、JSON 或手动共用盘")
+
+  for (const width of [320, 360, 1440]) {
+    await page.setViewportSize({ width, height: width < 500 ? 844 : 1000 })
+    await expectNoHorizontalOverflow(page)
+    await expect.poll(() => dialog.evaluate(element => {
+      const box = element.getBoundingClientRect()
+      return box.left >= 0 && box.right <= window.innerWidth
+        && box.top >= 0 && box.bottom <= window.innerHeight
+    })).toBe(true)
+    const dialogGeometry = await dialog.evaluate(element => {
+      const box = element.getBoundingClientRect()
+      const buttons = Array.from(element.querySelectorAll<HTMLElement>(".modal-actions button"))
+        .map(button => button.getBoundingClientRect())
+      return {
+        left: box.left,
+        right: box.right,
+        top: box.top,
+        bottom: box.bottom,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        buttons: buttons.map(button => ({ left: button.left, right: button.right, top: button.top, bottom: button.bottom })),
+      }
+    })
+    expect(dialogGeometry.left).toBeGreaterThanOrEqual(0)
+    expect(dialogGeometry.right).toBeLessThanOrEqual(dialogGeometry.viewportWidth)
+    expect(dialogGeometry.top).toBeGreaterThanOrEqual(0)
+    expect(dialogGeometry.bottom).toBeLessThanOrEqual(dialogGeometry.viewportHeight)
+    expect(dialogGeometry.buttons).toHaveLength(2)
+    expect(dialogGeometry.buttons[0].right).toBeLessThanOrEqual(dialogGeometry.buttons[1].left)
+    await page.screenshot({ path: `../output/playwright/enka-rebind-preview-${width}.png`, fullPage: true })
+  }
+
+  await dialog.getByRole("button", { name: "确认更换 UID" }).click()
+  await expect(page.locator(".n-message").filter({ hasText: `已从 UID ${uid} 更换为 ${replacementUid}` })).toBeVisible()
+  inventory = await readInventoryStore(page)
+  expect(inventory.enkaImportState.byOwner.default.binding.uid).toBe(replacementUid)
+  expect(inventory.enkaImportState.byOwner.default.bindingSession.uid).toBe(replacementUid)
+  expect(inventory.enkaImportState.byOwner.default.undoJournal).toMatchObject({
+    kind: "enka-rebind",
+    previousUid: uid,
+    uid: replacementUid,
+    status: "committed",
+  })
+  expect(Object.keys(inventory.enkaImportState.byOwner.default.history.byAgent)).toEqual(["aria"])
+  expect(inventory.driveDiscs.some((disc: any) => disc.id === showcaseOnlyDiscId)).toBe(false)
+  const detachedShared = inventory.driveDiscs.find((disc: any) => disc.id === scannerCanonicalId)
+  expect(detachedShared.id).toBe(scannerCanonicalId)
+  expect(detachedShared.provenance.enkaZzz).toBeUndefined()
+  expect(detachedShared.provenance.scanner).toBeTruthy()
+  expect(detachedShared.source.type).toBe("zzz-scanner")
+  expect(detachedShared.reservedForAgentId).toBe("aria")
+  expect(detachedShared.excludedForAgentIds).toEqual(["yixuan"])
+  expect(inventory.driveDiscLoadouts.some((loadout: any) => loadout.id === showcaseLoadoutId)).toBe(false)
+
+  await page.reload()
+  await expect(page.locator(".page-header")).toContainText(`已绑定 UID ${replacementUid}`)
+  await expect(page.getByRole("heading", { name: "已导入角色（1）" })).toBeVisible()
+  await page.getByRole("button", { name: "撤销上次导入" }).click()
+  await expect(page.locator(".n-message").filter({ hasText: "最近一次展柜数据导入已撤销" })).toBeVisible()
+  inventory = await readInventoryStore(page)
+  expect(inventory.enkaImportState.byOwner.default.binding.uid).toBe(uid)
+  expect(inventory.enkaImportState.byOwner.default.bindingSession.uid).toBe(uid)
+  expect(inventory.enkaImportState.byOwner.default.undoJournal).toBeNull()
+  expect(Object.keys(inventory.enkaImportState.byOwner.default.history.byAgent)).toHaveLength(5)
+  expect(inventory.driveDiscs.some((disc: any) => disc.id === showcaseOnlyDiscId)).toBe(true)
+  expect(inventory.driveDiscs.find((disc: any) => disc.id === scannerCanonicalId).provenance.enkaZzz).toBeTruthy()
+  expect(inventory.driveDiscLoadouts.some((loadout: any) => loadout.id === showcaseLoadoutId)).toBe(true)
+})
+
 test("startup recovery rolls back a prepared transaction with partial configs", async ({ page }) => {
   test.slow()
   await mockAppConfig(page, true)
@@ -413,5 +737,6 @@ test("startup recovery rolls back a prepared transaction with partial configs", 
   }
   const inventory = await readInventoryStore(page)
   expect(inventory.enkaImportState.byOwner.default.binding).toBeUndefined()
+  expect(Object.keys(inventory.enkaImportState.byOwner.default.history?.byAgent ?? {})).toHaveLength(0)
   expect(inventory.driveDiscs).toHaveLength(0)
 })

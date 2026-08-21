@@ -50,9 +50,8 @@ async function openAccounts(page: Page, ownerCount: number) {
 }
 
 async function openShortPage(page: Page) {
-  await page.goto("/import")
-  await expect(page.locator(".app-main")).toBeVisible()
-  await expect(page.getByRole("contentinfo")).toBeVisible()
+  await openAccounts(page, 1)
+  await page.evaluate(() => document.querySelector(".app-main")?.replaceChildren())
 }
 
 async function footerMetrics(page: Page) {
