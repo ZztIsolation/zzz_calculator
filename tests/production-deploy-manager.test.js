@@ -780,6 +780,7 @@ const expectedValidationCatalogs = [
     "bosses.json",
     "combat_buffs.json",
     "drive_disc_sets.json",
+    "enka_zzz_mapping.json",
     "stat_rules.json",
     "w_engines.json",
 ]

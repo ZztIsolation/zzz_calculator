@@ -194,8 +194,9 @@ and the worker rejects an empty, linked, multiply linked, mis-owned, permissivel
 mode-set or oversized response before parsing it. The source `data` tree is never copied into
 the validation scope:
 only `agents.json`, `agent_skills.json`, `anomaly_effects.json`, `bosses.json`,
-`combat_buffs.json`, `drive_disc_sets.json`, `stat_rules.json` and
-`w_engines.json` are allow-listed. `user_drive_discs.example.json` is copied
+`combat_buffs.json`, `drive_disc_sets.json`, `enka_zzz_mapping.json`,
+`stat_rules.json` and `w_engines.json` are allow-listed.
+`user_drive_discs.example.json` is copied
 as both the example and isolated `user_drive_discs.json`; real inventory,
 scan telemetry and unknown files never enter the sandbox. Seed data is capped
 at 64 MiB, 8,192 entries and 1 MiB per file before candidate code starts; this
