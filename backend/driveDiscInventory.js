@@ -92,6 +92,12 @@ export async function saveUserDriveDiscStore(dataDir, store) {
 export async function importScannerExportToStore(dataDir, input, options = {}) {
     const currentStore = await loadUserDriveDiscStore(dataDir)
     const plan = buildScannerImportPlan(currentStore, input, modelOptions(options))
+    if (plan.hasUnresolvedConflicts) {
+        const error = new Error("Drive Disc import has unresolved possible matches and requires preview confirmation.")
+        error.code = "DRIVE_DISC_IMPORT_CONFLICT"
+        error.conflicts = plan.reconciliation.conflicts
+        throw error
+    }
     const saved = await saveUserDriveDiscStore(dataDir, plan.nextStore)
     return {
         ...saved,

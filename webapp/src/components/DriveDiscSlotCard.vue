@@ -2,6 +2,7 @@
 import { computed } from "vue"
 import { NButton, NTag } from "naive-ui"
 import { Ban, LockKeyhole } from "lucide-vue-next"
+import DriveDiscSourceTags from "@/components/DriveDiscSourceTags.vue"
 import { driveDiscUsageStateForAgent } from "@core/inventory-model.js"
 import { fallbackIcon, imageForDriveDiscSet } from "@/utils/assets"
 import { formatStoredStatValue, labelOf, storedStatLabel } from "@/utils/format"
@@ -73,9 +74,7 @@ const detail = computed(() => {
 })
 const secondary = computed(() => {
   if (!props.disc) return props.missingReference ? "请重新选择当前号位" : props.emptyHint
-  const subStats = (props.disc.subStats ?? []).map((stat: any) => statText(stat)).join(" / ") || "无副词条"
-  if (!props.showSequence || !props.disc.source?.sequence) return subStats
-  return `${subStats} · 扫描 #${props.disc.source.sequence}`
+  return (props.disc.subStats ?? []).map((stat: any) => statText(stat)).join(" / ") || "无副词条"
 })
 const rarityLevel = computed(() => {
   if (!props.disc) return ""
@@ -170,6 +169,7 @@ function toggleExclusion() {
       <strong>{{ title }}</strong>
       <span>{{ detail }}</span>
       <small>{{ secondary }}</small>
+      <DriveDiscSourceTags v-if="disc" :disc="disc" :show-scanner-sequence="showSequence" />
     </div>
     <div class="disc-slot-card-meta">
       <div v-if="disc && targetAgentId && (reservationAction || exclusionAction)" class="disc-slot-card-actions">
@@ -334,6 +334,10 @@ function toggleExclusion() {
 
 .disc-slot-card-copy small {
   font-size: 11px;
+}
+
+.disc-slot-card-copy :deep(.drive-disc-source-tags) {
+  margin-top: 2px;
 }
 
 .disc-slot-card-meta {

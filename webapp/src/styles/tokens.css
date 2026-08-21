@@ -93,6 +93,9 @@ textarea {
 
 .app-shell {
   min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
 .app-topbar {
@@ -160,9 +163,38 @@ textarea {
 }
 
 .app-main {
+  flex: 1 0 auto;
   width: min(1480px, calc(100% - 32px));
   margin: 0 auto;
   padding: 18px 0 36px;
+}
+
+.site-footer {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 12px calc(16px + env(safe-area-inset-right, 0px))
+    calc(12px + env(safe-area-inset-bottom, 0px))
+    calc(16px + env(safe-area-inset-left, 0px));
+  color: var(--app-muted);
+  text-align: center;
+}
+
+.site-footer a {
+  color: inherit;
+  text-underline-offset: 3px;
+}
+
+.site-footer a:hover {
+  color: var(--app-text);
+}
+
+.site-footer a:focus-visible {
+  border-radius: 2px;
+  outline: 3px solid rgba(47, 125, 246, 0.7);
+  outline-offset: 3px;
 }
 
 .panel {

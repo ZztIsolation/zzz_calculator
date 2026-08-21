@@ -106,15 +106,12 @@ assert.equal(stagnantModifiers.find(effect => effect.stat === "anomalyDamageBonu
 assert.equal(stagnantModifiers.some(effect => effect.stat === "enemyDamageTakenBonus"), false)
 assert.equal(stagnant.inCombat.buffTotals.dmgBonus, withoutBoss.inCombat.buffTotals.dmgBonus)
 assert.equal(stagnant.damage.multipliers.dmg, withoutBoss.damage.multipliers.dmg)
-assert.equal(stagnant.damage.multipliers.enemyDamageTaken, withoutBoss.damage.multipliers.enemyDamageTaken)
+assert.equal(Object.hasOwn(stagnant.damage.multipliers, "enemyDamageTaken"), false)
 assert.equal(
     stagnant.damage.whiteBoxRows.find(row => row.label === "增伤乘区")?.value,
     stagnant.damage.multipliers.dmg,
 )
-assert.equal(
-    stagnant.damage.whiteBoxRows.find(row => row.label === "敌方承伤乘区")?.value,
-    withoutBoss.damage.multipliers.enemyDamageTaken,
-)
+assert.equal(stagnant.damage.whiteBoxRows.some(row => row.label === "敌方承伤乘区"), false)
 assert.equal(stagnant.damage.finalDamage, withoutBoss.damage.finalDamage)
 
 const stagnantPhase2Id = "boss_encounter.girtablullu_stagnant_aberrant.v3_1.p2"
@@ -139,7 +136,7 @@ assert.equal(stagnantOneStackModifiers.find(effect => effect.stat === "anomalyDa
 assert.equal(stagnantOneStackModifiers.some(effect => effect.stat === "enemyDamageTakenBonus"), false)
 assert.equal(stagnantOneStack.inCombat.buffTotals.dmgBonus, withoutBoss.inCombat.buffTotals.dmgBonus)
 assert.equal(stagnantOneStack.damage.multipliers.dmg, withoutBoss.damage.multipliers.dmg)
-assert.equal(stagnantOneStack.damage.multipliers.enemyDamageTaken, withoutBoss.damage.multipliers.enemyDamageTaken)
+assert.equal(Object.hasOwn(stagnantOneStack.damage.multipliers, "enemyDamageTaken"), false)
 
 const configuredStagnant = resultFor(stagnantId, {
     [stagnantId]: {
@@ -156,7 +153,7 @@ assert.equal(configuredStagnantModifiers.some(effect => effect.stat === "enemyDa
 assert.equal(configuredStagnant.inCombat.buffTotals.anomalyProficiencyFlat, 60)
 assert.equal(configuredStagnant.inCombat.buffTotals.dmgBonus, withoutBoss.inCombat.buffTotals.dmgBonus)
 assert.equal(configuredStagnant.damage.multipliers.dmg, withoutBoss.damage.multipliers.dmg)
-assert.equal(configuredStagnant.damage.multipliers.enemyDamageTaken, withoutBoss.damage.multipliers.enemyDamageTaken)
+assert.equal(Object.hasOwn(configuredStagnant.damage.multipliers, "enemyDamageTaken"), false)
 
 const deadEndId = "boss_encounter.notorious_dead_end_butcher.v3_1.p1"
 const deadEndBoss = source.bosses.find(boss => boss.id === "boss.notorious_dead_end_butcher")

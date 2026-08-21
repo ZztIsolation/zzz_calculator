@@ -445,6 +445,20 @@ Helper 启动前直接拦截；程序尚未启动时无法自行显示诊断。m
 下载域名，失败后重试主站服务器，GitHub Release 仅作为最后兜底；本地绝区零与云绝区零
 目标均受支持。扫描器包和扫描结果属于发布资源或本地缓存，不作为普通源码提交。
 
+## 第三方服务与致谢
+
+“展柜数据导入”使用 [Enka.Network](https://enka.network/) 提供的绝区零公开角色展柜
+API。感谢 Enka.Network 维护者持续运行该服务并公开
+[绝区零 API 文档](https://github.com/EnkaNetwork/API-docs/blob/master/docs/zzz/api.md)。
+响应结构与生成后的本地映射快照参考
+[EnkaNetwork/API-docs 仓库](https://github.com/EnkaNetwork/API-docs)；快照所对应的
+上游提交由 `data/enka_zzz_mapping.json` 自身记录。
+
+ZZZ 计算器是独立项目，与 Enka.Network 及 HoYoverse 均无官方隶属、合作或背书关系。
+上游仓库公开可见不代表 Enka.Network 整体属于开源项目，本段致谢也不授予任何额外许可。
+正式启用生产环境的“展柜数据导入”前，维护者必须确认 API-docs 派生快照的再分发边界；
+若无法确认，则应改用独立维护的映射数据。
+
 ## 文档
 
 - [建模说明](docs/modeling.md)

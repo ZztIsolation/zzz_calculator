@@ -1,19 +1,25 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue"
-import { NConfigProvider, NMessageProvider, type GlobalThemeOverrides } from "naive-ui"
-import { Calculator, Database, HardDrive, Settings2, UserRound } from "lucide-vue-next"
+import { computed } from "vue"
+import { NAlert, NConfigProvider, NMessageProvider, type GlobalThemeOverrides } from "naive-ui"
+import { Calculator, Database, Download, HardDrive, Settings2, UserRound } from "lucide-vue-next"
+import { useRoute } from "vue-router"
 import { useAccountStore } from "@/stores/account"
 import { useAppConfigStore } from "@/stores/app-config"
 
 const accountStore = useAccountStore()
 const appConfigStore = useAppConfigStore()
+const route = useRoute()
+const props = defineProps<{ startupError?: string }>()
 const maintenanceEnabled = computed(() => appConfigStore.config.maintenanceEnabled)
+const enkaImportEnabled = computed(() => appConfigStore.config.enkaImportEnabled)
+const enkaImportDisabledNotice = computed(() => route.query.notice === "enka-import-disabled")
 
-onMounted(() => {
-  void accountStore.load()
+const currentAccountLabel = computed(() => accountStore.currentOwnerLabel)
+const accountChipText = computed(() => {
+  if (accountStore.loadState === "error") return "账号加载失败"
+  if (currentAccountLabel.value) return `账号 / ${currentAccountLabel.value}`
+  return "账号加载中"
 })
-
-const currentAccountLabel = computed(() => accountStore.currentOwner?.label ?? accountStore.currentOwnerId)
 
 const themeOverrides: GlobalThemeOverrides = {
   common: {
@@ -96,6 +102,10 @@ const themeOverrides: GlobalThemeOverrides = {
               <UserRound :size="16" />
               <span>账号</span>
             </RouterLink>
+            <RouterLink v-if="enkaImportEnabled" to="/import">
+              <Download :size="16" />
+              <span>导入</span>
+            </RouterLink>
             <RouterLink to="/settings">
               <HardDrive :size="16" />
               <span>设置</span>
@@ -105,10 +115,12 @@ const themeOverrides: GlobalThemeOverrides = {
               <span>维护</span>
             </RouterLink>
           </nav>
-          <span class="account-chip">账号 / {{ currentAccountLabel }}</span>
+          <span class="account-chip" aria-live="polite">{{ accountChipText }}</span>
         </header>
         <main class="app-main">
-          <RouterView />
+          <NAlert v-if="props.startupError" type="error" :title="props.startupError" />
+          <NAlert v-if="enkaImportDisabledNotice" type="warning" title="展柜数据导入当前未启用。" />
+          <RouterView v-if="!props.startupError" />
         </main>
         <footer class="site-footer">
           <a

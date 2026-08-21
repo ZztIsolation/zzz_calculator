@@ -13,6 +13,9 @@ import {
     validateScanTelemetryEvent,
 } from "./scanTelemetry.js"
 import { buildMeta, calculateInCombatPanel, calculateOutOfCombatPanel, loadCatalog } from "./calculator.js"
+import { createEnkaProxy, EnkaProxyError } from "./enkaProxy.js"
+import { parseEnkaShowcase } from "../core/enka-import/parse-enka.js"
+import { mapShowcaseToCatalog } from "../core/enka-import/entity-mapping.js"
 import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "../core/driveDiscAnalysis-core.js"
 import { OptimizerCancelledError, optimizeDriveDiscs, optimizeDriveDiscsAsync, previewDriveDiscOptimization } from "./driveDiscOptimizer.js"
 import {
@@ -96,6 +99,7 @@ function envFlag(name) {
 }
 
 const scanTelemetryEnabled = envFlag("SCAN_TELEMETRY_ENABLED") === true
+const enkaImportEnabled = envFlag("ENKA_IMPORT_ENABLED") ?? nodeEnv !== "production"
 const driveDiscReservationsUiEnabled = envFlag("DRIVE_DISC_RESERVATIONS_UI_ENABLED") ?? nodeEnv !== "production"
 const driveDiscExclusionsUiEnabled = envFlag("DRIVE_DISC_EXCLUSIONS_UI_ENABLED") ?? nodeEnv !== "production"
 const scanTelemetryRetentionDays = Math.max(1, Math.min(365, Number(process.env.SCAN_TELEMETRY_RETENTION_DAYS) || 30))
@@ -109,6 +113,13 @@ const scanTelemetryStore = scanTelemetryEnabled
     : null
 const scanTelemetryRateLimitMax = Math.max(1, Math.min(1_000_000, Number(process.env.SCAN_TELEMETRY_RATE_LIMIT_MAX) || 60))
 const allowScanTelemetryRequest = createScanTelemetryRateLimiter({ max: scanTelemetryRateLimitMax, windowMs: 60_000 })
+const enkaProxy = createEnkaProxy({
+    ...(process.env.ENKA_API_BASE_URL ? { baseUrl: process.env.ENKA_API_BASE_URL } : {}),
+    perIpLimit: Math.max(1, Number(process.env.ENKA_IMPORT_IP_RATE_LIMIT) || 10),
+    globalLimit: Math.max(1, Number(process.env.ENKA_IMPORT_GLOBAL_RATE_LIMIT) || 60),
+    maxConcurrent: Math.max(1, Number(process.env.ENKA_IMPORT_MAX_CONCURRENT) || 4),
+    maxQueue: Math.max(0, process.env.ENKA_IMPORT_MAX_QUEUE === undefined ? 32 : Number(process.env.ENKA_IMPORT_MAX_QUEUE) || 0),
+})
 await scanTelemetryStore?.init()
 
 function isMaintenanceEnabled() {
@@ -218,6 +229,7 @@ function createRequestStore(input = {}) {
 }
 
 let catalog = await loadCatalog(dataDir, exampleDir)
+const enkaMapping = JSON.parse(await readFile(path.join(dataDir, "enka_zzz_mapping.json"), "utf8"))
 const optimizerJobs = new Map()
 const OPTIMIZER_JOB_TTL_MS = 10 * 60 * 1000
 
@@ -385,6 +397,16 @@ function sendJson(res, statusCode, payload) {
     applyDefaultCors(res)
     res.writeHead(statusCode, {
         "Content-Type": "application/json; charset=utf-8",
+    })
+    res.end(text)
+}
+
+function sendSameOriginJson(res, statusCode, payload, headers = {}) {
+    const text = JSON.stringify(payload, null, 2)
+    res.writeHead(statusCode, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        ...headers,
     })
     res.end(text)
 }
@@ -2125,6 +2147,7 @@ async function routeApi(req, res, pathname, searchParams) {
         sendJson(res, 200, {
             ok: true,
             service: "zzz_calculator",
+            ...(enkaImportEnabled ? { enkaImport: enkaProxy.metrics() } : {}),
         })
         return
     }
@@ -2134,6 +2157,7 @@ async function routeApi(req, res, pathname, searchParams) {
             maintenanceEnabled: isMaintenanceEnabled(),
             scanTelemetryEnabled,
             scanTelemetryRetentionDays,
+            enkaImportEnabled,
             driveDiscReservationsUiEnabled,
             driveDiscExclusionsUiEnabled,
         })
@@ -2147,6 +2171,49 @@ async function routeApi(req, res, pathname, searchParams) {
 
     if (req.method === "GET" && pathname === "/api/catalog") {
         sendJson(res, 200, catalog)
+        return
+    }
+
+    if (pathname.startsWith("/api/enka/zzz/")) {
+        if (req.method !== "GET") {
+            sendSameOriginJson(res, 405, { ok: false, code: "METHOD_NOT_ALLOWED", error: "Method not allowed." })
+            return
+        }
+        if (!enkaImportEnabled) {
+            sendSameOriginJson(res, 404, { ok: false, code: "FEATURE_DISABLED", error: "Enka 导入功能未启用。" })
+            return
+        }
+        if (req.headers.origin && !isSameOriginRequest(req)) {
+            sendSameOriginJson(res, 403, { ok: false, code: "SAME_ORIGIN_REQUIRED", error: "Same-origin request required." })
+            return
+        }
+        const uid = pathname.slice("/api/enka/zzz/".length)
+        try {
+            const upstream = await enkaProxy.request(uid, { ip: requestClientIp(req) })
+            const parsed = parseEnkaShowcase(upstream.showcase)
+            const mapped = mapShowcaseToCatalog(parsed, catalog, enkaMapping, { uid })
+            sendSameOriginJson(res, 200, {
+                ok: true,
+                uid,
+                cache: upstream.cache,
+                ttlSeconds: upstream.ttlSeconds,
+                agents: mapped.mappedAgents,
+                skippedAgents: mapped.skippedAgents,
+                warnings: mapped.warnings.map(message => ({ code: "IMPORT_WARNING", message })),
+            })
+        } catch (error) {
+            if (error instanceof EnkaProxyError) {
+                sendSameOriginJson(res, error.status, {
+                    ok: false,
+                    code: error.code,
+                    error: error.message,
+                    retryAfter: error.retryAfter,
+                }, error.retryAfter ? { "Retry-After": String(error.retryAfter) } : {})
+            } else {
+                console.error("Enka proxy failed:", error instanceof Error ? error.message : String(error))
+                sendSameOriginJson(res, 502, { ok: false, code: "PROXY_FAILED", error: "Enka 代理请求失败，请稍后重试。" })
+            }
+        }
         return
     }
 

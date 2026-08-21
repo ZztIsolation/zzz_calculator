@@ -1475,4 +1475,73 @@ describe("build store", () => {
     expect(store.damageConfig.selectedEventId).toBe("sheer-1")
     expect(store.damageConfig.events[0].kind).toBe("sheer")
   })
+
+  it("serializes ordinary build persistence with the drive disc import lock", async () => {
+    const originalLocks = Object.getOwnPropertyDescriptor(navigator, "locks")
+    const requestedLocks: string[] = []
+    Object.defineProperty(navigator, "locks", {
+      configurable: true,
+      value: {
+        request: async (name: string, callback: () => unknown) => {
+          requestedLocks.push(name)
+          return callback()
+        },
+      },
+    })
+    try {
+      const store = useBuildStore()
+      store.agentId = "agent_a"
+      store.agentLevel = 60
+
+      await store.persist()
+
+      expect(requestedLocks).toEqual([
+        "zzz-drive-disc-import:store",
+        "zzz-drive-disc-import:default",
+      ])
+      const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "{}")
+      expect(saved.byOwner.default.byAgent.agent_a.agentLevel).toBe(60)
+    } finally {
+      if (originalLocks) Object.defineProperty(navigator, "locks", originalLocks)
+      else Reflect.deleteProperty(navigator, "locks")
+    }
+  })
+
+  it("rejects a queued build save when an import changes the selection documents first", async () => {
+    const originalLocks = Object.getOwnPropertyDescriptor(navigator, "locks")
+    let releaseGlobalLock!: () => void
+    const globalLockGate = new Promise<void>(resolve => {
+      releaseGlobalLock = resolve
+    })
+    Object.defineProperty(navigator, "locks", {
+      configurable: true,
+      value: {
+        request: async (name: string, callback: () => unknown) => {
+          if (name === "zzz-drive-disc-import:store") await globalLockGate
+          return callback()
+        },
+      },
+    })
+    try {
+      const store = useBuildStore()
+      store.agentId = "agent_a"
+      store.agentLevel = 50
+      const save = store.persist()
+      await Promise.resolve()
+      localStorage.setItem("zzz-calculator.webapp.build.v1", JSON.stringify({
+        version: 2,
+        currentOwnerId: "default",
+        byOwner: { default: { currentAgentId: "agent_a", byAgent: { agent_a: { agentLevel: 60 } } } },
+      }))
+      releaseGlobalLock()
+
+      await expect(save).rejects.toThrow("配置在保存期间被导入或其他页面更新")
+      const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "{}")
+      expect(saved.byOwner.default.byAgent.agent_a.agentLevel).toBe(60)
+      expect(store.error).toContain("配置在保存期间被导入或其他页面更新")
+    } finally {
+      if (originalLocks) Object.defineProperty(navigator, "locks", originalLocks)
+      else Reflect.deleteProperty(navigator, "locks")
+    }
+  })
 })

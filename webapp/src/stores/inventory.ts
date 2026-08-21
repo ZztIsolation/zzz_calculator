@@ -4,14 +4,18 @@ import {
   deleteDriveDiscLoadout,
   deleteUserDriveDisc,
   exportCurrentUserDriveDiscs,
-  importScannerExportToStore,
   loadCurrentUserDriveDiscStore,
-  previewScannerExportImport,
+  loadUserDriveDiscStore,
+  planScannerExportImport,
   setDriveDiscExclusions,
   setDriveDiscReservations,
   upsertDriveDiscLoadout,
   upsertUserDriveDisc,
 } from "@runtime/local-store.js"
+import {
+  commitDriveDiscImportPlan,
+  freezeDriveDiscInventoryImportPlan,
+} from "@runtime/drive-disc-import-transaction"
 import { toCalculatorDriveDisc } from "@core/drive-disc-core.js"
 import { driveDiscUsageStateForAgent } from "@core/inventory-model.js"
 import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "@core/driveDiscAnalysis-core.js"
@@ -45,7 +49,7 @@ const SCAN_CLIENTS = {
   },
 } as const
 
-type ScanStatus = "idle" | "connecting" | "waiting-helper" | "preparing" | "downloading" | "ready" | "scanning" | "stopping" | "complete" | "warning" | "error"
+type ScanStatus = "idle" | "connecting" | "waiting-helper" | "preparing" | "downloading" | "ready" | "scanning" | "stopping" | "review" | "complete" | "warning" | "error"
 type ScanClient = keyof typeof SCAN_CLIENTS
 type ScanPhase = "a" | "b" | "c" | "d"
 type ScanErrorContext = "" | "prepare" | "scan" | "helper-missing" | "helper-outdated" | "helper-rejected" | "browser-permission" | "browser-websocket" | "game-not-found"
@@ -248,6 +252,11 @@ export const useInventoryStore = defineStore("inventory", {
     restrictionAgentFilter: "",
     search: "",
     importPreview: null as any,
+    importPlan: null as any,
+    importDraft: null as any,
+    importResolutions: {} as Record<string, any>,
+    importApplying: false,
+    importResolving: false,
     importSummary: null as any,
     scanStatus: "idle" as ScanStatus,
     scanMessage: "",
@@ -281,6 +290,14 @@ export const useInventoryStore = defineStore("inventory", {
   getters: {
     driveDiscs: state => state.store?.driveDiscs ?? [],
     loadouts: state => state.store?.driveDiscLoadouts ?? [],
+    loadoutsForAgent: state => (agentId: string) => {
+      const normalizedAgentId = String(agentId ?? "")
+      if (!normalizedAgentId) {
+        return []
+      }
+      return (state.store?.driveDiscLoadouts ?? [])
+        .filter((loadout: any) => String(loadout?.agentId ?? "") === normalizedAgentId)
+    },
     imports: state => state.store?.imports ?? [],
     slotCounts: state => {
       const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
@@ -348,7 +365,7 @@ export const useInventoryStore = defineStore("inventory", {
       })
     },
     scanCanStart: state => Boolean(state.scanConnected)
-      && !["connecting", "waiting-helper", "preparing", "downloading", "scanning", "stopping"].includes(state.scanStatus),
+      && !["connecting", "waiting-helper", "preparing", "downloading", "scanning", "stopping", "review"].includes(state.scanStatus),
     scanPreparing: state => ["connecting", "preparing", "downloading"].includes(state.scanStatus),
     scanWaitingForHelper: state => state.scanStatus === "waiting-helper",
     hasDriveDiscs: state => (state.store?.driveDiscs ?? []).length > 0,
@@ -357,7 +374,7 @@ export const useInventoryStore = defineStore("inventory", {
     scanHelperCanSelfUpdate: state => state.scanHelperProtocolVersion >= 3,
     scanPhase(state): ScanPhase {
       const status = state.scanStatus
-      if (["scanning", "stopping", "complete", "warning"].includes(status)) {
+      if (["scanning", "stopping", "review", "complete", "warning"].includes(status)) {
         return "d"
       }
       if (status === "ready") {
@@ -427,9 +444,16 @@ export const useInventoryStore = defineStore("inventory", {
         this.loading = false
       }
     },
+    // Full (all-owners) store + current owner id, for building an Enka drive-disc plan.
+    async fullStoreWithOwner() {
+      const store = await loadUserDriveDiscStore()
+      return { store, ownerId: String(store?.currentOwnerId ?? "default") }
+    },
     calculatorDriveDiscs(options: any = {}) {
       const selected = new Map<number, any>()
       const mode = options.mode ?? "loadout"
+      const enforceAgentId = options.agentId !== undefined
+      const agentId = String(options.agentId ?? "")
       const resultDiscs = Array.isArray(options.optimizedDriveDiscs) ? options.optimizedDriveDiscs : []
       if (mode === "optimized" && resultDiscs.length) {
         return resultDiscs.map((disc: any) => toCalculatorDriveDisc(disc)).filter(Boolean)
@@ -444,7 +468,8 @@ export const useInventoryStore = defineStore("inventory", {
         }
       } else if (mode === "loadout") {
         const loadout = options.loadoutId
-          ? this.loadouts.find((item: any) => item.id === options.loadoutId)
+          ? this.loadouts.find((item: any) => item.id === options.loadoutId
+            && (!enforceAgentId || (agentId && String(item?.agentId ?? "") === agentId)))
           : null
         const idsBySlot = loadout?.driveDiscIdsBySlot ?? loadout?.idsBySlot ?? null
         if (idsBySlot) {
@@ -549,28 +574,100 @@ export const useInventoryStore = defineStore("inventory", {
       this.store = result.store
       await this.load()
     },
+    createImportDraft(payload: any, removeMissing = false, sourcePath = "webapp-paste", removeMissingRarities: string[] | null = null) {
+      const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
+      return {
+        payload: clone(payload),
+        options: {
+          removeMissing,
+          sourcePath,
+          removeMissingRarities: clone(removeMissingRarities),
+          importedAt: new Date().toISOString(),
+          importId: `drive-disc-import-${nonce}`,
+        },
+        resolutions: {} as Record<string, any>,
+      }
+    },
+    async createFrozenImportPlan(draft: any) {
+      const inventoryPlan = await planScannerExportImport(clone(draft.payload), {
+        ...clone(draft.options),
+        resolutions: clone(draft.resolutions ?? {}),
+      })
+      return freezeDriveDiscInventoryImportPlan(inventoryPlan, {
+        transactionId: globalThis.crypto?.randomUUID?.(),
+      })
+    },
     async previewImportPayload(payload: any, removeMissing = false, sourcePath = "webapp-paste", removeMissingRarities: string[] | null = null) {
-      this.importPreview = await previewScannerExportImport(payload, { removeMissing, sourcePath, removeMissingRarities })
+      const draft = this.createImportDraft(payload, removeMissing, sourcePath, removeMissingRarities)
+      const plan = await this.createFrozenImportPlan(draft)
+      this.importDraft = draft
+      this.importResolutions = {}
+      this.importPlan = plan
+      this.importPreview = plan.preview
       return this.importPreview
     },
     async previewImportText(text: string, removeMissing = false) {
       const payload = JSON.parse(text)
       return this.previewImportPayload(payload, removeMissing, "webapp-paste")
     },
-    async importScannerPayload(payload: any, removeMissing = false, sourcePath = "webapp-paste", removeMissingRarities: string[] | null = null) {
-      // Scanner exports are JSON data. Snapshotting here strips Vue proxies before IndexedDB cloning.
-      const importPayload = JSON.parse(JSON.stringify(payload))
-      const importOptions = { removeMissing, sourcePath, removeMissingRarities }
-      this.importPreview = await previewScannerExportImport(importPayload, importOptions)
-      const store = await importScannerExportToStore(importPayload, importOptions)
-      this.store = store
-      this.importSummary = store.lastImportSummary ?? null
+    clearImportPreview() {
+      this.importPreview = null
+      this.importPlan = null
+      this.importDraft = null
+      this.importResolutions = {}
+    },
+    async resolveImportConflict(resolution: any) {
+      if (!this.importDraft || this.importApplying || this.importResolving) return
+      this.importResolving = true
+      try {
+        const resolutions = {
+          ...(this.importDraft.resolutions ?? {}),
+          [resolution.key]: resolution.action === "update"
+            ? { action: "update", existingId: resolution.existingId }
+            : { action: "add" },
+        }
+        const draft = { ...this.importDraft, resolutions }
+        const plan = await this.createFrozenImportPlan(draft)
+        this.importDraft = draft
+        this.importResolutions = resolutions
+        this.importPlan = plan
+        this.importPreview = plan.preview
+      } finally {
+        this.importResolving = false
+      }
+    },
+    async commitFrozenImport(plan: any) {
+      await commitDriveDiscImportPlan(plan)
+      this.importSummary = clone(plan.summary)
       await this.load()
       return this.importSummary
     },
+    async confirmImportPreview() {
+      if (!this.importPlan) throw new Error("请先预览驱动盘导入。")
+      if (this.importPlan.hasUnresolvedConflicts) throw new Error("仍有疑似同盘需要确认。")
+      if (this.importApplying) throw new Error("驱动盘导入正在提交，请稍候。")
+      this.importApplying = true
+      try {
+        const summary = await this.commitFrozenImport(this.importPlan)
+        this.clearImportPreview()
+        return summary
+      } finally {
+        this.importApplying = false
+      }
+    },
+    async importScannerPayload(payload: any, removeMissing = false, sourcePath = "webapp-paste", removeMissingRarities: string[] | null = null) {
+      const draft = this.createImportDraft(payload, removeMissing, sourcePath, removeMissingRarities)
+      const plan = await this.createFrozenImportPlan(draft)
+      this.importPreview = plan.preview
+      if (plan.hasUnresolvedConflicts) {
+        return { ...clone(plan.summary), reviewRequired: true, plan, draft }
+      }
+      return this.commitFrozenImport(plan)
+    },
     async importScannerJson(text: string, removeMissing = false) {
       const payload = JSON.parse(text)
-      return this.importScannerPayload(payload, removeMissing, "webapp-paste")
+      await this.previewImportPayload(payload, removeMissing, "webapp-paste")
+      return this.confirmImportPreview()
     },
     async importScannerFile(file: File, removeMissing = false) {
       const text = await file.text()
@@ -580,7 +677,19 @@ export const useInventoryStore = defineStore("inventory", {
       if (!this.scanSession?.payload) {
         throw new Error("没有可导入的扫描结果。")
       }
+      if (this.scanSession.plan) return this.confirmScanImport()
       const summary = await this.importScannerPayload(this.scanSession.payload, removeMissing, "webapp-scan")
+      if (summary?.reviewRequired) {
+        this.scanSession = {
+          ...this.scanSession,
+          plan: summary.plan,
+          importDraft: summary.draft,
+          resolutions: {},
+          preview: summary.plan.preview,
+        }
+        this.scanStatus = "review"
+        return summary
+      }
       this.scanSession = {
         ...this.scanSession,
         imported: true,
@@ -589,6 +698,60 @@ export const useInventoryStore = defineStore("inventory", {
       }
       this.scanMessage = "扫描结果已导入仓库"
       return summary
+    },
+    async resolveScanConflict(resolution: any) {
+      const currentDraft = this.scanSession?.importDraft
+      if (!currentDraft || this.importApplying || this.importResolving) return
+      this.importResolving = true
+      try {
+        const resolutions = {
+          ...(currentDraft.resolutions ?? {}),
+          [resolution.key]: resolution.action === "update"
+            ? { action: "update", existingId: resolution.existingId }
+            : { action: "add" },
+        }
+        const draft = { ...currentDraft, resolutions }
+        const plan = await this.createFrozenImportPlan(draft)
+        this.scanSession = {
+          ...this.scanSession,
+          plan,
+          importDraft: draft,
+          resolutions,
+          preview: plan.preview,
+        }
+      } finally {
+        this.importResolving = false
+      }
+    },
+    async confirmScanImport() {
+      const plan = this.scanSession?.plan
+      if (!plan) throw new Error("没有待确认的扫描导入计划。")
+      if (plan.hasUnresolvedConflicts) throw new Error("仍有疑似同盘需要确认。")
+      if (this.importApplying) return null
+      this.importApplying = true
+      try {
+        const summary = await this.commitFrozenImport(plan)
+        this.scanSession = {
+          ...this.scanSession,
+          plan: null,
+          importDraft: null,
+          imported: true,
+          importedAt: new Date().toISOString(),
+          summary,
+        }
+        this.scanStatus = "complete"
+        this.scanMessage = `扫描导入完成：新增 ${summary?.added ?? 0}，更新 ${summary?.updated ?? 0}，未变 ${summary?.skipped ?? 0}`
+        this.scanProgressText = "扫描完成，已导入"
+        return summary
+      } finally {
+        this.importApplying = false
+      }
+    },
+    discardScanImportReview() {
+      this.scanSession = null
+      this.scanStatus = this.scanConnected ? "ready" : "idle"
+      this.scanMessage = this.scanConnected ? "已放弃本次扫描结果，可以重新扫描" : "已放弃本次扫描结果"
+      this.scanProgressText = this.scanMessage
     },
     analyze(catalog: any, input: any, view: "diff" | "substats" | "gains" = "diff") {
       if (view === "substats") {
@@ -822,6 +985,29 @@ export const useInventoryStore = defineStore("inventory", {
         const removeMissing = partial ? false : requestedRemoveMissing
         const sourcePath = partial ? "webapp-scan-partial" : "webapp-scan"
         const summary = await this.importScannerPayload(retainedItems, removeMissing, sourcePath, removeMissing ? ["S"] : null)
+        if (summary?.reviewRequired) {
+          this.scanSession = {
+            ...this.scanSession,
+            preview: summary.plan.preview,
+            plan: summary.plan,
+            importDraft: summary.draft,
+            resolutions: {},
+            imported: false,
+            summary: summary.plan.summary,
+          }
+          this.scanRemoveMissing = false
+          this.scanStatus = "review"
+          this.scanFailure = null
+          this.scanErrorContext = ""
+          this.scanMessage = `扫描完成，发现 ${summary.plan.conflicts.length} 张疑似同盘，请确认处理方式`
+          this.scanProgressText = this.scanMessage
+          finishActiveScanTelemetry("completed", {
+            counters: envelope,
+            versions: currentScannerVersions(scanner, this.scanHelperVersion, this.scanHelperProtocolVersion, envelope),
+            diagnostics: envelope?.diagnostics,
+          })
+          return
+        }
         this.scanSession = {
           ...this.scanSession,
           preview: this.importPreview,
@@ -1181,18 +1367,20 @@ export const useInventoryStore = defineStore("inventory", {
       }
     },
     async openScannerPanel() {
-      if (scanner?.scanning || (this.scanConnected && this.scanStatus === "ready")) {
+      if (this.scanStatus === "review" || scanner?.scanning || (this.scanConnected && this.scanStatus === "ready")) {
         return
       }
       await this.connectScanner()
     },
     closeScannerPanel() {
       this.stopScannerPolling()
+      const preserveReview = this.scanStatus === "review"
       if (scanner && !scanner.scanning) {
         scanner.disconnect()
         scanner = null
         this.scanConnected = false
       }
+      if (preserveReview) return
       if (this.scanStatus !== "complete" && this.scanStatus !== "scanning") {
         this.scanStatus = "idle"
         this.scanMessage = ""
@@ -1246,6 +1434,10 @@ export const useInventoryStore = defineStore("inventory", {
       return ["S"]
     },
     async startScan() {
+      if (this.scanStatus === "review") {
+        this.scanMessage = "请先确认或放弃当前扫描导入。"
+        return
+      }
       const rarities = this.selectedScanRarities()
       if (!scanner?.connected) {
         await this.connectScanner()
@@ -1331,6 +1523,25 @@ export const useInventoryStore = defineStore("inventory", {
           safePartial ? "webapp-scan-partial" : "webapp-scan-retry",
           removeMissing ? ["S"] : null,
         )
+        if (summary?.reviewRequired) {
+          this.scanSession = {
+            ...this.scanSession,
+            preview: summary.plan.preview,
+            plan: summary.plan,
+            importDraft: summary.draft,
+            resolutions: {},
+            imported: false,
+            summary: summary.plan.summary,
+            error: "",
+          }
+          this.scanStatus = "review"
+          this.scanFailure = null
+          this.scanErrorContext = ""
+          this.scanProgressPercent = 100
+          this.scanProgressText = `发现 ${summary.plan.conflicts.length} 张疑似同盘，请确认处理方式`
+          this.scanMessage = this.scanProgressText
+          return
+        }
         this.scanSession = {
           ...this.scanSession,
           preview: this.importPreview,

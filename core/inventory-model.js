@@ -1,3 +1,5 @@
+import { recordNonEnkaBindingSessionChanges } from "./enka-import/binding-session.js"
+
 const DRIVE_DISC_SET_ALIASES = {
     "雪兔梦游仙境": { id: "zzz_wiki_1907", name: { zhCN: "雪兔梦游仙境" } },
     "囚徒手记": { id: "zzz_wiki_1906", name: { zhCN: "囚徒手记" } },
@@ -33,6 +35,8 @@ const DRIVE_DISC_SET_ALIASES = {
 
 export const DRIVE_DISC_EXPORT_FORMAT = "zzz-calculator-drive-disc-export"
 export const DRIVE_DISC_EXPORT_VERSION = 1
+export const DRIVE_DISC_FINGERPRINT_VERSION = 2
+export const DRIVE_DISC_PROVENANCE_VERSION = 1
 
 const STAT_LABELS = {
     "生命值": { flat: "hpFlat", pct: "hpPct" },
@@ -53,6 +57,9 @@ const STAT_LABELS = {
     "以太伤害加成": { pct: "etherDmg" },
     "风属性伤害加成": { pct: "windDmg" },
 }
+const KNOWN_DRIVE_DISC_STATS = new Set(
+    Object.values(STAT_LABELS).flatMap(modes => Object.values(modes)),
+)
 
 function stableStringify(value) {
     if (Array.isArray(value)) {
@@ -100,38 +107,239 @@ function statFingerprintEntry(stat, { includeValue = true } = {}) {
         stat: stat?.stat ?? "unknown",
         mode: stat?.mode ?? "unknown",
     }
+    if (entry.stat === "unknown" || entry.mode === "unknown") {
+        entry.rawIdentity = {
+            propertyId: String(stat?.raw?.propertyId ?? stat?.propertyId ?? "").trim(),
+            label: String(stat?.label ?? "").trim(),
+            rawValue: stat?.rawValue ?? stat?.raw?.propertyValue ?? null,
+        }
+    }
     if (includeValue) {
         entry.value = normalizedStatValue(stat?.value)
     }
     return entry
 }
 
-export function driveDiscContentFingerprint(disc, options = {}) {
-    return hashWith(options, stableStringify({
-        setName: disc?.setName ?? "",
+export function hasUnknownDriveDiscStat(disc) {
+    const stats = [disc?.mainStat, ...(disc?.subStats ?? [])]
+    return stats.some(stat => {
+        const statKey = String(stat?.stat ?? "").trim()
+        return !stat
+            || !KNOWN_DRIVE_DISC_STATS.has(statKey)
+            || (stat.mode != null && String(stat.mode).trim() === "unknown")
+    })
+}
+
+function localizedText(value) {
+    if (typeof value === "string") return value.trim()
+    if (!value || typeof value !== "object") return ""
+    return String(value.zhCN ?? value.en ?? Object.values(value).find(item => typeof item === "string") ?? "").trim()
+}
+
+function canonicalSetKey(disc) {
+    const setId = String(disc?.setId ?? "").trim()
+    if (setId && !setId.startsWith("scanner-set-")) return `id:${setId}`
+    return `name:${localizedText(disc?.canonicalSetName) || String(disc?.setName ?? "").trim()}`
+}
+
+function sortedStatFingerprintEntries(stats, options = {}) {
+    return (stats ?? [])
+        .map(stat => statFingerprintEntry(stat, options))
+        .sort((left, right) => stableStringify(left).localeCompare(stableStringify(right)))
+}
+
+export function canonicalDriveDiscContent(disc) {
+    return {
+        set: canonicalSetKey(disc),
         partition: Number(disc?.partition ?? 0),
-        rarity: String(disc?.rarity ?? ""),
+        rarity: String(disc?.rarity ?? "").trim().toUpperCase(),
         level: Number(disc?.level ?? 0),
         mainStat: statFingerprintEntry(disc?.mainStat, { includeValue: true }),
-        subStats: (disc?.subStats ?? []).map(stat => statFingerprintEntry(stat, { includeValue: true })),
-    }))
+        subStats: sortedStatFingerprintEntries(disc?.subStats, { includeValue: true }),
+    }
+}
+
+export function canonicalDriveDiscIdentity(disc) {
+    return {
+        set: canonicalSetKey(disc),
+        partition: Number(disc?.partition ?? 0),
+        rarity: String(disc?.rarity ?? "").trim().toUpperCase(),
+        mainStat: statFingerprintEntry(disc?.mainStat, { includeValue: false }),
+        subStats: sortedStatFingerprintEntries(disc?.subStats, { includeValue: false }),
+    }
+}
+
+export function driveDiscContentFingerprint(disc, options = {}) {
+    return `v${DRIVE_DISC_FINGERPRINT_VERSION}:${hashWith(options, stableStringify(canonicalDriveDiscContent(disc)))}`
 }
 
 export function driveDiscIdentityFingerprint(disc, options = {}) {
-    return hashWith(options, stableStringify({
-        setName: disc?.setName ?? "",
-        partition: Number(disc?.partition ?? 0),
-        rarity: String(disc?.rarity ?? ""),
-        mainStat: statFingerprintEntry(disc?.mainStat, { includeValue: false }),
-        subStats: (disc?.subStats ?? []).map(stat => statFingerprintEntry(stat, { includeValue: false })),
-    }))
+    return `v${DRIVE_DISC_FINGERPRINT_VERSION}:${hashWith(options, stableStringify(canonicalDriveDiscIdentity(disc)))}`
+}
+
+export function sameDriveDiscContent(left, right) {
+    return stableStringify(canonicalDriveDiscContent(left)) === stableStringify(canonicalDriveDiscContent(right))
+}
+
+export function sameDriveDiscIdentity(left, right) {
+    return stableStringify(canonicalDriveDiscIdentity(left)) === stableStringify(canonicalDriveDiscIdentity(right))
 }
 
 export function withDriveDiscFingerprints(disc, options = {}) {
     const next = { ...(disc ?? {}) }
+    next.fingerprintVersion = DRIVE_DISC_FINGERPRINT_VERSION
     next.contentFingerprint = driveDiscContentFingerprint(next, options)
     next.identityFingerprint = driveDiscIdentityFingerprint(next, options)
     return next
+}
+
+function timeValue(value, fallback = null) {
+    const text = String(value ?? "").trim()
+    return text || fallback
+}
+
+function legacyProvenance(disc) {
+    const source = disc?.source ?? {}
+    const provenance = disc?.provenance?.version === DRIVE_DISC_PROVENANCE_VERSION
+        ? cloneJsonValue(disc.provenance)
+        : { version: DRIVE_DISC_PROVENANCE_VERSION }
+    const sourceType = String(source.type ?? "")
+    const sequenceOnlyScanner = !sourceType
+        && source.sequence != null
+        && String(source.sequence).trim() !== ""
+    const firstSeenAt = timeValue(source.importedAt, disc?.createdAt ?? null)
+    const lastSeenAt = timeValue(source.matchedAt, source.importedAt ?? disc?.updatedAt ?? firstSeenAt)
+
+    if (["enka-zzz-showcase", "enka-showcase"].includes(sourceType)
+        || (source.uid != null && source.equipmentUid != null)) {
+        provenance.enkaZzz = {
+            ...(provenance.enkaZzz ?? {}),
+            uid: String(source.uid ?? provenance.enkaZzz?.uid ?? ""),
+            equipmentUid: String(source.equipmentUid ?? provenance.enkaZzz?.equipmentUid ?? ""),
+            ...(source.equipmentId != null ? { equipmentId: String(source.equipmentId) } : {}),
+            ...(source.agentId != null ? { lastAgentId: String(source.agentId) } : {}),
+            firstSeenAt: provenance.enkaZzz?.firstSeenAt ?? firstSeenAt,
+            lastSeenAt: provenance.enkaZzz?.lastSeenAt ?? lastSeenAt,
+        }
+    }
+    if (["zzz-scanner", "scanner"].includes(sourceType) || sequenceOnlyScanner) {
+        provenance.scanner = {
+            ...(provenance.scanner ?? {}),
+            firstSeenAt: provenance.scanner?.firstSeenAt ?? firstSeenAt,
+            lastSeenAt: provenance.scanner?.lastSeenAt ?? lastSeenAt,
+            lastImportId: source.importId ?? provenance.scanner?.lastImportId ?? null,
+            lastSourcePath: source.sourcePath ?? provenance.scanner?.lastSourcePath ?? null,
+            lastSequence: source.sequence ?? provenance.scanner?.lastSequence ?? null,
+            lastRawIndex: source.rawIndex ?? provenance.scanner?.lastRawIndex ?? null,
+        }
+    }
+    if (sourceType === "calculator-json") {
+        provenance.calculatorJson = {
+            ...(provenance.calculatorJson ?? {}),
+            firstSeenAt: provenance.calculatorJson?.firstSeenAt ?? firstSeenAt,
+            lastSeenAt: provenance.calculatorJson?.lastSeenAt ?? lastSeenAt,
+            lastImportId: source.importId ?? provenance.calculatorJson?.lastImportId ?? null,
+            sourceRecordId: source.sourceRecordId ?? provenance.calculatorJson?.sourceRecordId ?? disc?.id ?? null,
+        }
+    }
+    if (sourceType === "manual") {
+        provenance.manual = {
+            ...(provenance.manual ?? {}),
+            lastEditedAt: provenance.manual?.lastEditedAt ?? timeValue(disc?.updatedAt, firstSeenAt),
+        }
+    }
+    return provenance
+}
+
+export function mergeDriveDiscProvenance(left, right) {
+    const current = left?.version === DRIVE_DISC_PROVENANCE_VERSION ? cloneJsonValue(left) : { version: DRIVE_DISC_PROVENANCE_VERSION }
+    const incoming = right?.version === DRIVE_DISC_PROVENANCE_VERSION ? right : {}
+    const mergeSeen = (before, after) => after ? {
+        ...(before ?? {}),
+        ...cloneJsonValue(after),
+        firstSeenAt: before?.firstSeenAt ?? after.firstSeenAt ?? null,
+        lastSeenAt: after.lastSeenAt ?? before?.lastSeenAt ?? null,
+    } : before
+    return {
+        ...current,
+        version: DRIVE_DISC_PROVENANCE_VERSION,
+        ...(incoming.enkaZzz || current.enkaZzz ? { enkaZzz: mergeSeen(current.enkaZzz, incoming.enkaZzz) } : {}),
+        ...(incoming.scanner || current.scanner ? { scanner: mergeSeen(current.scanner, incoming.scanner) } : {}),
+        ...(incoming.calculatorJson || current.calculatorJson
+            ? { calculatorJson: mergeSeen(current.calculatorJson, incoming.calculatorJson) }
+            : {}),
+        ...(incoming.manual || current.manual ? { manual: { ...(current.manual ?? {}), ...(incoming.manual ?? {}) } } : {}),
+    }
+}
+
+export function projectDriveDiscSource(provenance, fallback = null) {
+    if (provenance?.enkaZzz) {
+        return {
+            type: "enka-zzz-showcase",
+            uid: provenance.enkaZzz.uid,
+            equipmentUid: provenance.enkaZzz.equipmentUid,
+            ...(provenance.enkaZzz.equipmentId ? { equipmentId: provenance.enkaZzz.equipmentId } : {}),
+            ...(provenance.enkaZzz.lastAgentId ? { agentId: provenance.enkaZzz.lastAgentId } : {}),
+        }
+    }
+    if (provenance?.scanner) {
+        return {
+            type: "zzz-scanner",
+            importId: provenance.scanner.lastImportId ?? null,
+            sourcePath: provenance.scanner.lastSourcePath ?? null,
+            sequence: provenance.scanner.lastSequence ?? null,
+            rawIndex: provenance.scanner.lastRawIndex ?? null,
+        }
+    }
+    if (provenance?.calculatorJson) {
+        return {
+            type: "calculator-json",
+            importId: provenance.calculatorJson.lastImportId ?? null,
+            sourceRecordId: provenance.calculatorJson.sourceRecordId ?? null,
+        }
+    }
+    if (provenance?.manual) return { type: "manual" }
+    return fallback ?? null
+}
+
+function convertLegacyEnkaStatUnits(disc) {
+    if (Number(disc?.statUnitVersion ?? 0) >= 2) return disc
+    const normalizeStat = stat => stat?.mode === "pct"
+        ? { ...stat, value: normalizedStatValue(Number(stat.value ?? 0) * 100) }
+        : stat
+    return {
+        ...disc,
+        statUnitVersion: 2,
+        mainStat: normalizeStat(disc.mainStat),
+        subStats: (disc.subStats ?? []).map(normalizeStat),
+    }
+}
+
+function normalizeLegacyEnkaStatUnits(disc) {
+    const sourceType = String(disc?.source?.type ?? "")
+    const isEnka = ["enka-zzz-showcase", "enka-showcase"].includes(sourceType)
+        || disc?.provenance?.enkaZzz
+    return isEnka ? convertLegacyEnkaStatUnits(disc) : disc
+}
+
+export function migrateConfirmedLegacyEnkaStatUnits(disc) {
+    return convertLegacyEnkaStatUnits(disc)
+}
+
+export function withDriveDiscProvenance(disc, options = {}) {
+    const normalizedUnits = normalizeLegacyEnkaStatUnits(disc ?? {})
+    const provenance = legacyProvenance(normalizedUnits)
+    const pendingLegacyEnkaMigration = /^enka-(?!zzz:)/.test(String(normalizedUnits?.id ?? ""))
+        && !provenance.enkaZzz
+        && Number(normalizedUnits?.statUnitVersion ?? 0) < 2
+    const next = {
+        ...normalizedUnits,
+        provenance,
+        source: projectDriveDiscSource(provenance, normalizedUnits.source),
+    }
+    if (!pendingLegacyEnkaMigration) next.statUnitVersion = 2
+    else if (!Object.prototype.hasOwnProperty.call(normalizedUnits, "statUnitVersion")) delete next.statUnitVersion
+    return withDriveDiscFingerprints(next, options)
 }
 
 function cleanReservedForAgentId(value) {
@@ -294,7 +502,7 @@ export function normalizeInventoryStore(store, options = {}) {
         owners: safeOwners,
         imports: Array.isArray(store?.imports) ? store.imports : [],
         driveDiscs: Array.isArray(store?.driveDiscs)
-            ? store.driveDiscs.map(disc => withDriveDiscFingerprints(
+            ? store.driveDiscs.map(disc => withDriveDiscProvenance(
                 normalizeDriveDiscUsageRestrictions(normalizeDriveDiscSetAlias(disc, options)),
                 options,
             ))
@@ -340,7 +548,7 @@ export function createDriveDiscExport(store, options = {}) {
         format: DRIVE_DISC_EXPORT_FORMAT,
         version: DRIVE_DISC_EXPORT_VERSION,
         exportedAt: options.exportedAt ?? nowIso(),
-        sourceAccount: { label: owner.label },
+        sourceAccount: { id: owner.id, label: owner.label },
         driveDiscs: normalized.driveDiscs
             .filter(item => (item.ownerId ?? "default") === ownerId)
             .map(driveDiscForExport),
@@ -380,7 +588,10 @@ function parseScannerValue(rawValue) {
 }
 
 function resolveStat(label, mode) {
-    const entry = STAT_LABELS[label]
+    const normalizedLabel = String(label ?? "").trim()
+        .replace(/%$/, "")
+        .replace(/^物理属性伤害加成$/, "物理伤害加成")
+    const entry = STAT_LABELS[normalizedLabel]
     return entry ? entry[mode] ?? entry.flat ?? entry.pct ?? null : null
 }
 
@@ -438,7 +649,7 @@ function normalizeScannerItem(rawItem, index, options, warnings) {
         },
         raw: rawItem,
     }, options)
-    const withFingerprints = withDriveDiscFingerprints(normalized, options)
+    const withFingerprints = withDriveDiscProvenance(normalized, options)
     return { ...withFingerprints, id: `scanner-${withFingerprints.contentFingerprint}` }
 }
 
@@ -517,7 +728,7 @@ function normalizeNativeDriveDisc(rawItem, index, options) {
         identityFingerprint: _identityFingerprint,
         ...record
     } = cloneJsonValue(rawItem)
-    return withDriveDiscFingerprints(normalizeDriveDiscUsageRestrictions(normalizeDriveDiscSetAlias({
+    const normalized = withDriveDiscProvenance(normalizeDriveDiscUsageRestrictions(normalizeDriveDiscSetAlias({
         ...record,
         id,
         ownerId: options.ownerId,
@@ -532,6 +743,24 @@ function normalizeNativeDriveDisc(rawItem, index, options) {
             normalizeNativeStat(stat, `${context}.subStats[${statIndex}]`)
         ),
     }, options)), options)
+    const observedAt = options.importedAt ?? nowIso()
+    const provenance = mergeDriveDiscProvenance(normalized.provenance, {
+        version: DRIVE_DISC_PROVENANCE_VERSION,
+        calculatorJson: {
+            firstSeenAt: observedAt,
+            lastSeenAt: observedAt,
+            lastImportId: options.importId ?? null,
+            sourceRecordId: id,
+            sourceAccountKey: options.sourceAccountKey ?? null,
+            sourceAccountId: options.sourceAccountId ?? null,
+            sourceAccountLabel: options.sourceAccountLabel ?? null,
+        },
+    })
+    return withDriveDiscProvenance({
+        ...normalized,
+        provenance,
+        source: projectDriveDiscSource(provenance, normalized.source),
+    }, options)
 }
 
 function normalizeNativeDriveDiscExport(input, options = {}) {
@@ -552,9 +781,22 @@ function normalizeNativeDriveDiscExport(input, options = {}) {
     const ownerId = String(options.ownerId ?? "").trim() || "default"
     const importedAt = options.importedAt ?? nowIso()
     const sourcePath = options.sourcePath ?? null
+    const sourceAccountId = String(input.sourceAccount.id ?? "").trim()
+    const sourceAccountLabel = String(input.sourceAccount.label).trim()
+    const sourceAccountKey = sourceAccountId
+        ? `id:${sourceAccountId}`
+        : `label:${sourceAccountLabel}`
     const importId = options.importId ?? `zzz-calculator-export-${hashWith(options, `${ownerId}:${sourcePath ?? ""}:${importedAt}`)}`
     const driveDiscs = input.driveDiscs.map((item, index) =>
-        normalizeNativeDriveDisc(item, index, { ...options, ownerId })
+        normalizeNativeDriveDisc(item, index, {
+            ...options,
+            ownerId,
+            importedAt,
+            importId,
+            sourceAccountKey,
+            sourceAccountId: sourceAccountId || null,
+            sourceAccountLabel,
+        })
     )
     const ids = new Set()
     for (const disc of driveDiscs) {
@@ -591,74 +833,449 @@ export function normalizeDriveDiscImport(input, options = {}) {
     return normalizeScannerExport(input, options)
 }
 
-function buildDuplicateAwareIndex(items, keyOf) {
-    const result = new Map()
-    for (const item of items ?? []) {
-        const key = keyOf(item)
-        if (!key) continue
-        const existing = result.get(key) ?? []
-        existing.push(item)
-        result.set(key, existing)
-    }
-    return result
+function enkaProvenanceKey(disc) {
+    const enka = disc?.provenance?.enkaZzz
+    const source = disc?.source ?? {}
+    const uid = String(enka?.uid ?? source.uid ?? "").trim()
+    const equipmentUid = String(enka?.equipmentUid ?? source.equipmentUid ?? "").trim()
+    return uid && equipmentUid ? `${uid}:${equipmentUid}` : ""
 }
 
-function matchedImportSource(source, options) {
+function enkaIdentityObservation(disc) {
+    const enka = disc?.provenance?.enkaZzz
+    const source = disc?.source ?? {}
+    const uid = String(enka?.uid ?? source.uid ?? "").trim()
+    const equipmentUid = String(enka?.equipmentUid ?? source.equipmentUid ?? "").trim()
     return {
-        ...(source ?? {}),
-        [options.matchedAtField ?? "matchedAt"]: nowIso(),
+        uid,
+        equipmentUid,
+        agentId: String(enka?.lastAgentId ?? source.agentId ?? disc?.equippedBy ?? "").trim(),
+        partition: Number(disc?.partition ?? 0),
+        set: canonicalSetKey(disc),
+        templateId: String(enka?.equipmentId ?? source.equipmentId ?? "").trim(),
+        locked: Boolean(disc?.locked),
+        content: canonicalDriveDiscContent(disc),
     }
 }
 
-function mergeImportedDriveDisc(existing, imported, options) {
-    const createdAt = options.preserveCreatedAtOnMerge === false
-        ? {}
-        : { createdAt: existing.createdAt ?? imported.createdAt ?? nowIso() }
-    return withDriveDiscFingerprints({
-        ...existing,
-        ...imported,
-        id: existing.id,
-        ownerId: existing.ownerId ?? imported.ownerId,
-        locked: existing.locked ?? imported.locked ?? false,
-        equippedBy: existing.equippedBy ?? imported.equippedBy ?? null,
-        reservedForAgentId: existing.reservedForAgentId ?? imported.reservedForAgentId ?? null,
-        excludedForAgentIds: normalizeExcludedForAgentIds(
-            existing.excludedForAgentIds ?? imported.excludedForAgentIds,
-            existing.reservedForAgentId ?? imported.reservedForAgentId,
-        ),
-        ...createdAt,
-        updatedAt: nowIso(),
-        source: matchedImportSource({
-            ...(existing.source ?? {}),
-            ...(imported.source ?? {}),
-            previousImportId: existing.source?.importId ?? null,
-        }, options),
-    }, options)
-}
-
-function nativeDriveDiscComparable(disc) {
-    return stableStringify(driveDiscForExport(disc))
-}
-
-function mergeNativeDriveDisc(existing, imported, options) {
-    return withDriveDiscFingerprints({
-        ...existing,
-        ...imported,
-        id: existing.id,
-        ownerId: existing.ownerId ?? imported.ownerId,
-    }, options)
-}
-
-function removeDuplicateContentMatches(contentMatches, keepId, nextSameOwner, remappedIds, deletedIds) {
-    let removed = 0
-    for (const duplicate of contentMatches ?? []) {
-        if (!duplicate?.id || duplicate.id === keepId || !nextSameOwner.has(duplicate.id)) continue
-        nextSameOwner.delete(duplicate.id)
-        remappedIds.set(duplicate.id, keepId)
-        deletedIds.add(duplicate.id)
-        removed += 1
+function enkaImmutableIdentity(disc) {
+    const enka = disc?.provenance?.enkaZzz
+    const source = disc?.source ?? {}
+    return {
+        partition: Number(disc?.partition ?? 0),
+        set: canonicalSetKey(disc),
+        equipmentId: String(enka?.equipmentId ?? source.equipmentId ?? "").trim(),
+        rarity: String(disc?.rarity ?? "").trim().toUpperCase(),
+        maxLevel: Number(disc?.maxLevel ?? 0),
     }
-    return removed
+}
+
+function immutableEnkaIdentityDifferences(existing, imported) {
+    const before = enkaImmutableIdentity(existing)
+    const after = enkaImmutableIdentity(imported)
+    return Object.keys(before).flatMap(field => {
+        const left = before[field]
+        const right = after[field]
+        const leftKnown = typeof left === "number" ? left > 0 : Boolean(left)
+        const rightKnown = typeof right === "number" ? right > 0 : Boolean(right)
+        return leftKnown && rightKnown && left !== right ? [{ field, before: left, after: right }] : []
+    })
+}
+
+export function validateEnkaDriveDiscIdentities(discs = [], { expectedUid = null, existingDiscs = [] } = {}) {
+    const normalizedExpectedUid = expectedUid == null ? null : String(expectedUid).trim()
+    const observationsByKey = new Map()
+    const blockingErrors = []
+    const immutableErrorKeys = new Set()
+    const canonicalCollisionErrorKeys = new Set()
+
+    for (const disc of discs ?? []) {
+        const observation = enkaIdentityObservation(disc)
+        if (!observation.uid || !observation.equipmentUid) {
+            blockingErrors.push({
+                code: "ENKA_DISC_IDENTITY_MISSING",
+                message: "展柜驱动盘缺少游戏 UID 或 Equipment UID，无法建立安全身份。",
+                details: { observation },
+            })
+            continue
+        }
+        if (normalizedExpectedUid !== null && observation.uid !== normalizedExpectedUid) {
+            blockingErrors.push({
+                code: "ENKA_DISC_UID_MISMATCH",
+                message: `驱动盘 ${observation.equipmentUid} 的来源 UID 与本次展柜 UID 不一致。`,
+                details: { expectedUid: normalizedExpectedUid, observation },
+            })
+            continue
+        }
+        const key = `${observation.uid}:${observation.equipmentUid}`
+        const canonicalId = `enka-zzz:${observation.uid}:${observation.equipmentUid}`
+        const previous = observationsByKey.get(key)
+        if (!previous) {
+            observationsByKey.set(key, observation)
+        } else if (stableStringify(previous) !== stableStringify(observation)) {
+            blockingErrors.push({
+                code: "ENKA_EQUIPMENT_IDENTITY_CONFLICT",
+                message: `同一 Equipment UID ${observation.equipmentUid} 在本次展柜数据中对应了互相矛盾的角色、槽位、套装或模板。`,
+                details: {
+                    uid: observation.uid,
+                    equipmentUid: observation.equipmentUid,
+                    observations: [previous, observation],
+                },
+            })
+        }
+
+        for (const existing of existingDiscs ?? []) {
+            if (String(existing?.id ?? "") === canonicalId) {
+                const existingEnkaKey = enkaProvenanceKey(existing)
+                const sameStrongIdentity = existingEnkaKey === key
+                const safelyMatchesContent = !hasUnknownDriveDiscStat(existing)
+                    && !hasUnknownDriveDiscStat(disc)
+                    && !excludesDifferentStrongIdentity(existing, disc)
+                    && sameDriveDiscContent(existing, disc)
+                if (!sameStrongIdentity && !safelyMatchesContent) {
+                    const errorKey = stableStringify([canonicalId, existingEnkaKey])
+                    if (!canonicalCollisionErrorKeys.has(errorKey)) {
+                        canonicalCollisionErrorKeys.add(errorKey)
+                        blockingErrors.push({
+                            code: "ENKA_CANONICAL_ID_COLLISION",
+                            message: `驱动盘 ${observation.equipmentUid} 的 canonical ID 已被其他记录占用，无法安全合并。`,
+                            details: {
+                                uid: observation.uid,
+                                equipmentUid: observation.equipmentUid,
+                                canonicalId,
+                                existingId: String(existing.id),
+                                existingEnkaIdentity: existingEnkaKey || null,
+                            },
+                        })
+                    }
+                }
+            }
+            if (enkaProvenanceKey(existing) !== key) continue
+            const differences = immutableEnkaIdentityDifferences(existing, disc)
+            if (!differences.length) continue
+            const errorKey = stableStringify([key, existing?.id, differences])
+            if (immutableErrorKeys.has(errorKey)) continue
+            immutableErrorKeys.add(errorKey)
+            blockingErrors.push({
+                code: "ENKA_EQUIPMENT_IMMUTABLE_IDENTITY_CONFLICT",
+                message: `驱动盘 ${observation.equipmentUid} 与已有同一 Equipment UID 记录的槽位、套装或模板身份不一致。`,
+                details: {
+                    uid: observation.uid,
+                    equipmentUid: observation.equipmentUid,
+                    existingId: String(existing?.id ?? ""),
+                    differences,
+                },
+            })
+        }
+    }
+
+    return {
+        blockingErrors,
+        hasBlockingErrors: blockingErrors.length > 0,
+    }
+}
+
+function calculatorJsonProvenanceKey(disc) {
+    const source = disc?.provenance?.calculatorJson
+    const accountKey = String(source?.sourceAccountKey ?? "").trim()
+    const recordId = String(source?.sourceRecordId ?? "").trim()
+    return accountKey && recordId ? stableStringify([accountKey, recordId]) : ""
+}
+
+function sourceKindForImport(importRecord) {
+    return importRecord?.type === DRIVE_DISC_EXPORT_FORMAT ? "calculatorJson" : "scanner"
+}
+
+function hasSourceKind(disc, sourceKind) {
+    if (sourceKind === "enka") return Boolean(disc?.provenance?.enkaZzz)
+    return Boolean(disc?.provenance?.[sourceKind])
+}
+
+function candidateSort(sourceKind) {
+    return (left, right) => {
+        const sourceDelta = Number(hasSourceKind(right, sourceKind)) - Number(hasSourceKind(left, sourceKind))
+        if (sourceDelta) return sourceDelta
+        const createdDelta = String(left?.createdAt ?? "").localeCompare(String(right?.createdAt ?? ""))
+        return createdDelta || String(left?.id ?? "").localeCompare(String(right?.id ?? ""))
+    }
+}
+
+function materialDriveDiscSignature(disc) {
+    const value = driveDiscForExport(disc)
+    delete value.updatedAt
+    delete value.source
+    delete value.raw
+    if (value.provenance?.enkaZzz) {
+        delete value.provenance.enkaZzz.lastSeenAt
+    }
+    if (value.provenance?.scanner) {
+        delete value.provenance.scanner.lastSeenAt
+        delete value.provenance.scanner.lastImportId
+        delete value.provenance.scanner.lastSourcePath
+        delete value.provenance.scanner.lastSequence
+        delete value.provenance.scanner.lastRawIndex
+    }
+    if (value.provenance?.calculatorJson) {
+        delete value.provenance.calculatorJson.lastSeenAt
+        delete value.provenance.calculatorJson.lastImportId
+        delete value.provenance.calculatorJson.sourceAccountLabel
+    }
+    return stableStringify(value)
+}
+
+function mergeReconciledDriveDisc(existing, imported, { sourceKind, matchReason, now, options }) {
+    const strongNativeMatch = ["same-native-source", "same-native-id"].includes(matchReason)
+    const replaceCore = sourceKind === "enka"
+        || (sourceKind === "calculatorJson" && strongNativeMatch)
+        || matchReason === "resolved-identity"
+    const coreFields = [
+        "setId", "setName", "canonicalSetName", "partition", "rarity", "level", "maxLevel",
+        "mainStat", "subStats", "statUnitVersion", "raw",
+    ]
+    const core = {}
+    if (replaceCore) {
+        for (const field of coreFields) {
+            if (Object.prototype.hasOwnProperty.call(imported, field)) core[field] = cloneJsonValue(imported[field])
+        }
+    } else if (sourceKind === "scanner" && imported.raw) {
+        core.raw = cloneJsonValue(imported.raw)
+    }
+    const provenance = mergeDriveDiscProvenance(existing.provenance, imported.provenance)
+    const reservedForAgentId = Object.prototype.hasOwnProperty.call(existing, "reservedForAgentId")
+        ? existing.reservedForAgentId ?? null
+        : imported.reservedForAgentId ?? null
+    const next = {
+        ...existing,
+        ...core,
+        id: existing.id,
+        ownerId: existing.ownerId ?? imported.ownerId,
+        locked: sourceKind === "enka"
+            ? Boolean(imported.locked)
+            : sourceKind === "calculatorJson" && strongNativeMatch
+                ? Boolean(imported.locked)
+                : Boolean(existing.locked),
+        equippedBy: sourceKind === "enka"
+            ? imported.equippedBy ?? null
+            : sourceKind === "calculatorJson" && strongNativeMatch
+                ? imported.equippedBy ?? existing.equippedBy ?? null
+                : existing.equippedBy ?? null,
+        reservedForAgentId,
+        excludedForAgentIds: normalizeExcludedForAgentIds(existing.excludedForAgentIds, reservedForAgentId),
+        createdAt: existing.createdAt ?? imported.createdAt ?? now,
+        updatedAt: now,
+        provenance,
+        source: projectDriveDiscSource(provenance, existing.source ?? imported.source),
+    }
+    return withDriveDiscProvenance(next, options)
+}
+
+function reconciliationKey(sourceKind, imported, index) {
+    return enkaProvenanceKey(imported)
+        || calculatorJsonProvenanceKey(imported)
+        || `${sourceKind}:${index}:${stableStringify(canonicalDriveDiscIdentity(imported))}`
+}
+
+function contentCandidates(items, imported) {
+    return items.filter(item => item.contentFingerprint === imported.contentFingerprint && sameDriveDiscContent(item, imported))
+}
+
+function identityCandidates(items, imported) {
+    return items.filter(item => item.identityFingerprint === imported.identityFingerprint && sameDriveDiscIdentity(item, imported))
+}
+
+function excludesDifferentStrongIdentity(candidate, imported) {
+    const incomingKey = enkaProvenanceKey(imported)
+    const candidateKey = enkaProvenanceKey(candidate)
+    if (incomingKey && candidateKey && incomingKey !== candidateKey) return true
+    const incomingNativeKey = calculatorJsonProvenanceKey(imported)
+    const candidateNativeKey = calculatorJsonProvenanceKey(candidate)
+    return Boolean(incomingNativeKey && candidateNativeKey && incomingNativeKey !== candidateNativeKey)
+}
+
+function sourceWasAlreadyObserved(existing, imported, sourceKind) {
+    if (sourceKind === "enka") return enkaProvenanceKey(existing) === enkaProvenanceKey(imported)
+    if (sourceKind === "scanner") return Boolean(existing?.provenance?.scanner)
+    const importedKey = calculatorJsonProvenanceKey(imported)
+    return Boolean(importedKey && calculatorJsonProvenanceKey(existing) === importedKey)
+}
+
+export function planDriveDiscReconciliation({
+    existingDiscs = [],
+    importedDiscs = [],
+    ownerId = "default",
+    sourceKind = "scanner",
+    resolutions = {},
+    now = nowIso(),
+    options = {},
+}) {
+    const normalizedOwnerId = String(ownerId ?? "default")
+    const mismatchedExisting = existingDiscs.find(disc => String(disc?.ownerId ?? "default") !== normalizedOwnerId)
+    const mismatchedImported = importedDiscs.find(disc => disc?.ownerId != null
+        && String(disc.ownerId) !== normalizedOwnerId)
+    if (mismatchedExisting || mismatchedImported) {
+        throw new Error(`Drive Disc reconciliation cannot cross owner boundary "${normalizedOwnerId}".`)
+    }
+    const normalizedExisting = existingDiscs.map(disc => withDriveDiscProvenance(
+        normalizeDriveDiscUsageRestrictions(normalizeDriveDiscSetAlias(disc, options)),
+        options,
+    ))
+    const normalizedImported = importedDiscs.map(disc => withDriveDiscProvenance(
+        normalizeDriveDiscUsageRestrictions(normalizeDriveDiscSetAlias({ ...disc, ownerId: normalizedOwnerId }, options)),
+        options,
+    ))
+    const identityValidation = sourceKind === "enka"
+        ? validateEnkaDriveDiscIdentities(normalizedImported, { existingDiscs: normalizedExisting })
+        : { blockingErrors: [], hasBlockingErrors: false }
+    const nextById = new Map(normalizedExisting.map(disc => [String(disc.id), disc]))
+    const initialIds = new Set(nextById.keys())
+    const added = []
+    const updated = []
+    const unchanged = []
+    const sourceMerged = []
+    const conflicts = []
+    const warnings = []
+    const resolvedIds = {}
+    const matchedExistingIds = new Set()
+    const protectedHistoricalIds = new Set()
+    const seenWeakContent = new Set()
+    const firstImportedIdByEnkaKey = new Map()
+    let duplicateInImport = 0
+    let historicalDuplicates = 0
+
+    if (identityValidation.hasBlockingErrors) {
+        return {
+            driveDiscs: existingDiscs.map(cloneJsonValue),
+            added,
+            updated,
+            unchanged,
+            sourceMerged,
+            conflicts,
+            warnings,
+            blockingErrors: identityValidation.blockingErrors,
+            hasBlockingErrors: true,
+            resolvedIds,
+            matchedExistingIds,
+            protectedHistoricalIds,
+            initialIds,
+            duplicateInImport,
+            historicalDuplicates,
+            changed: false,
+        }
+    }
+
+    normalizedImported.forEach((imported, index) => {
+        const incomingEnkaKey = enkaProvenanceKey(imported)
+        const firstImportedId = incomingEnkaKey ? firstImportedIdByEnkaKey.get(incomingEnkaKey) : null
+        if (firstImportedId != null) {
+            duplicateInImport += 1
+            resolvedIds[String(imported.id)] = resolvedIds[firstImportedId]
+            return
+        }
+        if (incomingEnkaKey) firstImportedIdByEnkaKey.set(incomingEnkaKey, String(imported.id))
+        const hasUnknownStats = hasUnknownDriveDiscStat(imported)
+        const weakContentKey = stableStringify(canonicalDriveDiscContent(imported))
+        const isWeakDuplicate = !incomingEnkaKey && !hasUnknownStats && seenWeakContent.has(weakContentKey)
+        if (!incomingEnkaKey && !hasUnknownStats) seenWeakContent.add(weakContentKey)
+
+        const currentItems = [...nextById.values()]
+        let candidates = incomingEnkaKey
+            ? currentItems.filter(item => enkaProvenanceKey(item) === incomingEnkaKey)
+            : []
+        let matchReason = candidates.length ? "same-enka-identity" : ""
+
+        if (!candidates.length && sourceKind === "calculatorJson" && !hasUnknownStats) {
+            const sourceRecordId = calculatorJsonProvenanceKey(imported)
+            if (sourceRecordId) {
+                candidates = currentItems
+                    .filter(item => calculatorJsonProvenanceKey(item) === sourceRecordId)
+                    .filter(item => !excludesDifferentStrongIdentity(item, imported))
+                if (candidates.length) matchReason = "same-native-source"
+            }
+        }
+        if (!candidates.length && sourceKind === "calculatorJson" && !hasUnknownStats) {
+            const exactId = nextById.get(String(imported.id))
+            if (exactId && !excludesDifferentStrongIdentity(exactId, imported)) {
+                candidates = [exactId]
+                matchReason = "same-native-id"
+            }
+        }
+        if (!candidates.length && !hasUnknownStats) {
+            candidates = contentCandidates(currentItems, imported)
+                .filter(item => !excludesDifferentStrongIdentity(item, imported))
+            if (candidates.length) matchReason = "same-content"
+        }
+
+        if (candidates.length) {
+            candidates.sort(candidateSort(sourceKind))
+            const existing = candidates[0]
+            if (candidates.length > 1) {
+                historicalDuplicates += candidates.length - 1
+                for (const candidate of candidates) protectedHistoricalIds.add(String(candidate.id))
+                warnings.push(`驱动盘 ${imported.setName ?? imported.setId} ${imported.partition}号位存在 ${candidates.length} 条历史重复；本次未新增或删除历史记录。`)
+            }
+            const observed = sourceWasAlreadyObserved(existing, imported, sourceKind)
+            const after = mergeReconciledDriveDisc(existing, imported, { sourceKind, matchReason, now, options })
+            matchedExistingIds.add(String(existing.id))
+            resolvedIds[String(imported.id)] = String(existing.id)
+            if (isWeakDuplicate) duplicateInImport += 1
+            if (!observed) {
+                nextById.set(String(existing.id), after)
+                sourceMerged.push({ id: existing.id, before: existing, after, imported, reason: matchReason })
+            } else if (materialDriveDiscSignature(existing) === materialDriveDiscSignature(after)) {
+                nextById.set(String(existing.id), existing)
+                unchanged.push({ id: existing.id, before: existing, after: existing, imported, reason: matchReason })
+            } else {
+                nextById.set(String(existing.id), after)
+                updated.push({ id: existing.id, before: existing, after, imported, reason: matchReason })
+            }
+            return
+        }
+
+        // A shape-only match is not enough evidence that two records are the
+        // same physical disc.  In particular, a level or stat value change is
+        // a valid observation of a different disc (and two Enka equipment UIDs
+        // always represent different entities).  Exact content matches were
+        // handled above; every remaining record therefore gets a new canonical
+        // ID instead of entering the old update/add conflict flow.
+
+        const baseId = String(imported.id)
+        let nextId = baseId
+        let collisionIndex = 0
+        while (nextById.has(nextId)) {
+            collisionIndex += 1
+            nextId = `${baseId}-${hashWith(options, `${baseId}:${collisionIndex}`)}-${collisionIndex}`
+        }
+        const nextDisc = withDriveDiscProvenance({
+            ...imported,
+            id: nextId,
+            ownerId: normalizedOwnerId,
+            createdAt: imported.createdAt ?? now,
+            updatedAt: imported.updatedAt ?? now,
+        }, options)
+        nextById.set(nextId, nextDisc)
+        matchedExistingIds.add(nextId)
+        resolvedIds[String(imported.id)] = nextId
+        added.push(nextDisc)
+    })
+
+    return {
+        driveDiscs: [...nextById.values()],
+        added,
+        updated,
+        unchanged,
+        sourceMerged,
+        conflicts,
+        warnings,
+        blockingErrors: [],
+        hasBlockingErrors: false,
+        resolvedIds,
+        matchedExistingIds,
+        protectedHistoricalIds,
+        initialIds,
+        duplicateInImport,
+        historicalDuplicates,
+        changed: Boolean(added.length || updated.length || sourceMerged.length),
+    }
 }
 
 export function reconcileDriveDiscLoadoutSlots(loadouts = [], {
@@ -710,153 +1327,179 @@ export function reconcileDriveDiscLoadoutSlots(loadouts = [], {
 }
 
 export function buildScannerImportPlan(currentStore, input, options = {}) {
-    const effectiveOwnerId = options.ownerId ?? currentStore.currentOwnerId
+    const normalizedCurrentStore = normalizeInventoryStore(currentStore, options)
+    const effectiveOwnerId = options.ownerId ?? normalizedCurrentStore.currentOwnerId
     const normalized = normalizeDriveDiscImport(input, {
         ...options,
         ownerId: effectiveOwnerId,
         removeMissing: Boolean(options.removeMissing),
     })
     const nativeImport = normalized.importRecord.type === DRIVE_DISC_EXPORT_FORMAT
+    const sourceKind = sourceKindForImport(normalized.importRecord)
     const ownerId = normalized.importRecord.ownerId
-    const owners = currentStore.owners?.some(owner => owner.id === ownerId)
-        ? currentStore.owners
-        : [...(currentStore.owners ?? []), { id: ownerId, label: ownerId }]
+    const owners = normalizedCurrentStore.owners?.some(owner => owner.id === ownerId)
+        ? normalizedCurrentStore.owners
+        : [...(normalizedCurrentStore.owners ?? []), { id: ownerId, label: ownerId }]
     const belongsToOwner = item => (item.ownerId ?? "default") === ownerId
-    const existingSameOwner = (currentStore.driveDiscs ?? []).filter(belongsToOwner)
-    const existingOtherOwners = (currentStore.driveDiscs ?? []).filter(item => !belongsToOwner(item))
-    const byContent = buildDuplicateAwareIndex(existingSameOwner, item => item.contentFingerprint)
-    const byIdentity = buildDuplicateAwareIndex(existingSameOwner, item => item.identityFingerprint)
-    const nextSameOwner = new Map(existingSameOwner.map(item => [item.id, item]))
-    const matchedExistingIds = new Set()
-    const seenImportContent = new Set()
+    const existingSameOwner = (normalizedCurrentStore.driveDiscs ?? []).filter(belongsToOwner)
+    const sourceDriveDiscs = Array.isArray(currentStore?.driveDiscs)
+        ? currentStore.driveDiscs
+        : normalizedCurrentStore.driveDiscs ?? []
+    const existingOtherOwners = sourceDriveDiscs.filter(item => !belongsToOwner(item))
+    const reconciliation = planDriveDiscReconciliation({
+        existingDiscs: existingSameOwner,
+        importedDiscs: normalized.driveDiscs,
+        ownerId,
+        sourceKind,
+        resolutions: options.resolutions ?? {},
+        now: options.now ?? normalized.importRecord.importedAt ?? nowIso(),
+        options,
+    })
+    const nextSameOwner = new Map(reconciliation.driveDiscs.map(item => [String(item.id), item]))
     const deletedIds = new Set()
     const removedMissingIds = new Set()
     const remappedIds = new Map()
-    const added = []
-    const updated = []
-    const unchanged = []
     const removed = []
+    const sourceDetached = []
+    const warnings = [...(normalized.importRecord.warnings ?? []), ...reconciliation.warnings]
     const summary = {
-        added: 0,
-        skipped: 0,
-        updated: 0,
+        added: reconciliation.added.length,
+        skipped: reconciliation.unchanged.length,
+        updated: reconciliation.updated.length,
         removed: 0,
-        duplicateInImport: 0,
+        duplicateInImport: reconciliation.duplicateInImport,
         deduplicated: 0,
-        warnings: normalized.importRecord.warnings ?? [],
+        sourceMerged: reconciliation.sourceMerged.length,
+        sourceDetached: 0,
+        conflicts: reconciliation.conflicts.length,
+        historicalDuplicates: reconciliation.historicalDuplicates,
+        warnings,
     }
     const removeMissingRarities = Array.isArray(options.removeMissingRarities)
         ? new Set(options.removeMissingRarities.map(value => String(value).trim().toUpperCase()).filter(Boolean))
         : null
-
-    for (const imported of normalized.driveDiscs) {
-        if (nativeImport) {
-            const existing = nextSameOwner.get(imported.id)
-            if (existing) {
-                const before = existing
-                const after = mergeNativeDriveDisc(before, imported, options)
-                matchedExistingIds.add(existing.id)
-                nextSameOwner.set(existing.id, after)
-                if (nativeDriveDiscComparable(before) === nativeDriveDiscComparable(after)) {
-                    summary.skipped += 1
-                    unchanged.push({ id: existing.id, before, after, imported, reason: "same-native-record" })
-                } else {
-                    summary.updated += 1
-                    updated.push({ id: existing.id, before, after, imported, reason: "same-native-id" })
-                }
-                continue
-            }
-        } else if (seenImportContent.has(imported.contentFingerprint)) {
-            summary.duplicateInImport += 1
-            continue
-        }
-        if (!nativeImport) seenImportContent.add(imported.contentFingerprint)
-        const contentMatches = byContent.get(imported.contentFingerprint) ?? []
-        if (contentMatches.length) {
-            const existing = contentMatches.find(item => nextSameOwner.has(item.id)) ?? contentMatches[0]
-            const before = nextSameOwner.get(existing.id) ?? existing
-            const after = mergeImportedDriveDisc(before, imported, options)
-            matchedExistingIds.add(existing.id)
-            nextSameOwner.set(existing.id, after)
-            summary.deduplicated += removeDuplicateContentMatches(contentMatches, existing.id, nextSameOwner, remappedIds, deletedIds)
-            summary.skipped += 1
-            unchanged.push({ id: existing.id, before, after, imported, reason: "same-content" })
-            continue
-        }
-
-        const identityMatches = byIdentity.get(imported.identityFingerprint) ?? []
-        if (identityMatches.length === 1 && Number(imported.level ?? 0) > Number(identityMatches[0].level ?? 0)) {
-            const existing = identityMatches[0]
-            const before = nextSameOwner.get(existing.id) ?? existing
-            const after = mergeImportedDriveDisc(before, imported, options)
-            matchedExistingIds.add(existing.id)
-            nextSameOwner.set(existing.id, after)
-            summary.updated += 1
-            updated.push({ id: existing.id, before, after, imported, reason: "higher-level-same-identity" })
-            continue
-        }
-
-        let nextId = imported.id
-        while (nextSameOwner.has(nextId) || (!nativeImport && existingOtherOwners.some(item => item.id === nextId))) {
-            nextId = `scanner-${imported.contentFingerprint}-${hashWith(options, `${nextId}:${nextSameOwner.size}`)}`
-        }
-        const nextDisc = withDriveDiscFingerprints({
-            ...imported,
-            id: nextId,
-            createdAt: imported.createdAt ?? nowIso(),
-            updatedAt: imported.updatedAt ?? nowIso(),
-        }, options)
-        nextSameOwner.set(nextDisc.id, nextDisc)
-        matchedExistingIds.add(nextDisc.id)
-        summary.added += 1
-        added.push(nextDisc)
-    }
 
     if (options.removeMissing) {
         for (const disc of existingSameOwner) {
             if (removeMissingRarities?.size && !removeMissingRarities.has(String(disc.rarity ?? "").toUpperCase())) {
                 continue
             }
-            if (!matchedExistingIds.has(disc.id) && nextSameOwner.has(disc.id)) {
-                nextSameOwner.delete(disc.id)
-                deletedIds.add(disc.id)
-                removedMissingIds.add(disc.id)
-                removed.push(disc)
+            if (reconciliation.matchedExistingIds.has(String(disc.id)) || !nextSameOwner.has(String(disc.id))) continue
+            if (reconciliation.protectedHistoricalIds.has(String(disc.id))) continue
+            if (!nativeImport && !disc.provenance?.scanner) continue
+            const otherSources = disc.provenance?.enkaZzz || disc.provenance?.calculatorJson || disc.provenance?.manual
+            if (!nativeImport && otherSources) {
+                const provenance = cloneJsonValue(disc.provenance)
+                delete provenance.scanner
+                const after = withDriveDiscProvenance({
+                    ...disc,
+                    provenance,
+                    source: projectDriveDiscSource(provenance, provenance.enkaZzz ? disc.source : null),
+                    updatedAt: options.now ?? nowIso(),
+                }, options)
+                nextSameOwner.set(String(disc.id), after)
+                sourceDetached.push({ id: disc.id, before: disc, after, reason: "scanner-missing-other-source-preserved" })
+                continue
             }
+            nextSameOwner.delete(String(disc.id))
+            deletedIds.add(String(disc.id))
+            removedMissingIds.add(String(disc.id))
+            removed.push(disc)
         }
         summary.removed = removedMissingIds.size
+        summary.sourceDetached = sourceDetached.length
     }
 
-    const nextStore = {
-        ...currentStore,
+    for (const [importedId, canonicalId] of Object.entries(reconciliation.resolvedIds)) {
+        const fromId = String(importedId)
+        const toId = String(canonicalId)
+        if (fromId !== toId && deletedIds.has(fromId) && nextSameOwner.has(toId)) {
+            remappedIds.set(fromId, toId)
+        }
+    }
+
+    let nextStore = {
+        ...normalizedCurrentStore,
         owners,
-        imports: [...(currentStore.imports ?? []), { ...normalized.importRecord, summary }],
+        imports: [...(normalizedCurrentStore.imports ?? []), { ...normalized.importRecord, summary }],
         driveDiscs: [...existingOtherOwners, ...nextSameOwner.values()],
-        driveDiscLoadouts: reconcileDriveDiscLoadoutSlots(currentStore.driveDiscLoadouts ?? [], {
+        driveDiscLoadouts: reconcileDriveDiscLoadoutSlots(normalizedCurrentStore.driveDiscLoadouts ?? [], {
             ownerId,
             deletedIds,
             remappedIds,
         }),
     }
-    return {
-        currentStore,
+    const changedIds = new Set([
+        ...reconciliation.updated.map(item => String(item.id)),
+        ...reconciliation.sourceMerged.map(item => String(item.id)),
+        ...sourceDetached.map(item => String(item.id)),
+        ...removed.map(item => String(item.id)),
+    ])
+    nextStore = recordNonEnkaBindingSessionChanges({
+        storeBefore: normalizedCurrentStore,
+        storeAfter: nextStore,
         ownerId,
+        touchedDriveDiscIds: [...changedIds],
+        driveDiscIdRemap: Object.fromEntries(remappedIds),
+    })
+    const ownerImportState = nextStore.enkaImportState?.version === 1
+        ? nextStore.enkaImportState.byOwner?.[ownerId]
+        : null
+    const journal = ownerImportState?.undoJournal
+    const invalidatesUndo = Boolean(journal?.affectedDriveDiscIds?.some(id => changedIds.has(String(id))))
+    if (invalidatesUndo) {
+        const overlap = (journal.affectedDriveDiscIds ?? []).filter(id => changedIds.has(String(id)))
+        nextStore = {
+            ...nextStore,
+            enkaImportState: {
+                ...nextStore.enkaImportState,
+                byOwner: {
+                    ...nextStore.enkaImportState.byOwner,
+                    [ownerId]: {
+                        ...ownerImportState,
+                        undoJournal: {
+                            ...journal,
+                            status: "invalidated",
+                            invalidatedBy: sourceKind,
+                            invalidatedAt: options.now ?? nowIso(),
+                            overlap: { driveDiscIds: overlap },
+                        },
+                    },
+                },
+            },
+        }
+        warnings.push("本次导入修改了上次 Enka 导入涉及的驱动盘，原撤销记录已失效。")
+    }
+    return {
+        currentStore: normalizedCurrentStore,
+        ownerId,
+        sourceKind,
         normalized,
+        reconciliation,
+        driveDiscIdRemap: Object.fromEntries(remappedIds),
+        deletedDriveDiscIds: [...deletedIds],
         summary,
         nextStore,
+        hasUnresolvedConflicts: reconciliation.conflicts.length > 0,
         preview: {
             ownerId,
+            sourceKind,
+            importType: normalized.importRecord.type,
             sourcePath: normalized.importRecord.sourcePath,
             removeMissing: Boolean(options.removeMissing),
             removeMissingRarities: removeMissingRarities ? [...removeMissingRarities] : null,
             currentCount: existingSameOwner.length,
             nextCount: nextSameOwner.size,
             normalizedDiscs: normalized.driveDiscs,
-            added,
-            updated,
-            unchanged,
+            added: reconciliation.added,
+            updated: reconciliation.updated,
+            unchanged: reconciliation.unchanged,
+            sourceMerged: reconciliation.sourceMerged,
+            sourceDetached,
+            conflicts: reconciliation.conflicts,
             removed,
-            warnings: summary.warnings,
+            warnings,
+            invalidatesEnkaUndo: invalidatesUndo,
             summary,
         },
     }
@@ -897,20 +1540,36 @@ export function upsertDriveDisc(store, driveDisc, options = {}) {
     const excludedForAgentIds = Object.prototype.hasOwnProperty.call(normalizedDriveDisc, "excludedForAgentIds")
         ? normalizeExcludedForAgentIds(normalizedDriveDisc.excludedForAgentIds, reservedForAgentId)
         : normalizeExcludedForAgentIds(currentDriveDisc?.excludedForAgentIds, reservedForAgentId)
-    const nextDriveDisc = withDriveDiscFingerprints({
+    const editedAt = nowIso()
+    const provenance = mergeDriveDiscProvenance(
+        withDriveDiscProvenance(currentDriveDisc ?? normalizedDriveDisc, options).provenance,
+        {
+            version: DRIVE_DISC_PROVENANCE_VERSION,
+            manual: { lastEditedAt: editedAt },
+        },
+    )
+    const nextDriveDisc = withDriveDiscProvenance({
         ...normalizedDriveDisc,
         ownerId,
         reservedForAgentId,
         excludedForAgentIds,
-        updatedAt: nowIso(),
+        provenance,
+        source: projectDriveDiscSource(provenance, normalizedDriveDisc.source),
+        updatedAt: editedAt,
     }, options)
-    return {
-        ownerId,
-        driveDisc: nextDriveDisc,
-        nextStore: {
+    const nextStore = recordNonEnkaBindingSessionChanges({
+        storeBefore: store,
+        storeAfter: {
             ...store,
             driveDiscs: index >= 0 ? existing.map(item => matches(item) ? nextDriveDisc : item) : [...existing, nextDriveDisc],
         },
+        ownerId,
+        touchedDriveDiscIds: [nextDriveDisc.id],
+    })
+    return {
+        ownerId,
+        driveDisc: nextDriveDisc,
+        nextStore,
     }
 }
 
@@ -1252,6 +1911,7 @@ export function deleteDriveDiscLoadout(store, id) {
 }
 
 export function accountSummary(store) {
+    const enkaByOwner = store?.enkaImportState?.version === 1 ? store.enkaImportState.byOwner ?? {} : {}
     return {
         currentOwnerId: store.currentOwnerId,
         owners: (store.owners ?? []).map(owner => ({
@@ -1259,6 +1919,7 @@ export function accountSummary(store) {
             driveDiscCount: (store.driveDiscs ?? []).filter(item => (item.ownerId ?? "default") === owner.id).length,
             loadoutCount: (store.driveDiscLoadouts ?? []).filter(item => (item.ownerId ?? "default") === owner.id).length,
             importCount: (store.imports ?? []).filter(item => (item.ownerId ?? "default") === owner.id).length,
+            enkaUid: enkaByOwner[owner.id]?.binding?.uid ?? null,
         })),
     }
 }
@@ -1304,6 +1965,22 @@ export function deleteAccount(store, id) {
     const ownerId = cleanOwnerId(id)
     if (ownerId === store.currentOwnerId) throw new Error("Cannot delete the current account.")
     if (!(store.owners ?? []).some(owner => owner.id === ownerId)) throw new Error("Account not found.")
+    const enkaImportState = store.enkaImportState?.version === 1
+        ? {
+            ...store.enkaImportState,
+            byOwner: Object.fromEntries(
+                Object.entries(store.enkaImportState.byOwner ?? {}).filter(([key]) => key !== ownerId),
+            ),
+        }
+        : store.enkaImportState
+    const driveDiscImportState = store.driveDiscImportState?.version === 1
+        ? {
+            ...store.driveDiscImportState,
+            byOwner: Object.fromEntries(
+                Object.entries(store.driveDiscImportState.byOwner ?? {}).filter(([key]) => key !== ownerId),
+            ),
+        }
+        : store.driveDiscImportState
     return {
         ownerId,
         deleted: true,
@@ -1313,6 +1990,8 @@ export function deleteAccount(store, id) {
             imports: (store.imports ?? []).filter(item => (item.ownerId ?? "default") !== ownerId),
             driveDiscs: (store.driveDiscs ?? []).filter(item => (item.ownerId ?? "default") !== ownerId),
             driveDiscLoadouts: (store.driveDiscLoadouts ?? []).filter(item => (item.ownerId ?? "default") !== ownerId),
+            ...(enkaImportState ? { enkaImportState } : {}),
+            ...(driveDiscImportState ? { driveDiscImportState } : {}),
         },
     }
 }

@@ -339,10 +339,13 @@ declare module "@runtime/local-store.js" {
   export function deleteAccount(id: string): Promise<any>
   export function loadCurrentUserDriveDiscStore(): Promise<any>
   export function loadUserDriveDiscStore(): Promise<any>
+  export function loadUserDriveDiscStoreFresh(): Promise<any>
   export function exportCurrentUserDriveDiscs(options?: { ownerId?: string; exportedAt?: string }): Promise<any>
   export function saveUserDriveDiscStore(store: any): Promise<any>
+  export function saveUserDriveDiscStoreUnlocked(store: any): Promise<any>
   export function clearUserDriveDiscStore(ownerId?: string | null): Promise<any>
   export function previewScannerExportImport(input: any, options?: any): Promise<any>
+  export function planScannerExportImport(input: any, options?: any): Promise<any>
   export function importScannerExportToStore(input: any, options?: any): Promise<any>
   export function upsertUserDriveDisc(driveDisc: any): Promise<any>
   export function deleteUserDriveDisc(id: string): Promise<any>
@@ -432,7 +435,9 @@ declare module "@core/effectRuleTargets.js" {
 }
 
 declare module "@runtime/selection-storage.js" {
+  export const HOME_SELECTION_STORAGE_KEY: string
   export function currentAccountId(): string
+  export function loadHomeSelection(): any
   export function loadCurrentOwnerSelection(ownerId?: string): any
   export function saveCurrentOwnerSelection(selection: any, ownerId?: string): void
   export function setCurrentAccountId(ownerId: string): void
@@ -454,6 +459,21 @@ declare module "@core/maintenanceValidation.js" {
 
 declare module "@core/drive-disc-core.js" {
   export function toCalculatorDriveDisc(inventoryDisc?: any): any
+}
+
+declare module "@core/drive-disc-import/transaction-plan.js" {
+  export function applyDriveDiscImportSnapshot(input: any, phase?: "before" | "after"): any
+  export function applyPositionedOwnerItemsSnapshot(items: any[], ownerId: string, snapshot: any): any[]
+  export function buildDriveDiscImportTransactionPlan(options: any): any
+  export function clearPendingDriveDiscImportJournal(store: any, ownerId: string, transactionId?: string | null): any
+  export function driveDiscImportBaseMatches(input: any): boolean
+  export function driveDiscImportSnapshotMatches(input: any, phase?: "before" | "after"): boolean
+  export function pendingDriveDiscImportJournal(store: any, ownerId: string): any
+  export function pendingDriveDiscImportOwners(store: any): string[]
+  export function positionedOwnerItemsSnapshot(items: any[], ownerId: string, ids: Iterable<string>): any
+  export function reconcileSelectionDriveDiscReferences(document: any, options?: any): { document: any; affectedAgentIds: string[] }
+  export function reconcileStoreDriveDiscReferences(store: any, options?: any): { store: any; affectedLoadoutIds: string[] }
+  export function selectionConfigsSnapshot(document: any, ownerId: string, agentIds: Iterable<string>): { version: 1; ownerPresent: boolean; currentAgentId: any; configs: Record<string, any> }
 }
 
 declare module "@core/inventory-model.js" {

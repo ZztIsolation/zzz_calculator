@@ -1451,6 +1451,7 @@ describe("BuffPickerModal", () => {
     await openCustomTab(wrapper)
 
     const defaultLabels = selectByLabel(wrapper, "增幅类型").findAll("option").map(option => option.text())
+    expect(defaultLabels).not.toContain("敌方承伤提升%")
     for (const label of [
       "固定攻击力",
       "暴击伤害%",

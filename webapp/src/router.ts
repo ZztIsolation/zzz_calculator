@@ -9,6 +9,7 @@ export const router = createRouter({
     { path: "/", name: "workbench", component: () => import("@/views/WorkbenchView.vue") },
     { path: "/discs", name: "discs", component: () => import("@/views/DiscsView.vue") },
     { path: "/accounts", name: "accounts", component: () => import("@/views/AccountsView.vue") },
+    { path: "/import", name: "import", component: () => import("@/views/ImportView.vue") },
     { path: "/settings", name: "settings", component: () => import("@/views/SettingsView.vue") },
     { path: "/internal/scans", name: "internal-scans", component: () => import("@/views/InternalScansView.vue") },
     ...(includeMaintenance
@@ -19,9 +20,10 @@ export const router = createRouter({
 })
 
 router.beforeEach(async to => {
-  if (to.name !== "maintenance") {
+  if (to.name !== "maintenance" && to.name !== "import") {
     return true
   }
   const config = await loadAppConfig()
-  return config.maintenanceEnabled ? true : { name: "workbench" }
+  if (to.name === "maintenance") return config.maintenanceEnabled ? true : { name: "workbench" }
+  return config.enkaImportEnabled ? true : { name: "workbench", query: { notice: "enka-import-disabled" } }
 })

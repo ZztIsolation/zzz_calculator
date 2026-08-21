@@ -496,8 +496,11 @@ describe("local-store compatibility", () => {
       })
 
       expect(result.lastImportSummary).toMatchObject({ added: 1, removed: 0 })
-      expect(setItem).toHaveBeenCalledTimes(1)
-      expect(setItem).toHaveBeenCalledWith("zzz-calculator.userStore.v1", expect.any(String))
+      expect(setItem).toHaveBeenCalledTimes(2)
+      expect(setItem.mock.calls.map(([key]) => key)).toEqual([
+        "zzz-calculator.userStore.v1",
+        "zzz-calculator.userStore.v1",
+      ])
       expect(removeItem).not.toHaveBeenCalled()
       expect(clear).not.toHaveBeenCalled()
 
@@ -509,8 +512,8 @@ describe("local-store compatibility", () => {
       expect(persisted.imports[0]).toEqual(existingImport)
       expect(persisted.imports[1]).toMatchObject({ ownerId: "default", type: "zzz-calculator-drive-disc-export" })
       expect(persisted.driveDiscs).toHaveLength(3)
-      expect(persisted.driveDiscs.find((disc: any) => disc.id === "default-existing")).toEqual(defaultExisting)
-      expect(persisted.driveDiscs.find((disc: any) => disc.id === "alt-existing")).toEqual(altExisting)
+      expect(persisted.driveDiscs.find((disc: any) => disc.id === "default-existing")).toMatchObject(defaultExisting)
+      expect(persisted.driveDiscs.find((disc: any) => disc.id === "alt-existing")).toMatchObject(altExisting)
       expect(persisted.driveDiscs).toContainEqual(expect.objectContaining({ id: "native-new", ownerId: "default" }))
       expect(persisted.driveDiscLoadouts).toEqual([altLoadout])
       expect(persisted.settingsSentinel).toEqual({ preserve: true })

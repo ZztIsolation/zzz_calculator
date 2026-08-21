@@ -3,12 +3,15 @@ import { computed, onMounted, ref, watch } from "vue"
 import { NAlert, NButton, NCheckbox, NDrawer, NDrawerContent, NInput, NInputNumber, NModal, NProgress, NSelect, NSpin, NTab, NTabs, NTag, useMessage } from "naive-ui"
 import { Ban, Download, FileText, LockKeyhole, Plus, Radar, RefreshCw, Upload } from "lucide-vue-next"
 import ConfirmDialog from "@/components/ConfirmDialog.vue"
+import DriveDiscConflictResolver from "@/components/DriveDiscConflictResolver.vue"
 import DriveDiscPickerModal from "@/components/DriveDiscPickerModal.vue"
+import DriveDiscSourceTags from "@/components/DriveDiscSourceTags.vue"
 import DriveDiscSlotCard from "@/components/DriveDiscSlotCard.vue"
 import ImageAvatar from "@/components/ImageAvatar.vue"
 import ScannerErrorState from "@/components/ScannerErrorState.vue"
 import { formatNumber, statLabel, labelOf } from "@/utils/format"
 import { imageForAgent, imageForDriveDiscSet } from "@/utils/assets"
+import { driveDiscScannerSequence } from "@/utils/driveDiscProvenance"
 import { useAppConfigStore } from "@/stores/app-config"
 import { useCatalogStore } from "@/stores/catalog"
 import { useInventoryStore } from "@/stores/inventory"
@@ -92,13 +95,15 @@ watch(showScan, visible => {
 
 watch(showImport, visible => {
   if (visible) {
-    inventoryStore.importPreview = null
+    inventoryStore.clearImportPreview()
     importError.value = ""
+  } else {
+    inventoryStore.clearImportPreview()
   }
 })
 
 watch([importText, removeMissing], () => {
-  inventoryStore.importPreview = null
+  inventoryStore.clearImportPreview()
 })
 
 function requestStartScan() {
@@ -541,11 +546,13 @@ function driveDiscSetIcon(disc: any) {
 }
 
 function driveDiscIdentityMeta(disc: any) {
-  return disc?.source?.sequence ? `#${disc.source.sequence}` : disc?.id
+  const sequence = driveDiscScannerSequence(disc)
+  return sequence !== null ? `#${sequence}` : disc?.id
 }
 
 function discOptionLabel(disc: any) {
-  return `${disc.setName || disc.setId} · ${disc.partition}号位 · ${mainStatText(disc)}${disc.source?.sequence ? ` · #${disc.source.sequence}` : ""}`
+  const sequence = driveDiscScannerSequence(disc)
+  return `${disc.setName || disc.setId} · ${disc.partition}号位 · ${mainStatText(disc)}${sequence !== null ? ` · #${sequence}` : ""}`
 }
 
 function discOptionsForSlot(slot: number) {
@@ -862,6 +869,8 @@ const importPreviewSections = computed(() => {
   return [
     { key: "added", label: "新增", count: preview.summary.added ?? 0, rows: preview.added ?? [] },
     { key: "updated", label: "更新", count: preview.summary.updated ?? 0, rows: (preview.updated ?? []).map((item: any) => item.after ?? item.imported ?? item) },
+    { key: "sourceMerged", label: "合并来源", count: preview.summary.sourceMerged ?? 0, rows: (preview.sourceMerged ?? []).map((item: any) => item.after ?? item.imported ?? item) },
+    { key: "sourceDetached", label: "移除来源", count: preview.summary.sourceDetached ?? 0, rows: (preview.sourceDetached ?? []).map((item: any) => item.after ?? item.before ?? item) },
     { key: "unchanged", label: "未变", count: preview.summary.skipped ?? 0, rows: (preview.unchanged ?? []).map((item: any) => item.after ?? item.imported ?? item) },
     { key: "removed", label: "删除", count: preview.summary.removed ?? 0, rows: preview.removed ?? [] },
   ].filter(section => section.count > 0)
@@ -875,11 +884,27 @@ const scanPreviewSections = computed(() => {
   return [
     { key: "added", label: "新增", count: preview.summary.added ?? 0, rows: preview.added ?? [] },
     { key: "updated", label: "更新", count: preview.summary.updated ?? 0, rows: (preview.updated ?? []).map((item: any) => item.after ?? item.imported ?? item) },
+    { key: "sourceMerged", label: "合并来源", count: preview.summary.sourceMerged ?? 0, rows: (preview.sourceMerged ?? []).map((item: any) => item.after ?? item.imported ?? item) },
+    { key: "sourceDetached", label: "移除来源", count: preview.summary.sourceDetached ?? 0, rows: (preview.sourceDetached ?? []).map((item: any) => item.after ?? item.before ?? item) },
     { key: "unchanged", label: "未变", count: preview.summary.skipped ?? 0, rows: (preview.unchanged ?? []).map((item: any) => item.after ?? item.imported ?? item) },
     { key: "removed", label: "将删除", count: preview.summary.removed ?? 0, rows: preview.removed ?? [] },
   ].filter(section => section.count > 0)
 })
-const scanControlsDisabled = computed(() => ["scanning", "stopping"].includes(inventoryStore.scanStatus) || inventoryStore.scanPreparing)
+const scanControlsDisabled = computed(() => ["scanning", "stopping", "review"].includes(inventoryStore.scanStatus) || inventoryStore.scanPreparing)
+const importControlsLocked = computed(() => Boolean(inventoryStore.importPlan)
+  || inventoryStore.importApplying
+  || inventoryStore.importResolving)
+const nativeImportPreview = computed(() => {
+  if (inventoryStore.importPreview?.importType === "zzz-calculator-drive-disc-export") return true
+  try {
+    return JSON.parse(importText.value || "null")?.format === "zzz-calculator-drive-disc-export"
+  } catch {
+    return false
+  }
+})
+const removeMissingImportMessage = computed(() => nativeImportPreview.value
+  ? "本次导入会按此 Calculator 完整备份同步当前账号库存，并清理相关套装预设槽位。"
+  : "本次导入会删除当前账号中未出现在扫描结果里的驱动盘，并清理相关套装预设槽位。")
 const scanTelemetryEnabled = computed(() => scanTelemetryPreferenceEnabled())
 const scanProgressPercentage = computed(() => Math.min(100, Math.max(0, Math.round(inventoryStore.scanProgressPercent ?? 0))))
 const scanRuntimeStatus = computed(() => {
@@ -933,12 +958,39 @@ function requestImportScannerJson() {
 async function importScannerJson(forceRemoveMissing = false) {
   importError.value = ""
   try {
-    await inventoryStore.importScannerJson(importText.value, forceRemoveMissing || removeMissing.value)
+    void forceRemoveMissing
+    const summary = await inventoryStore.confirmImportPreview()
+    message.success(`导入完成：新增 ${summary?.added ?? 0}，更新 ${summary?.updated ?? 0}，移除 ${summary?.removed ?? 0}`)
     showImport.value = false
     importText.value = ""
     removeMissing.value = false
   } catch (error) {
     importError.value = error instanceof Error ? error.message : String(error)
+  }
+}
+
+async function resolveJsonImportConflict(resolution: any) {
+  importError.value = ""
+  try {
+    await inventoryStore.resolveImportConflict(resolution)
+  } catch (error) {
+    importError.value = error instanceof Error ? error.message : String(error)
+  }
+}
+
+async function resolveScanImportConflict(resolution: any) {
+  try {
+    await inventoryStore.resolveScanConflict(resolution)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : String(error))
+  }
+}
+
+async function confirmScanImportReview() {
+  try {
+    await inventoryStore.confirmScanImport()
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : String(error))
   }
 }
 
@@ -1020,7 +1072,7 @@ function confirmDangerImport() {
         </div>
       </div>
       <div class="panel-body section-band">
-        <div class="toolbar">
+        <div class="toolbar inventory-filter-toolbar">
           <NInput v-model:value="inventoryStore.search" clearable placeholder="搜索套装、主词条或 ID" style="max-width: 320px" />
           <NSelect v-model:value="inventoryStore.mainStatFilter" clearable :options="inventoryStore.mainStatOptions.map(stat => ({ label: statLabel(stat, catalogStore.meta), value: stat }))" placeholder="主词条" style="max-width: 200px" />
           <NSelect
@@ -1048,11 +1100,13 @@ function confirmDangerImport() {
           <NTag round>{{ inventoryStore.driveDiscs.length }} 件</NTag>
           <NTag round>{{ inventoryStore.loadouts.length }} 个套装预设</NTag>
         </div>
-        <NTabs v-model:value="inventoryStore.slotFilter" type="segment">
-          <NTab v-for="slot in slotTabs" :key="slot.value" :name="slot.value">
-            {{ slot.name }} {{ slot.count }}
-          </NTab>
-        </NTabs>
+        <div class="slot-filter-scroll">
+          <NTabs v-model:value="inventoryStore.slotFilter" type="segment">
+            <NTab v-for="slot in slotTabs" :key="slot.value" :name="slot.value">
+              {{ slot.name }} {{ slot.count }}
+            </NTab>
+          </NTabs>
+        </div>
         <div v-if="!inventoryStore.hasDriveDiscs" class="scan-empty-state">
           <div class="scan-empty-icon">
             <Radar :size="32" :stroke-width="1.6" />
@@ -1091,6 +1145,7 @@ function confirmDangerImport() {
                     <div class="disc-row-meta">
                       <strong :title="driveDiscSetName(disc)">{{ driveDiscSetName(disc) }}</strong>
                       <span :title="driveDiscIdentityMeta(disc)">{{ driveDiscIdentityMeta(disc) }}</span>
+                      <DriveDiscSourceTags :disc="disc" />
                     </div>
                   </div>
                 </td>
@@ -1499,31 +1554,48 @@ function confirmDangerImport() {
     @clear="clearLoadoutDiscSlot"
   />
 
-  <NModal v-model:show="showImport" preset="card" title="导入驱动盘 JSON" style="max-width: 760px">
+  <NModal
+    :show="showImport"
+    preset="card"
+    title="导入驱动盘 JSON"
+    style="width: min(760px, calc(100vw - 16px)); max-width: 760px"
+    :mask-closable="!inventoryStore.importApplying"
+    :close-on-esc="!inventoryStore.importApplying"
+    :closable="!inventoryStore.importApplying"
+    @update:show="visible => { if (!inventoryStore.importApplying) showImport = visible }"
+  >
     <div class="section-band">
       <div class="notranslate" translate="no">
-        <NInput v-model:value="importText" type="textarea" placeholder="粘贴扫描器或计算器导出的 JSON" :autosize="{ minRows: 8, maxRows: 16 }" />
+        <NInput v-model:value="importText" type="textarea" placeholder="粘贴扫描器或计算器导出的 JSON" aria-label="驱动盘 JSON 内容" :autosize="{ minRows: 8, maxRows: 16 }" :disabled="importControlsLocked" />
       </div>
       <div class="toolbar">
-        <input type="file" accept=".json,application/json" @change="previewFileImport">
-        <NCheckbox v-model:checked="removeMissing">同步删除本地存在但本次扫描缺失的驱动盘</NCheckbox>
+        <input type="file" accept=".json,application/json" :disabled="importControlsLocked" aria-label="选择驱动盘 JSON 文件" @change="previewFileImport">
+        <NCheckbox v-model:checked="removeMissing" :disabled="importControlsLocked">
+          {{ nativeImportPreview ? "按此 Calculator 备份同步库存" : "同步移除本次扫描缺失项" }}
+        </NCheckbox>
       </div>
       <div class="toolbar">
-        <NButton @click="previewImport">预览</NButton>
+        <NButton :loading="inventoryStore.importApplying" :disabled="importControlsLocked || !importText.trim()" @click="previewImport">预览</NButton>
         <NTag v-if="inventoryStore.importPreview" round>当前 {{ inventoryStore.importPreview.currentCount }} → {{ inventoryStore.importPreview.nextCount }}</NTag>
         <NTag v-if="inventoryStore.importPreview" type="success" round>新增 {{ inventoryStore.importPreview.summary.added }}</NTag>
         <NTag v-if="inventoryStore.importPreview" type="info" round>更新 {{ inventoryStore.importPreview.summary.updated }}</NTag>
         <NTag v-if="inventoryStore.importPreview" round>未变 {{ inventoryStore.importPreview.summary.skipped }}</NTag>
         <NTag v-if="inventoryStore.importPreview?.summary?.removed" type="error" round>将删除 {{ inventoryStore.importPreview.summary.removed }}</NTag>
-        <NTag v-if="inventoryStore.importSummary" type="success" round>
-          新增 {{ inventoryStore.importSummary.added }}，更新 {{ inventoryStore.importSummary.updated }}，移除 {{ inventoryStore.importSummary.removed }}
-        </NTag>
+        <NTag v-if="inventoryStore.importPreview?.summary?.sourceMerged" type="info" round>合并来源 {{ inventoryStore.importPreview.summary.sourceMerged }}</NTag>
+        <NTag v-if="inventoryStore.importPreview?.summary?.sourceDetached" type="warning" round>移除来源 {{ inventoryStore.importPreview.summary.sourceDetached }}</NTag>
+        <NTag v-if="inventoryStore.importPreview?.summary?.conflicts" type="warning" round>待确认 {{ inventoryStore.importPreview.summary.conflicts }}</NTag>
       </div>
-      <div v-if="inventoryStore.importPreview?.warnings?.length" class="section-band">
+      <div v-if="inventoryStore.importPreview?.warnings?.length" class="section-band" role="status" aria-live="polite">
         <NTag v-for="warning in inventoryStore.importPreview.warnings" :key="warning" type="warning">{{ warning }}</NTag>
       </div>
-      <div v-if="importPreviewSections.length" class="panel" style="max-height: 300px; overflow: auto;">
-        <table class="data-table">
+      <DriveDiscConflictResolver
+        :conflicts="inventoryStore.importPlan?.conflicts ?? []"
+        :resolutions="inventoryStore.importResolutions"
+        :disabled="inventoryStore.importResolving || inventoryStore.importApplying"
+        @resolve="resolveJsonImportConflict"
+      />
+      <div v-if="importPreviewSections.length" class="panel import-preview-panel" style="max-height: 300px; overflow: auto;">
+        <table class="data-table import-preview-table">
           <thead>
             <tr>
               <th>类型</th>
@@ -1536,28 +1608,43 @@ function confirmDangerImport() {
           <tbody>
             <template v-for="section in importPreviewSections" :key="section.key">
               <tr v-for="disc in section.rows.slice(0, 12)" :key="`${section.key}-${disc.id}`">
-                <td><NTag :type="section.key === 'removed' ? 'error' : section.key === 'added' ? 'success' : 'info'" size="small" round>{{ section.label }}</NTag></td>
-                <td class="num">{{ disc.partition }}</td>
-                <td>{{ disc.setName || disc.setId }}</td>
-                <td>{{ mainStatText(disc) }}</td>
-                <td class="num">{{ disc.level ?? "-" }}</td>
+                <td data-label="类型">
+                  <NTag :type="section.key === 'removed' ? 'error' : section.key === 'added' ? 'success' : 'info'" size="small" round>{{ section.label }}</NTag>
+                  <DriveDiscSourceTags :disc="disc" show-scanner-sequence />
+                </td>
+                <td class="num" data-label="槽位">{{ disc.partition }}</td>
+                <td data-label="套装">{{ disc.setName || disc.setId }}</td>
+                <td data-label="主词条">{{ mainStatText(disc) }}</td>
+                <td class="num" data-label="等级">{{ disc.level ?? "-" }}</td>
               </tr>
             </template>
           </tbody>
         </table>
       </div>
-      <NTag v-if="importError" type="error">{{ importError }}</NTag>
+      <NTag v-if="importError" type="error" role="alert">{{ importError }}</NTag>
     </div>
     <template #footer>
       <div class="drawer-footer">
-        <NButton @click="showImport = false">取消</NButton>
-        <NButton type="primary" :disabled="!inventoryStore.importPreview" @click="requestImportScannerJson">确认导入</NButton>
+        <NButton :disabled="inventoryStore.importApplying || inventoryStore.importResolving" @click="showImport = false">取消</NButton>
+        <NButton
+          type="primary"
+          :loading="inventoryStore.importApplying"
+          :disabled="inventoryStore.importResolving || !inventoryStore.importPlan || inventoryStore.importPlan.hasUnresolvedConflicts"
+          @click="requestImportScannerJson"
+        >确认导入</NButton>
       </div>
     </template>
   </NModal>
 
-  <NDrawer v-model:show="showScan" width="460" placement="right">
-    <NDrawerContent title="驱动盘扫描">
+  <NDrawer
+    :show="showScan"
+    width="min(460px, 100vw)"
+    placement="right"
+    :mask-closable="!inventoryStore.importApplying"
+    :close-on-esc="!inventoryStore.importApplying"
+    @update:show="visible => { if (!inventoryStore.importApplying) showScan = visible }"
+  >
+    <NDrawerContent title="驱动盘扫描" :closable="!inventoryStore.importApplying">
       <div class="section-band">
         <ol class="scan-phase-indicator" :data-active="inventoryStore.scanPhase">
           <li v-for="step in [
@@ -1665,26 +1752,60 @@ function confirmDangerImport() {
               <NTag type="info" round>更新 {{ inventoryStore.scanSession.preview.summary.updated }}</NTag>
               <NTag round>未变 {{ inventoryStore.scanSession.preview.summary.skipped }}</NTag>
               <NTag v-if="inventoryStore.scanSession.preview.summary.removed" type="error" round>删除 {{ inventoryStore.scanSession.preview.summary.removed }}</NTag>
+              <NTag v-if="inventoryStore.scanSession.preview.summary.sourceMerged" type="info" round>合并来源 {{ inventoryStore.scanSession.preview.summary.sourceMerged }}</NTag>
+              <NTag v-if="inventoryStore.scanSession.preview.summary.sourceDetached" type="warning" round>移除来源 {{ inventoryStore.scanSession.preview.summary.sourceDetached }}</NTag>
+              <NTag v-if="inventoryStore.scanSession.preview.summary.conflicts" type="warning" round>待确认 {{ inventoryStore.scanSession.preview.summary.conflicts }}</NTag>
               <NTag v-if="inventoryStore.scanSession.imported" type="success" round>
                 {{ inventoryStore.scanSession.partial ? "已安全导入" : "已自动导入" }}
               </NTag>
             </div>
+            <div
+              v-if="inventoryStore.scanSession.preview.warnings?.length"
+              class="section-band"
+              role="status"
+              aria-live="polite"
+            >
+              <NTag
+                v-for="warning in inventoryStore.scanSession.preview.warnings"
+                :key="warning"
+                type="warning"
+              >{{ warning }}</NTag>
+            </div>
             <div v-if="scanPreviewSections.length" class="panel" style="max-height: 260px; overflow: auto;">
-              <table class="data-table">
+              <table class="data-table scan-preview-table">
                 <tbody>
                   <template v-for="section in scanPreviewSections" :key="section.key">
                     <tr v-for="disc in section.rows.slice(0, 8)" :key="`${section.key}-${disc.id}`">
-                      <th><NTag :type="section.key === 'removed' ? 'error' : section.key === 'added' ? 'success' : 'info'" size="small" round>{{ section.label }}</NTag></th>
-                      <td>{{ disc.partition }}号位</td>
-                      <td>{{ disc.setName || disc.setId }}</td>
-                      <td>{{ mainStatText(disc) }}</td>
+                      <th>
+                        <NTag :type="section.key === 'removed' ? 'error' : section.key === 'added' ? 'success' : 'info'" size="small" round>{{ section.label }}</NTag>
+                        <DriveDiscSourceTags :disc="disc" show-scanner-sequence />
+                      </th>
+                      <td data-label="槽位">{{ disc.partition }}号位</td>
+                      <td data-label="套装">{{ disc.setName || disc.setId }}</td>
+                      <td data-label="主词条">{{ mainStatText(disc) }}</td>
                     </tr>
                   </template>
                 </tbody>
               </table>
             </div>
+            <DriveDiscConflictResolver
+              v-if="inventoryStore.scanStatus === 'review'"
+              :conflicts="inventoryStore.scanSession.plan?.conflicts ?? []"
+              :resolutions="inventoryStore.scanSession.resolutions ?? {}"
+              :disabled="inventoryStore.importResolving || inventoryStore.importApplying"
+              @resolve="resolveScanImportConflict"
+            />
+            <div v-if="inventoryStore.scanStatus === 'review'" class="drawer-footer scan-review-actions">
+              <NButton :disabled="inventoryStore.importApplying || inventoryStore.importResolving" @click="inventoryStore.discardScanImportReview">放弃本次结果</NButton>
+              <NButton
+                type="primary"
+                :loading="inventoryStore.importApplying"
+                :disabled="inventoryStore.importResolving || inventoryStore.scanSession.plan?.hasUnresolvedConflicts"
+                @click="confirmScanImportReview"
+              >确认导入</NButton>
+            </div>
           </div>
-          <NTag v-if="inventoryStore.scanSession?.error" type="error">{{ inventoryStore.scanSession.error }}</NTag>
+          <NTag v-if="inventoryStore.scanSession?.error" type="error" role="alert">{{ inventoryStore.scanSession.error }}</NTag>
         </div>
       </div>
     </NDrawerContent>
@@ -1713,7 +1834,7 @@ function confirmDangerImport() {
     v-model:show="confirmRemoveMissingImport"
     danger
     title="同步删除缺失盘"
-    message="本次导入会删除当前账号中未出现在扫描结果里的驱动盘，并清理相关套装预设槽位。"
+    :message="removeMissingImportMessage"
     confirm-text="确认同步删除"
     @confirm="confirmDangerImport"
   />
@@ -1809,21 +1930,25 @@ function confirmDangerImport() {
   min-width: 0;
 }
 
-.disc-row-meta strong,
-.disc-row-meta span {
+.disc-row-meta > strong,
+.disc-row-meta > span {
   display: block;
 }
 
-.disc-row-meta strong {
+.disc-row-meta > strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.disc-row-meta span {
+.disc-row-meta > span:not(.drive-disc-source-tags) {
   margin-top: 2px;
   color: var(--app-muted);
   font-size: 12px;
+}
+
+.disc-row-meta :deep(.drive-disc-source-tags) {
+  margin-top: 4px;
 }
 
 .reservation-agent {
@@ -1865,7 +1990,55 @@ function confirmDangerImport() {
   justify-content: end;
 }
 
+.scan-review-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.import-preview-panel,
+.import-preview-table,
+.scan-preview-table {
+  width: 100%;
+  max-width: 100%;
+}
+
+.import-preview-table td,
+.scan-preview-table td {
+  overflow-wrap: anywhere;
+}
+
+.import-preview-table td:first-child,
+.scan-preview-table th {
+  min-width: 0;
+}
+
+.import-preview-table td:first-child :deep(.drive-disc-source-tags),
+.scan-preview-table th :deep(.drive-disc-source-tags) {
+  margin-top: 4px;
+}
+
+.slot-filter-scroll {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
 @media (max-width: 680px) {
+  .inventory-filter-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .inventory-filter-toolbar > * {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
   .inventory-table-panel {
     max-height: none !important;
     overflow: visible !important;
@@ -1910,6 +2083,60 @@ function confirmDangerImport() {
   .inventory-table td:nth-child(5),
   .inventory-table td:nth-last-child(2) {
     grid-column: 1 / -1;
+  }
+
+  .import-preview-table,
+  .import-preview-table tbody,
+  .import-preview-table tr,
+  .import-preview-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .import-preview-table thead {
+    display: none;
+  }
+
+  .import-preview-table tbody {
+    display: grid;
+    gap: 8px;
+  }
+
+  .import-preview-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 5px 10px;
+    padding: 9px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius-sm);
+  }
+
+  .import-preview-table td {
+    padding: 0;
+    border: 0;
+  }
+
+  .import-preview-table td[data-label]::before,
+  .scan-preview-table td[data-label]::before {
+    display: block;
+    margin-bottom: 2px;
+    color: var(--app-muted);
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .import-preview-table td:nth-child(3),
+  .import-preview-table td:nth-child(4) {
+    grid-column: 1 / -1;
+  }
+
+  .scan-preview-table {
+    table-layout: fixed;
+  }
+
+  .scan-review-actions :deep(.n-button) {
+    flex: 1 1 140px;
   }
 
   .inventory-table td:last-child {

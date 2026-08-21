@@ -625,6 +625,23 @@ fallback. Local and Cloud Zenless Zone Zero targets are both supported. Scanner
 packages and generated scans are release artifacts or local caches, not normal
 source-control content.
 
+## Third-party services and acknowledgements
+
+Showcase Data Import uses the public Zenless Zone Zero Character Showcase API
+provided by [Enka.Network](https://enka.network/). We thank the Enka.Network
+maintainers for operating that service and publishing the
+[Zenless Zone Zero API documentation](https://github.com/EnkaNetwork/API-docs/blob/master/docs/zzz/api.md).
+The response schema and the generated local mapping snapshot are based on the
+[EnkaNetwork/API-docs repository](https://github.com/EnkaNetwork/API-docs); the
+snapshot records its exact upstream commit in `data/enka_zzz_mapping.json`.
+
+ZZZ Calculator is an independent project and is not affiliated with or endorsed
+by Enka.Network or HoYoverse. Public access to upstream repositories is not a
+claim that Enka.Network as a whole is open source, and this acknowledgement does
+not grant any additional license. Before enabling Showcase Data Import in
+production, maintainers must confirm the redistribution terms for the
+API-docs-derived snapshot or replace it with independently maintained mappings.
+
 ## Documentation
 
 - [Modeling notes](docs/modeling.md)

@@ -183,6 +183,7 @@ async function mountView(reservationUiEnabled = false, exclusionUiEnabled = fals
       maintenanceEnabled: false,
       scanTelemetryEnabled: false,
       scanTelemetryRetentionDays: 30,
+      enkaImportEnabled: false,
       driveDiscReservationsUiEnabled: reservationUiEnabled,
       driveDiscExclusionsUiEnabled: exclusionUiEnabled,
     },
@@ -232,7 +233,7 @@ function driveDisc(slot: number, overrides: any = {}) {
       { stat: "critRate", value: 4.8 },
       { stat: "critDmg", value: 9.6 },
     ],
-    source: { sequence: slot + 20 },
+      source: { type: "zzz-scanner", sequence: slot + 20 },
     ...overrides,
   }
 }
@@ -258,7 +259,7 @@ describe("DiscsView", () => {
       level: 15,
       mainStat: { stat: "hpFlat", value: 2200 },
       subStats: [{ stat: "critRate", value: 4.8 }],
-      source: { sequence: 7 },
+        source: { type: "zzz-scanner", sequence: 7 },
     }])
 
     const wrapper = await mountView()
@@ -268,6 +269,7 @@ describe("DiscsView", () => {
     expect(identity.find("img").attributes("src")).toBe("/assets/drive-discs/woodpecker_electro.webp")
     expect(identity.text()).toContain("啄木鸟电音")
     expect(identity.text()).toContain("#7")
+    expect(identity.text()).toContain("扫描器")
   })
 
   it("falls back to the shared empty drive disc icon for unknown sets", async () => {
@@ -391,7 +393,7 @@ describe("DiscsView", () => {
       id: "candidate-disc-1",
       setId: "swing_jazz",
       setName: "摇摆爵士",
-      source: { sequence: 88 },
+        source: { type: "zzz-scanner", sequence: 88 },
       reservedForAgentId: "agent-b",
     })
     const discs = [original, candidate, driveDisc(2), driveDisc(3), driveDisc(4)]

@@ -33,11 +33,20 @@ import {
 import {
   currentAccountId,
   loadCurrentOwnerSelection,
-  saveCurrentOwnerSelection,
 } from "@runtime/selection-storage.js"
+import {
+  readBuildSelectionDocument,
+  readLegacySelectionDocument,
+  WEBAPP_BUILD_STORAGE_KEY,
+  writeSelectionDocuments,
+} from "@runtime/build-storage"
+import { withDriveDiscImportOwnerLock } from "@runtime/drive-disc-import-lock"
 
-export const STORAGE_KEY = "zzz-calculator.webapp.build.v1"
+export const STORAGE_KEY = WEBAPP_BUILD_STORAGE_KEY
 const OLD_HOME_SELECTION_KEY = "zzz-calculator.homeSelection.v1"
+
+let buildPersistQueue: Promise<void> = Promise.resolve()
+let buildPersistenceBlocked = false
 
 export const ELEMENTS = ["physical", "fire", "ice", "electric", "ether", "wind"]
 export const SKILL_CATEGORIES = ["basic", "dodge", "assist", "special", "chain"]
@@ -487,6 +496,118 @@ function legacyOwnerSelection() {
   } catch {
     return ownerSelectionFromRaw(readJson(OLD_HOME_SELECTION_KEY))
   }
+}
+
+function selectionForOwner(document: any, ownerId: string) {
+  if (document?.byOwner && typeof document.byOwner === "object") {
+    return document.byOwner[ownerId] ?? { currentAgentId: null, byAgent: {} }
+  }
+  if (ownerId === "default" && document?.byAgent && typeof document.byAgent === "object") {
+    return { currentAgentId: document.currentAgentId ?? null, byAgent: document.byAgent }
+  }
+  return { currentAgentId: null, byAgent: {} }
+}
+
+function selectionDocumentFingerprint(document: any) {
+  return JSON.stringify(document ?? null)
+}
+
+function writeBuildPersistSnapshot(snapshot: any) {
+  const { ownerId, agentId } = snapshot
+  const buildSelection = readBuildSelectionDocument()
+  const buildOwner = selectionForOwner(buildSelection, ownerId)
+  const buildByAgent = { ...(buildOwner.byAgent ?? {}) }
+  const previousConfig = buildByAgent[agentId] ?? {}
+  const previousSnapshot = previousConfig.lastAnomalySourceSnapshot
+  const persistedConfig = {
+    ...previousConfig,
+    agentLevel: snapshot.agentLevel,
+    coreSkillLevel: snapshot.coreSkillLevel,
+    cinemaLevel: snapshot.cinemaLevel,
+    skillLevels: snapshot.skillLevels,
+    wEngineId: snapshot.wEngineId,
+    wEngineLevel: snapshot.wEngineLevel,
+    wEngineModificationLevel: snapshot.wEngineModificationLevel,
+    selectedLoadoutId: snapshot.selectedLoadoutId,
+    selectedOptimizedRank: snapshot.selectedOptimizedRank,
+    lastAnomalySourceSnapshot: snapshot.lastAnomalySourceSnapshot
+      ?? (previousSnapshot && typeof previousSnapshot === "object" && !Array.isArray(previousSnapshot)
+        ? clone(previousSnapshot)
+        : null),
+    discMode: snapshot.discMode,
+    manualDriveDiscIdsBySlot: snapshot.manualDriveDiscIdsBySlot,
+    targetConfig: snapshot.targetConfig,
+    damage: {
+      ...damageConfigFields(snapshot.damageConfig),
+      skillLevelsByCategory: {
+        ...(snapshot.damageConfig.skillLevelsByCategory ?? {}),
+        ...snapshot.skillLevels,
+      },
+    },
+    combat: {
+      activeBuffIds: snapshot.selectedBuffIds,
+      addedBuffs: snapshot.addedBuffs,
+      runtimeInputs: snapshot.runtimeInputs,
+      manuallyUncheckedDefaultBuffIds: snapshot.manuallyUncheckedDefaultBuffIds,
+    },
+  }
+  buildByAgent[agentId] = persistedConfig
+  const nextBuildSelection = {
+    version: 2,
+    currentOwnerId: ownerId,
+    byOwner: {
+      ...(buildSelection?.byOwner ?? {}),
+      [ownerId]: { currentAgentId: agentId, byAgent: buildByAgent },
+    },
+  }
+
+  const legacySelection = readLegacySelectionDocument()
+  const legacyOwner = selectionForOwner(legacySelection, ownerId)
+  const legacyByAgent = { ...(legacyOwner.byAgent ?? {}) }
+  legacyByAgent[agentId] = {
+    ...(legacyByAgent[agentId] ?? {}),
+    ...persistedConfig,
+    damage: {
+      ...(persistedConfig.damage ?? {}),
+      target: clone(snapshot.targetConfig),
+    },
+  }
+  const nextLegacySelection = {
+    version: 2,
+    currentOwnerId: ownerId,
+    byOwner: {
+      ...(legacySelection?.byOwner ?? {}),
+      [ownerId]: { currentAgentId: agentId, byAgent: legacyByAgent },
+    },
+  }
+  writeSelectionDocuments(nextBuildSelection, nextLegacySelection)
+}
+
+function persistBuildSnapshot(snapshot: any): Promise<void> {
+  const locks = typeof navigator !== "undefined" ? (navigator as any).locks : null
+  if (!locks?.request) {
+    writeBuildPersistSnapshot(snapshot)
+    return Promise.resolve()
+  }
+
+  const operation = buildPersistQueue.then(async () => {
+    if (buildPersistenceBlocked) {
+      throw new Error("配置已被其他页面更新，请刷新后再保存。")
+    }
+    const expectedBuild = selectionDocumentFingerprint(readBuildSelectionDocument())
+    const expectedLegacy = selectionDocumentFingerprint(readLegacySelectionDocument())
+    await withDriveDiscImportOwnerLock(snapshot.ownerId, async () => {
+      const currentBuild = selectionDocumentFingerprint(readBuildSelectionDocument())
+      const currentLegacy = selectionDocumentFingerprint(readLegacySelectionDocument())
+      if (currentBuild !== expectedBuild || currentLegacy !== expectedLegacy) {
+        buildPersistenceBlocked = true
+        throw new Error("配置在保存期间被导入或其他页面更新，请刷新后重试。")
+      }
+      writeBuildPersistSnapshot(snapshot)
+    })
+  })
+  buildPersistQueue = operation.then(() => undefined, () => undefined)
+  return operation
 }
 
 function savedConfigForAgent(agentId: string) {
@@ -1018,72 +1139,34 @@ export const useBuildStore = defineStore("build", {
     },
     persist() {
       if (!this.agentId) {
-        return
+        return Promise.resolve()
       }
-      const webappSaved = readJson(STORAGE_KEY) ?? {}
-      const ownerId = activeOwnerId()
-      const ownerSelection = ownerSelectionFromRaw(webappSaved) ?? { currentAgentId: null, byAgent: {} }
-      const webappByOwner = isOwnerScopedSelection(webappSaved) ? { ...(webappSaved.byOwner ?? {}) } : {}
-      const webappByAgent = { ...(ownerSelection.byAgent ?? {}) }
-      const previousConfig = webappByAgent[this.agentId] ?? {}
-      const previousSnapshot = previousConfig.lastAnomalySourceSnapshot
-      const persistedConfig = {
-        ...previousConfig,
+      const request = persistBuildSnapshot({
+        ownerId: activeOwnerId(),
+        agentId: this.agentId,
         agentLevel: this.agentLevel,
         coreSkillLevel: this.coreSkillLevel,
         cinemaLevel: this.cinemaLevel,
-        skillLevels: this.skillLevels,
+        skillLevels: clone(this.skillLevels),
         wEngineId: this.wEngineId,
         wEngineLevel: this.wEngineLevel,
         wEngineModificationLevel: this.wEngineModificationLevel,
         selectedLoadoutId: this.selectedLoadoutId,
         selectedOptimizedRank: this.selectedOptimizedRank,
-        lastAnomalySourceSnapshot: this.lastAnomalySourceSnapshot
-          ?? (previousSnapshot && typeof previousSnapshot === "object" && !Array.isArray(previousSnapshot)
-            ? clone(previousSnapshot)
-            : null),
+        lastAnomalySourceSnapshot: clone(this.lastAnomalySourceSnapshot),
         discMode: this.discMode,
-        manualDriveDiscIdsBySlot: this.manualDriveDiscIdsBySlot,
-        targetConfig: this.targetConfig,
-        damage: {
-          ...damageConfigFields(this.damageConfig),
-          skillLevelsByCategory: {
-            ...(this.damageConfig.skillLevelsByCategory ?? {}),
-            ...this.skillLevels,
-          },
-        },
-        combat: {
-          activeBuffIds: this.selectedBuffIds,
-          addedBuffs: this.addedBuffs,
-          runtimeInputs: this.runtimeInputs,
-          manuallyUncheckedDefaultBuffIds: this.manuallyUncheckedDefaultBuffIds,
-        },
-      }
-      webappByAgent[this.agentId] = persistedConfig
-      webappByOwner[ownerId] = {
-        currentAgentId: this.agentId,
-        byAgent: webappByAgent,
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        version: 2,
-        currentOwnerId: ownerId,
-        byOwner: webappByOwner,
-      }))
-
-      const legacySelection = legacyOwnerSelection()
-      const legacyByAgent = { ...(legacySelection?.byAgent ?? {}) }
-      legacyByAgent[this.agentId] = {
-        ...(legacyByAgent[this.agentId] ?? {}),
-        ...persistedConfig,
-        damage: {
-          ...(persistedConfig.damage ?? {}),
-          target: clone(this.targetConfig),
-        },
-      }
-      saveCurrentOwnerSelection({
-        currentAgentId: this.agentId,
-        byAgent: legacyByAgent,
-      }, ownerId)
+        manualDriveDiscIdsBySlot: clone(this.manualDriveDiscIdsBySlot),
+        targetConfig: clone(this.targetConfig),
+        damageConfig: clone(this.damageConfig),
+        selectedBuffIds: clone(this.selectedBuffIds),
+        addedBuffs: clone(this.addedBuffs),
+        runtimeInputs: clone(this.runtimeInputs),
+        manuallyUncheckedDefaultBuffIds: clone(this.manuallyUncheckedDefaultBuffIds),
+      })
+      void request.catch(error => {
+        this.error = error instanceof Error ? error.message : String(error)
+      })
+      return request
     },
   },
 })

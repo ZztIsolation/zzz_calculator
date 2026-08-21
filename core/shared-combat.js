@@ -104,7 +104,6 @@ export const CUSTOM_BUFF_STAT_OPTIONS = [
     ["penRatio", "穿透率%", "flat", null],
     ["sheerForceFlat", "固定贯穿力", "flat", null],
     ["dmgBonus", "通用伤害%", "flat", null],
-    ["enemyDamageTakenBonus", "敌方承伤提升%", "eventModifier", null],
     ["anomalyDamageBonus", "属性异常增伤%", "eventModifier", null],
     ["disorderDamageBonus", "紊乱增伤%", "eventModifier", null],
     ["sheerDmgBonus", "贯穿增伤%", "eventModifier", null],

@@ -203,6 +203,7 @@ async function verifyPagesArtifact(maintenanceEnabled) {
     assertArtifact(appConfig.maintenanceEnabled === maintenanceEnabled, "app-config maintenance flag mismatch")
     assertArtifact(appConfig.scanTelemetryEnabled === false, "Pages must keep scan telemetry disabled")
     assertArtifact(appConfig.scanTelemetryRetentionDays === 30, "Pages telemetry retention metadata mismatch")
+    assertArtifact(appConfig.enkaImportEnabled === false, "Pages must keep Enka import disabled")
     assertArtifact(appConfig.driveDiscReservationsUiEnabled === driveDiscReservationsUiEnabled, "app-config reservation UI flag mismatch")
     assertArtifact(appConfig.driveDiscExclusionsUiEnabled === driveDiscExclusionsUiEnabled, "app-config exclusion UI flag mismatch")
     assertArtifact(manifest.schemaVersion === 3, "scanner manifest schema mismatch")
@@ -295,6 +296,7 @@ await writeJson(path.join(outDir, "static", "app-config.json"), {
     maintenanceEnabled,
     scanTelemetryEnabled: false,
     scanTelemetryRetentionDays: 30,
+    enkaImportEnabled: false,
     driveDiscReservationsUiEnabled,
     driveDiscExclusionsUiEnabled,
 })
