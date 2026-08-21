@@ -15,7 +15,13 @@ const SOURCE_DESCRIPTORS: DriveDiscSourceDescriptor[] = [
 
 function legacySourceKey(source: any): DriveDiscSourceKey | null {
   const type = String(source?.type ?? "").trim().toLowerCase()
-  if (!type) return null
+  if (!type) {
+    return source?.sequence !== null
+      && source?.sequence !== undefined
+      && String(source.sequence).trim() !== ""
+      ? "scanner"
+      : null
+  }
   if (type.startsWith("enka")) return "enkaZzz"
   if (type === "zzz-scanner" || type === "scanner") return "scanner"
   if (type === "calculator-json" || type === "zzz-calculator-drive-disc-export" || type === "json") {

@@ -37,6 +37,13 @@ describe("drive disc provenance display", () => {
     expect(driveDiscSourceDescriptors({ source: { type } }).map(source => source.label)).toEqual([label])
   })
 
+  it("recognizes sequence-only legacy Scanner sources", () => {
+    const disc = { source: { sequence: 88 } }
+    expect(driveDiscSourceDescriptors(disc).map(source => source.label)).toEqual(["扫描器"])
+    expect(driveDiscScannerSequence(disc)).toBe("88")
+    expect(driveDiscSourceText(disc, { includeScannerSequence: true })).toBe("扫描器 #88")
+  })
+
   it("does not treat an Enka sequence-shaped compatibility field as Scanner provenance", () => {
     const disc = { source: { type: "enka-zzz-showcase", sequence: 9 } }
     expect(driveDiscScannerSequence(disc)).toBeNull()

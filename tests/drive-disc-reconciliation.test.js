@@ -6,6 +6,7 @@ import {
     buildScannerImportPlan,
     createEmptyInventoryStore,
     normalizeDriveDiscImport,
+    normalizeInventoryStore,
     planDriveDiscReconciliation,
 } from "../core/inventory-model.js"
 import { enkaDriveDiscId } from "../core/enka-import/drive-disc-plan.js"
@@ -105,6 +106,17 @@ function assertSources(disc, expected) {
     for (const source of expected) {
         assert.ok(disc.provenance?.[source], `expected provenance.${source} on ${disc.id}`)
     }
+}
+
+// Older Scanner inventories only stored the sequence and no source type.
+// Normalization must retain that stable UI identity and project a Scanner source.
+{
+    const normalized = normalizeInventoryStore(storeWith([
+        normalizedDisc("legacy-sequence-only", { source: { sequence: 88 } }),
+    ])).driveDiscs[0]
+    assert.equal(normalized.provenance.scanner.lastSequence, 88)
+    assert.equal(normalized.source.type, "zzz-scanner")
+    assert.equal(normalized.source.sequence, 88)
 }
 
 // Scanner -> Enka: keep the existing canonical id, attach Enka identity, and let

@@ -204,6 +204,9 @@ function legacyProvenance(disc) {
         ? cloneJsonValue(disc.provenance)
         : { version: DRIVE_DISC_PROVENANCE_VERSION }
     const sourceType = String(source.type ?? "")
+    const sequenceOnlyScanner = !sourceType
+        && source.sequence != null
+        && String(source.sequence).trim() !== ""
     const firstSeenAt = timeValue(source.importedAt, disc?.createdAt ?? null)
     const lastSeenAt = timeValue(source.matchedAt, source.importedAt ?? disc?.updatedAt ?? firstSeenAt)
 
@@ -219,7 +222,7 @@ function legacyProvenance(disc) {
             lastSeenAt: provenance.enkaZzz?.lastSeenAt ?? lastSeenAt,
         }
     }
-    if (sourceType === "zzz-scanner") {
+    if (["zzz-scanner", "scanner"].includes(sourceType) || sequenceOnlyScanner) {
         provenance.scanner = {
             ...(provenance.scanner ?? {}),
             firstSeenAt: provenance.scanner?.firstSeenAt ?? firstSeenAt,
