@@ -149,7 +149,7 @@ try {
   legacyValidationDataDir = await createLegacyValidationDataDir()
   const disabledPort = await freePort()
   disabled = startCalculator(disabledPort, {
-    ENKA_IMPORT_ENABLED: "",
+    ENKA_IMPORT_ENABLED: "false",
     ZZZ_CALCULATOR_DATA_DIR: legacyValidationDataDir,
   })
   const disabledBase = `http://127.0.0.1:${disabledPort}`

@@ -98,8 +98,26 @@ function envFlag(name) {
     return null
 }
 
+async function loadProductionRuntimeConfig() {
+    if (nodeEnv !== "production") {
+        return null
+    }
+    try {
+        const config = JSON.parse(await readFile(path.join(__dirname, "production-runtime-config.json"), "utf8"))
+        if (config?.version !== 1 || typeof config.enkaImportEnabled !== "boolean") {
+            throw new Error("unsupported production runtime configuration")
+        }
+        return config
+    } catch (error) {
+        console.warn(`Production runtime configuration is unavailable; optional features remain disabled. ${error.message}`)
+        return null
+    }
+}
+
+const productionRuntimeConfig = await loadProductionRuntimeConfig()
 const scanTelemetryEnabled = envFlag("SCAN_TELEMETRY_ENABLED") === true
-const enkaImportEnabled = envFlag("ENKA_IMPORT_ENABLED") ?? nodeEnv !== "production"
+const enkaImportEnabled = envFlag("ENKA_IMPORT_ENABLED")
+    ?? (nodeEnv === "production" ? productionRuntimeConfig?.enkaImportEnabled === true : true)
 const driveDiscReservationsUiEnabled = envFlag("DRIVE_DISC_RESERVATIONS_UI_ENABLED") ?? nodeEnv !== "production"
 const driveDiscExclusionsUiEnabled = envFlag("DRIVE_DISC_EXCLUSIONS_UI_ENABLED") ?? nodeEnv !== "production"
 const scanTelemetryRetentionDays = Math.max(1, Math.min(365, Number(process.env.SCAN_TELEMETRY_RETENTION_DAYS) || 30))

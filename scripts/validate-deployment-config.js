@@ -24,6 +24,8 @@ const files = {
     sudoers: await read("deploy/production/zzz-calculator-deploy.sudoers"),
     storageRoundtrip: await read("scripts/production-storage-roundtrip.mjs"),
     serverPackager: await read("scripts/package-server-release.js"),
+    systemdService: await read("deploy/systemd/zzz-calculator.service"),
+    productionRuntimeConfig: await read("backend/production-runtime-config.json"),
 }
 
 function requireText(contents, token, message) {
@@ -117,6 +119,15 @@ requireText(files.ci, "if-no-files-found: error", "Missing release artifacts mus
 requireText(files.ci, "retention-days: 14", "CI artifacts must have an explicit retention period.")
 requireText(files.serverPackager, 'new Set(["downloads"])', "The server packager must exclude the separately managed downloads tree.")
 requireText(files.serverPackager, "Calculator server releases must not contain separately managed download payloads.", "The server packager must fail closed if downloads enter the release tree.")
+assert.deepEqual(
+    JSON.parse(files.productionRuntimeConfig),
+    { version: 1, enkaImportEnabled: true },
+    "The versioned production runtime configuration must explicitly enable showcase import.",
+)
+requireText(files.systemdService, "Environment=ENKA_IMPORT_ENABLED=true", "The production systemd template must explicitly enable showcase import.")
+requireText(files.deployScript, "ENKA_IMPORT_ENABLED=true", "Candidate validation must exercise showcase import in production mode.")
+requireText(files.validationWorker, ".enkaImportEnabled == true", "Candidate validation must require showcase import to be enabled.")
+requireText(files.deploy, ".enkaImportEnabled == true", "Public deployment verification must require showcase import to be enabled.")
 assert.match(
     files.ci,
     /\(github\.event_name == 'push' \|\| github\.event_name == 'workflow_dispatch'\) &&\s*github\.ref == 'refs\/heads\/main'/,

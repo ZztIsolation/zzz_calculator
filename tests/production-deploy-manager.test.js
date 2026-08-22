@@ -504,6 +504,8 @@ includes(manager, '[[ -z "$data_dir" ]] || die "effective production process has
 includes(manager, 'telemetry_dir="$(process_environment_value "$pid" SCAN_TELEMETRY_DIR || true)"')
 includes(manager, '[[ -z "$telemetry_dir" ]] || die "effective production process has SCAN_TELEMETRY_DIR configured"')
 includes(manager, '.maintenanceEnabled == false and .scanTelemetryEnabled == false')
+includes(manager, "ENKA_IMPORT_ENABLED=true")
+includes(validationWorker, ".enkaImportEnabled == true")
 includes(manager, '"http://127.0.0.1:8787/api/user-drive-discs"')
 includes(manager, '[[ "$retired_inventory_status" == "410" ]]')
 const validationProfile = manager.match(/select_validation_systemd_profile\(\)[\s\S]*?^}/m)?.[0] ?? ""

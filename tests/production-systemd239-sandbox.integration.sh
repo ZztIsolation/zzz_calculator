@@ -331,7 +331,7 @@ http.createServer((request, response) => {
   } else if (request.url === "/api/catalog") {
     sendJson(response, catalog)
   } else if (request.url === "/api/app-config") {
-    sendJson(response, JSON.stringify({ maintenanceEnabled: false }))
+    sendJson(response, JSON.stringify({ maintenanceEnabled: false, enkaImportEnabled: true }))
   } else {
     response.writeHead(404)
     response.end()

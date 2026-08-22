@@ -48,6 +48,7 @@ async function startServer(extraEnv = {}, environment = "production") {
         env: {
             ...process.env,
             NODE_ENV: environment,
+            ENKA_IMPORT_ENABLED: "",
             DRIVE_DISC_RESERVATIONS_UI_ENABLED: "",
             DRIVE_DISC_EXCLUSIONS_UI_ENABLED: "",
             PORT: String(port),
@@ -185,6 +186,7 @@ try {
     assert.equal(appConfig.status, 200)
     assert.equal(JSON.parse(appConfig.body).maintenanceEnabled, false)
     assert.equal(JSON.parse(appConfig.body).scanTelemetryEnabled, false)
+    assert.equal(JSON.parse(appConfig.body).enkaImportEnabled, true)
     assert.equal(JSON.parse(appConfig.body).driveDiscReservationsUiEnabled, false)
     assert.equal(JSON.parse(appConfig.body).driveDiscExclusionsUiEnabled, false)
 
@@ -403,11 +405,13 @@ try {
     server.kill()
     await sleep(100)
     await startServer({
+        ENKA_IMPORT_ENABLED: "false",
         DRIVE_DISC_RESERVATIONS_UI_ENABLED: "false",
         DRIVE_DISC_EXCLUSIONS_UI_ENABLED: "false",
     }, "development")
     await waitForServer()
     const localDisabledConfig = JSON.parse((await getText("/api/app-config")).body)
+    assert.equal(localDisabledConfig.enkaImportEnabled, false)
     assert.equal(localDisabledConfig.driveDiscReservationsUiEnabled, false)
     assert.equal(localDisabledConfig.driveDiscExclusionsUiEnabled, false)
 } finally {
