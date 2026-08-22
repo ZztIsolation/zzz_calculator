@@ -736,12 +736,35 @@ async function main() {
     try {
         const candidateHealth = await waitForUrl(`${CANDIDATE_ORIGIN}/api/health`)
         assert.equal(candidate.child.exitCode, null, "candidate process exited before health verification")
-        assert.deepEqual(await candidateHealth.json(), { ok: true, service: "zzz_calculator" })
+        const candidateHealthBody = await candidateHealth.json()
+        assert.equal(candidateHealthBody.ok, true)
+        assert.equal(candidateHealthBody.service, "zzz_calculator")
+        assert.equal(typeof candidateHealthBody.enkaImport, "object")
+        for (const metric of [
+            "requests",
+            "cacheHits",
+            "inflightHits",
+            "upstreamRequests",
+            "upstreamErrors",
+            "rateLimited",
+            "queueRejected",
+            "cacheEntries",
+            "active",
+            "queued",
+        ]) {
+            assert.equal(
+                Number.isSafeInteger(candidateHealthBody.enkaImport?.[metric])
+                    && candidateHealthBody.enkaImport[metric] >= 0,
+                true,
+                `candidate Enka metric ${metric} must be a non-negative integer`,
+            )
+        }
         const candidateConfigResponse = await fetch(`${CANDIDATE_ORIGIN}/api/app-config`)
         assert.equal(candidateConfigResponse.ok, true)
         const candidateConfig = await candidateConfigResponse.json()
         assert.equal(candidateConfig.maintenanceEnabled, false)
         assert.equal(candidateConfig.scanTelemetryEnabled, false)
+        assert.equal(candidateConfig.enkaImportEnabled, true)
         await listen(proxy.server, 8788)
 
         context = await chromium.launchPersistentContext(profileDir, {
