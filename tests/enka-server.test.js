@@ -1,10 +1,11 @@
 import assert from "node:assert/strict"
 import { spawn } from "node:child_process"
-import { copyFile, mkdtemp, rm } from "node:fs/promises"
+import { copyFile, mkdir, mkdtemp, rm } from "node:fs/promises"
 import { createServer } from "node:http"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import { ENKA_RUNTIME_MAPPING_FILE, loadEnkaMappingSnapshot } from "../backend/enkaMapping.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const legacyValidationCatalogs = [
@@ -66,6 +67,24 @@ async function createLegacyValidationDataDir() {
   return directory
 }
 
+async function provePackagedMappingSurvivesLegacyValidationData() {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "zzz-enka-runtime-mapping-"))
+  const backendDir = path.join(directory, "backend")
+  const legacyDataDir = path.join(directory, "data")
+  await mkdir(backendDir)
+  await mkdir(legacyDataDir)
+  await copyFile(
+    path.join(rootDir, "data", "enka_zzz_mapping.json"),
+    path.join(backendDir, ENKA_RUNTIME_MAPPING_FILE),
+  )
+  try {
+    const mapping = await loadEnkaMappingSnapshot(backendDir, legacyDataDir)
+    assert.equal(mapping.source.commit, "dc86b5dc06ad27d26c9a4df9f0b6ffd0417bf554")
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+}
+
 async function waitForExit(child) {
   if (child.exitCode != null) return child.exitCode
   return Promise.race([
@@ -112,6 +131,7 @@ const upstream = createServer((req, res) => {
   res.end(body.slice(40))
 })
 const upstreamPort = await listen(upstream)
+await provePackagedMappingSurvivesLegacyValidationData()
 
 let enabled
 let disabled

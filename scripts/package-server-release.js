@@ -3,6 +3,7 @@ import { createHash } from "node:crypto"
 import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import { ENKA_RUNTIME_MAPPING_FILE } from "../backend/enkaMapping.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const outputDir = path.join(rootDir, "output")
@@ -49,6 +50,14 @@ for (const relativePath of trackedFiles) {
     await mkdir(path.dirname(targetPath), { recursive: true })
     await copyFile(sourcePath, targetPath)
 }
+
+// Immutable Enka metadata belongs with the release code. Keeping a packaged
+// copy outside data/ also lets older validation control planes sanitize the
+// data directory without removing an enabled feature's startup dependency.
+await copyFile(
+    path.join(rootDir, "data", "enka_zzz_mapping.json"),
+    path.join(stagingDir, "backend", ENKA_RUNTIME_MAPPING_FILE),
+)
 
 async function copyTree(sourceDir, targetDir, excludedEntries = new Set()) {
     const entries = await readdir(sourceDir, { withFileTypes: true })
