@@ -26,6 +26,8 @@ const files = {
     serverPackager: await read("scripts/package-server-release.js"),
     systemdService: await read("deploy/systemd/zzz-calculator.service"),
     productionRuntimeConfig: await read("backend/production-runtime-config.json"),
+    server: await read("backend/server.js"),
+    enkaMappingLoader: await read("backend/enkaMapping.js"),
 }
 
 function requireText(contents, token, message) {
@@ -413,6 +415,21 @@ requireText(
     files.validationWorker,
     '/usr/bin/node "$release_dir/backend/server.js" >/dev/null 2>&1 &',
     "Validation worker must discard candidate stdout and stderr.",
+)
+requireText(
+    files.serverPackager,
+    'path.join(stagingDir, "backend", ENKA_RUNTIME_MAPPING_FILE)',
+    "Server releases must bundle immutable Enka metadata outside the sanitized data directory.",
+)
+requireText(
+    files.server,
+    "await loadEnkaMappingSnapshot(__dirname, dataDir)",
+    "Enabled production startup must use the packaged Enka metadata loader.",
+)
+requireText(
+    files.enkaMappingLoader,
+    'path.join(backendDir, ENKA_RUNTIME_MAPPING_FILE)',
+    "The Enka metadata loader must prefer the immutable release bundle.",
 )
 for (const catalog of [
     "agents.json",

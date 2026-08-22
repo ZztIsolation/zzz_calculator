@@ -14,6 +14,7 @@ import {
 } from "./scanTelemetry.js"
 import { buildMeta, calculateInCombatPanel, calculateOutOfCombatPanel, loadCatalog } from "./calculator.js"
 import { createEnkaProxy, EnkaProxyError } from "./enkaProxy.js"
+import { loadEnkaMappingSnapshot } from "./enkaMapping.js"
 import { parseEnkaShowcase } from "../core/enka-import/parse-enka.js"
 import { mapShowcaseToCatalog } from "../core/enka-import/entity-mapping.js"
 import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "../core/driveDiscAnalysis-core.js"
@@ -250,7 +251,7 @@ function createRequestStore(input = {}) {
 
 let catalog = await loadCatalog(dataDir, exampleDir)
 const enkaMapping = enkaImportEnabled
-    ? JSON.parse(await readFile(path.join(dataDir, "enka_zzz_mapping.json"), "utf8"))
+    ? await loadEnkaMappingSnapshot(__dirname, dataDir)
     : null
 const optimizerJobs = new Map()
 const OPTIMIZER_JOB_TTL_MS = 10 * 60 * 1000

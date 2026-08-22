@@ -196,6 +196,11 @@ the validation scope:
 only `agents.json`, `agent_skills.json`, `anomaly_effects.json`, `bosses.json`,
 `combat_buffs.json`, `drive_disc_sets.json`, `enka_zzz_mapping.json`,
 `stat_rules.json` and `w_engines.json` are allow-listed.
+Server release packaging also copies the immutable Enka mapping beside the
+backend code. Enabled candidates prefer that release-bound copy, so a host
+still running the previous eight-catalog validation control plane can validate
+the transition without exposing any additional server data. Missing or invalid
+metadata still fails closed.
 `user_drive_discs.example.json` is copied
 as both the example and isolated `user_drive_discs.json`; real inventory,
 scan telemetry and unknown files never enter the sandbox. Seed data is capped
