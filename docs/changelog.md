@@ -2,6 +2,19 @@
 
 # Changelog
 
+## 2026-08-22 - Enabled Production Showcase Import
+
+Renamed the runtime-gated main navigation entry from `导入` to `展柜`, while
+keeping the page title `展柜数据导入`. Production server releases now carry a
+versioned runtime configuration that explicitly enables showcase import. A
+valid `ENKA_IMPORT_ENABLED` environment value remains authoritative, so
+operators can immediately force the feature off with `false`; missing or
+malformed versioned configuration also fails closed. The checked-in systemd
+template and isolated candidate validation now set the flag explicitly, while
+the GitHub Pages build remains disabled because it has no same-origin Enka
+proxy. Production deployment verification now rejects a candidate unless the
+public `/api/app-config` reports `enkaImportEnabled: true`.
+
 ## 2026-08-19 - Retired The Enemy Damage Taken Zone
 
 Retired `enemyDamageTakenBonus` as a damage multiplier. Historical payloads

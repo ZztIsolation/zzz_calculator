@@ -85,10 +85,11 @@ describe("App maintenance navigation", () => {
     await vi.waitFor(() => expect(wrapper.text()).toContain("维护"))
   })
 
-  it("shows Enka import only when the runtime config enables it", async () => {
+  it("shows the showcase navigation only when the runtime config enables it", async () => {
     appConfigFixture.config.enkaImportEnabled = true
     const wrapper = mountApp()
-    await vi.waitFor(() => expect(wrapper.text()).toContain("导入"))
+    await vi.waitFor(() => expect(wrapper.text()).toContain("展柜"))
+    expect(wrapper.text()).not.toContain("导入")
   })
 
   it("shows a notice after a disabled direct import route is redirected", () => {

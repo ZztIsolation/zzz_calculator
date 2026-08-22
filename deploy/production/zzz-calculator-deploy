@@ -2726,7 +2726,7 @@ run_validation_transient_unit() {
         NODE_ENV=production HOST=127.0.0.1 PORT="$VALIDATION_PORT" \
         ZZZ_CALCULATOR_DATA_DIR=/zzz-validation/data \
         SCAN_TELEMETRY_DIR=/zzz-validation/data/scan-telemetry \
-        MAINTENANCE_ENABLED=false SCAN_TELEMETRY_ENABLED=false \
+        MAINTENANCE_ENABLED=false SCAN_TELEMETRY_ENABLED=false ENKA_IMPORT_ENABLED=true \
         DRIVE_DISC_RESERVATIONS_UI_ENABLED=false DRIVE_DISC_EXCLUSIONS_UI_ENABLED=false \
         /bin/bash "$VALIDATION_WORKER" "${worker_args[@]}"
     launch_status="$?"

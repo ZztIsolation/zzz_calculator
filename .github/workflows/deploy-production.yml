@@ -622,10 +622,13 @@ jobs:
             curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
               -D "$RUNNER_TEMP/after-home.headers" -o "$RUNNER_TEMP/after-index.html" "$base/" || return 1
             grep -Eiq '^cache-control:[[:space:]]*no-store' "$RUNNER_TEMP/after-home.headers" || return 1
-            for path in /discs /settings /api/health /api/catalog /api/app-config; do
+            for path in /discs /settings /api/health /api/catalog; do
               curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
                 "$base$path" > /dev/null || return 1
             done
+            curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
+              "$base/api/app-config" > "$RUNNER_TEMP/after-app-config.json" || return 1
+            jq -e '.enkaImportEnabled == true' "$RUNNER_TEMP/after-app-config.json" > /dev/null || return 1
             curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \
               "$base/downloads/zzz-scanner/manifest.json" > "$RUNNER_TEMP/after-scanner-manifest.json" || return 1
             curl --fail --silent --show-error --max-time 15 --retry 2 --retry-delay 2 \

@@ -458,7 +458,7 @@ curl --disable --fail --silent --show-error --max-time 3 \
     "$VALIDATION_BASE_URL/api/app-config" >"$response_file" \
     || fail_worker "$EXIT_SERVER_ENDPOINT_FAILURE" "candidate app-config endpoint failed"
 assert_endpoint_response_file "$response_file"
-jq -e '.maintenanceEnabled == false' "$response_file" >/dev/null \
+jq -e '.maintenanceEnabled == false and .enkaImportEnabled == true' "$response_file" >/dev/null \
     || fail_worker "$EXIT_SERVER_ENDPOINT_FAILURE" "candidate app-config response is invalid"
 kill -0 "$server_pid" 2>/dev/null \
     || fail_worker "$EXIT_SERVER_ENDPOINT_FAILURE" "candidate server stopped during endpoint checks"

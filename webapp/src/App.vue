@@ -104,7 +104,7 @@ const themeOverrides: GlobalThemeOverrides = {
             </RouterLink>
             <RouterLink v-if="enkaImportEnabled" to="/import">
               <Download :size="16" />
-              <span>导入</span>
+              <span>展柜</span>
             </RouterLink>
             <RouterLink to="/settings">
               <HardDrive :size="16" />
