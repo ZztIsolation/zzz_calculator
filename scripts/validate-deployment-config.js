@@ -221,6 +221,13 @@ requireText(validation, "needs.preflight.outputs.mode != 'audit'", "Audit must b
 requireText(validation, "production-storage-roundtrip.mjs", "CD must run the isolated browser storage roundtrip.")
 requireText(validation, '--current-url "$PROD_URL"', "Storage roundtrip must exercise the live origin through its switching proxy.")
 requireText(validation, '--expected-commit "$CANDIDATE_SHA"', "Storage roundtrip must bind the candidate to the approved commit.")
+requireText(files.storageRoundtrip, "candidateHealthBody.enkaImport", "Storage roundtrip must validate enabled Enka health metrics.")
+requireText(files.storageRoundtrip, "candidateConfig.enkaImportEnabled, true", "Storage roundtrip must require showcase import to be enabled.")
+assert.doesNotMatch(
+    files.storageRoundtrip,
+    /assert\.deepEqual\(await candidateHealth\.json\(\)/,
+    "Storage roundtrip must allow additive health response fields.",
+)
 assert.match(
     remote,
     /needs:\s*[\s\S]*?-\s+preflight\s*[\s\S]*?-\s+validation\s*[\s\S]*?needs\.validation\.result\s*==\s*'success'/,
