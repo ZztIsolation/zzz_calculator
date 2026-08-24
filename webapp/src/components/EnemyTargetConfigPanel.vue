@@ -107,76 +107,118 @@ function setResistance(value: number | null) {
 </script>
 
 <template>
-  <section class="panel ui-layout-scope" data-layout-surface="enemy-target-config">
-    <div class="panel-header">
+  <section class="panel enemy-target-config-panel ui-layout-scope" data-layout-surface="enemy-target-config">
+    <div class="panel-header enemy-target-config-header">
       <h2 class="panel-title">Boss / 敌方效果</h2>
       <NTag round>{{ targetPresetName }}</NTag>
     </div>
-    <div class="panel-body section-band">
-      <div class="metric-grid ui-field-grid">
-        <div class="metric" data-layout-field>
+    <div class="panel-body section-band enemy-target-config-body">
+      <div class="enemy-target-config-fields">
+        <div class="metric enemy-target-config-field enemy-target-preset-field" data-layout-field>
           <dt>防御预设</dt>
           <dd><NSelect data-testid="target-preset-select" :value="target.presetId" :options="targetPresets" @update:value="applyPreset(String($event))" /></dd>
         </div>
-        <div class="metric" data-layout-field>
-          <dt>防御值</dt>
-          <dd>
-            <NInputNumber
-              v-if="isCustomTargetPreset"
-              data-testid="target-defense-input"
-              :value="target.defense"
-              :min="0"
-              :step="50"
-              @update:value="updateTarget({ defense: Number($event ?? 0) })"
-            />
-            <span v-else class="target-defense-value">{{ displayDefense }}</span>
-          </dd>
+
+        <div class="enemy-target-primary-fields" data-layout-row="enemy-target-primary-fields">
+          <div class="metric enemy-target-config-field enemy-target-defense-field" data-layout-field>
+            <dt>防御值</dt>
+            <dd>
+              <NInputNumber
+                v-if="isCustomTargetPreset"
+                data-testid="target-defense-input"
+                :value="target.defense"
+                :min="0"
+                :step="50"
+                @update:value="updateTarget({ defense: Number($event ?? 0) })"
+              />
+              <span v-else class="target-defense-value">{{ displayDefense }}</span>
+            </dd>
+          </div>
+          <div class="metric enemy-target-config-field enemy-target-stun-field" data-layout-field>
+            <dt>初始失衡倍率</dt>
+            <dd class="target-stun-multiplier">
+              <NInputNumber
+                data-testid="target-stun-multiplier-input"
+                :value="target.stunMultiplierPercent"
+                :min="0"
+                :step="5"
+                @update:value="updateTarget({ stunMultiplierPercent: Number($event ?? 0) })"
+              />
+              <span>%</span>
+            </dd>
+          </div>
         </div>
-        <div class="metric" data-layout-field>
-          <dt>初始失衡倍率</dt>
-          <dd class="target-stun-multiplier">
-            <NInputNumber
-              data-testid="target-stun-multiplier-input"
-              :value="target.stunMultiplierPercent"
-              :min="0"
-              :step="5"
-              @update:value="updateTarget({ stunMultiplierPercent: Number($event ?? 0) })"
-            />
-            <span>%</span>
-          </dd>
-        </div>
-        <div v-if="hasResistanceElement" class="metric" data-layout-field>
-          <dt>{{ resistanceLabel }}</dt>
-          <dd>
-            <NInputNumber
-              :value="currentResistanceValue"
-              :min="-100"
-              :max="100"
-              :step="1"
-              data-testid="target-resistance-input"
-              @update:value="setResistance(Number($event ?? 0))"
-            />
-          </dd>
-        </div>
-          <div v-else class="metric" data-layout-field>
+
+        <div class="enemy-target-resistance-row" data-layout-row="enemy-target-resistance">
+          <div v-if="hasResistanceElement" class="metric enemy-target-config-field enemy-target-resistance-field" data-layout-field>
+            <dt>{{ resistanceLabel }}</dt>
+            <dd>
+              <NInputNumber
+                :value="currentResistanceValue"
+                :min="-100"
+                :max="100"
+                :step="1"
+                data-testid="target-resistance-input"
+                @update:value="setResistance(Number($event ?? 0))"
+              />
+            </dd>
+          </div>
+          <div v-else class="metric enemy-target-config-field enemy-target-resistance-field" data-layout-field>
             <dt>抗性配置</dt>
             <dd><span class="target-defense-value">不单独配置</span></dd>
+          </div>
+          <div v-if="hasResistanceElement" class="toolbar enemy-target-resistance-actions">
+            <NButton size="small" @click="setResistance(0)">0%</NButton>
+            <NButton size="small" @click="setResistance(20)">20%</NButton>
+            <NButton size="small" @click="setResistance(-20)">-20%</NButton>
+          </div>
         </div>
-      </div>
-      <div v-if="hasResistanceElement" class="toolbar">
-        <NButton size="small" @click="setResistance(0)">0%</NButton>
-        <NButton size="small" @click="setResistance(20)">20%</NButton>
-        <NButton size="small" @click="setResistance(-20)">-20%</NButton>
       </div>
     </div>
   </section>
 </template>
 
 <style scoped>
+.enemy-target-config-body,
+.enemy-target-config-fields {
+  display: grid;
+  gap: 8px;
+}
+
+.enemy-target-primary-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.enemy-target-resistance-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  min-width: 0;
+  align-items: end;
+}
+
+.enemy-target-config-field {
+  min-width: 0;
+}
+
+.enemy-target-resistance-actions {
+  flex-wrap: nowrap;
+  gap: 4px;
+  padding-bottom: 1px;
+}
+
+.enemy-target-resistance-actions :deep(.n-button) {
+  min-width: 36px;
+  padding-inline: 7px;
+}
+
 .target-stun-multiplier {
   display: grid;
-  grid-template-columns: minmax(104px, 1fr) auto;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
   align-items: center;
   color: var(--app-muted);
   font-size: 12px;
@@ -184,7 +226,7 @@ function setResistance(value: number | null) {
 
 .target-stun-multiplier :deep(.n-input-number) {
   width: 100%;
-  min-width: 104px;
+  min-width: 0;
 }
 
 .target-defense-value {
@@ -193,6 +235,18 @@ function setResistance(value: number | null) {
   align-items: center;
   color: var(--app-text);
   font-weight: 650;
+}
+
+@media (max-width: 680px) {
+  .enemy-target-primary-fields,
+  .enemy-target-resistance-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .enemy-target-resistance-actions {
+    justify-content: flex-start;
+    padding-bottom: 0;
+  }
 }
 
 </style>

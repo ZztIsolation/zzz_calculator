@@ -16,15 +16,93 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("@click=\"runOptimization\"")
   })
 
-  it("renders the full optimizer progress summary", () => {
+  it("renders optimizer progress only after a run has started", () => {
     expect(source).toContain("optimizer-progress-card")
+    expect(source).toContain('v-if="optimizerProgressVisible"')
+    expect(source).toContain("const optimizerProgressVisible = computed")
+    expect(source).not.toContain(':data-active="optimizerProgress ? \'true\' : \'false\'"')
+  })
+
+  it("keeps the optimizer progress summary focused on state, percent, and elapsed time", () => {
     expect(source).toContain("optimizerProgressPercent")
-    expect(source).toContain("optimizerRunMeta")
-    expect(source).toContain("optimizerRunNote")
-    expect(source).toContain("optimizerDetailChips")
-    expect(source).toContain("prepareStageLabel")
-    expect(source).toContain("optimizerRate")
     expect(source).toContain("optimizerElapsed")
+    expect(source).toContain("optimizerUiStatus")
+    expect(source).toContain("optimizerStatusSummary")
+    expect(source).toContain("optimizerProgressPrimaryText")
+    expect(source).toContain("optimizerProgressIndeterminate")
+    expect(source).toContain("'is-indeterminate': optimizerProgressIndeterminate")
+    expect(source).toContain('role="progressbar"')
+    expect(source).toContain(':aria-valuenow="optimizerProgressIndeterminate ? undefined : Math.round(optimizerProgressPercent)"')
+  })
+
+  it("labels completed results from the submitted settings snapshot", () => {
+    expect(source).toContain("const optimizerResultAlgorithm = computed")
+    expect(source).toContain("optimizerProgress.value?.settings?.algorithm")
+    expect(source).toContain("optimizerStore.completedSettings?.algorithm")
+    expect(source).toContain('optimizerResultAlgorithm.value === "heuristic-potential"')
+  })
+
+  it("shows constraint chips only for non-default choices", () => {
+    expect(source).toContain('optimizerStore.algorithm === "heuristic-potential"')
+    expect(source).toContain('optimizerStore.fourPieceBuffMode === "manual"')
+    expect(source).toContain("activeMainStatLimitCount.value")
+    expect(source).toContain("activeMinimumCount.value")
+    expect(source).toContain('v-if="optimizerConstraintChips.length"')
+    expect(source).not.toContain('`算法：${optimizerAlgorithmOptions.find')
+    expect(source).not.toContain('`4件套 Buff：${optimizerStore.fourPieceBuffMode')
+    expect(source).not.toContain('"未限定主词条"')
+    expect(source).not.toContain('"未限定最小值"')
+  })
+
+  it("does not expose optimizer implementation diagnostics in the workbench", () => {
+    for (const symbol of [
+      "optimizerRunMeta",
+      "optimizerRunNote",
+      "optimizerDetailChips",
+      "optimizerRate",
+      "optimizerHasFreeTwoPieceMetrics",
+      "optimizerSetMetricChips",
+      "candidateChipTexts",
+      "algorithmProgressText",
+      "candidateText",
+      "prunedBySuperBound",
+      "scoredCombinationCount",
+      "boundChecksPerSecond",
+      "freeTwoPieceAutoSetCount",
+      "freeFourTwoPlanCount",
+      "freeFourTwoCombinationCount",
+      "freeSixPiecePlanCount",
+      "freeSixPieceCombinationCount",
+      "candidateCountsBySlot",
+    ]) {
+      expect(source).not.toContain(symbol)
+    }
+    for (const text of [
+      "内核 dense",
+      "内核 map",
+      "真实评分",
+      "上界速度",
+      "自动套装",
+      "4+2 计划",
+      "4+2 组合",
+      "六件计划",
+      "六件组合",
+      "候选 1号位",
+    ]) {
+      expect(source).not.toContain(text)
+    }
+  })
+
+  it("keeps save actions in the drive-disc scheme instead of the optimizer controls", () => {
+    const optimizerSectionStart = source.indexOf('<section class="workbench-section optimizer-constraint-panel">')
+    const driveDiscSectionStart = source.indexOf('<section class="workbench-section drive-disc-workbench-panel">')
+    expect(optimizerSectionStart).toBeGreaterThan(-1)
+    expect(driveDiscSectionStart).toBeGreaterThan(optimizerSectionStart)
+    const optimizerSection = source.slice(optimizerSectionStart, driveDiscSectionStart)
+    expect(optimizerSection).not.toContain("openSaveOptimizedLoadout")
+    expect(optimizerSection).not.toContain("存为套装")
+    expect(source).toContain('@click="openSaveCurrentLoadout"')
+    expect(source).toContain("存为套装")
   })
 
   it("offers only single-worker browser algorithms and hides pool metrics", () => {
@@ -37,12 +115,6 @@ describe("WorkbenchView optimizer progress", () => {
   it("describes an empty two-piece restriction as automatic complete-set matching", () => {
     expect(source).toContain('"自动匹配任意 2 件套"')
     expect(source).not.toContain('"未选择额外 2 件套"')
-    expect(source).toContain("optimizerHasFreeTwoPieceMetrics")
-    expect(source).toContain("自动套装 ${formatNumber(optimizerMetrics.value.freeTwoPieceAutoSetCount")
-    expect(source).toContain("4+2 计划 ${formatNumber(optimizerMetrics.value.freeFourTwoPlanCount")
-    expect(source).toContain("4+2 组合 ${formatNumber(optimizerMetrics.value.freeFourTwoCombinationCount")
-    expect(source).toContain("六件计划 ${formatNumber(optimizerMetrics.value.freeSixPiecePlanCount")
-    expect(source).toContain("六件组合 ${formatNumber(optimizerMetrics.value.freeSixPieceCombinationCount")
   })
 
   it("keeps drive disc substat analysis on the calculation workbench", () => {
@@ -124,6 +196,8 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("workbench-left")
     expect(source).toContain("workbench-center")
     expect(source).toContain("workbench-right")
+    expect(source.match(/class="[^"]*workbench-surface/g)).toHaveLength(3)
+    expect(source).toContain("workbench-section")
     expect(source).toContain("DamageWhiteBox")
     expect(source).toContain("PanelStatTable")
     expect(source).toContain("damage-panel-grid")
@@ -131,7 +205,7 @@ describe("WorkbenchView optimizer progress", () => {
   })
 
   it("prevents long Miyabi calculation labels from widening the left workbench column", () => {
-    expect(source).toContain('class="panel-body metric-grid calculation-summary-grid"')
+    expect(source).toContain('class="workbench-section-body metric-grid calculation-summary-grid"')
     expect(source).toContain('class="metric calculation-event-summary"')
     expect(source).toContain('class="chip-row calculation-event-summary-tags"')
     expect(source).toContain(".workbench-left .section-band {")
@@ -166,15 +240,45 @@ describe("WorkbenchView optimizer progress", () => {
   })
 
   it("makes all workbench configuration entrypoints prominent", () => {
-    expect(source).toContain('<NButton class="prominent-config-button" type="primary" secondary size="large" data-testid="open-buff-picker"')
-    expect(source).toContain('<NButton class="prominent-config-button" type="primary" secondary size="large" data-testid="open-calculation-config"')
+    expect(source).toContain('<NButton class="prominent-config-button" type="primary" secondary size="small" data-testid="open-buff-picker"')
+    expect(source).toContain('<NButton class="prominent-config-button" type="primary" secondary size="small" data-testid="open-calculation-config"')
     expect(source).toContain('<NButton class="prominent-config-button" type="primary" secondary size="large" data-testid="open-optimizer-config"')
     expect(source.match(/class="prominent-config-button"/g)).toHaveLength(3)
     expect(source).toContain("选择 Buff")
-    expect(source).toContain("min-width: 116px;")
-    expect(source).toContain("height: 40px;")
+    expect(source).toContain(".workbench-left .prominent-config-button")
+    expect(source).toContain("min-width: 96px;")
+    expect(source).toContain("height: 34px;")
     expect(source).toContain("border: 2px solid var(--app-blue);")
     expect(source).toContain(".prominent-config-button:focus-visible")
+  })
+
+  it("uses one rich selector for each selected agent and w-engine", () => {
+    expect(source).not.toContain("selection-summary")
+    expect(source).toContain("renderAgentSelectLabel")
+    expect(source).toContain("renderWEngineSelectLabel")
+    expect(source).toContain(':render-label="renderAgentSelectLabel"')
+    expect(source).toContain(':render-label="renderWEngineSelectLabel"')
+    expect(source).toContain("workbench-entity-select-icon")
+    expect(source).toContain('aria-label="选择角色"')
+    expect(source).toContain('aria-label="选择音擎"')
+  })
+
+  it("packs the agent selector and level controls into a denser three-column section", () => {
+    expect(source).toContain("workbench-agent-header")
+    expect(source).toContain(".workbench-left .build-profile-grid,")
+    expect(source).toContain("grid-template-columns: repeat(3, minmax(0, 1fr));")
+    expect(source).toContain(".workbench-left .build-profile-grid .compact-field-wide")
+    expect(source).toContain(".workbench-agent-section .build-skill-grid")
+    expect(source).toContain("min-height: 30px;")
+  })
+
+  it("keeps workbench borders scoped to one surface per column", () => {
+    expect(source).toContain(".workbench-surface {")
+    expect(source).toContain(".workbench-section + .workbench-section")
+    expect(source).toContain(".workbench-surface :deep(.metric:not(.layer-metric))")
+    expect(source).toContain(".workbench-summary-section")
+    expect(source).not.toContain('class="panel optimizer-constraint-panel"')
+    expect(source).not.toContain('class="panel drive-disc-workbench-panel"')
   })
 
   it("passes the selected core skill level into the Buff picker", () => {
@@ -272,11 +376,11 @@ describe("WorkbenchView optimizer result details", () => {
   it("renders every optimizer result slot with full drive disc attributes", () => {
     expect(source).toContain("OPTIMIZER_RESULT_SLOTS = [1, 2, 3, 4, 5, 6]")
     expect(source).toContain("selectedDriveDiscRows")
-    expect(source).toContain("disc-slot-card")
-    expect(source).toContain("driveDiscSetIcon")
-    expect(source).toContain("driveDiscStatText(row.disc.mainStat)")
-    expect(source).toContain("driveDiscSubStatText(row.disc)")
-    expect(source).toContain("driveDiscRarityLevelText(row.disc)")
+    expect(source).toContain("<DriveDiscSlotCard")
+    expect(source).toContain('stat-layout="vertical"')
+    expect(source).toContain(':show-reservation="reservationUiEnabled"')
+    expect(source).toContain(':reservation-action="reservationUiEnabled"')
+    expect(source).not.toContain('<template v-if="reservationUiEnabled">')
   })
 
   it("hides the panel stat summary only while viewing optimizer results", () => {
@@ -299,7 +403,6 @@ describe("WorkbenchView optimizer result details", () => {
     expect(source).toContain('@toggle-reservation="toggleSchemeDiscReservation"')
     expect(source).toContain("转移并锁定")
     expect(source).toContain("inventoryById.get(String(disc.id))")
-    expect(source).toContain("排除其他角色专属盘")
     expect(slotCardSource).toContain("disc-reservation-button")
     expect(slotCardSource).toContain("toggleReservation")
     expect(pickerSource).toContain("showReservation")

@@ -496,6 +496,43 @@ assert.equal(migrationPlan.nextStore.driveDiscLoadouts[0].driveDiscIdsBySlot[1],
 assert.equal(migrationPlan.results[0].operations.migratedDiscs.length, 1)
 assert.equal(migrationPlan.results[0].operations.migratedLoadouts.length, 1)
 
+const unversionedPercentEnkaDisc = importedDisc(uid, "unit-4.8", agentId, {
+  mainStat: { stat: "windDmg", value: 30, mode: "pct", label: "风属性伤害加成" },
+  subStats: [
+    { stat: "critRate", value: 0.048, mode: "pct", label: "暴击率" },
+    { stat: "critDmg", value: 9.6, mode: "pct", label: "暴击伤害" },
+  ],
+})
+delete unversionedPercentEnkaDisc.statUnitVersion
+const normalizedUnversionedPercentStore = normalizeInventoryStore({
+  ...createEmptyInventoryStore(),
+  driveDiscs: [unversionedPercentEnkaDisc],
+})
+assert.equal(normalizedUnversionedPercentStore.driveDiscs[0].mainStat.value, 30)
+assert.deepEqual(
+  normalizedUnversionedPercentStore.driveDiscs[0].subStats.map(stat => stat.value),
+  [4.8, 9.6],
+)
+assert.equal(normalizedUnversionedPercentStore.driveDiscs[0].statUnitVersion, 2)
+
+const corruptedVersionTwoEnkaStore = normalizeInventoryStore({
+  ...createEmptyInventoryStore(),
+  driveDiscs: [importedDisc(uid, "unit-corrupted", agentId, {
+    statUnitVersion: 2,
+    mainStat: { stat: "windDmg", value: 3000, mode: "pct", label: "风属性伤害加成" },
+    subStats: [
+      { stat: "critRate", value: 480, mode: "pct", label: "暴击率" },
+      { stat: "critDmg", value: 9.6, mode: "pct", label: "暴击伤害" },
+    ],
+  })],
+})
+assert.equal(corruptedVersionTwoEnkaStore.driveDiscs[0].mainStat.value, 30)
+assert.equal(corruptedVersionTwoEnkaStore.driveDiscs[0].subStats[0].value, 4.8)
+assert.equal(corruptedVersionTwoEnkaStore.driveDiscs[0].subStats[1].value, 9.6)
+assert.equal(corruptedVersionTwoEnkaStore.driveDiscs[0].statUnitVersion, 2)
+const renormalizedVersionTwoEnkaStore = normalizeInventoryStore(corruptedVersionTwoEnkaStore)
+assert.deepEqual(renormalizedVersionTwoEnkaStore.driveDiscs[0], corruptedVersionTwoEnkaStore.driveDiscs[0])
+
 const alreadyBoundLegacyPlan = buildDriveDiscSyncPlan({
   uid,
   mappedAgents: [{ agentId, agentName: "星见雅", driveDiscSourceCount: null, driveDiscPreset: null }],

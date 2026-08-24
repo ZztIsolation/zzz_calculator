@@ -10,6 +10,7 @@ import {
     driveDiscIdentityFingerprint,
     createDriveDiscExport,
     migrateDriveDiscSetAliases,
+    migrateDriveDiscStatUnits,
     normalizeInventoryStore,
     ownerScopedStore,
     setDriveDiscExclusions as setInventoryDriveDiscExclusions,
@@ -88,6 +89,10 @@ function readFallbackStore() {
     }
 }
 
+function migratePersistedInventoryStore(store) {
+    return migrateDriveDiscStatUnits(migrateDriveDiscSetAliases(store))
+}
+
 async function writePersistedStore(store) {
     const pendingDb = openDb()
     if (!pendingDb) {
@@ -104,12 +109,12 @@ async function writePersistedStore(store) {
 
 function readAndMigrateFallbackStore() {
     const persisted = readFallbackStore()
-    const migrated = migrateDriveDiscSetAliases(persisted)
+    const migrated = migratePersistedInventoryStore(persisted)
     if (migrated !== persisted) {
         try {
             localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(migrated))
         } catch (error) {
-            console.warn("自动修正驱动盘套装 ID 后回写浏览器存储失败。", error)
+            console.warn("自动修正驱动盘数据后回写浏览器存储失败。", error)
         }
     }
     return normalizeInventoryStore(migrated)
@@ -133,14 +138,14 @@ async function readAndMigratePersistedStore() {
         throw error
     }
 
-    const migrated = migrateDriveDiscSetAliases(persisted)
+    const migrated = migratePersistedInventoryStore(persisted)
     if (migrated !== persisted) {
         try {
             objectStore.put(migrated, STORE_KEY)
             await completed
         } catch (error) {
             await completed.catch(() => {})
-            console.warn("自动修正驱动盘套装 ID 后回写浏览器存储失败。", error)
+            console.warn("自动修正驱动盘数据后回写浏览器存储失败。", error)
         }
     } else {
         await completed
@@ -192,7 +197,7 @@ export async function exportCurrentUserDriveDiscs(options = {}) {
 
 export async function saveUserDriveDiscStoreUnlocked(store) {
     const nextStore = {
-        ...normalizeInventoryStore(migrateDriveDiscSetAliases(store)),
+        ...normalizeInventoryStore(migratePersistedInventoryStore(store)),
         updatedAt: new Date().toISOString(),
     }
     await writePersistedStore(nextStore)

@@ -303,10 +303,25 @@ export function projectDriveDiscSource(provenance, fallback = null) {
 }
 
 function convertLegacyEnkaStatUnits(disc) {
-    if (Number(disc?.statUnitVersion ?? 0) >= 2) return disc
-    const normalizeStat = stat => stat?.mode === "pct"
-        ? { ...stat, value: normalizedStatValue(Number(stat.value ?? 0) * 100) }
-        : stat
+    const version = Number(disc?.statUnitVersion ?? 0)
+    const percentStats = [disc?.mainStat, ...(disc?.subStats ?? [])]
+        .filter(stat => stat?.mode === "pct")
+    const hasCorruptedPercentUnits = percentStats
+        .some(stat => Math.abs(Number(stat?.value ?? 0)) >= 100)
+    if (version >= 2 && !hasCorruptedPercentUnits) return disc
+    const normalizeStat = stat => {
+        if (stat?.mode !== "pct") return stat
+        const value = Number(stat.value ?? 0)
+        const absoluteValue = Math.abs(value)
+        const multiplier = absoluteValue >= 100
+            ? 0.01
+            : version < 2 && absoluteValue > 0 && absoluteValue <= 1
+                ? 100
+                : 1
+        return multiplier === 1
+            ? stat
+            : { ...stat, value: normalizedStatValue(value * multiplier) }
+    }
     return {
         ...disc,
         statUnitVersion: 2,
@@ -340,6 +355,21 @@ export function withDriveDiscProvenance(disc, options = {}) {
     if (!pendingLegacyEnkaMigration) next.statUnitVersion = 2
     else if (!Object.prototype.hasOwnProperty.call(normalizedUnits, "statUnitVersion")) delete next.statUnitVersion
     return withDriveDiscFingerprints(next, options)
+}
+
+export function migrateDriveDiscStatUnits(store, options = {}) {
+    if (!store || typeof store !== "object" || !Array.isArray(store.driveDiscs)) {
+        return store
+    }
+
+    let changed = false
+    const driveDiscs = store.driveDiscs.map(disc => {
+        const normalized = normalizeLegacyEnkaStatUnits(disc)
+        if (normalized === disc) return disc
+        changed = true
+        return withDriveDiscProvenance(normalized, options)
+    })
+    return changed ? { ...store, driveDiscs } : store
 }
 
 function cleanReservedForAgentId(value) {

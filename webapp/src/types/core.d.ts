@@ -480,6 +480,7 @@ declare module "@core/inventory-model.js" {
   export function driveDiscContentFingerprint(disc: any, options?: any): string
   export function driveDiscIdentityFingerprint(disc: any, options?: any): string
   export function migrateDriveDiscSetAliases(store?: any, options?: any): any
+  export function migrateDriveDiscStatUnits(store?: any, options?: any): any
   export function normalizeInventoryStore(store?: any, options?: any): any
   export function ownerScopedStore(store: any, ownerId?: string, options?: any): any
   export function buildScannerImportPlan(store: any, input: any, options?: any): any

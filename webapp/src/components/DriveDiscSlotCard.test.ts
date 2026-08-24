@@ -34,6 +34,18 @@ const agents = [
   { id: "agent-b", name: { zhCN: "角色乙" } },
 ]
 const driveDiscSets = [{ id: "woodpecker_electro", name: { zhCN: "啄木鸟电音" } }]
+const statMeta = {
+  statRules: {
+    statDisplay: {
+      hpFlat: { label: "生命值" },
+      critRate: { label: "暴击率" },
+      critDmg: { label: "暴击伤害" },
+      anomalyProficiency: { label: "异常精通" },
+      atkPct: { label: "攻击力%" },
+      exceptionallyLongStat: { label: "这是一个需要在狭窄卡片中自动换行的超长词条名称" },
+    },
+  },
+}
 
 function mountCard(reservedForAgentId: string | null = null, excludedForAgentIds: string[] = []) {
   return mount(DriveDiscSlotCard, {
@@ -130,5 +142,91 @@ describe("DriveDiscSlotCard reservation action", () => {
     ])
     expect(wrapper.get(".drive-disc-source-tags").attributes("aria-label"))
       .toBe("来源：Enka、扫描器 #42、JSON、手动")
+  })
+})
+
+describe("DriveDiscSlotCard stat layout", () => {
+  it("keeps the compact presentation as the default", () => {
+    const wrapper = mount(DriveDiscSlotCard, {
+      props: { slot: 1, disc, driveDiscSets, meta: statMeta },
+    })
+
+    expect(wrapper.get(".disc-slot-card").attributes("data-stat-layout")).toBe("compact")
+    expect(wrapper.find(".disc-slot-card-stats").exists()).toBe(false)
+    expect(wrapper.text()).toContain("生命值 2200")
+  })
+
+  it("renders the main stat and four substats as ordered label-value rows", () => {
+    const wrapper = mount(DriveDiscSlotCard, {
+      props: {
+        slot: 1,
+        statLayout: "vertical",
+        driveDiscSets,
+        meta: statMeta,
+        disc: {
+          ...disc,
+          subStats: [
+            { stat: "critRate", mode: "pct", value: 4.8 },
+            { stat: "critDmg", mode: "pct", value: 9.6 },
+            { stat: "anomalyProficiency", mode: "flat", value: 18 },
+            { stat: "atkPct", mode: "pct", value: 3 },
+            { stat: "hpFlat", mode: "flat", value: 112 },
+          ],
+        },
+      },
+    })
+
+    expect(wrapper.get(".disc-slot-card").classes()).toContain("disc-slot-card-vertical")
+    expect(wrapper.get(".disc-slot-card-main-stat dt").text()).toBe("生命值")
+    expect(wrapper.get(".disc-slot-card-main-stat dd").text()).toBe("2200")
+    expect(wrapper.findAll(".disc-slot-card-sub-stat").map(row => [
+      row.get("dt").text(),
+      row.get("dd").text(),
+    ])).toEqual([
+      ["暴击率%", "4.8%"],
+      ["暴击伤害%", "9.6%"],
+      ["异常精通", "18"],
+      ["百分比攻击力%", "3%"],
+    ])
+  })
+
+  it("uses the same stable stats region for empty and missing slots without placeholder rows", async () => {
+    const wrapper = mount(DriveDiscSlotCard, {
+      props: { slot: 1, statLayout: "vertical" },
+    })
+
+    expect(wrapper.get(".disc-slot-card-stats").classes()).toContain("disc-slot-card-stats-empty")
+    expect(wrapper.findAll(".disc-slot-card-stat-row")).toHaveLength(0)
+    expect(wrapper.text()).toContain("空槽位")
+
+    await wrapper.setProps({ missingReference: true })
+    expect(wrapper.get(".disc-slot-card").classes()).toContain("disc-slot-card-missing")
+    expect(wrapper.findAll(".disc-slot-card-stat-row")).toHaveLength(0)
+    expect(wrapper.text()).toContain("此预设引用的驱动盘已不在当前库存")
+  })
+
+  it("keeps long labels wrappable and values non-wrapping without changing selection actions", async () => {
+    const wrapper = mount(DriveDiscSlotCard, {
+      props: {
+        slot: 1,
+        disc: {
+          ...disc,
+          subStats: [{ stat: "exceptionallyLongStat", mode: "flat", value: 123.456 }],
+        },
+        driveDiscSets,
+        meta: statMeta,
+        statLayout: "vertical",
+        interactive: true,
+      },
+    })
+
+    expect(wrapper.get(".disc-slot-card-sub-stat dt").text()).toBe("这是一个需要在狭窄卡片中自动换行的超长词条名称")
+    expect(wrapper.get(".disc-slot-card-sub-stat dd").text()).toBe("123.456")
+    await wrapper.get(".disc-slot-card").trigger("click")
+    expect(wrapper.emitted("select")?.[0]).toEqual([1])
+
+    const source = readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "DriveDiscSlotCard.vue"), "utf8")
+    expect(source).toMatch(/\.disc-slot-card-stat-row dt\s*\{[\s\S]*overflow-wrap: anywhere;/)
+    expect(source).toMatch(/\.disc-slot-card-stat-row dd\s*\{[\s\S]*white-space: nowrap;/)
   })
 })
