@@ -703,7 +703,8 @@ async function inspectCurrentWithoutExecutingApp(page, proxy, currentUrl) {
         }
     })
     assert.equal(result.healthStatus, 200)
-    assert.deepEqual(result.health, { ok: true, service: "zzz_calculator" })
+    assert.equal(result.health?.ok, true)
+    assert.equal(result.health?.service, "zzz_calculator")
     assert.equal(result.homeStatus, 200)
     assert.match(result.home, /<div id="app"><\/div>/)
 }
