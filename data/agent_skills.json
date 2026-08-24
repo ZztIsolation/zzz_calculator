@@ -3708,6 +3708,566 @@
         "startledSwanLevel4": "official API value 230 preserved without interpolation",
         "damageElement": "all four direct rows explicitly use Lumiflux damage; their resistance multiplier is fixed at 1, and they remain excluded from the Luminescence default score target"
       }
+    },
+    {
+      "id": "sigrid",
+      "agentId": "sigrid",
+      "name": {
+        "zhCN": "希格莉德技能倍率"
+      },
+      "categories": [
+        {
+          "id": "basic",
+          "name": {
+            "zhCN": "普通攻击"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "basic_chilling_spearpoint",
+              "name": {
+                "zhCN": "普通攻击：凛冽枪尖"
+              },
+              "damageElement": "ice",
+              "description": {
+                "zhCN": "向前方发动至多四段斩击，造成冰属性伤害；第四段视为[出枪式]。"
+              },
+              "rows": [
+                {
+                  "id": "hit_1",
+                  "label": {
+                    "zhCN": "一段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [77,84,91,98,105,112,119,126,133,140,147,154,161,168,175,182]
+                },
+                {
+                  "id": "hit_2",
+                  "label": {
+                    "zhCN": "二段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [143.8,156.9,170,183.1,196.2,209.3,222.4,235.5,248.6,261.7,274.8,287.9,301,314.1,327.2,340.3]
+                },
+                {
+                  "id": "hit_3",
+                  "label": {
+                    "zhCN": "三段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [101.4,110.7,120,129.3,138.6,147.9,157.2,166.5,175.8,185.1,194.4,203.7,213,222.3,231.6,240.9]
+                },
+                {
+                  "id": "hit_4",
+                  "label": {
+                    "zhCN": "四段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [221,241.1,261.2,281.3,301.4,321.5,341.6,361.7,381.8,401.9,422,442.1,462.2,482.3,502.4,522.5]
+                },
+                {
+                  "id": "hit_1_daze",
+                  "label": {
+                    "zhCN": "一段失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [45.4,47.5,49.6,51.7,53.8,55.9,58,60.1,62.2,64.3,66.4,68.5,70.6,72.7,74.8,76.9]
+                },
+                {
+                  "id": "hit_2_daze",
+                  "label": {
+                    "zhCN": "二段失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [88.7,92.8,96.9,101,105.1,109.2,113.3,117.4,121.5,125.6,129.7,133.8,137.9,142,146.1,150.2]
+                },
+                {
+                  "id": "hit_3_daze",
+                  "label": {
+                    "zhCN": "三段失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [55.8,58.4,61,63.6,66.2,68.8,71.4,74,76.6,79.2,81.8,84.4,87,89.6,92.2,94.8]
+                },
+                {
+                  "id": "hit_4_daze",
+                  "label": {
+                    "zhCN": "四段失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [138.5,144.8,151.1,157.4,163.7,170,176.3,182.6,188.9,195.2,201.5,207.8,214.1,220.4,226.7,233]
+                }
+              ],
+              "skillType": "basic"
+            },
+            {
+              "id": "basic_sheathed_spear",
+              "name": {
+                "zhCN": "普通攻击：敛枪式"
+              },
+              "damageElement": "ice",
+              "description": {
+                "zhCN": "处于[巡空枪势]且有发动机会时，按当前段数发动对应敛枪式。共有三段，每次释放提升段数，第三段后重置；第一、二段可通过格挡使下一次失衡值提升100%，并刷新枪势和发动机会。"
+              },
+              "rows": [
+                {
+                  "id": "stage_1",
+                  "label": {
+                    "zhCN": "第一段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [358.3,390.9,423.5,456.1,488.7,521.3,553.9,586.5,619.1,651.7,684.3,716.9,749.5,782.1,814.7,847.3]
+                },
+                {
+                  "id": "stage_2",
+                  "label": {
+                    "zhCN": "第二段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [609.1,664.5,719.9,775.3,830.7,886.1,941.5,996.9,1052.3,1107.7,1163.1,1218.5,1273.9,1329.3,1384.7,1440.1]
+                },
+                {
+                  "id": "stage_3",
+                  "label": {
+                    "zhCN": "第三段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [814.6,888.7,962.8,1036.9,1111,1185.1,1259.2,1333.3,1407.4,1481.5,1555.6,1629.7,1703.8,1777.9,1852,1926.1]
+                },
+                {
+                  "id": "stage_1_daze",
+                  "label": {
+                    "zhCN": "第一段失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [86.3,90.3,94.3,98.3,102.3,106.3,110.3,114.3,118.3,122.3,126.3,130.3,134.3,138.3,142.3,146.3]
+                },
+                {
+                  "id": "stage_2_daze",
+                  "label": {
+                    "zhCN": "第二段失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [143.1,149.7,156.3,162.9,169.5,176.1,182.7,189.3,195.9,202.5,209.1,215.7,222.3,228.9,235.5,242.1]
+                },
+                {
+                  "id": "stage_3_daze",
+                  "label": {
+                    "zhCN": "第三段失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [196.2,205.2,214.2,223.2,232.2,241.2,250.2,259.2,268.2,277.2,286.2,295.2,304.2,313.2,322.2,331.2],
+                  "officialDataNote": "官方2079接口中Lv7显示为50.2%，按正式发布数据勘误为250.2%。"
+                }
+              ],
+              "skillType": "basic",
+              "officialDataNote": "官方2079接口的Lv1伤害行将358.3/609.1/814.6文字误标为失衡倍率；本目录按该行所属伤害倍率字段录入。"
+            },
+            {
+              "id": "cinema_spear_opportunity_overflow",
+              "name": {
+                "zhCN": "影画1：敛枪机会溢出追加伤害"
+              },
+              "damageElement": "ice",
+              "description": {
+                "zhCN": "敛枪式发动机会溢出后，下一次敛枪式最后一击额外造成100%攻击力的冰属性伤害；作为单次可选事件，默认不计入循环。"
+              },
+              "levelRange": {
+                "min": 1,
+                "max": 1,
+                "default": 1
+              },
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "攻击力伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [100]
+                }
+              ],
+              "skillType": "basic"
+            }
+          ]
+        },
+        {
+          "id": "dodge",
+          "name": {
+            "zhCN": "闪避"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "dash_attack_chasing_wind",
+              "skillTags": ["dashAttack"],
+              "name": {
+                "zhCN": "冲刺攻击：逐风"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [119,129.9,140.8,151.7,162.6,173.5,184.4,195.3,206.2,217.1,228,238.9,249.8,260.7,271.6,282.5]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [46.8,49,51.2,53.4,55.6,57.8,60,62.2,64.4,66.6,68.8,71,73.2,75.4,77.6,79.8]
+                }
+              ],
+              "skillType": "dodge"
+            },
+            {
+              "id": "dodge_counter_returning_spear",
+              "name": {
+                "zhCN": "闪避反击：回马枪"
+              },
+              "damageElement": "ice",
+              "description": {
+                "zhCN": "极限闪避后凝聚寒冰反击，造成冰属性伤害；视为[出枪式]。"
+              },
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [243.1,265.2,287.3,309.4,331.5,353.6,375.7,397.8,419.9,442,464.1,486.2,508.3,530.4,552.5,574.6]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [172.3,180.2,188.1,196,203.9,211.8,219.7,227.6,235.5,243.4,251.3,259.2,267.1,275,282.9,290.8]
+                }
+              ],
+              "skillType": "dodge"
+            }
+          ]
+        },
+        {
+          "id": "assist",
+          "name": {
+            "zhCN": "支援技"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "quick_assist_sky_patrol_guard",
+              "skillTags": ["assistAttack"],
+              "name": {
+                "zhCN": "快速支援：巡戍铁卫"
+              },
+              "damageElement": "ice",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [39.7,43.4,47.1,50.8,54.5,58.2,61.9,65.6,69.3,73,76.7,80.4,84.1,87.8,91.5,95.2]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [31.2,32.7,34.2,35.7,37.2,38.7,40.2,41.7,43.2,44.7,46.2,47.7,49.2,50.7,52.2,53.7]
+                }
+              ],
+              "skillType": "assist"
+            },
+            {
+              "id": "defensive_assist_unyielding",
+              "name": {
+                "zhCN": "招架支援：凛然不侵"
+              },
+              "damageElement": "ice",
+              "rows": [
+                {
+                  "id": "light_parry_daze",
+                  "label": {
+                    "zhCN": "轻招架失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [271.3,283.7,296.1,308.5,320.9,333.3,345.7,358.1,370.5,382.9,395.3,407.7,420.1,432.5,444.9,457.3]
+                },
+                {
+                  "id": "heavy_parry_daze",
+                  "label": {
+                    "zhCN": "重招架失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [342.8,358.4,374,389.6,405.2,420.8,436.4,452,467.6,483.2,498.8,514.4,530,545.6,561.2,576.8]
+                },
+                {
+                  "id": "chain_parry_daze",
+                  "label": {
+                    "zhCN": "连续招架失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [166.8,174.4,182,189.6,197.2,204.8,212.4,220,227.6,235.2,242.8,250.4,258,265.6,273.2,280.8]
+                }
+              ],
+              "skillType": "assist"
+            },
+            {
+              "id": "assist_followup_ice_glutton",
+              "skillTags": ["assistAttack"],
+              "name": {
+                "zhCN": "支援突击：冰饕"
+              },
+              "damageElement": "ice",
+              "description": {
+                "zhCN": "招架支援后挥动长枪上挑并重击下砸，造成大量冰属性伤害；视为[出枪式]。"
+              },
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [514.9,561.8,608.7,655.6,702.5,749.4,796.3,843.2,890.1,937,983.9,1030.8,1077.7,1124.6,1171.5,1218.4]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [353.8,369.9,386,402.1,418.2,434.3,450.4,466.5,482.6,498.7,514.8,530.9,547,563.1,579.2,595.3]
+                }
+              ],
+              "skillType": "assist"
+            }
+          ]
+        },
+        {
+          "id": "special",
+          "name": {
+            "zhCN": "特殊技"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "special_ice_bloom",
+              "name": {
+                "zhCN": "特殊技：冰花"
+              },
+              "damageElement": "ice",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [53.7,58.6,63.5,68.4,73.3,78.2,83.1,88,92.9,97.8,102.7,107.6,112.5,117.4,122.3,127.2]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [42.2,44.2,46.2,48.2,50.1,52.2,54.2,56.2,58.2,60.2,62.2,64.2,66.2,68.2,70.2,72.2]
+                }
+              ],
+              "skillType": "special"
+            },
+            {
+              "id": "ex_special_scattered_jade",
+              "skillTags": ["exSpecial"],
+              "name": {
+                "zhCN": "强化特殊技：乱琼"
+              },
+              "damageElement": "ice",
+              "description": {
+                "zhCN": "能量足够且未处于枪势时发动连续刺击；视为[出枪式]。"
+              },
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [438.8,478.7,518.6,558.5,598.4,638.3,678.2,718.1,758,797.9,837.8,877.7,917.6,957.5,997.4,1037.3]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [274.3,286.8,299.3,311.8,324.3,336.8,349.3,361.8,374.3,386.8,399.3,411.8,424.3,436.8,449.3,461.8]
+                },
+                {
+                  "id": "energy_cost",
+                  "label": {
+                    "zhCN": "能量消耗"
+                  },
+                  "kind": "energyCost",
+                  "values": [60,60,60,60,60,60,60,60,60,60,60,60,60,60,60,60]
+                }
+              ],
+              "skillType": "special"
+            },
+            {
+              "id": "ex_special_shattered_jade",
+              "skillTags": ["exSpecial"],
+              "name": {
+                "zhCN": "强化特殊技：碎玉"
+              },
+              "damageElement": "ice",
+              "description": {
+                "zhCN": "能量足够且处于枪势时发动连续突进刺击；视为[出枪式]。"
+              },
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [1047.8,1143.1,1238.4,1333.7,1429,1524.3,1619.5,1714.9,1810.2,1905.5,2000.8,2096.1,2191.4,2286.7,2382,2477.3]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [362.6,379.1,395.6,412.1,428.6,445.1,461.6,478.1,494.6,511.1,527.6,544.1,560.6,577.1,593.6,610.1]
+                },
+                {
+                  "id": "energy_cost",
+                  "label": {
+                    "zhCN": "能量消耗"
+                  },
+                  "kind": "energyCost",
+                  "values": [50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50]
+                }
+              ],
+              "skillType": "special"
+            }
+          ]
+        },
+        {
+          "id": "chain",
+          "name": {
+            "zhCN": "连携技与终结技"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "chain_ice_sweeps_the_earth",
+              "name": {
+                "zhCN": "连携技：冰凌卷地"
+              },
+              "damageElement": "ice",
+              "description": {
+                "zhCN": "发动强力穿刺并获得[砥砺]，使后续敛枪式伤害提升20%，持续50秒。首次命中失衡精英或首领时进入[破阵]，连续释放敛枪式第一至第三段；0至5影同一目标每次失衡最多触发一次。"
+              },
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [943.7,1029.5,1115.3,1201.1,1286.9,1372.7,1458.5,1544.3,1630.1,1715.9,1801.7,1887.5,1973.3,2059.1,2144.9,2230.7]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [137.6,143.9,150.2,156.5,162.8,169.1,175.4,181.7,188,194.3,200.6,206.9,213.2,219.5,225.8,232.1]
+                }
+              ],
+              "skillType": "chain"
+            },
+            {
+              "id": "ultimate_frost_sky",
+              "name": {
+                "zhCN": "终结技：霜天"
+              },
+              "damageElement": "ice",
+              "description": {
+                "zhCN": "凝聚极寒之力发动毁灭性的连续突进，造成大量冰属性伤害；视为[出枪式]。"
+              },
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [2189.8,2388.9,2588,2787.1,2986.2,3185.3,3384.4,3583.5,3782.6,3981.7,4180.8,4379.9,4579,4778.1,4977.2,5176.3]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [265.8,277.9,290,302.1,314.2,326.3,338.4,350.5,362.6,374.7,386.8,398.9,411,423.1,435.2,447.3]
+                }
+              ],
+              "skillType": "ultimate"
+            }
+          ]
+        }
+      ],
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/2079/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "officialEntryPageId": 2079,
+        "officialEntryVersion": 1787280280,
+        "skillMultipliers": "all official damaging, daze, and energy rows for levels 1-16 source-checked against the Mihoyo Hoyowiki 2079 structured entry on 2026-08-24",
+        "sheathedSpearLevel1": "the official damage table labels 358.3/609.1/814.6 as daze in its HTML text; values are stored as damage multipliers because the containing row is the damage table",
+        "sheathedSpearLevel7Daze": "official structured entry displays the third-stage value as 50.2; corrected to the production value 250.2",
+        "officialFormattingOmissions": "missing percent signs on Dodge Counter daze Lv3/Lv5 and unlabeled Shattered Jade daze Lv1 are preserved as numeric values from their containing daze rows",
+        "damageElements": "Dash Attack is physical; every other damaging move is ice",
+        "cinemaOneOverflow": "stored as a one-level independent Basic Attack event so it receives Basic Attack, Tempering, and Cinema 2 targeted modifiers while remaining absent by default"
+      }
     }
   ]
 }

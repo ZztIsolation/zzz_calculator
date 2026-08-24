@@ -322,6 +322,7 @@ const EVENT_MODIFIER_STAT_KEYS = new Set([
     ...ELEMENT_DEF_IGNORE_STATS,
 ])
 const SKILL_TARGET_STAT_KEYS = new Set([
+    "penRatio",
     "allResIgnore",
     "physicalResIgnore",
     "fireResIgnore",
@@ -1196,7 +1197,22 @@ function resolveEffectRule(rule, effect, runtimeInput = {}, modifierContext = {}
         const maxStacks = Math.max(0, Number(rule.maxStacks ?? 1))
         const stacks = clampNumber(runtime.stacks ?? rule.defaultStacks ?? maxStacks, 0, maxStacks)
         const valuePerStack = Number(rule.valuePerStack ?? rule.value ?? 0)
-        const value = valuePerStack * stacks * coverage
+        const hasActivationStacks = rule.activationStacks !== undefined
+            && rule.activationStacks !== null
+            && rule.activationStacks !== ""
+            && Number.isFinite(Number(rule.activationStacks))
+        const activationStacks = hasActivationStacks
+            ? clampNumber(Number(rule.activationStacks), 0, maxStacks)
+            : null
+        const hasActivationValue = activationStacks !== null
+            && rule.value !== undefined
+            && rule.value !== null
+            && rule.value !== ""
+            && Number.isFinite(Number(rule.value))
+        const activeValue = hasActivationValue
+            ? Number(rule.value)
+            : valuePerStack * stacks
+        const value = (activationStacks === null || stacks >= activationStacks ? activeValue : 0) * coverage
         return applyBuffModifiersToResolvedRule({
             ...common,
             value,
@@ -1204,6 +1220,7 @@ function resolveEffectRule(rule, effect, runtimeInput = {}, modifierContext = {}
             stacks,
             maxStacks,
             defaultStacks: Number(rule.defaultStacks ?? maxStacks),
+            activationStacks,
         }, rule, modifierContext)
     }
 
@@ -3136,7 +3153,9 @@ function targetBreakdownForElement(panel, bonusTotals, target, damageElement, ev
     const levelCoefficient = target.levelCoefficient
     const enemyDefReduction = Number(bonusTotals.enemyDefReduction ?? 0) + Number(eventTotals.enemyDefReduction ?? 0)
     const enemyDefFlatReduction = Number(bonusTotals.enemyDefFlatReduction ?? 0)
-    const penRatio = Number(panel.penRatio ?? 0)
+    const panelPenRatio = Number(panel.penRatio ?? 0)
+    const targetedPenRatio = Number(eventTotals.penRatio ?? 0)
+    const penRatio = panelPenRatio + targetedPenRatio
     const penFlat = Number(panel.penFlat ?? 0)
     const targetDefenseAfterReduction = Math.max(0, targetDefense * (1 - enemyDefReduction) - enemyDefFlatReduction)
     const effectiveDefense = Math.max(0, targetDefenseAfterReduction * (1 - penRatio) - penFlat)
@@ -3176,6 +3195,8 @@ function targetBreakdownForElement(panel, bonusTotals, target, damageElement, ev
         enemyDefReduction,
         enemyDefFlatReduction,
         targetDefenseAfterReduction,
+        panelPenRatio,
+        targetedPenRatio,
         penRatio,
         penFlat,
         effectiveDefense,
@@ -3206,6 +3227,8 @@ function sheerTargetBreakdownForElement(panel, bonusTotals, target, damageElemen
         enemyDefReduction: 0,
         enemyDefFlatReduction: 0,
         targetDefenseAfterReduction: breakdown.targetDefense,
+        panelPenRatio: 0,
+        targetedPenRatio: 0,
         penRatio: 0,
         penFlat: 0,
         effectiveDefense: 0,
@@ -3376,6 +3399,7 @@ function eventTargetTotalsForElement(bonusTotals, event) {
         [elementDmgKey]: sumDamageModifiers(bonusTotals, event, elementDmgKey),
         enemyDefReduction: sumDamageModifiers(bonusTotals, event, "enemyDefReduction")
             + sumDamageModifiers(bonusTotals, event, elementDefIgnoreKey),
+        penRatio: sumDamageModifiers(bonusTotals, event, "penRatio"),
         enemyResReduction: sumDamageModifiers(bonusTotals, event, "enemyResReduction"),
         [resReductionKey]: sumDamageModifiers(bonusTotals, event, resReductionKey),
         [ALL_RES_IGNORE_KEY]: sumDamageModifiers(bonusTotals, event, ALL_RES_IGNORE_KEY),
@@ -3517,7 +3541,7 @@ function effectiveDisorderDamageEvent(event, bonusTotals) {
 function defenseWhiteBoxRow(targetBreakdown) {
     const formulaLines = [
         `减防后防御（减防/无视防御）= ${formatDamageNumber(targetBreakdown.targetDefense)} × (1 - ${formatDamagePercent(targetBreakdown.enemyDefReduction)}) - ${formatDamageNumber(targetBreakdown.enemyDefFlatReduction)}`,
-        `有效防御（穿透率）= ${formatDamageNumber(targetBreakdown.targetDefenseAfterReduction)} × (1 - ${formatDamagePercent(targetBreakdown.penRatio)}) - ${formatDamageNumber(targetBreakdown.penFlat)}`,
+        `有效防御（穿透率）= ${formatDamageNumber(targetBreakdown.targetDefenseAfterReduction)} × (1 - ${formatDamagePercent(targetBreakdown.penRatio)}) - ${formatDamageNumber(targetBreakdown.penFlat)}（穿透率合计 ${formatDamagePercent(targetBreakdown.penRatio)} = 面板穿透率 ${formatDamagePercent(targetBreakdown.panelPenRatio)} + 技能目标穿透率 ${formatDamagePercent(targetBreakdown.targetedPenRatio)}）`,
         `防御乘区 = ${formatDamageNumber(targetBreakdown.levelCoefficient)} / (${formatDamageNumber(targetBreakdown.levelCoefficient)} + ${formatDamageNumber(targetBreakdown.effectiveDefense)})`,
     ]
     return {
@@ -3977,6 +4001,9 @@ function calculateDirectDamageEvent({ event, panel, bonusTotals, target, include
                 ? { [elementDmgKey]: Number(panel[elementDmgKey] ?? 0) }
                 : {}),
             penRatio: Number(panel.penRatio ?? 0),
+            panelPenRatio: targetBreakdown.panelPenRatio,
+            targetedPenRatio: targetBreakdown.targetedPenRatio,
+            effectivePenRatio: targetBreakdown.penRatio,
             penFlat: Number(panel.penFlat ?? 0),
         },
         multipliers: {
@@ -4336,6 +4363,11 @@ function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTota
         panelSnapshot: {
             atk: Number(source.panel.atk ?? 0),
             anomalyProficiency: Number(source.panel.anomalyProficiency ?? 0),
+            penRatio: Number(source.panel.penRatio ?? 0),
+            panelPenRatio: targetBreakdown.panelPenRatio,
+            targetedPenRatio: targetBreakdown.targetedPenRatio,
+            effectivePenRatio: targetBreakdown.penRatio,
+            penFlat: Number(source.panel.penFlat ?? 0),
             triggerOutOfCombatPanel: outOfCombatPanel,
             sourceAgentId: source.agentId,
             sourceSnapshot: source.snapshot,
@@ -4627,6 +4659,9 @@ function calculateAnomalyDamageEvent({ event, panel, outOfCombatPanel = panel, b
             dmgBonus: Number(panel.dmgBonus ?? 0),
             [`${event.damageElement}Dmg`]: Number(panel[`${event.damageElement}Dmg`] ?? 0),
             penRatio: Number(panel.penRatio ?? 0),
+            panelPenRatio: targetBreakdown.panelPenRatio,
+            targetedPenRatio: targetBreakdown.targetedPenRatio,
+            effectivePenRatio: targetBreakdown.penRatio,
             penFlat: Number(panel.penFlat ?? 0),
         },
         multipliers: {
@@ -4748,7 +4783,7 @@ function targetDamageMultiplierForElement(panel, bonusTotals, target, damageElem
     const levelCoefficient = Number(target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT)
     const enemyDefReduction = Number(bonusTotals.enemyDefReduction ?? 0) + Number(eventTotals.enemyDefReduction ?? 0)
     const enemyDefFlatReduction = Number(bonusTotals.enemyDefFlatReduction ?? 0)
-    const penRatio = Number(panel.penRatio ?? 0)
+    const penRatio = Number(panel.penRatio ?? 0) + Number(eventTotals.penRatio ?? 0)
     const penFlat = Number(panel.penFlat ?? 0)
     const targetDefenseAfterReduction = Math.max(0, targetDefense * (1 - enemyDefReduction) - enemyDefFlatReduction)
     const effectiveDefense = Math.max(0, targetDefenseAfterReduction * (1 - penRatio) - penFlat)
@@ -5000,7 +5035,7 @@ function compiledTargetDamageMultiplier(panel, bonusTotals, target, compiledEven
         + compiledModifierSum(sums, "enemyDefReduction")
         + compiledModifierSum(sums, compiledEvent.elementDefIgnoreKey)
     const enemyDefFlatReduction = Number(bonusTotals.enemyDefFlatReduction ?? 0)
-    const penRatio = Number(panel.penRatio ?? 0)
+    const penRatio = Number(panel.penRatio ?? 0) + compiledModifierSum(sums, "penRatio")
     const penFlat = Number(panel.penFlat ?? 0)
     const targetDefenseAfterReduction = Math.max(0, targetDefense * (1 - enemyDefReduction) - enemyDefFlatReduction)
     const effectiveDefense = Math.max(0, targetDefenseAfterReduction * (1 - penRatio) - penFlat)
@@ -5208,7 +5243,7 @@ function denseTargetDamageMultiplier(panelValues, combatValues, target, compiled
         + denseModifierSum(sums, "enemyDefReduction")
         + denseModifierSum(sums, compiledEvent.elementDefIgnoreKey)
     const enemyDefFlatReduction = denseCombatValue(combatValues, "enemyDefFlatReduction")
-    const penRatio = densePanelValue(panelValues, "penRatio")
+    const penRatio = densePanelValue(panelValues, "penRatio") + denseModifierSum(sums, "penRatio")
     const penFlat = densePanelValue(panelValues, "penFlat")
     const targetDefenseAfterReduction = Math.max(0, targetDefense * (1 - enemyDefReduction) - enemyDefFlatReduction)
     const effectiveDefense = Math.max(0, targetDefenseAfterReduction * (1 - penRatio) - penFlat)
@@ -7049,6 +7084,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                         + denseModifierSum(sums, event.elementDmgKey),
                     targetedCritDmgBonus: denseModifierSum(sums, "critDmg")
                         + denseModifierSum(sums, event.elementCritDmgKey),
+                    targetedPenRatio: denseModifierSum(sums, "penRatio"),
                     targetDefenseAfterReduction,
                     levelCoefficient: Number(target.levelCoefficient ?? DEFAULT_DAMAGE_LEVEL_COEFFICIENT),
                     targetResistance: event.resistanceFixedOne
@@ -7117,7 +7153,10 @@ export function createInCombatPanelCalculator(catalog, input) {
                     const elementDmg = damageKey
                         ? outPanelValue(damageKey) + denseCombatValue(fixedCombatValues, damageKey)
                         : 0
-                    const effectiveDefense = Math.max(0, event.targetDefenseAfterReduction * (1 - penRatio) - penFlat)
+                    const effectiveDefense = Math.max(
+                        0,
+                        event.targetDefenseAfterReduction * (1 - (penRatio + event.targetedPenRatio)) - penFlat,
+                    )
                     const defenseMultiplier = Math.min(1, event.levelCoefficient / (event.levelCoefficient + effectiveDefense))
                     const resistanceMultiplier = event.resistanceFixedOne
                         ? 1
@@ -7234,7 +7273,9 @@ export function createInCombatPanelCalculator(catalog, input) {
                     for (const event of compiledEvents) {
                         const effectiveDefense = Math.max(
                             0,
-                            event.targetDefenseAfterReduction * (1 - panelValues[PANEL_KEY_LOOKUP.penRatio])
+                            event.targetDefenseAfterReduction * (1 - (
+                                panelValues[PANEL_KEY_LOOKUP.penRatio] + event.targetedPenRatio
+                            ))
                                 - panelValues[PANEL_KEY_LOOKUP.penFlat],
                         )
                         const defenseMultiplier = Math.min(
@@ -7340,6 +7381,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     skillDamageBonus,
                     targetedCritDmgBonus: denseModifierSum(sums, "critDmg")
                         + denseModifierSum(sums, event.elementCritDmgKey),
+                    targetedPenRatio: denseModifierSum(sums, "penRatio"),
                     sheerDmgBonus: denseModifierSum(sums, "sheerDmgBonus")
                         + denseModifierSum(sums, event.elementSheerDmgKey),
                     effectiveBaseMultiplier: event.isRelease
@@ -7564,7 +7606,10 @@ export function createInCombatPanelCalculator(catalog, input) {
                             * event.count
                         continue
                     }
-                    const effectiveDefense = Math.max(0, event.targetDefenseAfterReduction * (1 - penRatio) - penFlat)
+                    const effectiveDefense = Math.max(
+                        0,
+                        event.targetDefenseAfterReduction * (1 - (penRatio + event.targetedPenRatio)) - penFlat,
+                    )
                     const defenseMultiplier = Math.min(1, event.levelCoefficient / (event.levelCoefficient + effectiveDefense))
                     if (event.kind === "direct") {
                         total += (event.damageBasis === "anomalyProficiency" ? anomalyProficiency : atk)

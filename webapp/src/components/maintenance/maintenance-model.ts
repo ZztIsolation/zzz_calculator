@@ -90,6 +90,7 @@ const FIELD_LABELS: Record<string, string> = {
   valuePerStack: "每层数值",
   maxStacks: "最大层数",
   defaultStacks: "默认层数",
+  activationStacks: "激活层数",
   stackGroup: "共享层数组",
   sourceLabel: "来源名称",
   defaultSourceValue: "默认来源数值",

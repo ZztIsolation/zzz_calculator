@@ -56,6 +56,7 @@ function setCoveragePercent(rule: any, value: number | null) {
 function changeType(rule: any, type: string) {
   rule.type = type
   if (type !== "fixed") delete rule.valueSource
+  if (type !== "stacked") delete rule.activationStacks
   if (type === "derived") {
     rule.sourceLabel ??= { zhCN: "来源数值" }
     rule.defaultSourceValue ??= 0
@@ -71,6 +72,18 @@ function changeType(rule: any, type: string) {
     rule.value ??= Number(rule.valuePerStack ?? 0)
   }
   emit("change")
+}
+
+function stackedUsesActivationValue(rule: any) {
+  return rule.type === "stacked"
+    && rule.activationStacks !== undefined
+    && rule.activationStacks !== null
+    && rule.activationStacks !== ""
+    && Number.isFinite(Number(rule.value))
+}
+
+function editableValueKey(rule: any) {
+  return rule.type === "stacked" && !stackedUsesActivationValue(rule) ? "valuePerStack" : "value"
 }
 
 function changeTarget(rule: any, kind: string) {
@@ -196,15 +209,21 @@ function ensureSkillTargets(rule: any) {
 }
 
 function modificationText(rule: any) {
-  const key = rule.type === "stacked" ? "valuePerStack" : "value"
+  const key = editableValueKey(rule)
   return Array.isArray(rule.modificationValues?.[key]) ? rule.modificationValues[key].join("/") : ""
 }
 
 function setModificationText(rule: any, value: string) {
-  const key = rule.type === "stacked" ? "valuePerStack" : "value"
+  const key = editableValueKey(rule)
   const values = value.split("/").map(item => Number(item.trim())).filter(Number.isFinite)
   if (values.length) rule.modificationValues = { ...(rule.modificationValues ?? {}), [key]: values }
   else delete rule.modificationValues
+  emit("change")
+}
+
+function setActivationStacks(rule: any, value: number | null) {
+  if (value === null || value === undefined) delete rule.activationStacks
+  else rule.activationStacks = Number(value)
   emit("change")
 }
 
@@ -327,7 +346,7 @@ function selectStackGroup(rule: any, value: string) {
         <label v-if="!simple" class="maintenance-field maintenance-field-wide"><span>增幅对象</span><NRadioGroup class="maintenance-target-mode" :value="targetMode(rule)" :disabled="disabled" size="small"><NRadioButton v-for="item in TARGET_KIND_OPTIONS" :key="item.value" :value="item.value" :label="item.label" @click="changeTarget(rule, String(item.value))" /></NRadioGroup></label>
         <label class="maintenance-field" data-field-key="stat"><span>增幅类型</span><NSelect filterable :consistent-menu-width="false" :value="rule.stat" :options="statOptions(catalog, rule.target?.kind, rule.target?.settlementType)" :disabled="disabled" @update:value="changeStat(rule, String($event))" /></label>
         <label v-if="corePassiveScaling && (rule.type ?? 'fixed') === 'fixed'" class="maintenance-field"><span>数值来源</span><NSelect :value="rule.valueSource?.field ?? ''" :options="corePassiveScalingFieldOptions()" :disabled="disabled" @update:value="setValueSourceField(rule, $event ? String($event) : null)" /></label>
-        <label v-if="!['derived', 'formula'].includes(rule.type)" class="maintenance-field"><span>{{ rule.type === 'stacked' ? '每层数值' : '数值' }}</span><NInputNumber :value="rule.type === 'stacked' ? rule.valuePerStack : rule.value" :disabled="disabled || Boolean(rule.valueSource)" :step="0.01" @update:value="rule[rule.type === 'stacked' ? 'valuePerStack' : 'value'] = $event; emit('change')" /></label>
+        <label v-if="!['derived', 'formula'].includes(rule.type)" class="maintenance-field"><span>{{ stackedUsesActivationValue(rule) ? '激活数值' : rule.type === 'stacked' ? '每层数值' : '数值' }}</span><NInputNumber :value="rule[editableValueKey(rule)]" :disabled="disabled || Boolean(rule.valueSource)" :step="0.01" @update:value="rule[editableValueKey(rule)] = $event; emit('change')" /></label>
         <label v-if="rule.target?.kind !== 'skill' && !EVENT_STAT_KEYS.has(rule.stat)" class="maintenance-field"><span>计算方式</span><NSelect v-model:value="rule.mode" :options="EFFECT_MODE_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
         <label v-if="rule.target?.kind !== 'skill' && !EVENT_STAT_KEYS.has(rule.stat)" class="maintenance-field"><span>基准</span><NSelect v-model:value="rule.basis" :options="BASIS_OPTIONS" :disabled="disabled" clearable @update:value="emit('change')" /></label>
       </div>
@@ -366,6 +385,7 @@ function selectStackGroup(rule: any, value: string) {
       <div v-if="rule.type === 'stacked'" class="maintenance-grid rule-detail-grid">
         <label class="maintenance-field"><span>最大层数</span><NInputNumber v-model:value="rule.maxStacks" :disabled="disabled" :min="0" :step="1" @update:value="emit('change')" /></label>
         <label class="maintenance-field"><span>默认层数</span><NInputNumber v-model:value="rule.defaultStacks" :disabled="disabled" :min="0" :step="1" @update:value="emit('change')" /></label>
+        <label class="maintenance-field"><span>激活层数</span><NInputNumber :value="rule.activationStacks ?? null" :disabled="disabled" :min="0" :max="rule.maxStacks" :step="1" clearable placeholder="每层累加" @update:value="setActivationStacks(rule, $event)" /></label>
         <label class="maintenance-field"><span>共享层数组</span><NSelect clearable :consistent-menu-width="false" :value="rule.stackGroup ?? ''" :options="stackGroupOptions(rule)" :disabled="disabled" placeholder="未共享" @update:value="selectStackGroup(rule, String($event ?? ''))" /></label>
         <label class="maintenance-field"><span>共享层数显示名</span><NInput :value="textOf(rule.stackLabel)" :disabled="disabled" placeholder="同名规则共享层数" @update:value="setStackLabel(rule, String($event))" /></label>
       </div>

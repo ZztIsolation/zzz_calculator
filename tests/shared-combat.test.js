@@ -611,6 +611,31 @@ assert.equal(
     "Grouped stacked rules should still summarize each stat effect separately with the shared stack count",
 )
 
+const thresholdStackBuff = {
+    id: "threshold-stack",
+    effects: [{
+        id: "threshold-ice-ignore",
+        type: "stacked",
+        stat: "iceResIgnore",
+        mode: "flat",
+        valuePerStack: 0,
+        value: 23,
+        maxStacks: 2,
+        defaultStacks: 2,
+        activationStacks: 2,
+    }],
+}
+assert.equal(
+    storedEffectRulesText(thresholdStackBuff, runtimeForBuff({ runtime: { effects: { "threshold-ice-ignore": { stacks: 1 } } } }, thresholdStackBuff)),
+    "冰抗性无视% +0%（1/2 层）",
+    "Threshold stacked summaries should stay inactive below the required stacks",
+)
+assert.equal(
+    storedEffectRulesText(thresholdStackBuff, defaultRuntimeForBuff(thresholdStackBuff)),
+    "冰抗性无视% +23%（2/2 层）",
+    "Threshold stacked summaries should show the fixed activation value at the required stacks",
+)
+
 const splitRuntimeBuff = {
     id: "split-runtime",
     effects: [

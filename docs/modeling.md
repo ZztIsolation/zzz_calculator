@@ -19,8 +19,13 @@ v1 models an out-of-combat panel first, then an optional in-combat panel layer:
    Drive Disc 2-piece event rules, boss or enemy effects, field effects, and
    manual corrections.
 7. Direct, anomaly, and disorder damage can be modeled as damage events in the
-   same in-combat calculator. Stun, anomaly buildup, and rotation logic are
-   still out of scope.
+   same in-combat calculator. Authored skill groups can represent a fixed,
+   source-checked rotation, but the calculator does not simulate action time,
+   energy, Decibels, stance timers, or resource state transitions. Stun and
+   anomaly buildup remain out of scope.
+8. A skill-targeted `penRatio` modifier is added to the event's panel PEN Ratio
+   before defense is evaluated. It is not DEF Ignore: defense reduction is
+   applied first, percentage PEN applies next, and flat PEN is subtracted last.
 
 ## Frontend / Backend Split
 

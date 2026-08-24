@@ -32,6 +32,10 @@
     "1581": {
       "id": "remielle_dan",
       "name": "蕾米埃尔·丹"
+    },
+    "1591": {
+      "id": "sigrid",
+      "name": "希格莉德·德拉叙尔"
     }
   },
   "wEngines": {
@@ -302,6 +306,10 @@
     "14158": {
       "id": "zzz_wiki_2109",
       "name": "空羽复归之诗"
+    },
+    "14159": {
+      "id": "zzz_wiki_2162",
+      "name": "骁骑礼赞"
     }
   },
   "driveDiscSuits": {

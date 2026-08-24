@@ -2,6 +2,69 @@
 
 # Changelog
 
+## 2026-08-24 - Added Formal Sigrid Calculation Support
+
+Added Sigrid de L'Azur as a visible Ice Attack agent using standard ATK-based
+direct damage. Her `pierce` attack type remains catalog metadata and never
+selects the Rupture or Sheer formula. The level-60 catalog stores 7,788 HP,
+863 Base ATK, and 606 DEF before Core nodes; Core F adds 75 Base ATK and 14.4%
+CRIT Rate, producing 938 ATK and 19.4% out-of-combat CRIT Rate. Aerial Patrol
+Spear then adds the official 66%, giving 85.4% in combat. The official Wiki's
+repeated level-20 HP value was recorded as a source defect rather than copied.
+
+Imported every official level 1-16 damage, Daze, and Energy row for Frost-Tipped
+Spear, all three Converging Spear stages, Dodge, Assist, Special, Chain, and
+Ultimate moves. The import corrects the official HTML label that places the
+level-1 Converging Spear damage values under a Daze heading and uses the release
+value 250.2% for the malformed level-7 third-stage Daze cell. Dash Attack is
+Physical; all other damaging moves are Ice. The catalog cites official entry
+2079, version 1787280280, and uses post-release guides only to author the fixed
+rotation.
+
+Modeled Aerial Patrol Spear's Core-tier CRIT values as
+`33/39/44/50/55/61/66%`, its stunned-target effect as a 20-point Stun DMG
+Multiplier addition, Tempered as a Converging-Spear-only 20% damage bonus, and
+the Additional Ability as 840 Combat ATK plus an independently adjustable
+Contamination bonus that defaults off. Cinema 1 contributes 25% base-ATK-based
+Combat ATK and a separate optional 100% overflow event. Cinema 2 grants 24%
+event-targeted PEN to only the authored Unbridled/Converging moves. Cinema 4
+adds 18% damage, and Cinema 6 automatically adds 80/90/100 percentage points to
+the matching Converging Spear multipliers while exposing a repeatable
+Chain-plus-Formation-Breaker skill group.
+
+The zero-Cinema default Stun window is Chain, Formation Breaker stages 1/2/3,
+Ultimate, recorded stage 3, enhanced EX, and stage 1. Cinema 1 and above
+consume every guaranteed stage-3 refund without assuming an overflow: Chain,
+Formation Breaker stages 1/2/3, refunded stage 3, stage 1, Ultimate, stage 2,
+enhanced EX, and stage 3. Cinema 6 defaults to one Formation Breaker and lets
+the user increase the group count only when the selected team actually grants
+additional Sigrid Chain Attacks. The calculator deliberately does not infer
+Energy, Decibels, stance time, block timing, or animation speed.
+
+Added generic skill-targeted `penRatio` support. Every direct/anomaly scoring
+path now evaluates defense as reduced defense multiplied by one minus panel PEN
+Ratio minus event-targeted PEN Ratio, then subtracts flat PEN. White-box output
+separates panel, targeted, and effective PEN; ordinary, prepared, compiled,
+dense, fixed-set, browser Worker, and strict optimizer results are locked by
+parity tests. This remains distinct from DEF Ignore and DEF reduction.
+
+Added Knight's Extolment at 713 Base ATK and 48% CRIT DMG. Its shared Battle
+Edge control provides 0-2 stacks, 32/36.8/41.6/46.4/51.2% CRIT DMG per stack,
+and activates 20/23/26/29/32% Ice RES Ignore only at two stacks. The new generic
+`activationStacks` rule keeps runtime calculation, Buff summaries, maintenance
+validation, and optimizer controls aligned at zero, one, and two stacks.
+Official 300x300/400x400 assets are stored locally. Enka IDs 1591 and 14159 map
+to `sigrid` and `zzz_wiki_2162`, including Cinema, Core, skill levels, W-Engine,
+and Drive Disc import coverage.
+
+Sigrid defaults to Dawn's Bloom and Hormone Punk as four-piece optimizer
+candidates, with CRIT DMG/ATK, PEN/Ice DMG/ATK, and ATK main-stat pools for
+slots 4/5/6. Dedicated regressions cover official data, Core panels, every
+targeted and excluded Cinema 2 move, Cinemas 1/4/6, default rotations,
+Formation Breaker repetition, Dawn's Bloom two- and four-piece interaction,
+signature refinements/stacks, Enka imports, all score kernels, and browser
+presentation.
+
 ## 2026-08-22 - Enabled Production Showcase Import
 
 Renamed the runtime-gated main navigation entry from `导入` to `展柜`, while

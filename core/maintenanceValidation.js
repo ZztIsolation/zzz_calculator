@@ -165,6 +165,7 @@ const DAMAGE_MODIFIER_VALUE_UNIT_VALUES = new Set(["decimal"])
 const RULE_TARGET_KIND_VALUES = new Set(["default", "skill", "anomaly"])
 const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
 const SKILL_TARGET_STAT_VALUES = new Set([
+    "penRatio",
     "allResIgnore",
     "physicalResIgnore",
     "fireResIgnore",
@@ -781,9 +782,17 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
 
     if (type === "stacked") {
         validateOptionalId(errors, { id: rule.stackGroup }, `${path}.stackGroup`)
-        const value = requireFinite(errors, rule.valuePerStack ?? rule.value, `${path}.valuePerStack`)
+        const hasActivationStacks = rule.activationStacks !== undefined
+            && rule.activationStacks !== null
+            && rule.activationStacks !== ""
+        const hasFixedActivationValue = hasActivationStacks
+            && rule.value !== undefined
+            && rule.value !== null
+            && rule.value !== ""
+        const valueKey = hasFixedActivationValue ? "value" : "valuePerStack"
+        const value = requireFinite(errors, hasFixedActivationValue ? rule.value : rule.valuePerStack ?? rule.value, `${path}.${valueKey}`)
         if (Number.isFinite(value) && value === 0) {
-            add(errors, `${path}.valuePerStack`, "每层数值不能为 0。")
+            add(errors, `${path}.${valueKey}`, hasFixedActivationValue ? "激活数值不能为 0。" : "每层数值不能为 0。")
         }
         const maxStacks = requireFinite(errors, rule.maxStacks, `${path}.maxStacks`)
         if (Number.isFinite(maxStacks) && (!Number.isInteger(maxStacks) || maxStacks <= 0)) {
@@ -793,7 +802,16 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
         if (Number.isFinite(defaultStacks) && Number.isFinite(maxStacks) && (defaultStacks < 0 || defaultStacks > maxStacks)) {
             add(errors, `${path}.defaultStacks`, "默认层数必须在 0 到最大层数之间。")
         }
-        validateModificationValues(errors, rule.modificationValues, "valuePerStack", `${path}.modificationValues`, value)
+        if (hasActivationStacks) {
+            const activationStacks = requireFinite(errors, rule.activationStacks, `${path}.activationStacks`)
+            if (Number.isFinite(activationStacks)
+                && (!Number.isInteger(activationStacks)
+                    || activationStacks < 0
+                    || (Number.isFinite(maxStacks) && activationStacks > maxStacks))) {
+                add(errors, `${path}.activationStacks`, "激活层数必须是 0 到最大层数之间的整数。")
+            }
+        }
+        validateModificationValues(errors, rule.modificationValues, valueKey, `${path}.modificationValues`, value)
         return
     }
 

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url"
 import {
     buildMeta,
     calculateInCombatPanel,
+    createInCombatPanelCalculator,
     loadCalculatorContext,
 } from "../backend/calculator.js"
 import {
@@ -2007,6 +2008,144 @@ approx(skillObjectOtherMove.damage.multipliers.skillMultiplierBonus, 0, "Skill t
 approx(skillObjectOtherMove.damage.targetBreakdown.enemyDefReduction, 0, "Skill target defense reduction should not affect other moves")
 approx(skillObjectOtherMove.damage.targetBreakdown.enemyResReduction, 0, "Skill target resistance reduction should not affect other moves")
 approx(skillObjectOtherMove.damage.targetBreakdown.resIgnore, 0, "Skill target resistance ignore should not affect other moves")
+
+const targetedPenCatalog = cloneCatalog(catalog)
+targetedPenCatalog.combatBuffs.push({
+    id: "test.damage.skill_target_pen_ratio",
+    sourceType: "manual",
+    scope: "inCombat",
+    effects: [
+        {
+            id: "shared_stack_pen_ratio",
+            type: "stacked",
+            stat: "penRatio",
+            valuePerStack: 0,
+            value: 24,
+            mode: "flat",
+            maxStacks: 2,
+            defaultStacks: 2,
+            activationStacks: 2,
+            stackGroup: "test_target_pen_stacks",
+            target: {
+                kind: "skill",
+                skillTargets: [{
+                    agentSkillId: "hoshimi_miyabi",
+                    categoryId: "basic",
+                    moveId: "frost_moon",
+                }],
+            },
+        },
+        {
+            id: "shared_stack_damage_bonus",
+            type: "stacked",
+            stat: "dmgBonus",
+            valuePerStack: 5,
+            mode: "flat",
+            maxStacks: 2,
+            defaultStacks: 2,
+            activationStacks: 2,
+            stackGroup: "test_target_pen_stacks",
+            target: {
+                kind: "skill",
+                skillTargets: [{
+                    agentSkillId: "hoshimi_miyabi",
+                    categoryId: "basic",
+                    moveId: "frost_moon",
+                }],
+            },
+        },
+    ],
+})
+
+function targetedPenInput(stacks, moveId = "frost_moon") {
+    return {
+        agentId: "hoshimi_miyabi",
+        wEngineId: "hailfall_star_palace",
+        coreSkillLevel: "F",
+        driveDiscs: [],
+        combatBuffs: {
+            activeBuffIds: ["test.damage.skill_target_pen_ratio"],
+            manualStats: [
+                { id: "target-pen-panel-ratio", stat: "penRatio", value: 10, mode: "flat" },
+                { id: "target-pen-flat", stat: "penFlat", value: 20, mode: "flat" },
+                { id: "target-pen-defense-reduction", stat: "enemyDefReduction", value: 20, mode: "flat" },
+            ],
+            runtimeInputs: {
+                "test.damage.skill_target_pen_ratio": {
+                    effects: {
+                        shared_stack_pen_ratio: { stacks },
+                    },
+                },
+            },
+        },
+        damage: {
+            skillRef: {
+                agentSkillId: "hoshimi_miyabi",
+                categoryId: moveId === "frost_moon" ? "basic" : "special",
+                moveId,
+                rowId: moveId === "frost_moon" ? "charge_3" : "slash",
+                level: 12,
+            },
+            target: zeroResistanceTarget(),
+        },
+    }
+}
+
+const targetedPenBelowThreshold = calculateInCombatPanel(targetedPenCatalog, targetedPenInput(1))
+approx(targetedPenBelowThreshold.damage.targetBreakdown.panelPenRatio, 0.1, "Panel PEN ratio below activation threshold")
+approx(targetedPenBelowThreshold.damage.targetBreakdown.targetedPenRatio, 0, "Targeted PEN ratio should stay inactive below activation threshold")
+approx(targetedPenBelowThreshold.damage.multipliers.directDamageBonus, 0, "Per-stack rule should stay inactive below activation threshold")
+
+const targetedPen = calculateInCombatPanel(targetedPenCatalog, targetedPenInput(2))
+const targetedPenReducedDefense = 953 * (1 - 0.2)
+const targetedPenEffectiveDefense = targetedPenReducedDefense * (1 - (0.1 + 0.24)) - 20
+approx(targetedPen.damage.targetBreakdown.enemyDefReduction, 0.2, "Targeted PEN ratio must remain separate from DEF reduction")
+approx(targetedPen.damage.targetBreakdown.targetDefenseAfterReduction, targetedPenReducedDefense, "Targeted PEN applies after DEF reduction")
+approx(targetedPen.damage.targetBreakdown.panelPenRatio, 0.1, "Targeted PEN breakdown panel component")
+approx(targetedPen.damage.targetBreakdown.targetedPenRatio, 0.24, "Targeted PEN breakdown skill component")
+approx(targetedPen.damage.targetBreakdown.penRatio, 0.34, "Targeted PEN breakdown combined ratio")
+approx(targetedPen.damage.targetBreakdown.effectiveDefense, targetedPenEffectiveDefense, "Targeted PEN applies before flat PEN")
+approx(targetedPen.damage.events[0].panelSnapshot.penRatio, 0.1, "Damage snapshot keeps the panel PEN ratio")
+approx(targetedPen.damage.events[0].panelSnapshot.targetedPenRatio, 0.24, "Damage snapshot exposes targeted PEN ratio")
+approx(targetedPen.damage.events[0].panelSnapshot.effectivePenRatio, 0.34, "Damage snapshot exposes combined PEN ratio")
+approx(targetedPen.damage.multipliers.directDamageBonus, 0.1, "No-value activation rule should retain per-stack scaling after activation")
+assert.match(
+    targetedPen.damage.whiteBoxRows.find(row => row.label === "防御乘区")?.formula ?? "",
+    /面板穿透率 10% \+ 技能目标穿透率 24%/,
+    "Defense whitebox should explain panel and targeted PEN composition",
+)
+
+const targetedPenOtherMove = calculateInCombatPanel(targetedPenCatalog, targetedPenInput(2, "ex_flying_snow"))
+approx(targetedPenOtherMove.damage.targetBreakdown.panelPenRatio, 0.1, "Unmatched move should retain panel PEN ratio")
+approx(targetedPenOtherMove.damage.targetBreakdown.targetedPenRatio, 0, "Unmatched move should not receive targeted PEN ratio")
+approx(targetedPenOtherMove.damage.multipliers.directDamageBonus, 0, "Unmatched move should not receive activation stack damage bonus")
+
+for (const stacks of [1, 2]) {
+    const targetedPenCalculator = createInCombatPanelCalculator(targetedPenCatalog, targetedPenInput(stacks))
+    const targetedPenFull = targetedPenCalculator.calculate([], { round: false })
+    const targetedPenExpectedDamage = targetedPenFull.damage.totalFinalDamage ?? targetedPenFull.damage.finalDamage
+    const targetedPenCompiled = targetedPenCalculator.scoreOnlyFromSummary(new Map(), new Map())
+    const targetedPenPrepared = targetedPenCalculator.scoreOnlyFromSummaryLegacy(new Map(), new Map())
+    const targetedPenDenseTarget = targetedPenCalculator.compileDensePanelScoreTarget({
+        statIds: [],
+        setIds: [],
+        setIndexById: new Map(),
+    })
+    assert.ok(targetedPenDenseTarget, "Targeted PEN ratio should compile a dense score target")
+    const targetedPenDense = targetedPenDenseTarget.scoreDense(new Float64Array(), new Int16Array())
+    const targetedPenFixedTarget = targetedPenDenseTarget.compileForSetCounts(new Int16Array())
+    const targetedPenFixed = targetedPenFixedTarget.scoreScalar(new Float64Array())
+    const targetedPenOptimizer = targetedPenFixedTarget.scoreObjectiveScalar(new Float64Array())
+    for (const [pathLabel, result] of [
+        ["compiled", targetedPenCompiled],
+        ["prepared", targetedPenPrepared],
+        ["dense", targetedPenDense],
+        ["fixed", targetedPenFixed],
+        ["optimizer objective", targetedPenOptimizer],
+    ]) {
+        approx(result.finalDamage, targetedPenExpectedDamage, `Targeted PEN ratio ${stacks}-stack ${pathLabel} score parity`)
+    }
+}
 
 function calculateSkillTargetCurrentAttributeResistance(resReductionStat, skillRef) {
     const target = {

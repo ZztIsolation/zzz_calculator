@@ -115,7 +115,10 @@ function makeCatalog() {
       level60: { atkBase: 1, advancedStat: { stat: "critDmg", value: 1, mode: "flat" } }, modification: { minLevel: 1, maxLevel: 5, defaultLevel: 1 },
       effect: {
         name: { zhCN: "音擎效果" }, description: { zhCN: "测试" },
-        selfBuff: { scope: "inCombat", condition: "exSpecial", durationSeconds: 10, effectText: { zhCN: "强化特殊技触发。" }, coverage: { default: 1, min: 0, max: 1, step: 0.1 }, effects: [effect("engine_effect")], buffModifiers: [] },
+        selfBuff: { scope: "inCombat", condition: "exSpecial", durationSeconds: 10, effectText: { zhCN: "强化特殊技触发。" }, coverage: { default: 1, min: 0, max: 1, step: 0.1 }, effects: [
+          effect("engine_effect"),
+          { id: "engine_threshold", type: "stacked", target: { kind: "default" }, stat: "iceResIgnore", mode: "flat", valuePerStack: 0, value: 20, maxStacks: 2, defaultStacks: 2, activationStacks: 2, modificationValues: { value: [20, 23, 26, 29, 32] }, stackGroup: "engine_stacks", stackLabel: { zhCN: "测试层数" } },
+        ], buffModifiers: [] },
         teamBuff: null,
       }, sources: ["https://example.com/engine-primary", "https://example.com/engine-secondary"], verification: {},
     }] },
@@ -875,6 +878,13 @@ describe("MaintenanceView structured editor", () => {
     expect(wrapper.text()).toContain("发动强化特殊技")
     expect(wrapper.text()).toContain("分段效果文案")
     expect(wrapper.text()).toContain("可读效果预览")
+    const wEngineRules = wrapper.findAll(".maintenance-rule-card")
+    expect(wEngineRules).toHaveLength(2)
+    const thresholdRule = wEngineRules[1]
+    expect(field(thresholdRule, "激活数值").find("input").element.value).toBe("20")
+    expect(field(thresholdRule, "激活层数").find("input").element.value).toBe("2")
+    expect(field(thresholdRule, "1-5 级实际值").find("input").element.value).toBe("20/23/26/29/32")
+    expect(wrapper.find(".modification-preview-table").text()).toContain("32")
     expect(wrapper.text()).not.toContain("exSpecial")
 
     await switchResource(wrapper, "drive-disc-sets")

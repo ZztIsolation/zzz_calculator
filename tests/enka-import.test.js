@@ -36,8 +36,12 @@ const catalog = {
   displayAgents: [
     { id: "hoshimi_miyabi", name: { zhCN: "星见雅" } },
     { id: "aria", name: { zhCN: "爱芮" } },
+    { id: "sigrid", name: { zhCN: "希格莉德·德拉叙尔" } },
   ],
-  displayWEngines: [{ id: "hailfall_star_palace", name: { zhCN: "霰落星殿" } }],
+  displayWEngines: [
+    { id: "hailfall_star_palace", name: { zhCN: "霰落星殿" } },
+    { id: "zzz_wiki_2162", name: { zhCN: "骁骑礼赞" } },
+  ],
   displayDriveDiscSets: [{ id: knownEquipment.setId, name: { zhCN: knownEquipment.setName } }],
 }
 
@@ -120,6 +124,97 @@ assert.deepEqual(
 )
 assert.ok(mapped.warnings.some(warning => /6号位.*未导入/.test(warning)))
 assert.notEqual(enkaDriveDiscId("1302309616", "7038"), enkaDriveDiscId("1300027938", "7038"))
+
+assert.deepEqual(mapping.agents["1591"], { id: "sigrid", name: "希格莉德·德拉叙尔" })
+assert.deepEqual(mapping.wEngines["14159"], { id: "zzz_wiki_2162", name: "骁骑礼赞" })
+const mappedSigrid = mapShowcaseToCatalog(
+  parseEnkaShowcase({
+    PlayerInfo: {
+      ShowcaseDetail: {
+        AvatarList: [makeAvatar(1591, {
+          TalentLevel: 6,
+          CoreSkillEnhancement: 6,
+          SkillLevelList: makeSkillList(12),
+          Weapon: { Id: 14159, Level: 60, UpgradeLevel: 5 },
+          EquippedList: [makeRawDisc({ slot: 5, uid: "71591" })],
+        })],
+      },
+    },
+  }),
+  catalog,
+  mapping,
+  { uid: "1302309616" },
+)
+assert.equal(mappedSigrid.mappedAgents.length, 1)
+assert.equal(mappedSigrid.skippedAgents.length, 0)
+assert.equal(mappedSigrid.warnings.length, 0)
+assert.deepEqual(
+  {
+    agentId: mappedSigrid.mappedAgents[0].agentId,
+    agentName: mappedSigrid.mappedAgents[0].agentName,
+    agentLevel: mappedSigrid.mappedAgents[0].agentLevel,
+    cinemaLevel: mappedSigrid.mappedAgents[0].cinemaLevel,
+    coreSkillLevel: mappedSigrid.mappedAgents[0].coreSkillLevel,
+    skillLevels: mappedSigrid.mappedAgents[0].skillLevels,
+    wEngine: mappedSigrid.mappedAgents[0].wEngine,
+  },
+  {
+    agentId: "sigrid",
+    agentName: "希格莉德·德拉叙尔",
+    agentLevel: 60,
+    cinemaLevel: 6,
+    coreSkillLevel: "F",
+    skillLevels: { basic: 16, special: 16, dodge: 16, chain: 16, assist: 16 },
+    wEngine: { id: "zzz_wiki_2162", name: "骁骑礼赞", level: 60, modificationLevel: 5 },
+  },
+)
+assert.equal(mappedSigrid.mappedAgents[0].driveDiscPreset.driveDiscs.length, 1)
+assert.equal(mappedSigrid.mappedAgents[0].driveDiscPreset.driveDiscs[0].id, "enka-zzz:1302309616:71591")
+const emptySigridSelection = {
+  version: 2,
+  currentOwnerId: "default",
+  byOwner: { default: { currentAgentId: "", byAgent: {} } },
+}
+const sigridImportPlan = buildEnkaImportPlan({
+  uid: "1302309616",
+  mappedAgents: [{ ...mappedSigrid.mappedAgents[0], sourceUid: "1302309616" }],
+  store: createEmptyInventoryStore(),
+  ownerId: "default",
+  buildSelection: emptySigridSelection,
+  legacySelection: structuredClone(emptySigridSelection),
+  now: new Date("2026-08-24T00:00:00.000Z"),
+  transactionId: "tx-sigrid-official-mapping",
+})
+assert.equal(sigridImportPlan.hasBlockingErrors, false)
+const importedSigridBuild = sigridImportPlan.nextBuildSelection.byOwner.default.byAgent.sigrid
+assert.deepEqual(
+  {
+    agentLevel: importedSigridBuild.agentLevel,
+    cinemaLevel: importedSigridBuild.cinemaLevel,
+    coreSkillLevel: importedSigridBuild.coreSkillLevel,
+    skillLevels: importedSigridBuild.skillLevels,
+    damageSkillLevels: importedSigridBuild.damage.skillLevelsByCategory,
+    wEngineId: importedSigridBuild.wEngineId,
+    wEngineLevel: importedSigridBuild.wEngineLevel,
+    wEngineModificationLevel: importedSigridBuild.wEngineModificationLevel,
+  },
+  {
+    agentLevel: 60,
+    cinemaLevel: 6,
+    coreSkillLevel: "F",
+    skillLevels: { basic: 16, special: 16, dodge: 16, chain: 16, assist: 16 },
+    damageSkillLevels: { basic: 16, special: 16, dodge: 16, chain: 16, assist: 16 },
+    wEngineId: "zzz_wiki_2162",
+    wEngineLevel: 60,
+    wEngineModificationLevel: 5,
+  },
+)
+assert.equal(sigridImportPlan.nextStore.driveDiscs.length, 1)
+assert.equal(sigridImportPlan.nextStore.driveDiscs[0].equippedBy, "sigrid")
+assert.equal(
+  sigridImportPlan.nextStore.driveDiscLoadouts[0].driveDiscIdsBySlot[5],
+  "enka-zzz:1302309616:71591",
+)
 
 const mappedUnknownStat = mapShowcaseToCatalog(
   parseEnkaShowcase({

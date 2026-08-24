@@ -10,6 +10,12 @@ The entries below summarize each development day. Implementation details,
 modeling decisions, and verification evidence remain in the
 [detailed changelog](docs/changelog.md).
 
+### 2026-08-24 Sigrid Formal Calculation Support
+
+- Added Sigrid de L'Azur with complete level 1-16 skill multipliers, Core Skill, Cinemas, a one-Stun default rotation, Knight's Extolment, official artwork, and Enka showcase mappings. The catalog follows Version 3.1 release data and excludes superseded beta mechanics and values.
+- Modeled Aerial Patrol Spear CRIT Rate and Stun multiplier, Tempered, Contamination, Cinemas 1/2/4/6, and configurable Formation Breaker counts in their exact damage areas. Energy, Decibels, stance timers, blocks, and action time remain explicit non-simulated boundaries.
+- Added skill-targeted PEN Ratio so Cinema 2's 24% PEN applies only to Unbridled Spear and Converging Spear events across white-box, compiled/dense, fixed-score, browser Worker, and strict optimizer paths. Knight's Extolment now uses an exact two-stack threshold for Ice RES Ignore.
+
 ### 2026-07-29 Drive Disc Update
 
 - Added official catalog data and local artwork for Thorned Rose and Vow of the Prophetic Feather.

@@ -1038,6 +1038,39 @@ const badStacked = {
 }
 assertInvalid("buffs", badStacked, "默认层数")
 
+const activationStacked = {
+    ...validBuff,
+    effects: [
+        {
+            id: "activation-threshold",
+            type: "stacked",
+            stat: "iceResIgnore",
+            mode: "flat",
+            valuePerStack: 0,
+            value: 20,
+            maxStacks: 2,
+            defaultStacks: 2,
+            activationStacks: 2,
+            modificationValues: {
+                value: [20, 23, 26, 29, 32],
+            },
+        },
+    ],
+}
+assertValid("buffs", activationStacked)
+assertValid("buffs", {
+    ...activationStacked,
+    effects: [{ ...activationStacked.effects[0], activationStacks: 0 }],
+})
+assertInvalid("buffs", {
+    ...activationStacked,
+    effects: [{ ...activationStacked.effects[0], activationStacks: 3 }],
+}, "激活层数")
+assertInvalid("buffs", {
+    ...activationStacked,
+    effects: [{ ...activationStacked.effects[0], activationStacks: 1.5 }],
+}, "激活层数")
+
 const badSharedStackGroup = {
     ...validBuff,
     effects: [
@@ -2243,6 +2276,23 @@ const buffWithSkillTargetRules = {
                     {
                         kind: "skillType",
                         skillType: "ultimate",
+                    },
+                ],
+            },
+        },
+        {
+            id: "effect-skill-pen-ratio",
+            type: "fixed",
+            stat: "penRatio",
+            value: 24,
+            mode: "flat",
+            target: {
+                kind: "skill",
+                skillTargets: [
+                    {
+                        agentSkillId: "test_agent_skill",
+                        categoryId: "basic",
+                        moveId: "normal",
                     },
                 ],
             },
