@@ -80,7 +80,12 @@ async function chooseWorkbenchAgent(page: Page, option: string) {
   await page.locator(".n-base-select-option").filter({ hasText: option }).last().click()
 }
 
-async function expectProminentConfigButton(page: Page, testId: string, label: string) {
+async function expectProminentConfigButton(
+  page: Page,
+  testId: string,
+  label: string,
+  density: "standard" | "compact" = "standard",
+) {
   const button = page.getByTestId(testId)
   await expect(button).toBeVisible()
   await expect(button).toHaveText(label)
@@ -98,11 +103,11 @@ async function expectProminentConfigButton(page: Page, testId: string, label: st
     }
   })
 
-  expect(appearance.width).toBeGreaterThanOrEqual(116)
-  expect(appearance.height).toBeGreaterThanOrEqual(40)
+  expect(appearance.width).toBeGreaterThanOrEqual(density === "compact" ? 96 : 116)
+  expect(appearance.height).toBeGreaterThanOrEqual(density === "compact" ? 34 : 40)
   expect(appearance.backgroundColor).not.toBe("rgba(0, 0, 0, 0)")
   expect(appearance.fontWeight).toBeGreaterThanOrEqual(700)
-  expect(appearance.borderWidth).toBeGreaterThanOrEqual(2)
+  expect(appearance.borderWidth).toBeGreaterThanOrEqual(density === "compact" ? 1 : 2)
   expect(appearance.borderColor).not.toBe(appearance.backgroundColor)
 
   await button.focus()
@@ -122,7 +127,7 @@ async function expectProminentConfigButton(page: Page, testId: string, label: st
 
 test("event management keeps disorder labels and controls visible", async ({ page }) => {
   await openApp(page)
-  await expectProminentConfigButton(page, "open-calculation-config", "配置")
+  await expectProminentConfigButton(page, "open-calculation-config", "配置", "compact")
   await page.getByTestId("open-calculation-config").click()
   await chooseNaiveOption(page, "计算方式", "自定义")
   await page.getByRole("button", { name: "添加异常事件", exact: true }).click()
@@ -201,7 +206,16 @@ test("Dan team score parameters stay synchronized inside and outside calculation
 test("optimizer and buff configuration use protected field layouts", async ({ page }) => {
   await openApp(page)
   await expectProminentConfigButton(page, "open-optimizer-config", "计算配置")
-  await expectProminentConfigButton(page, "open-buff-picker", "选择 Buff")
+  await expectProminentConfigButton(page, "open-buff-picker", "选择 Buff", "compact")
+
+  const optimizerSection = page.locator(".optimizer-constraint-panel")
+  const driveDiscSection = page.locator(".drive-disc-workbench-panel")
+  const saveLoadoutActions = page.getByRole("button", { name: "存为套装", exact: true })
+
+  await expect(optimizerSection.locator(".optimizer-progress-card")).toHaveCount(0)
+  await expect(optimizerSection).not.toContainText(/内核|真实评分|剪枝|上界|自动套装|4\+2 计划|4\+2 组合|六件计划|六件组合/)
+  await expect(saveLoadoutActions).toHaveCount(1)
+  await expect(driveDiscSection.getByRole("button", { name: "存为套装", exact: true })).toHaveCount(1)
 
   await page.getByTestId("open-optimizer-config").click()
   await expectStableLayout(page, "optimizer-config")

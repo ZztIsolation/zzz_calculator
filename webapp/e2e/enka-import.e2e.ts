@@ -475,7 +475,7 @@ test("five-agent import requires preview, persists both configs, and can undo", 
   await agentSelect.click()
   await agentSelect.locator("input").fill("爱芮")
   await page.locator(".n-base-select-option").filter({ hasText: "爱芮" }).last().click()
-  await expect(page.locator(".workbench-left .selection-summary-copy strong").first()).toHaveText("爱芮")
+  await expect(page.locator(".workbench-left .workbench-entity-select-name").first()).toHaveText("爱芮")
   await page.getByRole("button", { name: "已有套装", exact: true }).click()
   await expect(page.locator(".loadout-agent-mismatch-alert")).toContainText("当前保存的套装不属于该角色")
   await expect(page.locator(".drive-disc-workbench-panel .panel-header .n-tag")).toHaveText("0 / 6")

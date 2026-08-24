@@ -237,6 +237,143 @@ describe("local-store IndexedDB compatibility", () => {
     expect(put).toHaveBeenCalledTimes(1)
   })
 
+  it("repairs corrupted version-2 Enka percent stats once without changing Scanner data", async () => {
+    const corruptedEnkaDisc = {
+      id: "indexeddb-corrupted-enka-disc",
+      ownerId: "default",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 4,
+      rarity: "S",
+      level: 15,
+      maxLevel: 15,
+      statUnitVersion: 2,
+      mainStat: { stat: "critRate", mode: "pct", value: 2400 },
+      subStats: [
+        { stat: "critDmg", mode: "pct", value: 480 },
+        { stat: "atkPct", mode: "pct", value: 3 },
+        { stat: "atkFlat", mode: "flat", value: 57 },
+      ],
+      source: {
+        type: "enka-zzz-showcase",
+        uid: "123456789",
+        equipmentUid: "enka-equipment-1",
+      },
+      provenance: {
+        version: 1,
+        enkaZzz: {
+          uid: "123456789",
+          equipmentUid: "enka-equipment-1",
+        },
+      },
+      futureDiscField: { preserve: "enka" },
+    }
+    const scannerDisc = {
+      id: "indexeddb-normal-scanner-disc",
+      ownerId: "default",
+      setId: "woodpecker_electro",
+      setName: "啄木鸟电音",
+      partition: 5,
+      rarity: "S",
+      level: 15,
+      maxLevel: 15,
+      statUnitVersion: 2,
+      mainStat: { stat: "electricDmg", mode: "pct", value: 30 },
+      subStats: [
+        { stat: "critRate", mode: "pct", value: 4.8 },
+        { stat: "atkFlat", mode: "flat", value: 57 },
+      ],
+      source: { type: "zzz-scanner", importId: "scanner-import" },
+      provenance: {
+        version: 1,
+        scanner: { lastImportId: "scanner-import" },
+      },
+      raw: { "来源": "Scanner" },
+      futureDiscField: { preserve: "scanner" },
+    }
+    const persisted = {
+      version: 1,
+      updatedAt: "2026-08-24T00:00:00.000Z",
+      currentOwnerId: "default",
+      owners: [{ id: "default", label: "默认用户" }],
+      imports: [{ id: "scanner-import", ownerId: "default" }],
+      driveDiscs: [corruptedEnkaDisc, scannerDisc],
+      driveDiscLoadouts: [],
+      futureStoreField: { preserve: true },
+    }
+    const records = new Map<string, any>([["userDriveDiscStore", persisted]])
+    const transactionCalls: Array<[string, string]> = []
+    const put = vi.fn((value: any, key: string) => {
+      records.set(key, value)
+      return asyncRequest(key)
+    })
+    const database = {
+      objectStoreNames: { contains: (name: string) => name === "state" },
+      createObjectStore: vi.fn(),
+      transaction(name: string, mode: string) {
+        transactionCalls.push([name, mode])
+        return asyncTransaction(scheduleComplete => ({
+          get(key: string) {
+            scheduleComplete()
+            return asyncRequest(records.get(key))
+          },
+          put(value: any, key: string) {
+            scheduleComplete()
+            return put(value, key)
+          },
+        }))
+      },
+    }
+    vi.stubGlobal("indexedDB", {
+      open() {
+        return asyncRequest(database)
+      },
+    })
+
+    const localStore = await import("@runtime/local-store.js?indexeddb-enka-stat-unit-migration")
+    const [first, concurrent] = await Promise.all([
+      localStore.loadUserDriveDiscStore(),
+      localStore.loadUserDriveDiscStore(),
+    ])
+
+    const firstEnka = first.driveDiscs.find((disc: any) => disc.id === corruptedEnkaDisc.id)
+    expect(firstEnka.statUnitVersion).toBe(2)
+    expect(firstEnka.mainStat.value).toBe(24)
+    expect(firstEnka.subStats).toEqual([
+      expect.objectContaining({ stat: "critDmg", mode: "pct", value: 4.8 }),
+      expect.objectContaining({ stat: "atkPct", mode: "pct", value: 3 }),
+      expect.objectContaining({ stat: "atkFlat", mode: "flat", value: 57 }),
+    ])
+    expect(concurrent.driveDiscs).toEqual(first.driveDiscs)
+    expect(put).toHaveBeenCalledTimes(1)
+    expect(put).toHaveBeenCalledWith(expect.any(Object), "userDriveDiscStore")
+
+    const written = records.get("userDriveDiscStore")
+    const writtenEnka = written.driveDiscs.find((disc: any) => disc.id === corruptedEnkaDisc.id)
+    const writtenScanner = written.driveDiscs.find((disc: any) => disc.id === scannerDisc.id)
+    expect(writtenEnka.mainStat.value).toBe(24)
+    expect(writtenEnka.subStats[0].value).toBe(4.8)
+    expect(writtenEnka.subStats[1].value).toBe(3)
+    expect(writtenEnka.subStats[2].value).toBe(57)
+    expect(writtenEnka.futureDiscField).toEqual({ preserve: "enka" })
+    expect(writtenScanner.statUnitVersion).toBe(scannerDisc.statUnitVersion)
+    expect(writtenScanner.mainStat).toEqual(scannerDisc.mainStat)
+    expect(writtenScanner.subStats).toEqual(scannerDisc.subStats)
+    expect(writtenScanner.source).toEqual(scannerDisc.source)
+    expect(writtenScanner.provenance).toEqual(scannerDisc.provenance)
+    expect(writtenScanner.futureDiscField).toEqual(scannerDisc.futureDiscField)
+    expect(written.updatedAt).toBe(persisted.updatedAt)
+    expect(written.imports).toEqual(persisted.imports)
+    expect(written.futureStoreField).toEqual({ preserve: true })
+
+    await localStore.loadUserDriveDiscStore()
+    expect(transactionCalls).toEqual([
+      ["state", "readwrite"],
+      ["state", "readwrite"],
+    ])
+    expect(put).toHaveBeenCalledTimes(1)
+  })
+
   it("previews native imports through a readonly IndexedDB transaction without writing", async () => {
     const persisted = {
       version: 1,

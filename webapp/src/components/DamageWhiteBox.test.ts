@@ -99,6 +99,9 @@ describe("DamageWhiteBox", () => {
     expect(wrapper.text()).toContain("520%")
     expect(wrapper.text()).toContain("减防后防御（减防/无视防御）= 953 × (1 - 20%) - 0")
     expect(wrapper.text()).toContain("防御乘区 = 794 / (794 + 762.4)")
+    expect(wrapper.findAll(".damage-whitebox-current-values > span")).toHaveLength(2)
+    expect(wrapper.findAll(".damage-whitebox-row")).toHaveLength(2)
+    expect(wrapper.findAll(".damage-whitebox-row-value").map(row => row.text())).toEqual(["520%", "0.5101"])
   })
 
   it("switches the visible white-box rows from the event select", async () => {

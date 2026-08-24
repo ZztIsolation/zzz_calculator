@@ -56,6 +56,24 @@ function mountPanel(targetConfig: any = {}, metaOverrides: any = {}, damageEleme
 }
 
 describe("EnemyTargetConfigPanel", () => {
+  it("groups preset, primary values, and resistance actions into compact rows", () => {
+    const wrapper = mountPanel()
+
+    expect(wrapper.find(".enemy-target-preset-field").find("[data-testid='target-preset-select']").exists()).toBe(true)
+
+    const primaryFields = wrapper.find("[data-layout-row='enemy-target-primary-fields']")
+    expect(primaryFields.find(".enemy-target-defense-field").exists()).toBe(true)
+    expect(primaryFields.find("[data-testid='target-stun-multiplier-input']").exists()).toBe(true)
+
+    const resistanceRow = wrapper.find("[data-layout-row='enemy-target-resistance']")
+    expect(resistanceRow.find("[data-testid='target-resistance-input']").exists()).toBe(true)
+    expect(resistanceRow.findAll(".enemy-target-resistance-actions button").map(button => button.text())).toEqual([
+      "0%",
+      "20%",
+      "-20%",
+    ])
+  })
+
   it("uses the current damage element as the resistance field", async () => {
     const wrapper = mountPanel()
 

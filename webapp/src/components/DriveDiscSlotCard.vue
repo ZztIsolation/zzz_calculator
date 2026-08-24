@@ -15,6 +15,7 @@ const props = withDefaults(defineProps<{
   agents?: any[]
   targetAgentId?: string
   interactive?: boolean
+  statLayout?: "compact" | "vertical"
   missingReference?: boolean
   showSequence?: boolean
   showReservation?: boolean
@@ -31,6 +32,7 @@ const props = withDefaults(defineProps<{
   agents: () => [],
   targetAgentId: "",
   interactive: false,
+  statLayout: "compact",
   missingReference: false,
   showSequence: false,
   showReservation: false,
@@ -76,6 +78,7 @@ const secondary = computed(() => {
   if (!props.disc) return props.missingReference ? "请重新选择当前号位" : props.emptyHint
   return (props.disc.subStats ?? []).map((stat: any) => statText(stat)).join(" / ") || "无副词条"
 })
+const verticalSubStats = computed(() => Array.isArray(props.disc?.subStats) ? props.disc.subStats.slice(0, 4) : [])
 const rarityLevel = computed(() => {
   if (!props.disc) return ""
   const rarity = props.disc.rarity ? String(props.disc.rarity) : "-"
@@ -122,9 +125,17 @@ const exclusionActionLabel = computed(() => {
 const exclusionDisabled = computed(() => props.exclusionBusy || usage.value.state === "excluded-by-reservation")
 
 function statText(stat: any) {
+  return `${statLabel(stat)} ${statValue(stat)}`
+}
+
+function statLabel(stat: any) {
   if (!stat?.stat) return "-"
-  const mode = String(stat.mode ?? "")
-  return `${storedStatLabel(String(stat.stat), mode, props.meta)} ${formatStoredStatValue(String(stat.stat), stat.value, mode)}`
+  return storedStatLabel(String(stat.stat), String(stat.mode ?? ""), props.meta)
+}
+
+function statValue(stat: any) {
+  if (!stat?.stat) return "-"
+  return formatStoredStatValue(String(stat.stat), stat.value, String(stat.mode ?? ""))
 }
 
 function choose() {
@@ -151,6 +162,7 @@ function toggleExclusion() {
       'disc-slot-card-empty': !disc,
       'disc-slot-card-missing': missingReference,
       'disc-slot-card-manual': interactive,
+      'disc-slot-card-vertical': statLayout === 'vertical',
       'disc-slot-card-conflict': showReservation && ['other', 'unknown'].includes(reservation.state),
     }"
     :role="interactive ? 'button' : undefined"
@@ -158,6 +170,7 @@ function toggleExclusion() {
     :data-slot="slot"
     :data-reservation-state="showReservation && disc ? reservation.state : undefined"
     :data-usage-state="showExclusion && disc ? usage.state : undefined"
+    :data-stat-layout="statLayout"
     @click="choose"
     @keydown.enter.prevent="choose"
     @keydown.space.prevent="choose"
@@ -167,8 +180,29 @@ function toggleExclusion() {
     </span>
     <div class="disc-slot-card-copy">
       <strong>{{ title }}</strong>
-      <span>{{ detail }}</span>
-      <small>{{ secondary }}</small>
+      <dl v-if="statLayout === 'vertical' && disc" class="disc-slot-card-stats">
+        <div class="disc-slot-card-stat-row disc-slot-card-main-stat">
+          <dt>{{ statLabel(disc.mainStat) }}</dt>
+          <dd>{{ statValue(disc.mainStat) }}</dd>
+        </div>
+        <div
+          v-for="(stat, index) in verticalSubStats"
+          :key="`${String(stat?.stat ?? 'unknown')}-${String(stat?.mode ?? '')}-${index}`"
+          class="disc-slot-card-stat-row disc-slot-card-sub-stat"
+        >
+          <dt>{{ statLabel(stat) }}</dt>
+          <dd>{{ statValue(stat) }}</dd>
+        </div>
+        <div v-if="verticalSubStats.length === 0" class="disc-slot-card-no-substats">无副词条</div>
+      </dl>
+      <div v-else-if="statLayout === 'vertical'" class="disc-slot-card-stats disc-slot-card-stats-empty">
+        <span>{{ detail }}</span>
+        <small>{{ secondary }}</small>
+      </div>
+      <template v-else>
+        <span>{{ detail }}</span>
+        <small>{{ secondary }}</small>
+      </template>
       <DriveDiscSourceTags v-if="disc" :disc="disc" :show-scanner-sequence="showSequence" />
     </div>
     <div class="disc-slot-card-meta">
@@ -336,6 +370,70 @@ function toggleExclusion() {
   font-size: 11px;
 }
 
+.disc-slot-card-stats {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-width: 0;
+  min-height: 102px;
+  margin: 2px 0 0;
+}
+
+.disc-slot-card-stat-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: start;
+  gap: 8px;
+  min-width: 0;
+  min-height: 18px;
+  line-height: 1.35;
+}
+
+.disc-slot-card-stat-row dt,
+.disc-slot-card-stat-row dd {
+  min-width: 0;
+  margin: 0;
+  font-size: 11px;
+}
+
+.disc-slot-card-stat-row dt {
+  color: var(--app-muted);
+  overflow-wrap: anywhere;
+}
+
+.disc-slot-card-stat-row dd {
+  color: var(--app-text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.disc-slot-card-main-stat {
+  padding-bottom: 3px;
+  margin-bottom: 1px;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.disc-slot-card-main-stat dt,
+.disc-slot-card-main-stat dd {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.disc-slot-card-no-substats {
+  color: var(--app-muted);
+  line-height: 1.35;
+}
+
+.disc-slot-card-stats-empty {
+  align-content: center;
+}
+
+.disc-slot-card-stats-empty span,
+.disc-slot-card-stats-empty small {
+  overflow-wrap: anywhere;
+}
+
 .disc-slot-card-copy :deep(.drive-disc-source-tags) {
   margin-top: 2px;
 }
@@ -390,6 +488,10 @@ function toggleExclusion() {
 
   .disc-slot-card-meta :deep(.n-tag__content) {
     text-align: left;
+  }
+
+  .disc-slot-card-stat-row {
+    gap: 6px;
   }
 }
 </style>

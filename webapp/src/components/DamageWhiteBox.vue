@@ -154,7 +154,7 @@ function selectEventId(value: string | number | null) {
 <style scoped>
 .damage-whitebox {
   display: grid;
-  gap: 14px;
+  gap: 0;
 }
 
 .damage-whitebox-current {
@@ -164,10 +164,8 @@ function selectEventId(value: string | number | null) {
   justify-content: space-between;
   gap: 10px;
   min-width: 0;
-  padding: 12px;
-  border: 1px solid #dbeafe;
-  border-radius: var(--app-radius-sm);
-  background: #f7fbff;
+  padding: 10px 0 12px;
+  border-bottom: 1px solid var(--app-border);
 }
 
 .damage-whitebox-current > div:first-child {
@@ -193,18 +191,21 @@ function selectEventId(value: string | number | null) {
 .damage-whitebox-current-values {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px 12px;
 }
 
 .damage-whitebox-current-values span {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  min-height: 28px;
-  padding: 4px 8px;
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-sm);
-  background: #fff;
+  min-height: 24px;
+  padding-left: 12px;
+  border-left: 1px solid var(--app-border);
+}
+
+.damage-whitebox-current-values span:first-child {
+  padding-left: 0;
+  border-left: 0;
 }
 
 .damage-selected-variants {
@@ -220,6 +221,8 @@ function selectEventId(value: string | number | null) {
   display: grid;
   min-width: 0;
   gap: 4px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--app-border);
 }
 
 .damage-event-select > span {
@@ -230,7 +233,6 @@ function selectEventId(value: string | number | null) {
 
 .damage-whitebox-rows {
   display: grid;
-  gap: 8px;
 }
 
 .damage-whitebox-row {
@@ -239,10 +241,12 @@ function selectEventId(value: string | number | null) {
   gap: 12px;
   align-items: center;
   min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-sm);
-  background: #fff;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.damage-whitebox-row:last-child {
+  border-bottom: 0;
 }
 
 .damage-whitebox-row-main {
