@@ -26,6 +26,20 @@ v1 models an out-of-combat panel first, then an optional in-combat panel layer:
 8. A skill-targeted `penRatio` modifier is added to the event's panel PEN Ratio
    before defense is evaluated. It is not DEF Ignore: defense reduction is
    applied first, percentage PEN applies next, and flat PEN is subtracted last.
+9. Agents with `potentialVision` expose an independent effective
+   `potentialLevel` from P0 through their authored maximum. Potential-specific
+   moves, rows, and skill groups use `requiresPotentialLevel`; default rotations
+   select `potentialVariants` before Cinema variants. P0 is the disabled
+   calculation state.
+10. An authored skill row may constrain event repetitions through
+    `eventCountRange`. Missing counts use the row default and out-of-range counts
+    are rejected consistently by direct calculation, prepared scoring, the UI,
+    maintenance validation, and optimization.
+11. Skill-group counts use the maintenance-managed `1 / 0 / 100 / 1`
+    default/min/max/step contract unless the group declares
+    `authoredCountRange: true`. That marker is reserved for game-mechanic bounds
+    such as Soldier 11's single empowered-fifth package and keeps the authored
+    count range intact through maintenance saves.
 
 ## Frontend / Backend Split
 

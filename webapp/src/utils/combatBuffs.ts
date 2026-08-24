@@ -6,6 +6,7 @@ import {
   nameOf,
 } from "@core/shared-combat.js"
 import { materializeCorePassiveScalingEffect } from "@core/corePassiveScaling.js"
+import { materializePotentialVisionEffect } from "@core/potentialVision.js"
 import { buffDisplayName } from "@/utils/format"
 
 export type BuffCategory = "self" | "selfWEngine" | "teammate" | "teammateWEngine" | "teammateDriveDisc" | "field" | "boss" | "custom"
@@ -28,6 +29,7 @@ type CombatBuffContext = {
   agentId?: string
   coreSkillLevel?: string
   cinemaLevel?: number
+  potentialLevel?: number
   wEngineId?: string
   wEngineModificationLevel?: number
   addedBuffs?: any[]
@@ -97,7 +99,13 @@ function skillBuffSourceLabel(meta: any, buff: any = {}) {
   return { zhCN: [sourceName, buffName].filter(Boolean).join("｜") }
 }
 
-export function currentAgentBuffCandidates(meta: any, agentId = "", cinemaLevel = 0, coreSkillLevel?: string): any[] {
+export function currentAgentBuffCandidates(
+  meta: any,
+  agentId = "",
+  cinemaLevel = 0,
+  coreSkillLevel?: string,
+  potentialLevel = 0,
+): any[] {
   const agent = (meta?.agents ?? []).find((item: any) => item.id === agentId)
   if (!agent) {
     return []
@@ -109,9 +117,10 @@ export function currentAgentBuffCandidates(meta: any, agentId = "", cinemaLevel 
   ]
     .filter(([, buff]) => inCombatEffect(buff))
     .map(([key, buff]) => {
-      const materializedBuff = key === "corePassive"
+      const coreMaterializedBuff = key === "corePassive"
         ? materializeCorePassiveScalingEffect(buff, agent, coreSkillLevel)
         : buff
+      const materializedBuff = materializePotentialVisionEffect(coreMaterializedBuff, agent, potentialLevel)
       const source = agentBuffSourceLabel(String(key), materializedBuff)
       return {
         ...materializedBuff,
@@ -389,7 +398,13 @@ export function buildCombatBuffGroups(context: CombatBuffContext): Record<BuffCa
   const catalogBuffs = combatBuffsFromContext(context)
   return {
     self: dedupeById([
-      ...currentAgentBuffCandidates(context.meta, context.agentId, context.cinemaLevel, context.coreSkillLevel),
+      ...currentAgentBuffCandidates(
+        context.meta,
+        context.agentId,
+        context.cinemaLevel,
+        context.coreSkillLevel,
+        context.potentialLevel,
+      ),
       ...catalogBuffs.filter((buff: any) => buff?.sourceType === "self"),
     ]),
     selfWEngine: currentWEngineBuffCandidates(context.meta, context.wEngineId, context.wEngineModificationLevel),

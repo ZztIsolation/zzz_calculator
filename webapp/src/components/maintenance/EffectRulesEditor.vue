@@ -19,8 +19,9 @@ const props = withDefaults(defineProps<{
   allowModificationValues?: boolean
   preferredSkillId?: string
   corePassiveScaling?: any
+  potentialVisionScaling?: any
   runtimeParameters?: any[]
-}>(), { simple: false, allowCoverage: false, allowModificationValues: false, preferredSkillId: "", corePassiveScaling: null, runtimeParameters: () => [] })
+}>(), { simple: false, allowCoverage: false, allowModificationValues: false, preferredSkillId: "", corePassiveScaling: null, potentialVisionScaling: null, runtimeParameters: () => [] })
 const emit = defineEmits<{ change: [] }>()
 
 function rules() {
@@ -183,16 +184,54 @@ function corePassiveScalingFieldOptions() {
   ]
 }
 
+function potentialVisionScalingFieldOptions() {
+  const levels = props.potentialVisionScaling?.levels ?? []
+  if (!levels.length) return []
+  const fields = Object.keys(levels[0] ?? {}).filter(key => key !== "level"
+    && levels.every((level: any) => Number.isFinite(Number(level?.[key]))))
+  return fields.map(field => option(`potential:${field}`, `潜能影像倍率 · ${statLabel(field, props.catalog?.meta)}`))
+}
+
+function valueSourceOptions() {
+  return [...corePassiveScalingFieldOptions(), ...potentialVisionScalingFieldOptions()]
+}
+
+function valueSourceOptionValue(rule: any) {
+  if (rule.valueSource?.kind === "potentialVisionScaling") return `potential:${rule.valueSource.field}`
+  return rule.valueSource?.field ?? ""
+}
+
 function setValueSourceField(rule: any, field: string | null) {
   const normalized = String(field ?? "").trim()
   if (!normalized) {
     delete rule.valueSource
+  } else if (normalized.startsWith("potential:")) {
+    const potentialField = normalized.slice("potential:".length)
+    rule.valueSource = { kind: "potentialVisionScaling", field: potentialField }
+    const firstValue = Number(props.potentialVisionScaling?.levels?.[0]?.[potentialField])
+    if (Number.isFinite(firstValue)) rule.value = firstValue
   } else {
     rule.valueSource = { kind: "corePassiveScaling", field: normalized }
     const firstValue = Number(props.corePassiveScaling?.levels?.[0]?.[normalized])
     if (Number.isFinite(firstValue)) rule.value = firstValue
   }
   emit("change")
+}
+
+function setEventStunnedRequirement(rule: any, value: boolean | null) {
+  if (value === true || value === false) {
+    rule.requirement = { ...(rule.requirement ?? {}), eventStunned: value }
+  } else if (rule.requirement) {
+    delete rule.requirement.eventStunned
+    if (!Object.keys(rule.requirement).length) delete rule.requirement
+  }
+  emit("change")
+}
+
+function eventStunnedRequirementValue(rule: any) {
+  if (rule.requirement?.eventStunned === true) return "true"
+  if (rule.requirement?.eventStunned === false) return "false"
+  return null
 }
 
 function changeAnomalyVariants(rule: any, values: unknown) {
@@ -345,7 +384,7 @@ function selectStackGroup(rule: any, value: string) {
         <label v-if="!simple" class="maintenance-field"><span>计算类型</span><NSelect :value="rule.type ?? 'fixed'" :options="EFFECT_TYPE_OPTIONS" :disabled="disabled" @update:value="changeType(rule, String($event))" /></label>
         <label v-if="!simple" class="maintenance-field maintenance-field-wide"><span>增幅对象</span><NRadioGroup class="maintenance-target-mode" :value="targetMode(rule)" :disabled="disabled" size="small"><NRadioButton v-for="item in TARGET_KIND_OPTIONS" :key="item.value" :value="item.value" :label="item.label" @click="changeTarget(rule, String(item.value))" /></NRadioGroup></label>
         <label class="maintenance-field" data-field-key="stat"><span>增幅类型</span><NSelect filterable :consistent-menu-width="false" :value="rule.stat" :options="statOptions(catalog, rule.target?.kind, rule.target?.settlementType)" :disabled="disabled" @update:value="changeStat(rule, String($event))" /></label>
-        <label v-if="corePassiveScaling && (rule.type ?? 'fixed') === 'fixed'" class="maintenance-field"><span>数值来源</span><NSelect :value="rule.valueSource?.field ?? ''" :options="corePassiveScalingFieldOptions()" :disabled="disabled" @update:value="setValueSourceField(rule, $event ? String($event) : null)" /></label>
+        <label v-if="valueSourceOptions().length > 1 && (rule.type ?? 'fixed') === 'fixed'" class="maintenance-field"><span>数值来源</span><NSelect :value="valueSourceOptionValue(rule)" :options="valueSourceOptions()" :disabled="disabled" @update:value="setValueSourceField(rule, $event ? String($event) : null)" /></label>
         <label v-if="!['derived', 'formula'].includes(rule.type)" class="maintenance-field"><span>{{ stackedUsesActivationValue(rule) ? '激活数值' : rule.type === 'stacked' ? '每层数值' : '数值' }}</span><NInputNumber :value="rule[editableValueKey(rule)]" :disabled="disabled || Boolean(rule.valueSource)" :step="0.01" @update:value="rule[editableValueKey(rule)] = $event; emit('change')" /></label>
         <label v-if="rule.target?.kind !== 'skill' && !EVENT_STAT_KEYS.has(rule.stat)" class="maintenance-field"><span>计算方式</span><NSelect v-model:value="rule.mode" :options="EFFECT_MODE_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
         <label v-if="rule.target?.kind !== 'skill' && !EVENT_STAT_KEYS.has(rule.stat)" class="maintenance-field"><span>基准</span><NSelect v-model:value="rule.basis" :options="BASIS_OPTIONS" :disabled="disabled" clearable @update:value="emit('change')" /></label>
@@ -401,6 +440,7 @@ function selectStackGroup(rule: any, value: string) {
         <label class="maintenance-field"><span>冷却时间（秒）</span><NInputNumber v-model:value="rule.cooldownSeconds" :disabled="disabled" :min="0" clearable @update:value="emit('change')" /></label>
         <label class="maintenance-field"><span>装备者特性要求</span><NSelect :value="rule.requirement?.specialty ?? null" :options="SPECIALTY_OPTIONS" :disabled="disabled" clearable @update:value="setRuleSpecialty(rule, $event ? String($event) : null)" /></label>
         <label class="maintenance-field"><span>装备者属性要求</span><NSelect :value="rule.requirement?.attribute ?? null" :options="ATTRIBUTE_OPTIONS" :disabled="disabled" clearable @update:value="setRuleAttribute(rule, $event ? String($event) : null)" /></label>
+        <label class="maintenance-field"><span>失衡状态要求</span><NSelect :value="eventStunnedRequirementValue(rule)" :options="[option('true', '仅失衡'), option('false', '仅非失衡')]" :disabled="disabled" clearable placeholder="不限制" @update:value="setEventStunnedRequirement(rule, $event == null ? null : String($event) === 'true')" /></label>
         <label class="maintenance-field"><span>初始属性门槛</span><NSelect :value="rule.requirement?.outOfCombatStat?.stat ?? null" :options="OUT_OF_COMBAT_REQUIREMENT_STAT_OPTIONS" :disabled="disabled" clearable @update:value="setRuleOutOfCombatStat(rule, $event ? String($event) : null)" /></label>
         <label v-if="rule.requirement?.outOfCombatStat?.stat" class="maintenance-field"><span>最小值</span><NInputNumber v-model:value="rule.requirement.outOfCombatStat.min" :disabled="disabled" clearable @update:value="emit('change')" /></label>
         <label v-if="rule.requirement?.outOfCombatStat?.stat" class="maintenance-field"><span>最大值</span><NInputNumber v-model:value="rule.requirement.outOfCombatStat.max" :disabled="disabled" clearable @update:value="emit('change')" /></label>

@@ -38,6 +38,17 @@ export function normalizeDefaultCalculationCinemaLevel(value, fallback = 0) {
     return isDefaultCalculationCinemaLevel(fallback) ? Number(fallback) : 0
 }
 
+export function normalizeDefaultCalculationPotentialLevel(value, fallback = 0) {
+    const level = Number(value)
+    if (Number.isInteger(level)) {
+        return Math.min(6, Math.max(0, level))
+    }
+    const fallbackLevel = Number(fallback)
+    return Number.isInteger(fallbackLevel)
+        ? Math.min(6, Math.max(0, fallbackLevel))
+        : 0
+}
+
 export function defaultCalculationVariantName(cinemaLevel = 0) {
     const level = normalizeDefaultCalculationCinemaLevel(cinemaLevel)
     return { zhCN: `默认循环（${level}影）` }
@@ -55,7 +66,7 @@ export function defaultCalculationConfigEntries(config = null) {
     if (!isPlainObject(config)) {
         return []
     }
-    const { variants: rawVariants, ...baseConfig } = config
+    const { variants: rawVariants, potentialVariants: _potentialVariants, ...baseConfig } = config
     const entries = [
         {
             ...cloneJson(baseConfig),
@@ -67,7 +78,11 @@ export function defaultCalculationConfigEntries(config = null) {
             if (!isPlainObject(variant)) {
                 return
             }
-            const { variants: _nestedVariants, ...variantConfig } = variant
+            const {
+                variants: _nestedVariants,
+                potentialVariants: _nestedPotentialVariants,
+                ...variantConfig
+            } = variant
             entries.push({
                 ...cloneJson(variantConfig),
                 cinemaLevel: normalizeDefaultCalculationCinemaLevel(variantConfig.cinemaLevel, 0),
@@ -77,9 +92,45 @@ export function defaultCalculationConfigEntries(config = null) {
     return entries.sort((left, right) => left.cinemaLevel - right.cinemaLevel)
 }
 
-export function resolveDefaultCalculationConfig(config = null, cinemaLevel = 0) {
+function potentialVariantRange(variant = {}) {
+    const min = normalizeDefaultCalculationPotentialLevel(
+        variant.minPotentialLevel ?? variant.potentialLevel,
+        0,
+    )
+    const rawMax = variant.maxPotentialLevel
+    const max = rawMax === undefined || rawMax === null || rawMax === ""
+        ? 6
+        : normalizeDefaultCalculationPotentialLevel(rawMax, min)
+    return { min, max: Math.max(min, max) }
+}
+
+function resolvePotentialCalculationConfig(config = null, potentialLevel = 0) {
+    if (!isPlainObject(config)) {
+        return null
+    }
+
+    const targetLevel = normalizeDefaultCalculationPotentialLevel(potentialLevel, 0)
+    const potentialVariants = Array.isArray(config.potentialVariants)
+        ? config.potentialVariants.filter(isPlainObject)
+        : []
+    const selectedVariant = potentialVariants
+        .map((variant, index) => ({ variant, index, ...potentialVariantRange(variant) }))
+        .filter(entry => entry.min <= targetLevel && targetLevel <= entry.max)
+        .sort((left, right) => right.min - left.min || left.max - right.max || left.index - right.index)[0]
+
+    if (selectedVariant) {
+        const { minPotentialLevel, maxPotentialLevel, potentialLevel: _level, ...variant } = selectedVariant.variant
+        return cloneJson(variant)
+    }
+
+    const { potentialVariants: _potentialVariants, ...baseConfig } = config
+    return cloneJson(baseConfig)
+}
+
+export function resolveDefaultCalculationConfig(config = null, cinemaLevel = 0, potentialLevel = 0) {
     const targetLevel = normalizeDefaultCalculationCinemaLevel(cinemaLevel, 0)
-    const selected = defaultCalculationConfigEntries(config)
+    const potentialConfig = resolvePotentialCalculationConfig(config, potentialLevel)
+    const selected = defaultCalculationConfigEntries(potentialConfig)
         .filter(entry => entry.cinemaLevel <= targetLevel)
         .sort((left, right) => right.cinemaLevel - left.cinemaLevel)[0]
     return selected ? withDefaultCalculationVariantName(selected) : null

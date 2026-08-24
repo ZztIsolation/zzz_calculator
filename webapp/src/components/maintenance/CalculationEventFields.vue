@@ -16,7 +16,8 @@ const props = withDefaults(defineProps<{
   skillGroups?: any[]
   disabled?: boolean
   allowSkillGroup?: boolean
-}>(), { skillGroups: () => [], allowSkillGroup: true })
+  potentialLevel?: number | null
+}>(), { skillGroups: () => [], allowSkillGroup: true, potentialLevel: null })
 const emit = defineEmits<{ change: [] }>()
 
 function agentSkill() {
@@ -48,10 +49,10 @@ function defaultManualDamageElement() {
 
 function newSkillRef() {
   const skill = agentSkill()
-  const category = skill?.categories?.[0]
-  const move = category?.moves?.[0]
-  const row = move?.rows?.[0]
-  return { agentSkillId: skill?.id ?? "", categoryId: category?.id ?? "", moveId: move?.id ?? "", rowId: row?.id ?? "" }
+  const categoryId = String(categoryOptions(props.catalog, skill?.id ?? "", props.potentialLevel)[0]?.value ?? "")
+  const moveId = String(moveOptions(props.catalog, skill?.id ?? "", categoryId, false, props.potentialLevel)[0]?.value ?? "")
+  const rowId = String(rowOptions(props.catalog, skill?.id ?? "", categoryId, moveId, false, props.potentialLevel)[0]?.value ?? "")
+  return { agentSkillId: skill?.id ?? "", categoryId, moveId, rowId }
 }
 
 function changeKind(kind: string) {
@@ -92,14 +93,42 @@ function changeSource(source: string) {
 
 function changeCategory(value: string) {
   props.event.skillRef.categoryId = value
-  props.event.skillRef.moveId = String(moveOptions(props.catalog, props.event.skillRef.agentSkillId, value)[0]?.value ?? "")
-  props.event.skillRef.rowId = String(rowOptions(props.catalog, props.event.skillRef.agentSkillId, value, props.event.skillRef.moveId)[0]?.value ?? "")
+  props.event.skillRef.moveId = String(moveOptions(props.catalog, props.event.skillRef.agentSkillId, value, false, props.potentialLevel)[0]?.value ?? "")
+  props.event.skillRef.rowId = String(rowOptions(props.catalog, props.event.skillRef.agentSkillId, value, props.event.skillRef.moveId, false, props.potentialLevel)[0]?.value ?? "")
+  applySelectedRowCountRange()
   emit("change")
 }
 
 function changeMove(value: string) {
   props.event.skillRef.moveId = value
-  props.event.skillRef.rowId = String(rowOptions(props.catalog, props.event.skillRef.agentSkillId, props.event.skillRef.categoryId, value)[0]?.value ?? "")
+  props.event.skillRef.rowId = String(rowOptions(props.catalog, props.event.skillRef.agentSkillId, props.event.skillRef.categoryId, value, false, props.potentialLevel)[0]?.value ?? "")
+  applySelectedRowCountRange()
+  emit("change")
+}
+
+function selectedSkillRow() {
+  const skill = agentSkill()
+  const category = (skill?.categories ?? []).find((item: any) => item.id === props.event.skillRef?.categoryId)
+  const move = (category?.moves ?? []).find((item: any) => item.id === props.event.skillRef?.moveId)
+  return (move?.rows ?? []).find((item: any) => item.id === props.event.skillRef?.rowId) ?? null
+}
+
+function eventCountRange() {
+  return selectedSkillRow()?.eventCountRange ?? null
+}
+
+function applySelectedRowCountRange() {
+  const range = eventCountRange()
+  if (!range) return
+  const value = Number(props.event.count)
+  props.event.count = Number.isInteger(value) && value >= Number(range.min) && value <= Number(range.max)
+    ? value
+    : Number(range.default)
+}
+
+function changeRow(value: string) {
+  props.event.skillRef.rowId = value
+  applySelectedRowCountRange()
   emit("change")
 }
 
@@ -154,7 +183,7 @@ function updateStunned(value: boolean) {
 <template>
   <div class="calculation-event-grid">
     <label class="maintenance-field"><span>类型</span><NSelect :value="visibleKind()" :options="eventKindOptions()" :disabled="disabled" @update:value="changeKind(String($event))" /></label>
-    <label v-if="visibleKind() !== 'luminescence'" class="maintenance-field"><span>次数</span><NInputNumber v-model:value="event.count" :disabled="disabled" :min="0" :step="1" @update:value="emit('change')" /></label>
+    <label v-if="visibleKind() !== 'luminescence'" class="maintenance-field"><span>次数</span><NInputNumber v-model:value="event.count" :disabled="disabled" :min="eventCountRange()?.min ?? 0" :max="eventCountRange()?.max" :step="1" @update:value="emit('change')" /></label>
     <label v-if="visibleKind() !== 'luminescence'" class="maintenance-switch-field"><span>是否失衡</span><NSwitch :value="event.stunned !== false" :disabled="disabled" @update:value="updateStunned(Boolean($event))"><template #checked>是</template><template #unchecked>否</template></NSwitch></label>
     <label v-if="!['skillGroup', 'luminescence'].includes(visibleKind())" class="maintenance-field"><span>伤害比例%</span><NInputNumber v-model:value="event.damageRatioPct" :disabled="disabled" :min="0" :step="0.1" placeholder="100" @update:value="emit('change')" /></label>
     <label v-if="visibleKind() === 'skillGroup'" class="maintenance-field"><span>技能组</span><NSelect v-model:value="event.skillGroupId" :options="groupOptions()" :disabled="disabled" @update:value="emit('change')" /></label>
@@ -162,9 +191,9 @@ function updateStunned(value: boolean) {
     <template v-if="['direct', 'sheer'].includes(visibleKind())">
       <label class="maintenance-field"><span>伤害来源</span><NSelect :value="sourceOf()" :options="EVENT_SOURCE_OPTIONS" :disabled="disabled" @update:value="changeSource(String($event))" /></label>
       <template v-if="event.skillRef">
-        <label class="maintenance-field"><span>技能大类</span><NSelect filterable :value="event.skillRef.categoryId" :options="categoryOptions(catalog, event.skillRef.agentSkillId)" :disabled="disabled" @update:value="changeCategory(String($event))" /></label>
-        <label class="maintenance-field"><span>招式</span><NSelect filterable :value="event.skillRef.moveId" :options="moveOptions(catalog, event.skillRef.agentSkillId, event.skillRef.categoryId)" :disabled="disabled" @update:value="changeMove(String($event))" /></label>
-        <label class="maintenance-field"><span>倍率行</span><NSelect filterable v-model:value="event.skillRef.rowId" :options="rowOptions(catalog, event.skillRef.agentSkillId, event.skillRef.categoryId, event.skillRef.moveId)" :disabled="disabled" @update:value="emit('change')" /></label>
+        <label class="maintenance-field"><span>技能大类</span><NSelect filterable :value="event.skillRef.categoryId" :options="categoryOptions(catalog, event.skillRef.agentSkillId, potentialLevel)" :disabled="disabled" @update:value="changeCategory(String($event))" /></label>
+        <label class="maintenance-field"><span>招式</span><NSelect filterable :value="event.skillRef.moveId" :options="moveOptions(catalog, event.skillRef.agentSkillId, event.skillRef.categoryId, false, potentialLevel)" :disabled="disabled" @update:value="changeMove(String($event))" /></label>
+        <label class="maintenance-field"><span>倍率行</span><NSelect filterable :value="event.skillRef.rowId" :options="rowOptions(catalog, event.skillRef.agentSkillId, event.skillRef.categoryId, event.skillRef.moveId, false, potentialLevel)" :disabled="disabled" @update:value="changeRow(String($event))" /></label>
       </template>
       <template v-else>
         <label class="maintenance-field"><span>事件名称</span><NInput v-model:value="event.label" :disabled="disabled" placeholder="额外能力：落雷" @update:value="emit('change')" /></label>

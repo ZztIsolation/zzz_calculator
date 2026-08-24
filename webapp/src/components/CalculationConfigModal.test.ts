@@ -17,6 +17,8 @@ const yixuanSkillCatalog = (agentSkillsData as any).agentSkills.find((skill: any
 const alice = (agentsData as any).agents.find((agent: any) => agent.id === "alice_thymefield")
 const aria = (agentsData as any).agents.find((agent: any) => agent.id === "aria")
 const dan = (agentsData as any).agents.find((agent: any) => agent.id === "remielle_dan")
+const soldier11 = (agentsData as any).agents.find((agent: any) => agent.id === "soldier_11")
+const soldier11SkillCatalog = (agentSkillsData as any).agentSkills.find((skill: any) => skill.id === "soldier_11")
 
 const miyabiWithSkillGroups = {
   ...JSON.parse(JSON.stringify(miyabi)),
@@ -154,7 +156,7 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value))
 }
 
-function mountModal(overrides: { agent?: any, damageConfig?: any, meta?: any, skillCatalog?: any, cinemaLevel?: number, combatEffects?: any[], releaseContext?: any, sourceSnapshotProvider?: (agentId: string) => any } = {}) {
+function mountModal(overrides: { agent?: any, damageConfig?: any, meta?: any, skillCatalog?: any, cinemaLevel?: number, potentialLevel?: number, combatEffects?: any[], releaseContext?: any, sourceSnapshotProvider?: (agentId: string) => any } = {}) {
   const agent = overrides.agent ?? miyabi
   const skillCatalog = overrides.skillCatalog
     ?? (agentSkillsData as any).agentSkills.find((skill: any) => skill.id === agent?.id)
@@ -178,6 +180,7 @@ function mountModal(overrides: { agent?: any, damageConfig?: any, meta?: any, sk
       skillCatalog,
       skillLevels: { basic: 12, dodge: 12, assist: 12, special: 12, chain: 12, core_skill: "F" },
       cinemaLevel: overrides.cinemaLevel ?? 0,
+      potentialLevel: overrides.potentialLevel ?? 0,
       combatEffects: overrides.combatEffects ?? [],
       releaseContext: overrides.releaseContext,
       sourceSnapshotProvider: overrides.sourceSnapshotProvider,
@@ -1663,5 +1666,68 @@ describe("CalculationConfigModal", () => {
       teammateAttack: 3150,
       luminescenceDamageSharePct: 50,
     })
+  })
+
+  it("rejects a saved P1 skill at P0 instead of silently replacing it", async () => {
+    const event = {
+      id: "locked-potential-hit",
+      kind: "direct",
+      count: 1,
+      stunned: true,
+      critMode: "expected",
+      skillRef: {
+        agentSkillId: "soldier_11",
+        categoryId: "basic",
+        moveId: "potential_firepower_burst",
+        rowId: "damage",
+        level: 12,
+      },
+    }
+    const wrapper = mountModal({
+      agent: soldier11,
+      skillCatalog: soldier11SkillCatalog,
+      potentialLevel: 0,
+      damageConfig: { mode: "custom", selectedEventId: event.id, events: [event] },
+    })
+
+    await openModal(wrapper)
+    expect(document.body.textContent).toContain("该技能需要潜能 P1，当前为 P0，无法使用")
+    const saveButton = Array.from(document.body.querySelectorAll("button"))
+      .find(button => button.textContent?.trim() === "保存配置") as HTMLButtonElement
+    expect(saveButton.disabled).toBe(true)
+
+    await wrapper.setProps({ potentialLevel: 1 })
+    await nextTick()
+    expect(document.body.textContent).not.toContain("当前为 P0，无法使用")
+  })
+
+  it("clamps a potential extra-hit event to its authored count range", async () => {
+    const event = {
+      id: "potential-extra-hit",
+      kind: "direct",
+      count: 7,
+      stunned: true,
+      critMode: "expected",
+      skillRef: {
+        agentSkillId: "soldier_11",
+        categoryId: "basic",
+        moveId: "potential_empowered_fire_suppression_fifth",
+        rowId: "extra_damage",
+        level: 12,
+      },
+    }
+    const wrapper = mountModal({
+      agent: soldier11,
+      skillCatalog: soldier11SkillCatalog,
+      potentialLevel: 1,
+      damageConfig: { mode: "custom", selectedEventId: event.id, events: [event] },
+    })
+
+    await openModal(wrapper)
+    const countInput = wrapper.findAllComponents(NInputNumber)
+      .find(input => input.props("max") === 6)
+    expect(countInput?.props("value")).toBe(6)
+    const saved = await saveModal(wrapper)
+    expect(saved.events[0].count).toBe(6)
   })
 })

@@ -4,7 +4,7 @@ import path from "node:path"
 import { describe, expect, it } from "vitest"
 
 const viewPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "WorkbenchView.vue")
-const source = readFileSync(viewPath, "utf8")
+const source = readFileSync(viewPath, "utf8").replace(/\r\n/g, "\n")
 const componentDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../components")
 const slotCardSource = readFileSync(path.join(componentDir, "DriveDiscSlotCard.vue"), "utf8")
 const pickerSource = readFileSync(path.join(componentDir, "DriveDiscPickerModal.vue"), "utf8")
@@ -323,10 +323,21 @@ describe("WorkbenchView optimizer progress", () => {
 
   it("shows the resolved admin default calculation name in the settings summary", () => {
     expect(source).toContain("const calculationModeLabel = computed")
-    expect(source).toContain("resolveDefaultCalculationConfig(selectedAgent.value?.defaultCalculationConfig, buildStore.cinemaLevel)")
+    expect(source).toContain("selectedAgent.value?.defaultCalculationConfig,")
+    expect(source).toContain("buildStore.potentialLevel,")
     expect(source).toContain("`默认循环（${name}）`")
     expect(source).toContain("<dd>{{ calculationModeLabel }}</dd>")
     expect(source).not.toContain("<dd>{{ damageModeLabel(buildStore.damageConfig.mode) }}</dd>")
+  })
+
+  it("shows potential controls only for agents with a potential vision and wires the level everywhere", () => {
+    expect(source).toContain('v-if="selectedAgent?.potentialVision"')
+    expect(source).toContain('aria-label="潜能影像"')
+    expect(source).toContain('label: level === 0 ? "P0 · 关闭 / 未激发" : `P${level}`')
+    expect(source).toContain("buildStore.setPotentialLevel")
+    expect(source).toContain("potentialLevel: buildStore.potentialLevel")
+    expect(source.match(/:potential-level="buildStore\.potentialLevel"/g)).toHaveLength(2)
+    expect(source).toContain("build-profile-grid--potential")
   })
 
   it("loads optimizer constraints from the selected agent", () => {

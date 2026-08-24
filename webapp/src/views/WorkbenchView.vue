@@ -217,6 +217,13 @@ const coreSkillOptions = computed(() => {
   ]
 })
 const cinemaLevelOptions = Array.from({ length: 7 }, (_, level) => ({ label: `${level} 影`, value: level }))
+const potentialLevelOptions = computed(() => {
+  const maxLevel = Math.max(0, Math.trunc(Number(selectedAgent.value?.potentialVision?.maxLevel ?? 0)))
+  return Array.from({ length: maxLevel + 1 }, (_, level) => ({
+    label: level === 0 ? "P0 · 关闭 / 未激发" : `P${level}`,
+    value: level,
+  }))
+})
 const modificationOptions = computed(() => {
   const min = Number(selectedWEngine.value?.modification?.minLevel ?? 1)
   const max = Number(selectedWEngine.value?.modification?.maxLevel ?? 5)
@@ -328,7 +335,11 @@ const calculationModeLabel = computed(() => {
   if (buildStore.damageConfig.mode !== "adminDefault") {
     return damageModeLabel(buildStore.damageConfig.mode)
   }
-  const config = resolveDefaultCalculationConfig(selectedAgent.value?.defaultCalculationConfig, buildStore.cinemaLevel)
+  const config = resolveDefaultCalculationConfig(
+    selectedAgent.value?.defaultCalculationConfig,
+    buildStore.cinemaLevel,
+    buildStore.potentialLevel,
+  )
   if (!config) {
     return "默认循环"
   }
@@ -566,6 +577,7 @@ const activeBuffBadges = computed(() => activeBuffIdsForPanel.value.map(id => ({
     driveDiscSets: catalogStore.driveDiscSets,
     agentId: buildStore.agentId,
     cinemaLevel: buildStore.cinemaLevel,
+    potentialLevel: buildStore.potentialLevel,
     wEngineId: buildStore.wEngineId,
     wEngineModificationLevel: buildStore.wEngineModificationLevel,
     addedBuffs: buildStore.addedBuffs,
@@ -675,6 +687,7 @@ const buildSignature = computed(() => JSON.stringify({
   agentLevel: buildStore.agentLevel,
   coreSkillLevel: buildStore.coreSkillLevel,
   cinemaLevel: buildStore.cinemaLevel,
+  potentialLevel: buildStore.potentialLevel,
   skillLevels: buildStore.skillLevels,
   wEngineId: buildStore.wEngineId,
   wEngineLevel: buildStore.wEngineLevel,
@@ -1284,7 +1297,11 @@ function formatPercentValue(value: any) {
           />
         </div>
         <div class="workbench-section-body section-band">
-          <div class="build-compact-grid build-profile-grid ui-field-grid" data-layout-surface="agent-profile-fields">
+          <div
+            class="build-compact-grid build-profile-grid ui-field-grid"
+            :class="{ 'build-profile-grid--potential': selectedAgent?.potentialVision }"
+            data-layout-surface="agent-profile-fields"
+          >
             <label class="compact-field ui-field" data-layout-field>
               <span>等级</span>
               <NInputNumber v-model:value="buildStore.agentLevel" :min="1" :max="60" size="small" />
@@ -1296,6 +1313,16 @@ function formatPercentValue(value: any) {
                 :options="cinemaLevelOptions"
                 size="small"
                 @update:value="buildStore.setCinemaLevel(Number($event ?? 0), catalogStore.meta)"
+              />
+            </label>
+            <label v-if="selectedAgent?.potentialVision" class="compact-field ui-field" data-layout-field>
+              <span>潜能影像</span>
+              <NSelect
+                :value="buildStore.potentialLevel"
+                :options="potentialLevelOptions"
+                size="small"
+                aria-label="潜能影像"
+                @update:value="buildStore.setPotentialLevel(Number($event ?? 0), catalogStore.meta)"
               />
             </label>
             <label class="compact-field compact-field-wide ui-field ui-field--full" data-layout-field>
@@ -1979,6 +2006,7 @@ function formatPercentValue(value: any) {
     :agent-id="buildStore.agentId"
     :core-skill-level="String(buildStore.coreSkillLevel)"
     :cinema-level="buildStore.cinemaLevel"
+    :potential-level="buildStore.potentialLevel"
     :w-engine-id="buildStore.wEngineId"
     :w-engine-modification-level="buildStore.wEngineModificationLevel"
     @apply="applyBuffs"
@@ -1992,6 +2020,7 @@ function formatPercentValue(value: any) {
     :meta="catalogStore.meta"
     :agent="selectedAgent"
     :cinema-level="buildStore.cinemaLevel"
+    :potential-level="buildStore.potentialLevel"
     :combat-effects="buildStore.result?.inCombat?.activeEffects ?? []"
     :release-context="{ inCombatPanel: buildStore.result?.inCombat?.panel, outOfCombatPanel: buildStore.result?.outOfCombat?.panel, outOfCombatBaseAtk: buildStore.result?.outOfCombat?.base?.atk, coreSkillLevel: buildStore.coreSkillLevel, luminescenceDamageMultiplier: currentLuminescenceDamageMultiplier, teamAnomalyDamageMultiplier: currentTeamAnomalyDamageMultiplier }"
     :source-snapshot-provider="anomalySourceSnapshotForAgent"
@@ -2122,6 +2151,10 @@ function formatPercentValue(value: any) {
 .workbench-left .build-profile-grid,
 .workbench-left .build-skill-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.workbench-left .build-profile-grid--potential {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .workbench-left .build-profile-grid .compact-field-wide {

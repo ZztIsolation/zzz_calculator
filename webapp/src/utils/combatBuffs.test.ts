@@ -308,4 +308,42 @@ describe("combat buff display helpers", () => {
     }))
     expect(groups.boss[0].effects).toHaveLength(1)
   })
+
+  it("materializes additional-ability potential scaling for the active P level", () => {
+    const potentialMeta = {
+      agents: [{
+        id: "potential_agent",
+        name: { zhCN: "潜能角色" },
+        potentialVision: {
+          defaultLevel: 6,
+          maxLevel: 6,
+          scaling: {
+            levels: [
+              { level: 0, critDmgPct: 0 },
+              { level: 2, critDmgPct: 16 },
+              { level: 6, critDmgPct: 48 },
+            ],
+          },
+        },
+        combatBuffs: {
+          additionalAbility: {
+            scope: "inCombat",
+            effects: [{
+              id: "potential-crit-dmg",
+              type: "fixed",
+              stat: "critDmg",
+              value: 0,
+              valueSource: { kind: "potentialVisionScaling", field: "critDmgPct" },
+            }],
+          },
+        },
+      }],
+      combatBuffs: [],
+    }
+
+    const atP0 = buildCombatBuffGroups({ meta: potentialMeta, agentId: "potential_agent", potentialLevel: 0 })
+    const atP6 = buildCombatBuffGroups({ meta: potentialMeta, agentId: "potential_agent", potentialLevel: 6 })
+    expect(atP0.self[0].effects[0].value).toBe(0)
+    expect(atP6.self[0].effects[0].value).toBe(48)
+  })
 })

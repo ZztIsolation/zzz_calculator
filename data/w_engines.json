@@ -4534,6 +4534,7 @@
       },
       "rarity": "S",
       "specialty": "attack",
+      "relatedAgentId": "soldier_11",
       "images": {
         "icon": "/assets/w-engines/zzz_wiki_223.png",
         "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/26/11536806/2cd3aa09c2f818eadf4ce632c5f421fd_1967602675265095788.png"

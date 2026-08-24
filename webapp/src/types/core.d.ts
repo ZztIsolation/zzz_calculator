@@ -292,9 +292,9 @@ declare module "@core/corePassiveScaling.js" {
 }
 
 declare module "@core/calculationSkillGroups.js" {
-  export function calculationSkillGroups(source?: any): any[]
-  export function hasCalculationSkillGroups(source?: any): boolean
-  export function skillGroupById(source?: any, groupId?: string): any
+  export function calculationSkillGroups(source?: any, options?: { potentialLevel?: number }): any[]
+  export function hasCalculationSkillGroups(source?: any, options?: { potentialLevel?: number }): boolean
+  export function skillGroupById(source?: any, groupId?: string, options?: { potentialLevel?: number }): any
   export function skillGroupCountLimits(group?: any): { min: number, max: number | null, step: number }
   export function normalizeSkillGroupCounts(source?: any, inputCounts?: Record<string, any>): Record<string, number>
   export function isSkillGroupReferenceEvent(event?: any): boolean
@@ -312,7 +312,13 @@ declare module "@core/defaultCalculationConfig.js" {
   export function defaultCalculationVariantName(cinemaLevel?: number): { zhCN: string }
   export function withDefaultCalculationVariantName(config?: any): any
   export function defaultCalculationConfigEntries(config?: any): any[]
-  export function resolveDefaultCalculationConfig(config?: any, cinemaLevel?: number): any
+  export function resolveDefaultCalculationConfig(config?: any, cinemaLevel?: number, potentialLevel?: number): any
+}
+
+declare module "@core/potentialVision.js" {
+  export function normalizePotentialLevel(agent?: any, value?: any, fallback?: number): number
+  export function potentialLevelRequirementMatches(value?: any, potentialLevel?: number): boolean
+  export function materializePotentialVisionEffect(effect?: any, agent?: any, potentialLevel?: number): any
 }
 
 declare module "@core/driveDiscOptimizer-core.js" {

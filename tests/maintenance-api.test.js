@@ -271,6 +271,25 @@ try {
     const skillBuffWithRow = structuredClone(reloadedSkillBuffAgent)
     skillBuffWithRow.combatBuffs.skillBuffs[0].sourceSkillRef.rowId = "damage"
     await saveRejected("agents", skillBuffWithRow, "不能保存倍率行")
+    const soldier11 = structuredClone(managedAgentCatalog.agents.agents.find(item => item.id === "soldier_11"))
+    const soldier11Save = await save("agents", soldier11)
+    const savedEmpoweredPackage = soldier11Save.savedItem.skillGroups
+        .find(group => group.id === "potential_empowered_fifth_package")
+    assert.deepEqual(
+        {
+            authoredCountRange: savedEmpoweredPackage.authoredCountRange,
+            defaultCount: savedEmpoweredPackage.defaultCount,
+            minCount: savedEmpoweredPackage.minCount,
+            maxCount: savedEmpoweredPackage.maxCount,
+            step: savedEmpoweredPackage.step,
+        },
+        { authoredCountRange: true, defaultCount: 1, minCount: 0, maxCount: 1, step: 1 },
+    )
+    const reloadedSoldier11 = (await catalog()).agents.agents.find(item => item.id === "soldier_11")
+    assert.equal(
+        reloadedSoldier11.skillGroups.find(group => group.id === "potential_empowered_fifth_package").maxCount,
+        1,
+    )
 
     const danAgent = structuredClone(
         managedAgentCatalog.agents.agents.find(item => item.id === "remielle_dan"),

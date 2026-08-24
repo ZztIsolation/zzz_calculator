@@ -28,6 +28,11 @@ import {
     materializeCorePassiveScalingEffect,
 } from "./corePassiveScaling.js"
 import {
+    materializePotentialVisionEffect,
+    normalizePotentialLevel,
+    potentialLevelRequirementMatches,
+} from "./potentialVision.js"
+import {
     anomalyReleaseProfile,
     evaluateAnomalyReleaseProfile,
     evaluateAnomalyReleaseProfileInterval,
@@ -1045,6 +1050,7 @@ function isRuleEventModifier(rule = {}) {
     }
     const stat = canonicalBuffStat(rule.stat)
     return ["skill", "anomaly"].includes(ruleTargetKind(rule))
+        || Object.prototype.hasOwnProperty.call(rule?.requirement ?? {}, "eventStunned")
         || EVENT_MODIFIER_STAT_KEYS.has(stat)
         || (hasEventAppliesToFilters(rule) && EVENT_MODIFIER_KIND_VALUES.has(stat))
 }
@@ -1829,7 +1835,7 @@ function cinemaBuffName(buff = {}) {
     return name
 }
 
-function agentCombatBuffEntries(agent, coreSkillLevel) {
+function agentCombatBuffEntries(agent, coreSkillLevel, potentialLevel) {
     const combatBuffs = agent?.combatBuffs ?? {}
     const fixedEntries = [
         ["corePassive", combatBuffs.corePassive],
@@ -1837,9 +1843,14 @@ function agentCombatBuffEntries(agent, coreSkillLevel) {
     ]
         .filter(([, buff]) => buff)
         .map(([key, buff]) => {
-            const materializedBuff = key === "corePassive"
+            const coreMaterializedBuff = key === "corePassive"
                 ? materializeCorePassiveScalingEffect(buff, agent, coreSkillLevel)
                 : buff
+            const materializedBuff = materializePotentialVisionEffect(
+                coreMaterializedBuff,
+                agent,
+                potentialLevel,
+            )
             return {
                 id: `agent:${agent.id}.${key}`,
                 key,
@@ -1859,13 +1870,16 @@ function agentCombatBuffEntries(agent, coreSkillLevel) {
         }))
     const cinemaEntries = (combatBuffs.cinemaBuffs ?? [])
         .filter(buff => buff)
-        .map(buff => ({
-            id: `agent:${agent.id}.cinema.${buff.cinemaLevel}`,
-            key: `cinema.${buff.cinemaLevel}`,
-            buff,
-            name: buff.name ?? cinemaBuffName(buff),
-            conditionLabel: buff.conditionLabel ?? buff.description ?? null,
-        }))
+        .map(buff => {
+            const materializedBuff = materializePotentialVisionEffect(buff, agent, potentialLevel)
+            return {
+                id: `agent:${agent.id}.cinema.${buff.cinemaLevel}`,
+                key: `cinema.${buff.cinemaLevel}`,
+                buff: materializedBuff,
+                name: materializedBuff.name ?? cinemaBuffName(materializedBuff),
+                conditionLabel: materializedBuff.conditionLabel ?? materializedBuff.description ?? null,
+            }
+        })
     return [...fixedEntries, ...skillEntries, ...cinemaEntries]
 }
 
@@ -2458,6 +2472,14 @@ function resolveDamageSkillRef(catalog, agent, skillRef = null, options = {}) {
     if ((row.kind ?? "damageMultiplier") !== "damageMultiplier") {
         throw new Error(`Skill row is not a damage multiplier: ${skillSet.id}.${categoryId}.${moveId}.${rowId}`)
     }
+    const potentialLevel = normalizePotentialLevel(agent, options.potentialLevel)
+    for (const [kind, value] of [["category", category], ["move", move], ["row", row]]) {
+        if (!potentialLevelRequirementMatches(value, potentialLevel)) {
+            throw new Error(
+                `Skill ${kind} requires potential P${value.requiresPotentialLevel}: ${skillSet.id}.${categoryId}.${moveId}.${rowId} (current P${potentialLevel})`,
+            )
+        }
+    }
 
     const isCoreSkillLevel = isCoreSkillLevelScale(category)
     const defaultLevel = defaultLevelForSkill(category, move, row)
@@ -2507,6 +2529,9 @@ function resolveDamageSkillRef(catalog, agent, skillRef = null, options = {}) {
             moveName: move.name,
             rowLabel: resolvedRow.label,
             label: sourceLabelParts.join(" / "),
+            eventCountRange: normalizeSkillEventCountRange(resolvedRow.eventCountRange, {
+                label: `${skillSet.id}.${categoryId}.${moveId}.${resolvedRow.id}`,
+            }),
         }
     }
     const generatedSkillComponents = (Array.isArray(row.generatedFromRowIds) ? row.generatedFromRowIds : [])
@@ -2527,6 +2552,9 @@ function resolveDamageSkillRef(catalog, agent, skillRef = null, options = {}) {
     return {
         skillMultiplier: Math.max(0, value / 100),
         skillPercent: value,
+        eventCountRange: normalizeSkillEventCountRange(row.eventCountRange, {
+            label: `${skillSet.id}.${categoryId}.${moveId}.${rowId}`,
+        }),
         skillSource: skillSourceForRow(row),
         generatedSkillComponents,
     }
@@ -2552,6 +2580,36 @@ function normalizeDamageTarget(input = {}, damageElement) {
 function normalizeDamageCount(value, fallback = 1) {
     const numeric = Number(value ?? fallback)
     return Number.isFinite(numeric) ? Math.max(0, numeric) : fallback
+}
+
+function normalizeSkillEventCountRange(range, { label = "skill row" } = {}) {
+    if (range === undefined || range === null) {
+        return null
+    }
+    if (!range || typeof range !== "object" || Array.isArray(range)) {
+        throw new Error(`Invalid event count range for ${label}`)
+    }
+    const min = Number(range.min ?? 0)
+    const max = Number(range.max)
+    const defaultCount = Number(range.default ?? min)
+    if (!Number.isInteger(min) || !Number.isInteger(max) || !Number.isInteger(defaultCount)
+        || min < 0 || max < min || defaultCount < min || defaultCount > max) {
+        throw new Error(`Invalid event count range for ${label}`)
+    }
+    return { min, max, default: defaultCount }
+}
+
+function normalizeSkillEventCount(value, range, fallback = 1, label = "skill event") {
+    if (!range) {
+        return normalizeDamageCount(value, fallback)
+    }
+    const count = value === undefined || value === null || value === ""
+        ? range.default
+        : Number(value)
+    if (!Number.isInteger(count) || count < range.min || count > range.max) {
+        throw new Error(`Event count out of range for ${label}: ${value} (expected ${range.min}..${range.max})`)
+    }
+    return count
 }
 
 function bossAppearanceLabel(appearance = {}) {
@@ -2661,6 +2719,10 @@ function directDamageBasisValue(panel = {}, event = {}) {
 
 function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index = 0, options = {}) {
     if (event.normalized === true) {
+        const eventCountRange = normalizeSkillEventCountRange(
+            event.eventCountRange ?? event.skillSource?.eventCountRange,
+            { label: event.skillSource?.label ?? event.id ?? `direct-${index + 1}` },
+        )
         const damageElement = DIRECT_DAMAGE_ELEMENTS.has(event.damageElement)
             ? event.damageElement
             : DIRECT_DAMAGE_ELEMENTS.has(event.skillSource?.damageElement)
@@ -2680,7 +2742,8 @@ function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index 
                 ? event.critMode
                 : "expected",
             damageElement,
-            count: normalizeDamageCount(event.count, 1),
+            count: normalizeSkillEventCount(event.count, eventCountRange, 1, event.id ?? `direct-${index + 1}`),
+            eventCountRange,
             stunned: normalizeEventStunned(event.stunned),
         }
     }
@@ -2707,7 +2770,13 @@ function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index 
         label: normalizeDamageEventLabel(event),
         critMode,
         damageElement,
-        count: normalizeDamageCount(event.count, 1),
+        count: normalizeSkillEventCount(
+            event.count,
+            skillRefResult?.eventCountRange,
+            1,
+            event.id ?? skillRefResult?.skillSource?.label ?? `direct-${index + 1}`,
+        ),
+        eventCountRange: skillRefResult?.eventCountRange ?? null,
         stunned: normalizeEventStunned(event.stunned),
     }
 }
@@ -2748,6 +2817,10 @@ function generatedDirectDamageComponentEvents(event = {}) {
 
 function normalizeSheerDamageEvent(event = {}, agent = {}, catalog = {}, index = 0, options = {}) {
     if (event.normalized === true) {
+        const eventCountRange = normalizeSkillEventCountRange(
+            event.eventCountRange ?? event.skillSource?.eventCountRange,
+            { label: event.skillSource?.label ?? event.id ?? `sheer-${index + 1}` },
+        )
         const damageElement = DAMAGE_ELEMENTS.includes(event.damageElement)
             ? event.damageElement
             : resolveDamageElement(agent)
@@ -2764,7 +2837,8 @@ function normalizeSheerDamageEvent(event = {}, agent = {}, catalog = {}, index =
                 ? event.critMode
                 : "expected",
             damageElement,
-            count: normalizeDamageCount(event.count, 1),
+            count: normalizeSkillEventCount(event.count, eventCountRange, 1, event.id ?? `sheer-${index + 1}`),
+            eventCountRange,
             stunned: normalizeEventStunned(event.stunned),
         }
     }
@@ -2790,7 +2864,13 @@ function normalizeSheerDamageEvent(event = {}, agent = {}, catalog = {}, index =
         label: normalizeDamageEventLabel(event),
         critMode,
         damageElement,
-        count: normalizeDamageCount(event.count, 1),
+        count: normalizeSkillEventCount(
+            event.count,
+            skillRefResult?.eventCountRange,
+            1,
+            event.id ?? skillRefResult?.skillSource?.label ?? `sheer-${index + 1}`,
+        ),
+        eventCountRange: skillRefResult?.eventCountRange ?? null,
         stunned: normalizeEventStunned(event.stunned),
     }
 }
@@ -3048,12 +3128,15 @@ function normalizeDamageRequest(input = {}, agent = {}, catalog = {}, options = 
         : Object.prototype.hasOwnProperty.call(legacyTargetInput, "stunned")
             ? normalizeStunned(legacyTargetInput.stunned)
             : true
+    const potentialLevel = normalizePotentialLevel(agent, options.potentialLevel)
     const expandedInput = expandCalculationConfigSkillGroups(input, agent, {
         strict: true,
         defaultStunned: legacyStunnedFallback,
+        potentialLevel,
     })
     const skillOptions = {
         ...options,
+        potentialLevel,
         skillLevelsByCategory: expandedInput.skillLevelsByCategory ?? options.skillLevelsByCategory,
     }
     const hasConfiguredEvents = Array.isArray(input.events) && input.events.length > 0
@@ -3375,6 +3458,10 @@ export function damageModifierAppliesTo(modifier, event) {
     const appliesTo = modifier.appliesTo ?? {}
     const skillTargets = generatedModifierSkillTargets(modifier)
     const hasSkillTargets = skillTargets.length > 0
+    if (Object.prototype.hasOwnProperty.call(modifier?.requirement ?? {}, "eventStunned")
+        && normalizeEventStunned(matchingEvent?.stunned) !== normalizeStunned(modifier.requirement.eventStunned)) {
+        return false
+    }
     if (modifier.target?.kind === "skill" && !hasSkillTargets) {
         return false
     }
@@ -6746,6 +6833,7 @@ export function buildMeta(catalog) {
         faction: agent.faction,
         images: agent.images,
         coreSkill: agent.coreSkill,
+        potentialVision: agent.potentialVision ?? null,
         anomalyReleaseProfiles: agent.anomalyReleaseProfiles ?? [],
         combatBuffs: agent.combatBuffs ?? {},
         preferredDriveDiscs: agent.preferredDriveDiscs ?? null,
@@ -6973,7 +7061,9 @@ export function createInCombatPanelCalculator(catalog, input) {
         coreSkillLevel: input.coreSkillLevel,
     })
     const activeCatalogBuffs = (catalog.combatBuffs ?? []).filter(buff => activeBuffIds.has(buff.id))
-    const activeAgentBuffs = agentCombatBuffEntries(agent, input.coreSkillLevel).filter(entry => activeBuffIds.has(entry.id))
+    const potentialLevel = normalizePotentialLevel(agent, input.potentialLevel)
+    const activeAgentBuffs = agentCombatBuffEntries(agent, input.coreSkillLevel, potentialLevel)
+        .filter(entry => activeBuffIds.has(entry.id))
     const currentWEngineRequirement = wEngineEffectData(wEngine)?.requirement?.specialty ?? wEngine.specialty
     const activeCurrentWEngineEntries = wEngineCombatBuffEntries(wEngine).filter(entry => activeBuffIds.has(entry.key))
     const appliedCurrentWEngineKeys = new Set(activeCurrentWEngineEntries.map(entry => entry.key))
@@ -6985,6 +7075,7 @@ export function createInCombatPanelCalculator(catalog, input) {
     const normalizedDamageInput = normalizeDamageRequest(input.damage, agent, catalog, {
         coreSkillLevel: input.coreSkillLevel,
         cinemaLevel: input.cinemaLevel,
+        potentialLevel,
     })
     const compiledDamageTarget = compileDamageScoreTarget(normalizedDamageInput, agent)
     const hasMasteryToProficiencyConversion = activeAgentBuffs.some(entry =>
@@ -8649,6 +8740,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                 skillOptions: {
                     coreSkillLevel: input.coreSkillLevel,
                     cinemaLevel: input.cinemaLevel,
+                    potentialLevel,
                     outOfCombatBaseAtk: outOfCombat.base?.atk,
                 },
             })
@@ -8735,7 +8827,9 @@ export function calculateInCombatPanel(catalog, input) {
     const ignoredEffects = []
     const exclusiveGroups = new Set()
     const activeCatalogBuffs = (catalog.combatBuffs ?? []).filter(buff => activeBuffIds.has(buff.id))
-    const activeAgentBuffs = agentCombatBuffEntries(agent, input.coreSkillLevel).filter(entry => activeBuffIds.has(entry.id))
+    const potentialLevel = normalizePotentialLevel(agent, input.potentialLevel)
+    const activeAgentBuffs = agentCombatBuffEntries(agent, input.coreSkillLevel, potentialLevel)
+        .filter(entry => activeBuffIds.has(entry.id))
     const currentWEngineRequirement = wEngineEffectData(wEngine)?.requirement?.specialty ?? wEngine.specialty
     const activeCurrentWEngineEntries = wEngineCombatBuffEntries(wEngine).filter(entry => activeBuffIds.has(entry.key))
     const appliedWEngineKeys = new Set(activeCurrentWEngineEntries.map(entry => entry.key))
@@ -9017,6 +9111,7 @@ export function calculateInCombatPanel(catalog, input) {
         skillOptions: {
             coreSkillLevel: input.coreSkillLevel,
             cinemaLevel: input.cinemaLevel,
+            potentialLevel,
             outOfCombatBaseAtk: outOfCombat.base?.atk,
         },
     })

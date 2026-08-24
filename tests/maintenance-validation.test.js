@@ -61,6 +61,16 @@ const systemManagedFixture = applySystemManagedMaintenanceFields({
 })
 assert.deepEqual(systemManagedFixture.skillGroups[0], { defaultCount: 1, minCount: 0, maxCount: 100, step: 1 })
 assert.deepEqual(systemManagedFixture.nested.coverage, { default: 1.5, min: 0, max: 1, step: 0.1 })
+const authoredCountRangeFixture = applySystemManagedMaintenanceFields({
+    skillGroups: [{ authoredCountRange: true, defaultCount: 1, minCount: 0, maxCount: 1, step: 1 }],
+})
+assert.deepEqual(authoredCountRangeFixture.skillGroups[0], {
+    authoredCountRange: true,
+    defaultCount: 1,
+    minCount: 0,
+    maxCount: 1,
+    step: 1,
+})
 const migratedCoverageFixture = applySystemManagedMaintenanceFields({
     coverage: { default: 0.4, min: 0.2, max: 0.8, step: 0.2 },
     effects: [
@@ -273,6 +283,48 @@ function assertInvalid(kind, item, text, context = {}) {
         `Expected an error containing ${text}, got:\n${result.errors.join("\n")}`,
     )
 }
+
+const soldier11 = catalog.agentsMap.get("soldier_11")
+const soldier11MaintenanceContext = {
+    agents: catalog.agents,
+    currentAgentId: "soldier_11",
+    agentSkills: catalog.agentSkills,
+    driveDiscSets: catalog.driveDiscSets,
+    anomalyEffects: catalog.anomalyEffects,
+    disorderEffects: catalog.disorderEffects,
+}
+assert.ok(soldier11, "Soldier 11 should exist in the maintained agent catalog")
+assertValid("agents", soldier11, soldier11MaintenanceContext)
+const cleanedSoldier11 = cleanMaintenanceItem("agents", soldier11, soldier11MaintenanceContext)
+assert.deepEqual(cleanedSoldier11.potentialVision.scaling.levels.map(row => row.critDmgPct), [0, 0, 16, 24, 32, 40, 48])
+assert.deepEqual(
+    cleanedSoldier11.defaultCalculationConfig.potentialVariants.map(variant => [variant.minPotentialLevel, variant.maxPotentialLevel]),
+    [[1, 6]],
+)
+assert.equal(cleanedSoldier11.combatBuffs.additionalAbility.effects
+    .find(effect => effect.id === "prairie-fire-stunned-damage").requirement.eventStunned, true)
+assert.equal(cleanedSoldier11.skillGroups
+    .find(group => group.id === "potential_empowered_fifth_package").requiresPotentialLevel, 1)
+assert.deepEqual(
+    Object.fromEntries(Object.entries(cleanedSoldier11.skillGroups
+        .find(group => group.id === "potential_empowered_fifth_package"))
+        .filter(([key]) => ["authoredCountRange", "defaultCount", "minCount", "maxCount", "step"].includes(key))),
+    { authoredCountRange: true, defaultCount: 1, minCount: 0, maxCount: 1, step: 1 },
+)
+
+const invalidSoldier11Count = clone(soldier11)
+invalidSoldier11Count.skillGroups
+    .find(group => group.id === "potential_empowered_fifth_package").events
+    .find(event => event.id === "empowered-fifth-extra").count = 7
+assertInvalid("agents", invalidSoldier11Count, "次数必须是 0 到 6 的整数", soldier11MaintenanceContext)
+
+const overlappingPotentialRanges = clone(soldier11)
+overlappingPotentialRanges.defaultCalculationConfig.potentialVariants.push({
+    ...clone(overlappingPotentialRanges.defaultCalculationConfig.potentialVariants[0]),
+    minPotentialLevel: 3,
+    maxPotentialLevel: 6,
+})
+assertInvalid("agents", overlappingPotentialRanges, "潜能方案等级范围不能重叠", soldier11MaintenanceContext)
 
 assertValid("agents", validAgent)
 const dynamicCoreAgent = {
@@ -2446,7 +2498,7 @@ assertValid("combat-buffs", {
         },
     }],
 })
-assertInvalid("combat-buffs", {
+assertValid("combat-buffs", {
     ...validBuff,
     effects: [{
         id: "mixed-skill-target-modes",
@@ -2462,7 +2514,7 @@ assertInvalid("combat-buffs", {
             ],
         },
     }],
-}, "不能混合指定角色招式、通用技能大类和通用招式标签")
+})
 assertInvalid("combat-buffs", {
     ...validBuff,
     effects: [{

@@ -40,6 +40,7 @@ import {
   skillGroupCountLimits,
 } from "@core/calculationSkillGroups.js"
 import { resolveDefaultCalculationConfig } from "@core/defaultCalculationConfig.js"
+import { potentialLevelRequirementMatches } from "@core/potentialVision.js"
 import {
   disorderBaseMultiplier,
   disorderElapsedStepSeconds,
@@ -68,6 +69,7 @@ const props = defineProps<{
   meta: any
   agent?: any
   cinemaLevel?: number
+  potentialLevel?: number
   combatEffects?: any[]
   releaseContext?: {
     inCombatPanel?: any
@@ -91,10 +93,15 @@ const releaseSnapshotError = ref("")
 const isAdminDefaultMode = computed(() => draft.value.mode === "adminDefault")
 const canEditEventStructure = computed(() => draft.value.mode === "custom")
 const canUseSheerDamage = computed(() => isRuptureAgent(props.agent))
-const canUseAdminDefault = computed(() => hasAdminDefaultCalculation(props.agent, props.cinemaLevel ?? 0))
-const adminCalculationConfig = computed(() => resolveDefaultCalculationConfig(props.agent?.defaultCalculationConfig, props.cinemaLevel ?? 0))
-const skillGroups = computed(() => calculationSkillGroups(props.agent))
-const hasSkillGroups = computed(() => hasCalculationSkillGroups(props.agent))
+const canUseAdminDefault = computed(() => hasAdminDefaultCalculation(props.agent, props.cinemaLevel ?? 0, props.potentialLevel ?? 0))
+const adminCalculationConfig = computed(() => resolveDefaultCalculationConfig(
+  props.agent?.defaultCalculationConfig,
+  props.cinemaLevel ?? 0,
+  props.potentialLevel ?? 0,
+))
+const skillGroups = computed(() => calculationSkillGroups(props.agent)
+  .filter((group: any) => potentialLevelRequirementMatches(group, props.potentialLevel ?? 0)))
+const hasSkillGroups = computed(() => skillGroups.value.length > 0)
 const skillGroupOptions = computed(() => skillGroups.value.map((group: any) => ({
   label: skillGroupLabel(group),
   value: group.id,
@@ -135,7 +142,7 @@ function eventForMode(mode: string) {
 }
 
 function normalizeDraftForAgent(config: any) {
-  const mode = normalizeDamageModeForAgent(config?.mode, props.agent, props.cinemaLevel ?? 0)
+  const mode = normalizeDamageModeForAgent(config?.mode, props.agent, props.cinemaLevel ?? 0, props.potentialLevel ?? 0)
   if (mode === config?.mode) {
     return config
   }
@@ -152,7 +159,7 @@ watch(() => props.show, value => {
   if (value) {
     releaseSnapshotError.value = ""
     const { target: _target, targetConfig: _targetConfig, ...damageConfig } = props.damageConfig ?? {}
-    const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0)
+    const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0, props.potentialLevel ?? 0)
     const shouldUseFallbackEvents = damageConfig?.mode === "adminDefault"
       && Array.isArray(fallback.events)
       && fallback.events.length > 0
@@ -187,7 +194,7 @@ watch(() => props.show, value => {
   }
 })
 
-watch([() => props.skillCatalog, () => props.skillLevels], () => {
+watch([() => props.skillCatalog, () => props.skillLevels, () => props.potentialLevel], () => {
   if (props.show) {
     normalizeDraftSkillSelections()
   }
@@ -213,11 +220,23 @@ const releaseSourceOptions = computed(() => (props.meta?.agents ?? []).map((agen
 })))
 
 const selectedEvent = computed(() => (draft.value.events ?? []).find((event: any) => event.id === draft.value.selectedEventId) ?? draft.value.events?.[0])
-const skillCategories = computed(() => props.skillCatalog?.categories ?? [])
-const skillCategoryOptions = computed(() => skillCategories.value.map((category: any) => ({
-  label: skillCategoryLabel(category.id, category),
-  value: category.id,
-})))
+const skillCategories = computed(() => (props.skillCatalog?.categories ?? [])
+  .filter((category: any) => potentialLevelRequirementMatches(category, props.potentialLevel ?? 0)))
+const skillCategoryOptions = computed(() => {
+  const options: any[] = skillCategories.value.map((category: any) => ({
+    label: skillCategoryLabel(category.id, category),
+    value: category.id,
+  }))
+  const locked = lockedPotentialSkillSelection(selectedEvent.value)?.category
+  if (locked && !options.some(option => option.value === locked.id)) {
+    options.push({
+      label: `${skillCategoryLabel(locked.id, locked)}（需要 P${requiredPotentialLevel(locked)}）`,
+      value: locked.id,
+      disabled: true,
+    })
+  }
+  return options
+})
 
 function luminescencePreviewEvent(event: any) {
   return {
@@ -374,7 +393,8 @@ function skillGroupEventCount(group: any) {
 }
 
 function selectedSkillGroup(event: any = selectedEvent.value) {
-  return skillGroupById(props.agent, event?.skillGroupId)
+  const group = skillGroupById(props.agent, event?.skillGroupId)
+  return potentialLevelRequirementMatches(group, props.potentialLevel ?? 0) ? group : null
 }
 
 function skillGroupChildEvents(group: any = selectedSkillGroup()) {
@@ -405,9 +425,32 @@ function skillGroupChildTitle(childEvent: any) {
 
 function selectedEventCountLimits(event: any = selectedEvent.value) {
   if (event?.kind !== "skillGroup") {
-    return { min: 0, max: null, step: 1 }
+    const range = normalizeEventCountRange(selectedRow(event)?.eventCountRange)
+    return range ? { min: range.min, max: range.max, step: 1 } : { min: 0, max: null, step: 1 }
   }
   return skillGroupCountLimits(selectedSkillGroup(event) ?? {})
+}
+
+function normalizeEventCountRange(value: any) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null
+  const min = Number.isFinite(Number(value.min)) ? Number(value.min) : 0
+  const requestedMax = Number(value.max)
+  const max = Number.isFinite(requestedMax) ? Math.max(min, requestedMax) : null
+  const requestedDefault = Number(value.default)
+  const fallbackDefault = Number.isFinite(requestedDefault) ? requestedDefault : min
+  return {
+    min,
+    max,
+    default: Math.max(min, max === null ? fallbackDefault : Math.min(max, fallbackDefault)),
+  }
+}
+
+function normalizedCountForRange(value: unknown, range: any) {
+  const numeric = Number(value)
+  const fallback = range?.default ?? 1
+  const count = Number.isFinite(numeric) ? numeric : fallback
+  if (!range) return Math.max(0, count)
+  return Math.max(range.min, range.max === null ? count : Math.min(range.max, count))
 }
 
 function normalizeSkillGroupEvent(event: any, index = 0) {
@@ -437,7 +480,43 @@ function isEventActive(event: any) {
 }
 
 function skillRows(category: any, move: any) {
+  if (!potentialLevelRequirementMatches(category, props.potentialLevel ?? 0)
+    || !potentialLevelRequirementMatches(move, props.potentialLevel ?? 0)) {
+    return []
+  }
   return damageSkillRowsWithGeneratedTotals(category ?? {}, move ?? {})
+    .filter((row: any) => potentialLevelRequirementMatches(row, props.potentialLevel ?? 0))
+}
+
+function rawSkillSelection(event: any) {
+  const skillRef = event?.skillRef
+  if (!skillRef) return null
+  const category = (props.skillCatalog?.categories ?? [])
+    .find((item: any) => item.id === skillRef.categoryId)
+  const move = (category?.moves ?? []).find((item: any) => item.id === skillRef.moveId)
+  const row = damageSkillRowsWithGeneratedTotals(category ?? {}, move ?? {})
+    .find((item: any) => item.id === skillRef.rowId)
+  return category && move && row ? { category, move, row } : null
+}
+
+function lockedPotentialSkillSelection(event: any) {
+  const selection = rawSkillSelection(event)
+  if (!selection) return null
+  return [selection.category, selection.move, selection.row]
+    .every(value => potentialLevelRequirementMatches(value, props.potentialLevel ?? 0))
+    ? null
+    : selection
+}
+
+function requiredPotentialLevel(...values: any[]) {
+  return Math.max(0, ...values.map(value => Number(value?.requiresPotentialLevel ?? 0)).filter(Number.isFinite))
+}
+
+function lockedPotentialSkillMessage(event: any) {
+  const selection = lockedPotentialSkillSelection(event)
+  if (!selection) return ""
+  const required = requiredPotentialLevel(selection.category, selection.move, selection.row)
+  return `该技能需要潜能 P${required}，当前为 P${props.potentialLevel ?? 0}，无法使用`
 }
 
 function isDirectSkillEvent(event: any) {
@@ -450,6 +529,12 @@ function firstCategoryWithDamageRows() {
 }
 
 function skillSelection(categoryId?: string, moveId?: string, rowId?: string) {
+  if (categoryId && moveId && rowId) {
+    const rawSelection = rawSkillSelection({ skillRef: { categoryId, moveId, rowId } })
+    if (rawSelection && lockedPotentialSkillSelection({ skillRef: { categoryId, moveId, rowId } })) {
+      return null
+    }
+  }
   const category = skillCategories.value.find((item: any) => item.id === categoryId)
     ?? firstCategoryWithDamageRows()
     ?? null
@@ -472,6 +557,7 @@ function skillSelection(categoryId?: string, moveId?: string, rowId?: string) {
   if (!Number.isFinite(skillMultiplier)) {
     return null
   }
+  const eventCountRange = normalizeEventCountRange(row.eventCountRange)
   return {
     category,
     move,
@@ -484,6 +570,7 @@ function skillSelection(categoryId?: string, moveId?: string, rowId?: string) {
       rowId: row.id,
       level,
     },
+    eventCountRange,
   }
 }
 
@@ -503,6 +590,9 @@ function eventWithSkillSelection(event: any) {
     ...event,
     skillMultiplier: selection.skillMultiplier,
     skillRef: selection.skillRef,
+    ...(selection.eventCountRange
+      ? { count: normalizedCountForRange(event?.count, selection.eventCountRange) }
+      : {}),
   }
 }
 
@@ -675,16 +765,16 @@ function optionLabel(options: Array<{ label: string, value: string }>, value: un
 }
 
 function selectedSkillCategoryLabel(event: any) {
-  const category = selectedCategory(event)
+  const category = selectedCategory(event) ?? lockedPotentialSkillSelection(event)?.category
   return category ? skillCategoryLabel(category.id, category) : "未配置"
 }
 
 function selectedSkillMoveLabel(event: any) {
-  return labelOf(selectedMove(event)) || "未配置"
+  return labelOf(selectedMove(event) ?? lockedPotentialSkillSelection(event)?.move) || "未配置"
 }
 
 function selectedSkillRowLabel(event: any) {
-  const row = selectedRow(event)
+  const row = selectedRow(event) ?? lockedPotentialSkillSelection(event)?.row
   return row ? skillRowLabel(row) : "未配置"
 }
 
@@ -693,20 +783,40 @@ function selectedSkillGroupLabel(event: any) {
 }
 
 function moveOptions(event: any) {
-  const category = selectedCategory(event)
-  return (category?.moves ?? []).map((move: any) => ({
+  const locked = lockedPotentialSkillSelection(event)
+  const category = selectedCategory(event) ?? locked?.category
+  const options: any[] = (category?.moves ?? [])
+    .filter((move: any) => potentialLevelRequirementMatches(move, props.potentialLevel ?? 0))
+    .map((move: any) => ({
     label: labelOf(move),
     value: move.id,
   }))
+  if (locked?.move && !options.some(option => option.value === locked.move.id)) {
+    options.push({
+      label: `${labelOf(locked.move)}（需要 P${requiredPotentialLevel(locked.category, locked.move)}）`,
+      value: locked.move.id,
+      disabled: true,
+    })
+  }
+  return options
 }
 
 function rowOptions(event: any) {
-  const category = selectedCategory(event)
-  const move = selectedMove(event)
-  return skillRows(category, move).map((row: any) => ({
+  const locked = lockedPotentialSkillSelection(event)
+  const category = selectedCategory(event) ?? locked?.category
+  const move = selectedMove(event) ?? locked?.move
+  const options: any[] = skillRows(category, move).map((row: any) => ({
     label: skillRowLabel(row),
     value: row.id,
   }))
+  if (locked?.row && !options.some(option => option.value === locked.row.id)) {
+    options.push({
+      label: `${skillRowLabel(locked.row)}（需要 P${requiredPotentialLevel(locked.category, locked.move, locked.row)}）`,
+      value: locked.row.id,
+      disabled: true,
+    })
+  }
+  return options
 }
 
 function selectedSkillSummary(event: any) {
@@ -887,6 +997,15 @@ function updateSelectedEvent(patch: any, options: { clearLabel?: boolean } = {})
   })
 }
 
+function updateSelectedEventCount(value: unknown) {
+  const limits = selectedEventCountLimits()
+  const count = Number(value)
+  const normalized = Number.isFinite(count)
+    ? Math.max(limits.min, limits.max === null ? count : Math.min(limits.max, count))
+    : Math.max(limits.min, 1)
+  updateSelectedEvent({ count: normalized })
+}
+
 function newEvent(kind: string) {
   const id = `${kind}-${Date.now().toString(36)}`
   if (kind === "skillGroup") {
@@ -964,7 +1083,7 @@ function removeEvent(eventId = selectedEvent.value?.id) {
 }
 
 function applyMode(mode: string) {
-  const nextMode = normalizeDamageModeForAgent(mode, props.agent, props.cinemaLevel ?? 0)
+  const nextMode = normalizeDamageModeForAgent(mode, props.agent, props.cinemaLevel ?? 0, props.potentialLevel ?? 0)
   draft.value.mode = nextMode
   if (nextMode === "single") {
     draft.value.events = [newEvent("direct")]
@@ -976,7 +1095,7 @@ function applyMode(mode: string) {
     draft.value.events = [newEvent("anomaly")]
     draft.value.selectedEventId = draft.value.events[0].id
   } else if (nextMode === "adminDefault") {
-    const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0)
+    const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0, props.potentialLevel ?? 0)
     draft.value.events = JSON.parse(JSON.stringify(fallback.events ?? [newEvent("direct")]))
     draft.value.selectedEventId = fallback.selectedEventId ?? draft.value.events[0]?.id
   }
@@ -988,14 +1107,25 @@ const eventWarnings = computed(() => {
     return ["请选择一个事件"]
   }
   const warnings: string[] = []
+  const lockedSkillMessage = lockedPotentialSkillMessage(event)
+  if (lockedSkillMessage) warnings.push(lockedSkillMessage)
   if (!isLuminescenceSettlement(event) && (!Number.isFinite(Number(event.count)) || Number(event.count) <= 0)) {
     warnings.push("次数需要大于 0")
+  }
+  const countLimits = selectedEventCountLimits(event)
+  if (Number.isFinite(Number(event.count))
+    && (Number(event.count) < countLimits.min
+      || (countLimits.max !== null && Number(event.count) > countLimits.max))) {
+    warnings.push(`次数范围应为 ${countLimits.min}-${countLimits.max ?? "不限"}`)
   }
   if (event.kind === "skillGroup") {
     if (!event.skillGroupId) {
       warnings.push("技能组事件需要选择技能组")
     } else if (!selectedSkillGroup(event)) {
-      warnings.push("技能组不存在")
+      const lockedGroup = skillGroupById(props.agent, event.skillGroupId)
+      warnings.push(lockedGroup
+        ? `该技能组需要潜能 P${requiredPotentialLevel(lockedGroup)}，当前为 P${props.potentialLevel ?? 0}，无法使用`
+        : "技能组不存在")
     }
     return warnings
   }
@@ -1028,11 +1158,19 @@ const eventWarnings = computed(() => {
   }
   return warnings
 })
+const hasLockedPotentialSkills = computed(() => (draft.value.events ?? []).some((event: any) => {
+  if (lockedPotentialSkillSelection(event)) return true
+  if (event?.kind !== "skillGroup") return false
+  const group = skillGroupById(props.agent, event.skillGroupId)
+  return Boolean(group) && !potentialLevelRequirementMatches(group, props.potentialLevel ?? 0)
+}))
 
 function applySkill(value: any) {
+  const countRange = normalizeEventCountRange(value.eventCountRange)
   updateSelectedEvent({
     skillMultiplier: value.skillMultiplier,
     skillRef: value.skillRef,
+    ...(countRange ? { count: countRange.default } : {}),
   }, { clearLabel: true })
 }
 
@@ -1044,6 +1182,7 @@ function updateSkillRef(categoryId: string, moveId?: string, rowId?: string) {
   updateSelectedEvent({
     skillMultiplier: selection.skillMultiplier,
     skillRef: selection.skillRef,
+    ...(selection.eventCountRange ? { count: selection.eventCountRange.default } : {}),
   }, { clearLabel: true })
 }
 
@@ -1173,7 +1312,7 @@ function close() {
 
 function save() {
   if (draft.value.mode === "adminDefault") {
-    const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0)
+    const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0, props.potentialLevel ?? 0)
     const draftLuminescenceEvents = (draft.value.events ?? [])
       .filter((event: any) => isLuminescenceSettlement(event))
     emit("save", {
@@ -1200,7 +1339,12 @@ function save() {
   normalizeDraftElapsedSeconds()
   normalizeDraftStunned()
   normalizeDraftAnomalyEffects()
-  const normalizedDraft = isDamageModeAllowedForAgent(draft.value.mode, props.agent, props.cinemaLevel ?? 0)
+  const normalizedDraft = isDamageModeAllowedForAgent(
+    draft.value.mode,
+    props.agent,
+    props.cinemaLevel ?? 0,
+    props.potentialLevel ?? 0,
+  )
     ? draft.value
     : normalizeDraftForAgent(draft.value)
   const { target: _target, targetConfig: _targetConfig, ...damageConfig } = normalizedDraft
@@ -1327,7 +1471,7 @@ function save() {
                     :max="selectedEventCountLimits().max ?? undefined"
                     :step="selectedEventCountLimits().step"
                     aria-label="事件次数"
-                    @update:value="updateSelectedEvent({ count: Number($event ?? 1) })"
+                    @update:value="updateSelectedEventCount($event)"
                   />
                 </div>
               </div>
@@ -1610,6 +1754,7 @@ function save() {
       v-model:show="showSkillPicker"
       :skill-catalog="skillCatalog"
       :skill-levels="skillLevels"
+      :potential-level="potentialLevel"
       @select="applySkill"
     />
 
@@ -1617,7 +1762,7 @@ function save() {
       <div class="drawer-footer">
         <span class="muted">事件 {{ draft.events?.length ?? 0 }} 项</span>
         <NButton @click="close">取消</NButton>
-        <NButton type="primary" :disabled="isLuminescenceSettlement(selectedEvent) && eventWarnings.length > 0" @click="save">保存配置</NButton>
+        <NButton type="primary" :disabled="hasLockedPotentialSkills || (isLuminescenceSettlement(selectedEvent) && eventWarnings.length > 0)" @click="save">保存配置</NButton>
       </div>
     </template>
   </NModal>

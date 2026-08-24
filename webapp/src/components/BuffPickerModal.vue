@@ -52,6 +52,7 @@ const props = defineProps<{
   agentId?: string
   coreSkillLevel?: string
   cinemaLevel?: number
+  potentialLevel?: number
   wEngineId?: string
   wEngineModificationLevel?: number
 }>()
@@ -324,6 +325,7 @@ const groupedBuffs = computed(() => {
     agentId: props.agentId,
     coreSkillLevel: props.coreSkillLevel,
     cinemaLevel: props.cinemaLevel,
+    potentialLevel: props.potentialLevel,
     wEngineId: props.wEngineId,
     wEngineModificationLevel: props.wEngineModificationLevel,
     addedBuffs: draftAddedBuffs.value,

@@ -32,6 +32,130 @@ describe("build store", () => {
     localStorage.clear()
   })
 
+  it("defaults potential characters to their authored level and keeps ordinary characters at P0", () => {
+    const potentialAgent = {
+      id: "potential_agent",
+      name: { zhCN: "潜能角色" },
+      potentialVision: { defaultLevel: 6, maxLevel: 6 },
+    }
+    const ordinaryAgent = { id: "ordinary_agent", name: { zhCN: "普通角色" } }
+    const meta = {
+      agents: [potentialAgent, ordinaryAgent],
+      wEngines: [{ id: "engine_a", name: { zhCN: "音擎 A" } }],
+      combatBuffs: [],
+    }
+    const store = useBuildStore()
+
+    store.initialize({}, meta)
+    expect(store.agentId).toBe("potential_agent")
+    expect(store.potentialLevel).toBe(6)
+    expect(store.buildInput({}, meta, []).potentialLevel).toBe(6)
+
+    store.selectAgent("ordinary_agent", meta)
+    expect(store.potentialLevel).toBe(0)
+    store.setPotentialLevel(6, meta)
+    expect(store.potentialLevel).toBe(0)
+  })
+
+  it("persists potential level per owner and agent while old saves use the authored default", () => {
+    localStorage.setItem("zzz-calculator.currentAccount.v1", "alice")
+    const potentialAgent = {
+      id: "potential_agent",
+      name: { zhCN: "潜能角色" },
+      potentialVision: { defaultLevel: 6, maxLevel: 6 },
+    }
+    const meta = {
+      agents: [potentialAgent],
+      wEngines: [{ id: "engine_a", name: { zhCN: "音擎 A" } }],
+      combatBuffs: [],
+    }
+    localStorage.setItem("zzz-calculator.webapp.build.v1", JSON.stringify({
+      version: 2,
+      currentOwnerId: "alice",
+      byOwner: {
+        alice: {
+          currentAgentId: "potential_agent",
+          byAgent: { potential_agent: { wEngineId: "engine_a" } },
+        },
+      },
+    }))
+    const store = useBuildStore()
+
+    store.initialize({}, meta)
+    expect(store.potentialLevel).toBe(6)
+    store.setPotentialLevel(0, meta)
+    expect(store.potentialLevel).toBe(0)
+
+    const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "{}")
+    expect(saved.byOwner.alice.byAgent.potential_agent.potentialLevel).toBe(0)
+    setActivePinia(createPinia())
+    const restored = useBuildStore()
+    restored.initialize({}, meta)
+    expect(restored.potentialLevel).toBe(0)
+  })
+
+  it("does not inherit another owner's potential level when the current owner has no build", async () => {
+    localStorage.setItem("zzz-calculator.currentAccount.v1", "bob")
+    localStorage.setItem("zzz-calculator.webapp.build.v1", JSON.stringify({
+      version: 2,
+      currentOwnerId: "alice",
+      byOwner: {
+        alice: {
+          currentAgentId: "potential_agent",
+          byAgent: {
+            potential_agent: { wEngineId: "engine_a", potentialLevel: 0 },
+          },
+        },
+      },
+    }))
+    const potentialAgent = {
+      id: "potential_agent",
+      name: { zhCN: "潜能角色" },
+      potentialVision: { defaultLevel: 6, maxLevel: 6 },
+    }
+    const meta = {
+      agents: [potentialAgent],
+      wEngines: [{ id: "engine_a", name: { zhCN: "音擎 A" } }],
+      combatBuffs: [],
+    }
+    const store = useBuildStore()
+
+    store.initialize({}, meta)
+    expect(store.potentialLevel).toBe(6)
+    await store.persist()
+
+    const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "{}")
+    expect(saved.byOwner.alice.byAgent.potential_agent.potentialLevel).toBe(0)
+    expect(saved.byOwner.bob.byAgent.potential_agent.potentialLevel).toBe(6)
+  })
+
+  it("switches an active admin default when potential level changes", () => {
+    const agent = {
+      id: "potential_agent",
+      potentialVision: { defaultLevel: 6, maxLevel: 6 },
+      defaultCalculationConfig: {
+        mode: "custom",
+        selectedEventId: "p0-hit",
+        events: [{ id: "p0-hit", kind: "direct", skillMultiplier: 100, count: 1 }],
+        potentialVariants: [{
+          minPotentialLevel: 1,
+          maxPotentialLevel: 6,
+          mode: "custom",
+          selectedEventId: "p1-hit",
+          events: [{ id: "p1-hit", kind: "direct", skillMultiplier: 200, count: 1 }],
+        }],
+      },
+    }
+    const meta = { agents: [agent], wEngines: [], combatBuffs: [] }
+    const store = useBuildStore()
+
+    store.applyAgentConfig(agent.id, meta)
+    store.setDamageConfig({ mode: "adminDefault" }, agent)
+    expect(store.damageConfig.selectedEventId).toBe("p1-hit")
+    store.setPotentialLevel(0, meta)
+    expect(store.damageConfig.selectedEventId).toBe("p0-hit")
+  })
+
   it("builds a damage input with visual-era defaults preserved", () => {
     const store = useBuildStore()
     const meta = {

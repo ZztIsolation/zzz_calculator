@@ -698,6 +698,7 @@ const baseStore = createEmptyInventoryStore()
 const existingMiyabi = {
   agentLevel: 50,
   cinemaLevel: 1,
+  potentialLevel: 4,
   wEngineId: "old-engine",
   selectedOptimizedRank: 9,
   manualDriveDiscIdsBySlot: { 1: "manual-1" },
@@ -752,6 +753,7 @@ const importPlan = buildEnkaImportPlan({
 })
 const nextMiyabi = importPlan.nextBuildSelection.byOwner.default.byAgent[agentId]
 assert.equal(nextMiyabi.agentLevel, 60)
+assert.equal(nextMiyabi.potentialLevel, 4, "Enka imports without potential data must preserve the local potential level")
 assert.equal(nextMiyabi.wEngineId, "old-engine")
 assert.deepEqual(nextMiyabi.combat, existingMiyabi.combat)
 assert.deepEqual(nextMiyabi.damage.events, existingMiyabi.damage.events)

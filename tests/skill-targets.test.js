@@ -66,6 +66,8 @@ const exSpecialSource = { agentSkillId: "agent_a", categoryId: "special", moveId
 const normalSpecialSource = { ...exSpecialSource, moveId: "normal_special_test", skillTags: [] }
 const assistAttackSource = { agentSkillId: "agent_a", categoryId: "assist", moveId: "quick_assist_test", rowId: "damage", skillType: "assist", skillTags: ["assistAttack"] }
 const supportActionSource = { ...assistAttackSource, moveId: "defensive_assist_test", skillTags: [] }
+const fireSuppressionSource = { ...dashSource, moveId: "fire_suppression", skillTags: ["fireSuppression"] }
+const taggedDodgeCounterSource = { ...dashSource, moveId: "dodge_counter", skillTags: ["dodgeCounter"] }
 assert.deepEqual(normalizeSkillTarget({ kind: "skillTag", skillTag: "dashAttack" }), [{ kind: "skillTag", skillTag: "dashAttack" }])
 assert.equal(skillTargetMatches({ kind: "skillTag", skillTag: "dashAttack" }, dashSource), true)
 assert.equal(skillTargetMatches({ kind: "skillTag", skillTag: "dashAttack" }, dodgeCounterSource), false)
@@ -73,6 +75,8 @@ assert.equal(skillTargetMatches({ kind: "skillTag", skillTag: "exSpecial" }, exS
 assert.equal(skillTargetMatches({ kind: "skillTag", skillTag: "exSpecial" }, normalSpecialSource), false)
 assert.equal(skillTargetMatches({ kind: "skillTag", skillTag: "assistAttack" }, assistAttackSource), true)
 assert.equal(skillTargetMatches({ kind: "skillTag", skillTag: "assistAttack" }, supportActionSource), false)
+assert.equal(skillTargetMatches({ kind: "skillTag", skillTag: "fireSuppression" }, fireSuppressionSource), true)
+assert.equal(skillTargetMatches({ kind: "skillTag", skillTag: "dodgeCounter" }, taggedDodgeCounterSource), true)
 assert.deepEqual(skillTagsForMove({ skillTags: ["dashAttack", "dashAttack", "unknown"] }), ["dashAttack"])
 assert.equal(skillTargetMatches({ categoryId: "chain", moveIdPrefixes: ["ultimate_"] }, ultimateSource), true)
 assert.equal(skillTargetMatches({ categoryId: "chain", moveIdPrefixes: ["ultimate_"] }, chainSource), false)
@@ -161,14 +165,16 @@ for (const { target, path } of storedTargets) {
         }
     }
 }
-assert.equal(moveCount, 92)
-assert.equal(rowCount, 160)
+assert.equal(moveCount, 107)
+assert.equal(rowCount, 205)
 assert.deepEqual(Object.fromEntries(skillTagCounts), {
-    dashAttack: 6,
-    assistAttack: 12,
-    exSpecial: 14,
+    dashAttack: 8,
+    assistAttack: 14,
+    exSpecial: 15,
+    fireSuppression: 4,
+    dodgeCounter: 1,
 })
-assert.equal(storedTargets.length, 77)
+assert.equal(storedTargets.length, 82)
 const zhishuangTargets = combatBuffCatalog.fieldBuffs
     .find(buff => buff.id === "field.critical_assault.v3_1.p2.zhishuang")
     .effects.flatMap(effect => effect.target?.skillTargets ?? [])

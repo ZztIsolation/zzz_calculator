@@ -276,6 +276,15 @@ describe("maintenance structured model", () => {
         maxCount: 3,
         step: 0.5,
         events: [],
+      }, {
+        id: "group_b",
+        name: { zhCN: "机制限定循环" },
+        authoredCountRange: true,
+        defaultCount: 1,
+        minCount: 0,
+        maxCount: 1,
+        step: 1,
+        events: [],
       }],
       combatBuffs: {
         corePassive: {
@@ -288,6 +297,7 @@ describe("maintenance structured model", () => {
       },
     })
     expect(draft.skillGroups[0]).toMatchObject({ defaultCount: 1, minCount: 0, maxCount: 100, step: 1 })
+    expect(draft.skillGroups[1]).toMatchObject({ authoredCountRange: true, defaultCount: 1, minCount: 0, maxCount: 1, step: 1 })
     expect(draft.combatBuffs.corePassive.coverage).toBeUndefined()
     expect(draft.combatBuffs.corePassive.effects[0].coverage).toEqual({ default: 0.4, min: 0, max: 1, step: 0.1 })
     const preview = maskedPreview(draft)
@@ -295,6 +305,7 @@ describe("maintenance structured model", () => {
     expect(preview.skillGroups[0]).not.toHaveProperty("minCount")
     expect(preview.skillGroups[0]).not.toHaveProperty("maxCount")
     expect(preview.skillGroups[0]).not.toHaveProperty("step")
+    expect(preview.skillGroups[1]).not.toHaveProperty("authoredCountRange")
     expect(preview.combatBuffs.corePassive.effects[0].coverage).toEqual({ default: "40%" })
   })
 

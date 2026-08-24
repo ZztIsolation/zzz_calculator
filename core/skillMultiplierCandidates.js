@@ -163,6 +163,9 @@ function generatedHitTotalRow(category, move, rows) {
             },
         generated: true,
         generatedFromRowIds: block.map(row => row.id),
+        ...(block[0].requiresPotentialLevel !== undefined
+            ? { requiresPotentialLevel: block[0].requiresPotentialLevel }
+            : {}),
     }
 }
 
@@ -202,6 +205,9 @@ function validHitBlock(category, move, block) {
 
     const range = skillLevelRange(category, move, block[0])
     if (!block.every(row => sameSkillLevelRange(range, skillLevelRange(category, move, row)))) {
+        return null
+    }
+    if (!block.every(row => row.requiresPotentialLevel === block[0].requiresPotentialLevel)) {
         return null
     }
 
