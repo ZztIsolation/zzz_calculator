@@ -227,10 +227,20 @@ requireText(files.storageRoundtrip, "candidateHealthBody.enkaImport", "Storage r
 requireText(files.storageRoundtrip, "candidateConfig.enkaImportEnabled, true", "Storage roundtrip must require showcase import to be enabled.")
 requireText(files.storageRoundtrip, "result.health?.ok, true", "Current production health must require an explicit healthy state.")
 requireText(files.storageRoundtrip, 'result.health?.service, "zzz_calculator"', "Current production health must require the Calculator service identity.")
+requireText(
+    files.storageRoundtrip,
+    '.optimizer-progress-card[data-status="done"]',
+    "Storage roundtrip must wait for the optimizer's semantic completion state.",
+)
 assert.doesNotMatch(
     files.storageRoundtrip,
     /assert\.deepEqual\((?:await candidateHealth\.json\(\)|result\.health)/,
     "Storage roundtrip must allow additive health response fields.",
+)
+assert.doesNotMatch(
+    files.storageRoundtrip,
+    /getByText\(["']已完成["']/,
+    "Storage roundtrip must not bind optimizer completion to retired display copy.",
 )
 assert.match(
     remote,
