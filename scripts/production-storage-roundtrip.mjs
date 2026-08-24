@@ -630,7 +630,8 @@ async function verifyOptimizerCanComposeSet(page) {
     const runButton = page.getByRole("button", { name: "开始优化" })
     assert.equal(await runButton.isEnabled(), true, "optimizer cannot start with the migrated set")
     await runButton.click()
-    await page.getByText("已完成", { exact: true }).waitFor({ state: "visible", timeout: 60_000 })
+    await page.locator('.optimizer-progress-card[data-status="done"]')
+        .waitFor({ state: "visible", timeout: 60_000 })
     assert.equal(await page.getByRole("button", { name: "优化结果" }).isEnabled(), true, "optimizer produced no set composition")
 }
 
