@@ -225,9 +225,11 @@ requireText(validation, '--current-url "$PROD_URL"', "Storage roundtrip must exe
 requireText(validation, '--expected-commit "$CANDIDATE_SHA"', "Storage roundtrip must bind the candidate to the approved commit.")
 requireText(files.storageRoundtrip, "candidateHealthBody.enkaImport", "Storage roundtrip must validate enabled Enka health metrics.")
 requireText(files.storageRoundtrip, "candidateConfig.enkaImportEnabled, true", "Storage roundtrip must require showcase import to be enabled.")
+requireText(files.storageRoundtrip, "result.health?.ok, true", "Current production health must require an explicit healthy state.")
+requireText(files.storageRoundtrip, 'result.health?.service, "zzz_calculator"', "Current production health must require the Calculator service identity.")
 assert.doesNotMatch(
     files.storageRoundtrip,
-    /assert\.deepEqual\(await candidateHealth\.json\(\)/,
+    /assert\.deepEqual\((?:await candidateHealth\.json\(\)|result\.health)/,
     "Storage roundtrip must allow additive health response fields.",
 )
 assert.match(
