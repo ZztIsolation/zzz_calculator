@@ -5739,6 +5739,333 @@
         }
       ],
       "buffModifiers": []
+    },
+    {
+      "id": "field.critical_assault.v3_1.p3.cuixin",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "critical_assault",
+        "gameVersion": "3.1",
+        "phaseNo": 3,
+        "phaseName": {
+          "zhCN": "第三期"
+        }
+      },
+      "name": {
+        "zhCN": "摧心"
+      },
+      "source": {
+        "zhCN": "危局强袭战"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.1版本第三期"
+      },
+      "description": {
+        "zhCN": "代理人的暴击伤害提升30%。[强攻]特性的代理人攻击力提升10%，[普通攻击]命中时造成的伤害提升30%，并无视敌人15%的防御力。"
+      },
+      "effects": [
+        {
+          "id": "field_critical_assault_v3_1_p3_cuixin_crit_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "critDmg",
+          "mode": "flat",
+          "value": 30,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_1_p3_cuixin_attack_atk",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "atkPct",
+          "mode": "pct",
+          "basis": "outOfCombatAtk",
+          "value": 10,
+          "requirement": {
+            "specialty": "attack"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_1_p3_cuixin_attack_basic_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "skill",
+            "skillTargets": [
+              {
+                "kind": "skillType",
+                "skillType": "basic"
+              }
+            ]
+          },
+          "stat": "dmgBonus",
+          "mode": "flat",
+          "value": 30,
+          "requirement": {
+            "specialty": "attack"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_1_p3_cuixin_attack_basic_def_ignore",
+          "type": "fixed",
+          "target": {
+            "kind": "skill",
+            "skillTargets": [
+              {
+                "kind": "skillType",
+                "skillType": "basic"
+              }
+            ]
+          },
+          "stat": "enemyDefIgnore",
+          "mode": "flat",
+          "value": 15,
+          "requirement": {
+            "specialty": "attack"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.critical_assault.v3_1.p3.bingxi",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "critical_assault",
+        "gameVersion": "3.1",
+        "phaseNo": 3,
+        "phaseName": {
+          "zhCN": "第三期"
+        }
+      },
+      "name": {
+        "zhCN": "冰袭"
+      },
+      "source": {
+        "zhCN": "危局强袭战"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.1版本第三期"
+      },
+      "description": {
+        "zhCN": "代理人的[普通攻击]、[终结技]造成的伤害提升30%。[强攻]特性的代理人攻击命中敌人时，无视其20%的冰属性伤害抗性。代理人发动[强化特殊技]后，自身的冰属性伤害提升30%，持续15秒，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_critical_assault_v3_1_p3_bingxi_basic_ultimate_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "skill",
+            "skillTargets": [
+              {
+                "kind": "skillType",
+                "skillType": "basic"
+              },
+              {
+                "kind": "skillType",
+                "skillType": "ultimate"
+              }
+            ]
+          },
+          "stat": "dmgBonus",
+          "mode": "flat",
+          "value": 30,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_1_p3_bingxi_attack_ice_res_ignore",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "iceResIgnore",
+          "mode": "flat",
+          "value": 20,
+          "requirement": {
+            "specialty": "attack"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_1_p3_bingxi_ex_special_ice_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "iceDmg",
+          "mode": "flat",
+          "value": 30,
+          "condition": "代理人发动强化特殊技后",
+          "durationSeconds": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.critical_assault.v3_1.p3.yixi",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "critical_assault",
+        "gameVersion": "3.1",
+        "phaseNo": 3,
+        "phaseName": {
+          "zhCN": "第三期"
+        }
+      },
+      "name": {
+        "zhCN": "异袭"
+      },
+      "source": {
+        "zhCN": "危局强袭战"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.1版本第三期"
+      },
+      "description": {
+        "zhCN": "队伍中存在2/3名[异常]特性的代理人时，全队造成的属性异常伤害分别提升10%/30%，全队的攻击力分别提升5%/15%。对敌人造成属性异常伤害时，无视其10%的全属性伤害抗性与10%的防御力。"
+      },
+      "effects": [
+        {
+          "id": "field_critical_assault_v3_1_p3_yixi_anomaly_damage",
+          "type": "formula",
+          "target": {
+            "kind": "anomaly",
+            "settlementType": "attribute"
+          },
+          "stat": "anomalyDamageBonus",
+          "mode": "flat",
+          "source": {
+            "variable": "x",
+            "label": {
+              "zhCN": "队伍内异常特性代理人数量"
+            },
+            "defaultValue": 3,
+            "min": 0,
+            "max": 3
+          },
+          "formula": {
+            "expression": "10 * max(x - 1, 0) + 10 * max(x - 2, 0)",
+            "valueUnit": "storedPercent"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_1_p3_yixi_atk",
+          "type": "formula",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "atkPct",
+          "mode": "pct",
+          "basis": "outOfCombatAtk",
+          "source": {
+            "variable": "x",
+            "label": {
+              "zhCN": "队伍内异常特性代理人数量"
+            },
+            "defaultValue": 3,
+            "min": 0,
+            "max": 3
+          },
+          "formula": {
+            "expression": "5 * max(x - 1, 0) + 5 * max(x - 2, 0)",
+            "valueUnit": "storedPercent"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_1_p3_yixi_all_res_ignore",
+          "type": "fixed",
+          "target": {
+            "kind": "anomaly",
+            "settlementType": "attribute"
+          },
+          "stat": "allResIgnore",
+          "mode": "flat",
+          "value": 10,
+          "condition": "对敌人造成属性异常伤害时",
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_1_p3_yixi_enemy_def_ignore",
+          "type": "fixed",
+          "target": {
+            "kind": "anomaly",
+            "settlementType": "attribute"
+          },
+          "stat": "enemyDefIgnore",
+          "mode": "flat",
+          "value": 10,
+          "condition": "对敌人造成属性异常伤害时",
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
     }
   ],
   "bossBuffs": [],

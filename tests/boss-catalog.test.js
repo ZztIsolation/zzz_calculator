@@ -13,9 +13,9 @@ const meta = buildMeta(catalog)
 const source = JSON.parse(await readFile(path.join(rootDir, "data", "bosses.json"), "utf8"))
 
 assert.equal(source.version, 2)
-assert.equal(source.bosses.length, 10)
-assert.equal(meta.bosses.length, 10)
-assert.equal(meta.bossCombatBuffs.length, 11)
+assert.equal(source.bosses.length, 13)
+assert.equal(meta.bosses.length, 13)
+assert.equal(meta.bossCombatBuffs.length, 14)
 
 for (const boss of source.bosses) {
     assert.ok(boss.images.icon.startsWith("/assets/bosses/"))
@@ -48,8 +48,8 @@ const bossEntries = source.bosses.flatMap(boss =>
         ...(encounter.playerDebuffs ?? []),
     ]))
 const bossEffects = bossEntries.flatMap(entry => entry.effects ?? [])
-assert.equal(bossEntries.length, 16)
-assert.equal(bossEffects.length, 22)
+assert.equal(bossEntries.length, 22)
+assert.equal(bossEffects.length, 28)
 for (const effect of bossEffects) {
     assert.deepEqual(
         effect.coverage,
@@ -194,6 +194,24 @@ assert.equal(bloodHunterModifiers.find(effect => effect.stat === "anomalyDamageB
 assert.equal(bloodHunterModifiers.find(effect => effect.stat === "iceCritDmg")?.value, 0.6)
 assert.equal(bloodHunterModifiers.find(effect => effect.stat === "etherCritDmg")?.value, 0.6)
 
+const initialDeadEnd = resultFor("boss_encounter.initial_dead_end_butcher.v3_1.p3")
+const initialDeadEndModifiers = initialDeadEnd.inCombat.activeEffects
+    .flatMap(effect => effect.resolvedDamageModifiers ?? [])
+assert.equal(initialDeadEnd.inCombat.buffTotals.critDmg, 0.75)
+assert.equal(initialDeadEndModifiers.find(effect => effect.stat === "anomalyDamageBonus")?.value, -0.45)
+
+const girtablullu = resultFor("boss_encounter.girtablullu.v3_1.p3")
+const girtablulluModifiers = girtablullu.inCombat.activeEffects
+    .flatMap(effect => effect.resolvedDamageModifiers ?? [])
+assert.equal(girtablulluModifiers.find(effect => effect.stat === "anomalyDamageBonus")?.value, 0.225)
+assert.equal(girtablullu.damage.multipliers.stun, 1.8)
+
+const primordialNightmare = resultFor("boss_encounter.primordial_nightmare_creator.v3_1.p3")
+const primordialNightmareModifiers = primordialNightmare.inCombat.activeEffects
+    .flatMap(effect => effect.resolvedDamageModifiers ?? [])
+assert.equal(primordialNightmare.inCombat.buffTotals.critDmg, 0.6)
+assert.equal(primordialNightmareModifiers.find(effect => effect.stat === "anomalyDamageBonus")?.value, -0.3)
+
 const phaseOneBosses = source.bosses.filter(boss => boss.encounters.some(encounter =>
     encounter.appearances.some(appearance => appearance.gameVersion === "3.1" && appearance.phaseNo === 1)))
 assert.ok(phaseOneBosses.every(boss => boss.target.defense === 953))
@@ -214,6 +232,30 @@ assert.deepEqual(phaseTwoBossIds, [
 const phaseTwoText = JSON.stringify(source.bosses.filter(boss => phaseTwoBossIds.includes(boss.id)))
 assert.equal(phaseTwoText.includes("操作分"), false)
 assert.equal(phaseTwoText.includes("异常积蓄"), false)
+
+const phaseThreeBosses = source.bosses.filter(boss => boss.encounters.some(encounter =>
+    encounter.appearances.some(appearance => appearance.gameVersion === "3.1" && appearance.phaseNo === 3)))
+assert.deepEqual(phaseThreeBosses.map(boss => boss.id), [
+    "boss.initial_dead_end_butcher",
+    "boss.girtablullu",
+    "boss.primordial_nightmare_creator",
+    "boss.replica_blood_hunter_janitor",
+])
+assert.deepEqual(phaseThreeBosses.map(boss => boss.name.zhCN), [
+    "初生死路屠夫",
+    "基塔布鲁",
+    "太初梦魇·「始主」",
+    "复写体·猎血清道夫",
+])
+const phaseThreeEntriesText = JSON.stringify(phaseThreeBosses.flatMap(boss => boss.encounters
+    .filter(encounter => encounter.appearances.some(appearance => appearance.gameVersion === "3.1" && appearance.phaseNo === 3))
+    .flatMap(encounter => [...encounter.playerBuffs, ...encounter.playerDebuffs])))
+assert.equal(phaseThreeEntriesText.includes("操作得分"), false)
+assert.equal(phaseThreeEntriesText.includes("乱流"), false)
+assert.equal(phaseThreeEntriesText.includes("异常积蓄"), false)
+const bloodHunterSource = source.bosses.find(boss => boss.id === "boss.replica_blood_hunter_janitor")
+assert.deepEqual(bloodHunterSource.encounters[0].appearances.map(appearance => appearance.phaseNo), [2, 3])
+assert.equal(bloodHunterSource.encounters.length, 1, "Phase 3 should reuse the unchanged phase 2 Blood Hunter encounter")
 
 for (const buff of meta.bossCombatBuffs) {
     assert.equal("mechanics" in buff, false)
