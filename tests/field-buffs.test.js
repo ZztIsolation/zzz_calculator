@@ -18,6 +18,9 @@ const FIELD_BUFF_IDS = {
     pojing: "field.critical_assault.v3_1.p2.pojing",
     luliPhase2: "field.critical_assault.v3_1.p2.luli",
     zhishuang: "field.critical_assault.v3_1.p2.zhishuang",
+    cuixinPhase3: "field.critical_assault.v3_1.p3.cuixin",
+    bingxi: "field.critical_assault.v3_1.p3.bingxi",
+    yixi: "field.critical_assault.v3_1.p3.yixi",
     wenyin: "field.defense_v5.v3_1.p1.wenyin_gongzhen",
     zhongmuDefense31: "field.defense_v5.v3_1.p1.zhongmu_xiezou",
     shuanglei: "field.defense_v5.v3_1.p1.shuanglei_pofeng",
@@ -43,6 +46,8 @@ const EFFECT_IDS = {
     luliPhase2Proficiency: "field_critical_assault_v3_1_p2_luli_anomaly_proficiency",
     luliPhase2Anomaly: "field_critical_assault_v3_1_p2_luli_anomaly_damage",
     luliPhase2Res: "field_critical_assault_v3_1_p2_luli_enemy_res_reduction",
+    yixiAnomaly: "field_critical_assault_v3_1_p3_yixi_anomaly_damage",
+    yixiAtk: "field_critical_assault_v3_1_p3_yixi_atk",
     wenyinAnomaly: "field_defense_v5_v3_1_p1_wenyin_attribute_anomaly_damage",
     zhuoluanProficiency: "field_defense_v5_v3_1_p2_zhuoluan_anomaly_proficiency",
     lianshiRes: "field_defense_v5_v3_0_p3_lianshi_anomaly_res_ignore",
@@ -60,6 +65,9 @@ const EXPECTED_NAMES = {
     [FIELD_BUFF_IDS.pojing]: "破境",
     [FIELD_BUFF_IDS.luliPhase2]: "勠力",
     [FIELD_BUFF_IDS.zhishuang]: "制霜",
+    [FIELD_BUFF_IDS.cuixinPhase3]: "摧心",
+    [FIELD_BUFF_IDS.bingxi]: "冰袭",
+    [FIELD_BUFF_IDS.yixi]: "异袭",
     [FIELD_BUFF_IDS.wenyin]: "紊音共振",
     [FIELD_BUFF_IDS.zhongmuDefense31]: "终幕协奏",
     [FIELD_BUFF_IDS.shuanglei]: "霜雷破锋",
@@ -88,14 +96,25 @@ const CRITICAL_ASSAULT_3_1_PHASE_2_IDS = [
     FIELD_BUFF_IDS.luliPhase2,
     FIELD_BUFF_IDS.zhishuang,
 ]
+const CRITICAL_ASSAULT_3_1_PHASE_3_IDS = [
+    FIELD_BUFF_IDS.cuixinPhase3,
+    FIELD_BUFF_IDS.bingxi,
+    FIELD_BUFF_IDS.yixi,
+]
 const PHASE_2_IDS = [...DEFENSE_3_1_PHASE_2_IDS, ...CRITICAL_ASSAULT_3_1_PHASE_2_IDS]
-const VERSION_3_1_IDS = [...DEFENSE_3_1_IDS, ...CRITICAL_ASSAULT_3_1_IDS, ...CRITICAL_ASSAULT_3_1_PHASE_2_IDS]
+const VERSION_3_1_IDS = [
+    ...DEFENSE_3_1_IDS,
+    ...CRITICAL_ASSAULT_3_1_IDS,
+    ...CRITICAL_ASSAULT_3_1_PHASE_2_IDS,
+    ...CRITICAL_ASSAULT_3_1_PHASE_3_IDS,
+]
 
 const ALL_RES_IGNORE_BUFF_IDS = [
     "liuyin.cinema_1.good_review_res_ignore",
     "lucia_elowen.cinema_1_dream_song_res_ignore",
     "field.defense_v5.v3_0.p2.jijing_chefeng",
     FIELD_BUFF_IDS.yanwang,
+    FIELD_BUFF_IDS.yixi,
 ]
 const ELEMENT_RES_IGNORE_STATS = new Set([
     "physicalResIgnore",
@@ -127,14 +146,15 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
     const isDefense = DEFENSE_3_0_IDS.includes(id) || DEFENSE_3_1_IDS.includes(id)
     const isVersion31 = VERSION_3_1_IDS.includes(id)
     const isPhase2 = PHASE_2_IDS.includes(id)
+    const isPhase3 = CRITICAL_ASSAULT_3_1_PHASE_3_IDS.includes(id)
     assert.deepEqual(buff.period, {
         modeId: isDefense ? "defense_v5" : "critical_assault",
         gameVersion: isVersion31 ? "3.1" : "3.0",
-        phaseNo: isPhase2 ? 2 : isVersion31 ? 1 : 3,
-        phaseName: { zhCN: isPhase2 ? "第二期" : isVersion31 ? "第一期" : "第三期" },
+        phaseNo: isPhase3 ? 3 : isPhase2 ? 2 : isVersion31 ? 1 : 3,
+        phaseName: { zhCN: isPhase3 ? "第三期" : isPhase2 ? "第二期" : isVersion31 ? "第一期" : "第三期" },
     })
     assert.equal(buff.source?.zhCN, isDefense ? "防卫战 v5" : "危局强袭战")
-    assert.equal(buff.sourcePeriod?.zhCN, isPhase2 ? "3.1版本第二期" : isVersion31 ? "3.1版本第一期" : "3.0版本第三期")
+    assert.equal(buff.sourcePeriod?.zhCN, isPhase3 ? "3.1版本第三期" : isPhase2 ? "3.1版本第二期" : isVersion31 ? "3.1版本第一期" : "3.0版本第三期")
 
     const validation = validateMaintenanceItem("field-buffs", buff, {
         items: catalog.combatBuffs,
@@ -145,14 +165,14 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
 }
 
 const allFieldBuffs = catalog.combatBuffs.filter(buff => buff.sourceType === "field")
-assert.equal(allFieldBuffs.length, 21, "Field Buff catalog should keep all maintained entries")
+assert.equal(allFieldBuffs.length, 24, "Field Buff catalog should keep all maintained entries")
 assert.deepEqual(
     allFieldBuffs
-        .filter(buff => buff.period?.gameVersion === "3.1" && buff.period?.phaseNo === 2)
-        .slice(0, DEFENSE_3_1_PHASE_2_IDS.length)
+        .filter(buff => buff.period?.gameVersion === "3.1" && buff.period?.phaseNo === 3)
+        .slice(0, CRITICAL_ASSAULT_3_1_PHASE_3_IDS.length)
         .map(buff => buff.id),
-    DEFENSE_3_1_PHASE_2_IDS,
-    "Defense Battle 3.1 phase 2 should lead the authored order for the latest field period",
+    CRITICAL_ASSAULT_3_1_PHASE_3_IDS,
+    "Critical Assault 3.1 phase 3 should be the latest authored field period",
 )
 for (const buff of allFieldBuffs) {
     assert.ok(buff.effects.length > 0, `${buff.id} should expose structured effects`)
@@ -224,6 +244,21 @@ assert.equal(
     fieldBuff(FIELD_BUFF_IDS.zhishuang).description.zhCN,
     "[强攻]特性的代理人攻击力提升25%，[普通攻击]、[强化特殊技]、[连携技]命中敌人时，无视其30%的冰属性伤害抗性和以太属性伤害抗性。代理人命中处于失衡状态的敌人时，其失衡易伤提升40%，持续5秒，重复触发时刷新持续时间。",
     "Zhishuang should preserve the complete source text",
+)
+assert.equal(
+    fieldBuff(FIELD_BUFF_IDS.cuixinPhase3).description.zhCN,
+    "代理人的暴击伤害提升30%。[强攻]特性的代理人攻击力提升10%，[普通攻击]命中时造成的伤害提升30%，并无视敌人15%的防御力。",
+    "Phase 3 Cuixin should preserve the complete source text",
+)
+assert.equal(
+    fieldBuff(FIELD_BUFF_IDS.bingxi).description.zhCN,
+    "代理人的[普通攻击]、[终结技]造成的伤害提升30%。[强攻]特性的代理人攻击命中敌人时，无视其20%的冰属性伤害抗性。代理人发动[强化特殊技]后，自身的冰属性伤害提升30%，持续15秒，重复触发时刷新持续时间。",
+    "Bingxi should preserve the complete source text",
+)
+assert.equal(
+    fieldBuff(FIELD_BUFF_IDS.yixi).description.zhCN,
+    "队伍中存在2/3名[异常]特性的代理人时，全队造成的属性异常伤害分别提升10%/30%，全队的攻击力分别提升5%/15%。对敌人造成属性异常伤害时，无视其10%的全属性伤害抗性与10%的防御力。",
+    "Yixi should preserve the complete source text",
 )
 assert.equal(JSON.stringify(CRITICAL_ASSAULT_3_1_PHASE_2_IDS.map(fieldBuff)).includes("秽息盾削减值"), false)
 
@@ -344,6 +379,37 @@ approx(
     cuixinAttack.outOfCombat.panel.atk * 0.1,
     "Cuixin should grant Attack agents 10% of out-of-combat ATK",
 )
+
+const cuixinPhase3Attack = calculateAttackBasic(FIELD_BUFF_IDS.cuixinPhase3)
+approx(
+    cuixinPhase3Attack.inCombat.panel.atk - cuixinPhase3Attack.outOfCombat.panel.atk,
+    cuixinPhase3Attack.outOfCombat.panel.atk * 0.1,
+    "Phase 3 Cuixin should grant Attack agents 10% of out-of-combat ATK",
+)
+approx(
+    cuixinPhase3Attack.inCombat.panel.critDmg - cuixinPhase3Attack.outOfCombat.panel.critDmg,
+    0.3,
+    "Phase 3 Cuixin should grant 30% CRIT DMG",
+)
+approx(cuixinPhase3Attack.damage.multipliers.directDamageBonus, 0.3, "Phase 3 Cuixin should grant 30% Basic Attack damage")
+approx(cuixinPhase3Attack.damage.targetBreakdown.enemyDefReduction, 0.15, "Phase 3 Cuixin should grant 15% Basic Attack DEF ignore")
+
+const bingxiAttack = calculateAttackBasic(FIELD_BUFF_IDS.bingxi, {}, "ice")
+approx(bingxiAttack.damage.multipliers.directDamageBonus, 0.3, "Bingxi should grant 30% Basic Attack damage")
+approx(bingxiAttack.damage.targetBreakdown.resIgnore, 0.2, "Bingxi should grant Attack agents 20% Ice RES ignore")
+approx(bingxiAttack.inCombat.panel.iceDmg - bingxiAttack.outOfCombat.panel.iceDmg, 0.3, "Bingxi should grant 30% Ice damage")
+const bingxiUltimate = calculateSkill(FIELD_BUFF_IDS.bingxi, miyabiSkillRefs.ultimate)
+approx(bingxiUltimate.damage.multipliers.directDamageBonus, 0.3, "Bingxi should grant 30% Ultimate damage")
+approx(bingxiUltimate.damage.targetBreakdown.resIgnore, 0, "Bingxi Ice RES ignore should not apply to non-Attack agents")
+
+const yixiDirect = calculateAttackBasic(FIELD_BUFF_IDS.yixi, {}, "ice")
+approx(
+    yixiDirect.inCombat.panel.atk - yixiDirect.outOfCombat.panel.atk,
+    yixiDirect.outOfCombat.panel.atk * 0.15,
+    "Yixi should grant 15% of out-of-combat ATK with three Anomaly agents",
+)
+approx(yixiDirect.damage.targetBreakdown.resIgnore, 0, "Yixi anomaly RES ignore should not affect direct damage")
+approx(yixiDirect.damage.targetBreakdown.enemyDefReduction, 0, "Yixi anomaly DEF ignore should not affect direct damage")
 
 const zhishuangAttack = calculateAttackBasic(FIELD_BUFF_IDS.zhishuang)
 approx(
@@ -511,6 +577,38 @@ function calculateAnomaly(fieldBuffId, event, runtime = {}) {
             },
         },
     })
+}
+
+for (const [anomalyAgentCount, expectedAnomalyDamage, expectedAtk] of [
+    [0, 0, 0],
+    [1, 0, 0],
+    [2, 0.1, 0.05],
+    [3, 0.3, 0.15],
+]) {
+    const yixi = calculateAnomaly(FIELD_BUFF_IDS.yixi, {
+        id: `yixi-burn-${anomalyAgentCount}`,
+        kind: "anomaly",
+        settlementType: "attribute",
+        anomalyEffect: "burn",
+        procCount: 1,
+    }, {
+        effects: {
+            [EFFECT_IDS.yixiAnomaly]: { sourceValue: anomalyAgentCount },
+            [EFFECT_IDS.yixiAtk]: { sourceValue: anomalyAgentCount },
+        },
+    })
+    approx(
+        yixi.inCombat.panel.atk - yixi.outOfCombat.panel.atk,
+        yixi.outOfCombat.panel.atk * expectedAtk,
+        `Yixi should grant the correct ATK with ${anomalyAgentCount} Anomaly agents`,
+    )
+    approx(
+        yixi.damage.multipliers.attributeAnomalyDamage,
+        1 + expectedAnomalyDamage,
+        `Yixi should grant the correct anomaly damage with ${anomalyAgentCount} Anomaly agents`,
+    )
+    approx(yixi.damage.targetBreakdown.resIgnore, 0.1, "Yixi should grant attribute anomaly 10% all-attribute RES ignore")
+    approx(yixi.damage.targetBreakdown.enemyDefReduction, 0.1, "Yixi should grant attribute anomaly 10% DEF ignore")
 }
 
 for (const [anomalyAgentCount, expectedAnomalyDamage] of [[0, 0], [1, 0], [2, 0.1], [3, 0.6]]) {

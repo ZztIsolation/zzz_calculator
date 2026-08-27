@@ -339,6 +339,42 @@ const fieldBuffs = [
     description: { zhCN: "普通攻击冰抗无视与强攻代理人冰伤、暴伤提升" },
     effects: [{ id: "field-defense-guanche", type: "fixed", stat: "iceDmg", value: 20, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
   },
+  {
+    id: "field.critical_assault.v3_1.p3.cuixin",
+    sourceType: "field",
+    sourceCategory: "field",
+    sourceKind: "field",
+    source: { zhCN: "危局强袭战" },
+    sourcePeriod: { zhCN: "3.1版本第三期" },
+    period: { modeId: "critical_assault", gameVersion: "3.1", phaseNo: 3, phaseName: { zhCN: "第三期" } },
+    name: { zhCN: "摧心" },
+    description: { zhCN: "暴击伤害与强攻代理人的普通攻击提升" },
+    effects: [{ id: "field-critical-cuixin-p3", type: "fixed", stat: "critDmg", value: 30, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
+  {
+    id: "field.critical_assault.v3_1.p3.bingxi",
+    sourceType: "field",
+    sourceCategory: "field",
+    sourceKind: "field",
+    source: { zhCN: "危局强袭战" },
+    sourcePeriod: { zhCN: "3.1版本第三期" },
+    period: { modeId: "critical_assault", gameVersion: "3.1", phaseNo: 3, phaseName: { zhCN: "第三期" } },
+    name: { zhCN: "冰袭" },
+    description: { zhCN: "普通攻击、终结技、冰属性伤害与冰抗无视提升" },
+    effects: [{ id: "field-critical-bingxi", type: "fixed", stat: "iceDmg", value: 30, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
+  {
+    id: "field.critical_assault.v3_1.p3.yixi",
+    sourceType: "field",
+    sourceCategory: "field",
+    sourceKind: "field",
+    source: { zhCN: "危局强袭战" },
+    sourcePeriod: { zhCN: "3.1版本第三期" },
+    period: { modeId: "critical_assault", gameVersion: "3.1", phaseNo: 3, phaseName: { zhCN: "第三期" } },
+    name: { zhCN: "异袭" },
+    description: { zhCN: "异常伤害、攻击力、全属性抗性无视与防御无视提升" },
+    effects: [{ id: "field-critical-yixi", type: "fixed", stat: "anomalyDamageBonus", value: 30, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
 ]
 
 const bossBuffs = [
@@ -387,6 +423,20 @@ const bossBuffs = [
     playerBuffs: [],
     playerDebuffs: [],
     effects: [{ id: "c-dmg", type: "fixed", stat: "dmgBonus", value: 10, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
+  {
+    id: "boss.encounter.d",
+    bossId: "boss.d",
+    sourceType: "boss",
+    bossName: { zhCN: "Boss 丁" },
+    name: { zhCN: "Boss 丁敌情" },
+    images: { icon: "/assets/bosses/d.webp" },
+    target: { defense: 952, weaknessElements: ["wind"], resistanceElements: [] },
+    appearances: [{ modeId: "critical_assault", gameVersion: "3.1", phaseNo: 3 }],
+    enemyIntel: { zhCN: "Boss 丁完整敌情" },
+    playerBuffs: [],
+    playerDebuffs: [],
+    effects: [{ id: "d-anomaly", type: "fixed", stat: "anomalyDamageBonus", value: 10, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
   },
 ]
 
@@ -1080,16 +1130,25 @@ describe("BuffPickerModal", () => {
     const wrapper = mountModal()
 
     await openBossTab(wrapper)
+    const selects = wrapper.findAll(".boss-buff-filter-row select")
+    expect(selects).toHaveLength(3)
+    expect((selects[0].element as HTMLSelectElement).value).toBe("3.1")
+    expect((selects[1].element as HTMLSelectElement).value).toBe("critical_assault:3.1:3")
+    expect(wrapper.text()).toContain("Boss 丁")
+    expect(wrapper.text()).not.toContain("Boss 甲")
+    expect(wrapper.text()).not.toContain("Boss 乙")
+
+    await selects[1].setValue("critical_assault:3.1:2")
+    await nextTick()
     expect(wrapper.text()).toContain("Boss 甲")
     expect(wrapper.text()).toContain("Boss 乙")
     expect(wrapper.text()).not.toContain("Boss 丙")
+    expect(wrapper.text()).not.toContain("Boss 丁")
     expect(wrapper.text()).toContain("仅说明，未计入计算")
     expect(wrapper.text()).toContain("防御 952")
     expect(wrapper.find("input[type='range']").exists()).toBe(true)
     expect(buttonByText(wrapper, "添加当前列表").attributes("disabled")).toBeDefined()
 
-    const selects = wrapper.findAll(".boss-buff-filter-row select")
-    expect(selects).toHaveLength(3)
     await selects[0].setValue("3.0")
     await nextTick()
     await selects[1].setValue("critical_assault:3.0:3")
@@ -1111,6 +1170,8 @@ describe("BuffPickerModal", () => {
     const wrapper = mountModal({ selectedIds: [buffId] })
 
     await openBossTab(wrapper)
+    await wrapper.findAll(".boss-buff-filter-row select")[1].setValue("critical_assault:3.1:2")
+    await nextTick()
     expect(wrapper.findAll(".rule-enabled-control")).toHaveLength(2)
     expect(wrapper.findAll(".rule-coverage-control")).toHaveLength(2)
 
@@ -1143,6 +1204,8 @@ describe("BuffPickerModal", () => {
       runtimeInputs: payload.runtimeInputs,
     })
     await openBossTab(reopened)
+    await reopened.findAll(".boss-buff-filter-row select")[1].setValue("critical_assault:3.1:2")
+    await nextTick()
     const reopenedRow = buffRowByText(reopened, "Boss 甲")
     const reopenedEnabled = reopenedRow.find(".rule-enabled-control input")
     const reopenedCoverage = reopenedRow.find(".rule-coverage-control input")
@@ -1167,6 +1230,8 @@ describe("BuffPickerModal", () => {
     })
 
     await openBossTab(wrapper)
+    await wrapper.findAll(".boss-buff-filter-row select")[1].setValue("critical_assault:3.1:2")
+    await nextTick()
     await buffRowByText(wrapper, "Boss 乙").find(".buff-row-toggle").trigger("click")
     await nextTick()
     await buttonByText(wrapper, "应用选择").trigger("click")
@@ -1184,9 +1249,10 @@ describe("BuffPickerModal", () => {
 
     await openFieldTab(wrapper)
 
-    expect(wrapper.text()).toContain("灼乱漩涡")
+    expect(wrapper.text()).toContain("冰袭")
+    expect(wrapper.text()).toContain("异袭")
     expect(wrapper.text()).not.toContain("紊音共振")
-    expect(wrapper.text()).not.toContain("摧心")
+    expect(wrapper.text()).not.toContain("灼乱漩涡")
     expect(wrapper.text()).not.toContain("极境彻风")
 
     const selects = wrapper.findAll(".field-buff-filter-row select")
@@ -1221,7 +1287,10 @@ describe("BuffPickerModal", () => {
 
   it("configures Field Buff effects independently and restores retained coverage", async () => {
     const buffId = "field.critical_assault.v3_1.p1.cuixin"
-    const criticalAssault31Buffs = fieldBuffs.filter(buff => buff.period.modeId === "critical_assault" && buff.period.gameVersion === "3.1")
+    const criticalAssault31Buffs = fieldBuffs.filter(buff =>
+      buff.period.modeId === "critical_assault"
+      && buff.period.gameVersion === "3.1"
+      && buff.period.phaseNo === 1)
     const wrapper = mountModal({ selectedIds: [buffId], buffs: criticalAssault31Buffs })
 
     await openFieldTab(wrapper)
@@ -1307,23 +1376,23 @@ describe("BuffPickerModal", () => {
     expect(visibleRows.some(text => text.includes("湮亡"))).toBe(false)
   })
 
-  it("defaults the field tab to Defense Battle 3.1 phase 2", async () => {
+  it("defaults the field tab to Critical Assault 3.1 phase 3", async () => {
     const wrapper = mountModal()
 
     await openFieldTab(wrapper)
     const selects = wrapper.findAll(".field-buff-filter-row select")
 
     expect((selects[0].element as HTMLSelectElement).value).toBe("3.1")
-    expect((selects[1].element as HTMLSelectElement).value).toBe("defense_v5|3.1|2")
+    expect((selects[1].element as HTMLSelectElement).value).toBe("critical_assault|3.1|3")
     const selectedPeriod = selects[1].findAll("option")
       .find(option => (option.element as HTMLOptionElement).selected)
-    expect(selectedPeriod?.text()).toBe("防卫战 v5 · 3.1版本 · 第二期")
+    expect(selectedPeriod?.text()).toBe("危局强袭战 · 3.1版本 · 第三期")
     const visibleRows = wrapper.findAll(".buff-row").map(row => row.text())
     expect(visibleRows).toHaveLength(3)
-    expect(visibleRows[0]).toContain("灼乱漩涡")
-    expect(visibleRows[1]).toContain("诡域奇谲")
-    expect(visibleRows[2]).toContain("贯彻霜寒")
-    expect(visibleRows.some(text => text.includes("3.1版本第一期"))).toBe(false)
+    expect(visibleRows[0]).toContain("摧心")
+    expect(visibleRows[1]).toContain("冰袭")
+    expect(visibleRows[2]).toContain("异袭")
+    expect(visibleRows.some(text => text.includes("3.1版本第二期"))).toBe(false)
   })
 
   it("shows Critical Assault 3.1 phase 1 when requested", async () => {
