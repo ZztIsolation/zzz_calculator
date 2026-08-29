@@ -469,9 +469,14 @@ export async function commitEnkaImportPlan(plan: any): Promise<any> {
   return commitDriveDiscImportPlan(adaptedEnkaPlan(importPlan, before))
 }
 
-export async function recoverPendingEnkaImport(ownerId: string): Promise<"none" | "committed" | "rolled-back"> {
-  const genericRecovery = await recoverPendingDriveDiscImport(ownerId)
+export async function recoverPendingEnkaImport(
+  ownerId: string,
+  lockOptions: { waitTimeoutMs?: number; lockTimeoutMs?: number; purpose?: string; signal?: AbortSignal } = {},
+): Promise<"none" | "committed" | "rolled-back"> {
+  const genericRecovery = await recoverPendingDriveDiscImport(ownerId, lockOptions)
   if (genericRecovery !== "none") return genericRecovery
+  const store = await loadUserDriveDiscStoreFresh()
+  if (!pendingEnkaImportJournal(store, ownerId)) return "none"
   return withDriveDiscImportOwnerLock(ownerId, async () => {
     const current = await currentState()
     const journal = pendingEnkaImportJournal(current.store, ownerId)
@@ -486,7 +491,7 @@ export async function recoverPendingEnkaImport(ownerId: string): Promise<"none" 
       store: preserveCurrentStoreObservations(target.store, current.store),
     })
     return "rolled-back"
-  })
+  }, lockOptions)
 }
 
 export async function applyEnkaRebindPlan(plan: any): Promise<any> {

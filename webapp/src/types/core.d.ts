@@ -328,31 +328,42 @@ declare module "@core/driveDiscOptimizer-core.js" {
 }
 
 declare module "@runtime/local-store.js" {
+  export const DRIVE_DISC_STORAGE_TIMEOUT: "DRIVE_DISC_STORAGE_TIMEOUT"
+  export const DEFAULT_STORAGE_TIMEOUT_MS: number
+  export interface LocalStoreOperationOptions {
+    ownerId?: string
+    waitTimeoutMs?: number
+    lockTimeoutMs?: number
+    storageTimeoutMs?: number
+    purpose?: string
+    signal?: AbortSignal
+  }
   export function clearAllBrowserData(): Promise<void>
   export function driveDiscContentFingerprint(disc: any): string
   export function driveDiscIdentityFingerprint(disc: any): string
   export function ownerScopedStore(store: any, ownerId?: string): any
-  export function accountSummary(): Promise<any>
-  export function createAccount(account?: any): Promise<any>
-  export function updateAccount(id: string, patch?: any): Promise<any>
-  export function switchAccount(id: string): Promise<any>
-  export function deleteAccount(id: string): Promise<any>
-  export function loadCurrentUserDriveDiscStore(): Promise<any>
-  export function loadUserDriveDiscStore(): Promise<any>
-  export function loadUserDriveDiscStoreFresh(): Promise<any>
-  export function exportCurrentUserDriveDiscs(options?: { ownerId?: string; exportedAt?: string }): Promise<any>
-  export function saveUserDriveDiscStore(store: any): Promise<any>
-  export function saveUserDriveDiscStoreUnlocked(store: any): Promise<any>
-  export function clearUserDriveDiscStore(ownerId?: string | null): Promise<any>
+  export function accountSummary(options?: LocalStoreOperationOptions): Promise<any>
+  export function createAccount(account?: any, options?: LocalStoreOperationOptions): Promise<any>
+  export function updateAccount(id: string, patch?: any, options?: LocalStoreOperationOptions): Promise<any>
+  export function switchAccount(id: string, options?: LocalStoreOperationOptions): Promise<any>
+  export function deleteAccount(id: string, options?: LocalStoreOperationOptions): Promise<any>
+  export function loadCurrentUserDriveDiscStore(options?: LocalStoreOperationOptions): Promise<any>
+  export function loadCurrentUserDriveDiscStoreFresh(options?: LocalStoreOperationOptions): Promise<any>
+  export function loadUserDriveDiscStore(options?: LocalStoreOperationOptions): Promise<any>
+  export function loadUserDriveDiscStoreFresh(options?: LocalStoreOperationOptions): Promise<any>
+  export function exportCurrentUserDriveDiscs(options?: LocalStoreOperationOptions & { exportedAt?: string }): Promise<any>
+  export function saveUserDriveDiscStore(store: any, options?: LocalStoreOperationOptions): Promise<any>
+  export function saveUserDriveDiscStoreUnlocked(store: any, options?: LocalStoreOperationOptions): Promise<any>
+  export function clearUserDriveDiscStore(ownerId?: string | null, options?: LocalStoreOperationOptions): Promise<any>
   export function previewScannerExportImport(input: any, options?: any): Promise<any>
   export function planScannerExportImport(input: any, options?: any): Promise<any>
   export function importScannerExportToStore(input: any, options?: any): Promise<any>
-  export function upsertUserDriveDisc(driveDisc: any): Promise<any>
-  export function deleteUserDriveDisc(id: string): Promise<any>
-  export function setDriveDiscReservations(input: { ownerId?: string; discIds: string[]; reservedForAgentId: string | null; allowTransfer?: boolean; allowExclusionOverride?: boolean }): Promise<any>
-  export function setDriveDiscExclusions(input: { ownerId?: string; discIds: string[]; excludedForAgentId: string; excluded: boolean; allowReservationRelease?: boolean }): Promise<any>
-  export function upsertDriveDiscLoadout(loadout: any, options?: { reserveDiscs?: boolean; allowTransfer?: boolean }): Promise<any>
-  export function deleteDriveDiscLoadout(id: string): Promise<any>
+  export function upsertUserDriveDisc(driveDisc: any, options?: LocalStoreOperationOptions): Promise<any>
+  export function deleteUserDriveDisc(id: string, options?: LocalStoreOperationOptions): Promise<any>
+  export function setDriveDiscReservations(input: { ownerId?: string; discIds: string[]; reservedForAgentId: string | null; allowTransfer?: boolean; allowExclusionOverride?: boolean }, options?: LocalStoreOperationOptions): Promise<any>
+  export function setDriveDiscExclusions(input: { ownerId?: string; discIds: string[]; excludedForAgentId: string; excluded: boolean; allowReservationRelease?: boolean }, options?: LocalStoreOperationOptions): Promise<any>
+  export function upsertDriveDiscLoadout(loadout: any, options?: LocalStoreOperationOptions & { reserveDiscs?: boolean; allowTransfer?: boolean }): Promise<any>
+  export function deleteDriveDiscLoadout(id: string, options?: LocalStoreOperationOptions): Promise<any>
 }
 
 declare module "@core/shared-combat.js" {

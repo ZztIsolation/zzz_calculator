@@ -1567,8 +1567,9 @@ describe("build store", () => {
     Object.defineProperty(navigator, "locks", {
       configurable: true,
       value: {
-        request: async (name: string, callback: () => unknown) => {
+        request: async (name: string, optionsOrCallback: any, maybeCallback?: () => unknown) => {
           requestedLocks.push(name)
+          const callback = typeof optionsOrCallback === "function" ? optionsOrCallback : maybeCallback!
           return callback()
         },
       },
@@ -1582,7 +1583,6 @@ describe("build store", () => {
 
       expect(requestedLocks).toEqual([
         "zzz-drive-disc-import:store",
-        "zzz-drive-disc-import:default",
       ])
       const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1") || "{}")
       expect(saved.byOwner.default.byAgent.agent_a.agentLevel).toBe(60)
@@ -1601,7 +1601,8 @@ describe("build store", () => {
     Object.defineProperty(navigator, "locks", {
       configurable: true,
       value: {
-        request: async (name: string, callback: () => unknown) => {
+        request: async (name: string, optionsOrCallback: any, maybeCallback?: () => unknown) => {
+          const callback = typeof optionsOrCallback === "function" ? optionsOrCallback : maybeCallback!
           if (name === "zzz-drive-disc-import:store") await globalLockGate
           return callback()
         },

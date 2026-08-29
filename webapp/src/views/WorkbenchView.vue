@@ -79,9 +79,23 @@ const manualDiscSetFilterIds = ref<string[]>([])
 const manualDiscMainStatFilter = ref("")
 const manualDiscSearch = ref("")
 const loadoutNameDraft = ref("")
-const saveLoadoutMode = ref<"manual" | "optimized">("manual")
+type SaveLoadoutDraft = {
+  id: string
+  ownerId: string
+  mode: "manual" | "optimized"
+  defaultName: string
+  agentId: string
+  driveDiscIdsBySlot: Record<string, string>
+  source: Record<string, unknown>
+  score?: unknown
+}
+const saveLoadoutDraft = ref<SaveLoadoutDraft | null>(null)
+const saveLoadoutBusy = ref(false)
+const saveLoadoutError = ref("")
 const OPTIMIZED_RESULT_LIMIT = 10
 const OPTIMIZER_RESULT_SLOTS = [1, 2, 3, 4, 5, 6]
+const SAVE_LOADOUT_WAIT_TIMEOUT_MS = 5_000
+const SAVE_LOADOUT_STORAGE_TIMEOUT_MS = 15_000
 
 onMounted(async () => {
   await catalogStore.load()
@@ -399,13 +413,11 @@ const filteredManualDiscOptions = computed(() => {
         || Number(left.source?.sequence ?? 999999) - Number(right.source?.sequence ?? 999999)
     })
 })
-const saveLoadoutDiscs = computed(() => saveLoadoutMode.value === "optimized"
-  ? selectedOptimizedScheme.value?.driveDiscs ?? []
-  : selectedDriveDiscs.value)
-const saveLoadoutIdsBySlot = computed(() => driveDiscIdsBySlotFromDiscs(saveLoadoutDiscs.value))
+const saveLoadoutIdsBySlot = computed(() => saveLoadoutDraft.value?.driveDiscIdsBySlot ?? {})
+const saveLoadoutDiscCount = computed(() => Object.keys(saveLoadoutIdsBySlot.value).length)
 const saveLoadoutMissingSlots = computed(() => OPTIMIZER_RESULT_SLOTS.filter(slot => !saveLoadoutIdsBySlot.value[String(slot)]))
-const saveLoadoutTitle = computed(() => saveLoadoutMode.value === "optimized" ? "保存优化结果" : "保存自选套装")
-const saveLoadoutSourceLabel = computed(() => saveLoadoutMode.value === "optimized" ? "优化结果" : "手动选择")
+const saveLoadoutTitle = computed(() => saveLoadoutDraft.value?.mode === "optimized" ? "保存优化结果" : "保存自选套装")
+const saveLoadoutSourceLabel = computed(() => saveLoadoutDraft.value?.mode === "optimized" ? "优化结果" : "手动选择")
 const canSaveCurrentScheme = computed(() => {
   if (buildStore.discMode === "manual") {
     return selectedDriveDiscs.value.length > 0
@@ -834,6 +846,13 @@ function defaultLoadoutName(mode: "manual" | "optimized") {
   return `${agentName}-自选套装`
 }
 
+function createLoadoutId() {
+  const uuid = globalThis.crypto?.randomUUID?.()
+  return uuid
+    ? `loadout-${uuid}`
+    : `loadout-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
+}
+
 function openSaveCurrentLoadout() {
   if (buildStore.discMode === "optimized") {
     openSaveOptimizedLoadout()
@@ -846,44 +865,109 @@ function openSaveManualLoadout() {
   if (!selectedDriveDiscs.value.length) {
     return
   }
-  saveLoadoutMode.value = "manual"
-  loadoutNameDraft.value = defaultLoadoutName("manual")
+  const defaultName = defaultLoadoutName("manual")
+  saveLoadoutDraft.value = {
+    id: createLoadoutId(),
+    ownerId: String(inventoryStore.store?.currentOwnerId ?? accountStore.currentOwnerId ?? "default"),
+    mode: "manual",
+    defaultName,
+    agentId: String(buildStore.agentId ?? ""),
+    driveDiscIdsBySlot: driveDiscIdsBySlotFromDiscs(selectedDriveDiscs.value),
+    source: { type: "manual", scope: "workbench" },
+  }
+  loadoutNameDraft.value = defaultName
+  saveLoadoutError.value = ""
   showSaveLoadoutModal.value = true
 }
 
 function openSaveOptimizedLoadout() {
-  if (!selectedOptimizedScheme.value?.driveDiscs?.length) {
+  const scheme = selectedOptimizedScheme.value
+  if (!scheme?.driveDiscs?.length) {
     return
   }
-  saveLoadoutMode.value = "optimized"
-  loadoutNameDraft.value = defaultLoadoutName("optimized")
+  const defaultName = defaultLoadoutName("optimized")
+  saveLoadoutDraft.value = {
+    id: createLoadoutId(),
+    ownerId: String(inventoryStore.store?.currentOwnerId ?? accountStore.currentOwnerId ?? "default"),
+    mode: "optimized",
+    defaultName,
+    agentId: String(buildStore.agentId ?? ""),
+    driveDiscIdsBySlot: driveDiscIdsBySlotFromDiscs(scheme.driveDiscs),
+    score: scheme.score,
+    source: { type: "optimizer", rank: scheme.rank },
+  }
+  loadoutNameDraft.value = defaultName
+  saveLoadoutError.value = ""
   showSaveLoadoutModal.value = true
 }
 
-async function saveLoadoutFromModal() {
-  const driveDiscIdsBySlot = saveLoadoutIdsBySlot.value
-  if (!Object.keys(driveDiscIdsBySlot).length) {
+function closeSaveLoadoutModal() {
+  if (saveLoadoutBusy.value) {
     return
   }
-  const mode = saveLoadoutMode.value
-  const scheme = selectedOptimizedScheme.value
-  const loadout = await inventoryStore.saveLoadout({
-    name: loadoutNameDraft.value.trim() || defaultLoadoutName(mode),
-    agentId: buildStore.agentId,
-    driveDiscIdsBySlot,
-    ...(mode === "optimized"
-      ? {
-          score: scheme?.score,
-          source: { type: "optimizer", rank: scheme?.rank },
-        }
-      : {
-          source: { type: "manual", scope: "workbench" },
-        }),
-  })
   showSaveLoadoutModal.value = false
+  saveLoadoutError.value = ""
+  saveLoadoutDraft.value = null
+}
+
+function updateSaveLoadoutModalVisibility(visible: boolean) {
+  if (saveLoadoutBusy.value) {
+    return
+  }
+  if (!visible) {
+    closeSaveLoadoutModal()
+  }
+}
+
+function saveLoadoutFailureMessage(error: unknown) {
+  const code = error && typeof error === "object" && "code" in error
+    ? String((error as { code?: unknown }).code ?? "")
+    : ""
+  if (code === "DRIVE_DISC_STORE_BUSY") {
+    return "其他页面或旧版本页面正在写入驱动盘库存。请刷新或关闭其他 Calculator 页面后重试。"
+  }
+  if (code === "DRIVE_DISC_STORAGE_TIMEOUT") {
+    return "浏览器数据库响应超时，本次套装未保存。请稍后重试。"
+  }
+  const detail = error instanceof Error ? error.message : String(error ?? "")
+  return detail || "保存套装时发生未知错误，请重试。"
+}
+
+async function saveLoadoutFromModal() {
+  const draft = saveLoadoutDraft.value
+  if (saveLoadoutBusy.value || !draft || !Object.keys(draft.driveDiscIdsBySlot).length) {
+    return
+  }
+  saveLoadoutBusy.value = true
+  saveLoadoutError.value = ""
+  let loadout: any = null
+  try {
+    loadout = await inventoryStore.saveLoadout({
+      id: draft.id,
+      name: loadoutNameDraft.value.trim() || draft.defaultName,
+      agentId: draft.agentId,
+      driveDiscIdsBySlot: { ...draft.driveDiscIdsBySlot },
+      source: { ...draft.source },
+      ...(draft.mode === "optimized" ? { score: draft.score } : {}),
+    }, {
+      ownerId: draft.ownerId,
+      waitTimeoutMs: SAVE_LOADOUT_WAIT_TIMEOUT_MS,
+      storageTimeoutMs: SAVE_LOADOUT_STORAGE_TIMEOUT_MS,
+      purpose: "保存套装",
+    })
+  } catch (error) {
+    saveLoadoutError.value = saveLoadoutFailureMessage(error)
+    message.error(saveLoadoutError.value)
+    return
+  } finally {
+    saveLoadoutBusy.value = false
+  }
+  const mode = draft.mode
+  closeSaveLoadoutModal()
   if (mode === "optimized") {
     buildStore.selectLoadout(loadout.id)
   }
+  message.success("套装已保存")
 }
 
 function schemeConflictDisc(conflict: any) {
@@ -1718,26 +1802,53 @@ function formatPercentValue(value: any) {
     </template>
   </NModal>
 
-  <NModal v-model:show="showSaveLoadoutModal" preset="card" :title="saveLoadoutTitle" style="width: min(640px, calc(100vw - 16px)); max-width: 640px">
+  <NModal
+    :show="showSaveLoadoutModal"
+    preset="card"
+    :title="saveLoadoutTitle"
+    style="width: min(640px, calc(100vw - 16px)); max-width: 640px"
+    data-testid="save-loadout-modal"
+    :mask-closable="!saveLoadoutBusy"
+    :close-on-esc="!saveLoadoutBusy"
+    :closable="!saveLoadoutBusy"
+    @update:show="updateSaveLoadoutModalVisibility"
+  >
     <div class="section-band ui-layout-scope" data-layout-surface="save-loadout">
       <div class="metric" data-layout-field>
         <dt>套装名称</dt>
-        <dd><NInput v-model:value="loadoutNameDraft" clearable placeholder="输入套装名称" /></dd>
+        <dd><NInput v-model:value="loadoutNameDraft" clearable placeholder="输入套装名称" :disabled="saveLoadoutBusy" /></dd>
       </div>
       <div class="chip-row save-loadout-summary">
         <NTag round>{{ saveLoadoutSourceLabel }}</NTag>
-        <NTag round>{{ saveLoadoutDiscs.length }} / 6</NTag>
+        <NTag round>{{ saveLoadoutDiscCount }} / 6</NTag>
         <NTag :type="saveLoadoutMissingSlots.length ? 'warning' : 'success'" round>
           {{ saveLoadoutMissingSlots.length ? `缺失 ${saveLoadoutMissingSlots.join('、')} 号位` : '六槽完整' }}
         </NTag>
       </div>
     </div>
+    <NAlert
+      v-if="saveLoadoutError"
+      class="save-loadout-error"
+      type="error"
+      title="套装未保存"
+      data-testid="save-loadout-error"
+    >
+      {{ saveLoadoutError }}
+    </NAlert>
     <template #footer>
       <div class="drawer-footer">
         <span class="modal-summary">保存后会更新驱动盘页中的套装预设</span>
         <span class="toolbar">
-          <NButton @click="showSaveLoadoutModal = false">取消</NButton>
-          <NButton type="primary" :disabled="!saveLoadoutDiscs.length" @click="saveLoadoutFromModal">保存套装</NButton>
+          <NButton data-testid="cancel-save-loadout" :disabled="saveLoadoutBusy" @click="closeSaveLoadoutModal">取消</NButton>
+          <NButton
+            type="primary"
+            data-testid="confirm-save-loadout"
+            :loading="saveLoadoutBusy"
+            :disabled="saveLoadoutBusy || !saveLoadoutDiscCount"
+            @click="saveLoadoutFromModal"
+          >
+            保存套装
+          </NButton>
         </span>
       </div>
     </template>
@@ -2470,6 +2581,10 @@ function formatPercentValue(value: any) {
 
 .save-loadout-summary {
   margin-top: 10px;
+}
+
+.save-loadout-error {
+  margin-top: 12px;
 }
 
 .scheme-reservation-conflict-list {

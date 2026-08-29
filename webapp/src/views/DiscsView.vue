@@ -16,6 +16,8 @@ import { useAppConfigStore } from "@/stores/app-config"
 import { useCatalogStore } from "@/stores/catalog"
 import { useInventoryStore } from "@/stores/inventory"
 import { driveDiscReservationStateForLoadout, driveDiscUsageStateForAgent } from "@core/inventory-model.js"
+import { DRIVE_DISC_STORE_BUSY } from "@runtime/drive-disc-import-lock"
+import { DRIVE_DISC_STORAGE_TIMEOUT } from "@runtime/local-store.js"
 import { scanTelemetryPreferenceEnabled } from "@runtime/scan-telemetry"
 
 const catalogStore = useCatalogStore()
@@ -43,6 +45,8 @@ const ROLL_COUNT_OPTIONS = Array.from({ length: 6 }, (_, index) => ({
   value: index + 1,
 }))
 const ROLL_EPSILON = 1e-6
+const LOADOUT_SAVE_LOCK_TIMEOUT_MS = 5_000
+const LOADOUT_SAVE_STORAGE_TIMEOUT_MS = 15_000
 
 const selectedDisc = ref<any | null>(null)
 const showDiscEditor = ref(false)
@@ -63,6 +67,8 @@ const exclusionAgentIds = ref<string[]>([])
 const showLoadoutEditor = ref(false)
 const loadoutDraft = ref<any>({ driveDiscIdsBySlot: {} })
 const loadoutIsNew = ref(false)
+const loadoutSaving = ref(false)
+const loadoutSaveError = ref("")
 const deleteLoadoutId = ref("")
 const showLoadoutDiscPicker = ref(false)
 const activeLoadoutDiscSlot = ref(0)
@@ -805,6 +811,7 @@ function openNewLoadout() {
     driveDiscIdsBySlot: {},
   }
   activeLoadoutDiscSlot.value = 0
+  loadoutSaveError.value = ""
   showLoadoutDiscPicker.value = false
   showLoadoutEditor.value = true
 }
@@ -817,17 +824,19 @@ function openEditLoadout(loadout: any) {
     ...(loadout.driveDiscIdsBySlot ?? {}),
   }
   activeLoadoutDiscSlot.value = 0
+  loadoutSaveError.value = ""
   showLoadoutDiscPicker.value = false
   showLoadoutEditor.value = true
 }
 
 function openLoadoutDiscPicker(slot: number) {
+  if (loadoutSaving.value) return
   activeLoadoutDiscSlot.value = Number(slot)
   showLoadoutDiscPicker.value = true
 }
 
 function selectLoadoutDisc(disc: any) {
-  if (!activeLoadoutDiscSlot.value || !disc?.id) return
+  if (loadoutSaving.value || !activeLoadoutDiscSlot.value || !disc?.id) return
   loadoutDraft.value.driveDiscIdsBySlot = {
     ...(loadoutDraft.value.driveDiscIdsBySlot ?? {}),
     [String(activeLoadoutDiscSlot.value)]: String(disc.id),
@@ -836,7 +845,7 @@ function selectLoadoutDisc(disc: any) {
 }
 
 function clearLoadoutDiscSlot() {
-  if (!activeLoadoutDiscSlot.value) return
+  if (loadoutSaving.value || !activeLoadoutDiscSlot.value) return
   const next = { ...(loadoutDraft.value.driveDiscIdsBySlot ?? {}) }
   delete next[String(activeLoadoutDiscSlot.value)]
   loadoutDraft.value.driveDiscIdsBySlot = next
@@ -844,15 +853,44 @@ function clearLoadoutDiscSlot() {
 }
 
 function cancelLoadoutEditor() {
+  if (loadoutSaving.value) return
   showLoadoutDiscPicker.value = false
   showLoadoutEditor.value = false
+  loadoutSaveError.value = ""
+}
+
+function loadoutSaveFailureMessage(error: unknown) {
+  const code = String((error as any)?.code ?? "")
+  if (code === DRIVE_DISC_STORE_BUSY) {
+    return "其他页面或旧版本页面正在写入驱动盘库存。请刷新或关闭其他 Calculator 页面后重试。"
+  }
+  if (code === DRIVE_DISC_STORAGE_TIMEOUT) {
+    return "浏览器数据库响应超时，本次套装预设未保存。请稍后重试。"
+  }
+  const detail = error instanceof Error ? error.message : String(error ?? "")
+  return detail || "保存套装预设时发生未知错误，请重试。"
 }
 
 async function saveLoadout() {
-  await inventoryStore.saveLoadout(loadoutDraft.value)
-  loadoutIsNew.value = false
-  showLoadoutDiscPicker.value = false
-  showLoadoutEditor.value = false
+  if (loadoutSaving.value) return
+  loadoutSaving.value = true
+  loadoutSaveError.value = ""
+  try {
+    await inventoryStore.saveLoadout(loadoutDraft.value, {
+      waitTimeoutMs: LOADOUT_SAVE_LOCK_TIMEOUT_MS,
+      storageTimeoutMs: LOADOUT_SAVE_STORAGE_TIMEOUT_MS,
+      purpose: "保存套装预设",
+    })
+    loadoutIsNew.value = false
+    showLoadoutDiscPicker.value = false
+    showLoadoutEditor.value = false
+    message.success("套装预设已保存")
+  } catch (error) {
+    loadoutSaveError.value = loadoutSaveFailureMessage(error)
+    message.error(loadoutSaveError.value)
+  } finally {
+    loadoutSaving.value = false
+  }
 }
 
 async function confirmDeleteLoadout() {
@@ -1483,6 +1521,9 @@ function confirmDangerImport() {
     v-model:show="showLoadoutEditor"
     preset="card"
     title="编辑套装预设"
+    :mask-closable="!loadoutSaving"
+    :close-on-esc="!loadoutSaving"
+    :closable="!loadoutSaving"
     :style="reservationUiEnabled ? 'width: min(1120px, calc(100vw - 16px)); max-width: 1120px' : 'width: min(880px, calc(100vw - 16px)); max-width: 880px'"
   >
     <div class="section-band ui-layout-scope" data-layout-surface="loadout-editor">
@@ -1498,7 +1539,7 @@ function confirmDangerImport() {
           :target-agent-id="loadoutDraft.agentId"
           :missing-reference="row.missingReference"
           empty-hint="点击选择当前号位驱动盘"
-          interactive
+          :interactive="!loadoutSaving"
           show-sequence
           show-reservation
           :show-exclusion="exclusionUiEnabled"
@@ -1508,17 +1549,17 @@ function confirmDangerImport() {
       <div v-else class="metric-grid ui-field-grid">
         <div class="metric" data-layout-field>
           <span class="metric-title">名称</span>
-          <div class="metric-value"><NInput v-model:value="loadoutDraft.name" aria-label="套装预设名称" /></div>
+          <div class="metric-value"><NInput v-model:value="loadoutDraft.name" aria-label="套装预设名称" :disabled="loadoutSaving" /></div>
         </div>
         <div class="metric" data-layout-field>
           <span class="metric-title">角色</span>
-          <div class="metric-value"><NSelect v-model:value="loadoutDraft.agentId" :options="agentOptions" aria-label="套装预设角色" filterable /></div>
+          <div class="metric-value"><NSelect v-model:value="loadoutDraft.agentId" :options="agentOptions" aria-label="套装预设角色" filterable :disabled="loadoutSaving" /></div>
         </div>
       </div>
       <div class="metric-grid ui-field-grid">
         <div v-for="slot in [1,2,3,4,5,6]" :key="slot" class="metric" data-layout-field>
           <span class="metric-title">{{ slot }}号位</span>
-          <div class="metric-value"><NSelect v-model:value="loadoutDraft.driveDiscIdsBySlot[String(slot)]" clearable filterable :options="discOptionsForSlot(slot)" :aria-label="`${slot}号位驱动盘`" /></div>
+          <div class="metric-value"><NSelect v-model:value="loadoutDraft.driveDiscIdsBySlot[String(slot)]" clearable filterable :options="discOptionsForSlot(slot)" :aria-label="`${slot}号位驱动盘`" :disabled="loadoutSaving" /></div>
         </div>
       </div>
       <div class="chip-row">
@@ -1526,18 +1567,21 @@ function confirmDangerImport() {
           {{ loadoutMissingSlots.length ? `缺失 ${loadoutMissingSlots.join('、')} 号位` : '六槽完整' }}
         </NTag>
       </div>
+      <NAlert v-if="loadoutSaveError" type="error" title="套装预设未保存" data-testid="loadout-save-error">
+        {{ loadoutSaveError }}
+      </NAlert>
     </div>
     <template #footer>
       <div class="drawer-footer">
-        <NButton @click="reservationUiEnabled ? cancelLoadoutEditor() : showLoadoutEditor = false">取消</NButton>
-        <NButton v-if="loadoutDraft.id && (!reservationUiEnabled || !loadoutIsNew)" type="error" @click="deleteLoadoutId = loadoutDraft.id">删除</NButton>
-        <NButton type="primary" @click="saveLoadout">保存</NButton>
+        <NButton :disabled="loadoutSaving" @click="cancelLoadoutEditor">取消</NButton>
+        <NButton v-if="loadoutDraft.id && (!reservationUiEnabled || !loadoutIsNew)" type="error" :disabled="loadoutSaving" @click="deleteLoadoutId = loadoutDraft.id">删除</NButton>
+        <NButton type="primary" :loading="loadoutSaving" :disabled="loadoutSaving" @click="saveLoadout">保存</NButton>
       </div>
     </template>
   </NModal>
 
   <DriveDiscPickerModal
-    v-if="reservationUiEnabled"
+    v-if="reservationUiEnabled && !loadoutSaving"
     v-model:show="showLoadoutDiscPicker"
     :slot="activeLoadoutDiscSlot"
     :discs="inventoryStore.driveDiscs"
