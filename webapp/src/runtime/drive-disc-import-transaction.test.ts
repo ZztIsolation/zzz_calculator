@@ -130,6 +130,22 @@ beforeEach(() => {
 })
 
 describe("drive disc import runtime transaction", () => {
+  it("checks for a pending journal before acquiring the startup recovery lock", async () => {
+    const request = vi.fn()
+    const original = Object.getOwnPropertyDescriptor(navigator, "locks")
+    Object.defineProperty(navigator, "locks", {
+      configurable: true,
+      value: { request },
+    })
+    try {
+      await expect(recoverPendingDriveDiscImport(ownerId)).resolves.toBe("none")
+      expect(request).not.toHaveBeenCalled()
+    } finally {
+      if (original) Object.defineProperty(navigator, "locks", original)
+      else Reflect.deleteProperty(navigator, "locks")
+    }
+  })
+
   it("writes a prepared journal before configs and clears it only after both configs", async () => {
     const plan = createPlan()
     await commitDriveDiscImportPlan(plan)

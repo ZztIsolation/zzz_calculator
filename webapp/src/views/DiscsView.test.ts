@@ -431,6 +431,68 @@ describe("DiscsView", () => {
     expect(persisted.driveDiscs.find((disc: any) => disc.id === candidate.id).reservedForAgentId).toBe("agent-b")
   })
 
+  it("keeps a timed-out loadout save visible and allows an explicit retry", async () => {
+    const wrapper = await mountView()
+    const inventoryStore = useInventoryStore()
+    let rejectFirstSave!: (reason: unknown) => void
+    const firstSave = new Promise((_, reject) => {
+      rejectFirstSave = reject
+    })
+    const save = vi.spyOn(inventoryStore, "saveLoadout")
+      .mockReturnValueOnce(firstSave as any)
+      .mockResolvedValueOnce({ id: "retry-loadout" } as any)
+
+    await button(wrapper, "新增预设").trigger("click")
+    const modal = wrapper.find(".test-modal")
+    const nameInput = modal.get('[aria-label="套装预设名称"]')
+    await nameInput.setValue("保留的套装草稿")
+    await button(wrapper, "保存").trigger("click")
+
+    expect(button(wrapper, "保存").attributes()).toHaveProperty("disabled")
+    expect(button(wrapper, "取消").attributes()).toHaveProperty("disabled")
+    rejectFirstSave(Object.assign(new Error("lock timeout"), { code: "DRIVE_DISC_STORE_BUSY" }))
+    await flushPromises()
+
+    expect(wrapper.find(".test-modal").exists()).toBe(true)
+    expect(wrapper.get('[data-testid="loadout-save-error"]').text()).toContain("其他页面或旧版本页面正在写入驱动盘库存")
+    expect(wrapper.get('[aria-label="套装预设名称"]').element).toHaveProperty("value", "保留的套装草稿")
+    expect(button(wrapper, "保存").attributes()).not.toHaveProperty("disabled")
+    expect(messageFixture.error).toHaveBeenCalled()
+
+    await button(wrapper, "保存").trigger("click")
+    await flushPromises()
+
+    expect(save).toHaveBeenCalledTimes(2)
+    expect(save.mock.calls[0][1]).toMatchObject({
+      waitTimeoutMs: 5_000,
+      storageTimeoutMs: 15_000,
+      purpose: "保存套装预设",
+    })
+    expect(wrapper.find(".test-modal").exists()).toBe(false)
+    expect(messageFixture.success).toHaveBeenCalledWith("套装预设已保存")
+  })
+
+  it("makes visual loadout slots read-only while a save is pending", async () => {
+    seedInventory([driveDisc(1)])
+    const wrapper = await mountView(true)
+    const inventoryStore = useInventoryStore()
+    let resolveSave!: (value: unknown) => void
+    vi.spyOn(inventoryStore, "saveLoadout").mockReturnValue(new Promise(resolve => {
+      resolveSave = resolve
+    }) as any)
+
+    await button(wrapper, "新增预设").trigger("click")
+    expect(wrapper.findAll(".loadout-editor-slot-grid .disc-slot-card-manual")).toHaveLength(6)
+    await button(wrapper, "保存").trigger("click")
+
+    expect(wrapper.findAll(".loadout-editor-slot-grid .disc-slot-card-manual")).toHaveLength(0)
+    await wrapper.get('.loadout-editor-slot-grid .disc-slot-card[data-slot="1"]').trigger("click")
+    expect(wrapper.find('[data-layout-surface="loadout-drive-disc-picker"]').exists()).toBe(false)
+
+    resolveSave({ id: "visual-save" })
+    await flushPromises()
+  })
+
   it("shows the required game display modes and inventory page before scanning", async () => {
     const wrapper = await mountView()
     const inventoryStore = useInventoryStore()

@@ -209,6 +209,78 @@ describe("inventory store", () => {
     expect(store.loadouts[0].status).toBe("incomplete")
   })
 
+  it("captures the current owner when saving a loadout and preserves other owners", async () => {
+    localStorage.setItem("zzz-calculator.userStore.v1", JSON.stringify({
+      version: 1,
+      currentOwnerId: "alt",
+      owners: [
+        { id: "default", label: "默认用户" },
+        { id: "alt", label: "其他账号" },
+      ],
+      imports: [],
+      driveDiscs: [],
+      driveDiscLoadouts: [{
+        id: "default-loadout",
+        ownerId: "default",
+        name: "默认账号套装",
+        agentId: "agent-default",
+        driveDiscIdsBySlot: {},
+      }],
+    }))
+    const store = useInventoryStore()
+    await store.load()
+
+    const saved = await store.saveLoadout({
+      id: "alt-loadout",
+      name: "其他账号套装",
+      agentId: "agent-alt",
+      driveDiscIdsBySlot: {},
+    }, {
+      waitTimeoutMs: 5_000,
+      storageTimeoutMs: 15_000,
+      purpose: "保存套装",
+    })
+
+    const persisted = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "null")
+    expect(saved.ownerId).toBe("alt")
+    expect(store.loadouts.map((loadout: any) => loadout.id)).toEqual(["alt-loadout"])
+    expect(persisted.driveDiscLoadouts.map((loadout: any) => [loadout.id, loadout.ownerId])).toEqual([
+      ["default-loadout", "default"],
+      ["alt-loadout", "alt"],
+    ])
+  })
+
+  it("honors an explicitly frozen loadout owner after the active account changes", async () => {
+    localStorage.setItem("zzz-calculator.userStore.v1", JSON.stringify({
+      version: 1,
+      currentOwnerId: "alt",
+      owners: [
+        { id: "default", label: "默认用户" },
+        { id: "alt", label: "其他账号" },
+      ],
+      imports: [],
+      driveDiscs: [],
+      driveDiscLoadouts: [],
+    }))
+    const store = useInventoryStore()
+    await store.load()
+
+    const saved = await store.saveLoadout({
+      id: "frozen-owner-loadout",
+      name: "冻结账号套装",
+      agentId: "agent-default",
+      driveDiscIdsBySlot: {},
+    }, { ownerId: "default" })
+
+    const persisted = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1") || "null")
+    expect(saved.ownerId).toBe("default")
+    expect(store.loadouts).toEqual([])
+    expect(persisted.driveDiscLoadouts).toContainEqual(expect.objectContaining({
+      id: "frozen-owner-loadout",
+      ownerId: "default",
+    }))
+  })
+
   it("isolates loadouts and loadout calculations by their exact agent id", async () => {
     const store = useInventoryStore()
     await store.load()

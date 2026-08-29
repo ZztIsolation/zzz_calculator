@@ -9,12 +9,18 @@ import { recoverPendingEnkaImport } from "@runtime/enka-import-transaction"
 import { loadUserDriveDiscStoreFresh } from "@runtime/local-store.js"
 import "@/styles/tokens.css"
 
+const STARTUP_RECOVERY_LOCK_TIMEOUT_MS = 5_000
+
 async function bootstrap() {
   const pinia = createPinia()
   const accountStore = useAccountStore(pinia)
   let startupError = ""
   try {
-    await recoverAllPendingDriveDiscImports()
+    const recoveryLockOptions = {
+      waitTimeoutMs: STARTUP_RECOVERY_LOCK_TIMEOUT_MS,
+      purpose: "恢复未完成的驱动盘导入",
+    }
+    await recoverAllPendingDriveDiscImports(recoveryLockOptions)
     const store = await loadUserDriveDiscStoreFresh()
     const ownerIds = new Set([
       String(store?.currentOwnerId ?? "default"),
@@ -22,7 +28,7 @@ async function bootstrap() {
       ...Object.keys(store?.enkaImportState?.byOwner ?? {}),
     ])
     for (const ownerId of ownerIds) {
-      await recoverPendingEnkaImport(ownerId)
+      await recoverPendingEnkaImport(ownerId, recoveryLockOptions)
     }
   } catch (error) {
     startupError = `未完成的驱动盘导入自动恢复失败，请刷新页面后再修改配置：${error instanceof Error ? error.message : String(error)}`

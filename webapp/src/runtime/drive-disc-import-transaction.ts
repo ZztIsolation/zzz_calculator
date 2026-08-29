@@ -12,7 +12,10 @@ import {
   loadUserDriveDiscStoreFresh,
   saveUserDriveDiscStoreUnlocked,
 } from "@runtime/local-store.js"
-import { withDriveDiscImportOwnerLock } from "@runtime/drive-disc-import-lock"
+import {
+  withDriveDiscImportOwnerLock,
+  type DriveDiscImportLockOptions,
+} from "@runtime/drive-disc-import-lock"
 import {
   readBuildSelectionDocument,
   readLegacySelectionDocument,
@@ -168,15 +171,22 @@ export async function commitDriveDiscImportPlan(plan: any): Promise<any> {
   })
 }
 
-export async function recoverPendingDriveDiscImport(ownerId: string): Promise<"none" | "committed" | "rolled-back"> {
-  return withDriveDiscImportOwnerLock(ownerId, () => recoverPendingUnlocked(ownerId))
+export async function recoverPendingDriveDiscImport(
+  ownerId: string,
+  lockOptions: DriveDiscImportLockOptions = {},
+): Promise<"none" | "committed" | "rolled-back"> {
+  const store = await loadUserDriveDiscStoreFresh()
+  if (!pendingDriveDiscImportJournal(store, ownerId)) return "none"
+  return withDriveDiscImportOwnerLock(ownerId, () => recoverPendingUnlocked(ownerId), lockOptions)
 }
 
-export async function recoverAllPendingDriveDiscImports(): Promise<Record<string, "committed" | "rolled-back">> {
+export async function recoverAllPendingDriveDiscImports(
+  lockOptions: DriveDiscImportLockOptions = {},
+): Promise<Record<string, "committed" | "rolled-back">> {
   const result: Record<string, "committed" | "rolled-back"> = {}
   const ownerIds = pendingDriveDiscImportOwners(await loadUserDriveDiscStoreFresh())
   for (const ownerId of ownerIds) {
-    const recovered = await recoverPendingDriveDiscImport(ownerId)
+    const recovered = await recoverPendingDriveDiscImport(ownerId, lockOptions)
     if (recovered !== "none") result[ownerId] = recovered
   }
   return result

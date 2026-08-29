@@ -56,6 +56,17 @@ type ScanErrorContext = "" | "prepare" | "scan" | "helper-missing" | "helper-out
 type ScanErrorVariant = "helper-missing" | "helper-outdated" | "helper-rejected" | "browser-permission" | "browser-websocket" | "prepare-failed" | "scan-failed" | "game-not-found" | "diagnostic-failure"
 type ScanHelperUpgradeMode = "" | "legacy-manual" | "manual-download" | "self-updating" | "awaiting-restart" | "confirming" | "self-update-failed"
 
+export interface DriveDiscLoadoutSaveOptions {
+  ownerId?: string
+  reserveDiscs?: boolean
+  allowTransfer?: boolean
+  waitTimeoutMs?: number
+  lockTimeoutMs?: number
+  storageTimeoutMs?: number
+  purpose?: string
+  signal?: AbortSignal
+}
+
 const GAME_NOT_FOUND_PATTERNS = [
   /未找到/,
   /找不到.*(进程|窗口|游戏)/,
@@ -525,10 +536,20 @@ export const useInventoryStore = defineStore("inventory", {
         mimeType: "application/json;charset=utf-8",
       }
     },
-    async saveLoadout(loadout: any) {
-      const result = await upsertDriveDiscLoadout(normalizeLoadoutDraft(loadout))
-      this.store = result.store
-      await this.load()
+    async saveLoadout(loadout: any, options: DriveDiscLoadoutSaveOptions = {}) {
+      const activeOwnerId = String(this.store?.currentOwnerId ?? "default")
+      const ownerId = String(options.ownerId ?? loadout?.ownerId ?? this.store?.currentOwnerId ?? "default")
+      const draft = normalizeLoadoutDraft({
+        ...loadout,
+        ownerId,
+      })
+      const result = await upsertDriveDiscLoadout(draft, {
+        ...options,
+        ownerId,
+      })
+      if (ownerId === activeOwnerId) {
+        this.store = result.store
+      }
       return result.loadout
     },
     async reserveDiscs(
