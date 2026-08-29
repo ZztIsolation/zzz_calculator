@@ -72,6 +72,31 @@ function cinemaBuffName(buff: any = {}) {
   }
 }
 
+function skillCatalogs(meta: any): any[] {
+  if (Array.isArray(meta?.displayAgentSkills)) {
+    return meta.displayAgentSkills
+  }
+  if (Array.isArray(meta?.agentSkills)) {
+    return meta.agentSkills
+  }
+  return meta?.agentSkills?.agentSkills ?? []
+}
+
+function skillBuffSourceLabel(meta: any, buff: any = {}) {
+  const ref = buff.sourceSkillRef ?? {}
+  const skill = skillCatalogs(meta).find((item: any) =>
+    item?.id === ref.agentSkillId || item?.agentId === ref.agentSkillId)
+  const category = (skill?.categories ?? []).find((item: any) => item?.id === ref.categoryId)
+  const move = (category?.moves ?? []).find((item: any) => item?.id === ref.moveId)
+  const sourceName = localizedText(move?.name)
+    || localizedText(category?.name)
+    || localizedText(buff.source)
+    || localizedText(buff.sourceLabel)
+    || "技能"
+  const buffName = localizedText(buff.name)
+  return { zhCN: [sourceName, buffName].filter(Boolean).join("｜") }
+}
+
 export function currentAgentBuffCandidates(meta: any, agentId = "", cinemaLevel = 0, coreSkillLevel?: string): any[] {
   const agent = (meta?.agents ?? []).find((item: any) => item.id === agentId)
   if (!agent) {
@@ -107,6 +132,29 @@ export function currentAgentBuffCandidates(meta: any, agentId = "", cinemaLevel 
       }
     })
 
+  const skillBuffs = (combatBuffs.skillBuffs ?? [])
+    .filter((buff: any) => inCombatEffect(buff))
+    .map((buff: any) => {
+      const source = skillBuffSourceLabel(meta, buff)
+      return {
+        ...buff,
+        id: `agent:${agent.id}.skill.${buff.id}`,
+        sourceType: "self",
+        sourceCategory: "agent",
+        sourceKind: "skill",
+        ownerId: agent.id,
+        ownerName: agent.name,
+        ownerImages: agent.images ?? null,
+        agentName: agent.name,
+        agentImages: agent.images ?? null,
+        source,
+        sourceLabel: source,
+        name: buff.name ?? source,
+        description: buff.description ?? null,
+        conditionLabel: buff.conditionLabel ?? buff.condition ?? null,
+      }
+    })
+
   const cinemaBuffs = (combatBuffs.cinemaBuffs ?? [])
     .filter((buff: any) => {
       const level = Number(buff?.cinemaLevel)
@@ -136,7 +184,7 @@ export function currentAgentBuffCandidates(meta: any, agentId = "", cinemaLevel 
       }
     })
 
-  return [...fixedBuffs, ...cinemaBuffs]
+  return [...fixedBuffs, ...skillBuffs, ...cinemaBuffs]
 }
 
 function wEngineEffectData(wEngine: any) {

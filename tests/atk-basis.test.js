@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url"
 import {
     calculateInCombatPanel,
     calculateOutOfCombatPanel,
+    createInCombatPanelCalculator,
     loadCalculatorContext,
 } from "../backend/calculator.js"
 
@@ -233,6 +234,69 @@ approx(
     activeCinemaBuff.inCombat.panel.atk - inactiveCinemaBuff.inCombat.panel.atk,
     123,
     "Active cinema Buff should add its modeled effect to the in-combat panel",
+)
+
+const withSkillBuff = cloneCatalog(catalog)
+const skillBuffAgent = withSkillBuff.agents.find(agent => agent.id === input.agentId)
+skillBuffAgent.combatBuffs = {
+    ...(skillBuffAgent.combatBuffs ?? {}),
+    skillBuffs: [
+        {
+            id: "test_source_buff",
+            name: { zhCN: "测试技能来源 Buff" },
+            description: { zhCN: "测试技能触发后攻击力提升 123 点。" },
+            scope: "inCombat",
+            sourceSkillRef: {
+                agentSkillId: input.agentId,
+                categoryId: "basic",
+                moveId: "quick_sword",
+            },
+            effects: [
+                {
+                    id: "skill-buff-atk",
+                    type: "fixed",
+                    stat: "atkFlat",
+                    value: 123,
+                    mode: "flat",
+                },
+            ],
+        },
+    ],
+}
+const skillBuffId = `agent:${input.agentId}.skill.test_source_buff`
+const inactiveSkillBuff = calculateInCombatPanel(withSkillBuff, {
+    ...input,
+    combatBuffs: { activeBuffIds: [] },
+})
+const activeSkillBuff = calculateInCombatPanel(withSkillBuff, {
+    ...input,
+    combatBuffs: { activeBuffIds: [skillBuffId] },
+})
+assert.equal(
+    activeSkillBuff.inCombat.activeEffects.some(effect => effect.key === skillBuffId),
+    true,
+    "Skill-source Buff should use the stable agent:<agent>.skill.<id> key",
+)
+approx(
+    activeSkillBuff.inCombat.panel.atk - inactiveSkillBuff.inCombat.panel.atk,
+    123,
+    "Active skill-source Buff should apply through the normal calculator",
+)
+
+const inactiveSkillBuffCalculator = createInCombatPanelCalculator(withSkillBuff, {
+    ...input,
+    combatBuffs: { activeBuffIds: [] },
+})
+const activeSkillBuffCalculator = createInCombatPanelCalculator(withSkillBuff, {
+    ...input,
+    combatBuffs: { activeBuffIds: [skillBuffId] },
+})
+const inactiveSkillBuffScore = inactiveSkillBuffCalculator.scoreOnlyFromSummary()
+const activeSkillBuffScore = activeSkillBuffCalculator.scoreOnlyFromSummary()
+approx(
+    activeSkillBuffScore.panel.atk - inactiveSkillBuffScore.panel.atk,
+    123,
+    "Active skill-source Buff should apply through compiled score-only paths",
 )
 
 const fourPiece = calculateInCombatPanel(catalog, {

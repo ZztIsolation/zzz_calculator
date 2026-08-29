@@ -2269,6 +2269,240 @@ const generatedHitTotal = calculateInCombatPanel(generatedTargetCatalog, minimal
 }))
 approx(generatedHitTotal.damage.multipliers.skillMultiplierBonus, 1, "Row target should match generated total source rows")
 
+// A generated total can contain rows with different target-only multipliers.
+// Sigrid Cinema 2 is the concrete case: only Basic Attack hit 4 is a
+// Converging Spear hit and receives the 24% targeted PEN. The stored event must
+// remain one selectable total while every calculation kernel evaluates its
+// constituent rows independently.
+const sigridSegmentCatalog = cloneCatalog(catalog)
+const sigridSegmentZeroEngine = {
+    id: "sigrid_segment_zero_engine",
+    name: { zhCN: "希格莉德分段测试音擎" },
+    rarity: "B",
+    specialty: "attack",
+    level60: { atkBase: 0 },
+    modification: { minLevel: 1, maxLevel: 1, defaultLevel: 1 },
+}
+sigridSegmentCatalog.wEngines.push(sigridSegmentZeroEngine)
+
+function sigridSegmentEvent(rowId, id = rowId) {
+    return {
+        id,
+        kind: "direct",
+        count: 1,
+        stunned: false,
+        critMode: "nonCrit",
+        skillRef: {
+            agentSkillId: "sigrid",
+            categoryId: "basic",
+            moveId: "basic_chilling_spearpoint",
+            rowId,
+        },
+    }
+}
+
+const sigridSegmentBaseInput = {
+    agentId: "sigrid",
+    agentLevel: 60,
+    coreSkillLevel: "F",
+    cinemaLevel: 2,
+    wEngineId: sigridSegmentZeroEngine.id,
+    wEngineModificationLevel: 1,
+    driveDiscs: [],
+    combatBuffs: {
+        activeBuffIds: ["agent:sigrid.cinema.2"],
+    },
+}
+const sigridGeneratedTotalInput = {
+    ...sigridSegmentBaseInput,
+    damage: {
+        mode: "custom",
+        skillLevelsByCategory: { basic: 12 },
+        selectedEventId: "sigrid-basic-total",
+        events: [sigridSegmentEvent(GENERATED_HIT_TOTAL_ROW_ID, "sigrid-basic-total")],
+        target: zeroResistanceTarget({
+            stunned: false,
+            defense: 953,
+            levelCoefficient: 794,
+        }),
+    },
+}
+const sigridSplitInput = {
+    ...sigridSegmentBaseInput,
+    damage: {
+        mode: "custom",
+        skillLevelsByCategory: { basic: 12 },
+        selectedEventId: "sigrid-hit-1",
+        events: ["hit_1", "hit_2", "hit_3", "hit_4"].map(rowId => sigridSegmentEvent(rowId)),
+        target: zeroResistanceTarget({
+            stunned: false,
+            defense: 953,
+            levelCoefficient: 794,
+        }),
+    },
+}
+const sigridGeneratedTotal = calculateInCombatPanel(sigridSegmentCatalog, sigridGeneratedTotalInput)
+const sigridSplit = calculateInCombatPanel(sigridSegmentCatalog, sigridSplitInput)
+assert.equal(sigridGeneratedTotal.damage.events.length, 1, "Generated total should remain one public event")
+assert.deepEqual(
+    sigridGeneratedTotal.damage.events[0].components.map(component => [
+        component.input.skillSource.rowId,
+        component.targetBreakdown.targetedPenRatio,
+    ]),
+    [["hit_1", 0], ["hit_2", 0], ["hit_3", 0], ["hit_4", 0.24]],
+    "Sigrid Cinema 2 PEN should be resolved per generated hit",
+)
+approx(
+    sigridGeneratedTotal.damage.totalFinalDamage,
+    sigridSplit.damage.totalFinalDamage,
+    "Sigrid generated total should equal the sum of independently targeted hit rows",
+)
+const sigridGeneratedCountTwo = calculateInCombatPanel(sigridSegmentCatalog, {
+    ...sigridGeneratedTotalInput,
+    damage: {
+        ...sigridGeneratedTotalInput.damage,
+        events: [{ ...sigridGeneratedTotalInput.damage.events[0], count: 2 }],
+    },
+})
+approx(
+    sigridGeneratedCountTwo.damage.totalFinalDamage,
+    sigridGeneratedTotal.damage.totalFinalDamage * 2,
+    "Sigrid generated total should apply event count once after summing segments",
+)
+assert.equal(
+    sigridGeneratedTotal.damage.whiteBoxRows.find(row => row.label === "防御乘区")?.displayValue,
+    "分段",
+    "Generated total whitebox should identify segmented defense",
+)
+for (const label of ["暴击乘区", "增伤乘区", "抗性乘区", "失衡乘区"]) {
+    assert.notEqual(
+        sigridGeneratedTotal.damage.whiteBoxRows.find(row => row.label === label)?.displayValue,
+        "分段",
+        `Generated total whitebox should keep uniform ${label} scalar readable`,
+    )
+}
+assert.equal(
+    sigridGeneratedTotal.damage.targetBreakdown.targetedPenRatio,
+    null,
+    "Generated total should not expose hit-specific PEN as a parent scalar",
+)
+assert.equal(
+    sigridGeneratedTotal.damage.multipliers.defense,
+    null,
+    "Generated total should not expose a single defense multiplier when segments differ",
+)
+
+const sigridSegmentCalculator = createInCombatPanelCalculator(sigridSegmentCatalog, sigridGeneratedTotalInput)
+const sigridSegmentFull = sigridSegmentCalculator.calculate([], { round: false })
+const sigridSegmentCompiled = sigridSegmentCalculator.scoreOnlyFromSummary(new Map(), new Map())
+const sigridSegmentLegacy = sigridSegmentCalculator.scoreOnlyFromSummaryLegacy(new Map(), new Map())
+approx(
+    sigridSegmentCompiled.finalDamage,
+    sigridGeneratedTotal.damage.totalFinalDamage,
+    "Compiled Sigrid generated total should match the normal calculation",
+)
+approx(
+    sigridSegmentLegacy.finalDamage,
+    sigridGeneratedTotal.damage.totalFinalDamage,
+    "Prepared Sigrid generated total should match the normal calculation",
+)
+approx(
+    sigridSegmentFull.damage.totalFinalDamage,
+    sigridGeneratedTotal.damage.totalFinalDamage,
+    "Full calculator Sigrid generated total should match the normal calculation",
+)
+const sigridDenseTarget = sigridSegmentCalculator.compileDensePanelScoreTarget({
+    statIds: [],
+    setIds: [],
+    setIndexById: new Map(),
+})
+assert.ok(sigridDenseTarget, "Sigrid generated total should compile to a dense score target")
+const sigridDense = sigridDenseTarget.scoreDense(new Float64Array(), new Int16Array())
+const sigridFixedTarget = sigridDenseTarget.compileForSetCounts(new Int16Array())
+const sigridFixed = sigridFixedTarget.scoreScalar(new Float64Array())
+const sigridObjective = sigridFixedTarget.scoreObjectiveScalar(new Float64Array())
+approx(
+    sigridDense.finalDamage,
+    sigridGeneratedTotal.damage.totalFinalDamage,
+    "Dense Sigrid generated total should match the normal calculation",
+)
+approx(
+    sigridFixed.finalDamage,
+    sigridGeneratedTotal.damage.totalFinalDamage,
+    "Fixed Sigrid generated total should match the normal calculation",
+)
+approx(
+    sigridObjective.finalDamage,
+    sigridGeneratedTotal.damage.totalFinalDamage,
+    "Optimizer objective Sigrid generated total should match the normal calculation",
+)
+
+// OR targets must be classified from the target that actually matches the
+// child row. An unrelated whole-move target must not widen a row-only target
+// to every component of a generated total.
+const sigridMixedTargetCatalog = cloneCatalog(sigridSegmentCatalog)
+sigridMixedTargetCatalog.combatBuffs.push({
+    id: "test.sigrid.mixed_skill_multiplier",
+    sourceType: "manual",
+    scope: "inCombat",
+    effects: [{
+        id: "mixed-skill-multiplier",
+        type: "fixed",
+        stat: "skillMultiplierBonus",
+        value: 100,
+        mode: "flat",
+        target: {
+            kind: "skill",
+            skillTargets: [
+                {
+                    kind: "specific",
+                    agentSkillId: "sigrid",
+                    categoryId: "basic",
+                    moveId: "basic_chilling_spearpoint",
+                    rowId: "hit_4",
+                },
+                {
+                    kind: "specific",
+                    agentSkillId: "sigrid",
+                    categoryId: "special",
+                    moveId: "ex_special_shattered_jade",
+                },
+            ],
+        },
+    }],
+})
+const sigridMixedGenerated = calculateInCombatPanel(sigridMixedTargetCatalog, {
+    ...sigridGeneratedTotalInput,
+    combatBuffs: {
+        activeBuffIds: [
+            "agent:sigrid.cinema.2",
+            "test.sigrid.mixed_skill_multiplier",
+        ],
+    },
+})
+const sigridMixedSplit = calculateInCombatPanel(sigridMixedTargetCatalog, {
+    ...sigridSplitInput,
+    combatBuffs: {
+        activeBuffIds: [
+            "agent:sigrid.cinema.2",
+            "test.sigrid.mixed_skill_multiplier",
+        ],
+    },
+})
+assert.deepEqual(
+    sigridMixedGenerated.damage.events[0].components.map(component => [
+        component.input.skillSource.rowId,
+        component.multipliers.skillMultiplierBonus,
+    ]),
+    [["hit_1", 0], ["hit_2", 0], ["hit_3", 0], ["hit_4", 1]],
+    "Mixed OR skill targets should keep the row-only multiplier on hit 4",
+)
+approx(
+    sigridMixedGenerated.damage.totalFinalDamage,
+    sigridMixedSplit.damage.totalFinalDamage,
+    "Mixed OR skill targets should preserve generated-total and split parity",
+)
+
 const sheerBaseInput = {
     agentId: "yixuan",
     combatBuffs: {

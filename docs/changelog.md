@@ -2,6 +2,44 @@
 
 # Changelog
 
+## 2026-08-24 - Split Sigrid's Tempering into a Chain-Attack Buff
+
+Introduced the reusable `combatBuffs.skillBuffs[]` catalog contract for Buffs
+provided by a specific agent move. Each entry owns a stable local ID, an exact
+move-level `sourceSkillRef`, its default-selection state, effect rules, runtime
+inputs, and Buff modifiers. Runtime IDs use
+`agent:<agent-id>.skill.<buff-id>`. Maintenance validation rejects duplicate
+IDs, missing moves, multiplier-row references, and skill catalogs belonging to
+another agent. The maintenance API applies the same localized-text/effect
+cleanup as other agent Buffs and materializes missing Buff, effect, and modifier
+IDs before validation. The maintenance UI can create, remove, and edit these
+Buffs without exposing a multiplier-row selector.
+
+Moved Sigrid's 20% Converging Spear damage bonus and its 50-second duration out
+of `核心被动：天空骑士` into the default-enabled skill Buff `tempering`, sourced
+from `连携技：冰凌卷地`. The player Buff list now shows it separately as
+`希格莉德·德拉叙尔 | 连携技：冰凌卷地｜砥砺`, allowing Core Passive and
+Tempering to be toggled independently. Existing per-effect Tempering coverage
+stored under the old Core Passive runtime key migrates idempotently to
+`agent:sigrid.skill.tempering`; an old manual Core Passive exclusion does not
+disable the newly independent default Buff.
+
+## 2026-08-24 - Refined Sigrid's Default Event Composition
+
+Changed the shared Sigrid skill group from a Chain-plus-Formation-Breaker bundle
+to a pure enhanced-Basic total. Its player-facing name is now
+`强化普攻总倍率（敛枪1/2/3）`, and its three child events are exactly Converging
+Spear stages 1, 2, and 3. The stable internal group ID is retained so existing
+saved references remain readable. Cinema 1 continues to reference this pure
+Converging Spear group, while Cinema 6 keeps its separate repeatable
+Chain-triggered Formation Breaker group.
+
+Re-authored the Cinema 0 default event list as five independently auditable
+entries: the enhanced-Basic group twice, Chain Attack twice, Ultimate once,
+enhanced EX Shattered Jade twice, and one standalone stage-3 Converging Spear.
+This removes the hidden Chain Attack from the group and makes every requested
+count visible in the event manager and white-box total.
+
 ## 2026-08-24 - Added Formal Sigrid Calculation Support
 
 Added Sigrid de L'Azur as a visible Ice Attack agent using standard ATK-based

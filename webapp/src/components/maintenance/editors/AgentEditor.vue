@@ -13,7 +13,7 @@ import BuffModifiersEditor from "../BuffModifiersEditor.vue"
 import SourceListEditor from "../SourceListEditor.vue"
 import {
   ATTACK_TYPE_OPTIONS, ATTRIBUTE_OPTIONS, CORE_SKILL_LEVELS, DIRECT_DAMAGE_ELEMENT_OPTIONS, RARITY_OPTIONS, SCOPE_OPTIONS, SPECIALTY_OPTIONS,
-  defaultCalculationEvent, option,
+  categoryOptions, defaultCalculationEvent, moveOptions, option,
 } from "../maintenance-options"
 import { internalId, textOf } from "../maintenance-model"
 import { SYSTEM_MANAGED_SKILL_GROUP_COUNTS } from "@core/maintenanceValidation.js"
@@ -98,6 +98,55 @@ function addCinemaBuff() {
   const used = new Set(props.model.combatBuffs.cinemaBuffs.map((item: any) => Number(item.cinemaLevel)))
   const level = [1, 2, 3, 4, 5, 6].find(value => !used.has(value)) ?? 1
   props.model.combatBuffs.cinemaBuffs.push({ cinemaLevel: level, cinemaName: { zhCN: "新影画" }, description: { zhCN: "" }, scope: "inCombat", defaultChecked: false, effects: [], buffModifiers: [] })
+  changed()
+}
+
+function currentAgentSkill() {
+  return (props.catalog?.agentSkills?.agentSkills ?? []).find((skill: any) => skill.agentId === props.model.id)
+}
+
+function newSourceSkillRef() {
+  const skill = currentAgentSkill()
+  const category = skill?.categories?.[0]
+  const move = category?.moves?.[0]
+  return { agentSkillId: skill?.id ?? "", categoryId: category?.id ?? "", moveId: move?.id ?? "" }
+}
+
+function addSkillBuff() {
+  props.model.combatBuffs.skillBuffs.push({
+    id: internalId("skill_buff"),
+    name: { zhCN: "新技能 Buff" },
+    description: { zhCN: "" },
+    scope: "inCombat",
+    defaultChecked: false,
+    sourceSkillRef: newSourceSkillRef(),
+    effects: [],
+    buffModifiers: [],
+  })
+  changed()
+}
+
+function skillBuffCategoryOptions() {
+  return categoryOptions(props.catalog, currentAgentSkill()?.id ?? "")
+}
+
+function skillBuffMoveOptions(buff: any) {
+  return moveOptions(props.catalog, currentAgentSkill()?.id ?? "", buff.sourceSkillRef?.categoryId ?? "")
+}
+
+function changeSkillBuffCategory(buff: any, value: string) {
+  const skill = currentAgentSkill()
+  buff.sourceSkillRef ??= {}
+  buff.sourceSkillRef.agentSkillId = skill?.id ?? ""
+  buff.sourceSkillRef.categoryId = value
+  buff.sourceSkillRef.moveId = String(moveOptions(props.catalog, skill?.id ?? "", value)[0]?.value ?? "")
+  changed()
+}
+
+function changeSkillBuffMove(buff: any, value: string) {
+  buff.sourceSkillRef ??= {}
+  buff.sourceSkillRef.agentSkillId = currentAgentSkill()?.id ?? ""
+  buff.sourceSkillRef.moveId = value
   changed()
 }
 
@@ -189,6 +238,24 @@ function enableCoreSkill(enabled: boolean) {
         <EffectRulesEditor :model="model.combatBuffs[entry.key]" :catalog="catalog" :disabled="disabled" :allow-coverage="model.combatBuffs[entry.key].scope === 'inCombat'" :preferred-skill-id="catalog?.agentSkills?.agentSkills?.find((skill: any) => skill.agentId === model.id)?.id" :core-passive-scaling="entry.key === 'corePassive' ? model.coreSkill?.corePassiveScaling : null" @change="changed" />
         <div class="buff-modifier-block"><div class="maintenance-row-head"><strong>Buff 修饰</strong></div><BuffModifiersEditor :model="model.combatBuffs[entry.key]" :catalog="catalog" :disabled="disabled" @change="changed" /></div>
       </template>
+    </MaintenanceSection>
+
+    <MaintenanceSection title="技能来源 Buff" description="维护由当前角色具体招式提供的独立 Buff；来源只绑定到整招式，不选择倍率行。">
+      <template #actions><NButton size="small" :disabled="disabled || !currentAgentSkill()" @click="addSkillBuff"><template #icon><Plus :size="15" /></template>添加技能 Buff</NButton></template>
+      <article v-for="(buff, index) in model.combatBuffs.skillBuffs" :key="index" class="maintenance-subcard skill-buff-card">
+        <header class="maintenance-section-head"><div><h4>{{ textOf(buff.name) || `技能来源 Buff ${index + 1}` }}</h4></div><NButton quaternary type="error" :disabled="disabled" title="删除技能 Buff" @click="model.combatBuffs.skillBuffs.splice(index, 1); changed()"><template #icon><Trash2 :size="16" /></template></NButton></header>
+        <div class="maintenance-grid">
+          <label class="maintenance-field"><span>稳定 ID</span><NInput :value="buff.id" :disabled="disabled" @update:value="buff.id = String($event); changed()" /></label>
+          <label class="maintenance-field"><span>Buff 名称</span><NInput :value="textOf(buff.name)" :disabled="disabled" @update:value="buff.name = { zhCN: String($event) }; changed()" /></label>
+          <label class="maintenance-field"><span>来源技能目录</span><NSelect :value="buff.sourceSkillRef?.categoryId" :options="skillBuffCategoryOptions()" :disabled="disabled || !currentAgentSkill()" @update:value="changeSkillBuffCategory(buff, String($event))" /></label>
+          <label class="maintenance-field"><span>来源招式</span><NSelect :value="buff.sourceSkillRef?.moveId" :options="skillBuffMoveOptions(buff)" :disabled="disabled || !currentAgentSkill()" @update:value="changeSkillBuffMove(buff, String($event))" /></label>
+          <label class="maintenance-field"><span>生效范围</span><NSelect :value="buff.scope" :options="SCOPE_OPTIONS" :disabled="disabled" @update:value="setBuffScope(buff, String($event))" /></label>
+          <label class="maintenance-switch-field"><span>默认启用</span><NSwitch :value="buff.defaultChecked === true" :disabled="disabled" @update:value="buff.defaultChecked = Boolean($event); changed()" /></label>
+          <label class="maintenance-field maintenance-field-wide"><span>Buff 描述</span><NInput type="textarea" :value="textOf(buff.description)" :disabled="disabled" @update:value="buff.description = { zhCN: String($event) }; changed()" /></label>
+        </div>
+        <EffectRulesEditor :model="buff" :catalog="catalog" :disabled="disabled" :allow-coverage="buff.scope === 'inCombat'" :preferred-skill-id="buff.sourceSkillRef?.agentSkillId" @change="changed" />
+        <div class="buff-modifier-block"><div class="maintenance-row-head"><strong>Buff 修饰</strong></div><BuffModifiersEditor :model="buff" :catalog="catalog" :disabled="disabled" @change="changed" /></div>
+      </article>
     </MaintenanceSection>
 
     <MaintenanceSection title="影画 Buff" description="只新增已经建模的影画，不会自动补齐空影画。">

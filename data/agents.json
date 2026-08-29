@@ -3916,17 +3916,17 @@
             "zhCN": "核心被动：天空骑士"
           },
           "description": {
-            "zhCN": "任意[出枪式]命中后进入或刷新[巡空枪势]并获得1次[普通攻击：敛枪式]发动机会；一/二/三段对应持续8/7/6秒。激活或刷新枪势时，暴击率随核心技等级提升33/39/44/50/55/61/66%，持续8秒并可延长至40秒。枪势期间攻击失衡目标时，失衡易伤倍率提升20%。默认失衡轴还按连携技提供的[砥砺]计算，使敛枪式伤害提升20%。"
+            "zhCN": "任意[出枪式]命中后进入或刷新[巡空枪势]并获得1次[普通攻击：敛枪式]发动机会；一/二/三段对应持续8/7/6秒。激活或刷新枪势时，暴击率随核心技等级提升33/39/44/50/55/61/66%，持续8秒并可延长至40秒。枪势期间攻击失衡目标时，失衡易伤倍率提升20%。"
           },
           "effects": [
             {
               "id": "sky-patrol-stance-crit-rate",
               "type": "fixed",
-          "stat": "critRate",
-          "value": 33,
-          "mode": "flat",
-          "condition": "激活或刷新巡空枪势",
-          "durationSeconds": 8,
+              "stat": "critRate",
+              "value": 33,
+              "mode": "flat",
+              "condition": "激活或刷新巡空枪势",
+              "durationSeconds": 8,
               "valueSource": {
                 "kind": "corePassiveScaling",
                 "field": "skyPatrolStanceCritRatePct"
@@ -3944,46 +3944,12 @@
             {
               "id": "sky-patrol-stunned-target-bonus",
               "type": "fixed",
-          "stat": "stunDmgMultiplierBonus",
-          "value": 20,
-          "mode": "flat",
-          "condition": "巡空枪势期间命中失衡敌人",
+              "stat": "stunDmgMultiplierBonus",
+              "value": 20,
+              "mode": "flat",
+              "condition": "巡空枪势期间命中失衡敌人",
               "target": {
                 "kind": "default"
-              },
-              "coverage": {
-                "default": 1,
-                "min": 0,
-                "max": 1,
-                "step": 0.1
-              }
-            },
-            {
-              "id": "tempering-sheathed-spear-damage",
-              "type": "fixed",
-              "stat": "dmgBonus",
-              "value": 20,
-          "mode": "flat",
-          "condition": "已发动连携技：冰凌卷地并获得砥砺",
-          "durationSeconds": 50,
-              "target": {
-                "kind": "skill",
-                "skillTargets": [
-                  {
-                    "kind": "specific",
-                    "agentSkillId": "sigrid",
-                    "categoryId": "basic",
-                    "skillType": "basic",
-                    "moveId": "basic_sheathed_spear"
-                  },
-                  {
-                    "kind": "specific",
-                    "agentSkillId": "sigrid",
-                    "categoryId": "basic",
-                    "skillType": "basic",
-                    "moveId": "cinema_spear_opportunity_overflow"
-                  }
-                ]
               },
               "coverage": {
                 "default": 1,
@@ -4012,9 +3978,7 @@
             },
             "critBuffDurationSecondsPerTrigger": 8,
             "critBuffMaximumDurationSeconds": 40,
-            "blockedSheathedSpearDazeBonusPct": 100,
-            "temperingDamageBonusPct": 20,
-            "temperingDurationSeconds": 50
+            "blockedSheathedSpearDazeBonusPct": 100
           }
         },
         "additionalAbility": {
@@ -4029,10 +3993,10 @@
             {
               "id": "sky-alliance-atk-flat",
               "type": "fixed",
-          "stat": "atkFlat",
-          "value": 840,
-          "mode": "flat",
-          "condition": "队伍中存在支援或击破角色",
+              "stat": "atkFlat",
+              "value": 840,
+              "mode": "flat",
+              "condition": "队伍中存在支援或击破角色",
               "target": {
                 "kind": "default"
               },
@@ -4071,6 +4035,58 @@
             }
           }
         },
+        "skillBuffs": [
+          {
+            "id": "tempering",
+            "sourceSkillRef": {
+              "agentSkillId": "sigrid",
+              "categoryId": "chain",
+              "moveId": "chain_ice_sweeps_the_earth"
+            },
+            "scope": "inCombat",
+            "defaultChecked": true,
+            "name": {
+              "zhCN": "砥砺"
+            },
+            "description": {
+              "zhCN": "发动[连携技：冰凌卷地]时获得[砥砺]，使后续[普通攻击：敛枪式]造成的伤害提升20%，持续50秒。"
+            },
+            "effects": [
+              {
+                "id": "tempering-sheathed-spear-damage",
+                "type": "fixed",
+                "stat": "dmgBonus",
+                "value": 20,
+                "mode": "flat",
+                "condition": "已发动连携技：冰凌卷地并获得砥砺",
+                "durationSeconds": 50,
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "kind": "specific",
+                      "agentSkillId": "sigrid",
+                      "categoryId": "basic",
+                      "skillType": "basic",
+                      "moveId": "basic_sheathed_spear"
+                    }
+                  ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": [],
+            "mechanics": {
+              "temperingDamageBonusPct": 20,
+              "temperingDurationSeconds": 50
+            }
+          }
+        ],
         "cinemaBuffs": [
           {
             "cinemaLevel": 1,
@@ -4078,7 +4094,7 @@
               "zhCN": "很久很久以前"
             },
             "description": {
-              "zhCN": "发动敛枪式第三段时返还枪势和1次敛枪机会；机会溢出时，下一次敛枪式最后一击额外造成100%攻击力冰属性伤害；自身攻击力提升25%。溢出伤害保留为默认0次的独立可选事件。"
+              "zhCN": "发动敛枪式第三段时返还枪势和1次敛枪机会；机会溢出时，下一次敛枪式最后一击额外造成100%攻击力冰属性伤害；自身攻击力提升25%。"
             },
             "scope": "inCombat",
             "defaultChecked": false,
@@ -4089,7 +4105,7 @@
                 "stat": "atkPct",
                 "value": 25,
                 "mode": "pct",
-                "basis": "baseAtk",
+                "basis": "outOfCombatAtk",
                 "target": {
                   "kind": "default"
                 },
@@ -4114,7 +4130,7 @@
               "zhCN": "传说的第一幕"
             },
             "description": {
-              "zhCN": "[出枪式]和[普通攻击：敛枪式]造成伤害的穿透率提升24%；枪势持续时间延长2秒；喧响值获取效率提升10%。仅将可量化的招式定向穿透率纳入伤害计算。"
+              "zhCN": "[出枪式]和[普通攻击：敛枪式]造成伤害的穿透率提升24%；枪势持续时间延长2秒；喧响值获取效率提升10%。"
             },
             "scope": "inCombat",
             "defaultChecked": false,
@@ -4122,10 +4138,10 @@
               {
                 "id": "cinema-2-spear-form-pen-ratio",
                 "type": "fixed",
-              "stat": "penRatio",
-              "value": 24,
-              "mode": "flat",
-              "condition": "出枪式或敛枪式造成伤害",
+                "stat": "penRatio",
+                "value": 24,
+                "mode": "flat",
+                "condition": "出枪式或敛枪式造成伤害",
                 "target": {
                   "kind": "skill",
                   "skillTargets": [
@@ -4185,13 +4201,6 @@
                       "categoryId": "chain",
                       "skillType": "ultimate",
                       "moveId": "ultimate_frost_sky"
-                    },
-                    {
-                      "kind": "specific",
-                      "agentSkillId": "sigrid",
-                      "categoryId": "basic",
-                      "skillType": "basic",
-                      "moveId": "cinema_spear_opportunity_overflow"
                     }
                   ]
                 },
@@ -4223,11 +4232,11 @@
               {
                 "id": "cinema-4-damage-bonus",
                 "type": "fixed",
-              "stat": "dmgBonus",
-              "value": 18,
-              "mode": "flat",
-              "condition": "获得巡空枪势",
-              "durationSeconds": 8,
+                "stat": "dmgBonus",
+                "value": 18,
+                "mode": "flat",
+                "condition": "获得巡空枪势",
+                "durationSeconds": 8,
                 "target": {
                   "kind": "default"
                 },
@@ -4506,8 +4515,7 @@
       },
       "preferredDriveDiscs": {
         "defaultSetIds": [
-          "zzz_wiki_1552",
-          "hormone_punk"
+          "zzz_wiki_1552"
         ],
         "mainStatLimits": {
           "4": [
@@ -4528,15 +4536,28 @@
         "mode": "custom",
         "cinemaLevel": 0,
         "name": {
-          "zhCN": "0影单次失衡窗口"
+          "zhCN": "0影单次失衡"
         },
         "events": [
           {
             "id": "sigrid_break_sequence_ref",
             "kind": "skillGroup",
             "skillGroupId": "formation_break_sequence",
-            "count": 1,
+            "count": 2,
             "stunned": true
+          },
+          {
+            "id": "sigrid_chain_ice_sweeps_the_earth",
+            "kind": "direct",
+            "count": 2,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "sigrid",
+              "categoryId": "chain",
+              "moveId": "chain_ice_sweeps_the_earth",
+              "rowId": "damage"
+            }
           },
           {
             "id": "sigrid_ultimate_frost_sky",
@@ -4552,22 +4573,9 @@
             }
           },
           {
-            "id": "sigrid_post_ultimate_sheathed_spear_stage_3",
-            "kind": "direct",
-            "count": 1,
-            "stunned": true,
-            "critMode": "expected",
-            "skillRef": {
-              "agentSkillId": "sigrid",
-              "categoryId": "basic",
-              "moveId": "basic_sheathed_spear",
-              "rowId": "stage_3"
-            }
-          },
-          {
             "id": "sigrid_ex_special_shattered_jade",
             "kind": "direct",
-            "count": 1,
+            "count": 2,
             "stunned": true,
             "critMode": "expected",
             "skillRef": {
@@ -4578,7 +4586,7 @@
             }
           },
           {
-            "id": "sigrid_final_sheathed_spear_stage_1",
+            "id": "sigrid_sheathed_spear_stage_3",
             "kind": "direct",
             "count": 1,
             "stunned": true,
@@ -4587,11 +4595,11 @@
               "agentSkillId": "sigrid",
               "categoryId": "basic",
               "moveId": "basic_sheathed_spear",
-              "rowId": "stage_1"
+              "rowId": "stage_3"
             }
           }
         ],
-        "selectedEventId": "sigrid_break_sequence_ref",
+        "selectedEventId": "sigrid_ultimate_frost_sky",
         "variants": [
           {
             "mode": "custom",
@@ -4604,7 +4612,7 @@
                 "id": "sigrid_break_sequence_ref",
                 "kind": "skillGroup",
                 "skillGroupId": "formation_break_sequence",
-                "count": 1,
+                "count": 2,
                 "stunned": true
               },
               {
@@ -4634,13 +4642,6 @@
                 }
               },
               {
-                "id": "sigrid_overflow_ref",
-                "kind": "skillGroup",
-                "skillGroupId": "cinema_1_opportunity_overflow",
-                "count": 0,
-                "stunned": true
-              },
-              {
                 "id": "sigrid_ultimate_frost_sky",
                 "kind": "direct",
                 "count": 1,
@@ -4654,22 +4655,9 @@
                 }
               },
               {
-                "id": "sigrid_post_ultimate_sheathed_spear_stage_2",
-                "kind": "direct",
-                "count": 1,
-                "stunned": true,
-                "critMode": "expected",
-                "skillRef": {
-                  "agentSkillId": "sigrid",
-                  "categoryId": "basic",
-                  "moveId": "basic_sheathed_spear",
-                  "rowId": "stage_2"
-                }
-              },
-              {
                 "id": "sigrid_ex_special_shattered_jade",
                 "kind": "direct",
-                "count": 1,
+                "count": 2,
                 "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
@@ -4680,68 +4668,28 @@
                 }
               },
               {
-                "id": "sigrid_final_sheathed_spear_stage_3",
+                "id": "event_40ed8eb511",
                 "kind": "direct",
-                "count": 1,
+                "count": 2,
                 "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "sigrid",
-                  "categoryId": "basic",
-                  "moveId": "basic_sheathed_spear",
-                  "rowId": "stage_3"
+                  "categoryId": "chain",
+                  "moveId": "chain_ice_sweeps_the_earth",
+                  "rowId": "damage"
                 }
               }
             ],
-            "selectedEventId": "sigrid_break_sequence_ref"
+            "selectedEventId": "event_40ed8eb511"
           },
           {
             "mode": "custom",
             "cinemaLevel": 6,
             "name": {
-              "zhCN": "6影单次失衡窗口（破阵次数可调）"
+              "zhCN": "6影单次失衡窗口"
             },
             "events": [
-              {
-                "id": "sigrid_cinema_6_break_sequence_ref",
-                "kind": "skillGroup",
-                "skillGroupId": "cinema_6_formation_break_sequence",
-                "count": 1,
-                "stunned": true
-              },
-              {
-                "id": "sigrid_refunded_sheathed_spear_stage_3",
-                "kind": "direct",
-                "count": 1,
-                "stunned": true,
-                "critMode": "expected",
-                "skillRef": {
-                  "agentSkillId": "sigrid",
-                  "categoryId": "basic",
-                  "moveId": "basic_sheathed_spear",
-                  "rowId": "stage_3"
-                }
-              },
-              {
-                "id": "sigrid_post_refund_sheathed_spear_stage_1",
-                "kind": "direct",
-                "count": 1,
-                "stunned": true,
-                "critMode": "expected",
-                "skillRef": {
-                  "agentSkillId": "sigrid",
-                  "categoryId": "basic",
-                  "moveId": "basic_sheathed_spear",
-                  "rowId": "stage_1"
-                }
-              },
-              {
-                "id": "sigrid_overflow_ref",
-                "kind": "skillGroup",
-                "skillGroupId": "cinema_1_opportunity_overflow",
-                "count": 0,
-                "stunned": true
-              },
               {
                 "id": "sigrid_ultimate_frost_sky",
                 "kind": "direct",
@@ -4756,22 +4704,9 @@
                 }
               },
               {
-                "id": "sigrid_post_ultimate_sheathed_spear_stage_2",
-                "kind": "direct",
-                "count": 1,
-                "stunned": true,
-                "critMode": "expected",
-                "skillRef": {
-                  "agentSkillId": "sigrid",
-                  "categoryId": "basic",
-                  "moveId": "basic_sheathed_spear",
-                  "rowId": "stage_2"
-                }
-              },
-              {
                 "id": "sigrid_ex_special_shattered_jade",
                 "kind": "direct",
-                "count": 1,
+                "count": 2,
                 "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
@@ -4782,20 +4717,27 @@
                 }
               },
               {
-                "id": "sigrid_final_sheathed_spear_stage_3",
+                "id": "event_3307183af7",
                 "kind": "direct",
-                "count": 1,
+                "count": 2,
                 "stunned": true,
                 "critMode": "expected",
                 "skillRef": {
                   "agentSkillId": "sigrid",
-                  "categoryId": "basic",
-                  "moveId": "basic_sheathed_spear",
-                  "rowId": "stage_3"
+                  "categoryId": "chain",
+                  "moveId": "chain_ice_sweeps_the_earth",
+                  "rowId": "damage"
                 }
+              },
+              {
+                "id": "event_d75c2de041",
+                "kind": "skillGroup",
+                "skillGroupId": "formation_break_sequence",
+                "count": 4,
+                "stunned": true
               }
             ],
-            "selectedEventId": "sigrid_cinema_6_break_sequence_ref"
+            "selectedEventId": "event_d75c2de041"
           }
         ]
       },
@@ -4803,115 +4745,13 @@
         {
           "id": "formation_break_sequence",
           "name": {
-            "zhCN": "一次破阵（连携+敛枪1/2/3）"
+            "zhCN": "强化普攻总倍率（敛枪1/2/3）"
           },
           "defaultCount": 1,
           "minCount": 0,
           "maxCount": 100,
           "step": 1,
           "events": [
-            {
-              "id": "chain",
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "sigrid",
-                "categoryId": "chain",
-                "moveId": "chain_ice_sweeps_the_earth",
-                "rowId": "damage"
-              }
-            },
-            {
-              "id": "sheathed-stage-1",
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "sigrid",
-                "categoryId": "basic",
-                "moveId": "basic_sheathed_spear",
-                "rowId": "stage_1"
-              }
-            },
-            {
-              "id": "sheathed-stage-2",
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "sigrid",
-                "categoryId": "basic",
-                "moveId": "basic_sheathed_spear",
-                "rowId": "stage_2"
-              }
-            },
-            {
-              "id": "sheathed-stage-3",
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "sigrid",
-                "categoryId": "basic",
-                "moveId": "basic_sheathed_spear",
-                "rowId": "stage_3"
-              }
-            }
-          ]
-        },
-        {
-          "id": "cinema_1_opportunity_overflow",
-          "name": {
-            "zhCN": "1影敛枪机会溢出追加伤害"
-          },
-          "defaultCount": 1,
-          "minCount": 0,
-          "maxCount": 100,
-          "step": 1,
-          "events": [
-            {
-              "id": "overflow-damage",
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "sigrid",
-                "categoryId": "basic",
-                "moveId": "cinema_spear_opportunity_overflow",
-                "rowId": "damage"
-              }
-            }
-          ]
-        },
-        {
-          "id": "cinema_6_formation_break_sequence",
-          "name": {
-            "zhCN": "6影一次连携破阵（可重复）"
-          },
-          "defaultCount": 1,
-          "minCount": 0,
-          "maxCount": 100,
-          "step": 1,
-          "events": [
-            {
-              "id": "chain",
-              "kind": "direct",
-              "count": 1,
-              "stunned": true,
-              "critMode": "expected",
-              "skillRef": {
-                "agentSkillId": "sigrid",
-                "categoryId": "chain",
-                "moveId": "chain_ice_sweeps_the_earth",
-                "rowId": "damage"
-              }
-            },
             {
               "id": "sheathed-stage-1",
               "kind": "direct",
@@ -4963,9 +4803,9 @@
         "officialEntryPageId": 2079,
         "officialEntryVersion": 1787280280,
         "level60Stats": "ATK 863 and DEF 606 are source-checked from the official 2079 entry; official max-level HP repeats the level-20 value 2670, so HP 7788 uses the verified production-data correction recorded for this release",
-        "combatMechanics": "source-checked-mihoyo-baike-entry-2079-2026-08-24; post-release guides dated 2026-08-19 and 2026-08-22 are used only for the default stunned-window sequence",
+        "combatMechanics": "source-checked-mihoyo-baike-entry-2079-2026-08-24; Tempering is owned by the Chain Attack skill Buff rather than the Core Passive; post-release guides dated 2026-08-19 and 2026-08-22 are used only for the default stunned-window sequence",
         "damageModel": "standard ATK direct damage; attackTypes pierce is only an attack-type label and never selects rupture or sheer damage",
-        "defaultAssumptions": "Core F, additional ability active, Imbued coverage 0, 150% base stun multiplier, full Tempering coverage, one formation-break sequence, and no opportunity overflow",
+        "defaultAssumptions": "Core F, additional ability active, independent Tempering skill Buff active at full coverage, Imbued coverage 0, 150% base stun multiplier, enhanced-Basic group x2, Chain Attack x2, Ultimate x1, Shattered Jade x2, and standalone Converging Spear stage 3 x1 at Cinema 0",
         "unsupportedMechanics": "stance duration, energy, decibel generation, blocking, and action-speed changes remain descriptive and are not simulated as an automatic state machine",
         "excludedPreReleaseData": "does not use beta deactivation rules, 72% stance Crit Rate, old Cinema multipliers, or the old three-stack signature W-Engine"
       },

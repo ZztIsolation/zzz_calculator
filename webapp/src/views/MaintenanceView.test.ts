@@ -319,6 +319,38 @@ describe("MaintenanceView structured editor", () => {
     }
   })
 
+  it("adds and saves a skill-sourced Buff bound to the current agent move", async () => {
+    const { wrapper, fetchMock } = await mountView()
+
+    await button(wrapper, "添加技能 Buff").trigger("click")
+    let card = wrapper.find(".skill-buff-card")
+    expect(card.exists()).toBe(true)
+    expect(field(card, "来源技能目录").find("select").element.value).toBe("basic")
+    expect(field(card, "来源招式").find("select").element.value).toBe("move")
+    expect(card.text()).not.toContain("倍率行")
+
+    await field(card, "稳定 ID").find("input").setValue("tempering")
+    card = wrapper.find(".skill-buff-card")
+    await field(card, "Buff 名称").find("input").setValue("砥砺")
+    await field(card, "Buff 描述").find("textarea").setValue("连携技触发后提升敛枪式伤害。")
+    await button(card, "添加增幅").trigger("click")
+    await field(card, "数值").find("input").setValue(20)
+    const defaultSwitch = card.findAll(".maintenance-switch-field")
+      .find((item: any) => item.find("span").text().trim() === "默认启用")!
+    await defaultSwitch.find("input").setValue(true)
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("完整目录已刷新"))
+
+    const call = fetchMock.mock.calls.find(([url, init]) => url === "/api/maintenance/agents" && init?.method === "POST")!
+    const body = JSON.parse(String(call[1]?.body ?? "{}"))
+    expect(body.combatBuffs.skillBuffs).toEqual([expect.objectContaining({
+      id: "tempering",
+      name: { zhCN: "砥砺" },
+      defaultChecked: true,
+      sourceSkillRef: { agentSkillId: "skills_a", categoryId: "basic", moveId: "move" },
+    })])
+  })
+
   it("shows skill catalog ids only inside collapsed read-only technical information", async () => {
     const { wrapper } = await mountView()
     await switchResource(wrapper, "agent-skills")

@@ -1444,7 +1444,7 @@ function compileDenseDamageModifierEntries(effectEntries = [], compiledEvents = 
                     result.push({
                         entryIndex,
                         kindIndex,
-                        value: Number(modifier.value ?? 0),
+                        value: modifierValueForEvent(modifier, compiledEvent.event),
                         requirement: modifier.requirement ?? null,
                     })
                 }
@@ -1452,7 +1452,7 @@ function compileDenseDamageModifierEntries(effectEntries = [], compiledEvents = 
                     result.push({
                         entryIndex,
                         kindIndex: DAMAGE_MODIFIER_SUM_KEY_INDEX.get(TEAM_ANOMALY_DAMAGE_MODIFIER_SUM_KEY),
-                        value: Number(modifier.value ?? 0),
+                        value: modifierValueForEvent(modifier, compiledEvent.event),
                         requirement: modifier.requirement ?? null,
                     })
                 }
@@ -1848,6 +1848,15 @@ function agentCombatBuffEntries(agent, coreSkillLevel) {
                 conditionLabel: materializedBuff.conditionLabel,
             }
         })
+    const skillEntries = (Array.isArray(combatBuffs.skillBuffs) ? combatBuffs.skillBuffs : [])
+        .filter(buff => buff)
+        .map(buff => ({
+            id: `agent:${agent.id}.skill.${buff.id}`,
+            key: `skill.${buff.id}`,
+            buff,
+            name: buff.name,
+            conditionLabel: buff.conditionLabel ?? buff.description ?? null,
+        }))
     const cinemaEntries = (combatBuffs.cinemaBuffs ?? [])
         .filter(buff => buff)
         .map(buff => ({
@@ -1857,7 +1866,7 @@ function agentCombatBuffEntries(agent, coreSkillLevel) {
             name: buff.name ?? cinemaBuffName(buff),
             conditionLabel: buff.conditionLabel ?? buff.description ?? null,
         }))
-    return [...fixedEntries, ...cinemaEntries]
+    return [...fixedEntries, ...skillEntries, ...cinemaEntries]
 }
 
 function nameWithSource(teammateName, sourceLabel) {
@@ -2470,37 +2479,56 @@ function resolveDamageSkillRef(catalog, agent, skillRef = null, options = {}) {
         throw new Error(`Missing skill multiplier for ${skillSet.id}.${categoryId}.${moveId}.${rowId} level ${requestedLevel}`)
     }
 
-    const labelParts = [
-        localizedName(category.name, category.id),
-        localizedName(move.name, move.id),
-        localizedName(row.label, row.id),
-    ].filter(Boolean)
     const skillType = skillTypeForMove(category, move)
     if (!skillType) {
         throw new Error(`Skill move has invalid skillType: ${skillSet.id}.${categoryId}.${moveId}`)
     }
 
-    return {
-        skillMultiplier: Math.max(0, value / 100),
-        skillPercent: value,
-        skillSource: {
+    const skillSourceForRow = resolvedRow => {
+        const sourceLabelParts = [
+            localizedName(category.name, category.id),
+            localizedName(move.name, move.id),
+            localizedName(resolvedRow.label, resolvedRow.id),
+        ].filter(Boolean)
+        return {
             agentSkillId: skillSet.id,
             categoryId,
             moveId,
-            rowId,
+            rowId: resolvedRow.id,
             skillType,
             skillTags: skillTagsForMove(move),
-            generatedFromRowIds: Array.isArray(row.generatedFromRowIds) ? row.generatedFromRowIds : [],
+            generatedFromRowIds: Array.isArray(resolvedRow.generatedFromRowIds) ? resolvedRow.generatedFromRowIds : [],
             level: requestedLevel,
             levelScale: skillLevelScale(category),
             levelLabel: skillLevelLabel(category, requestedLevel),
-            damageBasis: row.damageBasis ?? "atk",
+            damageBasis: resolvedRow.damageBasis ?? "atk",
             damageElement: DIRECT_DAMAGE_ELEMENTS.has(move.damageElement) ? move.damageElement : null,
             categoryName: category.name,
             moveName: move.name,
-            rowLabel: row.label,
-            label: labelParts.join(" / "),
-        },
+            rowLabel: resolvedRow.label,
+            label: sourceLabelParts.join(" / "),
+        }
+    }
+    const generatedSkillComponents = (Array.isArray(row.generatedFromRowIds) ? row.generatedFromRowIds : [])
+        .map(componentRowId => (move.rows ?? []).find(item => item.id === componentRowId))
+        .filter(Boolean)
+        .map(componentRow => {
+            const componentValue = skillRowValue(category, move, componentRow, requestedLevel)
+            if (!Number.isFinite(componentValue)) {
+                throw new Error(`Missing generated skill component for ${skillSet.id}.${categoryId}.${moveId}.${componentRow.id} level ${requestedLevel}`)
+            }
+            return {
+                skillMultiplier: Math.max(0, componentValue / 100),
+                skillPercent: componentValue,
+                skillSource: skillSourceForRow(componentRow),
+            }
+        })
+
+    return {
+        skillMultiplier: Math.max(0, value / 100),
+        skillPercent: value,
+        skillSource: skillSourceForRow(row),
+        generatedSkillComponents,
     }
 }
 
@@ -2673,6 +2701,7 @@ function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index 
         normalized: true,
         skillMultiplier: Number.isFinite(skillMultiplier) ? Math.max(0, skillMultiplier) : 1,
         skillSource: skillRefResult?.skillSource ?? null,
+        generatedSkillComponents: skillRefResult?.generatedSkillComponents ?? [],
         damageBasis: normalizeDirectDamageBasis(skillRefResult?.skillSource?.damageBasis ?? event.damageBasis),
         damageScale: normalizeDamageScale(event),
         label: normalizeDamageEventLabel(event),
@@ -2681,6 +2710,40 @@ function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index 
         count: normalizeDamageCount(event.count, 1),
         stunned: normalizeEventStunned(event.stunned),
     }
+}
+
+function generatedDirectDamageComponentEvents(event = {}) {
+    const rawComponents = Array.isArray(event.generatedSkillComponents)
+        ? event.generatedSkillComponents
+        : []
+    const components = rawComponents.filter(component =>
+        component?.skillSource && Number.isFinite(Number(component.skillMultiplier)))
+    if (event.kind !== "direct"
+        || components.length < 2
+        || components.length !== rawComponents.length) {
+        return [event]
+    }
+
+    const totalMultiplier = components.reduce(
+        (total, component) => total + Math.max(0, Number(component.skillMultiplier ?? 0)),
+        0,
+    )
+    return components.map((component, index) => {
+        const skillMultiplier = Math.max(0, Number(component.skillMultiplier ?? 0))
+        return {
+            ...event,
+            id: `${event.id}::${component.skillSource.rowId ?? index + 1}`,
+            skillMultiplier,
+            skillSource: component.skillSource,
+            generatedSkillComponents: [],
+            generatedParentEventId: event.id,
+            generatedParentSkillSource: event.skillSource,
+            generatedComponentIndex: index,
+            generatedComponentCount: components.length,
+            generatedComponentWeight: totalMultiplier > 0 ? skillMultiplier / totalMultiplier : 1 / components.length,
+            damageBasis: normalizeDirectDamageBasis(component.skillSource.damageBasis ?? event.damageBasis),
+        }
+    })
 }
 
 function normalizeSheerDamageEvent(event = {}, agent = {}, catalog = {}, index = 0, options = {}) {
@@ -3236,9 +3299,82 @@ function sheerTargetBreakdownForElement(panel, bonusTotals, target, damageElemen
     }
 }
 
+function generatedModifierSkillTargets(modifier = {}) {
+    const appliesToTargets = modifier?.appliesTo?.skillTargets
+    if (Array.isArray(appliesToTargets) && appliesToTargets.length > 0) {
+        return appliesToTargets
+    }
+    const targetTargets = modifier?.target?.skillTargets
+    return Array.isArray(targetTargets) ? targetTargets : []
+}
+
+function generatedModifierTargetRowId(target = {}) {
+    const rowId = String(target?.rowId ?? "").trim()
+    return rowId || null
+}
+
+// Child events already match ordinary broad and source-row targets directly;
+// only an explicit synthetic total-row target needs the parent source.
+function generatedModifierParentRowTargetMatches(modifier = {}, event = {}) {
+    const parentSource = event?.generatedParentSkillSource
+    if (!parentSource) {
+        return false
+    }
+    return generatedModifierSkillTargets(modifier).some(target =>
+        generatedModifierTargetRowId(target) === String(parentSource.rowId ?? "")
+        && skillTargetMatches(target, parentSource))
+}
+
+function generatedModifierMatchingTargets(modifier = {}, event = {}) {
+    const targets = generatedModifierSkillTargets(modifier)
+    if (!targets.length || !event?.skillSource) {
+        return []
+    }
+
+    const matchingTargets = targets.filter(target => skillTargetMatches(target, event.skillSource))
+    if (generatedModifierParentRowTargetMatches(modifier, event)) {
+        matchingTargets.push(...targets.filter(target =>
+            generatedModifierTargetRowId(target) === String(event.generatedParentSkillSource.rowId ?? "")
+            && !matchingTargets.includes(target)))
+    }
+    return matchingTargets
+}
+
+function generatedModifierParentSource(modifier = {}, event = {}) {
+    return generatedModifierParentRowTargetMatches(modifier, event)
+        ? event.generatedParentSkillSource
+        : null
+}
+
+function modifierMatchingEvent(modifier = {}, event = {}) {
+    const parentSource = generatedModifierParentSource(modifier, event)
+    return parentSource ? { ...event, skillSource: parentSource } : event
+}
+
+function modifierValueForEvent(modifier = {}, event = {}) {
+    const value = Number(modifier?.value ?? 0)
+    if (String(modifier?.kind ?? "") !== "skillMultiplierBonus"
+        || !event?.generatedParentSkillSource) {
+        return value
+    }
+
+    const aggregateTarget = generatedModifierMatchingTargets(modifier, event).some(target => {
+        const rowId = generatedModifierTargetRowId(target)
+        return !rowId || rowId === String(event.generatedParentSkillSource.rowId ?? "")
+    })
+    if (!aggregateTarget) {
+        return value
+    }
+
+    const weight = Number(event.generatedComponentWeight)
+    return Number.isFinite(weight) ? value * weight : value
+}
+
 export function damageModifierAppliesTo(modifier, event) {
+    const matchingEvent = modifierMatchingEvent(modifier, event)
     const appliesTo = modifier.appliesTo ?? {}
-    const hasSkillTargets = Array.isArray(appliesTo.skillTargets) && appliesTo.skillTargets.length
+    const skillTargets = generatedModifierSkillTargets(modifier)
+    const hasSkillTargets = skillTargets.length > 0
     if (modifier.target?.kind === "skill" && !hasSkillTargets) {
         return false
     }
@@ -3246,35 +3382,35 @@ export function damageModifierAppliesTo(modifier, event) {
         return false
     }
     if (Array.isArray(appliesTo.damageKinds) && appliesTo.damageKinds.length) {
-        const eventKinds = eventDamageKindKeys(event)
+        const eventKinds = eventDamageKindKeys(matchingEvent)
         if (!eventKinds.some(kind => appliesTo.damageKinds.includes(kind))) {
             return false
         }
     }
     if (Array.isArray(appliesTo.anomalyEffects) && appliesTo.anomalyEffects.length) {
-        const effectIds = [event.anomalyEffect, event.previousAnomalyEffect].filter(Boolean)
+        const effectIds = [matchingEvent.anomalyEffect, matchingEvent.previousAnomalyEffect].filter(Boolean)
         if (!effectIds.some(effectId => appliesTo.anomalyEffects.includes(effectId))) {
             return false
         }
     }
     if (Array.isArray(appliesTo.settlementTypes) && appliesTo.settlementTypes.length) {
-        const settlementType = isLuminescenceSettlement(event)
+        const settlementType = isLuminescenceSettlement(matchingEvent)
             ? "luminescence"
-            : isReleaseSettlement(event)
+            : isReleaseSettlement(matchingEvent)
             ? "release"
-            : isDisorderDamageEvent(event) ? "disorder" : "attribute"
+            : isDisorderDamageEvent(matchingEvent) ? "disorder" : "attribute"
         if (!appliesTo.settlementTypes.includes(settlementType)) {
             return false
         }
     }
     if (Array.isArray(appliesTo.anomalyVariants) && appliesTo.anomalyVariants.length
-        && !appliesTo.anomalyVariants.includes(event.anomalyVariant ?? "normal")) {
+        && !appliesTo.anomalyVariants.includes(matchingEvent.anomalyVariant ?? "normal")) {
         return false
     }
-    if (Array.isArray(appliesTo.elements) && appliesTo.elements.length && !appliesTo.elements.includes(event.damageElement)) {
+    if (Array.isArray(appliesTo.elements) && appliesTo.elements.length && !appliesTo.elements.includes(matchingEvent.damageElement)) {
         return false
     }
-    if (Array.isArray(appliesTo.skillTargets) && appliesTo.skillTargets.length && !skillTargetsApplyTo(appliesTo.skillTargets, event)) {
+    if (skillTargets.length && !skillTargetsApplyTo(skillTargets, matchingEvent)) {
         return false
     }
     return true
@@ -3324,6 +3460,12 @@ function matchingDamageModifiers(bonusTotals, event, kind) {
         .filter(modifier => !IGNORED_DAMAGE_MODIFIER_KINDS.has(modifier?.kind)
             && modifier.kind === kind
             && damageModifierAppliesTo(modifier, event))
+        .map(modifier => {
+            const value = modifierValueForEvent(modifier, event)
+            return value === Number(modifier.value ?? 0)
+                ? modifier
+                : { ...modifier, value }
+        })
 }
 
 function sumDamageModifiers(bonusTotals, event, kind) {
@@ -3926,7 +4068,7 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
     return rows
 }
 
-function calculateDirectDamageEvent({ event, panel, bonusTotals, target, includeWhiteBox }) {
+function calculateDirectDamageEventCore({ event, panel, bonusTotals, target, includeWhiteBox }) {
     const atk = Number(panel.atk ?? 0)
     const damageBasisValue = directDamageBasisValue(panel, event)
     const rawCritRate = Number(panel.critRate ?? 0)
@@ -4046,6 +4188,257 @@ function calculateDirectDamageEvent({ event, panel, bonusTotals, target, include
             })
             : [],
     }
+}
+
+function generatedDirectDamageVariant(componentResults, mode, count) {
+    let finalDamage = 0
+    let singleDamage = 0
+    let weightedCritMultiplier = 0
+    let critWeight = 0
+    for (const component of componentResults) {
+        const variant = component?.damageVariants?.[mode]
+        if (!variant) {
+            continue
+        }
+        const componentSingleDamage = Number(variant.singleDamage ?? 0)
+        finalDamage += Number(variant.finalDamage ?? componentSingleDamage * Number(count ?? 1))
+        singleDamage += componentSingleDamage
+        const componentCritMultiplier = Number(variant.critMultiplier ?? 1)
+        const preCritDamage = componentCritMultiplier !== 0
+            ? componentSingleDamage / componentCritMultiplier
+            : componentSingleDamage
+        weightedCritMultiplier += componentCritMultiplier * Math.max(0, preCritDamage)
+        critWeight += Math.max(0, preCritDamage)
+    }
+
+    return {
+        critMode: mode,
+        critMultiplier: critWeight > 0 ? weightedCritMultiplier / critWeight : 1,
+        singleDamage,
+        finalDamage,
+    }
+}
+
+function generatedUniformComponentValue(componentResults = [], key, fallback = null) {
+    const values = componentResults.map(component => component?.[key])
+    if (!values.length || values.some(value => value === undefined)) {
+        return fallback
+    }
+    const first = values[0]
+    const uniform = values.every(value => {
+        if (typeof value === "number" && typeof first === "number") {
+            return Math.abs(value - first) <= 1e-12 * Math.max(1, Math.abs(value), Math.abs(first))
+        }
+        return value === first
+    })
+    return uniform ? first : null
+}
+
+function generatedSummedComponentValue(componentResults = [], key, fallback = 0) {
+    let sum = 0
+    let found = false
+    for (const component of componentResults) {
+        const value = Number(component?.[key])
+        if (!Number.isFinite(value)) {
+            continue
+        }
+        sum += value
+        found = true
+    }
+    return found ? sum : fallback
+}
+
+function generatedSegmentedNumericFields(parentValue = {}, componentValues = [], excludedKeys = new Set()) {
+    const result = { ...parentValue }
+    for (const [key, value] of Object.entries(parentValue)) {
+        if (excludedKeys.has(key) || typeof value !== "number") {
+            continue
+        }
+        result[key] = generatedUniformComponentValue(componentValues, key, value)
+    }
+    return result
+}
+
+function generatedWhiteBoxRowVaries(componentResults = [], label) {
+    const componentRows = componentResults
+        .map(component => (component.whiteBoxRows ?? []).find(row => row.label === label))
+        .filter(Boolean)
+    return componentRows.length > 1
+        && generatedUniformComponentValue(componentRows, "value", null) === null
+}
+
+function generatedDirectDamageWhiteBoxRows(parentRows = [], componentResults = [], finalDamage = 0) {
+    const rows = parentRows.map(row => ({
+        ...row,
+        ...(Array.isArray(row?.formulaLines) ? { formulaLines: [...row.formulaLines] } : {}),
+    }))
+    const componentLines = componentResults.map((component, index) =>
+        `${index + 1}. ${component.label ?? component.input?.skillSource?.label ?? "分段"} = ${formatDamageNumber(component.finalDamage)}`)
+    const segmentedLabels = new Set([
+        "暴击乘区",
+        "增伤乘区",
+        "防御乘区",
+        "抗性乘区",
+        "失衡乘区",
+    ])
+    for (const row of rows) {
+        if (!segmentedLabels.has(row.label) || !generatedWhiteBoxRowVaries(componentResults, row.label)) {
+            continue
+        }
+        const componentLinesForRow = componentResults.map((component, index) => {
+            const componentRow = (component.whiteBoxRows ?? []).find(item => item.label === row.label)
+            if (!componentRow) {
+                return `${index + 1}. ${component.label ?? "分段"}`
+            }
+            const lines = Array.isArray(componentRow.formulaLines)
+                ? componentRow.formulaLines
+                : String(componentRow.formula ?? "").split(/\r?\n/u).filter(Boolean)
+            return `${index + 1}. ${component.label ?? "分段"}: ${lines.join("；")}`
+        })
+        row.formulaLines = [
+            "本事件按各段分别匹配目标乘区",
+            ...componentLinesForRow,
+        ]
+        delete row.formula
+        row.value = null
+        row.displayValue = "分段"
+    }
+    const finalRow = rows.find(row => row.label === "最终伤害")
+    if (finalRow) {
+        finalRow.formulaLines = [
+            "各段最终伤害相加",
+            ...componentLines,
+        ]
+        delete finalRow.formula
+        finalRow.value = finalDamage
+        finalRow.displayValue = formatDamageNumber(finalDamage)
+    }
+    if (componentLines.length) {
+        rows.push({
+            label: "分段明细",
+            formulaLines: componentLines,
+            value: finalDamage,
+            displayValue: formatDamageNumber(finalDamage),
+        })
+    }
+    return rows
+}
+
+function aggregateGeneratedDirectDamageEvent({ event, parentResult, componentResults, target, includeWhiteBox }) {
+    const damageVariants = Object.fromEntries(
+        ["expected", "crit", "nonCrit"].map(mode => [
+            mode,
+            generatedDirectDamageVariant(componentResults, mode, event.count),
+        ]),
+    )
+    const selectedVariant = damageVariants[event.critMode] ?? damageVariants.expected
+    const componentBreakdowns = componentResults.map(component => component.targetBreakdown)
+    const componentMultipliers = componentResults.map(component => component.multipliers)
+    const componentSnapshots = componentResults.map(component => component.panelSnapshot)
+    const componentDamageBases = [...new Set(componentMultipliers
+        .map(multipliers => String(multipliers?.damageBasis ?? "").trim())
+        .filter(Boolean))]
+    const aggregateMultipliers = {
+        ...generatedSegmentedNumericFields(
+            parentResult.multipliers,
+            componentMultipliers,
+            new Set(["skill", "baseSkill", "skillMultiplierBonus", "crit", "segmented", "componentMultipliers"]),
+        ),
+        damageBasis: componentDamageBases.length === 1 ? componentDamageBases[0] : null,
+        baseSkill: generatedSummedComponentValue(componentMultipliers, "baseSkill", parentResult.multipliers.baseSkill),
+        skillMultiplierBonus: generatedSummedComponentValue(
+            componentMultipliers,
+            "skillMultiplierBonus",
+            parentResult.multipliers.skillMultiplierBonus,
+        ),
+        skill: generatedSummedComponentValue(componentMultipliers, "skill", parentResult.multipliers.skill),
+        crit: selectedVariant.critMultiplier,
+        segmented: true,
+        componentMultipliers,
+    }
+    const aggregatePanelSnapshot = {
+        ...generatedSegmentedNumericFields(
+            parentResult.panelSnapshot,
+            componentSnapshots,
+            new Set(["segmented", "componentSnapshots"]),
+        ),
+        segmented: true,
+        componentSnapshots,
+    }
+    const aggregateTargetBreakdown = {
+        ...generatedSegmentedNumericFields(
+            parentResult.targetBreakdown,
+            componentBreakdowns,
+            new Set(["segmented", "componentBreakdowns"]),
+        ),
+        segmented: true,
+        componentBreakdowns,
+    }
+    const aggregateInput = {
+        ...parentResult.input,
+        ...event,
+        target,
+        generatedDamageBases: componentDamageBases,
+        damageBasis: componentDamageBases.length === 1 ? componentDamageBases[0] : null,
+        skillSource: event.skillSource
+            ? {
+                ...event.skillSource,
+                damageBasis: componentDamageBases.length === 1 ? componentDamageBases[0] : null,
+            }
+            : event.skillSource,
+    }
+    return {
+        ...parentResult,
+        id: event.id,
+        kind: event.kind,
+        settlementType: event.settlementType ?? null,
+        label: event.skillSource?.label ?? event.label ?? parentResult.label,
+        finalDamage: selectedVariant.finalDamage,
+        singleDamage: selectedVariant.singleDamage,
+        damageVariants,
+        count: event.count,
+        input: aggregateInput,
+        panelSnapshot: aggregatePanelSnapshot,
+        multipliers: aggregateMultipliers,
+        targetBreakdown: aggregateTargetBreakdown,
+        components: componentResults,
+        whiteBoxRows: includeWhiteBox
+            ? generatedDirectDamageWhiteBoxRows(parentResult.whiteBoxRows, componentResults, selectedVariant.finalDamage)
+            : [],
+    }
+}
+
+function calculateDirectDamageEvent({ event, panel, bonusTotals, target, includeWhiteBox }) {
+    const componentEvents = generatedDirectDamageComponentEvents(event)
+    if (componentEvents.length < 2) {
+        return calculateDirectDamageEventCore({ event, panel, bonusTotals, target, includeWhiteBox })
+    }
+
+    const componentResults = componentEvents.map(componentEvent =>
+        calculateDirectDamageEventCore({
+            event: componentEvent,
+            panel,
+            bonusTotals,
+            target,
+            includeWhiteBox,
+        }))
+    const parentResult = calculateDirectDamageEventCore({
+        event: {
+            ...event,
+            generatedSkillComponents: [],
+        },
+        panel,
+        bonusTotals,
+        target,
+        includeWhiteBox,
+    })
+    return aggregateGeneratedDirectDamageEvent({
+        event,
+        parentResult,
+        componentResults,
+        target,
+        includeWhiteBox,
+    })
 }
 
 function calculateSheerDamageEvent({ event, agent, panel, bonusTotals, target, includeWhiteBox }) {
@@ -4809,7 +5202,7 @@ function targetResistanceMultiplierForElement(panel, bonusTotals, target, damage
     return clampNumber(1 - (targetResistance - enemyResReduction - resIgnore), 0.01, 2)
 }
 
-function calculateDirectDamageFinalValue(event, panel, bonusTotals, target) {
+function calculateDirectDamageFinalValueCore(event, panel, bonusTotals, target) {
     const eventTotals = eventTargetTotalsForElement(bonusTotals, event)
     const elementDmgKey = `${event.damageElement}Dmg`
     const elementCritDmgKey = CRIT_DMG_KEY_BY_ELEMENT[event.damageElement]
@@ -4902,6 +5295,18 @@ function calculateSheerDamageFinalValue(event, panel, bonusTotals, target, agent
         * Number(event.count ?? 1)
 }
 
+function calculateDirectDamageFinalValue(event, panel, bonusTotals, target) {
+    const componentEvents = generatedDirectDamageComponentEvents(event)
+    if (componentEvents.length < 2) {
+        return calculateDirectDamageFinalValueCore(event, panel, bonusTotals, target)
+    }
+
+    return componentEvents.reduce(
+        (total, componentEvent) => total + calculateDirectDamageFinalValueCore(componentEvent, panel, bonusTotals, target),
+        0,
+    )
+}
+
 function calculateDamageTotalFinalValue({ agent, panel, outOfCombatPanel = panel, bonusTotals, damageRequest }) {
     const target = damageRequest.target
     let total = 0
@@ -4965,7 +5370,11 @@ function compileDamageScoreTarget(damageRequest = {}, agent = {}) {
         agentLevel: damageRequest.agentLevel,
         anomalyLevelMultiplier: anomalyLevelMultiplier(damageRequest.agentLevel),
         isRuptureAgent: isRuptureAgent(agent),
-        events: (damageRequest.events ?? []).map(event => compileDamageScoreEvent(event)),
+        // Keep the stored parent event intact for the UI, while compiled score
+        // kernels evaluate generated hit totals one constituent at a time.
+        events: (damageRequest.events ?? [])
+            .flatMap(event => generatedDirectDamageComponentEvents(event))
+            .map(event => compileDamageScoreEvent(event)),
     }
 }
 
@@ -4999,12 +5408,13 @@ function modifierSumsForCompiledEvent(modifiers = [], event = {}) {
             || !damageModifierAppliesTo(modifier, event)) {
             continue
         }
+        const value = modifierValueForEvent(modifier, event)
         sums ??= Object.create(null)
-        sums[modifier.kind] = Number(sums[modifier.kind] ?? 0) + Number(modifier.value ?? 0)
+        sums[modifier.kind] = Number(sums[modifier.kind] ?? 0) + value
         if (isTeamAnomalyDamageModifier(modifier)) {
             sums[TEAM_ANOMALY_DAMAGE_MODIFIER_SUM_KEY] = Number(
                 sums[TEAM_ANOMALY_DAMAGE_MODIFIER_SUM_KEY] ?? 0,
-            ) + Number(modifier.value ?? 0)
+            ) + value
         }
     }
     return sums

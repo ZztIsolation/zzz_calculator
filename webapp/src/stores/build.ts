@@ -198,6 +198,54 @@ function normalizeBossBuffSelection(selectedIds: string[], runtimeInputs: Record
   return { selectedIds: normalizedIds, runtimeInputs: normalizedRuntimeInputs, winner }
 }
 
+const SIGRID_TEMPERING_BUFF_ID = "agent:sigrid.skill.tempering"
+const SIGRID_CORE_PASSIVE_BUFF_ID = "agent:sigrid.corePassive"
+const SIGRID_TEMPERING_EFFECT_ID = "tempering-sheathed-spear-damage"
+
+function normalizeAgentSkillBuffRuntimeInputs(agent: any, runtimeInputs: Record<string, any>) {
+  const normalized = clone(runtimeInputs ?? {}) as Record<string, any>
+  const hasTemperingBuff = agent?.id === "sigrid"
+    && (agent?.combatBuffs?.skillBuffs ?? []).some((buff: any) => buff?.id === "tempering")
+  if (!hasTemperingBuff) {
+    return normalized
+  }
+
+  const legacyRuntime = normalized[SIGRID_CORE_PASSIVE_BUFF_ID]
+  if (!legacyRuntime || typeof legacyRuntime !== "object" || Array.isArray(legacyRuntime)) {
+    return normalized
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(normalized, SIGRID_TEMPERING_BUFF_ID)) {
+    const legacyEffectRuntime = legacyRuntime.effects?.[SIGRID_TEMPERING_EFFECT_ID]
+      ?? legacyRuntime[SIGRID_TEMPERING_EFFECT_ID]
+    const migratedEffectRuntime = legacyEffectRuntime && typeof legacyEffectRuntime === "object" && !Array.isArray(legacyEffectRuntime)
+      ? { ...legacyEffectRuntime }
+      : {}
+    if (migratedEffectRuntime.coverage === undefined && legacyRuntime.coverage !== undefined) {
+      migratedEffectRuntime.coverage = legacyRuntime.coverage
+    }
+    if (Object.keys(migratedEffectRuntime).length) {
+      normalized[SIGRID_TEMPERING_BUFF_ID] = {
+        effects: {
+          [SIGRID_TEMPERING_EFFECT_ID]: migratedEffectRuntime,
+        },
+      }
+    }
+  }
+
+  const remainingLegacyRuntime = { ...legacyRuntime }
+  if (remainingLegacyRuntime.effects && typeof remainingLegacyRuntime.effects === "object" && !Array.isArray(remainingLegacyRuntime.effects)) {
+    const remainingEffects = { ...remainingLegacyRuntime.effects }
+    delete remainingEffects[SIGRID_TEMPERING_EFFECT_ID]
+    if (Object.keys(remainingEffects).length) remainingLegacyRuntime.effects = remainingEffects
+    else delete remainingLegacyRuntime.effects
+  }
+  delete remainingLegacyRuntime[SIGRID_TEMPERING_EFFECT_ID]
+  if (Object.keys(remainingLegacyRuntime).length) normalized[SIGRID_CORE_PASSIVE_BUFF_ID] = remainingLegacyRuntime
+  else delete normalized[SIGRID_CORE_PASSIVE_BUFF_ID]
+  return normalized
+}
+
 function defaultEvent(kind = "direct", id = `${kind}-1`) {
   if (kind === "anomaly") {
     return {
@@ -644,6 +692,11 @@ export function defaultBuffIdsFor(agent: any, cinemaLevel: number, wEngine: any)
   if (agent?.combatBuffs?.additionalAbility?.scope === "inCombat") {
     ids.push(`agent:${agent.id}.additionalAbility`)
   }
+  for (const buff of Array.isArray(agent?.combatBuffs?.skillBuffs) ? agent.combatBuffs.skillBuffs : []) {
+    if (buff?.id && buff?.scope === "inCombat" && buff?.defaultChecked === true) {
+      ids.push(`agent:${agent.id}.skill.${buff.id}`)
+    }
+  }
   for (const buff of agent?.combatBuffs?.cinemaBuffs ?? []) {
     if (buff?.scope === "inCombat" && Number(cinemaLevel) >= Number(buff?.cinemaLevel ?? 99)) {
       ids.push(`agent:${agent.id}.cinema.${buff.cinemaLevel}`)
@@ -897,7 +950,7 @@ export const useBuildStore = defineStore("build", {
       )
       this.selectedBuffIds = normalizedBossSelection.selectedIds
       this.addedBuffs = normalizeAddedBuffs(combat.addedBuffs ?? config.addedBuffs, meta)
-      this.runtimeInputs = normalizedBossSelection.runtimeInputs
+      this.runtimeInputs = normalizeAgentSkillBuffRuntimeInputs(agent, normalizedBossSelection.runtimeInputs)
       this.manuallyUncheckedDefaultBuffIds = stringArray(combat.manuallyUncheckedDefaultBuffIds)
       this.damageConfig = normalizeDamageConfig({
         ...(rawDamageConfig ?? {}),
@@ -1009,7 +1062,8 @@ export const useBuildStore = defineStore("build", {
       const normalizedBossSelection = normalizeBossBuffSelection(selectedIds, runtimeInputs, meta)
       this.selectedBuffIds = normalizedBossSelection.selectedIds.filter(id => !defaultIds.includes(id))
       this.addedBuffs = addedBuffs
-      this.runtimeInputs = normalizedBossSelection.runtimeInputs
+      const agent = meta?.agents?.find((item: any) => item.id === this.agentId)
+      this.runtimeInputs = normalizeAgentSkillBuffRuntimeInputs(agent, normalizedBossSelection.runtimeInputs)
       this.manuallyUncheckedDefaultBuffIds = defaultIds.filter(id => !selectedIds.includes(id))
       this.persist()
     },

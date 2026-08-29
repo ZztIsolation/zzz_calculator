@@ -62,6 +62,9 @@ function activeAgentBuffIds(cinemaLevel = 0) {
     return [
         "agent:sigrid.corePassive",
         "agent:sigrid.additionalAbility",
+        ...(agent.combatBuffs.skillBuffs ?? [])
+            .filter(buff => buff.defaultChecked === true)
+            .map(buff => `agent:sigrid.skill.${buff.id}`),
         ...(agent.combatBuffs.cinemaBuffs ?? [])
             .filter(buff => Number(buff.cinemaLevel) <= cinemaLevel)
             .map(buff => `agent:sigrid.cinema.${buff.cinemaLevel}`),
@@ -121,7 +124,7 @@ assert.deepEqual(agent.level60, {
     energyRegen: 120,
     penRatio: 0,
 })
-assert.deepEqual(agent.preferredDriveDiscs.defaultSetIds, ["zzz_wiki_1552", "hormone_punk"])
+assert.deepEqual(agent.preferredDriveDiscs.defaultSetIds, ["zzz_wiki_1552"])
 assert.deepEqual(agent.preferredDriveDiscs.mainStatLimits, {
     4: ["critDmg", "atkPct"],
     5: ["penRatio", "iceDmg", "atkPct"],
@@ -176,8 +179,7 @@ assert.deepEqual(skillRow("special", "ex_special_shattered_jade", "energy_cost")
 for (const category of skillCatalog.categories.filter(item => item.id !== "cinema")) {
     for (const move of category.moves) {
         for (const row of move.rows) {
-            const expectedLength = move.id === "cinema_spear_opportunity_overflow" ? 1 : 16
-            assert.equal(row.values.length, expectedLength,
+            assert.equal(row.values.length, 16,
                 `${category.id}/${move.id}/${row.id} should contain its complete level range`)
             assert.ok(row.values.every(Number.isFinite), `${category.id}/${move.id}/${row.id} should be numeric`)
         }
@@ -187,8 +189,6 @@ for (const category of skillCatalog.categories.filter(item => item.id !== "cinem
         }
     }
 }
-assert.deepEqual(skillRow("basic", "cinema_spear_opportunity_overflow", "damage").values, [100])
-
 const ordinary = calculate([
     directEvent("basic", "basic_chilling_spearpoint", "hit_1", { stunned: false }),
 ]).damage.events[0]
@@ -215,6 +215,54 @@ approx(nonSheathed.multipliers.dmg, 1, "Tempering excludes ordinary Basic Attack
 approx(sheathed.targetBreakdown.activeStunMultiplier, 1.7, "Sky Patrol Stance stunned-target bonus")
 approx(ordinary.targetBreakdown.activeStunMultiplier, 1, "Stunned-target bonus does not affect a non-stunned event")
 
+const temperingBuff = agent.combatBuffs.skillBuffs.find(buff => buff.id === "tempering")
+assert.deepEqual(temperingBuff.sourceSkillRef, {
+    agentSkillId: "sigrid",
+    categoryId: "chain",
+    moveId: "chain_ice_sweeps_the_earth",
+})
+assert.equal(temperingBuff.defaultChecked, true)
+assert.equal(temperingBuff.effects[0].id, "tempering-sheathed-spear-damage")
+assert.equal(temperingBuff.mechanics.temperingDamageBonusPct, 20)
+assert.equal(temperingBuff.mechanics.temperingDurationSeconds, 50)
+assert.ok(!agent.combatBuffs.corePassive.effects.some(effect => effect.id === "tempering-sheathed-spear-damage"))
+assert.equal(agent.combatBuffs.corePassive.mechanics.temperingDamageBonusPct, undefined)
+assert.equal(agent.combatBuffs.corePassive.mechanics.temperingDurationSeconds, undefined)
+
+const coreOnly = calculate([
+    directEvent("basic", "basic_sheathed_spear", "stage_1"),
+], { activeBuffIds: ["agent:sigrid.corePassive"] })
+approx(coreOnly.inCombat.panel.critRate, 0.854, "Core Passive remains independently active")
+approx(coreOnly.damage.events[0].multipliers.dmg, 1, "Core Passive no longer grants Tempering")
+approx(coreOnly.damage.events[0].targetBreakdown.activeStunMultiplier, 1.7,
+    "Core Passive retains stunned-target multiplier")
+
+const temperingOnly = calculate([
+    directEvent("basic", "basic_sheathed_spear", "stage_1"),
+], { activeBuffIds: ["agent:sigrid.skill.tempering"] })
+approx(temperingOnly.inCombat.panel.critRate, 0.194, "Tempering does not grant Sky Patrol Crit Rate")
+approx(temperingOnly.damage.events[0].multipliers.dmg, 1.2, "Tempering independently grants Sheathed Spear damage")
+approx(temperingOnly.damage.events[0].targetBreakdown.activeStunMultiplier, 1.5,
+    "Tempering does not grant the Core Passive stunned-target multiplier")
+
+for (const rowId of ["stage_1", "stage_2", "stage_3"]) {
+    const result = calculate([directEvent("basic", "basic_sheathed_spear", rowId)], {
+        activeBuffIds: ["agent:sigrid.skill.tempering"],
+    }).damage.events[0]
+    approx(result.multipliers.dmg, 1.2, `Tempering applies to Sheathed Spear ${rowId}`)
+}
+for (const [categoryId, moveId, rowId] of [
+    ["basic", "basic_chilling_spearpoint", "hit_1"],
+    ["chain", "chain_ice_sweeps_the_earth", "damage"],
+    ["chain", "ultimate_frost_sky", "damage"],
+    ["special", "ex_special_shattered_jade", "damage"],
+]) {
+    const result = calculate([directEvent(categoryId, moveId, rowId)], {
+        activeBuffIds: ["agent:sigrid.skill.tempering"],
+    }).damage.events[0]
+    approx(result.multipliers.dmg, 1, `Tempering excludes ${moveId}`)
+}
+
 const cinemaOne = calculate([
     directEvent("basic", "basic_chilling_spearpoint", "hit_1", { stunned: false }),
 ], { cinemaLevel: 1 })
@@ -231,7 +279,6 @@ const m2Targets = [
     ["special", "ex_special_shattered_jade", "damage"],
     ["chain", "chain_ice_sweeps_the_earth", "damage"],
     ["chain", "ultimate_frost_sky", "damage"],
-    ["basic", "cinema_spear_opportunity_overflow", "damage"],
 ]
 for (const [categoryId, moveId, rowId] of m2Targets) {
     const result = calculate([directEvent(categoryId, moveId, rowId)], { cinemaLevel: 2 }).damage.events[0]
@@ -287,21 +334,33 @@ function configRows(cinemaLevel) {
     return { config, expanded, rows: expanded.events.map(event => event.skillRef?.rowId) }
 }
 const zeroConfig = configRows(0)
-assert.deepEqual(zeroConfig.rows, ["damage", "stage_1", "stage_2", "stage_3", "damage", "stage_3", "damage", "stage_1"])
+const zeroGroup = agent.skillGroups.find(group => group.id === "formation_break_sequence")
+assert.equal(zeroGroup.name.zhCN, "强化普攻总倍率（敛枪1/2/3）")
+assert.deepEqual(zeroGroup.events.map(event => event.skillRef), [
+    { agentSkillId: "sigrid", categoryId: "basic", moveId: "basic_sheathed_spear", rowId: "stage_1" },
+    { agentSkillId: "sigrid", categoryId: "basic", moveId: "basic_sheathed_spear", rowId: "stage_2" },
+    { agentSkillId: "sigrid", categoryId: "basic", moveId: "basic_sheathed_spear", rowId: "stage_3" },
+])
+assert.deepEqual(zeroConfig.config.events.map(event => [
+    event.kind === "skillGroup" ? event.skillGroupId : event.skillRef?.moveId,
+    event.skillRef?.rowId ?? null,
+    event.count,
+]), [
+    ["formation_break_sequence", null, 2],
+    ["chain_ice_sweeps_the_earth", "damage", 2],
+    ["ultimate_frost_sky", "damage", 1],
+    ["ex_special_shattered_jade", "damage", 2],
+    ["basic_sheathed_spear", "stage_3", 1],
+])
+assert.deepEqual(zeroConfig.rows, ["stage_1", "stage_2", "stage_3", "damage", "damage", "damage", "stage_3"])
+assert.deepEqual(zeroConfig.expanded.events.map(event => event.count), [2, 2, 2, 2, 1, 2, 1])
 const oneConfig = configRows(1)
-assert.deepEqual(oneConfig.rows, ["damage", "stage_1", "stage_2", "stage_3", "stage_3", "stage_1", "damage", "stage_2", "damage", "stage_3"])
-assert.equal(oneConfig.config.events.find(event => event.id === "sigrid_overflow_ref").count, 0)
+assert.deepEqual(oneConfig.rows, ["stage_1", "stage_2", "stage_3", "stage_3", "stage_1", "damage", "damage", "damage"])
+assert.deepEqual(oneConfig.expanded.events.map(event => event.count), [2, 2, 2, 1, 1, 1, 2, 2])
 const sixConfig = configRows(6)
-assert.deepEqual(sixConfig.rows, oneConfig.rows)
-assert.equal(sixConfig.config.events.find(event => event.id === "sigrid_cinema_6_break_sequence_ref").count, 1)
-
-const repeatedSixConfig = structuredClone(sixConfig.config)
-repeatedSixConfig.events.find(event => event.id === "sigrid_cinema_6_break_sequence_ref").count = 2
-const repeatedSix = expandCalculationConfigSkillGroups(repeatedSixConfig, agent, { strict: true })
-assert.deepEqual(repeatedSix.events.slice(0, 4).map(event => event.count), [2, 2, 2, 2])
+assert.deepEqual(sixConfig.rows, ["damage", "damage", "damage", "stage_1", "stage_2", "stage_3"])
+assert.deepEqual(sixConfig.expanded.events.map(event => event.count), [1, 2, 2, 4, 4, 4])
 assert.deepEqual(agent.skillGroups.map(group => [group.defaultCount, group.minCount, group.maxCount, group.step]), [
-    [1, 0, 100, 1],
-    [1, 0, 100, 1],
     [1, 0, 100, 1],
 ])
 

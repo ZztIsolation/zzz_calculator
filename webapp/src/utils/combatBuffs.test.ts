@@ -17,6 +17,15 @@ describe("combat buff display helpers", () => {
           scope: "inCombat",
           effects: [{ id: "atk", type: "fixed", stat: "atkFlat", value: 10 }],
         },
+        skillBuffs: [{
+          id: "tempering",
+          name: { zhCN: "砥砺" },
+          description: { zhCN: "敛枪式伤害提升" },
+          scope: "inCombat",
+          defaultChecked: true,
+          sourceSkillRef: { agentSkillId: "agent_a", categoryId: "chain", moveId: "chain_ice_sweeps_the_earth" },
+          effects: [{ id: "tempering-dmg", type: "fixed", stat: "dmgBonus", value: 20 }],
+        }],
         cinemaBuffs: [{
           cinemaLevel: 1,
           scope: "inCombat",
@@ -24,6 +33,15 @@ describe("combat buff display helpers", () => {
           effects: [{ id: "dmg", type: "fixed", stat: "dmgBonus", value: 0.1 }],
         }],
       },
+    }],
+    agentSkills: [{
+      id: "agent_a",
+      agentId: "agent_a",
+      categories: [{
+        id: "chain",
+        name: { zhCN: "连携技与终结技" },
+        moves: [{ id: "chain_ice_sweeps_the_earth", name: { zhCN: "连携技：冰凌卷地" } }],
+      }],
     }],
     wEngines: [
       {
@@ -120,8 +138,14 @@ describe("combat buff display helpers", () => {
 
     expect(groups.self.map(item => item.id)).toEqual([
       "agent:agent_a.corePassive",
+      "agent:agent_a.skill.tempering",
       "agent:agent_a.cinema.1",
     ])
+    expect(groups.self[1]).toMatchObject({
+      sourceKind: "skill",
+      source: { zhCN: "连携技：冰凌卷地｜砥砺" },
+      sourceSkillRef: { agentSkillId: "agent_a", categoryId: "chain", moveId: "chain_ice_sweeps_the_earth" },
+    })
     expect(groups.selfWEngine.map(item => item.id)).toEqual([
       "wEngine:engine_self.self",
       "wEngine:engine_self.team",
@@ -150,6 +174,7 @@ describe("combat buff display helpers", () => {
     }
 
     expect(buffLabelForId("agent:agent_a.corePassive", context)).toBe("角色甲 | 核心被动")
+    expect(buffLabelForId("agent:agent_a.skill.tempering", context)).toBe("角色甲 | 连携技：冰凌卷地｜砥砺")
     expect(buffLabelForId("teammate_buff", context)).toBe("队友甲 | 强化特殊技")
     expect(buffLabelForId("field.defense_v5.v3_0.p2.jijing_chefeng", context)).toBe("极境彻风")
     expect(buffLabelForId("driveDisc4pc:set_a.self", context)).toBe("队友套装 4 件套（自身）")

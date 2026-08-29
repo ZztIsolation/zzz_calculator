@@ -65,6 +65,8 @@ const FIELD_LABELS: Record<string, string> = {
   combatBuffs: "角色 Buff",
   corePassive: "核心被动",
   additionalAbility: "额外能力",
+  skillBuffs: "技能来源 Buff",
+  sourceSkillRef: "来源技能",
   cinemaBuffs: "影画 Buff",
   cinemaLevel: "影画等级",
   cinemaName: "影画名称",
@@ -319,10 +321,22 @@ export function prepareDraft(resource: ResourceValue, input: any): any {
     delete item.preferredDriveDiscs.defaultSet
     item.preferredDriveDiscs.mainStatLimits ??= {}
     for (const slot of [4, 5, 6]) item.preferredDriveDiscs.mainStatLimits[String(slot)] ??= []
-    item.combatBuffs ??= { corePassive: null, additionalAbility: null, cinemaBuffs: [] }
+    item.combatBuffs ??= { corePassive: null, additionalAbility: null, skillBuffs: [], cinemaBuffs: [] }
+    item.combatBuffs.skillBuffs ??= []
     item.combatBuffs.cinemaBuffs ??= []
     ensureEffectIds(item.combatBuffs.corePassive)
     ensureEffectIds(item.combatBuffs.additionalAbility)
+    item.combatBuffs.skillBuffs.forEach((buff: any) => {
+      ensureId(buff, "skill_buff")
+      buff.name ??= { zhCN: "" }
+      buff.description ??= { zhCN: "" }
+      buff.scope ??= "inCombat"
+      buff.defaultChecked ??= false
+      buff.sourceSkillRef ??= { agentSkillId: "", categoryId: "", moveId: "" }
+      buff.effects ??= []
+      buff.buffModifiers ??= []
+      ensureEffectIds(buff)
+    })
     item.combatBuffs.cinemaBuffs.forEach(ensureEffectIds)
     item.skillGroups ??= []
     item.skillGroups.forEach((group: any) => {
@@ -504,7 +518,7 @@ export function blankRecord(resource: ResourceValue, catalog: any, options: Crea
       name: localizedName(name), rarity: "S", attribute: "physical", damageElement: "physical", specialty: "attack",
       attackTypes: [], faction: "", images: { portrait: "", source: "" },
       level60: { hpBase: 1, atkBase: 1, defBase: 1, critRate: 5, critDmg: 50, impact: 0, anomalyProficiency: 0, anomalyMastery: 0, energyRegen: 120, penRatio: 0 },
-      combatBuffs: { corePassive: null, additionalAbility: null, cinemaBuffs: [] },
+      combatBuffs: { corePassive: null, additionalAbility: null, skillBuffs: [], cinemaBuffs: [] },
       preferredDriveDiscs: { mainStatLimits: { 4: [], 5: [], 6: [] } }, skillGroups: [], defaultCalculationConfig: null,
       sources: [], verification: {}, hidden: false,
     })
@@ -587,6 +601,7 @@ export function defaultArrayItem(path: string, parent?: any): any {
   const key = path.split(".").at(-1) ?? path
   if (key === "effects") return { id: internalId("effect"), type: "fixed", target: { kind: "default" }, stat: "atkFlat", mode: "flat", value: 1 }
   if (key === "buffModifiers") return { id: internalId("modifier"), operation: "multiplyResolvedValue", factor: 1, targetBuffIds: [], targetEffectIds: [], label: localizedName("") }
+  if (key === "skillBuffs") return { id: internalId("skill_buff"), name: localizedName("新技能 Buff"), description: localizedName(""), scope: "inCombat", defaultChecked: false, sourceSkillRef: { agentSkillId: "", categoryId: "", moveId: "" }, effects: [], buffModifiers: [] }
   if (key === "cinemaBuffs") return { cinemaLevel: Math.min(6, (parent?.length ?? 0) + 1), cinemaName: localizedName("新影画"), description: localizedName("待填写"), scope: "inCombat", defaultChecked: false, effects: [defaultArrayItem("effects")], buffModifiers: [] }
   if (key === "categories") return blankSkillCategory()
   if (key === "moves") return { id: internalId("skill_move"), name: localizedName("新招式"), skillType: "basic", skillTags: [], damageElement: "physical", rows: [defaultArrayItem("rows")] }

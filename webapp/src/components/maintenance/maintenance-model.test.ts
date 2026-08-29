@@ -109,6 +109,33 @@ describe("maintenance structured model", () => {
     expect(draft.categories[0].moves[0].skillType).toBe("basic")
   })
 
+  it("prepares skill-sourced Buff arrays and their nested ids", () => {
+    const draft = prepareDraft("agents", {
+      id: "agent_a",
+      combatBuffs: {
+        corePassive: null,
+        additionalAbility: null,
+        skillBuffs: [{
+          id: "tempering",
+          name: { zhCN: "砥砺" },
+          sourceSkillRef: { agentSkillId: "agent_a", categoryId: "chain", moveId: "chain_attack" },
+          effects: [{ type: "fixed", stat: "dmgBonus", value: 20 }],
+          buffModifiers: [{ operation: "multiplyResolvedValue", factor: 1 }],
+        }],
+      },
+    })
+
+    expect(draft.combatBuffs.skillBuffs[0]).toMatchObject({
+      id: "tempering",
+      scope: "inCombat",
+      defaultChecked: false,
+      sourceSkillRef: { agentSkillId: "agent_a", categoryId: "chain", moveId: "chain_attack" },
+    })
+    expect(draft.combatBuffs.skillBuffs[0].effects[0].id).toMatch(/^effect_/)
+    expect(draft.combatBuffs.skillBuffs[0].buffModifiers[0].id).toMatch(/^modifier_/)
+    expect(prepareDraft("agents", {}).combatBuffs.skillBuffs).toEqual([])
+  })
+
   it("migrates known legacy skill prefixes while preserving unknown targets for correction", () => {
     const draft = prepareDraft("agents", {
       combatBuffs: {

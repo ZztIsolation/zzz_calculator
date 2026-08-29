@@ -42,6 +42,10 @@ describe("build store", () => {
         combatBuffs: {
           corePassive: { scope: "inCombat", effects: [] },
           additionalAbility: { scope: "inCombat", effects: [] },
+          skillBuffs: [
+            { id: "skill-on", scope: "inCombat", defaultChecked: true, effects: [] },
+            { id: "skill-off", scope: "inCombat", defaultChecked: false, effects: [] },
+          ],
           cinemaBuffs: [{ scope: "inCombat", cinemaLevel: 1, effects: [] }],
         },
         defaultCalculationConfig: {
@@ -68,9 +72,90 @@ describe("build store", () => {
     expect(input.damage.target.stunned).toBeUndefined()
     expect(input.damage.events[0].stunned).toBe(true)
     expect(input.combatBuffs.activeBuffIds).toContain("agent:agent_a.corePassive")
+    expect(input.combatBuffs.activeBuffIds).toContain("agent:agent_a.skill.skill-on")
+    expect(input.combatBuffs.activeBuffIds).not.toContain("agent:agent_a.skill.skill-off")
     expect(input.combatBuffs.activeBuffIds).toContain("agent:agent_a.cinema.1")
     expect(input.combatBuffs.activeBuffIds).toContain("wEngine:engine_a.self")
     expect(input.combatBuffs.activeBuffIds).toContain("teammate_buff")
+  })
+
+  it("migrates Sigrid Tempering runtime independently while honoring the new default", () => {
+    const store = useBuildStore()
+    const meta = {
+      agents: [{
+        id: "sigrid",
+        name: { zhCN: "希格莉德·德拉叙尔" },
+        combatBuffs: {
+          corePassive: { scope: "inCombat", effects: [] },
+          skillBuffs: [{
+            id: "tempering",
+            scope: "inCombat",
+            defaultChecked: true,
+            effects: [{ id: "tempering-sheathed-spear-damage", type: "fixed", stat: "dmgBonus", value: 20 }],
+          }],
+        },
+      }],
+      wEngines: [],
+      combatBuffs: [],
+    }
+    store.applyAgentConfig("sigrid", meta, {
+      combat: {
+        manuallyUncheckedDefaultBuffIds: ["agent:sigrid.corePassive"],
+        runtimeInputs: {
+          "agent:sigrid.corePassive": {
+            coverage: 0.6,
+            effects: {
+              "sky-patrol-stunned-target-bonus": { coverage: 0.8 },
+              "tempering-sheathed-spear-damage": { coverage: 0.35, enabled: false },
+            },
+          },
+        },
+      },
+    })
+
+    expect(store.runtimeInputs["agent:sigrid.skill.tempering"]).toEqual({
+      effects: {
+        "tempering-sheathed-spear-damage": { coverage: 0.35, enabled: false },
+      },
+    })
+    expect(store.runtimeInputs["agent:sigrid.corePassive"]).toEqual({
+      coverage: 0.6,
+      effects: {
+        "sky-patrol-stunned-target-bonus": { coverage: 0.8 },
+      },
+    })
+    expect(store.activeBuffIds(meta)).toContain("agent:sigrid.skill.tempering")
+    expect(store.activeBuffIds(meta)).not.toContain("agent:sigrid.corePassive")
+
+    store.applyAgentConfig("sigrid", meta, {
+      combat: {
+        runtimeInputs: {
+          "agent:sigrid.corePassive": {
+            coverage: 0.45,
+            effects: {
+              "tempering-sheathed-spear-damage": { coverage: 0.2 },
+            },
+          },
+          "agent:sigrid.skill.tempering": {
+            effects: {
+              "tempering-sheathed-spear-damage": { coverage: 0.9 },
+            },
+          },
+        },
+      },
+    })
+    expect(store.runtimeInputs["agent:sigrid.skill.tempering"].effects["tempering-sheathed-spear-damage"].coverage).toBe(0.9)
+    expect(store.runtimeInputs["agent:sigrid.corePassive"]).toEqual({ coverage: 0.45 })
+
+    store.applyAgentConfig("sigrid", meta, {
+      combat: {
+        runtimeInputs: {
+          "agent:sigrid.corePassive": { coverage: 0.55 },
+        },
+      },
+    })
+    expect(store.runtimeInputs["agent:sigrid.skill.tempering"].effects["tempering-sheathed-spear-damage"].coverage).toBe(0.55)
+    expect(store.runtimeInputs["agent:sigrid.corePassive"]).toEqual({ coverage: 0.55 })
   })
 
   it("keeps current skill levels authoritative over stale damage snapshots", () => {

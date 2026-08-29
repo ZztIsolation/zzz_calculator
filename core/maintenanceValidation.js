@@ -1171,6 +1171,38 @@ function validateCalculationSkillRef(errors, skillRef, path, context = {}, agent
     }
 }
 
+function validateSkillBuffSourceRef(errors, skillRef, path, context = {}, agentId = "") {
+    if (!skillRef || typeof skillRef !== "object" || Array.isArray(skillRef)) {
+        add(errors, path, "必须选择来源技能。")
+        return
+    }
+    for (const key of ["agentSkillId", "categoryId", "moveId"]) {
+        if (!String(skillRef[key] ?? "").trim()) {
+            add(errors, `${path}.${key}`, "必填。")
+        }
+    }
+    if (skillRef.rowId !== undefined && skillRef.rowId !== null && String(skillRef.rowId).trim()) {
+        add(errors, `${path}.rowId`, "来源技能只需精确到招式，不能保存倍率行。")
+    }
+
+    const skill = skillCatalogForRef(context, skillRef)
+    if (!skill) {
+        add(errors, `${path}.agentSkillId`, "技能倍率目录不存在。")
+        return
+    }
+    if (agentId && skill.agentId !== agentId) {
+        add(errors, `${path}.agentSkillId`, "技能倍率目录不属于当前角色。")
+    }
+    const category = (skill.categories ?? []).find(item => item.id === skillRef.categoryId)
+    if (!category) {
+        add(errors, `${path}.categoryId`, "技能大类不存在。")
+        return
+    }
+    if (!(category.moves ?? []).some(item => item.id === skillRef.moveId)) {
+        add(errors, `${path}.moveId`, "技能招式不存在。")
+    }
+}
+
 function validatePositiveNumber(errors, value, path, label = "数值") {
     const numericValue = requireFinite(errors, value, path)
     if (Number.isFinite(numericValue) && numericValue <= 0) {
@@ -1765,6 +1797,39 @@ function validateCinemaBuffs(errors, cinemaBuffs, context = {}) {
     })
 }
 
+function validateSkillBuffs(errors, skillBuffs, context = {}, agentId = "") {
+    if (skillBuffs === undefined || skillBuffs === null) {
+        return
+    }
+    if (!Array.isArray(skillBuffs)) {
+        add(errors, "combatBuffs.skillBuffs", "必须是数组。")
+        return
+    }
+
+    const seenIds = new Set()
+    skillBuffs.forEach((buff, index) => {
+        const path = `combatBuffs.skillBuffs[${index}]`
+        const id = String(buff?.id ?? "").trim()
+        requireId(errors, buff, `${path}.id`)
+        if (id) {
+            if (seenIds.has(id)) {
+                add(errors, `${path}.id`, "同一角色的技能来源 Buff ID 不能重复。")
+            }
+            seenIds.add(id)
+        }
+
+        requireName(errors, buff?.name, `${path}.name.zhCN`)
+        if (!hasText(buff?.description)) {
+            add(errors, `${path}.description`, "Buff 描述必填。")
+        }
+        if (buff?.defaultChecked !== undefined && typeof buff.defaultChecked !== "boolean") {
+            add(errors, `${path}.defaultChecked`, "默认启用状态必须是布尔值。")
+        }
+        validateSkillBuffSourceRef(errors, buff?.sourceSkillRef, `${path}.sourceSkillRef`, context, agentId)
+        validateEffectSet(errors, buff, path, { requireRule: true, sourceType: "self", context })
+    })
+}
+
 function validateAnomalyReleaseProfiles(errors, profiles) {
     if (profiles === undefined || profiles === null) return
     if (!Array.isArray(profiles)) {
@@ -1818,6 +1883,7 @@ function validateAgent(item, context) {
         context: { ...context, agent: item, allowCorePassiveScalingSource: true },
     })
     validateEffectSet(errors, item?.combatBuffs?.additionalAbility, "combatBuffs.additionalAbility", { sourceType: "self", context })
+    validateSkillBuffs(errors, item?.combatBuffs?.skillBuffs, context, item?.id)
     validateCinemaBuffs(errors, item?.combatBuffs?.cinemaBuffs, context)
     validateAnomalyReleaseProfiles(errors, item?.anomalyReleaseProfiles)
     validatePreferredDriveDiscs(errors, item?.preferredDriveDiscs, context)

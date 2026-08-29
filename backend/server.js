@@ -922,6 +922,29 @@ function cleanAgentCinemaBuff(buff) {
     return next
 }
 
+function cleanAgentSkillBuff(buff) {
+    if (!buff || typeof buff !== "object" || Array.isArray(buff)) {
+        return buff
+    }
+
+    const next = cleanAgentCombatBuff({
+        ...buff,
+        id: String(buff.id ?? "").trim(),
+        scope: buff.scope ?? "inCombat",
+        defaultChecked: buff.defaultChecked ?? false,
+    })
+    const sourceSkillRef = buff.sourceSkillRef ?? {}
+    next.sourceSkillRef = {
+        agentSkillId: String(sourceSkillRef.agentSkillId ?? "").trim(),
+        categoryId: String(sourceSkillRef.categoryId ?? "").trim(),
+        moveId: String(sourceSkillRef.moveId ?? "").trim(),
+        ...(String(sourceSkillRef.rowId ?? "").trim()
+            ? { rowId: String(sourceSkillRef.rowId).trim() }
+            : {}),
+    }
+    return next
+}
+
 function cleanPreferredDriveDiscs(preferredDriveDiscs = null) {
     if (!preferredDriveDiscs || typeof preferredDriveDiscs !== "object" || Array.isArray(preferredDriveDiscs)) {
         return null
@@ -1274,6 +1297,13 @@ function cleanAgent(item = {}, options = {}) {
                 ...item.combatBuffs,
                 corePassive: cleanAgentCombatBuff(item.combatBuffs.corePassive),
                 additionalAbility: cleanAgentCombatBuff(item.combatBuffs.additionalAbility),
+                ...(item.combatBuffs.skillBuffs !== undefined
+                    ? {
+                        skillBuffs: Array.isArray(item.combatBuffs.skillBuffs)
+                            ? item.combatBuffs.skillBuffs.map(cleanAgentSkillBuff).filter(Boolean)
+                            : item.combatBuffs.skillBuffs,
+                    }
+                    : {}),
                 cinemaBuffs: (item.combatBuffs.cinemaBuffs ?? [])
                     .map(cleanAgentCinemaBuff)
                     .filter(Boolean),
@@ -1542,6 +1572,12 @@ function materializeAgentIds(item) {
     const combatBuffs = item.combatBuffs ?? {}
     materializeEffectSetIds(combatBuffs.corePassive)
     materializeEffectSetIds(combatBuffs.additionalAbility)
+    if (Array.isArray(combatBuffs.skillBuffs)) {
+        combatBuffs.skillBuffs = combatBuffs.skillBuffs.map(buff => {
+            ensureMaintenanceId(buff, "skill_buff")
+            return materializeEffectSetIds(buff)
+        })
+    }
     if (Array.isArray(combatBuffs.cinemaBuffs)) {
         combatBuffs.cinemaBuffs.forEach(materializeEffectSetIds)
     }
