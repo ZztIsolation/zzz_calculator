@@ -30,7 +30,12 @@ const previewRows = computed(() => {
 })
 
 function ruleValueAt(rule: any, level: number) {
-  const key = rule.type === "stacked" ? "valuePerStack" : "value"
+  const hasActivationValue = rule.type === "stacked"
+    && rule.activationStacks !== undefined
+    && rule.activationStacks !== null
+    && rule.activationStacks !== ""
+    && Number.isFinite(Number(rule.value))
+  const key = rule.type === "stacked" && !hasActivationValue ? "valuePerStack" : "value"
   return rule.modificationValues?.[key]?.[level - 1] ?? rule[key] ?? 0
 }
 </script>

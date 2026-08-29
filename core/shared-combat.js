@@ -1287,7 +1287,15 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
         const valuePerStack = Number.isFinite(displayValuePerStack)
             ? displayValuePerStack
             : Number(rule.valuePerStack ?? rule.value ?? 0)
-        const value = valuePerStack * stacks * coverage
+        const hasActivationStacks = rule.activationStacks !== undefined
+            && rule.activationStacks !== null
+            && rule.activationStacks !== ""
+            && Number.isFinite(Number(rule.activationStacks))
+        const activationStacks = hasActivationStacks ? Number(rule.activationStacks) : null
+        const displayActivationValue = Number(rule.displayValue ?? rule.value)
+        const hasActivationValue = activationStacks !== null && Number.isFinite(displayActivationValue)
+        const activeValue = hasActivationValue ? displayActivationValue : valuePerStack * stacks
+        const value = (activationStacks === null || stacks >= activationStacks ? activeValue : 0) * coverage
         const runtimeText = coverageConfig
             ? `${stacks}/${rule.maxStacks ?? stacks} 层，覆盖率 ${coverageValue}`
             : `${stacks}/${rule.maxStacks ?? stacks} 层`

@@ -19,8 +19,13 @@ v1 models an out-of-combat panel first, then an optional in-combat panel layer:
    Drive Disc 2-piece event rules, boss or enemy effects, field effects, and
    manual corrections.
 7. Direct, anomaly, and disorder damage can be modeled as damage events in the
-   same in-combat calculator. Stun, anomaly buildup, and rotation logic are
-   still out of scope.
+   same in-combat calculator. Authored skill groups can represent a fixed,
+   source-checked rotation, but the calculator does not simulate action time,
+   energy, Decibels, stance timers, or resource state transitions. Stun and
+   anomaly buildup remain out of scope.
+8. A skill-targeted `penRatio` modifier is added to the event's panel PEN Ratio
+   before defense is evaluated. It is not DEF Ignore: defense reduction is
+   applied first, percentage PEN applies next, and flat PEN is subtracted last.
 
 ## Frontend / Backend Split
 
@@ -856,9 +861,19 @@ Every rule can choose an amplification target:
   target matches that skill type across all agents. A `kind: "specific"`
   target requires an agent and skill type; omitting `moveId` targets that
   agent's complete skill type, omitting `rowId` targets the whole move, and a
-  `rowId` targets only that multiplier row. Generated total rows also carry
-  their source row ids, so a row-targeted rule is applied once when the
-  generated total contains that source row.
+  `rowId` targets only that multiplier row. A generated direct-damage total row is a
+  catalog/UI aggregation, not one homogeneous hit: runtime keeps one public
+  parent event but expands its `generatedFromRowIds` into internal components.
+  Each component matches skill targets and nonlinear defense, resistance, and
+  stun zones independently; a source-row target therefore affects only its
+  matching component, while a broad target without `rowId` (or an explicit
+  `__generated_hit_total` target) applies to the aggregate's components. An
+  aggregate `skillMultiplierBonus` is one additive bonus for the generated
+  total and is distributed by component base-multiplier weight so it is not
+  counted once per hit. The parent `finalDamage` and all variants are the sum
+  of component results; when `segmented: true`, use `components`,
+  `componentMultipliers`, `componentBreakdowns`, and the segmented white-box
+  rows instead of treating parent zone scalars as a single-hit formula.
 
 A `kind: "skillTag"` target matches an explicit move tag. The initial tags are
 `dashAttack`, `exSpecial`, and `assistAttack`. Tags are orthogonal to

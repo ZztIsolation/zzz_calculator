@@ -412,6 +412,79 @@ assertValid("agents", {
         })),
     },
 })
+const validSkillBuff = {
+    id: "chain_tempering",
+    name: { zhCN: "砥砺" },
+    description: { zhCN: "发动指定连携技后获得增益。" },
+    scope: "inCombat",
+    defaultChecked: true,
+    sourceSkillRef: {
+        agentSkillId: validAgentSkill.id,
+        categoryId: "basic",
+        moveId: "normal",
+    },
+    effects: [{
+        id: "skill-buff-atk",
+        type: "fixed",
+        stat: "atkFlat",
+        value: 100,
+        mode: "flat",
+    }],
+}
+const validSkillBuffAgent = {
+    ...clone(validAgent),
+    combatBuffs: {
+        ...clone(validAgent.combatBuffs),
+        skillBuffs: [validSkillBuff],
+    },
+}
+const skillBuffContext = { agentSkills: [validAgentSkill] }
+assertValid("agents", validSkillBuffAgent, skillBuffContext)
+
+const nonArraySkillBuffs = clone(validSkillBuffAgent)
+nonArraySkillBuffs.combatBuffs.skillBuffs = {}
+assertInvalid("agents", nonArraySkillBuffs, "combatBuffs.skillBuffs: 必须是数组", skillBuffContext)
+
+const duplicateSkillBuffId = clone(validSkillBuffAgent)
+duplicateSkillBuffId.combatBuffs.skillBuffs.push(clone(validSkillBuff))
+assertInvalid("agents", duplicateSkillBuffId, "技能来源 Buff ID 不能重复", skillBuffContext)
+
+const missingSkillBuffId = clone(validSkillBuffAgent)
+delete missingSkillBuffId.combatBuffs.skillBuffs[0].id
+assertInvalid("agents", missingSkillBuffId, "combatBuffs.skillBuffs[0].id: 必填", skillBuffContext)
+
+const missingSkillBuffSource = clone(validSkillBuffAgent)
+delete missingSkillBuffSource.combatBuffs.skillBuffs[0].sourceSkillRef
+assertInvalid("agents", missingSkillBuffSource, "必须选择来源技能", skillBuffContext)
+
+const crossAgentSkillBuffSource = clone(validSkillBuffAgent)
+crossAgentSkillBuffSource.combatBuffs.skillBuffs[0].sourceSkillRef.agentSkillId = "other_agent_skill"
+assertInvalid("agents", crossAgentSkillBuffSource, "技能倍率目录不属于当前角色", {
+    agentSkills: [
+        validAgentSkill,
+        { ...clone(validAgentSkill), id: "other_agent_skill", agentId: "other_agent" },
+    ],
+})
+
+const missingSkillBuffCatalog = clone(validSkillBuffAgent)
+missingSkillBuffCatalog.combatBuffs.skillBuffs[0].sourceSkillRef.agentSkillId = "missing_agent_skill"
+assertInvalid("agents", missingSkillBuffCatalog, "技能倍率目录不存在", skillBuffContext)
+
+const missingSkillBuffCategory = clone(validSkillBuffAgent)
+missingSkillBuffCategory.combatBuffs.skillBuffs[0].sourceSkillRef.categoryId = "missing_category"
+assertInvalid("agents", missingSkillBuffCategory, "技能大类不存在", skillBuffContext)
+
+const missingSkillBuffMove = clone(validSkillBuffAgent)
+missingSkillBuffMove.combatBuffs.skillBuffs[0].sourceSkillRef.moveId = "missing_move"
+assertInvalid("agents", missingSkillBuffMove, "技能招式不存在", skillBuffContext)
+
+const skillBuffSourceWithRow = clone(validSkillBuffAgent)
+skillBuffSourceWithRow.combatBuffs.skillBuffs[0].sourceSkillRef.rowId = "hit_1"
+assertInvalid("agents", skillBuffSourceWithRow, "不能保存倍率行", skillBuffContext)
+
+const emptySkillBuff = clone(validSkillBuffAgent)
+emptySkillBuff.combatBuffs.skillBuffs[0].effects = []
+assertInvalid("agents", emptySkillBuff, "至少需要一条有效规则", skillBuffContext)
 assertValid("agent-skills", validAgentSkill)
 const lumifluxAgentSkill = clone(validAgentSkill)
 lumifluxAgentSkill.categories[0].moves[0].damageElement = "lumiflux"
@@ -1037,6 +1110,39 @@ const badStacked = {
     ],
 }
 assertInvalid("buffs", badStacked, "默认层数")
+
+const activationStacked = {
+    ...validBuff,
+    effects: [
+        {
+            id: "activation-threshold",
+            type: "stacked",
+            stat: "iceResIgnore",
+            mode: "flat",
+            valuePerStack: 0,
+            value: 20,
+            maxStacks: 2,
+            defaultStacks: 2,
+            activationStacks: 2,
+            modificationValues: {
+                value: [20, 23, 26, 29, 32],
+            },
+        },
+    ],
+}
+assertValid("buffs", activationStacked)
+assertValid("buffs", {
+    ...activationStacked,
+    effects: [{ ...activationStacked.effects[0], activationStacks: 0 }],
+})
+assertInvalid("buffs", {
+    ...activationStacked,
+    effects: [{ ...activationStacked.effects[0], activationStacks: 3 }],
+}, "激活层数")
+assertInvalid("buffs", {
+    ...activationStacked,
+    effects: [{ ...activationStacked.effects[0], activationStacks: 1.5 }],
+}, "激活层数")
 
 const badSharedStackGroup = {
     ...validBuff,
@@ -2243,6 +2349,23 @@ const buffWithSkillTargetRules = {
                     {
                         kind: "skillType",
                         skillType: "ultimate",
+                    },
+                ],
+            },
+        },
+        {
+            id: "effect-skill-pen-ratio",
+            type: "fixed",
+            stat: "penRatio",
+            value: 24,
+            mode: "flat",
+            target: {
+                kind: "skill",
+                skillTargets: [
+                    {
+                        agentSkillId: "test_agent_skill",
+                        categoryId: "basic",
+                        moveId: "normal",
                     },
                 ],
             },

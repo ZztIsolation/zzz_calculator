@@ -85,6 +85,8 @@ const expectedModificationValues = {
     "zzz_wiki_2109:selfBuff:effect_wiki_2109_self_anomaly_proficiency:value": [96, 105, 115, 125, 135],
     "zzz_wiki_2109:selfBuff:effect_wiki_2109_self_anomaly_damage:value": [20, 23, 26, 29, 32],
     "zzz_wiki_2109:teamBuff:effect_wiki_2109_team_damage:value": [30, 34.5, 39, 43.5, 48],
+    "zzz_wiki_2162:selfBuff:effect_wiki_2162_self_battle_edge_crit_dmg:valuePerStack": [32, 36.8, 41.6, 46.4, 51.2],
+    "zzz_wiki_2162:selfBuff:effect_wiki_2162_self_bone_chill_ice_res_ignore:value": [20, 23, 26, 29, 32],
 }
 
 for (const engine of catalog.wEngines) {
@@ -327,6 +329,106 @@ assertSignatureScorePathParity(
     "Luminescence",
     signatureRemielleInput(1, ["wEngine:zzz_wiki_2109.self"]),
 )
+
+const sigridSignature = wEngine("zzz_wiki_2162")
+assert.deepEqual(
+    [
+        sigridSignature.name.zhCN,
+        sigridSignature.rarity,
+        sigridSignature.specialty,
+        sigridSignature.relatedAgentId,
+        sigridSignature.level60.atkBase,
+        sigridSignature.level60.advancedStat.stat,
+        sigridSignature.level60.advancedStat.value,
+        sigridSignature.level60.advancedStat.mode,
+    ],
+    ["骁骑礼赞", "S", "attack", "sigrid", 713, "critDmg", 48, "flat"],
+    "Sigrid's signature W-Engine should keep its exact official level-60 catalog data",
+)
+assert.equal(sigridSignature.effect.name.zhCN, "骑士仪典")
+assert.match(sigridSignature.effect.description.zhCN, /32%\/36\.8%\/41\.6%\/46\.4%\/51\.2%.*25秒.*最多叠加2层.*20%\/23%\/26%\/29%\/32%冰属性伤害抗性/)
+assert.ok(
+    sigridSignature.sources.includes("https://baike.mihoyo.com/zzz/wiki/content/2162/detail?mhy_presentation_style=fullscreen"),
+    "Sigrid's signature W-Engine should cite its official detail page",
+)
+assert.equal(
+    defaultWEngineIdForAgent(catalog.wEngines, "sigrid", ""),
+    "zzz_wiki_2162",
+    "Sigrid should default to her signature W-Engine when no valid saved choice exists",
+)
+
+const sigridSignatureStackGroups = runtimeStackGroups(sigridSignature.effect.selfBuff)
+assert.deepEqual(
+    sigridSignatureStackGroups.map(group => group.ruleIds),
+    [[
+        "effect_wiki_2162_self_battle_edge_crit_dmg",
+        "effect_wiki_2162_self_bone_chill_ice_res_ignore",
+    ]],
+    "Battle Edge CRIT DMG and Bone Chill Ice RES Ignore should share one stack control",
+)
+const sigridSignatureRank2 = materializeFrontendWEngine(sigridSignature, 2)
+assert.equal(
+    storedEffectRulesText(
+        sigridSignatureRank2.effect.selfBuff,
+        defaultRuntimeForBuff(sigridSignatureRank2.effect.selfBuff),
+        meta,
+    ),
+    "暴击伤害% +73.6%（2/2 层），冰抗性无视% +23%（2/2 层）",
+    "Sigrid signature preview should show the active full-stack Bone Chill value",
+)
+
+function sigridSignatureResult(level, stacks = undefined, agentId = "sigrid") {
+    const runtimeInputs = stacks === undefined
+        ? {}
+        : {
+            "wEngine:zzz_wiki_2162.self": {
+                effects: {
+                    effect_wiki_2162_self_battle_edge_crit_dmg: { stacks },
+                },
+            },
+        }
+    return calculateInCombatPanel(catalog, {
+        agentId,
+        coreSkillLevel: "none",
+        cinemaLevel: 0,
+        wEngineId: "zzz_wiki_2162",
+        wEngineModificationLevel: level,
+        combatBuffs: {
+            activeBuffIds: ["wEngine:zzz_wiki_2162.self"],
+            runtimeInputs,
+        },
+        damage: {
+            selectedEventId: "signature-ice-hit",
+            events: [{
+                id: "signature-ice-hit",
+                kind: "direct",
+                damageElement: "ice",
+                skillMultiplier: 100,
+                critMode: "crit",
+                stunned: false,
+            }],
+        },
+    })
+}
+
+const sigridSignatureRank1Default = sigridSignatureResult(1)
+const sigridSignatureRank5Default = sigridSignatureResult(5)
+const sigridSignatureRank1Zero = sigridSignatureResult(1, 0)
+const sigridSignatureRank1One = sigridSignatureResult(1, 1)
+const sigridSignatureCrossSpecialty = sigridSignatureResult(5, 2, "anby_demara")
+approx(sigridSignatureRank1Default.outOfCombat.bonusTotals.critDmg, 0.48, "Signature advanced CRIT DMG should apply outside combat")
+approx(sigridSignatureRank1Default.inCombat.buffTotals.critDmg, 0.64, "Signature rank 1 should default to two 32% Battle Edge stacks")
+approx(sigridSignatureRank1Default.inCombat.buffTotals.iceResIgnore, 0.2, "Signature rank 1 Bone Chill should ignore 20% Ice RES at two stacks")
+approx(sigridSignatureRank1Default.damage.targetBreakdown.resIgnore, 0.2, "Bone Chill should enter the Ice damage resistance multiplier")
+approx(sigridSignatureRank5Default.inCombat.buffTotals.critDmg, 1.024, "Signature rank 5 should grant two 51.2% Battle Edge stacks")
+approx(sigridSignatureRank5Default.inCombat.buffTotals.iceResIgnore, 0.32, "Signature rank 5 Bone Chill should ignore 32% Ice RES at two stacks")
+approx(sigridSignatureRank1Zero.inCombat.buffTotals.critDmg, 0, "Zero Battle Edge stacks should grant no CRIT DMG")
+approx(sigridSignatureRank1Zero.inCombat.buffTotals.iceResIgnore, 0, "Zero Battle Edge stacks should not activate Bone Chill")
+approx(sigridSignatureRank1One.inCombat.buffTotals.critDmg, 0.32, "One Battle Edge stack should grant one CRIT DMG stack")
+approx(sigridSignatureRank1One.inCombat.buffTotals.iceResIgnore, 0, "One Battle Edge stack should not activate Bone Chill")
+approx(sigridSignatureRank1One.damage.targetBreakdown.resIgnore, 0, "One Battle Edge stack should not alter the Ice resistance multiplier")
+approx(sigridSignatureCrossSpecialty.inCombat.buffTotals.critDmg, 0, "Non-Attack wearers should not receive Battle Edge")
+approx(sigridSignatureCrossSpecialty.inCombat.buffTotals.iceResIgnore, 0, "Non-Attack wearers should not receive Bone Chill")
 
 const cloudcleaveRank2 = materializeFrontendWEngine(wEngine("cloudcleave_radiance"), 2)
 assert.equal(

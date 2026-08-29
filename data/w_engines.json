@@ -6717,6 +6717,122 @@
         "effectText": "source-checked-mihoyo-baike-entry-2109-version-1785290498-2026-08-04",
         "effectBuff": "source-checked; default anomalyDamageBonus applies to Attribute Anomaly, Release, and Luminescence while Disorder uses its separate bonus"
       }
+    },
+    {
+      "id": "zzz_wiki_2162",
+      "name": {
+        "zhCN": "骁骑礼赞"
+      },
+      "rarity": "S",
+      "specialty": "attack",
+      "attribute": "ice",
+      "relatedAgentId": "sigrid",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_2162.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/08/14/233874762/b81184023d3add881d9e7ca75c803fa6_2848809684713686958.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "critDmg",
+          "value": 48,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "骑士仪典"
+        },
+        "requirement": {
+          "specialty": "attack",
+          "label": {
+            "zhCN": "对于【强攻】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者的[普通攻击]和[强化特殊技]的重击命中敌人时，获得1层[兵锋]，使暴击伤害提升32%/36.8%/41.6%/46.4%/51.2%，持续25秒；[兵锋]最多叠加2层，且每种招式类型最多提供1层，重复触发时，刷新所有[兵锋]持续时间；拥有2层[兵锋]时，获得[彻骨]：装备者造成的伤害无视目标20%/23%/26%/29%/32%冰属性伤害抗性。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_2162_self_battle_edge_crit_dmg",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critDmg",
+              "mode": "flat",
+              "valuePerStack": 32,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "modificationValues": {
+                "valuePerStack": [
+                  32,
+                  36.8,
+                  41.6,
+                  46.4,
+                  51.2
+                ]
+              },
+              "stackGroup": "sigrid_battle_edge",
+              "stackLabel": {
+                "zhCN": "兵锋层数"
+              },
+              "condition": "普通攻击或强化特殊技的重击命中（每种招式类型最多提供1层）",
+              "durationSeconds": 25
+            },
+            {
+              "id": "effect_wiki_2162_self_bone_chill_ice_res_ignore",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "iceResIgnore",
+              "mode": "flat",
+              "valuePerStack": 0,
+              "value": 20,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "activationStacks": 2,
+              "modificationValues": {
+                "value": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
+              },
+              "stackGroup": "sigrid_battle_edge",
+              "stackLabel": {
+                "zhCN": "兵锋层数"
+              },
+              "condition": "拥有2层[兵锋]（[彻骨]）",
+              "durationSeconds": 25
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/2162/detail?mhy_presentation_style=fullscreen",
+        "https://act-api-takumi-static.mihoyo.com/hoyowiki/zzz/wapi/entry_page?entry_page_id=2162&lang=zh-cn&app_sn=zzz_wiki"
+      ],
+      "verification": {
+        "level60Stats": "source-checked-mihoyo-baike-entry-2162-version-1787113018-2026-08-24",
+        "effectText": "source-checked-mihoyo-baike-entry-2162-version-1787113018-2026-08-24",
+        "effectBuff": "source-checked; one shared 0-2 Battle Edge stack control defaults to two stacks, with Bone Chill active only at two stacks"
+      }
     }
   ]
 }

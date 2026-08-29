@@ -233,6 +233,45 @@ try {
         { default: 0.65, min: 0, max: 1, step: 0.1 },
     )
 
+    const skillBuffAgent = structuredClone(
+        managedAgentCatalog.agents.agents.find(item => item.id === "sigrid"),
+    )
+    assert.ok(skillBuffAgent?.combatBuffs?.skillBuffs?.[0], "Sigrid skill Buff fixture must exist")
+    const submittedSkillBuff = skillBuffAgent.combatBuffs.skillBuffs[0]
+    delete submittedSkillBuff.id
+    delete submittedSkillBuff.effects[0].id
+    submittedSkillBuff.name.en = "Tempering"
+    submittedSkillBuff.description.en = "Legacy maintenance-only text"
+    submittedSkillBuff.buffModifiers = [{
+        operation: "multiplyResolvedValue",
+        factor: 1,
+        targetBuffIds: ["agent:sigrid.corePassive"],
+        targetEffectIds: ["sky-patrol-stance-crit-rate"],
+        label: { zhCN: "测试修饰", en: "Test modifier" },
+    }]
+    const skillBuffSave = await save("agents", skillBuffAgent)
+    const savedSkillBuff = skillBuffSave.savedItem.combatBuffs.skillBuffs[0]
+    assert.ok(savedSkillBuff.id, "skill Buff id must be materialized")
+    assert.ok(savedSkillBuff.effects[0].id, "skill Buff effect id must be materialized")
+    assert.ok(savedSkillBuff.buffModifiers[0].id, "skill Buff modifier id must be materialized")
+    assert.deepEqual(savedSkillBuff.name, { zhCN: "砥砺" })
+    assert.deepEqual(savedSkillBuff.description, {
+        zhCN: "发动[连携技：冰凌卷地]时获得[砥砺]，使后续[普通攻击：敛枪式]造成的伤害提升20%，持续50秒。",
+    })
+    assert.deepEqual(savedSkillBuff.sourceSkillRef, {
+        agentSkillId: "sigrid",
+        categoryId: "chain",
+        moveId: "chain_ice_sweeps_the_earth",
+    })
+    const reloadedSkillBuffAgent = (await catalog()).agents.agents.find(item => item.id === "sigrid")
+    const skillBuffResave = await save("agents", reloadedSkillBuffAgent)
+    assert.equal(skillBuffResave.savedItem.combatBuffs.skillBuffs[0].id, savedSkillBuff.id)
+    assert.equal(skillBuffResave.savedItem.combatBuffs.skillBuffs[0].effects[0].id, savedSkillBuff.effects[0].id)
+    assert.equal(skillBuffResave.savedItem.combatBuffs.skillBuffs[0].buffModifiers[0].id, savedSkillBuff.buffModifiers[0].id)
+    const skillBuffWithRow = structuredClone(reloadedSkillBuffAgent)
+    skillBuffWithRow.combatBuffs.skillBuffs[0].sourceSkillRef.rowId = "damage"
+    await saveRejected("agents", skillBuffWithRow, "不能保存倍率行")
+
     const danAgent = structuredClone(
         managedAgentCatalog.agents.agents.find(item => item.id === "remielle_dan"),
     )

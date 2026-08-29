@@ -37,6 +37,7 @@ const expected = [
     ["zzz_wiki_1586", "嚣枪喧焰", "S", 713, "energyRegen", 60, "喋声吞炎"],
     ["zzz_wiki_1941", "鳞齿寻踪", "S", 713, "energyRegen", 60, "仿生毒素"],
     ["zzz_wiki_2031", "日冕遗蜕", "S", 713, "atkPct", 30, "日蚀效应"],
+    ["zzz_wiki_2162", "骁骑礼赞", "S", 713, "critDmg", 48, "骑士仪典"],
 ]
 
 function textOf(value) {
@@ -55,12 +56,12 @@ function approx(actual, expectedValue, message) {
     assert.ok(Math.abs(Number(actual) - expectedValue) < 1e-9, `${message}: expected ${expectedValue}, got ${actual}`)
 }
 
-assert.equal(attackEngines.length, 24, "Official Attack W-Engine catalog should contain 24 entries")
-assert.equal(new Set(attackEngines.map(item => textOf(item.name))).size, 24, "Attack W-Engine names should be unique")
+assert.equal(attackEngines.length, 25, "Official Attack W-Engine catalog should contain 25 entries")
+assert.equal(new Set(attackEngines.map(item => textOf(item.name))).size, 25, "Attack W-Engine names should be unique")
 assert.deepEqual(
     Object.fromEntries(["B", "A", "S"].map(rarity => [rarity, attackEngines.filter(item => item.rarity === rarity).length])),
-    { B: 3, A: 8, S: 13 },
-    "Official rarity distribution should remain 3 B / 8 A / 13 S",
+    { B: 3, A: 8, S: 14 },
+    "Official rarity distribution should remain 3 B / 8 A / 14 S",
 )
 
 for (const [id, name, rarity, atkBase, stat, value, effectName] of expected) {
@@ -101,10 +102,11 @@ for (const [id, name, rarity, atkBase, stat, value, effectName] of expected) {
 const agentIds = new Set(catalog.agents.map(item => item.id))
 assert.deepEqual(
     attackEngines.filter(item => item.relatedAgentId).map(item => [item.id, item.relatedAgentId]),
-    [["cloudcleave_radiance", "ye_shunguang"]],
-    "Only the currently maintained Attack agent should receive a relatedAgentId",
+    [["cloudcleave_radiance", "ye_shunguang"], ["zzz_wiki_2162", "sigrid"]],
+    "Maintained Attack agents should receive their signature W-Engine relationship",
 )
 assert.ok(agentIds.has("ye_shunguang"))
+assert.ok(agentIds.has("sigrid"))
 
 assert.equal(engine("zzz_wiki_117").effect.selfBuff, null, "Fixed Energy restoration should not be misrepresented as Energy Regen")
 assert.deepEqual(rules("zzz_wiki_221").map(rule => rule.stat), ["atkPct"], "Cannon Rotor proc damage should not be converted into a generic damage Buff")
@@ -113,6 +115,18 @@ assert.equal(rules("zzz_wiki_211").find(rule => rule.id.includes("charged"))?.ty
 assert.equal(rules("zzz_wiki_211").find(rule => rule.id.includes("charged"))?.stat, "etherDmg", "Riot Suppressor charged hit should remain Ether-only")
 assert.equal(rules("zzz_wiki_1941").find(rule => rule.stat === "electricDefIgnore")?.type, "fixed", "Spectral Gaze duration extension should not multiply DEF Ignore")
 assert.match(rules("zzz_wiki_2031").find(rule => rule.stat === "etherResIgnore")?.condition ?? "", /佩洛伊斯/, "Corona Husk should preserve its wearer restriction")
+
+const sigridSignatureRules = rules("zzz_wiki_2162")
+const sigridBattleEdge = sigridSignatureRules.find(rule => rule.stat === "critDmg")
+const sigridBoneChill = sigridSignatureRules.find(rule => rule.stat === "iceResIgnore")
+assert.deepEqual(
+    [sigridBattleEdge.maxStacks, sigridBattleEdge.defaultStacks, sigridBattleEdge.durationSeconds],
+    [2, 2, 25],
+    "Sigrid signature should expose a default two-stack 25-second Battle Edge control",
+)
+assert.equal(sigridBoneChill.activationStacks, 2, "Bone Chill should activate only at two Battle Edge stacks")
+assert.equal(sigridBoneChill.stackGroup, sigridBattleEdge.stackGroup, "Battle Edge and Bone Chill should share one stack control")
+assert.deepEqual(sigridBoneChill.modificationValues.value, [20, 23, 26, 29, 32], "Bone Chill should store all exact refinement values")
 
 const cloudRules = rules("cloudcleave_radiance")
 assert.equal(cloudRules.find(rule => rule.stat === "physicalResIgnore")?.condition, undefined, "Cloudcleave Physical RES Ignore should be unconditional")

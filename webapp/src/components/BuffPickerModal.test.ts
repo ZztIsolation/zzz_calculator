@@ -706,6 +706,70 @@ function remielleRuntimeMeta() {
 }
 
 describe("BuffPickerModal", () => {
+  it("shows a skill-sourced Buff and keeps it independently disabled after reopening", async () => {
+    const skillBuffMeta = {
+      ...meta,
+      agents: [{
+        id: "sigrid",
+        name: { zhCN: "希格莉德·德拉叙尔" },
+        attribute: "ice",
+        combatBuffs: {
+          corePassive: {
+            scope: "inCombat",
+            effects: [{ id: "core-crit", type: "fixed", stat: "critRate", value: 66 }],
+          },
+          skillBuffs: [{
+            id: "tempering",
+            name: { zhCN: "砥砺" },
+            description: { zhCN: "连携技触发后提升敛枪式伤害。" },
+            scope: "inCombat",
+            defaultChecked: true,
+            sourceSkillRef: {
+              agentSkillId: "sigrid",
+              categoryId: "chain",
+              moveId: "chain_ice_sweeps_the_earth",
+            },
+            effects: [{ id: "tempering-dmg", type: "fixed", stat: "dmgBonus", value: 20 }],
+          }],
+        },
+      }],
+      agentSkills: [{
+        id: "sigrid",
+        agentId: "sigrid",
+        categories: [{
+          id: "chain",
+          name: { zhCN: "连携技与终结技" },
+          moves: [{ id: "chain_ice_sweeps_the_earth", name: { zhCN: "连携技：冰凌卷地" } }],
+        }],
+      }],
+    }
+    const coreId = "agent:sigrid.corePassive"
+    const temperingId = "agent:sigrid.skill.tempering"
+    const wrapper = mountModal({
+      meta: skillBuffMeta,
+      agentId: "sigrid",
+      selectedIds: [coreId, temperingId],
+      defaultIds: [coreId, temperingId],
+    })
+
+    await openModal(wrapper)
+    const coreRow = buffRowByText(wrapper, "希格莉德·德拉叙尔 | 核心被动")
+    const temperingRow = buffRowByText(wrapper, "希格莉德·德拉叙尔 | 连携技：冰凌卷地｜砥砺")
+    expect(coreRow.classes()).toContain("is-selected")
+    expect(temperingRow.classes()).toContain("is-selected")
+
+    await temperingRow.find(".buff-row-toggle").trigger("click")
+    await buttonByText(wrapper, "应用选择").trigger("click")
+    const payload = wrapper.emitted("apply")?.at(-1)?.[0] as any
+    expect(payload.selectedBuffIds).toContain(coreId)
+    expect(payload.selectedBuffIds).not.toContain(temperingId)
+
+    await wrapper.setProps({ show: false, selectedIds: payload.selectedBuffIds })
+    await openModal(wrapper)
+    expect(buffRowByText(wrapper, "希格莉德·德拉叙尔 | 核心被动").classes()).toContain("is-selected")
+    expect(buffRowByText(wrapper, "希格莉德·德拉叙尔 | 连携技：冰凌卷地｜砥砺").classes()).not.toContain("is-selected")
+  })
+
   it("updates core-passive scaling values while the picker remains open", async () => {
     const dynamicMeta = {
       ...meta,

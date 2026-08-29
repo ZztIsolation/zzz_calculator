@@ -115,7 +115,10 @@ function makeCatalog() {
       level60: { atkBase: 1, advancedStat: { stat: "critDmg", value: 1, mode: "flat" } }, modification: { minLevel: 1, maxLevel: 5, defaultLevel: 1 },
       effect: {
         name: { zhCN: "音擎效果" }, description: { zhCN: "测试" },
-        selfBuff: { scope: "inCombat", condition: "exSpecial", durationSeconds: 10, effectText: { zhCN: "强化特殊技触发。" }, coverage: { default: 1, min: 0, max: 1, step: 0.1 }, effects: [effect("engine_effect")], buffModifiers: [] },
+        selfBuff: { scope: "inCombat", condition: "exSpecial", durationSeconds: 10, effectText: { zhCN: "强化特殊技触发。" }, coverage: { default: 1, min: 0, max: 1, step: 0.1 }, effects: [
+          effect("engine_effect"),
+          { id: "engine_threshold", type: "stacked", target: { kind: "default" }, stat: "iceResIgnore", mode: "flat", valuePerStack: 0, value: 20, maxStacks: 2, defaultStacks: 2, activationStacks: 2, modificationValues: { value: [20, 23, 26, 29, 32] }, stackGroup: "engine_stacks", stackLabel: { zhCN: "测试层数" } },
+        ], buffModifiers: [] },
         teamBuff: null,
       }, sources: ["https://example.com/engine-primary", "https://example.com/engine-secondary"], verification: {},
     }] },
@@ -314,6 +317,38 @@ describe("MaintenanceView structured editor", () => {
       await switchResource(wrapper, value)
       expect(wrapper.text()).toContain(visible)
     }
+  })
+
+  it("adds and saves a skill-sourced Buff bound to the current agent move", async () => {
+    const { wrapper, fetchMock } = await mountView()
+
+    await button(wrapper, "添加技能 Buff").trigger("click")
+    let card = wrapper.find(".skill-buff-card")
+    expect(card.exists()).toBe(true)
+    expect(field(card, "来源技能目录").find("select").element.value).toBe("basic")
+    expect(field(card, "来源招式").find("select").element.value).toBe("move")
+    expect(card.text()).not.toContain("倍率行")
+
+    await field(card, "稳定 ID").find("input").setValue("tempering")
+    card = wrapper.find(".skill-buff-card")
+    await field(card, "Buff 名称").find("input").setValue("砥砺")
+    await field(card, "Buff 描述").find("textarea").setValue("连携技触发后提升敛枪式伤害。")
+    await button(card, "添加增幅").trigger("click")
+    await field(card, "数值").find("input").setValue(20)
+    const defaultSwitch = card.findAll(".maintenance-switch-field")
+      .find((item: any) => item.find("span").text().trim() === "默认启用")!
+    await defaultSwitch.find("input").setValue(true)
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("完整目录已刷新"))
+
+    const call = fetchMock.mock.calls.find(([url, init]) => url === "/api/maintenance/agents" && init?.method === "POST")!
+    const body = JSON.parse(String(call[1]?.body ?? "{}"))
+    expect(body.combatBuffs.skillBuffs).toEqual([expect.objectContaining({
+      id: "tempering",
+      name: { zhCN: "砥砺" },
+      defaultChecked: true,
+      sourceSkillRef: { agentSkillId: "skills_a", categoryId: "basic", moveId: "move" },
+    })])
   })
 
   it("shows skill catalog ids only inside collapsed read-only technical information", async () => {
@@ -875,6 +910,13 @@ describe("MaintenanceView structured editor", () => {
     expect(wrapper.text()).toContain("发动强化特殊技")
     expect(wrapper.text()).toContain("分段效果文案")
     expect(wrapper.text()).toContain("可读效果预览")
+    const wEngineRules = wrapper.findAll(".maintenance-rule-card")
+    expect(wEngineRules).toHaveLength(2)
+    const thresholdRule = wEngineRules[1]
+    expect(field(thresholdRule, "激活数值").find("input").element.value).toBe("20")
+    expect(field(thresholdRule, "激活层数").find("input").element.value).toBe("2")
+    expect(field(thresholdRule, "1-5 级实际值").find("input").element.value).toBe("20/23/26/29/32")
+    expect(wrapper.find(".modification-preview-table").text()).toContain("32")
     expect(wrapper.text()).not.toContain("exSpecial")
 
     await switchResource(wrapper, "drive-disc-sets")

@@ -142,7 +142,7 @@ export const EVENT_STATS: Array<[string, string, "flat"]> = [
 ]
 
 export const SKILL_TARGET_STATS: Array<[string, string, "flat"]> = [
-  ["dmgBonus", "技能目标伤害加成%", "flat"], ["physicalDmg", "物理伤害加成%", "flat"],
+  ["dmgBonus", "技能目标伤害加成%", "flat"], ["penRatio", "技能目标穿透率%", "flat"], ["physicalDmg", "物理伤害加成%", "flat"],
   ["fireDmg", "火属性伤害加成%", "flat"], ["iceDmg", "冰属性伤害加成%", "flat"],
   ["electricDmg", "电属性伤害加成%", "flat"], ["etherDmg", "以太伤害加成%", "flat"], ["windDmg", "风属性伤害加成%", "flat"],
   ...EVENT_STATS.filter(([value]) => !["anomalyDamageBonus", "alienationCoefficientBonus"].includes(value)), ["skillMultiplierBonus", "技能倍率加算%", "flat"],
