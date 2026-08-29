@@ -168,7 +168,7 @@ assert.deepEqual(Object.fromEntries(skillTagCounts), {
     assistAttack: 12,
     exSpecial: 14,
 })
-assert.equal(storedTargets.length, 73)
+assert.equal(storedTargets.length, 77)
 const zhishuangTargets = combatBuffCatalog.fieldBuffs
     .find(buff => buff.id === "field.critical_assault.v3_1.p2.zhishuang")
     .effects.flatMap(effect => effect.target?.skillTargets ?? [])
@@ -176,6 +176,13 @@ assert.equal(zhishuangTargets.length, 6)
 assert.equal(zhishuangTargets.filter(target => skillTargetMatches(target, chainSource)).length, 2)
 assert.equal(zhishuangTargets.filter(target => skillTargetMatches(target, exSpecialSource)).length, 2)
 assert.equal(zhishuangTargets.filter(target => skillTargetMatches(target, normalSpecialSource)).length, 2)
+const bingxiTargets = combatBuffCatalog.fieldBuffs
+    .find(buff => buff.id === "field.critical_assault.v3_1.p3.bingxi")
+    .effects.flatMap(effect => effect.target?.skillTargets ?? [])
+assert.deepEqual(bingxiTargets, [
+    { kind: "skillType", skillType: "basic" },
+    { kind: "skillType", skillType: "ultimate" },
+])
 const guancheTargets = combatBuffCatalog.fieldBuffs
     .find(buff => buff.id === "field.defense_v5.v3_1.p2.guanche_shuanghan")
     .effects.flatMap(effect => effect.target?.skillTargets ?? [])

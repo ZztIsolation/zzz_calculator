@@ -1046,6 +1046,380 @@
       "hidden": false
     },
     {
+      "id": "boss.initial_dead_end_butcher",
+      "name": {
+        "zhCN": "初生死路屠夫"
+      },
+      "aliases": [
+        "初生·死路屠夫"
+      ],
+      "images": {
+        "icon": "/assets/bosses/initial-dead-end-butcher.webp",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/06/17/15559334/67f2a3dfe4791dc4712d44eb2ba2a45f_6227060370066565691.png"
+      },
+      "target": {
+        "defense": 952,
+        "weaknessElements": [
+          "ice",
+          "ether"
+        ],
+        "resistanceElements": [],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.initial_dead_end_butcher.v3_1.p3",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.1",
+              "phaseNo": 3,
+              "startDate": "2026-08-26",
+              "endDate": "2026-09-09"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "未处于失衡状态下时，首领敌人每 6 秒获得 1 层[孤注一掷]，最多叠加 3 层；每层[孤注一掷]会使首领敌人造成的伤害提升 10%。代理人攻击命中敌人时，目标每拥有 1 层[孤注一掷]，代理人攻击造成的暴击伤害提升 25%，属性异常伤害降低 15%。敌人进入失衡状态时，获得 1 层[孤注一掷]；敌人从失衡状态恢复时，[孤注一掷]层数将会被重置。"
+          },
+          "recommendedSpecialties": [
+            "attack"
+          ],
+          "playerBuffs": [
+            {
+              "id": "initial_dead_end_butcher_gambit_crit_damage",
+              "name": {
+                "zhCN": "孤注一掷·暴击易伤"
+              },
+              "description": {
+                "zhCN": "目标每拥有 1 层[孤注一掷]，代理人攻击造成的暴击伤害提升 25%，最多 3 层。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "initial_dead_end_butcher_gambit_crit_damage_value",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "critDmg",
+                  "mode": "flat",
+                  "valuePerStack": 25,
+                  "maxStacks": 3,
+                  "defaultStacks": 3,
+                  "stackGroup": "initial_dead_end_butcher_gambit_stacks",
+                  "stackLabel": {
+                    "zhCN": "孤注一掷层数"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [
+            {
+              "id": "initial_dead_end_butcher_gambit_anomaly_damage",
+              "name": {
+                "zhCN": "孤注一掷·异常压制"
+              },
+              "description": {
+                "zhCN": "目标每拥有 1 层[孤注一掷]，代理人造成的属性异常伤害降低 15%，最多 3 层。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "initial_dead_end_butcher_gambit_anomaly_damage_value",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyDamageBonus",
+                  "mode": "flat",
+                  "valuePerStack": -15,
+                  "maxStacks": 3,
+                  "defaultStacks": 3,
+                  "stackGroup": "initial_dead_end_butcher_gambit_stacks",
+                  "stackLabel": {
+                    "zhCN": "孤注一掷层数"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "米游社百科 Boss 图鉴（图片与属性）"
+              },
+              "url": "https://baike.mihoyo.com/zzz/wiki/content/286/detail"
+            }
+          ],
+          "hidden": false
+        }
+      ],
+      "hidden": false
+    },
+    {
+      "id": "boss.girtablullu",
+      "name": {
+        "zhCN": "基塔布鲁"
+      },
+      "aliases": [
+        "Girtablullu"
+      ],
+      "images": {
+        "icon": "/assets/bosses/girtablullu.webp",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/06/16/428571341/f437497a250d70c8ef67f371e815f5aa_5593432538378266720.png"
+      },
+      "target": {
+        "defense": 952,
+        "weaknessElements": [
+          "wind"
+        ],
+        "resistanceElements": [],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.girtablullu.v3_1.p3",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.1",
+              "phaseNo": 3,
+              "startDate": "2026-08-26",
+              "endDate": "2026-09-09"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "代理人每次对首领施加异常状态时，会给首领施加 1 层[残蜕]，每层[残蜕]会令首领受到的异常伤害提升 7.5%，受到的[乱流]伤害额外提升 5%，持续 10 秒；[残蜕]最多累计 3 层，每层效果单独结算持续时间。[侵蚀壁垒]持续期间，首领被施加[残蜕]时还会额外削减[侵蚀壁垒]最大值的 20%，并累积 15% 的失衡值（15 秒内不会重复触发）；[侵蚀壁垒]被击破时，首领立即获得最大层数的[残蜕]。首领进入失衡状态时，会移除所有[残蜕]，并施加相同层数的[裂伤]；每层[裂伤]会降低首领 5% 异常积蓄抗性，并增加其 10% 失衡易伤倍率。首领失衡状态结束时，移除所有[裂伤]。"
+          },
+          "recommendedSpecialties": [
+            "anomaly"
+          ],
+          "playerBuffs": [
+            {
+              "id": "girtablullu_p3_residual_molt",
+              "name": {
+                "zhCN": "残蜕"
+              },
+              "description": {
+                "zhCN": "每层[残蜕]使首领受到的属性异常伤害提升 7.5%，持续 10 秒，最多 3 层。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "girtablullu_p3_residual_molt_anomaly_damage",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyDamageBonus",
+                  "mode": "flat",
+                  "valuePerStack": 7.5,
+                  "maxStacks": 3,
+                  "defaultStacks": 3,
+                  "durationSeconds": 10,
+                  "stackGroup": "girtablullu_p3_residual_molt_stacks",
+                  "stackLabel": {
+                    "zhCN": "残蜕层数"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            },
+            {
+              "id": "girtablullu_p3_laceration",
+              "name": {
+                "zhCN": "裂伤"
+              },
+              "description": {
+                "zhCN": "首领进入失衡状态时，每层[残蜕]转换为 1 层[裂伤]；每层使失衡易伤倍率提升 10%，最多 3 层。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "girtablullu_p3_laceration_stun_vulnerable",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "stunDmgMultiplierBonus",
+                  "mode": "flat",
+                  "valuePerStack": 10,
+                  "maxStacks": 3,
+                  "defaultStacks": 3,
+                  "stackGroup": "girtablullu_p3_laceration_stacks",
+                  "stackLabel": {
+                    "zhCN": "裂伤层数"
+                  },
+                  "condition": "首领进入失衡状态时",
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "米游社百科 Boss 图鉴（图片与属性）"
+              },
+              "url": "https://baike.mihoyo.com/zzz/wiki/content/2050/detail"
+            }
+          ],
+          "hidden": false
+        }
+      ],
+      "hidden": false
+    },
+    {
+      "id": "boss.primordial_nightmare_creator",
+      "name": {
+        "zhCN": "太初梦魇·「始主」"
+      },
+      "aliases": [
+        "始主"
+      ],
+      "images": {
+        "icon": "/assets/bosses/primordial-nightmare-creator.webp",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2025/12/30/428571341/4a8d65e98a9f6226c19a8c3faacb3f75_60980163260949746.png"
+      },
+      "target": {
+        "defense": 476,
+        "weaknessElements": [
+          "physical"
+        ],
+        "resistanceElements": [
+          "ice",
+          "ether"
+        ],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.primordial_nightmare_creator.v3_1.p3",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.1",
+              "phaseNo": 3,
+              "startDate": "2026-08-26",
+              "endDate": "2026-09-09"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "首领受到的异常伤害降低 30%。当其从[棱盾]状态切换回普通状态，或从普通状态切换为[棱盾]状态时，使代理人对其造成的暴击伤害提升 20%，最多叠加 3 层；当其从失衡状态恢复时层数重置。"
+          },
+          "recommendedSpecialties": [
+            "attack"
+          ],
+          "playerBuffs": [
+            {
+              "id": "primordial_nightmare_creator_shield_switch_crit_damage",
+              "name": {
+                "zhCN": "棱盾切换·暴击易伤"
+              },
+              "description": {
+                "zhCN": "在普通状态与[棱盾]状态之间切换时，代理人造成的暴击伤害提升 20%，最多 3 层；从失衡状态恢复时层数重置。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "primordial_nightmare_creator_shield_switch_crit_damage_value",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "critDmg",
+                  "mode": "flat",
+                  "valuePerStack": 20,
+                  "maxStacks": 3,
+                  "defaultStacks": 3,
+                  "stackGroup": "primordial_nightmare_creator_shield_switch_stacks",
+                  "stackLabel": {
+                    "zhCN": "状态切换层数"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [
+            {
+              "id": "primordial_nightmare_creator_anomaly_resistance",
+              "name": {
+                "zhCN": "异常伤害压制"
+              },
+              "description": {
+                "zhCN": "首领受到的属性异常伤害降低 30%。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "primordial_nightmare_creator_anomaly_resistance_value",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyDamageBonus",
+                  "mode": "flat",
+                  "value": -30,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "米游社百科 Boss 图鉴（图片与属性）"
+              },
+              "url": "https://baike.mihoyo.com/zzz/wiki/content/1771/detail"
+            }
+          ],
+          "hidden": false
+        }
+      ],
+      "hidden": false
+    },
+    {
       "id": "boss.replica_blood_hunter_janitor",
       "name": {
         "zhCN": "复写体·猎血清道夫"
@@ -1076,6 +1450,13 @@
               "phaseNo": 2,
               "startDate": "2026-08-12",
               "endDate": "2026-08-26"
+            },
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.1",
+              "phaseNo": 3,
+              "startDate": "2026-08-26",
+              "endDate": "2026-09-09"
             }
           ],
           "enemyIntel": {
