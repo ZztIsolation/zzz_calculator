@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref, watch } from "vue"
 import { NAlert, NButton, NInput, NInputNumber, NModal, NSelect, NTag, useMessage } from "naive-ui"
-import { Ban, LineChart, LockKeyhole, RefreshCcw, Save, SlidersHorizontal, Sparkles, X } from "lucide-vue-next"
+import { Ban, ChevronDown, ChevronUp, LineChart, LockKeyhole, RefreshCcw, Save, SlidersHorizontal, Sparkles, X } from "lucide-vue-next"
 import BuffPickerModal from "@/components/BuffPickerModal.vue"
 import CalculationConfigModal from "@/components/CalculationConfigModal.vue"
 import DamageSummaryBar from "@/components/DamageSummaryBar.vue"
@@ -62,6 +62,7 @@ const exclusionUiEnabled = computed(() => reservationUiEnabled.value && appConfi
 
 const showBuffPicker = ref(false)
 const showCalculationConfig = ref(false)
+const showAllDamageEvents = ref(false)
 const showOptimizerConfig = ref(false)
 const showDriveDiscAnalysis = ref(false)
 const showFourPieceSetModal = ref(false)
@@ -513,6 +514,18 @@ const damageEventSummary = computed(() => (buildStore.damageConfig.events ?? [])
     label: damageEventSummaryTitle(event, catalogStore.meta, selectedSkillCatalog.value),
   }
 }))
+const visibleDamageEventSummary = computed(() => showAllDamageEvents.value
+  ? damageEventSummary.value
+  : damageEventSummary.value.slice(0, 2))
+const hiddenDamageEventCount = computed(() => Math.max(0, damageEventSummary.value.length - 2))
+const damageEventSummarySignature = computed(() => [
+  buildStore.agentId,
+  buildStore.damageConfig.mode,
+  ...(buildStore.damageConfig.events ?? []).map((event: any) => String(event?.id ?? "")),
+].join("|"))
+watch(damageEventSummarySignature, () => {
+  showAllDamageEvents.value = false
+})
 const selectedDamageEvent = computed(() => {
   const events = buildStore.damageConfig.events ?? []
   return events.find((event: any) => event.id === buildStore.damageConfig.selectedEventId) ?? events[0]
@@ -1375,20 +1388,59 @@ function formatPercentValue(value: any) {
               @update="updateLuminescenceParameters"
             />
           </section>
-          <div v-if="activeLuminescenceEvent" class="calculation-luminescence-summary" data-layout-field>
+          <div v-if="activeLuminescenceEvent" id="calculation-event-summary-list" class="calculation-luminescence-summary" data-layout-field>
             <strong>事件 {{ buildStore.damageConfig.events?.length ?? 1 }} 项</strong>
             <span aria-hidden="true">·</span>
-            <NTag v-for="event in damageEventSummary" :key="event.id" round>{{ event.label }}</NTag>
+            <NTag v-for="event in visibleDamageEventSummary" :key="event.id" round>{{ event.label }}</NTag>
+            <div
+              v-if="hiddenDamageEventCount > 0"
+              class="calculation-event-summary-toggle-row"
+            >
+              <NButton
+                class="calculation-event-summary-toggle"
+                text
+                size="small"
+                data-testid="calculation-event-summary-toggle"
+                :aria-expanded="showAllDamageEvents"
+                aria-controls="calculation-event-summary-list"
+                @click="showAllDamageEvents = !showAllDamageEvents"
+              >
+                <template #icon>
+                  <ChevronUp v-if="showAllDamageEvents" :size="16" aria-hidden="true" />
+                  <ChevronDown v-else :size="16" aria-hidden="true" />
+                </template>
+                {{ showAllDamageEvents ? "收起其余" : `其余 ${hiddenDamageEventCount} 项` }}
+              </NButton>
+            </div>
           </div>
-          <dl v-if="!activeLuminescenceEvent" class="metric" data-layout-field>
-            <dt>事件</dt>
-            <dd>{{ buildStore.damageConfig.events?.length ?? 1 }} 项</dd>
-          </dl>
           <div v-if="!activeLuminescenceEvent" class="metric calculation-event-summary" data-layout-field>
-            <dt>事件摘要</dt>
-            <dd class="chip-row calculation-event-summary-tags">
-              <NTag v-for="event in damageEventSummary" :key="event.id" round>{{ event.label }}</NTag>
-            </dd>
+            <div class="calculation-event-summary-heading">
+              <span class="metric-title">事件摘要</span>
+              <strong class="calculation-event-count">{{ buildStore.damageConfig.events?.length ?? 1 }} 项</strong>
+            </div>
+            <div id="calculation-event-summary-list" class="chip-row calculation-event-summary-tags">
+              <NTag v-for="event in visibleDamageEventSummary" :key="event.id" round>{{ event.label }}</NTag>
+              <div
+                v-if="hiddenDamageEventCount > 0"
+                class="calculation-event-summary-toggle-row"
+              >
+                <NButton
+                  class="calculation-event-summary-toggle"
+                  text
+                  size="small"
+                  data-testid="calculation-event-summary-toggle"
+                  :aria-expanded="showAllDamageEvents"
+                  aria-controls="calculation-event-summary-list"
+                  @click="showAllDamageEvents = !showAllDamageEvents"
+                >
+                  <template #icon>
+                    <ChevronUp v-if="showAllDamageEvents" :size="16" aria-hidden="true" />
+                    <ChevronDown v-else :size="16" aria-hidden="true" />
+                  </template>
+                  {{ showAllDamageEvents ? "收起其余" : `其余 ${hiddenDamageEventCount} 项` }}
+                </NButton>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -2144,8 +2196,36 @@ function formatPercentValue(value: any) {
   overflow-wrap: anywhere;
 }
 
+.calculation-summary-grid > .metric {
+  margin: 0;
+}
+
 .calculation-event-summary {
   grid-column: 1 / -1;
+}
+
+.calculation-event-summary-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 10px;
+  min-width: 0;
+  margin-bottom: 4px;
+}
+
+.calculation-event-summary-heading .metric-title {
+  min-width: 0;
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.calculation-event-count {
+  flex: 0 0 auto;
+  color: var(--app-text);
+  font-size: 12px;
 }
 
 .calculation-mode-summary--luminescence,
@@ -2197,6 +2277,48 @@ function formatPercentValue(value: any) {
   min-width: 0;
   line-height: 1.35;
   white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.calculation-event-summary-toggle-row {
+  display: flex;
+  flex: 0 0 100%;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.calculation-event-summary-toggle {
+  flex: 0 0 auto;
+  min-height: 30px;
+  max-width: 100%;
+  padding: 0 6px;
+  border-radius: 4px;
+  color: var(--app-blue);
+  font-size: 14px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.calculation-event-summary-toggle:not(.n-button--disabled):hover {
+  background: #eef5ff;
+  color: #124b9c;
+}
+
+.calculation-event-summary-toggle:not(.n-button--disabled):active {
+  background: #dbeafe;
+  color: #0f438c;
+}
+
+.calculation-event-summary-toggle:focus-visible {
+  outline: 3px solid rgba(47, 125, 246, 0.28);
+  outline-offset: 2px;
+}
+
+.calculation-event-summary-toggle :deep(.n-button__content) {
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
