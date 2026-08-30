@@ -145,6 +145,36 @@ test("event management keeps disorder labels and controls visible", async ({ pag
   await expectStableLayout(page, "calculation-config")
 })
 
+test("calculation summary keeps extra events behind an inline toggle", async ({ page }) => {
+  await openApp(page)
+  await chooseWorkbenchAgent(page, "星见雅")
+
+  const summary = page.locator('[data-layout-surface="calculation-summary"]')
+  const eventTags = summary.locator(".calculation-event-summary-tags .n-tag")
+  const toggle = page.getByTestId("calculation-event-summary-toggle")
+
+  await expect(summary).toContainText("事件摘要")
+  await expect(toggle).toHaveText(/其余 \d+ 项/)
+  await expect(toggle).toHaveAttribute("aria-expanded", "false")
+  await expect(eventTags).toHaveCount(2)
+  await expectStableLayout(page, "calculation-summary")
+
+  await toggle.click()
+  await expect(toggle).toHaveText("收起其余")
+  await expect(toggle).toHaveAttribute("aria-expanded", "true")
+  await expect(eventTags).toHaveCount(8)
+  await expectStableLayout(page, "calculation-summary")
+
+  await toggle.click()
+  await expect(toggle).toHaveText(/其余 \d+ 项/)
+  await expect(toggle).toHaveAttribute("aria-expanded", "false")
+  await expect(eventTags).toHaveCount(2)
+
+  await chooseWorkbenchAgent(page, "蕾米埃尔·丹")
+  await expect(page.getByTestId("calculation-event-summary-toggle")).toHaveCount(0)
+  await expectStableLayout(page, "calculation-summary")
+})
+
 test("Dan team score parameters stay synchronized inside and outside calculation settings", async ({ page }) => {
   test.slow()
   await openApp(page)

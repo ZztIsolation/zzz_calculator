@@ -159,8 +159,9 @@ describe("WorkbenchView optimizer progress", () => {
   })
 
   it("keeps non-Luminescence summaries unchanged and locks calculation inputs while optimizing", () => {
-    expect(source).toContain('v-if="!activeLuminescenceEvent" class="metric"')
     expect(source).toContain('v-if="!activeLuminescenceEvent" class="metric calculation-event-summary"')
+    expect(source).toContain('class="calculation-event-summary-heading"')
+    expect(source).toContain('class="calculation-event-count"')
     expect(source).toContain(':disabled="optimizerStore.isBusy" @click="showCalculationConfig = true"')
     expect(source).toContain(':disabled="optimizerStore.isBusy"')
     expect(source).toContain("&& luminescenceParametersValid.value")
@@ -214,6 +215,21 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain(".calculation-event-summary-tags :deep(.n-tag__content)")
     expect(source).toContain("overflow-wrap: anywhere;")
     expect(source).toContain("white-space: normal;")
+  })
+
+  it("keeps extra calculation events behind an accessible inline toggle", () => {
+    expect(source).toContain("const showAllDamageEvents = ref(false)")
+    expect(source).toContain("const visibleDamageEventSummary = computed")
+    expect(source).toContain("damageEventSummary.value.slice(0, 2)")
+    expect(source).toContain("const hiddenDamageEventCount = computed")
+    expect(source).toContain('data-testid="calculation-event-summary-toggle"')
+    expect(source).toContain(':aria-expanded="showAllDamageEvents"')
+    expect(source).toContain('aria-controls="calculation-event-summary-list"')
+    expect(source).toContain('showAllDamageEvents ? "收起其余" : `其余 ${hiddenDamageEventCount} 项`')
+    expect(source).toContain("<ChevronDown")
+    expect(source).toContain("<ChevronUp")
+    expect(source).toContain("watch(damageEventSummarySignature")
+    expect(source).toContain(".calculation-event-summary-toggle:focus-visible")
   })
 
   it("passes the rupture sheer-force flag to both panel tables", () => {
