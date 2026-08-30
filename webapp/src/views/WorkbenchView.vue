@@ -1392,32 +1392,11 @@ function formatPercentValue(value: any) {
             <strong>事件 {{ buildStore.damageConfig.events?.length ?? 1 }} 项</strong>
             <span aria-hidden="true">·</span>
             <NTag v-for="event in visibleDamageEventSummary" :key="event.id" round>{{ event.label }}</NTag>
-            <NButton
+            <div
               v-if="hiddenDamageEventCount > 0"
-              class="calculation-event-summary-toggle"
-              text
-              size="small"
-              data-testid="calculation-event-summary-toggle"
-              :aria-expanded="showAllDamageEvents"
-              aria-controls="calculation-event-summary-list"
-              @click="showAllDamageEvents = !showAllDamageEvents"
+              class="calculation-event-summary-toggle-row"
             >
-              <template #icon>
-                <ChevronUp v-if="showAllDamageEvents" :size="14" aria-hidden="true" />
-                <ChevronDown v-else :size="14" aria-hidden="true" />
-              </template>
-              {{ showAllDamageEvents ? "收起其余" : `其余 ${hiddenDamageEventCount} 项` }}
-            </NButton>
-          </div>
-          <div v-if="!activeLuminescenceEvent" class="metric calculation-event-summary" data-layout-field>
-            <div class="calculation-event-summary-heading">
-              <span class="metric-title">事件摘要</span>
-              <strong class="calculation-event-count">{{ buildStore.damageConfig.events?.length ?? 1 }} 项</strong>
-            </div>
-            <div id="calculation-event-summary-list" class="chip-row calculation-event-summary-tags">
-              <NTag v-for="event in visibleDamageEventSummary" :key="event.id" round>{{ event.label }}</NTag>
               <NButton
-                v-if="hiddenDamageEventCount > 0"
                 class="calculation-event-summary-toggle"
                 text
                 size="small"
@@ -1427,11 +1406,40 @@ function formatPercentValue(value: any) {
                 @click="showAllDamageEvents = !showAllDamageEvents"
               >
                 <template #icon>
-                  <ChevronUp v-if="showAllDamageEvents" :size="14" aria-hidden="true" />
-                  <ChevronDown v-else :size="14" aria-hidden="true" />
+                  <ChevronUp v-if="showAllDamageEvents" :size="16" aria-hidden="true" />
+                  <ChevronDown v-else :size="16" aria-hidden="true" />
                 </template>
                 {{ showAllDamageEvents ? "收起其余" : `其余 ${hiddenDamageEventCount} 项` }}
               </NButton>
+            </div>
+          </div>
+          <div v-if="!activeLuminescenceEvent" class="metric calculation-event-summary" data-layout-field>
+            <div class="calculation-event-summary-heading">
+              <span class="metric-title">事件摘要</span>
+              <strong class="calculation-event-count">{{ buildStore.damageConfig.events?.length ?? 1 }} 项</strong>
+            </div>
+            <div id="calculation-event-summary-list" class="chip-row calculation-event-summary-tags">
+              <NTag v-for="event in visibleDamageEventSummary" :key="event.id" round>{{ event.label }}</NTag>
+              <div
+                v-if="hiddenDamageEventCount > 0"
+                class="calculation-event-summary-toggle-row"
+              >
+                <NButton
+                  class="calculation-event-summary-toggle"
+                  text
+                  size="small"
+                  data-testid="calculation-event-summary-toggle"
+                  :aria-expanded="showAllDamageEvents"
+                  aria-controls="calculation-event-summary-list"
+                  @click="showAllDamageEvents = !showAllDamageEvents"
+                >
+                  <template #icon>
+                    <ChevronUp v-if="showAllDamageEvents" :size="16" aria-hidden="true" />
+                    <ChevronDown v-else :size="16" aria-hidden="true" />
+                  </template>
+                  {{ showAllDamageEvents ? "收起其余" : `其余 ${hiddenDamageEventCount} 项` }}
+                </NButton>
+              </div>
             </div>
           </div>
         </div>
@@ -2188,6 +2196,10 @@ function formatPercentValue(value: any) {
   overflow-wrap: anywhere;
 }
 
+.calculation-summary-grid > .metric {
+  margin: 0;
+}
+
 .calculation-event-summary {
   grid-column: 1 / -1;
 }
@@ -2204,6 +2216,10 @@ function formatPercentValue(value: any) {
 .calculation-event-summary-heading .metric-title {
   min-width: 0;
   margin: 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
 }
 
 .calculation-event-count {
@@ -2264,14 +2280,24 @@ function formatPercentValue(value: any) {
   overflow-wrap: anywhere;
 }
 
+.calculation-event-summary-toggle-row {
+  display: flex;
+  flex: 0 0 100%;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .calculation-event-summary-toggle {
   flex: 0 0 auto;
-  min-height: 28px;
+  min-height: 30px;
   max-width: 100%;
   padding: 0 6px;
   border-radius: 4px;
   color: var(--app-blue);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 750;
   white-space: nowrap;
 }

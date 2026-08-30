@@ -152,17 +152,59 @@ test("calculation summary keeps extra events behind an inline toggle", async ({ 
   const summary = page.locator('[data-layout-surface="calculation-summary"]')
   const eventTags = summary.locator(".calculation-event-summary-tags .n-tag")
   const toggle = page.getByTestId("calculation-event-summary-toggle")
+  const toggleRow = summary.locator(".calculation-event-summary-toggle-row")
+  const modeLabel = summary.locator("dt").first()
+  const eventSummaryLabel = summary.locator(".calculation-event-summary-heading .metric-title")
+  const sectionHeader = summary.locator("xpath=preceding-sibling::*[1]")
+
+  const labelStyle = async (locator: typeof modeLabel) => locator.evaluate(element => {
+    const style = getComputedStyle(element)
+    return {
+      color: style.color,
+      fontFamily: style.fontFamily,
+      fontSize: style.fontSize,
+      fontWeight: style.fontWeight,
+      lineHeight: style.lineHeight,
+    }
+  })
+  const expectToggleBelowLastEvent = async () => {
+    const [lastEventBox, toggleBox, toggleRowBox] = await Promise.all([
+      eventTags.last().boundingBox(),
+      toggle.boundingBox(),
+      toggleRow.boundingBox(),
+    ])
+    expect(lastEventBox).not.toBeNull()
+    expect(toggleBox).not.toBeNull()
+    expect(toggleRowBox).not.toBeNull()
+    expect(toggleBox!.y).toBeGreaterThanOrEqual(lastEventBox!.y + lastEventBox!.height)
+    expect(Math.abs(toggleBox!.x - toggleRowBox!.x)).toBeLessThanOrEqual(1)
+  }
 
   await expect(summary).toContainText("事件摘要")
   await expect(toggle).toHaveText(/其余 \d+ 项/)
   await expect(toggle).toHaveAttribute("aria-expanded", "false")
+  await expect(toggle).toHaveCSS("font-size", "14px")
   await expect(eventTags).toHaveCount(2)
+  await expect(eventSummaryLabel).toHaveText("事件摘要")
+  expect(await labelStyle(eventSummaryLabel)).toEqual(await labelStyle(modeLabel))
+  await expectToggleBelowLastEvent()
+
+  const [headerBox, modeLabelBox] = await Promise.all([
+    sectionHeader.boundingBox(),
+    modeLabel.boundingBox(),
+  ])
+  expect(headerBox).not.toBeNull()
+  expect(modeLabelBox).not.toBeNull()
+  const contentStartGap = modeLabelBox!.y - (headerBox!.y + headerBox!.height)
+  expect(contentStartGap).toBeGreaterThanOrEqual(0)
+  expect(contentStartGap).toBeLessThanOrEqual(10)
   await expectStableLayout(page, "calculation-summary")
 
   await toggle.click()
   await expect(toggle).toHaveText("收起其余")
   await expect(toggle).toHaveAttribute("aria-expanded", "true")
   await expect(eventTags).toHaveCount(8)
+  await expectToggleBelowLastEvent()
   await expectStableLayout(page, "calculation-summary")
 
   await toggle.click()

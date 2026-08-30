@@ -217,6 +217,20 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("white-space: normal;")
   })
 
+  it("uses compact spacing and shared label typography in the calculation summary", () => {
+    expect(source).toContain(`.calculation-summary-grid > .metric {
+  margin: 0;
+}`)
+    expect(source).toContain(`.calculation-event-summary-heading .metric-title {
+  min-width: 0;
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+}`)
+  })
+
   it("keeps extra calculation events behind an accessible inline toggle", () => {
     expect(source).toContain("const showAllDamageEvents = ref(false)")
     expect(source).toContain("const visibleDamageEventSummary = computed")
@@ -228,6 +242,12 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain('showAllDamageEvents ? "收起其余" : `其余 ${hiddenDamageEventCount} 项`')
     expect(source).toContain("<ChevronDown")
     expect(source).toContain("<ChevronUp")
+    expect(source.match(/class="calculation-event-summary-toggle-row"/g)).toHaveLength(2)
+    expect(source.match(/<ChevronUp v-if="showAllDamageEvents" :size="16"/g)).toHaveLength(2)
+    expect(source.match(/<ChevronDown v-else :size="16"/g)).toHaveLength(2)
+    expect(source).toContain(".calculation-event-summary-toggle-row {")
+    expect(source).toContain("flex: 0 0 100%;")
+    expect(source).toContain("font-size: 14px;")
     expect(source).toContain("watch(damageEventSummarySignature")
     expect(source).toContain(".calculation-event-summary-toggle:focus-visible")
   })
