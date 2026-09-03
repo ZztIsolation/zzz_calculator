@@ -126,7 +126,7 @@ assert.deepEqual(agent.level60, {
 })
 assert.deepEqual(agent.preferredDriveDiscs.defaultSetIds, ["zzz_wiki_1552"])
 assert.deepEqual(agent.preferredDriveDiscs.mainStatLimits, {
-    4: ["critDmg", "atkPct"],
+    4: ["critDmg", "atkPct", "critRate"],
     5: ["penRatio", "iceDmg", "atkPct"],
     6: ["atkPct"],
 })

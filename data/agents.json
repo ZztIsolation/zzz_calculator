@@ -4519,7 +4519,8 @@
         "mainStatLimits": {
           "4": [
             "critDmg",
-            "atkPct"
+            "atkPct",
+            "critRate"
           ],
           "5": [
             "penRatio",

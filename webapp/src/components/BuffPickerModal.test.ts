@@ -340,6 +340,42 @@ const fieldBuffs = [
     effects: [{ id: "field-defense-guanche", type: "fixed", stat: "iceDmg", value: 20, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
   },
   {
+    id: "field.defense_v5.v3_1.p3.huanyan_shifeng",
+    sourceType: "field",
+    sourceCategory: "field",
+    sourceKind: "field",
+    source: { zhCN: "防卫战 v5" },
+    sourcePeriod: { zhCN: "3.1版本第三期" },
+    period: { modeId: "defense_v5", gameVersion: "3.1", phaseNo: 3, phaseName: { zhCN: "第三期" } },
+    name: { zhCN: "幻焰蚀锋" },
+    description: { zhCN: "火、冰属性伤害、暴击伤害与强攻代理人减防提升" },
+    effects: [{ id: "field-defense-huanyan", type: "fixed", stat: "fireDmg", value: 35, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
+  {
+    id: "field.defense_v5.v3_1.p3.wenyin_gongzhen",
+    sourceType: "field",
+    sourceCategory: "field",
+    sourceKind: "field",
+    source: { zhCN: "防卫战 v5" },
+    sourcePeriod: { zhCN: "3.1版本第三期" },
+    period: { modeId: "defense_v5", gameVersion: "3.1", phaseNo: 3, phaseName: { zhCN: "第三期" } },
+    name: { zhCN: "紊音共振" },
+    description: { zhCN: "异常代理人数量提升属性异常伤害与初始喧响值" },
+    effects: [{ id: "field-defense-wenyin-p3", type: "fixed", stat: "anomalyDamageBonus", value: 60, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
+  {
+    id: "field.defense_v5.v3_1.p3.yulei_guanmang",
+    sourceType: "field",
+    sourceCategory: "field",
+    sourceKind: "field",
+    source: { zhCN: "防卫战 v5" },
+    sourcePeriod: { zhCN: "3.1版本第三期" },
+    period: { modeId: "defense_v5", gameVersion: "3.1", phaseNo: 3, phaseName: { zhCN: "第三期" } },
+    name: { zhCN: "御雷贯芒" },
+    description: { zhCN: "电抗无视与强化特殊技后的暴击率、暴击伤害提升" },
+    effects: [{ id: "field-defense-yulei", type: "fixed", stat: "electricResIgnore", value: 20, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
+  {
     id: "field.critical_assault.v3_1.p3.cuixin",
     sourceType: "field",
     sourceCategory: "field",
@@ -1313,9 +1349,10 @@ describe("BuffPickerModal", () => {
 
     await openFieldTab(wrapper)
 
-    expect(wrapper.text()).toContain("冰袭")
-    expect(wrapper.text()).toContain("异袭")
-    expect(wrapper.text()).not.toContain("紊音共振")
+    expect(wrapper.text()).toContain("幻焰蚀锋")
+    expect(wrapper.text()).toContain("紊音共振")
+    expect(wrapper.text()).toContain("御雷贯芒")
+    expect(wrapper.text()).not.toContain("冰袭")
     expect(wrapper.text()).not.toContain("灼乱漩涡")
     expect(wrapper.text()).not.toContain("极境彻风")
 
@@ -1440,22 +1477,22 @@ describe("BuffPickerModal", () => {
     expect(visibleRows.some(text => text.includes("湮亡"))).toBe(false)
   })
 
-  it("defaults the field tab to Critical Assault 3.1 phase 3", async () => {
+  it("defaults the field tab to Defense Battle 3.1 phase 3", async () => {
     const wrapper = mountModal()
 
     await openFieldTab(wrapper)
     const selects = wrapper.findAll(".field-buff-filter-row select")
 
     expect((selects[0].element as HTMLSelectElement).value).toBe("3.1")
-    expect((selects[1].element as HTMLSelectElement).value).toBe("critical_assault|3.1|3")
+    expect((selects[1].element as HTMLSelectElement).value).toBe("defense_v5|3.1|3")
     const selectedPeriod = selects[1].findAll("option")
       .find(option => (option.element as HTMLOptionElement).selected)
-    expect(selectedPeriod?.text()).toBe("危局强袭战 · 3.1版本 · 第三期")
+    expect(selectedPeriod?.text()).toBe("防卫战 v5 · 3.1版本 · 第三期")
     const visibleRows = wrapper.findAll(".buff-row").map(row => row.text())
     expect(visibleRows).toHaveLength(3)
-    expect(visibleRows[0]).toContain("摧心")
-    expect(visibleRows[1]).toContain("冰袭")
-    expect(visibleRows[2]).toContain("异袭")
+    expect(visibleRows[0]).toContain("幻焰蚀锋")
+    expect(visibleRows[1]).toContain("紊音共振")
+    expect(visibleRows[2]).toContain("御雷贯芒")
     expect(visibleRows.some(text => text.includes("3.1版本第二期"))).toBe(false)
   })
 

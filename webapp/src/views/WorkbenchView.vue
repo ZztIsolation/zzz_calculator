@@ -1699,28 +1699,6 @@ function formatPercentValue(value: any) {
 
     <aside class="workbench-right">
       <div class="workbench-right-sticky workbench-surface">
-        <DamageSummaryBar class="workbench-summary-section" :result="buildStore.result" :error="buildStore.error" :loading="catalogStore.loading" />
-        <section class="workbench-section workbench-whitebox-section">
-          <div class="panel-header workbench-section-header">
-            <div>
-              <h2 class="panel-title">{{ isLuminescenceScore ? "队伍异常评分白盒" : "伤害白盒" }}</h2>
-              <p class="panel-subtitle">随当前驱动盘方案实时刷新</p>
-            </div>
-            <NButton size="small" @click="recalculate">
-              <template #icon><RefreshCcw :size="16" /></template>
-              刷新
-            </NButton>
-          </div>
-          <div class="workbench-section-body">
-            <div v-if="buildStore.error" class="empty-state">{{ buildStore.error }}</div>
-            <DamageWhiteBox
-              v-else
-              :damage="buildStore.result?.damage"
-              :meta="catalogStore.meta"
-              :skill-catalog="selectedSkillCatalog"
-            />
-          </div>
-        </section>
         <section class="workbench-section damage-panel-card">
           <div class="panel-header workbench-section-header">
             <div>
@@ -1746,6 +1724,28 @@ function formatPercentValue(value: any) {
                 :include-sheer-force="selectedAgent?.specialty === 'rupture'"
               />
             </div>
+          </div>
+        </section>
+        <DamageSummaryBar class="workbench-summary-section" :result="buildStore.result" :error="buildStore.error" :loading="catalogStore.loading" />
+        <section class="workbench-section workbench-whitebox-section">
+          <div class="panel-header workbench-section-header">
+            <div>
+              <h2 class="panel-title">{{ isLuminescenceScore ? "队伍异常评分白盒" : "伤害白盒" }}</h2>
+              <p class="panel-subtitle">随当前驱动盘方案实时刷新</p>
+            </div>
+            <NButton size="small" @click="recalculate">
+              <template #icon><RefreshCcw :size="16" /></template>
+              刷新
+            </NButton>
+          </div>
+          <div class="workbench-section-body">
+            <div v-if="buildStore.error" class="empty-state">{{ buildStore.error }}</div>
+            <DamageWhiteBox
+              v-else
+              :damage="buildStore.result?.damage"
+              :meta="catalogStore.meta"
+              :skill-catalog="selectedSkillCatalog"
+            />
           </div>
         </section>
       </div>
@@ -2073,6 +2073,7 @@ function formatPercentValue(value: any) {
 }
 
 .workbench-section + .workbench-section,
+.workbench-section + .workbench-summary-section,
 .workbench-summary-section + .workbench-section {
   border-top: 1px solid var(--app-border);
 }

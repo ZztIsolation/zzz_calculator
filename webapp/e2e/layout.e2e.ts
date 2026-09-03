@@ -125,6 +125,42 @@ async function expectProminentConfigButton(
   expect(focusAppearance.outlineOffset).toBeGreaterThanOrEqual(2)
 }
 
+test("right workbench column keeps panel, summary, and white box in order", async ({ page }) => {
+  await openApp(page)
+
+  const rightColumn = page.locator(".workbench-right-sticky")
+  const panel = rightColumn.locator(".damage-panel-card")
+  const summary = rightColumn.locator(".workbench-summary-section")
+  const whiteBox = rightColumn.locator(".workbench-whitebox-section")
+
+  await expect(panel).toBeVisible()
+  await expect(summary).toBeVisible()
+  await expect(whiteBox).toBeVisible()
+
+  const [columnBox, panelBox, summaryBox, whiteBoxBox] = await Promise.all([
+    rightColumn.boundingBox(),
+    panel.boundingBox(),
+    summary.boundingBox(),
+    whiteBox.boundingBox(),
+  ])
+
+  expect(columnBox).not.toBeNull()
+  expect(panelBox).not.toBeNull()
+  expect(summaryBox).not.toBeNull()
+  expect(whiteBoxBox).not.toBeNull()
+  expect(summaryBox!.y).toBeGreaterThanOrEqual(panelBox!.y + panelBox!.height)
+  expect(whiteBoxBox!.y).toBeGreaterThanOrEqual(summaryBox!.y + summaryBox!.height)
+  await expect(summary).toHaveCSS("border-top-width", "1px")
+  await expect(whiteBox).toHaveCSS("border-top-width", "1px")
+
+  for (const sectionBox of [panelBox!, summaryBox!, whiteBoxBox!]) {
+    expect(sectionBox.x).toBeGreaterThanOrEqual(columnBox!.x - 1)
+    expect(sectionBox.x + sectionBox.width).toBeLessThanOrEqual(columnBox!.x + columnBox!.width + 1)
+  }
+
+  await expectStableLayout(page, "damage-whitebox")
+})
+
 test("event management keeps disorder labels and controls visible", async ({ page }) => {
   await openApp(page)
   await expectProminentConfigButton(page, "open-calculation-config", "配置", "compact")

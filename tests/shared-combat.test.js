@@ -266,6 +266,30 @@ assert.equal(
     "Generic skill targets should display player-facing skill names without raw id paths",
 )
 assert.equal(
+    skillTargetLabel({ kind: "skillTag", skillTag: "fireSuppression" }, meta),
+    "火力镇压",
+    "Skill-tag targets should display their localized player-facing label",
+)
+assert.equal(
+    skillTargetLabel({ kind: "skillTag", skillTag: "" }, meta),
+    "未选择招式标签",
+    "Empty skill-tag targets should not fall back to all agents",
+)
+assert.equal(
+    storedEffectRuleText({
+        type: "fixed",
+        stat: "dmgBonus",
+        value: 70,
+        mode: "flat",
+        target: {
+            kind: "skill",
+            skillTargets: [{ kind: "skillTag", skillTag: "fireSuppression" }],
+        },
+    }, {}, {}, meta),
+    "技能目标伤害加成% +70%（技能：火力镇压）",
+    "Soldier 11 Heat Wave should display its Fire Suppression skill-tag target",
+)
+assert.equal(
     storedEffectRuleText({
         type: "fixed",
         stat: "dmgBonus",

@@ -4,6 +4,7 @@ import {
     normalizeSkillTarget,
     normalizeSkillTargets,
     normalizeSkillTargetsInValue,
+    skillTagLabel,
     skillTypeLabel,
     unknownLegacySkillTargetPrefixes,
 } from "./skillTargets.js"
@@ -1431,6 +1432,9 @@ export function skillTargetLabel(target = {}, meta = {}) {
     const normalized = normalizedTargets[0] ?? target
     if (normalized.kind === "skillType") {
         return skillTypeLabel(normalized.skillType) || "未选择技能大类"
+    }
+    if (normalized.kind === "skillTag") {
+        return skillTagLabel(normalized.skillTag) || "未选择招式标签"
     }
     if (unknownLegacySkillTargetPrefixes(normalized).length) {
         return "旧版招式目标"

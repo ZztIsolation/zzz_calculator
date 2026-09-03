@@ -205,6 +205,17 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));")
   })
 
+  it("orders the right column as panel, damage summary, then white box", () => {
+    const panelStart = source.indexOf('<section class="workbench-section damage-panel-card">')
+    const summaryStart = source.indexOf('<DamageSummaryBar class="workbench-summary-section"')
+    const whiteBoxStart = source.indexOf('<section class="workbench-section workbench-whitebox-section">')
+
+    expect(panelStart).toBeGreaterThan(-1)
+    expect(summaryStart).toBeGreaterThan(panelStart)
+    expect(whiteBoxStart).toBeGreaterThan(summaryStart)
+    expect(source).toContain(".workbench-section + .workbench-summary-section,")
+  })
+
   it("prevents long Miyabi calculation labels from widening the left workbench column", () => {
     expect(source).toContain('class="workbench-section-body metric-grid calculation-summary-grid"')
     expect(source).toContain('class="metric calculation-event-summary"')
