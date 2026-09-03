@@ -8,14 +8,12 @@ import {
   skillLevelLabel,
   skillRowValue,
 } from "@core/skillMultiplierCandidates.js"
-import { potentialLevelRequirementMatches } from "@core/potentialVision.js"
 import { labelOf } from "@/utils/format"
 
 const props = defineProps<{
   show: boolean
   skillCatalog: any
   skillLevels: Record<string, any>
-  potentialLevel?: number
 }>()
 
 const emit = defineEmits<{
@@ -25,8 +23,7 @@ const emit = defineEmits<{
 
 const query = ref("")
 const selectedCategoryId = ref("")
-const availableCategories = computed(() => (props.skillCatalog?.categories ?? [])
-  .filter((category: any) => potentialLevelRequirementMatches(category, props.potentialLevel ?? 0)))
+const availableCategories = computed(() => props.skillCatalog?.categories ?? [])
 
 watch(() => props.show, value => {
   if (value) {
@@ -54,11 +51,7 @@ const rows = computed(() => {
       continue
     }
     for (const move of category.moves ?? []) {
-      if (!potentialLevelRequirementMatches(move, props.potentialLevel ?? 0)) {
-        continue
-      }
-      for (const row of damageSkillRowsWithGeneratedTotals(category, move)
-        .filter((item: any) => potentialLevelRequirementMatches(item, props.potentialLevel ?? 0))) {
+      for (const row of damageSkillRowsWithGeneratedTotals(category, move)) {
         const level = normalizeSkillLevel(category, move, row, props.skillLevels?.[category.id] ?? defaultSkillLevel(category, move, row))
         const value = skillRowValue(category, move, row, level)
         const haystack = [

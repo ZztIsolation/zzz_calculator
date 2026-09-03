@@ -30,7 +30,6 @@ import {
 import {
     materializePotentialVisionEffect,
     normalizePotentialLevel,
-    potentialLevelRequirementMatches,
 } from "./potentialVision.js"
 import {
     anomalyReleaseProfile,
@@ -2472,15 +2471,6 @@ function resolveDamageSkillRef(catalog, agent, skillRef = null, options = {}) {
     if ((row.kind ?? "damageMultiplier") !== "damageMultiplier") {
         throw new Error(`Skill row is not a damage multiplier: ${skillSet.id}.${categoryId}.${moveId}.${rowId}`)
     }
-    const potentialLevel = normalizePotentialLevel(agent, options.potentialLevel)
-    for (const [kind, value] of [["category", category], ["move", move], ["row", row]]) {
-        if (!potentialLevelRequirementMatches(value, potentialLevel)) {
-            throw new Error(
-                `Skill ${kind} requires potential P${value.requiresPotentialLevel}: ${skillSet.id}.${categoryId}.${moveId}.${rowId} (current P${potentialLevel})`,
-            )
-        }
-    }
-
     const isCoreSkillLevel = isCoreSkillLevelScale(category)
     const defaultLevel = defaultLevelForSkill(category, move, row)
     const currentLevel = isCoreSkillLevel
@@ -2612,6 +2602,26 @@ function normalizeSkillEventCount(value, range, fallback = 1, label = "skill eve
     return count
 }
 
+function normalizeSkillEventCountData(event = {}, range, fallback = 1, label = "skill event") {
+    const expansion = event.skillGroupExpansion
+    if (!expansion) {
+        return { count: normalizeSkillEventCount(event.count, range, fallback, label) }
+    }
+    if (!expansion || typeof expansion !== "object" || Array.isArray(expansion)) {
+        throw new Error(`Invalid skill group expansion for ${label}`)
+    }
+    const groupId = String(expansion.groupId ?? "").trim()
+    const repeatCount = Number(expansion.repeatCount)
+    if (!groupId || !Number.isFinite(repeatCount) || repeatCount <= 0) {
+        throw new Error(`Invalid skill group expansion for ${label}`)
+    }
+    const childCount = normalizeSkillEventCount(expansion.childCount, range, fallback, label)
+    return {
+        count: childCount * repeatCount,
+        skillGroupExpansion: { groupId, repeatCount, childCount },
+    }
+}
+
 function bossAppearanceLabel(appearance = {}) {
     const version = String(appearance.gameVersion ?? "").trim()
     const phaseNo = Number(appearance.phaseNo)
@@ -2728,6 +2738,12 @@ function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index 
             : DIRECT_DAMAGE_ELEMENTS.has(event.skillSource?.damageElement)
                 ? event.skillSource.damageElement
                 : resolveDirectDamageElement(agent)
+        const countData = normalizeSkillEventCountData(
+            event,
+            eventCountRange,
+            1,
+            event.id ?? `direct-${index + 1}`,
+        )
         return {
             ...event,
             id: String(event.id ?? `direct-${index + 1}`),
@@ -2742,7 +2758,7 @@ function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index 
                 ? event.critMode
                 : "expected",
             damageElement,
-            count: normalizeSkillEventCount(event.count, eventCountRange, 1, event.id ?? `direct-${index + 1}`),
+            ...countData,
             eventCountRange,
             stunned: normalizeEventStunned(event.stunned),
         }
@@ -2757,6 +2773,12 @@ function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index 
     const damageElement = DIRECT_DAMAGE_ELEMENTS.has(event.damageElement)
         ? event.damageElement
         : skillRefResult?.skillSource?.damageElement ?? resolveDirectDamageElement(agent)
+    const countData = normalizeSkillEventCountData(
+        event,
+        skillRefResult?.eventCountRange,
+        1,
+        event.id ?? skillRefResult?.skillSource?.label ?? `direct-${index + 1}`,
+    )
 
     return {
         id: String(event.id ?? `direct-${index + 1}`),
@@ -2770,12 +2792,7 @@ function normalizeDirectDamageEvent(event = {}, agent = {}, catalog = {}, index 
         label: normalizeDamageEventLabel(event),
         critMode,
         damageElement,
-        count: normalizeSkillEventCount(
-            event.count,
-            skillRefResult?.eventCountRange,
-            1,
-            event.id ?? skillRefResult?.skillSource?.label ?? `direct-${index + 1}`,
-        ),
+        ...countData,
         eventCountRange: skillRefResult?.eventCountRange ?? null,
         stunned: normalizeEventStunned(event.stunned),
     }
@@ -2824,6 +2841,12 @@ function normalizeSheerDamageEvent(event = {}, agent = {}, catalog = {}, index =
         const damageElement = DAMAGE_ELEMENTS.includes(event.damageElement)
             ? event.damageElement
             : resolveDamageElement(agent)
+        const countData = normalizeSkillEventCountData(
+            event,
+            eventCountRange,
+            1,
+            event.id ?? `sheer-${index + 1}`,
+        )
         return {
             ...event,
             id: String(event.id ?? `sheer-${index + 1}`),
@@ -2837,7 +2860,7 @@ function normalizeSheerDamageEvent(event = {}, agent = {}, catalog = {}, index =
                 ? event.critMode
                 : "expected",
             damageElement,
-            count: normalizeSkillEventCount(event.count, eventCountRange, 1, event.id ?? `sheer-${index + 1}`),
+            ...countData,
             eventCountRange,
             stunned: normalizeEventStunned(event.stunned),
         }
@@ -2853,6 +2876,12 @@ function normalizeSheerDamageEvent(event = {}, agent = {}, catalog = {}, index =
     const damageElement = DAMAGE_ELEMENTS.includes(event.damageElement)
         ? event.damageElement
         : DAMAGE_ELEMENTS.includes(skillDamageElement) ? skillDamageElement : resolveDamageElement(agent)
+    const countData = normalizeSkillEventCountData(
+        event,
+        skillRefResult?.eventCountRange,
+        1,
+        event.id ?? skillRefResult?.skillSource?.label ?? `sheer-${index + 1}`,
+    )
 
     return {
         id: String(event.id ?? `sheer-${index + 1}`),
@@ -2864,12 +2893,7 @@ function normalizeSheerDamageEvent(event = {}, agent = {}, catalog = {}, index =
         label: normalizeDamageEventLabel(event),
         critMode,
         damageElement,
-        count: normalizeSkillEventCount(
-            event.count,
-            skillRefResult?.eventCountRange,
-            1,
-            event.id ?? skillRefResult?.skillSource?.label ?? `sheer-${index + 1}`,
-        ),
+        ...countData,
         eventCountRange: skillRefResult?.eventCountRange ?? null,
         stunned: normalizeEventStunned(event.stunned),
     }

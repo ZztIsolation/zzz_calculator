@@ -248,9 +248,8 @@ function enableCoreSkill(enabled: boolean) {
         <div class="maintenance-grid">
           <label class="maintenance-field"><span>名称</span><NInput :value="textOf(group.name)" :disabled="disabled" @update:value="group.name = { zhCN: String($event) }; changed()" /></label>
           <label class="maintenance-field maintenance-field-wide"><span>描述</span><NInput :value="textOf(group.description)" :disabled="disabled" @update:value="group.description = { zhCN: String($event) }; changed()" /></label>
-          <label class="maintenance-field"><span>需要潜能等级</span><NInputNumber v-model:value="group.requiresPotentialLevel" :disabled="disabled" :min="1" :max="6" clearable @update:value="changed" /></label>
         </div>
-        <CalculationEventsEditor :events="group.events" :catalog="catalog" :agent="model" :skill-groups="model.skillGroups" :disabled="disabled" :allow-skill-group="false" :potential-level="group.requiresPotentialLevel ?? null" @change="changed" />
+        <CalculationEventsEditor :events="group.events" :catalog="catalog" :agent="model" :skill-groups="model.skillGroups" :disabled="disabled" :allow-skill-group="false" @change="changed" />
       </article>
     </MaintenanceSection>
 

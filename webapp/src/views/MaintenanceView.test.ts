@@ -623,7 +623,8 @@ describe("MaintenanceView structured editor", () => {
     await vi.waitFor(() => expect(wrapper.text()).toContain("完整目录已刷新"))
     const call = fetchMock.mock.calls.find(([url, init]) => url === "/api/maintenance/agents" && init?.method === "POST")!
     const body = JSON.parse(String(call[1]?.body ?? "{}"))
-    expect(body.skillGroups[0]).toMatchObject({ defaultCount: 1, minCount: 0, maxCount: 100, step: 1 })
+    expect(body.skillGroups[0]).toMatchObject({ defaultCount: 1, minCount: 0, step: 1 })
+    expect(body.skillGroups[0]).not.toHaveProperty("maxCount")
     expect(body.combatBuffs.corePassive.coverage).toBeUndefined()
     expect(body.combatBuffs.corePassive.effects[0].coverage).toEqual({ default: 0.4, min: 0, max: 1, step: 0.1 })
   })

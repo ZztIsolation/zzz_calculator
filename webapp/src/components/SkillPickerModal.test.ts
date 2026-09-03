@@ -17,11 +17,9 @@ const skillCatalog = {
       {
         id: "potential",
         name: { zhCN: "潜能招式" },
-        requiresPotentialLevel: 1,
         rows: [{
           id: "extra",
           label: { zhCN: "潜能追加倍率" },
-          requiresPotentialLevel: 1,
           eventCountRange: { min: 0, max: 6, default: 6 },
           values: [166.4],
         }],
@@ -30,14 +28,13 @@ const skillCatalog = {
   }],
 }
 
-function mountPicker(potentialLevel: number) {
+function mountPicker() {
   return mount(SkillPickerModal, {
     attachTo: document.body,
     props: {
       show: false,
       skillCatalog,
       skillLevels: { basic: 1 },
-      potentialLevel,
     },
     global: {
       stubs: {
@@ -53,23 +50,20 @@ function mountPicker(potentialLevel: number) {
   })
 }
 
-describe("SkillPickerModal potential filtering", () => {
-  it("hides P1 moves at P0 and exposes them at P1", async () => {
-    const wrapper = mountPicker(0)
+describe("SkillPickerModal Potential behavior", () => {
+  it("shows Potential moves without a level gate", async () => {
+    const wrapper = mountPicker()
     await wrapper.setProps({ show: true })
     await nextTick()
 
     expect(document.body.textContent).toContain("常规招式")
-    expect(document.body.textContent).not.toContain("潜能招式")
-
-    await wrapper.setProps({ potentialLevel: 1 })
-    await nextTick()
     expect(document.body.textContent).toContain("潜能招式")
+
     wrapper.unmount()
   })
 
   it("returns the authored count range with a potential multiplier row", async () => {
-    const wrapper = mountPicker(1)
+    const wrapper = mountPicker()
     await wrapper.setProps({ show: true })
     await nextTick()
     const potentialRow = Array.from(document.body.querySelectorAll<HTMLButtonElement>("button.skill-row"))

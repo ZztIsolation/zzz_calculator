@@ -1317,15 +1317,11 @@ function cleanCalculationSkillGroups(groups = [], options = {}) {
                 id,
                 ...(group.name ? { name: zhOnly(group.name) } : {}),
                 ...(cleanOptionalZh(group.description) ? { description: cleanOptionalZh(group.description) } : {}),
-                ...(group.requiresPotentialLevel !== undefined
-                    ? { requiresPotentialLevel: Number(group.requiresPotentialLevel) }
-                    : {}),
                 ...(group.authoredCountRange === true
                     ? {
                         authoredCountRange: true,
                         defaultCount: Number(group.defaultCount),
                         minCount: Number(group.minCount),
-                        maxCount: Number(group.maxCount),
                         step: Number(group.step),
                     }
                     : SYSTEM_MANAGED_SKILL_GROUP_COUNTS),
@@ -1429,8 +1425,20 @@ function cleanAgentSkill(item = {}) {
     return {
         ...item,
         categories: (item.categories ?? []).map(category => {
-            const { icon, ...categoryRest } = category ?? {}
-            return categoryRest
+            const { icon, requiresPotentialLevel: _categoryPotentialLevel, ...categoryRest } = category ?? {}
+            return {
+                ...categoryRest,
+                moves: (categoryRest.moves ?? []).map(move => {
+                    const { requiresPotentialLevel: _movePotentialLevel, ...moveRest } = move ?? {}
+                    return {
+                        ...moveRest,
+                        rows: (moveRest.rows ?? []).map(row => {
+                            const { requiresPotentialLevel: _rowPotentialLevel, ...rowRest } = row ?? {}
+                            return rowRest
+                        }),
+                    }
+                }),
+            }
         }),
     }
 }

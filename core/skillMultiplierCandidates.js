@@ -160,12 +160,9 @@ function generatedHitTotalRow(category, move, rows) {
                 min: Number(range.min ?? 1),
                 max: Number(range.max ?? block[0].values?.length ?? Number(range.min ?? 1)),
                 default: Number(range.default ?? range.max ?? range.min ?? 1),
-            },
+        },
         generated: true,
         generatedFromRowIds: block.map(row => row.id),
-        ...(block[0].requiresPotentialLevel !== undefined
-            ? { requiresPotentialLevel: block[0].requiresPotentialLevel }
-            : {}),
     }
 }
 
@@ -207,10 +204,6 @@ function validHitBlock(category, move, block) {
     if (!block.every(row => sameSkillLevelRange(range, skillLevelRange(category, move, row)))) {
         return null
     }
-    if (!block.every(row => row.requiresPotentialLevel === block[0].requiresPotentialLevel)) {
-        return null
-    }
-
     return block
 }
 

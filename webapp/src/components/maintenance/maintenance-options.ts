@@ -1,6 +1,5 @@
 import { statLabel } from "@core/shared-combat.js"
 import { SKILL_TAGS, SKILL_TAG_LABELS, SKILL_TYPES, SKILL_TYPE_LABELS, skillTypeForMove } from "@core/skillTargets.js"
-import { potentialLevelRequirementMatches } from "@core/potentialVision.js"
 import { internalId, textOf, type SelectOption } from "./maintenance-model"
 
 export const option = (value: string | number, label: string): SelectOption => ({ value, label })
@@ -204,25 +203,23 @@ export function skillById(catalog: any, id: string) {
   return (catalog?.agentSkills?.agentSkills ?? []).find((item: any) => item.id === id)
 }
 
-export function categoryOptions(catalog: any, skillId: string, potentialLevel: number | null = null) {
+export function categoryOptions(catalog: any, skillId: string, _potentialLevel: number | null = null) {
   return (skillById(catalog, skillId)?.categories ?? [])
-    .filter((item: any) => potentialLevel === null || potentialLevelRequirementMatches(item, potentialLevel))
     .map((item: any) => option(item.id, textOf(item.name) || "未命名大类"))
 }
 
-export function moveOptions(catalog: any, skillId: string, categoryId: string, includeAll = false, potentialLevel: number | null = null) {
-  const category = (skillById(catalog, skillId)?.categories ?? []).find((item: any) => item.id === categoryId)
+export function moveOptions(catalog: any, skillId: string, categoryId: string, includeAll = false, _potentialLevel: number | null = null) {
+  const skill = skillById(catalog, skillId)
+  const category = (skill?.categories ?? []).find((item: any) => item.id === categoryId)
   const rows = (category?.moves ?? [])
-    .filter((item: any) => potentialLevel === null || potentialLevelRequirementMatches(item, potentialLevel))
     .map((item: any) => option(item.id, textOf(item.name) || "未命名招式"))
   return includeAll ? [option("", "不限招式"), ...rows] : rows
 }
 
-export function rowOptions(catalog: any, skillId: string, categoryId: string, moveId: string, includeAll = false, potentialLevel: number | null = null) {
+export function rowOptions(catalog: any, skillId: string, categoryId: string, moveId: string, includeAll = false, _potentialLevel: number | null = null) {
   const category = (skillById(catalog, skillId)?.categories ?? []).find((item: any) => item.id === categoryId)
   const move = (category?.moves ?? []).find((item: any) => item.id === moveId)
   const rows = (move?.rows ?? [])
-    .filter((item: any) => potentialLevel === null || potentialLevelRequirementMatches(item, potentialLevel))
     .map((item: any) => option(item.id, textOf(item.label) || "未命名倍率行"))
   return includeAll ? [option("", "整招式"), ...rows] : rows
 }

@@ -21,7 +21,6 @@ const PLACEHOLDER_NAMES = new Set(["未命名"])
 export const SYSTEM_MANAGED_SKILL_GROUP_COUNTS = Object.freeze({
     defaultCount: 1,
     minCount: 0,
-    maxCount: 100,
     step: 1,
 })
 
@@ -61,6 +60,7 @@ export function applySystemManagedMaintenanceFields(value) {
     if (Array.isArray(value.skillGroups)) {
         value.skillGroups.forEach(group => {
             if (group && typeof group === "object" && !Array.isArray(group)) {
+                delete group.maxCount
                 if (group.authoredCountRange !== true) {
                     Object.assign(group, SYSTEM_MANAGED_SKILL_GROUP_COUNTS)
                 }
@@ -1155,22 +1155,6 @@ function skillCatalogForRef(context = {}, skillRef = {}) {
     return agentSkills.find(skill => skill.id === skillRef.agentSkillId) ?? null
 }
 
-function validateRequiresPotentialLevel(errors, value, path) {
-    if (value === undefined || value === null || value === "") {
-        return null
-    }
-    const level = Number(value)
-    if (!Number.isInteger(level) || level < 1 || level > 6) {
-        add(errors, path, "潜能解锁等级必须是 1 到 6 的整数。")
-        return null
-    }
-    return level
-}
-
-function requiredPotentialLevel(...values) {
-    return Math.max(0, ...values.map(value => Number(value ?? 0)).filter(Number.isFinite))
-}
-
 function validateEventCountRange(errors, range, path) {
     if (range === undefined || range === null) {
         return null
@@ -1237,11 +1221,7 @@ function validateCalculationSkillRef(errors, skillRef, path, context = {}, agent
     if ((row.kind ?? "damageMultiplier") !== "damageMultiplier") {
         add(errors, `${path}.rowId`, "只能选择伤害倍率行。")
     }
-    const requiredLevel = requiredPotentialLevel(category.requiresPotentialLevel, move.requiresPotentialLevel, row.requiresPotentialLevel)
-    if (context.potentialLevel !== undefined && requiredLevel > Number(context.potentialLevel ?? 0)) {
-        add(errors, path, `该技能需要潜能影像 P${requiredLevel}。`)
-    }
-    return { skill, category, move, row, requiredPotentialLevel: requiredLevel }
+    return { skill, category, move, row }
 }
 
 function validateSkillBuffSourceRef(errors, skillRef, path, context = {}, agentId = "") {
@@ -1312,21 +1292,11 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
         if (skillGroupId && !group) {
             add(errors, `${path}.skillGroupId`, "技能组不存在。")
         }
-        const requiredLevel = Number(group?.requiresPotentialLevel ?? 0)
-        if (group && context.potentialLevel !== undefined && requiredLevel > Number(context.potentialLevel ?? 0)) {
-            add(errors, `${path}.skillGroupId`, `该技能组需要潜能影像 P${requiredLevel}。`)
-        }
         const count = validateSkillGroupCount(errors, event.count ?? group?.defaultCount ?? 1, `${path}.count`)
         if (group) {
             const minCount = Number(group.minCount ?? 0)
-            const maxCount = group.maxCount === undefined || group.maxCount === null || group.maxCount === ""
-                ? null
-                : Number(group.maxCount)
             if (Number.isFinite(count) && Number.isFinite(minCount) && count < minCount) {
                 add(errors, `${path}.count`, "次数不能小于技能组最小次数。")
-            }
-            if (Number.isFinite(count) && Number.isFinite(maxCount) && count > maxCount) {
-                add(errors, `${path}.count`, "次数不能大于技能组最大次数。")
             }
         }
         return
@@ -1542,24 +1512,14 @@ function validateCalculationSkillGroups(errors, groups, path, context = {}, agen
         if (group.authoredCountRange !== undefined && group.authoredCountRange !== true) {
             add(errors, `${groupPath}.authoredCountRange`, "仅在需要保留游戏规则限定的次数范围时设为 true。")
         }
-        validateRequiresPotentialLevel(errors, group.requiresPotentialLevel, `${groupPath}.requiresPotentialLevel`)
         const minCount = validateSkillGroupCount(errors, group.minCount ?? 0, `${groupPath}.minCount`)
-        const maxCount = group.maxCount === undefined || group.maxCount === null || group.maxCount === ""
-            ? null
-            : validateSkillGroupCount(errors, group.maxCount, `${groupPath}.maxCount`)
         const defaultCount = validateSkillGroupCount(errors, group.defaultCount ?? 0, `${groupPath}.defaultCount`)
         const step = requireFinite(errors, group.step ?? 1, `${groupPath}.step`)
         if (Number.isFinite(step) && step <= 0) {
             add(errors, `${groupPath}.step`, "步长必须大于 0。")
         }
-        if (Number.isFinite(minCount) && Number.isFinite(maxCount) && maxCount < minCount) {
-            add(errors, `${groupPath}.maxCount`, "最大次数不能小于最小次数。")
-        }
         if (Number.isFinite(defaultCount) && Number.isFinite(minCount) && defaultCount < minCount) {
             add(errors, `${groupPath}.defaultCount`, "默认次数不能小于最小次数。")
-        }
-        if (Number.isFinite(defaultCount) && Number.isFinite(maxCount) && defaultCount > maxCount) {
-            add(errors, `${groupPath}.defaultCount`, "默认次数不能大于最大次数。")
         }
         validateCalculationEventList(errors, group.events, `${groupPath}.events`, context, agentId)
     })
@@ -1849,7 +1809,6 @@ function validateAgentSkill(item, context) {
                 seenCategories.add(category.id)
             }
             requireName(errors, category?.name, `${categoryPath}.name.zhCN`)
-            validateRequiresPotentialLevel(errors, category?.requiresPotentialLevel, `${categoryPath}.requiresPotentialLevel`)
             const levelScale = category?.levelScale ?? "skill"
             requireEnum(errors, levelScale, SKILL_LEVEL_SCALE_VALUES, `${categoryPath}.levelScale`)
             const categoryRange = validateSkillLevelRange(errors, category?.levelRange, `${categoryPath}.levelRange`, null, levelScale)
@@ -1873,7 +1832,6 @@ function validateAgentSkill(item, context) {
                     seenMoves.add(move.id)
                 }
                 requireName(errors, move?.name, `${movePath}.name.zhCN`)
-                validateRequiresPotentialLevel(errors, move?.requiresPotentialLevel, `${movePath}.requiresPotentialLevel`)
                 requireEnum(errors, move?.skillType, SKILL_TYPE_VALUES, `${movePath}.skillType`)
                 if (move?.skillTags !== undefined) {
                     if (!Array.isArray(move.skillTags)) {
@@ -1923,7 +1881,6 @@ function validateAgentSkill(item, context) {
                         seenRows.add(row.id)
                     }
                     requireName(errors, row?.label, `${rowPath}.label.zhCN`)
-                    validateRequiresPotentialLevel(errors, row?.requiresPotentialLevel, `${rowPath}.requiresPotentialLevel`)
                     requireEnum(errors, row?.kind ?? "damageMultiplier", SKILL_ROW_KIND_VALUES, `${rowPath}.kind`)
                     if (row?.damageBasis !== undefined && row.damageBasis !== "") {
                         requireEnum(errors, row.damageBasis, SKILL_ROW_DAMAGE_BASIS_VALUES, `${rowPath}.damageBasis`)
@@ -2118,8 +2075,9 @@ function validateAgent(item, context) {
     validateCinemaBuffs(errors, item?.combatBuffs?.cinemaBuffs, context)
     validateAnomalyReleaseProfiles(errors, item?.anomalyReleaseProfiles)
     validatePreferredDriveDiscs(errors, item?.preferredDriveDiscs, context)
-    const roleSkillGroupById = validateCalculationSkillGroups(errors, item?.skillGroups, "skillGroups", context, item?.id)
-    validateDefaultCalculationConfig(errors, item?.defaultCalculationConfig, { ...context, currentAgent: item }, item?.id, roleSkillGroupById)
+    const agentContext = { ...context, currentAgent: item }
+    const roleSkillGroupById = validateCalculationSkillGroups(errors, item?.skillGroups, "skillGroups", agentContext, item?.id)
+    validateDefaultCalculationConfig(errors, item?.defaultCalculationConfig, agentContext, item?.id, roleSkillGroupById)
 
     if (item?.coreSkill) {
         if (typeof item.coreSkill !== "object" || Array.isArray(item.coreSkill)) {

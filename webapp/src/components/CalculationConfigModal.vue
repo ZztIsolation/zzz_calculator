@@ -40,7 +40,6 @@ import {
   skillGroupCountLimits,
 } from "@core/calculationSkillGroups.js"
 import { resolveDefaultCalculationConfig } from "@core/defaultCalculationConfig.js"
-import { potentialLevelRequirementMatches } from "@core/potentialVision.js"
 import {
   disorderBaseMultiplier,
   disorderElapsedStepSeconds,
@@ -99,8 +98,7 @@ const adminCalculationConfig = computed(() => resolveDefaultCalculationConfig(
   props.cinemaLevel ?? 0,
   props.potentialLevel ?? 0,
 ))
-const skillGroups = computed(() => calculationSkillGroups(props.agent)
-  .filter((group: any) => potentialLevelRequirementMatches(group, props.potentialLevel ?? 0)))
+const skillGroups = computed(() => calculationSkillGroups(props.agent))
 const hasSkillGroups = computed(() => skillGroups.value.length > 0)
 const skillGroupOptions = computed(() => skillGroups.value.map((group: any) => ({
   label: skillGroupLabel(group),
@@ -220,23 +218,11 @@ const releaseSourceOptions = computed(() => (props.meta?.agents ?? []).map((agen
 })))
 
 const selectedEvent = computed(() => (draft.value.events ?? []).find((event: any) => event.id === draft.value.selectedEventId) ?? draft.value.events?.[0])
-const skillCategories = computed(() => (props.skillCatalog?.categories ?? [])
-  .filter((category: any) => potentialLevelRequirementMatches(category, props.potentialLevel ?? 0)))
-const skillCategoryOptions = computed(() => {
-  const options: any[] = skillCategories.value.map((category: any) => ({
+const skillCategories = computed(() => props.skillCatalog?.categories ?? [])
+const skillCategoryOptions = computed(() => skillCategories.value.map((category: any) => ({
     label: skillCategoryLabel(category.id, category),
     value: category.id,
-  }))
-  const locked = lockedPotentialSkillSelection(selectedEvent.value)?.category
-  if (locked && !options.some(option => option.value === locked.id)) {
-    options.push({
-      label: `${skillCategoryLabel(locked.id, locked)}（需要 P${requiredPotentialLevel(locked)}）`,
-      value: locked.id,
-      disabled: true,
-    })
-  }
-  return options
-})
+  })))
 
 function luminescencePreviewEvent(event: any) {
   return {
@@ -393,8 +379,7 @@ function skillGroupEventCount(group: any) {
 }
 
 function selectedSkillGroup(event: any = selectedEvent.value) {
-  const group = skillGroupById(props.agent, event?.skillGroupId)
-  return potentialLevelRequirementMatches(group, props.potentialLevel ?? 0) ? group : null
+  return skillGroupById(props.agent, event?.skillGroupId)
 }
 
 function skillGroupChildEvents(group: any = selectedSkillGroup()) {
@@ -428,7 +413,7 @@ function selectedEventCountLimits(event: any = selectedEvent.value) {
     const range = normalizeEventCountRange(selectedRow(event)?.eventCountRange)
     return range ? { min: range.min, max: range.max, step: 1 } : { min: 0, max: null, step: 1 }
   }
-  return skillGroupCountLimits(selectedSkillGroup(event) ?? {})
+  return { ...skillGroupCountLimits(selectedSkillGroup(event) ?? {}), max: null }
 }
 
 function normalizeEventCountRange(value: any) {
@@ -480,43 +465,7 @@ function isEventActive(event: any) {
 }
 
 function skillRows(category: any, move: any) {
-  if (!potentialLevelRequirementMatches(category, props.potentialLevel ?? 0)
-    || !potentialLevelRequirementMatches(move, props.potentialLevel ?? 0)) {
-    return []
-  }
   return damageSkillRowsWithGeneratedTotals(category ?? {}, move ?? {})
-    .filter((row: any) => potentialLevelRequirementMatches(row, props.potentialLevel ?? 0))
-}
-
-function rawSkillSelection(event: any) {
-  const skillRef = event?.skillRef
-  if (!skillRef) return null
-  const category = (props.skillCatalog?.categories ?? [])
-    .find((item: any) => item.id === skillRef.categoryId)
-  const move = (category?.moves ?? []).find((item: any) => item.id === skillRef.moveId)
-  const row = damageSkillRowsWithGeneratedTotals(category ?? {}, move ?? {})
-    .find((item: any) => item.id === skillRef.rowId)
-  return category && move && row ? { category, move, row } : null
-}
-
-function lockedPotentialSkillSelection(event: any) {
-  const selection = rawSkillSelection(event)
-  if (!selection) return null
-  return [selection.category, selection.move, selection.row]
-    .every(value => potentialLevelRequirementMatches(value, props.potentialLevel ?? 0))
-    ? null
-    : selection
-}
-
-function requiredPotentialLevel(...values: any[]) {
-  return Math.max(0, ...values.map(value => Number(value?.requiresPotentialLevel ?? 0)).filter(Number.isFinite))
-}
-
-function lockedPotentialSkillMessage(event: any) {
-  const selection = lockedPotentialSkillSelection(event)
-  if (!selection) return ""
-  const required = requiredPotentialLevel(selection.category, selection.move, selection.row)
-  return `该技能需要潜能 P${required}，当前为 P${props.potentialLevel ?? 0}，无法使用`
 }
 
 function isDirectSkillEvent(event: any) {
@@ -529,12 +478,6 @@ function firstCategoryWithDamageRows() {
 }
 
 function skillSelection(categoryId?: string, moveId?: string, rowId?: string) {
-  if (categoryId && moveId && rowId) {
-    const rawSelection = rawSkillSelection({ skillRef: { categoryId, moveId, rowId } })
-    if (rawSelection && lockedPotentialSkillSelection({ skillRef: { categoryId, moveId, rowId } })) {
-      return null
-    }
-  }
   const category = skillCategories.value.find((item: any) => item.id === categoryId)
     ?? firstCategoryWithDamageRows()
     ?? null
@@ -765,16 +708,16 @@ function optionLabel(options: Array<{ label: string, value: string }>, value: un
 }
 
 function selectedSkillCategoryLabel(event: any) {
-  const category = selectedCategory(event) ?? lockedPotentialSkillSelection(event)?.category
+  const category = selectedCategory(event)
   return category ? skillCategoryLabel(category.id, category) : "未配置"
 }
 
 function selectedSkillMoveLabel(event: any) {
-  return labelOf(selectedMove(event) ?? lockedPotentialSkillSelection(event)?.move) || "未配置"
+  return labelOf(selectedMove(event)) || "未配置"
 }
 
 function selectedSkillRowLabel(event: any) {
-  const row = selectedRow(event) ?? lockedPotentialSkillSelection(event)?.row
+  const row = selectedRow(event)
   return row ? skillRowLabel(row) : "未配置"
 }
 
@@ -783,40 +726,20 @@ function selectedSkillGroupLabel(event: any) {
 }
 
 function moveOptions(event: any) {
-  const locked = lockedPotentialSkillSelection(event)
-  const category = selectedCategory(event) ?? locked?.category
-  const options: any[] = (category?.moves ?? [])
-    .filter((move: any) => potentialLevelRequirementMatches(move, props.potentialLevel ?? 0))
-    .map((move: any) => ({
+  const category = selectedCategory(event)
+  return (category?.moves ?? []).map((move: any) => ({
     label: labelOf(move),
     value: move.id,
   }))
-  if (locked?.move && !options.some(option => option.value === locked.move.id)) {
-    options.push({
-      label: `${labelOf(locked.move)}（需要 P${requiredPotentialLevel(locked.category, locked.move)}）`,
-      value: locked.move.id,
-      disabled: true,
-    })
-  }
-  return options
 }
 
 function rowOptions(event: any) {
-  const locked = lockedPotentialSkillSelection(event)
-  const category = selectedCategory(event) ?? locked?.category
-  const move = selectedMove(event) ?? locked?.move
-  const options: any[] = skillRows(category, move).map((row: any) => ({
+  const category = selectedCategory(event)
+  const move = selectedMove(event)
+  return skillRows(category, move).map((row: any) => ({
     label: skillRowLabel(row),
     value: row.id,
   }))
-  if (locked?.row && !options.some(option => option.value === locked.row.id)) {
-    options.push({
-      label: `${skillRowLabel(locked.row)}（需要 P${requiredPotentialLevel(locked.category, locked.move, locked.row)}）`,
-      value: locked.row.id,
-      disabled: true,
-    })
-  }
-  return options
 }
 
 function selectedSkillSummary(event: any) {
@@ -1107,8 +1030,6 @@ const eventWarnings = computed(() => {
     return ["请选择一个事件"]
   }
   const warnings: string[] = []
-  const lockedSkillMessage = lockedPotentialSkillMessage(event)
-  if (lockedSkillMessage) warnings.push(lockedSkillMessage)
   if (!isLuminescenceSettlement(event) && (!Number.isFinite(Number(event.count)) || Number(event.count) <= 0)) {
     warnings.push("次数需要大于 0")
   }
@@ -1122,10 +1043,7 @@ const eventWarnings = computed(() => {
     if (!event.skillGroupId) {
       warnings.push("技能组事件需要选择技能组")
     } else if (!selectedSkillGroup(event)) {
-      const lockedGroup = skillGroupById(props.agent, event.skillGroupId)
-      warnings.push(lockedGroup
-        ? `该技能组需要潜能 P${requiredPotentialLevel(lockedGroup)}，当前为 P${props.potentialLevel ?? 0}，无法使用`
-        : "技能组不存在")
+      warnings.push("技能组不存在")
     }
     return warnings
   }
@@ -1158,13 +1076,6 @@ const eventWarnings = computed(() => {
   }
   return warnings
 })
-const hasLockedPotentialSkills = computed(() => (draft.value.events ?? []).some((event: any) => {
-  if (lockedPotentialSkillSelection(event)) return true
-  if (event?.kind !== "skillGroup") return false
-  const group = skillGroupById(props.agent, event.skillGroupId)
-  return Boolean(group) && !potentialLevelRequirementMatches(group, props.potentialLevel ?? 0)
-}))
-
 function applySkill(value: any) {
   const countRange = normalizeEventCountRange(value.eventCountRange)
   updateSelectedEvent({
@@ -1754,7 +1665,6 @@ function save() {
       v-model:show="showSkillPicker"
       :skill-catalog="skillCatalog"
       :skill-levels="skillLevels"
-      :potential-level="potentialLevel"
       @select="applySkill"
     />
 
@@ -1762,7 +1672,7 @@ function save() {
       <div class="drawer-footer">
         <span class="muted">事件 {{ draft.events?.length ?? 0 }} 项</span>
         <NButton @click="close">取消</NButton>
-        <NButton type="primary" :disabled="hasLockedPotentialSkills || (isLuminescenceSettlement(selectedEvent) && eventWarnings.length > 0)" @click="save">保存配置</NButton>
+        <NButton type="primary" :disabled="isLuminescenceSettlement(selectedEvent) && eventWarnings.length > 0" @click="save">保存配置</NButton>
       </div>
     </template>
   </NModal>

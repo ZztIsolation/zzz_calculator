@@ -72,7 +72,6 @@ const FIELD_LABELS: Record<string, string> = {
   minPotentialLevel: "最低潜能等级",
   maxPotentialLevel: "最高潜能等级",
   mechanicUnlockLevel: "机制解锁等级",
-  requiresPotentialLevel: "需要潜能等级",
   eventCountRange: "事件次数范围",
   cinemaBuffs: "影画 Buff",
   cinemaLevel: "影画等级",
@@ -133,7 +132,6 @@ const FIELD_LABELS: Record<string, string> = {
   skillGroups: "技能组",
   defaultCount: "默认次数",
   minCount: "最少次数",
-  maxCount: "最多次数",
   events: "计算事件",
   defaultCalculationConfig: "默认计算配置",
   variants: "影画配置变体",
@@ -358,6 +356,8 @@ export function prepareDraft(resource: ResourceValue, input: any): any {
     item.skillGroups ??= []
     item.skillGroups.forEach((group: any) => {
       ensureId(group, "skill_group")
+      delete group.requiresPotentialLevel
+      delete group.maxCount
       group.name ??= { zhCN: "" }
       group.description ??= { zhCN: "" }
       if (group.authoredCountRange !== true) {
@@ -406,12 +406,14 @@ export function prepareDraft(resource: ResourceValue, input: any): any {
     item.categories ??= []
     item.categories.forEach((category: any) => {
       ensureId(category, "skill_category")
+      delete category.requiresPotentialLevel
       category.name ??= { zhCN: "" }
       category.levelScale ??= Array.isArray(category.levelRange?.levels) ? "coreSkill" : "skill"
       category.levelRange ??= category.levelScale === "coreSkill" ? { levels: ["A", "B", "C", "D", "E", "F"], default: "F" } : { min: 1, max: 12, default: 12 }
       category.moves ??= []
       category.moves.forEach((move: any) => {
         ensureId(move, "skill_move")
+        delete move.requiresPotentialLevel
         move.name ??= { zhCN: "" }
         move.skillType ||= legacySkillTypeForMove(category, move) || "basic"
         move.skillTags ??= []
@@ -419,6 +421,7 @@ export function prepareDraft(resource: ResourceValue, input: any): any {
         move.rows ??= []
         move.rows.forEach((row: any) => {
           ensureId(row, "skill_row")
+          delete row.requiresPotentialLevel
           row.label ??= { zhCN: "" }
           row.kind ??= "damageMultiplier"
           row.values ??= []

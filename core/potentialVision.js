@@ -28,21 +28,6 @@ export function normalizePotentialLevel(agent = {}, value, fallback) {
     return Math.min(maxLevel, Math.max(MIN_POTENTIAL_LEVEL, requestedLevel ?? fallbackLevel))
 }
 
-export function potentialLevelRequirementMatches(value = {}, potentialLevel = 0) {
-    if (!Object.prototype.hasOwnProperty.call(value ?? {}, "requiresPotentialLevel")) {
-        return true
-    }
-    const requiredLevel = finiteInteger(value?.requiresPotentialLevel)
-    if (requiredLevel === null) {
-        return false
-    }
-    const activeLevel = Math.min(
-        MAX_POTENTIAL_LEVEL,
-        Math.max(MIN_POTENTIAL_LEVEL, finiteInteger(potentialLevel) ?? MIN_POTENTIAL_LEVEL),
-    )
-    return activeLevel >= Math.min(MAX_POTENTIAL_LEVEL, Math.max(MIN_POTENTIAL_LEVEL, requiredLevel))
-}
-
 export function potentialVisionScalingRow(agent = {}, potentialLevel) {
     const levels = Array.isArray(agent?.potentialVision?.scaling?.levels)
         ? agent.potentialVision.scaling.levels

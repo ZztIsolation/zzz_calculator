@@ -295,7 +295,7 @@ declare module "@core/calculationSkillGroups.js" {
   export function calculationSkillGroups(source?: any, options?: { potentialLevel?: number }): any[]
   export function hasCalculationSkillGroups(source?: any, options?: { potentialLevel?: number }): boolean
   export function skillGroupById(source?: any, groupId?: string, options?: { potentialLevel?: number }): any
-  export function skillGroupCountLimits(group?: any): { min: number, max: number | null, step: number }
+  export function skillGroupCountLimits(group?: any): { min: number, step: number }
   export function normalizeSkillGroupCounts(source?: any, inputCounts?: Record<string, any>): Record<string, number>
   export function isSkillGroupReferenceEvent(event?: any): boolean
   export function normalizeSkillGroupReferenceEvent(event?: any, source?: any, index?: number, options?: any): any
@@ -317,7 +317,6 @@ declare module "@core/defaultCalculationConfig.js" {
 
 declare module "@core/potentialVision.js" {
   export function normalizePotentialLevel(agent?: any, value?: any, fallback?: number): number
-  export function potentialLevelRequirementMatches(value?: any, potentialLevel?: number): boolean
   export function materializePotentialVisionEffect(effect?: any, agent?: any, potentialLevel?: number): any
 }
 
@@ -462,7 +461,7 @@ declare module "@runtime/selection-storage.js" {
 }
 
 declare module "@core/maintenanceValidation.js" {
-  export const SYSTEM_MANAGED_SKILL_GROUP_COUNTS: Readonly<{ defaultCount: 1, minCount: 0, maxCount: 100, step: 1 }>
+  export const SYSTEM_MANAGED_SKILL_GROUP_COUNTS: Readonly<{ defaultCount: 1, minCount: 0, step: 1 }>
   export const SYSTEM_MANAGED_COVERAGE: Readonly<{ default: 1, min: 0, max: 1, step: 0.1 }>
   export function createSystemManagedCoverage(defaultValue?: number): { default: number, min: 0, max: 1, step: 0.1 }
   export function applySystemManagedMaintenanceFields<T>(value: T): T

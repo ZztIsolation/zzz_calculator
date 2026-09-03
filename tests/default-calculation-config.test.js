@@ -7,7 +7,6 @@ import {
 import {
     materializePotentialVisionEffect,
     normalizePotentialLevel,
-    potentialLevelRequirementMatches,
     potentialVisionScalingRow,
 } from "../core/potentialVision.js"
 
@@ -79,6 +78,7 @@ const potentialAgent = {
     potentialVision: {
         defaultLevel: 6,
         maxLevel: 6,
+        mechanicUnlockLevel: 1,
         scaling: {
             levels: [
                 { level: 0, critDmgPct: 0 },
@@ -93,8 +93,6 @@ assert.equal(normalizePotentialLevel(potentialAgent, -1), 0)
 assert.equal(normalizePotentialLevel(potentialAgent, 9), 6)
 assert.equal(normalizePotentialLevel({}, 6), 0)
 assert.equal(potentialVisionScalingRow(potentialAgent, 4).critDmgPct, 16)
-assert.equal(potentialLevelRequirementMatches({ requiresPotentialLevel: 1 }, 0), false)
-assert.equal(potentialLevelRequirementMatches({ requiresPotentialLevel: 1 }, 1), true)
 const potentialEffect = {
     effects: [{
         id: "potential-crit-dmg",

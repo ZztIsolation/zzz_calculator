@@ -1,5 +1,3 @@
-import { potentialLevelRequirementMatches } from "./potentialVision.js"
-
 function cloneJson(value) {
     if (value === undefined) {
         return undefined
@@ -19,18 +17,10 @@ function finiteNumber(value, fallback = 0) {
     return Number.isFinite(numeric) ? numeric : fallback
 }
 
-function clamp(value, min, max) {
-    return Math.min(max, Math.max(min, value))
-}
-
 function groupRange(group = {}) {
     const min = Math.max(0, finiteNumber(group.minCount, 0))
-    const rawMax = group.maxCount === undefined || group.maxCount === null || group.maxCount === ""
-        ? Number.POSITIVE_INFINITY
-        : finiteNumber(group.maxCount, Number.POSITIVE_INFINITY)
-    const max = Math.max(min, rawMax)
     const step = Math.max(0.000001, finiteNumber(group.step, 1))
-    return { min, max, step }
+    return { min, step }
 }
 
 function normalizeId(value) {
@@ -49,8 +39,6 @@ export function calculationSkillGroups(source = {}, options = {}) {
             : []
     return groups
         .filter(group => group && typeof group === "object" && !Array.isArray(group))
-        .filter(group => options.potentialLevel === undefined
-            || potentialLevelRequirementMatches(group, options.potentialLevel))
 }
 
 export function hasCalculationSkillGroups(source = {}, options = {}) {
@@ -63,8 +51,8 @@ export function skillGroupById(source = {}, groupId = "", options = {}) {
 }
 
 export function skillGroupCountLimits(group = {}) {
-    const { min, max, step } = groupRange(group)
-    return { min, max: Number.isFinite(max) ? max : null, step }
+    const { min, step } = groupRange(group)
+    return { min, step }
 }
 
 export function normalizeSkillGroupCounts(source = {}, inputCounts = {}, options = {}) {
@@ -74,9 +62,9 @@ export function normalizeSkillGroupCounts(source = {}, inputCounts = {}, options
         if (!id) {
             continue
         }
-        const { min, max } = groupRange(group)
+        const { min } = groupRange(group)
         const fallback = finiteNumber(group.defaultCount, min)
-        counts[id] = clamp(finiteNumber(inputCounts?.[id], fallback), min, max)
+        counts[id] = Math.max(min, finiteNumber(inputCounts?.[id], fallback))
     }
     return counts
 }
@@ -91,19 +79,8 @@ function strictSkillGroupError(message, event = {}) {
 }
 
 export function normalizeSkillGroupReferenceEvent(event = {}, source = {}, index = 0, options = {}) {
-    const allGroups = calculationSkillGroups(source)
     const groups = calculationSkillGroups(source, options)
     const requestedGroupId = normalizeId(event.skillGroupId ?? event.groupId)
-    const unavailableGroup = requestedGroupId
-        ? allGroups.find(item => normalizeId(item.id) === requestedGroupId
-            && !potentialLevelRequirementMatches(item, options.potentialLevel ?? 0))
-        : null
-    if (options.strict && unavailableGroup) {
-        throw strictSkillGroupError(
-            `技能组 ${requestedGroupId} 需要潜能 P${unavailableGroup.requiresPotentialLevel}，当前为 P${options.potentialLevel ?? 0}。`,
-            event,
-        )
-    }
     if (!groups.length) {
         if (options.strict) {
             throw strictSkillGroupError("当前角色没有可用的技能组定义。", event)
@@ -124,9 +101,9 @@ export function normalizeSkillGroupReferenceEvent(event = {}, source = {}, index
         }
         return null
     }
-    const { min, max } = groupRange(group)
+    const { min } = groupRange(group)
     const fallbackCount = finiteNumber(group.defaultCount, min)
-    const count = clamp(finiteNumber(event.count, fallbackCount), min, max)
+    const count = Math.max(min, finiteNumber(event.count, fallbackCount))
     const id = normalizeId(event.id) || `${groupId}-ref-${index + 1}`
     return {
         id,
@@ -187,8 +164,14 @@ export function expandCalculationEvents(events = [], source = {}, options = {}) 
             }
             const next = cloneJson(childEvent)
             const childId = normalizeId(next.id) || `event-${childIndex + 1}`
+            const childCount = finiteNumber(next.count, 1)
             next.id = `${refId}__${childId}`
-            next.count = finiteNumber(next.count, 1) * groupCount
+            next.count = childCount * groupCount
+            next.skillGroupExpansion = {
+                groupId: event.skillGroupId,
+                repeatCount: groupCount,
+                childCount,
+            }
             next.stunned = normalizeStunned(event.stunned)
             if (!selectedIdMap.has(refId)) {
                 selectedIdMap.set(refId, next.id)

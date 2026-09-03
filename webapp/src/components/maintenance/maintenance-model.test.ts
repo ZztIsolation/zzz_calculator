@@ -296,8 +296,10 @@ describe("maintenance structured model", () => {
         cinemaBuffs: [],
       },
     })
-    expect(draft.skillGroups[0]).toMatchObject({ defaultCount: 1, minCount: 0, maxCount: 100, step: 1 })
-    expect(draft.skillGroups[1]).toMatchObject({ authoredCountRange: true, defaultCount: 1, minCount: 0, maxCount: 1, step: 1 })
+    expect(draft.skillGroups[0]).toMatchObject({ defaultCount: 1, minCount: 0, step: 1 })
+    expect(draft.skillGroups[1]).toMatchObject({ authoredCountRange: true, defaultCount: 1, minCount: 0, step: 1 })
+    expect(draft.skillGroups[0]).not.toHaveProperty("maxCount")
+    expect(draft.skillGroups[1]).not.toHaveProperty("maxCount")
     expect(draft.combatBuffs.corePassive.coverage).toBeUndefined()
     expect(draft.combatBuffs.corePassive.effects[0].coverage).toEqual({ default: 0.4, min: 0, max: 1, step: 0.1 })
     const preview = maskedPreview(draft)
@@ -370,5 +372,33 @@ describe("maintenance structured model", () => {
       cooldownSeconds: 1,
       requirement: { specialty: "attack" },
     })
+  })
+
+  it("removes legacy per-skill potential-level fields from maintenance drafts", () => {
+    const skills = prepareDraft("agent-skills", {
+      categories: [{
+        name: { zhCN: "普通攻击" },
+        requiresPotentialLevel: 1,
+        moves: [{
+          name: { zhCN: "潜能招式" },
+          requiresPotentialLevel: 1,
+          rows: [{
+            label: { zhCN: "伤害倍率" },
+            requiresPotentialLevel: 1,
+            values: [100],
+          }],
+        }],
+      }],
+    })
+    expect(JSON.stringify(skills)).not.toContain("requiresPotentialLevel")
+
+    const agent = prepareDraft("agents", {
+      skillGroups: [{
+        name: { zhCN: "潜能组" },
+        requiresPotentialLevel: 1,
+        events: [],
+      }],
+    })
+    expect(JSON.stringify(agent.skillGroups)).not.toContain("requiresPotentialLevel")
   })
 })

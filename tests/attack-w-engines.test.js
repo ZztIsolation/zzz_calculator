@@ -146,13 +146,35 @@ assert.deepEqual(
 )
 
 const baseInput = catalog.examples.yeShunguang.input
+const brimstoneRule = rules("zzz_wiki_223")[0]
+assert.equal(engine("zzz_wiki_223").level60.advancedStat.mode, "flat", "Brimstone ATK advanced stat should use the base-ATK percentage representation")
+assert.equal(engine("zzz_wiki_223").level60.advancedStat.basis, "baseAtk", "Brimstone ATK advanced stat should use Base ATK as its basis")
+assert.equal(brimstoneRule.defaultStacks, 5, "Brimstone should default to five ATK stacks")
+assert.deepEqual(brimstoneRule.coverage, { default: 1, min: 0, max: 1, step: 0.1 }, "Brimstone ATK stacks should expose independent coverage")
 const brimstone = calculateInCombatPanel(catalog, {
     ...baseInput,
     wEngineId: "zzz_wiki_223",
     wEngineModificationLevel: 5,
     combatBuffs: { activeBuffIds: ["wEngine:zzz_wiki_223.self"] },
 })
-approx(brimstone.inCombat.buffTotals.atkPctOutOfCombat, 0.56, "Brimstone rank 5 should apply eight exact ATK stacks")
+approx(brimstone.inCombat.buffTotals.atkPctOutOfCombat, 0.35, "Brimstone rank 5 should apply five default ATK stacks")
+
+const brimstoneFullStacks = calculateInCombatPanel(catalog, {
+    ...baseInput,
+    wEngineId: "zzz_wiki_223",
+    wEngineModificationLevel: 5,
+    combatBuffs: {
+        activeBuffIds: ["wEngine:zzz_wiki_223.self"],
+        runtimeInputs: {
+            "wEngine:zzz_wiki_223.self": {
+                effects: {
+                    effect_wiki_223_self_atk: { stacks: 8 },
+                },
+            },
+        },
+    },
+})
+approx(brimstoneFullStacks.inCombat.buffTotals.atkPctOutOfCombat, 0.56, "Brimstone rank 5 should allow eight exact ATK stacks")
 
 const deepSeaVisitor = calculateInCombatPanel(catalog, {
     ...baseInput,

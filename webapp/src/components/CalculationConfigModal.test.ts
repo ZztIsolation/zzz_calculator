@@ -28,7 +28,6 @@ const miyabiWithSkillGroups = {
       name: { zhCN: "一变" },
       defaultCount: 10,
       minCount: 0,
-      maxCount: 30,
       step: 1,
       events: [
         {
@@ -50,7 +49,6 @@ const miyabiWithSkillGroups = {
       name: { zhCN: "一大" },
       defaultCount: 2,
       minCount: 0,
-      maxCount: 10,
       step: 1,
       events: [
         {
@@ -648,6 +646,9 @@ describe("CalculationConfigModal", () => {
     const expectedMultiplier = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 3 }).format(skillRow.values[11])
     expect(items[0].querySelector("small")?.textContent).toContain(`当前倍率 ${expectedMultiplier}%`)
     expect(listTitle).not.toContain("直伤 ·")
+    items[4].querySelector<HTMLButtonElement>(".calculation-event-select")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+    await nextTick()
     expect(document.body.querySelectorAll(".panel-title")[1].textContent).toContain("紊乱 · 烈霜霜寒紊乱（星见雅）")
     expect(document.body.textContent).not.toContain("miyabi_frost_moon_charge_3")
     expect(document.body.textContent).not.toMatch(/\bcharge_3\b/)
@@ -956,7 +957,7 @@ describe("CalculationConfigModal", () => {
       .dispatchEvent(new MouseEvent("click", { bubbles: true }))
     await nextTick()
     expect(readonlyDetailText()).toEqual(expect.arrayContaining([
-      "4",
+      "3",
       "普通攻击",
       "强化普攻：霜月",
       "三段蓄力斩击伤害倍率",
@@ -1668,7 +1669,7 @@ describe("CalculationConfigModal", () => {
     })
   })
 
-  it("rejects a saved P1 skill at P0 instead of silently replacing it", async () => {
+  it("allows a Potential move to remain selected and save at P0", async () => {
     const event = {
       id: "locked-potential-hit",
       kind: "direct",
@@ -1691,14 +1692,12 @@ describe("CalculationConfigModal", () => {
     })
 
     await openModal(wrapper)
-    expect(document.body.textContent).toContain("该技能需要潜能 P1，当前为 P0，无法使用")
+    expect(document.body.textContent).not.toContain("需要潜能 P1")
     const saveButton = Array.from(document.body.querySelectorAll("button"))
       .find(button => button.textContent?.trim() === "保存配置") as HTMLButtonElement
-    expect(saveButton.disabled).toBe(true)
-
-    await wrapper.setProps({ potentialLevel: 1 })
-    await nextTick()
-    expect(document.body.textContent).not.toContain("当前为 P0，无法使用")
+    expect(saveButton.disabled).toBe(false)
+    const saved = await saveModal(wrapper)
+    expect(saved.events[0].skillRef.moveId).toBe("potential_firepower_burst")
   })
 
   it("clamps a potential extra-hit event to its authored count range", async () => {

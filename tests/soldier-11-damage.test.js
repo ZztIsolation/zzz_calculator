@@ -171,7 +171,6 @@ const levelTwelveExpected = new Map([
     ["basic/fire_suppression/hit_2", 114.4],
     ["basic/fire_suppression/hit_3", 264],
     ["basic/fire_suppression/hit_4", 681.7],
-    ["basic/potential_fire_suppression_fifth/damage", 883.9],
     ["basic/potential_empowered_fire_suppression_fifth/base_damage", 883.9],
     ["basic/potential_empowered_fire_suppression_fifth/extra_damage", 166.4],
     ["basic/potential_firepower_burst/damage", 188.7],
@@ -207,7 +206,6 @@ const levelSixteenExpected = new Map([
 const levelFourteenExpected = new Map([
     ["basic/warmup_sparks/hit_4", 465.6],
     ["basic/fire_suppression/hit_4", 743.7],
-    ["basic/potential_fire_suppression_fifth/damage", 964.3],
     ["basic/potential_empowered_fire_suppression_fifth/extra_damage", 181.6],
     ["special/ex_special_fervent_fire/damage", 1473.2],
     ["chain/chain_uplifting_flame/damage", 1380],
@@ -241,12 +239,8 @@ for (const category of skillCatalog.categories) {
     }
 }
 assert.deepEqual(skillRow("special", "ex_special_fervent_fire", "energy_cost").values, Array(16).fill(80))
-assert.deepEqual(skillRow("basic", "potential_fire_suppression_fifth", "damage").values,
-    Array.from({ length: 16 }, (_, index) => Number((441.7 + 40.2 * index).toFixed(1))))
 assert.deepEqual(skillRow("basic", "potential_empowered_fire_suppression_fifth", "extra_damage").values,
     Array.from({ length: 16 }, (_, index) => Number((82.8 + 7.6 * index).toFixed(1))))
-assert.deepEqual(skillRow("basic", "potential_fire_suppression_fifth", "daze").values,
-    Array.from({ length: 16 }, (_, index) => Number((145.3 + 6.7 * index).toFixed(1))))
 assert.deepEqual(skillRow("basic", "potential_firepower_burst", "damage").values,
     Array.from({ length: 16 }, (_, index) => Number((94.1 + 8.6 * index).toFixed(1))))
 assert.deepEqual(skillRow("basic", "potential_firepower_burst", "daze").values,
@@ -266,41 +260,20 @@ for (const invalidCount of [1.5, 7]) {
 }
 
 for (const moveId of [
-    "potential_fire_suppression_fifth",
     "potential_empowered_fire_suppression_fifth",
     "potential_firepower_burst",
 ]) {
-    assert.equal(move("basic", moveId).requiresPotentialLevel, 1)
-    assert.ok(move("basic", moveId).rows.every(row => row.requiresPotentialLevel === 1))
+    assert.ok(move("basic", moveId))
 }
+assert.equal(JSON.stringify(skillCatalog).includes("requiresPotentialLevel"), false)
 assert.deepEqual(move("basic", "fire_suppression").skillTags, ["fireSuppression"])
 assert.deepEqual(move("dodge", "dash_attack_fire_suppression").skillTags, ["dashAttack", "fireSuppression"])
 assert.deepEqual(move("dodge", "dodge_counter_backfire").skillTags, ["dodgeCounter"])
-assert.equal(move("basic", "potential_firepower_burst").skillTags, undefined)
-
-const basicCategory = skillCatalog.categories.find(category => category.id === "basic")
-basicCategory.requiresPotentialLevel = 1
-try {
-    assert.throws(
-        () => calculate([directEvent("basic", "warmup_sparks", "hit_1")], { potentialLevel: 0 }),
-        /Skill category requires potential P1/,
-    )
-} finally {
-    delete basicCategory.requiresPotentialLevel
-}
-
-assert.throws(
-    () => calculate([
-        directEvent("basic", "potential_fire_suppression_fifth", "damage"),
-    ], { potentialLevel: 0 }),
-    /requires potential P1/,
-)
-assert.throws(
-    () => calculate([
-        directEvent("basic", "potential_empowered_fire_suppression_fifth", "extra_damage"),
-    ], { potentialLevel: 0 }),
-    /requires potential P1/,
-)
+assert.deepEqual(move("basic", "potential_firepower_burst").skillTags, [])
+const p0PotentialMove = calculate([
+    directEvent("basic", "potential_empowered_fire_suppression_fifth", "extra_damage"),
+], { potentialLevel: 0 }).damage.events[0]
+assert.equal(p0PotentialMove.count, 1)
 const omittedExtraCount = calculate([
     directEvent("basic", "potential_empowered_fire_suppression_fifth", "extra_damage", { omitCount: true }),
 ], { potentialLevel: 1 }).damage.events[0]
@@ -386,32 +359,71 @@ approx(m6Suppression.multipliers.resistance, 1.25, "M6 Fire Suppression fire res
 approx(m6Extra.multipliers.resistance, 1.25, "M6 empowered fifth extra inherits fire resistance ignore")
 approx(m6Burst.multipliers.resistance, 1, "M6 excludes Firepower Burst")
 
-function expandedConfig(potentialLevel) {
-    const config = resolveDefaultCalculationConfig(agent.defaultCalculationConfig, 0, potentialLevel)
+function expandedGroupConfig(skillGroupId, potentialLevel, repeatCount = 1, sourceAgent = agent) {
+    const config = {
+        mode: "custom",
+        selectedEventId: `${skillGroupId}-ref`,
+        events: [{ id: `${skillGroupId}-ref`, kind: "skillGroup", skillGroupId, count: repeatCount, stunned: true }],
+    }
     return {
         config,
-        expanded: expandCalculationConfigSkillGroups(config, agent, { strict: true, potentialLevel }),
+        expanded: expandCalculationConfigSkillGroups(config, sourceAgent, { strict: true, potentialLevel }),
     }
 }
-const p0Config = expandedConfig(0)
-assert.equal(p0Config.config.name.zhCN, "P0失衡爆发轴")
+const p0Config = expandedGroupConfig("fire_suppression_string", 0)
 assert.deepEqual(p0Config.expanded.events.map(event => event.skillRef.rowId),
-    ["damage", "hit_1", "hit_2", "hit_3", "hit_4", "damage", "hit_1", "hit_2", "hit_3", "hit_4"])
-const p1Config = expandedConfig(1)
-assert.equal(p1Config.config.name.zhCN, "P1及以上失衡爆发轴")
+    ["hit_1", "hit_2", "hit_3", "hit_4"])
+const p1Config = expandedGroupConfig("potential_empowered_fifth_package", 1, 3)
 assert.deepEqual(p1Config.expanded.events.map(event => event.skillRef.rowId),
-    ["damage", "hit_4", "base_damage", "extra_damage", "damage", "hit_4", "base_damage", "extra_damage"])
+    ["hit_4", "base_damage", "extra_damage"])
+assert.deepEqual(p1Config.expanded.events.map(event => event.count), [3, 3, 18])
+assert.deepEqual(p1Config.expanded.events[2].skillGroupExpansion, {
+    groupId: "potential_empowered_fifth_package",
+    repeatCount: 3,
+    childCount: 6,
+})
 assert.ok(p1Config.expanded.events.every(event => event.stunned))
 const levelTwelveRawMultiplier = p1Config.expanded.events.reduce((total, event) => {
     const { categoryId, moveId, rowId } = event.skillRef
     return total + skillRow(categoryId, moveId, rowId).values[11] * event.count
 }, 0)
-approx(levelTwelveRawMultiplier, 10599.2, "P1+ Lv12 default raw multiplier package")
-assert.equal(agent.skillGroups.find(group => group.id === "potential_empowered_fifth_package").requiresPotentialLevel, 1)
-assert.equal(agent.skillGroups.find(group => group.id === "potential_empowered_fifth_package").maxCount, 1)
+approx(levelTwelveRawMultiplier, 7692, "P1+ Lv12 empowered fifth raw multiplier package repeated three times")
+assert.equal(JSON.stringify(agent.skillGroups).includes("requiresPotentialLevel"), false)
+assert.equal(Object.hasOwn(agent.skillGroups.find(group => group.id === "potential_empowered_fifth_package"), "maxCount"), false)
+assert.equal(
+    expandCalculationConfigSkillGroups(p1Config.config, agent, { strict: true, potentialLevel: 0 }).events.length,
+    3,
+)
+
+const currentDefaultConfig = resolveDefaultCalculationConfig(agent.defaultCalculationConfig, 0, 0)
+assert.ok(currentDefaultConfig, "Soldier 11 saved default calculation config should exist")
+const expandedCurrentDefault = expandCalculationConfigSkillGroups(currentDefaultConfig, agent, {
+    strict: true,
+    potentialLevel: 0,
+})
+const currentDefaultExtra = expandedCurrentDefault.events
+    .find(event => event.id === "event_7fdef8f8dd__empowered-fifth-extra")
+assert.equal(currentDefaultExtra.count, 18)
+assert.deepEqual(currentDefaultExtra.skillGroupExpansion, {
+    groupId: "potential_empowered_fifth_package",
+    repeatCount: 3,
+    childCount: 6,
+})
+assert.doesNotThrow(() => calculate(expandedCurrentDefault.events, { potentialLevel: 0 }))
+
+const invalidGroupAgent = structuredClone(agent)
+invalidGroupAgent.skillGroups
+    .find(group => group.id === "potential_empowered_fifth_package").events
+    .find(event => event.id === "empowered-fifth-extra").count = 7
+const invalidExpandedGroup = expandedGroupConfig(
+    "potential_empowered_fifth_package",
+    0,
+    3,
+    invalidGroupAgent,
+)
 assert.throws(
-    () => expandCalculationConfigSkillGroups(p1Config.config, agent, { strict: true, potentialLevel: 0 }),
-    /需要潜能 P1/,
+    () => calculate(invalidExpandedGroup.expanded.events, { potentialLevel: 0 }),
+    /Event count out of range.*7.*expected 0\.\.6/,
 )
 
 const p6PreparedInput = {
@@ -449,7 +461,7 @@ for (const [label, result] of [
     ["dense", p6Dense],
     ["fixed", p6Fixed],
 ]) {
-    approx(result.finalDamage, p6ExpectedDamage, `${label} P6 default rotation parity`)
+    approx(result.finalDamage, p6ExpectedDamage, `${label} P6 empowered package parity`)
 }
 
 const optimizerSlotMainStats = {
