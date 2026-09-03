@@ -17,6 +17,8 @@ const yixuanSkillCatalog = (agentSkillsData as any).agentSkills.find((skill: any
 const alice = (agentsData as any).agents.find((agent: any) => agent.id === "alice_thymefield")
 const aria = (agentsData as any).agents.find((agent: any) => agent.id === "aria")
 const dan = (agentsData as any).agents.find((agent: any) => agent.id === "remielle_dan")
+const soldier11 = (agentsData as any).agents.find((agent: any) => agent.id === "soldier_11")
+const soldier11SkillCatalog = (agentSkillsData as any).agentSkills.find((skill: any) => skill.id === "soldier_11")
 
 const miyabiWithSkillGroups = {
   ...JSON.parse(JSON.stringify(miyabi)),
@@ -26,7 +28,6 @@ const miyabiWithSkillGroups = {
       name: { zhCN: "一变" },
       defaultCount: 10,
       minCount: 0,
-      maxCount: 30,
       step: 1,
       events: [
         {
@@ -48,7 +49,6 @@ const miyabiWithSkillGroups = {
       name: { zhCN: "一大" },
       defaultCount: 2,
       minCount: 0,
-      maxCount: 10,
       step: 1,
       events: [
         {
@@ -154,7 +154,7 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value))
 }
 
-function mountModal(overrides: { agent?: any, damageConfig?: any, meta?: any, skillCatalog?: any, cinemaLevel?: number, combatEffects?: any[], releaseContext?: any, sourceSnapshotProvider?: (agentId: string) => any } = {}) {
+function mountModal(overrides: { agent?: any, damageConfig?: any, meta?: any, skillCatalog?: any, cinemaLevel?: number, potentialLevel?: number, combatEffects?: any[], releaseContext?: any, sourceSnapshotProvider?: (agentId: string) => any } = {}) {
   const agent = overrides.agent ?? miyabi
   const skillCatalog = overrides.skillCatalog
     ?? (agentSkillsData as any).agentSkills.find((skill: any) => skill.id === agent?.id)
@@ -178,6 +178,7 @@ function mountModal(overrides: { agent?: any, damageConfig?: any, meta?: any, sk
       skillCatalog,
       skillLevels: { basic: 12, dodge: 12, assist: 12, special: 12, chain: 12, core_skill: "F" },
       cinemaLevel: overrides.cinemaLevel ?? 0,
+      potentialLevel: overrides.potentialLevel ?? 0,
       combatEffects: overrides.combatEffects ?? [],
       releaseContext: overrides.releaseContext,
       sourceSnapshotProvider: overrides.sourceSnapshotProvider,
@@ -645,6 +646,9 @@ describe("CalculationConfigModal", () => {
     const expectedMultiplier = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 3 }).format(skillRow.values[11])
     expect(items[0].querySelector("small")?.textContent).toContain(`当前倍率 ${expectedMultiplier}%`)
     expect(listTitle).not.toContain("直伤 ·")
+    items[4].querySelector<HTMLButtonElement>(".calculation-event-select")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+    await nextTick()
     expect(document.body.querySelectorAll(".panel-title")[1].textContent).toContain("紊乱 · 烈霜霜寒紊乱（星见雅）")
     expect(document.body.textContent).not.toContain("miyabi_frost_moon_charge_3")
     expect(document.body.textContent).not.toMatch(/\bcharge_3\b/)
@@ -953,7 +957,7 @@ describe("CalculationConfigModal", () => {
       .dispatchEvent(new MouseEvent("click", { bubbles: true }))
     await nextTick()
     expect(readonlyDetailText()).toEqual(expect.arrayContaining([
-      "4",
+      "3",
       "普通攻击",
       "强化普攻：霜月",
       "三段蓄力斩击伤害倍率",
@@ -1663,5 +1667,66 @@ describe("CalculationConfigModal", () => {
       teammateAttack: 3150,
       luminescenceDamageSharePct: 50,
     })
+  })
+
+  it("allows a Potential move to remain selected and save at P0", async () => {
+    const event = {
+      id: "locked-potential-hit",
+      kind: "direct",
+      count: 1,
+      stunned: true,
+      critMode: "expected",
+      skillRef: {
+        agentSkillId: "soldier_11",
+        categoryId: "basic",
+        moveId: "potential_firepower_burst",
+        rowId: "damage",
+        level: 12,
+      },
+    }
+    const wrapper = mountModal({
+      agent: soldier11,
+      skillCatalog: soldier11SkillCatalog,
+      potentialLevel: 0,
+      damageConfig: { mode: "custom", selectedEventId: event.id, events: [event] },
+    })
+
+    await openModal(wrapper)
+    expect(document.body.textContent).not.toContain("需要潜能 P1")
+    const saveButton = Array.from(document.body.querySelectorAll("button"))
+      .find(button => button.textContent?.trim() === "保存配置") as HTMLButtonElement
+    expect(saveButton.disabled).toBe(false)
+    const saved = await saveModal(wrapper)
+    expect(saved.events[0].skillRef.moveId).toBe("potential_firepower_burst")
+  })
+
+  it("clamps a potential extra-hit event to its authored count range", async () => {
+    const event = {
+      id: "potential-extra-hit",
+      kind: "direct",
+      count: 7,
+      stunned: true,
+      critMode: "expected",
+      skillRef: {
+        agentSkillId: "soldier_11",
+        categoryId: "basic",
+        moveId: "potential_empowered_fire_suppression_fifth",
+        rowId: "extra_damage",
+        level: 12,
+      },
+    }
+    const wrapper = mountModal({
+      agent: soldier11,
+      skillCatalog: soldier11SkillCatalog,
+      potentialLevel: 1,
+      damageConfig: { mode: "custom", selectedEventId: event.id, events: [event] },
+    })
+
+    await openModal(wrapper)
+    const countInput = wrapper.findAllComponents(NInputNumber)
+      .find(input => input.props("max") === 6)
+    expect(countInput?.props("value")).toBe(6)
+    const saved = await saveModal(wrapper)
+    expect(saved.events[0].count).toBe(6)
   })
 })

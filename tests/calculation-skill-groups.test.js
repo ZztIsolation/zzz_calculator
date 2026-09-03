@@ -15,7 +15,6 @@ const agent = {
             name: { zhCN: "一变" },
             defaultCount: 10,
             minCount: 0,
-            maxCount: 30,
             step: 1,
             events: [
                 {
@@ -38,7 +37,6 @@ const agent = {
             name: { zhCN: "一大" },
             defaultCount: 2,
             minCount: 0,
-            maxCount: 10,
             step: 1,
             events: [
                 {
@@ -109,6 +107,17 @@ assert.equal(expandedConfig.events[0].count, 1)
 assert.equal(expandedConfig.events[1].count, 20)
 assert.equal(expandedConfig.events[2].count, 2)
 assert.equal(expandedConfig.events[3].count, 6)
+assert.equal(Object.hasOwn(expandedConfig.events[0], "skillGroupExpansion"), false)
+assert.deepEqual(expandedConfig.events[1].skillGroupExpansion, {
+    groupId: "loop",
+    repeatCount: 10,
+    childCount: 2,
+})
+assert.deepEqual(expandedConfig.events[3].skillGroupExpansion, {
+    groupId: "loop",
+    repeatCount: 3,
+    childCount: 2,
+})
 assert.equal(expandedConfig.events[1].stunned, false)
 assert.equal(expandedConfig.events[2].stunned, true)
 assert.equal(expandedConfig.events[3].stunned, true)
@@ -127,9 +136,25 @@ assert.deepEqual(defaultRef, {
     stunned: true,
 })
 
-const clamped = normalizeSkillGroupCounts(agent, { loop: 999, ultimate: -5 })
-assert.deepEqual(clamped, { loop: 30, ultimate: 0 })
+const normalized = normalizeSkillGroupCounts(agent, { loop: 999, ultimate: -5 })
+assert.deepEqual(normalized, { loop: 999, ultimate: 0 })
 
+const potentialAgent = {
+    ...agent,
+    skillGroups: [
+        ...agent.skillGroups,
+        {
+            id: "potential-loop",
+            defaultCount: 1,
+            events: [{
+                id: "potential-hit",
+                kind: "direct",
+                skillMultiplier: 100,
+                skillRef: { categoryId: "basic", moveId: "potential-move", rowId: "damage" },
+            }],
+        },
+    ],
+}
 assert.throws(
     () => expandCalculationConfigSkillGroups({
         mode: "custom",
@@ -138,6 +163,19 @@ assert.throws(
     }, agent, { strict: true }),
     /技能组引用无法展开.*missing/u,
 )
+
+const expandedPotentialGroupAtP0 = expandCalculationConfigSkillGroups({
+    mode: "custom",
+    selectedEventId: "potential-ref",
+    events: [{ id: "potential-ref", kind: "skillGroup", skillGroupId: "potential-loop" }],
+}, potentialAgent, { strict: true, potentialLevel: 0 })
+assert.equal(expandedPotentialGroupAtP0.events[0].id, "potential-ref__potential-hit")
+const expandedPotentialGroup = expandCalculationConfigSkillGroups({
+    mode: "custom",
+    selectedEventId: "potential-ref",
+    events: [{ id: "potential-ref", kind: "skillGroup", skillGroupId: "potential-loop" }],
+}, potentialAgent, { strict: true, potentialLevel: 1 })
+assert.equal(expandedPotentialGroup.events[0].id, "potential-ref__potential-hit")
 
 assert.throws(
     () => expandCalculationConfigSkillGroups({

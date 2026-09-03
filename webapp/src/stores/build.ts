@@ -10,6 +10,7 @@ import {
   hasCalculationSkillGroups,
 } from "@core/calculationSkillGroups.js"
 import { resolveDefaultCalculationConfig } from "@core/defaultCalculationConfig.js"
+import { normalizePotentialLevel } from "@core/potentialVision.js"
 import { normalizeSkillTargetsInValue } from "@core/skillTargets.js"
 import {
   createAnomalySourceSnapshot,
@@ -287,12 +288,15 @@ export function primaryDamageModeForAgent(agent: any = null) {
   return isRuptureAgent(agent) ? "sheer" : "single"
 }
 
-export function hasAdminDefaultCalculation(agent: any = null, cinemaLevel = 0) {
-  const config = resolveDefaultCalculationConfig(agent?.defaultCalculationConfig, cinemaLevel)
-  return Boolean(config?.events?.length || hasCalculationSkillGroups(agent) || hasCalculationSkillGroups(config))
+export function hasAdminDefaultCalculation(agent: any = null, cinemaLevel = 0, potentialLevel = 0) {
+  const config = resolveDefaultCalculationConfig(agent?.defaultCalculationConfig, cinemaLevel, potentialLevel)
+  const options = { potentialLevel }
+  return Boolean(config?.events?.length
+    || hasCalculationSkillGroups(agent, options)
+    || hasCalculationSkillGroups(config, options))
 }
 
-export function isDamageModeAllowedForAgent(mode: unknown, agent: any = null, cinemaLevel = 0) {
+export function isDamageModeAllowedForAgent(mode: unknown, agent: any = null, cinemaLevel = 0, potentialLevel = 0) {
   const value = String(mode ?? "")
   if (value === "sheer") {
     return isRuptureAgent(agent)
@@ -301,14 +305,14 @@ export function isDamageModeAllowedForAgent(mode: unknown, agent: any = null, ci
     return !isRuptureAgent(agent)
   }
   if (value === "adminDefault") {
-    return hasAdminDefaultCalculation(agent, cinemaLevel)
+    return hasAdminDefaultCalculation(agent, cinemaLevel, potentialLevel)
   }
   return ["anomaly", "custom"].includes(value)
 }
 
-export function normalizeDamageModeForAgent(mode: unknown, agent: any = null, cinemaLevel = 0) {
+export function normalizeDamageModeForAgent(mode: unknown, agent: any = null, cinemaLevel = 0, potentialLevel = 0) {
   const value = String(mode ?? "")
-  return isDamageModeAllowedForAgent(value, agent, cinemaLevel) ? value : primaryDamageModeForAgent(agent)
+  return isDamageModeAllowedForAgent(value, agent, cinemaLevel, potentialLevel) ? value : primaryDamageModeForAgent(agent)
 }
 
 function primaryDamageConfigForAgent(agent: any = null) {
@@ -324,11 +328,11 @@ function primaryDamageConfigForAgent(agent: any = null) {
   }
 }
 
-export function defaultDamageConfig(agent: any = null, cinemaLevel = 0) {
-  const config = resolveDefaultCalculationConfig(agent?.defaultCalculationConfig, cinemaLevel)
+export function defaultDamageConfig(agent: any = null, cinemaLevel = 0, potentialLevel = 0) {
+  const config = resolveDefaultCalculationConfig(agent?.defaultCalculationConfig, cinemaLevel, potentialLevel)
   if (config?.events?.length) {
     const configuredMode = config.mode ?? "custom"
-    if (!isDamageModeAllowedForAgent(configuredMode, agent, cinemaLevel)) {
+    if (!isDamageModeAllowedForAgent(configuredMode, agent, cinemaLevel, potentialLevel)) {
       return primaryDamageConfigForAgent(agent)
     }
     return {
@@ -339,9 +343,10 @@ export function defaultDamageConfig(agent: any = null, cinemaLevel = 0) {
       events: clone(config.events),
     }
   }
-  const skillGroupSource = hasCalculationSkillGroups(agent) ? agent : config
-  if (hasCalculationSkillGroups(skillGroupSource)) {
-    const events = calculationSkillGroups(skillGroupSource)
+  const options = { potentialLevel }
+  const skillGroupSource = hasCalculationSkillGroups(agent, options) ? agent : config
+  if (hasCalculationSkillGroups(skillGroupSource, options)) {
+    const events = calculationSkillGroups(skillGroupSource, options)
       .map((group: any, index: number) => defaultSkillGroupReferenceEvent(skillGroupSource, group.id, index))
       .filter(Boolean)
     if (events.length) {
@@ -447,11 +452,11 @@ function damageConfigFields(value: any = {}) {
   return damage
 }
 
-function normalizeDamageConfig(value: any, agent: any = null, cinemaLevel = 0) {
-  const fallback = defaultDamageConfig(agent, cinemaLevel)
+function normalizeDamageConfig(value: any, agent: any = null, cinemaLevel = 0, potentialLevel = 0) {
+  const fallback = defaultDamageConfig(agent, cinemaLevel, potentialLevel)
   const rawMode = value?.mode ?? fallback.mode
-  const modeAllowed = isDamageModeAllowedForAgent(rawMode, agent, cinemaLevel)
-  const mode = normalizeDamageModeForAgent(rawMode, agent, cinemaLevel)
+  const modeAllowed = isDamageModeAllowedForAgent(rawMode, agent, cinemaLevel, potentialLevel)
+  const mode = normalizeDamageModeForAgent(rawMode, agent, cinemaLevel, potentialLevel)
   const eventFallback = modeAllowed ? fallback : primaryDamageConfigForAgent(agent)
   const usesAdminDefault = mode === "adminDefault"
   const fallbackStunned = usesAdminDefault ? true : (legacyTargetStunned(value) ?? true)
@@ -513,8 +518,7 @@ function ownerSelectionFromRaw(value: any) {
   }
   if (value.byOwner && typeof value.byOwner === "object") {
     const ownerId = activeOwnerId()
-    const storedOwnerId = String(value.currentOwnerId ?? ownerId)
-    return value.byOwner[ownerId] ?? value.byOwner[storedOwnerId] ?? value.byOwner.default ?? null
+    return value.byOwner[ownerId] ?? null
   }
   if (value.byAgent && typeof value.byAgent === "object") {
     return {
@@ -572,6 +576,7 @@ function writeBuildPersistSnapshot(snapshot: any) {
     agentLevel: snapshot.agentLevel,
     coreSkillLevel: snapshot.coreSkillLevel,
     cinemaLevel: snapshot.cinemaLevel,
+    potentialLevel: snapshot.potentialLevel,
     skillLevels: snapshot.skillLevels,
     wEngineId: snapshot.wEngineId,
     wEngineLevel: snapshot.wEngineLevel,
@@ -875,6 +880,7 @@ export const useBuildStore = defineStore("build", {
     agentLevel: 60,
     coreSkillLevel: "none" as string | number,
     cinemaLevel: 0,
+    potentialLevel: 0,
     skillLevels: defaultSkillLevels() as Record<string, any>,
     wEngineId: "",
     wEngineLevel: 60,
@@ -928,6 +934,11 @@ export const useBuildStore = defineStore("build", {
       this.agentLevel = numeric(config.agentLevel, 60)
       this.coreSkillLevel = config.coreSkillLevel ?? coreSkillDefaultLevel(agent)
       this.cinemaLevel = numeric(config.cinemaLevel, 0)
+      this.potentialLevel = normalizePotentialLevel(
+        agent,
+        config.potentialLevel,
+        agent?.potentialVision?.defaultLevel ?? 0,
+      )
       this.skillLevels = {
         ...defaultSkillLevels(),
         ...(config.skillLevels ?? config.skillLevelsByCategory ?? config.damage?.skillLevelsByCategory ?? {}),
@@ -955,7 +966,7 @@ export const useBuildStore = defineStore("build", {
       this.damageConfig = normalizeDamageConfig({
         ...(rawDamageConfig ?? {}),
         target: rawDamageConfig?.target ?? rawTargetConfig,
-      }, agent, this.cinemaLevel)
+      }, agent, this.cinemaLevel, this.potentialLevel)
       this.targetConfig = normalizeTargetConfig(legacyBossEncounterId ? {
         ...rawTargetConfig,
         presetId: "normal-boss",
@@ -985,7 +996,15 @@ export const useBuildStore = defineStore("build", {
       this.cinemaLevel = nextLevel
       if (this.damageConfig?.mode === "adminDefault") {
         const agent = meta?.agents?.find((item: any) => item.id === this.agentId)
-        this.damageConfig = normalizeDamageConfig(this.damageConfig, agent, this.cinemaLevel)
+        this.damageConfig = normalizeDamageConfig(this.damageConfig, agent, this.cinemaLevel, this.potentialLevel)
+      }
+      this.persist()
+    },
+    setPotentialLevel(level: number, meta: any = null) {
+      const agent = meta?.agents?.find((item: any) => item.id === this.agentId)
+      this.potentialLevel = normalizePotentialLevel(agent, level, 0)
+      if (this.damageConfig?.mode === "adminDefault") {
+        this.damageConfig = normalizeDamageConfig(this.damageConfig, agent, this.cinemaLevel, this.potentialLevel)
       }
       this.persist()
     },
@@ -1018,7 +1037,7 @@ export const useBuildStore = defineStore("build", {
       if (hasTargetConfig) {
         this.targetConfig = normalizeTargetConfig(config.target ?? config.targetConfig)
       }
-      this.damageConfig = normalizeDamageConfig(config, agent, this.cinemaLevel)
+      this.damageConfig = normalizeDamageConfig(config, agent, this.cinemaLevel, this.potentialLevel)
       this.persist()
     },
     setTargetConfig(target: any) {
@@ -1128,9 +1147,9 @@ export const useBuildStore = defineStore("build", {
         && this.damageConfig?.selectedEventId === "direct-1"
         && this.damageConfig?.events?.length === 1
         && this.damageConfig?.events?.[0]?.id === "direct-1"
-        && hasAdminDefaultCalculation(damageAgent, this.cinemaLevel)
+        && hasAdminDefaultCalculation(damageAgent, this.cinemaLevel, this.potentialLevel)
       const sourceDamageConfig = untouchedFallbackDamage
-        ? defaultDamageConfig(damageAgent, this.cinemaLevel)
+        ? defaultDamageConfig(damageAgent, this.cinemaLevel, this.potentialLevel)
         : this.damageConfig
       const damage = normalizeDamageConfig({
         ...sourceDamageConfig,
@@ -1139,14 +1158,18 @@ export const useBuildStore = defineStore("build", {
           ...(sourceDamageConfig.skillLevelsByCategory ?? {}),
           ...this.skillLevels,
         },
-      }, damageAgent, this.cinemaLevel)
-      const expandedDamage = expandCalculationConfigSkillGroups(damage, damageAgent, { strict: true })
+      }, damageAgent, this.cinemaLevel, this.potentialLevel)
+      const expandedDamage = expandCalculationConfigSkillGroups(damage, damageAgent, {
+        strict: true,
+        potentialLevel: this.potentialLevel,
+      })
       const activeBuffIds = this.activeBuffIds(meta, catalog, driveDiscs)
       return {
         agentId: this.agentId,
         agentLevel: this.agentLevel,
         coreSkillLevel: this.coreSkillLevel,
         cinemaLevel: this.cinemaLevel,
+        potentialLevel: this.potentialLevel,
         wEngineId: this.wEngineId,
         wEngineLevel: this.wEngineLevel,
         wEngineModificationLevel: this.wEngineModificationLevel,
@@ -1201,6 +1224,7 @@ export const useBuildStore = defineStore("build", {
         agentLevel: this.agentLevel,
         coreSkillLevel: this.coreSkillLevel,
         cinemaLevel: this.cinemaLevel,
+        potentialLevel: this.potentialLevel,
         skillLevels: clone(this.skillLevels),
         wEngineId: this.wEngineId,
         wEngineLevel: this.wEngineLevel,

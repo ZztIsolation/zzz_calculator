@@ -221,10 +221,10 @@ try {
         {
             defaultCount: managedAgentResult.savedItem.skillGroups[0].defaultCount,
             minCount: managedAgentResult.savedItem.skillGroups[0].minCount,
-            maxCount: managedAgentResult.savedItem.skillGroups[0].maxCount,
             step: managedAgentResult.savedItem.skillGroups[0].step,
+            hasMaxCount: Object.hasOwn(managedAgentResult.savedItem.skillGroups[0], "maxCount"),
         },
-        { defaultCount: 1, minCount: 0, maxCount: 100, step: 1 },
+        { defaultCount: 1, minCount: 0, step: 1, hasMaxCount: false },
     )
     assert.equal(managedAgentResult.savedItem.combatBuffs.corePassive.coverage, undefined)
     assert.equal(managedAgentResult.savedItem.skillGroups[0].events[0].stunned, false)
@@ -271,6 +271,25 @@ try {
     const skillBuffWithRow = structuredClone(reloadedSkillBuffAgent)
     skillBuffWithRow.combatBuffs.skillBuffs[0].sourceSkillRef.rowId = "damage"
     await saveRejected("agents", skillBuffWithRow, "不能保存倍率行")
+    const soldier11 = structuredClone(managedAgentCatalog.agents.agents.find(item => item.id === "soldier_11"))
+    const soldier11Save = await save("agents", soldier11)
+    const savedEmpoweredPackage = soldier11Save.savedItem.skillGroups
+        .find(group => group.id === "potential_empowered_fifth_package")
+    assert.deepEqual(
+        {
+            authoredCountRange: savedEmpoweredPackage.authoredCountRange,
+            defaultCount: savedEmpoweredPackage.defaultCount,
+            minCount: savedEmpoweredPackage.minCount,
+            step: savedEmpoweredPackage.step,
+            hasMaxCount: Object.hasOwn(savedEmpoweredPackage, "maxCount"),
+        },
+        { authoredCountRange: true, defaultCount: 1, minCount: 0, step: 1, hasMaxCount: false },
+    )
+    const reloadedSoldier11 = (await catalog()).agents.agents.find(item => item.id === "soldier_11")
+    assert.equal(Object.hasOwn(
+        reloadedSoldier11.skillGroups.find(group => group.id === "potential_empowered_fifth_package"),
+        "maxCount",
+    ), false)
 
     const danAgent = structuredClone(
         managedAgentCatalog.agents.agents.find(item => item.id === "remielle_dan"),

@@ -126,7 +126,7 @@ assert.deepEqual(agent.level60, {
 })
 assert.deepEqual(agent.preferredDriveDiscs.defaultSetIds, ["zzz_wiki_1552"])
 assert.deepEqual(agent.preferredDriveDiscs.mainStatLimits, {
-    4: ["critDmg", "atkPct"],
+    4: ["critDmg", "atkPct", "critRate"],
     5: ["penRatio", "iceDmg", "atkPct"],
     6: ["atkPct"],
 })
@@ -360,8 +360,8 @@ assert.deepEqual(oneConfig.expanded.events.map(event => event.count), [2, 2, 2, 
 const sixConfig = configRows(6)
 assert.deepEqual(sixConfig.rows, ["damage", "damage", "damage", "stage_1", "stage_2", "stage_3"])
 assert.deepEqual(sixConfig.expanded.events.map(event => event.count), [1, 2, 2, 4, 4, 4])
-assert.deepEqual(agent.skillGroups.map(group => [group.defaultCount, group.minCount, group.maxCount, group.step]), [
-    [1, 0, 100, 1],
+assert.deepEqual(agent.skillGroups.map(group => [group.defaultCount, group.minCount, group.step]), [
+    [1, 0, 1],
 ])
 
 function dawnDisc(partition) {

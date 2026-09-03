@@ -68,6 +68,7 @@ const props = defineProps<{
   meta: any
   agent?: any
   cinemaLevel?: number
+  potentialLevel?: number
   combatEffects?: any[]
   releaseContext?: {
     inCombatPanel?: any
@@ -91,10 +92,14 @@ const releaseSnapshotError = ref("")
 const isAdminDefaultMode = computed(() => draft.value.mode === "adminDefault")
 const canEditEventStructure = computed(() => draft.value.mode === "custom")
 const canUseSheerDamage = computed(() => isRuptureAgent(props.agent))
-const canUseAdminDefault = computed(() => hasAdminDefaultCalculation(props.agent, props.cinemaLevel ?? 0))
-const adminCalculationConfig = computed(() => resolveDefaultCalculationConfig(props.agent?.defaultCalculationConfig, props.cinemaLevel ?? 0))
+const canUseAdminDefault = computed(() => hasAdminDefaultCalculation(props.agent, props.cinemaLevel ?? 0, props.potentialLevel ?? 0))
+const adminCalculationConfig = computed(() => resolveDefaultCalculationConfig(
+  props.agent?.defaultCalculationConfig,
+  props.cinemaLevel ?? 0,
+  props.potentialLevel ?? 0,
+))
 const skillGroups = computed(() => calculationSkillGroups(props.agent))
-const hasSkillGroups = computed(() => hasCalculationSkillGroups(props.agent))
+const hasSkillGroups = computed(() => skillGroups.value.length > 0)
 const skillGroupOptions = computed(() => skillGroups.value.map((group: any) => ({
   label: skillGroupLabel(group),
   value: group.id,
@@ -135,7 +140,7 @@ function eventForMode(mode: string) {
 }
 
 function normalizeDraftForAgent(config: any) {
-  const mode = normalizeDamageModeForAgent(config?.mode, props.agent, props.cinemaLevel ?? 0)
+  const mode = normalizeDamageModeForAgent(config?.mode, props.agent, props.cinemaLevel ?? 0, props.potentialLevel ?? 0)
   if (mode === config?.mode) {
     return config
   }
@@ -152,7 +157,7 @@ watch(() => props.show, value => {
   if (value) {
     releaseSnapshotError.value = ""
     const { target: _target, targetConfig: _targetConfig, ...damageConfig } = props.damageConfig ?? {}
-    const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0)
+    const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0, props.potentialLevel ?? 0)
     const shouldUseFallbackEvents = damageConfig?.mode === "adminDefault"
       && Array.isArray(fallback.events)
       && fallback.events.length > 0
@@ -187,7 +192,7 @@ watch(() => props.show, value => {
   }
 })
 
-watch([() => props.skillCatalog, () => props.skillLevels], () => {
+watch([() => props.skillCatalog, () => props.skillLevels, () => props.potentialLevel], () => {
   if (props.show) {
     normalizeDraftSkillSelections()
   }
@@ -215,9 +220,9 @@ const releaseSourceOptions = computed(() => (props.meta?.agents ?? []).map((agen
 const selectedEvent = computed(() => (draft.value.events ?? []).find((event: any) => event.id === draft.value.selectedEventId) ?? draft.value.events?.[0])
 const skillCategories = computed(() => props.skillCatalog?.categories ?? [])
 const skillCategoryOptions = computed(() => skillCategories.value.map((category: any) => ({
-  label: skillCategoryLabel(category.id, category),
-  value: category.id,
-})))
+    label: skillCategoryLabel(category.id, category),
+    value: category.id,
+  })))
 
 function luminescencePreviewEvent(event: any) {
   return {
@@ -405,9 +410,32 @@ function skillGroupChildTitle(childEvent: any) {
 
 function selectedEventCountLimits(event: any = selectedEvent.value) {
   if (event?.kind !== "skillGroup") {
-    return { min: 0, max: null, step: 1 }
+    const range = normalizeEventCountRange(selectedRow(event)?.eventCountRange)
+    return range ? { min: range.min, max: range.max, step: 1 } : { min: 0, max: null, step: 1 }
   }
-  return skillGroupCountLimits(selectedSkillGroup(event) ?? {})
+  return { ...skillGroupCountLimits(selectedSkillGroup(event) ?? {}), max: null }
+}
+
+function normalizeEventCountRange(value: any) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null
+  const min = Number.isFinite(Number(value.min)) ? Number(value.min) : 0
+  const requestedMax = Number(value.max)
+  const max = Number.isFinite(requestedMax) ? Math.max(min, requestedMax) : null
+  const requestedDefault = Number(value.default)
+  const fallbackDefault = Number.isFinite(requestedDefault) ? requestedDefault : min
+  return {
+    min,
+    max,
+    default: Math.max(min, max === null ? fallbackDefault : Math.min(max, fallbackDefault)),
+  }
+}
+
+function normalizedCountForRange(value: unknown, range: any) {
+  const numeric = Number(value)
+  const fallback = range?.default ?? 1
+  const count = Number.isFinite(numeric) ? numeric : fallback
+  if (!range) return Math.max(0, count)
+  return Math.max(range.min, range.max === null ? count : Math.min(range.max, count))
 }
 
 function normalizeSkillGroupEvent(event: any, index = 0) {
@@ -472,6 +500,7 @@ function skillSelection(categoryId?: string, moveId?: string, rowId?: string) {
   if (!Number.isFinite(skillMultiplier)) {
     return null
   }
+  const eventCountRange = normalizeEventCountRange(row.eventCountRange)
   return {
     category,
     move,
@@ -484,6 +513,7 @@ function skillSelection(categoryId?: string, moveId?: string, rowId?: string) {
       rowId: row.id,
       level,
     },
+    eventCountRange,
   }
 }
 
@@ -503,6 +533,9 @@ function eventWithSkillSelection(event: any) {
     ...event,
     skillMultiplier: selection.skillMultiplier,
     skillRef: selection.skillRef,
+    ...(selection.eventCountRange
+      ? { count: normalizedCountForRange(event?.count, selection.eventCountRange) }
+      : {}),
   }
 }
 
@@ -887,6 +920,15 @@ function updateSelectedEvent(patch: any, options: { clearLabel?: boolean } = {})
   })
 }
 
+function updateSelectedEventCount(value: unknown) {
+  const limits = selectedEventCountLimits()
+  const count = Number(value)
+  const normalized = Number.isFinite(count)
+    ? Math.max(limits.min, limits.max === null ? count : Math.min(limits.max, count))
+    : Math.max(limits.min, 1)
+  updateSelectedEvent({ count: normalized })
+}
+
 function newEvent(kind: string) {
   const id = `${kind}-${Date.now().toString(36)}`
   if (kind === "skillGroup") {
@@ -964,7 +1006,7 @@ function removeEvent(eventId = selectedEvent.value?.id) {
 }
 
 function applyMode(mode: string) {
-  const nextMode = normalizeDamageModeForAgent(mode, props.agent, props.cinemaLevel ?? 0)
+  const nextMode = normalizeDamageModeForAgent(mode, props.agent, props.cinemaLevel ?? 0, props.potentialLevel ?? 0)
   draft.value.mode = nextMode
   if (nextMode === "single") {
     draft.value.events = [newEvent("direct")]
@@ -976,7 +1018,7 @@ function applyMode(mode: string) {
     draft.value.events = [newEvent("anomaly")]
     draft.value.selectedEventId = draft.value.events[0].id
   } else if (nextMode === "adminDefault") {
-    const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0)
+    const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0, props.potentialLevel ?? 0)
     draft.value.events = JSON.parse(JSON.stringify(fallback.events ?? [newEvent("direct")]))
     draft.value.selectedEventId = fallback.selectedEventId ?? draft.value.events[0]?.id
   }
@@ -990,6 +1032,12 @@ const eventWarnings = computed(() => {
   const warnings: string[] = []
   if (!isLuminescenceSettlement(event) && (!Number.isFinite(Number(event.count)) || Number(event.count) <= 0)) {
     warnings.push("次数需要大于 0")
+  }
+  const countLimits = selectedEventCountLimits(event)
+  if (Number.isFinite(Number(event.count))
+    && (Number(event.count) < countLimits.min
+      || (countLimits.max !== null && Number(event.count) > countLimits.max))) {
+    warnings.push(`次数范围应为 ${countLimits.min}-${countLimits.max ?? "不限"}`)
   }
   if (event.kind === "skillGroup") {
     if (!event.skillGroupId) {
@@ -1028,11 +1076,12 @@ const eventWarnings = computed(() => {
   }
   return warnings
 })
-
 function applySkill(value: any) {
+  const countRange = normalizeEventCountRange(value.eventCountRange)
   updateSelectedEvent({
     skillMultiplier: value.skillMultiplier,
     skillRef: value.skillRef,
+    ...(countRange ? { count: countRange.default } : {}),
   }, { clearLabel: true })
 }
 
@@ -1044,6 +1093,7 @@ function updateSkillRef(categoryId: string, moveId?: string, rowId?: string) {
   updateSelectedEvent({
     skillMultiplier: selection.skillMultiplier,
     skillRef: selection.skillRef,
+    ...(selection.eventCountRange ? { count: selection.eventCountRange.default } : {}),
   }, { clearLabel: true })
 }
 
@@ -1173,7 +1223,7 @@ function close() {
 
 function save() {
   if (draft.value.mode === "adminDefault") {
-    const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0)
+    const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0, props.potentialLevel ?? 0)
     const draftLuminescenceEvents = (draft.value.events ?? [])
       .filter((event: any) => isLuminescenceSettlement(event))
     emit("save", {
@@ -1200,7 +1250,12 @@ function save() {
   normalizeDraftElapsedSeconds()
   normalizeDraftStunned()
   normalizeDraftAnomalyEffects()
-  const normalizedDraft = isDamageModeAllowedForAgent(draft.value.mode, props.agent, props.cinemaLevel ?? 0)
+  const normalizedDraft = isDamageModeAllowedForAgent(
+    draft.value.mode,
+    props.agent,
+    props.cinemaLevel ?? 0,
+    props.potentialLevel ?? 0,
+  )
     ? draft.value
     : normalizeDraftForAgent(draft.value)
   const { target: _target, targetConfig: _targetConfig, ...damageConfig } = normalizedDraft
@@ -1327,7 +1382,7 @@ function save() {
                     :max="selectedEventCountLimits().max ?? undefined"
                     :step="selectedEventCountLimits().step"
                     aria-label="事件次数"
-                    @update:value="updateSelectedEvent({ count: Number($event ?? 1) })"
+                    @update:value="updateSelectedEventCount($event)"
                   />
                 </div>
               </div>

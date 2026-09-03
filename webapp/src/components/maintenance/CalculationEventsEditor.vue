@@ -4,7 +4,7 @@ import { NButton, NTag } from "naive-ui"
 import { Copy, Plus, Trash2 } from "lucide-vue-next"
 import CalculationEventFields from "./CalculationEventFields.vue"
 import {
-  EVENT_KIND_OPTIONS, anomalyOptions, defaultCalculationEvent, moveOptions, option, rowOptions,
+  EVENT_KIND_OPTIONS, anomalyOptions, categoryOptions, defaultCalculationEvent, moveOptions, option, rowOptions,
 } from "./maintenance-options"
 import { internalId, textOf } from "./maintenance-model"
 
@@ -17,7 +17,8 @@ const props = withDefaults(defineProps<{
   allowSkillGroup?: boolean
   layout?: "cards" | "master-detail"
   selectedEventId?: string | null
-}>(), { skillGroups: () => [], allowSkillGroup: true, layout: "cards", selectedEventId: null })
+  potentialLevel?: number | null
+}>(), { skillGroups: () => [], allowSkillGroup: true, layout: "cards", selectedEventId: null, potentialLevel: null })
 const emit = defineEmits<{ change: [], "update:selectedEventId": [value: string | null] }>()
 
 const selectedEvent = computed(() => props.events.find(event => event.id === props.selectedEventId) ?? props.events[0] ?? null)
@@ -33,10 +34,12 @@ function preferredSkillId() {
 
 function newSkillRef() {
   const skill = agentSkill()
-  const category = skill?.categories?.[0]
-  const move = category?.moves?.[0]
-  const row = move?.rows?.[0]
-  return { agentSkillId: skill?.id ?? "", categoryId: category?.id ?? "", moveId: move?.id ?? "", rowId: row?.id ?? "" }
+  const categoryId = String(categoryOptions(props.catalog, skill?.id ?? "", props.potentialLevel)[0]?.value ?? "")
+  const category = skill?.categories?.find((item: any) => item.id === categoryId)
+  const moveId = String(moveOptions(props.catalog, skill?.id ?? "", categoryId, false, props.potentialLevel)[0]?.value ?? "")
+  const move = category?.moves?.find((item: any) => item.id === moveId)
+  const rowId = String(rowOptions(props.catalog, skill?.id ?? "", categoryId, moveId, false, props.potentialLevel)[0]?.value ?? "")
+  return { agentSkillId: skill?.id ?? "", categoryId: category?.id ?? "", moveId: move?.id ?? "", rowId }
 }
 
 function add(kind: string) {
@@ -109,8 +112,8 @@ function eventTitle(event: any, index: number) {
   const kind = EVENT_KIND_OPTIONS.find(item => item.value === visibleKind(event))?.label ?? "计算事件"
   if (event.kind === "skillGroup") return `${kind} · ${groupOptions().find(item => item.value === event.skillGroupId)?.label ?? `事件 ${index + 1}`}`
   if (event.skillRef) {
-    const move = moveOptions(props.catalog, event.skillRef.agentSkillId, event.skillRef.categoryId).find((item: any) => item.value === event.skillRef.moveId)?.label
-    const row = rowOptions(props.catalog, event.skillRef.agentSkillId, event.skillRef.categoryId, event.skillRef.moveId).find((item: any) => item.value === event.skillRef.rowId)?.label
+    const move = moveOptions(props.catalog, event.skillRef.agentSkillId, event.skillRef.categoryId, false, props.potentialLevel).find((item: any) => item.value === event.skillRef.moveId)?.label
+    const row = rowOptions(props.catalog, event.skillRef.agentSkillId, event.skillRef.categoryId, event.skillRef.moveId, false, props.potentialLevel).find((item: any) => item.value === event.skillRef.rowId)?.label
     return [kind, move, row].filter(Boolean).join(" · ")
   }
   if (event.anomalyEffect) {
@@ -186,7 +189,7 @@ function eventSummary(event: any) {
         <NTag v-if="selectedEvent" round>{{ EVENT_KIND_OPTIONS.find(item => item.value === visibleKind(selectedEvent))?.label }}</NTag>
       </header>
       <div v-if="selectedEvent" class="calculation-master-editor-body">
-        <CalculationEventFields :event="selectedEvent" :catalog="catalog" :agent="agent" :skill-groups="skillGroups" :disabled="disabled" :allow-skill-group="allowSkillGroup" @change="handleEventChange(selectedEvent)" />
+        <CalculationEventFields :event="selectedEvent" :catalog="catalog" :agent="agent" :skill-groups="skillGroups" :disabled="disabled" :allow-skill-group="allowSkillGroup" :potential-level="potentialLevel" @change="handleEventChange(selectedEvent)" />
       </div>
       <div v-else class="calculation-event-empty">从左侧添加一个事件开始配置</div>
     </section>

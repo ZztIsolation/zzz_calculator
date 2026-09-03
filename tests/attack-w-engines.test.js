@@ -102,10 +102,11 @@ for (const [id, name, rarity, atkBase, stat, value, effectName] of expected) {
 const agentIds = new Set(catalog.agents.map(item => item.id))
 assert.deepEqual(
     attackEngines.filter(item => item.relatedAgentId).map(item => [item.id, item.relatedAgentId]),
-    [["cloudcleave_radiance", "ye_shunguang"], ["zzz_wiki_2162", "sigrid"]],
+    [["cloudcleave_radiance", "ye_shunguang"], ["zzz_wiki_223", "soldier_11"], ["zzz_wiki_2162", "sigrid"]],
     "Maintained Attack agents should receive their signature W-Engine relationship",
 )
 assert.ok(agentIds.has("ye_shunguang"))
+assert.ok(agentIds.has("soldier_11"))
 assert.ok(agentIds.has("sigrid"))
 
 assert.equal(engine("zzz_wiki_117").effect.selfBuff, null, "Fixed Energy restoration should not be misrepresented as Energy Regen")
@@ -145,13 +146,35 @@ assert.deepEqual(
 )
 
 const baseInput = catalog.examples.yeShunguang.input
+const brimstoneRule = rules("zzz_wiki_223")[0]
+assert.equal(engine("zzz_wiki_223").level60.advancedStat.mode, "flat", "Brimstone ATK advanced stat should use the base-ATK percentage representation")
+assert.equal(engine("zzz_wiki_223").level60.advancedStat.basis, "baseAtk", "Brimstone ATK advanced stat should use Base ATK as its basis")
+assert.equal(brimstoneRule.defaultStacks, 5, "Brimstone should default to five ATK stacks")
+assert.deepEqual(brimstoneRule.coverage, { default: 1, min: 0, max: 1, step: 0.1 }, "Brimstone ATK stacks should expose independent coverage")
 const brimstone = calculateInCombatPanel(catalog, {
     ...baseInput,
     wEngineId: "zzz_wiki_223",
     wEngineModificationLevel: 5,
     combatBuffs: { activeBuffIds: ["wEngine:zzz_wiki_223.self"] },
 })
-approx(brimstone.inCombat.buffTotals.atkPctOutOfCombat, 0.56, "Brimstone rank 5 should apply eight exact ATK stacks")
+approx(brimstone.inCombat.buffTotals.atkPctOutOfCombat, 0.35, "Brimstone rank 5 should apply five default ATK stacks")
+
+const brimstoneFullStacks = calculateInCombatPanel(catalog, {
+    ...baseInput,
+    wEngineId: "zzz_wiki_223",
+    wEngineModificationLevel: 5,
+    combatBuffs: {
+        activeBuffIds: ["wEngine:zzz_wiki_223.self"],
+        runtimeInputs: {
+            "wEngine:zzz_wiki_223.self": {
+                effects: {
+                    effect_wiki_223_self_atk: { stacks: 8 },
+                },
+            },
+        },
+    },
+})
+approx(brimstoneFullStacks.inCombat.buffTotals.atkPctOutOfCombat, 0.56, "Brimstone rank 5 should allow eight exact ATK stacks")
 
 const deepSeaVisitor = calculateInCombatPanel(catalog, {
     ...baseInput,

@@ -39,6 +39,51 @@ entries: the enhanced-Basic group twice, Chain Attack twice, Ultimate once,
 enhanced EX Shattered Jade twice, and one standalone stage-3 Converging Spear.
 This removes the hidden Chain Attack from the group and makes every requested
 count visible in the event manager and white-box total.
+## 2026-08-25 - Added Soldier 11 And Potential Vision Support
+
+Added Soldier 11 as a visible Fire Attack agent with complete official level
+1-16 Basic, Dodge, Assist, Special, Chain, and Ultimate damage, Daze, and Energy
+tables. The level-60 catalog stores 7,673 HP, 813 Base ATK, and 612 DEF before
+Core nodes. Core F contributes 75 Base ATK and 14.4% CRIT Rate, while Heatwave
+scales from 35% to 70% and targets only Fire Suppression moves. The official
+portrait is stored locally, The Brimstone is linked as her signature W-Engine,
+and Enka agent ID 1041 maps to `soldier_11`.
+
+Introduced first-class Potential Vision state through `potentialLevel`, with P0
+as the disabled calculation state and Soldier 11 defaulting to P6 on first
+selection. Potential-specific moves, rows, and skill groups carry explicit
+unlock requirements. Default profiles resolve the matching Potential range
+before applying the existing Cinema fallback. Buff values can resolve from a
+complete Potential scaling table, and event-only requirements can distinguish
+Stunned from non-Stunned events across ordinary, prepared, compiled, dense,
+fixed-score, Worker, and optimizer paths.
+
+P1 unlocks the fifth Fire Suppression hit, empowered fifth-hit packets, Fire
+Assault, guard stance metadata, and Basic-string retention. P2-P6 add
+16/24/32/40/48% CRIT DMG through Fields of Fire. The Additional Ability keeps
+10% Fire DMG globally and applies its extra 22.5% only to Stunned events.
+Cinema 2 exposes one shared 0-12 stack control for Basic, Dash, and Dodge
+Counter damage; Cinema 6 grants 25% Fire RES Ignore only to Fire Suppression.
+Energy, mitigation, invulnerability, guard timing, and animation duration remain
+descriptive rather than invented damage multipliers.
+
+The P0 reference rotation is Chain, Fire Suppression stages 1-4, Ultimate, and
+stages 1-4 again. The P1-P6 Stun rotation is Chain, B4, empowered B5 plus six
+extra packets, Ultimate, B4, and the same empowered B5 package. The level-12
+raw multiplier sum is locked at 10,599.2%. The extra-packet row accepts only
+0-6 repetitions and defaults to six because B4 and the B5 body consume two of
+the eight guaranteed Fire Suppression triggers before the remainder resolves.
+The empowered-fifth skill group carries an authored 0-1 package limit, which
+the maintenance editor, sanitizer, API save, and reload paths preserve instead
+of replacing with the ordinary system-managed 0-100 group range.
+
+Malformed Potential table values in the official Wiki are not silently copied:
+B5 levels 3/6/15 and the missing level-15 extra/Burst rows are corrected from
+current client data and a complete cross-check table, with verification notes
+stored beside the authored data. Dedicated tests cover all multiplier rows,
+P0/P1 gates, P0-P6 Buff values, Core tiers, Cinemas 2/6, count rejection,
+maintenance round trips, Enka preservation, every score kernel, and exact
+optimizer equivalence.
 
 ## 2026-08-24 - Added Formal Sigrid Calculation Support
 

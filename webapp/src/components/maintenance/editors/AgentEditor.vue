@@ -49,7 +49,12 @@ function addSkillGroup() {
 
 function calculationVariants() {
   const config = props.model.defaultCalculationConfig
-  return config ? [config, ...(config.variants ?? [])] : []
+  if (!config) return []
+  return [
+    config,
+    ...(config.variants ?? []),
+    ...(config.potentialVariants ?? []).flatMap((variant: any) => [variant, ...(variant.variants ?? [])]),
+  ]
 }
 
 function calculationModeOptions() {
@@ -85,6 +90,46 @@ function defaultLoopLevels() {
 
 function defaultLoopEventCount() {
   return calculationVariants().reduce((sum: number, entry: any) => sum + (entry.events?.length ?? 0), 0)
+}
+
+function potentialLoopCount() {
+  return props.model.defaultCalculationConfig?.potentialVariants?.length ?? 0
+}
+
+function enablePotentialVision(enabled: boolean) {
+  props.model.potentialVision = enabled ? {
+    name: { zhCN: "潜能影像" },
+    defaultLevel: 6,
+    maxLevel: 6,
+    mechanicUnlockLevel: 1,
+    scaling: {
+      name: { zhCN: "潜能觉醒" },
+      levels: Array.from({ length: 7 }, (_, level) => ({ level, value: 0 })),
+    },
+    mechanics: {},
+  } : null
+  changed()
+}
+
+function potentialScalingFields() {
+  const row = props.model.potentialVision?.scaling?.levels?.[0] ?? {}
+  return Object.keys(row).filter(key => key !== "level")
+}
+
+function syncPotentialLevels() {
+  const vision = props.model.potentialVision
+  if (!vision) return
+  const maxLevel = Math.max(1, Math.min(6, Number(vision.maxLevel ?? 6)))
+  vision.maxLevel = maxLevel
+  vision.defaultLevel = Math.max(0, Math.min(maxLevel, Number(vision.defaultLevel ?? 0)))
+  vision.mechanicUnlockLevel = Math.max(1, Math.min(maxLevel, Number(vision.mechanicUnlockLevel ?? 1)))
+  const byLevel = new Map((vision.scaling?.levels ?? []).map((row: any) => [Number(row.level), row]))
+  const fields = potentialScalingFields()
+  vision.scaling.levels = Array.from({ length: maxLevel + 1 }, (_, level) => ({
+    ...(byLevel.get(level) ?? Object.fromEntries(fields.map(field => [field, 0]))),
+    level,
+  }))
+  changed()
 }
 
 function setEffectSet(key: "corePassive" | "additionalAbility", enabled: boolean) {
@@ -208,7 +253,7 @@ function enableCoreSkill(enabled: boolean) {
       </article>
     </MaintenanceSection>
 
-    <MaintenanceSection title="默认计算方式" description="按影画维护管理员默认循环；当前影画使用不超过该等级的最高已配置循环。">
+    <MaintenanceSection title="默认计算方式" description="先按潜能影像选择方案，再按影画使用不超过当前等级的最高已配置循环。">
       <template #actions>
         <div class="default-loop-section-actions">
           <NButton size="small" :disabled="disabled" @click="showDefaultLoopModal = true"><template #icon><Settings2 :size="15" /></template>{{ model.defaultCalculationConfig ? "管理默认循环" : "配置默认循环" }}</NButton>
@@ -219,6 +264,7 @@ function enableCoreSkill(enabled: boolean) {
         <div>
           <strong>{{ model.defaultCalculationConfig ? `已配置 ${calculationVariants().length} 套管理员默认循环` : "尚未配置管理员默认循环" }}</strong>
           <span v-if="model.defaultCalculationConfig">适用影画：{{ defaultLoopLevels().join("、") }} 影 · 共 {{ defaultLoopEventCount() }} 个事件</span>
+          <span v-if="model.defaultCalculationConfig && potentialLoopCount()">潜能方案：{{ potentialLoopCount() }} 套</span>
           <span v-else>配置后可在优化器中按角色影画自动选择对应循环</span>
         </div>
         <div v-if="model.defaultCalculationConfig" class="default-loop-summary-tags">
@@ -235,7 +281,7 @@ function enableCoreSkill(enabled: boolean) {
           <label class="maintenance-field"><span>生效范围</span><NSelect :value="model.combatBuffs[entry.key].scope" :options="SCOPE_OPTIONS" :disabled="disabled" @update:value="setBuffScope(model.combatBuffs[entry.key], String($event))" /></label>
           <label class="maintenance-field maintenance-field-wide"><span>Buff 描述</span><NInput type="textarea" :value="textOf(model.combatBuffs[entry.key].description)" :disabled="disabled" @update:value="model.combatBuffs[entry.key].description = { zhCN: String($event) }; changed()" /></label>
         </div>
-        <EffectRulesEditor :model="model.combatBuffs[entry.key]" :catalog="catalog" :disabled="disabled" :allow-coverage="model.combatBuffs[entry.key].scope === 'inCombat'" :preferred-skill-id="catalog?.agentSkills?.agentSkills?.find((skill: any) => skill.agentId === model.id)?.id" :core-passive-scaling="entry.key === 'corePassive' ? model.coreSkill?.corePassiveScaling : null" @change="changed" />
+        <EffectRulesEditor :model="model.combatBuffs[entry.key]" :catalog="catalog" :disabled="disabled" :allow-coverage="model.combatBuffs[entry.key].scope === 'inCombat'" :preferred-skill-id="catalog?.agentSkills?.agentSkills?.find((skill: any) => skill.agentId === model.id)?.id" :core-passive-scaling="entry.key === 'corePassive' ? model.coreSkill?.corePassiveScaling : null" :potential-vision-scaling="entry.key === 'additionalAbility' ? model.potentialVision?.scaling : null" @change="changed" />
         <div class="buff-modifier-block"><div class="maintenance-row-head"><strong>Buff 修饰</strong></div><BuffModifiersEditor :model="model.combatBuffs[entry.key]" :catalog="catalog" :disabled="disabled" @change="changed" /></div>
       </template>
     </MaintenanceSection>
@@ -256,6 +302,25 @@ function enableCoreSkill(enabled: boolean) {
         <EffectRulesEditor :model="buff" :catalog="catalog" :disabled="disabled" :allow-coverage="buff.scope === 'inCombat'" :preferred-skill-id="buff.sourceSkillRef?.agentSkillId" @change="changed" />
         <div class="buff-modifier-block"><div class="maintenance-row-head"><strong>Buff 修饰</strong></div><BuffModifiersEditor :model="buff" :catalog="catalog" :disabled="disabled" @change="changed" /></div>
       </article>
+    </MaintenanceSection>
+
+    <MaintenanceSection title="潜能影像" description="P0 表示关闭；P1 解锁机制，后续等级可提供数值成长。">
+      <template #actions><NSwitch :value="Boolean(model.potentialVision)" :disabled="disabled" @update:value="enablePotentialVision" /></template>
+      <template v-if="model.potentialVision">
+        <div class="maintenance-grid">
+          <label class="maintenance-field"><span>潜能名称</span><NInput :value="textOf(model.potentialVision.name)" :disabled="disabled" @update:value="model.potentialVision.name = { zhCN: String($event) }; changed()" /></label>
+          <label class="maintenance-field"><span>默认等级</span><NInputNumber v-model:value="model.potentialVision.defaultLevel" :disabled="disabled" :min="0" :max="model.potentialVision.maxLevel" :step="1" @update:value="syncPotentialLevels" /></label>
+          <label class="maintenance-field"><span>最高等级</span><NInputNumber v-model:value="model.potentialVision.maxLevel" :disabled="disabled" :min="1" :max="6" :step="1" @update:value="syncPotentialLevels" /></label>
+          <label class="maintenance-field"><span>机制解锁等级</span><NInputNumber v-model:value="model.potentialVision.mechanicUnlockLevel" :disabled="disabled" :min="1" :max="model.potentialVision.maxLevel" :step="1" @update:value="syncPotentialLevels" /></label>
+          <label class="maintenance-field"><span>成长名称</span><NInput :value="textOf(model.potentialVision.scaling.name)" :disabled="disabled" @update:value="model.potentialVision.scaling.name = { zhCN: String($event) }; changed()" /></label>
+        </div>
+        <div class="skill-table-wrap potential-scaling-table-wrap">
+          <table class="skill-multiplier-table">
+            <thead><tr><th>潜能</th><th v-for="field in potentialScalingFields()" :key="field">{{ field }}</th></tr></thead>
+            <tbody><tr v-for="row in model.potentialVision.scaling.levels" :key="row.level"><td>P{{ row.level }}</td><td v-for="field in potentialScalingFields()" :key="field"><NInputNumber v-model:value="row[field]" :disabled="disabled" :step="0.1" @update:value="changed" /></td></tr></tbody>
+          </table>
+        </div>
+      </template>
     </MaintenanceSection>
 
     <MaintenanceSection title="影画 Buff" description="只新增已经建模的影画，不会自动补齐空影画。">

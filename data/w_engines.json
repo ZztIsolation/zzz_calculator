@@ -4534,6 +4534,7 @@
       },
       "rarity": "S",
       "specialty": "attack",
+      "relatedAgentId": "soldier_11",
       "images": {
         "icon": "/assets/w-engines/zzz_wiki_223.png",
         "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/26/11536806/2cd3aa09c2f818eadf4ce632c5f421fd_1967602675265095788.png"
@@ -4543,7 +4544,8 @@
         "advancedStat": {
           "stat": "atkPct",
           "value": 30,
-          "mode": "pct"
+          "mode": "flat",
+          "basis": "baseAtk"
         }
       },
       "modification": {
@@ -4579,7 +4581,7 @@
               "mode": "pct",
               "valuePerStack": 3.5,
               "maxStacks": 8,
-              "defaultStacks": 8,
+              "defaultStacks": 5,
               "modificationValues": {
                 "valuePerStack": [
                   3.5,
@@ -4593,6 +4595,12 @@
               "stackGroup": "brimstone_breath",
               "stackLabel": {
                 "zhCN": "炽烈吐息层数"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],

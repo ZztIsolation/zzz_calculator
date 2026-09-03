@@ -20,8 +20,10 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ "update:show": [value: boolean], apply: [value: any] }>()
 
 const draft = ref<any | null>(null)
+const activePotentialKey = ref(0)
 const activeLevel = ref(0)
 const showDeleteVariantConfirm = ref(false)
+const showDeletePotentialConfirm = ref(false)
 
 const calculationModeOptions = computed(() => [
   option("custom", "自定义"),
@@ -29,9 +31,15 @@ const calculationModeOptions = computed(() => [
   option("anomaly", "最大化异常伤害"),
 ])
 
-const entries = computed<any[]>(() => {
+const potentialEntries = computed<any[]>(() => {
   if (!draft.value) return []
-  return [draft.value, ...(draft.value.variants ?? [])].sort((a, b) => Number(a.cinemaLevel ?? 0) - Number(b.cinemaLevel ?? 0))
+  return [draft.value, ...(draft.value.potentialVariants ?? [])]
+})
+const activePotentialEntry = computed(() => potentialEntries.value.find(entry => Number(entry.minPotentialLevel ?? 0) === activePotentialKey.value) ?? potentialEntries.value[0] ?? null)
+const entries = computed<any[]>(() => {
+  const source = activePotentialEntry.value
+  if (!source) return []
+  return [source, ...(source.variants ?? [])].sort((a, b) => Number(a.cinemaLevel ?? 0) - Number(b.cinemaLevel ?? 0))
 })
 const activeEntry = computed(() => entries.value.find(entry => Number(entry.cinemaLevel ?? 0) === activeLevel.value) ?? entries.value[0] ?? null)
 const usedLevels = computed(() => new Set(entries.value.map(entry => Number(entry.cinemaLevel ?? 0))))
@@ -43,8 +51,10 @@ const activeLevelOptions = computed(() => [1, 2, 3, 4, 5, 6].map(level => ({
   value: level,
   disabled: level !== activeLevel.value && usedLevels.value.has(level),
 })))
-const totalEventCount = computed(() => entries.value.reduce((sum, entry) => sum + (entry.events?.length ?? 0), 0))
-const canApply = computed(() => entries.value.length > 0 && entries.value.every((entry, index) => (entry.events?.length ?? 0) > 0 || (index === 0 && (draft.value?.skillGroups?.length ?? 0) > 0)))
+const totalEventCount = computed(() => potentialEntries.value.reduce((sum, potential) => sum
+  + [potential, ...(potential.variants ?? [])].reduce((inner, entry) => inner + (entry.events?.length ?? 0), 0), 0))
+const canApply = computed(() => potentialEntries.value.length > 0 && potentialEntries.value.every(potential =>
+  [potential, ...(potential.variants ?? [])].every((entry, index) => (entry.events?.length ?? 0) > 0 || (index === 0 && (potential?.skillGroups?.length ?? 0) > 0))))
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value))
@@ -59,6 +69,7 @@ function createBaseConfig() {
     selectedEventId: event.id,
     events: [event],
     variants: [],
+    potentialVariants: [],
   }
 }
 
@@ -93,31 +104,54 @@ function normalizeEntry(entry: any) {
 
 function prepareDraft(config: any | null | undefined) {
   const next = config ? clone(config) : createBaseConfig()
-  next.cinemaLevel = 0
-  normalizeEntry(next)
-  const seen = new Set([0])
-  next.variants = (Array.isArray(next.variants) ? next.variants : [])
+  function normalizeCinemaProfile(profile: any) {
+    profile.cinemaLevel = 0
+    normalizeEntry(profile)
+    const seen = new Set([0])
+    profile.variants = (Array.isArray(profile.variants) ? profile.variants : [])
+      .filter((entry: any) => {
+        const level = Number(entry?.cinemaLevel)
+        if (!entry || !Number.isInteger(level) || level < 1 || level > 6 || seen.has(level)) return false
+        seen.add(level)
+        return true
+      })
+      .map((entry: any) => {
+        normalizeEntry(entry)
+        delete entry.variants
+        delete entry.skillGroups
+        delete entry.potentialVariants
+        return entry
+      })
+      .sort((a: any, b: any) => Number(a.cinemaLevel) - Number(b.cinemaLevel))
+  }
+  normalizeCinemaProfile(next)
+  const maxPotentialLevel = Number(props.agent?.potentialVision?.maxLevel ?? 0)
+  const ranges: Array<{ min: number, max: number }> = []
+  next.potentialVariants = (Array.isArray(next.potentialVariants) ? next.potentialVariants : [])
     .filter((entry: any) => {
-      const level = Number(entry?.cinemaLevel)
-      if (!entry || !Number.isInteger(level) || level < 1 || level > 6 || seen.has(level)) return false
-      seen.add(level)
+      const min = Number(entry?.minPotentialLevel)
+      const max = Number(entry?.maxPotentialLevel ?? min)
+      if (!entry || !Number.isInteger(min) || !Number.isInteger(max) || min < 1 || max < min || max > maxPotentialLevel) return false
+      if (ranges.some(range => min <= range.max && max >= range.min)) return false
+      ranges.push({ min, max })
       return true
     })
     .map((entry: any) => {
-      normalizeEntry(entry)
-      delete entry.variants
-      delete entry.skillGroups
+      delete entry.potentialVariants
+      normalizeCinemaProfile(entry)
       return entry
     })
-    .sort((a: any, b: any) => Number(a.cinemaLevel) - Number(b.cinemaLevel))
+    .sort((a: any, b: any) => Number(a.minPotentialLevel) - Number(b.minPotentialLevel))
   return next
 }
 
 watch(() => props.show, value => {
   if (!value) return
   draft.value = prepareDraft(props.config)
+  activePotentialKey.value = 0
   activeLevel.value = 0
   showDeleteVariantConfirm.value = false
+  showDeletePotentialConfirm.value = false
 }, { immediate: true })
 
 function setSelectedEvent(value: string | null) {
@@ -142,8 +176,8 @@ function addVariant(levelValue: string | number) {
     selectedEventId: eventIds.get(String(source.selectedEventId ?? "")) ?? events[0]?.id ?? null,
     events,
   }
-  draft.value.variants.push(variant)
-  draft.value.variants.sort((a: any, b: any) => Number(a.cinemaLevel) - Number(b.cinemaLevel))
+  activePotentialEntry.value.variants.push(variant)
+  activePotentialEntry.value.variants.sort((a: any, b: any) => Number(a.cinemaLevel) - Number(b.cinemaLevel))
   activeLevel.value = level
 }
 
@@ -151,15 +185,42 @@ function changeActiveLevel(value: string | number) {
   const level = Number(value)
   if (!activeEntry.value || activeLevel.value === 0 || usedLevels.value.has(level)) return
   activeEntry.value.cinemaLevel = level
-  draft.value.variants.sort((a: any, b: any) => Number(a.cinemaLevel) - Number(b.cinemaLevel))
+  activePotentialEntry.value.variants.sort((a: any, b: any) => Number(a.cinemaLevel) - Number(b.cinemaLevel))
   activeLevel.value = level
 }
 
 function removeActiveVariant() {
   if (!draft.value || activeLevel.value === 0) return
-  draft.value.variants = draft.value.variants.filter((entry: any) => Number(entry.cinemaLevel) !== activeLevel.value)
+  activePotentialEntry.value.variants = activePotentialEntry.value.variants.filter((entry: any) => Number(entry.cinemaLevel) !== activeLevel.value)
   activeLevel.value = 0
   showDeleteVariantConfirm.value = false
+}
+
+function changePotentialEntry(value: string | number) {
+  activePotentialKey.value = Number(value)
+  activeLevel.value = 0
+}
+
+function addPotentialVariant() {
+  if (!draft.value || !props.agent?.potentialVision || (draft.value.potentialVariants ?? []).length) return
+  const maxPotentialLevel = Number(props.agent.potentialVision.maxLevel ?? 6)
+  const profile = clone(draft.value)
+  delete profile.potentialVariants
+  profile.minPotentialLevel = Number(props.agent.potentialVision.mechanicUnlockLevel ?? 1)
+  profile.maxPotentialLevel = maxPotentialLevel
+  profile.name = { zhCN: `P${profile.minPotentialLevel}+默认方案` }
+  draft.value.potentialVariants = [profile]
+  activePotentialKey.value = profile.minPotentialLevel
+  activeLevel.value = 0
+}
+
+function removeActivePotentialVariant() {
+  if (!draft.value || activePotentialKey.value === 0) return
+  draft.value.potentialVariants = (draft.value.potentialVariants ?? [])
+    .filter((entry: any) => Number(entry.minPotentialLevel) !== activePotentialKey.value)
+  activePotentialKey.value = 0
+  activeLevel.value = 0
+  showDeletePotentialConfirm.value = false
 }
 
 function close() {
@@ -170,7 +231,9 @@ function apply() {
   if (!draft.value || !canApply.value) return
   const next = prepareDraft(draft.value)
   next.cinemaLevel = 0
-  for (const entry of [next, ...(next.variants ?? [])]) normalizeEntry(entry)
+  for (const potential of [next, ...(next.potentialVariants ?? [])]) {
+    for (const entry of [potential, ...(potential.variants ?? [])]) normalizeEntry(entry)
+  }
   emit("apply", next)
   close()
 }
@@ -188,6 +251,15 @@ function apply() {
   >
     <div v-if="draft" class="default-loop-modal-content ui-layout-scope" data-layout-surface="default-calculation-config">
     <div class="default-loop-modal-body">
+      <div v-if="agent?.potentialVision" class="default-loop-potential-bar">
+        <NTabs :value="activePotentialKey" type="segment" class="default-loop-tabs" @update:value="changePotentialEntry">
+          <NTab v-for="entry in potentialEntries" :key="entry.minPotentialLevel ?? 0" :name="Number(entry.minPotentialLevel ?? 0)">
+            {{ Number(entry.minPotentialLevel ?? 0) === 0 ? "P0" : `P${entry.minPotentialLevel}-P${entry.maxPotentialLevel}` }}
+          </NTab>
+        </NTabs>
+        <NButton v-if="potentialEntries.length === 1" circle secondary :disabled="disabled" title="添加潜能循环" aria-label="添加潜能循环" @click="addPotentialVariant"><template #icon><Plus :size="16" /></template></NButton>
+        <NButton v-if="activePotentialKey !== 0" circle quaternary type="error" :disabled="disabled" title="删除当前潜能循环" aria-label="删除当前潜能循环" @click="showDeletePotentialConfirm = true"><template #icon><Trash2 :size="16" /></template></NButton>
+      </div>
       <div class="default-loop-variant-bar">
         <NTabs :value="activeLevel" type="segment" class="default-loop-tabs" @update:value="activeLevel = Number($event)">
           <NTab v-for="entry in entries" :key="entry.cinemaLevel" :name="Number(entry.cinemaLevel)">{{ Number(entry.cinemaLevel) }} 影</NTab>
@@ -205,6 +277,7 @@ function apply() {
         :catalog="catalog"
         :agent="agent"
         :skill-groups="skillGroups"
+        :potential-level="activePotentialKey"
         :disabled="disabled"
         layout="master-detail"
         @update:selected-event-id="setSelectedEvent"
@@ -213,6 +286,10 @@ function apply() {
           <div class="default-loop-config-panel">
             <label class="maintenance-field"><span>方案名称</span><NInput :value="textOf(activeEntry.name)" :disabled="disabled" @update:value="activeEntry.name = { zhCN: String($event) }" /></label>
             <label class="maintenance-field"><span>计算方式</span><NSelect v-model:value="activeEntry.mode" :options="calculationModeOptions" :disabled="disabled" /></label>
+            <template v-if="activePotentialKey !== 0">
+              <label class="maintenance-field"><span>最低潜能</span><NInput v-model:value="activePotentialEntry.minPotentialLevel" disabled /></label>
+              <label class="maintenance-field"><span>最高潜能</span><NInput v-model:value="activePotentialEntry.maxPotentialLevel" disabled /></label>
+            </template>
             <label class="maintenance-field"><span>适用影画</span>
               <span v-if="activeLevel === 0" class="default-loop-base-level"><Lock :size="14" />0 影基础</span>
               <NSelect v-else :value="activeLevel" :options="activeLevelOptions" :disabled="disabled" @update:value="changeActiveLevel" />
@@ -239,11 +316,20 @@ function apply() {
     danger
     @confirm="removeActiveVariant"
   />
+  <ConfirmDialog
+    v-model:show="showDeletePotentialConfirm"
+    title="删除潜能循环"
+    :message="`确认删除 P${activePotentialEntry?.minPotentialLevel}-P${activePotentialEntry?.maxPotentialLevel} 默认循环？`"
+    confirm-text="删除"
+    danger
+    @confirm="removeActivePotentialVariant"
+  />
 </template>
 
 <style scoped>
 .default-loop-modal-content { height: 100%; min-height: 0; overflow: auto; }
-.default-loop-modal-body { display: grid; height: 100%; min-height: 0; grid-template-rows: auto minmax(0, 1fr); gap: 14px; }
+.default-loop-modal-body { display: grid; height: 100%; min-height: 0; grid-template-rows: auto auto minmax(0, 1fr); gap: 14px; }
+.default-loop-potential-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; }
 .default-loop-variant-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; }
 .default-loop-tabs { min-width: 0; }
 .default-loop-config-panel { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--app-border); border-radius: var(--app-radius-sm); background: var(--app-panel-muted); }

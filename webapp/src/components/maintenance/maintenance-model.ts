@@ -67,6 +67,12 @@ const FIELD_LABELS: Record<string, string> = {
   additionalAbility: "额外能力",
   skillBuffs: "技能来源 Buff",
   sourceSkillRef: "来源技能",
+  potentialVision: "潜能影像",
+  potentialVariants: "潜能方案",
+  minPotentialLevel: "最低潜能等级",
+  maxPotentialLevel: "最高潜能等级",
+  mechanicUnlockLevel: "机制解锁等级",
+  eventCountRange: "事件次数范围",
   cinemaBuffs: "影画 Buff",
   cinemaLevel: "影画等级",
   cinemaName: "影画名称",
@@ -126,7 +132,6 @@ const FIELD_LABELS: Record<string, string> = {
   skillGroups: "技能组",
   defaultCount: "默认次数",
   minCount: "最少次数",
-  maxCount: "最多次数",
   events: "计算事件",
   defaultCalculationConfig: "默认计算配置",
   variants: "影画配置变体",
@@ -303,6 +308,7 @@ function ensureCalculationConfigIds(config: any) {
     }
   })
   if (Array.isArray(config.variants)) config.variants.forEach(ensureCalculationConfigIds)
+  if (Array.isArray(config.potentialVariants)) config.potentialVariants.forEach(ensureCalculationConfigIds)
 }
 
 export function prepareDraft(resource: ResourceValue, input: any): any {
@@ -338,12 +344,25 @@ export function prepareDraft(resource: ResourceValue, input: any): any {
       ensureEffectIds(buff)
     })
     item.combatBuffs.cinemaBuffs.forEach(ensureEffectIds)
+    if (item.potentialVision) {
+      item.potentialVision.name ??= { zhCN: "潜能影像" }
+      item.potentialVision.maxLevel ??= 6
+      item.potentialVision.defaultLevel ??= 0
+      item.potentialVision.mechanicUnlockLevel ??= 1
+      item.potentialVision.scaling ??= { name: { zhCN: "潜能觉醒" }, levels: [] }
+      item.potentialVision.scaling.name ??= { zhCN: "潜能觉醒" }
+      item.potentialVision.scaling.levels ??= []
+    }
     item.skillGroups ??= []
     item.skillGroups.forEach((group: any) => {
       ensureId(group, "skill_group")
+      delete group.requiresPotentialLevel
+      delete group.maxCount
       group.name ??= { zhCN: "" }
       group.description ??= { zhCN: "" }
-      Object.assign(group, SYSTEM_MANAGED_SKILL_GROUP_COUNTS)
+      if (group.authoredCountRange !== true) {
+        Object.assign(group, SYSTEM_MANAGED_SKILL_GROUP_COUNTS)
+      }
       group.events ??= []
       group.events.forEach((event: any) => {
         ensureId(event, "event")
@@ -357,11 +376,21 @@ export function prepareDraft(resource: ResourceValue, input: any): any {
       item.defaultCalculationConfig.mode ??= "custom"
       item.defaultCalculationConfig.events ??= []
       item.defaultCalculationConfig.variants ??= []
+      item.defaultCalculationConfig.potentialVariants ??= []
       item.defaultCalculationConfig.variants.forEach((variant: any, index: number) => {
         variant.cinemaLevel ??= index + 1
         variant.name ??= { zhCN: `${variant.cinemaLevel}影默认方案` }
         variant.mode ??= "custom"
         variant.events ??= []
+      })
+      item.defaultCalculationConfig.potentialVariants.forEach((variant: any) => {
+        variant.minPotentialLevel ??= 1
+        variant.maxPotentialLevel ??= item.potentialVision?.maxLevel ?? 6
+        variant.cinemaLevel ??= 0
+        variant.name ??= { zhCN: `P${variant.minPotentialLevel}+默认方案` }
+        variant.mode ??= "custom"
+        variant.events ??= []
+        variant.variants ??= []
       })
     }
     if (item.coreSkill) {
@@ -377,12 +406,14 @@ export function prepareDraft(resource: ResourceValue, input: any): any {
     item.categories ??= []
     item.categories.forEach((category: any) => {
       ensureId(category, "skill_category")
+      delete category.requiresPotentialLevel
       category.name ??= { zhCN: "" }
       category.levelScale ??= Array.isArray(category.levelRange?.levels) ? "coreSkill" : "skill"
       category.levelRange ??= category.levelScale === "coreSkill" ? { levels: ["A", "B", "C", "D", "E", "F"], default: "F" } : { min: 1, max: 12, default: 12 }
       category.moves ??= []
       category.moves.forEach((move: any) => {
         ensureId(move, "skill_move")
+        delete move.requiresPotentialLevel
         move.name ??= { zhCN: "" }
         move.skillType ||= legacySkillTypeForMove(category, move) || "basic"
         move.skillTags ??= []
@@ -390,6 +421,7 @@ export function prepareDraft(resource: ResourceValue, input: any): any {
         move.rows ??= []
         move.rows.forEach((row: any) => {
           ensureId(row, "skill_row")
+          delete row.requiresPotentialLevel
           row.label ??= { zhCN: "" }
           row.kind ??= "damageMultiplier"
           row.values ??= []
@@ -520,6 +552,7 @@ export function blankRecord(resource: ResourceValue, catalog: any, options: Crea
       level60: { hpBase: 1, atkBase: 1, defBase: 1, critRate: 5, critDmg: 50, impact: 0, anomalyProficiency: 0, anomalyMastery: 0, energyRegen: 120, penRatio: 0 },
       combatBuffs: { corePassive: null, additionalAbility: null, skillBuffs: [], cinemaBuffs: [] },
       preferredDriveDiscs: { mainStatLimits: { 4: [], 5: [], 6: [] } }, skillGroups: [], defaultCalculationConfig: null,
+      potentialVision: null,
       sources: [], verification: {}, hidden: false,
     })
   }
@@ -609,6 +642,7 @@ export function defaultArrayItem(path: string, parent?: any): any {
   if (key === "skillGroups") return { id: internalId("skill_group"), name: localizedName("新技能组"), description: localizedName(""), ...SYSTEM_MANAGED_SKILL_GROUP_COUNTS, events: [defaultArrayItem("events")] }
   if (key === "events") return { id: internalId("event"), kind: "direct", count: 1, critMode: "expected", skillMultiplier: 100, damageElement: "physical" }
   if (key === "variants") return { cinemaLevel: 1, name: localizedName("影画方案"), mode: "custom", events: [defaultArrayItem("events")] }
+  if (key === "potentialVariants") return { minPotentialLevel: 1, maxPotentialLevel: 6, cinemaLevel: 0, name: localizedName("潜能方案"), mode: "custom", events: [defaultArrayItem("events")], variants: [] }
   if (key === "skillTargets") return {}
   if (key === "values") return 0
   return ""
@@ -710,6 +744,7 @@ export function maskedPreview(value: any): any {
       && key !== "minCount"
       && key !== "maxCount"
       && key !== "step"
+      && key !== "authoredCountRange"
       && key !== "maintenanceType")
     .map(([key, child]) => key === "coverage" && child && typeof child === "object"
       ? [key, { default: `${Number((Number((child as any).default ?? 1) * 100).toFixed(2))}%` }]

@@ -17,18 +17,10 @@ function finiteNumber(value, fallback = 0) {
     return Number.isFinite(numeric) ? numeric : fallback
 }
 
-function clamp(value, min, max) {
-    return Math.min(max, Math.max(min, value))
-}
-
 function groupRange(group = {}) {
     const min = Math.max(0, finiteNumber(group.minCount, 0))
-    const rawMax = group.maxCount === undefined || group.maxCount === null || group.maxCount === ""
-        ? Number.POSITIVE_INFINITY
-        : finiteNumber(group.maxCount, Number.POSITIVE_INFINITY)
-    const max = Math.max(min, rawMax)
     const step = Math.max(0.000001, finiteNumber(group.step, 1))
-    return { min, max, step }
+    return { min, step }
 }
 
 function normalizeId(value) {
@@ -39,39 +31,40 @@ function normalizeStunned(value, fallback = true) {
     return value === undefined ? fallback : Boolean(value)
 }
 
-export function calculationSkillGroups(source = {}) {
+export function calculationSkillGroups(source = {}, options = {}) {
     const groups = Array.isArray(source?.skillGroups)
         ? source.skillGroups
         : Array.isArray(source?.defaultCalculationConfig?.skillGroups)
             ? source.defaultCalculationConfig.skillGroups
             : []
-    return groups.filter(group => group && typeof group === "object" && !Array.isArray(group))
+    return groups
+        .filter(group => group && typeof group === "object" && !Array.isArray(group))
 }
 
-export function hasCalculationSkillGroups(source = {}) {
-    return calculationSkillGroups(source).some(group => Array.isArray(group.events) && group.events.length)
+export function hasCalculationSkillGroups(source = {}, options = {}) {
+    return calculationSkillGroups(source, options).some(group => Array.isArray(group.events) && group.events.length)
 }
 
-export function skillGroupById(source = {}, groupId = "") {
+export function skillGroupById(source = {}, groupId = "", options = {}) {
     const id = normalizeId(groupId)
-    return calculationSkillGroups(source).find(group => normalizeId(group.id) === id) ?? null
+    return calculationSkillGroups(source, options).find(group => normalizeId(group.id) === id) ?? null
 }
 
 export function skillGroupCountLimits(group = {}) {
-    const { min, max, step } = groupRange(group)
-    return { min, max: Number.isFinite(max) ? max : null, step }
+    const { min, step } = groupRange(group)
+    return { min, step }
 }
 
-export function normalizeSkillGroupCounts(source = {}, inputCounts = {}) {
+export function normalizeSkillGroupCounts(source = {}, inputCounts = {}, options = {}) {
     const counts = {}
-    for (const group of calculationSkillGroups(source)) {
+    for (const group of calculationSkillGroups(source, options)) {
         const id = normalizeId(group.id)
         if (!id) {
             continue
         }
-        const { min, max } = groupRange(group)
+        const { min } = groupRange(group)
         const fallback = finiteNumber(group.defaultCount, min)
-        counts[id] = clamp(finiteNumber(inputCounts?.[id], fallback), min, max)
+        counts[id] = Math.max(min, finiteNumber(inputCounts?.[id], fallback))
     }
     return counts
 }
@@ -86,14 +79,14 @@ function strictSkillGroupError(message, event = {}) {
 }
 
 export function normalizeSkillGroupReferenceEvent(event = {}, source = {}, index = 0, options = {}) {
-    const groups = calculationSkillGroups(source)
+    const groups = calculationSkillGroups(source, options)
+    const requestedGroupId = normalizeId(event.skillGroupId ?? event.groupId)
     if (!groups.length) {
         if (options.strict) {
             throw strictSkillGroupError("当前角色没有可用的技能组定义。", event)
         }
         return null
     }
-    const requestedGroupId = normalizeId(event.skillGroupId ?? event.groupId)
     const requestedGroup = requestedGroupId
         ? groups.find(item => normalizeId(item.id) === requestedGroupId)
         : null
@@ -108,9 +101,9 @@ export function normalizeSkillGroupReferenceEvent(event = {}, source = {}, index
         }
         return null
     }
-    const { min, max } = groupRange(group)
+    const { min } = groupRange(group)
     const fallbackCount = finiteNumber(group.defaultCount, min)
-    const count = clamp(finiteNumber(event.count, fallbackCount), min, max)
+    const count = Math.max(min, finiteNumber(event.count, fallbackCount))
     const id = normalizeId(event.id) || `${groupId}-ref-${index + 1}`
     return {
         id,
@@ -121,8 +114,8 @@ export function normalizeSkillGroupReferenceEvent(event = {}, source = {}, index
     }
 }
 
-export function defaultSkillGroupReferenceEvent(source = {}, groupId = "", index = 0) {
-    return normalizeSkillGroupReferenceEvent({ skillGroupId: groupId }, source, index)
+export function defaultSkillGroupReferenceEvent(source = {}, groupId = "", index = 0, options = {}) {
+    return normalizeSkillGroupReferenceEvent({ skillGroupId: groupId }, source, index, options)
 }
 
 export function normalizeCalculationEventsWithSkillGroups(events = [], source = {}, options = {}) {
@@ -150,7 +143,7 @@ export function expandCalculationEvents(events = [], source = {}, options = {}) 
             expandedEvents.push(cloneJson(event))
             return
         }
-        const group = skillGroupById(source, event.skillGroupId)
+        const group = skillGroupById(source, event.skillGroupId, options)
         if (!group || !Array.isArray(group.events) || !group.events.length) {
             if (options.strict) {
                 throw strictSkillGroupError(`技能组 ${event.skillGroupId} 没有配置可展开的事件。`, event)
@@ -171,8 +164,14 @@ export function expandCalculationEvents(events = [], source = {}, options = {}) 
             }
             const next = cloneJson(childEvent)
             const childId = normalizeId(next.id) || `event-${childIndex + 1}`
+            const childCount = finiteNumber(next.count, 1)
             next.id = `${refId}__${childId}`
-            next.count = finiteNumber(next.count, 1) * groupCount
+            next.count = childCount * groupCount
+            next.skillGroupExpansion = {
+                groupId: event.skillGroupId,
+                repeatCount: groupCount,
+                childCount,
+            }
             next.stunned = normalizeStunned(event.stunned)
             if (!selectedIdMap.has(refId)) {
                 selectedIdMap.set(refId, next.id)
@@ -207,8 +206,8 @@ export function expandCalculationConfigSkillGroups(config = {}, source = config,
 }
 
 export function expandCalculationSkillGroups(config = {}, options = {}) {
-    const counts = normalizeSkillGroupCounts(config, options.counts ?? options)
-    const events = calculationSkillGroups(config).map((group, index) => ({
+    const counts = normalizeSkillGroupCounts(config, options.counts ?? options, options)
+    const events = calculationSkillGroups(config, options).map((group, index) => ({
         id: `${normalizeId(group.id) || `skill-group-${index + 1}`}-ref-${index + 1}`,
         kind: "skillGroup",
         skillGroupId: normalizeId(group.id),

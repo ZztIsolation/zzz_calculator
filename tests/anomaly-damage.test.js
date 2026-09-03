@@ -437,6 +437,21 @@ assert.equal(damageModifierAppliesTo(polarizedAttributeWildcard, {
     anomalyVariant: "normal",
 }), false, "Attribute variant filters should remain independent from the concrete-Anomaly wildcard")
 
+const stunnedOnlyModifier = {
+    requirement: { eventStunned: true },
+    appliesTo: { elements: ["fire"] },
+}
+assert.equal(damageModifierAppliesTo(stunnedOnlyModifier, {
+    kind: "direct",
+    damageElement: "fire",
+    stunned: true,
+}), true)
+assert.equal(damageModifierAppliesTo(stunnedOnlyModifier, {
+    kind: "direct",
+    damageElement: "fire",
+    stunned: false,
+}), false)
+
 const manualEffectModifier = calculateEvent({
     id: "manual-effect",
     kind: "anomaly",

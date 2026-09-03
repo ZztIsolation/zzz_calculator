@@ -23,15 +23,22 @@ const emit = defineEmits<{
 
 const query = ref("")
 const selectedCategoryId = ref("")
+const availableCategories = computed(() => props.skillCatalog?.categories ?? [])
 
 watch(() => props.show, value => {
   if (value) {
     query.value = ""
-    selectedCategoryId.value = props.skillCatalog?.categories?.[0]?.id ?? ""
+    selectedCategoryId.value = availableCategories.value[0]?.id ?? ""
   }
 })
 
-const categoryOptions = computed(() => (props.skillCatalog?.categories ?? []).map((category: any) => ({
+watch(availableCategories, categories => {
+  if (!categories.some((category: any) => category.id === selectedCategoryId.value)) {
+    selectedCategoryId.value = categories[0]?.id ?? ""
+  }
+})
+
+const categoryOptions = computed(() => availableCategories.value.map((category: any) => ({
   label: labelOf(category),
   value: category.id,
 })))
@@ -39,7 +46,7 @@ const categoryOptions = computed(() => (props.skillCatalog?.categories ?? []).ma
 const rows = computed(() => {
   const needle = query.value.trim().toLowerCase()
   const result: any[] = []
-  for (const category of props.skillCatalog?.categories ?? []) {
+  for (const category of availableCategories.value) {
     if (selectedCategoryId.value && category.id !== selectedCategoryId.value) {
       continue
     }
@@ -64,6 +71,7 @@ const rows = computed(() => {
 })
 
 function choose(item: any) {
+  const eventCountRange = normalizeEventCountRange(item.row?.eventCountRange)
   emit("select", {
     skillMultiplier: item.value,
     skillRef: {
@@ -73,9 +81,24 @@ function choose(item: any) {
       rowId: item.row.id,
       level: item.level,
     },
+    ...(eventCountRange ? { eventCountRange } : {}),
     summary: `${labelOf(item.category)} / ${labelOf(item.move)} / ${labelOf(item.row)} · ${skillLevelLabel(item.category, item.level)} · ${item.value}%`,
   })
   emit("update:show", false)
+}
+
+function normalizeEventCountRange(value: any) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null
+  const min = Number.isFinite(Number(value.min)) ? Number(value.min) : 0
+  const requestedMax = Number(value.max)
+  const max = Number.isFinite(requestedMax) ? Math.max(min, requestedMax) : null
+  const requestedDefault = Number(value.default)
+  const fallbackDefault = Number.isFinite(requestedDefault) ? requestedDefault : min
+  return {
+    min,
+    max,
+    default: Math.max(min, max === null ? fallbackDefault : Math.min(max, fallbackDefault)),
+  }
 }
 </script>
 

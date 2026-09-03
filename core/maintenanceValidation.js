@@ -21,7 +21,6 @@ const PLACEHOLDER_NAMES = new Set(["未命名"])
 export const SYSTEM_MANAGED_SKILL_GROUP_COUNTS = Object.freeze({
     defaultCount: 1,
     minCount: 0,
-    maxCount: 100,
     step: 1,
 })
 
@@ -61,7 +60,10 @@ export function applySystemManagedMaintenanceFields(value) {
     if (Array.isArray(value.skillGroups)) {
         value.skillGroups.forEach(group => {
             if (group && typeof group === "object" && !Array.isArray(group)) {
-                Object.assign(group, SYSTEM_MANAGED_SKILL_GROUP_COUNTS)
+                delete group.maxCount
+                if (group.authoredCountRange !== true) {
+                    Object.assign(group, SYSTEM_MANAGED_SKILL_GROUP_COUNTS)
+                }
             }
         })
     }
@@ -146,7 +148,7 @@ const IMPLICIT_EFFECT_SCOPE_BY_SOURCE_TYPE = new Map([
     ["driveDisc4pcTeam", "inCombat"],
 ])
 const EFFECT_TYPE_VALUES = new Set(["fixed", "derived", "formula", "stacked", "damageModifier"])
-const EFFECT_VALUE_SOURCE_KIND_VALUES = new Set(["corePassiveScaling"])
+const EFFECT_VALUE_SOURCE_KIND_VALUES = new Set(["corePassiveScaling", "potentialVisionScaling"])
 const BUFF_MODIFIER_OPERATION_VALUES = new Set(["multiplyResolvedValue"])
 const FORMULA_VALUE_UNIT_VALUES = new Set(["storedValue", "storedPercent"])
 const SKILL_ROW_KIND_VALUES = new Set(["damageMultiplier", "dazeMultiplier", "energyCost", "statBonus"])
@@ -521,6 +523,9 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     if (rule.requirement?.attribute) {
         requireEnum(errors, rule.requirement.attribute, ATTRIBUTE_VALUES, `${path}.requirement.attribute`)
     }
+    if (rule.requirement?.eventStunned !== undefined && typeof rule.requirement.eventStunned !== "boolean") {
+        add(errors, `${path}.requirement.eventStunned`, "失衡状态要求必须是布尔值。")
+    }
     if (rule.requirement?.excludedAgentIds !== undefined) {
         if (!Array.isArray(rule.requirement.excludedAgentIds)) {
             add(errors, `${path}.requirement.excludedAgentIds`, "排除角色必须是 ID 数组。")
@@ -580,14 +585,14 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
         if (type !== "fixed") {
             add(errors, `${path}.valueSource`, "动态数值来源只支持固定值规则。")
         }
-        if (!context.allowCorePassiveScalingSource) {
-            add(errors, `${path}.valueSource`, "核心被动倍率来源只能用于角色核心被动。")
-        }
         requireEnum(errors, source.kind, EFFECT_VALUE_SOURCE_KIND_VALUES, `${path}.valueSource.kind`)
         const field = String(source.field ?? "").trim()
         if (!/^[A-Za-z][A-Za-z0-9]*$/.test(field)) {
             add(errors, `${path}.valueSource.field`, "倍率字段必须是有效的字段名。")
-        } else if (source.kind === "corePassiveScaling" && context.allowCorePassiveScalingSource) {
+        } else if (source.kind === "corePassiveScaling") {
+            if (!context.allowCorePassiveScalingSource) {
+                add(errors, `${path}.valueSource`, "核心被动倍率来源只能用于角色核心被动。")
+            }
             const scalingLevels = context.agent?.coreSkill?.corePassiveScaling?.levels
             const coreSkillLevels = context.agent?.coreSkill?.levels ?? []
             if (!Array.isArray(scalingLevels) || scalingLevels.length !== coreSkillLevels.length + 1) {
@@ -598,6 +603,27 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
                 const fallbackValue = Number(rule.value)
                 if (Number.isFinite(firstValue) && Number.isFinite(fallbackValue) && Math.abs(firstValue - fallbackValue) > 1e-9) {
                     add(errors, `${path}.value`, "兼容值必须与核心被动倍率第一档一致。")
+                }
+            }
+        } else if (source.kind === "potentialVisionScaling") {
+            if (!context.allowPotentialVisionScalingSource) {
+                add(errors, `${path}.valueSource`, "潜能影像倍率来源只能用于角色自身 Buff。")
+            }
+            const maxLevel = Number(context.agent?.potentialVision?.maxLevel ?? 0)
+            const scalingLevels = context.agent?.potentialVision?.scaling?.levels
+            if (!Array.isArray(scalingLevels) || scalingLevels.length !== maxLevel + 1) {
+                add(errors, `${path}.valueSource.field`, "潜能影像倍率必须包含 P0 到最高潜能等级的完整档位。")
+            } else {
+                scalingLevels.forEach((level, index) => {
+                    if (Number(level?.level) !== index) {
+                        add(errors, `${path}.valueSource.field[${index}]`, "潜能影像倍率档位必须从 P0 连续排列。")
+                    }
+                    requireFinite(errors, level?.[field], `${path}.valueSource.field[${index}]`)
+                })
+                const firstValue = Number(scalingLevels[0]?.[field])
+                const fallbackValue = Number(rule.value)
+                if (Number.isFinite(firstValue) && Number.isFinite(fallbackValue) && Math.abs(firstValue - fallbackValue) > 1e-9) {
+                    add(errors, `${path}.value`, "兼容值必须与潜能影像倍率 P0 档一致。")
                 }
             }
         }
@@ -816,7 +842,7 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     }
 
     const value = requireFinite(errors, rule.value, `${path}.value`)
-    if (Number.isFinite(value) && value === 0) {
+    if (Number.isFinite(value) && value === 0 && !rule.valueSource) {
         add(errors, `${path}.value`, "数值不能为 0。")
     }
     validateModificationValues(errors, rule.modificationValues, "value", `${path}.modificationValues`, value)
@@ -899,8 +925,8 @@ function validateSkillTargetModes(errors, targets = [], path) {
         .flatMap(target => normalizeSkillTarget(target))
         .map(target => target.kind)
         .filter(kind => kind === "specific" || kind === "skillType" || kind === "skillTag"))
-    if (modes.size > 1) {
-        add(errors, path, "同一增幅中不能混合指定角色招式、通用技能大类和通用招式标签。")
+    if (modes.has("specific") && modes.size > 1) {
+        add(errors, path, "同一增幅中不能混合指定角色招式与通用技能目标。")
     }
 }
 
@@ -1129,10 +1155,36 @@ function skillCatalogForRef(context = {}, skillRef = {}) {
     return agentSkills.find(skill => skill.id === skillRef.agentSkillId) ?? null
 }
 
+function validateEventCountRange(errors, range, path) {
+    if (range === undefined || range === null) {
+        return null
+    }
+    if (typeof range !== "object" || Array.isArray(range)) {
+        add(errors, path, "事件次数范围必须是对象。")
+        return null
+    }
+    const min = requireFinite(errors, range.min, `${path}.min`)
+    const max = requireFinite(errors, range.max, `${path}.max`)
+    const defaultValue = requireFinite(errors, range.default, `${path}.default`)
+    for (const [key, value] of [["min", min], ["max", max], ["default", defaultValue]]) {
+        if (Number.isFinite(value) && (!Number.isInteger(value) || value < 0)) {
+            add(errors, `${path}.${key}`, "事件次数必须是非负整数。")
+        }
+    }
+    if (Number.isFinite(min) && Number.isFinite(max) && min > max) {
+        add(errors, path, "事件次数最小值不能大于最大值。")
+    }
+    if (Number.isFinite(defaultValue)
+        && ((Number.isFinite(min) && defaultValue < min) || (Number.isFinite(max) && defaultValue > max))) {
+        add(errors, `${path}.default`, "默认事件次数必须位于允许范围内。")
+    }
+    return Number.isFinite(min) && Number.isFinite(max) ? { min, max, default: defaultValue } : null
+}
+
 function validateCalculationSkillRef(errors, skillRef, path, context = {}, agentId = "") {
     if (!skillRef || typeof skillRef !== "object" || Array.isArray(skillRef)) {
         add(errors, path, "必须选择技能倍率。")
-        return
+        return null
     }
     for (const key of ["agentSkillId", "categoryId", "moveId", "rowId"]) {
         if (!String(skillRef[key] ?? "").trim()) {
@@ -1146,7 +1198,7 @@ function validateCalculationSkillRef(errors, skillRef, path, context = {}, agent
     const skill = skillCatalogForRef(context, skillRef)
     if (!skill) {
         add(errors, `${path}.agentSkillId`, "技能倍率目录不存在。")
-        return
+        return null
     }
     if (agentId && skill.agentId !== agentId) {
         add(errors, `${path}.agentSkillId`, "技能倍率目录不属于当前角色。")
@@ -1154,21 +1206,22 @@ function validateCalculationSkillRef(errors, skillRef, path, context = {}, agent
     const category = (skill.categories ?? []).find(item => item.id === skillRef.categoryId)
     if (!category) {
         add(errors, `${path}.categoryId`, "技能大类不存在。")
-        return
+        return null
     }
     const move = (category.moves ?? []).find(item => item.id === skillRef.moveId)
     if (!move) {
         add(errors, `${path}.moveId`, "技能招式不存在。")
-        return
+        return null
     }
     const row = (move.rows ?? []).find(item => item.id === skillRef.rowId)
     if (!row) {
         add(errors, `${path}.rowId`, "技能倍率行不存在。")
-        return
+        return null
     }
     if ((row.kind ?? "damageMultiplier") !== "damageMultiplier") {
         add(errors, `${path}.rowId`, "只能选择伤害倍率行。")
     }
+    return { skill, category, move, row }
 }
 
 function validateSkillBuffSourceRef(errors, skillRef, path, context = {}, agentId = "") {
@@ -1242,19 +1295,12 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
         const count = validateSkillGroupCount(errors, event.count ?? group?.defaultCount ?? 1, `${path}.count`)
         if (group) {
             const minCount = Number(group.minCount ?? 0)
-            const maxCount = group.maxCount === undefined || group.maxCount === null || group.maxCount === ""
-                ? null
-                : Number(group.maxCount)
             if (Number.isFinite(count) && Number.isFinite(minCount) && count < minCount) {
                 add(errors, `${path}.count`, "次数不能小于技能组最小次数。")
-            }
-            if (Number.isFinite(count) && Number.isFinite(maxCount) && count > maxCount) {
-                add(errors, `${path}.count`, "次数不能大于技能组最大次数。")
             }
         }
         return
     }
-    validatePositiveNumber(errors, event.count ?? 1, `${path}.count`, "次数")
     if (event.damageRatioPct !== undefined) {
         validateNonNegativeNumber(errors, event.damageRatioPct, `${path}.damageRatioPct`, "伤害比例")
     }
@@ -1265,8 +1311,18 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
             && event.skillMultiplier !== null
             && String(event.skillMultiplier).trim() !== ""
         if (hasSkillRef) {
-            validateCalculationSkillRef(errors, event.skillRef, `${path}.skillRef`, context, agentId)
+            const resolvedSkillRef = validateCalculationSkillRef(errors, event.skillRef, `${path}.skillRef`, context, agentId)
+            const countRange = validateEventCountRange(errors, resolvedSkillRef?.row?.eventCountRange, `${path}.skillRef.eventCountRange`)
+            if (countRange) {
+                const count = validateSkillGroupCount(errors, event.count ?? countRange.default, `${path}.count`)
+                if (Number.isFinite(count) && (!Number.isInteger(count) || count < countRange.min || count > countRange.max)) {
+                    add(errors, `${path}.count`, `次数必须是 ${countRange.min} 到 ${countRange.max} 的整数。`)
+                }
+            } else {
+                validatePositiveNumber(errors, event.count ?? 1, `${path}.count`, "次数")
+            }
         } else if (hasManualSkillMultiplier) {
+            validatePositiveNumber(errors, event.count ?? 1, `${path}.count`, "次数")
             validatePositiveNumber(errors, event.skillMultiplier, `${path}.skillMultiplier`, "手填倍率")
             if (event.damageElement !== undefined && event.damageElement !== "") {
                 requireEnum(
@@ -1287,6 +1343,7 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
         }
         return
     }
+    validatePositiveNumber(errors, event.count ?? 1, `${path}.count`, "次数")
     const settlementType = event.kind === "disorder"
         ? "disorder"
         : (ANOMALY_SETTLEMENT_TYPE_VALUES.has(event.settlementType) ? event.settlementType : "attribute")
@@ -1452,23 +1509,17 @@ function validateCalculationSkillGroups(errors, groups, path, context = {}, agen
         if (group.description !== undefined && hasText(group.description)) {
             requireName(errors, group.description, `${groupPath}.description.zhCN`)
         }
+        if (group.authoredCountRange !== undefined && group.authoredCountRange !== true) {
+            add(errors, `${groupPath}.authoredCountRange`, "仅在需要保留游戏规则限定的次数范围时设为 true。")
+        }
         const minCount = validateSkillGroupCount(errors, group.minCount ?? 0, `${groupPath}.minCount`)
-        const maxCount = group.maxCount === undefined || group.maxCount === null || group.maxCount === ""
-            ? null
-            : validateSkillGroupCount(errors, group.maxCount, `${groupPath}.maxCount`)
         const defaultCount = validateSkillGroupCount(errors, group.defaultCount ?? 0, `${groupPath}.defaultCount`)
         const step = requireFinite(errors, group.step ?? 1, `${groupPath}.step`)
         if (Number.isFinite(step) && step <= 0) {
             add(errors, `${groupPath}.step`, "步长必须大于 0。")
         }
-        if (Number.isFinite(minCount) && Number.isFinite(maxCount) && maxCount < minCount) {
-            add(errors, `${groupPath}.maxCount`, "最大次数不能小于最小次数。")
-        }
         if (Number.isFinite(defaultCount) && Number.isFinite(minCount) && defaultCount < minCount) {
             add(errors, `${groupPath}.defaultCount`, "默认次数不能小于最小次数。")
-        }
-        if (Number.isFinite(defaultCount) && Number.isFinite(maxCount) && defaultCount > maxCount) {
-            add(errors, `${groupPath}.defaultCount`, "默认次数不能大于最大次数。")
         }
         validateCalculationEventList(errors, group.events, `${groupPath}.events`, context, agentId)
     })
@@ -1542,7 +1593,7 @@ function validateDefaultCalculationConfig(errors, config, context = {}, agentId 
         errors,
         config,
         "defaultCalculationConfig",
-        context,
+        { ...context, potentialLevel: 0 },
         agentId,
         roleSkillGroupById,
         { allowLegacySkillGroups: true },
@@ -1559,7 +1610,86 @@ function validateDefaultCalculationConfig(errors, config, context = {}, agentId 
                     return
                 }
                 validateDefaultCalculationCinemaLevel(errors, variant.cinemaLevel, `${path}.cinemaLevel`, seenLevels)
-                validateDefaultCalculationConfigEntry(errors, variant, path, context, agentId, skillGroupById)
+                validateDefaultCalculationConfigEntry(errors, variant, path, { ...context, potentialLevel: 0 }, agentId, skillGroupById)
+            })
+        }
+    }
+    if (config.potentialVariants !== undefined) {
+        if (!Array.isArray(config.potentialVariants)) {
+            add(errors, "defaultCalculationConfig.potentialVariants", "必须是数组。")
+        } else {
+            const ranges = []
+            config.potentialVariants.forEach((variant, index) => {
+                const path = `defaultCalculationConfig.potentialVariants[${index}]`
+                if (!variant || typeof variant !== "object" || Array.isArray(variant)) {
+                    add(errors, path, "必须是对象。")
+                    return
+                }
+                const minPotentialLevel = Number(variant.minPotentialLevel)
+                const maxPotentialLevel = Number(variant.maxPotentialLevel ?? minPotentialLevel)
+                if (!Number.isInteger(minPotentialLevel) || minPotentialLevel < 1 || minPotentialLevel > 6) {
+                    add(errors, `${path}.minPotentialLevel`, "潜能方案起始等级必须是 1 到 6 的整数。")
+                }
+                if (!Number.isInteger(maxPotentialLevel)
+                    || maxPotentialLevel < minPotentialLevel
+                    || maxPotentialLevel > Number(context.currentAgent?.potentialVision?.maxLevel ?? 6)) {
+                    add(errors, `${path}.maxPotentialLevel`, "潜能方案结束等级必须不小于起始等级且不超过角色最高潜能。")
+                }
+                for (const range of ranges) {
+                    if (minPotentialLevel <= range.max && maxPotentialLevel >= range.min) {
+                        add(errors, path, "潜能方案等级范围不能重叠。")
+                        break
+                    }
+                }
+                ranges.push({ min: minPotentialLevel, max: maxPotentialLevel })
+                if (variant.potentialVariants !== undefined) {
+                    add(errors, `${path}.potentialVariants`, "潜能方案不能继续嵌套潜能方案。")
+                }
+                const variantSeenLevels = new Set()
+                const baseVariantCinemaLevel = validateDefaultCalculationCinemaLevel(
+                    errors,
+                    variant.cinemaLevel ?? 0,
+                    `${path}.cinemaLevel`,
+                    variantSeenLevels,
+                )
+                if (baseVariantCinemaLevel !== null && baseVariantCinemaLevel !== 0) {
+                    add(errors, `${path}.cinemaLevel`, "潜能方案的基础默认循环必须是 0 影。")
+                }
+                validateDefaultCalculationConfigEntry(
+                    errors,
+                    variant,
+                    path,
+                    { ...context, potentialLevel: minPotentialLevel },
+                    agentId,
+                    skillGroupById,
+                )
+                if (variant.variants !== undefined) {
+                    if (!Array.isArray(variant.variants)) {
+                        add(errors, `${path}.variants`, "必须是数组。")
+                    } else {
+                        variant.variants.forEach((cinemaVariant, cinemaIndex) => {
+                            const cinemaPath = `${path}.variants[${cinemaIndex}]`
+                            if (!cinemaVariant || typeof cinemaVariant !== "object" || Array.isArray(cinemaVariant)) {
+                                add(errors, cinemaPath, "必须是对象。")
+                                return
+                            }
+                            validateDefaultCalculationCinemaLevel(
+                                errors,
+                                cinemaVariant.cinemaLevel,
+                                `${cinemaPath}.cinemaLevel`,
+                                variantSeenLevels,
+                            )
+                            validateDefaultCalculationConfigEntry(
+                                errors,
+                                cinemaVariant,
+                                cinemaPath,
+                                { ...context, potentialLevel: minPotentialLevel },
+                                agentId,
+                                skillGroupById,
+                            )
+                        })
+                    }
+                }
             })
         }
     }
@@ -1759,6 +1889,7 @@ function validateAgentSkill(item, context) {
                         ? validateSkillLevelRange(errors, row.levelRange, `${rowPath}.levelRange`, moveRange, levelScale)
                         : moveRange
                     validateSkillValues(errors, { ...row, kind: row?.kind ?? "damageMultiplier" }, rowRange, rowPath)
+                    validateEventCountRange(errors, row?.eventCountRange, `${rowPath}.eventCountRange`)
                 })
             })
         })
@@ -1853,6 +1984,59 @@ function validateAnomalyReleaseProfiles(errors, profiles) {
     }
 }
 
+function validatePotentialVision(errors, potentialVision) {
+    if (potentialVision === undefined || potentialVision === null) {
+        return
+    }
+    if (typeof potentialVision !== "object" || Array.isArray(potentialVision)) {
+        add(errors, "potentialVision", "必须是对象。")
+        return
+    }
+    requireName(errors, potentialVision.name, "potentialVision.name.zhCN")
+    const maxLevel = requireFinite(errors, potentialVision.maxLevel, "potentialVision.maxLevel")
+    if (!Number.isInteger(maxLevel) || maxLevel < 1 || maxLevel > 6) {
+        add(errors, "potentialVision.maxLevel", "最高潜能等级必须是 1 到 6 的整数。")
+    }
+    const defaultLevel = requireFinite(errors, potentialVision.defaultLevel, "potentialVision.defaultLevel")
+    if (!Number.isInteger(defaultLevel) || defaultLevel < 0 || (Number.isFinite(maxLevel) && defaultLevel > maxLevel)) {
+        add(errors, "potentialVision.defaultLevel", "默认潜能等级必须位于 P0 到最高潜能等级之间。")
+    }
+    const unlockLevel = requireFinite(errors, potentialVision.mechanicUnlockLevel, "potentialVision.mechanicUnlockLevel")
+    if (!Number.isInteger(unlockLevel) || unlockLevel < 1 || (Number.isFinite(maxLevel) && unlockLevel > maxLevel)) {
+        add(errors, "potentialVision.mechanicUnlockLevel", "机制解锁等级必须位于 P1 到最高潜能等级之间。")
+    }
+
+    const scaling = potentialVision.scaling
+    if (!scaling || typeof scaling !== "object" || Array.isArray(scaling)) {
+        add(errors, "potentialVision.scaling", "潜能数值成长必须是对象。")
+        return
+    }
+    requireName(errors, scaling.name, "potentialVision.scaling.name.zhCN")
+    if (!Array.isArray(scaling.levels)) {
+        add(errors, "potentialVision.scaling.levels", "必须是数组。")
+        return
+    }
+    const expectedLength = Number.isInteger(maxLevel) ? maxLevel + 1 : 0
+    if (expectedLength && scaling.levels.length !== expectedLength) {
+        add(errors, "potentialVision.scaling.levels", `必须完整包含 P0 到 P${maxLevel}。`)
+    }
+    scaling.levels.forEach((level, index) => {
+        const path = `potentialVision.scaling.levels[${index}]`
+        if (!level || typeof level !== "object" || Array.isArray(level)) {
+            add(errors, path, "必须是对象。")
+            return
+        }
+        if (Number(level.level) !== index) {
+            add(errors, `${path}.level`, "潜能等级必须从 P0 连续排列。")
+        }
+        const numericFields = Object.entries(level).filter(([key]) => key !== "level")
+        if (!numericFields.length) {
+            add(errors, path, "每个潜能档位至少需要一个数值字段。")
+        }
+        numericFields.forEach(([key, value]) => requireFinite(errors, value, `${path}.${key}`))
+    })
+}
+
 function validateAgent(item, context) {
     const errors = []
     requireId(errors, item)
@@ -1882,13 +2066,18 @@ function validateAgent(item, context) {
         sourceType: "self",
         context: { ...context, agent: item, allowCorePassiveScalingSource: true },
     })
-    validateEffectSet(errors, item?.combatBuffs?.additionalAbility, "combatBuffs.additionalAbility", { sourceType: "self", context })
+    validatePotentialVision(errors, item?.potentialVision)
+    validateEffectSet(errors, item?.combatBuffs?.additionalAbility, "combatBuffs.additionalAbility", {
+        sourceType: "self",
+        context: { ...context, agent: item, allowPotentialVisionScalingSource: true },
+    })
     validateSkillBuffs(errors, item?.combatBuffs?.skillBuffs, context, item?.id)
     validateCinemaBuffs(errors, item?.combatBuffs?.cinemaBuffs, context)
     validateAnomalyReleaseProfiles(errors, item?.anomalyReleaseProfiles)
     validatePreferredDriveDiscs(errors, item?.preferredDriveDiscs, context)
-    const roleSkillGroupById = validateCalculationSkillGroups(errors, item?.skillGroups, "skillGroups", context, item?.id)
-    validateDefaultCalculationConfig(errors, item?.defaultCalculationConfig, { ...context, currentAgent: item }, item?.id, roleSkillGroupById)
+    const agentContext = { ...context, currentAgent: item }
+    const roleSkillGroupById = validateCalculationSkillGroups(errors, item?.skillGroups, "skillGroups", agentContext, item?.id)
+    validateDefaultCalculationConfig(errors, item?.defaultCalculationConfig, agentContext, item?.id, roleSkillGroupById)
 
     if (item?.coreSkill) {
         if (typeof item.coreSkill !== "object" || Array.isArray(item.coreSkill)) {

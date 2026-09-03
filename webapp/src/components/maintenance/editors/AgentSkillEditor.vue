@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NInput, NInputNumber, NSelect } from "naive-ui"
+import { NButton, NInput, NInputNumber, NSelect, NSwitch } from "naive-ui"
 import { Plus, Trash2 } from "lucide-vue-next"
 import MaintenanceSection from "../MaintenanceSection.vue"
 import SourceListEditor from "../SourceListEditor.vue"
@@ -61,6 +61,12 @@ function addRow(category: any, move: any) {
   move.rows.push({ id: internalId("skill_row"), label: { zhCN: "新倍率行" }, kind: "damageMultiplier", values: levelsFor(category).map(() => 0) })
   changed()
 }
+
+function setEventCountRange(row: any, enabled: boolean) {
+  if (enabled) row.eventCountRange = { min: 0, max: 1, default: 1 }
+  else delete row.eventCountRange
+  changed()
+}
 </script>
 
 <template>
@@ -113,12 +119,13 @@ function addRow(category: any, move: any) {
           </div>
           <div class="skill-table-wrap">
             <table class="skill-multiplier-table">
-              <thead><tr><th class="skill-col-label">行名</th><th class="skill-col-kind">类型</th><th class="skill-col-basis">伤害基准</th><th v-for="level in levelsFor(category)" :key="level">{{ category.levelScale === 'coreSkill' ? level : `LV${level}` }}</th><th>操作</th></tr></thead>
+              <thead><tr><th class="skill-col-label">行名</th><th class="skill-col-kind">类型</th><th class="skill-col-basis">伤害基准</th><th>次数范围</th><th v-for="level in levelsFor(category)" :key="level">{{ category.levelScale === 'coreSkill' ? level : `LV${level}` }}</th><th>操作</th></tr></thead>
               <tbody>
                 <tr v-for="(row, rowIndex) in move.rows" :key="row.id">
                   <td class="skill-col-label"><NInput :value="textOf(row.label)" :disabled="disabled" @update:value="row.label = { zhCN: String($event) }; changed()" /></td>
                   <td class="skill-col-kind"><NSelect v-model:value="row.kind" :options="SKILL_ROW_KIND_OPTIONS" :disabled="disabled" @update:value="changed" /></td>
                   <td class="skill-col-basis"><NSelect v-model:value="row.damageBasis" :options="DAMAGE_BASIS_OPTIONS" :disabled="disabled" clearable @update:value="changed" /></td>
+                  <td class="skill-count-range-cell"><NSwitch :value="Boolean(row.eventCountRange)" :disabled="disabled" @update:value="setEventCountRange(row, $event)" /><template v-if="row.eventCountRange"><NInputNumber v-model:value="row.eventCountRange.min" :disabled="disabled" :min="0" :step="1" placeholder="最小" @update:value="changed" /><NInputNumber v-model:value="row.eventCountRange.max" :disabled="disabled" :min="0" :step="1" placeholder="最大" @update:value="changed" /><NInputNumber v-model:value="row.eventCountRange.default" :disabled="disabled" :min="0" :step="1" placeholder="默认" @update:value="changed" /></template></td>
                   <td v-for="(_level, levelIndex) in levelsFor(category)" :key="levelIndex"><NInputNumber v-model:value="row.values[levelIndex]" :disabled="disabled" :step="0.01" @update:value="changed" /></td>
                   <td><NButton quaternary type="error" :disabled="disabled" title="删除倍率行" @click="move.rows.splice(rowIndex, 1); changed()"><template #icon><Trash2 :size="15" /></template></NButton></td>
                 </tr>
@@ -130,3 +137,7 @@ function addRow(category: any, move: any) {
     </MaintenanceSection>
   </div>
 </template>
+
+<style scoped>
+.skill-count-range-cell { display: grid; min-width: 100px; gap: 4px; }
+</style>

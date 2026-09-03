@@ -5681,6 +5681,1367 @@
         "damageElements": "Dash Attack is physical; every other damaging move is ice",
         "cinemaOneOverflow": "stored as a one-level independent Basic Attack event so it receives Basic Attack, Tempering, and Cinema 2 targeted modifiers while remaining absent by default"
       }
+    },
+    {
+      "id": "soldier_11",
+      "agentId": "soldier_11",
+      "name": {
+        "zhCN": "11号技能倍率"
+      },
+      "categories": [
+        {
+          "id": "basic",
+          "name": {
+            "zhCN": "普通攻击"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "warmup_sparks",
+              "name": {
+                "zhCN": "普通攻击：热身火花"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "hit_1",
+                  "label": {
+                    "zhCN": "一段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    34.4,
+                    37.6,
+                    40.8,
+                    44,
+                    47.2,
+                    50.4,
+                    53.6,
+                    56.8,
+                    60,
+                    63.2,
+                    66.4,
+                    69.6,
+                    72.8,
+                    76,
+                    79.2,
+                    82.4
+                  ]
+                },
+                {
+                  "id": "hit_2",
+                  "label": {
+                    "zhCN": "二段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    41.2,
+                    45,
+                    48.8,
+                    52.6,
+                    56.4,
+                    60.2,
+                    64,
+                    67.8,
+                    71.6,
+                    75.4,
+                    79.2,
+                    83,
+                    86.8,
+                    90.6,
+                    94.4,
+                    98.2
+                  ]
+                },
+                {
+                  "id": "hit_3",
+                  "label": {
+                    "zhCN": "三段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    102.8,
+                    112.2,
+                    121.6,
+                    131,
+                    140.4,
+                    149.8,
+                    159.2,
+                    168.6,
+                    178,
+                    187.4,
+                    196.8,
+                    206.2,
+                    215.6,
+                    225,
+                    234.4,
+                    243.8
+                  ]
+                },
+                {
+                  "id": "hit_4",
+                  "label": {
+                    "zhCN": "四段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    213.4,
+                    232.8,
+                    252.2,
+                    271.6,
+                    291,
+                    310.4,
+                    329.8,
+                    349.2,
+                    368.6,
+                    388,
+                    407.4,
+                    426.8,
+                    446.2,
+                    465.6,
+                    485,
+                    504.4
+                  ]
+                },
+                {
+                  "id": "hit_1_daze",
+                  "label": {
+                    "zhCN": "一段失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    17.2,
+                    18,
+                    18.8,
+                    19.6,
+                    20.4,
+                    21.2,
+                    22,
+                    22.8,
+                    23.6,
+                    24.4,
+                    25.2,
+                    26,
+                    26.8,
+                    27.6,
+                    28.4,
+                    29.2
+                  ]
+                },
+                {
+                  "id": "hit_2_daze",
+                  "label": {
+                    "zhCN": "二段失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    34.4,
+                    36,
+                    37.6,
+                    39.2,
+                    40.8,
+                    42.4,
+                    44,
+                    45.6,
+                    47.2,
+                    48.8,
+                    50.4,
+                    52,
+                    53.6,
+                    55.2,
+                    56.8,
+                    58.4
+                  ]
+                },
+                {
+                  "id": "hit_3_daze",
+                  "label": {
+                    "zhCN": "三段失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    82.3,
+                    86.1,
+                    89.9,
+                    93.7,
+                    97.5,
+                    101.3,
+                    105.1,
+                    108.9,
+                    112.7,
+                    116.5,
+                    120.3,
+                    124.1,
+                    127.9,
+                    131.7,
+                    135.5,
+                    139.3
+                  ]
+                },
+                {
+                  "id": "hit_4_daze",
+                  "label": {
+                    "zhCN": "四段失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    167.6,
+                    175.3,
+                    183,
+                    190.7,
+                    198.4,
+                    206.1,
+                    213.8,
+                    221.5,
+                    229.2,
+                    236.9,
+                    244.6,
+                    252.3,
+                    260,
+                    267.7,
+                    275.4,
+                    283.1
+                  ]
+                }
+              ],
+              "skillType": "basic",
+              "skillTags": []
+            },
+            {
+              "id": "fire_suppression",
+              "skillTags": [
+                "fireSuppression"
+              ],
+              "name": {
+                "zhCN": "普通攻击：火力镇压"
+              },
+              "damageElement": "fire",
+              "rows": [
+                {
+                  "id": "hit_1",
+                  "label": {
+                    "zhCN": "一段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    55.1,
+                    60.2,
+                    65.3,
+                    70.4,
+                    75.5,
+                    80.6,
+                    85.7,
+                    90.8,
+                    95.9,
+                    101,
+                    106.1,
+                    111.2,
+                    116.3,
+                    121.4,
+                    126.5,
+                    131.6
+                  ]
+                },
+                {
+                  "id": "hit_2",
+                  "label": {
+                    "zhCN": "二段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    57.2,
+                    62.4,
+                    67.6,
+                    72.8,
+                    78,
+                    83.2,
+                    88.4,
+                    93.6,
+                    98.8,
+                    104,
+                    109.2,
+                    114.4,
+                    119.6,
+                    124.8,
+                    130,
+                    135.2
+                  ]
+                },
+                {
+                  "id": "hit_3",
+                  "label": {
+                    "zhCN": "三段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    132,
+                    144,
+                    156,
+                    168,
+                    180,
+                    192,
+                    204,
+                    216,
+                    228,
+                    240,
+                    252,
+                    264,
+                    276,
+                    288,
+                    300,
+                    312
+                  ]
+                },
+                {
+                  "id": "hit_4",
+                  "label": {
+                    "zhCN": "四段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    340.7,
+                    371.7,
+                    402.7,
+                    433.7,
+                    464.7,
+                    495.7,
+                    526.7,
+                    557.7,
+                    588.7,
+                    619.7,
+                    650.7,
+                    681.7,
+                    712.7,
+                    743.7,
+                    774.7,
+                    805.7
+                  ]
+                },
+                {
+                  "id": "hit_1_daze",
+                  "label": {
+                    "zhCN": "一段失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    18,
+                    18.9,
+                    19.8,
+                    20.7,
+                    21.6,
+                    22.5,
+                    23.4,
+                    24.3,
+                    25.2,
+                    26.1,
+                    27,
+                    27.9,
+                    28.8,
+                    29.7,
+                    30.6,
+                    31.5
+                  ]
+                },
+                {
+                  "id": "hit_2_daze",
+                  "label": {
+                    "zhCN": "二段失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    33.6,
+                    35.2,
+                    36.8,
+                    38.4,
+                    40,
+                    41.6,
+                    43.2,
+                    44.8,
+                    46.4,
+                    48,
+                    49.6,
+                    51.2,
+                    52.8,
+                    54.4,
+                    56,
+                    57.6
+                  ]
+                },
+                {
+                  "id": "hit_3_daze",
+                  "label": {
+                    "zhCN": "三段失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    75.2,
+                    78.7,
+                    82.2,
+                    85.7,
+                    89.2,
+                    92.7,
+                    96.2,
+                    99.7,
+                    103.2,
+                    106.7,
+                    110.2,
+                    113.7,
+                    117.2,
+                    120.7,
+                    124.2,
+                    127.7
+                  ]
+                },
+                {
+                  "id": "hit_4_daze",
+                  "label": {
+                    "zhCN": "四段失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    192,
+                    200.7,
+                    209.6,
+                    218.4,
+                    227.2,
+                    236,
+                    244.8,
+                    253.6,
+                    262.4,
+                    271.2,
+                    280,
+                    288.8,
+                    297.6,
+                    306.4,
+                    315.2,
+                    324
+                  ]
+                }
+              ],
+              "skillType": "basic"
+            },
+            {
+              "id": "potential_empowered_fire_suppression_fifth",
+              "skillTags": [
+                "fireSuppression"
+              ],
+              "name": {
+                "zhCN": "普通攻击：火力镇压·第五段（潜能）"
+              },
+              "damageElement": "fire",
+              "description": {
+                "zhCN": "潜能影像P1解锁。发动连携技或终结技后强化下一次第五段普通攻击；本体倍率与第五段相同，并按剩余火力镇压次数造成追加伤害。标准爆发轴在第四段和本体各消耗一次后剩余6次。"
+              },
+              "rows": [
+                {
+                  "id": "base_damage",
+                  "label": {
+                    "zhCN": "强化第五段本体伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    441.7,
+                    481.9,
+                    522.1,
+                    562.3,
+                    602.5,
+                    642.7,
+                    682.9,
+                    723.1,
+                    763.3,
+                    803.5,
+                    843.7,
+                    883.9,
+                    924.1,
+                    964.3,
+                    1004.5,
+                    1044.7
+                  ]
+                },
+                {
+                  "id": "extra_damage",
+                  "label": {
+                    "zhCN": "每次消耗火力镇压追加伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "eventCountRange": {
+                    "min": 0,
+                    "max": 6,
+                    "default": 6
+                  },
+                  "values": [
+                    82.8,
+                    90.4,
+                    98,
+                    105.6,
+                    113.2,
+                    120.8,
+                    128.4,
+                    136,
+                    143.6,
+                    151.2,
+                    158.8,
+                    166.4,
+                    174,
+                    181.6,
+                    189.2,
+                    196.8
+                  ]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "强化第五段失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    145.3,
+                    152,
+                    158.7,
+                    165.4,
+                    172.1,
+                    178.8,
+                    185.5,
+                    192.2,
+                    198.9,
+                    205.6,
+                    212.3,
+                    219,
+                    225.7,
+                    232.4,
+                    239.1,
+                    245.8
+                  ]
+                }
+              ],
+              "skillType": "basic"
+            },
+            {
+              "id": "potential_firepower_burst",
+              "name": {
+                "zhCN": "普通攻击：火力迸发"
+              },
+              "damageElement": "fire",
+              "description": {
+                "zhCN": "潜能影像P1解锁的格挡反击。该招式不触发火力镇压，因此不带有fireSuppression标签。"
+              },
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    94.1,
+                    102.7,
+                    111.3,
+                    119.9,
+                    128.5,
+                    137.1,
+                    145.7,
+                    154.3,
+                    162.9,
+                    171.5,
+                    180.1,
+                    188.7,
+                    197.3,
+                    205.9,
+                    214.5,
+                    223.1
+                  ]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    30.7,
+                    32.1,
+                    33.5,
+                    34.9,
+                    36.3,
+                    37.7,
+                    39.1,
+                    40.5,
+                    41.9,
+                    43.3,
+                    44.7,
+                    46.1,
+                    47.5,
+                    48.9,
+                    50.3,
+                    51.7
+                  ]
+                }
+              ],
+              "skillType": "basic",
+              "skillTags": []
+            }
+          ],
+          "levelScale": "skill"
+        },
+        {
+          "id": "dodge",
+          "name": {
+            "zhCN": "闪避"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "dash_attack_blazing_fire",
+              "skillTags": [
+                "dashAttack"
+              ],
+              "name": {
+                "zhCN": "冲刺攻击：炽火"
+              },
+              "damageElement": "physical",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    68.3,
+                    74.6,
+                    80.9,
+                    87.2,
+                    93.5,
+                    99.8,
+                    106.1,
+                    112.4,
+                    118.7,
+                    125,
+                    131.3,
+                    137.6,
+                    143.9,
+                    150.2,
+                    156.5,
+                    162.8
+                  ]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    34.2,
+                    35.8,
+                    37.4,
+                    39,
+                    40.6,
+                    42.2,
+                    43.8,
+                    45.4,
+                    47,
+                    48.6,
+                    50.2,
+                    51.8,
+                    53.4,
+                    55,
+                    56.6,
+                    58.2
+                  ]
+                }
+              ],
+              "skillType": "dodge"
+            },
+            {
+              "id": "dash_attack_fire_suppression",
+              "skillTags": [
+                "dashAttack",
+                "fireSuppression"
+              ],
+              "name": {
+                "zhCN": "冲刺攻击：火力镇压"
+              },
+              "damageElement": "fire",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    78.8,
+                    86,
+                    93.2,
+                    100.4,
+                    107.6,
+                    114.8,
+                    122,
+                    129.2,
+                    136.4,
+                    143.6,
+                    150.8,
+                    158,
+                    165.2,
+                    172.4,
+                    179.6,
+                    186.8
+                  ]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    78.8,
+                    82.4,
+                    86,
+                    89.6,
+                    93.2,
+                    96.8,
+                    100.4,
+                    104,
+                    107.6,
+                    111.2,
+                    114.8,
+                    118.4,
+                    122,
+                    125.6,
+                    129.2,
+                    132.8
+                  ]
+                }
+              ],
+              "skillType": "dodge"
+            },
+            {
+              "id": "dodge_counter_backfire",
+              "skillTags": [
+                "dodgeCounter"
+              ],
+              "name": {
+                "zhCN": "闪避反击：逆火"
+              },
+              "damageElement": "fire",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    262,
+                    285.9,
+                    309.8,
+                    333.7,
+                    357.6,
+                    381.5,
+                    405.4,
+                    429.3,
+                    453.2,
+                    477.1,
+                    501,
+                    524.9,
+                    548.8,
+                    572.7,
+                    596.6,
+                    620.5
+                  ]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    225.8,
+                    236.1,
+                    246.4,
+                    256.7,
+                    267,
+                    277.3,
+                    287.6,
+                    297.9,
+                    308.2,
+                    318.5,
+                    328.8,
+                    339.1,
+                    349.4,
+                    359.7,
+                    370,
+                    380.3
+                  ]
+                }
+              ],
+              "skillType": "dodge"
+            }
+          ],
+          "levelScale": "skill"
+        },
+        {
+          "id": "assist",
+          "name": {
+            "zhCN": "支援技"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "quick_assist_fire_cover",
+              "skillTags": [
+                "assistAttack"
+              ],
+              "name": {
+                "zhCN": "快速支援：火力掩护"
+              },
+              "damageElement": "fire",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    120.8,
+                    131.8,
+                    142.8,
+                    153.8,
+                    164.8,
+                    175.8,
+                    186.8,
+                    197.8,
+                    208.8,
+                    219.8,
+                    230.8,
+                    241.8,
+                    252.8,
+                    263.8,
+                    274.8,
+                    285.8
+                  ]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    120.8,
+                    126.3,
+                    131.8,
+                    137.3,
+                    142.8,
+                    148.3,
+                    153.8,
+                    159.3,
+                    164.8,
+                    170.3,
+                    175.8,
+                    181.3,
+                    186.8,
+                    192.3,
+                    197.8,
+                    203.3
+                  ]
+                }
+              ],
+              "skillType": "assist"
+            },
+            {
+              "id": "defensive_assist_hold_the_line",
+              "name": {
+                "zhCN": "招架支援：巩固防线"
+              },
+              "damageElement": "fire",
+              "rows": [
+                {
+                  "id": "light_parry_daze",
+                  "label": {
+                    "zhCN": "轻招架失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    259,
+                    270.8,
+                    282.6,
+                    294.4,
+                    306.2,
+                    318,
+                    329.8,
+                    341.6,
+                    353.4,
+                    365.2,
+                    377,
+                    388.8,
+                    400.6,
+                    412.4,
+                    424.2,
+                    436
+                  ]
+                },
+                {
+                  "id": "heavy_parry_daze",
+                  "label": {
+                    "zhCN": "重招架失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    327.3,
+                    342.2,
+                    357.1,
+                    372,
+                    386.9,
+                    401.8,
+                    416.7,
+                    431.6,
+                    446.5,
+                    461.4,
+                    476.3,
+                    491.2,
+                    506.1,
+                    521,
+                    535.9,
+                    550.8
+                  ]
+                },
+                {
+                  "id": "chain_parry_daze",
+                  "label": {
+                    "zhCN": "连续招架失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    159.3,
+                    166.6,
+                    173.9,
+                    181.2,
+                    188.5,
+                    195.8,
+                    203,
+                    210.4,
+                    217.7,
+                    225,
+                    232.3,
+                    239.6,
+                    246.9,
+                    254.2,
+                    261.5,
+                    268.8
+                  ]
+                }
+              ],
+              "skillType": "assist",
+              "skillTags": []
+            },
+            {
+              "id": "assist_followup_reignite",
+              "skillTags": [
+                "assistAttack"
+              ],
+              "name": {
+                "zhCN": "支援突击：重燃"
+              },
+              "damageElement": "fire",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    383.7,
+                    418.6,
+                    453.5,
+                    488.4,
+                    523.3,
+                    558.2,
+                    593.1,
+                    628,
+                    662.9,
+                    697.8,
+                    732.7,
+                    767.8,
+                    802.4,
+                    837.4,
+                    872.3,
+                    907.2
+                  ]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    335.5,
+                    350.8,
+                    366.1,
+                    381.4,
+                    396.7,
+                    412,
+                    427.3,
+                    442.6,
+                    457.9,
+                    473.2,
+                    488.5,
+                    503.8,
+                    519.1,
+                    534.4,
+                    549.7,
+                    565
+                  ]
+                }
+              ],
+              "skillType": "assist"
+            }
+          ],
+          "levelScale": "skill"
+        },
+        {
+          "id": "special",
+          "name": {
+            "zhCN": "特殊技"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "special_raging_fire",
+              "name": {
+                "zhCN": "特殊技：烈火"
+              },
+              "damageElement": "fire",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    52.6,
+                    57.4,
+                    62.2,
+                    67,
+                    71.8,
+                    76.6,
+                    81.4,
+                    86.2,
+                    91,
+                    95.8,
+                    100.6,
+                    105.4,
+                    110.2,
+                    115,
+                    119.8,
+                    124.6
+                  ]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    52.6,
+                    55,
+                    57.4,
+                    59.8,
+                    62.2,
+                    64.6,
+                    67,
+                    69.4,
+                    71.8,
+                    74.2,
+                    76.6,
+                    79,
+                    81.4,
+                    83.8,
+                    86.2,
+                    88.6
+                  ]
+                }
+              ],
+              "skillType": "special",
+              "skillTags": []
+            },
+            {
+              "id": "ex_special_fervent_fire",
+              "skillTags": [
+                "exSpecial"
+              ],
+              "name": {
+                "zhCN": "强化特殊技：盛燃烈火"
+              },
+              "damageElement": "fire",
+              "description": {
+                "zhCN": "发动后使普通攻击和冲刺攻击必定触发火力镇压；潜能P1及以上持续30秒或8次，并进入戒备姿态。"
+              },
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    675,
+                    736.4,
+                    797.8,
+                    859.2,
+                    920.6,
+                    982,
+                    1043.4,
+                    1104.8,
+                    1166.2,
+                    1227.6,
+                    1289,
+                    1350.4,
+                    1411.8,
+                    1473.2,
+                    1534.6,
+                    1596
+                  ]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    543.5,
+                    568.3,
+                    593.1,
+                    617.9,
+                    642.7,
+                    667.5,
+                    692.3,
+                    717.1,
+                    741.9,
+                    766.7,
+                    791.5,
+                    816.3,
+                    841.1,
+                    865.9,
+                    890.7,
+                    915.5
+                  ]
+                },
+                {
+                  "id": "energy_cost",
+                  "label": {
+                    "zhCN": "能量消耗"
+                  },
+                  "kind": "energyCost",
+                  "values": [
+                    80,
+                    80,
+                    80,
+                    80,
+                    80,
+                    80,
+                    80,
+                    80,
+                    80,
+                    80,
+                    80,
+                    80,
+                    80,
+                    80,
+                    80,
+                    80
+                  ]
+                }
+              ],
+              "skillType": "special"
+            }
+          ],
+          "levelScale": "skill"
+        },
+        {
+          "id": "chain",
+          "name": {
+            "zhCN": "连携技与终结技"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "chain_uplifting_flame",
+              "name": {
+                "zhCN": "连携技：昂扬烈焰"
+              },
+              "damageElement": "fire",
+              "description": {
+                "zhCN": "发动后使普通攻击和冲刺攻击必定触发火力镇压；潜能P1及以上持续30秒或8次。"
+              },
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    632.5,
+                    690,
+                    747.5,
+                    805,
+                    862.5,
+                    920,
+                    977.5,
+                    1035,
+                    1092.5,
+                    1150,
+                    1207.5,
+                    1265,
+                    1322.5,
+                    1380,
+                    1437.5,
+                    1495
+                  ]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    213.6,
+                    223.4,
+                    233.2,
+                    243,
+                    252.8,
+                    262.6,
+                    272.4,
+                    282.2,
+                    292,
+                    301.8,
+                    311.6,
+                    321.4,
+                    331.2,
+                    341,
+                    350.8,
+                    360.6
+                  ]
+                }
+              ],
+              "skillType": "chain",
+              "skillTags": []
+            },
+            {
+              "id": "ultimate_roaring_flame",
+              "name": {
+                "zhCN": "终结技：轰鸣烈焰"
+              },
+              "damageElement": "fire",
+              "description": {
+                "zhCN": "发动后使普通攻击和冲刺攻击必定触发火力镇压；潜能P1及以上持续30秒或8次。"
+              },
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    2103,
+                    2294.2,
+                    2485.4,
+                    2676.6,
+                    2867.8,
+                    3059,
+                    3250.1,
+                    3441.4,
+                    3632.6,
+                    3823.8,
+                    4015,
+                    4206.2,
+                    4397.4,
+                    4588.6,
+                    4779.8,
+                    4971
+                  ]
+                },
+                {
+                  "id": "daze",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "kind": "dazeMultiplier",
+                  "values": [
+                    285,
+                    298,
+                    311,
+                    324,
+                    337,
+                    350,
+                    363,
+                    376,
+                    389,
+                    402,
+                    415,
+                    428,
+                    441,
+                    454,
+                    467,
+                    480
+                  ]
+                }
+              ],
+              "skillType": "ultimate",
+              "skillTags": []
+            }
+          ],
+          "levelScale": "skill"
+        }
+      ],
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/73/detail?mhy_presentation_style=fullscreen",
+        "https://git.mero.moe/dimbreath/ZenlessData/src/branch/master/Data/JsonBytes/NewAbility/AvatarAbility/LonginusAbility/Longinus_Enhance.json",
+        "https://zzz.honeyhunterworld.com/1041-char/?lang=CN"
+      ],
+      "verification": {
+        "officialEntryPageId": 73,
+        "officialEntryVersion": 1778153484,
+        "skillMultipliers": "all official damaging, daze, and energy rows for levels 1-16 source-checked against the Mihoyo Hoyowiki entry 73 structured module 4 on 2026-08-25",
+        "potentialMultipliers": "P1 move rows are source-checked against structured module 1528 and corrected with current client data plus the complete multiplier table",
+        "fireSuppressionHitThreeLevel13": "official HTML displays 276.% and is stored as 276",
+        "potentialFifthCorrections": "official P1 table has erroneous Lv3, Lv6 and Lv15/missing cells; fifth damage is stored as the complete 441.7..1044.7 sequence with 40.2 increments, extra damage as 82.8..196.8 with 7.6 increments, and daze as 145.3..245.8 with 6.7 increments",
+        "firepowerBurstCorrections": "official P1 table omits Lv15; damage is stored as 94.1..223.1 with 8.6 increments and daze as 30.7..51.7 with 1.4 increments",
+        "damageElements": "Warmup Sparks and physical Dash Attack are physical; all other damaging moves are fire",
+        "firepowerBurstCoreExclusion": "Firepower Burst intentionally lacks the fireSuppression tag and does not receive Heat Wave or Cinema 6"
+      }
     }
   ]
 }

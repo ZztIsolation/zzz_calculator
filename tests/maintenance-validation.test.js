@@ -59,8 +59,17 @@ const systemManagedFixture = applySystemManagedMaintenanceFields({
     skillGroups: [{ defaultCount: 9, minCount: 2, maxCount: 3, step: 0.5 }],
     nested: { coverage: { default: 1.5, min: 0.4, max: 0.6, step: 0.2 } },
 })
-assert.deepEqual(systemManagedFixture.skillGroups[0], { defaultCount: 1, minCount: 0, maxCount: 100, step: 1 })
+assert.deepEqual(systemManagedFixture.skillGroups[0], { defaultCount: 1, minCount: 0, step: 1 })
 assert.deepEqual(systemManagedFixture.nested.coverage, { default: 1.5, min: 0, max: 1, step: 0.1 })
+const authoredCountRangeFixture = applySystemManagedMaintenanceFields({
+    skillGroups: [{ authoredCountRange: true, defaultCount: 1, minCount: 0, maxCount: 1, step: 1 }],
+})
+assert.deepEqual(authoredCountRangeFixture.skillGroups[0], {
+    authoredCountRange: true,
+    defaultCount: 1,
+    minCount: 0,
+    step: 1,
+})
 const migratedCoverageFixture = applySystemManagedMaintenanceFields({
     coverage: { default: 0.4, min: 0.2, max: 0.8, step: 0.2 },
     effects: [
@@ -273,6 +282,74 @@ function assertInvalid(kind, item, text, context = {}) {
         `Expected an error containing ${text}, got:\n${result.errors.join("\n")}`,
     )
 }
+
+const soldier11 = catalog.agentsMap.get("soldier_11")
+const soldier11MaintenanceContext = {
+    agents: catalog.agents,
+    currentAgentId: "soldier_11",
+    agentSkills: catalog.agentSkills,
+    driveDiscSets: catalog.driveDiscSets,
+    anomalyEffects: catalog.anomalyEffects,
+    disorderEffects: catalog.disorderEffects,
+}
+assert.ok(soldier11, "Soldier 11 should exist in the maintained agent catalog")
+assertValid("agents", soldier11, soldier11MaintenanceContext)
+const cleanedSoldier11 = cleanMaintenanceItem("agents", soldier11, soldier11MaintenanceContext)
+assert.deepEqual(cleanedSoldier11.potentialVision.scaling.levels.map(row => row.critDmgPct), [0, 0, 16, 24, 32, 40, 48])
+assert.equal(cleanedSoldier11.defaultCalculationConfig.events
+    .find(event => event.id === "event_7fdef8f8dd").count, 3)
+assert.equal(cleanedSoldier11.combatBuffs.additionalAbility.effects
+    .find(effect => effect.id === "prairie-fire-stunned-damage").requirement.eventStunned, true)
+assert.equal(JSON.stringify(cleanedSoldier11.skillGroups).includes("requiresPotentialLevel"), false)
+assert.deepEqual(
+    Object.fromEntries(Object.entries(cleanedSoldier11.skillGroups
+        .find(group => group.id === "potential_empowered_fifth_package"))
+        .filter(([key]) => ["authoredCountRange", "defaultCount", "minCount", "step"].includes(key))),
+    { authoredCountRange: true, defaultCount: 1, minCount: 0, step: 1 },
+)
+
+const unlimitedSkillGroupAgent = clone(soldier11)
+unlimitedSkillGroupAgent.skillGroups
+    .find(group => group.id === "potential_empowered_fifth_package").maxCount = 1
+unlimitedSkillGroupAgent.defaultCalculationConfig = {
+    mode: "custom",
+    cinemaLevel: 0,
+    name: { zhCN: "技能组重复三次" },
+    selectedEventId: "repeat-potential-group",
+    events: [{
+        id: "repeat-potential-group",
+        kind: "skillGroup",
+        skillGroupId: "potential_empowered_fifth_package",
+        count: 3,
+        stunned: true,
+    }],
+}
+unlimitedSkillGroupAgent.defaultCalculationConfig.events[0].skillGroupExpansion = {
+    groupId: "should-not-persist",
+    repeatCount: 99,
+    childCount: 99,
+}
+assertValid("agents", unlimitedSkillGroupAgent, soldier11MaintenanceContext)
+const cleanedUnlimitedSkillGroupAgent = cleanMaintenanceItem("agents", unlimitedSkillGroupAgent, soldier11MaintenanceContext)
+assert.equal(cleanedUnlimitedSkillGroupAgent.defaultCalculationConfig.events[0].count, 3)
+assert.equal(Object.hasOwn(cleanedUnlimitedSkillGroupAgent.defaultCalculationConfig.events[0], "skillGroupExpansion"), false)
+assert.equal(Object.hasOwn(
+    cleanedUnlimitedSkillGroupAgent.skillGroups.find(group => group.id === "potential_empowered_fifth_package"),
+    "maxCount",
+), false)
+
+const legacyPotentialSkillCatalog = clone(catalog.agentSkills.find(item => item.id === "soldier_11"))
+legacyPotentialSkillCatalog.categories[0].requiresPotentialLevel = 1
+legacyPotentialSkillCatalog.categories[0].moves[0].requiresPotentialLevel = 1
+legacyPotentialSkillCatalog.categories[0].moves[0].rows[0].requiresPotentialLevel = 1
+const cleanedPotentialSkillCatalog = cleanMaintenanceItem("agent-skills", legacyPotentialSkillCatalog)
+assert.equal(JSON.stringify(cleanedPotentialSkillCatalog).includes("requiresPotentialLevel"), false)
+
+const invalidSoldier11Count = clone(soldier11)
+invalidSoldier11Count.skillGroups
+    .find(group => group.id === "potential_empowered_fifth_package").events
+    .find(event => event.id === "empowered-fifth-extra").count = 7
+assertInvalid("agents", invalidSoldier11Count, "次数必须是 0 到 6 的整数", soldier11MaintenanceContext)
 
 assertValid("agents", validAgent)
 const dynamicCoreAgent = {
@@ -1844,7 +1921,6 @@ const validSkillGroups = [
         description: { zhCN: "一轮技能循环" },
         defaultCount: 10,
         minCount: 0,
-        maxCount: 30,
         step: 1,
         events: [
             {
@@ -1859,7 +1935,6 @@ const validSkillGroups = [
         name: { zhCN: "一大" },
         defaultCount: 2,
         minCount: 0,
-        maxCount: 10,
         step: 1,
         events: [
             {
@@ -1998,11 +2073,12 @@ assertInvalid("agents", {
         ],
     },
 }, "次数不能小于 0", validCalculationContext)
-assertInvalid("agents", {
+assertValid("agents", {
     ...validAgent,
     skillGroups: validSkillGroups,
     defaultCalculationConfig: {
         ...validSkillGroupCalculationConfig,
+        selectedEventId: validSkillGroupCalculationConfig.events[1].id,
         events: [
             {
                 ...validSkillGroupCalculationConfig.events[1],
@@ -2010,7 +2086,7 @@ assertInvalid("agents", {
             },
         ],
     },
-}, "次数不能大于技能组最大次数", validCalculationContext)
+}, validCalculationContext)
 assertValid("agents", {
     ...validAgent,
     defaultCalculationConfig: {
@@ -2446,7 +2522,7 @@ assertValid("combat-buffs", {
         },
     }],
 })
-assertInvalid("combat-buffs", {
+assertValid("combat-buffs", {
     ...validBuff,
     effects: [{
         id: "mixed-skill-target-modes",
@@ -2462,7 +2538,7 @@ assertInvalid("combat-buffs", {
             ],
         },
     }],
-}, "不能混合指定角色招式、通用技能大类和通用招式标签")
+})
 assertInvalid("combat-buffs", {
     ...validBuff,
     effects: [{

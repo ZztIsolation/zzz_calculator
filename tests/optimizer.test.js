@@ -513,7 +513,6 @@ groupedDamageAgent.skillGroups = [
         id: "loop",
         defaultCount: 2,
         minCount: 0,
-        maxCount: 30,
         step: 1,
         events: [
             {
@@ -529,7 +528,6 @@ groupedDamageAgent.skillGroups = [
         id: "anomaly",
         defaultCount: 1,
         minCount: 0,
-        maxCount: 10,
         step: 1,
         events: [
             {

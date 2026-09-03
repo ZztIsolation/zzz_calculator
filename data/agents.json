@@ -756,7 +756,6 @@
           },
           "defaultCount": 1,
           "minCount": 0,
-          "maxCount": 100,
           "step": 1,
           "events": [
             {
@@ -833,7 +832,6 @@
           },
           "defaultCount": 1,
           "minCount": 0,
-          "maxCount": 100,
           "step": 1,
           "events": [
             {
@@ -1238,7 +1236,8 @@
             ],
             "buffModifiers": []
           }
-        ]
+        ],
+        "skillBuffs": []
       },
       "coreSkill": {
         "name": {
@@ -1417,7 +1416,8 @@
           "4": [
             "atkPct",
             "critRate",
-            "critDmg"
+            "critDmg",
+            "anomalyProficiency"
           ],
           "5": [
             "atkPct",
@@ -1439,7 +1439,7 @@
           {
             "id": "miyabi_frost_moon_charge_3",
             "kind": "direct",
-            "count": 4,
+            "count": 3,
             "stunned": true,
             "critMode": "expected",
             "skillRef": {
@@ -1535,7 +1535,7 @@
             }
           }
         ],
-        "selectedEventId": "miyabi_frozen_disorder",
+        "selectedEventId": "miyabi_frost_moon_charge_3",
         "variants": [
           {
             "mode": "custom",
@@ -1548,7 +1548,7 @@
                 "id": "direct-1",
                 "kind": "skillGroup",
                 "skillGroupId": "skill_group_1",
-                "count": 4,
+                "count": 3,
                 "stunned": true
               },
               {
@@ -1658,7 +1658,6 @@
           },
           "defaultCount": 1,
           "minCount": 0,
-          "maxCount": 100,
           "step": 1,
           "events": [
             {
@@ -4520,7 +4519,8 @@
         "mainStatLimits": {
           "4": [
             "critDmg",
-            "atkPct"
+            "atkPct",
+            "critRate"
           ],
           "5": [
             "penRatio",
@@ -4749,7 +4749,6 @@
           },
           "defaultCount": 1,
           "minCount": 0,
-          "maxCount": 100,
           "step": 1,
           "events": [
             {
@@ -4810,6 +4809,754 @@
         "excludedPreReleaseData": "does not use beta deactivation rules, 72% stance Crit Rate, old Cinema multipliers, or the old three-stack signature W-Engine"
       },
       "hidden": false
+    },
+    {
+      "id": "soldier_11",
+      "name": {
+        "zhCN": "11号"
+      },
+      "rarity": "S",
+      "attribute": "fire",
+      "specialty": "attack",
+      "attackTypes": [
+        "slash"
+      ],
+      "faction": "奥波勒斯小队",
+      "images": {
+        "portrait": "/assets/agents/soldier_11.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/25/76099754/41cac9b7c43299248f50ef69a8d4d6fe_9121267123322404.png"
+      },
+      "level60": {
+        "hpBase": 7673,
+        "atkBase": 813,
+        "defBase": 612,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 93,
+        "anomalyProficiency": 93,
+        "anomalyMastery": 94,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动：热浪"
+          },
+          "description": {
+            "zhCN": "11号在普通攻击或冲刺攻击中触发[火力镇压]时，当前招式造成的伤害随核心技等级提升35%/40.8%/46.6%/52.5%/58.3%/64.1%/70%。"
+          },
+          "effects": [
+            {
+              "id": "heat-wave-fire-suppression-damage",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 35,
+              "mode": "flat",
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "fireSuppressionDmgBonusPct"
+              },
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillTag",
+                    "skillTag": "fireSuppression"
+                  }
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": [],
+          "mechanics": {
+            "triggerSkillTag": "fireSuppression",
+            "excludedMoveIds": [
+              "potential_firepower_burst"
+            ]
+          }
+        },
+        "additionalAbility": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "额外能力：燎原"
+          },
+          "description": {
+            "zhCN": "队伍中存在与自身属性或阵营相同的角色时触发：11号造成的火属性伤害提升10%；攻击失衡状态下的敌人时，该增益额外提升22.5%。潜能影像P2-P6还使自身暴击伤害提升16%/24%/32%/40%/48%。"
+          },
+          "effects": [
+            {
+              "id": "prairie-fire-damage",
+              "type": "fixed",
+              "stat": "fireDmg",
+              "value": 10,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "prairie-fire-stunned-damage",
+              "type": "fixed",
+              "stat": "fireDmg",
+              "value": 22.5,
+              "mode": "flat",
+              "requirement": {
+                "eventStunned": true
+              },
+              "target": {
+                "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "absolute-flame-crit-dmg",
+              "type": "fixed",
+              "stat": "critDmg",
+              "value": 0,
+              "mode": "flat",
+              "valueSource": {
+                "kind": "potentialVisionScaling",
+                "field": "critDmgPct"
+              },
+              "target": {
+                "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": [],
+          "mechanics": {
+            "activation": "sameAttributeOrFactionAgent",
+            "stunnedBonusUsesEventState": true,
+            "potentialCritDmgRequiresAdditionalAbility": true
+          }
+        },
+        "cinemaBuffs": [
+          {
+            "cinemaLevel": 2,
+            "cinemaName": {
+              "zhCN": "高温汇聚"
+            },
+            "description": {
+              "zhCN": "触发[火力镇压]时，普通攻击、冲刺攻击、闪避反击造成的伤害提升3%，最多叠加12层，持续15秒，每层独立计时。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "high-temperature-convergence-damage",
+                "type": "stacked",
+                "stat": "dmgBonus",
+                "valuePerStack": 3,
+                "maxStacks": 12,
+                "defaultStacks": 12,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "kind": "skillType",
+                      "skillType": "basic"
+                    },
+                    {
+                      "kind": "skillType",
+                      "skillType": "dodge"
+                    }
+                  ]
+                },
+                "stackGroup": "soldier_11_high_temperature_convergence",
+                "stackLabel": {
+                  "zhCN": "高温汇聚层数"
+                },
+                "condition": "触发火力镇压后",
+                "durationSeconds": 15,
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 6,
+            "cinemaName": {
+              "zhCN": "炽热心流"
+            },
+            "description": {
+              "zhCN": "发动强化特殊技、连携技或终结技时获得8层充能；触发[火力镇压]时消耗1层，使当前招式无视目标25%火属性伤害抗性。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "fiery-flow-fire-res-ignore",
+                "type": "fixed",
+                "stat": "fireResIgnore",
+                "value": 25,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "kind": "skillTag",
+                      "skillTag": "fireSuppression"
+                    }
+                  ]
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": [],
+            "mechanics": {
+              "chargeGainPerTrigger": 8,
+              "maximumCharges": 8,
+              "chargeTriggers": [
+                "exSpecial",
+                "chain",
+                "ultimate"
+              ],
+              "chargeCostPerFireSuppressionMove": 1,
+              "empoweredFifthExtraInheritsMoveBuffs": true
+            }
+          }
+        ],
+        "skillBuffs": []
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "热浪"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "核心被动：热浪"
+          },
+          "levels": [
+            {
+              "level": 1,
+              "fireSuppressionDmgBonusPct": 35
+            },
+            {
+              "level": 2,
+              "fireSuppressionDmgBonusPct": 40.8
+            },
+            {
+              "level": 3,
+              "fireSuppressionDmgBonusPct": 46.6
+            },
+            {
+              "level": 4,
+              "fireSuppressionDmgBonusPct": 52.5
+            },
+            {
+              "level": 5,
+              "fireSuppressionDmgBonusPct": 58.3
+            },
+            {
+              "level": 6,
+              "fireSuppressionDmgBonusPct": 64.1
+            },
+            {
+              "level": 7,
+              "fireSuppressionDmgBonusPct": 70
+            }
+          ],
+          "defaultLevelAtCoreSkill": "F"
+        },
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/73/detail?mhy_presentation_style=fullscreen"
+        ],
+        "verification": {
+          "stats": "source-checked-mihoyo-baike-entry-73-2026-08-25",
+          "corePassiveScaling": "initial/A-F values are 35/40.8/46.6/52.5/58.3/64.1/70 percent"
+        }
+      },
+      "potentialVision": {
+        "name": {
+          "zhCN": "炽焰行歌"
+        },
+        "defaultLevel": 6,
+        "maxLevel": 6,
+        "mechanicUnlockLevel": 1,
+        "scaling": {
+          "name": {
+            "zhCN": "潜能觉醒：绝焰"
+          },
+          "levels": [
+            {
+              "level": 0,
+              "critDmgPct": 0
+            },
+            {
+              "level": 1,
+              "critDmgPct": 0
+            },
+            {
+              "level": 2,
+              "critDmgPct": 16
+            },
+            {
+              "level": 3,
+              "critDmgPct": 24
+            },
+            {
+              "level": 4,
+              "critDmgPct": 32
+            },
+            {
+              "level": 5,
+              "critDmgPct": 40
+            },
+            {
+              "level": 6,
+              "critDmgPct": 48
+            }
+          ]
+        },
+        "mechanics": {
+          "levelOneUnlocksEnhancedMoves": true,
+          "fireSuppressionMaximumTriggers": 8,
+          "fireSuppressionDurationSeconds": 30,
+          "guardStance": true,
+          "guardCounterMoveId": "potential_firepower_burst",
+          "basicStringRetentionAfterPerfectDodgeSeconds": 5,
+          "enhancedFifthConsumesRemainingFireSuppressionTriggers": true,
+          "enhancedFifthMaximumExtraHits": 6
+        },
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/73/detail?mhy_presentation_style=fullscreen",
+          "https://zzz.mihoyo.com/news/161717",
+          "https://zzz.mihoyo.com/news/161772",
+          "https://zzz.mihoyo.com/news/162592"
+        ]
+      },
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "inferno_metal"
+        ],
+        "mainStatLimits": {
+          "4": [
+            "critRate",
+            "critDmg",
+            "atkPct"
+          ],
+          "5": [
+            "fireDmg",
+            "penRatio",
+            "atkPct"
+          ],
+          "6": [
+            "atkPct"
+          ]
+        }
+      },
+      "skillGroups": [
+        {
+          "id": "fire_suppression_string",
+          "name": {
+            "zhCN": "火刀1至4段"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "stage-1",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier_11",
+                "categoryId": "basic",
+                "moveId": "fire_suppression",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "stage-2",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier_11",
+                "categoryId": "basic",
+                "moveId": "fire_suppression",
+                "rowId": "hit_2"
+              }
+            },
+            {
+              "id": "stage-3",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier_11",
+                "categoryId": "basic",
+                "moveId": "fire_suppression",
+                "rowId": "hit_3"
+              }
+            },
+            {
+              "id": "stage-4",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier_11",
+                "categoryId": "basic",
+                "moveId": "fire_suppression",
+                "rowId": "hit_4"
+              }
+            }
+          ]
+        },
+        {
+          "id": "potential_empowered_fifth_package",
+          "name": {
+            "zhCN": "火刀4至5段+6次追加"
+          },
+          "authoredCountRange": true,
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "stage-4",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier_11",
+                "categoryId": "basic",
+                "moveId": "fire_suppression",
+                "rowId": "hit_4"
+              }
+            },
+            {
+              "id": "empowered-fifth-base",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier_11",
+                "categoryId": "basic",
+                "moveId": "potential_empowered_fire_suppression_fifth",
+                "rowId": "base_damage"
+              }
+            },
+            {
+              "id": "empowered-fifth-extra",
+              "kind": "direct",
+              "count": 6,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier_11",
+                "categoryId": "basic",
+                "moveId": "potential_empowered_fire_suppression_fifth",
+                "rowId": "extra_damage"
+              }
+            }
+          ]
+        },
+        {
+          "id": "skill_group_0450a8f883",
+          "name": {
+            "zhCN": "火刀1至5段"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "event_eafbf4005d",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier_11",
+                "categoryId": "basic",
+                "moveId": "fire_suppression",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "event_88ba536530",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier_11",
+                "categoryId": "basic",
+                "moveId": "fire_suppression",
+                "rowId": "hit_2"
+              }
+            },
+            {
+              "id": "event_86c94cdbe2",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier_11",
+                "categoryId": "basic",
+                "moveId": "fire_suppression",
+                "rowId": "hit_3"
+              }
+            },
+            {
+              "id": "event_be4b303fe5",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier_11",
+                "categoryId": "basic",
+                "moveId": "warmup_sparks",
+                "rowId": "hit_4"
+              }
+            },
+            {
+              "id": "event_495866f329",
+              "kind": "direct",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "soldier_11",
+                "categoryId": "basic",
+                "moveId": "potential_empowered_fire_suppression_fifth",
+                "rowId": "base_damage"
+              }
+            }
+          ]
+        }
+      ],
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/73/detail?mhy_presentation_style=fullscreen",
+        "https://zzz.mihoyo.com/news/161717",
+        "https://zzz.mihoyo.com/news/161772",
+        "https://zzz.mihoyo.com/news/162592"
+      ],
+      "verification": {
+        "officialEntryPageId": 73,
+        "officialEntryVersion": 1778153484,
+        "level60Stats": "source-checked-mihoyo-baike-entry-73-2026-08-25",
+        "potentialMechanics": "P1 move unlock, guard stance, basic-string retention, 30-second or 8-trigger fire suppression, and P2-P6 crit damage scaling are source-checked against the official potential-awakening material",
+        "defaultPotentialLevel": "P6 is the first-selection default only for Soldier 11; P0 remains the disabled state",
+        "defaultRotation": "all events target a stunned enemy; P1+ consumes two of eight fire-suppression triggers before the fifth-stage extra package, leaving six extra hits",
+        "unsupportedMechanics": "M1 energy, M4 mitigation and invulnerability, guard blocking, and retained basic-string state are descriptive and are not converted into damage multipliers"
+      },
+      "hidden": false,
+      "defaultCalculationConfig": {
+        "mode": "custom",
+        "cinemaLevel": 0,
+        "name": {
+          "zhCN": "默认方案"
+        },
+        "events": [
+          {
+            "id": "event_627e2b77c8",
+            "kind": "direct",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "soldier_11",
+              "categoryId": "special",
+              "moveId": "ex_special_fervent_fire",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "event_7fdef8f8dd",
+            "kind": "skillGroup",
+            "skillGroupId": "potential_empowered_fifth_package",
+            "count": 3,
+            "stunned": true
+          },
+          {
+            "id": "event_965025cbb0",
+            "kind": "direct",
+            "count": 2,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "soldier_11",
+              "categoryId": "chain",
+              "moveId": "chain_uplifting_flame",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "event_8aa19fdd5e",
+            "kind": "direct",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "soldier_11",
+              "categoryId": "chain",
+              "moveId": "ultimate_roaring_flame",
+              "rowId": "damage"
+            }
+          }
+        ],
+        "selectedEventId": "event_8aa19fdd5e"
+      }
     }
   ]
 }

@@ -945,6 +945,41 @@ function cleanAgentSkillBuff(buff) {
     return next
 }
 
+function cleanPotentialVision(potentialVision) {
+    if (!potentialVision || typeof potentialVision !== "object" || Array.isArray(potentialVision)) {
+        return null
+    }
+
+    const maxLevel = Number(potentialVision.maxLevel ?? 6)
+    const boundedMaxLevel = Number.isInteger(maxLevel) ? Math.max(1, Math.min(6, maxLevel)) : 6
+    const defaultLevel = Number(potentialVision.defaultLevel ?? 0)
+    const mechanicUnlockLevel = Number(potentialVision.mechanicUnlockLevel ?? 1)
+    const rawScaling = potentialVision.scaling
+    const scaling = rawScaling && typeof rawScaling === "object" && !Array.isArray(rawScaling)
+        ? {
+            ...rawScaling,
+            ...(rawScaling.name ? { name: zhOnly(rawScaling.name) } : {}),
+            levels: (Array.isArray(rawScaling.levels) ? rawScaling.levels : []).map(level => ({
+                ...level,
+                level: Number(level?.level),
+            })),
+        }
+        : null
+
+    return {
+        ...potentialVision,
+        ...(potentialVision.name ? { name: zhOnly(potentialVision.name) } : {}),
+        defaultLevel: Number.isInteger(defaultLevel)
+            ? Math.max(0, Math.min(boundedMaxLevel, defaultLevel))
+            : 0,
+        maxLevel: boundedMaxLevel,
+        mechanicUnlockLevel: Number.isInteger(mechanicUnlockLevel)
+            ? Math.max(1, Math.min(boundedMaxLevel, mechanicUnlockLevel))
+            : 1,
+        ...(scaling ? { scaling } : {}),
+    }
+}
+
 function cleanPreferredDriveDiscs(preferredDriveDiscs = null) {
     if (!preferredDriveDiscs || typeof preferredDriveDiscs !== "object" || Array.isArray(preferredDriveDiscs)) {
         return null
@@ -1230,6 +1265,32 @@ function cleanDefaultCalculationConfig(config = null, skillGroups = [], options 
     if (variants.length) {
         baseConfig.variants = variants
     }
+    const rawPotentialVariants = Array.isArray(config.potentialVariants) ? config.potentialVariants : []
+    const potentialVariants = rawPotentialVariants
+        .map(variant => {
+            if (!variant || typeof variant !== "object" || Array.isArray(variant)) {
+                return null
+            }
+            const minPotentialLevel = Number(variant.minPotentialLevel)
+            const maxPotentialLevel = Number(variant.maxPotentialLevel ?? minPotentialLevel)
+            if (!Number.isInteger(minPotentialLevel)
+                || !Number.isInteger(maxPotentialLevel)
+                || minPotentialLevel < 0
+                || maxPotentialLevel > 6
+                || minPotentialLevel > maxPotentialLevel) {
+                return null
+            }
+            const { potentialVariants: _nestedPotentialVariants, minPotentialLevel: _min, maxPotentialLevel: _max, ...variantConfig } = variant
+            const cleaned = cleanDefaultCalculationConfig(variantConfig, skillGroups, options)
+            return cleaned
+                ? { ...cleaned, minPotentialLevel, maxPotentialLevel }
+                : null
+        })
+        .filter(Boolean)
+        .sort((left, right) => Number(left.minPotentialLevel) - Number(right.minPotentialLevel))
+    if (potentialVariants.length) {
+        baseConfig.potentialVariants = potentialVariants
+    }
     return baseConfig
 }
 
@@ -1256,7 +1317,14 @@ function cleanCalculationSkillGroups(groups = [], options = {}) {
                 id,
                 ...(group.name ? { name: zhOnly(group.name) } : {}),
                 ...(cleanOptionalZh(group.description) ? { description: cleanOptionalZh(group.description) } : {}),
-                ...SYSTEM_MANAGED_SKILL_GROUP_COUNTS,
+                ...(group.authoredCountRange === true
+                    ? {
+                        authoredCountRange: true,
+                        defaultCount: Number(group.defaultCount),
+                        minCount: Number(group.minCount),
+                        step: Number(group.step),
+                    }
+                    : SYSTEM_MANAGED_SKILL_GROUP_COUNTS),
                 events,
             }
         })
@@ -1289,6 +1357,7 @@ function cleanAgent(item = {}, options = {}) {
         cleanCalculationSkillGroups(item.defaultCalculationConfig?.skillGroups, calculationOptions),
     )
     const defaultCalculationConfig = cleanDefaultCalculationConfig(item.defaultCalculationConfig, skillGroups, calculationOptions)
+    const potentialVision = cleanPotentialVision(item.potentialVision)
     const next = {
         ...item,
         name: zhOnly(item.name),
@@ -1325,6 +1394,11 @@ function cleanAgent(item = {}, options = {}) {
     } else {
         delete next.defaultCalculationConfig
     }
+    if (potentialVision) {
+        next.potentialVision = potentialVision
+    } else {
+        delete next.potentialVision
+    }
     return next
 }
 
@@ -1351,8 +1425,20 @@ function cleanAgentSkill(item = {}) {
     return {
         ...item,
         categories: (item.categories ?? []).map(category => {
-            const { icon, ...categoryRest } = category ?? {}
-            return categoryRest
+            const { icon, requiresPotentialLevel: _categoryPotentialLevel, ...categoryRest } = category ?? {}
+            return {
+                ...categoryRest,
+                moves: (categoryRest.moves ?? []).map(move => {
+                    const { requiresPotentialLevel: _movePotentialLevel, ...moveRest } = move ?? {}
+                    return {
+                        ...moveRest,
+                        rows: (moveRest.rows ?? []).map(row => {
+                            const { requiresPotentialLevel: _rowPotentialLevel, ...rowRest } = row ?? {}
+                            return rowRest
+                        }),
+                    }
+                }),
+            }
         }),
     }
 }
@@ -1563,6 +1649,9 @@ function materializeCalculationConfigIds(config) {
     config.events = materializeCalculationEventIds(config.events)
     if (Array.isArray(config.variants)) {
         config.variants = config.variants.map(variant => materializeCalculationConfigIds(variant))
+    }
+    if (Array.isArray(config.potentialVariants)) {
+        config.potentialVariants = config.potentialVariants.map(variant => materializeCalculationConfigIds(variant))
     }
     return config
 }
