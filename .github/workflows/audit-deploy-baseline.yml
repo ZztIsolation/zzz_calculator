@@ -1,0 +1,150 @@
+name: Audit deploy baseline
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Baseline operation while production CD is disabled
+        required: true
+        default: audit
+        type: choice
+        options:
+          - audit
+          - dry-run
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: deploy-baseline-audit
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: validate disabled-gate baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      candidate_sha: ${{ steps.baseline.outputs.candidate_sha }}
+      ci_run_id: ${{ steps.baseline.outputs.ci_run_id }}
+      operation_mode: ${{ steps.baseline.outputs.operation_mode }}
+    steps:
+      - name: Resolve current deploy baseline and retained main artifact
+        id: baseline
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          REQUESTED_MODE: ${{ inputs.mode }}
+          PRODUCTION_CD_ENABLED: ${{ vars.PRODUCTION_CD_ENABLED }}
+        with:
+          script: |
+            const fail = message => {
+              core.setFailed(message);
+              return null;
+            };
+            if (context.ref !== "refs/heads/main") {
+              return fail("Audit deploy baseline must be dispatched from main.");
+            }
+            if (process.env.PRODUCTION_CD_ENABLED !== "false") {
+              return fail("Set PRODUCTION_CD_ENABLED=false before auditing the deploy baseline.");
+            }
+            const mode = process.env.REQUESTED_MODE;
+            if (!["audit", "dry-run"].includes(mode)) {
+              return fail("Baseline mode must be audit or dry-run.");
+            }
+
+            const getBranch = branch => github.rest.repos.getBranch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch,
+            }).then(response => response.data);
+            const [main, deploy] = await Promise.all([
+              getBranch("main"),
+              getBranch("deploy"),
+            ]);
+            if (!main.protected || !deploy.protected) {
+              return fail("Both main and deploy must be protected before baseline audit/dry-run.");
+            }
+            if (context.sha !== main.commit.sha) {
+              return fail(`Workflow SHA ${context.sha} is not current main ${main.commit.sha}.`);
+            }
+            const comparison = (await github.rest.repos.compareCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              base: deploy.commit.sha,
+              head: main.commit.sha,
+            })).data;
+            if (!["ahead", "identical"].includes(comparison.status)) {
+              return fail(`deploy ${deploy.commit.sha} is not an ancestor of current main ${main.commit.sha}.`);
+            }
+
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: "ci.yml",
+              branch: "main",
+              head_sha: deploy.commit.sha,
+              status: "success",
+              per_page: 100,
+            });
+            const run = runs.data.workflow_runs.find(candidate =>
+              candidate.name === "CI"
+              && candidate.path === ".github/workflows/ci.yml"
+              && ["push", "workflow_dispatch"].includes(candidate.event)
+              && candidate.head_branch === "main"
+              && candidate.head_sha === deploy.commit.sha
+              && candidate.conclusion === "success"
+              && candidate.head_repository?.full_name === repository
+            );
+            if (!run) {
+              return fail(`No successful main CI run is retained for deploy baseline ${deploy.commit.sha}.`);
+            }
+            const artifactName = `server-release-${deploy.commit.sha}`;
+            const artifacts = await github.paginate(
+              github.rest.actions.listWorkflowRunArtifacts,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: run.id,
+                per_page: 100,
+              },
+            );
+            if (!artifacts.some(artifact =>
+              artifact.name === artifactName
+              && !artifact.expired
+              && artifact.size_in_bytes > 0)) {
+              return fail(`The deploy baseline artifact ${artifactName} is missing, empty, or expired.`);
+            }
+
+            const [finalMain, finalDeploy] = await Promise.all([
+              getBranch("main"),
+              getBranch("deploy"),
+            ]);
+            if (finalMain.commit.sha !== main.commit.sha
+              || finalDeploy.commit.sha !== deploy.commit.sha
+              || !finalMain.protected
+              || !finalDeploy.protected) {
+              return fail("main or deploy changed while resolving the baseline; run the workflow again.");
+            }
+            core.setOutput("candidate_sha", deploy.commit.sha);
+            core.setOutput("ci_run_id", String(run.id));
+            core.setOutput("operation_mode", mode);
+            await core.summary
+              .addHeading("Deploy baseline")
+              .addRaw(`${mode} will use deploy ${deploy.commit.sha}, main CI run ${run.id}, and ${artifactName}.`)
+              .write();
+
+  production:
+    name: run baseline ${{ needs.validate.outputs.operation_mode }}
+    needs: validate
+    if: needs.validate.result == 'success'
+    uses: ./.github/workflows/deploy-production.yml
+    with:
+      candidate_sha: ${{ needs.validate.outputs.candidate_sha }}
+      ci_run_id: ${{ needs.validate.outputs.ci_run_id }}
+      operation_mode: ${{ needs.validate.outputs.operation_mode }}
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read

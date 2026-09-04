@@ -10,14 +10,20 @@ Calculator CI, and immutable `server-release-<full-sha>` artifact/evidence
 creation. A push to `main` no longer constitutes a production deployment
 request, and production CD must not rebuild from a later or different checkout.
 
-The normal release path is an approved `main` -> `deploy` promotion PR. The
-promotion workflow rechecks the PR source and base, required approval, the
-current `main` head, a successful `CI / verify` run on that exact SHA, the
-artifact and evidence binding, and the remote fast-forward relationship. It
-updates the protected `deploy` branch with a non-forced (`force=false`) write to
-that same tested SHA, records promotion evidence, and closes the promotion PR.
-The resulting `deploy` SHA is the frozen production candidate even when `main`
-continues to receive later changes.
+The normal release path starts with `prepare-deploy.yml`, which verifies the
+current branch heads and exact retained `main` CI artifact before creating or
+refreshing a bot-authored `main` -> `deploy` approval PR. The promotion workflow
+then rechecks the PR source and base, current-head human approval, current
+`main`, a successful `CI / verify` run on that exact SHA, the artifact binding,
+and the remote fast-forward relationship. It updates `deploy` with a
+non-forced (`force=false`) write to that same tested SHA, uploads promotion
+evidence, and calls production CD explicitly. Once the PR head is reachable from `deploy`,
+GitHub may mark it indirectly merged; otherwise the workflow closes it. This
+adds no merge commit and preserves the exact tested SHA. Deployment outcomes
+are appended to that closed/merged approval record. The resulting `deploy` SHA
+stays frozen even when `main` advances; a failed CD can be retried from that
+`deploy` ref by `resume-deploy.yml` only after the same SHA, CI run, artifact,
+approval record, and branch protection are revalidated.
 
 Production CD accepts only the promoted `deploy` ref (or the promotion
 workflow's explicit `workflow_call`). It downloads the artifact from the
@@ -30,15 +36,27 @@ public verification. Manual CD is limited to read-only `audit` and isolated
 `dry-run` from `deploy`; rollback is initiated from `deploy` and refuses a
 changed branch SHA. Missing approval, stale SHA, missing artifact, a successful
 CI run from any branch other than `main`, or a non-fast-forward update fails
-closed without changing the branch or contacting production.
+closed before the promotion workflow changes the branch or contacts production.
+The emergency direct-push path independently requires a same-SHA approved PR;
+remote strict `eligibility` protection prevents such a push before approval.
 
 Migration starts with `PRODUCTION_CD_ENABLED=false` and no active legacy
 `main` deployment. The initial `deploy` branch is created at the exact online
 `.deployed-commit` only after confirming that commit is an ancestor of `main`.
-Branch rules then prohibit deletion and force-push, require linear history and
-promotion eligibility/approval, and retain the existing `production` approval
-policy. Only after deploy-branch audit/dry-run and zero-impact checks pass is
-the enable gate restored; changing the variable alone never triggers a deploy.
+Branch rules enforce administrators, prohibit deletion and force-push, and
+require the strict GitHub Actions `eligibility` status, while approval is
+rechecked in the workflow and by the protected `production` Environment. This
+personal repository cannot combine an
+Actions-only writer, required PR merge, and required linear history with an
+exact-SHA `updateRef(force:false)` promotion, so direct human/admin writes are
+documented emergency bypasses rather than the normal path. While the gate is
+false, `audit-deploy-baseline.yml` runs the new reusable control plane from
+`main` against the still-live `deploy` SHA, so baseline audit/dry-run does not
+advance the branch or deploy. Only after those zero-impact checks, a real human
+eligibility run, and branch-rule verification pass is the gate restored;
+changing the variable alone never triggers a deploy. Mocked-Octokit regression
+coverage executes the promotion script for successful, unapproved, stale,
+missing-artifact, wrong-CI-branch, and non-fast-forward cases.
 
 ## 2026-08-24 - Split Sigrid's Tempering into a Chain-Attack Buff
 

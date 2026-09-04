@@ -377,7 +377,7 @@ npm run build:pages
 npm run benchmark:optimizer
 ```
 
-`npm test` 覆盖 Node 计算模型、优化器 fixture/进度/API/fuzz、存储兼容、扫描器桥接、生产服务行为和 Vue 测试。`npm run test:layout` 会先构建应用，再用 Chromium 在桌面、缩放桌面和移动端拒绝标签裁切、控件越界及意外横向滚动。必需的 `CI / verify` 使用 Node 20，覆盖目标为 `main` 的 Pull Request，以及推送或手动运行的 `main`。
+`npm test` 覆盖 Node 计算模型、优化器 fixture/进度/API/fuzz、存储兼容、扫描器桥接、生产服务行为、可执行的提升事件矩阵和 Vue 测试。`npm run test:layout` 会先构建应用，再用 Chromium 在桌面、缩放桌面和移动端拒绝标签裁切、控件越界及意外横向滚动。`CI / verify` 使用 Node 20，只覆盖目标为 `main` 的 Pull Request 与推送；`main` -> `deploy` 审批 PR 只运行只读 eligibility，不再构建第二份发布 artifact。只有成功的 `main` push 或手动 `main` CI run 会上传生产发布 artifact。
 
 ## 生产服务器部署
 
@@ -387,21 +387,43 @@ npm run benchmark:optimizer
 
 1. `main` 是集成与验证分支。`main` 上成功的 CI 会上传不可变的
    `server-release-<完整 SHA>` artifact 及 evidence。推送 `main` 本身不会部署生产。
-2. 目标提交通过 CI 后，从 `main` 创建并审批指向受保护 `deploy` 分支的
-   PR。提升工作流会重新核对 PR 的来源/目标、必要审批、当前 `main` SHA、
-   同一 SHA 上成功的 `CI / verify`、对应 artifact 以及是否可以快进；随后以
-   非强制更新把 `deploy` 推到同一个 SHA，记录提升证据并关闭该提升 PR。
-3. 只有更新 `deploy` 才会产生自动生产候选。CD 复用已经成功的 `main` CI
-   run 中的精确 artifact，核对 `.deployed-commit` 与 artifact SHA，然后进入
-   受保护的 `production` Environment 和服务器 manager 门禁。CD 不重新构建，
-   也不生成第二份 artifact。
-4. 提升会冻结本次部署 SHA。提升完成后即使 `main` 继续前进，正在部署的候选
-   仍保持 `deploy` 的原 SHA。手动 CD 只允许从 `deploy` 运行只读 `audit` 和隔离
-   `dry-run`；回滚同样从 `deploy` 发起，且分支 SHA 发生变化时必须 fail closed。
+2. 从当前 `main` 手动运行 **Prepare deploy promotion**。它会核对当前
+   `main`/`deploy`、精确成功 CI 与 artifact 以及快进关系，然后创建或刷新仓库内
+   `main` -> `deploy` PR，作为人工审批记录。不要在 GitHub UI 中合并该 PR。
+3. 审批后，从当前 `main` 手动运行 **Promote deploy** 并填写 PR 编号。工作流在
+   更新前重新核对打开的 PR、当前 head 的有效审批、两个分支 head、精确 CI/artifact
+   和快进关系，再用 `force=false` 更新 `deploy`，并把冻结 SHA 与 CI run ID 交给
+   生产 CD。PR head 一旦可从 `deploy` 到达，GitHub 可能立即把它标记为间接合并；
+   若它仍为 open，工作流会将其关闭。整个过程不生成 merge commit，也不替换 SHA。
+4. CD 复用成功 `main` CI run 的精确 artifact，核对 `.deployed-commit` 与
+   artifact SHA，然后进入受保护的 `production` Environment 和服务器 manager
+   门禁；CD 不重新构建，也不生成第二份 artifact。若 CD 失败，`deploy` 保留冻结
+   候选，closed/merged 审批 PR 继续作为证据；从该冻结 `deploy` ref 运行
+   **Resume deploy**，重新核对 SHA、CI run、artifact 和审批后重试，不移动分支。
+5. 提升后即使 `main` 继续前进，候选仍保持为 `deploy` 的冻结 SHA。手动 CD 只允许
+   从 `deploy` 运行只读 `audit` 和隔离 `dry-run`；回滚同样从 `deploy` 发起，且分支
+   SHA 发生变化时必须 fail closed。
 
-迁移期间先保持 `PRODUCTION_CD_ENABLED=false`，完成受保护 `deploy` 分支、提升
-资格检查、audit/dry-run 和零影响复核后再恢复为 `true`。只有明确提升到
-`deploy` 的提交才允许进入生产。
+此个人仓库无法在保留原始已验证 `main` SHA 并使用 `updateRef(force:false)` 的同时，
+再由 GitHub 规则强制“仅 Actions 可写”、必须通过 PR merge 和 required linear
+history。正常路径由工作流内部门禁与受保护 `production` Environment 审批共同约束；
+`deploy` 对管理员同样生效，禁止 force-push/删除，并要求 GitHub Actions app 的 strict
+`eligibility`。人工或管理员直推属于需要保留审计记录的应急绕过，
+不是正常发布路径，并且仍必须关联同 SHA、已获人工审批的 `main` -> `deploy` PR，
+通过精确 `main` CI/artifact 与生产门禁。
+
+迁移期间先保持 `PRODUCTION_CD_ENABLED=false`：将 `deploy` 建在当前线上
+`.deployed-commit`，确认它是 `main` 祖先，启用禁止 force-push/删除，确认没有旧
+`main` CD 在运行；在门禁关闭期间从新 `main` 运行 **Audit deploy baseline**，对仍
+停在真实线上 SHA 的 `deploy` 完成 audit/dry-run 与零影响复核。由于
+**Prepare deploy promotion** 使用
+`GITHUB_TOKEN` 创建审批 PR，仓库需允许 Actions 创建 Pull Request；该工作流不会为
+自己的 PR 审批，当前候选仍必须获得人工 approval。之后只在准备明确提升前恢复为
+`true`，并让 `deploy` 在首次正式提升开始前始终等于线上 SHA。
+
+首次切换继续保留 `production` Environment 当前的 protected-branches 策略。reusable
+提升运行携带 caller `main` ref，因此以后若改 custom branch policy，必须同时允许
+`main` 与 `deploy`；在当前 `workflow_call` 架构下不能直接收紧为 deploy-only。
 
 生产应用运行在 `121.199.21.10`。应用版本与下载资源使用相互独立的生命周期：
 

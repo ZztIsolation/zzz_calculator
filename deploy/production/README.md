@@ -116,30 +116,70 @@ repository URL to later jobs.
 
 The repository uses two explicit branch roles:
 
-- `main` is the integration branch. Pull requests and pushes to `main` run the
-  required `CI / verify` check. A successful push or manual CI run on `main`
-  uploads `server-release-<full-sha>` and its evidence. CI does not deploy.
-- `deploy` is the protected production release branch. The
-  `.github/workflows/promote-deploy.yml` workflow is the only normal writer. It
-  handles an approved `main` -> `deploy` promotion after rechecking the PR
-  source/target, required approval, current `main` SHA, a successful CI run on
-  that exact SHA, the matching artifact, and fast-forward eligibility. It uses
-  a non-forced update (`force=false`) to set `deploy` to the exact tested SHA,
-  records the promotion evidence, and closes the promotion PR.
-- `.github/workflows/deploy-production.yml` accepts the promoted `deploy` ref
-  (and the promotion workflow's `workflow_call`). It downloads the artifact
-  produced by the successful `main` run; it never rebuilds the application.
-  A bot-generated branch update must not start a duplicate push deployment.
+- `main` is the integration branch. Pull requests and pushes to `main` run
+  `CI / verify`; a `main` -> `deploy` approval PR runs only promotion
+  eligibility and does not build a second artifact. Only a successful push or
+  manual CI run on `main` uploads `server-release-<full-sha>` and its evidence.
+  CI does not deploy.
+- `.github/workflows/prepare-deploy.yml`, dispatched from current `main`, checks
+  the current branch heads, exact successful `main` CI artifact, and
+  fast-forward relationship before creating or refreshing an in-repository
+  `main` -> `deploy` PR. That PR is an approval record; it must not be merged in
+  the GitHub UI.
+- `.github/workflows/promote-deploy.yml`, dispatched from current `main` with
+  the approved PR number, rechecks the open PR and its head-specific human
+  approval, both branch heads, exact CI/artifact, and fast-forward relationship.
+  It uses `updateRef(force:false)` to set `deploy` to the tested `main` SHA and
+  calls `.github/workflows/deploy-production.yml` with the frozen candidate.
+- Making the PR head reachable from `deploy` may cause GitHub to mark it as an
+  indirect merge immediately. If it remains open, the promotion workflow
+  closes it before CD; no merge commit or replacement SHA is created. CD
+  outcome comments are added to that immutable approval record.
+- `.github/workflows/resume-deploy.yml`, dispatched from the frozen `deploy`
+  ref, can
+  retry that frozen candidate after validating the supplied `candidate_sha`,
+  `ci_run_id`, promotion PR and head-specific approval, exact artifact, and
+  unchanged `deploy` ref. It does not move either branch.
+- `.github/workflows/deploy-production.yml` downloads the artifact produced by
+  the successful `main` run and never rebuilds the application. Bot-generated
+  `deploy` updates do not start a duplicate push deployment; `Promote deploy`
+  and `Resume deploy` invoke the reviewed reusable workflow directly.
 - Manual production runs are read-only `audit` or isolated `dry-run` and must
   be started from `deploy`. The rollback workflow also requires `deploy` and
   verifies that its SHA has not changed before invoking `rollback --previous`.
 
-The promotion call passes `candidate_sha`, `ci_run_id`, and, when available,
+Promotion and resume calls pass `candidate_sha`, `ci_run_id`, and
 `promotion_pr_number` to the deployment workflow. The manager receives
 `--expected-commit` equal to that frozen candidate SHA; the SHA is simultaneously
-the validated `main` commit and the current `deploy` commit. `PRODUCTION_CD_ENABLED`
-is a final enable gate, not a trigger: keep it `false` during migration and
-until the deploy-branch audit/dry-run has completed without changing production.
+the validated `main` commit and the current `deploy` commit.
+
+This personal repository cannot enforce an Actions-only writer, mandatory PR
+merge, and required linear history while also preserving the exact tested SHA
+with `updateRef(force:false)`. Configure `deploy` to reject force-pushes and
+deletion, enforce the rules for administrators, and require the strict
+`eligibility` status from the GitHub Actions app. The normal path relies on
+that check, the workflow gates above, and protected `production` Environment
+approval. A direct human or administrator push is an emergency, audited
+bypass, not the normal path; it still has to resolve a same-SHA approved
+`main` -> `deploy` PR, exact successful `main` CI artifact, and every production
+gate.
+
+`PRODUCTION_CD_ENABLED` is a final enable gate, not a trigger. Keep it `false`
+during first migration, create `deploy` at the live `.deployed-commit` only
+after proving that SHA is a `main` ancestor, confirm no legacy `main` CD remains
+active, and enable no-force-push/deletion protection. Run
+`.github/workflows/audit-deploy-baseline.yml` from current `main` while the gate
+is false; it invokes the new reusable control plane against the still-live
+`deploy` SHA for audit/dry-run without advancing the branch. Complete the
+zero-impact verification before enabling promotion. The repository setting
+that permits Actions to create pull requests is required for
+`prepare-deploy.yml`; that workflow never submits an approval, and promotion
+still requires a current human review.
+
+Reusable workflows carry the caller's GitHub ref. Normal promotion therefore
+enters the Environment as `main`, while Resume enters it as `deploy`. Keep the
+current protected-branches policy during migration; a future custom policy
+must allow both refs unless promotion is redesigned to dispatch on `deploy`.
 
 ## Command contract
 
