@@ -1,17 +1,36 @@
 name: Deploy production
 
 on:
-  workflow_run:
-    workflows:
-      - CI
-    types:
-      - completed
+  push:
     branches:
-      - main
+      - deploy
+  workflow_call:
+    inputs:
+      candidate_sha:
+        description: Exact SHA verified on main and currently selected by deploy
+        required: true
+        type: string
+      ci_run_id:
+        description: Successful main CI run that owns the immutable artifact
+        required: true
+        type: string
+      promotion_pr_number:
+        description: Optional main to deploy approval PR
+        required: false
+        type: string
+      operation_mode:
+        description: Internal caller mode; normal promotion defaults to deploy
+        required: false
+        default: deploy
+        type: string
+    outputs:
+      deployment_status:
+        description: Successful completion marker for the calling workflow
+        value: ${{ jobs.remote.outputs.deployment_status }}
   workflow_dispatch:
     inputs:
       mode:
-        description: Read-only audit or isolated dry-run (real deploys only come from CI)
+        description: Read-only audit or isolated dry-run (real deploys come from deploy promotion)
         required: true
         default: dry-run
         type: choice
@@ -19,13 +38,14 @@ on:
           - audit
           - dry-run
       run_id:
-        description: Optional successful CI run ID; blank uses the newest successful main CI run
+        description: Optional successful main CI run ID; blank resolves the run for deploy HEAD
         required: false
         type: string
 
 permissions:
   contents: read
   actions: read
+  pull-requests: read
 
 concurrency:
   group: production-deploy
@@ -35,35 +55,46 @@ jobs:
   preflight:
     name: validate candidate
     if: >-
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main' &&
+      (github.event_name == 'push' &&
+       github.ref == 'refs/heads/deploy' &&
+       !endsWith(github.actor, '[bot]') &&
        vars.PRODUCTION_CD_ENABLED == 'true') ||
+      (inputs.candidate_sha != '' && inputs.ci_run_id != '') ||
       (github.event_name == 'workflow_dispatch' &&
-       github.ref == 'refs/heads/main')
+       github.ref == 'refs/heads/deploy')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
       mode: ${{ steps.candidate.outputs.mode }}
       run_id: ${{ steps.candidate.outputs.run_id }}
       sha: ${{ steps.candidate.outputs.sha }}
-      main_sha: ${{ steps.candidate.outputs.main_sha }}
+      deploy_sha: ${{ steps.candidate.outputs.deploy_sha }}
       artifact_name: ${{ steps.candidate.outputs.artifact_name }}
       production_url: ${{ steps.candidate.outputs.production_url }}
+      promotion_pr_number: ${{ steps.candidate.outputs.promotion_pr_number }}
     steps:
-      - name: Validate successful CI run and current main
+      - name: Validate deploy candidate and successful main CI artifact
         id: candidate
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           REQUESTED_MODE: ${{ inputs.mode || '' }}
-          REQUESTED_RUN_ID: ${{ inputs.run_id || '' }}
+          REQUESTED_CALL_MODE: ${{ inputs.operation_mode || 'deploy' }}
+          REQUESTED_CALL_RUN_ID: ${{ inputs.ci_run_id || '' }}
+          REQUESTED_MANUAL_RUN_ID: ${{ inputs.run_id || '' }}
+          REQUESTED_CANDIDATE_SHA: ${{ inputs.candidate_sha || '' }}
+          PROMOTION_PR_NUMBER: ${{ inputs.promotion_pr_number || '' }}
+          CALLER_WORKFLOW: ${{ github.workflow }}
+          CALLER_WORKFLOW_REF: ${{ github.workflow_ref }}
+          PRODUCTION_CD_ENABLED: ${{ vars.PRODUCTION_CD_ENABLED }}
           PROD_URL: ${{ vars.PROD_URL }}
         with:
           script: |
             const requestedMode = process.env.REQUESTED_MODE;
             const productionUrl = process.env.PROD_URL;
             let mode = "deploy";
-            let runId = process.env.REQUESTED_RUN_ID;
+            let runId = process.env.REQUESTED_CALL_RUN_ID;
+            let candidateSha = process.env.REQUESTED_CANDIDATE_SHA;
+            let directPush = false;
 
             if (!productionUrl || !productionUrl.startsWith("https://")) {
               core.setFailed("Repository variable PROD_URL must be a non-empty HTTPS URL.");
@@ -71,41 +102,156 @@ jobs:
             }
             core.setOutput("production_url", productionUrl.replace(/\/$/, ""));
 
-            if (context.eventName === "workflow_run") {
-              runId = String(context.payload.workflow_run.id);
-              if (context.payload.workflow_run.conclusion !== "success"
-                || context.payload.workflow_run.head_branch !== "main") {
-                core.setFailed("The triggering CI run is not a successful main run.");
+            const calledWorkflow = Boolean(candidateSha || process.env.REQUESTED_CALL_RUN_ID);
+            if (calledWorkflow) {
+              const allowedCallers = new Map([
+                ["Promote deploy", { file: "promote-deploy.yml", ref: "main", modes: ["deploy"] }],
+                ["Resume deploy", { file: "resume-deploy.yml", ref: "deploy", modes: ["deploy"] }],
+                ["Audit deploy baseline", { file: "audit-deploy-baseline.yml", ref: "main", modes: ["audit", "dry-run"] }],
+              ]);
+              const caller = allowedCallers.get(process.env.CALLER_WORKFLOW);
+              const expectedRef = caller
+                ? `${context.repo.owner}/${context.repo.repo}/.github/workflows/${caller.file}@refs/heads/${caller.ref}`
+                : "";
+              mode = process.env.REQUESTED_CALL_MODE || "deploy";
+              if (!caller
+                || process.env.CALLER_WORKFLOW_REF !== expectedRef
+                || !caller.modes.includes(mode)) {
+                core.setFailed("Production deployment was called by an unapproved workflow, ref, or operation mode.");
                 return;
               }
-            } else {
-              if (context.ref !== "refs/heads/main") {
-                core.setFailed("Manual production audit/dry-run must run from main.");
+              if (!/^[0-9a-f]{40}$/.test(candidateSha) || !/^\d+$/.test(runId)) {
+                core.setFailed("Reusable deployment requires a full candidate SHA and numeric main CI run ID.");
                 return;
               }
+              const baselineAudit = process.env.CALLER_WORKFLOW === "Audit deploy baseline";
+              if (baselineAudit && process.env.PRODUCTION_CD_ENABLED !== "false") {
+                core.setFailed("Baseline audit/dry-run is available only while PRODUCTION_CD_ENABLED is false.");
+                return;
+              }
+              if (!baselineAudit && process.env.PRODUCTION_CD_ENABLED !== "true") {
+                core.setFailed("Repository variable PRODUCTION_CD_ENABLED must be true for production promotion.");
+                return;
+              }
+            } else if (context.eventName === "push") {
+              if (context.ref !== "refs/heads/deploy"
+                || context.actor.endsWith("[bot]")
+                || context.payload.deleted
+                || context.payload.forced
+                || !/^[0-9a-f]{40}$/.test(context.payload.before || "")
+                || !/^[0-9a-f]{40}$/.test(context.sha)) {
+                core.setFailed("Automatic production deployment requires a non-bot, non-forced update to deploy.");
+                return;
+              }
+              const pushComparison = (await github.rest.repos.compareCommits({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                base: context.payload.before,
+                head: context.sha,
+              })).data;
+              if (pushComparison.status !== "ahead" || pushComparison.ahead_by < 1) {
+                core.setFailed("The deploy push is not a non-forced fast-forward update.");
+                return;
+              }
+              candidateSha = context.sha;
+              runId = "";
+              directPush = true;
+            } else if (context.eventName === "workflow_dispatch") {
+              if (context.ref !== "refs/heads/deploy") {
+                core.setFailed("Manual production audit/dry-run must run from deploy.");
+                return;
+              }
+              runId = process.env.REQUESTED_MANUAL_RUN_ID;
               mode = requestedMode;
               if (!["audit", "dry-run"].includes(mode)) {
                 core.setFailed("Manual mode must be audit or dry-run; deploy is CI-only.");
                 return;
               }
+            } else {
+              core.setFailed(`Unsupported production deployment event: ${context.eventName}.`);
+              return;
             }
 
             const branch = (await github.rest.repos.getBranch({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              branch: "main",
+              branch: "deploy",
             })).data;
-            if (context.eventName === "workflow_dispatch" && context.sha !== branch.commit.sha) {
-              core.setFailed(`Manual workflow SHA ${context.sha} is not current main ${branch.commit.sha}.`);
+            if (!branch.protected) {
+              core.setFailed("deploy must be protected before any production operation.");
               return;
+            }
+            if (!calledWorkflow
+              && context.eventName === "workflow_dispatch"
+              && context.sha !== branch.commit.sha) {
+              core.setFailed(`Manual workflow SHA ${context.sha} is not current deploy ${branch.commit.sha}.`);
+              return;
+            }
+            if (candidateSha && candidateSha !== branch.commit.sha) {
+              core.setFailed(`deploy is ${branch.commit.sha}, not candidate ${candidateSha}.`);
+              return;
+            }
+
+            if (directPush) {
+              const repository = `${context.repo.owner}/${context.repo.repo}`;
+              const promotionRecords = await github.paginate(github.rest.pulls.list, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: "all",
+                base: "deploy",
+                head: `${context.repo.owner}:main`,
+                per_page: 100,
+              });
+              const promotionPulls = promotionRecords.filter(pullRequest =>
+                pullRequest.head?.sha === candidateSha
+                && pullRequest.head?.ref === "main"
+                && pullRequest.head?.repo?.full_name === repository
+                && pullRequest.base?.ref === "deploy"
+                && !pullRequest.draft
+              );
+              let approvedPull = null;
+              for (const pullRequest of promotionPulls) {
+                const reviews = await github.paginate(github.rest.pulls.listReviews, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pullRequest.number,
+                  per_page: 100,
+                });
+                const effectiveByReviewer = new Map();
+                for (const review of reviews) {
+                  if (review.user?.type !== "User"
+                    || review.user?.login === pullRequest.user?.login
+                    || !["OWNER", "MEMBER", "COLLABORATOR"].includes(review.author_association)
+                    || !["APPROVED", "CHANGES_REQUESTED", "DISMISSED"].includes(review.state)) {
+                    continue;
+                  }
+                  const previous = effectiveByReviewer.get(review.user.login);
+                  if (!previous || review.id > previous.id) {
+                    effectiveByReviewer.set(review.user.login, review);
+                  }
+                }
+                const effectiveReviews = [...effectiveByReviewer.values()]
+                  .filter(review => review.commit_id === candidateSha);
+                if (!effectiveReviews.some(review => review.state === "CHANGES_REQUESTED")
+                  && effectiveReviews.some(review => review.state === "APPROVED")) {
+                  approvedPull = pullRequest;
+                  break;
+                }
+              }
+              if (!approvedPull) {
+                core.setFailed("The direct deploy push has no matching main-to-deploy PR with current human approval.");
+                return;
+              }
+              process.env.PROMOTION_PR_NUMBER = String(approvedPull.number);
             }
 
             if (mode === "audit") {
               core.setOutput("mode", mode);
               core.setOutput("run_id", "");
               core.setOutput("sha", branch.commit.sha);
-              core.setOutput("main_sha", branch.commit.sha);
+              core.setOutput("deploy_sha", branch.commit.sha);
               core.setOutput("artifact_name", "");
+              core.setOutput("promotion_pr_number", "");
               return;
             }
 
@@ -115,14 +261,24 @@ jobs:
                 repo: context.repo.repo,
                 workflow_id: "ci.yml",
                 branch: "main",
+                head_sha: branch.commit.sha,
                 status: "success",
-                per_page: 1,
+                per_page: 100,
               });
-              if (runs.data.workflow_runs.length === 0) {
-                core.setFailed("No successful main CI run is available for this audit/dry-run.");
+              const matchingRun = runs.data.workflow_runs.find(run =>
+                run.name === "CI"
+                && run.path === ".github/workflows/ci.yml"
+                && ["push", "workflow_dispatch"].includes(run.event)
+                && run.head_branch === "main"
+                && run.head_sha === branch.commit.sha
+                && run.conclusion === "success"
+                && run.head_repository?.full_name === `${context.repo.owner}/${context.repo.repo}`
+              );
+              if (!matchingRun) {
+                core.setFailed(`No successful main CI run exists for deploy SHA ${branch.commit.sha}.`);
                 return;
               }
-              runId = String(runs.data.workflow_runs[0].id);
+              runId = String(matchingRun.id);
             }
 
             const run = (await github.rest.actions.getWorkflowRun({
@@ -132,6 +288,7 @@ jobs:
             })).data;
             const repository = `${context.repo.owner}/${context.repo.repo}`;
             if (run.name !== "CI"
+              || run.path !== ".github/workflows/ci.yml"
               || !["push", "workflow_dispatch"].includes(run.event)
               || run.head_branch !== "main"
               || run.conclusion !== "success"
@@ -139,8 +296,8 @@ jobs:
               core.setFailed("The selected run is not a successful Calculator CI run on main.");
               return;
             }
-            if (mode === "deploy" && branch.commit.sha !== run.head_sha) {
-              core.setFailed(`main advanced from ${run.head_sha} to ${branch.commit.sha}; refusing a stale deployment.`);
+            if (branch.commit.sha !== run.head_sha) {
+              core.setFailed(`deploy is ${branch.commit.sha}, but main CI run ${run.id} verified ${run.head_sha}.`);
               return;
             }
 
@@ -148,17 +305,26 @@ jobs:
             core.setOutput("mode", mode);
             core.setOutput("run_id", String(run.id));
             core.setOutput("sha", sha);
-            core.setOutput("main_sha", branch.commit.sha);
+            core.setOutput("deploy_sha", branch.commit.sha);
             core.setOutput("artifact_name", `server-release-${sha}`);
+            core.setOutput("promotion_pr_number", process.env.PROMOTION_PR_NUMBER);
 
       - name: Record preflight summary
+        env:
+          MODE: ${{ steps.candidate.outputs.mode }}
+          RUN_ID: ${{ steps.candidate.outputs.run_id }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+          DEPLOY_SHA: ${{ steps.candidate.outputs.deploy_sha }}
+          ARTIFACT_NAME: ${{ steps.candidate.outputs.artifact_name }}
+          PROMOTION_PR_NUMBER: ${{ steps.candidate.outputs.promotion_pr_number }}
         run: |
           {
-            echo "mode=${{ steps.candidate.outputs.mode }}"
-            echo "run_id=${{ steps.candidate.outputs.run_id }}"
-            echo "sha=${{ steps.candidate.outputs.sha }}"
-            echo "main_sha=${{ steps.candidate.outputs.main_sha }}"
-            echo "artifact=${{ steps.candidate.outputs.artifact_name }}"
+            printf 'mode=%s\n' "$MODE"
+            printf 'run_id=%s\n' "$RUN_ID"
+            printf 'candidate_sha=%s\n' "$CANDIDATE_SHA"
+            printf 'deploy_sha=%s\n' "$DEPLOY_SHA"
+            printf 'artifact=%s\n' "$ARTIFACT_NAME"
+            printf 'promotion_pr_number=%s\n' "$PROMOTION_PR_NUMBER"
           } >> "$GITHUB_STEP_SUMMARY"
 
   validation:
@@ -175,13 +341,17 @@ jobs:
       metadata_sha256: ${{ steps.metadata.outputs.sha256 }}
     steps:
       - name: Initialize validation evidence
+        env:
+          PROMOTION_PR_NUMBER: ${{ needs.preflight.outputs.promotion_pr_number }}
         shell: bash
         run: |
           set -euo pipefail
-          printf 'workflow_run_id=%s\nmode=%s\ncandidate_sha=%s\n' \
+          printf 'workflow_run_id=%s\nmode=%s\nsource_branch=main\nrelease_branch=deploy\ncandidate_sha=%s\nci_run_id=%s\npromotion_pr_number=%s\n' \
             "$GITHUB_RUN_ID" \
             "${{ needs.preflight.outputs.mode }}" \
             "${{ needs.preflight.outputs.sha }}" \
+            "${{ needs.preflight.outputs.run_id }}" \
+            "$PROMOTION_PR_NUMBER" \
             > "$RUNNER_TEMP/validation-output.txt"
 
       - name: Re-check candidate before artifact access
@@ -189,7 +359,7 @@ jobs:
         env:
           CANDIDATE_SHA: ${{ needs.preflight.outputs.sha }}
           CANDIDATE_RUN_ID: ${{ needs.preflight.outputs.run_id }}
-          EXPECTED_MAIN_SHA: ${{ needs.preflight.outputs.main_sha }}
+          EXPECTED_DEPLOY_SHA: ${{ needs.preflight.outputs.deploy_sha }}
           CANDIDATE_MODE: ${{ needs.preflight.outputs.mode }}
         with:
           script: |
@@ -198,22 +368,32 @@ jobs:
               repo: context.repo.repo,
               run_id: Number(process.env.CANDIDATE_RUN_ID),
             })).data;
-            if (run.head_sha !== process.env.CANDIDATE_SHA || run.conclusion !== "success") {
-              core.setFailed("The CI candidate changed or is no longer successful.");
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            if (run.name !== "CI"
+              || run.path !== ".github/workflows/ci.yml"
+              || !["push", "workflow_dispatch"].includes(run.event)
+              || run.head_branch !== "main"
+              || run.head_sha !== process.env.CANDIDATE_SHA
+              || run.conclusion !== "success"
+              || run.head_repository?.full_name !== repository) {
+              core.setFailed("The selected run is no longer a successful main CI candidate.");
               return;
             }
             const branch = (await github.rest.repos.getBranch({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              branch: "main",
+              branch: "deploy",
             })).data;
-            if (branch.commit.sha !== process.env.EXPECTED_MAIN_SHA) {
-              core.setFailed(`main advanced to ${branch.commit.sha}; restart this production operation.`);
+            if (!branch.protected) {
+              core.setFailed("deploy branch protection was removed during validation.");
               return;
             }
-            if (process.env.CANDIDATE_MODE === "deploy"
-              && branch.commit.sha !== process.env.CANDIDATE_SHA) {
-              core.setFailed(`main is ${branch.commit.sha}, not candidate ${process.env.CANDIDATE_SHA}.`);
+            if (branch.commit.sha !== process.env.EXPECTED_DEPLOY_SHA) {
+              core.setFailed(`deploy advanced to ${branch.commit.sha}; restart this production operation.`);
+              return;
+            }
+            if (branch.commit.sha !== process.env.CANDIDATE_SHA) {
+              core.setFailed(`deploy is ${branch.commit.sha}, not candidate ${process.env.CANDIDATE_SHA}.`);
             }
 
       - name: Download exact CI artifact
@@ -395,18 +575,24 @@ jobs:
        (needs.preflight.outputs.mode != 'audit' && needs.validation.result == 'success'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      deployment_status: ${{ steps.completion.outputs.status }}
     environment:
       name: production
       url: ${{ needs.preflight.outputs.production_url }}
     steps:
       - name: Initialize deployment evidence
+        env:
+          PROMOTION_PR_NUMBER: ${{ needs.preflight.outputs.promotion_pr_number }}
         shell: bash
         run: |
           set -euo pipefail
-          printf 'workflow_run_id=%s\nmode=%s\ncandidate_sha=%s\nvalidated_metadata_sha256=%s\n' \
+          printf 'workflow_run_id=%s\nmode=%s\nsource_branch=main\nrelease_branch=deploy\ncandidate_sha=%s\nci_run_id=%s\npromotion_pr_number=%s\nvalidated_metadata_sha256=%s\n' \
             "$GITHUB_RUN_ID" \
             "${{ needs.preflight.outputs.mode }}" \
             "${{ needs.preflight.outputs.sha }}" \
+            "${{ needs.preflight.outputs.run_id }}" \
+            "$PROMOTION_PR_NUMBER" \
             "${{ needs.validation.outputs.metadata_sha256 }}" \
             > "$RUNNER_TEMP/deploy-output.txt"
 
@@ -415,22 +601,26 @@ jobs:
         env:
           CANDIDATE_SHA: ${{ needs.preflight.outputs.sha }}
           CANDIDATE_RUN_ID: ${{ needs.preflight.outputs.run_id }}
-          EXPECTED_MAIN_SHA: ${{ needs.preflight.outputs.main_sha }}
+          EXPECTED_DEPLOY_SHA: ${{ needs.preflight.outputs.deploy_sha }}
           CANDIDATE_MODE: ${{ needs.preflight.outputs.mode }}
         with:
           script: |
             const branch = (await github.rest.repos.getBranch({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              branch: "main",
+              branch: "deploy",
             })).data;
-            if (branch.commit.sha !== process.env.EXPECTED_MAIN_SHA) {
-              core.setFailed(`main advanced to ${branch.commit.sha}; restart this production operation.`);
+            if (!branch.protected) {
+              core.setFailed("deploy branch protection was removed before production access.");
+              return;
+            }
+            if (branch.commit.sha !== process.env.EXPECTED_DEPLOY_SHA) {
+              core.setFailed(`deploy advanced to ${branch.commit.sha}; restart this production operation.`);
               return;
             }
             if (process.env.CANDIDATE_MODE === "audit") {
               if (branch.commit.sha !== process.env.CANDIDATE_SHA) {
-                core.setFailed(`Audit workflow SHA ${process.env.CANDIDATE_SHA} is not current main.`);
+                core.setFailed(`Audit workflow SHA ${process.env.CANDIDATE_SHA} is not current deploy.`);
               }
               return;
             }
@@ -439,13 +629,19 @@ jobs:
               repo: context.repo.repo,
               run_id: Number(process.env.CANDIDATE_RUN_ID),
             })).data;
-            if (run.head_sha !== process.env.CANDIDATE_SHA || run.conclusion !== "success") {
-              core.setFailed("The CI candidate changed or is no longer successful.");
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            if (run.name !== "CI"
+              || run.path !== ".github/workflows/ci.yml"
+              || !["push", "workflow_dispatch"].includes(run.event)
+              || run.head_branch !== "main"
+              || run.head_sha !== process.env.CANDIDATE_SHA
+              || run.conclusion !== "success"
+              || run.head_repository?.full_name !== repository) {
+              core.setFailed("The selected run is no longer a successful main CI candidate.");
               return;
             }
-            if (process.env.CANDIDATE_MODE === "deploy"
-              && branch.commit.sha !== process.env.CANDIDATE_SHA) {
-              core.setFailed(`main is ${branch.commit.sha}, not candidate ${process.env.CANDIDATE_SHA}.`);
+            if (branch.commit.sha !== process.env.CANDIDATE_SHA) {
+              core.setFailed(`deploy is ${branch.commit.sha}, not candidate ${process.env.CANDIDATE_SHA}.`);
             }
 
       - name: Re-download exact CI artifact on fresh runner
@@ -521,7 +717,7 @@ jobs:
       - name: Run remote gate and verify production transaction
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_MAIN_SHA: ${{ needs.preflight.outputs.main_sha }}
+          EXPECTED_DEPLOY_SHA: ${{ needs.preflight.outputs.deploy_sha }}
           PROD_HOST: ${{ secrets.PROD_HOST }}
           PROD_USER: ${{ secrets.PROD_USER }}
           PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
@@ -550,7 +746,7 @@ jobs:
           exec > >(tee -a "$evidence_file") 2>&1
 
           test -n "$GH_TOKEN"
-          test -n "$EXPECTED_MAIN_SHA"
+          test -n "$EXPECTED_DEPLOY_SHA"
           test -n "$PROD_HOST"
           test -n "$PROD_USER"
           test -n "$PROD_SSH_PRIVATE_KEY"
@@ -558,21 +754,25 @@ jobs:
           [[ "$PROD_URL" == https://* ]]
           base="${PROD_URL%/}"
 
-          assert_main_current() {
+          assert_deploy_current() {
             local gate="$1"
-            local live_main
-            live_main="$(curl --fail --silent --show-error --max-time 15 \
+            local branch_json live_deploy
+            branch_json="$(curl --fail --silent --show-error --max-time 15 \
               -H "Authorization: Bearer $GH_TOKEN" \
               -H 'Accept: application/vnd.github+json' \
               -H 'X-GitHub-Api-Version: 2022-11-28' \
-              "https://api.github.com/repos/$GITHUB_REPOSITORY/branches/main" \
-              | jq -er '.commit.sha')"
-            if [[ "$live_main" != "$EXPECTED_MAIN_SHA" ]]; then
-              echo "main advanced to $live_main at gate: $gate"
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/branches/deploy")"
+            jq -e '.protected == true' <<< "$branch_json" > /dev/null || {
+              echo "deploy branch protection is not active at gate: $gate"
+              return 1
+            }
+            live_deploy="$(jq -er '.commit.sha' <<< "$branch_json")"
+            if [[ "$live_deploy" != "$EXPECTED_DEPLOY_SHA" ]]; then
+              echo "deploy advanced to $live_deploy at gate: $gate"
               return 1
             fi
-            if [[ "$CANDIDATE_MODE" == "deploy" && "$live_main" != "$CANDIDATE_SHA" ]]; then
-              echo "deploy candidate $CANDIDATE_SHA is not live main $live_main"
+            if [[ "$live_deploy" != "$CANDIDATE_SHA" ]]; then
+              echo "deploy candidate $CANDIDATE_SHA is not live deploy $live_deploy"
               return 1
             fi
           }
@@ -680,7 +880,7 @@ jobs:
           ssh-keygen -y -f "$key_file" > /dev/null
           ssh_opts=(-i "$key_file" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" -o RequestTTY=no -o ForwardAgent=no -o ClearAllForwardings=yes)
 
-          assert_main_current "before first SSH/SCP"
+          assert_deploy_current "before first SSH/SCP"
           if [[ "$CANDIDATE_MODE" == "audit" ]]; then
             ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
               sudo -n /usr/local/sbin/zzz-calculator-deploy audit
@@ -704,14 +904,16 @@ jobs:
             exit 0
           fi
 
-          assert_main_current "immediately before deploy invocation"
+          assert_deploy_current "immediately before deploy invocation"
           ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
             sudo -n /usr/local/sbin/zzz-calculator-deploy deploy \
               --artifact "$remote_archive_name" --evidence "$remote_evidence_name" \
               --expected-sha "$ARTIFACT_SHA256" --expected-commit "$CANDIDATE_SHA"
 
-          if ! verify_public_candidate; then
-            echo "Public verification failed; rolling back to the server-recorded previous release."
+          if ! assert_deploy_current "immediately after deploy invocation" \
+            || ! verify_public_candidate \
+            || ! assert_deploy_current "after public verification"; then
+            echo "The deploy ref or public verification failed; rolling back to the server-recorded previous release."
             rollback_status=0
             ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
               sudo -n /usr/local/sbin/zzz-calculator-deploy rollback --previous \
@@ -737,3 +939,9 @@ jobs:
           path: ${{ runner.temp }}/deploy-output.txt
           if-no-files-found: error
           retention-days: 14
+
+      - name: Mark deployment complete
+        id: completion
+        if: success()
+        shell: bash
+        run: printf 'status=success\n' >> "$GITHUB_OUTPUT"

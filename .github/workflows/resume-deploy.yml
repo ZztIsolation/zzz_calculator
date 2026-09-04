@@ -1,0 +1,213 @@
+name: Resume deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Frozen SHA currently pointed to by deploy
+        required: true
+        type: string
+      ci_run_id:
+        description: Successful main CI run that produced the candidate artifact
+        required: true
+        type: string
+      promotion_pr_number:
+        description: Main-to-deploy approval PR for this frozen candidate
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+concurrency:
+  group: deploy-promotion-write
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: validate frozen candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      candidate_sha: ${{ steps.validate.outputs.candidate_sha }}
+      ci_run_id: ${{ steps.validate.outputs.ci_run_id }}
+      promotion_pr_number: ${{ steps.validate.outputs.promotion_pr_number }}
+    steps:
+      - name: Validate deploy, approval PR, CI run, and artifact
+        id: validate
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          CI_RUN_ID: ${{ inputs.ci_run_id }}
+          PROMOTION_PR_NUMBER: ${{ inputs.promotion_pr_number }}
+          PRODUCTION_CD_ENABLED: ${{ vars.PRODUCTION_CD_ENABLED }}
+        with:
+          script: |
+            const fail = message => {
+              core.setFailed(message);
+              return null;
+            };
+            if (context.ref !== "refs/heads/deploy") {
+              return fail("Resume deploy must be dispatched from deploy.");
+            }
+            if (process.env.PRODUCTION_CD_ENABLED !== "true") {
+              return fail("Repository variable PRODUCTION_CD_ENABLED must be true before resuming production CD.");
+            }
+            const candidateSha = process.env.CANDIDATE_SHA;
+            const runId = process.env.CI_RUN_ID;
+            const pullNumber = Number(process.env.PROMOTION_PR_NUMBER);
+            if (!/^[0-9a-f]{40}$/.test(candidateSha || "")) {
+              return fail("candidate_sha must be a full lowercase 40-character commit SHA.");
+            }
+            if (!/^\d+$/.test(runId || "")) {
+              return fail("ci_run_id must be numeric.");
+            }
+            if (!Number.isSafeInteger(pullNumber) || pullNumber < 1) {
+              return fail("promotion_pr_number must be a positive pull request number.");
+            }
+
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            const getBranch = branch => github.rest.repos.getBranch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch,
+            }).then(response => response.data);
+            const deploy = await getBranch("deploy");
+            if (!deploy.protected) {
+              return fail("deploy must remain protected before resuming production CD.");
+            }
+            if (context.sha !== deploy.commit.sha) {
+              return fail(`Workflow SHA ${context.sha} is not current deploy ${deploy.commit.sha}.`);
+            }
+            if (deploy.commit.sha !== candidateSha) {
+              return fail(`deploy is ${deploy.commit.sha}, not frozen candidate ${candidateSha}.`);
+            }
+
+            const pullRequest = (await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pullNumber,
+            })).data;
+            if (!["open", "closed"].includes(pullRequest.state)
+              || pullRequest.base?.ref !== "deploy"
+              || pullRequest.head?.ref !== "main"
+              || pullRequest.head?.repo?.full_name !== repository) {
+              return fail("The supplied PR is not an in-repository main-to-deploy promotion record.");
+            }
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pullNumber,
+              per_page: 100,
+            });
+            const effectiveByReviewer = new Map();
+            for (const review of reviews) {
+              if (review.user?.type !== "User"
+                || review.user?.login === pullRequest.user?.login
+                || !["OWNER", "MEMBER", "COLLABORATOR"].includes(review.author_association)
+                || !["APPROVED", "CHANGES_REQUESTED", "DISMISSED"].includes(review.state)) {
+                continue;
+              }
+              const previous = effectiveByReviewer.get(review.user.login);
+              if (!previous || review.id > previous.id) {
+                effectiveByReviewer.set(review.user.login, review);
+              }
+            }
+            const effectiveReviews = [...effectiveByReviewer.values()]
+              .filter(review => review.commit_id === candidateSha);
+            if (effectiveReviews.some(review => review.state === "CHANGES_REQUESTED")
+              || !effectiveReviews.some(review => review.state === "APPROVED")) {
+              return fail("The frozen candidate does not have an effective human approval in the promotion PR.");
+            }
+
+            const run = (await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: Number(runId),
+            })).data;
+            if (run.name !== "CI"
+              || run.path !== ".github/workflows/ci.yml"
+              || !["push", "workflow_dispatch"].includes(run.event)
+              || run.head_branch !== "main"
+              || run.head_sha !== candidateSha
+              || run.conclusion !== "success"
+              || run.head_repository?.full_name !== repository) {
+              return fail("The supplied run is not a successful main CI run for the frozen candidate.");
+            }
+            const artifacts = await github.paginate(
+              github.rest.actions.listWorkflowRunArtifacts,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: run.id,
+                per_page: 100,
+              },
+            );
+            const artifactName = `server-release-${candidateSha}`;
+            if (!artifacts.some(artifact =>
+              artifact.name === artifactName
+              && !artifact.expired
+              && artifact.size_in_bytes > 0)) {
+              return fail(`The exact candidate artifact ${artifactName} is missing, empty, or expired.`);
+            }
+
+            const finalDeploy = await getBranch("deploy");
+            if (finalDeploy.commit.sha !== candidateSha || !finalDeploy.protected) {
+              return fail(`deploy advanced to ${finalDeploy.commit.sha} during resume validation.`);
+            }
+            core.setOutput("candidate_sha", candidateSha);
+            core.setOutput("ci_run_id", String(run.id));
+            core.setOutput("promotion_pr_number", String(pullNumber));
+            await core.summary
+              .addHeading("Resume production deployment")
+              .addRaw(`Validated frozen deploy ${candidateSha}, main CI run ${run.id}, PR #${pullNumber}, and ${artifactName}.`)
+              .write();
+
+  production:
+    name: resume production deployment
+    needs: validate
+    if: needs.validate.result == 'success'
+    uses: ./.github/workflows/deploy-production.yml
+    with:
+      candidate_sha: ${{ needs.validate.outputs.candidate_sha }}
+      ci_run_id: ${{ needs.validate.outputs.ci_run_id }}
+      promotion_pr_number: ${{ needs.validate.outputs.promotion_pr_number }}
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+
+  report:
+    name: report resume result
+    needs:
+      - validate
+      - production
+    if: always() && needs.validate.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Annotate the frozen promotion PR
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          PROMOTION_PR_NUMBER: ${{ needs.validate.outputs.promotion_pr_number }}
+          CANDIDATE_SHA: ${{ needs.validate.outputs.candidate_sha }}
+          PRODUCTION_RESULT: ${{ needs.production.result }}
+          DEPLOYMENT_STATUS: ${{ needs.production.outputs.deployment_status }}
+        with:
+          script: |
+            const succeeded = process.env.PRODUCTION_RESULT === "success"
+              && process.env.DEPLOYMENT_STATUS === "success";
+            const detail = succeeded
+              ? "Production resume completed successfully."
+              : `Production resume did not complete (job=${process.env.PRODUCTION_RESULT}, status=${process.env.DEPLOYMENT_STATUS || "unset"}).`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number(process.env.PROMOTION_PR_NUMBER),
+              body: `${detail} Frozen candidate: ${process.env.CANDIDATE_SHA}.`,
+            });
