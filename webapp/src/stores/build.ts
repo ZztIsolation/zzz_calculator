@@ -14,6 +14,7 @@ import { normalizePotentialLevel } from "@core/potentialVision.js"
 import { normalizeSkillTargetsInValue } from "@core/skillTargets.js"
 import {
   createAnomalySourceSnapshot,
+  defaultAnomalyReleaseProfile,
   isReleaseSettlement,
   normalizeAnomalyReleaseEventForAgent,
   normalizeAnomalySourceSnapshot,
@@ -28,6 +29,7 @@ import {
   normalizeCustomBuffEffect,
   normalizeCustomBuffStat,
   normalizeRuntimeForBuff,
+  damageElementForAgent,
   defaultWEngineIdForAgent,
   sortWEnginesForAgent,
 } from "@core/shared-combat.js"
@@ -328,6 +330,46 @@ function primaryDamageConfigForAgent(agent: any = null) {
   }
 }
 
+const ATTRIBUTE_EFFECT_BY_ELEMENT: Record<string, string> = {
+  physical: "assault",
+  fire: "burn",
+  ice: "shatter",
+  electric: "shock",
+  ether: "corruption",
+}
+
+function defaultReleaseDamageConfigForAgent(agent: any = null) {
+  const agentId = String(agent?.id ?? "").trim()
+  if (!agentId) {
+    return null
+  }
+  const damageElement = damageElementForAgent(agent)
+  const profile = defaultAnomalyReleaseProfile(agent, damageElement)
+  const anomalyEffect = ATTRIBUTE_EFFECT_BY_ELEMENT[damageElement]
+  if (!profile || !anomalyEffect) {
+    return null
+  }
+  const eventId = `${agentId}-self-${anomalyEffect}-release`
+  return {
+    mode: "anomaly",
+    agentLevel: 60,
+    skillLevelsByCategory: {},
+    selectedEventId: eventId,
+    events: [
+      {
+        id: eventId,
+        kind: "anomaly",
+        settlementType: "release",
+        anomalyEffect,
+        count: 1,
+        stunned: true,
+        triggerActorRef: { agentId, profileId: profile.id },
+        anomalySource: { actorRef: { agentId } },
+      },
+    ],
+  }
+}
+
 export function defaultDamageConfig(agent: any = null, cinemaLevel = 0, potentialLevel = 0) {
   const config = resolveDefaultCalculationConfig(agent?.defaultCalculationConfig, cinemaLevel, potentialLevel)
   if (config?.events?.length) {
@@ -358,6 +400,10 @@ export function defaultDamageConfig(agent: any = null, cinemaLevel = 0, potentia
         events,
       }
     }
+  }
+  const releaseConfig = defaultReleaseDamageConfigForAgent(agent)
+  if (releaseConfig) {
+    return releaseConfig
   }
   return primaryDamageConfigForAgent(agent)
 }

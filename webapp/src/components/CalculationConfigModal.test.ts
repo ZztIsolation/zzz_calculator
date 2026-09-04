@@ -16,6 +16,7 @@ const yixuan = (agentsData as any).agents.find((agent: any) => agent.id === "yix
 const yixuanSkillCatalog = (agentSkillsData as any).agentSkills.find((skill: any) => skill.id === "yixuan")
 const alice = (agentsData as any).agents.find((agent: any) => agent.id === "alice_thymefield")
 const aria = (agentsData as any).agents.find((agent: any) => agent.id === "aria")
+const vivian = (agentsData as any).agents.find((agent: any) => agent.id === "vivian")
 const dan = (agentsData as any).agents.find((agent: any) => agent.id === "remielle_dan")
 const soldier11 = (agentsData as any).agents.find((agent: any) => agent.id === "soldier_11")
 const soldier11SkillCatalog = (agentSkillsData as any).agentSkills.find((skill: any) => skill.id === "soldier_11")
@@ -489,6 +490,39 @@ describe("CalculationConfigModal", () => {
     expect(saved.events[0].anomalySource).not.toHaveProperty("snapshot")
     expect(saved.events[0].anomalyVariant).toBeUndefined()
     expect(saved.events[0].procCount).toBeUndefined()
+  })
+
+  it("shows Vivian's current in-combat proficiency as the release conversion source", async () => {
+    const wrapper = mountModal({
+      agent: vivian,
+      damageConfig: {
+        mode: "anomaly",
+        selectedEventId: "vivian-self-corruption-release",
+        events: [{
+          id: "vivian-self-corruption-release",
+          kind: "anomaly",
+          settlementType: "release",
+          anomalyEffect: "corruption",
+          count: 1,
+          stunned: true,
+          triggerActorRef: { agentId: "vivian", profileId: "core_passive" },
+          anomalySource: { actorRef: { agentId: "vivian" } },
+        }],
+      },
+      releaseContext: {
+        inCombatPanel: { anomalyProficiency: 328 },
+        outOfCombatPanel: { anomalyProficiency: 208, anomalyMastery: 144 },
+        coreSkillLevel: "F",
+      },
+    })
+    await openModal(wrapper)
+
+    const explanation = document.body.querySelector(".release-explanation")?.textContent ?? ""
+    expect(explanation).toContain("当前异常精通")
+    expect(explanation).toContain("328")
+    expect(explanation).not.toContain("局外异常掌控")
+    expect(explanation).not.toContain("异放失衡倍率修正")
+    expect(document.body.querySelector('[data-layout-field="event-multiplier"]')?.textContent).toContain("126.075%")
   })
 
   it("locks Aria Release when switching from Attribute Anomaly", async () => {

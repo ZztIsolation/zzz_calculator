@@ -136,7 +136,9 @@ const anomalyVariantOptions = [
 ]
 
 function eventForMode(mode: string) {
-  return mode === "sheer" ? newEvent("sheer") : newEvent("direct")
+  if (mode === "sheer") return newEvent("sheer")
+  if (mode === "anomaly") return newEvent("anomaly")
+  return newEvent("direct")
 }
 
 function normalizeDraftForAgent(config: any) {
@@ -320,6 +322,8 @@ function releaseBreakdown(event: any) {
       event,
       eventElement: effect.element,
     })
+    const conversionSource = releaseTraceNode(evaluated.trace, (trace: any) => trace.whiteBoxRole === "conversionSource")
+    const stunnedCondition = releaseTraceNode(evaluated.trace, (trace: any) => trace.kind === "condition")
     return {
       ...evaluated,
       currentMultiplier: evaluated.finalBaseMultiplier * normalizeDamageScale(event),
@@ -327,20 +331,22 @@ function releaseBreakdown(event: any) {
       triggerLabel: labelOf(props.agent),
       sourceLabel: agentLabel(event?.anomalySource?.actorRef?.agentId),
       snapshot: event?.anomalySource?.snapshot ?? null,
-      outOfCombatAnomalyMastery: Number(props.releaseContext?.outOfCombatPanel?.anomalyMastery ?? 0),
-      stunnedRatio: releaseTraceValue(evaluated.trace, "异放失衡倍率修正") ?? 1,
+      conversionSourceLabel: conversionSource?.label ?? "转换数据来源",
+      conversionSourceValue: Number(conversionSource?.rawValue ?? conversionSource?.value ?? 0),
+      hasStunnedRatio: Boolean(stunnedCondition),
+      stunnedRatio: stunnedCondition ? Number(stunnedCondition.value ?? 1) : 1,
     }
   } catch {
     return null
   }
 }
 
-function releaseTraceValue(trace: any, label: string): number | null {
+function releaseTraceNode(trace: any, predicate: (value: any) => boolean): any | null {
   if (!trace) return null
-  if (trace.label === label && Number.isFinite(Number(trace.value))) return Number(trace.value)
+  if (predicate(trace)) return trace
   for (const child of trace.children ?? []) {
-    const value = releaseTraceValue(child, label)
-    if (value !== null) return value
+    const match = releaseTraceNode(child, predicate)
+    if (match) return match
   }
   return null
 }
@@ -939,6 +945,21 @@ function newEvent(kind: string) {
     }
   }
   if (kind === "anomaly") {
+    const releaseProfile = !hasAdminDefaultCalculation(props.agent, props.cinemaLevel ?? 0, props.potentialLevel ?? 0)
+      ? anomalyReleaseProfile(props.agent, "", damageElementForAgent(props.agent))
+      : null
+    if (releaseProfile) {
+      return normalizeAnomalyReleaseEventForAgent({
+        id,
+        kind,
+        settlementType: "release",
+        anomalyEffect: defaultAgentEffectId("release"),
+        count: 1,
+        stunned: true,
+        triggerActorRef: { agentId: String(props.agent?.id ?? ""), profileId: releaseProfile.id },
+        anomalySource: { actorRef: { agentId: String(props.agent?.id ?? "") } },
+      }, props.agent)
+    }
     return { id, kind, settlementType: "attribute", anomalyEffect: defaultAgentEffectId("attribute"), procCount: 1, count: 1, stunned: true }
   }
   if (kind === "disorder") {
@@ -1622,8 +1643,8 @@ function save() {
                 </div>
               </div>
               <dl class="disorder-explanation-metrics release-explanation-metrics">
-                <div><dt>局外异常掌控</dt><dd>{{ formatReleaseValue(selectedReleaseBreakdown.outOfCombatAnomalyMastery) }}</dd></div>
-                <div><dt>异放失衡倍率修正</dt><dd>× {{ formatReleaseValue(selectedReleaseBreakdown.stunnedRatio) }}</dd></div>
+                <div><dt>{{ selectedReleaseBreakdown.conversionSourceLabel }}</dt><dd>{{ formatReleaseValue(selectedReleaseBreakdown.conversionSourceValue) }}</dd></div>
+                <div v-if="selectedReleaseBreakdown.hasStunnedRatio"><dt>异放失衡倍率修正</dt><dd>× {{ formatReleaseValue(selectedReleaseBreakdown.stunnedRatio) }}</dd></div>
                 <div><dt>异放最终倍率</dt><dd>{{ formatDisorderMultiplier(selectedReleaseBreakdown.currentMultiplier) }}</dd></div>
               </dl>
             </section>

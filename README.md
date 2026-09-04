@@ -10,6 +10,12 @@ The entries below summarize each development day. Implementation details,
 modeling decisions, and verification evidence remain in the
 [detailed changelog](docs/changelog.md).
 
+### 2026-09-05 Vivian Single-Release Modeling (Development Branch)
+
+- Added Vivian (薇薇安·班希) from official Wiki entry 1276, including her level-60 panel, seven Core Passive Release coefficient tiers, the expressible Additional Ability/Cinema effects, official artwork, Enka `1331` mapping, and the signature Dreaming Bird relationship.
+- The workbench intentionally defines no administrator default rotation. A fresh build receives one non-administrator `mode: anomaly` event: a single Ether Corruption unit with Vivian as both the original source and Release trigger. The Release ratio reads current in-combat Anomaly Proficiency, so a self-sourced panel contributes to both the base unit and the ratio.
+- The official page has no stable skill IDs, so this branch does not fabricate a skill catalog or multi-event rotation. Cinema 2's 130% proficiency-yield conversion and Cinema 6's special five-fold Release remain explicit boundaries for a future event variant.
+
 ### 2026-08-25 Soldier 11 And Potential Vision Modeling
 
 - Added Soldier 11 with complete level 1-16 skill multipliers, Core Skill, Cinemas, The Brimstone relationship, official artwork, and Enka `1041` mapping. Malformed Potential cells in the official Wiki are explicitly corrected against current game data and documented as source defects.

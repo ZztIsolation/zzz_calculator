@@ -1630,6 +1630,7 @@
       "rarity": "S",
       "specialty": "anomaly",
       "attribute": "ether",
+      "relatedAgentId": "vivian",
       "images": {
         "icon": "/assets/w-engines/zzz_wiki_1277.png",
         "source": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
@@ -1696,7 +1697,8 @@
         "teamBuff": null
       },
       "sources": [
-        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45"
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1277/detail?mhy_presentation_style=fullscreen"
       ],
       "verification": {
         "level60Stats": "source-checked",
