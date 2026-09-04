@@ -377,9 +377,31 @@ npm run build:pages
 npm run benchmark:optimizer
 ```
 
-`npm test` 覆盖 Node 计算模型、优化器 fixture/进度/API/fuzz、存储兼容、扫描器桥接、生产服务行为和 Vue 测试。`npm run test:layout` 会先构建应用，再用 Chromium 在桌面、缩放桌面和移动端拒绝标签裁切、控件越界及意外横向滚动。CI 使用 Node 20，在每个分支和 Pull Request 上运行两套门禁。
+`npm test` 覆盖 Node 计算模型、优化器 fixture/进度/API/fuzz、存储兼容、扫描器桥接、生产服务行为和 Vue 测试。`npm run test:layout` 会先构建应用，再用 Chromium 在桌面、缩放桌面和移动端拒绝标签裁切、控件越界及意外横向滚动。必需的 `CI / verify` 使用 Node 20，覆盖目标为 `main` 的 Pull Request，以及推送或手动运行的 `main`。
 
 ## 生产服务器部署
+
+### 生产 CD 分支门禁
+
+生产发布与日常 `main` 开发刻意分离：
+
+1. `main` 是集成与验证分支。`main` 上成功的 CI 会上传不可变的
+   `server-release-<完整 SHA>` artifact 及 evidence。推送 `main` 本身不会部署生产。
+2. 目标提交通过 CI 后，从 `main` 创建并审批指向受保护 `deploy` 分支的
+   PR。提升工作流会重新核对 PR 的来源/目标、必要审批、当前 `main` SHA、
+   同一 SHA 上成功的 `CI / verify`、对应 artifact 以及是否可以快进；随后以
+   非强制更新把 `deploy` 推到同一个 SHA，记录提升证据并关闭该提升 PR。
+3. 只有更新 `deploy` 才会产生自动生产候选。CD 复用已经成功的 `main` CI
+   run 中的精确 artifact，核对 `.deployed-commit` 与 artifact SHA，然后进入
+   受保护的 `production` Environment 和服务器 manager 门禁。CD 不重新构建，
+   也不生成第二份 artifact。
+4. 提升会冻结本次部署 SHA。提升完成后即使 `main` 继续前进，正在部署的候选
+   仍保持 `deploy` 的原 SHA。手动 CD 只允许从 `deploy` 运行只读 `audit` 和隔离
+   `dry-run`；回滚同样从 `deploy` 发起，且分支 SHA 发生变化时必须 fail closed。
+
+迁移期间先保持 `PRODUCTION_CD_ENABLED=false`，完成受保护 `deploy` 分支、提升
+资格检查、audit/dry-run 和零影响复核后再恢复为 `true`。只有明确提升到
+`deploy` 的提交才允许进入生产。
 
 生产应用运行在 `121.199.21.10`。应用版本与下载资源使用相互独立的生命周期：
 

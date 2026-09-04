@@ -549,9 +549,39 @@ npm run build:pages
 npm run benchmark:optimizer
 ```
 
-`npm test` covers the Node calculation model, optimizer fixtures/progress/API/fuzz behavior, storage compatibility, scanner bridge, production server behavior, and the Vue test suite. `npm run test:layout` builds the app and uses Chromium to reject clipped labels, overflowing controls, and unintended horizontal scrolling across desktop, scaled-desktop, and mobile layouts. CI uses Node 20 and runs both suites for every branch and pull request.
+`npm test` covers the Node calculation model, optimizer fixtures/progress/API/fuzz behavior, storage compatibility, scanner bridge, production server behavior, and the Vue test suite. `npm run test:layout` builds the app and uses Chromium to reject clipped labels, overflowing controls, and unintended horizontal scrolling across desktop, scaled-desktop, and mobile layouts. The required `CI / verify` check uses Node 20 for pull requests targeting `main` and for pushes or manual runs on `main`.
 
 ## Production Server Deployment
+
+### Production CD branch gate
+
+Production release promotion is intentionally separate from day-to-day work on
+`main`:
+
+1. `main` is the integration and verification branch. A successful `main` CI
+   run publishes the immutable `server-release-<full-sha>` artifact and its
+   evidence. Pushing `main` never deploys to production.
+2. After the desired `main` commit has passed CI, open and approve a PR from
+   `main` to the protected `deploy` branch. The promotion workflow rechecks the
+   PR base/head, required approval, the current `main` SHA, a successful `CI /
+   verify` run on that exact SHA, the matching artifact, and fast-forward
+   eligibility. It advances `deploy` with a non-forced update to the same SHA,
+   records the promotion evidence, and closes the promotion PR.
+3. Updating `deploy` is the only automatic production candidate. CD downloads
+   the artifact from the already-successful `main` run, verifies
+   `.deployed-commit` and the artifact SHA, and then enters the protected
+   `production` Environment and server-manager gates. CD does not rebuild the
+   application or create a second artifact.
+4. A promotion freezes the deployed SHA. `main` may continue to advance after
+   the promotion without changing the candidate already being deployed. Manual
+   CD runs are limited to read-only `audit` and isolated `dry-run` from
+   `deploy`; rollback is also initiated from `deploy` and fails closed if the
+   branch SHA changed.
+
+During migration, keep `PRODUCTION_CD_ENABLED=false` until the protected
+`deploy` branch, promotion eligibility check, audit/dry-run, and zero-impact
+verification have all passed. Enable it only for a deliberately promoted
+`deploy` commit.
 
 The production application runs on `121.199.21.10`. Application releases and
 download payloads deliberately use separate lifecycles:

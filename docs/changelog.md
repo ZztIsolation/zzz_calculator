@@ -2,6 +2,44 @@
 
 # Changelog
 
+## 2026-09-04 - Separated Production CD Onto The Protected Deploy Branch
+
+Production release control is now separated from the integration branch. The
+`main` branch remains the source of truth for pull-request validation, complete
+Calculator CI, and immutable `server-release-<full-sha>` artifact/evidence
+creation. A push to `main` no longer constitutes a production deployment
+request, and production CD must not rebuild from a later or different checkout.
+
+The normal release path is an approved `main` -> `deploy` promotion PR. The
+promotion workflow rechecks the PR source and base, required approval, the
+current `main` head, a successful `CI / verify` run on that exact SHA, the
+artifact and evidence binding, and the remote fast-forward relationship. It
+updates the protected `deploy` branch with a non-forced (`force=false`) write to
+that same tested SHA, records promotion evidence, and closes the promotion PR.
+The resulting `deploy` SHA is the frozen production candidate even when `main`
+continues to receive later changes.
+
+Production CD accepts only the promoted `deploy` ref (or the promotion
+workflow's explicit `workflow_call`). It downloads the artifact from the
+successful `main` run identified by `ci_run_id`, verifies the exact
+`candidate_sha`, `.deployed-commit`, and artifact SHA-256, then retains the
+protected `production` Environment approval, server-manager inert probe,
+`current -> candidate -> rollback -> candidate` validation, atomic switch,
+stable-health gate, browser same-origin storage roundtrip, and independent
+public verification. Manual CD is limited to read-only `audit` and isolated
+`dry-run` from `deploy`; rollback is initiated from `deploy` and refuses a
+changed branch SHA. Missing approval, stale SHA, missing artifact, a successful
+CI run from any branch other than `main`, or a non-fast-forward update fails
+closed without changing the branch or contacting production.
+
+Migration starts with `PRODUCTION_CD_ENABLED=false` and no active legacy
+`main` deployment. The initial `deploy` branch is created at the exact online
+`.deployed-commit` only after confirming that commit is an ancestor of `main`.
+Branch rules then prohibit deletion and force-push, require linear history and
+promotion eligibility/approval, and retain the existing `production` approval
+policy. Only after deploy-branch audit/dry-run and zero-impact checks pass is
+the enable gate restored; changing the variable alone never triggers a deploy.
+
 ## 2026-08-24 - Split Sigrid's Tempering into a Chain-Attack Buff
 
 Introduced the reusable `combatBuffs.skillBuffs[]` catalog contract for Buffs

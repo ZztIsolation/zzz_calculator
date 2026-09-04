@@ -20,10 +20,11 @@ unset ZZZDEPLOY_PUBLIC_KEY
 
 The bootstrap is also the control-plane upgrade path. Whenever the manager,
 validation worker, SSH gateway or sudoers policy changes, rerun the bootstrap
-from the same pinned `main` commit before approving its first `dry-run`. Verify
-the installed file hashes afterward. The transaction may update only these
-dedicated deployment files and accounts; it must still leave `current`, the
-production service, Nginx and download manifests unchanged.
+from the same pinned `main` commit that produced the reviewed release before
+approving its first `dry-run`. Verify the installed file hashes afterward. The
+transaction may update only these dedicated deployment files and accounts; it
+must still leave `current`, the production service, Nginx and download manifests
+unchanged.
 
 The initializer creates a password-locked `zzzdeploy` account and installs a
 root-owned forced-command SSH gateway. The dedicated key disables PTY,
@@ -111,6 +112,35 @@ user, private key and pinned `known_hosts` remain secrets in the protected
 `production` Environment; the secretless preflight job exports the normalized
 repository URL to later jobs.
 
+## GitHub Actions release boundary
+
+The repository uses two explicit branch roles:
+
+- `main` is the integration branch. Pull requests and pushes to `main` run the
+  required `CI / verify` check. A successful push or manual CI run on `main`
+  uploads `server-release-<full-sha>` and its evidence. CI does not deploy.
+- `deploy` is the protected production release branch. The
+  `.github/workflows/promote-deploy.yml` workflow is the only normal writer. It
+  handles an approved `main` -> `deploy` promotion after rechecking the PR
+  source/target, required approval, current `main` SHA, a successful CI run on
+  that exact SHA, the matching artifact, and fast-forward eligibility. It uses
+  a non-forced update (`force=false`) to set `deploy` to the exact tested SHA,
+  records the promotion evidence, and closes the promotion PR.
+- `.github/workflows/deploy-production.yml` accepts the promoted `deploy` ref
+  (and the promotion workflow's `workflow_call`). It downloads the artifact
+  produced by the successful `main` run; it never rebuilds the application.
+  A bot-generated branch update must not start a duplicate push deployment.
+- Manual production runs are read-only `audit` or isolated `dry-run` and must
+  be started from `deploy`. The rollback workflow also requires `deploy` and
+  verifies that its SHA has not changed before invoking `rollback --previous`.
+
+The promotion call passes `candidate_sha`, `ci_run_id`, and, when available,
+`promotion_pr_number` to the deployment workflow. The manager receives
+`--expected-commit` equal to that frozen candidate SHA; the SHA is simultaneously
+the validated `main` commit and the current `deploy` commit. `PRODUCTION_CD_ENABLED`
+is a final enable gate, not a trigger: keep it `false` during migration and
+until the deploy-branch audit/dry-run has completed without changing production.
+
 ## Command contract
 
 The installed program must be invoked through the exact sudo rule. Artifact
@@ -122,10 +152,10 @@ to `history` and never includes credentials.
 sudo -n /usr/local/sbin/zzz-calculator-deploy audit
 sudo -n /usr/local/sbin/zzz-calculator-deploy dry-run \
   --artifact zzz-calculator-server-<artifact-sha-prefix>.tar.gz \
-  --expected-sha <artifact-sha256> --expected-commit <40-char-main-sha>
+  --expected-sha <artifact-sha256> --expected-commit <40-char-candidate-sha>
 sudo -n /usr/local/sbin/zzz-calculator-deploy deploy \
   --artifact zzz-calculator-server-<artifact-sha-prefix>.tar.gz \
-  --expected-sha <artifact-sha256> --expected-commit <40-char-main-sha>
+  --expected-sha <artifact-sha256> --expected-commit <40-char-candidate-sha>
 sudo -n /usr/local/sbin/zzz-calculator-deploy rollback --previous
 ```
 
