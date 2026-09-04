@@ -446,6 +446,7 @@ for (const token of [
     "candidate_sha: ${{ needs.validate.outputs.candidate_sha }}",
     "ci_run_id: ${{ needs.validate.outputs.ci_run_id }}",
     "operation_mode: ${{ needs.validate.outputs.operation_mode }}",
+    "secrets: inherit",
 ]) {
     requireText(baselineCall, token, `Baseline reusable deployment call is missing: ${token}`)
 }
@@ -631,6 +632,7 @@ for (const token of [
     "candidate_sha: ${{ needs.promote.outputs.candidate_sha }}",
     "ci_run_id: ${{ needs.promote.outputs.ci_run_id }}",
     "promotion_pr_number: ${{ needs.promote.outputs.pr_number }}",
+    "secrets: inherit",
 ]) {
     requireText(promotedDeployment, token, `Promoted deployment call is missing: ${token}`)
 }
@@ -713,6 +715,7 @@ for (const token of [
     "candidate_sha: ${{ needs.validate.outputs.candidate_sha }}",
     "ci_run_id: ${{ needs.validate.outputs.ci_run_id }}",
     "promotion_pr_number: ${{ needs.validate.outputs.promotion_pr_number }}",
+    "secrets: inherit",
 ]) {
     requireText(resumedDeployment, token, `Resumed deployment call is missing: ${token}`)
 }
