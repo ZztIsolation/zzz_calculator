@@ -207,6 +207,9 @@ jobs:
           private-key: ${{ secrets.DEPLOY_PROMOTER_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
+          permission-actions: read
+          permission-contents: write
+          permission-pull-requests: read
 
       - name: Validate approved PR and fast-forward deploy
         id: promote
