@@ -502,6 +502,9 @@ const newPromotionArchitecture = files.promote.includes("actions/create-github-a
 if (newPromotionArchitecture) {
     const eligibilityWorkflow = files.eligibility
     const promoteTriggers = section(files.promote, "on:", "\npermissions:")
+    const promotionPreflight = section(files.promote, "  promotion_preflight:", "\n  promote:")
+    const promotion = section(files.promote, "  promote:", "\n  production:")
+    const successfulPromotionReport = section(files.promote, "  report-success:", "\n  report-failure:")
     requireText(eligibilityWorkflow, "pull_request_review:", "Eligibility must run on promotion reviews.")
     requireText(eligibilityWorkflow, "name: eligibility", "Eligibility must expose the stable required check name.")
     requireText(eligibilityWorkflow, "github.rest.pulls.listReviews", "Eligibility must verify human review state.")
@@ -520,6 +523,42 @@ if (newPromotionArchitecture) {
     requireText(files.promote, "github.rest.git.updateRef", "Promotion must update deploy through the GitHub API.")
     requireText(files.promote, "force: false", "Promotion must never force-update deploy.")
     assert.doesNotMatch(files.promote, /force:\s*true|pulls\.merge/, "Promotion must not force-update or merge the PR.")
+    requireText(files.promote, "cancel-in-progress: false", "A running production promotion must not be cancelled.")
+    for (const [output, expression] of [
+        ["candidate_sha", 'core.setOutput("candidate_sha", main.commit.sha)'],
+        ["deploy_sha", 'core.setOutput("deploy_sha", deploy.commit.sha)'],
+        ["ci_run_id", 'core.setOutput("ci_run_id", String(run.id))'],
+        ["artifact_name", 'core.setOutput("artifact_name", artifactName)'],
+        ["promotion_pr_number", 'core.setOutput("promotion_pr_number", String(pullNumber))'],
+    ]) {
+        requireText(
+            promotionPreflight,
+            `${output}: ` + "${{ steps.validate.outputs." + output + " }}",
+            `Promotion preflight must expose ${output}.`,
+        )
+        requireText(promotionPreflight, expression, `Promotion preflight must set ${output}.`)
+        requireText(
+            promotion,
+            "needs.promotion_preflight.outputs." + output,
+            `Promotion must consume validated ${output}.`,
+        )
+    }
+    requireText(promotion, "workflowRunSha !== expectedCandidateSha", "Automatic promotion must bind the eligibility SHA to preflight.")
+    requireText(promotion, "main.commit.sha !== expectedCandidateSha", "Promotion must re-check the preflight main SHA.")
+    requireText(promotion, "deploy.commit.sha !== expectedDeploySha", "Promotion must re-check the preflight deploy SHA.")
+    requireText(promotion, "String(candidate.id) === expectedCiRunId", "Promotion must use the preflight CI run.")
+    requireText(promotion, "artifactName !== expectedArtifactName", "Promotion must use the preflight artifact name.")
+    assert.doesNotMatch(
+        promotion,
+        /REQUESTED_PR_NUMBER:\s*\$\{\{\s*inputs\.pr_number/,
+        "Promotion must not read the manual-only PR input after preflight.",
+    )
+    assert.doesNotMatch(
+        promotion,
+        /github\.rest\.(?:pulls\.update|issues\.createComment)/,
+        "The least-privilege App token must not perform PR writes.",
+    )
+    requireText(successfulPromotionReport, "github.rest.pulls.update", "The workflow token must close a still-open promotion record after success.")
     requireText(files.promote, "promotion-evidence.json", "Promotion evidence must be retained.")
     requireText(files.promote, "secrets: inherit", "Production reusable workflow must inherit its protected secrets.")
 } else {
