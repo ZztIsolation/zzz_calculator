@@ -30,6 +30,18 @@ const promotionScript = await readGithubScript(
     ".github/workflows/promote-deploy.yml",
     "Validate approved PR and fast-forward deploy",
 )
+const promotionWorkflow = await readFile(path.join(rootDir, ".github/workflows/promote-deploy.yml"), "utf8")
+const eligibilityWorkflow = await readFile(path.join(rootDir, ".github/workflows/deploy-eligibility.yml"), "utf8")
+
+assert.match(promotionWorkflow, /workflow_run:[\s\S]*workflows:[\s\S]*Deploy eligibility/)
+assert.match(promotionWorkflow, /actions\/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349/)
+assert.match(promotionWorkflow, /DEPLOY_PROMOTER_APP_ID/)
+assert.match(promotionWorkflow, /DEPLOY_PROMOTER_PRIVATE_KEY/)
+assert.match(promotionWorkflow, /github-token: \$\{\{ steps\.app-token\.outputs\.token \}\}/)
+assert.doesNotMatch(promotionWorkflow, /force:\s*true|pulls\.merge/)
+assert.match(eligibilityWorkflow, /name: Deploy eligibility/)
+assert.match(eligibilityWorkflow, /name: eligibility/)
+assert.doesNotMatch(eligibilityWorkflow, /contents:\s*write|git\.updateRef|secrets\./)
 
 function successfulReview() {
     return {
@@ -147,6 +159,7 @@ async function executePromotion(overrides = {}) {
         actor: "reviewer",
         eventName: "workflow_dispatch",
         ref: "refs/heads/main",
+        payload: {},
         repo: { owner: "ZztIsolation", repo: "zzz_calculator" },
         runId: 601,
         sha: state.mainSha,
