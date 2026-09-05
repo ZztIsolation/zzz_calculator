@@ -18,11 +18,12 @@ installation token，以 `force=false` 快进 `deploy`，然后复用现有的�
 - 在 Actions secrets 保存 `DEPLOY_PROMOTER_APP_ID` 与
   `DEPLOY_PROMOTER_PRIVATE_KEY`。私钥不得进入仓库、日志或发布证据。
 - 用 active repository ruleset 仅匹配 `deploy`：禁止 force push/删除，保留
-  `eligibility` required check，并只把该 App 加入 `always` bypass；停用旧的
-  classic `deploy` protection 后再做一次 dry-run，避免两套规则互相阻断。
+  `eligibility` required check，并只把该 App 加入 `always` bypass；确认规则内容
+  后停用旧的 classic `deploy` protection，避免两套规则互相阻断。若仓库套餐不提供
+  `Evaluate` 状态，则保持 ruleset active，并在首次发布前用只读 preflight 验证配置。
 - `production` Environment 继续保存 SSH secrets 和 protected-branch policy，
-  但 required reviewer 只保留晋级 PR 的一次人工审批；切换前保存原 reviewer
-  配置，失败时按发布记录恢复。
+  但不再配置 required reviewer；晋级 PR 的一次有效审批是唯一人工门禁。切换前
+  保存原 reviewer 配置，失败时按发布记录恢复。
 
 工作流在缺少 App secrets、候选 SHA、artifact 或 ruleset 保护时必须 fail
 closed；不得回退到 PAT、管理员直推或 force push。每次发布证据必须记录
@@ -45,8 +46,8 @@ main CI run/artifact、ruleset 快照和生产回滚结果。
 - [ ] `main` 只负责集成、验证和生成不可变 artifact；推送 `main` 不得直接启动生产 CD。
 - [ ] `deploy` 是唯一自动生产候选分支。正常发布必须经过获批的 `main` -> `deploy` 提升 PR，且只允许非强制快进到已经在 `main` 上验证的同一 SHA。
 - [ ] `prepare-deploy.yml` 创建或刷新审批 PR；`promote-deploy.yml` 完成资格复核、以 `force=false` 更新 `deploy` 并调用生产 CD。CD 复用对应 `main` CI run 的 artifact，不重新构建。
-- [ ] `deploy` 快进后，GitHub 可将审批 PR 立即标记为 indirect merge；若仍为 open，提升工作流会关闭它。PR 不产生 merge commit，closed/merged 记录继续接收 CD 成功/失败评论；失败时由 `resume-deploy.yml` 从冻结 `deploy` 复核同一 SHA/CI/artifact/审批后重试。
-- [ ] `deploy` 禁止删除和 force-push，并在基线验收后要求 GitHub Actions app 的严格 `eligibility` status check。个人仓库无法在保留原始已验证 SHA 和 `updateRef(force:false)` 的同时强制 Actions-only writer、PR merge 与 required linear history；正常路径依靠 required eligibility、工作流门禁和 `production` Environment 审批。人工/管理员直推也必须关联同 SHA 的获批 PR，否则只会 fail closed。
+- [ ] `deploy` 快进后，GitHub 可将审批 PR 立即标记为 indirect merge；若部署成功后仍为 open，收尾 job 使用受限的 `GITHUB_TOKEN` 关闭它。App token 保持 Pull requests 只读。PR 不产生 merge commit，closed/merged 记录继续接收 CD 成功/失败评论；失败时由 `resume-deploy.yml` 从冻结 `deploy` 复核同一 SHA/CI/artifact/审批后重试。
+- [ ] `deploy` 禁止删除和 force-push，并要求 GitHub Actions app 的 `eligibility` status check。个人仓库无法在保留原始已验证 SHA 和 `updateRef(force:false)` 的同时强制 Actions-only writer、PR merge 与 required linear history；正常路径依靠 required eligibility、工作流门禁以及 `production` Environment 的 secrets/branch policy。人工/管理员直推也必须关联同 SHA 的获批 PR，否则只会 fail closed。
 
 ## 2. 发布类型与允许改动
 

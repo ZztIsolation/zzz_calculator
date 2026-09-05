@@ -33,8 +33,15 @@ jobs:
       github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      candidate_sha: ${{ steps.validate.outputs.candidate_sha }}
+      deploy_sha: ${{ steps.validate.outputs.deploy_sha }}
+      ci_run_id: ${{ steps.validate.outputs.ci_run_id }}
+      artifact_name: ${{ steps.validate.outputs.artifact_name }}
+      promotion_pr_number: ${{ steps.validate.outputs.promotion_pr_number }}
     steps:
       - name: Validate promotion candidate
+        id: validate
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           REQUESTED_PR_NUMBER: ${{ inputs.pr_number || '' }}
@@ -63,6 +70,13 @@ jobs:
               || pullRequest.head?.ref !== "main"
               || pullRequest.head?.repo?.full_name !== repository) {
               return fail("Promotion PR must be an open, non-draft, in-repository main-to-deploy PR.");
+            }
+            const workflowRunSha = context.payload.workflow_run?.head_sha ?? "";
+            if (context.eventName === "workflow_run"
+              && (!/^[0-9a-f]{40}$/.test(workflowRunSha)
+                || context.payload.workflow_run?.head_branch !== "main"
+                || workflowRunSha !== pullRequest.head.sha)) {
+              return fail("Deploy eligibility result does not match the promotion PR candidate.");
             }
 
             const reviews = await github.paginate(github.rest.pulls.listReviews, {
@@ -158,6 +172,11 @@ jobs:
               && artifact.size_in_bytes > 0)) {
               return fail(`The exact main CI artifact ${artifactName} is missing, empty, or expired.`);
             }
+            core.setOutput("candidate_sha", main.commit.sha);
+            core.setOutput("deploy_sha", deploy.commit.sha);
+            core.setOutput("ci_run_id", String(run.id));
+            core.setOutput("artifact_name", artifactName);
+            core.setOutput("promotion_pr_number", String(pullNumber));
             core.info(`eligible: pr=${pullNumber} main=${main.commit.sha} deploy=${deploy.commit.sha} ci_run=${run.id} artifact=${artifactName}`);
 
   promote:
@@ -188,12 +207,19 @@ jobs:
           private-key: ${{ secrets.DEPLOY_PROMOTER_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
+          permission-actions: read
+          permission-contents: write
+          permission-pull-requests: read
 
       - name: Validate approved PR and fast-forward deploy
         id: promote
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
-          REQUESTED_PR_NUMBER: ${{ inputs.pr_number }}
+          REQUESTED_PR_NUMBER: ${{ needs.promotion_preflight.outputs.promotion_pr_number }}
+          PREFLIGHT_CANDIDATE_SHA: ${{ needs.promotion_preflight.outputs.candidate_sha }}
+          PREFLIGHT_DEPLOY_SHA: ${{ needs.promotion_preflight.outputs.deploy_sha }}
+          PREFLIGHT_CI_RUN_ID: ${{ needs.promotion_preflight.outputs.ci_run_id }}
+          PREFLIGHT_ARTIFACT_NAME: ${{ needs.promotion_preflight.outputs.artifact_name }}
           PRODUCTION_CD_ENABLED: ${{ vars.PRODUCTION_CD_ENABLED }}
         with:
           github-token: ${{ steps.app-token.outputs.token }}
@@ -202,10 +228,21 @@ jobs:
               core.setFailed(message);
               return null;
             };
+            const expectedCandidateSha = process.env.PREFLIGHT_CANDIDATE_SHA ?? "";
+            const expectedDeploySha = process.env.PREFLIGHT_DEPLOY_SHA ?? "";
+            const expectedCiRunId = process.env.PREFLIGHT_CI_RUN_ID ?? "";
+            const expectedArtifactName = process.env.PREFLIGHT_ARTIFACT_NAME ?? "";
+            if (!/^[0-9a-f]{40}$/.test(expectedCandidateSha)
+              || !/^[0-9a-f]{40}$/.test(expectedDeploySha)
+              || !/^\d+$/.test(expectedCiRunId)
+              || expectedArtifactName !== `server-release-${expectedCandidateSha}`) {
+              return fail("Promotion preflight outputs are missing or invalid.");
+            }
             const workflowRunSha = context.payload.workflow_run?.head_sha ?? "";
             if (context.eventName === "workflow_run"
               && (!/^[0-9a-f]{40}$/.test(workflowRunSha)
-                || context.payload.workflow_run?.head_branch !== "main")) {
+                || context.payload.workflow_run?.head_branch !== "main"
+                || workflowRunSha !== expectedCandidateSha)) {
               return fail("Deploy eligibility workflow must complete successfully for main.");
             }
             if (context.eventName === "workflow_dispatch" && context.ref !== "refs/heads/main") {
@@ -283,6 +320,9 @@ jobs:
             if (!main.protected || !deploy.protected) {
               return fail("Both main and deploy must be protected before promotion.");
             }
+            if (main.commit.sha !== expectedCandidateSha || deploy.commit.sha !== expectedDeploySha) {
+              return fail("The validated promotion context changed after preflight.");
+            }
             if (context.sha !== main.commit.sha) {
               return fail(`Workflow SHA ${context.sha} is not current main ${main.commit.sha}.`);
             }
@@ -312,7 +352,8 @@ jobs:
               per_page: 100,
             });
             const run = runs.data.workflow_runs.find(candidate =>
-              candidate.name === "CI"
+              String(candidate.id) === expectedCiRunId
+              && candidate.name === "CI"
               && candidate.path === ".github/workflows/ci.yml"
               && ["push", "workflow_dispatch"].includes(candidate.event)
               && candidate.head_branch === "main"
@@ -324,6 +365,9 @@ jobs:
               return fail(`No successful main CI run exists for ${main.commit.sha}.`);
             }
             const artifactName = `server-release-${main.commit.sha}`;
+            if (artifactName !== expectedArtifactName) {
+              return fail("The validated artifact name changed after preflight.");
+            }
             const getArtifacts = () => github.paginate(
               github.rest.actions.listWorkflowRunArtifacts,
               {
@@ -393,19 +437,7 @@ jobs:
               return fail(`deploy did not settle on the approved candidate ${main.commit.sha}.`);
             }
 
-            let promotionRecord = await getPullRequest();
-            if (promotionRecord.state === "open") {
-              try {
-                promotionRecord = (await github.rest.pulls.update({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  pull_number: pullNumber,
-                  state: "closed",
-                })).data;
-              } catch (error) {
-                core.warning(`deploy was promoted, but the approval PR could not be closed: ${error.message}`);
-              }
-            }
+            const promotionRecord = await getPullRequest();
 
             core.setOutput("candidate_sha", main.commit.sha);
             core.setOutput("ci_run_id", String(run.id));
@@ -442,16 +474,6 @@ jobs:
               `${JSON.stringify(evidence, null, 2)}\n`,
               { encoding: "utf8", mode: 0o600 },
             );
-            try {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: pullNumber,
-                body: `Promotion approved and fast-forwarded deploy to ${main.commit.sha}. Reusing successful main CI run ${run.id} and artifact ${artifactName}; protected production CD follows in this workflow.`,
-              });
-            } catch (error) {
-              core.warning(`deploy was promoted, but the PR evidence comment failed: ${error.message}`);
-            }
             await core.summary
               .addHeading("Deploy promotion")
               .addRaw(`PR #${pullNumber} fast-forwarded deploy to ${main.commit.sha}.`)
@@ -505,6 +527,19 @@ jobs:
           script: |
             const pullNumber = Number(process.env.PROMOTION_PR_NUMBER);
             try {
+              const pullRequest = (await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pullNumber,
+              })).data;
+              if (pullRequest.state === "open") {
+                await github.rest.pulls.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pullNumber,
+                  state: "closed",
+                });
+              }
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,

@@ -32,6 +32,10 @@ const promotionScript = await readGithubScript(
 )
 const promotionWorkflow = await readFile(path.join(rootDir, ".github/workflows/promote-deploy.yml"), "utf8")
 const eligibilityWorkflow = await readFile(path.join(rootDir, ".github/workflows/deploy-eligibility.yml"), "utf8")
+const promotionJob = promotionWorkflow.slice(
+    promotionWorkflow.indexOf("\n  promote:"),
+    promotionWorkflow.indexOf("\n  production:"),
+)
 
 assert.match(promotionWorkflow, /workflow_run:[\s\S]*workflows:[\s\S]*Deploy eligibility/)
 assert.match(
@@ -39,9 +43,27 @@ assert.match(
     /jobs:\s*[\s\S]*promotion_preflight:[\s\S]*\n  promote:[\s\S]*\n    name: promote fast-forward\n    needs: promotion_preflight/,
     "The promotion job must depend on the actual promotion_preflight job id.",
 )
+for (const output of ["candidate_sha", "deploy_sha", "ci_run_id", "artifact_name", "promotion_pr_number"]) {
+    assert.match(
+        promotionWorkflow,
+        new RegExp(`${output}: \\$\\{\\{ steps\\.validate\\.outputs\\.${output} \\}\\}`),
+        `Promotion preflight must expose ${output}.`,
+    )
+    assert.match(
+        promotionWorkflow,
+        new RegExp(`needs\\.promotion_preflight\\.outputs\\.${output}`),
+        `Promotion must consume the validated ${output}.`,
+    )
+}
+assert.doesNotMatch(promotionJob, /REQUESTED_PR_NUMBER:\s*\$\{\{\s*inputs\.pr_number/)
+assert.doesNotMatch(promotionJob, /github\.rest\.(?:pulls\.update|issues\.createComment)/)
+assert.match(promotionWorkflow, /report-success:[\s\S]*github\.rest\.pulls\.update/)
 assert.match(promotionWorkflow, /actions\/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349/)
 assert.match(promotionWorkflow, /DEPLOY_PROMOTER_APP_ID/)
 assert.match(promotionWorkflow, /DEPLOY_PROMOTER_PRIVATE_KEY/)
+assert.match(promotionWorkflow, /permission-actions:\s*read/)
+assert.match(promotionWorkflow, /permission-contents:\s*write/)
+assert.match(promotionWorkflow, /permission-pull-requests:\s*read/)
 assert.match(promotionWorkflow, /github-token: \$\{\{ steps\.app-token\.outputs\.token \}\}/)
 assert.doesNotMatch(promotionWorkflow, /force:\s*true|pulls\.merge/)
 assert.match(eligibilityWorkflow, /name: Deploy eligibility/)
@@ -168,13 +190,22 @@ async function executePromotion(overrides = {}) {
         repo: { owner: "ZztIsolation", repo: "zzz_calculator" },
         runId: 601,
         sha: state.mainSha,
+        ...overrides.contextOverrides,
     }
     const savedEnvironment = {
         REQUESTED_PR_NUMBER: process.env.REQUESTED_PR_NUMBER,
+        PREFLIGHT_CANDIDATE_SHA: process.env.PREFLIGHT_CANDIDATE_SHA,
+        PREFLIGHT_DEPLOY_SHA: process.env.PREFLIGHT_DEPLOY_SHA,
+        PREFLIGHT_CI_RUN_ID: process.env.PREFLIGHT_CI_RUN_ID,
+        PREFLIGHT_ARTIFACT_NAME: process.env.PREFLIGHT_ARTIFACT_NAME,
         PRODUCTION_CD_ENABLED: process.env.PRODUCTION_CD_ENABLED,
         RUNNER_TEMP: process.env.RUNNER_TEMP,
     }
     process.env.REQUESTED_PR_NUMBER = "42"
+    process.env.PREFLIGHT_CANDIDATE_SHA = overrides.preflightCandidateSha ?? state.mainSha
+    process.env.PREFLIGHT_DEPLOY_SHA = overrides.preflightDeploySha ?? state.deploySha
+    process.env.PREFLIGHT_CI_RUN_ID = overrides.preflightCiRunId ?? String(state.run.id)
+    process.env.PREFLIGHT_ARTIFACT_NAME = overrides.preflightArtifactName ?? `server-release-${state.mainSha}`
     process.env.PRODUCTION_CD_ENABLED = "true"
     process.env.RUNNER_TEMP = tempDir
 
@@ -209,6 +240,15 @@ assert.equal(success.evidence.candidateSha, mainSha)
 assert.equal(success.evidence.effectiveReviews[0].reviewId, 901)
 assert.equal(success.evidence.effectiveReviews[0].commitSha, mainSha)
 
+const workflowRunSuccess = await executePromotion({
+    contextOverrides: {
+        eventName: "workflow_run",
+        payload: { workflow_run: { head_branch: "main", head_sha: mainSha } },
+    },
+})
+assert.deepEqual(workflowRunSuccess.failures, [])
+assert.equal(workflowRunSuccess.updateCalls.length, 1)
+
 const negativeCases = [
     ["unapproved PR", { reviews: [] }, /no effective human approval/i],
     ["stale main SHA", { mainSha: "c".repeat(40) }, /refresh and reapprove/i],
@@ -216,6 +256,27 @@ const negativeCases = [
     ["non-main CI", { run: { ...successRun("d".repeat(40)), head_branch: "feature" } }, /No successful main CI run/i],
     ["non-fast-forward update", { comparison: { status: "diverged", ahead_by: 1 } }, /cannot be promoted with a non-forced fast-forward/i],
     ["unprotected branches", { protectedBranches: false }, /must be protected/i],
+    [
+        "tampered preflight candidate",
+        {
+            preflightCandidateSha: "c".repeat(40),
+            preflightArtifactName: `server-release-${"c".repeat(40)}`,
+        },
+        /validated promotion context changed/i,
+    ],
+    ["tampered preflight deploy base", { preflightDeploySha: "c".repeat(40) }, /validated promotion context changed/i],
+    ["tampered preflight CI run", { preflightCiRunId: "999" }, /No successful main CI run/i],
+    ["tampered preflight artifact", { preflightArtifactName: `server-release-${"c".repeat(40)}` }, /preflight outputs are missing or invalid/i],
+    [
+        "mismatched eligibility SHA",
+        {
+            contextOverrides: {
+                eventName: "workflow_run",
+                payload: { workflow_run: { head_branch: "main", head_sha: "c".repeat(40) } },
+            },
+        },
+        /eligibility workflow must complete successfully/i,
+    ],
 ]
 
 for (const [name, overrides, expectedFailure] of negativeCases) {
@@ -238,4 +299,4 @@ function successRun(sha) {
     }
 }
 
-console.log("Deploy promotion workflow behavior checks passed (7 cases).")
+console.log("Deploy promotion workflow behavior checks passed (13 cases).")
