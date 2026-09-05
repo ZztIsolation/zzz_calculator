@@ -162,7 +162,7 @@ jobs:
 
   promote:
     name: promote fast-forward
-    needs: promotion-preflight
+    needs: promotion_preflight
     if: >-
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success' &&

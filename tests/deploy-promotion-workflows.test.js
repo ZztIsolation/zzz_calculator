@@ -34,6 +34,11 @@ const promotionWorkflow = await readFile(path.join(rootDir, ".github/workflows/p
 const eligibilityWorkflow = await readFile(path.join(rootDir, ".github/workflows/deploy-eligibility.yml"), "utf8")
 
 assert.match(promotionWorkflow, /workflow_run:[\s\S]*workflows:[\s\S]*Deploy eligibility/)
+assert.match(
+    promotionWorkflow,
+    /jobs:\s*[\s\S]*promotion_preflight:[\s\S]*\n  promote:[\s\S]*\n    name: promote fast-forward\n    needs: promotion_preflight/,
+    "The promotion job must depend on the actual promotion_preflight job id.",
+)
 assert.match(promotionWorkflow, /actions\/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349/)
 assert.match(promotionWorkflow, /DEPLOY_PROMOTER_APP_ID/)
 assert.match(promotionWorkflow, /DEPLOY_PROMOTER_PRIVATE_KEY/)
