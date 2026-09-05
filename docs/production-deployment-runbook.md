@@ -5,11 +5,12 @@
 ## 当前 deploy 晋级架构
 
 当前发布链保留 `deploy` 作为可审计的发布指针，但不再允许普通
-`GITHUB_TOKEN` 直接写入受保护分支。`Deploy eligibility` 只读检查
-`main -> deploy` 晋级 PR 的有效审批、最新 SHA、成功的 main CI 和同 SHA
-artifact；`Promote deploy` 在 eligibility 成功后使用短期 GitHub App
-installation token，以 `force=false` 快进 `deploy`，然后复用现有的生产
-候选验证、SSH manager、健康检查和自动回滚。
+`GITHUB_TOKEN` 直接写入受保护分支，也不再创建晋级 PR。仓库所有者明确要求
+部署后，从 `main` 显式 dispatch `Promote deploy` 并冻结完整候选 SHA。只读
+eligibility job 核对 owner 身份、main 历史、成功 CI 和同 SHA artifact；写入 job
+使用短期 GitHub App installation token，以 `force=false` 快进 `deploy`。确认
+`deploy` 已等于候选后，同一次运行复用现有的生产候选验证、SSH manager、健康
+检查和自动回滚。
 
 一次性仓库配置必须完成以下项目后，工作流才允许真实晋级：
 
@@ -17,18 +18,19 @@ installation token，以 `force=false` 快进 `deploy`，然后复用现有的�
   Contents 读写、Pull requests 读取和 Actions 读取权限。
 - 在 Actions secrets 保存 `DEPLOY_PROMOTER_APP_ID` 与
   `DEPLOY_PROMOTER_PRIVATE_KEY`。私钥不得进入仓库、日志或发布证据。
-- 用 active repository ruleset 仅匹配 `deploy`：禁止 force push/删除，保留
-  `eligibility` required check，并只把该 App 加入 `always` bypass；确认规则内容
-  后停用旧的 classic `deploy` protection，避免两套规则互相阻断。若仓库套餐不提供
-  `Evaluate` 状态，则保持 ruleset active，并在首次发布前用只读 preflight 验证配置。
+- 用 active repository ruleset 仅匹配 `deploy`：限制创建和更新、禁止 force
+  push/删除，并只把该 App 加入 `always` bypass；不得保留会要求人工或其他身份
+  更新 `deploy` 的 classic protection 或 required status check。
 - `production` Environment 继续保存 SSH secrets 和 protected-branch policy，
-  但不再配置 required reviewer；晋级 PR 的一次有效审批是唯一人工门禁。切换前
-  保存原 reviewer 配置，失败时按发布记录恢复。
+  不配置 required reviewer；owner 显式 workflow dispatch 是唯一人工发布信号。
+- 仓库 Actions 默认 token 保持 read-only，并关闭“Allow GitHub Actions to create
+  and approve pull requests”。App 注册可保留 Pull requests 读取权限，但发布时签发的
+  token 只申请 Actions 读取和 Contents 写入。
 
 工作流在缺少 App secrets、候选 SHA、artifact 或 ruleset 保护时必须 fail
-closed；不得回退到 PAT、管理员直推或 force push。每次发布证据必须记录
-App token 只在 Promote job 使用、晋级前后 `deploy` SHA、approval review ID、
-main CI run/artifact、ruleset 快照和生产回滚结果。
+closed；不得回退到 PAT、管理员直推或 force push。每次发布证据必须记录 App
+token 只在 Promote job 使用、owner/triggering actor、promotion run/attempt、晋级
+前后 `deploy` SHA、main CI run/artifact、ruleset 快照和生产回滚结果。
 
 ## 1. 基本原则
 
@@ -44,10 +46,10 @@ main CI run/artifact、ruleset 快照和生产回滚结果。
 - [ ] 不得把密码、Token、Cookie、私钥、Basic Auth 内容写入本文档、仓库、命令脚本、CI 日志或发布记录。
 - [ ] 生产现场 Nginx/systemd 配置不得被仓库模板直接覆盖。先保存现场副本，再做逐行 diff，只应用本次获批项。
 - [ ] `main` 只负责集成、验证和生成不可变 artifact；推送 `main` 不得直接启动生产 CD。
-- [ ] `deploy` 是唯一自动生产候选分支。正常发布必须经过获批的 `main` -> `deploy` 提升 PR，且只允许非强制快进到已经在 `main` 上验证的同一 SHA。
-- [ ] `prepare-deploy.yml` 创建或刷新审批 PR；`promote-deploy.yml` 完成资格复核、以 `force=false` 更新 `deploy` 并调用生产 CD。CD 复用对应 `main` CI run 的 artifact，不重新构建。
-- [ ] `deploy` 快进后，GitHub 可将审批 PR 立即标记为 indirect merge；若部署成功后仍为 open，收尾 job 使用受限的 `GITHUB_TOKEN` 关闭它。App token 保持 Pull requests 只读。PR 不产生 merge commit，closed/merged 记录继续接收 CD 成功/失败评论；失败时由 `resume-deploy.yml` 从冻结 `deploy` 复核同一 SHA/CI/artifact/审批后重试。
-- [ ] `deploy` 禁止删除和 force-push，并要求 GitHub Actions app 的 `eligibility` status check。个人仓库无法在保留原始已验证 SHA 和 `updateRef(force:false)` 的同时强制 Actions-only writer、PR merge 与 required linear history；正常路径依靠 required eligibility、工作流门禁以及 `production` Environment 的 secrets/branch policy。人工/管理员直推也必须关联同 SHA 的获批 PR，否则只会 fail closed。
+- [ ] `deploy` 是唯一生产候选指针。正常发布只接受 owner 从 `main` 显式 dispatch 的冻结 SHA，且只允许非强制快进到已通过 main CI 的提交；`main` push 本身永不部署。
+- [ ] `promote-deploy.yml` 完成只读资格复核、以 `force=false` 更新 `deploy`、确认实时分支已落在候选 SHA，再在同一次串行运行中调用生产 CD。CD 复用对应 main CI artifact，不重新构建。
+- [ ] `main` 在 dispatch 后可以继续前进，不得替换或取消已冻结候选；若生产失败，`resume-deploy.yml` 从当前 `deploy` 复核原 promotion run、同一 SHA/CI/artifact 后重试。
+- [ ] `deploy` ruleset 限制创建和更新为 Deploy Promoter App bypass，禁止删除和 force-push；不配置人工直推、PR merge、required eligibility 或管理员回退路径。
 
 ## 2. 发布类型与允许改动
 
@@ -102,7 +104,8 @@ main CI run/artifact、ruleset 快照和生产回滚结果。
 RELEASE_TYPE=web|binary|combined
 SOURCE_BRANCH=main
 RELEASE_BRANCH=deploy
-PROMOTION_PR=<number-or-empty>
+PROMOTION_RUN_ID=<owner-dispatched-promote-run-id>
+REQUESTED_BY=ZztIsolation
 CI_RUN_ID=<successful-main-ci-run-id>
 CALCULATOR_COMMIT=<40-char-candidate-sha>
 CALCULATOR_SHORT=<12-char-sha>
@@ -136,13 +139,13 @@ previous_dir="$(readlink -f /opt/zzz_calculator/current)"
 
 - [ ] `SOURCE_BRANCH=main` 与 `RELEASE_BRANCH=deploy` 已明确记录；候选提交为精确 40 位 SHA。
 - [ ] `git status --porcelain --untracked-files=all` 输出为空。
-- [ ] `main` 上的目标提交已经通过 `CI / verify`；对应 artifact/evidence 来自同一成功 push 或手动 `main` CI run。`main` -> `deploy` PR 只运行提升 eligibility，不重复运行完整 CI，也不生成第二份生产 artifact。
-- [ ] 已从当前 `main` 运行 `prepare-deploy.yml`；它确认精确成功 CI/artifact 和快进关系后，创建或刷新来源为 `main`、目标为 `deploy` 的审批 PR。不得在 GitHub UI 合并该 PR。
-- [ ] PR 已由当前 head 对应的有效人工 review 批准，且未被 `main` 或 `deploy` 前进 invalidated。
-- [ ] 提升资格复核确认当前 `main` SHA、成功 CI SHA、artifact `.deployed-commit` 和 PR head 相同，并确认 `deploy` 可非强制快进到该 SHA。
+- [ ] `main` 上的冻结候选已经通过 `CI / verify`；对应 artifact/evidence 来自同一成功 push 或手动 main CI run。晋级不重复运行完整 CI，也不生成第二份生产 artifact。
+- [ ] owner 的明确发布请求已经解析为完整 `candidate_sha`，并从 `main` dispatch `promote-deploy.yml`，同时传入 `confirm_production=true`；无需创建、批准或合并 PR。
+- [ ] 原始 actor 与 triggering actor 均为仓库 owner；候选等于 dispatch 时的 workflow SHA，并且仍是当前 main 的祖先或 head。main 后续前进不使候选失效。
+- [ ] 提升资格复核确认候选 SHA、成功 CI SHA 和 artifact `.deployed-commit` 相同，并确认 `deploy` 可非强制快进到该 SHA。
 - [ ] 提升工作流以 `force=false` 更新 `deploy` 后，再记录 `origin/deploy` 的完整 SHA；该 SHA 必须与 `main` CI SHA 完全一致。
-- [ ] 记录提升 PR、CI run URL、artifact 名称、提交 SHA、有效 reviewer 快照、开始时间和结束时间；PR 在 `deploy` 快进后由 GitHub 标记 indirect merge，或由工作流关闭。CD 失败时仍在该 closed/merged 记录中写入恢复参数。
-- [ ] 若需恢复，`resume-deploy.yml` 从冻结的当前 `deploy` 接收 `candidate_sha`、`ci_run_id` 和 `promotion_pr_number`；它必须确认 workflow SHA/`deploy` 未移动、PR 对候选 SHA 仍有有效审批且 artifact 未过期，才允许重新调用 CD。`main` 后续前进不使该候选陈旧。
+- [ ] 记录 promotion run/attempt/URL、owner/triggering actor、CI run URL、artifact 名称、提交 SHA、开始时间和结束时间；CD 失败时在 Actions summary/evidence 中记录恢复参数。
+- [ ] 若需恢复，`resume-deploy.yml` 从冻结的当前 `deploy` 接收 `candidate_sha`、`ci_run_id` 和 `promotion_run_id`；它必须确认原 Promote run 和快进步骤、workflow SHA/`deploy` 未移动且 artifact 未过期，才允许重新调用 CD。当前 main 可以继续前进。
 - [ ] 检查 diff 未混入 `downloads/`、`dist/`、凭据、测试 sentinel 或不相关功能。
 
 ### 4.2 Calculator 门禁
@@ -668,12 +671,15 @@ journalctl -u zzz-calculator.service --since '10 minutes ago' --no-pager
 ## Git / CI
 - source branch：`main`
 - release branch：`deploy`
-- promotion PR：
+- authorization type：owner `workflow_dispatch`
+- requested by / triggering actor：
+- promotion run / attempt / URL：
 - Calculator commit / frozen candidate SHA：
 - Scanner commit（如适用）：
 - PR：
-- promotion method：non-forced fast-forward（`force=false`）；生产成功且 PR head 未变化后由工作流关闭 PR
+- promotion method：Deploy Promoter App non-forced fast-forward（`force=false`）
 - main CI run / URL：
+- previous deploy SHA：
 - deploy update SHA：
 - promotion evidence：
 - Scanner Actions run 1 / run 2（如适用）：
@@ -747,10 +753,10 @@ journalctl -u zzz-calculator.service --since '10 minutes ago' --no-pager
 - rollback command reviewed：
 - rollback rehearsal/result：
 
-## 已知风险与批准
+## 已知风险与授权
 - 风险：
 - 证据：
-- 批准人/时间：
+- owner 显式发布请求/时间：
 ```
 
 ## 19. 发布后安全收尾
@@ -767,58 +773,42 @@ journalctl -u zzz-calculator.service --since '10 minutes ago' --no-pager
 
 Calculator 的自动化入口是 `.github/workflows/ci.yml`、
 `.github/workflows/audit-deploy-baseline.yml`、
-`.github/workflows/prepare-deploy.yml`、
 `.github/workflows/promote-deploy.yml`、
 `.github/workflows/deploy-production.yml`、
 `.github/workflows/resume-deploy.yml` 和
 `.github/workflows/rollback-production.yml`。CI 的 required check 固定为
 `CI / verify`；只有 `main` 的成功 CI run 才上传绑定完整 SHA 的服务器产物和
-evidence。`promote-deploy.yml` 是 `main` -> `deploy` 的唯一正常提升入口，CD
-只能下载该成功 CI run 的精确产物，禁止在部署任务中重新构建。
+evidence。`promote-deploy.yml` 是 `main` -> `deploy` 的唯一正常提升入口，只接受
+owner 显式 dispatch；CD 只能下载该成功 CI run 的精确产物，禁止在部署任务中
+重新构建。旧 `prepare-deploy.yml` 和独立 `deploy-eligibility.yml` 已停用，不得用
+PR、review、bot approval 或 deploy push 重新引入旁路。
 
-### 20.1 分支迁移顺序
+### 20.1 显式晋级控制面迁移顺序
 
-首次切换或在仓库尚未有 `deploy` 时，严格按以下顺序执行，不要把当前最新
-`main` 自动当作首个生产候选：
+从旧审批 PR 架构切换时严格按以下顺序执行：
 
-1. 将仓库变量 `PRODUCTION_CD_ENABLED` 临时设为 `false`，确认没有仍在运行的
-   旧 `main` `workflow_run` 部署；等待或取消旧运行并保留其审计记录。
-2. 在只读服务器基线中读取线上 `.deployed-commit`，确认该提交是 `main` 的祖先；
-   以该提交创建 `deploy`，而不是直接把 `deploy` 指向最新 `main`。若不是祖先，
-   停止迁移并人工处理基线差异。
-3. 先为 `deploy` 配置禁止删除和 force-push；保留 `main` 现有保护规则和
-   `production` Environment 审批人/受保护分支策略。当前个人仓库无法同时实现
-   Actions-only writer、required PR merge、required linear history 和“保留原始
-   `main` merge SHA 的 `updateRef(force:false)`”，因此不得配置会阻止受控快进或
-   改写 SHA 的规则。
-4. 合并本次工作流并确认新 `main` 的 `CI / verify` 成功后，仍让 `deploy` 停在第
-   2 步的线上 SHA。从当前 `main` 运行 `audit-deploy-baseline.yml`，先选 `audit`，
-   再选 `dry-run`。它只在 `PRODUCTION_CD_ENABLED=false` 时调用新 reusable 控制面，
-   复用该线上 SHA 的成功 `main` CI artifact，且不推进 `deploy`、不切换生产
-   `current`。若该 14 天 artifact 已过期，停止迁移并重新设计基线，不得绕过。
-5. 确认 audit/dry-run 前后线上 release、服务、PID、`NRestarts`、manifest、state
-   pair 和 marker 全部零影响。启用仓库的“Allow GitHub Actions to create and
-   approve pull requests”设置，供 `prepare-deploy.yml` 建立 bot-authored 审批记录；
-   该工作流不提交 approval，仍由人类审阅者批准当前 head。当前仓库只有 owner 一名
-   collaborator 且该设置初始为 false，因此本次迁移必须启用它，不能改由 owner
-   自建并自批同一 PR。
-6. 保持 gate=false，运行 prepare 并完成人工 approval，使 GitHub Actions 的
-   `eligibility` check 首次在候选 SHA 上成功出现。随后为 `deploy` 增加 strict
-   required status check `eligibility`，限定 GitHub Actions app（当前 app id
-   `15368`），并启用 enforce admins；继续禁止 force-push/删除，但不启用 required
-   PR merge、required linear history 或 writer restriction。promotion dispatch
-   自身会再次真实运行 eligibility，不能用 skipped job 满足该状态。
-7. 全部零影响复核通过后，才将 `PRODUCTION_CD_ENABLED` 恢复为 `true`。变量变更
-   本身不触发部署；后续从 `main` 运行 prepare，人工审批后再运行 promote。
-   promote 复核 PR、审批、当前 `main`、成功 CI、artifact 和远端 `deploy`，以
-   `force=false` 快进并显式 `workflow_call` 生产 CD。审批 PR 会在 head 可从 base
-   到达时被 GitHub 标记为 indirect merge，或由工作流关闭；失败仍保留该记录和
-   冻结候选，可从 `deploy` 运行 `resume-deploy.yml` 复核后重试。
+1. 保存 ruleset、Actions workflow 权限、production Environment、`main`、`deploy`
+   和服务器 `.deployed-commit` 的无敏感信息快照，确认没有正在运行的 Promote、
+   Resume、Rollback 或 production job。
+2. 从最新远端 `main` 建立控制面分支，删除 PR/approval 工作流并合并显式晋级实现；
+   等待新 main 的完整 CI 和精确服务器 artifact 成功，期间不得移动 `deploy`。
+3. 原子更新仅匹配 `deploy` 的 active ruleset：保留 App `always` bypass，加入
+   Restrict creations、Restrict updates、deletion 和 non-fast-forward，删除 required
+   `eligibility`。随后关闭 Actions 创建/批准 PR 的仓库选项；默认 token 继续 read-only。
+4. 从 `main` 对控制面合并 SHA 做一次安全解析检查；错误 ref/未确认必须在 App token
+   和生产 secrets 之前失败。然后由 owner 以完整 SHA 和 `confirm_production=true`
+   做一次真实 Promote，不再创建或等待 PR。
+5. Promote 必须先复核 owner、冻结 SHA、main 包含关系、成功 CI/artifact 与严格快进，
+   再用短期 App token 执行 `updateRef(force:false)`。只有实时 `deploy` 等于候选后，
+   同一运行才能调用 production workflow；App push 不另起生产 workflow。
+6. 验证单一事务的 artifact、四阶段门禁、原子切换、服务稳定、公开路由、浏览器存储
+   和 manifest 哈希。更新分支前失败则重新显式 Promote；更新分支后失败则保留冻结
+   `deploy`，从该 ref 使用原 promotion/CI run ID 执行 Resume。
 
 - [ ] GitHub `main` 已启用 PR、`CI / verify`、分支最新、conversation resolution、禁止 force push/删除；管理员应急绕过保留审计记录。
-- [ ] `deploy` 已创建在当前线上 `.deployed-commit` 对应的基线（该提交必须是 `main` 的祖先），并启用 enforce admins、禁止 force-push/删除和 GitHub Actions app 的 strict required `eligibility`；未配置会阻断 `updateRef(force:false)` 或改写原始 SHA 的 required PR merge/linear-history 规则。人工直推也必须有同 SHA 获批 PR 和 eligibility，只作为有审计的应急绕过。
-- [ ] `production` Environment 继续使用现有 protected-branch 审批策略；审批人和 `PROD_HOST`、`PROD_USER`、`PROD_SSH_PRIVATE_KEY`、`PROD_KNOWN_HOSTS` 已配置。reusable promotion 的 caller ref 是 `main`，resume 是 `deploy`；未来 custom policy 必须同时允许二者，除非另行重构触发方式。`PRODUCTION_CD_ENABLED=false` 时真实 deploy 跳过，但 `audit-deploy-baseline.yml` 和 deploy-ref 手动 audit/dry-run 仍可执行。
-- [ ] `promote-deploy.yml` 已重新检查 PR 来源/目标、必要审批、最新 `main` SHA、成功的同 SHA CI、artifact/evidence 和非强制快进关系；随后以 `force=false` 把 `deploy` 更新到同一 SHA 并上传提升证据。PR 由 GitHub 标记 indirect merge 或由工作流关闭；失败时从冻结 `deploy` 使用原参数运行 `resume-deploy.yml`。
+- [ ] `deploy` 已创建在当前线上 `.deployed-commit` 对应的基线，并由 active ruleset 限制为 Deploy Promoter App 才能创建或更新，同时禁止删除和 force-push；不存在 required eligibility、人工直推或管理员回退规则。
+- [ ] `production` Environment 保留 protected-branches 策略和 `PROD_HOST`、`PROD_USER`、`PROD_SSH_PRIVATE_KEY`、`PROD_KNOWN_HOSTS`，不配置 reviewer。Promote caller ref 是 `main`，Resume 是 `deploy`，所以 custom policy 必须同时允许二者。`PRODUCTION_CD_ENABLED=false` 时真实 deploy 禁止，但 owner audit/dry-run 仍可执行。
+- [ ] `promote-deploy.yml` 已检查 owner 与 triggering actor、dispatch 确认、冻结 SHA/main 包含关系、成功同 SHA CI、artifact/evidence 和非强制快进；随后以 `force=false` 更新 `deploy` 并上传 promotion run 证据。失败时从冻结 `deploy` 使用 candidate/CI/promotion run 三元组运行 `resume-deploy.yml`。
 - [ ] 服务器已从 `main` CI 验证且 `deploy` 冻结的同一固定 SHA 运行 `deploy/production/bootstrap-zzz-calculator-deploy.sh`，已安装 manager/worker/gateway/sudoers 哈希与该 SHA 一致；`zzzdeploy` 仅使用锁定密码的专用 key，sudo 只允许 root-owned 部署程序。控制面有变化时必须先事务性重跑 bootstrap，且初始化不得触碰 `current`、生产 systemd 服务、Nginx 或下载源。
 - [ ] `systemd-run` client 与 PID 1 manager 版本均可解析，取两者较低值后的 effective version 不低于 v239；使用固定 v239 baseline，只有 v242/v248 画像才分别增加 `RestrictSUIDSGID`/`PrivateIPC`。root-owned inert capability probe 已在 claim incoming artifact 和候选代码前以完整参数一次通过；没有发生未知属性重试、参数降级或候选字节提前执行。
 - [ ] v239 baseline 以 `SystemCallArchitectures=native` 禁止 compat ABI 绕过；显式窄 IPC syscall deny 和 `personality` syscall deny、per-unit `RemoveIPC=yes`、IPC 路径隐藏、AF_UNIX 禁止、空 capabilities、`NoNewPrivileges`、私有 network/mount namespace 和只读生产视图均由 worker 在服务器实际 native 架构上自证。Rocky/RHEL v239 不接受 transient `LockPersonality=`，因此以同一 seccomp filter 直接拒绝该 syscall，并由固定 `setarch` 探针验证返回 `EPERM`；没有使用会误伤 pipe/worker 调用的 `@ipc` syscall group。CI-only parser 诊断必须在真实 v239 PID 1 上逐项提交完整 baseline、严格清理每个诊断 unit，并先证明两个假属性能在一次结果中同时汇总；完整 inert probe 仍是组合画像的最终门禁。`ipcmk -Q/-S/-M` 全部以 `EPERM` 失败，且没有修改 logind `RemoveIPC` 或其他生产全局配置。

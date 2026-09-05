@@ -549,7 +549,7 @@ npm run build:pages
 npm run benchmark:optimizer
 ```
 
-`npm test` covers the Node calculation model, optimizer fixtures/progress/API/fuzz behavior, storage compatibility, scanner bridge, production server behavior, executable promotion event-matrix cases, and the Vue test suite. `npm run test:layout` builds the app and uses Chromium to reject clipped labels, overflowing controls, and unintended horizontal scrolling across desktop, scaled-desktop, and mobile layouts. The `CI / verify` check uses Node 20 for pull requests and pushes targeting `main`; a `main` -> `deploy` approval PR runs only the read-only promotion eligibility check and does not build a second release artifact. Only a successful `main` push or manual `main` CI run uploads a production release artifact.
+`npm test` covers the Node calculation model, optimizer fixtures/progress/API/fuzz behavior, storage compatibility, scanner bridge, production server behavior, executable promotion event-matrix cases, and the Vue test suite. `npm run test:layout` builds the app and uses Chromium to reject clipped labels, overflowing controls, and unintended horizontal scrolling across desktop, scaled-desktop, and mobile layouts. The `CI / verify` check uses Node 20 for pull requests and pushes targeting `main`; only a successful `main` push or manual `main` CI run uploads a production release artifact. Explicit promotion reuses that exact artifact and never runs a second application build.
 
 ## Production Server Deployment
 
@@ -561,50 +561,39 @@ Production release promotion is intentionally separate from day-to-day work on
 1. `main` is the integration and verification branch. A successful `main` CI
    run publishes the immutable `server-release-<full-sha>` artifact and its
    evidence. Pushing `main` never deploys to production.
-2. Dispatch **Prepare deploy promotion** from current `main`. It validates the
-   current `main` and `deploy` heads, exact successful CI run and artifact, and
-   fast-forward relationship, then creates or refreshes the in-repository
-   `main` -> `deploy` PR used as the human approval record. Do not merge that PR
-   in the GitHub UI.
-3. After approval, dispatch **Promote deploy** from current `main` with the PR
-   number. It rechecks the open PR, approval for its current head, both branch
-   heads, the exact CI/artifact, and fast-forward eligibility before updating
-   `deploy` with `force=false`. It then calls production CD with the frozen SHA
-   and CI run ID. Making the PR head reachable from `deploy` can cause GitHub
-   to mark the PR indirectly merged immediately; if it is still open, the
-   workflow closes it. No merge commit or replacement SHA is created.
-4. CD downloads the artifact from the already-successful `main` run, verifies
+2. An explicit production request dispatches **Promote deploy** from `main`
+   with the full candidate SHA and `confirm_production=true`. The dispatch SHA
+   is frozen for the release; later `main` commits are excluded as long as the
+   candidate remains in current `main` history.
+3. The read-only eligibility job requires both the original actor and any
+   re-run actor to be the repository owner. It verifies protected branch state,
+   the strict `deploy`-to-candidate fast-forward, the successful exact-SHA main
+   CI run, and the non-empty, unexpired artifact. The write job rechecks the
+   frozen values before minting a repository-scoped App token and updating
+   `deploy` with `force=false`.
+4. After confirming that live `deploy` equals the frozen candidate, the same
+   promotion run calls production CD. CD downloads the artifact from the
+   already-successful `main` run, verifies
    `.deployed-commit` and the artifact SHA, and then enters the protected
    `production` Environment and server-manager gates. CD does not rebuild the
-   application or create a second artifact. If CD fails, `deploy` remains at
-   the frozen candidate and the closed/merged approval PR remains as evidence;
-   **Resume deploy**, dispatched from that frozen `deploy` ref, can revalidate
-   the SHA, CI run, artifact, and approval and retry without moving `deploy`.
+   application or create a second artifact.
 5. `main` may continue to advance after promotion without changing the frozen
-   candidate. Manual CD runs are limited to read-only `audit` and isolated
-   `dry-run` from `deploy`; rollback is also initiated from `deploy` and fails
-   closed if the branch SHA changed.
+   candidate. If CD fails after promotion, **Resume deploy** revalidates the
+   frozen `deploy` SHA, original promotion run, exact CI/artifact, and retries
+   without moving the branch. Manual audit/dry-run and rollback remain owner-only
+   operations from `deploy` and fail closed if its SHA changes.
 
-This personal repository cannot combine an Actions-only writer restriction,
-mandatory PR merges, and required linear history with preserving the original
-tested `main` SHA through `updateRef(force:false)`. The normal path is enforced
-inside the workflows and by protected `production` Environment approval;
-`deploy` enforces administrators, blocks force-push/deletion, and requires the
-strict `eligibility` check from the GitHub Actions app. A direct human or
-administrator push is an emergency, audited bypass, not the normal release path, and it must
-still resolve a same-SHA approved `main` -> `deploy` PR and satisfy the exact
-successful `main` CI/artifact and production gates.
+The active `deploy` ruleset restricts branch creation and updates to the
+dedicated Deploy Promoter App, blocks deletion and force-push, and grants no
+human or administrator write path. The App token requests only Actions read and
+Contents write; a normal `GITHUB_TOKEN`, PAT fallback, direct push, PR merge, or
+bot approval is never part of production promotion. Authorization is the
+owner-attributed workflow dispatch and its immutable Actions evidence.
 
-During migration, keep `PRODUCTION_CD_ENABLED=false` until `deploy` has been
-created at the exact live `.deployed-commit`, that commit is confirmed as a
-`main` ancestor, force-push/deletion protection is active, no legacy `main` CD
-is running, and **Audit deploy baseline** has used the new reusable workflow on
-`main` to audit/dry-run the still-live `deploy` SHA with zero impact. Because
-**Prepare deploy promotion** creates the approval PR with `GITHUB_TOKEN`, the
-repository must allow Actions to create pull requests; the workflow never
-approves its own PR, and a current human approval is still mandatory. Enable
-the production gate only before the first deliberate promotion, keeping
-`deploy` equal to the live SHA until that promotion starts.
+The repository setting that allows Actions to create or approve pull requests
+is disabled because release automation no longer creates a promotion PR. Keep
+`PRODUCTION_CD_ENABLED=false` during a control-plane migration or baseline
+audit, then restore it only before an explicit owner-authorized promotion.
 
 Keep the production Environment's current protected-branch policy during the
 switch. Reusable promotion runs carry the caller ref `main`, so a later custom

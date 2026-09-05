@@ -17,9 +17,62 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  authorize:
+    name: authorize rollback request
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      deploy_sha: ${{ steps.authorize.outputs.deploy_sha }}
+      requested_by: ${{ steps.authorize.outputs.requested_by }}
+      triggering_actor: ${{ steps.authorize.outputs.triggering_actor }}
+    steps:
+      - name: Validate explicit owner rollback request
+        id: authorize
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          CONFIRM_ROLLBACK: ${{ inputs.confirm }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        with:
+          script: |
+            const fail = message => {
+              core.setFailed(message);
+              return null;
+            };
+            const owner = context.repo.owner.toLowerCase();
+            const requestedBy = (context.actor || "").toLowerCase();
+            const triggeringActor = (process.env.TRIGGERING_ACTOR || "").toLowerCase();
+            if (requestedBy !== owner || triggeringActor !== owner) {
+              return fail("Rollback production may only be dispatched or re-run by the repository owner.");
+            }
+            if (process.env.CONFIRM_ROLLBACK !== "true") {
+              return fail("confirm must be true before rolling back production.");
+            }
+            if (context.ref !== "refs/heads/deploy") {
+              return fail("Rollback production must be dispatched from deploy.");
+            }
+            const deploy = (await github.rest.repos.getBranch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: "deploy",
+            })).data;
+            if (!deploy.protected) {
+              return fail("deploy must remain protected before rolling back production.");
+            }
+            if (context.sha !== deploy.commit.sha) {
+              return fail(`Workflow SHA ${context.sha} is not current deploy ${deploy.commit.sha}.`);
+            }
+            core.setOutput("deploy_sha", deploy.commit.sha);
+            core.setOutput("requested_by", context.actor);
+            core.setOutput("triggering_actor", process.env.TRIGGERING_ACTOR);
+            await core.summary
+              .addHeading("Rollback authorization")
+              .addRaw(`Owner ${context.actor} confirmed rollback while deploy was ${deploy.commit.sha}.`)
+              .write();
+
   rollback:
     name: rollback to previous release
-    if: inputs.confirm == true && github.ref == 'refs/heads/deploy'
+    needs: authorize
+    if: needs.authorize.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
@@ -27,11 +80,16 @@ jobs:
       url: ${{ vars.PROD_URL }}
     steps:
       - name: Initialize rollback evidence
+        env:
+          EXPECTED_DEPLOY_SHA: ${{ needs.authorize.outputs.deploy_sha }}
+          REQUESTED_BY: ${{ needs.authorize.outputs.requested_by }}
+          TRIGGERING_ACTOR: ${{ needs.authorize.outputs.triggering_actor }}
         shell: bash
         run: |
           set -euo pipefail
-          printf 'workflow_run_id=%s\nworkflow_sha=%s\n' \
-            "$GITHUB_RUN_ID" "$GITHUB_SHA" > "$RUNNER_TEMP/rollback-output.txt"
+          printf 'workflow_run_id=%s\nworkflow_run_attempt=%s\nworkflow_sha=%s\nrelease_branch=deploy\nexpected_deploy_sha=%s\nrequested_by=%s\ntriggering_actor=%s\n' \
+            "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$EXPECTED_DEPLOY_SHA" \
+            "$REQUESTED_BY" "$TRIGGERING_ACTOR" > "$RUNNER_TEMP/rollback-output.txt"
 
       - name: Configure restricted SSH host verification
         env:
@@ -47,7 +105,7 @@ jobs:
       - name: Roll back, verify, and restore original on failure
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_DEPLOY_SHA: ${{ github.sha }}
+          EXPECTED_DEPLOY_SHA: ${{ needs.authorize.outputs.deploy_sha }}
           PROD_HOST: ${{ secrets.PROD_HOST }}
           PROD_USER: ${{ secrets.PROD_USER }}
           PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}

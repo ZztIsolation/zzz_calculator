@@ -11,14 +11,18 @@ on:
         description: Successful main CI run that produced the candidate artifact
         required: true
         type: string
-      promotion_pr_number:
-        description: Main-to-deploy approval PR for this frozen candidate
+      promotion_run_id:
+        description: Original owner-dispatched Promote deploy run that advanced deploy
         required: true
-        type: number
+        type: string
+      confirm_production:
+        description: Confirm resuming production deployment for the frozen deploy SHA
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
-  pull-requests: read
   actions: read
 
 concurrency:
@@ -33,15 +37,20 @@ jobs:
     outputs:
       candidate_sha: ${{ steps.validate.outputs.candidate_sha }}
       ci_run_id: ${{ steps.validate.outputs.ci_run_id }}
-      promotion_pr_number: ${{ steps.validate.outputs.promotion_pr_number }}
+      promotion_run_id: ${{ steps.validate.outputs.promotion_run_id }}
+      artifact_name: ${{ steps.validate.outputs.artifact_name }}
+      promotion_run_url: ${{ steps.validate.outputs.promotion_run_url }}
+      fast_forward_job_id: ${{ steps.validate.outputs.fast_forward_job_id }}
     steps:
-      - name: Validate deploy, approval PR, CI run, and artifact
+      - name: Validate explicit resume request, promotion run, CI, and artifact
         id: validate
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           CANDIDATE_SHA: ${{ inputs.candidate_sha }}
           CI_RUN_ID: ${{ inputs.ci_run_id }}
-          PROMOTION_PR_NUMBER: ${{ inputs.promotion_pr_number }}
+          PROMOTION_RUN_ID: ${{ inputs.promotion_run_id }}
+          CONFIRM_PRODUCTION: ${{ inputs.confirm_production }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
           PRODUCTION_CD_ENABLED: ${{ vars.PRODUCTION_CD_ENABLED }}
         with:
           script: |
@@ -49,23 +58,39 @@ jobs:
               core.setFailed(message);
               return null;
             };
+            const owner = context.repo.owner.toLowerCase();
+            const requestedBy = (context.actor || "").toLowerCase();
+            const triggeringActor = (process.env.TRIGGERING_ACTOR || "").toLowerCase();
+            if (requestedBy !== owner || triggeringActor !== owner) {
+              return fail("Resume deploy may only be dispatched or re-run by the repository owner.");
+            }
+            if (process.env.CONFIRM_PRODUCTION !== "true") {
+              return fail("confirm_production must be true before resuming production CD.");
+            }
             if (context.ref !== "refs/heads/deploy") {
               return fail("Resume deploy must be dispatched from deploy.");
             }
             if (process.env.PRODUCTION_CD_ENABLED !== "true") {
               return fail("Repository variable PRODUCTION_CD_ENABLED must be true before resuming production CD.");
             }
+
             const candidateSha = process.env.CANDIDATE_SHA;
             const runId = process.env.CI_RUN_ID;
-            const pullNumber = Number(process.env.PROMOTION_PR_NUMBER);
+            const promotionRunId = process.env.PROMOTION_RUN_ID;
             if (!/^[0-9a-f]{40}$/.test(candidateSha || "")) {
               return fail("candidate_sha must be a full lowercase 40-character commit SHA.");
             }
             if (!/^\d+$/.test(runId || "")) {
               return fail("ci_run_id must be numeric.");
             }
-            if (!Number.isSafeInteger(pullNumber) || pullNumber < 1) {
-              return fail("promotion_pr_number must be a positive pull request number.");
+            if (!/^\d+$/.test(promotionRunId || "")) {
+              return fail("promotion_run_id must be numeric.");
+            }
+            const numericCiRunId = Number(runId);
+            const numericPromotionRunId = Number(promotionRunId);
+            if (!Number.isSafeInteger(numericCiRunId) || numericCiRunId < 1
+              || !Number.isSafeInteger(numericPromotionRunId) || numericPromotionRunId < 1) {
+              return fail("ci_run_id and promotion_run_id must be positive safe integers.");
             }
 
             const repository = `${context.repo.owner}/${context.repo.repo}`;
@@ -85,47 +110,44 @@ jobs:
               return fail(`deploy is ${deploy.commit.sha}, not frozen candidate ${candidateSha}.`);
             }
 
-            const pullRequest = (await github.rest.pulls.get({
+            const promotionRun = (await github.rest.actions.getWorkflowRun({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: pullNumber,
+              run_id: numericPromotionRunId,
             })).data;
-            if (!["open", "closed"].includes(pullRequest.state)
-              || pullRequest.base?.ref !== "deploy"
-              || pullRequest.head?.ref !== "main"
-              || pullRequest.head?.repo?.full_name !== repository) {
-              return fail("The supplied PR is not an in-repository main-to-deploy promotion record.");
+            if (promotionRun.name !== "Promote deploy"
+              || promotionRun.path !== ".github/workflows/promote-deploy.yml"
+              || promotionRun.event !== "workflow_dispatch"
+              || promotionRun.head_branch !== "main"
+              || promotionRun.head_sha !== candidateSha
+              || promotionRun.actor?.login?.toLowerCase() !== owner
+              || promotionRun.triggering_actor?.login?.toLowerCase() !== owner
+              || promotionRun.head_repository?.full_name !== repository) {
+              return fail("The supplied promotion run is not an owner-dispatched and owner-triggered Promote deploy run for the frozen candidate.");
             }
-            const reviews = await github.paginate(github.rest.pulls.listReviews, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pullNumber,
-              per_page: 100,
-            });
-            const effectiveByReviewer = new Map();
-            for (const review of reviews) {
-              if (review.user?.type !== "User"
-                || review.user?.login === pullRequest.user?.login
-                || !["OWNER", "MEMBER", "COLLABORATOR"].includes(review.author_association)
-                || !["APPROVED", "CHANGES_REQUESTED", "DISMISSED"].includes(review.state)) {
-                continue;
-              }
-              const previous = effectiveByReviewer.get(review.user.login);
-              if (!previous || review.id > previous.id) {
-                effectiveByReviewer.set(review.user.login, review);
-              }
-            }
-            const effectiveReviews = [...effectiveByReviewer.values()]
-              .filter(review => review.commit_id === candidateSha);
-            if (effectiveReviews.some(review => review.state === "CHANGES_REQUESTED")
-              || !effectiveReviews.some(review => review.state === "APPROVED")) {
-              return fail("The frozen candidate does not have an effective human approval in the promotion PR.");
+            const promotionJobs = await github.paginate(
+              github.rest.actions.listJobsForWorkflowRun,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: numericPromotionRunId,
+                filter: "all",
+                per_page: 100,
+              },
+            );
+            const fastForwardJob = promotionJobs.find(job =>
+              job.name === "promote fast-forward"
+              && job.steps?.some(step =>
+                step.name === "Validate explicit request and fast-forward deploy"
+                && step.conclusion === "success"));
+            if (!fastForwardJob) {
+              return fail("The supplied promotion run has no successful deploy fast-forward step.");
             }
 
             const run = (await github.rest.actions.getWorkflowRun({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              run_id: Number(runId),
+              run_id: numericCiRunId,
             })).data;
             if (run.name !== "CI"
               || run.path !== ".github/workflows/ci.yml"
@@ -159,10 +181,14 @@ jobs:
             }
             core.setOutput("candidate_sha", candidateSha);
             core.setOutput("ci_run_id", String(run.id));
-            core.setOutput("promotion_pr_number", String(pullNumber));
+            core.setOutput("promotion_run_id", String(promotionRun.id));
+            core.setOutput("artifact_name", artifactName);
+            core.setOutput("promotion_run_url", promotionRun.html_url);
+            core.setOutput("fast_forward_job_id", String(fastForwardJob.id));
             await core.summary
               .addHeading("Resume production deployment")
-              .addRaw(`Validated frozen deploy ${candidateSha}, main CI run ${run.id}, PR #${pullNumber}, and ${artifactName}.`)
+              .addRaw(`Validated frozen deploy ${candidateSha}, main CI run ${run.id}, and ${artifactName}.`)
+              .addRaw(` Original promotion: ${promotionRun.html_url}; fast-forward job: ${fastForwardJob.id}.`)
               .write();
 
   production:
@@ -173,42 +199,94 @@ jobs:
     with:
       candidate_sha: ${{ needs.validate.outputs.candidate_sha }}
       ci_run_id: ${{ needs.validate.outputs.ci_run_id }}
-      promotion_pr_number: ${{ needs.validate.outputs.promotion_pr_number }}
+      promotion_run_id: ${{ needs.validate.outputs.promotion_run_id }}
     permissions:
       contents: read
       actions: read
-      pull-requests: read
     secrets: inherit
 
   report:
-    name: report resume result
+    name: record resume result
     needs:
       - validate
       - production
-    if: always() && needs.validate.result == 'success'
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
-      pull-requests: write
     steps:
-      - name: Annotate the frozen promotion PR
+      - name: Record resume evidence and summary
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
-          PROMOTION_PR_NUMBER: ${{ needs.validate.outputs.promotion_pr_number }}
-          CANDIDATE_SHA: ${{ needs.validate.outputs.candidate_sha }}
+          REQUESTED_CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          REQUESTED_CI_RUN_ID: ${{ inputs.ci_run_id }}
+          REQUESTED_PROMOTION_RUN_ID: ${{ inputs.promotion_run_id }}
+          CONFIRM_PRODUCTION: ${{ inputs.confirm_production }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          VALIDATION_RESULT: ${{ needs.validate.result }}
           PRODUCTION_RESULT: ${{ needs.production.result }}
           DEPLOYMENT_STATUS: ${{ needs.production.outputs.deployment_status }}
+          VALIDATED_CANDIDATE_SHA: ${{ needs.validate.outputs.candidate_sha }}
+          VALIDATED_CI_RUN_ID: ${{ needs.validate.outputs.ci_run_id }}
+          VALIDATED_PROMOTION_RUN_ID: ${{ needs.validate.outputs.promotion_run_id }}
+          ARTIFACT_NAME: ${{ needs.validate.outputs.artifact_name }}
+          PROMOTION_RUN_URL: ${{ needs.validate.outputs.promotion_run_url }}
+          FAST_FORWARD_JOB_ID: ${{ needs.validate.outputs.fast_forward_job_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUNNER_TEMP_DIR: ${{ runner.temp }}
         with:
           script: |
-            const succeeded = process.env.PRODUCTION_RESULT === "success"
+            const fs = require("fs");
+            const path = require("path");
+            const succeeded = process.env.VALIDATION_RESULT === "success"
+              && process.env.PRODUCTION_RESULT === "success"
               && process.env.DEPLOYMENT_STATUS === "success";
+            const evidence = {
+              schemaVersion: 1,
+              repository: `${context.repo.owner}/${context.repo.repo}`,
+              event: context.eventName,
+              requestedBy: context.actor,
+              triggeringActor: process.env.TRIGGERING_ACTOR,
+              resumeWorkflowRunId: context.runId,
+              resumeWorkflowRunAttempt: Number(process.env.RUN_ATTEMPT),
+              confirmed: process.env.CONFIRM_PRODUCTION === "true",
+              requestedCandidateSha: process.env.REQUESTED_CANDIDATE_SHA,
+              requestedCiRunId: process.env.REQUESTED_CI_RUN_ID,
+              requestedPromotionRunId: process.env.REQUESTED_PROMOTION_RUN_ID,
+              validatedCandidateSha: process.env.VALIDATED_CANDIDATE_SHA,
+              validatedCiRunId: process.env.VALIDATED_CI_RUN_ID,
+              validatedPromotionRunId: process.env.VALIDATED_PROMOTION_RUN_ID,
+              promotionRunUrl: process.env.PROMOTION_RUN_URL,
+              fastForwardJobId: process.env.FAST_FORWARD_JOB_ID,
+              artifactName: process.env.ARTIFACT_NAME,
+              validationResult: process.env.VALIDATION_RESULT,
+              productionResult: process.env.PRODUCTION_RESULT,
+              deploymentStatus: process.env.DEPLOYMENT_STATUS || "unset",
+              status: succeeded ? "success" : "failure",
+              recordedAt: new Date().toISOString(),
+            };
+            fs.writeFileSync(
+              path.join(process.env.RUNNER_TEMP_DIR, "resume-evidence.json"),
+              `${JSON.stringify(evidence, null, 2)}\n`,
+              { encoding: "utf8", mode: 0o600 },
+            );
             const detail = succeeded
               ? "Production resume completed successfully."
-              : `Production resume did not complete (job=${process.env.PRODUCTION_RESULT}, status=${process.env.DEPLOYMENT_STATUS || "unset"}).`;
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: Number(process.env.PROMOTION_PR_NUMBER),
-              body: `${detail} Frozen candidate: ${process.env.CANDIDATE_SHA}.`,
-            });
+              : `Production resume did not complete (validation=${process.env.VALIDATION_RESULT}, job=${process.env.PRODUCTION_RESULT}, status=${process.env.DEPLOYMENT_STATUS || "unset"}).`;
+            const candidateLabel = process.env.VALIDATED_CANDIDATE_SHA || "not validated";
+            const promotionLabel = process.env.VALIDATED_PROMOTION_RUN_ID || "not validated";
+            await core.summary
+              .addHeading("Resume deploy result")
+              .addRaw(detail)
+              .addRaw(` Candidate: ${candidateLabel}. Promotion run: ${promotionLabel}.`)
+              .write();
+
+      - name: Upload resume evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: production-resume-${{ github.run_id }}
+          path: ${{ runner.temp }}/resume-evidence.json
+          if-no-files-found: error
+          retention-days: 14

@@ -13,8 +13,6 @@ const files = {
     ci: await read(".github/workflows/ci.yml"),
     baseline: await read(".github/workflows/audit-deploy-baseline.yml"),
     deploy: await read(".github/workflows/deploy-production.yml"),
-    eligibility: await read(".github/workflows/deploy-eligibility.yml"),
-    prepare: await read(".github/workflows/prepare-deploy.yml"),
     promote: await read(".github/workflows/promote-deploy.yml"),
     resume: await read(".github/workflows/resume-deploy.yml"),
     rollback: await read(".github/workflows/rollback-production.yml"),
@@ -53,8 +51,6 @@ const workflows = {
     ci: files.ci,
     baseline: files.baseline,
     deploy: files.deploy,
-    eligibility: files.eligibility,
-    prepare: files.prepare,
     promote: files.promote,
     resume: files.resume,
     rollback: files.rollback,
@@ -118,12 +114,16 @@ requireText(files.ci, "cancel-in-progress: true", "CI must cancel superseded run
 requireText(files.packageJson, '"test:deployment-workflows": "node tests/deploy-promotion-workflows.test.js"', "npm test must expose executable promotion behavior checks.")
 requireText(files.packageJson, "npm run test:deployment-workflows", "The full npm test chain must run promotion behavior checks.")
 for (const token of [
-    '"unapproved PR"',
-    '"stale main SHA"',
+    '"non-owner requester"',
+    '"non-owner rerunner"',
+    '"missing confirmation"',
+    '"dispatch SHA mismatch"',
+    '"candidate removed from main"',
+    '"deploy race"',
     '"missing artifact"',
-    '"non-main CI"',
-    '"non-fast-forward update"',
-    "assert.equal(result.updateCalls.length, 0",
+    '"non-fast-forward candidate"',
+    '"ruleset rejects update"',
+    "assert.equal(result.updateCalls.length, expectedUpdates",
 ]) {
     requireText(files.promotionWorkflowTest, token, `Executable promotion behavior coverage is missing: ${token}`)
 }
@@ -190,23 +190,21 @@ assert.match(
 
 const deployTriggers = section(files.deploy, "on:", "\npermissions:")
 const deployPermissions = section(files.deploy, "permissions:", "\nconcurrency:")
-const deployPushTrigger = section(deployTriggers, "  push:", "\n  workflow_call:")
 const reusableDeploy = section(deployTriggers, "  workflow_call:", "\n  workflow_dispatch:")
-assert.match(deployPushTrigger, /^\s*- deploy\s*$/m, "Production CD push events must come from deploy.")
-assert.doesNotMatch(deployPushTrigger, /^\s*- main\s*$/m, "A main push must never trigger production CD.")
-assert.doesNotMatch(deployTriggers, /workflow_run:/, "The retired main workflow_run trigger must remain disabled.")
-requireText(deployPermissions, "pull-requests: read", "Direct deploy push validation must be able to read its approval record.")
+assert.doesNotMatch(deployTriggers, /(?:^|\n)\s*(?:push|pull_request|pull_request_review|workflow_run):/, "Production CD must not have an event-driven deploy path.")
+assert.doesNotMatch(deployPermissions, /pull-requests:\s*(?:read|write)/, "Production CD must not receive pull-request permissions.")
+assert.doesNotMatch(files.deploy, /github\.rest\.pulls\.|github\.rest\.issues\.|promotion_pr_number/i, "Production CD must not depend on PR records.")
 
 const reusableCandidateInput = section(reusableDeploy, "      candidate_sha:", "\n      ci_run_id:")
-const reusableRunInput = section(reusableDeploy, "      ci_run_id:", "\n      promotion_pr_number:")
-const reusablePromotionInput = section(reusableDeploy, "      promotion_pr_number:", "\n    outputs:")
+const reusableRunInput = section(reusableDeploy, "      ci_run_id:", "\n      promotion_run_id:")
+const reusablePromotionInput = section(reusableDeploy, "      promotion_run_id:", "\n      operation_mode:")
 const reusableOperationInput = section(reusableDeploy, "      operation_mode:", "\n    outputs:")
 for (const [inputName, input] of [["candidate_sha", reusableCandidateInput], ["ci_run_id", reusableRunInput]]) {
     requireText(input, "required: true", `Reusable deployment input ${inputName} must be required.`)
     requireText(input, "type: string", `Reusable deployment input ${inputName} must be a string.`)
 }
-requireText(reusablePromotionInput, "required: false", "The promotion PR number must remain optional for direct deploy recovery.")
-requireText(reusablePromotionInput, "type: string", "The reusable promotion PR number must be a string.")
+requireText(reusablePromotionInput, "required: false", "The promotion run ID must remain optional for audit/dry-run callers.")
+requireText(reusablePromotionInput, "type: string", "The reusable promotion run ID must be a string.")
 requireText(reusableOperationInput, "required: false", "The internal operation mode must remain optional for normal promotion.")
 requireText(reusableOperationInput, "default: deploy", "Normal reusable calls must default to deploy mode.")
 requireText(reusableOperationInput, "type: string", "The internal operation mode must be a string.")
@@ -252,11 +250,6 @@ requireText(
 )
 assert.match(
     preflight,
-    /github\.event_name == 'push'[\s\S]*github\.ref == 'refs\/heads\/deploy'[\s\S]*!endsWith\(github\.actor, '\[bot\]'\)[\s\S]*vars\.PRODUCTION_CD_ENABLED == 'true'/,
-    "Direct production push handling must require deploy, a non-bot actor, and the production feature gate.",
-)
-assert.match(
-    preflight,
     /inputs\.candidate_sha != '' && inputs\.ci_run_id != ''/,
     "Reusable production calls must supply both the frozen candidate and successful main CI run.",
 )
@@ -279,33 +272,30 @@ for (const token of [
     "@refs/heads/${caller.ref}",
     '/^[0-9a-f]{40}$/.test(candidateSha)',
     '/^\\d+$/.test(runId)',
+    'promotionRun.name !== "Promote deploy"',
+    'promotionRun.path !== ".github/workflows/promote-deploy.yml"',
+    'promotionRun.event !== "workflow_dispatch"',
+    'promotionRun.head_branch !== "main"',
+    "promotionRun.head_sha !== candidateSha",
+    "promotionRun.triggering_actor?.login",
+    "promotionRunId !== currentRunId",
+    "String(promotionRun.run_attempt) !== currentRunAttempt",
+    "sameLogin(promotionActor, repositoryOwner)",
+    "sameLogin(promotionTriggeringActor, repositoryOwner)",
     'process.env.PRODUCTION_CD_ENABLED !== "false"',
     'process.env.PRODUCTION_CD_ENABLED !== "true"',
 ]) {
     requireText(preflight, token, `Reusable deployment caller validation is missing: ${token}`)
 }
-requireText(preflight, 'context.ref !== "refs/heads/deploy"', "Direct and manual CD entry points must reject other refs.")
-requireText(preflight, 'context.actor.endsWith("[bot]")', "Bot pushes must not duplicate a reusable promotion deployment.")
+requireText(preflight, 'context.ref !== "refs/heads/deploy"', "Manual audit/dry-run must reject non-deploy refs.")
 for (const token of [
-    "context.payload.deleted",
-    "context.payload.forced",
-    'base: context.payload.before',
-    "head: context.sha",
-    'pushComparison.status !== "ahead" || pushComparison.ahead_by < 1',
-    "github.rest.pulls.list",
-    'state: "all"',
-    'base: "deploy"',
-    'head: `${context.repo.owner}:main`',
-    "pullRequest.head?.sha === candidateSha",
-    'pullRequest.head?.ref === "main"',
-    'pullRequest.base?.ref === "deploy"',
-    "github.rest.pulls.listReviews",
-    ".filter(review => review.commit_id === candidateSha)",
-    'review.state === "CHANGES_REQUESTED"',
-    'review.state === "APPROVED"',
-    "if (!approvedPull)",
+    "CURRENT_ACTOR: ${{ github.actor }}",
+    "CURRENT_TRIGGERING_ACTOR: ${{ github.triggering_actor }}",
+    "REPOSITORY_OWNER: ${{ github.repository_owner }}",
+    "sameLogin(currentActor, repositoryOwner)",
+    "sameLogin(currentTriggeringActor, repositoryOwner)",
 ]) {
-    requireText(preflight, token, `Direct deploy push fast-forward gate is missing: ${token}`)
+    requireText(preflight, token, `Production owner authorization is missing: ${token}`)
 }
 requireText(preflight, 'branch: "deploy"', "Production preflight must resolve the frozen deploy branch.")
 requireText(preflight, "if (!branch.protected)", "Production preflight must reject an unprotected deploy branch.")
@@ -421,6 +411,11 @@ const baselineValidation = section(files.baseline, "  validate:", "\n  productio
 const baselineCall = section(files.baseline, "  production:")
 for (const token of [
     'context.ref !== "refs/heads/main"',
+    "REPOSITORY_OWNER: ${{ github.repository_owner }}",
+    "WORKFLOW_ACTOR: ${{ github.actor }}",
+    "WORKFLOW_TRIGGERING_ACTOR: ${{ github.triggering_actor }}",
+    "sameLogin(actor, owner)",
+    "sameLogin(triggeringActor, owner)",
     'process.env.PRODUCTION_CD_ENABLED !== "false"',
     'getBranch("main")',
     'getBranch("deploy")',
@@ -454,319 +449,209 @@ for (const token of [
     requireText(baselineCall, token, `Baseline reusable deployment call is missing: ${token}`)
 }
 
-const prepareTriggers = section(files.prepare, "on:", "\npermissions:")
-requireText(prepareTriggers, "workflow_dispatch:", "Prepare deploy must be an explicit manual operation.")
-assert.doesNotMatch(prepareTriggers, /\b(?:push|pull_request|workflow_call|workflow_run):/, "Prepare deploy must not run automatically.")
-assert.doesNotMatch(files.prepare, /\benvironment:|secrets\./, "Preparing an approval record must not access production.")
-assert.doesNotMatch(files.prepare, /git\.updateRef|pulls\.merge/, "Prepare deploy must not move or merge a branch.")
-for (const token of [
-    'context.ref !== "refs/heads/main"',
-    'getBranch("main")',
-    'getBranch("deploy")',
-    "deploy.commit.sha === main.commit.sha",
-    "base: deploy.commit.sha",
-    "head: main.commit.sha",
-    'comparison.status !== "ahead" || comparison.ahead_by < 1',
-    'workflow_id: "ci.yml"',
-    'branch: "main"',
-    "head_sha: main.commit.sha",
-    'status: "success"',
-    'candidate.path === ".github/workflows/ci.yml"',
-    "candidate.head_sha === main.commit.sha",
-    "candidate.head_repository?.full_name === repository",
-    "github.rest.actions.listWorkflowRunArtifacts",
-    "candidate.name === artifactName",
-    "!candidate.expired",
-    "candidate.size_in_bytes > 0",
-    "latestMain.commit.sha !== main.commit.sha",
-    "latestDeploy.commit.sha !== deploy.commit.sha",
-    "!latestMain.protected",
-    "!latestDeploy.protected",
-    "github.rest.pulls.list",
-    'state: "open"',
-    'base: "deploy"',
-    'head: `${context.repo.owner}:main`',
-    "existing.length > 1",
-    "github.rest.pulls.update",
-    "github.rest.pulls.create",
-    'head: "main"',
-    'base: "deploy"',
-    "maintainer_can_modify: false",
-    "Do not merge this PR in the GitHub UI.",
-]) {
-    requireText(files.prepare, token, `Prepare-deploy approval contract is missing: ${token}`)
+const promoteTriggers = section(files.promote, "on:", "\npermissions:")
+const promoteDispatch = section(promoteTriggers, "  workflow_dispatch:")
+assert.doesNotMatch(
+    promoteTriggers,
+    /(?:^|\n)\s*(?:push|pull_request|pull_request_review|workflow_run):/,
+    "Promote deploy must only support explicit workflow_dispatch.",
+)
+const promoteCandidateInput = section(promoteDispatch, "      candidate_sha:", "\n      confirm_production:")
+const promoteConfirmationInput = section(promoteDispatch, "      confirm_production:")
+requireText(promoteCandidateInput, "required: true", "Explicit promotion must require candidate_sha.")
+requireText(promoteCandidateInput, "type: string", "candidate_sha must be a string.")
+for (const token of ["required: true", "default: false", "type: boolean"]) {
+    requireText(promoteConfirmationInput, token, "Explicit promotion confirmation contract is incomplete: " + token)
 }
 
-const newPromotionArchitecture = files.promote.includes("actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349")
-    && files.eligibility.includes("name: Deploy eligibility")
-if (newPromotionArchitecture) {
-    const eligibilityWorkflow = files.eligibility
-    const promoteTriggers = section(files.promote, "on:", "\npermissions:")
-    const promotionPreflight = section(files.promote, "  promotion_preflight:", "\n  promote:")
-    const promotion = section(files.promote, "  promote:", "\n  production:")
-    const successfulPromotionReport = section(files.promote, "  report-success:", "\n  report-failure:")
-    requireText(eligibilityWorkflow, "pull_request_review:", "Eligibility must run on promotion reviews.")
-    requireText(eligibilityWorkflow, "name: eligibility", "Eligibility must expose the stable required check name.")
-    requireText(eligibilityWorkflow, "github.rest.pulls.listReviews", "Eligibility must verify human review state.")
-    requireText(eligibilityWorkflow, "github.rest.actions.listWorkflowRuns", "Eligibility must bind to main CI.")
-    requireText(eligibilityWorkflow, "github.rest.actions.listWorkflowRunArtifacts", "Eligibility must bind to the exact artifact.")
-    assert.doesNotMatch(eligibilityWorkflow, /contents:\s*write|secrets\.|git\.updateRef/, "Eligibility must remain read-only.")
-    requireText(promoteTriggers, "workflow_run:", "Promotion must consume the eligibility workflow result.")
-    requireText(promoteTriggers, "Deploy eligibility", "Promotion must be tied to the named eligibility workflow.")
-    requireText(promoteTriggers, "workflow_dispatch:", "Promotion must retain an explicit retry entry point.")
-    requireText(files.promote, "context.payload.workflow_run?.head_sha", "Promotion must bind workflow_run to its candidate SHA.")
-    requireText(files.promote, "context.payload.workflow_run?.pull_requests?.[0]?.number", "Promotion must resolve the promotion PR from workflow_run.")
-    requireText(files.promote, "actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349", "Promotion must mint a pinned GitHub App token.")
-    requireText(files.promote, "secrets.DEPLOY_PROMOTER_APP_ID", "Promotion App ID secret is missing.")
-    requireText(files.promote, "secrets.DEPLOY_PROMOTER_PRIVATE_KEY", "Promotion App private-key secret is missing.")
-    requireText(files.promote, "permission-actions: read", "Promotion App token must scope Actions to read.")
-    requireText(files.promote, "permission-contents: write", "Promotion App token must scope Contents to write.")
-    requireText(files.promote, "permission-pull-requests: read", "Promotion App token must scope Pull requests to read.")
-    requireText(files.promote, "github-token: ${{ steps.app-token.outputs.token }}", "Branch writes must use the App token.")
-    requireText(files.promote, "github.rest.git.updateRef", "Promotion must update deploy through the GitHub API.")
-    requireText(files.promote, "force: false", "Promotion must never force-update deploy.")
-    assert.doesNotMatch(files.promote, /force:\s*true|pulls\.merge/, "Promotion must not force-update or merge the PR.")
-    requireText(files.promote, "cancel-in-progress: false", "A running production promotion must not be cancelled.")
-    for (const [output, expression] of [
-        ["candidate_sha", 'core.setOutput("candidate_sha", main.commit.sha)'],
-        ["deploy_sha", 'core.setOutput("deploy_sha", deploy.commit.sha)'],
-        ["ci_run_id", 'core.setOutput("ci_run_id", String(run.id))'],
-        ["artifact_name", 'core.setOutput("artifact_name", artifactName)'],
-        ["promotion_pr_number", 'core.setOutput("promotion_pr_number", String(pullNumber))'],
-    ]) {
-        requireText(
-            promotionPreflight,
-            `${output}: ` + "${{ steps.validate.outputs." + output + " }}",
-            `Promotion preflight must expose ${output}.`,
-        )
-        requireText(promotionPreflight, expression, `Promotion preflight must set ${output}.`)
-        requireText(
-            promotion,
-            "needs.promotion_preflight.outputs." + output,
-            `Promotion must consume validated ${output}.`,
-        )
-    }
-    requireText(promotion, "workflowRunSha !== expectedCandidateSha", "Automatic promotion must bind the eligibility SHA to preflight.")
-    requireText(promotion, "main.commit.sha !== expectedCandidateSha", "Promotion must re-check the preflight main SHA.")
-    requireText(promotion, "deploy.commit.sha !== expectedDeploySha", "Promotion must re-check the preflight deploy SHA.")
-    requireText(promotion, "String(candidate.id) === expectedCiRunId", "Promotion must use the preflight CI run.")
-    requireText(promotion, "artifactName !== expectedArtifactName", "Promotion must use the preflight artifact name.")
-    assert.doesNotMatch(
-        promotion,
-        /REQUESTED_PR_NUMBER:\s*\$\{\{\s*inputs\.pr_number/,
-        "Promotion must not read the manual-only PR input after preflight.",
-    )
-    assert.doesNotMatch(
-        promotion,
-        /github\.rest\.(?:pulls\.update|issues\.createComment)/,
-        "The least-privilege App token must not perform PR writes.",
-    )
-    requireText(successfulPromotionReport, "github.rest.pulls.update", "The workflow token must close a still-open promotion record after success.")
-    requireText(files.promote, "promotion-evidence.json", "Promotion evidence must be retained.")
-    requireText(files.promote, "secrets: inherit", "Production reusable workflow must inherit its protected secrets.")
-} else {
-const promoteTriggers = section(files.promote, "on:", "\npermissions:")
-const promotionEvents = section(promoteTriggers, "  pull_request:", "\n  workflow_dispatch:")
-for (const token of ["pull_request:", "pull_request_review:", "opened", "synchronize", "reopened", "ready_for_review", "submitted", "dismissed", "- deploy"]) {
-    requireText(promotionEvents, token, `Promotion eligibility trigger is missing: ${token}`)
-}
-const promoteDispatch = section(promoteTriggers, "  workflow_dispatch:")
-for (const token of ["pr_number:", "required: true", "type: number"]) {
-    requireText(promoteDispatch, token, `Promotion dispatch contract is missing: ${token}`)
-}
-const promotePermissions = section(files.promote, "permissions:", "\njobs:")
-requireText(promotePermissions, "contents: read", "Promotion must default to read-only repository access.")
-assert.doesNotMatch(promotePermissions, /contents:\s*write/, "Only the explicit promotion job may write deploy.")
+const promotePermissions = section(files.promote, "permissions:", "\nconcurrency:")
+requireText(promotePermissions, "contents: read", "Promotion must default to read-only Contents.")
+requireText(promotePermissions, "actions: read", "Promotion must default to read-only Actions.")
+assert.doesNotMatch(promotePermissions, /contents:\s*write|pull-requests:/, "Default promotion permissions must remain read-only.")
+requireText(files.promote, "group: deploy-promotion-write", "Promotion must hold the repository-wide promotion lock.")
+requireText(files.promote, "cancel-in-progress: false", "A frozen promotion must not be cancelled by later main work.")
+assert.doesNotMatch(
+    files.promote,
+    /pull_request|pull-requests:|github\.rest\.(?:pulls|issues)\.|promotion_pr/i,
+    "Explicit promotion must not depend on PRs, reviews, or PR permissions.",
+)
 
 const eligibility = section(files.promote, "  eligibility:", "\n  promote:")
 const promotion = section(files.promote, "  promote:", "\n  production:")
 const promotedDeployment = section(files.promote, "  production:", "\n  report-success:")
 const successfulPromotionReport = section(files.promote, "  report-success:", "\n  report-failure:")
 const reportPromotionFailure = section(files.promote, "  report-failure:")
-requireText(
-    eligibility,
-    "'ignored non-deploy review' || 'eligibility'",
-    "Skipped reviews for unrelated PRs must not create a passing eligibility check context.",
-)
-assert.match(
-    eligibility,
-    /github\.event_name == 'pull_request'[\s\S]*\|\|[\s\S]*github\.event_name == 'pull_request_review'/,
-    "PR and review events must perform eligibility checks only.",
-)
-assert.doesNotMatch(eligibility, /contents:\s*write|git\.updateRef|uses:\s*\.\//, "Eligibility checks must remain read-only.")
-requireText(eligibility, "github.event_name == 'workflow_dispatch'", "Manual promotion dispatch must run the real eligibility job.")
-requireText(promotion, "needs: eligibility", "The write job must depend on the successful eligibility check.")
-requireText(promotion, "needs.eligibility.result == 'success'", "Only successful eligibility may advance deploy.")
-requireText(promotion, "contents: write", "The promotion job needs narrowly scoped branch-write permission.")
-assert.doesNotMatch(files.promote, /force:\s*true|pulls\.merge/, "Promotion must never force-update or merge the approval PR.")
-assert.doesNotMatch(files.promote, /\benvironment:|secrets\./, "Promotion and eligibility must not access production secrets.")
-requireText(files.promote, "github.event_name == 'workflow_dispatch' && 'deploy-promotion-write'", "Promotion dispatch must hold the workflow-wide write lock.")
-requireText(files.promote, "cancel-in-progress: false", "A running production promotion must not be cancelled.")
-
-for (const [label, contents] of [["eligibility", eligibility], ["promotion", promotion]]) {
-    for (const token of [
-        "github.rest.pulls.get",
-        'pullRequest.state !== "open"',
-        "pullRequest.draft",
-        'pullRequest.base?.ref !== "deploy"',
-        'pullRequest.head?.ref !== "main"',
-        "pullRequest.head?.repo?.full_name !== repository",
-        "github.rest.pulls.listReviews",
-        ".filter(review => review.commit_id ===",
-        'review.user?.type !== "User"',
-        "review.user?.login === pullRequest.user?.login",
-        '["OWNER", "MEMBER", "COLLABORATOR"].includes(review.author_association)',
-        'review.state === "CHANGES_REQUESTED"',
-        'review.state === "APPROVED"',
-        'getBranch("main")',
-        'getBranch("deploy")',
-        "!main.protected || !deploy.protected",
-        "pullRequest.head.sha !== main.commit.sha",
-        "pullRequest.base.sha !== deploy.commit.sha",
-        "base: deploy.commit.sha",
-        "head: main.commit.sha",
-        'comparison.status !== "ahead" || comparison.ahead_by < 1',
-        "github.rest.actions.listWorkflowRuns",
-        'workflow_id: "ci.yml"',
-        'branch: "main"',
-        "head_sha: main.commit.sha",
-        'status: "success"',
-        'candidate.path === ".github/workflows/ci.yml"',
-        "candidate.head_sha === main.commit.sha",
-        "candidate.head_repository?.full_name === repository",
-        "github.rest.actions.listWorkflowRunArtifacts",
-        "artifact.name === artifactName",
-        "!artifact.expired",
-        "artifact.size_in_bytes > 0",
-    ]) {
-        requireText(contents, token, `Promote-deploy ${label} contract is missing: ${token}`)
-    }
-}
+assert.doesNotMatch(eligibility, /secrets\.|create-github-app-token|git\.updateRef|\benvironment:/, "Eligibility must remain secretless and read-only.")
 for (const token of [
+    'context.eventName !== "workflow_dispatch"',
     'context.ref !== "refs/heads/main"',
+    "REQUESTED_BY: ${{ github.actor }}",
+    "TRIGGERING_ACTOR: ${{ github.triggering_actor }}",
+    "sameLogin(requestedBy, owner)",
+    "sameLogin(triggeringActor, owner)",
+    'process.env.CONFIRM_PRODUCTION !== "true"',
     'process.env.PRODUCTION_CD_ENABLED !== "true"',
-    "finalPullRequest.head.sha !== main.commit.sha",
-    "finalPullRequest.base.sha !== deploy.commit.sha",
-    "finalMain.commit.sha !== main.commit.sha",
-    "finalDeploy.commit.sha !== deploy.commit.sha",
-    "!finalMain.protected",
-    "!finalDeploy.protected",
-    "getArtifacts()",
+    '/^[0-9a-f]{40}$/.test(candidateSha)',
+    "context.sha !== candidateSha",
+    'getBranch("main")',
+    'getBranch("deploy")',
+    "!main.protected || !deploy.protected",
+    "base: candidateSha",
+    "head: mainSha",
+    'comparison.status !== "ahead" || comparison.ahead_by < 1',
+    "deploy.commit.sha === candidateSha",
+    "base: deploy.commit.sha",
+    "head: candidateSha",
+    'deployComparison.status !== "ahead" || deployComparison.ahead_by < 1',
+    "github.rest.actions.listWorkflowRuns",
+    'workflow_id: "ci.yml"',
+    'branch: "main"',
+    "head_sha: candidateSha",
+    'status: "success"',
+    'candidate.path === ".github/workflows/ci.yml"',
+    'candidate.head_sha === candidateSha',
+    "candidate.head_repository?.full_name === repository",
+    "github.rest.actions.listWorkflowRunArtifacts",
+    "candidate.name === artifactName",
+    "!candidate.expired",
+    "candidate.size_in_bytes > 0",
+    "latestDeploy.commit.sha !== deploy.commit.sha",
+]) {
+    requireText(eligibility, token, "Promotion eligibility contract is missing: " + token)
+}
+for (const output of ["candidate_sha", "deploy_sha", "ci_run_id", "artifact_name", "requested_by", "promotion_run_id"]) {
+    requireText(eligibility, 'core.setOutput("' + output + '"', "Eligibility output is missing: " + output)
+}
+
+requireText(promotion, "needs: eligibility", "Promotion write job must depend on eligibility.")
+requireText(promotion, "needs.eligibility.result == 'success'", "Only successful eligibility may advance deploy.")
+requireText(promotion, "actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349", "Promotion must mint the pinned App token.")
+for (const token of [
+    "secrets.DEPLOY_PROMOTER_APP_ID",
+    "secrets.DEPLOY_PROMOTER_PRIVATE_KEY",
+    "permission-actions: read",
+    "permission-contents: write",
+    "PROMOTER_INSTALLATION_ID: ${{ steps.app-token.outputs.installation-id }}",
+    "PROMOTER_APP_SLUG: ${{ steps.app-token.outputs.app-slug }}",
+    "github-token: ${{ steps.app-token.outputs.token }}",
+]) {
+    requireText(promotion, token, "Promotion App-token contract is missing: " + token)
+}
+assert.doesNotMatch(promotion, /permission-pull-requests|github-token:\s*\${{\s*github\.token/, "The branch write must use only the least-privilege App token.")
+for (const token of [
+    'context.eventName !== "workflow_dispatch"',
+    'context.ref !== "refs/heads/main"',
+    "expectedPromotionRunId !== String(context.runId)",
+    "context.sha !== candidateSha",
+    "deploy.commit.sha !== expectedDeploySha",
+    "base: candidateSha",
+    "head: mainSha",
+    "base: deploy.commit.sha",
+    "head: candidateSha",
+    "String(run.id) !== expectedCiRunId",
+    'run.path !== ".github/workflows/ci.yml"',
+    'run.head_branch !== "main"',
+    "run.head_sha !== candidateSha",
+    "run.head_repository?.full_name !== repository",
+    "candidate.name === expectedArtifactName",
+    "!candidate.expired",
+    "candidate.size_in_bytes > 0",
+    "finalDeploy.commit.sha !== expectedDeploySha",
     "github.rest.git.updateRef",
     'ref: "heads/deploy"',
-    "sha: main.commit.sha",
+    "sha: candidateSha",
     "force: false",
-    "liveDeploy.commit.sha !== main.commit.sha",
-    'core.setOutput("candidate_sha", main.commit.sha)',
-    'core.setOutput("ci_run_id", String(run.id))',
-    'core.setOutput("pr_number", String(pullNumber))',
+    "liveDeploy.commit.sha !== candidateSha",
+    'core.setOutput("previous_deploy_sha", expectedDeploySha)',
+    'core.setOutput("artifact_name", expectedArtifactName)',
+    'type: "workflow_dispatch"',
+    "appSlug: promoterAppSlug",
+    "installationId: Number(promoterInstallationId)",
+    "resultingDeploySha: liveDeploy.commit.sha",
     'path.join(process.env.RUNNER_TEMP, "promotion-evidence.json")',
-    'updateMode: "fast-forward"',
-    "force: false",
-    "github.rest.pulls.update",
-    'state: "closed"',
-    "indirectlyMerged: Boolean(promotionRecord.merged_at)",
-    "effectiveReviews: finalReviews.map",
-    "reviewer: review.user.login",
-    "reviewId: review.id",
-    "commitSha: review.commit_id",
-    "submittedAt: review.submitted_at",
-    "authorAssociation: review.author_association",
 ]) {
-    requireText(promotion, token, `Promotion write contract is missing: ${token}`)
+    requireText(promotion, token, "Promotion write contract is missing: " + token)
 }
-const promotionEvidenceUpload = section(promotion, "      - name: Upload promotion evidence")
-for (const token of [
-    "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
-    "promotion-evidence.json",
-    "if-no-files-found: error",
-    "retention-days: 14",
-]) {
-    requireText(promotionEvidenceUpload, token, `Promotion evidence upload is missing: ${token}`)
-}
-for (const [label, contents, shaExpression] of [
-    ["eligibility", eligibility, "pullRequest.head.sha"],
-    ["promotion", promotion, "headSha"],
-    ["resume", files.resume, "candidateSha"],
-]) {
-    const latestReviewIndex = contents.indexOf("effectiveByReviewer.set")
-    const shaFilterIndex = contents.indexOf(`.filter(review => review.commit_id === ${shaExpression})`)
-    assert.ok(latestReviewIndex >= 0, `${label} must select each human reviewer's latest state.`)
-    assert.ok(
-        shaFilterIndex > latestReviewIndex,
-        `${label} must select the latest reviewer state before binding it to the candidate SHA.`,
-    )
-}
+assert.doesNotMatch(files.promote, /force:\s*true|pulls\.merge/, "Promotion must never force-update or merge a PR.")
+
 for (const token of [
     "needs.promote.result == 'success'",
-    `uses: ${expectedLocalWorkflowRef}`,
+    "uses: " + expectedLocalWorkflowRef,
     "candidate_sha: ${{ needs.promote.outputs.candidate_sha }}",
     "ci_run_id: ${{ needs.promote.outputs.ci_run_id }}",
-    "promotion_pr_number: ${{ needs.promote.outputs.pr_number }}",
+    "promotion_run_id: ${{ needs.promote.outputs.promotion_run_id }}",
     "secrets: inherit",
 ]) {
-    requireText(promotedDeployment, token, `Promoted deployment call is missing: ${token}`)
+    requireText(promotedDeployment, token, "Promoted deployment call is missing: " + token)
 }
 for (const token of [
     "needs.production.result == 'success'",
     "needs.production.outputs.deployment_status == 'success'",
-    "github.rest.issues.createComment",
-    "The promotion record is complete.",
+    "Production deployment succeeded.",
 ]) {
-    requireText(successfulPromotionReport, token, `Successful promotion reporting contract is missing: ${token}`)
+    requireText(successfulPromotionReport, token, "Successful promotion reporting contract is missing: " + token)
 }
 for (const token of [
     "needs.production.result != 'success'",
     "needs.production.outputs.deployment_status != 'success'",
-    "deploy remains frozen; use Resume deploy",
+    "deploy remains frozen for Resume deploy",
+    "candidate_sha",
+    "ci_run_id",
+    "promotion_run_id",
 ]) {
-    requireText(reportPromotionFailure, token, `Failed promotion reporting contract is missing: ${token}`)
-}
-
+    requireText(reportPromotionFailure, token, "Failed promotion reporting contract is missing: " + token)
 }
 
 const resumeTriggers = section(files.resume, "on:", "\npermissions:")
-requireText(resumeTriggers, "workflow_dispatch:", "Resume deploy must be manually dispatched.")
-assert.doesNotMatch(resumeTriggers, /\b(?:push|pull_request|workflow_call|workflow_run):/, "Resume deploy must not run automatically.")
+requireText(resumeTriggers, "workflow_dispatch:", "Resume deploy must be explicitly dispatched.")
+assert.doesNotMatch(resumeTriggers, /(?:^|\n)\s*(?:push|pull_request|workflow_call|workflow_run):/, "Resume deploy must not run automatically.")
 const resumeCandidateInput = section(resumeTriggers, "      candidate_sha:", "\n      ci_run_id:")
-const resumeRunInput = section(resumeTriggers, "      ci_run_id:", "\n      promotion_pr_number:")
-const resumePromotionInput = section(resumeTriggers, "      promotion_pr_number:")
-for (const [inputName, input, type] of [
-    ["candidate_sha", resumeCandidateInput, "string"],
-    ["ci_run_id", resumeRunInput, "string"],
-    ["promotion_pr_number", resumePromotionInput, "number"],
+const resumeRunInput = section(resumeTriggers, "      ci_run_id:", "\n      promotion_run_id:")
+const resumePromotionInput = section(resumeTriggers, "      promotion_run_id:", "\n      confirm_production:")
+const resumeConfirmationInput = section(resumeTriggers, "      confirm_production:")
+for (const [inputName, input] of [
+    ["candidate_sha", resumeCandidateInput],
+    ["ci_run_id", resumeRunInput],
+    ["promotion_run_id", resumePromotionInput],
 ]) {
-    requireText(input, "required: true", `Resume input ${inputName} must be required.`)
-    requireText(input, `type: ${type}`, `Resume input ${inputName} must use type ${type}.`)
+    requireText(input, "required: true", "Resume input " + inputName + " must be required.")
+    requireText(input, "type: string", "Resume input " + inputName + " must be a string.")
 }
-assert.doesNotMatch(files.resume, /\benvironment:|secrets\.|git\.updateRef|contents:\s*write/, "Resume must validate and call CD without direct production or branch-write access.")
+for (const token of ["required: true", "default: false", "type: boolean"]) {
+    requireText(resumeConfirmationInput, token, "Resume confirmation contract is incomplete: " + token)
+}
+assert.doesNotMatch(files.resume, /\benvironment:|secrets\.|git\.updateRef|contents:\s*write|pull-requests:|github\.rest\.(?:pulls|issues)\.|promotion_pr/i, "Resume must validate and call CD without direct secrets, branch writes, or PR access.")
 requireText(files.resume, "group: deploy-promotion-write", "Resume must hold the promotion lock for its entire deployment call.")
 requireText(files.resume, "cancel-in-progress: false", "A running frozen-candidate resume must not be cancelled.")
 const resumeValidation = section(files.resume, "  validate:", "\n  production:")
 const resumedDeployment = section(files.resume, "  production:", "\n  report:")
 const resumeReport = section(files.resume, "  report:")
 for (const token of [
+    "TRIGGERING_ACTOR: ${{ github.triggering_actor }}",
+    "requestedBy !== owner || triggeringActor !== owner",
+    'process.env.CONFIRM_PRODUCTION !== "true"',
     'context.ref !== "refs/heads/deploy"',
     'process.env.PRODUCTION_CD_ENABLED !== "true"',
     '/^[0-9a-f]{40}$/.test(candidateSha || "")',
     '/^\\d+$/.test(runId || "")',
-    "Number.isSafeInteger(pullNumber)",
+    '/^\\d+$/.test(promotionRunId || "")',
     'getBranch("deploy")',
     "context.sha !== deploy.commit.sha",
     "deploy.commit.sha !== candidateSha",
     "if (!deploy.protected)",
-    "github.rest.pulls.get",
-    'pullRequest.base?.ref !== "deploy"',
-    'pullRequest.head?.ref !== "main"',
-    "pullRequest.head?.repo?.full_name !== repository",
-    "github.rest.pulls.listReviews",
-    ".filter(review => review.commit_id === candidateSha)",
-    'review.user?.type !== "User"',
-    "review.user?.login === pullRequest.user?.login",
-    '["OWNER", "MEMBER", "COLLABORATOR"].includes(review.author_association)',
-    'review.state === "CHANGES_REQUESTED"',
-    'review.state === "APPROVED"',
     "github.rest.actions.getWorkflowRun",
+    'promotionRun.name !== "Promote deploy"',
+    'promotionRun.path !== ".github/workflows/promote-deploy.yml"',
+    'promotionRun.event !== "workflow_dispatch"',
+    'promotionRun.head_branch !== "main"',
+    "promotionRun.head_sha !== candidateSha",
+    "promotionRun.actor?.login?.toLowerCase() !== owner",
+    "promotionRun.triggering_actor?.login?.toLowerCase() !== owner",
+    "promotionRun.head_repository?.full_name !== repository",
+    "github.rest.actions.listJobsForWorkflowRun",
+    'job.name === "promote fast-forward"',
+    'step.name === "Validate explicit request and fast-forward deploy"',
+    'step.conclusion === "success"',
     'run.path !== ".github/workflows/ci.yml"',
     'run.head_branch !== "main"',
     "run.head_sha !== candidateSha",
@@ -778,39 +663,74 @@ for (const token of [
     "finalDeploy.commit.sha !== candidateSha || !finalDeploy.protected",
     'core.setOutput("candidate_sha", candidateSha)',
     'core.setOutput("ci_run_id", String(run.id))',
-    'core.setOutput("promotion_pr_number", String(pullNumber))',
+    'core.setOutput("promotion_run_id", String(promotionRun.id))',
 ]) {
-    requireText(resumeValidation, token, `Resume-deploy frozen candidate contract is missing: ${token}`)
+    requireText(resumeValidation, token, "Resume frozen-candidate contract is missing: " + token)
 }
+assert.doesNotMatch(resumeValidation, /getBranch\("main"\)|deploy-promotion-\$\{\{/, "Resume must not depend on current main or promotion evidence upload.")
+
 for (const token of [
     "needs.validate.result == 'success'",
-    `uses: ${expectedLocalWorkflowRef}`,
+    "uses: " + expectedLocalWorkflowRef,
     "candidate_sha: ${{ needs.validate.outputs.candidate_sha }}",
     "ci_run_id: ${{ needs.validate.outputs.ci_run_id }}",
-    "promotion_pr_number: ${{ needs.validate.outputs.promotion_pr_number }}",
+    "promotion_run_id: ${{ needs.validate.outputs.promotion_run_id }}",
     "secrets: inherit",
 ]) {
-    requireText(resumedDeployment, token, `Resumed deployment call is missing: ${token}`)
+    requireText(resumedDeployment, token, "Resumed deployment call is missing: " + token)
 }
-requireText(resumeReport, "if: always() && needs.validate.result == 'success'", "Resume outcomes must always be recorded after validation.")
-requireText(resumeReport, "needs.production.outputs.deployment_status", "Resume reporting must consume the reusable deployment status.")
+for (const token of [
+    "if: always()",
+    "needs.production.outputs.deployment_status",
+    "resume-evidence.json",
+    "production-resume-${{ github.run_id }}",
+    "if-no-files-found: error",
+]) {
+    requireText(resumeReport, token, "Resume evidence/report contract is missing: " + token)
+}
 
-requireText(files.rollback, "inputs.confirm == true", "Manual rollback must require explicit confirmation.")
 const rollbackTriggers = section(files.rollback, "on:", "\npermissions:")
-requireText(rollbackTriggers, "workflow_dispatch:", "Rollback must be manually dispatched.")
-assert.doesNotMatch(rollbackTriggers, /\b(?:push|pull_request|workflow_call|workflow_run):/, "Rollback must not run automatically.")
-requireText(files.rollback, "github.ref == 'refs/heads/deploy'", "Rollback must run from protected deploy.")
-requireText(files.rollback, "environment:", "Rollback must use the protected production environment.")
-requireText(files.rollback, "StrictHostKeyChecking=yes", "Rollback must pin host key checking.")
-requireText(files.rollback, "EXPECTED_DEPLOY_SHA: ${{ github.sha }}", "Rollback must bind itself to the dispatched deploy SHA.")
-requireText(files.rollback, 'branches/deploy', "Rollback must re-read deploy through the GitHub API.")
-requireText(files.rollback, "assert_deploy_current", "Rollback must reject a stale deploy branch before using production access.")
-requireText(files.rollback, ".protected == true", "Rollback must reject removed deploy branch protection.")
-requireText(files.rollback, "if ! verify_rollback_public || ! assert_deploy_current; then", "Rollback must restore the original release if deploy moves during verification.")
+requireText(rollbackTriggers, "workflow_dispatch:", "Rollback must be explicitly dispatched.")
+assert.doesNotMatch(rollbackTriggers, /(?:^|\n)\s*(?:push|pull_request|workflow_call|workflow_run):/, "Rollback must not run automatically.")
+requireText(files.rollback, "group: production-deploy", "Rollback must serialize with production deployment.")
+requireText(files.rollback, "cancel-in-progress: false", "Rollback must not cancel a production transaction.")
+const rollbackAuthorization = section(files.rollback, "  authorize:", "\n  rollback:")
+const rollbackJob = section(files.rollback, "  rollback:")
+assert.doesNotMatch(rollbackAuthorization, /\benvironment:|secrets\./, "Rollback authorization must complete before production secrets are available.")
+for (const token of [
+    "CONFIRM_ROLLBACK: ${{ inputs.confirm }}",
+    "TRIGGERING_ACTOR: ${{ github.triggering_actor }}",
+    "requestedBy !== owner || triggeringActor !== owner",
+    'process.env.CONFIRM_ROLLBACK !== "true"',
+    'context.ref !== "refs/heads/deploy"',
+    'branch: "deploy"',
+    "if (!deploy.protected)",
+    "context.sha !== deploy.commit.sha",
+    'core.setOutput("deploy_sha", deploy.commit.sha)',
+    'core.setOutput("requested_by", context.actor)',
+    'core.setOutput("triggering_actor", process.env.TRIGGERING_ACTOR)',
+]) {
+    requireText(rollbackAuthorization, token, "Rollback owner authorization contract is missing: " + token)
+}
+for (const token of [
+    "needs: authorize",
+    "if: needs.authorize.result == 'success'",
+    "environment:",
+    "EXPECTED_DEPLOY_SHA: ${{ needs.authorize.outputs.deploy_sha }}",
+    "requested_by=%s",
+    "triggering_actor=%s",
+    "workflow_run_attempt=%s",
+    "StrictHostKeyChecking=yes",
+    "assert_deploy_current",
+    ".protected == true",
+    "if ! verify_rollback_public || ! assert_deploy_current; then",
+]) {
+    requireText(rollbackJob, token, "Rollback production contract is missing: " + token)
+}
 const rollbackInvocations = [...files.rollback.matchAll(/zzz-calculator-deploy rollback[^\r\n]*/g)].map(match => match[0])
 assert.ok(rollbackInvocations.length >= 1, "Rollback workflow must invoke the deployment manager")
 for (const invocation of rollbackInvocations) {
-    assert.match(invocation, /rollback --previous(?:[;\s]|$)/, `Rollback accepts an arbitrary target: ${invocation}`)
+    assert.match(invocation, /rollback --previous(?:[;\s]|$)/, "Rollback accepts an arbitrary target: " + invocation)
 }
 const rollbackEvidenceUpload = section(files.rollback, "      - name: Upload rollback evidence")
 requireText(rollbackEvidenceUpload, "if: always()", "Rollback evidence upload must run after failures.")
