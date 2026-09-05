@@ -1,18 +1,13 @@
 name: Promote deploy
 
 on:
-  pull_request:
+  workflow_run:
+    workflows:
+      - Deploy eligibility
     types:
-      - opened
-      - synchronize
-      - reopened
-      - ready_for_review
+      - completed
     branches:
-      - deploy
-  pull_request_review:
-    types:
-      - submitted
-      - dismissed
+      - main
   workflow_dispatch:
     inputs:
       pr_number:
@@ -26,17 +21,15 @@ permissions:
   actions: read
 
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && 'deploy-promotion-write' || format('deploy-promotion-eligibility-{0}', github.event.pull_request.number) }}
+  group: deploy-promotion-write
   cancel-in-progress: false
 
 jobs:
-  eligibility:
-    name: ${{ github.event_name == 'pull_request_review' && github.event.pull_request.base.ref != 'deploy' && 'ignored non-deploy review' || 'eligibility' }}
+  promotion_preflight:
+    name: promotion-preflight
     if: >-
-      (github.event_name == 'pull_request' &&
-       github.event.pull_request.base.ref == 'deploy') ||
-      (github.event_name == 'pull_request_review' &&
-       github.event.pull_request.base.ref == 'deploy') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success') ||
       github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -49,6 +42,7 @@ jobs:
           script: |
             const repository = `${context.repo.owner}/${context.repo.repo}`;
             const pullNumber = context.payload.pull_request?.number
+              ?? context.payload.workflow_run?.pull_requests?.[0]?.number
               ?? Number(process.env.REQUESTED_PR_NUMBER);
             const fail = message => {
               core.setFailed(message);
@@ -168,21 +162,33 @@ jobs:
 
   promote:
     name: promote fast-forward
-    needs: eligibility
+    needs: promotion-preflight
     if: >-
-      github.event_name == 'workflow_dispatch' &&
-      needs.eligibility.result == 'success'
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       needs.promotion_preflight.result == 'success') ||
+      (github.event_name == 'workflow_dispatch' &&
+       needs.promotion_preflight.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
+      pull-requests: read
       actions: read
     outputs:
       candidate_sha: ${{ steps.promote.outputs.candidate_sha }}
       ci_run_id: ${{ steps.promote.outputs.ci_run_id }}
       pr_number: ${{ steps.promote.outputs.pr_number }}
     steps:
+      - name: Mint deploy promoter token
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.DEPLOY_PROMOTER_APP_ID }}
+          private-key: ${{ secrets.DEPLOY_PROMOTER_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
       - name: Validate approved PR and fast-forward deploy
         id: promote
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
@@ -190,12 +196,19 @@ jobs:
           REQUESTED_PR_NUMBER: ${{ inputs.pr_number }}
           PRODUCTION_CD_ENABLED: ${{ vars.PRODUCTION_CD_ENABLED }}
         with:
+          github-token: ${{ steps.app-token.outputs.token }}
           script: |
             const fail = message => {
               core.setFailed(message);
               return null;
             };
-            if (context.ref !== "refs/heads/main") {
+            const workflowRunSha = context.payload.workflow_run?.head_sha ?? "";
+            if (context.eventName === "workflow_run"
+              && (!/^[0-9a-f]{40}$/.test(workflowRunSha)
+                || context.payload.workflow_run?.head_branch !== "main")) {
+              return fail("Deploy eligibility workflow must complete successfully for main.");
+            }
+            if (context.eventName === "workflow_dispatch" && context.ref !== "refs/heads/main") {
               return fail("Promote deploy must be dispatched from main.");
             }
             if (process.env.PRODUCTION_CD_ENABLED !== "true") {

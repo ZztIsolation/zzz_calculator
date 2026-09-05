@@ -2,6 +2,33 @@
 
 本文档是 `zzz_calculator` 网站、Helper、Scanner、公开 manifest 和腾讯云 CDN 的唯一生产发布检查清单。每次发布必须复制“发布证据模板”到独立发布记录中逐项填写，不得只凭口头确认、旧 CI 绿灯或本机缓存判断成功。
 
+## 当前 deploy 晋级架构
+
+当前发布链保留 `deploy` 作为可审计的发布指针，但不再允许普通
+`GITHUB_TOKEN` 直接写入受保护分支。`Deploy eligibility` 只读检查
+`main -> deploy` 晋级 PR 的有效审批、最新 SHA、成功的 main CI 和同 SHA
+artifact；`Promote deploy` 在 eligibility 成功后使用短期 GitHub App
+installation token，以 `force=false` 快进 `deploy`，然后复用现有的生产
+候选验证、SSH manager、健康检查和自动回滚。
+
+一次性仓库配置必须完成以下项目后，工作流才允许真实晋级：
+
+- 创建仅安装到本仓库的 `Deploy Promoter` GitHub App，授予 Metadata 读取、
+  Contents 读写、Pull requests 读取和 Actions 读取权限。
+- 在 Actions secrets 保存 `DEPLOY_PROMOTER_APP_ID` 与
+  `DEPLOY_PROMOTER_PRIVATE_KEY`。私钥不得进入仓库、日志或发布证据。
+- 用 active repository ruleset 仅匹配 `deploy`：禁止 force push/删除，保留
+  `eligibility` required check，并只把该 App 加入 `always` bypass；停用旧的
+  classic `deploy` protection 后再做一次 dry-run，避免两套规则互相阻断。
+- `production` Environment 继续保存 SSH secrets 和 protected-branch policy，
+  但 required reviewer 只保留晋级 PR 的一次人工审批；切换前保存原 reviewer
+  配置，失败时按发布记录恢复。
+
+工作流在缺少 App secrets、候选 SHA、artifact 或 ruleset 保护时必须 fail
+closed；不得回退到 PAT、管理员直推或 force push。每次发布证据必须记录
+App token 只在 Promote job 使用、晋级前后 `deploy` SHA、approval review ID、
+main CI run/artifact、ruleset 快照和生产回滚结果。
+
 ## 1. 基本原则
 
 - [ ] 生产域名保持 `https://zzzcaculator.top`，避免改变浏览器 origin 和用户 IndexedDB/localStorage 所属域。

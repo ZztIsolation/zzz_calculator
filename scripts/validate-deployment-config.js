@@ -13,6 +13,7 @@ const files = {
     ci: await read(".github/workflows/ci.yml"),
     baseline: await read(".github/workflows/audit-deploy-baseline.yml"),
     deploy: await read(".github/workflows/deploy-production.yml"),
+    eligibility: await read(".github/workflows/deploy-eligibility.yml"),
     prepare: await read(".github/workflows/prepare-deploy.yml"),
     promote: await read(".github/workflows/promote-deploy.yml"),
     resume: await read(".github/workflows/resume-deploy.yml"),
@@ -52,6 +53,7 @@ const workflows = {
     ci: files.ci,
     baseline: files.baseline,
     deploy: files.deploy,
+    eligibility: files.eligibility,
     prepare: files.prepare,
     promote: files.promote,
     resume: files.resume,
@@ -64,6 +66,7 @@ const expectedActionRefs = new Set([
     "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
     "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
     "actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b",
+    "actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349",
 ])
 const observedActionRefs = new Set()
 const observedLocalWorkflowRefs = []
@@ -494,6 +497,32 @@ for (const token of [
     requireText(files.prepare, token, `Prepare-deploy approval contract is missing: ${token}`)
 }
 
+const newPromotionArchitecture = files.promote.includes("actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349")
+    && files.eligibility.includes("name: Deploy eligibility")
+if (newPromotionArchitecture) {
+    const eligibilityWorkflow = files.eligibility
+    const promoteTriggers = section(files.promote, "on:", "\npermissions:")
+    requireText(eligibilityWorkflow, "pull_request_review:", "Eligibility must run on promotion reviews.")
+    requireText(eligibilityWorkflow, "name: eligibility", "Eligibility must expose the stable required check name.")
+    requireText(eligibilityWorkflow, "github.rest.pulls.listReviews", "Eligibility must verify human review state.")
+    requireText(eligibilityWorkflow, "github.rest.actions.listWorkflowRuns", "Eligibility must bind to main CI.")
+    requireText(eligibilityWorkflow, "github.rest.actions.listWorkflowRunArtifacts", "Eligibility must bind to the exact artifact.")
+    assert.doesNotMatch(eligibilityWorkflow, /contents:\s*write|secrets\.|git\.updateRef/, "Eligibility must remain read-only.")
+    requireText(promoteTriggers, "workflow_run:", "Promotion must consume the eligibility workflow result.")
+    requireText(promoteTriggers, "Deploy eligibility", "Promotion must be tied to the named eligibility workflow.")
+    requireText(promoteTriggers, "workflow_dispatch:", "Promotion must retain an explicit retry entry point.")
+    requireText(files.promote, "context.payload.workflow_run?.head_sha", "Promotion must bind workflow_run to its candidate SHA.")
+    requireText(files.promote, "context.payload.workflow_run?.pull_requests?.[0]?.number", "Promotion must resolve the promotion PR from workflow_run.")
+    requireText(files.promote, "actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349", "Promotion must mint a pinned GitHub App token.")
+    requireText(files.promote, "secrets.DEPLOY_PROMOTER_APP_ID", "Promotion App ID secret is missing.")
+    requireText(files.promote, "secrets.DEPLOY_PROMOTER_PRIVATE_KEY", "Promotion App private-key secret is missing.")
+    requireText(files.promote, "github-token: ${{ steps.app-token.outputs.token }}", "Branch writes must use the App token.")
+    requireText(files.promote, "github.rest.git.updateRef", "Promotion must update deploy through the GitHub API.")
+    requireText(files.promote, "force: false", "Promotion must never force-update deploy.")
+    assert.doesNotMatch(files.promote, /force:\s*true|pulls\.merge/, "Promotion must not force-update or merge the PR.")
+    requireText(files.promote, "promotion-evidence.json", "Promotion evidence must be retained.")
+    requireText(files.promote, "secrets: inherit", "Production reusable workflow must inherit its protected secrets.")
+} else {
 const promoteTriggers = section(files.promote, "on:", "\npermissions:")
 const promotionEvents = section(promoteTriggers, "  pull_request:", "\n  workflow_dispatch:")
 for (const token of ["pull_request:", "pull_request_review:", "opened", "synchronize", "reopened", "ready_for_review", "submitted", "dismissed", "- deploy"]) {
@@ -650,6 +679,8 @@ for (const token of [
     "deploy remains frozen; use Resume deploy",
 ]) {
     requireText(reportPromotionFailure, token, `Failed promotion reporting contract is missing: ${token}`)
+}
+
 }
 
 const resumeTriggers = section(files.resume, "on:", "\npermissions:")
