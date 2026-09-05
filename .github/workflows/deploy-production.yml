@@ -1,9 +1,6 @@
 name: Deploy production
 
 on:
-  push:
-    branches:
-      - deploy
   workflow_call:
     inputs:
       candidate_sha:
@@ -14,8 +11,8 @@ on:
         description: Successful main CI run that owns the immutable artifact
         required: true
         type: string
-      promotion_pr_number:
-        description: Optional main to deploy approval PR
+      promotion_run_id:
+        description: Original owner-dispatched Promote deploy workflow run
         required: false
         type: string
       operation_mode:
@@ -45,7 +42,6 @@ on:
 permissions:
   contents: read
   actions: read
-  pull-requests: read
 
 concurrency:
   group: production-deploy
@@ -55,10 +51,6 @@ jobs:
   preflight:
     name: validate candidate
     if: >-
-      (github.event_name == 'push' &&
-       github.ref == 'refs/heads/deploy' &&
-       !endsWith(github.actor, '[bot]') &&
-       vars.PRODUCTION_CD_ENABLED == 'true') ||
       (inputs.candidate_sha != '' && inputs.ci_run_id != '') ||
       (github.event_name == 'workflow_dispatch' &&
        github.ref == 'refs/heads/deploy')
@@ -71,7 +63,11 @@ jobs:
       deploy_sha: ${{ steps.candidate.outputs.deploy_sha }}
       artifact_name: ${{ steps.candidate.outputs.artifact_name }}
       production_url: ${{ steps.candidate.outputs.production_url }}
-      promotion_pr_number: ${{ steps.candidate.outputs.promotion_pr_number }}
+      promotion_run_id: ${{ steps.candidate.outputs.promotion_run_id }}
+      requested_by: ${{ steps.candidate.outputs.requested_by }}
+      actor: ${{ steps.candidate.outputs.actor }}
+      triggering_actor: ${{ steps.candidate.outputs.triggering_actor }}
+      run_attempt: ${{ steps.candidate.outputs.run_attempt }}
     steps:
       - name: Validate deploy candidate and successful main CI artifact
         id: candidate
@@ -82,9 +78,14 @@ jobs:
           REQUESTED_CALL_RUN_ID: ${{ inputs.ci_run_id || '' }}
           REQUESTED_MANUAL_RUN_ID: ${{ inputs.run_id || '' }}
           REQUESTED_CANDIDATE_SHA: ${{ inputs.candidate_sha || '' }}
-          PROMOTION_PR_NUMBER: ${{ inputs.promotion_pr_number || '' }}
+          REQUESTED_PROMOTION_RUN_ID: ${{ inputs.promotion_run_id || '' }}
           CALLER_WORKFLOW: ${{ github.workflow }}
           CALLER_WORKFLOW_REF: ${{ github.workflow_ref }}
+          CURRENT_ACTOR: ${{ github.actor }}
+          CURRENT_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+          CURRENT_RUN_ATTEMPT: ${{ github.run_attempt }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
           PRODUCTION_CD_ENABLED: ${{ vars.PRODUCTION_CD_ENABLED }}
           PROD_URL: ${{ vars.PROD_URL }}
         with:
@@ -94,10 +95,33 @@ jobs:
             let mode = "deploy";
             let runId = process.env.REQUESTED_CALL_RUN_ID;
             let candidateSha = process.env.REQUESTED_CANDIDATE_SHA;
-            let directPush = false;
+            let promotionRunId = process.env.REQUESTED_PROMOTION_RUN_ID;
+            const repositoryOwner = process.env.REPOSITORY_OWNER ?? "";
+            const currentActor = process.env.CURRENT_ACTOR ?? "";
+            const currentTriggeringActor = process.env.CURRENT_TRIGGERING_ACTOR ?? "";
+            const currentRunId = process.env.CURRENT_RUN_ID ?? "";
+            const currentRunAttempt = process.env.CURRENT_RUN_ATTEMPT ?? "";
+            const sameLogin = (left, right) => left.toLowerCase() === right.toLowerCase();
+            let requestedBy = currentActor;
+            let evidenceActor = currentActor;
+            let evidenceTriggeringActor = currentTriggeringActor;
+            let evidenceRunAttempt = currentRunAttempt;
 
             if (!productionUrl || !productionUrl.startsWith("https://")) {
               core.setFailed("Repository variable PROD_URL must be a non-empty HTTPS URL.");
+              return;
+            }
+            if (!repositoryOwner
+              || !sameLogin(repositoryOwner, context.repo.owner)
+              || !currentActor
+              || !currentTriggeringActor
+              || !/^\d+$/.test(currentRunId)
+              || !Number.isSafeInteger(Number(currentRunId))
+              || Number(currentRunId) < 1
+              || !/^\d+$/.test(currentRunAttempt)
+              || !Number.isSafeInteger(Number(currentRunAttempt))
+              || Number(currentRunAttempt) < 1) {
+              core.setFailed("GitHub workflow identity context is missing or invalid.");
               return;
             }
             core.setOutput("production_url", productionUrl.replace(/\/$/, ""));
@@ -133,29 +157,51 @@ jobs:
                 core.setFailed("Repository variable PRODUCTION_CD_ENABLED must be true for production promotion.");
                 return;
               }
-            } else if (context.eventName === "push") {
-              if (context.ref !== "refs/heads/deploy"
-                || context.actor.endsWith("[bot]")
-                || context.payload.deleted
-                || context.payload.forced
-                || !/^[0-9a-f]{40}$/.test(context.payload.before || "")
-                || !/^[0-9a-f]{40}$/.test(context.sha)) {
-                core.setFailed("Automatic production deployment requires a non-bot, non-forced update to deploy.");
+              if (mode === "deploy") {
+                const promotionRunNumber = Number(promotionRunId);
+                if (!/^\d+$/.test(promotionRunId)
+                  || !Number.isSafeInteger(promotionRunNumber)
+                  || promotionRunNumber < 1) {
+                  core.setFailed("Reusable production deployment requires a numeric promotion_run_id.");
+                  return;
+                }
+                const promotionRun = (await github.rest.actions.getWorkflowRun({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: promotionRunNumber,
+                })).data;
+                const repository = `${context.repo.owner}/${context.repo.repo}`;
+                const promotionActor = promotionRun.actor?.login ?? "";
+                const promotionTriggeringActor = promotionRun.triggering_actor?.login ?? "";
+                if (promotionRun.name !== "Promote deploy"
+                  || promotionRun.path !== ".github/workflows/promote-deploy.yml"
+                  || promotionRun.event !== "workflow_dispatch"
+                  || promotionRun.head_branch !== "main"
+                  || promotionRun.head_sha !== candidateSha
+                  || promotionRun.head_repository?.full_name !== repository
+                  || promotionRun.repository?.full_name !== repository
+                  || !sameLogin(promotionActor, repositoryOwner)
+                  || !sameLogin(promotionTriggeringActor, repositoryOwner)
+                  || !Number.isSafeInteger(promotionRun.run_attempt)
+                  || promotionRun.run_attempt < 1) {
+                  core.setFailed("promotion_run_id is not an owner-dispatched Promote deploy run for this repository.");
+                  return;
+                }
+                if (process.env.CALLER_WORKFLOW === "Promote deploy"
+                  && (promotionRunId !== currentRunId
+                    || String(promotionRun.run_attempt) !== currentRunAttempt)) {
+                  core.setFailed("Promote deploy must bind production CD to its current workflow run and attempt.");
+                  return;
+                }
+                requestedBy = promotionActor;
+                evidenceActor = promotionActor;
+                evidenceTriggeringActor = promotionTriggeringActor;
+                evidenceRunAttempt = String(promotionRun.run_attempt);
+              } else if (!sameLogin(currentActor, repositoryOwner)
+                || !sameLogin(currentTriggeringActor, repositoryOwner)) {
+                core.setFailed("Audit and dry-run calls must be initiated and re-run by the repository owner.");
                 return;
               }
-              const pushComparison = (await github.rest.repos.compareCommits({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                base: context.payload.before,
-                head: context.sha,
-              })).data;
-              if (pushComparison.status !== "ahead" || pushComparison.ahead_by < 1) {
-                core.setFailed("The deploy push is not a non-forced fast-forward update.");
-                return;
-              }
-              candidateSha = context.sha;
-              runId = "";
-              directPush = true;
             } else if (context.eventName === "workflow_dispatch") {
               if (context.ref !== "refs/heads/deploy") {
                 core.setFailed("Manual production audit/dry-run must run from deploy.");
@@ -165,6 +211,11 @@ jobs:
               mode = requestedMode;
               if (!["audit", "dry-run"].includes(mode)) {
                 core.setFailed("Manual mode must be audit or dry-run; deploy is CI-only.");
+                return;
+              }
+              if (!sameLogin(currentActor, repositoryOwner)
+                || !sameLogin(currentTriggeringActor, repositoryOwner)) {
+                core.setFailed("Manual production audit/dry-run must be initiated and re-run by the repository owner.");
                 return;
               }
             } else {
@@ -192,66 +243,17 @@ jobs:
               return;
             }
 
-            if (directPush) {
-              const repository = `${context.repo.owner}/${context.repo.repo}`;
-              const promotionRecords = await github.paginate(github.rest.pulls.list, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                state: "all",
-                base: "deploy",
-                head: `${context.repo.owner}:main`,
-                per_page: 100,
-              });
-              const promotionPulls = promotionRecords.filter(pullRequest =>
-                pullRequest.head?.sha === candidateSha
-                && pullRequest.head?.ref === "main"
-                && pullRequest.head?.repo?.full_name === repository
-                && pullRequest.base?.ref === "deploy"
-                && !pullRequest.draft
-              );
-              let approvedPull = null;
-              for (const pullRequest of promotionPulls) {
-                const reviews = await github.paginate(github.rest.pulls.listReviews, {
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  pull_number: pullRequest.number,
-                  per_page: 100,
-                });
-                const effectiveByReviewer = new Map();
-                for (const review of reviews) {
-                  if (review.user?.type !== "User"
-                    || review.user?.login === pullRequest.user?.login
-                    || !["OWNER", "MEMBER", "COLLABORATOR"].includes(review.author_association)
-                    || !["APPROVED", "CHANGES_REQUESTED", "DISMISSED"].includes(review.state)) {
-                    continue;
-                  }
-                  const previous = effectiveByReviewer.get(review.user.login);
-                  if (!previous || review.id > previous.id) {
-                    effectiveByReviewer.set(review.user.login, review);
-                  }
-                }
-                const effectiveReviews = [...effectiveByReviewer.values()]
-                  .filter(review => review.commit_id === candidateSha);
-                if (!effectiveReviews.some(review => review.state === "CHANGES_REQUESTED")
-                  && effectiveReviews.some(review => review.state === "APPROVED")) {
-                  approvedPull = pullRequest;
-                  break;
-                }
-              }
-              if (!approvedPull) {
-                core.setFailed("The direct deploy push has no matching main-to-deploy PR with current human approval.");
-                return;
-              }
-              process.env.PROMOTION_PR_NUMBER = String(approvedPull.number);
-            }
-
             if (mode === "audit") {
               core.setOutput("mode", mode);
               core.setOutput("run_id", "");
               core.setOutput("sha", branch.commit.sha);
               core.setOutput("deploy_sha", branch.commit.sha);
               core.setOutput("artifact_name", "");
-              core.setOutput("promotion_pr_number", "");
+              core.setOutput("promotion_run_id", "");
+              core.setOutput("requested_by", requestedBy);
+              core.setOutput("actor", evidenceActor);
+              core.setOutput("triggering_actor", evidenceTriggeringActor);
+              core.setOutput("run_attempt", evidenceRunAttempt);
               return;
             }
 
@@ -307,7 +309,11 @@ jobs:
             core.setOutput("sha", sha);
             core.setOutput("deploy_sha", branch.commit.sha);
             core.setOutput("artifact_name", `server-release-${sha}`);
-            core.setOutput("promotion_pr_number", process.env.PROMOTION_PR_NUMBER);
+            core.setOutput("promotion_run_id", mode === "deploy" ? promotionRunId : "");
+            core.setOutput("requested_by", requestedBy);
+            core.setOutput("actor", evidenceActor);
+            core.setOutput("triggering_actor", evidenceTriggeringActor);
+            core.setOutput("run_attempt", evidenceRunAttempt);
 
       - name: Record preflight summary
         env:
@@ -316,7 +322,11 @@ jobs:
           CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
           DEPLOY_SHA: ${{ steps.candidate.outputs.deploy_sha }}
           ARTIFACT_NAME: ${{ steps.candidate.outputs.artifact_name }}
-          PROMOTION_PR_NUMBER: ${{ steps.candidate.outputs.promotion_pr_number }}
+          PROMOTION_RUN_ID: ${{ steps.candidate.outputs.promotion_run_id }}
+          REQUESTED_BY: ${{ steps.candidate.outputs.requested_by }}
+          ACTOR: ${{ steps.candidate.outputs.actor }}
+          TRIGGERING_ACTOR: ${{ steps.candidate.outputs.triggering_actor }}
+          RUN_ATTEMPT: ${{ steps.candidate.outputs.run_attempt }}
         run: |
           {
             printf 'mode=%s\n' "$MODE"
@@ -324,7 +334,11 @@ jobs:
             printf 'candidate_sha=%s\n' "$CANDIDATE_SHA"
             printf 'deploy_sha=%s\n' "$DEPLOY_SHA"
             printf 'artifact=%s\n' "$ARTIFACT_NAME"
-            printf 'promotion_pr_number=%s\n' "$PROMOTION_PR_NUMBER"
+            printf 'promotion_run_id=%s\n' "$PROMOTION_RUN_ID"
+            printf 'requested_by=%s\n' "$REQUESTED_BY"
+            printf 'actor=%s\n' "$ACTOR"
+            printf 'triggering_actor=%s\n' "$TRIGGERING_ACTOR"
+            printf 'run_attempt=%s\n' "$RUN_ATTEMPT"
           } >> "$GITHUB_STEP_SUMMARY"
 
   validation:
@@ -342,16 +356,24 @@ jobs:
     steps:
       - name: Initialize validation evidence
         env:
-          PROMOTION_PR_NUMBER: ${{ needs.preflight.outputs.promotion_pr_number }}
+          PROMOTION_RUN_ID: ${{ needs.preflight.outputs.promotion_run_id }}
+          REQUESTED_BY: ${{ needs.preflight.outputs.requested_by }}
+          ACTOR: ${{ needs.preflight.outputs.actor }}
+          TRIGGERING_ACTOR: ${{ needs.preflight.outputs.triggering_actor }}
+          RUN_ATTEMPT: ${{ needs.preflight.outputs.run_attempt }}
         shell: bash
         run: |
           set -euo pipefail
-          printf 'workflow_run_id=%s\nmode=%s\nsource_branch=main\nrelease_branch=deploy\ncandidate_sha=%s\nci_run_id=%s\npromotion_pr_number=%s\n' \
+          printf 'workflow_run_id=%s\nmode=%s\nsource_branch=main\nrelease_branch=deploy\ncandidate_sha=%s\nci_run_id=%s\npromotion_run_id=%s\nrequested_by=%s\nactor=%s\ntriggering_actor=%s\nrun_attempt=%s\n' \
             "$GITHUB_RUN_ID" \
             "${{ needs.preflight.outputs.mode }}" \
             "${{ needs.preflight.outputs.sha }}" \
             "${{ needs.preflight.outputs.run_id }}" \
-            "$PROMOTION_PR_NUMBER" \
+            "$PROMOTION_RUN_ID" \
+            "$REQUESTED_BY" \
+            "$ACTOR" \
+            "$TRIGGERING_ACTOR" \
+            "$RUN_ATTEMPT" \
             > "$RUNNER_TEMP/validation-output.txt"
 
       - name: Re-check candidate before artifact access
@@ -583,16 +605,24 @@ jobs:
     steps:
       - name: Initialize deployment evidence
         env:
-          PROMOTION_PR_NUMBER: ${{ needs.preflight.outputs.promotion_pr_number }}
+          PROMOTION_RUN_ID: ${{ needs.preflight.outputs.promotion_run_id }}
+          REQUESTED_BY: ${{ needs.preflight.outputs.requested_by }}
+          ACTOR: ${{ needs.preflight.outputs.actor }}
+          TRIGGERING_ACTOR: ${{ needs.preflight.outputs.triggering_actor }}
+          RUN_ATTEMPT: ${{ needs.preflight.outputs.run_attempt }}
         shell: bash
         run: |
           set -euo pipefail
-          printf 'workflow_run_id=%s\nmode=%s\nsource_branch=main\nrelease_branch=deploy\ncandidate_sha=%s\nci_run_id=%s\npromotion_pr_number=%s\nvalidated_metadata_sha256=%s\n' \
+          printf 'workflow_run_id=%s\nmode=%s\nsource_branch=main\nrelease_branch=deploy\ncandidate_sha=%s\nci_run_id=%s\npromotion_run_id=%s\nrequested_by=%s\nactor=%s\ntriggering_actor=%s\nrun_attempt=%s\nvalidated_metadata_sha256=%s\n' \
             "$GITHUB_RUN_ID" \
             "${{ needs.preflight.outputs.mode }}" \
             "${{ needs.preflight.outputs.sha }}" \
             "${{ needs.preflight.outputs.run_id }}" \
-            "$PROMOTION_PR_NUMBER" \
+            "$PROMOTION_RUN_ID" \
+            "$REQUESTED_BY" \
+            "$ACTOR" \
+            "$TRIGGERING_ACTOR" \
+            "$RUN_ATTEMPT" \
             "${{ needs.validation.outputs.metadata_sha256 }}" \
             > "$RUNNER_TEMP/deploy-output.txt"
 

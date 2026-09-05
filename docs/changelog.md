@@ -2,6 +2,44 @@
 
 # Changelog
 
+## 2026-09-06 - Replaced Promotion Approval PRs With Explicit Deploy Dispatch
+
+Production promotion now uses one owner-attributed `workflow_dispatch` instead
+of a bot-authored `main` -> `deploy` pull request and human review. Day-to-day
+pushes and merges on `main` still run the complete `CI / verify` pipeline and
+publish immutable `server-release-<full-sha>` artifacts, but they never move
+`deploy` or contact production. An explicit deployment request freezes the
+candidate SHA at dispatch; later `main` commits are excluded while that frozen
+SHA remains in current `main` history.
+
+The read-only eligibility job validates the repository owner as both the
+original actor and any re-run actor, the production confirmation input,
+protected `main` and `deploy`, the strict fast-forward from `deploy` to the
+candidate, the exact successful main CI run, and its non-empty, unexpired
+artifact. The write job rechecks all frozen values before minting a short-lived
+Deploy Promoter installation token scoped to Actions read and Contents write.
+Only that token can call `updateRef(force:false)`; the workflow confirms the
+live `deploy` SHA before invoking the reusable production workflow in the same
+serialized run.
+
+The `deploy` ruleset now restricts branch creation and updates to the dedicated
+App bypass actor while retaining deletion and non-fast-forward protection. The
+obsolete required `eligibility` branch check and the repository option that
+allowed Actions to create or approve pull requests are removed. The direct
+`push: deploy` production path is also removed so the App update cannot create
+a duplicate deployment run.
+
+Promotion evidence now records the explicit authorization type, actor,
+triggering actor, run and attempt, workflow ref, previous and resulting deploy
+SHAs, exact CI/artifact, App installation identity, and non-forced update. A
+failed production transaction leaves `deploy` frozen; `Resume deploy` validates
+the original Promote run plus the same CI/artifact and may retry even after
+`main` advances. Resume, rollback, baseline audit, and manual audit/dry-run are
+owner-only. Browser storage validation, the server manager's
+`current,candidate,rollback,candidate` sequence, health stability checks,
+automatic rollback, and Calculator/Scanner/Helper data boundaries are
+unchanged.
+
 ## 2026-09-04 - Separated Production CD Onto The Protected Deploy Branch
 
 Production release control is now separated from the integration branch. The

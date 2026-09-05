@@ -36,6 +36,9 @@ jobs:
         env:
           REQUESTED_MODE: ${{ inputs.mode }}
           PRODUCTION_CD_ENABLED: ${{ vars.PRODUCTION_CD_ENABLED }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          WORKFLOW_ACTOR: ${{ github.actor }}
+          WORKFLOW_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
         with:
           script: |
             const fail = message => {
@@ -44,6 +47,13 @@ jobs:
             };
             if (context.ref !== "refs/heads/main") {
               return fail("Audit deploy baseline must be dispatched from main.");
+            }
+            const owner = process.env.REPOSITORY_OWNER ?? "";
+            const actor = process.env.WORKFLOW_ACTOR ?? "";
+            const triggeringActor = process.env.WORKFLOW_TRIGGERING_ACTOR ?? "";
+            const sameLogin = (left, right) => left.toLowerCase() === right.toLowerCase();
+            if (!owner || !sameLogin(actor, owner) || !sameLogin(triggeringActor, owner)) {
+              return fail("Audit deploy baseline must be initiated and re-run by the repository owner.");
             }
             if (process.env.PRODUCTION_CD_ENABLED !== "false") {
               return fail("Set PRODUCTION_CD_ENABLED=false before auditing the deploy baseline.");
@@ -147,5 +157,4 @@ jobs:
     permissions:
       contents: read
       actions: read
-      pull-requests: read
     secrets: inherit
