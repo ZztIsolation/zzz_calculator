@@ -1018,6 +1018,75 @@ describe("BuffPickerModal", () => {
     expect(reopenedPayload.runtimeInputs["remielle.additional"].parameters.anomalyAgentCount).toBe(3)
   })
 
+  it("previews and persists Ju Fufu's attack-converted Tiger Roar crit damage", async () => {
+    const buffId = "juhufu.core_tiger_roar_crit_dmg"
+    const effectId = "juhufu_core_tiger_roar_crit_dmg"
+    const juhufuMeta = {
+      ...meta,
+      teammateCombatBuffGroups: [{
+        id: "juhufu",
+        name: { zhCN: "橘福福" },
+        attribute: "fire",
+        specialty: "stun",
+        buffs: [{
+          id: buffId,
+          source: { zhCN: "核心被动（F级）" },
+          description: {
+            zhCN: "拥有[威风]时，橘福福可为全队施加[虎啸]效果：暴击伤害提升20%，橘福福的初始攻击力大于等于2800点时，每超过100点攻击力会使暴击伤害额外提升5%，最多额外提升30%。",
+          },
+          scope: "inCombat",
+          effects: [{
+            id: effectId,
+            type: "formula",
+            target: { kind: "default" },
+            stat: "critDmg",
+            mode: "flat",
+            source: {
+              variable: "x",
+              label: { zhCN: "橘福福初始攻击力" },
+              defaultValue: 3400,
+              min: 0,
+              step: 50,
+            },
+            formula: {
+              expression: "clamp(20 + floor((x - 2800) / 2) / 10, 20, 50)",
+              valueUnit: "storedPercent",
+            },
+            coverage: { default: 1, min: 0, max: 1, step: 0.1 },
+          }],
+        }],
+      }],
+    }
+    const wrapper = mountModal({ meta: juhufuMeta })
+    await openTeammateTab(wrapper)
+
+    const row = buffRowByText(wrapper, "橘福福初始攻击力")
+    const initialAtkInput = row.find(".runtime-grid input[type='number']")
+    expect(initialAtkInput.element.getAttribute("value")).toBe("3400")
+    expect(initialAtkInput.element.getAttribute("step")).toBe("50")
+    expect(row.text()).toContain("暴击伤害% +50%")
+
+    await row.find(".buff-row-toggle").trigger("click")
+    await initialAtkInput.setValue("2851")
+    expect(row.text()).toContain("暴击伤害% +22.5%")
+    await buttonByText(wrapper, "应用选择").trigger("click")
+
+    const payload = wrapper.emitted("apply")?.[0]?.[0] as any
+    expect(payload.selectedBuffIds).toEqual([buffId])
+    expect(payload.runtimeInputs[buffId].effects[effectId].sourceValue).toBe(2851)
+
+    await wrapper.setProps({
+      show: false,
+      selectedIds: payload.selectedBuffIds,
+      runtimeInputs: payload.runtimeInputs,
+    })
+    await openTeammateTab(wrapper)
+
+    const reopenedRow = buffRowByText(wrapper, "橘福福初始攻击力")
+    expect(reopenedRow.find(".runtime-grid input[type='number']").element.getAttribute("value")).toBe("2851")
+    expect(reopenedRow.text()).toContain("暴击伤害% +22.5%")
+  })
+
   it("discards un-applied per-Buff counts and Special Skill runtime changes", async () => {
     const wrapper = mountModal({ meta: remielleRuntimeMeta() })
     await openTeammateTab(wrapper)

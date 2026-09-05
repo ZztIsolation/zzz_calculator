@@ -143,6 +143,90 @@ assert.equal(cappedResult.inCombat.activeEffects[0].resolvedStats[0].rawSourceVa
 assert.equal(cappedResult.inCombat.activeEffects[0].resolvedStats[0].sourceValue, 27000)
 assert.equal(cappedResult.inCombat.activeEffects[0].resolvedStats[0].value, 0.4)
 
+const juhufuCoreBuffId = "juhufu.core_tiger_roar_crit_dmg"
+const juhufuCoreEffectId = "juhufu_core_tiger_roar_crit_dmg"
+const juhufuCoreBuff = catalog.combatBuffs.find(buff => buff.id === juhufuCoreBuffId)
+const juhufuCoreCritDmgEffect = juhufuCoreBuff?.effects.find(effect => effect.id === juhufuCoreEffectId)
+assert.ok(juhufuCoreCritDmgEffect, "Juhufu core crit damage effect should exist")
+assert.equal(juhufuCoreCritDmgEffect.type, "formula")
+assert.equal(juhufuCoreCritDmgEffect.source?.variable, "x")
+assert.equal(juhufuCoreCritDmgEffect.source?.defaultValue, 3400)
+assert.equal(juhufuCoreCritDmgEffect.source?.min, 0)
+assert.equal(juhufuCoreCritDmgEffect.source?.max, undefined, "Juhufu initial ATK input should accept values above the cap threshold")
+assert.equal(juhufuCoreCritDmgEffect.source?.step, 50)
+assert.equal(juhufuCoreCritDmgEffect.formula?.expression, "clamp(20 + floor((x - 2800) / 2) / 10, 20, 50)")
+assert.equal(juhufuCoreCritDmgEffect.formula?.valueUnit, "storedPercent")
+
+function calculateJuhufuCoreCritDmg(sourceValue) {
+    return calculateInCombatPanel(catalog, {
+        ...input,
+        combatBuffs: {
+            activeBuffIds: [juhufuCoreBuffId],
+            ...(sourceValue === undefined
+                ? {}
+                : {
+                    runtimeInputs: {
+                        [juhufuCoreBuffId]: {
+                            effects: {
+                                [juhufuCoreEffectId]: {
+                                    sourceValue,
+                                },
+                            },
+                        },
+                    },
+                }),
+        },
+    })
+}
+
+function juhufuCoreResolvedStat(result) {
+    return result.inCombat.activeEffects
+        .find(effect => effect.key === juhufuCoreBuffId)
+        ?.resolvedStats.find(stat => stat.id === juhufuCoreEffectId)
+}
+
+const juhufuDefault = calculateJuhufuCoreCritDmg()
+const juhufuDefaultResolved = juhufuCoreResolvedStat(juhufuDefault)
+assert.ok(juhufuDefaultResolved, "Juhufu core should resolve without a saved runtime input")
+assert.equal(juhufuDefaultResolved.rawSourceValue, 3400)
+assert.equal(juhufuDefaultResolved.sourceValue, 3400)
+approx(juhufuDefaultResolved.formulaValue, 50, "Juhufu core default formula value")
+approx(juhufuDefaultResolved.value, 0.5, "Juhufu core default resolved crit damage")
+approx(
+    juhufuDefault.inCombat.panel.critDmg - juhufuDefault.outOfCombat.panel.critDmg,
+    0.5,
+    "Juhufu core should remain 50% crit damage when old saves omit the runtime input",
+)
+
+const juhufuCoreCases = [
+    [2799, 20],
+    [2800, 20],
+    [2850, 22.5],
+    [2851, 22.5],
+    [2852, 22.6],
+    [3399, 49.9],
+    [3400, 50],
+    [3401, 50],
+]
+
+for (const [sourceValue, expectedCritDmgPercent] of juhufuCoreCases) {
+    const result = calculateJuhufuCoreCritDmg(sourceValue)
+    const activeEffect = result.inCombat.activeEffects.find(effect => effect.key === juhufuCoreBuffId)
+    const resolved = juhufuCoreResolvedStat(result)
+    assert.ok(activeEffect, `Juhufu core should be active for sourceValue=${sourceValue}`)
+    assert.ok(resolved, `Juhufu core should resolve for sourceValue=${sourceValue}`)
+    assert.equal(activeEffect.runtime.effects[juhufuCoreEffectId].sourceValue, sourceValue)
+    assert.equal(resolved.rawSourceValue, sourceValue)
+    assert.equal(resolved.sourceValue, sourceValue)
+    approx(resolved.formulaValue, expectedCritDmgPercent, `Juhufu core formula sourceValue=${sourceValue}`)
+    approx(resolved.value, expectedCritDmgPercent / 100, `Juhufu core resolved stat sourceValue=${sourceValue}`)
+    approx(
+        result.inCombat.panel.critDmg - result.outOfCombat.panel.critDmg,
+        expectedCritDmgPercent / 100,
+        `Juhufu core panel sourceValue=${sourceValue}`,
+    )
+}
+
 const qianxia = calculateInCombatPanel(catalog, {
     ...input,
     combatBuffs: {
