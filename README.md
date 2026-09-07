@@ -14,7 +14,9 @@ modeling decisions, and verification evidence remain in the
 
 - Added Vivian (薇薇安·班希) from official Wiki entry 1276, including her level-60 panel, seven Core Passive Release coefficient tiers, the expressible Additional Ability/Cinema effects, official artwork, Enka `1331` mapping, and the signature Dreaming Bird relationship.
 - The workbench intentionally defines no administrator default rotation. A fresh build receives one non-administrator `mode: anomaly` event: a single Ether Corruption unit with Vivian as both the original source and Release trigger. The Release ratio reads current in-combat Anomaly Proficiency, so a self-sourced panel contributes to both the base unit and the ratio.
-- The official page has no stable skill IDs, so this branch does not fabricate a skill catalog or multi-event rotation. Cinema 2's 130% proficiency-yield conversion and Cinema 6's special five-fold Release remain explicit boundaries for a future event variant.
+- Retained Core Passive: Fate's Lament as a description-only self Buff: it records the official mechanics without independent calculation effects, follows the existing default-Buff selection, and remains manually switchable.
+- The Core Passive description includes the official F-level per-10-Proficiency coefficients for all six anomaly attributes; the structured core-scaling table remains the calculation source for other core levels.
+- The official page has no stable skill IDs, so this branch does not fabricate a skill catalog or multi-event rotation. Cinema 2's 130% proficiency yield is modeled as a Release-only `1.3` factor on the Anomaly Proficiency conversion; it does not alter the original anomaly unit, ordinary Anomaly, Disorder, or other damage zones. Cinema 6's special five-fold Release remains an explicit boundary for a future event variant.
 
 ### 2026-08-25 Soldier 11 And Potential Vision Modeling
 

@@ -1,8 +1,12 @@
 const RELEASE_RESULT_MODES = new Set(["originalAnomalyRatio", "fixedAnomalyMultiplier"])
 const RELEASE_UNITS = new Set(["raw", "percent", "decimal"])
 const RELEASE_OPERATIONS = new Set(["add", "subtract", "multiply", "divide", "max", "min", "clamp", "floor"])
-const RELEASE_LEAF_KINDS = new Set(["constant", "triggerStat", "coreSkillScaling", "condition"])
+const RELEASE_LEAF_KINDS = new Set(["constant", "triggerStat", "coreSkillScaling", "condition", "releaseModifier"])
 const RELEASE_TRIGGER_STATS = new Set(["atk", "anomalyProficiency", "anomalyMastery"])
+const RELEASE_MODIFIER_KEYS = new Set(["releaseProficiencyYieldBonus"])
+const RELEASE_MODIFIER_LABELS = {
+    releaseProficiencyYieldBonus: "异放精通收益修正",
+}
 const RELEASE_WHITE_BOX_ROLES = new Set(["conversionSource"])
 const RELEASE_OPERATION_PRECEDENCE = {
     add: 1,
@@ -91,6 +95,29 @@ function expressionLabel(node, fallback) {
     return localizedText(node?.label, fallback)
 }
 
+function releaseModifierKey(node) {
+    return String(node?.modifier ?? node?.modifierId ?? node?.key ?? "").trim()
+}
+
+function releaseModifierValue(context, modifier) {
+    const values = context?.releaseModifiers ?? context?.releaseModifierValues ?? {}
+    const value = values?.[modifier]
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+        return finiteNumber(value.value ?? value.bonus ?? value.amount ?? 0, `异放事件修正 ${modifier}`)
+    }
+    return finiteNumber(value ?? 0, `异放事件修正 ${modifier}`)
+}
+
+function releaseModifierInterval(context, modifier) {
+    const values = context?.releaseModifiers ?? context?.releaseModifierValues ?? {}
+    const value = values?.[modifier]
+    if (value && typeof value === "object" && !Array.isArray(value)
+        && (value.min !== undefined || value.max !== undefined)) {
+        return intervalOf(value, `异放事件修正 ${modifier}`)
+    }
+    return intervalOf(value ?? 0, `异放事件修正 ${modifier}`)
+}
+
 function operationFormulaTerm(trace, parentOperation, index) {
     const formula = trace.formula ?? trace.expression
     if (trace.kind !== "operation") return formula
@@ -102,9 +129,11 @@ function operationFormulaTerm(trace, parentOperation, index) {
 }
 
 function evaluateLeaf(node, context) {
-    const unit = node.unit ?? "raw"
+    const unit = node.unit ?? (node.kind === "releaseModifier" ? "decimal" : "raw")
     let rawValue
     let sourceLabel
+    let modifierBonus = null
+    let modifierFactor = null
 
     if (node.kind === "constant") {
         rawValue = finiteNumber(node.value, "异放公式常量")
@@ -137,6 +166,18 @@ function evaluateLeaf(node, context) {
         const matched = context?.event?.stunned === true
         rawValue = finiteNumber(matched ? node.whenTrue : node.whenFalse, "异放条件值")
         sourceLabel = expressionLabel(node, "是否失衡")
+    } else if (node.kind === "releaseModifier") {
+        const modifier = releaseModifierKey(node)
+        if (!modifier) {
+            throw new Error("异放公式的事件修正标识不能为空。")
+        }
+        if (!RELEASE_MODIFIER_KEYS.has(modifier)) {
+            throw new Error(`异放公式使用了不支持的事件修正：${modifier}`)
+        }
+        modifierBonus = releaseModifierValue(context, modifier)
+        modifierFactor = Math.max(0, 1 + modifierBonus)
+        rawValue = unit === "percent" ? modifierFactor * 100 : modifierFactor
+        sourceLabel = expressionLabel(node, RELEASE_MODIFIER_LABELS[modifier] ?? modifier)
     } else {
         throw new Error(`异放公式使用了不支持的叶节点：${node.kind ?? ""}`)
     }
@@ -155,6 +196,13 @@ function evaluateLeaf(node, context) {
             whiteBoxRole: node.whiteBoxRole,
             formula: rawDisplay,
             expression: rawDisplay,
+            ...(modifierBonus !== null ? {
+                modifier: releaseModifierKey(node),
+                modifierBonus,
+                modifierFactor,
+                modifierFormula: `1 + ${displayNumber(modifierBonus * 100)}% = ${displayNumber(modifierFactor)}`,
+                neutral: Math.abs(modifierFactor - 1) <= 1e-12,
+            } : {}),
             children: [],
         },
     }
@@ -198,7 +246,13 @@ function evaluateOperation(node, context) {
         divide: " / ",
     }
     const formula = symbols[operation]
-        ? evaluated.map((item, index) => operationFormulaTerm(item.trace, operation, index)).join(symbols[operation])
+        ? (() => {
+            const visible = operation === "multiply"
+                ? evaluated.filter(item => !item.trace?.neutral)
+                : evaluated
+            if (!visible.length) return operation === "multiply" ? "1" : evaluated.map(item => operationFormulaTerm(item.trace, operation, 0)).join(symbols[operation])
+            return visible.map((item, index) => operationFormulaTerm(item.trace, operation, index)).join(symbols[operation])
+        })()
         : `${operation}(${evaluated.map(item => item.trace.formula ?? item.trace.expression).join(", ")})`
     return {
         value,
@@ -335,6 +389,17 @@ export function evaluateReleaseExpressionInterval(node, context = {}) {
                 throw new Error(`异放公式使用了不支持的条件：${node.condition ?? ""}`)
             }
             raw = intervalOf(context?.event?.stunned === true ? node.whenTrue : node.whenFalse, "异放条件值")
+        } else if (node.kind === "releaseModifier") {
+            const modifier = releaseModifierKey(node)
+            if (!modifier) throw new Error("异放公式的事件修正标识不能为空。")
+            if (!RELEASE_MODIFIER_KEYS.has(modifier)) {
+                throw new Error(`异放公式使用了不支持的事件修正：${modifier}`)
+            }
+            const bonus = releaseModifierInterval(context, modifier)
+            raw = { min: Math.max(0, 1 + bonus.min), max: Math.max(0, 1 + bonus.max) }
+            if (unit === "percent") {
+                raw = { min: raw.min * 100, max: raw.max * 100 }
+            }
         } else {
             throw new Error(`异放公式使用了不支持的叶节点：${node.kind ?? ""}`)
         }
@@ -478,6 +543,12 @@ export function validateAnomalyReleaseProfile(profile = {}) {
         }
         if (node.kind === "coreSkillScaling" && !String(node.field ?? "").trim()) {
             errors.push(`${path}.field 不能为空。`)
+        }
+        if (node.kind === "releaseModifier") {
+            const modifier = releaseModifierKey(node)
+            if (!RELEASE_MODIFIER_KEYS.has(modifier)) {
+                errors.push(`${path}.modifier 不是允许的异放事件修正。`)
+            }
         }
         if (node.kind === "condition" && node.condition !== "stunned") {
             errors.push(`${path}.condition 目前只支持 stunned。`)

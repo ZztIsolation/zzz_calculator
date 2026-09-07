@@ -3014,6 +3014,37 @@ assertInvalid("combat-buffs", {
         target: { kind: "default" },
     }],
 }, "初始异常掌控转异常暴击率只能用于异放结算")
+const releaseProficiencyYieldBonus = {
+    ...anomalyTargetBuff.effects[0],
+    id: "release-proficiency-yield-bonus",
+    stat: "releaseProficiencyYieldBonus",
+    value: 30,
+    target: { kind: "anomaly", settlementType: "release" },
+}
+assertValid("combat-buffs", {
+    ...anomalyTargetBuff,
+    effects: [releaseProficiencyYieldBonus],
+})
+assertInvalid("combat-buffs", {
+    ...anomalyTargetBuff,
+    effects: [{
+        id: "legacy-release-proficiency-yield-bonus",
+        type: "damageModifier",
+        kind: "releaseProficiencyYieldBonus",
+        value: 0.3,
+    }],
+}, "不是支持的选项")
+for (const target of [
+    { kind: "anomaly", settlementType: "attribute" },
+    { kind: "anomaly", settlementType: "disorder" },
+    { kind: "anomaly", settlementType: "luminescence" },
+    { kind: "default" },
+]) {
+    assertInvalid("combat-buffs", {
+        ...anomalyTargetBuff,
+        effects: [{ ...releaseProficiencyYieldBonus, target }],
+    }, "异放精通收益提升只能用于异放结算")
+}
 const buffWithModifierOnly = {
     ...validBuff,
     id: "youye.cinema_1.amplify_additional_ability",

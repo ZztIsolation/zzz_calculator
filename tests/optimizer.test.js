@@ -214,11 +214,265 @@ function resultScores(result) {
     return result.results.map(item => Number(item.score.toFixed(6)))
 }
 
+function strictFixtureStore({ setId = fourSet, slotOneValues = [100, 50], equalIdentityOrder = false, excludedIndex = -1 } = {}) {
+    const mains = slotMain
+    const slotOne = slotOneValues.map((value, index) => {
+        const id = equalIdentityOrder
+            ? (index === 0 ? "z-equal-late-id" : "a-equal-early-id")
+            : `fixture-slot1-${index}`
+        const sequence = equalIdentityOrder
+            ? (index === 0 ? 2 : 1)
+            : index + 1
+        const item = disc(id, setId, 1, mains[1], [{ stat: "atkFlat", value }])
+        item.source.sequence = sequence
+        if (index === excludedIndex) item.excludedForAgentIds = [exampleInput.agentId]
+        return item
+    })
+    return {
+        version: 1,
+        owners: [{ id: "default", label: "默认用户" }],
+        imports: [],
+        driveDiscLoadouts: [],
+        driveDiscs: [
+            ...slotOne,
+            ...[2, 3, 4, 5, 6].map(slot => disc(`fixture-slot${slot}`, setId, slot, mains[slot])),
+        ],
+    }
+}
+
+function strictFixtureInput({ event = null, algorithm = "exact-super-bound", settings = {} } = {}) {
+    return optimizerInput({
+        damage: event ? {
+            agentLevel: 60,
+            selectedEventId: event.id,
+            events: [event],
+            target: {
+                defense: 953,
+                levelCoefficient: 794,
+                resistanceByElement: { ether: 0 },
+            },
+        } : exampleInput.damage,
+        settings: {
+            algorithm,
+            fourPieceSetId: fourSet,
+            twoPieceSetId: fourSet,
+            ...settings,
+        },
+    })
+}
+
+function bruteForceStrictFixture(input, fixtureStore) {
+    const bySlot = [1, 2, 3, 4, 5, 6].map(slot =>
+        fixtureStore.driveDiscs.filter(item => Number(item.partition) === slot)
+            .filter(item => {
+                const limits = input.settings.mainStatLimits?.[slot]
+                    ?? input.settings.mainStatLimits?.[String(slot)]
+                    ?? []
+                return !limits.length || limits.includes(item.mainStat.stat)
+            })
+            .filter(item => !item.excludedForAgentIds?.includes(input.agentId))
+    )
+    const results = []
+    const selected = []
+    function walk(index) {
+        if (index >= bySlot.length) {
+            const data = calculateInCombatPanel(catalog, {
+                ...input,
+                driveDiscs: selected.map(toCalculatorDriveDisc),
+                combatBuffs: {
+                    ...input.combatBuffs,
+                    activeBuffIds: [
+                        ...(input.combatBuffs?.activeBuffIds ?? [])
+                            .filter(id => !String(id).startsWith("driveDisc4pc:")),
+                        ...fourPieceIds(input.settings.fourPieceSetId),
+                    ],
+                },
+            })
+            results.push({
+                ids: selected.map(item => item.id).join("|"),
+                stableKey: selected.map(item => `${String(item.source?.sequence ?? Number.MAX_SAFE_INTEGER).padStart(8, "0")}:${item.id}`).join("|"),
+                score: data.damage.totalFinalDamage ?? data.damage.finalDamage,
+            })
+            return
+        }
+        for (const item of bySlot[index]) {
+            selected.push(item)
+            walk(index + 1)
+            selected.pop()
+        }
+    }
+    walk(0)
+    return results.sort((left, right) => right.score - left.score || left.stableKey.localeCompare(right.stableKey)).slice(0, 10)
+}
+
+function assertStrictFixtureMatchesBrute({ label, input, fixtureStore, expectedCount = null }) {
+    const brute = bruteForceStrictFixture(input, fixtureStore)
+    const exact = optimizeDriveDiscs(catalog, fixtureStore, input)
+    const legacy = optimizeDriveDiscs(catalog, fixtureStore, {
+        ...input,
+        settings: { ...input.settings, algorithm: "exact-legacy", enableUpperBoundPruning: false },
+    })
+    const expectedIds = brute.map(item => item.ids)
+    const expectedScores = brute.map(item => Number(item.score.toFixed(6)))
+    assert.equal(exact.metrics.strictExact, true, `${label} exact-super-bound should remain strict`)
+    assert.equal(legacy.metrics.strictExact, true, `${label} exact-legacy should remain strict`)
+    assert.deepEqual(resultIds(exact), expectedIds, `${label} super-bound IDs should match independent brute force`)
+    assert.deepEqual(resultIds(legacy), expectedIds, `${label} legacy IDs should match independent brute force`)
+    assert.deepEqual(resultScores(exact), expectedScores, `${label} super-bound scores should match independent brute force`)
+    assert.deepEqual(resultScores(legacy), expectedScores, `${label} legacy scores should match independent brute force`)
+    if (expectedCount !== null) {
+        assert.equal(exact.results.length, expectedCount, `${label} should return every legal result when fewer than Top 10 exist`)
+        assert.equal(legacy.results.length, expectedCount, `${label} legacy should return every legal result when fewer than Top 10 exist`)
+    }
+    return { brute, exact, legacy }
+}
+
 const exact = optimizeDriveDiscs(catalog, store, optimizerInput())
 const exactAlias = optimizeDriveDiscs(catalog, store, optimizerInput({ settings: { algorithm: "exact" } }))
 const exactLegacy = optimizeDriveDiscs(catalog, store, optimizerInput({ settings: { algorithm: "exact-legacy" } }))
 const exactNoPrune = optimizeDriveDiscs(catalog, store, optimizerInput({ settings: { enableUpperBoundPruning: false } }))
 const brute = bruteForce(optimizerInput())
+
+const strictTwoCandidateStore = strictFixtureStore()
+const strictTargetCases = [
+    ["direct damage", strictFixtureInput()],
+    ["attribute anomaly", strictFixtureInput({
+        event: {
+            id: "strict-attribute-anomaly",
+            kind: "anomaly",
+            settlementType: "attribute",
+            anomalyEffect: "shatter",
+            procCount: 1,
+            count: 1,
+        },
+    })],
+    ["disorder", strictFixtureInput({
+        event: {
+            id: "strict-disorder",
+            kind: "anomaly",
+            settlementType: "disorder",
+            anomalyEffect: "frost_frozen",
+            elapsedSeconds: 0,
+            durationSeconds: 20,
+            count: 1,
+        },
+    })],
+]
+for (const [label, input] of strictTargetCases) {
+    const { exact: strictResult, legacy: strictLegacy } = assertStrictFixtureMatchesBrute({
+        label,
+        input,
+        fixtureStore: strictTwoCandidateStore,
+        expectedCount: 2,
+    })
+    assert.equal(strictResult.metrics.estimatedCombinationCount, 2, `${label} estimate should include both legal candidates`)
+    assert.equal(strictLegacy.metrics.estimatedCombinationCount, 2, `${label} legacy estimate should include both legal candidates`)
+}
+
+const vivianStrictInput = {
+    agentId: "vivian",
+    coreSkillLevel: "F",
+    cinemaLevel: 2,
+    wEngineId: "zzz_wiki_1277",
+    wEngineModificationLevel: 1,
+    combatBuffs: {
+        activeBuffIds: [
+            "agent:vivian.corePassive",
+            "agent:vivian.additionalAbility",
+            "wEngine:zzz_wiki_1277.self",
+            "agent:vivian.cinema.2",
+        ],
+    },
+    damage: {
+        mode: "anomaly",
+        selectedEventId: "strict-vivian-release",
+        events: [{
+            id: "strict-vivian-release",
+            kind: "anomaly",
+            settlementType: "release",
+            anomalyEffect: "corruption",
+            count: 1,
+            stunned: true,
+            triggerActorRef: { agentId: "vivian", profileId: "core_passive" },
+            anomalySource: { actorRef: { agentId: "vivian" } },
+        }],
+        target: {
+            defense: 953,
+            levelCoefficient: 794,
+            resistanceByElement: { ether: 0 },
+        },
+    },
+    settings: {
+        algorithm: "exact-super-bound",
+        objective: "damage",
+        fourPieceSetId: fourSet,
+        twoPieceSetId: fourSet,
+        mainStatLimits: {
+            4: [slotMain[4].stat],
+            5: [slotMain[5].stat],
+            6: [slotMain[6].stat],
+        },
+    },
+}
+const vivianStrict = assertStrictFixtureMatchesBrute({
+    label: "Vivian release",
+    input: vivianStrictInput,
+    fixtureStore: strictTwoCandidateStore,
+    expectedCount: 2,
+})
+assert.equal(vivianStrict.exact.metrics.estimatedCombinationCount, 2,
+    "Vivian Release estimate should include the full legal candidate space")
+
+const strictTopTenStore = strictFixtureStore({
+    slotOneValues: Array.from({ length: 11 }, (_, index) => 110 - index * 10),
+})
+const strictTopTen = assertStrictFixtureMatchesBrute({
+    label: "eleven legal candidates",
+    input: strictFixtureInput(),
+    fixtureStore: strictTopTenStore,
+})
+assert.equal(strictTopTen.exact.results.length, 10)
+assert.equal(strictTopTen.legacy.results.length, 10)
+assert.equal(strictTopTen.exact.metrics.estimatedCombinationCount, 11)
+assert.equal(strictTopTen.legacy.metrics.estimatedCombinationCount, 11)
+const strictTopTenParallel = await optimizeDriveDiscsAsync(catalog, strictTopTenStore, {
+    ...strictFixtureInput(),
+    settings: {
+        ...strictFixtureInput().settings,
+        algorithm: "exact-super-bound-parallel",
+        workerCount: 2,
+    },
+})
+assert.equal(strictTopTenParallel.metrics.strictExact, true)
+assert.deepEqual(resultIds(strictTopTenParallel), strictTopTen.brute.map(item => item.ids),
+    "Node parallel strict Top 10 should match independent brute force after retaining all legal candidates")
+assert.deepEqual(resultScores(strictTopTenParallel), strictTopTen.brute.map(item => Number(item.score.toFixed(6))))
+assert.equal(strictTopTenParallel.metrics.estimatedCombinationCount, 11)
+
+const equalCandidateStore = strictFixtureStore({ slotOneValues: [50, 50], equalIdentityOrder: true })
+const equalStrict = assertStrictFixtureMatchesBrute({
+    label: "equal-stat cross-ordered candidates",
+    input: strictFixtureInput(),
+    fixtureStore: equalCandidateStore,
+    expectedCount: 2,
+})
+assert.equal(equalStrict.exact.metrics.candidateCountsBySlot["1"], 2)
+const equalHeuristic = optimizeDriveDiscs(catalog, equalCandidateStore, strictFixtureInput({
+    algorithm: "heuristic-potential",
+}))
+assert.ok(equalHeuristic.results.length > 0,
+    "Heuristic dominance must not delete every equal-stat candidate when source and ID order disagree")
+assert.ok(equalHeuristic.metrics.candidateCountsBySlot["1"] > 0)
+
+const excludedStrongStore = strictFixtureStore({ excludedIndex: 0 })
+const excludedStrong = assertStrictFixtureMatchesBrute({
+    label: "explicitly excluded stronger candidate",
+    input: strictFixtureInput(),
+    fixtureStore: excludedStrongStore,
+    expectedCount: 1,
+})
+assert.ok(resultIds(excludedStrong.exact)[0].startsWith("fixture-slot1-1|"))
+assert.equal(excludedStrong.exact.metrics.excludedByExclusion, 1)
 
 const currentSkillDamage = level => ({
     skillLevelsByCategory: { basic: level },

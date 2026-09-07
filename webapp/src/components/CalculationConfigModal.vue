@@ -306,24 +306,49 @@ function releaseEffect(event: any) {
   return (props.meta?.anomalyEffects ?? []).find((effect: any) => effect?.id === effectId) ?? null
 }
 
+function releaseModifierValues(event: any, effect: any) {
+  const previewEvent = {
+    ...event,
+    kind: "anomaly",
+    settlementType: "release",
+    anomalyVariant: "release",
+    damageElement: effect?.element ?? event?.damageElement,
+  }
+  let releaseProficiencyYieldBonus = 0
+  for (const combatEffect of props.combatEffects ?? []) {
+    for (const modifier of combatEffect?.resolvedDamageModifiers ?? []) {
+      if (modifier?.kind !== "releaseProficiencyYieldBonus" || !damageModifierAppliesTo(modifier, previewEvent)) continue
+      const value = Number(modifier?.value ?? 0)
+      if (Number.isFinite(value)) releaseProficiencyYieldBonus += value
+    }
+  }
+  return { releaseProficiencyYieldBonus }
+}
+
 function releaseBreakdown(event: any) {
   if (!isReleaseSettlement(event)) return null
   const effect = releaseEffect(event)
   const profile = anomalyReleaseProfile(props.agent, event?.triggerActorRef?.profileId, effect?.element)
   if (!effect || !profile) return null
   try {
+    const releaseModifiers = releaseModifierValues(event, effect)
     const evaluated = evaluateAnomalyReleaseProfile(profile, {
       originalBaseMultiplier: Number(effect.baseMultiplier ?? 0),
       trigger: {
         inCombatPanel: props.releaseContext?.inCombatPanel ?? {},
         outOfCombatPanel: props.releaseContext?.outOfCombatPanel ?? {},
       },
+      releaseModifiers,
       coreScalingRow: corePassiveScalingRow(props.agent, props.releaseContext?.coreSkillLevel),
       event,
       eventElement: effect.element,
     })
     const conversionSource = releaseTraceNode(evaluated.trace, (trace: any) => trace.whiteBoxRole === "conversionSource")
     const stunnedCondition = releaseTraceNode(evaluated.trace, (trace: any) => trace.kind === "condition")
+    const proficiencyYieldModifier = releaseTraceNode(
+      evaluated.trace,
+      (trace: any) => trace.kind === "releaseModifier" && trace.modifier === "releaseProficiencyYieldBonus",
+    )
     return {
       ...evaluated,
       currentMultiplier: evaluated.finalBaseMultiplier * normalizeDamageScale(event),
@@ -335,6 +360,8 @@ function releaseBreakdown(event: any) {
       conversionSourceValue: Number(conversionSource?.rawValue ?? conversionSource?.value ?? 0),
       hasStunnedRatio: Boolean(stunnedCondition),
       stunnedRatio: stunnedCondition ? Number(stunnedCondition.value ?? 1) : 1,
+      hasProficiencyYieldModifier: Number(proficiencyYieldModifier?.modifierBonus ?? 0) !== 0,
+      proficiencyYieldFactor: Number(proficiencyYieldModifier?.modifierFactor ?? 1),
     }
   } catch {
     return null
@@ -1644,6 +1671,7 @@ function save() {
               </div>
               <dl class="disorder-explanation-metrics release-explanation-metrics">
                 <div><dt>{{ selectedReleaseBreakdown.conversionSourceLabel }}</dt><dd>{{ formatReleaseValue(selectedReleaseBreakdown.conversionSourceValue) }}</dd></div>
+                <div v-if="selectedReleaseBreakdown.hasProficiencyYieldModifier"><dt>异放精通收益修正</dt><dd>× {{ formatReleaseValue(selectedReleaseBreakdown.proficiencyYieldFactor) }}</dd></div>
                 <div v-if="selectedReleaseBreakdown.hasStunnedRatio"><dt>异放失衡倍率修正</dt><dd>× {{ formatReleaseValue(selectedReleaseBreakdown.stunnedRatio) }}</dd></div>
                 <div><dt>异放最终倍率</dt><dd>{{ formatDisorderMultiplier(selectedReleaseBreakdown.currentMultiplier) }}</dd></div>
               </dl>

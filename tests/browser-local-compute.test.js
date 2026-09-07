@@ -299,6 +299,159 @@ assert.equal("k" in danWorkerEventInput, false)
 assert.equal("referenceAnomalyProficiency" in danWorkerEventInput, false)
 assert.equal("referenceLuminescenceDamageMultiplier" in danWorkerEventInput, false)
 
+const vivianSet = "phaethons_melody"
+const vivianTwoSet = "freedom_blues"
+const vivianWorkerMainBySlot = {
+    1: { stat: "hpFlat", value: 2200 },
+    2: { stat: "atkFlat", value: 316 },
+    3: { stat: "defFlat", value: 184 },
+    4: { stat: "anomalyProficiency", value: 92 },
+    5: { stat: "etherDmg", value: 30, mode: "pct" },
+    6: { stat: "anomalyMastery", value: 30, mode: "pct" },
+}
+const vivianWorkerStore = {
+    ...store,
+    driveDiscs: [vivianSet, vivianTwoSet].flatMap((setId, setIndex) =>
+        [1, 2, 3, 4, 5, 6].flatMap(slot => [
+            disc(`vivian-worker-${setIndex}-${slot}-atk`, setId, slot, vivianWorkerMainBySlot[slot], [
+                { stat: "atkPct", value: 3 + slot + setIndex, mode: "pct" },
+            ]),
+            disc(`vivian-worker-${setIndex}-${slot}-release`, setId, slot, vivianWorkerMainBySlot[slot], [
+                { stat: "atkPct", value: 3 + slot + setIndex, mode: "pct" },
+                slot === 4
+                    ? { stat: "penRatio", value: 6 + slot + setIndex, mode: "pct" }
+                    : { stat: "anomalyProficiency", value: 9 * (slot + setIndex + 1) },
+            ]),
+        ]),
+    ),
+}
+const vivianReleaseEvent = {
+    id: "vivian-worker-release",
+    kind: "anomaly",
+    settlementType: "release",
+    anomalyEffect: "corruption",
+    count: 1,
+    stunned: true,
+    triggerActorRef: { agentId: "vivian", profileId: "core_passive" },
+    anomalySource: { actorRef: { agentId: "vivian" } },
+}
+const vivianWorkerInput = {
+    agentId: "vivian",
+    coreSkillLevel: "F",
+    cinemaLevel: 2,
+    wEngineId: "zzz_wiki_1277",
+    wEngineModificationLevel: 1,
+    driveDiscs: [],
+    combatBuffs: {
+        activeBuffIds: [
+            "agent:vivian.additionalAbility",
+            "wEngine:zzz_wiki_1277.self",
+            "agent:vivian.cinema.2",
+        ],
+    },
+    damage: {
+        mode: "anomaly",
+        selectedEventId: vivianReleaseEvent.id,
+        events: [vivianReleaseEvent],
+        target: {
+            defense: 953,
+            levelCoefficient: 794,
+            resistanceByElement: { ether: 0 },
+        },
+    },
+    settings: {
+        objective: "damage",
+        algorithm: "exact-super-bound",
+        fourPieceSetId: vivianSet,
+        twoPieceSetId: vivianTwoSet,
+        enableUpperBoundPruning: true,
+        disableParallel: true,
+        mainStatLimits: catalog.agentsMap.get("vivian").preferredDriveDiscs.mainStatLimits,
+    },
+}
+const vivianWorkerRuntime = createDriveDiscOptimizerRuntime({
+    availableParallelism: () => 1,
+    yieldControl: async () => {},
+})
+const vivianWorkerResult = await vivianWorkerRuntime.optimizeDriveDiscsAsync(
+    catalog,
+    vivianWorkerStore,
+    vivianWorkerInput,
+)
+const vivianWorkerLegacyResult = await vivianWorkerRuntime.optimizeDriveDiscsAsync(
+    catalog,
+    vivianWorkerStore,
+    {
+        ...vivianWorkerInput,
+        settings: {
+            ...vivianWorkerInput.settings,
+            algorithm: "exact-legacy",
+            enableUpperBoundPruning: false,
+        },
+    },
+)
+assert.equal(vivianWorkerResult.results.length, 10,
+    "Browser Worker Vivian multi-candidate fixture should produce a full Top 10.")
+assert.equal(vivianWorkerResult.metrics.strictExact, true)
+assert.deepEqual(vivianWorkerResult.metrics.candidateCountsBySlot,
+    { 1: 4, 2: 4, 3: 4, 4: 4, 5: 4, 6: 4 },
+    "Browser Worker strict optimization should retain both dominated and dominating legal candidates.")
+assert.equal(vivianWorkerResult.metrics.estimatedCombinationCount, 960,
+    "Browser Worker estimate should cover the complete legal 4+2 candidate space.")
+assert.equal(vivianWorkerLegacyResult.metrics.estimatedCombinationCount, 960,
+    "Browser Worker legacy estimate should cover the same complete legal candidate space.")
+assert.ok(Number(vivianWorkerResult.metrics.superBoundChecks ?? 0) > 0,
+    "Browser Worker Vivian fixture should execute Release interval-bound checks.")
+assert.ok(Number(vivianWorkerResult.metrics.prunedBySuperBound ?? 0) > 0,
+    "Browser Worker Vivian fixture should prune at least one legal loadout.")
+assert.ok(
+    Number(vivianWorkerResult.metrics.scoredCombinationCount ?? 0)
+        < Number(vivianWorkerResult.metrics.estimatedCombinationCount ?? 0),
+    "Browser Worker Vivian fixture should score fewer loadouts than exhaustive enumeration.",
+)
+assert.equal(
+    Number(vivianWorkerResult.metrics.scoredCombinationCount ?? 0)
+        + Number(vivianWorkerResult.metrics.prunedBySuperBound ?? 0),
+    Number(vivianWorkerResult.metrics.estimatedCombinationCount ?? 0),
+    "Browser Worker Vivian scored and pruned loadouts should account for the full search space.",
+)
+assert.deepEqual(
+    vivianWorkerResult.results.map(result => result.driveDiscs.map(item => item.id)),
+    vivianWorkerLegacyResult.results.map(result => result.driveDiscs.map(item => item.id)),
+    "Browser Worker Vivian Release Top 10 IDs should match exact legacy enumeration.",
+)
+assert.deepEqual(
+    vivianWorkerResult.results.map(result => result.score),
+    vivianWorkerLegacyResult.results.map(result => result.score),
+    "Browser Worker Vivian Release Top 10 scores should match exact legacy enumeration.",
+)
+for (const vivianWorkerItem of vivianWorkerResult.results) {
+    const vivianWorkerCoreResult = browserCalculateInCombatPanel(catalog, {
+        ...vivianWorkerInput,
+        driveDiscs: vivianWorkerItem.driveDiscs,
+        combatBuffs: {
+            ...vivianWorkerInput.combatBuffs,
+            activeBuffIds: [
+                ...vivianWorkerInput.combatBuffs.activeBuffIds,
+                `driveDisc4pc:${vivianWorkerItem.fourPieceSetId}.self`,
+            ],
+        },
+    })
+    assert.equal(
+        Math.abs(vivianWorkerItem.score - vivianWorkerCoreResult.damage.totalFinalDamage) <= 1e-9,
+        true,
+        "Every Browser Worker Vivian Top 10 score should equal direct shared-core calculation within floating-point tolerance.",
+    )
+    assert.equal(vivianWorkerItem.data.damage.events[0].multipliers.releaseProficiencyYieldFactor, 1.3)
+    assert.equal(vivianWorkerCoreResult.damage.events[0].multipliers.releaseProficiencyYieldFactor, 1.3)
+}
+assert.equal(vivianWorkerLegacyResult.metrics.strictExact, true)
+assert.equal(
+    Number(vivianWorkerLegacyResult.metrics.scoredCombinationCount ?? 0),
+    Number(vivianWorkerLegacyResult.metrics.estimatedCombinationCount ?? 0),
+    "Vivian exact legacy control should enumerate every legal loadout.",
+)
+
 assert.deepEqual(
     browserAnalyzeDriveDiscSubstats(catalog, payload),
     backendAnalyzeDriveDiscSubstats(catalog, payload),

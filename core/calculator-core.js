@@ -299,7 +299,7 @@ const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
 // Kept in the accepted data vocabulary for old saved effects, but this legacy
 // modifier is intentionally ignored by every calculation path.
 const IGNORED_DAMAGE_MODIFIER_KINDS = new Set(["enemyDamageTakenBonus"])
-const DAMAGE_MODIFIER_KINDS = ["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg", "skillMultiplierBonus", ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS]
+const DAMAGE_MODIFIER_KINDS = ["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "releaseProficiencyYieldBonus", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg", "skillMultiplierBonus", ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS]
 const EVENT_MODIFIER_STAT_KEYS = new Set([
     "enemyDamageTakenBonus",
     "anomalyDamageBonus",
@@ -311,6 +311,7 @@ const EVENT_MODIFIER_STAT_KEYS = new Set([
     "anomalyCritDmg",
     "anomalyCritRatePerInitialMasteryAbove100",
     "anomalyDurationBonusSeconds",
+    "releaseProficiencyYieldBonus",
     "stunDmgMultiplierBonus",
     "stunDmgMultiplierBonusAlways",
     "stunDmgMultiplierBonusCapAlways",
@@ -3670,7 +3671,7 @@ function eventTargetTotalsForElement(bonusTotals, event) {
     }
 }
 
-function releaseBreakdownForEvent(event, panel = {}, outOfCombatPanel = panel) {
+function releaseBreakdownForEvent(event, panel = {}, outOfCombatPanel = panel, releaseModifiers = {}) {
     if (!isReleaseSettlement(event)) {
         return {
             resultMode: null,
@@ -3684,10 +3685,17 @@ function releaseBreakdownForEvent(event, panel = {}, outOfCombatPanel = panel) {
     return evaluateAnomalyReleaseProfile(event.releaseProfile, {
         originalBaseMultiplier: Number(event.baseMultiplierPerProc ?? event.baseMultiplier ?? 0),
         trigger: { inCombatPanel: panel, outOfCombatPanel },
+        releaseModifiers,
         coreScalingRow: event.releaseCoreScalingRow,
         event,
         eventElement: event.damageElement,
     })
+}
+
+function releaseModifierValuesForEvent(bonusTotals, event) {
+    return {
+        releaseProficiencyYieldBonus: sumDamageModifiers(bonusTotals, event, "releaseProficiencyYieldBonus"),
+    }
 }
 
 function releaseCritRateBonusForEvent(event, panel = {}, outOfCombatPanel = panel) {
@@ -4815,8 +4823,9 @@ function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTota
         target,
         agentLevel: source.agentLevel,
     })
-    const releaseBreakdown = releaseBreakdownForEvent(event, panel, outOfCombatPanel)
     const triggerBonusTotals = releaseOnlyBonusTotals(bonusTotals)
+    const releaseModifiers = releaseModifierValuesForEvent(triggerBonusTotals, event)
+    const releaseBreakdown = releaseBreakdownForEvent(event, panel, outOfCombatPanel, releaseModifiers)
     const triggerEventTotals = eventTargetTotalsForElement(triggerBonusTotals, event)
     const combinedEventTotals = addEventTotals(sourceUnit.eventTotals, triggerEventTotals)
     const elementDmgKey = `${event.damageElement}Dmg`
@@ -4884,6 +4893,11 @@ function calculateReleaseDamageEvent({ event, panel, outOfCombatPanel, bonusTota
             releaseScale: releaseBreakdown.releaseScale,
             releaseFormulaValue: releaseBreakdown.formulaValue,
             releaseResultMode: releaseBreakdown.resultMode,
+            releaseProficiencyYieldBonus: releaseModifiers.releaseProficiencyYieldBonus,
+            releaseProficiencyYieldFactor: Math.max(
+                0,
+                1 + releaseModifiers.releaseProficiencyYieldBonus,
+            ),
             releaseTrace: releaseBreakdown.trace,
             baseMultiplierBonus: sourceUnit.baseMultiplierBonus + releaseBaseMultiplierBonus,
             releaseBaseMultiplierBonus,
@@ -5489,9 +5503,9 @@ function compileDamageScoreTarget(damageRequest = {}, agent = {}) {
     }
 }
 
-function compiledEventBaseMultiplier(compiledEvent, durationBonusSeconds = 0, panel = {}, outOfCombatPanel = panel) {
+function compiledEventBaseMultiplier(compiledEvent, durationBonusSeconds = 0, panel = {}, outOfCombatPanel = panel, releaseModifiers = {}) {
     if (compiledEvent.isRelease) {
-        return releaseBreakdownForEvent(compiledEvent, panel, outOfCombatPanel).finalBaseMultiplier
+        return releaseBreakdownForEvent(compiledEvent, panel, outOfCombatPanel, releaseModifiers).finalBaseMultiplier
     }
     if (!compiledEvent.isDisorder) {
         if (compiledEvent.usesDefaultProcCount
@@ -5685,6 +5699,12 @@ function calculateCompiledDamageScoreValue({ agent, panel, outOfCombatPanel = pa
                 compiledModifierSum(sums, "anomalyDurationBonusSeconds"),
                 panel,
                 outOfCombatPanel,
+                {
+                    releaseProficiencyYieldBonus: compiledModifierSum(
+                        sums,
+                        "releaseProficiencyYieldBonus",
+                    ),
+                },
             ) + compiledModifierSum(
                 sums,
                 compiledEvent.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
@@ -5920,6 +5940,12 @@ function calculateCompiledDamageScoreValueDense({
                 denseModifierSum(modifierSums, "anomalyDurationBonusSeconds"),
                 panelProxy,
                 outOfCombatPanelProxy,
+                {
+                    releaseProficiencyYieldBonus: denseModifierSum(
+                        modifierSums,
+                        "releaseProficiencyYieldBonus",
+                    ),
+                },
             ) + denseModifierSum(
                 modifierSums,
                 compiledEvent.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
@@ -7926,6 +7952,10 @@ export function createInCombatPanelCalculator(catalog, input) {
                         event.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
                     ),
                     durationBonusSeconds: denseModifierSum(sums, "anomalyDurationBonusSeconds"),
+                    releaseProficiencyYieldBonus: denseModifierSum(
+                        sums,
+                        "releaseProficiencyYieldBonus",
+                    ),
                     baseMultiplierScale: event.baseMultiplierScale,
                     anomalyDamageBonus: 1 + denseModifierSum(
                         sums,
@@ -8156,6 +8186,9 @@ export function createInCombatPanelCalculator(catalog, input) {
                                 outOfCombatPanel: formulaOutOfCombatIntervalPanel,
                             },
                             coreScalingRow: event.releaseCoreScalingRow,
+                            releaseModifiers: {
+                                releaseProficiencyYieldBonus: event.releaseProficiencyYieldBonus,
+                            },
                             event,
                             eventElement: event.damageElement,
                         }).finalBaseMultiplier.max
@@ -8168,6 +8201,9 @@ export function createInCombatPanelCalculator(catalog, input) {
                                 event.durationBonusSeconds,
                                 formulaInCombatPanel,
                                 formulaOutOfCombatPanel,
+                                {
+                                    releaseProficiencyYieldBonus: event.releaseProficiencyYieldBonus,
+                                },
                             )) + event.baseMultiplierBonus,
                         ) * event.baseMultiplierScale
                         : event.effectiveBaseMultiplier
@@ -8263,6 +8299,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     : null)
                 return {
                     scoreKernel: fixedObjectiveKernel ? "compiled-objective-fixed-sets" : "compiled-dense-fixed-sets",
+                    releaseIntervalBound: fixedObjectiveKernel?.releaseIntervalBound === true,
                     scoreObjectiveScalar: fixedObjectiveKernel?.scoreObjectiveScalar,
                     scoreCombinedScalar: fixedObjectiveKernel?.scoreCombinedScalar,
                     scoreScalar(statValues = []) {

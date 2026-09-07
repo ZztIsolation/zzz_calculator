@@ -40,6 +40,7 @@ function releaseEvent() {
 
 function releaseInput(overrides = {}) {
     const activeBuffIds = overrides.activeBuffIds ?? [
+        "agent:vivian.corePassive",
         "agent:vivian.additionalAbility",
         "wEngine:zzz_wiki_1277.self",
     ]
@@ -72,6 +73,48 @@ function releaseInput(overrides = {}) {
 }
 
 assert.ok(agent, "Vivian should be present in the agent catalog")
+const corePassive = agent.combatBuffs?.corePassive
+assert.ok(corePassive, "Vivian should expose her Core Passive as a displayable Buff")
+assert.equal(corePassive.scope, "inCombat")
+assert.equal(corePassive.name?.zhCN, "核心被动：命运悲歌")
+assert.equal(corePassive.source?.zhCN, "核心被动：命运悲歌")
+assert.ok(corePassive.description?.zhCN?.includes("[异放]"))
+assert.ok(corePassive.description?.zhCN?.includes("[薇薇安的预言]"))
+assert.ok(corePassive.description?.zhCN?.includes("2点[飞羽]"))
+for (const coefficientText of [
+    "以太6.15%",
+    "电3.20%",
+    "火8%",
+    "物理0.75%",
+    "冰1.08%",
+    "风0.32%",
+]) {
+    assert.ok(corePassive.description?.zhCN?.includes(coefficientText), `Core Passive description should include ${coefficientText}`)
+}
+assert.ok(!corePassive.description?.zhCN?.includes("未强化/A/B/C/D/E/F"))
+assert.deepEqual(corePassive.effects, [])
+assert.deepEqual(corePassive.buffModifiers, [])
+const cinemaTwoCatalogBuff = agent.combatBuffs?.cinemaBuffs?.find(buff => Number(buff.cinemaLevel) === 2)
+assert.ok(cinemaTwoCatalogBuff, "Vivian should expose her Cinema 2 Buff")
+const cinemaTwoProficiencyYield = cinemaTwoCatalogBuff.effects?.find(
+    effect => effect.id === "vivian-cinema-2-release-proficiency-yield",
+)
+assert.deepEqual(
+    {
+        type: cinemaTwoProficiencyYield?.type,
+        stat: cinemaTwoProficiencyYield?.stat,
+        value: cinemaTwoProficiencyYield?.value,
+        mode: cinemaTwoProficiencyYield?.mode,
+        target: cinemaTwoProficiencyYield?.target,
+    },
+    {
+        type: "fixed",
+        stat: "releaseProficiencyYieldBonus",
+        value: 30,
+        mode: "flat",
+        target: { kind: "anomaly", settlementType: "release" },
+    },
+)
 assert.deepEqual(agent.level60, {
     hpBase: 7673,
     atkBase: 805,
@@ -112,6 +155,15 @@ assert.deepEqual(
     },
 )
 assert.deepEqual(
+    profile.expression.args[1],
+    {
+        kind: "releaseModifier",
+        modifier: "releaseProficiencyYieldBonus",
+        unit: "decimal",
+        label: { zhCN: "异放精通收益修正" },
+    },
+)
+assert.deepEqual(
     agent.coreSkill.corePassiveScaling.levels.map(level => level.releaseCoefficientPctByElement.ether),
     [3.07, 3.59, 4.11, 4.63, 5.15, 5.65, 6.15],
 )
@@ -131,6 +183,17 @@ const ratioAtF = evaluateAnomalyReleaseProfile(profile, {
 approx(ratioAtF.releaseScale, 2.0172, "F-level Ether release ratio at 328 AP")
 assert.equal(ratioAtF.trace.formula, "328 / 10 × 6.15%")
 
+const ratioAtFCinemaTwo = evaluateAnomalyReleaseProfile(profile, {
+    originalBaseMultiplier: 0.625,
+    trigger: { inCombatPanel: { anomalyProficiency: 328 } },
+    releaseModifiers: { releaseProficiencyYieldBonus: 0.3 },
+    coreScalingRow: corePassiveScalingRow(agent, "F"),
+    event: releaseEvent(),
+    eventElement: "ether",
+})
+approx(ratioAtFCinemaTwo.releaseScale, 2.62236, "Cinema 2 F-level Ether release ratio at 328 AP")
+assert.equal(ratioAtFCinemaTwo.trace.formula, "328 / 10 × 1.3 × 6.15%")
+
 const result = calculateInCombatPanel(catalog, releaseInput())
 const eventResult = result.damage.events[0]
 assert.equal(result.damage.events.length, 1, "Vivian target must be a single release event")
@@ -149,6 +212,15 @@ approx(eventResult.multipliers.anomaly, 0.625 * 2.0172, "release base multiplier
 approx(eventResult.multipliers.attributeAnomalyDamage, 1.12, "additional ability Corruption bonus")
 assert.ok(eventResult.whiteBoxRows.some(row => row.label === "转换数据来源" && row.value === 328))
 assert.ok(eventResult.whiteBoxRows.some(row => row.label === "异放公式：异放倍率" && row.formula.includes("328 / 10")))
+
+const withoutDescriptionOnlyCorePassive = calculateInCombatPanel(catalog, releaseInput({
+    activeBuffIds: ["agent:vivian.additionalAbility", "wEngine:zzz_wiki_1277.self"],
+}))
+approx(
+    withoutDescriptionOnlyCorePassive.damage.totalFinalDamage,
+    result.damage.totalFinalDamage,
+    "description-only Core Passive must not change release damage",
+)
 
 const lowerAp = calculateInCombatPanel(catalog, releaseInput({
     activeBuffIds: ["agent:vivian.additionalAbility"],
@@ -174,11 +246,71 @@ const cinemaOne = calculateInCombatPanel(catalog, releaseInput({
     activeBuffIds: ["agent:vivian.additionalAbility", "wEngine:zzz_wiki_1277.self", "agent:vivian.cinema.1"],
 }))
 approx(cinemaOne.damage.events[0].multipliers.attributeAnomalyDamage, 1.28, "Cinema 1 Prophecy anomaly bonus")
-const cinemaTwo = calculateInCombatPanel(catalog, releaseInput({
+const cinemaTwoInput = releaseInput({
     cinemaLevel: 2,
     activeBuffIds: ["agent:vivian.additionalAbility", "wEngine:zzz_wiki_1277.self", "agent:vivian.cinema.2"],
-}))
+})
+const cinemaTwo = calculateInCombatPanel(catalog, cinemaTwoInput)
 approx(cinemaTwo.damage.events[0].targetBreakdown.resIgnore, 0.15, "Cinema 2 release resistance ignore")
+approx(cinemaTwo.damage.events[0].multipliers.originalAnomalyBaseMultiplier, 0.625,
+    "Cinema 2 proficiency yield must not alter the original Ether anomaly unit")
+approx(cinemaTwo.damage.events[0].multipliers.anomalyProficiency, 3.28,
+    "Cinema 2 proficiency yield must not alter source Anomaly Proficiency scaling")
+approx(cinemaTwo.damage.events[0].multipliers.releaseProficiencyYieldBonus, 0.3,
+    "Cinema 2 stores the release proficiency yield as a 30% bonus")
+approx(cinemaTwo.damage.events[0].multipliers.releaseProficiencyYieldFactor, 1.3,
+    "Cinema 2 applies a 1.3 release proficiency yield factor")
+approx(cinemaTwo.damage.events[0].multipliers.releaseScale, 2.62236,
+    "Cinema 2 only scales the release AP conversion")
+assert.equal(cinemaTwo.damage.events[0].multipliers.releaseTrace.formula,
+    "328 / 10 × 1.3 × 6.15%")
+
+const nonReleaseActiveBuffIds = [
+    "agent:vivian.additionalAbility",
+    "wEngine:zzz_wiki_1277.self",
+]
+for (const event of [
+    {
+        id: "vivian-normal-corruption",
+        kind: "anomaly",
+        settlementType: "attribute",
+        anomalyEffect: "corruption",
+        count: 1,
+        stunned: false,
+        triggerActorRef: { agentId: "vivian" },
+        anomalySource: { actorRef: { agentId: "vivian" } },
+    },
+    {
+        id: "vivian-burn-disorder",
+        kind: "anomaly",
+        settlementType: "disorder",
+        anomalyEffect: "burn",
+        elapsedSeconds: 1,
+        count: 1,
+        stunned: false,
+        triggerActorRef: { agentId: "vivian" },
+        anomalySource: { actorRef: { agentId: "vivian" } },
+    },
+]) {
+    const withoutCinemaTwo = calculateInCombatPanel(catalog, releaseInput({
+        cinemaLevel: 2,
+        activeBuffIds: nonReleaseActiveBuffIds,
+        event,
+    }))
+    const withCinemaTwo = calculateInCombatPanel(catalog, releaseInput({
+        cinemaLevel: 2,
+        activeBuffIds: [...nonReleaseActiveBuffIds, "agent:vivian.cinema.2"],
+        event,
+    }))
+    approx(
+        withCinemaTwo.damage.totalFinalDamage,
+        withoutCinemaTwo.damage.totalFinalDamage,
+        `Cinema 2 release proficiency yield must not affect ${event.settlementType} damage`,
+    )
+    assert.equal(withCinemaTwo.damage.events[0].multipliers.releaseProficiencyYieldBonus, undefined)
+    assert.equal(withCinemaTwo.damage.events[0].multipliers.releaseProficiencyYieldFactor, undefined)
+}
+
 const cinemaFour = calculateInCombatPanel(catalog, releaseInput({
     cinemaLevel: 4,
     activeBuffIds: ["agent:vivian.additionalAbility", "wEngine:zzz_wiki_1277.self", "agent:vivian.cinema.4"],
@@ -190,8 +322,12 @@ const cinemaSix = calculateInCombatPanel(catalog, releaseInput({
 }))
 approx(cinemaSix.damage.events[0].multipliers.dmg, 1.4, "Cinema 6 Ether damage bonus")
 
-const prepared = createInCombatPanelCalculator(catalog, releaseInput())
+const prepared = createInCombatPanelCalculator(catalog, cinemaTwoInput)
 const fullPrepared = prepared.calculate([], { round: false })
+approx(fullPrepared.damage.totalFinalDamage, cinemaTwo.damage.totalFinalDamage,
+    "Cinema 2 prepared full calculation parity")
+approx(fullPrepared.damage.events[0].multipliers.releaseProficiencyYieldFactor, 1.3,
+    "Cinema 2 prepared calculation retains the release proficiency yield factor")
 const compiledPrepared = prepared.scoreOnlyFromSummary(new Map(), new Map())
 const legacyPrepared = prepared.scoreOnlyFromSummaryLegacy(new Map(), new Map())
 const indexedPrepared = prepared.scoreOnlyFromIndexedSummary([], [], [], [], new Map())
@@ -209,9 +345,57 @@ const denseTarget = prepared.compileDensePanelScoreTarget({
 })
 assert.ok(denseTarget, "self-sourced Vivian release should compile a dense target")
 const densePrepared = denseTarget.scoreDense(new Float64Array(), new Int16Array())
-const fixedPrepared = denseTarget.compileForSetCounts(new Int16Array()).scoreScalar(new Float64Array())
+const fixedTarget = denseTarget.compileForSetCounts(new Int16Array())
+assert.equal(fixedTarget.releaseIntervalBound, true,
+    "Cinema 2 fixed Release kernel should expose its safe interval bound")
+const fixedPrepared = fixedTarget.scoreScalar(new Float64Array())
 approx(densePrepared.finalDamage, fullPrepared.damage.totalFinalDamage, "dense release score parity")
 approx(fixedPrepared.finalDamage, fullPrepared.damage.totalFinalDamage, "fixed release score parity")
+const cinemaZeroDenseTarget = createInCombatPanelCalculator(catalog, releaseInput())
+    .compileDensePanelScoreTarget({
+        statIds: [],
+        setIds: [],
+        setIndexById: new Map(),
+    })
+assert.ok(cinemaZeroDenseTarget, "Cinema 0 self-sourced Vivian release should compile a dense target")
+assert.equal(cinemaZeroDenseTarget.compileForSetCounts(new Int16Array()).releaseIntervalBound, true,
+    "Cinema 0 fixed Release kernel should expose its safe interval bound")
+const conditionalReleaseBaseInput = releaseInput()
+const conditionalReleaseInput = {
+    ...conditionalReleaseBaseInput,
+    combatBuffs: {
+        ...conditionalReleaseBaseInput.combatBuffs,
+        manualEffects: [{
+            id: "vivian-release-dynamic-out-of-combat-requirement",
+            label: "Dynamic out-of-combat requirement regression",
+            effects: [{
+                id: "vivian-release-dynamic-out-of-combat-dmg",
+                type: "fixed",
+                stat: "dmgBonus",
+                value: 10,
+                mode: "flat",
+                requirement: { outOfCombatStat: { stat: "atk", min: 0 } },
+            }],
+        }],
+    },
+}
+const conditionalReleaseFull = calculateInCombatPanel(catalog, conditionalReleaseInput)
+const conditionalReleaseDenseTarget = createInCombatPanelCalculator(catalog, conditionalReleaseInput)
+    .compileDensePanelScoreTarget({
+        statIds: [],
+        setIds: [],
+        setIndexById: new Map(),
+    })
+assert.ok(conditionalReleaseDenseTarget,
+    "a dynamic out-of-combat requirement should retain the dense Vivian Release fallback")
+const conditionalReleaseFixedTarget = conditionalReleaseDenseTarget.compileForSetCounts(new Int16Array())
+assert.equal(conditionalReleaseFixedTarget.releaseIntervalBound, false,
+    "a fallback without a fixed objective kernel must not advertise a safe Release interval bound")
+const conditionalReleaseFixed = conditionalReleaseFixedTarget.scoreScalar(new Float64Array())
+assert.ok(Number.isFinite(conditionalReleaseFixed.finalDamage),
+    "the dense fallback should still return a finite Vivian Release score")
+approx(conditionalReleaseFixed.finalDamage, conditionalReleaseFull.damage.totalFinalDamage,
+    "the dense fallback should preserve full Vivian Release damage")
 const metadata = prepared.optimizerStatMetadata()
 assert.equal(metadata.requiresReleaseIntervalBound, true)
 assert.equal(metadata.strictMonotonic, false)
@@ -219,17 +403,17 @@ for (const stat of ["anomalyProficiency", "anomalyProficiencyFlat", "atkFlat", "
     assert.ok(metadata.relevantStatIds.includes(stat), `optimizer should retain ${stat} for Vivian release`)
 }
 
-function optimizerDisc(id, partition, mainStat) {
+function optimizerDisc(id, partition, mainStat, { setId = "phaethons_melody", subStats = [] } = {}) {
     return {
         id,
         ownerId: "default",
-        setId: "phaethons_melody",
+        setId,
         partition,
         rarity: "S",
         level: 15,
         maxLevel: 15,
         mainStat,
-        subStats: [],
+        subStats,
         source: { type: "test", sequence: partition },
     }
 }
@@ -246,7 +430,7 @@ const optimizerStore = {
     ],
 }
 const optimizationInput = {
-    ...releaseInput(),
+    ...cinemaTwoInput,
     settings: {
         objective: "damage",
         algorithm: "exact-super-bound",
@@ -273,5 +457,128 @@ const optimizedFull = calculateInCombatPanel(catalog, {
 })
 approx(optimized.results[0].score, optimizedFull.damage.totalFinalDamage, "strict optimizer release score parity")
 assert.equal(optimizedFull.damage.events.length, 1)
+
+const optimizerMainStatBySlot = {
+    1: { stat: "hpFlat", value: 2200, mode: "flat" },
+    2: { stat: "atkFlat", value: 316, mode: "flat" },
+    3: { stat: "defFlat", value: 184, mode: "flat" },
+    4: { stat: "anomalyProficiency", value: 92, mode: "flat" },
+    5: { stat: "etherDmg", value: 30, mode: "flat" },
+    6: { stat: "anomalyMastery", value: 30, mode: "pct" },
+}
+const strictOptimizerStore = {
+    currentOwnerId: "default",
+    driveDiscs: ["phaethons_melody", "swing_jazz"].flatMap((setId, setIndex) =>
+        Array.from({ length: 6 }, (_, slotIndex) => {
+            const slot = slotIndex + 1
+            return [
+                optimizerDisc(`${setId}-${slot}-strong`, slot, optimizerMainStatBySlot[slot], {
+                    setId,
+                    subStats: slot === 4
+                        ? [
+                            { stat: "atkPct", value: 8.4 + setIndex + slot / 10, mode: "pct" },
+                            { stat: "penFlat", value: 9 + slot, mode: "flat" },
+                        ]
+                        : [
+                            { stat: "anomalyProficiency", value: 18 + setIndex + slot, mode: "flat" },
+                            { stat: "atkPct", value: 5.4 + slot / 10, mode: "pct" },
+                        ],
+                }),
+                optimizerDisc(`${setId}-${slot}-weak`, slot, optimizerMainStatBySlot[slot], {
+                    setId,
+                    subStats: [
+                        { stat: "defPct", value: 4.8 + slot / 10, mode: "pct" },
+                        { stat: "hpPct", value: 4.8 + setIndex, mode: "pct" },
+                    ],
+                }),
+            ]
+        }).flat()
+    ),
+}
+
+function strictOptimizerInput({ cinemaLevel, activeBuffIds, algorithm, autoTwoPiece }) {
+    return {
+        ...releaseInput({ cinemaLevel, activeBuffIds }),
+        settings: {
+            objective: "damage",
+            algorithm,
+            fourPieceSetIds: ["phaethons_melody"],
+            twoPieceSetIds: autoTwoPiece ? [] : ["swing_jazz"],
+            mainStatLimits: agent.preferredDriveDiscs.mainStatLimits,
+            minimums: {},
+            disableParallel: true,
+        },
+    }
+}
+
+function strictResultIds(result) {
+    return result.results.map(item => ({
+        fourPieceSetId: item.fourPieceSetId,
+        driveDiscIds: item.driveDiscs.map(disc => disc.id),
+    }))
+}
+
+for (const scenario of [
+    {
+        label: "Cinema 0 fixed 4+2",
+        cinemaLevel: 0,
+        activeBuffIds: [
+            "agent:vivian.corePassive",
+            "agent:vivian.additionalAbility",
+            "wEngine:zzz_wiki_1277.self",
+        ],
+        autoTwoPiece: false,
+    },
+    {
+        label: "Cinema 2 automatic extra two-piece",
+        cinemaLevel: 2,
+        activeBuffIds: [
+            "agent:vivian.corePassive",
+            "agent:vivian.additionalAbility",
+            "wEngine:zzz_wiki_1277.self",
+            "agent:vivian.cinema.2",
+        ],
+        autoTwoPiece: true,
+    },
+]) {
+    const superBound = optimizeDriveDiscs(catalog, strictOptimizerStore, strictOptimizerInput({
+        ...scenario,
+        algorithm: "exact-super-bound",
+    }))
+    const legacy = optimizeDriveDiscs(catalog, strictOptimizerStore, strictOptimizerInput({
+        ...scenario,
+        algorithm: "exact-legacy",
+    }))
+
+    assert.equal(superBound.results.length, 10, `${scenario.label} should return a complete Top 10`)
+    assert.deepEqual(strictResultIds(superBound), strictResultIds(legacy),
+        `${scenario.label} super-bound Top 10 IDs and order should equal legacy exact search`)
+    assert.deepEqual(
+        superBound.results.map(item => Number(item.score.toFixed(8))),
+        legacy.results.map(item => Number(item.score.toFixed(8))),
+        `${scenario.label} super-bound Top 10 scores should match legacy exact search at stable precision`)
+    assert.equal(superBound.metrics.strictExact, true, `${scenario.label} should remain strictly exact`)
+    assert.ok(Number(superBound.metrics.superBoundChecks ?? 0) > 0,
+        `${scenario.label} should exercise Release super-bound checks`)
+    assert.ok(Number(superBound.metrics.prunedBySuperBound ?? 0) > 0,
+        `${scenario.label} should prune at least one combination`)
+    assert.ok(Number(superBound.metrics.scoredCombinationCount ?? 0)
+        < Number(superBound.metrics.estimatedCombinationCount ?? 0),
+        `${scenario.label} should score fewer combinations than it estimates`)
+    assert.equal(superBound.metrics.processedCombinationCount, superBound.metrics.estimatedCombinationCount,
+        `${scenario.label} scored and pruned combinations should cover the full exact search space`)
+    assert.equal(
+        Number(superBound.metrics.scoredCombinationCount ?? 0)
+            + Number(superBound.metrics.prunedBySuperBound ?? 0),
+        Number(superBound.metrics.estimatedCombinationCount ?? 0),
+        `${scenario.label} scored plus pruned combinations should equal the estimate`,
+    )
+    if (scenario.autoTwoPiece) {
+        assert.ok(Number(superBound.metrics.freeTwoPieceAutoSetCount ?? 0) > 0,
+            `${scenario.label} should exercise automatic extra two-piece matching`)
+        assert.ok(Number(superBound.metrics.freeFourTwoPlanCount ?? 0) > 0,
+            `${scenario.label} should include automatic 4+2 plans`)
+    }
+}
 
 console.log("Vivian release modeling tests passed")

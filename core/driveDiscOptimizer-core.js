@@ -194,6 +194,10 @@ function compareStable(left, right) {
     return stableDiscSignature(left.driveDiscs).localeCompare(stableDiscSignature(right.driveDiscs))
 }
 
+function compareStableDiscs(left, right) {
+    return stableDiscSignature([left]).localeCompare(stableDiscSignature([right]))
+}
+
 function hotMetricSample(metrics, key, callCount) {
     const count = Number(callCount ?? 0)
     if (count > 64 && count % 256 !== 0) {
@@ -812,8 +816,7 @@ function dominatesRow(left, right, relevantStatIds = null) {
     const keys = relevantStatIds?.size
         ? relevantStatIds
         : new Set([...left.vector.keys(), ...right.vector.keys()])
-    let strictlyBetter = sourceOrder(left.disc) < sourceOrder(right.disc)
-        || String(left.disc.id) < String(right.disc.id)
+    let strictlyBetter = compareStableDiscs(left.disc, right.disc) < 0
     for (const key of keys) {
         const leftValue = left.vector.get(key) ?? 0
         const rightValue = right.vector.get(key) ?? 0
@@ -944,6 +947,7 @@ function groupCandidatesBySlot(store, settings, relevantStatIds = null, restrict
     }
     const filtered = usageStates.filter(item => item.usage.available).map(item => item.disc)
 
+    const canCompressDominatedCandidates = normalizeAlgorithm(settings.algorithm) === "heuristic-potential"
     return Object.fromEntries(SLOT_NUMBERS.map(slot => {
         const slotDiscs = filtered
             .filter(disc => Number(disc.partition) === slot)
@@ -951,6 +955,9 @@ function groupCandidatesBySlot(store, settings, relevantStatIds = null, restrict
                 sourceOrder(left) - sourceOrder(right)
                 || String(left.id).localeCompare(String(right.id))
             )
+        if (!canCompressDominatedCandidates) {
+            return [String(slot), slotDiscs]
+        }
         const baselineCandidates = removeDominatedDiscs(slotDiscs)
         return [String(slot), relevantStatIds?.size
             ? removeDominatedDiscs(baselineCandidates, relevantStatIds)

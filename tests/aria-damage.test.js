@@ -892,6 +892,11 @@ const cinemaOneDense = cinemaOneDenseTarget.scoreDense(
 approx(cinemaOneDense.finalDamage, cinemaOnePreparedFull.damage.totalFinalDamage,
     "Cinema 1 dense score should equal the full calculation")
 const cinemaOneFixedTarget = cinemaOneDenseTarget.compileForSetCounts(Int16Array.of(1))
+assert.equal(
+    cinemaOneFixedTarget.releaseIntervalBound,
+    true,
+    "Aria fixed Release kernels must expose interval-bound safety for the floored Mastery conversion and stunned condition",
+)
 const cinemaOneFixed = cinemaOneFixedTarget.scoreScalar(Float64Array.of(30))
 approx(cinemaOneFixed.finalDamage, cinemaOnePreparedFull.damage.totalFinalDamage,
     "Cinema 1 fixed score should equal the full calculation")
@@ -973,6 +978,73 @@ const dualTopFull = calculateInCombatPanel(catalog, {
 })
 approx(dual.results[0].score, dualTopFull.damage.totalFinalDamage,
     "Cinema 1 strict optimizer score must equal the full calculation")
+
+const pruningOptimizerDiscs = ["astral_voice", "freedom_blues"].flatMap((setId, setIndex) =>
+    Array.from({ length: 6 }, (_, slotIndex) => {
+        const slot = slotIndex + 1
+        return [0, 1].map(variant => disc(
+            `aria-prune-${setIndex + 1}-${slot}-${variant + 1}`,
+            setId,
+            slot,
+            mainBySlot[slot],
+            variant === 0
+                ? [
+                    { stat: "anomalyMastery", value: 4.4 + slot / 10, mode: "pct" },
+                    { stat: "anomalyProficiency", value: 4 + setIndex, mode: "flat" },
+                ]
+                : [
+                    { stat: "atkPct", value: 6 + slot / 10, mode: "pct" },
+                    { stat: "anomalyProficiency", value: 11 + setIndex, mode: "flat" },
+                ],
+        ))
+    }).flat(),
+)
+const pruningOptimizerStore = { currentOwnerId: "default", driveDiscs: pruningOptimizerDiscs }
+const pruningOptimizerInput = {
+    ...optimizationInput(["astral_voice"]),
+    settings: {
+        ...optimizationInput(["astral_voice"]).settings,
+        algorithm: "exact-super-bound",
+        enableObjectiveRelevantDominance: false,
+    },
+}
+const pruningSuperBound = optimizeDriveDiscs(catalog, pruningOptimizerStore, pruningOptimizerInput)
+const pruningLegacy = optimizeDriveDiscs(catalog, pruningOptimizerStore, {
+    ...pruningOptimizerInput,
+    settings: {
+        ...pruningOptimizerInput.settings,
+        algorithm: "exact-legacy",
+    },
+})
+const optimizerTopSignature = result => result.results.map(item => ({
+    score: Number(item.score.toFixed(8)),
+    ids: item.driveDiscs.map(disc => disc.id),
+}))
+assert.equal(pruningSuperBound.results.length, 10, "Aria pruning fixture should produce a full Top 10")
+assert.deepEqual(
+    optimizerTopSignature(pruningSuperBound),
+    optimizerTopSignature(pruningLegacy),
+    "Aria interval super-bound must preserve the exact legacy Top 10 IDs, order, and scores",
+)
+assert.equal(pruningSuperBound.metrics.strictExact, true)
+assert.equal(
+    pruningSuperBound.metrics.estimatedCombinationCount,
+    960,
+    "Aria pruning fixture should stay bounded to 15 fixed 4+2 layouts with two candidates per slot",
+)
+assert.ok(pruningSuperBound.metrics.superBoundChecks > 0,
+    "Aria Release optimization should execute interval super-bound checks")
+assert.ok(pruningSuperBound.metrics.prunedBySuperBound > 0,
+    "Aria Release optimization should prune at least one combination by interval super-bound")
+assert.ok(
+    pruningSuperBound.metrics.scoredCombinationCount < pruningSuperBound.metrics.estimatedCombinationCount,
+    "Aria Release interval pruning should score fewer combinations than the exact search space",
+)
+assert.equal(
+    pruningSuperBound.metrics.scoredCombinationCount + pruningSuperBound.metrics.prunedBySuperBound,
+    pruningSuperBound.metrics.estimatedCombinationCount,
+    "Aria Release scored and interval-pruned combinations should cover the full exact search space",
+)
 
 const externalOptimizationInput = {
     ...optimizationInput(["astral_voice"]),

@@ -39,6 +39,7 @@
     "test:luminescence": "node tests/luminescence-formula.test.js && node tests/luminescence-integration.test.js",
     "test:alice-damage": "node tests/alice-damage.test.js",
     "test:aria-damage": "node tests/aria-damage.test.js",
+    "test:vivian-damage": "node tests/vivian-damage.test.js",
     "test:soldier-11-damage": "node tests/soldier-11-damage.test.js",
     "test:sigrid-damage": "node tests/sigrid-damage.test.js",
     "test:compiled-score": "node tests/compiled-score.test.js",

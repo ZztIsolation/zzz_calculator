@@ -521,8 +521,52 @@ describe("CalculationConfigModal", () => {
     expect(explanation).toContain("当前异常精通")
     expect(explanation).toContain("328")
     expect(explanation).not.toContain("局外异常掌控")
+    expect(explanation).not.toContain("异放精通收益修正")
     expect(explanation).not.toContain("异放失衡倍率修正")
     expect(document.body.querySelector('[data-layout-field="event-multiplier"]')?.textContent).toContain("126.075%")
+  })
+
+  it("shows Vivian Cinema 2's release proficiency yield factor without changing the source anomaly", async () => {
+    const wrapper = mountModal({
+      agent: vivian,
+      cinemaLevel: 2,
+      damageConfig: {
+        mode: "anomaly",
+        selectedEventId: "vivian-self-corruption-release",
+        events: [{
+          id: "vivian-self-corruption-release",
+          kind: "anomaly",
+          settlementType: "release",
+          anomalyEffect: "corruption",
+          count: 1,
+          stunned: true,
+          triggerActorRef: { agentId: "vivian", profileId: "core_passive" },
+          anomalySource: { actorRef: { agentId: "vivian" } },
+        }],
+      },
+      combatEffects: [{
+        key: "vivian.cinema_2.release_proficiency_yield",
+        name: { zhCN: "薇薇安｜影画2" },
+        resolvedDamageModifiers: [{
+          kind: "releaseProficiencyYieldBonus",
+          value: 0.3,
+          appliesTo: { damageKinds: ["anomaly"], settlementTypes: ["release"] },
+        }],
+      }],
+      releaseContext: {
+        inCombatPanel: { anomalyProficiency: 328 },
+        outOfCombatPanel: { anomalyProficiency: 208, anomalyMastery: 144 },
+        coreSkillLevel: "F",
+      },
+    })
+    await openModal(wrapper)
+
+    const explanation = document.body.querySelector(".release-explanation")?.textContent ?? ""
+    expect(explanation).toContain("当前异常精通")
+    expect(explanation).toContain("328")
+    expect(explanation).toContain("异放精通收益修正")
+    expect(explanation).toContain("× 1.3")
+    expect(document.body.querySelector('[data-layout-field="event-multiplier"]')?.textContent).toContain("163.898%")
   })
 
   it("locks Aria Release when switching from Attribute Anomaly", async () => {
