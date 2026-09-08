@@ -5557,6 +5557,584 @@
         ],
         "selectedEventId": "event_8aa19fdd5e"
       }
+    },
+    {
+      "id": "vivian",
+      "name": {
+        "zhCN": "薇薇安·班希"
+      },
+      "rarity": "S",
+      "attribute": "ether",
+      "damageElement": "ether",
+      "specialty": "anomaly",
+      "attackTypes": [
+        "slash"
+      ],
+      "faction": "反舌鸟",
+      "images": {
+        "portrait": "/assets/agents/vivian.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/1276/detail?mhy_presentation_style=fullscreen"
+      },
+      "level60": {
+        "hpBase": 7673,
+        "atkBase": 805,
+        "defBase": 606,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 86,
+        "anomalyProficiency": 118,
+        "anomalyMastery": 108,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动：命运悲歌"
+          },
+          "source": {
+            "zhCN": "核心被动：命运悲歌"
+          },
+          "description": {
+            "zhCN": "[普通攻击：落羽生花]命中处于以太异常状态、电属性异常状态、火属性异常状态、物理属性异常状态、冰属性异常状态或风属性异常状态的目标时，触发一次[异放]：额外结算一次相对于原属性异常伤害的属性异常伤害。F级时，异放比例按每10点异常精通计算：以太6.15%、电3.20%、火8%、物理0.75%、冰1.08%、风0.32%。[普通攻击：裙裾浮游·悬落]或[普通攻击：落羽生花]命中处于任意属性异常状态的目标时，使目标陷入[薇薇安的预言]，每0.55秒受到薇薇安55%攻击力的以太伤害，该伤害可以触发属性异常效果的额外伤害；当目标不再处于属性异常状态时，[薇薇安的预言]结束；进入战场时，薇薇安获得2点[飞羽]。"
+          },
+          "effects": [],
+          "buffModifiers": []
+        },
+        "additionalAbility": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "额外能力：预言之泪"
+          },
+          "description": {
+            "zhCN": "队伍中存在其他[异常]角色或与自身属性相同的角色时触发：其他角色施加属性异常时，薇薇安消耗1点[护羽]发动[普通攻击：落羽生花]；全队造成的[侵蚀]伤害和[侵蚀]状态被结算的[紊乱]伤害提升12%。"
+          },
+          "effects": [
+            {
+              "id": "vivian-additional-corruption-damage",
+              "type": "fixed",
+              "stat": "anomalyDamageBonus",
+              "value": 12,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute",
+                "anomalyEffects": [
+                  "corruption"
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "vivian-additional-corruption-disorder-damage",
+              "type": "fixed",
+              "stat": "disorderDamageBonus",
+              "value": 12,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "disorder",
+                "anomalyEffects": [
+                  "corruption"
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "cinemaBuffs": [
+          {
+            "cinemaLevel": 1,
+            "cinemaName": {
+              "zhCN": "在春天走进果园"
+            },
+            "description": {
+              "zhCN": "累计消耗4点[护羽]时回复1点[飞羽]；处于[薇薇安的预言]下的目标受到的所有属性异常伤害和[紊乱]伤害提升16%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "vivian-cinema-1-attribute-damage",
+                "type": "fixed",
+                "stat": "anomalyDamageBonus",
+                "value": 16,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "attribute"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              },
+              {
+                "id": "vivian-cinema-1-disorder-damage",
+                "type": "fixed",
+                "stat": "disorderDamageBonus",
+                "value": 16,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "disorder"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 2,
+            "cinemaName": {
+              "zhCN": "暴风雨夜，暴风雨夜"
+            },
+            "description": {
+              "zhCN": "以太异常积蓄效率提升25%；[异放]从精通中获得的收益提升至原本的130%，且无视目标15%全属性伤害抗性。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "vivian-cinema-2-release-proficiency-yield",
+                "type": "fixed",
+                "stat": "releaseProficiencyYieldBonus",
+                "value": 30,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "release"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              },
+              {
+                "id": "vivian-cinema-2-release-all-res-ignore",
+                "type": "fixed",
+                "stat": "allResIgnore",
+                "value": 15,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "release"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 4,
+            "cinemaName": {
+              "zhCN": "苇间风"
+            },
+            "description": {
+              "zhCN": "[普通攻击：裙裾浮游·悬落]和[普通攻击：落羽生花]命中时必定暴击，并使薇薇安的攻击力提升12%，持续12秒；进入战场时立即获得5点[护羽]。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "vivian-cinema-4-atk",
+                "type": "fixed",
+                "stat": "atkPct",
+                "value": 12,
+                "mode": "pct",
+                "basis": "outOfCombatAtk",
+                "target": {
+                  "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 6,
+            "cinemaName": {
+              "zhCN": "薇薇安"
+            },
+            "description": {
+              "zhCN": "薇薇安造成的以太伤害提升40%；[普通攻击：裙裾浮游·悬落]命中时触发特殊[异放]，额外消耗的[护羽]最多使伤害比例提升至原本的5倍。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "vivian-cinema-6-ether-damage",
+                "type": "fixed",
+                "stat": "etherDmg",
+                "value": 40,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          }
+        ],
+        "skillBuffs": []
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "命运悲歌"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 12,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "核心被动：命运悲歌"
+          },
+          "levels": [
+            {
+              "level": 1,
+              "coreSkillLevel": "initial",
+              "releaseCoefficientPctByElement": {
+                "ether": 3.07,
+                "electric": 1.6,
+                "fire": 4,
+                "physical": 0.37,
+                "ice": 0.54,
+                "wind": 0.16
+              }
+            },
+            {
+              "level": 2,
+              "coreSkillLevel": "A",
+              "releaseCoefficientPctByElement": {
+                "ether": 3.59,
+                "electric": 1.86,
+                "fire": 4.66,
+                "physical": 0.44,
+                "ice": 0.63,
+                "wind": 0.18
+              }
+            },
+            {
+              "level": 3,
+              "coreSkillLevel": "B",
+              "releaseCoefficientPctByElement": {
+                "ether": 4.11,
+                "electric": 2.12,
+                "fire": 5.32,
+                "physical": 0.51,
+                "ice": 0.72,
+                "wind": 0.21
+              }
+            },
+            {
+              "level": 4,
+              "coreSkillLevel": "C",
+              "releaseCoefficientPctByElement": {
+                "ether": 4.63,
+                "electric": 2.38,
+                "fire": 5.98,
+                "physical": 0.58,
+                "ice": 0.81,
+                "wind": 0.24
+              }
+            },
+            {
+              "level": 5,
+              "coreSkillLevel": "D",
+              "releaseCoefficientPctByElement": {
+                "ether": 5.15,
+                "electric": 2.64,
+                "fire": 6.64,
+                "physical": 0.65,
+                "ice": 0.9,
+                "wind": 0.26
+              }
+            },
+            {
+              "level": 6,
+              "coreSkillLevel": "E",
+              "releaseCoefficientPctByElement": {
+                "ether": 5.65,
+                "electric": 2.9,
+                "fire": 7.3,
+                "physical": 0.7,
+                "ice": 0.99,
+                "wind": 0.29
+              }
+            },
+            {
+              "level": 7,
+              "coreSkillLevel": "F",
+              "releaseCoefficientPctByElement": {
+                "ether": 6.15,
+                "electric": 3.2,
+                "fire": 8,
+                "physical": 0.75,
+                "ice": 1.08,
+                "wind": 0.32
+              }
+            }
+          ],
+          "defaultLevelAtCoreSkill": "F"
+        },
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/1276/detail?mhy_presentation_style=fullscreen"
+        ],
+        "verification": {
+          "skillLevelBonuses": "A/C/E each add Anomaly Mastery +12 and Core Passive level +1; B/D/F each add Base ATK +25 and Core Passive level +1",
+          "corePassiveScaling": "official entry 1276 version 1781774238; initial/A-F [异放] per-10-AP coefficients are recorded for ether/electric/fire/physical/ice/wind. The official B-level electric text contains the obvious typo 2.2.12%; runtime data uses the arithmetic-consistent 2.12%.",
+          "scope": "This branch intentionally models one self-sourced Ether release event; the official skill payload has no stable skill IDs, so no fabricated skill catalog or rotation is stored."
+        }
+      },
+      "anomalyReleaseProfiles": [
+        {
+          "id": "core_passive",
+          "name": {
+            "zhCN": "核心被动：命运悲歌"
+          },
+          "default": true,
+          "supportedElements": [
+            "ether",
+            "electric",
+            "fire",
+            "physical",
+            "ice",
+            "wind"
+          ],
+          "resultMode": "originalAnomalyRatio",
+          "expression": {
+            "op": "multiply",
+            "label": {
+              "zhCN": "异放倍率"
+            },
+            "args": [
+              {
+                "op": "divide",
+                "label": {
+                  "zhCN": "当前异常精通换算"
+                },
+                "args": [
+                  {
+                    "kind": "triggerStat",
+                    "panel": "inCombat",
+                    "stat": "anomalyProficiency",
+                    "unit": "raw",
+                    "whiteBoxRole": "conversionSource",
+                    "label": {
+                      "zhCN": "当前异常精通"
+                    }
+                  },
+                  {
+                    "kind": "constant",
+                    "value": 10,
+                    "unit": "raw",
+                    "label": {
+                      "zhCN": "异常精通除数"
+                    }
+                  }
+                ]
+              },
+              {
+                "kind": "releaseModifier",
+                "modifier": "releaseProficiencyYieldBonus",
+                "unit": "decimal",
+                "label": {
+                  "zhCN": "异放精通收益修正"
+                }
+              },
+              {
+                "kind": "coreSkillScaling",
+                "field": "releaseCoefficientPctByElement",
+                "key": "eventElement",
+                "unit": "percent",
+                "label": {
+                  "zhCN": "核心属性系数"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "phaethons_melody"
+        ],
+        "mainStatLimits": {
+          "4": [
+            "anomalyProficiency",
+            "atkPct"
+          ],
+          "5": [
+            "etherDmg",
+            "atkPct",
+            "penRatio"
+          ],
+          "6": [
+            "anomalyMastery"
+          ]
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1276/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "officialEntryPageId": 1276,
+        "officialEntryVersion": 1781774238,
+        "officialEntrySha256": "f12c37d38d399f6ea29ebbf891b32b109b2a9036c8488594d5a5fc30ff50b8a4",
+        "level60Stats": "official level-60 panel before A-F node gains: HP/ATK/DEF 7673/805/606, Impact/AP/AM 86/118/108",
+        "releaseEvent": "one release event contains the self-caused Ether anomaly base (corruption, one 0.625 anomaly unit) and Vivian as both anomaly source and trigger; the target must already be in an applicable anomaly state per the official wording",
+        "apSemantics": "the official wording says anomaly proficiency without an initial/out-of-combat qualifier; this model uses the current in-combat trigger panel so active W-Engine and Drive Disc AP effects apply to both the self base and the release ratio",
+        "targetAssumption": "stunned=true is a maximum-single-hit scenario input; Vivian's profile has no additional release-only stun factor",
+        "cinema2ReleaseProficiencyYield": "M2 stores releaseProficiencyYieldBonus=30 on release-only anomaly targets; the release formula applies it only to the trigger's anomaly-proficiency conversion as a 1.3 factor, without changing the original anomaly base or other damage zones",
+        "unsupportedMechanics": "official skill payload has no stable internal skill IDs; M6's special five-fold release still needs a dedicated release-ratio event variant and is retained in the cinema description rather than approximated as ordinary anomaly damage"
+      },
+      "hidden": false
     }
   ]
 }

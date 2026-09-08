@@ -337,6 +337,17 @@ assert.equal(
 assert.equal(
     storedEffectRuleText({
         type: "fixed",
+        stat: "releaseProficiencyYieldBonus",
+        value: 30,
+        mode: "flat",
+        target: { kind: "anomaly", settlementType: "release" },
+    }, {}, {}, meta),
+    "异放精通收益提升 +30%（异放）",
+    "Release Proficiency yield should display as a Release-only percentage modifier",
+)
+assert.equal(
+    storedEffectRuleText({
+        type: "fixed",
         stat: "anomalyDamageBonus",
         value: 12,
         mode: "flat",
@@ -913,6 +924,11 @@ for (const optionList of [CUSTOM_BUFF_STAT_OPTIONS, CUSTOM_BUFF_SKILL_STAT_OPTIO
         optionList.some(option => option[0] === "anomalyCritRatePerInitialMasteryAbove100"),
         false,
         "Player Custom Buff options should not expose initial-Mastery anomaly Crit conversion",
+    )
+    assert.equal(
+        optionList.some(option => option[0] === "releaseProficiencyYieldBonus"),
+        false,
+        "Player Custom Buff options should not expose Release Proficiency yield",
     )
 }
 assert.ok(CUSTOM_BUFF_STAT_OPTIONS.some(option => option[0] === "critDmg"), "Default Custom Buff options should retain global Crit DMG")

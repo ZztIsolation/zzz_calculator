@@ -96,6 +96,29 @@ changing the variable alone never triggers a deploy. Mocked-Octokit regression
 coverage executes the promotion script for successful, unapproved, stale,
 missing-artifact, wrong-CI-branch, and non-fast-forward cases.
 
+## 2026-09-05 - Added Vivian's Self-Sourced Ether Release Model
+
+Added Vivian (薇薇安·班希) as a visible anomaly agent using the official
+entry 1276 data. The model records all seven Core Passive Ether release
+coefficients, A/C/E Anomaly Mastery and B/D/F Base ATK node gains, the
+additional Corruption/Corruption Disorder bonuses, and the modeled Cinema 1,
+2, 4, and 6 effects. Vivian's target is one non-administrator `mode: anomaly`
+release event: a single Corruption anomaly unit with Vivian as both the source
+and trigger, scored from the current in-combat Anomaly Proficiency so the
+self-sourced base and release ratio receive the intended double AP dependence.
+The workbench creates this target without an administrator default rotation;
+the release explanation derives its conversion-source label and value from the
+formula trace. Cinema 2's 130% proficiency yield is represented by a
+Release-only `releaseProficiencyYieldBonus=30` event modifier, applying a `1.3`
+factor only to the Anomaly Proficiency conversion. It does not change the
+original anomaly unit, ordinary Attribute Anomaly, Disorder, or other damage
+zones. Vivian's Core Passive is retained as an in-combat, description-only Buff
+with the F-level per-10-Proficiency coefficients visible; it has no independent
+effects or modifiers and cannot duplicate the release calculation. The official
+page has no stable skill IDs, so no fabricated skill catalog or multi-event
+rotation is stored. Cinema 6's special five-fold release remains deferred until
+a dedicated release-ratio event variant exists.
+
 ## 2026-08-24 - Split Sigrid's Tempering into a Chain-Attack Buff
 
 Introduced the reusable `combatBuffs.skillBuffs[]` catalog contract for Buffs

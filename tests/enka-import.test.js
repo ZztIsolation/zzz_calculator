@@ -126,6 +126,7 @@ assert.ok(mapped.warnings.some(warning => /6号位.*未导入/.test(warning)))
 assert.notEqual(enkaDriveDiscId("1302309616", "7038"), enkaDriveDiscId("1300027938", "7038"))
 
 assert.deepEqual(mapping.agents["1591"], { id: "sigrid", name: "希格莉德·德拉叙尔" })
+assert.deepEqual(mapping.agents["1331"], { id: "vivian", name: "薇薇安·班希" })
 assert.deepEqual(mapping.wEngines["14159"], { id: "zzz_wiki_2162", name: "骁骑礼赞" })
 const mappedSigrid = mapShowcaseToCatalog(
   parseEnkaShowcase({

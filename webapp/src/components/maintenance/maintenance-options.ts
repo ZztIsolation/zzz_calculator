@@ -159,6 +159,7 @@ export const ANOMALY_TARGET_STATS: Array<[string, string, "flat"]> = [
   ["baseMultiplierBonus", "异常倍率修正%", "flat"], ["disorderBaseMultiplierBonus", "紊乱倍率加算%", "flat"],
   ["anomalyCritRate", "异常暴击率%", "flat"], ["anomalyCritDmg", "异常暴击伤害%", "flat"],
   ["anomalyCritRatePerInitialMasteryAbove100", "初始异常掌控超过 100 时每点转异常暴击率%", "flat"],
+  ["releaseProficiencyYieldBonus", "异放精通收益提升%", "flat"],
   ["anomalyDurationBonusSeconds", "异常持续时间延长（秒）", "flat"],
   ["enemyDefReduction", "敌方防御力降低%", "flat"], ["enemyDefIgnore", "无视防御率%", "flat"],
   ["enemyResReduction", "敌方全属性抗性降低%", "flat"], ["allResIgnore", "全属性抗性无视%", "flat"],
@@ -168,13 +169,17 @@ export const ANOMALY_TARGET_STATS: Array<[string, string, "flat"]> = [
 ]
 
 export const EVENT_STAT_KEYS = new Set([...EVENT_STATS, ...ANOMALY_TARGET_STATS].map(([value]) => value))
+const RELEASE_ONLY_ANOMALY_TARGET_STATS = new Set([
+  "anomalyCritRatePerInitialMasteryAbove100",
+  "releaseProficiencyYieldBonus",
+])
 
 export function statOptions(catalog: any, targetKind = "default", settlementType = ""): SelectOption[] {
   const base = targetKind === "skill"
     ? SKILL_TARGET_STATS
     : targetKind === "anomaly"
       ? ANOMALY_TARGET_STATS.filter(([value]) =>
-          value !== "anomalyCritRatePerInitialMasteryAbove100" || settlementType === "release")
+          !RELEASE_ONLY_ANOMALY_TARGET_STATS.has(value) || settlementType === "release")
       : [...PANEL_STATS, ...EVENT_STATS]
   const labels = new Map(base.map(([value, label]) => [value, label]))
   for (const value of Object.keys(catalog?.meta?.statRules?.statDisplay ?? {})) {

@@ -141,6 +141,7 @@ export function resolveDamageEventMultiplier(event = {}, catalog = {}, releaseCo
                 inCombatPanel: releaseContext.inCombatPanel ?? {},
                 outOfCombatPanel: releaseContext.outOfCombatPanel ?? {},
             },
+            releaseModifiers: releaseContext.releaseModifiers ?? {},
             coreScalingRow: event.releaseCoreScalingRow ?? corePassiveScalingRow(agent, releaseContext.coreSkillLevel),
             event,
             eventElement: effect.element,

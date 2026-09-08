@@ -187,6 +187,16 @@ approx(resolveDamageEventMultiplier({
     damageRatioPct: 2.5,
     count: 6,
 }, catalog), 0.825, "Displayed direct multiplier should include hidden event scale but exclude event count")
+approx(resolveDamageEventMultiplier({
+    kind: "anomaly",
+    settlementType: "release",
+    anomalyEffect: "corruption",
+    triggerActorRef: { agentId: "vivian", profileId: "core_passive" },
+}, catalog, {
+    inCombatPanel: { anomalyProficiency: 328 },
+    coreSkillLevel: "F",
+    releaseModifiers: { releaseProficiencyYieldBonus: 0.3 },
+}), 1.638975, "Displayed Vivian Cinema 2 Release multiplier should include the 1.3 Proficiency yield factor")
 
 const ignoredDurationDisorder = calculateEvent({
     id: "ignored-duration",

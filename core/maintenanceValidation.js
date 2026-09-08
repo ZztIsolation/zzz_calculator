@@ -165,7 +165,7 @@ const DAMAGE_MODIFIER_KIND_VALUES = new Set(["enemyDamageTakenBonus", "anomalyDa
 const SKILL_TARGET_DAMAGE_MODIFIER_KIND_VALUES = new Set(["directDamageBonus", "skillMultiplierBonus"])
 const DAMAGE_MODIFIER_VALUE_UNIT_VALUES = new Set(["decimal"])
 const RULE_TARGET_KIND_VALUES = new Set(["default", "skill", "anomaly"])
-const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
+const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "releaseProficiencyYieldBonus", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
 const SKILL_TARGET_STAT_VALUES = new Set([
     "penRatio",
     "allResIgnore",
@@ -233,6 +233,7 @@ const ANOMALY_TARGET_STAT_VALUES = new Set([
     "anomalyCritDmg",
     "anomalyCritRatePerInitialMasteryAbove100",
     "anomalyDurationBonusSeconds",
+    "releaseProficiencyYieldBonus",
     "stunDmgMultiplierBonus",
     "stunDmgMultiplierBonusAlways",
     "stunDmgMultiplierBonusCapAlways",
@@ -713,6 +714,10 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     if (rule.stat === "anomalyCritRatePerInitialMasteryAbove100"
         && (targetKind !== "anomaly" || target.settlementType !== "release")) {
         add(errors, `${path}.stat`, "初始异常掌控转异常暴击率只能用于异放结算。")
+    }
+    if (rule.stat === "releaseProficiencyYieldBonus"
+        && (targetKind !== "anomaly" || target.settlementType !== "release")) {
+        add(errors, `${path}.stat`, "异放精通收益提升只能用于异放结算。")
     }
     if (DEFAULT_EVENT_MODIFIER_STAT_VALUES.has(rule.stat) && effectiveScope !== "inCombat") {
         add(errors, `${path}.stat`, "事件增幅只能用于局内 Buff。")

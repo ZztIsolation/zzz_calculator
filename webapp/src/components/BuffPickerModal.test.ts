@@ -893,6 +893,82 @@ describe("BuffPickerModal", () => {
     expect(text).toContain("异常暴击伤害% +25%（异放：侵蚀）")
   })
 
+  it("shows Vivian's description-only core passive when default-selected", async () => {
+    const coreId = "agent:vivian.corePassive"
+    const vivianMeta = {
+      ...meta,
+      agents: [{
+        id: "vivian",
+        name: { zhCN: "薇薇安·班希" },
+        attribute: "ether",
+        combatBuffs: {
+          corePassive: {
+            scope: "inCombat",
+            name: { zhCN: "核心被动：命运悲歌" },
+            source: { zhCN: "核心被动：命运悲歌" },
+            description: { zhCN: "命中异常目标时触发一次[异放]；F级每10点异常精通的以太比例为6.15%，并施加[薇薇安的预言]。" },
+            effects: [],
+            buffModifiers: [],
+          },
+        },
+      }],
+    }
+    const wrapper = mountModal({
+      meta: vivianMeta,
+      agentId: "vivian",
+      wEngineId: "",
+      selectedIds: [coreId],
+      defaultIds: [coreId],
+    })
+
+    await openModal(wrapper)
+    const row = buffRowByText(wrapper, "薇薇安·班希 | 核心被动：命运悲歌")
+    expect(row.classes()).toContain("is-selected")
+    expect(row.text()).toContain("触发一次[异放]")
+    expect(row.text()).toContain("F级每10点异常精通的以太比例为6.15%")
+    expect((row.find('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(true)
+
+    await row.find(".buff-row-toggle").trigger("click")
+    await buttonByText(wrapper, "应用选择").trigger("click")
+    const payload = wrapper.emitted("apply")?.[0]?.[0] as any
+    expect(payload.selectedBuffIds).not.toContain(coreId)
+
+    await wrapper.setProps({ show: false, selectedIds: payload.selectedBuffIds })
+    await openModal(wrapper)
+    expect(buffRowByText(wrapper, "薇薇安·班希 | 核心被动：命运悲歌").classes()).not.toContain("is-selected")
+  })
+
+  it("shows Vivian Cinema 2's proficiency yield bonus as Release-only", async () => {
+    const vivianMeta = {
+      ...meta,
+      agents: [{
+        id: "vivian",
+        combatBuffs: {
+          cinemaBuffs: [{
+            cinemaLevel: 2,
+            cinemaName: { zhCN: "暴风雨夜，暴风雨夜" },
+            scope: "inCombat",
+            effects: [{
+              id: "vivian-cinema-2-release-proficiency-yield",
+              type: "fixed",
+              stat: "releaseProficiencyYieldBonus",
+              value: 30,
+              mode: "flat",
+              target: { kind: "anomaly", settlementType: "release" },
+            }],
+          }],
+        },
+      }],
+    }
+    const wrapper = mountModal({ meta: vivianMeta, agentId: "vivian", cinemaLevel: 2 })
+
+    await openModal(wrapper)
+
+    const text = wrapper.find(".buff-effect-lines").text()
+    expect(text).toContain("异放精通收益提升 +30%（异放）")
+    expect(text).not.toContain("异放：全部原异常")
+  })
+
   it("renders the buff category tabs as a dedicated control strip", async () => {
     const wrapper = mountModal()
 

@@ -321,6 +321,148 @@ function assertSameTop(seed, scenarioIndex, legacy, superBound) {
     }
 }
 
+const VIVIAN_RELEASE_FUZZ_CASES = [
+    { seed: 3101, cinemaLevel: 0, coreSkillLevel: "A", fourPieceSetId: "phaethons_melody", twoPieceSetId: "freedom_blues" },
+    { seed: 3102, cinemaLevel: 2, coreSkillLevel: "B", fourPieceSetId: "chaos_jazz", twoPieceSetId: "freedom_blues" },
+    { seed: 3103, cinemaLevel: 0, coreSkillLevel: "C", fourPieceSetId: "phaethons_melody", twoPieceSetId: "chaos_jazz" },
+    { seed: 3104, cinemaLevel: 2, coreSkillLevel: "D", fourPieceSetId: "phaethons_melody", twoPieceSetId: "freedom_blues" },
+    { seed: 3105, cinemaLevel: 0, coreSkillLevel: "E", fourPieceSetId: "chaos_jazz", twoPieceSetId: "freedom_blues" },
+    { seed: 3106, cinemaLevel: 2, coreSkillLevel: "F", fourPieceSetId: "phaethons_melody", twoPieceSetId: "chaos_jazz" },
+]
+const vivianReleaseMainStatOptions = {
+    1: [{ stat: "hpFlat", value: 2200 }],
+    2: [{ stat: "atkFlat", value: 316 }],
+    3: [{ stat: "defFlat", value: 184 }],
+    4: [
+        { stat: "anomalyProficiency", value: 92 },
+        { stat: "atkPct", value: 30, mode: "pct" },
+    ],
+    5: [
+        { stat: "etherDmg", value: 30, mode: "pct" },
+        { stat: "atkPct", value: 30, mode: "pct" },
+        { stat: "penRatio", value: 24, mode: "pct" },
+    ],
+    6: [
+        { stat: "anomalyMastery", value: 30, mode: "pct" },
+        { stat: "atkPct", value: 30, mode: "pct" },
+    ],
+}
+const vivianReleaseSubStatPool = [
+    "anomalyProficiency",
+    "atkPct",
+    "atkFlat",
+    "penRatio",
+    "dmgBonus",
+]
+
+function vivianReleaseFuzzDisc(scenario, scenarioIndex, setId, setIndex, slot, variant, rng) {
+    const mainOptions = vivianReleaseMainStatOptions[slot]
+    const mainStat = mainOptions[(scenarioIndex + setIndex + slot + variant) % mainOptions.length]
+    const used = new Set([mainStat.stat])
+    const subStats = []
+    while (subStats.length < 3) {
+        const stat = pick(rng, vivianReleaseSubStatPool)
+        if (used.has(stat)) continue
+        used.add(stat)
+        subStats.push({
+            stat,
+            value: subStatValue(stat, rng),
+            mode: stat === "atkFlat" || stat === "anomalyProficiency" ? "flat" : "pct",
+            label: stat,
+        })
+    }
+    return {
+        id: `vivian-release-${scenario.seed}-${setIndex}-${slot}-${variant}`,
+        ownerId: "default",
+        setId,
+        setName: catalog.driveDiscSetsMap.get(setId)?.name?.zhCN ?? setId,
+        partition: slot,
+        rarity: "S",
+        level: 15,
+        maxLevel: 15,
+        locked: false,
+        equippedBy: null,
+        reservedForAgentId: null,
+        mainStat: {
+            ...mainStat,
+            mode: mainStat.mode ?? "flat",
+            label: mainStat.stat,
+        },
+        subStats,
+        source: {
+            type: "release-fuzz",
+            sequence: scenario.seed * 100 + setIndex * 20 + slot * 2 + variant,
+        },
+    }
+}
+
+function vivianReleaseFuzzStore(scenario, scenarioIndex) {
+    const rng = createRng(scenario.seed)
+    return {
+        version: 1,
+        currentOwnerId: "default",
+        owners: [{ id: "default", label: "默认用户" }],
+        imports: [],
+        driveDiscLoadouts: [],
+        driveDiscs: [scenario.fourPieceSetId, scenario.twoPieceSetId].flatMap((setId, setIndex) =>
+            [1, 2, 3, 4, 5, 6].flatMap(slot => [0, 1].map(variant =>
+                vivianReleaseFuzzDisc(scenario, scenarioIndex, setId, setIndex, slot, variant, rng),
+            )),
+        ),
+    }
+}
+
+function vivianReleaseOptimizerInput(scenario, algorithm) {
+    const activeBuffIds = [
+        "agent:vivian.corePassive",
+        "agent:vivian.additionalAbility",
+        "wEngine:zzz_wiki_1277.self",
+    ]
+    if (scenario.cinemaLevel >= 2) activeBuffIds.push("agent:vivian.cinema.2")
+    return {
+        agentId: "vivian",
+        coreSkillLevel: scenario.coreSkillLevel,
+        cinemaLevel: scenario.cinemaLevel,
+        wEngineId: "zzz_wiki_1277",
+        wEngineModificationLevel: 1,
+        driveDiscs: [],
+        combatBuffs: { activeBuffIds },
+        damage: {
+            mode: "anomaly",
+            selectedEventId: "vivian-fuzz-release",
+            events: [{
+                id: "vivian-fuzz-release",
+                kind: "anomaly",
+                settlementType: "release",
+                anomalyEffect: "corruption",
+                count: 1,
+                stunned: true,
+                triggerActorRef: { agentId: "vivian", profileId: "core_passive" },
+                anomalySource: { actorRef: { agentId: "vivian" } },
+            }],
+            target: {
+                defense: 953,
+                levelCoefficient: 794,
+                resistanceByElement: { ether: 0 },
+            },
+        },
+        settings: {
+            objective: "damage",
+            algorithm,
+            fourPieceSetId: scenario.fourPieceSetId,
+            twoPieceSetId: scenario.twoPieceSetId,
+            mainStatLimits: {
+                4: ["anomalyProficiency", "atkPct"],
+                5: ["etherDmg", "atkPct", "penRatio"],
+                6: ["anomalyMastery", "atkPct"],
+            },
+            minimums: {},
+            disableParallel: true,
+            enableUpperBoundPruning: algorithm !== "exact-legacy",
+        },
+    }
+}
+
 const FUZZ_SEEDS = 160
 let suffixTopKBoundCoverage = 0
 let chunkBoundCoverage = 0
@@ -367,6 +509,55 @@ for (let seed = 1; seed <= FUZZ_SEEDS; seed += 1) {
     }
 }
 
+let vivianReleaseBoundChecks = 0
+let vivianReleasePruned = 0
+const vivianReleaseCinemaCoverage = new Set()
+const vivianReleaseCoreLevelCoverage = new Set()
+const vivianReleaseSetCoverage = new Set()
+for (const [scenarioIndex, scenario] of VIVIAN_RELEASE_FUZZ_CASES.entries()) {
+    const releaseStore = vivianReleaseFuzzStore(scenario, scenarioIndex)
+    const legacy = optimizeDriveDiscs(
+        catalog,
+        releaseStore,
+        vivianReleaseOptimizerInput(scenario, "exact-legacy"),
+    )
+    const superBound = optimizeDriveDiscs(
+        catalog,
+        releaseStore,
+        vivianReleaseOptimizerInput(scenario, "exact-super-bound"),
+    )
+    const scenarioLabel = `${scenario.coreSkillLevel}/C${scenario.cinemaLevel}/${scenario.fourPieceSetId}+${scenario.twoPieceSetId}`
+    assert.equal(legacy.metrics.strictExact, true)
+    assert.equal(superBound.metrics.strictExact, true)
+    assert.equal(superBound.results.length, 10, `Vivian Release ${scenarioLabel} should produce a full Top 10.`)
+    assertSameTop(`vivian-release-${scenario.seed}`, scenarioLabel, legacy, superBound)
+    assert.equal(
+        Number(superBound.metrics.scoredCombinationCount ?? 0)
+            + Number(superBound.metrics.prunedBySuperBound ?? 0),
+        Number(superBound.metrics.estimatedCombinationCount ?? 0),
+        `Vivian Release ${scenarioLabel} should account for every scored or pruned loadout.`,
+    )
+    assert.ok(
+        Number(superBound.metrics.superBoundChecks ?? 0) > 0,
+        `Vivian Release ${scenarioLabel} should execute its interval upper bound.`,
+    )
+    assert.equal(
+        superBound.results[0].data.damage.events[0].multipliers.releaseProficiencyYieldFactor ?? 1,
+        scenario.cinemaLevel >= 2 ? 1.3 : 1,
+        `Vivian Release ${scenarioLabel} should preserve its Cinema proficiency factor.`,
+    )
+    vivianReleaseBoundChecks += Number(superBound.metrics.superBoundChecks ?? 0)
+    vivianReleasePruned += Number(superBound.metrics.prunedBySuperBound ?? 0)
+    vivianReleaseCinemaCoverage.add(scenario.cinemaLevel)
+    vivianReleaseCoreLevelCoverage.add(scenario.coreSkillLevel)
+    vivianReleaseSetCoverage.add(`${scenario.fourPieceSetId}+${scenario.twoPieceSetId}`)
+}
+assert.deepEqual([...vivianReleaseCinemaCoverage].sort((a, b) => a - b), [0, 2])
+assert.deepEqual([...vivianReleaseCoreLevelCoverage].sort(), ["A", "B", "C", "D", "E", "F"])
+assert.ok(vivianReleaseSetCoverage.size >= 3, "Vivian Release fuzz should cover multiple 4+2 set pairs.")
+assert.ok(vivianReleaseBoundChecks > 0, "Vivian Release fuzz should exercise interval-bound checks.")
+assert.ok(vivianReleasePruned > 0, "Vivian Release fuzz should exercise strict upper-bound pruning.")
+
 const chunkStore = chunkBoundStore()
 const chunkLegacy = optimizeDriveDiscs(catalog, chunkStore, optimizerInput("chunk", 0, "exact-legacy", chunkStore))
 const chunkSuperBound = optimizeDriveDiscs(catalog, chunkStore, optimizerInput(
@@ -382,4 +573,4 @@ assert.ok(Number(chunkSuperBound.metrics.chunkBoundChecks ?? 0) > 0, "chunk boun
 chunkBoundCoverage += 1
 
 assert.ok(reservationCoverage > 0, "reservation fuzz should exclude other-agent candidates")
-console.log(`optimizer fuzz tests passed (${FUZZ_SEEDS} seeds, reservations=${reservationCoverage}, suffixTopK=${suffixTopKBoundCoverage}, chunk=${chunkBoundCoverage})`)
+console.log(`optimizer fuzz tests passed (${FUZZ_SEEDS} seeds, reservations=${reservationCoverage}, suffixTopK=${suffixTopKBoundCoverage}, chunk=${chunkBoundCoverage}, vivianReleaseChecks=${vivianReleaseBoundChecks}, vivianReleasePruned=${vivianReleasePruned})`)

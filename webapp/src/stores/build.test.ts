@@ -1,6 +1,6 @@
 import { createPinia, setActivePinia } from "pinia"
 import { beforeEach, describe, expect, it } from "vitest"
-import { activeDriveDisc4pcRuntimeInputs, defaultDamageConfig, normalizeDamageModeForAgent, useBuildStore } from "@/stores/build"
+import { activeDriveDisc4pcRuntimeInputs, defaultDamageConfig, hasAdminDefaultCalculation, normalizeDamageModeForAgent, useBuildStore } from "@/stores/build"
 
 function teammateWEngineMeta() {
   const teamWEngine = (id: string) => ({
@@ -1750,5 +1750,47 @@ describe("build store", () => {
       if (originalLocks) Object.defineProperty(navigator, "locks", originalLocks)
       else Reflect.deleteProperty(navigator, "locks")
     }
+  })
+
+  it("defaults a release-profile agent to one self-sourced anomaly event without an administrator rotation", () => {
+    const vivian = {
+      id: "vivian",
+      name: { zhCN: "薇薇安" },
+      attribute: "ether",
+      specialty: "anomaly",
+      anomalyReleaseProfiles: [{ id: "core_passive", default: true, supportedElements: ["ether"] }],
+      combatBuffs: { corePassive: null, additionalAbility: null, cinemaBuffs: [] },
+    }
+    const engine = { id: "engine_a", name: { zhCN: "音擎 A" } }
+    const meta = { agents: [vivian], wEngines: [engine], combatBuffs: [] }
+
+    expect(hasAdminDefaultCalculation(vivian)).toBe(false)
+    const config = defaultDamageConfig(vivian)
+    expect(config.mode).toBe("anomaly")
+    expect(config.events).toHaveLength(1)
+    expect(config.events[0]).toMatchObject({
+      kind: "anomaly",
+      settlementType: "release",
+      anomalyEffect: "corruption",
+      count: 1,
+      stunned: true,
+      triggerActorRef: { agentId: "vivian", profileId: "core_passive" },
+      anomalySource: { actorRef: { agentId: "vivian" } },
+    })
+
+    const store = useBuildStore()
+    store.initialize(meta, meta)
+    expect(store.damageConfig.mode).toBe("anomaly")
+    expect(store.damageConfig.events[0].settlementType).toBe("release")
+    expect(store.damageConfig.events[0].anomalyEffect).toBe("corruption")
+    const optimizerInput = store.buildInput(meta, meta, [])
+    expect(optimizerInput.damage.mode).toBe("anomaly")
+    expect(optimizerInput.damage.events).toHaveLength(1)
+    expect(optimizerInput.damage.events[0]).toMatchObject({
+      settlementType: "release",
+      anomalyEffect: "corruption",
+      triggerActorRef: { agentId: "vivian", profileId: "core_passive" },
+      anomalySource: { actorRef: { agentId: "vivian" } },
+    })
   })
 })
