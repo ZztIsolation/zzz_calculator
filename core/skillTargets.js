@@ -30,6 +30,9 @@ export const SKILL_TAGS = Object.freeze([
     "assistAttack",
     "fireSuppression",
     "dodgeCounter",
+    "sharp",
+    "maim",
+    "crimsonInscription",
 ])
 
 export const SKILL_TAG_LABELS = Object.freeze({
@@ -38,6 +41,9 @@ export const SKILL_TAG_LABELS = Object.freeze({
     assistAttack: "支援攻击",
     fireSuppression: "火力镇压",
     dodgeCounter: "闪避反击",
+    sharp: "锐化",
+    maim: "毁伤",
+    crimsonInscription: "猩红铭刻",
 })
 
 export const SKILL_TAG_VALUES = new Set(SKILL_TAGS)

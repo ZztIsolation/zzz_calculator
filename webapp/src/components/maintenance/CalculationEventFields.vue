@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { NInput, NInputNumber, NSelect, NSwitch } from "naive-ui"
 import {
-  ANOMALY_VARIANT_OPTIONS, CALCULATION_DAMAGE_BASIS_OPTIONS, CRIT_MODE_OPTIONS, DAMAGE_ELEMENT_OPTIONS, DIRECT_DAMAGE_ELEMENT_OPTIONS, DISORDER_TYPE_OPTIONS, EVENT_KIND_OPTIONS, EVENT_SOURCE_OPTIONS,
+  ANOMALY_VARIANT_OPTIONS, CALCULATION_DAMAGE_BASIS_OPTIONS, CRIT_MODE_OPTIONS, SHARP_CRIT_MODE_OPTIONS, DAMAGE_ELEMENT_OPTIONS, DIRECT_DAMAGE_ELEMENT_OPTIONS, DISORDER_TYPE_OPTIONS, EVENT_KIND_OPTIONS, EVENT_SOURCE_OPTIONS,
   anomalyOptions, categoryOptions, defaultCalculationEvent, moveOptions, option, rowOptions,
 } from "./maintenance-options"
 import { textOf } from "./maintenance-model"
@@ -26,7 +26,7 @@ function agentSkill() {
 
 function visibleKind() {
   if (props.event.kind === "skillGroup") return "skillGroup"
-  if (props.event.kind === "direct" || props.event.kind === "sheer") return props.event.kind
+  if (props.event.kind === "direct" || props.event.kind === "sheer" || props.event.kind === "sharp") return props.event.kind
   return props.event.kind === "disorder" || props.event.settlementType === "disorder"
     ? "disorder"
     : props.event.settlementType === "release"
@@ -68,11 +68,22 @@ function changeKind(kind: string) {
   if (kind === "luminescence") {
     props.event.triggerActorRef = { agentId: props.agent?.id ?? "" }
   }
-  if (["direct", "sheer"].includes(kind) && agentSkill()) {
+  if (["direct", "sheer", "sharp"].includes(kind) && agentSkill()) {
     delete props.event.__source
     delete props.event.skillMultiplier
     delete props.event.damageElement
     props.event.skillRef = newSkillRef()
+    if (kind === "sharp") {
+      props.event.sharpProfileId = props.agent?.sharpProfile?.id ?? "armorer"
+      props.event.sharpComponent = "normal"
+      props.event.sharpScenario = {
+        crimsonInscription: true,
+        gashStacks: 3,
+        remnantEdgeActive: true,
+        perfectDodgeCoverage: 0,
+        triggeredEngineEffects: true,
+      }
+    }
   }
   emit("change")
 }
@@ -150,6 +161,9 @@ function eventKindOptions() {
       if (item.value === "luminescence" && props.agent?.id !== "remielle_dan") {
         return { ...item, disabled: true, label: "耀变（仅丹）" }
       }
+      if (item.value === "sharp" && props.agent?.specialty !== "armorer") {
+        return { ...item, disabled: true, label: "锐化（仅锋御）" }
+      }
       return item
     })
 }
@@ -178,6 +192,10 @@ function updateStunned(value: boolean) {
   props.event.stunned = Boolean(value)
   emit("change")
 }
+
+function critModeOptions() {
+  return visibleKind() === "sharp" ? SHARP_CRIT_MODE_OPTIONS : CRIT_MODE_OPTIONS
+}
 </script>
 
 <template>
@@ -188,7 +206,7 @@ function updateStunned(value: boolean) {
     <label v-if="!['skillGroup', 'luminescence'].includes(visibleKind())" class="maintenance-field"><span>伤害比例%</span><NInputNumber v-model:value="event.damageRatioPct" :disabled="disabled" :min="0" :step="0.1" placeholder="100" @update:value="emit('change')" /></label>
     <label v-if="visibleKind() === 'skillGroup'" class="maintenance-field"><span>技能组</span><NSelect v-model:value="event.skillGroupId" :options="groupOptions()" :disabled="disabled" @update:value="emit('change')" /></label>
 
-    <template v-if="['direct', 'sheer'].includes(visibleKind())">
+    <template v-if="['direct', 'sheer', 'sharp'].includes(visibleKind())">
       <label class="maintenance-field"><span>伤害来源</span><NSelect :value="sourceOf()" :options="EVENT_SOURCE_OPTIONS" :disabled="disabled" @update:value="changeSource(String($event))" /></label>
       <template v-if="event.skillRef">
         <label class="maintenance-field"><span>技能大类</span><NSelect filterable :value="event.skillRef.categoryId" :options="categoryOptions(catalog, event.skillRef.agentSkillId, potentialLevel)" :disabled="disabled" @update:value="changeCategory(String($event))" /></label>
@@ -200,7 +218,15 @@ function updateStunned(value: boolean) {
         <label class="maintenance-field"><span>手填倍率%</span><NInputNumber v-model:value="event.skillMultiplier" :disabled="disabled" :min="0" :step="0.1" @update:value="emit('change')" /></label>
         <label class="maintenance-field"><span>伤害属性</span><NSelect v-model:value="event.damageElement" :options="manualDamageElementOptions()" :disabled="disabled" @update:value="emit('change')" /></label>
       </template>
-      <label class="maintenance-field"><span>暴击模式</span><NSelect v-model:value="event.critMode" :options="CRIT_MODE_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
+      <label class="maintenance-field"><span>暴击模式</span><NSelect v-model:value="event.critMode" :options="critModeOptions()" :disabled="disabled" @update:value="emit('change')" /></label>
+      <template v-if="visibleKind() === 'sharp'">
+        <label class="maintenance-field"><span>锐化组件</span><NSelect v-model:value="event.sharpComponent" :options="[{ label: '普通锐化', value: 'normal' }, { label: '毁伤', value: 'maim' }]" :disabled="disabled" @update:value="emit('change')" /></label>
+        <label v-if="event.sharpComponent === 'maim'" class="maintenance-field"><span>毁伤触发方式</span><NSelect v-model:value="event.maimTrigger" :options="[{ label: '消耗残痕', value: 'gash' }, { label: '六影免费毁伤', value: 'free' }]" :disabled="disabled" @update:value="emit('change')" /></label>
+        <label class="maintenance-field"><span>猩红铭刻</span><NSwitch :value="event.sharpScenario?.crimsonInscription !== false" :disabled="disabled" @update:value="event.sharpScenario = { ...(event.sharpScenario ?? {}), crimsonInscription: Boolean($event) }; emit('change')" /></label>
+        <label class="maintenance-field"><span>残痕层数</span><NInputNumber :value="event.sharpScenario?.gashStacks ?? 3" :disabled="disabled" :min="0" :max="3" :step="1" @update:value="event.sharpScenario = { ...(event.sharpScenario ?? {}), gashStacks: Number($event ?? 0) }; emit('change')" /></label>
+        <label class="maintenance-field"><span>残锋</span><NSwitch :value="event.sharpScenario?.remnantEdgeActive !== false" :disabled="disabled" @update:value="event.sharpScenario = { ...(event.sharpScenario ?? {}), remnantEdgeActive: Boolean($event) }; emit('change')" /></label>
+        <label class="maintenance-field"><span>音擎触发效果</span><NSwitch :value="event.sharpScenario?.triggeredEngineEffects !== false" :disabled="disabled" @update:value="event.sharpScenario = { ...(event.sharpScenario ?? {}), triggeredEngineEffects: Boolean($event) }; emit('change')" /></label>
+      </template>
       <label v-if="!event.skillRef && visibleKind() === 'direct'" class="maintenance-field"><span>伤害基础值</span><NSelect v-model:value="event.damageBasis" :options="CALCULATION_DAMAGE_BASIS_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
     </template>
 

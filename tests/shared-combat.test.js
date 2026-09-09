@@ -141,6 +141,26 @@ assert.deepEqual(
     "Buffs without modifiers should not report modifier text",
 )
 
+const customSharpEffect = normalizeCustomBuffEffect({
+    type: "fixed",
+    stat: "sharpCritRate",
+    value: 15,
+    target: {
+        kind: "sharp",
+        damageKinds: ["sharp"],
+        sharpComponents: ["maim"],
+        sharpScenario: { crimsonInscription: true },
+        sharpScenarioAnyOf: [{ skillTypes: ["chain"] }],
+    },
+})
+assert.deepEqual(customSharpEffect?.target, {
+    kind: "sharp",
+    damageKinds: ["sharp"],
+    sharpComponents: ["maim"],
+    sharpScenario: { crimsonInscription: true },
+    sharpScenarioAnyOf: [{ skillTypes: ["chain"] }],
+}, "Custom sharp effects should retain component and scenario targeting")
+
 const modifierOnlyBuff = {
     id: "modifier-only-test",
     effects: [],

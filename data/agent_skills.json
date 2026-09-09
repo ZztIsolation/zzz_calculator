@@ -7042,6 +7042,1780 @@
         "damageElements": "Warmup Sparks and physical Dash Attack are physical; all other damaging moves are fire",
         "firepowerBurstCoreExclusion": "Firepower Burst intentionally lacks the fireSuppression tag and does not receive Heat Wave or Cinema 6"
       }
+    },
+    {
+      "id": "claret",
+      "agentId": "claret",
+      "name": {
+        "zhCN": "克拉蕾技能倍率"
+      },
+      "categories": [
+        {
+          "id": "basic",
+          "name": {
+            "zhCN": "普通攻击"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "basic_blood_forge",
+              "name": {
+                "zhCN": "普通攻击：血锻四式"
+              },
+              "description": {
+                "zhCN": "点按发动:向前方发动至多四段锤击，造成电属性伤害；"
+              },
+              "skillType": "basic",
+              "damageElement": "electric",
+              "damageKind": "sharp",
+              "damageBasis": "def",
+              "skillTags": [],
+              "rows": [
+                {
+                  "id": "hit_1",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "一段伤害倍率"
+                  },
+                  "values": [
+                    54.4,
+                    59.4,
+                    64.4,
+                    69.4,
+                    74.4,
+                    79.4,
+                    84.4,
+                    89.4,
+                    94.4,
+                    99.4,
+                    104.4,
+                    109.4,
+                    114.4,
+                    119.4,
+                    124.4,
+                    129.4
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "hit_2",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "二段伤害倍率"
+                  },
+                  "values": [
+                    67.2,
+                    73.4,
+                    79.6,
+                    85.8,
+                    92,
+                    98.2,
+                    104.4,
+                    110.6,
+                    116.8,
+                    123,
+                    129.2,
+                    135.4,
+                    141.6,
+                    147.8,
+                    154,
+                    160.2
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "hit_3",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "三段伤害倍率"
+                  },
+                  "values": [
+                    95.2,
+                    103.9,
+                    112.6,
+                    121.3,
+                    130,
+                    138.7,
+                    147.4,
+                    156.1,
+                    164.8,
+                    173.5,
+                    182.2,
+                    190.9,
+                    199.6,
+                    208.3,
+                    217,
+                    225.7
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "hit_4",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "四段伤害倍率"
+                  },
+                  "values": [
+                    289.5,
+                    315.9,
+                    342.3,
+                    368.7,
+                    395.1,
+                    421.5,
+                    447.9,
+                    474.3,
+                    500.7,
+                    527.1,
+                    553.5,
+                    579.9,
+                    606.3,
+                    632.7,
+                    659.1,
+                    685.5
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "daze_hit_1",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "一段失衡倍率"
+                  },
+                  "values": [
+                    34.7,
+                    36.3,
+                    37.9,
+                    39.5,
+                    41.1,
+                    42.7,
+                    44.3,
+                    45.9,
+                    47.5,
+                    49.1,
+                    50.7,
+                    52.3,
+                    53.9,
+                    55.5,
+                    57.1,
+                    58.7
+                  ]
+                },
+                {
+                  "id": "daze_hit_2",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "二段失衡倍率"
+                  },
+                  "values": [
+                    42.9,
+                    44.9,
+                    46.9,
+                    48.9,
+                    50.9,
+                    52.9,
+                    54.9,
+                    56.9,
+                    58.9,
+                    60.9,
+                    62.9,
+                    64.9,
+                    66.9,
+                    68.9,
+                    70.9,
+                    72.9
+                  ]
+                },
+                {
+                  "id": "daze_hit_3",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "三段失衡倍率"
+                  },
+                  "values": [
+                    60.9,
+                    63.7,
+                    66.5,
+                    69.3,
+                    72.1,
+                    74.9,
+                    77.7,
+                    80.5,
+                    83.3,
+                    86.1,
+                    88.9,
+                    91.7,
+                    94.5,
+                    97.3,
+                    100.1,
+                    102.9
+                  ]
+                },
+                {
+                  "id": "daze_hit_4",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "四段失衡倍率"
+                  },
+                  "values": [
+                    178.8,
+                    187,
+                    195.2,
+                    203.3,
+                    211.6,
+                    219.8,
+                    228,
+                    236.2,
+                    244.4,
+                    252.6,
+                    260.8,
+                    269,
+                    277.2,
+                    285.4,
+                    293.6,
+                    301.8
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "basic_crimson_forge",
+              "name": {
+                "zhCN": "普通攻击：血华誓·锻星"
+              },
+              "description": {
+                "zhCN": "处于[猩红铭刻]下，点按发动：使用血斧向前方发动至多三段斩击，造成电属性伤害；第二段攻击招式发动时，克拉蕾会后跳并扔出血斧，后撤期间可触发极限闪避效果；第三段攻击招式发动时，克拉蕾会连续斩击后跳起下砸，连续斩击期间抗打断等级提升，受到的伤害降低40%，连点或长按可以延长连续斩击的持续时间，停止连点或松开时克拉蕾会立刻跳起下砸，跳起期间可触发极限闪避效果，成功触发极限闪避后，点按或长按可以衔接[普通攻击：血华誓·锻星]第三段；发动期间不会退出[猩红铭刻]状态。"
+              },
+              "skillType": "basic",
+              "damageElement": "electric",
+              "damageKind": "sharp",
+              "damageBasis": "def",
+              "skillTags": [],
+              "rows": [
+                {
+                  "id": "hit_1",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "一段伤害倍率"
+                  },
+                  "values": [
+                    107.7,
+                    117.5,
+                    127.3,
+                    137.1,
+                    146.9,
+                    156.7,
+                    166.5,
+                    176.3,
+                    186.1,
+                    195.9,
+                    205.7,
+                    215.5,
+                    225.3,
+                    235.1,
+                    244.9,
+                    254.7
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "hit_2",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "二段伤害倍率"
+                  },
+                  "values": [
+                    287.4,
+                    313.6,
+                    339.8,
+                    366,
+                    392.2,
+                    418.4,
+                    444.6,
+                    470.8,
+                    497,
+                    523.2,
+                    549.4,
+                    575.6,
+                    601.8,
+                    628,
+                    654.2,
+                    680.4
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "hit_3",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "三段连续斩击伤害倍率"
+                  },
+                  "values": [
+                    452.1,
+                    493.2,
+                    534.3,
+                    575.4,
+                    616.5,
+                    657.6,
+                    698.7,
+                    739.8,
+                    780.9,
+                    822,
+                    863.1,
+                    904.2,
+                    945.3,
+                    986.4,
+                    1027.5,
+                    1068.6
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "hit_4",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "三段下砸伤害倍率"
+                  },
+                  "values": [
+                    177.3,
+                    193.5,
+                    209.7,
+                    225.9,
+                    242.1,
+                    258.3,
+                    274.5,
+                    290.7,
+                    306.9,
+                    323.1,
+                    339.3,
+                    355.5,
+                    371.7,
+                    387.9,
+                    404.1,
+                    420.3
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "daze_hit_1",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "一段失衡倍率"
+                  },
+                  "values": [
+                    55,
+                    57.5,
+                    60,
+                    62.5,
+                    65,
+                    67.5,
+                    70,
+                    72.5,
+                    75,
+                    77.5,
+                    80,
+                    82.5,
+                    85,
+                    87.5,
+                    90,
+                    92.5
+                  ]
+                },
+                {
+                  "id": "daze_hit_2",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "二段失衡倍率"
+                  },
+                  "values": [
+                    146.7,
+                    153.4,
+                    160.1,
+                    166.8,
+                    173.5,
+                    180.2,
+                    186.9,
+                    193.6,
+                    200.3,
+                    207,
+                    213.7,
+                    220.4,
+                    227.1,
+                    233.8,
+                    240.5,
+                    247.2
+                  ]
+                },
+                {
+                  "id": "daze_hit_3",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "三段连续斩击失衡倍率"
+                  },
+                  "values": [
+                    187,
+                    195.5,
+                    204,
+                    212.5,
+                    221,
+                    229.5,
+                    238,
+                    246.5,
+                    255,
+                    263.5,
+                    272,
+                    280.5,
+                    289,
+                    297.5,
+                    306,
+                    314.5
+                  ]
+                },
+                {
+                  "id": "daze_hit_4",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "三段下砸失衡倍率"
+                  },
+                  "values": [
+                    73.4,
+                    76.8,
+                    80.2,
+                    83.6,
+                    87,
+                    90.4,
+                    93.8,
+                    97.2,
+                    100.6,
+                    104,
+                    107.4,
+                    110.8,
+                    114.2,
+                    117.6,
+                    121,
+                    124.4
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "basic_crimson_fall",
+              "name": {
+                "zhCN": "普通攻击：血华誓·伏钺"
+              },
+              "description": {
+                "zhCN": "处于[猩红铭刻]下，发动[特殊技：血华誓·斩金断铁]或[特殊技：血华誓·葬血强袭]并成功触发[毁伤]后，点按或长按发动：使用血斧旋转跳起下砸并斩击目标敌人，造成电属性伤害，跳起期间可触发极限闪避效果；招式发动后，点按或长按可以衔接[普通攻击：血华誓·锻星]第三段；发动期间不会退出[猩红铭刻]状态。"
+              },
+              "skillType": "basic",
+              "damageElement": "electric",
+              "damageKind": "sharp",
+              "damageBasis": "def",
+              "skillTags": [],
+              "rows": [
+                {
+                  "id": "damage",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "values": [
+                    328,
+                    357.9,
+                    387.8,
+                    417.7,
+                    447.6,
+                    477.5,
+                    507.4,
+                    537.3,
+                    567.2,
+                    597.1,
+                    627,
+                    656.9,
+                    686.8,
+                    716.7,
+                    746.6,
+                    776.5
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "daze_daze",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "values": [
+                    135.7,
+                    141.9,
+                    148.1,
+                    154.3,
+                    160.5,
+                    166.7,
+                    172.9,
+                    179.1,
+                    185.3,
+                    191.5,
+                    197.7,
+                    203.9,
+                    210.1,
+                    216.3,
+                    222.5,
+                    228.7
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "dodge",
+          "name": {
+            "zhCN": "闪避"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "dodge_night_watch",
+              "name": {
+                "zhCN": "闪避：夜视"
+              },
+              "description": {
+                "zhCN": "点按发动：快速的冲刺闪避；招式发动期间拥有无敌效果。"
+              },
+              "skillType": "dodge",
+              "skillTags": [],
+              "rows": [
+                {
+                  "id": "none",
+                  "kind": "statBonus",
+                  "label": {
+                    "zhCN": "无数值倍率"
+                  },
+                  "values": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "dash_quench",
+              "name": {
+                "zhCN": "冲刺攻击：淬火"
+              },
+              "description": {
+                "zhCN": "非[猩红铭刻]状态下闪避时，点按发动：向前进行锤击，造成电属性伤害。"
+              },
+              "skillType": "dodge",
+              "damageElement": "electric",
+              "damageKind": "sharp",
+              "damageBasis": "def",
+              "skillTags": [],
+              "rows": [
+                {
+                  "id": "damage",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "values": [
+                    52.9,
+                    57.8,
+                    62.7,
+                    67.6,
+                    72.5,
+                    77.4,
+                    82.3,
+                    87.2,
+                    92.1,
+                    97,
+                    101.9,
+                    106.8,
+                    111.7,
+                    116.6,
+                    121.5,
+                    126.4
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "daze_daze",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "values": [
+                    43.1,
+                    45.1,
+                    47.1,
+                    49.1,
+                    51,
+                    53.1,
+                    55.1,
+                    57.1,
+                    59.1,
+                    61.1,
+                    63.1,
+                    65.1,
+                    67.1,
+                    69.1,
+                    71.1,
+                    73.1
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "dodge_counter_return",
+              "name": {
+                "zhCN": "闪避反击：回锋"
+              },
+              "description": {
+                "zhCN": "触发极限闪避时，点按发动：使用锤柄对前方进行强力反击，造成电属性伤害；招式发动期间拥有无敌效果。"
+              },
+              "skillType": "dodge",
+              "damageElement": "electric",
+              "damageKind": "sharp",
+              "damageBasis": "def",
+              "skillTags": [
+                "dodgeCounter"
+              ],
+              "rows": [
+                {
+                  "id": "damage",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "values": [
+                    272.5,
+                    297.3,
+                    322.1,
+                    346.9,
+                    371.7,
+                    396.5,
+                    421.3,
+                    446.1,
+                    470.9,
+                    495.7,
+                    520.5,
+                    545.3,
+                    570.1,
+                    594.9,
+                    619.7,
+                    644.5
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "daze_daze",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "values": [
+                    196.2,
+                    205.2,
+                    214.2,
+                    223.2,
+                    232.2,
+                    241.2,
+                    250.2,
+                    259.2,
+                    268.2,
+                    277.2,
+                    286.2,
+                    295.2,
+                    304.2,
+                    313.2,
+                    322.2,
+                    331.2
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "dodge_counter_crimson_return",
+              "name": {
+                "zhCN": "闪避反击：血华誓·回锋"
+              },
+              "description": {
+                "zhCN": "触发极限闪避时，点按发动：使用血斧对前方进行强力反击，造成电属性伤害；发动期间不会退出[猩红铭刻]状态；招式发动期间拥有无敌效果。"
+              },
+              "skillType": "dodge",
+              "damageElement": "electric",
+              "damageKind": "sharp",
+              "damageBasis": "def",
+              "skillTags": [
+                "dodgeCounter"
+              ],
+              "rows": [
+                {
+                  "id": "damage",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "values": [
+                    330,
+                    360,
+                    390,
+                    420,
+                    450,
+                    480,
+                    510,
+                    540,
+                    570,
+                    600,
+                    630,
+                    660,
+                    690,
+                    720,
+                    750,
+                    780
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "daze_daze",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "values": [
+                    190.7,
+                    199.4,
+                    208.1,
+                    216.8,
+                    225.5,
+                    234.2,
+                    242.9,
+                    251.6,
+                    260.3,
+                    269,
+                    277.7,
+                    286.4,
+                    295.1,
+                    303.8,
+                    312.5,
+                    321.2
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "assist",
+          "name": {
+            "zhCN": "支援技"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "assist_moonfall",
+              "name": {
+                "zhCN": "快速支援：厄月再临"
+              },
+              "description": {
+                "zhCN": "当前操作中的角色被击飞时，点按发动：造成电属性伤害；招式发动期间拥有无敌效果。"
+              },
+              "skillType": "assist",
+              "damageElement": "electric",
+              "damageKind": "sharp",
+              "damageBasis": "def",
+              "skillTags": [
+                "assistAttack"
+              ],
+              "rows": [
+                {
+                  "id": "damage",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "values": [
+                    52.9,
+                    57.8,
+                    62.7,
+                    67.6,
+                    72.5,
+                    77.4,
+                    82.3,
+                    87.2,
+                    92.1,
+                    97,
+                    101.9,
+                    106.8,
+                    111.7,
+                    116.6,
+                    121.5,
+                    126.4
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "daze_daze",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "values": [
+                    43.1,
+                    45.1,
+                    47.1,
+                    49.1,
+                    51,
+                    53.1,
+                    55.1,
+                    57.1,
+                    59.1,
+                    61.1,
+                    63.1,
+                    65.1,
+                    67.1,
+                    69.1,
+                    71.1,
+                    73.1
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "assist_crimson_moonfall",
+              "name": {
+                "zhCN": "快速支援：血华誓·厄月再临"
+              },
+              "description": {
+                "zhCN": "当前操作中的角色被击飞时，点按发动：造成电属性伤害；发动期间不会退出[猩红铭刻]状态；招式发动期间拥有无敌效果。"
+              },
+              "skillType": "assist",
+              "damageElement": "electric",
+              "damageKind": "sharp",
+              "damageBasis": "def",
+              "skillTags": [
+                "assistAttack"
+              ],
+              "rows": [
+                {
+                  "id": "damage",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "values": [
+                    115.8,
+                    126.4,
+                    137,
+                    147.6,
+                    158.2,
+                    168.8,
+                    179.4,
+                    190,
+                    200.6,
+                    211.2,
+                    221.8,
+                    232.4,
+                    243,
+                    253.6,
+                    264.2,
+                    274.8
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "daze_daze",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "values": [
+                    40.4,
+                    42.3,
+                    44.2,
+                    46.1,
+                    48,
+                    49.9,
+                    51.8,
+                    53.7,
+                    55.6,
+                    57.5,
+                    59.4,
+                    61.3,
+                    63.2,
+                    65.1,
+                    67,
+                    68.9
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "assist_unyielding_core",
+              "name": {
+                "zhCN": "招架支援：不屈炉心"
+              },
+              "description": {
+                "zhCN": "前场角色即将被攻击时，点按发动：招架敌人的攻击，累积大量失衡值；发动期间，[猩红铭刻]持续时间不再减少；招式发动期间拥有无敌效果。"
+              },
+              "skillType": "assist",
+              "skillTags": [],
+              "rows": [
+                {
+                  "id": "daze_parry_light",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "轻招架失衡倍率"
+                  },
+                  "values": [
+                    271.3,
+                    283.7,
+                    296.1,
+                    308.5,
+                    320.9,
+                    333.3,
+                    345.7,
+                    358.1,
+                    370.5,
+                    382.9,
+                    395.3,
+                    407.7,
+                    420.1,
+                    432.5,
+                    444.9,
+                    457.3
+                  ]
+                },
+                {
+                  "id": "daze_parry_heavy",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "重招架失衡倍率"
+                  },
+                  "values": [
+                    342.8,
+                    358.4,
+                    374,
+                    389.6,
+                    405.2,
+                    420.8,
+                    436.4,
+                    452,
+                    467.6,
+                    483.2,
+                    498.8,
+                    514.4,
+                    530,
+                    545.6,
+                    561.2,
+                    576.8
+                  ]
+                },
+                {
+                  "id": "daze_parry_chain",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "连续招架失衡倍率"
+                  },
+                  "values": [
+                    166.8,
+                    174.4,
+                    182,
+                    189.6,
+                    197.2,
+                    204.8,
+                    212.4,
+                    220,
+                    227.6,
+                    235.2,
+                    242.8,
+                    250.4,
+                    258,
+                    265.6,
+                    273.2,
+                    280.8
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "assist_pure_melt",
+              "name": {
+                "zhCN": "支援突击：血华誓·无垢溶锋"
+              },
+              "description": {
+                "zhCN": "发动[招架支援]后，点按发动：造成大量电属性伤害；发动期间不会退出[猩红铭刻]状态；招式发动期间拥有无敌效果。"
+              },
+              "skillType": "assist",
+              "damageElement": "electric",
+              "damageKind": "sharp",
+              "damageBasis": "def",
+              "skillTags": [
+                "assistAttack"
+              ],
+              "rows": [
+                {
+                  "id": "damage",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "values": [
+                    446.2,
+                    486.8,
+                    527.4,
+                    568,
+                    608.6,
+                    649.2,
+                    689.8,
+                    730.4,
+                    771,
+                    811.6,
+                    852.2,
+                    892.8,
+                    933.4,
+                    974,
+                    1014.6,
+                    1055.2
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "daze_daze",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "values": [
+                    315.8,
+                    330.2,
+                    344.6,
+                    359,
+                    373.4,
+                    387.8,
+                    402.1,
+                    416.6,
+                    431,
+                    445.4,
+                    459.8,
+                    474.2,
+                    488.6,
+                    503,
+                    517.4,
+                    531.8
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "assist_counter_iron",
+              "name": {
+                "zhCN": "反制支援：寸铁不让"
+              },
+              "description": {
+                "zhCN": "自身或前场角色即将被部分敌人的控制技攻击时，点按发动：与怪物进行角力，角力成功后，化解敌人的控制技并造成电属性伤害；发动期间，[猩红铭刻]持续时间不再减少；招式发动期间拥有无敌效果。"
+              },
+              "skillType": "assist",
+              "damageElement": "electric",
+              "damageKind": "sharp",
+              "damageBasis": "def",
+              "skillTags": [],
+              "rows": [
+                {
+                  "id": "damage",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "values": [
+                    1153,
+                    1257.9,
+                    1362.8,
+                    1467.7,
+                    1572.6,
+                    1677.5,
+                    1782.4,
+                    1887.3,
+                    1992.2,
+                    2097.1,
+                    2202,
+                    2306.9,
+                    2411.8,
+                    2516.7,
+                    2621.6,
+                    2726.5
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "daze_daze",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "values": [
+                    714.9,
+                    747.4,
+                    779.9,
+                    812.3,
+                    844.9,
+                    877.4,
+                    909.9,
+                    942.4,
+                    974.9,
+                    1007.4,
+                    1039.9,
+                    1072.4,
+                    1104.9,
+                    1137.4,
+                    1169.9,
+                    1202.4
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "assist_carve_form",
+              "name": {
+                "zhCN": "支援突击：血华誓·琢形"
+              },
+              "description": {
+                "zhCN": "发动[反制支援]后，点按发动：造成大量电属性伤害，重击命中敌人时，直接为目标添加1层[残痕]；发动期间，[猩红铭刻]持续时间不再减少；招式发动期间拥有无敌效果。"
+              },
+              "skillType": "assist",
+              "damageElement": "electric",
+              "damageKind": "sharp",
+              "damageBasis": "def",
+              "skillTags": [
+                "assistAttack"
+              ],
+              "rows": [
+                {
+                  "id": "damage",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "values": [
+                    856.3,
+                    934.2,
+                    1012.1,
+                    1090,
+                    1167.9,
+                    1245.8,
+                    1323.7,
+                    1401.6,
+                    1479.5,
+                    1557.4,
+                    1635.3,
+                    1713.2,
+                    1791.1,
+                    1869,
+                    1946.9,
+                    2024.8
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "daze_daze",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "values": [
+                    526.4,
+                    550.4,
+                    574.4,
+                    598.4,
+                    622.4,
+                    646.4,
+                    670.4,
+                    694.4,
+                    718.4,
+                    742.4,
+                    766.4,
+                    790.4,
+                    814.4,
+                    838.4,
+                    862.4,
+                    886.4
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "special",
+          "name": {
+            "zhCN": "特殊技"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "special_first_light",
+              "name": {
+                "zhCN": "特殊技：初辉启鸣"
+              },
+              "description": {
+                "zhCN": "点按发动：向前方发动两段锤击，造成电属性伤害；招式发动期间抗打断等级提升。"
+              },
+              "skillType": "special",
+              "damageElement": "electric",
+              "damageKind": "sharp",
+              "damageBasis": "def",
+              "skillTags": [],
+              "rows": [
+                {
+                  "id": "damage",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "values": [
+                    90.1,
+                    98.3,
+                    106.5,
+                    114.7,
+                    122.9,
+                    131.1,
+                    139.3,
+                    147.5,
+                    155.7,
+                    163.9,
+                    172.1,
+                    180.3,
+                    188.5,
+                    196.7,
+                    204.9,
+                    213.1
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "daze_daze",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "values": [
+                    36.7,
+                    38.4,
+                    40.1,
+                    41.8,
+                    43.5,
+                    45.2,
+                    46.9,
+                    48.6,
+                    50.3,
+                    52,
+                    53.7,
+                    55.4,
+                    57.1,
+                    58.8,
+                    60.5,
+                    62.2
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "special_forge_secret",
+              "name": {
+                "zhCN": "强化特殊技：血华誓·铸锋秘术"
+              },
+              "description": {
+                "zhCN": "锐能足够且不处于[猩红铭刻]时，点按发动：将锻造锤变形为血斧并斩击目标敌人，并造成电属性伤害；招式发动后，进入[猩红铭刻]，持续16秒，处于后场时，持续时间不再减少，克拉蕾击败敌人时，延长3秒[猩红铭刻]持续时间，3秒内最多触发1次；招式发动时，保持长按，可以跳过斩击，快速派生[特殊技：血华誓·斩金断铁]和[特殊技：血华誓·葬血强袭]；招式发动后，点按或长按可以衔接[普通攻击：血华誓·锻星]第三段；招式发动期间拥有无敌效果。"
+              },
+              "skillType": "special",
+              "damageElement": "electric",
+              "damageKind": "sharp",
+              "damageBasis": "def",
+              "skillTags": [
+                "exSpecial"
+              ],
+              "rows": [
+                {
+                  "id": "damage",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "values": [
+                    624.8,
+                    681.6,
+                    738.4,
+                    795.2,
+                    852,
+                    908.8,
+                    965.6,
+                    1022.4,
+                    1079.2,
+                    1136,
+                    1192.8,
+                    1249.6,
+                    1306.4,
+                    1363.2,
+                    1420,
+                    1476.8
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "daze_daze",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "values": [
+                    258.5,
+                    270.3,
+                    282.1,
+                    293.9,
+                    305.7,
+                    317.5,
+                    329.3,
+                    341.1,
+                    352.9,
+                    364.7,
+                    376.5,
+                    388.3,
+                    400.1,
+                    411.9,
+                    423.7,
+                    435.5
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "special_slash_gold",
+              "name": {
+                "zhCN": "特殊技：血华誓·斩金断铁"
+              },
+              "description": {
+                "zhCN": "处于[猩红铭刻]时，点按或发动：向前方进行强力上挑后，横向斩击，造成电属性伤害；横向斩击命中持有[残痕]的敌人时，对目标触发[毁伤]，额外造成范围电属性伤害；发动期间不会退出[猩红铭刻]状态；招式发动期间抗打断等级提升，成功触发[毁伤]后，招式发动期间拥有无敌效果。"
+              },
+              "skillType": "special",
+              "damageElement": "electric",
+              "damageKind": "sharp",
+              "damageBasis": "def",
+              "skillTags": [],
+              "rows": [
+                {
+                  "id": "hit_1",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "上挑伤害倍率"
+                  },
+                  "values": [
+                    76.6,
+                    83.6,
+                    90.6,
+                    97.6,
+                    104.6,
+                    111.6,
+                    118.6,
+                    125.6,
+                    132.6,
+                    139.6,
+                    146.6,
+                    153.6,
+                    160.6,
+                    167.6,
+                    174.6,
+                    181.6
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "hit_2",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "横斩伤害倍率"
+                  },
+                  "values": [
+                    87.7,
+                    95.7,
+                    103.7,
+                    111.7,
+                    119.7,
+                    127.7,
+                    135.7,
+                    143.7,
+                    151.7,
+                    159.7,
+                    167.7,
+                    175.7,
+                    183.7,
+                    191.7,
+                    199.7,
+                    207.7
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "maim",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "毁伤伤害倍率"
+                  },
+                  "values": [
+                    812.7,
+                    886.6,
+                    960.5,
+                    1034.4,
+                    1108.3,
+                    1182.2,
+                    1256.1,
+                    1330,
+                    1403.9,
+                    1477.8,
+                    1551.7,
+                    1625.6,
+                    1699.5,
+                    1773.4,
+                    1847.3,
+                    1921.2
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def",
+                  "sharpComponent": "maim",
+                  "maimTrigger": "gash"
+                },
+                {
+                  "id": "daze_hit_1",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "上挑失衡倍率"
+                  },
+                  "values": [
+                    31.2,
+                    32.7,
+                    34.2,
+                    35.7,
+                    37.2,
+                    38.7,
+                    40.2,
+                    41.7,
+                    43.2,
+                    44.7,
+                    46.2,
+                    47.7,
+                    49.2,
+                    50.7,
+                    52.2,
+                    53.7
+                  ]
+                },
+                {
+                  "id": "daze_hit_2",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "横斩失衡倍率"
+                  },
+                  "values": [
+                    35.8,
+                    37.5,
+                    39.2,
+                    40.9,
+                    42.6,
+                    44.3,
+                    46,
+                    47.7,
+                    49.4,
+                    51,
+                    52.8,
+                    54.5,
+                    56.2,
+                    57.9,
+                    59.6,
+                    61.3
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "special_blood_assault",
+              "name": {
+                "zhCN": "特殊技：血华誓·葬血强袭"
+              },
+              "description": {
+                "zhCN": "处于[猩红铭刻]，在[特殊技：血华誓·斩金断铁]上挑期间，保持长按或发动：向前方发动连续3次横向斩击，造成大量电属性伤害；每次横向斩击命中持有[残痕]的敌人时，对目标触发[毁伤]，额外造成范围电属性伤害，招式内最多可以连续触发3次[毁伤]，第三次[毁伤]具有更高打断等级；发动期间不会退出[猩红铭刻]状态；招式发动期间抗打断等级提升，成功触发[毁伤]后，招式发动期间拥有无敌效果。"
+              },
+              "skillType": "special",
+              "damageElement": "electric",
+              "damageKind": "sharp",
+              "damageBasis": "def",
+              "skillTags": [],
+              "unmodeledReason": {
+                "zhCN": "官方说明最多可连续触发3次毁伤，但当前条目没有单列毁伤伤害倍率，因此本体可选、毁伤只保留说明，不计入总伤害。"
+              },
+              "rows": [
+                {
+                  "id": "damage",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "values": [
+                    312.8,
+                    341.3,
+                    369.8,
+                    398.3,
+                    426.8,
+                    455.3,
+                    483.8,
+                    512.3,
+                    540.8,
+                    569.3,
+                    597.8,
+                    626.3,
+                    654.8,
+                    683.3,
+                    711.8,
+                    740.3
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "daze_daze",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "values": [
+                    254.9,
+                    266.5,
+                    278.1,
+                    289.7,
+                    301.3,
+                    312.9,
+                    324.5,
+                    336.1,
+                    347.7,
+                    359.3,
+                    370.9,
+                    382.5,
+                    394.1,
+                    405.7,
+                    417.3,
+                    428.9
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "chain",
+          "name": {
+            "zhCN": "连携技"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "chain_blood_contract",
+              "name": {
+                "zhCN": "连携技：血华誓·血契共鸣"
+              },
+              "description": {
+                "zhCN": "触发[连携技]时，选择对应角色发动：对前方敌人发动连续斩击，造成大量电属性伤害；发动期间，[猩红铭刻]持续时间不在减少，不会退出[猩红铭刻]状态；招式发动期间拥有无敌效果。"
+              },
+              "skillType": "chain",
+              "damageElement": "electric",
+              "damageKind": "sharp",
+              "damageBasis": "def",
+              "skillTags": [],
+              "rows": [
+                {
+                  "id": "damage",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "values": [
+                    1058,
+                    1154.2,
+                    1250.4,
+                    1346.6,
+                    1422.8,
+                    1539,
+                    1635.1,
+                    1731.4,
+                    1827.6,
+                    1923.8,
+                    2020,
+                    2116.2,
+                    2212.4,
+                    2308.6,
+                    2404.8,
+                    2501
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "daze_daze",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "values": [
+                    276.9,
+                    289.5,
+                    302.1,
+                    314.7,
+                    327.3,
+                    339.9,
+                    352.5,
+                    365.1,
+                    377.7,
+                    390.3,
+                    402.8,
+                    415.5,
+                    428.1,
+                    440.7,
+                    453.3,
+                    465.9
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ultimate_hundred_hammers",
+              "name": {
+                "zhCN": "终结技：血华誓·千锤百炼"
+              },
+              "description": {
+                "zhCN": "喧响等级达到[极]时，点发动：对前方敌人发动联系斩击，造成大量电属性伤害；发动期间，[猩红铭刻]持续时间不在减少，不会退出[猩红铭刻]状态；招式发动时，回复10点锐能；招式发动期间拥有无敌效果。"
+              },
+              "skillType": "chain",
+              "damageElement": "electric",
+              "damageKind": "sharp",
+              "damageBasis": "def",
+              "skillTags": [],
+              "rows": [
+                {
+                  "id": "damage",
+                  "kind": "damageMultiplier",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "values": [
+                    2252,
+                    2456.8,
+                    2661.6,
+                    2866.4,
+                    3071.2,
+                    3275.9,
+                    3480.8,
+                    3685.6,
+                    3890.4,
+                    4095.2,
+                    4300,
+                    4504.8,
+                    4709.6,
+                    4914.4,
+                    5119.2,
+                    5324
+                  ],
+                  "damageKind": "sharp",
+                  "damageBasis": "def"
+                },
+                {
+                  "id": "daze_daze",
+                  "kind": "dazeMultiplier",
+                  "label": {
+                    "zhCN": "失衡倍率"
+                  },
+                  "values": [
+                    353.8,
+                    369.9,
+                    386,
+                    402.1,
+                    418.2,
+                    434.3,
+                    450.4,
+                    466.5,
+                    482.6,
+                    498.7,
+                    514.8,
+                    530.9,
+                    547,
+                    563.1,
+                    579.2,
+                    595.3
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/2145/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "officialEntryPageId": 2145,
+        "officialEntryVersion": "1788411769",
+        "damageRows": "All official damage rows are marked damageKind sharp and use DEF; defense support keeps daze rows only."
+      }
     }
   ]
 }

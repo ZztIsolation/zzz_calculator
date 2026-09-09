@@ -6843,6 +6843,407 @@
         "effectText": "source-checked-mihoyo-baike-entry-2162-version-1787113018-2026-08-24",
         "effectBuff": "source-checked; one shared 0-2 Battle Edge stack control defaults to two stacks, with Bone Chill active only at two stacks"
       }
+    },
+    {
+      "id": "zzz_wiki_2188",
+      "name": {
+        "zhCN": "猩红渴望"
+      },
+      "rarity": "S",
+      "specialty": "armorer",
+      "relatedAgentId": "claret",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_2188.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/2188/detail?mhy_presentation_style=fullscreen"
+      },
+      "level60": {
+        "defBase": 431,
+        "advancedStat": {
+          "stat": "defPct",
+          "value": 48,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "渴血"
+        },
+        "description": {
+          "zhCN": "暴击率提升25%-35%，电属性伤害提升15%-25%；发动强化特殊技或触发毁伤后，电属性锐化伤害提升10%-16%，持续40秒。"
+        },
+        "requirement": {
+          "specialty": "armorer"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "condition": null,
+          "effects": [
+            {
+              "id": "scarlet-crit-rate",
+              "type": "fixed",
+              "stat": "critRate",
+              "value": 25,
+              "modificationValues": {
+                "value": [
+                  25,
+                  27.5,
+                  30,
+                  32.5,
+                  35
+                ]
+              },
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              }
+            },
+            {
+              "id": "scarlet-electric-dmg",
+              "type": "fixed",
+              "stat": "electricDmg",
+              "value": 15,
+              "modificationValues": {
+                "value": [
+                  15,
+                  17.5,
+                  20,
+                  22.5,
+                  25
+                ]
+              },
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              }
+            },
+            {
+              "id": "scarlet-electric-sharp-dmg",
+              "type": "fixed",
+              "stat": "electricSharpDmg",
+              "value": 10,
+              "modificationValues": {
+                "value": [
+                  10,
+                  11.5,
+                  13,
+                  14.5,
+                  16
+                ]
+              },
+              "mode": "flat",
+              "target": {
+                "kind": "sharp",
+                "sharpScenario": {
+                  "triggeredEngineEffects": true
+                }
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/2188/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "officialEntryPageId": 2188,
+        "officialEntryVersion": "1788433458",
+        "baseStat": "Level 60 Base DEF 431; advanced defPct 48%"
+      },
+      "hidden": false
+    },
+    {
+      "id": "zzz_wiki_2189",
+      "name": {
+        "zhCN": "血髓秘匣"
+      },
+      "rarity": "A",
+      "specialty": "armorer",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_2189.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/2189/detail?mhy_presentation_style=fullscreen"
+      },
+      "level60": {
+        "defBase": 356,
+        "advancedStat": {
+          "stat": "critRate",
+          "value": 20,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "启封之刻"
+        },
+        "description": {
+          "zhCN": "锋御角色暴击率超过100%时，每超出1%暴击率使造成的伤害提升0.48%-0.8%，上限24%-40%。"
+        },
+        "requirement": {
+          "specialty": "armorer"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "condition": null,
+          "effects": [
+            {
+              "id": "marrow-overflow-rate",
+              "type": "fixed",
+              "stat": "sharpOverflowPerCritRate",
+              "value": 0.48,
+              "modificationValues": {
+                "value": [
+                  0.48,
+                  0.56,
+                  0.64,
+                  0.72,
+                  0.8
+                ]
+              },
+              "mode": "flat",
+              "target": {
+                "kind": "sharp"
+              }
+            },
+            {
+              "id": "marrow-overflow-cap",
+              "type": "fixed",
+              "stat": "sharpOverflowCap",
+              "value": 24,
+              "modificationValues": {
+                "value": [
+                  24,
+                  28,
+                  32,
+                  36,
+                  40
+                ]
+              },
+              "mode": "flat",
+              "target": {
+                "kind": "sharp"
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/2189/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "officialEntryPageId": 2189,
+        "officialEntryVersion": "1788433825",
+        "baseStat": "Level 60 Base DEF 356; advanced critRate 20%"
+      },
+      "hidden": false
+    },
+    {
+      "id": "zzz_wiki_2190",
+      "name": {
+        "zhCN": "「月相」-弦"
+      },
+      "rarity": "B",
+      "specialty": "armorer",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_2190.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/2190/detail?mhy_presentation_style=fullscreen"
+      },
+      "level60": {
+        "defBase": 282,
+        "advancedStat": {
+          "stat": "defPct",
+          "value": 32,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "弦月"
+        },
+        "description": {
+          "zhCN": "发动强化特殊技时，普通攻击造成的伤害提升18%-30%，持续10秒。"
+        },
+        "requirement": {
+          "specialty": "armorer"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "condition": null,
+          "effects": [
+            {
+              "id": "moon-basic-damage",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "value": 18,
+              "modificationValues": {
+                "value": [
+                  18,
+                  21,
+                  24,
+                  27,
+                  30
+                ]
+              },
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "damageKinds": [
+                  "sharp"
+                ],
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "basic"
+                  }
+                ],
+                "sharpScenario": {
+                  "triggeredEngineEffects": true
+                }
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/2190/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "officialEntryPageId": 2190,
+        "officialEntryVersion": "1788440333",
+        "baseStat": "Level 60 Base DEF 282; advanced defPct 32%"
+      },
+      "hidden": false
+    },
+    {
+      "id": "zzz_wiki_2200",
+      "name": {
+        "zhCN": "喵运当头"
+      },
+      "rarity": "A",
+      "specialty": "armorer",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_2200.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/2200/detail?mhy_presentation_style=fullscreen"
+      },
+      "level60": {
+        "defBase": 356,
+        "advancedStat": {
+          "stat": "defPct",
+          "value": 40,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "幸运肉球"
+        },
+        "description": {
+          "zhCN": "防御力提升8%-12%；释放强化特殊技时，防御力额外提升8%-12%，持续40秒。"
+        },
+        "requirement": {
+          "specialty": "armorer"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "condition": null,
+          "effects": [
+            {
+              "id": "lucky-paw-def",
+              "type": "fixed",
+              "stat": "defPct",
+              "value": 8,
+              "modificationValues": {
+                "value": [
+                  8,
+                  9,
+                  10,
+                  11,
+                  12
+                ]
+              },
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "basis": "baseDef"
+            },
+            {
+              "id": "lucky-paw-extra-def",
+              "type": "fixed",
+              "stat": "defPct",
+              "value": 8,
+              "modificationValues": {
+                "value": [
+                  8,
+                  9,
+                  10,
+                  11,
+                  12
+                ]
+              },
+              "mode": "flat",
+              "target": {
+                "kind": "sharp",
+                "sharpScenario": {
+                  "triggeredEngineEffects": true
+                }
+              },
+              "basis": "baseDef"
+            }
+          ],
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/2200/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "officialEntryPageId": 2200,
+        "officialEntryVersion": "1788787729",
+        "baseStat": "Level 60 Base DEF 356; advanced defPct 40%"
+      },
+      "hidden": false
     }
   ]
 }

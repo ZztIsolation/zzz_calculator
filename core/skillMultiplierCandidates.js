@@ -150,6 +150,7 @@ function generatedHitTotalRow(category, move, rows) {
         label: GENERATED_HIT_TOTAL_LABEL,
         kind: "damageMultiplier",
         ...(block.every(row => row.damageBasis === block[0].damageBasis) && block[0].damageBasis ? { damageBasis: block[0].damageBasis } : {}),
+        ...(block.every(row => row.damageKind === block[0].damageKind) && block[0].damageKind ? { damageKind: block[0].damageKind } : {}),
         values,
         levelRange: Array.isArray(range.levels)
             ? {

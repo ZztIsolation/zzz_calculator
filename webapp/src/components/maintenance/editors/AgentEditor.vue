@@ -43,7 +43,8 @@ function driveDiscOptions() {
 }
 
 function addSkillGroup() {
-  props.model.skillGroups.push({ id: internalId("skill_group"), name: { zhCN: `技能组${props.model.skillGroups.length + 1}` }, description: { zhCN: "" }, ...SYSTEM_MANAGED_SKILL_GROUP_COUNTS, events: [defaultCalculationEvent("direct")] })
+  const eventKind = props.model.specialty === "rupture" ? "sheer" : props.model.specialty === "armorer" ? "sharp" : "direct"
+  props.model.skillGroups.push({ id: internalId("skill_group"), name: { zhCN: `技能组${props.model.skillGroups.length + 1}` }, description: { zhCN: "" }, ...SYSTEM_MANAGED_SKILL_GROUP_COUNTS, events: [defaultCalculationEvent(eventKind)] })
   changed()
 }
 
@@ -60,15 +61,28 @@ function calculationVariants() {
 function calculationModeOptions() {
   return [
     option("custom", "自定义"),
-    props.model.specialty === "rupture" ? option("sheer", "最大化贯穿伤害") : option("single", "最大化单个技能伤害"),
+    props.model.specialty === "rupture"
+      ? option("sheer", "最大化贯穿伤害")
+      : props.model.specialty === "armorer"
+        ? option("sharp", "最大化锐化伤害")
+        : option("single", "最大化单个技能伤害"),
     option("anomaly", "最大化异常伤害"),
   ]
 }
 
 function changeSpecialty(value: string) {
   props.model.specialty = value
+  if (value === "armorer") {
+    props.model.sharpProfile ??= {
+      id: "armorer",
+      basisStat: "def",
+      baseLacerationDmgPct: 150,
+      critRateCapPct: 200,
+      initialCritDmgToCritRateRatio: 0.35,
+    }
+  }
   const allowed = new Set(calculationModeOptions().map(item => item.value))
-  const fallback = value === "rupture" ? "sheer" : "single"
+  const fallback = value === "rupture" ? "sheer" : value === "armorer" ? "sharp" : "single"
   for (const variant of calculationVariants()) if (!allowed.has(variant.mode)) variant.mode = fallback
   changed()
 }
@@ -231,6 +245,17 @@ function enableCoreSkill(enabled: boolean) {
     <MaintenanceSection title="60 级面板">
       <div class="maintenance-grid stat-number-grid">
         <label v-for="([key, label]) in LEVEL_FIELDS" :key="key" class="maintenance-field"><span>{{ label }}</span><NInputNumber v-model:value="model.level60[key]" :disabled="disabled" :step="0.01" @update:value="changed" /></label>
+        <label v-if="model.specialty === 'armorer'" class="maintenance-field"><span>锐暴伤害%</span><NInputNumber v-model:value="model.level60.lacerationDmg" :disabled="disabled" :min="0" :step="0.1" @update:value="changed" /></label>
+      </div>
+    </MaintenanceSection>
+
+    <MaintenanceSection v-if="model.specialty === 'armorer'" title="锋御伤害档案">
+      <div class="maintenance-grid">
+        <label class="maintenance-field"><span>档案 ID</span><NInput v-model:value="model.sharpProfile.id" :disabled="disabled" @update:value="changed" /></label>
+        <label class="maintenance-field"><span>伤害基底</span><NInput value="防御力" disabled /></label>
+        <label class="maintenance-field"><span>基础锐暴伤害%</span><NInputNumber v-model:value="model.sharpProfile.baseLacerationDmgPct" :disabled="disabled" :min="0" :step="0.1" @update:value="changed" /></label>
+        <label class="maintenance-field"><span>暴击上限%</span><NInputNumber v-model:value="model.sharpProfile.critRateCapPct" :disabled="disabled" :min="0" :max="200" :step="1" @update:value="changed" /></label>
+        <label class="maintenance-field"><span>初始暴伤转暴击率</span><NInputNumber v-model:value="model.sharpProfile.initialCritDmgToCritRateRatio" :disabled="disabled" :min="0" :step="0.01" @update:value="changed" /></label>
       </div>
     </MaintenanceSection>
 

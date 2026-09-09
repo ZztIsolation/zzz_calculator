@@ -272,6 +272,24 @@ function defaultEvent(kind = "direct", id = `${kind}-1`) {
       stunned: true,
     }
   }
+  if (kind === "sharp") {
+    return {
+      id,
+      kind: "sharp",
+      sharpProfileId: "armorer",
+      sharpComponent: "normal",
+      critMode: "expected",
+      count: 1,
+      stunned: true,
+      sharpScenario: {
+        crimsonInscription: true,
+        gashStacks: 3,
+        remnantEdgeActive: true,
+        perfectDodgeCoverage: 0,
+        triggeredEngineEffects: true,
+      },
+    }
+  }
   return {
     id,
     kind,
@@ -286,8 +304,14 @@ export function isRuptureAgent(agent: any = null) {
   return agent?.specialty === "rupture"
 }
 
+export function isArmorerAgent(agent: any = null) {
+  return agent?.specialty === "armorer"
+}
+
 export function primaryDamageModeForAgent(agent: any = null) {
-  return isRuptureAgent(agent) ? "sheer" : "single"
+  if (isRuptureAgent(agent)) return "sheer"
+  if (isArmorerAgent(agent)) return "sharp"
+  return "single"
 }
 
 export function hasAdminDefaultCalculation(agent: any = null, cinemaLevel = 0, potentialLevel = 0) {
@@ -300,11 +324,17 @@ export function hasAdminDefaultCalculation(agent: any = null, cinemaLevel = 0, p
 
 export function isDamageModeAllowedForAgent(mode: unknown, agent: any = null, cinemaLevel = 0, potentialLevel = 0) {
   const value = String(mode ?? "")
+  if (!agent && ["single", "sheer", "sharp"].includes(value)) {
+    return true
+  }
   if (value === "sheer") {
     return isRuptureAgent(agent)
   }
+  if (value === "sharp") {
+    return isArmorerAgent(agent)
+  }
   if (value === "single") {
-    return !isRuptureAgent(agent)
+    return !isRuptureAgent(agent) && !isArmorerAgent(agent)
   }
   if (value === "adminDefault") {
     return hasAdminDefaultCalculation(agent, cinemaLevel, potentialLevel)
@@ -319,7 +349,7 @@ export function normalizeDamageModeForAgent(mode: unknown, agent: any = null, ci
 
 function primaryDamageConfigForAgent(agent: any = null) {
   const mode = primaryDamageModeForAgent(agent)
-  const kind = mode === "sheer" ? "sheer" : "direct"
+  const kind = mode === "sheer" ? "sheer" : mode === "sharp" ? "sharp" : "direct"
   const eventId = `${kind}-1`
   return {
     mode,
@@ -380,7 +410,8 @@ export function defaultDamageConfig(agent: any = null, cinemaLevel = 0, potentia
     return {
       mode: "adminDefault",
       agentLevel: 60,
-      skillLevelsByCategory: {},
+      skillLevelsByCategory: clone(config.skillLevelsByCategory ?? {}),
+      ...(config.sharpScenario ? { sharpScenario: clone(config.sharpScenario) } : {}),
       selectedEventId: config.selectedEventId ?? config.events[0]?.id,
       events: clone(config.events),
     }
@@ -444,7 +475,7 @@ function normalizeDamageEvent(event: any, index = 0, fallbackStunned = true, age
       stunned,
     }
   }
-  const kind = ["direct", "sheer", "anomaly", "disorder"].includes(event?.kind) ? event.kind : "direct"
+  const kind = ["direct", "sheer", "sharp", "anomaly", "disorder"].includes(event?.kind) ? event.kind : "direct"
   const fallback = defaultEvent(kind, `${kind}-${index + 1}`)
   const normalized = {
     ...fallback,
@@ -453,6 +484,17 @@ function normalizeDamageEvent(event: any, index = 0, fallbackStunned = true, age
     kind,
     count: Math.max(0, numeric(event?.count, fallback.count ?? 1)),
     stunned,
+  }
+  if (kind === "sharp") {
+    normalized.sharpProfileId = String(normalized.sharpProfileId ?? agent?.sharpProfile?.id ?? "armorer")
+    normalized.sharpComponent = normalized.sharpComponent === "maim" ? "maim" : "normal"
+    normalized.sharpScenario = clone(normalized.sharpScenario ?? {
+      crimsonInscription: true,
+      gashStacks: 3,
+      remnantEdgeActive: true,
+      perfectDodgeCoverage: 0,
+      triggeredEngineEffects: true,
+    })
   }
   if (kind === "anomaly" && normalized.settlementType === "luminescence") {
     const legacyRecord = Array.isArray(normalized.records)
@@ -768,6 +810,18 @@ function defaultSkillLevels() {
   return Object.fromEntries(SKILL_CATEGORIES.map(category => [category, 12]))
 }
 
+function authoredSkillLevels(agent: any, cinemaLevel = 0, potentialLevel = 0) {
+  return defaultDamageConfig(agent, cinemaLevel, potentialLevel)?.skillLevelsByCategory ?? {}
+}
+
+function shouldAdoptAuthoredSkillLevels(current: Record<string, any>, agent: any, cinemaLevel: number, potentialLevel: number) {
+  const expected = {
+    ...defaultSkillLevels(),
+    ...authoredSkillLevels(agent, cinemaLevel, potentialLevel),
+  }
+  return SKILL_CATEGORIES.every(category => Number(current?.[category] ?? 12) === Number(expected[category] ?? 12))
+}
+
 function normalizeStoredMode(mode: any) {
   return mode === "percent" ? "pct" : mode ?? "flat"
 }
@@ -985,9 +1039,19 @@ export const useBuildStore = defineStore("build", {
         config.potentialLevel,
         agent?.potentialVision?.defaultLevel ?? 0,
       )
+      const authoredLevels = authoredSkillLevels(agent, this.cinemaLevel, this.potentialLevel)
+      const explicitLevels = config.skillLevels
+        ?? config.skillLevelsByCategory
+        ?? config.damage?.skillLevelsByCategory
+        ?? {}
+      const legacyDefaultLevels = rawDamageConfig?.mode === "adminDefault"
+        && Object.keys(authoredLevels).length > 0
+        && Object.keys(explicitLevels).length > 0
+        && Object.values(explicitLevels).every(value => Number(value) === 12)
       this.skillLevels = {
         ...defaultSkillLevels(),
-        ...(config.skillLevels ?? config.skillLevelsByCategory ?? config.damage?.skillLevelsByCategory ?? {}),
+        ...authoredLevels,
+        ...(legacyDefaultLevels ? {} : explicitLevels),
       }
       this.wEngineId = wEngineId
       this.wEngineLevel = numeric(config.wEngineLevel, 60)
@@ -1012,6 +1076,7 @@ export const useBuildStore = defineStore("build", {
       this.damageConfig = normalizeDamageConfig({
         ...(rawDamageConfig ?? {}),
         target: rawDamageConfig?.target ?? rawTargetConfig,
+        ...(legacyDefaultLevels ? { skillLevelsByCategory: authoredLevels } : {}),
       }, agent, this.cinemaLevel, this.potentialLevel)
       this.targetConfig = normalizeTargetConfig(legacyBossEncounterId ? {
         ...rawTargetConfig,
@@ -1039,10 +1104,27 @@ export const useBuildStore = defineStore("build", {
     },
     setCinemaLevel(level: number, meta: any = null) {
       const nextLevel = Math.max(0, Math.min(6, Math.trunc(numeric(level, 0))))
+      const previousLevel = this.cinemaLevel
+      const agent = meta?.agents?.find((item: any) => item.id === this.agentId)
+      const adoptAuthoredLevels = shouldAdoptAuthoredSkillLevels(
+        this.skillLevels,
+        agent,
+        previousLevel,
+        this.potentialLevel,
+      )
       this.cinemaLevel = nextLevel
       if (this.damageConfig?.mode === "adminDefault") {
-        const agent = meta?.agents?.find((item: any) => item.id === this.agentId)
-        this.damageConfig = normalizeDamageConfig(this.damageConfig, agent, this.cinemaLevel, this.potentialLevel)
+        const nextAuthoredLevels = authoredSkillLevels(agent, this.cinemaLevel, this.potentialLevel)
+        const sourceConfig = adoptAuthoredLevels && Object.keys(nextAuthoredLevels).length
+          ? { ...this.damageConfig, skillLevelsByCategory: nextAuthoredLevels }
+          : this.damageConfig
+        this.damageConfig = normalizeDamageConfig(sourceConfig, agent, this.cinemaLevel, this.potentialLevel)
+        if (adoptAuthoredLevels) {
+          this.skillLevels = {
+            ...this.skillLevels,
+            ...this.damageConfig.skillLevelsByCategory,
+          }
+        }
       }
       this.persist()
     },
@@ -1084,6 +1166,13 @@ export const useBuildStore = defineStore("build", {
         this.targetConfig = normalizeTargetConfig(config.target ?? config.targetConfig)
       }
       this.damageConfig = normalizeDamageConfig(config, agent, this.cinemaLevel, this.potentialLevel)
+      if (this.damageConfig.mode === "adminDefault"
+        && Object.keys(this.damageConfig.skillLevelsByCategory ?? {}).length > 0) {
+        this.skillLevels = {
+          ...this.skillLevels,
+          ...this.damageConfig.skillLevelsByCategory,
+        }
+      }
       this.persist()
     },
     setTargetConfig(target: any) {
@@ -1111,10 +1200,13 @@ export const useBuildStore = defineStore("build", {
     },
     removeDamageEvent(id: string) {
       const events = (this.damageConfig.events ?? []).filter((event: any) => event.id !== id)
+      const fallbackKind = this.damageConfig?.mode === "sharp"
+        ? "sharp"
+        : this.damageConfig?.mode === "sheer" ? "sheer" : "direct"
       this.setDamageConfig({
         ...this.damageConfig,
         selectedEventId: events[0]?.id,
-        events: events.length ? events : [defaultEvent("direct", "direct-1")],
+        events: events.length ? events : [defaultEvent(fallbackKind, `${fallbackKind}-1`)],
       })
     },
     applyBuffState(payload: any, meta: any) {

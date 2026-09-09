@@ -129,7 +129,7 @@ describe("OptimizerConfigModal", () => {
     expect(document.body.textContent).toContain("4号位主词条")
     expect(document.body.textContent).toContain("攻击力")
     expect(document.body.textContent).toContain("异常精通")
-    expect(document.body.textContent).toContain("以下四项均按局外面板数值判断，不计入局内 Buff。")
+    expect(document.body.textContent).toContain("以下面板最低值按局外面板数值判断，不计入局内 Buff。")
     expect(document.body.textContent).not.toContain("能量自动回复")
 
     const minimumInputs = document.body.querySelectorAll(".optimizer-minimum-grid input")
@@ -189,6 +189,25 @@ describe("OptimizerConfigModal", () => {
     await wrapper.setProps({ show: false })
     await openModal(wrapper)
     expect((await saveModal(wrapper)).algorithm).toBe("exact-super-bound")
+  })
+
+  it("round-trips the armorer laceration minimum", async () => {
+    const wrapper = mountModal({
+      minimumStats: [{ key: "def", label: "防御力" }, { key: "lacerationDmg", label: "锐暴伤害%" }],
+      optimizerConfig: {
+        algorithm: "exact-super-bound",
+        fourPieceBuffMode: "auto",
+        mainStatLimits: { "4": [], "5": [], "6": [] },
+        minimums: { lacerationDmg: 175 },
+      },
+    })
+    await openModal(wrapper)
+
+    const minimumComponents = wrapper.findAllComponents({ name: "InputNumber" })
+    expect(minimumComponents).toHaveLength(2)
+    expect(minimumComponents[1].props("value")).toBe(175)
+    const saved = await saveModal(wrapper)
+    expect(saved.minimums.lacerationDmg).toBe(175)
   })
 
   it("writes one stack value to every rule in a shared runtime group", async () => {

@@ -5,7 +5,7 @@ import { createSystemManagedCoverage } from "@core/maintenanceValidation.js"
 import { statLabel } from "@/utils/format"
 import SkillTargetEditor from "./SkillTargetEditor.vue"
 import {
-  ANOMALY_SETTLEMENT_OPTIONS, ANOMALY_VARIANT_OPTIONS, ATTRIBUTE_OPTIONS, BASIS_OPTIONS, EFFECT_MODE_OPTIONS, EFFECT_TYPE_OPTIONS, EVENT_STAT_KEYS, FORMULA_VALUE_UNIT_OPTIONS,
+  ANOMALY_SETTLEMENT_OPTIONS, ANOMALY_VARIANT_OPTIONS, ATTRIBUTE_OPTIONS, BASIS_OPTIONS, EFFECT_MODE_OPTIONS, EFFECT_TYPE_OPTIONS, EVENT_STAT_KEYS, FORMULA_VALUE_UNIT_OPTIONS, SHARP_TARGET_STATS,
   OUT_OF_COMBAT_REQUIREMENT_STAT_OPTIONS, SPECIALTY_OPTIONS, TARGET_KIND_OPTIONS, anomalyOptions, defaultEffectRule, defaultGeneralSkillTargets, defaultModeForStat, defaultSkillTarget, option, statOptions,
 } from "./maintenance-options"
 import { internalId, textOf } from "./maintenance-model"
@@ -103,12 +103,14 @@ function changeTarget(rule: any, kind: string) {
       kind: "anomaly",
       settlementType: "attribute",
     }
+  } else if (kind === "sharp") {
+    rule.target = { kind: "sharp", sharpComponents: [] }
   } else {
     rule.target = { kind: "default" }
   }
   const options = statOptions(
     props.catalog,
-    kind === "default" ? "default" : kind === "anomaly" ? "anomaly" : "skill",
+    kind === "default" ? "default" : kind === "anomaly" ? "anomaly" : kind === "sharp" ? "sharp" : "skill",
     rule.target?.settlementType,
   )
   if (!options.some(item => item.value === rule.stat)) rule.stat = String(options[0]?.value ?? "atkFlat")
@@ -116,8 +118,9 @@ function changeTarget(rule: any, kind: string) {
   emit("change")
 }
 
-function targetMode(rule: any): "default" | "anomaly" | "specific" | "skillType" | "skillTag" {
+function targetMode(rule: any): "default" | "anomaly" | "sharp" | "specific" | "skillType" | "skillTag" {
   if (rule.target?.kind === "anomaly") return "anomaly"
+  if (rule.target?.kind === "sharp") return "sharp"
   if (rule.target?.kind !== "skill") return "default"
   if ((rule.target.skillTargets ?? []).some((target: any) => target?.kind === "skillTag")) return "skillTag"
   return (rule.target.skillTargets ?? []).some((target: any) => target?.kind === "skillType") ? "skillType" : "specific"
@@ -132,7 +135,7 @@ function changeStat(rule: any, stat: string) {
 }
 
 function syncMode(rule: any) {
-  if (["skill", "anomaly"].includes(rule.target?.kind) || EVENT_STAT_KEYS.has(rule.stat)) {
+  if (["skill", "anomaly", "sharp"].includes(rule.target?.kind) || EVENT_STAT_KEYS.has(rule.stat)) {
     rule.mode = "flat"
     delete rule.basis
   } else if (!rule.mode || !["flat", "pct"].includes(rule.mode)) {
@@ -240,6 +243,18 @@ function changeAnomalyVariants(rule: any, values: unknown) {
   else delete rule.target.anomalyVariants
   emit("change")
 }
+
+function changeSharpComponents(rule: any, values: unknown) {
+  const components = Array.isArray(values) ? values.map(String).filter(value => ["normal", "maim"].includes(value)) : []
+  if (components.length) rule.target.sharpComponents = components
+  else delete rule.target.sharpComponents
+  emit("change")
+}
+
+const sharpComponentOptions = [
+  { label: "普通锐化", value: "normal" },
+  { label: "毁伤", value: "maim" },
+]
 
 function ensureSkillTargets(rule: any) {
   rule.target ??= { kind: "skill" }
@@ -399,6 +414,10 @@ function selectStackGroup(rule: any, value: string) {
         <label class="maintenance-field"><span>结算类型</span><NSelect :value="rule.target.settlementType" :options="ANOMALY_SETTLEMENT_OPTIONS" :disabled="disabled" @update:value="changeAnomalySettlement(rule, String($event))" /></label>
         <label v-if="rule.target.settlementType !== 'luminescence'" class="maintenance-field maintenance-field-wide"><span>具体异常（留空为全部）</span><NSelect multiple filterable clearable :value="rule.target.anomalyEffects ?? []" :options="anomalyTargetOptions(rule)" :placeholder="anomalyTargetPlaceholder(rule)" :disabled="disabled" @update:value="changeAnomalyEffects(rule, $event)" /></label>
         <label v-if="rule.target.settlementType === 'attribute'" class="maintenance-field maintenance-field-wide"><span>异常形态（留空为全部）</span><NSelect multiple clearable :value="rule.target.anomalyVariants ?? []" :options="ANOMALY_VARIANT_OPTIONS" :disabled="disabled" @update:value="changeAnomalyVariants(rule, $event)" /></label>
+      </div>
+
+      <div v-if="rule.target?.kind === 'sharp'" class="maintenance-nested-panel maintenance-grid">
+        <label class="maintenance-field maintenance-field-wide"><span>锐化组件（留空为全部）</span><NSelect multiple clearable :value="rule.target.sharpComponents ?? []" :options="sharpComponentOptions" :disabled="disabled" @update:value="changeSharpComponents(rule, $event)" /></label>
       </div>
 
       <NAlert v-if="rule.appliesTo" type="error" title="旧筛选无法保存">

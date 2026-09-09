@@ -8,7 +8,11 @@ import {
     skillTypeLabel,
     unknownLegacySkillTargetPrefixes,
 } from "./skillTargets.js"
-import { ELEMENT_CRIT_DMG_STATS, ELEMENT_DEF_IGNORE_STATS } from "./effectRuleTargets.js"
+import {
+    ELEMENT_CRIT_DMG_STATS,
+    ELEMENT_DEF_IGNORE_STATS,
+    ELEMENT_SHARP_DMG_STATS,
+} from "./effectRuleTargets.js"
 
 export const DEFAULT_DAMAGE_TARGET_PRESET_ID = "normal-boss"
 export const DEFAULT_DAMAGE_LEVEL_COEFFICIENT = 794
@@ -28,6 +32,7 @@ export const DAMAGE_KIND_LABELS = {
     anomaly: "异常",
     disorder: "紊乱",
     sheer: "贯穿",
+    sharp: "锐化",
 }
 export const DAMAGE_MODIFIER_KIND_LABELS = {
     enemyDamageTakenBonus: "敌方承伤提升",
@@ -51,6 +56,18 @@ export const DAMAGE_MODIFIER_KIND_LABELS = {
     electricSheerDmg: "电贯穿增伤",
     etherSheerDmg: "以太贯穿增伤",
     windSheerDmg: "风贯穿增伤",
+    lacerationDmg: "锐暴伤害",
+    sharpDmgBonus: "锐化伤害加成",
+    physicalSharpDmg: "物理锐化伤害加成",
+    fireSharpDmg: "火锐化伤害加成",
+    iceSharpDmg: "冰锐化伤害加成",
+    electricSharpDmg: "电锐化伤害加成",
+    etherSharpDmg: "以太锐化伤害加成",
+    windSharpDmg: "风锐化伤害加成",
+    sharpCritRate: "锐暴暴击率",
+    sharpMaimMultiplier: "毁伤倍率修正",
+    sharpOverflowPerCritRate: "溢出暴击率伤害",
+    sharpOverflowCap: "溢出暴击伤害上限",
     physicalCritDmg: "物理伤害暴击伤害",
     fireCritDmg: "火属性伤害暴击伤害",
     iceCritDmg: "冰属性伤害暴击伤害",
@@ -109,6 +126,18 @@ export const CUSTOM_BUFF_STAT_OPTIONS = [
     ["anomalyDamageBonus", "属性异常增伤%", "eventModifier", null],
     ["disorderDamageBonus", "紊乱增伤%", "eventModifier", null],
     ["sheerDmgBonus", "贯穿增伤%", "eventModifier", null],
+    ["sharpDmgBonus", "锐化伤害加成%", "eventModifier", null],
+    ["lacerationDmg", "锐暴伤害%", "eventModifier", null],
+    ["sharpCritRate", "锐暴暴击率%", "eventModifier", null],
+    ["sharpMaimMultiplier", "毁伤倍率修正%", "eventModifier", null],
+    ["sharpOverflowPerCritRate", "溢出暴击率伤害%", "eventModifier", null],
+    ["sharpOverflowCap", "溢出暴击伤害上限%", "eventModifier", null],
+    ["physicalSharpDmg", "物理锐化伤害%", "eventModifier", null],
+    ["fireSharpDmg", "火锐化伤害%", "eventModifier", null],
+    ["iceSharpDmg", "冰锐化伤害%", "eventModifier", null],
+    ["electricSharpDmg", "电锐化伤害%", "eventModifier", null],
+    ["etherSharpDmg", "以太锐化伤害%", "eventModifier", null],
+    ["windSharpDmg", "风锐化伤害%", "eventModifier", null],
     ["baseMultiplierBonus", "异常倍率加算%", "eventModifier", null],
     ["disorderBaseMultiplierBonus", "紊乱倍率加算%", "eventModifier", null],
     ["anomalyCritRate", "异常暴击率%", "eventModifier", null],
@@ -140,6 +169,16 @@ export const CUSTOM_BUFF_SKILL_STAT_OPTIONS = [
     ["stunDmgMultiplierBonus", "失衡易伤倍率加算%", "skill", null],
     ["stunDmgMultiplierBonusAlways", "失衡易伤倍率加算（未失衡生效）%", "skill", null],
     ["sheerDmgBonus", "贯穿增伤%", "skill", null],
+    ["sharpDmgBonus", "锐化伤害加成%", "skill", null],
+    ["physicalSharpDmg", "物理锐化伤害加成%", "skill", null],
+    ["fireSharpDmg", "火锐化伤害加成%", "skill", null],
+    ["iceSharpDmg", "冰锐化伤害加成%", "skill", null],
+    ["electricSharpDmg", "电锐化伤害加成%", "skill", null],
+    ["etherSharpDmg", "以太锐化伤害加成%", "skill", null],
+    ["windSharpDmg", "风锐化伤害加成%", "skill", null],
+    ["lacerationDmg", "锐暴伤害加成%", "skill", null],
+    ["sharpCritRate", "锐暴暴击率加成%", "skill", null],
+    ["sharpMaimMultiplier", "毁伤倍率修正%", "skill", null],
     ["skillMultiplierBonus", "技能倍率加算%", "skill", null],
     ["enemyDefReduction", "敌方减防率%", "skill", null],
     ["enemyDefIgnore", "无视防御率%", "skill", null],
@@ -218,6 +257,18 @@ export const FALLBACK_LABELS = {
     electricSheerDmg: "电贯穿增伤",
     etherSheerDmg: "以太贯穿增伤",
     windSheerDmg: "风贯穿增伤",
+    sharpDmgBonus: "锐化伤害加成",
+    physicalSharpDmg: "物理锐化伤害加成",
+    fireSharpDmg: "火锐化伤害加成",
+    iceSharpDmg: "冰锐化伤害加成",
+    electricSharpDmg: "电锐化伤害加成",
+    etherSharpDmg: "以太锐化伤害加成",
+    windSharpDmg: "风锐化伤害加成",
+    lacerationDmg: "锐暴伤害",
+    sharpCritRate: "锐暴暴击率",
+    sharpMaimMultiplier: "毁伤倍率修正",
+    sharpOverflowPerCritRate: "溢出暴击率伤害",
+    sharpOverflowCap: "溢出暴击伤害上限",
     physicalCritDmg: "物理伤害暴击伤害",
     fireCritDmg: "火属性伤害暴击伤害",
     iceCritDmg: "冰属性伤害暴击伤害",
@@ -263,6 +314,7 @@ export const ENUM_LABELS = {
         support: "支援",
         defense: "防护",
         rupture: "命破",
+        armorer: "锋御",
     },
     faction: {
         cunning_hares: "狡兔屋",
@@ -327,6 +379,13 @@ export const PERCENT_KEYS = new Set([
     "electricSheerDmg",
     "etherSheerDmg",
     "windSheerDmg",
+    "sharpDmgBonus",
+    ...ELEMENT_SHARP_DMG_STATS,
+    "lacerationDmg",
+    "sharpCritRate",
+    "sharpMaimMultiplier",
+    "sharpOverflowPerCritRate",
+    "sharpOverflowCap",
     ...ELEMENT_CRIT_DMG_STATS,
     ...ELEMENT_DEF_IGNORE_STATS,
     "baseMultiplierBonus",
@@ -393,6 +452,13 @@ export const STORED_PERCENT_STATS = new Set([
     "electricSheerDmg",
     "etherSheerDmg",
     "windSheerDmg",
+    "sharpDmgBonus",
+    ...ELEMENT_SHARP_DMG_STATS,
+    "lacerationDmg",
+    "sharpCritRate",
+    "sharpMaimMultiplier",
+    "sharpOverflowPerCritRate",
+    "sharpOverflowCap",
     ...ELEMENT_CRIT_DMG_STATS,
     ...ELEMENT_DEF_IGNORE_STATS,
     "baseMultiplierBonus",
@@ -452,6 +518,18 @@ export const STORED_STAT_LABELS = {
     electricSheerDmg: "电贯穿增伤%",
     etherSheerDmg: "以太贯穿增伤%",
     windSheerDmg: "风贯穿增伤%",
+    sharpDmgBonus: "锐化伤害加成%",
+    physicalSharpDmg: "物理锐化伤害加成%",
+    fireSharpDmg: "火锐化伤害加成%",
+    iceSharpDmg: "冰锐化伤害加成%",
+    electricSharpDmg: "电锐化伤害加成%",
+    etherSharpDmg: "以太锐化伤害加成%",
+    windSharpDmg: "风锐化伤害加成%",
+    lacerationDmg: "锐暴伤害%",
+    sharpCritRate: "锐暴暴击率%",
+    sharpMaimMultiplier: "毁伤倍率修正%",
+    sharpOverflowPerCritRate: "溢出暴击率伤害%",
+    sharpOverflowCap: "溢出暴击伤害上限%",
     physicalCritDmg: "物理伤害暴击伤害%",
     fireCritDmg: "火属性伤害暴击伤害%",
     iceCritDmg: "冰属性伤害暴击伤害%",
@@ -1202,6 +1280,10 @@ function ruleTargetText(rule = {}, meta) {
             ? `（${settlementLabel}：${labels.join("；")}）`
             : `（${settlementLabel}）`
     }
+    if (target.kind === "sharp") {
+        const components = Array.isArray(target.sharpComponents) ? target.sharpComponents : []
+        return components.length ? `（锐化：${components.join("；")}）` : "（锐化）"
+    }
     return ""
 }
 
@@ -1375,7 +1457,35 @@ export function normalizeCustomBuffEffect(effect) {
     }
     if ((effect?.type ?? "") === "fixed") {
         const target = effect.target?.kind === "skill"
-            ? { kind: "skill", skillTargets: normalizeSkillTargets(effect.target.skillTargets) }
+            ? {
+                kind: "skill",
+                skillTargets: normalizeSkillTargets(effect.target.skillTargets),
+                ...(Array.isArray(effect.target.damageKinds) && effect.target.damageKinds.length
+                    ? { damageKinds: [...new Set(effect.target.damageKinds.map(String).filter(Boolean))] }
+                    : {}),
+                ...(effect.target.sharpScenario && typeof effect.target.sharpScenario === "object" && !Array.isArray(effect.target.sharpScenario)
+                    ? { sharpScenario: { ...effect.target.sharpScenario } }
+                    : {}),
+                ...(Array.isArray(effect.target.sharpScenarioAnyOf) && effect.target.sharpScenarioAnyOf.length
+                    ? { sharpScenarioAnyOf: effect.target.sharpScenarioAnyOf.map(condition => ({ ...condition })) }
+                    : {}),
+            }
+            : effect.target?.kind === "sharp"
+                ? {
+                    kind: "sharp",
+                    sharpComponents: Array.isArray(effect.target.sharpComponents)
+                        ? [...new Set(effect.target.sharpComponents.map(String).filter(Boolean))]
+                        : [],
+                    ...(Array.isArray(effect.target.damageKinds) && effect.target.damageKinds.length
+                        ? { damageKinds: [...new Set(effect.target.damageKinds.map(String).filter(Boolean))] }
+                        : {}),
+                    ...(effect.target.sharpScenario && typeof effect.target.sharpScenario === "object" && !Array.isArray(effect.target.sharpScenario)
+                        ? { sharpScenario: { ...effect.target.sharpScenario } }
+                        : {}),
+                    ...(Array.isArray(effect.target.sharpScenarioAnyOf) && effect.target.sharpScenarioAnyOf.length
+                        ? { sharpScenarioAnyOf: effect.target.sharpScenarioAnyOf.map(condition => ({ ...condition })) }
+                        : {}),
+                }
             : { kind: "default" }
         if (target.kind === "skill" && !target.skillTargets.length) {
             return null
@@ -1387,6 +1497,7 @@ export function normalizeCustomBuffEffect(effect) {
             value,
             mode: effect.mode ?? "flat",
             target,
+            ...(effect.appliesTo ? { appliesTo: normalizeSkillTargetsInValue(effect.appliesTo) } : {}),
             label: effect.label ?? null,
         }
     }

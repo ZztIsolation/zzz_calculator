@@ -32,7 +32,7 @@ import {
   statLabel,
   storedStatLabel,
 } from "@/utils/format"
-import { SKILL_CATEGORIES, activeDriveDisc4pcRuntimeInputs, savedAnomalySourceSnapshotForAgent, useBuildStore } from "@/stores/build"
+import { SKILL_CATEGORIES, activeDriveDisc4pcRuntimeInputs, isArmorerAgent, savedAnomalySourceSnapshotForAgent, useBuildStore } from "@/stores/build"
 import { useAccountStore } from "@/stores/account"
 import { useAppConfigStore } from "@/stores/app-config"
 import { useCatalogStore } from "@/stores/catalog"
@@ -251,12 +251,19 @@ const optimizerAlgorithmOptions = [
   { label: "启发式潜力", value: "heuristic-potential" },
   { label: "旧版精确", value: "exact-legacy" },
 ]
-const minimumStats = [
-  { key: "atk", label: "攻击力" },
-  { key: "anomalyProficiency", label: "异常精通" },
-  { key: "critRate", label: "暴击率%" },
-  { key: "critDmg", label: "暴击伤害%" },
-]
+const minimumStats = computed(() => isArmorerAgent(selectedAgent.value)
+  ? [
+      { key: "def", label: "防御力" },
+      { key: "critRate", label: "暴击率%" },
+      { key: "critDmg", label: "暴击伤害%" },
+      { key: "lacerationDmg", label: "锐暴伤害%" },
+    ]
+  : [
+      { key: "atk", label: "攻击力" },
+      { key: "anomalyProficiency", label: "异常精通" },
+      { key: "critRate", label: "暴击率%" },
+      { key: "critDmg", label: "暴击伤害%" },
+    ])
 const mainStatOptionsBySlot = computed(() => {
   const pools = catalogStore.meta?.statRules?.driveDisc?.mainStatPools ?? {}
   const fallback = ["critRate", "critDmg", "atkPct", "hpPct", "defPct", "anomalyProficiency", "anomalyMastery", "energyRegen"]
@@ -467,12 +474,16 @@ const totalDamageLabel = computed(() => {
 const panelSummaryText = computed(() => {
   const panel = buildStore.result?.inCombat?.panel ?? buildStore.outOfCombat?.panel ?? {}
   const atk = panel.finalAtk ?? panel.atk ?? panel.baseAtk
+  const def = panel.def
+  const laceration = panel.lacerationDmg
   const critRate = panel.critRate
   const critDmg = panel.critDmg
   return [
-    atk !== undefined ? `攻击 ${formatNumber(atk, 0)}` : "",
+    isArmorerAgent(selectedAgent.value) && def !== undefined ? `防御 ${formatNumber(def, 0)}` : "",
+    !isArmorerAgent(selectedAgent.value) && atk !== undefined ? `攻击 ${formatNumber(atk, 0)}` : "",
     critRate !== undefined ? `暴击 ${formatNumber(Number(critRate) * 100, 1)}%` : "",
     critDmg !== undefined ? `爆伤 ${formatNumber(Number(critDmg) * 100, 1)}%` : "",
+    isArmorerAgent(selectedAgent.value) && laceration !== undefined ? `锐暴 ${formatNumber(Number(laceration) * 100, 1)}%` : "",
   ].filter(Boolean).join(" · ") || "等待计算"
 })
 watch(topOptimizedResultSchemes, schemes => {

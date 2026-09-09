@@ -15,6 +15,22 @@ const emit = defineEmits<{ change: [] }>()
 
 function changed() { emit("change") }
 
+function usesDefenseBase() {
+  return props.model?.specialty === "armorer"
+}
+
+function switchSpecialty(value: string) {
+  props.model.specialty = value
+  if (value === "armorer") {
+    if (!(Number(props.model.level60?.defBase) > 0)) props.model.level60.defBase = Number(props.model.level60?.atkBase ?? 1)
+    delete props.model.level60.atkBase
+  } else {
+    if (!(Number(props.model.level60?.atkBase) > 0)) props.model.level60.atkBase = Number(props.model.level60?.defBase ?? 1)
+    delete props.model.level60.defBase
+  }
+  changed()
+}
+
 function toggleBuff(key: "selfBuff" | "teamBuff", enabled: boolean) {
   props.model.effect[key] = enabled ? { scope: "inCombat", effects: [], buffModifiers: [], appliesToOutOfCombatPanel: false } : null
   changed()
@@ -46,12 +62,13 @@ function ruleValueAt(rule: any, level: number) {
       <div class="maintenance-grid">
         <label class="maintenance-field"><span>中文名称</span><NInput :value="textOf(model.name)" :disabled="disabled" @update:value="model.name = { ...model.name, zhCN: String($event) }; changed()" /></label>
         <label class="maintenance-field"><span>稀有度</span><NSelect v-model:value="model.rarity" :options="RARITY_OPTIONS" :disabled="disabled" @update:value="changed" /></label>
-        <label class="maintenance-field"><span>特性</span><NSelect v-model:value="model.specialty" :options="SPECIALTY_OPTIONS" :disabled="disabled" @update:value="changed" /></label>
+        <label class="maintenance-field"><span>特性</span><NSelect v-model:value="model.specialty" :options="SPECIALTY_OPTIONS" :disabled="disabled" @update:value="switchSpecialty(String($event))" /></label>
         <label class="maintenance-field"><span>属性</span><NSelect clearable v-model:value="model.attribute" :options="ATTRIBUTE_OPTIONS" :disabled="disabled" @update:value="changed" /></label>
         <label class="maintenance-field"><span>关联角色</span><NSelect filterable clearable v-model:value="model.relatedAgentId" :options="agentOptions(catalog)" :disabled="disabled" @update:value="changed" /></label>
         <label class="maintenance-field"><span>图片路径</span><NInput v-model:value="model.images.icon" :disabled="disabled" placeholder="/assets/w-engines/..." @update:value="changed" /></label>
         <label class="maintenance-field"><span>图片来源</span><NInput v-model:value="model.images.source" :disabled="disabled" placeholder="https://..." @update:value="changed" /></label>
-        <label class="maintenance-field"><span>基础攻击力</span><NInputNumber v-model:value="model.level60.atkBase" :disabled="disabled" :step="1" @update:value="changed" /></label>
+        <label v-if="usesDefenseBase()" class="maintenance-field"><span>基础防御力</span><NInputNumber v-model:value="model.level60.defBase" :disabled="disabled" :step="1" @update:value="changed" /></label>
+        <label v-else class="maintenance-field"><span>基础攻击力</span><NInputNumber v-model:value="model.level60.atkBase" :disabled="disabled" :step="1" @update:value="changed" /></label>
         <label class="maintenance-switch-field"><span>首页/优化器显示</span><NSwitch :value="model.hidden !== true" :disabled="disabled" @update:value="model.hidden = !$event; changed()" /></label>
       </div>
       <SourceListEditor :sources="model.sources" :disabled="disabled" @change="changed" />

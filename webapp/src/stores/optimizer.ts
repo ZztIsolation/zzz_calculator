@@ -5,11 +5,11 @@ import { driveDiscOptimizationInventoryFingerprint } from "@core/inventory-model
 type OptimizerStatus = "idle" | "estimating" | "preparing" | "running" | "cancelling" | "cancelled" | "done" | "error"
 
 const SETTINGS_KEY = "zzz-calculator.webapp.optimizer.v1"
-const SETTINGS_VERSION = 3
-const SUPPORTED_SETTINGS_VERSIONS = new Set([2, 3])
+const SETTINGS_VERSION = 4
+const SUPPORTED_SETTINGS_VERSIONS = new Set([2, 3, 4])
 const FALLBACK_AGENT_SETTINGS_ID = "__default__"
 const OPTIMIZER_WORKER_STALL_TIMEOUT_MS = 45_000
-const MINIMUM_STAT_KEYS = ["atk", "anomalyProficiency", "critRate", "critDmg"] as const
+const MINIMUM_STAT_KEYS = ["atk", "def", "anomalyProficiency", "critRate", "critDmg", "lacerationDmg"] as const
 const MINIMUM_DEFAULTS_VERSION = 2
 const CALCULATION_INPUT_FINGERPRINT_EXCLUDED_KEYS = new Set([
   "label",
@@ -17,7 +17,7 @@ const CALCULATION_INPUT_FINGERPRINT_EXCLUDED_KEYS = new Set([
   "ownerId",
   "driveDiscs",
 ])
-const LEGACY_MINIMUM_DEFAULTS: Record<typeof MINIMUM_STAT_KEYS[number], number> = {
+const LEGACY_MINIMUM_DEFAULTS: Partial<Record<typeof MINIMUM_STAT_KEYS[number], number>> = {
   atk: 2500,
   anomalyProficiency: 250,
   critRate: 80,
@@ -136,7 +136,7 @@ function normalizeMinimums(value: any = {}, removeLegacyDefaults = false) {
   const minimums = cleanMinimums(value)
   if (removeLegacyDefaults) {
     for (const key of MINIMUM_STAT_KEYS) {
-      if (minimums[key] === LEGACY_MINIMUM_DEFAULTS[key]) {
+      if (LEGACY_MINIMUM_DEFAULTS[key] !== undefined && minimums[key] === LEGACY_MINIMUM_DEFAULTS[key]) {
         delete minimums[key]
       }
     }

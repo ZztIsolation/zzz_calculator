@@ -13,6 +13,59 @@ declare module "@core/calculator-core.js" {
   export function isTeamAnomalyDamageModifier(modifier?: any): boolean
 }
 
+declare module "@core/sharpDamage.js" {
+  export type SharpCritMode = "expected" | "nonCrit" | "sharpCrit" | "lacerationCrit"
+  export interface SharpDamageProfile {
+    id: "armorer"
+    basisStat: "def"
+    baseLacerationDmgPct: number
+    critRateCapPct: number
+    initialCritDmgToCritRateRatio: number
+  }
+  export interface SharpScenario {
+    crimsonInscription: boolean
+    gashStacks: 0 | 1 | 2 | 3
+    remnantEdgeActive: boolean
+    perfectDodgeCoverage: number
+    triggeredEngineEffects: boolean
+  }
+  export interface SharpScenarioCondition {
+    sharpScenario?: Partial<SharpScenario>
+    skillTypes?: string[]
+    moveIds?: string[]
+    skillTags?: string[]
+  }
+  export interface SharpDamageEvent {
+    kind: "sharp"
+    sharpProfileId: string
+    skillRef?: Record<string, string | number>
+    skillMultiplier?: number
+    damageElement?: string
+    critMode: SharpCritMode
+    count: number
+    stunned: boolean
+    sharpComponent?: "normal" | "maim"
+    maimTrigger?: "gash" | "free"
+    sharpScenario?: SharpScenario
+  }
+  export const ARMORER_SHARP_PROFILE: SharpDamageProfile
+  export const DEFAULT_SHARP_SCENARIO: SharpScenario
+  export const SHARP_CRIT_MODES: readonly SharpCritMode[]
+  export function normalizeSharpScenario(value?: any): SharpScenario
+  export function normalizeSharpCritMode(value?: any): SharpCritMode
+  export function normalizeSharpDamageEvent(event?: any, options?: any): any
+  export function sharpEffectiveCritRate(options?: any): any
+  export function sharpLacerationDamage(options?: any): any
+  export function sharpOverflowDamageBonus(options?: any): any
+  export function sharpCritBreakdown(options?: any): any
+  export function sharpDamageMultiplierForMode(breakdown?: any, mode?: SharpCritMode): number
+  export function sharpDamageValue(options?: any): any
+  export function sharpDamageVariants(options?: any): any
+  export function sharpStatDependencies(event?: any, options?: any): string[]
+  export function sharpWhiteBoxRows(options?: any): any[]
+  export function isSharpDamageEvent(event?: any): boolean
+}
+
 declare module "@core/damageEventMultipliers.js" {
   export function disorderElapsedStepSeconds(event?: any, catalog?: any): number
   export function normalizeElapsedSeconds(value: unknown, durationSeconds?: number, stepSeconds?: number): number
@@ -446,6 +499,8 @@ declare module "@core/effectRuleTargets.js" {
   export const ELEMENT_DEF_IGNORE_STAT_BY_ELEMENT: Readonly<Record<string, string>>
   export const ELEMENT_CRIT_DMG_STATS: readonly string[]
   export const ELEMENT_DEF_IGNORE_STATS: readonly string[]
+  export const ELEMENT_SHARP_DMG_STAT_BY_ELEMENT: Readonly<Record<string, string>>
+  export const ELEMENT_SHARP_DMG_STATS: readonly string[]
   export function normalizeLegacyEffectAppliesToInValue<T>(value: T): T
   export function hasLegacyEffectAppliesTo(value: any): boolean
 }

@@ -644,6 +644,33 @@ assertInvalid("agent-skills", {
 assertValid("wEngines", validWEngine)
 assertValid("wEngines", {
     ...validWEngine,
+    id: "test_armorer_w_engine",
+    specialty: "armorer",
+    level60: {
+        ...validWEngine.level60,
+        atkBase: undefined,
+        defBase: 356,
+    },
+    effect: {
+        ...validWEngine.effect,
+        requirement: { specialty: "armorer" },
+    },
+})
+assertInvalid("wEngines", {
+    ...validWEngine,
+    id: "test_conflicting_w_engine",
+    specialty: "armorer",
+    level60: {
+        ...validWEngine.level60,
+        defBase: 356,
+    },
+    effect: {
+        ...validWEngine.effect,
+        requirement: { specialty: "armorer" },
+    },
+}, "必须且只能提供一个")
+assertValid("wEngines", {
+    ...validWEngine,
     effect: {
         name: { zhCN: "无 Buff 测试效果" },
         description: { zhCN: "该音擎暂未建模 Buff 规则。" },

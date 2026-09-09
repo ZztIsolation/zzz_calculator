@@ -91,8 +91,20 @@ function eventLabel(event: any): string {
 }
 
 function eventVariantItems(event: any) {
-  if (!event?.damageVariants || !["direct", "sheer"].includes(event.kind)) {
+  if (!event?.damageVariants || !["direct", "sheer", "sharp"].includes(event.kind)) {
     return []
+  }
+  if (event.kind === "sharp") {
+    return [
+      ["expected", "期望"],
+      ["nonCrit", "不触发锐暴"],
+      ["sharpCrit", "一次锐暴"],
+      ["lacerationCrit", "二次锐暴"],
+    ].map(([key, label]) => ({
+      key,
+      label,
+      value: event.damageVariants?.[key]?.finalDamage,
+    })).filter(item => Number.isFinite(Number(item.value)))
   }
   return [
     ["expected", "期望"],
