@@ -127,7 +127,12 @@ assert.notEqual(enkaDriveDiscId("1302309616", "7038"), enkaDriveDiscId("13000279
 
 assert.deepEqual(mapping.agents["1591"], { id: "sigrid", name: "希格莉德·德拉叙尔" })
 assert.deepEqual(mapping.agents["1331"], { id: "vivian", name: "薇薇安·班希" })
+assert.deepEqual(mapping.agents["1611"], { id: "claret", name: "克拉蕾·弗林特" })
 assert.deepEqual(mapping.wEngines["14159"], { id: "zzz_wiki_2162", name: "骁骑礼赞" })
+assert.deepEqual(mapping.wEngines["14161"], { id: "zzz_wiki_2188", name: "猩红渴望" })
+assert.deepEqual(mapping.wEngines["12016"], { id: "zzz_wiki_2190", name: "「月相」-弦" })
+assert.deepEqual(mapping.wEngines["13017"], { id: "zzz_wiki_2200", name: "喵运当头" })
+assert.deepEqual(mapping.wEngines["13021"], { id: "zzz_wiki_2189", name: "血髓秘匣" })
 const mappedSigrid = mapShowcaseToCatalog(
   parseEnkaShowcase({
     PlayerInfo: {
