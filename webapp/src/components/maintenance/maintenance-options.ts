@@ -1,5 +1,6 @@
 import { statLabel } from "@core/shared-combat.js"
-import { SKILL_TAGS, SKILL_TAG_LABELS, SKILL_TYPES, SKILL_TYPE_LABELS, skillTypeForMove } from "@core/skillTargets.js"
+import { IN_COMBAT_FORMULA_SOURCE_STATS } from "@core/effectFormula.js"
+import { SKILL_TAGS, SKILL_TAG_LABELS, SKILL_TYPES, SKILL_TYPE_LABELS, skillMultiplierTargetId, skillTypeForMove } from "@core/skillTargets.js"
 import { internalId, textOf, type SelectOption } from "./maintenance-model"
 
 export const option = (value: string | number, label: string): SelectOption => ({ value, label })
@@ -13,7 +14,7 @@ export const DAMAGE_ELEMENT_OPTIONS = ATTRIBUTE_OPTIONS.filter(item => !["honed_
 export const DIRECT_DAMAGE_ELEMENT_OPTIONS = [...DAMAGE_ELEMENT_OPTIONS, option("lumiflux", "流明")]
 export const SPECIALTY_OPTIONS = [
   option("attack", "强攻"), option("stun", "击破"), option("anomaly", "异常"),
-  option("support", "支援"), option("defense", "防护"), option("rupture", "命破"),
+  option("support", "支援"), option("defense", "防护"), option("rupture", "命破"), option("armorer", "锋御"),
 ]
 export const OUT_OF_COMBAT_REQUIREMENT_STAT_OPTIONS = [
   option("hp", "初始生命值"), option("atk", "初始攻击力"), option("def", "初始防御力"),
@@ -21,6 +22,7 @@ export const OUT_OF_COMBAT_REQUIREMENT_STAT_OPTIONS = [
   option("anomalyMastery", "初始异常掌控"), option("anomalyProficiency", "初始异常精通"),
   option("energyRegen", "初始能量自动回复"), option("penFlat", "初始穿透值"), option("penRatio", "初始穿透率"),
 ]
+export const OUT_OF_COMBAT_EFFECT_SOURCE_STAT_OPTIONS = OUT_OF_COMBAT_REQUIREMENT_STAT_OPTIONS
 export const SCOPE_OPTIONS = [option("outOfCombat", "局外"), option("inCombat", "局内")]
 export const ATTACK_TYPE_OPTIONS = [option("slash", "斩击"), option("pierce", "穿刺"), option("strike", "打击")]
 export const TARGET_KIND_OPTIONS = [
@@ -36,6 +38,19 @@ export const EFFECT_TYPE_OPTIONS = [
   option("fixed", "固定数值"), option("derived", "按来源数值换算"),
   option("formula", "受限函数换算"), option("stacked", "层数"),
 ]
+export const FORMULA_SOURCE_KIND_OPTIONS = [
+  option("runtime", "运行时来源数值"), option("inCombatStat", "局内面板属性"),
+]
+const IN_COMBAT_FORMULA_SOURCE_STAT_LABELS: Record<string, string> = {
+  hp: "局内生命值", atk: "局内攻击力", def: "局内防御力", critRate: "局内暴击率",
+  critDmg: "局内暴击伤害", impact: "局内冲击力", anomalyProficiency: "局内异常精通",
+  anomalyMastery: "局内异常掌控", energyRegen: "局内能量自动回复", penFlat: "局内穿透值", penRatio: "局内穿透率",
+}
+export const IN_COMBAT_FORMULA_SOURCE_STAT_OPTIONS = IN_COMBAT_FORMULA_SOURCE_STATS
+  .map(stat => option(stat, IN_COMBAT_FORMULA_SOURCE_STAT_LABELS[stat] ?? stat))
+export const DERIVED_SOURCE_KIND_OPTIONS = [
+  option("runtime", "运行时来源数值"), option("outOfCombatStat", "局外面板属性"),
+]
 export const EFFECT_MODE_OPTIONS = [option("flat", "直接加到面板"), option("pct", "按基准换算")]
 export const BASIS_OPTIONS = [
   option("", "默认基准"), option("baseHp", "基础生命值"), option("outOfCombatHp", "局外生命值"),
@@ -43,8 +58,9 @@ export const BASIS_OPTIONS = [
   option("baseDef", "基础防御力"), option("outOfCombatDef", "局外防御力"),
 ]
 export const CRIT_MODE_OPTIONS = [option("expected", "期望"), option("crit", "暴击"), option("nonCrit", "非暴击")]
+export const SHARP_CRIT_MODE_OPTIONS = [option("expected", "期望"), option("nonCrit", "不触发锐暴"), option("sharpCrit", "一次锐暴"), option("lacerationCrit", "二次锐暴")]
 export const EVENT_KIND_OPTIONS = [
-  option("direct", "直伤"), option("sheer", "贯穿"), option("anomaly", "属性异常"),
+  option("direct", "直伤"), option("sheer", "贯穿"), option("sharp", "锐化"), option("anomaly", "属性异常"),
   option("disorder", "紊乱"), option("release", "异放"), option("luminescence", "耀变"), option("skillGroup", "技能组"),
 ]
 export const EVENT_SOURCE_OPTIONS = [option("skill", "技能倍率"), option("manual", "手填倍率")]
@@ -52,7 +68,7 @@ export const DISORDER_TYPE_OPTIONS = [option("normal", "（普通）紊乱"), op
 export const ANOMALY_SETTLEMENT_OPTIONS = [option("attribute", "属性异常"), option("disorder", "紊乱"), option("release", "异放"), option("luminescence", "耀变")]
 export const LEVEL_SCALE_OPTIONS = [option("skill", "技能等级"), option("coreSkill", "核心技等级")]
 export const SKILL_ROW_KIND_OPTIONS = [option("damageMultiplier", "伤害倍率"), option("dazeMultiplier", "失衡倍率")]
-export const DAMAGE_BASIS_OPTIONS = [option("", "攻击力（默认）"), option("sheerForce", "贯穿力")]
+export const DAMAGE_BASIS_OPTIONS = [option("", "攻击力（默认）"), option("def", "防御力"), option("sheerForce", "贯穿力")]
 export const CORE_SKILL_LEVELS = ["A", "B", "C", "D", "E", "F"]
 export const FORMULA_VALUE_UNIT_OPTIONS = [option("storedValue", "普通数值"), option("storedPercent", "百分比数值")]
 
@@ -101,7 +117,7 @@ export const PANEL_STATS: Array<[string, string, "flat" | "pct"]> = [
   ["atkFlat", "固定攻击力", "flat"], ["atkPct", "百分比攻击力%", "pct"],
   ["hpFlat", "固定生命值", "flat"], ["hpPct", "百分比生命值%", "pct"],
   ["sheerForceFlat", "固定贯穿力", "flat"], ["defFlat", "固定防御力", "flat"], ["defPct", "百分比防御力%", "pct"],
-  ["critRate", "暴击率%", "flat"], ["critDmg", "暴击伤害%", "flat"],
+  ["critRate", "暴击率%", "flat"], ["critDmg", "暴击伤害%", "flat"], ["lacerationDmg", "锐暴伤害%", "flat"],
   ["impact", "冲击力%", "pct"], ["impactFlat", "固定冲击力", "flat"],
   ["anomalyProficiency", "异常精通", "flat"], ["anomalyMastery", "异常掌控%", "pct"],
   ["anomalyMasteryFlat", "固定异常掌控", "flat"], ["energyRegen", "能量自动回复%", "pct"],
@@ -133,6 +149,10 @@ export const EVENT_STATS: Array<[string, string, "flat"]> = [
   ["fireSheerDmg", "火属性贯穿增伤%", "flat"], ["iceSheerDmg", "冰属性贯穿增伤%", "flat"],
   ["electricSheerDmg", "电属性贯穿增伤%", "flat"], ["etherSheerDmg", "以太贯穿增伤%", "flat"],
   ["windSheerDmg", "风属性贯穿增伤%", "flat"],
+  ["sharpDmgBonus", "锐化增伤%", "flat"], ["physicalSharpDmg", "物理锐化增伤%", "flat"],
+  ["fireSharpDmg", "火锐化增伤%", "flat"], ["iceSharpDmg", "冰锐化增伤%", "flat"],
+  ["electricSharpDmg", "电锐化增伤%", "flat"], ["etherSharpDmg", "以太锐化增伤%", "flat"],
+  ["windSharpDmg", "风锐化增伤%", "flat"],
   ["physicalCritDmg", "物理伤害暴击伤害%", "flat"], ["fireCritDmg", "火属性伤害暴击伤害%", "flat"],
   ["iceCritDmg", "冰属性伤害暴击伤害%", "flat"], ["electricCritDmg", "电属性伤害暴击伤害%", "flat"],
   ["etherCritDmg", "以太伤害暴击伤害%", "flat"], ["windCritDmg", "风属性伤害暴击伤害%", "flat"],
@@ -145,7 +165,7 @@ export const SKILL_TARGET_STATS: Array<[string, string, "flat"]> = [
   ["dmgBonus", "技能目标伤害加成%", "flat"], ["penRatio", "技能目标穿透率%", "flat"], ["physicalDmg", "物理伤害加成%", "flat"],
   ["fireDmg", "火属性伤害加成%", "flat"], ["iceDmg", "冰属性伤害加成%", "flat"],
   ["electricDmg", "电属性伤害加成%", "flat"], ["etherDmg", "以太伤害加成%", "flat"], ["windDmg", "风属性伤害加成%", "flat"],
-  ...EVENT_STATS.filter(([value]) => !["anomalyDamageBonus", "alienationCoefficientBonus"].includes(value)), ["skillMultiplierBonus", "技能倍率加算%", "flat"],
+  ...EVENT_STATS.filter(([value]) => !["anomalyDamageBonus", "alienationCoefficientBonus"].includes(value)), ["skillMultiplierBonus", "技能倍率加算%", "flat"], ["lacerationDmg", "锐暴伤害%", "flat"],
   ["enemyDefReduction", "敌方防御力降低%", "flat"], ["enemyDefIgnore", "无视防御率%", "flat"],
   ["enemyResReduction", "敌方全属性抗性降低%", "flat"],
   ["allResIgnore", "全属性抗性无视%", "flat"],
@@ -286,11 +306,18 @@ export function defaultCalculationEvent(kind = "direct") {
     luminescenceDamageSharePct: 50,
   }
   if (kind === "skillGroup") return { ...base, kind: "skillGroup", skillGroupId: "" }
+  if (kind === "sharp") return {
+    ...base,
+    kind: "sharp",
+    critMode: "expected",
+    skillMultiplier: 100,
+    damageElement: "electric",
+  }
   return { ...base, critMode: "expected", skillMultiplier: 100, damageElement: "physical", __source: "manual" }
 }
 
 export const ANOMALY_VARIANT_OPTIONS = [option("normal", "普通异常"), option("polarizedAssault", "极性强击")]
-export const CALCULATION_DAMAGE_BASIS_OPTIONS = [option("atk", "攻击力"), option("anomalyProficiency", "异常精通")]
+export const CALCULATION_DAMAGE_BASIS_OPTIONS = [option("atk", "攻击力"), option("def", "防御力"), option("anomalyProficiency", "异常精通")]
 
 export function anomalyOptions(catalog: any, disorder = false) {
   return (catalog?.anomalyEffects?.effects ?? [])
@@ -305,10 +332,33 @@ export function buffCandidates(catalog: any) {
   }
   for (const buff of catalog?.combatBuffs?.fieldBuffs ?? []) rows.push({ value: buff.id, label: `场地｜${textOf(buff.name) || textOf(buff.source)}｜${textOf(buff.sourcePeriod)}`, effects: buff.effects ?? [] })
   for (const buff of catalog?.combatBuffs?.bossBuffs ?? []) rows.push({ value: buff.id, label: `Boss｜${textOf(buff.bossName)}｜${textOf(buff.bossSource)}`, effects: buff.effects ?? [] })
+  const skills = Array.isArray(catalog?.agentSkills)
+    ? catalog.agentSkills
+    : catalog?.agentSkills?.agentSkills ?? catalog?.displayAgentSkills ?? []
+  const agents = Array.isArray(catalog?.agents) ? catalog.agents : catalog?.agents?.agents ?? []
+  for (const skill of skills) {
+    const agentName = textOf(agents.find((agent: any) => agent?.id === skill?.agentId)?.name)
+    for (const category of skill?.categories ?? []) {
+      for (const move of category?.moves ?? []) {
+        const effects = (move?.rows ?? []).filter((row: any) => row?.id && (row?.kind ?? "damageMultiplier") === "damageMultiplier")
+        if (!effects.length) continue
+        rows.push({
+          value: skillMultiplierTargetId({ agentSkillId: skill.id, categoryId: category.id, moveId: move.id }),
+          label: `技能｜${agentName ? `${agentName}｜` : ""}${textOf(move.name) || move.id}`,
+          effects,
+        })
+      }
+    }
+  }
   return rows
 }
 
 export function effectSummary(effect: any, catalog: any) {
+  if (effect?.kind && effect?.label) {
+    const label = textOf(effect.label)
+    const value = Number.isFinite(Number(effect.value)) ? String(effect.value) : ""
+    return [label || "技能倍率", value].filter(Boolean).join(" ")
+  }
   const stat = effect.stat
     ? statOptions(catalog, effect.target?.kind, effect.target?.settlementType).find(item => item.value === effect.stat)?.label
     : ""

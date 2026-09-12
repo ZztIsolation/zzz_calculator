@@ -45,7 +45,7 @@ function newSkillRef() {
 function add(kind: string) {
   if (kind !== "luminescence" && hasLuminescenceEvent.value) return
   const event = defaultCalculationEvent(kind)
-  if (["direct", "sheer"].includes(kind) && preferredSkillId()) {
+  if (["direct", "sheer", "sharp"].includes(kind) && preferredSkillId()) {
     delete event.__source
     delete event.skillMultiplier
     delete event.damageElement
@@ -100,7 +100,7 @@ function groupOptions() {
 
 function visibleKind(event: any) {
   if (event.kind === "skillGroup") return "skillGroup"
-  if (event.kind === "direct" || event.kind === "sheer") return event.kind
+  if (event.kind === "direct" || event.kind === "sheer" || event.kind === "sharp") return event.kind
   return event.kind === "disorder" || event.settlementType === "disorder"
     ? "disorder"
     : event.settlementType === "release"
@@ -141,6 +141,7 @@ function eventSummary(event: any) {
     <div class="maintenance-action-row">
       <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('direct')"><template #icon><Plus :size="14" /></template>添加直伤</NButton>
       <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('sheer')">添加贯穿</NButton>
+      <NButton size="small" :disabled="disabled || hasLuminescenceEvent || agent?.specialty !== 'armorer'" @click="add('sharp')">添加锐化</NButton>
       <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('anomaly')">添加属性异常</NButton>
       <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('disorder')">添加紊乱</NButton>
       <NButton size="small" :disabled="disabled || hasLuminescenceEvent || !(agent?.anomalyReleaseProfiles?.length)" :title="agent?.anomalyReleaseProfiles?.length ? '' : '暂不支持'" @click="add('release')">添加异放</NButton>
@@ -174,6 +175,7 @@ function eventSummary(event: any) {
         <div class="calculation-add-toolbar">
           <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('direct')">添加技能</NButton>
           <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('sheer')">添加贯穿</NButton>
+          <NButton size="small" :disabled="disabled || hasLuminescenceEvent || agent?.specialty !== 'armorer'" @click="add('sharp')">添加锐化</NButton>
           <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('anomaly')">添加异常</NButton>
           <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('disorder')">添加紊乱</NButton>
           <NButton size="small" :disabled="disabled || hasLuminescenceEvent || !(agent?.anomalyReleaseProfiles?.length)" :title="agent?.anomalyReleaseProfiles?.length ? '' : '暂不支持'" @click="add('release')">添加异放</NButton>

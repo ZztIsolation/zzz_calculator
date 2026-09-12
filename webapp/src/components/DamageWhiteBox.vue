@@ -43,9 +43,14 @@ function damageNumber(value: unknown, digits = 3): string {
   return formatNumber(value, digits)
 }
 
+function summaryNumber(value: unknown, event: any = selectedEvent.value): string {
+  const luminescence = isLuminescenceScoreKind(event?.objectiveKind ?? props.damage?.objectiveKind)
+  return damageNumber(value, luminescence ? 3 : 0)
+}
+
 function eventValue(value: unknown, event: any = selectedEvent.value): string {
   const luminescence = isLuminescenceScoreKind(event?.objectiveKind ?? props.damage?.objectiveKind)
-  const formatted = damageNumber(value, 3)
+  const formatted = summaryNumber(value, event)
   return luminescence ? `${formatted} ${String(event?.scoreSuffix ?? props.damage?.scoreSuffix ?? "× k")}` : formatted
 }
 
@@ -91,8 +96,20 @@ function eventLabel(event: any): string {
 }
 
 function eventVariantItems(event: any) {
-  if (!event?.damageVariants || !["direct", "sheer"].includes(event.kind)) {
+  if (!event?.damageVariants || !["direct", "sheer", "sharp"].includes(event.kind)) {
     return []
+  }
+  if (event.kind === "sharp") {
+    return [
+      ["expected", "期望"],
+      ["nonCrit", "不触发锐暴"],
+      ["sharpCrit", "一次锐暴"],
+      ["lacerationCrit", "二次锐暴"],
+    ].map(([key, label]) => ({
+      key,
+      label,
+      value: event.damageVariants?.[key]?.finalDamage,
+    })).filter(item => Number.isFinite(Number(item.value)))
   }
   return [
     ["expected", "期望"],
@@ -117,12 +134,12 @@ function selectEventId(value: string | number | null) {
         <span>当前白盒</span>
         <strong>{{ selectedEvent ? eventLabel(selectedEvent) : "单次伤害" }}</strong>
         <small v-if="selectedVariantItems.length" class="damage-selected-variants">
-          <span v-for="item in selectedVariantItems" :key="item.key">{{ item.label }} {{ damageNumber(item.value) }}</span>
+          <span v-for="item in selectedVariantItems" :key="item.key">{{ item.label }} {{ summaryNumber(item.value) }}</span>
         </small>
       </div>
       <div class="damage-whitebox-current-values">
         <span v-if="selectedEvent">{{ isLuminescenceScore ? "本评分" : "本事件" }} <b class="num">{{ eventValue(selectedEvent.finalDamage) }}</b></span>
-        <span v-if="hasMultipleEvents">总计 <b class="num">{{ damageNumber(totalDamage) }}</b></span>
+        <span v-if="hasMultipleEvents">总计 <b class="num">{{ summaryNumber(totalDamage) }}</b></span>
       </div>
     </div>
 

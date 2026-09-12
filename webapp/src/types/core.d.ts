@@ -13,6 +13,56 @@ declare module "@core/calculator-core.js" {
   export function isTeamAnomalyDamageModifier(modifier?: any): boolean
 }
 
+declare module "@core/sharpDamage.js" {
+  export type SharpCritMode = "expected" | "nonCrit" | "sharpCrit" | "lacerationCrit"
+  export interface SharpDamageProfile {
+    id: "armorer"
+    basisStat: "def"
+    baseLacerationDmgPct: number
+    critRateCapPct: number
+    initialCritDmgToCritRateRatio: number
+  }
+  export interface SharpDamageEvent {
+    kind: "sharp"
+    skillRef?: Record<string, string | number>
+    skillMultiplier?: number
+    damageElement?: string
+    critMode: SharpCritMode
+    count: number
+    stunned: boolean
+  }
+  export const ARMORER_SHARP_PROFILE: SharpDamageProfile
+  export const SHARP_CRIT_MODES: readonly SharpCritMode[]
+  export function normalizeSharpCritMode(value?: any): SharpCritMode
+  export function normalizeSharpDamageEvent(event?: any, options?: any): any
+  export function sharpOutOfCombatCritRate(options?: any): any
+  export function sharpEffectiveCritRate(options?: any): any
+  export function sharpLacerationDamage(options?: any): any
+  export function sharpCritBreakdown(options?: any): any
+  export function sharpDamageMultiplierForMode(breakdown?: any, mode?: SharpCritMode): number
+  export function sharpDamageValue(options?: any): any
+  export function sharpDamageVariants(options?: any): any
+  export function sharpStatDependencies(event?: any, options?: any): string[]
+  export function sharpWhiteBoxRows(options?: any): any[]
+  export function isSharpDamageEvent(event?: any): boolean
+}
+
+declare module "@core/effectFormula.js" {
+  export const IN_COMBAT_FORMULA_SOURCE_STATS: readonly string[]
+  export const IN_COMBAT_FORMULA_SOURCE_TYPES: readonly string[]
+  export function isInCombatFormulaRule(rule?: any): boolean
+  export function isAllowedInCombatFormulaSourceStat(stat?: unknown): boolean
+  export function isAllowedInCombatFormulaSourceType(sourceType?: unknown): boolean
+  export function formulaParameterDefaults(rule?: any): Record<string, number>
+  export function formulaParameterNames(rule?: any): string[]
+  export function formulaParameterValues(rule?: any): Record<string, number>
+  export function formulaParameterModificationValues(rule?: any): Record<string, number[]>
+  export function materializeFormulaRuleForModificationLevel(rule?: any, level?: unknown, minLevel?: unknown): any
+  export function evaluateInCombatFormulaRule(rule?: any, panel?: any): any
+  export function migrateLegacySharpOverflowEffect(effect?: any): any
+  export function migrateLegacyBloodMarrowWEngine(wEngine?: any): any
+}
+
 declare module "@core/damageEventMultipliers.js" {
   export function disorderElapsedStepSeconds(event?: any, catalog?: any): number
   export function normalizeElapsedSeconds(value: unknown, durationSeconds?: number, stepSeconds?: number): number
@@ -415,8 +465,8 @@ declare module "@core/shared-combat.js" {
   export function runtimeSourceGroups(effect?: any): any[]
   export function runtimeStackGroups(effect?: any): any[]
   export function storedBuffModifierTexts(effect: any): string[]
-  export function storedEffectRuleText(rule: any, runtime?: any, effect?: any, meta?: any): string
-  export function storedEffectRulesText(effect: any, runtime?: any, meta?: any): string
+  export function storedEffectRuleText(rule: any, runtime?: any, effect?: any, meta?: any, displayContext?: any): string
+  export function storedEffectRulesText(effect: any, runtime?: any, meta?: any, displayContext?: any): string
 }
 
 declare module "@core/skillTargets.js" {
@@ -426,6 +476,7 @@ declare module "@core/skillTargets.js" {
   export const SKILL_TAGS: readonly string[]
   export const SKILL_TAG_LABELS: Readonly<Record<string, string>>
   export const SKILL_TAG_VALUES: Set<string>
+  export function skillMultiplierTargetId(ref?: { agentSkillId?: any, categoryId?: any, moveId?: any }): string
   export function skillTypeLabel(value?: any): string
   export function skillTagLabel(value?: any): string
   export function skillTagsForMove(move?: any): string[]
@@ -446,6 +497,8 @@ declare module "@core/effectRuleTargets.js" {
   export const ELEMENT_DEF_IGNORE_STAT_BY_ELEMENT: Readonly<Record<string, string>>
   export const ELEMENT_CRIT_DMG_STATS: readonly string[]
   export const ELEMENT_DEF_IGNORE_STATS: readonly string[]
+  export const ELEMENT_SHARP_DMG_STAT_BY_ELEMENT: Readonly<Record<string, string>>
+  export const ELEMENT_SHARP_DMG_STATS: readonly string[]
   export function normalizeLegacyEffectAppliesToInValue<T>(value: T): T
   export function hasLegacyEffectAppliesTo(value: any): boolean
 }

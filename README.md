@@ -10,6 +10,14 @@ The entries below summarize each development day. Implementation details,
 modeling decisions, and verification evidence remain in the
 [detailed changelog](docs/changelog.md).
 
+### 2026-09-13 Claret Armorer Sharp-Damage Modeling
+
+- Added Claret (克拉蕾·弗林特) as a first-class Armorer/sharp-damage domain. Sharp events use DEF as their basis, support the two-stage sharp-critical check and sharp-specific damage multiplier, and keep ordinary damage bonuses auditable in the white box.
+- Added Claret's source-checked skill groups, Core Passive and Cinema rules, four DEF-base Armorer W-Engines, official source metadata, local artwork, and Enka identity mapping. The 3.2 phase-one Boss and field catalog entries are included in the data layer.
+- Fixed sharp fixed-objective panel parity so in-combat DEF is preserved across normal, compiled, dense, indexed, fixed-set, Worker, and optimizer paths. Heuristic potential filtering no longer selects DEF/sharp-only candidates for ordinary agents.
+- Migrated dynamic in-combat formula handling into the shared core and kept Blood Marrow's overflow rule generic, so all supported damage domains consume the same validated bonus path. Tests cover formula evaluation, white-box rows, optimizer fuzz, browser-local computation, and catalog integrity.
+- This update is merged through pull requests into `main` only. The `deploy` branch is unchanged, and no production deployment or promotion workflow is triggered by this development update.
+
 ### 2026-09-05 Vivian Single-Release Modeling (Development Branch)
 
 - Added Vivian (薇薇安·班希) from official Wiki entry 1276, including her level-60 panel, seven Core Passive Release coefficient tiers, the expressible Additional Ability/Cinema effects, official artwork, Enka `1331` mapping, and the signature Dreaming Bird relationship.

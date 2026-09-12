@@ -5,7 +5,7 @@ import { createSystemManagedCoverage } from "@core/maintenanceValidation.js"
 import { statLabel } from "@/utils/format"
 import SkillTargetEditor from "./SkillTargetEditor.vue"
 import {
-  ANOMALY_SETTLEMENT_OPTIONS, ANOMALY_VARIANT_OPTIONS, ATTRIBUTE_OPTIONS, BASIS_OPTIONS, EFFECT_MODE_OPTIONS, EFFECT_TYPE_OPTIONS, EVENT_STAT_KEYS, FORMULA_VALUE_UNIT_OPTIONS,
+  ANOMALY_SETTLEMENT_OPTIONS, ANOMALY_VARIANT_OPTIONS, ATTRIBUTE_OPTIONS, BASIS_OPTIONS, DERIVED_SOURCE_KIND_OPTIONS, EFFECT_MODE_OPTIONS, EFFECT_TYPE_OPTIONS, EVENT_STAT_KEYS, FORMULA_SOURCE_KIND_OPTIONS, FORMULA_VALUE_UNIT_OPTIONS, IN_COMBAT_FORMULA_SOURCE_STAT_OPTIONS, OUT_OF_COMBAT_EFFECT_SOURCE_STAT_OPTIONS, SCOPE_OPTIONS,
   OUT_OF_COMBAT_REQUIREMENT_STAT_OPTIONS, SPECIALTY_OPTIONS, TARGET_KIND_OPTIONS, anomalyOptions, defaultEffectRule, defaultGeneralSkillTargets, defaultModeForStat, defaultSkillTarget, option, statOptions,
 } from "./maintenance-options"
 import { internalId, textOf } from "./maintenance-model"
@@ -88,6 +88,11 @@ function editableValueKey(rule: any) {
 }
 
 function changeTarget(rule: any, kind: string) {
+  if (rule.type === "formula" && formulaSourceKind(rule) === "inCombatStat") {
+    rule.target = { kind: "default" }
+    emit("change")
+    return
+  }
   delete rule.appliesTo
   if (kind === "specific") {
     const existing = (rule.target?.skillTargets ?? []).filter((target: any) => target?.kind === "specific")
@@ -124,6 +129,11 @@ function targetMode(rule: any): "default" | "anomaly" | "specific" | "skillType"
 }
 
 function changeStat(rule: any, stat: string) {
+  if (rule.type === "formula" && formulaSourceKind(rule) === "inCombatStat") {
+    rule.stat = "dmgBonus"
+    emit("change")
+    return
+  }
   rule.stat = stat
   delete rule.valueSource
   delete rule.appliesTo
@@ -214,6 +224,180 @@ function setValueSourceField(rule: any, field: string | null) {
     rule.valueSource = { kind: "corePassiveScaling", field: normalized }
     const firstValue = Number(props.corePassiveScaling?.levels?.[0]?.[normalized])
     if (Number.isFinite(firstValue)) rule.value = firstValue
+  }
+  emit("change")
+}
+
+function ruleScope(rule: any) {
+  return rule.scope ?? props.model.scope ?? "outOfCombat"
+}
+
+function setRuleScope(rule: any, value: string) {
+  if (value === (props.model.scope ?? "outOfCombat")) delete rule.scope
+  else rule.scope = value
+  emit("change")
+}
+
+function derivedSourceKind(rule: any) {
+  return rule.source?.kind === "outOfCombatStat" ? "outOfCombatStat" : "runtime"
+}
+
+function formulaSourceKind(rule: any) {
+  return rule.source?.kind === "inCombatStat" ? "inCombatStat" : "runtime"
+}
+
+function isInCombatFormulaRule(rule: any) {
+  return rule.type === "formula" && formulaSourceKind(rule) === "inCombatStat"
+}
+
+function inCombatFormulaSourceUnit(stat: string) {
+  return ["critRate", "critDmg", "energyRegen", "penRatio"].includes(stat)
+    ? "storedPercent"
+    : "storedValue"
+}
+
+function inCombatFormulaSourceLabel(stat: string) {
+  return String(IN_COMBAT_FORMULA_SOURCE_STAT_OPTIONS.find(option => option.value === stat)?.label ?? stat)
+}
+
+function setFormulaSourceKind(rule: any, value: string) {
+  if (value === "inCombatStat") {
+    const stat = IN_COMBAT_FORMULA_SOURCE_STAT_OPTIONS.some(option => option.value === rule.source?.stat)
+      ? String(rule.source.stat)
+      : "critRate"
+    rule.scope = "inCombat"
+    rule.stat = "dmgBonus"
+    rule.mode = "flat"
+    rule.target = { kind: "default" }
+    rule.source = {
+      kind: "inCombatStat",
+      stat,
+      unit: inCombatFormulaSourceUnit(stat),
+      label: { zhCN: inCombatFormulaSourceLabel(stat) },
+    }
+  } else {
+    if (rule.scope === "inCombat") delete rule.scope
+    rule.source = {
+      kind: "runtime",
+      variable: "x",
+      label: rule.source?.label ?? { zhCN: "来源数值" },
+      defaultValue: Number(rule.source?.defaultValue ?? 0),
+      ...(rule.source?.min !== undefined ? { min: rule.source.min } : {}),
+      ...(rule.source?.max !== undefined ? { max: rule.source.max } : {}),
+    }
+  }
+  emit("change")
+}
+
+function setFormulaSourceStat(rule: any, value: string) {
+  rule.source = {
+    ...(rule.source ?? {}),
+    kind: "inCombatStat",
+    stat: value,
+    unit: inCombatFormulaSourceUnit(value),
+    label: { zhCN: inCombatFormulaSourceLabel(value) },
+  }
+  emit("change")
+}
+
+function formulaParameterNames(rule: any): string[] {
+  const parameters = rule.formula?.parameters
+  return parameters && typeof parameters === "object" && !Array.isArray(parameters)
+    ? Object.keys(parameters)
+    : []
+}
+
+function formulaParameterModificationText(rule: any, name: string) {
+  const values = rule.formula?.modificationValues?.[name]
+  return Array.isArray(values) ? values.join("/") : ""
+}
+
+function setFormulaParameterModificationText(rule: any, name: string, value: string) {
+  const values = value.split("/").map(item => Number(item.trim())).filter(Number.isFinite)
+  rule.formula.modificationValues ??= {}
+  if (values.length) rule.formula.modificationValues[name] = values
+  else delete rule.formula.modificationValues[name]
+  emit("change")
+}
+
+function setFormulaParameterValue(rule: any, name: string, value: number | null) {
+  rule.formula.parameters[name] = Number(value ?? 0)
+  emit("change")
+}
+
+function setFormulaParameterName(rule: any, currentName: string, value: string) {
+  const name = value.trim()
+  if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(name)
+    || name === "x"
+    || name === currentName
+    || Object.prototype.hasOwnProperty.call(rule.formula?.parameters ?? {}, name)) {
+    return
+  }
+  rule.formula.parameters = Object.fromEntries(
+    Object.entries(rule.formula.parameters ?? {}).map(([key, parameterValue]) => [
+      key === currentName ? name : key,
+      parameterValue,
+    ]),
+  )
+  if (rule.formula?.modificationValues
+    && Object.prototype.hasOwnProperty.call(rule.formula.modificationValues, currentName)) {
+    rule.formula.modificationValues = Object.fromEntries(
+      Object.entries(rule.formula.modificationValues).map(([key, parameterValues]) => [
+        key === currentName ? name : key,
+        parameterValues,
+      ]),
+    )
+  }
+  const expression = String(rule.formula?.expression ?? "")
+  const escapedCurrentName = currentName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  rule.formula.expression = expression.replace(new RegExp(`\\b${escapedCurrentName}\\b`, "g"), name)
+  emit("change")
+}
+
+function addFormulaParameter(rule: any) {
+  rule.formula ??= { expression: "", valueUnit: "storedValue" }
+  rule.formula.parameters ??= {}
+  let index = Object.keys(rule.formula.parameters).length + 1
+  let name = `parameter${index}`
+  while (Object.prototype.hasOwnProperty.call(rule.formula.parameters, name)) {
+    index += 1
+    name = `parameter${index}`
+  }
+  rule.formula.parameters[name] = 0
+  emit("change")
+}
+
+function removeFormulaParameter(rule: any, name: string) {
+  if (rule.formula?.parameters) delete rule.formula.parameters[name]
+  if (rule.formula?.modificationValues) delete rule.formula.modificationValues[name]
+  emit("change")
+}
+
+function setDerivedSourceKind(rule: any, value: string) {
+  if (value === "outOfCombatStat") {
+    rule.scope = "outOfCombat"
+    rule.source = {
+      kind: "outOfCombatStat",
+      stat: rule.source?.stat ?? "critDmg",
+      unit: rule.source?.unit ?? "storedPercent",
+      label: rule.source?.label ?? rule.sourceLabel ?? { zhCN: "局外面板属性" },
+    }
+    delete rule.sourceLabel
+    delete rule.defaultSourceValue
+  } else {
+    delete rule.source
+    if (rule.scope === "outOfCombat") delete rule.scope
+    rule.sourceLabel ??= { zhCN: "来源数值" }
+    rule.defaultSourceValue ??= 0
+  }
+  emit("change")
+}
+
+function setDerivedSourceStat(rule: any, value: string) {
+  rule.source = {
+    ...(rule.source ?? { kind: "outOfCombatStat", unit: "storedPercent" }),
+    kind: "outOfCombatStat",
+    stat: value,
   }
   emit("change")
 }
@@ -382,12 +566,13 @@ function selectStackGroup(rule: any, value: string) {
       </header>
       <div class="effect-rule-grid">
         <label v-if="!simple" class="maintenance-field"><span>计算类型</span><NSelect :value="rule.type ?? 'fixed'" :options="EFFECT_TYPE_OPTIONS" :disabled="disabled" @update:value="changeType(rule, String($event))" /></label>
-        <label v-if="!simple" class="maintenance-field maintenance-field-wide"><span>增幅对象</span><NRadioGroup class="maintenance-target-mode" :value="targetMode(rule)" :disabled="disabled" size="small"><NRadioButton v-for="item in TARGET_KIND_OPTIONS" :key="item.value" :value="item.value" :label="item.label" @click="changeTarget(rule, String(item.value))" /></NRadioGroup></label>
-        <label class="maintenance-field" data-field-key="stat"><span>增幅类型</span><NSelect filterable :consistent-menu-width="false" :value="rule.stat" :options="statOptions(catalog, rule.target?.kind, rule.target?.settlementType)" :disabled="disabled" @update:value="changeStat(rule, String($event))" /></label>
+        <label v-if="!simple" class="maintenance-field maintenance-field-wide"><span>增幅对象</span><NRadioGroup class="maintenance-target-mode" :value="targetMode(rule)" :disabled="disabled || isInCombatFormulaRule(rule)" size="small"><NRadioButton v-for="item in TARGET_KIND_OPTIONS" :key="item.value" :value="item.value" :label="item.label" @click="changeTarget(rule, String(item.value))" /></NRadioGroup></label>
+        <label v-if="!simple" class="maintenance-field"><span>规则生效范围</span><NSelect :value="ruleScope(rule)" :options="SCOPE_OPTIONS" :disabled="disabled || (rule.type === 'formula' && formulaSourceKind(rule) === 'inCombatStat')" @update:value="setRuleScope(rule, String($event))" /></label>
+        <label class="maintenance-field" data-field-key="stat"><span>增幅类型</span><NSelect filterable :consistent-menu-width="false" :value="rule.stat" :options="statOptions(catalog, rule.target?.kind, rule.target?.settlementType)" :disabled="disabled || isInCombatFormulaRule(rule)" @update:value="changeStat(rule, String($event))" /></label>
         <label v-if="valueSourceOptions().length > 1 && (rule.type ?? 'fixed') === 'fixed'" class="maintenance-field"><span>数值来源</span><NSelect :value="valueSourceOptionValue(rule)" :options="valueSourceOptions()" :disabled="disabled" @update:value="setValueSourceField(rule, $event ? String($event) : null)" /></label>
         <label v-if="!['derived', 'formula'].includes(rule.type)" class="maintenance-field"><span>{{ stackedUsesActivationValue(rule) ? '激活数值' : rule.type === 'stacked' ? '每层数值' : '数值' }}</span><NInputNumber :value="rule[editableValueKey(rule)]" :disabled="disabled || Boolean(rule.valueSource)" :step="0.01" @update:value="rule[editableValueKey(rule)] = $event; emit('change')" /></label>
-        <label v-if="rule.target?.kind !== 'skill' && !EVENT_STAT_KEYS.has(rule.stat)" class="maintenance-field"><span>计算方式</span><NSelect v-model:value="rule.mode" :options="EFFECT_MODE_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
-        <label v-if="rule.target?.kind !== 'skill' && !EVENT_STAT_KEYS.has(rule.stat)" class="maintenance-field"><span>基准</span><NSelect v-model:value="rule.basis" :options="BASIS_OPTIONS" :disabled="disabled" clearable @update:value="emit('change')" /></label>
+        <label v-if="rule.target?.kind !== 'skill' && !EVENT_STAT_KEYS.has(rule.stat) && !isInCombatFormulaRule(rule)" class="maintenance-field"><span>计算方式</span><NSelect v-model:value="rule.mode" :options="EFFECT_MODE_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
+        <label v-if="rule.target?.kind !== 'skill' && !EVENT_STAT_KEYS.has(rule.stat) && !isInCombatFormulaRule(rule)" class="maintenance-field"><span>基准</span><NSelect v-model:value="rule.basis" :options="BASIS_OPTIONS" :disabled="disabled" clearable @update:value="emit('change')" /></label>
       </div>
 
       <div v-if="rule.target?.kind === 'skill'" class="maintenance-nested-panel">
@@ -406,19 +591,30 @@ function selectStackGroup(rule: any, value: string) {
       </NAlert>
 
       <div v-if="rule.type === 'derived'" class="maintenance-grid rule-detail-grid">
-        <label class="maintenance-field"><span>来源数值名称</span><NInput :value="textOf(rule.sourceLabel)" :disabled="disabled" @update:value="rule.sourceLabel = { zhCN: String($event) }; emit('change')" /></label>
-        <label class="maintenance-field"><span>默认来源数值</span><NInputNumber v-model:value="rule.defaultSourceValue" :disabled="disabled" @update:value="emit('change')" /></label>
+        <label class="maintenance-field"><span>来源类型</span><NSelect :value="derivedSourceKind(rule)" :options="DERIVED_SOURCE_KIND_OPTIONS" :disabled="disabled" @update:value="setDerivedSourceKind(rule, String($event))" /></label>
+        <label v-if="derivedSourceKind(rule) === 'outOfCombatStat'" class="maintenance-field"><span>局外来源属性</span><NSelect :value="rule.source.stat" :options="OUT_OF_COMBAT_EFFECT_SOURCE_STAT_OPTIONS" :disabled="disabled" @update:value="setDerivedSourceStat(rule, String($event))" /></label>
+        <label v-if="derivedSourceKind(rule) !== 'outOfCombatStat'" class="maintenance-field"><span>来源数值名称</span><NInput :value="textOf(rule.sourceLabel)" :disabled="disabled" @update:value="rule.sourceLabel = { zhCN: String($event) }; emit('change')" /></label>
+        <label v-if="derivedSourceKind(rule) !== 'outOfCombatStat'" class="maintenance-field"><span>默认来源数值</span><NInputNumber v-model:value="rule.defaultSourceValue" :disabled="disabled" @update:value="emit('change')" /></label>
         <label class="maintenance-field"><span>转换比例%</span><NInputNumber v-model:value="rule.ratio" :disabled="disabled" :step="0.01" @update:value="emit('change')" /></label>
         <label class="maintenance-field"><span>上限</span><NInputNumber v-model:value="rule.cap" :disabled="disabled" :step="0.01" clearable @update:value="emit('change')" /></label>
       </div>
 
       <div v-if="rule.type === 'formula'" class="maintenance-grid rule-detail-grid">
+        <label class="maintenance-field"><span>来源类型</span><NSelect :value="formulaSourceKind(rule)" :options="FORMULA_SOURCE_KIND_OPTIONS" :disabled="disabled" @update:value="setFormulaSourceKind(rule, String($event))" /></label>
+        <label v-if="formulaSourceKind(rule) === 'inCombatStat'" class="maintenance-field"><span>局内来源属性</span><NSelect :value="rule.source.stat" :options="IN_COMBAT_FORMULA_SOURCE_STAT_OPTIONS" :disabled="disabled" @update:value="setFormulaSourceStat(rule, String($event))" /></label>
         <label class="maintenance-field"><span>来源数值名称</span><NInput :value="textOf(rule.source?.label)" :disabled="disabled" @update:value="rule.source.label = { zhCN: String($event) }; emit('change')" /></label>
-        <label class="maintenance-field"><span>默认来源数值</span><NInputNumber v-model:value="rule.source.defaultValue" :disabled="disabled" @update:value="emit('change')" /></label>
-        <label class="maintenance-field"><span>来源下限</span><NInputNumber v-model:value="rule.source.min" :disabled="disabled" clearable @update:value="emit('change')" /></label>
-        <label class="maintenance-field"><span>来源上限</span><NInputNumber v-model:value="rule.source.max" :disabled="disabled" clearable @update:value="emit('change')" /></label>
+        <label v-if="formulaSourceKind(rule) === 'runtime'" class="maintenance-field"><span>默认来源数值</span><NInputNumber v-model:value="rule.source.defaultValue" :disabled="disabled" @update:value="emit('change')" /></label>
+        <label v-if="formulaSourceKind(rule) === 'runtime'" class="maintenance-field"><span>来源下限</span><NInputNumber v-model:value="rule.source.min" :disabled="disabled" clearable @update:value="emit('change')" /></label>
+        <label v-if="formulaSourceKind(rule) === 'runtime'" class="maintenance-field"><span>来源上限</span><NInputNumber v-model:value="rule.source.max" :disabled="disabled" clearable @update:value="emit('change')" /></label>
         <label class="maintenance-field"><span>公式结果单位</span><NSelect v-model:value="rule.formula.valueUnit" :options="FORMULA_VALUE_UNIT_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
         <label class="maintenance-field maintenance-field-wide"><span>公式</span><NInput v-model:value="rule.formula.expression" :disabled="disabled" placeholder="clamp(floor((x - 15000) / 400) + 10, 10, 40)" @update:value="emit('change')" /></label>
+        <template v-for="name in formulaParameterNames(rule)" :key="name">
+          <label class="maintenance-field"><span>参数名</span><NInput :value="name" :disabled="disabled" placeholder="threshold" @update:value="setFormulaParameterName(rule, name, String($event))" /></label>
+          <label class="maintenance-field"><span>参数 {{ name }} 默认值</span><NInputNumber :value="rule.formula.parameters[name]" :disabled="disabled" :step="0.01" @update:value="setFormulaParameterValue(rule, name, $event)" /></label>
+          <label v-if="allowModificationValues" class="maintenance-field"><span>{{ name }} 的 R1/R2/R3/R4/R5</span><NInput :value="formulaParameterModificationText(rule, name)" :disabled="disabled" placeholder="0.48/0.56/0.64/0.72/0.8" @update:value="setFormulaParameterModificationText(rule, name, String($event))" /></label>
+          <NButton quaternary type="error" :disabled="disabled" :title="`删除参数 ${name}`" @click="removeFormulaParameter(rule, name)"><template #icon><Trash2 :size="15" /></template>删除参数 {{ name }}</NButton>
+        </template>
+        <NButton size="small" :disabled="disabled" @click="addFormulaParameter(rule)"><template #icon><Plus :size="15" /></template>添加公式参数</NButton>
       </div>
 
       <div v-if="rule.type === 'stacked'" class="maintenance-grid rule-detail-grid">

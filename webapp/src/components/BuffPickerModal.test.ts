@@ -2272,4 +2272,56 @@ describe("BuffPickerModal", () => {
     expect(wrapper.text()).toContain("可见队友音擎")
     expect(wrapper.text()).not.toContain("隐藏队友音擎")
   })
+
+  it("renders an in-combat formula as one live generic damage rule without a source input", async () => {
+    const formulaMeta = {
+      ...meta,
+      wEngines: [{
+        id: "formula_engine",
+        name: { zhCN: "公式音擎" },
+        specialty: "attack",
+        modification: { minLevel: 1, maxLevel: 5, defaultLevel: 1 },
+        effect: {
+          name: { zhCN: "启封之刻" },
+          description: { zhCN: "暴击率转通用伤害" },
+          selfBuff: {
+            scope: "inCombat",
+            effects: [{
+              id: "formula-damage",
+              type: "formula",
+              stat: "dmgBonus",
+              mode: "flat",
+              target: { kind: "default" },
+              source: { kind: "inCombatStat", stat: "critRate", unit: "storedPercent", label: { zhCN: "局内暴击率" } },
+              formula: {
+                expression: "clamp(max(x - threshold, 0) * rate, 0, cap)",
+                valueUnit: "storedPercent",
+                parameters: { threshold: 100, rate: 0.8, cap: 40 },
+                modificationValues: { rate: [0.48, 0.56, 0.64, 0.72, 0.8], cap: [24, 28, 32, 36, 40] },
+              },
+            }],
+          },
+        },
+      }],
+    }
+    const wrapper = mountModal({
+      meta: formulaMeta,
+      wEngineId: "formula_engine",
+      wEngineModificationLevel: 5,
+      inCombatPanel: { critRate: 1.188 },
+    })
+    await openModal(wrapper)
+    const tab = wrapper.findAll(".n-tabs-tab").find(item => item.text() === "自身音擎 Buff")
+    expect(tab).toBeTruthy()
+    await tab!.trigger("click")
+    await nextTick()
+
+    const row = buffRowByText(wrapper, "启封之刻")
+    expect(row.findAll(".buff-effect-row")).toHaveLength(1)
+    expect(row.text()).toContain("局内暴击率超过100%时")
+    expect(row.text()).toContain("当前局内暴击率118.8%")
+    expect(row.text()).toContain("通用伤害提升15.04%")
+    expect(row.findAll(".runtime-grid")).toHaveLength(0)
+    expect(row.text()).not.toContain("来源数值")
+  })
 })

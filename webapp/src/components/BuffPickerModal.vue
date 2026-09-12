@@ -55,6 +55,7 @@ const props = defineProps<{
   potentialLevel?: number
   wEngineId?: string
   wEngineModificationLevel?: number
+  inCombatPanel?: Record<string, number> | null
 }>()
 
 const emit = defineEmits<{
@@ -813,7 +814,7 @@ function effectRowsFor(buff: any) {
     return {
       id,
       rule,
-      text: storedEffectRuleText(rule, runtime, buff, props.meta),
+      text: storedEffectRuleText(rule, runtime, buff, props.meta, { inCombatPanel: props.inCombatPanel }),
       coverage: effectRuleCoverage(rule, buff),
       enabled: runtime.effects?.[id]?.enabled !== false,
     }
