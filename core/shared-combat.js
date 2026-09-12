@@ -8,12 +8,39 @@ import {
     skillTypeLabel,
     unknownLegacySkillTargetPrefixes,
 } from "./skillTargets.js"
-import { ELEMENT_CRIT_DMG_STATS, ELEMENT_DEF_IGNORE_STATS } from "./effectRuleTargets.js"
+import {
+    ELEMENT_CRIT_DMG_STATS,
+    ELEMENT_DEF_IGNORE_STATS,
+    ELEMENT_SHARP_DMG_STATS,
+} from "./effectRuleTargets.js"
+import {
+    evaluateInCombatFormulaRule,
+    formulaParameterValues,
+    isInCombatFormulaRule,
+    materializeFormulaRuleForModificationLevel,
+} from "./effectFormula.js"
 
 export const DEFAULT_DAMAGE_TARGET_PRESET_ID = "normal-boss"
 export const DEFAULT_DAMAGE_LEVEL_COEFFICIENT = 794
 export const DAMAGE_ELEMENTS = ["physical", "fire", "ice", "electric", "ether", "wind"]
 export const DIRECT_DAMAGE_ELEMENTS = [...DAMAGE_ELEMENTS, "lumiflux"]
+const LEGACY_SHARP_OVERFLOW_RULE_IDS = new Set([
+    "marrow-overflow-rate",
+    "marrow-overflow-cap",
+])
+
+function stripLegacySharpOverflowRuntime(value) {
+    if (Array.isArray(value)) {
+        return value.map(stripLegacySharpOverflowRuntime)
+    }
+    if (!value || typeof value !== "object") {
+        return value
+    }
+    return Object.fromEntries(Object.entries(value)
+        .filter(([key]) => !LEGACY_SHARP_OVERFLOW_RULE_IDS.has(key)
+            && !["sharpOverflowPerCritRate", "sharpOverflowCap"].includes(key))
+        .map(([key, child]) => [key, stripLegacySharpOverflowRuntime(child)]))
+}
 export const DAMAGE_ELEMENT_SHORT_LABELS = {
     physical: "物理",
     fire: "火",
@@ -28,6 +55,7 @@ export const DAMAGE_KIND_LABELS = {
     anomaly: "异常",
     disorder: "紊乱",
     sheer: "贯穿",
+    sharp: "锐化",
 }
 export const DAMAGE_MODIFIER_KIND_LABELS = {
     enemyDamageTakenBonus: "敌方承伤提升",
@@ -51,6 +79,14 @@ export const DAMAGE_MODIFIER_KIND_LABELS = {
     electricSheerDmg: "电贯穿增伤",
     etherSheerDmg: "以太贯穿增伤",
     windSheerDmg: "风贯穿增伤",
+    lacerationDmg: "锐暴伤害",
+    sharpDmgBonus: "锐化伤害加成",
+    physicalSharpDmg: "物理锐化伤害加成",
+    fireSharpDmg: "火锐化伤害加成",
+    iceSharpDmg: "冰锐化伤害加成",
+    electricSharpDmg: "电锐化伤害加成",
+    etherSharpDmg: "以太锐化伤害加成",
+    windSharpDmg: "风锐化伤害加成",
     physicalCritDmg: "物理伤害暴击伤害",
     fireCritDmg: "火属性伤害暴击伤害",
     iceCritDmg: "冰属性伤害暴击伤害",
@@ -109,6 +145,14 @@ export const CUSTOM_BUFF_STAT_OPTIONS = [
     ["anomalyDamageBonus", "属性异常增伤%", "eventModifier", null],
     ["disorderDamageBonus", "紊乱增伤%", "eventModifier", null],
     ["sheerDmgBonus", "贯穿增伤%", "eventModifier", null],
+    ["sharpDmgBonus", "锐化伤害加成%", "eventModifier", null],
+    ["lacerationDmg", "锐暴伤害%", "flat", null],
+    ["physicalSharpDmg", "物理锐化伤害%", "eventModifier", null],
+    ["fireSharpDmg", "火锐化伤害%", "eventModifier", null],
+    ["iceSharpDmg", "冰锐化伤害%", "eventModifier", null],
+    ["electricSharpDmg", "电锐化伤害%", "eventModifier", null],
+    ["etherSharpDmg", "以太锐化伤害%", "eventModifier", null],
+    ["windSharpDmg", "风锐化伤害%", "eventModifier", null],
     ["baseMultiplierBonus", "异常倍率加算%", "eventModifier", null],
     ["disorderBaseMultiplierBonus", "紊乱倍率加算%", "eventModifier", null],
     ["anomalyCritRate", "异常暴击率%", "eventModifier", null],
@@ -140,6 +184,14 @@ export const CUSTOM_BUFF_SKILL_STAT_OPTIONS = [
     ["stunDmgMultiplierBonus", "失衡易伤倍率加算%", "skill", null],
     ["stunDmgMultiplierBonusAlways", "失衡易伤倍率加算（未失衡生效）%", "skill", null],
     ["sheerDmgBonus", "贯穿增伤%", "skill", null],
+    ["sharpDmgBonus", "锐化伤害加成%", "skill", null],
+    ["physicalSharpDmg", "物理锐化伤害加成%", "skill", null],
+    ["fireSharpDmg", "火锐化伤害加成%", "skill", null],
+    ["iceSharpDmg", "冰锐化伤害加成%", "skill", null],
+    ["electricSharpDmg", "电锐化伤害加成%", "skill", null],
+    ["etherSharpDmg", "以太锐化伤害加成%", "skill", null],
+    ["windSharpDmg", "风锐化伤害加成%", "skill", null],
+    ["lacerationDmg", "锐暴伤害加成%", "skill", null],
     ["skillMultiplierBonus", "技能倍率加算%", "skill", null],
     ["enemyDefReduction", "敌方减防率%", "skill", null],
     ["enemyDefIgnore", "无视防御率%", "skill", null],
@@ -218,6 +270,14 @@ export const FALLBACK_LABELS = {
     electricSheerDmg: "电贯穿增伤",
     etherSheerDmg: "以太贯穿增伤",
     windSheerDmg: "风贯穿增伤",
+    sharpDmgBonus: "锐化伤害加成",
+    physicalSharpDmg: "物理锐化伤害加成",
+    fireSharpDmg: "火锐化伤害加成",
+    iceSharpDmg: "冰锐化伤害加成",
+    electricSharpDmg: "电锐化伤害加成",
+    etherSharpDmg: "以太锐化伤害加成",
+    windSharpDmg: "风锐化伤害加成",
+    lacerationDmg: "锐暴伤害",
     physicalCritDmg: "物理伤害暴击伤害",
     fireCritDmg: "火属性伤害暴击伤害",
     iceCritDmg: "冰属性伤害暴击伤害",
@@ -263,6 +323,7 @@ export const ENUM_LABELS = {
         support: "支援",
         defense: "防护",
         rupture: "命破",
+        armorer: "锋御",
     },
     faction: {
         cunning_hares: "狡兔屋",
@@ -327,6 +388,9 @@ export const PERCENT_KEYS = new Set([
     "electricSheerDmg",
     "etherSheerDmg",
     "windSheerDmg",
+    "sharpDmgBonus",
+    ...ELEMENT_SHARP_DMG_STATS,
+    "lacerationDmg",
     ...ELEMENT_CRIT_DMG_STATS,
     ...ELEMENT_DEF_IGNORE_STATS,
     "baseMultiplierBonus",
@@ -393,6 +457,9 @@ export const STORED_PERCENT_STATS = new Set([
     "electricSheerDmg",
     "etherSheerDmg",
     "windSheerDmg",
+    "sharpDmgBonus",
+    ...ELEMENT_SHARP_DMG_STATS,
+    "lacerationDmg",
     ...ELEMENT_CRIT_DMG_STATS,
     ...ELEMENT_DEF_IGNORE_STATS,
     "baseMultiplierBonus",
@@ -452,6 +519,14 @@ export const STORED_STAT_LABELS = {
     electricSheerDmg: "电贯穿增伤%",
     etherSheerDmg: "以太贯穿增伤%",
     windSheerDmg: "风贯穿增伤%",
+    sharpDmgBonus: "锐化伤害加成%",
+    physicalSharpDmg: "物理锐化伤害加成%",
+    fireSharpDmg: "火锐化伤害加成%",
+    iceSharpDmg: "冰锐化伤害加成%",
+    electricSharpDmg: "电锐化伤害加成%",
+    etherSharpDmg: "以太锐化伤害加成%",
+    windSharpDmg: "风锐化伤害加成%",
+    lacerationDmg: "锐暴伤害%",
     physicalCritDmg: "物理伤害暴击伤害%",
     fireCritDmg: "火属性伤害暴击伤害%",
     iceCritDmg: "冰属性伤害暴击伤害%",
@@ -724,13 +799,14 @@ export function sortWEnginesForAgent(wEngines = [], agent = null) {
         .map(item => item.wEngine)
 }
 
-function modificationValueForLevel(rule, key, level) {
+function modificationValueForLevel(rule, key, level, minLevel = 1) {
     const values = rule?.modificationValues?.[key]
     if (!Array.isArray(values)) {
         return null
     }
 
-    const value = Number(values[level - 1])
+    const index = Math.max(0, Math.trunc(Number(level) || Number(minLevel)) - Number(minLevel))
+    const value = Number(values[index])
     if (!Number.isFinite(value)) {
         return null
     }
@@ -741,13 +817,14 @@ function modificationValueForLevel(rule, key, level) {
     }
 }
 
-function materializeEffectRuleForModificationLevel(rule, level) {
+function materializeEffectRuleForModificationLevel(rule, level, minLevel = 1) {
+    let next = materializeFormulaRuleForModificationLevel(rule, level, minLevel)
     if (!rule?.modificationValues) {
-        return rule
+        return next
     }
 
-    const next = { ...rule }
-    const fixedValue = modificationValueForLevel(rule, "value", level)
+    next = { ...next }
+    const fixedValue = modificationValueForLevel(rule, "value", level, minLevel)
     if (fixedValue) {
         next.value = fixedValue.value
         if (fixedValue.displayValue !== undefined) {
@@ -755,7 +832,7 @@ function materializeEffectRuleForModificationLevel(rule, level) {
         }
     }
 
-    const valuePerStack = modificationValueForLevel(rule, "valuePerStack", level)
+    const valuePerStack = modificationValueForLevel(rule, "valuePerStack", level, minLevel)
     if (valuePerStack) {
         next.valuePerStack = valuePerStack.value
         if (valuePerStack.displayValue !== undefined) {
@@ -766,14 +843,14 @@ function materializeEffectRuleForModificationLevel(rule, level) {
     return next
 }
 
-function materializeEffectSetForModificationLevel(effect, level) {
+function materializeEffectSetForModificationLevel(effect, level, minLevel = 1) {
     if (!effect || !Array.isArray(effect.effects)) {
         return effect
     }
 
     return {
         ...effect,
-        effects: effect.effects.map(rule => materializeEffectRuleForModificationLevel(rule, level)),
+        effects: effect.effects.map(rule => materializeEffectRuleForModificationLevel(rule, level, minLevel)),
     }
 }
 
@@ -783,12 +860,13 @@ export function materializeWEngineForModificationLevel(wEngine, value) {
     }
 
     const level = clampWEngineModificationLevel(value, wEngine)
+    const minLevel = Number(wEngine.modification?.minLevel ?? 1)
     const effect = wEngine.effect
         ? {
             ...wEngine.effect,
-            selfBuff: materializeEffectSetForModificationLevel(wEngine.effect.selfBuff, level),
-            teamBuff: materializeEffectSetForModificationLevel(wEngine.effect.teamBuff, level),
-            buff: materializeEffectSetForModificationLevel(wEngine.effect.buff, level),
+            selfBuff: materializeEffectSetForModificationLevel(wEngine.effect.selfBuff, level, minLevel),
+            teamBuff: materializeEffectSetForModificationLevel(wEngine.effect.teamBuff, level, minLevel),
+            buff: materializeEffectSetForModificationLevel(wEngine.effect.buff, level, minLevel),
         }
         : wEngine.effect
 
@@ -796,9 +874,9 @@ export function materializeWEngineForModificationLevel(wEngine, value) {
         ...wEngine,
         selectedModificationLevel: level,
         ...(effect ? { effect } : {}),
-        ...(wEngine.selfBuff ? { selfBuff: materializeEffectSetForModificationLevel(wEngine.selfBuff, level) } : {}),
-        ...(wEngine.teamBuff ? { teamBuff: materializeEffectSetForModificationLevel(wEngine.teamBuff, level) } : {}),
-        ...(wEngine.passive ? { passive: materializeEffectSetForModificationLevel(wEngine.passive, level) } : {}),
+        ...(wEngine.selfBuff ? { selfBuff: materializeEffectSetForModificationLevel(wEngine.selfBuff, level, minLevel) } : {}),
+        ...(wEngine.teamBuff ? { teamBuff: materializeEffectSetForModificationLevel(wEngine.teamBuff, level, minLevel) } : {}),
+        ...(wEngine.passive ? { passive: materializeEffectSetForModificationLevel(wEngine.passive, level, minLevel) } : {}),
     }
 }
 
@@ -914,7 +992,9 @@ function finiteSourceNumber(value, fallback = null) {
 }
 
 export function runtimeSourceConfigForRule(rule = {}) {
-    if (rule.type !== "derived" && rule.type !== "formula") {
+    if ((rule.type !== "derived" && rule.type !== "formula")
+        || isInCombatFormulaRule(rule)
+        || rule.source?.kind === "outOfCombatStat") {
         return null
     }
     const source = rule.source ?? {}
@@ -1065,7 +1145,9 @@ export function defaultRuntimeForBuff(buff = {}) {
     for (const rule of effectRules(buff)) {
         const id = effectRuleId(rule)
         const coverage = effectRuleCoverage(rule, buff)
-        if (rule.type === "derived" || rule.type === "formula") {
+        if ((rule.type === "derived" || rule.type === "formula")
+            && !isInCombatFormulaRule(rule)
+            && rule.source?.kind !== "outOfCombatStat") {
             runtime.effects[id] = {
                 enabled: true,
                 sourceValue: Number(rule.source?.defaultValue ?? rule.defaultSourceValue ?? 0),
@@ -1091,13 +1173,20 @@ export function normalizeRuntimeForBuff(buff = {}, runtime = {}) {
     const defaults = defaultRuntimeForBuff(buff)
     const input = runtime && typeof runtime === "object" ? runtime : {}
     const preservesRuleEnabled = ["field", "boss"].includes(buff?.sourceType)
-    const { coverage: legacyCoverage, ...inputWithoutLegacyCoverage } = input
+    const { coverage: legacyCoverage, effects: inputEffects, ...inputWithoutLegacyCoverage } = input
+    for (const id of LEGACY_SHARP_OVERFLOW_RULE_IDS) {
+        delete inputWithoutLegacyCoverage[id]
+    }
+    const sanitizedInputEffects = inputEffects && typeof inputEffects === "object"
+        ? Object.fromEntries(Object.entries(inputEffects)
+            .filter(([id]) => !LEGACY_SHARP_OVERFLOW_RULE_IDS.has(id)))
+        : {}
     const next = {
         ...defaults,
         ...inputWithoutLegacyCoverage,
         effects: {
             ...defaults.effects,
-            ...(input.effects ?? {}),
+            ...sanitizedInputEffects,
         },
     }
     const parameters = Object.fromEntries(runtimeParameterDefinitions(buff).flatMap(definition => {
@@ -1113,12 +1202,15 @@ export function normalizeRuntimeForBuff(buff = {}, runtime = {}) {
     for (const rule of effectRules(buff)) {
         const id = effectRuleId(rule)
         const legacyRuleRuntime = input[id] && typeof input[id] === "object" ? input[id] : {}
-        const configuredEnabled = input.effects?.[id]?.enabled ?? legacyRuleRuntime.enabled
+        const configuredEnabled = sanitizedInputEffects[id]?.enabled ?? legacyRuleRuntime.enabled
         next.effects[id] = {
             ...(defaults.effects[id] ?? { enabled: true }),
             ...legacyRuleRuntime,
             ...(next.effects[id] ?? {}),
             enabled: preservesRuleEnabled ? configuredEnabled !== false : true,
+        }
+        if (rule.source?.kind === "outOfCombatStat") {
+            delete next.effects[id].sourceValue
         }
         const coverage = effectRuleCoverage(rule, buff)
         if (coverage) {
@@ -1155,13 +1247,12 @@ export function normalizeRuntimeForBuff(buff = {}, runtime = {}) {
             }
         }
     }
-    const inputEffects = input.effects ?? {}
     for (const group of runtimeStackGroups(buff)) {
         const primaryId = group.ruleIds[0]
         let stacks = undefined
         for (const id of group.ruleIds) {
-            if (inputEffects[id]?.stacks !== undefined) {
-                stacks = inputEffects[id].stacks
+            if (sanitizedInputEffects[id]?.stacks !== undefined) {
+                stacks = sanitizedInputEffects[id].stacks
                 break
             }
         }
@@ -1206,6 +1297,10 @@ function ruleTargetText(rule = {}, meta) {
 }
 
 function storedRuleStatLabel(rule = {}, meta) {
+    if (rule.stat === "critRate"
+        && rule.valueSource?.kind === "corePassiveScaling") {
+        return "暴击率"
+    }
     if (rule.target?.kind === "skill" && rule.stat === "dmgBonus") {
         return "技能目标伤害加成%"
     }
@@ -1244,7 +1339,7 @@ function storedRuleRequirementText(rule = {}) {
     return ""
 }
 
-export function storedEffectRuleText(rule, runtime, effect, meta) {
+export function storedEffectRuleText(rule, runtime, effect, meta, displayContext = {}) {
     const id = effectRuleId(rule)
     const ruleRuntime = runtime?.effects?.[id] ?? {}
     const coverageConfig = effectRuleCoverage(rule, effect)
@@ -1265,6 +1360,11 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
         return `${DAMAGE_MODIFIER_KIND_LABELS[rule.kind] ?? rule.kind} +${formatStoredStatValue("dmgBonus", value)}${scopes.length ? `（${scopes.join(" / ")}）` : ""}${requirementText}${coverageText}`
     }
     if (rule.type === "derived") {
+        if (rule.source?.kind === "outOfCombatStat") {
+            const sourceLabel = localizedText(rule.source.label) || rule.source.stat || "局外属性"
+            const ratio = Number(rule.ratio ?? rule.ratioPct ?? 0)
+            return `${storedRuleStatLabel(rule, meta).replace(/%$/u, "")}按${sourceLabel}的 ${ratio}% 转化（局外面板）${coverageText}`
+        }
         const sourceValue = Number(ruleRuntime.sourceValue ?? rule.defaultSourceValue ?? 0)
         const ratio = Number(rule.ratio ?? rule.ratioPct ?? 0)
         const uncapped = sourceValue * ratio / 100
@@ -1274,6 +1374,37 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
     }
     if (rule.type === "formula") {
         const source = rule.source ?? {}
+        if (isInCombatFormulaRule(rule)) {
+            const sourceLabel = localizedText(source.label) || source.stat || "局内面板属性"
+            const parameters = formulaParameterValues(rule)
+            const threshold = Number(parameters.threshold)
+            const rate = Number(parameters.rate)
+            const cap = Number(parameters.cap)
+            let text
+            if (rule.stat === "dmgBonus" && source.stat === "critRate"
+                && Number.isFinite(threshold) && Number.isFinite(rate)) {
+                text = `局内暴击率超过${threshold}%时，每超出1%暴击率使造成的伤害提升${rate}%，${Number.isFinite(cap) ? `上限${cap}%` : "不设上限"}`
+            } else {
+                const parameterText = Object.entries(parameters)
+                    .map(([name, value]) => `${name}=${value}`)
+                    .join("，")
+                text = `${storedRuleStatLabel(rule, meta)}按${sourceLabel}计算：${rule.formula?.expression ?? ""}${parameterText ? `（${parameterText}）` : ""}`
+            }
+            const panel = displayContext?.inCombatPanel
+            if (panel && typeof panel === "object") {
+                try {
+                    const evaluated = evaluateInCombatFormulaRule(rule, panel)
+                    if (evaluated) {
+                        const displaySourceValue = Number(Number(evaluated.sourceValue ?? 0).toFixed(3))
+                        const displayValue = Number(evaluated.value ?? 0) * coverage * 100
+                        text += `；当前${sourceLabel}${displaySourceValue}${source.unit === "storedPercent" ? "%" : ""}，通用伤害提升${Number(displayValue.toFixed(3))}%`
+                    }
+                } catch {
+                    // Keep the authored formula text if a live preview cannot evaluate it.
+                }
+            }
+            return `${text}${requirementText}${coverageText}`
+        }
         const rawSourceValue = Number(ruleRuntime.sourceValue ?? source.defaultValue ?? 0)
         const sourceValue = Math.max(
             Number.isFinite(Number(source.min)) ? Number(source.min) : rawSourceValue,
@@ -1281,7 +1412,10 @@ export function storedEffectRuleText(rule, runtime, effect, meta) {
         )
         const expression = rule.formula?.expression ?? ""
         try {
-            const finalValue = evaluateFormulaExpression(expression, { [source.variable ?? "x"]: sourceValue }) * coverage
+            const finalValue = evaluateFormulaExpression(expression, {
+                [source.variable ?? "x"]: sourceValue,
+                ...formulaParameterValues(rule),
+            }) * coverage
             return `${storedRuleStatLabel(rule, meta)} +${formatStoredStatValue(rule.stat, finalValue, { percentMode: rule.mode === "pct" })}${ruleTargetText(rule, meta)}${requirementText}${coverageText}`
         } catch {
             return `${storedRuleStatLabel(rule, meta)}：公式无效`
@@ -1340,25 +1474,33 @@ export function storedBuffModifierTexts(effect) {
         .filter(Boolean)
 }
 
-export function storedEffectRulesText(effect, runtime = defaultRuntimeForBuff(effect), meta) {
+export function storedEffectRulesText(effect, runtime = defaultRuntimeForBuff(effect), meta, displayContext = {}) {
     return effectRules(effect)
-        .map(rule => storedEffectRuleText(rule, runtime, effect ?? {}, meta))
+        .map(rule => storedEffectRuleText(rule, runtime, effect ?? {}, meta, displayContext))
         .filter(Boolean)
         .join("，")
+}
+
+export function normalizeLegacyBuffStat(stat) {
+    return stat === "sharpCritRate" ? "critRate" : stat
 }
 
 export function normalizeCustomBuffStat(stat, meta) {
     if (!stat?.stat) {
         return null
     }
+    if (["sharpOverflowPerCritRate", "sharpOverflowCap"].includes(stat.stat)) {
+        return null
+    }
     const value = Number(stat.value ?? 0)
     if (!Number.isFinite(value) || value === 0) {
         return null
     }
+    const normalizedStat = normalizeLegacyBuffStat(stat.stat)
     return {
-        id: stat.id ?? `${stat.stat}-${Date.now()}`,
-        label: stat.label ?? statLabel(stat.stat, meta),
-        stat: stat.stat,
+        id: stat.id ?? `${normalizedStat}-${Date.now()}`,
+        label: stat.label ?? statLabel(normalizedStat, meta),
+        stat: normalizedStat,
         value,
         mode: stat.mode ?? "flat",
         basis: stat.basis ?? null,
@@ -1373,9 +1515,19 @@ export function normalizeCustomBuffEffect(effect) {
     if (!Number.isFinite(value) || value === 0) {
         return null
     }
+    if (["sharpOverflowPerCritRate", "sharpOverflowCap"].includes(effect.stat)
+        || ["sharpOverflowPerCritRate", "sharpOverflowCap"].includes(effect.kind)) {
+        return null
+    }
     if ((effect?.type ?? "") === "fixed") {
         const target = effect.target?.kind === "skill"
-            ? { kind: "skill", skillTargets: normalizeSkillTargets(effect.target.skillTargets) }
+            ? {
+                kind: "skill",
+                skillTargets: normalizeSkillTargets(effect.target.skillTargets),
+                ...(Array.isArray(effect.target.damageKinds) && effect.target.damageKinds.length
+                    ? { damageKinds: [...new Set(effect.target.damageKinds.map(String).filter(Boolean))] }
+                    : {}),
+            }
             : { kind: "default" }
         if (target.kind === "skill" && !target.skillTargets.length) {
             return null
@@ -1383,17 +1535,18 @@ export function normalizeCustomBuffEffect(effect) {
         return {
             id: effect.id ?? `${effect.stat ?? "effect"}-${Date.now()}`,
             type: "fixed",
-            stat: effect.stat,
+            stat: normalizeLegacyBuffStat(effect.stat),
             value,
             mode: effect.mode ?? "flat",
             target,
+            ...(effect.appliesTo ? { appliesTo: normalizeSkillTargetsInValue(effect.appliesTo) } : {}),
             label: effect.label ?? null,
         }
     }
     return {
         id: effect.id ?? `${effect.kind ?? "damage-modifier"}-${Date.now()}`,
         type: "damageModifier",
-        kind: effect.kind,
+        kind: normalizeLegacyBuffStat(effect.kind),
         value,
         valueUnit: effect.valueUnit ?? null,
         appliesTo: effect.appliesTo ? normalizeSkillTargetsInValue(effect.appliesTo) : null,
@@ -1482,9 +1635,9 @@ export function sanitizeAddedCombatBuffs(addedBuffs = [], meta) {
                     sourceCategory: "custom",
                     sourceKind: "custom",
                     name: item.name || "自定义 Buff",
-                    stats: stats.slice(0, 1),
-                    effects: effects.slice(0, 1),
-                    runtime: item.runtime ?? null,
+                    stats,
+                    effects,
+                    runtime: stripLegacySharpOverflowRuntime(item.runtime ?? null),
                 }
             }
             if (item.sourceKind === "teammateDriveDisc4pc" && !item.setId) {

@@ -2503,6 +2503,186 @@ approx(
     "Mixed OR skill targets should preserve generated-total and split parity",
 )
 
+const claretSharpWhiteBoxInput = {
+    agentId: "claret",
+    wEngineId: "zzz_wiki_2189",
+    wEngineModificationLevel: 5,
+    coreSkillLevel: "F",
+    cinemaLevel: 0,
+    driveDiscs: [],
+    combatBuffs: {
+        activeBuffIds: [
+            "agent:claret.corePassive",
+            "agent:claret.additionalAbility",
+            "wEngine:zzz_wiki_2189.self",
+        ],
+    },
+    damage: {
+        mode: "custom",
+        selectedEventId: "claret-sharp-whitebox",
+        events: [{
+            id: "claret-sharp-whitebox",
+            kind: "sharp",
+            damageElement: "electric",
+            skillMultiplier: 100,
+            critMode: "expected",
+            count: 2,
+            damageRatioPct: 50,
+            stunned: true,
+        }],
+        target: zeroResistanceTarget({
+            stunned: true,
+            stunMultiplierPercent: 150,
+        }),
+    },
+}
+const claretSharpWhiteBox = calculateInCombatPanel(catalog, claretSharpWhiteBoxInput)
+const claretSharpEvent = claretSharpWhiteBox.damage.events[0]
+assert.deepEqual(
+    claretSharpEvent.whiteBoxRows.map(row => row.label),
+    ["局内防御力", "技能倍率", "锐暴乘区", "普通增伤区", "锐化增伤乘区", "防御乘区", "抗性乘区", "失衡乘区", "伤害比例", "事件次数", "最终伤害"],
+    "Sharp whitebox should expose ordinary and sharp damage zones separately",
+)
+for (const removedLabel of [
+    "局外暴击率转换",
+    "锋御有效暴击率",
+    "第一次锐暴判定",
+    "第二次锐暴判定",
+    "双重锐暴乘区",
+    "锐化目标防御力修正",
+    "溢出暴击率增伤",
+    "通用增伤乘区",
+]) {
+    assert.equal(
+        claretSharpEvent.whiteBoxRows.some(row => row.label === removedLabel),
+        false,
+        `Sharp whitebox should not expose ${removedLabel} as a separate row`,
+    )
+}
+const claretSharpCritRow = claretSharpEvent.whiteBoxRows.find(row => row.label === "锐暴乘区")
+const claretSharpOrdinaryIncreaseRow = claretSharpEvent.whiteBoxRows.find(row => row.label === "普通增伤区")
+const claretSharpIncreaseRow = claretSharpEvent.whiteBoxRows.find(row => row.label === "锐化增伤乘区")
+assert.match(claretSharpCritRow?.formula ?? "", /clamp\(局内面板暴击率 .*0%, 200%\)/u)
+assert.match(claretSharpCritRow?.formula ?? "", /\(1 \+ .*%\) × \(1 \+ \(.*% - 100%\)/u)
+assert.equal(claretSharpCritRow?.displayValue, "2.8126")
+assert.equal(claretSharpOrdinaryIncreaseRow?.displayValue, "1.0104")
+assert.equal(claretSharpIncreaseRow?.displayValue, "1")
+approx(
+    claretSharpOrdinaryIncreaseRow?.value,
+    claretSharpEvent.multipliers.damage,
+    "Sharp whitebox ordinary damage zone should match the generic damage factor",
+)
+approx(
+    claretSharpIncreaseRow?.value,
+    claretSharpEvent.multipliers.sharpDmg,
+    "Sharp whitebox sharp damage zone should match the sharp damage factor",
+)
+assert.equal(claretSharpEvent.whiteBoxRows.find(row => row.label === "局内防御力")?.displayValue, "797")
+assert.equal(claretSharpEvent.whiteBoxRows.find(row => row.label === "伤害比例")?.displayValue, "50%")
+assert.equal(claretSharpEvent.whiteBoxRows.find(row => row.label === "事件次数")?.displayValue, "2")
+assert.equal(
+    claretSharpEvent.whiteBoxRows.at(-1)?.formula,
+    `${String(Number(claretSharpEvent.singleDamage.toFixed(3)))} × 2`,
+)
+
+const claretSharpModifierCatalog = cloneCatalog(catalog)
+claretSharpModifierCatalog.combatBuffs.push({
+    id: "test.claret.whitebox_modifiers",
+    sourceType: "manual",
+    scope: "inCombat",
+    effects: [
+        {
+            id: "claret-sharp-dmg",
+            type: "fixed",
+            stat: "dmgBonus",
+            value: 15,
+            mode: "flat",
+            target: { kind: "default" },
+            appliesTo: { damageKinds: ["sharp"] },
+        },
+        {
+            id: "claret-sharp-domain-dmg",
+            type: "fixed",
+            stat: "sharpDmgBonus",
+            value: 20,
+            mode: "flat",
+            target: { kind: "default" },
+        },
+    ],
+})
+const claretSharpModifiers = calculateInCombatPanel(claretSharpModifierCatalog, {
+    ...claretSharpWhiteBoxInput,
+    combatBuffs: {
+        activeBuffIds: [
+            "agent:claret.corePassive",
+            "agent:claret.additionalAbility",
+            "wEngine:zzz_wiki_2189.self",
+        ],
+        manualEffects: [{
+            id: "test.claret.whitebox_modifiers",
+            label: "白盒测试修正",
+            effects: claretSharpModifierCatalog.combatBuffs.at(-1).effects,
+        }],
+    },
+    damage: {
+        ...claretSharpWhiteBoxInput.damage,
+        selectedEventId: "claret-sharp-modifiers",
+        events: [{
+            ...claretSharpWhiteBoxInput.damage.events[0],
+            id: "claret-sharp-modifiers",
+            count: 1,
+            damageRatioPct: 100,
+        }],
+    },
+})
+const claretSharpModifiersEvent = claretSharpModifiers.damage.events[0]
+const claretSharpBasisRow = claretSharpModifiersEvent.whiteBoxRows.find(row => row.label === "局内防御力")
+const claretSharpModifiersOrdinaryIncreaseRow = claretSharpModifiersEvent.whiteBoxRows.find(row => row.label === "普通增伤区")
+const claretSharpModifiersIncreaseRow = claretSharpModifiersEvent.whiteBoxRows.find(row => row.label === "锐化增伤乘区")
+assert.equal(claretSharpBasisRow?.value, claretSharpModifiersEvent.multipliers.damageBasisValue)
+assert.equal(claretSharpBasisRow?.formula, "来自局内面板防御力")
+assert.match(claretSharpModifiersOrdinaryIncreaseRow?.formula ?? "", /技能目标增伤 15%/u)
+assert.equal(claretSharpModifiersIncreaseRow?.formula, "1 + 锐化增伤 20%")
+approx(
+    claretSharpModifiersOrdinaryIncreaseRow?.value,
+    claretSharpModifiersEvent.multipliers.damage,
+    "Sharp event modifiers should feed the ordinary whitebox damage zone",
+)
+approx(
+    claretSharpModifiersIncreaseRow?.value,
+    claretSharpModifiersEvent.multipliers.sharpDmg,
+    "Sharp event modifiers should feed the sharp whitebox damage zone",
+)
+
+const claretGeneratedSharp = calculateInCombatPanel(catalog, {
+    ...claretSharpWhiteBoxInput,
+    damage: {
+        ...claretSharpWhiteBoxInput.damage,
+        selectedEventId: "claret-generated-sharp",
+        events: [{
+            ...claretSharpWhiteBoxInput.damage.events[0],
+            id: "claret-generated-sharp",
+            count: 1,
+            damageRatioPct: 100,
+            skillMultiplier: 100,
+            skillSource: { label: "锐化技能总倍率" },
+            generatedSkillComponents: [
+                { skillMultiplier: 40, skillSource: { label: "锐化段一", rowId: "hit_1" } },
+                { skillMultiplier: 60, skillSource: { label: "锐化段二", rowId: "hit_2" } },
+            ],
+        }],
+    },
+})
+const claretGeneratedSharpEvent = claretGeneratedSharp.damage.events[0]
+assert.ok(claretGeneratedSharpEvent.whiteBoxRows.some(row => row.label === "局内防御力"))
+assert.ok(claretGeneratedSharpEvent.whiteBoxRows.some(row => row.label === "锐暴乘区"))
+assert.ok(claretGeneratedSharpEvent.whiteBoxRows.some(row => row.label === "分段明细"))
+approx(
+    claretGeneratedSharp.damage.totalFinalDamage,
+    claretGeneratedSharpEvent.components.reduce((total, component) => total + component.finalDamage, 0),
+    "Generated sharp whitebox should preserve child damage totals",
+)
+
 const sheerBaseInput = {
     agentId: "yixuan",
     combatBuffs: {

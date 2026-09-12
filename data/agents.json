@@ -6135,6 +6135,690 @@
         "unsupportedMechanics": "official skill payload has no stable internal skill IDs; M6's special five-fold release still needs a dedicated release-ratio event variant and is retained in the cinema description rather than approximated as ordinary anomaly damage"
       },
       "hidden": false
+    },
+    {
+      "id": "claret",
+      "name": {
+        "zhCN": "克拉蕾·弗林特"
+      },
+      "rarity": "S",
+      "attribute": "electric",
+      "damageElement": "electric",
+      "specialty": "armorer",
+      "attackTypes": [
+        "slash"
+      ],
+      "faction": "flint_workshop",
+      "images": {
+        "portrait": "/assets/agents/claret.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/2145/detail?mhy_presentation_style=fullscreen"
+      },
+      "level60": {
+        "hpBase": 5651,
+        "atkBase": 626,
+        "defBase": 441,
+        "critRate": 5,
+        "critDmg": 50,
+        "lacerationDmg": 150,
+        "impact": 93,
+        "anomalyProficiency": 79,
+        "anomalyMastery": 80,
+        "energyRegen": 100,
+        "penRatio": 0
+      },
+      "sharpProfile": {
+        "id": "armorer",
+        "basisStat": "def",
+        "baseLacerationDmgPct": 150,
+        "critRateCapPct": 200,
+        "initialCritDmgToCritRateRatio": 0.35
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动：苍白血宴"
+          },
+          "description": {
+            "zhCN": "克拉蕾发动招式造成的伤害均为锐化伤害，使用防御力作为招式伤害倍率；锐化伤害会积累残痕值，残痕值满时，敌人会进入[残痕]，[残痕]最多叠加3层，发动[特殊技：血华誓·斩金断铁]、[特殊技：血华誓·葬血强袭]命中处于[残痕]状态下的敌人时，会消耗[残痕]，触发[毁伤]；触发暴击时，锐化伤害不受暴击伤害加成，转而计算锐暴伤害加成；若暴击率超过100%且已经触发暴击时，还将基于超过部分的暴击率再进行一次锐暴判定，若触发锐暴则额外计算一次锐暴伤害加成；克拉蕾每拥有1%的初始暴击伤害，初始暴击率提升0.35%；克拉蕾处于[猩红铭刻]，或是在发动[连携技]、[终结技]、[反制支援]、[支援突击]期间，暴击率提升15%/17.5%/20%/22.5%/25%/27.5%/30%，残痕积蓄效率提升20%/25%/30%/35%/40%/45%/50%，在[普通攻击：血华誓·锻星]和[普通攻击：血华誓·伏钺]招式攻击期间触发极限闪避时，使招式剩余时间内造成的伤害提升15%。"
+          },
+          "effects": [
+            {
+              "id": "claret-sharp-state-crit-rate",
+              "type": "fixed",
+              "stat": "critRate",
+              "value": 15,
+              "mode": "flat",
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "critRatePct"
+              },
+              "target": {
+                "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "claret-initial-crit-dmg-to-crit-rate",
+              "type": "derived",
+              "scope": "outOfCombat",
+              "stat": "critRate",
+              "mode": "flat",
+              "source": {
+                "kind": "outOfCombatStat",
+                "stat": "critDmg",
+                "unit": "storedPercent",
+                "label": {
+                  "zhCN": "局外暴击伤害"
+                }
+              },
+              "ratio": 35,
+              "target": {
+                "kind": "default"
+              },
+              "sourceLabel": {
+                "zhCN": "来源数值"
+              },
+              "defaultSourceValue": 0
+            }
+          ],
+          "buffModifiers": []
+        },
+        "additionalAbility": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "额外能力：血裔传承"
+          },
+          "description": {
+            "zhCN": "队伍中存在击破、其他锋御或同属性角色时触发；克拉蕾或队友造成毁伤后全队锋御进入残锋，锐暴伤害提升25%，持续40秒。"
+          },
+          "effects": [
+            {
+              "id": "claret-remnant-edge-laceration",
+              "type": "fixed",
+              "stat": "lacerationDmg",
+              "value": 25,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "cinemaBuffs": [
+          {
+            "cinemaLevel": 1,
+            "cinemaName": {
+              "zhCN": "淋漓古志"
+            },
+            "description": {
+              "zhCN": "克拉蕾攻击命中敌人并造成锐暴时，残痕积蓄效率提高20%；克拉蕾触发[毁伤]造成的伤害倍率提升至原本的130%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [],
+            "buffModifiers": [
+              {
+                "id": "claret-c1-maim-multiplier",
+                "operation": "multiplyResolvedValue",
+                "factor": 1.3,
+                "targetBuffIds": [
+                  "skill:claret:special:special_slash_gold"
+                ],
+                "targetEffectIds": [
+                  "maim"
+                ],
+                "label": {
+                  "zhCN": "[毁伤]伤害倍率提升至原本的130%"
+                }
+              }
+            ]
+          },
+          {
+            "cinemaLevel": 2,
+            "cinemaName": {
+              "zhCN": "薪火荣冠"
+            },
+            "description": {
+              "zhCN": "猩红铭刻或连携技、终结技、反制支援、支援突击期间无视目标18%电属性伤害抗性。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "claret-c2-electric-res-ignore",
+                "type": "fixed",
+                "stat": "electricResIgnore",
+                "value": 18,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 3,
+            "cinemaName": {
+              "zhCN": "糖霜宣言"
+            },
+            "description": {
+              "zhCN": "普通攻击、闪避、支援技、特殊技、连携技技能等级+2。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 4,
+            "cinemaName": {
+              "zhCN": "赤月彷徨"
+            },
+            "description": {
+              "zhCN": "强化普通攻击第三段、连携技、终结技伤害提升20%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "claret-c4-selected-damage",
+                "type": "fixed",
+                "stat": "dmgBonus",
+                "value": 20,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "damageKinds": [
+                    "sharp"
+                  ],
+                  "skillTargets": [
+                    {
+                      "kind": "specific",
+                      "agentSkillId": "claret",
+                      "categoryId": "basic",
+                      "skillType": "basic",
+                      "moveId": "basic_crimson_forge",
+                      "rowId": "hit_3"
+                    },
+                    {
+                      "kind": "specific",
+                      "agentSkillId": "claret",
+                      "categoryId": "basic",
+                      "skillType": "basic",
+                      "moveId": "basic_crimson_forge",
+                      "rowId": "hit_4"
+                    },
+                    {
+                      "kind": "specific",
+                      "agentSkillId": "claret",
+                      "categoryId": "chain",
+                      "skillType": "chain",
+                      "moveId": "chain_blood_contract"
+                    },
+                    {
+                      "kind": "specific",
+                      "agentSkillId": "claret",
+                      "categoryId": "chain",
+                      "skillType": "chain",
+                      "moveId": "ultimate_hundred_hammers"
+                    }
+                  ]
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 5,
+            "cinemaName": {
+              "zhCN": "暮血熔炉"
+            },
+            "description": {
+              "zhCN": "普通攻击、闪避、支援技、特殊技、连携技技能等级+2。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 6,
+            "cinemaName": {
+              "zhCN": "热夜之梦"
+            },
+            "description": {
+              "zhCN": "连携技或终结技重击命中时，不消耗残痕直接触发一次单体毁伤。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [],
+            "buffModifiers": []
+          }
+        ],
+        "skillBuffs": []
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "苍白血宴"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "核心被动：苍白血宴"
+          },
+          "levels": [
+            {
+              "level": 1,
+              "sharpBuildupEfficiencyPct": 20,
+              "critRatePct": 15
+            },
+            {
+              "level": 2,
+              "sharpBuildupEfficiencyPct": 25,
+              "critRatePct": 17.5
+            },
+            {
+              "level": 3,
+              "sharpBuildupEfficiencyPct": 30,
+              "critRatePct": 20
+            },
+            {
+              "level": 4,
+              "sharpBuildupEfficiencyPct": 35,
+              "critRatePct": 22.5
+            },
+            {
+              "level": 5,
+              "sharpBuildupEfficiencyPct": 40,
+              "critRatePct": 25
+            },
+            {
+              "level": 6,
+              "sharpBuildupEfficiencyPct": 45,
+              "critRatePct": 27.5
+            },
+            {
+              "level": 7,
+              "sharpBuildupEfficiencyPct": 50,
+              "critRatePct": 30
+            }
+          ],
+          "defaultLevelAtCoreSkill": "F"
+        },
+        "corePassiveMechanics": {
+          "sharpDamageUsesDefense": true,
+          "lacerationDamagePct": 150,
+          "initialCritDmgToCritRateRatio": 0.35,
+          "gashMaximumStacks": 3,
+          "maimWithoutGashAtCinema6": true,
+          "bloodAssaultMaimModeled": false,
+          "critRateCapPct": 200
+        },
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/2145/detail?mhy_presentation_style=fullscreen"
+        ],
+        "verification": {
+          "officialEntryPageId": 2145,
+          "officialEntryVersion": "1788411769",
+          "coreValues": "Initial/A/B/C/D/E/F Crit Rate and remnant buildup efficiency are 15/20, 17.5/25, 20/30, 22.5/35, 25/40, 27.5/45, 30/50 percent."
+        }
+      },
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "zzz_wiki_2121"
+        ],
+        "mainStatLimits": {
+          "4": [
+            "critRate",
+            "critDmg",
+            "defPct"
+          ],
+          "5": [
+            "electricDmg",
+            "defPct",
+            "penRatio"
+          ],
+          "6": [
+            "defPct"
+          ]
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/2145/detail?mhy_presentation_style=fullscreen"
+      ],
+      "verification": {
+        "officialEntryPageId": 2145,
+        "officialEntryVersion": "1788411769",
+        "level60Stats": "source-checked official dynamic Wiki entry; HP 5651, ATK 626, DEF 441, Impact 93, CR 22.5%, CRIT DMG 50%, Sharp/Laceration DMG 150%, AM 80, AP 79.",
+        "modeling": "Sharp damage is isolated from direct/sheers; blood assault's up-to-three Maim is descriptive-only because the official table has no separate Maim multiplier row."
+      },
+      "hidden": false,
+      "skillGroups": [
+        {
+          "id": "skill_group_1e6b70a3be",
+          "name": {
+            "zhCN": "点按特殊技单次毁伤"
+          },
+          "description": {
+            "zhCN": "点按特殊技触发单次毁伤"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "event_76fb24b44e",
+              "kind": "sharp",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "claret",
+                "categoryId": "special",
+                "moveId": "special_slash_gold",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "event_5f9a4f4c62",
+              "kind": "sharp",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "claret",
+                "categoryId": "special",
+                "moveId": "special_slash_gold",
+                "rowId": "hit_2"
+              }
+            },
+            {
+              "id": "event_3766b1d771",
+              "kind": "sharp",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "claret",
+                "categoryId": "special",
+                "moveId": "special_slash_gold",
+                "rowId": "maim"
+              }
+            }
+          ]
+        },
+        {
+          "id": "skill_group_c5b606ba9a",
+          "name": {
+            "zhCN": "长按特殊技三次毁伤"
+          },
+          "description": {
+            "zhCN": "长按特殊技后连续触发三次毁伤"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "event_b2627ba565",
+              "kind": "sharp",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "claret",
+                "categoryId": "special",
+                "moveId": "special_blood_assault",
+                "rowId": "damage"
+              }
+            },
+            {
+              "id": "event_3ddd9d1f6e",
+              "kind": "sharp",
+              "count": 3,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "claret",
+                "categoryId": "special",
+                "moveId": "special_slash_gold",
+                "rowId": "maim"
+              }
+            }
+          ]
+        },
+        {
+          "id": "skill_group_bd7ae09812",
+          "name": {
+            "zhCN": "普攻下砸+连续斩击"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "event_9885de687c",
+              "kind": "sharp",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "claret",
+                "categoryId": "basic",
+                "moveId": "basic_crimson_fall",
+                "rowId": "damage"
+              }
+            },
+            {
+              "id": "event_0d260d8358",
+              "kind": "sharp",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "claret",
+                "categoryId": "basic",
+                "moveId": "basic_crimson_forge",
+                "rowId": "hit_3"
+              }
+            },
+            {
+              "id": "event_3abbda7697",
+              "kind": "sharp",
+              "count": 1,
+              "stunned": true,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "claret",
+                "categoryId": "basic",
+                "moveId": "basic_crimson_forge",
+                "rowId": "hit_4"
+              }
+            }
+          ]
+        }
+      ],
+      "defaultCalculationConfig": {
+        "mode": "custom",
+        "cinemaLevel": 0,
+        "name": {
+          "zhCN": "双连携六毁伤"
+        },
+        "events": [
+          {
+            "id": "event_a26856f5be",
+            "kind": "skillGroup",
+            "skillGroupId": "skill_group_c5b606ba9a",
+            "count": 2,
+            "stunned": true
+          },
+          {
+            "id": "event_194d3b37af",
+            "kind": "skillGroup",
+            "skillGroupId": "skill_group_bd7ae09812",
+            "count": 2,
+            "stunned": true
+          },
+          {
+            "id": "event_3ef5b7b5f2",
+            "kind": "sharp",
+            "count": 2,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "claret",
+              "categoryId": "chain",
+              "moveId": "chain_blood_contract",
+              "rowId": "damage"
+            }
+          },
+          {
+            "id": "event_affde2bcdf",
+            "kind": "sharp",
+            "count": 1,
+            "stunned": true,
+            "critMode": "expected",
+            "skillRef": {
+              "agentSkillId": "claret",
+              "categoryId": "chain",
+              "moveId": "ultimate_hundred_hammers",
+              "rowId": "damage"
+            }
+          }
+        ],
+        "selectedEventId": "event_affde2bcdf"
+      }
     }
   ]
 }

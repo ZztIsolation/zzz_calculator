@@ -110,10 +110,13 @@ export function resolveDamageEventMultiplier(event = {}, catalog = {}, releaseCo
     }
 
     const damageScale = normalizeDamageScale(event)
-    if (event.kind === "direct" || event.kind === "sheer") {
+    if (event.kind === "direct" || event.kind === "sheer" || event.kind === "sharp") {
         const skillMultiplierPct = Number(event.skillMultiplier)
-        return Number.isFinite(skillMultiplierPct)
-            ? Math.max(0, skillMultiplierPct) / 100 * damageScale
+        const multiplier = event.kind === "sharp" && event.normalized === true
+            ? skillMultiplierPct
+            : skillMultiplierPct / 100
+        return Number.isFinite(multiplier)
+            ? Math.max(0, multiplier) * damageScale
             : null
     }
 

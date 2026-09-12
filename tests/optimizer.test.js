@@ -3,7 +3,11 @@ import { mkdtemp } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { calculateInCombatPanel, loadCalculatorContext } from "../backend/calculator.js"
+import {
+    calculateInCombatPanel,
+    createInCombatPanelCalculator,
+    loadCalculatorContext,
+} from "../backend/calculator.js"
 import { optimizeDriveDiscs, optimizeDriveDiscsAsync, previewDriveDiscOptimization } from "../backend/driveDiscOptimizer.js"
 import {
     clearUserDriveDiscStore,
@@ -842,6 +846,114 @@ const heuristic = optimizeDriveDiscs(catalog, store, optimizerInput({ settings: 
 assert.equal(heuristic.metrics.algorithmId, "heuristic-potential")
 assert.equal(heuristic.metrics.strictExact, false)
 assert.ok(heuristic.results.length > 0)
+
+const ordinaryRelevanceStore = {
+    version: 1,
+    owners: [{ id: "default", label: "默认用户" }],
+    imports: [],
+    driveDiscLoadouts: [],
+    driveDiscs: [
+        ...[1, 2, 3, 4, 5, 6].flatMap(slot => {
+            const ordinaryMainStat = slot === 5
+                ? { stat: "fireDmg", value: 30, mode: "pct" }
+                : slotMain[slot]
+            const useful = disc(
+                `soldier-atk-${slot}`,
+                fourSet,
+                slot,
+                ordinaryMainStat,
+                [{ stat: "atkFlat", value: 100 }],
+            )
+            const irrelevant = disc(
+                `soldier-sharp-${slot}`,
+                fourSet,
+                slot,
+                ordinaryMainStat,
+                [
+                    { stat: "atkFlat", value: 99 },
+                    // Keep a tiny relevant dimension so dominance does not
+                    // remove this candidate before heuristic potential runs.
+                    { stat: "penRatio", value: 0.01, mode: "pct" },
+                    { stat: "defPct", value: 30, mode: "pct" },
+                    { stat: "sharpDmgBonus", value: 100, mode: "pct" },
+                    { stat: "lacerationDmg", value: 100, mode: "pct" },
+                ],
+            )
+            useful.source.sequence = slot * 2 - 1
+            irrelevant.source.sequence = slot * 2
+            return [useful, irrelevant]
+        }),
+    ],
+}
+const ordinaryRelevanceInput = {
+    agentId: "soldier_11",
+    coreSkillLevel: "F",
+    wEngineId: "zzz_wiki_223",
+    combatBuffs: { activeBuffIds: [] },
+    damage: {
+        mode: "custom",
+        selectedEventId: "soldier-relevance-hit",
+        events: [{
+            id: "soldier-relevance-hit",
+            kind: "direct",
+            skillMultiplier: 100,
+            damageElement: "fire",
+            critMode: "nonCrit",
+            count: 1,
+            stunned: true,
+        }],
+    },
+    settings: {
+        objective: "damage",
+        fourPieceSetId: fourSet,
+        twoPieceSetId: fourSet,
+    },
+}
+const ordinaryCalculator = createInCombatPanelCalculator(catalog, ordinaryRelevanceInput)
+const ordinaryMetadata = ordinaryCalculator.optimizerStatMetadata()
+assert.ok(ordinaryMetadata.relevantStatIds.includes("atkFlat"))
+for (const irrelevantStat of ["defFlat", "defPct", "sharpDmgBonus", "lacerationDmg"]) {
+    assert.equal(
+        ordinaryMetadata.relevantStatIds.includes(irrelevantStat),
+        false,
+        `ordinary direct damage must not mark ${irrelevantStat} as relevant`,
+    )
+}
+const ordinaryExact = optimizeDriveDiscs(catalog, ordinaryRelevanceStore, {
+    ...ordinaryRelevanceInput,
+    settings: {
+        ...ordinaryRelevanceInput.settings,
+        algorithm: "exact-super-bound",
+        enableUpperBoundPruning: false,
+    },
+})
+const ordinaryHeuristic = optimizeDriveDiscs(catalog, ordinaryRelevanceStore, {
+    ...ordinaryRelevanceInput,
+    settings: {
+        ...ordinaryRelevanceInput.settings,
+        algorithm: "heuristic-potential",
+    },
+})
+assert.deepEqual(
+    ordinaryExact.metrics.candidateCountsBySlot,
+    { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2 },
+    "strict exact should retain both ordinary-role candidates in every slot",
+)
+assert.equal(ordinaryExact.metrics.estimatedCombinationCount, 64)
+assert.ok(ordinaryHeuristic.results.length > 0)
+assert.deepEqual(
+    ordinaryHeuristic.metrics.candidateCountsBySlot,
+    { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1 },
+    "heuristic should retain the relevant ordinary-role candidate in every slot",
+)
+assert.equal(ordinaryHeuristic.metrics.estimatedCombinationCount, 1)
+assert.deepEqual(
+    ordinaryHeuristic.results[0].driveDiscs.map(item => item.id),
+    ordinaryExact.results[0].driveDiscs.map(item => item.id),
+    "heuristic should keep the useful ordinary-role candidate instead of irrelevant sharp stats",
+)
+assert.ok(ordinaryHeuristic.results[0].driveDiscs.every(item => item.id.startsWith("soldier-atk-")))
+assert.ok(Math.abs(ordinaryHeuristic.results[0].score - ordinaryExact.results[0].score) < 1e-9)
 
 const parallel = await optimizeDriveDiscsAsync(catalog, store, optimizerInput({
     settings: {

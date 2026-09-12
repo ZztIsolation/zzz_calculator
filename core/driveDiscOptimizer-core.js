@@ -63,6 +63,8 @@ const ALGORITHM_ALIASES = {
 const DEFAULT_POTENTIAL_WEIGHTS = {
     hpFlat: 0.02,
     hpPct: 4,
+    defFlat: 0.05,
+    defPct: 6,
     sheerForceFlat: 0.1,
     atkFlat: 0.05,
     atkPct: 6,
@@ -82,6 +84,14 @@ const DEFAULT_POTENTIAL_WEIGHTS = {
     electricSheerDmg: 5,
     etherSheerDmg: 5,
     windSheerDmg: 5,
+    sharpDmgBonus: 5,
+    physicalSharpDmg: 5,
+    fireSharpDmg: 5,
+    iceSharpDmg: 5,
+    electricSharpDmg: 5,
+    etherSharpDmg: 5,
+    windSharpDmg: 5,
+    lacerationDmg: 7,
     penRatio: 5,
     penFlat: 0.03,
     allResIgnore: 5,
@@ -100,6 +110,7 @@ const DEFAULT_POTENTIAL_WEIGHTS = {
 }
 const PERCENT_PANEL_STATS = new Set([
     "hpPct",
+    "defPct",
     "sheerDmgBonus",
     "physicalSheerDmg",
     "fireSheerDmg",
@@ -107,8 +118,15 @@ const PERCENT_PANEL_STATS = new Set([
     "electricSheerDmg",
     "etherSheerDmg",
     "windSheerDmg",
+    "sharpDmgBonus",
+    "physicalSharpDmg",
+    "fireSharpDmg",
+    "iceSharpDmg",
+    "electricSharpDmg",
+    "etherSharpDmg",
+    "windSharpDmg",
+    "lacerationDmg",
     "atkPct",
-    "defPct",
     "critRate",
     "critDmg",
     "impact",
@@ -458,8 +476,11 @@ function setCountsMapToArray(counts, setIndexById, setCount) {
     return result
 }
 
-function collectStatIds(candidatesBySlot, vectorById, optimisticEntries, optimisticEntriesByActiveCount) {
+function collectStatIds(candidatesBySlot, vectorById, optimisticEntries, optimisticEntriesByActiveCount, requiredStatIds = []) {
     const ids = new Set(Object.keys(DEFAULT_POTENTIAL_WEIGHTS))
+    for (const stat of requiredStatIds ?? []) {
+        if (stat) ids.add(String(stat))
+    }
     for (const slot of SLOT_NUMBERS) {
         for (const disc of candidatesBySlot[String(slot)] ?? []) {
             for (const stat of (vectorById.get(disc.id) ?? new Map()).keys()) {
@@ -494,8 +515,14 @@ function collectSetIds(candidatesBySlot, settings) {
     return [...ids].sort()
 }
 
-function prepareIndexedCandidateData(candidatesBySlot, candidateData, settings, optimisticEntries, optimisticEntriesByActiveCount) {
-    const statIds = collectStatIds(candidatesBySlot, candidateData.vectorById, optimisticEntries, optimisticEntriesByActiveCount)
+function prepareIndexedCandidateData(candidatesBySlot, candidateData, settings, optimisticEntries, optimisticEntriesByActiveCount, requiredStatIds = []) {
+    const statIds = collectStatIds(
+        candidatesBySlot,
+        candidateData.vectorById,
+        optimisticEntries,
+        optimisticEntriesByActiveCount,
+        requiredStatIds,
+    )
     const setIds = collectSetIds(candidatesBySlot, settings)
     const statIndexById = indexMapFromIds(statIds)
     const setIndexById = indexMapFromIds(setIds)
@@ -1422,8 +1449,26 @@ function probeValueForStat(stat) {
     return 1
 }
 
-function inferPotentialWeights(panelCalculator) {
+function inferPotentialWeights(panelCalculator, relevantStatIds = null, useHeuristicRelevance = false) {
     const weights = { ...DEFAULT_POTENTIAL_WEIGHTS }
+    const hasRelevantStatFilter = useHeuristicRelevance && Array.isArray(relevantStatIds)
+    const relevantStats = new Set(
+        hasRelevantStatFilter
+            ? (relevantStatIds ?? [])
+            : [],
+    )
+    if (hasRelevantStatFilter) {
+        for (const stat of relevantStats) {
+            if (!Object.prototype.hasOwnProperty.call(weights, stat)) {
+                weights[stat] = 0
+            }
+        }
+        for (const stat of Object.keys(weights)) {
+            if (!relevantStats.has(stat)) {
+                weights[stat] = 0
+            }
+        }
+    }
     const scoreOnly = panelCalculator.scoreOnlyFromSummary ?? panelCalculator.scoreFromSummary
     if (typeof scoreOnly !== "function") {
         return weights
@@ -1437,13 +1482,26 @@ function inferPotentialWeights(panelCalculator) {
         return weights
     }
 
-    for (const stat of Object.keys(DEFAULT_POTENTIAL_WEIGHTS)) {
+    const statsToProbe = new Set(Object.keys(DEFAULT_POTENTIAL_WEIGHTS))
+    if (hasRelevantStatFilter) {
+        for (const stat of relevantStats) {
+            statsToProbe.add(stat)
+        }
+    }
+    for (const stat of statsToProbe) {
+        if (hasRelevantStatFilter && !relevantStats.has(stat)) {
+            continue
+        }
         const probeValue = probeValueForStat(stat)
         try {
             const probe = scoreOnly.call(panelCalculator, new Map([[stat, probeValue]]), new Map())
             const delta = (Number(probe?.finalDamage ?? 0) - baseScore) / probeValue
-            if (Number.isFinite(delta) && delta > 0) {
-                weights[stat] = delta
+            if (Number.isFinite(delta)) {
+                if (useHeuristicRelevance) {
+                    weights[stat] = Math.max(0, delta)
+                } else if (delta > 0) {
+                    weights[stat] = delta
+                }
             }
         } catch {
             // Keep the static fallback weight for stats that the current target cannot probe.
@@ -2979,7 +3037,14 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
         evaluated: 0,
         processedCombinationCount: 0,
     })
-    const potentialWeights = inferPotentialWeights(panelCalculator)
+    // Declared dependencies are useful for approximate ranking even when they
+    // are not monotonic enough for exact dominance pruning.
+    const useHeuristicRelevance = normalizeAlgorithm(settings.algorithm) === "heuristic-potential"
+    const potentialWeights = inferPotentialWeights(
+        panelCalculator,
+        useHeuristicRelevance ? optimizerStatMetadata?.relevantStatIds ?? null : null,
+        useHeuristicRelevance,
+    )
     sortCandidatesByPotential(candidatesBySlot, candidateData.vectorById, potentialWeights)
     candidatesBySlot = filterCandidatesByPotential(candidatesBySlot, candidateData.vectorById, potentialWeights, settings)
     reportPrepare("potential", "正在排序候选评分潜力", settings, {
@@ -3040,6 +3105,7 @@ function createOptimizerState(catalog, store, input = {}, options = {}) {
             settings,
             optimisticTwoPieceEntries,
             optimisticTwoPieceEntriesByActiveCount,
+            optimizerStatMetadata?.relevantStatIds ?? [],
         )
         : {}
     reportPrepare("indexed-data", "正在准备评分索引", settings, {

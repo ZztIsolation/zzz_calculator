@@ -294,6 +294,19 @@ const soldier11MaintenanceContext = {
 }
 assert.ok(soldier11, "Soldier 11 should exist in the maintained agent catalog")
 assertValid("agents", soldier11, soldier11MaintenanceContext)
+const claret = catalog.agentsMap.get("claret")
+assert.ok(claret, "Claret should exist in the maintained agent catalog")
+assertValid("agents", claret, { ...soldier11MaintenanceContext, currentAgentId: "claret" })
+const cleanedClaret = cleanMaintenanceItem("agents", claret, { ...soldier11MaintenanceContext, currentAgentId: "claret" })
+assert.equal(
+    cleanedClaret.combatBuffs.corePassive.effects.find(effect => effect.id === "claret-initial-crit-dmg-to-crit-rate")?.source?.kind,
+    "outOfCombatStat",
+    "Claret out-of-combat conversion should survive maintenance cleaning",
+)
+const cleanedClaretCinemaOne = cleanedClaret.combatBuffs.cinemaBuffs.find(buff => buff.cinemaLevel === 1)
+assert.equal(cleanedClaretCinemaOne?.buffModifiers?.[0]?.factor, 1.3)
+assert.deepEqual(cleanedClaretCinemaOne?.buffModifiers?.[0]?.targetBuffIds, ["skill:claret:special:special_slash_gold"])
+assert.deepEqual(cleanedClaretCinemaOne?.buffModifiers?.[0]?.targetEffectIds, ["maim"])
 const cleanedSoldier11 = cleanMaintenanceItem("agents", soldier11, soldier11MaintenanceContext)
 assert.deepEqual(cleanedSoldier11.potentialVision.scaling.levels.map(row => row.critDmgPct), [0, 0, 16, 24, 32, 40, 48])
 assert.equal(cleanedSoldier11.defaultCalculationConfig.events
@@ -642,6 +655,33 @@ assertInvalid("agent-skills", {
     ],
 }, "必须是有效数字")
 assertValid("wEngines", validWEngine)
+assertValid("wEngines", {
+    ...validWEngine,
+    id: "test_armorer_w_engine",
+    specialty: "armorer",
+    level60: {
+        ...validWEngine.level60,
+        atkBase: undefined,
+        defBase: 356,
+    },
+    effect: {
+        ...validWEngine.effect,
+        requirement: { specialty: "armorer" },
+    },
+})
+assertInvalid("wEngines", {
+    ...validWEngine,
+    id: "test_conflicting_w_engine",
+    specialty: "armorer",
+    level60: {
+        ...validWEngine.level60,
+        defBase: 356,
+    },
+    effect: {
+        ...validWEngine.effect,
+        requirement: { specialty: "armorer" },
+    },
+}, "必须且只能提供一个")
 assertValid("wEngines", {
     ...validWEngine,
     effect: {

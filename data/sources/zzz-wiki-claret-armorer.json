@@ -1,0 +1,61 @@
+{
+  "workflow": "Playwright page context -> official entry_page API request",
+  "api": "https://act-api-takumi-static.mihoyo.com/hoyowiki/zzz/wapi/entry_page",
+  "requestHeaders": [
+    "x-rpc-wiki_app: zzz",
+    "Referer: https://baike.mihoyo.com/"
+  ],
+  "channelApi": "https://act-api-takumi-static.mihoyo.com/common/blackboard/zzz_wiki/v1/home/content/list?channel_id=45&lang=zh-cn&app_sn=zzz_wiki",
+  "channelUrl": "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+  "channelFilter": "特性/锋御",
+  "filteredEntryIds": [
+    2188,
+    2189,
+    2190,
+    2200
+  ],
+  "fetchedAt": "2026-09-09",
+  "entries": [
+    {
+      "id": 2145,
+      "name": "克拉蕾·弗林特",
+      "version": "1788411769",
+      "status": "Online",
+      "beta": false,
+      "sourceUrl": "https://baike.mihoyo.com/zzz/wiki/content/2145/detail?mhy_presentation_style=fullscreen"
+    },
+    {
+      "id": 2188,
+      "name": "猩红渴望",
+      "version": "1788433458",
+      "status": "Online",
+      "beta": false,
+      "sourceUrl": "https://baike.mihoyo.com/zzz/wiki/content/2188/detail?mhy_presentation_style=fullscreen"
+    },
+    {
+      "id": 2189,
+      "name": "血髓秘匣",
+      "version": "1788433825",
+      "status": "Online",
+      "beta": false,
+      "sourceUrl": "https://baike.mihoyo.com/zzz/wiki/content/2189/detail?mhy_presentation_style=fullscreen"
+    },
+    {
+      "id": 2190,
+      "name": "「月相」-弦",
+      "version": "1788440333",
+      "status": "Online",
+      "beta": false,
+      "sourceUrl": "https://baike.mihoyo.com/zzz/wiki/content/2190/detail?mhy_presentation_style=fullscreen"
+    },
+    {
+      "id": 2200,
+      "name": "喵运当头",
+      "version": "1788787729",
+      "status": "Online",
+      "beta": false,
+      "sourceUrl": "https://baike.mihoyo.com/zzz/wiki/content/2200/detail?mhy_presentation_style=fullscreen"
+    }
+  ],
+  "extractedFrom": "data.page.modules[].components[].data structured JSON; DOM text was not used for numeric values"
+}
