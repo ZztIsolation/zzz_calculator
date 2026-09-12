@@ -30,7 +30,14 @@ export const SKILL_TAGS = Object.freeze([
     "assistAttack",
     "fireSuppression",
     "dodgeCounter",
+    "sharp",
 ])
+
+export function skillMultiplierTargetId({ agentSkillId = "", categoryId = "", moveId = "" } = {}) {
+    return [agentSkillId, categoryId, moveId].every(value => String(value ?? "").trim())
+        ? `skill:${String(agentSkillId).trim()}:${String(categoryId).trim()}:${String(moveId).trim()}`
+        : ""
+}
 
 export const SKILL_TAG_LABELS = Object.freeze({
     dashAttack: "冲刺攻击",
@@ -38,6 +45,7 @@ export const SKILL_TAG_LABELS = Object.freeze({
     assistAttack: "支援攻击",
     fireSuppression: "火力镇压",
     dodgeCounter: "闪避反击",
+    sharp: "锐化",
 })
 
 export const SKILL_TAG_VALUES = new Set(SKILL_TAGS)

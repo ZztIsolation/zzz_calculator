@@ -158,6 +158,38 @@
       "label": "Wind Sheer DMG Bonus%",
       "display": "percent"
     },
+    "sharpDmgBonus": {
+      "label": "Sharp DMG Bonus%",
+      "display": "percent"
+    },
+    "physicalSharpDmg": {
+      "label": "Physical Sharp DMG Bonus%",
+      "display": "percent"
+    },
+    "fireSharpDmg": {
+      "label": "Fire Sharp DMG Bonus%",
+      "display": "percent"
+    },
+    "iceSharpDmg": {
+      "label": "Ice Sharp DMG Bonus%",
+      "display": "percent"
+    },
+    "electricSharpDmg": {
+      "label": "Electric Sharp DMG Bonus%",
+      "display": "percent"
+    },
+    "etherSharpDmg": {
+      "label": "Ether Sharp DMG Bonus%",
+      "display": "percent"
+    },
+    "windSharpDmg": {
+      "label": "Wind Sharp DMG Bonus%",
+      "display": "percent"
+    },
+    "lacerationDmg": {
+      "label": "Laceration DMG%",
+      "display": "percent"
+    },
     "physicalCritDmg": {
       "label": "Physical DMG CRIT DMG%",
       "display": "percent"

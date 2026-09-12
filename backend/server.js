@@ -54,6 +54,8 @@ import {
     normalizeEffectRuleTarget,
     normalizeLegacyEffectAppliesToInValue,
 } from "../core/effectRuleTargets.js"
+import { normalizeLegacyBuffStat } from "../core/shared-combat.js"
+import { migrateLegacyBloodMarrowWEngine } from "../core/effectFormula.js"
 import { disorderElapsedStepSeconds, normalizeElapsedSeconds } from "../core/damageEventMultipliers.js"
 import { isReleaseSettlement, normalizeAnomalySourceSnapshot } from "../core/anomalyRelease.js"
 import { isLuminescenceSettlement } from "../core/luminescence.js"
@@ -341,7 +343,7 @@ function cleanBossEncounter(encounter = {}) {
             name: zhOnly(entry.name),
             description: zhOnly(entry.description),
             ...(entry.unmodeledReason ? { unmodeledReason: zhOnly(entry.unmodeledReason) } : {}),
-            effects: entry.calculationStatus === "modeled" ? (entry.effects ?? []).map(cleanEffectRule) : [],
+            effects: entry.calculationStatus === "modeled" ? (entry.effects ?? []).map(cleanEffectRule).filter(Boolean) : [],
         }))
     }
     return next
@@ -665,9 +667,16 @@ function cleanImages(images = {}, key = "icon") {
 }
 
 function cleanEffectRule(effect = {}) {
+    if (["sharpOverflowPerCritRate", "sharpOverflowCap"].includes(String(effect.stat ?? ""))
+        || ["sharpOverflowPerCritRate", "sharpOverflowCap"].includes(String(effect.kind ?? ""))
+        || ["marrow-overflow-rate", "marrow-overflow-cap"].includes(String(effect.id ?? ""))) {
+        return null
+    }
     const { sourceStat, ...rest } = effect
     const next = normalizeEffectRuleTarget({
         ...rest,
+        ...(rest.stat ? { stat: normalizeLegacyBuffStat(rest.stat) } : {}),
+        ...(rest.kind ? { kind: normalizeLegacyBuffStat(rest.kind) } : {}),
         id: rest.id || randomId("effect"),
     })
 
@@ -703,7 +712,7 @@ function cleanBuff(buff = {}) {
     const next = {
         ...buff,
         id: buff.id || randomId("buff"),
-        effects: (buff.effects ?? []).map(cleanEffectRule),
+        effects: (buff.effects ?? []).map(cleanEffectRule).filter(Boolean),
         buffModifiers: (buff.buffModifiers ?? []).map(cleanBuffModifier),
     }
 
@@ -830,7 +839,7 @@ function cleanEffectSet(effect = {}) {
                 })),
             }
             : {}),
-        effects: (effect.effects ?? []).map(cleanEffectRule),
+        effects: (effect.effects ?? []).map(cleanEffectRule).filter(Boolean),
         buffModifiers: (effect.buffModifiers ?? []).map(cleanBuffModifier),
     }
 }
@@ -1008,6 +1017,18 @@ function cleanPreferredDriveDiscs(preferredDriveDiscs = null) {
     }
 }
 
+function cleanSharpProfile(profile = null) {
+    if (!profile || typeof profile !== "object" || Array.isArray(profile)) return null
+    return {
+        ...profile,
+        id: String(profile.id ?? "armorer").trim() || "armorer",
+        basisStat: "def",
+        baseLacerationDmgPct: Number(profile.baseLacerationDmgPct ?? 150),
+        critRateCapPct: Number(profile.critRateCapPct ?? 200),
+        initialCritDmgToCritRateRatio: Number(profile.initialCritDmgToCritRateRatio ?? 0.35),
+    }
+}
+
 function cleanCalculationSkillRef(skillRef = null) {
     if (!skillRef || typeof skillRef !== "object" || Array.isArray(skillRef)) {
         return null
@@ -1038,7 +1059,7 @@ function cleanCalculationEvent(event = {}, index = 0, options = {}) {
     if (event.kind === "skillGroup" && !options.allowSkillGroup) {
         return null
     }
-    const inputKind = ["direct", "sheer", "anomaly", "disorder", ...(options.allowSkillGroup ? ["skillGroup"] : [])].includes(event.kind)
+    const inputKind = ["direct", "sheer", "sharp", "anomaly", "disorder", ...(options.allowSkillGroup ? ["skillGroup"] : [])].includes(event.kind)
         ? event.kind
         : "direct"
     if (inputKind === "skillGroup") {
@@ -1061,7 +1082,7 @@ function cleanCalculationEvent(event = {}, index = 0, options = {}) {
         : isReleaseSettlement(event)
             ? "release"
         : inputKind === "disorder" || event.settlementType === "disorder" ? "disorder" : "attribute"
-    const kind = inputKind === "direct" || inputKind === "sheer" ? inputKind : "anomaly"
+    const kind = inputKind === "direct" || inputKind === "sheer" || inputKind === "sharp" ? inputKind : "anomaly"
     const id = String(event.id ?? `${kind}-${index + 1}`).trim() || `${kind}-${index + 1}`
     if (kind === "anomaly" && settlementType === "luminescence") {
         const legacyRecord = Array.isArray(event.records)
@@ -1121,6 +1142,24 @@ function cleanCalculationEvent(event = {}, index = 0, options = {}) {
         const supportedElements = kind === "direct" ? DIRECT_DAMAGE_ELEMENTS : DAMAGE_ELEMENTS
         if (supportedElements.has(damageElement)) {
             result.damageElement = damageElement
+        }
+        return result
+    }
+    if (kind === "sharp") {
+        const skillRef = cleanCalculationSkillRef(event.skillRef)
+        const result = {
+            ...base,
+            critMode: ["expected", "nonCrit", "sharpCrit", "lacerationCrit"].includes(event.critMode)
+                ? event.critMode
+                : "expected",
+        }
+        if (skillRef) {
+            result.skillRef = skillRef
+        } else {
+            const skillMultiplier = Number(event.skillMultiplier ?? 100)
+            result.skillMultiplier = Number.isFinite(skillMultiplier) ? Math.max(0, skillMultiplier) : 100
+            const damageElement = String(event.damageElement ?? "").trim()
+            if (DAMAGE_ELEMENTS.has(damageElement)) result.damageElement = damageElement
         }
         return result
     }
@@ -1211,7 +1250,7 @@ function cleanDefaultCalculationConfigEntry(config = null, skillGroups = [], opt
     if (!events.length) {
         return null
     }
-    const mode = ["single", "sheer", "anomaly", "custom"].includes(config.mode) ? config.mode : "custom"
+    const mode = ["single", "sheer", "sharp", "anomaly", "custom"].includes(config.mode) ? config.mode : "custom"
     const selectedEventId = String(config.selectedEventId ?? events[0]?.id ?? "").trim()
     const cinemaLevel = normalizeDefaultCalculationCinemaLevel(config.cinemaLevel, options.defaultCinemaLevel ?? 0)
     const name = config.name ? zhOnly(config.name) : defaultCalculationVariantName(cinemaLevel)
@@ -1220,6 +1259,11 @@ function cleanDefaultCalculationConfigEntry(config = null, skillGroups = [], opt
         ...(options.includeCinemaLevel ? { cinemaLevel } : {}),
         ...(name ? { name } : {}),
         events,
+    }
+    if (config.skillLevelsByCategory && typeof config.skillLevelsByCategory === "object" && !Array.isArray(config.skillLevelsByCategory)) {
+        result.skillLevelsByCategory = Object.fromEntries(Object.entries(config.skillLevelsByCategory)
+            .map(([key, value]) => [String(key), Number(value)])
+            .filter(([, value]) => Number.isFinite(value)))
     }
     if (events.length) {
         result.selectedEventId = events.some(event => event.id === selectedEventId) ? selectedEventId : events[0].id
@@ -1358,6 +1402,9 @@ function cleanAgent(item = {}, options = {}) {
     )
     const defaultCalculationConfig = cleanDefaultCalculationConfig(item.defaultCalculationConfig, skillGroups, calculationOptions)
     const potentialVision = cleanPotentialVision(item.potentialVision)
+    const sharpProfile = item.specialty === "armorer"
+        ? cleanSharpProfile(item.sharpProfile ?? { id: "armorer", basisStat: "def", baseLacerationDmgPct: 150, critRateCapPct: 200, initialCritDmgToCritRateRatio: 0.35 })
+        : null
     const next = {
         ...item,
         name: zhOnly(item.name),
@@ -1399,17 +1446,43 @@ function cleanAgent(item = {}, options = {}) {
     } else {
         delete next.potentialVision
     }
+    if (sharpProfile) {
+        next.sharpProfile = sharpProfile
+        next.level60 = { ...(next.level60 ?? {}), lacerationDmg: Number(next.level60?.lacerationDmg ?? sharpProfile.baseLacerationDmgPct) }
+    } else {
+        delete next.sharpProfile
+    }
     return next
 }
 
 function cleanWEngine(item = {}) {
+    item = migrateLegacyBloodMarrowWEngine(item)
     const effect = item.effect
     const selfBuff = effect?.selfBuff ?? effect?.buff
     const teamBuff = effect?.teamBuff
     const { buff, ...effectRest } = effect ?? {}
+    const level60 = { ...(item.level60 ?? {}) }
+    const hasAtkBase = Object.prototype.hasOwnProperty.call(level60, "atkBase")
+    const hasDefBase = Object.prototype.hasOwnProperty.call(level60, "defBase")
+    if (item.specialty === "armorer") {
+        if (!hasDefBase && hasAtkBase) {
+            level60.defBase = Number(level60.atkBase)
+            delete level60.atkBase
+        } else if (hasDefBase) {
+            level60.defBase = Number(level60.defBase)
+        }
+    } else {
+        if (!hasAtkBase && hasDefBase) {
+            level60.atkBase = Number(level60.defBase)
+            delete level60.defBase
+        } else if (hasAtkBase) {
+            level60.atkBase = Number(level60.atkBase)
+        }
+    }
     return {
         ...item,
         name: zhOnly(item.name),
+        level60,
         effect: effect
             ? {
                 ...effectRest,

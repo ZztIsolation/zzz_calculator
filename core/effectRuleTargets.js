@@ -25,6 +25,13 @@ export const ELEMENT_SHEER_DMG_STAT_BY_ELEMENT = Object.freeze(Object.fromEntrie
     DAMAGE_ELEMENTS.map(element => [element, `${element}SheerDmg`]),
 ))
 
+// Sharp/laceration damage has its own bonus axis. It deliberately does not
+// reuse the ordinary or sheer element damage keys so target matching can keep
+// the three damage domains independent.
+export const ELEMENT_SHARP_DMG_STAT_BY_ELEMENT = Object.freeze(Object.fromEntries(
+    DAMAGE_ELEMENTS.map(element => [element, `${element}SharpDmg`]),
+))
+
 export const ELEMENT_RES_IGNORE_STAT_BY_ELEMENT = Object.freeze(Object.fromEntries(
     DAMAGE_ELEMENTS.map(element => [element, `${element}ResIgnore`]),
 ))
@@ -35,6 +42,7 @@ export const ELEMENT_RES_REDUCTION_STAT_BY_ELEMENT = Object.freeze(Object.fromEn
 
 export const ELEMENT_CRIT_DMG_STATS = Object.freeze(Object.values(ELEMENT_CRIT_DMG_STAT_BY_ELEMENT))
 export const ELEMENT_DEF_IGNORE_STATS = Object.freeze(Object.values(ELEMENT_DEF_IGNORE_STAT_BY_ELEMENT))
+export const ELEMENT_SHARP_DMG_STATS = Object.freeze(Object.values(ELEMENT_SHARP_DMG_STAT_BY_ELEMENT))
 
 const ELEMENT_BY_INHERENT_STAT = new Map()
 for (const element of DAMAGE_ELEMENTS) {
@@ -43,6 +51,7 @@ for (const element of DAMAGE_ELEMENTS) {
         ELEMENT_CRIT_DMG_STAT_BY_ELEMENT[element],
         ELEMENT_DEF_IGNORE_STAT_BY_ELEMENT[element],
         ELEMENT_SHEER_DMG_STAT_BY_ELEMENT[element],
+        ELEMENT_SHARP_DMG_STAT_BY_ELEMENT[element],
         ELEMENT_RES_IGNORE_STAT_BY_ELEMENT[element],
         ELEMENT_RES_REDUCTION_STAT_BY_ELEMENT[element],
     ]) {
@@ -71,6 +80,8 @@ function explicitStatsForElements(stat, elements) {
                     ? ELEMENT_RES_REDUCTION_STAT_BY_ELEMENT
                     : stat === "sheerDmgBonus"
                         ? ELEMENT_SHEER_DMG_STAT_BY_ELEMENT
+                        : stat === "sharpDmgBonus"
+                            ? ELEMENT_SHARP_DMG_STAT_BY_ELEMENT
                         : null
     return mapping ? elements.map(element => mapping[element]).filter(Boolean) : []
 }

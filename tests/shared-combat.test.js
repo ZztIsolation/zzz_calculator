@@ -19,6 +19,7 @@ import {
     ENUM_LABELS,
     nameOf,
     normalizeCustomBuffEffect,
+    normalizeCustomBuffStat,
     normalizeRuntimeForBuff,
     runtimeEffectRules,
     runtimeForBuff,
@@ -34,6 +35,7 @@ import {
     storedEffectRuleText,
     storedEffectRulesText,
 } from "../core/shared-combat.js"
+import { materializeCorePassiveScalingEffect } from "../core/corePassiveScaling.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
@@ -41,6 +43,7 @@ const meta = buildMeta(catalog)
 const exampleInput = catalog.examples.yeShunguang.input
 const miyabiMeta = catalog.agents.find(agent => agent.id === "hoshimi_miyabi")
 const yixuanMeta = catalog.agents.find(agent => agent.id === "yixuan")
+const claretMeta = catalog.agents.find(agent => agent.id === "claret")
 
 assert.equal(agentAttributeText(miyabiMeta), "烈霜（冰属性结算）")
 assert.equal(damageElementForAgent(miyabiMeta), "ice")
@@ -50,6 +53,30 @@ const lumifluxMeta = { attribute: "lumiflux", damageElement: "lumiflux" }
 assert.equal(agentAttributeText(lumifluxMeta), "流明")
 assert.equal(damageElementForAgent(lumifluxMeta), "lumiflux")
 assert.equal(damageElementShortLabel("lumiflux"), "流明")
+
+const claretCorePassiveAtF = materializeCorePassiveScalingEffect(
+    claretMeta.combatBuffs.corePassive,
+    claretMeta,
+    "F",
+)
+const claretCorePassiveText = storedEffectRulesText(
+    claretCorePassiveAtF,
+    defaultRuntimeForBuff(claretCorePassiveAtF),
+    meta,
+)
+assert.match(claretCorePassiveText, /暴击率 \+30%/u, "Claret Core Passive should display the current ordinary CRIT Rate")
+assert.match(claretCorePassiveText, /局外暴击伤害.*35%.*局外面板/u, "Claret Core Passive should display the reusable out-of-combat conversion")
+assert.doesNotMatch(claretCorePassiveText, /锐暴暴击率/u, "Claret Buff display must not expose a separate sharp CRIT Rate")
+assert.equal(
+    runtimeSourceGroups(claretCorePassiveAtF).length,
+    0,
+    "Out-of-combat panel derived rules should not expose a manual source input",
+)
+assert.equal(
+    Object.hasOwn(defaultRuntimeForBuff(claretCorePassiveAtF).effects["claret-initial-crit-dmg-to-crit-rate"], "sourceValue"),
+    false,
+    "Out-of-combat panel derived rules should read the completed panel directly",
+)
 
 const defaultWEngines = [
     { id: "catalog-first", rarity: "B" },
@@ -139,6 +166,28 @@ assert.deepEqual(
     storedBuffModifierTexts(customStatBuff),
     [],
     "Buffs without modifiers should not report modifier text",
+)
+
+const customSharpEffect = normalizeCustomBuffEffect({
+    type: "fixed",
+    stat: "critRate",
+    value: 15,
+    target: {
+        kind: "sharp",
+        damageKinds: ["sharp"],
+        sharpComponents: ["maim"],
+        sharpScenario: { crimsonInscription: true },
+        sharpScenarioAnyOf: [{ skillTypes: ["chain"] }],
+    },
+})
+assert.deepEqual(customSharpEffect?.target, {
+    kind: "default",
+}, "Legacy custom sharp-target effects should normalize to the default target")
+assert.equal(customSharpEffect?.stat, "critRate", "Legacy sharp CRIT Rate fields should normalize to ordinary CRIT Rate")
+assert.equal(
+    normalizeCustomBuffStat({ stat: "sharpCritRate", value: 15 }, meta)?.stat,
+    "critRate",
+    "Legacy custom stat payloads should normalize to ordinary CRIT Rate",
 )
 
 const modifierOnlyBuff = {
@@ -833,6 +882,9 @@ const anomalyDamageBonusOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[
 assert.ok(anomalyDamageBonusOption, "Custom Buff stat options should include anomaly damage bonus")
 assert.equal(anomalyDamageBonusOption[0], "anomalyDamageBonus", "Anomaly damage bonus should be a fixed event stat")
 assert.equal(anomalyDamageBonusOption[2], "eventModifier", "Anomaly damage bonus option should use the default event modifier bucket")
+const lacerationDmgOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[0] === "lacerationDmg")
+assert.ok(lacerationDmgOption, "Custom Buff stat options should include laceration damage")
+assert.equal(lacerationDmgOption[2], "flat", "Laceration damage should use the panel stat bucket like CRIT DMG")
 const enemyDamageTakenOption = CUSTOM_BUFF_STAT_OPTIONS.find(option => option[0] === "enemyDamageTakenBonus")
 assert.equal(
     enemyDamageTakenOption,

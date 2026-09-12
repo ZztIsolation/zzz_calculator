@@ -12,8 +12,16 @@ import {
     ANOMALY_SETTLEMENT_TYPE_VALUES,
     ELEMENT_CRIT_DMG_STATS,
     ELEMENT_DEF_IGNORE_STATS,
+    ELEMENT_SHARP_DMG_STATS,
 } from "./effectRuleTargets.js"
 import { validateAnomalyReleaseProfile } from "./anomalyRelease.js"
+import { damageSkillRowsWithGeneratedTotals } from "./skillMultiplierCandidates.js"
+import {
+    IN_COMBAT_FORMULA_SOURCE_STATS,
+    formulaExpressionVariables,
+    isAllowedInCombatFormulaSourceStat,
+    isAllowedInCombatFormulaSourceType,
+} from "./effectFormula.js"
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9_.-]*$/
 const PLACEHOLDER_NAMES = new Set(["未命名"])
@@ -138,7 +146,7 @@ const OUT_OF_COMBAT_REQUIREMENT_STAT_VALUES = new Set([
     "penFlat",
     "penRatio",
 ])
-const SPECIALTY_VALUES = new Set(["attack", "stun", "anomaly", "support", "defense", "rupture"])
+const SPECIALTY_VALUES = new Set(["attack", "stun", "anomaly", "support", "defense", "rupture", "armorer"])
 const RARITY_VALUES = new Set(["B", "A", "S"])
 const SOURCE_TYPE_VALUES = new Set(["teammate", "self", "boss", "field", "manual"])
 const EFFECT_SCOPE_VALUES = new Set(["outOfCombat", "inCombat"])
@@ -149,23 +157,25 @@ const IMPLICIT_EFFECT_SCOPE_BY_SOURCE_TYPE = new Map([
 ])
 const EFFECT_TYPE_VALUES = new Set(["fixed", "derived", "formula", "stacked", "damageModifier"])
 const EFFECT_VALUE_SOURCE_KIND_VALUES = new Set(["corePassiveScaling", "potentialVisionScaling"])
+const FORMULA_SOURCE_KIND_VALUES = new Set(["runtime", "inCombatStat"])
 const BUFF_MODIFIER_OPERATION_VALUES = new Set(["multiplyResolvedValue"])
 const FORMULA_VALUE_UNIT_VALUES = new Set(["storedValue", "storedPercent"])
+const OUT_OF_COMBAT_EFFECT_SOURCE_KIND_VALUES = new Set(["outOfCombatStat"])
 const SKILL_ROW_KIND_VALUES = new Set(["damageMultiplier", "dazeMultiplier", "energyCost", "statBonus"])
-const SKILL_ROW_DAMAGE_BASIS_VALUES = new Set(["atk", "sheerForce", "anomalyProficiency"])
+const SKILL_ROW_DAMAGE_BASIS_VALUES = new Set(["atk", "def", "sheerForce", "anomalyProficiency"])
 const SKILL_LEVEL_SCALE_VALUES = new Set(["skill", "coreSkill"])
 const CORE_SKILL_LEVEL_VALUES = new Set(["0", "A", "B", "C", "D", "E", "F"])
-const DAMAGE_EVENT_KIND_VALUES = new Set(["direct", "anomaly", "disorder", "sheer"])
+const DAMAGE_EVENT_KIND_VALUES = new Set(["direct", "anomaly", "disorder", "sheer", "sharp"])
 const CALCULATION_EVENT_KIND_VALUES = new Set([...DAMAGE_EVENT_KIND_VALUES, "skillGroup"])
 const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
 const ANOMALY_VARIANT_VALUES = new Set(["normal", "polarizedAssault"])
-const CALCULATION_MODE_VALUES = new Set(["single", "sheer", "anomaly", "custom"])
+const CALCULATION_MODE_VALUES = new Set(["single", "sheer", "sharp", "anomaly", "custom"])
 const SHEER_DAMAGE_MODIFIER_KIND_VALUES = ["sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg"]
-const DAMAGE_MODIFIER_KIND_VALUES = new Set(["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "skillMultiplierBonus", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
+const DAMAGE_MODIFIER_KIND_VALUES = new Set(["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "skillMultiplierBonus", "sharpDmgBonus", "lacerationDmg", ...ELEMENT_SHARP_DMG_STATS, ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
 const SKILL_TARGET_DAMAGE_MODIFIER_KIND_VALUES = new Set(["directDamageBonus", "skillMultiplierBonus"])
 const DAMAGE_MODIFIER_VALUE_UNIT_VALUES = new Set(["decimal"])
 const RULE_TARGET_KIND_VALUES = new Set(["default", "skill", "anomaly"])
-const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "releaseProficiencyYieldBonus", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
+const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "releaseProficiencyYieldBonus", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "sharpDmgBonus", ...ELEMENT_SHARP_DMG_STATS, ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
 const SKILL_TARGET_STAT_VALUES = new Set([
     "penRatio",
     "allResIgnore",
@@ -191,6 +201,9 @@ const SKILL_TARGET_STAT_VALUES = new Set([
     "electricDmg",
     "etherDmg",
     "windDmg",
+    "sharpDmgBonus",
+    "lacerationDmg",
+    ...ELEMENT_SHARP_DMG_STATS,
     "critDmg",
     "disorderDamageBonus",
     "stunDmgMultiplierBonus",
@@ -279,6 +292,9 @@ const STAT_VALUES = new Set([
     "electricDmg",
     "etherDmg",
     "windDmg",
+    "lacerationDmg",
+    "sharpDmgBonus",
+    ...ELEMENT_SHARP_DMG_STATS,
     "enemyDefReduction",
     "enemyDefIgnore",
     "enemyDefFlatReduction",
@@ -503,10 +519,12 @@ function validateRuntimeParameters(errors, parameters, path = "runtimeParameters
 function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scope = "outOfCombat", context = {}) {
     const type = rule.type ?? "fixed"
     const targetKind = rule.target?.kind ?? "default"
-    const effectiveScope = sourceType === "driveDisc2pc" && targetKind === "skill"
+    const inheritedScope = sourceType === "driveDisc2pc" && targetKind === "skill"
         ? "inCombat"
         : scope
+    const effectiveScope = rule.scope ?? inheritedScope
     requireEnum(errors, type, EFFECT_TYPE_VALUES, `${path}.type`)
+    requireEnum(errors, effectiveScope, EFFECT_SCOPE_VALUES, `${path}.scope`)
     validateCoverage(errors, rule.coverage, `${path}.coverage`)
     if (rule.coverage && effectiveScope !== "inCombat") {
         add(errors, `${path}.coverage`, "只有局内 Buff 增幅可以配置覆盖率。")
@@ -671,6 +689,13 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
         if (effectiveScope !== "inCombat") {
             add(errors, `${path}.target.kind`, "技能增幅对象只能用于局内 Buff。")
         }
+        if (target.damageKinds !== undefined) {
+            if (!Array.isArray(target.damageKinds) || !target.damageKinds.length) {
+                add(errors, `${path}.target.damageKinds`, "伤害类型至少需要一项。")
+            } else {
+                target.damageKinds.forEach((kind, index) => requireEnum(errors, kind, DAMAGE_EVENT_KIND_VALUES, `${path}.target.damageKinds[${index}]`))
+            }
+        }
     } else if (targetKind === "anomaly") {
         const settlementType = target.settlementType
         requireEnum(errors, settlementType, ANOMALY_SETTLEMENT_TYPE_VALUES, `${path}.target.settlementType`)
@@ -739,7 +764,7 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
         add(errors, `${path}.basis`, "局内 atkPct 对自身、音擎或驱动盘 4 件套必须填写基准。")
     }
 
-    if (TARGET_STAT_VALUES.has(rule.stat) && scope !== "inCombat") {
+    if (TARGET_STAT_VALUES.has(rule.stat) && effectiveScope !== "inCombat") {
         add(errors, `${path}.stat`, "敌方目标属性只能用于局内 Buff。")
     }
 
@@ -747,8 +772,18 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
         if (rule.modificationValues) {
             add(errors, `${path}.modificationValues`, "改装等级实际值只支持固定值或叠层规则。")
         }
-        requireName(errors, rule.sourceLabel, `${path}.sourceLabel`)
-        requireFinite(errors, rule.defaultSourceValue, `${path}.defaultSourceValue`)
+        const source = rule.source ?? {}
+        if (source.kind === "outOfCombatStat") {
+            requireEnum(errors, source.kind, OUT_OF_COMBAT_EFFECT_SOURCE_KIND_VALUES, `${path}.source.kind`)
+            requireEnum(errors, source.stat, OUT_OF_COMBAT_REQUIREMENT_STAT_VALUES, `${path}.source.stat`)
+            requireName(errors, source.label, `${path}.source.label`)
+            if (source.unit != null && source.unit !== "") {
+                requireEnum(errors, source.unit, FORMULA_VALUE_UNIT_VALUES, `${path}.source.unit`)
+            }
+        } else {
+            requireName(errors, rule.sourceLabel, `${path}.sourceLabel`)
+            requireFinite(errors, rule.defaultSourceValue, `${path}.defaultSourceValue`)
+        }
         const ratio = requireFinite(errors, rule.ratio ?? rule.ratioPct, `${path}.ratio`)
         if (Number.isFinite(ratio) && ratio === 0) {
             add(errors, `${path}.ratio`, "转换比例不能为 0。")
@@ -763,17 +798,42 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     }
 
     if (type === "formula") {
-        if (rule.modificationValues) {
-            add(errors, `${path}.modificationValues`, "改装等级实际值只支持固定值或叠层规则。")
-        }
         const source = rule.source ?? {}
-        requireName(errors, source.label ?? rule.sourceLabel, `${path}.source.label`)
+        const sourceKind = source.kind ?? "runtime"
+        requireEnum(errors, sourceKind, FORMULA_SOURCE_KIND_VALUES, `${path}.source.kind`)
+        const readsInCombatPanel = sourceKind === "inCombatStat"
+        if (readsInCombatPanel) {
+            if (!isAllowedInCombatFormulaSourceType(sourceType)) {
+                add(errors, `${path}.source.kind`, "局内面板公式首版只能由角色自身或当前装备的音擎提供。")
+            }
+            if (effectiveScope !== "inCombat") {
+                add(errors, `${path}.source.kind`, "局内面板来源只能用于局内 Buff。")
+            }
+            if (!isAllowedInCombatFormulaSourceStat(source.stat)) {
+                add(errors, `${path}.source.stat`, `不是允许的局内来源属性（可选：${IN_COMBAT_FORMULA_SOURCE_STATS.join("、")}）。`)
+            }
+            requireName(errors, source.label, `${path}.source.label`)
+            requireEnum(errors, source.unit, FORMULA_VALUE_UNIT_VALUES, `${path}.source.unit`)
+            if (targetKind !== "default") {
+                add(errors, `${path}.target.kind`, "局内面板公式首版只能作用于常规属性 / 全局效果。")
+            }
+            if (rule.stat !== "dmgBonus") {
+                add(errors, `${path}.stat`, "局内面板公式首版只能输出通用伤害加成。")
+            }
+            if ((rule.mode ?? "flat") !== "flat") {
+                add(errors, `${path}.mode`, "局内面板公式必须使用直接加成方式。")
+            }
+        } else {
+            requireName(errors, source.label ?? rule.sourceLabel, `${path}.source.label`)
+        }
         const variable = source.variable ?? "x"
         if (variable !== "x") {
             add(errors, `${path}.source.variable`, "首版公式只支持变量 x。")
         }
 
-        const defaultValue = requireFinite(errors, source.defaultValue, `${path}.source.defaultValue`)
+        const defaultValue = readsInCombatPanel
+            ? 100
+            : requireFinite(errors, source.defaultValue, `${path}.source.defaultValue`)
         const min = source.min !== undefined && source.min !== null && source.min !== ""
             ? requireFinite(errors, source.min, `${path}.source.min`)
             : NaN
@@ -792,17 +852,84 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
             }
         }
 
+        const parameters = rule.formula?.parameters
+        if (parameters !== undefined
+            && (!parameters || typeof parameters !== "object" || Array.isArray(parameters))) {
+            add(errors, `${path}.formula.parameters`, "公式参数必须是数值对象。")
+        }
+        const parameterNames = []
+        for (const [name, value] of Object.entries(parameters ?? {})) {
+            if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(name) || name === "x") {
+                add(errors, `${path}.formula.parameters.${name}`, "参数名必须是有效标识符且不能使用 x。")
+                continue
+            }
+            requireFinite(errors, value, `${path}.formula.parameters.${name}`)
+            parameterNames.push(name)
+        }
+        const modificationValues = rule.formula?.modificationValues
+        if (modificationValues !== undefined
+            && (!modificationValues || typeof modificationValues !== "object" || Array.isArray(modificationValues))) {
+            add(errors, `${path}.formula.modificationValues`, "公式改装参数必须是数组对象。")
+        }
+        if ((sourceType === "wEngine" || sourceType === "wEngineTeam")
+            && (!modificationValues || typeof modificationValues !== "object" || Array.isArray(modificationValues)
+                || !Object.keys(modificationValues).length)) {
+            add(errors, `${path}.formula.modificationValues`, "音擎公式必须至少声明一组完整的改装等级参数。")
+        }
+        for (const [name, values] of Object.entries(modificationValues ?? {})) {
+            if (!parameterNames.includes(name)) {
+                add(errors, `${path}.formula.modificationValues.${name}`, "改装参数必须先在公式 parameters 中声明。")
+                continue
+            }
+            if (!Array.isArray(values) || !values.length) {
+                add(errors, `${path}.formula.modificationValues.${name}`, "改装参数必须是非空数值数组。")
+                continue
+            }
+            values.forEach((value, index) => requireFinite(errors, value, `${path}.formula.modificationValues.${name}[${index}]`))
+            if (sourceType === "wEngine" || sourceType === "wEngineTeam") {
+                const minLevel = Number(context.modification?.minLevel ?? 1)
+                const maxLevel = Number(context.modification?.maxLevel ?? 5)
+                const expectedLength = Math.max(1, maxLevel - minLevel + 1)
+                if (values.length !== expectedLength) {
+                    add(errors, `${path}.formula.modificationValues.${name}`, `必须包含 ${expectedLength} 个改装等级数值。`)
+                }
+                const defaultParameter = Number(parameters?.[name])
+                const firstValue = Number(values[0])
+                if (Number.isFinite(defaultParameter)
+                    && Number.isFinite(firstValue)
+                    && Math.abs(defaultParameter - firstValue) > 1e-9) {
+                    add(errors, `${path}.formula.modificationValues.${name}[0]`, "1级参数必须与公式 parameters 中的当前值一致。")
+                }
+            }
+        }
+        if (sourceType === "wEngine" || sourceType === "wEngineTeam") {
+            const minLevel = Number(context.modification?.minLevel ?? 1)
+            const maxLevel = Number(context.modification?.maxLevel ?? 5)
+            const expectedLength = Math.max(1, maxLevel - minLevel + 1)
+            for (const name of parameterNames.filter(name => name !== "threshold")) {
+                const values = modificationValues?.[name]
+                if (!Array.isArray(values) || values.length !== expectedLength) {
+                    add(errors, `${path}.formula.modificationValues.${name}`, `必须包含 ${expectedLength} 个改装等级数值。`)
+                }
+            }
+        }
+
         const expression = String(rule.formula?.expression ?? "").trim()
         if (!expression) {
             add(errors, `${path}.formula.expression`, "公式必填。")
         } else {
             try {
-                validateFormulaExpression(expression, new Set(["x"]))
+                validateFormulaExpression(expression, new Set(formulaExpressionVariables({
+                    formula: { parameters },
+                })))
                 const x = Math.max(
                     Number.isFinite(min) ? min : defaultValue,
                     Math.min(Number.isFinite(max) ? max : defaultValue, defaultValue),
                 )
-                evaluateFormulaExpression(expression, { x })
+                evaluateFormulaExpression(expression, {
+                    x,
+                    ...Object.fromEntries(parameterNames.map(name => [name, Number(parameters?.[name] ?? 0)])),
+                })
             } catch (error) {
                 add(errors, `${path}.formula.expression`, `公式无效：${error.message}`)
             }
@@ -1038,7 +1165,7 @@ function validateSpecificSkillTargetReference(errors, target, path, context = {}
         add(errors, `${path}.moveId`, "招式不存在或不属于所选技能大类。")
         return
     }
-    if (target.rowId && !(move.rows ?? []).some(row => row.id === target.rowId)) {
+    if (target.rowId && !damageSkillRowsWithGeneratedTotals(category, move).some(row => row.id === target.rowId)) {
         add(errors, `${path}.rowId`, "倍率行不存在。")
     }
 }
@@ -1218,7 +1345,7 @@ function validateCalculationSkillRef(errors, skillRef, path, context = {}, agent
         add(errors, `${path}.moveId`, "技能招式不存在。")
         return null
     }
-    const row = (move.rows ?? []).find(item => item.id === skillRef.rowId)
+    const row = damageSkillRowsWithGeneratedTotals(category, move).find(item => item.id === skillRef.rowId)
     if (!row) {
         add(errors, `${path}.rowId`, "技能倍率行不存在。")
         return null
@@ -1308,6 +1435,42 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
     }
     if (event.damageRatioPct !== undefined) {
         validateNonNegativeNumber(errors, event.damageRatioPct, `${path}.damageRatioPct`, "伤害比例")
+    }
+
+    if (event.kind === "sharp") {
+        const hasSkillRef = event.skillRef && typeof event.skillRef === "object" && !Array.isArray(event.skillRef)
+        const hasManualSkillMultiplier = event.skillMultiplier !== undefined
+            && event.skillMultiplier !== null
+            && String(event.skillMultiplier).trim() !== ""
+        let resolvedSkillRef = null
+        if (hasSkillRef) {
+            resolvedSkillRef = validateCalculationSkillRef(errors, event.skillRef, `${path}.skillRef`, context, agentId)
+            if (resolvedSkillRef?.row?.damageKind !== "sharp"
+                && resolvedSkillRef?.move?.damageKind !== "sharp") {
+                add(errors, `${path}.skillRef`, "锋御事件只能选择锐化伤害倍率行。")
+            }
+            const countRange = validateEventCountRange(errors, resolvedSkillRef?.row?.eventCountRange, `${path}.skillRef.eventCountRange`)
+            if (countRange) {
+                const count = validateSkillGroupCount(errors, event.count ?? countRange.default, `${path}.count`)
+                if (Number.isFinite(count) && (!Number.isInteger(count) || count < countRange.min || count > countRange.max)) {
+                    add(errors, `${path}.count`, `次数必须是 ${countRange.min} 到 ${countRange.max} 的整数。`)
+                }
+            } else {
+                validatePositiveNumber(errors, event.count ?? 1, `${path}.count`, "次数")
+            }
+        } else if (hasManualSkillMultiplier) {
+            validatePositiveNumber(errors, event.count ?? 1, `${path}.count`, "次数")
+            validatePositiveNumber(errors, event.skillMultiplier, `${path}.skillMultiplier`, "手填倍率")
+        } else {
+            add(errors, `${path}.skillRef`, "必须选择技能倍率或填写手填倍率。")
+        }
+        if (event.damageElement !== undefined && event.damageElement !== "") {
+            requireEnum(errors, event.damageElement, DAMAGE_ELEMENT_VALUES, `${path}.damageElement`)
+        }
+        if (event.critMode !== undefined) {
+            requireEnum(errors, event.critMode, new Set(["expected", "nonCrit", "sharpCrit", "lacerationCrit"]), `${path}.critMode`)
+        }
+        return
     }
 
     if (event.kind === "direct" || event.kind === "sheer") {
@@ -1863,6 +2026,9 @@ function validateAgentSkill(item, context) {
                 if (move?.damageElement) {
                     requireEnum(errors, move.damageElement, DIRECT_DAMAGE_ELEMENT_VALUES, `${movePath}.damageElement`)
                 }
+                if (move?.damageKind !== undefined && move.damageKind !== "sharp") {
+                    add(errors, `${movePath}.damageKind`, "当前独立伤害类型只能是 sharp。")
+                }
                 const moveRange = move?.levelRange
                     ? validateSkillLevelRange(errors, move.levelRange, `${movePath}.levelRange`, categoryRange, levelScale)
                     : categoryRange
@@ -1889,6 +2055,9 @@ function validateAgentSkill(item, context) {
                     requireEnum(errors, row?.kind ?? "damageMultiplier", SKILL_ROW_KIND_VALUES, `${rowPath}.kind`)
                     if (row?.damageBasis !== undefined && row.damageBasis !== "") {
                         requireEnum(errors, row.damageBasis, SKILL_ROW_DAMAGE_BASIS_VALUES, `${rowPath}.damageBasis`)
+                    }
+                    if (row?.damageKind !== undefined && row.damageKind !== "sharp") {
+                        add(errors, `${rowPath}.damageKind`, "当前独立伤害类型只能是 sharp。")
                     }
                     const rowRange = row?.levelRange
                         ? validateSkillLevelRange(errors, row.levelRange, `${rowPath}.levelRange`, moveRange, levelScale)
@@ -2067,6 +2236,27 @@ function validateAgent(item, context) {
         }
     }
 
+    if (item?.level60?.lacerationDmg !== undefined) {
+        validateNonNegativeNumber(errors, item.level60.lacerationDmg, "level60.lacerationDmg", "锐暴伤害")
+    } else if (item?.specialty === "armorer") {
+        add(errors, "level60.lacerationDmg", "锋御角色必须填写基础锐暴伤害。")
+    }
+    if (item?.sharpProfile !== undefined) {
+        const profile = item.sharpProfile
+        if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
+            add(errors, "sharpProfile", "锋御伤害档案必须是对象。")
+        } else {
+            requireId(errors, { id: profile.id }, "sharpProfile.id")
+            if (profile.basisStat !== "def") add(errors, "sharpProfile.basisStat", "当前锋御档案必须使用防御力。")
+            for (const [key, label] of [["baseLacerationDmgPct", "基础锐暴伤害"], ["critRateCapPct", "暴击上限"], ["initialCritDmgToCritRateRatio", "初始暴伤转化比例"]]) {
+                const value = requireFinite(errors, profile[key], `sharpProfile.${key}`)
+                if (Number.isFinite(value) && value < 0) add(errors, `sharpProfile.${key}`, `${label}不能小于 0。`)
+            }
+        }
+    } else if (item?.specialty === "armorer") {
+        add(errors, "sharpProfile", "锋御角色必须填写伤害档案。")
+    }
+
     validateEffectSet(errors, item?.combatBuffs?.corePassive, "combatBuffs.corePassive", {
         sourceType: "self",
         context: { ...context, agent: item, allowCorePassiveScalingSource: true },
@@ -2089,6 +2279,14 @@ function validateAgent(item, context) {
             add(errors, "coreSkill", "必须是 JSON 对象。")
         } else if (item.coreSkill.levels !== undefined && !Array.isArray(item.coreSkill.levels)) {
             add(errors, "coreSkill.levels", "必须是数组。")
+        }
+        const scaling = item.coreSkill.corePassiveScaling
+        if (scaling?.levels !== undefined) {
+            if (!Array.isArray(scaling.levels)) {
+                add(errors, "coreSkill.corePassiveScaling.levels", "必须是数组。")
+            } else if (scaling.levels.length !== (item.coreSkill.levels?.length ?? 0) + 1) {
+                add(errors, "coreSkill.corePassiveScaling.levels", "核心被动成长必须包含基础档和每个核心技节点档。")
+            }
         }
     }
 
@@ -2116,9 +2314,20 @@ function validateWEngine(item, context) {
     }
     validateOptionalSources(errors, item, item?.images?.icon ?? item?.images?.portrait)
 
-    const atkBase = requireFinite(errors, item?.level60?.atkBase, "level60.atkBase")
-    if (Number.isFinite(atkBase) && atkBase <= 0) {
-        add(errors, "level60.atkBase", "必须大于 0。")
+    const hasAtkBase = item?.level60?.atkBase !== undefined
+        && item?.level60?.atkBase !== null
+        && item?.level60?.atkBase !== ""
+    const hasDefBase = item?.level60?.defBase !== undefined
+        && item?.level60?.defBase !== null
+        && item?.level60?.defBase !== ""
+    if (hasAtkBase === hasDefBase) {
+        add(errors, "level60", "音擎必须且只能提供一个正的基础攻击力或基础防御力。")
+    } else {
+        const baseKey = hasDefBase ? "defBase" : "atkBase"
+        const baseValue = requireFinite(errors, item?.level60?.[baseKey], `level60.${baseKey}`)
+        if (Number.isFinite(baseValue) && baseValue <= 0) {
+            add(errors, `level60.${baseKey}`, "必须大于 0。")
+        }
     }
 
     if (!item?.level60?.advancedStat) {
@@ -2131,8 +2340,14 @@ function validateWEngine(item, context) {
     requireName(errors, item?.effect?.description, "effect.description.zhCN")
     const selfBuff = item?.effect?.selfBuff ?? item?.effect?.buff
     const teamBuff = item?.effect?.teamBuff
-    validateEffectSet(errors, selfBuff, "effect.selfBuff", { sourceType: "wEngine", context })
-    validateEffectSet(errors, teamBuff, "effect.teamBuff", { sourceType: "wEngineTeam", context })
+    validateEffectSet(errors, selfBuff, "effect.selfBuff", {
+        sourceType: "wEngine",
+        context: { ...context, modification: item?.modification ?? { minLevel: 1, maxLevel: 5 } },
+    })
+    validateEffectSet(errors, teamBuff, "effect.teamBuff", {
+        sourceType: "wEngineTeam",
+        context: { ...context, modification: item?.modification ?? { minLevel: 1, maxLevel: 5 } },
+    })
     validateDuplicateId(errors, item?.id, context, "id")
     return errors
 }

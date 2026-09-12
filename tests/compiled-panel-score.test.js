@@ -14,6 +14,7 @@ const statIds = [
     "atkPct",
     "critRate",
     "critDmg",
+    "lacerationDmg",
     "dmgBonus",
     "iceDmg",
     "etherDmg",
@@ -91,7 +92,7 @@ function compareDense(label, input, seeds = 64) {
         const setCounts = valuesToMap(setCountValues, setIds)
         const mapSummary = calculator.scoreOnlyFromSummary(statTotals, setCounts)
         const denseSummary = denseTarget.scoreDense(statValues, setCountValues)
-        for (const key of ["hp", "atk", "def", "critRate", "critDmg", "anomalyProficiency", "anomalyMastery", "penRatio", "allResIgnore", "iceDmg", "sheerForce", "sheerForceFlat"]) {
+        for (const key of ["hp", "atk", "def", "critRate", "critDmg", "lacerationDmg", "anomalyProficiency", "anomalyMastery", "penRatio", "allResIgnore", "iceDmg", "sheerForce", "sheerForceFlat"]) {
             approx(denseSummary.panel[key], mapSummary.panel[key], `${label} seed ${seed} panel.${key}`)
             approx(
                 denseSummary.outOfCombatPanelValues[panelStatIndexById.get(key)],
@@ -102,7 +103,7 @@ function compareDense(label, input, seeds = 64) {
         approx(denseSummary.finalDamage, mapSummary.finalDamage, `${label} seed ${seed} finalDamage`)
         const fixedTarget = denseTarget.compileForSetCounts(setCountValues)
         const fixedSummary = fixedTarget.scoreScalar(statValues)
-        for (const key of ["atk", "anomalyProficiency", "critRate", "critDmg"]) {
+        for (const key of ["atk", "anomalyProficiency", "critRate", "critDmg", "lacerationDmg"]) {
             approx(
                 fixedSummary.outOfCombatPanelValues[panelStatIndexById.get(key)],
                 mapSummary.outOfCombatPanel[key],
