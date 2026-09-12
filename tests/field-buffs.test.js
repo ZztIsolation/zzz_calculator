@@ -174,7 +174,7 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
 }
 
 const allFieldBuffs = catalog.combatBuffs.filter(buff => buff.sourceType === "field")
-assert.equal(allFieldBuffs.length, 27, "Field Buff catalog should keep all maintained entries")
+assert.equal(allFieldBuffs.length, 30, "Field Buff catalog should keep all maintained entries")
 assert.deepEqual(
     allFieldBuffs
         .filter(buff => buff.period?.modeId === "defense_v5" && buff.period?.gameVersion === "3.1" && buff.period?.phaseNo === 3)
@@ -192,6 +192,50 @@ for (const buff of allFieldBuffs) {
         )
     }
 }
+
+const CRITICAL_ASSAULT_3_2_PHASE_1_IDS = {
+    shijin: "field.critical_assault.v3_2.p1.shijin",
+    yaoshuang: "field.critical_assault.v3_2.p1.yaoshuang",
+    ruilie: "field.critical_assault.v3_2.p1.ruilie",
+}
+const EXPECTED_3_2_PHASE_1_NAMES = {
+    [CRITICAL_ASSAULT_3_2_PHASE_1_IDS.shijin]: "蚀烬",
+    [CRITICAL_ASSAULT_3_2_PHASE_1_IDS.yaoshuang]: "曜霜",
+    [CRITICAL_ASSAULT_3_2_PHASE_1_IDS.ruilie]: "锐裂",
+}
+for (const id of Object.values(CRITICAL_ASSAULT_3_2_PHASE_1_IDS)) {
+    const buff = fieldBuff(id)
+    assert.equal(buff.name?.zhCN, EXPECTED_3_2_PHASE_1_NAMES[id], `${id} should keep its maintained name`)
+    assert.deepEqual(buff.period, {
+        modeId: "critical_assault",
+        gameVersion: "3.2",
+        phaseNo: 1,
+        phaseName: { zhCN: "第一期" },
+    })
+    assert.equal(buff.source?.zhCN, "危局强袭战")
+    assert.equal(buff.sourcePeriod?.zhCN, "3.2版本第一期")
+    const validation = validateMaintenanceItem("field-buffs", buff, {
+        items: catalog.combatBuffs,
+        currentId: id,
+        agentSkills: catalog.agentSkills,
+    })
+    assert.equal(validation.ok, true, `${id} should pass field Buff validation: ${JSON.stringify(validation.errors)}`)
+}
+assert.equal(
+    fieldBuff(CRITICAL_ASSAULT_3_2_PHASE_1_IDS.shijin).description.zhCN,
+    "队伍中存在2/3名[异常]特性的代理人时，全队的异常精通分别提升20/60点，异常积蓄效率分别提升10%/20%。代理人使敌人进入属性异常状态后，敌人的防御力降低10%，持续10秒，重复触发时刷新持续时间。",
+    "Shijin should preserve the complete source text, including the descriptive-only anomaly buildup efficiency clause",
+)
+assert.equal(
+    fieldBuff(CRITICAL_ASSAULT_3_2_PHASE_1_IDS.yaoshuang).description.zhCN,
+    "[强攻]特性的代理人的冰属性伤害提升20%。代理人的暴击伤害提升30%，攻击处于失衡状态的敌人时，该敌人的失衡易伤倍率额外提升20%，持续20秒，重复触发时刷新持续时间。",
+    "Yaoshuang should preserve the complete source text",
+)
+assert.equal(
+    fieldBuff(CRITICAL_ASSAULT_3_2_PHASE_1_IDS.ruilie).description.zhCN,
+    "代理人的穿透率提升5%，攻击命中敌人时无视其15%的电属性伤害抗性。代理人发动[强化特殊技]、[特殊技]后，锐化伤害提升20%，防御力提升10%，持续20秒，重复触发时刷新持续时间。",
+    "Ruilie should preserve the complete source text",
+)
 
 assert.equal(
     fieldBuff(FIELD_BUFF_IDS.cuixin).description.zhCN,
@@ -935,5 +979,75 @@ const gouxiDisorderOnly = calculateSkill(FIELD_BUFF_IDS.gouxi, miyabiSkillRefs.b
     },
 })
 approx(gouxiDisorderOnly.damage.targetBreakdown.enemyDefReduction, 0.15, "Gouxi Disorder DEF reduction should remain independently active")
+
+const SHIJIN_PROFICIENCY_ID = "field_critical_assault_v3_2_p1_shijin_anomaly_proficiency"
+for (const [anomalyAgentCount, expectedProficiency] of [[0, 0], [1, 0], [2, 20], [3, 60]]) {
+    const shijin = calculateAnomaly(CRITICAL_ASSAULT_3_2_PHASE_1_IDS.shijin, {
+        id: `shijin-burn-${anomalyAgentCount}`,
+        kind: "anomaly",
+        settlementType: "attribute",
+        anomalyEffect: "burn",
+        procCount: 1,
+    }, {
+        effects: {
+            [SHIJIN_PROFICIENCY_ID]: { sourceValue: anomalyAgentCount },
+        },
+    })
+    approx(
+        shijin.inCombat.panel.anomalyProficiency - shijin.outOfCombat.panel.anomalyProficiency,
+        expectedProficiency,
+        `Shijin should grant the correct Anomaly Proficiency for ${anomalyAgentCount} Anomaly agents`,
+    )
+    approx(shijin.damage.targetBreakdown.enemyDefReduction, 0.1, "Shijin should reduce enemy DEF by 10% after applying an Anomaly")
+}
+
+const yaoshuangAttack = calculateAttackBasic(CRITICAL_ASSAULT_3_2_PHASE_1_IDS.yaoshuang, {}, "ice")
+approx(yaoshuangAttack.inCombat.panel.iceDmg - yaoshuangAttack.outOfCombat.panel.iceDmg, 0.2, "Yaoshuang should grant Attack agents 20% Ice damage")
+approx(yaoshuangAttack.inCombat.panel.critDmg - yaoshuangAttack.outOfCombat.panel.critDmg, 0.3, "Yaoshuang should grant 30% CRIT DMG")
+approx(yaoshuangAttack.damage.multipliers.stun, 1.7, "Yaoshuang should add 20% stun vulnerability")
+const yaoshuangAnomaly = calculateSkill(CRITICAL_ASSAULT_3_2_PHASE_1_IDS.yaoshuang, miyabiSkillRefs.basic)
+approx(yaoshuangAnomaly.inCombat.panel.iceDmg - yaoshuangAnomaly.outOfCombat.panel.iceDmg, 0, "Yaoshuang Ice damage should not apply to non-Attack agents")
+approx(yaoshuangAnomaly.inCombat.panel.critDmg - yaoshuangAnomaly.outOfCombat.panel.critDmg, 0.3, "Yaoshuang CRIT DMG should apply to non-Attack agents")
+
+const ruilieElectric = calculateAttackBasic(CRITICAL_ASSAULT_3_2_PHASE_1_IDS.ruilie, {}, "electric")
+approx(ruilieElectric.inCombat.panel.penRatio - ruilieElectric.outOfCombat.panel.penRatio, 0.05, "Ruilie should grant 5% PEN Ratio")
+approx(ruilieElectric.damage.targetBreakdown.resIgnore, 0.15, "Ruilie should grant 15% Electric RES ignore")
+const ruilieSharp = calculateInCombatPanel(catalog, {
+    agentId: "claret",
+    wEngineId: "zzz_wiki_2188",
+    wEngineModificationLevel: 5,
+    coreSkillLevel: "F",
+    driveDiscs: [],
+    combatBuffs: {
+        activeBuffIds: [CRITICAL_ASSAULT_3_2_PHASE_1_IDS.ruilie],
+        runtimeInputs: {},
+    },
+    damage: {
+        selectedEventId: "ruilie-sharp",
+        events: [{
+            id: "ruilie-sharp",
+            kind: "sharp",
+            skillRef: {
+                agentSkillId: "claret",
+                categoryId: "special",
+                moveId: "special_slash_gold",
+                rowId: "hit_1",
+            },
+            critMode: "nonCrit",
+            count: 1,
+        }],
+        target: { defense: 953, levelCoefficient: 794 },
+    },
+})
+approx(ruilieSharp.damage.events[0].multipliers.sharpDmg, 1.2, "Ruilie should grant 20% Sharp damage")
+approx(
+    ruilieSharp.inCombat.panel.def - ruilieSharp.outOfCombat.panel.def,
+    ruilieSharp.outOfCombat.panel.def * 0.1,
+    "Ruilie should grant 10% of out-of-combat DEF",
+)
+const ruilieRules = fieldBuff(CRITICAL_ASSAULT_3_2_PHASE_1_IDS.ruilie).effects
+    .filter(effect => effect.stat === "sharpDmgBonus" || effect.stat === "defPct")
+assert.ok(ruilieRules.every(effect => effect.condition === "代理人发动强化特殊技、特殊技后"))
+assert.ok(ruilieRules.every(effect => effect.durationSeconds === 20))
 
 console.log("field Buff regression tests passed")
