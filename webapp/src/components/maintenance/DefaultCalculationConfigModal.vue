@@ -27,7 +27,11 @@ const showDeletePotentialConfirm = ref(false)
 
 const calculationModeOptions = computed(() => [
   option("custom", "自定义"),
-  props.agent?.specialty === "rupture" ? option("sheer", "最大化贯穿伤害") : option("single", "最大化单个技能伤害"),
+  props.agent?.specialty === "rupture"
+    ? option("sheer", "最大化贯穿伤害")
+    : props.agent?.specialty === "armorer"
+      ? option("sharp", "最大化锐化伤害")
+      : option("single", "最大化单个技能伤害"),
   option("anomaly", "最大化异常伤害"),
 ])
 
@@ -61,7 +65,7 @@ function clone<T>(value: T): T {
 }
 
 function createBaseConfig() {
-  const event = defaultCalculationEvent("direct")
+  const event = defaultCalculationEvent(props.agent?.specialty === "armorer" ? "sharp" : "direct")
   return {
     cinemaLevel: 0,
     mode: "custom",

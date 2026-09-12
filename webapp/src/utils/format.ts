@@ -65,7 +65,7 @@ export function skillRowLabel(row: any): string {
 }
 
 function isDirectSkillEvent(event: any): boolean {
-  return event?.kind === "direct" || event?.kind === "sheer"
+  return event?.kind === "direct" || event?.kind === "sheer" || event?.kind === "sharp"
 }
 
 function isReadableDisplayText(value: unknown): value is string {
@@ -246,6 +246,7 @@ export function damageModeLabel(value: unknown): string {
   const labels: Record<string, string> = {
     single: "最大化单个技能伤害",
     sheer: "最大化贯穿伤害",
+    sharp: "最大化锐化伤害",
     anomaly: "最大化异常伤害",
     adminDefault: "管理员默认循环",
     custom: "自定义",
@@ -277,6 +278,9 @@ export function damageEventKindLabel(event: any): string {
   }
   if (kind === "sheer") {
     return "贯穿"
+  }
+  if (kind === "sharp") {
+    return "锐化"
   }
   if (kind === "anomaly") {
     return event?.settlementType === "disorder"

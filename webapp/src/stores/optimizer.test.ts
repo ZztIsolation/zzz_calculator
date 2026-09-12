@@ -248,7 +248,7 @@ describe("optimizer store", () => {
 
     expect(reloaded.fourPieceSetId).toBe("woodpecker_electro")
     const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer.v1") || "{}")
-    expect(saved.version).toBe(3)
+    expect(saved.version).toBe(4)
     expect(saved.byAgent.agent_b.fourPieceSetId).toBe("woodpecker_electro")
     expect(saved.byAgent.agent_b.fourPieceSetIds).toEqual(["woodpecker_electro"])
   })
@@ -274,7 +274,7 @@ describe("optimizer store", () => {
 
     expect(store.fourPieceSetIds).toEqual(["fanged_metal"])
     const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer.v1") || "{}")
-    expect(saved.version).toBe(3)
+    expect(saved.version).toBe(4)
     expect(saved.rolloutSentinel).toBe("keep-envelope")
     expect(saved.byAgent.agent_a.fourPieceSetId).toBe("fanged_metal")
     expect(saved.byAgent.agent_a.fourPieceSetIds).toEqual(["fanged_metal"])
@@ -308,7 +308,7 @@ describe("optimizer store", () => {
 
     expect(store.fourPieceSetId).toBe("woodpecker_electro")
     let saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer.v1") || "{}")
-    expect(saved.version).toBe(3)
+    expect(saved.version).toBe(4)
     expect(saved.rolloutSentinel).toBe("keep-envelope")
     expect(saved.byAgent.agent_a.fourPieceSetIds).toEqual(["woodpecker_electro", "fanged_metal"])
     expect(saved.byAgent.agent_a.futureConstraint).toEqual({ releaseProfileId: "aria-release" })
@@ -392,7 +392,7 @@ describe("optimizer store", () => {
     expect(store.minimums).toEqual({})
 
     const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer.v1") || "{}")
-    expect(saved.version).toBe(3)
+    expect(saved.version).toBe(4)
     expect(saved.currentAgentId).toBe("agent_b")
     expect(saved.byAgent.agent_a.twoPieceSetIds).toEqual(["swing_jazz"])
     expect(saved.byAgent.agent_b.twoPieceSetIds).toEqual([])

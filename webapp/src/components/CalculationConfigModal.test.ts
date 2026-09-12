@@ -18,6 +18,8 @@ const alice = (agentsData as any).agents.find((agent: any) => agent.id === "alic
 const aria = (agentsData as any).agents.find((agent: any) => agent.id === "aria")
 const vivian = (agentsData as any).agents.find((agent: any) => agent.id === "vivian")
 const dan = (agentsData as any).agents.find((agent: any) => agent.id === "remielle_dan")
+const claret = (agentsData as any).agents.find((agent: any) => agent.id === "claret")
+const claretSkillCatalog = (agentSkillsData as any).agentSkills.find((skill: any) => skill.id === "claret")
 const soldier11 = (agentsData as any).agents.find((agent: any) => agent.id === "soldier_11")
 const soldier11SkillCatalog = (agentSkillsData as any).agentSkills.find((skill: any) => skill.id === "soldier_11")
 
@@ -1806,5 +1808,37 @@ describe("CalculationConfigModal", () => {
     expect(countInput?.props("value")).toBe(6)
     const saved = await saveModal(wrapper)
     expect(saved.events[0].count).toBe(6)
+  })
+
+  it("keeps sharp events on common fields and strips legacy sharp controls", async () => {
+    const wrapper = mountModal({
+      agent: claret,
+      skillCatalog: claretSkillCatalog,
+      damageConfig: {
+        mode: "custom",
+        selectedEventId: "sharp-event",
+        events: [{
+          id: "sharp-event",
+          kind: "sharp",
+          skillMultiplier: 100,
+          damageElement: "electric",
+          critMode: "expected",
+          count: 1,
+          stunned: true,
+          sharpComponent: "maim",
+          maimTrigger: "gash",
+          sharpScenario: { crimsonInscription: true, gashStacks: 3 },
+        }],
+      },
+    })
+
+    await openModal(wrapper)
+    for (const label of ["锐化组件", "毁伤触发方式", "猩红铭刻", "残痕层数", "残锋", "音擎触发效果"]) {
+      expect(wrapper.text()).not.toContain(label)
+    }
+    const saved = await saveModal(wrapper)
+    expect(saved.events[0]).not.toHaveProperty("sharpComponent")
+    expect(saved.events[0]).not.toHaveProperty("maimTrigger")
+    expect(saved.events[0]).not.toHaveProperty("sharpScenario")
   })
 })

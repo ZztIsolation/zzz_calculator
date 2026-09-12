@@ -156,6 +156,77 @@ describe("build store", () => {
     expect(store.damageConfig.selectedEventId).toBe("p0-hit")
   })
 
+  it("keeps authored final skill levels for armorer cinema variants", () => {
+    const agent = {
+      id: "claret",
+      specialty: "armorer",
+      defaultCalculationConfig: {
+        mode: "custom",
+        selectedEventId: "sharp-hit",
+        events: [{ id: "sharp-hit", kind: "sharp", skillMultiplier: 100, count: 1 }],
+        variants: [
+          {
+            cinemaLevel: 3,
+            selectedEventId: "sharp-hit",
+            skillLevelsByCategory: { basic: 14, dodge: 14, assist: 14, special: 14, chain: 14 },
+            events: [{ id: "sharp-hit", kind: "sharp", skillMultiplier: 100, count: 1 }],
+          },
+          {
+            cinemaLevel: 5,
+            selectedEventId: "sharp-hit",
+            skillLevelsByCategory: { basic: 16, dodge: 16, assist: 16, special: 16, chain: 16 },
+            events: [{ id: "sharp-hit", kind: "sharp", skillMultiplier: 100, count: 1 }],
+          },
+        ],
+      },
+    }
+    const meta = { agents: [agent], wEngines: [], combatBuffs: [] }
+    const store = useBuildStore()
+
+    store.applyAgentConfig(agent.id, meta)
+    expect(store.skillLevels.basic).toBe(12)
+    store.setCinemaLevel(3, meta)
+    expect(store.skillLevels.basic).toBe(14)
+    expect(store.buildInput({}, meta, []).damage.skillLevelsByCategory.basic).toBe(14)
+    store.setCinemaLevel(5, meta)
+    expect(store.skillLevels.basic).toBe(16)
+    store.updateSkillLevel("basic", 13)
+    store.setCinemaLevel(6, meta)
+    expect(store.skillLevels.basic).toBe(13)
+    store.setDamageConfig({ mode: "custom", events: [{ id: "custom", kind: "sharp", skillMultiplier: 100 }] }, agent)
+    store.setDamageConfig({ mode: "adminDefault" }, agent)
+    expect(store.skillLevels.basic).toBe(16)
+  })
+
+  it("migrates an old armorer admin snapshot that stored every skill at level 12", () => {
+    const agent = {
+      id: "claret",
+      specialty: "armorer",
+      defaultCalculationConfig: {
+        mode: "custom",
+        selectedEventId: "sharp-hit",
+        events: [{ id: "sharp-hit", kind: "sharp", skillMultiplier: 100, count: 1 }],
+        variants: [{
+          cinemaLevel: 3,
+          selectedEventId: "sharp-hit",
+          skillLevelsByCategory: { basic: 14, dodge: 14, assist: 14, special: 14, chain: 14 },
+          events: [{ id: "sharp-hit", kind: "sharp", skillMultiplier: 100, count: 1 }],
+        }],
+      },
+    }
+    const meta = { agents: [agent], wEngines: [], combatBuffs: [] }
+    const store = useBuildStore()
+
+    store.applyAgentConfig(agent.id, meta, {
+      cinemaLevel: 3,
+      skillLevels: { basic: 12, dodge: 12, assist: 12, special: 12, chain: 12 },
+      damage: { mode: "adminDefault", skillLevelsByCategory: { basic: 12, dodge: 12, assist: 12, special: 12, chain: 12 } },
+    })
+
+    expect(store.skillLevels).toMatchObject({ basic: 14, special: 14, chain: 14 })
+    expect(store.damageConfig.skillLevelsByCategory).toMatchObject({ basic: 14, special: 14, chain: 14 })
+  })
+
   it("builds a damage input with visual-era defaults preserved", () => {
     const store = useBuildStore()
     const meta = {

@@ -23,7 +23,7 @@ describe("DamageWhiteBox", () => {
         count: 2,
         finalDamage: 1234.5,
         damageVariants: {
-          expected: { finalDamage: 1234.5 },
+          expected: { finalDamage: 389141.437 },
           crit: { finalDamage: 1600 },
           nonCrit: { finalDamage: 900 },
         },
@@ -86,12 +86,14 @@ describe("DamageWhiteBox", () => {
 
     expect(wrapper.text()).toContain("当前白盒")
     expect(wrapper.text()).toContain("普通攻击 / 强化普攻：霜月 / 三段蓄力斩击伤害倍率 ×2")
-    expect(wrapper.text()).toContain("本事件 1,234.5")
-    expect(wrapper.text()).toContain("总计 3,456.75")
-    expect(wrapper.text()).toContain("期望 1,234.5")
+    expect(wrapper.text()).toContain("本事件 1,235")
+    expect(wrapper.text()).toContain("总计 3,457")
+    expect(wrapper.text()).toContain("期望 389,141")
+    expect(wrapper.text()).not.toContain("389,141.437")
     expect(wrapper.find(".damage-event-select .n-select").exists()).toBe(true)
     const options = wrapper.getComponent(NSelect).props("options") as Array<{ label: string, value: string }>
     expect(options.map(option => option.value)).toEqual(["direct-1", "disorder-1"])
+    expect(options[0]?.label).toContain("1,235")
     expect(options.map(option => option.label).join("|")).not.toContain("技能组")
     expect(wrapper.findAll(".damage-event-button")).toHaveLength(0)
     expect(wrapper.text()).not.toContain("结算面板")
@@ -115,5 +117,24 @@ describe("DamageWhiteBox", () => {
     expect(wrapper.text()).toContain("紊乱倍率")
     expect(wrapper.text()).toContain("烈霜霜寒紊乱（星见雅）：450% + 10 × 7.5%")
     expect(wrapper.text()).not.toContain("防御乘区 = 794 / (794 + 762.4)")
+  })
+
+  it("keeps luminescence score precision and suffix separate from damage rounding", () => {
+    const wrapper = mount(DamageWhiteBox, {
+      props: {
+        damage: {
+          objectiveKind: "luminescenceTeamScore",
+          scoreSuffix: "× k",
+          events: [{
+            id: "score-1",
+            kind: "anomaly",
+            objectiveKind: "luminescenceTeamScore",
+            finalDamage: 12.3456,
+          }],
+        },
+      },
+    })
+
+    expect(wrapper.text()).toContain("本评分 12.346 × k")
   })
 })

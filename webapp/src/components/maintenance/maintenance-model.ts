@@ -4,6 +4,7 @@ import {
 } from "@core/maintenanceValidation.js"
 import { legacySkillTypeForMove, normalizeSkillTargetsInValue } from "@core/skillTargets.js"
 import { normalizeLegacyEffectAppliesToInValue } from "@core/effectRuleTargets.js"
+import { migrateLegacyBloodMarrowWEngine } from "@core/effectFormula.js"
 
 export type ResourceValue =
   | "agents"
@@ -57,6 +58,9 @@ const FIELD_LABELS: Record<string, string> = {
   defBase: "基础防御力",
   critRate: "暴击率",
   critDmg: "暴击伤害",
+  lacerationDmg: "锐暴伤害",
+  sharpDmgBonus: "锐化伤害加成",
+  sharpProfile: "锋御伤害档案",
   impact: "冲击力",
   anomalyProficiency: "异常精通",
   anomalyMastery: "异常掌控",
@@ -204,13 +208,13 @@ const ENUM_OPTIONS: Record<string, SelectOption[]> = {
   ),
   damageElement: options(["physical", "物理"], ["fire", "火"], ["ice", "冰"], ["electric", "电"], ["ether", "以太"], ["wind", "风"], ["lumiflux", "流明"]),
   element: options(["physical", "物理"], ["fire", "火"], ["ice", "冰"], ["electric", "电"], ["ether", "以太"], ["wind", "风"]),
-  specialty: options(["attack", "强攻"], ["stun", "击破"], ["anomaly", "异常"], ["support", "支援"], ["defense", "防护"], ["rupture", "命破"]),
+  specialty: options(["attack", "强攻"], ["stun", "击破"], ["anomaly", "异常"], ["support", "支援"], ["defense", "防护"], ["rupture", "命破"], ["armorer", "锋御"]),
   scope: options(["outOfCombat", "局外面板"], ["inCombat", "局内战斗"]),
   mode: options(["flat", "固定值"], ["pct", "百分比"]),
   basis: options(["baseHp", "基础生命"], ["outOfCombatHp", "局外生命"], ["baseAtk", "基础攻击"], ["outOfCombatAtk", "局外攻击"], ["baseDef", "基础防御"], ["outOfCombatDef", "局外防御"]),
-  critMode: options(["expected", "期望伤害"], ["crit", "必定暴击"], ["nonCrit", "不暴击"]),
+  critMode: options(["expected", "期望伤害"], ["crit", "必定暴击"], ["nonCrit", "不暴击"], ["sharpCrit", "一次锐暴"], ["lacerationCrit", "二次锐暴"]),
   levelScale: options(["skill", "技能等级"], ["coreSkill", "核心技等级"]),
-  damageBasis: options(["atk", "攻击力"], ["sheerForce", "贯穿力"], ["anomalyProficiency", "异常精通"]),
+  damageBasis: options(["atk", "攻击力"], ["def", "防御力"], ["sheerForce", "贯穿力"], ["anomalyProficiency", "异常精通"]),
   anomalyVariant: options(["normal", "普通异常"], ["polarizedAssault", "极性强击"]),
   modeId: options(["defense_v5", "式舆防卫战"], ["critical_assault", "危局强袭战"]),
   gameVersion: options(["3.0", "3.0 版本"], ["3.1", "3.1 版本"], ["3.2", "3.2 版本"], ["3.3", "3.3 版本"]),
@@ -241,6 +245,54 @@ function ensureId(item: any, prefix: string) {
   return item
 }
 
+const SHARP_LEGACY_FIELDS = new Set([
+  "sharpProfileId",
+  "sharpComponent",
+  "maimTrigger",
+  "sharpScenario",
+  "sharpComponents",
+  "sharpScenarioAnyOf",
+  "sharpMaimMultiplier",
+  "crimsonInscription",
+  "gashStacks",
+  "remnantEdgeActive",
+  "perfectDodgeCoverage",
+  "triggeredEngineEffects",
+  "sharpOverflowPerCritRate",
+  "sharpOverflowCap",
+])
+
+function stripSharpLegacyFields(value: any): any {
+  if (Array.isArray(value)) {
+    for (let index = value.length - 1; index >= 0; index -= 1) {
+      const child = value[index]
+      if (child && typeof child === "object" && !Array.isArray(child)
+        && (["sharpOverflowPerCritRate", "sharpOverflowCap"].includes(String(child.stat ?? ""))
+          || ["sharpOverflowPerCritRate", "sharpOverflowCap"].includes(String(child.kind ?? ""))
+          || ["marrow-overflow-rate", "marrow-overflow-cap"].includes(String(child.id ?? "")))) {
+        value.splice(index, 1)
+      } else {
+        stripSharpLegacyFields(child)
+      }
+    }
+    return value
+  }
+  if (!value || typeof value !== "object") return value
+  for (const key of Object.keys(value)) {
+    if (SHARP_LEGACY_FIELDS.has(key)) delete value[key]
+    else stripSharpLegacyFields(value[key])
+  }
+  for (const key of ["effects", "stats"]) {
+    if (Array.isArray(value[key])) {
+      value[key] = value[key].filter(child => !(child && typeof child === "object"
+        && (["sharpOverflowPerCritRate", "sharpOverflowCap"].includes(String(child.stat ?? ""))
+          || ["sharpOverflowPerCritRate", "sharpOverflowCap"].includes(String(child.kind ?? ""))
+          || ["marrow-overflow-rate", "marrow-overflow-cap"].includes(String(child.id ?? "")))))
+    }
+  }
+  return value
+}
+
 function normalizeEffectRule(rule: any) {
   ensureId(rule, "effect")
   if (rule.type === "damageModifier") {
@@ -254,6 +306,7 @@ function normalizeEffectRule(rule: any) {
   }
   rule.type ??= "fixed"
   rule.target ??= { kind: "default" }
+  if (rule.target?.kind === "sharp") rule.target = { kind: "default" }
   rule.stat ??= "atkFlat"
   rule.mode ??= "flat"
   if (rule.type === "derived") {
@@ -265,6 +318,16 @@ function normalizeEffectRule(rule: any) {
     rule.source ??= { variable: "x", label: { zhCN: "来源数值" }, defaultValue: 0 }
     rule.source.label ??= { zhCN: "来源数值" }
     rule.formula ??= { expression: "", valueUnit: "storedValue" }
+    if (rule.source.kind === "inCombatStat") {
+      rule.scope = "inCombat"
+      rule.stat = "dmgBonus"
+      rule.mode = "flat"
+      rule.target = { kind: "default" }
+      rule.source.variable = "x"
+      rule.source.unit ??= ["critRate", "critDmg", "energyRegen", "penRatio"].includes(rule.source.stat)
+        ? "storedPercent"
+        : "storedValue"
+    }
   }
   if (rule.type === "stacked") {
     rule.valuePerStack ??= Number(rule.value ?? 0)
@@ -312,13 +375,24 @@ function ensureCalculationConfigIds(config: any) {
 }
 
 export function prepareDraft(resource: ResourceValue, input: any): any {
-  const item = normalizeLegacyEffectAppliesToInValue(normalizeSkillTargetsInValue(deepClone(input ?? {})))
+  const cloned = deepClone(input ?? {})
+  const migrated = resource === "w-engines" ? migrateLegacyBloodMarrowWEngine(cloned) : cloned
+  const item = stripSharpLegacyFields(normalizeLegacyEffectAppliesToInValue(normalizeSkillTargetsInValue(migrated)))
   if (resource === "agents") {
     item.name ??= { zhCN: "" }
     item.damageElement ??= ""
     item.attackTypes ??= []
     item.images ??= { portrait: "", source: "" }
     item.level60 ??= {}
+    if (item.specialty === "armorer") {
+      item.sharpProfile ??= {
+        id: "armorer",
+        basisStat: "def",
+        baseLacerationDmgPct: 150,
+        critRateCapPct: 200,
+        initialCritDmgToCritRateRatio: 0.35,
+      }
+    }
     item.sources ??= []
     item.preferredDriveDiscs ??= {}
     const legacyDefaultSetId = String(item.preferredDriveDiscs.defaultSetId ?? item.preferredDriveDiscs.defaultSet ?? "").trim()
@@ -432,8 +506,23 @@ export function prepareDraft(resource: ResourceValue, input: any): any {
     item.name ??= { zhCN: "" }
     item.images ??= { icon: "", source: "" }
     item.sources ??= []
-    item.level60 ??= { atkBase: 0, advancedStat: { stat: "critDmg", value: 0, mode: "flat" } }
+    item.level60 ??= item.specialty === "armorer"
+      ? { defBase: 0, advancedStat: { stat: "critDmg", value: 0, mode: "flat" } }
+      : { atkBase: 0, advancedStat: { stat: "critDmg", value: 0, mode: "flat" } }
     item.level60.advancedStat ??= { stat: "critDmg", value: 0, mode: "flat" }
+    if (item.specialty === "armorer") {
+      if (!Object.prototype.hasOwnProperty.call(item.level60, "defBase")
+        && Object.prototype.hasOwnProperty.call(item.level60, "atkBase")) {
+        item.level60.defBase = Number(item.level60.atkBase ?? 0)
+        delete item.level60.atkBase
+      } else if (!Object.prototype.hasOwnProperty.call(item.level60, "defBase")) {
+        item.level60.defBase = 0
+      }
+    } else if (!Object.prototype.hasOwnProperty.call(item.level60, "atkBase")
+      && Object.prototype.hasOwnProperty.call(item.level60, "defBase")) {
+      item.level60.atkBase = Number(item.level60.defBase ?? 0)
+      delete item.level60.defBase
+    }
     item.modification ??= { minLevel: 1, maxLevel: 5, defaultLevel: 1 }
     item.effect ??= { name: { zhCN: "" }, description: { zhCN: "" }, selfBuff: null, teamBuff: null }
     item.effect.name ??= { zhCN: "" }

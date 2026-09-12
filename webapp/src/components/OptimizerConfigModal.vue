@@ -43,9 +43,11 @@ const optimizerMinimumFields = computed(() => props.minimumStats?.length
   ? props.minimumStats
   : [
       { key: "atk", label: "攻击力" },
+      { key: "def", label: "防御力" },
       { key: "anomalyProficiency", label: "异常精通" },
       { key: "critRate", label: "暴击率%" },
       { key: "critDmg", label: "暴击伤害%" },
+      { key: "lacerationDmg", label: "锐暴伤害%" },
     ])
 
 function clone<T>(value: T): T {
@@ -64,7 +66,7 @@ function optimizerMinimumValue(value: any, key: string) {
 }
 
 function optimizerMinimumStep(key: string) {
-  return key === "atk" ? 50 : 10
+  return ["atk", "def"].includes(key) ? 50 : 10
 }
 
 function normalizeOptimizerDraft(value: any = {}) {
@@ -79,9 +81,11 @@ function normalizeOptimizerDraft(value: any = {}) {
     },
     minimums: {
       atk: optimizerMinimumValue(value, "atk"),
+      def: optimizerMinimumValue(value, "def"),
       anomalyProficiency: optimizerMinimumValue(value, "anomalyProficiency"),
       critRate: optimizerMinimumValue(value, "critRate"),
       critDmg: optimizerMinimumValue(value, "critDmg"),
+      lacerationDmg: optimizerMinimumValue(value, "lacerationDmg"),
     },
   }
 }
@@ -403,7 +407,7 @@ function save() {
         <div class="optimizer-minimum-grid optimizer-config-field-wide ui-field-grid ui-field--full" data-layout-surface="optimizer-minimums">
           <p class="optimizer-minimum-note">
             <strong>面板最低值</strong>
-            <span>以下四项均按局外面板数值判断，不计入局内 Buff。</span>
+            <span>以下面板最低值按局外面板数值判断，不计入局内 Buff。</span>
           </p>
           <div v-for="item in optimizerMinimumFields" :key="item.key" class="metric optimizer-config-field ui-field" data-layout-field>
             <dt>{{ item.label }}</dt>

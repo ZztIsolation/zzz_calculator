@@ -13,7 +13,10 @@
 
 - 默认角色来自可展示 catalog；合法的旧选择应尽力恢复。角色切换后，推荐音擎、核心技、影画、默认循环和默认 Buff 必须按新角色重新解析。
 - 音擎改装等级和角色影画等级必须夹紧到合法范围；没有核心技等级的角色允许使用 `none`。
-- 计算支持单事件直伤、贯穿、异常、紊乱、自定义事件和角色 `defaultCalculationConfig`；影画变体使用不超过当前影画的最高已配置等级。
+- 计算支持单事件直伤、贯穿、锐化、异常、紊乱、自定义事件和角色 `defaultCalculationConfig`；影画变体使用不超过当前影画的最高已配置等级。
+- `armorer` 是独立的锐化伤害域。核心被动可以携带通用的局外面板派生规则，将局外 `critDmg` 按角色配置比例转换为普通 `critRate`；锋御事件使用转换后的局内面板暴击率，按 `Csharp = clamp(局内面板暴击率, 0, 2)` 计算，按 `p1/p2` 进行最多两次锐暴判定；普通直伤和贯穿仍只把暴击率截到 100%。效果规则目标只有常规属性/全局效果、技能和异常三类，不存在独立的锐化目标；锐化专属属性中的锐化增伤与元素锐化增伤作为事件修正录入。锐暴伤害是常规面板属性，与暴击伤害完全同轨：无条件、常规目标的锐暴伤害规则按 scope 聚合进局外/局内面板；技能/异常定向、带 `eventStunned`、带 `appliesTo` 过滤或 `type: damageModifier` 的锐暴伤害规则仍作为事件修正录入。“敌人受到的锐暴伤害提升”等敌方承伤语义按玩家面板暴击伤害的既有等价写法处理（叶释渊、未知复合侵蚀体先例），属有意为之，不得改回事件通道。
+- 锋御的基础锐暴伤害、锐化增伤、元素锐化增伤和毁伤倍率必须由 `core/sharpDamage.js` 的纯函数统一处理。锐化伤害白盒必须将普通增伤与锐化增伤拆为“普通增伤区”和“锐化增伤乘区”，单次伤害的最终公式分别列出两个乘数。血髓秘匣不再写入锐化专属溢出字段，而是使用 `marrow-overflow-damage` 局内来源公式：读取完成的局内暴击率，以百分数点计算后输出普通 `dmgBonus`。该通用增伤同时作用于直伤、贯穿、锐化、属性异常、紊乱和异放；耀变评分继续使用独立模型，不读取普通 `panel.dmgBonus`。普通、白盒、compiled、dense、indexed、fixed-set、Node Worker、浏览器 Worker 和严格优化器必须同值。
+- 锋御音擎使用 `level60.defBase`，旧音擎继续使用 `level60.atkBase`；两个字段必须恰有一个为正数。面板 `base.def` 必须包含角色、音擎和核心技三项，`baseBreakdown.wEngine.def` 必须与实际值一致。
 - 伤害事件的 `damageRatioPct` 必须同时作用于白盒、快速总伤、编译评分和固定套装优化路径；普通事件管理不得显示该技术比例输入，但维护端、存量 payload 和计算语义必须保留。`anomalyVariant: polarizedAssault` 必须显示为“极性强击”，`damageBasis: anomalyProficiency` 的直伤不得随攻击力变化。
 - 技能、贯穿、异常、紊乱和技能组引用必须拥有事件级 `stunned`，缺失时默认 `true`。技能组引用展开时必须覆盖全部组内事件；普通、白盒、快速总伤、compiled、dense、固定评分和优化器必须读取同一事件状态。未失衡事件不应用普通失衡易伤，但仍应用 `stunDmgMultiplierBonusAlways`。
 - `stunDmgMultiplierBonusCapAlways` 表示捕获的失衡易伤“加成上限”而非固定增伤：匹配事件无论是否失衡，都按 `min(目标配置失衡倍率 + 失衡倍率加算, 1 + 上限)` 计算。叶瞬光核心被动只定向明心境内招式，基础上限 110%；4影必须通过 Buff 修饰将同一规则提高到 200%，核心被动未启用时4影不得单独生效。普通、白盒、compiled、dense、固定评分和优化器必须保持一致。
@@ -58,7 +61,7 @@
 ## 优化器
 
 - 默认算法为 `exact-super-bound`，公开算法名、输入输出、进度和取消数据结构保持兼容。
-- `zzz-calculator.webapp.optimizer.v1` 的兼容基础必须读取版本 2 和 3。版本 2 保存当前单选四件套时同时写入旧 `fourPieceSetId` 和单元素 `fourPieceSetIds`；回滚读取版本 3 时只用首项驱动旧 UI，但必须保留完整数组、未知角色字段、其他角色记录、顶层元数据和原版本号。
+- `zzz-calculator.webapp.optimizer.v1` 的兼容基础必须读取版本 2、3 和 4。版本 2 保存当前单选四件套时同时写入旧 `fourPieceSetId` 和单元素 `fourPieceSetIds`；回滚读取版本 3 时只用首项驱动旧 UI，但必须保留完整数组、未知角色字段、其他角色记录、顶层元数据和原版本号。版本 4 的最低面板字段可包含锋御防御力。
 - “严格精准”必须保持 Top 10 驱动盘 ID、稳定顺序和既有浮点误差契约，不得只保证第一名或近似分数；合法方案不足 10 套时必须返回全部。`exact-legacy`、`exact-super-bound`、Node 并行和浏览器 Worker 必须在账号、槽位、套装、主词条、专属及手动排除等合法筛选后保留完整候选，不得在枚举前执行未经证明的单盘 dominance 删除；`candidateCountsBySlot` 与 `estimatedCombinationCount` 必须以该完整合法空间为基准。非精准 `heuristic-potential` 可继续压缩候选，但等属性盘的稳定比较必须与最终结果统一使用“来源顺序、驱动盘 ID”字典序，不能形成互相支配或空槽。完整候选空间仍允许使用已声明安全的普通上界、后缀 Top-K 上界和异放 `releaseIntervalBound` 剪枝。
 - 优化输入以 `settings.fourPieceSetIds` 保存候选 4 件套，并兼容读取旧 `fourPieceSetId`；角色推荐以 `preferredDriveDiscs.defaultSetIds` 保存并兼容旧 `defaultSetId`。多套优化按候选顺序逐套调用单套严格内核，后续分支可复用当前全局第 10 名安全下界，最终结果必须严格等于各单套 Top 10 合并后的全局 Top 10。每条结果必须带实际 `fourPieceSetId`，总指标必须汇总预计量、进度与耗时并保留分套明细，取消必须覆盖准备、分支切换和分支内部计算。
 - 标准、白盒、compiled、dense、固定套装评分、乐观上界、Node 优化器和浏览器 Worker 必须按候选套装计数识别定向 2 件套，并携带同一 `skillTags`；拂晓生花 2 件套只提升有技能来源的普通攻击，不提升终结技或手填倍率事件。

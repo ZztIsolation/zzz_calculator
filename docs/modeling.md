@@ -7,6 +7,9 @@ v1 models an out-of-combat panel first, then an optional in-combat panel layer:
 1. Agent base stats are fixed at level 60. `damage.agentLevel` is modeled only
    for anomaly damage's level zone; it does not yet change base panel stats.
 2. Total Base ATK is `agent Base ATK + W-Engine Base ATK + Core Skill Base ATK`.
+   Armorer agents additionally use `agent Base DEF + W-Engine Base DEF + Core
+   Skill Base DEF`; a W-Engine stores exactly one of `level60.atkBase` and
+   `level60.defBase`.
 3. Out-of-combat stats are built from agent base stats, selected Core Skill
    level bonuses, W-Engine advanced stats, Drive Disc main stats, Drive Disc
    sub-stats, and unconditional Drive Disc set effects.
@@ -18,7 +21,7 @@ v1 models an out-of-combat panel first, then an optional in-combat panel layer:
    from self, teammate, W-Engine passives, Drive Disc 4-piece effects, targeted
    Drive Disc 2-piece event rules, boss or enemy effects, field effects, and
    manual corrections.
-7. Direct, anomaly, and disorder damage can be modeled as damage events in the
+7. Direct, sharp, anomaly, and disorder damage can be modeled as damage events in the
    same in-combat calculator. Authored skill groups can represent a fixed,
    source-checked rotation, but the calculator does not simulate action time,
    energy, Decibels, stance timers, or resource state transitions. Stun and
@@ -42,6 +45,67 @@ v1 models an out-of-combat panel first, then an optional in-combat panel layer:
     fifth-hit extra damage. Expanded child events retain runtime-only group,
     repeat, and per-group child counts so row limits validate the child count
     before the aggregate count enters damage and optimizer kernels.
+
+## Armorer / Sharp Domain
+
+`specialty: "armorer"` is a first-class damage domain. Its skill events use
+`kind: "sharp"`; the type alone selects DEF as the skill basis and the sharp
+double-critical formula.
+Ordinary direct and sheer events keep their existing 100% critical-rate cap.
+
+The shared formula is implemented in `core/sharpDamage.js`:
+
+```text
+out-of-combat CR = raw out-of-combat CR + out-of-combat CRIT DMG × 0.35
+Csharp = clamp(in-combat panel CR + sharp-target CR bonus, 0, 2)
+sharp crit zone (Csharp <= 1) = Csharp × (1 + L) + (1 - Csharp)
+sharp crit zone (1 < Csharp <= 2) = (1 + L) × (1 + (Csharp - 1) × L)
+```
+
+The initial CRIT DMG conversion is authored as a reusable out-of-combat
+derived rule carried by the agent's Core Passive. It reads the finalized
+out-of-combat `critDmg` panel and writes ordinary `critRate`; in-combat CRIT DMG
+does not participate. `L` starts at the profile's 150% laceration damage,
+aggregates on the in-combat panel exactly like `critDmg` (profile base plus
+panel-bound buffs such as Claret's additional ability and enemy-taken
+laceration bonuses), and then receives any remaining event-channel laceration
+modifiers. `sharpCrit`, `lacerationCrit`, and
+`nonCrit` are explicit result variants. A Maim skill row remains an ordinary
+skill multiplier and does not create a separate sharp component, gash, or
+scenario state.
+
+Sharp single-event white-box rows use the same layout as direct damage: DEF
+basis, skill multiplier, one sharp-crit zone, one combined damage zone, target
+DEF, resistance, stun, optional damage ratio/count, and final damage. The
+sharp-crit row displays the expected formula as `C × (1 + L) + (1 - C)` below
+100% CR and `(1 + L) × (1 + (C - 100%) × L)` from 100% through the 200% cap.
+Generic, elemental, and sharp-domain bonuses remain separate multiplicative
+factors inside the single damage-zone row. Blood Marrow is no longer a
+sharp-only modifier: its `marrow-overflow-damage` rule reads the completed
+in-combat `critRate` panel and adds the result to generic `dmgBonus`, so direct,
+sheer, sharp, anomaly, disorder, and release events consume the same bonus.
+The Luminescence team score keeps its dedicated formula and does not read this
+ordinary damage panel bonus. The
+white-box values use the same trimmed precision policy as direct damage; the
+underlying calculation values are unchanged.
+
+The four current Armorer W-Engines use the official dynamic Wiki revisions
+recorded in `data/sources/zzz-wiki-claret-armorer.json`. Blood Marrow stores one
+reusable `type: "formula"` rule with an `inCombatStat` source. The source uses
+percentage-point values (`118.8`, not `1.188`), while a `storedPercent` result
+is converted to the calculator's decimal panel value (`0.1504`).
+
+## Official Wiki Data Workflow
+
+For a refresh, open the public entry in a Playwright browser context first. In
+that same context request the official `entry_page` API with
+`x-rpc-wiki_app: zzz` and the official Baike Referer. Parse only the structured
+JSON in `data.page.modules[].components[].data`; DOM snapshots are not a
+numeric source. Filter the official W-Engine channel API by `特性/锋御`, then
+pin each accepted `page.id`, `page.version`, `status`, source URL, and fetch
+date before changing catalog JSON. The materializer is kept at
+`scripts/import-claret-official-data.mjs`; its expected revisions fail closed
+when an upstream page changes.
 
 ## Frontend / Backend Split
 
@@ -75,7 +139,7 @@ The model follows these game-system facts:
   selected Core Skill level, and six Drive Discs.
 - Core Skill enhancements can grant base-stat additions such as Base ATK and
   panel-stat additions such as CRIT Rate.
-- W-Engines provide Base ATK, an advanced stat, and a passive effect. The
+- W-Engines provide Base ATK or Base DEF, an advanced stat, and a passive effect. The
   passive effect only applies when the equipped agent's specialty matches the
   W-Engine specialty.
 - Drive Discs have six partitions. Partitions 1, 2, and 3 have fixed main
@@ -147,7 +211,9 @@ type ZzzStat =
   | "physicalResIgnore" | "fireResIgnore" | "iceResIgnore"
   | "electricResIgnore" | "etherResIgnore" | "windResIgnore"
   | "physicalDmg" | "fireDmg" | "iceDmg" | "electricDmg" | "etherDmg"
-  | "dmgBonus";
+  | "dmgBonus" | "lacerationDmg" | "sharpDmgBonus"
+  | "physicalSharpDmg" | "fireSharpDmg" | "iceSharpDmg"
+  | "electricSharpDmg" | "etherSharpDmg" | "windSharpDmg";
 
 interface AgentStaticData {
   id: string;
@@ -199,7 +265,8 @@ interface WEngineStaticData {
     source?: string;
   };
   level60: {
-    atkBase: number;
+    atkBase?: number;
+    defBase?: number;
     advancedStat?: { stat: ZzzStat; value: number };
   };
   effect: {
@@ -223,6 +290,7 @@ interface DriveDisc {
   mainStat: { stat: ZzzStat; value: number };
   subStats: Array<{ stat: ZzzStat; value: number }>;
 }
+
 
 interface DriveDiscSetStaticData {
   id: string;
@@ -578,6 +646,7 @@ interface InCombatRequest {
     events?: Array<
       | { id: string; kind: "direct"; stunned?: boolean; skillMultiplier?: number; skillRef?: InCombatRequest["damage"]["skillRef"]; damageBasis?: "atk" | "anomalyProficiency"; damageRatioPct?: number; critMode?: "expected" | "crit" | "nonCrit"; count?: number }
       | { id: string; kind: "sheer"; stunned?: boolean; skillMultiplier?: number; skillRef?: InCombatRequest["damage"]["skillRef"]; damageRatioPct?: number; critMode?: "expected" | "crit" | "nonCrit"; count?: number }
+      | { id: string; kind: "sharp"; stunned?: boolean; skillMultiplier?: number; skillRef?: InCombatRequest["damage"]["skillRef"]; damageRatioPct?: number; critMode?: "expected" | "nonCrit" | "sharpCrit" | "lacerationCrit"; count?: number }
       | { id: string; kind: "anomaly"; stunned?: boolean; anomalyEffect: "assault" | "shatter" | "burn" | "shock" | "corruption"; anomalyVariant?: "normal" | "polarizedAssault"; damageRatioPct?: number; procCount?: number; count?: number }
       | { id: string; kind: "anomaly"; settlementType: "release"; stunned?: boolean; anomalyEffect: "assault" | "shatter" | "burn" | "shock" | "corruption"; triggerActorRef: { agentId: string; profileId: string }; anomalySource: { actorRef: { agentId: string }; snapshot?: AnomalyUnitSourceSnapshot }; damageRatioPct?: number; count?: number }
       | { id: string; kind: "disorder"; stunned?: boolean; previousAnomalyEffect: "burn" | "shock" | "corruption" | "frozen" | "flinch"; disorderType?: "normal" | "polarized"; damageRatioPct?: number; elapsedSeconds: number; count?: number }
@@ -859,6 +928,14 @@ stored value is multiplied by `factor`. Multiple matching modifiers multiply
 together. If the target Buff is not active, the modifier contributes no value.
 This is used for Youye's Cinema 1, which multiplies her additional ability's
 `anomalyDamageBonus` and `disorderDamageBonus` rules by `1.3`.
+
+An active modifier may also target a skill multiplier row. In that case,
+`targetBuffIds` uses the stable skill-row owner key
+`skill:<agentSkillId>:<categoryId>:<moveId>` and `targetEffectIds` contains the
+skill row id. The factor is applied while resolving that catalog row, before
+the damage event is sent through the normal, compiled, or dense calculation
+paths. This preserves the distinction between multiplying one stored skill
+multiplier and adding a general damage bonus.
 
 Every rule can choose an amplification target:
 
@@ -1470,11 +1547,11 @@ For Ye Shunguang at Core Skill F:
 base.atk = 863 + 743 + 75 = 1681
 ```
 
-HP and DEF do not receive W-Engine base values:
+Ordinary W-Engines contribute Base ATK; Armorer W-Engines contribute Base DEF:
 
 ```text
 base.hp = agent.level60.hpBase
-base.def = agent.level60.defBase
+base.def = agent.level60.defBase + wEngine.level60.defBase + coreSkill.defBase
 ```
 
 If a future Core Skill grants Base HP or Base DEF, those additions should enter

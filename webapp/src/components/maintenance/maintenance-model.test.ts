@@ -1,10 +1,33 @@
 import { describe, expect, it } from "vitest"
 import { cloneForCreate, maskedPreview, prepareDraft } from "./maintenance-model"
 import {
-  agentOptions, DAMAGE_ELEMENT_OPTIONS, DIRECT_DAMAGE_ELEMENT_OPTIONS, effectSummary, EVENT_STATS, PANEL_STATS, statOptions,
+  agentOptions, buffCandidates, DAMAGE_ELEMENT_OPTIONS, DIRECT_DAMAGE_ELEMENT_OPTIONS, effectSummary, EVENT_STATS, PANEL_STATS, statOptions,
 } from "./maintenance-options"
 
 describe("maintenance structured model", () => {
+  it("offers skill multiplier rows as Buff modifier targets", () => {
+    const candidates = buffCandidates({
+      agents: { agents: [{ id: "agent_a", name: { zhCN: "角色甲" } }] },
+      agentSkills: {
+        agentSkills: [{
+          id: "agent_a",
+          agentId: "agent_a",
+          categories: [{
+            id: "special",
+            moves: [{
+              id: "special_move",
+              name: { zhCN: "特殊技" },
+              rows: [{ id: "maim", kind: "damageMultiplier", label: { zhCN: "毁伤伤害倍率" }, values: [100] }],
+            }],
+          }],
+        }],
+      },
+    })
+    const target = candidates.find(item => item.value === "skill:agent_a:special:special_move")
+    expect(target?.label).toBe("技能｜角色甲｜特殊技")
+    expect(effectSummary(target?.effects[0], {})).toBe("毁伤伤害倍率")
+  })
+
   it("migrates Luminescence drafts to the minimal team-score event structure", () => {
     const draft = prepareDraft("agents", {
       defaultCalculationConfig: {
@@ -415,5 +438,33 @@ describe("maintenance structured model", () => {
       }],
     })
     expect(JSON.stringify(agent.skillGroups)).not.toContain("requiresPotentialLevel")
+  })
+
+  it("strips legacy sharp component and scenario fields from drafts", () => {
+    const agent = prepareDraft("agents", {
+      defaultCalculationConfig: {
+        events: [{
+          id: "sharp-event",
+          kind: "sharp",
+          sharpProfileId: "armorer",
+          sharpComponent: "maim",
+          maimTrigger: "gash",
+          sharpScenario: { crimsonInscription: true, gashStacks: 3 },
+        }],
+      },
+      skillGroups: [{
+        events: [{ id: "group-sharp", kind: "sharp", sharpComponent: "normal" }],
+      }],
+    })
+    const skills = prepareDraft("agent-skills", {
+      categories: [{
+        moves: [{ rows: [{ label: { zhCN: "毁伤" }, values: [100], sharpComponent: "maim", maimTrigger: "gash" }] }],
+      }],
+    })
+    for (const value of [agent, skills]) {
+      for (const key of ["sharpProfileId", "sharpComponent", "maimTrigger", "sharpScenario"]) {
+        expect(JSON.stringify(value)).not.toContain(`"${key}"`)
+      }
+    }
   })
 })

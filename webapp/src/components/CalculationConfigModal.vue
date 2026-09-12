@@ -9,6 +9,7 @@ import {
   defaultDamageConfig,
   hasAdminDefaultCalculation,
   isDamageModeAllowedForAgent,
+  isArmorerAgent,
   isRuptureAgent,
   normalizeDamageModeForAgent,
 } from "@/stores/build"
@@ -92,6 +93,7 @@ const releaseSnapshotError = ref("")
 const isAdminDefaultMode = computed(() => draft.value.mode === "adminDefault")
 const canEditEventStructure = computed(() => draft.value.mode === "custom")
 const canUseSheerDamage = computed(() => isRuptureAgent(props.agent))
+const canUseSharpDamage = computed(() => isArmorerAgent(props.agent))
 const canUseAdminDefault = computed(() => hasAdminDefaultCalculation(props.agent, props.cinemaLevel ?? 0, props.potentialLevel ?? 0))
 const adminCalculationConfig = computed(() => resolveDefaultCalculationConfig(
   props.agent?.defaultCalculationConfig,
@@ -105,8 +107,9 @@ const skillGroupOptions = computed(() => skillGroups.value.map((group: any) => (
   value: group.id,
 })))
 const calculationModeOptions = computed(() => [
-  !canUseSheerDamage.value ? { label: "最大化单个技能伤害", value: "single" } : null,
+  !canUseSheerDamage.value && !canUseSharpDamage.value ? { label: "最大化单个技能伤害", value: "single" } : null,
   canUseSheerDamage.value ? { label: "最大化贯穿伤害", value: "sheer" } : null,
+  canUseSharpDamage.value ? { label: "最大化锐化伤害", value: "sharp" } : null,
   { label: "最大化异常伤害", value: "anomaly" },
   { label: canUseAdminDefault.value ? labelOf(adminCalculationConfig.value) : "管理员默认循环（未配置）", value: "adminDefault", disabled: !canUseAdminDefault.value },
   { label: "自定义", value: "custom" },
@@ -115,6 +118,12 @@ const critModeOptions = [
   { label: "期望", value: "expected" },
   { label: "暴击", value: "crit" },
   { label: "不暴击", value: "nonCrit" },
+]
+const sharpCritModeOptions = [
+  { label: "期望", value: "expected" },
+  { label: "不触发锐暴", value: "nonCrit" },
+  { label: "一次锐暴", value: "sharpCrit" },
+  { label: "二次锐暴", value: "lacerationCrit" },
 ]
 const releaseProfiles = computed(() => anomalyReleaseProfiles(props.agent))
 const supportsRelease = computed(() => releaseProfiles.value.length > 0)
@@ -138,6 +147,7 @@ const anomalyVariantOptions = [
 function eventForMode(mode: string) {
   if (mode === "sheer") return newEvent("sheer")
   if (mode === "anomaly") return newEvent("anomaly")
+  if (mode === "sharp") return newEvent("sharp")
   return newEvent("direct")
 }
 
@@ -432,6 +442,10 @@ function eventStunValue(event: any) {
   return event?.stunned !== false
 }
 
+function critOptionsForEvent(event: any) {
+  return event?.kind === "sharp" ? sharpCritModeOptions : critModeOptions
+}
+
 function skillGroupChildTotalCount(childEvent: any, groupEvent: any = selectedEvent.value) {
   return eventCount(childEvent) * eventCount(groupEvent)
 }
@@ -502,7 +516,7 @@ function skillRows(category: any, move: any) {
 }
 
 function isDirectSkillEvent(event: any) {
-  return event?.kind === "direct" || event?.kind === "sheer"
+  return event?.kind === "direct" || event?.kind === "sheer" || event?.kind === "sharp"
 }
 
 function firstCategoryWithDamageRows() {
@@ -554,22 +568,34 @@ function selectedSkillSelection(event: any) {
   return skillSelection(event?.skillRef?.categoryId, event?.skillRef?.moveId, event?.skillRef?.rowId)
 }
 
+function stripLegacySharpFields(event: any) {
+  if (event?.kind !== "sharp") return event
+  const {
+    sharpProfileId: _sharpProfileId,
+    sharpComponent: _sharpComponent,
+    maimTrigger: _maimTrigger,
+    sharpScenario: _sharpScenario,
+    ...cleanEvent
+  } = event
+  return cleanEvent
+}
+
 function eventWithSkillSelection(event: any) {
   if (!isDirectSkillEvent(event)) {
-    return event
+    return stripLegacySharpFields(event)
   }
   const selection = selectedSkillSelection(event)
   if (!selection) {
-    return event
+    return stripLegacySharpFields(event)
   }
-  return {
+  return stripLegacySharpFields({
     ...event,
     skillMultiplier: selection.skillMultiplier,
     skillRef: selection.skillRef,
     ...(selection.eventCountRange
       ? { count: normalizedCountForRange(event?.count, selection.eventCountRange) }
       : {}),
-  }
+  })
 }
 
 function normalizeDraftSkillSelections() {
@@ -1011,6 +1037,9 @@ function addEvent(kind: string) {
   if (kind === "sheer" && !canUseSheerDamage.value) {
     return
   }
+  if (kind === "sharp" && !canUseSharpDamage.value) {
+    return
+  }
   if (kind === "skillGroup" && !hasSkillGroups.value) {
     return
   }
@@ -1047,7 +1076,8 @@ function removeEvent(eventId = selectedEvent.value?.id) {
   }
   const currentIndex = (draft.value.events ?? []).findIndex((event: any) => event.id === current.id)
   const events = draft.value.events.filter((event: any) => event.id !== current.id)
-  draft.value.events = events.length ? events : [newEvent("direct")]
+  const fallbackKind = canUseSharpDamage.value ? "sharp" : canUseSheerDamage.value ? "sheer" : "direct"
+  draft.value.events = events.length ? events : [newEvent(fallbackKind)]
   const nextIndex = Math.max(0, Math.min(currentIndex, draft.value.events.length - 1))
   draft.value.selectedEventId = draft.value.events[nextIndex]?.id
   draft.value.mode = "custom"
@@ -1062,6 +1092,9 @@ function applyMode(mode: string) {
   } else if (nextMode === "sheer") {
     draft.value.events = [newEvent("sheer")]
     draft.value.selectedEventId = draft.value.events[0].id
+  } else if (nextMode === "sharp") {
+    draft.value.events = [newEvent("sharp")]
+    draft.value.selectedEventId = draft.value.events[0].id
   } else if (nextMode === "anomaly") {
     draft.value.events = [newEvent("anomaly")]
     draft.value.selectedEventId = draft.value.events[0].id
@@ -1069,6 +1102,7 @@ function applyMode(mode: string) {
     const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0, props.potentialLevel ?? 0)
     draft.value.events = JSON.parse(JSON.stringify(fallback.events ?? [newEvent("direct")]))
     draft.value.selectedEventId = fallback.selectedEventId ?? draft.value.events[0]?.id
+    draft.value.skillLevelsByCategory = JSON.parse(JSON.stringify(fallback.skillLevelsByCategory ?? {}))
   }
 }
 
@@ -1096,7 +1130,7 @@ const eventWarnings = computed(() => {
     return warnings
   }
   if (damageEventNeedsSkillMultiplier(event, props.meta, props.skillCatalog)) {
-    warnings.push("直伤/贯穿事件需要技能倍率")
+    warnings.push("技能伤害事件需要技能倍率")
   }
   if (isReleaseSettlement(event)) {
     if (!supportsRelease.value) warnings.push("当前角色暂不支持异放")
@@ -1126,6 +1160,7 @@ const eventWarnings = computed(() => {
 })
 function applySkill(value: any) {
   const countRange = normalizeEventCountRange(value.eventCountRange)
+  const selection = skillSelection(value.skillRef?.categoryId, value.skillRef?.moveId, value.skillRef?.rowId)
   updateSelectedEvent({
     skillMultiplier: value.skillMultiplier,
     skillRef: value.skillRef,
@@ -1364,6 +1399,7 @@ function save() {
             <div v-if="canEditEventStructure && !(draft.events ?? []).some(isLuminescenceSettlement)" class="toolbar calculation-add-toolbar">
               <NButton class="calculation-add-button" size="medium" @click="addEvent('direct')">添加技能</NButton>
               <NButton v-if="canUseSheerDamage" class="calculation-add-button" size="medium" @click="addEvent('sheer')">添加贯穿</NButton>
+              <NButton v-if="canUseSharpDamage" class="calculation-add-button" size="medium" @click="addEvent('sharp')">添加锐化</NButton>
               <NButton class="calculation-add-button" size="medium" @click="addEvent('anomaly')">添加异常事件</NButton>
               <NButton v-if="hasSkillGroups" class="calculation-add-button" size="medium" @click="addEvent('skillGroup')">添加技能组</NButton>
             </div>
@@ -1473,42 +1509,42 @@ function save() {
                 <span class="metric-title">组内事件</span>
                 <div class="metric-value"><span class="calculation-readonly-value">{{ skillGroupEventCount(selectedSkillGroup()) }} 项</span></div>
               </div>
-              <div v-if="['direct', 'sheer'].includes(selectedEvent?.kind) && skillCategoryOptions.length" class="metric calculation-editor-field calculation-editor-field-medium ui-field" data-layout-field>
+              <div v-if="['direct', 'sheer', 'sharp'].includes(selectedEvent?.kind) && skillCategoryOptions.length" class="metric calculation-editor-field calculation-editor-field-medium ui-field" data-layout-field>
                 <span class="metric-title">技能大类</span>
                 <div class="metric-value">
                   <span v-if="isAdminDefaultMode" class="calculation-readonly-value">{{ selectedSkillCategoryLabel(selectedEvent) }}</span>
                   <NSelect v-else :value="selectedCategoryId(selectedEvent)" :options="skillCategoryOptions" aria-label="技能大类" @update:value="updateSkillCategory(String($event))" />
                 </div>
               </div>
-              <div v-if="['direct', 'sheer'].includes(selectedEvent?.kind) && skillCategoryOptions.length" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field>
+              <div v-if="['direct', 'sheer', 'sharp'].includes(selectedEvent?.kind) && skillCategoryOptions.length" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field>
                 <span class="metric-title">招式</span>
                 <div class="metric-value">
                   <span v-if="isAdminDefaultMode" class="calculation-readonly-value">{{ selectedSkillMoveLabel(selectedEvent) }}</span>
                   <NSelect v-else :value="selectedMoveId(selectedEvent)" :options="moveOptions(selectedEvent)" aria-label="招式" @update:value="updateSkillMove(String($event))" />
                 </div>
               </div>
-              <div v-if="['direct', 'sheer'].includes(selectedEvent?.kind) && skillCategoryOptions.length" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field>
+              <div v-if="['direct', 'sheer', 'sharp'].includes(selectedEvent?.kind) && skillCategoryOptions.length" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field>
                 <span class="metric-title">倍率行</span>
                 <div class="metric-value">
                   <span v-if="isAdminDefaultMode" class="calculation-readonly-value">{{ selectedSkillRowLabel(selectedEvent) }}</span>
                   <NSelect v-else :value="selectedRowId(selectedEvent)" :options="rowOptions(selectedEvent)" aria-label="倍率行" @update:value="updateSkillRow(String($event))" />
                 </div>
               </div>
-              <div v-if="['direct', 'sheer'].includes(selectedEvent?.kind) && !skillCategoryOptions.length" class="metric calculation-editor-field calculation-editor-field-medium ui-field" data-layout-field>
+              <div v-if="['direct', 'sheer', 'sharp'].includes(selectedEvent?.kind) && !skillCategoryOptions.length" class="metric calculation-editor-field calculation-editor-field-medium ui-field" data-layout-field>
                 <span class="metric-title">技能倍率%</span>
                 <div class="metric-value">
                   <span v-if="isAdminDefaultMode" class="calculation-readonly-value">{{ Number(selectedEvent?.skillMultiplier ?? 100) }}%</span>
                   <NInputNumber v-else :value="selectedEvent?.skillMultiplier ?? 100" :min="0" :step="0.1" aria-label="技能倍率百分比" @update:value="updateSelectedEvent({ skillMultiplier: Number($event ?? 0) })" />
                 </div>
               </div>
-              <div v-if="['direct', 'sheer'].includes(selectedEvent?.kind)" class="metric calculation-editor-field calculation-editor-field-short ui-field" data-layout-field>
+              <div v-if="['direct', 'sheer', 'sharp'].includes(selectedEvent?.kind)" class="metric calculation-editor-field calculation-editor-field-short ui-field" data-layout-field>
                 <span class="metric-title">暴击模式</span>
                 <div class="metric-value">
-                  <span v-if="isAdminDefaultMode" class="calculation-readonly-value">{{ optionLabel(critModeOptions, selectedEvent?.critMode ?? 'expected') }}</span>
+                  <span v-if="isAdminDefaultMode" class="calculation-readonly-value">{{ optionLabel(critOptionsForEvent(selectedEvent), selectedEvent?.critMode ?? 'expected') }}</span>
                   <NSelect
                     v-else
                     :value="selectedEvent?.critMode ?? 'expected'"
-                    :options="critModeOptions"
+                    :options="critOptionsForEvent(selectedEvent)"
                     aria-label="暴击模式"
                     @update:value="updateSelectedEvent({ critMode: $event })"
                   />
@@ -1676,7 +1712,7 @@ function save() {
                 <div><dt>异放最终倍率</dt><dd>{{ formatDisorderMultiplier(selectedReleaseBreakdown.currentMultiplier) }}</dd></div>
               </dl>
             </section>
-            <div v-if="['direct', 'sheer'].includes(selectedEvent?.kind)" class="toolbar" :class="{ 'calculation-readonly-summary': isAdminDefaultMode }">
+            <div v-if="['direct', 'sheer', 'sharp'].includes(selectedEvent?.kind)" class="toolbar" :class="{ 'calculation-readonly-summary': isAdminDefaultMode }">
               <template v-if="isAdminDefaultMode">
                 <Lock :size="15" />
                 <span>{{ selectedSkillSummary(selectedEvent) }}</span>
@@ -1728,6 +1764,23 @@ function save() {
 </template>
 
 <style scoped>
+.sharp-scenario {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px 0;
+  border-top: 1px solid var(--app-border);
+  border-bottom: 1px solid var(--app-border);
+}
+
+.sharp-scenario .metric {
+  min-width: 0;
+}
+
+.sharp-scenario :deep(.n-input-number) {
+  width: 100%;
+}
+
 .calculation-grid {
   min-width: 0;
 }
@@ -2317,6 +2370,10 @@ function save() {
 }
 
 @container ui-layout (max-width: 760px) {
+  .sharp-scenario {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .calculation-editor-panel {
     min-height: 0;
   }
