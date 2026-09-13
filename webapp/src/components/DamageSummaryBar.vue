@@ -15,7 +15,6 @@ const isLuminescenceScore = computed(() => ["luminescenceTeamScore", "luminescen
 const displayedDamage = computed(() => isLuminescenceScore.value
   ? damage.value?.score ?? damage.value?.finalDamage ?? damage.value?.totalFinalDamage ?? 0
   : damage.value?.totalFinalDamage ?? damage.value?.finalDamage ?? 0)
-const eventCount = computed(() => props.result?.damage?.events?.length ?? props.result?.damage?.eventResults?.length ?? 1)
 const scalarBlocked = computed(() => props.result?.damage?.scalarReady === false)
 const damageLabel = computed(() => isLuminescenceScore.value ? "当前队伍异常评分" : "当前最终伤害")
 const displayedValue = computed(() => {
@@ -40,8 +39,6 @@ const statusText = computed(() => props.error
       <NTag :type="statusType" round>
         {{ statusText }}
       </NTag>
-      <NTag round>事件 {{ eventCount }}</NTag>
-      <NTag round>局内面板</NTag>
     </div>
   </section>
 </template>

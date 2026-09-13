@@ -629,6 +629,19 @@ describe("MaintenanceView structured editor", () => {
     expect(body.combatBuffs.corePassive.effects[0].coverage).toEqual({ default: 0.4, min: 0, max: 1, step: 0.1 })
   })
 
+  it("edits and saves excluded specialty requirements", async () => {
+    const { wrapper, fetchMock } = await mountView()
+    const rule = wrapper.find(".maintenance-rule-card")
+    const excludedSpecialty = field(rule, "排除特性").find("select")
+    await excludedSpecialty.setValue(["armorer"])
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("完整目录已刷新"))
+
+    const call = fetchMock.mock.calls.find(([url, init]) => url === "/api/maintenance/agents" && init?.method === "POST")!
+    const body = JSON.parse(String(call[1]?.body ?? "{}"))
+    expect(body.combatBuffs.corePassive.effects[0].requirement.excludedSpecialties).toEqual(["armorer"])
+  })
+
   it("renders complete cascading selectors when an effect targets a skill", async () => {
     const { wrapper } = await mountView()
     const rule = wrapper.find(".maintenance-rule-card")

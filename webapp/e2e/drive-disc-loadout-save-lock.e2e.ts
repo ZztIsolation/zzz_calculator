@@ -184,7 +184,7 @@ async function prepareOptimizedScheme(page: Page): Promise<void> {
   const startOptimization = page.getByRole("button", { name: "开始优化", exact: true })
   await expect(startOptimization).toBeEnabled()
   await startOptimization.click()
-  await expect(page.getByRole("button", { name: "优化结果", exact: true })).toBeEnabled({ timeout: 20_000 })
+  await expect(page.getByRole("radio", { name: "优化结果", exact: true })).toBeEnabled({ timeout: 20_000 })
   await expect(page.locator('.drive-disc-workbench-panel .disc-slot-card[data-slot="1"]')).toContainText("啄木鸟电音")
   await expect(page.locator('.drive-disc-workbench-panel .disc-slot-card[data-slot="6"]')).toContainText("激素朋克")
   await expect(page.getByRole("button", { name: "存为套装", exact: true })).toBeEnabled()
