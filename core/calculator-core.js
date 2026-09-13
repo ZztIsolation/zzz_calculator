@@ -1197,9 +1197,11 @@ function effectRuleRequirementMatches(rule = {}, modifierContext = {}) {
     const requiredSpecialty = String(rule?.requirement?.specialty ?? "").trim()
     const requiredAttribute = String(rule?.requirement?.attribute ?? "").trim()
     const excludedAgentIds = stringArray(rule?.requirement?.excludedAgentIds)
+    const excludedSpecialties = stringArray(rule?.requirement?.excludedSpecialties)
     return (!requiredSpecialty || requiredSpecialty === modifierContext.agent?.specialty)
         && (!requiredAttribute || requiredAttribute === modifierContext.agent?.attribute)
         && (!excludedAgentIds.length || !excludedAgentIds.includes(String(modifierContext.agent?.id ?? "")))
+        && (!excludedSpecialties.length || !excludedSpecialties.includes(String(modifierContext.agent?.specialty ?? "")))
         && (
             !hasOutOfCombatStatRequirement(rule)
             || outOfCombatStatRequirementMatches(rule.requirement, modifierContext.outOfCombat?.panel)
@@ -10157,4 +10159,3 @@ export function calculateInCombatPanel(catalog, input) {
         damage,
     })
 }
-

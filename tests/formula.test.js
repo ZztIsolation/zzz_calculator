@@ -6,6 +6,10 @@ import {
     loadCalculatorContext,
 } from "../backend/calculator.js"
 import { validateMaintenanceItem } from "../core/maintenanceValidation.js"
+import {
+    defaultRuntimeForBuff,
+    normalizeRuntimeForBuff,
+} from "../core/shared-combat.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCalculatorContext(rootDir)
@@ -16,6 +20,7 @@ const expectedTeammateProfiles = {
     caesar_king: ["physical", "defense"],
     jane_doe: ["physical", "anomaly"],
     juhufu: ["fire", "stun"],
+    koleda: ["fire", "stun"],
     lighter: ["fire", "stun"],
     liuyin: ["physical", "stun"],
     lucia_elowen: ["ether", "support"],
@@ -53,8 +58,8 @@ function countTeammateProfile(index) {
     }, {})
 }
 
-assert.deepEqual(countTeammateProfile(0), { electric: 6, ether: 4, fire: 6, ice: 3, lumiflux: 1, physical: 6 })
-assert.deepEqual(countTeammateProfile(1), { anomaly: 4, attack: 3, defense: 3, stun: 8, support: 8 })
+assert.deepEqual(countTeammateProfile(0), { electric: 6, ether: 4, fire: 7, ice: 3, lumiflux: 1, physical: 6 })
+assert.deepEqual(countTeammateProfile(1), { anomaly: 4, attack: 3, defense: 3, stun: 9, support: 8 })
 
 function clone(value) {
     return JSON.parse(JSON.stringify(value))
@@ -247,6 +252,278 @@ approx(
     900,
     "Existing derived ratio Buff should keep using sourceValue * ratio / 100",
 )
+
+const rinaGroup = catalog.teammateCombatBuffGroups.find(group => group.id === "rina")
+assert.ok(rinaGroup, "Rina teammate Buff group should exist")
+assert.equal(rinaGroup.images?.icon, "/assets/agents/rina.png")
+const rinaPotentialBuffs = rinaGroup.buffs.filter(buff => buff.id === "rina.potential.perfect_service")
+assert.equal(rinaPotentialBuffs.length, 1, "Rina potential teammate Buffs should be one combined Buff")
+const rinaPotentialBuff = rinaPotentialBuffs[0]
+assert.deepEqual(rinaPotentialBuff.runtimeParameters, [{
+    id: "potentialLevel",
+    label: { zhCN: "潜能觉醒等级" },
+    kind: "enum",
+    values: ["P2", "P3", "P4", "P5", "P6"],
+    defaultValue: "P6",
+}])
+const rinaScaling = {
+    2: { atk: 216, def: 180, atkRatio: 300, defRatio: 250 },
+    3: { atk: 302.4, def: 252, atkRatio: 420, defRatio: 350 },
+    4: { atk: 396, def: 324, atkRatio: 550, defRatio: 450 },
+    5: { atk: 482.4, def: 396, atkRatio: 670, defRatio: 550 },
+    6: { atk: 576, def: 468, atkRatio: 800, defRatio: 650 },
+}
+for (const level of [2, 3, 4, 5, 6]) {
+    const levelKey = `P${level}`
+    const matchingEffects = rinaPotentialBuff.effects.filter(effect => effect.requirement?.runtimeParameter?.oneOf?.includes(levelKey))
+    assert.equal(matchingEffects.length, 2)
+    assert.deepEqual(matchingEffects.map(effect => effect.stat), ["atkFlat", "defFlat"])
+    for (const effect of matchingEffects) {
+        assert.equal(effect.type, "derived")
+        assert.equal(effect.sourceLabel.zhCN, "丽娜自身穿透率")
+        assert.equal(effect.defaultSourceValue, 72)
+        assert.deepEqual(effect.coverage, { default: 1, min: 0, max: 1, step: 0.1 })
+    }
+    assert.deepEqual(
+        matchingEffects.map(effect => ({ stat: effect.stat, ratio: effect.ratio, cap: effect.cap })),
+        [
+            { stat: "atkFlat", ratio: rinaScaling[level].atkRatio, cap: 576 },
+            { stat: "defFlat", ratio: rinaScaling[level].defRatio, cap: 468 },
+        ],
+    )
+
+    const defaultResult = calculateInCombatPanel(catalog, {
+        ...input,
+        combatBuffs: {
+            activeBuffIds: [rinaPotentialBuff.id],
+            runtimeInputs: { [rinaPotentialBuff.id]: { parameters: { potentialLevel: levelKey } } },
+        },
+    })
+    approx(defaultResult.inCombat.panel.atk - defaultResult.outOfCombat.panel.atk, rinaScaling[level].atk,
+        `Rina P${level} default ATK conversion`)
+    approx(defaultResult.inCombat.panel.def - defaultResult.outOfCombat.panel.def, rinaScaling[level].def,
+        `Rina P${level} default DEF conversion`)
+    assert.equal(defaultResult.inCombat.panel.penRatio, defaultResult.outOfCombat.panel.penRatio,
+        `Rina P${level} should not add PEN Ratio to the current agent`)
+    assert.deepEqual(
+        defaultResult.inCombat.activeEffects[0].resolvedStats.map(stat => stat.stat),
+        ["atkFlat", "defFlat"],
+        `Rina P${level} should only provide ATK and DEF flat Buffs`,
+    )
+}
+
+const rinaDefaultRuntime = defaultRuntimeForBuff(rinaPotentialBuff)
+assert.equal(rinaDefaultRuntime.parameters.potentialLevel, "P6")
+assert.equal(rinaDefaultRuntime.effects.rina_potential_atk_p2.sourceValue, 72)
+assert.equal(rinaDefaultRuntime.effects.rina_potential_def_p6.sourceValue, 72)
+const rinaP2Runtime = {
+    rina_potential_atk_p2: { sourceValue: 10 },
+    rina_potential_def_p2: { sourceValue: 10 },
+}
+const rinaNormalizedRuntime = normalizeRuntimeForBuff(rinaPotentialBuff, {
+    parameters: { potentialLevel: "P2" },
+    effects: { rina_potential_atk_p2: { sourceValue: 10 } },
+})
+assert.equal(rinaNormalizedRuntime.parameters.potentialLevel, "P2")
+assert.equal(rinaNormalizedRuntime.effects.rina_potential_atk_p2.sourceValue, 10)
+assert.equal(rinaNormalizedRuntime.effects.rina_potential_def_p2.sourceValue, 10)
+const rinaLowSource = calculateInCombatPanel(catalog, {
+    ...input,
+    combatBuffs: {
+        activeBuffIds: [rinaPotentialBuff.id],
+        runtimeInputs: {
+            [rinaPotentialBuff.id]: { parameters: { potentialLevel: "P2" }, effects: rinaP2Runtime },
+        },
+    },
+})
+approx(rinaLowSource.inCombat.panel.atk - rinaLowSource.outOfCombat.panel.atk, 30,
+    "Rina P2 should use the saved external PEN snapshot for ATK")
+approx(rinaLowSource.inCombat.panel.def - rinaLowSource.outOfCombat.panel.def, 25,
+    "Rina P2 should use the saved external PEN snapshot for DEF")
+assert.equal(rinaLowSource.inCombat.activeEffects[0].runtime.parameters.potentialLevel, "P2")
+assert.equal(rinaLowSource.inCombat.activeEffects[0].runtime.effects.rina_potential_atk_p2.sourceValue, 10)
+assert.equal(rinaLowSource.inCombat.activeEffects[0].runtime.effects.rina_potential_def_p2.sourceValue, 10)
+const rinaCappedSource = calculateInCombatPanel(catalog, {
+    ...input,
+    combatBuffs: {
+        activeBuffIds: [rinaPotentialBuff.id],
+        runtimeInputs: {
+            [rinaPotentialBuff.id]: {
+                parameters: { potentialLevel: "P2" },
+                effects: {
+                    rina_potential_atk_p2: { sourceValue: 300 },
+                    rina_potential_def_p2: { sourceValue: 300 },
+                },
+            },
+        },
+    },
+})
+approx(rinaCappedSource.inCombat.panel.atk - rinaCappedSource.outOfCombat.panel.atk, 576,
+    "Rina P2 ATK conversion should honor its cap")
+approx(rinaCappedSource.inCombat.panel.def - rinaCappedSource.outOfCombat.panel.def, 468,
+    "Rina P2 DEF conversion should honor its cap")
+
+const koledaGroup = catalog.teammateCombatBuffGroups.find(group => group.id === "koleda")
+assert.ok(koledaGroup, "Koleda teammate Buff group should exist")
+assert.equal(koledaGroup.attribute, "fire")
+assert.equal(koledaGroup.specialty, "stun")
+assert.equal(koledaGroup.images?.icon, "/assets/agents/koleda.png")
+assert.deepEqual(
+    koledaGroup.buffs.map(buff => buff.id),
+    [
+        "koleda.additional_ability.chain_damage",
+        "koleda.enhanced_basic.team_damage",
+        "koleda.potential.demolition_operation",
+    ],
+    "Koleda teammate Buffs should stay in authored order",
+)
+const koledaAdditional = koledaGroup.buffs[0]
+assert.equal(koledaAdditional.effects[0].target.skillTargets[0].skillType, "chain")
+assert.equal(koledaAdditional.effects[0].stat, "dmgBonus")
+assert.equal(koledaAdditional.effects[0].valuePerStack, 35)
+assert.equal(koledaAdditional.effects[0].maxStacks, 2)
+assert.equal(koledaAdditional.effects[0].defaultStacks, 2)
+assert.equal(koledaAdditional.effects[0].requirement.eventStunned, true)
+const koledaEnhancedBasic = koledaGroup.buffs[1]
+assert.equal(koledaEnhancedBasic.effects[0].stat, "dmgBonus")
+assert.equal(koledaEnhancedBasic.effects[0].value, 35)
+assert.equal(koledaEnhancedBasic.effects[0].durationSeconds, 40)
+const koledaPotential = koledaGroup.buffs[2]
+assert.deepEqual(koledaPotential.runtimeParameters, [{
+    id: "potentialLevel",
+    label: { zhCN: "潜能觉醒等级" },
+    kind: "enum",
+    values: ["P2", "P3", "P4", "P5", "P6"],
+    defaultValue: "P6",
+}])
+
+function koledaRuntime(buff, runtime = {}) {
+    return { [buff.id]: runtime }
+}
+
+function koledaAriaResult(activeBuffIds, damage, runtimeInputs = {}) {
+    return calculateInCombatPanel(catalog, {
+        agentId: "aria",
+        coreSkillLevel: "F",
+        wEngineId: "zzz_wiki_1883",
+        driveDiscs: [],
+        combatBuffs: { activeBuffIds, runtimeInputs },
+        damage,
+    })
+}
+
+const koledaChainDamage = {
+    selectedEventId: "koleda-chain",
+    events: [{
+        id: "koleda-chain",
+        kind: "direct",
+        stunned: true,
+        skillRef: {
+            agentSkillId: "aria",
+            categoryId: "chain",
+            moveId: "chain_dream_collaboration",
+            rowId: "damage",
+        },
+    }],
+    target: { defense: 953, levelCoefficient: 794, resistanceByElement: { ether: 0 } },
+}
+const koledaChainBase = koledaAriaResult([], koledaChainDamage)
+for (const stacks of [0, 1, 2]) {
+    const result = koledaAriaResult(
+        [koledaAdditional.id],
+        koledaChainDamage,
+        koledaRuntime(koledaAdditional, { effects: { koleda_additional_chain_damage: { stacks } } }),
+    )
+    approx(
+        result.damage.events[0].multipliers.dmg / koledaChainBase.damage.events[0].multipliers.dmg,
+        1 + stacks * 0.35,
+        `Koleda chain Buff should apply ${stacks} stacks only`,
+    )
+}
+const koledaUnstunnedChain = koledaAriaResult([koledaAdditional.id], {
+    ...koledaChainDamage,
+    events: [{ ...koledaChainDamage.events[0], stunned: false }],
+})
+approx(
+    koledaUnstunnedChain.damage.events[0].multipliers.dmg,
+    koledaChainBase.damage.events[0].multipliers.dmg,
+    "Koleda chain Buff should not affect an unstunned event",
+)
+const koledaBasicDamage = {
+    selectedEventId: "koleda-basic",
+    events: [{
+        id: "koleda-basic",
+        kind: "direct",
+        stunned: true,
+        skillRef: {
+            agentSkillId: "aria",
+            categoryId: "basic",
+            moveId: "absolute_pitch",
+            rowId: "charge_3_damage",
+        },
+    }],
+    target: { defense: 953, levelCoefficient: 794, resistanceByElement: { ether: 0 } },
+}
+const koledaBasicBase = koledaAriaResult([], koledaBasicDamage)
+const koledaBasicWithChainBuff = koledaAriaResult([koledaAdditional.id], koledaBasicDamage)
+approx(
+    koledaBasicWithChainBuff.damage.events[0].multipliers.dmg,
+    koledaBasicBase.damage.events[0].multipliers.dmg,
+    "Koleda chain Buff should not affect basic attacks",
+)
+const koledaTeamDamage = koledaAriaResult([koledaEnhancedBasic.id], koledaBasicDamage)
+approx(
+    koledaTeamDamage.inCombat.panel.dmgBonus - koledaTeamDamage.outOfCombat.panel.dmgBonus,
+    0.35,
+    "Koleda enhanced basic Buff should add 35% team damage",
+)
+assert.equal(koledaEnhancedBasic.effects[0].durationSeconds, 40)
+
+const koledaPotentialValues = {
+    P2: { sharp: 4, crit: 11 },
+    P3: { sharp: 6, crit: 17 },
+    P4: { sharp: 8, crit: 23 },
+    P5: { sharp: 10, crit: 29 },
+    P6: { sharp: 12, crit: 35 },
+}
+for (const [potentialLevel, values] of Object.entries(koledaPotentialValues)) {
+    const runtimeInputs = koledaRuntime(koledaPotential, { parameters: { potentialLevel } })
+    const nonArmorer = calculateInCombatPanel(catalog, {
+        agentId: "aria",
+        coreSkillLevel: "F",
+        wEngineId: "zzz_wiki_1883",
+        driveDiscs: [],
+        combatBuffs: { activeBuffIds: [koledaPotential.id], runtimeInputs },
+        damage: koledaBasicDamage,
+    })
+    approx(
+        nonArmorer.inCombat.panel.critDmg - nonArmorer.outOfCombat.panel.critDmg,
+        values.crit / 100,
+        `Koleda ${potentialLevel} should grant non-Armorer crit damage`,
+    )
+    assert.equal(
+        nonArmorer.inCombat.activeEffects[0].resolvedStats.some(stat => stat.stat === "sharpDmgBonus"),
+        false,
+        `Koleda ${potentialLevel} should not grant non-Armorer sharp damage`,
+    )
+
+    const armorer = calculateInCombatPanel(catalog, {
+        agentId: "claret",
+        coreSkillLevel: "F",
+        wEngineId: "zzz_wiki_2189",
+        driveDiscs: [],
+        combatBuffs: { activeBuffIds: [koledaPotential.id], runtimeInputs },
+    })
+    const sharpModifier = armorer.inCombat.activeEffects[0].resolvedDamageModifiers
+        .find(modifier => modifier.kind === "sharpDmgBonus")
+    approx(sharpModifier?.value, values.sharp / 100,
+        `Koleda ${potentialLevel} should grant Armorer sharp damage`)
+    assert.equal(
+        armorer.inCombat.activeEffects[0].resolvedStats.some(stat => stat.stat === "critDmg"),
+        false,
+        `Koleda ${potentialLevel} should not grant Armorer crit damage`,
+    )
+}
 
 const luciaGroup = catalog.teammateCombatBuffGroups.find(group => group.id === "lucia_elowen")
 assert.ok(luciaGroup, "Lucia teammate Buff group should exist")

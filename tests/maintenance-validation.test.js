@@ -1482,6 +1482,38 @@ assertInvalid("teammate-buffs", {
     },
 }, "引用的 Buff 运行时参数不存在")
 
+const excludedSpecialtyTeammateBuff = {
+    ...validTeammateBuff,
+    buff: {
+        ...validTeammateBuff.buff,
+        effects: [{
+            id: "excluded-specialty-effect",
+            type: "fixed",
+            stat: "critDmg",
+            value: 11,
+            mode: "flat",
+            requirement: { excludedSpecialties: ["armorer"] },
+        }],
+    },
+}
+assertValid("teammate-buffs", excludedSpecialtyTeammateBuff)
+assertInvalid("teammate-buffs", {
+    ...excludedSpecialtyTeammateBuff,
+    buff: { ...excludedSpecialtyTeammateBuff.buff, effects: [{ ...excludedSpecialtyTeammateBuff.buff.effects[0], requirement: { excludedSpecialties: "armorer" } }] },
+}, "排除特性必须是数组")
+assertInvalid("teammate-buffs", {
+    ...excludedSpecialtyTeammateBuff,
+    buff: { ...excludedSpecialtyTeammateBuff.buff, effects: [{ ...excludedSpecialtyTeammateBuff.buff.effects[0], requirement: { excludedSpecialties: ["future"] } }] },
+}, "不是支持的选项")
+assertInvalid("teammate-buffs", {
+    ...excludedSpecialtyTeammateBuff,
+    buff: { ...excludedSpecialtyTeammateBuff.buff, effects: [{ ...excludedSpecialtyTeammateBuff.buff.effects[0], requirement: { excludedSpecialties: ["armorer", "armorer"] } }] },
+}, "排除特性不能重复")
+assertInvalid("teammate-buffs", {
+    ...excludedSpecialtyTeammateBuff,
+    buff: { ...excludedSpecialtyTeammateBuff.buff, effects: [{ ...excludedSpecialtyTeammateBuff.buff.effects[0], requirement: { specialty: "armorer", excludedSpecialties: ["armorer"] } }] },
+}, "正向要求特性不能同时出现在排除特性中")
+
 const validAnomalyEffect = {
     id: "test_assault",
     maintenanceType: "anomaly",
