@@ -307,6 +307,16 @@ const cleanedClaretCinemaOne = cleanedClaret.combatBuffs.cinemaBuffs.find(buff =
 assert.equal(cleanedClaretCinemaOne?.buffModifiers?.[0]?.factor, 1.3)
 assert.deepEqual(cleanedClaretCinemaOne?.buffModifiers?.[0]?.targetBuffIds, ["skill:claret:special:special_slash_gold"])
 assert.deepEqual(cleanedClaretCinemaOne?.buffModifiers?.[0]?.targetEffectIds, ["maim"])
+const cleanedClaretCinemaSix = cleanedClaret.defaultCalculationConfig.variants
+    .find(variant => variant.cinemaLevel === 6)
+assert.equal(cleanedClaretCinemaSix?.name?.zhCN, "6影双连携九毁伤")
+assert.equal(
+    cleanedClaretCinemaSix?.events.find(event => event.skillGroupId === "skill_group_c5b606ba9a")?.count,
+    3,
+    "Claret maintenance cleaning should keep the cinema 6 extra long-hold skill group",
+)
+assert.ok(cleanedClaretCinemaSix?.events.some(event => event.id === cleanedClaretCinemaSix.selectedEventId))
+assert.equal(cleanedClaret.defaultCalculationConfig.cinemaLevel, 0)
 const cleanedSoldier11 = cleanMaintenanceItem("agents", soldier11, soldier11MaintenanceContext)
 assert.deepEqual(cleanedSoldier11.potentialVision.scaling.levels.map(row => row.critDmgPct), [0, 0, 16, 24, 32, 40, 48])
 assert.equal(cleanedSoldier11.defaultCalculationConfig.events
@@ -1499,19 +1509,43 @@ const excludedSpecialtyTeammateBuff = {
 assertValid("teammate-buffs", excludedSpecialtyTeammateBuff)
 assertInvalid("teammate-buffs", {
     ...excludedSpecialtyTeammateBuff,
-    buff: { ...excludedSpecialtyTeammateBuff.buff, effects: [{ ...excludedSpecialtyTeammateBuff.buff.effects[0], requirement: { excludedSpecialties: "armorer" } }] },
+    buff: {
+        ...excludedSpecialtyTeammateBuff.buff,
+        effects: [{
+            ...excludedSpecialtyTeammateBuff.buff.effects[0],
+            requirement: { excludedSpecialties: "armorer" },
+        }],
+    },
 }, "排除特性必须是数组")
 assertInvalid("teammate-buffs", {
     ...excludedSpecialtyTeammateBuff,
-    buff: { ...excludedSpecialtyTeammateBuff.buff, effects: [{ ...excludedSpecialtyTeammateBuff.buff.effects[0], requirement: { excludedSpecialties: ["future"] } }] },
+    buff: {
+        ...excludedSpecialtyTeammateBuff.buff,
+        effects: [{
+            ...excludedSpecialtyTeammateBuff.buff.effects[0],
+            requirement: { excludedSpecialties: ["future"] },
+        }],
+    },
 }, "不是支持的选项")
 assertInvalid("teammate-buffs", {
     ...excludedSpecialtyTeammateBuff,
-    buff: { ...excludedSpecialtyTeammateBuff.buff, effects: [{ ...excludedSpecialtyTeammateBuff.buff.effects[0], requirement: { excludedSpecialties: ["armorer", "armorer"] } }] },
+    buff: {
+        ...excludedSpecialtyTeammateBuff.buff,
+        effects: [{
+            ...excludedSpecialtyTeammateBuff.buff.effects[0],
+            requirement: { excludedSpecialties: ["armorer", "armorer"] },
+        }],
+    },
 }, "排除特性不能重复")
 assertInvalid("teammate-buffs", {
     ...excludedSpecialtyTeammateBuff,
-    buff: { ...excludedSpecialtyTeammateBuff.buff, effects: [{ ...excludedSpecialtyTeammateBuff.buff.effects[0], requirement: { specialty: "armorer", excludedSpecialties: ["armorer"] } }] },
+    buff: {
+        ...excludedSpecialtyTeammateBuff.buff,
+        effects: [{
+            ...excludedSpecialtyTeammateBuff.buff.effects[0],
+            requirement: { specialty: "armorer", excludedSpecialties: ["armorer"] },
+        }],
+    },
 }, "正向要求特性不能同时出现在排除特性中")
 
 const validAnomalyEffect = {

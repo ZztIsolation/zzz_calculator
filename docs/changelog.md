@@ -2,6 +2,45 @@
 
 # Changelog
 
+## 2026-09-14 - Claret Default Rotation Resolved By Cinema Level
+
+Claret's administrator default rotation now resolves by Cinema level instead of
+returning one loop for every level. The character data gains a single
+`cinemaLevel: 6` entry under `defaultCalculationConfig.variants`, the same shape
+`hoshimi_miyabi` already uses, so the resolver keeps returning the Cinema 0 base
+entry for Cinema 1-5 and switches to the variant only at Cinema 6.
+
+The variant repeats the `长按特殊技三次毁伤` skill group
+(`skill_group_c5b606ba9a`) three times instead of twice. Each repetition expands
+to one `special/special_blood_assault` damage hit plus three
+`special/special_slash_gold` `maim` hits, so the expanded Maim total rises from
+six to nine. Every other event is copied verbatim from the Cinema 0 entry: the
+`普攻下砸+连续斩击` group still repeats twice, `chain_blood_contract` still
+contributes two hits, and `ultimate_hundred_hammers` still contributes one. The
+variant rebuilds all four event ids and remaps `selectedEventId` to its own
+ultimate event, as the maintenance contract requires.
+
+No core, validation, or frontend code changed. `resolveDefaultCalculationConfig`
+already selects the highest configured level not above the current Cinema level,
+`webapp/src/stores/build.ts` already re-resolves the administrator loop when the
+Cinema level changes, and the `maim` multiplier row declares no
+`eventCountRange`, so nine expanded Maim hits stay legal. Cinema 6's own
+`热夜之梦` self Buff keeps empty `effects` and `buffModifiers`: the extra Maim is
+modeled by the authored rotation, never by an automatically assumed teammate,
+energy budget, remnant charge, or action time.
+
+`tests/sharp-damage.test.js` pins the resolution for Cinema 0, 5, and 6, asserts
+that only the long-hold skill group count differs, and checks the expanded Maim
+totals (six versus nine) through the ordinary calculation path.
+`tests/maintenance-validation.test.js` asserts the variant survives maintenance
+cleaning with its name, group count, and selected event intact.
+`docs/regression-contract.md` and `docs/modeling.md` record the resolution rule.
+
+The Claret materializer at `scripts/import-claret-official-data.mjs` was left
+unchanged on purpose. It already emitted a different administrator rotation
+(`默认锋御爆发（0-5影）`) before this update, so `data/agents.json` remains the
+current source of truth and re-running the importer is not part of this change.
+
 ## 2026-09-06 - Replaced Promotion Approval PRs With Explicit Deploy Dispatch
 
 Production promotion now uses one owner-attributed `workflow_dispatch` instead

@@ -10,6 +10,12 @@ The entries below summarize each development day. Implementation details,
 modeling decisions, and verification evidence remain in the
 [detailed changelog](docs/changelog.md).
 
+### 2026-09-14 Claret Cinema-Resolved Default Rotation
+
+- Claret's administrator default rotation now resolves by Cinema level. Cinema 0-5 keeps `双连携六毁伤`; Cinema 6 uses `6影双连携九毁伤`, which repeats the `长按特殊技三次毁伤` skill group three times instead of twice, so the expanded Maim total grows from six hits to nine. The basic slam group, the two chain hits, and the single ultimate are unchanged.
+- The Cinema 6 variant rebuilds its event ids and remaps `selectedEventId`, following the single-variant pattern already used by Miyabi. No core or frontend change was needed: the workbench re-resolves the administrator loop whenever the Cinema level changes.
+- Cinema 6's own `热夜之梦` Buff stays descriptive-only, so the extra Maim is expressed by the authored rotation rather than assumed from teammates, energy, remnant charges, or action time.
+
 ### 2026-09-13 Claret Armorer Sharp-Damage Modeling
 
 - Added Claret (克拉蕾·弗林特) as a first-class Armorer/sharp-damage domain. Sharp events use DEF as their basis, support the two-stage sharp-critical check and sharp-specific damage multiplier, and keep ordinary damage bonuses auditable in the white box.

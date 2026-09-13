@@ -15,6 +15,7 @@ import {
     sharpWhiteBoxRows,
 } from "../core/sharpDamage.js"
 import { evaluateInCombatFormulaRule } from "../core/effectFormula.js"
+import { resolveDefaultCalculationConfig } from "../core/defaultCalculationConfig.js"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const catalog = await loadCatalog(path.join(rootDir, "data"), path.join(rootDir, "examples"))
@@ -401,6 +402,54 @@ const claretCinemaOne = claret.combatBuffs.cinemaBuffs.find(buff => buff.cinemaL
 assert.equal(claretCinemaOne?.buffModifiers?.[0]?.factor, 1.3, "Claret Cinema 1 should store a 1.3 resolved-value modifier")
 assert.deepEqual(claretCinemaOne?.buffModifiers?.[0]?.targetBuffIds, ["skill:claret:special:special_slash_gold"])
 assert.deepEqual(claretCinemaOne?.buffModifiers?.[0]?.targetEffectIds, ["maim"])
+
+const claretCinema0Axis = resolveDefaultCalculationConfig(claret.defaultCalculationConfig, 0)
+assert.equal(claretCinema0Axis.name.zhCN, "双连携六毁伤", "Claret cinema 0 keeps the authored base loop")
+const claretCinema5Axis = resolveDefaultCalculationConfig(claret.defaultCalculationConfig, 5)
+assert.equal(claretCinema5Axis.name.zhCN, "双连携六毁伤", "Claret cinema 1-5 keeps the cinema 0 loop")
+const claretCinema6Axis = resolveDefaultCalculationConfig(claret.defaultCalculationConfig, 6)
+assert.equal(claretCinema6Axis.name.zhCN, "6影双连携九毁伤", "Claret cinema 6 selects the extra long-hold loop")
+
+const claretAxisSkillGroupCount = (axis, skillGroupId) => axis.events
+    .filter(event => event.skillGroupId === skillGroupId)
+    .reduce((total, event) => total + Number(event.count ?? 0), 0)
+const claretAxisSkillCount = (axis, moveId) => axis.events
+    .filter(event => event.skillRef?.moveId === moveId)
+    .reduce((total, event) => total + Number(event.count ?? 0), 0)
+assert.equal(claretAxisSkillGroupCount(claretCinema0Axis, "skill_group_c5b606ba9a"), 2)
+assert.equal(
+    claretAxisSkillGroupCount(claretCinema6Axis, "skill_group_c5b606ba9a"),
+    3,
+    "Claret cinema 6 should add one more long-hold three-maim skill group",
+)
+for (const axis of [claretCinema0Axis, claretCinema6Axis]) {
+    assert.equal(
+        claretAxisSkillGroupCount(axis, "skill_group_bd7ae09812"),
+        2,
+        "Claret cinema 6 must not repeat the basic slam loop",
+    )
+    assert.equal(claretAxisSkillCount(axis, "chain_blood_contract"), 2, "Both Claret loops should stay double-chain")
+    assert.equal(claretAxisSkillCount(axis, "ultimate_hundred_hammers"), 1, "Both Claret loops should keep one ultimate")
+    assert.ok(
+        axis.events.some(event => event.id === axis.selectedEventId),
+        "The Claret selected event must belong to the resolved loop",
+    )
+}
+assert.notEqual(
+    claretCinema6Axis.selectedEventId,
+    claretCinema0Axis.selectedEventId,
+    "Claret cinema 6 should rebuild its event ids",
+)
+
+function claretMaimCount(axis) {
+    return calculateInCombatPanel(catalog, sharpInput("zzz_wiki_2188", axis, { cinemaLevel: 0 }))
+        .damage.events
+        .filter(event => event.input?.skillSource?.rowId === "maim")
+        .reduce((total, event) => total + Number(event.count ?? 0), 0)
+}
+assert.equal(claretMaimCount(claretCinema0Axis), 6, "The Claret cinema 0 loop should expand to six Maim hits")
+assert.equal(claretMaimCount(claretCinema6Axis), 9, "The Claret cinema 6 loop should expand to nine Maim hits")
+
 const targetedClaretDamage = rowId => ({
     mode: "custom",
     events: [{
