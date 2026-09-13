@@ -63,4 +63,14 @@ describe("DamageSummaryBar", () => {
     expect(wrapper.text()).toContain("参数待确认")
     expect(wrapper.text()).not.toContain("0.00")
   })
+
+  it("keeps only the status chip in the summary row", () => {
+    const wrapper = mount(DamageSummaryBar, {
+      props: { result: { damage: { finalDamage: 100, events: [{}, {}] } } },
+    })
+
+    expect(wrapper.text()).toContain("即时刷新")
+    expect(wrapper.text()).not.toContain("局内面板")
+    expect(wrapper.text()).not.toContain("事件 ")
+  })
 })

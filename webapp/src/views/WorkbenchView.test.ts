@@ -123,7 +123,7 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("driveDiscAnalysisInput")
     expect(source).toContain("driveDiscAnalysisSourceLabel")
     expect(source).toContain("词条分析")
-    expect(source).toContain('<NButton type="primary" size="small" data-testid="open-drive-disc-analysis"')
+    expect(source).toContain('<NButton size="small" data-testid="open-drive-disc-analysis"')
     expect(source).toContain('${objectiveScoreText(selectedOptimizedScheme.value.score)}')
   })
 
@@ -389,7 +389,6 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("optimizerResultsAreStale")
     expect(source).toContain("配置已更新，需重新优化")
     expect(source).toContain(':stale="optimizerResultsAreStale"')
-    expect(source).toContain("上次评分")
   })
 
   it("keeps two-piece and four-piece limits in drafts until explicitly applied", () => {
@@ -410,7 +409,7 @@ describe("WorkbenchView drive disc loadout isolation", () => {
     expect(source).toContain("agentId: buildStore.agentId")
     expect(source).toContain(":value=\"selectedLoadout?.id ?? ''\"")
     expect(source).toContain("hasMismatchedLoadoutSelection")
-    expect(source).toContain('buildStore.discMode === "loadout" && selectedLoadout.value?.score')
+    expect(source).toContain("selectedLoadout.value.name")
     expect(source).toContain("当前保存的套装不属于该角色，请重新选择该角色的套装。")
     expect(source).not.toContain("inventoryStore.loadouts.find((item: any) => item.id === buildStore.selectedLoadoutId)")
     expect(source).not.toContain("...inventoryStore.loadouts.map((item: any)")
@@ -565,5 +564,47 @@ describe("WorkbenchView optimizer result details", () => {
   it("formats stored drive disc stats through the shared combat formatter", () => {
     expect(source).toContain("storedStatLabel")
     expect(source).toContain("formatStoredStatValue")
+  })
+})
+
+describe("WorkbenchView first-screen dedup", () => {
+  it("keeps the drive disc panel subtitle free of the duplicated scheme score line", () => {
+    expect(source).toContain("driveDiscAnalysisSourceLabel")
+    expect(source).not.toContain("currentSchemeScoreLabel")
+    expect(source).not.toContain('{{ selectedDriveDiscs.length }} / 6')
+  })
+
+  it("keeps the total score tag out of the panel card header", () => {
+    expect(source).not.toContain("totalDamageLabel")
+  })
+
+  it("hides the optimized four-piece set label when it only repeats the user's own limit", () => {
+    expect(source).toContain("const optimizedResultSetIsUserPinned = computed")
+    expect(source).toContain("optimizerStore.fourPieceSetIds.includes(id)")
+    expect(source).toContain("buildStore.discMode === 'optimized' && selectedOptimizedFourPieceSet && !optimizedResultSetIsUserPinned")
+  })
+})
+
+describe("WorkbenchView drive disc scheme source", () => {
+  it("separates the scheme source segmented control from the action buttons", () => {
+    expect(source).toContain("const driveDiscModeOptions = [")
+    expect(source).toContain('class="drive-disc-source-row"')
+    expect(source).toContain('class="drive-disc-source-label"')
+    expect(source).toContain("<NRadioGroup")
+    expect(source).toContain("<NRadioButton")
+    expect(source).toContain(':value="buildStore.discMode"')
+    expect(source).toContain("@update:value=\"buildStore.setDiscMode(String($event) as any)\"")
+    expect(source).not.toContain("drive-disc-mode-toolbar")
+    expect(source).not.toContain("drive-disc-mode-row")
+  })
+
+  it("keeps the optimized mode disabled until results exist", () => {
+    expect(source).toContain("option.value === 'optimized' && !optimizerStore.resultSchemes.length")
+  })
+
+  it("keeps save and analysis as secondary actions next to the source row", () => {
+    expect(source).toContain('class="toolbar drive-disc-action-toolbar"')
+    expect(source).toContain("openSaveCurrentLoadout")
+    expect(source).not.toContain('<NButton type="primary" size="small" data-testid="open-drive-disc-analysis"')
   })
 })

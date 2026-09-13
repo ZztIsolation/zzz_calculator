@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref, watch } from "vue"
-import { NAlert, NButton, NInput, NInputNumber, NModal, NSelect, NTag, useMessage } from "naive-ui"
+import { NAlert, NButton, NInput, NInputNumber, NModal, NRadioButton, NRadioGroup, NSelect, NTag, useMessage } from "naive-ui"
 import { Ban, ChevronDown, ChevronUp, LineChart, LockKeyhole, RefreshCcw, Save, SlidersHorizontal, Sparkles, X } from "lucide-vue-next"
 import BuffPickerModal from "@/components/BuffPickerModal.vue"
 import CalculationConfigModal from "@/components/CalculationConfigModal.vue"
@@ -238,6 +238,10 @@ const selectedOptimizerSets = computed(() => optimizerStore.fourPieceSetIds
   .filter(Boolean))
 const selectedOptimizedFourPieceSet = computed(() => catalogStore.displayDriveDiscSets
   .find((set: any) => set.id === selectedOptimizedScheme.value?.fourPieceSetId))
+const optimizedResultSetIsUserPinned = computed(() => {
+  const id = selectedOptimizedScheme.value?.fourPieceSetId
+  return !!id && optimizerStore.fourPieceSetIds.includes(id)
+})
 const draftFourPieceSets = computed(() => draftFourPieceSetIds.value
   .map(id => catalogStore.displayDriveDiscSets.find((set: any) => set.id === id))
   .filter(Boolean))
@@ -250,6 +254,11 @@ const optimizerAlgorithmOptions = [
   { label: "精确搜索（超界剪枝）", value: "exact-super-bound" },
   { label: "启发式潜力", value: "heuristic-potential" },
   { label: "旧版精确", value: "exact-legacy" },
+]
+const driveDiscModeOptions = [
+  { label: "自选", value: "manual" },
+  { label: "已有套装", value: "loadout" },
+  { label: "优化结果", value: "optimized" },
 ]
 const minimumStats = computed(() => isArmorerAgent(selectedAgent.value)
   ? [
@@ -326,17 +335,6 @@ const selectedDriveDiscRows = computed<Array<{ slot: number, disc: any | null }>
     slot,
     disc: bySlot.get(slot) ?? null,
   }))
-})
-const currentSchemeScoreLabel = computed(() => {
-  if (buildStore.discMode === "optimized" && selectedOptimizedScheme.value) {
-    return optimizerResultsAreStale.value
-      ? `第 ${selectedOptimizedScheme.value.rank} 名 · ${isLuminescenceScore.value ? "上次队伍异常评分" : "上次评分"} ${objectiveScoreText(selectedOptimizedScheme.value.score)}`
-      : `第 ${selectedOptimizedScheme.value.rank} 名 · ${isLuminescenceScore.value ? "队伍异常评分 " : ""}${objectiveScoreText(selectedOptimizedScheme.value.score)}`
-  }
-  if (buildStore.discMode === "loadout" && selectedLoadout.value?.score !== undefined) {
-    return `${isLuminescenceScore.value ? "队伍异常评分" : "评分"} ${objectiveScoreText(selectedLoadout.value.score)}`
-  }
-  return selectedDriveDiscs.value.length ? `${selectedDriveDiscs.value.length} / 6` : "未选择"
 })
 const calculationModeLabel = computed(() => {
   if (buildStore.damageConfig.mode !== "adminDefault") {
@@ -464,13 +462,6 @@ const optimizerConstraintChips = computed(() => [
     ? { key: "minimums", label: `属性下限 ${activeMinimumCount.value} 项`, type: "default" as const }
     : null,
 ].filter(Boolean))
-const totalDamageLabel = computed(() => {
-  const damage = buildStore.result?.damage
-  const value = isLuminescenceScore.value
-    ? damage?.score ?? damage?.finalDamage
-    : damage?.totalFinalDamage ?? damage?.finalDamage
-  return value === undefined || value === null ? "-" : objectiveScoreText(value)
-})
 const panelSummaryText = computed(() => {
   const panel = buildStore.result?.inCombat?.panel ?? buildStore.outOfCombat?.panel ?? {}
   const atk = panel.finalAtk ?? panel.atk ?? panel.baseAtk
@@ -1599,32 +1590,40 @@ function formatPercentValue(value: any) {
         <div class="panel-header workbench-section-header">
           <div>
             <h2 class="panel-title">驱动盘方案</h2>
-            <p class="panel-subtitle">{{ driveDiscAnalysisSourceLabel }} · {{ currentSchemeScoreLabel }}</p>
           </div>
-          <NTag round>{{ selectedDriveDiscs.length }} / 6</NTag>
         </div>
         <div class="workbench-section-body section-band">
-          <div class="drive-disc-mode-row">
-            <div class="toolbar drive-disc-mode-toolbar">
-              <NButton size="small" :type="buildStore.discMode === 'manual' ? 'primary' : 'default'" @click="buildStore.setDiscMode('manual')">自选</NButton>
-              <NButton size="small" :type="buildStore.discMode === 'loadout' ? 'primary' : 'default'" @click="buildStore.setDiscMode('loadout')">已有套装</NButton>
-              <NButton size="small" :type="buildStore.discMode === 'optimized' ? 'primary' : 'default'" :disabled="!optimizerStore.resultSchemes.length" @click="buildStore.setDiscMode('optimized')">优化结果</NButton>
-            </div>
-            <div class="toolbar drive-disc-action-toolbar">
-              <NButton size="small" :disabled="!canSaveCurrentScheme" @click="openSaveCurrentLoadout">
-                <template #icon><Save :size="16" /></template>
-                存为套装
-              </NButton>
-              <NButton type="primary" size="small" data-testid="open-drive-disc-analysis" :disabled="!selectedDriveDiscs.length" @click="showDriveDiscAnalysis = true">
-                <template #icon><LineChart :size="16" /></template>
-                词条分析
-              </NButton>
-            </div>
+          <div class="drive-disc-source-row" role="group" aria-label="驱动盘方案来源">
+            <span class="drive-disc-source-label">方案来源</span>
+            <NRadioGroup
+              class="drive-disc-source-options"
+              :value="buildStore.discMode"
+              aria-label="驱动盘方案来源"
+              @update:value="buildStore.setDiscMode(String($event) as any)"
+            >
+              <NRadioButton
+                v-for="option in driveDiscModeOptions"
+                :key="option.value"
+                :value="option.value"
+                :disabled="option.value === 'optimized' && !optimizerStore.resultSchemes.length"
+              >
+                {{ option.label }}
+              </NRadioButton>
+            </NRadioGroup>
+          </div>
+          <div class="toolbar drive-disc-action-toolbar">
+            <NButton size="small" :disabled="!canSaveCurrentScheme" @click="openSaveCurrentLoadout">
+              <template #icon><Save :size="16" /></template>
+              存为套装
+            </NButton>
+            <NButton size="small" data-testid="open-drive-disc-analysis" :disabled="!selectedDriveDiscs.length" @click="showDriveDiscAnalysis = true">
+              <template #icon><LineChart :size="16" /></template>
+              词条分析
+            </NButton>
           </div>
 
           <div class="drive-disc-analysis-strip">
             <div>
-              <strong>{{ driveDiscAnalysisSourceLabel }}</strong>
               <span>{{ selectedDriveDiscs.length ? `${selectedDriveDiscs.length} 件驱动盘参与当前${isLuminescenceScore ? "评分" : "伤害"}计算` : "选择驱动盘后可查看词条分析" }}</span>
             </div>
             <NTag v-if="buildStore.discMode !== 'optimized'" round>{{ panelSummaryText }}</NTag>
@@ -1657,7 +1656,7 @@ function formatPercentValue(value: any) {
             :score-digits="isLuminescenceScore ? 3 : 0"
             @update:model-value="buildStore.selectOptimizedRank"
           />
-          <div v-if="buildStore.discMode === 'optimized' && selectedOptimizedFourPieceSet" class="selected-set-summary optimized-result-set">
+          <div v-if="buildStore.discMode === 'optimized' && selectedOptimizedFourPieceSet && !optimizedResultSetIsUserPinned" class="selected-set-summary optimized-result-set">
             <span class="selected-set-chip selected-set-chip-with-icon">
               <img :src="imageForDriveDiscSet(selectedOptimizedFourPieceSet)" alt="" loading="lazy">
               <span>实际 4 件套：{{ labelOf(selectedOptimizedFourPieceSet) }}</span>
@@ -1716,7 +1715,6 @@ function formatPercentValue(value: any) {
               <h2 class="panel-title">面板</h2>
               <p class="panel-subtitle">局外与局内对照</p>
             </div>
-            <NTag round>{{ totalDamageLabel }}</NTag>
           </div>
           <div class="workbench-section-body damage-panel-grid">
             <div>
@@ -2445,16 +2443,39 @@ function formatPercentValue(value: any) {
   min-height: 0;
 }
 
-.drive-disc-mode-row,
-.drive-disc-analysis-strip {
-  display: flex;
+.drive-disc-source-row {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
+  gap: 12px;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--app-blue);
+  background: #f1f5fb;
 }
 
-.drive-disc-mode-toolbar {
-  gap: 6px;
+.drive-disc-source-label {
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.drive-disc-source-options {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+}
+
+.drive-disc-source-options :deep(.n-radio-button) {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+}
+
+.drive-disc-source-options :deep(.n-radio-button__label) {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+  white-space: normal;
 }
 
 .drive-disc-action-toolbar {
@@ -2473,13 +2494,6 @@ function formatPercentValue(value: any) {
   display: grid;
   min-width: 0;
   gap: 2px;
-}
-
-.drive-disc-analysis-strip strong {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  color: var(--app-text);
-  font-size: 13px;
 }
 
 .drive-disc-analysis-strip span {
@@ -3384,7 +3398,15 @@ function formatPercentValue(value: any) {
     grid-template-columns: 1fr;
   }
 
-  .drive-disc-mode-row,
+  .drive-disc-source-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .drive-disc-action-toolbar {
+    justify-content: flex-start;
+  }
+
   .drive-disc-analysis-strip {
     align-items: stretch;
     flex-direction: column;
