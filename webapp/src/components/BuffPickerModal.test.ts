@@ -741,6 +741,142 @@ function remielleRuntimeMeta() {
   }
 }
 
+function rinaPotentialMeta() {
+  const scaling: Array<[string, number, number]> = [
+    ["P2", 300, 250],
+    ["P3", 420, 350],
+    ["P4", 550, 450],
+    ["P5", 670, 550],
+    ["P6", 800, 650],
+  ]
+  return {
+    ...meta,
+    teammateCombatBuffGroups: [{
+      id: "rina",
+      name: { zhCN: "丽娜" },
+      attribute: "electric",
+      specialty: "support",
+      images: { icon: "/assets/agents/rina.png" },
+      buffs: [{
+        id: "rina.potential.perfect_service",
+        source: { zhCN: "潜能觉醒" },
+        description: { zhCN: "核心被动增益存在期间提供全队攻击力和防御力。" },
+        scope: "inCombat",
+        runtimeParameters: [{
+          id: "potentialLevel",
+          label: { zhCN: "潜能觉醒等级" },
+          kind: "enum",
+          values: scaling.map(([level]) => level),
+          defaultValue: "P6",
+        }],
+        effects: scaling.flatMap(([level, atkRatio, defRatio]) => [
+          {
+            id: `rina_potential_atk_${level.toLowerCase()}`,
+            type: "derived",
+            stat: "atkFlat",
+            mode: "flat",
+            sourceLabel: { zhCN: "丽娜自身穿透率" },
+            defaultSourceValue: 72,
+            ratio: atkRatio,
+            cap: 576,
+            requirement: { runtimeParameter: { id: "potentialLevel", oneOf: [level] } },
+          },
+          {
+            id: `rina_potential_def_${level.toLowerCase()}`,
+            type: "derived",
+            stat: "defFlat",
+            mode: "flat",
+            sourceLabel: { zhCN: "丽娜自身穿透率" },
+            defaultSourceValue: 72,
+            ratio: defRatio,
+            cap: 468,
+            requirement: { runtimeParameter: { id: "potentialLevel", oneOf: [level] } },
+          },
+        ]),
+      }],
+    }],
+  }
+}
+
+function koledaPotentialMeta() {
+  const levels = [
+    ["P2", 4, 11],
+    ["P3", 6, 17],
+    ["P4", 8, 23],
+    ["P5", 10, 29],
+    ["P6", 12, 35],
+  ] as const
+  return {
+    ...meta,
+    teammateCombatBuffGroups: [{
+      id: "koleda",
+      name: { zhCN: "珂蕾妲" },
+      attribute: "fire",
+      specialty: "stun",
+      images: { icon: "/assets/agents/koleda.png" },
+      buffs: [
+        {
+          id: "koleda.additional_ability.chain_damage",
+          source: { zhCN: "额外能力：白祇管理学" },
+          description: { zhCN: "失衡后连携技增伤" },
+          scope: "inCombat",
+          effects: [{
+            id: "koleda_additional_chain_damage",
+            type: "stacked",
+            target: { kind: "skill", skillTargets: [{ kind: "skillType", skillType: "chain" }] },
+            stat: "dmgBonus",
+            mode: "flat",
+            valuePerStack: 35,
+            maxStacks: 2,
+            defaultStacks: 2,
+            requirement: { eventStunned: true },
+          }],
+        },
+        {
+          id: "koleda.enhanced_basic.team_damage",
+          source: { zhCN: "强化普通攻击：砸扁，粉碎" },
+          description: { zhCN: "全队伤害提升" },
+          scope: "inCombat",
+          effects: [{ id: "koleda_enhanced_basic_team_damage", type: "fixed", stat: "dmgBonus", mode: "flat", value: 35 }],
+        },
+        {
+          id: "koleda.potential.demolition_operation",
+          source: { zhCN: "潜能觉醒：爆破作业" },
+          description: { zhCN: "锋御与非锋御角色增益" },
+          scope: "inCombat",
+          runtimeParameters: [{
+            id: "potentialLevel",
+            label: { zhCN: "潜能觉醒等级" },
+            kind: "enum",
+            values: levels.map(([level]) => level),
+            defaultValue: "P6",
+          }],
+          effects: levels.flatMap(([level, sharp, crit]) => [
+            {
+              id: `koleda_potential_armorer_sharp_${level.toLowerCase()}`,
+              type: "fixed",
+              target: { kind: "default" },
+              stat: "sharpDmgBonus",
+              mode: "flat",
+              value: sharp,
+              requirement: { specialty: "armorer", runtimeParameter: { id: "potentialLevel", oneOf: [level] } },
+            },
+            {
+              id: `koleda_potential_non_armorer_crit_${level.toLowerCase()}`,
+              type: "fixed",
+              target: { kind: "default" },
+              stat: "critDmg",
+              mode: "flat",
+              value: crit,
+              requirement: { excludedSpecialties: ["armorer"], runtimeParameter: { id: "potentialLevel", oneOf: [level] } },
+            },
+          ]),
+        },
+      ],
+    }],
+  }
+}
+
 describe("BuffPickerModal", () => {
   it("shows a skill-sourced Buff and keeps it independently disabled after reopening", async () => {
     const skillBuffMeta = {
@@ -1092,6 +1228,61 @@ describe("BuffPickerModal", () => {
     const reopenedPayload = wrapper.emitted("apply")?.[1]?.[0] as any
     expect(reopenedPayload.runtimeInputs["remielle.core"].parameters.anomalyAgentCount).toBe(2)
     expect(reopenedPayload.runtimeInputs["remielle.additional"].parameters.anomalyAgentCount).toBe(3)
+  })
+
+  it("renders Rina potential awakening as one Buff with PEN and potential-level controls", async () => {
+    const wrapper = mountModal({ meta: rinaPotentialMeta() })
+    await openTeammateTab(wrapper)
+
+    const rows = wrapper.findAll(".buff-row")
+    expect(rows).toHaveLength(1)
+    const row = rows[0]
+    expect(row.text()).toContain("丽娜 | 潜能觉醒")
+    expect(row.findAll(".buff-runtime-parameter")).toHaveLength(1)
+    expect(row.find(".buff-runtime-parameter").text()).toContain("潜能觉醒等级")
+    expect(row.findAll(".buff-runtime-parameter button").map(button => button.text())).toEqual(["P2", "P3", "P4", "P5", "P6"])
+    expect(row.findAll(".runtime-grid input[type='number']")).toHaveLength(1)
+    expect(row.text()).toContain("攻击力 +576")
+    expect(row.text()).toContain("防御力 +468")
+
+    await row.findAll(".buff-runtime-parameter button").find(button => button.text() === "P2")!.trigger("click")
+    expect(row.text()).toContain("攻击力 +216")
+    expect(row.text()).toContain("防御力 +180")
+    expect(row.text()).not.toContain("攻击力 +576")
+
+    const penInput = row.find(".runtime-grid input[type='number']")
+    await penInput.setValue("10")
+    await row.find(".buff-row-toggle").trigger("click")
+    await buttonByText(wrapper, "应用选择").trigger("click")
+    const payload = wrapper.emitted("apply")?.[0]?.[0] as any
+    expect(payload.selectedBuffIds).toEqual(["rina.potential.perfect_service"])
+    expect(payload.runtimeInputs["rina.potential.perfect_service"].parameters.potentialLevel).toBe("P2")
+    expect(payload.runtimeInputs["rina.potential.perfect_service"].effects.rina_potential_atk_p2.sourceValue).toBe(10)
+    expect(payload.runtimeInputs["rina.potential.perfect_service"].effects.rina_potential_def_p2.sourceValue).toBe(10)
+  })
+
+  it("shows Koleda potential awakening as one card with one level selector", async () => {
+    const wrapper = mountModal({ meta: koledaPotentialMeta() })
+    await openTeammateTab(wrapper)
+
+    const row = buffRowByText(wrapper, "锋御与非锋御角色增益")
+    expect(wrapper.findAll(".buff-row").filter(item => item.text().includes("锋御与非锋御角色增益"))).toHaveLength(1)
+    expect(row.findAll(".buff-runtime-parameter")).toHaveLength(1)
+    expect(row.find(".buff-runtime-parameter").text()).toContain("潜能觉醒等级")
+    expect(row.findAll(".buff-runtime-parameter button").map(button => button.text())).toEqual(["P2", "P3", "P4", "P5", "P6"])
+    expect(row.text()).toContain("锐化伤害加成% +12%")
+    expect(row.text()).toContain("暴击伤害% +35%")
+
+    await row.findAll(".buff-runtime-parameter button").find(button => button.text() === "P2")!.trigger("click")
+    expect(row.text()).toContain("锐化伤害加成% +4%")
+    expect(row.text()).toContain("暴击伤害% +11%")
+    expect(row.text()).not.toContain("锐化伤害加成% +12%")
+
+    await row.find(".buff-row-toggle").trigger("click")
+    await buttonByText(wrapper, "应用选择").trigger("click")
+    const payload = wrapper.emitted("apply")?.[0]?.[0] as any
+    expect(payload.selectedBuffIds).toEqual(["koleda.potential.demolition_operation"])
+    expect(payload.runtimeInputs["koleda.potential.demolition_operation"].parameters.potentialLevel).toBe("P2")
   })
 
   it("previews and persists Ju Fufu's attack-converted Tiger Roar crit damage", async () => {

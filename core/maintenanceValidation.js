@@ -553,6 +553,25 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
                 validateOptionalId(errors, { id: agentId }, `${path}.requirement.excludedAgentIds[${index}]`))
         }
     }
+    if (rule.requirement?.excludedSpecialties !== undefined) {
+        if (!Array.isArray(rule.requirement.excludedSpecialties)) {
+            add(errors, `${path}.requirement.excludedSpecialties`, "排除特性必须是数组。")
+        } else {
+            const specialties = rule.requirement.excludedSpecialties
+            const seenSpecialties = new Set()
+            specialties.forEach((specialty, index) => {
+                requireEnum(errors, specialty, SPECIALTY_VALUES, `${path}.requirement.excludedSpecialties[${index}]`)
+                const key = String(specialty ?? "")
+                if (seenSpecialties.has(key)) {
+                    add(errors, `${path}.requirement.excludedSpecialties[${index}]`, "排除特性不能重复。")
+                }
+                seenSpecialties.add(key)
+            })
+            if (rule.requirement.specialty && specialties.includes(rule.requirement.specialty)) {
+                add(errors, `${path}.requirement.excludedSpecialties`, "正向要求特性不能同时出现在排除特性中。")
+            }
+        }
+    }
     if (rule.requirement?.runtimeParameter !== undefined) {
         const requirement = rule.requirement.runtimeParameter
         if (!requirement || typeof requirement !== "object" || Array.isArray(requirement)) {
