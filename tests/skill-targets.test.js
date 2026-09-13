@@ -178,7 +178,7 @@ assert.deepEqual(Object.fromEntries(skillTagCounts), {
     fireSuppression: 3,
     dodgeCounter: 3,
 })
-assert.equal(storedTargets.length, 85)
+assert.equal(storedTargets.length, 86)
 const zhishuangTargets = combatBuffCatalog.fieldBuffs
     .find(buff => buff.id === "field.critical_assault.v3_1.p2.zhishuang")
     .effects.flatMap(effect => effect.target?.skillTargets ?? [])
