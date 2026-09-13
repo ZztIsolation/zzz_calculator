@@ -6817,7 +6817,59 @@
             }
           }
         ],
-        "selectedEventId": "event_affde2bcdf"
+        "selectedEventId": "event_affde2bcdf",
+        "variants": [
+          {
+            "mode": "custom",
+            "cinemaLevel": 6,
+            "name": {
+              "zhCN": "6影双连携九毁伤"
+            },
+            "events": [
+              {
+                "id": "event_7c41b92d0a",
+                "kind": "skillGroup",
+                "skillGroupId": "skill_group_c5b606ba9a",
+                "count": 3,
+                "stunned": true
+              },
+              {
+                "id": "event_2d9e5c8f14",
+                "kind": "skillGroup",
+                "skillGroupId": "skill_group_bd7ae09812",
+                "count": 2,
+                "stunned": true
+              },
+              {
+                "id": "event_b85a3f7e21",
+                "kind": "sharp",
+                "count": 2,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "claret",
+                  "categoryId": "chain",
+                  "moveId": "chain_blood_contract",
+                  "rowId": "damage"
+                }
+              },
+              {
+                "id": "event_4a1c8de65b",
+                "kind": "sharp",
+                "count": 1,
+                "stunned": true,
+                "critMode": "expected",
+                "skillRef": {
+                  "agentSkillId": "claret",
+                  "categoryId": "chain",
+                  "moveId": "ultimate_hundred_hammers",
+                  "rowId": "damage"
+                }
+              }
+            ],
+            "selectedEventId": "event_4a1c8de65b"
+          }
+        ]
       }
     }
   ]

@@ -95,6 +95,15 @@ reusable `type: "formula"` rule with an `inCombatStat` source. The source uses
 percentage-point values (`118.8`, not `1.188`), while a `storedPercent` result
 is converted to the calculator's decimal panel value (`0.1504`).
 
+Claret's administrator default rotation resolves by Cinema level. Cinema 0-5 uses
+`双连携六毁伤`; Cinema 6 uses `6影双连携九毁伤`, which repeats the
+`长按特殊技三次毁伤` skill group three times instead of twice, so the expanded
+Maim total grows from six hits to nine while every other event, including the
+double chain and the single ultimate, stays identical. Cinema 6's own `热夜之梦`
+self Buff remains descriptive-only with empty `effects` and `buffModifiers`, so
+the extra Maim is expressed by the authored rotation and is never inferred from
+teammates, energy, remnant charges, or action time.
+
 ## Official Wiki Data Workflow
 
 For a refresh, open the public entry in a Playwright browser context first. In
@@ -474,6 +483,7 @@ type EffectRule = (
     specialty?: string;
     attribute?: string;
     excludedAgentIds?: string[];
+    excludedSpecialties?: string[];
     runtimeParameter?: { id: string; oneOf: Array<string | number> };
   };
 };
@@ -996,7 +1006,9 @@ trigger metadata and do not automatically derive uptime. A rule with
 an omitted coverage is treated as 100%. Stacked rules likewise use their
 configured default/max stacks. `requirement.specialty` and
 `requirement.attribute` are enforced against the current agent before the rule
-is resolved.
+is resolved. `requirement.excludedSpecialties` is the inverse specialty filter:
+a rule with `excludedSpecialties: ["armorer"]` matches every current agent except
+`锋御`; a specialty cannot appear in both the positive and excluded lists.
 
 Skill-targeted rules may use only the event-safe stats: elemental resistance
 ignore, current/element resistance reduction, `enemyDefReduction`, generic and
@@ -1383,6 +1395,26 @@ For the first teammate, 千夏 currently has:
 
 - `核心被动`: `atkFlat +1050`;
 - `强化特殊技`: `atkFlat +50`.
+
+丽娜潜能觉醒的队友效果使用一个目录 Buff：`rina.potential.perfect_service`。
+该 Buff 提供两个运行时变量：丽娜自身穿透率（默认 `72`）和潜能觉醒等级
+（`P2` 至 `P6`，默认 `P6`）。P2-P6 分别按丽娜自身穿透率的每 1% 转换全队
+固定攻击力 / 防御力：`3 / 2.5`、`4.2 / 3.5`、`5.5 / 4.5`、`6.7 / 5.5`、
+`8 / 6.5` 点，攻击力和防御力上限分别为 `576` 与 `468`。每个等级的两条
+`derived` 规则通过 `requirement.runtimeParameter` 选择，所有规则共享同一个
+外部来源快照，因此运行时值保存在 `combatBuffs.runtimeInputs[buffId]` 下的
+`parameters.potentialLevel` 与 `effects[effectId].sourceValue`，不会读取当前正在
+计算角色的面板，也不会引入跨角色构筑或优化器联动。官方描述中的丽娜自身
+`+1.6%` 穿透率和潜能新增招式不属于队友 Buff，保持在本次建模范围之外。
+
+珂蕾妲队友目录使用 `koleda` 分组。`koleda.additional_ability.chain_damage`
+把失衡后的全队连携技增伤建模为每层 `35%`、最多 `2` 层的技能目标规则；
+`koleda.enhanced_basic.team_damage` 把消耗[熔炉升温]后的全队 `35%` 增伤建模为
+持续 `40` 秒的全局规则。`koleda.potential.demolition_operation` 是一个合并的
+潜能 Buff，使用 `potentialLevel`（`P2` 至 `P6`）选择数值档位：锋御角色读取
+`sharpDmgBonus`，非锋御角色读取 `critDmg`。非锋御分支使用
+`requirement.excludedSpecialties: ["armorer"]`，因此不会与锋御锐暴分支重叠；
+珂蕾妲自身核心被动和潜能新增技能不放入队友目录。
 
 Field Buffs are stored in `fieldBuffs`:
 
