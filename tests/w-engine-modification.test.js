@@ -175,6 +175,38 @@ assert.match(
     "Chinese descriptions should use fixed slash-delimited rank values",
 )
 
+const armorerRankFragments = {
+    zzz_wiki_2188: [
+        "暴击率提升25%/27.5%/30%/32.5%/35%",
+        "电属性伤害提升15%/17.5%/20%/22.5%/25%",
+        "电属性锐化伤害提升10%/11.5%/13%/14.5%/16%",
+    ],
+    zzz_wiki_2189: [
+        "每超出1%暴击率使造成的伤害提升0.48%/0.56%/0.64%/0.72%/0.8%",
+        "上限24%/28%/32%/36%/40%",
+    ],
+    zzz_wiki_2190: ["普通攻击造成的伤害提升18%/21%/24%/27%/30%"],
+    zzz_wiki_2200: [
+        "防御力提升8%/9%/10%/11%/12%",
+        "防御力额外提升8%/9%/10%/11%/12%",
+    ],
+}
+for (const [engineId, fragments] of Object.entries(armorerRankFragments)) {
+    const description = wEngine(engineId).effect.description.zhCN
+    for (const fragment of fragments) {
+        assert.ok(
+            description.includes(fragment),
+            `${engineId} description should enumerate all five rank values: ${fragment}`,
+        )
+    }
+}
+for (const engine of catalog.wEngines) {
+    assert.ok(
+        !/[0-9]%[-~～]/u.test(engine.effect?.description?.zhCN ?? ""),
+        `${engine.id} description should enumerate rank values instead of writing a percent range`,
+    )
+}
+
 const remielleSignature = wEngine("zzz_wiki_2109")
 assert.deepEqual(
     [

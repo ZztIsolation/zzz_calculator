@@ -2,6 +2,45 @@
 
 # Changelog
 
+## 2026-09-14 - Armorer W-Engine Descriptions Enumerated By Refinement Rank
+
+The four Claret Armorer W-Engines wrote their passive numbers as min-max ranges
+instead of the per-refinement rank lists every other W-Engine uses. `zzz_wiki_2188`
+猩红渴望, `zzz_wiki_2189` 血髓秘匣, `zzz_wiki_2190` 「月相」-弦 and `zzz_wiki_2200`
+喵运当头 now enumerate all five refinement values in refine order, with the unit
+repeated on every value:
+
+- 猩红渴望: `暴击率提升25%/27.5%/30%/32.5%/35%` (was `25%-35%`),
+  `电属性伤害提升15%/17.5%/20%/22.5%/25%` (was `15%-25%`), and
+  `电属性锐化伤害提升10%/11.5%/13%/14.5%/16%` (was `10%-16%`).
+- 血髓秘匣: `每超出1%暴击率使造成的伤害提升0.48%/0.56%/0.64%/0.72%/0.8%`
+  (was `0.48%-0.8%`) and `上限24%/28%/32%/36%/40%` (was `24%-40%`).
+- 「月相」-弦: `普通攻击造成的伤害提升18%/21%/24%/27%/30%` (was `18%-30%`).
+- 喵运当头: `防御力提升8%/9%/10%/11%/12%` and
+  `防御力额外提升8%/9%/10%/11%/12%` (was `8%-12%` twice).
+
+Fixed thresholds that are not refinement values keep their original wording, so
+血髓秘匣 still reads 暴击率超过100%时 and 每超出1%暴击率.
+
+The root cause was `scripts/import-claret-official-data.mjs`: it hand-typed those
+four description strings directly beside correct five-element `levels` arrays, so
+the displayed text and the structured data disagreed by construction, and
+`data/w_engines.json` inherited the mismatch when it was materialized. The
+importer now builds each string from the same `levels` arrays through a small
+`rankText(values, suffix)` helper, which joins the array as
+`25%/27.5%/30%/32.5%/35%`, and `data/w_engines.json` carries the generated
+result so a future import run cannot revert the text. `effect.description` stays
+display-only: nothing parses it and `effect.buff` remains the calculation
+payload, so no stat value, formula, refine scaling, or calculation path changed.
+
+`tests/w-engine-modification.test.js` pins the exact rank fragments for the four
+ids and adds a catalog-wide guard asserting that no `effect.description.zhCN`
+writes a percent range. `docs/regression-contract.md` now records the convention,
+which had previously survived only as the message of one assertion. The
+transposed bracketed enumeration in `zzz_wiki_216` 时光切片 and the skill-level
+range `9%~24%` on 耀嘉音's `special_aria_buff` are separate defects and were left
+untouched.
+
 ## 2026-09-14 - Claret Default Rotation Resolved By Cinema Level
 
 Claret's administrator default rotation now resolves by Cinema level instead of

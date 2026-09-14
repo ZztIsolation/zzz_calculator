@@ -585,6 +585,8 @@ function wEngine(page, config) {
     }
 }
 
+const rankText = (values, suffix = "%") => values.map(value => `${value}${suffix}`).join("/")
+
 function wEngineConfigs() {
     const levels = {
         scarletCrit: [25, 27.5, 30, 32.5, 35],
@@ -598,7 +600,7 @@ function wEngineConfigs() {
     return {
         2188: {
             rarity: "S", defBase: 431, advancedStat: "defPct", advancedValue: 48,
-            effectName: "渴血", description: "暴击率提升25%-35%，电属性伤害提升15%-25%；发动强化特殊技或触发毁伤后，电属性锐化伤害提升10%-16%，持续40秒。",
+            effectName: "渴血", description: `暴击率提升${rankText(levels.scarletCrit)}，电属性伤害提升${rankText(levels.scarletElectric)}；发动强化特殊技或触发毁伤后，电属性锐化伤害提升${rankText(levels.scarletSharp)}，持续40秒。`,
             effects: [
                 fixedRule("scarlet-crit-rate", "critRate", levels.scarletCrit),
                 fixedRule("scarlet-electric-dmg", "electricDmg", levels.scarletElectric),
@@ -607,7 +609,7 @@ function wEngineConfigs() {
         },
         2189: {
             rarity: "A", defBase: 356, advancedStat: "critRate", advancedValue: 20,
-            effectName: "启封之刻", description: "锋御角色暴击率超过100%时，每超出1%暴击率使造成的伤害提升0.48%-0.8%，上限24%-40%。",
+            effectName: "启封之刻", description: `锋御角色暴击率超过100%时，每超出1%暴击率使造成的伤害提升${rankText(levels.marrowPer)}，上限${rankText(levels.marrowCap)}。`,
             effects: [
                 formulaRule(
                     "marrow-overflow-damage",
@@ -627,7 +629,7 @@ function wEngineConfigs() {
         },
         2190: {
             rarity: "B", defBase: 282, advancedStat: "defPct", advancedValue: 32,
-            effectName: "弦月", description: "发动强化特殊技时，普通攻击造成的伤害提升18%-30%，持续10秒。",
+            effectName: "弦月", description: `发动强化特殊技时，普通攻击造成的伤害提升${rankText(levels.moonBasic)}，持续10秒。`,
             effects: [
                 fixedRule("moon-basic-damage", "dmgBonus", levels.moonBasic, {
                     kind: "skill",
@@ -638,7 +640,7 @@ function wEngineConfigs() {
         },
         2200: {
             rarity: "A", defBase: 356, advancedStat: "defPct", advancedValue: 40,
-            effectName: "幸运肉球", description: "防御力提升8%-12%；释放强化特殊技时，防御力额外提升8%-12%，持续40秒。",
+            effectName: "幸运肉球", description: `防御力提升${rankText(levels.catDef)}；释放强化特殊技时，防御力额外提升${rankText(levels.catDef)}，持续40秒。`,
             effects: [
                 fixedRule("lucky-paw-def", "defPct", levels.catDef, { kind: "default" }, { basis: "baseDef" }),
                 fixedRule(

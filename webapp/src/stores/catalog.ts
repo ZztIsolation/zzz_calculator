@@ -12,7 +12,12 @@ export const useCatalogStore = defineStore("catalog", {
   }),
   getters: {
     agents: state => state.meta?.agents ?? [],
-    displayAgents: state => state.meta?.displayAgents ?? state.catalog?.displayAgents ?? state.meta?.agents ?? [],
+    displayAgents: state => {
+      const agents = state.meta?.displayAgents ?? state.catalog?.displayAgents ?? state.meta?.agents ?? []
+      const claretIndex = agents.findIndex((agent: any) => agent?.id === "claret")
+      if (claretIndex <= 0) return agents
+      return [agents[claretIndex], ...agents.slice(0, claretIndex), ...agents.slice(claretIndex + 1)]
+    },
     displayAgentSkills: state => state.meta?.displayAgentSkills ?? state.meta?.agentSkills ?? [],
     wEngines: state => state.meta?.wEngines ?? [],
     displayWEngines: state => state.meta?.displayWEngines ?? state.catalog?.displayWEngines ?? state.meta?.wEngines ?? [],

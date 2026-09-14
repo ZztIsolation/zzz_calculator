@@ -19,6 +19,7 @@ output/
 test-results/
 .claude/
 .playwright-cli/
+.zcode/
 
 # user-local runtime data
 data/user_drive_discs.json
