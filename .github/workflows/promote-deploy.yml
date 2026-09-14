@@ -380,7 +380,11 @@ jobs:
               }
               throw error;
             }
-            const liveDeploy = await getBranch("deploy");
+            let liveDeploy = await getBranch("deploy");
+            for (let attempt = 0; attempt < 6 && liveDeploy.commit.sha !== candidateSha; attempt += 1) {
+              await new Promise(resolve => setTimeout(resolve, 5000));
+              liveDeploy = await getBranch("deploy");
+            }
             if (updated.object?.sha !== candidateSha || liveDeploy.commit.sha !== candidateSha) {
               return fail(`deploy did not settle on the requested candidate ${candidateSha}.`);
             }
