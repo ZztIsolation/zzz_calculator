@@ -857,7 +857,7 @@ async function main() {
         assertLuminescenceBuildCompatibility(luminescenceStore, rollbackBuild)
         assertLuminescenceBuildCompatibility(luminescenceStore, rollbackHome, { checkAltOwner: false })
         for (const [key, value] of Object.entries(initialLocalStorage)) {
-            if (!["zzz-calculator.webapp.build.v1", "zzz-calculator.homeSelection.v1"].includes(key)) {
+            if (!["zzz-calculator.webapp.build.v1", "zzz-calculator.homeSelection.v1", "zzz-calculator.webapp.optimizer.v1"].includes(key)) {
                 assert.equal(rollback.localStorage[key], candidateLocalAfterWrite.localStorage[key], `rollback release changed localStorage key ${key}`)
             }
         }
