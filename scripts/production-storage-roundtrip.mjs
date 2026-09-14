@@ -632,7 +632,14 @@ async function verifyOptimizerCanComposeSet(page) {
     await runButton.click()
     await page.locator('.optimizer-progress-card[data-status="done"]')
         .waitFor({ state: "visible", timeout: 60_000 })
-    assert.equal(await page.getByRole("button", { name: "优化结果" }).isEnabled(), true, "optimizer produced no set composition")
+    // The workbench exposes the result selector as a radio control. Keep a
+    // button fallback for older candidate bundles so this release gate checks
+    // the user-visible result state without coupling itself to one control type.
+    const optimizedResult = page.getByRole("radio", { name: "优化结果", exact: true })
+    const legacyOptimizedResult = page.getByRole("button", { name: "优化结果", exact: true })
+    const resultControl = await optimizedResult.count() > 0 ? optimizedResult : legacyOptimizedResult
+    await resultControl.waitFor({ state: "visible", timeout: 20_000 })
+    assert.equal(await resultControl.isEnabled(), true, "optimizer produced no set composition")
 }
 
 async function verifyLocalStorageFallback(context, proxy, currentPage, originalFallback) {
