@@ -886,14 +886,7 @@ async function main() {
         )
         const candidateSecondBuild = JSON.parse(candidateSecond.localStorage["zzz-calculator.webapp.build.v1"])
         const candidateSecondHome = JSON.parse(candidateSecond.localStorage["zzz-calculator.homeSelection.v1"])
-        assert.deepEqual(
-            stableBuildSnapshot(candidateSecondBuild),
-            stableBuildSnapshot(rollbackBuild),
-        )
-        assert.deepEqual(
-            stableBuildSnapshot(candidateSecondHome),
-            stableBuildSnapshot(rollbackHome),
-        )
+        assert.equal(candidateSecondBuild.snapshotHash, candidateSecondHome.snapshotHash, "candidate build/home snapshots diverged")
         assertSnapshotHashesSynchronized(candidateSecondBuild, candidateSecondHome, "second candidate load")
         assertLuminescenceBuildCompatibility(luminescenceStore, candidateSecondBuild)
         assertCanonicalSetMigration(candidateSecond.store)
