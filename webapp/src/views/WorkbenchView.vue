@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref, watch } from "vue"
 import { NAlert, NButton, NInput, NInputNumber, NModal, NRadioButton, NRadioGroup, NSelect, NTag, useMessage } from "naive-ui"
-import { Ban, ChevronDown, ChevronUp, LineChart, LockKeyhole, RefreshCcw, Save, SlidersHorizontal, Sparkles, X } from "lucide-vue-next"
+import { Ban, CheckSquare, ChevronDown, ChevronUp, LineChart, LockKeyhole, RefreshCcw, Save, SlidersHorizontal, Sparkles, X } from "lucide-vue-next"
 import BuffPickerModal from "@/components/BuffPickerModal.vue"
 import CalculationConfigModal from "@/components/CalculationConfigModal.vue"
 import DamageSummaryBar from "@/components/DamageSummaryBar.vue"
@@ -1378,7 +1378,7 @@ function formatPercentValue(value: any) {
       <section class="workbench-section workbench-buff-section">
         <div class="panel-header workbench-section-header">
           <h2 class="panel-title">局内 Buff</h2>
-          <NButton class="prominent-config-button" type="primary" secondary size="small" data-testid="open-buff-picker" @click="showBuffPicker = true">
+          <NButton class="prominent-config-button workbench-action-button workbench-action-button--buff" type="primary" size="small" data-testid="open-buff-picker" @click="showBuffPicker = true">
             <template #icon><SlidersHorizontal :size="16" /></template>
             选择 Buff
           </NButton>
@@ -1395,9 +1395,9 @@ function formatPercentValue(value: any) {
       <section class="workbench-section workbench-calculation-section">
         <div class="panel-header workbench-section-header">
           <h2 class="panel-title">计算设置</h2>
-          <NButton class="prominent-config-button" type="primary" secondary size="small" data-testid="open-calculation-config" :disabled="optimizerStore.isBusy" @click="showCalculationConfig = true">
-            <template #icon><SlidersHorizontal :size="16" /></template>
-            配置
+          <NButton class="prominent-config-button workbench-action-button workbench-action-button--calculation" type="primary" size="small" data-testid="open-calculation-config" :disabled="optimizerStore.isBusy" @click="showCalculationConfig = true">
+            <template #icon><CheckSquare :size="16" /></template>
+            编辑事件
           </NButton>
         </div>
         <div class="workbench-section-body metric-grid calculation-summary-grid" data-layout-surface="calculation-summary">
@@ -1491,7 +1491,7 @@ function formatPercentValue(value: any) {
             <p class="panel-subtitle">外部只保留套装限制，高级项在计算配置中调整</p>
           </div>
           <div class="toolbar optimizer-config-actions">
-            <NButton class="prominent-config-button" type="primary" secondary size="large" data-testid="open-optimizer-config" @click="showOptimizerConfig = true">
+            <NButton class="prominent-config-button workbench-action-button workbench-action-button--optimizer" type="primary" size="large" data-testid="open-optimizer-config" @click="showOptimizerConfig = true">
               <template #icon><SlidersHorizontal :size="18" /></template>
               计算配置
             </NButton>
@@ -1503,7 +1503,7 @@ function formatPercentValue(value: any) {
             <div class="metric optimizer-set-choice-field ui-field" data-layout-field>
               <dt>限定 4 件套</dt>
               <dd class="set-summary-actions">
-                <NButton size="small" @click="openFourPieceSetModal">选择</NButton>
+                <NButton class="optimizer-set-select-button" size="small" @click="openFourPieceSetModal">选择</NButton>
                 <div class="selected-set-summary" aria-live="polite">
                   <template v-if="selectedOptimizerSets.length">
                     <span v-for="set in selectedOptimizerSets" :key="set.id" class="selected-set-chip selected-set-chip-with-icon">
@@ -1521,7 +1521,7 @@ function formatPercentValue(value: any) {
                 <NButton size="tiny" text :disabled="!optimizerStore.twoPieceSetIds.length" @click="clearTwoPieceSetLimits">清空</NButton>
               </dt>
               <dd class="set-summary-actions">
-                <NButton size="small" @click="openTwoPieceSetModal">选择</NButton>
+                <NButton class="optimizer-set-select-button" size="small" @click="openTwoPieceSetModal">选择</NButton>
                 <div class="selected-set-summary" aria-live="polite">
                   <span v-if="!selectedTwoPieceSets.length" class="selected-set-empty">自动匹配任意 2 件套</span>
                   <template v-else>
@@ -1542,11 +1542,11 @@ function formatPercentValue(value: any) {
           </div>
           <div class="optimizer-run-row" :class="{ 'optimizer-run-row-has-progress': optimizerProgressVisible }">
             <div class="toolbar">
-              <NButton v-if="!optimizerStore.isBusy" type="primary" :disabled="!canRunOptimization" @click="runOptimization">
+              <NButton v-if="!optimizerStore.isBusy" class="optimizer-action-button optimizer-action-button--start" type="primary" :disabled="!canRunOptimization" @click="runOptimization">
                 <template #icon><Sparkles :size="16" /></template>
                 开始优化
               </NButton>
-              <NButton v-else type="warning" @click="optimizerStore.cancel">取消优化</NButton>
+              <NButton v-else class="optimizer-action-button optimizer-action-button--cancel" type="warning" @click="optimizerStore.cancel">取消优化</NButton>
             </div>
             <div
               v-if="optimizerProgressVisible"
@@ -2197,11 +2197,10 @@ function formatPercentValue(value: any) {
 }
 
 .workbench-left .prominent-config-button {
-  min-width: 96px;
-  height: 34px;
+  min-width: 112px;
+  height: 40px;
   padding: 0 12px;
-  border-width: 1px;
-  box-shadow: none;
+  border-width: 2px;
 }
 
 .workbench-left .workbench-buff-tags {
@@ -2408,6 +2407,190 @@ function formatPercentValue(value: any) {
 .prominent-config-button:focus-visible {
   outline: 3px solid rgba(47, 125, 246, 0.28);
   outline-offset: 2px;
+}
+
+.workbench-action-button {
+  position: relative;
+  overflow: hidden;
+  border-radius: 9px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.workbench-action-button::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  background: linear-gradient(115deg, transparent 25%, rgba(255, 255, 255, 0.28) 50%, transparent 75%);
+  opacity: 0;
+  transform: translateX(-120%);
+  transition: opacity 0.18s ease, transform 0.45s ease;
+}
+
+.workbench-action-button :deep(.n-button__content),
+.workbench-action-button :deep(.n-button__icon) {
+  position: relative;
+  z-index: 1;
+}
+
+.workbench-action-button :deep(.n-button__icon) {
+  margin-right: 6px;
+}
+
+.workbench-action-button--buff,
+.workbench-action-button--calculation,
+.workbench-action-button--optimizer {
+  border-color: #1d64d8;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: #fff;
+  box-shadow: 0 5px 12px rgba(37, 99, 235, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.workbench-action-button--buff:not(.n-button--disabled):hover,
+.workbench-action-button--calculation:not(.n-button--disabled):hover,
+.workbench-action-button--optimizer:not(.n-button--disabled):hover {
+  border-color: #174ea6;
+  background: linear-gradient(135deg, #4b8df8 0%, #1d4ed8 100%);
+  color: #fff;
+  box-shadow: 0 7px 16px rgba(37, 99, 235, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  transform: translateY(-2px);
+}
+
+.workbench-action-button:not(.n-button--disabled):hover::after {
+  opacity: 1;
+  transform: translateX(120%);
+}
+
+.workbench-action-button:not(.n-button--disabled):active {
+  box-shadow: 0 2px 5px rgba(47, 125, 246, 0.2), inset 0 1px 3px rgba(15, 23, 42, 0.12);
+  transform: translateY(0);
+}
+
+.workbench-action-button:focus-visible {
+  outline: 3px solid rgba(47, 125, 246, 0.32);
+  outline-offset: 3px;
+}
+
+.workbench-action-button.n-button--disabled {
+  opacity: 0.56;
+  box-shadow: none;
+}
+
+.optimizer-action-button {
+  position: relative;
+  min-width: 116px;
+  height: 40px;
+  padding: 0 16px;
+  overflow: hidden;
+  border-radius: 9px;
+  border-style: solid;
+  border-width: 2px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  transition: background-color 0.18s ease, background-image 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.optimizer-action-button::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  background: linear-gradient(115deg, transparent 25%, rgba(255, 255, 255, 0.28) 50%, transparent 75%);
+  opacity: 0;
+  transform: translateX(-120%);
+  transition: opacity 0.18s ease, transform 0.45s ease;
+}
+
+.optimizer-action-button :deep(.n-button__content),
+.optimizer-action-button :deep(.n-button__icon) {
+  position: relative;
+  z-index: 1;
+}
+
+.optimizer-action-button :deep(.n-button__icon) {
+  margin-right: 6px;
+}
+
+.optimizer-action-button:not(.n-button--disabled):hover {
+  transform: translateY(-2px);
+}
+
+.optimizer-action-button:not(.n-button--disabled):hover::after {
+  opacity: 1;
+  transform: translateX(120%);
+}
+
+.optimizer-action-button:not(.n-button--disabled):active {
+  transform: translateY(0);
+}
+
+.optimizer-action-button--start {
+  border-color: #066847;
+  background: linear-gradient(135deg, #0f9f6e 0%, #087a55 100%);
+  color: #fff;
+  box-shadow: 0 5px 12px rgba(8, 122, 85, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.optimizer-action-button--start:not(.n-button--disabled):hover {
+  border-color: #05573d;
+  background: linear-gradient(135deg, #18b57e 0%, #066847 100%);
+  color: #fff;
+  box-shadow: 0 7px 16px rgba(8, 122, 85, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.optimizer-action-button--start:not(.n-button--disabled):active {
+  border-color: #04452f;
+  background: #05573d;
+  color: #fff;
+  box-shadow: 0 2px 5px rgba(8, 122, 85, 0.22), inset 0 1px 3px rgba(4, 69, 47, 0.2);
+}
+
+.optimizer-action-button--start:focus-visible {
+  outline: 3px solid rgba(8, 122, 85, 0.28);
+  outline-offset: 3px;
+}
+
+.optimizer-action-button--cancel:focus-visible {
+  outline: 3px solid rgba(183, 121, 31, 0.3);
+  outline-offset: 3px;
+}
+
+.optimizer-action-button.n-button--disabled {
+  opacity: 0.56;
+  filter: saturate(0.35);
+  box-shadow: none;
+}
+
+.optimizer-action-button.n-button--disabled::after {
+  opacity: 0;
+  transform: none;
+  transition: none;
+}
+
+.optimizer-action-button :deep(.n-button__border),
+.optimizer-action-button :deep(.n-button__state-border),
+.workbench-action-button :deep(.n-button__border),
+.workbench-action-button :deep(.n-button__state-border) {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .optimizer-action-button,
+  .optimizer-action-button::after {
+    transition: none;
+  }
+
+  .optimizer-action-button:not(.n-button--disabled):hover,
+  .optimizer-action-button:not(.n-button--disabled):active {
+    transform: none;
+  }
+
+  .optimizer-action-button:not(.n-button--disabled):hover::after {
+    opacity: 0;
+    transform: none;
+  }
 }
 
 .optimizer-set-grid {
@@ -2978,6 +3161,48 @@ function formatPercentValue(value: any) {
   align-items: start;
   gap: 10px;
   font-weight: 600;
+}
+
+/* 边框只由 naive-ui 的覆盖层绘制：宿主若也加 border，覆盖层会被推入内侧，两层叠成双倍粗边。 */
+.optimizer-set-select-button {
+  min-width: 48px;
+  height: 32px;
+  padding: 0 10px;
+  color: #334155;
+  background: #fff;
+  font-weight: 650;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1);
+}
+
+.optimizer-set-select-button :deep(.n-button__border),
+.optimizer-set-select-button :deep(.n-button__state-border) {
+  border: 1px solid #94a3b8;
+}
+
+.optimizer-set-select-button:not(.n-button--disabled):hover {
+  color: #1f2937;
+  background: #f1f5f9;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.1);
+}
+
+.optimizer-set-select-button:not(.n-button--disabled):hover :deep(.n-button__border),
+.optimizer-set-select-button:not(.n-button--disabled):hover :deep(.n-button__state-border) {
+  border-color: #64748b;
+}
+
+.optimizer-set-select-button:not(.n-button--disabled):active {
+  background: #e2e8f0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1);
+}
+
+.optimizer-set-select-button:not(.n-button--disabled):active :deep(.n-button__border),
+.optimizer-set-select-button:not(.n-button--disabled):active :deep(.n-button__state-border) {
+  border-color: #475569;
+}
+
+.optimizer-set-select-button:focus-visible {
+  outline: 3px solid rgba(71, 85, 105, 0.28);
+  outline-offset: 2px;
 }
 
 .selected-set-summary {

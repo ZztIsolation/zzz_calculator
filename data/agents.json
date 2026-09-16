@@ -6317,19 +6317,6 @@
             "buffModifiers": []
           },
           {
-            "cinemaLevel": 3,
-            "cinemaName": {
-              "zhCN": "糖霜宣言"
-            },
-            "description": {
-              "zhCN": "普通攻击、闪避、支援技、特殊技、连携技技能等级+2。"
-            },
-            "scope": "inCombat",
-            "defaultChecked": false,
-            "effects": [],
-            "buffModifiers": []
-          },
-          {
             "cinemaLevel": 4,
             "cinemaName": {
               "zhCN": "赤月彷徨"
@@ -6386,19 +6373,6 @@
                 }
               }
             ],
-            "buffModifiers": []
-          },
-          {
-            "cinemaLevel": 5,
-            "cinemaName": {
-              "zhCN": "暮血熔炉"
-            },
-            "description": {
-              "zhCN": "普通攻击、闪避、支援技、特殊技、连携技技能等级+2。"
-            },
-            "scope": "inCombat",
-            "defaultChecked": false,
-            "effects": [],
             "buffModifiers": []
           },
           {

@@ -6903,6 +6903,12 @@
               "mode": "flat",
               "target": {
                 "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             },
             {
@@ -6922,6 +6928,12 @@
               "mode": "flat",
               "target": {
                 "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             },
             {
@@ -6941,6 +6953,12 @@
               "mode": "flat",
               "target": {
                 "kind": "default"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -7126,6 +7144,12 @@
                     "skillType": "basic"
                   }
                 ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -7203,7 +7227,13 @@
               "target": {
                 "kind": "default"
               },
-              "basis": "baseDef"
+              "basis": "baseDef",
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "lucky-paw-extra-def",

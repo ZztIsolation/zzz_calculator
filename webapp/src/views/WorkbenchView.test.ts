@@ -287,16 +287,39 @@ describe("WorkbenchView optimizer progress", () => {
   })
 
   it("makes all workbench configuration entrypoints prominent", () => {
-    expect(source).toContain('<NButton class="prominent-config-button" type="primary" secondary size="small" data-testid="open-buff-picker"')
-    expect(source).toContain('<NButton class="prominent-config-button" type="primary" secondary size="small" data-testid="open-calculation-config"')
-    expect(source).toContain('<NButton class="prominent-config-button" type="primary" secondary size="large" data-testid="open-optimizer-config"')
-    expect(source.match(/class="prominent-config-button"/g)).toHaveLength(3)
+    expect(source).toContain('<NButton class="prominent-config-button workbench-action-button workbench-action-button--buff" type="primary" size="small" data-testid="open-buff-picker"')
+    expect(source).toContain('<NButton class="prominent-config-button workbench-action-button workbench-action-button--calculation" type="primary" size="small" data-testid="open-calculation-config"')
+    expect(source).toContain("编辑事件")
+    expect(source).toContain('<NButton class="prominent-config-button workbench-action-button workbench-action-button--optimizer" type="primary" size="large" data-testid="open-optimizer-config"')
+    expect(source.match(/class="prominent-config-button(?:\s|"|')/g)).toHaveLength(3)
     expect(source).toContain("选择 Buff")
     expect(source).toContain(".workbench-left .prominent-config-button")
-    expect(source).toContain("min-width: 96px;")
-    expect(source).toContain("height: 34px;")
+    expect(source).toContain("min-width: 112px;")
+    expect(source).toContain("height: 40px;")
     expect(source).toContain("border: 2px solid var(--app-blue);")
     expect(source).toContain(".prominent-config-button:focus-visible")
+    // All three entrypoints share one fill, so they must share one rule.
+    expect(source).toContain(".workbench-action-button--buff,\n.workbench-action-button--calculation,\n.workbench-action-button--optimizer {")
+  })
+
+  it("separates optimizer execution styling from configuration actions", () => {
+    expect(source).toContain('<NButton v-if="!optimizerStore.isBusy" class="optimizer-action-button optimizer-action-button--start" type="primary" :disabled="!canRunOptimization" @click="runOptimization">')
+    expect(source).toContain('<NButton v-else class="optimizer-action-button optimizer-action-button--cancel" type="warning" @click="optimizerStore.cancel">取消优化</NButton>')
+    expect(source).toContain("linear-gradient(135deg, #0f9f6e 0%, #087a55 100%)")
+    expect(source).toContain("linear-gradient(135deg, #18b57e 0%, #066847 100%)")
+    expect(source).toContain("rgba(8, 122, 85, 0.28)")
+    expect(source).toContain("min-width: 116px;")
+    expect(source).toContain("height: 40px;")
+    expect(source).toContain("@media (prefers-reduced-motion: reduce)")
+  })
+
+  it("suppresses naive-ui border overlays on custom action buttons", () => {
+    for (const family of [".optimizer-action-button", ".workbench-action-button"]) {
+      for (const overlay of ["border", "state-border"]) {
+        const selector = `${family.replace(".", "\\.")} :deep\\(\\.n-button__${overlay}\\)`
+        expect(source).toMatch(new RegExp(`${selector}[^{}]*\\{[^}]*display: none;`))
+      }
+    }
   })
 
   it("uses one rich selector for each selected agent and w-engine", () => {

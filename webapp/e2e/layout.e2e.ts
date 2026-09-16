@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test, type Locator, type Page } from "@playwright/test"
 
 const FIELD_SELECTOR = [
   "[data-layout-field]",
@@ -97,6 +97,7 @@ async function expectProminentConfigButton(
       width: rect.width,
       height: rect.height,
       backgroundColor: style.backgroundColor,
+      backgroundImage: style.backgroundImage,
       fontWeight: Number(style.fontWeight),
       borderColor: style.borderColor,
       borderWidth: Number.parseFloat(style.borderWidth),
@@ -105,7 +106,9 @@ async function expectProminentConfigButton(
 
   expect(appearance.width).toBeGreaterThanOrEqual(density === "compact" ? 96 : 116)
   expect(appearance.height).toBeGreaterThanOrEqual(density === "compact" ? 34 : 40)
-  expect(appearance.backgroundColor).not.toBe("rgba(0, 0, 0, 0)")
+  expect(
+    appearance.backgroundColor !== "rgba(0, 0, 0, 0)" || appearance.backgroundImage !== "none",
+  ).toBe(true)
   expect(appearance.fontWeight).toBeGreaterThanOrEqual(700)
   expect(appearance.borderWidth).toBeGreaterThanOrEqual(density === "compact" ? 1 : 2)
   expect(appearance.borderColor).not.toBe(appearance.backgroundColor)
@@ -123,6 +126,41 @@ async function expectProminentConfigButton(
   expect(focusAppearance.focusVisible).toBe(true)
   expect(focusAppearance.outlineWidth).toBeGreaterThanOrEqual(3)
   expect(focusAppearance.outlineOffset).toBeGreaterThanOrEqual(2)
+}
+
+async function readActionButtonAppearance(page: Page, testId: string) {
+  return page.getByTestId(testId).evaluate(element => {
+    const style = getComputedStyle(element)
+    return {
+      backgroundImage: style.backgroundImage,
+      borderColor: style.borderColor,
+      borderWidth: Number.parseFloat(style.borderWidth),
+      borderRadius: style.borderRadius,
+      color: style.color,
+      fontWeight: Number(style.fontWeight),
+    }
+  })
+}
+
+async function expectNoBorderOverlay(page: Page, button: Locator, label: string) {
+  // naive-ui paints its own border overlay inside a button; a visible bordered
+  // child means that overlay leaked past the button's own border.
+  const readVisibleBorderedDescendants = () =>
+    button.evaluate(element =>
+      [...element.querySelectorAll("*")]
+        .filter(child => {
+          const style = getComputedStyle(child)
+          return style.display !== "none" && Number.parseFloat(style.borderTopWidth) > 0
+        })
+        .map(child => `${child.getAttribute("class")} -> ${getComputedStyle(child).borderTopColor}`),
+    )
+
+  expect(await readVisibleBorderedDescendants(), `${label} at rest`).toEqual([])
+  await button.hover()
+  expect(await readVisibleBorderedDescendants(), `${label} on hover`).toEqual([])
+  await page.mouse.move(0, 0)
+  await button.focus()
+  expect(await readVisibleBorderedDescendants(), `${label} on focus`).toEqual([])
 }
 
 test("right workbench column keeps panel, summary, and white box in order", async ({ page }) => {
@@ -163,7 +201,7 @@ test("right workbench column keeps panel, summary, and white box in order", asyn
 
 test("event management keeps disorder labels and controls visible", async ({ page }) => {
   await openApp(page)
-  await expectProminentConfigButton(page, "open-calculation-config", "配置", "compact")
+  await expectProminentConfigButton(page, "open-calculation-config", "编辑事件", "compact")
   await page.getByTestId("open-calculation-config").click()
   await chooseNaiveOption(page, "计算方式", "自定义")
   await page.getByRole("button", { name: "添加异常事件", exact: true }).click()
@@ -315,6 +353,74 @@ test("optimizer and buff configuration use protected field layouts", async ({ pa
   await openApp(page)
   await expectProminentConfigButton(page, "open-optimizer-config", "计算配置")
   await expectProminentConfigButton(page, "open-buff-picker", "选择 Buff", "compact")
+
+  const buffActionAppearance = await readActionButtonAppearance(page, "open-buff-picker")
+  expect(buffActionAppearance.backgroundImage).toContain("linear-gradient")
+  expect(await readActionButtonAppearance(page, "open-optimizer-config")).toEqual(buffActionAppearance)
+  expect(await readActionButtonAppearance(page, "open-calculation-config")).toEqual(buffActionAppearance)
+
+  const optimizerStart = page.getByRole("button", { name: "开始优化", exact: true })
+  await expect(optimizerStart).toBeVisible()
+  await expect(optimizerStart).toHaveClass(/optimizer-action-button--start/)
+  const startAppearance = await optimizerStart.evaluate(element => {
+    const rect = element.getBoundingClientRect()
+    const style = getComputedStyle(element)
+    return {
+      width: rect.width,
+      height: rect.height,
+      backgroundImage: style.backgroundImage,
+      borderColor: style.borderColor,
+      borderWidth: Number.parseFloat(style.borderWidth),
+      fontWeight: Number(style.fontWeight),
+    }
+  })
+  expect(startAppearance.width).toBeGreaterThanOrEqual(116)
+  expect(startAppearance.height).toBeGreaterThanOrEqual(40)
+  expect(startAppearance.backgroundImage).toContain("linear-gradient")
+  expect(startAppearance.backgroundImage).toContain("rgb(15, 159, 110)")
+  expect(startAppearance.backgroundImage).toContain("rgb(8, 122, 85)")
+  expect(startAppearance.borderColor).toBe("rgb(6, 104, 71)")
+  expect(startAppearance.borderWidth).toBeGreaterThanOrEqual(2)
+  expect(startAppearance.fontWeight).toBeGreaterThanOrEqual(800)
+
+  await optimizerStart.focus()
+  await expect(optimizerStart).toBeFocused()
+  await expect(optimizerStart).toHaveCSS("outline-width", "3px")
+  await expect(optimizerStart).toHaveCSS("outline-offset", "3px")
+
+  const configurationAppearance = await page.getByTestId("open-optimizer-config").evaluate(element => {
+    const style = getComputedStyle(element)
+    return { backgroundImage: style.backgroundImage, borderColor: style.borderColor }
+  })
+  expect(configurationAppearance.backgroundImage).not.toContain("rgb(15, 159, 110)")
+  expect(configurationAppearance.borderColor).not.toBe(startAppearance.borderColor)
+
+  await page.emulateMedia({ reducedMotion: "reduce" })
+  await optimizerStart.hover()
+  const reducedMotionAppearance = await optimizerStart.evaluate(element => {
+    const style = getComputedStyle(element)
+    const sweepStyle = getComputedStyle(element, "::after")
+    return {
+      transitionDuration: style.transitionDuration,
+      transform: style.transform,
+      sweepOpacity: sweepStyle.opacity,
+      sweepTransform: sweepStyle.transform,
+      sweepTransitionDuration: sweepStyle.transitionDuration,
+    }
+  })
+  expect(reducedMotionAppearance.transitionDuration.split(",").every(value => value.trim() === "0s")).toBe(true)
+  expect(reducedMotionAppearance.transform).toBe("none")
+  expect(reducedMotionAppearance.sweepOpacity).toBe("0")
+  expect(reducedMotionAppearance.sweepTransform).toBe("none")
+  expect(reducedMotionAppearance.sweepTransitionDuration.split(",").every(value => value.trim() === "0s")).toBe(true)
+  await page.emulateMedia({ reducedMotion: "no-preference" })
+
+  await expectNoBorderOverlay(page, optimizerStart, "开始优化")
+  await expectNoBorderOverlay(page, page.getByTestId("open-optimizer-config"), "计算配置")
+  await expectNoBorderOverlay(page, page.getByTestId("open-buff-picker"), "选择 Buff")
+  await expectNoBorderOverlay(page, page.getByTestId("open-calculation-config"), "编辑事件")
+
+  await expectStableLayout(page, "workbench")
 
   const optimizerSection = page.locator(".optimizer-constraint-panel")
   const driveDiscSection = page.locator(".drive-disc-workbench-panel")

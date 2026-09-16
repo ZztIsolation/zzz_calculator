@@ -181,9 +181,38 @@ async function prepareOptimizedScheme(page: Page): Promise<void> {
   await seedBrowserState(page)
   expect(await page.evaluate(() => typeof navigator.locks?.request)).toBe("function")
 
+  await page.route("**/optimizer.worker-*.js", async route => {
+    await new Promise(resolve => setTimeout(resolve, 750))
+    await route.continue()
+  })
   const startOptimization = page.getByRole("button", { name: "开始优化", exact: true })
   await expect(startOptimization).toBeEnabled()
+  const startBox = await startOptimization.boundingBox()
+  expect(startBox).not.toBeNull()
   await startOptimization.click()
+  const cancelOptimization = page.getByRole("button", { name: "取消优化", exact: true })
+  await expect(cancelOptimization).toBeVisible()
+  await expect(cancelOptimization).toHaveClass(/optimizer-action-button--cancel/)
+  await expect(cancelOptimization).toHaveClass(/n-button--warning-type/)
+  const cancelBox = await cancelOptimization.boundingBox()
+  expect(cancelBox).not.toBeNull()
+  expect(Math.abs(cancelBox!.width - startBox!.width)).toBeLessThanOrEqual(1)
+  expect(Math.abs(cancelBox!.height - startBox!.height)).toBeLessThanOrEqual(1)
+
+  const readVisibleBorderedDescendants = () =>
+    cancelOptimization.evaluate(element =>
+      [...element.querySelectorAll("*")]
+        .filter(child => {
+          const style = getComputedStyle(child)
+          return style.display !== "none" && Number.parseFloat(style.borderTopWidth) > 0
+        })
+        .map(child => `${child.getAttribute("class")} -> ${getComputedStyle(child).borderTopColor}`),
+    )
+
+  expect(await readVisibleBorderedDescendants(), "取消优化 at rest").toEqual([])
+  await cancelOptimization.focus()
+  expect(await readVisibleBorderedDescendants(), "取消优化 on focus").toEqual([])
+
   await expect(page.getByRole("radio", { name: "优化结果", exact: true })).toBeEnabled({ timeout: 20_000 })
   await expect(page.locator('.drive-disc-workbench-panel .disc-slot-card[data-slot="1"]')).toContainText("啄木鸟电音")
   await expect(page.locator('.drive-disc-workbench-panel .disc-slot-card[data-slot="6"]')).toContainText("激素朋克")
