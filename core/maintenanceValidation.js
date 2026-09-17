@@ -1281,6 +1281,25 @@ function validatePreferredDriveDiscs(errors, preferredDriveDiscs, context = {}) 
     }
 }
 
+function validateImportantSubStats(errors, importantSubStats) {
+    if (importantSubStats === undefined || importantSubStats === null) {
+        return
+    }
+    if (!Array.isArray(importantSubStats)) {
+        add(errors, "importantSubStats", "重要副词条必须是数组。")
+        return
+    }
+    for (const [index, stat] of importantSubStats.entries()) {
+        if (typeof stat !== "string" || !stat.trim()) {
+            add(errors, `importantSubStats[${index}]`, "必须是非空属性标识。")
+            continue
+        }
+        if (!STAT_VALUES.has(stat)) {
+            add(errors, `importantSubStats[${index}]`, "不是支持的属性。")
+        }
+    }
+}
+
 function calculationAnomalyIds(context = {}, maintenanceType) {
     const settlementType = maintenanceType === "disorder" ? "disorder" : "attribute"
     const fromUnified = Array.isArray(context.effects)
@@ -2289,6 +2308,7 @@ function validateAgent(item, context) {
     validateCinemaBuffs(errors, item?.combatBuffs?.cinemaBuffs, context)
     validateAnomalyReleaseProfiles(errors, item?.anomalyReleaseProfiles)
     validatePreferredDriveDiscs(errors, item?.preferredDriveDiscs, context)
+    validateImportantSubStats(errors, item?.importantSubStats)
     const agentContext = { ...context, currentAgent: item }
     const roleSkillGroupById = validateCalculationSkillGroups(errors, item?.skillGroups, "skillGroups", agentContext, item?.id)
     validateDefaultCalculationConfig(errors, item?.defaultCalculationConfig, agentContext, item?.id, roleSkillGroupById)

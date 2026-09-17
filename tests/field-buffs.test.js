@@ -174,13 +174,13 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
 }
 
 const allFieldBuffs = catalog.combatBuffs.filter(buff => buff.sourceType === "field")
-assert.equal(allFieldBuffs.length, 30, "Field Buff catalog should keep all maintained entries")
+assert.equal(allFieldBuffs.length, 33, "Field Buff catalog should keep all maintained entries")
 assert.deepEqual(
     allFieldBuffs
         .filter(buff => buff.period?.modeId === "defense_v5" && buff.period?.gameVersion === "3.1" && buff.period?.phaseNo === 3)
         .map(buff => buff.id),
     DEFENSE_3_1_PHASE_3_IDS,
-    "Defense Battle 3.1 phase 3 should be the latest authored field period",
+    "Defense Battle 3.1 phase 3 should keep its three authored entries in catalog order",
 )
 for (const buff of allFieldBuffs) {
     assert.ok(buff.effects.length > 0, `${buff.id} should expose structured effects`)
@@ -197,6 +197,26 @@ const CRITICAL_ASSAULT_3_2_PHASE_1_IDS = {
     shijin: "field.critical_assault.v3_2.p1.shijin",
     yaoshuang: "field.critical_assault.v3_2.p1.yaoshuang",
     ruilie: "field.critical_assault.v3_2.p1.ruilie",
+}
+const DEFENSE_3_2_PHASE_1_IDS = {
+    shiren: "field.defense_v5.v3_2.p1.shiren_cuijian",
+    yichao: "field.defense_v5.v3_2.p1.yichao_miyong",
+    shiguang: "field.defense_v5.v3_2.p1.shiguang_ranmeng",
+}
+const DEFENSE_3_2_EFFECT_IDS = {
+    shirenSharp: "field_defense_v5_v3_2_p1_shiren_sharp_dmg",
+    shirenDef: "field_defense_v5_v3_2_p1_shiren_def_pct",
+    shirenStun: "field_defense_v5_v3_2_p1_shiren_stun_vulnerable",
+    yichaoAnomaly: "field_defense_v5_v3_2_p1_yichao_anomaly_damage",
+    yichaoProficiency: "field_defense_v5_v3_2_p1_yichao_anomaly_proficiency",
+    shiguangEther: "field_defense_v5_v3_2_p1_shiguang_ether_dmg",
+    shiguangProficiency: "field_defense_v5_v3_2_p1_shiguang_anomaly_proficiency",
+    shiguangStun: "field_defense_v5_v3_2_p1_shiguang_stun_vulnerable",
+}
+const EXPECTED_DEFENSE_3_2_PHASE_1_NAMES = {
+    [DEFENSE_3_2_PHASE_1_IDS.shiren]: "矢刃摧坚",
+    [DEFENSE_3_2_PHASE_1_IDS.yichao]: "异潮弥涌",
+    [DEFENSE_3_2_PHASE_1_IDS.shiguang]: "蚀光染梦",
 }
 const EXPECTED_3_2_PHASE_1_NAMES = {
     [CRITICAL_ASSAULT_3_2_PHASE_1_IDS.shijin]: "蚀烬",
@@ -235,6 +255,40 @@ assert.equal(
     fieldBuff(CRITICAL_ASSAULT_3_2_PHASE_1_IDS.ruilie).description.zhCN,
     "代理人的穿透率提升5%，攻击命中敌人时无视其15%的电属性伤害抗性。代理人发动[强化特殊技]、[特殊技]后，锐化伤害提升20%，防御力提升10%，持续20秒，重复触发时刷新持续时间。",
     "Ruilie should preserve the complete source text",
+)
+
+for (const id of Object.values(DEFENSE_3_2_PHASE_1_IDS)) {
+    const buff = fieldBuff(id)
+    assert.equal(buff.name?.zhCN, EXPECTED_DEFENSE_3_2_PHASE_1_NAMES[id], `${id} should keep its maintained name`)
+    assert.deepEqual(buff.period, {
+        modeId: "defense_v5",
+        gameVersion: "3.2",
+        phaseNo: 1,
+        phaseName: { zhCN: "第一期" },
+    })
+    assert.equal(buff.source?.zhCN, "防卫战 v5")
+    assert.equal(buff.sourcePeriod?.zhCN, "3.2版本第一期")
+    const validation = validateMaintenanceItem("field-buffs", buff, {
+        items: catalog.combatBuffs,
+        currentId: id,
+        agentSkills: catalog.agentSkills,
+    })
+    assert.equal(validation.ok, true, `${id} should pass field Buff validation: ${JSON.stringify(validation.errors)}`)
+}
+assert.equal(
+    fieldBuff(DEFENSE_3_2_PHASE_1_IDS.shiren).description.zhCN,
+    "代理人的锐化伤害提升25%，防御力提升15%。代理人命中敌人且触发暴击后，若敌人处于失衡状态，失衡易伤倍率提升20%，持续10秒，重复触发时刷新持续时间。",
+    "Shiren Cuijian should preserve the complete source text",
+)
+assert.equal(
+    fieldBuff(DEFENSE_3_2_PHASE_1_IDS.yichao).description.zhCN,
+    "代理人造成的异常积蓄效率提升15%，造成的属性异常伤害提升20%。若队伍内有2名/3名[异常]特性的代理人，代理人的异常精通分别提升20/60点。",
+    "Yichao Miyong should preserve the complete source text, including the descriptive-only anomaly buildup efficiency clause",
+)
+assert.equal(
+    fieldBuff(DEFENSE_3_2_PHASE_1_IDS.shiguang).description.zhCN,
+    "代理人的以太伤害提升20%，异常精通提升20点。代理人使敌人进入属性异常状态后，失衡易伤倍率提升20%，持续15秒，重复触发时刷新持续时间。",
+    "Shiguang Ranmeng should preserve the complete source text",
 )
 
 assert.equal(
@@ -1049,5 +1103,95 @@ const ruilieRules = fieldBuff(CRITICAL_ASSAULT_3_2_PHASE_1_IDS.ruilie).effects
     .filter(effect => effect.stat === "sharpDmgBonus" || effect.stat === "defPct")
 assert.ok(ruilieRules.every(effect => effect.condition === "代理人发动强化特殊技、特殊技后"))
 assert.ok(ruilieRules.every(effect => effect.durationSeconds === 20))
+
+const shirenSharp = calculateInCombatPanel(catalog, {
+    agentId: "claret",
+    wEngineId: "zzz_wiki_2188",
+    wEngineModificationLevel: 5,
+    coreSkillLevel: "F",
+    driveDiscs: [],
+    combatBuffs: {
+        activeBuffIds: [DEFENSE_3_2_PHASE_1_IDS.shiren],
+        runtimeInputs: {},
+    },
+    damage: {
+        selectedEventId: "shiren-sharp",
+        events: [{
+            id: "shiren-sharp",
+            kind: "sharp",
+            skillRef: {
+                agentSkillId: "claret",
+                categoryId: "special",
+                moveId: "special_slash_gold",
+                rowId: "hit_1",
+            },
+            critMode: "nonCrit",
+            count: 1,
+        }],
+        target: { defense: 953, levelCoefficient: 794 },
+    },
+})
+approx(shirenSharp.damage.events[0].multipliers.sharpDmg, 1.25, "Shiren Cuijian should grant 25% Sharp damage")
+approx(
+    shirenSharp.inCombat.panel.def - shirenSharp.outOfCombat.panel.def,
+    shirenSharp.outOfCombat.panel.def * 0.15,
+    "Shiren Cuijian should grant 15% of out-of-combat DEF",
+)
+const shirenAttack = calculateAttackBasic(DEFENSE_3_2_PHASE_1_IDS.shiren)
+approx(shirenAttack.damage.multipliers.stun, 1.7, "Shiren Cuijian should add 20% stun vulnerability")
+const shirenStunRules = fieldBuff(DEFENSE_3_2_PHASE_1_IDS.shiren).effects
+    .filter(effect => effect.id === DEFENSE_3_2_EFFECT_IDS.shirenStun)
+assert.equal(shirenStunRules.length, 1, "Shiren Cuijian should expose one stun-vulnerability rule")
+assert.equal(shirenStunRules[0].condition, "代理人命中敌人且触发暴击后，若敌人处于失衡状态")
+assert.equal(shirenStunRules[0].durationSeconds, 10)
+
+for (const [anomalyAgentCount, expectedProficiency] of [[0, 0], [1, 0], [2, 20], [3, 60]]) {
+    const yichao = calculateAnomaly(DEFENSE_3_2_PHASE_1_IDS.yichao, {
+        id: `yichao-burn-${anomalyAgentCount}`,
+        kind: "anomaly",
+        settlementType: "attribute",
+        anomalyEffect: "burn",
+        procCount: 1,
+    }, {
+        effects: {
+            [DEFENSE_3_2_EFFECT_IDS.yichaoProficiency]: { sourceValue: anomalyAgentCount },
+        },
+    })
+    approx(
+        yichao.inCombat.panel.anomalyProficiency - yichao.outOfCombat.panel.anomalyProficiency,
+        expectedProficiency,
+        `Yichao Miyong should grant the correct Anomaly Proficiency for ${anomalyAgentCount} Anomaly agents`,
+    )
+    approx(
+        yichao.damage.multipliers.attributeAnomalyDamage,
+        1.2,
+        "Yichao Miyong should grant 20% attribute-anomaly damage",
+    )
+}
+const yichaoDisorder = calculateAnomaly(DEFENSE_3_2_PHASE_1_IDS.yichao, {
+    id: "yichao-burn-disorder",
+    kind: "disorder",
+    anomalyEffect: "burn",
+    elapsedSeconds: 0,
+})
+approx(yichaoDisorder.damage.multipliers.disorderDamage, 1, "Yichao Miyong should not increase Disorder damage")
+
+const shiguangAttack = calculateAttackBasic(DEFENSE_3_2_PHASE_1_IDS.shiguang, {}, "ether")
+approx(
+    shiguangAttack.inCombat.panel.etherDmg - shiguangAttack.outOfCombat.panel.etherDmg,
+    0.2,
+    "Shiguang Ranmeng should grant 20% Ether damage",
+)
+approx(
+    shiguangAttack.inCombat.panel.anomalyProficiency - shiguangAttack.outOfCombat.panel.anomalyProficiency,
+    20,
+    "Shiguang Ranmeng should grant 20 Anomaly Proficiency",
+)
+approx(shiguangAttack.damage.multipliers.stun, 1.7, "Shiguang Ranmeng should add 20% stun vulnerability")
+const shiguangStunRules = fieldBuff(DEFENSE_3_2_PHASE_1_IDS.shiguang).effects
+    .filter(effect => effect.id === DEFENSE_3_2_EFFECT_IDS.shiguangStun)
+assert.equal(shiguangStunRules.length, 1, "Shiguang Ranmeng should expose one stun-vulnerability rule")
+assert.equal(shiguangStunRules[0].condition, "代理人使敌人进入属性异常状态后")
+assert.equal(shiguangStunRules[0].durationSeconds, 15)
 
 console.log("field Buff regression tests passed")

@@ -233,6 +233,27 @@ try {
         { default: 0.65, min: 0, max: 1, step: 0.1 },
     )
 
+    managedAgent.importantSubStats = ["defPct", " critRate ", "defPct", "critDmg"]
+    const importantSubStatsResult = await save("agents", managedAgent)
+    assert.deepEqual(
+        importantSubStatsResult.savedItem.importantSubStats,
+        ["defPct", "critRate", "critDmg"],
+        "important substats must survive the maintenance save round trip, deduplicated and trimmed",
+    )
+    const reloadedImportantSubStats = await catalog()
+    assert.deepEqual(
+        reloadedImportantSubStats.agents.agents.find(item => item.id === managedAgent.id).importantSubStats,
+        ["defPct", "critRate", "critDmg"],
+    )
+
+    managedAgent.importantSubStats = []
+    const clearedImportantSubStats = await save("agents", managedAgent)
+    assert.equal(
+        Object.hasOwn(clearedImportantSubStats.savedItem, "importantSubStats"),
+        false,
+        "an empty important substat list must be dropped instead of persisted",
+    )
+
     const skillBuffAgent = structuredClone(
         managedAgentCatalog.agents.agents.find(item => item.id === "sigrid"),
     )

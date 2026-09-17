@@ -2,6 +2,27 @@
 
 # Changelog
 
+## 2026-09-18 - Defense Battle 3.2 Phase 1 Field Buffs
+
+Added the three Defense Battle v5, version 3.2 phase 1 field Buffs to
+`data/combat_buffs.json`: 矢刃摧坚, 异潮弥涌, and 蚀光染梦. They use the existing
+field-Buff schema and calculation paths, including Sharp DMG, DEF, anomaly
+damage/proficiency, Ether DMG, and stun-vulnerability effects. The picker now
+recognizes `防卫战 v5 · 3.2版本 · 第一期` as the authored period. Regression
+coverage in `tests/field-buffs.test.js` checks metadata, validation, formulas,
+attribute-versus-Disorder isolation, and the three damage effects.
+
+## 2026-09-18 - Agent Important Substats Highlight
+
+Added the optional agent-level `importantSubStats` field. The maintenance API
+validates, trims, deduplicates, and omits empty values; the field is projected
+through catalog metadata and can be edited from the agent maintenance form.
+The vertical Drive Disc scheme panel highlights matching substats in orange and
+bold, while compact cards, damage calculation, optimization, scoring, and sort
+weights remain unchanged. Claret is preconfigured with `defPct`, `critRate`,
+`critDmg`, and `penFlat`. Validation, API, editor, and component regression
+tests cover the persistence and display boundaries.
+
 ## 2026-09-14 - Armorer W-Engine Descriptions Enumerated By Refinement Rank
 
 The four Claret Armorer W-Engines wrote their passive numbers as min-max ranges

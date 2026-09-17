@@ -16,6 +16,7 @@ import {
   categoryOptions, defaultCalculationEvent, moveOptions, option,
 } from "../maintenance-options"
 import { internalId, textOf } from "../maintenance-model"
+import { storedStatLabel } from "@/utils/format"
 import { SYSTEM_MANAGED_SKILL_GROUP_COUNTS } from "@core/maintenanceValidation.js"
 
 const props = defineProps<{ model: any, catalog: any, disabled?: boolean }>()
@@ -40,6 +41,17 @@ function changed() { emit("change") }
 
 function driveDiscOptions() {
   return [{ label: "不指定", value: "" }, ...(props.catalog?.driveDiscSets?.sets ?? []).map((item: any) => ({ label: textOf(item.name), value: item.id }))]
+}
+
+const SUB_STAT_POOL_FALLBACK = [
+  "hpFlat", "atkFlat", "defFlat", "hpPct", "atkPct", "defPct", "critRate", "critDmg", "anomalyProficiency", "penFlat",
+]
+const SUB_STAT_PERCENT_KEYS = new Set(["hpPct", "atkPct", "defPct", "critRate", "critDmg"])
+
+function importantSubStatOptions() {
+  const pool = props.catalog?.meta?.statRules?.driveDisc?.subStatPool
+  const keys = Array.isArray(pool) && pool.length ? pool : SUB_STAT_POOL_FALLBACK
+  return keys.map((key: string) => option(key, storedStatLabel(key, SUB_STAT_PERCENT_KEYS.has(key) ? "pct" : "flat", props.catalog?.meta)))
 }
 
 function addSkillGroup() {
@@ -263,6 +275,12 @@ function enableCoreSkill(enabled: boolean) {
       <div class="maintenance-grid">
         <label class="maintenance-field"><span>推荐驱动盘套装</span><NSelect multiple filterable clearable v-model:value="model.preferredDriveDiscs.defaultSetIds" :options="driveDiscOptions()" :disabled="disabled" @update:value="changed" /></label>
         <label v-for="slot in [4, 5, 6]" :key="slot" class="maintenance-field"><span>{{ slot }} 号位主属性</span><NSelect multiple clearable v-model:value="model.preferredDriveDiscs.mainStatLimits[String(slot)]" :options="MAIN_STAT_OPTIONS[slot]" :disabled="disabled" @update:value="changed" /></label>
+      </div>
+    </MaintenanceSection>
+
+    <MaintenanceSection title="重要副词条" description="仅用于驱动盘方案面板的展示高亮，不影响伤害计算、优化和评分。">
+      <div class="maintenance-grid">
+        <label class="maintenance-field maintenance-field-wide"><span>重要副词条</span><NSelect multiple clearable filterable v-model:value="model.importantSubStats" :options="importantSubStatOptions()" :disabled="disabled" @update:value="changed" /></label>
       </div>
     </MaintenanceSection>
 

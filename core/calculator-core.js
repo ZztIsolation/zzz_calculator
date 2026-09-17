@@ -7712,6 +7712,7 @@ export function buildMeta(catalog) {
         sharpProfile: agent.sharpProfile ?? null,
         combatBuffs: agent.combatBuffs ?? {},
         preferredDriveDiscs: agent.preferredDriveDiscs ?? null,
+        importantSubStats: agent.importantSubStats ?? [],
         skillGroups: agent.skillGroups ?? [],
         defaultCalculationConfig: agent.defaultCalculationConfig ?? null,
     }))

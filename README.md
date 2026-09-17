@@ -10,6 +10,14 @@ The entries below summarize each development day. Implementation details,
 modeling decisions, and verification evidence remain in the
 [detailed changelog](docs/changelog.md).
 
+### 2026-09-18 Defense Battle 3.2 Phase 1 Field Buffs
+
+- Added 矢刃摧坚, 异潮弥涌, and 蚀光染梦 for Defense Battle v5, version 3.2 phase 1. The existing field-Buff schema and calculation paths are reused; the picker now recognizes `防卫战 v5 · 3.2版本 · 第一期`.
+
+### 2026-09-18 Agent Important Substats Highlight
+
+- Added the optional agent-level `importantSubStats` field and maintenance editor. Matching substats are highlighted in the vertical Drive Disc scheme panel; compact cards and all calculation/optimization/scoring paths are unchanged. Empty values are omitted on save, and Claret ships with `defPct`, `critRate`, `critDmg`, and `penFlat`.
+
 ### 2026-09-14 Claret Cinema-Resolved Default Rotation
 
 - Claret's administrator default rotation now resolves by Cinema level. Cinema 0-5 keeps `双连携六毁伤`; Cinema 6 uses `6影双连携九毁伤`, which repeats the `长按特殊技三次毁伤` skill group three times instead of twice, so the expanded Maim total grows from six hits to nine. The basic slam group, the two chain hits, and the single ultimate are unchanged.

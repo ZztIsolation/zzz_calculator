@@ -1452,6 +1452,14 @@ function cleanAgent(item = {}, options = {}) {
     } else {
         delete next.sharpProfile
     }
+    const importantSubStats = [...new Set((Array.isArray(item.importantSubStats) ? item.importantSubStats : [])
+        .map(stat => String(stat ?? "").trim())
+        .filter(Boolean))]
+    if (importantSubStats.length) {
+        next.importantSubStats = importantSubStats
+    } else {
+        delete next.importantSubStats
+    }
     return next
 }
 

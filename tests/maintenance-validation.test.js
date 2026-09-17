@@ -483,6 +483,33 @@ const cleanedPreferredDriveDiscs = cleanMaintenanceItem("agents", {
     },
 })
 assert.deepEqual(cleanedPreferredDriveDiscs.preferredDriveDiscs.defaultSetIds, [validDriveDiscSet.id, "second_drive_disc"])
+assertValid("agents", {
+    ...validAgent,
+    importantSubStats: ["defPct", "critRate", "critDmg", "penFlat"],
+})
+assertValid("agents", { ...validAgent, importantSubStats: [] })
+const cleanedImportantSubStats = cleanMaintenanceItem("agents", {
+    ...validAgent,
+    importantSubStats: ["defPct", " critRate ", "defPct", "", "critDmg"],
+})
+assert.deepEqual(cleanedImportantSubStats.importantSubStats, ["defPct", "critRate", "critDmg"])
+const cleanedEmptyImportantSubStats = cleanMaintenanceItem("agents", {
+    ...validAgent,
+    importantSubStats: [],
+})
+assert.equal(Object.hasOwn(cleanedEmptyImportantSubStats, "importantSubStats"), false)
+assertInvalid("agents", {
+    ...validAgent,
+    importantSubStats: "critRate",
+}, "importantSubStats")
+assertInvalid("agents", {
+    ...validAgent,
+    importantSubStats: ["not_a_stat"],
+}, "importantSubStats[0]", "不是支持的属性")
+assertInvalid("agents", {
+    ...validAgent,
+    importantSubStats: [""],
+}, "importantSubStats[0]", "必须是非空属性标识")
 assertInvalid("agents", {
     ...validAgent,
     preferredDriveDiscs: {

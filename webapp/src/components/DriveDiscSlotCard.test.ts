@@ -230,3 +230,58 @@ describe("DriveDiscSlotCard stat layout", () => {
     expect(source).toMatch(/\.disc-slot-card-stat-row dd\s*\{[\s\S]*white-space: nowrap;/)
   })
 })
+
+describe("DriveDiscSlotCard important substat highlight", () => {
+  const importantDisc = {
+    ...disc,
+    subStats: [
+      { stat: "critRate", mode: "pct", value: 4.8 },
+      { stat: "critDmg", mode: "pct", value: 9.6 },
+      { stat: "anomalyProficiency", mode: "flat", value: 18 },
+      { stat: "atkPct", mode: "pct", value: 3 },
+    ],
+  }
+  const highlightMeta = {
+    ...statMeta,
+    agents: [
+      { id: "agent-a", name: { zhCN: "角色甲" }, importantSubStats: ["critRate", "critDmg"] },
+      { id: "agent-b", name: { zhCN: "角色乙" }, importantSubStats: [] },
+    ],
+  }
+
+  it("highlights only the configured important substats of the target agent", () => {
+    const wrapper = mount(DriveDiscSlotCard, {
+      props: { slot: 1, statLayout: "vertical", disc: importantDisc, driveDiscSets, meta: highlightMeta, targetAgentId: "agent-a" },
+    })
+
+    expect(wrapper.findAll(".disc-slot-card-sub-stat").map(row => row.classes().includes("disc-slot-card-sub-stat-important")))
+      .toEqual([true, true, false, false])
+    expect(wrapper.findAll(".disc-slot-card-sub-stat")[0].classes()).toContain("disc-slot-card-sub-stat")
+  })
+
+  it("leaves every substat unhighlighted without a configured agent", () => {
+    const unconfigured = mount(DriveDiscSlotCard, {
+      props: { slot: 1, statLayout: "vertical", disc: importantDisc, driveDiscSets, meta: highlightMeta, targetAgentId: "agent-b" },
+    })
+    expect(unconfigured.findAll(".disc-slot-card-sub-stat-important")).toHaveLength(0)
+
+    const noTarget = mount(DriveDiscSlotCard, {
+      props: { slot: 1, statLayout: "vertical", disc: importantDisc, driveDiscSets, meta: highlightMeta },
+    })
+    expect(noTarget.findAll(".disc-slot-card-sub-stat-important")).toHaveLength(0)
+  })
+
+  it("does not highlight in the compact presentation", () => {
+    const wrapper = mount(DriveDiscSlotCard, {
+      props: { slot: 1, disc: importantDisc, driveDiscSets, meta: highlightMeta, targetAgentId: "agent-a" },
+    })
+
+    expect(wrapper.find(".disc-slot-card-stats").exists()).toBe(false)
+    expect(wrapper.findAll(".disc-slot-card-sub-stat-important")).toHaveLength(0)
+  })
+
+  it("keeps the highlight rule based on the shared accent token", () => {
+    const source = readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "DriveDiscSlotCard.vue"), "utf8")
+    expect(source).toMatch(/\.disc-slot-card-sub-stat-important dt,\s*\.disc-slot-card-sub-stat-important dd\s*\{[\s\S]*color: var\(--app-highlight\);[\s\S]*font-weight: 700;/)
+  })
+})

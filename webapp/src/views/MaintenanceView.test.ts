@@ -100,6 +100,7 @@ function makeCatalog() {
         ],
       },
       sources: ["https://example.com/agent-primary", "https://example.com/agent-secondary"], verification: {},
+      importantSubStats: ["critRate", "defPct"],
     }] },
     agentSkills: { agentSkills: [{
       id: "skills_a", agentId: "agent_a", name: { zhCN: "角色甲技能" },
@@ -154,7 +155,7 @@ function makeCatalog() {
         enemyIntel: { zhCN: "测试敌情" }, recommendedSpecialties: [], playerBuffs: [], playerDebuffs: [], sources: [], hidden: false,
       }], hidden: false,
     }] },
-    meta: { statRules: { statDisplay: { atkPct: { label: "攻击力百分比" }, critDmg: { label: "暴击伤害" } } }, combatBuffs: [] },
+    meta: { statRules: { statDisplay: { atkPct: { label: "攻击力百分比" }, critDmg: { label: "暴击伤害" } }, driveDisc: { subStatPool: ["hpFlat", "atkFlat", "defFlat", "hpPct", "atkPct", "defPct", "critRate", "critDmg", "anomalyProficiency", "penFlat"] } }, combatBuffs: [] },
   }
 }
 
@@ -874,6 +875,34 @@ describe("MaintenanceView structured editor", () => {
     const body = JSON.parse(String(call[1]?.body ?? "{}"))
     expect(body.sources).toEqual(["https://example.com/agent-primary", "https://example.com/agent-secondary-updated"])
     expect(body.images.source).toBe("")
+  })
+
+  it("edits the important substats of the current agent from the drive disc substat pool", async () => {
+    const { wrapper } = await mountView()
+    const select = field(wrapper, "重要副词条").find("select")
+    expect(select.attributes("multiple")).toBeDefined()
+    expect([...select.findAll("option")].map((item: any) => item.attributes("value")))
+      .toEqual(["hpFlat", "atkFlat", "defFlat", "hpPct", "atkPct", "defPct", "critRate", "critDmg", "anomalyProficiency", "penFlat"])
+    const labels = [...select.findAll("option")].map((item: any) => item.text())
+    expect(labels).toContain("暴击率%")
+    expect(labels).toContain("百分比防御力%")
+    expect(labels).toContain("穿透值")
+  })
+
+  it("saves the configured important substats with the agent payload", async () => {
+    const { wrapper, fetchMock } = await mountView()
+    const select = field(wrapper, "重要副词条").find("select")
+    for (const option of [...select.findAll("option")]) {
+      const element = option.element as HTMLOptionElement
+      element.selected = ["defPct", "critRate", "critDmg", "penFlat"].includes(String(option.attributes("value")))
+    }
+    await select.trigger("change")
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("完整目录已刷新"))
+    const call = fetchMock.mock.calls.find(([url, init]) => url === "/api/maintenance/agents" && init?.method === "POST")!
+    const body = JSON.parse(String(call[1]?.body ?? "{}"))
+    expect(body.importantSubStats).toEqual(["defPct", "critRate", "critDmg", "penFlat"])
+    expect(body.preferredDriveDiscs.mainStatLimits).toBeTruthy()
   })
 
   it("keeps a readable target event and normalizes objectives after specialty changes", async () => {

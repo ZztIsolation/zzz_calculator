@@ -6588,6 +6588,12 @@
           ]
         }
       },
+      "importantSubStats": [
+        "defPct",
+        "critRate",
+        "critDmg",
+        "penFlat"
+      ],
       "sources": [
         "https://baike.mihoyo.com/zzz/wiki/content/2145/detail?mhy_presentation_style=fullscreen"
       ],

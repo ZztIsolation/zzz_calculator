@@ -79,6 +79,14 @@ const secondary = computed(() => {
   return (props.disc.subStats ?? []).map((stat: any) => statText(stat)).join(" / ") || "无副词条"
 })
 const verticalSubStats = computed(() => Array.isArray(props.disc?.subStats) ? props.disc.subStats.slice(0, 4) : [])
+const importantSubStatKeys = computed(() => {
+  const targetId = String(props.targetAgentId ?? "").trim()
+  if (!targetId) return new Set<string>()
+  const pool = Array.isArray(props.meta?.agents) ? props.meta.agents : props.agents
+  const target = (pool ?? []).find((item: any) => item?.id === targetId)
+  const values = Array.isArray(target?.importantSubStats) ? target.importantSubStats : []
+  return new Set<string>(values.filter(Boolean).map(String))
+})
 const rarityLevel = computed(() => {
   if (!props.disc) return ""
   const rarity = props.disc.rarity ? String(props.disc.rarity) : "-"
@@ -138,6 +146,11 @@ function statValue(stat: any) {
   return formatStoredStatValue(String(stat.stat), stat.value, String(stat.mode ?? ""))
 }
 
+function isImportantSubStat(stat: any) {
+  const key = String(stat?.stat ?? "").trim()
+  return Boolean(key) && importantSubStatKeys.value.has(key)
+}
+
 function choose() {
   if (props.interactive) emit("select", props.slot)
 }
@@ -189,6 +202,7 @@ function toggleExclusion() {
           v-for="(stat, index) in verticalSubStats"
           :key="`${String(stat?.stat ?? 'unknown')}-${String(stat?.mode ?? '')}-${index}`"
           class="disc-slot-card-stat-row disc-slot-card-sub-stat"
+          :class="{ 'disc-slot-card-sub-stat-important': isImportantSubStat(stat) }"
         >
           <dt>{{ statLabel(stat) }}</dt>
           <dd>{{ statValue(stat) }}</dd>
@@ -406,6 +420,12 @@ function toggleExclusion() {
   font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: nowrap;
+}
+
+.disc-slot-card-sub-stat-important dt,
+.disc-slot-card-sub-stat-important dd {
+  color: var(--app-highlight);
+  font-weight: 700;
 }
 
 .disc-slot-card-main-stat {
