@@ -6176,7 +6176,12 @@
                 ]
               },
               "condition": "装备者为佩洛伊斯且处于日蚀效果",
-              "durationSeconds": 45
+              "durationSeconds": 45,
+              "requirement": {
+                "agentIds": [
+                  "pyrois"
+                ]
+              }
             }
           ],
           "appliesToOutOfCombatPanel": false,
@@ -6191,8 +6196,9 @@
       "verification": {
         "level60Stats": "source-checked",
         "effectText": "source-checked",
-        "effectBuff": "partially-modeled-agent-restriction"
-      }
+        "effectBuff": "modeled-agent-whitelist"
+      },
+      "relatedAgentId": "pyrois"
     },
     {
       "id": "zzz_wiki_1883",

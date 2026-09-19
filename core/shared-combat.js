@@ -1324,19 +1324,22 @@ const OUT_OF_COMBAT_REQUIREMENT_STAT_LABELS = {
     penRatio: "初始穿透率",
 }
 
-function storedRuleRequirementText(rule = {}) {
+function storedRuleRequirementText(rule = {}, meta = {}) {
+    const ids = Array.isArray(rule.requirement?.agentIds) ? rule.requirement.agentIds : []
+    const agents = Array.isArray(meta?.agents) ? meta.agents : meta?.agents?.agents ?? []
+    const agentText = ids.length ? `（仅限 ${ids.map(id => localizedText(agents.find(agent => agent.id === id)?.name) || id).join("、")}）` : ""
     const requirement = rule.requirement?.outOfCombatStat
     const stat = String(requirement?.stat ?? "").trim()
-    if (!stat) return ""
+    if (!stat) return agentText
     const label = OUT_OF_COMBAT_REQUIREMENT_STAT_LABELS[stat] ?? stat
     const min = Number(requirement.min)
     const max = Number(requirement.max)
     const hasMin = requirement.min !== undefined && requirement.min !== null && requirement.min !== "" && Number.isFinite(min)
     const hasMax = requirement.max !== undefined && requirement.max !== null && requirement.max !== "" && Number.isFinite(max)
-    if (hasMin && hasMax) return `（${label} ${min} - ${max}）`
-    if (hasMin) return `（${label} >= ${min}）`
-    if (hasMax) return `（${label} <= ${max}）`
-    return ""
+    if (hasMin && hasMax) return `（${label} ${min} - ${max}）${agentText}`
+    if (hasMin) return `（${label} >= ${min}）${agentText}`
+    if (hasMax) return `（${label} <= ${max}）${agentText}`
+    return agentText
 }
 
 export function storedEffectRuleText(rule, runtime, effect, meta, displayContext = {}) {
@@ -1346,7 +1349,7 @@ export function storedEffectRuleText(rule, runtime, effect, meta, displayContext
     const coverage = runtimeCoverageForEffectRule(rule, effect, runtime)
     const coverageValue = Number(coverage.toFixed(4))
     const coverageText = coverageConfig && coverage !== 1 ? `（覆盖率 ${coverageValue}）` : ""
-    const requirementText = storedRuleRequirementText(rule)
+    const requirementText = storedRuleRequirementText(rule, meta)
     if (rule.type === "damageModifier") {
         const rawValue = Number(rule.value ?? 0)
         const value = (rule.valueUnit === "decimal" ? rawValue * 100 : Math.abs(rawValue) > 1 ? rawValue : rawValue * 100) * coverage

@@ -10,6 +10,10 @@ The entries below summarize each development day. Implementation details,
 modeling decisions, and verification evidence remain in the
 [detailed changelog](docs/changelog.md).
 
+### 2026-09-19 Pyrois Four-Branch Ultimate Modeling
+
+- Added Pyrois, four distinct Ultimates, and separate Assault Directive skill groups with Mirage, Sunflare, Contamination, and Stun conditions. Sol Exuvia now enforces its wearer restriction. Official data takes precedence, and unrevealed M6 effects are explicitly excluded. See the [modeling notes](docs/pyrois-modeling.md) for sources and documented discrepancies.
+
 ### 2026-09-18 Defense Battle 3.2 Phase 1 Field Buffs
 
 - Added 矢刃摧坚, 异潮弥涌, and 蚀光染梦 for Defense Battle v5, version 3.2 phase 1. The existing field-Buff schema and calculation paths are reused; the picker now recognizes `防卫战 v5 · 3.2版本 · 第一期`.
