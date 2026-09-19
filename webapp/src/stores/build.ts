@@ -19,7 +19,8 @@ import {
   normalizeAnomalyReleaseEventForAgent,
   normalizeAnomalySourceSnapshot,
 } from "@core/anomalyRelease.js"
-import { teammateDriveDiscSetIdsFromBuffIds, wEngineIdFromTeamBuffId } from "@/utils/combatBuffs"
+import { buildCombatBuffGroups, teammateDriveDiscSetIdsFromBuffIds, wEngineIdFromTeamBuffId } from "@/utils/combatBuffs"
+import { normalizeBuffPickerState, selectedTeammateOwnerIds, type BuffPickerState } from "@/utils/teammateBuffPicker"
 import {
   clampWEngineModificationLevel,
   coreSkillDefaultLevel,
@@ -633,7 +634,36 @@ function selectionDocumentFingerprint(document: any) {
   return JSON.stringify(document ?? null)
 }
 
-function writeBuildPersistSnapshot(snapshot: any) {
+function buildPersistSnapshotFor(state: any) {
+  return {
+    ownerId: activeOwnerId(),
+    agentId: state.agentId,
+    agentLevel: state.agentLevel,
+    coreSkillLevel: state.coreSkillLevel,
+    cinemaLevel: state.cinemaLevel,
+    potentialLevel: state.potentialLevel,
+    skillLevels: clone(state.skillLevels),
+    wEngineId: state.wEngineId,
+    wEngineLevel: state.wEngineLevel,
+    wEngineModificationLevel: state.wEngineModificationLevel,
+    selectedLoadoutId: state.selectedLoadoutId,
+    selectedOptimizedRank: state.selectedOptimizedRank,
+    lastAnomalySourceSnapshot: clone(state.lastAnomalySourceSnapshot),
+    discMode: state.discMode,
+    manualDriveDiscIdsBySlot: clone(state.manualDriveDiscIdsBySlot),
+    targetConfig: clone(state.targetConfig),
+    damageConfig: clone(state.damageConfig),
+    selectedBuffIds: clone(state.selectedBuffIds) as string[],
+    addedBuffs: clone(state.addedBuffs),
+    runtimeInputs: clone(state.runtimeInputs) as Record<string, any>,
+    manuallyUncheckedDefaultBuffIds: clone(state.manuallyUncheckedDefaultBuffIds),
+    buffPickerState: normalizeBuffPickerState(state.buffPickerState),
+  }
+}
+
+type BuildPersistOptions = { rollbackOnFailure?: boolean }
+
+function writeBuildPersistSnapshot(snapshot: any, options: BuildPersistOptions = {}) {
   const { ownerId, agentId } = snapshot
   const buildSelection = readBuildSelectionDocument()
   const buildOwner = selectionForOwner(buildSelection, ownerId)
@@ -659,6 +689,7 @@ function writeBuildPersistSnapshot(snapshot: any) {
     discMode: snapshot.discMode,
     manualDriveDiscIdsBySlot: snapshot.manualDriveDiscIdsBySlot,
     targetConfig: snapshot.targetConfig,
+    buffPickerState: snapshot.buffPickerState,
     damage: {
       ...damageConfigFields(snapshot.damageConfig),
       skillLevelsByCategory: {
@@ -702,13 +733,32 @@ function writeBuildPersistSnapshot(snapshot: any) {
       [ownerId]: { currentAgentId: agentId, byAgent: legacyByAgent },
     },
   }
-  writeSelectionDocuments(nextBuildSelection, nextLegacySelection)
+  if (!options.rollbackOnFailure) {
+    writeSelectionDocuments(nextBuildSelection, nextLegacySelection)
+    return
+  }
+  const previousDocuments = [STORAGE_KEY, OLD_HOME_SELECTION_KEY]
+    .map(key => [key, localStorage.getItem(key)] as const)
+  try {
+    writeSelectionDocuments(nextBuildSelection, nextLegacySelection)
+  } catch (error) {
+    try {
+      for (const [key, previous] of previousDocuments) {
+        if (localStorage.getItem(key) === previous) continue
+        if (previous === null) localStorage.removeItem(key)
+        else localStorage.setItem(key, previous)
+      }
+    } catch (rollbackError) {
+      throw new AggregateError([error, rollbackError], "配置保存失败，恢复原配置时也失败，请刷新后检查。")
+    }
+    throw error
+  }
 }
 
-function persistBuildSnapshot(snapshot: any): Promise<void> {
+function persistBuildSnapshot(snapshot: any, options: BuildPersistOptions = {}): Promise<void> {
   const locks = typeof navigator !== "undefined" ? (navigator as any).locks : null
   if (!locks?.request) {
-    writeBuildPersistSnapshot(snapshot)
+    writeBuildPersistSnapshot(snapshot, options)
     return Promise.resolve()
   }
 
@@ -725,7 +775,7 @@ function persistBuildSnapshot(snapshot: any): Promise<void> {
         buildPersistenceBlocked = true
         throw new Error("配置在保存期间被导入或其他页面更新，请刷新后重试。")
       }
-      writeBuildPersistSnapshot(snapshot)
+      writeBuildPersistSnapshot(snapshot, options)
     })
   })
   buildPersistQueue = operation.then(() => undefined, () => undefined)
@@ -970,6 +1020,7 @@ export const useBuildStore = defineStore("build", {
     addedBuffs: [] as any[],
     runtimeInputs: {} as Record<string, any>,
     manuallyUncheckedDefaultBuffIds: [] as string[],
+    buffPickerState: null as BuffPickerState | null,
     targetConfig: defaultTargetConfig() as any,
     damageConfig: defaultDamageConfig() as any,
     discMode: "manual" as DiscMode,
@@ -1054,6 +1105,7 @@ export const useBuildStore = defineStore("build", {
       this.addedBuffs = normalizeAddedBuffs(combat.addedBuffs ?? config.addedBuffs, meta)
       this.runtimeInputs = normalizeAgentSkillBuffRuntimeInputs(agent, normalizedBossSelection.runtimeInputs)
       this.manuallyUncheckedDefaultBuffIds = stringArray(combat.manuallyUncheckedDefaultBuffIds)
+      this.buffPickerState = normalizeBuffPickerState(config.buffPickerState)
       this.damageConfig = normalizeDamageConfig({
         ...(rawDamageConfig ?? {}),
         target: rawDamageConfig?.target ?? rawTargetConfig,
@@ -1203,7 +1255,60 @@ export const useBuildStore = defineStore("build", {
       const agent = meta?.agents?.find((item: any) => item.id === this.agentId)
       this.runtimeInputs = normalizeAgentSkillBuffRuntimeInputs(agent, normalizedBossSelection.runtimeInputs)
       this.manuallyUncheckedDefaultBuffIds = defaultIds.filter(id => !selectedIds.includes(id))
+      if (Object.prototype.hasOwnProperty.call(payload ?? {}, "buffPickerState")) {
+        this.buffPickerState = normalizeBuffPickerState(payload.buffPickerState)
+      }
       this.persist()
+    },
+    async prepareBuffPicker(meta: any): Promise<boolean> {
+      if (!this.agentId || this.buffPickerState) return false
+      const groups = buildCombatBuffGroups({
+        meta,
+        agentId: this.agentId,
+        coreSkillLevel: String(this.coreSkillLevel),
+        cinemaLevel: this.cinemaLevel,
+        potentialLevel: this.potentialLevel,
+        wEngineId: this.wEngineId,
+        wEngineModificationLevel: this.wEngineModificationLevel,
+        addedBuffs: this.addedBuffs,
+      })
+      const activeIds = this.activeBuffIds(meta)
+      if (selectedTeammateOwnerIds(groups.teammate, activeIds).size < 3) return false
+
+      const defaultIds = new Set(this.defaultBuffIds(meta))
+      const preservedIds = new Set([
+        ...groups.self.map(buff => String(buff.id)),
+        ...groups.selfWEngine.map(buff => String(buff.id)),
+        ...defaultIds,
+      ])
+      const snapshot = buildPersistSnapshotFor(this)
+      const uncheckedDefaults = new Set(snapshot.manuallyUncheckedDefaultBuffIds)
+      // A legacy added-only reference may activate the equipped engine's team
+      // effect. Keep that selection before removing all added references.
+      snapshot.selectedBuffIds = [...new Set([
+        ...snapshot.selectedBuffIds.filter(id => preservedIds.has(id)),
+        ...activeIds.filter(id => preservedIds.has(id) && (!defaultIds.has(id) || uncheckedDefaults.has(id))),
+      ])]
+      snapshot.runtimeInputs = Object.fromEntries(Object.entries({
+        ...addedBuffRuntimeInputs(snapshot.addedBuffs),
+        ...snapshot.runtimeInputs,
+      })
+        .filter(([id]) => preservedIds.has(id)))
+      snapshot.addedBuffs = []
+      snapshot.buffPickerState = { teammateSlots: [null, null] }
+
+      // Persist the reset before changing the visible build. Failed saves leave
+      // the previous selection intact so opening the picker can be retried.
+      await persistBuildSnapshot(snapshot, { rollbackOnFailure: true })
+      if (activeOwnerId() !== snapshot.ownerId || this.agentId !== snapshot.agentId) return false
+      this.$patch(state => {
+        state.selectedBuffIds = snapshot.selectedBuffIds
+        state.addedBuffs = snapshot.addedBuffs
+        state.runtimeInputs = snapshot.runtimeInputs
+        state.manuallyUncheckedDefaultBuffIds = snapshot.manuallyUncheckedDefaultBuffIds
+        state.buffPickerState = snapshot.buffPickerState
+      })
+      return true
     },
     defaultBuffIds(meta: any) {
       const agent = meta?.agents?.find((item: any) => item.id === this.agentId)
@@ -1337,29 +1442,7 @@ export const useBuildStore = defineStore("build", {
       if (!this.agentId) {
         return Promise.resolve()
       }
-      const request = persistBuildSnapshot({
-        ownerId: activeOwnerId(),
-        agentId: this.agentId,
-        agentLevel: this.agentLevel,
-        coreSkillLevel: this.coreSkillLevel,
-        cinemaLevel: this.cinemaLevel,
-        potentialLevel: this.potentialLevel,
-        skillLevels: clone(this.skillLevels),
-        wEngineId: this.wEngineId,
-        wEngineLevel: this.wEngineLevel,
-        wEngineModificationLevel: this.wEngineModificationLevel,
-        selectedLoadoutId: this.selectedLoadoutId,
-        selectedOptimizedRank: this.selectedOptimizedRank,
-        lastAnomalySourceSnapshot: clone(this.lastAnomalySourceSnapshot),
-        discMode: this.discMode,
-        manualDriveDiscIdsBySlot: clone(this.manualDriveDiscIdsBySlot),
-        targetConfig: clone(this.targetConfig),
-        damageConfig: clone(this.damageConfig),
-        selectedBuffIds: clone(this.selectedBuffIds),
-        addedBuffs: clone(this.addedBuffs),
-        runtimeInputs: clone(this.runtimeInputs),
-        manuallyUncheckedDefaultBuffIds: clone(this.manuallyUncheckedDefaultBuffIds),
-      })
+      const request = persistBuildSnapshot(buildPersistSnapshotFor(this))
       void request.catch(error => {
         this.error = error instanceof Error ? error.message : String(error)
       })

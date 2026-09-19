@@ -9,6 +9,7 @@ import {
   driveDiscSourceDescriptors,
   driveDiscSourceText,
 } from "@/utils/driveDiscProvenance"
+import { driveDiscAdditionalRollText } from "@/utils/driveDiscSubstats"
 import { formatStoredStatValue, labelOf, storedStatLabel } from "@/utils/format"
 import { driveDiscUsageStateForAgent } from "@core/inventory-model.js"
 
@@ -139,7 +140,12 @@ function statText(stat: any) {
 }
 
 function subStatText(disc: any) {
-  return (disc?.subStats ?? []).map((stat: any) => statText(stat)).join(" / ") || "-"
+  return (disc?.subStats ?? []).map((stat: any) => {
+    const label = storedStatLabel(String(stat?.stat ?? ""), String(stat?.mode ?? ""), props.meta)
+    const value = formatStoredStatValue(String(stat?.stat ?? ""), stat?.value, String(stat?.mode ?? ""))
+    const additionalRollText = driveDiscAdditionalRollText(stat?.stat, stat?.value, props.meta, disc?.rarity)
+    return `${label}${additionalRollText ? ` ${additionalRollText}` : ""} ${value}`
+  }).join(" / ") || "-"
 }
 
 function rarityLevelText(disc: any) {

@@ -134,6 +134,7 @@ const FIELD_LABELS: Record<string, string> = {
   defaultSetIds: "推荐套装",
   mainStatLimits: "主词条限制",
   importantSubStats: "重要副词条",
+  importantPanelStats: "重要面板属性",
   skillGroups: "技能组",
   defaultCount: "默认次数",
   minCount: "最少次数",
@@ -403,6 +404,7 @@ export function prepareDraft(resource: ResourceValue, input: any): any {
     item.preferredDriveDiscs.mainStatLimits ??= {}
     for (const slot of [4, 5, 6]) item.preferredDriveDiscs.mainStatLimits[String(slot)] ??= []
     item.importantSubStats ??= []
+    item.importantPanelStats ??= []
     item.combatBuffs ??= { corePassive: null, additionalAbility: null, skillBuffs: [], cinemaBuffs: [] }
     item.combatBuffs.skillBuffs ??= []
     item.combatBuffs.cinemaBuffs ??= []
@@ -642,7 +644,7 @@ export function blankRecord(resource: ResourceValue, catalog: any, options: Crea
       attackTypes: [], faction: "", images: { portrait: "", source: "" },
       level60: { hpBase: 1, atkBase: 1, defBase: 1, critRate: 5, critDmg: 50, impact: 0, anomalyProficiency: 0, anomalyMastery: 0, energyRegen: 120, penRatio: 0 },
       combatBuffs: { corePassive: null, additionalAbility: null, skillBuffs: [], cinemaBuffs: [] },
-      preferredDriveDiscs: { mainStatLimits: { 4: [], 5: [], 6: [] } }, importantSubStats: [], skillGroups: [], defaultCalculationConfig: null,
+      preferredDriveDiscs: { mainStatLimits: { 4: [], 5: [], 6: [] } }, importantSubStats: [], importantPanelStats: [], skillGroups: [], defaultCalculationConfig: null,
       potentialVision: null,
       sources: [], verification: {}, hidden: false,
     })

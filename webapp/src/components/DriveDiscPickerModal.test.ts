@@ -61,10 +61,12 @@ describe("DriveDiscPickerModal provenance", () => {
         slot: 1,
         discs: [mixedDisc],
         driveDiscSets,
+        meta: { statRules: { driveDisc: { sRankSubStatBaseStep: { critRate: 2.4 } } } },
       },
     })
 
     const option = wrapper.get(".manual-disc-option")
+    expect(option.find(".manual-disc-option-stat span").text()).toContain("暴击率% +1")
     expect(option.attributes("aria-label"))
       .toBe("选择 1号位 啄木鸟电音 来源 Enka、扫描器、JSON 扫描序号 33")
     expect(option.findAll(".drive-disc-source-tag").map(tag => tag.text().trim())).toEqual([

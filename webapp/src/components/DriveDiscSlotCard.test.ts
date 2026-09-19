@@ -65,6 +65,22 @@ function mountCard(reservedForAgentId: string | null = null, excludedForAgentIds
 }
 
 describe("DriveDiscSlotCard reservation action", () => {
+  it("keeps imported lower-rank values without S-rank roll badges", async () => {
+    const wrapper = mount(DriveDiscSlotCard, {
+      props: {
+        slot: 1,
+        disc: { ...disc, subStats: [{ stat: "critRate", value: 4.8 }] },
+        meta: { statRules: { driveDisc: { sRankSubStatBaseStep: { critRate: 2.4 } } } },
+      },
+    })
+    expect(wrapper.text()).toContain("+1 4.8")
+    for (const rarity of ["A", "B"]) {
+      await wrapper.setProps({ disc: { ...disc, rarity, subStats: [{ stat: "critRate", value: 4.8 }] } })
+      expect(wrapper.text()).not.toContain("+1 4.8")
+      expect(wrapper.text()).toContain("4.8")
+    }
+  })
+
   it("renders public, current, other, and unknown reservation states with clear actions", async () => {
     const wrapper = mountCard()
     expect(wrapper.get(".disc-slot-card").attributes("data-reservation-state")).toBe("public")
@@ -243,6 +259,11 @@ describe("DriveDiscSlotCard important substat highlight", () => {
   }
   const highlightMeta = {
     ...statMeta,
+    statRules: {
+      driveDisc: {
+        sRankSubStatBaseStep: { critRate: 2.4, critDmg: 4.8, anomalyProficiency: 9, atkPct: 3 },
+      },
+    },
     agents: [
       { id: "agent-a", name: { zhCN: "角色甲" }, importantSubStats: ["critRate", "critDmg"] },
       { id: "agent-b", name: { zhCN: "角色乙" }, importantSubStats: [] },
@@ -256,6 +277,11 @@ describe("DriveDiscSlotCard important substat highlight", () => {
 
     expect(wrapper.findAll(".disc-slot-card-sub-stat").map(row => row.classes().includes("disc-slot-card-sub-stat-important")))
       .toEqual([true, true, false, false])
+    expect(wrapper.findAll(".disc-slot-card-sub-stat-rolls").map(node => node.text()))
+      .toEqual(["+1", "+1", "+1"])
+    expect(wrapper.findAll(".disc-slot-card-sub-stat-important .disc-slot-card-sub-stat-rolls")).toHaveLength(2)
+    expect(wrapper.findAll(".disc-slot-card-sub-stat-rolls-important").map(node => node.text()))
+      .toEqual(["+1", "+1"])
     expect(wrapper.findAll(".disc-slot-card-sub-stat")[0].classes()).toContain("disc-slot-card-sub-stat")
   })
 
@@ -264,11 +290,13 @@ describe("DriveDiscSlotCard important substat highlight", () => {
       props: { slot: 1, statLayout: "vertical", disc: importantDisc, driveDiscSets, meta: highlightMeta, targetAgentId: "agent-b" },
     })
     expect(unconfigured.findAll(".disc-slot-card-sub-stat-important")).toHaveLength(0)
+    expect(unconfigured.findAll(".disc-slot-card-sub-stat-rolls-important")).toHaveLength(0)
 
     const noTarget = mount(DriveDiscSlotCard, {
       props: { slot: 1, statLayout: "vertical", disc: importantDisc, driveDiscSets, meta: highlightMeta },
     })
     expect(noTarget.findAll(".disc-slot-card-sub-stat-important")).toHaveLength(0)
+    expect(noTarget.findAll(".disc-slot-card-sub-stat-rolls-important")).toHaveLength(0)
   })
 
   it("does not highlight in the compact presentation", () => {
@@ -282,6 +310,8 @@ describe("DriveDiscSlotCard important substat highlight", () => {
 
   it("keeps the highlight rule based on the shared accent token", () => {
     const source = readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "DriveDiscSlotCard.vue"), "utf8")
-    expect(source).toMatch(/\.disc-slot-card-sub-stat-important dt,\s*\.disc-slot-card-sub-stat-important dd\s*\{[\s\S]*color: var\(--app-highlight\);[\s\S]*font-weight: 700;/)
+    expect(source).toMatch(/\.disc-slot-card-sub-stat-important dt\s*\{[\s\S]*color: var\(--app-highlight\);[\s\S]*font-weight: 700;/)
+    expect(source).not.toMatch(/\.disc-slot-card-sub-stat-important dd\s*\{[\s\S]*color: var\(--app-highlight\);/)
+    expect(source).toMatch(/\.disc-slot-card-copy \.disc-slot-card-sub-stat-rolls-important\s*\{[\s\S]*color: var\(--app-highlight\);/)
   })
 })

@@ -889,6 +889,24 @@ describe("MaintenanceView structured editor", () => {
     expect(labels).toContain("穿透值")
   })
 
+  it("offers panel stats with specialty-specific rupture and armorer values", async () => {
+    const { wrapper } = await mountView()
+    const values = () => [...field(wrapper, "重要面板属性").find("select").findAll("option")]
+      .map((item: any) => item.attributes("value"))
+
+    expect(values()).toEqual([
+      "hp", "atk", "def", "critRate", "critDmg", "impact", "anomalyProficiency", "anomalyMastery", "penFlat", "penRatio", "dmgBonus",
+    ])
+
+    await field(wrapper, "特性").find("select").setValue("rupture")
+    expect(values()).toContain("sheerForce")
+    expect(values()).not.toContain("lacerationDmg")
+
+    await field(wrapper, "特性").find("select").setValue("armorer")
+    expect(values()).toContain("lacerationDmg")
+    expect(values()).not.toContain("sheerForce")
+  })
+
   it("saves the configured important substats with the agent payload", async () => {
     const { wrapper, fetchMock } = await mountView()
     const select = field(wrapper, "重要副词条").find("select")
@@ -903,6 +921,21 @@ describe("MaintenanceView structured editor", () => {
     const body = JSON.parse(String(call[1]?.body ?? "{}"))
     expect(body.importantSubStats).toEqual(["defPct", "critRate", "critDmg", "penFlat"])
     expect(body.preferredDriveDiscs.mainStatLimits).toBeTruthy()
+  })
+
+  it("saves the configured important panel stats with the agent payload", async () => {
+    const { wrapper, fetchMock } = await mountView()
+    const select = field(wrapper, "重要面板属性").find("select")
+    for (const option of [...select.findAll("option")]) {
+      const element = option.element as HTMLOptionElement
+      element.selected = ["atk", "critRate", "critDmg", "penFlat"].includes(String(option.attributes("value")))
+    }
+    await select.trigger("change")
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("完整目录已刷新"))
+    const call = fetchMock.mock.calls.find(([url, init]) => url === "/api/maintenance/agents" && init?.method === "POST")!
+    const body = JSON.parse(String(call[1]?.body ?? "{}"))
+    expect(body.importantPanelStats).toEqual(["atk", "critRate", "critDmg", "penFlat"])
   })
 
   it("keeps a readable target event and normalizes objectives after specialty changes", async () => {

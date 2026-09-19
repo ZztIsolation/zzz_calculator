@@ -5,6 +5,7 @@ import { Ban, LockKeyhole } from "lucide-vue-next"
 import DriveDiscSourceTags from "@/components/DriveDiscSourceTags.vue"
 import { driveDiscUsageStateForAgent } from "@core/inventory-model.js"
 import { fallbackIcon, imageForDriveDiscSet } from "@/utils/assets"
+import { driveDiscAdditionalRollText } from "@/utils/driveDiscSubstats"
 import { formatStoredStatValue, labelOf, storedStatLabel } from "@/utils/format"
 
 const props = withDefaults(defineProps<{
@@ -76,7 +77,7 @@ const detail = computed(() => {
 })
 const secondary = computed(() => {
   if (!props.disc) return props.missingReference ? "请重新选择当前号位" : props.emptyHint
-  return (props.disc.subStats ?? []).map((stat: any) => statText(stat)).join(" / ") || "无副词条"
+  return (props.disc.subStats ?? []).map((stat: any) => subStatText(stat)).join(" / ") || "无副词条"
 })
 const verticalSubStats = computed(() => Array.isArray(props.disc?.subStats) ? props.disc.subStats.slice(0, 4) : [])
 const importantSubStatKeys = computed(() => {
@@ -136,6 +137,11 @@ function statText(stat: any) {
   return `${statLabel(stat)} ${statValue(stat)}`
 }
 
+function subStatText(stat: any) {
+  const additionalRollText = additionalRollTextFor(stat)
+  return `${statLabel(stat)}${additionalRollText ? ` ${additionalRollText}` : ""} ${statValue(stat)}`
+}
+
 function statLabel(stat: any) {
   if (!stat?.stat) return "-"
   return storedStatLabel(String(stat.stat), String(stat.mode ?? ""), props.meta)
@@ -144,6 +150,10 @@ function statLabel(stat: any) {
 function statValue(stat: any) {
   if (!stat?.stat) return "-"
   return formatStoredStatValue(String(stat.stat), stat.value, String(stat.mode ?? ""))
+}
+
+function additionalRollTextFor(stat: any) {
+  return driveDiscAdditionalRollText(stat?.stat, stat?.value, props.meta, props.disc?.rarity)
 }
 
 function isImportantSubStat(stat: any) {
@@ -204,7 +214,14 @@ function toggleExclusion() {
           class="disc-slot-card-stat-row disc-slot-card-sub-stat"
           :class="{ 'disc-slot-card-sub-stat-important': isImportantSubStat(stat) }"
         >
-          <dt>{{ statLabel(stat) }}</dt>
+          <dt>
+            {{ statLabel(stat) }}
+            <span
+              v-if="additionalRollTextFor(stat)"
+              class="disc-slot-card-sub-stat-rolls"
+              :class="{ 'disc-slot-card-sub-stat-rolls-important': isImportantSubStat(stat) }"
+            >{{ additionalRollTextFor(stat) }}</span>
+          </dt>
           <dd>{{ statValue(stat) }}</dd>
         </div>
         <div v-if="verticalSubStats.length === 0" class="disc-slot-card-no-substats">无副词条</div>
@@ -422,10 +439,19 @@ function toggleExclusion() {
   white-space: nowrap;
 }
 
-.disc-slot-card-sub-stat-important dt,
-.disc-slot-card-sub-stat-important dd {
+.disc-slot-card-sub-stat-important dt {
   color: var(--app-highlight);
   font-weight: 700;
+}
+
+.disc-slot-card-sub-stat-rolls {
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.disc-slot-card-copy .disc-slot-card-sub-stat-rolls-important {
+  color: var(--app-highlight);
 }
 
 .disc-slot-card-main-stat {

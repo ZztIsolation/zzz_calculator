@@ -3,10 +3,21 @@ import { computed, ref, watch } from "vue"
 import { NButton, NCheckbox, NInput, NInputNumber, NModal, NRadioButton, NRadioGroup, NSelect, NScrollbar, NTabPane, NTabs, NTag } from "naive-ui"
 import ImageAvatar from "@/components/ImageAvatar.vue"
 import LayerSlider from "@/components/LayerSlider.vue"
+import TeammateSelect from "@/components/TeammateSelect.vue"
+import TeammateBuffCard from "@/components/TeammateBuffCard.vue"
 import { imageForBuff } from "@/utils/assets"
+import {
+  inferBuffPickerState,
+  isTeammatePotentialBuff,
+  normalizeBuffPickerState,
+  teammateCinemaLevel,
+  teammateOwnerId,
+  type BuffPickerState,
+} from "@/utils/teammateBuffPicker"
 import {
   BUFF_CATEGORY_TABS,
   buildCombatBuffGroups,
+  teammateBuffCandidates,
   teamWEngineBuffCandidates,
   type BuffCategory,
 } from "@/utils/combatBuffs"
@@ -47,6 +58,8 @@ const props = defineProps<{
   defaultIds?: string[]
   addedBuffs?: any[]
   runtimeInputs?: Record<string, any>
+  buffPickerState?: BuffPickerState | null
+  resetNotice?: string
   meta?: any
   driveDiscSets?: any[]
   agentId?: string
@@ -64,6 +77,7 @@ const emit = defineEmits<{
     selectedBuffIds: string[]
     addedBuffs: any[]
     runtimeInputs: Record<string, any>
+    buffPickerState: BuffPickerState
   }]
 }>()
 
@@ -73,12 +87,10 @@ const query = ref("")
 const draft = ref<Set<string>>(new Set())
 const draftAddedBuffs = ref<any[]>([])
 const draftRuntimeInputs = ref<Record<string, any>>({})
-const prioritizedTeammateOwnerIds = ref<Set<string>>(new Set())
+const draftBuffPickerState = ref<BuffPickerState>({ teammateSlots: [null, null] })
 const fieldVersion = ref("")
 const fieldPeriod = ref("")
 const fieldName = ref("")
-const teammateAttributes = ref<string[]>([])
-const teammateSpecialties = ref<string[]>([])
 const bossVersion = ref("")
 const bossPeriod = ref("")
 const bossName = ref("")
@@ -102,15 +114,11 @@ watch(() => props.show, value => {
       }
     }
     draft.value = selected
-    prioritizedTeammateOwnerIds.value = selectedTeammateOwnerIds(
-      groupedBuffs.value.teammate ?? [],
-      selected,
-    )
+    draftBuffPickerState.value = normalizeBuffPickerState(props.buffPickerState)
+      ?? inferBuffPickerState(groupedBuffs.value.teammate ?? [], selected)
     syncSelectedTeamWEngineReferences(teamWEngineCandidates)
     draftRuntimeInputs.value = JSON.parse(JSON.stringify(props.runtimeInputs ?? {}))
     query.value = ""
-    teammateAttributes.value = []
-    teammateSpecialties.value = []
     fieldVersion.value = ""
     fieldPeriod.value = ""
     fieldName.value = ""
@@ -338,30 +346,9 @@ const groupedBuffs = computed(() => {
       existing.add(id)
     }
   }
+  groups.teammate = groups.teammate.filter((buff: any) => buff?.hidden !== true)
   return groups
 })
-
-const teammateAttributeOrder = ["physical", "fire", "ice", "electric", "ether", "wind", "honed_edge", "frost", "xuanmo", "lumiflux"]
-const teammateSpecialtyOrder = ["attack", "stun", "anomaly", "support", "defense", "rupture"]
-
-function currentTeammateOptions(values: unknown[], order: string[], label: (value: string) => string) {
-  const available = new Set(values.map(value => String(value ?? "").trim()).filter(Boolean))
-  const ordered = order.filter(value => available.delete(value))
-  const remaining = [...available].sort((left, right) => label(left).localeCompare(label(right), "zh-CN"))
-  return [...ordered, ...remaining].map(value => ({ label: label(value), value }))
-}
-
-const teammateAttributeOptions = computed(() => currentTeammateOptions(
-  (groupedBuffs.value.teammate ?? []).map((buff: any) => buff.teammateAttribute),
-  teammateAttributeOrder,
-  attributeLabel,
-))
-
-const teammateSpecialtyOptions = computed(() => currentTeammateOptions(
-  (groupedBuffs.value.teammate ?? []).map((buff: any) => buff.teammateSpecialty),
-  teammateSpecialtyOrder,
-  specialtyLabel,
-))
 
 function buffText(buff: any) {
   const period = fieldBuffPeriod(buff)
@@ -595,40 +582,71 @@ function bossBuffMatchesFilters(buff: any) {
     && (!bossName.value || String(buff?.bossId ?? buff?.id ?? "") === bossName.value)
 }
 
-function teammateBuffMatchesFilters(buff: any) {
-  return (!teammateAttributes.value.length || teammateAttributes.value.includes(buff?.teammateAttribute))
-    && (!teammateSpecialties.value.length || teammateSpecialties.value.includes(buff?.teammateSpecialty))
+const teammateOwners = computed(() => {
+  const owners = new Map<string, any>()
+  for (const buff of groupedBuffs.value.teammate) {
+    const id = teammateOwnerId(buff)
+    if (id && !owners.has(id)) owners.set(id, buff)
+  }
+  return [...owners].map(([value, buff]) => ({
+    value,
+    label: localizedText(buff.ownerName ?? buff.teammateName) || value,
+    buff,
+  }))
+})
+
+const teammateCinemaOptions = Array.from({ length: 7 }, (_, value) => ({ label: `${value} 影`, value }))
+
+function teammateOptionsFor(index: number) {
+  const otherId = draftBuffPickerState.value.teammateSlots[1 - index]?.teammateId
+  return teammateOwners.value
+    .filter(owner => owner.value !== otherId)
+    .map(({ label, value, buff }) => ({ label, value, specialty: buff.teammateSpecialty, avatar: imageForBuff(buff) }))
 }
 
-function teammateOwnerId(buff: any) {
-  return String(buff?.ownerId ?? buff?.teammateId ?? "").trim()
-}
+function setTeammateSlot(index: number, value: string | null) {
+  const teammateId = String(value ?? "").trim()
+  const slots = draftBuffPickerState.value.teammateSlots
+  const previousId = slots[index]?.teammateId
+  if ((previousId ?? "") === teammateId || (teammateId && (slots[1 - index]?.teammateId === teammateId
+    || !teammateOwners.value.some(owner => owner.value === teammateId)))) return
 
-function selectedTeammateOwnerIds(buffs: any[], selectedIds: Set<string>) {
-  const ownerIds = new Set<string>()
-  for (const buff of buffs) {
-    const ownerId = teammateOwnerId(buff)
-    if (ownerId && selectedIds.has(buff?.id)) {
-      ownerIds.add(ownerId)
+  if (previousId) {
+    // Include catalog entries that are no longer displayed when removing an owner.
+    const meta = props.meta ?? {}
+    const allCandidates = teammateBuffCandidates({
+      ...meta,
+      displayTeammateCombatBuffGroups: meta.teammateCombatBuffGroups ?? meta.displayTeammateCombatBuffGroups,
+      displayCombatBuffs: meta.combatBuffs ?? meta.displayCombatBuffs,
+    })
+    const ids = new Set([...groupedBuffs.value.teammate, ...allCandidates]
+      .filter(buff => teammateOwnerId(buff) === previousId).map(buff => buff.id))
+    draft.value = new Set([...draft.value].filter(id => !ids.has(id)))
+    draftRuntimeInputs.value = Object.fromEntries(Object.entries(draftRuntimeInputs.value)
+      .filter(([id]) => !ids.has(id) && id !== `teammate:${previousId}`))
+  }
+  const nextSlots = [...slots] as BuffPickerState["teammateSlots"]
+  nextSlots[index] = teammateId ? { teammateId, cinemaLevel: 0 } : null
+  draftBuffPickerState.value = { teammateSlots: nextSlots }
+  if (teammateId) {
+    for (const buff of groupedBuffs.value.teammate) {
+      if (teammateOwnerId(buff) === teammateId && teammateCinemaLevel(buff) === null
+        && !isTeammatePotentialBuff(buff)) toggle(buff.id, true)
     }
   }
-  return ownerIds
 }
 
-function prioritizeSelectedTeammateBuffs(buffs: any[]) {
-  if (!prioritizedTeammateOwnerIds.value.size) {
-    return buffs
+function setTeammateCinema(index: number, value: number) {
+  const slot = draftBuffPickerState.value.teammateSlots[index]
+  const cinemaLevel = Math.max(0, Math.min(6, Math.trunc(Number(value) || 0)))
+  if (!slot || slot.cinemaLevel === cinemaLevel) return
+  const slots = [...draftBuffPickerState.value.teammateSlots] as BuffPickerState["teammateSlots"]
+  slots[index] = { ...slot, cinemaLevel }
+  draftBuffPickerState.value = { teammateSlots: slots }
+  for (const buff of groupedBuffs.value.teammate) {
+    const level = teammateCinemaLevel(buff)
+    if (teammateOwnerId(buff) === slot.teammateId && level !== null) toggle(buff.id, level <= cinemaLevel)
   }
-  const prioritized: any[] = []
-  const remaining: any[] = []
-  for (const buff of buffs) {
-    const ownerId = teammateOwnerId(buff)
-    const destination = ownerId && prioritizedTeammateOwnerIds.value.has(ownerId)
-      ? prioritized
-      : remaining
-    destination.push(buff)
-  }
-  return [...prioritized, ...remaining]
 }
 
 const categoryBuffs = computed(() => {
@@ -638,7 +656,8 @@ const categoryBuffs = computed(() => {
     : activeTab.value === "boss"
       ? bossBuffs.value.filter(bossBuffMatchesFilters)
       : activeTab.value === "teammate"
-        ? (groupedBuffs.value.teammate ?? []).filter(teammateBuffMatchesFilters)
+        ? (groupedBuffs.value.teammate ?? []).filter(buff => draftBuffPickerState.value.teammateSlots
+          .some(slot => slot?.teammateId === teammateOwnerId(buff)))
         : groupedBuffs.value[activeTab.value] ?? []
   return source
     .filter(buff => !needle || buffText(buff).includes(needle))
@@ -655,10 +674,19 @@ const visibleBuffs = computed(() => {
   if (activeTab.value === "custom") {
     return customBuffs.value
   }
-  return activeTab.value === "teammate"
-    ? prioritizeSelectedTeammateBuffs(categoryBuffs.value)
-    : categoryBuffs.value
+  return categoryBuffs.value
 })
+const buffSections = computed(() => activeTab.value === "teammate"
+  ? draftBuffPickerState.value.teammateSlots.map((slot, index) => ({
+    key: `teammate-${index}`,
+    slotIndex: index,
+    label: index === 0 ? "队友一" : "队友二",
+    slot,
+    buffs: slot ? visibleBuffs.value.filter(buff => teammateOwnerId(buff) === slot.teammateId) : [],
+    selectedCount: slot ? groupedBuffs.value.teammate.filter(buff =>
+      teammateOwnerId(buff) === slot.teammateId && draft.value.has(buff.id)).length : 0,
+  }))
+  : [{ key: activeTab.value, slotIndex: 0, label: "", slot: null, buffs: visibleBuffs.value, selectedCount: 0 }])
 const selectedCount = computed(() => draft.value.size
   + draftAddedBuffs.value.filter(buff => buff?.sourceKind === "custom").length)
 const canBulkAddVisible = computed(() => !["custom", "field", "boss"].includes(activeTab.value))
@@ -1072,6 +1100,7 @@ function apply() {
     selectedBuffIds,
     addedBuffs,
     runtimeInputs,
+    buffPickerState: normalizeBuffPickerState(draftBuffPickerState.value)!,
   })
   close()
 }
@@ -1082,10 +1111,13 @@ function apply() {
     :show="show"
     preset="card"
     title="选择 Buff"
-    style="width: min(1080px, calc(100vw - 16px)); max-width: 1080px"
+    class="calculation-modal calculation-modal--list"
+    :class="{ 'is-teammate-picker': activeTab === 'teammate' }"
+    :style="{ width: `min(${activeTab === 'teammate' ? 1280 : 1080}px, calc(100vw - 16px))`, maxWidth: `${activeTab === 'teammate' ? 1280 : 1080}px` }"
     @update:show="emit('update:show', $event)"
   >
-    <div class="section-band buff-picker-layout ui-layout-scope" data-layout-surface="buff-picker">
+    <div class="section-band buff-picker-layout calculation-modal-body ui-layout-scope" :class="{ 'is-teammate-layout': activeTab === 'teammate' }" data-layout-surface="buff-picker">
+      <p v-if="resetNotice" class="buff-picker-reset-notice" role="status" data-testid="buff-picker-reset-notice">{{ resetNotice }}</p>
       <div class="toolbar">
         <NInput v-model:value="query" clearable placeholder="搜索来源、名称、效果" style="max-width: 360px" />
         <NTag round>已选 {{ selectedCount }} 项</NTag>
@@ -1096,31 +1128,6 @@ function apply() {
       <NTabs v-model:value="activeTab" class="buff-category-tabs" type="segment">
         <NTabPane v-for="tab in categoryTabs" :key="tab.name" :name="tab.name" :tab="tab.label" />
       </NTabs>
-
-      <div v-if="activeTab === 'teammate'" class="teammate-buff-filter-row ui-field-grid ui-field-grid--comfortable" data-layout-surface="teammate-buff-filters">
-        <label class="custom-field ui-field" data-layout-field>
-          <span>属性</span>
-          <NSelect
-            v-model:value="teammateAttributes"
-            multiple
-            clearable
-            data-testid="teammate-attribute-filter"
-            placeholder="全部属性"
-            :options="teammateAttributeOptions"
-          />
-        </label>
-        <label class="custom-field ui-field" data-layout-field>
-          <span>特性</span>
-          <NSelect
-            v-model:value="teammateSpecialties"
-            multiple
-            clearable
-            data-testid="teammate-specialty-filter"
-            placeholder="全部特性"
-            :options="teammateSpecialtyOptions"
-          />
-        </label>
-      </div>
 
       <div v-if="activeTab === 'field'" class="field-buff-filter-row ui-field-grid ui-field-grid--comfortable" data-layout-surface="field-buff-filters">
         <label class="custom-field ui-field" data-layout-field>
@@ -1161,94 +1168,135 @@ function apply() {
         </label>
       </div>
 
-      <div v-if="activeTab === 'custom'" class="custom-buff-editor">
-        <NInput v-model:value="customName" placeholder="名称" />
-        <div class="custom-effect-list">
-          <div class="custom-effect-row ui-field-grid" data-layout-surface="custom-buff-effect">
-            <div class="custom-field custom-target-kind-field ui-field ui-field--full" data-layout-field>
-              <span>增幅对象</span>
-              <NRadioGroup
-                aria-label="增幅对象"
-                :value="customRow.targetKind"
-                size="small"
-              >
-                <NRadioButton v-for="item in customTargetKindOptions" :key="item.value" :value="item.value" :label="item.label" @click="setCustomTargetKind(String(item.value))" />
-              </NRadioGroup>
+      <div class="buff-sections" :class="{ 'is-teammate': activeTab === 'teammate' }">
+        <section v-for="section in buffSections" :key="section.key" class="buff-section" :class="{ 'teammate-buff-column': activeTab === 'teammate' }">
+          <header v-if="activeTab === 'teammate'" class="teammate-column-header">
+            <strong class="teammate-column-title">{{ section.label }}</strong>
+            <div class="teammate-slot-field ui-field" data-layout-field>
+                <TeammateSelect
+                  :value="section.slot?.teammateId ?? null"
+                  :options="teammateOptionsFor(section.slotIndex)"
+                  :data-testid="`teammate-slot-${section.slotIndex}`"
+                  :label="section.label"
+                  @update:value="setTeammateSlot(section.slotIndex, $event)"
+                />
             </div>
-            <label class="custom-field ui-field" data-layout-field>
-              <span>增幅类型</span>
-              <NSelect
-                :value="customRow.optionIndex"
-                :options="customStatOptions"
-                filterable
-                @update:value="setCustomOptionIndex"
-              />
-            </label>
-            <label class="custom-field ui-field" data-layout-field>
-              <span>数值</span>
-              <NInputNumber v-model:value="customRow.value" :step="0.1" />
-            </label>
-          </div>
-          <div v-if="customRow.targetKind === 'specific'" class="custom-skill-target-row ui-field-grid" data-layout-surface="custom-skill-target">
-            <label class="custom-field ui-field" data-layout-field>
-              <span>角色</span>
-              <NSelect
-                :value="customSkillTargetFields.target.agentSkillId"
-                :options="customSkillTargetFields.skillOptions"
-                @update:value="updateCustomSkillAgent(String($event))"
-              />
-            </label>
-            <label class="custom-field ui-field" data-layout-field>
-              <span>技能大类</span>
-              <NSelect
-                :value="customSkillTargetFields.target.skillType"
-                :options="customSkillTargetFields.skillTypeOptions"
-                @update:value="updateCustomSkillType(String($event))"
-              />
-            </label>
-            <label class="custom-field ui-field" data-layout-field>
-              <span>招式</span>
-              <NSelect
-                :value="customSkillTargetFields.target.moveId"
-                :options="customSkillTargetFields.moveOptions"
-                @update:value="updateCustomSkillMove(String($event))"
-              />
-            </label>
-            <label v-if="customSkillTargetFields.target.moveId" class="custom-field ui-field" data-layout-field>
-              <span>倍率行</span>
-              <NSelect
-                :value="customSkillTargetFields.target.rowId ?? ''"
-                :options="customSkillTargetFields.rowOptions"
-                @update:value="updateCustomSkillRow(String($event))"
-              />
-            </label>
-          </div>
-          <label v-if="customRow.targetKind === 'skillType'" class="custom-field custom-general-skill-types ui-field ui-field--full" data-layout-field>
-            <span>技能大类</span>
-            <NSelect
-              multiple
-              filterable
-              :value="customRow.skillTargets.map((target: any) => target.skillType)"
-              :options="customSkillTypeOptions"
-              placeholder="请选择至少一个技能大类"
-              @update:value="updateCustomGeneralSkillTypes($event)"
-            />
-          </label>
-        </div>
-        <NButton type="primary" @click="addCustomBuff">添加到本次选择</NButton>
-      </div>
-
-      <NScrollbar class="buff-list-scrollbar" style="width: 100%; max-width: 100%; min-width: 0; max-height: 560px">
+              <div class="teammate-cinema-field ui-field" data-layout-field>
+                <NSelect
+                  :value="section.slot?.cinemaLevel ?? 0"
+                  :options="teammateCinemaOptions"
+                  :disabled="!section.slot"
+                  :data-testid="`teammate-cinema-${section.slotIndex}`"
+                  :aria-label="`${section.label}影画`"
+                  @update:value="setTeammateCinema(section.slotIndex, $event)"
+                />
+              </div>
+            <span class="teammate-selection-count">已选 {{ section.selectedCount }}</span>
+          </header>
+      <NScrollbar class="buff-list-scrollbar">
         <div class="section-band buff-list">
-          <template v-for="buff in visibleBuffs" :key="buff.id">
+          <div v-if="activeTab === 'custom'" class="custom-buff-editor">
+            <NInput v-model:value="customName" placeholder="名称" />
+            <div class="custom-effect-list">
+              <div class="custom-effect-row ui-field-grid" data-layout-surface="custom-buff-effect">
+                <div class="custom-field custom-target-kind-field ui-field ui-field--full" data-layout-field>
+                  <span>增幅对象</span>
+                  <NRadioGroup
+                    aria-label="增幅对象"
+                    :value="customRow.targetKind"
+                    size="small"
+                  >
+                    <NRadioButton v-for="item in customTargetKindOptions" :key="item.value" :value="item.value" :label="item.label" @click="setCustomTargetKind(String(item.value))" />
+                  </NRadioGroup>
+                </div>
+                <label class="custom-field ui-field" data-layout-field>
+                  <span>增幅类型</span>
+                  <NSelect
+                    :value="customRow.optionIndex"
+                    :options="customStatOptions"
+                    filterable
+                    @update:value="setCustomOptionIndex"
+                  />
+                </label>
+                <label class="custom-field ui-field" data-layout-field>
+                  <span>数值</span>
+                  <NInputNumber v-model:value="customRow.value" :step="0.1" />
+                </label>
+              </div>
+              <div v-if="customRow.targetKind === 'specific'" class="custom-skill-target-row ui-field-grid" data-layout-surface="custom-skill-target">
+                <label class="custom-field ui-field" data-layout-field>
+                  <span>角色</span>
+                  <NSelect
+                    :value="customSkillTargetFields.target.agentSkillId"
+                    :options="customSkillTargetFields.skillOptions"
+                    @update:value="updateCustomSkillAgent(String($event))"
+                  />
+                </label>
+                <label class="custom-field ui-field" data-layout-field>
+                  <span>技能大类</span>
+                  <NSelect
+                    :value="customSkillTargetFields.target.skillType"
+                    :options="customSkillTargetFields.skillTypeOptions"
+                    @update:value="updateCustomSkillType(String($event))"
+                  />
+                </label>
+                <label class="custom-field ui-field" data-layout-field>
+                  <span>招式</span>
+                  <NSelect
+                    :value="customSkillTargetFields.target.moveId"
+                    :options="customSkillTargetFields.moveOptions"
+                    @update:value="updateCustomSkillMove(String($event))"
+                  />
+                </label>
+                <label v-if="customSkillTargetFields.target.moveId" class="custom-field ui-field" data-layout-field>
+                  <span>倍率行</span>
+                  <NSelect
+                    :value="customSkillTargetFields.target.rowId ?? ''"
+                    :options="customSkillTargetFields.rowOptions"
+                    @update:value="updateCustomSkillRow(String($event))"
+                  />
+                </label>
+              </div>
+              <label v-if="customRow.targetKind === 'skillType'" class="custom-field custom-general-skill-types ui-field ui-field--full" data-layout-field>
+                <span>技能大类</span>
+                <NSelect
+                  multiple
+                  filterable
+                  :value="customRow.skillTargets.map((target: any) => target.skillType)"
+                  :options="customSkillTypeOptions"
+                  placeholder="请选择至少一个技能大类"
+                  @update:value="updateCustomGeneralSkillTypes($event)"
+                />
+              </label>
+            </div>
+            <NButton type="primary" @click="addCustomBuff">添加到本次选择</NButton>
+          </div>
+
+          <template v-for="buff in section.buffs" :key="buff.id">
+            <TeammateBuffCard
+              v-if="activeTab === 'teammate'"
+              :buff="buff"
+              :selected="draft.has(buff.id)"
+              :runtime="runtimeFor(buff)"
+              :effect-rows="effectRowsFor(buff)"
+              :modifier-lines="modifierLinesFor(buff)"
+              @toggle="toggle(buff.id, $event)"
+              @coverage="(rule, value) => setRuleCoverage(buff, rule, value)"
+              @source-value="(group, value) => setSourceValue(buff, group, value)"
+              @stacks="(group, value) => setStacks(buff, group, value)"
+              @parameter="(definition, value) => setRuntimeParameterValue(buff, definition, value)"
+            />
             <article
-              class="buff-row"
+              v-else
+              class="buff-row standard-buff-row"
+              :data-buff-id="buff.id"
               :class="{ 'is-selected': draft.has(buff.id), 'is-selectable': activeTab !== 'custom' }"
             >
             <div class="buff-row-main">
               <NCheckbox
                 v-if="activeTab !== 'custom'"
                 class="buff-check"
+                :aria-label="buffDisplayName(buff)"
                 :checked="draft.has(buff.id)"
                 @update:checked="toggle(buff.id, Boolean($event))"
               />
@@ -1398,13 +1446,15 @@ function apply() {
             </div>
             </article>
           </template>
-          <div v-if="!visibleBuffs.length" class="empty-state">暂无可添加的 Buff</div>
+          <div v-if="!section.buffs.length" class="empty-state">{{ activeTab === 'teammate' && !section.slot ? '先选择一名队友，查看并调整其 Buff' : '暂无匹配的 Buff' }}</div>
         </div>
       </NScrollbar>
+        </section>
+      </div>
     </div>
     <template #footer>
-      <div class="drawer-footer">
-        <span class="muted">应用前不会改动当前方案</span>
+      <div class="drawer-footer calculation-modal-footer">
+        <span class="muted">{{ resetNotice ? '旧配置重置已保存；本次修改应用后生效' : '应用前不会改动当前方案' }}</span>
         <NButton @click="close">取消</NButton>
         <NButton type="primary" @click="apply">应用选择</NButton>
       </div>
@@ -1413,6 +1463,138 @@ function apply() {
 </template>
 
 <style scoped>
+.buff-picker-reset-notice {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-panel-muted);
+  color: var(--app-text);
+  line-height: 1.6;
+}
+
+.buff-sections,
+.buff-section {
+  min-width: 0;
+}
+
+.buff-picker-layout {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.buff-sections:not(.is-teammate),
+.buff-sections:not(.is-teammate) > .buff-section {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.buff-section :deep(.buff-list-scrollbar) {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  height: auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.buff-section :deep(.buff-list-scrollbar > .n-scrollbar-container) {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
+.buff-picker-layout > :not(.buff-sections) {
+  flex-shrink: 0;
+}
+
+.buff-sections.is-teammate {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.teammate-buff-column {
+  container: teammate-column / inline-size;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius);
+  background: var(--app-panel-muted);
+}
+
+.teammate-column-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 84px auto;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-bottom: 8px;
+}
+
+.teammate-column-title {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.teammate-selection-count {
+  font-size: 13px;
+  white-space: nowrap;
+  color: var(--app-muted);
+}
+
+.teammate-buff-column .buff-list {
+  gap: 8px;
+}
+
+@container teammate-column (max-width: 500px) {
+  .teammate-column-header {
+    grid-template-columns: minmax(0, 1fr) 84px;
+  }
+  .teammate-column-title { grid-area: 1 / 1; }
+  .teammate-selection-count { grid-area: 1 / 2; text-align: right; }
+  .teammate-slot-field { grid-area: 2 / 1; }
+  .teammate-cinema-field { grid-area: 2 / 2; }
+}
+
+@container ui-layout (max-width: 899px) {
+  .buff-sections.is-teammate {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-auto-rows: max-content;
+    align-items: start;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .teammate-buff-column :deep(.buff-list-scrollbar) {
+    display: block;
+    flex: none;
+    height: auto;
+    overflow: visible;
+  }
+  .teammate-buff-column :deep(.buff-list-scrollbar > .n-scrollbar-container) {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .teammate-buff-column :deep(.buff-list-scrollbar > .n-scrollbar-rail) {
+    display: none;
+  }
+}
+
 .buff-category-tabs {
   padding: 5px;
   border: 1px solid var(--app-border-strong);
@@ -1488,7 +1670,6 @@ function apply() {
   display: none;
 }
 
-.teammate-buff-filter-row,
 .field-buff-filter-row,
 .boss-buff-filter-row {
   --ui-field-min: 180px;
@@ -1559,7 +1740,7 @@ function apply() {
   white-space: nowrap;
 }
 
-.buff-row {
+.standard-buff-row {
   display: grid;
   gap: 12px;
   min-height: 112px;
@@ -1574,13 +1755,13 @@ function apply() {
     box-shadow 0.15s ease;
 }
 
-.buff-row.is-selectable:hover {
+.standard-buff-row.is-selectable:hover {
   border-color: rgba(47, 125, 246, 0.68);
   background: #fbfdff;
   box-shadow: 0 8px 20px rgba(47, 125, 246, 0.1);
 }
 
-.buff-row.is-selected {
+.standard-buff-row.is-selected {
   border-color: var(--app-blue);
   background: rgba(47, 125, 246, 0.07);
   box-shadow:

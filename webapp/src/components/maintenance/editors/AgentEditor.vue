@@ -16,7 +16,7 @@ import {
   categoryOptions, defaultCalculationEvent, moveOptions, option,
 } from "../maintenance-options"
 import { internalId, textOf } from "../maintenance-model"
-import { storedStatLabel } from "@/utils/format"
+import { statLabel, storedStatLabel } from "@/utils/format"
 import { SYSTEM_MANAGED_SKILL_GROUP_COUNTS } from "@core/maintenanceValidation.js"
 
 const props = defineProps<{ model: any, catalog: any, disabled?: boolean }>()
@@ -52,6 +52,17 @@ function importantSubStatOptions() {
   const pool = props.catalog?.meta?.statRules?.driveDisc?.subStatPool
   const keys = Array.isArray(pool) && pool.length ? pool : SUB_STAT_POOL_FALLBACK
   return keys.map((key: string) => option(key, storedStatLabel(key, SUB_STAT_PERCENT_KEYS.has(key) ? "pct" : "flat", props.catalog?.meta)))
+}
+
+const PANEL_STAT_KEYS = [
+  "hp", "atk", "def", "critRate", "critDmg", "impact", "anomalyProficiency", "anomalyMastery", "penFlat", "penRatio", "dmgBonus",
+]
+
+function importantPanelStatOptions() {
+  const keys = [...PANEL_STAT_KEYS]
+  if (props.model.specialty === "rupture") keys.splice(2, 0, "sheerForce")
+  if (props.model.specialty === "armorer") keys.splice(5, 0, "lacerationDmg")
+  return keys.map(key => option(key, statLabel(key, props.catalog?.meta)))
 }
 
 function addSkillGroup() {
@@ -281,6 +292,12 @@ function enableCoreSkill(enabled: boolean) {
     <MaintenanceSection title="重要副词条" description="仅用于驱动盘方案面板的展示高亮，不影响伤害计算、优化和评分。">
       <div class="maintenance-grid">
         <label class="maintenance-field maintenance-field-wide"><span>重要副词条</span><NSelect multiple clearable filterable v-model:value="model.importantSubStats" :options="importantSubStatOptions()" :disabled="disabled" @update:value="changed" /></label>
+      </div>
+    </MaintenanceSection>
+
+    <MaintenanceSection title="重要面板属性" description="同时用于局外与局内面板的名称高亮，不影响伤害计算、优化和评分。">
+      <div class="maintenance-grid">
+        <label class="maintenance-field maintenance-field-wide"><span>重要面板属性</span><NSelect multiple clearable filterable v-model:value="model.importantPanelStats" :options="importantPanelStatOptions()" :disabled="disabled" @update:value="changed" /></label>
       </div>
     </MaintenanceSection>
 

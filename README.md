@@ -18,6 +18,19 @@ modeling decisions, and verification evidence remain in the
 
 - Added the optional agent-level `importantSubStats` field and maintenance editor. Matching substats are highlighted in the vertical Drive Disc scheme panel; compact cards and all calculation/optimization/scoring paths are unchanged. Empty values are omitted on save, and Claret ships with `defPct`, `critRate`, `critDmg`, and `penFlat`.
 
+### 2026-09-17 Workbench Action And Catalog Cleanup
+
+- Refined Workbench action controls, event summaries, optimizer controls, responsive layout, and browser regression coverage. The same update removes obsolete Cinema entries and adds explicit default coverage metadata to affected W-Engine effects.
+
+### 2026-09-15 Armorer W-Engine Refinement Descriptions
+
+- Corrected Claret's four Armorer W-Engine descriptions to enumerate all five refinement values instead of displaying min-max ranges. The official-data importer now generates those descriptions from the structured refinement arrays, so display text and calculation data cannot drift apart.
+
+### 2026-09-14 Workbench And Teammate Buff Refinements
+
+- Refined Workbench scheme controls, damage-summary presentation, action buttons, and responsive interaction states.
+- Added teammate Buff rules with validated specialty exclusions and expanded maintenance, picker, formula, and skill-target coverage.
+
 ### 2026-09-14 Claret Cinema-Resolved Default Rotation
 
 - Claret's administrator default rotation now resolves by Cinema level. Cinema 0-5 keeps `双连携六毁伤`; Cinema 6 uses `6影双连携九毁伤`, which repeats the `长按特殊技三次毁伤` skill group three times instead of twice, so the expanded Maim total grows from six hits to nine. The basic slam group, the two chain hits, and the single ultimate are unchanged.
@@ -32,6 +45,19 @@ modeling decisions, and verification evidence remain in the
 - Migrated dynamic in-combat formula handling into the shared core and kept Blood Marrow's overflow rule generic, so all supported damage domains consume the same validated bonus path. Tests cover formula evaluation, white-box rows, optimizer fuzz, browser-local computation, and catalog integrity.
 - This update is merged through pull requests into `main` only. The `deploy` branch is unchanged, and no production deployment or promotion workflow is triggered by this development update.
 
+### 2026-09-08 Vivian Optimizer Parity
+
+- Completed Vivian's strict optimizer and cross-kernel parity. Ordinary, compiled, dense, fixed-score, browser Worker, and optimizer paths now share the same self-sourced Ether Release semantics and regression coverage.
+
+### 2026-09-06 Explicit Production Promotion
+
+- Replaced the bot-authored approval-PR promotion path with an owner-attributed explicit dispatch. The frozen main SHA, exact CI artifact, protected `deploy` ref, non-forced update, resume, rollback, and production evidence are revalidated as one transaction.
+
+### 2026-09-05 Production Verification And Buff Fixes
+
+- Corrected Juhufu's CRIT DMG scaling to use the initial attack value and added regression coverage for the teammate Buff rule.
+- Hardened the new production-promotion workflow's eligibility, token permissions, reusable-workflow context, and secret propagation.
+
 ### 2026-09-05 Vivian Single-Release Modeling (Development Branch)
 
 - Added Vivian (薇薇安·班希) from official Wiki entry 1276, including her level-60 panel, seven Core Passive Release coefficient tiers, the expressible Additional Ability/Cinema effects, official artwork, Enka `1331` mapping, and the signature Dreaming Bird relationship.
@@ -40,11 +66,39 @@ modeling decisions, and verification evidence remain in the
 - The Core Passive description includes the official F-level per-10-Proficiency coefficients for all six anomaly attributes; the structured core-scaling table remains the calculation source for other core levels.
 - The official page has no stable skill IDs, so this branch does not fabricate a skill catalog or multi-event rotation. Cinema 2's 130% proficiency yield is modeled as a Release-only `1.3` factor on the Anomaly Proficiency conversion; it does not alter the original anomaly unit, ordinary Anomaly, Disorder, or other damage zones. Cinema 6's special five-fold Release remains an explicit boundary for a future event variant.
 
+### 2026-09-04 Defense Buffs And Workbench Layout
+
+- Added the Defense Battle field Buff catalog updates and refined Workbench layout behavior across the protected responsive surfaces.
+- Preserved Soldier 11's manual catalog corrections and compatibility data while completing the surrounding Potential Vision maintenance coverage.
+- Separated production CD onto the protected `deploy` branch: `main` now produces the exact immutable artifact, while promotion, rollback, and browser-storage validation consume only the reviewed SHA.
+
+### 2026-08-31 Workbench Event Summary Expansion
+
+- Compact event summaries now preserve the chosen first two items and expose the remaining items through an inline, keyboard-accessible expansion. Desktop, scaled-desktop, and mobile layout coverage protects the interaction from clipping or unintended horizontal overflow.
+
+### 2026-08-30 Reliable Loadout Saves
+
+- Removed the nested Web Lock deadlock from Drive Disc loadout saves, added bounded storage waits, and restored retryable failed-save drafts without changing browser storage schemas or losing user data.
+
+### 2026-08-29 Sigrid Generated-Hit Segmentation
+
+- Sigrid's generated normal-attack total remains one public event but is evaluated per child hit, so skill-targeted PEN and other nonlinear defense, resistance, and stun modifiers apply only to the matching hit across ordinary, white-box, compiled, dense, Worker, and optimizer paths.
+
+### 2026-08-28 Critical Assault 3.1 Phase 3
+
+- Added the Critical Assault 3.1 phase-three field and Boss catalogs, official Boss assets, default picker coverage, and regression tests.
+
 ### 2026-08-25 Soldier 11 And Potential Vision Modeling
 
 - Added Soldier 11 with complete level 1-16 skill multipliers, Core Skill, Cinemas, The Brimstone relationship, official artwork, and Enka `1041` mapping. Malformed Potential cells in the official Wiki are explicitly corrected against current game data and documented as source defects.
 - Added a Potential Vision P0-P6 axis independent from Cinema: P1 unlocks the fifth Basic hit, its empowered package, and Fire Assault; P2-P6 grant 16/24/32/40/48% CRIT DMG only while Fields of Fire is active. The extra 22.5% Fire DMG now follows each event's Stun state.
 - The default P6 Stun package uses Chain-AA plus Ultimate-AA. Each empowered fifth hit resolves six extra packets after B4 and the B5 body consume one guaranteed Fire Suppression each; skill gates, count limits, white-box, compiled/dense, browser Worker, and strict optimizer paths share that contract.
+
+### 2026-08-24 Sigrid And Workbench Follow-Ups
+
+- Split Sigrid's Tempering into an independent Chain-Attack Buff and made her default event composition auditable, while retaining stable saved references.
+- Fixed Workbench UI regressions and Enka percentage recovery, with browser compatibility and layout coverage for the affected panels.
+- Extended production validation to accept semantic optimizer completion and additive health fields without weakening the existing release evidence contract.
 
 ### 2026-08-24 Sigrid Formal Calculation Support
 
@@ -52,11 +106,40 @@ modeling decisions, and verification evidence remain in the
 - Modeled Aerial Patrol Spear CRIT Rate and Stun multiplier, Tempered, Contamination, Cinemas 1/2/4/6, and configurable Formation Breaker counts in their exact damage areas. Energy, Decibels, stance timers, blocks, and action time remain explicit non-simulated boundaries.
 - Added skill-targeted PEN Ratio so Cinema 2's 24% PEN applies only to Unbridled Spear and Converging Spear events across white-box, compiled/dense, fixed-score, browser Worker, and strict optimizer paths. Knight's Extolment now uses an exact two-stack threshold for Ice RES Ignore.
 
+### 2026-08-22 Showcase Import And UID Safety
+
+- Added transactional showcase/Enka import with safe UID rebinding, unified Drive Disc import handling, account-aware loadout synchronization, and fail-closed production enablement and validation.
+
+### 2026-08-21 Defense Battle 3.1 Phase 2
+
+- Added the Defense Battle 3.1 phase-two field Buff catalog, picker metadata, and targeted regression coverage.
+
+### 2026-08-17 Drive Disc Editor Save Fix
+
+- Fixed Drive Disc editor saves and compatibility handling so edits remain retryable without dropping local inventory data.
+
+### 2026-08-14 Critical Assault 3.1 Phase 2
+
+- Added the Critical Assault 3.1 phase-two field Buff catalog, Boss metadata, and default picker coverage.
+
+### 2026-08-12 Remielle Teammate Buff Modeling
+
+- Added Remielle's teammate Buff group, independent Anomaly-count and skill-level controls, and the Alienation multiplier zone across normal, Release, Disorder, compiled, dense, fixed-score, and optimizer paths.
+
+### 2026-08-01 Scanner 1.0.49 Integration
+
+- Integrated the immutable Scanner 1.0.49 schema-v3 manifest with Helper 1.3.1 and protocol v4. Native fourth-row navigation, permission repair, and configured non-level-15 stops now complete safely without changing browser storage schemas.
+
 ### 2026-07-29 Drive Disc Update
 
 - Added official catalog data and local artwork for Thorned Rose and Vow of the Prophetic Feather.
 - Thorned Rose now applies its 16% DEF two-piece bonus, permanent 15% damage bonus, and automatic 8%/16% CRIT Rate thresholds at 1,000/1,800 final out-of-combat DEF across calculation and optimizer paths.
 - Vow of the Prophetic Feather applies 30 Anomaly Proficiency at two pieces and 50 more at four pieces. Its official 15% Luminous Attribute Anomaly damage text is preserved but intentionally excluded from calculation because it belongs to an independent multiplier area that is not modeled yet.
+- Added the Critical Assault 3.1 phase-one Boss archive and damage-affecting encounter rules, with local Boss assets and catalog validation.
+
+### 2026-07-28 Current Skill-Level Calculation Fix
+
+- Made the current Workbench skill-level selectors authoritative across ordinary, white-box, compiled, dense, fixed-score, browser-local, and exact optimizer calculation paths while preserving legacy saved-event compatibility.
 
 ### 2026-07-25 Hotfix
 

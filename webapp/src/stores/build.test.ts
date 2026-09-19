@@ -1,5 +1,8 @@
 import { createPinia, setActivePinia } from "pinia"
-import { beforeEach, describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import { fileURLToPath } from "node:url"
+import path from "node:path"
+import { buildMeta, calculateInCombatPanel, loadCalculatorContext } from "../../../backend/calculator.js"
 import { activeDriveDisc4pcRuntimeInputs, defaultDamageConfig, hasAdminDefaultCalculation, normalizeDamageModeForAgent, useBuildStore } from "@/stores/build"
 
 function teammateWEngineMeta() {
@@ -26,10 +29,255 @@ function teammateWEngineMeta() {
   }
 }
 
+function buffPickerMeta() {
+  const ownBuff = { scope: "inCombat", effects: [] }
+  return {
+    agents: [{
+      id: "agent_a",
+      name: { zhCN: "角色 A" },
+      combatBuffs: {
+        corePassive: ownBuff,
+        additionalAbility: ownBuff,
+        skillBuffs: [{ id: "optional", ...ownBuff }],
+      },
+    }, { id: "agent_b", name: { zhCN: "角色 B" } }],
+    wEngines: [
+      { id: "engine_a", name: { zhCN: "当前音擎" }, effect: { selfBuff: ownBuff, teamBuff: ownBuff } },
+      { id: "engine_team", name: { zhCN: "队友音擎" }, effect: { teamBuff: ownBuff } },
+    ],
+    teammateCombatBuffGroups: ["teammate_a", "teammate_b", "teammate_c"].map(id => ({
+      id,
+      name: { zhCN: id },
+      buffs: [{ id: `${id}.core`, ...ownBuff }, { id: `${id}.cinema1`, ...ownBuff }],
+    })),
+    combatBuffs: [
+      { id: "field.buff", sourceType: "field", effects: [] },
+      { id: "boss.buff", sourceType: "boss", effects: [] },
+    ],
+  }
+}
+
+function legacyBuffPickerBuild() {
+  const meta = buffPickerMeta()
+  const store = useBuildStore()
+  store.applyAgentConfig("agent_a", meta, { wEngineId: "engine_a" })
+  store.selectedBuffIds = [
+    "agent:agent_a.skill.optional",
+    "teammate_a.core", "teammate_b.core", "teammate_c.cinema1",
+    "field.buff", "boss.buff", "teammateDriveDisc4pc:team_set",
+    "wEngine:engine_team.team", "custom.buff",
+  ]
+  store.manuallyUncheckedDefaultBuffIds = ["agent:agent_a.corePassive", "wEngine:engine_a.self"]
+  store.addedBuffs = [
+    { id: "custom.buff", sourceKind: "custom", stats: [{ stat: "atkFlat", value: 100 }] },
+    { id: "wEngine:engine_team.team", sourceKind: "wEngineTeam", wEngineModificationLevel: 5 },
+    { id: "teammateDriveDisc4pc:team_set", sourceKind: "teammateDriveDisc4pc", setId: "team_set", runtime: { coverage: 0.4 } },
+  ]
+  store.runtimeInputs = Object.fromEntries([
+    ...store.selectedBuffIds,
+    "agent:agent_a.corePassive", "agent:agent_a.additionalAbility",
+    "wEngine:engine_a.self", "wEngine:engine_a.team", "teammate:teammate_a",
+  ].map((id, index) => [id, { coverage: (index + 1) / 20 }]))
+  return { store, meta }
+}
+
 describe("build store", () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     localStorage.clear()
+  })
+
+  it("persists picker slots per account and character without collapsing empty positions", async () => {
+    const meta = buffPickerMeta()
+    localStorage.setItem("zzz-calculator.currentAccount.v1", "alice")
+    const store = useBuildStore()
+    store.applyAgentConfig("agent_a", meta, { wEngineId: "engine_a" })
+    const firstState = { teammateSlots: [null, { teammateId: "teammate_b", cinemaLevel: 4 }] }
+    store.applyBuffState({ selectedBuffIds: store.activeBuffIds(meta), buffPickerState: firstState }, meta)
+    await store.persist()
+    store.selectAgent("agent_b", meta)
+    expect(store.buffPickerState).toBeNull()
+    store.applyBuffState({ selectedBuffIds: [], buffPickerState: {
+      teammateSlots: [{ teammateId: "teammate_a", cinemaLevel: 1 }, null],
+    } }, meta)
+    await store.persist()
+    store.selectAgent("agent_a", meta)
+    expect(store.buffPickerState).toEqual(firstState)
+    store.applyBuffState({ selectedBuffIds: store.activeBuffIds(meta) }, meta)
+    expect(store.buffPickerState).toEqual(firstState)
+    await store.persist()
+
+    for (const key of ["zzz-calculator.webapp.build.v1", "zzz-calculator.homeSelection.v1"]) {
+      const config = JSON.parse(localStorage.getItem(key)!).byOwner.alice.byAgent.agent_a
+      expect(config.buffPickerState).toEqual(firstState)
+      expect(config.combat.buffPickerState).toBeUndefined()
+    }
+    localStorage.setItem("zzz-calculator.currentAccount.v1", "bob")
+    store.initialize({}, meta)
+    expect(store.buffPickerState).toBeNull()
+    localStorage.setItem("zzz-calculator.currentAccount.v1", "alice")
+    setActivePinia(createPinia())
+    const restored = useBuildStore()
+    restored.initialize({}, meta)
+    expect(restored.buffPickerState).toEqual(firstState)
+  })
+
+  it("resets legacy three-owner selections before editing while retaining both own Buff tabs exactly", async () => {
+    const { store, meta } = legacyBuffPickerBuild()
+    const ownIds = ["agent:agent_a.skill.optional", "agent:agent_a.additionalAbility", "wEngine:engine_a.team"]
+    const ownRuntimeIds = [...ownIds, "agent:agent_a.corePassive", "wEngine:engine_a.self"]
+    const expectedRuntime = Object.fromEntries(ownRuntimeIds.map(id => [id, store.runtimeInputs[id]]))
+    const unchecked = [...store.manuallyUncheckedDefaultBuffIds]
+    expect(await store.prepareBuffPicker(meta)).toBe(true)
+    expect(store.activeBuffIds(meta)).toEqual(expect.arrayContaining(ownIds))
+    expect(store.activeBuffIds(meta)).toHaveLength(ownIds.length)
+    expect(store.selectedBuffIds).toEqual(["agent:agent_a.skill.optional"])
+    expect(store.manuallyUncheckedDefaultBuffIds).toEqual(unchecked)
+    expect(store.runtimeInputs).toEqual(expectedRuntime)
+    expect(store.addedBuffs).toEqual([])
+    expect(store.buffPickerState).toEqual({ teammateSlots: [null, null] })
+
+    // No apply call follows: canceling the new picker cannot restore old Buffs.
+    for (const key of ["zzz-calculator.webapp.build.v1", "zzz-calculator.homeSelection.v1"]) {
+      const config = JSON.parse(localStorage.getItem(key)!).byOwner.default.byAgent.agent_a
+      expect(config.combat.activeBuffIds).toEqual(["agent:agent_a.skill.optional"])
+      expect(config.combat.runtimeInputs).toEqual(expectedRuntime)
+      expect(config.combat.addedBuffs).toEqual([])
+      expect(config.combat.manuallyUncheckedDefaultBuffIds).toEqual(unchecked)
+      expect(config.buffPickerState).toEqual({ teammateSlots: [null, null] })
+    }
+    setActivePinia(createPinia())
+    const restored = useBuildStore()
+    restored.initialize({}, meta)
+    expect(restored.activeBuffIds(meta)).toEqual(store.activeBuffIds(meta))
+    expect(restored.runtimeInputs).toEqual(expectedRuntime)
+    expect(await restored.prepareBuffPicker(meta)).toBe(false)
+  })
+
+  it("preserves a currently equipped engine team effect activated by a legacy added-only reference", async () => {
+    const { store, meta } = legacyBuffPickerBuild()
+    store.manuallyUncheckedDefaultBuffIds.push("wEngine:engine_a.team")
+    store.addedBuffs.push({ id: "wEngine:engine_a.team", sourceKind: "wEngineTeam", runtime: { coverage: 0.35 } })
+    delete store.runtimeInputs["wEngine:engine_a.team"]
+    expect(store.activeBuffIds(meta)).toContain("wEngine:engine_a.team")
+    await store.prepareBuffPicker(meta)
+    expect(store.addedBuffs).toEqual([])
+    expect(store.activeBuffIds(meta)).toContain("wEngine:engine_a.team")
+    expect(store.manuallyUncheckedDefaultBuffIds).toContain("wEngine:engine_a.team")
+    expect(store.runtimeInputs["wEngine:engine_a.team"]).toEqual({ coverage: 0.35 })
+  })
+
+  it("does not reset two-owner legacy selections or configurations already using picker slots", async () => {
+    const { store, meta } = legacyBuffPickerBuild()
+    store.selectedBuffIds = ["teammate_a.core", "teammate_a.cinema1", "teammate_b.core", "field.buff"]
+    const before = JSON.parse(JSON.stringify(store.$state))
+    expect(await store.prepareBuffPicker(meta)).toBe(false)
+    expect(store.$state).toEqual(before)
+    expect(localStorage.getItem("zzz-calculator.webapp.build.v1")).toBeNull()
+    store.selectedBuffIds.push("teammate_c.core")
+    store.buffPickerState = { teammateSlots: [null, null] }
+    const withState = JSON.parse(JSON.stringify(store.$state))
+    expect(await store.prepareBuffPicker(meta)).toBe(false)
+    expect(store.$state).toEqual(withState)
+  })
+
+  it("leaves the legacy selection intact when reset persistence fails and supports retry", async () => {
+    const { store, meta } = legacyBuffPickerBuild()
+    await store.persist()
+    const before = JSON.parse(JSON.stringify(store.$state))
+    const beforeSaved = localStorage.getItem("zzz-calculator.webapp.build.v1")
+    const write = vi.spyOn(Storage.prototype, "setItem").mockImplementationOnce(() => {
+      throw new Error("保存空间不足")
+    })
+    try {
+      await expect(store.prepareBuffPicker(meta)).rejects.toThrow("保存空间不足")
+      expect(store.$state).toEqual(before)
+      expect(localStorage.getItem("zzz-calculator.webapp.build.v1")).toBe(beforeSaved)
+    } finally {
+      write.mockRestore()
+    }
+    expect(await store.prepareBuffPicker(meta)).toBe(true)
+    expect(store.buffPickerState).toEqual({ teammateSlots: [null, null] })
+  })
+
+  it("rolls back the first reset document if writing the legacy copy fails", async () => {
+    const { store, meta } = legacyBuffPickerBuild()
+    await store.persist()
+    const before = JSON.parse(JSON.stringify(store.$state))
+    const keys = ["zzz-calculator.webapp.build.v1", "zzz-calculator.homeSelection.v1"]
+    const beforeDocuments = keys.map(key => localStorage.getItem(key))
+    const originalSetItem = Storage.prototype.setItem
+    let failLegacyWrite = true
+    const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (key, value) {
+      if (key === keys[1] && failLegacyWrite) {
+        failLegacyWrite = false
+        throw new Error("旧版配置保存失败")
+      }
+      return originalSetItem.call(this, key, value)
+    })
+    try {
+      await expect(store.prepareBuffPicker(meta)).rejects.toThrow("旧版配置保存失败")
+      expect(store.$state).toEqual(before)
+      expect(keys.map(key => localStorage.getItem(key))).toEqual(beforeDocuments)
+      expect(await store.prepareBuffPicker(meta)).toBe(true)
+    } finally {
+      write.mockRestore()
+    }
+  })
+
+  it.each(["account", "agent"])("does not overwrite a different %s while the reset save is pending", async context => {
+    const { store, meta } = legacyBuffPickerBuild()
+    const originalLocks = Object.getOwnPropertyDescriptor(navigator, "locks")
+    let release!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    Object.defineProperty(navigator, "locks", {
+      configurable: true,
+      value: { request: async (_name: string, optionsOrCallback: any, maybeCallback?: () => unknown) => {
+        await gate
+        return (typeof optionsOrCallback === "function" ? optionsOrCallback : maybeCallback!)()
+      } },
+    })
+    try {
+      const pending = store.prepareBuffPicker(meta)
+      expect(store.selectedBuffIds).toContain("teammate_c.cinema1")
+      if (context === "account") localStorage.setItem("zzz-calculator.currentAccount.v1", "other")
+      store.applyAgentConfig(context === "agent" ? "agent_b" : "agent_a", meta, {
+        selectedBuffIds: ["teammate_b.core"],
+        buffPickerState: { teammateSlots: [{ teammateId: "teammate_b", cinemaLevel: 2 }, null] },
+      })
+      const switchedState = JSON.parse(JSON.stringify(store.$state))
+      release()
+      expect(await pending).toBe(false)
+      expect(store.$state).toEqual(switchedState)
+      const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1")!)
+      expect(saved.byOwner.default.byAgent.agent_a.buffPickerState).toEqual({ teammateSlots: [null, null] })
+    } finally {
+      release()
+      if (originalLocks) Object.defineProperty(navigator, "locks", originalLocks)
+      else Reflect.deleteProperty(navigator, "locks")
+    }
+  })
+
+  it("keeps real calculation input and damage unchanged when only picker presentation state changes", async () => {
+    const catalog = await loadCalculatorContext(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.."))
+    const meta = buildMeta(catalog)
+    const sample = catalog.examples.yeShunguang.input
+    const store = useBuildStore()
+    store.applyAgentConfig(sample.agentId, meta, {
+      ...sample,
+      combat: { activeBuffIds: sample.combatBuffs?.activeBuffIds ?? [], runtimeInputs: sample.combatBuffs?.runtimeInputs ?? {} },
+    })
+    const before = store.buildInput(catalog, meta, sample.driveDiscs ?? [])
+    const resultBefore = calculateInCombatPanel(catalog, before)
+    store.applyBuffState({
+      selectedBuffIds: store.activeBuffIds(meta),
+      buffPickerState: { teammateSlots: [{ teammateId: "rina", cinemaLevel: 6 }, null] },
+    }, meta)
+    const after = store.buildInput(catalog, meta, sample.driveDiscs ?? [])
+    expect(after).toEqual(before)
+    expect(calculateInCombatPanel(catalog, after)).toEqual(resultBefore)
+    expect(after).not.toHaveProperty("buffPickerState")
+    expect(after.combatBuffs).not.toHaveProperty("buffPickerState")
   })
 
   it("defaults potential characters to their authored level and keeps ordinary characters at P0", () => {

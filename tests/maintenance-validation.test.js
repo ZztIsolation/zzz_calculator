@@ -510,6 +510,33 @@ assertInvalid("agents", {
     ...validAgent,
     importantSubStats: [""],
 }, "importantSubStats[0]", "必须是非空属性标识")
+assertValid("agents", {
+    ...validAgent,
+    importantPanelStats: ["atk", "critRate", "critDmg", "penFlat", "sheerForce", "lacerationDmg"],
+})
+assertValid("agents", { ...validAgent, importantPanelStats: [] })
+const cleanedImportantPanelStats = cleanMaintenanceItem("agents", {
+    ...validAgent,
+    importantPanelStats: ["atk", " critRate ", "atk", "", "penFlat"],
+})
+assert.deepEqual(cleanedImportantPanelStats.importantPanelStats, ["atk", "critRate", "penFlat"])
+const cleanedEmptyImportantPanelStats = cleanMaintenanceItem("agents", {
+    ...validAgent,
+    importantPanelStats: [],
+})
+assert.equal(Object.hasOwn(cleanedEmptyImportantPanelStats, "importantPanelStats"), false)
+assertInvalid("agents", {
+    ...validAgent,
+    importantPanelStats: "critRate",
+}, "importantPanelStats")
+assertInvalid("agents", {
+    ...validAgent,
+    importantPanelStats: ["atkPct"],
+}, "importantPanelStats[0]", "不是支持的面板属性")
+assertInvalid("agents", {
+    ...validAgent,
+    importantPanelStats: [""],
+}, "importantPanelStats[0]", "必须是非空属性标识")
 assertInvalid("agents", {
     ...validAgent,
     preferredDriveDiscs: {

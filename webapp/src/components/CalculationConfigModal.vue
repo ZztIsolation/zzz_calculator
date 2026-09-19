@@ -1348,8 +1348,15 @@ function save() {
 </script>
 
 <template>
-  <NModal :show="show" preset="card" title="事件管理" style="width: min(1080px, calc(100vw - 16px)); max-width: 1080px" @update:show="emit('update:show', $event)">
-    <div class="ui-layout-scope" data-layout-surface="calculation-config">
+  <NModal
+    :show="show"
+    preset="card"
+    title="事件管理"
+    class="calculation-modal"
+    style="width: min(1080px, calc(100vw - 16px)); max-width: 1080px"
+    @update:show="emit('update:show', $event)"
+  >
+    <div class="calculation-modal-body ui-layout-scope" data-layout-surface="calculation-config">
     <div class="calculation-grid ui-master-detail">
       <aside class="section-band">
         <div class="metric">
@@ -1754,7 +1761,7 @@ function save() {
     />
 
     <template #footer>
-      <div class="drawer-footer">
+      <div class="drawer-footer calculation-modal-footer">
         <span class="muted">事件 {{ draft.events?.length ?? 0 }} 项</span>
         <NButton @click="close">取消</NButton>
         <NButton type="primary" :disabled="isLuminescenceSettlement(selectedEvent) && eventWarnings.length > 0" @click="save">保存配置</NButton>
@@ -2271,8 +2278,6 @@ function save() {
 .calculation-event-list {
   display: grid;
   gap: 8px;
-  max-height: min(46vh, 520px);
-  overflow: auto;
   padding-right: 2px;
 }
 
@@ -2376,10 +2381,6 @@ function save() {
 
   .calculation-editor-panel {
     min-height: 0;
-  }
-
-  .calculation-event-list {
-    max-height: 360px;
   }
 
   .calculation-event-list-item {

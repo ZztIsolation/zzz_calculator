@@ -11,6 +11,7 @@ import ImageAvatar from "@/components/ImageAvatar.vue"
 import ScannerErrorState from "@/components/ScannerErrorState.vue"
 import { formatNumber, statLabel, labelOf } from "@/utils/format"
 import { imageForAgent, imageForDriveDiscSet } from "@/utils/assets"
+import { driveDiscAdditionalRollText } from "@/utils/driveDiscSubstats"
 import { driveDiscScannerSequence } from "@/utils/driveDiscProvenance"
 import { useAppConfigStore } from "@/stores/app-config"
 import { useCatalogStore } from "@/stores/catalog"
@@ -269,7 +270,10 @@ function mainStatText(disc: any) {
 
 function subStatText(disc: any) {
   return (disc?.subStats ?? [])
-    .map((stat: any) => `${statLabel(stat.stat, catalogStore.meta)} ${stat.value}`)
+    .map((stat: any) => {
+      const additionalRollText = driveDiscAdditionalRollText(stat?.stat, stat?.value, catalogStore.meta, disc?.rarity)
+      return `${statLabel(stat.stat, catalogStore.meta)}${additionalRollText ? ` ${additionalRollText}` : ""} ${stat.value}`
+    })
     .join(" / ")
 }
 
@@ -1636,6 +1640,7 @@ function confirmDangerImport() {
         :conflicts="inventoryStore.importPlan?.conflicts ?? []"
         :resolutions="inventoryStore.importResolutions"
         :disabled="inventoryStore.importResolving || inventoryStore.importApplying"
+        :meta="catalogStore.meta"
         @resolve="resolveJsonImportConflict"
       />
       <div v-if="importPreviewSections.length" class="panel import-preview-panel" style="max-height: 300px; overflow: auto;">
@@ -1837,6 +1842,7 @@ function confirmDangerImport() {
               :conflicts="inventoryStore.scanSession.plan?.conflicts ?? []"
               :resolutions="inventoryStore.scanSession.resolutions ?? {}"
               :disabled="inventoryStore.importResolving || inventoryStore.importApplying"
+              :meta="catalogStore.meta"
               @resolve="resolveScanImportConflict"
             />
             <div v-if="inventoryStore.scanStatus === 'review'" class="drawer-footer scan-review-actions">

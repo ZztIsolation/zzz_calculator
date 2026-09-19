@@ -7713,6 +7713,7 @@ export function buildMeta(catalog) {
         combatBuffs: agent.combatBuffs ?? {},
         preferredDriveDiscs: agent.preferredDriveDiscs ?? null,
         importantSubStats: agent.importantSubStats ?? [],
+        importantPanelStats: agent.importantPanelStats ?? [],
         skillGroups: agent.skillGroups ?? [],
         defaultCalculationConfig: agent.defaultCalculationConfig ?? null,
     }))

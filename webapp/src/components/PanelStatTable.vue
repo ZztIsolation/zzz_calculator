@@ -6,8 +6,10 @@ const props = withDefaults(defineProps<{
   panel: Record<string, number> | null | undefined
   meta?: any
   includeSheerForce?: boolean
+  importantStats?: string[] | null
 }>(), {
   includeSheerForce: false,
+  importantStats: () => [],
 })
 
 const percentStats = new Set([
@@ -48,6 +50,10 @@ const keys = computed(() => {
     : domainKeys
 })
 
+const importantStatKeys = computed(() => new Set(
+  (Array.isArray(props.importantStats) ? props.importantStats : []).filter(Boolean).map(String),
+))
+
 function formatPanelValue(key: string, value: number): string {
   if (key === "anomalyMastery") {
     return formatNumber(Math.trunc(value), 0)
@@ -63,7 +69,7 @@ function formatPanelValue(key: string, value: number): string {
   <table class="data-table">
     <tbody>
       <tr v-for="key in keys" :key="key">
-        <th>{{ statLabel(key, meta) }}</th>
+        <th :class="{ 'panel-stat-important': importantStatKeys.has(key) }">{{ statLabel(key, meta) }}</th>
         <td class="num">
           {{ formatPanelValue(key, panel?.[key] ?? 0) }}
         </td>
@@ -71,3 +77,10 @@ function formatPanelValue(key: string, value: number): string {
     </tbody>
   </table>
 </template>
+
+<style scoped>
+.panel-stat-important {
+  color: var(--app-highlight);
+  font-weight: 700;
+}
+</style>

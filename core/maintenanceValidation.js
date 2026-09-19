@@ -306,6 +306,21 @@ const STAT_VALUES = new Set([
     "enemyEtherResReduction",
     "enemyWindResReduction",
 ])
+const IMPORTANT_PANEL_STAT_VALUES = new Set([
+    "hp",
+    "atk",
+    "def",
+    "critRate",
+    "critDmg",
+    "lacerationDmg",
+    "impact",
+    "anomalyProficiency",
+    "anomalyMastery",
+    "penFlat",
+    "penRatio",
+    "dmgBonus",
+    "sheerForce",
+])
 const RULE_STAT_VALUES = new Set([...STAT_VALUES, ...DEFAULT_EVENT_MODIFIER_STAT_VALUES, ...SKILL_TARGET_STAT_VALUES])
 const TARGET_STAT_VALUES = new Set([
     "enemyDefReduction",
@@ -1296,6 +1311,25 @@ function validateImportantSubStats(errors, importantSubStats) {
         }
         if (!STAT_VALUES.has(stat)) {
             add(errors, `importantSubStats[${index}]`, "不是支持的属性。")
+        }
+    }
+}
+
+function validateImportantPanelStats(errors, importantPanelStats) {
+    if (importantPanelStats === undefined || importantPanelStats === null) {
+        return
+    }
+    if (!Array.isArray(importantPanelStats)) {
+        add(errors, "importantPanelStats", "重要面板属性必须是数组。")
+        return
+    }
+    for (const [index, stat] of importantPanelStats.entries()) {
+        if (typeof stat !== "string" || !stat.trim()) {
+            add(errors, `importantPanelStats[${index}]`, "必须是非空属性标识。")
+            continue
+        }
+        if (!IMPORTANT_PANEL_STAT_VALUES.has(stat)) {
+            add(errors, `importantPanelStats[${index}]`, "不是支持的面板属性。")
         }
     }
 }
@@ -2309,6 +2343,7 @@ function validateAgent(item, context) {
     validateAnomalyReleaseProfiles(errors, item?.anomalyReleaseProfiles)
     validatePreferredDriveDiscs(errors, item?.preferredDriveDiscs, context)
     validateImportantSubStats(errors, item?.importantSubStats)
+    validateImportantPanelStats(errors, item?.importantPanelStats)
     const agentContext = { ...context, currentAgent: item }
     const roleSkillGroupById = validateCalculationSkillGroups(errors, item?.skillGroups, "skillGroups", agentContext, item?.id)
     validateDefaultCalculationConfig(errors, item?.defaultCalculationConfig, agentContext, item?.id, roleSkillGroupById)

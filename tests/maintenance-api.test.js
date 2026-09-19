@@ -254,6 +254,27 @@ try {
         "an empty important substat list must be dropped instead of persisted",
     )
 
+    managedAgent.importantPanelStats = ["atk", " critRate ", "atk", "critDmg", "penFlat"]
+    const importantPanelStatsResult = await save("agents", managedAgent)
+    assert.deepEqual(
+        importantPanelStatsResult.savedItem.importantPanelStats,
+        ["atk", "critRate", "critDmg", "penFlat"],
+        "important panel stats must survive the maintenance save round trip, deduplicated and trimmed",
+    )
+    const reloadedImportantPanelStats = await catalog()
+    assert.deepEqual(
+        reloadedImportantPanelStats.agents.agents.find(item => item.id === managedAgent.id).importantPanelStats,
+        ["atk", "critRate", "critDmg", "penFlat"],
+    )
+
+    managedAgent.importantPanelStats = []
+    const clearedImportantPanelStats = await save("agents", managedAgent)
+    assert.equal(
+        Object.hasOwn(clearedImportantPanelStats.savedItem, "importantPanelStats"),
+        false,
+        "an empty important panel stat list must be dropped instead of persisted",
+    )
+
     const skillBuffAgent = structuredClone(
         managedAgentCatalog.agents.agents.find(item => item.id === "sigrid"),
     )

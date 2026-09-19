@@ -50,19 +50,42 @@ vi.mock("naive-ui", async () => {
         value: { type: [String, Number, Array] },
         options: { type: Array, default: () => [] },
         multiple: { type: Boolean, default: false },
+        clearable: { type: Boolean, default: false },
+        disabled: { type: Boolean, default: false },
       },
       emits: ["update:value"],
       setup(props, { emit }) {
         return () => h("select", {
           value: props.value,
           multiple: props.multiple,
+          disabled: props.disabled,
           onChange: (event: Event) => {
             const select = event.target as HTMLSelectElement
             const resolve = (raw: string) => (props.options ?? []).find((item: any) => String(item.value) === raw)?.value ?? raw
-            emit("update:value", props.multiple ? [...select.selectedOptions].map(option => resolve(option.value)) : resolve(select.value))
+            emit("update:value", props.multiple ? [...select.selectedOptions].map(option => resolve(option.value)) : select.value === "" && props.clearable ? null : resolve(select.value))
           },
-        }, (props.options ?? []).map((option: any) =>
-          h("option", { key: option.value, value: option.value }, option.label)))
+        }, [
+          ...(props.clearable && !props.multiple ? [h("option", { value: "" }, "")] : []),
+          ...(props.options ?? []).map((option: any) =>
+            h("option", { key: option.value, value: option.value, disabled: option.disabled }, option.label)),
+        ])
+      },
+    }),
+    NCascader: defineComponent({
+      props: ["value", "options", "clearable", "disabled"],
+      emits: ["update:value"],
+      setup(props, { emit }) {
+        return () => h("select", {
+          value: props.value,
+          disabled: props.disabled,
+          onChange: (event: Event) => emit("update:value", (event.target as HTMLSelectElement).value || null),
+        }, [
+          ...(props.clearable ? [h("option", { value: "" }, "")] : []),
+          ...(props.options ?? []).map((group: any) => h("optgroup", { label: group.label },
+            (group.children ?? []).map((option: any) => h("option", {
+              value: option.value, disabled: option.disabled,
+            }, option.label)))),
+        ])
       },
     }),
     NTabPane: defineComponent({
@@ -662,7 +685,8 @@ async function openTeammateWEngineTab(wrapper: ReturnType<typeof mountModal>) {
 }
 
 function buffRowByText(wrapper: ReturnType<typeof mountModal>, text: string) {
-  const row = wrapper.findAll(".buff-row").find(item => item.text().includes(text))
+  const row = wrapper.findAll(".buff-row").find(item => item.text().includes(text)
+    || item.find(".buff-row-toggle").attributes("aria-label")?.includes(text))
   expect(row).toBeTruthy()
   return row!
 }
@@ -738,6 +762,60 @@ function remielleRuntimeMeta() {
         },
       ],
     }],
+  }
+}
+
+function teammateSlotState(first: string, second: string | null = null, cinemaLevel = 0) {
+  return { teammateSlots: [
+    { teammateId: first, cinemaLevel },
+    second ? { teammateId: second, cinemaLevel: 0 } : null,
+  ] }
+}
+
+function teammateSlot(wrapper: ReturnType<typeof mountModal>, index: number) {
+  const control = wrapper.find(`[data-testid="teammate-slot-${index}"]`)
+  return control.element.tagName === "SELECT" ? control : control.find("select")
+}
+
+function teammateCinema(wrapper: ReturnType<typeof mountModal>, index: number) {
+  return wrapper.find(`[data-testid="teammate-cinema-${index}"]`)
+}
+
+function selectedRow(wrapper: ReturnType<typeof mountModal>, text: string) {
+  return (buffRowByText(wrapper, text).find("input[type='checkbox']").element as HTMLInputElement).checked
+}
+
+function cinemaTeammateMeta() {
+  const buff = (id: string, source: string, extra = {}) => ({
+    id,
+    source: { zhCN: source },
+    description: { zhCN: `测试 ${source}` },
+    effects: [{ id: `${id}.effect`, type: "fixed", stat: "atkFlat", value: 10, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+    ...extra,
+  })
+  return {
+    ...meta,
+    teammateCombatBuffGroups: [
+      {
+        id: "slot_a", name: { zhCN: "队友甲" }, attribute: "physical", specialty: "support",
+        buffs: [
+          buff("slot_a.core", "核心被动"),
+          buff("slot_a.additional", "额外能力"),
+          buff("nonstandard_alpha", "影画一：初阶增益"),
+          buff("nonstandard_beta", "影画二：进阶增益"),
+          buff("slot_a.cinema.6", "最终增益"),
+          buff("slot_a.potential", "潜能觉醒"),
+        ],
+      },
+      {
+        id: "slot_b", name: { zhCN: "队友乙" }, attribute: "fire", specialty: "stun",
+        buffs: [buff("slot_b.core", "核心被动")],
+      },
+      {
+        id: "slot_c", name: { zhCN: "队友丙" }, attribute: "ice", specialty: "attack",
+        buffs: [buff("slot_c.core", "核心被动")],
+      },
+    ],
   }
 }
 
@@ -1119,55 +1197,110 @@ describe("BuffPickerModal", () => {
     expect(tabs.text()).toContain("自定义 Buff")
   })
 
-  it("combines dynamic teammate attribute, specialty, search, and bulk filters", async () => {
+  it("starts with empty slots and groups teammate candidates by specialty without extra filters", async () => {
     const wrapper = mountModal()
-
     await openTeammateTab(wrapper)
-    expect(wrapper.text()).toContain("物理支援队友")
-    expect(wrapper.text()).toContain("旧版未标注队友")
-
-    const attributeSelect = selectByLabel(wrapper, "属性")
-    const specialtySelect = selectByLabel(wrapper, "特性")
-    expect(attributeSelect.findAll("option").map(option => option.text())).toEqual(["物理属性", "火属性"])
-    expect(specialtySelect.findAll("option").map(option => option.text())).toEqual(["强攻", "击破", "支援"])
-
-    await attributeSelect.setValue(["physical"])
-    await nextTick()
-    expect(wrapper.text()).toContain("物理支援队友")
-    expect(wrapper.text()).toContain("物理击破队友")
-    expect(wrapper.text()).not.toContain("火系支援队友")
-    expect(wrapper.text()).not.toContain("旧版未标注队友")
-
-    await specialtySelect.setValue(["support"])
-    await nextTick()
-    expect(wrapper.text()).toContain("物理支援队友")
-    expect(wrapper.text()).not.toContain("物理击破队友")
-
-    await attributeSelect.setValue(["physical", "fire"])
-    await nextTick()
-    expect(wrapper.text()).toContain("物理支援队友")
-    expect(wrapper.text()).toContain("火系支援队友")
-    expect(wrapper.text()).not.toContain("火系强攻队友")
+    expect(wrapper.findAll(".teammate-buff-column")).toHaveLength(2)
+    expect(wrapper.findAll(".buff-row")).toHaveLength(0)
+    expect(teammateCinema(wrapper, 0).attributes("disabled")).toBeDefined()
+    expect(wrapper.find("[data-testid='teammate-attribute-filter']").exists()).toBe(false)
+    expect(wrapper.find("[data-testid='teammate-specialty-filter']").exists()).toBe(false)
+    const groups = teammateSlot(wrapper, 0).findAll("optgroup")
+    expect(groups.map(group => group.attributes("label"))).toEqual(expect.arrayContaining(["强攻", "击破", "支援"]))
+    expect(groups.find(group => group.attributes("label") === "支援")!.findAll("option").map(option => option.attributes("value")))
+      .toEqual(["physical_support", "fire_support"])
+    expect(teammateSlot(wrapper, 0).find("option[value='legacy_unknown']").exists()).toBe(true)
+    await teammateSlot(wrapper, 0).setValue("fire_support")
+    expect(selectedRow(wrapper, "火系团队增益")).toBe(true)
+    const duplicateOption = teammateSlot(wrapper, 1).find("option[value='fire_support']")
+    expect(!duplicateOption.exists() || duplicateOption.attributes("disabled") !== undefined).toBe(true)
+    await teammateSlot(wrapper, 1).setValue("physical_support")
 
     await wrapper.find("input[placeholder='搜索来源、名称、效果']").setValue("火系")
-    await nextTick()
-    expect(wrapper.text()).not.toContain("物理支援队友")
-    expect(wrapper.text()).toContain("火系支援队友")
-
+    expect(wrapper.findAll(".buff-row")).toHaveLength(1)
+    await buttonByText(wrapper, "移除当前列表").trigger("click")
+    expect(selectedRow(wrapper, "火系团队增益")).toBe(false)
     await buttonByText(wrapper, "添加当前列表").trigger("click")
     await buttonByText(wrapper, "应用选择").trigger("click")
     const payload = wrapper.emitted("apply")?.[0]?.[0] as any
-    expect(payload.selectedBuffIds).toEqual(["teammate.fire_support"])
+    expect(new Set(payload.selectedBuffIds)).toEqual(new Set(["teammate.fire_support", "teammate.physical_support"]))
+    expect(payload.buffPickerState).toEqual(teammateSlotState("fire_support", "physical_support"))
+  })
 
-    await wrapper.setProps({ show: false })
+  it("keeps teammate cards compact and expands their description without changing selection", async () => {
+    const customMeta = cinemaTeammateMeta()
+    const longDescription = "这是完整的队友技能说明，需要保留触发条件、持续时间以及各项增益的完整描述。".repeat(5)
+    customMeta.teammateCombatBuffGroups[0].buffs[0].description = { zhCN: longDescription }
+    const wrapper = mountModal({ meta: customMeta, buffPickerState: teammateSlotState("slot_a") })
+    await openModal(wrapper)
+    expect(wrapper.find(".buff-row .avatar").exists()).toBe(true)
     await openTeammateTab(wrapper)
-    expect(wrapper.text()).toContain("物理支援队友")
-    expect(wrapper.text()).toContain("火系强攻队友")
-    expect(wrapper.text()).toContain("旧版未标注队友")
+    const row = buffRowByText(wrapper, "队友甲 | 核心被动")
+    expect(row.find(".avatar").exists()).toBe(false)
+    expect(row.find(".chip-row").exists()).toBe(false)
+    expect(row.find(".buff-row-toggle").text()).toBe("核心被动")
+    expect(row.find(".teammate-buff-description").text()).toContain(longDescription)
+    const disclosure = row.find("button[aria-expanded]")
+    expect(disclosure.attributes("aria-expanded")).toBe("false")
+    expect(disclosure.text()).toBe("展开")
+    await disclosure.trigger("click")
+    expect(disclosure.attributes("aria-expanded")).toBe("true")
+    expect(disclosure.text()).toBe("收起")
+    expect(selectedRow(wrapper, "队友甲 | 核心被动")).toBe(false)
+    await disclosure.trigger("click")
+    expect(disclosure.attributes("aria-expanded")).toBe("false")
+    await buttonByText(wrapper, "应用选择").trigger("click")
+    expect((wrapper.emitted("apply")?.[0]?.[0] as any).selectedBuffIds).toEqual([])
+  })
+
+  it("edits teammate stack counts with number inputs and preserves independent coverage and modifiers", async () => {
+    const coverage = { default: 1, min: 0, max: 1, step: 0.1 }
+    const customMeta = {
+      ...meta,
+      teammateCombatBuffGroups: [{
+        id: "stack_owner", name: { zhCN: "层数队友" }, specialty: "support",
+        buffs: [{
+          id: "stack_owner.core", source: { zhCN: "核心被动" },
+          description: { zhCN: "两条效果独立设置覆盖率并共用层数。" },
+          effects: [
+            { id: "stack_atk", type: "stacked", stat: "atkFlat", valuePerStack: 20, maxStacks: 3, defaultStacks: 2, stackGroup: "shared", stackLabel: { zhCN: "增益层数" }, coverage },
+            { id: "stack_crit", type: "stacked", stat: "critDmg", valuePerStack: 10, maxStacks: 3, defaultStacks: 2, stackGroup: "shared", stackLabel: { zhCN: "增益层数" }, coverage },
+          ],
+        }, {
+          id: "stack_owner.cinema_1", source: { zhCN: "影画一" }, effects: [],
+          buffModifiers: [{ id: "amplify", operation: "multiplyResolvedValue", factor: 1.5, targetBuffIds: ["stack_owner.core"], targetEffectIds: ["stack_atk"], label: { zhCN: "提升核心增益" } }],
+        }],
+      }],
+    }
+    const wrapper = mountModal({ meta: customMeta, selectedIds: ["stack_owner.core", "stack_owner.cinema_1"] })
+    await openTeammateTab(wrapper)
+    const row = buffRowByText(wrapper, "层数队友 | 核心被动")
+    expect(row.find("input[type='range']").exists()).toBe(false)
+    expect(row.findAll(".stack-input")).toHaveLength(1)
+    const stacks = row.find(".stack-input")
+    expect(stacks.attributes("aria-label")).toBe("增益层数")
+    expect(stacks.attributes("max")).toBe("3")
+    expect((stacks.element as HTMLInputElement).value).toBe("2")
+    await stacks.setValue(1)
+    expect(row.text()).toContain("攻击力 +20")
+    expect(row.text()).toContain("暴击伤害% +10%")
+    const coverages = row.findAll(".rule-coverage-control input")
+    expect(coverages).toHaveLength(2)
+    await coverages[0].setValue(0.4)
+    await coverages[1].setValue(0.7)
+    const cinema = buffRowByText(wrapper, "层数队友 | 影画一")
+    expect(cinema.find(".buff-modifier-line").text()).toContain("提升核心增益")
+    await buttonByText(wrapper, "应用选择").trigger("click")
+    const payload = wrapper.emitted("apply")?.[0]?.[0] as any
+    expect(payload.runtimeInputs["stack_owner.core"].effects).toMatchObject({
+      stack_atk: { stacks: 1, coverage: 0.4 },
+      stack_crit: { stacks: 1, coverage: 0.7 },
+    })
+    expect(payload.selectedBuffIds).toEqual(["stack_owner.core", "stack_owner.cinema_1"])
   })
 
   it("persists independent teammate Buff parameters and selectable Special Skill level", async () => {
-    const wrapper = mountModal({ meta: remielleRuntimeMeta() })
+    const wrapper = mountModal({ meta: remielleRuntimeMeta(), buffPickerState: teammateSlotState("remielle_dan") })
     await openTeammateTab(wrapper)
 
     expect(wrapper.findAll(".teammate-runtime-header")).toHaveLength(0)
@@ -1182,7 +1315,7 @@ describe("BuffPickerModal", () => {
     expect(additionalRow.text()).toContain("攻击力 +1600")
     expect(additionalRow.text()).not.toContain("攻击力 +240")
     expect(additionalRow.text()).not.toContain("攻击力 +480")
-    expect(additionalRow.findAll(".chip-row > span")).toHaveLength(1)
+    expect(additionalRow.find(".chip-row").exists()).toBe(false)
     expect(coreRow.findAll(".buff-effect-row")).toHaveLength(2)
 
     await coreRow.find(".buff-runtime-parameter").findAll("button")
@@ -1231,13 +1364,14 @@ describe("BuffPickerModal", () => {
   })
 
   it("renders Rina potential awakening as one Buff with PEN and potential-level controls", async () => {
-    const wrapper = mountModal({ meta: rinaPotentialMeta() })
+    const wrapper = mountModal({ meta: rinaPotentialMeta(), buffPickerState: teammateSlotState("rina") })
     await openTeammateTab(wrapper)
 
     const rows = wrapper.findAll(".buff-row")
     expect(rows).toHaveLength(1)
     const row = rows[0]
-    expect(row.text()).toContain("丽娜 | 潜能觉醒")
+    expect(row.find(".buff-row-toggle").attributes("aria-label")).toContain("丽娜 | 潜能觉醒")
+    expect(row.find(".buff-row-toggle").text()).toBe("潜能觉醒")
     expect(row.findAll(".buff-runtime-parameter")).toHaveLength(1)
     expect(row.find(".buff-runtime-parameter").text()).toContain("潜能觉醒等级")
     expect(row.findAll(".buff-runtime-parameter button").map(button => button.text())).toEqual(["P2", "P3", "P4", "P5", "P6"])
@@ -1262,7 +1396,7 @@ describe("BuffPickerModal", () => {
   })
 
   it("shows Koleda potential awakening as one card with one level selector", async () => {
-    const wrapper = mountModal({ meta: koledaPotentialMeta() })
+    const wrapper = mountModal({ meta: koledaPotentialMeta(), buffPickerState: teammateSlotState("koleda") })
     await openTeammateTab(wrapper)
 
     const row = buffRowByText(wrapper, "锋御与非锋御角色增益")
@@ -1324,7 +1458,7 @@ describe("BuffPickerModal", () => {
         }],
       }],
     }
-    const wrapper = mountModal({ meta: juhufuMeta })
+    const wrapper = mountModal({ meta: juhufuMeta, buffPickerState: teammateSlotState("juhufu") })
     await openTeammateTab(wrapper)
 
     const row = buffRowByText(wrapper, "橘福福初始攻击力")
@@ -1355,7 +1489,7 @@ describe("BuffPickerModal", () => {
   })
 
   it("discards un-applied per-Buff counts and Special Skill runtime changes", async () => {
-    const wrapper = mountModal({ meta: remielleRuntimeMeta() })
+    const wrapper = mountModal({ meta: remielleRuntimeMeta(), buffPickerState: teammateSlotState("remielle_dan") })
     await openTeammateTab(wrapper)
     await buffRowByText(wrapper, "异化系数").find(".buff-runtime-parameter").findAll("button")
       .find(button => button.text() === "1")!.trigger("click")
@@ -1392,7 +1526,7 @@ describe("BuffPickerModal", () => {
     expect(payload.runtimeInputs["teammate:remielle_dan"]).toBeUndefined()
   })
 
-  it("keeps the maintenance-authored teammate and Buff order after filtering", async () => {
+  it("keeps the maintenance-authored Buff order in each column after text search", async () => {
     const orderedMeta = {
       ...meta,
       teammateCombatBuffGroups: [
@@ -1415,8 +1549,8 @@ describe("BuffPickerModal", () => {
         },
       ],
     }
-    const wrapper = mountModal({ meta: orderedMeta })
-    const labels = () => wrapper.findAll(".buff-row .buff-copy strong").map(item => item.text())
+    const wrapper = mountModal({ meta: orderedMeta, buffPickerState: teammateSlotState("ordered_a", "ordered_b") })
+    const labels = () => wrapper.findAll(".buff-row .buff-row-toggle").map(item => item.attributes("aria-label"))
 
     await openTeammateTab(wrapper)
     expect(labels()).toEqual([
@@ -1425,141 +1559,141 @@ describe("BuffPickerModal", () => {
       "顺序角色乙 | 影画一",
     ])
 
-    await selectByLabel(wrapper, "属性").setValue(["physical"])
-    await nextTick()
-    expect(labels()).toEqual([
-      "顺序角色甲 | 额外能力",
-      "顺序角色甲 | 核心被动",
-    ])
-
     await wrapper.find("input[placeholder='搜索来源、名称、效果']").setValue("顺序测试")
     await nextTick()
     expect(labels()).toEqual([
       "顺序角色甲 | 额外能力",
       "顺序角色甲 | 核心被动",
+      "顺序角色乙 | 影画一",
     ])
   })
 
-  it("prioritizes every Buff from all selected teammates while preserving authored order and filters", async () => {
-    const priorityMeta = {
-      ...meta,
-      teammateCombatBuffGroups: [
-        {
-          id: "priority_a",
-          name: { zhCN: "置顶角色甲" },
-          attribute: "physical",
-          specialty: "support",
-          buffs: [
-            { id: "priority_a.core", source: { zhCN: "核心被动" }, description: { zhCN: "共同排序描述" }, effects: [] },
-            { id: "priority_a.additional", source: { zhCN: "额外能力" }, description: { zhCN: "共同排序描述" }, effects: [] },
-          ],
-        },
-        {
-          id: "priority_b",
-          name: { zhCN: "置顶角色乙" },
-          attribute: "fire",
-          specialty: "attack",
-          buffs: [
-            { id: "priority_b.core", source: { zhCN: "核心被动" }, description: { zhCN: "共同排序描述" }, effects: [] },
-            { id: "priority_b.cinema", source: { zhCN: "影画一" }, description: { zhCN: "共同排序描述" }, effects: [] },
-          ],
-        },
-        {
-          id: "priority_c",
-          name: { zhCN: "置顶角色丙" },
-          attribute: "ice",
-          specialty: "anomaly",
-          buffs: [
-            { id: "priority_c.additional", source: { zhCN: "额外能力" }, description: { zhCN: "共同排序描述" }, effects: [] },
-            { id: "priority_c.cinema", source: { zhCN: "影画二" }, description: { zhCN: "共同排序描述" }, effects: [] },
-          ],
-        },
-      ],
+  it("infers legacy slots in catalog order without automatically selecting other Buffs", async () => {
+    const wrapper = mountModal({
+      meta: cinemaTeammateMeta(),
+      selectedIds: ["slot_b.core", "nonstandard_beta"],
+    })
+    await openTeammateTab(wrapper)
+    expect((teammateSlot(wrapper, 0).element as HTMLSelectElement).value).toBe("slot_a")
+    expect((teammateSlot(wrapper, 1).element as HTMLSelectElement).value).toBe("slot_b")
+    expect((teammateCinema(wrapper, 0).element as HTMLSelectElement).value).toBe("2")
+    expect(selectedRow(wrapper, "队友甲 | 核心被动")).toBe(false)
+    expect(selectedRow(wrapper, "影画一：初阶增益")).toBe(false)
+    expect(selectedRow(wrapper, "影画二：进阶增益")).toBe(true)
+    expect(wrapper.findAll(".buff-row")).toHaveLength(7)
+    await buttonByText(wrapper, "应用选择").trigger("click")
+    const payload = wrapper.emitted("apply")?.[0]?.[0] as any
+    expect(payload.selectedBuffIds).toEqual(["slot_b.core", "nonstandard_beta"])
+    expect(payload.buffPickerState).toEqual(teammateSlotState("slot_a", "slot_b", 2))
+  })
+
+  it("auto-selects ordinary Buffs and cumulatively changes cinema without changing potential or ordinary choices", async () => {
+    const wrapper = mountModal({ meta: cinemaTeammateMeta() })
+    await openTeammateTab(wrapper)
+    await teammateSlot(wrapper, 0).setValue("slot_a")
+    expect((teammateCinema(wrapper, 0).element as HTMLSelectElement).value).toBe("0")
+    expect(selectedRow(wrapper, "队友甲 | 核心被动")).toBe(true)
+    expect(selectedRow(wrapper, "队友甲 | 额外能力")).toBe(true)
+    expect(selectedRow(wrapper, "影画一：初阶增益")).toBe(false)
+    expect(selectedRow(wrapper, "影画二：进阶增益")).toBe(false)
+    expect(selectedRow(wrapper, "最终增益")).toBe(false)
+    expect(selectedRow(wrapper, "潜能觉醒")).toBe(false)
+    expect(wrapper.findAll(".buff-row")).toHaveLength(6)
+
+    await buffRowByText(wrapper, "队友甲 | 额外能力").find(".buff-row-toggle").trigger("click")
+    await buffRowByText(wrapper, "潜能觉醒").find(".buff-row-toggle").trigger("click")
+    await teammateCinema(wrapper, 0).setValue("2")
+    expect(selectedRow(wrapper, "影画一：初阶增益")).toBe(true)
+    expect(selectedRow(wrapper, "影画二：进阶增益")).toBe(true)
+    expect(selectedRow(wrapper, "最终增益")).toBe(false)
+    expect(selectedRow(wrapper, "队友甲 | 额外能力")).toBe(false)
+    expect(selectedRow(wrapper, "潜能觉醒")).toBe(true)
+    await teammateCinema(wrapper, 0).setValue("1")
+    expect(selectedRow(wrapper, "影画一：初阶增益")).toBe(true)
+    expect(selectedRow(wrapper, "影画二：进阶增益")).toBe(false)
+    expect(selectedRow(wrapper, "潜能觉醒")).toBe(true)
+
+    // The shortcut never makes high-cinema Buffs inaccessible to manual selection.
+    await buffRowByText(wrapper, "最终增益").find(".buff-row-toggle").trigger("click")
+    await buttonByText(wrapper, "应用选择").trigger("click")
+    const payload = wrapper.emitted("apply")?.[0]?.[0] as any
+    expect(new Set(payload.selectedBuffIds)).toEqual(new Set(["slot_a.core", "nonstandard_alpha", "slot_a.potential", "slot_a.cinema.6"]))
+    expect(payload.buffPickerState).toEqual(teammateSlotState("slot_a", null, 1))
+  })
+
+  it("restores explicit slot order and manual overrides without replaying auto-selection on reopen or search", async () => {
+    const state = { teammateSlots: [{ teammateId: "slot_b", cinemaLevel: 0 }, { teammateId: "slot_a", cinemaLevel: 2 }] }
+    const wrapper = mountModal({ meta: cinemaTeammateMeta(), selectedIds: ["nonstandard_beta"], buffPickerState: state })
+    await openTeammateTab(wrapper)
+    expect((teammateSlot(wrapper, 0).element as HTMLSelectElement).value).toBe("slot_b")
+    expect((teammateSlot(wrapper, 1).element as HTMLSelectElement).value).toBe("slot_a")
+    expect(selectedRow(wrapper, "影画一：初阶增益")).toBe(false)
+    expect(selectedRow(wrapper, "影画二：进阶增益")).toBe(true)
+    expect(selectedRow(wrapper, "队友甲 | 核心被动")).toBe(false)
+    await wrapper.find("input[placeholder='搜索来源、名称、效果']").setValue("影画")
+    await wrapper.findAll(".n-tabs-tab").find(tab => tab.text() === "自身 Buff")!.trigger("click")
+    await wrapper.findAll(".n-tabs-tab").find(tab => tab.text() === "队友 Buff")!.trigger("click")
+    await buttonByText(wrapper, "应用选择").trigger("click")
+    const payload = wrapper.emitted("apply")?.[0]?.[0] as any
+    expect(payload.selectedBuffIds).toEqual(["nonstandard_beta"])
+    expect(payload.buffPickerState).toEqual(state)
+    await wrapper.setProps({ show: false, selectedIds: payload.selectedBuffIds, buffPickerState: payload.buffPickerState })
+    await openTeammateTab(wrapper)
+    expect(selectedRow(wrapper, "影画一：初阶增益")).toBe(false)
+    expect(selectedRow(wrapper, "队友乙 | 核心被动")).toBe(false)
+    expect((teammateCinema(wrapper, 1).element as HTMLSelectElement).value).toBe("2")
+  })
+
+  it("prevents duplicate teammates and removes only replaced owners and their runtime", async () => {
+    const runtimeInputs = {
+      "slot_a.core": { coverage: 0.6 },
+      "slot_a.potential": { parameters: { potentialLevel: "P2" } },
+      "teammate:slot_a": { parameters: { count: 2 } },
+      "slot_b.core": { effects: { "slot_b.core.effect": { coverage: 0.8 } } },
     }
     const wrapper = mountModal({
-      meta: priorityMeta,
-      selectedIds: ["priority_b.cinema", "priority_c.additional"],
+      meta: cinemaTeammateMeta(),
+      selectedIds: ["slot_a.core", "slot_a.potential", "slot_b.core", "field.keep"],
+      runtimeInputs,
+      buffPickerState: teammateSlotState("slot_a", "slot_b", 2),
     })
-    const labels = () => wrapper.findAll(".buff-row .buff-copy strong").map(item => item.text())
-
     await openTeammateTab(wrapper)
-    expect(labels()).toEqual([
-      "置顶角色乙 | 核心被动",
-      "置顶角色乙 | 影画一",
-      "置顶角色丙 | 额外能力",
-      "置顶角色丙 | 影画二",
-      "置顶角色甲 | 核心被动",
-      "置顶角色甲 | 额外能力",
-    ])
-
-    await selectByLabel(wrapper, "属性").setValue(["physical", "fire"])
-    await wrapper.find("input[placeholder='搜索来源、名称、效果']").setValue("共同排序描述")
-    await nextTick()
-    expect(labels()).toEqual([
-      "置顶角色乙 | 核心被动",
-      "置顶角色乙 | 影画一",
-      "置顶角色甲 | 核心被动",
-      "置顶角色甲 | 额外能力",
-    ])
+    const duplicateOption = teammateSlot(wrapper, 0).find("option[value='slot_b']")
+    expect(!duplicateOption.exists() || duplicateOption.attributes("disabled") !== undefined).toBe(true)
+    await teammateSlot(wrapper, 0).setValue("slot_c")
+    expect((teammateCinema(wrapper, 0).element as HTMLSelectElement).value).toBe("0")
+    expect(selectedRow(wrapper, "队友丙 | 核心被动")).toBe(true)
+    await buttonByText(wrapper, "应用选择").trigger("click")
+    const payload = wrapper.emitted("apply")?.[0]?.[0] as any
+    expect(new Set(payload.selectedBuffIds)).toEqual(new Set(["slot_b.core", "slot_c.core", "field.keep"]))
+    expect(payload.runtimeInputs["slot_a.core"]).toBeUndefined()
+    expect(payload.runtimeInputs["slot_a.potential"]).toBeUndefined()
+    expect(payload.runtimeInputs["teammate:slot_a"]).toBeUndefined()
+    expect(payload.runtimeInputs["slot_b.core"]).toMatchObject(runtimeInputs["slot_b.core"])
+    expect(runtimeInputs["slot_a.core"]).toEqual({ coverage: 0.6 })
   })
 
-  it("updates teammate priority only after the modal is reopened with the applied selection", async () => {
-    const priorityMeta = {
-      ...meta,
-      teammateCombatBuffGroups: [
-        {
-          id: "snapshot_a",
-          name: { zhCN: "快照角色甲" },
-          attribute: "physical",
-          specialty: "support",
-          buffs: [
-            { id: "snapshot_a.core", source: { zhCN: "核心被动" }, effects: [] },
-            { id: "snapshot_a.additional", source: { zhCN: "额外能力" }, effects: [] },
-          ],
-        },
-        {
-          id: "snapshot_b",
-          name: { zhCN: "快照角色乙" },
-          attribute: "fire",
-          specialty: "attack",
-          buffs: [
-            { id: "snapshot_b.core", source: { zhCN: "核心被动" }, effects: [] },
-            { id: "snapshot_b.cinema", source: { zhCN: "影画一" }, effects: [] },
-          ],
-        },
-      ],
-    }
-    const wrapper = mountModal({ meta: priorityMeta })
-    const labels = () => wrapper.findAll(".buff-row .buff-copy strong").map(item => item.text())
-    const originalOrder = [
-      "快照角色甲 | 核心被动",
-      "快照角色甲 | 额外能力",
-      "快照角色乙 | 核心被动",
-      "快照角色乙 | 影画一",
-    ]
-    const prioritizedOrder = [
-      "快照角色乙 | 核心被动",
-      "快照角色乙 | 影画一",
-      "快照角色甲 | 核心被动",
-      "快照角色甲 | 额外能力",
-    ]
-
+  it("clears a teammate only in the draft and restores its state when cancelled", async () => {
+    const wrapper = mountModal({
+      meta: cinemaTeammateMeta(), selectedIds: ["slot_a.core", "nonstandard_beta"],
+      runtimeInputs: { "slot_a.core": { coverage: 0.7 } },
+      buffPickerState: teammateSlotState("slot_a", null, 2),
+    })
     await openTeammateTab(wrapper)
-    expect(labels()).toEqual(originalOrder)
-    await buffRowByText(wrapper, "快照角色乙 | 影画一").find(".buff-row-toggle").trigger("click")
-    await nextTick()
-    expect(labels()).toEqual(originalOrder)
-
-    await wrapper.setProps({ show: false, selectedIds: ["snapshot_b.cinema"] })
+    await teammateSlot(wrapper, 0).setValue("")
+    expect(wrapper.findAll(".buff-row")).toHaveLength(0)
+    await buttonByText(wrapper, "取消").trigger("click")
+    expect(wrapper.emitted("apply")).toBeUndefined()
+    await wrapper.setProps({ show: false })
     await openTeammateTab(wrapper)
-    expect(labels()).toEqual(prioritizedOrder)
-    await buffRowByText(wrapper, "快照角色乙 | 影画一").find(".buff-row-toggle").trigger("click")
-    await nextTick()
-    expect(labels()).toEqual(prioritizedOrder)
-
-    await wrapper.setProps({ show: false, selectedIds: [] })
-    await openTeammateTab(wrapper)
-    expect(labels()).toEqual(originalOrder)
+    expect(selectedRow(wrapper, "影画二：进阶增益")).toBe(true)
+    expect((teammateCinema(wrapper, 0).element as HTMLSelectElement).value).toBe("2")
+    await teammateSlot(wrapper, 0).setValue("")
+    await buttonByText(wrapper, "应用选择").trigger("click")
+    const payload = wrapper.emitted("apply")?.[0]?.[0] as any
+    expect(payload.selectedBuffIds).toEqual([])
+    expect(payload.runtimeInputs["slot_a.core"]).toBeUndefined()
+    expect(payload.buffPickerState).toEqual({ teammateSlots: [null, null] })
   })
 
   it("filters Boss Buffs by every appearance, phase, and Boss name", async () => {

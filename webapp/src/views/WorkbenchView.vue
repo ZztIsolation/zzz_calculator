@@ -61,6 +61,8 @@ const reservationUiEnabled = computed(() => appConfigStore.driveDiscReservations
 const exclusionUiEnabled = computed(() => reservationUiEnabled.value && appConfigStore.driveDiscExclusionsUiEnabled)
 
 const showBuffPicker = ref(false)
+const openingBuffPicker = ref(false)
+const buffPickerResetNotice = ref("")
 const showCalculationConfig = ref(false)
 const showAllDamageEvents = ref(false)
 const showOptimizerConfig = ref(false)
@@ -778,6 +780,26 @@ function updateManualDiscSetFilter(value: Array<string | number> | null) {
   manualDiscSetFilterIds.value = Array.isArray(value) ? value.map(String) : []
 }
 
+async function openBuffPicker() {
+  if (openingBuffPicker.value) return
+  const ownerId = accountStore.currentOwnerId
+  const agentId = buildStore.agentId
+  openingBuffPicker.value = true
+  buffPickerResetNotice.value = ""
+  try {
+    const reset = await buildStore.prepareBuffPicker(catalogStore.meta)
+    if (ownerId !== accountStore.currentOwnerId || agentId !== buildStore.agentId) return
+    buffPickerResetNotice.value = reset
+      ? "旧配置包含超过两名队友，已保留自身及自身音擎 Buff，其余已重置"
+      : ""
+    showBuffPicker.value = true
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : "Buff 配置保存失败，请重试。")
+  } finally {
+    openingBuffPicker.value = false
+  }
+}
+
 function applyBuffs(payload: any) {
   buildStore.applyBuffState(payload, catalogStore.meta)
 }
@@ -1378,7 +1400,7 @@ function formatPercentValue(value: any) {
       <section class="workbench-section workbench-buff-section">
         <div class="panel-header workbench-section-header">
           <h2 class="panel-title">局内 Buff</h2>
-          <NButton class="prominent-config-button workbench-action-button workbench-action-button--buff" type="primary" size="small" data-testid="open-buff-picker" @click="showBuffPicker = true">
+          <NButton class="prominent-config-button workbench-action-button workbench-action-button--buff" type="primary" size="small" data-testid="open-buff-picker" :loading="openingBuffPicker" :disabled="openingBuffPicker" @click="openBuffPicker">
             <template #icon><SlidersHorizontal :size="16" /></template>
             选择 Buff
           </NButton>
@@ -1723,6 +1745,7 @@ function formatPercentValue(value: any) {
                 :panel="buildStore.outOfCombat?.panel"
                 :meta="catalogStore.meta"
                 :include-sheer-force="selectedAgent?.specialty === 'rupture'"
+                :important-stats="selectedAgent?.importantPanelStats"
               />
             </div>
             <div>
@@ -1731,6 +1754,7 @@ function formatPercentValue(value: any) {
                 :panel="buildStore.result?.inCombat?.panel"
                 :meta="catalogStore.meta"
                 :include-sheer-force="selectedAgent?.specialty === 'rupture'"
+                :important-stats="selectedAgent?.importantPanelStats"
               />
             </div>
           </div>
@@ -2010,6 +2034,8 @@ function formatPercentValue(value: any) {
     :default-ids="buildStore.defaultBuffIds(catalogStore.meta)"
     :added-buffs="buildStore.addedBuffs"
     :runtime-inputs="buildStore.runtimeInputs"
+    :buff-picker-state="buildStore.buffPickerState"
+    :reset-notice="buffPickerResetNotice"
     :meta="catalogStore.meta"
     :drive-disc-sets="catalogStore.displayDriveDiscSets"
     :agent-id="buildStore.agentId"

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useId } from "vue"
 import DriveDiscSourceTags from "@/components/DriveDiscSourceTags.vue"
+import { driveDiscAdditionalRollText } from "@/utils/driveDiscSubstats"
 import { formatStoredStatValue, storedStatLabel } from "@/utils/format"
 
 type DriveDiscConflictResolution =
@@ -20,10 +21,12 @@ const props = withDefaults(defineProps<{
   conflicts?: DriveDiscConflict[]
   resolutions?: Record<string, DriveDiscConflictResolution>
   disabled?: boolean
+  meta?: any
 }>(), {
   conflicts: () => [],
   resolutions: () => ({}),
   disabled: false,
+  meta: null,
 })
 
 const emit = defineEmits<{
@@ -92,7 +95,12 @@ function statText(stat: any) {
 }
 
 function subStatsText(disc: any) {
-  return (disc?.subStats ?? []).map((stat: any) => statText(stat)).join(" / ") || "无副词条"
+  return (disc?.subStats ?? []).map((stat: any) => {
+    const label = storedStatLabel(String(stat?.stat ?? ""), String(stat?.mode ?? ""), props.meta)
+    const value = formatStoredStatValue(String(stat?.stat ?? ""), stat?.value, String(stat?.mode ?? ""))
+    const additionalRollText = driveDiscAdditionalRollText(stat?.stat, stat?.value, props.meta, disc?.rarity)
+    return `${label}${additionalRollText ? ` ${additionalRollText}` : ""} ${value}`
+  }).join(" / ") || "无副词条"
 }
 
 function discAriaName(disc: any) {

@@ -201,6 +201,7 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("workbench-section")
     expect(source).toContain("DamageWhiteBox")
     expect(source).toContain("PanelStatTable")
+    expect(source.match(/:important-stats="selectedAgent\?\.importantPanelStats"/g)).toHaveLength(2)
     expect(source).toContain("damage-panel-grid")
     expect(source).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));")
   })

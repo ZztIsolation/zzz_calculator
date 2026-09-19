@@ -275,8 +275,15 @@ function save() {
 </script>
 
 <template>
-  <NModal :show="show" preset="card" title="优化约束" style="width: min(920px, calc(100vw - 16px)); max-width: 920px" @update:show="emit('update:show', $event)">
-    <section class="optimizer-config-panel ui-layout-scope" data-layout-surface="optimizer-config">
+  <NModal
+    :show="show"
+    preset="card"
+    title="优化约束"
+    class="calculation-modal"
+    style="width: min(920px, calc(100vw - 16px)); max-width: 920px"
+    @update:show="emit('update:show', $event)"
+  >
+    <section class="calculation-modal-body optimizer-config-panel ui-layout-scope" data-layout-surface="optimizer-config">
       <div class="optimizer-config-header">
         <div>
           <h3 class="panel-title">计算配置</h3>
@@ -428,7 +435,7 @@ function save() {
     </section>
 
     <template #footer>
-      <div class="modal-actions">
+      <div class="modal-actions calculation-modal-footer">
         <NButton @click="close">取消</NButton>
         <NButton type="primary" @click="save">保存配置</NButton>
       </div>

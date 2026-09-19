@@ -20,6 +20,11 @@ const catalog = await loadCalculatorContext(rootDir)
 const exampleInput = catalog.examples.yeShunguang.input
 const meta = buildMeta(catalog)
 assert.ok(meta.agentSkills.some(item => item.id === "ye_shunguang"), "Meta should expose agent skill catalogs")
+assert.deepEqual(
+    meta.agents.find(item => item.id === "ye_shunguang")?.importantPanelStats,
+    ["atk", "critRate", "critDmg", "penFlat"],
+    "Meta should expose the maintained important panel stats",
+)
 const miyabiSkillCatalog = meta.agentSkills.find(item => item.id === "hoshimi_miyabi")
 assert.ok(miyabiSkillCatalog, "Meta should expose Miyabi skill catalog")
 assert.ok(

@@ -1460,6 +1460,14 @@ function cleanAgent(item = {}, options = {}) {
     } else {
         delete next.importantSubStats
     }
+    const importantPanelStats = [...new Set((Array.isArray(item.importantPanelStats) ? item.importantPanelStats : [])
+        .map(stat => String(stat ?? "").trim())
+        .filter(Boolean))]
+    if (importantPanelStats.length) {
+        next.importantPanelStats = importantPanelStats
+    } else {
+        delete next.importantPanelStats
+    }
     return next
 }
 

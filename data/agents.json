@@ -423,7 +423,8 @@
             ],
             "buffModifiers": []
           }
-        ]
+        ],
+        "skillBuffs": []
       },
       "coreSkill": {
         "name": {
@@ -901,6 +902,18 @@
             }
           ]
         }
+      ],
+      "importantSubStats": [
+        "atkPct",
+        "critRate",
+        "critDmg",
+        "penFlat"
+      ],
+      "importantPanelStats": [
+        "atk",
+        "critRate",
+        "critDmg",
+        "penFlat"
       ]
     },
     {
@@ -1701,6 +1714,12 @@
             }
           ]
         }
+      ],
+      "importantSubStats": [
+        "atkPct",
+        "critRate",
+        "critDmg",
+        "anomalyProficiency"
       ]
     },
     {
@@ -2022,7 +2041,8 @@
             ],
             "buffModifiers": []
           }
-        ]
+        ],
+        "skillBuffs": []
       },
       "coreSkill": {
         "name": {
@@ -2471,7 +2491,12 @@
         "attribute": "Biligame stores 属性=以太 and 属性名称=玄墨; shown as xuanmo and settled as ether for damage bonus and resistance buckets",
         "combatBuffs": "source-checked-mihoyo-baike-2026-07-09; additional ability stunned-target extra-special damage is modeled as skill-targeted damage bonus, and falling thunder is available as an optional sheer skill event",
         "cinemaBuffs": "source-checked-mihoyo-baike-2026-07-09; M2 resistance ignore is skill-targeted to EX special and ultimate events, M4 uses the 2-stack maximum, and M1/M2/M6 resource or extra-action effects remain descriptive"
-      }
+      },
+      "importantSubStats": [
+        "hpPct",
+        "critRate",
+        "critDmg"
+      ]
     },
     {
       "id": "alice_thymefield",
@@ -2679,7 +2704,8 @@
             "effects": [],
             "buffModifiers": []
           }
-        ]
+        ],
+        "skillBuffs": []
       },
       "coreSkill": {
         "name": {
@@ -2899,7 +2925,11 @@
         "panelDefaults": "source-checked-mihoyo-baike-2026-07-17",
         "combatMechanics": "source-checked-mihoyo-baike-2026-07-17; default rotation assumes one full 10-second physical anomaly window, 10 core-passive ticks, and cinema-triggered extra actions"
       },
-      "hidden": false
+      "hidden": false,
+      "importantSubStats": [
+        "atkPct",
+        "anomalyProficiency"
+      ]
     },
     {
       "id": "aria",
@@ -3120,7 +3150,8 @@
             ],
             "buffModifiers": []
           }
-        ]
+        ],
+        "skillBuffs": []
       },
       "coreSkill": {
         "name": {
@@ -3464,7 +3495,11 @@
         "combatMechanics": "official wording plus mechanism guide cross-check; official 25% cinema-1 release crit value takes precedence",
         "unsupportedMechanics": "anomaly buildup resistance, energy, decibel, cheer energy, and resource conversion remain descriptive"
       },
-      "hidden": false
+      "hidden": false,
+      "importantSubStats": [
+        "atkPct",
+        "anomalyProficiency"
+      ]
     },
     {
       "id": "remielle_dan",
@@ -3643,7 +3678,8 @@
               "specialVoidflareStrengthRatioToEntry": 0.25
             }
           }
-        ]
+        ],
+        "skillBuffs": []
       },
       "coreSkill": {
         "name": {
@@ -3877,7 +3913,11 @@
             "atkPct"
           ]
         }
-      }
+      },
+      "importantSubStats": [
+        "atkPct",
+        "anomalyProficiency"
+      ]
     },
     {
       "id": "sigrid",
@@ -4808,7 +4848,13 @@
         "unsupportedMechanics": "stance duration, energy, decibel generation, blocking, and action-speed changes remain descriptive and are not simulated as an automatic state machine",
         "excludedPreReleaseData": "does not use beta deactivation rules, 72% stance Crit Rate, old Cinema multipliers, or the old three-stack signature W-Engine"
       },
-      "hidden": false
+      "hidden": false,
+      "importantSubStats": [
+        "atkPct",
+        "critRate",
+        "critDmg",
+        "penFlat"
+      ]
     },
     {
       "id": "soldier_11",
@@ -5556,7 +5602,12 @@
           }
         ],
         "selectedEventId": "event_8aa19fdd5e"
-      }
+      },
+      "importantSubStats": [
+        "atkPct",
+        "critRate",
+        "critDmg"
+      ]
     },
     {
       "id": "vivian",
@@ -6134,7 +6185,11 @@
         "cinema2ReleaseProficiencyYield": "M2 stores releaseProficiencyYieldBonus=30 on release-only anomaly targets; the release formula applies it only to the trigger's anomaly-proficiency conversion as a 1.3 factor, without changing the original anomaly base or other damage zones",
         "unsupportedMechanics": "official skill payload has no stable internal skill IDs; M6's special five-fold release still needs a dedicated release-ratio event variant and is retained in the cinema description rather than approximated as ordinary anomaly damage"
       },
-      "hidden": false
+      "hidden": false,
+      "importantSubStats": [
+        "atkPct",
+        "anomalyProficiency"
+      ]
     },
     {
       "id": "claret",

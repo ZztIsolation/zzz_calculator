@@ -59,6 +59,7 @@ describe("DriveDiscConflictResolver", () => {
           "scanner:conflict-one": { action: "update", existingId: secondCandidateId },
           "scanner:conflict-two": { action: "add" },
         },
+        meta: { statRules: { driveDisc: { sRankSubStatBaseStep: { critDmg: 4.8 } } } },
       },
     })
 
@@ -71,6 +72,7 @@ describe("DriveDiscConflictResolver", () => {
     expect(wrapper.text()).toContain("安比")
     expect(wrapper.text()).toContain("扫描器 #17")
     expect(wrapper.text()).toContain("Enka")
+    expect(wrapper.text()).toContain("暴击伤害% +1")
 
     const radios = wrapper.findAll<HTMLInputElement>('input[type="radio"]')
     expect(radios).toHaveLength(5)

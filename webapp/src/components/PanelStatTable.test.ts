@@ -64,4 +64,29 @@ describe("PanelStatTable", () => {
     expect(proficiencyRow?.text()).not.toContain("520.0")
     expect(precisePanel.anomalyMastery).toBe(195.96)
   })
+
+  it("highlights only configured stat names while leaving values unchanged", () => {
+    const wrapper = mount(PanelStatTable, {
+      props: {
+        panel,
+        includeSheerForce: true,
+        importantStats: ["atk", "critRate", "sheerForce"],
+      },
+    })
+
+    const rows = wrapper.findAll("tr")
+    for (const label of ["攻击力", "暴击率", "贯穿力"]) {
+      const row = rows.find(item => item.find("th").text() === label)
+      expect(row?.find("th").classes()).toContain("panel-stat-important")
+      expect(row?.find("td").classes()).not.toContain("panel-stat-important")
+    }
+    expect(rows.find(item => item.find("th").text() === "暴击伤害")?.find("th").classes())
+      .not.toContain("panel-stat-important")
+  })
+
+  it("keeps every stat name unhighlighted without a configuration", () => {
+    const wrapper = mount(PanelStatTable, { props: { panel } })
+
+    expect(wrapper.findAll("th.panel-stat-important")).toHaveLength(0)
+  })
 })
