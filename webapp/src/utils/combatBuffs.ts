@@ -143,6 +143,7 @@ export function currentAgentBuffCandidates(
 
   const skillBuffs = (combatBuffs.skillBuffs ?? [])
     .filter((buff: any) => inCombatEffect(buff))
+    .map((buff: any) => materializeCorePassiveScalingEffect(buff, agent, coreSkillLevel))
     .map((buff: any) => {
       const source = skillBuffSourceLabel(meta, buff)
       return {

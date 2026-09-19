@@ -171,6 +171,7 @@ const FIELD_LABELS: Record<string, string> = {
   defaultValue: "默认值",
   oneOf: "允许值",
   excludedAgentIds: "排除角色",
+  agentIds: "限定角色",
   appliesToOutOfCombatPanel: "应用于局外面板",
   selfBuff: "佩戴者效果",
   teamBuff: "团队效果",

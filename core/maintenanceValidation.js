@@ -560,6 +560,26 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
     if (rule.requirement?.eventStunned !== undefined && typeof rule.requirement.eventStunned !== "boolean") {
         add(errors, `${path}.requirement.eventStunned`, "失衡状态要求必须是布尔值。")
     }
+    if (rule.requirement?.agentIds !== undefined) {
+        const ids = rule.requirement.agentIds
+        if (!Array.isArray(ids)) {
+            add(errors, `${path}.requirement.agentIds`, "限定角色必须是 ID 数组。")
+        } else {
+            const seen = new Set()
+            ids.forEach((id, index) => {
+                if (typeof id !== "string" || !id.trim()) {
+                    add(errors, `${path}.requirement.agentIds[${index}]`, "角色 ID 不能为空。")
+                } else {
+                    validateOptionalId(errors, { id }, `${path}.requirement.agentIds[${index}]`)
+                }
+                if (seen.has(id)) add(errors, `${path}.requirement.agentIds[${index}]`, "限定角色不能重复。")
+                if (Array.isArray(rule.requirement.excludedAgentIds) && rule.requirement.excludedAgentIds.includes(id)) {
+                    add(errors, `${path}.requirement.agentIds[${index}]`, "限定角色不能同时被排除。")
+                }
+                seen.add(id)
+            })
+        }
+    }
     if (rule.requirement?.excludedAgentIds !== undefined) {
         if (!Array.isArray(rule.requirement.excludedAgentIds)) {
             add(errors, `${path}.requirement.excludedAgentIds`, "排除角色必须是 ID 数组。")
@@ -644,7 +664,7 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
             add(errors, `${path}.valueSource.field`, "倍率字段必须是有效的字段名。")
         } else if (source.kind === "corePassiveScaling") {
             if (!context.allowCorePassiveScalingSource) {
-                add(errors, `${path}.valueSource`, "核心被动倍率来源只能用于角色核心被动。")
+                add(errors, `${path}.valueSource`, "核心被动倍率来源只能用于角色核心被动或技能来源 Buff。")
             }
             const scalingLevels = context.agent?.coreSkill?.corePassiveScaling?.levels
             const coreSkillLevels = context.agent?.coreSkill?.levels ?? []
@@ -2338,7 +2358,9 @@ function validateAgent(item, context) {
         sourceType: "self",
         context: { ...context, agent: item, allowPotentialVisionScalingSource: true },
     })
-    validateSkillBuffs(errors, item?.combatBuffs?.skillBuffs, context, item?.id)
+    validateSkillBuffs(errors, item?.combatBuffs?.skillBuffs, {
+        ...context, agent: item, allowCorePassiveScalingSource: true,
+    }, item?.id)
     validateCinemaBuffs(errors, item?.combatBuffs?.cinemaBuffs, context)
     validateAnomalyReleaseProfiles(errors, item?.anomalyReleaseProfiles)
     validatePreferredDriveDiscs(errors, item?.preferredDriveDiscs, context)

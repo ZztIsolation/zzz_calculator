@@ -102,7 +102,7 @@ for (const [id, name, rarity, atkBase, stat, value, effectName] of expected) {
 const agentIds = new Set(catalog.agents.map(item => item.id))
 assert.deepEqual(
     attackEngines.filter(item => item.relatedAgentId).map(item => [item.id, item.relatedAgentId]),
-    [["cloudcleave_radiance", "ye_shunguang"], ["zzz_wiki_223", "soldier_11"], ["zzz_wiki_2162", "sigrid"]],
+    [["cloudcleave_radiance", "ye_shunguang"], ["zzz_wiki_223", "soldier_11"], ["zzz_wiki_2031", "pyrois"], ["zzz_wiki_2162", "sigrid"]],
     "Maintained Attack agents should receive their signature W-Engine relationship",
 )
 assert.ok(agentIds.has("ye_shunguang"))

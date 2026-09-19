@@ -169,16 +169,16 @@ for (const { target, path } of storedTargets) {
         }
     }
 }
-assert.equal(moveCount, 125)
-assert.equal(rowCount, 256)
+assert.equal(moveCount, 140)
+assert.equal(rowCount, 296)
 assert.deepEqual(Object.fromEntries(skillTagCounts), {
-    dashAttack: 8,
-    assistAttack: 18,
-    exSpecial: 16,
+    dashAttack: 9,
+    assistAttack: 19,
+    exSpecial: 17,
     fireSuppression: 3,
-    dodgeCounter: 3,
+    dodgeCounter: 4,
 })
-assert.equal(storedTargets.length, 86)
+assert.equal(storedTargets.length, 89)
 const jifengTargets = combatBuffCatalog.fieldBuffs
     .find(buff => buff.id === "field.critical_assault.v3_2.p2.jifeng")
     .effects.flatMap(effect => effect.target?.skillTargets ?? [])

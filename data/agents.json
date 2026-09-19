@@ -6906,6 +6906,895 @@
           }
         ]
       }
+    },
+    {
+      "id": "pyrois",
+      "name": {
+        "zhCN": "佩洛伊斯"
+      },
+      "rarity": "S",
+      "attribute": "ether",
+      "damageElement": "ether",
+      "specialty": "attack",
+      "attackTypes": [
+        "slash"
+      ],
+      "faction": "法厄同",
+      "images": {
+        "portrait": "/assets/agents/pyrois.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/06/06/76099754/961895e79017cefda565737d4af89e1f_4013112206228241335.png"
+      },
+      "level60": {
+        "hpBase": 7673,
+        "atkBase": 849,
+        "defBase": 612,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 94,
+        "anomalyProficiency": 93,
+        "anomalyMastery": 94,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "name": {
+            "zhCN": "核心被动：煊赫车辇"
+          },
+          "description": {
+            "zhCN": "右分支重击命中失衡敌人时追加决算伤害；发动时延长失衡3秒，终结一击命中后结束失衡。后续事件的失衡状态需手动调整。本模型不模拟日珥、喧响值和持续时间。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "totalize",
+              "type": "fixed",
+              "stat": "skillMultiplierBonus",
+              "value": 1125,
+              "mode": "flat",
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "specific",
+                    "agentSkillId": "pyrois",
+                    "categoryId": "chain",
+                    "skillType": "ultimate",
+                    "moveId": "ultimate_eternal_imprisonment",
+                    "rowId": "damage"
+                  }
+                ]
+              },
+              "requirement": {
+                "eventStunned": true
+              },
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "totalizeMultiplierPct"
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "additionalAbility": {
+          "name": {
+            "zhCN": "额外能力：辉煌军势"
+          },
+          "description": {
+            "zhCN": "队伍存在击破或支援角色时，暴击伤害提升40%；连携技回复300点喧响值。默认关闭，满足配队条件时启用。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "glorious-legion-crit-dmg",
+              "type": "fixed",
+              "stat": "critDmg",
+              "value": 40,
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              }
+            }
+          ],
+          "buffModifiers": [],
+          "defaultChecked": false
+        },
+        "skillBuffs": [
+          {
+            "name": {
+              "zhCN": "阳炎"
+            },
+            "description": {
+              "zhCN": "阳炎持续21秒，仅终结技对失衡敌人的暴击伤害提升40%。与耀斑可同时开启；选择招式不会自动开启此状态。"
+            },
+            "scope": "inCombat",
+            "effects": [
+              {
+                "id": "mirage-ultimate-crit-dmg",
+                "type": "fixed",
+                "stat": "critDmg",
+                "value": 40,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "kind": "skillType",
+                      "skillType": "ultimate"
+                    }
+                  ]
+                },
+                "requirement": {
+                  "eventStunned": true
+                },
+                "durationSeconds": 21
+              }
+            ],
+            "buffModifiers": [],
+            "id": "mirage",
+            "defaultChecked": false,
+            "sourceSkillRef": {
+              "agentSkillId": "pyrois",
+              "categoryId": "chain",
+              "moveId": "ultimate_total_annihilation"
+            }
+          },
+          {
+            "name": {
+              "zhCN": "耀斑"
+            },
+            "description": {
+              "zhCN": "耀斑持续200秒，伤害提升随核心等级变化。能量获得效率+15%、完美格挡回复10点日珥仅作机制说明，不改变伤害或自动增加次数。"
+            },
+            "scope": "inCombat",
+            "effects": [
+              {
+                "id": "sunflare-damage",
+                "type": "fixed",
+                "stat": "dmgBonus",
+                "value": 20,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                },
+                "valueSource": {
+                  "kind": "corePassiveScaling",
+                  "field": "sunflareDamagePct"
+                },
+                "durationSeconds": 200
+              }
+            ],
+            "buffModifiers": [],
+            "id": "sunflare",
+            "defaultChecked": false,
+            "sourceSkillRef": {
+              "agentSkillId": "pyrois",
+              "categoryId": "chain",
+              "moveId": "ultimate_triumphant_return"
+            }
+          },
+          {
+            "name": {
+              "zhCN": "目标处于浸染"
+            },
+            "description": {
+              "zhCN": "仅左分支重击命中浸染敌人时追加核心倍率；浸染不等同于侵蚀、其他属性异常或失衡。"
+            },
+            "scope": "inCombat",
+            "effects": [
+              {
+                "id": "contamination-multiplier",
+                "type": "fixed",
+                "stat": "skillMultiplierBonus",
+                "value": 450,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "kind": "specific",
+                      "agentSkillId": "pyrois",
+                      "categoryId": "chain",
+                      "skillType": "ultimate",
+                      "moveId": "ultimate_unbound_swordstorm",
+                      "rowId": "damage"
+                    }
+                  ]
+                },
+                "valueSource": {
+                  "kind": "corePassiveScaling",
+                  "field": "contaminationMultiplierPct"
+                }
+              }
+            ],
+            "buffModifiers": [],
+            "id": "contamination",
+            "defaultChecked": false,
+            "sourceSkillRef": {
+              "agentSkillId": "pyrois",
+              "categoryId": "chain",
+              "moveId": "ultimate_unbound_swordstorm"
+            }
+          }
+        ],
+        "cinemaBuffs": [
+          {
+            "name": {
+              "zhCN": "影画1｜黄昏旧章"
+            },
+            "description": {
+              "zhCN": "进入战场获得1000点喧响值（勘域模式180秒一次）；暴击率提升8%。"
+            },
+            "scope": "inCombat",
+            "effects": [
+              {
+                "id": "cinema-1-crit-rate",
+                "type": "fixed",
+                "stat": "critRate",
+                "value": 8,
+                "mode": "flat",
+                "target": {
+                  "kind": "default"
+                }
+              }
+            ],
+            "buffModifiers": [],
+            "cinemaLevel": 1,
+            "cinemaName": {
+              "zhCN": "黄昏旧章"
+            },
+            "defaultChecked": false
+          }
+        ]
+      },
+      "cinemaDescriptions": [
+        {
+          "cinemaLevel": 1,
+          "name": {
+            "zhCN": "黄昏旧章"
+          },
+          "description": {
+            "zhCN": "进入战场获得1000点喧响值（勘域模式180秒一次）；暴击率提升8%。"
+          },
+          "modeled": true
+        },
+        {
+          "cinemaLevel": 2,
+          "name": {
+            "zhCN": "煜焰铁骑"
+          },
+          "description": {
+            "zhCN": "凯旋坦途回复1500点喧响值，180秒一次；喧响值上限+1000。仅影响资源循环。"
+          },
+          "modeled": true
+        },
+        {
+          "cinemaLevel": 3,
+          "name": {
+            "zhCN": "命定枷锁"
+          },
+          "description": {
+            "zhCN": "普通攻击、闪避、支援技、特殊技、连携技等级+2。技能等级输入为最终等级，不重复加级。"
+          },
+          "modeled": true
+        },
+        {
+          "cinemaLevel": 4,
+          "name": {
+            "zhCN": "焚昼孽火"
+          },
+          "description": {
+            "zhCN": "日华完美格挡获得生命上限8%的护盾，持续10秒；持盾时失衡值+10%。不增加伤害。"
+          },
+          "modeled": true
+        },
+        {
+          "cinemaLevel": 5,
+          "name": {
+            "zhCN": "稚子禁卫"
+          },
+          "description": {
+            "zhCN": "普通攻击、闪避、支援技、特殊技、连携技等级再+2。技能等级输入为最终等级，不重复加级。"
+          },
+          "modeled": true
+        },
+        {
+          "cinemaLevel": 6,
+          "name": {
+            "zhCN": "拂晓晨星"
+          },
+          "description": {
+            "zhCN": "官方尚未揭示六影独有效果；当前结果仅计算至五影已知效果。"
+          },
+          "modeled": false
+        }
+      ],
+      "coreSkill": {
+        "name": {
+          "zhCN": "煊赫车辇"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "critRate",
+                "value": 4.8,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "核心被动：煊赫车辇"
+          },
+          "levels": [
+            {
+              "level": 1,
+              "sunflareDamagePct": 20,
+              "contaminationMultiplierPct": 450,
+              "totalizeMultiplierPct": 1125
+            },
+            {
+              "level": 2,
+              "sunflareDamagePct": 23.4,
+              "contaminationMultiplierPct": 525,
+              "totalizeMultiplierPct": 1312
+            },
+            {
+              "level": 3,
+              "sunflareDamagePct": 26.8,
+              "contaminationMultiplierPct": 600,
+              "totalizeMultiplierPct": 1499
+            },
+            {
+              "level": 4,
+              "sunflareDamagePct": 30.2,
+              "contaminationMultiplierPct": 675,
+              "totalizeMultiplierPct": 1686
+            },
+            {
+              "level": 5,
+              "sunflareDamagePct": 33.6,
+              "contaminationMultiplierPct": 750,
+              "totalizeMultiplierPct": 1873
+            },
+            {
+              "level": 6,
+              "sunflareDamagePct": 37,
+              "contaminationMultiplierPct": 825,
+              "totalizeMultiplierPct": 2060
+            },
+            {
+              "level": 7,
+              "sunflareDamagePct": 40,
+              "contaminationMultiplierPct": 900,
+              "totalizeMultiplierPct": 2250
+            }
+          ],
+          "defaultLevelAtCoreSkill": "F"
+        },
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/1958/detail?mhy_presentation_style=fullscreen"
+        ]
+      },
+      "preferredDriveDiscs": {
+        "mainStatLimits": {
+          "4": [
+            "critRate",
+            "critDmg"
+          ],
+          "5": [
+            "etherDmg",
+            "atkPct",
+            "penRatio"
+          ],
+          "6": [
+            "atkPct"
+          ]
+        }
+      },
+      "skillGroups": [
+        {
+          "id": "celestial_light_34",
+          "name": {
+            "zhCN": "天光三＋四段"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "basic_celestial_light-hit_3",
+              "kind": "direct",
+              "count": 1,
+              "stunned": false,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "pyrois",
+                "categoryId": "basic",
+                "moveId": "basic_celestial_light",
+                "rowId": "hit_3"
+              }
+            },
+            {
+              "id": "basic_celestial_light-hit_4",
+              "kind": "direct",
+              "count": 1,
+              "stunned": false,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "pyrois",
+                "categoryId": "basic",
+                "moveId": "basic_celestial_light",
+                "rowId": "hit_4"
+              }
+            }
+          ]
+        },
+        {
+          "id": "celestial_light_all",
+          "name": {
+            "zhCN": "天光一至四段合计"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "basic_celestial_light-hit_1",
+              "kind": "direct",
+              "count": 1,
+              "stunned": false,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "pyrois",
+                "categoryId": "basic",
+                "moveId": "basic_celestial_light",
+                "rowId": "hit_1"
+              }
+            },
+            {
+              "id": "basic_celestial_light-hit_2",
+              "kind": "direct",
+              "count": 1,
+              "stunned": false,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "pyrois",
+                "categoryId": "basic",
+                "moveId": "basic_celestial_light",
+                "rowId": "hit_2"
+              }
+            },
+            {
+              "id": "basic_celestial_light-hit_3",
+              "kind": "direct",
+              "count": 1,
+              "stunned": false,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "pyrois",
+                "categoryId": "basic",
+                "moveId": "basic_celestial_light",
+                "rowId": "hit_3"
+              }
+            },
+            {
+              "id": "basic_celestial_light-hit_4",
+              "kind": "direct",
+              "count": 1,
+              "stunned": false,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "pyrois",
+                "categoryId": "basic",
+                "moveId": "basic_celestial_light",
+                "rowId": "hit_4"
+              }
+            }
+          ]
+        },
+        {
+          "id": "ultimate_total_annihilation_with_directive",
+          "name": {
+            "zhCN": "终结技：万军诛绝（含强袭训令）"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "ultimate_total_annihilation-damage",
+              "kind": "direct",
+              "count": 1,
+              "stunned": false,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "pyrois",
+                "categoryId": "chain",
+                "moveId": "ultimate_total_annihilation",
+                "rowId": "damage"
+              }
+            },
+            {
+              "id": "special_assault_directive-damage",
+              "kind": "direct",
+              "count": 1,
+              "stunned": false,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "pyrois",
+                "categoryId": "special",
+                "moveId": "special_assault_directive",
+                "rowId": "damage"
+              }
+            }
+          ]
+        },
+        {
+          "id": "ultimate_triumphant_return_with_directive",
+          "name": {
+            "zhCN": "终结技：凯旋坦途（含强袭训令）"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "ultimate_triumphant_return-damage",
+              "kind": "direct",
+              "count": 1,
+              "stunned": false,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "pyrois",
+                "categoryId": "chain",
+                "moveId": "ultimate_triumphant_return",
+                "rowId": "damage"
+              }
+            },
+            {
+              "id": "special_assault_directive-damage",
+              "kind": "direct",
+              "count": 1,
+              "stunned": false,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "pyrois",
+                "categoryId": "special",
+                "moveId": "special_assault_directive",
+                "rowId": "damage"
+              }
+            }
+          ]
+        },
+        {
+          "id": "ultimate_unbound_swordstorm_with_directive",
+          "name": {
+            "zhCN": "终结技：无拘剑势（含强袭训令）"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "ultimate_unbound_swordstorm-damage",
+              "kind": "direct",
+              "count": 1,
+              "stunned": false,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "pyrois",
+                "categoryId": "chain",
+                "moveId": "ultimate_unbound_swordstorm",
+                "rowId": "damage"
+              }
+            },
+            {
+              "id": "special_assault_directive-damage",
+              "kind": "direct",
+              "count": 1,
+              "stunned": false,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "pyrois",
+                "categoryId": "special",
+                "moveId": "special_assault_directive",
+                "rowId": "damage"
+              }
+            }
+          ]
+        },
+        {
+          "id": "ultimate_eternal_imprisonment_with_directive",
+          "name": {
+            "zhCN": "终结技：永陷幽囚（含强袭训令）"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "ultimate_eternal_imprisonment-damage",
+              "kind": "direct",
+              "count": 1,
+              "stunned": false,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "pyrois",
+                "categoryId": "chain",
+                "moveId": "ultimate_eternal_imprisonment",
+                "rowId": "damage"
+              }
+            },
+            {
+              "id": "special_assault_directive-damage",
+              "kind": "direct",
+              "count": 1,
+              "stunned": false,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "pyrois",
+                "categoryId": "special",
+                "moveId": "special_assault_directive",
+                "rowId": "damage"
+              }
+            }
+          ]
+        },
+        {
+          "id": "suns_halo_with_directive",
+          "name": {
+            "zhCN": "强化特殊技：日华（含强袭训令）"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "ex_special_suns_halo-damage",
+              "kind": "direct",
+              "count": 1,
+              "stunned": false,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "pyrois",
+                "categoryId": "special",
+                "moveId": "ex_special_suns_halo",
+                "rowId": "damage"
+              }
+            },
+            {
+              "id": "special_assault_directive-damage",
+              "kind": "direct",
+              "count": 1,
+              "stunned": false,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "pyrois",
+                "categoryId": "special",
+                "moveId": "special_assault_directive",
+                "rowId": "damage"
+              }
+            }
+          ]
+        },
+        {
+          "id": "suns_halo_body",
+          "name": {
+            "zhCN": "强化特殊技：日华（本体，不含强袭训令）"
+          },
+          "defaultCount": 1,
+          "minCount": 0,
+          "step": 1,
+          "events": [
+            {
+              "id": "ex_special_suns_halo-damage",
+              "kind": "direct",
+              "count": 1,
+              "stunned": false,
+              "critMode": "expected",
+              "skillRef": {
+                "agentSkillId": "pyrois",
+                "categoryId": "special",
+                "moveId": "ex_special_suns_halo",
+                "rowId": "damage"
+              }
+            }
+          ]
+        }
+      ],
+      "defaultCalculationConfig": {
+        "mode": "custom",
+        "cinemaLevel": 0,
+        "name": {
+          "zhCN": "天光三＋四段示例"
+        },
+        "skillLevelsByCategory": {
+          "basic": 12,
+          "dodge": 12,
+          "assist": 12,
+          "special": 12,
+          "chain": 12
+        },
+        "events": [
+          {
+            "id": "pyrois_celestial_light_34",
+            "kind": "skillGroup",
+            "skillGroupId": "celestial_light_34",
+            "count": 1,
+            "stunned": false
+          }
+        ],
+        "selectedEventId": "pyrois_celestial_light_34",
+        "variants": [
+          {
+            "mode": "custom",
+            "cinemaLevel": 3,
+            "name": {
+              "zhCN": "3影天光三＋四段示例"
+            },
+            "skillLevelsByCategory": {
+              "basic": 14,
+              "dodge": 14,
+              "assist": 14,
+              "special": 14,
+              "chain": 14
+            },
+            "events": [
+              {
+                "id": "pyrois_celestial_light_34",
+                "kind": "skillGroup",
+                "skillGroupId": "celestial_light_34",
+                "count": 1,
+                "stunned": false
+              }
+            ],
+            "selectedEventId": "pyrois_celestial_light_34"
+          },
+          {
+            "mode": "custom",
+            "cinemaLevel": 5,
+            "name": {
+              "zhCN": "5影天光三＋四段示例"
+            },
+            "skillLevelsByCategory": {
+              "basic": 16,
+              "dodge": 16,
+              "assist": 16,
+              "special": 16,
+              "chain": 16
+            },
+            "events": [
+              {
+                "id": "pyrois_celestial_light_34",
+                "kind": "skillGroup",
+                "skillGroupId": "celestial_light_34",
+                "count": 1,
+                "stunned": false
+              }
+            ],
+            "selectedEventId": "pyrois_celestial_light_34"
+          }
+        ]
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1958/detail?mhy_presentation_style=fullscreen",
+        "https://zzz.gachabase.net/agents/1551/pyrois/release/3.0.0/16735318?lang=chs",
+        "https://zzz.honeyhunterworld.com/1551-char/?lang=CN",
+        "https://zenless-zone-zero.fandom.com/wiki/Pyrois"
+      ],
+      "verification": {
+        "officialVersion": "1789136408",
+        "levels1to12": "official",
+        "levels13to16": "cross-checked-release-3.0.0-16735318-and-Honey-Hunter/Fandom; explicit values, not extrapolated",
+        "level60Stats": "official base 849 ATK / 5% CRIT; core F adds 75 ATK / 14.4% CRIT separately",
+        "cinema6": "unrevealed-not-modeled",
+        "modelingNotes": "docs/pyrois-modeling.md"
+      },
+      "hidden": false
     }
   ]
 }

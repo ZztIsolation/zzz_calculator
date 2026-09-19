@@ -810,10 +810,10 @@ function displayWEngines(meta: any = null) {
 
 export function defaultBuffIdsFor(agent: any, cinemaLevel: number, wEngine: any) {
   const ids: string[] = []
-  if (agent?.combatBuffs?.corePassive?.scope === "inCombat") {
+  if (agent?.combatBuffs?.corePassive?.scope === "inCombat" && agent.combatBuffs.corePassive.defaultChecked !== false) {
     ids.push(`agent:${agent.id}.corePassive`)
   }
-  if (agent?.combatBuffs?.additionalAbility?.scope === "inCombat") {
+  if (agent?.combatBuffs?.additionalAbility?.scope === "inCombat" && agent.combatBuffs.additionalAbility.defaultChecked !== false) {
     ids.push(`agent:${agent.id}.additionalAbility`)
   }
   for (const buff of Array.isArray(agent?.combatBuffs?.skillBuffs) ? agent.combatBuffs.skillBuffs : []) {

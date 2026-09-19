@@ -643,6 +643,19 @@ describe("MaintenanceView structured editor", () => {
     expect(body.combatBuffs.corePassive.effects[0].requirement.excludedSpecialties).toEqual(["armorer"])
   })
 
+  it("edits and saves a wearer whitelist without losing it on reload", async () => {
+    const { wrapper, fetchMock } = await mountView()
+    const rule = wrapper.find(".maintenance-rule-card")
+    const select = field(rule, "限定角色").find("select")
+    const value = select.findAll("option").find(option => option.attributes("value"))!.attributes("value")
+    await select.setValue([value])
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("完整目录已刷新"))
+    const call = fetchMock.mock.calls.find(([url, init]) => url === "/api/maintenance/agents" && init?.method === "POST")!
+    expect(JSON.parse(String(call[1]?.body)).combatBuffs.corePassive.effects[0].requirement.agentIds).toEqual([value])
+    expect(field(wrapper.find(".maintenance-rule-card"), "限定角色").find("select").element.selectedOptions[0]?.value).toBe(value)
+  })
+
   it("renders complete cascading selectors when an effect targets a skill", async () => {
     const { wrapper } = await mountView()
     const rule = wrapper.find(".maintenance-rule-card")
