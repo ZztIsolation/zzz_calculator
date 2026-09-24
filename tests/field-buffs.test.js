@@ -21,6 +21,9 @@ const FIELD_BUFF_IDS = {
     cuixinPhase3: "field.critical_assault.v3_1.p3.cuixin",
     bingxi: "field.critical_assault.v3_1.p3.bingxi",
     yixi: "field.critical_assault.v3_1.p3.yixi",
+    jifeng: "field.critical_assault.v3_2.p2.jifeng",
+    shijinPhase2: "field.critical_assault.v3_2.p2.shijin",
+    tanlie: "field.critical_assault.v3_2.p2.tanlie",
     wenyin: "field.defense_v5.v3_1.p1.wenyin_gongzhen",
     zhongmuDefense31: "field.defense_v5.v3_1.p1.zhongmu_xiezou",
     shuanglei: "field.defense_v5.v3_1.p1.shuanglei_pofeng",
@@ -72,6 +75,9 @@ const EXPECTED_NAMES = {
     [FIELD_BUFF_IDS.cuixinPhase3]: "摧心",
     [FIELD_BUFF_IDS.bingxi]: "冰袭",
     [FIELD_BUFF_IDS.yixi]: "异袭",
+    [FIELD_BUFF_IDS.jifeng]: "极锋",
+    [FIELD_BUFF_IDS.shijinPhase2]: "蚀烬",
+    [FIELD_BUFF_IDS.tanlie]: "坍裂",
     [FIELD_BUFF_IDS.wenyin]: "紊音共振",
     [FIELD_BUFF_IDS.zhongmuDefense31]: "终幕协奏",
     [FIELD_BUFF_IDS.shuanglei]: "霜雷破锋",
@@ -117,6 +123,11 @@ const VERSION_3_1_IDS = [
     ...CRITICAL_ASSAULT_3_1_PHASE_2_IDS,
     ...CRITICAL_ASSAULT_3_1_PHASE_3_IDS,
 ]
+const CRITICAL_ASSAULT_3_2_PHASE_2_IDS = [
+    FIELD_BUFF_IDS.jifeng,
+    FIELD_BUFF_IDS.shijinPhase2,
+    FIELD_BUFF_IDS.tanlie,
+]
 
 const ALL_RES_IGNORE_BUFF_IDS = [
     "liuyin.cinema_1.good_review_res_ignore",
@@ -154,16 +165,17 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
     assert.equal(buff.scope, "inCombat", `${id} should be an in-combat Buff`)
     const isDefense = DEFENSE_3_0_IDS.includes(id) || DEFENSE_3_1_IDS.includes(id)
     const isVersion31 = VERSION_3_1_IDS.includes(id)
+    const isVersion32 = id.includes(".v3_2.")
     const isPhase2 = PHASE_2_IDS.includes(id)
     const isPhase3 = PHASE_3_IDS.includes(id)
     assert.deepEqual(buff.period, {
         modeId: isDefense ? "defense_v5" : "critical_assault",
-        gameVersion: isVersion31 ? "3.1" : "3.0",
-        phaseNo: isPhase3 ? 3 : isPhase2 ? 2 : isVersion31 ? 1 : 3,
-        phaseName: { zhCN: isPhase3 ? "第三期" : isPhase2 ? "第二期" : isVersion31 ? "第一期" : "第三期" },
+        gameVersion: isVersion32 ? "3.2" : isVersion31 ? "3.1" : "3.0",
+        phaseNo: isVersion32 && CRITICAL_ASSAULT_3_2_PHASE_2_IDS.includes(id) ? 2 : isPhase3 ? 3 : isPhase2 ? 2 : isVersion31 ? 1 : 3,
+        phaseName: { zhCN: isVersion32 && CRITICAL_ASSAULT_3_2_PHASE_2_IDS.includes(id) ? "第二期" : isPhase3 ? "第三期" : isPhase2 ? "第二期" : isVersion31 ? "第一期" : "第三期" },
     })
     assert.equal(buff.source?.zhCN, isDefense ? "防卫战 v5" : "危局强袭战")
-    assert.equal(buff.sourcePeriod?.zhCN, isPhase3 ? "3.1版本第三期" : isPhase2 ? "3.1版本第二期" : isVersion31 ? "3.1版本第一期" : "3.0版本第三期")
+    assert.equal(buff.sourcePeriod?.zhCN, isVersion32 ? `3.2版本${CRITICAL_ASSAULT_3_2_PHASE_2_IDS.includes(id) ? "第二期" : "第一期"}` : isPhase3 ? "3.1版本第三期" : isPhase2 ? "3.1版本第二期" : isVersion31 ? "3.1版本第一期" : "3.0版本第三期")
 
     const validation = validateMaintenanceItem("field-buffs", buff, {
         items: catalog.combatBuffs,
@@ -174,7 +186,7 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
 }
 
 const allFieldBuffs = catalog.combatBuffs.filter(buff => buff.sourceType === "field")
-assert.equal(allFieldBuffs.length, 33, "Field Buff catalog should keep all maintained entries")
+assert.equal(allFieldBuffs.length, 36, "Field Buff catalog should keep all maintained entries")
 assert.deepEqual(
     allFieldBuffs
         .filter(buff => buff.period?.modeId === "defense_v5" && buff.period?.gameVersion === "3.1" && buff.period?.phaseNo === 3)
@@ -223,6 +235,11 @@ const EXPECTED_3_2_PHASE_1_NAMES = {
     [CRITICAL_ASSAULT_3_2_PHASE_1_IDS.yaoshuang]: "曜霜",
     [CRITICAL_ASSAULT_3_2_PHASE_1_IDS.ruilie]: "锐裂",
 }
+const EXPECTED_3_2_PHASE_2_NAMES = {
+    [FIELD_BUFF_IDS.jifeng]: "极锋",
+    [FIELD_BUFF_IDS.shijinPhase2]: "蚀烬",
+    [FIELD_BUFF_IDS.tanlie]: "坍裂",
+}
 for (const id of Object.values(CRITICAL_ASSAULT_3_2_PHASE_1_IDS)) {
     const buff = fieldBuff(id)
     assert.equal(buff.name?.zhCN, EXPECTED_3_2_PHASE_1_NAMES[id], `${id} should keep its maintained name`)
@@ -255,6 +272,40 @@ assert.equal(
     fieldBuff(CRITICAL_ASSAULT_3_2_PHASE_1_IDS.ruilie).description.zhCN,
     "代理人的穿透率提升5%，攻击命中敌人时无视其15%的电属性伤害抗性。代理人发动[强化特殊技]、[特殊技]后，锐化伤害提升20%，防御力提升10%，持续20秒，重复触发时刷新持续时间。",
     "Ruilie should preserve the complete source text",
+)
+
+for (const id of CRITICAL_ASSAULT_3_2_PHASE_2_IDS) {
+    const buff = fieldBuff(id)
+    assert.equal(buff.name?.zhCN, EXPECTED_3_2_PHASE_2_NAMES[id], `${id} should keep its maintained name`)
+    assert.deepEqual(buff.period, {
+        modeId: "critical_assault",
+        gameVersion: "3.2",
+        phaseNo: 2,
+        phaseName: { zhCN: "第二期" },
+    })
+    assert.equal(buff.source?.zhCN, "危局强袭战")
+    assert.equal(buff.sourcePeriod?.zhCN, "3.2版本第二期")
+    const validation = validateMaintenanceItem("field-buffs", buff, {
+        items: catalog.combatBuffs,
+        currentId: id,
+        agentSkills: catalog.agentSkills,
+    })
+    assert.equal(validation.ok, true, `${id} should pass field Buff validation: ${JSON.stringify(validation.errors)}`)
+}
+assert.equal(
+    fieldBuff(FIELD_BUFF_IDS.jifeng).description.zhCN,
+    "代理人的锐化伤害提升15%，防御力提升15%。代理人发动[强化特殊技]、[特殊技]、[终结技]后，攻击命中敌人时无视其20%的电属性伤害抗性，持续20秒，重复触发时刷新持续时间。",
+    "Jifeng should preserve the complete source text",
+)
+assert.equal(
+    fieldBuff(FIELD_BUFF_IDS.shijinPhase2).description.zhCN,
+    "队伍中存在2/3名[异常]特性的代理人时，全队的异常精通分别提升20/60点，异常积蓄效率分别提升10%/20%。代理人使敌人进入属性异常状态后，敌人的防御力降低10%，持续10秒，重复触发时刷新持续时间。",
+    "Phase 2 Shijin should preserve the descriptive-only buildup clause",
+)
+assert.equal(
+    fieldBuff(FIELD_BUFF_IDS.tanlie).description.zhCN,
+    "代理人的以太伤害和物理属性伤害提升25%，[击破]特性的代理人造成的失衡值提升20%。代理人使敌人进入失衡状态后，敌人的失衡易伤倍率提升40%，且失衡恢复速度降低15%，持续20秒，重复触发时刷新持续时间。",
+    "Tanlie should preserve the descriptive-only recovery clause",
 )
 
 for (const id of Object.values(DEFENSE_3_2_PHASE_1_IDS)) {
@@ -1103,6 +1154,73 @@ const ruilieRules = fieldBuff(CRITICAL_ASSAULT_3_2_PHASE_1_IDS.ruilie).effects
     .filter(effect => effect.stat === "sharpDmgBonus" || effect.stat === "defPct")
 assert.ok(ruilieRules.every(effect => effect.condition === "代理人发动强化特殊技、特殊技后"))
 assert.ok(ruilieRules.every(effect => effect.durationSeconds === 20))
+
+const jifengEffects = fieldBuff(FIELD_BUFF_IDS.jifeng).effects
+assert.equal(jifengEffects.find(effect => effect.stat === "sharpDmgBonus")?.value, 15)
+assert.equal(jifengEffects.find(effect => effect.stat === "defPct")?.value, 15)
+assert.deepEqual(
+    jifengEffects.find(effect => effect.stat === "electricResIgnore")?.target,
+    { kind: "default" },
+    "Jifeng's triggered sub-Buff should apply to every skill",
+)
+const jifengSharp = calculateInCombatPanel(catalog, {
+    agentId: "claret",
+    wEngineId: "zzz_wiki_2188",
+    wEngineModificationLevel: 5,
+    coreSkillLevel: "F",
+    driveDiscs: [],
+    combatBuffs: {
+        activeBuffIds: [FIELD_BUFF_IDS.jifeng],
+        runtimeInputs: {},
+    },
+    damage: {
+        selectedEventId: "jifeng-sharp",
+        events: [{
+            id: "jifeng-sharp",
+            kind: "sharp",
+            skillRef: {
+                agentSkillId: "claret",
+                categoryId: "special",
+                moveId: "special_slash_gold",
+                rowId: "hit_1",
+            },
+            critMode: "nonCrit",
+            count: 1,
+        }],
+        target: { defense: 953, levelCoefficient: 794 },
+    },
+})
+approx(jifengSharp.damage.events[0].multipliers.sharpDmg, 1.15, "Jifeng should grant 15% Sharp damage")
+approx(
+    jifengSharp.inCombat.panel.def - jifengSharp.outOfCombat.panel.def,
+    jifengSharp.outOfCombat.panel.def * 0.15,
+    "Jifeng should grant 15% of out-of-combat DEF",
+)
+
+const SHIJIN_PHASE_2_PROFICIENCY_ID = "field_critical_assault_v3_2_p2_shijin_anomaly_proficiency"
+const shijinPhase2 = calculateAnomaly(FIELD_BUFF_IDS.shijinPhase2, {
+    id: "shijin-phase-2-burn",
+    kind: "anomaly",
+    settlementType: "attribute",
+    anomalyEffect: "burn",
+    procCount: 1,
+}, {
+    effects: {
+        [SHIJIN_PHASE_2_PROFICIENCY_ID]: { sourceValue: 3 },
+    },
+})
+approx(
+    shijinPhase2.inCombat.panel.anomalyProficiency - shijinPhase2.outOfCombat.panel.anomalyProficiency,
+    60,
+    "Phase 2 Shijin should grant 60 Anomaly Proficiency to three Anomaly agents",
+)
+approx(shijinPhase2.damage.targetBreakdown.enemyDefReduction, 0.1, "Phase 2 Shijin should reduce enemy DEF by 10%")
+
+const tanlieEther = calculateAttackBasic(FIELD_BUFF_IDS.tanlie, {}, "ether")
+approx(tanlieEther.inCombat.panel.etherDmg - tanlieEther.outOfCombat.panel.etherDmg, 0.25, "Tanlie should grant 25% Ether damage")
+const tanlieRules = fieldBuff(FIELD_BUFF_IDS.tanlie).effects
+assert.equal(tanlieRules.some(effect => ["impact", "impactPct"].includes(effect.stat)), false, "Tanlie must not approximate Daze increase as Impact")
+assert.equal(tanlieRules.find(effect => effect.stat === "stunDmgMultiplierBonus")?.value, 40)
 
 const shirenSharp = calculateInCombatPanel(catalog, {
     agentId: "claret",

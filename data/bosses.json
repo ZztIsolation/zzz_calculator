@@ -292,6 +292,71 @@
             }
           ],
           "hidden": false
+        },
+        {
+          "id": "boss_encounter.miasma_fiend_named.v3_2.p2",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.2",
+              "phaseNo": 2,
+              "startDate": "2026-09-25",
+              "endDate": "2026-10-09"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "秽息妖鬼·名可名每次进入属性异常时，代理人对其造成的异常伤害提升8%，最多叠加6层。目标开启秽盾时清空所有层数，每层使其受到的秽盾削减效率提升2.5%。"
+          },
+          "recommendedSpecialties": [
+            "anomaly"
+          ],
+          "playerBuffs": [
+            {
+              "id": "miasma_fiend_named_v3_2_p2_anomaly_damage",
+              "name": {
+                "zhCN": "异常伤害提升"
+              },
+              "description": {
+                "zhCN": "每次使秽息妖鬼·名可名进入属性异常，代理人对其造成的异常伤害提升8%，最多6层。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "miasma_fiend_named_v3_2_p2_anomaly_damage_stacks",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyDamageBonus",
+                  "mode": "flat",
+                  "valuePerStack": 8,
+                  "maxStacks": 6,
+                  "defaultStacks": 6,
+                  "stackGroup": "miasma_fiend_named_v3_2_p2_anomaly_damage_stacks",
+                  "stackLabel": {
+                    "zhCN": "异常伤害提升层数"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "3.2 第二期敌人数据与效果（nanoka.cc 690461）"
+              },
+              "url": "https://zzz.nanoka.cc/boss/690461"
+            }
+          ],
+          "hidden": false
         }
       ],
       "hidden": false
@@ -1157,6 +1222,117 @@
             }
           ],
           "hidden": false
+        },
+        {
+          "id": "boss_encounter.dream_bound_ye_shiyuan.v3_2.p2",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.2",
+              "phaseNo": 2,
+              "startDate": "2026-09-25",
+              "endDate": "2026-10-09"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "索贝克与魇缚者每次交替上场时，可使魇缚者获得1层[合契]与1层[舍身]，[合契]与[舍身]最多叠加3层，每层[合契]可使全属性异常积蓄抗性提升15%，每层[舍身]可使魇缚者防御降低8%；魇缚者进入失衡状态时，受到暴击伤害提升50%。"
+          },
+          "recommendedSpecialties": [
+            "stun"
+          ],
+          "playerBuffs": [
+            {
+              "id": "dream_bound_ye_shiyuan_v3_2_p2_sacrifice",
+              "name": {
+                "zhCN": "舍身"
+              },
+              "description": {
+                "zhCN": "每层[舍身]可使魇缚者防御降低8%，最多叠加3层。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "dream_bound_ye_shiyuan_v3_2_p2_sacrifice_def_reduction",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "enemyDefReduction",
+                  "mode": "flat",
+                  "valuePerStack": 8,
+                  "maxStacks": 3,
+                  "defaultStacks": 3,
+                  "stackGroup": "dream_bound_ye_shiyuan_v3_2_p2_sacrifice_stacks",
+                  "stackLabel": {
+                    "zhCN": "舍身层数"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            },
+            {
+              "id": "dream_bound_ye_shiyuan_v3_2_p2_stunned_crit_damage",
+              "name": {
+                "zhCN": "失衡暴击易伤"
+              },
+              "description": {
+                "zhCN": "魇缚者进入失衡状态时，受到暴击伤害提升50%。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "dream_bound_ye_shiyuan_v3_2_p2_stunned_crit_damage_value",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "critDmg",
+                  "mode": "flat",
+                  "value": 50,
+                  "condition": "魇缚者进入失衡状态时",
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [
+            {
+              "id": "dream_bound_ye_shiyuan_v3_2_p2_pact",
+              "name": {
+                "zhCN": "合契"
+              },
+              "description": {
+                "zhCN": "每层[合契]可使魇缚者全属性异常积蓄抗性提升15%，最多叠加3层。"
+              },
+              "calculationStatus": "descriptiveOnly",
+              "unmodeledReason": {
+                "zhCN": "异常积蓄抗性不在伤害计算范围内。"
+              },
+              "effects": [],
+              "buffModifiers": []
+            }
+          ],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "3.2 第二期敌人数据与效果（nanoka.cc 690461）"
+              },
+              "url": "https://zzz.nanoka.cc/boss/690461"
+            }
+          ],
+          "hidden": false
         }
       ],
       "hidden": false
@@ -1957,6 +2133,102 @@
             }
           ],
           "hidden": false
+        },
+        {
+          "id": "boss_encounter.kusariku.v3_2.p2",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.2",
+              "phaseNo": 2,
+              "startDate": "2026-09-25",
+              "endDate": "2026-10-09"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "库萨里库受到的属性异常伤害降低40%。代理人成功使用[招架支援]应对库萨里库的「裂界闪袭」时，将对其施加1层[识破]；使库萨里库进入失衡状态时，对其施加2层[识破]。每层[识破]会使其受到的锐暴伤害提升20%，[识破]最多叠加4层，持续30秒，重复触发时刷新持续时间。"
+          },
+          "recommendedSpecialties": [
+            "armorer"
+          ],
+          "playerBuffs": [
+            {
+              "id": "kusariku_v3_2_p2_see_through",
+              "name": {
+                "zhCN": "识破"
+              },
+              "description": {
+                "zhCN": "每层[识破]使库萨里库受到的锐暴伤害提升20%；最多叠加4层，持续30秒，重复触发时刷新持续时间。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "kusariku_v3_2_p2_see_through_laceration_dmg",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "lacerationDmg",
+                  "mode": "flat",
+                  "valuePerStack": 20,
+                  "maxStacks": 4,
+                  "defaultStacks": 4,
+                  "durationSeconds": 30,
+                  "stackGroup": "kusariku_v3_2_p2_see_through_stacks",
+                  "stackLabel": {
+                    "zhCN": "识破层数"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [
+            {
+              "id": "kusariku_v3_2_p2_anomaly_damage_reduction",
+              "name": {
+                "zhCN": "属性异常伤害减免"
+              },
+              "description": {
+                "zhCN": "库萨里库受到的属性异常伤害降低40%。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "kusariku_v3_2_p2_anomaly_damage_reduction_value",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyDamageBonus",
+                  "mode": "flat",
+                  "value": -40,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "3.2 第二期敌人数据与效果（nanoka.cc 690461）"
+              },
+              "url": "https://zzz.nanoka.cc/boss/690461"
+            }
+          ],
+          "hidden": false
         }
       ],
       "hidden": false
@@ -2086,6 +2358,112 @@
                 "zhCN": "3.2 第一期敌人数据与效果（绝区零官方百科）"
               },
               "url": "https://baike.mihoyo.com/zzz/wiki/content/2211/detail?mhy_presentation_style=fullscreen"
+            }
+          ],
+          "hidden": false
+        },
+        {
+          "id": "boss_encounter.integrated_scorched_horizon_phaethon.v3_2.p2",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.2",
+              "phaseNo": 2,
+              "startDate": "2026-09-25",
+              "endDate": "2026-10-09"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "对异构·焚昼余火造成[部位破坏]或[完美反制]时，全队锐化伤害提高40%，持续60秒，重复触发时刷新持续时间。代理人攻击命中非失衡状态的敌人时，造成的失衡值提升15%。异构·焚昼余火处于失衡状态中时，失衡易伤倍率提升20%。"
+          },
+          "recommendedSpecialties": [
+            "armorer"
+          ],
+          "playerBuffs": [
+            {
+              "id": "integrated_scorched_v3_2_p2_sharp_damage",
+              "name": {
+                "zhCN": "锐化伤害提升"
+              },
+              "description": {
+                "zhCN": "对异构·焚昼余火造成[部位破坏]或[完美反制]时，全队锐化伤害提高40%，持续60秒，重复触发时刷新持续时间。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "integrated_scorched_v3_2_p2_sharp_damage_value",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "sharpDmgBonus",
+                  "mode": "flat",
+                  "value": 40,
+                  "condition": "对异构·焚昼余火造成部位破坏或完美反制后",
+                  "durationSeconds": 60,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            },
+            {
+              "id": "integrated_scorched_v3_2_p2_daze_bonus",
+              "name": {
+                "zhCN": "失衡值提升"
+              },
+              "description": {
+                "zhCN": "代理人攻击命中非失衡状态的敌人时，造成的失衡值提升15%。"
+              },
+              "calculationStatus": "descriptiveOnly",
+              "unmodeledReason": {
+                "zhCN": "失衡值积累不在伤害计算范围内。"
+              },
+              "effects": [],
+              "buffModifiers": []
+            },
+            {
+              "id": "integrated_scorched_v3_2_p2_stun_vulnerable",
+              "name": {
+                "zhCN": "失衡易伤提升"
+              },
+              "description": {
+                "zhCN": "异构·焚昼余火处于失衡状态中时，失衡易伤倍率提升20%。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "integrated_scorched_v3_2_p2_stun_vulnerable_value",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "stunDmgMultiplierBonus",
+                  "mode": "flat",
+                  "value": 20,
+                  "condition": "异构·焚昼余火处于失衡状态中时",
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "3.2 第二期敌人数据与效果（nanoka.cc 690461）"
+              },
+              "url": "https://zzz.nanoka.cc/boss/690461"
             }
           ],
           "hidden": false

@@ -179,6 +179,15 @@ assert.deepEqual(Object.fromEntries(skillTagCounts), {
     dodgeCounter: 3,
 })
 assert.equal(storedTargets.length, 86)
+const jifengTargets = combatBuffCatalog.fieldBuffs
+    .find(buff => buff.id === "field.critical_assault.v3_2.p2.jifeng")
+    .effects.flatMap(effect => effect.target?.skillTargets ?? [])
+assert.deepEqual(jifengTargets, [])
+assert.deepEqual(
+    combatBuffCatalog.fieldBuffs.find(buff => buff.id === "field.critical_assault.v3_2.p2.jifeng")
+        .effects.find(effect => effect.stat === "electricResIgnore")?.target,
+    { kind: "default" },
+)
 const zhishuangTargets = combatBuffCatalog.fieldBuffs
     .find(buff => buff.id === "field.critical_assault.v3_1.p2.zhishuang")
     .effects.flatMap(effect => effect.target?.skillTargets ?? [])

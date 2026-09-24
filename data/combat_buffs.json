@@ -7290,6 +7290,237 @@
         }
       ],
       "buffModifiers": []
+    },
+    {
+      "id": "field.critical_assault.v3_2.p2.jifeng",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "critical_assault",
+        "gameVersion": "3.2",
+        "phaseNo": 2,
+        "phaseName": {
+          "zhCN": "第二期"
+        }
+      },
+      "name": {
+        "zhCN": "极锋"
+      },
+      "source": {
+        "zhCN": "危局强袭战"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.2版本第二期"
+      },
+      "description": {
+        "zhCN": "代理人的锐化伤害提升15%，防御力提升15%。代理人发动[强化特殊技]、[特殊技]、[终结技]后，攻击命中敌人时无视其20%的电属性伤害抗性，持续20秒，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_critical_assault_v3_2_p2_jifeng_sharp_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "sharpDmgBonus",
+          "mode": "flat",
+          "value": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_2_p2_jifeng_def",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "defPct",
+          "mode": "pct",
+          "basis": "outOfCombatDef",
+          "value": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_2_p2_jifeng_electric_res_ignore",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "electricResIgnore",
+          "mode": "flat",
+          "value": 20,
+          "condition": "代理人发动强化特殊技、特殊技、终结技后",
+          "durationSeconds": 20,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.critical_assault.v3_2.p2.shijin",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "critical_assault",
+        "gameVersion": "3.2",
+        "phaseNo": 2,
+        "phaseName": {
+          "zhCN": "第二期"
+        }
+      },
+      "name": {
+        "zhCN": "蚀烬"
+      },
+      "source": {
+        "zhCN": "危局强袭战"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.2版本第二期"
+      },
+      "description": {
+        "zhCN": "队伍中存在2/3名[异常]特性的代理人时，全队的异常精通分别提升20/60点，异常积蓄效率分别提升10%/20%。代理人使敌人进入属性异常状态后，敌人的防御力降低10%，持续10秒，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_critical_assault_v3_2_p2_shijin_anomaly_proficiency",
+          "type": "formula",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "anomalyProficiency",
+          "mode": "flat",
+          "source": {
+            "variable": "x",
+            "label": {
+              "zhCN": "队伍内异常特性代理人数量"
+            },
+            "defaultValue": 3,
+            "min": 0,
+            "max": 3
+          },
+          "formula": {
+            "expression": "20 * max(x - 1, 0) + 20 * max(x - 2, 0)",
+            "valueUnit": "storedValue"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_2_p2_shijin_enemy_def_reduction",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "enemyDefReduction",
+          "mode": "flat",
+          "value": 10,
+          "condition": "代理人使敌人进入属性异常状态后",
+          "durationSeconds": 10,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.critical_assault.v3_2.p2.tanlie",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "critical_assault",
+        "gameVersion": "3.2",
+        "phaseNo": 2,
+        "phaseName": {
+          "zhCN": "第二期"
+        }
+      },
+      "name": {
+        "zhCN": "坍裂"
+      },
+      "source": {
+        "zhCN": "危局强袭战"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.2版本第二期"
+      },
+      "description": {
+        "zhCN": "代理人的以太伤害和物理属性伤害提升25%，[击破]特性的代理人造成的失衡值提升20%。代理人使敌人进入失衡状态后，敌人的失衡易伤倍率提升40%，且失衡恢复速度降低15%，持续20秒，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_critical_assault_v3_2_p2_tanlie_ether_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "etherDmg",
+          "mode": "flat",
+          "value": 25,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_2_p2_tanlie_physical_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "physicalDmg",
+          "mode": "flat",
+          "value": 25,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_2_p2_tanlie_stun_vulnerable",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "stunDmgMultiplierBonus",
+          "mode": "flat",
+          "value": 40,
+          "condition": "代理人使敌人进入失衡状态后",
+          "durationSeconds": 20,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
     }
   ],
   "bossBuffs": [],
