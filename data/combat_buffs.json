@@ -7353,21 +7353,7 @@
           "id": "field_critical_assault_v3_2_p2_jifeng_electric_res_ignore",
           "type": "fixed",
           "target": {
-            "kind": "skill",
-            "skillTargets": [
-              {
-                "kind": "skillType",
-                "skillType": "special"
-              },
-              {
-                "kind": "skillTag",
-                "skillTag": "exSpecial"
-              },
-              {
-                "kind": "skillType",
-                "skillType": "ultimate"
-              }
-            ]
+            "kind": "default"
           },
           "stat": "electricResIgnore",
           "mode": "flat",
@@ -7508,25 +7494,6 @@
           "stat": "physicalDmg",
           "mode": "flat",
           "value": 25,
-          "coverage": {
-            "default": 1,
-            "min": 0,
-            "max": 1,
-            "step": 0.1
-          }
-        },
-        {
-          "id": "field_critical_assault_v3_2_p2_tanlie_stun_value",
-          "type": "fixed",
-          "target": {
-            "kind": "default"
-          },
-          "stat": "impactPct",
-          "mode": "pct",
-          "value": 20,
-          "requirement": {
-            "specialty": "stun"
-          },
           "coverage": {
             "default": 1,
             "min": 0,

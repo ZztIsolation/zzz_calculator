@@ -1159,13 +1159,9 @@ const jifengEffects = fieldBuff(FIELD_BUFF_IDS.jifeng).effects
 assert.equal(jifengEffects.find(effect => effect.stat === "sharpDmgBonus")?.value, 15)
 assert.equal(jifengEffects.find(effect => effect.stat === "defPct")?.value, 15)
 assert.deepEqual(
-    jifengEffects.find(effect => effect.stat === "electricResIgnore")?.target.skillTargets,
-    [
-        { kind: "skillType", skillType: "special" },
-        { kind: "skillTag", skillTag: "exSpecial" },
-        { kind: "skillType", skillType: "ultimate" },
-    ],
-    "Jifeng should target Special, EX Special, and Ultimate skills",
+    jifengEffects.find(effect => effect.stat === "electricResIgnore")?.target,
+    { kind: "default" },
+    "Jifeng's triggered sub-Buff should apply to every skill",
 )
 const jifengSharp = calculateInCombatPanel(catalog, {
     agentId: "claret",
@@ -1223,7 +1219,7 @@ approx(shijinPhase2.damage.targetBreakdown.enemyDefReduction, 0.1, "Phase 2 Shij
 const tanlieEther = calculateAttackBasic(FIELD_BUFF_IDS.tanlie, {}, "ether")
 approx(tanlieEther.inCombat.panel.etherDmg - tanlieEther.outOfCombat.panel.etherDmg, 0.25, "Tanlie should grant 25% Ether damage")
 const tanlieRules = fieldBuff(FIELD_BUFF_IDS.tanlie).effects
-assert.equal(tanlieRules.find(effect => effect.stat === "impactPct")?.requirement?.specialty, "stun")
+assert.equal(tanlieRules.some(effect => ["impact", "impactPct"].includes(effect.stat)), false, "Tanlie must not approximate Daze increase as Impact")
 assert.equal(tanlieRules.find(effect => effect.stat === "stunDmgMultiplierBonus")?.value, 40)
 
 const shirenSharp = calculateInCombatPanel(catalog, {
