@@ -178,7 +178,18 @@ assert.deepEqual(Object.fromEntries(skillTagCounts), {
     fireSuppression: 3,
     dodgeCounter: 3,
 })
-assert.equal(storedTargets.length, 86)
+assert.equal(storedTargets.length, 89)
+const jifengTargets = combatBuffCatalog.fieldBuffs
+    .find(buff => buff.id === "field.critical_assault.v3_2.p2.jifeng")
+    .effects.flatMap(effect => effect.target?.skillTargets ?? [])
+assert.deepEqual(jifengTargets, [
+    { kind: "skillType", skillType: "special" },
+    { kind: "skillTag", skillTag: "exSpecial" },
+    { kind: "skillType", skillType: "ultimate" },
+])
+assert.equal(jifengTargets.filter(target => skillTargetMatches(target, exSpecialSource)).length, 2)
+assert.equal(jifengTargets.filter(target => skillTargetMatches(target, normalSpecialSource)).length, 1)
+assert.equal(jifengTargets.filter(target => skillTargetMatches(target, ultimateSource)).length, 1)
 const zhishuangTargets = combatBuffCatalog.fieldBuffs
     .find(buff => buff.id === "field.critical_assault.v3_1.p2.zhishuang")
     .effects.flatMap(effect => effect.target?.skillTargets ?? [])

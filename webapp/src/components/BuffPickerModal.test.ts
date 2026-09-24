@@ -434,6 +434,42 @@ const fieldBuffs = [
     description: { zhCN: "异常伤害、攻击力、全属性抗性无视与防御无视提升" },
     effects: [{ id: "field-critical-yixi", type: "fixed", stat: "anomalyDamageBonus", value: 30, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
   },
+  {
+    id: "field.critical_assault.v3_2.p2.jifeng",
+    sourceType: "field",
+    sourceCategory: "field",
+    sourceKind: "field",
+    source: { zhCN: "危局强袭战" },
+    sourcePeriod: { zhCN: "3.2版本第二期" },
+    period: { modeId: "critical_assault", gameVersion: "3.2", phaseNo: 2, phaseName: { zhCN: "第二期" } },
+    name: { zhCN: "极锋" },
+    description: { zhCN: "锐化伤害、防御力与电属性抗性无视提升" },
+    effects: [{ id: "field-critical-jifeng", type: "fixed", stat: "sharpDmgBonus", value: 15, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
+  {
+    id: "field.critical_assault.v3_2.p2.shijin",
+    sourceType: "field",
+    sourceCategory: "field",
+    sourceKind: "field",
+    source: { zhCN: "危局强袭战" },
+    sourcePeriod: { zhCN: "3.2版本第二期" },
+    period: { modeId: "critical_assault", gameVersion: "3.2", phaseNo: 2, phaseName: { zhCN: "第二期" } },
+    name: { zhCN: "蚀烬" },
+    description: { zhCN: "异常精通与敌方减防提升" },
+    effects: [{ id: "field-critical-shijin", type: "fixed", stat: "anomalyProficiency", value: 60, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
+  {
+    id: "field.critical_assault.v3_2.p2.tanlie",
+    sourceType: "field",
+    sourceCategory: "field",
+    sourceKind: "field",
+    source: { zhCN: "危局强袭战" },
+    sourcePeriod: { zhCN: "3.2版本第二期" },
+    period: { modeId: "critical_assault", gameVersion: "3.2", phaseNo: 2, phaseName: { zhCN: "第二期" } },
+    name: { zhCN: "坍裂" },
+    description: { zhCN: "物理、以太与失衡效果提升" },
+    effects: [{ id: "field-critical-tanlie", type: "fixed", stat: "etherDmg", value: 25, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
 ]
 
 const bossBuffs = [
@@ -496,6 +532,48 @@ const bossBuffs = [
     playerBuffs: [],
     playerDebuffs: [],
     effects: [{ id: "d-anomaly", type: "fixed", stat: "anomalyDamageBonus", value: 10, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
+  {
+    id: "boss.encounter.miasma.v3_2.p2",
+    bossId: "boss.miasma_fiend_named",
+    sourceType: "boss",
+    bossName: { zhCN: "秽息妖鬼·名可名" },
+    name: { zhCN: "秽息妖鬼·名可名敌情" },
+    images: { icon: "/assets/bosses/miasma-fiend-named.webp" },
+    target: { defense: 952, weaknessElements: ["physical", "ether"], resistanceElements: ["fire"] },
+    appearances: [{ modeId: "critical_assault", gameVersion: "3.2", phaseNo: 2 }],
+    enemyIntel: { zhCN: "3.2第二期秽息妖鬼敌情" },
+    playerBuffs: [],
+    playerDebuffs: [],
+    effects: [{ id: "miasma-p2", type: "stacked", stat: "anomalyDamageBonus", valuePerStack: 8, maxStacks: 6, defaultStacks: 6, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
+  {
+    id: "boss.encounter.ye-shiyuan.v3_2.p2",
+    bossId: "boss.dream_bound_ye_shiyuan",
+    sourceType: "boss",
+    bossName: { zhCN: "魇缚者·叶释渊" },
+    name: { zhCN: "魇缚者·叶释渊敌情" },
+    images: { icon: "/assets/bosses/dream-bound-ye-shiyuan.webp" },
+    target: { defense: 953, weaknessElements: ["physical", "ice", "wind"], resistanceElements: ["electric"] },
+    appearances: [{ modeId: "critical_assault", gameVersion: "3.2", phaseNo: 2 }],
+    enemyIntel: { zhCN: "3.2第二期魇缚者敌情" },
+    playerBuffs: [],
+    playerDebuffs: [],
+    effects: [{ id: "ye-shiyuan-p2", type: "fixed", stat: "critDmg", value: 50, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
+  {
+    id: "boss.encounter.kusariku.v3_2.p2",
+    bossId: "boss.kusariku",
+    sourceType: "boss",
+    bossName: { zhCN: "库萨里库" },
+    name: { zhCN: "库萨里库敌情" },
+    images: { icon: "/assets/bosses/kusariku.webp" },
+    target: { defense: 952, weaknessElements: ["electric", "fire"], resistanceElements: ["ice"] },
+    appearances: [{ modeId: "critical_assault", gameVersion: "3.2", phaseNo: 2 }],
+    enemyIntel: { zhCN: "3.2第二期库萨里库敌情" },
+    playerBuffs: [],
+    playerDebuffs: [],
+    effects: [{ id: "kusariku-p2", type: "stacked", stat: "lacerationDmg", valuePerStack: 20, maxStacks: 4, defaultStacks: 4, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
   },
 ]
 
@@ -1702,12 +1780,14 @@ describe("BuffPickerModal", () => {
     await openBossTab(wrapper)
     const selects = wrapper.findAll(".boss-buff-filter-row select")
     expect(selects).toHaveLength(3)
-    expect((selects[0].element as HTMLSelectElement).value).toBe("3.1")
-    expect((selects[1].element as HTMLSelectElement).value).toBe("critical_assault:3.1:3")
-    expect(wrapper.text()).toContain("Boss 丁")
-    expect(wrapper.text()).not.toContain("Boss 甲")
-    expect(wrapper.text()).not.toContain("Boss 乙")
-
+    expect((selects[0].element as HTMLSelectElement).value).toBe("3.2")
+    expect((selects[1].element as HTMLSelectElement).value).toBe("critical_assault:3.2:2")
+    expect(wrapper.text()).toContain("秽息妖鬼·名可名")
+    expect(wrapper.text()).toContain("魇缚者·叶释渊")
+    expect(wrapper.text()).toContain("库萨里库")
+    expect(wrapper.text()).not.toContain("Boss 丁")
+    await selects[0].setValue("3.1")
+    await nextTick()
     await selects[1].setValue("critical_assault:3.1:2")
     await nextTick()
     expect(wrapper.text()).toContain("Boss 甲")
@@ -1740,6 +1820,8 @@ describe("BuffPickerModal", () => {
     const wrapper = mountModal({ selectedIds: [buffId] })
 
     await openBossTab(wrapper)
+    await wrapper.findAll(".boss-buff-filter-row select")[0].setValue("3.1")
+    await nextTick()
     await wrapper.findAll(".boss-buff-filter-row select")[1].setValue("critical_assault:3.1:2")
     await nextTick()
     expect(wrapper.findAll(".rule-enabled-control")).toHaveLength(2)
@@ -1774,6 +1856,8 @@ describe("BuffPickerModal", () => {
       runtimeInputs: payload.runtimeInputs,
     })
     await openBossTab(reopened)
+    await reopened.findAll(".boss-buff-filter-row select")[0].setValue("3.1")
+    await nextTick()
     await reopened.findAll(".boss-buff-filter-row select")[1].setValue("critical_assault:3.1:2")
     await nextTick()
     const reopenedRow = buffRowByText(reopened, "Boss 甲")
@@ -1800,6 +1884,8 @@ describe("BuffPickerModal", () => {
     })
 
     await openBossTab(wrapper)
+    await wrapper.findAll(".boss-buff-filter-row select")[0].setValue("3.1")
+    await nextTick()
     await wrapper.findAll(".boss-buff-filter-row select")[1].setValue("critical_assault:3.1:2")
     await nextTick()
     await buffRowByText(wrapper, "Boss 乙").find(".buff-row-toggle").trigger("click")
@@ -1819,9 +1905,9 @@ describe("BuffPickerModal", () => {
 
     await openFieldTab(wrapper)
 
-    expect(wrapper.text()).toContain("幻焰蚀锋")
-    expect(wrapper.text()).toContain("紊音共振")
-    expect(wrapper.text()).toContain("御雷贯芒")
+    expect(wrapper.text()).toContain("极锋")
+    expect(wrapper.text()).toContain("蚀烬")
+    expect(wrapper.text()).toContain("坍裂")
     expect(wrapper.text()).not.toContain("冰袭")
     expect(wrapper.text()).not.toContain("灼乱漩涡")
     expect(wrapper.text()).not.toContain("极境彻风")
@@ -1947,23 +2033,23 @@ describe("BuffPickerModal", () => {
     expect(visibleRows.some(text => text.includes("湮亡"))).toBe(false)
   })
 
-  it("defaults the field tab to Defense Battle 3.1 phase 3", async () => {
+  it("defaults the field tab to Critical Assault 3.2 phase 2", async () => {
     const wrapper = mountModal()
 
     await openFieldTab(wrapper)
     const selects = wrapper.findAll(".field-buff-filter-row select")
 
-    expect((selects[0].element as HTMLSelectElement).value).toBe("3.1")
-    expect((selects[1].element as HTMLSelectElement).value).toBe("defense_v5|3.1|3")
+    expect((selects[0].element as HTMLSelectElement).value).toBe("3.2")
+    expect((selects[1].element as HTMLSelectElement).value).toBe("critical_assault|3.2|2")
     const selectedPeriod = selects[1].findAll("option")
       .find(option => (option.element as HTMLOptionElement).selected)
-    expect(selectedPeriod?.text()).toBe("防卫战 v5 · 3.1版本 · 第三期")
+    expect(selectedPeriod?.text()).toBe("危局强袭战 · 3.2版本 · 第二期")
     const visibleRows = wrapper.findAll(".buff-row").map(row => row.text())
     expect(visibleRows).toHaveLength(3)
-    expect(visibleRows[0]).toContain("幻焰蚀锋")
-    expect(visibleRows[1]).toContain("紊音共振")
-    expect(visibleRows[2]).toContain("御雷贯芒")
-    expect(visibleRows.some(text => text.includes("3.1版本第二期"))).toBe(false)
+    expect(visibleRows[0]).toContain("极锋")
+    expect(visibleRows[1]).toContain("蚀烬")
+    expect(visibleRows[2]).toContain("坍裂")
+    expect(visibleRows.some(text => text.includes("3.2版本第一期"))).toBe(false)
   })
 
   it("shows Critical Assault 3.1 phase 1 when requested", async () => {
@@ -1971,6 +2057,8 @@ describe("BuffPickerModal", () => {
 
     await openFieldTab(wrapper)
     const selects = wrapper.findAll(".field-buff-filter-row select")
+    await selects[0].setValue("3.1")
+    await nextTick()
     await selects[1].setValue("critical_assault|3.1|1")
     await nextTick()
 
