@@ -575,6 +575,20 @@ const bossBuffs = [
     playerDebuffs: [],
     effects: [{ id: "kusariku-p2", type: "stacked", stat: "lacerationDmg", valuePerStack: 20, maxStacks: 4, defaultStacks: 4, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
   },
+  {
+    id: "boss.encounter.integrated-scorched.v3_2.p2",
+    bossId: "boss.integrated_scorched_horizon_phaethon",
+    sourceType: "boss",
+    bossName: { zhCN: "异构·焚昼余火·法厄同" },
+    name: { zhCN: "异构·焚昼余火·法厄同敌情" },
+    images: { icon: "/assets/bosses/integrated-scorched-horizon-phaethon.webp" },
+    target: { defense: 952, weaknessElements: ["electric"], resistanceElements: ["physical"] },
+    appearances: [{ modeId: "critical_assault", gameVersion: "3.2", phaseNo: 2 }],
+    enemyIntel: { zhCN: "3.2第二期异构焚昼余火敌情" },
+    playerBuffs: [],
+    playerDebuffs: [],
+    effects: [{ id: "integrated-scorched-p2", type: "fixed", stat: "sharpDmgBonus", value: 40, coverage: { default: 1, min: 0, max: 1, step: 0.1 } }],
+  },
 ]
 
 const teammateWEngines = [
@@ -1785,6 +1799,7 @@ describe("BuffPickerModal", () => {
     expect(wrapper.text()).toContain("秽息妖鬼·名可名")
     expect(wrapper.text()).toContain("魇缚者·叶释渊")
     expect(wrapper.text()).toContain("库萨里库")
+    expect(wrapper.text()).toContain("异构·焚昼余火·法厄同")
     expect(wrapper.text()).not.toContain("Boss 丁")
     await selects[0].setValue("3.1")
     await nextTick()

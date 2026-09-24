@@ -15,7 +15,7 @@ const source = JSON.parse(await readFile(path.join(rootDir, "data", "bosses.json
 assert.equal(source.version, 2)
 assert.equal(source.bosses.length, 15)
 assert.equal(meta.bosses.length, 15)
-assert.equal(meta.bossCombatBuffs.length, 21)
+assert.equal(meta.bossCombatBuffs.length, 22)
 
 for (const boss of source.bosses) {
     assert.ok(boss.images.icon.startsWith("/assets/bosses/"))
@@ -48,8 +48,8 @@ const bossEntries = source.bosses.flatMap(boss =>
         ...(encounter.playerDebuffs ?? []),
     ]))
 const bossEffects = bossEntries.flatMap(entry => entry.effects ?? [])
-assert.equal(bossEntries.length, 38)
-assert.equal(bossEffects.length, 41)
+assert.equal(bossEntries.length, 41)
+assert.equal(bossEffects.length, 43)
 for (const effect of bossEffects) {
     assert.deepEqual(
         effect.coverage,
@@ -238,6 +238,17 @@ const integratedScorchedModifiers = integratedScorched.inCombat.activeEffects
     .flatMap(effect => effect.resolvedDamageModifiers ?? [])
 assert.equal(integratedScorchedModifiers.find(effect => effect.stat === "sharpDmgBonus")?.value, 0.4)
 assert.equal(integratedScorched.damage.multipliers.stun, 1.7)
+const integratedScorchedPhase32P2 = resultFor("boss_encounter.integrated_scorched_horizon_phaethon.v3_2.p2")
+const integratedScorchedPhase32P2Modifiers = integratedScorchedPhase32P2.inCombat.activeEffects
+    .flatMap(effect => effect.resolvedDamageModifiers ?? [])
+assert.equal(integratedScorchedPhase32P2Modifiers.find(effect => effect.stat === "sharpDmgBonus")?.value, 0.4)
+assert.equal(integratedScorchedPhase32P2.damage.multipliers.stun, 1.7)
+const integratedScorchedPhase32P2Encounter = integratedScorchedBoss?.encounters
+    .find(encounter => encounter.id === "boss_encounter.integrated_scorched_horizon_phaethon.v3_2.p2")
+const integratedScorchedDaze = integratedScorchedPhase32P2Encounter?.playerBuffs
+    .find(entry => entry.id === "integrated_scorched_v3_2_p2_daze_bonus")
+assert.equal(integratedScorchedDaze?.calculationStatus, "descriptiveOnly")
+assert.equal(integratedScorchedDaze?.effects.length, 0)
 
 const stagnantPhase32Id = "boss_encounter.girtablullu_stagnant_aberrant.v3_2.p1"
 const stagnantPhase32 = resultFor(stagnantPhase32Id)
@@ -299,6 +310,7 @@ assert.deepEqual(phase32PhaseTwoBossIds, [
     "boss.miasma_fiend_named",
     "boss.dream_bound_ye_shiyuan",
     "boss.kusariku",
+    "boss.integrated_scorched_horizon_phaethon",
 ])
 
 const phaseOneBosses = source.bosses.filter(boss => boss.encounters.some(encounter =>
