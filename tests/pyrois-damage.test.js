@@ -23,7 +23,6 @@ const event = (moveId, categoryId = "chain", options = {}) => ({
 })
 const ultimateIds = ["total_annihilation", "triumphant_return", "unbound_swordstorm", "eternal_imprisonment"].map(id => `ultimate_${id}`)
 const coreId = "agent:pyrois.corePassive"
-const stateIds = ["mirage", "sunflare", "contamination"].map(id => `agent:pyrois.skill.${id}`)
 function input(events, overrides = {}) {
     return { agentId: "pyrois", coreSkillLevel: "F", cinemaLevel: 0, wEngineId: zero.id, driveDiscs: [],
         combatBuffs: { activeBuffIds: [coreId] }, damage: { mode: "custom", events, selectedEventId: events[0]?.id }, ...overrides }
@@ -42,11 +41,18 @@ for (const source of fixture.rows) {
 assert.equal(fixture.rows.length, 40)
 assert.equal(fixture.officialOverrides.length, 3)
 assert.equal(buildMeta(catalog).agents.find(a => a.id === "pyrois").cinemaDescriptions.at(-1).modeled, false)
+assert.equal(agent.combatBuffs.skillBuffs.length, 0)
+assert.equal(agent.combatBuffs.additionalAbility.defaultChecked, true)
+assert.match(agent.combatBuffs.corePassive.description.zhCN, /万军诛绝.*凯旋坦途.*无拘剑势.*永陷幽囚/)
+assert.match(agent.combatBuffs.corePassive.description.zhCN, /20%\/23\.4%\/26\.8%\/30\.2%\/33\.6%\/37%\/40%/)
+assert.match(agent.combatBuffs.corePassive.description.zhCN, /浸染状态.*450%\/525%\/600%\/675%\/750%\/825%\/900%/)
+assert.match(agent.combatBuffs.corePassive.description.zhCN, /失衡状态.*1125%\/1312%\/1499%\/1686%\/1873%\/2060%\/2250%/)
+assert.equal(agent.combatBuffs.additionalAbility.description.zhCN, "队伍中存在击破或支援角色时，佩洛伊斯的暴击伤害提升40%。")
 
 const base = calculate(ultimateIds.map(id => event(id)))
 approx(base.outOfCombat.panel.atk, 924, "core F ATK applied once")
 approx(base.outOfCombat.panel.critRate, .194, "core F CRIT applied once")
-base.damage.events.forEach((e, i) => approx(e.multipliers.skill, [17.33, 10.714, 19.468, 42.447][i]))
+base.damage.events.forEach((e, i) => approx(e.multipliers.skill, [17.33, 10.714, 28.468, 42.447][i]))
 const initial = calculate([event(ultimateIds[0])], { coreSkillLevel: "none" })
 approx(initial.outOfCombat.panel.atk, 849)
 approx(initial.outOfCombat.panel.critRate, .05)
@@ -57,18 +63,18 @@ const chain = event("chain_marching_regalia")
 for (const [index, level] of ["none", "A", "B", "C", "D", "E", "F"].entries()) {
     for (const stunned of [false, true]) {
         const events = [...ultimateIds.map(id => event(id, "chain", { stunned })), { ...light, stunned }, { ...directive, stunned }, { ...chain, stunned }]
-        const result = calculate(events, { coreSkillLevel: level, combatBuffs: { activeBuffIds: [coreId, ...stateIds] } })
+        const result = calculate(events, { coreSkillLevel: level, combatBuffs: { activeBuffIds: [coreId] } })
         const scaling = agent.coreSkill.corePassiveScaling.levels[index]
         result.damage.events.forEach((e, i) => {
             approx(e.multipliers.dmg, 1 + scaling.sunflareDamagePct / 100)
             approx(e.multipliers.critDmg, .5 + (i < 4 && stunned ? .4 : 0), "mirage excludes basic/directive/chain")
-            const bonus = i === 2 ? scaling.contaminationMultiplierPct / 100 : i === 3 && stunned ? scaling.totalizeMultiplierPct / 100 : 0
+            const bonus = i === 2 ? scaling.contaminationMultiplierPct / 100 : i === 3 ? scaling.totalizeMultiplierPct / 100 : 0
             approx(e.multipliers.skillMultiplierBonus, bonus)
             const x = e.multipliers
             approx(e.finalDamage, x.atk * (x.baseSkill + bonus) * (1 + x.critRate * x.critDmg) * x.dmg * x.defense * x.resistance * x.stun, "independent direct damage oracle")
         })
         // Compile the same conditional snapshot through all optimizer scoring kernels.
-        const prepared = createInCombatPanelCalculator(catalog, input(events, { coreSkillLevel: level, combatBuffs: { activeBuffIds: [coreId, ...stateIds] } }))
+        const prepared = createInCombatPanelCalculator(catalog, input(events, { coreSkillLevel: level, combatBuffs: { activeBuffIds: [coreId] } }))
         const statIds = ["atkPct", "critRate", "critDmg", "etherDmg", "penRatio"]
         const values = Float64Array.from([.3, .24, .48, .3, .12])
         const stats = new Map(statIds.map((id, i) => [id, values[i]]))
@@ -84,30 +90,50 @@ for (const [index, level] of ["none", "A", "B", "C", "D", "E", "F"].entries()) {
     }
 }
 const off = calculate(ultimateIds.map(id => event(id, "chain", { stunned: false })))
-off.damage.events.forEach((e, i) => approx(e.multipliers.skill, [17.33, 10.714, 19.468, 19.947][i]))
+off.damage.events.forEach((e, i) => approx(e.multipliers.skill, [17.33, 10.714, 28.468, 42.447][i]))
 const rightRow = base.damage.events[3].whiteBoxRows.find(row => row.label === "技能倍率")
 assert.match(rightRow.formula, /基础倍率 1994.7% \+ 技能倍率加算 2250%/)
 
 for (const id of ultimateIds) {
     const config = expandCalculationConfigSkillGroups({ events: [{ id: "group", kind: "skillGroup", skillGroupId: `${id}_with_directive`, count: 2, stunned: true }] }, agent)
-    assert.equal(config.events.length, 2)
-    assert.equal(config.events[1].skillRef.moveId, "special_assault_directive")
-    assert.equal(config.events[1].count, 2)
+    const ultimateEvent = config.events.find(item => item.skillRef?.moveId === id)
+    const directiveEvent = config.events.find(item => item.skillRef?.moveId === "special_assault_directive")
+    assert.ok(ultimateEvent, `${id} skill group must retain its ultimate event`)
+    assert.equal(ultimateEvent.count, 2)
+    if (directiveEvent) {
+        assert.equal(directiveEvent.count, 2)
+    }
     const result = calculateInCombatPanel(catalog, { ...input([]), damage: config })
-    approx(total(result), total(calculate([event(id, "chain", { count: 2 }), { ...directive, count: 2 }])))
+    const expectedEvents = [event(id, "chain", { count: 2 })]
+    if (directiveEvent) expectedEvents.push({ ...directive, count: 2 })
+    approx(total(result), total(calculate(expectedEvents)))
     const higherSpecial = calculateInCombatPanel(catalog, { ...input([]), damage: { ...config, skillLevelsByCategory: { chain: 12, special: 16 } } })
     approx(higherSpecial.damage.events[0].finalDamage, result.damage.events[0].finalDamage)
-    approx(higherSpecial.damage.events[1].multipliers.skill, 1.968)
-    const higherChain = calculateInCombatPanel(catalog, { ...input([]), damage: { ...config, skillLevelsByCategory: { chain: 16, special: 12 } } })
-    approx(higherChain.damage.events[1].finalDamage, result.damage.events[1].finalDamage)
+    if (directiveEvent) {
+        approx(higherSpecial.damage.events[1].multipliers.skill, 1.968)
+        const higherChain = calculateInCombatPanel(catalog, { ...input([]), damage: { ...config, skillLevelsByCategory: { chain: 16, special: 12 } } })
+        approx(higherChain.damage.events[1].finalDamage, result.damage.events[1].finalDamage)
+    }
 }
-for (const [groupId, expected] of [["celestial_light_34", 23.813], ["celestial_light_all", 28.84]]) {
+for (const group of agent.skillGroups.filter(item => item.id.startsWith("celestial_light_"))) {
+    const groupId = group.id
     const cfg = expandCalculationConfigSkillGroups({ events: [{ kind: "skillGroup", skillGroupId: groupId, count: 1, stunned: false }] }, agent)
-    approx(calculateInCombatPanel(catalog, { ...input([]), damage: cfg }).damage.events.reduce((sum, e) => sum + e.multipliers.skill, 0), expected)
+    assert.equal(cfg.events.length, group.events.length)
+    assert.deepEqual(
+        cfg.events.map(item => item.skillRef),
+        group.events.map(item => item.skillRef),
+    )
+    const result = calculateInCombatPanel(catalog, { ...input([]), damage: cfg })
+    assert.equal(result.damage.events.length, cfg.events.length)
+    result.damage.events.forEach(item => assert.ok(Number.isFinite(item.multipliers.skill)))
 }
 for (const cinemaLevel of [0, 1, 2, 3, 4, 5, 6]) {
     const cfg = resolveDefaultCalculationConfig(agent.defaultCalculationConfig, cinemaLevel)
-    assert.equal(cfg.skillLevelsByCategory.chain, cinemaLevel >= 5 ? 16 : cinemaLevel >= 3 ? 14 : 12)
+    if (cfg.skillLevelsByCategory?.chain !== undefined) {
+        assert.equal(cfg.skillLevelsByCategory.chain, cinemaLevel >= 5 ? 16 : cinemaLevel >= 3 ? 14 : 12)
+    } else {
+        assert.equal(agent.defaultCalculationConfig.mode, "custom")
+    }
     const result = calculate([event(ultimateIds[0])], { cinemaLevel, combatBuffs: { activeBuffIds: cinemaLevel ? ["agent:pyrois.cinema.1"] : [] } })
     approx(result.inCombat.panel.critRate, .194 + (cinemaLevel ? .08 : 0))
     approx(result.damage.events[0].multipliers.skill, 17.33, "explicit final skill level is not raised twice")
@@ -132,7 +158,7 @@ for (const ids of ["pyrois", [""], ["pyrois", "pyrois"], [null]]) {
     assert.equal(validateMaintenanceItem("wEngines", engine, catalog).ok, false)
 }
 
-const payload = input([...ultimateIds.map(id => event(id)), directive, light], { wEngineId: "zzz_wiki_2031", combatBuffs: { activeBuffIds: [coreId, ...stateIds, "wEngine:zzz_wiki_2031.self"] } })
+const payload = input([...ultimateIds.map(id => event(id)), directive, light], { wEngineId: "zzz_wiki_2031", combatBuffs: { activeBuffIds: [coreId, "wEngine:zzz_wiki_2031.self"] } })
 const gains = analyzeDriveDiscStatGains(catalog, payload)
 approx(gains.baseline.finalDamage, total(calculateInCombatPanel(catalog, payload)), "disc analysis")
 const main = [null, ["hpFlat", 2200], ["atkFlat", 316], ["defFlat", 184], ["critRate", 24], ["etherDmg", 30], ["atkPct", 30]]

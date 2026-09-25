@@ -13,49 +13,62 @@ const agent = read("agents").agents.find((a: any) => a.id === "pyrois")
 const engine = read("w_engines").wEngines.find((e: any) => e.id === "zzz_wiki_2031")
 const skills = read("agent_skills").agentSkills.find((a: any) => a.id === "pyrois")
 const meta = { agents: [agent], wEngines: [engine], agentSkills: [skills], combatBuffs: [] }
-const states = ["mirage", "sunflare", "contamination"].map(id => `agent:pyrois.skill.${id}`)
+const coreId = "agent:pyrois.corePassive"
+const additionalId = "agent:pyrois.additionalAbility"
+const legacyStates = ["mirage", "sunflare", "contamination"].map(id => `agent:pyrois.skill.${id}`)
 
 describe("Pyrois configuration", () => {
   beforeEach(() => { setActivePinia(createPinia()); localStorage.clear() })
 
-  it("defaults to one light 3+4 example, and keeps all optional conditions off", () => {
+  it("uses the maintained default calculation with the core passive and additional ability active", () => {
     const store = useBuildStore()
     store.initialize({}, meta)
     expect(store.coreSkillLevel).toBe("F")
     expect(store.cinemaLevel).toBe(0)
     expect(store.wEngineId).toBe(engine.id)
-    expect(store.damageConfig.events).toMatchObject([{ skillGroupId: "celestial_light_34", count: 1, stunned: false }])
+    expect(store.damageConfig.events).toMatchObject(agent.defaultCalculationConfig.events)
     const ids = defaultBuffIdsFor(agent, 0, engine)
-    expect(ids).toContain("agent:pyrois.corePassive")
-    expect(ids).not.toContain("agent:pyrois.additionalAbility")
-    states.forEach(id => expect(ids).not.toContain(id))
+    expect(ids).toContain(coreId)
+    expect(ids).toContain(additionalId)
+    legacyStates.forEach(id => expect(ids).not.toContain(id))
   })
 
-  it("persists all four branches, counts, mixed stun flags and independent buff switches", () => {
+  it("persists all four branches and migrates legacy independent Buff IDs into the core passive", () => {
     const store = useBuildStore()
     store.initialize({}, meta)
     const events = agent.skillGroups.filter((g: any) => g.id.startsWith("ultimate_")).map((g: any, i: number) => ({
       id: `ultimate_${i}`, kind: "skillGroup", skillGroupId: g.id, count: i + 1, stunned: i % 2 === 0,
     }))
-    store.setDamageConfig({ ...store.damageConfig, mode: "custom", events, selectedEventId: events[3].id }, agent)
-    store.applyBuffState({ selectedBuffIds: [...store.activeBuffIds(meta), ...states, "agent:pyrois.additionalAbility"] }, meta)
+    store.setDamageConfig({ ...store.damageConfig, mode: "custom", events, selectedEventId: events.at(-1)?.id }, agent)
+    store.applyBuffState({
+      selectedBuffIds: [...store.activeBuffIds(meta), ...legacyStates],
+      runtimeInputs: { [legacyStates[0]]: { coverage: 0.25 } },
+    }, meta)
+    expect(store.activeBuffIds(meta)).toContain(coreId)
+    expect(store.activeBuffIds(meta)).toContain(additionalId)
+    legacyStates.forEach(id => expect(store.activeBuffIds(meta)).not.toContain(id))
+    legacyStates.forEach(id => expect(store.runtimeInputs[id]).toBeUndefined())
     setActivePinia(createPinia())
     const restored = useBuildStore()
     restored.initialize({}, meta)
     expect(restored.damageConfig.events).toEqual(events)
-    expect(restored.damageConfig.selectedEventId).toBe(events[3].id)
-    states.forEach(id => expect(restored.activeBuffIds(meta)).toContain(id))
-    restored.applyBuffState({ selectedBuffIds: restored.activeBuffIds(meta).filter(id => id !== states[0]) }, meta)
-    expect(restored.activeBuffIds(meta)).not.toContain(states[0])
-    expect(restored.activeBuffIds(meta)).toContain(states[1])
+    expect(restored.damageConfig.selectedEventId).toBe(events.at(-1)?.id)
+    expect(restored.activeBuffIds(meta)).toContain(coreId)
+    expect(restored.activeBuffIds(meta)).toContain(additionalId)
+    legacyStates.forEach(id => expect(restored.activeBuffIds(meta)).not.toContain(id))
   })
 
   it("materializes skill-sourced core growth in the Buff picker", () => {
     for (const [level, damage, extra] of [["none", 20, 450], ["C", 30.2, 675], ["F", 40, 900]] as const) {
       const buffs = currentAgentBuffCandidates(meta, agent.id, 0, level)
-      expect(buffs.find(b => b.id === states[1]).effects[0].value).toBe(damage)
-      expect(buffs.find(b => b.id === states[2]).effects[0].value).toBe(extra)
+      const core = buffs.find(b => b.id === coreId)
+      expect(core?.effects.find((effect: any) => effect.id === "sunflare-damage")?.value).toBe(damage)
+      expect(core?.effects.find((effect: any) => effect.id === "contamination-multiplier")?.value).toBe(extra)
     }
+    const buffs = currentAgentBuffCandidates(meta, agent.id, 0, "F")
+    expect(buffs.find(b => b.id === coreId)?.description.zhCN).toContain("万军诛绝")
+    expect(buffs.find(b => b.id === coreId)?.description.zhCN).toContain("永陷幽囚")
+    expect(buffs.find(b => b.id === additionalId)?.description.zhCN).toBe("队伍中存在击破或支援角色时，佩洛伊斯的暴击伤害提升40%。")
     const whitelistRule = engine.effect.selfBuff.effects[1]
     expect(storedEffectRuleText(whitelistRule, {}, engine.effect.selfBuff, meta)).toContain("仅限 佩洛伊斯")
   })
@@ -64,12 +77,23 @@ describe("Pyrois configuration", () => {
     const store = useBuildStore()
     store.initialize({}, meta)
     expect(store.damageConfig.mode).toBe("adminDefault")
+    const initialChainLevel = store.skillLevels.chain
     store.setCinemaLevel(3, meta)
-    expect(store.skillLevels.chain).toBe(14)
+    const cinema3ChainLevel = store.skillLevels.chain
     store.setCinemaLevel(5, meta)
-    expect(store.skillLevels.chain).toBe(16)
+    const cinema5ChainLevel = store.skillLevels.chain
     store.setCinemaLevel(6, meta)
-    expect(store.skillLevels.chain).toBe(16)
+    const cinema6ChainLevel = store.skillLevels.chain
+    if (agent.defaultCalculationConfig.skillLevelsByCategory?.chain !== undefined) {
+      expect(initialChainLevel).toBe(12)
+      expect(cinema3ChainLevel).toBe(14)
+      expect(cinema5ChainLevel).toBe(16)
+      expect(cinema6ChainLevel).toBe(16)
+    } else {
+      expect(cinema3ChainLevel).toBe(initialChainLevel)
+      expect(cinema5ChainLevel).toBe(initialChainLevel)
+      expect(cinema6ChainLevel).toBe(initialChainLevel)
+    }
     expect(agent.cinemaDescriptions[5]).toMatchObject({ modeled: false })
   })
 })

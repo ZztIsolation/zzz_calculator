@@ -205,6 +205,31 @@ function normalizeBossBuffSelection(selectedIds: string[], runtimeInputs: Record
 const SIGRID_TEMPERING_BUFF_ID = "agent:sigrid.skill.tempering"
 const SIGRID_CORE_PASSIVE_BUFF_ID = "agent:sigrid.corePassive"
 const SIGRID_TEMPERING_EFFECT_ID = "tempering-sheathed-spear-damage"
+const PYROIS_CORE_PASSIVE_BUFF_ID = "agent:pyrois.corePassive"
+const PYROIS_LEGACY_SKILL_BUFF_IDS = new Set([
+  "agent:pyrois.skill.mirage",
+  "agent:pyrois.skill.sunflare",
+  "agent:pyrois.skill.contamination",
+])
+
+function normalizePyroisBuffSelection(agent: any, selectedIds: string[], runtimeInputs: Record<string, any>) {
+  if (agent?.id !== "pyrois") {
+    return { selectedIds, runtimeInputs, migrated: false }
+  }
+  const migrated = selectedIds.some(id => PYROIS_LEGACY_SKILL_BUFF_IDS.has(id))
+  if (!migrated) {
+    return { selectedIds, runtimeInputs, migrated: false }
+  }
+  const normalizedRuntimeInputs = { ...(runtimeInputs ?? {}) }
+  for (const id of PYROIS_LEGACY_SKILL_BUFF_IDS) {
+    delete normalizedRuntimeInputs[id]
+  }
+  const normalizedIds = selectedIds.filter(id => !PYROIS_LEGACY_SKILL_BUFF_IDS.has(id))
+  if (!normalizedIds.includes(PYROIS_CORE_PASSIVE_BUFF_ID)) {
+    normalizedIds.push(PYROIS_CORE_PASSIVE_BUFF_ID)
+  }
+  return { selectedIds: normalizedIds, runtimeInputs: normalizedRuntimeInputs, migrated: true }
+}
 
 function normalizeAgentSkillBuffRuntimeInputs(agent: any, runtimeInputs: Record<string, any>) {
   const normalized = clone(runtimeInputs ?? {}) as Record<string, any>
@@ -1095,16 +1120,24 @@ export const useBuildStore = defineStore("build", {
       const selectedWithLegacyBoss = legacyBossEncounterId && !rawSelectedBuffIds.includes(legacyBossEncounterId)
         ? [...rawSelectedBuffIds, legacyBossEncounterId]
         : rawSelectedBuffIds
-      const normalizedBossSelection = normalizeBossBuffSelection(
+      const normalizedPyroisSelection = normalizePyroisBuffSelection(
+        agent,
         selectedWithLegacyBoss,
         combat.runtimeInputs ?? config.runtimeInputs ?? {},
+      )
+      const normalizedBossSelection = normalizeBossBuffSelection(
+        normalizedPyroisSelection.selectedIds,
+        normalizedPyroisSelection.runtimeInputs,
         meta,
         legacyBossEncounterId,
       )
       this.selectedBuffIds = normalizedBossSelection.selectedIds
       this.addedBuffs = normalizeAddedBuffs(combat.addedBuffs ?? config.addedBuffs, meta)
       this.runtimeInputs = normalizeAgentSkillBuffRuntimeInputs(agent, normalizedBossSelection.runtimeInputs)
-      this.manuallyUncheckedDefaultBuffIds = stringArray(combat.manuallyUncheckedDefaultBuffIds)
+      const manuallyUncheckedDefaultBuffIds = stringArray(combat.manuallyUncheckedDefaultBuffIds)
+      this.manuallyUncheckedDefaultBuffIds = normalizedPyroisSelection.migrated
+        ? manuallyUncheckedDefaultBuffIds.filter(id => id !== PYROIS_CORE_PASSIVE_BUFF_ID)
+        : manuallyUncheckedDefaultBuffIds
       this.buffPickerState = normalizeBuffPickerState(config.buffPickerState)
       this.damageConfig = normalizeDamageConfig({
         ...(rawDamageConfig ?? {}),
@@ -1249,12 +1282,17 @@ export const useBuildStore = defineStore("build", {
         ? payload.runtimeInputs
         : this.runtimeInputs
       const defaultIds = this.defaultBuffIds(meta)
-      const normalizedBossSelection = normalizeBossBuffSelection(selectedIds, runtimeInputs, meta)
+      const agent = meta?.agents?.find((item: any) => item.id === this.agentId)
+      const normalizedPyroisSelection = normalizePyroisBuffSelection(agent, selectedIds, runtimeInputs)
+      const normalizedBossSelection = normalizeBossBuffSelection(
+        normalizedPyroisSelection.selectedIds,
+        normalizedPyroisSelection.runtimeInputs,
+        meta,
+      )
       this.selectedBuffIds = normalizedBossSelection.selectedIds.filter(id => !defaultIds.includes(id))
       this.addedBuffs = addedBuffs
-      const agent = meta?.agents?.find((item: any) => item.id === this.agentId)
       this.runtimeInputs = normalizeAgentSkillBuffRuntimeInputs(agent, normalizedBossSelection.runtimeInputs)
-      this.manuallyUncheckedDefaultBuffIds = defaultIds.filter(id => !selectedIds.includes(id))
+      this.manuallyUncheckedDefaultBuffIds = defaultIds.filter(id => !normalizedPyroisSelection.selectedIds.includes(id))
       if (Object.prototype.hasOwnProperty.call(payload ?? {}, "buffPickerState")) {
         this.buffPickerState = normalizeBuffPickerState(payload.buffPickerState)
       }
