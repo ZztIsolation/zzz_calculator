@@ -489,6 +489,20 @@ function setRuleExcludedSpecialties(rule: any, values: unknown) {
   emit("change")
 }
 
+function setRuleAgentIds(rule: any, values: string[]) {
+  if (values.length) rule.requirement = { ...(rule.requirement ?? {}), agentIds: [...new Set(values)] }
+  else if (rule.requirement) {
+    delete rule.requirement.agentIds
+    if (!Object.keys(rule.requirement).length) delete rule.requirement
+  }
+  emit("change")
+}
+
+function agentRequirementOptions() {
+  const agents = Array.isArray(props.catalog?.agents) ? props.catalog.agents : props.catalog?.agents?.agents ?? []
+  return agents.map((agent: any) => option(agent.id, textOf(agent.name) || agent.id))
+}
+
 function setRuleOutOfCombatStat(rule: any, value: string | null) {
   if (value) {
     rule.requirement = {
@@ -645,6 +659,7 @@ function selectStackGroup(rule: any, value: string) {
         <label class="maintenance-field"><span>持续时间（秒）</span><NInputNumber v-model:value="rule.durationSeconds" :disabled="disabled" :min="0" clearable @update:value="emit('change')" /></label>
         <label class="maintenance-field"><span>冷却时间（秒）</span><NInputNumber v-model:value="rule.cooldownSeconds" :disabled="disabled" :min="0" clearable @update:value="emit('change')" /></label>
         <label class="maintenance-field"><span>装备者特性要求</span><NSelect :value="rule.requirement?.specialty ?? null" :options="SPECIALTY_OPTIONS" :disabled="disabled" clearable @update:value="setRuleSpecialty(rule, $event ? String($event) : null)" /></label>
+        <label class="maintenance-field"><span>限定角色</span><NSelect multiple filterable :value="rule.requirement?.agentIds ?? []" :options="agentRequirementOptions()" :disabled="disabled" clearable placeholder="不限角色" @update:value="setRuleAgentIds(rule, $event)" /></label>
         <label class="maintenance-field"><span>排除特性</span><NSelect multiple :value="rule.requirement?.excludedSpecialties ?? []" :options="SPECIALTY_OPTIONS" :disabled="disabled" clearable @update:value="setRuleExcludedSpecialties(rule, $event)" /></label>
         <label class="maintenance-field"><span>装备者属性要求</span><NSelect :value="rule.requirement?.attribute ?? null" :options="ATTRIBUTE_OPTIONS" :disabled="disabled" clearable @update:value="setRuleAttribute(rule, $event ? String($event) : null)" /></label>
         <label class="maintenance-field"><span>失衡状态要求</span><NSelect :value="eventStunnedRequirementValue(rule)" :options="[option('true', '仅失衡'), option('false', '仅非失衡')]" :disabled="disabled" clearable placeholder="不限制" @update:value="setEventStunnedRequirement(rule, $event == null ? null : String($event) === 'true')" /></label>

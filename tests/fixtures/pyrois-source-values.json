@@ -1,0 +1,1034 @@
+{
+  "officialUrl": "https://baike.mihoyo.com/zzz/wiki/content/1958/detail?mhy_presentation_style=fullscreen",
+  "officialVersion": "1789136408",
+  "supplementalUrls": [
+    "https://zzz.gachabase.net/agents/1551/pyrois/release/3.0.0/16735318?lang=chs",
+    "https://zzz.honeyhunterworld.com/1551-char/?lang=CN",
+    "https://zenless-zone-zero.fandom.com/wiki/Pyrois"
+  ],
+  "rows": [
+    {
+      "categoryId": "basic",
+      "moveId": "basic_afterglow",
+      "rowId": "hit_1",
+      "officialValues": [
+        45.6,
+        49.8,
+        54.0,
+        58.2,
+        62.4,
+        66.6,
+        70.8,
+        75.0,
+        79.2,
+        83.4,
+        87.6,
+        91.8
+      ],
+      "supplementalValues": [
+        96,
+        100.2,
+        104.4,
+        108.6
+      ]
+    },
+    {
+      "categoryId": "basic",
+      "moveId": "basic_afterglow",
+      "rowId": "hit_2",
+      "officialValues": [
+        64.1,
+        70.0,
+        75.9,
+        81.8,
+        87.7,
+        93.6,
+        99.5,
+        105.4,
+        111.3,
+        117.2,
+        123.1,
+        129.0
+      ],
+      "supplementalValues": [
+        134.9,
+        140.8,
+        146.7,
+        152.6
+      ]
+    },
+    {
+      "categoryId": "basic",
+      "moveId": "basic_afterglow",
+      "rowId": "hit_3",
+      "officialValues": [
+        276.3,
+        301.5,
+        326.7,
+        351.9,
+        377.1,
+        402.2,
+        427.5,
+        452.7,
+        477.9,
+        503.1,
+        528.3,
+        553.5
+      ],
+      "supplementalValues": [
+        578.7,
+        603.9,
+        629.1,
+        654.3
+      ]
+    },
+    {
+      "categoryId": "basic",
+      "moveId": "basic_afterglow",
+      "rowId": "daze_1",
+      "officialValues": [
+        30.9,
+        32.4,
+        33.9,
+        35.4,
+        36.9,
+        38.4,
+        39.9,
+        41.4,
+        42.9,
+        44.4,
+        45.9,
+        47.4
+      ],
+      "supplementalValues": [
+        48.9,
+        50.4,
+        51.9,
+        53.4
+      ]
+    },
+    {
+      "categoryId": "basic",
+      "moveId": "basic_afterglow",
+      "rowId": "daze_2",
+      "officialValues": [
+        41.8,
+        43.7,
+        45.6,
+        47.5,
+        49.4,
+        51.3,
+        53.2,
+        55.1,
+        57.0,
+        58.9,
+        60.8,
+        62.7
+      ],
+      "supplementalValues": [
+        64.6,
+        66.5,
+        68.4,
+        70.3
+      ]
+    },
+    {
+      "categoryId": "basic",
+      "moveId": "basic_afterglow",
+      "rowId": "daze_3",
+      "officialValues": [
+        178.6,
+        186.8,
+        195.0,
+        203.2,
+        211.4,
+        219.6,
+        227.8,
+        236.0,
+        244.2,
+        252.4,
+        260.6,
+        268.8
+      ],
+      "supplementalValues": [
+        277,
+        285.2,
+        293.4,
+        301.6
+      ]
+    },
+    {
+      "categoryId": "basic",
+      "moveId": "basic_celestial_light",
+      "rowId": "hit_1",
+      "officialValues": [
+        107.0,
+        116.8,
+        126.6,
+        136.4,
+        146.2,
+        156.0,
+        165.8,
+        175.6,
+        185.4,
+        195.2,
+        205.0,
+        214.8
+      ],
+      "supplementalValues": [
+        224.6,
+        234.4,
+        244.2,
+        254
+      ]
+    },
+    {
+      "categoryId": "basic",
+      "moveId": "basic_celestial_light",
+      "rowId": "hit_2",
+      "officialValues": [
+        143.8,
+        156.9,
+        170.0,
+        183.1,
+        196.2,
+        209.3,
+        222.4,
+        235.5,
+        248.6,
+        261.7,
+        274.8,
+        287.9
+      ],
+      "supplementalValues": [
+        301,
+        314.1,
+        327.2,
+        340.3
+      ]
+    },
+    {
+      "categoryId": "basic",
+      "moveId": "basic_celestial_light",
+      "rowId": "hit_3",
+      "officialValues": [
+        549.0,
+        599.0,
+        649.0,
+        699.0,
+        749.0,
+        799.0,
+        849.0,
+        899.0,
+        949.0,
+        999.0,
+        1049.0,
+        1099.0
+      ],
+      "supplementalValues": [
+        1149,
+        1199,
+        1249,
+        1299
+      ]
+    },
+    {
+      "categoryId": "basic",
+      "moveId": "basic_celestial_light",
+      "rowId": "hit_4",
+      "officialValues": [
+        641.0,
+        699.3,
+        757.6,
+        815.9,
+        874.2,
+        932.5,
+        990.8,
+        1049.1,
+        1107.4,
+        1165.7,
+        1224.0,
+        1282.3
+      ],
+      "supplementalValues": [
+        1340.6,
+        1398.9,
+        1457.2,
+        1515.5
+      ]
+    },
+    {
+      "categoryId": "basic",
+      "moveId": "basic_celestial_light",
+      "rowId": "daze_1",
+      "officialValues": [
+        52.3,
+        54.7,
+        57.1,
+        59.5,
+        61.9,
+        64.3,
+        66.7,
+        69.1,
+        71.5,
+        73.9,
+        76.3,
+        78.7
+      ],
+      "supplementalValues": [
+        81.1,
+        83.5,
+        85.9,
+        88.3
+      ]
+    },
+    {
+      "categoryId": "basic",
+      "moveId": "basic_celestial_light",
+      "rowId": "daze_2",
+      "officialValues": [
+        86.5,
+        90.5,
+        94.5,
+        98.5,
+        102.5,
+        106.5,
+        110.5,
+        114.5,
+        118.5,
+        122.5,
+        126.5,
+        130.5
+      ],
+      "supplementalValues": [
+        134.5,
+        138.5,
+        142.5,
+        146.5
+      ]
+    },
+    {
+      "categoryId": "basic",
+      "moveId": "basic_celestial_light",
+      "rowId": "daze_3",
+      "officialValues": [
+        187.0,
+        195.5,
+        204.0,
+        212.5,
+        221.0,
+        229.5,
+        238.0,
+        246.5,
+        255.0,
+        263.5,
+        272.0,
+        280.5
+      ],
+      "supplementalValues": [
+        289,
+        297.5,
+        306,
+        314.5
+      ]
+    },
+    {
+      "categoryId": "basic",
+      "moveId": "basic_celestial_light",
+      "rowId": "daze_4",
+      "officialValues": [
+        138.2,
+        144.5,
+        150.8,
+        157.1,
+        163.4,
+        169.7,
+        176.0,
+        182.3,
+        188.6,
+        194.9,
+        201.2,
+        207.5
+      ],
+      "supplementalValues": [
+        213.8,
+        220.1,
+        226.4,
+        232.7
+      ]
+    },
+    {
+      "categoryId": "dodge",
+      "moveId": "dash_sunrise",
+      "rowId": "damage",
+      "officialValues": [
+        95.3,
+        104.0,
+        112.7,
+        121.4,
+        130.1,
+        138.8,
+        147.5,
+        156.2,
+        164.9,
+        173.6,
+        182.3,
+        191.0
+      ],
+      "supplementalValues": [
+        199.7,
+        208.4,
+        217.1,
+        225.8
+      ]
+    },
+    {
+      "categoryId": "dodge",
+      "moveId": "dash_sunrise",
+      "rowId": "daze",
+      "officialValues": [
+        40.4,
+        42.3,
+        44.2,
+        46.1,
+        48.0,
+        49.9,
+        51.8,
+        53.7,
+        55.6,
+        57.5,
+        59.4,
+        61.3
+      ],
+      "supplementalValues": [
+        63.2,
+        65.1,
+        67,
+        68.9
+      ]
+    },
+    {
+      "categoryId": "dodge",
+      "moveId": "dodge_counter_first_light",
+      "rowId": "damage",
+      "officialValues": [
+        228.7,
+        249.5,
+        270.3,
+        291.1,
+        311.9,
+        332.7,
+        353.5,
+        374.3,
+        395.1,
+        415.9,
+        436.7,
+        457.5
+      ],
+      "supplementalValues": [
+        478.3,
+        499.1,
+        519.9,
+        540.7
+      ]
+    },
+    {
+      "categoryId": "dodge",
+      "moveId": "dodge_counter_first_light",
+      "rowId": "daze",
+      "officialValues": [
+        174.3,
+        182.3,
+        190.3,
+        198.3,
+        206.3,
+        214.3,
+        222.3,
+        230.3,
+        238.3,
+        246.3,
+        254.3,
+        262.3
+      ],
+      "supplementalValues": [
+        270.3,
+        278.3,
+        286.3,
+        294.3
+      ]
+    },
+    {
+      "categoryId": "assist",
+      "moveId": "quick_assist_duskguard",
+      "rowId": "damage",
+      "officialValues": [
+        41.2,
+        45.0,
+        48.8,
+        52.6,
+        56.4,
+        60.2,
+        64.0,
+        67.8,
+        71.6,
+        75.4,
+        79.2,
+        83.0
+      ],
+      "supplementalValues": [
+        86.8,
+        90.6,
+        94.4,
+        98.2
+      ]
+    },
+    {
+      "categoryId": "assist",
+      "moveId": "quick_assist_duskguard",
+      "rowId": "daze",
+      "officialValues": [
+        34.9,
+        36.5,
+        38.1,
+        39.7,
+        41.3,
+        42.9,
+        44.5,
+        46.1,
+        47.7,
+        49.3,
+        50.9,
+        52.5
+      ],
+      "supplementalValues": [
+        54.1,
+        55.7,
+        57.3,
+        58.9
+      ]
+    },
+    {
+      "categoryId": "assist",
+      "moveId": "defensive_assist_iron_guard",
+      "rowId": "light_parry",
+      "officialValues": [
+        271.3,
+        283.7,
+        296.1,
+        308.5,
+        320.9,
+        333.3,
+        345.7,
+        358.1,
+        370.5,
+        382.9,
+        395.3,
+        407.7
+      ],
+      "supplementalValues": [
+        420.1,
+        432.5,
+        444.9,
+        457.3
+      ]
+    },
+    {
+      "categoryId": "assist",
+      "moveId": "defensive_assist_iron_guard",
+      "rowId": "heavy_parry",
+      "officialValues": [
+        342.8,
+        358.4,
+        374.0,
+        389.6,
+        405.2,
+        420.8,
+        436.4,
+        452.0,
+        467.6,
+        483.2,
+        498.8,
+        514.4
+      ],
+      "supplementalValues": [
+        530,
+        545.6,
+        561.2,
+        576.8
+      ]
+    },
+    {
+      "categoryId": "assist",
+      "moveId": "defensive_assist_iron_guard",
+      "rowId": "chain_parry",
+      "officialValues": [
+        166.8,
+        174.4,
+        182.0,
+        189.6,
+        197.2,
+        204.8,
+        212.4,
+        220.0,
+        227.6,
+        235.2,
+        242.8,
+        250.4
+      ],
+      "supplementalValues": [
+        258,
+        265.6,
+        273.2,
+        280.8
+      ]
+    },
+    {
+      "categoryId": "assist",
+      "moveId": "assist_followup_daybreak",
+      "rowId": "damage",
+      "officialValues": [
+        338.6,
+        369.4,
+        400.1,
+        431.0,
+        461.8,
+        492.6,
+        523.4,
+        554.2,
+        585.0,
+        615.8,
+        646.6,
+        677.4
+      ],
+      "supplementalValues": [
+        708.2,
+        739,
+        769.8,
+        800.6
+      ]
+    },
+    {
+      "categoryId": "assist",
+      "moveId": "assist_followup_daybreak",
+      "rowId": "daze",
+      "officialValues": [
+        244.2,
+        255.3,
+        266.4,
+        277.5,
+        288.6,
+        299.7,
+        310.8,
+        321.9,
+        333.0,
+        344.1,
+        355.2,
+        366.3
+      ],
+      "supplementalValues": [
+        377.4,
+        388.5,
+        399.6,
+        410.7
+      ]
+    },
+    {
+      "categoryId": "special",
+      "moveId": "special_fading_rays",
+      "rowId": "damage",
+      "officialValues": [
+        52.1,
+        56.9,
+        61.7,
+        66.5,
+        71.3,
+        76.1,
+        80.9,
+        85.7,
+        90.5,
+        95.3,
+        100.1,
+        104.9
+      ],
+      "supplementalValues": [
+        109.7,
+        114.5,
+        119.3,
+        124.1
+      ]
+    },
+    {
+      "categoryId": "special",
+      "moveId": "special_fading_rays",
+      "rowId": "daze",
+      "officialValues": [
+        44.1,
+        46.2,
+        48.3,
+        50.4,
+        52.5,
+        54.6,
+        56.7,
+        58.8,
+        60.9,
+        63.0,
+        65.1,
+        67.2
+      ],
+      "supplementalValues": [
+        69.3,
+        71.4,
+        73.5,
+        75.6
+      ]
+    },
+    {
+      "categoryId": "special",
+      "moveId": "ex_special_suns_halo",
+      "rowId": "damage",
+      "officialValues": [
+        737.4,
+        804.5,
+        871.6,
+        938.7,
+        1005.8,
+        1072.9,
+        1140.0,
+        1207.1,
+        1274.2,
+        1341.3,
+        1408.4,
+        1475.5
+      ],
+      "supplementalValues": [
+        1542.6,
+        1609.7,
+        1676.8,
+        1743.9
+      ]
+    },
+    {
+      "categoryId": "special",
+      "moveId": "ex_special_suns_halo",
+      "rowId": "daze",
+      "officialValues": [
+        433.6,
+        453.4,
+        473.2,
+        493.0,
+        512.8,
+        532.6,
+        552.4,
+        572.2,
+        592.0,
+        611.8,
+        631.6,
+        651.4
+      ],
+      "supplementalValues": [
+        671.2,
+        691,
+        710.8,
+        730.6
+      ]
+    },
+    {
+      "categoryId": "special",
+      "moveId": "special_assault_directive",
+      "rowId": "damage",
+      "officialValues": [
+        82.8,
+        90.4,
+        98.0,
+        105.6,
+        113.2,
+        120.8,
+        128.4,
+        136.0,
+        143.6,
+        151.2,
+        158.8,
+        166.4
+      ],
+      "supplementalValues": [
+        174,
+        181.6,
+        189.2,
+        196.8
+      ]
+    },
+    {
+      "categoryId": "chain",
+      "moveId": "chain_marching_regalia",
+      "rowId": "damage",
+      "officialValues": [
+        1058.3,
+        1154.6,
+        1250.9,
+        1347.2,
+        1443.5,
+        1539.8,
+        1636.1,
+        1732.4,
+        1828.7,
+        1925.0,
+        2021.3,
+        2117.6
+      ],
+      "supplementalValues": [
+        2213.9,
+        2310.2,
+        2406.5,
+        2502.8
+      ]
+    },
+    {
+      "categoryId": "chain",
+      "moveId": "chain_marching_regalia",
+      "rowId": "daze",
+      "officialValues": [
+        291.6,
+        304.9,
+        318.2,
+        331.5,
+        344.8,
+        358.1,
+        371.4,
+        384.7,
+        398.0,
+        411.3,
+        424.6,
+        437.9
+      ],
+      "supplementalValues": [
+        451.2,
+        464.5,
+        477.8,
+        491.1
+      ]
+    },
+    {
+      "categoryId": "chain",
+      "moveId": "ultimate_total_annihilation",
+      "rowId": "damage",
+      "officialValues": [
+        866.2,
+        945.0,
+        1023.8,
+        1102.6,
+        1181.4,
+        1260.2,
+        1339.0,
+        1417.8,
+        1496.6,
+        1575.4,
+        1654.2,
+        1733.0
+      ],
+      "supplementalValues": [
+        1811.8,
+        1890.6,
+        1969.4,
+        2048.2
+      ]
+    },
+    {
+      "categoryId": "chain",
+      "moveId": "ultimate_total_annihilation",
+      "rowId": "daze",
+      "officialValues": [
+        267.7,
+        279.9,
+        292.1,
+        304.3,
+        316.5,
+        328.7,
+        340.9,
+        353.1,
+        365.3,
+        377.5,
+        398.7,
+        401.9
+      ],
+      "supplementalValues": [
+        414.1,
+        426.3,
+        438.5,
+        450.7
+      ]
+    },
+    {
+      "categoryId": "chain",
+      "moveId": "ultimate_triumphant_return",
+      "rowId": "damage",
+      "officialValues": [
+        535.7,
+        584.4,
+        633.1,
+        681.8,
+        730.5,
+        779.2,
+        827.9,
+        876.6,
+        925.3,
+        974.0,
+        1022.7,
+        1071.4
+      ],
+      "supplementalValues": [
+        1120.1,
+        1168.8,
+        1217.5,
+        1266.2
+      ]
+    },
+    {
+      "categoryId": "chain",
+      "moveId": "ultimate_triumphant_return",
+      "rowId": "daze",
+      "officialValues": [
+        126.6,
+        132.4,
+        138.2,
+        144.0,
+        149.8,
+        155.6,
+        161.4,
+        167.2,
+        173.0,
+        178.8,
+        184.6,
+        190.4
+      ],
+      "supplementalValues": [
+        196.2,
+        202,
+        207.8,
+        213.6
+      ]
+    },
+    {
+      "categoryId": "chain",
+      "moveId": "ultimate_unbound_swordstorm",
+      "rowId": "damage",
+      "officialValues": [
+        973.3,
+        1061.8,
+        1150.3,
+        1238.8,
+        1327.3,
+        1415.8,
+        1504.3,
+        1592.8,
+        1681.3,
+        1769.8,
+        1858.3,
+        1946.8
+      ],
+      "supplementalValues": [
+        2035.3,
+        2123.8,
+        2212.3,
+        2300.8
+      ]
+    },
+    {
+      "categoryId": "chain",
+      "moveId": "ultimate_unbound_swordstorm",
+      "rowId": "daze",
+      "officialValues": [
+        337.3,
+        352.7,
+        368.1,
+        383.5,
+        398.9,
+        414.3,
+        429.7,
+        445.1,
+        460.5,
+        475.9,
+        491.3,
+        506.7
+      ],
+      "supplementalValues": [
+        522.1,
+        537.5,
+        552.9,
+        568.3
+      ]
+    },
+    {
+      "categoryId": "chain",
+      "moveId": "ultimate_eternal_imprisonment",
+      "rowId": "damage",
+      "officialValues": [
+        997.0,
+        1087.7,
+        1178.4,
+        1269.1,
+        1359.8,
+        1450.5,
+        1541.2,
+        1631.9,
+        1722.6,
+        1813.3,
+        1904.0,
+        1994.7
+      ],
+      "supplementalValues": [
+        2085.4,
+        2176.1,
+        2266.8,
+        2357.5
+      ]
+    },
+    {
+      "categoryId": "chain",
+      "moveId": "ultimate_eternal_imprisonment",
+      "rowId": "daze",
+      "officialValues": [
+        251.3,
+        262.8,
+        274.3,
+        285.8,
+        297.3,
+        308.8,
+        320.3,
+        331.8,
+        343.3,
+        354.8,
+        366.3,
+        377.8
+      ],
+      "supplementalValues": [
+        389.3,
+        400.8,
+        412.3,
+        423.8
+      ]
+    }
+  ],
+  "officialOverrides": [
+    {
+      "move": "普通攻击：余晖",
+      "row": "三段伤害倍率",
+      "level": 6,
+      "official": 402.2,
+      "database": 402.3
+    },
+    {
+      "move": "支援突击：重睹天日",
+      "row": "伤害倍率",
+      "level": 3,
+      "official": 400.1,
+      "database": 400.2
+    },
+    {
+      "move": "终结技：万军诛绝",
+      "row": "失衡倍率",
+      "level": 11,
+      "official": 398.7,
+      "database": 389.7
+    }
+  ]
+}

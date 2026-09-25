@@ -219,6 +219,10 @@ const coreSkillOptions = computed(() => {
   ]
 })
 const cinemaLevelOptions = Array.from({ length: 7 }, (_, level) => ({ label: `${level} 影`, value: level }))
+const unmodeledCinemaNotice = computed(() => (selectedAgent.value?.cinemaDescriptions ?? [])
+  .filter((entry: any) => entry.modeled === false && entry.cinemaLevel <= buildStore.cinemaLevel)
+  .map((entry: any) => entry.description?.zhCN ?? "")
+  .filter(Boolean).join("；"))
 const potentialLevelOptions = computed(() => {
   const maxLevel = Math.max(0, Math.trunc(Number(selectedAgent.value?.potentialVision?.maxLevel ?? 0)))
   return Array.from({ length: maxLevel + 1 }, (_, level) => ({
@@ -1759,6 +1763,7 @@ function formatPercentValue(value: any) {
             </div>
           </div>
         </section>
+        <NAlert v-if="unmodeledCinemaNotice" type="info" :show-icon="false" data-testid="unmodeled-cinema-notice">{{ unmodeledCinemaNotice }}</NAlert>
         <DamageSummaryBar class="workbench-summary-section" :result="buildStore.result" :error="buildStore.error" :loading="catalogStore.loading" />
         <section class="workbench-section workbench-whitebox-section">
           <div class="panel-header workbench-section-header">

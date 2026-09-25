@@ -359,7 +359,7 @@ function enableCoreSkill(enabled: boolean) {
           <label class="maintenance-switch-field"><span>默认启用</span><NSwitch :value="buff.defaultChecked === true" :disabled="disabled" @update:value="buff.defaultChecked = Boolean($event); changed()" /></label>
           <label class="maintenance-field maintenance-field-wide"><span>Buff 描述</span><NInput type="textarea" :value="textOf(buff.description)" :disabled="disabled" @update:value="buff.description = { zhCN: String($event) }; changed()" /></label>
         </div>
-        <EffectRulesEditor :model="buff" :catalog="catalog" :disabled="disabled" :allow-coverage="buff.scope === 'inCombat'" :preferred-skill-id="buff.sourceSkillRef?.agentSkillId" @change="changed" />
+        <EffectRulesEditor :model="buff" :catalog="catalog" :disabled="disabled" :allow-coverage="buff.scope === 'inCombat'" :preferred-skill-id="buff.sourceSkillRef?.agentSkillId" :core-passive-scaling="model.coreSkill?.corePassiveScaling" @change="changed" />
         <div class="buff-modifier-block"><div class="maintenance-row-head"><strong>Buff 修饰</strong></div><BuffModifiersEditor :model="buff" :catalog="catalog" :disabled="disabled" @change="changed" /></div>
       </article>
     </MaintenanceSection>

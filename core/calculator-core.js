@@ -1194,6 +1194,11 @@ function hasOutOfCombatStatRequirement(rule = {}) {
 }
 
 function effectRuleRequirementMatches(rule = {}, modifierContext = {}) {
+    const requiredAgentIds = rule?.requirement?.agentIds
+    if (requiredAgentIds !== undefined && (!Array.isArray(requiredAgentIds)
+        || (requiredAgentIds.length && !requiredAgentIds.includes(String(modifierContext.agent?.id ?? ""))))) {
+        return false
+    }
     const requiredSpecialty = String(rule?.requirement?.specialty ?? "").trim()
     const requiredAttribute = String(rule?.requirement?.attribute ?? "").trim()
     const excludedAgentIds = stringArray(rule?.requirement?.excludedAgentIds)
@@ -2036,6 +2041,7 @@ function agentCombatBuffEntries(agent, coreSkillLevel, potentialLevel) {
         })
     const skillEntries = (Array.isArray(combatBuffs.skillBuffs) ? combatBuffs.skillBuffs : [])
         .filter(buff => buff)
+        .map(buff => materializeCorePassiveScalingEffect(buff, agent, coreSkillLevel))
         .map(buff => ({
             id: `agent:${agent.id}.skill.${buff.id}`,
             key: `skill.${buff.id}`,
@@ -4221,7 +4227,7 @@ function directDamageWhiteBoxRows({ event, damageBasisValue, critMultiplier, cri
         {
             label: "技能倍率",
             formula: event.skillSource
-                ? `${event.skillSource.label} ${event.skillSource.levelLabel ?? `LV${event.skillSource.level}`}${skillMultiplierBonus ? ` + 技能倍率加算 ${formatDamagePercent(skillMultiplierBonus)}` : ""}`
+                ? `${event.skillSource.label} ${event.skillSource.levelLabel ?? `LV${event.skillSource.level}`}${skillMultiplierBonus ? `：基础倍率 ${formatDamagePercent(event.skillMultiplier)} + 技能倍率加算 ${formatDamagePercent(skillMultiplierBonus)}` : ""}`
                 : `${event.label ?? "本次直伤倍率"}${skillMultiplierBonus ? ` + 技能倍率加算 ${formatDamagePercent(skillMultiplierBonus)}` : ""}`,
             value: effectiveSkillMultiplier,
             displayValue: formatDamagePercent(effectiveSkillMultiplier),
@@ -7711,6 +7717,7 @@ export function buildMeta(catalog) {
         anomalyReleaseProfiles: agent.anomalyReleaseProfiles ?? [],
         sharpProfile: agent.sharpProfile ?? null,
         combatBuffs: agent.combatBuffs ?? {},
+        cinemaDescriptions: agent.cinemaDescriptions ?? [],
         preferredDriveDiscs: agent.preferredDriveDiscs ?? null,
         importantSubStats: agent.importantSubStats ?? [],
         importantPanelStats: agent.importantPanelStats ?? [],
