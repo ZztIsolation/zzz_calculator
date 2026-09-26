@@ -10,6 +10,11 @@ The entries below summarize each development day. Implementation details,
 modeling decisions, and verification evidence remain in the
 [detailed changelog](docs/changelog.md).
 
+### 2026-09-26 Pyrois Enka Showcase Mapping And Production Release
+
+- Added the Enka avatar ID `1551` mapping to Pyrois, so showcase imports can recognize and offer Pyrois alongside other mapped agents.
+- Added regression coverage for mapped and skipped showcase agents. The correction was merged through PR #66 and promoted to production with the exact `main`, `deploy`, and server commit `080ad126fff5ac004f5e604027159f07487bb3dd`. Public UID `45591123` verification now maps `1551` to `pyrois` while preserving other unmapped entries.
+
 ### 2026-09-19 Pyrois Four-Branch Ultimate Modeling
 
 - Added Pyrois, four distinct Ultimates, and separate Assault Directive skill groups. The four branch effects are unified under the Core Passive using the direct-damage snapshot assumptions documented in [the modeling notes](docs/pyrois-modeling.md). Sol Exuvia now enforces its wearer restriction. Official data takes precedence, and unrevealed M6 effects are explicitly excluded.
