@@ -37,6 +37,7 @@ const catalog = {
     { id: "hoshimi_miyabi", name: { zhCN: "星见雅" } },
     { id: "aria", name: { zhCN: "爱芮" } },
     { id: "sigrid", name: { zhCN: "希格莉德·德拉叙尔" } },
+    { id: "pyrois", name: { zhCN: "佩洛伊斯" } },
   ],
   displayWEngines: [
     { id: "hailfall_star_palace", name: { zhCN: "霰落星殿" } },
@@ -128,11 +129,30 @@ assert.notEqual(enkaDriveDiscId("1302309616", "7038"), enkaDriveDiscId("13000279
 assert.deepEqual(mapping.agents["1591"], { id: "sigrid", name: "希格莉德·德拉叙尔" })
 assert.deepEqual(mapping.agents["1331"], { id: "vivian", name: "薇薇安·班希" })
 assert.deepEqual(mapping.agents["1611"], { id: "claret", name: "克拉蕾·弗林特" })
+assert.deepEqual(mapping.agents["1551"], { id: "pyrois", name: "佩洛伊斯" })
 assert.deepEqual(mapping.wEngines["14159"], { id: "zzz_wiki_2162", name: "骁骑礼赞" })
 assert.deepEqual(mapping.wEngines["14161"], { id: "zzz_wiki_2188", name: "猩红渴望" })
 assert.deepEqual(mapping.wEngines["12016"], { id: "zzz_wiki_2190", name: "「月相」-弦" })
 assert.deepEqual(mapping.wEngines["13017"], { id: "zzz_wiki_2200", name: "喵运当头" })
 assert.deepEqual(mapping.wEngines["13021"], { id: "zzz_wiki_2189", name: "血髓秘匣" })
+const mappedPyrois = mapShowcaseToCatalog(
+  parseEnkaShowcase({
+    PlayerInfo: {
+      ShowcaseDetail: {
+        AvatarList: [makeAvatar(1551, {
+          Weapon: { Id: 14159, Level: 60, UpgradeLevel: 1 },
+        })],
+      },
+    },
+  }),
+  catalog,
+  mapping,
+  { uid: "45591123" },
+)
+assert.equal(mappedPyrois.mappedAgents.length, 1)
+assert.equal(mappedPyrois.mappedAgents[0].agentId, "pyrois")
+assert.equal(mappedPyrois.mappedAgents[0].agentName, "佩洛伊斯")
+assert.equal(mappedPyrois.skippedAgents.length, 0)
 const mappedSigrid = mapShowcaseToCatalog(
   parseEnkaShowcase({
     PlayerInfo: {
