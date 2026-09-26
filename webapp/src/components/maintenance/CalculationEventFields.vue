@@ -2,7 +2,7 @@
 import { NInput, NInputNumber, NSelect, NSwitch } from "naive-ui"
 import {
   ANOMALY_VARIANT_OPTIONS, CALCULATION_DAMAGE_BASIS_OPTIONS, CRIT_MODE_OPTIONS, SHARP_CRIT_MODE_OPTIONS, DAMAGE_ELEMENT_OPTIONS, DIRECT_DAMAGE_ELEMENT_OPTIONS, DISORDER_TYPE_OPTIONS, EVENT_KIND_OPTIONS, EVENT_SOURCE_OPTIONS,
-  anomalyOptions, categoryOptions, defaultCalculationEvent, moveOptions, option, rowOptions,
+  anomalyOptions, categoryOptions, defaultCalculationEvent, moveOptions, option, rowOptions, turbulenceSecondaryOptions,
 } from "./maintenance-options"
 import { textOf } from "./maintenance-model"
 import { disorderElapsedStepSeconds, normalizeElapsedSeconds } from "@core/damageEventMultipliers.js"
@@ -29,6 +29,8 @@ function visibleKind() {
   if (props.event.kind === "direct" || props.event.kind === "sheer" || props.event.kind === "sharp") return props.event.kind
   return props.event.kind === "disorder" || props.event.settlementType === "disorder"
     ? "disorder"
+    : props.event.settlementType === "turbulence"
+      ? "turbulence"
     : props.event.settlementType === "release"
       ? "release"
       : props.event.settlementType === "luminescence" ? "luminescence" : "anomaly"
@@ -64,6 +66,10 @@ function changeKind(kind: string) {
     const profile = anomalyReleaseProfiles(props.agent)[0]
     props.event.triggerActorRef = { agentId: props.agent?.id ?? "", profileId: profile?.id ?? "" }
     props.event.anomalySource = { actorRef: { agentId: props.agent?.id ?? "" } }
+  }
+  if (kind === "turbulence") {
+    props.event.windSource = { actorRef: { agentId: props.agent?.id ?? "" } }
+    props.event.anomalySource = { actorRef: { agentId: "" } }
   }
   if (kind === "luminescence") {
     props.event.triggerActorRef = { agentId: props.agent?.id ?? "" }
@@ -215,6 +221,14 @@ function critModeOptions() {
       <label class="maintenance-field"><span>异常类型</span><NSelect filterable v-model:value="event.anomalyEffect" :options="anomalyOptions(catalog)" :disabled="disabled" @update:value="emit('change')" /></label>
       <label class="maintenance-field"><span>异常形态</span><NSelect v-model:value="event.anomalyVariant" :options="ANOMALY_VARIANT_OPTIONS" :disabled="disabled" @update:value="emit('change')" /></label>
       <label class="maintenance-field"><span>结算次数</span><NInputNumber v-model:value="event.procCount" :disabled="disabled" :min="0" :step="1" @update:value="emit('change')" /></label>
+    </template>
+    <template v-if="visibleKind() === 'turbulence'">
+      <label class="maintenance-field"><span>风化基底</span><NSelect filterable v-model:value="event.anomalyEffect" :options="anomalyOptions(catalog).filter((item: any) => item.value === 'wind_corrosion')" :disabled="disabled" @update:value="emit('change')" /></label>
+      <label class="maintenance-field"><span>第二异常</span><NSelect filterable v-model:value="event.secondaryAnomalyEffect" :options="turbulenceSecondaryOptions(catalog)" :disabled="disabled" @update:value="emit('change')" /></label>
+      <label class="maintenance-field"><span>剩余时间（秒）</span><NInputNumber v-model:value="event.secondaryAnomalyRemainingSeconds" :disabled="disabled" :min="0" :step="0.5" @update:value="emit('change')" /></label>
+      <label class="maintenance-field"><span>乱流倍率状态</span><NSelect v-model:value="event.turbulenceVariant" :options="[option('normal', '普通乱流'), option('polarized', '特殊乱流')]" :disabled="disabled" @update:value="emit('change')" /></label>
+      <label class="maintenance-field"><span>风化触发者</span><NInput :value="textOf(agent?.name)" disabled /></label>
+      <label class="maintenance-field"><span>第二异常来源</span><NInput v-model:value="event.anomalySource.actorRef.agentId" :disabled="disabled" placeholder="来源角色 ID" @update:value="emit('change')" /></label>
     </template>
     <template v-if="visibleKind() === 'release'">
       <label class="maintenance-field"><span>原异常</span><NSelect filterable v-model:value="event.anomalyEffect" :options="anomalyOptions(catalog)" :disabled="disabled" @update:value="emit('change')" /></label>

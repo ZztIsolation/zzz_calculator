@@ -20,7 +20,9 @@ function decimalPlaces(value) {
 }
 
 function effectCollection(catalog = {}, settlementType) {
-    const directKey = settlementType === "disorder" ? "disorderEffects" : "anomalyEffects"
+    const directKey = settlementType === "disorder"
+        ? "disorderEffects"
+        : settlementType === "turbulence" ? "turbulenceEffects" : "anomalyEffects"
     const direct = catalog?.[directKey]
     if (Array.isArray(direct)) {
         return direct
@@ -45,7 +47,9 @@ function effectCollection(catalog = {}, settlementType) {
 
 function effectById(catalog, settlementType, effectId) {
     const key = String(effectId ?? "").trim()
-    const mapKey = settlementType === "disorder" ? "disorderEffectsMap" : "anomalyEffectsMap"
+    const mapKey = settlementType === "disorder"
+        ? "disorderEffectsMap"
+        : settlementType === "turbulence" ? "turbulenceEffectsMap" : "anomalyEffectsMap"
     return (typeof catalog?.[mapKey]?.get === "function" ? catalog[mapKey].get(key) : null)
         ?? effectCollection(catalog, settlementType).find(effect => String(effect?.id ?? "") === key)
         ?? null
@@ -122,7 +126,8 @@ export function resolveDamageEventMultiplier(event = {}, catalog = {}, releaseCo
 
     const isDisorder = event.kind === "disorder" || event.settlementType === "disorder"
     const effectId = event.anomalyEffect ?? event.previousAnomalyEffect
-    const effect = effectById(catalog, isDisorder ? "disorder" : "attribute", effectId)
+    const isTurbulence = event.settlementType === "turbulence" || event.anomalyVariant === "turbulence"
+    const effect = effectById(catalog, isDisorder ? "disorder" : isTurbulence ? "turbulence" : "attribute", effectId)
     if (!effect) {
         return null
     }
@@ -130,6 +135,14 @@ export function resolveDamageEventMultiplier(event = {}, catalog = {}, releaseCo
     if (isDisorder) {
         const disorder = disorderBaseMultiplier(effect, event.elapsedSeconds)
         return disorder.baseMultiplier * disorderMultiplierScale(event.disorderType) * damageScale
+    }
+
+    if (isTurbulence) {
+        if (event.turbulenceMultiplierStatus && event.turbulenceMultiplierStatus !== "confirmed") {
+            return null
+        }
+        const explicit = Number(event.baseMultiplier)
+        return Number.isFinite(explicit) && explicit >= 0 ? explicit * damageScale : null
     }
 
     if (isReleaseSettlement(event)) {

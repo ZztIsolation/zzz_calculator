@@ -12,7 +12,7 @@ modeling decisions, and verification evidence remain in the
 
 ### 2026-09-19 Pyrois Four-Branch Ultimate Modeling
 
-- Added Pyrois, four distinct Ultimates, and separate Assault Directive skill groups with Mirage, Sunflare, Contamination, and Stun conditions. Sol Exuvia now enforces its wearer restriction. Official data takes precedence, and unrevealed M6 effects are explicitly excluded. See the [modeling notes](docs/pyrois-modeling.md) for sources and documented discrepancies.
+- Added Pyrois, four distinct Ultimates, and separate Assault Directive skill groups. The four branch effects are unified under the Core Passive using the direct-damage snapshot assumptions documented in [the modeling notes](docs/pyrois-modeling.md). Sol Exuvia now enforces its wearer restriction. Official data takes precedence, and unrevealed M6 effects are explicitly excluded.
 
 ### 2026-09-18 Defense Battle 3.2 Phase 1 Field Buffs
 

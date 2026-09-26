@@ -12,7 +12,7 @@ import {
     ScanTelemetryValidationError,
     validateScanTelemetryEvent,
 } from "./scanTelemetry.js"
-import { buildMeta, calculateInCombatPanel, calculateOutOfCombatPanel, loadCatalog } from "./calculator.js"
+import { buildMeta, calculateInCombatPanel, calculateOutOfCombatPanel, isTurbulenceSettlement, loadCatalog } from "./calculator.js"
 import { createEnkaProxy, EnkaProxyError } from "./enkaProxy.js"
 import { loadEnkaMappingSnapshot } from "./enkaMapping.js"
 import { parseEnkaShowcase } from "../core/enka-import/parse-enka.js"
@@ -1081,6 +1081,8 @@ function cleanCalculationEvent(event = {}, index = 0, options = {}) {
         ? "luminescence"
         : isReleaseSettlement(event)
             ? "release"
+        : isTurbulenceSettlement(event)
+            ? "turbulence"
         : inputKind === "disorder" || event.settlementType === "disorder" ? "disorder" : "attribute"
     const kind = inputKind === "direct" || inputKind === "sheer" || inputKind === "sharp" ? inputKind : "anomaly"
     const id = String(event.id ?? `${kind}-${index + 1}`).trim() || `${kind}-${index + 1}`
@@ -1190,6 +1192,31 @@ function cleanCalculationEvent(event = {}, index = 0, options = {}) {
                 anomalySource: {
                     actorRef: { agentId: sourceAgentId },
                     ...(snapshot ? { snapshot } : {}),
+                },
+            }
+        }
+        if (settlementType === "turbulence") {
+            const windSourceAgentId = String(event.windSource?.actorRef?.agentId ?? event.triggerActorRef?.agentId ?? options.agentId ?? "").trim()
+            const secondarySourceAgentId = String(event.anomalySource?.actorRef?.agentId ?? "").trim()
+            const windSnapshot = normalizeAnomalySourceSnapshot(event.windSource?.snapshot)
+            const secondarySnapshot = normalizeAnomalySourceSnapshot(event.anomalySource?.snapshot)
+            return {
+                ...base,
+                settlementType: "turbulence",
+                anomalyEffect: String(event.turbulenceEffect ?? event.anomalyEffect ?? "turbulence").trim(),
+                secondaryAnomalyEffect: String(event.secondaryAnomalyEffect ?? event.secondAnomalyEffect ?? "").trim(),
+                ...(DAMAGE_ELEMENTS.has(String(event.secondaryElement ?? "").trim())
+                    ? { secondaryElement: String(event.secondaryElement).trim() }
+                    : {}),
+                remainingSeconds: Math.max(0, Number(event.remainingSeconds ?? event.secondaryAnomalyRemainingSeconds ?? 0)),
+                turbulenceVariant: ["normal", "polarized"].includes(event.turbulenceVariant) ? event.turbulenceVariant : "normal",
+                windSource: {
+                    actorRef: { agentId: windSourceAgentId },
+                    ...(windSnapshot ? { snapshot: windSnapshot } : {}),
+                },
+                anomalySource: {
+                    actorRef: { agentId: secondarySourceAgentId },
+                    ...(secondarySnapshot ? { snapshot: secondarySnapshot } : {}),
                 },
             }
         }
@@ -1544,6 +1571,18 @@ function cleanAnomalyEffect(item = {}) {
     }
 }
 
+function cleanTurbulenceEffect(item = {}) {
+    return {
+        ...cleanAnomalyEffect(item),
+        settlementType: "turbulence",
+        multiplierTable: item.multiplierTable && typeof item.multiplierTable === "object" && !Array.isArray(item.multiplierTable)
+            ? structuredClone(item.multiplierTable)
+            : {},
+        sourceStatus: String(item.sourceStatus ?? "pending"),
+        calculationEnabled: item.calculationEnabled === true,
+    }
+}
+
 function cleanDisorderEffect(item = {}) {
     return {
         id: requireId(item),
@@ -1561,7 +1600,9 @@ function anomalyMaintenanceType(itemOrType = {}) {
     const raw = typeof itemOrType === "string"
         ? itemOrType
         : itemOrType?.settlementType ?? itemOrType?.maintenanceType
-    return raw === "disorder" ? "disorder" : "attribute"
+    if (raw === "disorder") return "disorder"
+    if (raw === "turbulence") return "turbulence"
+    return "attribute"
 }
 
 function anomalyMaintenanceTypeForUi(itemOrType = {}) {
@@ -1581,6 +1622,10 @@ function rawAnomalyEffectsFromPayload(payload = {}) {
             ...effect,
             settlementType: "disorder",
         })),
+        ...(payload.turbulenceEffects ?? []).map(effect => ({
+            ...effect,
+            settlementType: "turbulence",
+        })),
     ]
 }
 
@@ -1591,6 +1636,7 @@ function anomalyPayloadWithEffects(payload = {}, effects = []) {
     }
     delete next.anomalyEffects
     delete next.disorderEffects
+    delete next.turbulenceEffects
     return next
 }
 
@@ -1822,6 +1868,7 @@ function materializeMaintenanceItem(resource, input = {}) {
     if (resource === "anomaly-effects") {
         const prefix = item.settlementType === "disorder" || item.maintenanceType === "disorder"
             ? "disorder"
+            : item.settlementType === "turbulence" || item.maintenanceType === "turbulence" ? "turbulence"
             : "anomaly"
         return ensureMaintenanceId(item, prefix)
     }
@@ -1860,7 +1907,9 @@ function cleanAnomalyMaintenanceItem(item = {}) {
     const maintenanceType = anomalyMaintenanceTypeForUi(item)
     const cleaned = settlementType === "disorder"
         ? cleanDisorderEffect(item)
-        : cleanAnomalyEffect(item)
+        : settlementType === "turbulence"
+            ? cleanTurbulenceEffect(item)
+            : cleanAnomalyEffect(item)
     return {
         settlementType,
         maintenanceType,
@@ -1937,9 +1986,11 @@ async function saveMaintenanceItem(resource, item) {
                 readDataFile("drive_disc_sets.json"),
             ])
             validationContext.anomalyEffects = anomalyEffectsForType(anomalyEffectsPayload, "attribute")
+            validationContext.turbulenceEffects = anomalyEffectsForType(anomalyEffectsPayload, "turbulence")
             validationContext.disorderEffects = anomalyEffectsForType(anomalyEffectsPayload, "disorder")
             validationContext.driveDiscSets = driveDiscSetsPayload.sets ?? []
             cleanOptions.anomalyEffects = validationContext.anomalyEffects
+            cleanOptions.turbulenceEffects = validationContext.turbulenceEffects
             cleanOptions.disorderEffects = validationContext.disorderEffects
         }
         const itemForValidation = cleanMaintenanceItem(resource, normalizedItem, cleanOptions)

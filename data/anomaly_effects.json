@@ -134,6 +134,521 @@
       "tickMultiplier": 0.075,
       "tickIntervalSeconds": 1,
       "defaultDurationSeconds": 10
+    },
+    {
+      "id": "wind_corrosion",
+      "settlementType": "attribute",
+      "label": {
+        "zhCN": "风化",
+        "en": "Wind Corrosion"
+      },
+      "element": "wind",
+      "baseMultiplier": 12.5,
+      "defaultProcCount": 1,
+      "sourceStatus": "crossChecked",
+      "sources": [
+        "official-mihoyo-baike-content-1960",
+        "cross-checked-public-game-text"
+      ],
+      "version": "2026-09-22",
+      "crossChecked": true,
+      "metadata": {
+        "domain": "wind",
+        "stateKey": "windCorrosion",
+        "keepsStateAfterTurbulence": true,
+        "directDamageOnlyMultiplier": true,
+        "sourceStatus": "crossChecked",
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/2041/detail",
+          "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+          "https://zzz.gachabase.net/agents/1561/velina/release/3.1.0/18626312?lang=chs",
+          "https://news.17173.com/content/06132026/134134065.shtml",
+          "https://www.hoyolab.com/article/45547491"
+        ],
+        "verificationNote": "公开机制资料交叉验证的约1250%风属性异常基底；具体版本数值需随游戏版本复核。"
+      }
+    },
+    {
+      "id": "turbulence",
+      "settlementType": "turbulence",
+      "label": {
+        "zhCN": "乱流",
+        "en": "Turbulence"
+      },
+      "element": "wind",
+      "baseMultiplier": 0,
+      "defaultProcCount": 1,
+      "sourceStatus": "pending",
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/2041/detail",
+        "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+        "https://git.mero.moe/dimbreath/ZenlessData/blame/commit/1dbcef24b3a6039a135daad6b29832c9d556139c/TextMap/TextMapOverwriteTemplateTb.json#L786-L788",
+        "https://zzz.gachabase.net/agents/1561/velina/release/3.1.0/18626312?lang=chs",
+        "https://news.17173.com/content/06132026/134134065.shtml",
+        "https://www.hoyolab.com/article/45547491"
+      ],
+      "version": "2026-09-22",
+      "crossChecked": false,
+      "multiplierTable": {
+        "assault": {
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 7.13,
+          "rounding": "none",
+          "sourceStatus": "pending",
+          "source": "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
+        },
+        "shatter": {
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 5,
+          "rounding": "none",
+          "sourceStatus": "pending",
+          "source": "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
+        },
+        "burn": {
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 0.5,
+          "tickIntervalSeconds": 0.5,
+          "remainingTimeTickCount": 2,
+          "rounding": "floor",
+          "sourceStatus": "pending",
+          "source": "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
+        },
+        "shock": {
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 1.25,
+          "tickIntervalSeconds": 1,
+          "remainingTimeTickCount": 1,
+          "rounding": "floor",
+          "sourceStatus": "pending",
+          "source": "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
+        },
+        "corruption": {
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 0.625,
+          "tickIntervalSeconds": 0.5,
+          "remainingTimeTickCount": 2,
+          "rounding": "floor",
+          "sourceStatus": "pending",
+          "source": "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
+        },
+        "frozen": {
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 0.075,
+          "tickIntervalSeconds": 1,
+          "remainingTimeTickCount": 1,
+          "rounding": "floor",
+          "sourceStatus": "pending",
+          "source": "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
+        },
+        "flinch": {
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 0.075,
+          "tickIntervalSeconds": 1,
+          "remainingTimeTickCount": 1,
+          "rounding": "floor",
+          "sourceStatus": "pending",
+          "source": "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
+        }
+      },
+      "calculationEnabled": false
+    },
+    {
+      "id": "assault",
+      "settlementType": "turbulence",
+      "label": {
+        "zhCN": "强击乱流",
+        "en": "强击 Turbulence"
+      },
+      "element": "physical",
+      "fixedMultiplier": 4.5,
+      "tickMultiplier": 7.13,
+      "tickIntervalSeconds": 0,
+      "defaultDurationSeconds": 0,
+      "metadata": {
+        "domain": "wind",
+        "sourceStatus": "pending",
+        "sourceStatusReason": "官方文本确认乱流结算第二异常；倍率与剩余时间取整规则仍需版本化实测确认。",
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/2041/detail",
+          "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+          "https://git.mero.moe/dimbreath/ZenlessData/blame/commit/1dbcef24b3a6039a135daad6b29832c9d556139c/TextMap/TextMapOverwriteTemplateTb.json#L786-L788",
+          "https://zzz.gachabase.net/agents/1561/velina/release/3.1.0/18626312?lang=chs",
+          "https://news.17173.com/content/06132026/134134065.shtml",
+          "https://www.hoyolab.com/article/45547491"
+        ],
+        "calculationEnabled": false
+      },
+      "multiplierTable": {
+        "assault": {
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 7.13,
+          "rounding": "none",
+          "sourceStatus": "pending",
+          "source": "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
+        }
+      },
+      "sourceStatus": "pending",
+      "calculationEnabled": false
+    },
+    {
+      "id": "shatter",
+      "settlementType": "turbulence",
+      "label": {
+        "zhCN": "碎冰乱流",
+        "en": "碎冰 Turbulence"
+      },
+      "element": "ice",
+      "fixedMultiplier": 4.5,
+      "tickMultiplier": 5,
+      "tickIntervalSeconds": 0,
+      "defaultDurationSeconds": 0,
+      "metadata": {
+        "domain": "wind",
+        "sourceStatus": "pending",
+        "sourceStatusReason": "官方文本确认乱流结算第二异常；倍率与剩余时间取整规则仍需版本化实测确认。",
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/2041/detail",
+          "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+          "https://git.mero.moe/dimbreath/ZenlessData/blame/commit/1dbcef24b3a6039a135daad6b29832c9d556139c/TextMap/TextMapOverwriteTemplateTb.json#L786-L788",
+          "https://zzz.gachabase.net/agents/1561/velina/release/3.1.0/18626312?lang=chs",
+          "https://news.17173.com/content/06132026/134134065.shtml",
+          "https://www.hoyolab.com/article/45547491"
+        ],
+        "calculationEnabled": false
+      },
+      "multiplierTable": {
+        "shatter": {
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 5,
+          "rounding": "none",
+          "sourceStatus": "pending",
+          "source": "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
+        }
+      },
+      "sourceStatus": "pending",
+      "calculationEnabled": false
+    },
+    {
+      "id": "burn",
+      "settlementType": "turbulence",
+      "label": {
+        "zhCN": "灼烧乱流",
+        "en": "灼烧 Turbulence"
+      },
+      "element": "fire",
+      "fixedMultiplier": 4.5,
+      "tickMultiplier": 0.5,
+      "tickIntervalSeconds": 0.5,
+      "defaultDurationSeconds": 10,
+      "metadata": {
+        "domain": "wind",
+        "sourceStatus": "pending",
+        "sourceStatusReason": "官方文本确认乱流结算第二异常；倍率与剩余时间取整规则仍需版本化实测确认。",
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/2041/detail",
+          "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+          "https://git.mero.moe/dimbreath/ZenlessData/blame/commit/1dbcef24b3a6039a135daad6b29832c9d556139c/TextMap/TextMapOverwriteTemplateTb.json#L786-L788",
+          "https://zzz.gachabase.net/agents/1561/velina/release/3.1.0/18626312?lang=chs",
+          "https://news.17173.com/content/06132026/134134065.shtml",
+          "https://www.hoyolab.com/article/45547491"
+        ],
+        "calculationEnabled": false
+      },
+      "multiplierTable": {
+        "burn": {
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 0.5,
+          "tickIntervalSeconds": 0.5,
+          "remainingTimeTickCount": 2,
+          "rounding": "floor",
+          "sourceStatus": "pending",
+          "source": "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
+        }
+      },
+      "sourceStatus": "pending",
+      "calculationEnabled": false
+    },
+    {
+      "id": "shock",
+      "settlementType": "turbulence",
+      "label": {
+        "zhCN": "感电乱流",
+        "en": "感电 Turbulence"
+      },
+      "element": "electric",
+      "fixedMultiplier": 4.5,
+      "tickMultiplier": 1.25,
+      "tickIntervalSeconds": 1,
+      "defaultDurationSeconds": 10,
+      "metadata": {
+        "domain": "wind",
+        "sourceStatus": "pending",
+        "sourceStatusReason": "官方文本确认乱流结算第二异常；倍率与剩余时间取整规则仍需版本化实测确认。",
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/2041/detail",
+          "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+          "https://git.mero.moe/dimbreath/ZenlessData/blame/commit/1dbcef24b3a6039a135daad6b29832c9d556139c/TextMap/TextMapOverwriteTemplateTb.json#L786-L788",
+          "https://zzz.gachabase.net/agents/1561/velina/release/3.1.0/18626312?lang=chs",
+          "https://news.17173.com/content/06132026/134134065.shtml",
+          "https://www.hoyolab.com/article/45547491"
+        ],
+        "calculationEnabled": false
+      },
+      "multiplierTable": {
+        "shock": {
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 1.25,
+          "tickIntervalSeconds": 1,
+          "remainingTimeTickCount": 1,
+          "rounding": "floor",
+          "sourceStatus": "pending",
+          "source": "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
+        }
+      },
+      "sourceStatus": "pending",
+      "calculationEnabled": false
+    },
+    {
+      "id": "corruption",
+      "settlementType": "turbulence",
+      "label": {
+        "zhCN": "侵蚀乱流",
+        "en": "侵蚀 Turbulence"
+      },
+      "element": "ether",
+      "fixedMultiplier": 4.5,
+      "tickMultiplier": 0.625,
+      "tickIntervalSeconds": 0.5,
+      "defaultDurationSeconds": 10,
+      "metadata": {
+        "domain": "wind",
+        "sourceStatus": "pending",
+        "sourceStatusReason": "官方文本确认乱流结算第二异常；倍率与剩余时间取整规则仍需版本化实测确认。",
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/2041/detail",
+          "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+          "https://git.mero.moe/dimbreath/ZenlessData/blame/commit/1dbcef24b3a6039a135daad6b29832c9d556139c/TextMap/TextMapOverwriteTemplateTb.json#L786-L788",
+          "https://zzz.gachabase.net/agents/1561/velina/release/3.1.0/18626312?lang=chs",
+          "https://news.17173.com/content/06132026/134134065.shtml",
+          "https://www.hoyolab.com/article/45547491"
+        ],
+        "calculationEnabled": false
+      },
+      "multiplierTable": {
+        "corruption": {
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 0.625,
+          "tickIntervalSeconds": 0.5,
+          "remainingTimeTickCount": 2,
+          "rounding": "floor",
+          "sourceStatus": "pending",
+          "source": "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
+        }
+      },
+      "sourceStatus": "pending",
+      "calculationEnabled": false
+    },
+    {
+      "id": "frozen",
+      "settlementType": "turbulence",
+      "label": {
+        "zhCN": "霜寒乱流",
+        "en": "霜寒 Turbulence"
+      },
+      "element": "ice",
+      "fixedMultiplier": 4.5,
+      "tickMultiplier": 0.075,
+      "tickIntervalSeconds": 1,
+      "defaultDurationSeconds": 10,
+      "metadata": {
+        "domain": "wind",
+        "sourceStatus": "pending",
+        "sourceStatusReason": "官方文本确认乱流结算第二异常；倍率与剩余时间取整规则仍需版本化实测确认。",
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/2041/detail",
+          "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+          "https://git.mero.moe/dimbreath/ZenlessData/blame/commit/1dbcef24b3a6039a135daad6b29832c9d556139c/TextMap/TextMapOverwriteTemplateTb.json#L786-L788",
+          "https://zzz.gachabase.net/agents/1561/velina/release/3.1.0/18626312?lang=chs",
+          "https://news.17173.com/content/06132026/134134065.shtml",
+          "https://www.hoyolab.com/article/45547491"
+        ],
+        "calculationEnabled": false
+      },
+      "multiplierTable": {
+        "frozen": {
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 0.075,
+          "tickIntervalSeconds": 1,
+          "remainingTimeTickCount": 1,
+          "rounding": "floor",
+          "sourceStatus": "pending",
+          "source": "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
+        }
+      },
+      "sourceStatus": "pending",
+      "calculationEnabled": false
+    },
+    {
+      "id": "flinch",
+      "settlementType": "turbulence",
+      "label": {
+        "zhCN": "畏缩乱流",
+        "en": "畏缩 Turbulence"
+      },
+      "element": "physical",
+      "fixedMultiplier": 4.5,
+      "tickMultiplier": 0.075,
+      "tickIntervalSeconds": 1,
+      "defaultDurationSeconds": 10,
+      "metadata": {
+        "domain": "wind",
+        "sourceStatus": "pending",
+        "sourceStatusReason": "官方文本确认乱流结算第二异常；倍率与剩余时间取整规则仍需版本化实测确认。",
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/2041/detail",
+          "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+          "https://git.mero.moe/dimbreath/ZenlessData/blame/commit/1dbcef24b3a6039a135daad6b29832c9d556139c/TextMap/TextMapOverwriteTemplateTb.json#L786-L788",
+          "https://zzz.gachabase.net/agents/1561/velina/release/3.1.0/18626312?lang=chs",
+          "https://news.17173.com/content/06132026/134134065.shtml",
+          "https://www.hoyolab.com/article/45547491"
+        ],
+        "calculationEnabled": false
+      },
+      "multiplierTable": {
+        "flinch": {
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 0.075,
+          "tickIntervalSeconds": 1,
+          "remainingTimeTickCount": 1,
+          "rounding": "floor",
+          "sourceStatus": "pending",
+          "source": "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
+        }
+      },
+      "sourceStatus": "pending",
+      "calculationEnabled": false
+    }
+  ],
+  "version": 2,
+  "sources": [
+    "https://baike.mihoyo.com/zzz/wiki/content/2041/detail",
+    "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+    "https://git.mero.moe/dimbreath/ZenlessData/blame/commit/1dbcef24b3a6039a135daad6b29832c9d556139c/TextMap/TextMapOverwriteTemplateTb.json#L786-L788",
+    "https://zzz.gachabase.net/agents/1561/velina/release/3.1.0/18626312?lang=chs",
+    "https://news.17173.com/content/06132026/134134065.shtml",
+    "https://www.hoyolab.com/article/45547491"
+  ],
+  "turbulenceMultipliersVersion": 1,
+  "turbulenceMultipliers": [
+    {
+      "id": "zzz-3.1-wind-turbulence",
+      "gameVersion": "3.1.0",
+      "revision": "release-3.1.0",
+      "status": "pending",
+      "calculationEnabled": false,
+      "applicability": "wind_corrosion + second anomaly; turbulence keeps wind corrosion state",
+      "officialSources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/2041/detail",
+        "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+        "https://git.mero.moe/dimbreath/ZenlessData/blame/commit/1dbcef24b3a6039a135daad6b29832c9d556139c/TextMap/TextMapOverwriteTemplateTb.json#L786-L788"
+      ],
+      "crossCheckSources": [
+        "https://zzz.gachabase.net/agents/1561/velina/release/3.1.0/18626312?lang=chs",
+        "https://news.17173.com/content/06132026/134134065.shtml",
+        "https://www.hoyolab.com/article/45547491"
+      ],
+      "capturedAt": "2026-09-22",
+      "confidence": "medium",
+      "notes": "Rows preserve the current disorder-style comparison coefficients for review only. They are not enabled defaults until official text or a pinned in-game measurement confirms the exact turbulence formula.",
+      "rows": [
+        {
+          "secondAnomaly": "assault",
+          "element": "physical",
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 7.13,
+          "rounding": "none",
+          "variants": [
+            "normal"
+          ],
+          "status": "pending"
+        },
+        {
+          "secondAnomaly": "shatter",
+          "element": "ice",
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 5,
+          "rounding": "none",
+          "variants": [
+            "normal"
+          ],
+          "status": "pending"
+        },
+        {
+          "secondAnomaly": "burn",
+          "element": "fire",
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 0.5,
+          "tickIntervalSeconds": 0.5,
+          "remainingTimeTickCount": 2,
+          "rounding": "floor",
+          "variants": [
+            "normal"
+          ],
+          "status": "pending"
+        },
+        {
+          "secondAnomaly": "shock",
+          "element": "electric",
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 1.25,
+          "tickIntervalSeconds": 1,
+          "remainingTimeTickCount": 1,
+          "rounding": "floor",
+          "variants": [
+            "normal"
+          ],
+          "status": "pending"
+        },
+        {
+          "secondAnomaly": "corruption",
+          "element": "ether",
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 0.625,
+          "tickIntervalSeconds": 0.5,
+          "remainingTimeTickCount": 2,
+          "rounding": "floor",
+          "variants": [
+            "normal"
+          ],
+          "status": "pending"
+        },
+        {
+          "secondAnomaly": "frozen",
+          "element": "ice",
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 0.075,
+          "tickIntervalSeconds": 1,
+          "remainingTimeTickCount": 1,
+          "rounding": "floor",
+          "variants": [
+            "normal"
+          ],
+          "status": "pending"
+        },
+        {
+          "secondAnomaly": "flinch",
+          "element": "physical",
+          "fixedMultiplier": 4.5,
+          "remainingTimeCoefficient": 0.075,
+          "tickIntervalSeconds": 1,
+          "remainingTimeTickCount": 1,
+          "rounding": "floor",
+          "variants": [
+            "normal"
+          ],
+          "status": "pending"
+        }
+      ]
     }
   ]
 }

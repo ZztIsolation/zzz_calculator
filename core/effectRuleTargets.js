@@ -2,6 +2,7 @@ export const DAMAGE_ELEMENTS = Object.freeze(["physical", "fire", "ice", "electr
 
 export const ANOMALY_SETTLEMENT_TYPES = Object.freeze([
     "attribute",
+    "turbulence",
     "disorder",
     "release",
     "luminescence",
