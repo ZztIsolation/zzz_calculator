@@ -138,4 +138,104 @@ describe("OptimizerResultSelector", () => {
     expect(wrapper.text()).toContain("第 1 套 · 100% · 队伍异常评分 5,134.289 × k")
     expect(wrapper.get("[role='progressbar']").attributes("aria-label")).toContain("队伍异常评分比例")
   })
+
+  it("renders a manual or loadout score without a rank", () => {
+    const wrapper = mount(OptimizerResultSelector, {
+      props: {
+        modelValue: 0,
+        results: [],
+        currentScore: 810,
+        referenceScore: 900,
+        showRank: false,
+        showControls: false,
+      },
+    })
+
+    expect(wrapper.text()).toContain("90.0% · 评分 810")
+    expect(wrapper.text()).not.toContain("第")
+    expect(wrapper.find("[data-testid='optimizer-result-slider']").exists()).toBe(false)
+    expect(wrapper.get("[role='progressbar']").attributes("aria-valuenow")).toBe("90")
+    expect(wrapper.get("[role='progressbar']").attributes("aria-label")).toContain("当前方案相对优化第一套")
+  })
+
+  it("falls back to 100 percent when no optimizer reference exists", () => {
+    const wrapper = mount(OptimizerResultSelector, {
+      props: {
+        modelValue: 0,
+        results: [],
+        currentScore: 810,
+        referenceScore: 810,
+        showRank: false,
+        showControls: false,
+      },
+    })
+
+    expect(wrapper.text()).toContain("100% · 评分 810")
+  })
+
+  it("hides the comparison percentage for a stale manual or loadout score", () => {
+    const wrapper = mount(OptimizerResultSelector, {
+      props: {
+        modelValue: 0,
+        results: [],
+        currentScore: 810,
+        referenceScore: 900,
+        showRank: false,
+        showControls: false,
+        showPercentage: false,
+      },
+    })
+
+    expect(wrapper.text()).toContain("评分 810")
+    expect(wrapper.text()).not.toContain("90%")
+    expect(wrapper.get("[role='progressbar']").attributes("aria-valuenow")).toBeUndefined()
+    expect(wrapper.get("[role='progressbar']").attributes("aria-label")).toBe("当前方案评分")
+  })
+
+  it("shows one effective-substat line when PEN is not important", () => {
+    const wrapper = mount(OptimizerResultSelector, {
+      props: {
+        modelValue: 1,
+        results: [{ rank: 1, score: 1000 }],
+        effectiveSubstatCounts: { total: 12, withoutPenFlat: 12, includesPenFlat: false },
+      },
+    })
+
+    expect(wrapper.findAll(".optimizer-result-effective-substat-line")).toHaveLength(1)
+    expect(wrapper.text()).toContain("有效副词条数量 12")
+    expect(wrapper.text()).not.toContain("包含穿透值")
+  })
+
+  it("shows both effective-substat lines when PEN is important", () => {
+    const wrapper = mount(OptimizerResultSelector, {
+      props: {
+        modelValue: 1,
+        results: [{ rank: 1, score: 1000 }],
+        effectiveSubstatCounts: { total: 15, withoutPenFlat: 12, includesPenFlat: true },
+      },
+    })
+
+    expect(wrapper.findAll(".optimizer-result-effective-substat-line")).toHaveLength(2)
+    expect(wrapper.text()).toContain("有效副词条数量（包含穿透值） 15")
+    expect(wrapper.text()).toContain("有效副词条数量（不含穿透值） 12")
+  })
+
+  it("keeps effective-substat lines visible when stale comparison percentage is hidden", () => {
+    const wrapper = mount(OptimizerResultSelector, {
+      props: {
+        modelValue: 0,
+        results: [],
+        currentScore: 810,
+        referenceScore: 900,
+        showRank: false,
+        showControls: false,
+        showPercentage: false,
+        effectiveSubstatCounts: { total: 9, withoutPenFlat: 9, includesPenFlat: false },
+      },
+    })
+
+    expect(wrapper.text()).toContain("评分 810")
+    expect(wrapper.text()).toContain("有效副词条数量 9")
+    expect(wrapper.text()).not.toContain("90%")
+  })
 })

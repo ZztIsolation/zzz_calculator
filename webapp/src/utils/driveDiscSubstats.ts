@@ -30,3 +30,59 @@ export function driveDiscAdditionalRollText(stat: unknown, value: unknown, meta?
   const additionalRolls = driveDiscAdditionalRolls(stat, value, meta)
   return additionalRolls && additionalRolls > 0 ? `+${additionalRolls}` : ""
 }
+
+export interface EffectiveDriveDiscSubstatCounts {
+  total: number
+  withoutPenFlat: number
+  includesPenFlat: boolean
+}
+
+function effectiveSubstatRollCount(subStat: any, meta?: any, rarity: unknown = "S"): number {
+  const value = Number(subStat?.value)
+  if (!Number.isFinite(value) || value <= 0) return 0
+
+  const normalizedRarity = String(rarity ?? "S").trim().toUpperCase()
+  if (normalizedRarity === "S") {
+    const rolls = driveDiscSubStatRollCount(subStat?.stat, value, meta)
+    if (rolls !== null) return rolls
+  }
+
+  // Lower-rarity and legacy values do not have a safe S-rank roll mapping.
+  // Count the present effective substat once without inventing extra rolls.
+  return 1
+}
+
+/** Counts configured important substat rolls for the currently selected discs. */
+export function countEffectiveDriveDiscSubstats(
+  driveDiscs: any[] = [],
+  importantSubStats: unknown[] = [],
+  meta?: any,
+): EffectiveDriveDiscSubstatCounts {
+  const important = new Set(
+    (Array.isArray(importantSubStats) ? importantSubStats : [])
+      .map(stat => String(stat ?? "").trim())
+      .filter(Boolean),
+  )
+  const includesPenFlat = important.has("penFlat")
+  let withoutPenFlat = 0
+  let penFlat = 0
+
+  for (const disc of Array.isArray(driveDiscs) ? driveDiscs : []) {
+    for (const subStat of Array.isArray(disc?.subStats) ? disc.subStats : []) {
+      const stat = String(subStat?.stat ?? "").trim()
+      if (!important.has(stat)) continue
+      const rolls = effectiveSubstatRollCount(subStat, meta, disc?.rarity)
+      if (stat === "penFlat") {
+        penFlat += rolls
+      } else {
+        withoutPenFlat += rolls
+      }
+    }
+  }
+
+  return {
+    total: withoutPenFlat + penFlat,
+    withoutPenFlat,
+    includesPenFlat,
+  }
+}

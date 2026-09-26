@@ -121,10 +121,9 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("DriveDiscAnalysisModal")
     expect(source).toContain("showDriveDiscAnalysis")
     expect(source).toContain("driveDiscAnalysisInput")
-    expect(source).toContain("driveDiscAnalysisSourceLabel")
     expect(source).toContain("词条分析")
-    expect(source).toContain('<NButton size="small" data-testid="open-drive-disc-analysis"')
-    expect(source).toContain('${objectiveScoreText(selectedOptimizedScheme.value.score)}')
+    expect(source).toContain('<NButton type="primary" size="small" data-testid="open-drive-disc-analysis"')
+    expect(source).not.toContain("driveDiscAnalysisSourceLabel")
   })
 
   it("uses the team anomaly score label while accepting legacy Luminescence results", () => {
@@ -433,7 +432,6 @@ describe("WorkbenchView drive disc loadout isolation", () => {
     expect(source).toContain("agentId: buildStore.agentId")
     expect(source).toContain(":value=\"selectedLoadout?.id ?? ''\"")
     expect(source).toContain("hasMismatchedLoadoutSelection")
-    expect(source).toContain("selectedLoadout.value.name")
     expect(source).toContain("当前保存的套装不属于该角色，请重新选择该角色的套装。")
     expect(source).not.toContain("inventoryStore.loadouts.find((item: any) => item.id === buildStore.selectedLoadoutId)")
     expect(source).not.toContain("...inventoryStore.loadouts.map((item: any)")
@@ -464,9 +462,19 @@ describe("WorkbenchView optimizer result details", () => {
     expect(source).not.toContain('<template v-if="reservationUiEnabled">')
   })
 
-  it("hides the panel stat summary only while viewing optimizer results", () => {
-    expect(source).toContain('<NTag v-if="buildStore.discMode !== \'optimized\'" round>{{ panelSummaryText }}</NTag>')
-    expect(source).not.toContain('<NTag round>{{ panelSummaryText }}</NTag>')
+  it("uses the unified score selector for every non-optimized scheme source", () => {
+    expect(source).toContain("const currentDriveDiscScore = computed<number | null>")
+    expect(source).toContain("const optimizerReferenceScore = computed<number | null>")
+    expect(source).toContain("const driveDiscReferenceScore = computed")
+    expect(source).toContain("const showDriveDiscComparisonPercentage = computed")
+    expect(source).toContain("countEffectiveDriveDiscSubstats")
+    expect(source).toContain("const selectedAgentImportantSubStats = computed")
+    expect(source).toContain("const effectiveDriveDiscSubstats = computed")
+    expect(source).toContain(':effective-substat-counts="effectiveDriveDiscSubstats"')
+    expect(source).toContain(':show-rank="false"')
+    expect(source).toContain(':show-controls="false"')
+    expect(source).toContain(':show-percentage="showDriveDiscComparisonPercentage"')
+    expect(source).not.toContain("panelSummaryText")
   })
 
   it("labels optimized results with the four-piece set that produced them", () => {
@@ -593,7 +601,7 @@ describe("WorkbenchView optimizer result details", () => {
 
 describe("WorkbenchView first-screen dedup", () => {
   it("keeps the drive disc panel subtitle free of the duplicated scheme score line", () => {
-    expect(source).toContain("driveDiscAnalysisSourceLabel")
+    expect(source).not.toContain("driveDiscAnalysisSourceLabel")
     expect(source).not.toContain("currentSchemeScoreLabel")
     expect(source).not.toContain('{{ selectedDriveDiscs.length }} / 6')
   })
@@ -629,6 +637,6 @@ describe("WorkbenchView drive disc scheme source", () => {
   it("keeps save and analysis as secondary actions next to the source row", () => {
     expect(source).toContain('class="toolbar drive-disc-action-toolbar"')
     expect(source).toContain("openSaveCurrentLoadout")
-    expect(source).not.toContain('<NButton type="primary" size="small" data-testid="open-drive-disc-analysis"')
+    expect(source).toContain('<NButton type="primary" size="small" data-testid="open-drive-disc-analysis"')
   })
 })

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
-import { NButton, NModal, NTag } from "naive-ui"
-import { RefreshCcw } from "lucide-vue-next"
+import { NButton, NModal } from "naive-ui"
 import {
   analyzeDriveDiscStatDiffs,
   analyzeDriveDiscStatGains,
@@ -18,10 +17,8 @@ const props = withDefaults(defineProps<{
   catalog: any
   meta: any
   input: any
-  sourceLabel?: string
   maxRolls?: number
 }>(), {
-  sourceLabel: "",
   maxRolls: 10,
 })
 
@@ -59,11 +56,6 @@ const gainModeTabs: Array<{ label: string, value: GainDisplayMode }> = [
 ]
 
 const driveDiscCount = computed(() => Array.isArray(props.input?.driveDiscs) ? props.input.driveDiscs.length : 0)
-const sourceText = computed(() => props.sourceLabel || "当前驱动盘方案")
-const baselineDamage = computed(() =>
-  analysisData.value?.diffs?.baseline?.finalDamage
-  ?? analysisData.value?.gains?.baseline?.finalDamage
-  ?? null)
 const substatRows = computed(() => analysisData.value?.substats?.stats ?? [])
 const substatDiffRows = computed(() => analysisData.value?.diffs?.substatDiffs ?? [])
 const mainStatSlots = computed<any[]>(() => (Object.values(analysisData.value?.diffs?.mainStatDiffsBySlot ?? {}) as any[])
@@ -183,7 +175,7 @@ function percentText(value: unknown, digits = 3) {
   return formatPercent(value, digits)
 }
 
-function signedNumberText(value: unknown, digits = 3) {
+function signedNumberText(value: unknown, digits = 0) {
   const number = Number(value)
   if (!Number.isFinite(number)) {
     return "-"
@@ -303,21 +295,6 @@ function lastPoint(item: any) {
     @update:show="setShow"
   >
     <div class="drive-disc-analysis section-band ui-layout-scope" data-layout-surface="drive-disc-analysis">
-      <div class="analysis-context">
-        <div class="section-band">
-          <div class="chip-row">
-            <NTag round>{{ sourceText }}</NTag>
-            <NTag round>{{ driveDiscCount }} / 6</NTag>
-            <NTag v-if="baselineDamage !== null" round>基准伤害 {{ numberText(baselineDamage, 3) }}</NTag>
-          </div>
-          <p class="muted analysis-context-copy">按当前角色、音擎、局内 Buff、伤害目标和驱动盘方案计算。</p>
-        </div>
-        <NButton size="small" @click="refreshAnalysis">
-          <template #icon><RefreshCcw :size="16" /></template>
-          刷新
-        </NButton>
-      </div>
-
       <div class="toolbar">
         <NButton
           v-for="tab in analysisTabs"
@@ -334,12 +311,6 @@ function lastPoint(item: any) {
       <div v-else-if="!analysisData" class="empty-state">等待分析</div>
 
       <template v-else-if="activeView === 'substats'">
-        <div class="metric-grid analysis-summary-grid">
-          <dl class="metric" data-layout-field><dt>驱动盘数量</dt><dd>{{ analysisData.substats.driveDiscCount }}</dd></dl>
-          <dl class="metric" data-layout-field><dt>总有效词条</dt><dd>{{ numberText(analysisData.substats.totalEffectiveRolls, 3) }}</dd></dl>
-          <dl class="metric" data-layout-field><dt>统计口径</dt><dd>副词条</dd></dl>
-        </div>
-
         <div v-if="!substatRows.length" class="empty-state">当前驱动盘没有可统计的副词条。</div>
         <template v-else>
           <div class="analysis-bar-list">
@@ -381,12 +352,6 @@ function lastPoint(item: any) {
       </template>
 
       <template v-else-if="activeView === 'gains'">
-        <div class="metric-grid analysis-summary-grid">
-          <dl class="metric" data-layout-field><dt>基准伤害</dt><dd>{{ numberText(analysisData.gains.baseline?.finalDamage, 3) }}</dd></dl>
-          <dl class="metric" data-layout-field><dt>最大新增</dt><dd>{{ analysisData.gains.maxRolls ?? props.maxRolls }} 词条</dd></dl>
-          <dl class="metric" data-layout-field><dt>显示模式</dt><dd>{{ gainModeLabel() }}</dd></dl>
-        </div>
-
         <div class="analysis-mode-row">
           <div class="toolbar">
             <NButton
@@ -465,7 +430,7 @@ function lastPoint(item: any) {
                   <td class="num">{{ percentText(gainPointValue(item.oneRoll), 3) }}</td>
                   <td class="num">{{ percentText(gainPointValue(lastPoint(item)), 3) }}</td>
                   <td class="num">{{ numberText(item.oneRoll?.finalDamage, 3) }}</td>
-                  <td class="num">{{ signedNumberText(gainPointAbsoluteValue(item.oneRoll), 3) }}</td>
+                  <td class="num">{{ signedNumberText(gainPointAbsoluteValue(item.oneRoll)) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -474,12 +439,6 @@ function lastPoint(item: any) {
       </template>
 
       <template v-else>
-        <div class="metric-grid analysis-summary-grid">
-          <dl class="metric" data-layout-field><dt>基准伤害</dt><dd>{{ numberText(analysisData.diffs.baseline?.finalDamage, 3) }}</dd></dl>
-          <dl class="metric" data-layout-field><dt>副词条候选</dt><dd>{{ substatDiffRows.length }}</dd></dl>
-          <dl class="metric" data-layout-field><dt>主词条槽位</dt><dd>4 / 5 / 6</dd></dl>
-        </div>
-
         <section class="analysis-section">
           <h3>副词条差异计算</h3>
           <div v-if="!substatDiffRows.length" class="empty-state compact">当前伤害目标下没有可见的副词条边际收益。</div>
@@ -499,7 +458,7 @@ function lastPoint(item: any) {
                   <td>{{ statName(item.stat) }}</td>
                   <td class="num">{{ storedValue(item.stat, item.currentValue, item.mode) }}</td>
                   <td class="num">{{ storedValue(item.stat, item.addedValue, item.mode) }}</td>
-                  <td class="num analysis-diff-cell" :class="diffTone(item.absoluteDiff)">{{ signedNumberText(item.absoluteDiff, 3) }}</td>
+                  <td class="num analysis-diff-cell" :class="diffTone(item.absoluteDiff)">{{ signedNumberText(item.absoluteDiff) }}</td>
                   <td class="num analysis-diff-cell" :class="diffTone(item.relativeDiff)">{{ signedPercentText(item.relativeDiff, 3) }}</td>
                 </tr>
               </tbody>
@@ -527,7 +486,7 @@ function lastPoint(item: any) {
                   <td class="num">{{ storedValue(item.stat, item.removedValue, item.mode) }}</td>
                   <td>{{ statName(item.best.stat) }}</td>
                   <td class="num">{{ storedValue(item.best.stat, item.best.addedValue, item.best.mode) }}</td>
-                  <td class="num analysis-diff-cell" :class="diffTone(item.best.absoluteDiff)">{{ signedNumberText(item.best.absoluteDiff, 3) }}</td>
+                  <td class="num analysis-diff-cell" :class="diffTone(item.best.absoluteDiff)">{{ signedNumberText(item.best.absoluteDiff) }}</td>
                   <td class="num analysis-diff-cell" :class="diffTone(item.best.relativeDiff)">{{ signedPercentText(item.best.relativeDiff, 3) }}</td>
                 </tr>
               </tbody>
@@ -560,7 +519,7 @@ function lastPoint(item: any) {
                     <tr v-for="item in slot.candidates" :key="item.stat">
                       <td data-label="替换为">{{ statName(item.stat) }}</td>
                       <td class="num" data-label="候选数值">{{ storedValue(item.stat, item.value, item.mode) }}</td>
-                      <td class="num analysis-diff-cell" data-label="伤害差值" :class="diffTone(item.absoluteDiff)">{{ signedNumberText(item.absoluteDiff, 3) }}</td>
+                      <td class="num analysis-diff-cell" data-label="伤害差值" :class="diffTone(item.absoluteDiff)">{{ signedNumberText(item.absoluteDiff) }}</td>
                       <td class="num analysis-diff-cell" data-label="百分比差值" :class="diffTone(item.relativeDiff)">{{ signedPercentText(item.relativeDiff, 3) }}</td>
                     </tr>
                   </tbody>
@@ -581,22 +540,6 @@ function lastPoint(item: any) {
   padding-right: 2px;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-}
-
-.analysis-context {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 12px;
-}
-
-.analysis-context-copy {
-  margin: 0;
-  line-height: 1.45;
-}
-
-.analysis-summary-grid {
-  --ui-field-min: 160px;
 }
 
 .analysis-mode-row {
@@ -836,10 +779,6 @@ function lastPoint(item: any) {
 }
 
 @container ui-layout (max-width: 720px) {
-  .analysis-context {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .analysis-bar-row {
     grid-template-columns: minmax(0, 1fr);
   }

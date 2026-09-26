@@ -2,20 +2,31 @@
 import { computed, watch } from "vue"
 import { NInputNumber, NSlider } from "naive-ui"
 import { formatNumber } from "@/utils/format"
+import type { EffectiveDriveDiscSubstatCounts } from "@/utils/driveDiscSubstats"
 
 interface OptimizerResultOption {
   rank: number
   score: number
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   modelValue: number
   results: OptimizerResultOption[]
+  currentScore?: number | null
+  referenceScore?: number | null
+  effectiveSubstatCounts?: EffectiveDriveDiscSubstatCounts | null
   stale?: boolean
+  showRank?: boolean
+  showControls?: boolean
+  showPercentage?: boolean
   scoreLabel?: string
   scoreSuffix?: string
   scoreDigits?: number
-}>()
+}>(), {
+  showRank: true,
+  showControls: true,
+  showPercentage: true,
+})
 
 const emit = defineEmits<{
   "update:modelValue": [rank: number]
@@ -35,17 +46,33 @@ const currentRank = computed(() => availableRanks.value.includes(Number(props.mo
   : minRank.value)
 const selectedResult = computed(() => normalizedResults.value.find(result => Number(result.rank) === currentRank.value) ?? null)
 const bestResult = computed(() => normalizedResults.value[0] ?? null)
+const selectedScore = computed(() => {
+  const explicitScore = Number(props.currentScore)
+  if (Number.isFinite(explicitScore)) return explicitScore
+  return Number(selectedResult.value?.score)
+})
+const referenceScore = computed(() => {
+  const explicitScore = Number(props.referenceScore)
+  if (Number.isFinite(explicitScore)) return explicitScore
+  return Number(bestResult.value?.score)
+})
+const showRank = computed(() => props.showRank !== false)
+const showControls = computed(() => props.showControls !== false)
+const showPercentage = computed(() => props.showPercentage !== false)
 const hasValidResults = computed(() => {
-  const bestScore = Number(bestResult.value?.score)
-  return normalizedResults.value.length > 0 && Number.isFinite(bestScore) && bestScore > 0
+  if (Number.isFinite(Number(props.currentScore))) {
+    return Number.isFinite(selectedScore.value) && selectedScore.value > 0
+  }
+  return normalizedResults.value.length > 0 && Number.isFinite(referenceScore.value) && referenceScore.value > 0
 })
 const scorePercentage = computed<number | null>(() => {
-  const bestScore = Number(bestResult.value?.score)
-  const selectedScore = Number(selectedResult.value?.score)
-  if (!Number.isFinite(bestScore) || bestScore <= 0 || !Number.isFinite(selectedScore)) {
+  if (!showPercentage.value
+    || !Number.isFinite(referenceScore.value)
+    || referenceScore.value <= 0
+    || !Number.isFinite(selectedScore.value)) {
     return null
   }
-  return Math.max(0, Math.min(100, (selectedScore / bestScore) * 100))
+  return Math.max(0, Math.min(100, (selectedScore.value / referenceScore.value) * 100))
 })
 const percentageText = computed(() => {
   if (scorePercentage.value === null) {
@@ -55,18 +82,40 @@ const percentageText = computed(() => {
   return rounded === 100 ? "100%" : `${rounded.toFixed(1)}%`
 })
 const scoreText = computed(() => {
-  const score = Number(selectedResult.value?.score)
+  const score = selectedScore.value
   if (!Number.isFinite(score)) return "-"
   const suffix = String(props.scoreSuffix ?? "").trim()
   return `${formatNumber(score, props.scoreDigits ?? 0)}${suffix ? ` ${suffix}` : ""}`
 })
 const displayedScoreLabel = computed(() => `${props.stale ? "上次" : ""}${props.scoreLabel ?? "评分"}`)
+const ratioAriaLabel = computed(() => {
+  if (!showPercentage.value) return `当前方案${displayedScoreLabel.value}`
+  if (showRank.value) return `当前优化结果相对第一套的${displayedScoreLabel.value}比例`
+  return `当前方案相对优化第一套的${displayedScoreLabel.value}比例`
+})
+const resultSummaryText = computed(() => [
+  showRank.value ? `第 ${currentRank.value} 套` : "",
+  showPercentage.value ? percentageText.value : "",
+  `${displayedScoreLabel.value} ${scoreText.value}`,
+].filter(Boolean).join(" · "))
+const effectiveSubstatLines = computed(() => {
+  const counts = props.effectiveSubstatCounts
+  if (!counts) return []
+  const total = Math.max(0, Math.round(Number(counts.total) || 0))
+  if (!counts.includesPenFlat) {
+    return [{ label: "有效副词条数量", count: total }]
+  }
+  return [
+    { label: "有效副词条数量（包含穿透值）", count: total },
+    { label: "有效副词条数量（不含穿透值）", count: Math.max(0, Math.round(Number(counts.withoutPenFlat) || 0)) },
+  ]
+})
 const ratioStyle = computed(() => ({
   "--optimizer-result-ratio": `${scorePercentage.value ?? 0}%`,
 }))
 
 watch([() => props.modelValue, availableRankKey], () => {
-  if (!hasValidResults.value) {
+  if (!showControls.value || !hasValidResults.value) {
     return
   }
   const rank = currentRank.value
@@ -105,7 +154,7 @@ function rankTooltip(value: number) {
 
 <template>
   <div v-if="hasValidResults" class="optimizer-result-selector ui-layout-scope" data-layout-surface="optimizer-result-selector">
-    <div class="optimizer-result-control-row">
+    <div v-if="showControls" class="optimizer-result-control-row">
       <NSlider
         class="optimizer-result-slider"
         data-testid="optimizer-result-slider"
@@ -139,13 +188,25 @@ function rankTooltip(value: number) {
       :class="{ 'is-stale': props.stale }"
       :style="ratioStyle"
       role="progressbar"
-      :aria-label="`当前优化结果相对第一套的${displayedScoreLabel}比例`"
+      :aria-label="ratioAriaLabel"
       aria-valuemin="0"
       aria-valuemax="100"
       :aria-valuenow="scorePercentage ?? undefined"
     >
       <span class="optimizer-result-ratio-fill"></span>
-      <strong>第 {{ currentRank }} 套 · {{ percentageText }} · {{ displayedScoreLabel }} {{ scoreText }}</strong>
+      <strong>{{ resultSummaryText }}</strong>
+      <span
+        v-if="effectiveSubstatLines.length"
+        class="optimizer-result-effective-substats"
+        role="group"
+        aria-label="有效副词条统计"
+      >
+        <span
+          v-for="line in effectiveSubstatLines"
+          :key="line.label"
+          class="optimizer-result-effective-substat-line"
+        >{{ line.label }} <b>{{ line.count }}</b></span>
+      </span>
     </div>
   </div>
 </template>
@@ -177,6 +238,7 @@ function rankTooltip(value: number) {
 .optimizer-result-ratio {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   min-width: 0;
@@ -214,6 +276,23 @@ function rankTooltip(value: number) {
   font-size: 13px;
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+.optimizer-result-effective-substats {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  max-width: 100%;
+  gap: 1px;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.optimizer-result-effective-substat-line b {
+  color: var(--app-text);
+  font-weight: 800;
 }
 
 @container ui-layout (max-width: 680px) {

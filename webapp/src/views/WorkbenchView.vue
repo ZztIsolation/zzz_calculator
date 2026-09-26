@@ -17,6 +17,7 @@ import OptimizerResultSelector from "@/components/OptimizerResultSelector.vue"
 import PanelStatTable from "@/components/PanelStatTable.vue"
 import { fallbackIcon, imageForAgent, imageForDriveDiscSet, imageForWEngine } from "@/utils/assets"
 import { buffLabelForId } from "@/utils/combatBuffs"
+import { countEffectiveDriveDiscSubstats } from "@/utils/driveDiscSubstats"
 import {
   attributeLabel,
   buffEffectLines,
@@ -193,17 +194,6 @@ const driveDiscAnalysisInput = computed(() => {
     return null
   }
 })
-const driveDiscAnalysisSourceLabel = computed(() => {
-  if (buildStore.discMode === "optimized") {
-    return selectedOptimizedScheme.value
-      ? `优化结果：第 ${selectedOptimizedScheme.value.rank} 名 · ${objectiveScoreText(selectedOptimizedScheme.value.score)}`
-      : "优化结果"
-  }
-  if (buildStore.discMode === "loadout") {
-    return selectedLoadout.value ? `套装预设：${selectedLoadout.value.name || selectedLoadout.value.id}` : "套装预设"
-  }
-  return "手动选择"
-})
 const coreSkillOptions = computed(() => {
   const levels = selectedAgent.value?.coreSkill?.levels ?? []
   return [
@@ -314,12 +304,6 @@ const currentScoreSuffix = computed(() => isLuminescenceScore.value
   ? String(buildStore.result?.damage?.scoreSuffix ?? "× k")
   : "")
 
-function objectiveScoreText(value: unknown) {
-  const numeric = Number(value)
-  if (!Number.isFinite(numeric)) return "-"
-  const formatted = formatNumber(numeric, isLuminescenceScore.value ? 3 : 0)
-  return isLuminescenceScore.value ? `${formatted} ${currentScoreSuffix.value}` : formatted
-}
 const selectedDriveDiscRows = computed<Array<{ slot: number, disc: any | null }>>(() => {
   const inventoryById = new Map<string, any>(
     inventoryStore.driveDiscs.map((disc: any) => [String(disc.id), disc] as [string, any]),
@@ -468,21 +452,6 @@ const optimizerConstraintChips = computed(() => [
     ? { key: "minimums", label: `属性下限 ${activeMinimumCount.value} 项`, type: "default" as const }
     : null,
 ].filter(Boolean))
-const panelSummaryText = computed(() => {
-  const panel = buildStore.result?.inCombat?.panel ?? buildStore.outOfCombat?.panel ?? {}
-  const atk = panel.finalAtk ?? panel.atk ?? panel.baseAtk
-  const def = panel.def
-  const laceration = panel.lacerationDmg
-  const critRate = panel.critRate
-  const critDmg = panel.critDmg
-  return [
-    isArmorerAgent(selectedAgent.value) && def !== undefined ? `防御 ${formatNumber(def, 0)}` : "",
-    !isArmorerAgent(selectedAgent.value) && atk !== undefined ? `攻击 ${formatNumber(atk, 0)}` : "",
-    critRate !== undefined ? `暴击 ${formatNumber(Number(critRate) * 100, 1)}%` : "",
-    critDmg !== undefined ? `爆伤 ${formatNumber(Number(critDmg) * 100, 1)}%` : "",
-    isArmorerAgent(selectedAgent.value) && laceration !== undefined ? `锐暴 ${formatNumber(Number(laceration) * 100, 1)}%` : "",
-  ].filter(Boolean).join(" · ") || "等待计算"
-})
 watch(topOptimizedResultSchemes, schemes => {
   const values = schemes.map(scheme => Number(scheme.rank))
   if (!values.length) {
@@ -689,6 +658,31 @@ const optimizerCalculationStale = computed(() => {
   }
 })
 const optimizerResultsAreStale = computed(() => optimizerStore.resultsAreStale || optimizerCalculationStale.value)
+const currentDriveDiscScore = computed<number | null>(() => {
+  const damage = buildStore.result?.damage ?? {}
+  const value = isLuminescenceScore.value
+    ? damage.score ?? damage.finalDamage ?? damage.totalFinalDamage
+    : damage.totalFinalDamage ?? damage.finalDamage
+  const numeric = Number(value)
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null
+})
+const optimizerReferenceScore = computed<number | null>(() => {
+  const numeric = Number(topOptimizedResultSchemes.value[0]?.score)
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null
+})
+const driveDiscReferenceScore = computed(() => optimizerReferenceScore.value ?? currentDriveDiscScore.value)
+const showDriveDiscComparisonPercentage = computed(() => !optimizerResultsAreStale.value)
+const selectedAgentImportantSubStats = computed(() => {
+  const agentId = String(buildStore.agentId ?? "")
+  const metaAgent = (catalogStore.meta?.agents ?? []).find((agent: any) => String(agent?.id ?? "") === agentId)
+  if (Array.isArray(metaAgent?.importantSubStats)) return metaAgent.importantSubStats
+  return Array.isArray(selectedAgent.value?.importantSubStats) ? selectedAgent.value.importantSubStats : []
+})
+const effectiveDriveDiscSubstats = computed(() => countEffectiveDriveDiscSubstats(
+  selectedDriveDiscs.value,
+  selectedAgentImportantSubStats.value,
+  catalogStore.meta,
+))
 
 const buildSignature = computed(() => JSON.stringify({
   agentId: buildStore.agentId,
@@ -1642,7 +1636,7 @@ function formatPercentValue(value: any) {
               <template #icon><Save :size="16" /></template>
               存为套装
             </NButton>
-            <NButton size="small" data-testid="open-drive-disc-analysis" :disabled="!selectedDriveDiscs.length" @click="showDriveDiscAnalysis = true">
+            <NButton type="primary" size="small" data-testid="open-drive-disc-analysis" :disabled="!selectedDriveDiscs.length" @click="showDriveDiscAnalysis = true">
               <template #icon><LineChart :size="16" /></template>
               词条分析
             </NButton>
@@ -1652,7 +1646,6 @@ function formatPercentValue(value: any) {
             <div>
               <span>{{ selectedDriveDiscs.length ? `${selectedDriveDiscs.length} 件驱动盘参与当前${isLuminescenceScore ? "评分" : "伤害"}计算` : "选择驱动盘后可查看词条分析" }}</span>
             </div>
-            <NTag v-if="buildStore.discMode !== 'optimized'" round>{{ panelSummaryText }}</NTag>
           </div>
 
           <div v-if="buildStore.discMode === 'loadout'" class="drive-disc-mode-control">
@@ -1680,7 +1673,23 @@ function formatPercentValue(value: any) {
             :score-label="isLuminescenceScore ? '队伍异常评分' : '评分'"
             :score-suffix="currentScoreSuffix"
             :score-digits="isLuminescenceScore ? 3 : 0"
+            :effective-substat-counts="effectiveDriveDiscSubstats"
             @update:model-value="buildStore.selectOptimizedRank"
+          />
+          <OptimizerResultSelector
+            v-else
+            class="drive-disc-mode-control"
+            :model-value="0"
+            :results="[]"
+            :current-score="currentDriveDiscScore"
+            :reference-score="driveDiscReferenceScore"
+            :show-rank="false"
+            :show-controls="false"
+            :show-percentage="showDriveDiscComparisonPercentage"
+            :score-label="isLuminescenceScore ? '队伍异常评分' : '评分'"
+            :score-suffix="currentScoreSuffix"
+            :score-digits="isLuminescenceScore ? 3 : 0"
+            :effective-substat-counts="effectiveDriveDiscSubstats"
           />
           <div v-if="buildStore.discMode === 'optimized' && selectedOptimizedFourPieceSet && !optimizedResultSetIsUserPinned" class="selected-set-summary optimized-result-set">
             <span class="selected-set-chip selected-set-chip-with-icon">
@@ -2083,7 +2092,6 @@ function formatPercentValue(value: any) {
     :catalog="catalogStore.catalog"
     :meta="catalogStore.meta"
     :input="driveDiscAnalysisInput"
-    :source-label="driveDiscAnalysisSourceLabel"
   />
 </template>
 

@@ -3,6 +3,7 @@ import {
   driveDiscAdditionalRollText,
   driveDiscAdditionalRolls,
   driveDiscSubStatRollCount,
+  countEffectiveDriveDiscSubstats,
 } from "@/utils/driveDiscSubstats"
 
 const meta = {
@@ -36,5 +37,47 @@ describe("driveDiscSubstats", () => {
       expect(driveDiscAdditionalRollText("critRate", 4.8, meta, rarity)).toBe("")
     }
     expect(driveDiscAdditionalRollText("critRate", 4.8, meta, "S")).toBe("+1")
+  })
+
+  it("counts important substat rolls and separates PEN", () => {
+    const counts = countEffectiveDriveDiscSubstats([
+      {
+        rarity: "S",
+        subStats: [
+          { stat: "critRate", value: 7.2 },
+          { stat: "penFlat", value: 18 },
+          { stat: "atkPct", value: 3 },
+        ],
+      },
+    ], ["critRate", "penFlat", "atkPct"], {
+      statRules: {
+        driveDisc: {
+          sRankSubStatBaseStep: { critRate: 2.4, penFlat: 9, atkPct: 3 },
+        },
+      },
+    })
+
+    expect(counts).toEqual({ total: 6, withoutPenFlat: 4, includesPenFlat: true })
+  })
+
+  it("counts unknown and lower-rarity values once without inventing extra rolls", () => {
+    const counts = countEffectiveDriveDiscSubstats([
+      {
+        rarity: "A",
+        subStats: [{ stat: "critRate", value: 4.8 }],
+      },
+      {
+        rarity: "S",
+        subStats: [{ stat: "critRate", value: 3.1 }, { stat: "critRate", value: 0 }],
+      },
+    ], ["critRate"], meta)
+
+    expect(counts).toEqual({ total: 2, withoutPenFlat: 2, includesPenFlat: false })
+  })
+
+  it("returns zero for an empty important-substat configuration", () => {
+    expect(countEffectiveDriveDiscSubstats([
+      { rarity: "S", subStats: [{ stat: "critRate", value: 7.2 }] },
+    ], [], meta)).toEqual({ total: 0, withoutPenFlat: 0, includesPenFlat: false })
   })
 })
