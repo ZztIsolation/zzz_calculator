@@ -61,11 +61,11 @@ export const CRIT_MODE_OPTIONS = [option("expected", "期望"), option("crit", "
 export const SHARP_CRIT_MODE_OPTIONS = [option("expected", "期望"), option("nonCrit", "不触发锐暴"), option("sharpCrit", "一次锐暴"), option("lacerationCrit", "二次锐暴")]
 export const EVENT_KIND_OPTIONS = [
   option("direct", "直伤"), option("sheer", "贯穿"), option("sharp", "锐化"), option("anomaly", "属性异常"),
-  option("disorder", "紊乱"), option("release", "异放"), option("luminescence", "耀变"), option("skillGroup", "技能组"),
+  option("disorder", "紊乱"), option("turbulence", "乱流"), option("release", "异放"), option("luminescence", "耀变"), option("skillGroup", "技能组"),
 ]
 export const EVENT_SOURCE_OPTIONS = [option("skill", "技能倍率"), option("manual", "手填倍率")]
 export const DISORDER_TYPE_OPTIONS = [option("normal", "（普通）紊乱"), option("polarized", "极性紊乱")]
-export const ANOMALY_SETTLEMENT_OPTIONS = [option("attribute", "属性异常"), option("disorder", "紊乱"), option("release", "异放"), option("luminescence", "耀变")]
+export const ANOMALY_SETTLEMENT_OPTIONS = [option("attribute", "属性异常"), option("turbulence", "乱流"), option("disorder", "紊乱"), option("release", "异放"), option("luminescence", "耀变")]
 export const LEVEL_SCALE_OPTIONS = [option("skill", "技能等级"), option("coreSkill", "核心技等级")]
 export const SKILL_ROW_KIND_OPTIONS = [option("damageMultiplier", "伤害倍率"), option("dazeMultiplier", "失衡倍率")]
 export const DAMAGE_BASIS_OPTIONS = [option("", "攻击力（默认）"), option("def", "防御力"), option("sheerForce", "贯穿力")]
@@ -138,9 +138,9 @@ export const PANEL_STATS: Array<[string, string, "flat" | "pct"]> = [
 ]
 
 export const EVENT_STATS: Array<[string, string, "flat"]> = [
-  ["anomalyDamageBonus", "属性异常增伤%", "flat"], ["disorderDamageBonus", "紊乱增伤%", "flat"],
+  ["anomalyDamageBonus", "属性异常增伤%", "flat"], ["turbulenceDamageBonus", "乱流增伤%", "flat"], ["disorderDamageBonus", "紊乱增伤%", "flat"],
   ["alienationCoefficientBonus", "异化系数加成%", "flat"],
-  ["baseMultiplierBonus", "异常倍率修正%", "flat"], ["disorderBaseMultiplierBonus", "紊乱倍率加算%", "flat"],
+  ["baseMultiplierBonus", "异常倍率修正%", "flat"], ["turbulenceBaseMultiplierBonus", "乱流倍率修正%", "flat"], ["disorderBaseMultiplierBonus", "紊乱倍率加算%", "flat"],
   ["anomalyCritRate", "异常暴击率%", "flat"], ["anomalyCritDmg", "异常暴击伤害%", "flat"],
   ["stunDmgMultiplierBonus", "失衡易伤倍率加算%", "flat"],
   ["stunDmgMultiplierBonusAlways", "失衡易伤倍率加算（未失衡生效）%", "flat"],
@@ -175,8 +175,8 @@ export const SKILL_TARGET_STATS: Array<[string, string, "flat"]> = [
 ]
 
 export const ANOMALY_TARGET_STATS: Array<[string, string, "flat"]> = [
-  ["anomalyDamageBonus", "指定异常增伤%", "flat"], ["disorderDamageBonus", "紊乱增伤%", "flat"],
-  ["baseMultiplierBonus", "异常倍率修正%", "flat"], ["disorderBaseMultiplierBonus", "紊乱倍率加算%", "flat"],
+  ["anomalyDamageBonus", "指定异常增伤%", "flat"], ["turbulenceDamageBonus", "乱流增伤%", "flat"], ["disorderDamageBonus", "紊乱增伤%", "flat"],
+  ["baseMultiplierBonus", "异常倍率修正%", "flat"], ["turbulenceBaseMultiplierBonus", "乱流倍率修正%", "flat"], ["disorderBaseMultiplierBonus", "紊乱倍率加算%", "flat"],
   ["anomalyCritRate", "异常暴击率%", "flat"], ["anomalyCritDmg", "异常暴击伤害%", "flat"],
   ["anomalyCritRatePerInitialMasteryAbove100", "初始异常掌控超过 100 时每点转异常暴击率%", "flat"],
   ["releaseProficiencyYieldBonus", "异放精通收益提升%", "flat"],
@@ -296,6 +296,18 @@ export function defaultCalculationEvent(kind = "direct") {
   const base: any = { id: internalId("event"), kind, count: 1, stunned: true }
   if (kind === "anomaly") return { ...base, settlementType: "attribute", anomalyEffect: "assault", procCount: 1 }
   if (kind === "disorder") return { ...base, kind: "anomaly", settlementType: "disorder", disorderType: "normal", anomalyEffect: "burn", elapsedSeconds: 0 }
+  if (kind === "turbulence") return {
+    ...base,
+    kind: "anomaly",
+    settlementType: "turbulence",
+    anomalyEffect: "wind_corrosion",
+    turbulenceEffect: "turbulence",
+    secondaryAnomalyEffect: "burn",
+    secondaryAnomalyRemainingSeconds: 10,
+    turbulenceVariant: "normal",
+    windSource: { actorRef: { agentId: "" } },
+    anomalySource: { actorRef: { agentId: "" } },
+  }
   if (kind === "release") return { ...base, kind: "anomaly", settlementType: "release", anomalyEffect: "assault" }
   if (kind === "luminescence") return {
     id: base.id,
@@ -321,8 +333,14 @@ export const CALCULATION_DAMAGE_BASIS_OPTIONS = [option("atk", "攻击力"), opt
 
 export function anomalyOptions(catalog: any, disorder = false) {
   return (catalog?.anomalyEffects?.effects ?? [])
-    .filter((item: any) => disorder ? item.settlementType === "disorder" : item.settlementType !== "disorder")
+    .filter((item: any) => disorder ? item.settlementType === "disorder" : item.settlementType === "attribute")
     .map((item: any) => option(item.id, textOf(item.label) || "未命名结算"))
+}
+
+export function turbulenceSecondaryOptions(catalog: any) {
+  return (catalog?.anomalyEffects?.effects ?? [])
+    .filter((item: any) => item.settlementType === "attribute" && item.id !== "wind_corrosion")
+    .map((item: any) => option(item.id, textOf(item.label) || "未命名异常"))
 }
 
 export function buffCandidates(catalog: any) {

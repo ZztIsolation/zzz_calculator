@@ -7579,6 +7579,588 @@
         "critDmg",
         "atk"
       ]
+    },
+    {
+      "id": "velina",
+      "name": {
+        "zhCN": "维琳娜·艾嘉德",
+        "en": "Velina Aigard"
+      },
+      "rarity": "S",
+      "attribute": "wind",
+      "damageElement": "wind",
+      "specialty": "anomaly",
+      "attackTypes": [
+        "slash"
+      ],
+      "faction": "罗斯凯利法·外务筹策局",
+      "images": {
+        "portrait": "/assets/agents/velina.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen"
+      },
+      "level60": {
+        "hpBase": 7788,
+        "atkBase": 872,
+        "defBase": 612,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 86,
+        "anomalyProficiency": 112,
+        "anomalyMastery": 165,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动：风华盈袖"
+          },
+          "description": {
+            "zhCN": "初始能量自动回复超过1.2时，按核心被动成长获得伤害和异常掌控；触发乱流获得风蚀并召唤微域气旋，消耗2点风蚀时强化乱流并改召广域气旋。"
+          },
+          "effects": [
+            {
+              "id": "velina-turbulence-base-multiplier",
+              "type": "fixed",
+              "stat": "baseMultiplierBonus",
+              "value": 90,
+              "mode": "flat",
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "turbulenceBaseMultiplierBonusPct"
+              },
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "turbulence"
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "additionalAbility": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "额外能力：茶会礼仪"
+          },
+          "description": {
+            "zhCN": "队伍中存在其他异常角色或同属性角色时，风化和乱流伤害提升10%；终结技重击命中风属性异常目标时额外结算固定680%风属性异放。"
+          },
+          "effects": [
+            {
+              "id": "velina-wind-corrosion-damage",
+              "type": "fixed",
+              "stat": "anomalyDamageBonus",
+              "value": 10,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute",
+                "anomalyEffects": [
+                  "wind_corrosion"
+                ]
+              }
+            },
+            {
+              "id": "velina-turbulence-damage",
+              "type": "fixed",
+              "stat": "anomalyDamageBonus",
+              "value": 10,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "turbulence"
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "cinemaBuffs": [
+          {
+            "cinemaLevel": 1,
+            "cinemaName": {
+              "zhCN": "秩序化优雅"
+            },
+            "description": {
+              "zhCN": "触发乱流时无视目标20%全属性伤害抗性；全队造成风化伤害时无视目标20%风属性伤害抗性；广域气旋失衡值额外提升20%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "velina-c1-turbulence-all-res-ignore",
+                "type": "fixed",
+                "stat": "allResIgnore",
+                "value": 20,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "turbulence"
+                }
+              },
+              {
+                "id": "velina-c1-wind-corrosion-res-ignore",
+                "type": "fixed",
+                "stat": "windResIgnore",
+                "value": 20,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "attribute",
+                  "anomalyEffects": [
+                    "wind_corrosion"
+                  ]
+                }
+              },
+              {
+                "id": "velina-c1-vortex-stun",
+                "type": "fixed",
+                "stat": "stunDmgMultiplierBonus",
+                "value": 20,
+                "mode": "flat",
+                "target": {
+                  "kind": "skill",
+                  "skillTargets": [
+                    {
+                      "kind": "specific",
+                      "agentSkillId": "velina",
+                      "categoryId": "special",
+                      "skillType": "special",
+                      "moveId": "windstorm_eye"
+                    }
+                  ]
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 2,
+            "cinemaName": {
+              "zhCN": "饱和式计划"
+            },
+            "description": {
+              "zhCN": "触发风化时获得风蚀；广域气旋赋彩后的积蓄不参与异常伤害结算；风化和乱流伤害提升效果额外提升15%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "velina-c2-wind-corrosion-damage",
+                "type": "fixed",
+                "stat": "anomalyDamageBonus",
+                "value": 15,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "attribute",
+                  "anomalyEffects": [
+                    "wind_corrosion"
+                  ]
+                }
+              },
+              {
+                "id": "velina-c2-turbulence-damage",
+                "type": "fixed",
+                "stat": "anomalyDamageBonus",
+                "value": 15,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "turbulence"
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 4,
+            "cinemaName": {
+              "zhCN": "茶话即审判"
+            },
+            "description": {
+              "zhCN": "发动强化特殊技后攻击力提升15%，持续40秒。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "velina-c4-atk",
+                "type": "fixed",
+                "stat": "atkPct",
+                "value": 15,
+                "mode": "pct",
+                "target": {
+                  "kind": "default"
+                },
+                "basis": "outOfCombatAtk",
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 6,
+            "cinemaName": {
+              "zhCN": "首席天使"
+            },
+            "description": {
+              "zhCN": "消耗风蚀强化乱流后按冷却返还风蚀；风属性异常积蓄提升20%；再次施加风化时按上次剩余持续时间提高风化伤害，最多40%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [],
+            "mechanics": {
+              "windAnomalyBuildupBonusPct": 20,
+              "recastWindCorrosionDamageByRemainingSecondsPct": 2.5,
+              "recastWindCorrosionDamageCapPct": 40
+            },
+            "buffModifiers": []
+          }
+        ]
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "风华盈袖"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 18,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 18,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "anomalyMasteryFlat",
+                "value": 18,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "核心被动：风华盈袖"
+          },
+          "levels": [
+            {
+              "level": 1,
+              "turbulenceBaseMultiplierBonusPct": 90,
+              "microReleaseMultiplierPct": 85,
+              "broadReleaseMultiplierPct": 135
+            },
+            {
+              "level": 2,
+              "turbulenceBaseMultiplierBonusPct": 100,
+              "microReleaseMultiplierPct": 95,
+              "broadReleaseMultiplierPct": 155
+            },
+            {
+              "level": 3,
+              "turbulenceBaseMultiplierBonusPct": 110,
+              "microReleaseMultiplierPct": 105,
+              "broadReleaseMultiplierPct": 175
+            },
+            {
+              "level": 4,
+              "turbulenceBaseMultiplierBonusPct": 120,
+              "microReleaseMultiplierPct": 115,
+              "broadReleaseMultiplierPct": 195
+            },
+            {
+              "level": 5,
+              "turbulenceBaseMultiplierBonusPct": 130,
+              "microReleaseMultiplierPct": 125,
+              "broadReleaseMultiplierPct": 215
+            },
+            {
+              "level": 6,
+              "turbulenceBaseMultiplierBonusPct": 140,
+              "microReleaseMultiplierPct": 135,
+              "broadReleaseMultiplierPct": 235
+            },
+            {
+              "level": 7,
+              "turbulenceBaseMultiplierBonusPct": 150,
+              "microReleaseMultiplierPct": 145,
+              "broadReleaseMultiplierPct": 255
+            }
+          ],
+          "defaultLevelAtCoreSkill": "F"
+        },
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+          "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
+        ],
+        "verification": {
+          "stats": "source-checked-gachabase-release-3.1.0; official entry pending panel cross-check",
+          "corePassiveScaling": "official initial/A-F values for turbulence and cyclone release; initial/A-F = 90/100/110/120/130/140/150; micro 85/95/105/115/125/135/145; broad 135/155/175/195/215/235/255",
+          "version": "3.1.0 release / design revision 18626312"
+        }
+      },
+      "anomalyReleaseProfiles": [
+        {
+          "id": "micro_vortex",
+          "name": {
+            "zhCN": "微域气旋异放"
+          },
+          "default": true,
+          "supportedElements": [
+            "wind"
+          ],
+          "resultMode": "fixedAnomalyMultiplier",
+          "expression": {
+            "kind": "constant",
+            "whiteBoxRole": "conversionSource",
+            "value": 1.45,
+            "unit": "decimal",
+            "label": {
+              "zhCN": "微域气旋固定异放倍率"
+            }
+          }
+        },
+        {
+          "id": "broad_vortex",
+          "name": {
+            "zhCN": "广域气旋异放"
+          },
+          "supportedElements": [
+            "wind"
+          ],
+          "resultMode": "fixedAnomalyMultiplier",
+          "expression": {
+            "kind": "constant",
+            "whiteBoxRole": "conversionSource",
+            "value": 2.55,
+            "unit": "decimal",
+            "label": {
+              "zhCN": "广域气旋固定异放倍率"
+            }
+          }
+        },
+        {
+          "id": "ultimate_wind",
+          "name": {
+            "zhCN": "终结技重击异放"
+          },
+          "supportedElements": [
+            "wind"
+          ],
+          "resultMode": "fixedAnomalyMultiplier",
+          "expression": {
+            "kind": "constant",
+            "whiteBoxRole": "conversionSource",
+            "value": 6.8,
+            "unit": "decimal",
+            "label": {
+              "zhCN": "终结技重击固定异放倍率"
+            }
+          }
+        }
+      ],
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "zzz_wiki_2038"
+        ],
+        "mainStatLimits": {
+          "4": [
+            "anomalyProficiency",
+            "atkPct"
+          ],
+          "5": [
+            "windDmg",
+            "atkPct",
+            "penRatio"
+          ],
+          "6": [
+            "anomalyMastery",
+            "energyRegen"
+          ]
+        }
+      },
+      "defaultCalculationConfig": {
+        "mode": "custom",
+        "cinemaLevel": 0,
+        "name": {
+          "zhCN": "维琳娜风化与乱流示例"
+        },
+        "events": [
+          {
+            "id": "velina-wind-corrosion",
+            "kind": "anomaly",
+            "count": 1,
+            "stunned": false,
+            "settlementType": "attribute",
+            "anomalyEffect": "wind_corrosion",
+            "anomalyVariant": "normal",
+            "procCount": 1
+          },
+          {
+            "id": "velina-micro-vortex-release",
+            "kind": "anomaly",
+            "count": 1,
+            "stunned": false,
+            "settlementType": "release",
+            "anomalyEffect": "wind_corrosion",
+            "triggerActorRef": {
+              "agentId": "velina",
+              "profileId": "micro_vortex"
+            },
+            "fixedMultiplier": 1.45,
+            "anomalySource": {
+              "actorRef": {
+                "agentId": "velina"
+              },
+              "snapshot": {
+                "agentId": "velina",
+                "anomalyEffect": "wind_corrosion",
+                "element": "wind"
+              }
+            }
+          },
+          {
+            "id": "velina-broad-vortex-release",
+            "kind": "anomaly",
+            "count": 1,
+            "stunned": false,
+            "settlementType": "release",
+            "anomalyEffect": "wind_corrosion",
+            "triggerActorRef": {
+              "agentId": "velina",
+              "profileId": "broad_vortex"
+            },
+            "fixedMultiplier": 2.55,
+            "anomalySource": {
+              "actorRef": {
+                "agentId": "velina"
+              },
+              "snapshot": {
+                "agentId": "velina",
+                "anomalyEffect": "wind_corrosion",
+                "element": "wind"
+              }
+            }
+          }
+        ],
+        "selectedEventId": "velina-wind-corrosion"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+        "https://baike.mihoyo.com/zzz/wiki/content/2041/detail",
+        "https://git.mero.moe/dimbreath/ZenlessData/blame/commit/1dbcef24b3a6039a135daad6b29832c9d556139c/TextMap/TextMapOverwriteTemplateTb.json#L786-L788",
+        "https://zzz.gachabase.net/agents/1561/velina/release/3.1.0/18626312?lang=chs",
+        "https://news.17173.com/content/06132026/134134065.shtml",
+        "https://www.hoyolab.com/article/45547491"
+      ],
+      "verification": {
+        "officialVersion": "3.1.0 release / design revision 18626312",
+        "level60Stats": "source-checked-gachabase-release-3.1.0; official entry 1960 is canonical source to recheck before production import",
+        "mechanics": "wind corrosion/turbulence/release semantics cross-checked against official entry and public game text",
+        "turbulenceTable": "pending-versioned-table-in-anomaly_effects.json"
+      },
+      "hidden": false
     }
   ]
 }

@@ -9,7 +9,7 @@ function clone(value) {
     return structuredClone(value)
 }
 
-assert.deepEqual(ANOMALY_SETTLEMENT_TYPES, ["attribute", "disorder", "release", "luminescence"])
+assert.deepEqual(ANOMALY_SETTLEMENT_TYPES, ["attribute", "turbulence", "disorder", "release", "luminescence"])
 
 const migrated = normalizeLegacyEffectAppliesToInValue(clone({
     effects: [

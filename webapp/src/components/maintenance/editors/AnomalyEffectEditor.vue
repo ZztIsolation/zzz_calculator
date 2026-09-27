@@ -7,7 +7,11 @@ import { textOf } from "../maintenance-model"
 const props = defineProps<{ model: any, disabled?: boolean }>()
 const emit = defineEmits<{ change: [] }>()
 
-function kind() { return props.model.settlementType === "disorder" || props.model.maintenanceType === "disorder" ? "disorder" : "anomaly" }
+function kind() {
+  if (props.model.settlementType === "disorder" || props.model.maintenanceType === "disorder") return "disorder"
+  if (props.model.settlementType === "turbulence" || props.model.maintenanceType === "turbulence") return "turbulence"
+  return "anomaly"
+}
 function changed() { emit("change") }
 
 function changeKind(value: string) {
@@ -20,6 +24,16 @@ function changeKind(value: string) {
     props.model.defaultDurationSeconds ??= 10
     delete props.model.baseMultiplier
     delete props.model.defaultProcCount
+  } else if (value === "turbulence") {
+    props.model.maintenanceType = "turbulence"
+    props.model.settlementType = "turbulence"
+    props.model.element = "wind"
+    props.model.baseMultiplier ??= 0
+    props.model.defaultProcCount ??= 1
+    delete props.model.fixedMultiplier
+    delete props.model.tickMultiplier
+    delete props.model.tickIntervalSeconds
+    delete props.model.defaultDurationSeconds
   } else {
     props.model.maintenanceType = "anomaly"
     props.model.settlementType = "attribute"
@@ -38,7 +52,7 @@ function changeKind(value: string) {
   <div class="resource-editor anomaly-effect-editor">
     <MaintenanceSection title="异常 / 紊乱信息">
       <div class="maintenance-grid">
-        <label class="maintenance-field"><span>结算类型</span><NSelect :value="kind()" :options="[option('anomaly', '属性异常'), option('disorder', '紊乱')]" :disabled="disabled" @update:value="changeKind(String($event))" /></label>
+        <label class="maintenance-field"><span>结算类型</span><NSelect :value="kind()" :options="[option('anomaly', '属性异常'), option('turbulence', '乱流'), option('disorder', '紊乱')]" :disabled="disabled" @update:value="changeKind(String($event))" /></label>
         <label class="maintenance-field"><span>中文名称</span><NInput :value="textOf(model.label)" :disabled="disabled" @update:value="model.label = { ...model.label, zhCN: String($event) }; changed()" /></label>
         <label class="maintenance-field"><span>元素</span><NSelect v-model:value="model.element" :options="DAMAGE_ELEMENT_OPTIONS" :disabled="disabled" @update:value="changed" /></label>
         <template v-if="kind() === 'anomaly'">

@@ -209,6 +209,13 @@
           ]
         },
         "teamBuff": null
+      },
+      "modelingNotes": {
+        "zhCN": "二件套风属性伤害加成按结算属性作用于风化、风属性异放和风属性直伤；非风属性乱流使用其第二异常属性，不继承风属性伤害加成。四件套18%为通用伤害加成。"
+      },
+      "verification": {
+        "effectText": "source-checked-official-wind-catalog",
+        "coverage": "windCorrosion-release-direct-wind-only; turbulence-by-second-anomaly-element"
       }
     },
     {

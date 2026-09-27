@@ -12,6 +12,7 @@ export {
     materializeWEngineForModificationLevel,
     normalizeCatalog,
     normalizeCatalogPayload,
+    isTurbulenceSettlement,
 } from "../core/calculator-core.js"
 
 async function readJson(filePath) {

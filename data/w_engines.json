@@ -3137,7 +3137,74 @@
           "zhCN": "装备者的异常精通提升70/80/90/100/110点；装备者发动[强化特殊技]造成风属性伤害时，自身造成的[乱流]和[风化]伤害提升7%/8%/9%/10%/11%。持续40秒，最多叠加2层，重复触发时刷新持续时间，同一招式内最多触发一次，拥有2层该效果时，全队代理人的异常精通提升60/69/78/87/96点，该效果全队唯一。",
           "en": ""
         },
-        "selfBuff": null,
+        "selfBuff": {
+          "scope": "inCombat",
+          "condition": "windExSpecialDamage",
+          "durationSeconds": 40,
+          "effects": [
+            {
+              "id": "effect_wiki_2030_turbulence_damage",
+              "type": "stacked",
+              "stat": "anomalyDamageBonus",
+              "valuePerStack": 7,
+              "modificationValues": {
+                "valuePerStack": [
+                  7,
+                  8,
+                  9,
+                  10,
+                  11
+                ]
+              },
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "turbulence"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "effect_wiki_2030_wind_corrosion_damage",
+              "type": "stacked",
+              "stat": "anomalyDamageBonus",
+              "valuePerStack": 7,
+              "modificationValues": {
+                "valuePerStack": [
+                  7,
+                  8,
+                  9,
+                  10,
+                  11
+                ]
+              },
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute",
+                "anomalyEffects": [
+                  "wind_corrosion"
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
         "teamBuff": {
           "scope": "inCombat",
           "condition": "twoStacksAfterWindExSpecialDamage",
@@ -3179,7 +3246,11 @@
       "verification": {
         "level60Stats": "source-checked",
         "effectText": "source-checked",
-        "effectBuff": "source-checked-team-buff-only"
+        "effectBuff": "source-checked; wind_corrosion and turbulence are explicitly separated",
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+          "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
+        ]
       }
     },
     {

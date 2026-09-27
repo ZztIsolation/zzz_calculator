@@ -103,6 +103,8 @@ function visibleKind(event: any) {
   if (event.kind === "direct" || event.kind === "sheer" || event.kind === "sharp") return event.kind
   return event.kind === "disorder" || event.settlementType === "disorder"
     ? "disorder"
+    : event.settlementType === "turbulence"
+      ? "turbulence"
     : event.settlementType === "release"
       ? "release"
       : event.settlementType === "luminescence" ? "luminescence" : "anomaly"
@@ -144,6 +146,7 @@ function eventSummary(event: any) {
       <NButton size="small" :disabled="disabled || hasLuminescenceEvent || agent?.specialty !== 'armorer'" @click="add('sharp')">添加锐化</NButton>
       <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('anomaly')">添加属性异常</NButton>
       <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('disorder')">添加紊乱</NButton>
+      <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('turbulence')">添加乱流</NButton>
       <NButton size="small" :disabled="disabled || hasLuminescenceEvent || !(agent?.anomalyReleaseProfiles?.length)" :title="agent?.anomalyReleaseProfiles?.length ? '' : '暂不支持'" @click="add('release')">添加异放</NButton>
       <NButton v-if="allowSkillGroup" size="small" :disabled="disabled || hasLuminescenceEvent || agent?.id !== 'remielle_dan'" :title="agent?.id === 'remielle_dan' ? '' : '仅蕾米埃尔·丹支持'" @click="add('luminescence')">添加耀变</NButton>
       <NButton v-if="allowSkillGroup" size="small" :disabled="disabled || hasLuminescenceEvent || !skillGroups.length" @click="add('skillGroup')">添加技能组</NButton>
@@ -178,6 +181,7 @@ function eventSummary(event: any) {
           <NButton size="small" :disabled="disabled || hasLuminescenceEvent || agent?.specialty !== 'armorer'" @click="add('sharp')">添加锐化</NButton>
           <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('anomaly')">添加异常</NButton>
           <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('disorder')">添加紊乱</NButton>
+          <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('turbulence')">添加乱流</NButton>
           <NButton size="small" :disabled="disabled || hasLuminescenceEvent || !(agent?.anomalyReleaseProfiles?.length)" :title="agent?.anomalyReleaseProfiles?.length ? '' : '暂不支持'" @click="add('release')">添加异放</NButton>
           <NButton v-if="allowSkillGroup" size="small" :disabled="disabled || hasLuminescenceEvent || agent?.id !== 'remielle_dan'" :title="agent?.id === 'remielle_dan' ? '' : '仅蕾米埃尔·丹支持'" @click="add('luminescence')">添加耀变</NButton>
           <NButton v-if="allowSkillGroup" size="small" :disabled="disabled || hasLuminescenceEvent || !skillGroups.length" @click="add('skillGroup')">添加技能组</NButton>

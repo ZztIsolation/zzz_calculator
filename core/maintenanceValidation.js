@@ -171,11 +171,11 @@ const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
 const ANOMALY_VARIANT_VALUES = new Set(["normal", "polarizedAssault"])
 const CALCULATION_MODE_VALUES = new Set(["single", "sheer", "sharp", "anomaly", "custom"])
 const SHEER_DAMAGE_MODIFIER_KIND_VALUES = ["sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg"]
-const DAMAGE_MODIFIER_KIND_VALUES = new Set(["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "skillMultiplierBonus", "sharpDmgBonus", "lacerationDmg", ...ELEMENT_SHARP_DMG_STATS, ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
+const DAMAGE_MODIFIER_KIND_VALUES = new Set(["enemyDamageTakenBonus", "anomalyDamageBonus", "turbulenceDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "turbulenceBaseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "skillMultiplierBonus", "sharpDmgBonus", "lacerationDmg", ...ELEMENT_SHARP_DMG_STATS, ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
 const SKILL_TARGET_DAMAGE_MODIFIER_KIND_VALUES = new Set(["directDamageBonus", "skillMultiplierBonus"])
 const DAMAGE_MODIFIER_VALUE_UNIT_VALUES = new Set(["decimal"])
 const RULE_TARGET_KIND_VALUES = new Set(["default", "skill", "anomaly"])
-const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["enemyDamageTakenBonus", "anomalyDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "releaseProficiencyYieldBonus", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "sharpDmgBonus", ...ELEMENT_SHARP_DMG_STATS, ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
+const DEFAULT_EVENT_MODIFIER_STAT_VALUES = new Set(["enemyDamageTakenBonus", "anomalyDamageBonus", "turbulenceDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "turbulenceBaseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "releaseProficiencyYieldBonus", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "sharpDmgBonus", ...ELEMENT_SHARP_DMG_STATS, ...SHEER_DAMAGE_MODIFIER_KIND_VALUES, ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS])
 const SKILL_TARGET_STAT_VALUES = new Set([
     "penRatio",
     "allResIgnore",
@@ -239,8 +239,10 @@ const ANOMALY_TARGET_STAT_VALUES = new Set([
     "etherDmg",
     "windDmg",
     "anomalyDamageBonus",
+    "turbulenceDamageBonus",
     "disorderDamageBonus",
     "baseMultiplierBonus",
+    "turbulenceBaseMultiplierBonus",
     "disorderBaseMultiplierBonus",
     "anomalyCritRate",
     "anomalyCritDmg",
@@ -252,8 +254,8 @@ const ANOMALY_TARGET_STAT_VALUES = new Set([
     "stunDmgMultiplierBonusCapAlways",
     ...ELEMENT_DEF_IGNORE_STATS,
 ])
-const ANOMALY_EFFECT_VALUES = new Set(["assault", "shatter", "burn", "shock", "corruption", "frozen", "flinch"])
-const ANOMALY_MAINTENANCE_TYPE_VALUES = new Set(["anomaly", "disorder"])
+const ANOMALY_EFFECT_VALUES = new Set(["assault", "shatter", "burn", "shock", "corruption", "frozen", "flinch", "wind_corrosion", "turbulence"])
+const ANOMALY_MAINTENANCE_TYPE_VALUES = new Set(["anomaly", "disorder", "turbulence"])
 const STAT_VALUES = new Set([
     "atkFlat",
     "atkPct",
@@ -1355,22 +1357,28 @@ function validateImportantPanelStats(errors, importantPanelStats) {
 }
 
 function calculationAnomalyIds(context = {}, maintenanceType) {
-    const settlementType = maintenanceType === "disorder" ? "disorder" : "attribute"
+    const settlementType = maintenanceType === "disorder"
+        ? "disorder"
+        : maintenanceType === "turbulence" ? "turbulence" : "attribute"
     const fromUnified = Array.isArray(context.effects)
         ? context.effects
-            .filter(item => (item?.settlementType === "disorder" ? "disorder" : "attribute") === settlementType)
+            .filter(item => (item?.settlementType === "disorder"
+                ? "disorder"
+                : item?.settlementType === "turbulence" ? "turbulence" : "attribute") === settlementType)
             .map(item => item?.id)
             .filter(Boolean)
         : []
     const explicit = settlementType === "disorder"
         ? context.disorderEffects
-        : context.anomalyEffects
+        : settlementType === "turbulence" ? context.turbulenceEffects : context.anomalyEffects
     const fromContext = Array.isArray(explicit)
         ? explicit.map(item => item?.id).filter(Boolean)
         : []
     const defaults = settlementType === "disorder"
         ? ["burn", "shock", "corruption", "frozen", "flinch"]
-        : ["assault", "shatter", "burn", "shock", "corruption"]
+        : settlementType === "turbulence"
+            ? ["turbulence", "assault", "shatter", "burn", "shock", "corruption", "frozen", "flinch"]
+            : ["assault", "shatter", "burn", "shock", "corruption"]
     return new Set([...defaults, ...fromUnified, ...fromContext])
 }
 
@@ -1620,6 +1628,45 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
             if (event.anomalyVariant === "polarizedAssault" && event.anomalyEffect !== "assault") {
                 add(errors, `${path}.anomalyVariant`, "极性强击只能用于强击结算。")
             }
+        }
+        return
+    }
+    if (settlementType === "turbulence") {
+        const turbulenceEffectId = String(event.turbulenceEffect ?? event.anomalyEffect ?? "turbulence")
+        if (!calculationAnomalyIds(context, "turbulence").has(turbulenceEffectId)
+            && !calculationAnomalyIds(context, "turbulence").has("turbulence")) {
+            add(errors, `${path}.anomalyEffect`, "乱流倍率目录不存在。")
+        }
+        const secondaryId = String(
+            event.secondaryAnomalyEffect
+                ?? event.secondAnomalyEffect
+                ?? event.previousAnomalyEffect
+                ?? event.turbulenceSource?.anomalyEffect
+                ?? event.anomalySource?.anomalyEffect
+                ?? "",
+        )
+        const secondaryIds = new Set([
+            ...calculationAnomalyIds(context, "anomaly"),
+            ...calculationAnomalyIds(context, "disorder"),
+        ])
+        if (!secondaryId || !secondaryIds.has(secondaryId)) {
+            add(errors, `${path}.secondaryAnomalyEffect`, "乱流必须选择已登记的第二异常。")
+        }
+        const secondaryElement = event.secondaryElement ?? event.turbulenceSource?.element
+        if (secondaryElement !== undefined && secondaryElement !== "") {
+            requireEnum(errors, secondaryElement, DAMAGE_ELEMENT_VALUES, `${path}.secondaryElement`)
+        }
+        const windActorId = String(event.windSource?.actorRef?.agentId ?? event.triggerActorRef?.agentId ?? agentId ?? "")
+        const windSnapshot = event.windSource?.snapshot
+        if (windActorId && windActorId !== String(agentId ?? "")
+            && (!windSnapshot || typeof windSnapshot !== "object" || String(windSnapshot.agentId ?? "") !== windActorId)) {
+            add(errors, `${path}.windSource.snapshot`, "外部风化来源必须提供匹配的冻结快照。")
+        }
+        const anomalyActorId = String(event.anomalySource?.actorRef?.agentId ?? event.secondaryAnomalySource?.actorRef?.agentId ?? "")
+        const anomalySnapshot = event.anomalySource?.snapshot ?? event.secondaryAnomalySource?.snapshot
+        if (anomalyActorId && anomalyActorId !== String(agentId ?? "")
+            && (!anomalySnapshot || typeof anomalySnapshot !== "object" || String(anomalySnapshot.agentId ?? "") !== anomalyActorId)) {
+            add(errors, `${path}.anomalySource.snapshot`, "外部第二异常来源必须提供匹配的冻结快照。")
         }
         return
     }
