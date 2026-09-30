@@ -51,8 +51,10 @@ declare module "@core/effectFormula.js" {
   export const IN_COMBAT_FORMULA_SOURCE_STATS: readonly string[]
   export const IN_COMBAT_FORMULA_SOURCE_TYPES: readonly string[]
   export function isInCombatFormulaRule(rule?: any): boolean
+  export function isOutOfCombatFormulaRule(rule?: any): boolean
   export function isAllowedInCombatFormulaSourceStat(stat?: unknown): boolean
   export function isAllowedInCombatFormulaSourceType(sourceType?: unknown): boolean
+  export function formulaSourceValue(rule?: any, panel?: any): any
   export function formulaParameterDefaults(rule?: any): Record<string, number>
   export function formulaParameterNames(rule?: any): string[]
   export function formulaParameterValues(rule?: any): Record<string, number>
@@ -65,9 +67,11 @@ declare module "@core/effectFormula.js" {
 
 declare module "@core/damageEventMultipliers.js" {
   export function disorderElapsedStepSeconds(event?: any, catalog?: any): number
+  export function turbulenceElapsedStepSeconds(event?: any, catalog?: any): number
   export function normalizeElapsedSeconds(value: unknown, durationSeconds?: number, stepSeconds?: number): number
   export function normalizeDamageScale(event?: any): number
   export function disorderBaseMultiplier(effect?: any, elapsedSeconds?: unknown, durationBonusSeconds?: unknown): { baseDuration: number, durationBonus: number, duration: number, elapsed: number, remaining: number, tickIntervalSeconds: number, tickCount: number, baseMultiplier: number }
+  export function turbulenceBaseMultiplier(effect?: any, elapsedSeconds?: unknown, durationBonusSeconds?: unknown): { baseDuration: number, durationBonus: number, duration: number, elapsed: number, remaining: number, tickIntervalSeconds: number, tickCount: number, baseMultiplier: number }
   export function disorderMultiplierScale(type?: unknown): number
   export function resolveDamageEventMultiplier(event?: any, catalog?: any, releaseContext?: any): number | null
   export function disorderDurationSeconds(event?: any, catalog?: any, durationBonusSeconds?: unknown): number
@@ -79,6 +83,9 @@ declare module "@core/anomalyRelease.js" {
   export function defaultAnomalyReleaseProfile(agent?: any, damageElement?: string): any
   export function anomalyReleaseProfile(agent?: any, profileId?: string, damageElement?: string): any
   export function isAriaReleaseSourceLocked(agent?: any): boolean
+  export function isVelinaReleaseAgent(agent?: any): boolean
+  export function velinaReleaseSourceId(event?: any): string
+  export const VELINA_RELEASE_SOURCES: ReadonlyArray<{ value: string, label: string }>
   export function normalizeAnomalyReleaseEventForAgent(event?: any, agent?: any): any
   export function evaluateReleaseExpression(node?: any, context?: any): any
   export function evaluateReleaseExpressionInterval(node?: any, context?: any): { min: number, max: number }
@@ -514,6 +521,7 @@ declare module "@runtime/selection-storage.js" {
 }
 
 declare module "@core/maintenanceValidation.js" {
+  export function repairDynamicValueSourceFallbacks(agent: any, repairs?: any[]): any[]
   export const SYSTEM_MANAGED_SKILL_GROUP_COUNTS: Readonly<{ defaultCount: 1, minCount: 0, step: 1 }>
   export const SYSTEM_MANAGED_COVERAGE: Readonly<{ default: 1, min: 0, max: 1, step: 0.1 }>
   export function createSystemManagedCoverage(defaultValue?: number): { default: number, min: 0, max: 1, step: 0.1 }
@@ -613,4 +621,13 @@ declare module "@runtime/scanner-bridge.js" {
     startScan(options?: any): void
     stopScan(): void
   }
+}
+
+declare module "@core/anomalySettlement.js" {
+  export const WIND_TURBULENCE_NOTICE: string
+  export const LEGACY_TURBULENCE_FIELDS: readonly string[]
+  export function isWindAgent(agent?: any): boolean
+  export function isTurbulenceSettlement(event?: any): boolean
+  export function isLegacyTurbulenceEvent(event?: any): boolean
+  export function cleanStoredReactiveEvent(event?: any, agent?: any): any | null
 }

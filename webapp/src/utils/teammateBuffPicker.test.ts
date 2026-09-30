@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import catalog from "../../../data/combat_buffs.json"
+import { buildCombatBuffGroups } from "@/utils/combatBuffs"
 import {
   inferBuffPickerState,
   isTeammatePotentialBuff,
@@ -108,5 +109,13 @@ describe("teammate Buff picker helpers", () => {
       { teammateId: "rina", cinemaLevel: 1 },
     ] })
     expect(JSON.stringify(catalogBuffs)).toBe(original)
+  })
+
+  it("keeps Velina's teammate avatar wired to the local agent asset", () => {
+    const velina = catalog.teammates.find(group => group.id === "velina")
+    expect(velina?.images?.icon).toBe("/assets/agents/velina.png")
+    const velinaBuff = buildCombatBuffGroups({ meta: { teammateCombatBuffGroups: catalog.teammates } }).teammate
+      .find(buff => buff.ownerId === "velina")
+    expect(velinaBuff?.ownerImages?.icon).toBe("/assets/agents/velina.png")
   })
 })

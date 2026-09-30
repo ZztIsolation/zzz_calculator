@@ -3,6 +3,21 @@ import { NSelect } from "naive-ui"
 import DamageWhiteBox from "@/components/DamageWhiteBox.vue"
 
 describe("DamageWhiteBox", () => {
+  it.each([
+    [undefined, "乱流 · 烈霜（星见雅） ×1"],
+    ["手动命名事件", "乱流 · 手动命名事件 ×1"],
+  ])("uses the shared turbulence title while retaining authored label %s", (label, expected) => {
+    const wrapper = mount(DamageWhiteBox, { props: { damage: { events: [{
+      id: "turbulence", kind: "anomaly", settlementType: "turbulence", count: 1,
+      label: label ?? "乱流（烈霜乱流）", finalDamage: 1500,
+      input: { kind: "anomaly", settlementType: "turbulence", anomalyEffect: "frost_frozen", count: 1, label },
+    }] } } })
+    expect(wrapper.find(".damage-whitebox-current strong").text()).toBe(expected)
+    expect((wrapper.getComponent(NSelect).props("options") as any[])[0].label).toContain(expected)
+    expect(wrapper.text()).not.toContain("乱流（烈霜乱流）")
+    wrapper.unmount()
+  })
+
   function mountWhiteBox() {
     return mount(DamageWhiteBox, {
       props: {

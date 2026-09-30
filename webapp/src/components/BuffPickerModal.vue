@@ -69,6 +69,7 @@ const props = defineProps<{
   wEngineId?: string
   wEngineModificationLevel?: number
   inCombatPanel?: Record<string, number> | null
+  outOfCombatPanel?: Record<string, number> | null
 }>()
 
 const emit = defineEmits<{
@@ -842,7 +843,10 @@ function effectRowsFor(buff: any) {
     return {
       id,
       rule,
-      text: storedEffectRuleText(rule, runtime, buff, props.meta, { inCombatPanel: props.inCombatPanel }),
+      text: storedEffectRuleText(rule, runtime, buff, props.meta, {
+        inCombatPanel: props.inCombatPanel,
+        outOfCombatPanel: props.outOfCombatPanel,
+      }),
       coverage: effectRuleCoverage(rule, buff),
       enabled: runtime.effects?.[id]?.enabled !== false,
     }
@@ -851,6 +855,15 @@ function effectRowsFor(buff: any) {
 
 function modifierLinesFor(buff: any) {
   return storedBuffModifierTexts(buff)
+}
+
+function displayStatLabelForRule(rule: any) {
+  if (rule?.target?.kind === "anomaly" && rule.stat === "anomalyDamageBonus") {
+    if (rule.target.settlementType === "turbulence") return "乱流增伤"
+    const effects = Array.isArray(rule.target.anomalyEffects) ? rule.target.anomalyEffects : []
+    if (effects.length === 1 && effects[0] === "wind_corrosion") return "风化增伤"
+  }
+  return statLabel(rule?.stat, props.meta) || rule?.kind || rule?.type
 }
 
 function updateRuntime(buff: any, runtime: any) {
@@ -1441,7 +1454,7 @@ function apply() {
             </div>
             <div v-if="runtimeEffectRules(buff, runtimeFor(buff)).length" class="chip-row">
               <NTag v-for="rule in runtimeEffectRules(buff, runtimeFor(buff)).slice(0, 4)" :key="rule.id ?? rule.stat" size="small" round>
-                {{ statLabel(rule.stat, meta) || rule.kind || rule.type }}
+                {{ displayStatLabelForRule(rule) }}
               </NTag>
             </div>
             </article>

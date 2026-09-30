@@ -40,7 +40,7 @@ const MAIN_STAT_OPTIONS: Record<number, any[]> = {
 function changed() { emit("change") }
 
 function driveDiscOptions() {
-  return [{ label: "不指定", value: "" }, ...(props.catalog?.driveDiscSets?.sets ?? []).map((item: any) => ({ label: textOf(item.name), value: item.id }))]
+  return (props.catalog?.driveDiscSets?.sets ?? []).map((item: any) => ({ label: textOf(item.name), value: item.id }))
 }
 
 const SUB_STAT_POOL_FALLBACK = [
@@ -282,9 +282,10 @@ function enableCoreSkill(enabled: boolean) {
       </div>
     </MaintenanceSection>
 
-    <MaintenanceSection title="优先驱动盘">
+    <MaintenanceSection title="优先驱动盘" description="默认 2 件套留空时自动匹配任意套装，多选时在候选套装之间择优。玩家可在工作台修改或清空。">
       <div class="maintenance-grid">
-        <label class="maintenance-field"><span>推荐驱动盘套装</span><NSelect multiple filterable clearable v-model:value="model.preferredDriveDiscs.defaultSetIds" :options="driveDiscOptions()" :disabled="disabled" @update:value="changed" /></label>
+        <label class="maintenance-field"><span>默认 4 件套</span><NSelect multiple filterable clearable v-model:value="model.preferredDriveDiscs.defaultSetIds" :options="driveDiscOptions()" :disabled="disabled" @update:value="changed" /></label>
+        <label class="maintenance-field"><span>默认 2 件套</span><NSelect multiple filterable clearable v-model:value="model.preferredDriveDiscs.defaultTwoPieceSetIds" :options="driveDiscOptions()" :disabled="disabled" @update:value="changed" /></label>
         <label v-for="slot in [4, 5, 6]" :key="slot" class="maintenance-field"><span>{{ slot }} 号位主属性</span><NSelect multiple clearable v-model:value="model.preferredDriveDiscs.mainStatLimits[String(slot)]" :options="MAIN_STAT_OPTIONS[slot]" :disabled="disabled" @update:value="changed" /></label>
       </div>
     </MaintenanceSection>

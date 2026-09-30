@@ -1048,6 +1048,55 @@ function koledaPotentialMeta() {
 }
 
 describe("BuffPickerModal", () => {
+  it("renders Velina Wind Corrosion and Turbulence targets separately", async () => {
+    const velinaMeta = {
+      ...meta,
+      agents: [{
+        id: "velina",
+        name: { zhCN: "维琳娜·艾嘉德" },
+        attribute: "wind",
+        combatBuffs: {
+          additionalAbility: {
+            scope: "inCombat",
+            description: { zhCN: "风化和乱流伤害提升10%。" },
+            effects: [
+              {
+                id: "velina-wind-corrosion-damage",
+                type: "fixed",
+                stat: "anomalyDamageBonus",
+                value: 10,
+                mode: "flat",
+                target: { kind: "anomaly", settlementType: "attribute", anomalyEffects: ["wind_corrosion"] },
+              },
+              {
+                id: "velina-turbulence-damage",
+                type: "fixed",
+                stat: "turbulenceDamageBonus",
+                value: 10,
+                mode: "flat",
+                target: { kind: "anomaly", settlementType: "turbulence" },
+              },
+            ],
+          },
+        },
+      }],
+    }
+    const wrapper = mountModal({
+      meta: velinaMeta,
+      agentId: "velina",
+      selectedIds: ["agent:velina.additionalAbility"],
+      defaultIds: ["agent:velina.additionalAbility"],
+    })
+
+    await openModal(wrapper)
+
+    const row = buffRowByText(wrapper, "维琳娜·艾嘉德 | 额外能力")
+    const effectText = row.find(".buff-effect-lines").text()
+    expect(effectText).toContain("指定异常增伤% +10%（属性异常：风化）")
+    expect(effectText).toContain("乱流增伤% +10%（乱流）")
+    expect(row.findAll(".chip-row span").map(item => item.text())).toEqual(["风化增伤", "乱流增伤"])
+  })
+
   it("shows a skill-sourced Buff and keeps it independently disabled after reopening", async () => {
     const skillBuffMeta = {
       ...meta,

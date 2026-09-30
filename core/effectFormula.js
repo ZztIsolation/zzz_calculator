@@ -31,6 +31,59 @@ export function isInCombatFormulaRule(rule = {}) {
     return rule?.type === "formula" && rule?.source?.kind === "inCombatStat"
 }
 
+export function isOutOfCombatFormulaRule(rule = {}) {
+    return rule?.type === "formula" && rule?.source?.kind === "outOfCombatStat"
+}
+
+// A deliberately small, monotone subset of the existing expression language.
+// Preserve the interpreter's operation order, including floor at FP boundaries.
+// Unsupported expressions must retain the ordinary calculator fallback.
+export function compileInitialEnergyFormula(rule = {}) {
+    if (!isOutOfCombatFormulaRule(rule)
+        || rule.source?.stat !== "energyRegen"
+        || !["dmgBonus", "anomalyMasteryFlat"].includes(rule.stat)) return null
+    const variable = rule.source.variable ?? "x"
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(variable)) return null
+    const parameters = formulaParameterValues(rule)
+    if (Object.prototype.hasOwnProperty.call(parameters, variable)) return null
+    const atom = "([+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)|[A-Za-z_][A-Za-z0-9_]*)"
+    const pattern = new RegExp(`^clamp\\(floor\\(max\\(${variable}-${atom},0\\)/${atom}\\)\\*${atom},0,${atom}\\)$`)
+    const expression = String(rule.formula?.expression ?? "")
+    const match = expression.replace(/\s+/g, "").match(pattern)
+    if (!match) return null
+    const [threshold, step, rate, cap] = match.slice(1).map(token =>
+        Object.prototype.hasOwnProperty.call(parameters, token) ? parameters[token] : Number(token))
+    if (![threshold, step, rate, cap].every(Number.isFinite) || step <= 0 || rate < 0 || cap < 0) return null
+    // Validate before removing whitespace, so e.g. "1 .2" cannot become "1.2".
+    try {
+        evaluateFormulaExpression(expression, { [variable]: 0, ...parameters })
+    } catch {
+        return null
+    }
+    const source = rule.source
+    const min = Number(source.min)
+    const max = Number(source.max)
+    const percent = source.unit === "storedPercent"
+    return rawValue => {
+        const value = Number(rawValue ?? 0)
+        const input = Number.isFinite(value) ? value * (percent ? 100 : 1) : 0
+        const rounded = source.integer === true ? Math.round(input) : input
+        const x = Math.max(Number.isFinite(min) ? min : rounded, Math.min(Number.isFinite(max) ? max : rounded, rounded))
+        return Math.max(0, Math.min(cap, Math.floor(Math.max(x - threshold, 0) / step) * rate))
+    }
+}
+
+export function formulaSourceValue(rule = {}, panel = {}) {
+    const source = rule.source ?? {}
+    const rawSourceValue = Number(panel?.[source.stat] ?? 0)
+    const sourceValue = sourceUnitIsPercent(source) ? rawSourceValue * 100 : rawSourceValue
+    return {
+        rawSourceValue: Number.isFinite(rawSourceValue) ? rawSourceValue : 0,
+        sourceValue: Number.isFinite(sourceValue) ? sourceValue : 0,
+        sourceUnit: source.unit ?? "storedValue",
+    }
+}
+
 export function isAllowedInCombatFormulaSourceStat(stat) {
     return IN_COMBAT_FORMULA_SOURCE_STAT_SET.has(String(stat ?? "").trim())
 }
@@ -117,14 +170,7 @@ function sourceUnitIsPercent(source = {}) {
 }
 
 export function inCombatFormulaSourceValue(rule = {}, panel = {}) {
-    const source = rule.source ?? {}
-    const rawSourceValue = Number(panel?.[source.stat] ?? 0)
-    const sourceValue = sourceUnitIsPercent(source) ? rawSourceValue * 100 : rawSourceValue
-    return {
-        rawSourceValue: Number.isFinite(rawSourceValue) ? rawSourceValue : 0,
-        sourceValue: Number.isFinite(sourceValue) ? sourceValue : 0,
-        sourceUnit: source.unit ?? "storedValue",
-    }
+    return formulaSourceValue(rule, panel)
 }
 
 export function evaluateInCombatFormulaRule(rule = {}, panel = {}) {

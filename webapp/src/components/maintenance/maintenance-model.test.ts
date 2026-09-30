@@ -5,6 +5,16 @@ import {
 } from "./maintenance-options"
 
 describe("maintenance structured model", () => {
+  it("preserves both disc defaults in drafts and previews readable set names", () => {
+    const sets = [{ id: "four", name: { zhCN: "四件套甲" } }, { id: "energy", name: { zhCN: "充能套装" } }]
+    const legacy = prepareDraft("agents", { preferredDriveDiscs: { defaultSetId: "four" } })
+    expect(legacy.preferredDriveDiscs.defaultTwoPieceSetIds).toEqual([])
+    const draft = prepareDraft("agents", { preferredDriveDiscs: { defaultSetIds: ["four"], defaultTwoPieceSetIds: ["energy"] } })
+    expect(draft.preferredDriveDiscs.defaultTwoPieceSetIds).toEqual(["energy"])
+    expect(maskedPreview(draft, sets).preferredDriveDiscs).toMatchObject({ "默认 4 件套": ["四件套甲"], "默认 2 件套": ["充能套装"] })
+    expect(JSON.stringify(maskedPreview(draft, sets))).not.toContain("defaultTwoPieceSetIds")
+  })
+
   it("offers skill multiplier rows as Buff modifier targets", () => {
     const candidates = buffCandidates({
       agents: { agents: [{ id: "agent_a", name: { zhCN: "角色甲" } }] },
@@ -50,6 +60,35 @@ describe("maintenance structured model", () => {
       teammateAttack: 3150,
       luminescenceDamageSharePct: 50,
     })
+  })
+
+  it("migrates Velina Release events to releaseSource and keeps wind corrosion", () => {
+    const draft = prepareDraft("agents", {
+      id: "velina",
+      anomalyReleaseProfiles: [
+        { id: "micro_vortex" },
+        { id: "broad_vortex" },
+        { id: "ultimate_wind" },
+      ],
+      defaultCalculationConfig: {
+        events: [{
+          id: "velina-release",
+          kind: "anomaly",
+          settlementType: "release",
+          anomalyEffect: "wind_corrosion",
+          triggerActorRef: { agentId: "velina", profileId: "ultimate_wind" },
+          anomalySource: { actorRef: { agentId: "velina" } },
+        }],
+      },
+    })
+
+    expect(draft.defaultCalculationConfig.events[0]).toMatchObject({
+      settlementType: "release",
+      anomalyEffect: "wind_corrosion",
+      releaseSource: "ultimate_wind",
+    })
+    expect(draft.defaultCalculationConfig.events[0].triggerActorRef).toBeUndefined()
+    expect(draft.defaultCalculationConfig.events[0].anomalySource).toBeUndefined()
   })
 
   it("preserves explicit Luminescence share values for maintenance validation", () => {

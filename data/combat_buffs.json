@@ -1264,7 +1264,13 @@
                 "zhCN": "潜能觉醒等级"
               },
               "kind": "enum",
-              "values": ["P2", "P3", "P4", "P5", "P6"],
+              "values": [
+                "P2",
+                "P3",
+                "P4",
+                "P5",
+                "P6"
+              ],
               "defaultValue": "P6"
             }
           ],
@@ -1272,132 +1278,292 @@
             {
               "id": "rina_potential_atk_p2",
               "type": "derived",
-              "target": { "kind": "default" },
+              "target": {
+                "kind": "default"
+              },
               "stat": "atkFlat",
               "mode": "flat",
-              "sourceLabel": { "zhCN": "丽娜自身穿透率" },
+              "sourceLabel": {
+                "zhCN": "丽娜自身穿透率"
+              },
               "defaultSourceValue": 72,
               "ratio": 300,
               "cap": 576,
-              "requirement": { "runtimeParameter": { "id": "potentialLevel", "oneOf": ["P2"] } },
-              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+              "requirement": {
+                "runtimeParameter": {
+                  "id": "potentialLevel",
+                  "oneOf": [
+                    "P2"
+                  ]
+                }
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "rina_potential_def_p2",
               "type": "derived",
-              "target": { "kind": "default" },
+              "target": {
+                "kind": "default"
+              },
               "stat": "defFlat",
               "mode": "flat",
-              "sourceLabel": { "zhCN": "丽娜自身穿透率" },
+              "sourceLabel": {
+                "zhCN": "丽娜自身穿透率"
+              },
               "defaultSourceValue": 72,
               "ratio": 250,
               "cap": 468,
-              "requirement": { "runtimeParameter": { "id": "potentialLevel", "oneOf": ["P2"] } },
-              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+              "requirement": {
+                "runtimeParameter": {
+                  "id": "potentialLevel",
+                  "oneOf": [
+                    "P2"
+                  ]
+                }
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "rina_potential_atk_p3",
               "type": "derived",
-              "target": { "kind": "default" },
+              "target": {
+                "kind": "default"
+              },
               "stat": "atkFlat",
               "mode": "flat",
-              "sourceLabel": { "zhCN": "丽娜自身穿透率" },
+              "sourceLabel": {
+                "zhCN": "丽娜自身穿透率"
+              },
               "defaultSourceValue": 72,
               "ratio": 420,
               "cap": 576,
-              "requirement": { "runtimeParameter": { "id": "potentialLevel", "oneOf": ["P3"] } },
-              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+              "requirement": {
+                "runtimeParameter": {
+                  "id": "potentialLevel",
+                  "oneOf": [
+                    "P3"
+                  ]
+                }
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "rina_potential_def_p3",
               "type": "derived",
-              "target": { "kind": "default" },
+              "target": {
+                "kind": "default"
+              },
               "stat": "defFlat",
               "mode": "flat",
-              "sourceLabel": { "zhCN": "丽娜自身穿透率" },
+              "sourceLabel": {
+                "zhCN": "丽娜自身穿透率"
+              },
               "defaultSourceValue": 72,
               "ratio": 350,
               "cap": 468,
-              "requirement": { "runtimeParameter": { "id": "potentialLevel", "oneOf": ["P3"] } },
-              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+              "requirement": {
+                "runtimeParameter": {
+                  "id": "potentialLevel",
+                  "oneOf": [
+                    "P3"
+                  ]
+                }
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "rina_potential_atk_p4",
               "type": "derived",
-              "target": { "kind": "default" },
+              "target": {
+                "kind": "default"
+              },
               "stat": "atkFlat",
               "mode": "flat",
-              "sourceLabel": { "zhCN": "丽娜自身穿透率" },
+              "sourceLabel": {
+                "zhCN": "丽娜自身穿透率"
+              },
               "defaultSourceValue": 72,
               "ratio": 550,
               "cap": 576,
-              "requirement": { "runtimeParameter": { "id": "potentialLevel", "oneOf": ["P4"] } },
-              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+              "requirement": {
+                "runtimeParameter": {
+                  "id": "potentialLevel",
+                  "oneOf": [
+                    "P4"
+                  ]
+                }
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "rina_potential_def_p4",
               "type": "derived",
-              "target": { "kind": "default" },
+              "target": {
+                "kind": "default"
+              },
               "stat": "defFlat",
               "mode": "flat",
-              "sourceLabel": { "zhCN": "丽娜自身穿透率" },
+              "sourceLabel": {
+                "zhCN": "丽娜自身穿透率"
+              },
               "defaultSourceValue": 72,
               "ratio": 450,
               "cap": 468,
-              "requirement": { "runtimeParameter": { "id": "potentialLevel", "oneOf": ["P4"] } },
-              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+              "requirement": {
+                "runtimeParameter": {
+                  "id": "potentialLevel",
+                  "oneOf": [
+                    "P4"
+                  ]
+                }
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "rina_potential_atk_p5",
               "type": "derived",
-              "target": { "kind": "default" },
+              "target": {
+                "kind": "default"
+              },
               "stat": "atkFlat",
               "mode": "flat",
-              "sourceLabel": { "zhCN": "丽娜自身穿透率" },
+              "sourceLabel": {
+                "zhCN": "丽娜自身穿透率"
+              },
               "defaultSourceValue": 72,
               "ratio": 670,
               "cap": 576,
-              "requirement": { "runtimeParameter": { "id": "potentialLevel", "oneOf": ["P5"] } },
-              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+              "requirement": {
+                "runtimeParameter": {
+                  "id": "potentialLevel",
+                  "oneOf": [
+                    "P5"
+                  ]
+                }
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "rina_potential_def_p5",
               "type": "derived",
-              "target": { "kind": "default" },
+              "target": {
+                "kind": "default"
+              },
               "stat": "defFlat",
               "mode": "flat",
-              "sourceLabel": { "zhCN": "丽娜自身穿透率" },
+              "sourceLabel": {
+                "zhCN": "丽娜自身穿透率"
+              },
               "defaultSourceValue": 72,
               "ratio": 550,
               "cap": 468,
-              "requirement": { "runtimeParameter": { "id": "potentialLevel", "oneOf": ["P5"] } },
-              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+              "requirement": {
+                "runtimeParameter": {
+                  "id": "potentialLevel",
+                  "oneOf": [
+                    "P5"
+                  ]
+                }
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "rina_potential_atk_p6",
               "type": "derived",
-              "target": { "kind": "default" },
+              "target": {
+                "kind": "default"
+              },
               "stat": "atkFlat",
               "mode": "flat",
-              "sourceLabel": { "zhCN": "丽娜自身穿透率" },
+              "sourceLabel": {
+                "zhCN": "丽娜自身穿透率"
+              },
               "defaultSourceValue": 72,
               "ratio": 800,
               "cap": 576,
-              "requirement": { "runtimeParameter": { "id": "potentialLevel", "oneOf": ["P6"] } },
-              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+              "requirement": {
+                "runtimeParameter": {
+                  "id": "potentialLevel",
+                  "oneOf": [
+                    "P6"
+                  ]
+                }
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             },
             {
               "id": "rina_potential_def_p6",
               "type": "derived",
-              "target": { "kind": "default" },
+              "target": {
+                "kind": "default"
+              },
               "stat": "defFlat",
               "mode": "flat",
-              "sourceLabel": { "zhCN": "丽娜自身穿透率" },
+              "sourceLabel": {
+                "zhCN": "丽娜自身穿透率"
+              },
               "defaultSourceValue": 72,
               "ratio": 650,
               "cap": 468,
-              "requirement": { "runtimeParameter": { "id": "potentialLevel", "oneOf": ["P6"] } },
-              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+              "requirement": {
+                "runtimeParameter": {
+                  "id": "potentialLevel",
+                  "oneOf": [
+                    "P6"
+                  ]
+                }
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
             }
           ]
         }
@@ -1506,7 +1672,13 @@
                 "zhCN": "潜能觉醒等级"
               },
               "kind": "enum",
-              "values": ["P2", "P3", "P4", "P5", "P6"],
+              "values": [
+                "P2",
+                "P3",
+                "P4",
+                "P5",
+                "P6"
+              ],
               "defaultValue": "P6"
             }
           ],
@@ -1524,7 +1696,9 @@
                 "specialty": "armorer",
                 "runtimeParameter": {
                   "id": "potentialLevel",
-                  "oneOf": ["P2"]
+                  "oneOf": [
+                    "P2"
+                  ]
                 }
               },
               "coverage": {
@@ -1544,10 +1718,14 @@
               "mode": "flat",
               "value": 11,
               "requirement": {
-                "excludedSpecialties": ["armorer"],
+                "excludedSpecialties": [
+                  "armorer"
+                ],
                 "runtimeParameter": {
                   "id": "potentialLevel",
-                  "oneOf": ["P2"]
+                  "oneOf": [
+                    "P2"
+                  ]
                 }
               },
               "coverage": {
@@ -1570,7 +1748,9 @@
                 "specialty": "armorer",
                 "runtimeParameter": {
                   "id": "potentialLevel",
-                  "oneOf": ["P3"]
+                  "oneOf": [
+                    "P3"
+                  ]
                 }
               },
               "coverage": {
@@ -1590,10 +1770,14 @@
               "mode": "flat",
               "value": 17,
               "requirement": {
-                "excludedSpecialties": ["armorer"],
+                "excludedSpecialties": [
+                  "armorer"
+                ],
                 "runtimeParameter": {
                   "id": "potentialLevel",
-                  "oneOf": ["P3"]
+                  "oneOf": [
+                    "P3"
+                  ]
                 }
               },
               "coverage": {
@@ -1616,7 +1800,9 @@
                 "specialty": "armorer",
                 "runtimeParameter": {
                   "id": "potentialLevel",
-                  "oneOf": ["P4"]
+                  "oneOf": [
+                    "P4"
+                  ]
                 }
               },
               "coverage": {
@@ -1636,10 +1822,14 @@
               "mode": "flat",
               "value": 23,
               "requirement": {
-                "excludedSpecialties": ["armorer"],
+                "excludedSpecialties": [
+                  "armorer"
+                ],
                 "runtimeParameter": {
                   "id": "potentialLevel",
-                  "oneOf": ["P4"]
+                  "oneOf": [
+                    "P4"
+                  ]
                 }
               },
               "coverage": {
@@ -1662,7 +1852,9 @@
                 "specialty": "armorer",
                 "runtimeParameter": {
                   "id": "potentialLevel",
-                  "oneOf": ["P5"]
+                  "oneOf": [
+                    "P5"
+                  ]
                 }
               },
               "coverage": {
@@ -1682,10 +1874,14 @@
               "mode": "flat",
               "value": 29,
               "requirement": {
-                "excludedSpecialties": ["armorer"],
+                "excludedSpecialties": [
+                  "armorer"
+                ],
                 "runtimeParameter": {
                   "id": "potentialLevel",
-                  "oneOf": ["P5"]
+                  "oneOf": [
+                    "P5"
+                  ]
                 }
               },
               "coverage": {
@@ -1708,7 +1904,9 @@
                 "specialty": "armorer",
                 "runtimeParameter": {
                   "id": "potentialLevel",
-                  "oneOf": ["P6"]
+                  "oneOf": [
+                    "P6"
+                  ]
                 }
               },
               "coverage": {
@@ -1728,10 +1926,14 @@
               "mode": "flat",
               "value": 35,
               "requirement": {
-                "excludedSpecialties": ["armorer"],
+                "excludedSpecialties": [
+                  "armorer"
+                ],
                 "runtimeParameter": {
                   "id": "potentialLevel",
-                  "oneOf": ["P6"]
+                  "oneOf": [
+                    "P6"
+                  ]
                 }
               },
               "coverage": {
@@ -4366,6 +4568,141 @@
       "images": {
         "icon": "/assets/agents/remielle_dan.png",
         "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/07/22/15559334/13b7b06627a8a99ffdf1f397b1daf7d1_5495460923605178593.png"
+      }
+    },
+    {
+      "id": "velina",
+      "name": {
+        "zhCN": "维琳娜·艾嘉德"
+      },
+      "attribute": "wind",
+      "specialty": "anomaly",
+      "buffs": [
+        {
+          "id": "velina.core.turbulence_f",
+          "source": {
+            "zhCN": "核心被动：风华盈袖（F）"
+          },
+          "description": {
+            "zhCN": "当维琳娜拥有2点[风蚀]时，以 F 级核心被动触发乱流，使该次乱流伤害倍率提升150%。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "velina.core.turbulence_f.effect",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "turbulence"
+              },
+              "stat": "turbulenceBaseMultiplierBonus",
+              "mode": "flat",
+              "value": 150,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": [],
+          "runtimeParameters": []
+        },
+        {
+          "id": "velina.additional.turbulence",
+          "source": {
+            "zhCN": "额外能力：茶会礼仪"
+          },
+          "description": {
+            "zhCN": "队伍中存在其他异常角色或同属性角色时，乱流伤害提升10%。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "velina.additional.turbulence.effect",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "turbulence"
+              },
+              "stat": "turbulenceDamageBonus",
+              "mode": "flat",
+              "value": 10,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "velina.cinema_1.turbulence_res_ignore",
+          "source": {
+            "zhCN": "影画一：秩序化优雅"
+          },
+          "description": {
+            "zhCN": "触发乱流时无视目标20%全属性伤害抗性。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "velina.cinema_1.turbulence_res_ignore.effect",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "turbulence"
+              },
+              "stat": "allResIgnore",
+              "mode": "flat",
+              "value": 20,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        {
+          "id": "velina.cinema_2.turbulence",
+          "source": {
+            "zhCN": "影画二：饱和式计划"
+          },
+          "description": {
+            "zhCN": "乱流伤害提升效果额外提升15%。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "velina.cinema_2.turbulence.effect",
+              "type": "fixed",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "turbulence"
+              },
+              "stat": "turbulenceDamageBonus",
+              "mode": "flat",
+              "value": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        }
+      ],
+      "images": {
+        "icon": "/assets/agents/velina.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen"
       }
     }
   ],

@@ -134,6 +134,237 @@
       "tickMultiplier": 0.075,
       "tickIntervalSeconds": 1,
       "defaultDurationSeconds": 10
+    },
+    {
+      "id": "wind_corrosion",
+      "settlementType": "attribute",
+      "label": {
+        "zhCN": "风化",
+        "en": "Wind Corrosion"
+      },
+      "element": "wind",
+      "baseMultiplier": 12.5,
+      "defaultProcCount": 1,
+      "sourceStatus": "crossChecked",
+      "sources": [
+        "official-mihoyo-baike-content-1960",
+        "cross-checked-public-game-text"
+      ],
+      "version": "2026-09-22",
+      "crossChecked": true,
+      "metadata": {
+        "domain": "wind",
+        "stateKey": "windCorrosion",
+        "keepsStateAfterTurbulence": true,
+        "directDamageOnlyMultiplier": true,
+        "sourceStatus": "crossChecked",
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/2041/detail",
+          "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+          "https://zzz.gachabase.net/agents/1561/velina/release/3.1.0/18626312?lang=chs",
+          "https://news.17173.com/content/06132026/134134065.shtml",
+          "https://www.hoyolab.com/article/45547491"
+        ],
+        "verificationNote": "公开机制资料交叉验证的约1250%风属性异常基底；具体版本数值需随游戏版本复核。"
+      }
+    },
+    {
+      "id": "assault",
+      "settlementType": "turbulence",
+      "label": {
+        "zhCN": "强击乱流",
+        "en": "Assault Turbulence"
+      },
+      "element": "physical",
+      "fixedMultiplier": 8,
+      "tickMultiplier": 0.075,
+      "tickIntervalSeconds": 1,
+      "defaultDurationSeconds": 10,
+      "sourceStatus": "confirmed",
+      "metadata": {
+        "source": "user-provided-turbulence-formula-image-2026-09-28",
+        "rounding": "floor"
+      },
+      "version": "2026-09-28"
+    },
+    {
+      "id": "shatter",
+      "settlementType": "turbulence",
+      "label": {
+        "zhCN": "碎冰乱流",
+        "en": "Shatter Turbulence"
+      },
+      "element": "ice",
+      "fixedMultiplier": 13,
+      "tickMultiplier": 0.075,
+      "tickIntervalSeconds": 1,
+      "defaultDurationSeconds": 10,
+      "sourceStatus": "confirmed",
+      "metadata": {
+        "source": "user-provided-turbulence-formula-image-2026-09-28",
+        "rounding": "floor"
+      },
+      "version": "2026-09-28"
+    },
+    {
+      "id": "burn",
+      "settlementType": "turbulence",
+      "label": {
+        "zhCN": "灼烧乱流",
+        "en": "Burn Turbulence"
+      },
+      "element": "fire",
+      "fixedMultiplier": 9,
+      "tickMultiplier": 0.5,
+      "tickIntervalSeconds": 0.5,
+      "defaultDurationSeconds": 10,
+      "sourceStatus": "confirmed",
+      "metadata": {
+        "source": "user-provided-turbulence-formula-image-2026-09-28",
+        "rounding": "floor"
+      },
+      "version": "2026-09-28"
+    },
+    {
+      "id": "shock",
+      "settlementType": "turbulence",
+      "label": {
+        "zhCN": "感电乱流",
+        "en": "Shock Turbulence"
+      },
+      "element": "electric",
+      "fixedMultiplier": 6.5,
+      "tickMultiplier": 1.25,
+      "tickIntervalSeconds": 1,
+      "defaultDurationSeconds": 10,
+      "sourceStatus": "confirmed",
+      "metadata": {
+        "source": "user-provided-turbulence-formula-image-2026-09-28",
+        "rounding": "floor"
+      },
+      "version": "2026-09-28"
+    },
+    {
+      "id": "corruption",
+      "settlementType": "turbulence",
+      "label": {
+        "zhCN": "侵蚀乱流",
+        "en": "Corruption Turbulence"
+      },
+      "element": "ether",
+      "fixedMultiplier": 6.5,
+      "tickMultiplier": 0.625,
+      "tickIntervalSeconds": 0.5,
+      "defaultDurationSeconds": 10,
+      "sourceStatus": "confirmed",
+      "metadata": {
+        "source": "user-provided-turbulence-formula-image-2026-09-28",
+        "rounding": "floor"
+      },
+      "version": "2026-09-28"
+    },
+    {
+      "id": "frost_frozen",
+      "settlementType": "turbulence",
+      "label": {
+        "zhCN": "烈霜乱流",
+        "en": "Frost Turbulence"
+      },
+      "element": "ice",
+      "fixedMultiplier": 0,
+      "tickMultiplier": 0.75,
+      "tickIntervalSeconds": 1,
+      "defaultDurationSeconds": 20,
+      "sourceStatus": "confirmed",
+      "metadata": {
+        "source": "user-provided-turbulence-formula-image-2026-09-28",
+        "rounding": "floor"
+      },
+      "version": "2026-09-28"
+    }
+  ],
+  "version": 3,
+  "sources": [
+    "https://baike.mihoyo.com/zzz/wiki/content/2041/detail",
+    "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+    "https://git.mero.moe/dimbreath/ZenlessData/blame/commit/1dbcef24b3a6039a135daad6b29832c9d556139c/TextMap/TextMapOverwriteTemplateTb.json#L786-L788",
+    "https://zzz.gachabase.net/agents/1561/velina/release/3.1.0/18626312?lang=chs",
+    "https://news.17173.com/content/06132026/134134065.shtml",
+    "https://www.hoyolab.com/article/45547491"
+  ],
+  "turbulenceMultipliersVersion": 2,
+  "turbulenceMultipliers": [
+    {
+      "id": "zzz-wind-turbulence-formula-v2",
+      "gameVersion": "3.1.0",
+      "revision": "user-provided-formula-image-2026-09-28",
+      "status": "confirmed",
+      "calculationEnabled": true,
+      "applicability": "wind corrosion + non-wind anomaly; turbulence uses the non-wind anomaly base",
+      "capturedAt": "2026-09-28",
+      "confidence": "confirmed",
+      "rows": [
+        {
+          "baseAnomalyEffect": "assault",
+          "element": "physical",
+          "fixedMultiplier": 8,
+          "tickMultiplier": 0.075,
+          "tickIntervalSeconds": 1,
+          "defaultDurationSeconds": 10,
+          "rounding": "floor",
+          "status": "confirmed"
+        },
+        {
+          "baseAnomalyEffect": "shatter",
+          "element": "ice",
+          "fixedMultiplier": 13,
+          "tickMultiplier": 0.075,
+          "tickIntervalSeconds": 1,
+          "defaultDurationSeconds": 10,
+          "rounding": "floor",
+          "status": "confirmed"
+        },
+        {
+          "baseAnomalyEffect": "burn",
+          "element": "fire",
+          "fixedMultiplier": 9,
+          "tickMultiplier": 0.5,
+          "tickIntervalSeconds": 0.5,
+          "defaultDurationSeconds": 10,
+          "rounding": "floor",
+          "status": "confirmed"
+        },
+        {
+          "baseAnomalyEffect": "shock",
+          "element": "electric",
+          "fixedMultiplier": 6.5,
+          "tickMultiplier": 1.25,
+          "tickIntervalSeconds": 1,
+          "defaultDurationSeconds": 10,
+          "rounding": "floor",
+          "status": "confirmed"
+        },
+        {
+          "baseAnomalyEffect": "corruption",
+          "element": "ether",
+          "fixedMultiplier": 6.5,
+          "tickMultiplier": 0.625,
+          "tickIntervalSeconds": 0.5,
+          "defaultDurationSeconds": 10,
+          "rounding": "floor",
+          "status": "confirmed"
+        },
+        {
+          "baseAnomalyEffect": "frost_frozen",
+          "element": "ice",
+          "fixedMultiplier": 0,
+          "tickMultiplier": 0.75,
+          "tickIntervalSeconds": 1,
+          "defaultDurationSeconds": 20,
+          "rounding": "floor",
+          "status": "confirmed"
+        }
+      ]
     }
   ]
 }

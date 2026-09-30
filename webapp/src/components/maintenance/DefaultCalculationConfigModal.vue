@@ -7,7 +7,9 @@ import CalculationEventsEditor from "./CalculationEventsEditor.vue"
 import { defaultCalculationEvent, option } from "./maintenance-options"
 import { internalId, textOf } from "./maintenance-model"
 import { disorderElapsedStepSeconds, normalizeElapsedSeconds } from "@core/damageEventMultipliers.js"
-import { anomalyReleaseProfile, isReleaseSettlement } from "@core/anomalyRelease.js"
+import { anomalyReleaseProfile, isReleaseSettlement, isVelinaReleaseAgent, normalizeAnomalyReleaseEventForAgent } from "@core/anomalyRelease.js"
+import { cleanStoredReactiveEvent } from "@core/anomalySettlement.js"
+import { normalizeTurbulenceEditorEvent, turbulenceConfigurationWarning } from "@/utils/turbulence"
 
 const props = withDefaults(defineProps<{
   show: boolean
@@ -58,7 +60,11 @@ const activeLevelOptions = computed(() => [1, 2, 3, 4, 5, 6].map(level => ({
 const totalEventCount = computed(() => potentialEntries.value.reduce((sum, potential) => sum
   + [potential, ...(potential.variants ?? [])].reduce((inner, entry) => inner + (entry.events?.length ?? 0), 0), 0))
 const canApply = computed(() => potentialEntries.value.length > 0 && potentialEntries.value.every(potential =>
-  [potential, ...(potential.variants ?? [])].every((entry, index) => (entry.events?.length ?? 0) > 0 || (index === 0 && (potential?.skillGroups?.length ?? 0) > 0))))
+  [potential, ...(potential.variants ?? [])].every((entry, index) => (entry.events?.length ?? 0) > 0 || (index === 0 && (potential?.skillGroups?.length ?? 0) > 0))) && !turbulenceWarnings.value.length)
+const turbulenceWarnings = computed(() => [...new Set<string>(potentialEntries.value
+  .flatMap(potential => [potential, ...(potential.variants ?? [])])
+  .flatMap(entry => entry.events ?? [])
+  .map(event => turbulenceConfigurationWarning(event, props.catalog)).filter(Boolean))])
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value))
@@ -81,19 +87,28 @@ function normalizeEntry(entry: any) {
   entry.mode ??= "custom"
   entry.name ??= { zhCN: Number(entry.cinemaLevel ?? 0) ? `${entry.cinemaLevel}影默认方案` : "默认方案" }
   entry.events = Array.isArray(entry.events) ? entry.events : []
-  for (const event of entry.events) {
+  const normalizedEvents: any[] = []
+  for (const rawEvent of entry.events) {
+    const event = cleanStoredReactiveEvent(rawEvent, props.agent)
+    if (!event) continue
     event.id ||= internalId("event")
     if (isReleaseSettlement(event)) {
-      const profile = anomalyReleaseProfile(props.agent, event.triggerActorRef?.profileId)
-      event.kind = "anomaly"
-      event.settlementType = "release"
-      event.triggerActorRef = {
-        agentId: String(props.agent?.id ?? event.triggerActorRef?.agentId ?? ""),
-        profileId: String(profile?.id ?? event.triggerActorRef?.profileId ?? ""),
+      if (isVelinaReleaseAgent(props.agent)) {
+        const normalized = normalizeAnomalyReleaseEventForAgent(event, props.agent)
+        Object.keys(event).forEach(key => delete event[key])
+        Object.assign(event, normalized)
+      } else {
+        const profile = anomalyReleaseProfile(props.agent, event.triggerActorRef?.profileId)
+        event.kind = "anomaly"
+        event.settlementType = "release"
+        event.triggerActorRef = {
+          agentId: String(props.agent?.id ?? event.triggerActorRef?.agentId ?? ""),
+          profileId: String(profile?.id ?? event.triggerActorRef?.profileId ?? ""),
+        }
+        event.anomalySource ??= { actorRef: { agentId: event.triggerActorRef.agentId } }
+        delete event.anomalyVariant
+        delete event.procCount
       }
-      event.anomalySource ??= { actorRef: { agentId: event.triggerActorRef.agentId } }
-      delete event.anomalyVariant
-      delete event.procCount
     }
     if (event.kind === "disorder" || event.settlementType === "disorder") {
       event.elapsedSeconds = normalizeElapsedSeconds(
@@ -102,6 +117,24 @@ function normalizeEntry(entry: any) {
         disorderElapsedStepSeconds(event, props.catalog),
       )
     }
+    if (event.settlementType === "turbulence") {
+      Object.assign(event, normalizeTurbulenceEditorEvent(event, props.agent, props.catalog))
+      for (const key of [
+        "windSource",
+        "anomalySource",
+        "secondaryAnomalyEffect",
+        "secondAnomalyEffect",
+        "secondaryAnomalyRemainingSeconds",
+        "turbulenceEffect",
+        "turbulenceVariant",
+        "turbulenceMultiplierStatus",
+      ]) delete event[key]
+    }
+    normalizedEvents.push(event)
+  }
+  entry.events = normalizedEvents
+  if (props.agent?.attribute === "wind") {
+    entry.events = entry.events.filter((event: any) => event?.settlementType !== "turbulence" && event?.settlementType !== "disorder" && event?.kind !== "disorder")
   }
   if (!entry.events.some((event: any) => event.id === entry.selectedEventId)) entry.selectedEventId = entry.events[0]?.id ?? null
 }
@@ -254,6 +287,7 @@ function apply() {
     @update:show="close"
   >
     <div v-if="draft" class="default-loop-modal-content ui-layout-scope" data-layout-surface="default-calculation-config">
+    <p v-if="turbulenceWarnings.length" role="alert">{{ turbulenceWarnings.join(" ") }}</p>
     <div class="default-loop-modal-body">
       <div v-if="agent?.potentialVision" class="default-loop-potential-bar">
         <NTabs :value="activePotentialKey" type="segment" class="default-loop-tabs" @update:value="changePotentialEntry">

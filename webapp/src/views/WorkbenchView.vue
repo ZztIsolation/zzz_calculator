@@ -15,7 +15,8 @@ import LuminescenceParameterFields from "@/components/LuminescenceParameterField
 import OptimizerConfigModal from "@/components/OptimizerConfigModal.vue"
 import OptimizerResultSelector from "@/components/OptimizerResultSelector.vue"
 import PanelStatTable from "@/components/PanelStatTable.vue"
-import { fallbackIcon, imageForAgent, imageForDriveDiscSet, imageForWEngine } from "@/utils/assets"
+import WEngineSelect from "@/components/WEngineSelect.vue"
+import { fallbackIcon, imageForAgent, imageForDriveDiscSet } from "@/utils/assets"
 import { buffLabelForId } from "@/utils/combatBuffs"
 import { countEffectiveDriveDiscSubstats } from "@/utils/driveDiscSubstats"
 import {
@@ -143,14 +144,7 @@ const agentSelectOptions = computed(() => catalogStore.displayAgents.map((agent:
   value: agent.id,
   searchText: entitySearchText(agent),
   agent,
-})))
-const wEngineOptions = computed(() => buildStore.wEnginesForAgent(catalogStore.meta))
-const wEngineSelectOptions = computed(() => wEngineOptions.value.map((wEngine: any) => ({
-  label: entitySelectLabel(wEngine),
-  value: wEngine.id,
-  searchText: entitySearchText(wEngine),
-  wEngine,
-})))
+})).sort((left: { value: string }, right: { value: string }) => Number(right.value === "velina") - Number(left.value === "velina")))
 const canRunOptimization = computed(() => Boolean(
   buildStore.agentId
   && buildStore.wEngineId
@@ -748,15 +742,6 @@ function renderAgentSelectLabel(option: any) {
   return renderEntitySelectLabel(
     agent,
     imageForAgent(agent),
-    String(option?.label ?? option?.value ?? ""),
-  )
-}
-
-function renderWEngineSelectLabel(option: any) {
-  const wEngine = option?.wEngine ?? catalogStore.displayWEngines.find((item: any) => item.id === option?.value)
-  return renderEntitySelectLabel(
-    wEngine,
-    imageForWEngine(wEngine),
     String(option?.label ?? option?.value ?? ""),
   )
 }
@@ -1371,16 +1356,13 @@ function formatPercentValue(value: any) {
           <h2 class="panel-title">音擎</h2>
         </div>
         <div class="workbench-section-body section-band">
-          <NSelect
+          <WEngineSelect
             class="workbench-entity-select"
             :value="buildStore.wEngineId"
-            :options="wEngineSelectOptions"
-            :filter="filterSelectOption"
-            :render-label="renderWEngineSelectLabel"
-            filterable
-            placeholder="选择音擎"
+            :items="catalogStore.displayWEngines"
+            :agent="selectedAgent"
             aria-label="选择音擎"
-            @update:value="value => buildStore.selectWEngine(String(value), catalogStore.meta)"
+            @update:value="value => buildStore.selectWEngine(value, catalogStore.meta)"
           />
           <div class="build-compact-grid ui-field-grid" data-layout-surface="w-engine-fields">
             <label class="compact-field ui-field" data-layout-field>
@@ -2059,6 +2041,7 @@ function formatPercentValue(value: any) {
     :w-engine-id="buildStore.wEngineId"
     :w-engine-modification-level="buildStore.wEngineModificationLevel"
     :in-combat-panel="buildStore.result?.inCombat?.panel"
+    :out-of-combat-panel="buildStore.result?.outOfCombat?.panel"
     @apply="applyBuffs"
   />
 

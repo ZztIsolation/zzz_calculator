@@ -75,6 +75,68 @@ function inventoryStore(overrides: any = {}) {
 }
 
 describe("optimizer store", () => {
+  const energyAgent = {
+    ...preferredAgentA,
+    preferredDriveDiscs: { defaultSetIds: ["woodpecker_electro"], defaultTwoPieceSetIds: ["swing_jazz", "fanged_metal"] },
+  }
+
+  it.each([[], ["woodpecker_electro"]])("replaces legacy two-piece settings once: %j", oldIds => {
+    localStorage.setItem("zzz-calculator.webapp.optimizer.v1", JSON.stringify({
+      version: 4, currentAgentId: "agent_a", byAgent: {
+        agent_a: { twoPieceSetIds: oldIds, fourPieceSetSource: "manual", fourPieceSetIds: ["fanged_metal"], minimums: { atk: 1234 }, minimumDefaultsVersion: 2 },
+        agent_b: { twoPieceSetIds: ["woodpecker_electro"], sentinel: "untouched" },
+      },
+    }))
+    const store = useOptimizerStore()
+    store.initialize(preferredCatalog, energyAgent)
+    expect(store.twoPieceSetIds).toEqual(["swing_jazz", "fanged_metal"])
+    expect(store.twoPieceSetSource).toBe("preferred")
+    expect(store.fourPieceSetIds).toEqual(["fanged_metal"])
+    expect(store.minimums.atk).toBe(1234)
+    const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.optimizer.v1")!)
+    expect(saved.byAgent.agent_a.twoPieceDefaultsVersion).toBe(1)
+    expect(saved.byAgent.agent_b).toEqual({ twoPieceSetIds: ["woodpecker_electro"], sentinel: "untouched" })
+
+    store.setTwoPieceSetIds([])
+    store.loadAgentSettings(preferredAgentB, preferredCatalog)
+    expect(store.twoPieceSetIds).toEqual(["woodpecker_electro"])
+    store.loadAgentSettings(energyAgent, preferredCatalog)
+    expect(store.twoPieceSetIds).toEqual([])
+    expect(store.twoPieceSetSource).toBe("manual")
+    setActivePinia(createPinia())
+    const reloaded = useOptimizerStore()
+    reloaded.initialize(preferredCatalog, energyAgent)
+    expect(reloaded.twoPieceSetIds).toEqual([])
+    reloaded.setTwoPieceSetIds(["woodpecker_electro"])
+    reloaded.loadAgentSettings(energyAgent, preferredCatalog)
+    expect(reloaded.twoPieceSetIds).toEqual(["woodpecker_electro"])
+  })
+
+  it("uses current recommendations only while following defaults", () => {
+    const store = useOptimizerStore()
+    store.initialize(preferredCatalog, energyAgent)
+    expect(store.twoPieceSetIds).toEqual(["swing_jazz", "fanged_metal"])
+    const changedAgent = { ...energyAgent, preferredDriveDiscs: { defaultTwoPieceSetIds: ["fanged_metal"] } }
+    store.loadAgentSettings(changedAgent, preferredCatalog)
+    expect(store.twoPieceSetIds).toEqual(["fanged_metal"])
+    store.loadAgentSettings(preferredAgentA, preferredCatalog)
+    expect(store.twoPieceSetIds).toEqual([])
+    store.setTwoPieceSetIds(["woodpecker_electro"])
+    store.loadAgentSettings(changedAgent, preferredCatalog)
+    expect(store.twoPieceSetIds).toEqual(["woodpecker_electro"])
+  })
+
+  it("waits for valid recommendations before marking an agent migrated", () => {
+    const store = useOptimizerStore()
+    const hiddenCatalog = { ...preferredCatalog, displayDriveDiscSets: [{ id: "woodpecker_electro" }] }
+    store.initialize(hiddenCatalog, energyAgent)
+    expect(store.twoPieceSetIds).toEqual([])
+    expect(store.twoPieceDefaultsVersion).toBe(0)
+    store.loadAgentSettings(energyAgent, preferredCatalog)
+    expect(store.twoPieceSetIds).toEqual(["swing_jazz", "fanged_metal"])
+    expect(store.twoPieceDefaultsVersion).toBe(1)
+  })
+
   beforeEach(() => {
     setActivePinia(createPinia())
     localStorage.removeItem("zzz-calculator.webapp.optimizer.v1")

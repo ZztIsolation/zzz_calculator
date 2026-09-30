@@ -15,6 +15,7 @@ import {
 import {
   damageSkillRowsWithGeneratedTotals,
 } from "@core/skillMultiplierCandidates.js"
+import { turbulenceEffectLabel } from "@/utils/turbulence"
 
 export function labelOf(item: any): string {
   return nameOf(item)
@@ -285,6 +286,8 @@ export function damageEventKindLabel(event: any): string {
   if (kind === "anomaly") {
     return event?.settlementType === "disorder"
       ? "紊乱"
+      : event?.settlementType === "turbulence"
+        ? "乱流"
       : event?.settlementType === "release"
         ? "异放"
         : event?.settlementType === "luminescence" ? "耀变" : "属性异常"
@@ -357,6 +360,9 @@ export function damageEventSubjectLabel(event: any, meta?: any, fallbackSkillCat
     }
     if (event.settlementType === "release") {
       return `${anomalyEffectLabel(event.anomalyEffect, meta) || "属性异常"}异放`
+    }
+    if (event.settlementType === "turbulence") {
+      return turbulenceEffectLabel(event.anomalyEffect, meta)
     }
     if (event.settlementType === "luminescence") {
       return "队伍异常评分"

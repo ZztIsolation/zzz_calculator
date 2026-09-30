@@ -1,3 +1,4 @@
+import { cleanStoredReactiveEvent } from "@core/anomalySettlement.js"
 import { defineStore } from "pinia"
 import {
   calculateInCombatPanel,
@@ -15,6 +16,7 @@ import { normalizeSkillTargetsInValue } from "@core/skillTargets.js"
 import {
   createAnomalySourceSnapshot,
   defaultAnomalyReleaseProfile,
+  isVelinaReleaseAgent,
   isReleaseSettlement,
   normalizeAnomalyReleaseEventForAgent,
   normalizeAnomalySourceSnapshot,
@@ -383,6 +385,7 @@ const ATTRIBUTE_EFFECT_BY_ELEMENT: Record<string, string> = {
   ice: "shatter",
   electric: "shock",
   ether: "corruption",
+  wind: "wind_corrosion",
 }
 
 function defaultReleaseDamageConfigForAgent(agent: any = null) {
@@ -410,8 +413,12 @@ function defaultReleaseDamageConfigForAgent(agent: any = null) {
         anomalyEffect,
         count: 1,
         stunned: true,
-        triggerActorRef: { agentId, profileId: profile.id },
-        anomalySource: { actorRef: { agentId } },
+        ...(isVelinaReleaseAgent(agent)
+          ? { releaseSource: profile.id }
+          : {
+              triggerActorRef: { agentId, profileId: profile.id },
+              anomalySource: { actorRef: { agentId } },
+            }),
       },
     ],
   }
@@ -480,6 +487,8 @@ function calculationAgentFor(metaAgent: any = null, catalog: any = null, agentId
 }
 
 function normalizeDamageEvent(event: any, index = 0, fallbackStunned = true, agent: any = null) {
+  event = cleanStoredReactiveEvent(event, agent)
+  if (!event) return null
   const stunned = event?.stunned === undefined ? fallbackStunned : Boolean(event.stunned)
   if (event?.kind === "skillGroup") {
     const id = String(event?.id ?? `skillGroup-${index + 1}`)
@@ -501,8 +510,7 @@ function normalizeDamageEvent(event: any, index = 0, fallbackStunned = true, age
     count: Math.max(0, numeric(event?.count, fallback.count ?? 1)),
     stunned,
   }
-  if (kind === "sharp") {
-  }
+  if (normalized.settlementType === "turbulence") return cleanStoredReactiveEvent(normalized, agent)
   if (kind === "anomaly" && normalized.settlementType === "luminescence") {
     const legacyRecord = Array.isArray(normalized.records)
       ? normalized.records.find((record: any) => record?.kind === "normal")
@@ -579,9 +587,14 @@ function normalizeDamageConfig(value: any, agent: any = null, cinemaLevel = 0, p
         return merged
       })
     : modeAllowed && savedEvents.length ? savedEvents : eventFallback.events
-  const events = Array.isArray(eventSource) && eventSource.length
+  let events = Array.isArray(eventSource) && eventSource.length
     ? eventSource.map((event: any, index: number) => normalizeDamageEvent(event, index, fallbackStunned, agent))
     : eventFallback.events.map((event: any, index: number) => normalizeDamageEvent(event, index, fallbackStunned, agent))
+  events = events.filter(Boolean)
+  if (!events.length) {
+    events = eventFallback.events.map((event: any, index: number) => normalizeDamageEvent(event, index, fallbackStunned, agent)).filter(Boolean)
+    if (!events.length) events = primaryDamageConfigForAgent(agent).events
+  }
   const selectedEventId = events.some((event: any) => event.id === value?.selectedEventId)
     ? String(value.selectedEventId)
     : events[0]?.id
@@ -1251,6 +1264,7 @@ export const useBuildStore = defineStore("build", {
     },
     upsertDamageEvent(event: any) {
       const next = normalizeDamageEvent(event)
+      if (!next) return
       const events = [...(this.damageConfig.events ?? [])]
       const index = events.findIndex((item: any) => item.id === next.id)
       if (index >= 0) {
@@ -1406,6 +1420,7 @@ export const useBuildStore = defineStore("build", {
         }
       }
       const untouchedFallbackDamage = this.damageConfig?.mode === "single"
+        && damageAgent?.id !== "velina"
         && this.damageConfig?.selectedEventId === "direct-1"
         && this.damageConfig?.events?.length === 1
         && this.damageConfig?.events?.[0]?.id === "direct-1"

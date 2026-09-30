@@ -2,6 +2,26 @@
 
 # Changelog
 
+## 2026-09-30 - Four Anomaly W-Engines
+
+Added 朔月裁霜 (`zzz_wiki_1964`), 灼心摇壶 (`zzz_wiki_841`), 咚哒回声 (`zzz_wiki_2087`) and 雨林饕客 (`zzz_wiki_154`) from official MiHoYo wiki revisions `1778221212`, `1743671257`, `1782490033` and `1737349899`. Each entry includes its official PNG icon, level-60 base and advanced stats, full Chinese effect text, exact modification ranks 1–5, source URLs and revision-stamped verification. These are self-only Anomaly passives, with no speculative character association or teammate Buff.
+
+朔月裁霜 uses one shared 0–2 stack control, restricts both effects to Ice wearers, and applies its fixed full-stack bonus only to Release settlement. 灼心摇壶 shares one 0–10 stack control between generic damage and a non-stacking proficiency bonus activated at five stacks. 咚哒回声 exposes generic damage against anomaly-afflicted enemies independently of its Turbulence energy trigger. 雨林饕客 grants 0–10 stacks of ATK based explicitly on the out-of-combat ATK panel. Controls default to maximum stacks and full adjustable coverage; passives do not alter the initial panel. Existing fixed/stacked rules, attribute requirements, activation thresholds and precise anomaly targets handle these entries without new APIs, schemas or storage migrations.
+
+Flat off-field Energy restoration on 灼心摇壶 and triggered flat Energy restoration on 咚哒回声 remain in the authoritative description and are explicitly marked as not calculated. They are not converted to percentage Energy Regen. Hit cadence, energy spending, off-field stack gain, effect durations and independent expiry remain manually configured combat snapshots, following existing W-Engine modeling conventions.
+
+Regression coverage checks all five ranks, shared controls, zero/partial/full coverage, stack thresholds, specialty/attribute rejection, Release isolation from Attribute/Disorder/Turbulence/Luminescence, maintenance roundtrips, serialized runtime inputs, ordinary/compiled/dense/fixed scoring and exact optimizer Top 10 against exhaustive scoring.
+
+Validation: the complete `npm test` command passed, including all backend stages, 160 optimizer fuzz seeds and 54 frontend test files / 692 assertions. The production WebApp build passed. Playwright passed on desktop 1440 and mobile 390, verifying all four icons and selections, rank-five previews, shared-stack threshold changes, persisted rule values and reload restoration, without page errors or horizontal overflow. All 72 pre-existing W-Engine records were compared against the pre-edit snapshot and remained identical. No commit, push or deployment was performed.
+
+## 2026-09-29 - Velina Initial-Energy Optimizer Compilation
+
+Fixed Velina's Core Passive forcing the strict optimizer onto Map scoring. The dense compiler previously resolved initial-panel formula sources before a candidate panel existed, dropping both the damage bonus and mastery conversion. Initial-energy formulas now remain candidate-dependent through dense, fixed-set, objective-scalar and combined-bound scoring. The bounded stepped expression is compiled once without changing its floating-point operation order, units, coverage or Buff modifiers; unsupported formulas explicitly retain the generic fallback. Mastery is applied before mastery-derived proficiency and Release evaluation, and interval endpoints feed the existing safe Release bound. Candidate legality, exact Top 10 ranking, scoring probes, Worker messages and persisted data formats are unchanged.
+
+Unified dense Release inheritance with the ordinary calculator's existing exclusion for Velina C6 Wind Corrosion reapplication damage. Added threshold/cap and cross-kernel tests, exhaustive descendant checks for randomized bounds, minimum-panel and free-two-piece oracle comparisons, Node Worker coverage, and a real built-browser-Worker test for completion, progress, cancellation and reuse. The exact Top 10 IDs/order and numerically equivalent scores remain consistent across the strict optimizer paths.
+
+Validation passed the targeted calculation/optimizer suites, 160 existing fuzz seeds, 1,008 exhaustive new subtree bounds, the complete frontend suite and the production WebApp build. Chrome verified the emitted Worker against the brute-force oracle, including cancellation and a second successful run on the same Worker. No push or deployment was performed for the original validation.
+
 ## 2026-09-19 - Pyrois Four-Branch Ultimate Modeling
 
 Added the Ether Attack agent Pyrois with 15 moves, 40 multiplier rows, and eight reusable skill groups. Official wiki entry 1958 revision `1789136408` supplies base stats, Lv.1–12 multipliers, core growth and revealed cinemas. Explicit Lv.13–16 values were cross-checked against Gachabase release 3.0.0 revision 16735318 and supplemental skill tables. Three official/database differences are retained in the source fixture and documented in [the modeling notes](pyrois-modeling.md).

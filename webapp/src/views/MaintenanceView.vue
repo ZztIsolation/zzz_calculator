@@ -7,6 +7,7 @@ import {
 } from "lucide-vue-next"
 import ConfirmDialog from "@/components/ConfirmDialog.vue"
 import ImageAvatar from "@/components/ImageAvatar.vue"
+import { applyDraftValue, mergeAgentDraft, parseAgentBaseline, type AgentDraftConflict } from "@/utils/agentDraftMerge"
 import MaintenanceResourceEditor from "@/components/maintenance/MaintenanceResourceEditor.vue"
 import {
   blankRecord,
@@ -17,6 +18,7 @@ import {
   fieldLabel,
   maskedPreview,
   prepareDraft,
+  normalizeVelinaReleaseConfig,
   searchableText,
   textOf,
   type CreateOptions,
@@ -33,6 +35,7 @@ import {
   FIELD_BUFF_PHASE_OPTIONS,
   fieldBuffModeOption,
   fieldBuffPhaseName,
+  repairDynamicValueSourceFallbacks,
   validateMaintenanceItem,
 } from "@core/maintenanceValidation.js"
 
@@ -68,6 +71,7 @@ interface PendingCatalogRefresh {
 type DeleteMode = "record" | "buff" | "teammate" | "encounter" | "boss"
 
 const DRAFT_STORAGE_KEY = "zzz_maintenance_vue_draft_v4"
+const AGENT_DRAFT_STORAGE_KEY = "zzz_maintenance_agent_draft_v5"
 const INCOMPATIBLE_DRAFT_STORAGE_KEY = "zzz_maintenance_vue_draft_v3"
 const PREVIOUS_DRAFT_STORAGE_KEY = "zzz_maintenance_vue_draft_v2"
 const LEGACY_DRAFT_STORAGE_KEY = "zzz_maintenance_vue_draft_v1"
@@ -90,6 +94,7 @@ const busy = ref(false)
 const error = ref("")
 const validationErrors = ref<string[]>([])
 const validationPaths = ref<string[]>([])
+const compatibilityRepairs = ref<any[]>([])
 const saveState = ref("加载中")
 const saveHint = ref("正在读取维护数据")
 const maintenanceEnabled = ref(false)
@@ -100,6 +105,11 @@ const selectedKey = ref("")
 const selectedBuffId = ref("")
 const draft = ref<any>(null)
 const baselineText = ref("")
+const agentBase = ref<any>(null)
+const agentBaseRevision = ref<string | null>(null)
+const agentConflicts = ref<AgentDraftConflict[]>([])
+const agentBlock = ref<"" | "baseline" | "deleted" | "version">("")
+const agentSaveBlocked = computed(() => resource.value === "agents" && (Boolean(agentBlock.value) || agentConflicts.value.some(item => !item.choice)))
 const draftIsNew = ref(false)
 const originalIdentity = ref<OriginalIdentity>({ id: "", teammateId: "", maintenanceType: "" })
 const pendingCatalogRefresh = ref<PendingCatalogRefresh | null>(null)
@@ -111,7 +121,7 @@ const pendingRoute = ref("")
 const showCreateModal = ref(false)
 const createName = ref("")
 const createAgentId = ref("")
-const createAnomalyType = ref<"anomaly" | "disorder">("anomaly")
+const createAnomalyType = ref<"anomaly" | "disorder" | "turbulence">("anomaly")
 const createTeammateMode = ref<"new" | "existing">("new")
 const createTeammateId = ref("")
 const createFieldMode = ref("defense_v5")
@@ -124,7 +134,7 @@ let allowRouteLeave = false
 
 const resourceInfo = computed(() => resources.find(item => item.value === resource.value)!)
 const serializedDraft = computed(() => draft.value ? JSON.stringify(draft.value) : "")
-const hasUnsavedChanges = computed(() => Boolean(draft.value) && (draftIsNew.value || serializedDraft.value !== baselineText.value))
+const hasUnsavedChanges = computed(() => Boolean(draft.value) && (draftIsNew.value || serializedDraft.value !== baselineText.value || agentSaveBlocked.value))
 const records = computed(() => recordsFor(resource.value))
 const filteredRecords = computed(() => {
   const needle = query.value.trim().toLowerCase()
@@ -156,7 +166,7 @@ const previewValue = computed(() => {
     const { encounters: _encounters, ...boss } = draft.value
     return JSON.stringify(readablePreview(maskedPreview({ boss, encounter: currentEncounter.value })), null, 2)
   }
-  return JSON.stringify(readablePreview(maskedPreview(draft.value)), null, 2)
+  return JSON.stringify(readablePreview(maskedPreview(draft.value, catalog.value?.driveDiscSets?.sets ?? [])), null, 2)
 })
 const createAgentOptions = computed(() => (catalog.value?.agents?.agents ?? []).map((item: any) => ({ label: displayLabelForRecord("agents", item), value: item.id })))
 const createTeammateOptions = computed(() => (catalog.value?.combatBuffs?.teammates ?? []).map((item: any) => ({ label: `${textOf(item.name)} · ${item.buffs?.length ?? 0} 个 Buff`, value: item.id })))
@@ -166,7 +176,9 @@ const fieldVersionOptions = FIELD_BUFF_GAME_VERSIONS.map(value => ({ label: `${v
 const fieldPhaseOptions = FIELD_BUFF_PHASE_OPTIONS.map(option => ({ label: option.phaseName.zhCN, value: option.phaseNo }))
 
 function anomalyMaintenanceType(item: any) {
-  return item?.settlementType === "disorder" || item?.maintenanceType === "disorder" ? "disorder" : "anomaly"
+  if (item?.settlementType === "disorder" || item?.maintenanceType === "disorder") return "disorder"
+  if (item?.settlementType === "turbulence" || item?.maintenanceType === "turbulence") return "turbulence"
+  return "anomaly"
 }
 
 function anomalyRecords() {
@@ -174,6 +186,7 @@ function anomalyRecords() {
   if (Array.isArray(effects)) return effects.map((item: any) => ({ ...item, maintenanceType: anomalyMaintenanceType(item) }))
   return [
     ...(catalog.value?.anomalyEffects?.anomalyEffects ?? []).map((item: any) => ({ ...item, settlementType: "attribute", maintenanceType: "anomaly" })),
+    ...(catalog.value?.anomalyEffects?.turbulenceEffects ?? []).map((item: any) => ({ ...item, settlementType: "turbulence", maintenanceType: "turbulence" })),
     ...(catalog.value?.anomalyEffects?.disorderEffects ?? []).map((item: any) => ({ ...item, settlementType: "disorder", maintenanceType: "disorder" })),
   ]
 }
@@ -227,6 +240,7 @@ function resolveStoredDraft() {
     // Versioned draft keys are retained across upgrades. A resolved v4 marker
     // prevents a saved or discarded draft from being restored as unsaved.
     localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ version: 4, resolved: true }))
+    if (resource.value === "agents") localStorage.setItem(AGENT_DRAFT_STORAGE_KEY, JSON.stringify({ version: 5, resolved: true }))
   } catch {
     // Editing remains available without browser storage.
   }
@@ -248,7 +262,13 @@ function persistDraft() {
     originalIdentity: originalIdentity.value,
   }
   try {
-    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(stored))
+    if (resource.value === "agents") {
+      localStorage.setItem(AGENT_DRAFT_STORAGE_KEY, JSON.stringify({
+        ...stored, version: 5, baseSnapshot: agentBase.value, baseRevision: agentBaseRevision.value,
+        conflicts: agentConflicts.value, block: agentBlock.value,
+      }))
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ version: 4, resolved: true }))
+    } else localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(stored))
   } catch {
     // Editing remains available when localStorage is unavailable.
   }
@@ -263,6 +283,30 @@ function legacyTeammateGroup(item: any) {
 function restoreStoredDraft() {
   try {
     const current = JSON.parse(localStorage.getItem(DRAFT_STORAGE_KEY) || "null") as StoredDraftV4 | ResolvedDraftV4 | null
+    let agentStored: any = null
+    try { agentStored = JSON.parse(localStorage.getItem(AGENT_DRAFT_STORAGE_KEY) || "null") } catch { /* Preserve corrupt role drafts without blocking other resources. */ }
+    if (agentStored?.version === 5 && !agentStored.resolved && agentStored.resource === "agents" && agentStored.draft
+      && (!current || current.resolved || current.resource === "agents")) {
+      resource.value = "agents"
+      draft.value = deepClone(agentStored.draft)
+      selectedKey.value = agentStored.selectedKey
+      selectedBuffId.value = ""
+      originalIdentity.value = agentStored.originalIdentity
+      draftIsNew.value = agentStored.draftIsNew === true
+      baselineText.value = agentStored.baselineText ?? ""
+      agentBase.value = agentStored.baseSnapshot
+      agentBaseRevision.value = agentStored.baseRevision ?? null
+      agentConflicts.value = agentStored.conflicts ?? []
+      agentBlock.value = agentStored.block ?? ""
+      const latest = catalog.value?.agents?.agents?.find((item: any) => item.id === draft.value.id)
+      const revision = catalog.value?.agentRevisions?.[draft.value.id] ?? null
+      if (!draftIsNew.value && (!agentBase.value || agentBase.value.id !== draft.value.id || !revision || revision !== agentBaseRevision.value)) rebaseAgent(latest, revision)
+      else {
+        saveState.value = agentSaveBlocked.value ? "草稿需要处理" : "已恢复草稿"
+        saveHint.value = agentSaveBlocked.value ? "本机修改和冲突选择已保留，请完成处理后保存" : "上次未保存的角色修改已恢复"
+      }
+      return true
+    }
     if (current?.version === 4 && current.resolved === true) return false
     if (current?.version === 4
       && current.resolved !== true
@@ -277,6 +321,7 @@ function restoreStoredDraft() {
       originalIdentity.value = current.originalIdentity ?? { id: "", teammateId: "", maintenanceType: "" }
       saveState.value = "已恢复草稿"
       saveHint.value = "上次未保存的结构化修改已从本机恢复"
+      restoreLegacyAgentDraft()
       return true
     }
     // v3 is intentionally skipped: it may contain the retired broad-anomaly
@@ -294,6 +339,7 @@ function restoreStoredDraft() {
       persistDraft()
       saveState.value = "已迁移旧草稿"
       saveHint.value = "旧版技能目标已转为明确的角色招式或技能大类"
+      restoreLegacyAgentDraft()
       return true
     }
     const legacy = JSON.parse(localStorage.getItem(LEGACY_DRAFT_STORAGE_KEY) || "null")
@@ -311,6 +357,7 @@ function restoreStoredDraft() {
       persistDraft()
       saveState.value = "已迁移旧草稿"
       saveHint.value = "旧版 JSON 草稿已转为结构化表单"
+      restoreLegacyAgentDraft()
       return true
     }
   } catch {
@@ -319,10 +366,101 @@ function restoreStoredDraft() {
   return false
 }
 
+function restoreLegacyAgentDraft() {
+  if (resource.value !== "agents") return
+  agentBase.value = parseAgentBaseline(baselineText.value, draft.value.id)
+  if (agentBase.value) agentBase.value = prepareDraft("agents", agentBase.value)
+  agentBaseRevision.value = null
+  agentConflicts.value = []
+  agentBlock.value = ""
+  if (!draftIsNew.value) {
+    const latest = catalog.value?.agents?.agents?.find((item: any) => item.id === draft.value.id)
+    rebaseAgent(latest, catalog.value?.agentRevisions?.[draft.value.id] ?? null)
+  } else persistDraft()
+}
+
+function rebaseAgent(latest: any, revision: string | null) {
+  validationErrors.value = []
+  validationPaths.value = []
+  if (!latest) {
+    agentBlock.value = "deleted"
+    saveState.value = "角色已被删除"
+    saveHint.value = "本机草稿已保留，可导出或复制为新角色；不会自动恢复已删除的角色"
+  } else if (!agentBase.value || agentBase.value.id !== draft.value.id) {
+    agentBlock.value = "baseline"
+    saveState.value = "旧草稿缺少原始资料"
+    saveHint.value = "无法安全合并，请先导出草稿，再加载最新资料重新应用修改"
+  } else if (!revision) {
+    agentBlock.value = "version"
+    saveState.value = "需要刷新维护页"
+    saveHint.value = "未取得角色资料版本，本机草稿已保留"
+  } else {
+    const remote = prepareDraft("agents", latest)
+    let base = deepClone(agentBase.value)
+    for (const conflict of agentConflicts.value.filter(item => !item.choice)) base = applyDraftValue(base, conflict.path, conflict.base)
+    const result = mergeAgentDraft(base, draft.value, remote)
+    draft.value = result.merged
+    agentConflicts.value = result.conflicts
+    agentBase.value = deepClone(remote)
+    agentBaseRevision.value = revision
+    baselineText.value = JSON.stringify(remote)
+    agentBlock.value = ""
+    saveState.value = result.conflicts.length ? "资料存在冲突" : "已合并最新资料"
+    saveHint.value = result.conflicts.length ? "请逐项选择保留内容，处理完成后再保存" : "已合并最新资料，请检查后保存"
+  }
+  persistDraft()
+}
+
+function chooseAgentConflict(conflict: AgentDraftConflict, choice: "local" | "remote") {
+  draft.value = applyDraftValue(draft.value, conflict.path, conflict[choice])
+  conflict.choice = choice
+  saveState.value = agentConflicts.value.some(item => !item.choice) ? "资料存在冲突" : "冲突已处理"
+  saveHint.value = "本机修改和选择已保留，请检查后保存"
+  persistDraft()
+}
+
+function agentConflictLabel(path: string[]) {
+  const labels: Record<string, string> = { zhCN: "中文", combatBuffs: "角色 Buff", corePassive: "核心被动", additionalAbility: "额外能力", cinemaBuffs: "影画 Buff", defaultCalculationConfig: "默认循环", anomalyReleaseProfiles: "异放来源", level60: "满级面板", name: "名称", description: "描述", effects: "效果", events: "事件" }
+  return path.length ? path.map(key => labels[key] ?? fieldLabel(key)).join(" · ") : "角色资料"
+}
+
+function agentConflictText(value: { present: boolean, value?: any }) {
+  if (!value.present) return "（未设置 / 已删除）"
+  return typeof value.value === "string" ? value.value : JSON.stringify(readablePreview(maskedPreview(value.value)), null, 2)
+}
+
+function exportAgentDraft() {
+  const content = { version: 5, resource: "agents", draft: draft.value, baseSnapshot: agentBase.value, baseRevision: agentBaseRevision.value, conflicts: agentConflicts.value }
+  const url = URL.createObjectURL(new Blob([JSON.stringify(content, null, 2)], { type: "application/json" }))
+  const anchor = document.createElement("a")
+  anchor.href = url
+  anchor.download = `角色维护草稿-${draft.value.id || "新角色"}.json`
+  anchor.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+async function loadLatestAgent() {
+  if (busy.value) return
+  busy.value = true
+  try {
+    await fetchCatalog()
+    const latest = catalog.value?.agents?.agents?.find((item: any) => item.id === draft.value.id)
+    if (!latest) rebaseAgent(null, null)
+    else requestDiscard(() => setEditor(latest))
+  } catch (err) {
+    saveState.value = "加载失败"
+    saveHint.value = err instanceof Error ? err.message : String(err)
+  } finally { busy.value = false }
+}
+
 function setEditor(item: any, options: { isNew?: boolean, key?: string, buffId?: string, identity?: OriginalIdentity, state?: string, hint?: string } = {}) {
   pendingCatalogRefresh.value = null
   const prepared = prepareDraft(resource.value, item)
   draft.value = prepared
+  agentBase.value = resource.value === "agents" && !options.isNew ? deepClone(prepared) : null
+  agentBaseRevision.value = resource.value === "agents" && !options.isNew ? catalog.value?.agentRevisions?.[prepared.id] ?? null : null
+  agentConflicts.value = []
+  agentBlock.value = resource.value === "agents" && !options.isNew && !agentBaseRevision.value ? "version" : ""
   selectedBuffId.value = options.buffId ?? prepared?.buffs?.[0]?.id ?? prepared?.encounters?.[0]?.id ?? ""
   selectedKey.value = options.key ?? recordKey(prepared)
   baselineText.value = options.isNew ? "" : JSON.stringify(prepared)
@@ -546,12 +684,17 @@ function normalizeCalculationConfig(config: any) {
   for (const variant of config.variants ?? []) normalizeEntry(variant)
 }
 
+
 function normalizeForSave(item: any) {
   const next = deepClone(item)
+  compatibilityRepairs.value = []
   stripEditorMetadata(next)
   applySystemManagedMaintenanceFields(next)
   if (resource.value === "agents") {
+    repairDynamicValueSourceFallbacks(next, compatibilityRepairs.value)
     normalizeCalculationConfig(next.defaultCalculationConfig)
+    normalizeVelinaReleaseConfig(next.defaultCalculationConfig, next)
+    for (const group of next.skillGroups ?? []) normalizeVelinaReleaseConfig(group, next)
     if (!next.damageElement) delete next.damageElement
   }
   if (resource.value === "w-engines") {
@@ -567,6 +710,10 @@ function normalizeForSave(item: any) {
     if (next.period?.gameVersion && phaseName?.zhCN) next.sourcePeriod = { zhCN: `${next.period.gameVersion}版本${phaseName.zhCN}` }
   }
   return next
+}
+
+function compatibilityRepairHint(repairs = compatibilityRepairs.value) {
+  return repairs.length ? `；保存时将自动同步 ${repairs.length} 个动态兼容值` : ""
 }
 
 function teammateRequest(group: any) {
@@ -590,6 +737,7 @@ function validationContext(item: any) {
     items: catalog.value?.agents?.agents ?? [], currentId: originalIdentity.value.id,
     ...skillContext,
     anomalyEffects: anomalyRecords().filter(item => anomalyMaintenanceType(item) === "anomaly"),
+    turbulenceEffects: anomalyRecords().filter(item => anomalyMaintenanceType(item) === "turbulence"),
     disorderEffects: anomalyRecords().filter(item => anomalyMaintenanceType(item) === "disorder"),
     driveDiscSets: catalog.value?.driveDiscSets?.sets ?? [],
   }
@@ -677,7 +825,7 @@ function validateDraft() {
   validationPaths.value = result.ok ? [] : result.errors.map(validationPath)
   if (result.ok) {
     saveState.value = "校验通过"
-    saveHint.value = "表单格式和业务规则均通过校验"
+    saveHint.value = `表单格式和业务规则均通过校验${compatibilityRepairHint()}`
   } else {
     saveState.value = "需要修正"
     saveHint.value = `发现 ${result.errors.length} 个问题`
@@ -713,6 +861,12 @@ function applySavedItem(savedItem: any, responsePayload: any = {}) {
   }
   draftIsNew.value = false
   baselineText.value = JSON.stringify(draft.value)
+  if (resource.value === "agents") {
+    agentBase.value = deepClone(draft.value)
+    agentBaseRevision.value = responsePayload.agentRevision ?? null
+    agentConflicts.value = []
+    agentBlock.value = ""
+  }
   resolveStoredDraft()
 }
 
@@ -726,6 +880,7 @@ async function refreshCatalogAndSelect(pending: PendingCatalogRefresh) {
 
 async function saveDraft() {
   if (busy.value || !maintenanceEnabled.value || !draft.value) return
+  if (agentSaveBlocked.value) return
   if (pendingCatalogRefresh.value) {
     busy.value = true
     try {
@@ -744,12 +899,18 @@ async function saveDraft() {
   saveHint.value = "正在写入数据文件"
   try {
     const normalized = normalizeForSave(draft.value)
+    const pendingRepairs = compatibilityRepairs.value.length
     const response = await fetch(`/api/maintenance/${resource.value}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(resource.value === "agents" ? (draftIsNew.value
+        ? { "If-None-Match": "*" } : { "If-Match": `"${agentBaseRevision.value}"` }) : {}) },
       body: JSON.stringify(requestBody(normalized)),
     })
     const payload = await response.json().catch(() => ({}))
+    if (resource.value === "agents" && response.status === 412) {
+      rebaseAgent(payload.currentItem, payload.currentRevision ?? null)
+      return
+    }
     if (!response.ok || payload.ok === false || !payload.savedItem) throw new Error(payload.error ?? `保存失败：${response.status}`)
     applySavedItem(payload.savedItem, payload)
     catalogStore.invalidate()
@@ -762,8 +923,14 @@ async function saveDraft() {
     } catch (refreshError) {
       pendingCatalogRefresh.value = pending
       saveState.value = "已保存，刷新失败"
-      saveHint.value = `${refreshError instanceof Error ? refreshError.message : String(refreshError)}；点击刷新不会重复保存`
+      const repairHint = pendingRepairs ? `；已自动同步 ${pendingRepairs} 个动态兼容值` : ""
+      saveHint.value = `${refreshError instanceof Error ? refreshError.message : String(refreshError)}${repairHint}；点击刷新不会重复保存`
     }
+    if (!pendingCatalogRefresh.value) {
+      saveState.value = "已保存"
+      saveHint.value = `完整目录已刷新${pendingRepairs ? `；已自动同步 ${pendingRepairs} 个动态兼容值` : ""}`
+    }
+    if (payload.maintenanceWarning) saveHint.value += `；${payload.maintenanceWarning}`
   } catch (err) {
     validationErrors.value = [err instanceof Error ? err.message : String(err)]
     validationPaths.value = [""]
@@ -781,6 +948,7 @@ function requestDelete(mode: DeleteMode = resource.value === "teammate-buffs" ? 
 
 async function deleteDraft() {
   if (busy.value || !draft.value) return
+  if (agentSaveBlocked.value) return
   showDeleteConfirm.value = false
   if (draftIsNew.value && !originalIdentity.value.id && deleteMode.value !== "teammate") {
     resolveStoredDraft()
@@ -807,8 +975,12 @@ async function deleteDraft() {
     } else {
       pathname = `/api/maintenance/${resource.value}/${encodeURIComponent(originalIdentity.value.id)}`
     }
-    const response = await fetch(pathname, { method: "DELETE" })
+    const response = await fetch(pathname, { method: "DELETE", ...(resource.value === "agents" ? { headers: { "If-Match": `"${agentBaseRevision.value}"` } } : {}) })
     const payload = await response.json().catch(() => ({}))
+    if (resource.value === "agents" && response.status === 412) {
+      rebaseAgent(payload.currentItem, payload.currentRevision ?? null)
+      return
+    }
     if (!response.ok || payload.ok === false) throw new Error(payload.error ?? `删除失败：${response.status}`)
     catalogStore.invalidate()
     resolveStoredDraft()
@@ -820,6 +992,7 @@ async function deleteDraft() {
       : deleteMode.value === "boss"
         ? "Boss 档案及其全部敌情版本已删除"
         : "完整目录已刷新"
+    if (payload.maintenanceWarning) saveHint.value += `；${payload.maintenanceWarning}`
   } catch (err) {
     validationErrors.value = [err instanceof Error ? err.message : String(err)]
     validationPaths.value = [""]
@@ -879,7 +1052,7 @@ onBeforeUnmount(() => window.removeEventListener("beforeunload", warnBeforeUnloa
         <NButton :disabled="busy || !maintenanceEnabled || !draft || Boolean(pendingCatalogRefresh)" @click="cloneRecord"><template #icon><Copy :size="16" /></template>复制当前</NButton>
         <NButton :disabled="busy || !maintenanceEnabled || Boolean(pendingCatalogRefresh)" @click="openCreate"><template #icon><Plus :size="16" /></template>新增</NButton>
         <NButton :disabled="!draft" @click="validateDraft"><template #icon><CheckCircle2 :size="16" /></template>校验</NButton>
-        <NButton type="primary" :disabled="busy || !maintenanceEnabled || !draft" @click="saveDraft">
+        <NButton type="primary" :disabled="busy || !maintenanceEnabled || !draft || agentSaveBlocked" @click="saveDraft">
           <template #icon><RefreshCw v-if="pendingCatalogRefresh" :size="16" /><Save v-else :size="16" /></template>
           {{ pendingCatalogRefresh ? '刷新' : '保存' }}
         </NButton>
@@ -919,10 +1092,31 @@ onBeforeUnmount(() => window.removeEventListener("beforeunload", warnBeforeUnloa
           <div class="toolbar">
             <NButton v-if="resource === 'teammate-buffs'" type="error" secondary :disabled="busy || !maintenanceEnabled || !draft" @click="requestDelete('teammate')">删除角色</NButton>
             <NButton v-if="resource === 'boss-buffs'" type="error" secondary :disabled="busy || !maintenanceEnabled || !draft" @click="requestDelete('boss')">删除整个 Boss</NButton>
-            <NButton type="error" :disabled="busy || !maintenanceEnabled || !draft || Boolean(pendingCatalogRefresh)" @click="requestDelete()"><template #icon><Trash2 :size="16" /></template>{{ resource === 'teammate-buffs' ? '删除当前 Buff' : resource === 'boss-buffs' ? '删除当前版本' : '删除' }}</NButton>
-            <NButton type="primary" :disabled="busy || !maintenanceEnabled || !draft" @click="saveDraft">{{ pendingCatalogRefresh ? '刷新' : '保存' }}</NButton>
+            <NButton type="error" :disabled="busy || !maintenanceEnabled || !draft || Boolean(pendingCatalogRefresh) || agentSaveBlocked" @click="requestDelete()"><template #icon><Trash2 :size="16" /></template>{{ resource === 'teammate-buffs' ? '删除当前 Buff' : resource === 'boss-buffs' ? '删除当前版本' : '删除' }}</NButton>
+            <NButton type="primary" :disabled="busy || !maintenanceEnabled || !draft || agentSaveBlocked" @click="saveDraft">{{ pendingCatalogRefresh ? '刷新' : '保存' }}</NButton>
           </div>
         </div>
+
+        <section v-if="resource === 'agents' && (agentBlock || agentConflicts.length)" class="agent-conflict-panel" aria-label="角色资料合并" role="region">
+          <p v-if="agentBlock">{{ saveHint }}</p>
+          <div class="toolbar">
+            <NButton :disabled="busy" @click="exportAgentDraft">导出草稿</NButton>
+            <NButton :disabled="busy" @click="loadLatestAgent">加载最新资料</NButton>
+            <NButton v-if="agentBlock === 'deleted'" :disabled="busy" @click="cloneRecord">复制为新角色</NButton>
+          </div>
+          <article v-for="conflict in agentConflicts" :key="JSON.stringify(conflict.path)" class="agent-conflict-item">
+            <h3>{{ agentConflictLabel(conflict.path) }}</h3>
+            <div class="agent-conflict-values">
+              <div><strong>原内容</strong><pre>{{ agentConflictText(conflict.base) }}</pre></div>
+              <div><strong>我的修改</strong><pre>{{ agentConflictText(conflict.local) }}</pre></div>
+              <div><strong>最新资料</strong><pre>{{ agentConflictText(conflict.remote) }}</pre></div>
+            </div>
+            <div class="toolbar">
+              <NButton :disabled="busy" :type="conflict.choice === 'local' ? 'primary' : 'default'" :aria-pressed="conflict.choice === 'local'" @click="chooseAgentConflict(conflict, 'local')">保留我的修改</NButton>
+              <NButton :disabled="busy" :type="conflict.choice === 'remote' ? 'primary' : 'default'" :aria-pressed="conflict.choice === 'remote'" @click="chooseAgentConflict(conflict, 'remote')">采用最新资料</NButton>
+            </div>
+          </article>
+        </section>
 
         <div v-if="validationErrors.length" class="validation-summary" role="alert">
           <strong>请修正以下内容</strong>
@@ -938,7 +1132,7 @@ onBeforeUnmount(() => window.removeEventListener("beforeunload", warnBeforeUnloa
           :model="draft"
           :catalog="catalog"
           :selected-buff-id="selectedBuffId"
-          :disabled="busy || !maintenanceEnabled"
+          :disabled="busy || !maintenanceEnabled || agentSaveBlocked"
           @change="markDraftChanged"
           @select-buff="selectBuff"
           @add-buff="addTeammateBuff"
@@ -957,7 +1151,7 @@ onBeforeUnmount(() => window.removeEventListener("beforeunload", warnBeforeUnloa
       <div class="create-intro"><component :is="resourceInfo.icon" :size="20" /><span><strong>{{ resourceInfo.label }}</strong><small>{{ resourceInfo.description }}</small></span></div>
       <label v-if="(resource !== 'teammate-buffs' || createTeammateMode === 'new') && (resource !== 'boss-buffs' || createBossMode === 'new')" data-layout-field><span>{{ resource === 'teammate-buffs' ? '队友名称' : resource === 'boss-buffs' ? 'Boss 名称' : '初始名称' }}</span><NInput v-model:value="createName" :placeholder="resource === 'agent-skills' ? '技能资料名称' : '可稍后继续修改'" /></label>
       <label v-if="resource === 'agent-skills'" data-layout-field><span>所属角色</span><NSelect v-model:value="createAgentId" filterable :options="createAgentOptions" /></label>
-      <label v-if="resource === 'anomaly-effects'" data-layout-field><span>结算类型</span><NSelect v-model:value="createAnomalyType" :options="[{ label: '属性异常', value: 'anomaly' }, { label: '紊乱', value: 'disorder' }]" /></label>
+      <label v-if="resource === 'anomaly-effects'" data-layout-field><span>结算类型</span><NSelect v-model:value="createAnomalyType" :options="[{ label: '属性异常', value: 'anomaly' }, { label: '乱流', value: 'turbulence' }, { label: '紊乱', value: 'disorder' }]" /></label>
       <template v-if="resource === 'teammate-buffs'">
         <label data-layout-field><span>新增方式</span><NSelect v-model:value="createTeammateMode" :options="[{ label: '新增队友角色', value: 'new' }, { label: '给现有角色添加 Buff', value: 'existing' }]" /></label>
         <label v-if="createTeammateMode === 'existing'" data-layout-field><span>选择队友</span><NSelect v-model:value="createTeammateId" filterable :options="createTeammateOptions" /></label>
@@ -981,6 +1175,13 @@ onBeforeUnmount(() => window.removeEventListener("beforeunload", warnBeforeUnloa
 </template>
 
 <style>
+.agent-conflict-panel { padding: 14px; border: 1px solid var(--app-border); border-radius: 10px; background: #fffaf1; }
+.agent-conflict-item { margin-top: 16px; min-width: 0; }
+.agent-conflict-item h3 { margin: 0 0 8px; font-size: 14px; }
+.agent-conflict-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.agent-conflict-values > div { min-width: 0; }
+.agent-conflict-values pre { max-height: 220px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+@media (max-width: 760px) { .agent-conflict-values { grid-template-columns: minmax(0, 1fr); } }
 .maintenance-page { gap: 12px; }
 .maintenance-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .maintenance-header h1 { margin: 2px 0 4px; font-size: 24px; }

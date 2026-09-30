@@ -88,6 +88,9 @@ function eventLabel(event: any): string {
   if (isLuminescenceScoreKind(event?.objectiveKind ?? props.damage?.objectiveKind)) {
     return "队伍异常评分"
   }
+  if (event?.input?.settlementType === "turbulence") {
+    return damageEventTitle(event.input, props.meta, props.skillCatalog)
+  }
   const skillLabel = eventSkillLabel(event)
   if (skillLabel) {
     return `${skillLabel} ×${event?.count ?? 1}`
