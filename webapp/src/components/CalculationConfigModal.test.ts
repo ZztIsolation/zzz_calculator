@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils"
+import { DOMWrapper, mount } from "@vue/test-utils"
 import { afterEach, describe, expect, it } from "vitest"
 import { nextTick } from "vue"
 import { NInputNumber } from "naive-ui"
@@ -10,13 +10,15 @@ import anomalyEffectsData from "../../../data/anomaly_effects.json"
 
 const miyabi = (agentsData as any).agents.find((agent: any) => agent.id === "hoshimi_miyabi")
 const miyabiSkillCatalog = (agentSkillsData as any).agentSkills.find((skill: any) => skill.id === "hoshimi_miyabi")
-const anomalyEffects = (anomalyEffectsData as any).effects.filter((effect: any) => effect.settlementType !== "disorder")
+const anomalyEffects = (anomalyEffectsData as any).effects.filter((effect: any) => effect.settlementType === "attribute")
+const turbulenceEffects = (anomalyEffectsData as any).effects.filter((effect: any) => effect.settlementType === "turbulence")
 const disorderEffects = (anomalyEffectsData as any).effects.filter((effect: any) => effect.settlementType === "disorder")
 const yixuan = (agentsData as any).agents.find((agent: any) => agent.id === "yixuan")
 const yixuanSkillCatalog = (agentSkillsData as any).agentSkills.find((skill: any) => skill.id === "yixuan")
 const alice = (agentsData as any).agents.find((agent: any) => agent.id === "alice_thymefield")
 const aria = (agentsData as any).agents.find((agent: any) => agent.id === "aria")
 const vivian = (agentsData as any).agents.find((agent: any) => agent.id === "vivian")
+const velina = (agentsData as any).agents.find((agent: any) => agent.id === "velina")
 const dan = (agentsData as any).agents.find((agent: any) => agent.id === "remielle_dan")
 const claret = (agentsData as any).agents.find((agent: any) => agent.id === "claret")
 const claretSkillCatalog = (agentSkillsData as any).agentSkills.find((skill: any) => skill.id === "claret")
@@ -173,6 +175,7 @@ function mountModal(overrides: { agent?: any, damageConfig?: any, meta?: any, sk
       },
       meta: {
         anomalyEffects,
+        turbulenceEffects,
         disorderEffects,
         agents: (agentsData as any).agents,
         agentSkills: [skillCatalog],
@@ -236,6 +239,202 @@ afterEach(() => {
 })
 
 describe("CalculationConfigModal", () => {
+  const modalDom = () => new DOMWrapper(document.body)
+  const turbulenceSelect = (wrapper: ReturnType<typeof mount>) => selectComponentWithOption(wrapper, "frost_frozen")!
+  const turbulenceTime = (wrapper: ReturnType<typeof mount>) => wrapper.findAllComponents(NInputNumber)
+    .find(input => input.attributes("aria-label") === "乱流已流逝时间")!
+  const turbulenceCases = [
+    ["physical", "assault", "强击"], ["ice", "shatter", "碎冰"],
+    ["fire", "burn", "灼烧"], ["electric", "shock", "感电"],
+    ["ether", "corruption", "侵蚀"], ["frost", "frost_frozen", "烈霜（星见雅）"],
+  ]
+
+  it.each(turbulenceCases)("selects and names %s turbulence on switching and adding", async (attribute, expected, label) => {
+    const agent = (agentsData as any).agents.find((item: any) => item.attribute === attribute)
+    const wrapper = mountModal({ agent, damageConfig: {
+      mode: "custom", selectedEventId: "source",
+      events: [{ id: "source", kind: "anomaly", settlementType: "attribute", anomalyEffect: attribute === "frost" ? "shatter" : "assault", anomalyVariant: "normal", count: 1 }],
+    } })
+    await openModal(wrapper)
+    await wrapper.findAllComponents({ name: "RadioButton" }).find(button => button.props("value") === "turbulence")!.vm.$emit("click")
+    await nextTick()
+    expect(turbulenceSelect(wrapper).props("value")).toBe(expected)
+    expect(modalDom().get('[data-layout-field="turbulence-source"]').text()).toContain("原异常")
+    expect((turbulenceSelect(wrapper).props("options") as any[]).map(option => option.label)).toEqual(turbulenceCases.map(row => row[2]))
+    expect(modalDom().get(".calculation-editor-panel h3.panel-title").text()).toBe(`乱流 · ${label}`)
+    const saved = await saveModal(wrapper)
+    expect(saved.events[0]).toMatchObject({ settlementType: "turbulence", anomalyEffect: expected, elapsedSeconds: 0 })
+    expect(saved.events[0]).not.toHaveProperty("anomalyVariant")
+    await modalDom().findAll("button").find(button => button.text() === "添加乱流事件")!.trigger("click")
+    expect((await saveModal(wrapper)).events[1]).toMatchObject({ anomalyEffect: expected, elapsedSeconds: 0 })
+  })
+
+  it("retains manual turbulence choices and custom labels through repeat clicks, copies and reopening", async () => {
+    const wrapper = mountModal({ agent: vivian, damageConfig: {
+      mode: "custom", selectedEventId: "source",
+      events: [{ id: "source", kind: "anomaly", settlementType: "turbulence", anomalyEffect: "corruption", elapsedSeconds: 0.5, label: "自定义异常测试", count: 1 }],
+    } })
+    await openModal(wrapper)
+    turbulenceSelect(wrapper).vm.$emit("update:value", "shock")
+    await nextTick()
+    await wrapper.findAllComponents({ name: "RadioButton" }).find(button => button.props("value") === "turbulence")!.vm.$emit("click")
+    await nextTick()
+    await modalDom().get('[aria-label="复制目标事件"]').trigger("click")
+    const saved = await saveModal(wrapper)
+    expect(saved.events).toHaveLength(2)
+    for (const event of saved.events) expect(event).toMatchObject({ anomalyEffect: "shock", elapsedSeconds: 1, label: "自定义异常测试" })
+    await wrapper.setProps({ show: false, damageConfig: saved })
+    await openModal(wrapper)
+    expect(turbulenceSelect(wrapper).props("value")).toBe("shock")
+    expect(modalDom().get(".calculation-editor-panel h3.panel-title").text()).toBe("乱流 · 自定义异常测试")
+  })
+
+  it.each(["", "not-an-effect"])("repairs an invalid turbulence source (%s) in the draft", async anomalyEffect => {
+    const config = { mode: "anomaly", selectedEventId: "source", events: [{ id: "source", kind: "anomaly", settlementType: "turbulence", anomalyEffect, elapsedSeconds: 0.6, count: 1 }] }
+    const wrapper = mountModal({ agent: vivian, damageConfig: config })
+    await openModal(wrapper)
+    expect(turbulenceSelect(wrapper).props("value")).toBe("corruption")
+    expect((await saveModal(wrapper)).events[0]).toMatchObject({ anomalyEffect: "corruption", elapsedSeconds: 0.5 })
+    expect(config.events[0].anomalyEffect).toBe(anomalyEffect)
+  })
+
+  it("uses the new turbulence source's interval and independent multiplier", async () => {
+    const wrapper = mountModal({ agent: vivian, damageConfig: {
+      mode: "anomaly", selectedEventId: "source",
+      events: [{ id: "source", kind: "anomaly", settlementType: "attribute", anomalyEffect: "assault", elapsedSeconds: 0.6, count: 1 }],
+    } })
+    await openModal(wrapper)
+    await wrapper.findAllComponents({ name: "RadioButton" }).find(button => button.props("value") === "turbulence")!.vm.$emit("click")
+    await nextTick()
+    expect(turbulenceTime(wrapper).props("value")).toBe(0.5)
+    expect(turbulenceTime(wrapper).props("step")).toBe(0.5)
+    expect(modalDom().get('[data-layout-field="turbulence-multiplier"]').text()).toContain("1,837.5%")
+    turbulenceSelect(wrapper).vm.$emit("update:value", "shock")
+    await nextTick()
+    expect(turbulenceTime(wrapper).props("value")).toBe(1)
+    expect(modalDom().get('[data-layout-field="turbulence-multiplier"]').text()).toContain("1,775%")
+  })
+
+  it("uses custom turbulence intervals and matching input precision", async () => {
+    const customQuarter = {
+      id: "custom-quarter-turbulence",
+      settlementType: "turbulence",
+      label: { zhCN: "自定义四分之一秒乱流" },
+      element: "fire",
+      fixedMultiplier: 9,
+      tickMultiplier: 0.5,
+      tickIntervalSeconds: 0.25,
+      defaultDurationSeconds: 10,
+    }
+    const customTwoSeconds = {
+      ...customQuarter,
+      id: "custom-two-second-turbulence",
+      tickIntervalSeconds: 2,
+    }
+    const wrapper = mountModal({
+      agent: vivian,
+      meta: { turbulenceEffects: [...turbulenceEffects, customQuarter, customTwoSeconds] },
+      damageConfig: {
+        mode: "anomaly", selectedEventId: "source",
+        events: [{ id: "source", kind: "anomaly", settlementType: "turbulence", anomalyEffect: customQuarter.id, elapsedSeconds: 0, count: 1 }],
+      },
+    })
+    await openModal(wrapper)
+    expect(turbulenceTime(wrapper).props("step")).toBe(0.25)
+    expect(turbulenceTime(wrapper).props("precision")).toBe(2)
+    turbulenceTime(wrapper).vm.$emit("update:value", 0.37)
+    await nextTick()
+    expect((await saveModal(wrapper)).events[0].elapsedSeconds).toBe(0.25)
+
+    await wrapper.setProps({ show: false })
+    await wrapper.setProps({
+      show: true,
+      damageConfig: {
+        mode: "anomaly", selectedEventId: "source",
+        events: [{ id: "source", kind: "anomaly", settlementType: "turbulence", anomalyEffect: customTwoSeconds.id, elapsedSeconds: 0, count: 1 }],
+      },
+    })
+    await nextTick()
+    expect(turbulenceTime(wrapper).props("step")).toBe(2)
+    expect(turbulenceTime(wrapper).props("precision")).toBe(0)
+    turbulenceTime(wrapper).vm.$emit("update:value", 3.1)
+    await nextTick()
+    expect((await saveModal(wrapper)).events[0].elapsedSeconds).toBe(4)
+  })
+
+  it.each([{ effects: [] }, { effects: turbulenceEffects.filter((effect: any) => effect.id !== "corruption") }])("blocks saving unavailable turbulence data without choosing the first physical option", async ({ effects }) => {
+    const wrapper = mountModal({ agent: vivian, meta: { turbulenceEffects: effects }, damageConfig: {
+      mode: "anomaly", selectedEventId: "source",
+      events: [{ id: "source", kind: "anomaly", settlementType: "turbulence", anomalyEffect: "", elapsedSeconds: 0, count: 1 }],
+    } })
+    await openModal(wrapper)
+    const selected = wrapper.findAllComponents({ name: "Select" }).find(select => select.attributes("aria-label") === "乱流原异常")!
+    expect(selected.props("value")).toBe("corruption")
+    expect(modalDom().get('[role="alert"]').text()).toContain("乱流原异常")
+    expect(modalDom().findAll("button").find(button => button.text() === "保存配置")!.attributes("disabled")).toBeDefined()
+    await saveModal(wrapper)
+    expect(wrapper.emitted("save")).toBeUndefined()
+  })
+
+  it("uses Velina releaseSource and removes generalized source fields from saved events", async () => {
+    const wrapper = mountModal({
+      agent: velina,
+      damageConfig: {
+        mode: "custom",
+        selectedEventId: "velina-release",
+        events: [{
+          id: "velina-release",
+          kind: "anomaly",
+          settlementType: "release",
+          anomalyEffect: "wind_corrosion",
+          triggerActorRef: { agentId: "velina", profileId: "micro_vortex" },
+          anomalySource: { actorRef: { agentId: "velina" } },
+          count: 1,
+        }],
+      },
+      releaseContext: {
+        inCombatPanel: { anomalyMastery: 200, anomalyProficiency: 100 },
+        outOfCombatPanel: { anomalyMastery: 200, anomalyProficiency: 100 },
+        coreSkillLevel: "F",
+      },
+    })
+    await openModal(wrapper)
+
+    expect(document.body.querySelector('[data-layout-field="velina-release-source"]')?.textContent).toContain("异放来源")
+    expect(document.body.querySelector('[data-layout-field="release-trigger"]')).toBeNull()
+    expect(document.body.querySelector('[data-layout-field="release-source"]')).toBeNull()
+    expect(document.body.querySelector('[aria-label="异放原异常"]')).toBeNull()
+    const sourceSelect = selectComponentWithOption(wrapper, "broad_vortex")
+    expect(sourceSelect).toBeTruthy()
+    await sourceSelect!.vm.$emit("update:value", "ultimate_wind")
+    await nextTick()
+
+    const saved = await saveModal(wrapper)
+    expect(saved.events[0]).toMatchObject({ settlementType: "release", anomalyEffect: "wind_corrosion", releaseSource: "ultimate_wind" })
+    expect(saved.events[0].triggerActorRef).toBeUndefined()
+    expect(saved.events[0].anomalySource).toBeUndefined()
+  })
+
+  it("only shows the wind panel notice for anomaly and custom modes", async () => {
+    const wrapper = mountModal({
+      agent: velina,
+      damageConfig: {
+        mode: "single",
+        selectedEventId: "direct-1",
+        events: [{ id: "direct-1", kind: "direct", skillMultiplier: 100, count: 1 }],
+      },
+    })
+    await openModal(wrapper)
+    expect(document.body.querySelector('[data-testid="velina-turbulence-note"]')).toBeNull()
+    const modeSelect = selectComponentWithOption(wrapper, "custom")
+    await modeSelect!.vm.$emit("update:value", "custom")
+    await nextTick()
+    expect(document.body.querySelector('[data-testid="velina-turbulence-note"]')).not.toBeNull()
+    await modeSelect!.vm.$emit("update:value", "anomaly")
+    await nextTick()
+    expect(document.body.querySelector('[data-testid="velina-turbulence-note"]')).not.toBeNull()
+  })
+
   it("restores the saved configuration after cancelling draft changes", async () => {
     const wrapper = mountModal()
     await openModal(wrapper)
@@ -358,9 +557,9 @@ describe("CalculationConfigModal", () => {
     const settlementButtons = wrapper.findAllComponents({ name: "RadioButton" })
     expect(settlementSelector?.nextElementSibling?.classList.contains("calculation-editor-grid")).toBe(true)
     expect(settlementSelector?.textContent).toContain("结算类型")
-    expect(settlementButtons.map(button => button.props("label"))).toEqual(["属性异常", "紊乱结算", "异放"])
-    expect(settlementButtons[2].props("disabled")).toBe(true)
-    expect(settlementButtons[2].attributes("title")).toBe("暂不支持")
+    expect(settlementButtons.map(button => button.props("label"))).toEqual(["属性异常", "乱流", "紊乱结算", "异放"])
+    expect(settlementButtons[3].props("disabled")).toBe(true)
+    expect(settlementButtons[3].attributes("title")).toBe("暂不支持")
     expect(wrapper.findComponent({ name: "RadioGroup" }).props("value")).toBe("attribute")
     expect(selectComponentWithOption(wrapper, "disorder")).toBeUndefined()
 
@@ -460,8 +659,8 @@ describe("CalculationConfigModal", () => {
     await openModal(wrapper)
 
     const settlementButtons = wrapper.findAllComponents({ name: "RadioButton" })
-    expect(settlementButtons.map(button => button.props("label"))).toEqual(["属性异常", "紊乱结算", "异放"])
-    expect(settlementButtons[2].props("disabled")).toBe(false)
+    expect(settlementButtons.map(button => button.props("label"))).toEqual(["属性异常", "乱流", "紊乱结算", "异放"])
+    expect(settlementButtons[3].props("disabled")).toBe(false)
     expect(document.body.querySelector('[data-layout-field="release-source"]')?.textContent).toContain("爱芮")
     expect(document.body.querySelector('[data-layout-field="release-source"]')?.textContent).toContain("当前面板实时读取")
     expect(document.body.querySelector('[data-layout-field="release-snapshot"]')).toBeNull()
@@ -597,7 +796,7 @@ describe("CalculationConfigModal", () => {
     await openModal(wrapper)
 
     const settlementButtons = wrapper.findAllComponents({ name: "RadioButton" })
-    await settlementButtons[2].vm.$emit("click")
+    await settlementButtons.find(button => button.props("value") === "release")!.vm.$emit("click")
     await nextTick()
 
     expect(document.body.querySelector('[data-layout-field="release-source"]')?.textContent).toContain("爱芮")
@@ -1000,7 +1199,7 @@ describe("CalculationConfigModal", () => {
     expect(deleteButton).toBeTruthy()
     expect(deleteButton.title).toBe("删除目标事件")
     expect(Array.from(document.body.querySelectorAll(".calculation-add-toolbar button"))
-      .map(button => button.textContent?.trim())).toEqual(["添加技能", "添加异常事件", "添加技能组"])
+      .map(button => button.textContent?.trim())).toEqual(["添加技能", "添加异常事件", "添加乱流事件", "添加技能组"])
 
     copyButton.dispatchEvent(new MouseEvent("click", { bubbles: true }))
     await nextTick()

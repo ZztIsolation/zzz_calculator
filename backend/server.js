@@ -1,5 +1,6 @@
 import { createServer } from "node:http"
 import { createHash, randomUUID } from "node:crypto"
+import { AgentMaintenanceError, AgentMaintenanceHistory, agentRevision, agentRevisions, assertAgentRevision } from "./agentMaintenance.js"
 import { readFile, rename, rm, writeFile } from "node:fs/promises"
 import { createReadStream, existsSync, statSync } from "node:fs"
 import path from "node:path"
@@ -42,6 +43,7 @@ import {
     assertValidMaintenanceItem,
     fieldBuffModeOption,
     fieldBuffPhaseName,
+    repairDynamicValueSourceFallbacks,
     SYSTEM_MANAGED_SKILL_GROUP_COUNTS,
 } from "../core/maintenanceValidation.js"
 import {
@@ -56,7 +58,7 @@ import {
 } from "../core/effectRuleTargets.js"
 import { normalizeLegacyBuffStat } from "../core/shared-combat.js"
 import { migrateLegacyBloodMarrowWEngine } from "../core/effectFormula.js"
-import { disorderElapsedStepSeconds, normalizeElapsedSeconds } from "../core/damageEventMultipliers.js"
+import { disorderElapsedStepSeconds, normalizeElapsedSeconds, turbulenceElapsedStepSeconds } from "../core/damageEventMultipliers.js"
 import { isReleaseSettlement, normalizeAnomalySourceSnapshot } from "../core/anomalyRelease.js"
 import { isLuminescenceSettlement } from "../core/luminescence.js"
 
@@ -191,7 +193,7 @@ function applyMaintenanceCors(req, res) {
     }
     res.setHeader("Access-Control-Allow-Origin", origin)
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type")
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, If-Match, If-None-Match")
     res.setHeader("Vary", "Origin")
 }
 
@@ -252,6 +254,10 @@ function createRequestStore(input = {}) {
 }
 
 let catalog = await loadCatalog(dataDir, exampleDir)
+const agentHistory = new AgentMaintenanceHistory(dataDir)
+await agentHistory.recover((await readDataFile("agents.json")).agents ?? []).catch(() => {
+    console.error("角色维护历史待恢复；读取仍可用，下一次角色写入将重新核对。")
+})
 const enkaMapping = enkaImportEnabled
     ? await loadEnkaMappingSnapshot(__dirname, dataDir)
     : null
@@ -413,7 +419,7 @@ function applyDefaultCors(res) {
         res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
     }
     if (!res.hasHeader("Access-Control-Allow-Headers")) {
-        res.setHeader("Access-Control-Allow-Headers", "Content-Type")
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, If-Match, If-None-Match")
     }
 }
 
@@ -512,8 +518,35 @@ let maintenanceMutationQueue = Promise.resolve()
 function mutateDataFile(fileName, mutation) {
     const run = maintenanceMutationQueue.then(async () => {
         const payload = await readDataFile(fileName)
+        if (fileName === "agents.json") {
+            try { await agentHistory.recover(payload.agents ?? []) }
+            catch (error) {
+                if (error instanceof AgentMaintenanceError) throw error
+                throw new AgentMaintenanceError(503, "MAINTENANCE_HISTORY_UNAVAILABLE", "无法读取角色保存历史，请检查本机历史目录和磁盘状态后重试；草稿会保留。")
+            }
+        }
         const result = await mutation(payload)
-        await writeDataFile(fileName, result.payload)
+        let transaction = null
+        if (result.agentChange && agentRevision(result.agentChange.before) !== agentRevision(result.agentChange.after)) {
+            try { transaction = await agentHistory.prepare(result.agentChange.before, result.agentChange.after) }
+            catch (_) { throw new AgentMaintenanceError(503, "MAINTENANCE_HISTORY_UNAVAILABLE", "无法保存角色变更历史，请检查磁盘空间和目录权限后重试；角色资料未修改，草稿会保留。") }
+        }
+        try {
+            await writeDataFile(fileName, result.payload)
+        } catch (error) {
+            // A catalog reload can fail after the atomic rename has already succeeded.
+            const persisted = transaction && await readDataFile(fileName).catch(() => null)
+            const current = persisted?.agents?.find(item => item.id === transaction.record.agentId) ?? null
+            if (!transaction || !persisted || agentRevision(current) !== transaction.record.afterRevision) {
+                if (transaction && persisted) await agentHistory.abort(transaction).catch(() => {})
+                throw error
+            }
+            result.value.maintenanceWarning = "资料已保存，运行目录刷新失败，请刷新页面后核对。"
+        }
+        if (transaction) {
+            try { await agentHistory.commit(transaction) }
+            catch (_) { result.value.maintenanceWarning = "资料已保存，历史待恢复；无需重复提交。" }
+        }
         return result.value
     })
     maintenanceMutationQueue = run.then(() => undefined, () => undefined)
@@ -998,6 +1031,13 @@ function cleanPreferredDriveDiscs(preferredDriveDiscs = null) {
     const defaultSetIds = [...new Set((Array.isArray(rawDefaultSetIds) ? rawDefaultSetIds : [rawDefaultSetIds])
         .map(value => String(value ?? "").trim())
         .filter(Boolean))]
+    const rawTwoPieceSetIds = preferredDriveDiscs.defaultTwoPieceSetIds
+    // Preserve invalid shapes for validation rather than dropping them or throwing.
+    const defaultTwoPieceSetIds = Array.isArray(rawTwoPieceSetIds)
+        ? [...new Set(rawTwoPieceSetIds.map(value => String(value ?? "").trim()).filter(Boolean))]
+        : rawTwoPieceSetIds
+    const hasTwoPieceDefaults = Array.isArray(defaultTwoPieceSetIds)
+        ? defaultTwoPieceSetIds.length > 0 : defaultTwoPieceSetIds !== undefined
     const source = preferredDriveDiscs.mainStatLimits
         ?? preferredDriveDiscs.mainStats
         ?? preferredDriveDiscs
@@ -1008,11 +1048,12 @@ function cleanPreferredDriveDiscs(preferredDriveDiscs = null) {
         mainStatLimits[slot] = [...new Set(values.filter(Boolean).map(String))]
     }
     const hasMainStatLimits = Object.values(mainStatLimits).some(values => values.length)
-    if (!defaultSetIds.length && !hasMainStatLimits) {
+    if (!defaultSetIds.length && !hasTwoPieceDefaults && !hasMainStatLimits) {
         return null
     }
     return {
         ...(defaultSetIds.length ? { defaultSetIds } : {}),
+        ...(hasTwoPieceDefaults ? { defaultTwoPieceSetIds } : {}),
         ...(hasMainStatLimits ? { mainStatLimits } : {}),
     }
 }
@@ -1180,6 +1221,19 @@ function cleanCalculationEvent(event = {}, index = 0, options = {}) {
             }
         }
         if (settlementType === "release") {
+            if (String(options.agentId ?? "").trim() === "velina") {
+                const releaseSource = String(
+                    event.releaseSource
+                    ?? event.triggerActorRef?.profileId
+                    ?? "broad_vortex",
+                ).trim() || "broad_vortex"
+                return {
+                    ...base,
+                    settlementType: "release",
+                    anomalyEffect: "wind_corrosion",
+                    releaseSource,
+                }
+            }
             const triggerAgentId = String(event.triggerActorRef?.agentId ?? options.agentId ?? "").trim()
             const profileId = String(event.triggerActorRef?.profileId ?? options.defaultReleaseProfileId ?? "").trim()
             const sourceAgentId = String(event.anomalySource?.actorRef?.agentId ?? triggerAgentId).trim()
@@ -1196,28 +1250,19 @@ function cleanCalculationEvent(event = {}, index = 0, options = {}) {
             }
         }
         if (settlementType === "turbulence") {
-            const windSourceAgentId = String(event.windSource?.actorRef?.agentId ?? event.triggerActorRef?.agentId ?? options.agentId ?? "").trim()
-            const secondarySourceAgentId = String(event.anomalySource?.actorRef?.agentId ?? "").trim()
-            const windSnapshot = normalizeAnomalySourceSnapshot(event.windSource?.snapshot)
-            const secondarySnapshot = normalizeAnomalySourceSnapshot(event.anomalySource?.snapshot)
+            const anomalyEffect = String(event.anomalyEffect ?? "").trim()
+            if (!anomalyEffect || anomalyEffect === "wind_corrosion" || anomalyEffect === "turbulence") {
+                return null
+            }
             return {
                 ...base,
                 settlementType: "turbulence",
-                anomalyEffect: String(event.turbulenceEffect ?? event.anomalyEffect ?? "turbulence").trim(),
-                secondaryAnomalyEffect: String(event.secondaryAnomalyEffect ?? event.secondAnomalyEffect ?? "").trim(),
-                ...(DAMAGE_ELEMENTS.has(String(event.secondaryElement ?? "").trim())
-                    ? { secondaryElement: String(event.secondaryElement).trim() }
-                    : {}),
-                remainingSeconds: Math.max(0, Number(event.remainingSeconds ?? event.secondaryAnomalyRemainingSeconds ?? 0)),
-                turbulenceVariant: ["normal", "polarized"].includes(event.turbulenceVariant) ? event.turbulenceVariant : "normal",
-                windSource: {
-                    actorRef: { agentId: windSourceAgentId },
-                    ...(windSnapshot ? { snapshot: windSnapshot } : {}),
-                },
-                anomalySource: {
-                    actorRef: { agentId: secondarySourceAgentId },
-                    ...(secondarySnapshot ? { snapshot: secondarySnapshot } : {}),
-                },
+                anomalyEffect,
+                elapsedSeconds: normalizeElapsedSeconds(
+                    event.elapsedSeconds,
+                    Number.POSITIVE_INFINITY,
+                    turbulenceElapsedStepSeconds({ anomalyEffect }, options),
+                ),
             }
         }
         const procCount = Number(event.procCount ?? 1)
@@ -1581,13 +1626,21 @@ function cleanAnomalyEffect(item = {}) {
 
 function cleanTurbulenceEffect(item = {}) {
     return {
-        ...cleanAnomalyEffect(item),
+        id: requireId(item),
         settlementType: "turbulence",
+        sourceAnomalyEffect: String(item.sourceAnomalyEffect ?? item.id ?? "").trim(),
+        label: zhOnly(item.label),
+        element: item.element,
+        fixedMultiplier: Number(item.fixedMultiplier ?? 0),
+        tickMultiplier: Number(item.tickMultiplier ?? 0),
+        tickIntervalSeconds: Number(item.tickIntervalSeconds ?? 1),
+        defaultDurationSeconds: Number(item.defaultDurationSeconds ?? 10),
         multiplierTable: item.multiplierTable && typeof item.multiplierTable === "object" && !Array.isArray(item.multiplierTable)
             ? structuredClone(item.multiplierTable)
             : {},
-        sourceStatus: String(item.sourceStatus ?? "pending"),
-        calculationEnabled: item.calculationEnabled === true,
+        sourceStatus: String(item.sourceStatus ?? "confirmed"),
+        calculationEnabled: item.calculationEnabled !== false,
+        ...(item.metadata && typeof item.metadata === "object" ? { metadata: structuredClone(item.metadata) } : {}),
     }
 }
 
@@ -1614,7 +1667,8 @@ function anomalyMaintenanceType(itemOrType = {}) {
 }
 
 function anomalyMaintenanceTypeForUi(itemOrType = {}) {
-    return anomalyMaintenanceType(itemOrType) === "disorder" ? "disorder" : "anomaly"
+    const type = anomalyMaintenanceType(itemOrType)
+    return type === "disorder" || type === "turbulence" ? type : "anomaly"
 }
 
 function rawAnomalyEffectsFromPayload(payload = {}) {
@@ -1694,6 +1748,7 @@ export function cleanMaintenanceItem(resource, item, options = {}) {
         return cleanDriveDiscSet(item)
     }
     if (resource === "agents") {
+        repairDynamicValueSourceFallbacks(item, options.compatibilityRepairs ?? [])
         return cleanAgent(item, options)
     }
     return item
@@ -1962,7 +2017,7 @@ async function deleteAnomalyMaintenanceItem(maintenanceType, id) {
     })
 }
 
-async function saveMaintenanceItem(resource, item) {
+async function saveMaintenanceItem(resource, item, headers = {}) {
     if (resource === "anomaly-effects") {
         return saveAnomalyMaintenanceItem(item)
     }
@@ -1975,10 +2030,14 @@ async function saveMaintenanceItem(resource, item) {
 
     return mutateDataFile(config.fileName, async payload => {
         const collection = payload[config.collectionKey] ?? []
+        const previousAgent = resource === "agents" ? collection.find(entry => entry.id === item.id) ?? null : null
+        if (resource === "agents") assertAgentRevision(previousAgent, headers)
         const fieldBuffOriginalId = resource === "field-buffs"
             ? existingMaintenanceOriginalId(item, collection)
             : ""
+        const compatibilityRepairs = []
         const cleanOptions = fieldBuffOriginalId ? { originalId: fieldBuffOriginalId } : {}
+        if (resource === "agents") cleanOptions.compatibilityRepairs = compatibilityRepairs
         const validationContext = {
             items: collection,
             currentId: fieldBuffOriginalId || item?.id,
@@ -2010,15 +2069,18 @@ async function saveMaintenanceItem(resource, item) {
         }
         return {
             payload: nextPayload,
+            ...(resource === "agents" ? { agentChange: { before: previousAgent, after: savedItem } } : {}),
             value: {
                 payload: nextPayload,
                 savedItem,
+                ...(resource === "agents" ? { agentRevision: agentRevision(savedItem) } : {}),
+                ...(compatibilityRepairs.length ? { compatibilityRepairs } : {}),
             },
         }
     })
 }
 
-async function deleteMaintenanceItem(resource, id) {
+async function deleteMaintenanceItem(resource, id, headers = {}) {
     if (resource === "anomaly-effects") {
         return deleteAnomalyMaintenanceItem("anomaly", id)
     }
@@ -2029,11 +2091,13 @@ async function deleteMaintenanceItem(resource, id) {
     }
 
     return mutateDataFile(config.fileName, payload => {
+        const previousAgent = resource === "agents" ? (payload.agents ?? []).find(item => item.id === id) ?? null : null
+        if (resource === "agents") assertAgentRevision(previousAgent, headers, true)
         const nextPayload = {
             ...payload,
             [config.collectionKey]: deleteById(payload[config.collectionKey] ?? [], id),
         }
-        return { payload: nextPayload, value: nextPayload }
+        return { payload: nextPayload, value: nextPayload, ...(resource === "agents" ? { agentChange: { before: previousAgent, after: null } } : {}) }
     })
 }
 
@@ -2628,6 +2692,7 @@ async function routeApi(req, res, pathname, searchParams) {
             ok: true,
             data: {
                 agents,
+                agentRevisions: agentRevisions(agents.agents ?? []),
                 agentSkills,
                 wEngines,
                 driveDiscSets,
@@ -2651,19 +2716,23 @@ async function routeApi(req, res, pathname, searchParams) {
                     ? await saveTeammateBuff(body)
                     : resource === "boss-buffs" && body?.boss && body?.encounter
                         ? await saveBossEncounter(body)
-                        : await saveMaintenanceItem(resource, body)
+                        : await saveMaintenanceItem(resource, body, req.headers)
                 sendJson(res, 200, {
                     ok: true,
                     data: result.payload,
                     savedItem: result.savedItem,
+                    ...(result.agentRevision ? { agentRevision: result.agentRevision } : {}),
+                    ...(result.maintenanceWarning ? { maintenanceWarning: result.maintenanceWarning } : {}),
                     ...(result.savedBoss ? { savedBoss: result.savedBoss } : {}),
                     ...(result.savedEncounter ? { savedEncounter: result.savedEncounter } : {}),
+                    ...(result.compatibilityRepairs?.length ? { compatibilityRepairs: result.compatibilityRepairs } : {}),
                     meta: buildMeta(catalog),
                 })
                 return
             }
 
             if (req.method === "DELETE") {
+                let deleteResult
                 if (resource === "teammate-buffs") {
                     if (parts[2]) {
                         await deleteTeammateBuff(parts[1] ?? "", parts[2])
@@ -2675,15 +2744,20 @@ async function routeApi(req, res, pathname, searchParams) {
                 } else if (resource === "anomaly-effects") {
                     await deleteAnomalyMaintenanceItem(parts[1] ?? "anomaly", parts[2] ?? "")
                 } else {
-                    await deleteMaintenanceItem(resource, parts[1] ?? "")
+                    deleteResult = await deleteMaintenanceItem(resource, parts[1] ?? "", req.headers)
                 }
                 sendJson(res, 200, {
                     ok: true,
+                    ...(deleteResult?.maintenanceWarning ? { maintenanceWarning: deleteResult.maintenanceWarning } : {}),
                     meta: buildMeta(catalog),
                 })
                 return
             }
         } catch (error) {
+            if (error instanceof AgentMaintenanceError) {
+                sendJson(res, error.status, { ok: false, code: error.code, error: error.message, ...error.details })
+                return
+            }
             sendJson(res, 400, {
                 ok: false,
                 error: error instanceof Error ? error.message : String(error),

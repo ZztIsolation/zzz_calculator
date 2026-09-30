@@ -15,8 +15,10 @@ import {
 } from "./effectRuleTargets.js"
 import {
     evaluateInCombatFormulaRule,
+    formulaSourceValue,
     formulaParameterValues,
     isInCombatFormulaRule,
+    isOutOfCombatFormulaRule,
     materializeFormulaRuleForModificationLevel,
 } from "./effectFormula.js"
 
@@ -60,9 +62,11 @@ export const DAMAGE_KIND_LABELS = {
 export const DAMAGE_MODIFIER_KIND_LABELS = {
     enemyDamageTakenBonus: "敌方承伤提升",
     anomalyDamageBonus: "属性异常增伤",
+    turbulenceDamageBonus: "乱流增伤",
     disorderDamageBonus: "紊乱增伤",
     alienationCoefficientBonus: "异化系数加成",
     baseMultiplierBonus: "伤害倍率修正",
+    turbulenceBaseMultiplierBonus: "乱流倍率修正",
     disorderBaseMultiplierBonus: "紊乱倍率加算",
     anomalyCritRate: "异常暴击率",
     anomalyCritDmg: "异常暴击伤害",
@@ -110,6 +114,7 @@ export const ANOMALY_EFFECT_LABELS = {
     frozen: "霜寒",
     frost_frozen: "烈霜霜寒紊乱（星见雅）",
     flinch: "畏缩",
+    wind_corrosion: "风化",
 }
 export const DISORDER_EFFECT_LABELS = {
     burn: "灼烧紊乱",
@@ -261,6 +266,7 @@ export const FALLBACK_LABELS = {
     enemyEtherResReduction: "敌方以太减抗",
     enemyWindResReduction: "敌方风减抗",
     anomalyDamageBonus: "属性异常增伤",
+    turbulenceDamageBonus: "乱流增伤",
     disorderDamageBonus: "紊乱增伤",
     alienationCoefficientBonus: "异化系数加成",
     sheerDmgBonus: "贯穿增伤",
@@ -291,6 +297,7 @@ export const FALLBACK_LABELS = {
     etherDefIgnore: "以太伤害无视防御",
     windDefIgnore: "风属性伤害无视防御",
     baseMultiplierBonus: "异常倍率加算",
+    turbulenceBaseMultiplierBonus: "乱流倍率修正",
     disorderBaseMultiplierBonus: "紊乱倍率加算",
     anomalyCritRate: "异常暴击率",
     anomalyCritDmg: "异常暴击伤害",
@@ -368,6 +375,8 @@ export const PERCENT_KEYS = new Set([
     "etherDmg",
     "windDmg",
     "dmgBonus",
+    "turbulenceDamageBonus",
+    "turbulenceBaseMultiplierBonus",
     "enemyDamageTakenBonus",
     "enemyDefReduction",
     "enemyDefIgnore",
@@ -437,6 +446,8 @@ export const STORED_PERCENT_STATS = new Set([
     "etherDmg",
     "windDmg",
     "dmgBonus",
+    "turbulenceDamageBonus",
+    "turbulenceBaseMultiplierBonus",
     "enemyDamageTakenBonus",
     "enemyDefReduction",
     "enemyDefIgnore",
@@ -510,6 +521,7 @@ export const STORED_STAT_LABELS = {
     enemyEtherResReduction: "敌方以太减抗%",
     enemyWindResReduction: "敌方风减抗%",
     anomalyDamageBonus: "属性异常增伤%",
+    turbulenceDamageBonus: "乱流增伤%",
     disorderDamageBonus: "紊乱增伤%",
     alienationCoefficientBonus: "异化系数加成%",
     sheerDmgBonus: "贯穿增伤%",
@@ -540,6 +552,7 @@ export const STORED_STAT_LABELS = {
     etherDefIgnore: "以太伤害无视防御率%",
     windDefIgnore: "风属性伤害无视防御率%",
     baseMultiplierBonus: "异常倍率加算%",
+    turbulenceBaseMultiplierBonus: "乱流倍率修正%",
     disorderBaseMultiplierBonus: "紊乱倍率加算%",
     anomalyCritRate: "异常暴击率%",
     anomalyCritDmg: "异常暴击伤害%",
@@ -1282,6 +1295,8 @@ function ruleTargetText(rule = {}, meta) {
     if (target.kind === "anomaly") {
         const settlementLabel = target.settlementType === "disorder"
             ? "紊乱"
+            : target.settlementType === "turbulence"
+                ? "乱流"
             : target.settlementType === "release"
                 ? "异放"
                 : target.settlementType === "luminescence"
@@ -1297,6 +1312,10 @@ function ruleTargetText(rule = {}, meta) {
 }
 
 function storedRuleStatLabel(rule = {}, meta) {
+    const customLabel = localizedText(rule.label)
+    if (customLabel) {
+        return customLabel
+    }
     if (rule.stat === "critRate"
         && rule.valueSource?.kind === "corePassiveScaling") {
         return "暴击率"
@@ -1377,6 +1396,26 @@ export function storedEffectRuleText(rule, runtime, effect, meta, displayContext
     }
     if (rule.type === "formula") {
         const source = rule.source ?? {}
+        if (isOutOfCombatFormulaRule(rule)) {
+            const parameters = formulaParameterValues(rule)
+            const displayLabel = storedRuleStatLabel(rule, meta)
+            let text = `${displayLabel}+公式值不可用`
+            const panel = displayContext?.outOfCombatPanel
+            if (panel && typeof panel === "object") {
+                try {
+                    const sourceResult = formulaSourceValue(rule, panel)
+                    const formulaValue = evaluateFormulaExpression(rule.formula?.expression ?? "", {
+                        x: sourceResult.sourceValue,
+                        ...parameters,
+                    })
+                    const displayValue = Number(formulaValue) * coverage
+                    text = `${displayLabel}+${formatStoredStatValue(rule.stat, displayValue, { percentMode: rule.mode === "pct" })}`
+                } catch {
+                    // Keep the authored formula text if a live preview cannot evaluate it.
+                }
+            }
+            return `${text}${ruleTargetText(rule, meta)}${requirementText}${coverageText}`
+        }
         if (isInCombatFormulaRule(rule)) {
             const sourceLabel = localizedText(source.label) || source.stat || "局内面板属性"
             const parameters = formulaParameterValues(rule)

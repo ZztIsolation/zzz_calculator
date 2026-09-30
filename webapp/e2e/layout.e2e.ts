@@ -510,6 +510,7 @@ test("administrator default-loop events remain reachable inside the modal", asyn
   await page.locator(".default-loop-tabs .n-tabs-tab").filter({ hasText: /^6 影$/ }).click()
 
   const surface = page.locator('[data-layout-surface="default-calculation-config"]')
+  const sidebar = surface.locator(".calculation-master-sidebar")
   const eventList = surface.locator(".calculation-event-list")
   const eventItems = eventList.locator(".calculation-event-list-item")
   const lastEvent = eventItems.last()
@@ -520,27 +521,33 @@ test("administrator default-loop events remain reachable inside the modal", asyn
   await expectStableLayout(page, "default-calculation-config")
   await expect(footer).toBeVisible()
 
-  const listMetrics = await eventList.evaluate(element => ({
+  const viewportWidth = page.viewportSize()?.width ?? 0
+  const scrollRegion = viewportWidth <= 600 ? eventList : sidebar
+  const scrollMetrics = await scrollRegion.evaluate(element => ({
     clientHeight: element.clientHeight,
     scrollHeight: element.scrollHeight,
   }))
-  expect(listMetrics.scrollHeight).toBeGreaterThan(listMetrics.clientHeight)
+  expect(scrollMetrics.scrollHeight).toBeGreaterThan(scrollMetrics.clientHeight)
 
-  await eventList.evaluate(element => { element.scrollTop = element.scrollHeight })
-  const lastEventIsVisible = await lastEvent.evaluate(element => {
-    const list = element.closest(".calculation-event-list")!
-    const listRect = list.getBoundingClientRect()
+  await scrollRegion.evaluate(element => { element.scrollTop = element.scrollHeight })
+  const lastEventIsVisible = await lastEvent.evaluate((element, regionSelector) => {
+    const region = element.closest(regionSelector)!
+    const regionRect = region.getBoundingClientRect()
     const eventRect = element.getBoundingClientRect()
-    return eventRect.top >= listRect.top - 1 && eventRect.bottom <= listRect.bottom + 1
-  })
+    return eventRect.top >= regionRect.top - 1 && eventRect.bottom <= regionRect.bottom + 1
+  }, viewportWidth <= 600 ? ".calculation-event-list" : ".calculation-master-sidebar")
   expect(lastEventIsVisible).toBe(true)
+  if (viewportWidth > 600) {
+    await expect(sidebar.getByRole("button", { name: "添加技能", exact: true })).toBeInViewport({ ratio: 1 })
+    const listMetrics = await eventList.evaluate(element => ({ clientHeight: element.clientHeight, scrollHeight: element.scrollHeight }))
+    expect(listMetrics.scrollHeight).toBeLessThanOrEqual(listMetrics.clientHeight + 1)
+  }
 
   const expectedTitle = (await lastEvent.locator("strong").innerText()).trim()
   await lastEvent.locator(".calculation-event-select").click()
   await expect(lastEvent).toHaveClass(/active/)
   await expect(editorPanel.locator("h4")).toHaveText(expectedTitle)
 
-  const viewportWidth = page.viewportSize()?.width ?? 0
   const surfaceMetrics = await surface.evaluate(element => ({
     clientHeight: element.clientHeight,
     scrollHeight: element.scrollHeight,

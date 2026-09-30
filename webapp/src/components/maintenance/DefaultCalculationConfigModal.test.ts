@@ -2,6 +2,7 @@ import { mount } from "@vue/test-utils"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { nextTick } from "vue"
 import DefaultCalculationConfigModal from "./DefaultCalculationConfigModal.vue"
+import anomalyEffectsData from "../../../../data/anomaly_effects.json"
 
 vi.mock("naive-ui", async () => {
   const { defineComponent, h, inject, provide } = await import("vue")
@@ -128,9 +129,9 @@ function config() {
 }
 
 const wrappers: Array<ReturnType<typeof mount>> = []
-function mountModal(value = config()) {
+function mountModal(value: any = config(), overrides: any = {}) {
   const wrapper = mount(DefaultCalculationConfigModal, {
-    props: { show: true, config: value, catalog, agent, skillGroups: [] },
+    props: { show: true, config: value, catalog, agent, skillGroups: [], ...overrides },
     global: {
       stubs: {
         ConfirmDialog: {
@@ -156,6 +157,88 @@ afterEach(() => {
 })
 
 describe("DefaultCalculationConfigModal", () => {
+  const turbulenceCatalog = { ...catalog, anomalyEffects: anomalyEffectsData }
+  const sourceConfig = (anomalyEffect: string, elapsedSeconds = 0) => ({ ...config(), variants: [], selectedEventId: "source", events: [
+    { id: "source", kind: "anomaly", settlementType: "turbulence", anomalyEffect, elapsedSeconds, count: 1 },
+  ] })
+
+  it.each([
+    ["physical", "physical", "assault"], ["ice", "ice", "shatter"],
+    ["fire", "fire", "burn"], ["electric", "electric", "shock"],
+    ["ether", "ether", "corruption"], ["frost", "ice", "frost_frozen"],
+  ])("uses the %s source when adding or switching a maintenance turbulence event", async (attribute, damageElement, expected) => {
+    const wrapper = mountModal(config(), { agent: { ...agent, attribute, damageElement }, catalog: turbulenceCatalog })
+    const typeSelect = wrapper.findAll("select").find(select => select.find('option[value="turbulence"]').exists())!
+    await typeSelect.setValue("turbulence")
+    expect(wrapper.get<HTMLSelectElement>('[aria-label="乱流原异常"]').element.value).toBe(expected)
+    expect(wrapper.get('[aria-label="乱流原异常"]').findAll("option").map(option => option.text())).toEqual(["强击", "碎冰", "灼烧", "感电", "侵蚀", "烈霜（星见雅）"])
+    await button(wrapper, "添加乱流").trigger("click")
+    expect(wrapper.get<HTMLSelectElement>('[aria-label="乱流原异常"]').element.value).toBe(expected)
+  })
+
+  it("preserves a manual maintenance source through a repeat selection, copying and reopening", async () => {
+    const wrapper = mountModal(sourceConfig("corruption", 0.5), { agent: { ...agent, attribute: "ether", damageElement: "ether" }, catalog: turbulenceCatalog })
+    expect(wrapper.find(".maintenance-readonly-value").text()).toBe("1,837.5%")
+    await wrapper.get('[aria-label="乱流原异常"]').setValue("shock")
+    expect(wrapper.find(".maintenance-readonly-value").text()).toBe("1,775%")
+    const typeSelect = wrapper.findAll("select").find(select => select.find('option[value="turbulence"]').exists())!
+    await typeSelect.setValue("turbulence")
+    await wrapper.get('[aria-label="复制目标事件"]').trigger("click")
+    await button(wrapper, "应用").trigger("click")
+    const saved = wrapper.emitted("apply")![0][0] as any
+    expect(saved.events).toHaveLength(2)
+    for (const event of saved.events) expect(event).toMatchObject({ anomalyEffect: "shock", elapsedSeconds: 1 })
+    await wrapper.setProps({ show: false, config: saved })
+    await wrapper.setProps({ show: true })
+    expect(wrapper.get<HTMLSelectElement>('[aria-label="乱流原异常"]').element.value).toBe("shock")
+  })
+
+  it("uses custom turbulence intervals when normalizing a maintenance event", async () => {
+    const customQuarter = {
+      id: "custom-quarter-turbulence",
+      settlementType: "turbulence",
+      label: { zhCN: "自定义四分之一秒乱流" },
+      element: "fire",
+      fixedMultiplier: 9,
+      tickMultiplier: 0.5,
+      tickIntervalSeconds: 0.25,
+      defaultDurationSeconds: 10,
+    }
+    const customTwoSeconds = { ...customQuarter, id: "custom-two-second-turbulence", tickIntervalSeconds: 2 }
+    const customCatalog = {
+      ...catalog,
+      anomalyEffects: { ...anomalyEffectsData, effects: [...(anomalyEffectsData as any).effects, customQuarter, customTwoSeconds] },
+    }
+    const wrapper = mountModal(sourceConfig(customQuarter.id, 0.37), { catalog: customCatalog })
+    expect(wrapper.get('[aria-label="乱流原异常"]').element.value).toBe(customQuarter.id)
+    const elapsedField = wrapper.findAll(".maintenance-field").find(field => field.text().includes("已流逝秒数"))!
+    expect(elapsedField.find("input").attributes("step")).toBe("0.25")
+    expect(elapsedField.find("input").attributes("data-precision")).toBe("2")
+    await button(wrapper, "应用").trigger("click")
+    expect((wrapper.emitted("apply")![0][0] as any).events[0].elapsedSeconds).toBe(0.25)
+
+    const secondWrapper = mountModal(sourceConfig(customTwoSeconds.id, 3.1), { catalog: customCatalog })
+    await button(secondWrapper, "应用").trigger("click")
+    expect((secondWrapper.emitted("apply")![0][0] as any).events[0].elapsedSeconds).toBe(4)
+  })
+
+  it.each(["", "invalid"])("repairs invalid maintenance source %s only in the draft", async id => {
+    const original = sourceConfig(id, 0.6)
+    const wrapper = mountModal(original, { agent: { ...agent, attribute: "ether", damageElement: "ether" }, catalog: turbulenceCatalog })
+    expect(wrapper.get<HTMLSelectElement>('[aria-label="乱流原异常"]').element.value).toBe("corruption")
+    await button(wrapper, "应用").trigger("click")
+    const saved = wrapper.emitted("apply")![0][0] as any
+    expect(saved.events[0]).toMatchObject({ anomalyEffect: "corruption", elapsedSeconds: 0.5 })
+    expect(original.events[0].anomalyEffect).toBe(id)
+  })
+
+  it("blocks applying when turbulence data is missing in any cinema variant", () => {
+    const value = { ...config(), variants: [{ ...sourceConfig("corruption"), cinemaLevel: 6 }] }
+    const wrapper = mountModal(value)
+    expect(wrapper.find('[role="alert"]').text()).toContain("乱流原异常数据未就绪")
+    expect(button(wrapper, "应用").attributes("disabled")).toBeDefined()
+  })
+
   it("copies the active loop into a chosen cinema level with fresh event ids", async () => {
     const wrapper = mountModal()
     await button(wrapper, "新增 2 影循环").trigger("click")

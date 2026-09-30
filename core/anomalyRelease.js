@@ -8,6 +8,13 @@ const RELEASE_MODIFIER_LABELS = {
     releaseProficiencyYieldBonus: "异放精通收益修正",
 }
 const RELEASE_WHITE_BOX_ROLES = new Set(["conversionSource"])
+const VELINA_AGENT_ID = "velina"
+const VELINA_DEFAULT_RELEASE_SOURCE = "broad_vortex"
+export const VELINA_RELEASE_SOURCES = Object.freeze([
+    { value: "micro_vortex", label: "微域气旋" },
+    { value: "broad_vortex", label: "广域气旋" },
+    { value: "ultimate_wind", label: "终结技" },
+])
 const RELEASE_OPERATION_PRECEDENCE = {
     add: 1,
     subtract: 1,
@@ -152,10 +159,8 @@ function evaluateLeaf(node, context) {
             throw new Error("异放公式的核心技倍率字段不能为空。")
         }
         let value = context?.coreScalingRow?.[field]
-        if (node.key === "eventElement") {
-            value = value?.[context?.eventElement]
-        } else if (node.key) {
-            value = value?.[node.key]
+        if (node.key && value !== null && typeof value === "object") {
+            value = value?.[node.key === "eventElement" ? context?.eventElement : node.key]
         }
         rawValue = finiteNumber(value, `核心技倍率 ${field}`)
         sourceLabel = expressionLabel(node, "核心技倍率")
@@ -280,6 +285,14 @@ export function anomalyReleaseProfiles(agent = {}) {
     return Array.isArray(agent?.anomalyReleaseProfiles) ? agent.anomalyReleaseProfiles : []
 }
 
+export function isVelinaReleaseAgent(agent = {}) {
+    return String(agent?.id ?? "") === VELINA_AGENT_ID
+}
+
+export function velinaReleaseSourceId(event = {}) {
+    return String(event?.releaseSource ?? event?.triggerActorRef?.profileId ?? "").trim()
+}
+
 export function defaultAnomalyReleaseProfile(agent = {}, damageElement = "") {
     const profiles = anomalyReleaseProfiles(agent)
     return profiles.find(profile => profile?.default === true
@@ -312,9 +325,15 @@ export function normalizeAnomalyReleaseEventForAgent(event = {}, agent = {}) {
         return event
     }
 
+    const velina = isVelinaReleaseAgent(agent)
     const agentId = String(agent?.id ?? event?.triggerActorRef?.agentId ?? "")
-    const profile = anomalyReleaseProfile(agent, event?.triggerActorRef?.profileId)
-        ?? defaultAnomalyReleaseProfile(agent)
+    const requestedProfileId = velina
+        ? velinaReleaseSourceId(event)
+        : String(event?.triggerActorRef?.profileId ?? "").trim()
+    const profile = anomalyReleaseProfile(agent, requestedProfileId)
+        ?? (velina
+            ? anomalyReleaseProfile(agent, VELINA_DEFAULT_RELEASE_SOURCE)
+            : defaultAnomalyReleaseProfile(agent))
     const source = event?.anomalySource && typeof event.anomalySource === "object"
         ? event.anomalySource
         : {}
@@ -328,25 +347,36 @@ export function normalizeAnomalyReleaseEventForAgent(event = {}, agent = {}) {
         kind: "anomaly",
         settlementType: "release",
         ...(lockedToAria ? { anomalyEffect: "corruption" } : {}),
-        triggerActorRef: {
-            agentId,
-            profileId: String(profile?.id ?? event?.triggerActorRef?.profileId ?? ""),
-        },
-        anomalySource: lockedToAria
-            ? { actorRef: { agentId } }
+        ...(velina
+            ? {
+                anomalyEffect: "wind_corrosion",
+                releaseSource: requestedProfileId || VELINA_DEFAULT_RELEASE_SOURCE,
+            }
             : {
-                ...source,
-                actorRef: {
-                    ...sourceActorRef,
-                    agentId: sourceAgentId,
+                triggerActorRef: {
+                    agentId,
+                    profileId: String(profile?.id ?? event?.triggerActorRef?.profileId ?? ""),
                 },
-            },
+                anomalySource: lockedToAria
+                    ? { actorRef: { agentId } }
+                    : {
+                        ...source,
+                        actorRef: {
+                            ...sourceActorRef,
+                            agentId: sourceAgentId,
+                        },
+                    },
+            }),
     }
     delete normalized.previousAnomalyEffect
     delete normalized.disorderType
     delete normalized.elapsedSeconds
     delete normalized.procCount
     delete normalized.anomalyVariant
+    if (velina) {
+        delete normalized.triggerActorRef
+        delete normalized.anomalySource
+    }
     return normalized
 }
 
@@ -381,8 +411,9 @@ export function evaluateReleaseExpressionInterval(node, context = {}) {
             const field = String(node.field ?? "").trim()
             if (!field) throw new Error("异放公式的核心技倍率字段不能为空。")
             let value = context?.coreScalingRow?.[field]
-            if (node.key === "eventElement") value = value?.[context?.eventElement]
-            else if (node.key) value = value?.[node.key]
+            if (node.key && value !== null && typeof value === "object") {
+                value = value?.[node.key === "eventElement" ? context?.eventElement : node.key]
+            }
             raw = intervalOf(value, `核心技倍率 ${field}`)
         } else if (node.kind === "condition") {
             if (node.condition !== "stunned") {
@@ -560,7 +591,7 @@ export function validateAnomalyReleaseProfile(profile = {}) {
     try {
         evaluateReleaseExpression(profile.expression, {
             trigger: { outOfCombatPanel: new Proxy({}, { get: () => 100 }), inCombatPanel: new Proxy({}, { get: () => 100 }) },
-            coreScalingRow: new Proxy({}, { get: () => new Proxy({}, { get: () => 100 }) }),
+            coreScalingRow: new Proxy({}, { get: () => 100 }),
             event: { stunned: true },
             eventElement: profile.supportedElements?.[0] ?? "physical",
         })

@@ -7,6 +7,10 @@ import MaintenanceView from "@/views/MaintenanceView.vue"
 
 enableAutoUnmount(afterEach)
 
+function testAgentRevision(item: any) {
+  return `test-${Array.from(JSON.stringify(item)).reduce((hash, ch) => Math.imul(hash, 31) + ch.charCodeAt(0) | 0, 0)}`
+}
+
 vi.mock("naive-ui", () => ({
   NButton: {
     props: ["disabled", "type"],
@@ -159,8 +163,10 @@ function makeCatalog() {
   }
 }
 
-async function mountView(options: { failCatalogAfterSave?: boolean, delayFieldSave?: boolean, dynamicCore?: boolean } = {}) {
+async function mountView(options: { failCatalogAfterSave?: boolean, delayFieldSave?: boolean, dynamicCore?: boolean, dynamicMismatch?: boolean, failAgentSave?: boolean, initialAgent?: any, turbulenceEffect?: any, expectedText?: string } = {}) {
   let currentCatalog = structuredClone(makeCatalog())
+  if (options.initialAgent) currentCatalog.agents.agents[0] = structuredClone(options.initialAgent)
+  if (options.turbulenceEffect) currentCatalog.anomalyEffects.effects.push(structuredClone(options.turbulenceEffect))
   if (options.dynamicCore) {
     const agent = currentCatalog.agents.agents[0]
     agent.coreSkill = {
@@ -180,6 +186,7 @@ async function mountView(options: { failCatalogAfterSave?: boolean, delayFieldSa
       value: 45,
       valueSource: { kind: "corePassiveScaling", field: "anomalyProficiencyFlat" },
     }]
+    if (options.dynamicMismatch) agent.combatBuffs.corePassive.effects[0].value = 90
   }
   let successfulSaveCount = 0
   let releaseFieldSave = () => {}
@@ -188,16 +195,22 @@ async function mountView(options: { failCatalogAfterSave?: boolean, delayFieldSa
     if (url === "/api/app-config") return jsonResponse({ maintenanceEnabled: true })
     if (url === "/api/maintenance/catalog") {
       if (options.failCatalogAfterSave && successfulSaveCount > 0) return jsonResponse({ ok: false, error: "catalog refresh unavailable" }, 503)
-      return jsonResponse({ ok: true, data: currentCatalog })
+      return jsonResponse({ ok: true, data: { ...currentCatalog, agentRevisions: Object.fromEntries(currentCatalog.agents.agents.map((item: any) => [item.id, testAgentRevision(item)])) } })
     }
     if (url === "/api/maintenance/agents" && init?.method === "POST") {
       const body = JSON.parse(String(init.body ?? "{}"))
+      const current = currentCatalog.agents.agents.find((item: any) => item.id === body.id)
+      const headers = init.headers as Record<string, string>
+      if (options.failAgentSave) return jsonResponse({ ok: false, error: "disk unavailable" }, 503)
+      if (current ? headers["If-Match"] !== `"${testAgentRevision(current)}"` : headers["If-None-Match"] !== "*") {
+        return jsonResponse({ ok: false, code: "MAINTENANCE_EDIT_CONFLICT", currentItem: current ?? null, currentRevision: current ? testAgentRevision(current) : null }, 412)
+      }
       const savedItem = { ...body, id: body.id || "generated_agent" }
       const existingIndex = currentCatalog.agents.agents.findIndex((item: any) => item.id === savedItem.id)
       if (existingIndex >= 0) currentCatalog.agents.agents[existingIndex] = savedItem
       else currentCatalog.agents.agents.push(savedItem)
       successfulSaveCount += 1
-      return jsonResponse({ ok: true, savedItem })
+      return jsonResponse({ ok: true, savedItem, agentRevision: testAgentRevision(savedItem) })
     }
     if (url === "/api/maintenance/drive-disc-sets" && init?.method === "POST") {
       const body = JSON.parse(String(init.body ?? "{}"))
@@ -254,8 +267,32 @@ async function mountView(options: { failCatalogAfterSave?: boolean, delayFieldSa
   const pinia = createPinia()
   const catalogStore = useCatalogStore(pinia)
   const wrapper = mount(RouterView, { global: { plugins: [pinia, router] } })
-  await vi.waitFor(() => expect(wrapper.text()).toContain("角色甲"))
-  return { wrapper, fetchMock, router, releaseFieldSave, catalogStore }
+  await vi.waitFor(() => expect(wrapper.text()).toContain(options.expectedText ?? "角色甲"))
+  return { wrapper, fetchMock, router, releaseFieldSave, catalogStore,
+    updateAgent: (update: (agent: any) => void) => update(currentCatalog.agents.agents[0]),
+    getAgent: () => currentCatalog.agents.agents[0],
+    removeAgent: () => { currentCatalog.agents.agents = [] },
+  }
+}
+
+function agentWithTurbulenceEvent(anomalyEffect: string) {
+  const agent = structuredClone(makeCatalog().agents.agents[0])
+  agent.defaultCalculationConfig = {
+    cinemaLevel: 0,
+    mode: "anomaly",
+    name: { zhCN: "乱流测试方案" },
+    selectedEventId: "turbulence-event",
+    events: [{
+      id: "turbulence-event",
+      kind: "anomaly",
+      settlementType: "turbulence",
+      anomalyEffect,
+      elapsedSeconds: 0,
+      count: 1,
+      stunned: true,
+    }],
+  }
+  return agent
 }
 
 const resourceLabels: Record<string, string> = {
@@ -284,7 +321,135 @@ function field(scope: any, label: string) {
 beforeEach(() => localStorage.clear())
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear() })
 
+describe("MaintenanceView role revision protection", () => {
+  it("does not let an unreadable role draft block another resource's stored draft", async () => {
+    localStorage.setItem("zzz_maintenance_agent_draft_v5", "{broken")
+    const record = structuredClone(makeCatalog().wEngines.wEngines[0])
+    localStorage.setItem("zzz_maintenance_vue_draft_v4", JSON.stringify({ version: 4, resource: "w-engines", selectedKey: record.id, draft: record, baselineText: JSON.stringify(record), draftIsNew: false, originalIdentity: { id: record.id } }))
+    const result = await mountView({ expectedText: "音擎效果" })
+    expect(localStorage.getItem("zzz_maintenance_agent_draft_v5")).toBe("{broken")
+    expect(result.wrapper.text()).toContain("已恢复草稿")
+    expect(result.wrapper.text()).toContain("音擎效果")
+  })
+  it("merges a restored text-only draft with the server-added default calculation", async () => {
+    const base: any = structuredClone(makeCatalog().agents.agents[0])
+    delete base.defaultCalculationConfig
+    const draft = structuredClone(base); draft.name.zhCN = "角色甲本机文本"
+    const legacy = JSON.stringify({ version: 4, resource: "agents", selectedKey: base.id, selectedBuffId: "", draft, baselineText: JSON.stringify(base), draftIsNew: false, originalIdentity: { id: base.id, teammateId: "", maintenanceType: "" } })
+    localStorage.setItem("zzz_maintenance_vue_draft_v4", legacy)
+    const { wrapper, fetchMock, getAgent } = await mountView()
+    expect(wrapper.text()).toContain("已合并最新资料")
+    expect(wrapper.find(".agent-conflict-item").exists()).toBe(false)
+    expect(fetchMock.mock.calls.filter(([url, init]) => url === "/api/maintenance/agents" && init?.method === "POST")).toHaveLength(0)
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("完整目录已刷新"))
+    expect(getAgent().name.zhCN).toBe("角色甲本机文本")
+    expect(getAgent().defaultCalculationConfig.events).toMatchObject(makeCatalog().agents.agents[0].defaultCalculationConfig.events)
+    expect(JSON.parse(localStorage.getItem("zzz_maintenance_agent_draft_v5")!)).toEqual({ version: 5, resolved: true })
+  })
+
+  it("preserves conflict choices across refresh and checks a second server update", async () => {
+    const first = await mountView()
+    await field(first.wrapper, "中文名称").find("input").setValue("角色甲本机")
+    first.updateAgent(agent => { agent.name.zhCN = "角色甲服务器" })
+    await button(first.wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(first.wrapper.text()).toContain("资料存在冲突"))
+    expect(button(first.wrapper, "保存").attributes("disabled")).toBeDefined()
+    const remote = structuredClone(first.getAgent())
+    first.wrapper.unmount()
+    const second = await mountView({ initialAgent: remote })
+    expect(second.wrapper.text()).toContain("原内容")
+    expect(second.wrapper.text()).toContain("角色甲本机")
+    expect(button(second.wrapper, "保存").attributes("disabled")).toBeDefined()
+    await button(second.wrapper, "保留我的修改").trigger("click")
+    expect(JSON.parse(localStorage.getItem("zzz_maintenance_agent_draft_v5")!).conflicts[0].choice).toBe("local")
+    second.wrapper.unmount()
+    const third = await mountView({ initialAgent: remote })
+    expect(button(third.wrapper, "保存").attributes("disabled")).toBeUndefined()
+    third.updateAgent(agent => { agent.name.zhCN = "角色甲服务器再次修改" })
+    await button(third.wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(third.wrapper.text()).toContain("资料存在冲突"))
+    expect(button(third.wrapper, "保存").attributes("disabled")).toBeDefined()
+    await button(third.wrapper, "采用最新资料").trigger("click")
+    await button(third.wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(third.wrapper.text()).toContain("完整目录已刷新"))
+    expect(third.getAgent().name.zhCN).toBe("角色甲服务器再次修改")
+  })
+
+  it("blocks baseline-less legacy drafts and provides export without sending a write", async () => {
+    const draft = structuredClone(makeCatalog().agents.agents[0])
+    localStorage.setItem("zzz_maintenance_vue_draft_v4", JSON.stringify({ version: 4, resource: "agents", selectedKey: draft.id, draft, draftIsNew: false, baselineText: "", originalIdentity: { id: draft.id } }))
+    const { wrapper, fetchMock } = await mountView()
+    expect(wrapper.text()).toContain("旧草稿缺少原始资料")
+    expect(button(wrapper, "保存").attributes("disabled")).toBeDefined()
+    expect(button(wrapper, "导出草稿").exists()).toBe(true)
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false)
+    expect(JSON.parse(localStorage.getItem("zzz_maintenance_agent_draft_v5")!).draft.id).toBe(draft.id)
+  })
+
+  it("retains a failed save and restores controls without changing the baseline", async () => {
+    const { wrapper, getAgent } = await mountView({ failAgentSave: true })
+    await field(wrapper, "中文名称").find("input").setValue("角色甲重试草稿")
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("disk unavailable"))
+    expect(button(wrapper, "保存").attributes("disabled")).toBeUndefined()
+    const stored = JSON.parse(localStorage.getItem("zzz_maintenance_agent_draft_v5")!)
+    expect(stored.draft.name.zhCN).toBe("角色甲重试草稿")
+    expect(stored.baseSnapshot.name.zhCN).toBe("角色甲")
+    expect(getAgent().name.zhCN).toBe("角色甲")
+  })
+
+  it("keeps a deleted role draft without recreating the role", async () => {
+    const { wrapper, removeAgent, fetchMock } = await mountView()
+    await field(wrapper, "中文名称").find("input").setValue("角色甲未保存")
+    removeAgent()
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("角色已被删除"))
+    expect(button(wrapper, "保存").attributes("disabled")).toBeDefined()
+    expect(button(wrapper, "复制为新角色").exists()).toBe(true)
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1)
+  })
+})
+
 describe("MaintenanceView structured editor", () => {
+  it("saves a role plan that references a registered custom turbulence effect", async () => {
+    const customTurbulence = {
+      id: "custom_turbulence",
+      settlementType: "turbulence",
+      sourceAnomalyEffect: "burn",
+      label: { zhCN: "自定义灼烧乱流" },
+      element: "fire",
+      fixedMultiplier: 9,
+      tickMultiplier: 0.5,
+      tickIntervalSeconds: 0.5,
+      defaultDurationSeconds: 10,
+    }
+    const { wrapper, fetchMock } = await mountView({
+      turbulenceEffect: customTurbulence,
+      initialAgent: agentWithTurbulenceEvent(customTurbulence.id),
+    })
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("完整目录已刷新"))
+
+    const call = fetchMock.mock.calls.find(([url, init]) => url === "/api/maintenance/agents" && init?.method === "POST")
+    expect(call).toBeTruthy()
+    const body = JSON.parse(String(call![1]?.body ?? "{}"))
+    expect(body.defaultCalculationConfig.events[0]).toMatchObject({
+      settlementType: "turbulence",
+      anomalyEffect: customTurbulence.id,
+    })
+  })
+
+  it("blocks a role plan that references an unknown turbulence effect before sending it", async () => {
+    const { wrapper, fetchMock } = await mountView({
+      initialAgent: agentWithTurbulenceEvent("missing_turbulence"),
+    })
+    await button(wrapper, "保存").trigger("click")
+
+    expect(wrapper.text()).toContain("乱流必须选择已登记的非风属性异常基底")
+    expect(fetchMock.mock.calls.some(([url, init]) => url === "/api/maintenance/agents" && init?.method === "POST")).toBe(false)
+  })
+
   it("edits and preserves core-passive scaling value sources", async () => {
     const { wrapper, fetchMock } = await mountView({ dynamicCore: true })
     const rule = wrapper.find(".maintenance-rule-card")
@@ -301,6 +466,19 @@ describe("MaintenanceView structured editor", () => {
       kind: "corePassiveScaling",
       field: "anomalyProficiencyFlat",
     })
+  })
+
+  it("repairs a stale dynamic fallback when only text is edited", async () => {
+    const { wrapper, fetchMock } = await mountView({ dynamicCore: true, dynamicMismatch: true })
+    const corePassive = wrapper.findAll(".maintenance-form-section").find(item => item.text().includes("核心被动 Buff"))!
+    await field(corePassive, "Buff 描述").find("textarea").setValue("只修改文本")
+    await button(wrapper, "保存").trigger("click")
+    await vi.waitFor(() => expect(wrapper.text()).toContain("已自动同步 1 个动态兼容值"))
+
+    const call = fetchMock.mock.calls.find(([url, init]) => url === "/api/maintenance/agents" && init?.method === "POST")!
+    const body = JSON.parse(String(call[1]?.body ?? "{}"))
+    expect(body.combatBuffs.corePassive.effects[0].value).toBe(45)
+    expect(body.combatBuffs.corePassive.description).toEqual({ zhCN: "只修改文本" })
   })
 
   it("maps all eight resources without exposing editable ids, raw JSON, generic buffs, or system buffs", async () => {
@@ -537,7 +715,7 @@ describe("MaintenanceView structured editor", () => {
     })
     localStorage.setItem("zzz_maintenance_vue_draft_v1", storedV1)
     const { wrapper, router } = await mountView()
-    expect(wrapper.text()).toContain("已迁移旧草稿")
+    expect(wrapper.text()).toContain("已合并最新资料")
     expect(wrapper.text()).toContain("本地草稿角色")
     expect(localStorage.getItem("zzz_maintenance_vue_draft_v4")).not.toBeNull()
     expect(localStorage.getItem("zzz_maintenance_vue_draft_v1")).toBe(storedV1)
@@ -548,8 +726,8 @@ describe("MaintenanceView structured editor", () => {
     await button(wrapper.find(".modal"), "离开").trigger("click")
     await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/"))
     expect(localStorage.getItem("zzz_maintenance_vue_draft_v1")).toBe(storedV1)
-    expect(JSON.parse(localStorage.getItem("zzz_maintenance_vue_draft_v4")!)).toMatchObject({
-      version: 4,
+    expect(JSON.parse(localStorage.getItem("zzz_maintenance_agent_draft_v5")!)).toMatchObject({
+      version: 5,
       resource: "agents",
       draft: { id: "agent_a", name: { zhCN: "本地草稿角色" } },
     })
@@ -570,7 +748,7 @@ describe("MaintenanceView structured editor", () => {
 
     const { wrapper } = await mountView()
 
-    expect(wrapper.text()).toContain("已迁移旧草稿")
+    expect(wrapper.text()).toContain("已合并最新资料")
     expect(wrapper.text()).toContain("v2 本地草稿角色")
     expect(localStorage.getItem("zzz_maintenance_vue_draft_v4")).not.toBeNull()
     expect(localStorage.getItem("zzz_maintenance_vue_draft_v2")).toBe(storedV2)

@@ -362,6 +362,70 @@ assertSignatureScorePathParity(
     signatureRemielleInput(1, ["wEngine:zzz_wiki_2109.self"]),
 )
 
+const velinaSignature = wEngine("zzz_wiki_2030")
+assert.deepEqual(
+    runtimeStackGroups(velinaSignature.effect.selfBuff).map(group => group.ruleIds),
+    [["effect_wiki_2030_wind_corrosion_damage", "effect_wiki_2030_turbulence_damage"]],
+    "Wind Corrosion and Turbulence should share one signature stack control",
+)
+
+function velinaSignatureInput(level, stacks, agentId = "velina", settlementType = "attribute", team = false) {
+    return {
+        agentId,
+        coreSkillLevel: "none",
+        cinemaLevel: 0,
+        wEngineId: "zzz_wiki_2030",
+        wEngineModificationLevel: level,
+        driveDiscs: [],
+        combatBuffs: {
+            activeBuffIds: ["wEngine:zzz_wiki_2030.self", ...(team ? ["wEngine:zzz_wiki_2030.team"] : [])],
+            runtimeInputs: {
+                "wEngine:zzz_wiki_2030.self": {
+                    effects: { effect_wiki_2030_wind_corrosion_damage: { stacks } },
+                },
+            },
+        },
+        damage: {
+            selectedEventId: "signature-anomaly",
+            events: [{
+                id: "signature-anomaly",
+                kind: "anomaly",
+                settlementType,
+                anomalyEffect: agentId === "velina" ? "wind_corrosion" : settlementType === "disorder" ? "burn" : "assault",
+                elapsedSeconds: 0,
+                count: 1,
+                stunned: false,
+            }],
+        },
+    }
+}
+
+for (let level = 1; level <= 5; level += 1) {
+    const engine = materializeFrontendWEngine(velinaSignature, level)
+    const preview = storedEffectRulesText(engine.effect.selfBuff, defaultRuntimeForBuff(engine.effect.selfBuff), meta)
+    assert.ok(preview.includes(`+${60 + level * 10}`), "Signature preview should show the rank-specific Anomaly Proficiency")
+    assert.ok(preview.includes("风化") && preview.includes("乱流"), "Signature preview should expose both exact anomaly targets")
+    for (const stacks of [0, 1, 2]) {
+        const expectedBonus = 1 + stacks * (6 + level) / 100
+        const wind = calculateInCombatPanel(catalog, velinaSignatureInput(level, stacks))
+        approx(wind.inCombat.buffTotals.anomalyProficiencyFlat, 60 + level * 10, "Unconditional Anomaly Proficiency should survive zero stacks")
+        approx(wind.damage.events[0].multipliers.anomalyDamage, expectedBonus, "Wind Corrosion should receive the stacked bonus")
+        const turbulence = calculateInCombatPanel(catalog, velinaSignatureInput(level, stacks, "alice_thymefield", "turbulence"))
+        approx(turbulence.damage.events[0].multipliers.anomalyDamage, expectedBonus, "Turbulence should use the shared stack value")
+        for (const settlement of ["attribute", "disorder"]) {
+            const other = calculateInCombatPanel(catalog, velinaSignatureInput(level, stacks, "alice_thymefield", settlement))
+            approx(other.damage.events[0].multipliers.anomalyDamage, 1, "Signature bonus should not leak into other anomalies or Disorder")
+        }
+    }
+}
+const velinaSignatureFull = calculateInCombatPanel(catalog, velinaSignatureInput(1, 2, "velina", "attribute", true))
+approx(velinaSignatureFull.inCombat.buffTotals.anomalyProficiencyFlat, 130, "Rank 1 self and team effects should grant 70 + 60 Anomaly Proficiency exactly once")
+const wrongSpecialty = velinaSignatureInput(5, 2, "anby_demara")
+wrongSpecialty.damage.events = [{ id: "signature-anomaly", kind: "direct", damageElement: "electric", skillMultiplier: 100 }]
+approx(calculateInCombatPanel(catalog, wrongSpecialty).inCombat.buffTotals.anomalyProficiencyFlat, 0, "Non-Anomaly wearers should not receive the signature passive")
+assertSignatureScorePathParity("Signature Wind Corrosion", velinaSignatureInput(5, 2))
+assertSignatureScorePathParity("Signature Turbulence", velinaSignatureInput(5, 2, "alice_thymefield", "turbulence"))
+
 const sigridSignature = wEngine("zzz_wiki_2162")
 assert.deepEqual(
     [

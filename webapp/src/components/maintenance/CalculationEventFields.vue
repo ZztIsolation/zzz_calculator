@@ -1,13 +1,16 @@
 <script setup lang="ts">
+import { computed, watch } from "vue"
 import { NInput, NInputNumber, NSelect, NSwitch } from "naive-ui"
 import {
   ANOMALY_VARIANT_OPTIONS, CALCULATION_DAMAGE_BASIS_OPTIONS, CRIT_MODE_OPTIONS, SHARP_CRIT_MODE_OPTIONS, DAMAGE_ELEMENT_OPTIONS, DIRECT_DAMAGE_ELEMENT_OPTIONS, DISORDER_TYPE_OPTIONS, EVENT_KIND_OPTIONS, EVENT_SOURCE_OPTIONS,
   anomalyOptions, categoryOptions, defaultCalculationEvent, moveOptions, option, rowOptions, turbulenceSecondaryOptions,
 } from "./maintenance-options"
 import { textOf } from "./maintenance-model"
-import { disorderElapsedStepSeconds, normalizeElapsedSeconds } from "@core/damageEventMultipliers.js"
-import { anomalyReleaseProfiles } from "@core/anomalyRelease.js"
+import { disorderElapsedStepSeconds, normalizeElapsedSeconds, resolveDamageEventMultiplier, turbulenceElapsedStepSeconds } from "@core/damageEventMultipliers.js"
+import { anomalyReleaseProfiles, isVelinaReleaseAgent, normalizeAnomalyReleaseEventForAgent, VELINA_RELEASE_SOURCES } from "@core/anomalyRelease.js"
 import LuminescenceEventEditor from "@/components/LuminescenceEventEditor.vue"
+import { normalizeTurbulenceEditorEvent, turbulenceConfigurationWarning } from "@/utils/turbulence"
+import { formatPercent } from "@/utils/format"
 
 const props = withDefaults(defineProps<{
   event: any
@@ -19,6 +22,17 @@ const props = withDefaults(defineProps<{
   potentialLevel?: number | null
 }>(), { skillGroups: () => [], allowSkillGroup: true, potentialLevel: null })
 const emit = defineEmits<{ change: [] }>()
+const turbulenceMultiplier = computed(() => props.event.settlementType === "turbulence"
+  ? resolveDamageEventMultiplier(props.event, props.catalog) : null)
+
+watch(() => [props.event, props.event.anomalyEffect, props.event.settlementType, props.catalog, props.agent], () => {
+  if (props.disabled || props.event.settlementType !== "turbulence") return
+  const next = normalizeTurbulenceEditorEvent(props.event, props.agent, props.catalog)
+  if (next.anomalyEffect !== props.event.anomalyEffect || next.elapsedSeconds !== props.event.elapsedSeconds) {
+    Object.assign(props.event, next)
+    emit("change")
+  }
+}, { immediate: true })
 
 function agentSkill() {
   return (props.catalog?.agentSkills?.agentSkills ?? []).find((skill: any) => skill.agentId === props.agent?.id)
@@ -58,18 +72,17 @@ function newSkillRef() {
 }
 
 function changeKind(kind: string) {
+  if (kind === "turbulence" && visibleKind() === "turbulence") return
   const id = props.event.id
-  const next = defaultCalculationEvent(kind)
+  const elapsedSeconds = props.event.elapsedSeconds
+  const next = defaultCalculationEvent(kind, props.agent)
   Object.keys(props.event).forEach(key => delete props.event[key])
   Object.assign(props.event, next, { id })
   if (kind === "release") {
-    const profile = anomalyReleaseProfiles(props.agent)[0]
-    props.event.triggerActorRef = { agentId: props.agent?.id ?? "", profileId: profile?.id ?? "" }
-    props.event.anomalySource = { actorRef: { agentId: props.agent?.id ?? "" } }
+    Object.assign(props.event, normalizeAnomalyReleaseEventForAgent(props.event, props.agent))
   }
   if (kind === "turbulence") {
-    props.event.windSource = { actorRef: { agentId: props.agent?.id ?? "" } }
-    props.event.anomalySource = { actorRef: { agentId: "" } }
+    Object.assign(props.event, normalizeTurbulenceEditorEvent({ ...props.event, elapsedSeconds: elapsedSeconds ?? 0 }, props.agent, props.catalog))
   }
   if (kind === "luminescence") {
     props.event.triggerActorRef = { agentId: props.agent?.id ?? "" }
@@ -146,9 +159,18 @@ function releaseProfileOptions() {
   return anomalyReleaseProfiles(props.agent).map((profile: any) => option(profile.id, textOf(profile.name) || profile.id))
 }
 
+function velinaReleaseSourceOptions() {
+  return VELINA_RELEASE_SOURCES.map(source => option(source.value, source.label))
+}
+
+function isVelinaRelease() {
+  return isVelinaReleaseAgent(props.agent)
+}
+
 function eventKindOptions() {
   return EVENT_KIND_OPTIONS
     .filter(item => props.allowSkillGroup || !["skillGroup", "luminescence"].includes(String(item.value)))
+    .filter(item => props.agent?.attribute !== "wind" || !["turbulence", "disorder"].includes(String(item.value)))
     .map(item => {
       if (item.value === "release" && !anomalyReleaseProfiles(props.agent).length) {
         return { ...item, disabled: true, label: "异放（暂不支持）" }
@@ -164,11 +186,16 @@ function eventKindOptions() {
 }
 
 function elapsedStep() {
-  return disorderElapsedStepSeconds(props.event, props.catalog)
+  return visibleKind() === "turbulence"
+    ? turbulenceElapsedStepSeconds(props.event, props.catalog)
+    : disorderElapsedStepSeconds(props.event, props.catalog)
 }
 
 function elapsedPrecision() {
-  return Number.isInteger(elapsedStep()) ? 0 : 1
+  const step = elapsedStep()
+  const normalized = Number(step).toFixed(10).replace(/0+$/, "")
+  const decimalIndex = normalized.indexOf(".")
+  return decimalIndex < 0 ? 0 : normalized.length - decimalIndex - 1
 }
 
 function updateElapsedSeconds(value: unknown) {
@@ -180,6 +207,11 @@ function updateDisorderEffect(value: string) {
   props.event.anomalyEffect = value
   delete props.event.previousAnomalyEffect
   props.event.elapsedSeconds = normalizeElapsedSeconds(props.event.elapsedSeconds, Number.POSITIVE_INFINITY, elapsedStep())
+  emit("change")
+}
+
+function updateTurbulenceEffect(value: string) {
+  Object.assign(props.event, normalizeTurbulenceEditorEvent({ ...props.event, anomalyEffect: value }, props.agent, props.catalog))
   emit("change")
 }
 
@@ -223,18 +255,16 @@ function critModeOptions() {
       <label class="maintenance-field"><span>结算次数</span><NInputNumber v-model:value="event.procCount" :disabled="disabled" :min="0" :step="1" @update:value="emit('change')" /></label>
     </template>
     <template v-if="visibleKind() === 'turbulence'">
-      <label class="maintenance-field"><span>风化基底</span><NSelect filterable v-model:value="event.anomalyEffect" :options="anomalyOptions(catalog).filter((item: any) => item.value === 'wind_corrosion')" :disabled="disabled" @update:value="emit('change')" /></label>
-      <label class="maintenance-field"><span>第二异常</span><NSelect filterable v-model:value="event.secondaryAnomalyEffect" :options="turbulenceSecondaryOptions(catalog)" :disabled="disabled" @update:value="emit('change')" /></label>
-      <label class="maintenance-field"><span>剩余时间（秒）</span><NInputNumber v-model:value="event.secondaryAnomalyRemainingSeconds" :disabled="disabled" :min="0" :step="0.5" @update:value="emit('change')" /></label>
-      <label class="maintenance-field"><span>乱流倍率状态</span><NSelect v-model:value="event.turbulenceVariant" :options="[option('normal', '普通乱流'), option('polarized', '特殊乱流')]" :disabled="disabled" @update:value="emit('change')" /></label>
-      <label class="maintenance-field"><span>风化触发者</span><NInput :value="textOf(agent?.name)" disabled /></label>
-      <label class="maintenance-field"><span>第二异常来源</span><NInput v-model:value="event.anomalySource.actorRef.agentId" :disabled="disabled" placeholder="来源角色 ID" @update:value="emit('change')" /></label>
+      <label class="maintenance-field"><span>原异常</span><NSelect filterable :value="event.anomalyEffect" :options="turbulenceSecondaryOptions(catalog, event.anomalyEffect)" :disabled="disabled" aria-label="乱流原异常" @update:value="updateTurbulenceEffect(String($event))" /></label>
+      <p v-if="turbulenceConfigurationWarning(event, catalog)" role="alert">{{ turbulenceConfigurationWarning(event, catalog) }}</p>
+      <label class="maintenance-field"><span>已流逝秒数</span><NInputNumber v-model:value="event.elapsedSeconds" :disabled="disabled" :min="0" :step="elapsedStep()" :precision="elapsedPrecision()" @update:value="updateElapsedSeconds" /></label>
+      <label class="maintenance-field"><span>当前乱流倍率</span><span class="maintenance-readonly-value">{{ turbulenceMultiplier === null ? '未配置' : formatPercent(turbulenceMultiplier, 3) }}</span></label>
     </template>
     <template v-if="visibleKind() === 'release'">
-      <label class="maintenance-field"><span>原异常</span><NSelect filterable v-model:value="event.anomalyEffect" :options="anomalyOptions(catalog)" :disabled="disabled" @update:value="emit('change')" /></label>
-      <label class="maintenance-field"><span>倍率方案</span><NSelect v-model:value="event.triggerActorRef.profileId" :options="releaseProfileOptions()" :disabled="disabled" @update:value="emit('change')" /></label>
-      <label class="maintenance-field"><span>异放触发者</span><NInput :value="textOf(agent?.name)" disabled /></label>
-      <label class="maintenance-field"><span>原异常施加者</span><NInput :value="textOf(agent?.name)" disabled /></label>
+      <label v-if="!isVelinaRelease()" class="maintenance-field"><span>原异常</span><NSelect filterable v-model:value="event.anomalyEffect" :options="anomalyOptions(catalog)" :disabled="disabled" @update:value="emit('change')" /></label>
+      <label class="maintenance-field"><span>{{ isVelinaRelease() ? '异放来源' : '倍率方案' }}</span><NSelect v-if="isVelinaRelease()" v-model:value="event.releaseSource" :options="velinaReleaseSourceOptions()" :disabled="disabled" @update:value="emit('change')" /><NSelect v-else v-model:value="event.triggerActorRef.profileId" :options="releaseProfileOptions()" :disabled="disabled" @update:value="emit('change')" /></label>
+      <label v-if="!isVelinaRelease()" class="maintenance-field"><span>异放触发者</span><NInput :value="textOf(agent?.name)" disabled /></label>
+      <label v-if="!isVelinaRelease()" class="maintenance-field"><span>原异常施加者</span><NInput :value="textOf(agent?.name)" disabled /></label>
     </template>
     <LuminescenceEventEditor
       v-if="visibleKind() === 'luminescence'"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { cleanStoredReactiveEvent, isWindAgent as hasWindAttribute, WIND_TURBULENCE_NOTICE } from "@core/anomalySettlement.js"
 import { computed, ref, watch } from "vue"
 import { NButton, NInput, NInputNumber, NModal, NRadioButton, NRadioGroup, NSelect, NSwitch, NTag } from "naive-ui"
 import { Copy, Info, Lock, RefreshCcw, Trash2 } from "lucide-vue-next"
@@ -42,12 +43,14 @@ import {
 } from "@core/calculationSkillGroups.js"
 import { resolveDefaultCalculationConfig } from "@core/defaultCalculationConfig.js"
 import {
-  disorderBaseMultiplier,
-  disorderElapsedStepSeconds,
-  disorderMultiplierScale,
-  normalizeElapsedSeconds,
-  normalizeDamageScale,
-  resolveDamageEventMultiplier,
+    disorderBaseMultiplier,
+    disorderElapsedStepSeconds,
+    disorderMultiplierScale,
+    normalizeElapsedSeconds,
+    normalizeDamageScale,
+    resolveDamageEventMultiplier,
+    turbulenceBaseMultiplier,
+    turbulenceElapsedStepSeconds,
 } from "@core/damageEventMultipliers.js"
 import { damageElementForAgent } from "@core/shared-combat.js"
 import { corePassiveScalingRow } from "@core/corePassiveScaling.js"
@@ -56,10 +59,13 @@ import {
   anomalyReleaseProfiles,
   evaluateAnomalyReleaseProfile,
   isAriaReleaseSourceLocked,
+  isVelinaReleaseAgent,
   isReleaseSettlement,
   normalizeAnomalyReleaseEventForAgent,
+  VELINA_RELEASE_SOURCES,
 } from "@core/anomalyRelease.js"
 import { isLuminescenceSettlement } from "@core/luminescence.js"
+import { defaultTurbulenceEffectId, normalizeTurbulenceEditorEvent, turbulenceConfigurationWarning, turbulenceEffectLabel, turbulenceEffectsFor, turbulenceSourceOptions } from "@/utils/turbulence"
 
 const props = defineProps<{
   show: boolean
@@ -129,12 +135,18 @@ const releaseProfiles = computed(() => anomalyReleaseProfiles(props.agent))
 const supportsRelease = computed(() => releaseProfiles.value.length > 0)
 const supportsLuminescence = computed(() => props.agent?.id === "remielle_dan" || props.agent?.luminescenceModel?.status === "implemented")
 const releaseSourceLocked = computed(() => isAriaReleaseSourceLocked(props.agent))
+const isVelinaRelease = computed(() => isVelinaReleaseAgent(props.agent))
+const isWindAgent = computed(() => hasWindAttribute(props.agent))
+const velinaReleaseSourceOptions = computed(() => VELINA_RELEASE_SOURCES.map(source => ({
+  label: source.label,
+  value: source.value,
+})))
 type SettlementOption = { label: string, value: string, disabled?: boolean, title?: string }
 const anomalySettlementOptions = computed<SettlementOption[]>(() => {
   const options: Array<SettlementOption | null> = [
     { label: "属性异常", value: "attribute" },
-    props.agent?.attribute === "wind" ? { label: "乱流", value: "turbulence" } : null,
-    { label: "紊乱结算", value: "disorder" },
+    !isWindAgent.value ? { label: "乱流", value: "turbulence" } : null,
+    !isWindAgent.value ? { label: "紊乱结算", value: "disorder" } : null,
     { label: "异放", value: "release", disabled: !supportsRelease.value, title: supportsRelease.value ? "" : "暂不支持" },
     supportsLuminescence.value ? { label: "耀变", value: "luminescence" } : null,
   ]
@@ -226,6 +238,11 @@ const disorderOptions = computed(() => (props.meta?.disorderEffects ?? []).map((
   label: disorderEffectLabel(effect.id, props.meta),
   value: effect.id,
 })))
+
+const turbulenceEffects = computed(() => turbulenceEffectsFor(props.meta))
+const turbulenceOptions = computed(() => turbulenceSourceOptions(props.meta))
+const turbulenceWarnings = computed(() => [...new Set<string>((draft.value.events ?? [])
+  .map((event: any) => turbulenceConfigurationWarning(event, props.meta)).filter(Boolean))])
 
 function agentLabel(agentId: string) {
   return labelOf((props.meta?.agents ?? []).find((agent: any) => agent?.id === agentId)) || agentId || "未配置"
@@ -345,7 +362,10 @@ function releaseModifierValues(event: any, effect: any) {
 function releaseBreakdown(event: any) {
   if (!isReleaseSettlement(event)) return null
   const effect = releaseEffect(event)
-  const profile = anomalyReleaseProfile(props.agent, event?.triggerActorRef?.profileId, effect?.element)
+  const profileId = isVelinaReleaseAgent(props.agent)
+    ? event?.releaseSource
+    : event?.triggerActorRef?.profileId
+  const profile = anomalyReleaseProfile(props.agent, profileId, effect?.element)
   if (!effect || !profile) return null
   try {
     const releaseModifiers = releaseModifierValues(event, effect)
@@ -371,7 +391,9 @@ function releaseBreakdown(event: any) {
       currentMultiplier: evaluated.finalBaseMultiplier * normalizeDamageScale(event),
       effectLabel: anomalyEffectLabel(effect.id, props.meta),
       triggerLabel: labelOf(props.agent),
-      sourceLabel: agentLabel(event?.anomalySource?.actorRef?.agentId),
+      sourceLabel: isVelinaReleaseAgent(props.agent)
+        ? labelOf(props.agent)
+        : agentLabel(event?.anomalySource?.actorRef?.agentId),
       snapshot: event?.anomalySource?.snapshot ?? null,
       conversionSourceLabel: conversionSource?.label ?? "转换数据来源",
       conversionSourceValue: Number(conversionSource?.rawValue ?? conversionSource?.value ?? 0),
@@ -411,6 +433,9 @@ function eventMultiplier(event: any) {
   const disorder = disorderBreakdown(event)
   if (disorder) {
     return disorder.currentMultiplier
+  }
+  if (event?.settlementType === "turbulence") {
+    return turbulencePreview(event)?.currentMultiplier ?? null
   }
   return resolveDamageEventMultiplier(eventWithSkillSelection(event), props.meta)
 }
@@ -705,6 +730,9 @@ function disorderBreakdown(event: any) {
 }
 
 const selectedDisorderBreakdown = computed(() => disorderBreakdown(selectedEvent.value))
+const selectedTurbulenceBreakdown = computed(() => selectedEvent.value?.settlementType === "turbulence"
+  ? turbulencePreview(selectedEvent.value)
+  : null)
 
 function formatDisorderSeconds(value: unknown) {
   return Number(value).toFixed(1)
@@ -724,12 +752,15 @@ function disorderTickFormula(breakdown: any) {
 }
 
 function normalizeEventElapsedSeconds(event: any) {
-  if (event?.kind !== "disorder" && event?.settlementType !== "disorder") {
-    return event
-  }
+  if (event?.kind !== "disorder" && event?.settlementType !== "disorder"
+    && event?.settlementType !== "turbulence") return event
+  if (event?.settlementType === "turbulence" && !turbulenceEffectFor(event)) return event
+  const step = event?.settlementType === "turbulence"
+    ? turbulenceElapsedStep(event)
+    : disorderElapsedStep(event)
   return {
     ...event,
-    elapsedSeconds: normalizeElapsedSeconds(event.elapsedSeconds, Number.POSITIVE_INFINITY, disorderElapsedStep(event)),
+    elapsedSeconds: normalizeElapsedSeconds(event.elapsedSeconds, Number.POSITIVE_INFINITY, step),
   }
 }
 
@@ -822,12 +853,62 @@ function selectedDisorderEffectId(event: any) {
   return String(event?.anomalyEffect ?? event?.previousAnomalyEffect ?? "")
 }
 
+function selectedTurbulenceEffectId(event: any) {
+  return String(event?.anomalyEffect ?? "")
+}
+
+function turbulenceEffectFor(event: any) {
+  const id = selectedTurbulenceEffectId(event)
+  return turbulenceEffects.value.find((effect: any) => String(effect?.sourceAnomalyEffect ?? effect?.id ?? "") === id)
+    ?? turbulenceEffects.value.find((effect: any) => String(effect?.id ?? "") === id)
+    ?? null
+}
+
+function turbulenceElapsedStep(event: any) {
+  return turbulenceElapsedStepSeconds(event, { turbulenceEffects: turbulenceEffects.value })
+}
+
+function turbulenceElapsedPrecision(event: any) {
+  const step = turbulenceElapsedStep(event)
+  const normalized = Number(step).toFixed(10).replace(/0+$/, "")
+  const decimalIndex = normalized.indexOf(".")
+  return decimalIndex < 0 ? 0 : normalized.length - decimalIndex - 1
+}
+
+function turbulencePreview(event: any) {
+  const effect = turbulenceEffectFor(event)
+  if (!effect) return null
+  const modifiers = (props.combatEffects ?? []).flatMap((combatEffect: any) => combatEffect?.resolvedDamageModifiers ?? [])
+    .filter((modifier: any) => damageModifierAppliesTo(modifier, { ...event, damageElement: effect.element }))
+  const durationBonus = modifiers
+    .filter((modifier: any) => modifier?.kind === "anomalyDurationBonusSeconds")
+    .reduce((total: number, modifier: any) => total + Number(modifier?.value ?? 0), 0)
+  const baseMultiplierBonus = modifiers
+    .filter((modifier: any) => modifier?.kind === "turbulenceBaseMultiplierBonus")
+    .reduce((total: number, modifier: any) => total + Number(modifier?.value ?? 0), 0)
+  const timing = turbulenceBaseMultiplier(effect, event?.elapsedSeconds, durationBonus)
+  return {
+    ...timing,
+    fixedMultiplier: Number(effect.fixedMultiplier),
+    tickMultiplier: Number(effect.tickMultiplier),
+    damageScale: normalizeDamageScale(event),
+    baseMultiplierBonus,
+    currentMultiplier: Math.max(0, timing.baseMultiplier + baseMultiplierBonus) * normalizeDamageScale(event),
+  }
+}
+
+function turbulencePreviewText(event: any) {
+  const preview = turbulencePreview(event)
+  return preview ? formatPercent(preview.currentMultiplier, 3) : "-"
+}
+
 const ATTRIBUTE_EFFECT_BY_ELEMENT: Record<string, string> = {
   physical: "assault",
   fire: "burn",
   ice: "shatter",
   electric: "shock",
   ether: "corruption",
+  wind: "wind_corrosion",
 }
 
 const DISORDER_EFFECT_BY_ELEMENT: Record<string, string> = {
@@ -839,23 +920,27 @@ const DISORDER_EFFECT_BY_ELEMENT: Record<string, string> = {
 }
 
 function effectOptionsForSettlement(settlementType: string) {
-  return settlementType === "disorder" ? disorderOptions.value : anomalyOptions.value
+  if (settlementType === "disorder") return disorderOptions.value
+  if (settlementType === "turbulence") return turbulenceOptions.value
+  return anomalyOptions.value
 }
 
 function isKnownEffect(settlementType: string, effectId: string) {
   const options = effectOptionsForSettlement(settlementType)
+  if (settlementType === "turbulence") return Boolean(effectId) && options.some((option: { value: string }) => option.value === effectId)
   return !effectId || !options.length || options.some((option: { value: string }) => String(option.value) === effectId)
 }
 
 function defaultAgentEffectId(settlementType: string) {
+  if (settlementType === "turbulence") return defaultTurbulenceEffectId(props.agent)
   const options = effectOptionsForSettlement(settlementType)
   const element = damageElementForAgent(props.agent)
-  const fallback = settlementType === "disorder" ? "burn" : settlementType === "turbulence" ? "wind_corrosion" : "assault"
+  const fallback = settlementType === "disorder" ? "burn" : "assault"
   const preferred = settlementType === "disorder" && props.agent?.attribute === "frost"
     ? "frost_frozen"
     : settlementType === "disorder"
       ? DISORDER_EFFECT_BY_ELEMENT[element] ?? fallback
-      : settlementType === "turbulence" ? "wind_corrosion" : ATTRIBUTE_EFFECT_BY_ELEMENT[element] ?? fallback
+      : ATTRIBUTE_EFFECT_BY_ELEMENT[element] ?? fallback
   return options.some((option: { value: string }) => String(option.value) === preferred)
     ? preferred
     : options[0]?.value ?? fallback
@@ -896,6 +981,8 @@ function normalizeLuminescenceDraftEvent(event: any) {
 
 function normalizeDraftAnomalyEffects() {
   draft.value.events = (draft.value.events ?? []).map((event: any) => {
+    event = cleanStoredReactiveEvent(event, props.agent)
+    if (!event) return null
     if (event?.kind !== "anomaly" && event?.kind !== "disorder") {
       return event
     }
@@ -908,6 +995,9 @@ function normalizeDraftAnomalyEffects() {
       : event.settlementType === "turbulence"
         ? "turbulence"
         : event.kind === "disorder" || event.settlementType === "disorder" ? "disorder" : "attribute"
+    if (isWindAgent.value && (settlementType === "turbulence" || settlementType === "disorder")) {
+      return null
+    }
     const effectId = settlementType === "disorder" ? selectedDisorderEffectId(event) : selectedAnomalyEffectId(event)
     const normalized: any = {
       ...event,
@@ -916,16 +1006,16 @@ function normalizeDraftAnomalyEffects() {
     }
     delete normalized.previousAnomalyEffect
     if (settlementType === "turbulence") {
-      normalized.anomalyEffect = "wind_corrosion"
-      normalized.secondaryAnomalyEffect = normalized.secondaryAnomalyEffect ?? "burn"
-      normalized.secondaryAnomalyRemainingSeconds = Number(normalized.secondaryAnomalyRemainingSeconds ?? 10)
-      normalized.turbulenceVariant = normalized.turbulenceVariant ?? "normal"
+      return cleanStoredReactiveEvent(normalizeTurbulenceEditorEvent(event, props.agent, props.meta), props.agent)
     }
     if (release) {
       return normalizeAnomalyReleaseEventForAgent(normalized, props.agent)
     }
     return normalized
-  })
+  }).filter(Boolean)
+  if (!draft.value.events.some((event: any) => event.id === draft.value.selectedEventId)) {
+    draft.value.selectedEventId = draft.value.events[0]?.id ?? null
+  }
 }
 
 function withSelectedEffectOption(
@@ -945,6 +1035,10 @@ function anomalyOptionsFor(event: any) {
 
 function disorderOptionsFor(event: any) {
   return withSelectedEffectOption(disorderOptions.value, selectedDisorderEffectId(event), disorderEffectLabel)
+}
+
+function turbulenceOptionsFor(event: any) {
+  return turbulenceSourceOptions(props.meta, selectedTurbulenceEffectValue(event))
 }
 
 function selectedAnomalyEffectValue(event: any) {
@@ -967,6 +1061,20 @@ function selectedDisorderEffectLabel(event: any) {
   return optionLabel(disorderOptionsFor(event), value, disorderEffectLabel(value, props.meta) || "未配置")
 }
 
+function updateTurbulenceEffect(anomalyEffect: string) {
+  updateSelectedEvent(normalizeTurbulenceEditorEvent({ ...selectedEvent.value, anomalyEffect }, props.agent, props.meta))
+}
+
+function selectedTurbulenceEffectValue(event: any) {
+  const effectId = selectedTurbulenceEffectId(event)
+  return effectId || defaultAgentEffectId("turbulence")
+}
+
+function selectedTurbulenceEffectLabel(event: any) {
+  const value = selectedTurbulenceEffectValue(event)
+  return turbulenceEffectLabel(value, props.meta)
+}
+
 function isKnownDisorderEffect(effectId: string) {
   return isKnownEffect("disorder", effectId)
 }
@@ -983,7 +1091,10 @@ function updateSelectedEvent(patch: any, options: { clearLabel?: boolean } = {})
     if (event.id !== current.id) {
       return event
     }
-    const next = { ...event, ...patch }
+    const merged = { ...event, ...patch }
+    const next = isVelinaRelease.value && isReleaseSettlement(merged)
+      ? normalizeAnomalyReleaseEventForAgent(merged, props.agent)
+      : merged
     if (options.clearLabel) {
       delete next.label
     }
@@ -1015,7 +1126,7 @@ function newEvent(kind: string) {
     }
   }
   if (kind === "anomaly") {
-    const releaseProfile = !hasAdminDefaultCalculation(props.agent, props.cinemaLevel ?? 0, props.potentialLevel ?? 0)
+    const releaseProfile = isVelinaRelease.value || !hasAdminDefaultCalculation(props.agent, props.cinemaLevel ?? 0, props.potentialLevel ?? 0)
       ? anomalyReleaseProfile(props.agent, "", damageElementForAgent(props.agent))
       : null
     if (releaseProfile) {
@@ -1040,13 +1151,8 @@ function newEvent(kind: string) {
       id,
       kind: "anomaly",
       settlementType: "turbulence",
-      anomalyEffect: "wind_corrosion",
-      turbulenceEffect: "turbulence",
-      secondaryAnomalyEffect: "burn",
-      secondaryAnomalyRemainingSeconds: 10,
-      turbulenceVariant: "normal",
-      windSource: { actorRef: { agentId: String(props.agent?.id ?? "") } },
-      anomalySource: { actorRef: { agentId: "" } },
+      anomalyEffect: defaultAgentEffectId("turbulence"),
+      elapsedSeconds: 0,
       count: 1,
       stunned: true,
     }
@@ -1064,6 +1170,7 @@ function newEvent(kind: string) {
 }
 
 function addEvent(kind: string) {
+  if (isWindAgent.value && ["disorder", "turbulence"].includes(kind)) return
   if (!canEditEventStructure.value) {
     return
   }
@@ -1167,16 +1274,22 @@ const eventWarnings = computed(() => {
   }
   if (isReleaseSettlement(event)) {
     if (!supportsRelease.value) warnings.push("当前角色暂不支持异放")
-    if (event.triggerActorRef?.agentId !== props.agent?.id) warnings.push("异放触发者必须是当前角色")
-    if (!event.triggerActorRef?.profileId) warnings.push("异放倍率方案未配置")
-    if (!event.anomalySource?.actorRef?.agentId) warnings.push("原异常施加者未配置")
+    if (isVelinaRelease.value) {
+      if (!event.releaseSource) warnings.push("异放来源未配置")
+      else if (!releaseProfiles.value.some((profile: any) => profile?.id === event.releaseSource)) warnings.push("异放来源不存在")
+      if (event.anomalyEffect !== "wind_corrosion") warnings.push("维琳娜异放原异常必须是风化")
+    } else {
+      if (event.triggerActorRef?.agentId !== props.agent?.id) warnings.push("异放触发者必须是当前角色")
+      if (!event.triggerActorRef?.profileId) warnings.push("异放倍率方案未配置")
+      if (!event.anomalySource?.actorRef?.agentId) warnings.push("原异常施加者未配置")
+    }
     if (releaseSnapshotError.value) warnings.push(releaseSnapshotError.value)
   }
   if (isLuminescenceSettlement(event)) {
     if (event.triggerActorRef?.agentId !== props.agent?.id) warnings.push("耀变触发者必须是当前角色")
     warnings.push(...resolveLuminescenceParameters(event).errors)
   }
-  if (event.kind === "anomaly" && event.settlementType !== "disorder" && !isLuminescenceSettlement(event)) {
+  if (event.kind === "anomaly" && !["disorder", "turbulence"].includes(event.settlementType) && !isLuminescenceSettlement(event)) {
     if (!event.anomalyEffect) {
       warnings.push("属性异常事件需要选择异常类型")
     } else if (!isKnownEffect("attribute", selectedAnomalyEffectId(event))) {
@@ -1184,10 +1297,10 @@ const eventWarnings = computed(() => {
     }
   }
   if (event.kind === "anomaly" && event.settlementType === "turbulence") {
-    if (event.anomalyEffect !== "wind_corrosion") warnings.push("乱流必须使用风化基底")
-    if (!event.secondaryAnomalyEffect) warnings.push("乱流需要选择第二异常")
-    if (!Number.isFinite(Number(event.secondaryAnomalyRemainingSeconds)) || Number(event.secondaryAnomalyRemainingSeconds) < 0) warnings.push("乱流第二异常剩余时间无效")
-    if (!event.anomalySource?.actorRef?.agentId) warnings.push("乱流第二异常来源未配置")
+    if (isWindAgent.value) warnings.push("风属性角色不能配置乱流事件")
+    const warning = turbulenceConfigurationWarning(event, props.meta)
+    if (warning) warnings.push(warning)
+    if (!Number.isFinite(Number(event.elapsedSeconds)) || Number(event.elapsedSeconds) < 0) warnings.push("乱流已流逝时间无效")
   }
   const disorderEffectId = selectedDisorderEffectId(event)
   if ((event.kind === "disorder" || event.settlementType === "disorder") && !disorderEffectId) {
@@ -1233,6 +1346,7 @@ function updateSkillRow(rowId: string) {
 
 function updateAnomalySettlementType(value: string) {
   releaseSnapshotError.value = ""
+  if (isWindAgent.value && ["disorder", "turbulence"].includes(value)) return
   if (value === "disorder") {
     const effectId = defaultAgentEffectId("disorder")
     const nextEvent = { ...selectedEvent.value, anomalyEffect: effectId, settlementType: "disorder" }
@@ -1244,26 +1358,47 @@ function updateAnomalySettlementType(value: string) {
       disorderType: selectedEvent.value?.disorderType ?? "normal",
       elapsedSeconds: normalizeElapsedSeconds(selectedEvent.value?.elapsedSeconds, Number.POSITIVE_INFINITY, disorderElapsedStep(nextEvent)),
       procCount: undefined,
+      releaseSource: undefined,
       triggerActorRef: undefined,
       anomalySource: undefined,
+      windSource: undefined,
+      secondaryAnomalyEffect: undefined,
+      secondAnomalyEffect: undefined,
+      secondaryAnomalyRemainingSeconds: undefined,
+      turbulenceEffect: undefined,
+      turbulenceVariant: undefined,
+      turbulenceMultiplierStatus: undefined,
     }, { clearLabel: true })
     return
   }
   if (value === "turbulence") {
+    if (selectedEvent.value?.settlementType === "turbulence") return
+    const anomalyEffect = defaultAgentEffectId("turbulence")
+    const nextEvent = { ...selectedEvent.value, anomalyEffect }
     updateSelectedEvent({
       ...luminescenceFieldsToClear(),
       kind: "anomaly",
       settlementType: "turbulence",
-      anomalyEffect: "wind_corrosion",
-      secondaryAnomalyEffect: selectedEvent.value?.secondaryAnomalyEffect ?? "burn",
-      secondaryAnomalyRemainingSeconds: Number(selectedEvent.value?.secondaryAnomalyRemainingSeconds ?? 10),
-      turbulenceVariant: selectedEvent.value?.turbulenceVariant ?? "normal",
-      windSource: { actorRef: { agentId: String(props.agent?.id ?? "") } },
-      anomalySource: selectedEvent.value?.anomalySource ?? { actorRef: { agentId: "" } },
+      anomalyEffect,
+      anomalyVariant: undefined,
+      elapsedSeconds: normalizeElapsedSeconds(
+        selectedEvent.value?.elapsedSeconds,
+        Number.POSITIVE_INFINITY,
+        turbulenceElapsedStep(nextEvent),
+      ),
       procCount: undefined,
+      releaseSource: undefined,
       triggerActorRef: undefined,
       disorderType: undefined,
-      elapsedSeconds: undefined,
+      previousAnomalyEffect: undefined,
+      windSource: undefined,
+      anomalySource: undefined,
+      secondaryAnomalyEffect: undefined,
+      secondAnomalyEffect: undefined,
+      secondaryAnomalyRemainingSeconds: undefined,
+      turbulenceEffect: undefined,
+      turbulenceVariant: undefined,
+      turbulenceMultiplierStatus: undefined,
     }, { clearLabel: true })
     return
   }
@@ -1274,6 +1409,7 @@ function updateAnomalySettlementType(value: string) {
       ...selectedEvent.value,
       settlementType: "release",
       anomalyEffect: defaultAgentEffectId("release"),
+      ...(isVelinaRelease.value ? { releaseSource: "broad_vortex" } : {}),
       triggerActorRef: { agentId: String(props.agent?.id ?? ""), profileId: String(profile?.id ?? "") },
       anomalySource: { actorRef: { agentId: String(props.agent?.id ?? "") } },
     }, props.agent)
@@ -1309,8 +1445,16 @@ function updateAnomalySettlementType(value: string) {
     elapsedSeconds: undefined,
     procCount: selectedEvent.value?.procCount ?? 1,
     anomalyVariant: selectedEvent.value?.anomalyVariant === "polarizedAssault" ? "polarizedAssault" : "normal",
+    releaseSource: undefined,
     triggerActorRef: undefined,
     anomalySource: undefined,
+    windSource: undefined,
+    secondaryAnomalyEffect: undefined,
+    secondAnomalyEffect: undefined,
+    secondaryAnomalyRemainingSeconds: undefined,
+    turbulenceEffect: undefined,
+    turbulenceVariant: undefined,
+    turbulenceMultiplierStatus: undefined,
   }, { clearLabel: true })
 }
 
@@ -1362,6 +1506,7 @@ function close() {
 }
 
 function save() {
+  if (turbulenceWarnings.value.length) return
   if (draft.value.mode === "adminDefault") {
     const fallback = defaultDamageConfig(props.agent, props.cinemaLevel ?? 0, props.potentialLevel ?? 0)
     const draftLuminescenceEvents = (draft.value.events ?? [])
@@ -1387,9 +1532,9 @@ function save() {
     return
   }
   normalizeDraftSkillSelections()
-  normalizeDraftElapsedSeconds()
   normalizeDraftStunned()
   normalizeDraftAnomalyEffects()
+  normalizeDraftElapsedSeconds()
   const normalizedDraft = isDamageModeAllowedForAgent(
     draft.value.mode,
     props.agent,
@@ -1465,7 +1610,7 @@ function save() {
               <NButton v-if="canUseSheerDamage" class="calculation-add-button" size="medium" @click="addEvent('sheer')">添加贯穿</NButton>
               <NButton v-if="canUseSharpDamage" class="calculation-add-button" size="medium" @click="addEvent('sharp')">添加锐化</NButton>
               <NButton class="calculation-add-button" size="medium" @click="addEvent('anomaly')">添加异常事件</NButton>
-              <NButton v-if="props.agent?.attribute === 'wind'" class="calculation-add-button" size="medium" @click="addEvent('turbulence')">添加乱流事件</NButton>
+              <NButton v-if="!isWindAgent" class="calculation-add-button" size="medium" @click="addEvent('turbulence')">添加乱流事件</NButton>
               <NButton v-if="hasSkillGroups" class="calculation-add-button" size="medium" @click="addEvent('skillGroup')">添加技能组</NButton>
             </div>
           </div>
@@ -1484,6 +1629,9 @@ function save() {
             </div>
           </div>
           <div class="panel-body section-band">
+            <div v-if="isWindAgent && ['anomaly', 'custom'].includes(draft.mode)" class="calculation-turbulence-note" data-testid="velina-turbulence-note">
+              {{ WIND_TURBULENCE_NOTICE }}
+            </div>
             <div
               v-if="selectedEvent?.kind === 'anomaly'"
               class="calculation-settlement-selector"
@@ -1615,7 +1763,7 @@ function save() {
                   />
                 </div>
               </div>
-              <div v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType !== 'disorder' && !isLuminescenceSettlement(selectedEvent)" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field>
+              <div v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType !== 'disorder' && selectedEvent?.settlementType !== 'turbulence' && !isLuminescenceSettlement(selectedEvent) && !(isReleaseSettlement(selectedEvent) && isVelinaRelease)" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field>
                 <span class="metric-title">{{ isReleaseSettlement(selectedEvent) ? '原异常' : '异常类型' }}</span>
                 <div class="metric-value">
                   <span v-if="isAdminDefaultMode || (isReleaseSettlement(selectedEvent) && releaseSourceLocked)" class="calculation-readonly-value">{{ selectedAnomalyEffectLabel(selectedEvent) }}</span>
@@ -1637,45 +1785,35 @@ function save() {
                 </div>
               </div>
               <div v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType === 'turbulence'" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field="turbulence-source">
-                <span class="metric-title">风化基底</span>
-                <div class="metric-value"><span class="calculation-readonly-value">{{ selectedAnomalyEffectLabel({ ...selectedEvent, anomalyEffect: 'wind_corrosion' }) }}</span></div>
-              </div>
-              <div v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType === 'turbulence'" class="metric calculation-editor-field calculation-editor-field-medium ui-field" data-layout-field="turbulence-secondary">
-                <span class="metric-title">第二异常</span>
+                <span class="metric-title">原异常</span>
                 <div class="metric-value">
-                  <NSelect
-                    v-if="!isAdminDefaultMode"
-                    :value="selectedEvent?.secondaryAnomalyEffect ?? 'burn'"
-                    :options="anomalyOptions"
-                    aria-label="乱流第二异常"
-                    @update:value="updateSelectedEvent({ secondaryAnomalyEffect: $event })"
-                  />
-                  <span v-else class="calculation-readonly-value">{{ anomalyEffectLabel(selectedEvent?.secondaryAnomalyEffect ?? 'burn', props.meta) }}</span>
+                  <span v-if="isAdminDefaultMode" class="calculation-readonly-value">{{ selectedTurbulenceEffectLabel(selectedEvent) }}</span>
+                  <NSelect v-else :value="selectedTurbulenceEffectValue(selectedEvent)" :options="turbulenceOptionsFor(selectedEvent)" aria-label="乱流原异常" @update:value="updateTurbulenceEffect(String($event))" />
                 </div>
               </div>
-              <div v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType === 'turbulence'" class="metric calculation-editor-field calculation-editor-field-short ui-field" data-layout-field="turbulence-remaining-seconds">
-                <span class="metric-title">剩余时间</span>
+              <div v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType === 'turbulence'" class="metric calculation-editor-field calculation-editor-field-short ui-field" data-layout-field="turbulence-elapsed-seconds">
+                <span class="metric-title">已流逝时间</span>
                 <div class="metric-value">
-                  <NInputNumber v-if="!isAdminDefaultMode" :value="Number(selectedEvent?.secondaryAnomalyRemainingSeconds ?? 10)" :min="0" :step="0.5" aria-label="乱流第二异常剩余时间" @update:value="updateSelectedEvent({ secondaryAnomalyRemainingSeconds: Number($event ?? 0) })" />
-                  <span v-else class="calculation-readonly-value">{{ Number(selectedEvent?.secondaryAnomalyRemainingSeconds ?? 10) }} 秒</span>
+                  <NInputNumber v-if="!isAdminDefaultMode" :value="Number(selectedEvent?.elapsedSeconds ?? 0)" :min="0" :step="turbulenceElapsedStep(selectedEvent)" :precision="turbulenceElapsedPrecision(selectedEvent)" aria-label="乱流已流逝时间" @update:value="updateSelectedEvent({ elapsedSeconds: normalizeElapsedSeconds($event, Number.POSITIVE_INFINITY, turbulenceElapsedStep(selectedEvent)) })" />
+                  <span v-else class="calculation-readonly-value">{{ Number(selectedEvent?.elapsedSeconds ?? 0) }} 秒</span>
                 </div>
               </div>
-              <div v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType === 'turbulence'" class="metric calculation-editor-field calculation-editor-field-medium ui-field" data-layout-field="turbulence-variant">
-                <span class="metric-title">倍率状态</span>
-                <div class="metric-value">
-                  <NSelect v-if="!isAdminDefaultMode" :value="selectedEvent?.turbulenceVariant ?? 'normal'" :options="[{ label: '普通乱流', value: 'normal' }, { label: '特殊乱流', value: 'polarized' }]" aria-label="乱流倍率状态" @update:value="updateSelectedEvent({ turbulenceVariant: $event })" />
-                  <span v-else class="calculation-readonly-value">{{ selectedEvent?.turbulenceVariant === 'polarized' ? '特殊乱流' : '普通乱流' }}</span>
-                </div>
+              <div v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType === 'turbulence'" class="metric calculation-editor-field calculation-editor-field-medium ui-field" data-layout-field="turbulence-multiplier">
+                <span class="metric-title">当前乱流倍率</span>
+                <div class="metric-value"><span class="calculation-readonly-value">{{ turbulencePreviewText(selectedEvent) }}</span></div>
               </div>
-              <div v-if="selectedEvent?.kind === 'anomaly' && selectedEvent?.settlementType === 'turbulence'" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field="turbulence-source-agent">
-                <span class="metric-title">第二异常来源角色 ID</span>
-                <div class="metric-value"><NInput v-if="!isAdminDefaultMode" :value="selectedEvent?.anomalySource?.actorRef?.agentId ?? ''" aria-label="第二异常来源角色 ID" @update:value="updateSelectedEvent({ anomalySource: { actorRef: { agentId: String($event) } } })" /><span v-else class="calculation-readonly-value">{{ selectedEvent?.anomalySource?.actorRef?.agentId || '未配置' }}</span></div>
-              </div>
-              <div v-if="isReleaseSettlement(selectedEvent)" class="metric calculation-editor-field calculation-editor-field-medium ui-field" data-layout-field="release-trigger">
+              <div v-if="isReleaseSettlement(selectedEvent) && !isVelinaRelease" class="metric calculation-editor-field calculation-editor-field-medium ui-field" data-layout-field="release-trigger">
                 <span class="metric-title">异放触发者</span>
                 <div class="metric-value"><span class="calculation-readonly-value">{{ labelOf(agent) }}</span></div>
               </div>
-              <div v-if="isReleaseSettlement(selectedEvent)" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field="release-source">
+              <div v-if="isReleaseSettlement(selectedEvent) && isVelinaRelease" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field="velina-release-source">
+                <span class="metric-title">异放来源</span>
+                <div class="metric-value">
+                  <span v-if="isAdminDefaultMode" class="calculation-readonly-value">{{ optionLabel(velinaReleaseSourceOptions, selectedEvent?.releaseSource ?? 'broad_vortex') }}</span>
+                  <NSelect v-else :value="selectedEvent?.releaseSource ?? 'broad_vortex'" :options="velinaReleaseSourceOptions" aria-label="异放来源" @update:value="updateSelectedEvent({ releaseSource: String($event), anomalyEffect: 'wind_corrosion' }, { clearLabel: true })" />
+                </div>
+              </div>
+              <div v-if="isReleaseSettlement(selectedEvent) && !isVelinaRelease" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field="release-source">
                 <span class="metric-title">原异常施加者</span>
                 <div class="metric-value">
                   <span v-if="isAdminDefaultMode || releaseSourceLocked" class="calculation-readonly-value release-source-readonly">
@@ -1685,7 +1823,7 @@ function save() {
                   <NSelect v-else :value="selectedEvent?.anomalySource?.actorRef?.agentId" :options="releaseSourceOptions" filterable aria-label="原异常施加者" @update:value="updateReleaseSourceAgent(String($event))" />
                 </div>
               </div>
-              <div v-if="isReleaseSettlement(selectedEvent) && !releaseSourceLocked" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field="release-snapshot">
+              <div v-if="isReleaseSettlement(selectedEvent) && !isVelinaRelease && !releaseSourceLocked" class="metric calculation-editor-field calculation-editor-field-wide ui-field ui-field--wide" data-layout-field="release-snapshot">
                 <span class="metric-title">来源快照</span>
                 <div class="metric-value release-snapshot-value">
                   <span class="calculation-readonly-value">{{ releaseSnapshotTime(selectedEvent?.anomalySource?.snapshot) }}</span>
@@ -1793,6 +1931,27 @@ function save() {
               </div>
             </section>
             <section
+              v-if="selectedTurbulenceBreakdown"
+              class="disorder-explanation turbulence-explanation"
+              aria-labelledby="turbulence-explanation-title"
+            >
+              <div class="disorder-explanation-head">
+                <Info :size="19" aria-hidden="true" />
+                <div>
+                  <strong id="turbulence-explanation-title">乱流倍率说明</strong>
+                  <p>乱流结算所选原异常，伤害使用当前非风属性角色的面板；风属性代理人面板不参与该事件的计算。</p>
+                  <p>当前按每 {{ formatDisorderSeconds(selectedTurbulenceBreakdown.tickIntervalSeconds) }} 秒结算一段，已流逝时间会按该间隔就近取整。</p>
+                </div>
+              </div>
+              <div class="disorder-explanation-formula" aria-label="乱流倍率推导">
+                <p><span>剩余时间 T</span><strong>{{ formatDisorderSeconds(selectedTurbulenceBreakdown.duration) }} - {{ formatDisorderSeconds(selectedTurbulenceBreakdown.elapsed) }} = {{ formatDisorderSeconds(selectedTurbulenceBreakdown.remaining) }} 秒</strong></p>
+                <p><span>可结算段数</span><strong>{{ disorderTickFormula(selectedTurbulenceBreakdown) }}</strong></p>
+                <p><span>基础乱流倍率</span><strong>{{ formatDisorderMultiplier(selectedTurbulenceBreakdown.fixedMultiplier) }} + {{ selectedTurbulenceBreakdown.tickCount }} × {{ formatDisorderMultiplier(selectedTurbulenceBreakdown.tickMultiplier) }} = {{ formatDisorderMultiplier(selectedTurbulenceBreakdown.baseMultiplier) }}</strong></p>
+                <p><span>当前倍率</span><strong>({{ formatDisorderMultiplier(selectedTurbulenceBreakdown.baseMultiplier) }}{{ selectedTurbulenceBreakdown.baseMultiplierBonus ? ` + ${formatDisorderMultiplier(selectedTurbulenceBreakdown.baseMultiplierBonus)}` : "" }}) × {{ formatDisorderMultiplier(selectedTurbulenceBreakdown.damageScale) }} = {{ formatDisorderMultiplier(selectedTurbulenceBreakdown.currentMultiplier) }}</strong></p>
+              </div>
+              <div class="disorder-explanation-notes"><p>最终伤害使用“异常增伤区 + 乱流增伤区”，并保留异常暴击区与异常爆伤区。</p></div>
+            </section>
+            <section
               v-if="selectedReleaseBreakdown"
               class="disorder-explanation release-explanation"
               aria-labelledby="release-explanation-title"
@@ -1801,7 +1960,8 @@ function save() {
                 <Info :size="19" aria-hidden="true" />
                 <div>
                   <strong id="release-explanation-title">异放倍率说明</strong>
-                  <p>{{ selectedReleaseBreakdown.sourceLabel }}提供原异常单次倍率与伤害快照，{{ selectedReleaseBreakdown.triggerLabel }}提供角色专属异放倍率。</p>
+                  <p v-if="isVelinaRelease">使用维琳娜当前面板结算风属性异放，倍率由所选异放来源决定。</p>
+                  <p v-else>{{ selectedReleaseBreakdown.sourceLabel }}提供原异常单次倍率与伤害快照，{{ selectedReleaseBreakdown.triggerLabel }}提供角色专属异放倍率。</p>
                   <p v-if="releaseSourceLocked">{{ ARIA_RELEASE_CORE_DESCRIPTION }}</p>
                 </div>
               </div>
@@ -1855,9 +2015,10 @@ function save() {
 
     <template #footer>
       <div class="drawer-footer calculation-modal-footer">
+        <span v-if="turbulenceWarnings.length" role="alert">{{ turbulenceWarnings.join(" ") }}</span>
         <span class="muted">事件 {{ draft.events?.length ?? 0 }} 项</span>
         <NButton @click="close">取消</NButton>
-        <NButton type="primary" :disabled="isLuminescenceSettlement(selectedEvent) && eventWarnings.length > 0" @click="save">保存配置</NButton>
+        <NButton type="primary" :disabled="turbulenceWarnings.length > 0 || (isLuminescenceSettlement(selectedEvent) && eventWarnings.length > 0)" @click="save">保存配置</NButton>
       </div>
     </template>
   </NModal>
@@ -1941,6 +2102,16 @@ function save() {
   padding: 12px 14px;
   border-left: 3px solid var(--app-blue);
   background: #f8fafc;
+}
+
+.calculation-turbulence-note {
+  padding: 10px 12px;
+  border: 1px solid #f1c27d;
+  border-radius: var(--app-radius-sm);
+  background: #fff8eb;
+  color: #7a4b00;
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .calculation-settlement-label {

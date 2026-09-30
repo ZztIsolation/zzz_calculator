@@ -38,10 +38,12 @@ const catalog = {
     { id: "aria", name: { zhCN: "爱芮" } },
     { id: "sigrid", name: { zhCN: "希格莉德·德拉叙尔" } },
     { id: "pyrois", name: { zhCN: "佩洛伊斯" } },
+    { id: "velina", name: { zhCN: "维琳娜·艾嘉德" } },
   ],
   displayWEngines: [
     { id: "hailfall_star_palace", name: { zhCN: "霰落星殿" } },
     { id: "zzz_wiki_2162", name: { zhCN: "骁骑礼赞" } },
+    { id: "zzz_wiki_2030", name: { zhCN: "琳琅鎏心" } },
   ],
   displayDriveDiscSets: [{ id: knownEquipment.setId, name: { zhCN: knownEquipment.setName } }],
 }
@@ -153,6 +155,77 @@ assert.equal(mappedPyrois.mappedAgents.length, 1)
 assert.equal(mappedPyrois.mappedAgents[0].agentId, "pyrois")
 assert.equal(mappedPyrois.mappedAgents[0].agentName, "佩洛伊斯")
 assert.equal(mappedPyrois.skippedAgents.length, 0)
+// Enka API-docs dc86b5d: avatar 1561 (Velina), signature WeaponId 14156.
+const mappedVelina = mapShowcaseToCatalog(
+  parseEnkaShowcase({
+    PlayerInfo: {
+      ShowcaseDetail: {
+        AvatarList: [makeAvatar(1561, {
+          TalentLevel: 6,
+          CoreSkillEnhancement: 6,
+          SkillLevelList: makeSkillList(12),
+          Weapon: { Id: 14156, Level: 60, UpgradeLevel: 1 },
+          EquippedList: [makeRawDisc({ slot: 5, uid: "71561", propertyId: "32303" })],
+        })],
+      },
+    },
+  }),
+  catalog,
+  mapping,
+  { uid: "1302309616" },
+)
+assert.equal(mappedVelina.mappedAgents.length, 1)
+assert.deepEqual(mappedVelina.skippedAgents, [])
+assert.deepEqual(mappedVelina.warnings, [])
+assert.equal(mappedVelina.mappedAgents[0].agentId, "velina")
+assert.equal(mappedVelina.mappedAgents[0].agentName, "维琳娜·艾嘉德")
+const emptyVelinaSelection = {
+  version: 2,
+  currentOwnerId: "default",
+  byOwner: { default: { currentAgentId: "", byAgent: {} } },
+}
+const velinaImportPlan = buildEnkaImportPlan({
+  uid: "1302309616",
+  mappedAgents: [{ ...mappedVelina.mappedAgents[0], sourceUid: "1302309616" }],
+  store: createEmptyInventoryStore(),
+  ownerId: "default",
+  buildSelection: emptyVelinaSelection,
+  legacySelection: structuredClone(emptyVelinaSelection),
+  now: new Date("2026-09-30T00:00:00.000Z"),
+  transactionId: "tx-velina-official-mapping",
+})
+assert.equal(velinaImportPlan.hasBlockingErrors, false)
+const importedVelinaBuild = velinaImportPlan.nextBuildSelection.byOwner.default.byAgent.velina
+assert.deepEqual(
+  {
+    agentLevel: importedVelinaBuild.agentLevel,
+    cinemaLevel: importedVelinaBuild.cinemaLevel,
+    coreSkillLevel: importedVelinaBuild.coreSkillLevel,
+    skillLevels: importedVelinaBuild.skillLevels,
+    damageSkillLevels: importedVelinaBuild.damage.skillLevelsByCategory,
+    wEngineId: importedVelinaBuild.wEngineId,
+    wEngineLevel: importedVelinaBuild.wEngineLevel,
+    wEngineModificationLevel: importedVelinaBuild.wEngineModificationLevel,
+  },
+  {
+    agentLevel: 60,
+    cinemaLevel: 6,
+    coreSkillLevel: "F",
+    skillLevels: { basic: 16, special: 16, dodge: 16, chain: 16, assist: 16 },
+    damageSkillLevels: { basic: 16, special: 16, dodge: 16, chain: 16, assist: 16 },
+    wEngineId: "zzz_wiki_2030",
+    wEngineLevel: 60,
+    wEngineModificationLevel: 1,
+  },
+)
+assert.equal(velinaImportPlan.nextStore.driveDiscs.length, 1)
+assert.equal(velinaImportPlan.nextStore.driveDiscs[0].equippedBy, "velina")
+assert.equal(velinaImportPlan.nextStore.driveDiscs[0].mainStat.stat, "windDmg")
+assert.equal(velinaImportPlan.nextStore.driveDiscs[0].mainStat.value, 30)
+assert.equal(
+  velinaImportPlan.nextStore.driveDiscLoadouts[0].driveDiscIdsBySlot[5],
+  "enka-zzz:1302309616:71561",
+)
 const mappedSigrid = mapShowcaseToCatalog(
   parseEnkaShowcase({
     PlayerInfo: {

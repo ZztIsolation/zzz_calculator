@@ -14,7 +14,7 @@ import {
     ELEMENT_DEF_IGNORE_STATS,
     ELEMENT_SHARP_DMG_STATS,
 } from "./effectRuleTargets.js"
-import { validateAnomalyReleaseProfile } from "./anomalyRelease.js"
+import { validateAnomalyReleaseProfile, VELINA_RELEASE_SOURCES } from "./anomalyRelease.js"
 import { damageSkillRowsWithGeneratedTotals } from "./skillMultiplierCandidates.js"
 import {
     IN_COMBAT_FORMULA_SOURCE_STATS,
@@ -90,6 +90,58 @@ export function applySystemManagedMaintenanceFields(value) {
     return value
 }
 
+/**
+ * Synchronize stored compatibility values for rules whose actual value is
+ * resolved from a scaling table at runtime. The first row is the legacy
+ * fallback used by older consumers; malformed scaling data is deliberately
+ * left untouched so the normal validator can report it.
+ */
+export function repairDynamicValueSourceFallbacks(agent, repairs = []) {
+    if (!agent || typeof agent !== "object" || Array.isArray(agent)) {
+        return repairs
+    }
+
+    const coreLevels = agent.coreSkill?.corePassiveScaling?.levels
+    const potentialLevels = agent.potentialVision?.scaling?.levels
+    const visit = (effectSet, basePath) => {
+        const effects = Array.isArray(effectSet?.effects) ? effectSet.effects : []
+        effects.forEach((rule, index) => {
+            const source = rule?.valueSource
+            if (!source || typeof source !== "object") return
+            const levels = source.kind === "corePassiveScaling"
+                ? coreLevels
+                : source.kind === "potentialVisionScaling"
+                    ? potentialLevels
+                    : null
+            if (!Array.isArray(levels) || !levels.length) return
+            const field = String(source.field ?? "").trim()
+            const firstValue = Number(levels[0]?.[field])
+            if (!field || !Number.isFinite(firstValue)) return
+            const currentValue = Number(rule.value)
+            if (Number.isFinite(currentValue) && Math.abs(currentValue - firstValue) <= 1e-9) return
+            const path = `${basePath}.effects[${index}].value`
+            repairs.push({
+                path,
+                sourceKind: source.kind,
+                field,
+                from: rule.value,
+                to: firstValue,
+            })
+            rule.value = firstValue
+        })
+    }
+
+    visit(agent.combatBuffs?.corePassive, "combatBuffs.corePassive")
+    visit(agent.combatBuffs?.additionalAbility, "combatBuffs.additionalAbility")
+    ;(agent.combatBuffs?.skillBuffs ?? []).forEach((buff, index) => {
+        visit(buff, `combatBuffs.skillBuffs[${index}]`)
+    })
+    ;(agent.combatBuffs?.cinemaBuffs ?? []).forEach((buff, index) => {
+        visit(buff, `combatBuffs.cinemaBuffs[${index}]`)
+    })
+    return repairs
+}
+
 export const FIELD_BUFF_MODE_OPTIONS = Object.freeze([
     {
         modeId: "defense_v5",
@@ -157,7 +209,7 @@ const IMPLICIT_EFFECT_SCOPE_BY_SOURCE_TYPE = new Map([
 ])
 const EFFECT_TYPE_VALUES = new Set(["fixed", "derived", "formula", "stacked", "damageModifier"])
 const EFFECT_VALUE_SOURCE_KIND_VALUES = new Set(["corePassiveScaling", "potentialVisionScaling"])
-const FORMULA_SOURCE_KIND_VALUES = new Set(["runtime", "inCombatStat"])
+const FORMULA_SOURCE_KIND_VALUES = new Set(["runtime", "inCombatStat", "outOfCombatStat"])
 const BUFF_MODIFIER_OPERATION_VALUES = new Set(["multiplyResolvedValue"])
 const FORMULA_VALUE_UNIT_VALUES = new Set(["storedValue", "storedPercent"])
 const OUT_OF_COMBAT_EFFECT_SOURCE_KIND_VALUES = new Set(["outOfCombatStat"])
@@ -254,7 +306,7 @@ const ANOMALY_TARGET_STAT_VALUES = new Set([
     "stunDmgMultiplierBonusCapAlways",
     ...ELEMENT_DEF_IGNORE_STATS,
 ])
-const ANOMALY_EFFECT_VALUES = new Set(["assault", "shatter", "burn", "shock", "corruption", "frozen", "flinch", "wind_corrosion", "turbulence"])
+const ANOMALY_EFFECT_VALUES = new Set(["assault", "shatter", "burn", "shock", "corruption", "frozen", "frost_frozen", "flinch", "wind_corrosion", "turbulence"])
 const ANOMALY_MAINTENANCE_TYPE_VALUES = new Set(["anomaly", "disorder", "turbulence"])
 const STAT_VALUES = new Set([
     "atkFlat",
@@ -858,6 +910,7 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
         const sourceKind = source.kind ?? "runtime"
         requireEnum(errors, sourceKind, FORMULA_SOURCE_KIND_VALUES, `${path}.source.kind`)
         const readsInCombatPanel = sourceKind === "inCombatStat"
+        const readsOutOfCombatPanel = sourceKind === "outOfCombatStat"
         if (readsInCombatPanel) {
             if (!isAllowedInCombatFormulaSourceType(sourceType)) {
                 add(errors, `${path}.source.kind`, "局内面板公式首版只能由角色自身或当前装备的音擎提供。")
@@ -879,6 +932,18 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
             if ((rule.mode ?? "flat") !== "flat") {
                 add(errors, `${path}.mode`, "局内面板公式必须使用直接加成方式。")
             }
+        } else if (readsOutOfCombatPanel) {
+            if (effectiveScope !== "inCombat") {
+                add(errors, `${path}.source.kind`, "局外面板来源公式只能用于局内 Buff。")
+            }
+            if (!OUT_OF_COMBAT_REQUIREMENT_STAT_VALUES.has(String(source.stat ?? ""))) {
+                add(errors, `${path}.source.stat`, "不是允许的局外来源属性。")
+            }
+            requireName(errors, source.label, `${path}.source.label`)
+            requireEnum(errors, source.unit, FORMULA_VALUE_UNIT_VALUES, `${path}.source.unit`)
+            if (targetKind !== "default") {
+                add(errors, `${path}.target.kind`, "局外面板公式只能作用于常规属性 / 全局效果。")
+            }
         } else {
             requireName(errors, source.label ?? rule.sourceLabel, `${path}.source.label`)
         }
@@ -887,8 +952,8 @@ function validateEffectRule(errors, rule = {}, path, sourceType = "manual", scop
             add(errors, `${path}.source.variable`, "首版公式只支持变量 x。")
         }
 
-        const defaultValue = readsInCombatPanel
-            ? 100
+        const defaultValue = readsInCombatPanel || readsOutOfCombatPanel
+            ? 0
             : requireFinite(errors, source.defaultValue, `${path}.source.defaultValue`)
         const min = source.min !== undefined && source.min !== null && source.min !== ""
             ? requireFinite(errors, source.min, `${path}.source.min`)
@@ -1287,15 +1352,16 @@ function validatePreferredDriveDiscs(errors, preferredDriveDiscs, context = {}) 
             add(errors, "preferredDriveDiscs.defaultSetId", "驱动盘套装不存在。")
         }
     }
-    if (preferredDriveDiscs.defaultSetIds !== undefined) {
-        if (!Array.isArray(preferredDriveDiscs.defaultSetIds)) {
-            add(errors, "preferredDriveDiscs.defaultSetIds", "推荐驱动盘套装必须是数组。")
+    for (const field of ["defaultSetIds", "defaultTwoPieceSetIds"]) {
+        if (preferredDriveDiscs[field] === undefined) continue
+        if (!Array.isArray(preferredDriveDiscs[field])) {
+            add(errors, `preferredDriveDiscs.${field}`, "推荐驱动盘套装必须是数组。")
         } else {
             const driveDiscSets = Array.isArray(context.driveDiscSets) ? context.driveDiscSets : []
-            preferredDriveDiscs.defaultSetIds.forEach((setId, index) => {
-                validateOptionalId(errors, { id: setId }, `preferredDriveDiscs.defaultSetIds[${index}]`)
+            preferredDriveDiscs[field].forEach((setId, index) => {
+                validateOptionalId(errors, { id: setId }, `preferredDriveDiscs.${field}[${index}]`)
                 if (driveDiscSets.length && !driveDiscSets.some(set => set?.id === setId)) {
-                    add(errors, `preferredDriveDiscs.defaultSetIds[${index}]`, "驱动盘套装不存在。")
+                    add(errors, `preferredDriveDiscs.${field}[${index}]`, "驱动盘套装不存在。")
                 }
             })
         }
@@ -1377,7 +1443,7 @@ function calculationAnomalyIds(context = {}, maintenanceType) {
     const defaults = settlementType === "disorder"
         ? ["burn", "shock", "corruption", "frozen", "flinch"]
         : settlementType === "turbulence"
-            ? ["turbulence", "assault", "shatter", "burn", "shock", "corruption", "frozen", "flinch"]
+            ? ["assault", "shatter", "burn", "shock", "corruption", "frost_frozen"]
             : ["assault", "shatter", "burn", "shock", "corruption"]
     return new Set([...defaults, ...fromUnified, ...fromContext])
 }
@@ -1632,45 +1698,61 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
         return
     }
     if (settlementType === "turbulence") {
-        const turbulenceEffectId = String(event.turbulenceEffect ?? event.anomalyEffect ?? "turbulence")
-        if (!calculationAnomalyIds(context, "turbulence").has(turbulenceEffectId)
-            && !calculationAnomalyIds(context, "turbulence").has("turbulence")) {
-            add(errors, `${path}.anomalyEffect`, "乱流倍率目录不存在。")
+        const currentAgent = context.currentAgent?.id === agentId
+            ? context.currentAgent
+            : (context.agents ?? []).find(item => item?.id === agentId)
+        if (currentAgent?.attribute === "wind") {
+            add(errors, path, "风属性角色不能配置乱流事件。")
         }
-        const secondaryId = String(
-            event.secondaryAnomalyEffect
-                ?? event.secondAnomalyEffect
-                ?? event.previousAnomalyEffect
-                ?? event.turbulenceSource?.anomalyEffect
-                ?? event.anomalySource?.anomalyEffect
-                ?? "",
-        )
-        const secondaryIds = new Set([
-            ...calculationAnomalyIds(context, "anomaly"),
-            ...calculationAnomalyIds(context, "disorder"),
-        ])
-        if (!secondaryId || !secondaryIds.has(secondaryId)) {
-            add(errors, `${path}.secondaryAnomalyEffect`, "乱流必须选择已登记的第二异常。")
+        const baseId = String(event.anomalyEffect ?? "").trim()
+        if (!baseId || baseId === "wind_corrosion" || !calculationAnomalyIds(context, "turbulence").has(baseId)) {
+            add(errors, `${path}.anomalyEffect`, "乱流必须选择已登记的非风属性异常基底。")
         }
-        const secondaryElement = event.secondaryElement ?? event.turbulenceSource?.element
-        if (secondaryElement !== undefined && secondaryElement !== "") {
-            requireEnum(errors, secondaryElement, DAMAGE_ELEMENT_VALUES, `${path}.secondaryElement`)
+        for (const legacyField of [
+            "windSource",
+            "anomalySource",
+            "secondaryAnomalyEffect",
+            "secondAnomalyEffect",
+            "secondaryAnomalyRemainingSeconds",
+            "turbulenceEffect",
+            "turbulenceVariant",
+            "turbulenceMultiplierStatus",
+        ]) {
+            if (event[legacyField] !== undefined) {
+                add(errors, `${path}.${legacyField}`, "乱流事件不得保存旧双来源字段。")
+            }
         }
-        const windActorId = String(event.windSource?.actorRef?.agentId ?? event.triggerActorRef?.agentId ?? agentId ?? "")
-        const windSnapshot = event.windSource?.snapshot
-        if (windActorId && windActorId !== String(agentId ?? "")
-            && (!windSnapshot || typeof windSnapshot !== "object" || String(windSnapshot.agentId ?? "") !== windActorId)) {
-            add(errors, `${path}.windSource.snapshot`, "外部风化来源必须提供匹配的冻结快照。")
-        }
-        const anomalyActorId = String(event.anomalySource?.actorRef?.agentId ?? event.secondaryAnomalySource?.actorRef?.agentId ?? "")
-        const anomalySnapshot = event.anomalySource?.snapshot ?? event.secondaryAnomalySource?.snapshot
-        if (anomalyActorId && anomalyActorId !== String(agentId ?? "")
-            && (!anomalySnapshot || typeof anomalySnapshot !== "object" || String(anomalySnapshot.agentId ?? "") !== anomalyActorId)) {
-            add(errors, `${path}.anomalySource.snapshot`, "外部第二异常来源必须提供匹配的冻结快照。")
-        }
+        validateNonNegativeNumber(errors, event.elapsedSeconds ?? 0, `${path}.elapsedSeconds`, "已流逝秒数")
         return
     }
     if (settlementType === "release") {
+        const currentAgent = context.currentAgent?.id === agentId
+            ? context.currentAgent
+            : (context.agents ?? []).find(item => item?.id === agentId)
+        if (currentAgent?.id === "velina") {
+            if (event.anomalyEffect !== "wind_corrosion") {
+                add(errors, `${path}.anomalyEffect`, "维琳娜异放的原异常必须是风化。")
+            }
+            if (event.procCount !== undefined) {
+                add(errors, `${path}.procCount`, "异放不保存普通异常触发次数。")
+            }
+            if (event.anomalyVariant !== undefined) {
+                add(errors, `${path}.anomalyVariant`, "异放不能保存为异常形态。")
+            }
+            const releaseSource = String(event.releaseSource ?? event.triggerActorRef?.profileId ?? "")
+            if (!releaseSource) {
+                add(errors, `${path}.releaseSource`, "必须选择异放来源。")
+            } else if (!VELINA_RELEASE_SOURCES.some(source => source.value === releaseSource)
+                || !currentAgent.anomalyReleaseProfiles?.some(profile => profile?.id === releaseSource)) {
+                add(errors, `${path}.releaseSource`, "异放来源不存在。")
+            }
+            for (const legacyField of ["triggerActorRef", "anomalySource"]) {
+                if (event[legacyField] !== undefined) {
+                    add(errors, `${path}.${legacyField}`, "维琳娜异放不得保存旧触发者或来源字段。")
+                }
+            }
+            return
+        }
         if (!calculationAnomalyIds(context, "anomaly").has(event.anomalyEffect)) {
             add(errors, `${path}.anomalyEffect`, "原异常不存在。")
         }
@@ -1743,8 +1825,17 @@ function validateCalculationEvent(errors, event, path, context = {}, agentId = "
         return
     }
     const disorderEffectId = event.anomalyEffect ?? event.previousAnomalyEffect
+    const currentAgent = context.currentAgent?.id === agentId
+        ? context.currentAgent
+        : (context.agents ?? []).find(item => item?.id === agentId)
+    if (currentAgent?.attribute === "wind") {
+        add(errors, path, "风属性角色不能配置紊乱事件。")
+    }
     if (!calculationAnomalyIds(context, "disorder").has(disorderEffectId)) {
         add(errors, event.anomalyEffect === undefined ? `${path}.previousAnomalyEffect` : `${path}.anomalyEffect`, "紊乱类型不存在。")
+    }
+    if (disorderEffectId === "wind_corrosion") {
+        add(errors, `${path}.anomalyEffect`, "紊乱事件不支持风化。")
     }
     if (event.disorderType !== undefined) {
         requireEnum(errors, event.disorderType, DISORDER_TYPE_VALUES, `${path}.disorderType`)
@@ -2542,6 +2633,8 @@ function validateAnomalyMaintenanceItem(item, context) {
     const errors = []
     const maintenanceType = item?.settlementType === "disorder" || item?.maintenanceType === "disorder"
         ? "disorder"
+        : item?.settlementType === "turbulence" || item?.maintenanceType === "turbulence"
+            ? "turbulence"
         : "anomaly"
     requireEnum(errors, maintenanceType, ANOMALY_MAINTENANCE_TYPE_VALUES, "maintenanceType")
     if (item?.settlementType !== undefined) {
@@ -2550,8 +2643,11 @@ function validateAnomalyMaintenanceItem(item, context) {
     requireId(errors, item)
     requireName(errors, item?.label, "label.zhCN")
     requireEnum(errors, item?.element, DAMAGE_ELEMENT_VALUES, "element")
+    if ((item?.settlementType === "turbulence" || item?.maintenanceType === "turbulence") && item?.element === "wind") {
+        add(errors, "element", "乱流结算属性不能是风。")
+    }
 
-    if (maintenanceType === "disorder") {
+    if (maintenanceType === "disorder" || maintenanceType === "turbulence") {
         for (const stat of ["fixedMultiplier", "tickMultiplier", "tickIntervalSeconds", "defaultDurationSeconds"]) {
             const value = requireFinite(errors, item?.[stat], stat)
             if (Number.isFinite(value)) {
@@ -2560,6 +2656,12 @@ function validateAnomalyMaintenanceItem(item, context) {
                 } else if (stat !== "tickIntervalSeconds" && value < 0) {
                     add(errors, stat, "不能小于 0。")
                 }
+            }
+        }
+        if (maintenanceType === "turbulence") {
+            const sourceAnomalyEffect = String(item?.sourceAnomalyEffect ?? item?.id ?? "").trim()
+            if (!sourceAnomalyEffect || sourceAnomalyEffect === "wind_corrosion" || sourceAnomalyEffect === "turbulence") {
+                add(errors, "sourceAnomalyEffect", "乱流必须关联非风属性异常基底。")
             }
         }
     } else {

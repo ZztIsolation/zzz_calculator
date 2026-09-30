@@ -8,6 +8,8 @@ import {
     skillLevelScale,
     skillRowValue,
 } from "./skillMultiplierCandidates.js"
+import { isTurbulenceSettlement, isWindAgent, isLegacyTurbulenceEvent } from "./anomalySettlement.js"
+export { isTurbulenceSettlement } from "./anomalySettlement.js"
 import { expandCalculationConfigSkillGroups } from "./calculationSkillGroups.js"
 import { skillMultiplierTargetId, skillTagsForMove, skillTargetMatches, skillTypeForMove } from "./skillTargets.js"
 import {
@@ -15,6 +17,7 @@ import {
     disorderMultiplierScale,
     normalizeDamageScale,
     normalizeElapsedSeconds,
+    turbulenceBaseMultiplier,
 } from "./damageEventMultipliers.js"
 import {
     defenseWhiteBoxRow,
@@ -57,9 +60,12 @@ import {
     evaluateAnomalyReleaseProfileInterval,
     evaluateReleaseExpression,
     evaluateReleaseExpressionInterval,
+    isVelinaReleaseAgent,
     isReleaseSettlement,
     normalizeAnomalySourceSnapshot,
     releaseFormulaStatDependencies,
+    velinaReleaseSourceId,
+    VELINA_RELEASE_SOURCES,
 } from "./anomalyRelease.js"
 import {
     evaluateLuminescence,
@@ -72,11 +78,14 @@ import {
     runtimeParameterRequirementMatches,
 } from "./shared-combat.js"
 import {
+    compileInitialEnergyFormula,
     evaluateInCombatFormulaRule,
     formulaParameterValues,
+    formulaSourceValue,
     isAllowedInCombatFormulaSourceStat,
     isAllowedInCombatFormulaSourceType,
     isInCombatFormulaRule,
+    isOutOfCombatFormulaRule,
     materializeFormulaRuleForModificationLevel,
     migrateLegacyBloodMarrowWEngine,
 } from "./effectFormula.js"
@@ -1283,7 +1292,13 @@ function resolveEffectRule(rule, effect, runtimeInput = {}, modifierContext = {}
     if (type === "formula") {
         const source = rule.source ?? {}
         const variable = source.variable ?? "x"
-        const inputSourceValue = Number(runtime.sourceValue ?? source.defaultValue ?? rule.defaultSourceValue ?? 0)
+        const readsOutOfCombatPanel = source.kind === "outOfCombatStat"
+        const panelSource = readsOutOfCombatPanel
+            ? formulaSourceValue(rule, modifierContext.outOfCombat?.panel)
+            : null
+        const inputSourceValue = readsOutOfCombatPanel
+            ? panelSource.sourceValue
+            : Number(runtime.sourceValue ?? source.defaultValue ?? rule.defaultSourceValue ?? 0)
         const rawSourceValue = source.integer === true ? Math.round(inputSourceValue) : inputSourceValue
         const min = Number(source.min)
         const max = Number(source.max)
@@ -1305,6 +1320,7 @@ function resolveEffectRule(rule, effect, runtimeInput = {}, modifierContext = {}
             variable,
             rawSourceValue,
             sourceValue,
+            sourceUnit: readsOutOfCombatPanel ? panelSource.sourceUnit : source.unit ?? "storedValue",
             expression,
             valueUnit: rule.formula?.valueUnit ?? "storedValue",
             formulaValue,
@@ -1356,6 +1372,7 @@ function resolveEffectStats(effect, runtimeInput = {}, modifierContext = {}) {
         .filter(rule => effectRuleMatchesScope(rule, effect, scope))
         .filter(rule => effectRuleRequirementMatches(rule, modifierContext))
         .filter(rule => !isDeferredInCombatFormula(rule, effect, scope))
+        .filter(rule => !modifierContext.deferOutOfCombatFormulas || !isOutOfCombatFormulaRule(rule))
         .filter(rule => !isRuleEventModifier(rule))
         .map(rule => resolveEffectRule(rule, effect, runtimeInput, modifierContext))
         .filter(rule => rule.stat && Number.isFinite(Number(rule.value)))
@@ -1368,6 +1385,7 @@ function resolveEffectDamageModifiers(effect, runtimeInput = {}, modifierContext
         .filter(rule => effectRuleMatchesScope(rule, effect, scope))
         .filter(rule => effectRuleRequirementMatches(rule, modifierContext))
         .filter(rule => !isDeferredInCombatFormula(rule, effect, scope))
+        .filter(rule => !modifierContext.deferOutOfCombatFormulas || !isOutOfCombatFormulaRule(rule))
         .filter(rule => isRuleEventModifier(rule))
         .map(rule => {
             const resolved = resolveEffectRule(rule, effect, runtimeInput, modifierContext)
@@ -1541,12 +1559,34 @@ function compileDenseCombatEffectEntry({
         buffModifiers,
         agent,
         deferOutOfCombatStatRequirements: true,
+        deferOutOfCombatFormulas: true,
     })
     if (!normalized || normalized.scope !== "inCombat") {
         return null
     }
     if (missingRequiredCombatBasis(normalized.stats, sourceType)) {
         return null
+    }
+    const outOfCombatFormulas = []
+    for (const rule of effectRules(effect)) {
+        if (!isOutOfCombatFormulaRule(rule)
+            || !effectRuleEnabled(rule, normalized.runtime)
+            || !effectRuleMatchesScope(rule, effect, "inCombat")
+            || !effectRuleRequirementMatches(rule, { agent, deferOutOfCombatStatRequirements: true })) continue
+        const evaluate = compileInitialEnergyFormula(rule)
+        if (!evaluate || isRuleEventModifier(rule) || hasOutOfCombatStatRequirement(rule)) {
+            return { unsupported: true }
+        }
+        const coverage = coverageFromRuntime(rule, effect, normalized.runtime)
+        const modifierFactor = applyBuffModifiersToResolvedRule({ value: 1 }, rule, { sourceKey: key, buffModifiers }).value
+        if (!Number.isFinite(coverage) || coverage < 0 || !Number.isFinite(modifierFactor) || modifierFactor < 0) {
+            return { unsupported: true }
+        }
+        outOfCombatFormulas.push({
+            stat: rule.stat,
+            statIndex: COMBAT_BONUS_KEY_INDEX.get(rule.stat),
+            evaluate: energyRegen => toCalcValue(rule.stat, (evaluate(energyRegen) * coverage) * modifierFactor, rule.mode),
+        })
     }
     const damageModifiers = normalized.damageModifiers.map(modifier => ({
         ...modifier,
@@ -1572,6 +1612,7 @@ function compileDenseCombatEffectEntry({
         stats: normalized.stats,
         damageModifiers,
         dynamicFormulas,
+        outOfCombatFormulas,
         hasOutOfCombatStatRequirements: [...normalized.stats, ...damageModifiers]
             .some(hasOutOfCombatStatRequirement),
     }
@@ -1643,29 +1684,18 @@ function normalizeAnomalyCatalogEffect(effect = {}) {
 }
 
 function normalizeTurbulenceCatalogEffect(effect = {}) {
-    const id = String(effect.id ?? "").trim()
-    const multiplierTable = effect.multiplierTable && typeof effect.multiplierTable === "object"
-        ? structuredClone(effect.multiplierTable)
-        : {}
+    if (effect.element === "wind" || effect.id === "wind_corrosion") throw new Error("乱流目录不支持风化基底。")
     return {
-        id,
+        ...normalizeDisorderCatalogEffect(effect),
         settlementType: "turbulence",
-        label: normalizeCatalogLabel(effect.label, id),
-        element: DAMAGE_ELEMENTS.includes(effect.element) ? effect.element : "wind",
-        baseMultiplier: Math.max(0, Number(effect.baseMultiplier ?? 0)),
-        defaultProcCount: Math.max(0, Number(effect.defaultProcCount ?? 1)),
-        fixedMultiplier: Number.isFinite(Number(effect.fixedMultiplier)) ? Number(effect.fixedMultiplier) : null,
-        tickMultiplier: Number.isFinite(Number(effect.tickMultiplier)) ? Number(effect.tickMultiplier) : null,
-        multiplierTable,
-        metadata: effect.metadata && typeof effect.metadata === "object" ? structuredClone(effect.metadata) : null,
-        sourceStatus: String(effect.sourceStatus ?? "pending"),
-        sources: Array.isArray(effect.sources) ? structuredClone(effect.sources) : [],
+        sourceStatus: String(effect.sourceStatus ?? "confirmed"),
         version: String(effect.version ?? ""),
-        crossChecked: effect.crossChecked === true,
+        metadata: effect.metadata && typeof effect.metadata === "object" ? structuredClone(effect.metadata) : null,
     }
 }
 
 function normalizeDisorderCatalogEffect(effect = {}) {
+    if (effect.element === "wind" || effect.id === "wind_corrosion") throw new Error("紊乱目录不支持风化或风属性。")
     const id = String(effect.id ?? "").trim()
     return {
         id,
@@ -1688,6 +1718,7 @@ function rawAnomalyCatalogEffects(payload = {}) {
             ...effect,
             settlementType: "attribute",
         })),
+        ...(payload.turbulenceEffects ?? []).map(effect => ({ ...effect, settlementType: "turbulence" })),
         ...(payload.disorderEffects ?? []).map(effect => ({
             ...effect,
             settlementType: "disorder",
@@ -1803,7 +1834,9 @@ const RELEASE_SOURCE_INHERITED_MODIFIER_KINDS = new Set([
 
 function damageModifierAppliesToCompiledEvent(modifier, event) {
     if (damageModifierAppliesTo(modifier, event)) return true
-    if (!isReleaseSettlement(event) || !RELEASE_SOURCE_INHERITED_MODIFIER_KINDS.has(modifier?.kind)) {
+    if (!isReleaseSettlement(event)
+        || !RELEASE_SOURCE_INHERITED_MODIFIER_KINDS.has(modifier?.kind)
+        || !isReleaseSourceModifier(modifier)) {
         return false
     }
     return damageModifierAppliesTo(modifier, {
@@ -3088,10 +3121,6 @@ function turbulenceEffectData(catalog, effectId = "turbulence") {
     return effect
 }
 
-export function isTurbulenceSettlement(event = {}) {
-    return event?.settlementType === "turbulence" || event?.anomalyVariant === "turbulence"
-}
-
 function settlementTypeForEvent(event = {}) {
     if (isLuminescenceSettlement(event)) return "luminescence"
     if (isReleaseSettlement(event)) return "release"
@@ -3377,16 +3406,27 @@ function generatedSharpDamageComponentEvents(event = {}) {
 }
 
 function anomalyReleaseEventData(event = {}, agent = {}, damageElement = "physical", options = {}) {
-    const requestedTriggerAgentId = String(event.triggerActorRef?.agentId ?? agent.id ?? "")
+    const velina = isVelinaReleaseAgent(agent)
+    const requestedTriggerAgentId = velina
+        ? String(agent.id ?? "")
+        : String(event.triggerActorRef?.agentId ?? agent.id ?? "")
     if (requestedTriggerAgentId !== String(agent.id ?? "")) {
         throw new Error("异放触发者必须是当前配装角色。")
     }
-    const profile = anomalyReleaseProfile(agent, event.triggerActorRef?.profileId, damageElement)
+    const requestedProfileId = velina
+        ? velinaReleaseSourceId(event) || "broad_vortex"
+        : String(event.triggerActorRef?.profileId ?? "")
+    if (velina && !VELINA_RELEASE_SOURCES.some(source => source.value === requestedProfileId)) {
+        throw new Error("维琳娜异放来源不存在。")
+    }
+    const profile = anomalyReleaseProfile(agent, requestedProfileId, damageElement)
     if (!profile) {
         throw new Error(`角色 ${agent.id ?? "unknown"} 暂不支持 ${damageElement} 属性异放。`)
     }
-    const sourceAgentId = String(event.anomalySource?.actorRef?.agentId ?? agent.id ?? "")
-    const sourceSnapshot = normalizeAnomalySourceSnapshot(event.anomalySource?.snapshot)
+    const sourceAgentId = velina
+        ? String(agent.id ?? "")
+        : String(event.anomalySource?.actorRef?.agentId ?? agent.id ?? "")
+    const sourceSnapshot = velina ? null : normalizeAnomalySourceSnapshot(event.anomalySource?.snapshot)
     if (sourceAgentId !== String(agent.id ?? "") && (!sourceSnapshot || sourceSnapshot.agentId !== sourceAgentId)) {
         throw new Error("外部原异常施加者必须提供与角色一致的冻结快照。")
     }
@@ -3404,148 +3444,36 @@ function anomalyReleaseEventData(event = {}, agent = {}, damageElement = "physic
     }
 }
 
-function turbulenceSourceContext(source = {}, fallbackAgentId = "", label = "乱流来源") {
-    const actorRef = source?.actorRef && typeof source.actorRef === "object" ? source.actorRef : {}
-    const snapshot = normalizeAnomalySourceSnapshot(source?.snapshot)
-    const actorId = String(actorRef.agentId ?? source?.agentId ?? snapshot?.agentId ?? fallbackAgentId ?? "")
-    return {
-        actorRef: { agentId: actorId },
-        ...(snapshot ? { snapshot } : {}),
-        sourceLabel: label,
-    }
-}
-
-function turbulenceMultiplierResolution(effect, secondaryEffectId, event = {}, catalog = {}) {
-    const explicit = Number(event.baseMultiplier)
-    if (Number.isFinite(explicit) && explicit >= 0 && event.baseMultiplier !== undefined) {
-        return {
-            baseMultiplier: explicit,
-            sourceStatus: "confirmed",
-            source: "event",
-            tableKey: secondaryEffectId,
-        }
-    }
-    const catalogRows = (catalog.turbulenceMultipliers ?? [])
-        .flatMap(entry => Array.isArray(entry?.rows) ? entry.rows : [])
-        .filter(row => String(row?.secondAnomaly ?? "") === secondaryEffectId)
-    const catalogRow = catalogRows[catalogRows.length - 1]
-    const effectRow = effect?.multiplierTable?.[secondaryEffectId]
-    const catalogStatus = String(catalogRow?.sourceStatus ?? catalogRow?.status ?? "pending")
-    const table = catalogStatus === "confirmed" ? catalogRow : effectRow ?? catalogRow
-    if (!table || typeof table !== "object") {
-        return {
-            baseMultiplier: 0,
-            sourceStatus: "pending",
-            source: null,
-            tableKey: secondaryEffectId,
-        }
-    }
-    const fixedMultiplier = Number(table.fixedMultiplier ?? table.baseMultiplier ?? 0)
-    const remainingSeconds = Math.max(0, Number(event.remainingSeconds ?? event.secondaryAnomalyRemainingSeconds ?? table.defaultRemainingSeconds ?? 0))
-    const remainingCoefficient = Number(table.remainingTimeCoefficient ?? table.remainingSecondsCoefficient ?? 0)
-    const baseMultiplier = Math.max(0, fixedMultiplier + remainingSeconds * (Number.isFinite(remainingCoefficient) ? remainingCoefficient : 0))
-    const status = String(table.sourceStatus ?? table.status ?? effect.sourceStatus ?? "pending")
-    return {
-        baseMultiplier,
-        sourceStatus: status,
-        source: table.source ?? effect.sources?.[0] ?? null,
-        tableKey: secondaryEffectId,
-    }
-}
-
 function normalizeTurbulenceDamageEvent(event = {}, agent = {}, catalog = {}, index = 0) {
-    const turbulenceId = event.turbulenceEffect
-        ?? (event.anomalyEffect && event.anomalyEffect !== "wind_corrosion" ? event.anomalyEffect : "turbulence")
-    let effect
-    try {
-        effect = turbulenceEffectData(catalog, turbulenceId)
-    } catch {
-        effect = turbulenceEffectData(catalog, "turbulence")
+    if (isWindAgent(agent)) throw new Error("风属性角色不能配置乱流事件。")
+    if (isLegacyTurbulenceEvent(event)) throw new Error("旧乱流事件已停用，请重新添加乱流事件。")
+    const effect = turbulenceEffectData(catalog, event.anomalyEffect)
+    if (effect.element === "wind" || effect.id === "wind_corrosion") {
+        throw new Error("乱流必须选择非风属性异常基底。")
     }
-    const secondaryId = String(
-        event.secondaryAnomalyEffect
-            ?? event.secondAnomalyEffect
-            ?? event.previousAnomalyEffect
-            ?? event.anomalySource?.anomalyEffect
-            ?? event.turbulenceSource?.anomalyEffect
-            ?? "",
-    ).trim()
-    let secondaryEffect = null
-    if (secondaryId) {
-        try {
-            secondaryEffect = anomalyEffectData(catalog, secondaryId)
-        } catch {
-            try {
-                secondaryEffect = disorderEffectData(catalog, secondaryId)
-            } catch {
-                secondaryEffect = null
-            }
-        }
-    }
-    const currentAgentId = String(agent?.id ?? "")
-    const windSource = turbulenceSourceContext(
-        event.windSource ?? { actorRef: event.triggerActorRef, snapshot: event.windSourceSnapshot },
-        currentAgentId,
-        "风化来源",
-    )
-    const secondarySource = turbulenceSourceContext(
-        event.anomalySource ?? event.secondaryAnomalySource ?? { actorRef: event.secondaryTriggerActorRef },
-        currentAgentId,
-        "第二异常来源",
-    )
-    const secondaryElement = DAMAGE_ELEMENTS.includes(event.secondaryElement)
-        ? event.secondaryElement
-        : DAMAGE_ELEMENTS.includes(event.turbulenceSource?.element)
-            ? event.turbulenceSource.element
-        : DAMAGE_ELEMENTS.includes(secondarySource?.snapshot?.element)
-            ? secondarySource.snapshot.element
-        : secondaryEffect?.element ?? null
-    if (!secondaryId || !secondaryEffect || !secondaryElement) {
-        throw new Error("乱流事件必须提供第二异常及其结算属性。")
-    }
-    for (const source of [windSource, secondarySource]) {
-        if (source.actorRef.agentId && source.actorRef.agentId !== currentAgentId && !source.snapshot) {
-            throw new Error(`${source.sourceLabel}为外部角色时必须提供有效的冻结快照。`)
-        }
-    }
-    const snapshotRemainingSeconds = Number(
-        secondarySource.snapshot?.remainingSeconds
-            ?? secondarySource.snapshot?.anomalyState?.remainingSeconds
-            ?? 0,
-    )
-    const resolution = turbulenceMultiplierResolution(effect, secondaryId, {
-        ...event,
-        remainingSeconds: event.remainingSeconds
-            ?? event.secondaryAnomalyRemainingSeconds
-            ?? event.turbulenceSource?.remainingSeconds
-            ?? snapshotRemainingSeconds,
-    }, catalog)
+    const elapsed = normalizeElapsedSeconds(event.elapsedSeconds, Infinity, effect.tickIntervalSeconds)
+    const timing = turbulenceBaseMultiplier(effect, elapsed)
     return {
-        ...event,
         id: String(event.id ?? `turbulence-${index + 1}`),
         kind: "anomaly",
         settlementType: "turbulence",
         normalized: true,
         anomalyEffect: effect.id,
         anomalyLabel: effect.label,
-        anomalyVariant: "turbulence",
-        secondaryAnomalyEffect: secondaryId,
-        secondaryAnomalyLabel: secondaryEffect?.label ?? null,
-        secondaryElement,
-        damageElement: secondaryElement,
+        label: normalizeDamageEventLabel(event),
+        damageElement: effect.element,
         damageScale: normalizeDamageScale(event),
-        baseMultiplier: resolution.baseMultiplier,
-        baseMultiplierPerProc: resolution.baseMultiplier,
-        procCount: 1,
-        usesDefaultProcCount: false,
-        turbulenceMultiplierStatus: resolution.sourceStatus,
-        turbulenceMultiplierSource: resolution.source,
-        turbulenceMultiplierTableKey: resolution.tableKey,
-        remainingSeconds: Math.max(0, Number(event.remainingSeconds ?? event.secondaryAnomalyRemainingSeconds ?? event.turbulenceSource?.remainingSeconds ?? snapshotRemainingSeconds ?? 0)),
-        secondaryAnomalyRemainingSeconds: Math.max(0, Number(event.remainingSeconds ?? event.secondaryAnomalyRemainingSeconds ?? event.turbulenceSource?.remainingSeconds ?? snapshotRemainingSeconds ?? 0)),
-        windSource,
-        anomalySource: secondarySource,
-        triggerActorRef: windSource.actorRef,
+        baseMultiplier: timing.baseMultiplier,
+        fixedMultiplier: effect.fixedMultiplier,
+        tickMultiplier: effect.tickMultiplier,
+        tickIntervalSeconds: timing.tickIntervalSeconds,
+        baseDurationSeconds: timing.baseDuration,
+        durationBonusSeconds: 0,
+        durationSeconds: timing.duration,
+        tickCount: timing.tickCount,
+        // Preserve authored elapsed time until duration modifiers are known.
+        elapsedSeconds: elapsed,
+        remainingSeconds: timing.remaining,
         count: normalizeDamageCount(event.count, 1),
         stunned: normalizeEventStunned(event.stunned),
     }
@@ -3573,6 +3501,9 @@ function normalizeLuminescenceDamageEvent(event = {}, agent = {}, index = 0, opt
 
 function normalizeAnomalyDamageEvent(event = {}, agent = {}, catalog = {}, index = 0, options = {}) {
     const releaseSettlement = isReleaseSettlement(event)
+    if (releaseSettlement && isVelinaReleaseAgent(agent)) {
+        event = { ...event, anomalyEffect: "wind_corrosion", damageElement: "wind" }
+    }
     if (event.normalized === true) {
         const damageElement = DAMAGE_ELEMENTS.includes(event.damageElement) ? event.damageElement : "physical"
         const release = releaseSettlement ? anomalyReleaseEventData(event, agent, damageElement, options) : null
@@ -3646,6 +3577,9 @@ function normalizeAnomalyDamageEvent(event = {}, agent = {}, catalog = {}, index
 }
 
 function normalizeDisorderDamageEvent(event = {}, catalog = {}, index = 0) {
+    if ((event.anomalyEffect ?? event.previousAnomalyEffect) === "wind_corrosion" || event.damageElement === "wind") {
+        throw new Error("紊乱事件不支持风化或风属性。")
+    }
     const disorderType = normalizeDisorderType(event.disorderType)
     if (event.normalized === true) {
         let effect = null
@@ -3738,6 +3672,12 @@ function normalizeDamageEvent(event = {}, agent = {}, catalog = {}, index = 0, o
         : event.kind
     if (!DAMAGE_EVENT_KINDS.includes(kind)) {
         throw new Error(`不支持的伤害事件类型：${kind}`)
+    }
+    if (kind === "anomaly" && event.settlementType === "disorder" && isWindAgent(agent)) {
+        throw new Error("风属性角色不能配置紊乱事件。")
+    }
+    if (kind === "disorder" && isWindAgent(agent)) {
+        throw new Error("风属性角色不能配置紊乱事件。")
     }
     if (kind === "anomaly" && event.settlementType === "disorder") {
         return normalizeDisorderDamageEvent(event, catalog, index)
@@ -4120,7 +4060,6 @@ export function damageModifierAppliesTo(modifier, event) {
         const effectIds = [
             matchingEvent.anomalyEffect,
             matchingEvent.previousAnomalyEffect,
-            matchingEvent.secondaryAnomalyEffect,
         ].filter(Boolean)
         if (!effectIds.some(effectId => appliesTo.anomalyEffects.includes(effectId))) {
             return false
@@ -4425,6 +4364,31 @@ function effectiveDisorderDamageEvent(event, bonusTotals) {
     }
 }
 
+function effectiveTurbulenceDamageEvent(event, bonusTotals) {
+    if (!isTurbulenceSettlement(event)) {
+        return event
+    }
+    const durationBonusSeconds = sumDamageModifiers(bonusTotals, event, "anomalyDurationBonusSeconds")
+    const timing = turbulenceBaseMultiplier({
+        defaultDurationSeconds: event.baseDurationSeconds ?? event.durationSeconds ?? 10,
+        fixedMultiplier: event.fixedMultiplier ?? 0,
+        tickMultiplier: event.tickMultiplier ?? 0,
+        tickIntervalSeconds: event.tickIntervalSeconds ?? 1,
+    }, event.elapsedSeconds, durationBonusSeconds)
+    return {
+        ...event,
+        baseMultiplier: timing.baseMultiplier,
+        baseMultiplierPerProc: timing.baseMultiplier,
+        baseDurationSeconds: timing.baseDuration,
+        durationBonusSeconds: timing.durationBonus,
+        durationSeconds: timing.duration,
+        elapsedSeconds: timing.elapsed,
+        remainingSeconds: timing.remaining,
+        tickIntervalSeconds: timing.tickIntervalSeconds,
+        tickCount: timing.tickCount,
+    }
+}
+
 function critDmgBonusWhiteBoxText(skillTargetedCritDmgBonus, elementCritDmgBonus) {
     return [
         skillTargetedCritDmgBonus ? `定向暴击伤害 ${formatDamagePercent(skillTargetedCritDmgBonus)}` : "",
@@ -4635,15 +4599,20 @@ function calculateInitialMasteryConvertedAnomalyCritRate(initialAnomalyMastery, 
     return masteryAboveThreshold * Math.max(0, Number(critRatePerPoint ?? 0))
 }
 
-function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBonus, dmgMultiplier, targetBreakdown, anomalyProficiencyMultiplier, levelMultiplier, anomalyDamageBonus, alienation, anomalyCrit, releaseBreakdown = null, baseMultiplierBonus, effectiveBaseMultiplier, finalDamage, singleDamage }) {
+function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBonus, dmgMultiplier, targetBreakdown, anomalyProficiencyMultiplier, levelMultiplier, anomalyDamageBonus, attributeAnomalyDamageBonus = null, turbulenceDamageBonusMultiplier = null, alienation, anomalyCrit, releaseBreakdown = null, baseMultiplierBonus, effectiveBaseMultiplier, finalDamage, singleDamage }) {
     const damageElementText = damageElementLabel(event.damageElement)
     const effectLabel = localizedName(event.anomalyLabel, event.anomalyEffect ?? event.previousAnomalyEffect)
     const isDisorder = isDisorderDamageEvent(event)
     const isTurbulence = isTurbulenceSettlement(event)
-    const specialBonusLabel = isDisorder ? "紊乱增伤区" : isTurbulence ? "乱流增伤区" : "属性异常增伤区"
-    const specialBonusFormulaLabel = isDisorder ? "紊乱增伤" : isTurbulence ? "乱流/属性异常增伤" : "属性异常增伤"
     const multiplierScale = disorderMultiplierScale(event.disorderType)
     const isRelease = isReleaseSettlement(event)
+    const fixedReleaseSource = isRelease
+        && releaseBreakdown?.resultMode === "fixedAnomalyMultiplier"
+        && releaseBreakdown.trace?.whiteBoxRole === "conversionSource"
+        && ["constant", "coreSkillScaling", "triggerStat"].includes(releaseBreakdown.trace.kind)
+        && !releaseBreakdown.trace.children?.length
+        ? releaseBreakdown.trace
+        : null
     const rows = [
         {
             label: "局内攻击力",
@@ -4658,10 +4627,12 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
                     ? `${effectLabel}${event.durationBonusSeconds ? `（基础 ${formatDamageNumber(event.baseDurationSeconds)} 秒 + 延长 ${formatDamageNumber(event.durationBonusSeconds)} 秒 = ${formatDamageNumber(event.durationSeconds)} 秒；已流逝 ${formatDamageNumber(event.elapsedSeconds)} 秒，剩余 ${formatDamageNumber(event.remainingSeconds)} 秒）` : ""}：${formatDamagePercent(event.fixedMultiplier)} + ${event.tickCount} × ${formatDamagePercent(event.tickMultiplier)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`
                     : `${effectLabel}${event.durationBonusSeconds ? `（基础 ${formatDamageNumber(event.baseDurationSeconds)} 秒 + 延长 ${formatDamageNumber(event.durationBonusSeconds)} 秒 = ${formatDamageNumber(event.durationSeconds)} 秒；已流逝 ${formatDamageNumber(event.elapsedSeconds)} 秒，剩余 ${formatDamageNumber(event.remainingSeconds)} 秒）` : ""}：(${formatDamagePercent(event.fixedMultiplier)} + ${event.tickCount} × ${formatDamagePercent(event.tickMultiplier)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}) × 极性紊乱 ${formatDamagePercent(multiplierScale)}`
                 : isTurbulence
-                    ? `${effectLabel}：${formatDamagePercent(event.baseMultiplier)}（第二异常 ${localizedName(event.secondaryAnomalyLabel, event.secondaryAnomalyEffect)}；剩余 ${formatDamageNumber(event.remainingSeconds)} 秒；${event.turbulenceMultiplierStatus ?? "pending"}）${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`
+                    ? `${effectLabel}：${formatDamagePercent(event.baseMultiplier)}（基底 ${effectLabel}；已流逝 ${formatDamageNumber(event.elapsedSeconds)} 秒；剩余 ${formatDamageNumber(event.remainingSeconds)} 秒）${baseMultiplierBonus ? ` + 乱流倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`
                 : isRelease
                     ? releaseBreakdown?.resultMode === "fixedAnomalyMultiplier"
-                        ? `固定异放倍率 ${formatDamagePercent(releaseBreakdown.finalBaseMultiplier)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`
+                        ? fixedReleaseSource
+                            ? `${fixedReleaseSource.label}${baseMultiplierBonus ? ` ${formatDamagePercent(releaseBreakdown.finalBaseMultiplier)} + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`
+                            : `固定异放倍率 ${formatDamagePercent(releaseBreakdown.finalBaseMultiplier)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`
                         : `${effectLabel}单次 ${formatDamagePercent(event.baseMultiplierPerProc)} × 异放比例 ${formatDamageNumber(releaseBreakdown?.releaseScale, 6)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`
                     : `${effectLabel}：${formatDamagePercent(event.baseMultiplierPerProc)} × ${formatDamageNumber(event.procCount)}${baseMultiplierBonus ? ` + 倍率修正 ${formatDamagePercent(baseMultiplierBonus)}` : ""}`,
             value: effectiveBaseMultiplier,
@@ -4688,12 +4659,33 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
             value: levelMultiplier,
             displayValue: formatDamageNumber(levelMultiplier, 4),
         },
-        {
-            label: specialBonusLabel,
-            formula: `1 + ${specialBonusFormulaLabel} ${formatDamagePercent(anomalyDamageBonus - 1)}`,
-            value: anomalyDamageBonus,
-            displayValue: formatDamageNumber(anomalyDamageBonus, 4),
-        },
+        ...(isTurbulence && attributeAnomalyDamageBonus !== null && turbulenceDamageBonusMultiplier !== null
+            ? [
+                {
+                    label: "异常增伤区",
+                    formula: `1 + 异常增伤 ${formatDamagePercent(attributeAnomalyDamageBonus - 1)}`,
+                    value: attributeAnomalyDamageBonus,
+                    displayValue: formatDamageNumber(attributeAnomalyDamageBonus, 4),
+                },
+                {
+                    label: "乱流增伤区",
+                    formula: `1 + 乱流增伤 ${formatDamagePercent(turbulenceDamageBonusMultiplier - 1)}`,
+                    value: turbulenceDamageBonusMultiplier,
+                    displayValue: formatDamageNumber(turbulenceDamageBonusMultiplier, 4),
+                },
+                {
+                    label: "异常增伤合计",
+                    formula: `1 + ${formatDamagePercent(attributeAnomalyDamageBonus - 1)} + ${formatDamagePercent(turbulenceDamageBonusMultiplier - 1)}`,
+                    value: anomalyDamageBonus,
+                    displayValue: formatDamageNumber(anomalyDamageBonus, 4),
+                },
+            ]
+            : [{
+                label: isDisorder ? "紊乱增伤区" : "属性异常增伤区",
+                formula: `1 + ${isDisorder ? "紊乱增伤" : "属性异常增伤"} ${formatDamagePercent(anomalyDamageBonus - 1)}`,
+                value: anomalyDamageBonus,
+                displayValue: formatDamageNumber(anomalyDamageBonus, 4),
+            }]),
     ]
     if (isRelease) {
         rows.splice(1, 0,
@@ -4703,7 +4695,7 @@ function anomalyDamageWhiteBoxRows({ event, atk, selectedDmgBonus, skillDamageBo
                 value: Number(event.baseMultiplierPerProc ?? 0),
                 displayValue: formatDamagePercent(event.baseMultiplierPerProc),
             },
-            ...releaseTraceWhiteBoxRows(releaseBreakdown?.trace),
+            ...(fixedReleaseSource ? [] : releaseTraceWhiteBoxRows(releaseBreakdown?.trace)),
         )
     }
     if (alienation?.active) {
@@ -5499,14 +5491,20 @@ function releaseOnlyBonusTotals(bonusTotals = {}) {
     }
 }
 
-function releaseSourceBonusTotals(bonusTotals = {}) {
-    return {
-        ...bonusTotals,
-        damageModifiers: (bonusTotals.damageModifiers ?? []).filter(modifier =>
+function isReleaseSourceModifier(modifier) {
+    return modifier?.id !== "velina-c6-wind-corrosion-recast-damage"
+        && (
             modifier?.kind !== "anomalyDamageBonus"
             || !Array.isArray(modifier?.appliesTo?.settlementTypes)
             || modifier.appliesTo.settlementTypes.length === 0
-            || modifier.appliesTo.settlementTypes.includes("attribute")),
+            || modifier.appliesTo.settlementTypes.includes("attribute")
+        )
+}
+
+function releaseSourceBonusTotals(bonusTotals = {}) {
+    return {
+        ...bonusTotals,
+        damageModifiers: (bonusTotals.damageModifiers ?? []).filter(isReleaseSourceModifier),
     }
 }
 
@@ -5616,84 +5614,31 @@ export function calculateAnomalyUnitDamage({
     }
 }
 
-function turbulenceCalculationSource(event, panel, outOfCombatPanel, bonusTotals, agentLevel) {
-    const windAgentId = String(event.windSource?.actorRef?.agentId ?? event.triggerActorRef?.agentId ?? "")
-    const windSnapshot = normalizeAnomalySourceSnapshot(event.windSource?.snapshot)
-    const secondaryAgentId = String(event.anomalySource?.actorRef?.agentId ?? "")
-    const secondarySnapshot = normalizeAnomalySourceSnapshot(event.anomalySource?.snapshot)
-    const windSource = windSnapshot
-        ? {
-            agentId: windAgentId || windSnapshot.agentId,
-            panel: windSnapshot.panel,
-            outOfCombatPanel: windSnapshot.outOfCombatPanel,
-            bonusTotals: windSnapshot.buffTotals,
-            agentLevel: windSnapshot.agentLevel,
-            snapshot: windSnapshot,
-        }
-        : {
-            agentId: windAgentId,
-            panel,
-            outOfCombatPanel,
-            bonusTotals,
-            agentLevel,
-            snapshot: null,
-        }
-    const secondarySource = secondarySnapshot
-        ? {
-            agentId: secondaryAgentId || secondarySnapshot.agentId,
-            panel: secondarySnapshot.panel,
-            outOfCombatPanel: secondarySnapshot.outOfCombatPanel,
-            bonusTotals: secondarySnapshot.buffTotals,
-            agentLevel: secondarySnapshot.agentLevel,
-            snapshot: secondarySnapshot,
-        }
-        : windSource
-    return {
-        ...secondarySource,
-        windSource,
-        secondarySource,
-        triggerBonusTotals: windSource.bonusTotals,
-    }
-}
-
 function calculateTurbulenceDamageEvent({ event, panel, outOfCombatPanel = panel, bonusTotals, target, agentLevel, includeWhiteBox }) {
-    if (event.turbulenceMultiplierStatus !== "confirmed") {
-        throw new Error("乱流倍率缺少已确认的版本化资料，无法计算。")
-    }
-    const source = turbulenceCalculationSource(event, panel, outOfCombatPanel, bonusTotals, agentLevel)
     const sourceEvent = {
         ...event,
         settlementType: "turbulence",
-        anomalyVariant: "turbulence",
-        damageElement: event.secondaryElement ?? event.damageElement,
+        damageElement: event.damageElement,
         count: 1,
-        damageScale: 1,
+        damageScale: event.damageScale,
     }
-    const sourceEventTotals = eventTargetTotalsForElement(source.bonusTotals, sourceEvent)
-    const triggerEventTotals = source.secondarySource === source.windSource
-        ? {}
-        : eventTargetTotalsForElement(source.triggerBonusTotals, sourceEvent)
-    const combinedEventTotals = addEventTotals(sourceEventTotals, triggerEventTotals)
-    const selectedDmgBonus = selectedDmgBonusForElement(source.panel, sourceEvent.damageElement)
+    const eventTotals = eventTargetTotalsForElement(bonusTotals, sourceEvent)
+    const selectedDmgBonus = selectedDmgBonusForElement(panel, sourceEvent.damageElement)
     const elementDmgKey = `${sourceEvent.damageElement}Dmg`
-    const skillDamageBonus = Number(combinedEventTotals.dmgBonus ?? 0) + Number(combinedEventTotals[elementDmgKey] ?? 0)
+    const skillDamageBonus = Number(eventTotals.dmgBonus ?? 0) + Number(eventTotals[elementDmgKey] ?? 0)
     const dmgMultiplier = 1 + selectedDmgBonus + skillDamageBonus
-    const targetBreakdown = targetBreakdownForElement(source.panel, source.bonusTotals, target, sourceEvent.damageElement, combinedEventTotals, sourceEvent.stunned)
-    const anomalyProficiencyMultiplier = Math.max(0, Number(source.panel.anomalyProficiency ?? 0)) / 100
-    const levelMultiplier = anomalyLevelMultiplier(source.agentLevel)
+    const targetBreakdown = targetBreakdownForElement(panel, bonusTotals, target, sourceEvent.damageElement, eventTotals, sourceEvent.stunned)
+    const anomalyProficiencyMultiplier = Math.max(0, Number(panel.anomalyProficiency ?? 0)) / 100
+    const levelMultiplier = anomalyLevelMultiplier(agentLevel)
     const anomalyDamageBonus = 1
-        + Number(combinedEventTotals.anomalyDamageBonus ?? 0)
-        + Number(combinedEventTotals.turbulenceDamageBonus ?? 0)
-    const alienation = alienationBreakdownForEvent(source.bonusTotals, sourceEvent)
-    const baseMultiplierBonus = sumDamageModifiers(source.bonusTotals, sourceEvent, "baseMultiplierBonus")
-        + sumDamageModifiers(source.bonusTotals, sourceEvent, "turbulenceBaseMultiplierBonus")
-        + (source.secondarySource === source.windSource
-            ? 0
-            : sumDamageModifiers(source.triggerBonusTotals, sourceEvent, "baseMultiplierBonus")
-                + sumDamageModifiers(source.triggerBonusTotals, sourceEvent, "turbulenceBaseMultiplierBonus"))
+        + Number(eventTotals.anomalyDamageBonus ?? 0)
+        + Number(eventTotals.turbulenceDamageBonus ?? 0)
+    const attributeAnomalyDamageBonus = 1 + Number(eventTotals.anomalyDamageBonus ?? 0)
+    const turbulenceDamageBonusMultiplier = 1 + Number(eventTotals.turbulenceDamageBonus ?? 0)
+    const baseMultiplierBonus = sumDamageModifiers(bonusTotals, sourceEvent, "turbulenceBaseMultiplierBonus")
     const effectiveBaseMultiplier = Math.max(0, Number(event.baseMultiplier ?? 0) + baseMultiplierBonus)
-    const anomalyCrit = anomalyCritMultiplier(source.bonusTotals, sourceEvent, source.panel, source.outOfCombatPanel)
-    const singleDamage = Number(source.panel.atk ?? 0)
+    const anomalyCrit = anomalyCritMultiplier(bonusTotals, sourceEvent, panel, outOfCombatPanel)
+    const singleDamage = Number(panel.atk ?? 0)
         * effectiveBaseMultiplier
         * dmgMultiplier
         * targetBreakdown.defenseMultiplier
@@ -5702,7 +5647,6 @@ function calculateTurbulenceDamageEvent({ event, panel, outOfCombatPanel = panel
         * anomalyProficiencyMultiplier
         * levelMultiplier
         * anomalyDamageBonus
-        * alienation.multiplier
         * anomalyCrit.multiplier
         * event.damageScale
     const finalDamage = singleDamage * event.count
@@ -5710,23 +5654,20 @@ function calculateTurbulenceDamageEvent({ event, panel, outOfCombatPanel = panel
         id: event.id,
         kind: event.kind,
         settlementType: "turbulence",
-        label: event.label ?? `乱流（${event.secondaryAnomalyLabel?.zhCN ?? event.secondaryAnomalyEffect}）`,
+        label: event.label ?? `乱流（${localizedName(event.anomalyLabel, event.anomalyEffect)}）`,
         finalDamage,
         singleDamage,
         count: event.count,
         input: { ...event, target, agentLevel: normalizeAgentLevel(agentLevel) },
         panelSnapshot: {
-            atk: Number(source.panel.atk ?? 0),
-            anomalyProficiency: Number(source.panel.anomalyProficiency ?? 0),
-            initialAnomalyMastery: Number(source.outOfCombatPanel?.anomalyMastery ?? source.panel.anomalyMastery ?? 0),
-            sourceAgentId: source.agentId,
-            windSourceSnapshot: source.windSource.snapshot,
-            anomalySourceSnapshot: source.secondarySource.snapshot,
-            secondaryAnomalyEffect: event.secondaryAnomalyEffect,
-            secondaryElement: sourceEvent.damageElement,
+            atk: Number(panel.atk ?? 0),
+            anomalyProficiency: Number(panel.anomalyProficiency ?? 0),
+            initialAnomalyMastery: Number(outOfCombatPanel?.anomalyMastery ?? panel.anomalyMastery ?? 0),
+            baseAnomalyEffect: event.anomalyEffect,
+            damageElement: sourceEvent.damageElement,
         },
         multipliers: {
-            atk: Number(source.panel.atk ?? 0),
+            atk: Number(panel.atk ?? 0),
             anomaly: effectiveBaseMultiplier,
             baseMultiplier: Number(event.baseMultiplier ?? 0),
             baseMultiplierBonus,
@@ -5739,25 +5680,23 @@ function calculateTurbulenceDamageEvent({ event, panel, outOfCombatPanel = panel
             anomalyLevel: levelMultiplier,
             anomalyDamage: anomalyDamageBonus,
             anomalyCrit: anomalyCrit.multiplier,
+            anomalyCritRate: anomalyCrit.critRate,
+            anomalyCritDmg: anomalyCrit.critDmg,
             remainingSeconds: Number(event.remainingSeconds ?? 0),
-            turbulenceMultiplierStatus: event.turbulenceMultiplierStatus,
-            turbulenceMultiplierTableKey: event.turbulenceMultiplierTableKey,
+            elapsedSeconds: Number(event.elapsedSeconds ?? 0),
+            tickCount: Number(event.tickCount ?? 0),
             damageScale: event.damageScale,
         },
         targetBreakdown,
         turbulence: {
-            windSource: event.windSource,
-            anomalySource: event.anomalySource,
-            secondaryAnomalyEffect: event.secondaryAnomalyEffect,
-            secondaryElement: sourceEvent.damageElement,
+            baseAnomalyEffect: event.anomalyEffect,
             remainingSeconds: Number(event.remainingSeconds ?? 0),
-            multiplierStatus: event.turbulenceMultiplierStatus,
-            multiplierSource: event.turbulenceMultiplierSource,
+            elapsedSeconds: Number(event.elapsedSeconds ?? 0),
         },
         whiteBoxRows: includeWhiteBox
             ? anomalyDamageWhiteBoxRows({
-                event: sourceEvent,
-                atk: Number(source.panel.atk ?? 0),
+                event,
+                atk: Number(panel.atk ?? 0),
                 selectedDmgBonus,
                 skillDamageBonus,
                 dmgMultiplier,
@@ -5765,7 +5704,9 @@ function calculateTurbulenceDamageEvent({ event, panel, outOfCombatPanel = panel
                 anomalyProficiencyMultiplier,
                 levelMultiplier,
                 anomalyDamageBonus,
-                alienation,
+                attributeAnomalyDamageBonus,
+                turbulenceDamageBonusMultiplier,
+                alienation: null,
                 anomalyCrit,
                 baseMultiplierBonus,
                 effectiveBaseMultiplier,
@@ -6077,6 +6018,7 @@ function calculateAnomalyDamageEvent({ event, panel, outOfCombatPanel = panel, b
         return calculateLuminescenceDamageEvent({ event, panel, outOfCombatPanel, bonusTotals, includeWhiteBox })
     }
     event = effectiveDisorderDamageEvent(event, bonusTotals)
+    event = effectiveTurbulenceDamageEvent(event, bonusTotals)
     event = effectiveAttributeAnomalyDamageEvent(event, bonusTotals)
     if (isTurbulenceSettlement(event)) {
         return calculateTurbulenceDamageEvent({ event, panel, outOfCombatPanel, bonusTotals, target, agentLevel, includeWhiteBox })
@@ -6332,6 +6274,7 @@ function calculateAnomalyDamageFinalValue(event, panel, bonusTotals, target, age
         return evaluateLuminescenceForPanels(event, panel, outOfCombatPanel, bonusTotals).score
     }
     event = effectiveDisorderDamageEvent(event, bonusTotals)
+    event = effectiveTurbulenceDamageEvent(event, bonusTotals)
     event = effectiveAttributeAnomalyDamageEvent(event, bonusTotals)
     if (isTurbulenceSettlement(event)) {
         return calculateTurbulenceDamageEvent({
@@ -6474,11 +6417,6 @@ function compileDamageScoreEvent(event = {}) {
         releaseCoreScalingRow: event.releaseCoreScalingRow ?? null,
         triggerActorRef: event.triggerActorRef ?? null,
         anomalySource: event.anomalySource ?? null,
-        windSource: event.windSource ?? null,
-        secondaryAnomalyEffect: event.secondaryAnomalyEffect ?? null,
-        secondaryElement: event.secondaryElement ?? damageElement,
-        remainingSeconds: Number(event.remainingSeconds ?? 0),
-        turbulenceMultiplierStatus: event.turbulenceMultiplierStatus ?? null,
         fixedMultiplier: Number(event.fixedMultiplier ?? 0),
         tickMultiplier: Number(event.tickMultiplier ?? 0),
         tickIntervalSeconds: Number(event.tickIntervalSeconds ?? 0.5),
@@ -6513,6 +6451,14 @@ function compileDamageScoreTarget(damageRequest = {}, agent = {}) {
 function compiledEventBaseMultiplier(compiledEvent, durationBonusSeconds = 0, panel = {}, outOfCombatPanel = panel, releaseModifiers = {}) {
     if (compiledEvent.isRelease) {
         return releaseBreakdownForEvent(compiledEvent, panel, outOfCombatPanel, releaseModifiers).finalBaseMultiplier
+    }
+    if (compiledEvent.isTurbulence) {
+        return turbulenceBaseMultiplier({
+            defaultDurationSeconds: compiledEvent.baseDurationSeconds,
+            fixedMultiplier: compiledEvent.fixedMultiplier,
+            tickMultiplier: compiledEvent.tickMultiplier,
+            tickIntervalSeconds: compiledEvent.tickIntervalSeconds,
+        }, compiledEvent.elapsedSeconds, durationBonusSeconds).baseMultiplier
     }
     if (!compiledEvent.isDisorder) {
         if (compiledEvent.usesDefaultProcCount
@@ -6659,19 +6605,17 @@ function calculateCompiledDamageScoreValue({ agent, panel, outOfCombatPanel = pa
         }
 
         if (compiledEvent.isTurbulence) {
-            if (compiledEvent.turbulenceMultiplierStatus !== "confirmed") {
-                throw new Error("乱流倍率缺少已确认的版本化资料，无法计算。")
-            }
             const effectiveBaseMultiplier = Math.max(
                 0,
-                compiledEvent.baseMultiplier
-                    + compiledModifierSum(sums, "baseMultiplierBonus")
+                compiledEventBaseMultiplier(
+                    compiledEvent,
+                    compiledModifierSum(sums, "anomalyDurationBonusSeconds"),
+                )
                     + compiledModifierSum(sums, "turbulenceBaseMultiplierBonus"),
             )
             const anomalyDamageBonus = 1
                 + compiledModifierSum(sums, "anomalyDamageBonus")
                 + compiledModifierSum(sums, "turbulenceDamageBonus")
-            const alienationMultiplier = Math.max(0, 1 + compiledModifierSum(sums, "alienationCoefficientBonus"))
             total += Number(panel.atk ?? 0)
                 * effectiveBaseMultiplier
                 * (1 + selectedDmgBonus + skillDamageBonus)
@@ -6679,7 +6623,6 @@ function calculateCompiledDamageScoreValue({ agent, panel, outOfCombatPanel = pa
                 * (Math.max(0, Number(panel.anomalyProficiency ?? 0)) / 100)
                 * compiledDamageTarget.anomalyLevelMultiplier
                 * anomalyDamageBonus
-                * alienationMultiplier
                 * compiledAnomalyCritMultiplier(compiledEvent, sums, initialAnomalyMastery)
                 * compiledEvent.damageScale
                 * compiledEvent.count
@@ -6755,17 +6698,20 @@ function calculateCompiledDamageScoreValue({ agent, panel, outOfCombatPanel = pa
                 },
             ) + compiledModifierSum(
                 sums,
-                compiledEvent.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
+                compiledEvent.isTurbulence
+                    ? "turbulenceBaseMultiplierBonus"
+                    : compiledEvent.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
             ),
         ) * compiledEvent.baseMultiplierScale
         const anomalyDamageBonus = 1 + (
-            compiledEvent.isDisorder
+                compiledEvent.isDisorder
                 ? compiledModifierSum(sums, "disorderDamageBonus")
                 : compiledModifierSum(sums, "anomalyDamageBonus")
+                    + (compiledEvent.isTurbulence ? compiledModifierSum(sums, "turbulenceDamageBonus") : 0)
         )
         const alienationMultiplier = Math.max(
             0,
-            1 + compiledModifierSum(sums, "alienationCoefficientBonus"),
+            1 + (compiledEvent.isTurbulence ? 0 : compiledModifierSum(sums, "alienationCoefficientBonus")),
         )
         total += Number(panel.atk ?? 0)
             * effectiveBaseMultiplier
@@ -7010,22 +6956,22 @@ function calculateCompiledDamageScoreValueDense({
             continue
         }
         if (compiledEvent.isTurbulence) {
-            if (compiledEvent.turbulenceMultiplierStatus !== "confirmed") {
-                throw new Error("乱流倍率缺少已确认的版本化资料，无法计算。")
-            }
             const selectedDmgBonus = denseSelectedDmgBonusForElement(panelValues, compiledEvent.damageElement)
             const skillDamageBonus = denseModifierSum(modifierSums, "dmgBonus")
                 + denseModifierSum(modifierSums, compiledEvent.elementDmgKey)
             const effectiveBaseMultiplier = Math.max(
                 0,
-                compiledEvent.baseMultiplier
-                    + denseModifierSum(modifierSums, "baseMultiplierBonus")
+                turbulenceBaseMultiplier({
+                    defaultDurationSeconds: compiledEvent.baseDurationSeconds,
+                    fixedMultiplier: compiledEvent.fixedMultiplier,
+                    tickMultiplier: compiledEvent.tickMultiplier,
+                    tickIntervalSeconds: compiledEvent.tickIntervalSeconds,
+                }, compiledEvent.elapsedSeconds, denseModifierSum(modifierSums, "anomalyDurationBonusSeconds")).baseMultiplier
                     + denseModifierSum(modifierSums, "turbulenceBaseMultiplierBonus"),
             )
             const anomalyDamageBonus = 1
                 + denseModifierSum(modifierSums, "anomalyDamageBonus")
                 + denseModifierSum(modifierSums, "turbulenceDamageBonus")
-            const alienationMultiplier = Math.max(0, 1 + denseModifierSum(modifierSums, "alienationCoefficientBonus"))
             total += densePanelValue(panelValues, "atk")
                 * effectiveBaseMultiplier
                 * (1 + selectedDmgBonus + skillDamageBonus)
@@ -7033,7 +6979,6 @@ function calculateCompiledDamageScoreValueDense({
                 * (Math.max(0, densePanelValue(panelValues, "anomalyProficiency")) / 100)
                 * compiledDamageTarget.anomalyLevelMultiplier
                 * anomalyDamageBonus
-                * alienationMultiplier
                 * denseAnomalyCritMultiplier(compiledEvent, modifierSums, panelProxy, outOfCombatPanelProxy)
                 * compiledEvent.damageScale
                 * compiledEvent.count
@@ -7112,17 +7057,20 @@ function calculateCompiledDamageScoreValueDense({
                 },
             ) + denseModifierSum(
                 modifierSums,
-                compiledEvent.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
+                compiledEvent.isTurbulence
+                    ? "turbulenceBaseMultiplierBonus"
+                    : compiledEvent.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
             ),
         ) * compiledEvent.baseMultiplierScale
         const anomalyDamageBonus = 1 + (
-            compiledEvent.isDisorder
+                compiledEvent.isDisorder
                 ? denseModifierSum(modifierSums, "disorderDamageBonus")
                 : denseModifierSum(modifierSums, "anomalyDamageBonus")
+                    + (compiledEvent.isTurbulence ? denseModifierSum(modifierSums, "turbulenceDamageBonus") : 0)
         )
         const alienationMultiplier = Math.max(
             0,
-            1 + denseModifierSum(modifierSums, "alienationCoefficientBonus"),
+            1 + (compiledEvent.isTurbulence ? 0 : denseModifierSum(modifierSums, "alienationCoefficientBonus")),
         )
         total += densePanelValue(panelValues, "atk")
             * effectiveBaseMultiplier
@@ -8357,9 +8305,9 @@ export function buildMeta(catalog) {
             ...(catalog.turbulenceEffects ?? []),
             ...(catalog.disorderEffects ?? []),
         ],
-        turbulenceMultipliers: catalog.turbulenceMultipliers ?? [],
         anomalyEffects: catalog.anomalyEffects ?? [],
         turbulenceEffects: catalog.turbulenceEffects ?? [],
+        turbulenceMultipliers: catalog.turbulenceMultipliers ?? [],
         disorderEffects: catalog.disorderEffects ?? [],
     }
 }
@@ -8548,11 +8496,16 @@ export function createInCombatPanelCalculator(catalog, input) {
         let hasDynamicCombatFormula = false
         for (const { effect, sourceType } of dynamicFormulaEffects) {
             for (const rule of effectRules(effect)) {
-                if (!isInCombatFormulaRule(rule)
-                    || !isAllowedInCombatFormulaSourceType(sourceType)
+                if (!isAllowedInCombatFormulaSourceType(sourceType)
                     || effectRuleScope(rule, effect) !== "inCombat") {
                     continue
                 }
+                if (isOutOfCombatFormulaRule(rule)) {
+                    hasDynamicCombatFormula = true
+                    if (rule.source?.stat) panelStats.add(rule.source.stat)
+                    continue
+                }
+                if (!isInCombatFormulaRule(rule)) continue
                 hasDynamicCombatFormula = true
                 if (isAllowedInCombatFormulaSourceStat(rule.source?.stat)) {
                     panelStats.add(rule.source.stat)
@@ -8683,6 +8636,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                 buffModifiers: denseBuffModifiers,
                 agent,
             })
+            if (entry?.unsupported) return false
             if (entry) {
                 entries.push(entry)
             }
@@ -8847,6 +8801,16 @@ export function createInCombatPanelCalculator(catalog, input) {
                 entryIndex,
             })),
         )
+        const initialFormulaEntries = entries.flatMap((entry, entryIndex) =>
+            (entry.outOfCombatFormulas ?? []).map(formula => ({ ...formula, entryIndex })),
+        )
+        function initialFormulaBonus(formulas, stat, energyRegen) {
+            let value = 0
+            for (const formula of formulas) {
+                if (formula.stat === stat) value += formula.evaluate(energyRegen)
+            }
+            return value
+        }
         const modifierSums = new Float64Array(DAMAGE_MODIFIER_SUM_KEYS.length)
         const selectedAttributeBonusKey = resolveAttributeBonusKey(agent)
         const isRupture = isRuptureAgent(agent)
@@ -8893,6 +8857,11 @@ export function createInCombatPanelCalculator(catalog, input) {
                     }
                 }
 
+                for (const formula of initialFormulaEntries) {
+                    if (activeEntryFlags[formula.entryIndex]) {
+                        combatValues[formula.statIndex] += formula.evaluate(densePanelValue(outPanelValues, "energyRegen"))
+                    }
+                }
                 const hp = densePanelValue(outPanelValues, "hp")
                     + denseCombatValue(combatValues, "hpFlat")
                     + Number(outBase.hp ?? 0) * (denseCombatValue(combatValues, "hpPct") + denseCombatValue(combatValues, "hpPctBase"))
@@ -8989,6 +8958,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                 || typeof fixedOutOfCombatTarget.panelValue !== "function") {
                 return null
             }
+            const initialFormulas = initialFormulaEntries.filter(formula => fixedEntryFlags[formula.entryIndex])
             const target = compiledDamageTarget.target
             const compiledEvents = events.map((event, eventIndex) => {
                 const sums = new Float64Array(DAMAGE_MODIFIER_SUM_KEYS.length)
@@ -9072,6 +9042,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                 const penFlat = outPanelValue("penFlat") + denseCombatValue(fixedCombatValues, "penFlat")
                 const penRatio = outPanelValue("penRatio") + denseCombatValue(fixedCombatValues, "penRatio")
                 const dmgBonus = outPanelValue("dmgBonus") + denseCombatValue(fixedCombatValues, "dmgBonus")
+                    + initialFormulaBonus(initialFormulas, "dmgBonus", initialFormulas.length ? outPanelValue("energyRegen") : 0)
                 let total = 0
                 for (const event of compiledEvents) {
                     const resIgnoreKey = OUTPUT_PANEL_KEYS[event.resIgnoreIndex]
@@ -9270,6 +9241,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                 || typeof fixedOutOfCombatTarget.panelValue !== "function") {
                 return null
             }
+            const initialFormulas = initialFormulaEntries.filter(formula => fixedEntryFlags[formula.entryIndex])
             const target = compiledDamageTarget.target
             const compiledEvents = events.map((event, eventIndex) => {
                 const sums = new Float64Array(DAMAGE_MODIFIER_SUM_KEYS.length)
@@ -9291,6 +9263,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     settlementType: event.settlementType,
                     isRelease: event.isRelease,
                     isDisorder: event.isDisorder,
+                    isTurbulence: event.isTurbulence,
                     anomalyVariant: event.anomalyVariant,
                     baseMultiplier: event.baseMultiplier,
                     baseMultiplierPerProc: event.baseMultiplierPerProc,
@@ -9298,6 +9271,9 @@ export function createInCombatPanelCalculator(catalog, input) {
                     usesDefaultProcCount: event.usesDefaultProcCount,
                     baseDurationSeconds: event.baseDurationSeconds,
                     tickIntervalSeconds: event.tickIntervalSeconds,
+                    fixedMultiplier: event.fixedMultiplier,
+                    tickMultiplier: event.tickMultiplier,
+                    elapsedSeconds: event.elapsedSeconds,
                     releaseProfile: event.releaseProfile,
                     releaseCoreScalingRow: event.releaseCoreScalingRow,
                     triggerActorRef: event.triggerActorRef,
@@ -9332,12 +9308,16 @@ export function createInCombatPanelCalculator(catalog, input) {
                                 denseModifierSum(sums, "anomalyDurationBonusSeconds"),
                             ) + denseModifierSum(
                                 sums,
-                                event.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
+                                event.isTurbulence
+                                    ? "turbulenceBaseMultiplierBonus"
+                                    : event.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
                             ),
                         ) * event.baseMultiplierScale,
                     baseMultiplierBonus: denseModifierSum(
                         sums,
-                        event.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
+                        event.isTurbulence
+                            ? "turbulenceBaseMultiplierBonus"
+                            : event.isDisorder ? "disorderBaseMultiplierBonus" : "baseMultiplierBonus",
                     ),
                     durationBonusSeconds: denseModifierSum(sums, "anomalyDurationBonusSeconds"),
                     releaseProficiencyYieldBonus: denseModifierSum(
@@ -9345,13 +9325,15 @@ export function createInCombatPanelCalculator(catalog, input) {
                         "releaseProficiencyYieldBonus",
                     ),
                     baseMultiplierScale: event.baseMultiplierScale,
-                    anomalyDamageBonus: 1 + denseModifierSum(
-                        sums,
-                        event.isDisorder ? "disorderDamageBonus" : "anomalyDamageBonus",
-                    ),
+                    anomalyDamageBonus: 1
+                        + denseModifierSum(
+                            sums,
+                            event.isDisorder ? "disorderDamageBonus" : "anomalyDamageBonus",
+                        )
+                        + (event.isTurbulence ? denseModifierSum(sums, "turbulenceDamageBonus") : 0),
                     alienationMultiplier: Math.max(
                         0,
-                        1 + denseModifierSum(sums, "alienationCoefficientBonus"),
+                        1 + (event.isTurbulence ? 0 : denseModifierSum(sums, "alienationCoefficientBonus")),
                     ),
                     anomalyCritRate: denseModifierSum(sums, "anomalyCritRate"),
                     anomalyCritDmg: Math.max(0, denseModifierSum(sums, "anomalyCritDmg")),
@@ -9404,6 +9386,11 @@ export function createInCombatPanelCalculator(catalog, input) {
                 )
                 const hasFormulaInterval = Boolean(suffixDenseVector || branchIndexedVector || optimisticIndexedVector)
                 const lowerOutPanelValue = key => fixedOutOfCombatTarget.panelValue(statValues, key)
+                const energyRegen = initialFormulas.length ? outPanelValue("energyRegen") : 0
+                const lowerEnergyRegen = initialFormulas.length && hasFormulaInterval ? lowerOutPanelValue("energyRegen") : energyRegen
+                const masteryBonus = initialFormulaBonus(initialFormulas, "anomalyMasteryFlat", energyRegen)
+                const lowerMasteryBonus = hasFormulaInterval
+                    ? initialFormulaBonus(initialFormulas, "anomalyMasteryFlat", lowerEnergyRegen) : masteryBonus
                 const outBase = fixedOutOfCombatTarget.base
                 const outAtk = outPanelValue("atk")
                 const atk = outAtk
@@ -9434,11 +9421,12 @@ export function createInCombatPanelCalculator(catalog, input) {
                     ? outPanelValue("penRatio") + denseCombatValue(fixedCombatValues, "penRatio")
                     : 0
                 const dmgBonus = outPanelValue("dmgBonus") + denseCombatValue(fixedCombatValues, "dmgBonus")
+                    + initialFormulaBonus(initialFormulas, "dmgBonus", energyRegen)
                 const anomalyMastery = needsAnomaly
                     ? calculateAnomalyMastery(
                         outPanelValue("anomalyMastery"),
                         denseCombatValue(fixedCombatValues, "anomalyMasteryPct"),
-                        denseCombatValue(fixedCombatValues, "anomalyMasteryFlat"),
+                        denseCombatValue(fixedCombatValues, "anomalyMasteryFlat") + masteryBonus,
                     )
                     : 0
                 const anomalyProficiency = needsAnomaly
@@ -9453,7 +9441,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     ? calculateAnomalyMastery(
                         lowerOutPanelValue("anomalyMastery"),
                         denseCombatValue(fixedCombatValues, "anomalyMasteryPct"),
-                        denseCombatValue(fixedCombatValues, "anomalyMasteryFlat"),
+                        denseCombatValue(fixedCombatValues, "anomalyMasteryFlat") + lowerMasteryBonus,
                     )
                     : anomalyMastery
                 const lowerAnomalyProficiency = needsAnomaly && hasFormulaInterval
@@ -9500,6 +9488,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                         if (property === "anomalyMastery") return anomalyMastery
                         if (property === "anomalyProficiency") return anomalyProficiency
                         if (property === "atk") return atk
+                        if (property === "dmgBonus") return dmgBonus
                         return typeof property === "string"
                             ? outPanelValue(property) + denseCombatValue(fixedCombatValues, property)
                             : undefined
@@ -9516,6 +9505,11 @@ export function createInCombatPanelCalculator(catalog, input) {
                         if (property === "anomalyMastery") return { min: lowerAnomalyMastery, max: anomalyMastery }
                         if (property === "anomalyProficiency") return { min: lowerAnomalyProficiency, max: anomalyProficiency }
                         if (property === "atk") return { min: lowerAtk, max: atk }
+                        if (property === "dmgBonus") return {
+                            min: lowerOutPanelValue("dmgBonus") + denseCombatValue(fixedCombatValues, "dmgBonus")
+                                + initialFormulaBonus(initialFormulas, "dmgBonus", lowerEnergyRegen),
+                            max: dmgBonus,
+                        }
                         if (typeof property !== "string") return undefined
                         return {
                             min: lowerOutPanelValue(property) + denseCombatValue(fixedCombatValues, property),
@@ -9655,7 +9649,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                                 }).max)
                                 : releaseCritRateBonusForEvent(event, formulaInCombatPanel, formulaOutOfCombatPanel)
                             : 0
-                    const anomalyCritMultiplier = event.anomalyCritDmg > 0
+                    const anomalyCritMultiplier = !event.isDisorder && event.anomalyCritDmg > 0
                         ? 1 + clampNumber(event.anomalyCritRate + releaseMasteryCritRate, 0, 1) * event.anomalyCritDmg
                         : 1
                     total += atk
@@ -9730,7 +9724,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     scoreObjectiveScalar: fixedObjectiveKernel?.scoreObjectiveScalar,
                     scoreCombinedScalar: fixedObjectiveKernel?.scoreCombinedScalar,
                     scoreScalar(statValues = []) {
-                        if (fixedDirectKernel) {
+                        if (fixedDirectKernel && !initialFormulaEntries.length) {
                             return fixedDirectKernel.scoreScalar(statValues)
                         }
                         const summary = scoreDense(

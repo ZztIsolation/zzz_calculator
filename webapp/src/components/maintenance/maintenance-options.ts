@@ -2,6 +2,7 @@ import { statLabel } from "@core/shared-combat.js"
 import { IN_COMBAT_FORMULA_SOURCE_STATS } from "@core/effectFormula.js"
 import { SKILL_TAGS, SKILL_TAG_LABELS, SKILL_TYPES, SKILL_TYPE_LABELS, skillMultiplierTargetId, skillTypeForMove } from "@core/skillTargets.js"
 import { internalId, textOf, type SelectOption } from "./maintenance-model"
+import { defaultTurbulenceEffectId, turbulenceSourceOptions } from "@/utils/turbulence"
 
 export const option = (value: string | number, label: string): SelectOption => ({ value, label })
 
@@ -39,7 +40,7 @@ export const EFFECT_TYPE_OPTIONS = [
   option("formula", "受限函数换算"), option("stacked", "层数"),
 ]
 export const FORMULA_SOURCE_KIND_OPTIONS = [
-  option("runtime", "运行时来源数值"), option("inCombatStat", "局内面板属性"),
+  option("runtime", "运行时来源数值"), option("inCombatStat", "局内面板属性"), option("outOfCombatStat", "局外面板属性"),
 ]
 const IN_COMBAT_FORMULA_SOURCE_STAT_LABELS: Record<string, string> = {
   hp: "局内生命值", atk: "局内攻击力", def: "局内防御力", critRate: "局内暴击率",
@@ -292,7 +293,7 @@ export function defaultEffectRule() {
   return { id: internalId("effect"), type: "fixed", target: { kind: "default" }, stat: "atkFlat", mode: "flat", value: 0 }
 }
 
-export function defaultCalculationEvent(kind = "direct") {
+export function defaultCalculationEvent(kind = "direct", agent: any = null) {
   const base: any = { id: internalId("event"), kind, count: 1, stunned: true }
   if (kind === "anomaly") return { ...base, settlementType: "attribute", anomalyEffect: "assault", procCount: 1 }
   if (kind === "disorder") return { ...base, kind: "anomaly", settlementType: "disorder", disorderType: "normal", anomalyEffect: "burn", elapsedSeconds: 0 }
@@ -300,13 +301,8 @@ export function defaultCalculationEvent(kind = "direct") {
     ...base,
     kind: "anomaly",
     settlementType: "turbulence",
-    anomalyEffect: "wind_corrosion",
-    turbulenceEffect: "turbulence",
-    secondaryAnomalyEffect: "burn",
-    secondaryAnomalyRemainingSeconds: 10,
-    turbulenceVariant: "normal",
-    windSource: { actorRef: { agentId: "" } },
-    anomalySource: { actorRef: { agentId: "" } },
+    anomalyEffect: defaultTurbulenceEffectId(agent),
+    elapsedSeconds: 0,
   }
   if (kind === "release") return { ...base, kind: "anomaly", settlementType: "release", anomalyEffect: "assault" }
   if (kind === "luminescence") return {
@@ -337,10 +333,8 @@ export function anomalyOptions(catalog: any, disorder = false) {
     .map((item: any) => option(item.id, textOf(item.label) || "未命名结算"))
 }
 
-export function turbulenceSecondaryOptions(catalog: any) {
-  return (catalog?.anomalyEffects?.effects ?? [])
-    .filter((item: any) => item.settlementType === "attribute" && item.id !== "wind_corrosion")
-    .map((item: any) => option(item.id, textOf(item.label) || "未命名异常"))
+export function turbulenceSecondaryOptions(catalog: any, selectedId?: string) {
+  return turbulenceSourceOptions(catalog, selectedId)
 }
 
 export function buffCandidates(catalog: any) {

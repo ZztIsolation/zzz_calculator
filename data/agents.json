@@ -7583,8 +7583,7 @@
     {
       "id": "velina",
       "name": {
-        "zhCN": "维琳娜·艾嘉德",
-        "en": "Velina Aigard"
+        "zhCN": "维琳娜·艾嘉德"
       },
       "rarity": "S",
       "attribute": "wind",
@@ -7600,13 +7599,13 @@
       },
       "level60": {
         "hpBase": 7788,
-        "atkBase": 872,
+        "atkBase": 797,
         "defBase": 612,
         "critRate": 5,
         "critDmg": 50,
         "impact": 86,
-        "anomalyProficiency": 112,
-        "anomalyMastery": 165,
+        "anomalyProficiency": 111,
+        "anomalyMastery": 112,
         "energyRegen": 120,
         "penRatio": 0
       },
@@ -7617,13 +7616,71 @@
             "zhCN": "核心被动：风华盈袖"
           },
           "description": {
-            "zhCN": "初始能量自动回复超过1.2时，按核心被动成长获得伤害和异常掌控；触发乱流获得风蚀并召唤微域气旋，消耗2点风蚀时强化乱流并改召广域气旋。"
+            "zhCN": "初始能量自动回复超过1.2时，超过部分每0.01使造成的伤害提升0.21%，最多提升35%，并使异常掌控提升0.5点，最多提升84点。\n进入战场获得45点[风华]，发动强化特殊技时再获得45点，[风华]上限为135点。触发[乱流]时获得1点[风蚀]并召唤[微域气旋]；拥有2点[风蚀]时，下一次触发[乱流]会消耗2点[风蚀]，使该次[乱流]伤害倍率提升90/100/110/120/130/140/150%，并改为召唤[广域气旋]。\n[微域气旋]和[广域气旋]会在消散时触发爆炸命中处于风属性异常状态下的敌人时，都会对目标造成一次[异放]伤害：微域气旋固定结算85/95/105/115/125/135/145%倍率，广域气旋固定结算135/155/175/195/215/235/255%倍率的风属性异常伤害。"
           },
           "effects": [
             {
+              "id": "velina-energy-damage-bonus",
+              "type": "formula",
+              "scope": "inCombat",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "source": {
+                "kind": "outOfCombatStat",
+                "stat": "energyRegen",
+                "unit": "storedValue",
+                "label": {
+                  "zhCN": "维琳娜初始能量自动回复"
+                },
+                "variable": "x"
+              },
+              "formula": {
+                "expression": "clamp(floor(max(x - 1.2, 0) / 0.01) * 0.21, 0, 35)",
+                "valueUnit": "storedPercent"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "velina-energy-mastery-bonus",
+              "type": "formula",
+              "scope": "inCombat",
+              "stat": "anomalyMasteryFlat",
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "source": {
+                "kind": "outOfCombatStat",
+                "stat": "energyRegen",
+                "unit": "storedValue",
+                "label": {
+                  "zhCN": "维琳娜初始能量自动回复"
+                },
+                "variable": "x"
+              },
+              "formula": {
+                "expression": "clamp(floor(max(x - 1.2, 0) / 0.01) * 0.5, 0, 84)",
+                "valueUnit": "storedValue"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
               "id": "velina-turbulence-base-multiplier",
               "type": "fixed",
-              "stat": "baseMultiplierBonus",
+              "stat": "turbulenceBaseMultiplierBonus",
               "value": 90,
               "mode": "flat",
               "valueSource": {
@@ -7633,6 +7690,12 @@
               "target": {
                 "kind": "anomaly",
                 "settlementType": "turbulence"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
               }
             }
           ],
@@ -7644,7 +7707,7 @@
             "zhCN": "额外能力：茶会礼仪"
           },
           "description": {
-            "zhCN": "队伍中存在其他异常角色或同属性角色时，风化和乱流伤害提升10%；终结技重击命中风属性异常目标时额外结算固定680%风属性异放。"
+            "zhCN": "队伍中存在其他异常角色或同属性角色时触发：\n风化和乱流伤害提升10%；终结技重击命中处于风属性异常状态下的敌人时，额外结算固定680%倍率的风属性异放。\n核心被动中广域气旋造成的属性异常积蓄抗性降低效果额外提升7%，造成的失衡值提升30%，累积的属性异常积蓄值提升15%。"
           },
           "effects": [
             {
@@ -7664,7 +7727,7 @@
             {
               "id": "velina-turbulence-damage",
               "type": "fixed",
-              "stat": "anomalyDamageBonus",
+              "stat": "turbulenceDamageBonus",
               "value": 10,
               "mode": "flat",
               "target": {
@@ -7711,25 +7774,6 @@
                     "wind_corrosion"
                   ]
                 }
-              },
-              {
-                "id": "velina-c1-vortex-stun",
-                "type": "fixed",
-                "stat": "stunDmgMultiplierBonus",
-                "value": 20,
-                "mode": "flat",
-                "target": {
-                  "kind": "skill",
-                  "skillTargets": [
-                    {
-                      "kind": "specific",
-                      "agentSkillId": "velina",
-                      "categoryId": "special",
-                      "skillType": "special",
-                      "moveId": "windstorm_eye"
-                    }
-                  ]
-                }
               }
             ],
             "buffModifiers": []
@@ -7740,7 +7784,7 @@
               "zhCN": "饱和式计划"
             },
             "description": {
-              "zhCN": "触发风化时获得风蚀；广域气旋赋彩后的积蓄不参与异常伤害结算；风化和乱流伤害提升效果额外提升15%。"
+              "zhCN": "触发风化时获得风蚀；风化和乱流伤害提升效果额外提升15%。"
             },
             "scope": "inCombat",
             "defaultChecked": false,
@@ -7762,7 +7806,7 @@
               {
                 "id": "velina-c2-turbulence-damage",
                 "type": "fixed",
-                "stat": "anomalyDamageBonus",
+                "stat": "turbulenceDamageBonus",
                 "value": 15,
                 "mode": "flat",
                 "target": {
@@ -7810,11 +7854,39 @@
               "zhCN": "首席天使"
             },
             "description": {
-              "zhCN": "消耗风蚀强化乱流后按冷却返还风蚀；风属性异常积蓄提升20%；再次施加风化时按上次剩余持续时间提高风化伤害，最多40%。"
+              "zhCN": "消耗风蚀强化乱流后按冷却返还风蚀；风属性异常积蓄提升20%；\n当维琳娜对处于[风化]状态的敌人再次施加[风化]时，会根据上一次[风化]的剩余持续时间提升此次[风化]的伤害，每1秒剩余持续时间会使伤害提升2.5%，最多提升40%。"
             },
             "scope": "inCombat",
             "defaultChecked": false,
-            "effects": [],
+            "effects": [
+              {
+                "id": "velina-c6-wind-corrosion-recast-damage",
+                "type": "formula",
+                "stat": "anomalyDamageBonus",
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "attribute",
+                  "anomalyEffects": [
+                    "wind_corrosion"
+                  ]
+                },
+                "source": {
+                  "variable": "x",
+                  "defaultValue": 40,
+                  "min": 0,
+                  "max": 40,
+                  "step": 1,
+                  "label": {
+                    "zhCN": "风化增伤"
+                  }
+                },
+                "formula": {
+                  "expression": "x",
+                  "valueUnit": "storedValue"
+                }
+              }
+            ],
             "mechanics": {
               "windAnomalyBuildupBonusPct": 20,
               "recastWindCorrosionDamageByRemainingSecondsPct": 2.5,
@@ -7822,7 +7894,8 @@
             },
             "buffModifiers": []
           }
-        ]
+        ],
+        "skillBuffs": []
       },
       "coreSkill": {
         "name": {
@@ -7836,7 +7909,7 @@
             "label": "强化A",
             "stats": [
               {
-                "stat": "anomalyMasteryFlat",
+                "stat": "anomalyProficiency",
                 "value": 18,
                 "mode": "flat",
                 "target": "panel"
@@ -7872,7 +7945,7 @@
             "label": "强化C",
             "stats": [
               {
-                "stat": "anomalyMasteryFlat",
+                "stat": "anomalyProficiency",
                 "value": 18,
                 "mode": "flat",
                 "target": "panel"
@@ -7908,7 +7981,7 @@
             "label": "强化E",
             "stats": [
               {
-                "stat": "anomalyMasteryFlat",
+                "stat": "anomalyProficiency",
                 "value": 18,
                 "mode": "flat",
                 "target": "panel"
@@ -7995,7 +8068,7 @@
           "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
         ],
         "verification": {
-          "stats": "source-checked-gachabase-release-3.1.0; official entry pending panel cross-check",
+          "stats": "source-checked official entry 1960, page version 1789310040, verified 2026-09-29; A/C/E each add 18 anomaly proficiency, B/D/F each add 25 base ATK; applied separately from level60 stats",
           "corePassiveScaling": "official initial/A-F values for turbulence and cyclone release; initial/A-F = 90/100/110/120/130/140/150; micro 85/95/105/115/125/135/145; broad 135/155/175/195/215/235/255",
           "version": "3.1.0 release / design revision 18626312"
         }
@@ -8006,16 +8079,15 @@
           "name": {
             "zhCN": "微域气旋异放"
           },
-          "default": true,
           "supportedElements": [
             "wind"
           ],
           "resultMode": "fixedAnomalyMultiplier",
           "expression": {
-            "kind": "constant",
+            "kind": "coreSkillScaling",
             "whiteBoxRole": "conversionSource",
-            "value": 1.45,
-            "unit": "decimal",
+            "field": "microReleaseMultiplierPct",
+            "unit": "percent",
             "label": {
               "zhCN": "微域气旋固定异放倍率"
             }
@@ -8026,15 +8098,16 @@
           "name": {
             "zhCN": "广域气旋异放"
           },
+          "default": true,
           "supportedElements": [
             "wind"
           ],
           "resultMode": "fixedAnomalyMultiplier",
           "expression": {
-            "kind": "constant",
+            "kind": "coreSkillScaling",
             "whiteBoxRole": "conversionSource",
-            "value": 2.55,
-            "unit": "decimal",
+            "field": "broadReleaseMultiplierPct",
+            "unit": "percent",
             "label": {
               "zhCN": "广域气旋固定异放倍率"
             }
@@ -8064,6 +8137,10 @@
         "defaultSetIds": [
           "zzz_wiki_2038"
         ],
+        "defaultTwoPieceSetIds": [
+          "swing_jazz",
+          "moonlight_lullaby"
+        ],
         "mainStatLimits": {
           "4": [
             "anomalyProficiency",
@@ -8075,92 +8152,49 @@
             "penRatio"
           ],
           "6": [
-            "anomalyMastery",
             "energyRegen"
           ]
         }
       },
       "defaultCalculationConfig": {
-        "mode": "custom",
+        "mode": "anomaly",
         "cinemaLevel": 0,
         "name": {
-          "zhCN": "维琳娜风化与乱流示例"
+          "zhCN": "单次风化"
         },
         "events": [
-          {
-            "id": "velina-wind-corrosion",
-            "kind": "anomaly",
-            "count": 1,
-            "stunned": false,
-            "settlementType": "attribute",
-            "anomalyEffect": "wind_corrosion",
-            "anomalyVariant": "normal",
-            "procCount": 1
-          },
-          {
-            "id": "velina-micro-vortex-release",
-            "kind": "anomaly",
-            "count": 1,
-            "stunned": false,
-            "settlementType": "release",
-            "anomalyEffect": "wind_corrosion",
-            "triggerActorRef": {
-              "agentId": "velina",
-              "profileId": "micro_vortex"
-            },
-            "fixedMultiplier": 1.45,
-            "anomalySource": {
-              "actorRef": {
-                "agentId": "velina"
-              },
-              "snapshot": {
-                "agentId": "velina",
-                "anomalyEffect": "wind_corrosion",
-                "element": "wind"
-              }
-            }
-          },
           {
             "id": "velina-broad-vortex-release",
             "kind": "anomaly",
             "count": 1,
-            "stunned": false,
-            "settlementType": "release",
+            "stunned": true,
+            "settlementType": "attribute",
             "anomalyEffect": "wind_corrosion",
-            "triggerActorRef": {
-              "agentId": "velina",
-              "profileId": "broad_vortex"
-            },
-            "fixedMultiplier": 2.55,
-            "anomalySource": {
-              "actorRef": {
-                "agentId": "velina"
-              },
-              "snapshot": {
-                "agentId": "velina",
-                "anomalyEffect": "wind_corrosion",
-                "element": "wind"
-              }
-            }
+            "anomalyVariant": "normal",
+            "procCount": 1
           }
         ],
-        "selectedEventId": "velina-wind-corrosion"
+        "selectedEventId": "velina-broad-vortex-release"
       },
       "sources": [
         "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
-        "https://baike.mihoyo.com/zzz/wiki/content/2041/detail",
-        "https://git.mero.moe/dimbreath/ZenlessData/blame/commit/1dbcef24b3a6039a135daad6b29832c9d556139c/TextMap/TextMapOverwriteTemplateTb.json#L786-L788",
-        "https://zzz.gachabase.net/agents/1561/velina/release/3.1.0/18626312?lang=chs",
-        "https://news.17173.com/content/06132026/134134065.shtml",
-        "https://www.hoyolab.com/article/45547491"
+        "https://git.mero.moe/dimbreath/ZenlessData/blame/commit/1dbcef24b3a6039a135daad6b29832c9d556139c/TextMap/TextMapOverwriteTemplateTb.json#L786-L788"
       ],
       "verification": {
         "officialVersion": "3.1.0 release / design revision 18626312",
-        "level60Stats": "source-checked-gachabase-release-3.1.0; official entry 1960 is canonical source to recheck before production import",
+        "level60Stats": "source-checked official entry 1960, page version 1789310040, verified 2026-09-29; level 60 excluding core skill enhancements: HP 7788, ATK 797, DEF 612, Impact 86, CR 5%, CRIT DMG 50%, AP 111, AM 112, Energy Regen 1.2, PEN Ratio 0%",
         "mechanics": "wind corrosion/turbulence/release semantics cross-checked against official entry and public game text",
         "turbulenceTable": "pending-versioned-table-in-anomaly_effects.json"
       },
-      "hidden": false
+      "hidden": false,
+      "importantSubStats": [
+        "atkPct",
+        "anomalyProficiency"
+      ],
+      "importantPanelStats": [
+        "atk",
+        "anomalyProficiency"
+      ]
     }
   ]
 }
