@@ -686,7 +686,12 @@ function buildPersistSnapshotFor(state: any) {
   }
 }
 
-type BuildPersistOptions = { rollbackOnFailure?: boolean }
+type BuildPersistOptions = {
+  rollbackOnFailure?: boolean
+  expectedBuild?: any
+  expectedLegacy?: any
+  validate?: () => Promise<void>
+}
 
 function writeBuildPersistSnapshot(snapshot: any, options: BuildPersistOptions = {}) {
   const { ownerId, agentId } = snapshot
@@ -782,7 +787,7 @@ function writeBuildPersistSnapshot(snapshot: any, options: BuildPersistOptions =
 
 function persistBuildSnapshot(snapshot: any, options: BuildPersistOptions = {}): Promise<void> {
   const locks = typeof navigator !== "undefined" ? (navigator as any).locks : null
-  if (!locks?.request) {
+  if (!locks?.request && !options.validate) {
     writeBuildPersistSnapshot(snapshot, options)
     return Promise.resolve()
   }
@@ -791,17 +796,20 @@ function persistBuildSnapshot(snapshot: any, options: BuildPersistOptions = {}):
     if (buildPersistenceBlocked) {
       throw new Error("配置已被其他页面更新，请刷新后再保存。")
     }
-    const expectedBuild = selectionDocumentFingerprint(readBuildSelectionDocument())
-    const expectedLegacy = selectionDocumentFingerprint(readLegacySelectionDocument())
-    await withDriveDiscImportOwnerLock(snapshot.ownerId, async () => {
+    const expectedBuild = selectionDocumentFingerprint(options.validate ? options.expectedBuild : readBuildSelectionDocument())
+    const expectedLegacy = selectionDocumentFingerprint(options.validate ? options.expectedLegacy : readLegacySelectionDocument())
+    const write = async () => {
+      await options.validate?.()
       const currentBuild = selectionDocumentFingerprint(readBuildSelectionDocument())
       const currentLegacy = selectionDocumentFingerprint(readLegacySelectionDocument())
       if (currentBuild !== expectedBuild || currentLegacy !== expectedLegacy) {
-        buildPersistenceBlocked = true
+        if (!options.validate) buildPersistenceBlocked = true
         throw new Error("配置在保存期间被导入或其他页面更新，请刷新后重试。")
       }
       writeBuildPersistSnapshot(snapshot, options)
-    })
+    }
+    if (locks?.request) await withDriveDiscImportOwnerLock(snapshot.ownerId, write)
+    else await write()
   })
   buildPersistQueue = operation.then(() => undefined, () => undefined)
   return operation
@@ -1297,6 +1305,30 @@ export const useBuildStore = defineStore("build", {
         this.buffPickerState = normalizeBuffPickerState(payload.buffPickerState)
       }
       this.persist()
+    },
+    buffSaveFingerprint(): string {
+      return JSON.stringify(buildPersistSnapshotFor(this))
+    },
+    async saveBuffState(payload: any, meta: any, options: BuildPersistOptions) {
+      const selectedIds = stringArray(payload?.selectedBuffIds)
+      const defaults = this.defaultBuffIds(meta)
+      const agent = meta?.agents?.find((item: any) => item.id === this.agentId)
+      const pyrois = normalizePyroisBuffSelection(agent, selectedIds, payload.runtimeInputs ?? {})
+      const boss = normalizeBossBuffSelection(pyrois.selectedIds, pyrois.runtimeInputs, meta)
+      const patch = {
+        selectedBuffIds: boss.selectedIds.filter(id => !defaults.includes(id)),
+        addedBuffs: normalizeAddedBuffs(payload.addedBuffs, meta),
+        runtimeInputs: normalizeAgentSkillBuffRuntimeInputs(agent, boss.runtimeInputs),
+        manuallyUncheckedDefaultBuffIds: defaults.filter(id => !pyrois.selectedIds.includes(id)),
+        buffPickerState: normalizeBuffPickerState(payload.buffPickerState),
+      }
+      const snapshot = { ...buildPersistSnapshotFor(this), ...patch }
+      await persistBuildSnapshot(snapshot, { ...options, rollbackOnFailure: true })
+      if (activeOwnerId() === snapshot.ownerId && this.agentId === snapshot.agentId) {
+        // Replace nested Buff documents: a deep merge would retain overrides
+        // and runtime fields that an explicit resync has just removed.
+        this.$patch(state => { Object.assign(state, patch) })
+      }
     },
     async prepareBuffPicker(meta: any): Promise<boolean> {
       if (!this.agentId || this.buffPickerState) return false

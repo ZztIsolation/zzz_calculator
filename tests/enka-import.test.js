@@ -1785,4 +1785,30 @@ assert.equal(blockedLegacyRebind.blockingErrors[0].code, "ENKA_REBIND_BASELINE_I
 assert.equal(blockedLegacyRebind.journal, null)
 assert.deepEqual(blockedLegacyRebind.nextStore, incompleteLegacyStore)
 
+// A supported teammate can be imported without inventing a damage model or
+// changing the active calculator character. The same transaction owns its discs.
+const teammateParsed = parseEnkaShowcase({ PlayerInfo: { ShowcaseDetail: {
+  AvatarList: [makeAvatar(1311, { CoreSkillEnhancement: 6, SkillLevelList: makeSkillList(12) })],
+} } })
+const teammateMapped = mapShowcaseToCatalog(teammateParsed, {
+  ...catalog, teammateCombatBuffGroups: [{ id: 'yaojiayin', name: { zhCN: '耀嘉音' } }],
+}, mapping, { uid: '123456789' })
+assert.equal(teammateMapped.mappedAgents[0].teammateOnly, true)
+teammateMapped.mappedAgents.forEach(agent => { agent.sourceUid = '123456789' })
+const teammatePlan = buildEnkaImportPlan({
+  uid: '123456789', mappedAgents: teammateMapped.mappedAgents,
+  store: createEmptyInventoryStore(), ownerId: 'default', buildSelection: null, legacySelection: null,
+  transactionId: 'teammate-test', now: new Date('2026-09-30T00:00:00Z'),
+})
+assert.equal(teammatePlan.hasBlockingErrors, false)
+assert.equal(teammatePlan.nextBuildSelection.byOwner.default.currentAgentId, null)
+assert.equal(teammatePlan.nextBuildSelection.byOwner.default.byAgent.yaojiayin, undefined)
+assert.equal(enkaImportHistoryForOwner(teammatePlan.nextStore, 'default').byAgent.yaojiayin.snapshot.skillLevels.special, 12)
+const teammateRepeat = buildEnkaImportPlan({
+  uid: '123456789', mappedAgents: teammateMapped.mappedAgents,
+  store: teammatePlan.nextStore, ownerId: 'default', buildSelection: teammatePlan.nextBuildSelection,
+  legacySelection: teammatePlan.nextLegacySelection, transactionId: 'teammate-repeat', now: new Date('2026-09-30T01:00:00Z'),
+})
+assert.equal(teammateRepeat.isNoop, true)
+
 console.log("enka-import.test.js: all assertions passed")

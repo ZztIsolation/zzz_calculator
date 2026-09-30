@@ -441,6 +441,9 @@ function coreSkillHistoryNumber(value) {
 
 function importedAgentHistorySnapshot(agent, driveResult) {
   const snapshot = {
+    skillLevels: Object.fromEntries(Object.entries(agent?.skillLevels ?? {})
+      .filter(([, value]) => Number.isInteger(value) && value >= 1 && value <= 16)),
+    selectedLoadoutId: driveResult?.hasUsableLoadout ? driveResult.loadoutId : null,
     driveDiscCount: slotCount(driveResult?.driveDiscIdsBySlot),
     driveDiscSourceCount: agent?.driveDiscSourceCount != null
       && Number.isInteger(Number(agent.driveDiscSourceCount))
@@ -890,6 +893,11 @@ export function buildEnkaImportPlan({
 
   for (const agent of mappedAgents ?? []) {
     const driveResult = driveByAgent.get(agent.agentId)
+    if (agent.teammateOnly) {
+      agents.push({ agentId: agent.agentId, agentName: agent.agentName, teammateOnly: true,
+        changes: [], changed: false, drive: driveResult ?? null })
+      continue
+    }
     const merged = mergeAgentConfig(nextBuildByAgent[agent.agentId], agent, driveResult)
     const mergedLegacy = mergeAgentConfig(nextLegacyByAgent[agent.agentId], agent, driveResult)
     nextBuildByAgent[agent.agentId] = merged.config
@@ -904,12 +912,13 @@ export function buildEnkaImportPlan({
   }
 
   const selectedAgentIds = agents.map(agent => agent.agentId)
+  const calculableAgentIds = agents.filter(agent => !agent.teammateOnly).map(agent => agent.agentId)
   const nextBuildSelection = withOwnerSelection(buildSelection, ownerId, {
-    currentAgentId: currentBuildOwner.currentAgentId ?? selectedAgentIds[0] ?? null,
+    currentAgentId: currentBuildOwner.currentAgentId ?? calculableAgentIds[0] ?? null,
     byAgent: nextBuildByAgent,
   })
   const nextLegacySelection = withOwnerSelection(legacySelection, ownerId, {
-    currentAgentId: currentLegacyOwner.currentAgentId ?? currentBuildOwner.currentAgentId ?? selectedAgentIds[0] ?? null,
+    currentAgentId: currentLegacyOwner.currentAgentId ?? currentBuildOwner.currentAgentId ?? calculableAgentIds[0] ?? null,
     byAgent: nextLegacyByAgent,
   })
   const bindingSessionResult = recordEnkaBindingSessionImport({

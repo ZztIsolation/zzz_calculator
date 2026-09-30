@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, onMounted, ref, watch } from "vue"
+import { computed, h, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { NAlert, NButton, NInput, NInputNumber, NModal, NRadioButton, NRadioGroup, NSelect, NTag, useMessage } from "naive-ui"
 import { Ban, CheckSquare, ChevronDown, ChevronUp, LineChart, LockKeyhole, RefreshCcw, Save, SlidersHorizontal, Sparkles, X } from "lucide-vue-next"
 import BuffPickerModal from "@/components/BuffPickerModal.vue"
@@ -17,6 +17,8 @@ import OptimizerResultSelector from "@/components/OptimizerResultSelector.vue"
 import PanelStatTable from "@/components/PanelStatTable.vue"
 import { fallbackIcon, imageForAgent, imageForDriveDiscSet, imageForWEngine } from "@/utils/assets"
 import { buffLabelForId } from "@/utils/combatBuffs"
+import { sameTeammateValue, syncEnkaTeammates, type TeammateSources } from '@/utils/enkaTeammates'
+import { readTeammateSources } from '@runtime/enka-teammate-sources'
 import { countEffectiveDriveDiscSubstats } from "@/utils/driveDiscSubstats"
 import {
   attributeLabel,
@@ -63,7 +65,48 @@ const exclusionUiEnabled = computed(() => reservationUiEnabled.value && appConfi
 
 const showBuffPicker = ref(false)
 const openingBuffPicker = ref(false)
+const buffContextReady = ref(false)
 const buffPickerResetNotice = ref("")
+const teammateSources = ref<TeammateSources>()
+let buffSession: { context: Awaited<ReturnType<typeof readTeammateSources>>, state: string, agentId: string } | null = null
+let disposed = false
+onBeforeUnmount(() => { disposed = true })
+
+function currentBuffPayload() {
+  return { selectedBuffIds: buildStore.activeBuffIds(catalogStore.meta), addedBuffs: buildStore.addedBuffs,
+    runtimeInputs: buildStore.runtimeInputs, buffPickerState: buildStore.buffPickerState }
+}
+
+async function commitBuffDraft(payload: any, session: NonNullable<typeof buffSession>) {
+  await buildStore.saveBuffState(payload, catalogStore.meta, {
+    expectedBuild: session.context.build,
+    expectedLegacy: session.context.legacy,
+    validate: async () => {
+      const current = await readTeammateSources()
+      if (disposed || buildStore.agentId !== session.agentId
+        || accountStore.currentOwnerId !== session.context.sources.ownerId
+        || buildStore.buffSaveFingerprint() !== session.state
+        || !sameTeammateValue(current.sources, session.context.sources)) {
+        throw new Error('账号、配装或导入资料已变化，草稿已保留。请核对后重新打开 Buff 配置。')
+      }
+    },
+  })
+}
+
+async function refreshAutomaticTeammates() {
+  if (!buildStore.buffPickerState?.enka || showBuffPicker.value || disposed) return
+  const state = buildStore.buffSaveFingerprint()
+  const agentId = buildStore.agentId
+  try {
+    const context = await readTeammateSources()
+    if (disposed || state !== buildStore.buffSaveFingerprint()) return
+    const input = currentBuffPayload()
+    const result = syncEnkaTeammates(input, context.sources, catalogStore.meta, agentId, false, buildStore.wEngineId)
+    if (!sameTeammateValue(input, result.payload)) await commitBuffDraft(result.payload, { context, state, agentId })
+  } catch (error) {
+    if (!disposed) message.error(error instanceof Error ? error.message : '队友资料同步失败，请打开 Buff 配置重试。')
+  }
+}
 const showCalculationConfig = ref(false)
 const showAllDamageEvents = ref(false)
 const showOptimizerConfig = ref(false)
@@ -106,6 +149,7 @@ onMounted(async () => {
   await inventoryStore.load()
   if (catalogStore.catalog && catalogStore.meta) {
     buildStore.initialize(catalogStore.catalog, catalogStore.meta)
+    await refreshAutomaticTeammates()
     optimizerStore.initialize(
       catalogStore.catalog,
       catalogStore.displayAgents.find((item: any) => item.id === buildStore.agentId),
@@ -114,20 +158,28 @@ onMounted(async () => {
       optimizerStore.setFourPieceSets([catalogStore.displayDriveDiscSets[0]?.id ?? ""].filter(Boolean))
     }
     recalculate()
+    await nextTick()
+    await buildStore.persist()
+    buffContextReady.value = true
   }
 })
 
 watch(() => accountStore.currentOwnerId, async () => {
+  buffContextReady.value = false
   await inventoryStore.load()
   optimizerStore.reset()
   if (catalogStore.catalog && catalogStore.meta) {
     buildStore.initialize(catalogStore.catalog, catalogStore.meta)
+    await refreshAutomaticTeammates()
     optimizerStore.loadAgentSettings(
       catalogStore.displayAgents.find((item: any) => item.id === buildStore.agentId),
       catalogStore.catalog,
     )
   }
   recalculate()
+  await nextTick()
+  await buildStore.persist()
+  buffContextReady.value = true
 })
 
 const selectedAgent = computed(() => catalogStore.displayAgents.find((item: any) => item.id === buildStore.agentId))
@@ -455,11 +507,13 @@ const optimizerConstraintChips = computed(() => [
 watch(topOptimizedResultSchemes, schemes => {
   const values = schemes.map(scheme => Number(scheme.rank))
   if (!values.length) {
-    buildStore.selectOptimizedRank(0)
+    // Result-list housekeeping must not switch the user's loadout source or
+    // persist the previous character while this view is initializing.
+    buildStore.selectedOptimizedRank = 0
     return
   }
   if (!values.includes(Number(buildStore.selectedOptimizedRank))) {
-    buildStore.selectOptimizedRank(values[0])
+    buildStore.selectedOptimizedRank = values[0]!
   }
 }, { immediate: true })
 const skillLevelControls = computed(() => SKILL_CATEGORIES.map(categoryId => {
@@ -779,14 +833,21 @@ function updateManualDiscSetFilter(value: Array<string | number> | null) {
 }
 
 async function openBuffPicker() {
-  if (openingBuffPicker.value) return
+  if (openingBuffPicker.value || !buffContextReady.value) return
   const ownerId = accountStore.currentOwnerId
   const agentId = buildStore.agentId
   openingBuffPicker.value = true
   buffPickerResetNotice.value = ""
   try {
     const reset = await buildStore.prepareBuffPicker(catalogStore.meta)
+    // Flush calculation watchers and queued writes before capturing the draft baseline.
+    await nextTick()
+    await buildStore.persist()
+    const context = await readTeammateSources()
     if (ownerId !== accountStore.currentOwnerId || agentId !== buildStore.agentId) return
+    if (context.sources.ownerId !== ownerId || disposed) return
+    teammateSources.value = context.sources
+    buffSession = { context, state: buildStore.buffSaveFingerprint(), agentId }
     buffPickerResetNotice.value = reset
       ? "旧配置包含超过两名队友，已保留自身及自身音擎 Buff，其余已重置"
       : ""
@@ -798,8 +859,9 @@ async function openBuffPicker() {
   }
 }
 
-function applyBuffs(payload: any) {
-  buildStore.applyBuffState(payload, catalogStore.meta)
+async function applyBuffs(payload: any) {
+  if (!buffSession) throw new Error('请重新打开 Buff 配置。')
+  await commitBuffDraft(payload, buffSession)
 }
 
 function saveCalculationConfig(config: any) {
@@ -826,6 +888,7 @@ function saveOptimizerConfig(config: any) {
 
 function selectAgent(agentId: string) {
   buildStore.selectAgent(agentId, catalogStore.meta)
+  void refreshAutomaticTeammates()
   optimizerStore.loadAgentSettings(
     catalogStore.displayAgents.find((item: any) => item.id === agentId),
     catalogStore.catalog,
@@ -1398,7 +1461,7 @@ function formatPercentValue(value: any) {
       <section class="workbench-section workbench-buff-section">
         <div class="panel-header workbench-section-header">
           <h2 class="panel-title">局内 Buff</h2>
-          <NButton class="prominent-config-button workbench-action-button workbench-action-button--buff" type="primary" size="small" data-testid="open-buff-picker" :loading="openingBuffPicker" :disabled="openingBuffPicker" @click="openBuffPicker">
+          <NButton class="prominent-config-button workbench-action-button workbench-action-button--buff" type="primary" size="small" data-testid="open-buff-picker" :loading="openingBuffPicker" :disabled="openingBuffPicker || !buffContextReady" @click="openBuffPicker">
             <template #icon><SlidersHorizontal :size="16" /></template>
             选择 Buff
           </NButton>
@@ -2059,7 +2122,8 @@ function formatPercentValue(value: any) {
     :w-engine-id="buildStore.wEngineId"
     :w-engine-modification-level="buildStore.wEngineModificationLevel"
     :in-combat-panel="buildStore.result?.inCombat?.panel"
-    @apply="applyBuffs"
+    :teammate-sources="teammateSources"
+    :save="applyBuffs"
   />
 
   <CalculationConfigModal

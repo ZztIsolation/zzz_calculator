@@ -990,6 +990,7 @@ onBeforeUnmount(() => {
           />
           <span class="agent-info">
             <strong>{{ agent.agentName }}</strong>
+            <span v-if="agent.teammateOnly" class="meta">队友资料：用于 Buff 自动配置</span>
             <span class="meta">{{ agentSummary(agent) }}</span>
           </span>
           <NTag v-if="importedAgentIds.has(String(agent.agentId))" size="small" type="success">已导入</NTag>

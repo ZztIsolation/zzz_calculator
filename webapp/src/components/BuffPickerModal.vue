@@ -5,6 +5,7 @@ import ImageAvatar from "@/components/ImageAvatar.vue"
 import LayerSlider from "@/components/LayerSlider.vue"
 import TeammateSelect from "@/components/TeammateSelect.vue"
 import TeammateBuffCard from "@/components/TeammateBuffCard.vue"
+import { syncEnkaTeammates, teammateImportStatus, teammateLoadoutOptions, type TeammateSources } from '@/utils/enkaTeammates'
 import { imageForBuff } from "@/utils/assets"
 import {
   inferBuffPickerState,
@@ -69,6 +70,8 @@ const props = defineProps<{
   wEngineId?: string
   wEngineModificationLevel?: number
   inCombatPanel?: Record<string, number> | null
+  teammateSources?: TeammateSources
+  save?: (payload: any) => Promise<void>
 }>()
 
 const emit = defineEmits<{
@@ -88,6 +91,30 @@ const draft = ref<Set<string>>(new Set())
 const draftAddedBuffs = ref<any[]>([])
 const draftRuntimeInputs = ref<Record<string, any>>({})
 const draftBuffPickerState = ref<BuffPickerState>({ teammateSlots: [null, null] })
+const saving = ref(false)
+const saveError = ref('')
+const teammateNotices = ref<string[]>([])
+
+function syncTeammates(reset = false) {
+  if (!props.teammateSources) return
+  const result = syncEnkaTeammates({
+    selectedBuffIds: [...draft.value], addedBuffs: draftAddedBuffs.value,
+    runtimeInputs: draftRuntimeInputs.value, buffPickerState: draftBuffPickerState.value,
+  }, props.teammateSources, props.meta, props.agentId ?? '', reset, props.wEngineId)
+  draft.value = new Set(result.payload.selectedBuffIds)
+  draftAddedBuffs.value = result.payload.addedBuffs
+  draftRuntimeInputs.value = result.payload.runtimeInputs
+  draftBuffPickerState.value = result.payload.buffPickerState
+  teammateNotices.value = result.notices
+}
+
+function setTeammateLoadout(index: number, value: string | null) {
+  const slot = draftBuffPickerState.value.teammateSlots[index]
+  if (!slot) return
+  if (value) slot.loadoutId = value
+  else delete slot.loadoutId
+  syncTeammates()
+}
 const fieldVersion = ref("")
 const fieldPeriod = ref("")
 const fieldName = ref("")
@@ -118,6 +145,8 @@ watch(() => props.show, value => {
       ?? inferBuffPickerState(groupedBuffs.value.teammate ?? [], selected)
     syncSelectedTeamWEngineReferences(teamWEngineCandidates)
     draftRuntimeInputs.value = JSON.parse(JSON.stringify(props.runtimeInputs ?? {}))
+    saveError.value = ''
+    syncTeammates()
     query.value = ""
     fieldVersion.value = ""
     fieldPeriod.value = ""
@@ -586,7 +615,7 @@ const teammateOwners = computed(() => {
   const owners = new Map<string, any>()
   for (const buff of groupedBuffs.value.teammate) {
     const id = teammateOwnerId(buff)
-    if (id && !owners.has(id)) owners.set(id, buff)
+    if (id && id !== props.agentId && !owners.has(id)) owners.set(id, buff)
   }
   return [...owners].map(([value, buff]) => ({
     value,
@@ -601,7 +630,8 @@ function teammateOptionsFor(index: number) {
   const otherId = draftBuffPickerState.value.teammateSlots[1 - index]?.teammateId
   return teammateOwners.value
     .filter(owner => owner.value !== otherId)
-    .map(({ label, value, buff }) => ({ label, value, specialty: buff.teammateSpecialty, avatar: imageForBuff(buff) }))
+    .map(({ label, value, buff }) => ({ label, value, specialty: buff.teammateSpecialty, avatar: imageForBuff(buff),
+      importStatus: teammateImportStatus(props.teammateSources, value) }))
 }
 
 function setTeammateSlot(index: number, value: string | null) {
@@ -627,13 +657,14 @@ function setTeammateSlot(index: number, value: string | null) {
   }
   const nextSlots = [...slots] as BuffPickerState["teammateSlots"]
   nextSlots[index] = teammateId ? { teammateId, cinemaLevel: 0 } : null
-  draftBuffPickerState.value = { teammateSlots: nextSlots }
+  draftBuffPickerState.value = { ...draftBuffPickerState.value, teammateSlots: nextSlots }
   if (teammateId) {
     for (const buff of groupedBuffs.value.teammate) {
       if (teammateOwnerId(buff) === teammateId && teammateCinemaLevel(buff) === null
         && !isTeammatePotentialBuff(buff)) toggle(buff.id, true)
     }
   }
+  syncTeammates()
 }
 
 function setTeammateCinema(index: number, value: number) {
@@ -642,7 +673,13 @@ function setTeammateCinema(index: number, value: number) {
   if (!slot || slot.cinemaLevel === cinemaLevel) return
   const slots = [...draftBuffPickerState.value.teammateSlots] as BuffPickerState["teammateSlots"]
   slots[index] = { ...slot, cinemaLevel }
-  draftBuffPickerState.value = { teammateSlots: slots }
+  draftBuffPickerState.value = { ...draftBuffPickerState.value, teammateSlots: slots }
+  const source = props.teammateSources
+  if (source?.uid && source.history[slot.teammateId]?.uid === source.uid
+    && source.history[slot.teammateId]?.completeness === 'full') {
+    syncTeammates()
+    return
+  }
   for (const buff of groupedBuffs.value.teammate) {
     const level = teammateCinemaLevel(buff)
     if (teammateOwnerId(buff) === slot.teammateId && level !== null) toggle(buff.id, level <= cinemaLevel)
@@ -1072,10 +1109,13 @@ function removeCustomBuff(id: string) {
 }
 
 function close() {
+  if (saving.value) return
   emit("update:show", false)
 }
 
-function apply() {
+async function apply() {
+  if (saving.value) return
+  syncTeammates()
   const teamWEngineCandidates = groupedBuffs.value.teammateWEngine ?? []
   syncSelectedTeamWEngineReferences(teamWEngineCandidates)
   const availableTeamWEngineIds = new Set(teamWEngineCandidates.map((buff: any) => buff.id))
@@ -1096,13 +1136,23 @@ function apply() {
     if (buff) return [[id, normalizeRuntimeForBuff(buff, runtime)]]
     return []
   }))
-  emit("apply", {
+  const payload = {
     selectedBuffIds,
     addedBuffs,
     runtimeInputs,
     buffPickerState: normalizeBuffPickerState(draftBuffPickerState.value)!,
-  })
-  close()
+  }
+  saving.value = true
+  saveError.value = ''
+  try {
+    if (props.save) await props.save(payload)
+    else emit('apply', payload)
+    emit('update:show', false)
+  } catch (error) {
+    saveError.value = error instanceof Error ? error.message : '保存失败，请重试。'
+  } finally {
+    saving.value = false
+  }
 }
 </script>
 
@@ -1111,12 +1161,16 @@ function apply() {
     :show="show"
     preset="card"
     title="选择 Buff"
+    :mask-closable="!saving"
+    :close-on-esc="!saving"
+    :closable="!saving"
     class="calculation-modal calculation-modal--list"
     :class="{ 'is-teammate-picker': activeTab === 'teammate' }"
     :style="{ width: `min(${activeTab === 'teammate' ? 1280 : 1080}px, calc(100vw - 16px))`, maxWidth: `${activeTab === 'teammate' ? 1280 : 1080}px` }"
     @update:show="emit('update:show', $event)"
   >
-    <div class="section-band buff-picker-layout calculation-modal-body ui-layout-scope" :class="{ 'is-teammate-layout': activeTab === 'teammate' }" data-layout-surface="buff-picker">
+    <div :inert="saving || undefined" class="section-band buff-picker-layout calculation-modal-body ui-layout-scope" :class="{ 'is-teammate-layout': activeTab === 'teammate' }" data-layout-surface="buff-picker">
+      <p v-if="saveError" role="alert">{{ saveError }}</p>
       <p v-if="resetNotice" class="buff-picker-reset-notice" role="status" data-testid="buff-picker-reset-notice">{{ resetNotice }}</p>
       <div class="toolbar">
         <NInput v-model:value="query" clearable placeholder="搜索来源、名称、效果" style="max-width: 360px" />
@@ -1128,6 +1182,16 @@ function apply() {
       <NTabs v-model:value="activeTab" class="buff-category-tabs" type="segment">
         <NTabPane v-for="tab in categoryTabs" :key="tab.name" :name="tab.name" :tab="tab.label" />
       </NTabs>
+      <div v-if="activeTab === 'teammate' && teammateSources" class="teammate-sync-status" role="status">
+        <NButton size="small" @click="syncTeammates(true)">从导入资料重新同步</NButton>
+        <details class="teammate-source-notices">
+          <summary>来源与参数说明（{{ teammateNotices.length }} 项提示；未自动确定的参数请核对）</summary>
+          <div class="teammate-source-notices-body">
+            <p>影画、技能和音擎来自导入资料；未能自动确定的参数沿用原生默认值或手动值，并非实测面板。层数与覆盖率可手动调整。</p>
+            <p v-for="notice in teammateNotices" :key="notice">{{ notice }}</p>
+          </div>
+        </details>
+      </div>
 
       <div v-if="activeTab === 'field'" class="field-buff-filter-row ui-field-grid ui-field-grid--comfortable" data-layout-surface="field-buff-filters">
         <label class="custom-field ui-field" data-layout-field>
@@ -1192,6 +1256,15 @@ function apply() {
                 />
               </div>
             <span class="teammate-selection-count">已选 {{ section.selectedCount }}</span>
+            <NSelect
+              v-if="section.slot && teammateSources"
+              class="teammate-loadout-select"
+              :value="section.slot.loadoutId ?? null"
+              :options="teammateLoadoutOptions(teammateSources, section.slot.teammateId)"
+              clearable placeholder="使用当前方案 / 导入配装"
+              :aria-label="`${section.label}驱动盘方案`"
+              @update:value="setTeammateLoadout(section.slotIndex, $event)"
+            />
           </header>
       <NScrollbar class="buff-list-scrollbar">
         <div class="section-band buff-list">
@@ -1455,14 +1528,45 @@ function apply() {
     <template #footer>
       <div class="drawer-footer calculation-modal-footer">
         <span class="muted">{{ resetNotice ? '旧配置重置已保存；本次修改应用后生效' : '应用前不会改动当前方案' }}</span>
-        <NButton @click="close">取消</NButton>
-        <NButton type="primary" @click="apply">应用选择</NButton>
+        <NButton :disabled="saving" @click="close">取消</NButton>
+        <NButton type="primary" :loading="saving" @click="apply">应用选择</NButton>
       </div>
     </template>
   </NModal>
 </template>
 
 <style scoped>
+.teammate-sync-status {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.teammate-source-notices {
+  flex: 1;
+  min-width: 220px;
+}
+
+.teammate-source-notices summary {
+  cursor: pointer;
+  line-height: 28px;
+}
+
+.teammate-source-notices-body {
+  max-height: min(120px, 20vh);
+  overflow-y: auto;
+}
+
+.teammate-source-notices-body p {
+  margin: 4px 0;
+}
+
+.teammate-loadout-select {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
 .buff-picker-reset-notice {
   margin: 0;
   padding: 10px 12px;
