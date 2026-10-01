@@ -109,7 +109,7 @@ for (const [triggerName, trigger] of [["pull request", ciPullRequestTrigger], ["
     assert.match(trigger, /^\s*- main\s*$/m, `CI ${triggerName} must target main.`)
     assert.doesNotMatch(trigger, /^\s*- deploy\s*$/m, `CI ${triggerName} must not target the production deploy branch.`)
 }
-requireText(files.ci, "timeout-minutes: 25", "CI must have a bounded timeout.")
+requireText(files.ci, "timeout-minutes: 35", "CI must use the reviewed 35-minute timeout.")
 requireText(files.ci, "cancel-in-progress: true", "CI must cancel superseded runs.")
 requireText(files.packageJson, '"test:deployment-workflows": "node tests/deploy-promotion-workflows.test.js"', "npm test must expose executable promotion behavior checks.")
 requireText(files.packageJson, "npm run test:deployment-workflows", "The full npm test chain must run promotion behavior checks.")
