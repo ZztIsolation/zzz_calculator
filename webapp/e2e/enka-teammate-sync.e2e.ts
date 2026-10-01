@@ -114,12 +114,22 @@ test('imported teammate adoption, three refresh saves, retry and concurrent sour
   expect(errors).toEqual([])
 })
 
-test('resync stays a cancellable draft and retains scenario inputs on apply', async ({ page }) => {
+test('resync stays a cancellable draft and retains scenario inputs on apply', async ({ page }, testInfo) => {
   await seed(page)
   await openPicker(page)
   await page.getByRole('button', { name: '从导入资料重新同步' }).click()
   await expect(page.locator(`[data-buff-id="${core}"]`)).toHaveClass(/is-selected/)
   await expect(page.locator(`[data-buff-id="${cinema}"]`)).toHaveClass(/is-selected/)
+  await page.locator('.teammate-source-notices summary').click()
+  if (testInfo.project.use.isMobile) {
+    const scrollContainers = await page.locator('[data-layout-surface="buff-picker"]').evaluate(root =>
+      [root as HTMLElement, ...root.querySelectorAll<HTMLElement>('*')].filter(element =>
+        /auto|scroll/.test(getComputedStyle(element).overflowY) && element.scrollHeight > element.clientHeight + 2).length)
+    expect(scrollContainers).toBe(1)
+  }
+  const applyBox = await page.getByRole('button', { name: '应用选择', exact: true }).boundingBox()
+  expect(applyBox!.y + applyBox!.height).toBeLessThanOrEqual(page.viewportSize()!.height)
+  await page.screenshot({ path: testInfo.outputPath('enka-teammate-sync.png') })
   await page.getByRole('button', { name: '取消', exact: true }).click()
   expect((await saved(page)).combat.activeBuffIds).not.toContain(core)
   await openPicker(page)

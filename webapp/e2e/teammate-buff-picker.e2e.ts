@@ -97,8 +97,8 @@ test("teammates remain in their own responsive columns and preserve manual cinem
       [root as HTMLElement, ...root.querySelectorAll<HTMLElement>("*")].filter(element => {
         const style = getComputedStyle(element)
         return /auto|scroll/.test(style.overflowY) && element.scrollHeight > element.clientHeight + 2
-      }).length)
-    expect(scrollContainers).toBe(1)
+      }).map(element => ({ className: element.className, clientHeight: element.clientHeight, scrollHeight: element.scrollHeight })))
+    expect(scrollContainers, JSON.stringify(scrollContainers)).toHaveLength(1)
   }
 
   const cinemaOne = page.locator('[data-buff-id="qianxia.cinema_1.cat_gaze_def_reduction"]')

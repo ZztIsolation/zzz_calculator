@@ -98,12 +98,15 @@ async function commitBuffDraft(payload: any, session: NonNullable<typeof buffSes
 
 async function refreshAutomaticTeammates() {
   if (showBuffPicker.value || disposed) return
+  const ownerId = accountStore.currentOwnerId
+  const agentId = buildStore.agentId
   await nextTick()
+  if (disposed || ownerId !== accountStore.currentOwnerId || agentId !== buildStore.agentId) return
   await buildStore.persist()
   const state = buildStore.buffSaveFingerprint()
-  const agentId = buildStore.agentId
   const context = await readTeammateSources()
-  if (disposed || showBuffPicker.value || state !== buildStore.buffSaveFingerprint()) return
+  if (disposed || showBuffPicker.value || ownerId !== accountStore.currentOwnerId || context.sources.ownerId !== ownerId
+    || agentId !== buildStore.agentId || state !== buildStore.buffSaveFingerprint()) return
   const input = currentBuffPayload()
   if (!input.buffPickerState) {
     const candidates = teammateBuffCandidates(catalogStore.meta)
@@ -175,6 +178,7 @@ async function loadWorkbench(initial = false) {
     recalculate()
     await refreshAutomaticTeammates()
     await nextTick()
+    if (disposed || sequence !== loadSequence || ownerId !== accountStore.currentOwnerId) return
     await buildStore.persist()
     if (!disposed && sequence === loadSequence) buffContextReady.value = true
   } catch (error) {
@@ -828,6 +832,7 @@ async function openBuffPicker() {
     const reset = await buildStore.prepareBuffPicker(catalogStore.meta)
     // Flush calculation watchers and queued writes before capturing the draft baseline.
     await nextTick()
+    if (disposed || ownerId !== accountStore.currentOwnerId || agentId !== buildStore.agentId) return
     await buildStore.persist()
     const context = await readTeammateSources()
     if (ownerId !== accountStore.currentOwnerId || agentId !== buildStore.agentId) return
