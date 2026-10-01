@@ -2,6 +2,7 @@ import { mount } from "@vue/test-utils"
 import { describe, expect, it, vi } from "vitest"
 import { nextTick } from "vue"
 import BuffPickerModal from "@/components/BuffPickerModal.vue"
+import combatBuffCatalog from "../../../data/combat_buffs.json"
 
 vi.mock("naive-ui", async () => {
   const { defineComponent, h, inject, provide } = await import("vue")
@@ -2095,6 +2096,22 @@ describe("BuffPickerModal", () => {
     expect(visibleRows.some(text => text.includes("链式回路"))).toBe(true)
     expect(visibleRows.some(text => text.includes("零度行动"))).toBe(true)
     expect(visibleRows.some(text => text.includes("湮亡"))).toBe(false)
+  })
+
+  it("defaults the real catalog to Defense Battle 3.2 phase 2", async () => {
+    const wrapper = mountModal({ buffs: combatBuffCatalog.fieldBuffs })
+    await openFieldTab(wrapper)
+    const selects = wrapper.findAll(".field-buff-filter-row select")
+    expect((selects[0].element as HTMLSelectElement).value).toBe("3.2")
+    expect((selects[1].element as HTMLSelectElement).value).toBe("defense_v5|3.2|2")
+    const rows = wrapper.findAll(".buff-row").map(row => row.text())
+    expect(rows).toHaveLength(3)
+    for (const [index, name] of ["御风惊雷", "冰锋碎厄", "焚烬启明"].entries()) {
+      expect(rows[index]).toContain(name)
+    }
+    await selects[1].setValue("critical_assault|3.2|2")
+    await nextTick()
+    expect(wrapper.findAll(".buff-row").map(row => row.text()).join(" ")).toContain("极锋")
   })
 
   it("defaults the field tab to Critical Assault 3.2 phase 2", async () => {

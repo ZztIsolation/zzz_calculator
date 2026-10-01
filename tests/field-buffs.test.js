@@ -186,7 +186,7 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
 }
 
 const allFieldBuffs = catalog.combatBuffs.filter(buff => buff.sourceType === "field")
-assert.equal(allFieldBuffs.length, 36, "Field Buff catalog should keep all maintained entries")
+assert.equal(allFieldBuffs.length, 39, "Field Buff catalog should keep all maintained entries")
 assert.deepEqual(
     allFieldBuffs
         .filter(buff => buff.period?.modeId === "defense_v5" && buff.period?.gameVersion === "3.1" && buff.period?.phaseNo === 3)
@@ -1311,5 +1311,80 @@ const shiguangStunRules = fieldBuff(DEFENSE_3_2_PHASE_1_IDS.shiguang).effects
 assert.equal(shiguangStunRules.length, 1, "Shiguang Ranmeng should expose one stun-vulnerability rule")
 assert.equal(shiguangStunRules[0].condition, "代理人使敌人进入属性异常状态后")
 assert.equal(shiguangStunRules[0].durationSeconds, 15)
+
+const defense32Phase2 = allFieldBuffs.filter(buff =>
+    buff.period?.modeId === "defense_v5" && buff.period?.gameVersion === "3.2" && buff.period?.phaseNo === 2,
+)
+assert.deepEqual(defense32Phase2.map(buff => buff.name.zhCN), ["御风惊雷", "冰锋碎厄", "焚烬启明"])
+const [yufeng, bingfeng, fenjin] = defense32Phase2
+for (const buff of defense32Phase2) {
+    assert.equal(buff.source.zhCN, "防卫战 v5")
+    assert.equal(buff.sourcePeriod.zhCN, "3.2版本第二期")
+    assert.equal(buff.period.phaseName.zhCN, "第二期")
+    const validation = validateMaintenanceItem("field-buffs", buff, {
+        items: catalog.combatBuffs, currentId: buff.id, agentSkills: catalog.agentSkills,
+    })
+    assert.equal(validation.ok, true, JSON.stringify(validation.errors))
+}
+// Resource, buildup, Daze and recovery clauses remain descriptive only.
+assert.deepEqual(yufeng.effects.map(effect => effect.stat), ["sharpDmgBonus"])
+assert.deepEqual(bingfeng.effects.map(effect => effect.stat), ["iceDmg", "etherDmg", "enemyDefReduction"])
+assert.deepEqual(fenjin.effects.map(effect => effect.stat), ["fireDmg", "electricDmg", "stunDmgMultiplierBonus"])
+assert.ok(yufeng.description.zhCN.includes("[击破]特性的代理人恢复15点能量"))
+assert.ok(yufeng.description.zhCN.includes("失衡恢复速度降低15%，持续15秒"))
+assert.ok(bingfeng.description.zhCN.includes("冰属性与以太属性异常积蓄效率提升15%"))
+assert.ok(fenjin.description.zhCN.includes("[击破]特性的代理人造成的失衡值提升15%"))
+assert.ok(fenjin.description.zhCN.includes("失衡恢复速度降低15%，持续20秒"))
+
+function calculateDefensePhase2(buff, { kind = "direct", stunned = false, coverage = 1 } = {}) {
+    return calculateInCombatPanel(catalog, {
+        agentId: "claret",
+        wEngineId: "zzz_wiki_2188",
+        wEngineModificationLevel: 5,
+        coreSkillLevel: "F",
+        driveDiscs: [],
+        combatBuffs: {
+            activeBuffIds: [buff.id],
+            runtimeInputs: { [buff.id]: { effects: Object.fromEntries(
+                buff.effects.filter(effect => effect.condition).map(effect => [effect.id, { coverage }]),
+            ) } },
+        },
+        damage: {
+            selectedEventId: "defense-phase-2",
+            events: [{
+                id: "defense-phase-2", kind, stunned, critMode: "nonCrit", count: 1,
+                skillRef: { agentSkillId: "claret", categoryId: "special", moveId: "special_slash_gold", rowId: "hit_1" },
+            }],
+            target: { defense: 953, levelCoefficient: 794 },
+        },
+    })
+}
+const yufengSharp = calculateDefensePhase2(yufeng, { kind: "sharp" })
+approx(yufengSharp.damage.events[0].multipliers.sharpDmg, 1.2, "Yufeng grants 20% Sharp damage to non-Stun agents")
+const yufengDirect = calculateDefensePhase2(yufeng)
+approx(yufengDirect.damage.multipliers.directDamageBonus, 0, "Yufeng must not convert Sharp bonus to direct damage")
+for (const [buff, expected] of [[bingfeng, { iceDmg: 0.25, etherDmg: 0.25 }], [fenjin, { fireDmg: 0.35, electricDmg: 0.35 }]]) {
+    const result = calculateDefensePhase2(buff)
+    for (const stat of ["physicalDmg", "fireDmg", "iceDmg", "electricDmg", "etherDmg", "windDmg"]) {
+        approx((result.inCombat.panel[stat] ?? 0) - (result.outOfCombat.panel[stat] ?? 0), expected[stat] ?? 0,
+            `${buff.name.zhCN} should only boost its specified elements`)
+    }
+}
+const bingfengDef = bingfeng.effects.find(effect => effect.stat === "enemyDefReduction")
+assert.equal(bingfengDef.condition, "代理人使敌人进入属性异常状态后")
+assert.equal(bingfengDef.durationSeconds, 10)
+const fenjinStun = fenjin.effects.find(effect => effect.stat === "stunDmgMultiplierBonus")
+assert.equal(fenjinStun.condition, "代理人使敌人进入失衡状态后")
+assert.equal(fenjinStun.durationSeconds, 20)
+for (const coverage of [0, 0.5, 1]) {
+    const result = calculateDefensePhase2(bingfeng, { coverage })
+    approx(result.damage.targetBreakdown.enemyDefReduction, 0.1 * coverage, "Bingfeng DEF reduction honors trigger coverage")
+    approx(result.inCombat.panel.iceDmg - result.outOfCombat.panel.iceDmg, 0.25, "Bingfeng permanent damage is independent of trigger coverage")
+    for (const stunned of [false, true]) {
+        const result = calculateDefensePhase2(fenjin, { coverage, stunned })
+        approx(result.damage.multipliers.stun, stunned ? 1.5 + 0.3 * coverage : 1,
+            "Fenjin vulnerability requires a stunned event and honors coverage")
+    }
+}
 
 console.log("field Buff regression tests passed")
