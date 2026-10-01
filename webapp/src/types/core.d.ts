@@ -465,6 +465,7 @@ declare module "@core/shared-combat.js" {
   export function normalizeCustomBuffStat(stat?: any, meta?: any): any
   export function normalizeRuntimeForBuff(buff?: any, runtime?: any): any
   export function effectRules(effect?: any): any[]
+  export function buffModifiers(effect?: any): any[]
   export function effectRuleId(rule?: any): string
   export function effectRuleCoverage(rule?: any, effect?: any): any
   export function defaultCoverageForEffectRule(rule?: any, effect?: any): number

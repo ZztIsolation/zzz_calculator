@@ -5,7 +5,7 @@ import ImageAvatar from "@/components/ImageAvatar.vue"
 import LayerSlider from "@/components/LayerSlider.vue"
 import TeammateSelect from "@/components/TeammateSelect.vue"
 import TeammateBuffCard from "@/components/TeammateBuffCard.vue"
-import { syncEnkaTeammates, teammateImportStatus, teammateLoadoutOptions, type TeammateSources } from '@/utils/enkaTeammates'
+import { recordEnkaTeammateEdit, syncEnkaTeammates, teammateImportStatus, teammateLoadoutOptions, type TeammateSources, type TeammateSyncOperation } from '@/utils/enkaTeammates'
 import { imageForBuff } from "@/utils/assets"
 import {
   inferBuffPickerState,
@@ -96,12 +96,12 @@ const saving = ref(false)
 const saveError = ref('')
 const teammateNotices = ref<string[]>([])
 
-function syncTeammates(reset = false) {
+function syncTeammates(operation: TeammateSyncOperation = { kind: 'refresh' }) {
   if (!props.teammateSources) return
   const result = syncEnkaTeammates({
     selectedBuffIds: [...draft.value], addedBuffs: draftAddedBuffs.value,
     runtimeInputs: draftRuntimeInputs.value, buffPickerState: draftBuffPickerState.value,
-  }, props.teammateSources, props.meta, props.agentId ?? '', reset, props.wEngineId)
+  }, props.teammateSources, props.meta, props.agentId ?? '', operation, props.wEngineId)
   draft.value = new Set(result.payload.selectedBuffIds)
   draftAddedBuffs.value = result.payload.addedBuffs
   draftRuntimeInputs.value = result.payload.runtimeInputs
@@ -665,7 +665,7 @@ function setTeammateSlot(index: number, value: string | null) {
         && !isTeammatePotentialBuff(buff)) toggle(buff.id, true)
     }
   }
-  syncTeammates()
+  syncTeammates({ kind: 'select', slotIndex: index })
 }
 
 function setTeammateCinema(index: number, value: number) {
@@ -678,7 +678,7 @@ function setTeammateCinema(index: number, value: number) {
   const source = props.teammateSources
   if (source?.uid && source.history[slot.teammateId]?.uid === source.uid
     && source.history[slot.teammateId]?.completeness === 'full') {
-    syncTeammates()
+    syncTeammates({ kind: 'cinema', slotIndex: index })
     return
   }
   for (const buff of groupedBuffs.value.teammate) {
@@ -827,6 +827,7 @@ function removeTeamWEngineReference(id: string) {
 
 function setTeamWEngineModificationLevel(buff: any, value: unknown) {
   upsertTeamWEngineReference(buff, value)
+  recordEnkaTeammateEdit(draftBuffPickerState.value, `engine:${buff.id}`, normalizedTeamWEngineLevel(buff, value))
 }
 
 function hasRuntimeControls(buff: any) {
@@ -904,6 +905,7 @@ function displayStatLabelForRule(rule: any) {
 }
 
 function updateRuntime(buff: any, runtime: any) {
+  recordEnkaTeammateEdit(draftBuffPickerState.value, `runtime:${buff.id}`, runtime, runtimeFor(buff))
   draftRuntimeInputs.value = {
     ...draftRuntimeInputs.value,
     [buff.id]: normalizeRuntimeForBuff(buff, runtime),
@@ -965,6 +967,7 @@ function setStacks(buff: any, group: any, value: number | null) {
 }
 
 function toggle(id: string, checked: boolean) {
+  recordEnkaTeammateEdit(draftBuffPickerState.value, `enabled:${id}`, checked)
   const next = new Set(draft.value)
   const nextRuntime = { ...draftRuntimeInputs.value }
   const buff = Object.values(groupedBuffs.value).flat().find((item: any) => item?.id === id) as any
@@ -1196,11 +1199,12 @@ async function apply() {
         <NTabPane v-for="tab in categoryTabs" :key="tab.name" :name="tab.name" :tab="tab.label" />
       </NTabs>
       <div v-if="activeTab === 'teammate' && teammateSources" class="teammate-sync-status" role="status">
-        <NButton size="small" @click="syncTeammates(true)">从导入资料重新同步</NButton>
+        <NButton size="small" @click="syncTeammates({ kind: 'resync' })">从导入资料重新同步</NButton>
         <details class="teammate-source-notices">
           <summary>来源与参数说明（{{ teammateNotices.length }} 项提示；未自动确定的参数请核对）</summary>
           <div class="teammate-source-notices-body">
             <p>影画、技能和音擎来自导入资料；未能自动确定的参数沿用原生默认值或手动值，并非实测面板。层数与覆盖率可手动调整。</p>
+            <p>重新同步会恢复导入参数、配装及相应勾选，保留手填面板、层数和覆盖率；点击“应用选择”后生效。</p>
             <p v-for="notice in teammateNotices" :key="notice">{{ notice }}</p>
           </div>
         </details>
@@ -1274,7 +1278,7 @@ async function apply() {
               class="teammate-loadout-select"
               :value="section.slot.loadoutId ?? null"
               :options="teammateLoadoutOptions(teammateSources, section.slot.teammateId)"
-              clearable placeholder="使用当前方案 / 导入配装"
+              clearable placeholder="使用 Enka 导入配装"
               :aria-label="`${section.label}驱动盘方案`"
               @update:value="setTeammateLoadout(section.slotIndex, $event)"
             />

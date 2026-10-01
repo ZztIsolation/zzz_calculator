@@ -821,8 +821,7 @@ function persistBuildSnapshot(snapshot: any, options: BuildPersistOptions = {}):
       }
       writeBuildPersistSnapshot(snapshot, options)
     }
-    if (locks?.request) await withDriveDiscImportOwnerLock(snapshot.ownerId, write)
-    else await write()
+    await withDriveDiscImportOwnerLock(snapshot.ownerId, write)
   })
   buildPersistQueue = operation.then(() => undefined, () => undefined)
   return operation

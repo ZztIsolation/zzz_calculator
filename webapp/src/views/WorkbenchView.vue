@@ -17,7 +17,8 @@ import OptimizerResultSelector from "@/components/OptimizerResultSelector.vue"
 import PanelStatTable from "@/components/PanelStatTable.vue"
 import WEngineSelect from "@/components/WEngineSelect.vue"
 import { fallbackIcon, imageForAgent, imageForDriveDiscSet } from "@/utils/assets"
-import { buffLabelForId } from "@/utils/combatBuffs"
+import { buffLabelForId, teammateBuffCandidates } from "@/utils/combatBuffs"
+import { inferBuffPickerState, selectedTeammateOwnerIds } from '@/utils/teammateBuffPicker'
 import { sameTeammateValue, syncEnkaTeammates, type TeammateSources } from '@/utils/enkaTeammates'
 import { readTeammateSources } from '@runtime/enka-teammate-sources'
 import { countEffectiveDriveDiscSubstats } from "@/utils/driveDiscSubstats"
@@ -67,6 +68,7 @@ const exclusionUiEnabled = computed(() => reservationUiEnabled.value && appConfi
 const showBuffPicker = ref(false)
 const openingBuffPicker = ref(false)
 const buffContextReady = ref(false)
+const buffContextError = ref('')
 const buffPickerResetNotice = ref("")
 const teammateSources = ref<TeammateSources>()
 let buffSession: { context: Awaited<ReturnType<typeof readTeammateSources>>, state: string, agentId: string } | null = null
@@ -95,18 +97,23 @@ async function commitBuffDraft(payload: any, session: NonNullable<typeof buffSes
 }
 
 async function refreshAutomaticTeammates() {
-  if (!buildStore.buffPickerState?.enka || showBuffPicker.value || disposed) return
+  if (showBuffPicker.value || disposed) return
+  await nextTick()
+  await buildStore.persist()
   const state = buildStore.buffSaveFingerprint()
   const agentId = buildStore.agentId
-  try {
-    const context = await readTeammateSources()
-    if (disposed || state !== buildStore.buffSaveFingerprint()) return
-    const input = currentBuffPayload()
-    const result = syncEnkaTeammates(input, context.sources, catalogStore.meta, agentId, false, buildStore.wEngineId)
-    if (!sameTeammateValue(input, result.payload)) await commitBuffDraft(result.payload, { context, state, agentId })
-  } catch (error) {
-    if (!disposed) message.error(error instanceof Error ? error.message : '队友资料同步失败，请打开 Buff 配置重试。')
+  const context = await readTeammateSources()
+  if (disposed || showBuffPicker.value || state !== buildStore.buffSaveFingerprint()) return
+  const input = currentBuffPayload()
+  if (!input.buffPickerState) {
+    const candidates = teammateBuffCandidates(catalogStore.meta)
+    const owners = selectedTeammateOwnerIds(candidates, input.selectedBuffIds)
+    // Leave the existing explicit legacy reset flow in charge of >2 owners.
+    if (!owners.size || owners.size > 2) return
+    input.buffPickerState = inferBuffPickerState(candidates, input.selectedBuffIds)
   }
+  const result = syncEnkaTeammates(input, context.sources, catalogStore.meta, agentId, { kind: 'refresh' }, buildStore.wEngineId)
+  if (!sameTeammateValue(currentBuffPayload(), result.payload)) await commitBuffDraft(result.payload, { context, state, agentId })
 }
 const showCalculationConfig = ref(false)
 const showAllDamageEvents = ref(false)
@@ -145,43 +152,37 @@ const OPTIMIZER_RESULT_SLOTS = [1, 2, 3, 4, 5, 6]
 const SAVE_LOADOUT_WAIT_TIMEOUT_MS = 5_000
 const SAVE_LOADOUT_STORAGE_TIMEOUT_MS = 15_000
 
-onMounted(async () => {
-  await catalogStore.load()
-  await inventoryStore.load()
-  if (catalogStore.catalog && catalogStore.meta) {
+let loadSequence = 0
+async function loadWorkbench(initial = false) {
+  const sequence = ++loadSequence
+  const ownerId = accountStore.currentOwnerId
+  buffContextReady.value = false
+  buffContextError.value = ''
+  try {
+    await catalogStore.load()
+    await inventoryStore.load()
+    if (disposed || sequence !== loadSequence || ownerId !== accountStore.currentOwnerId) return
+    if (!catalogStore.catalog || !catalogStore.meta) throw new Error('目录加载失败，请重试。')
     buildStore.initialize(catalogStore.catalog, catalogStore.meta)
-    await refreshAutomaticTeammates()
-    optimizerStore.initialize(
-      catalogStore.catalog,
-      catalogStore.displayAgents.find((item: any) => item.id === buildStore.agentId),
-    )
+    if (initial) optimizerStore.initialize(catalogStore.catalog, catalogStore.displayAgents.find((item: any) => item.id === buildStore.agentId))
+    else {
+      optimizerStore.reset()
+      optimizerStore.loadAgentSettings(catalogStore.displayAgents.find((item: any) => item.id === buildStore.agentId), catalogStore.catalog)
+    }
     if (!optimizerStore.fourPieceSetIds.length) {
       optimizerStore.setFourPieceSets([catalogStore.displayDriveDiscSets[0]?.id ?? ""].filter(Boolean))
     }
     recalculate()
+    await refreshAutomaticTeammates()
     await nextTick()
     await buildStore.persist()
-    buffContextReady.value = true
+    if (!disposed && sequence === loadSequence) buffContextReady.value = true
+  } catch (error) {
+    if (!disposed && sequence === loadSequence) buffContextError.value = error instanceof Error ? error.message : '队友资料加载失败，请重试。'
   }
-})
-
-watch(() => accountStore.currentOwnerId, async () => {
-  buffContextReady.value = false
-  await inventoryStore.load()
-  optimizerStore.reset()
-  if (catalogStore.catalog && catalogStore.meta) {
-    buildStore.initialize(catalogStore.catalog, catalogStore.meta)
-    await refreshAutomaticTeammates()
-    optimizerStore.loadAgentSettings(
-      catalogStore.displayAgents.find((item: any) => item.id === buildStore.agentId),
-      catalogStore.catalog,
-    )
-  }
-  recalculate()
-  await nextTick()
-  await buildStore.persist()
-  buffContextReady.value = true
-})
+}
+onMounted(() => loadWorkbench(true))
+watch(() => accountStore.currentOwnerId, () => loadWorkbench())
 
 const selectedAgent = computed(() => catalogStore.displayAgents.find((item: any) => item.id === buildStore.agentId))
 const selectedWEngine = computed(() => catalogStore.displayWEngines.find((item: any) => item.id === buildStore.wEngineId))
@@ -873,7 +874,9 @@ function saveOptimizerConfig(config: any) {
 
 function selectAgent(agentId: string) {
   buildStore.selectAgent(agentId, catalogStore.meta)
-  void refreshAutomaticTeammates()
+  void refreshAutomaticTeammates().catch(error => {
+    if (!disposed) message.error(error instanceof Error ? error.message : '队友资料同步失败，请打开 Buff 配置重试。')
+  })
   optimizerStore.loadAgentSettings(
     catalogStore.displayAgents.find((item: any) => item.id === agentId),
     catalogStore.catalog,
@@ -1449,6 +1452,10 @@ function formatPercentValue(value: any) {
           </NButton>
         </div>
         <div class="workbench-section-body section-band">
+          <p v-if="buffContextError" role="alert">
+            {{ buffContextError }}
+            <NButton size="small" @click="loadWorkbench()">重新加载队友资料</NButton>
+          </p>
           <div class="chip-row workbench-buff-tags">
             <NTag v-for="item in activeBuffBadges" :key="item.id" size="small" round>{{ item.label }}</NTag>
             <NTag v-if="!activeBuffIdsForPanel.length" size="small" round>未启用 Buff</NTag>
