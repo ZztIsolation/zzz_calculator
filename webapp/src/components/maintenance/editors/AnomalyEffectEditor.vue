@@ -7,7 +7,11 @@ import { textOf } from "../maintenance-model"
 const props = defineProps<{ model: any, disabled?: boolean }>()
 const emit = defineEmits<{ change: [] }>()
 
-function kind() { return props.model.settlementType === "disorder" || props.model.maintenanceType === "disorder" ? "disorder" : "anomaly" }
+function kind() {
+  if (props.model.settlementType === "disorder" || props.model.maintenanceType === "disorder") return "disorder"
+  if (props.model.settlementType === "turbulence" || props.model.maintenanceType === "turbulence") return "turbulence"
+  return "anomaly"
+}
 function changed() { emit("change") }
 
 function changeKind(value: string) {
@@ -15,6 +19,17 @@ function changeKind(value: string) {
     props.model.maintenanceType = "disorder"
     props.model.settlementType = "disorder"
     props.model.fixedMultiplier ??= 4.5
+    props.model.tickMultiplier ??= 0
+    props.model.tickIntervalSeconds ??= 1
+    props.model.defaultDurationSeconds ??= 10
+    delete props.model.baseMultiplier
+    delete props.model.defaultProcCount
+  } else if (value === "turbulence") {
+    props.model.maintenanceType = "turbulence"
+    props.model.settlementType = "turbulence"
+    props.model.element = props.model.element === "wind" ? "physical" : props.model.element
+    props.model.sourceAnomalyEffect ??= props.model.id
+    props.model.fixedMultiplier ??= 0
     props.model.tickMultiplier ??= 0
     props.model.tickIntervalSeconds ??= 1
     props.model.defaultDurationSeconds ??= 10
@@ -36,11 +51,11 @@ function changeKind(value: string) {
 
 <template>
   <div class="resource-editor anomaly-effect-editor">
-    <MaintenanceSection title="异常 / 紊乱信息">
+    <MaintenanceSection title="异常 / 乱流 / 紊乱信息">
       <div class="maintenance-grid">
-        <label class="maintenance-field"><span>结算类型</span><NSelect :value="kind()" :options="[option('anomaly', '属性异常'), option('disorder', '紊乱')]" :disabled="disabled" @update:value="changeKind(String($event))" /></label>
+        <label class="maintenance-field"><span>结算类型</span><NSelect :value="kind()" :options="[option('anomaly', '属性异常'), option('turbulence', '乱流'), option('disorder', '紊乱')]" :disabled="disabled" @update:value="changeKind(String($event))" /></label>
         <label class="maintenance-field"><span>中文名称</span><NInput :value="textOf(model.label)" :disabled="disabled" @update:value="model.label = { ...model.label, zhCN: String($event) }; changed()" /></label>
-        <label class="maintenance-field"><span>元素</span><NSelect v-model:value="model.element" :options="DAMAGE_ELEMENT_OPTIONS" :disabled="disabled" @update:value="changed" /></label>
+        <label class="maintenance-field"><span>元素</span><NSelect v-model:value="model.element" :options="kind() === 'turbulence' ? DAMAGE_ELEMENT_OPTIONS.filter(item => item.value !== 'wind') : DAMAGE_ELEMENT_OPTIONS" :disabled="disabled" @update:value="changed" /></label>
         <template v-if="kind() === 'anomaly'">
           <label class="maintenance-field"><span>基础倍率</span><NInputNumber v-model:value="model.baseMultiplier" :disabled="disabled" :step="0.01" @update:value="changed" /></label>
           <label class="maintenance-field"><span>默认结算次数</span><NInputNumber v-model:value="model.defaultProcCount" :disabled="disabled" :min="0" :step="1" @update:value="changed" /></label>

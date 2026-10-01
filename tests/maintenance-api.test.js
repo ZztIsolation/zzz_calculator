@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { spawn } from "node:child_process"
-import { copyFile, mkdir, mkdtemp, readdir, rm } from "node:fs/promises"
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { createServer as createNetServer } from "node:net"
 import path from "node:path"
@@ -41,9 +41,10 @@ async function catalog() {
 }
 
 async function save(resource, item, origin = baseUrl) {
+    const conditions = await agentConditions(resource, item)
     const response = await fetch(`${baseUrl}/api/maintenance/${resource}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Origin: origin },
+        headers: { "Content-Type": "application/json", Origin: origin, ...conditions },
         body: JSON.stringify(item),
     })
     const body = await response.json().catch(() => ({}))
@@ -54,9 +55,10 @@ async function save(resource, item, origin = baseUrl) {
 }
 
 async function saveRejected(resource, item, expectedText) {
+    const conditions = await agentConditions(resource, item)
     const response = await fetch(`${baseUrl}/api/maintenance/${resource}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Origin: baseUrl },
+        headers: { "Content-Type": "application/json", Origin: baseUrl, ...conditions },
         body: JSON.stringify(item),
     })
     const body = await response.json().catch(() => ({}))
@@ -67,7 +69,15 @@ async function saveRejected(resource, item, expectedText) {
 }
 
 async function remove(pathname) {
-    return request(pathname, { method: "DELETE", headers: { Origin: baseUrl } })
+    const id = pathname.startsWith("/api/maintenance/agents/") ? decodeURIComponent(pathname.split("/").at(-1)) : null
+    const conditions = id ? await agentConditions("agents", { id }) : {}
+    return request(pathname, { method: "DELETE", headers: { Origin: baseUrl, ...conditions } })
+}
+
+async function agentConditions(resource, item) {
+    if (resource !== "agents") return {}
+    const revision = (await catalog()).agentRevisions[item.id]
+    return revision ? { "If-Match": `"${revision}"` } : { "If-None-Match": "*" }
 }
 
 async function waitForServer() {
@@ -99,6 +109,36 @@ try {
             await copyFile(path.join(sourceDataDir, fileName), path.join(tempDataDir, fileName))
         }
     }
+
+    const anomalyEffectsPath = path.join(tempDataDir, "anomaly_effects.json")
+    const anomalyEffectsFixture = JSON.parse(await readFile(anomalyEffectsPath, "utf8"))
+    anomalyEffectsFixture.effects.push(
+        {
+            id: "maintenance_api_turbulence_quarter",
+            settlementType: "turbulence",
+            sourceAnomalyEffect: "burn",
+            label: { zhCN: "测试四分之一秒乱流" },
+            element: "fire",
+            fixedMultiplier: 9,
+            tickMultiplier: 0.5,
+            tickIntervalSeconds: 0.25,
+            defaultDurationSeconds: 10,
+            sourceStatus: "confirmed",
+        },
+        {
+            id: "maintenance_api_turbulence_two_seconds",
+            settlementType: "turbulence",
+            sourceAnomalyEffect: "shock",
+            label: { zhCN: "测试两秒乱流" },
+            element: "electric",
+            fixedMultiplier: 6.5,
+            tickMultiplier: 1.25,
+            tickIntervalSeconds: 2,
+            defaultDurationSeconds: 10,
+            sourceStatus: "confirmed",
+        },
+    )
+    await writeFile(anomalyEffectsPath, `${JSON.stringify(anomalyEffectsFixture, null, 2)}\n`, "utf8")
 
     server = spawn(process.execPath, ["backend/server.js"], {
         cwd: rootDir,
@@ -178,6 +218,27 @@ try {
         assert.ok(itemsFor(await catalog()).some(item => item.id === generatedId), `${resource} idless save must persist`)
         await remove(`/api/maintenance/${resource}/${encodeURIComponent(generatedId)}`)
     }
+
+    const velina = structuredClone((await catalog()).agents.agents.find(item => item.id === "velina"))
+    assert.ok(velina, "Velina must be available for compatibility repair coverage")
+    velina.combatBuffs.corePassive.description.zhCN += " 文本维护回归"
+    const velinaRule = velina.combatBuffs.corePassive.effects.find(rule => rule.id === "velina-turbulence-base-multiplier")
+    assert.ok(velinaRule)
+    velinaRule.value = 150
+    const velinaRepairResult = await save("agents", velina, "https://trusted.example")
+    assert.equal(
+        velinaRepairResult.savedItem.combatBuffs.corePassive.effects.find(rule => rule.id === "velina-turbulence-base-multiplier").value,
+        90,
+    )
+    assert.deepEqual(velinaRepairResult.compatibilityRepairs, [expectCompatibilityRepair(
+        "combatBuffs.corePassive.effects[2].value",
+        "corePassiveScaling",
+        "turbulenceBaseMultiplierBonusPct",
+        150,
+        90,
+    )])
+    const reloadedVelinaAfterRepair = (await catalog()).agents.agents.find(item => item.id === "velina")
+    assert.equal(reloadedVelinaAfterRepair.combatBuffs.corePassive.effects.find(rule => rule.id === "velina-turbulence-base-multiplier").value, 90)
 
     const driveDiscCatalog = await catalog()
     const driveDiscSource = driveDiscCatalog.driveDiscSets.sets.find(item => item.fourPiece?.selfBuff)
@@ -333,6 +394,35 @@ try {
         "maxCount",
     ), false)
 
+    const velinaAgent = structuredClone(managedAgentCatalog.agents.agents.find(item => item.id === "velina"))
+    // Release migration is independent of the administrator-maintained default rotation.
+    velinaAgent.defaultCalculationConfig.events = [{
+        id: "velina-release-migration", kind: "anomaly", settlementType: "release",
+        anomalyEffect: "wind_corrosion", releaseSource: "broad_vortex", count: 1, stunned: true,
+    }]
+    velinaAgent.defaultCalculationConfig.selectedEventId = "velina-release-migration"
+    for (const source of ["micro_vortex", "broad_vortex", "ultimate_wind"]) {
+        const legacy = structuredClone(velinaAgent)
+        const event = legacy.defaultCalculationConfig.events[0]
+        delete event.releaseSource
+        event.triggerActorRef = { agentId: "velina", profileId: source }
+        event.anomalySource = { actorRef: { agentId: "aria" }, snapshot: { agentId: "aria" } }
+        const migrated = (await save("agents", legacy)).savedItem.defaultCalculationConfig.events[0]
+        assert.equal(migrated.releaseSource, source)
+        assert.equal(migrated.anomalyEffect, "wind_corrosion")
+        assert.equal(Object.hasOwn(migrated, "triggerActorRef"), false)
+        assert.equal(Object.hasOwn(migrated, "anomalySource"), false)
+    }
+    const invalidSourceAgent = structuredClone(velinaAgent)
+    invalidSourceAgent.defaultCalculationConfig.events[0].releaseSource = "unknown_source"
+    await saveRejected("agents", invalidSourceAgent, "releaseSource")
+    const missingSourceAgent = structuredClone(velinaAgent)
+    delete missingSourceAgent.defaultCalculationConfig.events[0].releaseSource
+    const restored = (await save("agents", missingSourceAgent)).savedItem.defaultCalculationConfig.events[0]
+    assert.equal(restored.releaseSource, "broad_vortex")
+    const reloadedVelina = (await catalog()).agents.agents.find(item => item.id === "velina")
+    assert.deepEqual(reloadedVelina.defaultCalculationConfig.events[0], restored)
+
     const danAgent = structuredClone(
         managedAgentCatalog.agents.agents.find(item => item.id === "remielle_dan"),
     )
@@ -406,6 +496,49 @@ try {
         timedAgentResult.savedItem.defaultCalculationConfig.events[2].elapsedSeconds,
         Number(wholeSecondDisorderEffect.defaultDurationSeconds) + 20,
         "elapsed Disorder time beyond the base duration must survive maintenance save",
+    )
+
+    const turbulenceTimedAgent = structuredClone(timedAgentResult.savedItem)
+    turbulenceTimedAgent.defaultCalculationConfig = {
+        mode: "custom",
+        selectedEventId: "maintenance-api-turbulence-quarter",
+        events: [
+            {
+                id: "maintenance-api-turbulence-quarter",
+                kind: "anomaly",
+                settlementType: "turbulence",
+                anomalyEffect: "maintenance_api_turbulence_quarter",
+                elapsedSeconds: 0.37,
+                count: 1,
+                stunned: true,
+            },
+            {
+                id: "maintenance-api-turbulence-two-seconds",
+                kind: "anomaly",
+                settlementType: "turbulence",
+                anomalyEffect: "maintenance_api_turbulence_two_seconds",
+                elapsedSeconds: 3.1,
+                count: 1,
+                stunned: true,
+            },
+            {
+                id: "maintenance-api-turbulence-long",
+                kind: "anomaly",
+                settlementType: "turbulence",
+                anomalyEffect: "maintenance_api_turbulence_two_seconds",
+                elapsedSeconds: 12.1,
+                count: 1,
+                stunned: true,
+            },
+        ],
+    }
+    const turbulenceTimedAgentResult = await save("agents", turbulenceTimedAgent)
+    assert.equal(turbulenceTimedAgentResult.savedItem.defaultCalculationConfig.events[0].elapsedSeconds, 0.25)
+    assert.equal(turbulenceTimedAgentResult.savedItem.defaultCalculationConfig.events[1].elapsedSeconds, 4)
+    assert.equal(
+        turbulenceTimedAgentResult.savedItem.defaultCalculationConfig.events[2].elapsedSeconds,
+        12,
+        "elapsed Turbulence time beyond the base duration must survive maintenance save",
     )
 
     const anomalyData = await catalog()
@@ -737,4 +870,8 @@ try {
 } finally {
     server?.kill()
     await rm(tempRoot, { recursive: true, force: true })
+}
+
+function expectCompatibilityRepair(path, sourceKind, field, from, to) {
+    return { path, sourceKind, field, from, to }
 }

@@ -11,6 +11,7 @@ const FALLBACK_AGENT_SETTINGS_ID = "__default__"
 const OPTIMIZER_WORKER_STALL_TIMEOUT_MS = 45_000
 const MINIMUM_STAT_KEYS = ["atk", "def", "anomalyProficiency", "critRate", "critDmg", "lacerationDmg"] as const
 const MINIMUM_DEFAULTS_VERSION = 2
+const TWO_PIECE_DEFAULTS_VERSION = 1
 const CALCULATION_INPUT_FINGERPRINT_EXCLUDED_KEYS = new Set([
   "label",
   "settings",
@@ -254,12 +255,26 @@ function normalizeOptimizerSettings(value: any = {}, catalog: any = null, agent:
       : savedFourPieceSetIds.length
         ? savedFourPieceSetIds
         : [firstDriveDiscSetId(catalog)].filter(Boolean)
+  const preferredTwoPieceSetIds = [...new Set(normalizeArray(agent?.preferredDriveDiscs?.defaultTwoPieceSetIds))]
+    .filter(id => !catalog || visibleSetIds.has(id))
+  const savedTwoPieceSetIds = [...new Set(normalizeArray(saved.twoPieceSetIds ?? saved.twoPieceSetId))]
+    .filter(id => !catalog || visibleSetIds.has(id))
+  // Apply the new recommendation once, including over legacy manual selections.
+  // Afterwards an explicit manual empty list must continue to mean unrestricted.
+  const migrateTwoPieceDefaults = preferredTwoPieceSetIds.length > 0
+    && Number(saved.twoPieceDefaultsVersion ?? 0) < TWO_PIECE_DEFAULTS_VERSION
+  const hasSavedTwoPieceSets = saved.twoPieceSetIds !== undefined || saved.twoPieceSetId !== undefined
+  const followsTwoPieceDefaults = migrateTwoPieceDefaults
+    || saved.twoPieceSetSource === "preferred"
+    || (!hasSavedTwoPieceSets && saved.twoPieceSetSource !== "manual")
   return {
     algorithm: normalizeBrowserOptimizerAlgorithm(saved.algorithm),
     fourPieceSetIds,
     fourPieceSetSource: hasManualFourPieceSet ? "manual" : "preferred",
-    twoPieceSetIds: normalizeArray(saved.twoPieceSetIds ?? saved.twoPieceSetId)
-      .filter(id => !catalog || visibleSetIds.has(id)),
+    twoPieceSetIds: followsTwoPieceDefaults ? preferredTwoPieceSetIds : savedTwoPieceSetIds,
+    twoPieceSetSource: followsTwoPieceDefaults ? "preferred" : "manual",
+    twoPieceDefaultsVersion: migrateTwoPieceDefaults
+      ? TWO_PIECE_DEFAULTS_VERSION : Number(saved.twoPieceDefaultsVersion ?? 0),
     fourPieceBuffMode: saved.fourPieceBuffMode === "manual" ? "manual" : "auto",
     fourPieceBuffRuntimeInputs: plainObject(saved.fourPieceBuffRuntimeInputs),
     mainStatLimits: cleanMainStatLimits(saved.mainStatLimits),
@@ -279,6 +294,8 @@ function optimizerSettingsPayload(state: any = {}, previous: any = {}) {
     fourPieceSetIds,
     fourPieceSetSource: state.fourPieceSetSource === "manual" ? "manual" : "preferred",
     twoPieceSetIds: normalizeArray(state.twoPieceSetIds),
+    twoPieceSetSource: state.twoPieceSetSource === "manual" ? "manual" : "preferred",
+    twoPieceDefaultsVersion: Number(state.twoPieceDefaultsVersion ?? 0),
     fourPieceBuffMode: state.fourPieceBuffMode === "manual" ? "manual" : "auto",
     fourPieceBuffRuntimeInputs: plainObject(state.fourPieceBuffRuntimeInputs),
     mainStatLimits: cleanMainStatLimits(state.mainStatLimits),
@@ -461,6 +478,8 @@ export const useOptimizerStore = defineStore("optimizer", {
     fourPieceSetIds: [] as string[],
     fourPieceSetSource: "preferred" as "preferred" | "manual",
     twoPieceSetIds: [] as string[],
+    twoPieceSetSource: "preferred" as "preferred" | "manual",
+    twoPieceDefaultsVersion: 0,
     fourPieceBuffMode: "auto" as "auto" | "manual",
     fourPieceBuffRuntimeInputs: {} as Record<string, any>,
     mainStatLimits: defaultMainStatLimits(),
@@ -507,6 +526,8 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.fourPieceSetIds = settings.fourPieceSetIds
       this.fourPieceSetSource = settings.fourPieceSetSource
       this.twoPieceSetIds = settings.twoPieceSetIds
+      this.twoPieceSetSource = settings.twoPieceSetSource
+      this.twoPieceDefaultsVersion = settings.twoPieceDefaultsVersion
       this.fourPieceBuffMode = settings.fourPieceBuffMode
       this.fourPieceBuffRuntimeInputs = settings.fourPieceBuffRuntimeInputs
       this.mainStatLimits = settings.mainStatLimits
@@ -560,7 +581,8 @@ export const useOptimizerStore = defineStore("optimizer", {
       this.persistSettings()
     },
     setTwoPieceSetIds(ids: string[]) {
-      this.twoPieceSetIds = normalizeArray(ids)
+      this.twoPieceSetIds = [...new Set(normalizeArray(ids))]
+      this.twoPieceSetSource = "manual"
       this.persistSettings()
     },
     applyAdvancedSettings(settings: any = {}) {

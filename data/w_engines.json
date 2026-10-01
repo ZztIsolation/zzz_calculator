@@ -3137,7 +3137,71 @@
           "zhCN": "装备者的异常精通提升70/80/90/100/110点；装备者发动[强化特殊技]造成风属性伤害时，自身造成的[乱流]和[风化]伤害提升7%/8%/9%/10%/11%。持续40秒，最多叠加2层，重复触发时刷新持续时间，同一招式内最多触发一次，拥有2层该效果时，全队代理人的异常精通提升60/69/78/87/96点，该效果全队唯一。",
           "en": ""
         },
-        "selfBuff": null,
+        "selfBuff": {
+          "scope": "inCombat",
+          "condition": "windExSpecialDamage",
+          "durationSeconds": 40,
+          "effects": [
+            {
+              "id": "effect_wiki_2030_self_ap",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "value": 70,
+              "modificationValues": {
+                "value": [70, 80, 90, 100, 110]
+              }
+            },
+            {
+              "id": "effect_wiki_2030_wind_corrosion_damage",
+              "type": "stacked",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute",
+                "anomalyEffects": ["wind_corrosion"]
+              },
+              "stat": "anomalyDamageBonus",
+              "mode": "flat",
+              "valuePerStack": 7,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "stackGroup": "wiki_2030_wind_ex_special",
+              "stackLabel": { "zhCN": "无懈之礼层数" },
+              "condition": "装备者发动强化特殊技造成风属性伤害；同一招式内最多触发一次，重复触发刷新持续时间",
+              "durationSeconds": 40,
+              "modificationValues": {
+                "valuePerStack": [7, 8, 9, 10, 11]
+              },
+              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+            },
+            {
+              "id": "effect_wiki_2030_turbulence_damage",
+              "type": "stacked",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "turbulence"
+              },
+              "stat": "turbulenceDamageBonus",
+              "mode": "flat",
+              "valuePerStack": 7,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "stackGroup": "wiki_2030_wind_ex_special",
+              "stackLabel": { "zhCN": "无懈之礼层数" },
+              "condition": "装备者发动强化特殊技造成风属性伤害；同一招式内最多触发一次，重复触发刷新持续时间",
+              "durationSeconds": 40,
+              "modificationValues": {
+                "valuePerStack": [7, 8, 9, 10, 11]
+              },
+              "coverage": { "default": 1, "min": 0, "max": 1, "step": 0.1 }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
         "teamBuff": {
           "scope": "inCombat",
           "condition": "twoStacksAfterWindExSpecialDamage",
@@ -3169,7 +3233,8 @@
               }
             }
           ],
-          "appliesToOutOfCombatPanel": false
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
         }
       },
       "sources": [
@@ -3179,8 +3244,13 @@
       "verification": {
         "level60Stats": "source-checked",
         "effectText": "source-checked",
-        "effectBuff": "source-checked-team-buff-only"
-      }
+        "effectBuff": "source-checked; wind_corrosion and turbulence are explicitly separated",
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+          "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
+        ]
+      },
+      "relatedAgentId": "velina"
     },
     {
       "id": "zzz_wiki_1427",
@@ -7276,6 +7346,443 @@
         "baseStat": "Level 60 Base DEF 356; advanced defPct 40%"
       },
       "hidden": false
+    },
+    {
+      "id": "zzz_wiki_1964",
+      "name": {
+        "zhCN": "朔月裁霜"
+      },
+      "rarity": "S",
+      "specialty": "anomaly",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1964.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/04/30/15559334/39c79cd0e48bff218c74eec559e116f2_5491997790821477316.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "anomalyMastery",
+          "value": 30,
+          "mode": "pct"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "终末裁决"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果"
+          }
+        },
+        "description": {
+          "zhCN": "冰属性的装备者发动[特殊技]、[强化特殊技]时，自身造成的冰属性伤害提升20%/23%/26%/29%/32%，持续40秒，最多叠加2层，同一招式内最多触发一次，重复触发时刷新持续时间，拥有2层效果时，装备者造成的[异放]伤害额外提升35%/38.5%/42%/45.5%/50%。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "condition": "冰属性装备者发动特殊技或强化特殊技；同一招式内最多触发一次，重复触发刷新持续时间",
+          "durationSeconds": 40,
+          "effects": [
+            {
+              "id": "effect_wiki_1964_self_ice_dmg",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "iceDmg",
+              "mode": "flat",
+              "valuePerStack": 20,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "stackGroup": "wiki_1964_final_verdict",
+              "stackLabel": {
+                "zhCN": "终末裁决层数"
+              },
+              "modificationValues": {
+                "valuePerStack": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              },
+              "requirement": {
+                "attribute": "ice"
+              },
+              "durationSeconds": 40
+            },
+            {
+              "id": "effect_wiki_1964_self_release_dmg",
+              "type": "stacked",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "release"
+              },
+              "stat": "anomalyDamageBonus",
+              "mode": "flat",
+              "valuePerStack": 0,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "stackGroup": "wiki_1964_final_verdict",
+              "stackLabel": {
+                "zhCN": "终末裁决层数"
+              },
+              "modificationValues": {
+                "value": [
+                  35,
+                  38.5,
+                  42,
+                  45.5,
+                  50
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              },
+              "value": 35,
+              "activationStacks": 2,
+              "requirement": {
+                "attribute": "ice"
+              },
+              "condition": "拥有2层终末裁决效果",
+              "durationSeconds": 40
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/1964/detail?mhy_presentation_style=fullscreen",
+        "https://act-api-takumi-static.mihoyo.com/hoyowiki/zzz/wapi/entry_page?entry_page_id=1964&lang=zh-cn&app_sn=zzz_wiki"
+      ],
+      "verification": {
+        "level60Stats": "source-checked-mihoyo-baike-entry-1964-version-1778221212-2026-09-30",
+        "effectText": "source-checked-mihoyo-baike-entry-1964-version-1778221212-2026-09-30",
+        "effectBuff": "source-checked; Ice wearers only; shared 0-2 stacks; full-stack fixed bonus targets Release only; trigger timing is configured manually"
+      }
+    },
+    {
+      "id": "zzz_wiki_841",
+      "name": {
+        "zhCN": "灼心摇壶"
+      },
+      "rarity": "S",
+      "specialty": "anomaly",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_841.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/10/08/158441880/a6467e15e97985d628b20eed5c1cdc55_7258114335694912644.png"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 30,
+          "mode": "pct",
+          "basis": "baseAtk"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "焦油斟注"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果"
+          }
+        },
+        "description": {
+          "zhCN": "位于后场时，装备者的能量自动回复提升0.6/0.75/0.9/1.05/1.2点/秒；[强化特殊技]或[支援攻击]命中敌人时，装备者造成的伤害提升3.5%/4.4%/5.2%/6.1%/7%，最多叠加10层，持续6秒，0.3秒内最多触发一次，位于后场时叠加效率翻倍，重复触发时刷新持续时间；获得伤害提升效果时，若叠加层数大于等于5层，则装备者的异常精通额外提升50/62/75/87/100点，异常精通提升效果不可叠加，持续6秒。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "condition": "强化特殊技或支援攻击命中敌人；0.3秒内最多触发一次，后场叠层效率翻倍，重复触发刷新持续时间",
+          "durationSeconds": 6,
+          "effects": [
+            {
+              "id": "effect_wiki_841_self_dmg",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "valuePerStack": 3.5,
+              "maxStacks": 10,
+              "defaultStacks": 10,
+              "stackGroup": "wiki_841_tar_infusion",
+              "stackLabel": {
+                "zhCN": "焦油斟注层数"
+              },
+              "modificationValues": {
+                "valuePerStack": [
+                  3.5,
+                  4.4,
+                  5.2,
+                  6.1,
+                  7
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              },
+              "durationSeconds": 6,
+              "cooldownSeconds": 0.3
+            },
+            {
+              "id": "effect_wiki_841_self_ap",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "valuePerStack": 0,
+              "maxStacks": 10,
+              "defaultStacks": 10,
+              "stackGroup": "wiki_841_tar_infusion",
+              "stackLabel": {
+                "zhCN": "焦油斟注层数"
+              },
+              "modificationValues": {
+                "value": [
+                  50,
+                  62,
+                  75,
+                  87,
+                  100
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              },
+              "value": 50,
+              "activationStacks": 5,
+              "condition": "获得伤害提升效果时达到至少5层；精通增益不可叠加",
+              "durationSeconds": 6
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/841/detail?mhy_presentation_style=fullscreen",
+        "https://act-api-takumi-static.mihoyo.com/hoyowiki/zzz/wapi/entry_page?entry_page_id=841&lang=zh-cn&app_sn=zzz_wiki"
+      ],
+      "verification": {
+        "level60Stats": "source-checked-mihoyo-baike-entry-841-version-1743671257-2026-09-30",
+        "effectText": "source-checked-mihoyo-baike-entry-841-version-1743671257-2026-09-30",
+        "effectBuff": "partially-modeled; flat off-field Energy restoration remains text-only; shared 0-10 stacks with a fixed AP bonus at 5+ stacks; duration, hit cadence and off-field stack efficiency are manually configured snapshot conditions"
+      }
+    },
+    {
+      "id": "zzz_wiki_2087",
+      "name": {
+        "zhCN": "咚哒回声"
+      },
+      "rarity": "A",
+      "specialty": "anomaly",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_2087.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/06/14/72175806/071c0ccfabea6219ad97cc80770b9ccf_978531652602606087.png"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "anomalyProficiency",
+          "value": 75,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "铿锵鸣鼔"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果"
+          }
+        },
+        "description": {
+          "zhCN": "装备者触发[乱流]效果时，为自身回复2/2.3/2.6/2.9/3.2点能量，10秒内最多触发一次；装备者攻击处于属性异常状态下的敌人时，造成的伤害提升11.5%/13.2%/15%/16.7%/18.4%。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "condition": "装备者攻击处于属性异常状态下的敌人",
+          "effects": [
+            {
+              "id": "effect_wiki_2087_self_dmg",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 11.5,
+              "modificationValues": {
+                "value": [
+                  11.5,
+                  13.2,
+                  15,
+                  16.7,
+                  18.4
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              },
+              "condition": "目标处于属性异常状态"
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/2087/detail?mhy_presentation_style=fullscreen",
+        "https://act-api-takumi-static.mihoyo.com/hoyowiki/zzz/wapi/entry_page?entry_page_id=2087&lang=zh-cn&app_sn=zzz_wiki"
+      ],
+      "verification": {
+        "level60Stats": "source-checked-mihoyo-baike-entry-2087-version-1782490033-2026-09-30",
+        "effectText": "source-checked-mihoyo-baike-entry-2087-version-1782490033-2026-09-30",
+        "effectBuff": "partially-modeled; triggered flat Energy restoration and its 10-second cooldown remain text-only; damage condition uses manual Buff activation and coverage, with no Wind or Turbulence prerequisite"
+      }
+    },
+    {
+      "id": "zzz_wiki_154",
+      "name": {
+        "zhCN": "雨林饕客"
+      },
+      "rarity": "A",
+      "specialty": "anomaly",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_154.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2024/05/23/11536806/859457119870b43e2e323651436b82e2_7772525266668421289.png"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "anomalyProficiency",
+          "value": 75,
+          "mode": "flat"
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "开饭了！"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果"
+          }
+        },
+        "description": {
+          "zhCN": "每消耗10点能量值，获得1层增益效果，每层增益效果使装备者的攻击力提升2.5%/2.8%/3.2%/3.6%/4%，最多叠加10层，持续10秒，每层效果单独结算持续时间。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "condition": "每消耗10点能量获得1层；每层效果单独结算持续时间",
+          "durationSeconds": 10,
+          "effects": [
+            {
+              "id": "effect_wiki_154_self_atk",
+              "type": "stacked",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "atkPct",
+              "mode": "pct",
+              "valuePerStack": 2.5,
+              "maxStacks": 10,
+              "defaultStacks": 10,
+              "stackGroup": "wiki_154_dinner_time",
+              "stackLabel": {
+                "zhCN": "开饭了层数"
+              },
+              "modificationValues": {
+                "valuePerStack": [
+                  2.5,
+                  2.8,
+                  3.2,
+                  3.6,
+                  4
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              },
+              "basis": "outOfCombatAtk",
+              "durationSeconds": 10
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/channel/map/2/45",
+        "https://baike.mihoyo.com/zzz/wiki/content/154/detail?mhy_presentation_style=fullscreen",
+        "https://act-api-takumi-static.mihoyo.com/hoyowiki/zzz/wapi/entry_page?entry_page_id=154&lang=zh-cn&app_sn=zzz_wiki"
+      ],
+      "verification": {
+        "level60Stats": "source-checked-mihoyo-baike-entry-154-version-1737349899-2026-09-30",
+        "effectText": "source-checked-mihoyo-baike-entry-154-version-1737349899-2026-09-30",
+        "effectBuff": "source-checked; 0-10 manually configured stacks scale out-of-combat ATK; energy consumption and independent stack expiration are descriptive snapshot conditions"
+      }
     }
   ]
 }

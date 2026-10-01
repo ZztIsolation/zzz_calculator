@@ -98,8 +98,8 @@ assert.equal(skillTargetMatches({ ...wholeSpecificType, moveId: "ultimate_test",
 const skillCatalog = JSON.parse(readFileSync(new URL("../data/agent_skills.json", import.meta.url), "utf8")).agentSkills
 const combatBuffCatalog = JSON.parse(readFileSync(new URL("../data/combat_buffs.json", import.meta.url), "utf8"))
 const dataRoots = [
-    JSON.parse(readFileSync(new URL("../data/agents.json", import.meta.url), "utf8")),
-    combatBuffCatalog,
+    { source: "data/agents.json", data: JSON.parse(readFileSync(new URL("../data/agents.json", import.meta.url), "utf8")) },
+    { source: "data/combat_buffs.json", data: combatBuffCatalog },
 ]
 const skillsById = new Map(skillCatalog.map(skill => [skill.id, skill]))
 let moveCount = 0
@@ -128,22 +128,40 @@ for (const skill of skillCatalog) {
 }
 
 const storedTargets = []
-function collectSkillTargets(value, path = "data") {
+function collectSkillTargets(value, path, source, ownerId = null) {
     if (Array.isArray(value)) {
-        value.forEach((item, index) => collectSkillTargets(item, `${path}[${index}]`))
+        value.forEach((item, index) => collectSkillTargets(item, `${path}[${index}]`, source, ownerId))
         return
     }
     if (!value || typeof value !== "object") {
         return
     }
+    ownerId ??= value.id ?? null
     if (Array.isArray(value.skillTargets)) {
-        value.skillTargets.forEach((target, index) => storedTargets.push({ target, path: `${path}.skillTargets[${index}]` }))
+        value.skillTargets.forEach((target, index) => storedTargets.push({ target, path: `${path}.skillTargets[${index}]`, source, ownerId }))
     }
     for (const [key, child] of Object.entries(value)) {
-        collectSkillTargets(child, `${path}.${key}`)
+        collectSkillTargets(child, `${path}.${key}`, source, ownerId)
     }
 }
-dataRoots.forEach((root, index) => collectSkillTargets(root, `root[${index}]`))
+dataRoots.forEach(({ source, data }) => collectSkillTargets(data, source, source))
+
+function skillTargetCountMessage(expectedCount, targets) {
+    const lines = [`Skill target count mismatch: expected ${expectedCount}, actual ${targets.length}.`]
+    for (const { source } of dataRoots) {
+        const sourceTargets = targets.filter(item => item.source === source)
+        const owners = new Map()
+        for (const { ownerId } of sourceTargets) {
+            const id = ownerId ?? "<unowned>"
+            owners.set(id, (owners.get(id) ?? 0) + 1)
+        }
+        lines.push(`${source}: ${sourceTargets.length}`)
+        for (const [id, count] of [...owners].sort(([a], [b]) => a.localeCompare(b))) {
+            lines.push(`  ${id}: ${count}`)
+        }
+    }
+    return lines.join("\n")
+}
 for (const { target, path } of storedTargets) {
     assert.ok(["specific", "skillType", "skillTag"].includes(target.kind), `${path} must use the canonical target discriminator`)
     assert.equal(Object.hasOwn(target, "moveIdPrefixes"), false, `${path} must not contain legacy prefixes`)
@@ -169,8 +187,8 @@ for (const { target, path } of storedTargets) {
         }
     }
 }
-assert.equal(moveCount, 140)
-assert.equal(rowCount, 296)
+assert.equal(moveCount, 152)
+assert.equal(rowCount, 312)
 assert.deepEqual(Object.fromEntries(skillTagCounts), {
     dashAttack: 9,
     assistAttack: 19,
@@ -178,7 +196,21 @@ assert.deepEqual(Object.fromEntries(skillTagCounts), {
     fireSuppression: 3,
     dodgeCounter: 4,
 })
-assert.equal(storedTargets.length, 89)
+// Removing Velina C1's incorrect velina-c1-vortex-stun rule removed one skill target.
+const expectedTargetCount = 89
+assert.equal(storedTargets.length, expectedTargetCount, skillTargetCountMessage(expectedTargetCount, storedTargets))
+
+// Check diagnostic output using an in-memory omission, without changing catalog data.
+const omittedTarget = storedTargets[0]
+const incompleteTargets = storedTargets.slice(1)
+assert.throws(
+    () => assert.equal(incompleteTargets.length, expectedTargetCount, skillTargetCountMessage(expectedTargetCount, incompleteTargets)),
+    error => error.code === "ERR_ASSERTION"
+        && error.message.includes("expected 89, actual 88")
+        && error.message.includes("data/agents.json:")
+        && error.message.includes("data/combat_buffs.json:")
+        && error.message.includes(`${omittedTarget.ownerId}:`),
+)
 const jifengTargets = combatBuffCatalog.fieldBuffs
     .find(buff => buff.id === "field.critical_assault.v3_2.p2.jifeng")
     .effects.flatMap(effect => effect.target?.skillTargets ?? [])

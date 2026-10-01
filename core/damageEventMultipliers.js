@@ -20,35 +20,38 @@ function decimalPlaces(value) {
 }
 
 function effectCollection(catalog = {}, settlementType) {
-    const directKey = settlementType === "disorder" ? "disorderEffects" : "anomalyEffects"
+    const directKey = settlementType === "disorder"
+        ? "disorderEffects"
+        : settlementType === "turbulence" ? "turbulenceEffects" : "anomalyEffects"
     const direct = catalog?.[directKey]
     if (Array.isArray(direct)) {
         return direct
     }
     if (Array.isArray(direct?.effects)) {
-        return direct.effects.filter(effect => settlementType === "disorder"
-            ? effect?.settlementType === "disorder"
-            : effect?.settlementType !== "disorder")
+        return direct.effects.filter(effect => (effect?.settlementType ?? "attribute") === settlementType)
     }
     if (Array.isArray(catalog?.anomalyEffects?.effects)) {
-        return catalog.anomalyEffects.effects.filter(effect => settlementType === "disorder"
-            ? effect?.settlementType === "disorder"
-            : effect?.settlementType !== "disorder")
+        return catalog.anomalyEffects.effects.filter(effect => (effect?.settlementType ?? "attribute") === settlementType)
     }
     if (Array.isArray(catalog?.effects)) {
-        return catalog.effects.filter(effect => settlementType === "disorder"
-            ? effect?.settlementType === "disorder"
-            : effect?.settlementType !== "disorder")
+        return catalog.effects.filter(effect => (effect?.settlementType ?? "attribute") === settlementType)
     }
     return []
 }
 
 function effectById(catalog, settlementType, effectId) {
     const key = String(effectId ?? "").trim()
-    const mapKey = settlementType === "disorder" ? "disorderEffectsMap" : "anomalyEffectsMap"
+    const mapKey = settlementType === "disorder"
+        ? "disorderEffectsMap"
+        : settlementType === "turbulence" ? "turbulenceEffectsMap" : "anomalyEffectsMap"
     return (typeof catalog?.[mapKey]?.get === "function" ? catalog[mapKey].get(key) : null)
         ?? effectCollection(catalog, settlementType).find(effect => String(effect?.id ?? "") === key)
         ?? null
+}
+
+export function turbulenceElapsedStepSeconds(event = {}, catalog = {}) {
+    const effect = effectById(catalog, "turbulence", event.anomalyEffect ?? event.baseAnomalyEffect)
+    return positiveFinite(effect?.tickIntervalSeconds, DEFAULT_ELAPSED_STEP_SECONDS)
 }
 
 export function disorderElapsedStepSeconds(event = {}, catalog = {}) {
@@ -100,6 +103,27 @@ export function disorderBaseMultiplier(effect = {}, elapsedSeconds, durationBonu
     }
 }
 
+export function turbulenceBaseMultiplier(effect = {}, elapsedSeconds, durationBonusSeconds = 0) {
+    const baseDuration = finiteNonNegative(effect.defaultDurationSeconds ?? 10, 10)
+    const durationBonus = finiteNonNegative(durationBonusSeconds, 0)
+    const duration = baseDuration + durationBonus
+    const interval = positiveFinite(effect.tickIntervalSeconds, DEFAULT_ELAPSED_STEP_SECONDS)
+    const elapsed = normalizeElapsedSeconds(elapsedSeconds, duration, interval)
+    const remaining = Math.max(0, duration - elapsed)
+    const tickCount = Math.floor((remaining + 1e-9) / interval)
+    return {
+        baseDuration,
+        durationBonus,
+        duration,
+        elapsed,
+        remaining,
+        tickIntervalSeconds: interval,
+        tickCount,
+        baseMultiplier: finiteNonNegative(effect.fixedMultiplier ?? 0, 0)
+            + tickCount * finiteNonNegative(effect.tickMultiplier, 0),
+    }
+}
+
 export function disorderMultiplierScale(type) {
     return type === "polarized" ? 0.25 : 1
 }
@@ -122,7 +146,8 @@ export function resolveDamageEventMultiplier(event = {}, catalog = {}, releaseCo
 
     const isDisorder = event.kind === "disorder" || event.settlementType === "disorder"
     const effectId = event.anomalyEffect ?? event.previousAnomalyEffect
-    const effect = effectById(catalog, isDisorder ? "disorder" : "attribute", effectId)
+    const isTurbulence = event.settlementType === "turbulence" || event.anomalyVariant === "turbulence"
+    const effect = effectById(catalog, isDisorder ? "disorder" : isTurbulence ? "turbulence" : "attribute", effectId)
     if (!effect) {
         return null
     }
@@ -130,6 +155,11 @@ export function resolveDamageEventMultiplier(event = {}, catalog = {}, releaseCo
     if (isDisorder) {
         const disorder = disorderBaseMultiplier(effect, event.elapsedSeconds)
         return disorder.baseMultiplier * disorderMultiplierScale(event.disorderType) * damageScale
+    }
+
+    if (isTurbulence) {
+        const turbulence = turbulenceBaseMultiplier(effect, event.elapsedSeconds, event.durationBonusSeconds)
+        return turbulence.baseMultiplier * damageScale
     }
 
     if (isReleaseSettlement(event)) {

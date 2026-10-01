@@ -5,6 +5,7 @@ import {
 import { legacySkillTypeForMove, normalizeSkillTargetsInValue } from "@core/skillTargets.js"
 import { normalizeLegacyEffectAppliesToInValue } from "@core/effectRuleTargets.js"
 import { migrateLegacyBloodMarrowWEngine } from "@core/effectFormula.js"
+import { isReleaseSettlement, isVelinaReleaseAgent, normalizeAnomalyReleaseEventForAgent } from "@core/anomalyRelease.js"
 
 export type ResourceValue =
   | "agents"
@@ -25,7 +26,7 @@ export interface SelectOption {
 export interface CreateOptions {
   name?: string
   agentId?: string
-  anomalyType?: "anomaly" | "disorder"
+  anomalyType?: "anomaly" | "disorder" | "turbulence"
   teammateMode?: "new" | "existing"
   teammateId?: string
   modeId?: string
@@ -131,7 +132,8 @@ const FIELD_LABELS: Record<string, string> = {
   targetEffectIds: "目标效果",
   preferredDriveDiscs: "推荐驱动盘",
   defaultSetId: "默认套装",
-  defaultSetIds: "推荐套装",
+  defaultSetIds: "默认 4 件套",
+  defaultTwoPieceSetIds: "默认 2 件套",
   mainStatLimits: "主词条限制",
   importantSubStats: "重要副词条",
   importantPanelStats: "重要面板属性",
@@ -330,6 +332,13 @@ function normalizeEffectRule(rule: any) {
       rule.source.unit ??= ["critRate", "critDmg", "energyRegen", "penRatio"].includes(rule.source.stat)
         ? "storedPercent"
         : "storedValue"
+    } else if (rule.source.kind === "outOfCombatStat") {
+      rule.scope = "inCombat"
+      rule.target = { kind: "default" }
+      rule.source.variable = "x"
+      rule.source.unit ??= ["critRate", "critDmg", "energyRegen", "penRatio"].includes(rule.source.stat)
+        ? "storedPercent"
+        : "storedValue"
     }
   }
   if (rule.type === "stacked") {
@@ -377,6 +386,19 @@ function ensureCalculationConfigIds(config: any) {
   if (Array.isArray(config.potentialVariants)) config.potentialVariants.forEach(ensureCalculationConfigIds)
 }
 
+export function normalizeVelinaReleaseConfig(config: any, agent: any) {
+  if (!config || !isVelinaReleaseAgent(agent)) return
+  for (const event of config.events ?? []) {
+    if (!isReleaseSettlement(event)) continue
+    const normalized = normalizeAnomalyReleaseEventForAgent(event, agent)
+    Object.keys(event).forEach(key => delete event[key])
+    Object.assign(event, normalized)
+  }
+  for (const entry of [...(config.variants ?? []), ...(config.potentialVariants ?? []), ...(config.skillGroups ?? [])]) {
+    normalizeVelinaReleaseConfig(entry, agent)
+  }
+}
+
 export function prepareDraft(resource: ResourceValue, input: any): any {
   const cloned = deepClone(input ?? {})
   const migrated = resource === "w-engines" ? migrateLegacyBloodMarrowWEngine(cloned) : cloned
@@ -400,6 +422,7 @@ export function prepareDraft(resource: ResourceValue, input: any): any {
     item.preferredDriveDiscs ??= {}
     const legacyDefaultSetId = String(item.preferredDriveDiscs.defaultSetId ?? item.preferredDriveDiscs.defaultSet ?? "").trim()
     item.preferredDriveDiscs.defaultSetIds ??= legacyDefaultSetId ? [legacyDefaultSetId] : []
+    item.preferredDriveDiscs.defaultTwoPieceSetIds ??= []
     delete item.preferredDriveDiscs.defaultSetId
     delete item.preferredDriveDiscs.defaultSet
     item.preferredDriveDiscs.mainStatLimits ??= {}
@@ -449,6 +472,8 @@ export function prepareDraft(resource: ResourceValue, input: any): any {
       })
     })
     ensureCalculationConfigIds(item.defaultCalculationConfig)
+    normalizeVelinaReleaseConfig(item.defaultCalculationConfig, item)
+    for (const group of item.skillGroups ?? []) normalizeVelinaReleaseConfig(group, item)
     if (item.defaultCalculationConfig) {
       item.defaultCalculationConfig.cinemaLevel ??= 0
       item.defaultCalculationConfig.name ??= { zhCN: "默认方案" }
@@ -668,6 +693,8 @@ export function blankRecord(resource: ResourceValue, catalog: any, options: Crea
   if (resource === "anomaly-effects") {
     return options.anomalyType === "disorder"
       ? { maintenanceType: "disorder", settlementType: "disorder", label: localizedName(name), element: "physical", fixedMultiplier: 4.5, tickMultiplier: 0, tickIntervalSeconds: 1, defaultDurationSeconds: 10 }
+      : options.anomalyType === "turbulence"
+        ? { maintenanceType: "turbulence", settlementType: "turbulence", label: localizedName(name), element: "physical", sourceAnomalyEffect: "assault", fixedMultiplier: 8, tickMultiplier: 0.075, tickIntervalSeconds: 1, defaultDurationSeconds: 10 }
       : { maintenanceType: "anomaly", settlementType: "attribute", label: localizedName(name), element: "physical", baseMultiplier: 1, defaultProcCount: 1 }
   }
   if (resource === "teammate-buffs") {
@@ -806,7 +833,7 @@ export function displayMetaForRecord(resource: ResourceValue, item: any): string
   if (resource === "agent-skills") return `${item.categories?.length ?? 0} 个技能大类`
   if (resource === "w-engines") return [item.rarity, ENUM_OPTIONS.specialty.find(entry => entry.value === item.specialty)?.label].filter(Boolean).join(" · ")
   if (resource === "drive-disc-sets") return [item.twoPiece ? "2 件套" : "", item.fourPiece ? "4 件套" : ""].filter(Boolean).join(" · ")
-  if (resource === "anomaly-effects") return `${item.settlementType === "disorder" ? "紊乱" : "属性异常"} · ${ENUM_OPTIONS.element.find(entry => entry.value === item.element)?.label ?? item.element}`
+  if (resource === "anomaly-effects") return `${item.settlementType === "disorder" ? "紊乱" : item.settlementType === "turbulence" ? "乱流" : "属性异常"} · ${ENUM_OPTIONS.element.find(entry => entry.value === item.element)?.label ?? item.element}`
   if (resource === "teammate-buffs") return [
     ENUM_OPTIONS.attribute.find(entry => entry.value === item.attribute)?.label,
     ENUM_OPTIONS.specialty.find(entry => entry.value === item.specialty)?.label,
@@ -824,11 +851,12 @@ export function searchableText(resource: ResourceValue, item: any): string {
   return visible.filter(Boolean).join(" ").toLowerCase()
 }
 
-export function maskedPreview(value: any): any {
-  if (Array.isArray(value)) return value.map(maskedPreview)
+export function maskedPreview(value: any, driveDiscSets: any[] = []): any {
+  if (Array.isArray(value)) return value.map(item => maskedPreview(item, driveDiscSets))
   if (!value || typeof value !== "object") return value
+  const discPreferenceFields = ["defaultSetIds", "defaultTwoPieceSetIds"]
   return Object.fromEntries(Object.entries(value)
-    .filter(([key]) => !key.startsWith("_")
+    .filter(([key]) => discPreferenceFields.includes(key) || (!key.startsWith("_")
       && key !== "id"
       && !key.endsWith("Id")
       && !key.endsWith("Ids")
@@ -839,8 +867,10 @@ export function maskedPreview(value: any): any {
       && key !== "maxCount"
       && key !== "step"
       && key !== "authoredCountRange"
-      && key !== "maintenanceType")
-    .map(([key, child]) => key === "coverage" && child && typeof child === "object"
+      && key !== "maintenanceType"))
+    .map(([key, child]) => discPreferenceFields.includes(key)
+      ? [fieldLabel(key), (Array.isArray(child) ? child : []).map(id => textOf(driveDiscSets.find(set => set.id === id)?.name) || "未知套装")]
+      : key === "coverage" && child && typeof child === "object"
       ? [key, { default: `${Number((Number((child as any).default ?? 1) * 100).toFixed(2))}%` }]
-      : [key, maskedPreview(child)]))
+      : [key, maskedPreview(child, driveDiscSets)]))
 }

@@ -325,9 +325,10 @@ describe("WorkbenchView optimizer progress", () => {
   it("uses one rich selector for each selected agent and w-engine", () => {
     expect(source).not.toContain("selection-summary")
     expect(source).toContain("renderAgentSelectLabel")
-    expect(source).toContain("renderWEngineSelectLabel")
+    expect(source).toContain("<WEngineSelect")
     expect(source).toContain(':render-label="renderAgentSelectLabel"')
-    expect(source).toContain(':render-label="renderWEngineSelectLabel"')
+    expect(source).toContain(':items="catalogStore.displayWEngines"')
+    expect(source).toContain(':agent="selectedAgent"')
     expect(source).toContain("workbench-entity-select-icon")
     expect(source).toContain('aria-label="选择角色"')
     expect(source).toContain('aria-label="选择音擎"')

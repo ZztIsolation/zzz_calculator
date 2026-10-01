@@ -10122,6 +10122,609 @@
         "levels1to12": "official",
         "levels13to16": "cross-checked-release-3.0.0-16735318-and-Honey-Hunter/Fandom; explicit values, not extrapolated"
       }
+    },
+    {
+      "id": "velina",
+      "agentId": "velina",
+      "name": {
+        "zhCN": "维琳娜技能倍率"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+        "https://baike.mihoyo.com/zzz/wiki/content/2041/detail",
+        "https://zzz.gachabase.net/agents/1561/velina/release/3.1.0/18626312?lang=chs"
+      ],
+      "verification": {
+        "version": "3.1.0 release / design revision 18626312",
+        "levels": "official game data cross-checked through Gachabase release page"
+      },
+      "categories": [
+        {
+          "id": "basic",
+          "name": {
+            "zhCN": "普通攻击"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "fan_dance",
+              "name": {
+                "zhCN": "普通攻击：扇舞"
+              },
+              "skillType": "basic",
+              "damageElement": "wind",
+              "rows": [
+                {
+                  "id": "hit_1",
+                  "label": {
+                    "zhCN": "一段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    0.517,
+                    0.564,
+                    0.611,
+                    0.658,
+                    0.705,
+                    0.752,
+                    0.799,
+                    0.846,
+                    0.893,
+                    0.94,
+                    0.987,
+                    1.034,
+                    1.081,
+                    1.128,
+                    1.175,
+                    1.222
+                  ]
+                },
+                {
+                  "id": "hit_2",
+                  "label": {
+                    "zhCN": "二段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    0.489,
+                    0.534,
+                    0.579,
+                    0.624,
+                    0.669,
+                    0.714,
+                    0.759,
+                    0.804,
+                    0.849,
+                    0.894,
+                    0.939,
+                    0.984,
+                    1.029,
+                    1.074,
+                    1.119,
+                    1.164
+                  ]
+                },
+                {
+                  "id": "hit_3",
+                  "label": {
+                    "zhCN": "三段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    1.691,
+                    1.845,
+                    1.999,
+                    2.153,
+                    2.307,
+                    2.461,
+                    2.615,
+                    2.769,
+                    2.923,
+                    3.077,
+                    3.231,
+                    3.385,
+                    3.539,
+                    3.693,
+                    3.847,
+                    4.001
+                  ]
+                },
+                {
+                  "id": "hit_4",
+                  "label": {
+                    "zhCN": "四段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    1.256,
+                    1.371,
+                    1.486,
+                    1.601,
+                    1.716,
+                    1.831,
+                    1.946,
+                    2.061,
+                    2.176,
+                    2.291,
+                    2.406,
+                    2.521,
+                    2.636,
+                    2.751,
+                    2.866,
+                    2.981
+                  ]
+                },
+                {
+                  "id": "hit_5",
+                  "label": {
+                    "zhCN": "五段伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    2.296,
+                    2.505,
+                    2.714,
+                    2.923,
+                    3.132,
+                    3.341,
+                    3.55,
+                    3.759,
+                    3.968,
+                    4.177,
+                    4.386,
+                    4.595,
+                    4.804,
+                    5.013,
+                    5.222,
+                    5.431
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "dodge",
+          "name": {
+            "zhCN": "闪避"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "dash_attack",
+              "name": {
+                "zhCN": "冲刺攻击：踏风"
+              },
+              "skillType": "dodge",
+              "damageElement": "wind",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    0.997,
+                    1.088,
+                    1.179,
+                    1.27,
+                    1.361,
+                    1.452,
+                    1.543,
+                    1.634,
+                    1.725,
+                    1.816,
+                    1.907,
+                    1.998,
+                    2.089,
+                    2.18,
+                    2.271,
+                    2.362
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "dodge_counter",
+              "name": {
+                "zhCN": "闪避反击：折云"
+              },
+              "skillType": "dodge",
+              "damageElement": "wind",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    3.949,
+                    4.308,
+                    4.667,
+                    5.026,
+                    5.385,
+                    5.744,
+                    6.103,
+                    6.462,
+                    6.821,
+                    7.18,
+                    7.539,
+                    7.898,
+                    8.257,
+                    8.616,
+                    8.975,
+                    9.334
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "assist",
+          "name": {
+            "zhCN": "支援技"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "quick_support",
+              "name": {
+                "zhCN": "快速支援：紧急预案"
+              },
+              "skillType": "assist",
+              "damageElement": "wind",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    2.038,
+                    2.224,
+                    2.41,
+                    2.596,
+                    2.782,
+                    2.968,
+                    3.154,
+                    3.34,
+                    3.526,
+                    3.712,
+                    3.898,
+                    4.084,
+                    4.27,
+                    4.456,
+                    4.642,
+                    4.828
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "assist_assault",
+              "name": {
+                "zhCN": "支援突击：谈判技巧"
+              },
+              "skillType": "assist",
+              "damageElement": "wind",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    5.327,
+                    5.812,
+                    6.297,
+                    6.782,
+                    7.267,
+                    7.752,
+                    8.237,
+                    8.722,
+                    9.207,
+                    9.692,
+                    10.177,
+                    10.662,
+                    11.147,
+                    11.632,
+                    12.117,
+                    12.602
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "special",
+          "name": {
+            "zhCN": "特殊技"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "wind_cut_clear",
+              "name": {
+                "zhCN": "特殊技：风切变·激浊"
+              },
+              "skillType": "special",
+              "damageElement": "wind",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    0.586,
+                    0.64,
+                    0.694,
+                    0.748,
+                    0.802,
+                    0.856,
+                    0.91,
+                    0.964,
+                    1.018,
+                    1.072,
+                    1.126,
+                    1.18,
+                    1.234,
+                    1.288,
+                    1.342,
+                    1.396
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "wind_cut_purify",
+              "name": {
+                "zhCN": "强化特殊技：风切变·扬清"
+              },
+              "skillType": "special",
+              "damageElement": "wind",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    4.405,
+                    4.806,
+                    5.207,
+                    5.608,
+                    6.009,
+                    6.41,
+                    6.811,
+                    7.212,
+                    7.613,
+                    8.014,
+                    8.415,
+                    8.816,
+                    9.217,
+                    9.618,
+                    10.019,
+                    10.42
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "wind_cut_triple",
+              "name": {
+                "zhCN": "强化特殊技：风切变·三重绝息"
+              },
+              "skillType": "special",
+              "damageElement": "wind",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    7.252,
+                    7.912,
+                    8.572,
+                    9.232,
+                    9.892,
+                    10.552,
+                    11.212,
+                    11.872,
+                    12.532,
+                    13.192,
+                    13.852,
+                    14.512,
+                    15.172,
+                    15.832,
+                    16.492,
+                    17.152
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "windstorm_eye",
+              "name": {
+                "zhCN": "强化特殊技：风切变·风暴眼"
+              },
+              "skillType": "special",
+              "damageElement": "wind",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    2.167,
+                    2.364,
+                    2.561,
+                    2.758,
+                    2.955,
+                    3.152,
+                    3.349,
+                    3.546,
+                    3.743,
+                    3.94,
+                    4.137,
+                    4.334,
+                    4.531,
+                    4.728,
+                    4.925,
+                    5.122
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "micro_vortex",
+              "name": {
+                "zhCN": "微域气旋"
+              },
+              "skillType": "special",
+              "damageElement": "wind",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    0.325,
+                    0.355,
+                    0.385,
+                    0.415,
+                    0.445,
+                    0.475,
+                    0.505,
+                    0.535,
+                    0.565,
+                    0.595,
+                    0.625,
+                    0.655,
+                    0.685,
+                    0.715,
+                    0.745,
+                    0.775
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "chain",
+          "name": {
+            "zhCN": "连携技"
+          },
+          "levelRange": {
+            "min": 1,
+            "max": 16,
+            "default": 12
+          },
+          "moves": [
+            {
+              "id": "chain_attack",
+              "name": {
+                "zhCN": "连携技：旋舞华章"
+              },
+              "skillType": "chain",
+              "damageElement": "wind",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    8.004,
+                    8.732,
+                    9.46,
+                    10.188,
+                    10.916,
+                    11.644,
+                    12.372,
+                    13.1,
+                    13.828,
+                    14.556,
+                    15.284,
+                    16.012,
+                    16.74,
+                    17.468,
+                    18.196,
+                    18.924
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "ultimate",
+              "name": {
+                "zhCN": "终结技：聆听呼啸"
+              },
+              "skillType": "ultimate",
+              "damageElement": "wind",
+              "rows": [
+                {
+                  "id": "damage",
+                  "label": {
+                    "zhCN": "伤害倍率"
+                  },
+                  "kind": "damageMultiplier",
+                  "values": [
+                    21.883,
+                    23.873,
+                    25.863,
+                    27.853,
+                    29.843,
+                    31.833,
+                    33.823,
+                    35.813,
+                    37.803,
+                    39.793,
+                    41.783,
+                    43.773,
+                    45.763,
+                    47.753,
+                    49.743,
+                    51.733
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 }

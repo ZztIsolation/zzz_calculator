@@ -19,6 +19,13 @@ import agentsData from "../../../data/agents.json"
 import agentSkillsData from "../../../data/agent_skills.json"
 
 describe("format helpers", () => {
+  it("uses turbulence source names independently of disorder and preserves custom titles", () => {
+    const event = { kind: "anomaly", settlementType: "turbulence", anomalyEffect: "frost_frozen", count: 1 }
+    expect(damageEventTitle(event)).toBe("乱流 · 烈霜（星见雅） ×1")
+    expect(damageEventSummaryTitle(event)).toBe("乱流 · 烈霜（星见雅） ×1")
+    expect(damageEventTitle({ ...event, label: "自定义事件" })).toBe("乱流 · 自定义事件 ×1")
+    expect(disorderEffectLabel("frost_frozen")).toBe("烈霜霜寒紊乱（星见雅）")
+  })
   it("localizes enum labels used by agents and w-engines", () => {
     expect(specialtyLabel("anomaly")).toBe("异常")
     expect(attributeLabel("physical")).toBe("物理属性")

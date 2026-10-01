@@ -291,7 +291,8 @@ function normalizeSettings(input = {}, agent = null) {
         throw new Error("必须选择限定 4 件套。")
     }
 
-    const rawTwoPieceIds = settings.twoPieceSetIds ?? settings.twoPieceSetId ?? input.twoPieceSetIds ?? input.twoPieceSetId ?? []
+    const rawTwoPieceIds = settings.twoPieceSetIds ?? settings.twoPieceSetId ?? input.twoPieceSetIds ?? input.twoPieceSetId
+        ?? agent?.preferredDriveDiscs?.defaultTwoPieceSetIds ?? []
     const twoPieceSetIds = [...new Set((Array.isArray(rawTwoPieceIds) ? rawTwoPieceIds : [rawTwoPieceIds])
         .map(item => String(item ?? "").trim())
         .filter(Boolean))]

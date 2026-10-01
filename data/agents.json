@@ -7579,6 +7579,622 @@
         "critDmg",
         "atk"
       ]
+    },
+    {
+      "id": "velina",
+      "name": {
+        "zhCN": "维琳娜·艾嘉德"
+      },
+      "rarity": "S",
+      "attribute": "wind",
+      "damageElement": "wind",
+      "specialty": "anomaly",
+      "attackTypes": [
+        "slash"
+      ],
+      "faction": "罗斯凯利法·外务筹策局",
+      "images": {
+        "portrait": "/assets/agents/velina.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen"
+      },
+      "level60": {
+        "hpBase": 7788,
+        "atkBase": 797,
+        "defBase": 612,
+        "critRate": 5,
+        "critDmg": 50,
+        "impact": 86,
+        "anomalyProficiency": 111,
+        "anomalyMastery": 112,
+        "energyRegen": 120,
+        "penRatio": 0
+      },
+      "combatBuffs": {
+        "corePassive": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "核心被动：风华盈袖"
+          },
+          "description": {
+            "zhCN": "初始能量自动回复超过1.2时，超过部分每0.01使造成的伤害提升0.21%，最多提升35%，并使异常掌控提升0.5点，最多提升84点。\n进入战场获得45点[风华]，发动强化特殊技时再获得45点，[风华]上限为135点。触发[乱流]时获得1点[风蚀]并召唤[微域气旋]；拥有2点[风蚀]时，下一次触发[乱流]会消耗2点[风蚀]，使该次[乱流]伤害倍率提升90/100/110/120/130/140/150%，并改为召唤[广域气旋]。\n[微域气旋]和[广域气旋]会在消散时触发爆炸命中处于风属性异常状态下的敌人时，都会对目标造成一次[异放]伤害：微域气旋固定结算85/95/105/115/125/135/145%倍率，广域气旋固定结算135/155/175/195/215/235/255%倍率的风属性异常伤害。"
+          },
+          "effects": [
+            {
+              "id": "velina-energy-damage-bonus",
+              "type": "formula",
+              "scope": "inCombat",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "source": {
+                "kind": "outOfCombatStat",
+                "stat": "energyRegen",
+                "unit": "storedValue",
+                "label": {
+                  "zhCN": "维琳娜初始能量自动回复"
+                },
+                "variable": "x"
+              },
+              "formula": {
+                "expression": "clamp(floor(max(x - 1.2, 0) / 0.01) * 0.21, 0, 35)",
+                "valueUnit": "storedPercent"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "velina-energy-mastery-bonus",
+              "type": "formula",
+              "scope": "inCombat",
+              "stat": "anomalyMasteryFlat",
+              "mode": "flat",
+              "target": {
+                "kind": "default"
+              },
+              "source": {
+                "kind": "outOfCombatStat",
+                "stat": "energyRegen",
+                "unit": "storedValue",
+                "label": {
+                  "zhCN": "维琳娜初始能量自动回复"
+                },
+                "variable": "x"
+              },
+              "formula": {
+                "expression": "clamp(floor(max(x - 1.2, 0) / 0.01) * 0.5, 0, 84)",
+                "valueUnit": "storedValue"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "velina-turbulence-base-multiplier",
+              "type": "fixed",
+              "stat": "turbulenceBaseMultiplierBonus",
+              "value": 90,
+              "mode": "flat",
+              "valueSource": {
+                "kind": "corePassiveScaling",
+                "field": "turbulenceBaseMultiplierBonusPct"
+              },
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "turbulence"
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "additionalAbility": {
+          "scope": "inCombat",
+          "name": {
+            "zhCN": "额外能力：茶会礼仪"
+          },
+          "description": {
+            "zhCN": "队伍中存在其他异常角色或同属性角色时触发：\n风化和乱流伤害提升10%；终结技重击命中处于风属性异常状态下的敌人时，额外结算固定680%倍率的风属性异放。\n核心被动中广域气旋造成的属性异常积蓄抗性降低效果额外提升7%，造成的失衡值提升30%，累积的属性异常积蓄值提升15%。"
+          },
+          "effects": [
+            {
+              "id": "velina-wind-corrosion-damage",
+              "type": "fixed",
+              "stat": "anomalyDamageBonus",
+              "value": 10,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "attribute",
+                "anomalyEffects": [
+                  "wind_corrosion"
+                ]
+              }
+            },
+            {
+              "id": "velina-turbulence-damage",
+              "type": "fixed",
+              "stat": "turbulenceDamageBonus",
+              "value": 10,
+              "mode": "flat",
+              "target": {
+                "kind": "anomaly",
+                "settlementType": "turbulence"
+              }
+            }
+          ],
+          "buffModifiers": []
+        },
+        "cinemaBuffs": [
+          {
+            "cinemaLevel": 1,
+            "cinemaName": {
+              "zhCN": "秩序化优雅"
+            },
+            "description": {
+              "zhCN": "触发乱流时无视目标20%全属性伤害抗性；全队造成风化伤害时无视目标20%风属性伤害抗性；广域气旋失衡值额外提升20%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "velina-c1-turbulence-all-res-ignore",
+                "type": "fixed",
+                "stat": "allResIgnore",
+                "value": 20,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "turbulence"
+                }
+              },
+              {
+                "id": "velina-c1-wind-corrosion-res-ignore",
+                "type": "fixed",
+                "stat": "windResIgnore",
+                "value": 20,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "attribute",
+                  "anomalyEffects": [
+                    "wind_corrosion"
+                  ]
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 2,
+            "cinemaName": {
+              "zhCN": "饱和式计划"
+            },
+            "description": {
+              "zhCN": "触发风化时获得风蚀；风化和乱流伤害提升效果额外提升15%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "velina-c2-wind-corrosion-damage",
+                "type": "fixed",
+                "stat": "anomalyDamageBonus",
+                "value": 15,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "attribute",
+                  "anomalyEffects": [
+                    "wind_corrosion"
+                  ]
+                }
+              },
+              {
+                "id": "velina-c2-turbulence-damage",
+                "type": "fixed",
+                "stat": "turbulenceDamageBonus",
+                "value": 15,
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "turbulence"
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 4,
+            "cinemaName": {
+              "zhCN": "茶话即审判"
+            },
+            "description": {
+              "zhCN": "发动强化特殊技后攻击力提升15%，持续40秒。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "velina-c4-atk",
+                "type": "fixed",
+                "stat": "atkPct",
+                "value": 15,
+                "mode": "pct",
+                "target": {
+                  "kind": "default"
+                },
+                "basis": "outOfCombatAtk",
+                "coverage": {
+                  "default": 1,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.1
+                }
+              }
+            ],
+            "buffModifiers": []
+          },
+          {
+            "cinemaLevel": 6,
+            "cinemaName": {
+              "zhCN": "首席天使"
+            },
+            "description": {
+              "zhCN": "消耗风蚀强化乱流后按冷却返还风蚀；风属性异常积蓄提升20%；\n当维琳娜对处于[风化]状态的敌人再次施加[风化]时，会根据上一次[风化]的剩余持续时间提升此次[风化]的伤害，每1秒剩余持续时间会使伤害提升2.5%，最多提升40%。"
+            },
+            "scope": "inCombat",
+            "defaultChecked": false,
+            "effects": [
+              {
+                "id": "velina-c6-wind-corrosion-recast-damage",
+                "type": "formula",
+                "stat": "anomalyDamageBonus",
+                "mode": "flat",
+                "target": {
+                  "kind": "anomaly",
+                  "settlementType": "attribute",
+                  "anomalyEffects": [
+                    "wind_corrosion"
+                  ]
+                },
+                "source": {
+                  "variable": "x",
+                  "defaultValue": 40,
+                  "min": 0,
+                  "max": 40,
+                  "step": 1,
+                  "label": {
+                    "zhCN": "风化增伤"
+                  }
+                },
+                "formula": {
+                  "expression": "x",
+                  "valueUnit": "storedValue"
+                }
+              }
+            ],
+            "mechanics": {
+              "windAnomalyBuildupBonusPct": 20,
+              "recastWindCorrosionDamageByRemainingSecondsPct": 2.5,
+              "recastWindCorrosionDamageCapPct": 40
+            },
+            "buffModifiers": []
+          }
+        ],
+        "skillBuffs": []
+      },
+      "coreSkill": {
+        "name": {
+          "zhCN": "风华盈袖"
+        },
+        "defaultLevel": "F",
+        "maxLevel": "F",
+        "levels": [
+          {
+            "level": "A",
+            "label": "强化A",
+            "stats": [
+              {
+                "stat": "anomalyProficiency",
+                "value": 18,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "B",
+            "label": "强化B",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "C",
+            "label": "强化C",
+            "stats": [
+              {
+                "stat": "anomalyProficiency",
+                "value": 18,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "D",
+            "label": "强化D",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "E",
+            "label": "强化E",
+            "stats": [
+              {
+                "stat": "anomalyProficiency",
+                "value": 18,
+                "mode": "flat",
+                "target": "panel"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "level": "F",
+            "label": "强化F",
+            "stats": [
+              {
+                "stat": "atkBase",
+                "value": 25,
+                "mode": "flat",
+                "target": "base"
+              }
+            ],
+            "skillLevelBonuses": [
+              {
+                "skill": "corePassive",
+                "value": 1
+              }
+            ]
+          }
+        ],
+        "corePassiveScaling": {
+          "name": {
+            "zhCN": "核心被动：风华盈袖"
+          },
+          "levels": [
+            {
+              "level": 1,
+              "turbulenceBaseMultiplierBonusPct": 90,
+              "microReleaseMultiplierPct": 85,
+              "broadReleaseMultiplierPct": 135
+            },
+            {
+              "level": 2,
+              "turbulenceBaseMultiplierBonusPct": 100,
+              "microReleaseMultiplierPct": 95,
+              "broadReleaseMultiplierPct": 155
+            },
+            {
+              "level": 3,
+              "turbulenceBaseMultiplierBonusPct": 110,
+              "microReleaseMultiplierPct": 105,
+              "broadReleaseMultiplierPct": 175
+            },
+            {
+              "level": 4,
+              "turbulenceBaseMultiplierBonusPct": 120,
+              "microReleaseMultiplierPct": 115,
+              "broadReleaseMultiplierPct": 195
+            },
+            {
+              "level": 5,
+              "turbulenceBaseMultiplierBonusPct": 130,
+              "microReleaseMultiplierPct": 125,
+              "broadReleaseMultiplierPct": 215
+            },
+            {
+              "level": 6,
+              "turbulenceBaseMultiplierBonusPct": 140,
+              "microReleaseMultiplierPct": 135,
+              "broadReleaseMultiplierPct": 235
+            },
+            {
+              "level": 7,
+              "turbulenceBaseMultiplierBonusPct": 150,
+              "microReleaseMultiplierPct": 145,
+              "broadReleaseMultiplierPct": 255
+            }
+          ],
+          "defaultLevelAtCoreSkill": "F"
+        },
+        "sources": [
+          "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+          "https://baike.mihoyo.com/zzz/wiki/content/2041/detail"
+        ],
+        "verification": {
+          "stats": "source-checked official entry 1960, page version 1789310040, verified 2026-09-29; A/C/E each add 18 anomaly proficiency, B/D/F each add 25 base ATK; applied separately from level60 stats",
+          "corePassiveScaling": "official initial/A-F values for turbulence and cyclone release; initial/A-F = 90/100/110/120/130/140/150; micro 85/95/105/115/125/135/145; broad 135/155/175/195/215/235/255",
+          "version": "3.1.0 release / design revision 18626312"
+        }
+      },
+      "anomalyReleaseProfiles": [
+        {
+          "id": "micro_vortex",
+          "name": {
+            "zhCN": "微域气旋异放"
+          },
+          "supportedElements": [
+            "wind"
+          ],
+          "resultMode": "fixedAnomalyMultiplier",
+          "expression": {
+            "kind": "coreSkillScaling",
+            "whiteBoxRole": "conversionSource",
+            "field": "microReleaseMultiplierPct",
+            "unit": "percent",
+            "label": {
+              "zhCN": "微域气旋固定异放倍率"
+            }
+          }
+        },
+        {
+          "id": "broad_vortex",
+          "name": {
+            "zhCN": "广域气旋异放"
+          },
+          "default": true,
+          "supportedElements": [
+            "wind"
+          ],
+          "resultMode": "fixedAnomalyMultiplier",
+          "expression": {
+            "kind": "coreSkillScaling",
+            "whiteBoxRole": "conversionSource",
+            "field": "broadReleaseMultiplierPct",
+            "unit": "percent",
+            "label": {
+              "zhCN": "广域气旋固定异放倍率"
+            }
+          }
+        },
+        {
+          "id": "ultimate_wind",
+          "name": {
+            "zhCN": "终结技重击异放"
+          },
+          "supportedElements": [
+            "wind"
+          ],
+          "resultMode": "fixedAnomalyMultiplier",
+          "expression": {
+            "kind": "constant",
+            "whiteBoxRole": "conversionSource",
+            "value": 6.8,
+            "unit": "decimal",
+            "label": {
+              "zhCN": "终结技重击固定异放倍率"
+            }
+          }
+        }
+      ],
+      "preferredDriveDiscs": {
+        "defaultSetIds": [
+          "zzz_wiki_2038"
+        ],
+        "defaultTwoPieceSetIds": [
+          "swing_jazz",
+          "moonlight_lullaby"
+        ],
+        "mainStatLimits": {
+          "4": [
+            "anomalyProficiency",
+            "atkPct"
+          ],
+          "5": [
+            "windDmg",
+            "atkPct",
+            "penRatio"
+          ],
+          "6": [
+            "energyRegen"
+          ]
+        }
+      },
+      "defaultCalculationConfig": {
+        "mode": "anomaly",
+        "cinemaLevel": 0,
+        "name": {
+          "zhCN": "单次风化"
+        },
+        "events": [
+          {
+            "id": "velina-broad-vortex-release",
+            "kind": "anomaly",
+            "count": 1,
+            "stunned": true,
+            "settlementType": "attribute",
+            "anomalyEffect": "wind_corrosion",
+            "anomalyVariant": "normal",
+            "procCount": 1
+          }
+        ],
+        "selectedEventId": "velina-broad-vortex-release"
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1960/detail?mhy_presentation_style=fullscreen",
+        "https://git.mero.moe/dimbreath/ZenlessData/blame/commit/1dbcef24b3a6039a135daad6b29832c9d556139c/TextMap/TextMapOverwriteTemplateTb.json#L786-L788"
+      ],
+      "verification": {
+        "officialVersion": "3.1.0 release / design revision 18626312",
+        "level60Stats": "source-checked official entry 1960, page version 1789310040, verified 2026-09-29; level 60 excluding core skill enhancements: HP 7788, ATK 797, DEF 612, Impact 86, CR 5%, CRIT DMG 50%, AP 111, AM 112, Energy Regen 1.2, PEN Ratio 0%",
+        "mechanics": "wind corrosion/turbulence/release semantics cross-checked against official entry and public game text",
+        "turbulenceTable": "pending-versioned-table-in-anomaly_effects.json"
+      },
+      "hidden": false,
+      "importantSubStats": [
+        "atkPct",
+        "anomalyProficiency"
+      ],
+      "importantPanelStats": [
+        "atk",
+        "anomalyProficiency"
+      ]
     }
   ]
 }

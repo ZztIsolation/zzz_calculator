@@ -2173,4 +2173,32 @@ describe("build store", () => {
       anomalySource: { actorRef: { agentId: "vivian" } },
     })
   })
+
+  it("uses Velina's maintained Wind Corrosion default for a new build", async () => {
+    const catalog = await loadCalculatorContext(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.."))
+    const meta = buildMeta(catalog)
+    const agent = catalog.agentsMap.get("velina")
+    const store = useBuildStore()
+    store.applyAgentConfig("velina", meta, {})
+    await store.persist()
+    expect(store.damageConfig.mode).toBe("adminDefault")
+    expect(store.buildInput(catalog, meta, []).damage.events[0]).toMatchObject({ kind: "anomaly", settlementType: "attribute", anomalyEffect: "wind_corrosion", procCount: 1, count: 1 })
+    const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1")!)
+    expect(saved.byOwner.default.byAgent.velina.damage.mode).toBe("adminDefault")
+    for (let level = 0; level <= 6; level++) {
+      expect(defaultDamageConfig(agent, level).events).toEqual(agent.defaultCalculationConfig.events)
+    }
+  })
+
+  it("preserves Velina's saved direct configuration instead of applying the maintained default", async () => {
+    const catalog = await loadCalculatorContext(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.."))
+    const meta = buildMeta(catalog)
+    const store = useBuildStore()
+    store.applyAgentConfig("velina", meta, { damage: { mode: "single", selectedEventId: "direct-1", events: [{ id: "direct-1", kind: "direct", skillMultiplier: 100, count: 1, stunned: true, critMode: "expected" }] } })
+    await store.persist()
+    expect(store.damageConfig.mode).toBe("single")
+    expect(store.buildInput(catalog, meta, []).damage.events[0]).toMatchObject({ kind: "direct", skillMultiplier: 100, count: 1 })
+    const saved = JSON.parse(localStorage.getItem("zzz-calculator.webapp.build.v1")!)
+    expect(saved.byOwner.default.byAgent.velina.damage.mode).toBe("single")
+  })
 })

@@ -39,6 +39,7 @@ const expectedTeammateProfiles = {
     soukaku: ["ice", "support"],
     trigger: ["electric", "stun"],
     tsukishiro_yanagi: ["electric", "anomaly"],
+    velina: ["wind", "anomaly"],
     xixifu: ["electric", "attack"],
     yaojiayin: ["ether", "support"],
     youye: ["physical", "support"],
@@ -58,8 +59,8 @@ function countTeammateProfile(index) {
     }, {})
 }
 
-assert.deepEqual(countTeammateProfile(0), { electric: 6, ether: 4, fire: 7, ice: 3, lumiflux: 1, physical: 6 })
-assert.deepEqual(countTeammateProfile(1), { anomaly: 4, attack: 3, defense: 3, stun: 9, support: 8 })
+assert.deepEqual(countTeammateProfile(0), { electric: 6, ether: 4, fire: 7, ice: 3, lumiflux: 1, physical: 6, wind: 1 })
+assert.deepEqual(countTeammateProfile(1), { anomaly: 5, attack: 3, defense: 3, stun: 9, support: 8 })
 
 function clone(value) {
     return JSON.parse(JSON.stringify(value))

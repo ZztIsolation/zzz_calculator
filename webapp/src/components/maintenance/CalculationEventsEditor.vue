@@ -4,9 +4,10 @@ import { NButton, NTag } from "naive-ui"
 import { Copy, Plus, Trash2 } from "lucide-vue-next"
 import CalculationEventFields from "./CalculationEventFields.vue"
 import {
-  EVENT_KIND_OPTIONS, anomalyOptions, categoryOptions, defaultCalculationEvent, moveOptions, option, rowOptions,
+  EVENT_KIND_OPTIONS, anomalyOptions, categoryOptions, defaultCalculationEvent, moveOptions, option, rowOptions, turbulenceSecondaryOptions,
 } from "./maintenance-options"
 import { internalId, textOf } from "./maintenance-model"
+import { normalizeAnomalyReleaseEventForAgent } from "@core/anomalyRelease.js"
 
 const props = withDefaults(defineProps<{
   events: any[]
@@ -44,7 +45,7 @@ function newSkillRef() {
 
 function add(kind: string) {
   if (kind !== "luminescence" && hasLuminescenceEvent.value) return
-  const event = defaultCalculationEvent(kind)
+  const event = defaultCalculationEvent(kind, props.agent)
   if (["direct", "sheer", "sharp"].includes(kind) && preferredSkillId()) {
     delete event.__source
     delete event.skillMultiplier
@@ -53,6 +54,9 @@ function add(kind: string) {
   }
   if (kind === "luminescence") {
     event.triggerActorRef = { agentId: props.agent?.id ?? "" }
+  }
+  if (kind === "release") {
+    Object.assign(event, normalizeAnomalyReleaseEventForAgent(event, props.agent))
   }
   if (kind === "luminescence") {
     props.events.splice(0, props.events.length, event)
@@ -103,6 +107,8 @@ function visibleKind(event: any) {
   if (event.kind === "direct" || event.kind === "sheer" || event.kind === "sharp") return event.kind
   return event.kind === "disorder" || event.settlementType === "disorder"
     ? "disorder"
+    : event.settlementType === "turbulence"
+      ? "turbulence"
     : event.settlementType === "release"
       ? "release"
       : event.settlementType === "luminescence" ? "luminescence" : "anomaly"
@@ -110,6 +116,7 @@ function visibleKind(event: any) {
 
 function eventTitle(event: any, index: number) {
   const kind = EVENT_KIND_OPTIONS.find(item => item.value === visibleKind(event))?.label ?? "计算事件"
+  if (visibleKind(event) === "turbulence" && event.label) return `${kind} · ${textOf(event.label)}`
   if (event.kind === "skillGroup") return `${kind} · ${groupOptions().find(item => item.value === event.skillGroupId)?.label ?? `事件 ${index + 1}`}`
   if (event.skillRef) {
     const move = moveOptions(props.catalog, event.skillRef.agentSkillId, event.skillRef.categoryId, false, props.potentialLevel).find((item: any) => item.value === event.skillRef.moveId)?.label
@@ -117,7 +124,10 @@ function eventTitle(event: any, index: number) {
     return [kind, move, row].filter(Boolean).join(" · ")
   }
   if (event.anomalyEffect) {
-    const label = [...anomalyOptions(props.catalog), ...anomalyOptions(props.catalog, true)].find(item => item.value === event.anomalyEffect)?.label
+    const label = (visibleKind(event) === "turbulence"
+      ? turbulenceSecondaryOptions(props.catalog, event.anomalyEffect)
+      : [...anomalyOptions(props.catalog), ...anomalyOptions(props.catalog, true)])
+      .find((item: any) => item.value === event.anomalyEffect)?.label
     return [kind, label].filter(Boolean).join(" · ")
   }
   if (event.label) return `${kind} · ${textOf(event.label)}`
@@ -143,7 +153,8 @@ function eventSummary(event: any) {
       <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('sheer')">添加贯穿</NButton>
       <NButton size="small" :disabled="disabled || hasLuminescenceEvent || agent?.specialty !== 'armorer'" @click="add('sharp')">添加锐化</NButton>
       <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('anomaly')">添加属性异常</NButton>
-      <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('disorder')">添加紊乱</NButton>
+      <NButton v-if="agent?.attribute !== 'wind'" size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('disorder')">添加紊乱</NButton>
+      <NButton v-if="agent?.attribute !== 'wind'" size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('turbulence')">添加乱流</NButton>
       <NButton size="small" :disabled="disabled || hasLuminescenceEvent || !(agent?.anomalyReleaseProfiles?.length)" :title="agent?.anomalyReleaseProfiles?.length ? '' : '暂不支持'" @click="add('release')">添加异放</NButton>
       <NButton v-if="allowSkillGroup" size="small" :disabled="disabled || hasLuminescenceEvent || agent?.id !== 'remielle_dan'" :title="agent?.id === 'remielle_dan' ? '' : '仅蕾米埃尔·丹支持'" @click="add('luminescence')">添加耀变</NButton>
       <NButton v-if="allowSkillGroup" size="small" :disabled="disabled || hasLuminescenceEvent || !skillGroups.length" @click="add('skillGroup')">添加技能组</NButton>
@@ -155,7 +166,7 @@ function eventSummary(event: any) {
   </div>
 
   <div v-else class="calculation-events-editor calculation-master-grid" data-layout-surface="maintenance-calculation-events">
-    <aside class="calculation-master-sidebar">
+    <aside class="calculation-master-sidebar" tabindex="0" aria-label="默认循环事件设置">
       <slot name="sidebar-top" />
       <section class="calculation-master-list-panel">
         <header class="calculation-master-panel-head"><h4>目标事件</h4><NTag round>{{ events.length }} 项</NTag></header>
@@ -177,7 +188,8 @@ function eventSummary(event: any) {
           <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('sheer')">添加贯穿</NButton>
           <NButton size="small" :disabled="disabled || hasLuminescenceEvent || agent?.specialty !== 'armorer'" @click="add('sharp')">添加锐化</NButton>
           <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('anomaly')">添加异常</NButton>
-          <NButton size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('disorder')">添加紊乱</NButton>
+          <NButton v-if="agent?.attribute !== 'wind'" size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('disorder')">添加紊乱</NButton>
+          <NButton v-if="agent?.attribute !== 'wind'" size="small" :disabled="disabled || hasLuminescenceEvent" @click="add('turbulence')">添加乱流</NButton>
           <NButton size="small" :disabled="disabled || hasLuminescenceEvent || !(agent?.anomalyReleaseProfiles?.length)" :title="agent?.anomalyReleaseProfiles?.length ? '' : '暂不支持'" @click="add('release')">添加异放</NButton>
           <NButton v-if="allowSkillGroup" size="small" :disabled="disabled || hasLuminescenceEvent || agent?.id !== 'remielle_dan'" :title="agent?.id === 'remielle_dan' ? '' : '仅蕾米埃尔·丹支持'" @click="add('luminescence')">添加耀变</NButton>
           <NButton v-if="allowSkillGroup" size="small" :disabled="disabled || hasLuminescenceEvent || !skillGroups.length" @click="add('skillGroup')">添加技能组</NButton>
@@ -200,13 +212,13 @@ function eventSummary(event: any) {
 
 <style scoped>
 .calculation-master-grid { display: grid; height: 100%; min-height: 0; grid-template-columns: 340px minmax(0, 1fr); align-items: stretch; gap: 16px; margin-top: 0; }
-.calculation-master-sidebar { display: grid; height: 100%; min-width: 0; min-height: 0; grid-template-rows: auto minmax(0, 1fr); gap: 12px; }
+.calculation-master-sidebar { display: grid; height: 100%; min-width: 0; min-height: 0; grid-template-rows: max-content max-content; align-content: start; gap: 12px; overflow-y: auto; overscroll-behavior: contain; }
 .calculation-master-list-panel, .calculation-master-editor-panel { min-width: 0; min-height: 0; overflow: hidden; border: 1px solid var(--app-border); border-radius: var(--app-radius-sm); background: #fff; }
-.calculation-master-list-panel { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.calculation-master-list-panel { display: grid; grid-template-rows: auto auto auto; overflow: visible; }
 .calculation-master-editor-panel { display: grid; grid-template-rows: auto minmax(0, 1fr); }
 .calculation-master-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; min-height: 56px; padding: 14px 16px; border-bottom: 1px solid var(--app-border); }
 .calculation-master-panel-head h4 { min-width: 0; margin: 0; overflow-wrap: anywhere; font-size: 15px; line-height: 1.45; }
-.calculation-event-list { display: grid; min-height: 0; align-content: start; gap: 8px; padding: 12px; overflow: auto; }
+.calculation-event-list { display: grid; min-height: 0; align-content: start; gap: 8px; padding: 12px; overflow: visible; }
 .calculation-event-list-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 6px; padding: 8px; border: 1px solid var(--app-border); border-radius: var(--app-radius-sm); background: #fff; }
 .calculation-event-list-item.active { border-color: var(--app-blue); background: #eff6ff; }
 .calculation-event-select { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 8px; width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
@@ -224,10 +236,9 @@ function eventSummary(event: any) {
 .calculation-event-empty { margin: 12px; padding: 24px 12px; border: 1px dashed var(--app-border); border-radius: var(--app-radius-sm); color: var(--app-muted); text-align: center; }
 @container ui-layout (max-width: 860px) {
   .calculation-master-grid { height: auto; grid-template-columns: 1fr; }
-  .calculation-master-sidebar { height: auto; }
-  .calculation-master-list-panel { grid-template-rows: auto auto auto; }
+  .calculation-master-sidebar { height: auto; overflow: visible; }
   .calculation-master-editor-panel { grid-template-rows: auto auto; }
-  .calculation-event-list { max-height: 320px; }
+  .calculation-event-list { max-height: 320px; overflow: auto; }
   .calculation-master-editor-body { overflow: visible; }
   .calculation-master-editor-body :deep(.calculation-event-grid) { grid-template-columns: 1fr; }
 }

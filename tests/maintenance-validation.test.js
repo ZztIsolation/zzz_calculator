@@ -6,6 +6,7 @@ import { cleanMaintenanceItem } from "../backend/server.js"
 import { loadCalculatorContext } from "../backend/calculator.js"
 import {
     applySystemManagedMaintenanceFields,
+    repairDynamicValueSourceFallbacks,
     validateMaintenanceItem,
 } from "../core/maintenanceValidation.js"
 
@@ -416,7 +417,39 @@ incompleteDynamicCoreLevels.coreSkill.corePassiveScaling.levels.pop()
 assertInvalid("agents", incompleteDynamicCoreLevels, "完整档位")
 const mismatchedDynamicFallback = clone(dynamicCoreAgent)
 mismatchedDynamicFallback.combatBuffs.corePassive.effects[0].value = 44
-assertInvalid("agents", mismatchedDynamicFallback, "兼容值必须与核心被动倍率第一档一致")
+const repairedDynamicFallback = cleanMaintenanceItem("agents", mismatchedDynamicFallback)
+assert.equal(repairedDynamicFallback.combatBuffs.corePassive.effects[0].value, 45)
+assertValid("agents", repairedDynamicFallback)
+const malformedDynamicFallback = clone(dynamicCoreAgent)
+malformedDynamicFallback.coreSkill.corePassiveScaling.levels[0] = { level: 1 }
+assertInvalid("agents", malformedDynamicFallback, "valueSource.field[0]")
+const potentialFallback = {
+    potentialVision: {
+        scaling: {
+            levels: [
+                { level: 0, anomalyDamageBonusPct: 10 },
+                { level: 1, anomalyDamageBonusPct: 20 },
+            ],
+        },
+    },
+    combatBuffs: {
+        additionalAbility: {
+            effects: [{
+                value: 20,
+                valueSource: { kind: "potentialVisionScaling", field: "anomalyDamageBonusPct" },
+            }],
+        },
+    },
+}
+const potentialRepairs = repairDynamicValueSourceFallbacks(potentialFallback)
+assert.deepEqual(potentialRepairs, [{
+    path: "combatBuffs.additionalAbility.effects[0].value",
+    sourceKind: "potentialVisionScaling",
+    field: "anomalyDamageBonusPct",
+    from: 20,
+    to: 10,
+}])
+assert.equal(potentialFallback.combatBuffs.additionalAbility.effects[0].value, 10)
 const misplacedDynamicSource = clone(dynamicCoreAgent)
 misplacedDynamicSource.combatBuffs.additionalAbility = {
     scope: "inCombat",
@@ -483,6 +516,21 @@ const cleanedPreferredDriveDiscs = cleanMaintenanceItem("agents", {
     },
 })
 assert.deepEqual(cleanedPreferredDriveDiscs.preferredDriveDiscs.defaultSetIds, [validDriveDiscSet.id, "second_drive_disc"])
+const twoPiecePreferenceAgent = { ...validAgent, preferredDriveDiscs: { defaultTwoPieceSetIds: [validDriveDiscSet.id] } }
+assertValid("agents", twoPiecePreferenceAgent, { driveDiscSets: [validDriveDiscSet] })
+const cleanedTwoPiecePreferences = cleanMaintenanceItem("agents", {
+    ...twoPiecePreferenceAgent,
+    preferredDriveDiscs: { defaultTwoPieceSetIds: [` ${validDriveDiscSet.id} `, validDriveDiscSet.id, ""] },
+})
+assert.deepEqual(cleanedTwoPiecePreferences.preferredDriveDiscs, { defaultTwoPieceSetIds: [validDriveDiscSet.id] })
+assert.equal(cleanMaintenanceItem("agents", { ...validAgent, preferredDriveDiscs: { defaultTwoPieceSetIds: [] } }).preferredDriveDiscs, undefined)
+for (const invalid of ["not-an-array", null, {}]) {
+    const cleaned = cleanMaintenanceItem("agents", { ...validAgent, preferredDriveDiscs: { defaultTwoPieceSetIds: invalid } })
+    assertInvalid("agents", cleaned, "必须是数组")
+}
+assertInvalid("agents", {
+    ...validAgent, preferredDriveDiscs: { defaultTwoPieceSetIds: ["missing_drive_disc"] },
+}, "驱动盘套装不存在", { driveDiscSets: [validDriveDiscSet] })
 assertValid("agents", {
     ...validAgent,
     importantSubStats: ["defPct", "critRate", "critDmg", "penFlat"],

@@ -148,7 +148,6 @@ const customStatBuff = {
     stats: [
         {
             id: "stat-1",
-            label: "通用伤害%",
             stat: "dmgBonus",
             value: 40,
             mode: "flat",
@@ -371,6 +370,54 @@ assert.equal(
     }, {}, {}, meta),
     "指定异常增伤% +18%（属性异常）",
     "Scoped Attribute Anomaly targets should use the precise anomaly label",
+)
+assert.equal(
+    storedEffectRuleText({
+        type: "fixed",
+        stat: "anomalyDamageBonus",
+        value: 10,
+        mode: "flat",
+        target: {
+            kind: "anomaly",
+            settlementType: "attribute",
+            anomalyEffects: ["wind_corrosion"],
+        },
+    }, {}, {}, meta),
+    "指定异常增伤% +10%（属性异常：风化）",
+    "Wind Corrosion targets should use the localized Wind Corrosion label",
+)
+assert.equal(
+    storedEffectRuleText({
+        type: "fixed",
+        stat: "anomalyDamageBonus",
+        value: 10,
+        mode: "flat",
+        target: { kind: "anomaly", settlementType: "turbulence" },
+    }, {}, {}, meta),
+    "指定异常增伤% +10%（乱流）",
+    "Turbulence targets should display their dedicated settlement label",
+)
+assert.equal(
+    storedEffectRuleText({
+        type: "fixed",
+        stat: "turbulenceDamageBonus",
+        value: 10,
+        mode: "flat",
+        target: { kind: "anomaly", settlementType: "turbulence" },
+    }, {}, {}, meta),
+    "乱流增伤% +10%（乱流）",
+    "Dedicated turbulence damage modifiers should use the localized stat label",
+)
+assert.equal(
+    storedEffectRuleText({
+        type: "fixed",
+        stat: "turbulenceBaseMultiplierBonus",
+        value: 150,
+        mode: "flat",
+        target: { kind: "anomaly", settlementType: "turbulence" },
+    }, {}, {}, meta),
+    "乱流倍率修正% +150%（乱流）",
+    "Dedicated turbulence multiplier modifiers should use the localized stat label",
 )
 assert.equal(
     storedEffectRuleText({
