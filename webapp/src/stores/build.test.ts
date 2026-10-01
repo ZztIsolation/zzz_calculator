@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url"
 import path from "node:path"
 import { buildMeta, calculateInCombatPanel, loadCalculatorContext } from "../../../backend/calculator.js"
 import { activeDriveDisc4pcRuntimeInputs, defaultDamageConfig, hasAdminDefaultCalculation, normalizeDamageModeForAgent, useBuildStore } from "@/stores/build"
+import { readBuildSelectionDocument, readLegacySelectionDocument } from '@runtime/build-storage'
 
 function teammateWEngineMeta() {
   const teamWEngine = (id: string) => ({
@@ -120,6 +121,66 @@ describe("build store", () => {
     const restored = useBuildStore()
     restored.initialize({}, meta)
     expect(restored.buffPickerState).toEqual(firstState)
+  })
+
+  it('keeps both saved documents and the visible build intact when the second Buff write fails, then retries', async () => {
+    const meta = buffPickerMeta()
+    const store = useBuildStore()
+    store.applyAgentConfig('agent_a', meta, { wEngineId: 'engine_a' })
+    await store.persist()
+    const before = store.buffSaveFingerprint()
+    const expectedBuild = readBuildSelectionDocument()
+    const expectedLegacy = readLegacySelectionDocument()
+    const payload = { selectedBuffIds: [...store.activeBuffIds(meta), 'field.buff'], addedBuffs: [], runtimeInputs: {},
+      buffPickerState: { teammateSlots: [{ teammateId: 'teammate_a', cinemaLevel: 2 }, null] } }
+    const original = Storage.prototype.setItem
+    let failed = false
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (key, value) {
+      if (key === 'zzz-calculator.homeSelection.v1' && !failed) { failed = true; throw new Error('quota-test') }
+      original.call(this, key, value)
+    })
+    const options = { expectedBuild, expectedLegacy, validate: async () => {} }
+    await expect(store.saveBuffState(payload, meta, options)).rejects.toThrow('quota-test')
+    spy.mockRestore()
+    expect(store.buffSaveFingerprint()).toBe(before)
+    expect(readBuildSelectionDocument()).toEqual(expectedBuild)
+    expect(readLegacySelectionDocument()).toEqual(expectedLegacy)
+    await store.saveBuffState(payload, meta, options)
+    expect(store.selectedBuffIds).toContain('field.buff')
+    store.applyAgentConfig('agent_a', meta, readBuildSelectionDocument().byOwner.default.byAgent.agent_a)
+    expect(store.buffPickerState?.teammateSlots[0]?.cinemaLevel).toBe(2)
+  })
+
+  it('replaces cleared Enka overrides in visible state after a successful resync save', async () => {
+    const meta = buffPickerMeta(); const store = useBuildStore()
+    store.applyAgentConfig('agent_a', meta, { wEngineId: 'engine_a' })
+    await store.persist()
+    const payload = { selectedBuffIds: [...store.activeBuffIds(meta)], addedBuffs: [], runtimeInputs: {},
+      buffPickerState: { teammateSlots: [{ teammateId: 'teammate_a', cinemaLevel: 1 }, null],
+        enka: { version: 1, ownerId: 'default', uid: '123456789', owners: { 'cinema:teammate_a': 'teammate_a' },
+          applied: { 'cinema:teammate_a': 1 }, overrides: { 'cinema:teammate_a': 1 } } } }
+    const options = () => ({ expectedBuild: readBuildSelectionDocument(), expectedLegacy: readLegacySelectionDocument(), validate: async () => {} })
+    await store.saveBuffState(payload, meta, options())
+    const reset = JSON.parse(JSON.stringify(payload))
+    reset.buffPickerState.teammateSlots[0].cinemaLevel = 0
+    reset.buffPickerState.enka.applied['cinema:teammate_a'] = 0
+    reset.buffPickerState.enka.overrides = {}
+    await store.saveBuffState(reset, meta, options())
+    expect(store.buffPickerState).toEqual(reset.buffPickerState)
+    expect(readBuildSelectionDocument().byOwner.default.byAgent.agent_a.buffPickerState).toEqual(store.buffPickerState)
+  })
+
+  it('rejects a stale Buff draft before replacing a concurrent document', async () => {
+    const meta = buffPickerMeta(); const store = useBuildStore()
+    store.applyAgentConfig('agent_a', meta, { wEngineId: 'engine_a' })
+    await store.persist()
+    const expectedBuild = readBuildSelectionDocument(); const expectedLegacy = readLegacySelectionDocument()
+    localStorage.setItem('zzz-calculator.homeSelection.v1', JSON.stringify({ concurrent: true }))
+    await expect(store.saveBuffState({ selectedBuffIds: ['field.buff'] }, meta, {
+      expectedBuild, expectedLegacy, validate: async () => {},
+    })).rejects.toThrow('配置在保存期间')
+    expect(JSON.parse(localStorage.getItem('zzz-calculator.homeSelection.v1')!)).toEqual({ concurrent: true })
+    expect(store.selectedBuffIds).not.toContain('field.buff')
   })
 
   it("resets legacy three-owner selections before editing while retaining both own Buff tabs exactly", async () => {

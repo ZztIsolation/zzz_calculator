@@ -1,4 +1,5 @@
 import { mapDriveDiscPreset } from "./drive-disc-mapping.js"
+import { ENKA_TEAMMATE_IDS } from './teammate-identities.js'
 
 function displayItems(catalog, displayKey, fallbackKey) {
   const displayed = catalog?.[displayKey]
@@ -13,14 +14,18 @@ function itemById(items, id) {
 export function mapShowcaseToCatalog(parsed, catalog, mapping, { uid } = {}) {
   const normalizedUid = String(uid ?? "").trim()
   const agentItems = displayItems(catalog, "displayAgents", "agents")
+  const teammateItems = displayItems(catalog, "displayTeammateCombatBuffGroups", "teammateCombatBuffGroups")
   const wEngineItems = displayItems(catalog, "displayWEngines", "wEngines")
   const mappedAgents = []
   const skippedAgents = []
   const warnings = [...(parsed?.warnings ?? [])]
 
   for (const source of parsed?.agents ?? []) {
+    const teammate = itemById(teammateItems, ENKA_TEAMMATE_IDS[source.enkaId])
     const agentMapping = mapping?.agents?.[source.enkaId]
-    const agentItem = itemById(agentItems, agentMapping?.id)
+      ?? (teammate ? { id: teammate.id, name: teammate.name?.zhCN ?? teammate.id } : null)
+    const calculableAgent = itemById(agentItems, agentMapping?.id)
+    const agentItem = calculableAgent ?? itemById(teammateItems, agentMapping?.id)
     if (!agentMapping || !agentItem) {
       skippedAgents.push({
         enkaId: source.enkaId,
@@ -59,6 +64,7 @@ export function mapShowcaseToCatalog(parsed, catalog, mapping, { uid } = {}) {
       ...source,
       agentId: agentItem.id,
       agentName: agentMapping.name,
+      ...(calculableAgent ? {} : { teammateOnly: true }),
       wEngine,
       driveDiscPreset: driveDiscResult.preset,
     })

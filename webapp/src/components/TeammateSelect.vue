@@ -9,7 +9,10 @@ type TeammateOption = {
   label: string
   specialty?: string
   avatar?: string
+  importStatus?: 'imported' | 'missing' | 'partial'
 }
+
+const importStatusLabels = { imported: '已导入', missing: '未导入', partial: '资料不完整' }
 
 const props = withDefaults(defineProps<{
   value: string | null
@@ -54,12 +57,26 @@ function renderLabel(option: CascaderOption) {
   return h("span", { class: "teammate-select-option" }, [
     h(ImageAvatar, { src: String(option.avatar ?? ""), name: option.label, size: 26, round: true }),
     h("span", { class: "teammate-select-option-name" }, option.label),
+    option.importStatus ? h('span', {
+      class: ['teammate-import-dot', `is-${option.importStatus}`],
+      role: 'img',
+      title: importStatusLabels[option.importStatus as keyof typeof importStatusLabels],
+      'aria-label': importStatusLabels[option.importStatus as keyof typeof importStatusLabels],
+    }) : null,
   ])
 }
 
 function matchesName(pattern: string, option: CascaderOption) {
   return !option.children && String(option.label ?? "").toLocaleLowerCase().includes(pattern.trim().toLocaleLowerCase())
 }
+
+function renderSearchLabel(option: { value: string | number; label?: string }) {
+  const teammate = props.options.find(item => item.value === option.value)
+  return teammate ? renderLabel(teammate) : option.label
+}
+
+// The filtered menu forwards attributes to Naive UI's select menu.
+const searchMenuProps = { class: 'teammate-select-search-menu', renderLabel: renderSearchLabel }
 
 function columnStyle({ level }: { level: number }) {
   const width = level === 0 ? "84px" : "min(220px, calc(100vw - 108px))"
@@ -87,7 +104,7 @@ function columnStyle({ level }: { level: number }) {
       :filter="matchesName"
       :get-column-style="columnStyle"
       :menu-props="{ class: 'teammate-select-menu' }"
-      :filter-menu-props="{ class: 'teammate-select-search-menu' }"
+      :filter-menu-props="searchMenuProps"
       :theme-overrides="{ optionHeight: '36px', optionFontSize: '14px', menuHeight: 'min(288px, 50vh)' }"
       :show-path="false"
       :virtual-scroll="false"
@@ -96,6 +113,14 @@ function columnStyle({ level }: { level: number }) {
       filterable
       clearable
       @update:value="updateValue"
+    />
+    <span
+      v-if="selectedOption?.importStatus"
+      class="teammate-import-dot"
+      :class="`is-${selectedOption.importStatus}`"
+      role="img"
+      :title="importStatusLabels[selectedOption.importStatus]"
+      :aria-label="importStatusLabels[selectedOption.importStatus]"
     />
   </label>
 </template>
@@ -130,6 +155,25 @@ function columnStyle({ level }: { level: number }) {
 </style>
 
 <style>
+.teammate-import-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  border: 1px solid var(--app-muted, #6b7280);
+  border-radius: 50%;
+}
+
+.teammate-import-dot.is-imported {
+  border-color: var(--app-blue, #2f7df6);
+  background: var(--app-blue, #2f7df6);
+}
+
+.teammate-import-dot.is-partial {
+  border-color: var(--app-amber, #b7791f);
+}
+
 .teammate-select-menu,
 .teammate-select-search-menu {
   max-width: calc(100vw - 24px);

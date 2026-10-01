@@ -1,10 +1,14 @@
+import type { EnkaTeammateState } from './enkaTeammates'
+
 export type TeammateSlot = {
   teammateId: string
   cinemaLevel: number
+  loadoutId?: string
 }
 
 export type BuffPickerState = {
   teammateSlots: [TeammateSlot | null, TeammateSlot | null]
+  enka?: EnkaTeammateState
 }
 
 const chineseCinemaLevels: Record<string, number> = {
@@ -72,8 +76,12 @@ export function normalizeBuffPickerState(value: unknown): BuffPickerState | null
     normalized.teammateSlots[index] = {
       teammateId,
       cinemaLevel: Number.isFinite(level) ? Math.min(6, Math.max(0, Math.trunc(level))) : 0,
+      ...(typeof slot.loadoutId === 'string' && slot.loadoutId ? { loadoutId: slot.loadoutId } : {}),
     }
   }
+  const enka = (value as { enka?: EnkaTeammateState }).enka
+  if (enka?.version === 1 && typeof enka.ownerId === 'string' && typeof enka.uid === 'string'
+    && enka.owners && enka.applied && enka.overrides) normalized.enka = JSON.parse(JSON.stringify(enka))
   return normalized
 }
 

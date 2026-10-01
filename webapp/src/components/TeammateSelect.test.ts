@@ -33,6 +33,7 @@ afterEach(() => {
 function mountSelect(value: string | null = null, available = options) {
   wrapper = mount(TeammateSelect, {
     attachTo: document.body,
+    global: { stubs: { transition: false } },
     props: { value, options: available, label: "队友一" },
     attrs: { "data-testid": "teammate-slot-0" },
   })
@@ -82,7 +83,7 @@ describe("TeammateSelect", () => {
   })
 
   it("searches names across categories and selects the matching teammate with the keyboard", async () => {
-    const selected = mountSelect()
+    const selected = mountSelect(null, options.map(option => ({ ...option, importStatus: 'imported' as const })))
     await openMenu()
     const input = selected.get("input")
     await input.setValue("千夏")
@@ -99,6 +100,7 @@ describe("TeammateSelect", () => {
     const menu = new DOMWrapper(document.body).get(".teammate-select-search-menu")
     expect(menu.text()).toContain("千夏")
     expect(menu.text()).not.toContain("丽娜")
+    expect(menu.get('.teammate-import-dot').attributes('title')).toBe('已导入')
     await input.trigger("keydown", { key: "Enter", code: "Enter" })
     expect(selected.emitted("update:value")?.at(-1)).toEqual(["chinatsu"])
   })

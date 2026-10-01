@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils"
+import { mount, flushPromises } from "@vue/test-utils"
 import { describe, expect, it, vi } from "vitest"
 import { nextTick } from "vue"
 import BuffPickerModal from "@/components/BuffPickerModal.vue"
@@ -113,6 +113,22 @@ vi.mock("naive-ui", async () => {
       template: "<span><slot /></span>",
     },
   }
+})
+
+it('retains the Buff draft on failed persistence and only closes after a successful retry', async () => {
+  const save = vi.fn().mockRejectedValueOnce(new Error('保存失败')).mockResolvedValueOnce(undefined)
+  const wrapper = mount(BuffPickerModal, { props: { show: false, buffs: [], selectedIds: ['keep.manual'], save } })
+  await wrapper.setProps({ show: true })
+  const apply = () => wrapper.findAll('button').find(button => button.text() === '应用选择')!
+  await apply().trigger('click'); await flushPromises()
+  expect(wrapper.get('[role="alert"]').text()).toBe('保存失败')
+  expect(wrapper.emitted('update:show')).toBeUndefined()
+  await apply().trigger('click'); await flushPromises()
+  expect(save).toHaveBeenCalledTimes(2)
+  expect(save.mock.calls[1]![0]).toEqual(save.mock.calls[0]![0])
+  expect(save.mock.calls[1]![0].selectedBuffIds).toContain('keep.manual')
+  expect(wrapper.emitted('update:show')).toEqual([[false]])
+  wrapper.unmount()
 })
 
 const fieldBuffs = [
@@ -1761,6 +1777,22 @@ describe("BuffPickerModal", () => {
     const payload = wrapper.emitted("apply")?.[0]?.[0] as any
     expect(new Set(payload.selectedBuffIds)).toEqual(new Set(["slot_a.core", "nonstandard_alpha", "slot_a.potential", "slot_a.cinema.6"]))
     expect(payload.buffPickerState).toEqual(teammateSlotState("slot_a", null, 1))
+  })
+
+  it('allows manual cinema changes when a complete record belongs to a different UID', async () => {
+    const wrapper = mountModal({ meta: cinemaTeammateMeta(), teammateSources: {
+      ownerId: 'default', uid: 'current-uid', configs: {}, loadouts: [], discs: [],
+      history: { slot_a: { completeness: 'full', uid: 'old-uid', snapshot: { cinemaLevel: 0 } } },
+    } })
+    await openTeammateTab(wrapper)
+    await teammateSlot(wrapper, 0).setValue('slot_a')
+    await teammateCinema(wrapper, 0).setValue('1')
+    expect(selectedRow(wrapper, '影画一：初阶增益')).toBe(true)
+    await buttonByText(wrapper, '应用选择').trigger('click')
+    const payload = wrapper.emitted('apply')?.[0]?.[0] as any
+    expect(payload.selectedBuffIds).toContain('nonstandard_alpha')
+    expect(payload.buffPickerState.teammateSlots[0].cinemaLevel).toBe(1)
+    wrapper.unmount()
   })
 
   it("restores explicit slot order and manual overrides without replaying auto-selection on reopen or search", async () => {
