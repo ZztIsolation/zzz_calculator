@@ -116,6 +116,7 @@ log() {
 }
 DRIVER_HELPERS
 for function_name in \
+    bounded_systemctl \
     parse_systemd_major_version \
     select_validation_systemd_profile \
     detect_validation_systemd_profile \

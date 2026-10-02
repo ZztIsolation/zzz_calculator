@@ -156,6 +156,45 @@ jobs:
       - name: Validate deployment configuration
         run: node scripts/validate-deployment-config.js
 
+      - name: Package reviewed deployment control plane
+        shell: bash
+        run: |
+          set -euo pipefail
+          control_dir="$(mktemp -d "$RUNNER_TEMP/deployment-control-plane.XXXXXXXX")"
+          cp -- deploy/production/bootstrap-zzz-calculator-deploy.sh \
+            deploy/production/zzz-calculator-deploy \
+            deploy/production/zzz-calculator-validation-worker \
+            deploy/production/zzz-calculator-ssh-gateway \
+            deploy/production/zzz-calculator-deploy.sudoers \
+            deploy/production/RECOVERY.md "$control_dir/"
+          printf '%s\n' "$GITHUB_SHA" > "$control_dir/SOURCE_COMMIT"
+          (
+            cd -- "$control_dir"
+            sha256sum bootstrap-zzz-calculator-deploy.sh zzz-calculator-deploy \
+              zzz-calculator-validation-worker zzz-calculator-ssh-gateway \
+              zzz-calculator-deploy.sudoers RECOVERY.md SOURCE_COMMIT > SHA256SUMS
+            sha256sum --check SHA256SUMS
+          )
+          tar -czf "output/deployment-control-plane-${GITHUB_SHA}.tar.gz" -C "$control_dir" .
+          (
+            cd output
+            sha256sum "deployment-control-plane-${GITHUB_SHA}.tar.gz" \
+              > "deployment-control-plane-${GITHUB_SHA}.sha256"
+          )
+
+      - name: Upload reviewed main control plane
+        if: >-
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+          github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: deployment-control-plane-${{ github.sha }}
+          path: |
+            output/deployment-control-plane-*.tar.gz
+            output/deployment-control-plane-*.sha256
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload immutable main release artifact
         if: >-
           (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&

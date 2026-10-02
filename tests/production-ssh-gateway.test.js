@@ -59,7 +59,7 @@ assert.ok(managerPattern.startsWith("^") && managerPattern.endsWith("$"), "Manag
 includes(gateway, '[[ "$artifact_prefix" == "$evidence_prefix" ]]')
 includes(gateway, '[[ "${expected_commit:0:12}" == "$artifact_prefix" ]]')
 
-const scpCalls = [...deployWorkflow.matchAll(/^\s*scp\s+([^\r\n]+)$/gm)].map(match => match[1])
+const scpCalls = [...deployWorkflow.matchAll(/^\s*run_bounded_phase upload-(?:archive|evidence) \d+ scp\s+([^\r\n]+)$/gm)].map(match => match[1])
 assert.equal(scpCalls.length, 2, "Production CD must upload exactly the archive and evidence")
 for (const call of scpCalls) {
     assert.match(call, /^-O\s+"\$\{ssh_opts\[@\]\}"/, "Production uploads must force predictable legacy SCP mode")
