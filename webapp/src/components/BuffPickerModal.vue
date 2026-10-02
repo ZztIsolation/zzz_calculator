@@ -966,21 +966,28 @@ function setStacks(buff: any, group: any, value: number | null) {
   updateRuntime(buff, { ...runtime, effects })
 }
 
+const imbuementBuffIds = ["system.imbuement", "roxy.additional_ability"]
+
 function toggle(id: string, checked: boolean) {
   recordEnkaTeammateEdit(draftBuffPickerState.value, `enabled:${id}`, checked)
   const next = new Set(draft.value)
   const nextRuntime = { ...draftRuntimeInputs.value }
   const buff = Object.values(groupedBuffs.value).flat().find((item: any) => item?.id === id) as any
   if (checked) {
+    if (imbuementBuffIds.includes(id)) {
+      for (const otherId of imbuementBuffIds) {
+        if (otherId !== id) {
+          next.delete(otherId)
+          delete nextRuntime[otherId]
+        }
+      }
+    }
     const fieldBuff = fieldBuffs.value.find(buff => buff.id === id)
     if (fieldBuff) {
-      const key = fieldBuffPeriodKey(fieldBuff)
-      if (key) {
-        for (const buff of fieldBuffs.value) {
-          if (buff.id !== id && fieldBuffPeriodKey(buff) === key) {
-            next.delete(buff.id)
-            delete nextRuntime[buff.id]
-          }
+      for (const buff of fieldBuffs.value) {
+        if (buff.id !== id) {
+          next.delete(buff.id)
+          delete nextRuntime[buff.id]
         }
       }
     }
@@ -1011,14 +1018,9 @@ function addVisibleBuffs() {
   if (!canBulkAddVisible.value) {
     return
   }
-  const next = new Set(draft.value)
   for (const buff of visibleBuffs.value) {
-    next.add(buff.id)
-    if (buff?.isTeammateWEngine) {
-      upsertTeamWEngineReference(buff)
-    }
+    toggle(buff.id, true)
   }
-  draft.value = next
 }
 
 function removeVisibleBuffs() {

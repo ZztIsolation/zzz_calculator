@@ -1720,6 +1720,12 @@
         "critRate",
         "critDmg",
         "anomalyProficiency"
+      ],
+      "importantPanelStats": [
+        "atk",
+        "critRate",
+        "critDmg",
+        "anomalyProficiency"
       ]
     },
     {
@@ -2496,6 +2502,11 @@
         "hpPct",
         "critRate",
         "critDmg"
+      ],
+      "importantPanelStats": [
+        "sheerForce",
+        "critRate",
+        "critDmg"
       ]
     },
     {
@@ -2929,6 +2940,11 @@
       "importantSubStats": [
         "atkPct",
         "anomalyProficiency"
+      ],
+      "importantPanelStats": [
+        "atk",
+        "anomalyProficiency",
+        "anomalyMastery"
       ]
     },
     {
@@ -3499,6 +3515,11 @@
       "importantSubStats": [
         "atkPct",
         "anomalyProficiency"
+      ],
+      "importantPanelStats": [
+        "atk",
+        "anomalyProficiency",
+        "anomalyMastery"
       ]
     },
     {
@@ -3916,6 +3937,10 @@
       },
       "importantSubStats": [
         "atkPct",
+        "anomalyProficiency"
+      ],
+      "importantPanelStats": [
+        "atk",
         "anomalyProficiency"
       ]
     },
@@ -4854,6 +4879,11 @@
         "critRate",
         "critDmg",
         "penFlat"
+      ],
+      "importantPanelStats": [
+        "atk",
+        "critRate",
+        "critDmg"
       ]
     },
     {
@@ -5607,6 +5637,11 @@
         "atkPct",
         "critRate",
         "critDmg"
+      ],
+      "importantPanelStats": [
+        "atk",
+        "critRate",
+        "critDmg"
       ]
     },
     {
@@ -6188,6 +6223,10 @@
       "hidden": false,
       "importantSubStats": [
         "atkPct",
+        "anomalyProficiency"
+      ],
+      "importantPanelStats": [
+        "atk",
         "anomalyProficiency"
       ]
     },
@@ -6905,7 +6944,12 @@
             "selectedEventId": "event_4a1c8de65b"
           }
         ]
-      }
+      },
+      "importantPanelStats": [
+        "critRate",
+        "lacerationDmg",
+        "def"
+      ]
     },
     {
       "id": "pyrois",

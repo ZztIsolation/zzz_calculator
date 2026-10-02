@@ -1997,8 +1997,11 @@ describe("BuffPickerModal", () => {
     expect(payload.runtimeInputs).not.toHaveProperty("boss.encounter.a")
   })
 
-  it("filters field buffs by version, phase, and name, with single selection per phase", async () => {
-    const wrapper = mountModal()
+  it("filters field buffs by version, phase, and name, with one global selection", async () => {
+    const fieldId = "field.defense_v5.v3_0.p2.jijing_chefeng"
+    const wrapper = mountModal({
+      runtimeInputs: { [fieldId]: { effects: { "field-atk": { coverage: 0.4 } } } },
+    })
 
     await openFieldTab(wrapper)
 
@@ -2017,26 +2020,28 @@ describe("BuffPickerModal", () => {
     await nextTick()
     await selects[2].setValue("field.defense_v5.v3_0.p2.mingse_yinguang")
     await nextTick()
-
     const filteredRows = wrapper.findAll(".buff-row").map(row => row.text())
     expect(filteredRows.some(text => text.includes("暝色引光"))).toBe(true)
     expect(filteredRows.some(text => text.includes("极境彻风"))).toBe(false)
-
     await selects[2].setValue("")
     await nextTick()
-    const fieldRows = wrapper.findAll(".buff-row-toggle")
-    const first = fieldRows.find(row => row.text().includes("极境彻风"))
-    const second = fieldRows.find(row => row.text().includes("暝色引光"))
+    const first = wrapper.findAll(".buff-row-toggle")
+      .find(row => row.text().includes("极境彻风"))
     expect(first).toBeTruthy()
-    expect(second).toBeTruthy()
-
     await first!.trigger("click")
+
+    await selects[1].setValue("defense_v5|3.0|3")
+    await nextTick()
+    const second = wrapper.findAll(".buff-row-toggle")
+      .find(row => row.text().includes("链式回路"))
+    expect(second).toBeTruthy()
     await second!.trigger("click")
     await nextTick()
     await buttonByText(wrapper, "应用选择").trigger("click")
 
     const payload = wrapper.emitted("apply")?.[0]?.[0] as any
-    expect(payload.selectedBuffIds).toEqual(["field.defense_v5.v3_0.p2.mingse_yinguang"])
+    expect(payload.selectedBuffIds).toEqual(["field.defense_v5.v3_0.p3.lianshi_huilu"])
+    expect(payload.runtimeInputs[fieldId]).toBeUndefined()
   })
 
   it("configures Field Buff effects independently and restores retained coverage", async () => {
@@ -2849,5 +2854,66 @@ describe("BuffPickerModal", () => {
     expect(row.text()).toContain("通用伤害提升15.04%")
     expect(row.findAll(".runtime-grid")).toHaveLength(0)
     expect(row.text()).not.toContain("来源数值")
+  })
+})
+
+describe("Roxy and general imbuement", () => {
+  const roxy = combatBuffCatalog.teammates.find(item => item.id === "roxy")!
+  const general = combatBuffCatalog.systemBuffs.find(item => item.id === "system.imbuement")!
+  const roxyMeta = { ...meta, teammateCombatBuffGroups: [roxy] }
+  async function tab(wrapper: ReturnType<typeof mountModal>, name: string) {
+    await wrapper.findAll(".n-tabs-tab").find(item => item.text() === name)!.trigger("click")
+    await nextTick()
+  }
+  it("removes the general entry while keeping the merged Roxy extra ability visible", async () => {
+    const wrapper = mountModal({ meta: roxyMeta, buffs: [general] })
+    await openTeammateTab(wrapper)
+    await teammateSlot(wrapper, 0).setValue("roxy")
+    const enhanced = wrapper.get('[data-buff-id="roxy.additional_ability"]')
+    expect(enhanced.classes()).toContain("is-selected")
+    expect(wrapper.findAll(".teammate-buff-card")).toHaveLength(4)
+    expect(enhanced.findAll(".buff-effect-row")).toHaveLength(2)
+    expect(wrapper.get('[data-buff-id="roxy.cinema_1_res_reduction"]').classes()).not.toContain("is-selected")
+    await teammateCinema(wrapper, 0).setValue("2")
+    expect(wrapper.get('[data-buff-id="roxy.cinema_1_res_reduction"]').classes()).toContain("is-selected")
+    expect(wrapper.get('[data-buff-id="roxy.cinema_2_stun"]').classes()).toContain("is-selected")
+    expect(wrapper.findAll(".n-tabs-tab").map(item => item.text())).not.toContain("通用 Buff")
+  })
+
+  it("edits one CRIT input for both specialties and restores coverage, cinema and source after reopening", async () => {
+    const wrapper = mountModal({ meta: roxyMeta, buffs: [general],
+      buffPickerState: teammateSlotState("roxy"), selectedIds: ["roxy.core_crit_damage", "roxy.additional_ability"] })
+    await openTeammateTab(wrapper)
+    const coreRow = wrapper.get('[data-buff-id="roxy.core_crit_damage"]')
+    const inputs = coreRow.findAll(".runtime-grid input[type='number']")
+    expect(inputs).toHaveLength(1)
+    expect((inputs[0].element as HTMLInputElement).value).toBe("100")
+    expect(coreRow.text()).toContain("40%")
+    expect(coreRow.text()).toContain("20%")
+    await inputs[0].setValue(50)
+    const coverages = coreRow.findAll(".rule-coverage-control input")
+    await coverages[0].setValue(.5)
+    await coverages[1].setValue(.5)
+    await buttonByText(wrapper, "应用选择").trigger("click")
+    const payload = wrapper.emitted("apply")?.[0]?.[0] as any
+    expect(payload.runtimeInputs["roxy.core_crit_damage"].effects).toMatchObject({
+      roxy_core_crit_dmg: { sourceValue: 50, coverage: .5 },
+      roxy_core_laceration_dmg: { sourceValue: 50, coverage: .5 },
+    })
+    await wrapper.setProps({ show: false, selectedIds: payload.selectedBuffIds,
+      runtimeInputs: payload.runtimeInputs, buffPickerState: payload.buffPickerState })
+    await openTeammateTab(wrapper)
+    expect((wrapper.get('[data-buff-id="roxy.core_crit_damage"] .runtime-grid input').element as HTMLInputElement).value).toBe("50")
+    expect((wrapper.get('[data-buff-id="roxy.core_crit_damage"] .rule-coverage-control input').element as HTMLInputElement).value).toBe("0.5")
+    expect(wrapper.get('[data-buff-id="roxy.additional_ability"]').classes()).toContain("is-selected")
+    expect(wrapper.get('[data-buff-id="roxy.cinema_2_stun"]').classes()).not.toContain("is-selected")
+  })
+
+  it("does not enable new buffs in existing configurations or expose hidden system fixtures", async () => {
+    const hidden = { ...general, id: "hidden-fixture", hidden: true }
+    const wrapper = mountModal({ meta: roxyMeta, buffs: [general, hidden] })
+    await openModal(wrapper)
+    expect(wrapper.findAll(".n-tabs-tab").map(item => item.text())).not.toContain("通用 Buff")
+    expect(wrapper.findAll('[data-buff-id="system.imbuement"]')).toHaveLength(0)
   })
 })

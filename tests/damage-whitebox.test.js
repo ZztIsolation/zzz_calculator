@@ -2545,7 +2545,7 @@ const claretSharpWhiteBox = calculateInCombatPanel(catalog, claretSharpWhiteBoxI
 const claretSharpEvent = claretSharpWhiteBox.damage.events[0]
 assert.deepEqual(
     claretSharpEvent.whiteBoxRows.map(row => row.label),
-    ["局内防御力", "技能倍率", "锐暴乘区", "普通增伤区", "锐化增伤乘区", "防御乘区", "抗性乘区", "失衡乘区", "伤害比例", "事件次数", "最终伤害"],
+    ["局内防御力", "技能倍率", "锐暴乘区", "普通增伤区", "锐化增伤乘区", "防御乘区", "抗性乘区", "失衡乘区", "浸染乘区", "伤害比例", "事件次数", "最终伤害"],
     "Sharp whitebox should expose ordinary and sharp damage zones separately",
 )
 for (const removedLabel of [

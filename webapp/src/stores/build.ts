@@ -107,6 +107,66 @@ function normalizeWEngineBuffId(meta: any, id: string) {
   return `wEngine:${canonicalWEngineId(meta, match[1])}.${match[2]}`
 }
 
+const ROXY_LEGACY_BUFF_IDS = new Set(["roxy.additional_stun", "roxy.additional_imbuement"])
+const ROXY_CANONICAL_BUFF_ID = "roxy.additional_ability"
+
+function normalizeTeammateBuffId(id: string) {
+  return ROXY_LEGACY_BUFF_IDS.has(String(id)) ? ROXY_CANONICAL_BUFF_ID : id
+}
+
+function normalizeTeammateBuffState(ids: string[], runtimeInputs: Record<string, any>) {
+  const normalizedIds = [...new Set(ids.map(normalizeTeammateBuffId))]
+  const legacyRoxy = ids.filter(id => ROXY_LEGACY_BUFF_IDS.has(String(id)))
+  if (!legacyRoxy.length) {
+    return { ids: normalizedIds, runtimeInputs }
+  }
+  const mergedRuntime = {
+    ...(runtimeInputs[ROXY_CANONICAL_BUFF_ID] ?? {}),
+    effects: {
+      ...(runtimeInputs[ROXY_CANONICAL_BUFF_ID]?.effects ?? {}),
+    },
+  }
+  for (const legacyId of legacyRoxy) {
+    const legacyRuntime = runtimeInputs[legacyId]
+    if (!legacyRuntime) continue
+    Object.assign(mergedRuntime.effects, legacyRuntime.effects ?? {})
+    if (legacyRuntime.parameters) {
+      mergedRuntime.parameters = { ...(mergedRuntime.parameters ?? {}), ...legacyRuntime.parameters }
+    }
+  }
+  const nextRuntimeInputs = Object.fromEntries(
+    Object.entries({ ...runtimeInputs, [ROXY_CANONICAL_BUFF_ID]: mergedRuntime })
+      .filter(([id]) => !ROXY_LEGACY_BUFF_IDS.has(id)),
+  )
+  return { ids: normalizedIds, runtimeInputs: nextRuntimeInputs }
+}
+
+function fieldBuffIdSet(meta: any) {
+  return new Set<string>((meta?.combatBuffs ?? [])
+    .filter((buff: any) => buff?.sourceType === "field")
+    .map((buff: any) => String(buff.id)))
+}
+
+function normalizeFieldBuffSelection(
+  selectedIds: string[],
+  runtimeInputs: Record<string, any>,
+  meta: any,
+) {
+  const fieldIds = fieldBuffIdSet(meta)
+  const selectedFieldIds = selectedIds.filter(id => fieldIds.has(id))
+  if (selectedFieldIds.length <= 1) {
+    return { selectedIds, runtimeInputs }
+  }
+  const normalizedRuntimeInputs = { ...(runtimeInputs ?? {}) }
+  for (const id of fieldIds) {
+    delete normalizedRuntimeInputs[id]
+  }
+  return {
+    selectedIds: selectedIds.filter(id => !fieldIds.has(id)),
+    runtimeInputs: normalizedRuntimeInputs,
+  }
+}
+
 function normalizeAddedBuffs(value: any, meta: any = null): any[] {
   const normalized = Array.isArray(value) ? normalizeSkillTargetsInValue(clone(value)) : []
   return normalized.map((item: any) => {
@@ -1136,14 +1196,23 @@ export const useBuildStore = defineStore("build", {
       const rawTargetConfig = config.targetConfig ?? rawDamageConfig?.target ?? rawDamageConfig?.targetConfig ?? {}
       const legacyBossEncounterId = String(rawTargetConfig?.bossEncounterId ?? "")
       const rawSelectedBuffIds = stringArray(combat.activeBuffIds ?? config.selectedBuffIds)
-        .map(id => normalizeWEngineBuffId(meta, id))
-      const selectedWithLegacyBoss = legacyBossEncounterId && !rawSelectedBuffIds.includes(legacyBossEncounterId)
-        ? [...rawSelectedBuffIds, legacyBossEncounterId]
-        : rawSelectedBuffIds
+        .map(id => normalizeTeammateBuffId(normalizeWEngineBuffId(meta, id)))
+      const normalizedTeammateState = normalizeTeammateBuffState(
+        rawSelectedBuffIds,
+        combat.runtimeInputs ?? config.runtimeInputs ?? {},
+      )
+      const normalizedFieldSelection = normalizeFieldBuffSelection(
+        normalizedTeammateState.ids,
+        normalizedTeammateState.runtimeInputs,
+        meta,
+      )
+      const selectedWithLegacyBoss = legacyBossEncounterId && !normalizedFieldSelection.selectedIds.includes(legacyBossEncounterId)
+        ? [...normalizedFieldSelection.selectedIds, legacyBossEncounterId]
+        : normalizedFieldSelection.selectedIds
       const normalizedPyroisSelection = normalizePyroisBuffSelection(
         agent,
         selectedWithLegacyBoss,
-        combat.runtimeInputs ?? config.runtimeInputs ?? {},
+        normalizedFieldSelection.runtimeInputs,
       )
       const normalizedBossSelection = normalizeBossBuffSelection(
         normalizedPyroisSelection.selectedIds,
@@ -1298,13 +1367,21 @@ export const useBuildStore = defineStore("build", {
     },
     applyBuffState(payload: any, meta: any) {
       const selectedIds = stringArray(payload?.selectedBuffIds ?? payload?.activeBuffIds)
+      const normalizedTeammateState = normalizeTeammateBuffState(
+        selectedIds,
+        payload?.runtimeInputs && typeof payload.runtimeInputs === "object"
+          ? payload.runtimeInputs
+          : this.runtimeInputs,
+      )
+      const normalizedFieldSelection = normalizeFieldBuffSelection(
+        normalizedTeammateState.ids,
+        normalizedTeammateState.runtimeInputs,
+        meta,
+      )
       const addedBuffs = Array.isArray(payload?.addedBuffs) ? normalizeAddedBuffs(payload.addedBuffs, meta) : this.addedBuffs
-      const runtimeInputs = payload?.runtimeInputs && typeof payload.runtimeInputs === "object"
-        ? payload.runtimeInputs
-        : this.runtimeInputs
       const defaultIds = this.defaultBuffIds(meta)
       const agent = meta?.agents?.find((item: any) => item.id === this.agentId)
-      const normalizedPyroisSelection = normalizePyroisBuffSelection(agent, selectedIds, runtimeInputs)
+      const normalizedPyroisSelection = normalizePyroisBuffSelection(agent, normalizedFieldSelection.selectedIds, normalizedFieldSelection.runtimeInputs)
       const normalizedBossSelection = normalizeBossBuffSelection(
         normalizedPyroisSelection.selectedIds,
         normalizedPyroisSelection.runtimeInputs,
