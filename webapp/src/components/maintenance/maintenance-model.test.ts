@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import combatBuffCatalog from "../../../../data/combat_buffs.json"
 import { cloneForCreate, maskedPreview, prepareDraft } from "./maintenance-model"
 import {
   agentOptions, buffCandidates, DAMAGE_ELEMENT_OPTIONS, DIRECT_DAMAGE_ELEMENT_OPTIONS, effectSummary, EVENT_STATS, PANEL_STATS, statOptions,
@@ -506,4 +507,17 @@ describe("maintenance structured model", () => {
       }
     }
   })
+})
+
+it("preserves Roxy formulas and imbuement when preparing maintenance drafts", () => {
+  const roxy = combatBuffCatalog.teammates.find(group => group.id === "roxy")!
+  const draft = prepareDraft("teammate-buffs", structuredClone(roxy))
+  expect(draft.buffs.map((buff: any) => buff.id)).toEqual(roxy.buffs.map(buff => buff.id))
+  expect(draft.buffs[0].effects.map((rule: any) => [rule.stat, rule.formula.expression, rule.source.defaultValue]))
+    .toEqual([["critDmg", "clamp(x * 0.4, 0, 40)", 100], ["lacerationDmg", "clamp(x * 0.2, 0, 20)", 100]])
+  expect(draft.buffs[1].effects[1]).toMatchObject({
+    stat: "imbuementDmgBonus", value: 18, target: { kind: "default" }, coverage: { default: 1 },
+  })
+  expect(statOptions({}, "default")).toContainEqual({ value: "imbuementDmgBonus", label: "浸染增伤%" })
+  expect(statOptions({}, "anomaly", "attribute").some(item => item.value === "imbuementDmgBonus")).toBe(false)
 })

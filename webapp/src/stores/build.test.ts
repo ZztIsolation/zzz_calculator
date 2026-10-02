@@ -1024,6 +1024,56 @@ describe("build store", () => {
     expect(store.runtimeInputs).not.toHaveProperty("boss.encounter.b")
   })
 
+  it("clears all field buffs when a legacy configuration contains multiple field selections", () => {
+    const store = useBuildStore()
+    const meta = {
+      agents: [],
+      wEngines: [],
+      combatBuffs: [
+        { id: "field.v3.p1", sourceType: "field", effects: [] },
+        { id: "field.v3.p2", sourceType: "field", effects: [] },
+        { id: "boss.encounter.a", sourceType: "boss", effects: [] },
+      ],
+    }
+    store.applyBuffState({
+      selectedBuffIds: ["field.v3.p1", "field.v3.p2", "boss.encounter.a"],
+      runtimeInputs: {
+        "field.v3.p1": { effects: { p1: { coverage: 0.4 } } },
+        "field.v3.p2": { effects: { p2: { coverage: 0.6 } } },
+      },
+    }, meta)
+
+    expect(store.activeBuffIds(meta)).toEqual(["boss.encounter.a"])
+    expect(store.runtimeInputs).not.toHaveProperty("field.v3.p1")
+    expect(store.runtimeInputs).not.toHaveProperty("field.v3.p2")
+  })
+
+  it("clears multiple field buffs while loading a persisted agent configuration", () => {
+    const store = useBuildStore()
+    const meta = {
+      agents: [{ id: "agent_a", name: { zhCN: "角色 A" } }],
+      wEngines: [{ id: "engine_a", name: { zhCN: "音擎 A" } }],
+      combatBuffs: [
+        { id: "field.v3.p1", sourceType: "field", effects: [] },
+        { id: "field.v3.p2", sourceType: "field", effects: [] },
+      ],
+    }
+    store.applyAgentConfig("agent_a", meta, {
+      wEngineId: "engine_a",
+      combat: {
+        activeBuffIds: ["field.v3.p1", "field.v3.p2"],
+        runtimeInputs: {
+          "field.v3.p1": { coverage: 0.4 },
+          "field.v3.p2": { coverage: 0.6 },
+        },
+      },
+    })
+
+    expect(store.activeBuffIds(meta)).toEqual([])
+    expect(store.runtimeInputs).not.toHaveProperty("field.v3.p1")
+    expect(store.runtimeInputs).not.toHaveProperty("field.v3.p2")
+  })
+
   it("preserves disabled Field Buff effects in the final calculation input", () => {
     const store = useBuildStore()
     const fieldBuff = {

@@ -20,6 +20,7 @@ import {
     turbulenceBaseMultiplier,
 } from "./damageEventMultipliers.js"
 import {
+    imbuementWhiteBoxRow,
     defenseWhiteBoxRow,
     formatDamageNumber,
     formatDamagePercent,
@@ -342,8 +343,9 @@ const DISORDER_TYPE_VALUES = new Set(["normal", "polarized"])
 // Kept in the accepted data vocabulary for old saved effects, but this legacy
 // modifier is intentionally ignored by every calculation path.
 const IGNORED_DAMAGE_MODIFIER_KINDS = new Set(["enemyDamageTakenBonus"])
-const DAMAGE_MODIFIER_KINDS = ["enemyDamageTakenBonus", "anomalyDamageBonus", "turbulenceDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "turbulenceBaseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "releaseProficiencyYieldBonus", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg", "sharpDmgBonus", ...ELEMENT_SHARP_DMG_STATS, "lacerationDmg", "skillMultiplierBonus", ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS]
+const DAMAGE_MODIFIER_KINDS = ["imbuementDmgBonus", "enemyDamageTakenBonus", "anomalyDamageBonus", "turbulenceDamageBonus", "disorderDamageBonus", "alienationCoefficientBonus", "baseMultiplierBonus", "turbulenceBaseMultiplierBonus", "disorderBaseMultiplierBonus", "anomalyCritRate", "anomalyCritDmg", "anomalyCritRatePerInitialMasteryAbove100", "anomalyDurationBonusSeconds", "releaseProficiencyYieldBonus", "stunDmgMultiplierBonus", "stunDmgMultiplierBonusAlways", "stunDmgMultiplierBonusCapAlways", "directDamageBonus", "sheerDmgBonus", "physicalSheerDmg", "fireSheerDmg", "iceSheerDmg", "electricSheerDmg", "etherSheerDmg", "windSheerDmg", "sharpDmgBonus", ...ELEMENT_SHARP_DMG_STATS, "lacerationDmg", "skillMultiplierBonus", ...ELEMENT_CRIT_DMG_STATS, ...ELEMENT_DEF_IGNORE_STATS]
 const EVENT_MODIFIER_STAT_KEYS = new Set([
+    "imbuementDmgBonus",
     "enemyDamageTakenBonus",
     "anomalyDamageBonus",
     "turbulenceDamageBonus",
@@ -374,6 +376,7 @@ const EVENT_MODIFIER_STAT_KEYS = new Set([
     ...ELEMENT_DEF_IGNORE_STATS,
 ])
 const SKILL_TARGET_STAT_KEYS = new Set([
+    "imbuementDmgBonus",
     "penRatio",
     "allResIgnore",
     "physicalResIgnore",
@@ -495,6 +498,7 @@ const STORED_PERCENT_STATS = new Set([
     "electricDmg",
     "etherDmg",
     "windDmg",
+    "imbuementDmgBonus",
     "enemyDamageTakenBonus",
     "anomalyDamageBonus",
     "turbulenceDamageBonus",
@@ -4036,6 +4040,10 @@ function modifierValueForEvent(modifier = {}, event = {}) {
 
 export function damageModifierAppliesTo(modifier, event) {
     const matchingEvent = modifierMatchingEvent(modifier, event)
+    if (modifier.kind === "imbuementDmgBonus"
+        && !["direct", "sheer", "sharp"].includes(matchingEvent.kind)) {
+        return false
+    }
     const appliesTo = modifier.appliesTo ?? {}
     const skillTargets = generatedModifierSkillTargets(modifier)
     const hasSkillTargets = skillTargets.length > 0
@@ -4137,9 +4145,14 @@ function matchingDamageModifiers(bonusTotals, event, kind) {
         })
 }
 
+// Imbuement is one status with alternative strengths, after coverage is applied.
+function combineDamageModifierValue(kind, total, value) {
+    return kind === "imbuementDmgBonus" ? Math.max(total, value) : total + value
+}
+
 function sumDamageModifiers(bonusTotals, event, kind) {
     return matchingDamageModifiers(bonusTotals, event, kind)
-        .reduce((total, modifier) => total + Number(modifier.value ?? 0), 0)
+        .reduce((total, modifier) => combineDamageModifierValue(kind, total, Number(modifier.value ?? 0)), 0)
 }
 
 function alienationBreakdownForEvent(bonusTotals, event) {
@@ -4209,6 +4222,7 @@ function eventTargetTotalsForElement(bonusTotals, event) {
         ? sumDamageModifiers(bonusTotals, event, "turbulenceDamageBonus")
         : 0
     return {
+        imbuementDmgBonus: sumDamageModifiers(bonusTotals, event, "imbuementDmgBonus"),
         critDmg: sumDamageModifiers(bonusTotals, event, "critDmg"),
         dmgBonus: sumDamageModifiers(bonusTotals, event, "dmgBonus"),
         [elementDmgKey]: sumDamageModifiers(bonusTotals, event, elementDmgKey),
@@ -4396,7 +4410,7 @@ function critDmgBonusWhiteBoxText(skillTargetedCritDmgBonus, elementCritDmgBonus
     ].filter(Boolean).join(" + ")
 }
 
-function directDamageWhiteBoxRows({ event, damageBasisValue, critMultiplier, critRateForDamage, critDmg, baseCritDmg, skillTargetedCritDmgBonus, elementCritDmgBonus, selectedDmgBonus, directDamageBonus, dmgMultiplier, targetBreakdown, skillMultiplierBonus, effectiveSkillMultiplier, finalDamage, singleDamage }) {
+function directDamageWhiteBoxRows({ event, damageBasisValue, critMultiplier, critRateForDamage, critDmg, baseCritDmg, skillTargetedCritDmgBonus, elementCritDmgBonus, selectedDmgBonus, directDamageBonus, dmgMultiplier, imbuementMultiplier = 1, targetBreakdown, skillMultiplierBonus, effectiveSkillMultiplier, finalDamage, singleDamage }) {
     const critModeLabel = {
         expected: "期望",
         crit: "暴击",
@@ -4438,6 +4452,7 @@ function directDamageWhiteBoxRows({ event, damageBasisValue, critMultiplier, cri
         defenseWhiteBoxRow(targetBreakdown),
         resistanceWhiteBoxRow({ targetBreakdown, damageElementText }),
         stunWhiteBoxRow(targetBreakdown),
+        imbuementWhiteBoxRow(imbuementMultiplier),
     ]
     if (event.damageScale !== 1) {
         rows.push({
@@ -4458,7 +4473,7 @@ function directDamageWhiteBoxRows({ event, damageBasisValue, critMultiplier, cri
     rows.push({
         label: "最终伤害",
         formula: event.count === 1
-            ? `${formatDamageNumber(damageBasisValue)} × ${formatDamagePercent(effectiveSkillMultiplier)} × ${formatDamageNumber(critMultiplier, 4)} × ${formatDamageNumber(dmgMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.defenseMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.resistanceMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.activeStunMultiplier, 4)}${event.damageScale !== 1 ? ` × ${formatDamagePercent(event.damageScale)}` : ""}`
+            ? `${formatDamageNumber(damageBasisValue)} × ${formatDamagePercent(effectiveSkillMultiplier)} × ${formatDamageNumber(critMultiplier, 4)} × ${formatDamageNumber(dmgMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.defenseMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.resistanceMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.activeStunMultiplier, 4)} × ${formatDamageNumber(imbuementMultiplier, 4)}${event.damageScale !== 1 ? ` × ${formatDamagePercent(event.damageScale)}` : ""}`
             : `${formatDamageNumber(singleDamage)} × ${formatDamageNumber(event.count)}`,
         value: finalDamage,
         displayValue: formatDamageNumber(finalDamage),
@@ -4475,7 +4490,7 @@ function sheerDefenseWhiteBoxRow() {
     }
 }
 
-function sheerDamageWhiteBoxRows({ event, hp, atk, sheerForceFlat, sheerForce, critMultiplier, critRateForDamage, critDmg, baseCritDmg, skillTargetedCritDmgBonus, elementCritDmgBonus, selectedDmgBonus, skillDamageBonus, dmgMultiplier, targetBreakdown, skillMultiplierBonus, effectiveSkillMultiplier, sheerDmgBonus, sheerDmgMultiplier, finalDamage, singleDamage }) {
+function sheerDamageWhiteBoxRows({ event, hp, atk, sheerForceFlat, sheerForce, critMultiplier, critRateForDamage, critDmg, baseCritDmg, skillTargetedCritDmgBonus, elementCritDmgBonus, selectedDmgBonus, skillDamageBonus, dmgMultiplier, imbuementMultiplier = 1, targetBreakdown, skillMultiplierBonus, effectiveSkillMultiplier, sheerDmgBonus, sheerDmgMultiplier, finalDamage, singleDamage }) {
     const critModeLabel = {
         expected: "期望",
         crit: "暴击",
@@ -4529,6 +4544,7 @@ function sheerDamageWhiteBoxRows({ event, hp, atk, sheerForceFlat, sheerForce, c
         sheerDefenseWhiteBoxRow(),
         resistanceWhiteBoxRow({ targetBreakdown, damageElementText }),
         stunWhiteBoxRow(targetBreakdown),
+        imbuementWhiteBoxRow(imbuementMultiplier),
     ]
     if (event.damageScale !== 1) {
         rows.push({
@@ -4549,7 +4565,7 @@ function sheerDamageWhiteBoxRows({ event, hp, atk, sheerForceFlat, sheerForce, c
     rows.push({
         label: "最终伤害",
         formula: event.count === 1
-            ? `${formatDamageNumber(sheerForce)} × ${formatDamagePercent(effectiveSkillMultiplier)} × ${formatDamageNumber(critMultiplier, 4)} × ${formatDamageNumber(dmgMultiplier, 4)} × ${formatDamageNumber(sheerDmgMultiplier, 4)} × 1 × ${formatDamageNumber(targetBreakdown.resistanceMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.activeStunMultiplier, 4)}${event.damageScale !== 1 ? ` × ${formatDamagePercent(event.damageScale)}` : ""}`
+            ? `${formatDamageNumber(sheerForce)} × ${formatDamagePercent(effectiveSkillMultiplier)} × ${formatDamageNumber(critMultiplier, 4)} × ${formatDamageNumber(dmgMultiplier, 4)} × ${formatDamageNumber(sheerDmgMultiplier, 4)} × 1 × ${formatDamageNumber(targetBreakdown.resistanceMultiplier, 4)} × ${formatDamageNumber(targetBreakdown.activeStunMultiplier, 4)} × ${formatDamageNumber(imbuementMultiplier, 4)}${event.damageScale !== 1 ? ` × ${formatDamagePercent(event.damageScale)}` : ""}`
             : `${formatDamageNumber(singleDamage)} × ${formatDamageNumber(event.count)}`,
         value: finalDamage,
         displayValue: formatDamageNumber(finalDamage),
@@ -4764,6 +4780,7 @@ function calculateDirectDamageEventCore({ event, panel, bonusTotals, target, inc
     const baseCritDmg = Number(panel.critDmg ?? 0)
     const selectedDmgBonus = selectedDmgBonusForElement(panel, event.damageElement)
     const eventTotals = eventTargetTotalsForElement(bonusTotals, event)
+    const imbuementMultiplier = 1 + Number(eventTotals.imbuementDmgBonus ?? 0)
     const elementDmgKey = `${event.damageElement}Dmg`
     const elementCritDmgKey = CRIT_DMG_KEY_BY_ELEMENT[event.damageElement]
     const elementCritDmgBonus = Number(eventTotals[elementCritDmgKey] ?? 0)
@@ -4779,6 +4796,7 @@ function calculateDirectDamageEventCore({ event, panel, bonusTotals, target, inc
     const targetBreakdown = targetBreakdownForElement(panel, bonusTotals, target, event.damageElement, eventTotals, event.stunned)
     const baseSingleDamage = damageBasisValue
         * effectiveSkillMultiplier
+        * imbuementMultiplier
         * dmgMultiplier
         * targetBreakdown.defenseMultiplier
         * targetBreakdown.resistanceMultiplier
@@ -4837,6 +4855,7 @@ function calculateDirectDamageEventCore({ event, panel, bonusTotals, target, inc
             penFlat: Number(panel.penFlat ?? 0),
         },
         multipliers: {
+            imbuement: imbuementMultiplier,
             atk,
             damageBasis: event.damageBasis,
             damageBasisValue,
@@ -4871,6 +4890,7 @@ function calculateDirectDamageEventCore({ event, panel, bonusTotals, target, inc
                 selectedDmgBonus,
                 directDamageBonus,
                 dmgMultiplier,
+                imbuementMultiplier,
                 targetBreakdown,
                 skillMultiplierBonus,
                 effectiveSkillMultiplier,
@@ -4954,6 +4974,7 @@ function calculateSharpDamageEventCore({ event, panel, outOfCombatPanel = panel,
                 : {}),
         },
         multipliers: {
+            imbuement: selectedResult.imbuementMultiplier,
             def: selectedResult.basis,
             panelDef: selectedResult.panelBasis,
             damageBasis: "def",
@@ -5362,6 +5383,7 @@ function calculateSheerDamageEvent({ event, agent, panel, bonusTotals, target, i
     const baseCritDmg = Number(panel.critDmg ?? 0)
     const selectedDmgBonus = selectedDmgBonusForElement(panel, event.damageElement)
     const eventTotals = eventTargetTotalsForElement(bonusTotals, event)
+    const imbuementMultiplier = 1 + Number(eventTotals.imbuementDmgBonus ?? 0)
     const elementDmgKey = `${event.damageElement}Dmg`
     const elementSheerDmgKey = SHEER_DMG_KEY_BY_ELEMENT[event.damageElement]
     const elementCritDmgKey = CRIT_DMG_KEY_BY_ELEMENT[event.damageElement]
@@ -5378,6 +5400,7 @@ function calculateSheerDamageEvent({ event, agent, panel, bonusTotals, target, i
     const targetBreakdown = sheerTargetBreakdownForElement(panel, bonusTotals, target, event.damageElement, eventTotals, event.stunned)
     const baseSingleDamage = sheerForce
         * effectiveSkillMultiplier
+        * imbuementMultiplier
         * dmgMultiplier
         * sheerDmgMultiplier
         * targetBreakdown.resistanceMultiplier
@@ -5432,6 +5455,7 @@ function calculateSheerDamageEvent({ event, agent, panel, bonusTotals, target, i
             [elementDmgKey]: Number(panel[elementDmgKey] ?? 0),
         },
         multipliers: {
+            imbuement: imbuementMultiplier,
             hp,
             atk,
             sheerForce,
@@ -5471,6 +5495,7 @@ function calculateSheerDamageEvent({ event, agent, panel, bonusTotals, target, i
                 selectedDmgBonus,
                 skillDamageBonus,
                 dmgMultiplier,
+                imbuementMultiplier,
                 targetBreakdown,
                 skillMultiplierBonus,
                 effectiveSkillMultiplier,
@@ -6258,6 +6283,7 @@ function calculateDirectDamageFinalValueCore(event, panel, bonusTotals, target) 
     const effectiveSkillMultiplier = Math.max(0, Number(event.skillMultiplier ?? 0) + skillMultiplierBonus)
     return directDamageBasisValue(panel, event)
         * effectiveSkillMultiplier
+        * (1 + Number(eventTotals.imbuementDmgBonus ?? 0))
         * (1 + selectedDmgBonus + directDamageBonus)
         * targetDamageMultiplierForElement(panel, bonusTotals, target, event.damageElement, eventTotals, event.stunned)
         * critMultiplierForMode(
@@ -6338,6 +6364,7 @@ function calculateSheerDamageFinalValue(event, panel, bonusTotals, target, agent
     const effectiveSkillMultiplier = Math.max(0, Number(event.skillMultiplier ?? 0) + skillMultiplierBonus)
     return effectiveSheerForceFromPanel(agent, panel)
         * effectiveSkillMultiplier
+        * (1 + Number(eventTotals.imbuementDmgBonus ?? 0))
         * critMultiplierForMode(
             panel,
             event.critMode,
@@ -6488,7 +6515,7 @@ function modifierSumsForCompiledEvent(modifiers = [], event = {}) {
         }
         const value = modifierValueForEvent(modifier, event)
         sums ??= Object.create(null)
-        sums[modifier.kind] = Number(sums[modifier.kind] ?? 0) + value
+        sums[modifier.kind] = combineDamageModifierValue(modifier.kind, Number(sums[modifier.kind] ?? 0), value)
         if (isTeamAnomalyDamageModifier(modifier)) {
             sums[TEAM_ANOMALY_DAMAGE_MODIFIER_SUM_KEY] = Number(
                 sums[TEAM_ANOMALY_DAMAGE_MODIFIER_SUM_KEY] ?? 0,
@@ -6650,6 +6677,7 @@ function calculateCompiledDamageScoreValue({ agent, panel, outOfCombatPanel = pa
             const directDamageBonus = compiledModifierSum(sums, "directDamageBonus") + skillDamageBonus
             total += directDamageBasisValue(panel, compiledEvent)
                 * effectiveSkillMultiplier
+                * (1 + compiledModifierSum(sums, "imbuementDmgBonus"))
                 * (1 + selectedDmgBonus + directDamageBonus)
                 * compiledTargetDamageMultiplier(panel, bonusTotals, target, compiledEvent, sums)
                 * compiledCritMultiplier(panel, compiledEvent.critMode, compiledEvent, sums)
@@ -6669,6 +6697,7 @@ function calculateCompiledDamageScoreValue({ agent, panel, outOfCombatPanel = pa
                 ? effectiveSheerForceFromPanel(agent, panel)
                 : 0)
                 * effectiveSkillMultiplier
+                * (1 + compiledModifierSum(sums, "imbuementDmgBonus"))
                 * compiledCritMultiplier(panel, compiledEvent.critMode, compiledEvent, sums)
                 * (1 + selectedDmgBonus + skillDamageBonus)
                 * compiledResistanceMultiplier(panel, bonusTotals, target, compiledEvent, sums)
@@ -6752,7 +6781,9 @@ function fillDenseModifierSums(sums, eventModifierEntries = [], activeEntryFlags
     for (const modifier of eventModifierEntries ?? []) {
         if (activeEntryFlags[modifier.entryIndex]
             && denseOutOfCombatStatRequirementMatches(modifier.requirement, outOfCombatPanelValues)) {
-            sums[modifier.kindIndex] += modifier.value
+            sums[modifier.kindIndex] = combineDamageModifierValue(
+                DAMAGE_MODIFIER_SUM_KEYS[modifier.kindIndex], sums[modifier.kindIndex], modifier.value,
+            )
         }
     }
 }
@@ -6842,6 +6873,7 @@ function densePanelProxy(panelValues) {
 
 function denseSharpEventTotals(sums, damageElement) {
     const keys = [
+        "imbuementDmgBonus",
         "dmgBonus",
         `${damageElement}Dmg`,
         "sharpDmgBonus",
@@ -7009,6 +7041,7 @@ function calculateCompiledDamageScoreValueDense({
             const directDamageBonus = denseModifierSum(modifierSums, "directDamageBonus") + skillDamageBonus
             total += densePanelValue(panelValues, compiledEvent.damageBasis === "anomalyProficiency" ? "anomalyProficiency" : "atk")
                 * effectiveSkillMultiplier
+                * (1 + denseModifierSum(modifierSums, "imbuementDmgBonus"))
                 * (1 + selectedDmgBonus + directDamageBonus)
                 * denseTargetDamageMultiplier(panelValues, combatValues, target, compiledEvent, modifierSums)
                 * denseCritMultiplier(panelValues, compiledEvent.critMode, compiledEvent, modifierSums)
@@ -7028,6 +7061,7 @@ function calculateCompiledDamageScoreValueDense({
                 ? densePanelValue(panelValues, "sheerForce")
                 : 0)
                 * effectiveSkillMultiplier
+                * (1 + denseModifierSum(modifierSums, "imbuementDmgBonus"))
                 * denseCritMultiplier(panelValues, compiledEvent.critMode, compiledEvent, modifierSums)
                 * (1 + selectedDmgBonus + skillDamageBonus)
                 * denseResistanceMultiplier(panelValues, combatValues, target, compiledEvent, modifierSums)
@@ -8981,6 +9015,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     damageIndex: PANEL_KEY_LOOKUP[`${event.damageElement}Dmg`],
                     resIgnoreIndex: PANEL_KEY_LOOKUP[event.resIgnoreKey],
                     effectiveSkillMultiplier: Math.max(0, event.skillMultiplier + denseModifierSum(sums, "skillMultiplierBonus")),
+                    imbuementMultiplier: 1 + denseModifierSum(sums, "imbuementDmgBonus"),
                     directDamageBonus: denseModifierSum(sums, "directDamageBonus")
                         + denseModifierSum(sums, "dmgBonus")
                         + denseModifierSum(sums, event.elementDmgKey),
@@ -9076,6 +9111,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                             : critRate * (1 + effectiveCritDmg) + (1 - critRate)
                     total += atk
                         * event.effectiveSkillMultiplier
+                        * event.imbuementMultiplier
                         * (1 + dmgBonus + elementDmg + event.directDamageBonus)
                         * defenseMultiplier
                         * resistanceMultiplier
@@ -9215,6 +9251,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                             * event.stunMultiplier
                         total += atk
                             * event.effectiveSkillMultiplier
+                            * event.imbuementMultiplier
                             * (1 + panelValues[PANEL_KEY_LOOKUP.dmgBonus] + densePanelValue(panelValues, OUTPUT_PANEL_KEYS[event.damageIndex]) + event.directDamageBonus)
                             * targetMultiplier
                             * critMultiplier
@@ -9289,6 +9326,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     sharpDamageKey: event.elementSharpDmgKey,
                     resIgnoreKey: event.resIgnoreKey,
                     effectiveSkillMultiplier: Math.max(0, event.skillMultiplier + denseModifierSum(sums, "skillMultiplierBonus")),
+                    imbuementMultiplier: 1 + denseModifierSum(sums, "imbuementDmgBonus"),
                     directDamageBonus: denseModifierSum(sums, "directDamageBonus") + skillDamageBonus,
                     skillDamageBonus,
                     targetedCritDmgBonus: denseModifierSum(sums, "critDmg")
@@ -9542,6 +9580,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     if (event.kind === "sheer") {
                         total += sheerForce
                             * event.effectiveSkillMultiplier
+                            * event.imbuementMultiplier
                             * critMultiplier
                             * (1 + dmgBonus + elementDmg + event.skillDamageBonus)
                             * resistanceMultiplier
@@ -9559,6 +9598,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                     if (event.kind === "direct") {
                         total += (event.damageBasis === "anomalyProficiency" ? anomalyProficiency : atk)
                             * event.effectiveSkillMultiplier
+                            * event.imbuementMultiplier
                             * (1 + dmgBonus + elementDmg + event.directDamageBonus)
                             * defenseMultiplier
                             * resistanceMultiplier
@@ -9589,6 +9629,7 @@ export function createInCombatPanelCalculator(catalog, input) {
                         const basis = def
                         total += basis
                             * event.effectiveSkillMultiplier
+                            * event.imbuementMultiplier
                             * (1 + dmgBonus + elementDmg + event.directDamageBonus)
                             * (1 + Number(event.sharpDmgBonus ?? 0) + Number(event.sharpDamageBonus ?? 0))
                             * sharpCrit

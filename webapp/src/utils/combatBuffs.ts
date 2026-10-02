@@ -422,7 +422,7 @@ export function allDisplayCombatBuffCandidates(context: CombatBuffContext): any[
   const groups = buildCombatBuffGroups(context)
   return dedupeById([
     ...Object.values(groups).flat(),
-    ...combatBuffsFromContext(context),
+    ...combatBuffsFromContext(context).filter((buff: any) => !buff?.hidden),
     ...(context.addedBuffs ?? []).filter((buff: any) => buff?.sourceKind === "custom"),
   ])
 }

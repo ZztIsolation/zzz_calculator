@@ -139,6 +139,7 @@ export const PANEL_STATS: Array<[string, string, "flat" | "pct"]> = [
 ]
 
 export const EVENT_STATS: Array<[string, string, "flat"]> = [
+  ["imbuementDmgBonus", "浸染增伤%", "flat"],
   ["anomalyDamageBonus", "属性异常增伤%", "flat"], ["turbulenceDamageBonus", "乱流增伤%", "flat"], ["disorderDamageBonus", "紊乱增伤%", "flat"],
   ["alienationCoefficientBonus", "异化系数加成%", "flat"],
   ["baseMultiplierBonus", "异常倍率修正%", "flat"], ["turbulenceBaseMultiplierBonus", "乱流倍率修正%", "flat"], ["disorderBaseMultiplierBonus", "紊乱倍率加算%", "flat"],

@@ -1,4 +1,5 @@
 import {
+    imbuementWhiteBoxRow,
     defenseWhiteBoxRow,
     formatDamageNumber,
     formatDamagePercent,
@@ -228,9 +229,11 @@ export function sharpDamageValue({
         profile,
     })
     const effectiveDamageMultiplier = Math.max(0, finite(damageMultiplier, 1))
+    const imbuementMultiplier = 1 + Math.max(0, eventNumber(eventTotals, "imbuementDmgBonus"))
     const singleDamage = basis
         * skill
         * effectiveDamageMultiplier
+        * imbuementMultiplier
         * Math.max(0, finite(sharpDamageMultiplier, 1))
         * sharpDamageMultiplierForMode(crit, normalized.critMode)
         * Math.max(0, finite(targetMultiplier, 1))
@@ -240,6 +243,7 @@ export function sharpDamageValue({
         panelBasis,
         skill,
         damageMultiplier: effectiveDamageMultiplier,
+        imbuementMultiplier,
         sharpDamageMultiplier: Math.max(0, finite(sharpDamageMultiplier, 1)),
         critMultiplier: sharpDamageMultiplierForMode(crit, normalized.critMode),
         crit,
@@ -380,6 +384,7 @@ export function sharpWhiteBoxRows({
         defenseWhiteBoxRow(targetBreakdown),
         resistanceWhiteBoxRow({ targetBreakdown, damageElementText }),
         stunWhiteBoxRow(targetBreakdown),
+        imbuementWhiteBoxRow(result.imbuementMultiplier ?? 1),
     ]
     if (damageScale !== 1) {
         rows.push({
@@ -409,6 +414,7 @@ export function sharpWhiteBoxRows({
                 formatDamageNumber(targetBreakdown.defenseMultiplier, 4),
                 formatDamageNumber(targetBreakdown.resistanceMultiplier, 4),
                 formatDamageNumber(targetBreakdown.activeStunMultiplier, 4),
+                formatDamageNumber(result.imbuementMultiplier ?? 1, 4),
                 ...(damageScale !== 1 ? [formatDamagePercent(damageScale)] : []),
             ].join(" × ")
             : `${formatDamageNumber(result.singleDamage)} × ${formatDamageNumber(eventCount)}`,

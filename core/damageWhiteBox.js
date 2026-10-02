@@ -1,5 +1,14 @@
 // Shared presentation helpers for damage white-box rows.
 
+export function imbuementWhiteBoxRow(multiplier = 1) {
+    return {
+        label: "浸染乘区",
+        formula: `1 + 浸染增伤 ${formatDamagePercent(multiplier - 1)}（已折算覆盖率，同类取最高）`,
+        value: multiplier,
+        displayValue: formatDamageNumber(multiplier, 4),
+    }
+}
+
 export function formatDamageNumber(value, digits = 3) {
     const number = Number(value)
     if (!Number.isFinite(number)) {

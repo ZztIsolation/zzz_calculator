@@ -11,6 +11,212 @@
   ],
   "teammates": [
     {
+      "id": "roxy",
+      "name": {
+        "zhCN": "洛克茜"
+      },
+      "attribute": "wind",
+      "specialty": "stun",
+      "buffs": [
+        {
+          "id": "roxy.core_crit_damage",
+          "source": {
+            "zhCN": "核心被动（F级）"
+          },
+          "description": {
+            "zhCN": "队伍中角色触发[浸染]或[净化]，或对风化目标再次施加风化时，按洛克茜暴击率提供增益：每1%暴击率使非锋御角色暴击伤害提升0.4%，上限40%；锋御角色锐暴伤害提升0.2%，上限20%，持续50秒。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "roxy_core_crit_dmg",
+              "type": "formula",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "critDmg",
+              "mode": "flat",
+              "source": {
+                "variable": "x",
+                "label": {
+                  "zhCN": "洛克茜暴击率（%）"
+                },
+                "defaultValue": 100,
+                "min": 0,
+                "max": 200
+              },
+              "formula": {
+                "expression": "clamp(x * 0.4, 0, 40)",
+                "valueUnit": "storedPercent"
+              },
+              "requirement": {
+                "excludedSpecialties": [
+                  "armorer"
+                ]
+              },
+              "durationSeconds": 50,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "roxy_core_laceration_dmg",
+              "type": "formula",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "lacerationDmg",
+              "mode": "flat",
+              "source": {
+                "variable": "x",
+                "label": {
+                  "zhCN": "洛克茜暴击率（%）"
+                },
+                "defaultValue": 100,
+                "min": 0,
+                "max": 200
+              },
+              "formula": {
+                "expression": "clamp(x * 0.2, 0, 20)",
+                "valueUnit": "storedPercent"
+              },
+              "requirement": {
+                "specialty": "armorer"
+              },
+              "durationSeconds": 50,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": [],
+          "runtimeParameters": []
+        },
+        {
+          "id": "roxy.additional_ability",
+          "source": {
+            "zhCN": "额外能力"
+          },
+          "description": {
+            "zhCN": "队伍中存在强攻、命破或锋御角色时触发：队伍中角色攻击命中敌人，使其失衡易伤倍率提升30%；敌人处于队伍角色造成的风化状态时，效果使风属性及触发浸染属性的直接攻击伤害额外提升8%。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "roxy_additional_stun",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "stunDmgMultiplierBonus",
+              "mode": "flat",
+              "value": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            },
+            {
+              "id": "roxy_additional_imbuement",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "imbuementDmgBonus",
+              "mode": "flat",
+              "value": 18,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": [],
+          "runtimeParameters": []
+        },
+        {
+          "id": "roxy.cinema_1_res_reduction",
+          "source": {
+            "zhCN": "影画一"
+          },
+          "description": {
+            "zhCN": "[强化特殊技：敬请安息]命中时，使敌方全属性伤害抗性降低15%，持续50秒，重复触发刷新持续时间。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "roxy_cinema_1_res_reduction",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "enemyResReduction",
+              "mode": "flat",
+              "value": 15,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              },
+              "durationSeconds": 50
+            }
+          ],
+          "buffModifiers": [],
+          "runtimeParameters": []
+        },
+        {
+          "id": "roxy.cinema_2_stun",
+          "source": {
+            "zhCN": "影画二"
+          },
+          "description": {
+            "zhCN": "[强化特殊技：小心风寒]命中敌人时，使敌人失衡易伤倍率提升30%，持续到目标从失衡状态恢复。"
+          },
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "roxy_cinema_2_stun",
+              "type": "fixed",
+              "target": {
+                "kind": "default"
+              },
+              "stat": "stunDmgMultiplierBonus",
+              "mode": "flat",
+              "value": 30,
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "buffModifiers": [],
+          "runtimeParameters": []
+        }
+      ],
+      "images": {
+        "icon": "/assets/agents/roxy.png",
+        "source": "https://act-upload.mihoyo.com/nap-obc-indep/2026/09/09/76099754/2fceac681717e64b0202b587b3eda1f8_509711787058331678.png"
+      },
+      "verification": {
+        "officialEntryId": "2152",
+        "officialVersion": "1790832594",
+        "modelingAssumptions": "核心 F；外部暴击率默认100%；忽略核心与浸染的属性限制；时间轴机制只作说明。"
+      }
+    },
+    {
       "id": "qianxia",
       "name": {
         "zhCN": "千夏"
@@ -8062,6 +8268,38 @@
   ],
   "bossBuffs": [],
   "systemBuffs": [
+    {
+      "id": "system.imbuement",
+      "hidden": true,
+      "sourceType": "manual",
+      "sourceCategory": "general",
+      "sourceKind": "general",
+      "name": {
+        "zhCN": "浸染"
+      },
+      "scope": "inCombat",
+      "description": {
+        "zhCN": "风化后触发其他属性异常形成浸染。按本模型忽略属性限制，所有属性的普通、贯穿、锐化直伤获得10%独立加成；不作用于属性异常、紊乱、极性紊乱、乱流、异放及耀变。与洛克茜浸染强化同类取最高，选中代表条件满足。"
+      },
+      "effects": [
+        {
+          "id": "system_imbuement",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "imbuementDmgBonus",
+          "mode": "flat",
+          "value": 10,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ]
+    },
     {
       "id": "buff_m9c4t2z8qw",
       "hidden": true,
