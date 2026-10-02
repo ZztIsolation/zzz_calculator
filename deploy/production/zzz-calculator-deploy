@@ -1969,63 +1969,93 @@ check_disk_headroom() {
         || die "insufficient inode headroom for candidate, rollback, and validation trees"
 }
 
+digest_release_tree() {
+    # This program is embedded in the installed root-owned manager. Never
+    # load a script or module from the candidate while computing its digest.
+    # Retain the exact GNU find / C sort / stat / sha256sum record format.
+    /usr/bin/node --input-type=commonjs - "$1" "$2" <<'DIGEST_JS'
+const fs = require('node:fs');
+const crypto = require('node:crypto');
+const { execFileSync } = require('node:child_process');
+const root = Buffer.from(process.argv[2]);
+const kind = process.argv[3];
+if (!['content', 'full', 'static'].includes(kind)) process.exit(2);
+const records = [];
+const rootDevice = fs.statSync(root, { bigint: true }).dev;
+const slash = Buffer.from('/');
+const excluded = ['data/user_drive_discs.json', 'data/scan-telemetry'].map(x => Buffer.from(x));
+let visited = 0;
+let bytes = 0n;
+function visit(relative, absolute, depth = 0) {
+    if (kind === 'static' && excluded.some(x => relative.equals(x))) return;
+    if (++visited > 20000 || depth > 64) throw new Error('Release tree exceeds the existing size/depth contract');
+    const stat = fs.lstatSync(absolute, { bigint: true });
+    if (!stat.isDirectory() && !stat.isFile()) return; // find does not follow links
+    if (stat.isFile()) bytes += stat.size;
+    if (bytes > 1073741824n) throw new Error('Release tree exceeds 1 GiB');
+    if (kind !== 'content' || stat.isFile()) records.push({ relative, absolute, stat });
+    if (!stat.isDirectory() || stat.dev !== rootDevice) return; // find -xdev
+    for (const name of fs.readdirSync(absolute, { encoding: 'buffer' })) {
+        const next = relative.equals(Buffer.from('.')) ? name : Buffer.concat([relative, slash, name]);
+        visit(next, Buffer.concat([absolute, slash, name]), depth + 1);
+    }
+}
+visit(Buffer.from('.'), root);
+// find emits '.' and './name'. Removing './' before sorting would put a
+// leading '-' filename before the root directory and change portable hashes.
+records.sort((a, b) => {
+    const leftRoot = a.relative.equals(Buffer.from('.'));
+    const rightRoot = b.relative.equals(Buffer.from('.'));
+    return leftRoot || rightRoot ? Number(rightRoot) - Number(leftRoot) : Buffer.compare(a.relative, b.relative);
+});
+const buffer = Buffer.alloc(1024 * 1024);
+const tree = crypto.createHash('sha256');
+for (const { relative, absolute, stat } of records) {
+    let fileHash = '-';
+    if (stat.isFile()) {
+        const file = crypto.createHash('sha256');
+        const fd = fs.openSync(absolute, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
+        try {
+            const opened = fs.fstatSync(fd, { bigint: true });
+            if (!opened.isFile() || opened.dev !== stat.dev || opened.ino !== stat.ino || opened.size !== stat.size)
+                throw new Error('Release file changed while hashing');
+            let count;
+            while ((count = fs.readSync(fd, buffer, 0, buffer.length, null)) > 0) file.update(buffer.subarray(0, count));
+            const after = fs.fstatSync(fd, { bigint: true });
+            if (after.size !== opened.size || after.mtimeNs !== opened.mtimeNs || after.ctimeNs !== opened.ctimeNs)
+                throw new Error('Release file changed while hashing');
+        } finally { fs.closeSync(fd); }
+        fileHash = file.digest('hex');
+        // GNU sha256sum prefixes its hash when escaping a newline/backslash in
+        // the filename. Preserve that historical format even for such paths.
+        if (relative.includes(10) || relative.includes(92)) fileHash = '\\' + fileHash;
+        // Coreutils versions differ in carriage-return escaping. Delegate
+        // only that exceptional filename to the installed legacy formatter.
+        if (relative.includes(13)) {
+            const name = relative.toString('utf8');
+            if (!Buffer.from(name).equals(relative)) throw new Error('Non-UTF8 escaped filename');
+            fileHash = execFileSync('/usr/bin/sha256sum', ['--', name], {
+                cwd: root.toString('utf8'), encoding: 'utf8', timeout: 10000,
+            }).split(/\s/, 1)[0];
+            if (!/^\\?[0-9a-f]{64}$/.test(fileHash)) throw new Error('Invalid legacy digest record');
+        }
+    }
+    tree.update(relative).update('\0');
+    if (kind === 'content') tree.update(`${stat.size}\0${fileHash}\n`);
+    else tree.update(`${stat.isDirectory() ? 'd' : 'f'}\0${(stat.mode & 0o7777n).toString(8)}\0${stat.isDirectory() ? 0 : stat.size}\0${fileHash}\n`);
+}
+process.stdout.write(tree.digest('hex') + '\n');
+DIGEST_JS
+}
+
 tree_sha256() {
-    local root="$1"
-    local relative file_sha file_size
-    (
-        cd "$root"
-        while IFS= read -r -d '' relative; do
-            relative="${relative#./}"
-            file_sha="$(sha256sum -- "$relative" | awk '{print $1}')"
-            file_size="$(stat -c '%s' -- "$relative")"
-            printf '%s\0%s\0%s\n' "$relative" "$file_size" "$file_sha"
-        done < <(find . -xdev -type f -print0 | LC_ALL=C sort -z)
-    ) | sha256sum | awk '{print $1}'
+    digest_release_tree "$1" content
 }
 
 portable_tree_sha256() {
-    local root="$1"
     local mode="${2:-full}"
-    local relative entry_type entry_mode entry_size entry_sha
     [[ "$mode" == "full" || "$mode" == "static" ]] || return 1
-    (
-        cd "$root"
-        if [[ "$mode" == "static" ]]; then
-            while IFS= read -r -d '' relative; do
-                relative="${relative#./}"
-                [[ -n "$relative" ]] || relative='.'
-                if [[ -d "$relative" ]]; then
-                    entry_type='d'; entry_size='0'; entry_sha='-'
-                else
-                    entry_type='f'
-                    entry_size="$(stat -c '%s' -- "$relative")"
-                    entry_sha="$(sha256sum -- "$relative" | awk '{print $1}')"
-                fi
-                entry_mode="$(stat -c '%a' -- "$relative")"
-                printf '%s\0%s\0%s\0%s\0%s\n' \
-                    "$relative" "$entry_type" "$entry_mode" "$entry_size" "$entry_sha"
-            done < <(find . -xdev \
-                \( -path './data/user_drive_discs.json' \
-                    -o -path './data/scan-telemetry' \
-                    -o -path './data/scan-telemetry/*' \) -prune \
-                -o \( -type d -o -type f \) -print0 | LC_ALL=C sort -z)
-        else
-            while IFS= read -r -d '' relative; do
-                relative="${relative#./}"
-                [[ -n "$relative" ]] || relative='.'
-                if [[ -d "$relative" ]]; then
-                    entry_type='d'; entry_size='0'; entry_sha='-'
-                else
-                    entry_type='f'
-                    entry_size="$(stat -c '%s' -- "$relative")"
-                    entry_sha="$(sha256sum -- "$relative" | awk '{print $1}')"
-                fi
-                entry_mode="$(stat -c '%a' -- "$relative")"
-                printf '%s\0%s\0%s\0%s\0%s\n' \
-                    "$relative" "$entry_type" "$entry_mode" "$entry_size" "$entry_sha"
-            done < <(find . -xdev \( -type d -o -type f \) -print0 | LC_ALL=C sort -z)
-        fi
-    ) | sha256sum | awk '{print $1}'
+    digest_release_tree "$1" "$mode"
 }
 
 tree_metadata_sha256() {

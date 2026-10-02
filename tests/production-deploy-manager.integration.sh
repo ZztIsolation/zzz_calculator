@@ -592,6 +592,7 @@ fi
     sed -n '/^write_migration_marker() {$/,/^}$/p' "$MANAGER"
     sed -n '/^record_managed_current() {$/,/^}$/p' "$MANAGER"
     sed -n '/^tree_usage() {$/,/^}$/p' "$MANAGER"
+    sed -n '/^digest_release_tree() {$/,/^tree_sha256() {$/p' "$MANAGER" | sed '$d'
     sed -n '/^tree_sha256() {$/,/^}$/p' "$MANAGER"
     sed -n '/^portable_tree_sha256() {$/,/^}$/p' "$MANAGER"
     sed -n '/^tree_metadata_sha256() {$/,/^}$/p' "$MANAGER"
