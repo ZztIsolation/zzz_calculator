@@ -11,6 +11,14 @@ step began at 17:10:51 UTC, the first manager preflight message arrived at
 15 seconds later. Transfer, connection and early preflight were not separately
 timed in that workflow. The new checkpoints distinguish those stages.
 
+The first bounded audit reached the old manager's preflight after 31 seconds
+and hit the 55-second runner deadline before completing. No publish action was
+invoked. The old content and portable digests spawned several processes per
+file for every tree read. The reviewed manager now hashes those trees in one
+trusted, streaming Node process, with byte-for-byte compatibility tests against
+the prior GNU tools recipe. Metadata, permission, snapshot and rollback checks
+are retained; the 60-second external audit budget is unchanged.
+
 ## Audit before recovery
 
 After the reviewed change is merged and its exact main CI succeeds, dispatch

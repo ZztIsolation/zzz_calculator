@@ -70,7 +70,7 @@
     "test:drive-disc-reservation-api": "node tests/drive-disc-reservation-api.test.js",
     "test:scanner-bridge": "node tests/scanner-bridge.test.js",
     "test:accounts": "node tests/accounts.test.js",
-    "test:production-deploy-manager": "node tests/production-deploy-manager.test.js",
+    "test:production-deploy-manager": "node tests/production-deploy-manager.test.js && node tests/production-tree-digests.test.js",
     "test:enka-proxy": "node tests/enka-proxy.test.js",
     "test:enka-server": "node tests/enka-server.test.js",
     "test:enka-import": "node tests/enka-import.test.js",
