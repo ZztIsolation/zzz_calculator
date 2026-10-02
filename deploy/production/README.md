@@ -1,5 +1,10 @@
 # Calculator production deploy manager
 
+For a frozen candidate or timed-out release, follow [the bounded recovery
+runbook](RECOVERY.md). It covers the protected audit entrypoint, reviewed
+control-plane bundle, fixed deadlines and the boundary between a non-disruptive
+dry-run and the normal deployment's explicit service restart.
+
 This directory contains the one-time server initializer and the root-owned
 deployment program used by the Calculator CD workflow. It is deliberately
 separate from the application service, Nginx configuration, Helper/Scanner

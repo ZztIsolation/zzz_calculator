@@ -444,6 +444,7 @@ TEST_COUNTER_FILE="${test_root}/health-pid-change.count" TEST_FAILURE_COUNT="0" 
         '    [[ "$MODE" != "reset-race" && "$MODE" != "reset-error-loaded" ]]' \
         '  else return 1; fi' \
         '}'
+    printf '%s\n' 'bounded_systemctl() { systemctl "$@"; }'
     sed -n '/^validation_cgroup_has_members() {$/,/^}$/p' "$MANAGER"
     sed -n '/^validation_unit_name_has_members() {$/,/^}$/p' "$MANAGER"
     sed -n '/^finish_validation_probe_if_gone() {$/,/^}$/p' "$MANAGER"

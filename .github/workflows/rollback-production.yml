@@ -74,7 +74,7 @@ jobs:
     needs: authorize
     if: needs.authorize.result == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     environment:
       name: production
       url: ${{ vars.PROD_URL }}
@@ -221,10 +221,32 @@ jobs:
           (umask 077; printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$key_file")
           chmod 600 "$key_file"
           ssh-keygen -y -f "$key_file" > /dev/null
-          ssh_opts=(-i "$key_file" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" -o RequestTTY=no -o ForwardAgent=no -o ClearAllForwardings=yes)
+          # Durations are fixed here, never supplied by workflow inputs.
+          # Do not print argv: commands carry authentication and server identity.
+          run_bounded_phase() {
+            local phase="$1" limit="$2" started="$SECONDS" status=0
+            shift 2
+            printf 'phase=%s event=start budget_s=%s at=%s\n' "$phase" "$((limit + 5))" "$(date -u +%FT%TZ)"
+            timeout --signal=TERM --kill-after=5s "${limit}s" "$@" || status="$?"
+            printf 'phase=%s event=complete duration_s=%s exit=%s\n' "$phase" "$((SECONDS - started))" "$status"
+            case "$status" in
+              124|137) echo "Phase deadline exceeded; audit remote state before another attempt." ;;
+              255) echo "SSH connection failed; remote completion is unknown. Audit before retrying." ;;
+            esac
+            return "$status"
+          }
+
+          ssh_opts=(-i "$key_file" -o BatchMode=yes -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" -o RequestTTY=no -o ForwardAgent=no -o ClearAllForwardings=yes)
 
           assert_deploy_current
-          if ! ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
+          run_bounded_phase control-plane-audit 55 ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
+            sudo -n /usr/local/sbin/zzz-calculator-deploy audit 2>&1 \
+            | tee "$RUNNER_TEMP/control-plane-audit.txt"
+          grep -Fq 'supervisor=bounded-v1 action=audit' "$RUNNER_TEMP/control-plane-audit.txt" || {
+            echo "Install the reviewed bounded deployment control plane through bootstrap before retrying."
+            exit 1
+          }
+          if ! run_bounded_phase rollback 330 ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
             sudo -n /usr/local/sbin/zzz-calculator-deploy rollback --previous; then
             echo "Rollback command failed; verifying that the original release remains healthy."
             verify_original_restored || true
@@ -234,7 +256,7 @@ jobs:
           if ! verify_rollback_public || ! assert_deploy_current; then
             echo "Rollback target or deploy ref failed verification; restoring the now-recorded previous release."
             restore_status=0
-            ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
+            run_bounded_phase restore 330 ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
               sudo -n /usr/local/sbin/zzz-calculator-deploy rollback --previous \
               || restore_status="$?"
             if [[ "$restore_status" -ne 0 ]]; then

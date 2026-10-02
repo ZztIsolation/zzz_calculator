@@ -596,7 +596,7 @@ jobs:
       ((needs.preflight.outputs.mode == 'audit' && needs.validation.result == 'skipped') ||
        (needs.preflight.outputs.mode != 'audit' && needs.validation.result == 'success'))
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     outputs:
       deployment_status: ${{ steps.completion.outputs.status }}
     environment:
@@ -609,7 +609,7 @@ jobs:
           REQUESTED_BY: ${{ needs.preflight.outputs.requested_by }}
           ACTOR: ${{ needs.preflight.outputs.actor }}
           TRIGGERING_ACTOR: ${{ needs.preflight.outputs.triggering_actor }}
-          RUN_ATTEMPT: ${{ needs.preflight.outputs.run_attempt }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         shell: bash
         run: |
           set -euo pipefail
@@ -908,14 +908,39 @@ jobs:
           (umask 077; printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$key_file")
           chmod 600 "$key_file"
           ssh-keygen -y -f "$key_file" > /dev/null
-          ssh_opts=(-i "$key_file" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" -o RequestTTY=no -o ForwardAgent=no -o ClearAllForwardings=yes)
+          # Durations are fixed here, never supplied by workflow inputs.
+          # Do not print argv: commands carry authentication and server identity.
+          run_bounded_phase() {
+            local phase="$1" limit="$2" started="$SECONDS" status=0
+            shift 2
+            printf 'phase=%s event=start budget_s=%s at=%s\n' "$phase" "$((limit + 5))" "$(date -u +%FT%TZ)"
+            timeout --signal=TERM --kill-after=5s "${limit}s" "$@" || status="$?"
+            printf 'phase=%s event=complete duration_s=%s exit=%s\n' "$phase" "$((SECONDS - started))" "$status"
+            case "$status" in
+              124|137) echo "Phase deadline exceeded; audit remote state before another attempt." ;;
+              255) echo "SSH connection failed; remote completion is unknown. Audit before retrying." ;;
+            esac
+            return "$status"
+          }
+
+          ssh_opts=(-i "$key_file" -o BatchMode=yes -o ConnectTimeout=10 -o ConnectionAttempts=1 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" -o RequestTTY=no -o ForwardAgent=no -o ClearAllForwardings=yes)
 
           assert_deploy_current "before first SSH/SCP"
           if [[ "$CANDIDATE_MODE" == "audit" ]]; then
-            ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
+            run_bounded_phase audit 55 ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
               sudo -n /usr/local/sbin/zzz-calculator-deploy audit
             exit 0
           fi
+
+          # Older managers do not enforce a server-side deadline. They remain
+          # auditable, but may not mutate production through this workflow.
+          run_bounded_phase control-plane-audit 55 ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
+            sudo -n /usr/local/sbin/zzz-calculator-deploy audit 2>&1 \
+            | tee "$RUNNER_TEMP/control-plane-audit.txt"
+          grep -Fq 'supervisor=bounded-v1 action=audit' "$RUNNER_TEMP/control-plane-audit.txt" || {
+            echo "Install the reviewed bounded deployment control plane through bootstrap before retrying."
+            exit 1
+          }
 
           archive_name="$(basename "$ARCHIVE")"
           evidence_name="$(basename "$EVIDENCE")"
@@ -923,11 +948,11 @@ jobs:
           remote_evidence_name="${evidence_name}.part"
           remote_archive="/var/lib/zzz-calculator-deploy/incoming/${remote_archive_name}"
           remote_evidence="/var/lib/zzz-calculator-deploy/incoming/${remote_evidence_name}"
-          scp -O "${ssh_opts[@]}" "$ARCHIVE" "$PROD_USER@$PROD_HOST:$remote_archive"
-          scp -O "${ssh_opts[@]}" "$EVIDENCE" "$PROD_USER@$PROD_HOST:$remote_evidence"
+          run_bounded_phase upload-archive 300 scp -O "${ssh_opts[@]}" "$ARCHIVE" "$PROD_USER@$PROD_HOST:$remote_archive"
+          run_bounded_phase upload-evidence 30 scp -O "${ssh_opts[@]}" "$EVIDENCE" "$PROD_USER@$PROD_HOST:$remote_evidence"
 
           if [[ "$CANDIDATE_MODE" == "dry-run" ]]; then
-            ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
+            run_bounded_phase dry-run 750 ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
               sudo -n /usr/local/sbin/zzz-calculator-deploy dry-run \
                 --artifact "$remote_archive_name" --evidence "$remote_evidence_name" \
                 --expected-sha "$ARTIFACT_SHA256" --expected-commit "$CANDIDATE_SHA"
@@ -935,7 +960,7 @@ jobs:
           fi
 
           assert_deploy_current "immediately before deploy invocation"
-          ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
+          run_bounded_phase deploy 810 ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
             sudo -n /usr/local/sbin/zzz-calculator-deploy deploy \
               --artifact "$remote_archive_name" --evidence "$remote_evidence_name" \
               --expected-sha "$ARTIFACT_SHA256" --expected-commit "$CANDIDATE_SHA"
@@ -945,7 +970,7 @@ jobs:
             || ! assert_deploy_current "after public verification"; then
             echo "The deploy ref or public verification failed; rolling back to the server-recorded previous release."
             rollback_status=0
-            ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
+            run_bounded_phase rollback 330 ssh "${ssh_opts[@]}" "$PROD_USER@$PROD_HOST" \
               sudo -n /usr/local/sbin/zzz-calculator-deploy rollback --previous \
               || rollback_status="$?"
             if [[ "$rollback_status" -ne 0 ]]; then

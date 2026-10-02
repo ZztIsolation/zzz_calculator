@@ -100,6 +100,18 @@ readonly MIN_DISK_HEADROOM_INODES="32768"
 readonly MAX_CURRENT_SNAPSHOT_BYTES="$((1024 * 1024 * 1024))"
 readonly MAX_CURRENT_SNAPSHOT_ENTRIES="20000"
 readonly MAX_RELEASE_DEPTH="64"
+readonly SYSTEMD_QUERY_TIMEOUT_SECONDS="5"
+readonly SYSTEMD_START_TIMEOUT_SECONDS="10"
+readonly SYSTEMD_STOP_TIMEOUT_SECONDS="10"
+readonly TRANSIENT_CLEANUP_TIMEOUT_SECONDS="15"
+
+# Only the root-owned supervisor uses this internal entrypoint. The SSH
+# gateway and sudo policy still accept only the four public action grammars.
+BOUNDED_OPERATION="0"
+if [[ "${1:-}" == "--bounded-operation" ]]; then
+    BOUNDED_OPERATION="1"
+    shift
+fi
 
 ACTION="${1:-}"
 STATUS="started"
@@ -217,6 +229,77 @@ log() {
     printf '[zzz-calculator-deploy] %s\n' "$*" >&2
 }
 
+run_phase() {
+    local phase="$1" started="$SECONDS"
+    shift
+    log "phase=${phase} event=start elapsed_s=${SECONDS}"
+    # Invoke directly: putting this call in an if/! would disable errexit in
+    # nested functions and could let an unsuccessful validation continue.
+    "$@"
+    log "phase=${phase} event=complete duration_s=$((SECONDS - started))"
+}
+
+bounded_systemctl() {
+    local limit="$SYSTEMD_QUERY_TIMEOUT_SECONDS"
+    case "${1:-}" in
+        stop) limit="$SYSTEMD_STOP_TIMEOUT_SECONDS" ;;
+    esac
+    /usr/bin/timeout --signal=TERM --kill-after=2s "${limit}s" /usr/bin/systemctl "$@"
+}
+
+audit_diagnostics() {
+    local item
+    log "phase=audit-diagnostics event=start"
+    # Fixed, read-only metadata only. Never emit process environments, command
+    # lines, authorized_keys, or candidate-controlled journal output.
+    for item in /usr/local/sbin/zzz-calculator-deploy \
+        /usr/local/libexec/zzz-calculator-validation-worker \
+        /usr/local/libexec/zzz-calculator-ssh-gateway \
+        /etc/sudoers.d/zzz-calculator-deploy; do
+        sha256sum -- "$item" || return 1
+    done
+    bounded_systemctl show "$SERVICE_NAME" --property=ActiveState \
+        --property=MainPID --property=NRestarts --property=ExecMainStartTimestampMonotonic
+    bounded_systemctl show --property=Version --property=SystemState --property=NJobs
+    bounded_systemctl list-units --all --no-legend --no-pager 'zzz-calculator-validation-*'
+    stat -c 'lock=%n device=%d inode=%i owner=%U:%G mode=%a' -- "$LOCK_FILE"
+    if command -v lslocks >/dev/null; then
+        /usr/bin/timeout --signal=TERM --kill-after=1s 3s lslocks --noheadings --output PID,COMMAND,PATH \
+            | awk -v lock="$LOCK_FILE" '$NF == lock { print "lock-holder=" $0 }'
+    fi
+    for item in "$INCOMING_DIR" "$VALIDATION_DIR" "$PROCESSING_DIR"; do
+        find "$item" -xdev -mindepth 1 -maxdepth 2 \
+            -printf 'transient=%p type=%y owner=%u:%g mode=%m bytes=%s mtime=%T@\n'
+    done
+    df -Pk -- "$DEPLOY_ROOT" "$RELEASE_ROOT"
+    df -Pi -- "$DEPLOY_ROOT" "$RELEASE_ROOT"
+    free -m
+    if command -v vmstat >/dev/null; then
+        /usr/bin/timeout --signal=TERM --kill-after=1s 4s vmstat 1 2
+    fi
+    if [[ -r /proc/pressure/io ]]; then cat /proc/pressure/io; fi
+    log "phase=audit-diagnostics event=complete"
+}
+
+supervise_operation() {
+    local limit grace result=0
+    case "$ACTION" in
+        audit) limit=30; grace=15 ;;
+        dry-run) limit=600; grace=120 ;;
+        deploy) limit=600; grace=180 ;;
+        rollback) limit=180; grace=120 ;;
+        *) usage; return 2 ;;
+    esac
+    log "supervisor=bounded-v1 action=${ACTION} deadline_s=${limit} cleanup_grace_s=${grace}"
+    # timeout runs on the server as root, with its own process group. TERM
+    # reaches the manager and children; on_exit retains its rollback/evidence
+    # cleanup window even if the runner loses its SSH connection.
+    /usr/bin/timeout --signal=TERM --kill-after="${grace}s" "${limit}s" \
+        /bin/bash --noprofile --norc "$0" --bounded-operation "$@" || result="$?"
+    log "supervisor=bounded-v1 action=${ACTION} event=complete exit=${result}"
+    return "$result"
+}
+
 die() {
     ERROR_MESSAGE="$*"
     log "ERROR: ${ERROR_MESSAGE}"
@@ -299,9 +382,9 @@ select_validation_systemd_profile() {
 detect_validation_systemd_profile() {
     local run_output manager_output run_version manager_version
 
-    run_output="$(/usr/bin/systemd-run --version)" \
+    run_output="$(/usr/bin/timeout --signal=TERM --kill-after=2s "${SYSTEMD_QUERY_TIMEOUT_SECONDS}s" /usr/bin/systemd-run --version)" \
         || die "cannot query the systemd-run client version"
-    manager_output="$(/usr/bin/systemctl show --property=Version --value)" \
+    manager_output="$(/usr/bin/timeout --signal=TERM --kill-after=2s "${SYSTEMD_QUERY_TIMEOUT_SECONDS}s" /usr/bin/systemctl show --property=Version --value)" \
         || die "cannot query the PID 1 systemd manager version"
     run_version="$(parse_systemd_major_version "$run_output")" \
         || die "cannot parse the systemd-run client version"
@@ -953,7 +1036,8 @@ cleanup_processing_job() {
     [[ -n "$PROCESSING_JOB_DIR" ]] || return 0
     [[ "$PROCESSING_JOB_DIR" == "$PROCESSING_DIR/job."* ]] || return 1
     [[ -d "$PROCESSING_JOB_DIR" && ! -L "$PROCESSING_JOB_DIR" ]] || return 0
-    if ! rm -rf --one-file-system -- "$PROCESSING_JOB_DIR"; then
+    if ! /usr/bin/timeout --signal=TERM --kill-after=2s "${TRANSIENT_CLEANUP_TIMEOUT_SECONDS}s" \
+        rm -rf --one-file-system -- "$PROCESSING_JOB_DIR"; then
         log "ERROR: failed to remove processing directory ${PROCESSING_JOB_DIR}"
         return 1
     fi
@@ -998,7 +1082,7 @@ finish_validation_probe_if_gone() {
 
     [[ "$unit" =~ ^zzz-calculator-validation-[0-9]+-[1-9][0-9]*\.service$ ]] || return 1
     [[ "$VALIDATION_UNIT" == "$unit" ]] || return 1
-    load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null)" || return 1
+    load_state="$(bounded_systemctl show "$unit" --property LoadState --value 2>/dev/null)" || return 1
     [[ "$load_state" == "not-found" ]] || return 1
     validation_unit_name_has_members "$unit" && return 1
     VALIDATION_UNIT=""
@@ -1011,7 +1095,7 @@ stop_validation_probe() {
     [[ -n "$VALIDATION_UNIT" ]] || return 0
     unit="$VALIDATION_UNIT"
     [[ "$unit" =~ ^zzz-calculator-validation-[0-9]+-[1-9][0-9]*\.service$ ]] || return 1
-    if ! load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null)"; then
+    if ! load_state="$(bounded_systemctl show "$unit" --property LoadState --value 2>/dev/null)"; then
         finish_validation_probe_if_gone "$unit" && return 0
         return 1
     fi
@@ -1021,7 +1105,7 @@ stop_validation_probe() {
     fi
     [[ "$load_state" == "loaded" ]] || return 1
 
-    if ! control_group="$(systemctl show "$unit" --property ControlGroup --value 2>/dev/null)"; then
+    if ! control_group="$(bounded_systemctl show "$unit" --property ControlGroup --value 2>/dev/null)"; then
         finish_validation_probe_if_gone "$unit" && return 0
         return 1
     fi
@@ -1031,7 +1115,7 @@ stop_validation_probe() {
     else
         validation_unit_name_has_members "$unit" && return 1
     fi
-    if ! systemctl stop "$unit" >/dev/null 2>&1; then
+    if ! bounded_systemctl stop "$unit" >/dev/null 2>&1; then
         finish_validation_probe_if_gone "$unit" && return 0
         return 1
     fi
@@ -1044,7 +1128,7 @@ stop_validation_probe() {
     fi
     validation_unit_name_has_members "$unit" && return 1
 
-    if ! load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null)"; then
+    if ! load_state="$(bounded_systemctl show "$unit" --property LoadState --value 2>/dev/null)"; then
         finish_validation_probe_if_gone "$unit" && return 0
         return 1
     fi
@@ -1053,18 +1137,18 @@ stop_validation_probe() {
         return
     fi
     [[ "$load_state" == "loaded" ]] || return 1
-    if ! active_state="$(systemctl show "$unit" --property ActiveState --value 2>/dev/null)"; then
+    if ! active_state="$(bounded_systemctl show "$unit" --property ActiveState --value 2>/dev/null)"; then
         finish_validation_probe_if_gone "$unit" && return 0
         return 1
     fi
     [[ "$active_state" == "inactive" || "$active_state" == "failed" ]] || return 1
-    if ! systemctl reset-failed "$unit" >/dev/null 2>&1; then
+    if ! bounded_systemctl reset-failed "$unit" >/dev/null 2>&1; then
         finish_validation_probe_if_gone "$unit" && return 0
         return 1
     fi
 
     for attempt in $(seq 1 50); do
-        if ! load_state="$(systemctl show "$unit" --property LoadState --value 2>/dev/null)"; then
+        if ! load_state="$(bounded_systemctl show "$unit" --property LoadState --value 2>/dev/null)"; then
             finish_validation_probe_if_gone "$unit" && return 0
             return 1
         fi
@@ -1088,7 +1172,8 @@ safe_remove_transient_dir() {
     [[ "$allowed" == "1" ]] || return 1
     [[ ! -L "$target" ]] || return 1
     [[ -e "$target" ]] || return 0
-    rm -rf --one-file-system -- "$target"
+    /usr/bin/timeout --signal=TERM --kill-after=2s "${TRANSIENT_CLEANUP_TIMEOUT_SECONDS}s" \
+        rm -rf --one-file-system -- "$target"
 }
 
 cleanup_transient_trees() {
@@ -1099,10 +1184,10 @@ cleanup_transient_trees() {
         VALIDATION_CLEANUP_RESULT="failed"
     fi
     if [[ -n "$VALIDATION_ACTIVE_LABEL" && -n "$VALIDATION_PROBE_ROOT" ]]; then
-        active_state="$(systemctl show "$VALIDATION_UNIT" --property ActiveState --value 2>/dev/null || true)"
-        sub_state="$(systemctl show "$VALIDATION_UNIT" --property SubState --value 2>/dev/null || true)"
-        result="$(systemctl show "$VALIDATION_UNIT" --property Result --value 2>/dev/null || true)"
-        exec_status="$(systemctl show "$VALIDATION_UNIT" --property ExecMainStatus --value 2>/dev/null || true)"
+        active_state="$(bounded_systemctl show "$VALIDATION_UNIT" --property ActiveState --value 2>/dev/null || true)"
+        sub_state="$(bounded_systemctl show "$VALIDATION_UNIT" --property SubState --value 2>/dev/null || true)"
+        result="$(bounded_systemctl show "$VALIDATION_UNIT" --property Result --value 2>/dev/null || true)"
+        exec_status="$(bounded_systemctl show "$VALIDATION_UNIT" --property ExecMainStatus --value 2>/dev/null || true)"
         if ! stop_validation_probe; then
             validation_stopped="0"
             failed="1"
@@ -1769,7 +1854,7 @@ prepare_processing_job() {
 claim_incoming_inputs() {
     local source
 
-    prepare_processing_job
+    run_phase prepare-processing prepare_processing_job
 
     source="$ARTIFACT_PATH"
     claim_incoming_file "$source"
@@ -2604,7 +2689,7 @@ record_managed_current() {
 
 run_audit() {
     [[ "$#" -eq 0 ]] || die "audit does not accept arguments"
-    assert_production_preflight
+    run_phase production-preflight assert_production_preflight
     assert_production_unchanged
 }
 
@@ -2695,7 +2780,7 @@ run_validation_transient_unit() {
     local release_dir="$2"
     local mode="$3"
     local unit_base active_state sub_state result exec_status attempt success="0"
-    local launch_status="0"
+    local launch_status="0" deadline
     local -a worker_args
 
     [[ -d "$release_dir" && ! -L "$release_dir" ]] || die "${label} validation release is invalid"
@@ -2712,8 +2797,10 @@ run_validation_transient_unit() {
     VALIDATION_ACTIVE_LABEL="$label"
     build_validation_systemd_properties "$release_dir"
 
+    log "phase=validation-${label} event=start unit=${VALIDATION_UNIT}"
     set +e
-    /usr/bin/systemd-run --quiet --unit "$unit_base" \
+    /usr/bin/timeout --signal=TERM --kill-after=2s "${SYSTEMD_START_TIMEOUT_SECONDS}s" \
+        /usr/bin/systemd-run --no-block --quiet --unit "$unit_base" \
         "${VALIDATION_SYSTEMD_PROPERTIES[@]}" \
         -- /usr/bin/timeout --signal=TERM --kill-after=5s 45s \
         /usr/bin/env -i \
@@ -2732,21 +2819,23 @@ run_validation_transient_unit() {
     launch_status="$?"
     set -e
     if [[ "$launch_status" -ne 0 ]]; then
-        active_state="$(systemctl show "$VALIDATION_UNIT" --property ActiveState --value 2>/dev/null || true)"
-        sub_state="$(systemctl show "$VALIDATION_UNIT" --property SubState --value 2>/dev/null || true)"
-        result="$(systemctl show "$VALIDATION_UNIT" --property Result --value 2>/dev/null || true)"
-        exec_status="$(systemctl show "$VALIDATION_UNIT" --property ExecMainStatus --value 2>/dev/null || true)"
+        active_state="$(bounded_systemctl show "$VALIDATION_UNIT" --property ActiveState --value 2>/dev/null || true)"
+        sub_state="$(bounded_systemctl show "$VALIDATION_UNIT" --property SubState --value 2>/dev/null || true)"
+        result="$(bounded_systemctl show "$VALIDATION_UNIT" --property Result --value 2>/dev/null || true)"
+        exec_status="$(bounded_systemctl show "$VALIDATION_UNIT" --property ExecMainStatus --value 2>/dev/null || true)"
         stop_validation_probe || true
         record_validation_unit_result "$label" "$active_state" "$sub_state" "$result" "$exec_status"
         VALIDATION_ACTIVE_LABEL=""
         die "${label} validation transient unit did not start successfully; systemd=${SYSTEMD_EFFECTIVE_VERSION} profile=${VALIDATION_SANDBOX_PROFILE} activeState=${active_state:-unknown} subState=${sub_state:-unknown} result=${result:-unknown} execStatus=${exec_status:-unknown}"
     fi
 
+    deadline="$((SECONDS + 55))"
     for attempt in $(seq 1 550); do
-        active_state="$(systemctl show "$VALIDATION_UNIT" --property ActiveState --value 2>/dev/null || true)"
-        sub_state="$(systemctl show "$VALIDATION_UNIT" --property SubState --value 2>/dev/null || true)"
-        result="$(systemctl show "$VALIDATION_UNIT" --property Result --value 2>/dev/null || true)"
-        exec_status="$(systemctl show "$VALIDATION_UNIT" --property ExecMainStatus --value 2>/dev/null || true)"
+        (( SECONDS < deadline )) || break
+        active_state="$(bounded_systemctl show "$VALIDATION_UNIT" --property ActiveState --value 2>/dev/null || true)"
+        sub_state="$(bounded_systemctl show "$VALIDATION_UNIT" --property SubState --value 2>/dev/null || true)"
+        result="$(bounded_systemctl show "$VALIDATION_UNIT" --property Result --value 2>/dev/null || true)"
+        exec_status="$(bounded_systemctl show "$VALIDATION_UNIT" --property ExecMainStatus --value 2>/dev/null || true)"
         if [[ "$active_state" == "active" && "$sub_state" == "exited" && "$result" == "success" && "$exec_status" == "0" ]]; then
             success="1"
             break
@@ -2756,16 +2845,19 @@ run_validation_transient_unit() {
         fi
         sleep 0.1
     done
+    log "phase=validation-${label} unit=${VALIDATION_UNIT} activeState=${active_state:-unknown} subState=${sub_state:-unknown} result=${result:-unknown} execStatus=${exec_status:-unknown}"
     if [[ "$success" != "1" ]]; then
         stop_validation_probe || true
         record_validation_unit_result "$label" "$active_state" "$sub_state" "$result" "$exec_status"
         VALIDATION_ACTIVE_LABEL=""
         die "${label} validation failed inside its private systemd sandbox; execStatus=${exec_status:-unknown}"
     fi
+    log "phase=validation-${label}-cleanup event=start"
     stop_validation_probe || die "${label} validation cgroup could not be stopped"
     record_validation_unit_result "$label" "$active_state" "$sub_state" "$result" "$exec_status"
     VALIDATION_ACTIVE_LABEL=""
     remove_validation_probe_root || die "${label} validation data could not be removed"
+    log "phase=validation-${label}-cleanup event=complete"
 }
 
 run_validation_sandbox_capability_probe() {
@@ -2933,17 +3025,17 @@ run_dry_run() {
     local current_snapshot candidate_dir rollback_dir rollback_commit
 
     parse_artifact_options "$@"
-    assert_production_preflight
+    run_phase production-preflight assert_production_preflight
     prepare_validation_job
-    run_validation_sandbox_capability_probe
-    prepare_processing_job
+    run_phase sandbox-capability run_validation_sandbox_capability_probe
+    run_phase prepare-processing prepare_processing_job
     current_snapshot="${PROCESSING_JOB_DIR}/sources/current"
-    seal_current_release "$CURRENT_BEFORE" "$current_snapshot"
-    claim_incoming_inputs
+    run_phase seal-current seal_current_release "$CURRENT_BEFORE" "$current_snapshot"
+    run_phase claim-upload claim_incoming_inputs
     candidate_dir="${PROCESSING_JOB_DIR}/sources/candidate"
     rollback_dir="${PROCESSING_JOB_DIR}/sources/rollback"
     install -d -m 0755 -- "$candidate_dir" "$rollback_dir"
-    extract_and_validate "$candidate_dir"
+    run_phase validate-archive extract_and_validate "$candidate_dir"
 
     rollback_commit="$(read_commit "$current_snapshot")"
     [[ -n "$rollback_commit" ]] || die "current release has no valid .deployed-commit"
@@ -2959,7 +3051,7 @@ run_dry_run() {
     PAGES_TREE_SHA256="$(tree_sha256 "$candidate_dir/dist/pages")"
     ROLLBACK_BASENAME="validation-rollback-${rollback_commit:0:12}"
 
-    run_four_stage_validation "$current_snapshot" "$candidate_dir" "$rollback_dir"
+    run_phase four-stage-validation run_four_stage_validation "$current_snapshot" "$candidate_dir" "$rollback_dir"
     assert_production_unchanged
     cleanup_processing_job || die "failed to remove root-only dry-run sources"
     log "dry-run validated ${ARTIFACT_BASENAME} through current/candidate/rollback/candidate"
@@ -2971,20 +3063,20 @@ run_deploy() {
     parse_artifact_options "$@"
     [[ -n "$EXPECTED_SHA256" ]] || die "deploy requires --expected-sha"
     [[ -n "$EXPECTED_COMMIT" ]] || die "deploy requires --expected-commit"
-    assert_production_preflight
+    run_phase production-preflight assert_production_preflight
     prepare_validation_job
-    run_validation_sandbox_capability_probe
-    prepare_processing_job
+    run_phase sandbox-capability run_validation_sandbox_capability_probe
+    run_phase prepare-processing prepare_processing_job
     current_snapshot="${PROCESSING_JOB_DIR}/sources/current"
-    seal_current_release "$CURRENT_BEFORE" "$current_snapshot"
+    run_phase seal-current seal_current_release "$CURRENT_BEFORE" "$current_snapshot"
     rollback_commit="$(read_commit "$current_snapshot")"
     PREVIOUS_BASENAME="$(basename -- "$CURRENT_BEFORE")"
     [[ "$(current_target)" == "$CURRENT_BEFORE" ]] || die "current release changed during preflight"
-    claim_incoming_inputs
+    run_phase claim-upload claim_incoming_inputs
 
     CANDIDATE_STAGING="$(mktemp -d "${RELEASE_ROOT}/.candidate.XXXXXXXX")"
     FINALIZE_UPLOAD="1"
-    extract_and_validate "$CANDIDATE_STAGING"
+    run_phase validate-archive extract_and_validate "$CANDIDATE_STAGING"
     candidate_target="${RELEASE_ROOT}/${RELEASE_BASENAME}"
     ROLLBACK_BASENAME="rollback-${DEPLOYED_COMMIT:0:12}"
     rollback_target="${RELEASE_ROOT}/${ROLLBACK_BASENAME}"
@@ -3022,7 +3114,7 @@ run_deploy() {
     RELEASE_TREE_SHA256="$(tree_sha256 "$CANDIDATE_STAGING")"
     PAGES_TREE_SHA256="$(tree_sha256 "$CANDIDATE_STAGING/dist/pages")"
 
-    run_four_stage_validation "$current_snapshot" "$CANDIDATE_STAGING" "$ROLLBACK_STAGING"
+    run_phase four-stage-validation run_four_stage_validation "$current_snapshot" "$CANDIDATE_STAGING" "$ROLLBACK_STAGING"
     assert_production_unchanged
     cleanup_processing_job || die "failed to remove root-only deploy sources before switching"
 
@@ -3074,7 +3166,7 @@ run_rollback() {
     local target old_current old_basename target_commit
 
     [[ "$#" -eq 1 && "$1" == "--previous" ]] || die "rollback accepts only --previous"
-    assert_production_preflight
+    run_phase production-preflight assert_production_preflight
     [[ "$CURRENT_RELEASE_POLICY" == "managed-immutable" ]] \
         || die "manual rollback is disabled until the legacy current has completed its first managed deployment"
     [[ "$STATE_PREVIOUS_EXISTED" == "1" ]] || die "no previous successful release is recorded"
@@ -3128,15 +3220,18 @@ main() {
         *) usage; exit 2 ;;
     esac
     shift
-    require_root_and_layout
+    run_phase layout require_root_and_layout
     trap 'on_exit $?' EXIT
     trap 'on_signal HUP' HUP
     trap 'on_signal INT' INT
     trap 'on_signal TERM' TERM
     acquire_lock
     preflight_evidence_storage
-    capture_before
-    read_state_snapshot
+    if [[ "$ACTION" == "audit" ]]; then
+        run_phase diagnostics audit_diagnostics >&2
+    fi
+    run_phase capture-before capture_before
+    run_phase state-snapshot read_state_snapshot
 
     case "$ACTION" in
         audit) run_audit "$@" ;;
@@ -3147,4 +3242,8 @@ main() {
     esac
 }
 
-main "$@"
+if [[ "$BOUNDED_OPERATION" == "1" ]]; then
+    main "$@"
+else
+    supervise_operation "$@"
+fi
