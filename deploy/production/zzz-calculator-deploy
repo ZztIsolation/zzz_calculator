@@ -1090,7 +1090,7 @@ finish_validation_probe_if_gone() {
 }
 
 stop_validation_probe() {
-    local unit load_state active_state control_group cgroup_procs attempt
+    local unit load_state active_state control_group cgroup_procs attempt deadline
     local control_group_was_realized="0"
     [[ -n "$VALIDATION_UNIT" ]] || return 0
     unit="$VALIDATION_UNIT"
@@ -1147,7 +1147,9 @@ stop_validation_probe() {
         return 1
     fi
 
+    deadline="$((SECONDS + 5))"
     for attempt in $(seq 1 50); do
+        (( SECONDS < deadline )) || return 1
         if ! load_state="$(bounded_systemctl show "$unit" --property LoadState --value 2>/dev/null)"; then
             finish_validation_probe_if_gone "$unit" && return 0
             return 1
