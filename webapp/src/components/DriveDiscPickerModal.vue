@@ -3,7 +3,7 @@ import { computed, h, ref, watch } from "vue"
 import { NButton, NInput, NModal, NSelect, NTag } from "naive-ui"
 import DriveDiscSourceTags from "@/components/DriveDiscSourceTags.vue"
 import ImageAvatar from "@/components/ImageAvatar.vue"
-import { fallbackIcon, imageForDriveDiscSet } from "@/utils/assets"
+import { fallbackIcon, thumbnailForDriveDiscSet } from "@/utils/assets"
 import {
   driveDiscScannerSequence,
   driveDiscSourceDescriptors,
@@ -202,7 +202,7 @@ function renderSetLabel(option: any) {
   const set = option?.set ?? props.driveDiscSets.find(item => item.id === option?.value)
   const name = labelOf(set) || String(option?.label ?? option?.value ?? "未知套装")
   return h("span", { class: "manual-disc-set-select-label" }, [
-    h(ImageAvatar, { src: imageForDriveDiscSet(set), name, size: 20 }),
+    h(ImageAvatar, { src: thumbnailForDriveDiscSet(set), name, size: 20 }),
     h("span", { class: "manual-disc-set-select-name", title: name }, name),
   ])
 }
@@ -278,7 +278,7 @@ function clearSlot() {
           :aria-label="discAriaLabel(disc)"
           @click="choose(disc)"
         >
-          <img :src="imageForDriveDiscSet(setForDisc(disc))" alt="" loading="lazy">
+          <img :src="thumbnailForDriveDiscSet(setForDisc(disc))" alt="" loading="lazy" decoding="async">
           <span class="manual-disc-option-main">
             <strong>{{ setName(disc) }}</strong>
             <span>{{ disc.partition }}号位 · {{ rarityLevelText(disc) }}</span>

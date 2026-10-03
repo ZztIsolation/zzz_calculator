@@ -1,0 +1,605 @@
+{
+  "recipe": {
+    "sharp": "0.35.5",
+    "format": "webp",
+    "quality": 72,
+    "agents": {
+      "width": 192
+    },
+    "icons": {
+      "width": 96,
+      "height": 96,
+      "fit": "contain"
+    }
+  },
+  "sources": {
+    "/assets/agents/alice_thymefield.png": {
+      "sourceHash": "3aa872bc9449510351f05a7f0aaa33e11232cc202ce1fa0676cad3636d92525e",
+      "thumbnailUrl": "/assets/thumbs/agents/alice_thymefield.dac6217acab77b3a.webp"
+    },
+    "/assets/agents/anby_demara.webp": {
+      "sourceHash": "26d8ea1f184cd381266e6b3afde6569dbb86e24da2de96db1af09fe65f1c4e1e",
+      "thumbnailUrl": "/assets/thumbs/agents/anby_demara.8baee337d5cefc14.webp"
+    },
+    "/assets/agents/aria.png": {
+      "sourceHash": "f099d5a28ecd0b6b5e370feb1be815c6fb768641695dcef660b42db4bd0fc385",
+      "thumbnailUrl": "/assets/thumbs/agents/aria.6e0d4bda8bc9b4f0.webp"
+    },
+    "/assets/agents/burnice_white.png": {
+      "sourceHash": "aac8c7920c34ae7ce41e8d6ea4fb380b92264f81411baf805db2bf526d17f48e",
+      "thumbnailUrl": "/assets/thumbs/agents/burnice_white.b136bf707c584936.webp"
+    },
+    "/assets/agents/caesar_king.png": {
+      "sourceHash": "6f3c9cd9a4bed5914c26a18b15658e582cfcddced2222cf8902e8e563fee2aae",
+      "thumbnailUrl": "/assets/thumbs/agents/caesar_king.cfdeacc70ad22b55.webp"
+    },
+    "/assets/agents/claret.png": {
+      "sourceHash": "60217c6c106e1eb25eb106e9abdedee53406399f425c7600d6699a9bf47d80cf",
+      "thumbnailUrl": "/assets/thumbs/agents/claret.da17c3cfc690e861.webp"
+    },
+    "/assets/agents/hoshimi_miyabi.png": {
+      "sourceHash": "f5ef77e9c9f85051f34ac0ba1df757a51be3fa0eeea9f1621300ce234d280ae1",
+      "thumbnailUrl": "/assets/thumbs/agents/hoshimi_miyabi.2a84217a73396800.webp"
+    },
+    "/assets/agents/jane_doe.png": {
+      "sourceHash": "be5841522ee56cc4450262237cf9219de89683f1bfda3cac86e3c470dd05c7b9",
+      "thumbnailUrl": "/assets/thumbs/agents/jane_doe.c72c5356c0a56681.webp"
+    },
+    "/assets/agents/juhufu.png": {
+      "sourceHash": "c4bb130d160655669f88c55591666d1e55d5cf16fcc75a99091076e323963cca",
+      "thumbnailUrl": "/assets/thumbs/agents/juhufu.15deea87d58a61e5.webp"
+    },
+    "/assets/agents/koleda.png": {
+      "sourceHash": "d5f8172e0ee0d94c54bf210618366d9af52e59949ba6b8d655e420b9d402a4e9",
+      "thumbnailUrl": "/assets/thumbs/agents/koleda.2c29eb0eda744f05.webp"
+    },
+    "/assets/agents/lighter.png": {
+      "sourceHash": "ec921a3a3591c1039285aeb8d12e9f79708edf78a2e032fa3579eda5e9adcd88",
+      "thumbnailUrl": "/assets/thumbs/agents/lighter.ff5b248cfe9db100.webp"
+    },
+    "/assets/agents/liuyin.png": {
+      "sourceHash": "0bb213625edd778ae400d89e2acd308aaa59b1636099d44a83c716cf8456af54",
+      "thumbnailUrl": "/assets/thumbs/agents/liuyin.67233a1b86e498ab.webp"
+    },
+    "/assets/agents/lucia_elowen.png": {
+      "sourceHash": "2787d94d1218fb23cc365559cccbc88d83c852a02bb0b5a3982705e6fa23c8db",
+      "thumbnailUrl": "/assets/thumbs/agents/lucia_elowen.74b6db9e3f2657db.webp"
+    },
+    "/assets/agents/lucy.png": {
+      "sourceHash": "3c5fd03d6db0889727eaff81e2e313916704ba86af226bfdba988ab975f71018",
+      "thumbnailUrl": "/assets/thumbs/agents/lucy.4220518e29dfd555.webp"
+    },
+    "/assets/agents/lycaon.png": {
+      "sourceHash": "59a7d1a7517d19c5a0ae3f546f22600985ce5a46b0fb0552792236c6fd2f7121",
+      "thumbnailUrl": "/assets/thumbs/agents/lycaon.959bfe438272a0e2.webp"
+    },
+    "/assets/agents/nangongyu.png": {
+      "sourceHash": "3b2266f04a5f7a1109622c123b73b009ba4bae6bc52bed534562483f68e2a05c",
+      "thumbnailUrl": "/assets/thumbs/agents/nangongyu.ddf1e156ad378ae3.webp"
+    },
+    "/assets/agents/nicole.png": {
+      "sourceHash": "f3d2480608b0039d838fb1d378e2b91905492e59bfb0f2e625911901d0944045",
+      "thumbnailUrl": "/assets/thumbs/agents/nicole.29433f250736e28a.webp"
+    },
+    "/assets/agents/norma_hollowell.png": {
+      "sourceHash": "fb77e63c6972bfcaf8bbad793b7fcdfffe6cca0b62372c72db514bae7b3d956a",
+      "thumbnailUrl": "/assets/thumbs/agents/norma_hollowell.9ef0515f8775283f.webp"
+    },
+    "/assets/agents/orphie_magusa.png": {
+      "sourceHash": "9ad1d24b259a30489e60f768c0e8e4caebfe2723d0f011401a0e8cd95d616760",
+      "thumbnailUrl": "/assets/thumbs/agents/orphie_magusa.60bb04122f2a36d7.webp"
+    },
+    "/assets/agents/pan_yinhu.png": {
+      "sourceHash": "0cc20d768f82dc2f62d336accdc051603e06755be598a12d0f231fa08ff0452d",
+      "thumbnailUrl": "/assets/thumbs/agents/pan_yinhu.9cac87a8fc679529.webp"
+    },
+    "/assets/agents/pyrois.png": {
+      "sourceHash": "78e7c9327568098e2746bc5ebb3bab3157d12dbee5c4f8be1e0312874600f334",
+      "thumbnailUrl": "/assets/thumbs/agents/pyrois.b3e3bc604920d685.webp"
+    },
+    "/assets/agents/qianxia.png": {
+      "sourceHash": "4f9410acc5d1492a068d9d5dc398e08f58043bc5caeff0447b2705b696234b70",
+      "thumbnailUrl": "/assets/thumbs/agents/qianxia.8c5f03bfb03e4be3.webp"
+    },
+    "/assets/agents/qingyi.png": {
+      "sourceHash": "606187b288783fa3649b5771c253b9cebc3ea534fcb1e928d021433ed016da5a",
+      "thumbnailUrl": "/assets/thumbs/agents/qingyi.80c5ad85856c3ffc.webp"
+    },
+    "/assets/agents/remielle_dan.png": {
+      "sourceHash": "ffcec1c61335f38969c5a9d9c260878c1121b48a6a021fda1bea6772ec496213",
+      "thumbnailUrl": "/assets/thumbs/agents/remielle_dan.87dd6629fb9c73be.webp"
+    },
+    "/assets/agents/rina.png": {
+      "sourceHash": "b76b8b5a842e97aacb3cc166747ca4aa3364f2e0be324a3c76dc2e7a6bcefaa4",
+      "thumbnailUrl": "/assets/thumbs/agents/rina.754faac5bd30fc09.webp"
+    },
+    "/assets/agents/roxy.png": {
+      "sourceHash": "afd08bf2b325a41c3a1b3a22c7c99246e8ffd5207dd5337854bee2cabc446a5e",
+      "thumbnailUrl": "/assets/thumbs/agents/roxy.52cd052f5a3d92c1.webp"
+    },
+    "/assets/agents/seed.png": {
+      "sourceHash": "bdab1d77a0fd4ed4b52f877ee528e513d95de8d7b173c76ed4765649b26237ad",
+      "thumbnailUrl": "/assets/thumbs/agents/seed.172c7678b7f6b454.webp"
+    },
+    "/assets/agents/sigrid.png": {
+      "sourceHash": "8d3ba3fffe11a5b3ad5aaa70fa55223fbc745ff4af90b5f53138df8442d44123",
+      "thumbnailUrl": "/assets/thumbs/agents/sigrid.e26108dd29c7beba.webp"
+    },
+    "/assets/agents/soldier_11.png": {
+      "sourceHash": "3178ebeee13432caf1e66fde76d3cb82c970c1daa1496c1d4f85cde98e3492fc",
+      "thumbnailUrl": "/assets/thumbs/agents/soldier_11.cba957037af18039.webp"
+    },
+    "/assets/agents/soukaku.png": {
+      "sourceHash": "da97c1b4657aa777fc1b5022413f6fc0e975d66a2502c7bb75b9ebf8fef37d40",
+      "thumbnailUrl": "/assets/thumbs/agents/soukaku.37fbb3c0c6d4d756.webp"
+    },
+    "/assets/agents/trigger.png": {
+      "sourceHash": "faab0d083a325d7e0b83cb2b84dcd49447defb6fa7d6a4ddb922e096e51b786e",
+      "thumbnailUrl": "/assets/thumbs/agents/trigger.7dba872b803f6dec.webp"
+    },
+    "/assets/agents/tsukishiro_yanagi.png": {
+      "sourceHash": "b5237b08735da95567a8bf354ed872ad241500cf1686893798ca7ad38493b306",
+      "thumbnailUrl": "/assets/thumbs/agents/tsukishiro_yanagi.f8b0901c5cf8e2b7.webp"
+    },
+    "/assets/agents/velina.png": {
+      "sourceHash": "9d0e0fcacf0cc58a85cf481f179481e48f017dde9e0d1d76850fd2f51e97754e",
+      "thumbnailUrl": "/assets/thumbs/agents/velina.3eb223ee3321ad3f.webp"
+    },
+    "/assets/agents/vivian.png": {
+      "sourceHash": "8aa99611b70dbf6826ac09b00369df2222c1f89def7d3971d8361ef5655769e9",
+      "thumbnailUrl": "/assets/thumbs/agents/vivian.a66bab281d612b9e.webp"
+    },
+    "/assets/agents/xixifu.png": {
+      "sourceHash": "55e4ba754be6949c2f78b33831817393c1637f85b8295c413596c5e1bf78c9ce",
+      "thumbnailUrl": "/assets/thumbs/agents/xixifu.c619fb609304ece4.webp"
+    },
+    "/assets/agents/yaojiayin.png": {
+      "sourceHash": "450c42b7c84ab7aaedbf24ecf81f6ac4d5d5f949b6cff1bd32d4a22ba2ce8422",
+      "thumbnailUrl": "/assets/thumbs/agents/yaojiayin.b822a58580ae26db.webp"
+    },
+    "/assets/agents/ye_shunguang.webp": {
+      "sourceHash": "8f2d0718abefa1d26853969f5cfc493e4f21e549a2329d0677e0f2a114e2f555",
+      "thumbnailUrl": "/assets/thumbs/agents/ye_shunguang.7af83c428b53dc34.webp"
+    },
+    "/assets/agents/yixuan.png": {
+      "sourceHash": "9a4a8c2e9bd81743a49d96b424367d40caadc1d264325f9a0bd29669872210df",
+      "thumbnailUrl": "/assets/thumbs/agents/yixuan.027d008e3e37a3de.webp"
+    },
+    "/assets/agents/youye.png": {
+      "sourceHash": "aafaa173f227dc45b8f9d85b1b6c0201d94137753b14bd3793b6e45b5b98829b",
+      "thumbnailUrl": "/assets/thumbs/agents/youye.3f3cd456e3650feb.webp"
+    },
+    "/assets/agents/zhao.png": {
+      "sourceHash": "aa208f95ad03edbf0e434a50fc80a2edbb74f7bb4e3e743edeb58ab4817b9d39",
+      "thumbnailUrl": "/assets/thumbs/agents/zhao.18ad521d93bf0f3d.webp"
+    },
+    "/assets/w-engines/cloudcleave_radiance.webp": {
+      "sourceHash": "1234ed0b4421966d5ad01b6fe296182e719370919bf81c7f599d98457f00997e",
+      "thumbnailUrl": "/assets/thumbs/w-engines/cloudcleave_radiance.4be39c944addbda7.webp"
+    },
+    "/assets/w-engines/demara_battery_mark_ii.webp": {
+      "sourceHash": "e2c40ff110fddf40c08dff9a4a7ff3132a33d2d73fe24478d838e6a3a2c74de6",
+      "thumbnailUrl": "/assets/thumbs/w-engines/demara_battery_mark_ii.00a3264529ca0203.webp"
+    },
+    "/assets/w-engines/hailfall_star_palace.png": {
+      "sourceHash": "9bda46c197707a80e0a5533dcfe78e4b47e2e469b3c223c6dd9879ca32f87598",
+      "thumbnailUrl": "/assets/thumbs/w-engines/hailfall_star_palace.e78084471f34d4fa.webp"
+    },
+    "/assets/w-engines/tenfold_starforge.png": {
+      "sourceHash": "8459708eb113e84c5ff8f38aa8b5d0200c3ee7b7a068acac821999714d9ec077",
+      "thumbnailUrl": "/assets/thumbs/w-engines/tenfold_starforge.877a1734fe23d447.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1107.png": {
+      "sourceHash": "ee7e77c3504f4223359d94d0e7c0e6eca0d1f60bfa0c7b76a7043c47398c16c7",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1107.69200c8be829e62e.webp"
+    },
+    "/assets/w-engines/zzz_wiki_114.png": {
+      "sourceHash": "05d8057e4310a646c1ab6285ec13105bc9cc2f3cf2740ee521d53a3e436e914b",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_114.62c3ee54eaab35a4.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1159.png": {
+      "sourceHash": "f34c9057a6611b41c2e6901308b56113cd6b874e49e14d6b96de20d1ed9aec2f",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1159.2a6fb8716f80b48e.webp"
+    },
+    "/assets/w-engines/zzz_wiki_117.png": {
+      "sourceHash": "5ce602e353b0fe69045d8dae3e2fe5d780b3aebddd2cc63778a850405e9b3351",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_117.5a50788290d59362.webp"
+    },
+    "/assets/w-engines/zzz_wiki_118.png": {
+      "sourceHash": "e055bde963ebb430a4a0c1cc4a0ac4e6d5f9a1c5f22967cdd8eb22769ea7ab9a",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_118.ff7643afe5c69051.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1197.png": {
+      "sourceHash": "3bcf7d84135f66d17e665a7b0774bca9374427a64bce07dfa21c4242284c2357",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1197.1ffffe025510b641.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1243.png": {
+      "sourceHash": "16f81208b138bf0ac6e3b76319f0bcbc3b895ed8ab379fc94ba68045392b76d1",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1243.83ce9963c5fed01d.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1277.png": {
+      "sourceHash": "1786c98992a6ec145c6525a6364b09c21b8d134cc14d543a2e5b95d4bc93b0a9",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1277.0fc2b8128253d222.webp"
+    },
+    "/assets/w-engines/zzz_wiki_128.png": {
+      "sourceHash": "eb108bcad89252ca2aabacc23ec22a02eccb5ab9327c8f2945b88eef54b5c5e4",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_128.8c9d599061acbbcd.webp"
+    },
+    "/assets/w-engines/zzz_wiki_129.png": {
+      "sourceHash": "ef65db8042bcd3cd550231d609311ca867a40e3ec137657e85e12de69bb50645",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_129.3e8bf2a10cdc7d24.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1305.png": {
+      "sourceHash": "6fdb3d3fa6e9151d145ec578e5e2de629da211a5cd87e7d648bf8322fd616f8e",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1305.41db42f541bd8ac1.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1340.png": {
+      "sourceHash": "5200f66d596ef07919291705ccb9cf7e5027e90de8577cb5e46ad7cfe757eef9",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1340.9d71ab44a53e03ad.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1342.png": {
+      "sourceHash": "50338c41fb27766531732e9577999330630730d445b19ae67f780d26e238cac4",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1342.ffad6deeaa1b90ca.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1343.png": {
+      "sourceHash": "d0c49e88d44176defbc7ee5c608dc8a88a329d00458f16a87f10e538bac9f208",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1343.233eebbb354d751e.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1427.png": {
+      "sourceHash": "32d2459554898135ec6a2e10a35a725aae2c5fb58c43aacb0ad1837b2272dcf4",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1427.6b71f8d6e09a633b.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1463.png": {
+      "sourceHash": "9b11e774b8ba238bc478c9b3df4a68c380b61f3b9123c0a936519a21cc10bc33",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1463.a47466cc02307e9e.webp"
+    },
+    "/assets/w-engines/zzz_wiki_154.png": {
+      "sourceHash": "f987d3c033287890c472fca0dba5ff13c9ac4ea1ee5f9b501a7a4e3364f68173",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_154.e0e27f8527ee6348.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1553.png": {
+      "sourceHash": "a8ae770f2fa7b0bb85e57a20068c3ace47f34f35d621e117555a469b22a2eb7a",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1553.8209b03ec46dad82.webp"
+    },
+    "/assets/w-engines/zzz_wiki_156.png": {
+      "sourceHash": "0e1830c8831894f018cea00d9f9a3feac4d83ce8ff4512fa849164f6d6dc4397",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_156.715f0b541e5a44b7.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1586.png": {
+      "sourceHash": "1c2d162f72cd6ffa6c81059d28dd00b81c5933c4395a5452485c205b9e31ffa1",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1586.bf562c0c71a6bef8.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1611.png": {
+      "sourceHash": "c78c875131ac38ac89ea8945180bcce33cc84c33d4d46568946b0779eb4c8184",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1611.493c25852b7b37ef.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1612.png": {
+      "sourceHash": "47f2ac17dae3898fd50e4585fa7356ca3f27ec1ad6a13f61ce3afafd2fd8ec63",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1612.42109dc896cb97bc.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1664.png": {
+      "sourceHash": "53c6fc82135902ab556d136b1a0af4e971837bc413f617dae41859a63986f9d8",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1664.e78331fcd29ae7df.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1689.png": {
+      "sourceHash": "06329f775b6d30a564eed7b62f56953b335dcd79ca7a6d3b8019a95c5d9ef1ec",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1689.8a5ae09f31ddc700.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1721.png": {
+      "sourceHash": "b48c8cb6de764c41ff22a1031e74a5fb014c7b98d405934d91f32e64e6508ae0",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1721.c91b6f31a626a91e.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1751.png": {
+      "sourceHash": "478ff6fcf2be1c481c9402d017df012f4a225e04cb58656446ae1c0355d143c0",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1751.c3c66a3a3db0786d.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1753.png": {
+      "sourceHash": "6d2765d017058d83341f470b8abe7e2fd899e6d50cd278a0681795237adde578",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1753.c82089b680e88a6d.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1774.png": {
+      "sourceHash": "2b7357bd0bdb05534b6d9a59ac547d705051b3d1bea3fa59b4fe15b858e1efaf",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1774.cb002eb8f686fe94.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1826.png": {
+      "sourceHash": "d8803d45b3c692481831a1edabebd0a74cf4264919d9e632a0ef3692f094bbd2",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1826.f36e60cc8d65970a.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1883.png": {
+      "sourceHash": "0c1d7cfdcd76e1cafada302e7763f991c08a606e6080cba7a41bc422f076d53a",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1883.ba82e5d49c00a593.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1908.png": {
+      "sourceHash": "a7fb3bd00d7073ec7f2284dcc735f5d945883fd50ad4d12caa4cd080555a75f4",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1908.50f46aa5e1b0cffd.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1941.png": {
+      "sourceHash": "3f2c2e48ad6dac1415a0681f5a45cc93e4c878e3bca9f713554465f55c7709a2",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1941.bf1a4b858ca776b1.webp"
+    },
+    "/assets/w-engines/zzz_wiki_1964.png": {
+      "sourceHash": "66d99c9867d046328cf06824b3086500cb42934e95fb6820b3b489b879f0e401",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_1964.cb0bd6ade8265ee7.webp"
+    },
+    "/assets/w-engines/zzz_wiki_2002.png": {
+      "sourceHash": "a0a72d7b5ff1158cf5abe226d25846c5bac2cac5a87aacedef5fd2639eb01602",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_2002.610403467d4224a1.webp"
+    },
+    "/assets/w-engines/zzz_wiki_2030.png": {
+      "sourceHash": "5e670d371247025aff5730ef634c0f506ef7e60440d0ebaa6177d47a0eb1203b",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_2030.a2b443c68e5ea71a.webp"
+    },
+    "/assets/w-engines/zzz_wiki_2031.png": {
+      "sourceHash": "60d29a0744daaa1436b0d841c367c89071081a7f6940dd958c8f43c449c4ad86",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_2031.7476b704955fdc4b.webp"
+    },
+    "/assets/w-engines/zzz_wiki_2087.png": {
+      "sourceHash": "0f4061559fd33e9e9e21c9017b14af4117a9d7bda2c38207839487b6457f81c4",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_2087.50511581eb4f3061.webp"
+    },
+    "/assets/w-engines/zzz_wiki_2088.png": {
+      "sourceHash": "baa5f7b10f6e2b94cbad71ea00f131b3a77f28c48230872b246460d68818f93d",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_2088.79d88f9d28394cdd.webp"
+    },
+    "/assets/w-engines/zzz_wiki_210.png": {
+      "sourceHash": "c2ab1ec8edb04978d6e2f93722ce56c01174a48e920e629365cf677c7c8189cf",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_210.60fbce9c0f14fad6.webp"
+    },
+    "/assets/w-engines/zzz_wiki_2109.png": {
+      "sourceHash": "9d53b01594423361b5b165260979754259f300886b3951847ece00256aeb43b8",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_2109.4892fcbdd1cb809e.webp"
+    },
+    "/assets/w-engines/zzz_wiki_211.png": {
+      "sourceHash": "829658e6724cb8321b350fc5473c4c2316da8003879eabc601f15083eb05406a",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_211.91e3d63e813d04c8.webp"
+    },
+    "/assets/w-engines/zzz_wiki_212.png": {
+      "sourceHash": "9e98776c80e4eeeac96a31f0c2c55dbccbe070cc1bdd2bc000c5892f13335a49",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_212.ab97010c79022a7c.webp"
+    },
+    "/assets/w-engines/zzz_wiki_213.png": {
+      "sourceHash": "fed6610beb6288f160ff42371fbc04f0dd0699294bdbb6717dec6c821979858d",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_213.be0a2e02aa62caeb.webp"
+    },
+    "/assets/w-engines/zzz_wiki_214.png": {
+      "sourceHash": "a922ce03a1634540ee816e5b37f3bf13fb7c4b72bfcc89b1235079dc2ba6928b",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_214.19a3a4aadb866a00.webp"
+    },
+    "/assets/w-engines/zzz_wiki_215.png": {
+      "sourceHash": "13913a74005b76e82f4147e4bc448462d682ebb1242ab1711dfd684d6d55f732",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_215.9db40b8fe1535032.webp"
+    },
+    "/assets/w-engines/zzz_wiki_216.png": {
+      "sourceHash": "ece200e44dbf80437d0dfde8995b6fd0d349254c8b6fa257aa48fc239a863349",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_216.3a9092997889cf69.webp"
+    },
+    "/assets/w-engines/zzz_wiki_2162.png": {
+      "sourceHash": "03235981e0148615dab72eb0795c38f96bde6105a4f41426c918efb2987b51ea",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_2162.26a20f1336995337.webp"
+    },
+    "/assets/w-engines/zzz_wiki_217.png": {
+      "sourceHash": "645454abc087877c1a45c783f7e173fec26bbd414941cb31dca5a7110cb6de21",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_217.8886f210a1883fe0.webp"
+    },
+    "/assets/w-engines/zzz_wiki_218.png": {
+      "sourceHash": "27c04a821358a5b1eb6fb41eefba0cc28d3b8eb3867c8e7352e4640ce14786c5",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_218.bc0262ad6ebad154.webp"
+    },
+    "/assets/w-engines/zzz_wiki_2188.png": {
+      "sourceHash": "ed95f9a5d38165dcf3c524a055888a32b9f976dd8209d6153dbf24a482c23594",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_2188.28f651ac2ab346ab.webp"
+    },
+    "/assets/w-engines/zzz_wiki_2189.png": {
+      "sourceHash": "04b93bde79ea8d8cc090fb55444b6b140c8b16d63f4a2364fc4d761d0ca750d7",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_2189.992a089859763fb9.webp"
+    },
+    "/assets/w-engines/zzz_wiki_2190.png": {
+      "sourceHash": "d416c53b91e06d7e2f8fc4e30c4398e2fc7011d456aee45ab56cba080de2ea3f",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_2190.55f2ef80cc1f464c.webp"
+    },
+    "/assets/w-engines/zzz_wiki_2200.png": {
+      "sourceHash": "5623d103a071f23481951ab4f96a222afdc3658d3c07fdcd2f5328fc9a74ff2a",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_2200.af48ea0101c6a393.webp"
+    },
+    "/assets/w-engines/zzz_wiki_221.png": {
+      "sourceHash": "8c152f150e88190c88ec1168151fbf86ae25585bb15e702675e98e41c9b9704d",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_221.7cf502d73d725244.webp"
+    },
+    "/assets/w-engines/zzz_wiki_222.png": {
+      "sourceHash": "2503621696a1ef7d6292d398b6217f06f3de19ffa50cdb247559012719b2eb24",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_222.8c3ad5c07a8dd939.webp"
+    },
+    "/assets/w-engines/zzz_wiki_223.png": {
+      "sourceHash": "7388eaf1c76c6509c6bc2e154a40b32ac697c499d9a538dcf4719fdf6ac665bd",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_223.74166a06ef35d36d.webp"
+    },
+    "/assets/w-engines/zzz_wiki_224.png": {
+      "sourceHash": "d8a993653aeebae167d2d775541972ac4e24422f5ec36b528267b88ec0aa59a7",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_224.a71a5446f0075a21.webp"
+    },
+    "/assets/w-engines/zzz_wiki_225.png": {
+      "sourceHash": "f861ad1cc37580f5d035d7935f8d2925780a2011dccc0b2b65524ef7e2623e9c",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_225.50f2097ec5557c59.webp"
+    },
+    "/assets/w-engines/zzz_wiki_263.png": {
+      "sourceHash": "c88e6efab4285b0f873eb35100476ac6496bff47d785ca395a1090af18343dbc",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_263.e7281c60a469f26e.webp"
+    },
+    "/assets/w-engines/zzz_wiki_264.png": {
+      "sourceHash": "3516a3de5de4b693d9ce55a1cdda29a6eabb7f343a3152c53a14cf6ab092f03f",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_264.ecdfbc69d89c693b.webp"
+    },
+    "/assets/w-engines/zzz_wiki_265.png": {
+      "sourceHash": "fbcb288f3cda81411fce5e771a5cfc55e8465266bc1a35e1296e319efd92c7ad",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_265.bddaa04176036de4.webp"
+    },
+    "/assets/w-engines/zzz_wiki_486.png": {
+      "sourceHash": "4f5f46af8383e6a4f52a4c99c00fb1aa819853e325b2f009770f22f0b641ada5",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_486.5c0800a7573595c7.webp"
+    },
+    "/assets/w-engines/zzz_wiki_494.png": {
+      "sourceHash": "e23f1bec3e8cb733f9b98d4538d0d711633fef260617e5237f189dc97ed188c1",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_494.475ba1892bf8abe7.webp"
+    },
+    "/assets/w-engines/zzz_wiki_678.png": {
+      "sourceHash": "144f4e8fd30df8a0ed2288a5fa05fc78a584e41805d9e4b5180b1b7b5fc9ea2d",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_678.1c36c1465bf6b89b.webp"
+    },
+    "/assets/w-engines/zzz_wiki_744.png": {
+      "sourceHash": "bd4c815cc16d738f7961d8fb5db22b56c9155094457de1b5f4c8d23b0038665b",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_744.d1a60cfc44a2a1bc.webp"
+    },
+    "/assets/w-engines/zzz_wiki_760.png": {
+      "sourceHash": "0361899a4ce6313438e50e8cd01defa77f67a6cb7e107ec2a36e83e396d0a1fc",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_760.61005e967a57d490.webp"
+    },
+    "/assets/w-engines/zzz_wiki_799.png": {
+      "sourceHash": "facf3ebb6326f0f838a5f8163d7f2040b71f837c676f4e026a39efe81a3d4d65",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_799.0041e29232862c47.webp"
+    },
+    "/assets/w-engines/zzz_wiki_841.png": {
+      "sourceHash": "265460cb58766057cbe17723cb677a1da6cacd05137cf4ceb82bf1200bd1fd29",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_841.3a1ab80a8bca5733.webp"
+    },
+    "/assets/w-engines/zzz_wiki_915.png": {
+      "sourceHash": "62fab5d7d15930b539b00b348702bfcd467ff4e3131b78a8f2fee782d5f3f5c0",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_915.1b3ff7947ed334fa.webp"
+    },
+    "/assets/w-engines/zzz_wiki_93.png": {
+      "sourceHash": "45e3acdac994d55bdb0feb92b3ad95364365c8f5a98697226c1970d787d53c4b",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_93.888acaf7d490f356.webp"
+    },
+    "/assets/w-engines/zzz_wiki_951.png": {
+      "sourceHash": "7f59883c38262aabfa5f482fba488f4b81ce45a8369dede10bfdaa33f47164d6",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_951.4a28dda0e133b8ca.webp"
+    },
+    "/assets/w-engines/zzz_wiki_991.png": {
+      "sourceHash": "378145e21a734ca6c9e28401c2724ddd79565f2401b833954a63214d7c072f38",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_991.e1fc1030724b885c.webp"
+    },
+    "/assets/w-engines/zzz_wiki_995.png": {
+      "sourceHash": "6054bd88ec08d5d50894fa53ea840d3636982cd45ef545a3db417b79c9093ecd",
+      "thumbnailUrl": "/assets/thumbs/w-engines/zzz_wiki_995.1c85a52d4d6df7d7.webp"
+    },
+    "/assets/drive-discs/astral_voice.webp": {
+      "sourceHash": "ee71f1c97ee4f45d04ca65e10405b45fa3433e97873e8ceb505934c5a395728c",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/astral_voice.d840ff4204d17af2.webp"
+    },
+    "/assets/drive-discs/branch_blade_song.webp": {
+      "sourceHash": "9f81a466bd865e8b26a8c4929d5e4d75062ed9b11a0abdf47b0b6d9be4996dd9",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/branch_blade_song.3c61f50312e36cd8.webp"
+    },
+    "/assets/drive-discs/chaos_jazz.png": {
+      "sourceHash": "009e860dc128a6512552335ae38954b3ea5e7fe73006f44f922328fc57ffa4b5",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/chaos_jazz.14e6492001cfdc11.webp"
+    },
+    "/assets/drive-discs/chaotic_metal.png": {
+      "sourceHash": "0fc46e3398346cd71899d402520b51e6b1f0efb1e4555d050912e7bb5e4a7a3a",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/chaotic_metal.124bd306e4467c2b.webp"
+    },
+    "/assets/drive-discs/dawn_bloom_journey.png": {
+      "sourceHash": "346f23c8fbe94a171d80c329741db28440f901e7d051ed25d023a859b290e7f9",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/dawn_bloom_journey.3e7bf1abc2c6ea6b.webp"
+    },
+    "/assets/drive-discs/fanged_metal.png": {
+      "sourceHash": "aad6996da4ee0430b76593cb68bea2b3ec55206eaae775ffe9e08987fbb25125",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/fanged_metal.f2ec970672b1467f.webp"
+    },
+    "/assets/drive-discs/freedom_blues.png": {
+      "sourceHash": "fe00a7e7e856c92ee908e6ff4cf70de89c534469206e9baac200e3982bc3a583",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/freedom_blues.0215b6a9fd388aa6.webp"
+    },
+    "/assets/drive-discs/hormone_punk.webp": {
+      "sourceHash": "303ab45447092caee7309f39e09a05a2dae5da209d14ef57b8215369fff12a9b",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/hormone_punk.e79738a6331e7011.webp"
+    },
+    "/assets/drive-discs/howling_salon.png": {
+      "sourceHash": "c64db9591216e8f427aa34a37cc033d9a892fee0e8d58cf98bac2f7891a9d330",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/howling_salon.9efbee77a81be1d1.webp"
+    },
+    "/assets/drive-discs/inferno_metal.png": {
+      "sourceHash": "03973619aae8f6cde1be0f3bf7c866365fdef7cd00e55f7c444d0954140604af",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/inferno_metal.362db1671e1fbd82.webp"
+    },
+    "/assets/drive-discs/king_of_the_summit.webp": {
+      "sourceHash": "f3867670ee02cd309033dd729283d2d2970956023caca3ff5a572c724daf48a8",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/king_of_the_summit.ed8c8ba7c8c8f08d.webp"
+    },
+    "/assets/drive-discs/moonlight_lullaby.webp": {
+      "sourceHash": "ebb9633d505ee721cc2489d46c6aa9b16f5b3aff7507d3a12f77db79b2abced9",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/moonlight_lullaby.30d6548ba5f58714.webp"
+    },
+    "/assets/drive-discs/phaethons_melody.webp": {
+      "sourceHash": "fefbef81469ba994525fd1eb35ff09b2001ef45dd79ee6967c22d59bb394f665",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/phaethons_melody.14933a4567130d3b.webp"
+    },
+    "/assets/drive-discs/polar_metal.png": {
+      "sourceHash": "b02bebe5e496f0cf60e27f5d771ca2da2794a1af773e23e57d690cfe2d0f045b",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/polar_metal.1e795e0c1a9c0243.webp"
+    },
+    "/assets/drive-discs/proto_punk.png": {
+      "sourceHash": "a55f73833b85a0f15144fa5242a68fc7ab315130d6ea9bdcf6a0be54e352ee71",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/proto_punk.74ab79b7ed85b5b3.webp"
+    },
+    "/assets/drive-discs/puffer_electro.png": {
+      "sourceHash": "e410292a0970349922daf715bf08b6c44d9ed8d7e550e81042243874db817755",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/puffer_electro.3c4cb29fbd1c999f.webp"
+    },
+    "/assets/drive-discs/shadow_harmony.webp": {
+      "sourceHash": "9d81126d1025d0f4cca09efa792210538a4409b99ada6280ca8873ba9fb3e70f",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/shadow_harmony.f41f4a23d3492a05.webp"
+    },
+    "/assets/drive-discs/shockstar_disco.png": {
+      "sourceHash": "54ed5b818ecdb40dfbbb8ce2d32caf3471f9cd02d7e9e0db873f88a1bd1fd3d4",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/shockstar_disco.fc7f2b505ef0a152.webp"
+    },
+    "/assets/drive-discs/soul_rock.png": {
+      "sourceHash": "f5f5cc48927cc197c6f2240221775ce6907f312d4f65a2fd7baafb2dd5a089db",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/soul_rock.f870a7dfe9e88f86.webp"
+    },
+    "/assets/drive-discs/swing_jazz.webp": {
+      "sourceHash": "d1341f75ba4617e94623f99f2f79cafca5a80568391792462eeb82720b95b3eb",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/swing_jazz.5003846accc20534.webp"
+    },
+    "/assets/drive-discs/thunder_metal.png": {
+      "sourceHash": "7a9591401d3a65b8dd7593dfe5c337ea90d7110e3c79471e8f4e5be3ab6c9b65",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/thunder_metal.d321acdde333fd01.webp"
+    },
+    "/assets/drive-discs/white_water_ballad.webp": {
+      "sourceHash": "b3e3cf6ee8889678ec6c5b336a3e7bfd2d8df0aac33d818141e7f260c047e8ff",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/white_water_ballad.711c847a8b17effa.webp"
+    },
+    "/assets/drive-discs/woodpecker_electro.webp": {
+      "sourceHash": "30c1e98e7055cbad0e49b6ad90f67216db5f29230e79c4d62ee4b764ba5e90be",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/woodpecker_electro.74f0c0e11d69a20e.webp"
+    },
+    "/assets/drive-discs/yunkui_tales.webp": {
+      "sourceHash": "7be66cc98c65a2c3da7dd0dda1882a05fd8d2e37317b67e7a8be01ed960efdef",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/yunkui_tales.536c60acfcb3b0d4.webp"
+    },
+    "/assets/drive-discs/zzz_wiki_1001.png": {
+      "sourceHash": "3e36db62f392b4ff7ebeaef13162e09c3f0a24073d2a30a0daba6d4eb69420aa",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/zzz_wiki_1001.bf9d721861896012.webp"
+    },
+    "/assets/drive-discs/zzz_wiki_1552.png": {
+      "sourceHash": "0dd07a657b2b39ebef7a876e18eeaa967731f31395064d61863e67573c652326",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/zzz_wiki_1552.89506cc514a9874e.webp"
+    },
+    "/assets/drive-discs/zzz_wiki_1906.png": {
+      "sourceHash": "047d5992337775138145a75b0be2d74cc11178d41f2410c453bf5fd9d8263b5f",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/zzz_wiki_1906.29a19bd1da79c94d.webp"
+    },
+    "/assets/drive-discs/zzz_wiki_1907.png": {
+      "sourceHash": "2d017814ba194e148e89f43a7199d528c274a661682120330cbc665dc824aa0e",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/zzz_wiki_1907.136bdafa6346b7b7.webp"
+    },
+    "/assets/drive-discs/zzz_wiki_2116.png": {
+      "sourceHash": "602d9b5d54c8ffedacb3d717b89d2e6df7481aff100e1786745749bf7a96bc13",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/zzz_wiki_2116.01436670c23fa596.webp"
+    },
+    "/assets/drive-discs/zzz_wiki_2121.png": {
+      "sourceHash": "2dad64308344331ed9b9bf10ee7917fc0d286bf5585258c493aeef63acbdf706",
+      "thumbnailUrl": "/assets/thumbs/drive-discs/zzz_wiki_2121.065267253c223c76.webp"
+    }
+  }
+}

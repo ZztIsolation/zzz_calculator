@@ -16,7 +16,7 @@ import OptimizerConfigModal from "@/components/OptimizerConfigModal.vue"
 import OptimizerResultSelector from "@/components/OptimizerResultSelector.vue"
 import PanelStatTable from "@/components/PanelStatTable.vue"
 import WEngineSelect from "@/components/WEngineSelect.vue"
-import { fallbackIcon, imageForAgent, imageForDriveDiscSet } from "@/utils/assets"
+import { fallbackIcon, thumbnailForAgent, thumbnailForDriveDiscSet } from "@/utils/assets"
 import { buffLabelForId, teammateBuffCandidates } from "@/utils/combatBuffs"
 import { inferBuffPickerState, selectedTeammateOwnerIds } from '@/utils/teammateBuffPicker'
 import { sameTeammateValue, syncEnkaTeammates, type TeammateSources } from '@/utils/enkaTeammates'
@@ -788,6 +788,7 @@ function renderEntitySelectLabel(entity: any, image: string, fallbackLabel = "")
       src: image,
       alt: "",
       loading: "lazy",
+      decoding: "async",
     }),
     h("span", { class: "workbench-entity-select-copy" }, [
       h("span", { class: "workbench-entity-select-name", title: label }, label),
@@ -800,7 +801,7 @@ function renderAgentSelectLabel(option: any) {
   const agent = option?.agent ?? catalogStore.displayAgents.find((item: any) => item.id === option?.value)
   return renderEntitySelectLabel(
     agent,
-    imageForAgent(agent),
+    thumbnailForAgent(agent),
     String(option?.label ?? option?.value ?? ""),
   )
 }
@@ -810,7 +811,7 @@ function renderManualDiscSetLabel(option: any) {
   const label = labelOf(set) || String(option?.label ?? option?.value ?? "未知套装")
   return h("span", { class: "manual-disc-set-select-label" }, [
     h(ImageAvatar, {
-      src: imageForDriveDiscSet(set),
+      src: thumbnailForDriveDiscSet(set),
       name: label,
       size: 20,
     }),
@@ -1251,7 +1252,7 @@ function driveDiscSetName(disc: any) {
 }
 
 function driveDiscSetIcon(disc: any) {
-  return imageForDriveDiscSet(driveDiscSetForDisc(disc))
+  return thumbnailForDriveDiscSet(driveDiscSetForDisc(disc))
 }
 
 function driveDiscStatText(stat: any) {
@@ -1584,7 +1585,7 @@ function formatPercentValue(value: any) {
                 <div class="selected-set-summary" aria-live="polite">
                   <template v-if="selectedOptimizerSets.length">
                     <span v-for="set in selectedOptimizerSets" :key="set.id" class="selected-set-chip selected-set-chip-with-icon">
-                      <img :src="imageForDriveDiscSet(set)" alt="" loading="lazy">
+                      <img :src="thumbnailForDriveDiscSet(set)" alt="" loading="lazy" decoding="async">
                       <span>{{ labelOf(set) }}</span>
                     </span>
                   </template>
@@ -1603,7 +1604,7 @@ function formatPercentValue(value: any) {
                   <span v-if="!selectedTwoPieceSets.length" class="selected-set-empty">自动匹配任意 2 件套</span>
                   <template v-else>
                     <span v-for="set in selectedTwoPieceSets" :key="set.id" class="selected-set-chip selected-set-chip-with-icon">
-                      <img :src="imageForDriveDiscSet(set)" alt="" loading="lazy">
+                      <img :src="thumbnailForDriveDiscSet(set)" alt="" loading="lazy" decoding="async">
                       <span>{{ labelOf(set) }}</span>
                       <button type="button" class="selected-set-remove" :aria-label="`移除 ${labelOf(set)}`" @click="removeTwoPieceSet(set.id)">
                         <X :size="14" />
@@ -1750,7 +1751,7 @@ function formatPercentValue(value: any) {
           />
           <div v-if="buildStore.discMode === 'optimized' && selectedOptimizedFourPieceSet && !optimizedResultSetIsUserPinned" class="selected-set-summary optimized-result-set">
             <span class="selected-set-chip selected-set-chip-with-icon">
-              <img :src="imageForDriveDiscSet(selectedOptimizedFourPieceSet)" alt="" loading="lazy">
+              <img :src="thumbnailForDriveDiscSet(selectedOptimizedFourPieceSet)" alt="" loading="lazy" decoding="async">
               <span>实际 4 件套：{{ labelOf(selectedOptimizedFourPieceSet) }}</span>
             </span>
           </div>
@@ -1922,7 +1923,7 @@ function formatPercentValue(value: any) {
           :class="{ active: buildStore.manualDriveDiscIdsBySlot[String(activeManualDiscSlot)] === disc.id }"
           @click="selectManualDriveDisc(disc)"
         >
-          <img :src="driveDiscSetIcon(disc)" alt="" loading="lazy">
+          <img :src="driveDiscSetIcon(disc)" alt="" loading="lazy" decoding="async">
           <span class="manual-disc-option-main">
             <strong>{{ driveDiscSetName(disc) }}</strong>
             <span>{{ disc.partition }}号位 · {{ driveDiscRarityLevelText(disc) }}{{ disc.source?.sequence ? ` · #${disc.source.sequence}` : "" }}</span>
@@ -2050,7 +2051,7 @@ function formatPercentValue(value: any) {
           :checked="draftHasFourPieceSet(set.id)"
           @change="toggleDraftFourPieceSet(set.id)"
         >
-        <img :src="imageForDriveDiscSet(set)" alt="" loading="lazy">
+        <img :src="thumbnailForDriveDiscSet(set)" alt="" loading="lazy" decoding="async">
         <span class="set-choice-text">
           <strong>{{ labelOf(set) }}</strong>
         </span>
@@ -2080,7 +2081,7 @@ function formatPercentValue(value: any) {
           :checked="draftHasTwoPieceSet(set.id)"
           @change="toggleDraftTwoPieceSet(set.id)"
         >
-        <img :src="imageForDriveDiscSet(set)" alt="" loading="lazy">
+        <img :src="thumbnailForDriveDiscSet(set)" alt="" loading="lazy" decoding="async">
         <span class="set-choice-text">
           <strong>{{ labelOf(set) }}</strong>
           <span>{{ twoPieceSetEffectText(set) }}</span>

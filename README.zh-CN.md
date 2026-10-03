@@ -519,6 +519,8 @@ Boss 资料使用独立的 `data/bosses.json` 档案。稳定的名称、别名�
 
 本地 `data/user_drive_discs.json`、`imports/` 或 `data/imports/` 下的扫描器导出、构建产物、日志、下载文件和 Playwright 产物均被 Git 忽略。包括 `data/bosses.json` 与本地 Boss WebP 在内的公开 catalog、示例、源资源和测试继续纳入版本控制。
 
+新增或替换内置角色、音擎、驱动盘图片后，运行 `npm --prefix webapp run assets:thumbnails`，并提交生成的缩略图、路径清单和构建状态文件。构建会执行 `assets:thumbnails -- --check`，拒绝缺失或过期产物。缩略图使用带内容哈希的 URL，维护和预览继续使用原图路径；角色缩略图保留原图比例，让现有 `contain`、`cover` 样式保持原来的取景。生成工具使用 webapp 的开发依赖 `sharp`，生产服务器只提供已提交的图片文件，不进行实时图片处理。
+
 ## 测试与构建
 
 安装 webapp 依赖后运行完整回归：

@@ -583,7 +583,7 @@ describe("WorkbenchView optimizer result details", () => {
     expect(source).toContain('max-tag-count="responsive"')
     expect(source).toContain("multiple")
     expect(source).toContain('placeholder="全部套装"')
-    expect(source).toContain("imageForDriveDiscSet(set)")
+    expect(source).toContain("thumbnailForDriveDiscSet(set)")
     expect(source).not.toContain('{ label: "全部套装", value: "" }')
   })
 

@@ -691,6 +691,8 @@ The Drive Disc inventory can export every disc in the current account to a versi
 
 The local file `data/user_drive_discs.json`, scanner exports under `imports/` or `data/imports/`, build output, logs, downloads, and Playwright artifacts are ignored by Git. Public catalogs, including `data/bosses.json` and local Boss WebP assets, examples, source assets, and tests remain versioned.
 
+After adding or changing bundled agent, W-Engine, or Drive Disc images, run `npm --prefix webapp run assets:thumbnails` and commit the generated thumbnails, path manifest, and build-state file. Builds run `assets:thumbnails -- --check` to reject missing or stale outputs. Thumbnails use content-hashed URLs; original image URLs remain available to maintenance and preview consumers. Agent thumbnails preserve the original aspect ratio so existing `contain` and `cover` styles retain their framing. Image generation uses the webapp's development-only `sharp` dependency; the production server serves committed files without image processing.
+
 ## Tests And Builds
 
 Run the complete regression suite after installing webapp dependencies:

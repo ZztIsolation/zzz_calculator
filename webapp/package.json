@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "vue-tsc --noEmit && vite build",
+    "build": "npm run assets:thumbnails -- --check && vue-tsc --noEmit && vite build",
+    "assets:thumbnails": "node scripts/generate-thumbnails.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "test:layout": "playwright test"
@@ -23,6 +24,7 @@
     "@types/node": "22.10.7",
     "@vue/test-utils": "2.4.11",
     "jsdom": "25.0.1",
+    "sharp": "0.35.5",
     "typescript": "5.9.3",
     "vitest": "2.1.9",
     "vue-tsc": "2.2.12"
