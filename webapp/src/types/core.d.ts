@@ -599,6 +599,7 @@ declare module "@runtime/scanner-bridge.js" {
     onStopAck: ((payload: any) => void) | null
     onDisconnect: ((failure?: any) => void) | null
     readonly connected: boolean
+    readonly connectionEpoch: number
     readonly scanning: boolean
     readonly mode: string
     readonly helperVersion: string

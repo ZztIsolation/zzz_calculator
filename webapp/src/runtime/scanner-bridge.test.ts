@@ -120,6 +120,242 @@ describe("ScannerBridge protocol v3 requests", () => {
   })
 })
 
+describe("ScannerBridge preparation command isolation", () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  function installSockets() {
+    class Socket {
+      static OPEN = 1
+      static sockets: Socket[] = []
+      readyState = 1
+      send = vi.fn()
+      close = vi.fn(() => { this.readyState = 3 })
+      onmessage?: (event: { data: string }) => void
+      onerror?: (event: Event) => void
+      onclose?: () => void
+      constructor() { Socket.sockets.push(this) }
+      receive(cmd: string, data = {}) {
+        this.onmessage?.({ data: JSON.stringify({ cmd, data }) })
+      }
+      commands() { return this.send.mock.calls.map(([raw]) => JSON.parse(raw).cmd) }
+    }
+    vi.stubGlobal("WebSocket", Socket)
+    return Socket
+  }
+
+  async function openConnection(bridge: any, Socket: ReturnType<typeof installSockets>) {
+    const pending = bridge._openWebSocket("ws://localhost/helper", "helper")
+    const socket = Socket.sockets.at(-1)!
+    socket.receive("hello", { version: "1.3.1", protocolVersion: 4 })
+    await pending
+    return socket
+  }
+
+  it("serializes different commands and only merges adjacent identical requests", async () => {
+    const Socket = installSockets()
+    const bridge: any = new ScannerBridge()
+    const socket = await openConnection(bridge, Socket)
+    const first = bridge.ensureScanner()
+    const firstAgain = bridge.ensureScanner()
+    const elevated = bridge.restartScannerElevated()
+    const elevatedAgain = bridge.restartScannerElevated()
+    const last = bridge.ensureScanner()
+    let elevatedFinished = false
+    void elevated.then(() => { elevatedFinished = true })
+    expect(socket.commands()).toEqual(["ensure_scanner"])
+
+    socket.receive("scanner_ready", { version: "ordinary" })
+    await expect(first).resolves.toMatchObject({ version: "ordinary" })
+    await expect(firstAgain).resolves.toMatchObject({ version: "ordinary" })
+    expect(elevatedFinished).toBe(false)
+    expect(socket.commands()).toEqual(["ensure_scanner", "restart_scanner_elevated"])
+
+    socket.receive("scanner_ready", { version: "elevated" })
+    await expect(elevated).resolves.toMatchObject({ version: "elevated" })
+    await expect(elevatedAgain).resolves.toMatchObject({ version: "elevated" })
+    expect(socket.commands()).toEqual(["ensure_scanner", "restart_scanner_elevated", "ensure_scanner"])
+    socket.receive("scanner_ready", { version: "last" })
+    await expect(last).resolves.toMatchObject({ version: "last" })
+    bridge.disconnect()
+  })
+
+  it("refuses an elevated restart on a legacy connection", async () => {
+    const Socket = installSockets()
+    const bridge: any = new ScannerBridge()
+    const socket = await openConnection(bridge, Socket)
+    bridge._mode = "legacy"
+    await expect(bridge.restartScannerElevated()).rejects.toMatchObject({
+      code: "scanner_elevation_unsupported", phase: "prepare",
+    })
+    expect(socket.commands()).toEqual([])
+    bridge.disconnect()
+  })
+
+  it("rejects all queued preparations on a terminal failure and permits an explicit retry", async () => {
+    const Socket = installSockets()
+    const bridge: any = new ScannerBridge()
+    const socket = await openConnection(bridge, Socket)
+    const first = bridge.restartScannerElevated()
+    const queued = bridge.ensureScanner()
+    const results = Promise.allSettled([first, queued])
+    socket.receive("scan_error", { code: "uac_cancelled", message: "已取消管理员授权" })
+    expect((await results).map(result => result.status === "rejected" && result.reason.code))
+      .toEqual(["uac_cancelled", "uac_cancelled"])
+    expect(socket.commands()).toEqual(["restart_scanner_elevated"])
+    const retry = bridge.restartScannerElevated()
+    expect(socket.commands()).toEqual(["restart_scanner_elevated", "restart_scanner_elevated"])
+    socket.receive("scanner_ready")
+    await retry
+    bridge.disconnect()
+  })
+
+  it("cancels active and queued operations on disconnect and ignores every old socket callback", async () => {
+    const Socket = installSockets()
+    const bridge: any = new ScannerBridge()
+    const oldSocket = await openConnection(bridge, Socket)
+    const oldEpoch = bridge.connectionEpoch
+    const first = bridge.ensureScanner()
+    const elevated = bridge.restartScannerElevated()
+    const results = Promise.allSettled([first, elevated])
+    const onDisconnect = vi.fn()
+    bridge.onDisconnect = onDisconnect
+    oldSocket.onclose?.()
+    expect((await results).map(result => result.status === "rejected" && result.reason.code))
+      .toEqual(["helper_disconnected", "helper_disconnected"])
+    expect(bridge.connectionEpoch).toBeGreaterThan(oldEpoch)
+    expect(oldSocket.commands()).toEqual(["ensure_scanner"])
+
+    const socket = await openConnection(bridge, Socket)
+    const pending = bridge.restartScannerElevated()
+    const ready = vi.fn()
+    bridge.onScannerReady = ready
+    oldSocket.receive("scanner_ready", { version: "obsolete" })
+    oldSocket.receive("scan_error", { code: "obsolete" })
+    oldSocket.onerror?.(new Event("error"))
+    oldSocket.onclose?.()
+    expect(bridge.connected).toBe(true)
+    expect(bridge.scannerVersion).not.toBe("obsolete")
+    expect(ready).not.toHaveBeenCalled()
+    expect(onDisconnect).toHaveBeenCalledTimes(1)
+    socket.receive("scanner_ready", { version: "current" })
+    await expect(pending).resolves.toMatchObject({ version: "current" })
+    bridge.disconnect()
+  })
+
+  it("retires a timed-out socket before a retry can consume its late ready response", async () => {
+    vi.useFakeTimers()
+    const Socket = installSockets()
+    const bridge: any = new ScannerBridge()
+    const oldSocket = await openConnection(bridge, Socket)
+    const epoch = bridge.connectionEpoch
+    const first = bridge.ensureScanner()
+    const elevated = bridge.restartScannerElevated()
+    const results = Promise.allSettled([first, elevated])
+    await vi.advanceTimersByTimeAsync(90_000)
+    expect((await results).map(result => result.status === "rejected" && result.reason.code))
+      .toEqual(["scanner_prepare_stalled", "scanner_prepare_stalled"])
+    expect(oldSocket.close).toHaveBeenCalledTimes(1)
+    expect(bridge.connected).toBe(false)
+    expect(bridge.connectionEpoch).toBeGreaterThan(epoch)
+
+    const socket = await openConnection(bridge, Socket)
+    const pending = bridge.restartScannerElevated()
+    const resolved = vi.fn()
+    void pending.then(resolved)
+    oldSocket.receive("scanner_ready", { version: "late" })
+    await Promise.resolve()
+    expect(resolved).not.toHaveBeenCalled()
+    expect(socket.commands()).toEqual(["restart_scanner_elevated"])
+    socket.receive("scanner_ready", { version: "retry" })
+    await expect(pending).resolves.toMatchObject({ version: "retry" })
+    bridge.disconnect()
+  })
+
+  it("also retires the socket at the overall timeout even while progress continues", async () => {
+    vi.useFakeTimers()
+    const Socket = installSockets()
+    const bridge: any = new ScannerBridge()
+    const socket = await openConnection(bridge, Socket)
+    const pending = bridge.ensureScanner()
+    const assertion = expect(pending).rejects.toMatchObject({ code: "scanner_prepare_timeout" })
+    for (let minute = 0; minute < 14; minute += 1) {
+      await vi.advanceTimersByTimeAsync(60_000)
+      socket.receive("launcher_progress", { stage: "download" })
+    }
+    await vi.advanceTimersByTimeAsync(60_000)
+    await assertion
+    expect(bridge.connected).toBe(false)
+    expect(socket.close).toHaveBeenCalledTimes(1)
+  })
+
+  it("shares a pending connection while preserving ordinary and elevated command order", async () => {
+    const Socket = installSockets()
+    vi.stubGlobal("navigator", { permissions: { query: async () => ({ state: "granted" }) } })
+    const fetchMock = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => String(url).endsWith("/token") ? { token: "shared" } : {},
+    }))
+    vi.stubGlobal("fetch", fetchMock)
+    const bridge: any = new ScannerBridge()
+    const first = bridge.ensureScanner()
+    const elevated = bridge.restartScannerElevated()
+    await vi.waitFor(() => expect(Socket.sockets).toHaveLength(1))
+    const socket = Socket.sockets[0]!
+    socket.receive("hello", { version: "1.3.1", protocolVersion: 4 })
+    await vi.waitFor(() => expect(socket.commands()).toEqual(["ensure_scanner"]))
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    socket.receive("scanner_ready")
+    await first
+    expect(socket.commands()).toEqual(["ensure_scanner", "restart_scanner_elevated"])
+    socket.receive("scanner_ready")
+    await elevated
+    bridge.disconnect()
+  })
+
+  it("does not let an abandoned HTTP connection attempt replace a newer socket", async () => {
+    const Socket = installSockets()
+    vi.stubGlobal("navigator", { permissions: { query: async () => ({ state: "granted" }) } })
+    let finishProbe!: (value: any) => void
+    const fetchMock = vi.fn(() => new Promise(resolve => { finishProbe = resolve }))
+    vi.stubGlobal("fetch", fetchMock)
+    const bridge: any = new ScannerBridge()
+    const abandoned = bridge.ensureScanner()
+    const assertion = expect(abandoned).rejects.toMatchObject({ code: "helper_disconnected" })
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    bridge.disconnect()
+    const currentSocket = await openConnection(bridge, Socket)
+    const pending = bridge.restartScannerElevated()
+    finishProbe({ ok: true, json: async () => ({ scanner: { installed: true } }) })
+    await assertion
+    expect(Socket.sockets).toHaveLength(1)
+    expect(bridge._ws).toBe(currentSocket)
+    expect(currentSocket.commands()).toEqual(["restart_scanner_elevated"])
+    currentSocket.receive("scanner_ready")
+    await pending
+    bridge.disconnect()
+  })
+
+  it("rejects an abandoned handshake immediately and ignores its late hello", async () => {
+    const Socket = installSockets()
+    const bridge: any = new ScannerBridge()
+    const handshake = bridge._openWebSocket("ws://localhost/old", "helper")
+    const assertion = expect(handshake).rejects.toMatchObject({ code: "helper_disconnected" })
+    const oldSocket = Socket.sockets[0]!
+    bridge.disconnect()
+    await assertion
+    const socket = await openConnection(bridge, Socket)
+    oldSocket.receive("hello", { version: "obsolete", protocolVersion: 1 })
+    oldSocket.onclose?.()
+    expect(bridge._ws).toBe(socket)
+    expect(bridge.helperVersion).toBe("1.3.1")
+    expect(bridge.protocolVersion).toBe(4)
+    bridge.disconnect()
+  })
+})
+
 describe("ScannerBridge terminal watchdogs", () => {
   afterEach(() => {
     vi.useRealTimers()

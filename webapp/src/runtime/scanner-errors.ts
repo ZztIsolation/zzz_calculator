@@ -30,6 +30,14 @@ const retryScan = [
   { kind: "retry_scan", label: "重新扫描" },
   { kind: "open_logs", label: "打开日志" },
 ]
+const startupDiagnostics = [
+  { kind: "copy_diagnostics", label: "复制问题信息" },
+  { kind: "open_logs", label: "打开日志" },
+]
+
+export function isScannerStartupRecovery(code: unknown): boolean {
+  return code === "uac_cancelled" || code === "child_start_failed"
+}
 
 function failure(
   phase: ScannerFailurePhase,
@@ -108,17 +116,15 @@ export const SCANNER_ERROR_CATALOG: Record<string, FailureCatalogEntry> = {
     { kind: "repair", label: "重新下载并修复" },
     { kind: "open_logs", label: "打开日志" },
   ]),
-  child_start_failed: failure("prepare", "无法启动 OCR 扫描器", "Helper 无法创建 Scanner 子进程。", "请选择重新下载并修复；仍然失败时请打开日志。", retryPrepare),
+  child_start_failed: failure("prepare", "扫描器启动失败", "扫描器未能启动，设置已保留。", "可按当前设置重试启动；仍然失败时，请展开详情复制问题信息。", startupDiagnostics),
   child_exited: failure("prepare", "扫描器启动后立即退出", "Scanner 尚未连接就已退出。", "请选择重新下载并修复，并提供诊断编号。", [
     { kind: "repair", label: "重新下载并修复" },
     { kind: "open_logs", label: "打开日志" },
   ]),
   child_handshake_timeout: failure("prepare", "扫描器启动超时", "Scanner 已启动，但没有完成本地连接。", "请重试；如果持续发生，请打开 Helper 日志。", retryPrepare),
+  scanner_elevation_unsupported: failure("prepare", "当前连接不支持管理员启动", "请通过扫描助手申请管理员启动。", "请运行扫描助手后重新连接，或关闭管理员启动选项。", retryConnect),
   port_in_use: failure("helper", "扫描助手端口被占用", "Helper 使用的本机端口已被其他程序占用。", "请关闭其他 Helper 实例；仍然失败时请重启电脑。", retryConnect),
-  uac_cancelled: failure("prepare", "已取消管理员授权", "Windows 管理员权限确认被取消，Scanner 没有启动。", "如果游戏以管理员身份运行，请重新选择管理员启动并确认 UAC。", [
-    { kind: "restart_elevated", label: "以管理员权限重启" },
-    { kind: "open_logs", label: "打开日志" },
-  ]),
+  uac_cancelled: failure("prepare", "已取消管理员启动", "你取消了 Windows 授权，扫描尚未开始，设置已保留。", "可以重新请求管理员授权，或取消“以管理员权限启动”后按当前设置重试。", startupDiagnostics, { severity: "warning" }),
   scanner_prepare_stalled: failure("prepare", "扫描器准备没有进展", "扫描器准备过程连续 90 秒没有收到下载或启动进展。", "请检查网络和安全软件后重试；仍然失败时请打开日志。", retryPrepare),
   scanner_prepare_timeout: failure("prepare", "扫描器准备超时", "扫描器在 15 分钟内没有完成准备。", "请重启 Helper 后重试；如果持续发生，请重新下载并修复。", [
     { kind: "repair", label: "重新下载并修复" },
@@ -130,7 +136,7 @@ export const SCANNER_ERROR_CATALOG: Record<string, FailureCatalogEntry> = {
   scan_cancelled: failure("scan", "扫描已停止", "扫描任务已按请求停止。", "可以调整选项后重新开始扫描。", [{ kind: "retry_scan", label: "重新扫描" }], { severity: "warning" }),
   scan_stop_timeout: failure("scan", "停止扫描超时", "发出停止请求后 15 秒内没有收到 Scanner 回执。", "请重新连接 Helper；若 Scanner 仍在操作游戏，请关闭 Helper 后重试。", retryConnect),
   game_not_found: failure("scan", "未找到绝区零窗口", "Scanner 没有找到所选客户端的游戏窗口。", "请启动游戏并打开驱动盘仓库；云游戏用户请切换客户端选项。", retryScan),
-  elevation_required: failure("scan", "需要管理员权限", "游戏进程权限高于 Scanner，无法可靠截图或发送输入。", "请以管理员权限重启 Scanner；只有本次启动会请求 UAC。", [
+  elevation_required: failure("scan", "需要处理扫描权限", "扫描器报告权限不足，可能是游戏权限较高，也可能是权限检测失败。", "扫描设置已保留。可请求以管理员权限重启；重启完成后请确认设置，再点击开始扫描。", [
     { kind: "restart_elevated", label: "以管理员权限重启" },
     { kind: "open_logs", label: "打开日志" },
   ]),
@@ -206,19 +212,39 @@ export function normalizeScannerFailure(
       .filter((action: any) => allowedActionKinds.has(String(action?.kind)) && String(action?.label ?? "").trim())
       .map((action: any) => ({ kind: String(action.kind), label: String(action.label) }))
     : []
+  // These recovery steps belong to the webpage. Older native releases send
+  // Chinese copy and actions that describe the previous automatic-retry flow.
+  const startupRecovery = isScannerStartupRecovery(code)
+  const browserRecovery = code === "elevation_required" || startupRecovery
+  const nativeFailure = startupRecovery
+    ? sourceDetails.nativeFailure && typeof sourceDetails.nativeFailure === "object" && !Array.isArray(sourceDetails.nativeFailure)
+      ? sourceDetails.nativeFailure as Record<string, unknown>
+      : {
+          code,
+          phase: input.phase ?? phase,
+          title: input.title ?? "",
+          message: rawMessage ?? "",
+          remedy: input.remedy ?? "",
+          actions: Array.isArray(input.actions)
+            ? input.actions.map((action: any) => action && typeof action === "object" ? { ...action } : action)
+            : [],
+          diagnosticId: input.diagnosticId ?? "",
+        }
+    : null
 
   return {
     code,
     phase,
-    severity: input.severity === "warning" ? "warning" : catalog.severity,
-    title: hasChinese(input.title) ? String(input.title) : catalog.title,
-    message: hasChinese(rawMessage) ? String(rawMessage) : catalog.message,
-    remedy: hasChinese(input.remedy) ? String(input.remedy) : catalog.remedy,
+    severity: startupRecovery ? catalog.severity : input.severity === "warning" ? "warning" : catalog.severity,
+    title: !browserRecovery && hasChinese(input.title) ? String(input.title) : catalog.title,
+    message: !browserRecovery && hasChinese(rawMessage) ? String(rawMessage) : catalog.message,
+    remedy: !browserRecovery && hasChinese(input.remedy) ? String(input.remedy) : catalog.remedy,
     retryable: input.retryable === undefined ? catalog.retryable : input.retryable !== false,
-    actions: actions.length ? actions : catalog.actions.map(action => ({ ...action })),
+    actions: !browserRecovery && actions.length ? actions : catalog.actions.map(action => ({ ...action })),
     diagnosticId: String(input.diagnosticId ?? ""),
     details: {
       ...sourceDetails,
+      ...(nativeFailure ? { nativeFailure } : {}),
       ...(!hasChinese(rawMessage) && rawMessage ? { rawMessage: String(rawMessage).slice(0, 500) } : {}),
     },
   }

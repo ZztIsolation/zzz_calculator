@@ -82,6 +82,10 @@ export class ScannerBridge {
         this._scanning = false
         this._scannerReady = false
         this._ensureResolver = null
+        this._ensureQueue = []
+        this._connectionEpoch = 0
+        this._connectPromise = null
+        this._rejectHandshake = null
         this._requestResolvers = new Map()
         this._heartbeatTimer = null
         this._lastHeartbeatAt = 0
@@ -105,6 +109,10 @@ export class ScannerBridge {
 
     get connected() {
         return this._ws?.readyState === WebSocket.OPEN
+    }
+
+    get connectionEpoch() {
+        return this._connectionEpoch
     }
 
     get scanning() {
@@ -136,26 +144,41 @@ export class ScannerBridge {
     }
 
     async connect() {
+        if (this._connectPromise) {
+            return this._connectPromise
+        }
         if (this.connected) {
             return this._helloData
         }
 
         this.disconnect()
-        const permission = await queryLoopbackPermission()
-        if (permission.state === "denied") {
-            throw permissionDeniedError("permission", permission)
-        }
-        try {
-            return await this._connectHelper()
-        } catch (helperError) {
-            if (helperError instanceof ScannerConnectionError && !LEGACY_FALLBACK_CODES.has(helperError.code)) {
-                throw helperError
+        const epoch = this._connectionEpoch
+        const pending = (async () => {
+            const permission = await queryLoopbackPermission()
+            this._assertConnectionEpoch(epoch)
+            if (permission.state === "denied") {
+                throw permissionDeniedError("permission", permission)
             }
             try {
-                return await this._connectLegacy()
-            } catch {
-                throw helperError
+                return await this._connectHelper(epoch)
+            } catch (helperError) {
+                this._assertConnectionEpoch(epoch)
+                if (helperError instanceof ScannerConnectionError && !LEGACY_FALLBACK_CODES.has(helperError.code)) {
+                    throw helperError
+                }
+                try {
+                    return await this._connectLegacy(epoch)
+                } catch {
+                    this._assertConnectionEpoch(epoch)
+                    throw helperError
+                }
             }
+        })()
+        this._connectPromise = pending
+        try {
+            return await pending
+        } finally {
+            if (this._connectPromise === pending) this._connectPromise = null
         }
     }
 
@@ -168,8 +191,11 @@ export class ScannerBridge {
     }
 
     async ensureScanner() {
-        if (!this.connected) {
-            await this.connect()
+        if (!this.connected || this._connectPromise) {
+            const connection = this.connect()
+            const epoch = this._connectionEpoch
+            await connection
+            this._assertConnectionEpoch(epoch)
         }
         if (this._mode !== "helper") {
             return
@@ -178,16 +204,28 @@ export class ScannerBridge {
     }
 
     async repairScanner() {
-        if (!this.connected) {
-            await this.connect()
+        if (!this.connected || this._connectPromise) {
+            const connection = this.connect()
+            const epoch = this._connectionEpoch
+            await connection
+            this._assertConnectionEpoch(epoch)
         }
         this._scannerReady = false
         return this._runEnsureCommand("repair_scanner")
     }
 
     async restartScannerElevated() {
-        if (!this.connected) {
-            await this.connect()
+        if (!this.connected || this._connectPromise) {
+            const connection = this.connect()
+            const epoch = this._connectionEpoch
+            await connection
+            this._assertConnectionEpoch(epoch)
+        }
+        if (this._mode !== "helper") {
+            throw Object.assign(new Error("当前连接不支持管理员启动，请连接扫描助手后重试。"), {
+                code: "scanner_elevation_unsupported",
+                phase: "prepare",
+            })
         }
         this._scannerReady = false
         return this._runEnsureCommand("restart_scanner_elevated")
@@ -202,39 +240,54 @@ export class ScannerBridge {
     }
 
     async getDiagnostics() {
-        if (!this.connected) {
-            await this.connect()
+        if (!this.connected || this._connectPromise) {
+            const connection = this.connect()
+            const epoch = this._connectionEpoch
+            await connection
+            this._assertConnectionEpoch(epoch)
         }
         return this._request("get_diagnostics", "helper_diagnostics")
     }
 
     async getStorageInfo() {
-        if (!this.connected) {
-            await this.connect()
+        if (!this.connected || this._connectPromise) {
+            const connection = this.connect()
+            const epoch = this._connectionEpoch
+            await connection
+            this._assertConnectionEpoch(epoch)
         }
         this._requireProtocolV3()
         return this._request("get_storage_info", "storage_info")
     }
 
     async cleanupStorage() {
-        if (!this.connected) {
-            await this.connect()
+        if (!this.connected || this._connectPromise) {
+            const connection = this.connect()
+            const epoch = this._connectionEpoch
+            await connection
+            this._assertConnectionEpoch(epoch)
         }
         this._requireProtocolV3()
         return this._request("cleanup_storage", "storage_cleanup_result")
     }
 
     async updateHelper() {
-        if (!this.connected) {
-            await this.connect()
+        if (!this.connected || this._connectPromise) {
+            const connection = this.connect()
+            const epoch = this._connectionEpoch
+            await connection
+            this._assertConnectionEpoch(epoch)
         }
         this._requireProtocolV3()
         return this._request("update_helper", "helper_update_result", {}, 10 * 60 * 1000)
     }
 
     async confirmHelperUpdate(transactionId) {
-        if (!this.connected) {
-            await this.connect()
+        if (!this.connected || this._connectPromise) {
+            const connection = this.connect()
+            const epoch = this._connectionEpoch
+            await connection
+            this._assertConnectionEpoch(epoch)
         }
         if (this._mode !== "helper" || this.protocolVersion < 4) {
             throw new Error("当前 Helper 不支持更新事务确认。")
@@ -271,61 +324,95 @@ export class ScannerBridge {
     }
 
     _runEnsureCommand(command) {
-        if (this._ensureResolver) {
-            return this._ensureResolver.promise
-        }
+        if (!this.connected) return Promise.reject(this._disconnectedError())
+        // Only adjacent requests may share a response: ensure, restart, ensure
+        // must retain that order even though the first and last commands match.
+        const previous = this._ensureQueue.at(-1) ?? this._ensureResolver
+        if (previous?.command === command) return previous.promise
         let resolveEnsure
         let rejectEnsure
         const promise = new Promise((resolve, reject) => {
             resolveEnsure = resolve
             rejectEnsure = reject
         })
-        const timer = setTimeout(() => {
-            this._rejectEnsure(Object.assign(new Error("OCR 扫描器在 15 分钟内没有完成准备。"), {
+        this._ensureQueue.push({
+            command, resolve: resolveEnsure, reject: rejectEnsure, promise,
+            epoch: this._connectionEpoch, socket: this._ws, timer: null, stallTimer: null,
+        })
+        this._drainEnsureQueue()
+        return promise
+    }
+
+    _drainEnsureQueue() {
+        if (this._ensureResolver || this._ensureQueue.length === 0) return
+        const pending = this._ensureQueue.shift()
+        if (!this.connected || pending.epoch !== this._connectionEpoch || pending.socket !== this._ws) {
+            pending.reject(this._disconnectedError())
+            this._rejectEnsure(this._disconnectedError())
+            return
+        }
+        this._ensureResolver = pending
+        pending.timer = setTimeout(() => {
+            this._expireEnsure(pending, Object.assign(new Error("OCR 扫描器在 15 分钟内没有完成准备。"), {
                 code: "scanner_prepare_timeout",
                 phase: "prepare",
             }))
         }, ENSURE_TIMEOUT_MS)
-        this._ensureResolver = { resolve: resolveEnsure, reject: rejectEnsure, promise, timer, stallTimer: null }
         this._touchEnsureProgress()
-        this._send(command, {})
-        return promise
+        try {
+            this._send(pending.command, {})
+        } catch (error) {
+            this._disconnect(error)
+        }
+    }
+
+    _expireEnsure(pending, error) {
+        if (this._ensureResolver !== pending) return
+        // Preparation replies have no request id. Retire the socket before a
+        // retry so a late scanner_ready can never settle the next operation.
+        this._disconnect(error)
     }
 
     _touchEnsureProgress() {
-        if (!this._ensureResolver) return
-        if (this._ensureResolver.stallTimer) clearTimeout(this._ensureResolver.stallTimer)
-        this._ensureResolver.stallTimer = setTimeout(() => {
-            this._rejectEnsure(Object.assign(new Error("扫描器准备过程连续 90 秒没有进展。"), {
+        const pending = this._ensureResolver
+        if (!pending) return
+        if (pending.stallTimer) clearTimeout(pending.stallTimer)
+        pending.stallTimer = setTimeout(() => {
+            this._expireEnsure(pending, Object.assign(new Error("扫描器准备过程连续 90 秒没有进展。"), {
                 code: "scanner_prepare_stalled",
                 phase: "prepare",
             }))
         }, ENSURE_STALL_TIMEOUT_MS)
     }
 
+    _disconnectedError() {
+        return Object.assign(new Error("扫描助手连接已断开。"), {
+            code: "helper_disconnected",
+            phase: "helper",
+        })
+    }
+
+    _assertConnectionEpoch(epoch) {
+        if (epoch !== this._connectionEpoch) throw this._disconnectedError()
+    }
+
     disconnect() {
+        this._disconnect(this._disconnectedError())
+    }
+
+    _disconnect(error) {
+        const socket = this._ws
+        this._ws = null
+        this._connectionEpoch += 1
+        this._connectPromise = null
+        this._rejectHandshake?.(error)
+        this._rejectHandshake = null
         this._scanning = false
         this._scannerReady = false
-        if (this._ensureResolver?.timer) {
-            clearTimeout(this._ensureResolver.timer)
-        }
-        if (this._ensureResolver?.stallTimer) {
-            clearTimeout(this._ensureResolver.stallTimer)
-        }
-        this._ensureResolver?.reject(Object.assign(new Error("扫描助手连接已断开。"), {
-            code: "helper_disconnected",
-            phase: "helper",
-        }))
-        this._ensureResolver = null
-        this._rejectRequests(Object.assign(new Error("扫描助手连接已断开。"), {
-            code: "helper_disconnected",
-            phase: "helper",
-        }))
+        this._rejectEnsure(error)
+        this._rejectRequests(error)
         this._clearScanTimers()
-        if (this._ws) {
-            try { this._ws.close() } catch {}
-            this._ws = null
-        }
+        if (socket) try { socket.close() } catch {}
     }
 
     startScan(options = {}) {
@@ -425,7 +512,7 @@ export class ScannerBridge {
         this._stopTimer = null
     }
 
-    async _connectHelper() {
+    async _connectHelper(epoch) {
         let probe
         try {
             probe = await fetch(`${HELPER_BASE_URL}/`, {
@@ -436,6 +523,7 @@ export class ScannerBridge {
         } catch (cause) {
             throw await this._fetchConnectionError("probe", cause)
         }
+        this._assertConnectionEpoch(epoch)
         if (!probe.ok) {
             throw connectionError(
                 "helper_unreachable",
@@ -444,6 +532,7 @@ export class ScannerBridge {
             )
         }
         const info = await probe.json().catch(() => ({}))
+        this._assertConnectionEpoch(epoch)
 
         let tokenResponse
         try {
@@ -457,6 +546,7 @@ export class ScannerBridge {
         } catch (cause) {
             throw await this._fetchConnectionError("token", cause)
         }
+        this._assertConnectionEpoch(epoch)
         if (!tokenResponse.ok) {
             if (tokenResponse.status === 403) {
                 throw connectionError(
@@ -472,6 +562,7 @@ export class ScannerBridge {
             )
         }
         const tokenData = await tokenResponse.json()
+        this._assertConnectionEpoch(epoch)
         if (!tokenData?.token) {
             throw connectionError("helper_origin_rejected", "token", "扫描助手未返回有效连接令牌，请更新 Helper 后重试。")
         }
@@ -479,7 +570,7 @@ export class ScannerBridge {
         this._mode = "helper"
         this._scannerReady = Boolean(info?.scanner?.installed)
         try {
-            return await this._openWebSocket(`ws://127.0.0.1:${HELPER_PORT}/ws/${encodeURIComponent(tokenData.token)}`, "helper")
+            return await this._openWebSocket(`ws://127.0.0.1:${HELPER_PORT}/ws/${encodeURIComponent(tokenData.token)}`, "helper", epoch)
         } catch (error) {
             const latestPermission = await queryLoopbackPermission()
             if (latestPermission.state === "denied") {
@@ -502,37 +593,54 @@ export class ScannerBridge {
         )
     }
 
-    async _connectLegacy() {
+    async _connectLegacy(epoch) {
+        this._assertConnectionEpoch(epoch)
         this._mode = "legacy"
         this._scannerReady = true
-        return await this._openWebSocket(`ws://127.0.0.1:${LEGACY_PORT}/ws/`, "legacy")
+        return await this._openWebSocket(`ws://127.0.0.1:${LEGACY_PORT}/ws/`, "legacy", epoch)
     }
 
-    _openWebSocket(url, mode) {
+    _openWebSocket(url, mode, epoch = this._connectionEpoch) {
         return new Promise((resolve, reject) => {
             let settled = false
             let handshakeComplete = false
             let timer = null
+            let socket
             const socketError = (code, message, cause = null) => mode === "helper"
                 ? connectionError(code, "websocket", message, { cause })
                 : new Error(message)
 
             try {
-                this._ws = new WebSocket(url)
+                this._assertConnectionEpoch(epoch)
+                socket = new WebSocket(url)
+                this._ws = socket
             } catch (cause) {
                 reject(socketError("helper_websocket_blocked", "浏览器无法创建扫描助手 WebSocket。", cause))
                 return
             }
+            const isCurrent = () => this._ws === socket && this._connectionEpoch === epoch
+            const rejectHandshake = (error) => {
+                if (settled) return
+                settled = true
+                clearTimeout(timer)
+                if (this._rejectHandshake === rejectHandshake) this._rejectHandshake = null
+                reject(error)
+            }
+            const failHandshake = (error) => {
+                rejectHandshake(error)
+                if (isCurrent()) this._ws = null
+                try { socket.close() } catch {}
+            }
+            this._rejectHandshake = rejectHandshake
 
             timer = setTimeout(() => {
-                if (!settled) {
-                    settled = true
-                    this.disconnect()
-                    reject(socketError("helper_connection_timeout", "连接扫描助手超时。"))
+                if (!settled && isCurrent()) {
+                    failHandshake(socketError("helper_connection_timeout", "连接扫描助手超时。"))
                 }
             }, CONNECT_TIMEOUT_MS)
 
-            this._ws.onmessage = (event) => {
+            socket.onmessage = (event) => {
+                if (!isCurrent()) return
                 let envelope
                 try { envelope = JSON.parse(event.data) } catch { return }
                 const cmd = this._envelopeCmd(envelope)
@@ -540,53 +648,50 @@ export class ScannerBridge {
                     settled = true
                     handshakeComplete = true
                     clearTimeout(timer)
+                    this._rejectHandshake = null
                     this._mode = mode
                     this._helloData = this._envelopeData(envelope)
-                    this._bindMessageHandler()
+                    this._bindMessageHandler(socket, epoch)
                     resolve(this._helloData)
                     return
                 }
                 this._handleMessage(envelope)
             }
 
-        this._ws.onerror = (event) => {
-            if (!settled) {
-                settled = true
-                clearTimeout(timer)
-                reject(socketError("helper_websocket_blocked", "扫描助手已响应，但浏览器未能建立 WebSocket。", event))
-                return
+            const connectionClosed = () => {
+                if (!isCurrent() || !handshakeComplete) return
+                const wasScanning = this._scanning
+                const failure = this._scanPayload({
+                    code: "helper_disconnected",
+                    phase: wasScanning ? "scan" : "helper",
+                    title: "扫描助手连接已断开",
+                    message: "网页与 Helper 的连接意外中断。",
+                    remedy: "请确认 Helper 仍在运行，然后重新连接。",
+                    retryable: true,
+                    actions: [{ kind: "retry_connect", label: "重新连接" }],
+                })
+                this._disconnect(Object.assign(new Error(failure.message), failure))
+                if (!wasScanning || !this._scanTerminalDelivered) {
+                    if (wasScanning) this._scanTerminalDelivered = true
+                    this.onDisconnect?.(failure)
+                }
             }
-            this._rejectEnsure(new Error("扫描助手连接出错，请重试。"))
-        }
-
-        this._ws.onclose = () => {
-            if (!settled) {
-                settled = true
-                clearTimeout(timer)
-                reject(socketError("helper_websocket_blocked", "扫描助手 WebSocket 在握手完成前关闭。"))
+            socket.onerror = (event) => {
+                if (!isCurrent()) return
+                if (!settled) {
+                    failHandshake(socketError("helper_websocket_blocked", "扫描助手已响应，但浏览器未能建立 WebSocket。", event))
+                    return
+                }
+                connectionClosed()
             }
-            if (!handshakeComplete) {
-                return
+            socket.onclose = () => {
+                if (!isCurrent()) return
+                if (!settled) {
+                    failHandshake(socketError("helper_websocket_blocked", "扫描助手 WebSocket 在握手完成前关闭。"))
+                    return
+                }
+                connectionClosed()
             }
-            const wasScanning = this._scanning
-            this._scanning = false
-            this._clearScanTimers()
-            const failure = this._scanPayload({
-                code: "helper_disconnected",
-                phase: wasScanning ? "scan" : "helper",
-                title: "扫描助手连接已断开",
-                message: "网页与 Helper 的连接意外中断。",
-                remedy: "请确认 Helper 仍在运行，然后重新连接。",
-                retryable: true,
-                actions: [{ kind: "retry_connect", label: "重新连接" }],
-            })
-            this._rejectEnsure(Object.assign(new Error(failure.message), failure))
-            this._rejectRequests(Object.assign(new Error(failure.message), failure))
-            if (!wasScanning || !this._scanTerminalDelivered) {
-                if (wasScanning) this._scanTerminalDelivered = true
-                this.onDisconnect?.(failure)
-            }
-        }
         })
     }
 
@@ -605,6 +710,8 @@ export class ScannerBridge {
         }
         this._ensureResolver?.reject(error)
         this._ensureResolver = null
+        for (const pending of this._ensureQueue) pending.reject(error)
+        this._ensureQueue = []
     }
 
     _rejectRequests(error) {
@@ -615,11 +722,12 @@ export class ScannerBridge {
         this._requestResolvers.clear()
     }
 
-    _bindMessageHandler() {
-        if (!this._ws) {
+    _bindMessageHandler(socket = this._ws, epoch = this._connectionEpoch) {
+        if (!socket) {
             return
         }
-        this._ws.onmessage = (event) => {
+        socket.onmessage = (event) => {
+            if (this._ws !== socket || this._connectionEpoch !== epoch) return
             let envelope
             try { envelope = JSON.parse(event.data) } catch { return }
             this._handleMessage(envelope)
@@ -658,6 +766,7 @@ export class ScannerBridge {
                 this._ensureResolver?.resolve(data)
                 this._ensureResolver = null
                 this.onScannerReady?.(data)
+                this._drainEnsureQueue()
                 break
             case "scan_progress":
                 this._touchHeartbeat(data)
