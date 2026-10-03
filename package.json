@@ -29,7 +29,7 @@
     "test:maintenance-api": "node tests/maintenance-api.test.js && node tests/agent-maintenance.test.js && node tests/agent-maintenance-api.test.js",
     "test:calculation-skill-groups": "node tests/calculation-skill-groups.test.js",
     "test:default-calculation-config": "node tests/default-calculation-config.test.js",
-    "test:catalog-loader": "node tests/catalog-loader.test.js",
+    "test:catalog-loader": "node tests/catalog-loader.test.js && node tests/catalog-api.test.js",
     "test:formula": "node tests/formula.test.js && node tests/in-combat-formula.test.js",
     "test:damage-whitebox": "node tests/damage-whitebox.test.js",
     "test:shared-combat": "node tests/shared-combat.test.js",

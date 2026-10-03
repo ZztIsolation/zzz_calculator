@@ -254,6 +254,7 @@ function createRequestStore(input = {}) {
 }
 
 let catalog = await loadCatalog(dataDir, exampleDir)
+let catalogResponse = serializeCatalog(catalog)
 const agentHistory = new AgentMaintenanceHistory(dataDir)
 await agentHistory.recover((await readDataFile("agents.json")).agents ?? []).catch(() => {
     console.error("角色维护历史待恢复；读取仍可用，下一次角色写入将重新核对。")
@@ -432,6 +433,26 @@ function sendJson(res, statusCode, payload) {
     res.end(text)
 }
 
+function serializeCatalog(value) {
+    const text = JSON.stringify(value)
+    return { text, etag: `"${createHash("sha256").update(text).digest("hex")}"` }
+}
+
+function sendCatalog(req, res) {
+    const { text, etag } = catalogResponse
+    const matches = String(req.headers["if-none-match"] ?? "").split(",").some(value => {
+        const candidate = value.trim()
+        return candidate === "*" || candidate.replace(/^W\//, "") === etag
+    })
+    applyDefaultCors(res)
+    res.writeHead(matches ? 304 : 200, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-cache",
+        "ETag": etag,
+    })
+    res.end(matches ? undefined : text)
+}
+
 function sendSameOriginJson(res, statusCode, payload, headers = {}) {
     const text = JSON.stringify(payload, null, 2)
     res.writeHead(statusCode, {
@@ -510,7 +531,11 @@ async function writeDataFile(fileName, payload) {
     } finally {
         await rm(tempPath, { force: true }).catch(() => {})
     }
-    catalog = await loadCatalog(dataDir, exampleDir)
+    // Prepare both before publishing so a failed reload retains the old body and ETag.
+    const nextCatalog = await loadCatalog(dataDir, exampleDir)
+    const nextResponse = serializeCatalog(nextCatalog)
+    catalog = nextCatalog
+    catalogResponse = nextResponse
 }
 
 let maintenanceMutationQueue = Promise.resolve()
@@ -2522,7 +2547,7 @@ async function routeApi(req, res, pathname, searchParams) {
     }
 
     if (req.method === "GET" && pathname === "/api/catalog") {
-        sendJson(res, 200, catalog)
+        sendCatalog(req, res)
         return
     }
 
