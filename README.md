@@ -10,6 +10,45 @@ The entries below summarize each development day. Implementation details,
 modeling decisions, and verification evidence remain in the
 [detailed changelog](docs/changelog.md).
 
+### 2026-10-04 Scanner Elevation Retry And Inventory Recovery
+
+- Fixed web Scanner elevation retries dropping settings such as “Remove Missing Drive Discs”. Connection, preparation, and restart requests now use connection epochs and an ordered queue so late responses cannot settle a later retry.
+- Startup failures, UAC cancellation, and Helper disconnects now expose expandable raw diagnostics; duplicate actions are disabled while busy, and failed scans retain recoverable inventory state.
+- Added preference-persistence, bridge, error-state, inventory-recovery, and desktop-browser regression coverage.
+
+### 2026-10-03 Bounded Production Deployment And Recovery
+
+- Added explicit runner, SSH, server, and systemd deadlines, phase checkpoints, TERM cleanup grace, bounded rollback, and a fail-closed `supervisor=bounded-v1` contract for audit, dry-run, deployment, and rollback.
+- Replaced process-heavy per-file tree hashing with one streaming Node implementation that preserves the legacy digest bytes; added the recovery runbook for lock ownership, control-plane installation, no-switch audit/dry-run, exact-SHA artifacts, and the intentional service-restart boundary.
+- Added timeout and digest-compatibility regression coverage.
+
+### 2026-10-02 Enka Teammate Buff Sync And Maintained-State Protection
+
+- Showcase/Enka imports now feed the native teammate-Buff configuration with explicit refresh, selection, Cinema, and resync behavior while preserving manual Buff/runtime choices, source details, loadouts, and retryable save conflicts.
+- Added official Roxy (洛克茜) teammate Buffs and the Imbuement multiplier. It applies to direct, sheer, and sharp damage, chooses the strongest covered source instead of stacking alternatives, and stays consistent across white-box, compiled/dense, Worker, and optimizer paths.
+- Field Buff selection is now globally exclusive across versions, phases, and modes; Boss Buffs remain independent, legacy persisted selections are normalized, and maintained `importantPanelStats` stay first-class data.
+
+### 2026-10-02 Defense Battle 3.2 Phase 2 Field Buffs
+
+- Added the Defense Battle v5, version 3.2 phase-two field Buffs 御风惊雷, 冰锋碎厄, and 焚烬启明, covering Sharp damage, Ice/Ether damage, Fire/Electric damage, triggered DEF reduction, and stun vulnerability.
+- Only supported stats and triggers enter calculation. Energy recovery, buildup efficiency, Daze increase, and stun-recovery reduction remain explicit descriptive boundaries.
+
+### 2026-10-01 Velina Wind Anomaly And Maintenance Modeling
+
+- Added Velina as a first-class Wind Anomaly agent with separate Wind Anomaly, Turbulence, and Release settlement semantics, confirmed multiplier catalogs, a configurable Cinema 6 recast bonus, maintenance editors, specialty-aware W-Engine selection, Enka mapping, and editable default two-piece recommendations.
+- Initial-panel and Release formulas remain candidate-dependent through ordinary, compiled, dense, fixed-set, Worker, and strict optimizer paths; source/element ownership and unsupported timeline mechanics remain explicit.
+- Added cross-kernel, browser, maintenance, and optimizer regression coverage.
+
+### 2026-09-30 Four Anomaly W-Engines
+
+- Added 朔月裁霜, 灼心摇壶, 咚哒回声, and 雨林饕客 with official icons, level-60 data, exact modification ranks 1–5, adjustable stacks, and precise anomaly targets.
+- Flat Energy restoration remains an explicit descriptive boundary rather than being converted into Energy Regen; shared controls, thresholds, persistence, maintenance, score kernels, and exact optimizer results are covered by regression tests.
+
+### 2026-09-27 Drive Disc Scoring And Analysis UI
+
+- Added effective-substat counts, current-versus-optimized score comparison, automatic recalculation, and a more visible analysis entry point in the Workbench.
+- Absolute damage differences now display as integers while underlying calculation precision is preserved; redundant context, refresh, and summary rows were removed.
+
 ### 2026-09-26 Pyrois Enka Showcase Mapping And Production Release
 
 - Added the Enka avatar ID `1551` mapping to Pyrois, so showcase imports can recognize and offer Pyrois alongside other mapped agents.
