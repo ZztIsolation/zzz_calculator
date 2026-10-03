@@ -94,7 +94,6 @@ const draftRuntimeInputs = ref<Record<string, any>>({})
 const draftBuffPickerState = ref<BuffPickerState>({ teammateSlots: [null, null] })
 const saving = ref(false)
 const saveError = ref('')
-const teammateNotices = ref<string[]>([])
 
 function syncTeammates(operation: TeammateSyncOperation = { kind: 'refresh' }) {
   if (!props.teammateSources) return
@@ -106,7 +105,6 @@ function syncTeammates(operation: TeammateSyncOperation = { kind: 'refresh' }) {
   draftAddedBuffs.value = result.payload.addedBuffs
   draftRuntimeInputs.value = result.payload.runtimeInputs
   draftBuffPickerState.value = result.payload.buffPickerState
-  teammateNotices.value = result.notices
 }
 
 function setTeammateLoadout(index: number, value: string | null) {
@@ -1240,18 +1238,7 @@ async function apply() {
         </label>
       </div>
 
-      <div class="buff-sections" :class="{ 'is-teammate': activeTab === 'teammate', 'has-sync-status': activeTab === 'teammate' && teammateSources }">
-        <div v-if="activeTab === 'teammate' && teammateSources" class="teammate-sync-status" role="status">
-          <NButton size="small" @click="syncTeammates({ kind: 'resync' })">从导入资料重新同步</NButton>
-          <details class="teammate-source-notices">
-            <summary>来源与参数说明（{{ teammateNotices.length }} 项提示；未自动确定的参数请核对）</summary>
-            <div class="teammate-source-notices-body">
-              <p>影画、技能和音擎来自导入资料；未能自动确定的参数沿用原生默认值或手动值，并非实测面板。层数与覆盖率可手动调整。</p>
-              <p>重新同步会恢复导入参数、配装及相应勾选，保留手填面板、层数和覆盖率；点击“应用选择”后生效。</p>
-              <p v-for="notice in teammateNotices" :key="notice">{{ notice }}</p>
-            </div>
-          </details>
-        </div>
+      <div class="buff-sections" :class="{ 'is-teammate': activeTab === 'teammate' }">
         <section v-for="section in buffSections" :key="section.key" class="buff-section" :class="{ 'teammate-buff-column': activeTab === 'teammate' }">
           <header v-if="activeTab === 'teammate'" class="teammate-column-header">
             <strong class="teammate-column-title">{{ section.label }}</strong>
@@ -1555,37 +1542,6 @@ async function apply() {
 </template>
 
 <style scoped>
-.teammate-sync-status {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.teammate-source-notices {
-  flex: 1;
-  min-width: 220px;
-}
-
-.teammate-source-notices summary {
-  cursor: pointer;
-  line-height: 28px;
-}
-
-.teammate-source-notices-body {
-  max-height: min(120px, 20vh);
-  overflow-y: auto;
-}
-
-.teammate-source-notices:not([open]) > .teammate-source-notices-body {
-  display: none;
-}
-
-.teammate-source-notices-body p {
-  margin: 4px 0;
-}
-
 .teammate-loadout-select {
   grid-column: 1 / -1;
   min-width: 0;
@@ -1653,10 +1609,6 @@ async function apply() {
   align-items: stretch;
 }
 
-.buff-sections.is-teammate.has-sync-status {
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
 .teammate-buff-column {
   container: teammate-column / inline-size;
   display: flex;
@@ -1704,17 +1656,13 @@ async function apply() {
 
 @container ui-layout (max-width: 899px) {
   .buff-sections.is-teammate,
-  .buff-sections.is-teammate.has-sync-status {
+  .buff-sections.is-teammate {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: none;
     grid-auto-rows: max-content;
     align-items: start;
     overflow-y: auto;
     overscroll-behavior: contain;
-  }
-  .teammate-source-notices-body {
-    max-height: none;
-    overflow: visible;
   }
   .teammate-buff-column :deep(.buff-list-scrollbar) {
     display: block;

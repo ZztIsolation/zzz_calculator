@@ -3,7 +3,6 @@ import { createEmptyInventoryStore } from '../../core/inventory-model.js'
 
 const special = 'yaojiayin.special_aria_buff'
 const core = 'yaojiayin.core_andante_atk'
-const cinema = 'yaojiayin.cinema_1.enemy_res_reduction'
 
 async function saved(page: Page) {
   return page.evaluate(() => JSON.parse(localStorage.getItem('zzz-calculator.webapp.build.v1')!).byOwner.default.byAgent.ye_shunguang)
@@ -112,33 +111,4 @@ test('imported teammate adoption, three refresh saves, retry and concurrent sour
   await expect(page.getByTestId('open-buff-picker')).toBeEnabled()
   expect((await saved(page)).combat.runtimeInputs[special].effects.yaojiayin_special_aria_dmg_bonus).toMatchObject({ sourceValue: 14, coverage: 0.5 })
   expect(errors).toEqual([])
-})
-
-test('resync stays a cancellable draft and retains scenario inputs on apply', async ({ page }, testInfo) => {
-  await seed(page)
-  await openPicker(page)
-  await page.getByRole('button', { name: '从导入资料重新同步' }).click()
-  await expect(page.locator(`[data-buff-id="${core}"]`)).toHaveClass(/is-selected/)
-  await expect(page.locator(`[data-buff-id="${cinema}"]`)).toHaveClass(/is-selected/)
-  await page.locator('.teammate-source-notices summary').click()
-  if (testInfo.project.use.isMobile) {
-    const scrollContainers = await page.locator('[data-layout-surface="buff-picker"]').evaluate(root =>
-      [root as HTMLElement, ...root.querySelectorAll<HTMLElement>('*')].filter(element =>
-        /auto|scroll/.test(getComputedStyle(element).overflowY) && element.scrollHeight > element.clientHeight + 2).length)
-    expect(scrollContainers).toBe(1)
-  }
-  const applyBox = await page.getByRole('button', { name: '应用选择', exact: true }).boundingBox()
-  expect(applyBox!.y + applyBox!.height).toBeLessThanOrEqual(page.viewportSize()!.height)
-  await page.screenshot({ path: testInfo.outputPath('enka-teammate-sync.png') })
-  await page.getByRole('button', { name: '取消', exact: true }).click()
-  expect((await saved(page)).combat.activeBuffIds).not.toContain(core)
-  await openPicker(page)
-  await page.getByRole('button', { name: '从导入资料重新同步' }).click()
-  await page.getByRole('button', { name: '应用选择', exact: true }).click()
-  await expect(page.getByRole('dialog')).toBeHidden()
-  const result = await saved(page)
-  expect(result.combat.activeBuffIds).toEqual(expect.arrayContaining([core, cinema]))
-  expect(result.combat.runtimeInputs[core].effects.yaojiayin_core_andante_atk_flat.sourceValue).toBe(2900)
-  expect(result.combat.runtimeInputs[special].effects.yaojiayin_special_aria_dmg_bonus).toMatchObject({ sourceValue: 12, coverage: 0.5 })
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(2)
 })

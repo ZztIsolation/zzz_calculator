@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, ref, watch } from "vue"
 import { NButton } from "naive-ui"
 import { AlertCircle, Cable, Download, Gamepad2, RefreshCcw, ShieldAlert, WifiOff } from "lucide-vue-next"
+import { isScannerStartupRecovery, normalizeScannerFailure } from "@runtime/scanner-errors"
 
 type Variant =
   | "helper-missing"
@@ -22,6 +23,7 @@ type Failure = {
   remedy?: string
   diagnosticId?: string
   actions?: Array<{ kind: string; label: string }>
+  details?: Record<string, unknown>
 }
 
 const props = defineProps<{
@@ -31,6 +33,8 @@ const props = defineProps<{
   primaryLabel?: string
   secondaryLabel?: string
   failure?: Failure | null
+  presentation?: "default" | "startup-recovery"
+  busy?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -132,10 +136,80 @@ const secondaryLabel = computed(() => props.secondaryLabel ?? preset.value.secon
 const displayTone = computed(() => props.failure?.severity === "warning" ? "warning" : preset.value.tone)
 const displayTitle = computed(() => props.failure?.title || preset.value.title)
 const displayMessage = computed(() => props.failure?.message || preset.value.subtext)
+const startupRecovery = computed(() => props.presentation === "startup-recovery"
+  && isScannerStartupRecovery(props.failure?.code))
+const startupFailure = computed(() => startupRecovery.value ? normalizeScannerFailure(props.failure) : null)
+const startupNativeFailure = computed(() => startupFailure.value?.details.nativeFailure as Record<string, unknown> | undefined)
+const startupReason = computed(() => {
+  const reason = String(startupNativeFailure.value?.message ?? "").trim()
+  return reason ? `系统返回：${reason}` : "未返回具体原因"
+})
+const startupNativeText = computed(() => JSON.stringify(startupNativeFailure.value ?? {}, null, 2))
+const detailsElement = ref<HTMLDetailsElement | null>(null)
+const detailsOpen = ref(false)
+
+watch([() => props.failure, () => props.busy], () => {
+  detailsOpen.value = false
+  if (detailsElement.value) detailsElement.value.open = false
+})
+
+function handleDetailsToggle(event: Event) {
+  const element = event.currentTarget as HTMLDetailsElement
+  if (props.busy) element.open = false
+  detailsOpen.value = element.open
+}
+
+function handleSummaryInteraction(event: Event) {
+  if (props.busy) event.preventDefault()
+}
+
+function emitAction(kind: string) {
+  if (!props.busy) emit("action", kind)
+}
 </script>
 
 <template>
-  <div class="scanner-error-state" :class="`tone-${displayTone}`" role="alert">
+  <div
+    v-if="startupRecovery && startupFailure"
+    class="scanner-startup-recovery"
+    :class="`tone-${startupFailure.severity}`"
+    :role="startupFailure.code === 'uac_cancelled' ? 'status' : 'alert'"
+    :aria-busy="busy || undefined"
+  >
+    <div class="scanner-startup-heading">
+      <AlertCircle :size="20" :stroke-width="1.8" aria-hidden="true" />
+      <h3 class="scanner-startup-title">{{ startupFailure.title }}</h3>
+    </div>
+    <p class="scanner-startup-message">{{ startupFailure.message }}</p>
+    <p v-if="startupFailure.code === 'child_start_failed'" class="scanner-startup-reason">{{ startupReason }}</p>
+    <details ref="detailsElement" class="scanner-startup-details" :open="detailsOpen" @toggle="handleDetailsToggle">
+      <summary
+        :aria-expanded="detailsOpen"
+        :aria-disabled="busy || undefined"
+        :tabindex="busy ? -1 : 0"
+        @click="handleSummaryInteraction"
+        @keydown.enter="handleSummaryInteraction"
+        @keydown.space="handleSummaryInteraction"
+      >查看详情</summary>
+      <div class="scanner-startup-details-content">
+        <p class="scanner-error-code">错误代码：{{ startupFailure.code }}</p>
+        <p v-if="startupFailure.diagnosticId" class="scanner-error-diagnostic">诊断编号：{{ startupFailure.diagnosticId }}</p>
+        <p class="scanner-startup-raw-label">原始错误</p>
+        <pre class="scanner-startup-raw">{{ startupNativeText }}</pre>
+        <div class="scanner-startup-actions">
+          <NButton
+            v-for="action in startupFailure.actions"
+            :key="action.kind"
+            type="default"
+            size="small"
+            :disabled="busy"
+            @click="emitAction(action.kind)"
+          >{{ action.label }}</NButton>
+        </div>
+      </div>
+    </details>
+  </div>
+  <div v-else class="scanner-error-state" :class="`tone-${displayTone}`" role="alert">
     <div class="scanner-error-icon">
       <component :is="preset.Icon" :size="40" :stroke-width="1.6" aria-hidden="true" />
     </div>
@@ -156,16 +230,17 @@ const displayMessage = computed(() => props.failure?.message || preset.value.sub
         :key="action.kind"
         :type="index === 0 ? 'primary' : 'default'"
         size="large"
-        @click="emit('action', action.kind)"
+        :disabled="busy"
+        @click="emitAction(action.kind)"
       >
         {{ action.label }}
       </NButton>
     </div>
     <div v-else class="scanner-error-actions">
-      <NButton type="primary" size="large" @click="emit('primary')">
+      <NButton type="primary" size="large" :disabled="busy" @click="!busy && emit('primary')">
         {{ primaryLabel }}
       </NButton>
-      <NButton v-if="secondaryLabel" size="large" @click="emit('secondary')">
+      <NButton v-if="secondaryLabel" size="large" :disabled="busy" @click="!busy && emit('secondary')">
         {{ secondaryLabel }}
       </NButton>
     </div>
@@ -173,6 +248,122 @@ const displayMessage = computed(() => props.failure?.message || preset.value.sub
 </template>
 
 <style scoped>
+.scanner-startup-recovery {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  background: var(--app-panel-muted);
+  text-align: left;
+}
+
+.scanner-startup-recovery.tone-warning {
+  border-color: color-mix(in srgb, var(--app-amber) 35%, var(--app-border));
+  background: color-mix(in srgb, var(--app-amber) 7%, var(--app-panel));
+}
+
+.scanner-startup-recovery.tone-error {
+  border-color: color-mix(in srgb, var(--app-red) 30%, var(--app-border));
+  background: color-mix(in srgb, var(--app-red) 5%, var(--app-panel));
+}
+
+.scanner-startup-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scanner-startup-heading > :first-child {
+  flex-shrink: 0;
+}
+
+.tone-warning .scanner-startup-heading > :first-child {
+  color: var(--app-amber);
+}
+
+.tone-error .scanner-startup-heading > :first-child {
+  color: var(--app-red);
+}
+
+.scanner-startup-title {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.scanner-startup-message,
+.scanner-startup-reason,
+.scanner-startup-raw-label {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.scanner-startup-message {
+  color: var(--app-text);
+}
+
+.scanner-startup-reason,
+.scanner-startup-raw-label {
+  color: var(--app-muted);
+}
+
+.scanner-startup-details {
+  min-width: 0;
+}
+
+.scanner-startup-details > summary {
+  width: fit-content;
+  border-radius: 4px;
+  color: var(--app-text);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.scanner-startup-details > summary:focus-visible {
+  outline: 2px solid var(--app-blue);
+  outline-offset: 3px;
+}
+
+.scanner-startup-details > summary[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.scanner-startup-details-content {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.scanner-startup-details .scanner-error-diagnostic {
+  overflow-wrap: anywhere;
+}
+
+.scanner-startup-raw {
+  max-height: 180px;
+  overflow: auto;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--app-border);
+  border-radius: 4px;
+  background: var(--app-panel);
+  color: var(--app-muted);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.scanner-startup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .scanner-error-state {
   display: flex;
   flex-direction: column;

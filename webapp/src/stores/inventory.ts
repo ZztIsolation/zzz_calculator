@@ -6,6 +6,7 @@ import {
   exportCurrentUserDriveDiscs,
   loadCurrentUserDriveDiscStore,
   loadUserDriveDiscStore,
+  loadUserDriveDiscStoreFresh,
   planScannerExportImport,
   setDriveDiscExclusions,
   setDriveDiscReservations,
@@ -20,7 +21,9 @@ import { toCalculatorDriveDisc } from "@core/drive-disc-core.js"
 import { driveDiscUsageStateForAgent } from "@core/inventory-model.js"
 import { analyzeDriveDiscStatDiffs, analyzeDriveDiscStatGains, analyzeDriveDiscSubstats } from "@core/driveDiscAnalysis-core.js"
 import { ScannerBridge } from "@runtime/scanner-bridge.js"
+import { loadScannerPreferences, saveScannerPreferences, type ScannerPreferences } from "@runtime/scanner-preferences"
 import {
+  isScannerStartupRecovery,
   normalizeScannerFailure,
   type ScannerFailure,
   type ScannerFailurePhase,
@@ -55,6 +58,16 @@ type ScanPhase = "a" | "b" | "c" | "d"
 type ScanErrorContext = "" | "prepare" | "scan" | "helper-missing" | "helper-outdated" | "helper-rejected" | "browser-permission" | "browser-websocket" | "game-not-found"
 type ScanErrorVariant = "helper-missing" | "helper-outdated" | "helper-rejected" | "browser-permission" | "browser-websocket" | "prepare-failed" | "scan-failed" | "game-not-found" | "diagnostic-failure"
 type ScanHelperUpgradeMode = "" | "legacy-manual" | "manual-download" | "self-updating" | "awaiting-restart" | "confirming" | "self-update-failed"
+
+type ScanRequestSnapshot = Readonly<ScannerPreferences & { ownerId: string; removeMissing: boolean }>
+
+function invalidatesAdminRequest(code: string) {
+  return code.startsWith("child_") || [
+    "elevation_required", "uac_cancelled", "helper_disconnected", "helper_outdated",
+    "helper_update_failed", "helper_update_confirmation_failed", "scanner_process_exited",
+    "scanner_transport_failed", "scanner_prepare_timeout", "scanner_prepare_stalled",
+  ].includes(code)
+}
 
 export interface DriveDiscLoadoutSaveOptions {
   ownerId?: string
@@ -282,6 +295,18 @@ export const useInventoryStore = defineStore("inventory", {
     scanMaxItems: 0,
     scanStopAtNonLevel15: true,
     scanRemoveMissing: false,
+    scanRunAsAdmin: false,
+    scanPreferencesLoaded: false,
+    scanPreferencesWarning: "",
+    scanConfigAvailable: false,
+    scanStartPending: false,
+    scanFinalizing: false,
+    scanActionNonce: 0,
+    scanAdminRequestCompleted: false,
+    scanAdminRequestEpoch: null as number | null,
+    scanRequiresElevation: false,
+    scanDeleteConfirmation: null as ScanRequestSnapshot | null,
+    scanActiveRequest: null as ScanRequestSnapshot | null,
     scanHelperDownloadUrl: HELPER_DOWNLOAD_URL,
     scanHelperMirrorDownloadUrl: HELPER_DOWNLOAD_URL,
     scanSession: null as any,
@@ -376,7 +401,15 @@ export const useInventoryStore = defineStore("inventory", {
       })
     },
     scanCanStart: state => Boolean(state.scanConnected)
+      && !state.scanStartPending
+      && !state.scanFinalizing
       && !["connecting", "waiting-helper", "preparing", "downloading", "scanning", "stopping", "review"].includes(state.scanStatus),
+    scanStartupRecovery: state => isScannerStartupRecovery(state.scanFailure?.code),
+    scanShowConfig: state => state.scanStatus === "ready" || (
+      state.scanConfigAvailable && (["error", "warning"].includes(state.scanStatus) || state.scanStartPending)
+      && !state.scanActiveRequest && !state.scanSession?.plan
+      && state.scanErrorContext !== "helper-outdated"
+    ),
     scanPreparing: state => ["connecting", "preparing", "downloading"].includes(state.scanStatus),
     scanWaitingForHelper: state => state.scanStatus === "waiting-helper",
     hasDriveDiscs: state => (state.store?.driveDiscs ?? []).length > 0,
@@ -385,6 +418,7 @@ export const useInventoryStore = defineStore("inventory", {
     scanHelperCanSelfUpdate: state => state.scanHelperProtocolVersion >= 3,
     scanPhase(state): ScanPhase {
       const status = state.scanStatus
+      if (isScannerStartupRecovery(state.scanFailure?.code) && !state.scanActiveRequest) return "c"
       if (["scanning", "stopping", "review", "complete", "warning"].includes(status)) {
         return "d"
       }
@@ -444,6 +478,66 @@ export const useInventoryStore = defineStore("inventory", {
     },
   },
   actions: {
+    loadScanPreferences() {
+      if (this.scanPreferencesLoaded) return
+      const preferences = loadScannerPreferences()
+      this.scanClient = preferences.client
+      this.scanMaxItems = preferences.maxItems
+      this.scanStopAtNonLevel15 = preferences.stopAtNonLevel15
+      this.scanRunAsAdmin = preferences.runAsAdmin
+      this.scanPreferencesLoaded = true
+    },
+    updateScanPreferences(input: Partial<ScannerPreferences>) {
+      this.loadScanPreferences()
+      this.cancelScanStartConfirmation()
+      if (input.client !== undefined) this.scanClient = input.client
+      if (input.maxItems !== undefined) this.scanMaxItems = input.maxItems
+      if (input.stopAtNonLevel15 !== undefined) this.scanStopAtNonLevel15 = input.stopAtNonLevel15
+      if (input.runAsAdmin !== undefined) {
+        this.scanRunAsAdmin = input.runAsAdmin
+        if (!input.runAsAdmin) this.scanRequiresElevation = false
+      }
+      this.scanPreferencesWarning = saveScannerPreferences(this.scanPreferences())
+        ? "" : "扫描设置未能保存到浏览器，本次设置仍可使用。"
+    },
+    scanPreferences(): ScannerPreferences {
+      return {
+        client: this.scanClient,
+        maxItems: Math.max(0, Math.min(9999, Math.trunc(Number(this.scanMaxItems) || 0))),
+        stopAtNonLevel15: this.scanStopAtNonLevel15,
+        runAsAdmin: this.scanRunAsAdmin,
+      }
+    },
+    async captureScanRequest(): Promise<ScanRequestSnapshot> {
+      const store = await loadUserDriveDiscStoreFresh()
+      return Object.freeze({
+        ...this.scanPreferences(),
+        ownerId: String(store.currentOwnerId),
+        removeMissing: this.scanRemoveMissing,
+      })
+    },
+    cancelScanStartConfirmation() {
+      this.scanDeleteConfirmation = null
+    },
+    async confirmScanStart() {
+      const request = this.scanDeleteConfirmation
+      this.scanDeleteConfirmation = null
+      if (request) await this.beginScanRequest(request)
+    },
+    clearAdminRequest() {
+      this.scanAdminRequestCompleted = false
+      this.scanAdminRequestEpoch = null
+    },
+    hasPreparedAdminRequest(): boolean {
+      return Boolean(scanner?.connected && this.scanAdminRequestCompleted
+        && this.scanAdminRequestEpoch === scanner.connectionEpoch)
+    },
+    cancelScannerPreparation() {
+      this.scanActionNonce += 1
+      this.scanStartPending = false
+      this.cancelScanStartConfirmation()
+      this.clearAdminRequest()
+    },
     async load() {
       this.loading = true
       this.error = ""
@@ -595,11 +689,12 @@ export const useInventoryStore = defineStore("inventory", {
       this.store = result.store
       await this.load()
     },
-    createImportDraft(payload: any, removeMissing = false, sourcePath = "webapp-paste", removeMissingRarities: string[] | null = null) {
+    createImportDraft(payload: any, removeMissing = false, sourcePath = "webapp-paste", removeMissingRarities: string[] | null = null, ownerId?: string) {
       const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
       return {
         payload: clone(payload),
         options: {
+          ...(ownerId ? { ownerId } : {}),
           removeMissing,
           sourcePath,
           removeMissingRarities: clone(removeMissingRarities),
@@ -614,6 +709,9 @@ export const useInventoryStore = defineStore("inventory", {
         ...clone(draft.options),
         resolutions: clone(draft.resolutions ?? {}),
       })
+      if (draft.options.ownerId && !inventoryPlan.currentStore.owners.some((owner: any) => owner.id === draft.options.ownerId)) {
+        throw new Error("本次扫描的目标账号已不存在，扫描结果已保留，未写入其他账号。")
+      }
       return freezeDriveDiscInventoryImportPlan(inventoryPlan, {
         transactionId: globalThis.crypto?.randomUUID?.(),
       })
@@ -676,8 +774,8 @@ export const useInventoryStore = defineStore("inventory", {
         this.importApplying = false
       }
     },
-    async importScannerPayload(payload: any, removeMissing = false, sourcePath = "webapp-paste", removeMissingRarities: string[] | null = null) {
-      const draft = this.createImportDraft(payload, removeMissing, sourcePath, removeMissingRarities)
+    async importScannerPayload(payload: any, removeMissing = false, sourcePath = "webapp-paste", removeMissingRarities: string[] | null = null, ownerId?: string) {
+      const draft = this.createImportDraft(payload, removeMissing, sourcePath, removeMissingRarities, ownerId)
       const plan = await this.createFrozenImportPlan(draft)
       this.importPreview = plan.preview
       if (plan.hasUnresolvedConflicts) {
@@ -699,7 +797,7 @@ export const useInventoryStore = defineStore("inventory", {
         throw new Error("没有可导入的扫描结果。")
       }
       if (this.scanSession.plan) return this.confirmScanImport()
-      const summary = await this.importScannerPayload(this.scanSession.payload, removeMissing, "webapp-scan")
+      const summary = await this.importScannerPayload(this.scanSession.payload, removeMissing, "webapp-scan", null, this.scanSession.ownerId)
       if (summary?.reviewRequired) {
         this.scanSession = {
           ...this.scanSession,
@@ -843,6 +941,8 @@ export const useInventoryStore = defineStore("inventory", {
       fallback: { phase?: ScannerFailurePhase; code?: string; context?: ScanErrorContext } = {},
     ) {
       const failure = normalizeScannerFailure(value, fallback)
+      if (invalidatesAdminRequest(failure.code)) this.clearAdminRequest()
+      if (isScannerStartupRecovery(failure.code)) this.scanConfigAvailable = true
       this.stopScannerPolling()
       this.scanStatus = failure.severity === "warning" ? "warning" : "error"
       this.scanFailure = failure
@@ -905,6 +1005,15 @@ export const useInventoryStore = defineStore("inventory", {
     },
     async finalizeScanTerminal(payload: any, terminalError: any = null) {
       if (this.scanRunNonce > 0 && this.scanTerminalHandledNonce === this.scanRunNonce) return
+      this.scanFinalizing = true
+      try {
+        await this.completeScanTerminal(payload, terminalError)
+      } finally {
+        this.scanFinalizing = false
+      }
+    },
+    async completeScanTerminal(payload: any, terminalError: any = null) {
+      if (this.scanRunNonce > 0 && this.scanTerminalHandledNonce === this.scanRunNonce) return
       this.scanTerminalHandledNonce = this.scanRunNonce
 
       const envelope = Array.isArray(payload) ? { items: payload } : (payload ?? {})
@@ -912,6 +1021,9 @@ export const useInventoryStore = defineStore("inventory", {
         || Array.isArray(envelope.items)
         || Array.isArray(envelope.retainedItems)
       if (!terminalError && !hasResultArray) {
+        this.scanActiveRequest = null
+        this.scanRemoveMissing = false
+        this.cancelScanStartConfirmation()
         this.applyScannerFailure({
           code: "scan_result_invalid",
           phase: "scan",
@@ -925,10 +1037,22 @@ export const useInventoryStore = defineStore("inventory", {
       const failedCount = Math.max(0, Number(envelope.failed) || 0)
       const streamIncomplete = Boolean(envelope.streamIncomplete)
       const terminalCode = String(terminalError?.code ?? envelope.terminationCode ?? "")
+      const request = this.scanActiveRequest
+      this.scanActiveRequest = null
+      this.cancelScanStartConfirmation()
+      // The native permission check runs before the first item. Treat this as
+      // recoverable preparation, retaining the draft rather than consuming it.
+      if (terminalCode === "elevation_required" && !retainedItems.length
+        && !(Number(envelope.visited) > 0) && !(Number(envelope.completed) > 0)) {
+        if (request) this.scanRemoveMissing = request.removeMissing
+        this.scanRequiresElevation = true
+        this.applyScannerFailure({ ...terminalError, ...envelope, code: terminalCode, phase: "prepare" }, { phase: "prepare", context: "prepare" })
+        return
+      }
       const expectedNonLevel15Stop = Boolean(
         !terminalError
         && terminalCode === "non_level_15_stop"
-        && this.scanStopAtNonLevel15
+        && (request?.stopAtNonLevel15 ?? this.scanStopAtNonLevel15)
         && failedCount === 0
         && !streamIncomplete,
       )
@@ -939,14 +1063,17 @@ export const useInventoryStore = defineStore("inventory", {
         || streamIncomplete
         || terminalCode === "non_level_15_stop",
       )
-      const requestedRemoveMissing = this.scanRemoveMissing
+      const requestedRemoveMissing = request?.removeMissing ?? false
+      this.scanRemoveMissing = false
 
       this.scanProgress = envelope
       this.scanProgressPercent = 100
       this.scanSession = {
         payload: retainedItems,
         raw: envelope,
-        client: this.scanClient,
+        client: request?.client ?? this.scanClient,
+        ownerId: request?.ownerId,
+        request,
         completedAt: new Date().toISOString(),
         preview: null,
         error: terminalError?.message ?? "",
@@ -1005,7 +1132,7 @@ export const useInventoryStore = defineStore("inventory", {
       try {
         const removeMissing = partial ? false : requestedRemoveMissing
         const sourcePath = partial ? "webapp-scan-partial" : "webapp-scan"
-        const summary = await this.importScannerPayload(retainedItems, removeMissing, sourcePath, removeMissing ? ["S"] : null)
+        const summary = await this.importScannerPayload(retainedItems, removeMissing, sourcePath, removeMissing ? ["S"] : null, request?.ownerId)
         if (summary?.reviewRequired) {
           this.scanSession = {
             ...this.scanSession,
@@ -1105,15 +1232,20 @@ export const useInventoryStore = defineStore("inventory", {
     bindScannerEvents() {
       const activeScanner = this.ensureScannerBridge()
       activeScanner.onLauncherProgress = (progress: any) => {
+        if (scanner !== activeScanner || this.scanActiveRequest) return
         this.applyLauncherProgress(progress)
       }
       activeScanner.onHelperUpdateProgress = (progress: any) => {
+        if (scanner !== activeScanner) return
         this.applyHelperUpdateProgress(progress)
       }
       activeScanner.onScannerReady = (scannerInfo: any = {}) => {
+        if (scanner !== activeScanner) return
+        this.scanConfigAvailable = true
         this.scanScannerVersion = String(
           scannerInfo?.version ?? scannerInfo?.appVersion ?? activeScanner.scannerVersion ?? this.scanScannerVersion,
         )
+        if (this.scanStartPending || this.scanActiveRequest || this.scanFinalizing) return
         this.scanStatus = "ready"
         this.scanFailure = null
         this.scanErrorContext = ""
@@ -1122,14 +1254,17 @@ export const useInventoryStore = defineStore("inventory", {
         this.scanProgressText = "OCR 扫描器已准备"
       }
       activeScanner.onHeartbeat = () => {
+        if (scanner !== activeScanner || !this.scanActiveRequest) return
         this.scanLastHeartbeatAt = Date.now()
       }
       activeScanner.onStopAck = () => {
+        if (scanner !== activeScanner || !this.scanActiveRequest) return
         this.scanStatus = "stopping"
         this.scanMessage = "Scanner 已收到停止请求，正在安全结束..."
         this.scanProgressText = this.scanMessage
       }
       activeScanner.onProgress = (progress: any) => {
+        if (scanner !== activeScanner || !this.scanActiveRequest) return
         const total = Number(progress?.queued) || 1
         const completed = Number(progress?.completed) || 0
         const failed = Number(progress?.failed) || 0
@@ -1144,8 +1279,13 @@ export const useInventoryStore = defineStore("inventory", {
         this.scanProgressText = progress?.message ?? `访问 ${progress?.visited ?? 0} / 完成 ${completed} / 失败 ${failed}`
         this.scanMessage = this.scanProgressText
       }
-      activeScanner.onComplete = async (payload: any) => this.finalizeScanTerminal(payload)
+      activeScanner.onComplete = async (payload: any) => {
+        if (scanner !== activeScanner) return
+        await this.finalizeScanTerminal(payload)
+      }
       activeScanner.onError = async (error: any) => {
+        if (scanner !== activeScanner) return
+        if (invalidatesAdminRequest(String(error?.code ?? ""))) this.clearAdminRequest()
         this.scanConnected = Boolean(scanner?.connected)
         if (this.scanHelperOutdated) {
           this.applyScannerFailure({
@@ -1159,13 +1299,21 @@ export const useInventoryStore = defineStore("inventory", {
           }
           return
         }
+        if (!this.scanActiveRequest) {
+          if (!this.scanStartPending && this.scanRunNonce > 0 && this.scanTerminalHandledNonce === this.scanRunNonce) return
+          this.applyScannerFailure(error, { phase: "prepare", context: "prepare" })
+          return
+        }
         await this.finalizeScanTerminal(error, error)
       }
       activeScanner.onDiagnostics = (diagnostics: any) => {
+        if (scanner !== activeScanner) return
         this.scanDiagnostics = diagnostics
       }
       activeScanner.onDisconnect = async (error: any) => {
+        if (scanner !== activeScanner) return
         this.scanConnected = false
+        this.cancelScannerPreparation()
         if (["legacy-manual", "manual-download", "self-updating", "awaiting-restart"].includes(this.scanHelperUpgradeMode)) {
           return
         }
@@ -1179,6 +1327,8 @@ export const useInventoryStore = defineStore("inventory", {
       }
     },
     async updateOutdatedHelper() {
+      this.clearAdminRequest()
+      this.cancelScanStartConfirmation()
       const activeScanner = this.ensureScannerBridge()
       if (!activeScanner.connected || !this.scanHelperCanSelfUpdate) {
         this.scanHelperUpgradeMode = "legacy-manual"
@@ -1259,6 +1409,8 @@ export const useInventoryStore = defineStore("inventory", {
     },
     async prepareConnectedScanner(hello: any = {}) {
       const activeScanner = this.ensureScannerBridge()
+      const actionNonce = this.scanActionNonce
+      const connectionEpoch = activeScanner.connectionEpoch
       this.scanConnected = true
       this.scanStatus = "preparing"
       this.scanErrorContext = ""
@@ -1326,6 +1478,7 @@ export const useInventoryStore = defineStore("inventory", {
       if (!await this.confirmPendingHelperUpdate(hello)) {
         return
       }
+      if (scanner !== activeScanner || actionNonce !== this.scanActionNonce || connectionEpoch !== activeScanner.connectionEpoch) return
 
       this.stopScannerPolling()
       this.scanHelperUpgradeMode = ""
@@ -1334,6 +1487,8 @@ export const useInventoryStore = defineStore("inventory", {
       this.scanMessage = "已连接，正在准备 OCR 扫描器..."
       try {
         const scannerInfo = await activeScanner.ensureScanner()
+        if (scanner !== activeScanner || actionNonce !== this.scanActionNonce || connectionEpoch !== activeScanner.connectionEpoch || !activeScanner.connected) return
+        this.scanConfigAvailable = true
         this.scanScannerVersion = String(
           scannerInfo?.version ?? scannerInfo?.appVersion ?? activeScanner.scannerVersion ?? this.scanScannerVersion,
         )
@@ -1343,6 +1498,8 @@ export const useInventoryStore = defineStore("inventory", {
         this.scanProgressText = ""
         this.scanMessage = `扫描助手已连接${hello?.version ? ` · ${hello.version}` : ""}`
       } catch (error) {
+        if (scanner !== activeScanner || actionNonce !== this.scanActionNonce) return
+        this.scanConnected = activeScanner.connected
         this.applyScannerFailure(error, { phase: "prepare", context: "prepare" })
       }
     },
@@ -1367,16 +1524,25 @@ export const useInventoryStore = defineStore("inventory", {
     startScannerPolling(options: { launchDeadline?: boolean } = {}) {
       this.stopScannerPolling()
       this.scanPolling = true
-      scanPollTimer = setInterval(async () => {
+      let polling = false
+      const timer = setInterval(async () => {
+        if (polling || scanPollTimer !== timer || !this.scanPolling) return
+        polling = true
         const activeScanner = this.ensureScannerBridge()
+        const actionNonce = this.scanActionNonce
         this.bindScannerEvents()
         try {
           const hello = await activeScanner.connect()
+          if (scanner !== activeScanner || actionNonce !== this.scanActionNonce || scanPollTimer !== timer || !this.scanPolling) return
           await this.prepareConnectedScanner(hello)
         } catch (error) {
+          if (scanner !== activeScanner || actionNonce !== this.scanActionNonce || scanPollTimer !== timer || !this.scanPolling) return
           this.applyTerminalScannerConnectionError(error)
+        } finally {
+          polling = false
         }
       }, HELPER_POLL_INTERVAL_MS)
+      scanPollTimer = timer
       if (options.launchDeadline) {
         helperLaunchTimer = setTimeout(() => {
           this.scanConnected = false
@@ -1388,6 +1554,7 @@ export const useInventoryStore = defineStore("inventory", {
       }
     },
     async openScannerPanel() {
+      this.loadScanPreferences()
       if (this.scanStatus === "review" || scanner?.scanning || (this.scanConnected && this.scanStatus === "ready")) {
         return
       }
@@ -1397,6 +1564,8 @@ export const useInventoryStore = defineStore("inventory", {
       this.stopScannerPolling()
       const preserveReview = this.scanStatus === "review"
       if (scanner && !scanner.scanning) {
+        this.cancelScannerPreparation()
+        this.scanRequiresElevation = false
         scanner.disconnect()
         scanner = null
         this.scanConnected = false
@@ -1414,6 +1583,8 @@ export const useInventoryStore = defineStore("inventory", {
     },
     async connectScanner() {
       const activeScanner = this.ensureScannerBridge()
+      const actionNonce = this.scanActionNonce
+      if (!activeScanner.connected) this.clearAdminRequest()
       this.bindScannerEvents()
       this.stopScannerPolling()
       this.scanStatus = "connecting"
@@ -1427,8 +1598,10 @@ export const useInventoryStore = defineStore("inventory", {
       lastFailureTelemetryKey = ""
       try {
         const hello = await activeScanner.connect()
+        if (scanner !== activeScanner || actionNonce !== this.scanActionNonce) return
         await this.prepareConnectedScanner(hello)
       } catch (error) {
+        if (scanner !== activeScanner || actionNonce !== this.scanActionNonce) return
         if (this.applyTerminalScannerConnectionError(error)) {
           return
         }
@@ -1454,21 +1627,108 @@ export const useInventoryStore = defineStore("inventory", {
     selectedScanRarities() {
       return ["S"]
     },
+    async prepareScannerAction(kind: "restart_elevated" | "repair" | "retry") {
+      if (this.scanStartPending || this.scanFinalizing || this.scanStatus === "review" || scanner?.scanning) return
+      const actionNonce = ++this.scanActionNonce
+      this.scanStartPending = true
+      this.cancelScanStartConfirmation()
+      if (kind !== "retry") this.clearAdminRequest()
+      if (kind === "repair") this.scanRequiresElevation = false
+      if (kind === "restart_elevated") this.scanRequiresElevation = true
+      const activeScanner = this.ensureScannerBridge()
+      let connectionEpoch = activeScanner.connectionEpoch
+      try {
+        if (!activeScanner.connected) {
+          await this.connectScanner()
+          if (actionNonce !== this.scanActionNonce || scanner !== activeScanner || !activeScanner.connected || this.scanStatus !== "ready") return
+        }
+        connectionEpoch = activeScanner.connectionEpoch
+        this.scanStatus = "preparing"
+        this.scanFailure = null
+        this.scanErrorContext = ""
+        this.scanProgressPercent = 12
+        this.scanProgressText = kind === "repair" ? "正在重新下载并修复扫描器..."
+          : kind === "restart_elevated" ? "正在请求管理员启动，请处理 Windows 授权提示..." : "正在准备扫描器..."
+        this.scanMessage = this.scanProgressText
+        if (kind === "restart_elevated") await activeScanner.restartScannerElevated()
+        else if (kind === "repair") await activeScanner.repairScanner()
+        else await activeScanner.ensureScanner()
+        if (actionNonce !== this.scanActionNonce || scanner !== activeScanner
+          || !activeScanner.connected || connectionEpoch !== activeScanner.connectionEpoch) return
+        if (kind === "restart_elevated") {
+          this.scanAdminRequestCompleted = true
+          this.scanAdminRequestEpoch = connectionEpoch
+        }
+        this.scanStatus = "ready"
+        this.scanFailure = null
+        this.scanErrorContext = ""
+        this.scanProgressPercent = null
+        this.scanProgressText = ""
+        this.scanMessage = "扫描器已准备，请确认设置后点击“开始扫描”。"
+      } catch (error) {
+        if (actionNonce !== this.scanActionNonce || scanner !== activeScanner) return
+        this.clearAdminRequest()
+        this.scanConnected = activeScanner.connected
+        this.applyScannerFailure(error, { phase: "prepare", context: "prepare" })
+      } finally {
+        if (actionNonce === this.scanActionNonce) this.scanStartPending = false
+      }
+    },
     async startScan() {
+      if (this.scanStartupRecovery) {
+        await this.retryScannerStartup()
+        return
+      }
+      await this.beginScanRequest(null)
+    },
+    async retryScannerStartup() {
+      if (this.scanStartPending || this.scanFinalizing || this.scanStatus === "review" || scanner?.scanning) return
+      // The current checkbox is authoritative for these recovery actions.
+      // A cancelled one-off admin launch must not override an unchecked option.
+      if (!this.scanRunAsAdmin) this.scanRequiresElevation = false
+      await this.prepareScannerAction(this.scanRunAsAdmin ? "restart_elevated" : "retry")
+    },
+    async beginScanRequest(confirmedRequest: ScanRequestSnapshot | null = null) {
+      if (this.scanStartPending || this.scanFinalizing || (this.scanActiveRequest && scanner?.scanning)) return
       if (this.scanStatus === "review") {
         this.scanMessage = "请先确认或放弃当前扫描导入。"
         return
       }
-      const rarities = this.selectedScanRarities()
-      if (!scanner?.connected) {
-        await this.connectScanner()
-      }
-      if (!scanner?.connected) {
+      if ((this.scanRunAsAdmin || this.scanRequiresElevation) && !this.hasPreparedAdminRequest()) {
+        await this.prepareScannerAction("restart_elevated")
         return
       }
+      const actionNonce = ++this.scanActionNonce
+      this.scanStartPending = true
+      const activeScanner = this.ensureScannerBridge()
       try {
-        await scanner.ensureScanner()
-        const client = SCAN_CLIENTS[this.scanClient] ?? SCAN_CLIENTS.local
+        if (!activeScanner.connected) await this.connectScanner()
+        if (actionNonce !== this.scanActionNonce || scanner !== activeScanner || !activeScanner.connected || this.scanHelperOutdated) return
+        const connectionEpoch = activeScanner.connectionEpoch
+        const request = await this.captureScanRequest()
+        if (!this.hasPreparedAdminRequest()) await activeScanner.ensureScanner()
+        if (actionNonce !== this.scanActionNonce || scanner !== activeScanner
+          || !activeScanner.connected || connectionEpoch !== activeScanner.connectionEpoch) return
+        const currentRequest = await this.captureScanRequest()
+        if (actionNonce !== this.scanActionNonce || scanner !== activeScanner
+          || !activeScanner.connected || connectionEpoch !== activeScanner.connectionEpoch) return
+        if (JSON.stringify(currentRequest) !== JSON.stringify(request)
+          || (confirmedRequest && JSON.stringify(confirmedRequest) !== JSON.stringify(request))) {
+          this.cancelScanStartConfirmation()
+          this.scanStatus = "ready"
+          this.scanMessage = "扫描设置或目标账号已变化，请检查设置后重新开始。"
+          return
+        }
+        if (request.removeMissing && !confirmedRequest) {
+          this.scanDeleteConfirmation = request
+          this.scanStatus = "ready"
+          return
+        }
+        this.cancelScanStartConfirmation()
+        this.scanActiveRequest = request
+        this.scanSession = null
+        const rarities = this.selectedScanRarities()
+        const client = SCAN_CLIENTS[request.client] ?? SCAN_CLIENTS.local
         this.scanStatus = "scanning"
         this.scanErrorContext = ""
         this.scanFailure = null
@@ -1482,18 +1742,18 @@ export const useInventoryStore = defineStore("inventory", {
         this.scanTerminalHandledNonce = -1
         lastFailureTelemetryKey = ""
         activeScanTelemetry = createScanTelemetrySession({
-          client: this.scanClient,
+          client: request.client,
           settings: {
             rarities,
-            maxItems: Number(this.scanMaxItems) || 0,
-            stopAtNonLevel15: this.scanStopAtNonLevel15,
+            maxItems: request.maxItems,
+            stopAtNonLevel15: request.stopAtNonLevel15,
           },
           versions: currentScannerVersions(scanner, this.scanHelperVersion, this.scanHelperProtocolVersion),
         })
-        scanner.startScan({
-          maxItems: Number(this.scanMaxItems) || 0,
+        activeScanner.startScan({
+          maxItems: request.maxItems,
           rarities,
-          stopAtNonLevel15: this.scanStopAtNonLevel15,
+          stopAtNonLevel15: request.stopAtNonLevel15,
           processName: client.processName,
           visualProfileClient: client.visualProfileClient,
           visualProfileQuality: "current",
@@ -1509,6 +1769,9 @@ export const useInventoryStore = defineStore("inventory", {
         })
         void startedScanTelemetryEvent(activeScanTelemetry)
       } catch (error) {
+        if (actionNonce !== this.scanActionNonce || scanner !== activeScanner) return
+        this.scanActiveRequest = null
+        this.scanConnected = activeScanner.connected
         const message = error instanceof Error ? error.message : String(error)
         this.applyScannerFailure({
           ...(error && typeof error === "object" ? error : {}),
@@ -1519,6 +1782,8 @@ export const useInventoryStore = defineStore("inventory", {
           phase: "prepare",
           context: detectGameNotFound(message) ? "game-not-found" : "prepare",
         })
+      } finally {
+        if (actionNonce === this.scanActionNonce) this.scanStartPending = false
       }
     },
     stopScan() {
@@ -1530,20 +1795,25 @@ export const useInventoryStore = defineStore("inventory", {
       this.scanProgressText = this.scanMessage
     },
     async importRetainedScan(partial = false) {
-      const payload = this.scanSession?.payload
+      if (this.scanFinalizing || this.scanStartPending || this.scanActiveRequest) return
+      const session = this.scanSession
+      const payload = session?.payload
       if (!Array.isArray(payload)) {
         this.applyScannerFailure({ code: "scan_result_invalid", phase: "scan" }, { phase: "scan" })
         return
       }
+      this.scanFinalizing = true
       try {
-        const safePartial = partial || Boolean(this.scanSession?.partial)
-        const removeMissing = safePartial ? false : Boolean(this.scanSession?.requestedRemoveMissing)
+        const safePartial = partial || Boolean(session?.partial)
+        const removeMissing = safePartial ? false : Boolean(session?.requestedRemoveMissing)
         const summary = await this.importScannerPayload(
           payload,
           removeMissing,
           safePartial ? "webapp-scan-partial" : "webapp-scan-retry",
           removeMissing ? ["S"] : null,
+          session.ownerId,
         )
+        if (this.scanSession !== session) return
         if (summary?.reviewRequired) {
           this.scanSession = {
             ...this.scanSession,
@@ -1580,6 +1850,7 @@ export const useInventoryStore = defineStore("inventory", {
           ? `已安全导入可识别结果：新增 ${summary?.added ?? 0}，更新 ${summary?.updated ?? 0}，未删除缺失`
           : `扫描结果重新导入完成：新增 ${summary?.added ?? 0}，更新 ${summary?.updated ?? 0}`
       } catch (error) {
+        if (this.scanSession !== session) return
         const message = error instanceof Error ? error.message : String(error)
         this.scanSession = { ...this.scanSession, error: message }
         this.applyScannerFailure({
@@ -1590,6 +1861,8 @@ export const useInventoryStore = defineStore("inventory", {
           phase: "import",
           context: "scan",
         })
+      } finally {
+        this.scanFinalizing = false
       }
     },
     async handleScannerFailureAction(kind: string) {
@@ -1622,40 +1895,24 @@ export const useInventoryStore = defineStore("inventory", {
         await this.importRetainedScan(true)
         return
       }
+      if (kind === "retry" && this.scanStartupRecovery) {
+        await this.retryScannerStartup()
+        return
+      }
       if (kind === "retry_scan" || (kind === "retry" && this.scanFailure?.phase === "scan")) {
         await this.startScan()
         return
       }
 
-      this.scanStatus = "preparing"
-      this.scanErrorContext = ""
-      this.scanProgressPercent = 12
-      this.scanProgressText = kind === "repair" ? "正在重新下载并修复扫描器..." : "正在重新启动扫描器..."
-      const shouldResumeScan = kind === "restart_elevated"
-      try {
-        if (kind === "repair") {
-          await activeScanner.repairScanner()
-        } else if (kind === "restart_elevated") {
-          await activeScanner.restartScannerElevated()
-        } else {
-          await activeScanner.ensureScanner()
-        }
-        this.scanStatus = "ready"
-        this.scanFailure = null
-        this.scanProgressPercent = 100
-        this.scanProgressText = "OCR 扫描器已准备"
-        if (shouldResumeScan) {
-          await this.startScan()
-        }
-      } catch (error) {
-        this.applyScannerFailure(error, { phase: kind === "restart_elevated" ? "scan" : "prepare" })
-      }
+      await this.prepareScannerAction(kind === "restart_elevated" || kind === "repair" ? kind : "retry")
     },
     scannerDiagnosticText() {
       return JSON.stringify({
         failure: this.scanFailure,
         helper: this.scanDiagnostics,
         helperVersion: this.scanHelperVersion,
+        helperProtocolVersion: this.scanHelperProtocolVersion,
+        scannerVersion: this.scanScannerVersion,
         progress: this.scanProgress,
         lastHeartbeatAt: this.scanLastHeartbeatAt,
         lastProgressAt: this.scanLastProgressAt,

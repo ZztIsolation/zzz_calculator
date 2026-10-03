@@ -118,6 +118,9 @@ try {
     const bridge = new ScannerBridge()
     await bridge.connect()
     assert.equal(bridge.mode, "helper")
+    const connectedEpoch = bridge.connectionEpoch
+    assert.equal(typeof connectedEpoch, "number")
+    assert.equal(Object.getOwnPropertyDescriptor(ScannerBridge.prototype, "connectionEpoch").set, undefined)
     assert.deepEqual(fetchUrls, ["http://127.0.0.1:22355/", "http://127.0.0.1:22355/token"])
     assert.equal(HelperSocket.last.url, "ws://127.0.0.1:22355/ws/abc")
     await bridge.ensureScanner()
@@ -184,6 +187,7 @@ try {
     bridge.launchHelper()
     assert.equal(appended.at(-1).src, "zzz-scanner://launch?origin=http%3A%2F%2Flocalhost%3A8787")
     bridge.disconnect()
+    assert.ok(bridge.connectionEpoch > connectedEpoch)
 
     globalThis.fetch = async (url) => {
         fetchUrls.push(String(url))
@@ -249,6 +253,7 @@ try {
     await legacyBridge.connect()
     assert.equal(legacyBridge.mode, "legacy")
     assert.equal(legacyAttempted, true)
+    await assert.rejects(legacyBridge.restartScannerElevated(), { code: "scanner_elevation_unsupported" })
     legacyBridge.disconnect()
 
     assertScannerPackageManifest()

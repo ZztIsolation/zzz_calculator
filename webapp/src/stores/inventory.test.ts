@@ -8,6 +8,7 @@ const scannerMockState = vi.hoisted(() => ({
   updateResults: [] as any[],
   diagnosticsResults: [] as any[],
   confirmResults: [] as any[],
+  elevatedResults: [] as any[],
 }))
 
 vi.mock("@runtime/scanner-bridge.js", () => {
@@ -24,6 +25,7 @@ vi.mock("@runtime/scanner-bridge.js", () => {
     onStopAck: ((payload: any) => void) | null = null
     onDisconnect: ((failure?: any) => void) | null = null
     connected = false
+    connectionEpoch = 0
     scanning = false
     mode = "helper"
     helperVersion = "1.3.1"
@@ -48,6 +50,7 @@ vi.mock("@runtime/scanner-bridge.js", () => {
 
     async connect() {
       this.connectCalls += 1
+      if (!this.connected) this.connectionEpoch += 1
       const result = scannerMockState.connectResults.shift()
       if (result instanceof Error) {
         throw result
@@ -86,6 +89,9 @@ vi.mock("@runtime/scanner-bridge.js", () => {
 
     async restartScannerElevated() {
       this.elevatedCalls += 1
+      const result = scannerMockState.elevatedResults.shift()
+      if (result instanceof Error) throw result
+      return await result
     }
 
     openLogFolder() {
@@ -113,6 +119,7 @@ vi.mock("@runtime/scanner-bridge.js", () => {
 
     disconnect() {
       this.disconnectCalls += 1
+      this.connectionEpoch += 1
       this.connected = false
       this.scanning = false
     }
@@ -132,6 +139,23 @@ vi.mock("@runtime/scanner-bridge.js", () => {
 })
 
 import { useInventoryStore } from "@/stores/inventory"
+
+function nativeLaunchFailure(code: "uac_cancelled" | "child_start_failed", diagnosticId = `native-${code}`) {
+  return Object.assign(new Error(code === "uac_cancelled" ? "你取消了 Windows 管理员权限确认，扫描器没有启动。" : "拒绝访问。"), {
+    code,
+    phase: "launch",
+    title: code === "uac_cancelled" ? "已取消管理员授权" : "无法启动 OCR 扫描器",
+    remedy: "请选择重新下载并修复；如果问题持续，请打开日志。",
+    retryable: true,
+    actions: [
+      { kind: "retry", label: "重试" },
+      { kind: "open_logs", label: "打开日志目录" },
+      { kind: "copy_diagnostics", label: "复制诊断信息" },
+    ],
+    diagnosticId,
+    details: {},
+  })
+}
 
 function scannerDisc(sequence: number, overrides: any = {}) {
   return {
@@ -163,6 +187,7 @@ describe("inventory store", () => {
     scannerMockState.updateResults.length = 0
     scannerMockState.diagnosticsResults.length = 0
     scannerMockState.confirmResults.length = 0
+    scannerMockState.elevatedResults.length = 0
     localStorage.clear()
     localStorage.setItem("zzz-calculator.userStore.v1", JSON.stringify({
       version: 1,
@@ -179,6 +204,471 @@ describe("inventory store", () => {
     store.stopScan()
     store.closeScannerPanel()
     vi.useRealTimers()
+  })
+
+  it.each(["uac_cancelled", "child_start_failed"] as const)(
+    "retries native %s directly with the selected admin launch, preserving the draft", async code => {
+      const store = useInventoryStore()
+      await store.openScannerPanel()
+      const helper = scannerMockState.instances[0]
+      store.updateScanPreferences({ runAsAdmin: true, client: "cloud", maxItems: 47, stopAtNonLevel15: false })
+      store.scanRemoveMissing = true
+      scannerMockState.elevatedResults.push(nativeLaunchFailure(code))
+      await store.startScan()
+      expect(store.scanStartupRecovery).toBe(true)
+      expect(store.scanPhase).toBe("c")
+      expect(store.scanStatus).toBe(code === "uac_cancelled" ? "warning" : "error")
+      const ensureCalls = helper.ensureCalls
+      await store.handleScannerFailureAction("retry")
+      expect(helper.ensureCalls).toBe(ensureCalls)
+      expect(helper.elevatedCalls).toBe(2)
+      expect(helper.startScanPayloads).toHaveLength(0)
+      expect(store.scanStatus).toBe("ready")
+      expect([store.scanClient, store.scanMaxItems, store.scanStopAtNonLevel15, store.scanRunAsAdmin, store.scanRemoveMissing])
+        .toEqual(["cloud", 47, false, true, true])
+      await store.startScan()
+      expect(store.scanDeleteConfirmation).not.toBeNull()
+      expect(helper.startScanPayloads).toHaveLength(0)
+      await store.confirmScanStart()
+      expect(helper.elevatedCalls).toBe(2)
+      expect(helper.startScanPayloads).toHaveLength(1)
+      expect(helper.startScanPayloads[0]).toMatchObject({ visualProfileClient: "cloud", maxItems: 47, stopAtNonLevel15: false })
+    },
+  )
+
+  it.each(["uac_cancelled", "child_start_failed"] as const)(
+    "uses the unchecked preference for %s recovery after a one-off admin request", async code => {
+      const store = useInventoryStore()
+      await store.openScannerPanel()
+      const helper = scannerMockState.instances[0]
+      scannerMockState.elevatedResults.push(nativeLaunchFailure(code))
+      await store.handleScannerFailureAction("restart_elevated")
+      expect(store.scanRunAsAdmin).toBe(false)
+      expect(store.scanRequiresElevation).toBe(true)
+      const ensureCalls = helper.ensureCalls
+      await store.startScan()
+      expect(helper.ensureCalls).toBe(ensureCalls + 1)
+      expect(helper.elevatedCalls).toBe(1)
+      expect(store.scanRequiresElevation).toBe(false)
+      expect(helper.startScanPayloads).toHaveLength(0)
+      await store.startScan()
+      expect(helper.startScanPayloads).toHaveLength(1)
+      expect(helper.elevatedCalls).toBe(1)
+      expect(localStorage.getItem("zzz-calculator.scannerPreferences.v1")).toBeNull()
+    },
+  )
+
+  it("re-evaluates the checkbox after each failure without downgrading an admin retry", async () => {
+    const store = useInventoryStore()
+    await store.openScannerPanel()
+    const helper = scannerMockState.instances[0]
+    store.updateScanPreferences({ runAsAdmin: true })
+    store.scanRemoveMissing = true
+    scannerMockState.elevatedResults.push(nativeLaunchFailure("child_start_failed", "first"))
+    await store.startScan()
+    store.updateScanPreferences({ runAsAdmin: false })
+    scannerMockState.ensureResults.push(nativeLaunchFailure("child_start_failed", "second"))
+    const ensureCalls = helper.ensureCalls
+    await store.startScan()
+    expect(helper.ensureCalls).toBe(ensureCalls + 1)
+    expect(helper.elevatedCalls).toBe(1)
+    expect(store.scanFailure?.diagnosticId).toBe("second")
+    store.updateScanPreferences({ runAsAdmin: true })
+    await store.startScan()
+    expect(helper.ensureCalls).toBe(ensureCalls + 1)
+    expect(helper.elevatedCalls).toBe(2)
+    expect(store.scanRemoveMissing).toBe(true)
+    expect(helper.startScanPayloads).toHaveLength(0)
+  })
+
+  it("keeps the config visible and blocks duplicate starts while recovery is pending", async () => {
+    const store = useInventoryStore()
+    await store.openScannerPanel()
+    const helper = scannerMockState.instances[0]
+    store.updateScanPreferences({ runAsAdmin: true })
+    scannerMockState.elevatedResults.push(nativeLaunchFailure("uac_cancelled"))
+    await store.startScan()
+    let finish!: () => void
+    scannerMockState.elevatedResults.push(new Promise<void>(resolve => { finish = resolve }))
+    const retry = store.startScan()
+    expect(store.scanShowConfig).toBe(true)
+    expect(store.scanFailure).toBeNull()
+    expect(store.scanPreparing).toBe(true)
+    expect(store.scanStartPending).toBe(true)
+    expect(store.scanCanStart).toBe(false)
+    await Promise.all([store.startScan(), store.handleScannerFailureAction("retry")])
+    expect(helper.elevatedCalls).toBe(2)
+    expect(helper.startScanPayloads).toHaveLength(0)
+    finish()
+    await retry
+    expect(store.scanCanStart).toBe(true)
+  })
+
+  it("shows recovery config even when the initial native launch fails before the first ready", async () => {
+    const store = useInventoryStore()
+    scannerMockState.ensureResults.push(nativeLaunchFailure("child_start_failed"))
+    await store.openScannerPanel()
+    expect(store.scanShowConfig).toBe(true)
+    expect(store.scanCanStart).toBe(true)
+    await store.startScan()
+    expect(store.scanStatus).toBe("ready")
+    expect(scannerMockState.instances[0].startScanPayloads).toHaveLength(0)
+  })
+
+  it("retains explicit admin and repair semantics independently of generic startup recovery", async () => {
+    const store = useInventoryStore()
+    await store.openScannerPanel()
+    const helper = scannerMockState.instances[0]
+    scannerMockState.elevatedResults.push(nativeLaunchFailure("uac_cancelled"))
+    await store.handleScannerFailureAction("restart_elevated")
+    expect(store.scanRunAsAdmin).toBe(false)
+    await store.handleScannerFailureAction("restart_elevated")
+    expect(helper.elevatedCalls).toBe(2)
+    expect(store.scanRunAsAdmin).toBe(false)
+    store.updateScanPreferences({ runAsAdmin: true })
+    store.applyScannerFailure(nativeLaunchFailure("child_start_failed"))
+    await store.handleScannerFailureAction("repair")
+    expect(helper.repairCalls).toBe(1)
+    expect(helper.elevatedCalls).toBe(2)
+    expect(store.scanAdminRequestCompleted).toBe(false)
+    expect(store.scanStatus).toBe("ready")
+    expect(helper.startScanPayloads).toHaveLength(0)
+  })
+
+  it("copies the current native failure together with actual reported versions", async () => {
+    const store = useInventoryStore()
+    await store.openScannerPanel()
+    store.scanScannerVersion = "1.0.49"
+    store.applyScannerFailure(nativeLaunchFailure("child_start_failed", "native-copy"))
+    const diagnostic = JSON.parse(store.scannerDiagnosticText())
+    expect(diagnostic).toMatchObject({
+      helperVersion: "1.3.1", helperProtocolVersion: 4, scannerVersion: "1.0.49",
+      failure: {
+        code: "child_start_failed", diagnosticId: "native-copy",
+        details: { nativeFailure: { phase: "launch", message: "拒绝访问。", diagnosticId: "native-copy" } },
+      },
+    })
+  })
+
+  it("uses the unchecked preference after repair instead of reviving a cancelled one-off admin request", async () => {
+    const store = useInventoryStore()
+    await store.openScannerPanel()
+    const helper = scannerMockState.instances[0]
+    scannerMockState.elevatedResults.push(nativeLaunchFailure("uac_cancelled"))
+    await store.handleScannerFailureAction("restart_elevated")
+    await store.handleScannerFailureAction("repair")
+    expect(helper.repairCalls).toBe(1)
+    expect(store.scanRequiresElevation).toBe(false)
+    expect(helper.startScanPayloads).toHaveLength(0)
+    await store.startScan()
+    expect(helper.elevatedCalls).toBe(1)
+    expect(helper.startScanPayloads).toHaveLength(1)
+  })
+
+  it("prepares the requested admin launch before deletion confirmation, then starts only once", async () => {
+    const store = useInventoryStore()
+    await store.openScannerPanel()
+    const helper = scannerMockState.instances[0]
+    store.updateScanPreferences({ runAsAdmin: true, client: "cloud", maxItems: 37, stopAtNonLevel15: false })
+    store.scanRemoveMissing = true
+
+    await store.startScan()
+    expect(helper.elevatedCalls).toBe(1)
+    expect(helper.startScanPayloads).toHaveLength(0)
+    expect(store.scanStatus).toBe("ready")
+    expect(store.scanDeleteConfirmation).toBeNull()
+    expect(store.scanRemoveMissing).toBe(true)
+
+    await store.startScan()
+    expect(helper.elevatedCalls).toBe(1)
+    expect(helper.startScanPayloads).toHaveLength(0)
+    expect(store.scanDeleteConfirmation).toMatchObject({ ownerId: "default", removeMissing: true, client: "cloud", maxItems: 37 })
+    await Promise.all([store.confirmScanStart(), store.confirmScanStart(), store.startScan()])
+    expect(helper.startScanPayloads).toHaveLength(1)
+    expect(helper.startScanPayloads[0]).toMatchObject({ visualProfileClient: "cloud", maxItems: 37, stopAtNonLevel15: false })
+    expect(store.scanActiveRequest).toMatchObject({ ownerId: "default", removeMissing: true })
+    expect(store.scanDeleteConfirmation).toBeNull()
+  })
+
+  it("restores only safe preferences without requesting UAC when the panel opens", async () => {
+    const store = useInventoryStore()
+    store.updateScanPreferences({ runAsAdmin: true, client: "cloud", maxItems: 37, stopAtNonLevel15: false })
+    store.scanRemoveMissing = true
+    setActivePinia(createPinia())
+    const fresh = useInventoryStore()
+    await fresh.openScannerPanel()
+    expect([fresh.scanRunAsAdmin, fresh.scanClient, fresh.scanMaxItems, fresh.scanStopAtNonLevel15, fresh.scanRemoveMissing])
+      .toEqual([true, "cloud", 37, false, false])
+    expect(scannerMockState.instances[0].elevatedCalls).toBe(0)
+    expect(scannerMockState.instances[0].startScanPayloads).toHaveLength(0)
+  })
+
+  it("keeps the complete draft on elevation_required and returns to settings after restart", async () => {
+    const store = useInventoryStore()
+    await store.openScannerPanel()
+    const helper = scannerMockState.instances[0]
+    store.updateScanPreferences({ client: "cloud", maxItems: 37, stopAtNonLevel15: false })
+    store.scanRemoveMissing = true
+    await store.startScan()
+    await store.confirmScanStart()
+    helper.scanning = false
+    await helper.onError({ code: "elevation_required", phase: "scan", retainedItems: [] })
+    expect(store.scanShowConfig).toBe(true)
+    expect(store.scanActiveRequest).toBeNull()
+    expect(store.scanRemoveMissing).toBe(true)
+
+    await store.handleScannerFailureAction("restart_elevated")
+    expect(helper.startScanPayloads).toHaveLength(1)
+    expect(store.scanStatus).toBe("ready")
+    expect([store.scanClient, store.scanMaxItems, store.scanStopAtNonLevel15, store.scanRemoveMissing, store.scanRunAsAdmin])
+      .toEqual(["cloud", 37, false, true, false])
+    await store.startScan()
+    expect(helper.startScanPayloads).toHaveLength(1)
+    expect(store.scanDeleteConfirmation).not.toBeNull()
+    await store.confirmScanStart()
+    expect(helper.elevatedCalls).toBe(1)
+    expect(helper.startScanPayloads).toHaveLength(2)
+  })
+
+  it("retains settings after UAC cancellation and only prepares on explicit retry", async () => {
+    const store = useInventoryStore()
+    await store.openScannerPanel()
+    const helper = scannerMockState.instances[0]
+    store.scanRunAsAdmin = true
+    store.scanRemoveMissing = true
+    scannerMockState.elevatedResults.push(Object.assign(new Error("cancelled"), { code: "uac_cancelled", phase: "prepare" }))
+    await store.startScan()
+    expect(store.scanFailure?.code).toBe("uac_cancelled")
+    expect(store.scanRemoveMissing).toBe(true)
+    expect(store.scanShowConfig).toBe(true)
+    expect(store.scanAdminRequestCompleted).toBe(false)
+    expect(store.scanStartPending).toBe(false)
+    expect(helper.startScanPayloads).toHaveLength(0)
+    await store.handleScannerFailureAction("restart_elevated")
+    expect(helper.elevatedCalls).toBe(2)
+    expect(store.scanStatus).toBe("ready")
+    expect(helper.startScanPayloads).toHaveLength(0)
+  })
+
+  it("does not allow ordinary ready messages or duplicate clicks to finish an admin request", async () => {
+    const store = useInventoryStore()
+    await store.openScannerPanel()
+    const helper = scannerMockState.instances[0]
+    store.scanRunAsAdmin = true
+    let finish!: () => void
+    scannerMockState.elevatedResults.push(new Promise<void>(resolve => { finish = resolve }))
+    const first = store.startScan()
+    await store.startScan()
+    helper.onScannerReady({ version: "1.0.49" })
+    expect(helper.elevatedCalls).toBe(1)
+    expect(store.scanAdminRequestCompleted).toBe(false)
+    expect(store.scanStartPending).toBe(true)
+    expect(helper.startScanPayloads).toHaveLength(0)
+    finish()
+    await first
+    expect(store.scanAdminRequestCompleted).toBe(true)
+    expect(store.scanStatus).toBe("ready")
+  })
+
+  it("ignores a late admin completion after closing and reconnecting the panel", async () => {
+    const store = useInventoryStore()
+    await store.openScannerPanel()
+    const oldHelper = scannerMockState.instances[0]
+    store.scanRunAsAdmin = true
+    let finish!: () => void
+    scannerMockState.elevatedResults.push(new Promise<void>(resolve => { finish = resolve }))
+    const first = store.startScan()
+    store.closeScannerPanel()
+    await store.openScannerPanel()
+    const helper = scannerMockState.instances[1]
+    oldHelper.onScannerReady({ version: "stale" })
+    finish()
+    await first
+    expect(store.scanAdminRequestCompleted).toBe(false)
+    expect(store.scanScannerVersion).not.toBe("stale")
+    await store.startScan()
+    expect(helper.elevatedCalls).toBe(1)
+    expect(helper.startScanPayloads).toHaveLength(0)
+  })
+
+  it.each(["child_exited", "scanner_process_exited", "scanner_transport_failed", "elevation_required"])(
+    "invalidates a completed admin request when %s is reported", async code => {
+      const store = useInventoryStore()
+      await store.openScannerPanel()
+      const helper = scannerMockState.instances[0]
+      store.scanRunAsAdmin = true
+      await store.startScan()
+      await helper.onError({ code, phase: "prepare" })
+      expect(store.scanAdminRequestCompleted).toBe(false)
+      await store.startScan()
+      expect(helper.elevatedCalls).toBe(2)
+      expect(helper.startScanPayloads).toHaveLength(0)
+    },
+  )
+
+  it("invalidates admin preparation after repair or a changed connection epoch", async () => {
+    const store = useInventoryStore()
+    await store.openScannerPanel()
+    const helper = scannerMockState.instances[0]
+    store.scanRunAsAdmin = true
+    await store.startScan()
+    await store.handleScannerFailureAction("repair")
+    expect(store.scanAdminRequestCompleted).toBe(false)
+    await store.startScan()
+    helper.connectionEpoch += 1
+    await store.startScan()
+    expect(helper.elevatedCalls).toBe(3)
+    expect(helper.startScanPayloads).toHaveLength(0)
+  })
+
+  it("uses deletion confirmation for retry actions and rejects confirmation after settings change", async () => {
+    const store = useInventoryStore()
+    await store.openScannerPanel()
+    const helper = scannerMockState.instances[0]
+    store.scanRemoveMissing = true
+    await store.handleScannerFailureAction("retry_scan")
+    expect(store.scanDeleteConfirmation).not.toBeNull()
+    expect(helper.startScanPayloads).toHaveLength(0)
+    store.scanMaxItems = 12
+    await store.confirmScanStart()
+    expect(helper.startScanPayloads).toHaveLength(0)
+    expect(store.scanMessage).toContain("已变化")
+    await store.startScan()
+    await store.confirmScanStart()
+    expect(helper.startScanPayloads).toHaveLength(1)
+  })
+
+  it("invalidates deletion confirmation when the persisted target account changes", async () => {
+    const store = useInventoryStore()
+    await store.openScannerPanel()
+    store.scanRemoveMissing = true
+    await store.startScan()
+    const persisted = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1")!)
+    persisted.owners.push({ id: "other", label: "另一个账号" })
+    persisted.currentOwnerId = "other"
+    localStorage.setItem("zzz-calculator.userStore.v1", JSON.stringify(persisted))
+    await store.confirmScanStart()
+    expect(scannerMockState.instances[0].startScanPayloads).toHaveLength(0)
+    expect(store.scanDeleteConfirmation).toBeNull()
+    expect(store.scanMessage).toContain("已变化")
+  })
+
+  it("imports into the frozen scan account and does not pick up later delete or stop options", async () => {
+    const store = useInventoryStore()
+    await store.openScannerPanel()
+    store.scanStopAtNonLevel15 = false
+    await store.startScan()
+    const helper = scannerMockState.instances[0]
+    const persisted = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1")!)
+    persisted.owners.push({ id: "other", label: "另一个账号" })
+    persisted.currentOwnerId = "other"
+    localStorage.setItem("zzz-calculator.userStore.v1", JSON.stringify(persisted))
+    store.scanRemoveMissing = true
+    store.scanStopAtNonLevel15 = true
+    await helper.onComplete({ items: [scannerDisc(1)], terminationCode: "non_level_15_stop", completed: 1, failed: 0 })
+    const after = JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1")!)
+    expect(after.driveDiscs).toHaveLength(1)
+    expect(after.driveDiscs[0].ownerId).toBe("default")
+    expect(after.currentOwnerId).toBe("other")
+    expect(store.scanSession.ownerId).toBe("default")
+    expect(store.scanSession.requestedRemoveMissing).toBe(false)
+    expect(store.scanStatus).toBe("warning")
+    expect(store.scanRemoveMissing).toBe(false)
+  })
+
+  it("prevents a second scan while automatic import is still finishing", async () => {
+    const store = useInventoryStore()
+    await store.openScannerPanel()
+    await store.startScan()
+    const helper = scannerMockState.instances[0]
+    helper.scanning = false
+    let finish!: (summary: any) => void
+    const spy = vi.spyOn(store, "importScannerPayload").mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const terminal = helper.onComplete({ items: [scannerDisc(1)], completed: 1 })
+    expect(store.scanFinalizing).toBe(true)
+    await store.startScan()
+    expect(helper.startScanPayloads).toHaveLength(1)
+    finish({ added: 1, updated: 0, skipped: 0 })
+    await terminal
+    expect(store.scanFinalizing).toBe(false)
+    spy.mockRestore()
+  })
+
+  it("serializes import retries and does not start another scan during the retry", async () => {
+    const store = useInventoryStore()
+    await store.openScannerPanel()
+    await store.startScan()
+    const helper = scannerMockState.instances[0]
+    helper.scanning = false
+    const spy = vi.spyOn(store, "importScannerPayload").mockRejectedValueOnce(new Error("busy"))
+    await helper.onComplete({ items: [scannerDisc(1)], completed: 1 })
+    expect(store.scanFailure?.code).toBe("import_failed")
+    let finish!: (summary: any) => void
+    spy.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const retry = store.handleScannerFailureAction("retry_import")
+    await store.handleScannerFailureAction("retry_import")
+    await store.startScan()
+    expect(store.scanFinalizing).toBe(true)
+    expect(spy).toHaveBeenCalledTimes(2)
+    expect(helper.startScanPayloads).toHaveLength(1)
+    finish({ added: 1, updated: 0, skipped: 0 })
+    await retry
+    expect(store.scanStatus).toBe("complete")
+    expect(store.scanFinalizing).toBe(false)
+    spy.mockRestore()
+  })
+
+  it("does not resume a pending connection poll after closing the scanner panel", async () => {
+    vi.useFakeTimers()
+    const store = useInventoryStore()
+    scannerMockState.connectResults.push(new Error("helper down"))
+    await store.openScannerPanel()
+    const helper = scannerMockState.instances[0]
+    let finish!: (hello: any) => void
+    scannerMockState.connectResults.push(new Promise(resolve => { finish = resolve }))
+    await vi.advanceTimersByTimeAsync(3000)
+    const callsBefore = helper.connectCalls
+    await vi.advanceTimersByTimeAsync(9000)
+    expect(helper.connectCalls).toBe(callsBefore)
+    store.closeScannerPanel()
+    finish({ version: "1.3.1", protocolVersion: 4 })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(store.scanStatus).toBe("idle")
+    expect(store.scanConnected).toBe(false)
+    expect(store.scanPolling).toBe(false)
+    expect(scannerMockState.instances).toHaveLength(1)
+    expect(helper.ensureCalls).toBe(0)
+  })
+
+  it("shows a preparation timeout even when the bridge retires the timed-out connection", async () => {
+    const store = useInventoryStore()
+    await store.openScannerPanel()
+    const helper = store.ensureScannerBridge() as any
+    vi.spyOn(helper, "ensureScanner").mockImplementationOnce(async () => {
+      helper.disconnect()
+      throw Object.assign(new Error("timeout"), { code: "scanner_prepare_stalled", phase: "prepare" })
+    })
+    await store.connectScanner()
+    expect(store.scanFailure?.code).toBe("scanner_prepare_stalled")
+    expect(store.scanConnected).toBe(false)
+    expect(store.scanShowConfig).toBe(true)
+    expect(store.scanStartPending).toBe(false)
+  })
+
+  it("retains results instead of importing into another account when the original account was deleted", async () => {
+    const store = useInventoryStore()
+    await store.openScannerPanel()
+    await store.startScan()
+    const helper = scannerMockState.instances[0]
+    localStorage.setItem("zzz-calculator.userStore.v1", JSON.stringify({
+      version: 1, currentOwnerId: "other", owners: [{ id: "other", label: "其他" }],
+      imports: [], driveDiscs: [], driveDiscLoadouts: [],
+    }))
+    await helper.onComplete({ items: [scannerDisc(1)], completed: 1 })
+    expect(store.scanFailure?.code).toBe("import_failed")
+    expect(store.scanSession.ownerId).toBe("default")
+    expect(store.scanSession.payload).toHaveLength(1)
+    expect(JSON.parse(localStorage.getItem("zzz-calculator.userStore.v1")!).driveDiscs).toEqual([])
   })
 
   it("saves drive discs and loadouts through the existing local-store schema", async () => {
@@ -971,6 +1461,7 @@ describe("inventory store", () => {
     await store.openScannerPanel()
     store.scanRemoveMissing = true
     await store.startScan()
+    await store.confirmScanStart()
     const helper = scannerMockState.instances[0]
 
     await helper.onComplete?.({
@@ -1009,6 +1500,7 @@ describe("inventory store", () => {
     await store.openScannerPanel()
     store.scanRemoveMissing = true
     await store.startScan()
+    await store.confirmScanStart()
     const helper = scannerMockState.instances[0]
 
     await helper.onComplete?.({
@@ -1096,6 +1588,7 @@ describe("inventory store", () => {
     await store.openScannerPanel()
     store.scanRemoveMissing = true
     await store.startScan()
+    await store.confirmScanStart()
     const helper = scannerMockState.instances[0]
     const retainedItems = Array.from({ length: 549 }, (_, index) => scannerDisc(index + 1, {
       partition: (index % 6) + 1,
@@ -1169,6 +1662,7 @@ describe("inventory store", () => {
     await store.openScannerPanel()
     store.scanRemoveMissing = true
     await store.startScan()
+    await store.confirmScanStart()
     const helper = scannerMockState.instances[0]
 
     await helper.onComplete?.({
@@ -1204,6 +1698,7 @@ describe("inventory store", () => {
     await store.openScannerPanel()
     store.scanRemoveMissing = true
     await store.startScan()
+    await store.confirmScanStart()
     const helper = scannerMockState.instances[0]
 
     await helper.onComplete?.({ items: [scannerDisc(1)], itemCount: 1, completed: 1 })

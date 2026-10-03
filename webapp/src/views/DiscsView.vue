@@ -82,7 +82,6 @@ const confirmRemoveMissingImport = ref(false)
 const pendingDangerImport = ref<"paste" | "">("")
 
 const showScan = ref(false)
-const confirmRemoveMissingScan = ref(false)
 
 onMounted(async () => {
   await Promise.all([catalogStore.load(), inventoryStore.load()])
@@ -112,19 +111,6 @@ watch(showImport, visible => {
 watch([importText, removeMissing], () => {
   inventoryStore.clearImportPreview()
 })
-
-function requestStartScan() {
-  if (inventoryStore.scanRemoveMissing) {
-    confirmRemoveMissingScan.value = true
-    return
-  }
-  inventoryStore.startScan()
-}
-
-function confirmDangerScan() {
-  confirmRemoveMissingScan.value = false
-  inventoryStore.startScan()
-}
 
 async function handleScannerError() {
   const variant = inventoryStore.scanErrorVariant
@@ -163,10 +149,11 @@ function handleScannerErrorSecondary() {
 
 async function handleScannerDiagnosticAction(kind: string) {
   if (kind === "copy_diagnostics") {
+    const recoveryText = inventoryStore.scanStartupRecovery ? inventoryStore.scannerDiagnosticText() : null
     await inventoryStore.handleScannerFailureAction(kind)
     try {
-      await navigator.clipboard.writeText(inventoryStore.scannerDiagnosticText())
-      message.success("诊断信息已复制")
+      await navigator.clipboard.writeText(recoveryText ?? inventoryStore.scannerDiagnosticText())
+      message.success(recoveryText ? "问题信息已复制" : "诊断信息已复制")
     } catch {
       message.error("浏览器无法复制诊断信息，请打开日志目录查看")
     }
@@ -932,7 +919,10 @@ const scanPreviewSections = computed(() => {
     { key: "removed", label: "将删除", count: preview.summary.removed ?? 0, rows: preview.removed ?? [] },
   ].filter(section => section.count > 0)
 })
-const scanControlsDisabled = computed(() => ["scanning", "stopping", "review"].includes(inventoryStore.scanStatus) || inventoryStore.scanPreparing)
+const scanControlsDisabled = computed(() => ["scanning", "stopping", "review"].includes(inventoryStore.scanStatus)
+  || inventoryStore.scanPreparing
+  || inventoryStore.scanStartPending
+  || inventoryStore.scanFinalizing)
 const importControlsLocked = computed(() => Boolean(inventoryStore.importPlan)
   || inventoryStore.importApplying
   || inventoryStore.importResolving)
@@ -952,7 +942,8 @@ const scanProgressPercentage = computed(() => Math.min(100, Math.max(0, Math.rou
 const scanRuntimeStatus = computed(() => {
   if (!["c", "d"].includes(inventoryStore.scanPhase)) return ""
   if (!inventoryStore.scanHelperVersion || !inventoryStore.scanScannerVersion) return ""
-  return `Helper ${inventoryStore.scanHelperVersion} · Scanner ${inventoryStore.scanScannerVersion} · 后台运行`
+  const versions = `Helper ${inventoryStore.scanHelperVersion} · Scanner ${inventoryStore.scanScannerVersion}`
+  return inventoryStore.scanStartupRecovery ? versions : `${versions} · 后台运行`
 })
 
 const scanPhaseTitle = computed(() => ({
@@ -1719,6 +1710,8 @@ function confirmDangerImport() {
           :primary-label="scannerErrorPrimaryLabel"
           :secondary-label="scannerErrorSecondaryLabel"
           :failure="inventoryStore.scanFailure"
+          :presentation="inventoryStore.scanStartupRecovery ? 'startup-recovery' : 'default'"
+          :busy="inventoryStore.scanStartPending"
           @primary="handleScannerError"
           @secondary="handleScannerErrorSecondary"
           @action="handleScannerDiagnosticAction"
@@ -1738,10 +1731,10 @@ function confirmDangerImport() {
           <p class="scan-phase-b-message">{{ inventoryStore.scanProgressText || inventoryStore.scanMessage || "正在准备 OCR 扫描器..." }}</p>
         </div>
 
-        <div v-else-if="inventoryStore.scanPhase === 'c'" class="section-band ui-layout-scope" data-layout-surface="scanner-config">
+        <div v-if="inventoryStore.scanShowConfig" class="section-band ui-layout-scope" data-layout-surface="scanner-config">
           <div class="metric" data-layout-field>
             <span class="metric-title">客户端</span>
-            <div class="metric-value"><NSelect v-model:value="inventoryStore.scanClient" :disabled="scanControlsDisabled" :options="[{ label: '本地绝区零', value: 'local' }, { label: '云绝区零', value: 'cloud' }]" aria-label="扫描客户端" /></div>
+            <div class="metric-value"><NSelect :value="inventoryStore.scanClient" :disabled="scanControlsDisabled" :options="[{ label: '本地绝区零', value: 'local' }, { label: '云绝区零', value: 'cloud' }]" aria-label="扫描客户端" @update:value="value => inventoryStore.updateScanPreferences({ client: value })" /></div>
           </div>
           <div class="metric-grid ui-field-grid">
             <div class="metric" role="group" aria-label="扫描品质" data-layout-field>
@@ -1750,15 +1743,18 @@ function confirmDangerImport() {
             </div>
             <div class="metric" data-layout-field>
               <span class="metric-title">上限</span>
-              <div class="metric-value"><NInputNumber v-model:value="inventoryStore.scanMaxItems" :disabled="scanControlsDisabled" :min="0" :max="9999" aria-label="扫描数量上限" /></div>
+              <div class="metric-value"><NInputNumber :value="inventoryStore.scanMaxItems" :disabled="scanControlsDisabled" :min="0" :max="9999" :precision="0" aria-label="扫描数量上限" @update:value="value => inventoryStore.updateScanPreferences({ maxItems: value ?? 0 })" /></div>
             </div>
           </div>
           <div class="section-band">
-            <NCheckbox v-model:checked="inventoryStore.scanStopAtNonLevel15" :disabled="scanControlsDisabled">遇到非 15 级时停止</NCheckbox>
-            <NCheckbox v-model:checked="inventoryStore.scanRemoveMissing" :disabled="scanControlsDisabled">同步删除缺失</NCheckbox>
+            <NCheckbox :checked="inventoryStore.scanStopAtNonLevel15" :disabled="scanControlsDisabled" @update:checked="value => inventoryStore.updateScanPreferences({ stopAtNonLevel15: value })">遇到非 15 级时停止</NCheckbox>
+            <NCheckbox :checked="inventoryStore.scanRunAsAdmin" :disabled="scanControlsDisabled" @update:checked="value => inventoryStore.updateScanPreferences({ runAsAdmin: value })">以管理员权限启动</NCheckbox>
+            <NCheckbox v-model:checked="inventoryStore.scanRemoveMissing" :disabled="scanControlsDisabled" @update:checked="inventoryStore.cancelScanStartConfirmation">同步删除缺失</NCheckbox>
           </div>
+          <NAlert v-if="inventoryStore.scanPreferencesWarning" type="warning" :show-icon="false" role="status">{{ inventoryStore.scanPreferencesWarning }}</NAlert>
+          <p v-if="inventoryStore.scanMessage && !inventoryStore.scanErrorVariant" class="muted" role="status" aria-live="polite">{{ inventoryStore.scanMessage }}</p>
           <div class="toolbar">
-            <NButton type="primary" size="large" :disabled="!inventoryStore.scanCanStart" @click="requestStartScan">
+            <NButton type="primary" size="large" :loading="inventoryStore.scanStartPending" :disabled="!inventoryStore.scanCanStart || inventoryStore.scanStartPending" @click="inventoryStore.startScan()">
               开始扫描
             </NButton>
           </div>
@@ -1779,7 +1775,7 @@ function confirmDangerImport() {
           </NAlert>
         </div>
 
-        <div v-else-if="inventoryStore.scanPhase === 'd'" class="section-band">
+        <div v-else-if="!inventoryStore.scanErrorVariant && inventoryStore.scanPhase === 'd'" class="section-band">
           <NProgress
             type="line"
             :percentage="scanProgressPercentage"
@@ -1890,12 +1886,13 @@ function confirmDangerImport() {
   />
 
   <ConfirmDialog
-    v-model:show="confirmRemoveMissingScan"
+    :show="Boolean(inventoryStore.scanDeleteConfirmation)"
     danger
     title="扫描后同步删除缺失盘"
     message="扫描完成后会删除当前账号中未出现在扫描结果里的驱动盘，并清理相关套装预设槽位，且无法恢复。"
     confirm-text="继续扫描"
-    @confirm="confirmDangerScan"
+    @update:show="visible => { if (!visible) inventoryStore.cancelScanStartConfirmation() }"
+    @confirm="inventoryStore.confirmScanStart"
   />
 </template>
 
