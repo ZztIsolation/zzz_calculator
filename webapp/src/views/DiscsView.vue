@@ -10,7 +10,7 @@ import DriveDiscSlotCard from "@/components/DriveDiscSlotCard.vue"
 import ImageAvatar from "@/components/ImageAvatar.vue"
 import ScannerErrorState from "@/components/ScannerErrorState.vue"
 import { formatNumber, statLabel, labelOf } from "@/utils/format"
-import { imageForAgent, imageForDriveDiscSet } from "@/utils/assets"
+import { thumbnailForAgent, thumbnailForDriveDiscSet } from "@/utils/assets"
 import { driveDiscAdditionalRollText } from "@/utils/driveDiscSubstats"
 import { driveDiscScannerSequence } from "@/utils/driveDiscProvenance"
 import { useAppConfigStore } from "@/stores/app-config"
@@ -539,7 +539,7 @@ async function confirmReservationTransfer() {
 }
 
 function driveDiscSetIcon(disc: any) {
-  return imageForDriveDiscSet(driveDiscSetForDisc(disc))
+  return thumbnailForDriveDiscSet(driveDiscSetForDisc(disc))
 }
 
 function driveDiscIdentityMeta(disc: any) {
@@ -1197,7 +1197,7 @@ function confirmDangerImport() {
                     <template v-else>
                       <div v-if="disc.reservedForAgentId" class="reservation-agent">
                         <ImageAvatar
-                          :src="imageForAgent(agentForId(disc.reservedForAgentId))"
+                          :src="thumbnailForAgent(agentForId(disc.reservedForAgentId))"
                           :name="agentName(disc.reservedForAgentId)"
                           :size="26"
                         />
@@ -1253,7 +1253,7 @@ function confirmDangerImport() {
                 <div class="loadout-heading-copy">
                   <h3 class="panel-title">{{ loadout.name || loadout.id }}</h3>
                   <div class="reservation-agent loadout-agent">
-                    <ImageAvatar :src="imageForAgent(loadoutAgent(loadout))" :name="agentName(loadout.agentId)" :size="24" />
+                    <ImageAvatar :src="thumbnailForAgent(loadoutAgent(loadout))" :name="agentName(loadout.agentId)" :size="24" />
                     <span>{{ agentName(loadout.agentId) }}</span>
                   </div>
                 </div>

@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { spawn } from "node:child_process"
 import { request as httpRequest } from "node:http"
 import { createServer as createNetServer } from "node:net"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, readFile, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -257,6 +257,17 @@ try {
     const appAsset = await getText(appAssetPath)
     assert.equal(appAsset.status, 200)
     assert.equal(appAsset.headers.get("cache-control"), "public, max-age=31536000, immutable")
+    const thumbnails = JSON.parse(await readFile(path.join(rootDir, "webapp/src/generated/thumbnail-manifest.json"), "utf8"))
+    for (const original of ["/assets/agents/ye_shunguang.webp", "/assets/w-engines/zzz_wiki_1751.png", "/assets/drive-discs/white_water_ballad.webp"]) {
+        assert.match(thumbnails[original], /^\/assets\/thumbs\//)
+        const thumbnail = await fetch(`${baseUrl}${thumbnails[original]}`)
+        assert.equal(thumbnail.status, 200)
+        assert.equal(thumbnail.headers.get("content-type"), "image/webp")
+        assert.ok((await thumbnail.arrayBuffer()).byteLength < 30_000)
+        const source = await fetch(`${baseUrl}${original}`)
+        assert.equal(source.status, 200, "original images must remain accessible")
+        await source.arrayBuffer()
+    }
     const stableAsset = await getText("/zzz-mark.svg")
     assert.equal(stableAsset.status, 200)
     assert.equal(stableAsset.headers.get("cache-control"), "no-cache")

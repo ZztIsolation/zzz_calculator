@@ -62,7 +62,7 @@ await withFetch({
 }, async calls => {
     const { loadCatalog } = await import(loaderUrl("api-first"))
     const catalog = await loadCatalog()
-    assert.deepEqual(calls, [{ path: "/api/catalog", cache: "no-store" }])
+    assert.deepEqual(calls, [{ path: "/api/catalog", cache: "no-cache" }])
     assert.equal(catalog.agents[0].id, "api-agent")
 })
 
@@ -76,7 +76,7 @@ await withFetch({
     const { loadCatalog } = await import(loaderUrl("static-fallback"))
     const catalog = await loadCatalog()
     assert.deepEqual(calls, [
-        { path: "/api/catalog", cache: "no-store" },
+        { path: "/api/catalog", cache: "no-cache" },
         { path: "/static/catalog.json", cache: "no-store" },
     ])
     assert.equal(catalog.agents[0].id, "static-agent")
@@ -198,6 +198,7 @@ await withFetch({
     assert.equal(catalog.agents[0].id, "fresh-agent")
     assert.equal(meta.agents[0].id, "fresh-agent")
     assert.equal(calls.length, 2)
+    assert.ok(calls.every(call => call.cache === "no-cache"), "invalidation must revalidate the HTTP cache")
 })
 
 console.log("catalog loader tests passed")

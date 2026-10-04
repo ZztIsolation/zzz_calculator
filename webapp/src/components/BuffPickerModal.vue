@@ -6,7 +6,7 @@ import LayerSlider from "@/components/LayerSlider.vue"
 import TeammateSelect from "@/components/TeammateSelect.vue"
 import TeammateBuffCard from "@/components/TeammateBuffCard.vue"
 import { recordEnkaTeammateEdit, syncEnkaTeammates, teammateImportStatus, teammateLoadoutOptions, type TeammateSources, type TeammateSyncOperation } from '@/utils/enkaTeammates'
-import { imageForBuff } from "@/utils/assets"
+import { thumbnailForBuff } from "@/utils/assets"
 import {
   inferBuffPickerState,
   isTeammatePotentialBuff,
@@ -629,7 +629,7 @@ function teammateOptionsFor(index: number) {
   const otherId = draftBuffPickerState.value.teammateSlots[1 - index]?.teammateId
   return teammateOwners.value
     .filter(owner => owner.value !== otherId)
-    .map(({ label, value, buff }) => ({ label, value, specialty: buff.teammateSpecialty, avatar: imageForBuff(buff),
+    .map(({ label, value, buff }) => ({ label, value, specialty: buff.teammateSpecialty, avatar: thumbnailForBuff(buff),
       importStatus: teammateImportStatus(props.teammateSources, value) }))
 }
 
@@ -1386,14 +1386,14 @@ async function apply() {
                 :aria-pressed="draft.has(buff.id)"
                 @click="toggle(buff.id, !draft.has(buff.id))"
               >
-                <ImageAvatar :src="imageForBuff(buff)" :name="buffDisplayName(buff)" round />
+                <ImageAvatar :src="thumbnailForBuff(buff)" :name="buffDisplayName(buff)" round />
                 <span class="buff-copy">
                   <strong :title="buffDisplayName(buff)">{{ buffDisplayName(buff) }}</strong>
                   <small :title="buffSubtitle(buff)">{{ buffSubtitle(buff) }}</small>
                 </span>
               </button>
               <span v-else class="buff-row-toggle is-static">
-                <ImageAvatar :src="imageForBuff(buff)" :name="buffDisplayName(buff)" round />
+                <ImageAvatar :src="thumbnailForBuff(buff)" :name="buffDisplayName(buff)" round />
                 <span class="buff-copy">
                   <strong :title="buffDisplayName(buff)">{{ buffDisplayName(buff) }}</strong>
                   <small :title="buffSubtitle(buff)">{{ buffSubtitle(buff) }}</small>

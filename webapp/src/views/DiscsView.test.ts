@@ -266,7 +266,7 @@ describe("DiscsView", () => {
     const identity = wrapper.find(".disc-row-identity")
 
     expect(identity.exists()).toBe(true)
-    expect(identity.find("img").attributes("src")).toBe("/assets/drive-discs/woodpecker_electro.webp")
+    expect(identity.find("img").attributes("src")).toMatch(/^\/assets\/thumbs\/drive-discs\/woodpecker_electro\.[a-f0-9]{16}\.webp$/)
     expect(identity.text()).toContain("啄木鸟电音")
     expect(identity.text()).toContain("#7")
     expect(identity.text()).toContain("扫描器")

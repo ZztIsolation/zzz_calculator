@@ -665,7 +665,7 @@ async function verifyLocalStorageFallback(context, proxy, currentPage, originalF
         failureErrors,
     )
     assert.equal(await failurePage.evaluate(() => localStorage.getItem("zzz-calculator.userStore.v1")), originalFallback)
-    const migratedIcon = failurePage.locator('img[src="/assets/drive-discs/zzz_wiki_2116.png"]').first()
+    const migratedIcon = failurePage.locator('img[src="/assets/drive-discs/zzz_wiki_2116.png"], img[src^="/assets/thumbs/drive-discs/zzz_wiki_2116."][src$=".webp"]').first()
     await migratedIcon.waitFor({ state: "visible" })
     await failurePage.close()
 

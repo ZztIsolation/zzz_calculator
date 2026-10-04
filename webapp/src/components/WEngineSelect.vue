@@ -2,7 +2,7 @@
 import { computed, h, nextTick, ref, useId, watch } from "vue"
 import { NCascader, type CascaderOption } from "naive-ui"
 import ImageAvatar from "@/components/ImageAvatar.vue"
-import { imageForWEngine } from "@/utils/assets"
+import { thumbnailForWEngine } from "@/utils/assets"
 import { entityMetaText, entitySearchText, entitySelectLabel, labelOf, specialtyLabel } from "@/utils/format"
 
 const props = defineProps<{
@@ -53,7 +53,7 @@ const groupedOptions = computed<CascaderOption[]>(() => {
 
 function renderItem(item: any) {
   return h("span", { class: "w-engine-select-option", "data-engine-id": item.id }, [
-    h(ImageAvatar, { src: imageForWEngine(item), name: labelOf(item), size: 28 }),
+    h(ImageAvatar, { src: thumbnailForWEngine(item), name: labelOf(item), size: 28 }),
     h("span", { class: "w-engine-select-copy" }, [
       h("span", { class: "w-engine-select-name", title: labelOf(item) }, labelOf(item)),
       h("span", { class: "w-engine-select-meta", title: entityMetaText(item) }, entityMetaText(item)),
@@ -122,7 +122,7 @@ watch(() => props.agent?.id, () => { show.value = false })
       @update:show="updateShow"
     />
     <div v-if="selectedItem && !show" class="w-engine-select-display" aria-hidden="true">
-      <ImageAvatar :src="imageForWEngine(selectedItem)" :name="labelOf(selectedItem)" :size="28" />
+      <ImageAvatar :src="thumbnailForWEngine(selectedItem)" :name="labelOf(selectedItem)" :size="28" />
       <span class="w-engine-select-copy">
         <span class="w-engine-select-name" :title="labelOf(selectedItem)">{{ labelOf(selectedItem) }}</span>
         <span class="w-engine-select-meta">{{ entityMetaText(selectedItem) }}</span>

@@ -2,7 +2,7 @@
 import { computed, ref } from "vue"
 import { NInput, NScrollbar } from "naive-ui"
 import ImageAvatar from "@/components/ImageAvatar.vue"
-import { iconForEntity } from "@/utils/assets"
+import { thumbnailForEntity } from "@/utils/assets"
 import { entityMetaText, labelOf } from "@/utils/format"
 
 const props = withDefaults(defineProps<{
@@ -64,7 +64,7 @@ function metaOf(item: any) {
           :class="{ active: item.id === modelValue }"
           @click="emit('update:modelValue', item.id)"
         >
-          <ImageAvatar :src="iconForEntity(item, kind)" :name="labelOf(item)" :round="kind === 'agent' || kind === 'buff'" />
+          <ImageAvatar :src="thumbnailForEntity(item, kind)" :name="labelOf(item)" :round="kind === 'agent' || kind === 'buff'" />
           <span>
             <span class="entity-name" :title="labelOf(item)">{{ labelOf(item) }}</span>
             <span class="entity-meta" :title="metaOf(item)">{{ metaOf(item) }}</span>

@@ -1,4 +1,34 @@
+import thumbnailManifest from "@/generated/thumbnail-manifest.json"
+
 export const fallbackIcon = "/assets/drive-discs/empty-5ad1cbe3.svg"
+
+const thumbnailPaths: Record<string, string> = thumbnailManifest
+
+export function thumbnailForImage(src?: string): string {
+  const original = src || fallbackIcon
+  // Custom, remote, Boss, SVG, and unknown paths keep their original source.
+  return thumbnailPaths[original] || original
+}
+
+export function thumbnailForAgent(agent: any): string {
+  return thumbnailForImage(imageForAgent(agent))
+}
+
+export function thumbnailForWEngine(wEngine: any): string {
+  return thumbnailForImage(imageForWEngine(wEngine))
+}
+
+export function thumbnailForBuff(buff: any): string {
+  return thumbnailForImage(imageForBuff(buff))
+}
+
+export function thumbnailForDriveDiscSet(set: any): string {
+  return thumbnailForImage(imageForDriveDiscSet(set))
+}
+
+export function thumbnailForEntity(item: any, kind: "agent" | "wEngine" | "buff" | "driveDiscSet" | "generic"): string {
+  return thumbnailForImage(iconForEntity(item, kind))
+}
 
 export function imageForAgent(agent: any): string {
   return String(agent?.images?.portrait || agent?.images?.icon || fallbackIcon)

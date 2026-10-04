@@ -4,7 +4,7 @@ import { NButton, NTag } from "naive-ui"
 import { Ban, LockKeyhole } from "lucide-vue-next"
 import DriveDiscSourceTags from "@/components/DriveDiscSourceTags.vue"
 import { driveDiscUsageStateForAgent } from "@core/inventory-model.js"
-import { fallbackIcon, imageForDriveDiscSet } from "@/utils/assets"
+import { fallbackIcon, thumbnailForDriveDiscSet } from "@/utils/assets"
 import { driveDiscAdditionalRollText } from "@/utils/driveDiscSubstats"
 import { formatStoredStatValue, labelOf, storedStatLabel } from "@/utils/format"
 
@@ -199,7 +199,7 @@ function toggleExclusion() {
     @keydown.space.prevent="choose"
   >
     <span class="disc-slot-card-icon">
-      <img :src="disc ? imageForDriveDiscSet(driveDiscSet) : fallbackIcon" alt="" loading="lazy">
+      <img :src="disc ? thumbnailForDriveDiscSet(driveDiscSet) : fallbackIcon" alt="" loading="lazy" decoding="async">
     </span>
     <div class="disc-slot-card-copy">
       <strong>{{ title }}</strong>

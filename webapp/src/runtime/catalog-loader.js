@@ -16,7 +16,7 @@ function cloneJson(value) {
 }
 
 async function requestJson(path) {
-    const response = await fetch(path, { cache: "no-store" })
+    const response = await fetch(path, { cache: path === "/api/catalog" ? "no-cache" : "no-store" })
     if (!response.ok) {
         const text = await response.text()
         throw new Error(text || `Request failed: ${response.status}`)

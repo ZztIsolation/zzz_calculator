@@ -31,6 +31,6 @@ function handleError() {
     :class="{ round }"
     :style="{ '--avatar-size': `${size}px` }"
   >
-    <img :src="currentSrc" :alt="name || '图标'" loading="lazy" @error="handleError">
+    <img :src="currentSrc" :alt="name || '图标'" loading="lazy" decoding="async" @error="handleError">
   </span>
 </template>
