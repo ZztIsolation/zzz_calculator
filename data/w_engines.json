@@ -7783,6 +7783,1731 @@
         "effectText": "source-checked-mihoyo-baike-entry-154-version-1737349899-2026-09-30",
         "effectBuff": "source-checked; 0-10 manually configured stacks scale out-of-combat ATK; energy consumption and independent stack expiration are descriptive snapshot conditions"
       }
+    },
+    {
+      "id": "zzz_wiki_2234",
+      "name": {
+        "zhCN": "绯月银棺"
+      },
+      "rarity": "S",
+      "specialty": "stun",
+      "attribute": "wind",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_2234.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/2234/detail"
+      },
+      "level60": {
+        "atkBase": 713,
+        "advancedStat": {
+          "stat": "energyRegen",
+          "value": 60,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "永夜辗眠"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者暴击率提升24%/26%/28%/30%/32%；造成的伤害无视目标15%/17.3%/19.5%/21.8%/24%风属性伤害抗性；装备者发动[强化特殊技]造成风属性伤害时，造成的失衡值提升16%/18.4%/20.8%/23.2%/25.6%，全队其他角色造成的伤害提升20%/23%/26%/29%/32%，持续50秒，重复触发时刷新持续时间，伤害提升效果全队唯一。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_2234_self_crit_rate",
+              "type": "fixed",
+              "stat": "critRate",
+              "mode": "flat",
+              "value": 24,
+              "modificationValues": {
+                "value": [
+                  24,
+                  26,
+                  28,
+                  30,
+                  32
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_2234_self_wind_res_ignore",
+              "type": "fixed",
+              "stat": "windResIgnore",
+              "mode": "flat",
+              "value": 15,
+              "modificationValues": {
+                "value": [
+                  15,
+                  17.3,
+                  19.5,
+                  21.8,
+                  24
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_2234_team_dmg",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 20,
+              "modificationValues": {
+                "value": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "exSpecialWindDamage",
+          "durationSeconds": 50
+        }
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/2234/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_220",
+      "name": {
+        "zhCN": "燃狱齿轮"
+      },
+      "rarity": "S",
+      "specialty": "stun",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_220.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/220/detail"
+      },
+      "level60": {
+        "atkBase": 684,
+        "advancedStat": {
+          "stat": "impact",
+          "value": 18,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "热血施工"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "位于后场时，装备者的能量自动回复提升0.6/0.75/0.9/1.05/1.2点/秒；发动[强化特殊技]时，装备者的冲击力提升10%/12.5%/15%/17.5%/20%，最多叠加2层，持续10秒，每层效果单独结算持续时间。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_220_self_impact",
+              "type": "stacked",
+              "stat": "impactPct",
+              "mode": "flat",
+              "valuePerStack": 10,
+              "maxStacks": 2,
+              "defaultStacks": 2,
+              "modificationValues": {
+                "valuePerStack": [
+                  10,
+                  12.5,
+                  15,
+                  17.5,
+                  20
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "exSpecial",
+          "durationSeconds": 10
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/220/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_219",
+      "name": {
+        "zhCN": "拘缚者"
+      },
+      "rarity": "S",
+      "specialty": "stun",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_219.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/219/detail"
+      },
+      "level60": {
+        "atkBase": 684,
+        "advancedStat": {
+          "stat": "impact",
+          "value": 18,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "束缚枷锁"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "攻击命中敌人时，[普通攻击]造成的伤害和失衡值提升6%/7.5%/9%/10.5%/12%，最多叠加5层，持续8秒，同一招式内最多触发一次，每层效果单独结算持续时间。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_219_basic_dmg",
+              "type": "stacked",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "valuePerStack": 6,
+              "maxStacks": 5,
+              "defaultStacks": 5,
+              "modificationValues": {
+                "valuePerStack": [
+                  6,
+                  7.5,
+                  9,
+                  10.5,
+                  12
+                ]
+              },
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "basic"
+                  }
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "hitEnemy",
+          "durationSeconds": 8
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/219/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1922",
+      "name": {
+        "zhCN": "炎炙沸釜"
+      },
+      "rarity": "A",
+      "specialty": "stun",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1922.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/1922/detail"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "impact",
+          "value": 15,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "红油辣锅"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "发动[支援突击]时，装备者对目标造成的失衡值提升7.2%/8.2%/9.2%/10.2%/11.5%，装备者造成的伤害提升7.2%/8.2%/9.2%/10.2%/11.5%，持续30秒，重复触发时刷新持续时间。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1922_self_dmg",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 7.2,
+              "modificationValues": {
+                "value": [
+                  7.2,
+                  8.2,
+                  9.2,
+                  10.2,
+                  11.5
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "assistAttack",
+          "durationSeconds": 30
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1922/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1345",
+      "name": {
+        "zhCN": "震元奇枢"
+      },
+      "rarity": "A",
+      "specialty": "defense",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1345.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/1345/detail"
+      },
+      "level60": {
+        "atkBase": 624,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 25,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "寻经定络"
+        },
+        "requirement": {
+          "specialty": "defense",
+          "label": {
+            "zhCN": "对于【防护】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "装备者的[强化特殊技]和[终结技]造成的伤害增加25%/28.7%/32.5%/36.2%/40%；队伍中任意角色受到伤害或回复生命时，为装备者回复2/2.3/2.6/2.9/3.2点能量，5秒内最多触发一次。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1345_skill_dmg",
+              "type": "fixed",
+              "stat": "dmgBonus",
+              "mode": "flat",
+              "value": 25,
+              "modificationValues": {
+                "value": [
+                  25,
+                  28.7,
+                  32.5,
+                  36.2,
+                  40
+                ]
+              },
+              "target": {
+                "kind": "skill",
+                "skillTargets": [
+                  {
+                    "kind": "skillType",
+                    "skillType": "special"
+                  },
+                  {
+                    "kind": "skillType",
+                    "skillType": "ultimate"
+                  }
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1345/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1198",
+      "name": {
+        "zhCN": "裁纸刀"
+      },
+      "rarity": "A",
+      "specialty": "stun",
+      "attribute": "physical",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1198.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/1198/detail"
+      },
+      "level60": {
+        "atkBase": 624,
+        "advancedStat": {
+          "stat": "impact",
+          "value": 15,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "小心手指"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "发动[追加攻击]时，装备者造成的物理伤害提升15%/17.3%/19.5%/21.8%/24%，造成的失衡值提升10%/11.5%/13%/14.5%/16%，持续10秒。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1198/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1344",
+      "name": {
+        "zhCN": "光影刻刀"
+      },
+      "rarity": "A",
+      "specialty": "defense",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1344.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/1344/detail"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "impact",
+          "value": 15,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "镌刻倏忽"
+        },
+        "requirement": {
+          "specialty": "defense",
+          "label": {
+            "zhCN": "对于【防护】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "队伍中角色生命值大于等于50%，受到的伤害降低7.5%/8.6%/9.7%/10.8%/12%，受到的[秽息侵染]值降低10%/11.5%/13%/14.5%/16%，该效果全队唯一。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1344/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_761",
+      "name": {
+        "zhCN": "维序者-特化型"
+      },
+      "rarity": "A",
+      "specialty": "defense",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_761.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/761/detail"
+      },
+      "level60": {
+        "atkBase": 624,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 25,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "标准格挡术"
+        },
+        "requirement": {
+          "specialty": "defense",
+          "label": {
+            "zhCN": "对于【防护】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "拥有护盾时，装备者的能量自动回复提升0.4/0.46/0.52/0.58/0.64点/秒；[强化特殊技]和[支援突击]累积的属性异常积蓄值提升36%/40%/45%/50%/55%。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/761/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_143",
+      "name": {
+        "zhCN": "比格气缸"
+      },
+      "rarity": "A",
+      "specialty": "defense",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_143.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/143/detail"
+      },
+      "level60": {
+        "atkBase": 624,
+        "advancedStat": {
+          "stat": "defPct",
+          "value": 40,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "万斤顶"
+        },
+        "requirement": {
+          "specialty": "defense",
+          "label": {
+            "zhCN": "对于【防护】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "受到伤害降低7.5%/8.5%/9.5%/10.5%/12%；受到敌方攻击后，下一次攻击命中敌人时，额外造成装备者600%/690%/780%/870%/960%防御力的伤害，且必定触发暴击，7.5秒内最多触发一次。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/143/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_157",
+      "name": {
+        "zhCN": "人为刀俎"
+      },
+      "rarity": "A",
+      "specialty": "stun",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_157.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/157/detail"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "energyRegen",
+          "value": 50,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "浓厚汤底"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "每拥有10点能量值，装备者的冲击力提升2%/2.3%/2.6%/2.9%/3.2%，最多叠加8层，能量消耗后该增益效果仍然保留，持续8秒，每层效果单独结算持续时间。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_157_self_impact",
+              "type": "stacked",
+              "stat": "impactPct",
+              "mode": "flat",
+              "valuePerStack": 2,
+              "maxStacks": 8,
+              "defaultStacks": 8,
+              "modificationValues": {
+                "valuePerStack": [
+                  2,
+                  2.3,
+                  2.6,
+                  2.9,
+                  3.2
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "energyThreshold",
+          "durationSeconds": 8
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/157/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_146",
+      "name": {
+        "zhCN": "兔能环"
+      },
+      "rarity": "A",
+      "specialty": "defense",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_146.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/146/detail"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "defPct",
+          "value": 40,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "摸摸兔兔"
+        },
+        "requirement": {
+          "specialty": "defense",
+          "label": {
+            "zhCN": "对于【防护】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "生命值上限提升8%/9.2%/10.4%/11.6%/12.8%；拥有护盾时，装备者的攻击力提升10%/11.5%/13%/14.5%/16%。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_146_self_hp",
+              "type": "fixed",
+              "stat": "hpPct",
+              "mode": "pct",
+              "value": 8,
+              "modificationValues": {
+                "value": [
+                  8,
+                  9.2,
+                  10.4,
+                  11.6,
+                  12.8
+                ]
+              }
+            },
+            {
+              "id": "effect_wiki_146_self_atk",
+              "type": "fixed",
+              "stat": "atkPct",
+              "mode": "pct",
+              "value": 10,
+              "modificationValues": {
+                "value": [
+                  10,
+                  11.5,
+                  13,
+                  14.5,
+                  16
+                ]
+              },
+              "condition": "shielded",
+              "basis": "outOfCombatAtk"
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": []
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/146/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_142",
+      "name": {
+        "zhCN": "春日融融"
+      },
+      "rarity": "A",
+      "specialty": "defense",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_142.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/142/detail"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 25,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "热泉汤"
+        },
+        "requirement": {
+          "specialty": "defense",
+          "label": {
+            "zhCN": "对于【防护】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "受到的伤害降低7.5%/8.5%/9.5%/10.5%/12%；受到敌方攻击时，装备者的能量获得效率提升10%/11.5%/13%/14.5%/16%，持续12秒；装备者换回后场时，该增益效果将转递给当前操作中的角色，并刷新持续时间，同名被动效果之间不可叠加。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_142_self_energy",
+              "type": "fixed",
+              "stat": "energyRegen",
+              "mode": "flat",
+              "value": 10,
+              "modificationValues": {
+                "value": [
+                  10,
+                  11.5,
+                  13,
+                  14.5,
+                  16
+                ]
+              },
+              "coverage": {
+                "default": 1,
+                "min": 0,
+                "max": 1,
+                "step": 0.1
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "hitByEnemy",
+          "durationSeconds": 12
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/142/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_141",
+      "name": {
+        "zhCN": "贵重骨核"
+      },
+      "rarity": "A",
+      "specialty": "stun",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_141.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/141/detail"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "impact",
+          "value": 15,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "巨兽猎手"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "敌方生命值大于等于50%时，装备者对目标造成的失衡值提升10%/11.5%/13%/14.5%/16%，敌方生命值大于等于75%时，该增益效果额外提升10%/11.5%/13%/14.5%/16%。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/141/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_139",
+      "name": {
+        "zhCN": "正版变身器"
+      },
+      "rarity": "A",
+      "specialty": "defense",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_139.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/139/detail"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "hpPct",
+          "value": 25,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "骑士飞踢"
+        },
+        "requirement": {
+          "specialty": "defense",
+          "label": {
+            "zhCN": "对于【防护】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "生命值上限提升8%/9%/10%/11%/12.5%；受到敌方攻击时，装备者的冲击力提升10%/11.5%/13%/14.5%/16%，持续12秒。"
+        },
+      "selfBuff": {
+        "scope": "inCombat",
+        "effects": [
+          {
+            "id": "effect_wiki_139_self_hp",
+            "type": "fixed",
+            "stat": "hpPct",
+            "mode": "pct",
+            "value": 8,
+            "modificationValues": {
+              "value": [
+                8,
+                9,
+                10,
+                11,
+                12.5
+              ]
+            }
+          },
+          {
+            "id": "effect_wiki_139_self_impact",
+            "type": "fixed",
+            "stat": "impactPct",
+            "mode": "flat",
+            "value": 10,
+            "modificationValues": {
+              "value": [
+                10,
+                11.5,
+                13,
+                14.5,
+                16
+              ]
+            },
+            "condition": "hitByEnemy",
+            "durationSeconds": 12
+          }
+        ],
+        "appliesToOutOfCombatPanel": false,
+        "buffModifiers": []
+      },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/139/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_155",
+      "name": {
+        "zhCN": "左轮转子"
+      },
+      "rarity": "A",
+      "specialty": "stun",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_155.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/155/detail"
+      },
+      "level60": {
+        "atkBase": 594,
+        "advancedStat": {
+          "stat": "impact",
+          "value": 15,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "开火！"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "每3秒为装备者提供1层充能效果，最多叠加6层；发动[强化特殊技]时，消耗所有充能，每层充能效果使招式造成的失衡值提升4%/4.6%/5.2%/5.8%/6.4%。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/155/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_1341",
+      "name": {
+        "zhCN": "「灰烬」-钴蓝"
+      },
+      "rarity": "B",
+      "specialty": "rupture",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_1341.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/1341/detail"
+      },
+      "level60": {
+        "atkBase": 475,
+        "advancedStat": {
+          "stat": "hpPct",
+          "value": 20,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "黯火"
+        },
+        "requirement": {
+          "specialty": "rupture",
+          "label": {
+            "zhCN": "对于【命破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "成为接战状态下的当前操作角色时，装备者的攻击力提升7.2%/8.2%/9.3%/10.4%/11.5%，持续10秒，20秒内最多触发一次。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_1341_self_atk",
+              "type": "fixed",
+              "stat": "atkPct",
+              "mode": "pct",
+              "value": 7.2,
+              "modificationValues": {
+                "value": [
+                  7.2,
+                  8.2,
+                  9.3,
+                  10.4,
+                  11.5
+                ]
+              },
+              "basis": "outOfCombatAtk"
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "onField",
+          "durationSeconds": 10
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/1341/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_132",
+      "name": {
+        "zhCN": "「电磁暴」-壹式"
+      },
+      "rarity": "B",
+      "specialty": "anomaly",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_132.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/132/detail"
+      },
+      "level60": {
+        "atkBase": 475,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 20,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "紊乱电流"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "累计属性异常积蓄值时，装备者的异常掌控提升25/28/32/36/40点，持续10秒，20秒内最多触发一次。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_132_self_anomaly_mastery",
+              "type": "fixed",
+              "stat": "anomalyMasteryFlat",
+              "mode": "flat",
+              "value": 25,
+              "modificationValues": {
+                "value": [
+                  25,
+                  28,
+                  32,
+                  36,
+                  40
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "anomalyBuildup",
+          "durationSeconds": 10
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/132/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_131",
+      "name": {
+        "zhCN": "「电磁暴」-贰式"
+      },
+      "rarity": "B",
+      "specialty": "anomaly",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_131.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/131/detail"
+      },
+      "level60": {
+        "atkBase": 475,
+        "advancedStat": {
+          "stat": "anomalyProficiency",
+          "value": 60,
+          "mode": "flat",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "高压电涌"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "累计属性异常积蓄值时，装备者的异常精通提升25/28/32/36/40点，持续10秒，20秒内最多触发一次。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_131_self_anomaly_proficiency",
+              "type": "fixed",
+              "stat": "anomalyProficiency",
+              "mode": "flat",
+              "value": 25,
+              "modificationValues": {
+                "value": [
+                  25,
+                  28,
+                  32,
+                  36,
+                  40
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "anomalyBuildup",
+          "durationSeconds": 10
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/131/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_130",
+      "name": {
+        "zhCN": "「电磁暴」-叁式"
+      },
+      "rarity": "B",
+      "specialty": "anomaly",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_130.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/130/detail"
+      },
+      "level60": {
+        "atkBase": 475,
+        "advancedStat": {
+          "stat": "penRatio",
+          "value": 16,
+          "mode": "flat",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "过载电荷"
+        },
+        "requirement": {
+          "specialty": "anomaly",
+          "label": {
+            "zhCN": "对于【异常】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "队伍中任意角色对敌人施加属性异常效果时，装备者回复3.5/4/4.5/5/5.5点能量，12秒内最多触发一次。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/130/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_133",
+      "name": {
+        "zhCN": "「湍流」-斧型"
+      },
+      "rarity": "B",
+      "specialty": "stun",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_133.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/133/detail"
+      },
+      "level60": {
+        "atkBase": 475,
+        "advancedStat": {
+          "stat": "energyRegen",
+          "value": 40,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "疾潮"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "成为接战状态下的当前操作角色时，装备者的冲击力提升9%/10%/11%/12%/13%，持续10秒，20秒内最多触发一次。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_133_self_impact",
+              "type": "fixed",
+              "stat": "impactPct",
+              "mode": "flat",
+              "value": 9,
+              "modificationValues": {
+                "value": [
+                  9,
+                  10,
+                  11,
+                  12,
+                  13
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "onField",
+          "durationSeconds": 10
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/133/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_119",
+      "name": {
+        "zhCN": "「湍流」-矢型"
+      },
+      "rarity": "B",
+      "specialty": "stun",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_119.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/119/detail"
+      },
+      "level60": {
+        "atkBase": 475,
+        "advancedStat": {
+          "stat": "impact",
+          "value": 12,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "巨浪"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "攻击命中敌人时，装备者对主要攻击目标造成的失衡值提升8%/9%/10%/11%/12%。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/119/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_116",
+      "name": {
+        "zhCN": "「湍流」-铳型"
+      },
+      "rarity": "B",
+      "specialty": "stun",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_116.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/116/detail"
+      },
+      "level60": {
+        "atkBase": 475,
+        "advancedStat": {
+          "stat": "atkPct",
+          "value": 20,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "暗涌"
+        },
+        "requirement": {
+          "specialty": "stun",
+          "label": {
+            "zhCN": "对于【击破】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "[强化特殊技]造成的失衡值提升10%/11.5%/13%/14.5%/16%。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/116/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_127",
+      "name": {
+        "zhCN": "「恒等式」-变格"
+      },
+      "rarity": "B",
+      "specialty": "defense",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_127.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/127/detail"
+      },
+      "level60": {
+        "atkBase": 475,
+        "advancedStat": {
+          "stat": "defPct",
+          "value": 32,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "致眩"
+        },
+        "requirement": {
+          "specialty": "defense",
+          "label": {
+            "zhCN": "对于【防护】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "受到敌方攻击时，攻击者造成的伤害降低6%/7%/8%/9%/10%，持续12秒。"
+        },
+        "selfBuff": null,
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/127/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
+    },
+    {
+      "id": "zzz_wiki_126",
+      "name": {
+        "zhCN": "「恒等式」-本格"
+      },
+      "rarity": "B",
+      "specialty": "defense",
+      "images": {
+        "icon": "/assets/w-engines/zzz_wiki_126.png",
+        "source": "https://baike.mihoyo.com/zzz/wiki/content/126/detail"
+      },
+      "level60": {
+        "atkBase": 475,
+        "advancedStat": {
+          "stat": "defPct",
+          "value": 32,
+          "mode": "pct",
+          "target": {
+            "kind": "default"
+          }
+        }
+      },
+      "modification": {
+        "minLevel": 1,
+        "maxLevel": 5,
+        "defaultLevel": 1
+      },
+      "effect": {
+        "name": {
+          "zhCN": "沉击"
+        },
+        "requirement": {
+          "specialty": "defense",
+          "label": {
+            "zhCN": "对于【防护】角色，能够触发以下效果",
+            "en": "For matching specialty characters, the following effect can be triggered."
+          }
+        },
+        "description": {
+          "zhCN": "受到敌方攻击时，装备者的防御力提升20%/23%/26%/29%/32%，持续8秒。"
+        },
+        "selfBuff": {
+          "scope": "inCombat",
+          "effects": [
+            {
+              "id": "effect_wiki_126_self_def",
+              "type": "fixed",
+              "stat": "defPct",
+              "mode": "pct",
+              "value": 20,
+              "modificationValues": {
+                "value": [
+                  20,
+                  23,
+                  26,
+                  29,
+                  32
+                ]
+              }
+            }
+          ],
+          "appliesToOutOfCombatPanel": false,
+          "buffModifiers": [],
+          "condition": "hitByEnemy",
+          "durationSeconds": 8
+        },
+        "teamBuff": null
+      },
+      "sources": [
+        "https://baike.mihoyo.com/zzz/wiki/content/126/detail"
+      ],
+      "verification": {
+        "level60Stats": "source-checked",
+        "effect": "source-checked",
+        "effectBuff": "source-checked"
+      }
     }
   ]
 }
