@@ -80,6 +80,98 @@ async function chooseWorkbenchAgent(page: Page, option: string) {
   await page.locator(".n-base-select-option").filter({ hasText: option }).last().click()
 }
 
+async function expectWorkbenchTLayout(page: Page) {
+  const geometry = await page.locator('[data-layout-surface="workbench"]').evaluate(root => {
+    const bounds = (element: Element) => {
+      const rect = element.getBoundingClientRect()
+      return { x: rect.x, y: rect.y, right: rect.right, bottom: rect.bottom, width: rect.width }
+    }
+    const top = root.querySelector(".workbench-left")!
+    return {
+      viewportWidth: innerWidth,
+      workbench: bounds(root),
+      top: bounds(top),
+      center: bounds(root.querySelector(".workbench-center")!),
+      right: bounds(root.querySelector(".workbench-right")!),
+      sections: [...top.querySelectorAll(":scope > .workbench-section")].map(section => ({
+        ...bounds(section),
+        dividerLeft: Number.parseFloat(getComputedStyle(section).borderLeftWidth),
+        dividerTop: Number.parseFloat(getComputedStyle(section).borderTopWidth),
+      })),
+    }
+  })
+  const { viewportWidth, workbench, top, center, right, sections } = geometry
+  const context = JSON.stringify(geometry)
+  const closeTo = (actual: number, expected: number) => expect(Math.abs(actual - expected), context).toBeLessThanOrEqual(2)
+  const topColumns = viewportWidth >= 1200 ? 5 : viewportWidth > 980 ? 3 : viewportWidth > 680 ? 2 : 1
+
+  expect(sections, context).toHaveLength(5)
+  closeTo(top.x, workbench.x)
+  closeTo(top.right, workbench.right)
+  expect(center.y, context).toBeGreaterThanOrEqual(top.bottom)
+  closeTo(center.x, top.x)
+
+  for (const [index, section] of sections.entries()) {
+    const firstInRow = sections[Math.floor(index / topColumns) * topColumns]
+    closeTo(section.y, firstInRow.y)
+    expect(section.x, context).toBeGreaterThanOrEqual(top.x)
+    expect(section.right, context).toBeLessThanOrEqual(top.right)
+    if (index % topColumns > 0) expect(section.x, context).toBeGreaterThanOrEqual(sections[index - 1].right - 2)
+    if (index >= topColumns) expect(section.y, context).toBeGreaterThanOrEqual(sections[index - topColumns].bottom - 2)
+    expect(section.dividerLeft > 0, `Vertical divider for section ${index}; ${context}`).toBe(index % topColumns > 0)
+    expect(section.dividerTop > 0, `Horizontal divider for section ${index}; ${context}`).toBe(index >= topColumns)
+  }
+
+  if (viewportWidth >= 1200) {
+    // The denser agent and calculation groups get more room than the engine group.
+    expect(sections[0].width, context).toBeGreaterThan(sections[1].width)
+    expect(sections[3].width, context).toBeGreaterThan(sections[1].width)
+  }
+
+  if (viewportWidth > 980) {
+    closeTo(center.y, right.y)
+    closeTo(right.right, top.right)
+    expect(right.x, context).toBeGreaterThanOrEqual(center.right)
+    expect(center.width / (center.width + right.width), context).toBeCloseTo(0.6, 2)
+  } else {
+    closeTo(center.right, top.right)
+    closeTo(right.x, top.x)
+    closeTo(right.right, top.right)
+    expect(right.y, context).toBeGreaterThanOrEqual(center.bottom)
+  }
+
+  await expectStableLayout(page, "workbench")
+  const clippedContents = await page.locator(".workbench-left").evaluate(top => {
+    const elements = top.querySelectorAll<HTMLElement>(
+      ".workbench-section-header > *, .enemy-target-config-header > *, .n-tag, .n-select, .n-input-number",
+    )
+    const issues = [...elements].flatMap(element => {
+      const content = element.matches(".n-tag") ? element.querySelector<HTMLElement>(".n-tag__content") : null
+      const section = element.closest(".workbench-section")!.getBoundingClientRect()
+      const rect = element.getBoundingClientRect()
+      const clipped = rect.left < section.left - 2 || rect.right > section.right + 2
+        || rect.top < section.top - 2 || rect.bottom > section.bottom + 2
+        || (content && (content.scrollWidth > content.clientWidth + 2 || content.scrollHeight > content.clientHeight + 2))
+      return clipped ? [element.textContent?.trim() || element.className] : []
+    })
+    for (const input of top.querySelectorAll<HTMLInputElement>(".n-input-number input")) {
+      if (input.value && input.getBoundingClientRect().height > 0 && input.scrollWidth > input.clientWidth + 2) {
+        issues.push(`Numeric value ${input.value} is clipped (${input.scrollWidth}px in ${input.clientWidth}px)`)
+      }
+    }
+    for (const select of top.querySelectorAll<HTMLElement>(".n-select")) {
+      // Rich entity pickers expose the full name through their existing title/tooltip.
+      if (select.closest(".workbench-entity-select, .w-engine-select")) continue
+      const label = select.querySelector<HTMLElement>(".n-base-selection-input__content, .n-base-selection-overlay__wrapper")
+      if (label?.textContent?.trim() && (label.scrollWidth > label.clientWidth + 2 || label.scrollHeight > label.clientHeight + 2)) {
+        issues.push(`Selected value ${label.textContent.trim()} is clipped`)
+      }
+    }
+    return issues
+  })
+  expect(clippedContents, "Top configuration headers, tags, and controls must remain visible within their own groups").toEqual([])
+}
+
 async function expectProminentConfigButton(
   page: Page,
   testId: string,
@@ -197,6 +289,63 @@ test("right workbench column keeps panel, summary, and white box in order", asyn
   }
 
   await expectStableLayout(page, "damage-whitebox")
+})
+
+test("workbench spans its configuration above wider scheme and result columns", async ({ page }) => {
+  await openApp(page)
+  await expectWorkbenchTLayout(page)
+})
+
+test("workbench T layout adapts at each breakpoint with potential, many buffs, and long events", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-1440", "Exercise the six breakpoint neighbors once")
+  test.slow()
+  const addedBuffs = Array.from({ length: 12 }, (_, index) => ({
+    id: `custom.layout-${index}`,
+    name: { zhCN: `布局测试增益 ${index + 1}：持续战斗中的额外攻击力提升` },
+    sourceKind: "custom",
+    sourceCategory: "custom",
+    stats: [{ stat: "atkFlat", value: 1 }],
+  }))
+  await page.addInitScript(buffs => {
+    const config = { combat: { activeBuffIds: buffs.map(buff => buff.id), addedBuffs: buffs } }
+    const selection = {
+      version: 2,
+      currentOwnerId: "default",
+      byOwner: { default: { currentAgentId: "soldier_11", byAgent: { soldier_11: config, hoshimi_miyabi: config } } },
+    }
+    for (const key of ["zzz-calculator.webapp.build.v1", "zzz-calculator.homeSelection.v1"]) {
+      localStorage.setItem(key, JSON.stringify(selection))
+    }
+  }, addedBuffs)
+  await openApp(page)
+  await expect(page.getByLabel("潜能影像", { exact: true })).toBeVisible()
+  await expect(page.locator(".workbench-buff-tags .n-tag").filter({ hasText: "布局测试增益" })).toHaveCount(12)
+
+  await page.setViewportSize({ width: 1200, height: 900 })
+  await page.getByTestId("target-preset-select").click()
+  await page.locator(".n-base-select-option").filter({ hasText: /^自定义$/ }).click()
+  const defenseInput = page.getByTestId("target-defense-input").locator("input")
+  await defenseInput.fill("1234")
+  await defenseInput.press("Tab")
+
+  for (const width of [1200, 1199, 981, 980, 681, 680]) {
+    await test.step(`${width}px`, async () => {
+      await page.setViewportSize({ width, height: 900 })
+      await expect(defenseInput).toHaveValue("1234")
+      await expectWorkbenchTLayout(page)
+    })
+  }
+
+  await page.setViewportSize({ width: 1200, height: 900 })
+  await chooseWorkbenchAgent(page, "星见雅")
+  const eventTags = page.locator(".calculation-event-summary-tags .n-tag")
+  await expect(eventTags).toHaveCount(2)
+  await page.getByTestId("calculation-event-summary-toggle").click()
+  await expect(eventTags).toHaveCount(8)
+  await expect(page.locator(".workbench-buff-tags .n-tag").filter({ hasText: "布局测试增益" })).toHaveCount(12)
+  await expectWorkbenchTLayout(page)
+  await page.setViewportSize({ width: 680, height: 900 })
+  await expectWorkbenchTLayout(page)
 })
 
 test("event management keeps disorder labels and controls visible", async ({ page }) => {

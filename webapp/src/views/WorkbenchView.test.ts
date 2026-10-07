@@ -189,7 +189,7 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).not.toContain("自定义 {{ buildStore.addedBuffs.length }} 条")
   })
 
-  it("merges damage and optimizer into one three-column workbench", () => {
+  it("forms a T-shaped workbench with a full-width configuration row", () => {
     expect(source).not.toContain("<NTabs")
     expect(source).not.toContain("NTabPane")
     expect(source).toContain("workbench-merged-grid")
@@ -334,7 +334,7 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain('aria-label="选择音擎"')
   })
 
-  it("packs the agent selector and level controls into a denser three-column section", () => {
+  it("packs the agent selector and level controls into the responsive top row", () => {
     expect(source).toContain("workbench-agent-header")
     expect(source).toContain(".workbench-left .build-profile-grid,")
     expect(source).toContain("grid-template-columns: repeat(3, minmax(0, 1fr));")
@@ -343,7 +343,7 @@ describe("WorkbenchView optimizer progress", () => {
     expect(source).toContain("min-height: 30px;")
   })
 
-  it("keeps workbench borders scoped to one surface per column", () => {
+  it("keeps workbench borders scoped to each surface and responsive separator", () => {
     expect(source).toContain(".workbench-surface {")
     expect(source).toContain(".workbench-section + .workbench-section")
     expect(source).toContain(".workbench-surface :deep(.metric:not(.layer-metric))")

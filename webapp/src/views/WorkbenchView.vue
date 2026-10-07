@@ -2157,7 +2157,10 @@ function formatPercentValue(value: any) {
 
 <style scoped>
 .workbench-merged-grid {
-  grid-template-columns: minmax(250px, 300px) minmax(480px, 1fr) minmax(340px, 430px);
+  grid-template-columns: minmax(0, 1.5fr) minmax(360px, 1fr);
+  grid-template-areas:
+    "left left"
+    "center right";
   gap: 14px;
 }
 
@@ -2234,9 +2237,54 @@ function formatPercentValue(value: any) {
 }
 
 .workbench-left {
-  grid-template-columns: minmax(0, 1fr);
+  grid-area: left;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.9fr) minmax(0, 1.15fr) minmax(0, 1.4fr) minmax(0, 1.15fr);
+  align-items: stretch;
   width: 100%;
   max-width: 100%;
+}
+
+.workbench-center {
+  grid-area: center;
+}
+
+.workbench-right {
+  grid-area: right;
+  align-self: stretch;
+}
+
+.workbench-left > .workbench-section {
+  container: workbench-config / inline-size;
+  border: 0;
+  border-left: 1px solid var(--app-border);
+}
+
+.workbench-left > .workbench-section:first-child {
+  border-left: 0;
+}
+
+.workbench-left .workbench-section-header,
+.workbench-enemy-section :deep(.enemy-target-config-header) {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.workbench-left .panel-title {
+  flex: 0 0 auto;
+}
+
+.workbench-left :deep(.n-tag) {
+  max-width: 100%;
+  height: auto;
+  min-height: 28px;
+  white-space: normal;
+}
+
+.workbench-left :deep(.n-tag__content) {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .workbench-left > *,
@@ -2340,6 +2388,10 @@ function formatPercentValue(value: any) {
 
 .calculation-summary-grid > .metric {
   margin: 0;
+}
+
+.calculation-summary-grid {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .calculation-event-summary {
@@ -3677,13 +3729,42 @@ function formatPercentValue(value: any) {
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 1280px) {
-  .workbench-merged-grid {
-    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+/* The top modules share the viewport width; their fields follow the module width. */
+@container workbench-config (max-width: 280px) {
+  .workbench-left .build-profile-grid,
+  .workbench-left .build-skill-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container workbench-config (max-width: 260px) {
+  .workbench-enemy-section :deep(.enemy-target-primary-fields),
+  .workbench-enemy-section :deep(.enemy-target-resistance-row) {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .workbench-right {
-    grid-column: 1 / -1;
+  .workbench-enemy-section :deep(.enemy-target-resistance-actions) {
+    justify-content: flex-start;
+  }
+}
+
+@container workbench-config (max-width: 210px) {
+  .workbench-w-engine-section .build-compact-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1199px) {
+  .workbench-left {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .workbench-left > .workbench-section:nth-child(3n + 1) {
+    border-left: 0;
+  }
+
+  .workbench-left > .workbench-section:nth-child(n + 4) {
+    border-top: 1px solid var(--app-border);
   }
 
   .workbench-right-sticky {
@@ -3695,18 +3776,27 @@ function formatPercentValue(value: any) {
 @media (max-width: 980px) {
   .workbench-merged-grid {
     grid-template-columns: 1fr;
-  }
-
-  .workbench-right {
-    order: -1;
+    grid-template-areas:
+      "left"
+      "center"
+      "right";
   }
 
   .workbench-left {
-    order: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .workbench-center {
-    order: 1;
+  .workbench-left > .workbench-section:nth-child(n) {
+    border-top: 0;
+    border-left: 0;
+  }
+
+  .workbench-left > .workbench-section:nth-child(2n) {
+    border-left: 1px solid var(--app-border);
+  }
+
+  .workbench-left > .workbench-section:nth-child(n + 3) {
+    border-top: 1px solid var(--app-border);
   }
 
   .workbench-left :deep(.n-input),
@@ -3738,6 +3828,19 @@ function formatPercentValue(value: any) {
 }
 
 @media (max-width: 680px) {
+  .workbench-left {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workbench-left > .workbench-section:nth-child(n) {
+    border-left: 0;
+    border-top: 1px solid var(--app-border);
+  }
+
+  .workbench-left > .workbench-section:nth-child(1) {
+    border-top: 0;
+  }
+
   .scheme-reservation-conflict-row {
     grid-template-columns: minmax(0, 1fr);
     gap: 6px;
