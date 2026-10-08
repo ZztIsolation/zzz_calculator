@@ -2229,6 +2229,102 @@
             }
           ],
           "hidden": false
+        },
+        {
+          "id": "boss_encounter.kusariku.v3_2.p3",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.2",
+              "phaseNo": 3,
+              "startDate": "2026-10-09",
+              "endDate": "2026-10-23"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "库萨里库受到的属性异常伤害降低40%。\n代理人成功使用[招架支援]应对库萨里库的「裂界闪袭」时，将对其施加1层[识破]，使库萨里库进入失衡状态时，对其施加2层[识破]。每层[识破]会使其受到的锐暴伤害提升20%，[识破]最多叠加4层，持续30秒，重复触发时刷新持续时间。\n在库萨里库开启[侵蚀壁垒]后，使用[招架支援]反制库萨里库的「裂界闪袭」并对其造成部位破坏，可获得1000操作得分；成功通过[招架支援]应对「裂界闪袭」时，可获得700操作得分；[完美反制]库萨里库的[控制技]时，可获得2000操作得分。最多获得5000操作得分。"
+          },
+          "recommendedSpecialties": [
+            "armorer"
+          ],
+          "playerBuffs": [
+            {
+              "id": "kusariku_v3_2_p3_see_through",
+              "name": {
+                "zhCN": "识破"
+              },
+              "description": {
+                "zhCN": "代理人成功使用[招架支援]应对库萨里库的「裂界闪袭」时，将对其施加1层[识破]，使库萨里库进入失衡状态时，对其施加2层[识破]。每层[识破]会使其受到的锐暴伤害提升20%，[识破]最多叠加4层，持续30秒，重复触发时刷新持续时间。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "kusariku_v3_2_p3_see_through_laceration_dmg",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "lacerationDmg",
+                  "mode": "flat",
+                  "valuePerStack": 20,
+                  "maxStacks": 4,
+                  "defaultStacks": 4,
+                  "stackGroup": "kusariku_v3_2_p3_see_through_stacks",
+                  "stackLabel": {
+                    "zhCN": "识破层数"
+                  },
+                  "durationSeconds": 30,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [
+            {
+              "id": "kusariku_v3_2_p3_anomaly_damage_reduction",
+              "name": {
+                "zhCN": "属性异常伤害减免"
+              },
+              "description": {
+                "zhCN": "库萨里库受到的属性异常伤害降低40%。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "kusariku_v3_2_p3_anomaly_damage_reduction_value",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyDamageBonus",
+                  "mode": "flat",
+                  "value": -40,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "3.2 第三期敌人数据与效果（nanoka.cc 690471）"
+              },
+              "url": "https://zzz.nanoka.cc/boss/690471"
+            }
+          ],
+          "hidden": false
         }
       ],
       "hidden": false
@@ -2464,6 +2560,409 @@
                 "zhCN": "3.2 第二期敌人数据与效果（nanoka.cc 690461）"
               },
               "url": "https://zzz.nanoka.cc/boss/690461"
+            }
+          ],
+          "hidden": false
+        }
+      ],
+      "hidden": false
+    },
+    {
+      "id": "boss.integrated_girtablullu.v3_2",
+      "name": {
+        "zhCN": "异构·基塔布鲁"
+      },
+      "aliases": [
+        "异构基塔布鲁",
+        "Integrated: Girtablullu"
+      ],
+      "images": {
+        "icon": "/assets/bosses/integrated-girtablullu.webp",
+        "source": "https://www.buhflipexplode.org/assets/zzz/enemies/girtablullu-r.webp"
+      },
+      "target": {
+        "defense": 952,
+        "weaknessElements": [],
+        "resistanceElements": [],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.integrated_girtablullu.v3_2.p3",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.2",
+              "phaseNo": 3,
+              "startDate": "2026-10-09",
+              "endDate": "2026-10-23"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "每次成功招架基塔布鲁召唤的眷属攻击并触发[活性转化]时，可获得500操作得分；成功触发[连携招架]应对基塔布鲁的攻击时，可获得1000操作得分，最多可触发3次；如果成功在基塔布鲁第一次开启[侵蚀壁垒]后的25秒内击破[侵蚀壁垒]，可获得1500操作得分。最多获得5000操作得分。\n代理人攻击命中首领敌人时，使首领敌人获得1点[紊相值]；同一名代理人每1秒最多施加1点[紊相值]。\n首领敌人持有的[紊相值]达到10点时，会立即移除所有[紊相值]并使首领敌人进入[紊相]状态。[紊相]状态期间，敌人受到的属性异常伤害提升40%，受到的锐化伤害提升75%，持续10秒，重复进入[紊相]状态时刷新持续时间。\n代理人成功对首领敌人施加属性异常状态时，全队代理人会获得[升变]效果：造成的伤害提升15%，异常精通提升20点；[升变]效果持续10秒，重复触发刷新持续时间。"
+          },
+          "recommendedSpecialties": [
+            "anomaly"
+          ],
+          "playerBuffs": [
+            {
+              "id": "integrated_girtablullu_v3_2_dissonant",
+              "name": {
+                "zhCN": "紊相"
+              },
+              "description": {
+                "zhCN": "代理人攻击命中首领敌人时，使首领敌人获得1点[紊相值]；同一名代理人每1秒最多施加1点[紊相值]。\n首领敌人持有的[紊相值]达到10点时，会立即移除所有[紊相值]并使首领敌人进入[紊相]状态。[紊相]状态期间，敌人受到的属性异常伤害提升40%，受到的锐化伤害提升75%，持续10秒，重复进入[紊相]状态时刷新持续时间。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "integrated_girtablullu_v3_2_dissonant_anomaly_damage",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyDamageBonus",
+                  "mode": "flat",
+                  "value": 40,
+                  "condition": "[紊相]状态期间",
+                  "durationSeconds": 10,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                },
+                {
+                  "id": "integrated_girtablullu_v3_2_dissonant_sharp_damage",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "sharpDmgBonus",
+                  "mode": "flat",
+                  "value": 75,
+                  "condition": "[紊相]状态期间",
+                  "durationSeconds": 10,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            },
+            {
+              "id": "integrated_girtablullu_v3_2_transmutation",
+              "name": {
+                "zhCN": "升变"
+              },
+              "description": {
+                "zhCN": "代理人成功对首领敌人施加属性异常状态时，全队代理人会获得[升变]效果：造成的伤害提升15%，异常精通提升20点；[升变]效果持续10秒，重复触发刷新持续时间。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "integrated_girtablullu_v3_2_transmutation_damage",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "dmgBonus",
+                  "mode": "flat",
+                  "value": 15,
+                  "condition": "对异构·基塔布鲁施加属性异常状态时",
+                  "durationSeconds": 10,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                },
+                {
+                  "id": "integrated_girtablullu_v3_2_transmutation_proficiency",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyProficiency",
+                  "mode": "flat",
+                  "value": 20,
+                  "condition": "对异构·基塔布鲁施加属性异常状态时",
+                  "durationSeconds": 10,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "3.2 第三期敌人数据与效果（nanoka.cc 690471）"
+              },
+              "url": "https://zzz.nanoka.cc/boss/690471"
+            }
+          ],
+          "hidden": false
+        }
+      ],
+      "hidden": false
+    },
+    {
+      "id": "boss.scorched_horizon_phaethon.v3_2",
+      "name": {
+        "zhCN": "焚昼余火·法厄同"
+      },
+      "aliases": [
+        "焚昼余火·法厄同"
+      ],
+      "images": {
+        "icon": "/assets/bosses/scorched-horizon-phaethon.webp",
+        "source": "https://cdn.wikiwiki.jp/to/w/zenless/%E7%94%BB%E5%83%8F/::ref/%E3%82%A8%E3%83%8D%E3%83%9F%E3%83%BC_%E7%84%A6%E5%A4%A9%E6%AE%8B%E7%81%AB%E3%83%BB%E3%83%91%E3%82%A8%E3%83%88%E3%83%BC%E3%83%B3.webp?rev=d9244c370def8ad79665dec839148dc6&t=20260509190011"
+      },
+      "target": {
+        "defense": 952,
+        "weaknessElements": [
+          "ice",
+          "wind"
+        ],
+        "resistanceElements": [
+          "physical"
+        ],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.scorched_horizon_phaethon.v3_2.p3",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.2",
+              "phaseNo": 3,
+              "startDate": "2026-10-09",
+              "endDate": "2026-10-23"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "焚昼余火开启[焚风]状态后，获得5层[赴火]，每层[赴火]使自身造成的伤害提升10%，且受到的暴击伤害降低25%。焚昼余火拥有[赴火]时，每次进入异常状态将失去一层[赴火]，并使后续受到的异放伤害提升10%，最多叠加3层，持续15秒，重复触发时刷新持续时间。\n焚昼余火处于[焚风]状态期间，对焚昼余火造成部位破坏时，可获得1250操作得分；代理人将在空中发动攻击的焚昼余火击落时，可获得1500操作得分；[完美反制]焚昼余火的[控制技]时，可获得2000操作得分。最多获得5000操作得分。"
+          },
+          "recommendedSpecialties": [
+            "anomaly"
+          ],
+          "playerBuffs": [
+            {
+              "id": "scorched_horizon_phaethon_v3_2_anomaly_damage",
+              "name": {
+                "zhCN": "赴火·异放伤害"
+              },
+              "description": {
+                "zhCN": "焚昼余火开启[焚风]状态后，获得5层[赴火]，每层[赴火]使自身造成的伤害提升10%，且受到的暴击伤害降低25%。焚昼余火拥有[赴火]时，每次进入异常状态将失去一层[赴火]，并使后续受到的异放伤害提升10%，最多叠加3层，持续15秒，重复触发时刷新持续时间。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "scorched_horizon_phaethon_v3_2_anomaly_damage_value",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "anomaly",
+                    "settlementType": "release"
+                  },
+                  "stat": "anomalyDamageBonus",
+                  "mode": "flat",
+                  "valuePerStack": 10,
+                  "maxStacks": 3,
+                  "defaultStacks": 3,
+                  "stackGroup": "scorched_horizon_phaethon_v3_2_anomaly_damage_stacks",
+                  "stackLabel": {
+                    "zhCN": "异放伤害提升层数"
+                  },
+                  "durationSeconds": 15,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  },
+                  "condition": "焚昼余火拥有[赴火]时，每次进入异常状态"
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [
+            {
+              "id": "scorched_horizon_phaethon_v3_2_departing_flame",
+              "name": {
+                "zhCN": "赴火"
+              },
+              "description": {
+                "zhCN": "焚昼余火开启[焚风]状态后，获得5层[赴火]，每层[赴火]使自身造成的伤害提升10%，且受到的暴击伤害降低25%。焚昼余火拥有[赴火]时，每次进入异常状态将失去一层[赴火]，并使后续受到的异放伤害提升10%，最多叠加3层，持续15秒，重复触发时刷新持续时间。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "scorched_horizon_phaethon_v3_2_departing_flame_crit_dmg",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "critDmg",
+                  "mode": "flat",
+                  "valuePerStack": -25,
+                  "maxStacks": 5,
+                  "defaultStacks": 0,
+                  "stackGroup": "scorched_horizon_phaethon_v3_2_departing_flame_stacks",
+                  "stackLabel": {
+                    "zhCN": "赴火层数"
+                  },
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  }
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "3.2 第三期敌人数据与效果（nanoka.cc 690471）"
+              },
+              "url": "https://zzz.nanoka.cc/boss/690471"
+            }
+          ],
+          "hidden": false
+        }
+      ],
+      "hidden": false
+    },
+    {
+      "id": "boss.molten_hunt",
+      "name": {
+        "zhCN": "熔狱行赭"
+      },
+      "aliases": [],
+      "images": {
+        "icon": "/assets/bosses/molten-hunt.webp",
+        "source": "https://static.nanoka.cc/assets/zzz/Monster_SymbioticEtherealSinner.webp"
+      },
+      "target": {
+        "defense": 952,
+        "weaknessElements": [
+          "ice",
+          "wind"
+        ],
+        "resistanceElements": [
+          "physical"
+        ],
+        "resistanceOverrides": {}
+      },
+      "encounters": [
+        {
+          "id": "boss_encounter.molten_hunt.v3_2.p3",
+          "appearances": [
+            {
+              "modeId": "critical_assault",
+              "gameVersion": "3.2",
+              "phaseNo": 3,
+              "startDate": "2026-10-09",
+              "endDate": "2026-10-23"
+            }
+          ],
+          "enemyIntel": {
+            "zhCN": "熔狱行赭进入[熔狱]状态后，其受到的属性异常伤害降低30%；每击碎一颗燧石，全队额外恢复20点能量；每触发一次[连携招架]首领会获得1层[过热]；累计触发两次[招架支援]或[极限闪避]首领会获得1层[过热]，每层[过热]会使全队代理人暴击伤害提升25%。最多叠加3层，持续20秒，触发[招架支援]或重复触发[过热]时刷新持续时间。\n成功触发[完美反制]时，可获得2000操作得分；每击碎一颗燧石可获得1000操作分，最多获得5000操作得分。"
+          },
+          "recommendedSpecialties": [],
+          "playerBuffs": [
+            {
+              "id": "molten_hunt_v3_2_overheat",
+              "name": {
+                "zhCN": "过热"
+              },
+              "description": {
+                "zhCN": "熔狱行赭进入[熔狱]状态后，其受到的属性异常伤害降低30%；每击碎一颗燧石，全队额外恢复20点能量；每触发一次[连携招架]首领会获得1层[过热]；累计触发两次[招架支援]或[极限闪避]首领会获得1层[过热]，每层[过热]会使全队代理人暴击伤害提升25%。最多叠加3层，持续20秒，触发[招架支援]或重复触发[过热]时刷新持续时间。"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "molten_hunt_v3_2_overheat_crit_dmg",
+                  "type": "stacked",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "critDmg",
+                  "mode": "flat",
+                  "valuePerStack": 25,
+                  "maxStacks": 3,
+                  "defaultStacks": 3,
+                  "stackGroup": "molten_hunt_v3_2_overheat_stacks",
+                  "stackLabel": {
+                    "zhCN": "过热层数"
+                  },
+                  "durationSeconds": 20,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  },
+                  "condition": "每触发一次[连携招架]；累计触发两次[招架支援]或[极限闪避]"
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "playerDebuffs": [
+            {
+              "id": "molten_hunt_v3_2_anomaly_damage_reduction",
+              "name": {
+                "zhCN": "属性异常伤害减免"
+              },
+              "description": {
+                "zhCN": "熔狱行赭进入[熔狱]状态后，其受到的属性异常伤害降低30%；"
+              },
+              "calculationStatus": "modeled",
+              "effects": [
+                {
+                  "id": "molten_hunt_v3_2_anomaly_damage_reduction_value",
+                  "type": "fixed",
+                  "target": {
+                    "kind": "default"
+                  },
+                  "stat": "anomalyDamageBonus",
+                  "mode": "flat",
+                  "value": -30,
+                  "coverage": {
+                    "default": 1,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.1
+                  },
+                  "condition": "熔狱行赭进入[熔狱]状态后"
+                }
+              ],
+              "buffModifiers": []
+            }
+          ],
+          "sources": [
+            {
+              "label": {
+                "zhCN": "3.2 第三期敌人数据与效果（nanoka.cc 690471）"
+              },
+              "url": "https://zzz.nanoka.cc/boss/690471"
             }
           ],
           "hidden": false

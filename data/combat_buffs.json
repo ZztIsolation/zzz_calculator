@@ -8264,6 +8264,269 @@
         }
       ],
       "buffModifiers": []
+    },
+    {
+      "id": "field.critical_assault.v3_2.p3.linlie",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "critical_assault",
+        "gameVersion": "3.2",
+        "phaseNo": 3,
+        "phaseName": {
+          "zhCN": "第三期"
+        }
+      },
+      "name": {
+        "zhCN": "凛冽"
+      },
+      "source": {
+        "zhCN": "危局强袭战"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.2版本第三期"
+      },
+      "description": {
+        "zhCN": "代理人的冰属性伤害提升15%，异常精通提升60点。\n代理人对敌人触发[异放]或[紊乱]时，全队造成的属性异常伤害和[紊乱]伤害提升25%，同时积蓄效率提升15%，持续15秒，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_critical_assault_v3_2_p3_linlie_ice_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "iceDmg",
+          "mode": "flat",
+          "value": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_2_p3_linlie_anomaly_proficiency",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "anomalyProficiency",
+          "mode": "flat",
+          "value": 60,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_2_p3_linlie_attribute_anomaly_damage",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "anomalyDamageBonus",
+          "mode": "flat",
+          "value": 25,
+          "condition": "代理人对敌人触发[异放]或[紊乱]时",
+          "durationSeconds": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_2_p3_linlie_disorder_damage",
+          "type": "fixed",
+          "target": {
+            "kind": "anomaly",
+            "settlementType": "disorder"
+          },
+          "stat": "disorderDamageBonus",
+          "mode": "flat",
+          "value": 25,
+          "condition": "代理人对敌人触发[异放]或[紊乱]时",
+          "durationSeconds": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.critical_assault.v3_2.p3.poyu",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "critical_assault",
+        "gameVersion": "3.2",
+        "phaseNo": 3,
+        "phaseName": {
+          "zhCN": "第三期"
+        }
+      },
+      "name": {
+        "zhCN": "破御"
+      },
+      "source": {
+        "zhCN": "危局强袭战"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.2版本第三期"
+      },
+      "description": {
+        "zhCN": "代理人对敌人造成的失衡值提升20%。\n[强攻]特性的代理人攻击力提升20%，发动[终结技]后自身暴击伤害提升50%，持续20秒，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_critical_assault_v3_2_p3_poyu_attack_atk",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "atkPct",
+          "mode": "pct",
+          "basis": "outOfCombatAtk",
+          "value": 20,
+          "requirement": {
+            "specialty": "attack"
+          },
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_2_p3_poyu_attack_crit_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "critDmg",
+          "mode": "flat",
+          "value": 50,
+          "requirement": {
+            "specialty": "attack"
+          },
+          "condition": "强攻特性的代理人发动终结技后",
+          "durationSeconds": 20,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
+    },
+    {
+      "id": "field.critical_assault.v3_2.p3.fengren",
+      "sourceType": "field",
+      "scope": "inCombat",
+      "period": {
+        "modeId": "critical_assault",
+        "gameVersion": "3.2",
+        "phaseNo": 3,
+        "phaseName": {
+          "zhCN": "第三期"
+        }
+      },
+      "name": {
+        "zhCN": "锋刃"
+      },
+      "source": {
+        "zhCN": "危局强袭战"
+      },
+      "sourcePeriod": {
+        "zhCN": "3.2版本第三期"
+      },
+      "description": {
+        "zhCN": "代理人的防御力提升15%，锐化伤害提升15%。\n[击破]特性的代理人的[强化特殊技]造成的失衡值提升20%。代理人发动[强化特殊技]、[特殊技]后，电属性伤害和风属性伤害提升30%，持续15秒，重复触发时刷新持续时间。"
+      },
+      "effects": [
+        {
+          "id": "field_critical_assault_v3_2_p3_fengren_def",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "defPct",
+          "mode": "pct",
+          "basis": "outOfCombatDef",
+          "value": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_2_p3_fengren_sharp_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "sharpDmgBonus",
+          "mode": "flat",
+          "value": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_2_p3_fengren_electric_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "electricDmg",
+          "mode": "flat",
+          "value": 30,
+          "condition": "代理人发动强化特殊技、特殊技后",
+          "durationSeconds": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        },
+        {
+          "id": "field_critical_assault_v3_2_p3_fengren_wind_dmg",
+          "type": "fixed",
+          "target": {
+            "kind": "default"
+          },
+          "stat": "windDmg",
+          "mode": "flat",
+          "value": 30,
+          "condition": "代理人发动强化特殊技、特殊技后",
+          "durationSeconds": 15,
+          "coverage": {
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 0.1
+          }
+        }
+      ],
+      "buffModifiers": []
     }
   ],
   "bossBuffs": [],
