@@ -13,9 +13,9 @@ const meta = buildMeta(catalog)
 const source = JSON.parse(await readFile(path.join(rootDir, "data", "bosses.json"), "utf8"))
 
 assert.equal(source.version, 2)
-assert.equal(source.bosses.length, 15)
-assert.equal(meta.bosses.length, 15)
-assert.equal(meta.bossCombatBuffs.length, 22)
+assert.equal(source.bosses.length, 18)
+assert.equal(meta.bosses.length, 18)
+assert.equal(meta.bossCombatBuffs.length, 26)
 
 for (const boss of source.bosses) {
     assert.ok(boss.images.icon.startsWith("/assets/bosses/"))
@@ -48,8 +48,8 @@ const bossEntries = source.bosses.flatMap(boss =>
         ...(encounter.playerDebuffs ?? []),
     ]))
 const bossEffects = bossEntries.flatMap(entry => entry.effects ?? [])
-assert.equal(bossEntries.length, 41)
-assert.equal(bossEffects.length, 43)
+assert.equal(bossEntries.length, 49)
+assert.equal(bossEffects.length, 53)
 for (const effect of bossEffects) {
     assert.deepEqual(
         effect.coverage,
@@ -313,6 +313,53 @@ assert.deepEqual(phase32PhaseTwoBossIds, [
     "boss.integrated_scorched_horizon_phaethon",
 ])
 
+const phase32PhaseThreeBossIds = source.bosses
+    .filter(boss => boss.encounters.some(encounter => encounter.appearances.some(appearance =>
+        appearance.gameVersion === "3.2" && appearance.phaseNo === 3)))
+    .map(boss => boss.id)
+    .sort()
+assert.deepEqual(phase32PhaseThreeBossIds, [
+    "boss.integrated_girtablullu.v3_2",
+    "boss.kusariku",
+    "boss.molten_hunt",
+    "boss.scorched_horizon_phaethon.v3_2",
+].sort())
+assert.equal(source.bosses.find(boss => boss.id === "boss.integrated_girtablullu.v3_2")?.target.defense, 952)
+assert.deepEqual(source.bosses.find(boss => boss.id === "boss.scorched_horizon_phaethon.v3_2")?.target.weaknessElements, ["ice", "wind"])
+assert.deepEqual(source.bosses.find(boss => boss.id === "boss.molten_hunt")?.target.resistanceElements, ["physical"])
+
+const integratedGirtablulluPhase32P3 = resultFor("boss_encounter.integrated_girtablullu.v3_2.p3")
+const integratedGirtablulluPhase32P3Modifiers = integratedGirtablulluPhase32P3.inCombat.activeEffects
+    .flatMap(effect => effect.resolvedDamageModifiers ?? [])
+assert.equal(integratedGirtablulluPhase32P3Modifiers.find(effect => effect.stat === "anomalyDamageBonus")?.value, 0.4)
+assert.equal(integratedGirtablulluPhase32P3Modifiers.find(effect => effect.stat === "sharpDmgBonus")?.value, 0.75)
+assert.equal(integratedGirtablulluPhase32P3.inCombat.buffTotals.dmgBonus, 0.15)
+assert.equal(integratedGirtablulluPhase32P3.inCombat.buffTotals.anomalyProficiencyFlat, 20)
+
+const scorchedHorizonPhase32P3 = resultFor("boss_encounter.scorched_horizon_phaethon.v3_2.p3")
+assert.equal(
+    scorchedHorizonPhase32P3.inCombat.activeEffects.flatMap(effect => effect.resolvedDamageModifiers ?? [])
+        .find(effect => effect.stat === "anomalyDamageBonus")?.value,
+    0.3,
+)
+assert.equal(scorchedHorizonPhase32P3.inCombat.buffTotals.critDmg, 0)
+
+const moltenHuntPhase32P3 = resultFor("boss_encounter.molten_hunt.v3_2.p3")
+assert.equal(moltenHuntPhase32P3.inCombat.buffTotals.critDmg, 0.75)
+assert.equal(
+    moltenHuntPhase32P3.inCombat.activeEffects.flatMap(effect => effect.resolvedDamageModifiers ?? [])
+        .find(effect => effect.stat === "anomalyDamageBonus")?.value,
+    -0.3,
+)
+
+const kusarikuPhase32P3 = resultFor("boss_encounter.kusariku.v3_2.p3")
+assert.equal(kusarikuPhase32P3.inCombat.buffTotals.lacerationDmg, 0.8)
+assert.equal(
+    kusarikuPhase32P3.inCombat.activeEffects.flatMap(effect => effect.resolvedDamageModifiers ?? [])
+        .find(effect => effect.stat === "anomalyDamageBonus")?.value,
+    -0.4,
+)
+
 const phaseOneBosses = source.bosses.filter(boss => boss.encounters.some(encounter =>
     encounter.appearances.some(appearance => appearance.gameVersion === "3.1" && appearance.phaseNo === 1)))
 assert.ok(phaseOneBosses.every(boss => boss.target.defense === 953))
@@ -398,4 +445,35 @@ assert.equal(validateMaintenanceItem("boss-buffs", { boss: duplicateAppearance, 
     currentEncounterId: duplicateAppearance.encounters[0].id,
 }).ok, false)
 
+// Source text specifies Release, so ordinary anomaly/Disorder damage must stay unchanged.
+const phase3PhaethonId = "boss_encounter.scorched_horizon_phaethon.v3_2.p3"
+for (const settlementType of ["attribute", "release", "disorder"]) {
+    const input = {
+        agentId: settlementType === "disorder" ? "hoshimi_miyabi" : "velina",
+        coreSkillLevel: "F", driveDiscs: [], wEngineId: catalog.wEngines[0].id,
+        combatBuffs: { activeBuffIds: [] },
+        damage: { mode: "custom", selectedEventId: "phase3-release", events: [{
+            id: "phase3-release", kind: "anomaly", settlementType,
+            anomalyEffect: settlementType === "disorder" ? "burn" : "wind_corrosion",
+            ...(settlementType === "release" ? { releaseSource: "broad_vortex" } : {}), count: 1, stunned: false,
+        }], target: { defense: 952, levelCoefficient: 794 } },
+    }
+    const base = calculateInCombatPanel(catalog, input)
+    input.combatBuffs.activeBuffIds = [phase3PhaethonId]
+    const buffed = calculateInCombatPanel(catalog, input)
+    const expectedRatio = settlementType === "release" ? 1.3 : 1
+    assert.ok(Math.abs(buffed.damage.events[0].multipliers.attributeAnomalyDamage
+        / base.damage.events[0].multipliers.attributeAnomalyDamage - expectedRatio) < 1e-9,
+        `Phaethon must only amplify Release: ${settlementType}`)
+}
+for (const stacks of [0, 1, 4]) {
+    const id = "boss_encounter.kusariku.v3_2.p3"
+    const result = resultFor(id, { [id]: { effects: { kusariku_v3_2_p3_see_through_laceration_dmg: { stacks } } } })
+    assert.equal(result.inCombat.buffTotals.lacerationDmg, stacks * 0.2)
+}
+for (const stacks of [0, 1, 3]) {
+    const id = "boss_encounter.molten_hunt.v3_2.p3"
+    const result = resultFor(id, { [id]: { effects: { molten_hunt_v3_2_overheat_crit_dmg: { stacks } } } })
+    assert.equal(result.inCombat.buffTotals.critDmg, stacks * 0.25)
+}
 console.log("boss catalog tests passed")

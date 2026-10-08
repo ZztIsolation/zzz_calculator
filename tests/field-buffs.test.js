@@ -186,7 +186,7 @@ for (const id of Object.values(FIELD_BUFF_IDS)) {
 }
 
 const allFieldBuffs = catalog.combatBuffs.filter(buff => buff.sourceType === "field")
-assert.equal(allFieldBuffs.length, 39, "Field Buff catalog should keep all maintained entries")
+assert.equal(allFieldBuffs.length, 42, "Field Buff catalog should keep all maintained entries")
 assert.deepEqual(
     allFieldBuffs
         .filter(buff => buff.period?.modeId === "defense_v5" && buff.period?.gameVersion === "3.1" && buff.period?.phaseNo === 3)
@@ -209,6 +209,11 @@ const CRITICAL_ASSAULT_3_2_PHASE_1_IDS = {
     shijin: "field.critical_assault.v3_2.p1.shijin",
     yaoshuang: "field.critical_assault.v3_2.p1.yaoshuang",
     ruilie: "field.critical_assault.v3_2.p1.ruilie",
+}
+const CRITICAL_ASSAULT_3_2_PHASE_3_IDS = {
+    linlie: "field.critical_assault.v3_2.p3.linlie",
+    poyu: "field.critical_assault.v3_2.p3.poyu",
+    fengren: "field.critical_assault.v3_2.p3.fengren",
 }
 const DEFENSE_3_2_PHASE_1_IDS = {
     shiren: "field.defense_v5.v3_2.p1.shiren_cuijian",
@@ -239,6 +244,11 @@ const EXPECTED_3_2_PHASE_2_NAMES = {
     [FIELD_BUFF_IDS.jifeng]: "极锋",
     [FIELD_BUFF_IDS.shijinPhase2]: "蚀烬",
     [FIELD_BUFF_IDS.tanlie]: "坍裂",
+}
+const EXPECTED_3_2_PHASE_3_NAMES = {
+    [CRITICAL_ASSAULT_3_2_PHASE_3_IDS.linlie]: "凛冽",
+    [CRITICAL_ASSAULT_3_2_PHASE_3_IDS.poyu]: "破御",
+    [CRITICAL_ASSAULT_3_2_PHASE_3_IDS.fengren]: "锋刃",
 }
 for (const id of Object.values(CRITICAL_ASSAULT_3_2_PHASE_1_IDS)) {
     const buff = fieldBuff(id)
@@ -307,6 +317,44 @@ assert.equal(
     "代理人的以太伤害和物理属性伤害提升25%，[击破]特性的代理人造成的失衡值提升20%。代理人使敌人进入失衡状态后，敌人的失衡易伤倍率提升40%，且失衡恢复速度降低15%，持续20秒，重复触发时刷新持续时间。",
     "Tanlie should preserve the descriptive-only recovery clause",
 )
+
+for (const id of Object.keys(EXPECTED_3_2_PHASE_3_NAMES)) {
+    const buff = fieldBuff(id)
+    assert.equal(buff.name?.zhCN, EXPECTED_3_2_PHASE_3_NAMES[id])
+    assert.deepEqual(buff.period, {
+        modeId: "critical_assault",
+        gameVersion: "3.2",
+        phaseNo: 3,
+        phaseName: { zhCN: "第三期" },
+    })
+    assert.equal(buff.sourcePeriod?.zhCN, "3.2版本第三期")
+    const validation = validateMaintenanceItem("field-buffs", buff, {
+        items: catalog.combatBuffs,
+        currentId: id,
+        agentSkills: catalog.agentSkills,
+    })
+    assert.equal(validation.ok, true, `${id} should pass field Buff validation: ${JSON.stringify(validation.errors)}`)
+}
+assert.equal(
+    fieldBuff(CRITICAL_ASSAULT_3_2_PHASE_3_IDS.linlie).description.zhCN,
+    "代理人的冰属性伤害提升15%，异常精通提升60点。\n代理人对敌人触发[异放]或[紊乱]时，全队造成的属性异常伤害和[紊乱]伤害提升25%，同时积蓄效率提升15%，持续15秒，重复触发时刷新持续时间。",
+)
+assert.deepEqual(
+    fieldBuff(CRITICAL_ASSAULT_3_2_PHASE_3_IDS.linlie).effects.map(effect => [effect.stat, effect.target?.settlementType ?? "default"]),
+    [["iceDmg", "default"], ["anomalyProficiency", "default"], ["anomalyDamageBonus", "default"], ["disorderDamageBonus", "disorder"]],
+)
+assert.deepEqual(
+    fieldBuff(CRITICAL_ASSAULT_3_2_PHASE_3_IDS.poyu).effects.map(effect => [effect.stat, effect.value]),
+    [["atkPct", 20], ["critDmg", 50]],
+)
+assert.deepEqual(
+    fieldBuff(CRITICAL_ASSAULT_3_2_PHASE_3_IDS.fengren).effects.map(effect => [effect.stat, effect.value]),
+    [["defPct", 15], ["sharpDmgBonus", 15], ["electricDmg", 30], ["windDmg", 30]],
+)
+assert.equal(fieldBuff(CRITICAL_ASSAULT_3_2_PHASE_3_IDS.poyu).description.zhCN,
+    "代理人对敌人造成的失衡值提升20%。\n[强攻]特性的代理人攻击力提升20%，发动[终结技]后自身暴击伤害提升50%，持续20秒，重复触发时刷新持续时间。")
+assert.equal(fieldBuff(CRITICAL_ASSAULT_3_2_PHASE_3_IDS.fengren).description.zhCN,
+    "代理人的防御力提升15%，锐化伤害提升15%。\n[击破]特性的代理人的[强化特殊技]造成的失衡值提升20%。代理人发动[强化特殊技]、[特殊技]后，电属性伤害和风属性伤害提升30%，持续15秒，重复触发时刷新持续时间。")
 
 for (const id of Object.values(DEFENSE_3_2_PHASE_1_IDS)) {
     const buff = fieldBuff(id)
@@ -1387,4 +1435,34 @@ for (const coverage of [0, 0.5, 1]) {
     }
 }
 
+const poyuAttack = calculateAttackBasic(CRITICAL_ASSAULT_3_2_PHASE_3_IDS.poyu)
+approx(poyuAttack.inCombat.panel.atk - poyuAttack.outOfCombat.panel.atk,
+    poyuAttack.outOfCombat.panel.atk * 0.2, "Poyu uses out-of-combat ATK")
+approx(poyuAttack.inCombat.panel.critDmg - poyuAttack.outOfCombat.panel.critDmg, 0.5,
+    "Poyu's Ultimate trigger also buffs subsequent Basic attacks")
+const poyuAnomaly = calculateSkill(CRITICAL_ASSAULT_3_2_PHASE_3_IDS.poyu, miyabiSkillRefs.basic)
+approx(poyuAnomaly.inCombat.panel.atk - poyuAnomaly.outOfCombat.panel.atk, 0, "Poyu excludes non-Attack agents")
+approx(poyuAnomaly.inCombat.panel.critDmg - poyuAnomaly.outOfCombat.panel.critDmg, 0, "Poyu CRIT DMG excludes non-Attack agents")
+for (const coverage of [0, 0.5, 1]) {
+    const linlie = fieldBuff(CRITICAL_ASSAULT_3_2_PHASE_3_IDS.linlie)
+    const runtime = { effects: Object.fromEntries(linlie.effects.filter(e => e.durationSeconds)
+        .map(e => [e.id, { coverage }])) }
+    for (const settlementType of ["attribute", "disorder"]) {
+        const result = calculateAnomaly(linlie.id, { id: "linlie", kind: "anomaly", settlementType,
+            anomalyEffect: "burn", procCount: 1 }, runtime)
+        approx(result.damage.multipliers[settlementType === "attribute" ? "attributeAnomalyDamage" : "disorderDamage"],
+            1 + 0.25 * coverage, "Linlie applies 25% independently to anomaly and Disorder")
+        approx(result.inCombat.panel.anomalyProficiency - result.outOfCombat.panel.anomalyProficiency, 60,
+            "Linlie permanent proficiency is independent of trigger coverage")
+    }
+    for (const element of ["electric", "wind"]) {
+        const fengren = fieldBuff(CRITICAL_ASSAULT_3_2_PHASE_3_IDS.fengren)
+        const result = calculateAttackBasic(fengren.id, { effects: Object.fromEntries(fengren.effects
+            .filter(e => e.durationSeconds).map(e => [e.id, { coverage }])) }, element)
+        approx(result.inCombat.panel[element + "Dmg"] - result.outOfCombat.panel[element + "Dmg"],
+            0.3 * coverage, "Fengren Special triggers buff subsequent attacks and non-Stun agents")
+        approx(result.inCombat.panel.def - result.outOfCombat.panel.def, result.outOfCombat.panel.def * 0.15,
+            "Fengren permanent DEF uses out-of-combat DEF")
+    }
+}
 console.log("field Buff regression tests passed")
